@@ -158,9 +158,12 @@ func TestApp_008_RelatedNavigate_SingleID_CacheMiss_AutoOpensDetail(t *testing.T
 	}
 }
 
-// TestApp_008_RelatedNavigate_SingleRelatedIDs_CacheMiss_AutoOpensDetail verifies
-// the right-column path: RelatedIDs with one element must auto-open detail after load.
-func TestApp_008_RelatedNavigate_SingleRelatedIDs_CacheMiss_AutoOpensDetail(t *testing.T) {
+// TestApp_008_RelatedNavigate_SingleRelatedIDs_CacheMiss_AutoOpensDrillTarget verifies
+// the right-column path: RelatedIDs with one element must auto-open the type's drill
+// target (child view if Children[Key="enter"] is registered, else detail) — NOT leave
+// the operator stranded on a 1-row filtered list. For asg the Enter-child is
+// `asg_activities`, so the test asserts that view loads after auto-navigation.
+func TestApp_008_RelatedNavigate_SingleRelatedIDs_CacheMiss_AutoOpensDrillTarget(t *testing.T) {
 	m := newRelatedDemoModel(t)
 
 	ec2Res := resource.Resource{
@@ -193,8 +196,10 @@ func TestApp_008_RelatedNavigate_SingleRelatedIDs_CacheMiss_AutoOpensDetail(t *t
 	}
 
 	view := stripAnsi(relatedViewContent(m))
-	if !strings.Contains(view, "detail --") || !strings.Contains(view, "asg-single") {
-		t.Fatalf("single related right-column cache-miss path must auto-open ASG detail; got:\n%s", view)
+	// asg has Children[Key="enter"]=asg_activities — auto-open must mirror
+	// manual Enter and land on the child view, not the generic detail.
+	if !strings.Contains(view, "asg_activities") {
+		t.Fatalf("single related right-column cache-miss path must auto-open asg Enter-child (asg_activities); got:\n%s", view)
 	}
 	if strings.Contains(view, "asg(1/") || strings.Contains(view, "asg(1)") {
 		t.Fatalf("single related right-column cache-miss path must not leave user in list view; got:\n%s", view)
@@ -266,8 +271,12 @@ func TestApp_008_RelatedNavigate_SingleID_CacheMiss_LoadsMoreUntilTargetFound(t 
 	}
 
 	view := stripAnsi(relatedViewContent(m))
-	if !strings.Contains(view, "detail --") || !strings.Contains(view, "alarm-page2-target") {
-		t.Fatalf("exact-ID related navigation should auto-open detail once a later page contains the target; got:\n%s", view)
+	// alarm has Children[Key="enter"]=alarm_history — auto-open must open
+	// the Enter-child, not the generic detail. The test still guards the
+	// key property: once the later page yields the target, the user must
+	// not be left on a dead-end 1-row list.
+	if !strings.Contains(view, "alarm_history") {
+		t.Fatalf("exact-ID related navigation should auto-open alarm Enter-child (alarm_history) once a later page contains the target; got:\n%s", view)
 	}
 }
 

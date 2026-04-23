@@ -141,6 +141,75 @@ func NewCloudFrontFixtures() *CloudFrontFixtures {
 				Comment:          aws.String("Legacy API distribution with weak TLS configuration"),
 				LastModifiedTime: aws.Time(time.Date(2025, 6, 10, 10, 0, 0, 0, time.UTC)),
 			},
+			// S3 healthy-bucket distribution (checkS3CF pivot).
+			// checkS3CF checks strings.Contains(*origin.DomainName, bucketName+".s3").
+			{
+				Id:         aws.String("E6F7G8H9I0J1K2"),
+				ARN:        aws.String("arn:aws:cloudfront::123456789012:distribution/E6F7G8H9I0J1K2"),
+				DomainName: aws.String("d666666fghijk3.cloudfront.net"),
+				Status:     aws.String("Deployed"),
+				Enabled:    aws.Bool(true),
+				Aliases: &cftypes.Aliases{
+					Quantity: aws.Int32(1),
+					Items:    []string{"demo.acme-corp.com"},
+				},
+				Origins: &cftypes.Origins{
+					Quantity: aws.Int32(1),
+					Items: []cftypes.Origin{
+						{
+							Id: aws.String("s3-demo-healthy"),
+							// DomainName must contain bucketName+".s3" for checkS3CF to match.
+							DomainName: aws.String(HealthyBucketName + ".s3.us-east-1.amazonaws.com"),
+						},
+					},
+				},
+				DefaultCacheBehavior: &cftypes.DefaultCacheBehavior{
+					TargetOriginId:       aws.String("s3-demo-healthy"),
+					ViewerProtocolPolicy: cftypes.ViewerProtocolPolicyRedirectToHttps,
+				},
+				PriceClass:       cftypes.PriceClassPriceClass100,
+				Comment:          aws.String("Demo distribution backed by a9s-demo-healthy S3 bucket"),
+				LastModifiedTime: aws.Time(time.Date(2026, 1, 15, 9, 0, 0, 0, time.UTC)),
+			},
+			// Distribution fronting the PAB-issue buckets — realistic
+			// scenario: a CDN points at an origin bucket whose access
+			// policy is misconfigured. Operator pivoting from the `!`
+			// row reaches the distribution via this row.
+			{
+				Id:         aws.String("E7G8H9I0J1K2L3"),
+				ARN:        aws.String("arn:aws:cloudfront::123456789012:distribution/E7G8H9I0J1K2L3"),
+				DomainName: aws.String("d777777ghijkl4.cloudfront.net"),
+				Status:     aws.String("Deployed"),
+				Enabled:    aws.Bool(true),
+				Origins: &cftypes.Origins{
+					Quantity: aws.Int32(4),
+					Items: []cftypes.Origin{
+						{
+							Id:         aws.String("s3-nopab"),
+							DomainName: aws.String("a9s-demo-nopab.s3.us-east-1.amazonaws.com"),
+						},
+						{
+							Id:         aws.String("s3-partial"),
+							DomainName: aws.String("a9s-demo-partial-pab.s3.us-east-1.amazonaws.com"),
+						},
+						{
+							Id:         aws.String("s3-multifail"),
+							DomainName: aws.String("a9s-demo-multifail-pab.s3.us-east-1.amazonaws.com"),
+						},
+						{
+							Id:         aws.String("s3-nilcfg"),
+							DomainName: aws.String("a9s-demo-nilcfg.s3.us-east-1.amazonaws.com"),
+						},
+					},
+				},
+				DefaultCacheBehavior: &cftypes.DefaultCacheBehavior{
+					TargetOriginId:       aws.String("s3-partial"),
+					ViewerProtocolPolicy: cftypes.ViewerProtocolPolicyRedirectToHttps,
+				},
+				PriceClass:       cftypes.PriceClassPriceClass100,
+				Comment:          aws.String("CDN fronting misconfigured S3 buckets"),
+				LastModifiedTime: aws.Time(time.Date(2026, 2, 20, 11, 0, 0, 0, time.UTC)),
+			},
 		},
 	}
 }

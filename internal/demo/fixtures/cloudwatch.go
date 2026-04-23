@@ -167,6 +167,28 @@ func NewCloudWatchFixtures() *CloudWatchFixtures {
 					{Name: aws.String("DBInstanceIdentifier"), Value: aws.String("prod-dbi-1")},
 				},
 			},
+			// prod-dbi-aurora-1 alarm — required for the "all pivots
+			// non-zero" graph-root assertion on the Aurora dbi fixture.
+			{
+				AlarmName:             aws.String("rds-prod-dbi-aurora-1-cpu"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:rds-prod-dbi-aurora-1-cpu"),
+				AlarmDescription:      aws.String("Triggers when prod-dbi-aurora-1 CPU exceeds 75%"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 5 datapoints were less than the threshold (75.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)),
+				MetricName:            aws.String("CPUUtilization"),
+				Namespace:             aws.String("AWS/RDS"),
+				Threshold:             aws.Float64(75.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanOrEqualToThreshold,
+				EvaluationPeriods:     aws.Int32(5),
+				Period:                aws.Int32(60),
+				Statistic:             cwtypes.StatisticAverage,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("DBInstanceIdentifier"), Value: aws.String("prod-dbi-aurora-1")},
+				},
+			},
 			// acme-docdb-prod alarm — required for dbc→alarm related-panel pivot.
 			// Dimension DBClusterIdentifier matches fixtures.ProdDbcID.
 			{
@@ -187,6 +209,28 @@ func NewCloudWatchFixtures() *CloudWatchFixtures {
 				AlarmActions:          []string{relatedAlarmSNSARN},
 				Dimensions: []cwtypes.Dimension{
 					{Name: aws.String("DBClusterIdentifier"), Value: aws.String("acme-docdb-prod")},
+				},
+			},
+			// prod-aurora-cluster alarm — required for the dbc→alarm pivot
+			// on the Aurora cluster "all pivots non-zero" graph-root.
+			{
+				AlarmName:             aws.String("aurora-prod-cluster-cpu"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:aurora-prod-cluster-cpu"),
+				AlarmDescription:      aws.String("Triggers when prod-aurora-cluster CPU exceeds 80%"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 5 datapoints were less than the threshold (80.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 18, 6, 0, 0, 0, time.UTC)),
+				MetricName:            aws.String("CPUUtilization"),
+				Namespace:             aws.String("AWS/RDS"),
+				Threshold:             aws.Float64(80.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanOrEqualToThreshold,
+				EvaluationPeriods:     aws.Int32(5),
+				Period:                aws.Int32(60),
+				Statistic:             cwtypes.StatisticAverage,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("DBClusterIdentifier"), Value: aws.String("prod-aurora-cluster")},
 				},
 			},
 			// Issue: OK state but ActionsEnabled=false → Warning (alarm silenced/muted)

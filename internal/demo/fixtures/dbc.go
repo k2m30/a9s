@@ -29,6 +29,11 @@ const (
 	// ProdDbcMasterSecretARN — matches secrets.go entry for acme-docdb-prod.
 	ProdDbcMasterSecretARN = "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/docdb/acme-docdb-prod-XyZaBc"
 
+	// ProdDbcAuroraMasterSecretARN — Secrets Manager ARN for the Aurora
+	// cluster (prod-aurora-cluster) master user. Used so the Aurora dbc
+	// fixture covers the dbc→secrets pivot.
+	ProdDbcAuroraMasterSecretARN = "arn:aws:secretsmanager:us-east-1:123456789012:secret:rds!cluster-prod-aurora-cluster-MNOPQR"
+
 	// MaintDbcOverdueID / MaintDbcOverdueARN — healthy + overdue maintenance.
 	MaintDbcOverdueID  = "healthy-dbc-maint-overdue"
 	MaintDbcOverdueARN = "arn:aws:rds:us-east-1:123456789012:cluster:healthy-dbc-maint-overdue"
@@ -173,8 +178,13 @@ func buildDBCClusters() []docdbtypes.DBCluster {
 	noBkpPlusMaint.BackupRetentionPeriod = aws.Int32(0)
 	noBkpPlusMaint.ClusterCreateTime = aws.Time(mustTime("2025-02-10T08:00:00Z"))
 
-	// prod-aurora-cluster — Aurora PostgreSQL cluster for dbi→dbc related-panel pivot.
-	// prod-dbi-aurora-1 has DBClusterIdentifier="prod-aurora-cluster".
+	// prod-aurora-cluster — Aurora PostgreSQL cluster. Acts as the
+	// "all pivots non-zero" graph-root for dbc (asserted in
+	// tests/integration/scenario_dbc_visual_test.go). Every registered
+	// dbc pivot resolves on this single fixture: sg (VpcSecurityGroups),
+	// alarm (cloudwatch fixture), logs (cwlogs fixture), kms (KmsKeyId),
+	// secrets (MasterUserSecret below), dbi (prod-dbi-aurora-1 is a member),
+	// docdb-snap (cluster snapshot fixture), subnet+vpc (subnet group).
 	aurora := docdbtypes.DBCluster{
 		DBClusterIdentifier:        aws.String("prod-aurora-cluster"),
 		DBClusterArn:               aws.String("arn:aws:rds:us-east-1:123456789012:cluster:prod-aurora-cluster"),
@@ -196,7 +206,10 @@ func buildDBCClusters() []docdbtypes.DBCluster {
 		DBClusterMembers: []docdbtypes.DBClusterMember{
 			{DBInstanceIdentifier: aws.String("prod-dbi-aurora-1"), IsClusterWriter: aws.Bool(true)},
 		},
-		MasterUsername:    aws.String("pgadmin"),
+		MasterUsername: aws.String("pgadmin"),
+		MasterUserSecret: &docdbtypes.ClusterMasterUserSecret{
+			SecretArn: aws.String(ProdDbcAuroraMasterSecretARN),
+		},
 		MultiAZ:           aws.Bool(true),
 		ClusterCreateTime: aws.Time(mustTime("2025-03-01T12:00:00Z")),
 	}
@@ -241,6 +254,28 @@ func buildDBCSnapshots() []docdbtypes.DBClusterSnapshot {
 			StorageEncrypted:            aws.Bool(true),
 			VpcId:                       aws.String(dbcVPCID),
 		},
+		// Automated snapshot for prod-aurora-cluster — required for the
+		// dbc→docdb-snap pivot on the Aurora "all pivots non-zero"
+		// graph-root. Aurora cluster snapshots share the DocDB API surface
+		// (DescribeDBClusterSnapshots) so they land in the same cache.
+		{
+			DBClusterSnapshotIdentifier: aws.String("rds:prod-aurora-cluster-2026-04-15"),
+			DBClusterIdentifier:         aws.String("prod-aurora-cluster"),
+			DBClusterSnapshotArn:        aws.String("arn:aws:rds:us-east-1:123456789012:cluster-snapshot:rds:prod-aurora-cluster-2026-04-15"),
+			Status:                      aws.String("available"),
+			Engine:                      aws.String("aurora-postgresql"),
+			EngineVersion:               aws.String("16.4"),
+			SnapshotType:                aws.String("automated"),
+			SnapshotCreateTime:          aws.Time(mustTime("2026-04-15T04:00:00Z")),
+			ClusterCreateTime:           aws.Time(mustTime("2025-03-01T12:00:00Z")),
+			MasterUsername:              aws.String("pgadmin"),
+			Port:                        aws.Int32(5432),
+			KmsKeyId:                    aws.String(dbcKMSKeyID),
+			PercentProgress:             aws.Int32(100),
+			StorageType:                 aws.String("aurora"),
+			StorageEncrypted:            aws.Bool(true),
+			VpcId:                       aws.String(dbcVPCID),
+		},
 		// Manual pre-upgrade snapshot for warn-dbc-modifying.
 		{
 			DBClusterSnapshotIdentifier: aws.String("pre-upgrade-docdb-snap"),
@@ -280,6 +315,34 @@ func buildDBCSubnetGroups() []docdbtypes.DBSubnetGroup {
 			DBSubnetGroupName:        aws.String("acme-docdb-subnet-group"),
 			DBSubnetGroupDescription: aws.String("Subnet group for acme-docdb-prod cluster"),
 			DBSubnetGroupArn:         aws.String("arn:aws:rds:us-east-1:123456789012:subgrp:acme-docdb-subnet-group"),
+			VpcId:                    aws.String(dbcVPCID),
+			SubnetGroupStatus:        aws.String("Complete"),
+			Subnets: []docdbtypes.Subnet{
+				{
+					SubnetIdentifier: aws.String(dbcSubnetA),
+					SubnetStatus:     aws.String("Active"),
+					SubnetAvailabilityZone: &docdbtypes.AvailabilityZone{
+						Name: aws.String("us-east-1a"),
+					},
+				},
+				{
+					SubnetIdentifier: aws.String(dbcSubnetB),
+					SubnetStatus:     aws.String("Active"),
+					SubnetAvailabilityZone: &docdbtypes.AvailabilityZone{
+						Name: aws.String("us-east-1b"),
+					},
+				},
+			},
+		},
+		// Subnet group for prod-aurora-cluster — required for the dbc→subnet
+		// and dbc→vpc pivots on the Aurora "all pivots non-zero" graph-root.
+		// Aurora uses rdsSubnetGroup ("acme-rds-subnet-group") in the dbc
+		// fixture; the group must exist in the DocDB-API-backed cache since
+		// the checker calls DescribeDBSubnetGroups on c.DocDB.
+		{
+			DBSubnetGroupName:        aws.String(rdsSubnetGroup),
+			DBSubnetGroupDescription: aws.String("Subnet group for prod-aurora-cluster"),
+			DBSubnetGroupArn:         aws.String("arn:aws:rds:us-east-1:123456789012:subgrp:" + rdsSubnetGroup),
 			VpcId:                    aws.String(dbcVPCID),
 			SubnetGroupStatus:        aws.String("Complete"),
 			Subnets: []docdbtypes.Subnet{

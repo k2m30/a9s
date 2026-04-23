@@ -201,6 +201,20 @@ func buildIAMRoles() []iamtypes.Role {
 		MaxSessionDuration:       aws.Int32(3600),
 	})
 
+	// S3 healthy-bucket access role (checkS3Role pivot).
+	// checkS3Role matches roles whose policy_resources field contains the bucket ARN.
+	// policy_resources is populated by the IAM roles fetcher in Phase 7.
+	// Adding this role now so the graph is ready when Phase 7 wires the field.
+	roles = append(roles, iamtypes.Role{
+		RoleName:    aws.String("a9s-demo-s3-access-role"),
+		RoleId:      aws.String("AROAEXAMPLES3ACCESS01"),
+		Arn:         aws.String("arn:aws:iam::123456789012:role/a9s-demo-s3-access-role"),
+		Path:        aws.String("/"),
+		CreateDate:  aws.Time(time.Date(2025, 1, 10, 10, 0, 0, 0, time.UTC)),
+		Description: aws.String("Role granting read access to a9s-demo-healthy S3 bucket (" + HealthyBucketARN + ")"),
+		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"lambda.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
+	})
+
 	// CT-event cross-reference roles for ctdetail nav tests
 	for _, rd := range []struct{ id, desc string }{
 		{"KarpenterNodeRole", "Karpenter node provisioner role (ct-events case A cross-ref)"},
@@ -475,6 +489,10 @@ func buildIAMRelations(f *IAMFixtures) {
 	}
 	f.InlineRolePolicies["acme-eks-node-role"] = []string{"trust-policy"}
 	f.InlineRolePolicies["acme-lambda-execution"] = []string{"logging-policy"}
+	// s3→role pivot: the demo role has an inline policy whose Statement[].
+	// Resource mentions HealthyBucketARN. Enriched via ListRolePolicies +
+	// GetRolePolicy during the IAM roles fetch.
+	f.InlineRolePolicies["a9s-demo-s3-access-role"] = []string{"s3-bucket-access"}
 
 	// Attached user policies
 	f.AttachedUserPolicies["alice.johnson"] = []iamtypes.AttachedPolicy{
@@ -543,6 +561,7 @@ func buildIAMRelations(f *IAMFixtures) {
 	f.InlinePolicyDocuments["acme-eks-node-role/trust-policy"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}`)
 
 	f.InlinePolicyDocuments["acme-lambda-execution/logging-policy"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["logs:CreateLogStream","logs:PutLogEvents"],"Resource":"arn:aws:logs:us-east-1:123456789012:log-group:/aws/lambda/*"}]}`)
+	f.InlinePolicyDocuments["a9s-demo-s3-access-role/s3-bucket-access"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:GetObject","s3:ListBucket"],"Resource":["` + HealthyBucketARN + `","` + HealthyBucketARN + `/*"]}]}`)
 
 	// Issue role: wildcard trust — no external-id condition
 	f.PolicyDocuments["arn:aws:iam::123456789012:policy/orphan-unattached-policy"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:GetObject"],"Resource":"arn:aws:s3:::acme-old-project-*/*"}]}`)

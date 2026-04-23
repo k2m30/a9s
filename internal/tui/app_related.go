@@ -172,6 +172,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 				pendingFilter:        result.TargetID,
 				relatedIDs:           []string{result.TargetID},
 				autoOpenSingleDetail: true,
+				reapplyChecker:       msg.Checker,
 			})
 			return m, tea.Batch(initCmd, m.fetchResources(msg.TargetType))
 		}
@@ -203,6 +204,9 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 					)
 					rl.SetTitleSuffix(relatedTitleSuffix(msg.SourceResource))
 					rl.SetRelatedIDFilter(result.RelatedIDs)
+					if msg.Checker != nil {
+						rl.SetReapplyChecker(msg.Checker, msg.SourceResource)
+					}
 					rl.SetEscPops(true)
 					rl.SetSize(m.innerSize())
 					m.pushView(&rl)
@@ -222,6 +226,9 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 				)
 				rl.SetTitleSuffix(relatedTitleSuffix(msg.SourceResource))
 				rl.SetRelatedIDFilter(result.RelatedIDs)
+				if msg.Checker != nil {
+					rl.SetReapplyChecker(msg.Checker, msg.SourceResource)
+				}
 				rl.SetEscPops(true)
 				rl.SetSize(m.innerSize())
 				m.pushView(&rl)
@@ -234,9 +241,10 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 					pendingFilter:        result.RelatedIDs[0],
 					relatedIDs:           result.RelatedIDs,
 					autoOpenSingleDetail: true,
+					reapplyChecker:       msg.Checker,
 				}
 			} else {
-				opts = relatedListOpts{relatedIDs: result.RelatedIDs}
+				opts = relatedListOpts{relatedIDs: result.RelatedIDs, reapplyChecker: msg.Checker}
 			}
 			initCmd := m.newRelatedList(*rt, msg.SourceResource, opts)
 			return m, tea.Batch(initCmd, m.fetchResources(msg.TargetType))
@@ -293,7 +301,12 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 				}
 			}
 		}
-		initCmd := m.newRelatedList(*rt, msg.SourceResource, relatedListOpts{})
+		// Approximate-zero (0+) path: zero known IDs but the reverse-scan
+		// cache was truncated. Navigate with the checker so each loaded page
+		// re-applies the predicate and matches accumulate.
+		initCmd := m.newRelatedList(*rt, msg.SourceResource, relatedListOpts{
+			reapplyChecker: msg.Checker,
+		})
 		return m, tea.Batch(initCmd, m.fetchResources(msg.TargetType))
 	}
 
@@ -352,6 +365,7 @@ type relatedListOpts struct {
 	pendingFilter        string
 	relatedIDs           []string
 	autoOpenSingleDetail bool
+	reapplyChecker       resource.RelatedChecker // carried forward for m-loads-more re-apply
 }
 
 // newRelatedList creates a ResourceListModel configured for related-resource navigation,
@@ -365,6 +379,9 @@ func (m *Model) newRelatedList(rt resource.ResourceTypeDef, src resource.Resourc
 	}
 	if len(opts.relatedIDs) > 0 {
 		rl.SetRelatedIDFilter(opts.relatedIDs)
+	}
+	if opts.reapplyChecker != nil {
+		rl.SetReapplyChecker(opts.reapplyChecker, src)
 	}
 	if opts.autoOpenSingleDetail {
 		rl.SetAutoOpenSingleDetail(true)

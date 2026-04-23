@@ -277,6 +277,12 @@ func TestQA_ListViewColumns_S3Bucket(t *testing.T) {
 
 	for _, col := range vd.List {
 		t.Run(col.Title, func(t *testing.T) {
+			if col.Path == "" {
+				// Key-only columns (e.g. Status) are populated at runtime from
+				// Fields["status"] by the Wave-2 enricher. They have no Path to
+				// resolve against the raw SDK struct — skip ExtractScalar here.
+				t.Skipf("key-only column %q (Key=%q) is populated from Fields at runtime, not from struct path", col.Title, col.Key)
+			}
 			result := fieldpath.ExtractScalar(bucket, col.Path)
 			if result == "" {
 				t.Errorf("ExtractScalar(%q) returned empty for realistic S3 Bucket", col.Path)

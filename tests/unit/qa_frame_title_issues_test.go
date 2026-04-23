@@ -85,8 +85,8 @@ func TestFrameTitleNoIssues(t *testing.T) {
 	}
 }
 
-// TestFrameTitleWithIssues verifies that with 25 resources (3 stopped) and no
-// filters, the title shows the issue count badge: "ec2(25/3 issues)".
+// TestFrameTitleWithIssues — spec §4: S1 (issue count) is MENU-only; list
+// title carries the resource count only. IssueCount is tracked on the model.
 func TestFrameTitleWithIssues(t *testing.T) {
 	resources := makeResourcesWithStatuses(
 		"running", "running", "running", "running", "running",
@@ -97,16 +97,17 @@ func TestFrameTitleWithIssues(t *testing.T) {
 	)
 	m := newListFromCache(ec2TypeDef(), resources, nil, "", false)
 	got := m.FrameTitle()
-	want := "ec2(25/3 issues)"
-	if got != want {
-		t.Errorf("FrameTitle() = %q, want %q (25 total, 3 stopped=issues)", got, want)
+	if got != "ec2(25)" {
+		t.Errorf("FrameTitle() = %q, want %q (title carries count only)", got, "ec2(25)")
+	}
+	if m.IssueCount() != 3 {
+		t.Errorf("IssueCount() = %d, want 3", m.IssueCount())
 	}
 }
 
-// TestFrameTitleWithIssuesTruncated verifies that truncated pagination + issue count
-// produces "ec2(25+/5+ issues)" (both total and issue count get "+" suffix).
+// TestFrameTitleWithIssuesTruncated — pagination "+" is operational completeness
+// (kept on the total count). "issues" duplication into title is spec §4 illegal.
 func TestFrameTitleWithIssuesTruncated(t *testing.T) {
-	// 20 running + 5 stopped = 5 issues
 	resources := makeResourcesWithStatuses(
 		"running", "running", "running", "running", "running",
 		"running", "running", "running", "running", "running",
@@ -117,12 +118,14 @@ func TestFrameTitleWithIssuesTruncated(t *testing.T) {
 	pagination := &resource.PaginationMeta{IsTruncated: true}
 	m := newListFromCache(ec2TypeDef(), resources, pagination, "", false)
 	got := m.FrameTitle()
-
-	if !strings.Contains(got, "+") {
-		t.Errorf("FrameTitle() = %q; want '+' for truncated count", got)
+	if got != "ec2(25+)" {
+		t.Errorf("FrameTitle() = %q, want %q (truncated → '+' on total)", got, "ec2(25+)")
 	}
-	if !strings.Contains(got, "issues") {
-		t.Errorf("FrameTitle() = %q; want 'issues' badge when truncated with issue resources", got)
+	if strings.Contains(got, "issue") {
+		t.Errorf("FrameTitle() = %q; spec §4 S1 is MENU-only, no issue count in title", got)
+	}
+	if !m.IsTruncated() {
+		t.Error("IsTruncated() = false; pagination state must propagate")
 	}
 }
 
@@ -232,57 +235,23 @@ func TestFrameTitleLoadingMore(t *testing.T) {
 	}
 }
 
-// TestFrameTitleIssueCountVariants exercises different issue status strings to
-// verify that issueCount is correctly computed from allResources.
+// TestFrameTitleIssueCountVariants — spec §4: S1 is MENU-only. The list title
+// carries the resource count only; IssueCount() is a model invariant consumed
+// by the menu badge and the ctrl+z filter, not rendered in the title.
 func TestFrameTitleIssueCountVariants(t *testing.T) {
 	tests := []struct {
-		name            string
-		statuses        []string
-		wantContains    string
-		wantNotContains string
+		name         string
+		statuses     []string
+		wantTitle    string
+		wantIssueCnt int
 	}{
-		{
-			name:            "only running",
-			statuses:        []string{"running", "running"},
-			wantContains:    "ec2(2)",
-			wantNotContains: "issues",
-		},
-		{
-			name:            "only stopped",
-			statuses:        []string{"stopped", "stopped", "stopped"},
-			wantContains:    "3 issues",
-			wantNotContains: "",
-		},
-		{
-			name:            "only pending",
-			statuses:        []string{"pending", "pending"},
-			wantContains:    "2 issues",
-			wantNotContains: "",
-		},
-		{
-			name:            "only failed",
-			statuses:        []string{"failed"},
-			wantContains:    "1 issue",
-			wantNotContains: "1 issues",
-		},
-		{
-			name:            "mixed running and stopped",
-			statuses:        []string{"running", "stopped", "running", "stopped"},
-			wantContains:    "2 issues",
-			wantNotContains: "",
-		},
-		{
-			name:            "suffix-matched: create_failed",
-			statuses:        []string{"running", "create_failed"},
-			wantContains:    "1 issue",
-			wantNotContains: "1 issues",
-		},
-		{
-			name:            "suffix-matched: update_in_progress",
-			statuses:        []string{"running", "update_in_progress"},
-			wantContains:    "1 issue",
-			wantNotContains: "1 issues",
-		},
+		{"only running", []string{"running", "running"}, "ec2(2)", 0},
+		{"only stopped", []string{"stopped", "stopped", "stopped"}, "ec2(3)", 3},
+		{"only pending", []string{"pending", "pending"}, "ec2(2)", 2},
+		{"only failed", []string{"failed"}, "ec2(1)", 1},
+		{"mixed running and stopped", []string{"running", "stopped", "running", "stopped"}, "ec2(4)", 2},
+		{"suffix-matched: create_failed", []string{"running", "create_failed"}, "ec2(2)", 1},
+		{"suffix-matched: update_in_progress", []string{"running", "update_in_progress"}, "ec2(2)", 1},
 	}
 
 	for _, tc := range tests {
@@ -290,12 +259,14 @@ func TestFrameTitleIssueCountVariants(t *testing.T) {
 			resources := makeResourcesWithStatuses(tc.statuses...)
 			m := newListFromCache(ec2TypeDef(), resources, nil, "", false)
 			got := m.FrameTitle()
-
-			if !strings.Contains(got, tc.wantContains) {
-				t.Errorf("FrameTitle() = %q; want it to contain %q", got, tc.wantContains)
+			if got != tc.wantTitle {
+				t.Errorf("FrameTitle() = %q, want %q", got, tc.wantTitle)
 			}
-			if tc.wantNotContains != "" && strings.Contains(got, tc.wantNotContains) {
-				t.Errorf("FrameTitle() = %q; want it to NOT contain %q", got, tc.wantNotContains)
+			if m.IssueCount() != tc.wantIssueCnt {
+				t.Errorf("IssueCount() = %d, want %d", m.IssueCount(), tc.wantIssueCnt)
+			}
+			if strings.Contains(got, "issue") {
+				t.Errorf("FrameTitle() = %q; spec §4 title must not contain 'issue' (S1 is menu-only)", got)
 			}
 		})
 	}

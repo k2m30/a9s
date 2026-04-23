@@ -4,7 +4,6 @@ package aws
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -15,20 +14,31 @@ import (
 
 func init() {
 	registerIssueEnricher("s3", EnrichS3PublicAccessBlock, 100)
-	resource.RegisterIssueEnricherFieldKeys("s3", []string{"public_access"})
+	resource.RegisterIssueEnricherFieldKeys("s3", []string{"status"})
 }
 
 // EnrichS3PublicAccessBlock calls GetPublicAccessBlock per bucket (cap EnrichmentCap)
-// and returns a Finding when the bucket has no PAB configuration, or when any of the
+// and emits a finding when the bucket has no PAB configuration or when any of the
 // four PAB flags is false.
 //
-// Severity is "~" (informational).
-// Summaries:
-//   - "no public access block (account-level may apply)" — NoSuchPublicAccessBlockConfiguration
-//   - "public-access block partial: <flag>=false" — one or more flags false
+// Contract (EnrichmentFinding):
+//   - Severity is always "!" (important background concern on a Healthy row).
+//   - Summary is always "public access block incomplete" — stable across all instances.
+//   - Rows carry the per-case detail (never duplicated in Summary).
 //
-// IssueCount stays 0.
-// Skip when clients.S3 == nil.
+// On NoSuchPublicAccessBlockConfiguration:
+//   Rows: {Label:"Status", Value:"no public access block configuration"},
+//         {Label:"Account-level PAB", Value:"may still apply"}
+//
+// On out.PublicAccessBlockConfiguration == nil (no API error):
+//   Same Rows as above.
+//
+// On partial PAB (one or more flags false):
+//   Rows: one entry per false flag: {Label:"<FlagName>", Value:"false"},
+//         plus {Label:"Account-level PAB", Value:"may still apply"}
+//
+// On any other API error: no finding emitted; TruncatedIDs[id] = true.
+// IssueCount stays 0 (framework counts "!" findings directly).
 func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
@@ -52,31 +62,37 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 			Bucket: aws.String(name),
 		})
 		if err != nil {
-			// Check for NoSuchPublicAccessBlockConfiguration (bucket has no PAB config set).
 			var apiErr smithy.APIError
 			if errors.As(err, &apiErr) && apiErr.ErrorCode() == "NoSuchPublicAccessBlockConfiguration" {
 				findings[name] = resource.EnrichmentFinding{
-					Severity: "~",
-					Summary:  "no public access block (account-level may apply)",
+					Severity: "!",
+					Summary:  "public access block incomplete",
+					Rows: []resource.FindingRow{
+						{Label: "Status", Value: "no public access block configuration"},
+						{Label: "Account-level PAB", Value: "may still apply"},
+					},
 				}
-				fieldUpdates[name] = map[string]string{"public_access": "?"}
+				fieldUpdates[name] = map[string]string{"status": "public access block incomplete"}
 				continue
 			}
-			// Other errors: skip but signal incomplete data.
+			// Other errors: data incomplete — do not emit a finding.
 			truncated = true
 			truncatedIDs[r.ID] = true
 			continue
 		}
 		if out.PublicAccessBlockConfiguration == nil {
 			findings[name] = resource.EnrichmentFinding{
-				Severity: "~",
-				Summary:  "no public access block (account-level may apply)",
+				Severity: "!",
+				Summary:  "public access block incomplete",
+				Rows: []resource.FindingRow{
+					{Label: "Status", Value: "no public access block configuration"},
+					{Label: "Account-level PAB", Value: "may still apply"},
+				},
 			}
-			fieldUpdates[name] = map[string]string{"public_access": "?"}
+			fieldUpdates[name] = map[string]string{"status": "public access block incomplete"}
 			continue
 		}
 		cfg := out.PublicAccessBlockConfiguration
-		// Check each of the four PAB flags; report the first false one.
 		type flagCheck struct {
 			name  string
 			value *bool
@@ -87,22 +103,23 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 			{"BlockPublicPolicy", cfg.BlockPublicPolicy},
 			{"RestrictPublicBuckets", cfg.RestrictPublicBuckets},
 		}
-		allBlocked := true
+		var falseFlags []resource.FindingRow
 		for _, fc := range flags {
 			if fc.value == nil || !*fc.value {
-				allBlocked = false
-				findings[name] = resource.EnrichmentFinding{
-					Severity: "~",
-					Summary:  fmt.Sprintf("public-access block partial: %s=false", fc.name),
-				}
-				break
+				falseFlags = append(falseFlags, resource.FindingRow{Label: fc.name, Value: "false"})
 			}
 		}
-		if allBlocked {
-			fieldUpdates[name] = map[string]string{"public_access": "BLOCKED"}
-		} else {
-			fieldUpdates[name] = map[string]string{"public_access": "RISK"}
+		if len(falseFlags) == 0 {
+			// All flags true — healthy bucket. No finding.
+			continue
 		}
+		falseFlags = append(falseFlags, resource.FindingRow{Label: "Account-level PAB", Value: "may still apply"})
+		findings[name] = resource.EnrichmentFinding{
+			Severity: "!",
+			Summary:  "public access block incomplete",
+			Rows:     falseFlags,
+		}
+		fieldUpdates[name] = map[string]string{"status": "public access block incomplete"}
 	}
 	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
 }

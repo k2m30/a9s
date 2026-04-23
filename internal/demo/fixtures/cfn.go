@@ -130,6 +130,19 @@ func NewCFNFixtures() *CFNFixtures {
 				{Key: aws.String("Team"), Value: aws.String("data")},
 			},
 		},
+		// S3 healthy-bucket CFN stack (checkS3CFN pivot).
+		// The healthy bucket carries the aws:cloudformation:stack-name tag pointing here.
+		{
+			StackName:    aws.String(S3CFNStackName),
+			StackStatus:  cfntypes.StackStatusCreateComplete,
+			CreationTime: aws.Time(mustParseCFNTime("2025-01-10T10:00:00+00:00")),
+			Description:  aws.String("S3 demo bucket stack managed by CloudFormation"),
+			StackId:      aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/" + S3CFNStackName + "/88888888-8888-8888-8888-888888888888"),
+			RoleARN:      aws.String(prodCIDeployRoleARN),
+			Tags: []cfntypes.Tag{
+				{Key: aws.String("Environment"), Value: aws.String("production")},
+			},
+		},
 	}
 
 	stackEvents := map[string][]cfntypes.StackEvent{

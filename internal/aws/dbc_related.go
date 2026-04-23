@@ -85,10 +85,14 @@ func checkDbcLogs(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
 	}
 
-	prefix := "/aws/docdb/" + clusterID + "/"
+	// dbc covers both DocumentDB (/aws/docdb/<cluster>/*) and Aurora
+	// (/aws/rds/cluster/<cluster>/*). Match either prefix so the pivot
+	// resolves on both engine families.
+	docdbPrefix := "/aws/docdb/" + clusterID + "/"
+	rdsPrefix := "/aws/rds/cluster/" + clusterID + "/"
 	var ids []string
 	for _, logRes := range logList {
-		if strings.HasPrefix(logRes.ID, prefix) {
+		if strings.HasPrefix(logRes.ID, docdbPrefix) || strings.HasPrefix(logRes.ID, rdsPrefix) {
 			ids = append(ids, logRes.ID)
 		}
 	}
