@@ -183,31 +183,33 @@ func checkS3KMS(ctx context.Context, clients any, res resource.Resource, _ resou
 	return relatedResult("kms", ids)
 }
 
-// checkS3Logs calls s3:GetBucketLogging and returns the target bucket
-// configured as the server-access-log destination. Pattern C — single
-// per-bucket API call. The target is an S3 bucket (not a CloudWatch log
-// group), so we emit a "logs"-targeted entry IDed by the destination bucket.
+// checkS3Logs calls s3:GetBucketLogging and returns the destination S3 bucket
+// configured to receive this bucket's server-access logs. Pattern C — single
+// per-bucket API call. S3 server-access logs are delivered to ANOTHER S3
+// BUCKET (not CloudWatch Log Groups), so the pivot targets `s3` — the
+// destination resource kind — and the navigation ID is the destination
+// bucket name. Spec §2 `logs` subsection + a9s-devops (2026-04-20).
 func checkS3Logs(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.S3 == nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
 	}
 	logAPI, ok := c.S3.(S3GetBucketLoggingAPI)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
 	}
 	out, err := logAPI.GetBucketLogging(ctx, &s3.GetBucketLoggingInput{Bucket: aws.String(bucket)})
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
+		return resource.RelatedCheckResult{TargetType: "s3", Count: -1, Err: err}
 	}
 	if out.LoggingEnabled == nil || out.LoggingEnabled.TargetBucket == nil || *out.LoggingEnabled.TargetBucket == "" {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
 	}
-	return relatedResult("logs", []string{*out.LoggingEnabled.TargetBucket})
+	return relatedResult("s3", []string{*out.LoggingEnabled.TargetBucket})
 }
 
 // checkS3Athena scans the athena cache for WorkGroups whose enriched
@@ -297,16 +299,16 @@ func checkS3Backup(ctx context.Context, clients any, res resource.Resource, cach
 	return relatedResult("backup", ids)
 }
 
-// checkS3EBRule scans the eb-rule cache for rules whose enriched
-// Fields["target_arns"] contains this bucket's ARN. Target ARNs are not part
-// of ListRules response; they arrive via the eb_rule_targets child view or
-// future enrichment. Count: 0 when no match in cache.
+// checkS3EBRule scans the eb-rule cache for rules whose EventPattern filters
+// on `source=aws.s3` AND `detail.bucket.name` containing this bucket. Spec
+// §2: "rules with EventPattern.source=['aws.s3'] AND EventPattern.detail.
+// bucket.name matching this bucket". Event-pattern is the only standard
+// join between an S3 bucket and an EventBridge rule (per a9s-devops).
 func checkS3EBRule(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
 		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
 	}
-	bucketARN := "arn:aws:s3:::" + bucket
 	ruleList, truncated, err := s3RelatedResources(ctx, clients, cache, "eb-rule")
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1, Err: err}
@@ -314,45 +316,25 @@ func checkS3EBRule(ctx context.Context, clients any, res resource.Resource, cach
 	if ruleList == nil {
 		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
 	}
+	bucketQuoted := `"` + bucket + `"`
 	var ids []string
 	for _, ruleRes := range ruleList {
-		if strings.Contains(ruleRes.Fields["target_arns"], bucketARN) {
-			ids = append(ids, ruleRes.ID)
+		pattern := ruleRes.Fields["event_pattern"]
+		if pattern == "" {
+			continue
 		}
+		if !strings.Contains(pattern, `"aws.s3"`) {
+			continue
+		}
+		if !strings.Contains(pattern, bucketQuoted) {
+			continue
+		}
+		ids = append(ids, ruleRes.ID)
 	}
 	if len(ids) == 0 && truncated {
 		return resource.ApproximateZero("eb-rule")
 	}
 	return relatedResult("eb-rule", ids)
-}
-
-// checkS3IAMUser scans the iam-user cache for users whose enriched policy
-// documents mention this bucket's ARN. Policy bodies are not loaded into the
-// user list by default — ListUsers returns only summary metadata. Count: 0
-// when no match.
-func checkS3IAMUser(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	bucket := res.ID
-	if bucket == "" {
-		return resource.RelatedCheckResult{TargetType: "iam-user", Count: 0}
-	}
-	bucketARN := "arn:aws:s3:::" + bucket
-	userList, truncated, err := s3RelatedResources(ctx, clients, cache, "iam-user")
-	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "iam-user", Count: -1, Err: err}
-	}
-	if userList == nil {
-		return resource.RelatedCheckResult{TargetType: "iam-user", Count: -1}
-	}
-	var ids []string
-	for _, userRes := range userList {
-		if strings.Contains(userRes.Fields["policy_resources"], bucketARN) {
-			ids = append(ids, userRes.ID)
-		}
-	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("iam-user")
-	}
-	return relatedResult("iam-user", ids)
 }
 
 // checkS3R53 scans the r53 cache for hosted zones whose enriched
@@ -410,35 +392,6 @@ func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.ApproximateZero("role")
 	}
 	return relatedResult("role", ids)
-}
-
-// checkS3WAF scans the waf cache for WebACLs whose enriched
-// Fields["log_destination_arns"] reference this bucket. WAF LoggingConfiguration
-// destinations are not in the summary list; requires per-ACL GetLoggingConfiguration
-// enrichment. Count: 0 when no match in cached data.
-func checkS3WAF(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	bucket := res.ID
-	if bucket == "" {
-		return resource.RelatedCheckResult{TargetType: "waf", Count: 0}
-	}
-	bucketARN := "arn:aws:s3:::" + bucket
-	wafList, truncated, err := s3RelatedResources(ctx, clients, cache, "waf")
-	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "waf", Count: -1, Err: err}
-	}
-	if wafList == nil {
-		return resource.RelatedCheckResult{TargetType: "waf", Count: -1}
-	}
-	var ids []string
-	for _, wafRes := range wafList {
-		if strings.Contains(wafRes.Fields["log_destination_arns"], bucketARN) {
-			ids = append(ids, wafRes.ID)
-		}
-	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("waf")
-	}
-	return relatedResult("waf", ids)
 }
 
 // checkS3Trail searches the trail cache for trails whose S3BucketName matches
@@ -542,14 +495,12 @@ func init() {
 		{TargetType: "sqs", DisplayName: "SQS (notifications)", Checker: checkS3SQS},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkS3CFN},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkS3KMS},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkS3Logs},
+		{TargetType: "s3", DisplayName: "Access Log Bucket", Checker: checkS3Logs},
 		{TargetType: "athena", DisplayName: "Athena WorkGroups", Checker: checkS3Athena},
 		{TargetType: "glue", DisplayName: "Glue Jobs", Checker: checkS3Glue},
 		{TargetType: "backup", DisplayName: "Backup", Checker: checkS3Backup},
 		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkS3EBRule},
-		{TargetType: "iam-user", DisplayName: "IAM Users", Checker: checkS3IAMUser},
 		{TargetType: "r53", DisplayName: "Route 53", Checker: checkS3R53},
 		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkS3Role},
-		{TargetType: "waf", DisplayName: "WAF", Checker: checkS3WAF},
 	})
 }

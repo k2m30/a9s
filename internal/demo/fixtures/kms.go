@@ -108,6 +108,19 @@ func NewKMSFixtures() *KMSFixtures {
 			CreationDate: aws.Time(time.Date(2024, 9, 5, 6, 0, 0, 0, time.UTC)),
 			Enabled:      false,
 		},
+		// S3 healthy-bucket SSE-KMS key (checkS3KMS pivot).
+		// The checker strips everything up to the last "/" from the KMS key ARN,
+		// leaving the bare key ID. This must match S3BucketKMSKeyID in s3.go.
+		{
+			KeyId:        aws.String(S3BucketKMSKeyID),
+			Arn:          aws.String("arn:aws:kms:us-east-1:123456789012:key/" + S3BucketKMSKeyID),
+			Description:  aws.String("Server-side encryption key for a9s-demo-healthy S3 bucket"),
+			KeyState:     kmstypes.KeyStateEnabled,
+			KeyManager:   kmstypes.KeyManagerTypeCustomer,
+			KeyUsage:     kmstypes.KeyUsageTypeEncryptDecrypt,
+			CreationDate: aws.Time(time.Date(2025, 1, 10, 10, 0, 0, 0, time.UTC)),
+			Enabled:      true,
+		},
 		// PendingDeletion key — referenced by broken-dbi-encryption-locked fixture (KmsKeyId).
 		// This key was deleted while still in use by an RDS instance, causing
 		// the instance to enter the inaccessible-encryption-credentials state.
@@ -177,6 +190,12 @@ func NewKMSFixtures() *KMSFixtures {
 			AliasName:   aws.String("alias/deleted-rds-key"),
 			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/deleted-rds-key"),
 			TargetKeyId: aws.String("deadbeef-0000-0000-0000-000000000000"),
+		},
+		// S3 healthy-bucket KMS key alias.
+		{
+			AliasName:   aws.String("alias/" + S3BucketKMSKeyID),
+			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/" + S3BucketKMSKeyID),
+			TargetKeyId: aws.String(S3BucketKMSKeyID),
 		},
 	}
 

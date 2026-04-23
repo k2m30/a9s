@@ -92,7 +92,7 @@
 | `redshift` | [API_Cluster](https://docs.aws.amazon.com/redshift/latest/APIReference/API_Cluster.html) | `alarm`, `cfn`, `ct-events`, `kms`, `logs`, `role`, `s3`, `secrets`, `sg`, `subnet`, `vpc` |
 | `role` | [API_Role](https://docs.aws.amazon.com/IAM/latest/APIReference/API_Role.html) | `ct-events`, `ec2`, `eks`, `glue`, `iam-group`, `iam-user`, `lambda`, `ng`, `policy` |
 | `rtb` | [API_RouteTable](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_RouteTable.html) | `cfn`, `ct-events`, `eni`, `igw`, `nat`, `subnet`, `tgw`, `vpc`, `vpce` |
-| `s3` | [API_ListBuckets](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListBuckets.html) | `athena`, `backup`, `cf`, `cfn`, `ct-events`, `eb-rule`, `glue`, `iam-user`, `kms`, `lambda`, `logs`, `r53`, `role`, `sns`, `sqs`, `trail`, `waf` |
+| `s3` | [API_ListBuckets](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListBuckets.html) | `athena`, `backup`, `cf`, `cfn`, `ct-events`, `eb-rule`, `glue`, `kms`, `lambda`, `r53`, `role`, `s3`, `sns`, `sqs`, `trail` |
 | `secrets` | [API_SecretListEntry](https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_SecretListEntry.html) | `cb`, `cfn`, `codeartifact`, `ct-events`, `dbi`, `eb`, `ecs-task`, `kms`, `lambda`, `logs`, `role`, `sns` |
 | `ses` | [API_IdentityInfo](https://docs.aws.amazon.com/ses/latest/APIReference-V2/API_IdentityInfo.html) | `ct-events`, `eb-rule`, `kinesis`, `lambda`, `r53`, `s3`, `sns` |
 | `sfn` | [API_StateMachineListItem](https://docs.aws.amazon.com/step-functions/latest/apireference/API_StateMachineListItem.html) | `alarm`, `ct-events`, `eb-rule`, `kms`, `lambda`, `logs`, `role` |
@@ -847,16 +847,16 @@ AWS API: https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListBuckets.html
 - **`ct-events`** — Audit trail for bucket-level events.
 - **`eb-rule`** — EB rules on S3 object events.
 - **`glue`** — Glue crawlers over S3 data.
-- **`iam-user`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`kms`** — Bucket SSE-KMS key.
 - **`lambda`** — Lambdas with this bucket as event source.
-- **`logs`** — Server access-log target bucket.
+- **`s3`** — Server access-log destination bucket (`GetBucketLogging.LoggingEnabled.TargetBucket`). S3 server-access logs go to another S3 bucket, not CloudWatch Logs — registered as `s3` (DisplayName "Access Log Bucket"), not `logs`.
 - **`r53`** — R53 alias to S3 website endpoint.
-- **`role`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
+- **`role`** — Bucket policy may reference IAM role ARNs as principals; advanced audit pivot via `s3:GetBucketPolicy`.
 - **`sns`** — BucketNotification SNS target.
 - **`sqs`** — BucketNotification SQS target.
 - **`trail`** — CloudTrails writing to this bucket.
-- **`waf`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
+- ~~**`iam-user`**~~ — Removed 2026-04-22. Principal attribution requires CloudTrail data-plane parsing (Wave 3); `ListBuckets` Owner field is an account ID, not a user ARN. No operator-grade AWS API surface for a direct S3→IAM-user edge. a9s-devops: not worth it (docs/resources/s3.md §5).
+- ~~**`waf`**~~ — Removed 2026-04-22. WAF web ACLs attach to CloudFront/ALB/API Gateway/AppSync/Cognito, not S3 directly. The indirect path S3→CloudFront→WAF is already reachable via the `cf` panel entry. a9s-devops: not worth it (docs/resources/s3.md §5).
 
 ### `secrets`
 

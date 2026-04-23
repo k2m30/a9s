@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/backup"
@@ -11,7 +12,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("backup", []string{"plan_name", "plan_id", "creation_date", "last_execution"})
+	resource.RegisterFieldKeys("backup", []string{"plan_name", "plan_id", "creation_date", "last_execution", "resources"})
 
 	resource.RegisterPaginated("backup", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -55,6 +56,9 @@ func FetchBackupPlansPage(ctx context.Context, api BackupListBackupPlansAPI, con
 		return resource.FetchResult{}, fmt.Errorf("fetching Backup plans: %w", err)
 	}
 
+	selectionAPI, _ := api.(BackupListBackupSelectionsAPI)
+	getSelectionAPI, _ := api.(BackupGetBackupSelectionAPI)
+
 	var resources []resource.Resource
 
 	for _, plan := range output.BackupPlansList {
@@ -78,6 +82,12 @@ func FetchBackupPlansPage(ctx context.Context, api BackupListBackupPlansAPI, con
 			lastExecution = plan.LastExecutionDate.Format("2006-01-02 15:04")
 		}
 
+		// Enumerate the plan's selection resource ARNs so sibling pivots
+		// (s3, ddb, efs, dbi, …) can match via cache scan. One
+		// ListBackupSelections + one GetBackupSelection per selection —
+		// bounded by plan count; selections per plan typically ≤3.
+		resourcesCSV := enumerateBackupPlanResources(ctx, selectionAPI, getSelectionAPI, planID)
+
 		r := resource.Resource{
 			ID:     planID,
 			Name:   planName,
@@ -87,6 +97,7 @@ func FetchBackupPlansPage(ctx context.Context, api BackupListBackupPlansAPI, con
 				"plan_id":        planID,
 				"creation_date":  creationDate,
 				"last_execution": lastExecution,
+				"resources":      resourcesCSV,
 			},
 			RawStruct: plan,
 		}
@@ -115,4 +126,42 @@ func FetchBackupPlansPage(ctx context.Context, api BackupListBackupPlansAPI, con
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// enumerateBackupPlanResources walks the plan's selections and returns a
+// comma-separated list of every resource ARN covered by the plan. Returns
+// "" when the plan has no selections, the API shape is unavailable, or any
+// enumeration call fails (partial data is still better than zero, but an
+// empty aggregation lets the caller degrade cleanly to the "no resources"
+// signal rather than surfacing a half-built list).
+func enumerateBackupPlanResources(
+	ctx context.Context,
+	selectionAPI BackupListBackupSelectionsAPI,
+	getSelectionAPI BackupGetBackupSelectionAPI,
+	planID string,
+) string {
+	if selectionAPI == nil || getSelectionAPI == nil || planID == "" {
+		return ""
+	}
+	listOut, err := selectionAPI.ListBackupSelections(ctx, &backup.ListBackupSelectionsInput{
+		BackupPlanId: aws.String(planID),
+	})
+	if err != nil || listOut == nil {
+		return ""
+	}
+	var arns []string
+	for _, sel := range listOut.BackupSelectionsList {
+		if sel.SelectionId == nil {
+			continue
+		}
+		selOut, selErr := getSelectionAPI.GetBackupSelection(ctx, &backup.GetBackupSelectionInput{
+			BackupPlanId: aws.String(planID),
+			SelectionId:  sel.SelectionId,
+		})
+		if selErr != nil || selOut == nil || selOut.BackupSelection == nil {
+			continue
+		}
+		arns = append(arns, selOut.BackupSelection.Resources...)
+	}
+	return strings.Join(arns, ",")
 }

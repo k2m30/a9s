@@ -484,6 +484,27 @@ func buildRDSSnapshots() []rdstypes.DBSnapshot {
 			PercentProgress:      aws.Int32(100),
 			SourceRegion:         aws.String("us-east-1"),
 		},
+		// Snapshot for prod-dbi-aurora-1 — required for the Aurora dbi
+		// fixture to cover the rds-snap pivot (all-pivots-non-zero contract).
+		{
+			DBSnapshotIdentifier: aws.String("rds:" + ProdDbiAuroraID + "-2026-04-15"),
+			DBInstanceIdentifier: aws.String(ProdDbiAuroraID),
+			DBSnapshotArn:        aws.String("arn:aws:rds:us-east-1:123456789012:snapshot:rds:" + ProdDbiAuroraID + "-2026-04-15"),
+			Status:               aws.String("available"),
+			Engine:               aws.String("aurora-postgresql"),
+			EngineVersion:        aws.String("16.4"),
+			SnapshotType:         aws.String("automated"),
+			SnapshotCreateTime:   aws.Time(mustTime("2026-04-15T03:00:00Z")),
+			AllocatedStorage:     aws.Int32(100),
+			StorageType:          aws.String("aurora"),
+			Encrypted:            aws.Bool(true),
+			KmsKeyId:             aws.String(dbiKMSKeyID),
+			AvailabilityZone:     aws.String("us-east-1a"),
+			MasterUsername:       aws.String("pgadmin"),
+			LicenseModel:         aws.String("postgresql-license"),
+			PercentProgress:      aws.Int32(100),
+			SourceRegion:         aws.String("us-east-1"),
+		},
 		{
 			DBSnapshotIdentifier: aws.String("rds:prod-api-primary-2026-03-20"),
 			DBInstanceIdentifier: aws.String("prod-api-primary"),

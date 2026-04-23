@@ -1,7 +1,6 @@
 package views
 
 import (
-	"fmt"
 	"maps"
 	"strings"
 
@@ -69,6 +68,15 @@ type ResourceListModel struct {
 	// had their enrichment truncated (per-resource API error or page cap) and
 	// are rendered with a "?" prefix in the identity column.
 	truncatedByID map[string]bool
+
+	// reapplyChecker + reapplySource — carried forward from a related-panel
+	// navigation. On each fresh page of target resources (ResourcesLoadedMsg),
+	// the checker re-runs against the page and new matching IDs merge into
+	// relatedIDSet. This makes approximate pivots (0+, 10+, 25+) behave
+	// symmetrically: the ID set extends organically as the target type's
+	// pagination is consumed. Nil on non-related-navigated lists (no-op).
+	reapplyChecker resource.RelatedChecker
+	reapplySource  resource.Resource
 }
 
 // NewResourceList creates a ResourceListModel in loading state.
@@ -179,6 +187,25 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 		if m.autoOpenSingleDetail && len(m.filteredResources) == 1 {
 			r := m.filteredResources[0]
 			m.autoOpenSingleDetail = false
+			// Mirror Enter: if the type registers a child under Key="enter"
+			// and its DrillCondition (if any) admits this row, jump straight
+			// into the child view. Otherwise fall back to the generic detail.
+			// This keeps related-panel pivots consistent with manual drill
+			// from the same list — a pivot that narrows to one row must not
+			// strand the operator on bucket metadata when Enter would have
+			// opened bucket contents.
+			if enterChild := m.enterChildFor(r); enterChild != nil {
+				ctx := m.buildChildContext(*enterChild, &r)
+				displayName := ctx[enterChild.DisplayNameKey]
+				childType := enterChild.ChildType
+				return m, func() tea.Msg {
+					return messages.EnterChildViewMsg{
+						ChildType:     childType,
+						ParentContext: ctx,
+						DisplayName:   displayName,
+					}
+				}
+			}
 			return m, func() tea.Msg {
 				return messages.NavigateMsg{
 					Target:         messages.TargetDetail,
@@ -444,28 +471,12 @@ func (m *ResourceListModel) View() string {
 		visibleRows--
 	}
 
-	// Reserve one row for the enrichment banner when it will be shown.
-	// A banner appears when: truncation flag is set, OR any findings exist
-	// (some may be off-viewport or have their marker hidden by hscroll).
-	// We conservatively reserve a row any time banner content is possible;
-	// this prevents the total line count from exceeding m.height.
-	mightShowBanner := m.enrichmentTruncated || len(m.findingsByID) > 0
-	if mightShowBanner && visibleRows > 1 {
-		visibleRows--
-	}
-
+	// Spec §4: only S1–S5 surfaces are rendered. No findings banner.
 	// Determine the window of rows to display, keeping cursor centered.
 	startRow, endRow := m.scroll.VisibleWindow(visibleRows)
 
 	var sb strings.Builder
-
-	// Banner: surface enrichment findings that aren't visible as row markers
-	// in the current viewport (off-viewport, filtered-out, or ~-severity types
-	// where row color doesn't signal the issue alone).
-	if banner := m.findingsBanner(startRow, endRow, markerColIdx); banner != "" {
-		sb.WriteString(banner)
-		sb.WriteString("\n")
-	}
+	_ = markerColIdx // column index reserved for per-row glyph rendering downstream.
 
 	sb.WriteString(headerLine)
 
@@ -507,56 +518,6 @@ func (m *ResourceListModel) View() string {
 	}
 
 	return sb.String()
-}
-
-// findingsBanner returns a one-line banner summarizing enrichment findings
-// that are not visible as row markers in the rendered viewport
-// [startRow, endRow). A finding is "visible" only if its resource ID is on
-// a row that is currently rendered to screen AND the marker column is visible
-// (markerColIdx >= 0). When markerColIdx == -1 (identity column scrolled
-// off-screen), all viewport-row findings are treated as hidden because the
-// row marker is suppressed by renderDataRow.
-//
-// Returns "" when every finding maps to a visible row with a visible marker
-// and the truncation flag is unset.
-func (m *ResourceListModel) findingsBanner(startRow, endRow, markerColIdx int) string {
-	// Allow through when truncated even with zero findings/issueCount — the
-	// user must know the count is a lower bound.
-	if m.enrichmentIssueCount == 0 && len(m.findingsByID) == 0 && !m.enrichmentTruncated {
-		return ""
-	}
-	if startRow < 0 {
-		startRow = 0
-	}
-	if endRow > len(m.filteredResources) {
-		endRow = len(m.filteredResources)
-	}
-	// Count findings that have a visible row marker.
-	// When markerColIdx == -1 the identity column is off-screen, so
-	// renderDataRow suppresses the marker on every row — treat all as hidden.
-	visibleWithFinding := 0
-	if markerColIdx >= 0 {
-		for i := startRow; i < endRow; i++ {
-			if _, ok := m.findingsByID[m.filteredResources[i].ID]; ok {
-				visibleWithFinding++
-			}
-		}
-	}
-	hidden := len(m.findingsByID) - visibleWithFinding
-	if hidden <= 0 && !m.enrichmentTruncated {
-		return ""
-	}
-	var parts []string
-	if hidden > 0 {
-		parts = append(parts, fmt.Sprintf("%d background-check finding(s) off-viewport or on filtered/unloaded rows", hidden))
-	}
-	if m.enrichmentTruncated {
-		parts = append(parts, "count is a lower bound (truncated)")
-	}
-	if len(parts) == 0 {
-		return ""
-	}
-	return styles.BannerInfo.Render("ⓘ " + strings.Join(parts, "; "))
 }
 
 // SetEnrichmentState stores Wave 2 enrichment results for this resource type.

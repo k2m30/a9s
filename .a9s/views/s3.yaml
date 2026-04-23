@@ -8,10 +8,9 @@ list:
   Creation Date:
     path: CreationDate
     width: 22
-  Public Access:
-    path: Name
-    key: public_access
-    width: 14
+  Status:
+    key: status
+    width: 32
 
 detail:
   - Name
