@@ -25,13 +25,40 @@ func (f *BackupFake) ListBackupPlans(_ context.Context, _ *backup.ListBackupPlan
 	return &backup.ListBackupPlansOutput{BackupPlansList: f.fix.Plans}, nil
 }
 
-func (f *BackupFake) ListBackupJobs(_ context.Context, _ *backup.ListBackupJobsInput, _ ...func(*backup.Options)) (*backup.ListBackupJobsOutput, error) {
-	return &backup.ListBackupJobsOutput{}, nil
+// ListBackupJobs returns all fixture jobs, optionally filtered by ByCreatedAfter.
+// The enricher queries with ByCreatedAfter=now-24h to scope to the recent window.
+func (f *BackupFake) ListBackupJobs(_ context.Context, input *backup.ListBackupJobsInput, _ ...func(*backup.Options)) (*backup.ListBackupJobsOutput, error) {
+	jobs := f.fix.Jobs
+	if input != nil && input.ByCreatedAfter != nil {
+		cutoff := *input.ByCreatedAfter
+		filtered := make([]backuptypes.BackupJob, 0, len(jobs))
+		for _, j := range jobs {
+			if j.CreationDate != nil && !j.CreationDate.Before(cutoff) {
+				filtered = append(filtered, j)
+			}
+		}
+		jobs = filtered
+	}
+	return &backup.ListBackupJobsOutput{BackupJobs: jobs}, nil
 }
 
-// GetBackupPlan returns an empty plan — demo mode does not model plan rules.
-func (f *BackupFake) GetBackupPlan(_ context.Context, _ *backup.GetBackupPlanInput, _ ...func(*backup.Options)) (*backup.GetBackupPlanOutput, error) {
-	return &backup.GetBackupPlanOutput{}, nil
+// GetBackupPlan returns the plan's rules from the PlanRules fixture map.
+// The KMS and SNS related checkers read Rules[].TargetBackupVaultName from the response.
+func (f *BackupFake) GetBackupPlan(_ context.Context, input *backup.GetBackupPlanInput, _ ...func(*backup.Options)) (*backup.GetBackupPlanOutput, error) {
+	if input == nil || input.BackupPlanId == nil {
+		return &backup.GetBackupPlanOutput{}, nil
+	}
+	rules, ok := f.fix.PlanRules[*input.BackupPlanId]
+	if !ok {
+		return &backup.GetBackupPlanOutput{BackupPlan: &backuptypes.BackupPlan{}}, nil
+	}
+	return &backup.GetBackupPlanOutput{
+		BackupPlanId: input.BackupPlanId,
+		BackupPlan: &backuptypes.BackupPlan{
+			BackupPlanName: aws.String("fixture-plan-" + *input.BackupPlanId),
+			Rules:          rules,
+		},
+	}, nil
 }
 
 // ListBackupSelections returns the list of selection summaries for the plan.
@@ -74,8 +101,8 @@ func (f *BackupFake) GetBackupSelection(_ context.Context, input *backup.GetBack
 		}
 		selCopy := sel
 		return &backup.GetBackupSelectionOutput{
-			BackupPlanId: input.BackupPlanId,
-			SelectionId:  input.SelectionId,
+			BackupPlanId:    input.BackupPlanId,
+			SelectionId:     input.SelectionId,
 			BackupSelection: &selCopy,
 		}, nil
 	}
@@ -88,14 +115,43 @@ func selectionIDFor(planID string, idx int) string {
 	return planID + "-sel-" + strconv.Itoa(idx)
 }
 
-// DescribeBackupVault returns an empty vault description.
-func (f *BackupFake) DescribeBackupVault(_ context.Context, _ *backup.DescribeBackupVaultInput, _ ...func(*backup.Options)) (*backup.DescribeBackupVaultOutput, error) {
-	return &backup.DescribeBackupVaultOutput{}, nil
+// DescribeBackupVault returns the vault descriptor from the VaultEncryptionKeys fixture map.
+// The KMS related checker reads EncryptionKeyArn from the response.
+// Vaults not in the map return an empty response (no customer-managed key).
+func (f *BackupFake) DescribeBackupVault(_ context.Context, input *backup.DescribeBackupVaultInput, _ ...func(*backup.Options)) (*backup.DescribeBackupVaultOutput, error) {
+	if input == nil || input.BackupVaultName == nil {
+		return &backup.DescribeBackupVaultOutput{}, nil
+	}
+	out := &backup.DescribeBackupVaultOutput{
+		BackupVaultName: input.BackupVaultName,
+		BackupVaultArn:  aws.String("arn:aws:backup:us-east-1:123456789012:backup-vault:" + *input.BackupVaultName),
+	}
+	if keyARN, ok := f.fix.VaultEncryptionKeys[*input.BackupVaultName]; ok && keyARN != "" {
+		out.EncryptionKeyArn = aws.String(keyARN)
+	}
+	return out, nil
 }
 
-// GetBackupVaultNotifications returns an empty notification config.
-func (f *BackupFake) GetBackupVaultNotifications(_ context.Context, _ *backup.GetBackupVaultNotificationsInput, _ ...func(*backup.Options)) (*backup.GetBackupVaultNotificationsOutput, error) {
-	return &backup.GetBackupVaultNotificationsOutput{}, nil
+// GetBackupVaultNotifications returns the SNS notification config from the
+// VaultSNSTopics fixture map. When a vault is absent from the map, it returns
+// a ResourceNotFoundException-style error, matching the real AWS Backup API
+// behaviour when no notifications are configured on the vault.
+// The SNS related checker (checkBackupSNS) handles this error by skipping the vault.
+func (f *BackupFake) GetBackupVaultNotifications(_ context.Context, input *backup.GetBackupVaultNotificationsInput, _ ...func(*backup.Options)) (*backup.GetBackupVaultNotificationsOutput, error) {
+	if input == nil || input.BackupVaultName == nil {
+		return &backup.GetBackupVaultNotificationsOutput{}, nil
+	}
+	topicARN, ok := f.fix.VaultSNSTopics[*input.BackupVaultName]
+	if !ok {
+		// Simulate ResourceNotFoundException — vault has no SNS notifications configured.
+		return nil, &backuptypes.ResourceNotFoundException{
+			Message: aws.String("Vault " + *input.BackupVaultName + " has no notification configuration"),
+		}
+	}
+	return &backup.GetBackupVaultNotificationsOutput{
+		BackupVaultName: input.BackupVaultName,
+		SNSTopicArn:     aws.String(topicARN),
+	}, nil
 }
 
 // ListRecoveryPointsByResource returns recovery points for the given resource ARN.

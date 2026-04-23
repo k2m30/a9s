@@ -93,7 +93,9 @@ func check{Source}{Target}(ctx context.Context, clients interface{}, res resourc
         return resource.RelatedCheckResult{TargetType: "{target}", Count: -1, Err: err}
     }
     if targetList == nil {
-        return resource.RelatedCheckResult{TargetType: "{target}", Count: -1}
+        // Target fetcher not registered / nothing loaded yet — honest lower
+        // bound is zero, NOT an error. See "Count: -1 vs ApproximateZero" below.
+        return resource.ApproximateZero("{target}")
     }
 
     // 3. Match against source
@@ -104,9 +106,9 @@ func check{Source}{Target}(ctx context.Context, clients interface{}, res resourc
             ids = append(ids, targetRes.ID)
         }
     }
-    // Truncation guard: partial page with 0 matches → unknown, not zero
+    // Truncation guard: partial page with 0 matches → honest lower bound, not an error.
     if len(ids) == 0 && truncated {
-        return resource.RelatedCheckResult{TargetType: "{target}", Count: -1}
+        return resource.ApproximateZero("{target}")
     }
     return relatedResult("{target}", ids)
 }
@@ -130,9 +132,30 @@ func relatedResult(target string, ids []string) resource.RelatedCheckResult {
 ```
 
 **Count semantics:**
-- `Count: 0` -- confirmed none
-- `Count: -1` -- unknown (cache miss with no clients, or error)
-- `Count: N` (N > 0) -- confirmed N found, ResourceIDs populated
+- `Count: 0` -- confirmed none (exhaustive scan produced no matches)
+- `Count: N` (N > 0) -- confirmed N found, `ResourceIDs` populated
+- `Count: -1` -- **error state**. Something went wrong: AWS API returned an
+  error, required client is nil, `assertStruct` failed, or we lack the identity
+  needed to run the query. The UI renders this as `"?"` and it contributes to
+  the per-resource truncation bucket.
+- `resource.ApproximateZero("{target}")` -- **honest lower bound of zero**. Not
+  an error. Returned when the target list comes back nil (fetcher not
+  registered, nothing loaded yet) or when a truncated target page produced zero
+  matches so far. The UI renders this as `"0+"`.
+
+### Return-value classifier for a checker -- load-bearing
+
+A related checker must choose one of four return values per code path. Getting this wrong misleads the UI: `Count: -1` renders as `"?"` and feeds the truncation bucket; `ApproximateZero` renders as `"0+"`; `Count: 0` renders as plain `"0"`. The operator reads those three differently. Classify every branch:
+
+1. **Error path** -- AWS call returned an error, required client is nil, an `assertStruct` failed, the source resource lacks the identity needed to form the query, or an intermediate helper returned a sentinel meaning "unknown, could not determine". Return `resource.RelatedCheckResult{TargetType: "{target}", Count: -1, Err: err}` (attach `Err` when a real `error` value is in hand). If an intermediate helper's documented contract is "nil return = error distinct from empty", propagate its nil as `Count: -1`; do NOT collapse it into `ApproximateZero`.
+
+2. **Complete-answer API** -- the checker makes a single bounded AWS call (not cache-backed, not paginated) that returns an exhaustive answer. `out == nil && err == nil` (or an empty output slice with no error) means the AWS service reported zero authoritatively. Return `Count: 0`. This is NOT `ApproximateZero` -- no lower bound is involved because no pagination cursor remains.
+
+3. **Nil target list from the cache-backed helper** -- the checker uses the standard `{source}RelatedResources(ctx, clients, cache, "{target}")` (or equivalent `FetchRelatedTarget` wrapper) and the returned list is `nil` because the target fetcher is not registered or nothing has been loaded yet. Return `resource.ApproximateZero("{target}")`. Zero registered targets is an honest lower bound of zero, not an error.
+
+4. **Truncated target page with zero matches so far** -- the cache-backed helper returned a partial page (`truncated == true`) and this checker's match loop produced no IDs. Return `resource.ApproximateZero("{target}")`. Later pages may produce matches; the current view is a lower bound.
+
+**Decision order when reviewing a new or rewritten checker:** for each `return` statement, ask (in order) -- Is an AWS call or helper erroring? Is this a one-shot exhaustive API with `out == nil && err == nil`? Is this the `if targetList == nil` branch from a cache-backed helper? Is this the truncated-and-no-matches branch? The first "yes" determines the return. Returning `Count: -1` on a nil-list-from-cache or truncated-empty branch is the regression this section exists to prevent.
 
 ### Pattern N: Naming-Convention (reverse lookup by name pattern)
 
@@ -277,7 +300,8 @@ func check{Source}{Target1}(ctx context.Context, clients interface{}, res resour
         return resource.RelatedCheckResult{TargetType: "{target1}", Count: -1, Err: err}
     }
     if targetList == nil {
-        return resource.RelatedCheckResult{TargetType: "{target1}", Count: -1}
+        // Honest zero — fetcher not registered or nothing loaded yet.
+        return resource.ApproximateZero("{target1}")
     }
 
     var ids []string
@@ -287,9 +311,9 @@ func check{Source}{Target1}(ctx context.Context, clients interface{}, res resour
             ids = append(ids, r.ID)
         }
     }
-    // Truncation guard: partial page with 0 matches → unknown, not zero
+    // Truncation guard: partial page with 0 matches → honest lower bound.
     if len(ids) == 0 && truncated {
-        return resource.RelatedCheckResult{TargetType: "{target1}", Count: -1}
+        return resource.ApproximateZero("{target1}")
     }
     return relatedResult("{target1}", ids)
 }

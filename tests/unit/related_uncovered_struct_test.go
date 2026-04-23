@@ -9,7 +9,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
-	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
 	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 	kafkatypes "github.com/aws/aws-sdk-go-v2/service/kafka/types"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
@@ -504,41 +503,6 @@ func TestRelated_DocdbSnap_KMS_NoKey(t *testing.T) {
 		ID:        "snap-001",
 		Fields:    map[string]string{},
 		RawStruct: docdbtypes.DBClusterSnapshot{KmsKeyId: nil},
-	}
-	got := checker(context.Background(), nil, res, nil)
-	if got.Count != 0 {
-		t.Errorf("expected Count=0, got %d", got.Count)
-	}
-}
-
-// --- Redis → SG ---
-
-func TestRelated_Redis_SG_ExtractsSecurityGroups(t *testing.T) {
-	checker := checkerByTargetUncovered(t, "redis", "sg")
-	res := resource.Resource{
-		ID:     "my-redis-cluster",
-		Fields: map[string]string{},
-		RawStruct: elasticachetypes.CacheCluster{
-			SecurityGroups: []elasticachetypes.SecurityGroupMembership{
-				{SecurityGroupId: aws.String("sg-redis1")},
-			},
-		},
-	}
-	got := checker(context.Background(), nil, res, nil)
-	if got.Count != 1 {
-		t.Errorf("expected Count=1, got %d", got.Count)
-	}
-	if len(got.ResourceIDs) != 1 || got.ResourceIDs[0] != "sg-redis1" {
-		t.Errorf("expected ResourceIDs=[sg-redis1], got %v", got.ResourceIDs)
-	}
-}
-
-func TestRelated_Redis_SG_Empty(t *testing.T) {
-	checker := checkerByTargetUncovered(t, "redis", "sg")
-	res := resource.Resource{
-		ID:        "my-redis-cluster",
-		Fields:    map[string]string{},
-		RawStruct: elasticachetypes.CacheCluster{SecurityGroups: []elasticachetypes.SecurityGroupMembership{}},
 	}
 	got := checker(context.Background(), nil, res, nil)
 	if got.Count != 0 {

@@ -6,9 +6,33 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
+
+// ddbTableStatusPhrase maps a DynamoDB TableStatus enum to the §4 list phrase.
+// Returns "" for ACTIVE (Healthy silence) and a lowercase phrase for all other states.
+func ddbTableStatusPhrase(ts ddbtypes.TableStatus) string {
+	switch ts {
+	case ddbtypes.TableStatusActive:
+		return ""
+	case ddbtypes.TableStatusCreating:
+		return "creating"
+	case ddbtypes.TableStatusUpdating:
+		return "updating"
+	case ddbtypes.TableStatusDeleting:
+		return "deleting"
+	case ddbtypes.TableStatusArchiving:
+		return "archiving"
+	case ddbtypes.TableStatusInaccessibleEncryptionCredentials:
+		return "kms key inaccessible"
+	case ddbtypes.TableStatusArchived:
+		return "archived: kms key lost"
+	default:
+		return ""
+	}
+}
 
 func init() {
 	resource.RegisterFieldKeys("ddb", []string{"table_name", "status", "item_count", "size_bytes", "billing_mode"})
@@ -82,13 +106,16 @@ func FetchDynamoDBTablesPage(ctx context.Context, listAPI DDBListTablesAPI, desc
 		}
 
 		table := descOutput.Table
+		if table == nil {
+			continue
+		}
 
 		name := ""
 		if table.TableName != nil {
 			name = *table.TableName
 		}
 
-		status := string(table.TableStatus)
+		phrase := ddbTableStatusPhrase(table.TableStatus)
 
 		itemCount := ""
 		if table.ItemCount != nil {
@@ -105,16 +132,28 @@ func FetchDynamoDBTablesPage(ctx context.Context, listAPI DDBListTablesAPI, desc
 			billingMode = string(table.BillingModeSummary.BillingMode)
 		}
 
+		arn := ""
+		if table.TableArn != nil {
+			arn = *table.TableArn
+		}
+
+		var issues []string
+		if phrase != "" {
+			issues = []string{phrase}
+		}
+
 		r := resource.Resource{
 			ID:     name,
 			Name:   name,
-			Status: status,
+			Status: phrase,
+			Issues: issues,
 			Fields: map[string]string{
 				"table_name":   name,
-				"status":       status,
+				"status":       phrase,
 				"item_count":   itemCount,
 				"size_bytes":   sizeBytes,
 				"billing_mode": billingMode,
+				"arn":          arn,
 			},
 			RawStruct: table,
 		}

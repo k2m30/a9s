@@ -5,12 +5,9 @@ list:
   Type:
     path: IdentityType
     width: 16
-  Verification:
-    path: VerificationStatus
-    width: 16
-  Sending:
-    path: SendingEnabled
-    width: 10
+  Status:
+    key: status
+    width: 36
 
 detail:
   - IdentityName

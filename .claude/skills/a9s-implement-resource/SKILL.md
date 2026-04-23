@@ -64,7 +64,7 @@ You may skim other files (message definitions, registry shape) to ground type si
 
 ## Phases
 
-Run in order. Phases 0–5 are analysis and planning done by the skill runner. Phases 6a/6b/7 dispatch agents. Phase 7.5 is the scope-diff gate. Phase 8 is the scenario-harness visual render gate. Phase 9 is the final four-point report checklist — implementation is not "done" until 9 emits PASS on every item.
+Run in order. Phases 0–5 are analysis and planning done by the skill runner. Phases 6a/6b/7 dispatch agents. Phase 7.5 is the scope-diff gate. Phase 8 is the scenario-harness visual render gate. Phase 9 is the final report checklist (five user-facing gates: §9.1 illegal UI, §9.2 fixture coverage, §9.3 graph-root pivot counts, §9.4 drill-through, §9.5 detail completeness) — implementation is not "done" until 9 emits PASS on every item. Phase 10 is the post-push review loop (CI + reviewer comments).
 
 ### Phase 0 — Intake
 
@@ -78,7 +78,15 @@ Run in order. Phases 0–5 are analysis and planning done by the skill runner. P
 
 Record the actual path. Phase 7 scope will reference THIS file, not a hypothetical `<shortName>.go`. If the fetcher lives in a shared service file, phase 7 extends (not creates) that file; phase 7.5's approved union includes `internal/aws/<service>.go` in place of `internal/aws/<shortName>.go`.
 
-The renderer already wires all five UI surfaces (S1 in `mainmenu.go`, S2 via `typeDef.ResolveColor`, S3 in `table_render.go`, S4 via the fetcher's `Status` field, S5 via `EnrichmentFinding.Summary`). The universal rules below govern every per-resource run — they are the same for every resource type and asserted by phase 8's scenario test.
+The renderer already wires all five UI surfaces:
+
+- **S1** — `mainmenu.go` reads `unifiedIssueCount` from the availability/enrichment chain.
+- **S2** — `typeDef.ResolveColor(r)` reads `r.Fields["status"]` (and falls back to `r.Status` / other keys per the Color function); the Wave-2 enricher writes `FieldUpdates["status"]` which merges into `Fields`.
+- **S3** — `table_render.go` prefixes glyphs onto green rows based on finding severity.
+- **S4** — Status column reads `Fields["status"]` (fetcher seeds; enricher may overwrite via `FieldUpdates`). The `Resource.Status` field is the fetcher's initial value only — downstream Wave-2 updates land in Fields. Color functions that pattern-match on the Status phrase MUST read with the fallback `status := r.Status; if status == "" { status = r.Fields["status"] }` (the `Fields` fallback is what makes Wave-2 phrases like `"account SHUTDOWN"` reachable from a Healthy row).
+- **S5** — unified Attention section (`injectAttentionSection`) renders `Resource.Issues` (Wave-1) + `EnrichmentFinding` (Wave-2) together.
+
+The universal rules below govern every per-resource run — they are the same for every resource type and asserted by phase 8's scenario test.
 
 ## Universal UI rules (apply to every resource)
 
@@ -100,6 +108,13 @@ These rules are invariant across all resource types. They are enforced by phase 
 5. **Related panel counts are non-zero for every §2 pivot with `count shown: yes`** on the graph-root fixture. No exceptions, no "deferred pending sibling enrichment", no "follow-up ticket" excuses. A registered pivot that always returns `0` is a bug, not a deferred feature. If surfacing the pivot requires N+1 calls in the sibling fetcher (GetWorkGroup per workgroup, ListTargetsByRule per rule, ListResourceRecordSets per zone, etc.), do it — that cost is the cost of a working pivot, and it's the only version of the contract that renders a real operator graph. Pivots where §2 explicitly says `count shown: unknown` (e.g. windowed `ct-events`) are the only exemption, and even those must be documented in §2 with the reason.
 
    **"Implement resource" means implement the whole contract.** No deferrals, no stubs that return 0, no "Phase 7 will wire this" comments. If a pivot can't be wired end-to-end (fetcher populates the field, fixture tags an entry at the graph-root bucket, checker resolves non-zero), the skill is not done. User guidance 2026-04-23: "related resources MUST work. if they don't it's a bug. simple."
+
+   **At least 50% of pivots with `count shown: yes` on the graph-root fixture must render Count ≥ 2 (not just ≥ 1).** A graph-root fixture where every pivot resolves to exactly 1 is a trivially-connected mock — it does not exercise the "which of these related resources is the one I care about" path and provides false confidence. Skill phase 9.3 reports both the Count ≥ 1 total and the Count ≥ 2 ratio; FAIL if the ≥ 2 ratio is below 50%.
+
+   **Every registered related pivot AND every registered navigable field must drill to a non-empty landing.** The phase-8 scenario harness includes a drill-through test that opens the graph-root instance's detail view, follows each related pivot via `DrillRelated`, follows each navigable field via `FollowNavigableField`, and asserts every landing is non-empty. IDs returned by checkers must match the target resource type's `Resource.ID` format. When AWS returns ARNs but the target indexes on bare names/UUIDs:
+
+   - **Navigable fields** route through the central `resource.NavIDFromValue` registry in `internal/resource/related.go`. Target types `kms`, `role`, `ecs`, `logs`, `s3`, `iam-user` already have extractors; add new target types there — NOT per-field.
+   - **Related-pivot checkers** extract inline (the checker has full control over what it returns). The canonical pattern is `lambdaARNToName` in `internal/aws/ses_related.go` — split by `:function:`, strip any version suffix. Return bare names/UUIDs that match the target resource's `Resource.ID`. If the registered path does not resolve against the fetcher's RawStruct at all (structurally invalid — e.g. docdb DBCluster.DBSubnetGroup is `*string`, not a struct), REMOVE the registration and route navigation through the related-panel checker instead.
 6. **Detail view (S5) renders findings through the unified `Attention (N)` section** — one section, at the top of the detail view, with a count in the header. There are NO per-type section names (`Pending Maintenance`, `Latest Build`, `Target Health`, etc. — those existed before 2026-04-22 and were collapsed into the single Attention section). Every Wave-1 phrase from `Resource.Issues` and the Wave-2 `EnrichmentFinding` render as entries inside it. The renderer (`injectAttentionSection` in `internal/tui/views/detail_fields.go`) handles this universally — no per-resource code required. Entry presentation: each primary entry is `<glyph> <phrase>` with the first letter capitalized for readability (data stays canonical lowercase; the capitalization is purely visual via `capitalizeFirst`). Rows render indented beneath the primary entry as `Label: Value` pairs.
 7. **Multiple findings on the same instance remain individually visible across S2–S5.** S1 and S3 aggregate to one per instance (one count, one glyph — `!` beats `~`, color picks worst severity). But no finding may silently disappear. When an instance carries more than one finding:
    - **S4** renders the highest-precedence phrase plus a `(+N)` suffix when others exist on the same row — e.g. `storage-full (+2)`. The operator sees there is more to open for.
@@ -281,9 +296,9 @@ Also read **`.a9s/views/<shortName>.yaml`** and **`internal/config/defaults.go`*
 
 Record any column delta in the impl-plan's "Contract surface gap analysis" section alongside the related/enricher deltas. If the only finding is "Status column is correct, no jargon columns, identity columns match AWS fields" — that is the normal case, record it and move on. The same section lists: what the spec §2/§3/§4 demand, what the four surface files currently provide, and the delta the coder must close.
 
-### Phase 6 — Fixtures-first, then QA + coder in parallel
+### Phase 6 — Fixtures-first (gate for QA and phase 7)
 
-Three sub-steps: **6a** (fixtures), then **6b** (QA tests) and **7** (coder implementation) in parallel.
+Phase 6 has two sub-steps, **6a** (fixtures, blocking) and **6b** (QA tests, parallel with phase 7). Phase 7 is a peer phase, NOT a sub-step of phase 6 — but 6a must complete before either 6b or phase 7 can start. Read this phase and phase 7 together; dispatch 6a first, then 6b and 7 in parallel.
 
 Rationale for the sequencing:
 - **Fixtures are a single asset**, not two. `internal/demo/fixtures/<shortName>.go` feeds BOTH `./a9s --demo` (showcase) AND the unit test suite (6 test files in the tree currently import from here, and counting). Tests import raw SDK-shape fixtures from this file; inline construction in tests is the anti-pattern we are retiring.
@@ -328,7 +343,7 @@ Skill: a9s-create-demo-fixture with argument <shortName>. Follow the skill end-t
 - internal/demo/fixtures/<shortName>_fixtures.go (if present — folded into <shortName>.go)
 
 ### Expected exports (QA will import these by exact name):
-- `<ShortNameCamel>Fixtures` struct + `New<ShortNameCamel>Fixtures()` constructor. The camel-cased SHORTNAME, not the AWS service name — `redis` gets `RedisFixtures`, not `ElastiCacheFixtures`; `dbi` gets `DBIFixtures`, not `RDSFixtures`; `ng` gets `NGFixtures`, not `EKSFixtures`.
+- `<ShortName>Fixtures` struct + `New<ShortName>Fixtures()` constructor, where `<ShortName>` is Go-idiomatic Pascal-case with AWS-style acronyms preserved UPPERCASE. Key on the SHORTNAME, not the AWS service name — `redis` gets `RedisFixtures`, not `ElastiCacheFixtures`; `dbi` gets `DBIFixtures`, not `RDSFixtures`; `ng` gets `NGFixtures`, not `EKSFixtures`; `msk` gets `MSKFixtures`.
 - Exported ID/ARN `const` (e.g. `ProdDbiID`, `ProdDbiARN`, `ProdRedisID`) for sibling-file cross-reference.
 - One slice element per non-adversarial fixture in docs/resources/<shortName>-impl-plan.md §2.
 
@@ -354,7 +369,12 @@ Record the exact exported symbol list the coder emits — 6b needs it.
 
 #### 6b. QA — test files (parallel with phase 7, after 6a)
 
-Dispatch `Agent(a9s-qa)` with the scored handshake (`Mode: score` → accept/rework → `Mode: execute` with `Confirmed score: <N>`).
+Dispatch `Agent(a9s-qa)`. Two dispatch modes are valid, pick one explicitly:
+
+- **`Mode: score`** (default for this phase) — QA replies with `SCORE: <N> — <rationale>`. Accept or rework the scope, then re-dispatch with `Mode: execute` and `Confirmed score: <N>`. Use this when the scope is complex or you want QA to critique the coverage before writing.
+- **`Mode: write`** — QA writes the tests immediately, no scoring dance. Use this when the scope is well-trodden (e.g. the per-resource template in this phase) and an extra round would be pure ceremony.
+
+ALWAYS include a `Mode:` line — omitting it leads QA to pick score-mode by default and return a critique when you wanted tests, burning a dispatch round.
 
 QA task shape:
 
@@ -415,7 +435,7 @@ Parallelization: parallel-safe with 6b QA (both run after 6a)
 - internal/aws/<shortName>_interfaces.go — add any missing narrow interface
 - internal/aws/<shortName>_related.go — RegisterRelated for every target in §2
 - internal/aws/<shortName>_issue_enrichment.go — Wave 2 enricher per §3.2. ONLY include this file when §3.2 has signals; if the spec says `No Wave 2 signals`, omit this file entirely. All enricher body lives here — do NOT spin off `<shortName>_maintenance.go` / `<shortName>_overdue.go` / similar helper files.
-- internal/aws/<shortName>_detail_enrichment.go — only if §2 of the spec requires detail fields beyond the list shape
+- internal/aws/<shortName>_detail_enrichment.go — only if spec §3.2 ("detail text" column) requires fields/API calls beyond what the list fetcher already has. Detail-enrichment is NOT about §2 (related panel) — that's covered by `_related.go` checkers.
 - .a9s/views/<shortName>.yaml — regenerate via `go run ./cmd/viewsgen/` AFTER amending `internal/config/defaults.go` (the yaml is generated, never hand-edited)
 - internal/config/defaults.go — update the `defaultViews` entry for this shortName per the universal column rules in phase 0 (exactly one Status column, no jargon columns, identity/metadata per-resource)
 
@@ -525,13 +545,19 @@ The test drives the real `tui.Model.Update()` loop via `fullIntegrationNewDemoSc
 3. **Warning/Broken rows show §4 phrase**: for each fixture whose bucket ≠ Healthy, `scenario.ExpectRowStatusEquals(<fixture ID>, <exact §4 "List text" phrase>)`.
 4. **Glyph presence/absence**: for each fixture whose Wave 2 finding severity is `~` on a Healthy row, `scenario.ExpectRowNamePrefix(<fixture ID>, "~ ")`. For `!`, `"! "`. For any non-Healthy row, `scenario.ExpectRowNoGlyphPrefix(<fixture ID>)` regardless of finding presence.
 5. **S1 menu count**: `scenario.ExpectMenuIssueCount(<shortName>, <expected N>)` where N = count of distinct fixtures that have at least one `!` severity finding (NOT total finding count — a fixture with 3 `!` findings counts as 1). Must satisfy `N ≤ total fixture count for this type`. When the spec §3.2 has no Wave 2 `!` signals at all, N = 0 and the helper treats that as "badge absent" (no `issues:` string in the menu entry for this type).
-6. **Related pivot counts**: for each fixture, `scenario.OpenDetailResource(<shortName>, <fixture ID>)` then for each pivot in spec §2 whose "count shown" is `yes`, `scenario.ExpectRelatedRowCountAtLeast(<pivot display name>, 1)`. Pivots where §2 says `count shown: unknown` are skipped.
-7. **Multi-W1 suffix (U7a)**: for the `warn-<short>-multi` fixture, `scenario.ExpectRowStatusEquals(<id>, "<top> (+N-1)")`.
-8. **W1+W2 suffix (U7b)**: for the `warn-<short>-<w1>-plus-<w2>` fixture, `scenario.ExpectRowStatusEquals(<id>, "<w1> (+1)")`.
-9. **Healthy + ~ glyph (U3)**: `scenario.ExpectRowNamePrefix(<healthy+w2 id>, "~ ")`.
-10. **Non-green rows no glyph (rule 3)**: `scenario.ExpectRowNoGlyphPrefix(<w1+w2 id>)` — the row has a Wave-2 finding but is Warning-colored; the color is the signal, no glyph.
-11. **S5 Wave-2 finding-row visibility (U7c)**: `scenario.OpenDetailResource(<shortName>, <w1+w2 fixture>)`; then `scenario.ExpectViewContains(<w2 finding Action or Description string>)`. Verifies no Wave-2 finding silently disappears when Status shows the Wave-1 phrase.
-12. **S5 every-Wave-1-phrase visibility (U7e)**: on the multi-W1 fixture, open detail and assert every entry of `Resource.Issues` appears — BUT with first letter capitalized, because `injectAttentionSection` applies `capitalizeFirst` to every entry at render time. Data (`Resource.Issues`) stays canonical lowercase (`"publicly accessible"`); the rendered frame has `"Publicly accessible"`. Use a helper or pin the expected strings explicitly:
+6. **Related pivot counts (rendering)**: for each fixture, `scenario.OpenDetailResource(<shortName>, <fixture ID>)` then for each pivot in spec §2 whose "count shown" is `yes`, `scenario.ExpectRelatedRowCountAtLeast(<pivot display name>, 1)`. Pivots where §2 says `count shown: unknown` are skipped. This asserts the RENDERED count in the right-column panel — a pure visual check.
+
+7. **Drill-through (navigation)** — orthogonal to rule 6. Rule 6 asserts that the count renders correctly; this rule asserts that PRESSING ENTER on the count actually lands on real resources. The pins live in a separate table-driven file — `tests/integration/scenario_related_drill_through_test.go`. Do NOT add a new test function per resource; add ONE row per graph-root fixture to the `drillThroughFixtures` table:
+   ```go
+   {"<label>", "<shortName>", <graphRootID constant or literal>},
+   ```
+   Multiple rows per `shortName` are allowed when a resource has more than one graph-root-equivalent fixture (e.g. `dbi/prod-dbi-1` and `dbi/prod-dbi-aurora`). The shared loops run `DrillRelated` on every pivot with Count ≥ 1 and `FollowNavigableField` on every registered navigable field, asserting non-empty landings and enforcing the `resource.NavIDFromValue` bare-ID contract via `assertBareIDs`. No per-resource assertion code needed.
+8. **Multi-W1 suffix (U7a)**: for the `warn-<short>-multi` fixture, `scenario.ExpectRowStatusEquals(<id>, "<top> (+N-1)")`.
+9. **W1+W2 suffix (U7b)**: for the `warn-<short>-<w1>-plus-<w2>` fixture, `scenario.ExpectRowStatusEquals(<id>, "<w1> (+1)")`.
+10. **Healthy + ~ glyph (U3)**: `scenario.ExpectRowNamePrefix(<healthy+w2 id>, "~ ")`.
+11. **Non-green rows no glyph (rule 3)**: `scenario.ExpectRowNoGlyphPrefix(<w1+w2 id>)` — the row has a Wave-2 finding but is Warning-colored; the color is the signal, no glyph.
+12. **S5 Wave-2 finding-row visibility (U7c)**: `scenario.OpenDetailResource(<shortName>, <w1+w2 fixture>)`; then `scenario.ExpectViewContains(<w2 finding Action or Description string>)`. Verifies no Wave-2 finding silently disappears when Status shows the Wave-1 phrase.
+13. **S5 every-Wave-1-phrase visibility (U7e)**: on the multi-W1 fixture, open detail and assert every entry of `Resource.Issues` appears — BUT with first letter capitalized, because `injectAttentionSection` applies `capitalizeFirst` to every entry at render time. Data (`Resource.Issues`) stays canonical lowercase (`"publicly accessible"`); the rendered frame has `"Publicly accessible"`. Use a helper or pin the expected strings explicitly:
     ```go
     multi := selectXxxByID(t, scenario, <multiW1 id>)
     scenario.OpenDetailResource("<short>", multi)
@@ -576,6 +602,7 @@ If `scenario.ExpectRowStatusBlank` / `ExpectRowNamePrefix` / `ExpectMenuIssueCou
 - glyphs: ~<N> / !<N> prefixes verified; <N> non-green rows glyph-free
 - S1 menu badge: expected issues:<N>, got issues:<N>
 - related pivots non-zero: <M>/<total> (skipped: <N> unknown-count)
+- drill-through (rule 7): TestScenario_RelatedDrillThrough_All/<label> PASS (related: <N> pivots landed; navigable: <N> fields landed or N/A)
 - rule-7 U7a (multi-W1 +N suffix): <fixture-id> → "<expected>" OK
 - rule-7 U7b (W1+W2 suffix bump): <fixture-id> → "<expected>" OK
 - rule-7 U7c (S5 all findings): <fixture-id> detail contains <w2 cause> OK
@@ -604,7 +631,7 @@ This is the regression pin for the 2026-04-22 class of bugs where unit tests gre
 
 ### Phase 9 — Final report checklist (runs AFTER phase 8 passes)
 
-This phase does not change any code. It is the closeout that proves the four user-facing invariants that have been paid for in blood across multiple shipped resources. Skip any of these four and the skill is NOT done — regardless of how green phases 6–8 look.
+This phase does not change any code. It is the closeout that proves the five user-facing invariants (§9.1–§9.5) that have been paid for in blood across multiple shipped resources. Skip any of them and the skill is NOT done — regardless of how green phases 6–8 look.
 
 Emit the checklist verbatim in the final report, with each item marked `PASS`, `FAIL`, or `N/A (<reason>)`. If any item is FAIL, keep the skill running until it is PASS. "N/A" is only valid when the resource spec genuinely has no instance of the thing being checked (e.g. no Wave-1 signals at all → no multi-issue fixture possible), and the reason must be cited.
 
@@ -646,26 +673,47 @@ Report format:
     multi-issue fixture: <fixture-id> carries <finding-1>, <finding-2>, ... — PASS
 ```
 
-#### 9.3 "All related resources non-zero" graph-root
+#### 9.3 Graph-root pivot counts
 
-At least ONE fixture must resolve every registered `count shown: yes` pivot to ≥ 1. This is the showroom instance — an operator opens its detail view and sees every pivot populated, proving each registered panel entry actually works end-to-end. Document which fixture and list every pivot count.
+At least ONE fixture must resolve every registered `count shown: yes` pivot to ≥ 1 AND at least 50% of those pivots to ≥ 2. This is the showroom instance — an operator opens its detail view and sees every pivot populated, proving each registered panel entry works end-to-end AND the multi-resource disambiguation path is exercised (not a trivially-connected "one of each" mock).
 
 If the resource type has engine-split registrations (e.g. dbc covers both DocDB and Aurora, where some pivots are engine-specific), identify the graph-root that covers the union — add fixture entries as needed so one fixture carries the full set.
 
 Report format:
 
 ```text
-9.3 graph-root all-pivots-non-zero: <fixture-id>
+9.3 graph-root pivot counts: <fixture-id>
     - <Pivot Display Name 1>: <count>
     - <Pivot Display Name 2>: <count>
     - ...
-    <N>/<total> registered `count shown: yes` pivots ≥ 1 — PASS
+    non-zero: <N>/<total> registered `count shown: yes` pivots ≥ 1 — PASS
     (ct-events and other `count shown: unknown` pivots exempt)
+    ≥ 2 ratio: <M>/<total> pivots render Count ≥ 2 — PASS/FAIL (must be ≥ 50%)
 ```
 
-FAIL if any registered `count shown: yes` pivot is 0 on the nominated graph-root. Fix the fixture (or the sibling fetcher enrichment) until it's non-zero — do NOT accept a "best attempt" graph-root that covers 9 of 10 pivots.
+FAIL if any `count shown: yes` pivot is 0 on the graph-root. Fix the fixture (or the sibling fetcher enrichment) until it's non-zero — do NOT accept a "best attempt" graph-root that covers 9 of 10 pivots.
 
-#### 9.4 Detail view surfaces every finding — with a test
+FAIL if the ≥ 2 ratio falls below 50%. A trivially-connected graph-root (every pivot exactly 1) does not exercise the "which of these related resources is the one I care about" path and provides false confidence.
+
+#### 9.4 Drill-through validation (related pivots + navigable fields)
+
+Every registered pivot with Count ≥ 1 AND every registered navigable field must drill to a non-empty landing. The drill-through pins live in `tests/integration/scenario_related_drill_through_test.go` as table-driven subtests generated from `drillThroughFixtures`. Adding a new resource means one row, not a new test function.
+
+Report format:
+
+```text
+9.4 drill-through: TestScenario_RelatedDrillThrough_All/<label> — PASS
+    navigable-field drill-through: TestScenario_NavigableFieldDrillThrough_All/<label> — PASS (or SKIP if no navigable fields registered)
+```
+
+FAIL if `TestScenario_RelatedDrillThrough_All/<label>` does not PASS — a Count ≥ 1 that does not land a resource means the checker's ID format does not match the target's `Resource.ID` (the SES/DDB bug class). Fix with per-checker ARN-to-name extraction (see `lambdaARNToName` in `ses_related.go`).
+
+FAIL if navigable fields are registered and `TestScenario_NavigableFieldDrillThrough_All/<label>` does not PASS — options:
+
+- `NavIDFromValue` (in `internal/resource/related.go`) has no extractor for the target type, or the wrong extractor is registered — add/fix the entry.
+- The registered `FieldPath` does not resolve against the fetcher's RawStruct at all (as with dbc's `DBSubnetGroup.VpcId` against a docdb DBCluster whose DBSubnetGroup is `*string`, or redis's `SecurityGroups.SecurityGroupId` against a ReplicationGroup that has no such field) — REMOVE the stale entry from `RegisterNavigableFields(...)` and route navigation through the related-panel checker instead. Do not work around structurally-invalid paths with harness hacks.
+
+#### 9.5 Detail view surfaces every finding — with a test
 
 The unified `Attention (N)` section in the detail view must render every finding carried by the selected resource:
 
@@ -677,7 +725,7 @@ This must be asserted by a phase-8 scenario test that opens the multi-issue fixt
 Report format:
 
 ```text
-9.4 detail-view completeness test: TestScenario_<Short>Visual#multi_issue_detail
+9.5 detail-view completeness test: TestScenario_<Short>Visual#multi_issue_detail
     Fixture: <multi-issue fixture-id>
     Findings asserted in detail (via ExpectViewContains):
       - <Wave-1 phrase A>
@@ -691,34 +739,48 @@ Report format:
 
 If any expected phrase is missing from the rendered detail frame (even with green unit tests) — FAIL. The rendered frame from 8.4 is the authority.
 
-#### 9.5 Final report format
+#### 9.6 Final report format
 
-Aggregate the four items plus any skipped ones under a dedicated header in the PR-ready report:
+Aggregate the five check items plus any skipped ones under a dedicated header in the PR-ready report:
 
 ```text
 ## Phase 9 Report Checklist
 
 9.1 illegal UI elements: PASS
 9.2 fixture coverage: PASS (Wave-1 N/N, Wave-2 N/N, multi-issue: <id>)
-9.3 graph-root all-pivots-non-zero: PASS (<fixture>, N/N pivots)
-9.4 detail-view completeness: PASS (test: <name>, rendered frame logged)
+9.3 graph-root pivot counts: PASS (<fixture>, N/N non-zero, M/total ≥ 2)
+9.4 drill-through: PASS (related: <pass|N/A>, navigable: <pass|skipped>)
+9.5 detail-view completeness: PASS (test: <name>, rendered frame logged)
 
 Implementation: DONE.
 ```
 
-If any item is FAIL, do NOT emit "DONE" — loop back to the phase that owns the gap (fixture gaps → phase 6a; test gaps → phase 6b; rendering gaps → phase 7 or the scenario test).
+If any item is FAIL, do NOT emit "DONE" — loop back to the phase that owns the gap (fixture gaps → phase 6a; test gaps → phase 6b; rendering gaps → phase 7; drill-through gaps → phase 7 coder + one `drillThroughFixtures` row).
+
+### Phase 10 — Post-push review loop (runs AFTER user-approved push)
+
+After the user pushes, code lands in CI and — if a PR exists — collects reviewer comments. The skill is NOT done when phase 9 reports DONE; it is done when phase 10 confirms zero outstanding CI failures and zero unresolved review comments.
+
+Check, in order:
+
+1. **CI status.** `rtk gh run list --branch <branch> --limit 5` — list the most recent workflow runs. Any `failure` or `cancelled` is a blocker. For each failure: `rtk gh run view <id> --log-failed` to get the error, diagnose, fix, commit, push (explicit user approval required per CLAUDE.md / memory).
+2. **Reviewer comments.** If a PR exists (`rtk gh pr list --head <branch>`), fetch `rtk gh pr view <PR> --comments` and `rtk gh api repos/<owner>/<repo>/pulls/<PR>/comments` (inline review comments). Every finding is a bug unless the reviewer marks it as ignorable — do NOT defer, do NOT file a follow-up issue without the user's explicit OK. Fix each finding using the same coder+QA workflow as the implementation phases.
+3. **Consistency sweep.** After any doc-touching fix, re-run the `a9s-consistency-checker` agent per CLAUDE.md.
+
+Loop until both CI and reviewer comments are clean. Only then is the skill truly done.
 
 ## What this skill never does
 
-- Does not commit or push. The user does that.
+- Does not commit or push without explicit user approval for each action (per CLAUDE.md memory: "authorization stands for the scope specified, not beyond").
 - Does not touch unrelated resources. Scope is one shortName per invocation.
 - Does not skip phase 2. If there are TBDs, they get resolved before any code moves.
 - Does not "preserve" existing test expectations. The pseudocode spec in phase 3 is authoritative; anything in `tests/**` that contradicts it is wrong by definition.
+- Does not defer failures to follow-up issues without explicit user OK. "Fix all" means fix all.
 
-## Handling a spec change mid-flight
+## Handling a spec change or spec error mid-flight
 
-If phase 2 produces a TBD answer that materially changes §2 or §4 of the spec doc, update the spec first, then restart phases 3 and 4 from the amended spec. The impl-plan doc always reflects the current spec. Cheaper than discovering the contradiction in phase 7.
+If phase 2 produces a TBD answer that materially changes §2 or §4 of the spec doc, update the spec first, then restart phases 3 and 4 from the amended spec.
 
-## What to do when the spec is wrong
+If the spec has a factual error — e.g. an AWS field that doesn't exist on the list response — stop the skill and regenerate the spec (`a9s-resource-spec <shortName>`). Do not patch around the error at the impl-plan level; that just moves the drift.
 
-Occasionally the spec has an actual factual error — e.g. an AWS field that doesn't exist on the list response. Stop the skill and regenerate the spec (`a9s-resource-spec <shortName>`) first. Do not patch around the error at the impl-plan level; that just moves the drift.
+Either way: the impl-plan doc always reflects the current spec. Cheaper than discovering the contradiction in phase 7.

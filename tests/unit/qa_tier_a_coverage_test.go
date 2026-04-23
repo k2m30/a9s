@@ -45,7 +45,9 @@ var allAttentionColumns = []attentionColumnCase{
 	{resourceType: "cb", key: "last_build", description: "CodeBuild last build"},
 	{resourceType: "codeartifact", key: "package_count", description: "CodeArtifact package count"},
 	{resourceType: "glue", key: "last_run", description: "Glue job last run"},
-	{resourceType: "backup", key: "last_status", description: "Backup plan last status"},
+	// backup no longer exposes a last_status column; the Status column
+	// (key: status) owns every Wave-2 job-state phrase per docs/resources/backup.md §4.
+	{resourceType: "backup", key: "status", description: "Backup plan status (Wave-2 job findings)"},
 
 	// Group 2: Wave-1 fetcher-stored fields referenced by Key in list view
 	{resourceType: "ec2", key: "instance_status", description: "EC2 instance health status"},

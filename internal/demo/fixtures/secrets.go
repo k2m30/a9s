@@ -127,6 +127,23 @@ func NewSecretsFixtures() *SecretsFixtures {
 			RotationEnabled:  aws.Bool(true),
 			CreatedDate:      aws.Time(time.Date(2025, 6, 1, 10, 0, 0, 0, time.UTC)),
 		},
+		// Redis prod auth token — required for redis→secrets related-panel pivot (phase-7).
+		// Name matches ProdRedisSecretName; tag elasticache:replication-group-id enables
+		// tag-based matching once checkRedisSecrets is implemented in phase-7.
+		{
+			Name:             aws.String(ProdRedisSecretName),
+			ARN:              aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:" + ProdRedisSecretName + "-AbCdEf"),
+			Description:      aws.String("AUTH token for prod-redis-sessions ElastiCache cluster"),
+			LastAccessedDate: aws.Time(time.Date(2026, 4, 20, 0, 0, 0, 0, time.UTC)),
+			LastChangedDate:  aws.Time(time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)),
+			RotationEnabled:  aws.Bool(true),
+			LastRotatedDate:  aws.Time(time.Date(2026, 4, 1, 3, 0, 0, 0, time.UTC)),
+			CreatedDate:      aws.Time(time.Date(2025, 3, 15, 10, 0, 0, 0, time.UTC)),
+			Tags: []smtypes.Tag{
+				{Key: aws.String("elasticache:replication-group-id"), Value: aws.String(ProdRedisID)},
+				{Key: aws.String("Environment"), Value: aws.String("production")},
+			},
+		},
 		{
 			Name:             aws.String("staging/database/mysql"),
 			ARN:              aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:staging/database/mysql-StUvWx"),

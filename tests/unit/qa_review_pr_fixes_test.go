@@ -8,8 +8,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/acm"
 	acmtypes "github.com/aws/aws-sdk-go-v2/service/acm/types"
-	"github.com/aws/aws-sdk-go-v2/service/backup"
-	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 	"github.com/aws/aws-sdk-go-v2/service/codeartifact"
 	codeartifacttypes "github.com/aws/aws-sdk-go-v2/service/codeartifact/types"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
@@ -50,39 +48,13 @@ func TestACM_DaysLeft_RecentlyExpired(t *testing.T) {
 	}
 }
 
-// P2.2 — backup last_status reflects newest job even when older than 24h.
-type backupOldJobFake struct {
-	awsclient.BackupAPI
-}
-
-func (backupOldJobFake) ListBackupJobs(_ context.Context, _ *backup.ListBackupJobsInput, _ ...func(*backup.Options)) (*backup.ListBackupJobsOutput, error) {
-	tenDaysAgo := time.Now().Add(-10 * 24 * time.Hour)
-	return &backup.ListBackupJobsOutput{
-		BackupJobs: []backuptypes.BackupJob{
-			{
-				BackupJobId:  aws.String("job-old-1"),
-				CreationDate: &tenDaysAgo,
-				State:        backuptypes.BackupJobStateCompleted,
-				CreatedBy:    &backuptypes.RecoveryPointCreator{BackupPlanId: aws.String("plan-weekly")},
-			},
-		},
-	}, nil
-}
-
-func TestBackup_LastStatus_OldestJob(t *testing.T) {
-	clients := &awsclient.ServiceClients{Backup: backupOldJobFake{}}
-	result, err := awsclient.EnrichBackupJobs(context.Background(), clients, nil)
-	if err != nil {
-		t.Fatalf("unexpected: %v", err)
-	}
-	updates, ok := result.FieldUpdates["plan-weekly"]
-	if !ok {
-		t.Fatalf("expected FieldUpdates for plan-weekly even though job is 10d old (last_status must surface newest job regardless of 24h cutoff)")
-	}
-	if updates["last_status"] != string(backuptypes.BackupJobStateCompleted) {
-		t.Errorf("last_status = %q, want %q", updates["last_status"], backuptypes.BackupJobStateCompleted)
-	}
-}
+// P2.2 was a regression pin for the retired `last_status` field on backup. The
+// backup spec (docs/resources/backup.md §4) collapsed last_status into the
+// unified Status column as part of the 2026-04-23 rewrite — no column, no
+// field, no test. Removed rather than updated because there is no equivalent
+// invariant to preserve: last_status always surfaced the newest job regardless
+// of the 24h cutoff, but the new Status column carries only the in-window
+// Wave-2 finding phrase and is blank for healthy plans.
 
 // P3.1 — CodeArtifact ListPackages pagination: count must include all pages.
 type codeArtifactPagedFake struct {

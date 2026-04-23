@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("backup", []string{"plan_name", "plan_id", "creation_date", "last_execution", "resources"})
+	resource.RegisterFieldKeys("backup", []string{"plan_name", "plan_id", "creation_date", "last_execution", "resources", "not_resources"})
 
 	resource.RegisterPaginated("backup", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -86,7 +86,7 @@ func FetchBackupPlansPage(ctx context.Context, api BackupListBackupPlansAPI, con
 		// (s3, ddb, efs, dbi, …) can match via cache scan. One
 		// ListBackupSelections + one GetBackupSelection per selection —
 		// bounded by plan count; selections per plan typically ≤3.
-		resourcesCSV := enumerateBackupPlanResources(ctx, selectionAPI, getSelectionAPI, planID)
+		resourcesCSV, notResourcesCSV := enumerateBackupPlanResources(ctx, selectionAPI, getSelectionAPI, planID)
 
 		r := resource.Resource{
 			ID:     planID,
@@ -98,6 +98,7 @@ func FetchBackupPlansPage(ctx context.Context, api BackupListBackupPlansAPI, con
 				"creation_date":  creationDate,
 				"last_execution": lastExecution,
 				"resources":      resourcesCSV,
+				"not_resources":  notResourcesCSV,
 			},
 			RawStruct: plan,
 		}
@@ -128,28 +129,28 @@ func FetchBackupPlansPage(ctx context.Context, api BackupListBackupPlansAPI, con
 	}, nil
 }
 
-// enumerateBackupPlanResources walks the plan's selections and returns a
-// comma-separated list of every resource ARN covered by the plan. Returns
-// "" when the plan has no selections, the API shape is unavailable, or any
-// enumeration call fails (partial data is still better than zero, but an
-// empty aggregation lets the caller degrade cleanly to the "no resources"
-// signal rather than surfacing a half-built list).
+// enumerateBackupPlanResources walks the plan's selections and returns
+// comma-separated lists of resource ARNs and excluded ARNs covered by the
+// plan. Returns ("", "") when the plan has no selections, the API shape is
+// unavailable, or any enumeration call fails. The two return values correspond
+// to BackupSelection.Resources (include list, may contain wildcards) and
+// BackupSelection.NotResources (exclude list, same wildcard semantics).
 func enumerateBackupPlanResources(
 	ctx context.Context,
 	selectionAPI BackupListBackupSelectionsAPI,
 	getSelectionAPI BackupGetBackupSelectionAPI,
 	planID string,
-) string {
+) (string, string) {
 	if selectionAPI == nil || getSelectionAPI == nil || planID == "" {
-		return ""
+		return "", ""
 	}
 	listOut, err := selectionAPI.ListBackupSelections(ctx, &backup.ListBackupSelectionsInput{
 		BackupPlanId: aws.String(planID),
 	})
 	if err != nil || listOut == nil {
-		return ""
+		return "", ""
 	}
-	var arns []string
+	var resources, notResources []string
 	for _, sel := range listOut.BackupSelectionsList {
 		if sel.SelectionId == nil {
 			continue
@@ -159,9 +160,13 @@ func enumerateBackupPlanResources(
 			SelectionId:  sel.SelectionId,
 		})
 		if selErr != nil || selOut == nil || selOut.BackupSelection == nil {
-			continue
+			// fail closed — partial enumeration would drop NotResources exclusions,
+			// causing false-positive backup coverage. Return empty pair so the caller
+			// degrades cleanly rather than claiming incorrect coverage.
+			return "", ""
 		}
-		arns = append(arns, selOut.BackupSelection.Resources...)
+		resources = append(resources, selOut.BackupSelection.Resources...)
+		notResources = append(notResources, selOut.BackupSelection.NotResources...)
 	}
-	return strings.Join(arns, ",")
+	return strings.Join(resources, ","), strings.Join(notResources, ",")
 }

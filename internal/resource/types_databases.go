@@ -128,38 +128,46 @@ func databasesResourceTypes() []ResourceTypeDef {
 			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
 				{Key: "cluster_id", Title: "Cluster ID", Width: 28, Sortable: true},
-				{Key: "engine_version", Title: "Version", Width: 10, Sortable: true},
 				{Key: "node_type", Title: "Node Type", Width: 18, Sortable: true},
-				{Key: "status", Title: "Status", Width: 14, Sortable: true},
+				{Key: "status", Title: "Status", Width: 32, Sortable: true},
 				{Key: "nodes", Title: "Nodes", Width: 8, Sortable: true},
 				{Key: "endpoint", Title: "Endpoint", Width: 40, Sortable: false},
 			},
 			Color: func(r Resource) Color {
-				base := ColorHealthy
-				switch r.Fields["status"] {
-				case "available":
-					base = ColorHealthy
-				case "creating", "modifying", "snapshotting", "deleting", "rebooting cluster nodes":
-					base = ColorWarning
-				case "create-failed", "restore-failed", "incompatible-network":
-					base = ColorBroken
-				case "deleted":
-					base = ColorDim
+				// Strip the universal-rule-7 (+N) suffix so both raw AWS keywords
+				// (stored by DescribeReplicationGroups) and §4 phrases (constructed
+				// by computeRedisIssues) classify correctly.
+				// Examples:
+				//   "creating — new group" (§4)        → ColorWarning
+				//   "create failed — see events" (§4)  → ColorBroken
+				//   "shard 0001: modifying" (§4)       → ColorWarning
+				//   "deleted" (terminal)                → ColorDim
+				//   "" (healthy silence)                → ColorHealthy
+				phrase := StripFindingSuffix(r.Fields["status"])
+				// Terminal state — dim, not broken.
+				if phrase == "deleted" {
+					return ColorDim
 				}
-				if base == ColorBroken {
-					return base
+				// Broken: §4 phrases.
+				switch phrase {
+				case "create failed \u2014 see events":
+					return ColorBroken
 				}
-				// AutomaticFailover != enabled on a multi-AZ replication group → Warning
-				// (per docs/attention-signals.md). Populated by the redis fetcher after
-				// the CacheCluster → ReplicationGroup migration. Empty values are
-				// treated as unknown (no penalty) so legacy fixtures are unaffected.
-				af := r.Fields["automatic_failover"]
-				if r.Fields["multi_az"] == "enabled" && af != "" && af != "enabled" {
-					if base < ColorWarning {
-						base = ColorWarning
-					}
+				// Warning: §4 phrases.
+				switch phrase {
+				case "creating \u2014 new group",
+					"modifying \u2014 config change",
+					"snapshotting \u2014 backup running",
+					"deleting \u2014 teardown",
+					"multi-AZ without auto-failover":
+					return ColorWarning
 				}
-				return base
+				// Multi-shard shard-level phrases: "shard <id>: <state>" — all Warning.
+				if strings.HasPrefix(phrase, "shard ") {
+					return ColorWarning
+				}
+				// "" (healthy silence) → Healthy.
+				return ColorHealthy
 			},
 		},
 		{
@@ -218,14 +226,20 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "billing_mode", Title: "Billing", Width: 16, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				status := r.Fields["status"]
-				switch status {
-				case "ACTIVE":
+				// Strip the universal-rule-7 (+N) suffix before matching so that
+				// "archived: kms key lost (+1)" still maps to ColorBroken.
+				phrase := StripFindingSuffix(r.Fields["status"])
+				switch phrase {
+				case "":
 					return ColorHealthy
-				case "CREATING", "UPDATING", "DELETING":
+				case "creating", "updating", "deleting", "archiving":
 					return ColorWarning
-				case "INACCESSIBLE_ENCRYPTION_CREDENTIALS", "ARCHIVED", "ARCHIVING":
+				case "kms key inaccessible", "archived: kms key lost":
 					return ColorBroken
+				case "PITR off":
+					// Wave-2 ~ finding on a Healthy row — the `~` glyph does the
+					// signaling; the row color stays green so the glyph renders.
+					return ColorHealthy
 				}
 				return ColorHealthy
 			},

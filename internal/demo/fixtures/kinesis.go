@@ -48,6 +48,17 @@ func NewKinesisFixtures() *KinesisFixtures {
 					StreamMode: kinesistypes.StreamModeOnDemand,
 				},
 			},
+			// orders-prod-cdc — DDB→kinesis pivot: matches DescribeKinesisStreamingDestination
+			// result for the orders-prod table (KinesisDestinations["orders-prod"]).
+			{
+				StreamName:              aws.String(OrdersProdKinesisStream),
+				StreamARN:               aws.String(OrdersProdKinesisStreamARN),
+				StreamStatus:            kinesistypes.StreamStatusActive,
+				StreamCreationTimestamp: aws.Time(mustParseKinesisTime("2026-01-01T00:00:00+00:00")),
+				StreamModeDetails: &kinesistypes.StreamModeDetails{
+					StreamMode: kinesistypes.StreamModeOnDemand,
+				},
+			},
 			// Issue: StreamStatus=DELETING → Warning (stream being torn down)
 			{
 				StreamName:              aws.String("kinesis-deleting"),

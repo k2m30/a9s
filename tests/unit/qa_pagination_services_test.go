@@ -175,38 +175,35 @@ func TestQA_Pagination_FetchRDSInstancesPage_Error(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Mock: ElastiCache DescribeCacheClusters (paginated, uses Marker)
+// Mock: ElastiCache DescribeReplicationGroups (paginated, uses Marker)
 // ---------------------------------------------------------------------------
 
-type mockElastiCacheDescribeCacheClustersAPIPaginated struct {
+type mockElastiCacheDescribeReplicationGroupsAPIPaginated struct {
 	Calls     int
-	PageFunc  func(call int) (*elasticache.DescribeCacheClustersOutput, error)
-	lastInput *elasticache.DescribeCacheClustersInput
+	PageFunc  func(call int) (*elasticache.DescribeReplicationGroupsOutput, error)
+	lastInput *elasticache.DescribeReplicationGroupsInput
 }
 
-func (m *mockElastiCacheDescribeCacheClustersAPIPaginated) DescribeCacheClusters(_ context.Context, in *elasticache.DescribeCacheClustersInput, _ ...func(*elasticache.Options)) (*elasticache.DescribeCacheClustersOutput, error) {
+func (m *mockElastiCacheDescribeReplicationGroupsAPIPaginated) DescribeReplicationGroups(_ context.Context, in *elasticache.DescribeReplicationGroupsInput, _ ...func(*elasticache.Options)) (*elasticache.DescribeReplicationGroupsOutput, error) {
 	m.Calls++
 	m.lastInput = in
 	return m.PageFunc(m.Calls)
 }
 
 // ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchRedisClustersPage
+// TestQA_Pagination_FetchRedisPage
 // ---------------------------------------------------------------------------
 
-func TestQA_Pagination_FetchRedisClustersPage_FirstPage(t *testing.T) {
-	numNodes := int32(3)
-	mock := &mockElastiCacheDescribeCacheClustersAPIPaginated{
-		PageFunc: func(_ int) (*elasticache.DescribeCacheClustersOutput, error) {
-			return &elasticache.DescribeCacheClustersOutput{
-				CacheClusters: []ecachetypes.CacheCluster{
+func TestQA_Pagination_FetchRedisPage_FirstPage(t *testing.T) {
+	mock := &mockElastiCacheDescribeReplicationGroupsAPIPaginated{
+		PageFunc: func(_ int) (*elasticache.DescribeReplicationGroupsOutput, error) {
+			return &elasticache.DescribeReplicationGroupsOutput{
+				ReplicationGroups: []ecachetypes.ReplicationGroup{
 					{
-						CacheClusterId:     aws.String("my-redis"),
+						ReplicationGroupId: aws.String("my-redis"),
+						Status:             aws.String("available"),
 						Engine:             aws.String("redis"),
-						EngineVersion:      aws.String("7.0.7"),
-						CacheNodeType:      aws.String("cache.t3.micro"),
-						CacheClusterStatus: aws.String("available"),
-						NumCacheNodes:      &numNodes,
+						MemberClusters:     []string{"my-redis-001"},
 					},
 				},
 				Marker: aws.String("marker-page-2"),
@@ -214,7 +211,7 @@ func TestQA_Pagination_FetchRedisClustersPage_FirstPage(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchRedisClustersPage(context.Background(), mock, "")
+	result, err := awsclient.FetchRedisPage(context.Background(), mock, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -238,19 +235,16 @@ func TestQA_Pagination_FetchRedisClustersPage_FirstPage(t *testing.T) {
 	}
 }
 
-func TestQA_Pagination_FetchRedisClustersPage_Continuation(t *testing.T) {
-	numNodes := int32(1)
-	mock := &mockElastiCacheDescribeCacheClustersAPIPaginated{
-		PageFunc: func(_ int) (*elasticache.DescribeCacheClustersOutput, error) {
-			return &elasticache.DescribeCacheClustersOutput{
-				CacheClusters: []ecachetypes.CacheCluster{
+func TestQA_Pagination_FetchRedisPage_Continuation(t *testing.T) {
+	mock := &mockElastiCacheDescribeReplicationGroupsAPIPaginated{
+		PageFunc: func(_ int) (*elasticache.DescribeReplicationGroupsOutput, error) {
+			return &elasticache.DescribeReplicationGroupsOutput{
+				ReplicationGroups: []ecachetypes.ReplicationGroup{
 					{
-						CacheClusterId:     aws.String("staging-redis"),
+						ReplicationGroupId: aws.String("staging-redis"),
+						Status:             aws.String("creating"),
 						Engine:             aws.String("redis"),
-						EngineVersion:      aws.String("6.2.6"),
-						CacheNodeType:      aws.String("cache.t2.micro"),
-						CacheClusterStatus: aws.String("creating"),
-						NumCacheNodes:      &numNodes,
+						MemberClusters:     []string{"staging-redis-001"},
 					},
 				},
 				Marker: nil,
@@ -258,7 +252,7 @@ func TestQA_Pagination_FetchRedisClustersPage_Continuation(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchRedisClustersPage(context.Background(), mock, "marker-page-2")
+	result, err := awsclient.FetchRedisPage(context.Background(), mock, "marker-page-2")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -276,17 +270,17 @@ func TestQA_Pagination_FetchRedisClustersPage_Continuation(t *testing.T) {
 	}
 }
 
-func TestQA_Pagination_FetchRedisClustersPage_Empty(t *testing.T) {
-	mock := &mockElastiCacheDescribeCacheClustersAPIPaginated{
-		PageFunc: func(_ int) (*elasticache.DescribeCacheClustersOutput, error) {
-			return &elasticache.DescribeCacheClustersOutput{
-				CacheClusters: []ecachetypes.CacheCluster{},
-				Marker:        nil,
+func TestQA_Pagination_FetchRedisPage_Empty(t *testing.T) {
+	mock := &mockElastiCacheDescribeReplicationGroupsAPIPaginated{
+		PageFunc: func(_ int) (*elasticache.DescribeReplicationGroupsOutput, error) {
+			return &elasticache.DescribeReplicationGroupsOutput{
+				ReplicationGroups: []ecachetypes.ReplicationGroup{},
+				Marker:            nil,
 			}, nil
 		},
 	}
 
-	result, err := awsclient.FetchRedisClustersPage(context.Background(), mock, "")
+	result, err := awsclient.FetchRedisPage(context.Background(), mock, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -298,14 +292,14 @@ func TestQA_Pagination_FetchRedisClustersPage_Empty(t *testing.T) {
 	}
 }
 
-func TestQA_Pagination_FetchRedisClustersPage_Error(t *testing.T) {
-	mock := &mockElastiCacheDescribeCacheClustersAPIPaginated{
-		PageFunc: func(_ int) (*elasticache.DescribeCacheClustersOutput, error) {
-			return nil, errors.New("describe cache clusters failed")
+func TestQA_Pagination_FetchRedisPage_Error(t *testing.T) {
+	mock := &mockElastiCacheDescribeReplicationGroupsAPIPaginated{
+		PageFunc: func(_ int) (*elasticache.DescribeReplicationGroupsOutput, error) {
+			return nil, errors.New("describe replication groups failed")
 		},
 	}
 
-	_, err := awsclient.FetchRedisClustersPage(context.Background(), mock, "")
+	_, err := awsclient.FetchRedisPage(context.Background(), mock, "")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

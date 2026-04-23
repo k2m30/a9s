@@ -1080,8 +1080,8 @@ func TestQA_MainMenu_SelectionPersistsAcrossGAndShiftG(t *testing.T) {
 	}
 	msg := cmd()
 	nav := msg.(messages.NavigateMsg)
-	if nav.ResourceType != "ses" {
-		t.Errorf("after G, g, G, should be on ses, got %q", nav.ResourceType)
+	if nav.ResourceType != "backup" {
+		t.Errorf("after G, g, G, should be on backup, got %q", nav.ResourceType)
 	}
 }
 

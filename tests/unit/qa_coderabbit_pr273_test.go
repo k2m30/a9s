@@ -787,10 +787,9 @@ func TestCR273_Item2_DocDB_ColorReadsStatusKey(t *testing.T) {
 	}
 }
 
-// TestCR273_Item2_DDB_ColorReadsStatusKey is a positive guard confirming that
-// the DynamoDB INACCESSIBLE_ENCRYPTION_CREDENTIALS→ColorBroken mapping was
-// fixed in commit 35a54d4. If this test regresses (starts failing), the fix
-// was reverted.
+// TestCR273_Item2_DDB_ColorReadsStatusKey pins the post-spec-rewrite contract:
+// Fields["status"] carries the §4 phrase (e.g. "kms key inaccessible"), not the
+// raw AWS enum. Color must classify the phrase as Broken. Spec: docs/resources/ddb.md §4.
 func TestCR273_Item2_DDB_ColorReadsStatusKey(t *testing.T) {
 	td := resource.FindResourceType("ddb")
 	if td == nil {
@@ -799,13 +798,13 @@ func TestCR273_Item2_DDB_ColorReadsStatusKey(t *testing.T) {
 	r := resource.Resource{
 		ID:     "table-test-1",
 		Name:   "acme-events-table",
-		Status: "INACCESSIBLE_ENCRYPTION_CREDENTIALS",
-		Fields: map[string]string{"status": "INACCESSIBLE_ENCRYPTION_CREDENTIALS"},
+		Status: "kms key inaccessible",
+		Fields: map[string]string{"status": "kms key inaccessible"},
 	}
 	got := td.Color(r)
 	if got != resource.ColorBroken {
-		t.Errorf("ddb Color(status=INACCESSIBLE_ENCRYPTION_CREDENTIALS) = %v, want ColorBroken (%v): regression — fix in 35a54d4 was reverted",
-			got, resource.ColorBroken)
+		t.Errorf("ddb Color(status=%q) = %v, want ColorBroken (%v): §4 phrase for INACCESSIBLE_ENCRYPTION_CREDENTIALS must classify as Broken",
+			r.Status, got, resource.ColorBroken)
 	}
 }
 

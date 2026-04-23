@@ -547,6 +547,122 @@ func mapKeys(m map[string]any) []string {
 }
 
 // ---------------------------------------------------------------------------
+// TestExtractFirstListScalar — behavior tests for the list-scalar walker
+// ---------------------------------------------------------------------------
+
+// Structs used only by ExtractFirstListScalar tests — kept local to avoid
+// polluting the shared test-struct namespace.
+
+type flsSubnet struct {
+	SubnetId *string
+}
+
+type flsVpc struct {
+	Subnets []flsSubnet
+}
+
+type flsItem struct {
+	Name string
+}
+
+type flsContainer struct {
+	Items []flsItem
+}
+
+type flsInner struct {
+	ID string
+}
+
+type flsOuter struct {
+	// *[]flsInner — pointer-to-slice intermediate
+	Children *[]flsInner
+}
+
+type flsScalarOnly struct {
+	Region string
+}
+
+func flsPtr(s string) *string { return &s }
+
+func TestExtractFirstListScalar(t *testing.T) {
+	emptySubnets := []flsSubnet{}
+	innerSlice := []flsInner{{ID: "inner-1"}, {ID: "inner-2"}}
+
+	tests := []struct {
+		name  string
+		obj   any
+		path  string
+		want  string
+	}{
+		{
+			name: "list of structs with pointer field — returns first element value",
+			obj: flsVpc{
+				Subnets: []flsSubnet{
+					{SubnetId: flsPtr("subnet-abc")},
+					{SubnetId: flsPtr("subnet-xyz")},
+				},
+			},
+			path: "Subnets.SubnetId",
+			want: "subnet-abc",
+		},
+		{
+			name: "list of structs with value (non-pointer) field — returns first element value",
+			obj: flsContainer{
+				Items: []flsItem{
+					{Name: "alpha"},
+					{Name: "beta"},
+				},
+			},
+			path: "Items.Name",
+			want: "alpha",
+		},
+		{
+			name: "pointer-to-slice intermediate — walked transparently",
+			obj: flsOuter{
+				Children: &innerSlice,
+			},
+			path: "Children.ID",
+			want: "inner-1",
+		},
+		{
+			name: "empty slice — returns empty string",
+			obj: flsVpc{
+				Subnets: emptySubnets,
+			},
+			path: "Subnets.SubnetId",
+			want: "",
+		},
+		{
+			name: "nil intermediate pointer — returns empty string",
+			obj:  flsOuter{Children: nil},
+			path: "Children.ID",
+			want: "",
+		},
+		{
+			name: "path with no list — behaves like ExtractScalar",
+			obj:  flsScalarOnly{Region: "us-east-1"},
+			path: "Region",
+			want: "us-east-1",
+		},
+		{
+			name: "empty path — returns empty string",
+			obj:  flsScalarOnly{Region: "us-east-1"},
+			path: "",
+			want: "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := fieldpath.ExtractFirstListScalar(tc.obj, tc.path)
+			if got != tc.want {
+				t.Errorf("ExtractFirstListScalar(%T, %q) = %q; want %q", tc.obj, tc.path, got, tc.want)
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
 // helpers
 // ---------------------------------------------------------------------------
 

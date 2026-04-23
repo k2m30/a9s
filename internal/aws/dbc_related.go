@@ -46,7 +46,7 @@ func checkDbcAlarm(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
 	}
 	if alarmList == nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.ApproximateZero("alarm")
 	}
 
 	var ids []string
@@ -82,7 +82,7 @@ func checkDbcLogs(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
 	}
 	if logList == nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.ApproximateZero("logs")
 	}
 
 	// dbc covers both DocumentDB (/aws/docdb/<cluster>/*) and Aurora
@@ -130,7 +130,7 @@ func checkDbcDBI(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "dbi", Count: -1, Err: err}
 	}
 	if dbiList == nil {
-		return resource.RelatedCheckResult{TargetType: "dbi", Count: -1}
+		return resource.ApproximateZero("dbi")
 	}
 
 	var ids []string
@@ -165,7 +165,7 @@ func checkDbcDocdbSnap(ctx context.Context, clients any, res resource.Resource, 
 		return resource.RelatedCheckResult{TargetType: "docdb-snap", Count: -1, Err: err}
 	}
 	if snapList == nil {
-		return resource.RelatedCheckResult{TargetType: "docdb-snap", Count: -1}
+		return resource.ApproximateZero("docdb-snap")
 	}
 
 	var ids []string
@@ -258,7 +258,7 @@ func checkDbcSecrets(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1, Err: err}
 	}
 	if secretList == nil {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
+		return resource.ApproximateZero("secrets")
 	}
 
 	var ids []string

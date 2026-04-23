@@ -501,6 +501,29 @@ func buildVpcs() []ec2types.Vpc {
 				{Key: aws.String("Name"), Value: aws.String("default")},
 			},
 		},
+		// Redis prod VPC — required for redis→vpc related-panel pivot.
+		{
+			VpcId:           aws.String(ProdRedisVpcID),
+			CidrBlock:       aws.String("10.10.0.0/16"),
+			State:           ec2types.VpcStateAvailable,
+			IsDefault:       aws.Bool(false),
+			InstanceTenancy: ec2types.TenancyDefault,
+			DhcpOptionsId:   aws.String("dopt-0redis0000000001"),
+			OwnerId:         aws.String("123456789012"),
+			CidrBlockAssociationSet: []ec2types.VpcCidrBlockAssociation{
+				{
+					AssociationId: aws.String("vpc-cidr-assoc-redis-01"),
+					CidrBlock:     aws.String("10.10.0.0/16"),
+					CidrBlockState: &ec2types.VpcCidrBlockState{
+						State: ec2types.VpcCidrBlockStateCodeAssociated,
+					},
+				},
+			},
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("acme-redis-prod")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+			},
+		},
 	}
 }
 
@@ -694,6 +717,31 @@ func buildSecurityGroups() []ec2types.SecurityGroup {
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
 			},
 		},
+		// Redis prod security group — required for redis→sg related-panel pivot.
+		// Matches fixtures.ProdRedisSGID on the prod-redis-sessions-001 member cluster.
+		{
+			GroupId:          aws.String(ProdRedisSGID),
+			GroupName:        aws.String("acme-redis-prod-sg"),
+			VpcId:            aws.String(ProdRedisVpcID),
+			Description:      aws.String("Redis production security group — allows port 6379 from app tier"),
+			OwnerId:          aws.String("123456789012"),
+			SecurityGroupArn: aws.String("arn:aws:ec2:us-east-1:123456789012:security-group/" + ProdRedisSGID),
+			IpPermissions: []ec2types.IpPermission{
+				{
+					IpProtocol: aws.String("tcp"),
+					FromPort:   aws.Int32(6379),
+					ToPort:     aws.Int32(6379),
+					IpRanges:   []ec2types.IpRange{{CidrIp: aws.String("10.10.0.0/16"), Description: aws.String("Redis from prod VPC")}},
+				},
+			},
+			IpPermissionsEgress: []ec2types.IpPermission{
+				{IpProtocol: aws.String("-1"), IpRanges: []ec2types.IpRange{{CidrIp: aws.String("0.0.0.0/0")}}},
+			},
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("acme-redis-prod-sg")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+			},
+		},
 		// Protocol -1 open to 0.0.0.0/0 → Risk column shows WIDE_OPEN
 		{
 			GroupId:          aws.String("sg-0wide0open0000003"),
@@ -818,6 +866,43 @@ func buildSubnets() []ec2types.Subnet {
 				{Key: aws.String("Name"), Value: aws.String("prod-private-1b")},
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
 				{Key: aws.String("Tier"), Value: aws.String("private")},
+			},
+		},
+		// Redis prod subnets — required for redis→subnet related-panel pivot.
+		{
+			SubnetId:                aws.String(ProdRedisSubnetA),
+			VpcId:                   aws.String(ProdRedisVpcID),
+			CidrBlock:               aws.String("10.10.1.0/24"),
+			AvailabilityZone:        aws.String("us-east-1a"),
+			AvailabilityZoneId:      aws.String("use1-az1"),
+			State:                   ec2types.SubnetStateAvailable,
+			AvailableIpAddressCount: aws.Int32(251),
+			MapPublicIpOnLaunch:     aws.Bool(false),
+			DefaultForAz:            aws.Bool(false),
+			SubnetArn:               aws.String("arn:aws:ec2:us-east-1:123456789012:subnet/" + ProdRedisSubnetA),
+			OwnerId:                 aws.String("123456789012"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("redis-private-1a")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+				{Key: aws.String("Tier"), Value: aws.String("cache")},
+			},
+		},
+		{
+			SubnetId:                aws.String(ProdRedisSubnetB),
+			VpcId:                   aws.String(ProdRedisVpcID),
+			CidrBlock:               aws.String("10.10.2.0/24"),
+			AvailabilityZone:        aws.String("us-east-1b"),
+			AvailabilityZoneId:      aws.String("use1-az2"),
+			State:                   ec2types.SubnetStateAvailable,
+			AvailableIpAddressCount: aws.Int32(251),
+			MapPublicIpOnLaunch:     aws.Bool(false),
+			DefaultForAz:            aws.Bool(false),
+			SubnetArn:               aws.String("arn:aws:ec2:us-east-1:123456789012:subnet/" + ProdRedisSubnetB),
+			OwnerId:                 aws.String("123456789012"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("redis-private-1b")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+				{Key: aws.String("Tier"), Value: aws.String("cache")},
 			},
 		},
 		{

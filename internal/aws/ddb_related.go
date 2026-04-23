@@ -4,7 +4,6 @@ import (
 	"context"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/service/backup"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
@@ -46,7 +45,7 @@ func checkDdbAlarm(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
 	}
 	if alarmList == nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		return resource.ApproximateZero("alarm")
 	}
 
 	var ids []string
@@ -65,36 +64,42 @@ func checkDdbAlarm(ctx context.Context, clients any, res resource.Resource, cach
 	if len(ids) == 0 && truncated {
 		return resource.ApproximateZero("alarm")
 	}
+	if truncated {
+		return truncatedResultDDB("alarm", ids)
+	}
 	return relatedResult("alarm", ids)
 }
 
-// checkDdbBackup resolves AWS Backup recovery points for this DynamoDB table
-// via backup:ListRecoveryPointsByResource (Pattern C: 1 API call).
-// The table ARN is read from res.Fields["arn"]. Count = number of recovery points.
-func checkDdbBackup(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// checkDdbBackup resolves AWS Backup plans that cover this DynamoDB table by
+// reverse-scanning the already-loaded backup list cache. For each cached plan,
+// Fields["resources"] contains a comma-separated list of resource ARNs or
+// wildcard patterns (e.g. arn:aws:dynamodb:*:*:table/*); Fields["not_resources"]
+// contains exclusion patterns with the same wildcard semantics. A plan covers
+// this table iff any Resources entry matches the table's ARN AND no NotResources
+// entry matches. No live API call is made — this is a pure cache scan.
+func checkDdbBackup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	tableARN := res.Fields["arn"]
 	if tableARN == "" {
 		return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
 	}
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil || c.Backup == nil {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
-	}
-	api, ok := c.Backup.(BackupListRecoveryPointsByResourceAPI)
-	if !ok {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
-	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*backup.ListRecoveryPointsByResourceOutput, error) {
-		return api.ListRecoveryPointsByResource(ctx, &backup.ListRecoveryPointsByResourceInput{ResourceArn: &tableARN})
-	})
+	backupList, truncated, err := ddbRelatedResources(ctx, clients, cache, "backup")
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "backup", Count: -1, Err: err}
 	}
+	if backupList == nil {
+		return resource.ApproximateZero("backup")
+	}
 	var ids []string
-	for _, rp := range out.RecoveryPoints {
-		if rp.RecoveryPointArn != nil && *rp.RecoveryPointArn != "" {
-			ids = append(ids, *rp.RecoveryPointArn)
+	for _, planRes := range backupList {
+		if BackupPlanCoversARN(planRes.Fields["resources"], planRes.Fields["not_resources"], tableARN) {
+			ids = append(ids, planRes.ID)
 		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.ApproximateZero("backup")
+	}
+	if truncated {
+		return truncatedResultDDB("backup", ids)
 	}
 	return relatedResult("backup", ids)
 }
@@ -133,6 +138,13 @@ func checkDdbKinesis(ctx context.Context, clients any, res resource.Resource, _ 
 		}
 	}
 	return relatedResult("kinesis", ids)
+}
+
+// truncatedResultDDB returns a RelatedCheckResult with Approximate=true when the
+// target cache is truncated and matches were found. Later pages may contain
+// additional matches, so the displayed count is a lower bound — rendered as "(N+)".
+func truncatedResultDDB(target string, ids []string) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: target, Count: len(ids), ResourceIDs: ids, Approximate: true}
 }
 
 // ddbRelatedResources returns the resource list for target from cache or by fetching the first page.

@@ -3,8 +3,8 @@ list:
     path: TableName
     width: 36
   Status:
-    path: TableStatus
-    width: 12
+    key: status
+    width: 32
   Items:
     path: ItemCount
     width: 12
@@ -14,9 +14,6 @@ list:
   Billing:
     path: BillingModeSummary.BillingMode
     width: 16
-  PITR:
-    key: pitr_enabled
-    width: 6
 
 detail:
   - TableName

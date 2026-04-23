@@ -10,10 +10,12 @@ package unit
 //   - EnrichELBAttributes    (line 2267)
 //   - EnrichCFNCombined      (line 2956)
 //   - EnrichEBEnvironmentHealth (line 2209)
-//   - EnrichRedisReplicationGroup (line 1258)
 //
 // Per enricher: happy-path (findings emitted), truncation (API error), no-issue.
 // All fakes embed the aggregate interface and override only the method under test.
+//
+// Note: Redis has no Wave-2 enricher — spec §3.2 explicitly has no Wave-2 signals.
+// EnrichRedisReplicationGroup tests were removed post-phase-7.
 
 import (
 	"context"
@@ -25,8 +27,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cfnsvc "github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
-	"github.com/aws/aws-sdk-go-v2/service/elasticache"
-	echetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
 	"github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk"
 	elbv2svc "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
@@ -1193,160 +1193,3 @@ func TestEnrichCFNCombined_NilClient_ReturnsEmpty(t *testing.T) {
 	}
 }
 
-// =============================================================================
-// ElastiCache fake
-// =============================================================================
-
-// redisWave3Fake embeds ElastiCacheAPI and overrides DescribeReplicationGroups.
-type redisWave3Fake struct {
-	awsclient.ElastiCacheAPI
-
-	groups []echetypes.ReplicationGroup
-	marker *string
-	err    error
-}
-
-func (f *redisWave3Fake) DescribeReplicationGroups(
-	_ context.Context,
-	_ *elasticache.DescribeReplicationGroupsInput,
-	_ ...func(*elasticache.Options),
-) (*elasticache.DescribeReplicationGroupsOutput, error) {
-	if f.err != nil {
-		return nil, f.err
-	}
-	return &elasticache.DescribeReplicationGroupsOutput{
-		ReplicationGroups: f.groups,
-		Marker:            f.marker,
-	}, nil
-}
-
-// Compile-time check.
-var _ awsclient.ElastiCacheAPI = (*redisWave3Fake)(nil)
-
-// =============================================================================
-// EnrichRedisReplicationGroup
-// =============================================================================
-
-// TestEnrichRedisReplicationGroup_FieldUpdatesPopulated verifies that replication
-// group membership causes FieldUpdates to be set for known cluster IDs.
-func TestEnrichRedisReplicationGroup_FieldUpdatesPopulated(t *testing.T) {
-	clusterID1 := "prod-redis-001"
-	clusterID2 := "prod-redis-002"
-	fake := &redisWave3Fake{
-		groups: []echetypes.ReplicationGroup{
-			{
-				AutomaticFailover: echetypes.AutomaticFailoverStatusEnabled,
-				MultiAZ:           echetypes.MultiAZStatusEnabled,
-				MemberClusters:    []string{clusterID1, clusterID2},
-			},
-		},
-	}
-	clients := &awsclient.ServiceClients{ElastiCache: fake}
-	resources := []resource.Resource{
-		{ID: clusterID1, Name: clusterID1},
-		{ID: clusterID2, Name: clusterID2},
-	}
-
-	result, err := awsclient.EnrichRedisReplicationGroup(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	for _, id := range []string{clusterID1, clusterID2} {
-		updates, ok := result.FieldUpdates[id]
-		if !ok {
-			t.Errorf("expected FieldUpdates for cluster %q; got map: %v", id, result.FieldUpdates)
-			continue
-		}
-		if updates["automatic_failover"] != "enabled" {
-			t.Errorf("cluster %q: automatic_failover = %q, want %q", id, updates["automatic_failover"], "enabled")
-		}
-		if updates["multi_az"] != "enabled" {
-			t.Errorf("cluster %q: multi_az = %q, want %q", id, updates["multi_az"], "enabled")
-		}
-	}
-	// No findings: Redis enricher only produces FieldUpdates, no issues.
-	if len(result.Findings) != 0 {
-		t.Errorf("expected no findings; got %v", result.Findings)
-	}
-}
-
-// TestEnrichRedisReplicationGroup_UnknownClusterSkipped verifies that clusters
-// NOT in the input resources slice do not appear in FieldUpdates.
-func TestEnrichRedisReplicationGroup_UnknownClusterSkipped(t *testing.T) {
-	knownID := "known-cluster-001"
-	unknownID := "unknown-cluster-999"
-	fake := &redisWave3Fake{
-		groups: []echetypes.ReplicationGroup{
-			{
-				AutomaticFailover: echetypes.AutomaticFailoverStatusDisabled,
-				MultiAZ:           echetypes.MultiAZStatusDisabled,
-				MemberClusters:    []string{knownID, unknownID},
-			},
-		},
-	}
-	clients := &awsclient.ServiceClients{ElastiCache: fake}
-	resources := []resource.Resource{
-		{ID: knownID, Name: knownID},
-	}
-
-	result, err := awsclient.EnrichRedisReplicationGroup(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if _, ok := result.FieldUpdates[unknownID]; ok {
-		t.Errorf("unknown cluster %q must not appear in FieldUpdates", unknownID)
-	}
-	if _, ok := result.FieldUpdates[knownID]; !ok {
-		t.Errorf("known cluster %q should appear in FieldUpdates", knownID)
-	}
-}
-
-// TestEnrichRedisReplicationGroup_APIErrorReturnsEmpty verifies that an API
-// error on DescribeReplicationGroups returns an empty (non-nil) result
-// without propagating the error — the enricher is best-effort for field updates.
-func TestEnrichRedisReplicationGroup_APIErrorReturnsEmpty(t *testing.T) {
-	fake := &redisWave3Fake{
-		err: errors.New("simulated DescribeReplicationGroups error"),
-	}
-	clients := &awsclient.ServiceClients{ElastiCache: fake}
-	resources := []resource.Resource{
-		{ID: "err-cluster-001", Name: "err-cluster-001"},
-	}
-
-	result, err := awsclient.EnrichRedisReplicationGroup(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("unexpected error (enricher should absorb API errors): %v", err)
-	}
-	if result.Findings == nil {
-		t.Error("Findings map must not be nil even on API error")
-	}
-	if result.TruncatedIDs == nil {
-		t.Error("TruncatedIDs map must not be nil even on API error")
-	}
-}
-
-// TestEnrichRedisReplicationGroup_NoGroupsMembership_EmptyFieldUpdates verifies
-// that clusters not in any replication group produce no FieldUpdates.
-func TestEnrichRedisReplicationGroup_NoGroupsMembership_EmptyFieldUpdates(t *testing.T) {
-	fake := &redisWave3Fake{
-		groups: []echetypes.ReplicationGroup{
-			{
-				AutomaticFailover: echetypes.AutomaticFailoverStatusEnabled,
-				MultiAZ:           echetypes.MultiAZStatusEnabled,
-				MemberClusters:    []string{"some-other-cluster"},
-			},
-		},
-	}
-	clients := &awsclient.ServiceClients{ElastiCache: fake}
-	resources := []resource.Resource{
-		{ID: "my-standalone-cluster", Name: "my-standalone-cluster"},
-	}
-
-	result, err := awsclient.EnrichRedisReplicationGroup(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(result.FieldUpdates) != 0 {
-		t.Errorf("expected no FieldUpdates for non-member cluster; got %v", result.FieldUpdates)
-	}
-}

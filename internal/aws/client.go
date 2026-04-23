@@ -42,6 +42,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/ses"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
@@ -86,6 +87,7 @@ type ServiceClients struct {
 	WAFv2            WAFv2API
 	Glue             GlueAPI
 	ElasticBeanstalk ElasticBeanstalkAPI
+	SES              SESV1API
 	SESv2            SESv2API
 	Redshift         RedshiftAPI
 	CloudTrail       CloudTrailAPI
@@ -152,6 +154,7 @@ func CreateServiceClients(cfg aws.Config) *ServiceClients {
 		WAFv2:            wafv2.NewFromConfig(cfg),
 		Glue:             glue.NewFromConfig(cfg),
 		ElasticBeanstalk: elasticbeanstalk.NewFromConfig(cfg),
+		SES:              ses.NewFromConfig(cfg),
 		SESv2:            sesv2.NewFromConfig(cfg),
 		Redshift:         redshift.NewFromConfig(cfg),
 		CloudTrail:       cloudtrail.NewFromConfig(cfg),

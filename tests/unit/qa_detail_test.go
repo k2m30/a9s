@@ -367,20 +367,18 @@ func TestQA_Detail_RDS_BooleanMultiAZFalse(t *testing.T) {
 
 func TestQA_Detail_Redis_ViewContainsExpectedFields(t *testing.T) {
 	ensureNoColor(t)
-	cluster := realisticRedisCacheCluster()
-	res := buildResource("redis-prod-001", "redis-prod-001", cluster)
+	rg := realisticRedisReplicationGroup()
+	res := buildResource("redis-prod-001", "redis-prod-001", rg)
 	cfg := configForType("redis")
 	m := newDetailModel(res, "redis", cfg)
 
 	view := m.View()
 	for _, expected := range []string{
-		"CacheClusterId", "redis-prod-001",
-		"Engine", "redis",
-		"EngineVersion", "7.0.12",
-		"CacheClusterStatus", "available",
+		"ReplicationGroupId", "redis-prod-001",
+		"Description", "Prod Redis replication group",
+		"Status", "available",
 		"CacheNodeType", "cache.r6g.large",
-		"NumCacheNodes", "3",
-		"PreferredAvailability", "us-east-1a",
+		"MemberClusters",
 	} {
 		if !strings.Contains(view, expected) {
 			t.Errorf("Redis detail should contain %q, got:\n%s", expected, view)
@@ -390,8 +388,8 @@ func TestQA_Detail_Redis_ViewContainsExpectedFields(t *testing.T) {
 
 func TestQA_Detail_Redis_NestedConfigurationEndpoint(t *testing.T) {
 	ensureNoColor(t)
-	cluster := realisticRedisCacheCluster()
-	res := buildResource("redis-prod-001", "redis-prod-001", cluster)
+	rg := realisticRedisReplicationGroup()
+	res := buildResource("redis-prod-001", "redis-prod-001", rg)
 	cfg := configForType("redis")
 	m := newDetailModel(res, "redis", cfg)
 
@@ -409,20 +407,19 @@ func TestQA_Detail_Redis_NestedConfigurationEndpoint(t *testing.T) {
 
 func TestQA_Detail_Redis_NilConfigurationEndpoint(t *testing.T) {
 	ensureNoColor(t)
-	cluster := elasticachetypes.CacheCluster{
-		CacheClusterId:     new("redis-single"),
-		CacheClusterStatus: new("available"),
-		Engine:             new("redis"),
-		// ConfigurationEndpoint is nil (single-node cluster)
+	rg := elasticachetypes.ReplicationGroup{
+		ReplicationGroupId: new("redis-single"),
+		Status:             new("available"),
+		// ConfigurationEndpoint is nil (single-node replication group)
 	}
-	res := buildResource("redis-single", "redis-single", cluster)
+	res := buildResource("redis-single", "redis-single", rg)
 	cfg := configForType("redis")
 	m := newDetailModel(res, "redis", cfg)
 
 	// Should not panic
 	view := m.View()
 	if !strings.Contains(view, "redis-single") {
-		t.Error("Redis detail should show cluster ID even when ConfigurationEndpoint is nil")
+		t.Error("Redis detail should show replication group ID even when ConfigurationEndpoint is nil")
 	}
 }
 
@@ -872,7 +869,7 @@ func TestQA_Detail_YAMLSwitch_AllTypes(t *testing.T) {
 		{"S3", "s3", buildResource("bucket", "bucket", realisticS3Bucket())},
 		{"EC2", "ec2", buildResource("i-abc", "inst", realisticEC2Instance())},
 		{"RDS", "dbi", buildResource("rds-1", "rds-1", realisticRDSInstance())},
-		{"Redis", "redis", buildResource("redis-1", "redis-1", realisticRedisCacheCluster())},
+		{"Redis", "redis", buildResource("redis-1", "redis-1", realisticRedisReplicationGroup())},
 		{"DocDB", "dbc", buildResource("docdb-1", "docdb-1", realisticDocDBCluster())},
 		{"EKS", "eks", buildResource("eks-1", "eks-1", realisticEKSCluster())},
 		{"Secrets", "secrets", buildResource("secret-1", "secret-1", realisticSecretListEntry())},
@@ -1027,17 +1024,17 @@ func TestQA_Detail_FixtureRDSInstances(t *testing.T) {
 
 func TestQA_Detail_FixtureRedisClusters(t *testing.T) {
 	ensureNoColor(t)
-	cluster := realisticRedisCacheCluster()
-	res := buildResource("redis-prod-001", "redis-prod-001", cluster)
+	rg := realisticRedisReplicationGroup()
+	res := buildResource("redis-prod-001", "redis-prod-001", rg)
 	cfg := configForType("redis")
 	m := newDetailModel(res, "redis", cfg)
 
 	view := m.View()
 	if !strings.Contains(view, "redis-prod-001") {
-		t.Error("Redis fixture detail should contain cluster ID")
+		t.Error("Redis fixture detail should contain replication group ID")
 	}
-	if !strings.Contains(view, "7.0.12") {
-		t.Error("Redis fixture detail should contain engine version")
+	if !strings.Contains(view, "cache.r6g.large") {
+		t.Error("Redis fixture detail should contain node type")
 	}
 }
 
@@ -1290,18 +1287,19 @@ func TestQA_Detail_FieldOrdering_DocDB(t *testing.T) {
 
 func TestQA_Detail_FieldOrdering_Redis(t *testing.T) {
 	ensureNoColor(t)
-	cluster := realisticRedisCacheCluster()
-	res := buildResource("redis-test", "redis-test", cluster)
+	rg := realisticRedisReplicationGroup()
+	res := buildResource("redis-test", "redis-test", rg)
 	cfg := configForType("redis")
 	m := newDetailModel(res, "redis", cfg)
 
 	view := m.View()
+	// Detail view config order: ReplicationGroupId, ARN, Description, Status, CacheNodeType,
+	// MemberClusters, ConfigurationEndpoint, MultiAZ, AutomaticFailover, KmsKeyId, ...
 	// Note: field names longer than 22 chars are truncated by PadOrTrunc.
-	// "ConfigurationEndpoint" (21 chars) fits; "PreferredAvailabilityZone" (25 chars) is truncated.
+	// "ReplicationGroupId" (18 chars) fits; "AutomaticFailover" (17 chars) fits.
 	expectedOrder := []string{
-		"CacheClusterId", "Engine", "EngineVersion",
-		"CacheClusterStatus", "CacheNodeType", "NumCacheNodes",
-		"ConfigurationEndpoint", "PreferredAvailability",
+		"ReplicationGroupId", "Description", "Status",
+		"CacheNodeType", "MemberClusters", "ConfigurationEndpoint",
 	}
 	lastIdx := -1
 	for _, field := range expectedOrder {
@@ -1375,7 +1373,7 @@ func TestQA_Detail_AllTypes_ViewNonEmpty(t *testing.T) {
 		{"S3Object", "s3_objects", buildResource("o", "o", realisticS3ObjectFile())},
 		{"EC2", "ec2", buildResource("i", "i", realisticEC2Instance())},
 		{"RDS", "dbi", buildResource("r", "r", realisticRDSInstance())},
-		{"Redis", "redis", buildResource("rc", "rc", realisticRedisCacheCluster())},
+		{"Redis", "redis", buildResource("rc", "rc", realisticRedisReplicationGroup())},
 		{"DocDB", "dbc", buildResource("dc", "dc", realisticDocDBCluster())},
 		{"EKS", "eks", buildResource("ek", "ek", realisticEKSCluster())},
 		{"Secrets", "secrets", buildResource("s", "s", realisticSecretListEntry())},
@@ -1408,7 +1406,7 @@ func TestQA_Detail_AllTypes_NilFieldsRender(t *testing.T) {
 		{"S3Object_nil", "s3_objects", buildResource("o", "o", s3types.Object{})},
 		{"EC2_nil", "ec2", buildResource("i", "i", ec2types.Instance{})},
 		{"RDS_nil", "dbi", buildResource("r", "r", rdstypes.DBInstance{})},
-		{"Redis_nil", "redis", buildResource("rc", "rc", elasticachetypes.CacheCluster{})},
+		{"Redis_nil", "redis", buildResource("rc", "rc", elasticachetypes.ReplicationGroup{})},
 		{"DocDB_nil", "dbc", buildResource("dc", "dc", docdbtypes.DBCluster{})},
 		{"EKS_nil", "eks", buildResource("ek", "ek", &ekstypes.Cluster{})},
 		{"Secrets_nil", "secrets", buildResource("s", "s", smtypes.SecretListEntry{})},

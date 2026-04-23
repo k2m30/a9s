@@ -174,20 +174,19 @@ func TestQA_ListRawStruct_Redis(t *testing.T) {
 	ensureNoColor(t)
 	cfg := configForType("redis")
 
-	cluster := realisticRedisCacheCluster()
+	rg := realisticRedisReplicationGroup()
 	res := resource.Resource{
 		ID:     "redis-prod-001",
 		Name:   "redis-prod-001",
 		Status: "available",
 		Fields: map[string]string{
-			"cluster_id":     "redis-prod-001",
-			"engine_version": "7.0.12",
-			"node_type":      "cache.r6g.large",
-			"status":         "available",
-			"nodes":          "3",
-			"endpoint":       "old-endpoint",
+			"cluster_id": "redis-prod-001",
+			"node_type":  "cache.r6g.large",
+			"status":     "available",
+			"nodes":      "3",
+			"endpoint":   "old-endpoint",
 		},
-		RawStruct: cluster,
+		RawStruct: rg,
 	}
 
 	view := newListModel(t, "redis", cfg, []resource.Resource{res})
@@ -196,13 +195,13 @@ func TestQA_ListRawStruct_Redis(t *testing.T) {
 	if !strings.Contains(view, "redis-prod-001.abc123.clustercfg") {
 		t.Errorf("Redis list should contain endpoint prefix from RawStruct, got:\n%s", view)
 	}
-	// CacheClusterId from RawStruct
+	// ReplicationGroupId from RawStruct
 	if !strings.Contains(view, "redis-prod-001") {
-		t.Errorf("Redis list should contain cluster ID from RawStruct, got:\n%s", view)
+		t.Errorf("Redis list should contain replication group ID from RawStruct, got:\n%s", view)
 	}
-	// NumCacheNodes as "3" from RawStruct
-	if !strings.Contains(view, "3") {
-		t.Errorf("Redis list should contain node count from RawStruct, got:\n%s", view)
+	// CacheNodeType from RawStruct
+	if !strings.Contains(view, "cache.r6g.large") {
+		t.Errorf("Redis list should contain node type from RawStruct, got:\n%s", view)
 	}
 }
 
@@ -480,13 +479,22 @@ func TestQA_ListRawStruct_Redis_RawStructOverridesFields(t *testing.T) {
 	ensureNoColor(t)
 	cfg := configForType("redis")
 
-	cluster := elasticachetypes.CacheCluster{
-		CacheClusterId:     new("correct-redis"),
-		Engine:             new("redis"),
-		EngineVersion:      new("7.0.12"),
+	// Redis list columns (post-CodeRabbit review, 2026-04-23 — Cluster ID moved
+	// from Key to Path so a regression to Fields-sourced ID rendering fails here):
+	//   "Cluster ID"  → Path:"ReplicationGroupId"           — reads from RawStruct
+	//   "Node Type"   → Path:"CacheNodeType"                 — reads from RawStruct
+	//   "Status"      → Key:"status"                         — reads from Fields
+	//   "Nodes"       → Key:"nodes"                          — reads from Fields
+	//   "Endpoint"    → Path:"ConfigurationEndpoint.Address" — reads from RawStruct
+	//
+	// Path-based columns are overridden by RawStruct; Key-based columns always
+	// come from Fields. This test verifies Path columns use RawStruct values
+	// even when Fields carries a conflicting ("WRONG-*") value.
+	rg := elasticachetypes.ReplicationGroup{
+		ReplicationGroupId: new("correct-redis"),
+		Status:             new("available"),
 		CacheNodeType:      new("cache.r6g.xlarge"),
-		CacheClusterStatus: new("available"),
-		NumCacheNodes:      new(int32(5)),
+		MemberClusters:     []string{"correct-redis-001"},
 		ConfigurationEndpoint: &elasticachetypes.Endpoint{
 			Address: new("correct-redis.cache.amazonaws.com"),
 			Port:    new(int32(6379)),
@@ -497,35 +505,37 @@ func TestQA_ListRawStruct_Redis_RawStructOverridesFields(t *testing.T) {
 		ID:   "correct-redis",
 		Name: "correct-redis",
 		Fields: map[string]string{
-			"cluster_id":     "WRONG-CLUSTER",
-			"engine_version": "WRONG-VER",
-			"node_type":      "WRONG-TYPE",
-			"status":         "WRONG-STATUS",
-			"nodes":          "WRONG-NODES",
-			"endpoint":       "WRONG-ENDPOINT",
+			"cluster_id": "WRONG-ID",       // Path col — overridden by RawStruct.ReplicationGroupId
+			"node_type":  "WRONG-TYPE",     // Path col — overridden by RawStruct.CacheNodeType
+			"status":     "WRONG-STATUS",   // Key col — will appear from Fields
+			"nodes":      "WRONG-NODES",    // Key col — will appear from Fields
+			"endpoint":   "WRONG-ENDPOINT", // Path col — overridden by RawStruct.ConfigurationEndpoint
 		},
-		RawStruct: cluster,
+		RawStruct: rg,
 	}
 
 	view := newListModel(t, "redis", cfg, []resource.Resource{res})
 
-	// RawStruct values
+	// Path-based columns must show RawStruct values
 	if !strings.Contains(view, "correct-redis") {
-		t.Errorf("Redis list should contain 'correct-redis' from RawStruct, got:\n%s", view)
-	}
-	if !strings.Contains(view, "correct-redis.cache") {
-		t.Errorf("Redis list should contain endpoint prefix from RawStruct, got:\n%s", view)
+		t.Errorf("Redis list should contain Cluster ID from RawStruct (Path col), got:\n%s", view)
 	}
 	if !strings.Contains(view, "cache.r6g.xlarge") {
-		t.Errorf("Redis list should contain node type from RawStruct, got:\n%s", view)
+		t.Errorf("Redis list should contain node type from RawStruct (Path col), got:\n%s", view)
+	}
+	if !strings.Contains(view, "correct-redis.cache") {
+		t.Errorf("Redis list should contain endpoint from RawStruct (Path col), got:\n%s", view)
 	}
 
-	// Fields must not appear
-	if strings.Contains(view, "WRONG-CLUSTER") {
-		t.Error("Redis list should NOT contain WRONG-CLUSTER from Fields")
+	// Path-based columns must NOT show stale Fields values
+	if strings.Contains(view, "WRONG-ID") {
+		t.Error("Redis list should NOT contain WRONG-ID from Fields (Path col overridden by RawStruct)")
+	}
+	if strings.Contains(view, "WRONG-TYPE") {
+		t.Error("Redis list should NOT contain WRONG-TYPE from Fields (Path col overridden by RawStruct)")
 	}
 	if strings.Contains(view, "WRONG-ENDPOINT") {
-		t.Error("Redis list should NOT contain WRONG-ENDPOINT from Fields")
+		t.Error("Redis list should NOT contain WRONG-ENDPOINT from Fields (Path col overridden by RawStruct)")
 	}
 }
 
@@ -777,12 +787,11 @@ func TestQA_ListRawStruct_WithProductionViewsYAML(t *testing.T) {
 	})
 
 	t.Run("Redis", func(t *testing.T) {
-		cluster := elasticachetypes.CacheCluster{
-			CacheClusterId:     new("prod-redis-test"),
-			EngineVersion:      new("7.1.0"),
+		rg := elasticachetypes.ReplicationGroup{
+			ReplicationGroupId: new("prod-redis-test"),
+			Status:             new("available"),
 			CacheNodeType:      new("cache.m7g.large"),
-			CacheClusterStatus: new("available"),
-			NumCacheNodes:      new(int32(2)),
+			MemberClusters:     []string{"prod-redis-test-001", "prod-redis-test-002"},
 			ConfigurationEndpoint: &elasticachetypes.Endpoint{
 				Address: new("prod-redis-test.clustercfg.usw2.cache.amazonaws.com"),
 			},
@@ -791,7 +800,7 @@ func TestQA_ListRawStruct_WithProductionViewsYAML(t *testing.T) {
 			ID:        "prod-redis-test",
 			Name:      "prod-redis-test",
 			Fields:    map[string]string{"endpoint": "WRONG-EP"},
-			RawStruct: cluster,
+			RawStruct: rg,
 		}
 		view := newListModel(t, "redis", cfg, []resource.Resource{res})
 		if !strings.Contains(view, "prod-redis-test.clustercfg") {
@@ -926,7 +935,7 @@ func TestQA_ListRawStruct_AllTypes(t *testing.T) {
 		// -- Already covered individually above, included for completeness --
 		{"ec2", realisticEC2Instance(), []string{"i-0abcdef1234567890", "running", "t3.medium"}},
 		{"dbi", realisticRDSInstance(), []string{"prod-db-01", "mysql", "db.r5.large"}},
-		{"redis", realisticRedisCacheCluster(), []string{"redis-prod-001", "7.0.12", "cache.r6g.large"}},
+		{"redis", realisticRedisReplicationGroup(), []string{"redis-prod-001", "cache.r6g.large"}},
 		// dbc: Status column now uses Key:"status" (reads from Fields, not RawStruct) so the
 		// raw AWS keyword "available" no longer appears in the list. Identity columns remain.
 		{"dbc", realisticDocDBCluster(), []string{"docdb-prod-cluster", "5.0.0"}},
@@ -947,7 +956,9 @@ func TestQA_ListRawStruct_AllTypes(t *testing.T) {
 		{"role", realisticIAMRole(), []string{"lambda-exec-role", "/"}},
 		{"logs", realisticLogGroup(), []string{"/aws/lambda/my-api-handler"}},
 		{"ssm", realisticSSMParameter(), []string{"/app/config/db-host", "String"}},
-		{"ddb", realisticDDBTable(), []string{"users-table", "ACTIVE"}},
+		// ddb: Fields["status"] carries the §4 phrase (blank for Healthy/ACTIVE) —
+		// the raw AWS enum no longer surfaces in the list view. Spec: docs/resources/ddb.md §4.
+		{"ddb", realisticDDBTable(), []string{"users-table"}},
 		{"acm", realisticACMCertificate(), []string{"example.com", "ISSUED"}},
 		{"asg", realisticASG(), []string{"my-app-asg"}},
 		{"vpc", realisticVPC(), []string{"vpc-0abc1234def56789a", "10.0.0.0/16", "available"}},
@@ -1219,7 +1230,7 @@ var (
 	_ ecstypes.Cluster
 	_ efstypes.FileSystemDescription
 	_ ebtypes.EnvironmentDescription
-	_ elasticachetypes.CacheCluster
+	_ elasticachetypes.ReplicationGroup
 	_ elbv2types.LoadBalancer
 	_ ekstypes.Cluster
 	_ eventbridgetypes.Rule

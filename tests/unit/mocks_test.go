@@ -167,6 +167,21 @@ func (m *mockElastiCacheClient) DescribeCacheClusters(
 	return m.output, m.err
 }
 
+// mockElastiCacheReplicationGroupsClient implements
+// awsclient.ElastiCacheDescribeReplicationGroupsAPI for testing.
+type mockElastiCacheReplicationGroupsClient struct {
+	output *elasticache.DescribeReplicationGroupsOutput
+	err    error
+}
+
+func (m *mockElastiCacheReplicationGroupsClient) DescribeReplicationGroups(
+	ctx context.Context,
+	params *elasticache.DescribeReplicationGroupsInput,
+	optFns ...func(*elasticache.Options),
+) (*elasticache.DescribeReplicationGroupsOutput, error) {
+	return m.output, m.err
+}
+
 // ---------------------------------------------------------------------------
 // DocumentDB mocks
 // ---------------------------------------------------------------------------

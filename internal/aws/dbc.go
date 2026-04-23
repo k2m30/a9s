@@ -35,12 +35,12 @@ func init() {
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkDbcVPC},
 	})
 
-	// docdb_types.DBCluster: VpcSecurityGroups[].VpcSecurityGroupId, DBSubnetGroup.VpcId,
-	// DBSubnetGroup.Subnets[].SubnetIdentifier, KmsKeyId
+	// docdb_types.DBCluster: VpcSecurityGroups[].VpcSecurityGroupId (list),
+	// KmsKeyId (scalar). DBSubnetGroup on DocDB is just a *string name, not
+	// a struct — VPC/Subnet navigation is surfaced via checkDbcVPC /
+	// checkDbcSubnet in the related-panel, not via navigable fields.
 	resource.RegisterNavigableFields("dbc", []resource.NavigableField{
 		{FieldPath: "VpcSecurityGroups.VpcSecurityGroupId", TargetType: "sg"},
-		{FieldPath: "DBSubnetGroup.VpcId", TargetType: "vpc"},
-		{FieldPath: "DBSubnetGroup.Subnets.SubnetIdentifier", TargetType: "subnet"},
 		{FieldPath: "KmsKeyId", TargetType: "kms"},
 	})
 }

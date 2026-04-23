@@ -321,3 +321,176 @@ func TestMenuCount_MatchesListCount_AfterWave2(t *testing.T) {
 		t.Errorf("main menu does not show issue count 1 for ec2 after Wave-2 enrichment; output:\n%s", menuContent)
 	}
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Target #4 — unifiedIssueCount must not count "~"-severity findings
+//
+// Problem: unifiedIssueCount adds every finding ID to the issue-ID set
+// regardless of finding.Severity. Only "!" findings must bump the badge;
+// "~" (informational) findings must never contribute.
+//
+// These tests FAIL until the coder adds a Severity=="!" guard in the
+// findings loop of unifiedIssueCount.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// tildeSeverityEC2Instances returns 3 EC2 resources whose Color is Healthy
+// (running state → ColorHealthy → !IsIssue). Used as Wave-1 baseline
+// so any badge count must come from Wave-2 findings only.
+func tildeSeverityEC2Instances() []resource.Resource {
+	return []resource.Resource{
+		{ID: "i-aaa", Name: "server-a", Status: "running",
+			Fields: map[string]string{"name": "server-a", "state": "running"}},
+		{ID: "i-bbb", Name: "server-b", Status: "running",
+			Fields: map[string]string{"name": "server-b", "state": "running"}},
+		{ID: "i-ccc", Name: "server-c", Status: "running",
+			Fields: map[string]string{"name": "server-c", "state": "running"}},
+	}
+}
+
+// TestUnifiedIssueCount_IgnoresTildeSeverityFindings verifies three cases:
+//  1. One "!" finding + two "~" findings → unified count = 1 (only "!" counts).
+//  2. Three "~" findings, no "!" → unified count = 0 (informational only, no badge).
+//  3. One Wave-1 broken resource + one "~" finding on its ID → count = 1
+//     (broken comes from Wave-1 IsIssue; "~" must not double-count or bump).
+//
+// Regression pin: unifiedIssueCount must ignore findings where Severity != "!".
+// The menu issue badge (format " issues:N") must reflect only "!" findings.
+//
+// Navigation pattern: AvailabilityCheckedMsg seeds probeResources so that
+// unifiedIssueCount has wave1Resources to work with; NavigateMsg pops back to
+// the menu so that m.View() renders the menu (not the resource list).
+func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
+	tui.Version = "test"
+
+	t.Run("one ! finding + two ~ findings → count=1 (only ! counts)", func(t *testing.T) {
+		m := newRootSizedModel()
+
+		// Use AvailabilityCheckedMsg (Gen=0 matches fresh model's availabilityGen=0)
+		// to seed probeResources["ec2"] so unifiedIssueCount has wave1Resources.
+		// All three resources are running → Wave-1 contributes 0 to issue IDs.
+		resources := tildeSeverityEC2Instances()
+		m, _ = rootApplyMsg(m, messages.AvailabilityCheckedMsg{
+			ResourceType: "ec2",
+			Count:        3,
+			Resources:    resources,
+			Issues:       0,
+			Gen:          0,
+		})
+
+		m = navigateToEC2List(m)
+
+		// EnrichmentCheckedMsg: unifiedIssueCount re-derives from Findings.
+		// Bug (before fix): all 3 findings counted → issues:3.
+		// Correct (after fix): only "!" findings → issues:1.
+		m, _ = rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+			ResourceType: "ec2",
+			Issues:       1,
+			Truncated:    false,
+			Findings: map[string]resource.EnrichmentFinding{
+				"i-aaa": {Severity: "!", Summary: "system status impaired"},
+				"i-bbb": {Severity: "~", Summary: "pending maintenance"},
+				"i-ccc": {Severity: "~", Summary: "quota 80%+ used"},
+			},
+			Gen:     0,
+			TypeGen: 0,
+		})
+
+		// Pop back to the menu so m.View() renders the main menu.
+		m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetMainMenu})
+		menuContent := stripANSI(m.View().Content)
+
+		// The menu badge format is " issues:N". Bug produces " issues:3".
+		// After fix: " issues:1" (only the "!" finding counts).
+		if strings.Contains(menuContent, " issues:3") {
+			t.Errorf("menu shows issues:3, want issues:1 — ~ severity must not count; output:\n%s", menuContent)
+		}
+		if strings.Contains(menuContent, " issues:2") {
+			t.Errorf("menu shows issues:2, want issues:1 — ~ severity must not count; output:\n%s", menuContent)
+		}
+	})
+
+	t.Run("three ~ findings only → count=0 (no badge)", func(t *testing.T) {
+		m := newRootSizedModel()
+
+		resources := tildeSeverityEC2Instances()
+		m, _ = rootApplyMsg(m, messages.AvailabilityCheckedMsg{
+			ResourceType: "ec2",
+			Count:        3,
+			Resources:    resources,
+			Issues:       0,
+			Gen:          0,
+		})
+
+		m = navigateToEC2List(m)
+
+		// All three findings are "~" (informational). unifiedIssueCount must return 0.
+		// Bug (before fix): counts all 3 → issues:3.
+		// Correct (after fix): no "!" findings → no badge.
+		m, _ = rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+			ResourceType: "ec2",
+			Issues:       0,
+			Truncated:    false,
+			Findings: map[string]resource.EnrichmentFinding{
+				"i-aaa": {Severity: "~", Summary: "pending maintenance"},
+				"i-bbb": {Severity: "~", Summary: "pending maintenance"},
+				"i-ccc": {Severity: "~", Summary: "quota 80%+ used"},
+			},
+			Gen:     0,
+			TypeGen: 0,
+		})
+
+		m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetMainMenu})
+		menuContent := stripANSI(m.View().Content)
+
+		// No issue badge: " issues:" must not appear at all for ec2.
+		// Bug produces " issues:3"; correct result has no badge (issueBadge returns "").
+		if strings.Contains(menuContent, " issues:") {
+			t.Errorf("menu shows issue badge, want none — all findings are ~ severity; output:\n%s", menuContent)
+		}
+	})
+
+	t.Run("one Wave-1 broken + ~ finding on same ID → count=1 (no double-count)", func(t *testing.T) {
+		m := newRootSizedModel()
+
+		// EC2 resource with Status=stopped → Color func returns ColorBroken (IsIssue=true).
+		// Wave-1 contributes 1 to the issue count.
+		brokenResource := resource.Resource{
+			ID:     "i-stopped",
+			Name:   "stopped-server",
+			Status: "stopped",
+			Fields: map[string]string{"name": "stopped-server", "state": "stopped"},
+		}
+		m, _ = rootApplyMsg(m, messages.AvailabilityCheckedMsg{
+			ResourceType: "ec2",
+			Count:        1,
+			Resources:    []resource.Resource{brokenResource},
+			Issues:       1, // Wave-1 issue
+			Gen:          0,
+		})
+
+		m = navigateToEC2List(m)
+
+		// Wave-2: a "~" finding on the same ID. Wave-1 already contributes count=1.
+		// unifiedIssueCount must return 1 (dedup + no ~ bump).
+		// Bug (before fix): "~" is counted, dedup collapses to 1 anyway — this subtest
+		// catches the case where a DIFFERENT id has a "~" finding that inflates count.
+		m, _ = rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+			ResourceType: "ec2",
+			Issues:       0, // enricher excludes ~ from IssueCount
+			Truncated:    false,
+			Findings: map[string]resource.EnrichmentFinding{
+				"i-stopped": {Severity: "~", Summary: "pending maintenance"},
+			},
+			Gen:     0,
+			TypeGen: 0,
+		})
+
+		m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetMainMenu})
+		menuContent := stripANSI(m.View().Content)
+
+		// Wave-1 broken resource contributes issues:1. ~ on same ID must not bump to 2.
+		if strings.Contains(menuContent, " issues:2") {
+			t.Errorf("menu shows issues:2, want issues:1 — ~ on broken resource must not double-count; output:\n%s", menuContent)
+		}
+	})
+}

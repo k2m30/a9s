@@ -1,42 +1,34 @@
 list:
   Cluster ID:
-    path: CacheClusterId
+    path: ReplicationGroupId
     width: 28
-  Version:
-    path: EngineVersion
-    width: 10
   Node Type:
     path: CacheNodeType
     width: 18
   Status:
-    path: CacheClusterStatus
-    width: 14
-  Failover:
-    key: automatic_failover
-    width: 10
+    key: status
+    width: 32
   Nodes:
-    path: NumCacheNodes
+    key: nodes
     width: 8
   Endpoint:
     path: ConfigurationEndpoint.Address
     width: 40
 
 detail:
-  - CacheClusterId
-  - ARN
-  - Engine
-  - EngineVersion
-  - CacheClusterStatus
-  - CacheNodeType
-  - NumCacheNodes
-  - CacheNodes
-  - ConfigurationEndpoint
-  - PreferredAvailabilityZone
   - ReplicationGroupId
-  - CacheSubnetGroupName
-  - SecurityGroups
+  - ARN
+  - Description
+  - Status
+  - CacheNodeType
+  - MemberClusters
+  - ConfigurationEndpoint
+  - MultiAZ
+  - AutomaticFailover
+  - KmsKeyId
   - AtRestEncryptionEnabled
   - TransitEncryptionEnabled
   - AuthTokenEnabled
   - SnapshotRetentionLimit
-  - PreferredMaintenanceWindow
+  - SnapshotWindow
+  - LogDeliveryConfigurations

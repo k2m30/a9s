@@ -15,6 +15,7 @@ import (
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo"
+	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
@@ -884,4 +885,194 @@ func cloneStringMap(in map[string]string) map[string]string {
 		out[k] = v
 	}
 	return out
+}
+
+// DrillRelated dispatches a RelatedNavigateMsg for the named related-panel row and
+// returns the resources that land in the target view. It requires that the current
+// detail view is open and that the row has already been observed in lastRelatedByName
+// (i.e. its checker ran and produced a Count). Fails the test if the row was not
+// observed or if the resulting resource list is empty.
+//
+// After the helper returns, the caller must press Esc to pop back to the detail view
+// before calling DrillRelated again (each drill pushes a new view onto the stack).
+func (s *fullIntegrationScenario) DrillRelated(displayName string) []resource.Resource {
+	s.t.Helper()
+	msg, ok := s.lastRelatedByName[displayName]
+	if !ok {
+		s.failf("DrillRelated(%q): row was not observed in lastRelatedByName; got %v", displayName, s.relatedNames())
+	}
+	if msg.Result.Count < 1 && len(msg.Result.ResourceIDs) == 0 && len(msg.Result.FetchFilter) == 0 {
+		s.failf("DrillRelated(%q): Count=0 and no ResourceIDs/FetchFilter — cannot drill an empty pivot", displayName)
+	}
+
+	// Snapshot state before the drill so we can detect what changed.
+	prevResource := s.currentResource
+
+	rel := s.relatedNavigateMsg(displayName)
+	s.beginAction("drill related %s", displayName)
+	// beginAction resets lastResourcesLoaded to nil; after applyAndDrain, a non-nil
+	// lastResourcesLoaded means the drill triggered a new ResourcesLoadedMsg.
+	s.applyAndDrain(rel)
+
+	// Case 1: a new resource list was loaded (multi-ID or FetchFilter path).
+	// Use lastResourcesLoaded (reset by beginAction before dispatch) to confirm a
+	// new list arrived, rather than comparing currentListType/currentListResources
+	// which may still hold state from an earlier OpenList call.
+	if s.lastResourcesLoaded != nil {
+		if len(s.currentListResources) == 0 {
+			s.failf("DrillRelated(%q): navigation produced an empty resource list (type=%q)", displayName, s.currentListType)
+		}
+		return append([]resource.Resource(nil), s.currentListResources...)
+	}
+
+	// Case 2: a single-resource detail was auto-opened (TargetID + single cache hit).
+	// currentResource pointer changed after NavigateMsg{Target: TargetDetail} was observed.
+	if s.currentResource != nil && s.currentResource != prevResource {
+		return []resource.Resource{*s.currentResource}
+	}
+
+	// Case 3: cache-hit filtered list pushed without a ResourcesLoadedMsg.
+	// Occurs when handleRelatedNavigate takes the RelatedIDs cache-hit branch and calls
+	// NewResourceListFromCache — which pushes a view and returns nil cmd, so no
+	// ResourcesLoadedMsg is ever dispatched. Detected by checking the rendered view title
+	// for "{targetType}(N)". Return synthetic resource stubs from the RelatedIDs; their
+	// IDs are the checker-emitted values — exactly what tests need for format assertions.
+	targetType := rel.TargetType
+	rendered := s.currentView()
+	if strings.Contains(rendered, targetType+"(") {
+		if strings.Contains(rendered, targetType+"(0)") {
+			s.failf("DrillRelated(%q): cache-hit filtered list is empty — target type %q rendered with count 0 (RelatedIDs=%v)",
+				displayName, targetType, rel.RelatedIDs)
+		}
+		if len(rel.RelatedIDs) == 0 {
+			// FetchFilter path with cache hit: no RelatedIDs to return, but the view
+			// shows resources — return a single-element stub to signal non-empty.
+			return []resource.Resource{{ID: targetType + "/cache-hit"}}
+		}
+		result := make([]resource.Resource, len(rel.RelatedIDs))
+		for i, id := range rel.RelatedIDs {
+			result[i] = resource.Resource{ID: id}
+		}
+		return result
+	}
+
+	// Case 4: detail-view pushed without a NavigateMsg.
+	// handleRelatedNavigate's KindDetail + cache-hit branch pushes a detail view
+	// and returns nil Cmd — no NavigateMsg is emitted, so currentResource stays
+	// pointed at the parent. Detect the push via the rendered frame title:
+	// "detail -- <id>" or "detail -- <id> (<name>)".
+	if strings.Contains(rendered, "detail -- ") {
+		// Extract the ID from the title. The format is "detail -- <id>" or
+		// "detail -- <id> (<name>)". The ID stops at " (" or end-of-line.
+		after := rendered[strings.Index(rendered, "detail -- ")+len("detail -- "):]
+		if nlIdx := strings.IndexAny(after, "\n│"); nlIdx >= 0 {
+			after = after[:nlIdx]
+		}
+		if parIdx := strings.Index(after, " ("); parIdx >= 0 {
+			after = after[:parIdx]
+		}
+		id := strings.TrimSpace(after)
+		if id != "" {
+			return []resource.Resource{{ID: id}}
+		}
+	}
+
+	// Neither a list nor a detail landed — the resolver either flashed or produced nothing.
+	if s.lastFlash != nil {
+		s.failf("DrillRelated(%q): navigation resulted in a flash instead of a resource view: %q", displayName, s.lastFlash.Text)
+	}
+	s.failf("DrillRelated(%q): navigation produced neither a resource list nor a detail view", displayName)
+	return nil
+}
+
+// FollowNavigableField dispatches a RelatedNavigateMsg derived from the registered
+// NavigableField for the given field path on the current detail resource. The method
+// looks up the NavigableField definition, extracts the field value from the resource's
+// RawStruct, applies NavIDFromValue to convert ARNs → bare IDs, and dispatches the
+// resulting RelatedNavigateMsg. It then returns the first resource that lands.
+//
+// This path tests the DISPATCH→RESOLUTION→LANDING pipeline (the same path that Enter
+// on a navigable field follows in production) without requiring cursor manipulation.
+// It catches ID-format mismatches between what the detail view carries and what the
+// target resource type indexes on (e.g., the DDB→KMS full-ARN vs. bare-key-ID bug).
+//
+// Fails the test if:
+//   - No NavigableField is registered for the given field path on the current resource type.
+//   - The field value cannot be extracted from RawStruct.
+//   - The dispatch produces no resource landing (empty list and no detail).
+func (s *fullIntegrationScenario) FollowNavigableField(fieldPath string) resource.Resource {
+	s.t.Helper()
+	if s.currentResourceType == "" || s.currentResource == nil {
+		s.failf("FollowNavigableField(%q): no active detail resource (currentResourceType=%q)", fieldPath, s.currentResourceType)
+	}
+
+	nf := resource.IsFieldNavigable(s.currentResourceType, fieldPath)
+	if nf == nil {
+		registered := resource.GetNavigableFields(s.currentResourceType)
+		paths := make([]string, len(registered))
+		for i, f := range registered {
+			paths[i] = f.FieldPath
+		}
+		s.failf("FollowNavigableField(%q): no navigable field registered for resource type %q; registered: %v", fieldPath, s.currentResourceType, paths)
+	}
+
+	// Extract the raw field value from the resource's RawStruct.
+	rawValue := ""
+	if s.currentResource.RawStruct != nil {
+		rawValue = fieldpath.ExtractScalar(s.currentResource.RawStruct, fieldPath)
+		if rawValue == "" {
+			// Fall back to list-aware extraction for paths that traverse
+			// slices (e.g. VpcSecurityGroups.VpcSecurityGroupId).
+			rawValue = fieldpath.ExtractFirstListScalar(s.currentResource.RawStruct, fieldPath)
+		}
+	}
+	// Fall back to the Fields map if RawStruct extraction yielded nothing.
+	if rawValue == "" {
+		rawValue = s.currentResource.Fields[fieldPath]
+	}
+	if rawValue == "" {
+		s.failf("FollowNavigableField(%q): field value is empty on resource %q (type=%q); RawStruct=%T",
+			fieldPath, s.currentResource.ID, s.currentResourceType, s.currentResource.RawStruct)
+	}
+
+	targetID := resource.NavIDFromValue(nf.TargetType, rawValue)
+	if targetID == "" {
+		s.failf("FollowNavigableField(%q): NavIDFromValue(targetType=%q, value=%q) returned empty string",
+			fieldPath, nf.TargetType, rawValue)
+	}
+
+	// Snapshot state before dispatch.
+	prevListType := s.currentListType
+	prevResource := s.currentResource
+	sourceRes := *s.currentResource
+	sourceType := s.currentResourceType
+
+	s.beginAction("follow navigable field %s → %s (targetID=%s)", fieldPath, nf.TargetType, targetID)
+	s.applyAndDrain(messages.RelatedNavigateMsg{
+		TargetType:     nf.TargetType,
+		SourceResource: sourceRes,
+		SourceType:     sourceType,
+		TargetID:       targetID,
+	})
+
+	// Case 1: single-resource detail auto-opened.
+	if s.currentResource != nil && s.currentResource != prevResource {
+		return *s.currentResource
+	}
+	// Case 2: filtered resource list loaded.
+	if s.currentListType != prevListType || len(s.currentListResources) > 0 {
+		if len(s.currentListResources) == 0 {
+			s.failf("FollowNavigableField(%q → %s): navigation produced an empty resource list (type=%q, targetID=%q)",
+				fieldPath, nf.TargetType, s.currentListType, targetID)
+		}
+		return s.currentListResources[0]
+	}
+
+	if s.lastFlash != nil {
+		s.failf("FollowNavigableField(%q → %s): navigation resulted in a flash instead of a resource view: %q (targetID=%q, rawValue=%q)",
+			fieldPath, nf.TargetType, s.lastFlash.Text, targetID, rawValue)
+	}
+	s.failf("FollowNavigableField(%q → %s): navigation produced neither a resource list nor a detail view (targetID=%q, rawValue=%q)",
+		fieldPath, nf.TargetType, targetID, rawValue)
+	return resource.Resource{}
 }

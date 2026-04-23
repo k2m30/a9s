@@ -287,7 +287,7 @@ Some resource types hide problems behind extra API calls (e.g., EC2 with impaire
 
 **Architecture:**
 - `internal/aws/issue_enrichment.go` — Wave 2 infrastructure: `IssueEnricherRegistry` map, unexported `registerIssueEnricher` helper (panics on empty name, nil fn, duplicate short name), `NoOpIssueEnricher`, `IssueEnricher` struct, `IssueEnricherFunc` / `IssueEnricherResult` types, shared helpers, `EnrichmentCap` / `PerParentPageCap`.
-- `internal/aws/*_issue_enrichment.go` — one file per registered short name (67 total: 43 real enricher functions + 24 `NoOpIssueEnricher` registrations for types with Wave 2 = "None" per `docs/attention-signals.md`). Each file's `init()` calls `registerIssueEnricher(<shortname>, <fn>, <priority>)` and — if the enricher writes `FieldUpdates` — `resource.RegisterIssueEnricherFieldKeys(<shortname>, [...])`.
+- `internal/aws/*_issue_enrichment.go` — 67 enricher-registry entries across 66 registered short names (`dbi` registers twice: once under `dbi` for its per-instance enricher and once under `rds` as an alias for the shared maintenance enricher). 43 entries are real enricher functions; the remaining 24 are `NoOpIssueEnricher` registrations for types with Wave 2 = "None" per `docs/attention-signals.md`. Each file's `init()` calls `registerIssueEnricher(<shortname>, <fn>, <priority>)` and — if the enricher writes `FieldUpdates` — `resource.RegisterIssueEnricherFieldKeys(<shortname>, [...])`.
 - `internal/tui/app_fetchers.go` — `buildEnrichQueue()`, `probeEnrichment()`
 - `internal/tui/app_handlers_navigate.go` — `startEnrichment()`, `handleEnrichmentChecked()` with only-increase guard
 
@@ -303,7 +303,7 @@ Wave 1 probes complete
   → all done: clear probeResources, save cache with enriched counts (when caching enabled)
 ```
 
-**Registry**: All 67 registered resource types have an `IssueEnricherRegistry` entry per `docs/attention-signals.md`. 43 entries are real enricher functions; the remaining 24 are `NoOpIssueEnricher` (zero findings, zero issues) for types whose Wave 2 column is "None". `NoOpIssueEnricher` entries make the "no Wave 2 signal" classification explicit and testable (`TestAttentionSignalsDoc` enforces every documented row has a registry entry). Some types with `NoOpIssueEnricher` perform in-fetcher Wave 2 — their fetchers already make per-resource Describe calls and populate health fields at fetch time (e.g., EKS `health_issues_count`, CloudTrail `is_logging`, OpenSearch `cluster_health`).
+**Registry**: All 66 registered resource types have an `IssueEnricherRegistry` entry per `docs/attention-signals.md`, with one additional entry (`rds`) aliasing the shared `dbi` maintenance enricher — 67 entries total. 43 entries are real enricher functions; the remaining 24 are `NoOpIssueEnricher` (zero findings, zero issues) for types whose Wave 2 column is "None". `NoOpIssueEnricher` entries make the "no Wave 2 signal" classification explicit and testable (`TestAttentionSignalsDoc` enforces every documented row has a registry entry). Some types with `NoOpIssueEnricher` perform in-fetcher Wave 2 — their fetchers already make per-resource Describe calls and populate health fields at fetch time (e.g., EKS `health_issues_count`, CloudTrail `is_logging`, OpenSearch `cluster_health`).
 
 **Priority order** (`buildEnrichQueue`): Batchable enrichers that make account-wide calls are dispatched first (e.g., RDS/DocDB maintenance, EC2 instance status). Per-resource enrichers (e.g., DynamoDB PITR, KMS rotation, S3 PAB) iterate over resource IDs/ARNs, capped at `EnrichmentCap` (50). The registry key for each enricher must match the `ShortName` Wave 1 uses to store probe resources — a mismatch silently skips the enricher.
 
@@ -510,6 +510,8 @@ type RelatedDef struct {
 
 `handleRelatedCheckStarted` (`app_related.go`) fans out one goroutine per `RelatedDef`, capped by `maxConcurrentProbes=4`. Results include a `Generation uint64` to discard stale results after Ctrl+R or profile/region switch.
 
+**Truncated-cache contract (`Approximate=true` / `ApproximateZero`)**: cache-scan checkers that can't see the full universe — because the target cache's `IsTruncated=true` after its first page — must signal the undercount rather than silently rendering `0`. `resource.ApproximateZero(shortName)` returns a sentinel `RelatedCheckResult{Count:0, Approximate:true}` used when a truncated cache yielded no matches yet later pages may contain some. File-local `truncatedResult*` helpers (in `ddb_related.go`, `s3_related.go`, `ses_related.go`, `redis_related.go`) produce the same shape when matches were found but the cache was still truncated. The UI renders these as `(N+)` or `(0+)` so operators know the real count is at least N.
+
 ### Navigable Fields
 
 ```go
@@ -520,6 +522,10 @@ type NavigableField struct {
 ```
 
 In the detail view, navigable fields are underlined. Pressing Enter on one emits `RelatedNavigateMsg`, which pushes a filtered list of the target resource type.
+
+**ID-format normalization**: Some navigable fields carry ARNs (KMS `KeyArn`, IAM `RoleArn`, ECS `ClusterArn`, Lambda `FunctionArn`, CloudWatch `LogGroupArn`) while the target resource's `Resource.ID` is a bare name or alias. `resource.NavIDFromValue(targetType, value)` (in `internal/resource/related.go`) is a central registry that normalizes these values into bare IDs at navigation time. Target types with registered extractors: `kms`, `role`, `ecs`, `logs`, `s3`, `iam-user`. Other target types pass through unchanged. `buildFieldList` in `internal/tui/views/detail_fields.go` applies this transform to every scalar navigable item before rendering so the resolved bare ID matches `Resource.ID` on the target's list.
+
+**List-typed scalar extraction**: `fieldpath.ExtractFirstListScalar(obj, dotPath)` (in `internal/fieldpath/extract.go`) walks slice-valued dotted paths to pull a scalar from the first element, enabling navigable fields on fields like `Subnets.SubnetId` without hand-rolled traversal. Returns an empty string when the path is empty, the slice is empty, or any intermediate step is nil — unlike `ExtractScalar`, which only walks struct fields and pointers.
 
 ---
 

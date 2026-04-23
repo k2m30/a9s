@@ -2,141 +2,704 @@ package unit
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
-	ectypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
+	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ---------------------------------------------------------------------------
-// T057 - Test Redis (ElastiCache) response parsing with client-side filtering
+// Mock — ElastiCacheDescribeReplicationGroupsAPI
 // ---------------------------------------------------------------------------
 
-func TestFetchRedisClusters_FiltersOnlyRedis(t *testing.T) {
-	mock := &mockElastiCacheClient{
-		output: &elasticache.DescribeCacheClustersOutput{
-			CacheClusters: []ectypes.CacheCluster{
-				{
-					CacheClusterId:     aws.String("redis-prod-001"),
-					Engine:             aws.String("redis"),
-					EngineVersion:      aws.String("7.0.12"),
-					CacheNodeType:      aws.String("cache.r6g.large"),
-					CacheClusterStatus: aws.String("available"),
-					NumCacheNodes:      aws.Int32(3),
-					ConfigurationEndpoint: &ectypes.Endpoint{
-						Address: aws.String("redis-prod-001.abc123.clustercfg.use1.cache.amazonaws.com"),
-					},
-				},
-				{
-					CacheClusterId:     aws.String("redis-staging-001"),
-					Engine:             aws.String("redis"),
-					EngineVersion:      aws.String("6.2.14"),
-					CacheNodeType:      aws.String("cache.t3.medium"),
-					CacheClusterStatus: aws.String("available"),
-					NumCacheNodes:      aws.Int32(1),
-					// No ConfigurationEndpoint
-				},
-				{
-					CacheClusterId:     aws.String("memcached-prod-001"),
-					Engine:             aws.String("memcached"),
-					EngineVersion:      aws.String("1.6.22"),
-					CacheNodeType:      aws.String("cache.m5.large"),
-					CacheClusterStatus: aws.String("available"),
-					NumCacheNodes:      aws.Int32(2),
-					ConfigurationEndpoint: &ectypes.Endpoint{
-						Address: aws.String("memcached-prod-001.abc123.cfg.use1.cache.amazonaws.com"),
-					},
-				},
-			},
-		},
-	}
+type mockRedisRGClient struct {
+	output *elasticache.DescribeReplicationGroupsOutput
+	err    error
+}
 
-	resources, err := awsclient.FetchRedisClusters(context.Background(), mock)
+func (m *mockRedisRGClient) DescribeReplicationGroups(
+	_ context.Context,
+	_ *elasticache.DescribeReplicationGroupsInput,
+	_ ...func(*elasticache.Options),
+) (*elasticache.DescribeReplicationGroupsOutput, error) {
+	return m.output, m.err
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+// rgOutput wraps a single ReplicationGroup into a DescribeReplicationGroupsOutput.
+// Engine defaults to "redis" when unset so pre-existing tests don't need to
+// restate it. Tests that exercise the engine-filter path (valkey, memcached,
+// nil Engine) construct DescribeReplicationGroupsOutput directly.
+func rgOutput(rg elasticachetypes.ReplicationGroup) *elasticache.DescribeReplicationGroupsOutput {
+	if rg.Engine == nil {
+		rg.Engine = aws.String("redis")
+	}
+	return &elasticache.DescribeReplicationGroupsOutput{
+		ReplicationGroups: []elasticachetypes.ReplicationGroup{rg},
+	}
+}
+
+// fetchOnePage calls FetchRedisPage with the given mock and returns the first
+// resource, failing if the result count does not equal 1.
+func fetchOnePage(t *testing.T, mock *mockRedisRGClient) (interface{ GetFields() map[string]string }, interface{}) {
+	t.Helper()
+	result, err := awsclient.FetchRedisPage(context.Background(), mock, "")
 	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+		t.Fatalf("FetchRedisPage error: %v", err)
 	}
-
-	// Should only return 2 redis clusters, not the memcached one
-	if len(resources) != 2 {
-		t.Fatalf("expected 2 resources (redis only), got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
+	return nil, result.Resources[0]
+}
 
-	// Verify required fields exist
-	requiredFields := []string{"cluster_id", "engine_version", "node_type", "status", "nodes", "endpoint"}
-	for i, r := range resources {
-		for _, key := range requiredFields {
-			if _, ok := r.Fields[key]; !ok {
-				t.Errorf("resource[%d].Fields missing key %q", i, key)
-			}
+// ---------------------------------------------------------------------------
+// T001 — Healthy available: Fields["status"] == "" (Healthy silence)
+// ---------------------------------------------------------------------------
+
+func TestRedis_Fetch_HealthyAvailable(t *testing.T) {
+	mock := &mockRedisRGClient{
+		output: rgOutput(elasticachetypes.ReplicationGroup{
+			ReplicationGroupId: aws.String("prod-redis-sessions"),
+			Status:             aws.String("available"),
+			MultiAZ:            elasticachetypes.MultiAZStatusEnabled,
+			AutomaticFailover:  elasticachetypes.AutomaticFailoverStatusEnabled,
+			CacheNodeType:      aws.String("cache.r6g.large"),
+			MemberClusters:     []string{"prod-redis-sessions-001"},
+			ARN:                aws.String("arn:aws:elasticache:us-east-1:123456789012:replicationgroup:prod-redis-sessions"),
+		}),
+	}
+	result, err := awsclient.FetchRedisPage(context.Background(), mock, "")
+	if err != nil {
+		t.Fatalf("FetchRedisPage error: %v", err)
+	}
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+	r := result.Resources[0]
+	if r.ID != "prod-redis-sessions" {
+		t.Errorf("ID = %q, want %q", r.ID, "prod-redis-sessions")
+	}
+	if r.Fields["status"] != "" {
+		t.Errorf("Fields[\"status\"] = %q, want %q (Healthy silence)", r.Fields["status"], "")
+	}
+	if len(r.Issues) != 0 {
+		t.Errorf("Issues = %v, want empty (Healthy)", r.Issues)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// T002 — Status=creating
+// ---------------------------------------------------------------------------
+
+func TestRedis_Fetch_StatusCreating(t *testing.T) {
+	mock := &mockRedisRGClient{
+		output: rgOutput(elasticachetypes.ReplicationGroup{
+			ReplicationGroupId: aws.String("dev-feature-redis"),
+			Status:             aws.String("creating"),
+			MultiAZ:            elasticachetypes.MultiAZStatusDisabled,
+			AutomaticFailover:  elasticachetypes.AutomaticFailoverStatusDisabling,
+		}),
+	}
+	result, err := awsclient.FetchRedisPage(context.Background(), mock, "")
+	if err != nil {
+		t.Fatalf("FetchRedisPage error: %v", err)
+	}
+	r := result.Resources[0]
+
+	const wantPhrase = "creating \u2014 new group"
+	if r.Fields["status"] != wantPhrase {
+		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
+	}
+	if len(r.Issues) != 1 || r.Issues[0] != wantPhrase {
+		t.Errorf("Issues = %v, want [%q]", r.Issues, wantPhrase)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// T003 — Status=modifying (with AutomaticFailover enabled — single warning)
+// ---------------------------------------------------------------------------
+
+func TestRedis_Fetch_StatusModifying(t *testing.T) {
+	mock := &mockRedisRGClient{
+		output: rgOutput(elasticachetypes.ReplicationGroup{
+			ReplicationGroupId: aws.String("prod-redis-cache"),
+			Status:             aws.String("modifying"),
+			MultiAZ:            elasticachetypes.MultiAZStatusEnabled,
+			AutomaticFailover:  elasticachetypes.AutomaticFailoverStatusEnabled,
+		}),
+	}
+	result, err := awsclient.FetchRedisPage(context.Background(), mock, "")
+	if err != nil {
+		t.Fatalf("FetchRedisPage error: %v", err)
+	}
+	r := result.Resources[0]
+
+	const wantPhrase = "modifying \u2014 config change"
+	if r.Fields["status"] != wantPhrase {
+		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
+	}
+	if len(r.Issues) != 1 || r.Issues[0] != wantPhrase {
+		t.Errorf("Issues = %v, want [%q]", r.Issues, wantPhrase)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// T004 — Status=snapshotting
+// ---------------------------------------------------------------------------
+
+func TestRedis_Fetch_StatusSnapshotting(t *testing.T) {
+	mock := &mockRedisRGClient{
+		output: rgOutput(elasticachetypes.ReplicationGroup{
+			ReplicationGroupId: aws.String("prod-redis-analytics"),
+			Status:             aws.String("snapshotting"),
+			MultiAZ:            elasticachetypes.MultiAZStatusEnabled,
+			AutomaticFailover:  elasticachetypes.AutomaticFailoverStatusEnabled,
+		}),
+	}
+	result, err := awsclient.FetchRedisPage(context.Background(), mock, "")
+	if err != nil {
+		t.Fatalf("FetchRedisPage error: %v", err)
+	}
+	r := result.Resources[0]
+
+	const wantPhrase = "snapshotting \u2014 backup running"
+	if r.Fields["status"] != wantPhrase {
+		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
+	}
+	if len(r.Issues) != 1 || r.Issues[0] != wantPhrase {
+		t.Errorf("Issues = %v, want [%q]", r.Issues, wantPhrase)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// T005 — Status=deleting
+// ---------------------------------------------------------------------------
+
+func TestRedis_Fetch_StatusDeleting(t *testing.T) {
+	mock := &mockRedisRGClient{
+		output: rgOutput(elasticachetypes.ReplicationGroup{
+			ReplicationGroupId: aws.String("old-redis-unused"),
+			Status:             aws.String("deleting"),
+			MultiAZ:            elasticachetypes.MultiAZStatusDisabled,
+			AutomaticFailover:  elasticachetypes.AutomaticFailoverStatusDisabled,
+		}),
+	}
+	result, err := awsclient.FetchRedisPage(context.Background(), mock, "")
+	if err != nil {
+		t.Fatalf("FetchRedisPage error: %v", err)
+	}
+	r := result.Resources[0]
+
+	const wantPhrase = "deleting \u2014 teardown"
+	if r.Fields["status"] != wantPhrase {
+		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
+	}
+	if len(r.Issues) != 1 || r.Issues[0] != wantPhrase {
+		t.Errorf("Issues = %v, want [%q]", r.Issues, wantPhrase)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// T006 — Status=create-failed (Broken)
+// ---------------------------------------------------------------------------
+
+func TestRedis_Fetch_StatusCreateFailed(t *testing.T) {
+	mock := &mockRedisRGClient{
+		output: rgOutput(elasticachetypes.ReplicationGroup{
+			ReplicationGroupId: aws.String("bad-config-redis"),
+			Status:             aws.String("create-failed"),
+			MultiAZ:            elasticachetypes.MultiAZStatusDisabled,
+			AutomaticFailover:  elasticachetypes.AutomaticFailoverStatusDisabled,
+		}),
+	}
+	result, err := awsclient.FetchRedisPage(context.Background(), mock, "")
+	if err != nil {
+		t.Fatalf("FetchRedisPage error: %v", err)
+	}
+	r := result.Resources[0]
+
+	const wantPhrase = "create failed \u2014 see events"
+	if r.Fields["status"] != wantPhrase {
+		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
+	}
+	if len(r.Issues) != 1 || r.Issues[0] != wantPhrase {
+		t.Errorf("Issues = %v, want [%q]", r.Issues, wantPhrase)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// T007 — MultiAZ=enabled, AutomaticFailover=disabled (single warning)
+// ---------------------------------------------------------------------------
+
+func TestRedis_Fetch_MultiAZWithoutFailover(t *testing.T) {
+	mock := &mockRedisRGClient{
+		output: rgOutput(elasticachetypes.ReplicationGroup{
+			ReplicationGroupId: aws.String("legacy-redis-analytics"),
+			Status:             aws.String("available"),
+			MultiAZ:            elasticachetypes.MultiAZStatusEnabled,
+			AutomaticFailover:  elasticachetypes.AutomaticFailoverStatusDisabled,
+		}),
+	}
+	result, err := awsclient.FetchRedisPage(context.Background(), mock, "")
+	if err != nil {
+		t.Fatalf("FetchRedisPage error: %v", err)
+	}
+	r := result.Resources[0]
+
+	const wantPhrase = "multi-AZ without auto-failover"
+	if r.Fields["status"] != wantPhrase {
+		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
+	}
+	if len(r.Issues) != 1 || r.Issues[0] != wantPhrase {
+		t.Errorf("Issues = %v, want [%q]", r.Issues, wantPhrase)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// T008 — MultiAZ=disabled, AutomaticFailover=disabled (single-AZ — no finding)
+// ---------------------------------------------------------------------------
+
+func TestRedis_Fetch_MultiAZDisabled_NoFinding(t *testing.T) {
+	mock := &mockRedisRGClient{
+		output: rgOutput(elasticachetypes.ReplicationGroup{
+			ReplicationGroupId: aws.String("staging-redis"),
+			Status:             aws.String("available"),
+			MultiAZ:            elasticachetypes.MultiAZStatusDisabled,
+			AutomaticFailover:  elasticachetypes.AutomaticFailoverStatusDisabled,
+		}),
+	}
+	result, err := awsclient.FetchRedisPage(context.Background(), mock, "")
+	if err != nil {
+		t.Fatalf("FetchRedisPage error: %v", err)
+	}
+	r := result.Resources[0]
+
+	if r.Fields["status"] != "" {
+		t.Errorf("Fields[\"status\"] = %q, want %q (single-AZ groups do not trigger the signal)", r.Fields["status"], "")
+	}
+	if len(r.Issues) != 0 {
+		t.Errorf("Issues = %v, want empty (no signal for single-AZ)", r.Issues)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// T009 — Multi-W1 (U7a): Status=modifying + MultiAZ without auto-failover
+// ---------------------------------------------------------------------------
+
+func TestRedis_Fetch_MultiW1_ModifyingPlusNoFailover(t *testing.T) {
+	mock := &mockRedisRGClient{
+		output: rgOutput(elasticachetypes.ReplicationGroup{
+			ReplicationGroupId: aws.String("legacy-redis-billing"),
+			Status:             aws.String("modifying"),
+			MultiAZ:            elasticachetypes.MultiAZStatusEnabled,
+			AutomaticFailover:  elasticachetypes.AutomaticFailoverStatusDisabled,
+		}),
+	}
+	result, err := awsclient.FetchRedisPage(context.Background(), mock, "")
+	if err != nil {
+		t.Fatalf("FetchRedisPage error: %v", err)
+	}
+	r := result.Resources[0]
+
+	const wantStatus = "modifying \u2014 config change (+1)"
+	if r.Fields["status"] != wantStatus {
+		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantStatus)
+	}
+	if len(r.Issues) != 2 {
+		t.Fatalf("Issues len = %d, want 2; Issues = %v", len(r.Issues), r.Issues)
+	}
+	// Issues must be in §4 precedence order: alphabetical among warnings.
+	// "modifying — config change" < "multi-AZ without auto-failover" alphabetically.
+	if r.Issues[0] != "modifying \u2014 config change" {
+		t.Errorf("Issues[0] = %q, want %q", r.Issues[0], "modifying \u2014 config change")
+	}
+	if r.Issues[1] != "multi-AZ without auto-failover" {
+		t.Errorf("Issues[1] = %q, want %q", r.Issues[1], "multi-AZ without auto-failover")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// T010 — Column population: cluster_id, node_type, nodes, endpoint
+// ---------------------------------------------------------------------------
+
+func TestRedis_Fetch_PopulatesColumns(t *testing.T) {
+	mock := &mockRedisRGClient{
+		output: rgOutput(elasticachetypes.ReplicationGroup{
+			ReplicationGroupId: aws.String("prod-redis-sessions"),
+			Status:             aws.String("available"),
+			MultiAZ:            elasticachetypes.MultiAZStatusEnabled,
+			AutomaticFailover:  elasticachetypes.AutomaticFailoverStatusEnabled,
+			CacheNodeType:      aws.String("cache.r6g.large"),
+			MemberClusters:     []string{"prod-redis-sessions-001", "prod-redis-sessions-002", "prod-redis-sessions-003"},
+			ConfigurationEndpoint: &elasticachetypes.Endpoint{
+				Address: aws.String("prod-redis-sessions.cfg.use1.cache.amazonaws.com"),
+				Port:    aws.Int32(6379),
+			},
+			ARN: aws.String("arn:aws:elasticache:us-east-1:123456789012:replicationgroup:prod-redis-sessions"),
+		}),
+	}
+	result, err := awsclient.FetchRedisPage(context.Background(), mock, "")
+	if err != nil {
+		t.Fatalf("FetchRedisPage error: %v", err)
+	}
+	r := result.Resources[0]
+
+	if r.Fields["cluster_id"] != "prod-redis-sessions" {
+		t.Errorf("Fields[\"cluster_id\"] = %q, want %q", r.Fields["cluster_id"], "prod-redis-sessions")
+	}
+	if r.Fields["node_type"] != "cache.r6g.large" {
+		t.Errorf("Fields[\"node_type\"] = %q, want %q", r.Fields["node_type"], "cache.r6g.large")
+	}
+	if r.Fields["nodes"] != "3" {
+		t.Errorf("Fields[\"nodes\"] = %q, want %q", r.Fields["nodes"], "3")
+	}
+	if r.Fields["endpoint"] != "prod-redis-sessions.cfg.use1.cache.amazonaws.com" {
+		t.Errorf("Fields[\"endpoint\"] = %q, want %q", r.Fields["endpoint"], "prod-redis-sessions.cfg.use1.cache.amazonaws.com")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// T011 — Anti-test: no CloudWatch metric fields invented (Wave 3 out of scope)
+// ---------------------------------------------------------------------------
+
+func TestRedis_Wave3_NoMetricFieldsInvented(t *testing.T) {
+	mock := &mockRedisRGClient{
+		output: rgOutput(elasticachetypes.ReplicationGroup{
+			ReplicationGroupId: aws.String("prod-redis-sessions"),
+			Status:             aws.String("available"),
+			MultiAZ:            elasticachetypes.MultiAZStatusEnabled,
+			AutomaticFailover:  elasticachetypes.AutomaticFailoverStatusEnabled,
+		}),
+	}
+	result, err := awsclient.FetchRedisPage(context.Background(), mock, "")
+	if err != nil {
+		t.Fatalf("FetchRedisPage error: %v", err)
+	}
+	r := result.Resources[0]
+
+	// Wave 3 metric fields must NOT be populated by the Wave 1 fetcher.
+	forbiddenKeys := []string{"memory_pressure", "evictions", "replication_lag", "engine_cpu"}
+	for _, key := range forbiddenKeys {
+		if val, ok := r.Fields[key]; ok {
+			t.Errorf("Fields[%q] = %q should not exist — Wave 3 metrics are out of scope for Wave 1 fetcher", key, val)
 		}
 	}
-
-	// Verify first redis cluster
-	r0 := resources[0]
-	if r0.ID != "redis-prod-001" {
-		t.Errorf("resource[0].ID: expected %q, got %q", "redis-prod-001", r0.ID)
-	}
-	if r0.Status != "available" {
-		t.Errorf("resource[0].Status: expected %q, got %q", "available", r0.Status)
-	}
-	if r0.Fields["cluster_id"] != "redis-prod-001" {
-		t.Errorf("resource[0].Fields[\"cluster_id\"]: expected %q, got %q", "redis-prod-001", r0.Fields["cluster_id"])
-	}
-	if r0.Fields["engine_version"] != "7.0.12" {
-		t.Errorf("resource[0].Fields[\"engine_version\"]: expected %q, got %q", "7.0.12", r0.Fields["engine_version"])
-	}
-	if r0.Fields["node_type"] != "cache.r6g.large" {
-		t.Errorf("resource[0].Fields[\"node_type\"]: expected %q, got %q", "cache.r6g.large", r0.Fields["node_type"])
-	}
-	if r0.Fields["nodes"] != "3" {
-		t.Errorf("resource[0].Fields[\"nodes\"]: expected %q, got %q", "3", r0.Fields["nodes"])
-	}
-	if r0.Fields["endpoint"] != "redis-prod-001.abc123.clustercfg.use1.cache.amazonaws.com" {
-		t.Errorf("resource[0].Fields[\"endpoint\"]: expected %q, got %q",
-			"redis-prod-001.abc123.clustercfg.use1.cache.amazonaws.com", r0.Fields["endpoint"])
-	}
-
-	// Verify second redis cluster (no ConfigurationEndpoint)
-	r1 := resources[1]
-	if r1.ID != "redis-staging-001" {
-		t.Errorf("resource[1].ID: expected %q, got %q", "redis-staging-001", r1.ID)
-	}
-	if r1.Fields["endpoint"] != "" {
-		t.Errorf("resource[1].Fields[\"endpoint\"]: expected empty string, got %q", r1.Fields["endpoint"])
+	// Verify status is still healthy-silence (no metric override).
+	if r.Fields["status"] != "" {
+		t.Errorf("Fields[\"status\"] = %q, want %q (healthy group)", r.Fields["status"], "")
 	}
 }
 
-func TestFetchRedisClusters_ErrorResponse(t *testing.T) {
-	mock := &mockElastiCacheClient{
-		output: nil,
-		err:    fmt.Errorf("AWS API error: access denied"),
-	}
+// ---------------------------------------------------------------------------
+// §0b.1 — Engine filter: Valkey / Memcached / nil Engine RGs must be dropped
+// ---------------------------------------------------------------------------
 
-	resources, err := awsclient.FetchRedisClusters(context.Background(), mock)
-	if err == nil {
-		t.Fatal("expected an error, got nil")
-	}
-	if resources != nil {
-		t.Errorf("expected nil resources on error, got %d resources", len(resources))
+// rgOutputMulti wraps multiple ReplicationGroups into a DescribeReplicationGroupsOutput.
+func rgOutputMulti(rgs ...elasticachetypes.ReplicationGroup) *elasticache.DescribeReplicationGroupsOutput {
+	return &elasticache.DescribeReplicationGroupsOutput{
+		ReplicationGroups: rgs,
 	}
 }
 
-func TestFetchRedisClusters_EmptyResponse(t *testing.T) {
-	mock := &mockElastiCacheClient{
-		output: &elasticache.DescribeCacheClustersOutput{
-			CacheClusters: []ectypes.CacheCluster{},
-		},
+// TestRedis_Fetch_SkipsNonRedisEngines verifies that a Valkey RG is excluded
+// and only the Redis RG is returned. This is the regression pin for §0b.1.
+// EXPECTED FAIL until coder adds engine filter in FetchRedisPage.
+func TestRedis_Fetch_SkipsNonRedisEngines(t *testing.T) {
+	mock := &mockRedisRGClient{
+		output: rgOutputMulti(
+			elasticachetypes.ReplicationGroup{
+				ReplicationGroupId: aws.String("prod-redis"),
+				Status:             aws.String("available"),
+				Engine:             aws.String("redis"),
+			},
+			elasticachetypes.ReplicationGroup{
+				ReplicationGroupId: aws.String("prod-valkey"),
+				Status:             aws.String("available"),
+				Engine:             aws.String("valkey"),
+			},
+		),
 	}
-
-	resources, err := awsclient.FetchRedisClusters(context.Background(), mock)
+	result, err := awsclient.FetchRedisPage(context.Background(), mock, "")
 	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+		t.Fatalf("FetchRedisPage error: %v", err)
 	}
-	if len(resources) != 0 {
-		t.Errorf("expected 0 resources, got %d", len(resources))
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource (redis only), got %d: %v",
+			len(result.Resources), resourceIDs(result.Resources))
+	}
+	if result.Resources[0].ID != "prod-redis" {
+		t.Errorf("ID = %q, want %q", result.Resources[0].ID, "prod-redis")
+	}
+}
+
+// TestRedis_Fetch_MemcachedEngineFiltered verifies that a Memcached RG is
+// excluded and only the Redis RG is returned.
+// EXPECTED FAIL until coder adds engine filter in FetchRedisPage.
+func TestRedis_Fetch_MemcachedEngineFiltered(t *testing.T) {
+	mock := &mockRedisRGClient{
+		output: rgOutputMulti(
+			elasticachetypes.ReplicationGroup{
+				ReplicationGroupId: aws.String("prod-redis"),
+				Status:             aws.String("available"),
+				Engine:             aws.String("redis"),
+			},
+			elasticachetypes.ReplicationGroup{
+				ReplicationGroupId: aws.String("prod-memcached"),
+				Status:             aws.String("available"),
+				Engine:             aws.String("memcached"),
+			},
+		),
+	}
+	result, err := awsclient.FetchRedisPage(context.Background(), mock, "")
+	if err != nil {
+		t.Fatalf("FetchRedisPage error: %v", err)
+	}
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource (redis only), got %d: %v",
+			len(result.Resources), resourceIDs(result.Resources))
+	}
+	if result.Resources[0].ID != "prod-redis" {
+		t.Errorf("ID = %q, want %q", result.Resources[0].ID, "prod-redis")
+	}
+}
+
+// TestRedis_Fetch_NilEngineFiltered verifies that a RG with Engine==nil is
+// treated as non-redis and dropped (defensive nil guard per §0b.1).
+// EXPECTED FAIL until coder adds engine filter in FetchRedisPage.
+func TestRedis_Fetch_NilEngineFiltered(t *testing.T) {
+	mock := &mockRedisRGClient{
+		output: rgOutputMulti(
+			elasticachetypes.ReplicationGroup{
+				ReplicationGroupId: aws.String("prod-redis"),
+				Status:             aws.String("available"),
+				Engine:             aws.String("redis"),
+			},
+			elasticachetypes.ReplicationGroup{
+				ReplicationGroupId: aws.String("rg-no-engine"),
+				Status:             aws.String("available"),
+				Engine:             nil,
+			},
+		),
+	}
+	result, err := awsclient.FetchRedisPage(context.Background(), mock, "")
+	if err != nil {
+		t.Fatalf("FetchRedisPage error: %v", err)
+	}
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource (redis only), got %d: %v",
+			len(result.Resources), resourceIDs(result.Resources))
+	}
+	if result.Resources[0].ID != "prod-redis" {
+		t.Errorf("ID = %q, want %q", result.Resources[0].ID, "prod-redis")
+	}
+}
+
+// resourceIDs returns the IDs of a slice of resources for error messages.
+func resourceIDs(rs []resource.Resource) []string {
+	ids := make([]string, len(rs))
+	for i, r := range rs {
+		ids[i] = r.ID
+	}
+	return ids
+}
+
+// ---------------------------------------------------------------------------
+// §0b.4 — Shard-level signals for multi-shard RGs
+// ---------------------------------------------------------------------------
+
+// nodeGroup is a convenience constructor for an elasticachetypes.NodeGroup.
+func nodeGroup(id, status string) elasticachetypes.NodeGroup {
+	return elasticachetypes.NodeGroup{
+		NodeGroupId: aws.String(id),
+		Status:      aws.String(status),
+	}
+}
+
+// TestRedis_Fetch_SingleShardModifying_UsesRGPhrase verifies that a single-shard
+// RG (NodeGroups==1) with Status=modifying uses the old RG-level phrase, not a
+// shard-scoped phrase. Single-shard behavior must be preserved.
+// NOTE: this test passes with the CURRENT code (no shard logic yet) because the
+// current code already emits the RG-level phrase for all modifying groups.
+func TestRedis_Fetch_SingleShardModifying_UsesRGPhrase(t *testing.T) {
+	mock := &mockRedisRGClient{
+		output: rgOutput(elasticachetypes.ReplicationGroup{
+			ReplicationGroupId: aws.String("single-shard-modifying"),
+			Status:             aws.String("modifying"),
+			MultiAZ:            elasticachetypes.MultiAZStatusEnabled,
+			AutomaticFailover:  elasticachetypes.AutomaticFailoverStatusEnabled,
+			NodeGroups: []elasticachetypes.NodeGroup{
+				nodeGroup("0001", "modifying"),
+			},
+		}),
+	}
+	result, err := awsclient.FetchRedisPage(context.Background(), mock, "")
+	if err != nil {
+		t.Fatalf("FetchRedisPage error: %v", err)
+	}
+	r := result.Resources[0]
+
+	const wantPhrase = "modifying \u2014 config change"
+	if r.Fields["status"] != wantPhrase {
+		t.Errorf("Fields[\"status\"] = %q, want %q (single-shard preserves RG phrase)", r.Fields["status"], wantPhrase)
+	}
+	if len(r.Issues) != 1 || r.Issues[0] != wantPhrase {
+		t.Errorf("Issues = %v, want [%q]", r.Issues, wantPhrase)
+	}
+}
+
+// TestRedis_Fetch_MultiShard_OneShardModifying verifies that a 3-shard RG with
+// only shard 0001 modifying emits a shard-scoped phrase.
+// EXPECTED FAIL until coder adds per-NodeGroup logic in computeRedisIssues.
+func TestRedis_Fetch_MultiShard_OneShardModifying(t *testing.T) {
+	mock := &mockRedisRGClient{
+		output: rgOutput(elasticachetypes.ReplicationGroup{
+			ReplicationGroupId: aws.String("multi-shard-modifying"),
+			Status:             aws.String("modifying"),
+			MultiAZ:            elasticachetypes.MultiAZStatusEnabled,
+			AutomaticFailover:  elasticachetypes.AutomaticFailoverStatusEnabled,
+			NodeGroups: []elasticachetypes.NodeGroup{
+				nodeGroup("0001", "modifying"),
+				nodeGroup("0002", "available"),
+				nodeGroup("0003", "available"),
+			},
+		}),
+	}
+	result, err := awsclient.FetchRedisPage(context.Background(), mock, "")
+	if err != nil {
+		t.Fatalf("FetchRedisPage error: %v", err)
+	}
+	r := result.Resources[0]
+
+	const wantPhrase = "shard 0001: modifying"
+	if r.Fields["status"] != wantPhrase {
+		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
+	}
+	if len(r.Issues) != 1 || r.Issues[0] != wantPhrase {
+		t.Errorf("Issues = %v, want [%q]", r.Issues, wantPhrase)
+	}
+}
+
+// TestRedis_Fetch_MultiShard_TwoShardsTransitioning verifies that a 3-shard RG
+// with 0001 modifying and 0002 snapshotting emits the leading phrase with (+1).
+// Rule 7: top phrase is alphabetically first; hidden count is 1.
+// Alphabetical: "shard 0001: modifying" < "shard 0002: snapshotting".
+// EXPECTED FAIL until coder adds per-NodeGroup logic in computeRedisIssues.
+func TestRedis_Fetch_MultiShard_TwoShardsTransitioning(t *testing.T) {
+	mock := &mockRedisRGClient{
+		output: rgOutput(elasticachetypes.ReplicationGroup{
+			ReplicationGroupId: aws.String("multi-shard-two-transitioning"),
+			Status:             aws.String("modifying"),
+			MultiAZ:            elasticachetypes.MultiAZStatusEnabled,
+			AutomaticFailover:  elasticachetypes.AutomaticFailoverStatusEnabled,
+			NodeGroups: []elasticachetypes.NodeGroup{
+				nodeGroup("0001", "modifying"),
+				nodeGroup("0002", "snapshotting"),
+				nodeGroup("0003", "available"),
+			},
+		}),
+	}
+	result, err := awsclient.FetchRedisPage(context.Background(), mock, "")
+	if err != nil {
+		t.Fatalf("FetchRedisPage error: %v", err)
+	}
+	r := result.Resources[0]
+
+	const wantStatus = "shard 0001: modifying (+1)"
+	if r.Fields["status"] != wantStatus {
+		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantStatus)
+	}
+	if len(r.Issues) != 2 {
+		t.Fatalf("Issues len = %d, want 2; Issues = %v", len(r.Issues), r.Issues)
+	}
+	// Alphabetical by phrase: "shard 0001: modifying" < "shard 0002: snapshotting".
+	if r.Issues[0] != "shard 0001: modifying" {
+		t.Errorf("Issues[0] = %q, want %q", r.Issues[0], "shard 0001: modifying")
+	}
+	if r.Issues[1] != "shard 0002: snapshotting" {
+		t.Errorf("Issues[1] = %q, want %q", r.Issues[1], "shard 0002: snapshotting")
+	}
+}
+
+// TestRedis_Fetch_MultiShard_AllShardAvailableButRGModifying verifies that when
+// all NodeGroups are available but the RG itself reports Status=modifying, the
+// fetcher falls back to the RG-level phrase (transient state).
+// EXPECTED FAIL until coder adds the anyShard fallback in computeRedisIssues.
+func TestRedis_Fetch_MultiShard_AllShardAvailableButRGModifying(t *testing.T) {
+	mock := &mockRedisRGClient{
+		output: rgOutput(elasticachetypes.ReplicationGroup{
+			ReplicationGroupId: aws.String("multi-shard-rg-modifying"),
+			Status:             aws.String("modifying"),
+			MultiAZ:            elasticachetypes.MultiAZStatusEnabled,
+			AutomaticFailover:  elasticachetypes.AutomaticFailoverStatusEnabled,
+			NodeGroups: []elasticachetypes.NodeGroup{
+				nodeGroup("0001", "available"),
+				nodeGroup("0002", "available"),
+				nodeGroup("0003", "available"),
+			},
+		}),
+	}
+	result, err := awsclient.FetchRedisPage(context.Background(), mock, "")
+	if err != nil {
+		t.Fatalf("FetchRedisPage error: %v", err)
+	}
+	r := result.Resources[0]
+
+	// Transient: RG is modifying but no specific shard is — fall back to RG phrase.
+	const wantPhrase = "modifying \u2014 config change"
+	if r.Fields["status"] != wantPhrase {
+		t.Errorf("Fields[\"status\"] = %q, want %q (fallback to RG phrase when no shard is transitioning)", r.Fields["status"], wantPhrase)
+	}
+	if len(r.Issues) != 1 || r.Issues[0] != wantPhrase {
+		t.Errorf("Issues = %v, want [%q]", r.Issues, wantPhrase)
+	}
+}
+
+// TestRedis_Fetch_MultiShard_ShardPlusMultiAZNoFailover verifies Rule 7 when
+// a shard-level phrase coexists with the multi-AZ without auto-failover warning.
+// Alphabetical: "multi-AZ without auto-failover" < "shard 0001: modifying"
+// ("multi" < "shard") → multi-AZ phrase is the top phrase; shard is hidden.
+// EXPECTED FAIL until coder adds per-NodeGroup logic in computeRedisIssues.
+func TestRedis_Fetch_MultiShard_ShardPlusMultiAZNoFailover(t *testing.T) {
+	mock := &mockRedisRGClient{
+		output: rgOutput(elasticachetypes.ReplicationGroup{
+			ReplicationGroupId: aws.String("multi-shard-no-failover"),
+			Status:             aws.String("modifying"),
+			MultiAZ:            elasticachetypes.MultiAZStatusEnabled,
+			AutomaticFailover:  elasticachetypes.AutomaticFailoverStatusDisabled,
+			NodeGroups: []elasticachetypes.NodeGroup{
+				nodeGroup("0001", "modifying"),
+				nodeGroup("0002", "available"),
+				nodeGroup("0003", "available"),
+			},
+		}),
+	}
+	result, err := awsclient.FetchRedisPage(context.Background(), mock, "")
+	if err != nil {
+		t.Fatalf("FetchRedisPage error: %v", err)
+	}
+	r := result.Resources[0]
+
+	// Alphabetical: "multi-AZ without auto-failover" < "shard 0001: modifying".
+	// Top phrase: "multi-AZ without auto-failover"; hidden count: 1.
+	const wantStatus = "multi-AZ without auto-failover (+1)"
+	if r.Fields["status"] != wantStatus {
+		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantStatus)
+	}
+	if len(r.Issues) != 2 {
+		t.Fatalf("Issues len = %d, want 2; Issues = %v", len(r.Issues), r.Issues)
+	}
+	if r.Issues[0] != "multi-AZ without auto-failover" {
+		t.Errorf("Issues[0] = %q, want %q", r.Issues[0], "multi-AZ without auto-failover")
+	}
+	if r.Issues[1] != "shard 0001: modifying" {
+		t.Errorf("Issues[1] = %q, want %q", r.Issues[1], "shard 0001: modifying")
 	}
 }

@@ -19,7 +19,6 @@ import (
 	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	ostypes "github.com/aws/aws-sdk-go-v2/service/opensearch/types"
-	sesv2types "github.com/aws/aws-sdk-go-v2/service/sesv2/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -437,39 +436,4 @@ func TestRelated_EFS_Lambda_NilClients(t *testing.T) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// ses_related.go — checkSESLambda (45.5%)
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestRelated_SES_Lambda_EmptyIdentityName verifies checkSESLambda returns
-// Count=0 when the SES identity resource has an empty ID.
-func TestRelated_SES_Lambda_EmptyIdentityName(t *testing.T) {
-	src := resource.Resource{
-		ID:        "",
-		RawStruct: sesv2types.IdentityInfo{},
-	}
-	checker := sesCheckerByTarget(t, "lambda")
-	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty identity name)", result.Count)
-	}
-}
-
-// TestRelated_SES_Lambda_NilClients verifies checkSESLambda returns Count=-1
-// when the identity has a name but no SES client is available.
-func TestRelated_SES_Lambda_NilClients(t *testing.T) {
-	src := resource.Resource{
-		ID:   "example.com",
-		Name: "example.com",
-		RawStruct: sesv2types.IdentityInfo{
-			IdentityName: aws.String("example.com"),
-			IdentityType: sesv2types.IdentityTypeDomain,
-		},
-	}
-	checker := sesCheckerByTarget(t, "lambda")
-	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	// nil clients → cannot check config set → Count=-1
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (nil SES client)", result.Count)
-	}
-}
+// SES related-checker coverage lives in aws_ses_related_test.go (phase 6b).

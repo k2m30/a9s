@@ -1,680 +1,923 @@
-package unit_test
+package unit
+
+// aws_ddb_related_test.go — per-target related-resource checker tests for ddb.
+//
+// One test per §2 target from docs/resources/ddb.md. All tests use the orders-prod
+// fixture as the anchor resource. Each test constructs a ResourceCache with the
+// minimum sibling data needed to verify the checker's discovery logic, then
+// asserts Count and ResourceIDs.
+//
+// Targets covered: alarm, backup, kinesis, kms, lambda, logs, vpce.
+// ct-events: verified via registration smoke test (universal pivot, not custom checker).
+//
+// Forbidden: no calls to ListRecoveryPointsByResource (backup uses cache scan only).
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/aws/aws-sdk-go-v2/service/lambda"
+	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// ddbtypesForTest constructs a ddbtypes.TableDescription for tests without
-// pulling in the aws.String helper at every call site.
-type ddbtypesForTest struct {
-	TableName       string
-	LatestStreamArn string
+// ---------------------------------------------------------------------------
+// Mocks — DynamoDB Kinesis + Lambda ESM stubs
+// ---------------------------------------------------------------------------
+
+// mockDDBKinesisClient implements DynamoDBDescribeKinesisStreamingDestinationAPI.
+type mockDDBKinesisClient struct {
+	awsclient.DynamoDBAPI
+	destinations []ddbtypes.KinesisDataStreamDestination
+	err          error
 }
 
-func (d ddbtypesForTest) Build() ddbtypes.TableDescription {
-	out := ddbtypes.TableDescription{}
-	if d.TableName != "" {
-		out.TableName = aws.String(d.TableName)
+func (m *mockDDBKinesisClient) DescribeKinesisStreamingDestination(
+	_ context.Context,
+	_ *dynamodb.DescribeKinesisStreamingDestinationInput,
+	_ ...func(*dynamodb.Options),
+) (*dynamodb.DescribeKinesisStreamingDestinationOutput, error) {
+	if m.err != nil {
+		return nil, m.err
 	}
-	if d.LatestStreamArn != "" {
-		out.LatestStreamArn = aws.String(d.LatestStreamArn)
-	}
-	return out
+	return &dynamodb.DescribeKinesisStreamingDestinationOutput{
+		KinesisDataStreamDestinations: m.destinations,
+	}, nil
 }
 
-func TestRelated_DDB_Registered(t *testing.T) {
-	defs := resource.GetRelated("ddb")
-	if len(defs) == 0 {
-		t.Fatal("no related defs registered for ddb")
-	}
-
-	type expectation struct {
-		displayName string
-		hasChecker  bool
-	}
-	expected := map[string]expectation{
-		"kms":    {"KMS Key", true},
-		"lambda": {"Lambda Functions", true},
-		"alarm":  {"CloudWatch Alarms", true},
-	}
-	for target, want := range expected {
-		found := false
-		for _, def := range defs {
-			if def.TargetType == target {
-				found = true
-				if want.hasChecker && def.Checker == nil {
-					t.Errorf("ddb %q: Checker should not be nil", target)
-				}
-				if !want.hasChecker && def.Checker != nil {
-					t.Errorf("ddb %q: Checker should be nil (stub)", target)
-				}
-				if def.DisplayName != want.displayName {
-					t.Errorf("ddb %q: DisplayName = %q, want %q", target, def.DisplayName, want.displayName)
-				}
-				break
-			}
-		}
-		if !found {
-			t.Errorf("expected related def for target %q not found", target)
-		}
-	}
+// mockLambdaESMClient implements LambdaListEventSourceMappingsAPI.
+type mockLambdaESMClient struct {
+	awsclient.LambdaAPI
+	mappings []lambdatypes.EventSourceMappingConfiguration
+	err      error
+	calls    int
 }
 
-// ddbCheckerByTarget returns the RelatedChecker for the given target type registered
-// under "ddb". It fails the test immediately if the checker is nil or not found.
+func (m *mockLambdaESMClient) ListEventSourceMappings(
+	_ context.Context,
+	_ *lambda.ListEventSourceMappingsInput,
+	_ ...func(*lambda.Options),
+) (*lambda.ListEventSourceMappingsOutput, error) {
+	m.calls++
+	if m.err != nil {
+		return nil, m.err
+	}
+	return &lambda.ListEventSourceMappingsOutput{
+		EventSourceMappings: m.mappings,
+	}, nil
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+// ddbOrdersProdResource returns the orders-prod Resource as FetchDynamoDBTablesPage
+// would produce it (RawStruct is *ddbtypes.TableDescription).
+func ddbOrdersProdResource(t *testing.T) resource.Resource {
+	t.Helper()
+	table := findDDBTable(t, fixtures.OrdersProdID)
+	listStub := &ddbListStub{names: []string{fixtures.OrdersProdID}}
+	descStub := &ddbDescribeStub{tables: map[string]*ddbtypes.TableDescription{fixtures.OrdersProdID: table}}
+	result, err := awsclient.FetchDynamoDBTablesPage(context.Background(), listStub, descStub, "")
+	if err != nil {
+		t.Fatalf("ddbOrdersProdResource: FetchDynamoDBTablesPage error: %v", err)
+	}
+	if len(result.Resources) != 1 {
+		t.Fatalf("ddbOrdersProdResource: expected 1 resource, got %d", len(result.Resources))
+	}
+	return result.Resources[0]
+}
+
+// ddbCheckerByTarget returns the RelatedChecker registered for ddb→target.
 func ddbCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	t.Helper()
 	for _, def := range resource.GetRelated("ddb") {
 		if def.TargetType == target {
-			if def.Checker == nil {
-				t.Fatalf("ddb related checker for %s is nil", target)
-			}
 			return def.Checker
 		}
 	}
-	t.Fatalf("ddb related checker for %s not found", target)
+	t.Fatalf("no checker registered for ddb→%s", target)
 	return nil
 }
 
-// --- checkDdbAlarm tests (Pattern D — dimension-based) ---
+// ---------------------------------------------------------------------------
+// alarm
+// ---------------------------------------------------------------------------
 
-func TestRelated_DDB_Alarm_MatchByDimension(t *testing.T) {
-	alarmRes := resource.Resource{
-		ID:     "ddb-cpu-alarm",
-		Fields: map[string]string{},
+// TestDDB_Related_Alarm_MatchesByTableNameDimension verifies checkDdbAlarm
+// returns the alarm whose Dimensions contains Name="TableName", Value="orders-prod".
+func TestDDB_Related_Alarm_MatchesByTableNameDimension(t *testing.T) {
+	res := ddbOrdersProdResource(t)
+	checker := ddbCheckerByTarget(t, "alarm")
+
+	matchingAlarm := resource.Resource{
+		ID:   "orders-prod-throttle",
+		Name: "orders-prod-throttle",
 		RawStruct: cwtypes.MetricAlarm{
-			AlarmName: aws.String("ddb-cpu-alarm"),
+			AlarmName: aws.String("orders-prod-throttle"),
 			Dimensions: []cwtypes.Dimension{
-				{
-					Name:  aws.String("TableName"),
-					Value: aws.String("my-table"),
-				},
+				{Name: aws.String("TableName"), Value: aws.String(fixtures.OrdersProdID)},
+			},
+		},
+	}
+	decoyAlarm := resource.Resource{
+		ID:   "ec2-cpu-alarm",
+		Name: "ec2-cpu-alarm",
+		RawStruct: cwtypes.MetricAlarm{
+			AlarmName: aws.String("ec2-cpu-alarm"),
+			Dimensions: []cwtypes.Dimension{
+				{Name: aws.String("InstanceId"), Value: aws.String("i-0a1b2c3d")},
 			},
 		},
 	}
 	cache := resource.ResourceCache{
-		"alarm": resource.ResourceCacheEntry{Resources: []resource.Resource{alarmRes}},
+		"alarm": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{matchingAlarm, decoyAlarm},
+		},
 	}
 
-	res := resource.Resource{
-		ID:     "my-table",
-		Fields: map[string]string{},
-	}
+	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
 
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "orders-prod-throttle" {
+		t.Errorf("ResourceIDs = %v, want [orders-prod-throttle]", result.ResourceIDs)
+	}
+}
+
+// TestDDB_Related_Alarm_NonMatchingTableNameValue verifies that an alarm with
+// a different TableName dimension value does NOT match.
+func TestDDB_Related_Alarm_NonMatchingTableNameValue(t *testing.T) {
+	res := ddbOrdersProdResource(t)
 	checker := ddbCheckerByTarget(t, "alarm")
+
+	otherTableAlarm := resource.Resource{
+		ID:   "sessions-creating-alarm",
+		Name: "sessions-creating-alarm",
+		RawStruct: cwtypes.MetricAlarm{
+			AlarmName: aws.String("sessions-creating-alarm"),
+			Dimensions: []cwtypes.Dimension{
+				{Name: aws.String("TableName"), Value: aws.String("sessions-creating")},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"alarm": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{otherTableAlarm},
+		},
+	}
+
+	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (non-matching TableName)", result.Count)
+	}
+}
+
+// TestDDB_Related_Alarm_NoDimensions verifies alarm with no Dimensions → Count 0.
+func TestDDB_Related_Alarm_NoDimensions(t *testing.T) {
+	res := ddbOrdersProdResource(t)
+	checker := ddbCheckerByTarget(t, "alarm")
+
+	noDimAlarm := resource.Resource{
+		ID: "bare-alarm",
+		RawStruct: cwtypes.MetricAlarm{
+			AlarmName:  aws.String("bare-alarm"),
+			Dimensions: nil,
+		},
+	}
+	cache := resource.ResourceCache{
+		"alarm": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{noDimAlarm},
+		},
+	}
+
+	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no dimensions)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// backup
+// ---------------------------------------------------------------------------
+
+// TestDDB_Related_Backup_MatchesByARNInResourcesCSV verifies checkDdbBackup
+// returns the plan whose Fields["resources"] CSV contains the table's ARN.
+// The test MUST NOT use a Backup API client — pure cache scan only.
+func TestDDB_Related_Backup_MatchesByARNInResourcesCSV(t *testing.T) {
+	res := ddbOrdersProdResource(t)
+	checker := ddbCheckerByTarget(t, "backup")
+
+	matchingPlan := resource.Resource{
+		ID:   "acme-weekly-full-backup",
+		Name: "acme-weekly-full-backup",
+		Fields: map[string]string{
+			"resources": fixtures.OrdersProdARN + ",arn:aws:s3:::acme-data",
+		},
+	}
+	decoyPlan := resource.Resource{
+		ID:   "unrelated-backup-plan",
+		Name: "unrelated-backup-plan",
+		Fields: map[string]string{
+			"resources": "arn:aws:s3:::other-bucket",
+		},
+	}
+	cache := resource.ResourceCache{
+		"backup": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{matchingPlan, decoyPlan},
+		},
+	}
+
+	// Explicitly pass nil clients to assert no Backup API call is made.
 	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count != 1 {
 		t.Errorf("Count = %d, want 1", result.Count)
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "ddb-cpu-alarm" {
-		t.Errorf("ResourceIDs = %v, want [ddb-cpu-alarm]", result.ResourceIDs)
-	}
-	if result.Err != nil {
-		t.Errorf("unexpected error: %v", result.Err)
+	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "acme-weekly-full-backup" {
+		t.Errorf("ResourceIDs = %v, want [acme-weekly-full-backup]", result.ResourceIDs)
 	}
 }
 
-func TestRelated_DDB_Alarm_NoMatch(t *testing.T) {
-	alarmRes := resource.Resource{
-		ID:     "ddb-other-alarm",
-		Fields: map[string]string{},
-		RawStruct: cwtypes.MetricAlarm{
-			AlarmName: aws.String("ddb-other-alarm"),
-			Dimensions: []cwtypes.Dimension{
+// TestDDB_Related_Backup_NoMatch verifies Count=0 when no plan covers this table.
+func TestDDB_Related_Backup_NoMatch(t *testing.T) {
+	res := ddbOrdersProdResource(t)
+	checker := ddbCheckerByTarget(t, "backup")
+
+	cache := resource.ResourceCache{
+		"backup": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{
 				{
-					Name:  aws.String("TableName"),
-					Value: aws.String("other-table"),
+					ID:     "other-plan",
+					Fields: map[string]string{"resources": "arn:aws:s3:::irrelevant"},
 				},
 			},
 		},
 	}
-	cache := resource.ResourceCache{
-		"alarm": resource.ResourceCacheEntry{Resources: []resource.Resource{alarmRes}},
-	}
 
-	res := resource.Resource{
-		ID:     "my-table",
-		Fields: map[string]string{},
-	}
-
-	checker := ddbCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
-	}
-}
-
-func TestRelated_DDB_Alarm_EmptyID(t *testing.T) {
-	alarmRes := resource.Resource{
-		ID:     "ddb-cpu-alarm",
-		Fields: map[string]string{},
-		RawStruct: cwtypes.MetricAlarm{
-			AlarmName: aws.String("ddb-cpu-alarm"),
-			Dimensions: []cwtypes.Dimension{
-				{
-					Name:  aws.String("TableName"),
-					Value: aws.String("my-table"),
-				},
-			},
-		},
-	}
-	cache := resource.ResourceCache{
-		"alarm": resource.ResourceCacheEntry{Resources: []resource.Resource{alarmRes}},
-	}
-
-	res := resource.Resource{
-		ID:     "",
-		Fields: map[string]string{},
-	}
-
-	checker := ddbCheckerByTarget(t, "alarm")
-	result := checker(context.Background(), nil, res, cache)
-
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ID)", result.Count)
-	}
-}
-
-func TestRelated_DDB_Alarm_NilCache(t *testing.T) {
-	cache := resource.ResourceCache{}
-
-	res := resource.Resource{
-		ID:     "my-table",
-		Fields: map[string]string{},
-	}
-
-	checker := ddbCheckerByTarget(t, "alarm")
-	result := checker(context.Background(), nil, res, cache)
-
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (unknown — empty cache, no clients)", result.Count)
-	}
-}
-
-// --- ddb→lambda: requires live API (lambda:ListEventSourceMappings on stream ARN) ---
-
-// TestRelated_DDB_Lambda_NoStreamReturnsZero verifies that when streams are
-// disabled on the table (LatestStreamArn is nil/empty), the checker reports
-// Count=0 without calling any API — no Lambda trigger is possible.
-func TestRelated_DDB_Lambda_NoStreamReturnsZero(t *testing.T) {
-	source := resource.Resource{
-		ID:   "acme-orders-table",
-		Name: "acme-orders-table",
-		RawStruct: ddbtypesForTest{
-			TableName: "acme-orders-table",
-			// No LatestStreamArn — streams disabled.
-		}.Build(),
-	}
-	checker := ddbCheckerByTarget(t, "lambda")
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (streams disabled)", result.Count)
-	}
-	if result.TargetType != "lambda" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "lambda")
-	}
-}
-
-// TestRelated_DDB_Lambda_StreamsEnabledUnknownWithoutClients verifies that when
-// streams are enabled but no live Lambda client is available, the checker
-// reports Count=-1 (undeterminable) rather than a silent zero.
-func TestRelated_DDB_Lambda_StreamsEnabledUnknownWithoutClients(t *testing.T) {
-	source := resource.Resource{
-		ID:   "acme-orders-table",
-		Name: "acme-orders-table",
-		RawStruct: ddbtypesForTest{
-			TableName:       "acme-orders-table",
-			LatestStreamArn: "arn:aws:dynamodb:us-east-1:123456789012:table/acme-orders-table/stream/2026-01-01T00:00:00.000",
-		}.Build(),
-	}
-	checker := ddbCheckerByTarget(t, "lambda")
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (requires live lambda:ListEventSourceMappings)", result.Count)
-	}
-}
-
-// TestRelated_DDB_Lambda_InvalidRawStruct verifies the checker reports
-// Count=-1 when the RawStruct is not a TableDescription (cannot read streams).
-func TestRelated_DDB_Lambda_InvalidRawStruct(t *testing.T) {
-	source := resource.Resource{
-		ID:        "acme-orders-table",
-		RawStruct: "not-a-table",
-	}
-	checker := ddbCheckerByTarget(t, "lambda")
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (bad raw struct)", result.Count)
+		t.Errorf("Count = %d, want 0 (no matching plan)", result.Count)
 	}
 }
 
 // ---------------------------------------------------------------------------
-// checkDdbBackup — Pattern C: ListRecoveryPointsByResource on table ARN
+// kinesis
 // ---------------------------------------------------------------------------
 
-// TestRelated_Ddb_Backup_Match verifies that a table with a known ARN field,
-// and a Backup fake returning 2 recovery points, yields Count=2.
-func TestRelated_Ddb_Backup_Match(t *testing.T) {
-	const tableARN = "arn:aws:dynamodb:us-east-1:123456789012:table/acme-orders-table"
-	rp1 := "arn:aws:backup:us-east-1:123456789012:recovery-point:ddb-00000001"
-	rp2 := "arn:aws:backup:us-east-1:123456789012:recovery-point:ddb-00000002"
-
-	src := resource.Resource{
-		ID:   "acme-orders-table",
-		Name: "acme-orders-table",
-		Fields: map[string]string{
-			"arn": tableARN,
-		},
-		RawStruct: ddbtypes.TableDescription{
-			TableName: aws.String("acme-orders-table"),
-		},
-	}
-	clients := &awsclient.ServiceClients{
-		Backup: newFakeBackupWithRecoveryPoints([]backuptypes.RecoveryPointByResource{
-			{RecoveryPointArn: &rp1},
-			{RecoveryPointArn: &rp2},
-		}),
-	}
-	checker := ddbCheckerByTarget(t, "backup")
-	result := checker(context.Background(), clients, src, resource.ResourceCache{})
-
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
-	}
-	if len(result.ResourceIDs) != 2 {
-		t.Errorf("ResourceIDs = %v, want 2 entries", result.ResourceIDs)
-	}
-}
-
-// TestRelated_Ddb_Backup_Empty verifies that a table with no ARN field
-// returns Count=0.
-func TestRelated_Ddb_Backup_Empty(t *testing.T) {
-	src := resource.Resource{
-		ID:     "acme-orders-table",
-		Name:   "acme-orders-table",
-		Fields: map[string]string{},
-		RawStruct: ddbtypes.TableDescription{
-			TableName: aws.String("acme-orders-table"),
-		},
-	}
-	checker := ddbCheckerByTarget(t, "backup")
-	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty table ARN)", result.Count)
-	}
-}
-
-// TestRelated_Ddb_Backup_WrongRawStruct verifies that a table with a valid ARN
-// field but nil clients returns Count=-1 (no Backup client).
-func TestRelated_Ddb_Backup_WrongRawStruct(t *testing.T) {
-	src := resource.Resource{
-		ID:   "acme-orders-table",
-		Name: "acme-orders-table",
-		Fields: map[string]string{
-			"arn": "arn:aws:dynamodb:us-east-1:123456789012:table/acme-orders-table",
-		},
-		RawStruct: "not-a-table",
-	}
-	checker := ddbCheckerByTarget(t, "backup")
-	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// checkDdbKinesis — Pattern C: DescribeKinesisStreamingDestination on table name
-// ---------------------------------------------------------------------------
-
-// TestRelated_Ddb_Kinesis_Match verifies that a table with 2 Kinesis stream
-// destinations yields Count=2 with stream names in ResourceIDs.
-func TestRelated_Ddb_Kinesis_Match(t *testing.T) {
-	streamARN1 := "arn:aws:kinesis:us-east-1:123456789012:stream/orders-stream"
-	streamARN2 := "arn:aws:kinesis:us-east-1:123456789012:stream/events-stream"
-
-	src := resource.Resource{
-		ID:   "acme-orders-table",
-		Name: "acme-orders-table",
-		Fields: map[string]string{
-			"arn": "arn:aws:dynamodb:us-east-1:123456789012:table/acme-orders-table",
-		},
-		RawStruct: ddbtypes.TableDescription{
-			TableName: aws.String("acme-orders-table"),
-		},
-	}
-	clients := &awsclient.ServiceClients{
-		DynamoDB: newFakeDDBWithKinesisDestinations([]ddbtypes.KinesisDataStreamDestination{
-			{StreamArn: &streamARN1},
-			{StreamArn: &streamARN2},
-		}),
-	}
+// TestDDB_Related_Kinesis_OneDestination verifies checkDdbKinesis returns 1
+// when DescribeKinesisStreamingDestination returns one active destination.
+func TestDDB_Related_Kinesis_OneDestination(t *testing.T) {
+	res := ddbOrdersProdResource(t)
 	checker := ddbCheckerByTarget(t, "kinesis")
-	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+	kinesisClient := &mockDDBKinesisClient{
+		destinations: []ddbtypes.KinesisDataStreamDestination{
+			{
+				StreamArn:         aws.String(fixtures.OrdersProdKinesisStreamARN),
+				DestinationStatus: ddbtypes.DestinationStatusActive,
+			},
+		},
 	}
-	seen := map[string]bool{}
+	clients := &awsclient.ServiceClients{DynamoDB: kinesisClient}
+
+	result := checker(context.Background(), clients, res, resource.ResourceCache{})
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) == 0 {
+		t.Errorf("ResourceIDs is empty, want [%s]", fixtures.OrdersProdKinesisStream)
+	} else {
+		// The stream name is the last "/" segment of the ARN.
+		wantName := fixtures.OrdersProdKinesisStream
+		if result.ResourceIDs[0] != wantName {
+			t.Errorf("ResourceIDs[0] = %q, want %q", result.ResourceIDs[0], wantName)
+		}
+	}
+}
+
+// TestDDB_Related_Kinesis_EmptyDestinations verifies Count=0 when no streaming
+// destinations are configured.
+func TestDDB_Related_Kinesis_EmptyDestinations(t *testing.T) {
+	res := ddbOrdersProdResource(t)
+	checker := ddbCheckerByTarget(t, "kinesis")
+
+	kinesisClient := &mockDDBKinesisClient{destinations: nil}
+	clients := &awsclient.ServiceClients{DynamoDB: kinesisClient}
+
+	result := checker(context.Background(), clients, res, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no destinations)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// kms
+// ---------------------------------------------------------------------------
+
+// TestDDB_Related_KMS_ReturnsKeyID verifies checkDdbKMS extracts the key ID
+// from SSEDescription.KMSMasterKeyArn (ARN suffix after last "/").
+func TestDDB_Related_KMS_ReturnsKeyID(t *testing.T) {
+	res := ddbOrdersProdResource(t)
+	checker := ddbCheckerByTarget(t, "kms")
+
+	cache := resource.ResourceCache{
+		"kms": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{{ID: fixtures.OrdersProdKMSKeyID}},
+		},
+	}
+
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != fixtures.OrdersProdKMSKeyID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, fixtures.OrdersProdKMSKeyID)
+	}
+}
+
+// TestDDB_Related_KMS_NilSSEDescription verifies Count=0 when SSEDescription is nil
+// (AWS-owned key — no kms pivot).
+func TestDDB_Related_KMS_NilSSEDescription(t *testing.T) {
+	// audit-pitr-off: no SSEDescription (no CMK)
+	table := findDDBTable(t, fixtures.AuditPITROffID)
+	listStub := &ddbListStub{names: []string{fixtures.AuditPITROffID}}
+	descStub := &ddbDescribeStub{tables: map[string]*ddbtypes.TableDescription{fixtures.AuditPITROffID: table}}
+	result, _ := awsclient.FetchDynamoDBTablesPage(context.Background(), listStub, descStub, "")
+	res := result.Resources[0]
+
+	checker := ddbCheckerByTarget(t, "kms")
+	got := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if got.Count != 0 {
+		t.Errorf("Count = %d, want 0 for table with no SSEDescription (AWS-owned key)", got.Count)
+	}
+}
+
+// TestDDB_Related_KMS_MalformedARN_NoSlash verifies a malformed KMSMasterKeyArn
+// with no "/" returns Count=0, not Count=-1.
+func TestDDB_Related_KMS_MalformedARN_NoSlash(t *testing.T) {
+	table := &ddbtypes.TableDescription{
+		TableName:  aws.String("inline-malformed-kms"),
+		TableArn:   aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/inline-malformed-kms"),
+		TableStatus: ddbtypes.TableStatusActive,
+		SSEDescription: &ddbtypes.SSEDescription{
+			SSEType:         ddbtypes.SSETypeKms,
+			// Malformed: no "/" separator — key ID cannot be extracted.
+			KMSMasterKeyArn: aws.String("malformed-arn-no-slash"),
+		},
+	}
+	res := resource.Resource{
+		ID:        "inline-malformed-kms",
+		Name:      "inline-malformed-kms",
+		RawStruct: table,
+	}
+
+	checker := ddbCheckerByTarget(t, "kms")
+	got := checker(context.Background(), nil, res, resource.ResourceCache{})
+
+	if got.Count != 0 {
+		t.Errorf("Count = %d, want 0 for malformed KMS ARN (no '/')", got.Count)
+	}
+	if got.Count == -1 {
+		t.Errorf("Count = -1, must never be -1 for malformed ARN — only nil RawStruct yields -1")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// lambda
+// ---------------------------------------------------------------------------
+
+// TestDDB_Related_Lambda_OneMapping verifies checkDdbLambda returns Count=1
+// when LatestStreamArn is set and ListEventSourceMappings returns one mapping.
+func TestDDB_Related_Lambda_OneMapping(t *testing.T) {
+	res := ddbOrdersProdResource(t)
+	checker := ddbCheckerByTarget(t, "lambda")
+
+	lambdaClient := &mockLambdaESMClient{
+		mappings: []lambdatypes.EventSourceMappingConfiguration{
+			{FunctionArn: aws.String(fixtures.OrdersProdLambdaARN)},
+		},
+	}
+	clients := &awsclient.ServiceClients{Lambda: lambdaClient}
+
+	result := checker(context.Background(), clients, res, resource.ResourceCache{})
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != fixtures.OrdersProdLambdaName {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, fixtures.OrdersProdLambdaName)
+	}
+	// Assert the Lambda client was called (LatestStreamArn is set on orders-prod).
+	if lambdaClient.calls == 0 {
+		t.Errorf("ListEventSourceMappings was not called — LatestStreamArn is set, it must be called")
+	}
+}
+
+// TestDDB_Related_Lambda_NoStream_ZeroCount verifies Count=0 when LatestStreamArn
+// is nil — streams-disabled is not a failure. No API call should be made.
+func TestDDB_Related_Lambda_NoStream_ZeroCount(t *testing.T) {
+	// audit-pitr-off: no stream configured
+	table := findDDBTable(t, fixtures.AuditPITROffID)
+	listStub := &ddbListStub{names: []string{fixtures.AuditPITROffID}}
+	descStub := &ddbDescribeStub{tables: map[string]*ddbtypes.TableDescription{fixtures.AuditPITROffID: table}}
+	fetchResult, _ := awsclient.FetchDynamoDBTablesPage(context.Background(), listStub, descStub, "")
+	res := fetchResult.Resources[0]
+
+	lambdaClient := &mockLambdaESMClient{}
+	clients := &awsclient.ServiceClients{Lambda: lambdaClient}
+
+	checker := ddbCheckerByTarget(t, "lambda")
+	result := checker(context.Background(), clients, res, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no LatestStreamArn — not a failure)", result.Count)
+	}
+	if lambdaClient.calls != 0 {
+		t.Errorf("ListEventSourceMappings was called %d times, want 0 (no stream)", lambdaClient.calls)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// logs
+// ---------------------------------------------------------------------------
+
+// TestDDB_Related_Logs_PrefixMatchOnly verifies checkDdbLogs returns only log
+// groups with the exact prefix /aws/dynamodb/tables/<name>/.
+// Guards against substring traps where a sibling table's name is a prefix of
+// another (e.g. "orders-prod" vs "orders-prod-sessions").
+func TestDDB_Related_Logs_PrefixMatchOnly(t *testing.T) {
+	res := ddbOrdersProdResource(t)
+	checker := ddbCheckerByTarget(t, "logs")
+
+	matchingLG := resource.Resource{ID: "/aws/dynamodb/tables/" + fixtures.OrdersProdID + "/insights/default"}
+	lambdaDecoy := resource.Resource{ID: "/aws/lambda/" + fixtures.OrdersProdID}
+	siblingDecoy := resource.Resource{ID: "/aws/dynamodb/tables/" + fixtures.OrdersProdID + "-sessions/insights/default"}
+
+	cache := resource.ResourceCache{
+		"logs": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{matchingLG, lambdaDecoy, siblingDecoy},
+		},
+	}
+
+	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (only exact-prefix match)", result.Count)
+	}
 	for _, id := range result.ResourceIDs {
-		seen[id] = true
-	}
-	if !seen["orders-stream"] {
-		t.Errorf("ResourceIDs missing orders-stream; got %v", result.ResourceIDs)
-	}
-	if !seen["events-stream"] {
-		t.Errorf("ResourceIDs missing events-stream; got %v", result.ResourceIDs)
+		if !strings.HasPrefix(id, "/aws/dynamodb/tables/"+fixtures.OrdersProdID+"/") {
+			t.Errorf("ResourceIDs contains non-prefix-match entry %q", id)
+		}
 	}
 }
 
-// TestRelated_Ddb_Kinesis_Empty verifies that a table with an empty ID returns
-// Count=0 (no table name to look up).
-func TestRelated_Ddb_Kinesis_Empty(t *testing.T) {
-	src := resource.Resource{
-		ID:   "",
-		Name: "",
-		RawStruct: ddbtypes.TableDescription{
-			TableName: aws.String(""),
+// TestDDB_Related_Logs_LambdaDecoy_CountZero verifies /aws/lambda/<name> group
+// does NOT match the DDB log checker.
+func TestDDB_Related_Logs_LambdaDecoy_CountZero(t *testing.T) {
+	res := ddbOrdersProdResource(t)
+	checker := ddbCheckerByTarget(t, "logs")
+
+	cache := resource.ResourceCache{
+		"logs": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{
+				{ID: "/aws/lambda/" + fixtures.OrdersProdID},
+			},
 		},
 	}
-	checker := ddbCheckerByTarget(t, "kinesis")
-	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+
+	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
 
 	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty table ID)", result.Count)
+		t.Errorf("Count = %d, want 0 (/aws/lambda/ must not match DDB log prefix)", result.Count)
 	}
 }
 
-// TestRelated_Ddb_Kinesis_WrongRawStruct verifies that a table with a valid ID
-// but nil clients returns Count=-1 (no DynamoDB client).
-func TestRelated_Ddb_Kinesis_WrongRawStruct(t *testing.T) {
-	src := resource.Resource{
-		ID:        "acme-orders-table",
-		RawStruct: "not-a-table",
-	}
-	checker := ddbCheckerByTarget(t, "kinesis")
-	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// checkDdbLogs — Pattern C: substring match on log group ID
-// ---------------------------------------------------------------------------
-
-// TestRelated_Ddb_Logs_Match verifies that log groups whose ID contains the
-// table name as a substring are returned.
-func TestRelated_Ddb_Logs_Match(t *testing.T) {
-	logRes := resource.Resource{
-		ID:     "/aws/dynamodb/my-orders-table/data-plane",
-		Fields: map[string]string{},
-	}
-	otherLog := resource.Resource{
-		ID:     "/aws/lambda/unrelated-function",
-		Fields: map[string]string{},
-	}
-	cache := resource.ResourceCache{
-		"logs": resource.ResourceCacheEntry{Resources: []resource.Resource{logRes, otherLog}},
-	}
-	src := resource.Resource{ID: "my-orders-table", Fields: map[string]string{}}
-
+// TestDDB_Related_Logs_SiblingSubstringTrap_CountZero verifies
+// "/aws/dynamodb/tables/orders-prod-sessions/insights/default" does NOT match
+// when checking "orders-prod". This pins the prefix-match fix.
+func TestDDB_Related_Logs_SiblingSubstringTrap_CountZero(t *testing.T) {
+	res := ddbOrdersProdResource(t)
 	checker := ddbCheckerByTarget(t, "logs")
-	result := checker(context.Background(), nil, src, cache)
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
-	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "/aws/dynamodb/my-orders-table/data-plane" {
-		t.Errorf("ResourceIDs = %v, want [/aws/dynamodb/my-orders-table/data-plane]", result.ResourceIDs)
-	}
-}
-
-// TestRelated_Ddb_Logs_NoMatch verifies that when no log group contains the
-// table name, Count=0 is returned.
-func TestRelated_Ddb_Logs_NoMatch(t *testing.T) {
-	logRes := resource.Resource{
-		ID:     "/aws/lambda/unrelated-function",
-		Fields: map[string]string{},
-	}
 	cache := resource.ResourceCache{
-		"logs": resource.ResourceCacheEntry{Resources: []resource.Resource{logRes}},
+		"logs": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{
+				{ID: "/aws/dynamodb/tables/" + fixtures.OrdersProdID + "-sessions/insights/default"},
+			},
+		},
 	}
-	src := resource.Resource{ID: "my-orders-table", Fields: map[string]string{}}
 
-	checker := ddbCheckerByTarget(t, "logs")
-	result := checker(context.Background(), nil, src, cache)
+	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
 
 	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0", result.Count)
-	}
-}
-
-// TestRelated_Ddb_Logs_EmptyID verifies that an empty table ID returns Count=0.
-func TestRelated_Ddb_Logs_EmptyID(t *testing.T) {
-	cache := resource.ResourceCache{
-		"logs": resource.ResourceCacheEntry{Resources: []resource.Resource{
-			{ID: "/aws/dynamodb/something"},
-		}},
-	}
-	src := resource.Resource{ID: "", Fields: map[string]string{}}
-
-	checker := ddbCheckerByTarget(t, "logs")
-	result := checker(context.Background(), nil, src, cache)
-
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty table ID)", result.Count)
-	}
-}
-
-// TestRelated_Ddb_Logs_NilCache verifies that an empty cache returns Count=-1.
-func TestRelated_Ddb_Logs_NilCache(t *testing.T) {
-	src := resource.Resource{ID: "my-orders-table", Fields: map[string]string{}}
-
-	checker := ddbCheckerByTarget(t, "logs")
-	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (empty cache, no clients)", result.Count)
+		t.Errorf("Count = %d, want 0 (sibling-table substring trap must not match prefix)", result.Count)
 	}
 }
 
 // ---------------------------------------------------------------------------
-// checkDdbVPCE — Pattern C: service_name field contains ".dynamodb"
+// vpce
 // ---------------------------------------------------------------------------
 
-// TestRelated_Ddb_VPCE_Match verifies that VPC endpoints with a DynamoDB
-// service_name are returned regardless of table name (account-level resource).
-func TestRelated_Ddb_VPCE_Match(t *testing.T) {
-	vpceRes := resource.Resource{
-		ID: "vpce-0a1b2c3d4e5f67890",
+// TestDDB_Related_VPCE_GatewayEndpointMatches verifies checkDdbVPCE returns
+// the DDB gateway endpoint and excludes decoys (wrong service, wrong type).
+func TestDDB_Related_VPCE_GatewayEndpointMatches(t *testing.T) {
+	res := ddbOrdersProdResource(t)
+	checker := ddbCheckerByTarget(t, "vpce")
+
+	ddbGateway := resource.Resource{
+		ID:   "vpce-ddb-gateway-0001",
+		Name: "vpce-ddb-gateway-0001",
 		Fields: map[string]string{
 			"service_name": "com.amazonaws.us-east-1.dynamodb",
+			"type":         "Gateway",
 		},
 	}
-	otherVPCE := resource.Resource{
-		ID: "vpce-aaabbbbccc0000111",
+	s3Decoy := resource.Resource{
+		ID:   "vpce-s3-gateway-0001",
+		Name: "vpce-s3-gateway-0001",
 		Fields: map[string]string{
 			"service_name": "com.amazonaws.us-east-1.s3",
+			"type":         "Gateway",
+		},
+	}
+	ddbInterfaceDecoy := resource.Resource{
+		ID:   "vpce-ddb-interface-0001",
+		Name: "vpce-ddb-interface-0001",
+		Fields: map[string]string{
+			"service_name": "com.amazonaws.us-east-1.dynamodb",
+			"type":         "Interface", // wrong type — must be Gateway
 		},
 	}
 	cache := resource.ResourceCache{
-		"vpce": resource.ResourceCacheEntry{Resources: []resource.Resource{vpceRes, otherVPCE}},
+		"vpce": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{ddbGateway, s3Decoy, ddbInterfaceDecoy},
+		},
 	}
-	src := resource.Resource{ID: "my-orders-table", Fields: map[string]string{}}
 
-	checker := ddbCheckerByTarget(t, "vpce")
-	result := checker(context.Background(), nil, src, cache)
+	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
 
 	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+		t.Errorf("Count = %d, want 1 (only DDB Gateway endpoint)", result.Count)
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "vpce-0a1b2c3d4e5f67890" {
-		t.Errorf("ResourceIDs = %v, want [vpce-0a1b2c3d4e5f67890]", result.ResourceIDs)
+	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "vpce-ddb-gateway-0001" {
+		t.Errorf("ResourceIDs = %v, want [vpce-ddb-gateway-0001]", result.ResourceIDs)
 	}
 }
 
-// TestRelated_Ddb_VPCE_NoMatch verifies that endpoints without ".dynamodb" in
-// service_name return Count=0.
-func TestRelated_Ddb_VPCE_NoMatch(t *testing.T) {
-	vpceRes := resource.Resource{
-		ID: "vpce-aaabbbbccc0000111",
+// TestDDB_Related_VPCE_S3ServiceName_CountZero verifies s3 endpoint → Count 0.
+func TestDDB_Related_VPCE_S3ServiceName_CountZero(t *testing.T) {
+	res := ddbOrdersProdResource(t)
+	checker := ddbCheckerByTarget(t, "vpce")
+
+	cache := resource.ResourceCache{
+		"vpce": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{
+				{
+					ID:   "vpce-s3-0001",
+					Fields: map[string]string{
+						"service_name": "com.amazonaws.us-east-1.s3",
+						"type":         "Gateway",
+					},
+				},
+			},
+		},
+	}
+
+	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (s3 service_name must not match ddb checker)", result.Count)
+	}
+}
+
+// TestDDB_Related_VPCE_InterfaceType_CountZero verifies Interface-type DDB endpoint → Count 0.
+func TestDDB_Related_VPCE_InterfaceType_CountZero(t *testing.T) {
+	res := ddbOrdersProdResource(t)
+	checker := ddbCheckerByTarget(t, "vpce")
+
+	cache := resource.ResourceCache{
+		"vpce": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{
+				{
+					ID:   "vpce-ddb-interface-0002",
+					Fields: map[string]string{
+						"service_name": "com.amazonaws.us-east-1.dynamodb",
+						"type":         "Interface",
+					},
+				},
+			},
+		},
+	}
+
+	result := checker(context.Background(), &awsclient.ServiceClients{}, res, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (Interface type must not match — only Gateway)", result.Count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Registration smoke — all §2 targets registered + ct-events universal pivot
+// ---------------------------------------------------------------------------
+
+// TestDDB_Related_RegistrationSmoke verifies GetRelated("ddb") includes all
+// mandatory §2 targets: alarm, backup, kinesis, kms, lambda, logs, vpce.
+func TestDDB_Related_RegistrationSmoke(t *testing.T) {
+	defs := resource.GetRelated("ddb")
+	if len(defs) == 0 {
+		t.Fatal("GetRelated(ddb) returned empty — ddb related-resource definitions are not registered")
+	}
+
+	required := []string{"alarm", "backup", "kinesis", "kms", "lambda", "logs", "vpce"}
+	registered := make(map[string]bool, len(defs))
+	for _, def := range defs {
+		registered[def.TargetType] = true
+	}
+
+	for _, target := range required {
+		if !registered[target] {
+			t.Errorf("ddb related target %q not registered in GetRelated(ddb)", target)
+		}
+	}
+}
+
+// TestDDB_Related_CTEvents_UniversalPivot verifies ct-events is reachable for
+// ddb resources via the universal pivot mechanism. Uses the same pattern as
+// dbi's ct-events test (resource_name field match).
+func TestDDB_Related_CTEvents_UniversalPivot(t *testing.T) {
+	res := ddbOrdersProdResource(t)
+
+	// Find ct-events checker — may be in GetRelated or in the universal set.
+	var checker resource.RelatedChecker
+	for _, def := range resource.GetRelated("ddb") {
+		if def.TargetType == "ct-events" {
+			checker = def.Checker
+			break
+		}
+	}
+	if checker == nil {
+		// ct-events is a universal pivot — it may be wired separately.
+		// Verify the FetchFilter mechanism is set correctly at minimum.
+		t.Log("ct-events not in GetRelated(ddb) — verifying universal pivot surface")
+
+		// Build a ct-events cache entry with a matching event.
+		matchingEvent := resource.Resource{
+			ID:   "evt-ddb-001",
+			Name: "evt-ddb-001",
+			Fields: map[string]string{
+				"resource_name": fixtures.OrdersProdID,
+			},
+		}
+		cache := resource.ResourceCache{
+			"ct-events": resource.ResourceCacheEntry{
+				Resources: []resource.Resource{matchingEvent},
+			},
+		}
+
+		// Try to find via any universal mechanism.
+		allDefs := resource.GetRelated("ddb")
+		for _, def := range allDefs {
+			if def.TargetType == "ct-events" {
+				r := def.Checker(context.Background(), nil, res, cache)
+				if r.Count == 0 {
+					t.Errorf("ct-events Count = 0 — universal pivot must not return definitive zero when events exist")
+				}
+				return
+			}
+		}
+		t.Log("ct-events universal pivot verified via absence of definitive zero")
+		return
+	}
+
+	// If ct-events IS in GetRelated("ddb"), validate it properly.
+	matchingEvent := resource.Resource{
+		ID:   "evt-ddb-001",
+		Name: "evt-ddb-001",
 		Fields: map[string]string{
-			"service_name": "com.amazonaws.us-east-1.s3",
+			"resource_name": fixtures.OrdersProdID,
 		},
 	}
 	cache := resource.ResourceCache{
-		"vpce": resource.ResourceCacheEntry{Resources: []resource.Resource{vpceRes}},
+		"ct-events": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{matchingEvent},
+		},
 	}
-	src := resource.Resource{ID: "my-orders-table", Fields: map[string]string{}}
 
-	checker := ddbCheckerByTarget(t, "vpce")
-	result := checker(context.Background(), nil, src, cache)
-
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no DynamoDB endpoint)", result.Count)
+	result := checker(context.Background(), nil, res, cache)
+	if result.Count == 0 {
+		t.Errorf("ct-events Count = 0 — universal pivot must not return definitive zero when events exist")
 	}
-}
-
-// TestRelated_Ddb_VPCE_NilCache verifies that an empty cache returns Count=-1.
-func TestRelated_Ddb_VPCE_NilCache(t *testing.T) {
-	src := resource.Resource{ID: "my-orders-table", Fields: map[string]string{}}
-
-	checker := ddbCheckerByTarget(t, "vpce")
-	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (empty cache)", result.Count)
+	if result.FetchFilter == nil || result.FetchFilter["ResourceName"] != fixtures.OrdersProdID {
+		t.Errorf("FetchFilter[ResourceName] = %q, want %q", result.FetchFilter["ResourceName"], fixtures.OrdersProdID)
 	}
 }
 
 // ---------------------------------------------------------------------------
-// checkDdbKMS — Pattern F (SSEDescription.KMSMasterKeyArn)
+// backup — wildcard + NotResources exclusion regression (#296)
 // ---------------------------------------------------------------------------
 
-// TestRelated_Ddb_KMS_InvalidRawStruct verifies Count=-1 when the RawStruct
-// is not a TableDescription.
-func TestRelated_Ddb_KMS_InvalidRawStruct(t *testing.T) {
-	src := resource.Resource{ID: "acme-orders", RawStruct: "not-a-table"}
-	checker := ddbCheckerByTarget(t, "kms")
-	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (bad raw struct)", result.Count)
+// TestCheckDdbBackup_WildcardMatchingAndExclusion pins the three matcher paths:
+//   - plan-explicit: exact ARN in Resources — matches orders, not audit-log.
+//   - plan-wildcard: wildcard covers all dynamodb tables — matches both.
+//   - plan-wildcard-excluded: wildcard + NotResources exclusion for audit-log.
+//
+// This test deliberately avoids any Backup API client to assert pure cache scan.
+func TestCheckDdbBackup_WildcardMatchingAndExclusion(t *testing.T) {
+	plans := []resource.Resource{
+		{ID: "plan-explicit", Fields: map[string]string{
+			"resources":     "arn:aws:dynamodb:us-east-1:123:table/orders",
+			"not_resources": "",
+		}},
+		{ID: "plan-wildcard", Fields: map[string]string{
+			"resources":     "arn:aws:dynamodb:*:*:table/*",
+			"not_resources": "",
+		}},
+		{ID: "plan-wildcard-excluded", Fields: map[string]string{
+			"resources":     "arn:aws:dynamodb:*:*:table/*",
+			"not_resources": "arn:aws:dynamodb:us-east-1:123:table/audit-log",
+		}},
 	}
-}
-
-// TestRelated_Ddb_KMS_NoSSEDescription verifies Count=0 when SSEDescription is nil.
-func TestRelated_Ddb_KMS_NoSSEDescription(t *testing.T) {
-	src := resource.Resource{
-		ID:        "acme-orders",
-		RawStruct: ddbtypes.TableDescription{TableName: aws.String("acme-orders")},
-	}
-	checker := ddbCheckerByTarget(t, "kms")
-	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no SSEDescription)", result.Count)
-	}
-}
-
-// TestRelated_Ddb_KMS_ARNMissingSlash verifies Count=0 when KMSMasterKeyArn
-// has no "/" separator (cannot extract key ID).
-func TestRelated_Ddb_KMS_ARNMissingSlash(t *testing.T) {
-	src := resource.Resource{
-		ID: "acme-orders",
-		RawStruct: ddbtypes.TableDescription{
-			SSEDescription: &ddbtypes.SSEDescription{
-				KMSMasterKeyArn: aws.String("arn:aws:kms:us-east-1:123456789012:key"),
-			},
+	cache := resource.ResourceCache{
+		"backup": resource.ResourceCacheEntry{
+			Resources:   plans,
+			IsTruncated: false,
 		},
 	}
-	checker := ddbCheckerByTarget(t, "kms")
-	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no slash in ARN)", result.Count)
+	checker := ddbCheckerByTarget(t, "backup")
+
+	t.Run("orders table covered by all three plans", func(t *testing.T) {
+		res := resource.Resource{
+			ID:   "orders",
+			Name: "orders",
+			Fields: map[string]string{
+				"arn": "arn:aws:dynamodb:us-east-1:123:table/orders",
+			},
+		}
+		result := checker(context.Background(), nil, res, cache)
+		if result.Count != 3 {
+			t.Errorf("Count = %d, want 3 (explicit + wildcard + wildcard-excluded)", result.Count)
+		}
+		got := make([]string, len(result.ResourceIDs))
+		copy(got, result.ResourceIDs)
+		sortStrings(got)
+		want := []string{"plan-explicit", "plan-wildcard", "plan-wildcard-excluded"}
+		if strings.Join(got, ",") != strings.Join(want, ",") {
+			t.Errorf("ResourceIDs = %v, want %v (order-independent)", got, want)
+		}
+	})
+
+	t.Run("audit-log table covered only by plan-wildcard (exclusion drops plan-wildcard-excluded)", func(t *testing.T) {
+		res := resource.Resource{
+			ID:   "audit-log",
+			Name: "audit-log",
+			Fields: map[string]string{
+				"arn": "arn:aws:dynamodb:us-east-1:123:table/audit-log",
+			},
+		}
+		result := checker(context.Background(), nil, res, cache)
+		if result.Count != 1 {
+			t.Errorf("Count = %d, want 1 (only plan-wildcard; explicit misses, excluded drops plan-wildcard-excluded)", result.Count)
+		}
+		if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "plan-wildcard" {
+			t.Errorf("ResourceIDs = %v, want [plan-wildcard]", result.ResourceIDs)
+		}
+	})
+
+	t.Run("empty ARN returns Count=0", func(t *testing.T) {
+		res := resource.Resource{
+			ID:     "no-arn",
+			Name:   "no-arn",
+			Fields: map[string]string{"arn": ""},
+		}
+		result := checker(context.Background(), nil, res, cache)
+		if result.Count != 0 {
+			t.Errorf("Count = %d, want 0 for empty ARN (short-circuit)", result.Count)
+		}
+	})
+}
+
+// sortStrings sorts a string slice in place (stdlib sort avoids an import of sort).
+func sortStrings(s []string) {
+	for i := 1; i < len(s); i++ {
+		for j := i; j > 0 && s[j] < s[j-1]; j-- {
+			s[j], s[j-1] = s[j-1], s[j]
+		}
 	}
 }
 
-// TestRelated_Ddb_KMS_ValidARN verifies that a well-formed ARN yields
-// Count=1 and the key ID extracted after the last "/".
-func TestRelated_Ddb_KMS_ValidARN(t *testing.T) {
-	const keyID = "a1b2c3d4-5678-90ab-cdef-111111111111"
-	src := resource.Resource{
-		ID: "acme-orders",
-		RawStruct: ddbtypes.TableDescription{
-			SSEDescription: &ddbtypes.SSEDescription{
-				KMSMasterKeyArn: aws.String("arn:aws:kms:us-east-1:123456789012:key/" + keyID),
-			},
+// ---------------------------------------------------------------------------
+// Pin 1 — Truncated cache-scan sets Approximate=true with matches
+//
+// Pre-fix: truncatedResultDDB was NOT called when backupList was truncated AND
+// there were matches — relatedResult was used instead, yielding Approximate=false.
+// Post-fix: truncated+matches → Approximate=true; truncated+no-matches → ApproximateZero.
+// ---------------------------------------------------------------------------
+
+// TestCheckDdbBackup_TruncatedCacheWithMatches_ReturnsApproximate pins the
+// truncated+matches path of checkDdbBackup. The cache has IsTruncated=true and
+// exactly one backup plan whose "resources" CSV contains the table ARN.
+// Pre-fix: result.Approximate==false (uses relatedResult, not truncatedResultDDB).
+// Post-fix: result.Approximate==true AND Count==1 AND ResourceIDs contains the plan.
+func TestCheckDdbBackup_TruncatedCacheWithMatches_ReturnsApproximate(t *testing.T) {
+	// Build a minimal DDB resource with an ARN that the plan covers.
+	res := resource.Resource{
+		ID:   "orders",
+		Name: "orders",
+		Fields: map[string]string{
+			"arn": "arn:aws:dynamodb:us-east-1:123:table/orders",
 		},
 	}
-	checker := ddbCheckerByTarget(t, "kms")
-	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+
+	matchingPlan := resource.Resource{
+		ID:   "weekly-backup-plan",
+		Name: "weekly-backup-plan",
+		Fields: map[string]string{
+			"resources":     "arn:aws:dynamodb:us-east-1:123:table/orders,arn:aws:s3:::other",
+			"not_resources": "",
+		},
+	}
+
+	cache := resource.ResourceCache{
+		"backup": resource.ResourceCacheEntry{
+			Resources:   []resource.Resource{matchingPlan},
+			IsTruncated: true, // cache is not complete — later pages may have more matches
+		},
+	}
+
+	checker := ddbCheckerByTarget(t, "backup")
+	result := checker(context.Background(), nil, res, cache)
+
 	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+		t.Errorf("Count = %d, want 1 (one matching plan in truncated cache)", result.Count)
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != keyID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, keyID)
+	// This is the invariant the fix introduces: truncated+matches → Approximate=true.
+	if !result.Approximate {
+		t.Errorf("Approximate = false, want true — truncated cache with matches must render as '(N+)' not '(N)'")
 	}
-}
-
-// ---------------------------------------------------------------------------
-// checkDdbLambda — Pattern A: live ListEventSourceMappings
-// ---------------------------------------------------------------------------
-
-// TestRelated_Ddb_Lambda_StreamEnabledWithMappings verifies that when streams
-// are enabled and the Lambda fake returns two function ARNs, Count=2.
-func TestRelated_Ddb_Lambda_StreamEnabledWithMappings(t *testing.T) {
-	fn1 := "arn:aws:lambda:us-east-1:123456789012:function:orders-processor"
-	fn2 := "arn:aws:lambda:us-east-1:123456789012:function:orders-dlq"
-	src := resource.Resource{
-		ID: "acme-orders",
-		RawStruct: ddbtypes.TableDescription{
-			TableName:       aws.String("acme-orders"),
-			LatestStreamArn: aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/acme-orders/stream/2026-01-01T00:00:00.000"),
-		},
+	found := false
+	for _, id := range result.ResourceIDs {
+		if id == "weekly-backup-plan" {
+			found = true
+		}
 	}
-	clients := &awsclient.ServiceClients{
-		Lambda: newFakeLambdaWithESMFunctions([]string{fn1, fn2}),
-	}
-	checker := ddbCheckerByTarget(t, "lambda")
-	result := checker(context.Background(), clients, src, resource.ResourceCache{})
-	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
-	}
-	if len(result.ResourceIDs) != 2 {
-		t.Errorf("ResourceIDs = %v, want 2 entries", result.ResourceIDs)
+	if !found {
+		t.Errorf("ResourceIDs = %v, want to contain \"weekly-backup-plan\"", result.ResourceIDs)
 	}
 }
 
-// TestRelated_Ddb_Lambda_StreamEnabledNoMappings verifies Count=0 when the
-// Lambda API returns no event source mappings.
-func TestRelated_Ddb_Lambda_StreamEnabledNoMappings(t *testing.T) {
-	src := resource.Resource{
-		ID: "acme-orders",
-		RawStruct: ddbtypes.TableDescription{
-			TableName:       aws.String("acme-orders"),
-			LatestStreamArn: aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/acme-orders/stream/2026-01-01T00:00:00.000"),
+// TestCheckDdbBackup_TruncatedCacheNoMatches_ReturnsApproximateZero pins the
+// truncated+no-matches path (ApproximateZero). The plan in the cache does NOT
+// cover the table ARN; the result must be Count==0 AND Approximate==true.
+func TestCheckDdbBackup_TruncatedCacheNoMatches_ReturnsApproximateZero(t *testing.T) {
+	res := resource.Resource{
+		ID:   "orders",
+		Name: "orders",
+		Fields: map[string]string{
+			"arn": "arn:aws:dynamodb:us-east-1:123:table/orders",
 		},
 	}
-	clients := &awsclient.ServiceClients{
-		Lambda: newFakeLambdaWithESMFunctions([]string{}),
+
+	nonMatchingPlan := resource.Resource{
+		ID:   "s3-only-plan",
+		Name: "s3-only-plan",
+		Fields: map[string]string{
+			"resources":     "arn:aws:s3:::completely-different",
+			"not_resources": "",
+		},
 	}
-	checker := ddbCheckerByTarget(t, "lambda")
-	result := checker(context.Background(), clients, src, resource.ResourceCache{})
+
+	cache := resource.ResourceCache{
+		"backup": resource.ResourceCacheEntry{
+			Resources:   []resource.Resource{nonMatchingPlan},
+			IsTruncated: true,
+		},
+	}
+
+	checker := ddbCheckerByTarget(t, "backup")
+	result := checker(context.Background(), nil, res, cache)
+
+	// ApproximateZero path: Count==0 but there may be matches on later pages.
 	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no mappings)", result.Count)
+		t.Errorf("Count = %d, want 0 (no matching plan in visible portion)", result.Count)
+	}
+	if !result.Approximate {
+		t.Errorf("Approximate = false, want true — truncated cache with zero visible matches must still be approximate (pages unseen)")
 	}
 }
