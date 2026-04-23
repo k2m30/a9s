@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("r53", []string{"zone_id", "name", "record_count", "private_zone", "comment", "alias_targets"})
+	resource.RegisterFieldKeys("r53", []string{"zone_id", "name", "record_count", "private_zone", "comment", "alias_targets", "s3website_alias_names"})
 
 	resource.RegisterPaginated("r53", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -88,8 +88,9 @@ func FetchHostedZonesPage(ctx context.Context, api Route53ListHostedZonesAPI, co
 		}
 
 		aliasTargets := ""
+		s3WebsiteAliasNames := ""
 		if recordSetsAPI != nil && zoneID != "" {
-			aliasTargets = enumerateR53AliasTargets(ctx, recordSetsAPI, zoneID)
+			aliasTargets, s3WebsiteAliasNames = enumerateR53AliasTargets(ctx, recordSetsAPI, zoneID)
 		}
 
 		r := resource.Resource{
@@ -97,12 +98,13 @@ func FetchHostedZonesPage(ctx context.Context, api Route53ListHostedZonesAPI, co
 			Name:   name,
 			Status: "",
 			Fields: map[string]string{
-				"zone_id":       zoneID,
-				"name":          name,
-				"record_count":  recordCount,
-				"private_zone":  privateZone,
-				"comment":       comment,
-				"alias_targets": aliasTargets,
+				"zone_id":               zoneID,
+				"name":                  name,
+				"record_count":          recordCount,
+				"private_zone":          privateZone,
+				"comment":               comment,
+				"alias_targets":         aliasTargets,
+				"s3website_alias_names": s3WebsiteAliasNames,
 			},
 			RawStruct: zone,
 		}
@@ -132,23 +134,45 @@ func FetchHostedZonesPage(ctx context.Context, api Route53ListHostedZonesAPI, co
 	}, nil
 }
 
-// enumerateR53AliasTargets lists the zone's record sets and returns a
-// comma-separated AliasTarget.DNSName list. Used so sibling pivots
-// (s3, cf, elb, …) can scan alias_targets and resolve non-zero.
+// enumerateR53AliasTargets lists the zone's record sets and returns two
+// comma-separated lists:
+//   1. aliasTargets — every AliasTarget.DNSName (for pivots that key off
+//      the DNSName shape, e.g. elb/cf).
+//   2. s3WebsiteAliasNames — record FQDNs (trailing dot stripped) whose
+//      AliasTarget.DNSName matches the S3-website regional endpoint
+//      (s3-website-<region>.amazonaws.com or s3-website.<region>.
+//      amazonaws.com). Used by checkS3R53 per spec §2 — Route 53 alias
+//      to S3 requires bucket-name == FQDN, so the join key is the record
+//      name, NOT a substring of DNSName (which never contains the bucket
+//      name in real AWS).
 // Cost: one ListResourceRecordSets call per zone.
-func enumerateR53AliasTargets(ctx context.Context, api Route53ListResourceRecordSetsAPI, zoneID string) string {
+func enumerateR53AliasTargets(ctx context.Context, api Route53ListResourceRecordSetsAPI, zoneID string) (string, string) {
 	out, err := api.ListResourceRecordSets(ctx, &route53.ListResourceRecordSetsInput{
 		HostedZoneId: aws.String(zoneID),
 	})
 	if err != nil || out == nil {
-		return ""
+		return "", ""
 	}
-	var aliases []string
+	var aliases, s3Website []string
 	for _, rr := range out.ResourceRecordSets {
 		if rr.AliasTarget == nil || rr.AliasTarget.DNSName == nil {
 			continue
 		}
-		aliases = append(aliases, *rr.AliasTarget.DNSName)
+		dns := *rr.AliasTarget.DNSName
+		aliases = append(aliases, dns)
+		if isS3WebsiteEndpoint(dns) && rr.Name != nil && *rr.Name != "" {
+			s3Website = append(s3Website, strings.TrimSuffix(*rr.Name, "."))
+		}
 	}
-	return strings.Join(aliases, ",")
+	return strings.Join(aliases, ","), strings.Join(s3Website, ",")
+}
+
+// isS3WebsiteEndpoint reports whether a Route 53 AliasTarget DNSName is
+// an S3 static-website regional endpoint. AWS returns one of:
+//   - s3-website-<region>.amazonaws.com.   (legacy hyphen form)
+//   - s3-website.<region>.amazonaws.com.   (newer dot form)
+// The bucket name is NEVER part of this DNSName — the join to a specific
+// bucket is by record name (FQDN) which per AWS must equal the bucket name.
+func isS3WebsiteEndpoint(dns string) bool {
+	return strings.Contains(dns, "s3-website-") || strings.Contains(dns, "s3-website.")
 }

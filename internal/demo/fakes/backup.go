@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/backup"
 	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 
@@ -48,7 +49,7 @@ func (f *BackupFake) ListBackupSelections(_ context.Context, input *backup.ListB
 	for i, sel := range sels {
 		summaries = append(summaries, backuptypes.BackupSelectionsListMember{
 			BackupPlanId:  input.BackupPlanId,
-			SelectionId:   stringPtr(selectionIDFor(*input.BackupPlanId, i)),
+			SelectionId:   aws.String(selectionIDFor(*input.BackupPlanId, i)),
 			SelectionName: sel.SelectionName,
 			IamRoleArn:    sel.IamRoleArn,
 		})
@@ -80,8 +81,6 @@ func (f *BackupFake) GetBackupSelection(_ context.Context, input *backup.GetBack
 	}
 	return &backup.GetBackupSelectionOutput{}, nil
 }
-
-func stringPtr(s string) *string { return &s }
 
 func selectionIDFor(planID string, idx int) string {
 	// Deterministic synthetic selection ID — stable across calls so

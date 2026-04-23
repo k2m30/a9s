@@ -184,24 +184,17 @@ func NewR53Fixtures() *R53Fixtures {
 					},
 				},
 			},
-			// S3 healthy-bucket record set.
-			// AliasTarget.DNSName contains the S3 website endpoint — used by checkS3R53
-			// once Phase 7 populates alias_targets in the r53 fetcher.
+			// S3 healthy-bucket alias record. AWS-realistic shape: record
+			// NAME (FQDN) is exactly the bucket name (S3 website aliases
+			// require bucket-name==FQDN), and AliasTarget.DNSName is the
+			// regional s3-website endpoint WITHOUT any bucket segment.
+			// checkS3R53 joins on the record name.
 			"/hostedzone/Z4567890123ABCDEFGHIJ": {
 				{
-					Name: aws.String("demo.acme-corp.com."),
+					Name: aws.String(HealthyBucketName + "."),
 					Type: r53types.RRTypeA,
 					AliasTarget: &r53types.AliasTarget{
 						DNSName:              aws.String("s3-website-us-east-1.amazonaws.com."),
-						HostedZoneId:         aws.String("Z3AQBSTGFYJSTF"),
-						EvaluateTargetHealth: false,
-					},
-				},
-				{
-					Name: aws.String(HealthyBucketName + ".demo.acme-corp.com."),
-					Type: r53types.RRTypeA,
-					AliasTarget: &r53types.AliasTarget{
-						DNSName:              aws.String(HealthyBucketName + ".s3-website-us-east-1.amazonaws.com."),
 						HostedZoneId:         aws.String("Z3AQBSTGFYJSTF"),
 						EvaluateTargetHealth: false,
 					},

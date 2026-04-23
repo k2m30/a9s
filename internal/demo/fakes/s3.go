@@ -24,6 +24,14 @@ func NewS3() *S3Fake {
 	return &S3Fake{fix: fixtures.NewS3Fixtures()}
 }
 
+// NewS3FromFixtures constructs an S3Fake backed by a caller-supplied
+// fixture set, bypassing the default NewS3Fixtures builder. Intended
+// for tests that need to override specific maps (BucketPolicies,
+// EncryptionConfigs, …) without mutating shared demo state.
+func NewS3FromFixtures(f *fixtures.S3Fixtures) *S3Fake {
+	return &S3Fake{fix: f}
+}
+
 func (f *S3Fake) ListBuckets(_ context.Context, input *s3.ListBucketsInput, _ ...func(*s3.Options)) (*s3.ListBucketsOutput, error) {
 	out := &s3.ListBucketsOutput{Buckets: f.fix.Buckets}
 	if input.ContinuationToken != nil && *input.ContinuationToken != "" {
@@ -174,4 +182,21 @@ func (f *S3Fake) GetBucketLogging(_ context.Context, input *s3.GetBucketLoggingI
 		return &s3.GetBucketLoggingOutput{}, nil
 	}
 	return cfg, nil
+}
+
+// GetBucketPolicy returns the bucket's resource-policy JSON document.
+// Buckets with no entry in BucketPolicies get NoSuchBucketPolicy —
+// the canonical AWS response the checker honors as a legitimate 0.
+func (f *S3Fake) GetBucketPolicy(_ context.Context, input *s3.GetBucketPolicyInput, _ ...func(*s3.Options)) (*s3.GetBucketPolicyOutput, error) {
+	if input.Bucket == nil {
+		return nil, fmt.Errorf("GetBucketPolicy: bucket name is required")
+	}
+	policy, ok := f.fix.BucketPolicies[*input.Bucket]
+	if !ok || policy == "" {
+		return nil, &smithy.GenericAPIError{
+			Code:    "NoSuchBucketPolicy",
+			Message: "The bucket policy does not exist",
+		}
+	}
+	return &s3.GetBucketPolicyOutput{Policy: &policy}, nil
 }
