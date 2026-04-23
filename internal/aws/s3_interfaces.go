@@ -48,6 +48,13 @@ type S3GetBucketTaggingAPI interface {
 	GetBucketTagging(ctx context.Context, params *s3.GetBucketTaggingInput, optFns ...func(*s3.Options)) (*s3.GetBucketTaggingOutput, error)
 }
 
+// S3GetBucketPolicyAPI defines the interface for the S3 GetBucketPolicy
+// operation. Used by the s3→role pivot to discover roles named as
+// AWS principals in the bucket's resource policy.
+type S3GetBucketPolicyAPI interface {
+	GetBucketPolicy(ctx context.Context, params *s3.GetBucketPolicyInput, optFns ...func(*s3.Options)) (*s3.GetBucketPolicyOutput, error)
+}
+
 // S3API is the aggregate interface covering all S3 operations used by a9s fetchers.
 // *s3.Client structurally satisfies this interface.
 type S3API interface {
