@@ -728,3 +728,96 @@ func TestDDB_Related_CTEvents_UniversalPivot(t *testing.T) {
 		t.Errorf("FetchFilter[ResourceName] = %q, want %q", result.FetchFilter["ResourceName"], fixtures.OrdersProdID)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// backup — wildcard + NotResources exclusion regression (#296)
+// ---------------------------------------------------------------------------
+
+// TestCheckDdbBackup_WildcardMatchingAndExclusion pins the three matcher paths:
+//   - plan-explicit: exact ARN in Resources — matches orders, not audit-log.
+//   - plan-wildcard: wildcard covers all dynamodb tables — matches both.
+//   - plan-wildcard-excluded: wildcard + NotResources exclusion for audit-log.
+//
+// This test deliberately avoids any Backup API client to assert pure cache scan.
+func TestCheckDdbBackup_WildcardMatchingAndExclusion(t *testing.T) {
+	plans := []resource.Resource{
+		{ID: "plan-explicit", Fields: map[string]string{
+			"resources":     "arn:aws:dynamodb:us-east-1:123:table/orders",
+			"not_resources": "",
+		}},
+		{ID: "plan-wildcard", Fields: map[string]string{
+			"resources":     "arn:aws:dynamodb:*:*:table/*",
+			"not_resources": "",
+		}},
+		{ID: "plan-wildcard-excluded", Fields: map[string]string{
+			"resources":     "arn:aws:dynamodb:*:*:table/*",
+			"not_resources": "arn:aws:dynamodb:us-east-1:123:table/audit-log",
+		}},
+	}
+	cache := resource.ResourceCache{
+		"backup": resource.ResourceCacheEntry{
+			Resources:   plans,
+			IsTruncated: false,
+		},
+	}
+	checker := ddbCheckerByTarget(t, "backup")
+
+	t.Run("orders table covered by all three plans", func(t *testing.T) {
+		res := resource.Resource{
+			ID:   "orders",
+			Name: "orders",
+			Fields: map[string]string{
+				"arn": "arn:aws:dynamodb:us-east-1:123:table/orders",
+			},
+		}
+		result := checker(context.Background(), nil, res, cache)
+		if result.Count != 3 {
+			t.Errorf("Count = %d, want 3 (explicit + wildcard + wildcard-excluded)", result.Count)
+		}
+		got := make([]string, len(result.ResourceIDs))
+		copy(got, result.ResourceIDs)
+		sortStrings(got)
+		want := []string{"plan-explicit", "plan-wildcard", "plan-wildcard-excluded"}
+		if strings.Join(got, ",") != strings.Join(want, ",") {
+			t.Errorf("ResourceIDs = %v, want %v (order-independent)", got, want)
+		}
+	})
+
+	t.Run("audit-log table covered only by plan-wildcard (exclusion drops plan-wildcard-excluded)", func(t *testing.T) {
+		res := resource.Resource{
+			ID:   "audit-log",
+			Name: "audit-log",
+			Fields: map[string]string{
+				"arn": "arn:aws:dynamodb:us-east-1:123:table/audit-log",
+			},
+		}
+		result := checker(context.Background(), nil, res, cache)
+		if result.Count != 1 {
+			t.Errorf("Count = %d, want 1 (only plan-wildcard; explicit misses, excluded drops plan-wildcard-excluded)", result.Count)
+		}
+		if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "plan-wildcard" {
+			t.Errorf("ResourceIDs = %v, want [plan-wildcard]", result.ResourceIDs)
+		}
+	})
+
+	t.Run("empty ARN returns Count=0", func(t *testing.T) {
+		res := resource.Resource{
+			ID:     "no-arn",
+			Name:   "no-arn",
+			Fields: map[string]string{"arn": ""},
+		}
+		result := checker(context.Background(), nil, res, cache)
+		if result.Count != 0 {
+			t.Errorf("Count = %d, want 0 for empty ARN (short-circuit)", result.Count)
+		}
+	})
+}
+
+// sortStrings sorts a string slice in place (stdlib sort avoids an import of sort).
+func sortStrings(s []string) {
+	for i := 1; i < len(s); i++ {
+		for j := i; j > 0 && s[j] < s[j-1]; j-- {
+			s[j], s[j-1] = s[j-1], s[j]
+		}
+	}
+}

@@ -272,10 +272,16 @@ func checkS3Glue(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResult("glue", ids)
 }
 
-// checkS3Backup scans the backup cache for recovery points whose ResourceArn
-// identifies this bucket (arn:aws:s3:::BUCKET). The backup cache holds backup
-// plans/jobs, not per-resource recovery points — so a full scan rarely matches.
-// When the cache lacks the needed shape, Count: 0 (scan complete, no hits).
+// checkS3Backup scans the backup cache for plans that cover this bucket.
+// Two matching paths are applied per cached plan:
+//   - Legacy: Fields["resource_arn"] exactly equals the bucket ARN
+//     (recovery-point-shaped cache entries; unrelated to BackupSelection).
+//   - Selection: BackupPlanCoversARN checks Fields["resources"] (may contain
+//     wildcard patterns such as arn:aws:s3:::*) and Fields["not_resources"]
+//     (exclusion list). A plan covers this bucket iff any Resources entry
+//     matches AND no NotResources entry matches.
+//
+// No live API call is made — this is a pure cache scan.
 func checkS3Backup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
@@ -291,7 +297,7 @@ func checkS3Backup(ctx context.Context, clients any, res resource.Resource, cach
 	}
 	var ids []string
 	for _, bk := range bkList {
-		if bk.Fields["resource_arn"] == bucketARN || containsARNExact(bk.Fields["resources"], bucketARN) {
+		if bk.Fields["resource_arn"] == bucketARN || BackupPlanCoversARN(bk.Fields["resources"], bk.Fields["not_resources"], bucketARN) {
 			ids = append(ids, bk.ID)
 		}
 	}
@@ -299,18 +305,6 @@ func checkS3Backup(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.ApproximateZero("backup")
 	}
 	return relatedResult("backup", ids)
-}
-
-// containsARNExact splits a comma-joined ARN list and returns true if any
-// entry exactly equals target. This is required over strings.Contains
-// because ARNs share a ":::<name>" segment that collides on prefix
-// (e.g. bucket "prod" would match a selection covering
-// arn:aws:s3:::prod-logs).
-func containsARNExact(csv, target string) bool {
-	if csv == "" || target == "" {
-		return false
-	}
-	return slices.Contains(strings.Split(csv, ","), target)
 }
 
 // checkS3EBRule scans the eb-rule cache for rules whose EventPattern filters

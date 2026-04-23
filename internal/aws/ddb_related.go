@@ -69,9 +69,11 @@ func checkDdbAlarm(ctx context.Context, clients any, res resource.Resource, cach
 
 // checkDdbBackup resolves AWS Backup plans that cover this DynamoDB table by
 // reverse-scanning the already-loaded backup list cache. For each cached plan,
-// Fields["resources"] contains a comma-separated list of resource ARNs; we
-// match each against this table's ARN from res.Fields["arn"].
-// No live API call is made — this is a pure cache scan.
+// Fields["resources"] contains a comma-separated list of resource ARNs or
+// wildcard patterns (e.g. arn:aws:dynamodb:*:*:table/*); Fields["not_resources"]
+// contains exclusion patterns with the same wildcard semantics. A plan covers
+// this table iff any Resources entry matches the table's ARN AND no NotResources
+// entry matches. No live API call is made — this is a pure cache scan.
 func checkDdbBackup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	tableARN := res.Fields["arn"]
 	if tableARN == "" {
@@ -86,15 +88,8 @@ func checkDdbBackup(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	var ids []string
 	for _, planRes := range backupList {
-		resourcesCSV := planRes.Fields["resources"]
-		if resourcesCSV == "" {
-			continue
-		}
-		for arn := range strings.SplitSeq(resourcesCSV, ",") {
-			if strings.TrimSpace(arn) == tableARN {
-				ids = append(ids, planRes.ID)
-				break
-			}
+		if BackupPlanCoversARN(planRes.Fields["resources"], planRes.Fields["not_resources"], tableARN) {
+			ids = append(ids, planRes.ID)
 		}
 	}
 	if len(ids) == 0 && truncated {
