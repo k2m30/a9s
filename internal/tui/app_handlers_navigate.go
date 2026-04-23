@@ -359,6 +359,11 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		m.relatedGen++      // cancel in-flight results from previous batch
 		m.enrichGen++       // cancel in-flight enrichment from previous batch
 		m.enrichResKey = "" // force gen bump on next enrichment dispatch
+		// Invalidate the SES v1 receipt rule set cache so Ctrl+R on a detail view
+		// picks up receipt-rule changes without requiring a profile/region switch.
+		if rt == "ses" {
+			awsclient.InvalidateSESRuleSetCache(m.clients)
+		}
 		m.flash = flashState{text: "Refreshing...", isError: false, active: true}
 
 		var cmds []tea.Cmd

@@ -117,7 +117,7 @@ func buildBackupRecoveryPoints() map[string][]backuptypes.RecoveryPointByResourc
 				RecoveryPointArn: aws.String("arn:aws:backup:us-east-1:123456789012:recovery-point:rp-ddb-weekly-20260420"),
 				BackupVaultName:  aws.String("Default"),
 				Status:           backuptypes.RecoveryPointStatusCompleted,
-				CreationDate:     aws.Time(mustParseBackupTime("2026-04-20T03:00:00+00:00")),
+				CreationDate:     aws.Time(mustParseBackupTime("2026-04-20T03:00:00Z")),
 			},
 		},
 		efsARN: {

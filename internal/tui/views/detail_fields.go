@@ -432,6 +432,18 @@ func (m *DetailModel) buildFieldList() {
 			ancestorByLevel[level] = subKey
 		}
 	}
+	// Post-process: apply NavIDFromValue to top-level scalar navigable items.
+	// ExtractFieldList marks them IsNavigable but does not know the target type's
+	// ID format — NavID must be resolved here where resource.NavIDFromValue is available.
+	// Only set NavID when the extractor actually changes the value (the value is an ARN).
+	for i, item := range items {
+		if item.IsNavigable && !item.IsSubField && item.TargetType != "" && item.Value != "" {
+			if navID := resource.NavIDFromValue(item.TargetType, item.Value); navID != "" && navID != item.Value {
+				items[i].NavID = navID
+			}
+		}
+	}
+
 	m.fieldList = items
 	if m.resourceType == "ec2" {
 		m.injectEC2StatusChecks()

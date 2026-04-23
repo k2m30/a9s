@@ -821,3 +821,103 @@ func sortStrings(s []string) {
 		}
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Pin 1 — Truncated cache-scan sets Approximate=true with matches
+//
+// Pre-fix: truncatedResultDDB was NOT called when backupList was truncated AND
+// there were matches — relatedResult was used instead, yielding Approximate=false.
+// Post-fix: truncated+matches → Approximate=true; truncated+no-matches → ApproximateZero.
+// ---------------------------------------------------------------------------
+
+// TestCheckDdbBackup_TruncatedCacheWithMatches_ReturnsApproximate pins the
+// truncated+matches path of checkDdbBackup. The cache has IsTruncated=true and
+// exactly one backup plan whose "resources" CSV contains the table ARN.
+// Pre-fix: result.Approximate==false (uses relatedResult, not truncatedResultDDB).
+// Post-fix: result.Approximate==true AND Count==1 AND ResourceIDs contains the plan.
+func TestCheckDdbBackup_TruncatedCacheWithMatches_ReturnsApproximate(t *testing.T) {
+	// Build a minimal DDB resource with an ARN that the plan covers.
+	res := resource.Resource{
+		ID:   "orders",
+		Name: "orders",
+		Fields: map[string]string{
+			"arn": "arn:aws:dynamodb:us-east-1:123:table/orders",
+		},
+	}
+
+	matchingPlan := resource.Resource{
+		ID:   "weekly-backup-plan",
+		Name: "weekly-backup-plan",
+		Fields: map[string]string{
+			"resources":     "arn:aws:dynamodb:us-east-1:123:table/orders,arn:aws:s3:::other",
+			"not_resources": "",
+		},
+	}
+
+	cache := resource.ResourceCache{
+		"backup": resource.ResourceCacheEntry{
+			Resources:   []resource.Resource{matchingPlan},
+			IsTruncated: true, // cache is not complete — later pages may have more matches
+		},
+	}
+
+	checker := ddbCheckerByTarget(t, "backup")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (one matching plan in truncated cache)", result.Count)
+	}
+	// This is the invariant the fix introduces: truncated+matches → Approximate=true.
+	if !result.Approximate {
+		t.Errorf("Approximate = false, want true — truncated cache with matches must render as '(N+)' not '(N)'")
+	}
+	found := false
+	for _, id := range result.ResourceIDs {
+		if id == "weekly-backup-plan" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("ResourceIDs = %v, want to contain \"weekly-backup-plan\"", result.ResourceIDs)
+	}
+}
+
+// TestCheckDdbBackup_TruncatedCacheNoMatches_ReturnsApproximateZero pins the
+// truncated+no-matches path (ApproximateZero). The plan in the cache does NOT
+// cover the table ARN; the result must be Count==0 AND Approximate==true.
+func TestCheckDdbBackup_TruncatedCacheNoMatches_ReturnsApproximateZero(t *testing.T) {
+	res := resource.Resource{
+		ID:   "orders",
+		Name: "orders",
+		Fields: map[string]string{
+			"arn": "arn:aws:dynamodb:us-east-1:123:table/orders",
+		},
+	}
+
+	nonMatchingPlan := resource.Resource{
+		ID:   "s3-only-plan",
+		Name: "s3-only-plan",
+		Fields: map[string]string{
+			"resources":     "arn:aws:s3:::completely-different",
+			"not_resources": "",
+		},
+	}
+
+	cache := resource.ResourceCache{
+		"backup": resource.ResourceCacheEntry{
+			Resources:   []resource.Resource{nonMatchingPlan},
+			IsTruncated: true,
+		},
+	}
+
+	checker := ddbCheckerByTarget(t, "backup")
+	result := checker(context.Background(), nil, res, cache)
+
+	// ApproximateZero path: Count==0 but there may be matches on later pages.
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no matching plan in visible portion)", result.Count)
+	}
+	if !result.Approximate {
+		t.Errorf("Approximate = false, want true — truncated cache with zero visible matches must still be approximate (pages unseen)")
+	}
+}

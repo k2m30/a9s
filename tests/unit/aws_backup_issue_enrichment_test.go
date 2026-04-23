@@ -261,8 +261,8 @@ func TestBackup_Enricher_TwoFailed_CountsCorrectly(t *testing.T) {
 	for _, row := range finding.Rows {
 		rowVals[row.Value] = true
 	}
-	require.True(t, rowVals["FAILED"] || rowVals["EXPIRED"],
-		"Rows must carry at least one of the failed job States; rowValues: %v", rowVals)
+	require.True(t, rowVals["FAILED"], "Rows must carry FAILED state; rowValues: %v", rowVals)
+	require.True(t, rowVals["EXPIRED"], "Rows must carry EXPIRED state; rowValues: %v", rowVals)
 }
 
 // ---------------------------------------------------------------------------
@@ -439,6 +439,17 @@ func TestBackup_Enricher_MixedFailedAndPartial_BrokenWins(t *testing.T) {
 	require.True(t, rowVals["FAILED"],
 		"Rows must contain State=FAILED; rows: %v", finding.Rows)
 
+	// Partial evidence must be preserved alongside the FAILED evidence so the
+	// enricher cannot silently drop partial context when a failed job exists.
+	var sawPartial bool
+	for _, row := range finding.Rows {
+		if row.Label == "Partial jobs" || row.Tier == "~" {
+			sawPartial = true
+			break
+		}
+	}
+	require.True(t, sawPartial, "mixed FAILED+PARTIAL finding must surface partial evidence in Rows")
+
 	// U11: skip pure-integer count values.
 	for _, row := range finding.Rows {
 		if row.Value == "" {
@@ -524,7 +535,8 @@ func TestBackup_Enricher_BannedWords_NeverAppear(t *testing.T) {
 	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil)
 	require.NoError(t, err)
 
-	finding := result.Findings[planID]
+	finding, ok := result.Findings[planID]
+	require.Truef(t, ok, "expected finding for planID %q, got none", planID)
 
 	bannedWords := []string{
 		"Wave 1", "Wave 2", "Wave 3",

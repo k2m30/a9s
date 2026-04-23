@@ -64,6 +64,9 @@ func checkDdbAlarm(ctx context.Context, clients any, res resource.Resource, cach
 	if len(ids) == 0 && truncated {
 		return resource.ApproximateZero("alarm")
 	}
+	if truncated {
+		return truncatedResultDDB("alarm", ids)
+	}
 	return relatedResult("alarm", ids)
 }
 
@@ -94,6 +97,9 @@ func checkDdbBackup(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	if len(ids) == 0 && truncated {
 		return resource.ApproximateZero("backup")
+	}
+	if truncated {
+		return truncatedResultDDB("backup", ids)
 	}
 	return relatedResult("backup", ids)
 }
@@ -132,6 +138,13 @@ func checkDdbKinesis(ctx context.Context, clients any, res resource.Resource, _ 
 		}
 	}
 	return relatedResult("kinesis", ids)
+}
+
+// truncatedResultDDB returns a RelatedCheckResult with Approximate=true when the
+// target cache is truncated and matches were found. Later pages may contain
+// additional matches, so the displayed count is a lower bound — rendered as "(N+)".
+func truncatedResultDDB(target string, ids []string) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: target, Count: len(ids), ResourceIDs: ids, Approximate: true}
 }
 
 // ddbRelatedResources returns the resource list for target from cache or by fetching the first page.

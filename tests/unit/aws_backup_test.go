@@ -11,6 +11,7 @@ package unit
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -254,3 +255,124 @@ func TestBackup_DefaultListColumns_OneStatusColumn(t *testing.T) {
 // busywork — t.Helper is a no-op inside a Test function and the guard
 // runs at compile time, not test time).
 var _ awsclient.BackupAPI = fakes.NewBackup()
+
+// ---------------------------------------------------------------------------
+// PIN 4 — enumerateBackupPlanResources fail-closed regression pins
+// ---------------------------------------------------------------------------
+// These tests exercise the fail-closed contract of enumerateBackupPlanResources
+// (backup.go). Pre-fix code returned partial data when GetBackupSelection
+// failed, which could drop NotResources exclusions and yield false-positive
+// backup coverage. Post-fix code returns ("","") on any error.
+//
+// The function is unexported; it is exercised indirectly via FetchBackupPlans
+// by providing a mock that implements both BackupListBackupSelectionsAPI and
+// BackupGetBackupSelectionAPI — the fetcher type-asserts at call time.
+
+// backupFullMock implements BackupListBackupPlansAPI, BackupListBackupSelectionsAPI,
+// and BackupGetBackupSelectionAPI so FetchBackupPlansPage can type-assert all
+// three interfaces from a single mock value.
+type backupFullMock struct {
+	// ListBackupPlans response
+	plansOutput *backup.ListBackupPlansOutput
+	plansErr    error
+	// ListBackupSelections response
+	selectionsOutput *backup.ListBackupSelectionsOutput
+	selectionsErr    error
+	// GetBackupSelection response — same response returned for every selection ID
+	getSelectionOutput *backup.GetBackupSelectionOutput
+	getSelectionErr    error
+}
+
+func (m *backupFullMock) ListBackupPlans(_ context.Context, _ *backup.ListBackupPlansInput, _ ...func(*backup.Options)) (*backup.ListBackupPlansOutput, error) {
+	return m.plansOutput, m.plansErr
+}
+func (m *backupFullMock) ListBackupSelections(_ context.Context, _ *backup.ListBackupSelectionsInput, _ ...func(*backup.Options)) (*backup.ListBackupSelectionsOutput, error) {
+	return m.selectionsOutput, m.selectionsErr
+}
+func (m *backupFullMock) GetBackupSelection(_ context.Context, _ *backup.GetBackupSelectionInput, _ ...func(*backup.Options)) (*backup.GetBackupSelectionOutput, error) {
+	return m.getSelectionOutput, m.getSelectionErr
+}
+
+// TestBackup_EnumerateSelection_FailClosedOnGetError verifies that when
+// GetBackupSelection returns an error for any selection, Fields["resources"]
+// and Fields["not_resources"] are both empty strings ("fail-closed").
+//
+// Pre-fix: partial data was returned for the selections that succeeded before
+// the error, which could omit NotResources exclusions and cause false-positive
+// backup coverage in related-panel checkers.
+func TestBackup_EnumerateSelection_FailClosedOnGetError(t *testing.T) {
+	selID := "sel-abc123"
+	mock := &backupFullMock{
+		plansOutput: &backup.ListBackupPlansOutput{
+			BackupPlansList: []backuptypes.BackupPlansListMember{
+				{
+					BackupPlanId:   aws.String("plan-fail-closed-001"),
+					BackupPlanName: aws.String("fail-closed-plan"),
+				},
+			},
+		},
+		selectionsOutput: &backup.ListBackupSelectionsOutput{
+			BackupSelectionsList: []backuptypes.BackupSelectionsListMember{
+				{SelectionId: aws.String(selID)},
+			},
+		},
+		// GetBackupSelection fails — simulates a permissions error or transient failure.
+		getSelectionOutput: nil,
+		getSelectionErr:    fmt.Errorf("AccessDeniedException: insufficient permissions"),
+	}
+
+	resources, err := awsclient.FetchBackupPlans(context.Background(), mock)
+	require.NoError(t, err, "FetchBackupPlans must not propagate GetBackupSelection errors")
+	require.Len(t, resources, 1, "one plan must still be returned")
+
+	r := resources[0]
+	require.Empty(t, r.Fields["resources"],
+		"Fields[resources] must be empty string when GetBackupSelection fails (fail-closed)")
+	require.Empty(t, r.Fields["not_resources"],
+		"Fields[not_resources] must be empty string when GetBackupSelection fails (fail-closed)")
+}
+
+// TestBackup_EnumerateSelection_SuccessReturnsBothCSVs verifies that when all
+// GetBackupSelection calls succeed, Fields["resources"] contains the included
+// ARNs and Fields["not_resources"] contains the excluded ARNs — both as
+// comma-separated strings.
+func TestBackup_EnumerateSelection_SuccessReturnsBothCSVs(t *testing.T) {
+	includeARN := "arn:aws:s3:::acme-backups"
+	excludeARN := "arn:aws:s3:::acme-temp"
+	selID := "sel-xyz789"
+
+	mock := &backupFullMock{
+		plansOutput: &backup.ListBackupPlansOutput{
+			BackupPlansList: []backuptypes.BackupPlansListMember{
+				{
+					BackupPlanId:   aws.String("plan-success-enum-001"),
+					BackupPlanName: aws.String("success-enum-plan"),
+				},
+			},
+		},
+		selectionsOutput: &backup.ListBackupSelectionsOutput{
+			BackupSelectionsList: []backuptypes.BackupSelectionsListMember{
+				{SelectionId: aws.String(selID)},
+			},
+		},
+		getSelectionOutput: &backup.GetBackupSelectionOutput{
+			BackupSelection: &backuptypes.BackupSelection{
+				SelectionName: aws.String("my-selection"),
+				IamRoleArn:    aws.String("arn:aws:iam::123456789012:role/AWSBackupDefault"),
+				Resources:     []string{includeARN},
+				NotResources:  []string{excludeARN},
+			},
+		},
+		getSelectionErr: nil,
+	}
+
+	resources, err := awsclient.FetchBackupPlans(context.Background(), mock)
+	require.NoError(t, err)
+	require.Len(t, resources, 1)
+
+	r := resources[0]
+	require.Equal(t, includeARN, r.Fields["resources"],
+		"Fields[resources] must contain the ARN from BackupSelection.Resources")
+	require.Equal(t, excludeARN, r.Fields["not_resources"],
+		"Fields[not_resources] must contain the ARN from BackupSelection.NotResources")
+}

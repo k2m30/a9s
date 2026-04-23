@@ -989,3 +989,115 @@ func TestRelated_Redis_Registration_KMSVPCNoTargetCache(t *testing.T) {
 		}
 	}
 }
+
+// ---------------------------------------------------------------------------
+// PIN 1 — Truncated cache regression pins (redis checkers)
+// ---------------------------------------------------------------------------
+// These tests assert that when the target cache is marked IsTruncated=true
+// the checker returns Approximate=true. Pre-fix code used `relatedResult`
+// instead of `truncatedResultRedis`, yielding Approximate=false and losing
+// the signal that the count may be understated.
+
+// TestRelated_Redis_Alarm_TruncatedCacheWithMatches_ReturnsApproximate
+// verifies that checkRedisAlarm sets Approximate=true when the alarm cache is
+// truncated and at least one alarm matches a MemberCluster dimension.
+func TestRelated_Redis_Alarm_TruncatedCacheWithMatches_ReturnsApproximate(t *testing.T) {
+	matchingAlarm := resource.Resource{
+		ID:   "matching-alarm",
+		Name: "matching-alarm",
+		Fields: map[string]string{},
+		RawStruct: cwtypes.MetricAlarm{
+			AlarmName: aws.String("matching-alarm"),
+			Dimensions: []cwtypes.Dimension{
+				{
+					Name:  aws.String("CacheClusterId"),
+					Value: aws.String("prod-redis-sessions-001"),
+				},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"alarm": resource.ResourceCacheEntry{
+			Resources:   []resource.Resource{matchingAlarm},
+			IsTruncated: true,
+		},
+	}
+
+	checker := redisCheckerByTarget(t, "alarm")
+	result := checker(context.Background(), nil, redisGraphRoot(), cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if !result.Approximate {
+		t.Errorf("Approximate = false, want true (truncated cache must propagate Approximate flag)")
+	}
+	found := false
+	for _, id := range result.ResourceIDs {
+		if id == "matching-alarm" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("ResourceIDs = %v, expected to contain %q", result.ResourceIDs, "matching-alarm")
+	}
+}
+
+// TestRelated_Redis_Alarm_TruncatedCacheNoMatches_ReturnsApproximateZero
+// verifies that checkRedisAlarm returns Count=0, Approximate=true when the
+// alarm cache is truncated but no alarm matches.
+func TestRelated_Redis_Alarm_TruncatedCacheNoMatches_ReturnsApproximateZero(t *testing.T) {
+	noMatchAlarm := resource.Resource{
+		ID:   "unrelated-alarm",
+		Name: "unrelated-alarm",
+		Fields: map[string]string{},
+		RawStruct: cwtypes.MetricAlarm{
+			AlarmName:  aws.String("unrelated-alarm"),
+			Dimensions: []cwtypes.Dimension{},
+		},
+	}
+	cache := resource.ResourceCache{
+		"alarm": resource.ResourceCacheEntry{
+			Resources:   []resource.Resource{noMatchAlarm},
+			IsTruncated: true,
+		},
+	}
+
+	checker := redisCheckerByTarget(t, "alarm")
+	result := checker(context.Background(), nil, redisGraphRoot(), cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no dimension match)", result.Count)
+	}
+	if !result.Approximate {
+		t.Errorf("Approximate = false, want true (truncated cache, no matches must still set Approximate)")
+	}
+}
+
+// TestRelated_Redis_Logs_TruncatedCacheWithMatches_ReturnsApproximate
+// verifies that checkRedisLogs sets Approximate=true when the logs cache is
+// truncated and the log group matches the RG's LogDeliveryConfigurations.
+func TestRelated_Redis_Logs_TruncatedCacheWithMatches_ReturnsApproximate(t *testing.T) {
+	const logGroupName = "/aws/elasticache/redis/prod-redis-sessions/slow-log"
+	logRes := resource.Resource{
+		ID:     logGroupName,
+		Name:   logGroupName,
+		Fields: map[string]string{},
+	}
+	cache := resource.ResourceCache{
+		"logs": resource.ResourceCacheEntry{
+			Resources:   []resource.Resource{logRes},
+			IsTruncated: true,
+		},
+	}
+
+	checker := redisCheckerByTarget(t, "logs")
+	result := checker(context.Background(), nil, redisGraphRoot(), cache)
+
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1", result.Count)
+	}
+	if !result.Approximate {
+		t.Errorf("Approximate = false, want true (truncated cache must propagate Approximate flag)")
+	}
+}

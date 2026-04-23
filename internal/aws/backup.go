@@ -160,7 +160,10 @@ func enumerateBackupPlanResources(
 			SelectionId:  sel.SelectionId,
 		})
 		if selErr != nil || selOut == nil || selOut.BackupSelection == nil {
-			continue
+			// fail closed — partial enumeration would drop NotResources exclusions,
+			// causing false-positive backup coverage. Return empty pair so the caller
+			// degrades cleanly rather than claiming incorrect coverage.
+			return "", ""
 		}
 		resources = append(resources, selOut.BackupSelection.Resources...)
 		notResources = append(notResources, selOut.BackupSelection.NotResources...)

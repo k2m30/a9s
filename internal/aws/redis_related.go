@@ -102,6 +102,9 @@ func checkRedisAlarms(ctx context.Context, clients any, res resource.Resource, c
 	if len(ids) == 0 && truncated {
 		return resource.ApproximateZero("alarm")
 	}
+	if truncated {
+		return truncatedResultRedis("alarm", ids)
+	}
 	return relatedResult("alarm", ids)
 }
 
@@ -160,6 +163,9 @@ func checkRedisCFN(ctx context.Context, clients any, res resource.Resource, cach
 	if len(ids) == 0 && truncated {
 		return resource.ApproximateZero("cfn")
 	}
+	if truncated {
+		return truncatedResultRedis("cfn", ids)
+	}
 	return relatedResult("cfn", ids)
 }
 
@@ -216,6 +222,9 @@ func checkRedisCtEvents(ctx context.Context, clients any, res resource.Resource,
 	}
 	if len(ids) == 0 && truncated {
 		return resource.ApproximateZero("ct-events")
+	}
+	if truncated {
+		return truncatedResultRedis("ct-events", ids)
 	}
 	return relatedResult("ct-events", ids)
 }
@@ -287,6 +296,9 @@ func checkRedisLogs(ctx context.Context, clients any, res resource.Resource, cac
 	if len(ids) == 0 && truncated {
 		return resource.ApproximateZero("logs")
 	}
+	if truncated {
+		return truncatedResultRedis("logs", ids)
+	}
 	return relatedResult("logs", ids)
 }
 
@@ -341,6 +353,9 @@ func checkRedisSecrets(ctx context.Context, clients any, res resource.Resource, 
 	if len(ids) == 0 && truncated {
 		return resource.ApproximateZero("secrets")
 	}
+	if truncated {
+		return truncatedResultRedis("secrets", ids)
+	}
 	return relatedResult("secrets", ids)
 }
 
@@ -380,6 +395,9 @@ func checkRedisSG(ctx context.Context, clients any, res resource.Resource, cache
 	}
 	if len(ids) == 0 && truncated {
 		return resource.ApproximateZero("sg")
+	}
+	if truncated {
+		return truncatedResultRedis("sg", ids)
 	}
 	return relatedResult("sg", ids)
 }
@@ -421,6 +439,9 @@ func checkRedisSNS(ctx context.Context, clients any, res resource.Resource, cach
 	if len(ids) == 0 && truncated {
 		return resource.ApproximateZero("sns")
 	}
+	if truncated {
+		return truncatedResultRedis("sns", ids)
+	}
 	return relatedResult("sns", ids)
 }
 
@@ -461,6 +482,9 @@ func checkRedisSubnet(ctx context.Context, clients any, res resource.Resource, c
 	}
 	if len(ids) == 0 && truncated {
 		return resource.ApproximateZero("subnet")
+	}
+	if truncated {
+		return truncatedResultRedis("subnet", ids)
 	}
 	return relatedResult("subnet", ids)
 }
@@ -527,6 +551,13 @@ func redisSubnetGroup(ctx context.Context, clients any, res resource.Resource) *
 	}
 	sng := out.CacheSubnetGroups[0]
 	return &sng
+}
+
+// truncatedResultRedis returns a RelatedCheckResult with Approximate=true when the
+// target cache is truncated and matches were found. Later pages may contain
+// additional matches, so the displayed count is a lower bound — rendered as "(N+)".
+func truncatedResultRedis(target string, ids []string) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: target, Count: len(ids), ResourceIDs: ids, Approximate: true}
 }
 
 // redisRelatedResources returns the resource list for target from cache or by fetching the first page.

@@ -79,6 +79,7 @@ a9s supports **66 AWS resource types** across **12 service categories**. All API
 | Kinesis Streams | `kinesis` |
 | MSK Clusters | `msk` |
 | Step Functions | `sfn` |
+| SES Identities | `ses` |
 
 ## Secrets & Config
 
@@ -129,4 +130,3 @@ a9s supports **66 AWS resource types** across **12 service categories**. All API
 | Resource | Short Name |
 |----------|-----------|
 | Backup Plans | `backup` |
-| SES Identities | `ses` |

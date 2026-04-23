@@ -34,8 +34,8 @@ import (
 //
 // Covered checkers:
 //   asg → vpc  (EC2.DescribeSubnets)
-//   ddb → backup (Backup.ListRecoveryPointsByResource)
 //   ddb → kinesis (DynamoDB.DescribeKinesisStreamingDestination)
+//   kms → role  (IAM.SimulatePrincipalPolicy)
 // ---------------------------------------------------------------------------
 
 func TestChecker_AccessDenied_ReturnsMinusOne(t *testing.T) {
@@ -114,7 +114,6 @@ func TestChecker_AccessDenied_ReturnsMinusOne(t *testing.T) {
 //
 // Covered checkers:
 //   asg → vpc  (EC2.DescribeSubnets)
-//   ddb → backup (Backup.ListRecoveryPointsByResource)
 //
 // NOTE: DefaultRetryConfig() uses a 500ms base delay with jitter. We override
 // with a 1ms delay via SetRetryConfigForTest so the retry path still executes

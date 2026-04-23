@@ -45,6 +45,9 @@ func checkSESR53(ctx context.Context, clients any, res resource.Resource, cache 
 	if len(ids) == 0 && truncated {
 		return resource.ApproximateZero("r53")
 	}
+	if truncated {
+		return truncatedResultSES("r53", ids)
+	}
 	return relatedResult("r53", ids)
 }
 
@@ -220,6 +223,9 @@ func checkSESEbRule(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	if len(ids) == 0 && truncated {
 		return resource.ApproximateZero("eb-rule")
+	}
+	if truncated {
+		return truncatedResultSES("eb-rule", ids)
 	}
 	return relatedResult("eb-rule", ids)
 }
@@ -474,6 +480,13 @@ func checkSESSns(ctx context.Context, clients any, res resource.Resource, _ reso
 	return relatedResult("sns", ids)
 }
 
+// truncatedResultSES returns a RelatedCheckResult with Approximate=true when the
+// target cache is truncated and matches were found. Later pages may contain
+// additional matches, so the displayed count is a lower bound — rendered as "(N+)".
+func truncatedResultSES(target string, ids []string) resource.RelatedCheckResult {
+	return resource.RelatedCheckResult{TargetType: target, Count: len(ids), ResourceIDs: ids, Approximate: true}
+}
+
 // InvalidateSESRuleSetCache drops the cached DescribeActiveReceiptRuleSet
 // response for the given client. Called from the Ctrl+R handler so that
 // receipt-rule changes are picked up without waiting for a profile/region
@@ -484,5 +497,14 @@ func InvalidateSESRuleSetCache(c *ServiceClients) {
 	}
 	sesRuleSetCacheMu.Lock()
 	delete(sesRuleSetCaches, c)
+	sesRuleSetCacheMu.Unlock()
+}
+
+// ClearAllSESRuleSetCaches drops every cached receipt rule set across all
+// *ServiceClients keys. Called from the profile/region-switch handler so
+// stale session state cannot leak across reconnects.
+func ClearAllSESRuleSetCaches() {
+	sesRuleSetCacheMu.Lock()
+	sesRuleSetCaches = make(map[*ServiceClients]*sesReceiptRuleSetCache)
 	sesRuleSetCacheMu.Unlock()
 }

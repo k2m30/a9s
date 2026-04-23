@@ -127,7 +127,7 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource
 			if mostRecent != nil {
 				rows = append(rows, resource.FindingRow{
 					Label: "Most recent",
-					Value: mostRecent.Format("2006-01-02 15:04 UTC"),
+					Value: mostRecent.UTC().Format("2006-01-02 15:04 UTC"),
 					Tier:  "!",
 				})
 			}

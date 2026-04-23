@@ -419,6 +419,7 @@ Delta between what spec §2/§3/§4 require and what the four contract-surface f
 ### 3.1 Views config (.a9s/views/ses.yaml + internal/config/defaults_backup.go)
 
 CURRENT:
+
 ```yaml
 list:
   Identity: {path: IdentityName, width: 36}
@@ -428,6 +429,7 @@ list:
 ```
 
 REQUIRED (universal rule: exactly one Status column, no jargon):
+
 ```yaml
 list:
   Identity: {path: IdentityName, width: 36}
@@ -461,14 +463,14 @@ CURRENT: registers one "account" key; handles SHUTDOWN (!), PROBATION (~), sendi
 REQUIRED:
 - Call `GetAccount` once (unchanged).
 - Decide single top finding (account-level) using §4 precedence:
-    - SHUTDOWN → severity `!`, Summary `"account SHUTDOWN"`.
-    - PROBATION → severity `!`, Summary `"account PROBATION"`.
-    - quota > 80% → severity `~`, Summary `"quota 80%+ used"`.
-    - otherwise: no finding.
+  - SHUTDOWN → severity `!`, Summary `"account SHUTDOWN"`.
+  - PROBATION → severity `!`, Summary `"account PROBATION"`.
+  - quota > 80% → severity `~`, Summary `"quota 80%+ used"`.
+  - otherwise: no finding.
 - Replicate the one finding onto every identity row in the input slice: for each `res` in `resources`, set `findings[res.ID] = <finding>` with the SAME Summary (Rows may vary; see contract below).
 - Set `FieldUpdates[id]["status"]` for every row:
-    - If `res.Status == ""` (Healthy): set to `finding.Summary` verbatim (no suffix).
-    - If `res.Status != ""` (non-Healthy, already has Wave-1 phrase): bump via `resource.BumpFindingSuffix(res.Status)` — Wave-1 keeps precedence.
+  - If `res.Status == ""` (Healthy): set to `finding.Summary` verbatim (no suffix).
+  - If `res.Status != ""` (non-Healthy, already has Wave-1 phrase): bump via `resource.BumpFindingSuffix(res.Status)` — Wave-1 keeps precedence.
 - `IssueCount`: 1 if finding severity is `!`, else 0. Counted ONCE for the whole account (spec §4 "S1 counts the account-level finding once, not N times").
 - `SendingEnabled==false` is NO LONGER a Wave-2 signal here. Move to Wave 1 in fetcher per spec §3.1. Delete the current `!exists && !out.SendingEnabled` branch.
 - Enrichment contract (U11): Summary is the short phrase only; per-identity context rides in Rows (Enforcement Status / Sent Last 24h / Max 24h Send). `strings.Contains(Summary, rowValue)` must be false for every Row.
@@ -486,6 +488,7 @@ REQUIRED:
 ### 3.5 Interfaces (internal/aws/ses_interfaces.go)
 
 REQUIRED ADDITION:
+
 ```go
 type SESV1DescribeActiveReceiptRuleSetAPI interface {
     DescribeActiveReceiptRuleSet(ctx, *ses.DescribeActiveReceiptRuleSetInput, ...func(*ses.Options))
@@ -493,6 +496,7 @@ type SESV1DescribeActiveReceiptRuleSetAPI interface {
 }
 type SESV1API interface { SESV1DescribeActiveReceiptRuleSetAPI }
 ```
+
 Use package path `github.com/aws/aws-sdk-go-v2/service/ses` (v1).
 
 ### 3.6 ServiceClients + client factory (internal/aws/client.go)
