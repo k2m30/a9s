@@ -126,6 +126,15 @@ func NewCWLogsFixtures() *CWLogsFixtures {
 			RetentionInDays: aws.Int32(30),
 			CreationTime:    aws.Int64(1745769600000), // 2025-04-28
 		},
+		// Redis prod slow-log group — required for redis→logs related-panel pivot.
+		// The prod-redis-sessions RG LogDeliveryConfigurations destination points here.
+		{
+			LogGroupName:    aws.String(ProdRedisLogGroup),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:" + ProdRedisLogGroup + ":*"),
+			StoredBytes:     aws.Int64(10485760),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1741996800000), // 2025-03-15
+		},
 	}
 
 	logStreams := map[string][]cwlogstypes.LogStream{

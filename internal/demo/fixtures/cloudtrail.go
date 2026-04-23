@@ -584,5 +584,21 @@ func buildCTEvents() []cloudtrailtypes.Event {
 			},
 			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/ci-service-account","accountId":"123456789012","userName":"ci-service-account"},"eventSource":"cloudformation.amazonaws.com","eventName":"UpdateStack","requestParameters":{"stackName":"acme-vpc-stack"}}`),
 		},
+		// prod-redis-sessions events — ready for redis→ct-events related-panel pivot (phase-7).
+		// ResourceName matches ProdRedisID so checkRedisCTEvents (phase-7) can filter by
+		// fields["resource_name"] == res.ID (the replication group ID).
+		// Username matches ci-service-account which exists in iam.go (IAM Users fixture).
+		{
+			EventId:     aws.String("evt-redis-modify-001"),
+			EventName:   aws.String("ModifyReplicationGroup"),
+			EventSource: aws.String("elasticache.amazonaws.com"),
+			EventTime:   aws.Time(time.Date(2026, 4, 18, 11, 30, 0, 0, time.UTC)),
+			Username:    aws.String("ci-service-account"),
+			ReadOnly:    aws.String("false"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::ElastiCache::ReplicationGroup"), ResourceName: aws.String(ProdRedisID)},
+			},
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/ci-service-account","accountId":"123456789012","userName":"ci-service-account"},"eventSource":"elasticache.amazonaws.com","eventName":"ModifyReplicationGroup","requestParameters":{"replicationGroupId":"prod-redis-sessions","automaticFailoverEnabled":true}}`),
+		},
 	}
 }

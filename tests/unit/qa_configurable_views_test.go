@@ -144,37 +144,39 @@ func realisticRDSInstance() rdstypes.DBInstance {
 	}
 }
 
-func realisticRedisCacheCluster() elasticachetypes.CacheCluster {
-	return elasticachetypes.CacheCluster{
-		CacheClusterId:     new("redis-prod-001"),
-		ARN:                new("arn:aws:elasticache:us-east-1:123456789012:cluster:redis-prod-001"),
-		Engine:             new("redis"),
-		EngineVersion:      new("7.0.12"),
-		CacheNodeType:      new("cache.r6g.large"),
-		CacheClusterStatus: new("available"),
-		NumCacheNodes:      new(int32(3)),
+func realisticRedisReplicationGroup() elasticachetypes.ReplicationGroup {
+	return elasticachetypes.ReplicationGroup{
+		ReplicationGroupId:       new("redis-prod-001"),
+		ARN:                      new("arn:aws:elasticache:us-east-1:123456789012:replicationgroup:redis-prod-001"),
+		Description:              new("Prod Redis replication group"),
+		Status:                   new("available"),
+		CacheNodeType:            new("cache.r6g.large"),
+		MemberClusters:           []string{"redis-prod-001-001", "redis-prod-001-002", "redis-prod-001-003"},
+		MultiAZ:                  elasticachetypes.MultiAZStatusEnabled,
+		AutomaticFailover:        elasticachetypes.AutomaticFailoverStatusEnabled,
+		KmsKeyId:                 new("arn:aws:kms:us-east-1:123456789012:key/redis-prod-001-key"),
+		AtRestEncryptionEnabled:  new(true),
+		TransitEncryptionEnabled: new(true),
+		AuthTokenEnabled:         new(false),
+		SnapshotRetentionLimit:   new(int32(7)),
+		SnapshotWindow:           new("05:00-06:00"),
 		ConfigurationEndpoint: &elasticachetypes.Endpoint{
 			Address: new("redis-prod-001.abc123.clustercfg.use1.cache.amazonaws.com"),
 			Port:    new(int32(6379)),
 		},
-		PreferredAvailabilityZone: new("us-east-1a"),
-		CacheNodes: []elasticachetypes.CacheNode{
+		LogDeliveryConfigurations: []elasticachetypes.LogDeliveryConfiguration{
 			{
-				CacheNodeId:              new("0001"),
-				CacheNodeStatus:          new("available"),
-				CustomerAvailabilityZone: new("us-east-1a"),
+				LogType:         elasticachetypes.LogTypeSlowLog,
+				LogFormat:       elasticachetypes.LogFormatText,
+				DestinationType: elasticachetypes.DestinationTypeCloudWatchLogs,
+				DestinationDetails: &elasticachetypes.DestinationDetails{
+					CloudWatchLogsDetails: &elasticachetypes.CloudWatchLogsDestinationDetails{
+						LogGroup: new("/aws/elasticache/redis/redis-prod-001/slow-log"),
+					},
+				},
+				Status: elasticachetypes.LogDeliveryConfigurationStatusActive,
 			},
 		},
-		ReplicationGroupId:   new("redis-prod-repl"),
-		CacheSubnetGroupName: new("redis-prod-subnet-group"),
-		SecurityGroups: []elasticachetypes.SecurityGroupMembership{
-			{SecurityGroupId: new("sg-0abc1234"), Status: new("active")},
-		},
-		AtRestEncryptionEnabled:    new(true),
-		TransitEncryptionEnabled:   new(true),
-		AuthTokenEnabled:           new(false),
-		SnapshotRetentionLimit:     new(int32(7)),
-		PreferredMaintenanceWindow: new("sun:05:00-sun:06:00"),
 	}
 }
 
@@ -674,7 +676,7 @@ func TestQA_NilFields_RDS(t *testing.T) {
 // ===========================================================================
 
 func TestQA_ListViewColumns_Redis(t *testing.T) {
-	cluster := realisticRedisCacheCluster()
+	rg := realisticRedisReplicationGroup()
 	vd := config.DefaultViewDef("redis")
 
 	for _, col := range vd.List {
@@ -683,55 +685,55 @@ func TestQA_ListViewColumns_Redis(t *testing.T) {
 				t.Skipf("column %q has no path (uses Fields fallback)", col.Title)
 				return
 			}
-			result := fieldpath.ExtractScalar(cluster, col.Path)
+			result := fieldpath.ExtractScalar(rg, col.Path)
 			if result == "" {
-				t.Errorf("ExtractScalar(%q) returned empty for realistic Redis CacheCluster", col.Path)
+				t.Errorf("ExtractScalar(%q) returned empty for realistic Redis ReplicationGroup", col.Path)
 			}
 		})
 	}
 
 	// Verify specific values
-	if got := fieldpath.ExtractScalar(cluster, "CacheClusterId"); got != "redis-prod-001" {
-		t.Errorf("CacheClusterId: expected %q, got %q", "redis-prod-001", got)
+	if got := fieldpath.ExtractScalar(rg, "ReplicationGroupId"); got != "redis-prod-001" {
+		t.Errorf("ReplicationGroupId: expected %q, got %q", "redis-prod-001", got)
 	}
-	if got := fieldpath.ExtractScalar(cluster, "ConfigurationEndpoint.Address"); got != "redis-prod-001.abc123.clustercfg.use1.cache.amazonaws.com" {
+	if got := fieldpath.ExtractScalar(rg, "ConfigurationEndpoint.Address"); got != "redis-prod-001.abc123.clustercfg.use1.cache.amazonaws.com" {
 		t.Errorf("ConfigurationEndpoint.Address: expected correct address, got %q", got)
 	}
 }
 
 func TestQA_DetailViewPaths_Redis(t *testing.T) {
-	cluster := realisticRedisCacheCluster()
+	rg := realisticRedisReplicationGroup()
 	vd := config.DefaultViewDef("redis")
 
 	for _, df := range vd.Detail {
 		path := df.String()
 		t.Run(path, func(t *testing.T) {
-			result := fieldpath.ExtractSubtree(cluster, path)
+			result := fieldpath.ExtractSubtree(rg, path)
 			if result == "" {
-				t.Errorf("ExtractSubtree(%q) returned empty for realistic Redis CacheCluster", path)
+				t.Errorf("ExtractSubtree(%q) returned empty for realistic Redis ReplicationGroup", path)
 			}
 		})
 	}
 
 	// Verify ConfigurationEndpoint renders as YAML subtree (has Address and Port)
-	epYAML := fieldpath.ExtractSubtree(cluster, "ConfigurationEndpoint")
+	epYAML := fieldpath.ExtractSubtree(rg, "ConfigurationEndpoint")
 	if epYAML == "" {
 		t.Error("ConfigurationEndpoint should produce non-empty YAML")
 	}
 }
 
 func TestQA_NilFields_Redis(t *testing.T) {
-	// Minimal Redis cluster — no endpoint, no nodes
-	cluster := elasticachetypes.CacheCluster{
-		CacheClusterId:     new("redis-test"),
-		CacheClusterStatus: new("creating"),
+	// Minimal Redis replication group — no endpoint, no member clusters
+	rg := elasticachetypes.ReplicationGroup{
+		ReplicationGroupId: new("redis-test"),
+		Status:             new("creating"),
 	}
 	vd := config.DefaultViewDef("redis")
 
 	for _, col := range vd.List {
 		t.Run("list_"+col.Title, func(t *testing.T) {
 			// Must not panic — nil ConfigurationEndpoint should not crash
-			_ = fieldpath.ExtractScalar(cluster, col.Path)
+			_ = fieldpath.ExtractScalar(rg, col.Path)
 		})
 	}
 
@@ -739,12 +741,12 @@ func TestQA_NilFields_Redis(t *testing.T) {
 		path := df.String()
 		t.Run("detail_"+path, func(t *testing.T) {
 			// Must not panic
-			_ = fieldpath.ExtractSubtree(cluster, path)
+			_ = fieldpath.ExtractSubtree(rg, path)
 		})
 	}
 
 	// Specifically verify nil ConfigurationEndpoint.Address returns ""
-	if got := fieldpath.ExtractScalar(cluster, "ConfigurationEndpoint.Address"); got != "" {
+	if got := fieldpath.ExtractScalar(rg, "ConfigurationEndpoint.Address"); got != "" {
 		t.Errorf("nil ConfigurationEndpoint.Address should return empty, got %q", got)
 	}
 }
@@ -1106,17 +1108,17 @@ func TestQA_RDS_NilEndpoint(t *testing.T) {
 // ===========================================================================
 
 func TestQA_Redis_NilConfigurationEndpoint(t *testing.T) {
-	cluster := elasticachetypes.CacheCluster{
-		CacheClusterId:     new("redis-no-endpoint"),
-		CacheClusterStatus: new("available"),
-		// ConfigurationEndpoint is nil (single-node clusters)
+	rg := elasticachetypes.ReplicationGroup{
+		ReplicationGroupId: new("redis-no-endpoint"),
+		Status:             new("available"),
+		// ConfigurationEndpoint is nil (single-node replication groups)
 	}
 
-	if got := fieldpath.ExtractScalar(cluster, "ConfigurationEndpoint.Address"); got != "" {
+	if got := fieldpath.ExtractScalar(rg, "ConfigurationEndpoint.Address"); got != "" {
 		t.Errorf("expected empty for nil ConfigurationEndpoint.Address, got %q", got)
 	}
 
-	if got := fieldpath.ExtractSubtree(cluster, "ConfigurationEndpoint"); got != "" {
+	if got := fieldpath.ExtractSubtree(rg, "ConfigurationEndpoint"); got != "" {
 		t.Errorf("expected empty for nil ConfigurationEndpoint, got %q", got)
 	}
 }

@@ -21,6 +21,10 @@ func NewSNSFixtures() *SNSFixtures {
 		{TopicArn: aws.String("arn:aws:sns:us-east-1:123456789012:deploy-notifications")},
 		// S3 healthy-bucket event notifications topic (checkS3SNS pivot).
 		{TopicArn: aws.String("arn:aws:sns:us-east-1:123456789012:" + S3EventsTopicName)},
+		// Redis prod ops pager topic — required for redis→sns related-panel pivot.
+		// The prod-redis-sessions member cluster NotificationConfiguration.TopicArn
+		// points here so checkRedisSNS resolves a non-zero count for the demo showroom.
+		{TopicArn: aws.String(ProdRedisSNSTopicARN)},
 	}
 
 	subscriptions := []snstypes.Subscription{

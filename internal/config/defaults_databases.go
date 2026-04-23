@@ -40,27 +40,23 @@ func databasesDefaultViews() map[string]ViewDef {
 			},
 		},
 		"redis": {
+			// List API: DescribeReplicationGroups. Each row = one ReplicationGroup.
+			// engine_version is not a field on ReplicationGroup (only on CacheCluster);
+			// it is omitted to avoid unnecessary DescribeCacheClusters traffic.
 			List: []ListColumn{
-				{Title: "Cluster ID", Path: "CacheClusterId", Width: 28},
-				{Title: "Version", Path: "EngineVersion", Width: 10},
+				{Title: "Cluster ID", Key: "cluster_id", SortPath: "ReplicationGroupId", Width: 28},
 				{Title: "Node Type", Path: "CacheNodeType", Width: 18},
-				{Title: "Status", Path: "CacheClusterStatus", Width: 14},
-				// Failover sourced from EnrichRedisReplicationGroup which calls
-				// DescribeReplicationGroups (account-wide, 1 call) and writes
-				// automatic_failover into Fields[] keyed by member CacheClusterId.
-				// Enum: enabled / disabled / enabling / disabling.
-				{Title: "Failover", Key: "automatic_failover", Width: 10},
-				{Title: "Nodes", Path: "NumCacheNodes", Width: 8},
+				{Title: "Status", Key: "status", SortPath: "Status", Width: 32},
+				{Title: "Nodes", Key: "nodes", Width: 8},
 				{Title: "Endpoint", Path: "ConfigurationEndpoint.Address", Width: 40},
 			},
 			Detail: []DetailField{
-				{Path: "CacheClusterId"}, {Path: "ARN"}, {Path: "Engine"}, {Path: "EngineVersion"},
-				{Path: "CacheClusterStatus"}, {Path: "CacheNodeType"}, {Path: "NumCacheNodes"},
-				{Path: "CacheNodes"}, {Path: "ConfigurationEndpoint"}, {Path: "PreferredAvailabilityZone"},
-				{Path: "ReplicationGroupId"}, {Path: "CacheSubnetGroupName"}, {Path: "SecurityGroups"},
-				{Path: "AtRestEncryptionEnabled"}, {Path: "TransitEncryptionEnabled"},
-				{Path: "AuthTokenEnabled"}, {Path: "SnapshotRetentionLimit"},
-				{Path: "PreferredMaintenanceWindow"},
+				{Path: "ReplicationGroupId"}, {Path: "ARN"}, {Path: "Description"},
+				{Path: "Status"}, {Path: "CacheNodeType"}, {Path: "MemberClusters"},
+				{Path: "ConfigurationEndpoint"}, {Path: "MultiAZ"}, {Path: "AutomaticFailover"},
+				{Path: "KmsKeyId"}, {Path: "AtRestEncryptionEnabled"}, {Path: "TransitEncryptionEnabled"},
+				{Path: "AuthTokenEnabled"}, {Path: "SnapshotRetentionLimit"}, {Path: "SnapshotWindow"},
+				{Path: "LogDeliveryConfigurations"},
 			},
 		},
 		"dbc": {

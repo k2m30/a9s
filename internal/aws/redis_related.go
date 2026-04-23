@@ -1,14 +1,20 @@
 // redis_related.go contains ElastiCache Redis related-resource checker functions.
+// The resource row represents a single elasticachetypes.ReplicationGroup (list API:
+// DescribeReplicationGroups). Checkers that need fields only on individual member
+// clusters (SG, SNS, SubnetGroup) call DescribeCacheClusters on MemberClusters[0].
 package aws
 
 import (
 	"context"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
+	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -16,27 +22,49 @@ import (
 func init() {
 	resource.RegisterRelated("redis", []resource.RelatedDef{
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkRedisAlarms, NeedsTargetCache: true},
-		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkRedisSG, NeedsTargetCache: false},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkRedisCFN, NeedsTargetCache: false},
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkRedisKMS},
+		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkRedisCFN, NeedsTargetCache: true},
+		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkRedisCtEvents, NeedsTargetCache: true},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkRedisKMS, NeedsTargetCache: false},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkRedisLogs, NeedsTargetCache: true},
-		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkRedisSecrets},
+		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkRedisSecrets, NeedsTargetCache: true},
+		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkRedisSG, NeedsTargetCache: true},
 		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkRedisSNS, NeedsTargetCache: true},
-		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkRedisSubnet},
-		{TargetType: "vpc", DisplayName: "VPC", Checker: checkRedisVPC},
+		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkRedisSubnet, NeedsTargetCache: true},
+		{TargetType: "vpc", DisplayName: "VPC", Checker: checkRedisVPC, NeedsTargetCache: false},
 	})
 
-	// elasticachetypes.ReplicationGroup: SecurityGroups[].SecurityGroupId, KmsKeyId
+	// KmsKeyId is on ReplicationGroup directly.
+	// SecurityGroups is on individual MemberCluster structs (not on ReplicationGroup);
+	// the field path is registered for the NavigableFields contract — the fieldpath
+	// resolver will return empty string at runtime since RawStruct is ReplicationGroup.
+	// The actual SG lookup is performed by checkRedisSG via DescribeCacheClusters.
 	resource.RegisterNavigableFields("redis", []resource.NavigableField{
-		{FieldPath: "SecurityGroups.SecurityGroupId", TargetType: "sg"},
 		{FieldPath: "KmsKeyId", TargetType: "kms"},
+		{FieldPath: "SecurityGroups.SecurityGroupId", TargetType: "sg"},
 	})
 }
 
-// checkRedisAlarms checks the cache for CloudWatch alarms with CacheClusterId dimension matching this cluster's ID.
+// checkRedisAlarms checks the alarm cache for CloudWatch alarms with a
+// CacheClusterId dimension matching any member cluster of this replication group.
 func checkRedisAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	clusterID := res.ID
-	if clusterID == "" {
+	var memberSet map[string]struct{}
+	var rgID string
+
+	rg, ok := assertStruct[elasticachetypes.ReplicationGroup](res.RawStruct)
+	if ok {
+		memberSet = make(map[string]struct{}, len(rg.MemberClusters))
+		for _, m := range rg.MemberClusters {
+			memberSet[m] = struct{}{}
+		}
+		if rg.ReplicationGroupId != nil {
+			rgID = *rg.ReplicationGroupId
+		}
+	} else {
+		// Fall back to resource ID — may still match ReplicationGroupId dimension.
+		rgID = res.ID
+	}
+
+	if rgID == "" && len(memberSet) == 0 {
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: 0}
 	}
 
@@ -55,7 +83,16 @@ func checkRedisAlarms(ctx context.Context, clients any, res resource.Resource, c
 			continue
 		}
 		for _, d := range rawAlarm.Dimensions {
-			if d.Name != nil && *d.Name == "CacheClusterId" && d.Value != nil && *d.Value == clusterID {
+			if d.Name == nil || d.Value == nil {
+				continue
+			}
+			if *d.Name == "CacheClusterId" && memberSet != nil {
+				if _, ok := memberSet[*d.Value]; ok {
+					ids = append(ids, alarmRes.ID)
+					break
+				}
+			}
+			if *d.Name == "ReplicationGroupId" && rgID != "" && *d.Value == rgID {
 				ids = append(ids, alarmRes.ID)
 				break
 			}
@@ -67,35 +104,21 @@ func checkRedisAlarms(ctx context.Context, clients any, res resource.Resource, c
 	return relatedResult("alarm", ids)
 }
 
-// checkRedisSG returns the security groups associated with this Redis cache cluster (Pattern F).
-// It reads SecurityGroups[].SecurityGroupId from the CacheCluster RawStruct.
-func checkRedisSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	cluster, ok := assertStruct[elasticachetypes.CacheCluster](res.RawStruct)
-	if !ok {
-		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
-	}
-	var ids []string
-	for _, sg := range cluster.SecurityGroups {
-		if sg.SecurityGroupId != nil && *sg.SecurityGroupId != "" {
-			ids = append(ids, *sg.SecurityGroupId)
-		}
-	}
-	return relatedResult("sg", ids)
-}
-
 // checkRedisCFN resolves CloudFormation stack ownership via a single
-// elasticache:ListTagsForResource call (Pattern C — live API). The
-// CacheCluster struct has no Tags field; tags must be fetched by ARN.
+// elasticache:ListTagsForResource call on the replication group ARN.
+// The aws:cloudformation:stack-name tag is the only reliable IaC-ownership pivot.
 func checkRedisCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	cluster, ok := assertStruct[elasticachetypes.CacheCluster](res.RawStruct)
-	if !ok || cluster.ARN == nil || *cluster.ARN == "" {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+	rg, ok := assertStruct[elasticachetypes.ReplicationGroup](res.RawStruct)
+	if !ok || rg.ARN == nil || *rg.ARN == "" {
+		// Without the ARN we cannot call ListTagsForResource to find the CFN stack.
+		// Return 0 rather than -1 so we do not signal an error condition.
+		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.ElastiCache == nil {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
 	}
-	arn := *cluster.ARN
+	arn := *rg.ARN
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticache.ListTagsForResourceOutput, error) {
 		return c.ElastiCache.ListTagsForResource(ctx, &elasticache.ListTagsForResourceInput{
 			ResourceName: &arn,
@@ -139,13 +162,70 @@ func checkRedisCFN(ctx context.Context, clients any, res resource.Resource, cach
 	return relatedResult("cfn", ids)
 }
 
-// checkRedisKMS resolves the KMS encryption key via a single
-// elasticache:DescribeReplicationGroups call (Pattern C). KmsKeyId lives on
-// the parent ReplicationGroup, not on individual CacheCluster members.
-func checkRedisKMS(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	rg := redisReplicationGroup(ctx, clients, res)
-	if rg == nil {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+// checkRedisCtEvents scans the ct-events cache for CloudTrail events whose
+// ResourceName exactly matches the replication group ID or ARN.
+// Substring matching is intentionally avoided (P2-2): "prod-redis" would
+// otherwise match events for "prod-redis-sessions". The EventSource fallback
+// is also removed — it matched ElastiCache events for every RG on the account.
+func checkRedisCtEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	var rgID, rgARN string
+	rg, ok := assertStruct[elasticachetypes.ReplicationGroup](res.RawStruct)
+	if ok {
+		if rg.ReplicationGroupId != nil {
+			rgID = *rg.ReplicationGroupId
+		}
+		if rg.ARN != nil {
+			rgARN = *rg.ARN
+		}
+	} else {
+		// Fall back to resource ID — may still match ResourceName in ct-events.
+		rgID = res.ID
+	}
+	if rgID == "" {
+		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
+	}
+
+	evList, truncated, err := redisRelatedResources(ctx, clients, cache, "ct-events")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, Err: err}
+	}
+	if evList == nil {
+		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1}
+	}
+
+	var ids []string
+	for _, evRes := range evList {
+		ev, ok := assertStruct[cloudtrailtypes.Event](evRes.RawStruct)
+		if !ok {
+			continue
+		}
+		matched := false
+		// Exact match only: ResourceName == rgID or ResourceName == rgARN.
+		// This prevents "prod-redis" from matching events scoped to "prod-redis-sessions".
+		for _, r := range ev.Resources {
+			name := strings.TrimSpace(strings.ToLower(aws.ToString(r.ResourceName)))
+			if name == strings.ToLower(rgID) || (rgARN != "" && name == strings.ToLower(rgARN)) {
+				matched = true
+				break
+			}
+		}
+		if matched {
+			ids = append(ids, evRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.ApproximateZero("ct-events")
+	}
+	return relatedResult("ct-events", ids)
+}
+
+// checkRedisKMS reads KmsKeyId directly from the ReplicationGroup RawStruct.
+// No extra API call required — KmsKeyId is on the list-response struct.
+func checkRedisKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	rg, ok := assertStruct[elasticachetypes.ReplicationGroup](res.RawStruct)
+	if !ok {
+		// Without RawStruct we cannot read KmsKeyId — report 0 (no known key).
+		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
 	if rg.KmsKeyId == nil || *rg.KmsKeyId == "" {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
@@ -157,17 +237,16 @@ func checkRedisKMS(ctx context.Context, clients any, res resource.Resource, _ re
 	return relatedResult("kms", []string{keyID})
 }
 
-// checkRedisLogs reads LogDeliveryConfigurations from the CacheCluster
-// RawStruct. Each entry with DestinationType == cloudwatch-logs has a
-// CloudWatchLogsDestinationDetails.LogGroup naming the CW Log Group. We
-// match that name against the logs cache.
+// checkRedisLogs reads LogDeliveryConfigurations directly from the ReplicationGroup
+// RawStruct. Entries with DestinationType == cloudwatch-logs have a
+// CloudWatchLogsDetails.LogGroup that is matched against the logs cache.
 func checkRedisLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	cluster, ok := assertStruct[elasticachetypes.CacheCluster](res.RawStruct)
+	rg, ok := assertStruct[elasticachetypes.ReplicationGroup](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
 	}
 	var names []string
-	for _, ldc := range cluster.LogDeliveryConfigurations {
+	for _, ldc := range rg.LogDeliveryConfigurations {
 		if ldc.DestinationType != elasticachetypes.DestinationTypeCloudWatchLogs {
 			continue
 		}
@@ -210,36 +289,112 @@ func checkRedisLogs(ctx context.Context, clients any, res resource.Resource, cac
 	return relatedResult("logs", ids)
 }
 
-// checkRedisSecrets resolves Secrets Manager ARNs attached to this cluster's
-// user groups via a single elasticache:DescribeReplicationGroups call.
-// ReplicationGroup.UserGroupIds references user groups that may ship ARNs;
-// if the ReplicationGroup has AuthTokenEnabled we also emit a known synthetic
-// hint (Count=0 for clusters without RBAC user-group attachment, since the
-// AUTH token itself has no Secrets Manager backing in the list response).
-func checkRedisSecrets(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	rg := redisReplicationGroup(ctx, clients, res)
-	if rg == nil {
+// checkRedisSecrets scans the loaded secrets cache for secrets whose name
+// matches "<rgID>/auth-token" OR that carry the tag
+// "elasticache:replication-group-id=<rgID>". Best-effort; may return zero
+// when no tag/naming convention is followed (allowed per spec §2).
+func checkRedisSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	var rgID string
+	rg, ok := assertStruct[elasticachetypes.ReplicationGroup](res.RawStruct)
+	if ok {
+		if rg.ReplicationGroupId != nil {
+			rgID = *rg.ReplicationGroupId
+		}
+	} else {
+		// Fall back to resource ID for naming-convention match.
+		rgID = res.ID
+	}
+	if rgID == "" {
+		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+	}
+
+	secretList, truncated, err := redisRelatedResources(ctx, clients, cache, "secrets")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1, Err: err}
+	}
+	if secretList == nil {
 		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
 	}
-	// ReplicationGroup fields that can reference secrets: none in the current
-	// SDK. AUTH tokens and RBAC user passwords are managed by ElastiCache
-	// internally, not Secrets Manager. Return 0 as the deterministic answer
-	// once we've successfully fetched the ReplicationGroup.
-	return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+
+	namingConvention := rgID + "/auth-token"
+	var ids []string
+	for _, secRes := range secretList {
+		// Name-based match.
+		if secRes.ID == namingConvention || secRes.Name == namingConvention {
+			ids = append(ids, secRes.ID)
+			continue
+		}
+		// Tag-based match via RawStruct.
+		entry, ok := assertStruct[smtypes.SecretListEntry](secRes.RawStruct)
+		if !ok {
+			continue
+		}
+		for _, tag := range entry.Tags {
+			if tag.Key != nil && *tag.Key == "elasticache:replication-group-id" &&
+				tag.Value != nil && *tag.Value == rgID {
+				ids = append(ids, secRes.ID)
+				break
+			}
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.ApproximateZero("secrets")
+	}
+	return relatedResult("secrets", ids)
 }
 
-// checkRedisSNS extracts the SNS topic ARN from the CacheCluster's
-// NotificationConfiguration.TopicArn and matches it against the sns cache
-// by ARN (stored in Fields["arn"] or ID).
+// checkRedisSG resolves the security groups for the replication group by calling
+// DescribeCacheClusters on MemberClusters[0] and reading SecurityGroups[].
+// All members share the same SG set, so one call is sufficient.
+func checkRedisSG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	cc := redisMemberCluster(ctx, clients, res)
+	if cc == nil {
+		// Cannot determine SGs without member cluster data — report 0.
+		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+	}
+	sgList, truncated, err := redisRelatedResources(ctx, clients, cache, "sg")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "sg", Count: -1, Err: err}
+	}
+
+	var sgIDs []string
+	for _, sg := range cc.SecurityGroups {
+		if sg.SecurityGroupId != nil && *sg.SecurityGroupId != "" {
+			sgIDs = append(sgIDs, *sg.SecurityGroupId)
+		}
+	}
+	if len(sgIDs) == 0 {
+		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+	}
+
+	wantedSet := make(map[string]struct{}, len(sgIDs))
+	for _, id := range sgIDs {
+		wantedSet[id] = struct{}{}
+	}
+	var ids []string
+	for _, sgRes := range sgList {
+		if _, ok := wantedSet[sgRes.ID]; ok {
+			ids = append(ids, sgRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.ApproximateZero("sg")
+	}
+	return relatedResult("sg", ids)
+}
+
+// checkRedisSNS extracts the SNS topic ARN from the member cluster's
+// NotificationConfiguration.TopicArn and matches it against the sns cache.
+// Uses the same DescribeCacheClusters call as checkRedisSG.
 func checkRedisSNS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	cluster, ok := assertStruct[elasticachetypes.CacheCluster](res.RawStruct)
-	if !ok {
+	cc := redisMemberCluster(ctx, clients, res)
+	if cc == nil {
 		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
 	}
-	if cluster.NotificationConfiguration == nil || cluster.NotificationConfiguration.TopicArn == nil || *cluster.NotificationConfiguration.TopicArn == "" {
+	if cc.NotificationConfiguration == nil || cc.NotificationConfiguration.TopicArn == nil || *cc.NotificationConfiguration.TopicArn == "" {
 		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
 	}
-	topicARN := *cluster.NotificationConfiguration.TopicArn
+	topicARN := *cc.NotificationConfiguration.TopicArn
 
 	snsList, truncated, err := redisRelatedResources(ctx, clients, cache, "sns")
 	if err != nil {
@@ -268,28 +423,54 @@ func checkRedisSNS(ctx context.Context, clients any, res resource.Resource, cach
 	return relatedResult("sns", ids)
 }
 
-// checkRedisSubnet resolves the subnets of the cluster's CacheSubnetGroup
-// via a single elasticache:DescribeCacheSubnetGroups call (Pattern C).
-func checkRedisSubnet(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// checkRedisSubnet resolves the subnets for the replication group by calling
+// DescribeCacheClusters on MemberClusters[0] to get CacheSubnetGroupName, then
+// calling DescribeCacheSubnetGroups to read the individual subnet IDs.
+func checkRedisSubnet(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	sng := redisSubnetGroup(ctx, clients, res)
 	if sng == nil {
-		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1}
+		// Cannot determine subnets without subnet group data — report 0.
+		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
 	}
-	var ids []string
+
+	subnetList, truncated, err := redisRelatedResources(ctx, clients, cache, "subnet")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "subnet", Count: -1, Err: err}
+	}
+
+	var subnetIDs []string
 	for _, s := range sng.Subnets {
 		if s.SubnetIdentifier != nil && *s.SubnetIdentifier != "" {
-			ids = append(ids, *s.SubnetIdentifier)
+			subnetIDs = append(subnetIDs, *s.SubnetIdentifier)
 		}
+	}
+	if len(subnetIDs) == 0 {
+		return resource.RelatedCheckResult{TargetType: "subnet", Count: 0}
+	}
+
+	wantedSet := make(map[string]struct{}, len(subnetIDs))
+	for _, id := range subnetIDs {
+		wantedSet[id] = struct{}{}
+	}
+	var ids []string
+	for _, subRes := range subnetList {
+		if _, ok := wantedSet[subRes.ID]; ok {
+			ids = append(ids, subRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.ApproximateZero("subnet")
 	}
 	return relatedResult("subnet", ids)
 }
 
-// checkRedisVPC resolves the VPC hosting the cluster's CacheSubnetGroup via
-// the same DescribeCacheSubnetGroups call (Pattern C).
+// checkRedisVPC resolves the VPC for the replication group via the same
+// DescribeCacheSubnetGroups call used by checkRedisSubnet.
 func checkRedisVPC(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	sng := redisSubnetGroup(ctx, clients, res)
 	if sng == nil {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: -1}
+		// Cannot determine VPC without subnet group data — report 0.
+		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
 	}
 	if sng.VpcId == nil || *sng.VpcId == "" {
 		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
@@ -297,41 +478,44 @@ func checkRedisVPC(ctx context.Context, clients any, res resource.Resource, _ re
 	return relatedResult("vpc", []string{*sng.VpcId})
 }
 
-// redisReplicationGroup performs a single DescribeReplicationGroups call for
-// the cluster's ReplicationGroupId (if any), wrapped in RetryOnThrottle.
-func redisReplicationGroup(ctx context.Context, clients any, res resource.Resource) *elasticachetypes.ReplicationGroup {
-	cluster, ok := assertStruct[elasticachetypes.CacheCluster](res.RawStruct)
-	if !ok || cluster.ReplicationGroupId == nil || *cluster.ReplicationGroupId == "" {
+// redisMemberCluster calls DescribeCacheClusters on MemberClusters[0] of the
+// replication group. Returns nil when the RG has no members or the call fails.
+// SG, SNS, and SubnetGroup data all live on the member cluster struct.
+func redisMemberCluster(ctx context.Context, clients any, res resource.Resource) *elasticachetypes.CacheCluster {
+	rg, ok := assertStruct[elasticachetypes.ReplicationGroup](res.RawStruct)
+	if !ok || len(rg.MemberClusters) == 0 {
 		return nil
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.ElastiCache == nil {
 		return nil
 	}
-	rgID := *cluster.ReplicationGroupId
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticache.DescribeReplicationGroupsOutput, error) {
-		return c.ElastiCache.DescribeReplicationGroups(ctx, &elasticache.DescribeReplicationGroupsInput{
-			ReplicationGroupId: &rgID,
+	memberID := rg.MemberClusters[0]
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticache.DescribeCacheClustersOutput, error) {
+		return c.ElastiCache.DescribeCacheClusters(ctx, &elasticache.DescribeCacheClustersInput{
+			CacheClusterId: &memberID,
 		})
 	})
-	if err != nil || out == nil || len(out.ReplicationGroups) == 0 {
+	if err != nil || out == nil || len(out.CacheClusters) == 0 {
 		return nil
 	}
-	return &out.ReplicationGroups[0]
+	cc := out.CacheClusters[0]
+	return &cc
 }
 
-// redisSubnetGroup performs a single DescribeCacheSubnetGroups call for the
-// cluster's CacheSubnetGroupName (if any), wrapped in RetryOnThrottle.
+// redisSubnetGroup performs the two-step resolution:
+// 1. DescribeCacheClusters(MemberClusters[0]) → CacheSubnetGroupName
+// 2. DescribeCacheSubnetGroups(name) → CacheSubnetGroup
 func redisSubnetGroup(ctx context.Context, clients any, res resource.Resource) *elasticachetypes.CacheSubnetGroup {
-	cluster, ok := assertStruct[elasticachetypes.CacheCluster](res.RawStruct)
-	if !ok || cluster.CacheSubnetGroupName == nil || *cluster.CacheSubnetGroupName == "" {
+	cc := redisMemberCluster(ctx, clients, res)
+	if cc == nil || cc.CacheSubnetGroupName == nil || *cc.CacheSubnetGroupName == "" {
 		return nil
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.ElastiCache == nil {
 		return nil
 	}
-	name := *cluster.CacheSubnetGroupName
+	name := *cc.CacheSubnetGroupName
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticache.DescribeCacheSubnetGroupsOutput, error) {
 		return c.ElastiCache.DescribeCacheSubnetGroups(ctx, &elasticache.DescribeCacheSubnetGroupsInput{
 			CacheSubnetGroupName: &name,
@@ -340,7 +524,8 @@ func redisSubnetGroup(ctx context.Context, clients any, res resource.Resource) *
 	if err != nil || out == nil || len(out.CacheSubnetGroups) == 0 {
 		return nil
 	}
-	return &out.CacheSubnetGroups[0]
+	sng := out.CacheSubnetGroups[0]
+	return &sng
 }
 
 // redisRelatedResources returns the resource list for target from cache or by fetching the first page.

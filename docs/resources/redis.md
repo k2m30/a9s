@@ -91,18 +91,29 @@ Transcribed from `docs/attention-signals.md`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
-- **Signal**: `ReplicationGroup.Status == "available"`.
+- **Signal**: `ReplicationGroup.Engine != "redis"` (Valkey / Memcached rows seen on the shared API response).
+  - **State bucket**: n/a — filtered OUT at fetch time. Non-Redis engines must never appear in the `redis` list; they are the domain of a future `valkey` / `memcached` short name, not this type.
+  - **How obtained**: list-response field `Engine` on `DescribeReplicationGroups` (SDK Go v2 `elasticache/types.ReplicationGroup.Engine *string`; values `"redis"`, `"valkey"`, `"memcached"`). a9s-devops (2026-04-23): AWS lists every ElastiCache engine's RGs through the same API; the engine string is the only reliable filter, and the previous `DescribeCacheClusters` path did filter on Engine — parity requires the same filter here.
+- **Signal**: `ReplicationGroup.Status == "available"` AND `len(NodeGroups) == 0 || every NodeGroup.Status == "available"`.
   - **State bucket**: Healthy.
-  - **How obtained**: list-response field `Status` on `DescribeReplicationGroups`.
-- **Signal**: `ReplicationGroup.Status in ("creating", "modifying", "deleting", "snapshotting")`.
+  - **How obtained**: list-response fields `Status` and `NodeGroups[].Status` on `DescribeReplicationGroups`. Healthy means the RG AND every shard is available.
+- **Signal**: `ReplicationGroup.Status in ("creating", "deleting")`.
   - **State bucket**: Warning.
-  - **How obtained**: list-response field `Status` on `DescribeReplicationGroups`.
+  - **How obtained**: list-response field `Status` on `DescribeReplicationGroups`. Applies when the RG itself is being created or torn down — shards do not exist yet (creating) or are going away (deleting), so the shard-level signals below do not fire for these states.
 - **Signal**: `ReplicationGroup.Status == "create-failed"`.
   - **State bucket**: Broken.
   - **How obtained**: list-response field `Status` on `DescribeReplicationGroups`.
+- **Signal**: `ReplicationGroup.Status in ("modifying", "snapshotting")` AND `len(NodeGroups) <= 1`.
+  - **State bucket**: Warning.
+  - **How obtained**: list-response field `Status`. For cluster-mode-DISABLED Redis (0-1 node groups), the RG-level phrase is the operator's primary reading — no shard suffix is added on the common path.
+- **Signal**: `any NodeGroup.Status != "available"` AND `len(NodeGroups) > 1` (cluster-mode-enabled, per-shard transition).
+  - **State bucket**: Warning.
+  - **How obtained**: list-response field `NodeGroups[].Status` on `DescribeReplicationGroups` (SDK Go v2 `elasticache/types.NodeGroup.Status *string`; enum matches RG `Status` — `available`, `creating`, `modifying`, `deleting`). One distinct §4 phrase per transitioning shard keyed on `NodeGroupId` + its status. Rule 7 `(+N-1)` suffix applies when multiple shards are non-available.
 - **Signal**: `AutomaticFailover != "enabled"` on a multi-AZ replication group.
   - **State bucket**: Warning.
   - **How obtained**: list-response fields `AutomaticFailover` and `MultiAZ` on `DescribeReplicationGroups` (multi-AZ detected via `MultiAZ == "enabled"` per `elasticache/types.MultiAZStatus`).
+- **Detail-only visibility (no state bucket, no phrase — renders in the detail view only)**: per-node AZ + role breakdown.
+  - **How obtained**: list-response field `NodeGroups[].NodeGroupMembers[]` on `DescribeReplicationGroups`, exposing `CacheClusterId`, `CurrentRole` (`"primary"` / `"replica"` — docs note `CurrentRole` is populated for cluster-mode-DISABLED only; may be nil on cluster-mode-enabled), `PreferredAvailabilityZone`. a9s-devops (2026-04-23): operator needs to see "which AZ is the primary, which AZ(s) host replicas" during failover triage; this data is free on the list response and belongs in the detail view's Attention section or an adjacent detail row. It is NOT surfaced as a list-level phrase because "primary AZ = <x>" is not actionable by itself — it's context for the shard-transition signal above.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
@@ -114,6 +125,10 @@ No Wave 2 signals.
 - OUT OF SCOPE: CloudWatch `Evictions`.
 - OUT OF SCOPE: CloudWatch `ReplicationLag`.
 - OUT OF SCOPE: CloudWatch `EngineCPUUtilization`.
+- **OUT OF SCOPE: CloudTrail-sourced failover event correlation** (e.g. `ReplicationGroup-FailingOver`, `ReplicationGroupFailoverComplete`, `ForcedFailover`) as a list-time attention signal.
+  - **Rationale**: the operator intent ("show which AZ is failing over right now") is real and legitimate, but CloudTrail `LookupEvents` is account-wide rate-limited to 2 TPS. Per-row Wave-2 lookup on a 50-RG account would take 25+ seconds to populate the list. A single bulk-lookup call per list fetch (`LookupEvents(EventName ∈ {ReplicationGroupFailingOver, FailoverCompleted, ForcedFailover})` with short lookback) is technically possible but adds a second "time budget" to every redis list, and the same data is already reachable via the existing `ct-events` related-panel pivot when the operator opens the detail view of a suspicious row — that is the right place for historical-event correlation, not the list.
+  - a9s-devops (2026-04-23): possible=yes (Option B bulk-lookup), worth=no at list level. The Wave-1 `shard <ng-id>: modifying` phrase plus the per-node AZ visibility in the detail view already tells the operator "a shard is transitioning and here's where it lives" — which is what they need to decide the next action. Adding CloudTrail on top without solving rate-limit discipline invites regressions on medium+ accounts. Operators wanting exact event timestamps drill into `ct-events` from detail.
+- OUT OF SCOPE: per-shard replication lag (`NodeGroup` does not expose it; only CloudWatch does — already listed above).
 
 ## 4. Issue Visualization
 
@@ -132,10 +147,14 @@ Wave → surface mapping applied below. `Status == "available"` with `AutomaticF
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) | Detail text (S5) |
 |---|---|---|---|---|---|---|
 | `Status == creating` | 1 | Warning | n/a | S2, S4 | `creating — new group` | `Replication group is being created; nodes are not yet serving traffic.` |
-| `Status == modifying` | 1 | Warning | n/a | S2, S4 | `modifying — config change` | `Replication group is applying a configuration change; failover or latency spikes possible.` |
-| `Status == snapshotting` | 1 | Warning | n/a | S2, S4 | `snapshotting — backup running` | `Replication group is taking a backup; performance may dip until it completes.` |
+| `Status == modifying` (single-shard) | 1 | Warning | n/a | S2, S4 | `modifying — config change` | `Replication group is applying a configuration change; failover or latency spikes possible.` |
+| `Status == snapshotting` (single-shard) | 1 | Warning | n/a | S2, S4 | `snapshotting — backup running` | `Replication group is taking a backup; performance may dip until it completes.` |
 | `Status == deleting` | 1 | Warning | n/a | S2, S4 | `deleting — teardown` | `Replication group is being deleted; endpoints will stop accepting connections.` |
 | `Status == create-failed` | 1 | Broken | n/a | S2, S4 | `create failed — see events` | `Replication group create failed; AWS did not surface a cause field — check CloudTrail events for the failure reason.` |
+| `any NodeGroup.Status == modifying` (multi-shard) | 1 | Warning | n/a | S2, S4, S5 | `shard <ng-id>: modifying` | `Shard <ng-id> is applying a change; primary currently in <primary-AZ>, replicas in <replica-AZs>. Failover or latency spikes possible on this shard only.` |
+| `any NodeGroup.Status == snapshotting` (multi-shard) | 1 | Warning | n/a | S2, S4, S5 | `shard <ng-id>: snapshotting` | `Shard <ng-id> is taking a backup; primary currently in <primary-AZ>.` |
+| `any NodeGroup.Status == creating` (multi-shard) | 1 | Warning | n/a | S2, S4, S5 | `shard <ng-id>: creating` | `Shard <ng-id> is being added or re-sharded.` |
+| `any NodeGroup.Status == deleting` (multi-shard) | 1 | Warning | n/a | S2, S4, S5 | `shard <ng-id>: deleting` | `Shard <ng-id> is being removed.` |
 | `AutomaticFailover != enabled` on multi-AZ | 1 | Warning | n/a | S2, S4 | `multi-AZ without auto-failover` | `Replication group is deployed multi-AZ but automatic failover is not enabled; a primary-node loss will require manual intervention.` |
 
 Notes for fillers:
@@ -143,6 +162,9 @@ Notes for fillers:
 - No `bare state keyword` appears in S4 alone; every row pairs the state with a short reason the operator cares about.
 - The `create-failed` S4 text explicitly points to events because `ReplicationGroup` carries no `FailureMessage` or `FailureCode` field — a9s-devops confirmed the cause text is only available via CloudTrail for Redis create failures.
 - The `AutomaticFailover != enabled` row only applies when `MultiAZ == "enabled"` — single-AZ groups are not expected to have automatic failover and do not produce this finding.
+- **Shard-level vs RG-level precedence**: for cluster-mode-DISABLED Redis (0-1 node groups), the RG-level phrases (`modifying — config change`, `snapshotting — backup running`) are used as today. For cluster-mode-ENABLED Redis (N ≥ 2 node groups), the RG-level transient phrase is DROPPED in favour of one distinct §4 phrase per transitioning shard (`shard <ng-id>: modifying`, etc.). This preserves the UX for 95% of deployments (single-shard Redis is the common case) while giving cluster-mode-enabled operators the precise shard ID they need during incident triage.
+- **Rule 7 and shard phrases**: when multiple shards are transitioning at once, each shard is a distinct §4 phrase, so rule 7's `(+N-1)` suffix applies across shards (e.g. `shard 0001: modifying (+1)` when both `0001` and `0002` are modifying). Precedence among shard phrases is alphabetical by `<ng-id>: <state>` (e.g. `0001` before `0002`). `create-failed` (Broken) still beats any shard-level Warning.
+- **Per-node AZ / role visibility**: the detail view's Attention section renders one row per non-available shard with primary AZ + replica AZs alongside the shard ID. `NodeGroupMember.CurrentRole` may be nil for cluster-mode-enabled (AWS SDK docs) — render role as `primary` / `replica` when the field is populated, fall back to endpoint-match (`PrimaryEndpoint` vs `ReadEndpoint`) or omit the role label otherwise. When `CurrentRole` is populated on cluster-mode-disabled groups, the same shard-ID-aware detail block applies — but since single-shard RGs don't hit the shard phrase path, the AZ breakdown only renders when the Attention section is already shown for another reason (e.g. `modifying — config change` on single-shard). Implementation SHOULD render the per-node AZ row for every non-Healthy detail view where NodeGroups is populated, regardless of shard count — the extra 1-3 lines of context are cheap and match the operator ask.
 
 ## 4.1 UX review (two sentences)
 
@@ -160,6 +182,15 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 ## 6. Citations
 
 - Contract URL and expected related targets — `docs/related-resources.md` § Per-type contract row `redis`.
+- `ReplicationGroup.Engine` — AWS SDK Go v2 `elasticache/types.ReplicationGroup` § `Engine *string` (values `"redis"`, `"valkey"`, `"memcached"`). Non-Redis engines must be filtered out of the `redis` fetcher because `DescribeReplicationGroups` is shared across engines.
+- `ReplicationGroup.NodeGroups[]` — AWS SDK Go v2 `elasticache/types.ReplicationGroup` § `NodeGroups []NodeGroup`.
+- `NodeGroup.Status` / `NodeGroupId` / `NodeGroupMembers` — AWS SDK Go v2 `elasticache/types.NodeGroup` § `Status *string`, `NodeGroupId *string`, `NodeGroupMembers []NodeGroupMember`.
+- `NodeGroupMember.CurrentRole` / `PreferredAvailabilityZone` / `CacheClusterId` — AWS SDK Go v2 `elasticache/types.NodeGroupMember` § respective fields. Docs note `CurrentRole` is only populated for cluster-mode-DISABLED Redis.
+- Wave-1 Valkey / Memcached filter — a9s-devops (2026-04-23): non-Redis engines sharing the `DescribeReplicationGroups` response is a real-account hazard. Review finding P2-1 (see `docs/resources/redis-impl-plan.md` §0). Non-Redis RGs must be filtered at the fetcher boundary, matching the pre-migration behavior.
+- Wave-1 shard-level signals — a9s-devops (2026-04-23): cluster-mode-enabled Redis operators need shard ID + per-node AZ when a shard transitions. Data is free on the list response. Implemented as a shard-aware §4 phrase on multi-shard RGs; single-shard RGs preserve the existing phrase for UX stability.
+- Wave-3 CloudTrail-failover rationale — a9s-devops (2026-04-23): `LookupEvents` 2 TPS rate limit makes per-row Wave-2 lookup too slow on medium+ accounts; bulk-lookup per list fetch is technically possible but adds a second time budget and duplicates functionality already reachable via the `ct-events` related-panel pivot.
+- Tightened CT-events checker match — review finding P2-2 (2026-04-23): the `ResourceName` match must be exact equality (not substring) to avoid overmatching similarly named groups (`prod-redis` vs `prod-redis-sessions`); the `EventSource == "elasticache.amazonaws.com"` fallback must be removed because it matches ElastiCache activity for every RG on the account.
+- Cache-free KMS and VPC checkers — review finding P3 (2026-04-23): `checkRedisKMS` returns `[KmsKeyId]` directly from the list response; `checkRedisVPC` returns `[VpcId]` directly from the subnet-group chain. Neither reads the target cache, so `NeedsTargetCache` must be `false` — otherwise the detail-view probe pipeline burns two slots on unnecessary KMS / VPC list prefetches.
 - Per-target reasoning (alarm, cfn, ct-events, kms, logs, secrets, sg, sns, subnet, vpc) — `docs/related-resources.md` § `redis`.
 - Wave 1 signals and state buckets — `docs/attention-signals.md` § Databases & Storage row `redis`.
 - Wave 3 out-of-scope metrics — `docs/attention-signals.md` § Databases & Storage row `redis` column "Wave 3".

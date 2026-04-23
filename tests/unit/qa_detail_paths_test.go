@@ -36,7 +36,7 @@ func TestDetailPaths_AllConfiguredFieldsRendered(t *testing.T) {
 	allFixtures := map[string]resource.Resource{
 		"ec2":          buildResource("i-0abcdef1234567890", "web-server-prod", realisticEC2Instance()),
 		"dbi":          buildResource("prod-db-01", "prod-db-01", realisticRDSInstance()),
-		"redis":        buildResource("redis-prod-001", "redis-prod-001", realisticRedisCacheCluster()),
+		"redis":        buildResource("redis-prod-001", "redis-prod-001", realisticRedisReplicationGroup()),
 		"dbc":          buildResource("docdb-prod-cluster", "docdb-prod-cluster", realisticDocDBCluster()),
 		"eks":          buildResource("prod-cluster", "prod-cluster", realisticEKSCluster()),
 		"secrets":      buildResource("prod/database/password", "prod/database/password", realisticSecretListEntry()),
