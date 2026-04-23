@@ -84,6 +84,11 @@ const (
 	// ProdDbiMasterSecretARN is the Secrets Manager ARN for prod-dbi-1's RDS-managed password.
 	ProdDbiMasterSecretARN = "arn:aws:secretsmanager:us-east-1:123456789012:secret:rds!db-prod-dbi-1-ABCDEF"
 
+	// ProdDbiAuroraMasterSecretARN is the Secrets Manager ARN for
+	// prod-dbi-aurora-1's RDS-managed password (used so the Aurora fixture
+	// covers the dbi→secrets pivot on a single fixture).
+	ProdDbiAuroraMasterSecretARN = "arn:aws:secretsmanager:us-east-1:123456789012:secret:rds!db-prod-dbi-aurora-1-GHIJKL"
+
 	dbiMonitoringRoleARN    = "arn:aws:iam::123456789012:role/rds-monitoring-role"
 	dbiEnhancedMonitorARN   = "arn:aws:iam::123456789012:role/rds-enhanced-monitoring"
 )
@@ -155,16 +160,26 @@ func buildDBIInstances() []rdstypes.DBInstance {
 	prodDbi1.MonitoringRoleArn = aws.String(dbiEnhancedMonitorARN)
 	prodDbi1.EnabledCloudwatchLogsExports = []string{"postgresql", "upgrade"}
 
-	// 2. prod-dbi-aurora-1 — Aurora cluster member, Healthy
+	// 2. prod-dbi-aurora-1 — Aurora cluster member, Healthy.
+	// This fixture is the "all related pivots non-zero" graph-root for dbi
+	// (asserted in tests/integration/scenario_dbi_visual_test.go). Aurora
+	// supports all the optional fields below — cluster-level secret + instance
+	// MasterUserSecret may coexist, Enhanced Monitoring works per-instance,
+	// associated roles support S3 import/export workflows, and log exports
+	// are valid per-instance.
 	auroraBase := dbiBaselineHealthy(ProdDbiAuroraID, ProdDbiAuroraARN)
 	auroraBase.Engine = aws.String("aurora-postgresql")
 	auroraBase.EngineVersion = aws.String("16.4")
 	auroraBase.DBClusterIdentifier = aws.String(dbiAuroraClusterID)
-	auroraBase.MasterUserSecret = nil // Aurora uses cluster-level secrets
 	auroraBase.StorageType = aws.String("aurora")
-	auroraBase.AssociatedRoles = nil
-	auroraBase.MonitoringRoleArn = nil
-	auroraBase.EnabledCloudwatchLogsExports = nil
+	auroraBase.MasterUserSecret = &rdstypes.MasterUserSecret{
+		SecretArn: aws.String(ProdDbiAuroraMasterSecretARN),
+	}
+	auroraBase.AssociatedRoles = []rdstypes.DBInstanceRole{
+		{RoleArn: aws.String(dbiMonitoringRoleARN), FeatureName: aws.String("Monitoring")},
+	}
+	auroraBase.MonitoringRoleArn = aws.String(dbiEnhancedMonitorARN)
+	auroraBase.EnabledCloudwatchLogsExports = []string{"postgresql", "upgrade"}
 
 	// 3. staging-dbi-modifying — Warning (transitional with pending class change)
 	modifying := dbiBaselineHealthy(StagingDbiModifyingID, StagingDbiModifyingARN)

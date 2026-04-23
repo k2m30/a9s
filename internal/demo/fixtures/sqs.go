@@ -56,6 +56,17 @@ func NewSQSFixtures() *SQSFixtures {
 					"QueueArn":                              "arn:aws:sqs:us-east-1:123456789012:webhook-ingest-queue.fifo",
 				},
 			},
+			// S3 healthy-bucket dead-letter queue (checkS3SQS pivot).
+			{
+				QueueURL:  "https://sqs.us-east-1.amazonaws.com/123456789012/" + S3DLQueueName,
+				QueueName: S3DLQueueName,
+				Attributes: map[string]string{
+					"ApproximateNumberOfMessages":           "0",
+					"ApproximateNumberOfMessagesNotVisible": "0",
+					"MessageRetentionPeriod":                "1209600",
+					"QueueArn":                              "arn:aws:sqs:us-east-1:123456789012:" + S3DLQueueName,
+				},
+			},
 		},
 	}
 }

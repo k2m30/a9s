@@ -66,6 +66,25 @@ func NewGlueFixtures() *GlueFixtures {
 					Name: aws.String("pythonshell"),
 				},
 			},
+			// S3 healthy-bucket ETL job (checkS3Glue pivot).
+			// checkS3Glue uses assertStruct[gluetypes.Job] and reads Command.ScriptLocation.
+			// bucketFromS3URI("s3://a9s-demo-healthy/scripts/etl.py") == "a9s-demo-healthy".
+			{
+				Name:            aws.String("a9s-demo-s3-etl"),
+				Role:            aws.String("acme-glue-role"),
+				GlueVersion:     aws.String("4.0"),
+				WorkerType:      gluetypes.WorkerTypeG1x,
+				NumberOfWorkers: aws.Int32(5),
+				MaxRetries:      1,
+				CreatedOn:       aws.Time(mustParseGlueTime("2025-01-10T10:00:00+00:00")),
+				LastModifiedOn:  aws.Time(mustParseGlueTime("2026-01-15T09:00:00+00:00")),
+				Command: &gluetypes.JobCommand{
+					Name:           aws.String("glueetl"),
+					ScriptLocation: aws.String("s3://" + HealthyBucketName + "/scripts/etl.py"),
+					PythonVersion:  aws.String("3"),
+				},
+				Description: aws.String("ETL job reading from and writing to a9s-demo-healthy S3 bucket"),
+			},
 			// Issue: latest JobRun=ERROR → Broken (job script threw an unhandled exception)
 			{
 				Name:            aws.String("glue-error-run"),

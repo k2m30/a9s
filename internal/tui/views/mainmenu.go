@@ -263,7 +263,9 @@ func (m *MainMenuModel) View() string {
 		// Name field fills remaining width: total - 4 leading - aliasW - 3 trailing.
 		nameFieldW := max(m.width-4-aliasW-3, 10)
 		if rl.itemIndex == m.scroll.Cursor() {
-			// Build name with count suffix if known
+			// Build name with count suffix if known.
+			// Count is an operational completeness signal (not a spec-§4
+			// attention surface), so "+" marks a truncated lower bound.
 			nameStr := item.Name
 			if m.availability != nil {
 				if count, known := m.availability[item.ShortName]; known {
@@ -289,7 +291,8 @@ func (m *MainMenuModel) View() string {
 				count, known = m.availability[item.ShortName]
 			}
 
-			// Build name with count suffix if known
+			// Build name with count suffix if known. "+" marks a truncated
+			// lower bound on the resource count (operational, not §4 attention).
 			nameStr := item.Name
 			if known {
 				countSuffix := " (" + itoa(count) + ")"
@@ -524,20 +527,18 @@ func (m *MainMenuModel) SetEnrichProgress(checked, total int) {
 	m.enrichTotal = total
 }
 
-// issueBadge returns the " issues:N" or " issues:N+" suffix for a resource type.
-// Returns empty string if no issues are known.
+// issueBadge returns the " issues:N" suffix for a resource type per spec §4 S1.
+// No "+" suffix — truncation state is behavioral (drives isVisibleUnderIssueFilter
+// for ctrl+z) and MUST NOT appear in rendered text.
 func (m MainMenuModel) issueBadge(shortName string) string {
-	var badge string
-	if m.issueKnown[shortName] {
-		count := m.issueCounts[shortName]
-		if count > 0 {
-			badge = " issues:" + itoa(count)
-			if m.issueTruncated[shortName] {
-				badge += "+"
-			}
-		}
+	if !m.issueKnown[shortName] {
+		return ""
 	}
-	return badge
+	count := m.issueCounts[shortName]
+	if count == 0 {
+		return ""
+	}
+	return " issues:" + itoa(count)
 }
 
 // isVisibleUnderIssueFilter determines whether a resource type should be

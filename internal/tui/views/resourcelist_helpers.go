@@ -1,6 +1,7 @@
 package views
 
 import (
+	"context"
 	"strings"
 
 	"charm.land/bubbles/v2/key"
@@ -114,6 +115,84 @@ func (m *ResourceListModel) SetRelatedIDFilter(ids []string) {
 		set[id] = struct{}{}
 	}
 	m.relatedIDSet = set
+}
+
+// SetReapplyChecker registers the originating RelatedDef.Checker (and source
+// resource) so each subsequent ResourcesLoadedMsg / m-loads-more can re-run
+// it against the new page and extend relatedIDSet with newly matched IDs.
+//
+// Carrying a checker also puts the list into "filter-active" state with an
+// initially empty match set — so a zero-initial (0+) navigation hides every
+// unrelated row immediately, instead of falling back to an unfiltered list
+// while the operator waits for the first checker re-apply.
+//
+// Passing a nil checker clears the carry (no-op re-apply).
+func (m *ResourceListModel) SetReapplyChecker(checker resource.RelatedChecker, src resource.Resource) {
+	m.reapplyChecker = checker
+	m.reapplySource = src
+	if checker != nil && m.relatedIDSet == nil {
+		// Filter is active but empty; zero rows visible until the first
+		// ReapplyCheckerAgainst populates matches.
+		m.relatedIDSet = make(map[string]struct{})
+		m.applySortAndFilter()
+		m.styledRowCache = nil
+	}
+}
+
+// ReapplyCheckerAgainst re-runs the carried checker against `newPage` and
+// merges any returned ResourceIDs into relatedIDSet. No-op when no checker
+// is carried. The carried checker is invoked with a synthetic cache that
+// contains only the new page under this list's target type — checkers that
+// reverse-scan via FetchRelatedTarget pick up the delta naturally.
+//
+// Runs applySortAndFilter (not bare applyFilter) so newly merged matches
+// land in the correct sorted position instead of appended in fetch order.
+func (m *ResourceListModel) ReapplyCheckerAgainst(newPage []resource.Resource) {
+	if m.reapplyChecker == nil || len(newPage) == 0 {
+		return
+	}
+	synth := resource.ResourceCache{
+		m.typeDef.ShortName: resource.ResourceCacheEntry{Resources: newPage},
+	}
+	result := m.reapplyChecker(context.Background(), nil, m.reapplySource, synth)
+	if len(result.ResourceIDs) == 0 {
+		// No new matches on this page, but filter state (including the
+		// "active empty" state set by SetReapplyChecker) stays intact.
+		return
+	}
+	if m.relatedIDSet == nil {
+		m.relatedIDSet = make(map[string]struct{}, len(result.ResourceIDs))
+	}
+	for _, id := range result.ResourceIDs {
+		if id == "" {
+			continue
+		}
+		m.relatedIDSet[id] = struct{}{}
+	}
+	m.applySortAndFilter()
+	m.styledRowCache = nil
+}
+
+// RelatedIDFilterSize returns the size of the current related-ID filter.
+// Zero means the filter is not active; a positive count means the list
+// shows only resources whose ID is in the set.
+func (m *ResourceListModel) RelatedIDFilterSize() int {
+	return len(m.relatedIDSet)
+}
+
+// VisibleResources returns the currently-visible (post-filter, post-sort)
+// resources. Exposed for tests that assert end-to-end filtering behavior.
+func (m *ResourceListModel) VisibleResources() []resource.Resource {
+	return m.filteredResources
+}
+
+// AppendResourcesForTest appends resources to allResources and re-runs the
+// sort+filter pipeline, mirroring what the Update handler does on an
+// Append=true ResourcesLoadedMsg. Exposed for tests that simulate
+// m-loads-more without driving a full tea.Msg cycle.
+func (m *ResourceListModel) AppendResourcesForTest(page []resource.Resource) {
+	m.allResources = append(m.allResources, page...)
+	m.applySortAndFilter()
 }
 
 // SetAutoOpenSingleDetail configures one-shot auto-navigation to detail when
@@ -245,6 +324,24 @@ func (m *ResourceListModel) SetShowIssueBadge(v bool) {
 	m.showIssueBadge = v
 }
 
+// enterChildFor returns the Children entry registered under Key="enter" for
+// this resource type, or nil if none is registered or its DrillCondition
+// vetoes the given row. Used by the auto-open-single-row branch to mirror
+// manual Enter behavior during related-panel auto-navigation.
+func (m ResourceListModel) enterChildFor(r resource.Resource) *resource.ChildViewDef {
+	for i := range m.typeDef.Children {
+		c := &m.typeDef.Children[i]
+		if c.Key != "enter" {
+			continue
+		}
+		if c.DrillCondition != nil && !c.DrillCondition(r) {
+			return nil
+		}
+		return c
+	}
+	return nil
+}
+
 // handleChildKey iterates through the typeDef's Children looking for a match
 // on keyName. If found, checks DrillCondition, builds context, and returns
 // an EnterChildViewMsg command. Returns the model and nil cmd if no child matched.
@@ -312,12 +409,11 @@ func (m *ResourceListModel) ClearLoading() {
 }
 
 // FrameTitle returns e.g. "ec2(42)" or "ec2(3/42)" when filtered.
-// For child views with a display name, shows that name instead of the short name.
-// During loading, returns just the name without count.
-// When pagination indicates truncation:
-//   - "ec2(200+)"             — truncated, no filter
-//   - "ec2(200+ loading...)"  — truncated, loadingMore in progress
-//   - "ec2(15/200+)"          — truncated, filter active
+// Pagination truncation is an OPERATIONAL completeness signal (count is a
+// lower bound), rendered as a "+" suffix on the total — this is NOT an
+// attention surface and does not violate spec §4.
+// Spec §4 constraint: the title must NOT duplicate S1 (`issues:N` is MENU-only);
+// "(N/M issues)" is illegal.
 func (m ResourceListModel) FrameTitle() string {
 	name := m.typeDef.ShortName
 	if m.typeDef.ListTitle != "" {
@@ -345,42 +441,18 @@ func (m ResourceListModel) FrameTitle() string {
 
 	isAttention := m.IsEnabled()
 	hasTextFilter := m.filterText != "" && filtered != total
-	// Use unified Wave-1 + Wave-2 count when enrichment has run; fall back to Wave-1 only.
-	ic := m.issueCount
-	if m.enrichmentIssueCount > 0 {
-		ic = m.enrichmentIssueCount
-	}
-	issueStr := itoa(ic)
-	// "+" suffix when count is a lower bound: either list pagination is
-	// truncated (more pages unread) or Wave 2 enrichment returned truncated.
-	if ic > 0 && (truncated || m.enrichmentTruncated) {
-		issueStr = itoa(ic) + "+"
-	}
 
 	var title string
 	switch {
 	case hasTextFilter && isAttention:
-		// text filter + ctrl+z: name(filtered of total) [!]
-		// filtered is already the intersection of both filters
 		title = name + "(" + itoa(filtered) + " of " + totalStr + ")"
 	case hasTextFilter:
-		// text filter only: name(filtered/total) — no issue badge
 		title = name + "(" + itoa(filtered) + "/" + totalStr + ")"
 	case isAttention:
-		// ctrl+z only: name(N of total) [!]
 		attentionVisible := len(m.filteredResources)
 		title = name + "(" + itoa(attentionVisible) + " of " + totalStr + ")"
 	default:
-		// No filters: show issue count if > 0 and badge is enabled.
-		if ic > 0 && m.showIssueBadge {
-			issueWord := "issues"
-			if ic == 1 {
-				issueWord = "issue"
-			}
-			title = name + "(" + totalStr + "/" + issueStr + " " + issueWord + ")"
-		} else {
-			title = name + "(" + totalStr + ")"
-		}
+		title = name + "(" + totalStr + ")"
 	}
 
 	if m.titleSuffix != "" {
@@ -484,10 +556,13 @@ func (m ResourceListModel) EscPops() bool {
 }
 
 // applyFilter filters allResources into filteredResources.
+// When relatedIDSet is non-nil the ID filter is ACTIVE — even if empty —
+// so zero-match pivots hide every row rather than falling back to an
+// unfiltered list while the operator waits for m-loads-more pages.
 func (m *ResourceListModel) applyFilter() {
 	base := m.allResources
-	if len(m.relatedIDSet) > 0 {
-		subset := make([]resource.Resource, 0, len(base))
+	if m.relatedIDSet != nil {
+		subset := make([]resource.Resource, 0, len(m.relatedIDSet))
 		for _, r := range base {
 			if _, ok := m.relatedIDSet[r.ID]; ok {
 				subset = append(subset, r)

@@ -2,8 +2,10 @@ package fakes
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/service/backup"
+	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
 )
@@ -31,10 +33,60 @@ func (f *BackupFake) GetBackupPlan(_ context.Context, _ *backup.GetBackupPlanInp
 	return &backup.GetBackupPlanOutput{}, nil
 }
 
-// ListBackupSelections returns an empty list — demo mode does not model
-// backup selections.
-func (f *BackupFake) ListBackupSelections(_ context.Context, _ *backup.ListBackupSelectionsInput, _ ...func(*backup.Options)) (*backup.ListBackupSelectionsOutput, error) {
-	return &backup.ListBackupSelectionsOutput{}, nil
+// ListBackupSelections returns the list of selection summaries for the plan.
+// Each entry is derived from the fixture's BackupSelection objects so
+// GetBackupSelection can look up the full record by (planID, selectionID).
+func (f *BackupFake) ListBackupSelections(_ context.Context, input *backup.ListBackupSelectionsInput, _ ...func(*backup.Options)) (*backup.ListBackupSelectionsOutput, error) {
+	if input == nil || input.BackupPlanId == nil {
+		return &backup.ListBackupSelectionsOutput{}, nil
+	}
+	sels, ok := f.fix.Selections[*input.BackupPlanId]
+	if !ok {
+		return &backup.ListBackupSelectionsOutput{}, nil
+	}
+	summaries := make([]backuptypes.BackupSelectionsListMember, 0, len(sels))
+	for i, sel := range sels {
+		summaries = append(summaries, backuptypes.BackupSelectionsListMember{
+			BackupPlanId:  input.BackupPlanId,
+			SelectionId:   stringPtr(selectionIDFor(*input.BackupPlanId, i)),
+			SelectionName: sel.SelectionName,
+			IamRoleArn:    sel.IamRoleArn,
+		})
+	}
+	return &backup.ListBackupSelectionsOutput{BackupSelectionsList: summaries}, nil
+}
+
+// GetBackupSelection returns the full BackupSelection (including the
+// Resources list) for the (planID, selectionID) pair produced by
+// ListBackupSelections.
+func (f *BackupFake) GetBackupSelection(_ context.Context, input *backup.GetBackupSelectionInput, _ ...func(*backup.Options)) (*backup.GetBackupSelectionOutput, error) {
+	if input == nil || input.BackupPlanId == nil || input.SelectionId == nil {
+		return &backup.GetBackupSelectionOutput{}, nil
+	}
+	sels, ok := f.fix.Selections[*input.BackupPlanId]
+	if !ok {
+		return &backup.GetBackupSelectionOutput{}, nil
+	}
+	for i, sel := range sels {
+		if selectionIDFor(*input.BackupPlanId, i) != *input.SelectionId {
+			continue
+		}
+		selCopy := sel
+		return &backup.GetBackupSelectionOutput{
+			BackupPlanId: input.BackupPlanId,
+			SelectionId:  input.SelectionId,
+			BackupSelection: &selCopy,
+		}, nil
+	}
+	return &backup.GetBackupSelectionOutput{}, nil
+}
+
+func stringPtr(s string) *string { return &s }
+
+func selectionIDFor(planID string, idx int) string {
+	// Deterministic synthetic selection ID — stable across calls so
+	// ListBackupSelections summaries round-trip to GetBackupSelection.
+	return planID + "-sel-" + strconv.Itoa(idx)
 }
 
 // DescribeBackupVault returns an empty vault description.

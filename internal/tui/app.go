@@ -446,6 +446,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case messages.ResourcesLoadedMsg:
 		m.flash.active = false
 		updated, cmd := m.updateActiveView(msg)
+		// Re-apply any carried related-checker against the newly loaded page.
+		// For related-navigation lists, this extends relatedIDSet with matches
+		// from the new page — essential for approximate pivots where the
+		// initial ID set was a lower bound (see views.ResourceListModel.
+		// SetReapplyChecker).
+		if updatedModel, ok := updated.(Model); ok {
+			if rl, ok := updatedModel.activeView().(*views.ResourceListModel); ok {
+				rl.ReapplyCheckerAgainst(msg.Resources)
+			}
+		}
 		// Write-through: update cache after view has processed the message.
 		if updatedModel, ok := updated.(Model); ok {
 			if rl, ok := updatedModel.activeView().(*views.ResourceListModel); ok {
