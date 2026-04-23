@@ -385,6 +385,9 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	}
 	rt := rl.ResourceType()
 	delete(m.resourceCache, rt) // clear cache for refreshed type only
+	if rt == "ses" {
+		awsclient.InvalidateSESRuleSetCache(m.clients)
+	}
 	m.flash = flashState{text: "Refreshing...", isError: false, active: true}
 
 	// Top-level list with a registered enricher: bump per-type gen, clear

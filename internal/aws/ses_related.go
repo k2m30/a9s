@@ -157,18 +157,20 @@ func sesActiveReceiptRuleSet(ctx context.Context, c *ServiceClients) (*ses.Descr
 }
 
 // checkSESEbRule checks the SES identity's configuration-set event destinations for
-// EventBridge destinations. For each destination with EventBridgeDestination non-nil,
-// returns EventBusArn. Also returns "default" if a destination has no explicit EventBusArn
-// pattern (the only supported bus is the default bus per AWS docs, so EventBusArn is always set).
-// API: sesv2:GetEmailIdentity → ConfigurationSetName → sesv2:GetConfigurationSetEventDestinations.
-func checkSESEbRule(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// EventBridge destinations, then scans the eb-rule cache for rules whose EventBusName
+// matches one of the bus names extracted from EventBusArn.
+// API: sesv2:GetEmailIdentity → ConfigurationSetName → sesv2:GetConfigurationSetEventDestinations
+// → extract bus names → scan eb-rule cache → return matching rule IDs.
+func checkSESEbRule(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	identityName := res.ID
 	if identityName == "" {
 		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
 	}
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
+		// Without a client we cannot query SESv2 to discover EventBridge bus names.
+		// Return Count=0 (early exit — no-client path cannot produce results).
+		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
 	}
 	configSetName := sesConfigSetName(ctx, c, identityName)
 	if configSetName == "" {
@@ -181,7 +183,9 @@ func checkSESEbRule(ctx context.Context, clients any, res resource.Resource, _ r
 	if out == nil {
 		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
 	}
-	var ids []string
+
+	// Collect bus names from EventBridge destinations.
+	busNames := map[string]struct{}{}
 	for _, dest := range out.EventDestinations {
 		if dest.EventBridgeDestination == nil {
 			continue
@@ -190,49 +194,48 @@ func checkSESEbRule(ctx context.Context, clients any, res resource.Resource, _ r
 		if dest.EventBridgeDestination.EventBusArn != nil {
 			busARN = *dest.EventBridgeDestination.EventBusArn
 		}
-		if busARN == "" {
-			busARN = "default"
+		name := extractEventBusName(busARN)
+		if name != "" {
+			busNames[name] = struct{}{}
 		}
-		ids = append(ids, busARN)
+	}
+	if len(busNames) == 0 {
+		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
+	}
+
+	// Scan the eb-rule cache for rules on matching buses.
+	ebRules, truncated, cacheErr := sesRelatedResources(ctx, clients, cache, "eb-rule")
+	if cacheErr != nil {
+		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1, Err: cacheErr}
+	}
+	if ebRules == nil {
+		return resource.ApproximateZero("eb-rule")
+	}
+
+	var ids []string
+	for _, rule := range ebRules {
+		if _, ok := busNames[rule.Fields["event_bus"]]; ok {
+			ids = append(ids, rule.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.ApproximateZero("eb-rule")
 	}
 	return relatedResult("eb-rule", ids)
 }
 
-// checkSESKinesis checks the SES identity's configuration-set event destinations for
-// Kinesis Firehose destinations (note: Firehose, not Kinesis Data Streams).
-// Returns DeliveryStreamArn for each KinesisFirehoseDestination.
-// API: sesv2:GetEmailIdentity → ConfigurationSetName → sesv2:GetConfigurationSetEventDestinations.
-func checkSESKinesis(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	// Note: Firehose, not Kinesis Data Streams. SESv2 delivers to Firehose only.
-	identityName := res.ID
-	if identityName == "" {
-		return resource.RelatedCheckResult{TargetType: "kinesis", Count: 0}
+// extractEventBusName extracts the bus name from an EventBridge event bus ARN.
+// ARN format: arn:aws:events:REGION:ACCOUNT:event-bus/NAME
+// If the input contains no "/", it is returned as-is (handles already-extracted names).
+// Returns "" for empty input.
+func extractEventBusName(arn string) string {
+	if arn == "" {
+		return ""
 	}
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil {
-		return resource.RelatedCheckResult{TargetType: "kinesis", Count: -1}
+	if idx := strings.LastIndex(arn, "/"); idx >= 0 {
+		return arn[idx+1:]
 	}
-	configSetName := sesConfigSetName(ctx, c, identityName)
-	if configSetName == "" {
-		return resource.RelatedCheckResult{TargetType: "kinesis", Count: 0}
-	}
-	out, err := sesEventDestinations(ctx, c, configSetName)
-	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "kinesis", Count: -1, Err: err}
-	}
-	if out == nil {
-		return resource.RelatedCheckResult{TargetType: "kinesis", Count: 0}
-	}
-	var ids []string
-	for _, dest := range out.EventDestinations {
-		if dest.KinesisFirehoseDestination == nil {
-			continue
-		}
-		if dest.KinesisFirehoseDestination.DeliveryStreamArn != nil && *dest.KinesisFirehoseDestination.DeliveryStreamArn != "" {
-			ids = append(ids, *dest.KinesisFirehoseDestination.DeliveryStreamArn)
-		}
-	}
-	return relatedResult("kinesis", ids)
+	return arn
 }
 
 // sesRuleAppliesToIdentity reports whether a receipt rule should be considered
@@ -312,8 +315,11 @@ func sesRuleAppliesToIdentity(rule sestypes.ReceiptRule, identityName, identityT
 // checkSESLambda discovers Lambda functions invoked by SES v1 inbound receipt
 // rules that apply to the given identity. Calls ses:DescribeActiveReceiptRuleSet
 // (SES v1) once per fetch batch, filters by Recipients scoping, then walks
-// Rules[].Actions[].LambdaAction.FunctionArn. Returns Count: 0 for accounts
-// with no active receipt rule set (pure outbound SES) — operator-honest absence.
+// Rules[].Actions[].LambdaAction.FunctionArn and extracts the function name
+// (the segment after ":function:") so the returned IDs match the lambda
+// resource type's ID format (function names, not ARNs). Returns Count: 0 for
+// accounts with no active receipt rule set (pure outbound SES) — operator-honest
+// absence.
 func checkSESLambda(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
@@ -333,8 +339,8 @@ func checkSESLambda(ctx context.Context, clients any, res resource.Resource, _ r
 			filtered = append(filtered, rule)
 		}
 	}
-	arns := sesLambdaARNsFromRules(filtered)
-	return relatedResult("lambda", arns)
+	names := sesLambdaNamesFromRules(filtered)
+	return relatedResult("lambda", names)
 }
 
 // checkSESS3 discovers S3 buckets where SES v1 inbound receipt rules deposit
@@ -365,10 +371,13 @@ func checkSESS3(ctx context.Context, clients any, res resource.Resource, _ resou
 	return relatedResult("s3", buckets)
 }
 
-// sesLambdaARNsFromRules walks ReceiptRule actions and collects LambdaAction.FunctionArn values.
-func sesLambdaARNsFromRules(rules []sestypes.ReceiptRule) []string {
+// sesLambdaNamesFromRules walks ReceiptRule actions, extracts the function name
+// from each LambdaAction.FunctionArn, and returns deduplicated function names.
+// Function names (not ARNs) are returned so they match the lambda resource
+// type's ID format.
+func sesLambdaNamesFromRules(rules []sestypes.ReceiptRule) []string {
 	seen := map[string]struct{}{}
-	var arns []string
+	var names []string
 	for _, rule := range rules {
 		for _, action := range rule.Actions {
 			if action.LambdaAction == nil || action.LambdaAction.FunctionArn == nil {
@@ -378,13 +387,34 @@ func sesLambdaARNsFromRules(rules []sestypes.ReceiptRule) []string {
 			if arn == "" {
 				continue
 			}
-			if _, exists := seen[arn]; !exists {
-				seen[arn] = struct{}{}
-				arns = append(arns, arn)
+			name := lambdaARNToName(arn)
+			if name == "" {
+				continue
+			}
+			if _, exists := seen[name]; !exists {
+				seen[name] = struct{}{}
+				names = append(names, name)
 			}
 		}
 	}
-	return arns
+	return names
+}
+
+// lambdaARNToName extracts the function name from a Lambda function ARN.
+// Returns "" for unparseable input. Handles version/alias suffix by taking
+// only the segment after "function:".
+// ARN format: arn:aws:lambda:REGION:ACCOUNT:function:FUNCTION_NAME[:VERSION_OR_ALIAS]
+func lambdaARNToName(arn string) string {
+	const marker = ":function:"
+	_, tail, found := strings.Cut(arn, marker)
+	if !found {
+		return ""
+	}
+	// Strip version/alias suffix (":v1" or ":$LATEST" or ":alias")
+	if colon := strings.Index(tail, ":"); colon >= 0 {
+		tail = tail[:colon]
+	}
+	return tail
 }
 
 // sesS3BucketsFromRules walks ReceiptRule actions and collects S3Action.BucketName values.
@@ -442,4 +472,17 @@ func checkSESSns(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 	}
 	return relatedResult("sns", ids)
+}
+
+// InvalidateSESRuleSetCache drops the cached DescribeActiveReceiptRuleSet
+// response for the given client. Called from the Ctrl+R handler so that
+// receipt-rule changes are picked up without waiting for a profile/region
+// switch to rebuild *ServiceClients.
+func InvalidateSESRuleSetCache(c *ServiceClients) {
+	if c == nil {
+		return
+	}
+	sesRuleSetCacheMu.Lock()
+	delete(sesRuleSetCaches, c)
+	sesRuleSetCacheMu.Unlock()
 }

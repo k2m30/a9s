@@ -126,16 +126,21 @@ func TestScenario_SESVisual(t *testing.T) {
 	scenario.OpenDetailResource("ses", root)
 	scenario.ExpectNoAPIError()
 
+	// Kinesis Streams pivot removed: SES ships to Firehose, not Kinesis Data Streams.
+	// A follow-up issue will add a Firehose resource type.
 	for _, displayName := range []string{
 		"Route 53 (DNS)",
-		"EventBridge Rules",
-		"Kinesis Streams",
 		"Lambda Functions",
 		"S3 Buckets",
 		"SNS Topics",
 	} {
 		scenario.ExpectRelatedRowCountAtLeast(displayName, 1)
 	}
+
+	// EventBridge Rules: the fixture has multiple rules on the "default" bus, so
+	// the exact count is implementation-detail. Assert at least one rule is returned
+	// and the row is present. Do NOT pin the exact number.
+	scenario.ExpectRelatedRowCountAtLeast("EventBridge Rules", 1)
 
 	// -----------------------------------------------------------------
 	// Rule 7 U7c / U7e — S5 Attention section surfaces every Wave-1
