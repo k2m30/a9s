@@ -193,6 +193,7 @@ func serviceRouter(req *http.Request) (int, string) {
       <ReplicationGroup>
         <ReplicationGroupId>prod-redis</ReplicationGroupId>
         <Status>available</Status>
+        <Engine>redis</Engine>
         <MemberClusters>
           <member>prod-redis-001</member>
         </MemberClusters>

@@ -479,15 +479,17 @@ func TestQA_ListRawStruct_Redis_RawStructOverridesFields(t *testing.T) {
 	ensureNoColor(t)
 	cfg := configForType("redis")
 
-	// Redis list columns:
-	//   "Cluster ID"  → Key:"cluster_id"              — reads from Fields (not RawStruct)
-	//   "Node Type"   → Path:"CacheNodeType"           — reads from RawStruct
-	//   "Status"      → Key:"status"                   — reads from Fields (not RawStruct)
-	//   "Nodes"       → Key:"nodes"                    — reads from Fields (not RawStruct)
+	// Redis list columns (post-CodeRabbit review, 2026-04-23 — Cluster ID moved
+	// from Key to Path so a regression to Fields-sourced ID rendering fails here):
+	//   "Cluster ID"  → Path:"ReplicationGroupId"           — reads from RawStruct
+	//   "Node Type"   → Path:"CacheNodeType"                 — reads from RawStruct
+	//   "Status"      → Key:"status"                         — reads from Fields
+	//   "Nodes"       → Key:"nodes"                          — reads from Fields
 	//   "Endpoint"    → Path:"ConfigurationEndpoint.Address" — reads from RawStruct
 	//
-	// Only Path-based columns are overridden by RawStruct; Key-based columns always
-	// come from Fields. This test verifies Path columns use RawStruct values.
+	// Path-based columns are overridden by RawStruct; Key-based columns always
+	// come from Fields. This test verifies Path columns use RawStruct values
+	// even when Fields carries a conflicting ("WRONG-*") value.
 	rg := elasticachetypes.ReplicationGroup{
 		ReplicationGroupId: new("correct-redis"),
 		Status:             new("available"),
@@ -503,11 +505,11 @@ func TestQA_ListRawStruct_Redis_RawStructOverridesFields(t *testing.T) {
 		ID:   "correct-redis",
 		Name: "correct-redis",
 		Fields: map[string]string{
-			"cluster_id": "correct-redis",  // Key col — will appear (not wrong)
-			"node_type":  "WRONG-TYPE",     // Path col — overridden by RawStruct
+			"cluster_id": "WRONG-ID",       // Path col — overridden by RawStruct.ReplicationGroupId
+			"node_type":  "WRONG-TYPE",     // Path col — overridden by RawStruct.CacheNodeType
 			"status":     "WRONG-STATUS",   // Key col — will appear from Fields
 			"nodes":      "WRONG-NODES",    // Key col — will appear from Fields
-			"endpoint":   "WRONG-ENDPOINT", // Path col — overridden by RawStruct
+			"endpoint":   "WRONG-ENDPOINT", // Path col — overridden by RawStruct.ConfigurationEndpoint
 		},
 		RawStruct: rg,
 	}
@@ -515,6 +517,9 @@ func TestQA_ListRawStruct_Redis_RawStructOverridesFields(t *testing.T) {
 	view := newListModel(t, "redis", cfg, []resource.Resource{res})
 
 	// Path-based columns must show RawStruct values
+	if !strings.Contains(view, "correct-redis") {
+		t.Errorf("Redis list should contain Cluster ID from RawStruct (Path col), got:\n%s", view)
+	}
 	if !strings.Contains(view, "cache.r6g.xlarge") {
 		t.Errorf("Redis list should contain node type from RawStruct (Path col), got:\n%s", view)
 	}
@@ -523,6 +528,9 @@ func TestQA_ListRawStruct_Redis_RawStructOverridesFields(t *testing.T) {
 	}
 
 	// Path-based columns must NOT show stale Fields values
+	if strings.Contains(view, "WRONG-ID") {
+		t.Error("Redis list should NOT contain WRONG-ID from Fields (Path col overridden by RawStruct)")
+	}
 	if strings.Contains(view, "WRONG-TYPE") {
 		t.Error("Redis list should NOT contain WRONG-TYPE from Fields (Path col overridden by RawStruct)")
 	}

@@ -1,6 +1,6 @@
 list:
   Cluster ID:
-    key: cluster_id
+    path: ReplicationGroupId
     width: 28
   Node Type:
     path: CacheNodeType

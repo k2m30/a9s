@@ -44,7 +44,10 @@ func databasesDefaultViews() map[string]ViewDef {
 			// engine_version is not a field on ReplicationGroup (only on CacheCluster);
 			// it is omitted to avoid unnecessary DescribeCacheClusters traffic.
 			List: []ListColumn{
-				{Title: "Cluster ID", Key: "cluster_id", SortPath: "ReplicationGroupId", Width: 28},
+				// Cluster ID is Path-based (reads ReplicationGroupId from RawStruct)
+				// so a regression that populates Fields["cluster_id"] with a stale
+				// value cannot surface in the UI — matches the dbc / dbi convention.
+				{Title: "Cluster ID", Path: "ReplicationGroupId", Width: 28},
 				{Title: "Node Type", Path: "CacheNodeType", Width: 18},
 				{Title: "Status", Key: "status", SortPath: "Status", Width: 32},
 				{Title: "Nodes", Key: "nodes", Width: 8},

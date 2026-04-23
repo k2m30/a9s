@@ -166,17 +166,19 @@ func TestRelated_Redis_Registered(t *testing.T) {
 		displayName string
 		hasChecker  bool
 	}
-	// 9 pivots registered in current code; ct-events is phase 7 addition.
+	// 10 pivots registered per docs/resources/redis.md §2 (universal ct-events
+	// pivot plus the 9 type-specific targets).
 	expected := map[string]expectation{
-		"alarm":   {"CW Alarms", true},
-		"sg":      {"Security Groups", true},
-		"cfn":     {"CloudFormation", true},
-		"kms":     {"KMS Key", true},
-		"logs":    {"Log Groups", true},
-		"secrets": {"Secrets Manager", true},
-		"sns":     {"SNS Topics", true},
-		"subnet":  {"Subnets", true},
-		"vpc":     {"VPC", true},
+		"alarm":     {"CW Alarms", true},
+		"cfn":       {"CloudFormation", true},
+		"ct-events": {"CloudTrail Events", true},
+		"kms":       {"KMS Key", true},
+		"logs":      {"Log Groups", true},
+		"secrets":   {"Secrets Manager", true},
+		"sg":        {"Security Groups", true},
+		"sns":       {"SNS Topics", true},
+		"subnet":    {"Subnets", true},
+		"vpc":       {"VPC", true},
 	}
 	for target, want := range expected {
 		found := false

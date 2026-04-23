@@ -2,6 +2,7 @@
 package fixtures
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -479,7 +480,7 @@ func buildCTEvents() []cloudtrailtypes.Event {
 			},
 			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/ci-service-account","accountId":"123456789012","userName":"ci-service-account"},"eventSource":"ecs.amazonaws.com","eventName":"UpdateService","requestParameters":{"cluster":"acme-services"}}`),
 		},
-		// DynamoDB event
+		// DynamoDB event — acme-orders table (legacy fixture).
 		{
 			EventId:     aws.String("evt-ddb-update-001"),
 			EventName:   aws.String("UpdateTable"),
@@ -491,6 +492,21 @@ func buildCTEvents() []cloudtrailtypes.Event {
 				{ResourceType: aws.String("AWS::DynamoDB::Table"), ResourceName: aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/acme-orders")},
 			},
 			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/alice.johnson","accountId":"123456789012","userName":"alice.johnson"},"eventSource":"dynamodb.amazonaws.com","eventName":"UpdateTable","requestParameters":{"tableName":"acme-orders"}}`),
+		},
+		// DynamoDB event — orders-prod table (universal ct-events pivot graph-root).
+		// The ct-events related checker matches events whose ResourceName contains
+		// the table name "orders-prod". This ensures the pivot resolves ≥ 1.
+		{
+			EventId:     aws.String("evt-ddb-orders-prod-001"),
+			EventName:   aws.String("UpdateContinuousBackups"),
+			EventSource: aws.String("dynamodb.amazonaws.com"),
+			EventTime:   aws.Time(tQ),
+			Username:    aws.String("alice.johnson"),
+			ReadOnly:    aws.String("false"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::DynamoDB::Table"), ResourceName: aws.String(OrdersProdARN)},
+			},
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/alice.johnson","accountId":"123456789012","userName":"alice.johnson"},"eventSource":"dynamodb.amazonaws.com","eventName":"UpdateContinuousBackups","requestParameters":{"tableName":"orders-prod","pointInTimeRecoverySpecification":{"pointInTimeRecoveryEnabled":true}}}`),
 		},
 		// Secrets Manager event
 		{
@@ -598,7 +614,13 @@ func buildCTEvents() []cloudtrailtypes.Event {
 			Resources: []cloudtrailtypes.Resource{
 				{ResourceType: aws.String("AWS::ElastiCache::ReplicationGroup"), ResourceName: aws.String(ProdRedisID)},
 			},
-			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/ci-service-account","accountId":"123456789012","userName":"ci-service-account"},"eventSource":"elasticache.amazonaws.com","eventName":"ModifyReplicationGroup","requestParameters":{"replicationGroupId":"prod-redis-sessions","automaticFailoverEnabled":true}}`),
+			// CloudTrailEvent JSON body derives replicationGroupId from ProdRedisID so
+			// the inner JSON stays in sync with Resources[0].ResourceName if the const
+			// value is ever renamed.
+			CloudTrailEvent: aws.String(fmt.Sprintf(
+				`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/ci-service-account","accountId":"123456789012","userName":"ci-service-account"},"eventSource":"elasticache.amazonaws.com","eventName":"ModifyReplicationGroup","requestParameters":{"replicationGroupId":%q,"automaticFailoverEnabled":true}}`,
+				ProdRedisID,
+			)),
 		},
 	}
 }

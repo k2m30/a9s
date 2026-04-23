@@ -54,7 +54,7 @@ Required tests: the existing `TestRelated_Redis_KMS` and `TestRelated_Redis_VPC`
 
 See updated spec §3.1 and §4. Summary:
 
-- New signal: `any NodeGroup.Status != "available"` on multi-shard RGs → Warning, phrase `shard <ng-id>: <state>`. One distinct §4 phrase per transitioning shard. Rule 7 `(+N-1)` suffix applies across multiple shards.
+- New signal: `any NodeGroup.Status != "available"` on multi-shard RGs → Warning, phrase `shard <ng-id>: <state>`. One distinct §4 phrase per transitioning shard. Rule 7 `(+N-1)` suffix applies across multiple shards — N = total non-available NodeGroup count on this RG; rendered form matches the fetcher's `redisStatusPhrase` output (`<top-phrase> (+X)` where X = `len(issues) - 1`). Example: three transitioning shards → `shard 0001: modifying (+2)`.
 - Single-shard RGs preserve the existing `modifying — config change` / `snapshotting — backup running` phrases.
 - Detail view Attention section includes per-node AZ + role rows for every non-available NodeGroup.
 

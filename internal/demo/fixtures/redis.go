@@ -733,10 +733,14 @@ func buildRedisTagLists() map[string][]elasticachetypes.Tag {
 		},
 	}
 	return map[string][]elasticachetypes.Tag{
-		// RG ARN — kept for reference / future use.
+		// RG ARN — checkRedisCFN (post-spec-rewrite) calls
+		// ListTagsForResource(ResourceName=rg.ARN) per docs/resources/redis.md §2
+		// (cfn pivot discovery reads the AWS-managed tag off the replication group,
+		// not the member cluster). This is the entry the demo actually resolves.
 		ProdRedisARN: cfnTag,
-		// Member cluster ARN — checkRedisCFN calls ListTagsForResource on cluster.ARN
-		// (the CacheCluster ARN), so this entry is what the demo actually resolves.
+		// Member cluster ARN — retained for backward compatibility with any
+		// fake / test that still expects the tag on the CacheCluster ARN. Not
+		// the primary path.
 		ProdRedisMemberClusterARN: cfnTag,
 	}
 }

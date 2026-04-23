@@ -108,7 +108,7 @@ Transcribed from `docs/attention-signals.md`.
   - **How obtained**: list-response field `Status`. For cluster-mode-DISABLED Redis (0-1 node groups), the RG-level phrase is the operator's primary reading — no shard suffix is added on the common path.
 - **Signal**: `any NodeGroup.Status != "available"` AND `len(NodeGroups) > 1` (cluster-mode-enabled, per-shard transition).
   - **State bucket**: Warning.
-  - **How obtained**: list-response field `NodeGroups[].Status` on `DescribeReplicationGroups` (SDK Go v2 `elasticache/types.NodeGroup.Status *string`; enum matches RG `Status` — `available`, `creating`, `modifying`, `deleting`). One distinct §4 phrase per transitioning shard keyed on `NodeGroupId` + its status. Rule 7 `(+N-1)` suffix applies when multiple shards are non-available.
+  - **How obtained**: list-response field `NodeGroups[].Status` on `DescribeReplicationGroups` (SDK Go v2 `elasticache/types.NodeGroup.Status *string`; enum matches RG `Status` — `available`, `creating`, `modifying`, `deleting`). One distinct §4 phrase per transitioning shard keyed on `NodeGroupId` + its status. Rule 7 `(+N-1)` suffix applies when multiple shards are non-available — N = total count of non-available NodeGroups in this RG; the rendered suffix is literally `(+N-1)` (e.g. three transitioning shards → `shard <top-id>: <state> (+2)`).
 - **Signal**: `AutomaticFailover != "enabled"` on a multi-AZ replication group.
   - **State bucket**: Warning.
   - **How obtained**: list-response fields `AutomaticFailover` and `MultiAZ` on `DescribeReplicationGroups` (multi-AZ detected via `MultiAZ == "enabled"` per `elasticache/types.MultiAZStatus`).

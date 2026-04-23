@@ -98,10 +98,12 @@ func TestDetailPaths_AllConfiguredFieldsRendered(t *testing.T) {
 		"backup":       buildResource("daily-backup-plan", "daily-backup-plan", realisticBackup()),
 	}
 
-	// Perf: test 3 representative resource types to keep this test under 20ms.
-	// Chosen: ec2 (most complex, nested fields), s3 (simple bucket), lambda (function).
+	// Perf: test 4 representative resource types to keep this test under 25ms.
+	// Chosen: ec2 (most complex, nested fields), s3 (simple bucket), lambda
+	// (function), redis (ReplicationGroup — pins the post-spec-rewrite RawStruct
+	// shape so a regression back to CacheCluster would surface here).
 	// Full coverage is exercised by individual per-type detail tests in qa_detail_*_test.go.
-	shortNames := []string{"ec2", "s3", "lambda"}
+	shortNames := []string{"ec2", "s3", "lambda", "redis"}
 
 	for _, shortName := range shortNames {
 		t.Run(shortName, func(t *testing.T) {

@@ -49,13 +49,17 @@ func loadedRedisModel(t *testing.T) views.ResourceListModel {
 
 // multiStatusRedisFixtures returns Redis replication groups with different statuses for color tests.
 // Post-phase-7: RawStruct is ReplicationGroup (DescribeReplicationGroups).
+// Fields["status"] carries the §4 phrase (Healthy silence = empty string) per
+// docs/resources/redis.md §4, matching what the fetcher emits in production.
+// RawStruct.Status still holds the raw AWS enum value because that is what the
+// AWS SDK reports and any direct-RawStruct consumer will see.
 func multiStatusRedisFixtures() []resource.Resource {
 	return []resource.Resource{
 		{
 			ID: "redis-available", Name: "redis-available", Status: "available",
 			Fields: map[string]string{
 				"cluster_id": "redis-available",
-				"node_type":  "cache.t2.micro", "status": "available",
+				"node_type":  "cache.t2.micro", "status": "",
 				"nodes": "1", "endpoint": "",
 			},
 			RawStruct: elasticachetypes.ReplicationGroup{
@@ -69,7 +73,7 @@ func multiStatusRedisFixtures() []resource.Resource {
 			ID: "redis-creating", Name: "redis-creating", Status: "creating",
 			Fields: map[string]string{
 				"cluster_id": "redis-creating",
-				"node_type":  "cache.t2.micro", "status": "creating",
+				"node_type":  "cache.t2.micro", "status": "creating — new group",
 				"nodes": "1", "endpoint": "",
 			},
 			RawStruct: elasticachetypes.ReplicationGroup{
@@ -83,7 +87,7 @@ func multiStatusRedisFixtures() []resource.Resource {
 			ID: "redis-deleting", Name: "redis-deleting", Status: "deleting",
 			Fields: map[string]string{
 				"cluster_id": "redis-deleting",
-				"node_type":  "cache.t2.micro", "status": "deleting",
+				"node_type":  "cache.t2.micro", "status": "deleting — teardown",
 				"nodes": "1", "endpoint": "",
 			},
 			RawStruct: elasticachetypes.ReplicationGroup{

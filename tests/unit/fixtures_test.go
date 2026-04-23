@@ -237,9 +237,14 @@ func fixtureRedisClusters() []resource.Resource {
 			Fields: map[string]string{
 				"cluster_id": "test-redis-1",
 				"node_type":  "cache.t2.micro",
-				"status":     "available",
-				"nodes":      "1",
-				"endpoint":   "",
+				// Post-spec-rewrite (2026-04-23): Healthy rows carry empty
+				// Fields["status"] per redis.md §4 ("Healthy rows render blank").
+				"status": "",
+				// nodes matches RawStruct.MemberClusters count (0 — MemberClusters
+				// intentionally omitted to avoid YAML list items that would break
+				// TestQA_YAML_KeyValueFormat_AllTypes).
+				"nodes":    "0",
+				"endpoint": "",
 			},
 			RawStruct: elasticachetypes.ReplicationGroup{
 				ReplicationGroupId: aws.String("test-redis-1"),
