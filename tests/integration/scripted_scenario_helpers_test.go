@@ -521,9 +521,13 @@ func (s *fullIntegrationScenario) ExpectRowStatusBlank(resourceID string) {
 		s.failf("row for %q not found in rendered view", resourceID)
 		return
 	}
+	// Strip the identity cell before scanning — banned tokens like "healthy"
+	// must not fire on resource names that happen to contain them
+	// (e.g. "a9s-demo-healthy" bucket).
+	scan := strings.ReplaceAll(line, resourceID, "")
 	banned := []string{"OK", "ACTIVE", "available", "running", "healthy"}
 	for _, token := range banned {
-		if strings.Contains(line, token) {
+		if strings.Contains(scan, token) {
 			s.failf("row for %q must render blank Status but contains banned token %q: %q", resourceID, token, line)
 		}
 	}

@@ -28,7 +28,12 @@ func databasesDefaultViews() map[string]ViewDef {
 				{Title: "Bucket Name", Path: "Name", Width: 36},
 				{Title: "Region", Path: "BucketRegion", Width: 14},
 				{Title: "Creation Date", Path: "CreationDate", Width: 22},
-				{Title: "Public Access", Path: "Name", Key: "public_access", Width: 14},
+				// Status column: key-only lookup. NO Path fallback — the extractor
+			// would otherwise resolve to RawStruct.Name on every healthy row,
+			// rendering the bucket name in the Status cell. Spec §4 S4: healthy
+			// rows render blank. Fields["status"] is populated by the Wave-2
+			// enricher; absence means blank.
+			{Title: "Status", Key: "status", Width: 32},
 			},
 			Detail: []DetailField{
 				{Path: "Name"}, {Path: "BucketArn"}, {Path: "BucketRegion"}, {Path: "CreationDate"},

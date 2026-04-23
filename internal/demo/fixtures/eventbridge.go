@@ -69,6 +69,17 @@ func NewEventBridgeFixtures() *EventBridgeFixtures {
 			Description:        aws.String("Disabled rule — targets are configured but this rule will not trigger"),
 			RoleArn:            aws.String(prodEBRoleARN),
 		},
+		// S3 healthy-bucket event bridge rule (checkS3EBRule pivot).
+		// checkS3EBRule reads ruleRes.Fields["target_arns"] which is populated in Phase 7.
+		// Adding now so the graph is ready when Phase 7 wires the field.
+		{
+			Name:         aws.String("a9s-demo-s3-events-rule"),
+			Arn:          aws.String("arn:aws:events:us-east-1:123456789012:rule/a9s-demo-s3-events-rule"),
+			State:        eventbridgetypes.RuleStateEnabled,
+			EventBusName: aws.String("default"),
+			EventPattern: aws.String(`{"source":["aws.s3"],"detail-type":["Object Created"],"detail":{"bucket":{"name":["` + HealthyBucketName + `"]}}}`),
+			Description:  aws.String("Routes S3 object-created events from a9s-demo-healthy (" + HealthyBucketARN + ") to Lambda"),
+		},
 	}
 
 	targetsByRule := map[string][]eventbridgetypes.Target{
@@ -91,6 +102,13 @@ func NewEventBridgeFixtures() *EventBridgeFixtures {
 			{
 				Id:  aws.String("SQSDeadLetterQueue"),
 				Arn: aws.String("arn:aws:sqs:us-east-1:123456789012:scheduled-tasks-dlq"),
+			},
+		},
+		// S3 healthy-bucket rule targets.
+		"a9s-demo-s3-events-rule": {
+			{
+				Id:  aws.String("S3NotifierLambda"),
+				Arn: aws.String("arn:aws:lambda:us-east-1:123456789012:function:" + S3NotifierLambdaName),
 			},
 		},
 	}

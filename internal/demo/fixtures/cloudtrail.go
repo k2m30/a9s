@@ -42,6 +42,10 @@ func buildCTTrailStatus() map[string]cloudtrail.GetTrailStatusOutput {
 		"arn:aws:cloudtrail:us-east-1:123456789012:trail/legacy-validation-disabled": {
 			IsLogging: aws.Bool(true),
 		},
+		// S3 healthy-bucket trail status.
+		"arn:aws:cloudtrail:us-east-1:123456789012:trail/a9s-demo-s3-trail": {
+			IsLogging: aws.Bool(true),
+		},
 	}
 }
 
@@ -113,6 +117,70 @@ func buildCTTrails() []cloudtrailtypes.Trail {
 			IsMultiRegionTrail:         aws.Bool(false),
 			IsOrganizationTrail:        aws.Bool(false),
 			LogFileValidationEnabled:   aws.Bool(false),
+			IncludeGlobalServiceEvents: aws.Bool(false),
+			HasCustomEventSelectors:    aws.Bool(false),
+			HasInsightSelectors:        aws.Bool(false),
+		},
+		// S3 healthy-bucket trail (checkS3Trail pivot).
+		// checkS3Trail uses assertStruct[Trail] and checks S3BucketName == bucketName.
+		{
+			Name:                       aws.String("a9s-demo-s3-trail"),
+			TrailARN:                   aws.String("arn:aws:cloudtrail:us-east-1:123456789012:trail/a9s-demo-s3-trail"),
+			S3BucketName:               aws.String(HealthyBucketName),
+			HomeRegion:                 aws.String("us-east-1"),
+			IsMultiRegionTrail:         aws.Bool(false),
+			IsOrganizationTrail:        aws.Bool(false),
+			LogFileValidationEnabled:   aws.Bool(true),
+			IncludeGlobalServiceEvents: aws.Bool(false),
+			HasCustomEventSelectors:    aws.Bool(false),
+			HasInsightSelectors:        aws.Bool(false),
+		},
+		// Audit trails for PAB-issue buckets — give the operator a
+		// "who's watching this?" pivot from the public-access findings.
+		{
+			Name:                       aws.String("a9s-demo-s3-nopab-audit"),
+			TrailARN:                   aws.String("arn:aws:cloudtrail:us-east-1:123456789012:trail/a9s-demo-s3-nopab-audit"),
+			S3BucketName:               aws.String("a9s-demo-nopab"),
+			HomeRegion:                 aws.String("us-east-1"),
+			IsMultiRegionTrail:         aws.Bool(false),
+			IsOrganizationTrail:        aws.Bool(false),
+			LogFileValidationEnabled:   aws.Bool(true),
+			IncludeGlobalServiceEvents: aws.Bool(false),
+			HasCustomEventSelectors:    aws.Bool(false),
+			HasInsightSelectors:        aws.Bool(false),
+		},
+		{
+			Name:                       aws.String("a9s-demo-s3-partial-audit"),
+			TrailARN:                   aws.String("arn:aws:cloudtrail:us-east-1:123456789012:trail/a9s-demo-s3-partial-audit"),
+			S3BucketName:               aws.String("a9s-demo-partial-pab"),
+			HomeRegion:                 aws.String("us-east-1"),
+			IsMultiRegionTrail:         aws.Bool(false),
+			IsOrganizationTrail:        aws.Bool(false),
+			LogFileValidationEnabled:   aws.Bool(true),
+			IncludeGlobalServiceEvents: aws.Bool(false),
+			HasCustomEventSelectors:    aws.Bool(false),
+			HasInsightSelectors:        aws.Bool(false),
+		},
+		{
+			Name:                       aws.String("a9s-demo-s3-multifail-audit"),
+			TrailARN:                   aws.String("arn:aws:cloudtrail:us-east-1:123456789012:trail/a9s-demo-s3-multifail-audit"),
+			S3BucketName:               aws.String("a9s-demo-multifail-pab"),
+			HomeRegion:                 aws.String("us-east-1"),
+			IsMultiRegionTrail:         aws.Bool(false),
+			IsOrganizationTrail:        aws.Bool(false),
+			LogFileValidationEnabled:   aws.Bool(true),
+			IncludeGlobalServiceEvents: aws.Bool(false),
+			HasCustomEventSelectors:    aws.Bool(false),
+			HasInsightSelectors:        aws.Bool(false),
+		},
+		{
+			Name:                       aws.String("a9s-demo-s3-nilcfg-audit"),
+			TrailARN:                   aws.String("arn:aws:cloudtrail:us-east-1:123456789012:trail/a9s-demo-s3-nilcfg-audit"),
+			S3BucketName:               aws.String("a9s-demo-nilcfg"),
+			HomeRegion:                 aws.String("us-east-1"),
+			IsMultiRegionTrail:         aws.Bool(false),
+			IsOrganizationTrail:        aws.Bool(false),
+			LogFileValidationEnabled:   aws.Bool(true),
 			IncludeGlobalServiceEvents: aws.Bool(false),
 			HasCustomEventSelectors:    aws.Bool(false),
 			HasInsightSelectors:        aws.Bool(false),

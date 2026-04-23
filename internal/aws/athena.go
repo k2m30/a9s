@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("athena", []string{"workgroup_name", "state", "description", "engine_version"})
+	resource.RegisterFieldKeys("athena", []string{"workgroup_name", "state", "description", "engine_version", "result_output_location"})
 
 	resource.RegisterPaginated("athena", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -49,7 +49,12 @@ func FetchAthenaWorkgroups(ctx context.Context, api AthenaListWorkGroupsAPI) ([]
 	return all, nil
 }
 
-// FetchAthenaWorkgroupsPage fetches a single page of Athena workgroups.
+// FetchAthenaWorkgroupsPage fetches a single page of Athena workgroups. When
+// api also implements AthenaGetWorkGroupAPI, each workgroup is enriched with
+// result_output_location (and any other per-config fields) so sibling
+// checkers like checkS3Athena can resolve via cache scan. This is the
+// related-panel contract: pivots pointing at athena must actually work.
+// Cost: N+1 per page (bounded by DefaultPageSize; GetWorkGroup is cheap).
 func FetchAthenaWorkgroupsPage(ctx context.Context, api AthenaListWorkGroupsAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &athena.ListWorkGroupsInput{
 		MaxResults: aws.Int32(DefaultPageSize),
@@ -62,6 +67,8 @@ func FetchAthenaWorkgroupsPage(ctx context.Context, api AthenaListWorkGroupsAPI,
 	if err != nil {
 		return resource.FetchResult{}, fmt.Errorf("fetching Athena workgroups: %w", err)
 	}
+
+	getAPI, _ := api.(AthenaGetWorkGroupAPI)
 
 	var resources []resource.Resource
 
@@ -88,16 +95,28 @@ func FetchAthenaWorkgroupsPage(ctx context.Context, api AthenaListWorkGroupsAPI,
 			engineVersion = *wg.EngineVersion.EffectiveEngineVersion
 		}
 
+		outputLocation := ""
+		if getAPI != nil && wgName != "" {
+			if wgOut, wgErr := getAPI.GetWorkGroup(ctx, &athena.GetWorkGroupInput{WorkGroup: aws.String(wgName)}); wgErr == nil &&
+				wgOut != nil && wgOut.WorkGroup != nil &&
+				wgOut.WorkGroup.Configuration != nil &&
+				wgOut.WorkGroup.Configuration.ResultConfiguration != nil &&
+				wgOut.WorkGroup.Configuration.ResultConfiguration.OutputLocation != nil {
+				outputLocation = *wgOut.WorkGroup.Configuration.ResultConfiguration.OutputLocation
+			}
+		}
+
 		r := resource.Resource{
 			ID:     wgName,
 			Name:   wgName,
 			Status: state,
 			Fields: map[string]string{
-				"workgroup_name": wgName,
-				"state":          state,
-				"description":    description,
-				"creation_time":  creationTime,
-				"engine_version": engineVersion,
+				"workgroup_name":         wgName,
+				"state":                  state,
+				"description":            description,
+				"creation_time":          creationTime,
+				"engine_version":         engineVersion,
+				"result_output_location": outputLocation,
 			},
 			RawStruct: wg,
 		}

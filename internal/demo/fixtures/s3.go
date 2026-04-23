@@ -9,6 +9,27 @@ import (
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
+// Exported constants — referenced by sibling fixture files and QA tests.
+const (
+	// HealthyBucketName is the graph-root bucket used in related-panel tests.
+	HealthyBucketName = "a9s-demo-healthy"
+	// HealthyBucketARN is the ARN for the healthy bucket.
+	HealthyBucketARN = "arn:aws:s3:::a9s-demo-healthy"
+	// LogsBucketName is the access-log target bucket for the healthy bucket.
+	LogsBucketName = "a9s-demo-logs"
+	// S3NotifierLambdaName is the Lambda function notified by the healthy bucket.
+	S3NotifierLambdaName = "a9s-demo-s3-notifier"
+	// S3EventsTopicName is the SNS topic for healthy-bucket notifications.
+	S3EventsTopicName = "a9s-demo-s3-events"
+	// S3DLQueueName is the SQS dead-letter queue for the healthy bucket.
+	S3DLQueueName = "a9s-demo-s3-dlq"
+	// S3BucketKMSKeyID is the bare KMS key ID used to encrypt the healthy bucket.
+	// The checker strips everything up to the last "/" from the key ARN.
+	S3BucketKMSKeyID = "a9s-demo-s3-key"
+	// S3CFNStackName is the CloudFormation stack that owns the healthy bucket.
+	S3CFNStackName = "a9s-demo-stack"
+)
+
 // S3Fixtures holds all S3 domain objects served by the fake.
 type S3Fixtures struct {
 	// Buckets is the full list of buckets returned by ListBuckets.
@@ -16,6 +37,19 @@ type S3Fixtures struct {
 	// NotificationConfigs maps bucket names to their notification configuration.
 	// Buckets not in this map return an empty notification config.
 	NotificationConfigs map[string]*s3.GetBucketNotificationConfigurationOutput
+	// PublicAccessBlockConfigs maps bucket names to their PAB configuration output.
+	// A nil value means return NoSuchPublicAccessBlockConfiguration.
+	// A missing key means return an empty (all-nil-flags) PAB output.
+	PublicAccessBlockConfigs map[string]*s3.GetPublicAccessBlockOutput
+	// EncryptionConfigs maps bucket names to their encryption configuration output.
+	// A missing key means return ServerSideEncryptionConfigurationNotFoundError.
+	EncryptionConfigs map[string]*s3.GetBucketEncryptionOutput
+	// LoggingConfigs maps bucket names to their logging configuration output.
+	// A missing key means return an empty (no logging) output.
+	LoggingConfigs map[string]*s3.GetBucketLoggingOutput
+	// TaggingConfigs maps bucket names to their tagging configuration output.
+	// A missing key means return NoSuchTagSet.
+	TaggingConfigs map[string]*s3.GetBucketTaggingOutput
 	// Objects maps bucket name → prefix → slice of S3 objects at that prefix level.
 	Objects map[string]map[string][]s3types.Object
 	// CommonPrefixes maps bucket name → prefix → slice of common prefixes (folders).
@@ -32,12 +66,16 @@ func mustTime(s string) time.Time {
 }
 
 // NewS3Fixtures builds and returns a fully-populated S3Fixtures struct
-// with deterministic demo data matching the legacy demo code paths.
+// with deterministic demo data.
 func NewS3Fixtures() *S3Fixtures {
 	f := &S3Fixtures{
-		NotificationConfigs: buildS3NotificationConfigs(),
-		Objects:             buildS3Objects(),
-		CommonPrefixes:      buildS3CommonPrefixes(),
+		NotificationConfigs:      buildS3NotificationConfigs(),
+		PublicAccessBlockConfigs: buildS3PublicAccessBlockConfigs(),
+		EncryptionConfigs:        buildS3EncryptionConfigs(),
+		LoggingConfigs:           buildS3LoggingConfigs(),
+		TaggingConfigs:           buildS3TaggingConfigs(),
+		Objects:                  buildS3Objects(),
+		CommonPrefixes:           buildS3CommonPrefixes(),
 	}
 	f.Buckets = buildS3Buckets()
 	return f
@@ -59,7 +97,25 @@ var s3NamePool = []string{
 }
 
 func buildS3Buckets() []s3types.Bucket {
-	// Named buckets with objects
+	// Spec-defined fixture buckets (graph root + issue variants).
+	specBuckets := []struct {
+		name, arn, region, created string
+	}{
+		// Healthy: full PAB, KMS encryption, S3 access logging, CFN stack tag, notifications.
+		{HealthyBucketName, HealthyBucketARN, "us-east-1", "2025-01-10T10:00:00+00:00"},
+		// Logs target: plain access-log destination bucket (no issues).
+		{LogsBucketName, "arn:aws:s3:::" + LogsBucketName, "us-east-1", "2025-01-10T10:05:00+00:00"},
+		// Warning: no bucket-level PAB configured (account-level policy may apply).
+		{"a9s-demo-nopab", "arn:aws:s3:::a9s-demo-nopab", "us-east-1", "2025-02-01T12:00:00+00:00"},
+		// Warning: PAB partial — BlockPublicAcls=false, others true.
+		{"a9s-demo-partial-pab", "arn:aws:s3:::a9s-demo-partial-pab", "us-east-1", "2025-03-15T09:00:00+00:00"},
+		// Warning: PAB multi-false — BlockPublicAcls=false AND BlockPublicPolicy=false.
+		{"a9s-demo-multifail-pab", "arn:aws:s3:::a9s-demo-multifail-pab", "us-east-1", "2025-04-20T14:00:00+00:00"},
+		// Informational: GetPublicAccessBlock returns nil config (no error).
+		{"a9s-demo-nilcfg", "arn:aws:s3:::a9s-demo-nilcfg", "us-east-1", "2025-05-05T11:00:00+00:00"},
+	}
+
+	// Named legacy buckets with objects.
 	namedBuckets := []struct {
 		name, arn, region, created string
 	}{
@@ -71,7 +127,7 @@ func buildS3Buckets() []s3types.Bucket {
 		{"backup-db-snapshots", "arn:aws:s3:::backup-db-snapshots", "us-east-1", "2025-09-01T07:55:28+00:00"},
 	}
 
-	// CT-event cross-reference buckets
+	// CT-event cross-reference buckets.
 	ctBuckets := []struct{ name, created string }{
 		{"prod-logs", "2025-02-10T08:00:00+00:00"},
 		{"prod-artifacts", "2025-03-15T10:30:00+00:00"},
@@ -81,6 +137,15 @@ func buildS3Buckets() []s3types.Bucket {
 	}
 
 	var buckets []s3types.Bucket
+
+	for _, b := range specBuckets {
+		buckets = append(buckets, s3types.Bucket{
+			Name:         aws.String(b.name),
+			BucketArn:    aws.String(b.arn),
+			BucketRegion: aws.String(b.region),
+			CreationDate: aws.Time(mustTime(b.created)),
+		})
+	}
 
 	for _, b := range namedBuckets {
 		buckets = append(buckets, s3types.Bucket{
@@ -100,7 +165,7 @@ func buildS3Buckets() []s3types.Bucket {
 		})
 	}
 
-	// Generated buckets to reach 22+ total
+	// Generated buckets to reach 22+ total.
 	for i, name := range s3NamePool {
 		createDate := time.Date(2025, time.Month(1+(i%12)), 1+i, 8+(i%12), (i*7)%60, 0, 0, time.UTC)
 		buckets = append(buckets, s3types.Bucket{
@@ -115,11 +180,164 @@ func buildS3Buckets() []s3types.Bucket {
 }
 
 // ---------------------------------------------------------------------------
+// Public Access Block configs
+// ---------------------------------------------------------------------------
+
+// buildS3PublicAccessBlockConfigs returns per-bucket PAB configuration.
+// Semantics:
+//   - Key present, non-nil value → return that config.
+//   - Key present, nil value     → fake must return NoSuchPublicAccessBlockConfiguration.
+//   - Key absent                 → fake returns empty output (all flags nil/false).
+func buildS3PublicAccessBlockConfigs() map[string]*s3.GetPublicAccessBlockOutput {
+	return map[string]*s3.GetPublicAccessBlockOutput{
+		// Healthy: all four flags enabled.
+		HealthyBucketName: {
+			PublicAccessBlockConfiguration: &s3types.PublicAccessBlockConfiguration{
+				BlockPublicAcls:       aws.Bool(true),
+				IgnorePublicAcls:      aws.Bool(true),
+				BlockPublicPolicy:     aws.Bool(true),
+				RestrictPublicBuckets: aws.Bool(true),
+			},
+		},
+		// no-pab: return nil → fake returns NoSuchPublicAccessBlockConfiguration.
+		"a9s-demo-nopab": nil,
+		// partial-pab: BlockPublicAcls=false, others true → Warning (one flag off).
+		"a9s-demo-partial-pab": {
+			PublicAccessBlockConfiguration: &s3types.PublicAccessBlockConfiguration{
+				BlockPublicAcls:       aws.Bool(false),
+				IgnorePublicAcls:      aws.Bool(true),
+				BlockPublicPolicy:     aws.Bool(true),
+				RestrictPublicBuckets: aws.Bool(true),
+			},
+		},
+		// multi-false-pab: two flags off → Warning (multiple flags disabled).
+		"a9s-demo-multifail-pab": {
+			PublicAccessBlockConfiguration: &s3types.PublicAccessBlockConfiguration{
+				BlockPublicAcls:       aws.Bool(false),
+				IgnorePublicAcls:      aws.Bool(true),
+				BlockPublicPolicy:     aws.Bool(false),
+				RestrictPublicBuckets: aws.Bool(true),
+			},
+		},
+		// nil-cfg: GetPublicAccessBlock returns non-nil output but nil inner config.
+		"a9s-demo-nilcfg": {
+			PublicAccessBlockConfiguration: nil,
+		},
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Encryption configs
+// ---------------------------------------------------------------------------
+
+func buildS3EncryptionConfigs() map[string]*s3.GetBucketEncryptionOutput {
+	keyARN := "arn:aws:kms:us-east-1:123456789012:key/" + S3BucketKMSKeyID
+	kmsRule := s3types.ServerSideEncryptionRule{
+		ApplyServerSideEncryptionByDefault: &s3types.ServerSideEncryptionByDefault{
+			SSEAlgorithm:   s3types.ServerSideEncryptionAwsKms,
+			KMSMasterKeyID: aws.String(keyARN),
+		},
+		BucketKeyEnabled: aws.Bool(true),
+	}
+	kmsOut := &s3.GetBucketEncryptionOutput{
+		ServerSideEncryptionConfiguration: &s3types.ServerSideEncryptionConfiguration{
+			Rules: []s3types.ServerSideEncryptionRule{kmsRule},
+		},
+	}
+	return map[string]*s3.GetBucketEncryptionOutput{
+		// Graph-root healthy bucket uses a dedicated CMK.
+		HealthyBucketName: kmsOut,
+		// PAB-issue buckets share the same KMS key — so an operator
+		// pivoting from an issue bucket sees a non-zero KMS relation
+		// and can drill into the key that encrypts their data.
+		"a9s-demo-nopab":         kmsOut,
+		"a9s-demo-partial-pab":   kmsOut,
+		"a9s-demo-multifail-pab": kmsOut,
+		"a9s-demo-nilcfg":        kmsOut,
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Logging configs
+// ---------------------------------------------------------------------------
+
+func buildS3LoggingConfigs() map[string]*s3.GetBucketLoggingOutput {
+	logToCentral := &s3.GetBucketLoggingOutput{
+		LoggingEnabled: &s3types.LoggingEnabled{
+			TargetBucket: aws.String(LogsBucketName),
+			TargetPrefix: aws.String("s3-access/"),
+		},
+	}
+	return map[string]*s3.GetBucketLoggingOutput{
+		// Healthy and every PAB-issue bucket ship access logs to the
+		// same central log destination — so the `logs` pivot resolves
+		// on issue buckets too (forensic follow-up: "show me access
+		// logs for the bucket that has the public-access problem").
+		HealthyBucketName:        logToCentral,
+		"a9s-demo-nopab":         logToCentral,
+		"a9s-demo-partial-pab":   logToCentral,
+		"a9s-demo-multifail-pab": logToCentral,
+		"a9s-demo-nilcfg":        logToCentral,
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Tagging configs (for CFN stack-name lookup)
+// ---------------------------------------------------------------------------
+
+func buildS3TaggingConfigs() map[string]*s3.GetBucketTaggingOutput {
+	cfnTagged := &s3.GetBucketTaggingOutput{
+		TagSet: []s3types.Tag{
+			{
+				Key:   aws.String("aws:cloudformation:stack-name"),
+				Value: aws.String(S3CFNStackName),
+			},
+			{
+				Key:   aws.String("Environment"),
+				Value: aws.String("production"),
+			},
+		},
+	}
+	return map[string]*s3.GetBucketTaggingOutput{
+		// All spec buckets (healthy + PAB-issue) are CloudFormation-managed
+		// by the same stack so the CFN pivot resolves on issue buckets too.
+		// An operator chasing a public-access finding wants to reach the
+		// stack template to see the policy as declared.
+		HealthyBucketName:        cfnTagged,
+		"a9s-demo-nopab":         cfnTagged,
+		"a9s-demo-partial-pab":   cfnTagged,
+		"a9s-demo-multifail-pab": cfnTagged,
+		"a9s-demo-nilcfg":        cfnTagged,
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Notification configs (for GetBucketNotificationConfiguration)
 // ---------------------------------------------------------------------------
 
 func buildS3NotificationConfigs() map[string]*s3.GetBucketNotificationConfigurationOutput {
 	return map[string]*s3.GetBucketNotificationConfigurationOutput{
+		// Healthy bucket: notifies Lambda, SQS (dead-letter queue), and SNS topic.
+		HealthyBucketName: {
+			LambdaFunctionConfigurations: []s3types.LambdaFunctionConfiguration{
+				{
+					LambdaFunctionArn: aws.String("arn:aws:lambda:us-east-1:123456789012:function:" + S3NotifierLambdaName),
+					Events:            []s3types.Event{s3types.EventS3ObjectCreated},
+				},
+			},
+			QueueConfigurations: []s3types.QueueConfiguration{
+				{
+					QueueArn: aws.String("arn:aws:sqs:us-east-1:123456789012:" + S3DLQueueName),
+					Events:   []s3types.Event{s3types.EventS3ObjectRemoved},
+				},
+			},
+			TopicConfigurations: []s3types.TopicConfiguration{
+				{
+					TopicArn: aws.String("arn:aws:sns:us-east-1:123456789012:" + S3EventsTopicName),
+					Events:   []s3types.Event{s3types.EventS3ReducedRedundancyLostObject},
+				},
+			},
+		},
 		"data-pipeline-logs": {
 			LambdaFunctionConfigurations: []s3types.LambdaFunctionConfiguration{
 				{LambdaFunctionArn: aws.String("arn:aws:lambda:us-east-1:123456789012:function:process-orders")},

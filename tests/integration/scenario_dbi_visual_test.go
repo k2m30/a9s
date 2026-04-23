@@ -113,12 +113,21 @@ func TestScenario_DBIVisual(t *testing.T) {
 		scenario.ExpectRelatedRowCountAtLeast(displayName, 1)
 	}
 
-	// Aurora member → RDS Clusters ≥ 1.
+	// Aurora member → every §2 `count shown: yes` pivot ≥ 1.
+	// prod-dbi-aurora-1 is the "all pivots non-zero" graph-root — it covers
+	// every registered dbi pivot on a single fixture. ct-events is exempt
+	// per §5 (count shown: unknown for windowed LookupEvents).
 	scenario.Back()
 	aurora := selectDBIByID(t, scenario, demofixtures.ProdDbiAuroraID)
 	scenario.OpenDetailResource("dbi", aurora)
 	scenario.ExpectNoAPIError()
-	scenario.ExpectRelatedRowCountAtLeast("RDS Clusters", 1)
+	for _, displayName := range []string{
+		"Security Groups", "KMS Key", "Subnets", "CloudWatch Alarms",
+		"RDS Snapshots", "Log Groups", "VPC", "Secrets Manager",
+		"IAM Roles", "Network Interfaces", "RDS Clusters",
+	} {
+		scenario.ExpectRelatedRowCountAtLeast(displayName, 1)
+	}
 
 	// -----------------------------------------------------------------
 	// Rule 7 U7c — S5 shows every finding even on a row whose S4 is Wave 1.

@@ -355,6 +355,30 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 		LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
 	})
 
+	// S3 notifier: invoked by healthy-bucket S3 event notification (checkS3Lambda pivot).
+	fns = append(fns, lambdatypes.FunctionConfiguration{
+		FunctionName:     aws.String(S3NotifierLambdaName),
+		FunctionArn:      aws.String("arn:aws:lambda:us-east-1:123456789012:function:" + S3NotifierLambdaName),
+		Role:             aws.String(lambdaProdRoleARN),
+		Runtime:          lambdatypes.RuntimePython312,
+		MemorySize:       aws.Int32(128),
+		Timeout:          aws.Int32(30),
+		Handler:          aws.String("notifier.handler"),
+		Description:      aws.String("Handles S3 event notifications from a9s-demo-healthy bucket"),
+		LastModified:     aws.String("2026-01-20T10:00:00+00:00"),
+		CodeSize:         524288,
+		State:            lambdatypes.StateActive,
+		PackageType:      lambdatypes.PackageTypeZip,
+		Architectures:    []lambdatypes.Architecture{lambdatypes.ArchitectureX8664},
+		EphemeralStorage: &lambdatypes.EphemeralStorage{Size: aws.Int32(512)},
+		TracingConfig:    &lambdatypes.TracingConfigResponse{Mode: lambdatypes.TracingModePassThrough},
+		LoggingConfig: &lambdatypes.LoggingConfig{
+			LogGroup:  aws.String("/aws/lambda/" + S3NotifierLambdaName),
+			LogFormat: lambdatypes.LogFormatText,
+		},
+		LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
+	})
+
 	// Generate 18 more functions to reach 26 total (including the image function above).
 	for i := range 18 {
 		name := lambdaNamePool[i]

@@ -20,12 +20,13 @@ import (
 type rightColumnRow struct {
 	targetType  string
 	displayName string
-	count       int               // -1 = loading, 0+ = resolved
-	resourceIDs []string          // IDs from checker result (for navigation in US3)
-	fetchFilter map[string]string // server-side filter for filtered paginated fetcher
+	count       int                      // -1 = loading, 0+ = resolved
+	resourceIDs []string                 // IDs from checker result (for navigation in US3)
+	fetchFilter map[string]string        // server-side filter for filtered paginated fetcher
 	loading     bool
 	err         error
-	approximate bool // true when count was derived from a truncated cache; UI renders "N+"
+	approximate bool                     // true when count was derived from a truncated cache; UI renders "N+"
+	checker     resource.RelatedChecker  // originating RelatedDef.Checker — carried forward for re-apply on load-more
 }
 
 type rightColumnModel struct {
@@ -53,6 +54,7 @@ func newRightColumn(defs []resource.RelatedDef, parentRes resource.Resource, sou
 			displayName: def.DisplayName,
 			count:       -1,
 			loading:     true,
+			checker:     def.Checker,
 		}
 	}
 	return rightColumnModel{
@@ -189,6 +191,7 @@ func (m rightColumnModel) updateKeyMsg(msg tea.KeyMsg) (rightColumnModel, tea.Cm
 					SourceResource: m.parentRes,
 					RelatedIDs:     row.resourceIDs,
 					FetchFilter:    row.fetchFilter,
+					Checker:        row.checker,
 				}
 			}
 		}
@@ -242,9 +245,14 @@ func (m rightColumnModel) View() string {
 				rowText = "  " + row.displayName
 				rowStyle = styles.DimText
 			case row.count == 0 && row.approximate:
+				// Reverse-scan over a truncated cache hit zero matches so far.
+				// Render "(0+)" to signal "lower bound — more pages may reveal
+				// matches." Row stays navigable; target list carries the
+				// checker and re-runs it on m-loads-more.
 				rowText = "  " + row.displayName + " (0+)"
 				rowStyle = styles.RowNormal
 			case row.count == 0:
+				// Confirmed zero — cache fully scanned, no matches. Dim.
 				rowText = "  " + row.displayName + " (0)"
 				rowStyle = styles.DimText
 			case row.approximate:
@@ -312,8 +320,8 @@ func isActionableRow(row rightColumnRow) bool {
 		return false
 	}
 	if len(row.fetchFilter) > 0 {
-		// Any row with a server-side filter is navigable — the fetch determines
-		// the real count.
+		// Server-side filter carries the pivot intent; the fetch resolves
+		// the real count. Navigable regardless of local count.
 		return true
 	}
 	if row.count == -1 {
@@ -321,8 +329,11 @@ func isActionableRow(row rightColumnRow) bool {
 		return false
 	}
 	if row.approximate {
-		// 0+ or N+ — reverse-scan lower bound. Navigable to the target-type
-		// list; the target list view can filter client-side.
+		// 0+ or N+ — reverse-scan cache was truncated. Navigable: the target
+		// list carries the checker forward and re-runs it on each fetched
+		// page (m-loads-more), so new matches appear as pages arrive. Zero
+		// initial matches is honest: "we haven't seen any yet, scroll m for
+		// more." See docs/resources/<short>.md §2 per-pivot discovery.
 		return true
 	}
 	return row.count > 0

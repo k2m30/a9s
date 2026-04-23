@@ -4,12 +4,14 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/athena"
 	athenatypes "github.com/aws/aws-sdk-go-v2/service/athena/types"
 )
 
 // AthenaFixtures holds typed fixture data for Athena.
 type AthenaFixtures struct {
-	WorkGroups []athenatypes.WorkGroupSummary
+	WorkGroups       []athenatypes.WorkGroupSummary
+	WorkGroupDetails map[string]*athena.GetWorkGroupOutput
 }
 
 func mustParseAthenaTime(s string) time.Time {
@@ -49,6 +51,33 @@ func NewAthenaFixtures() *AthenaFixtures {
 				EngineVersion: &athenatypes.EngineVersion{
 					EffectiveEngineVersion: aws.String("Athena engine version 3"),
 					SelectedEngineVersion:  aws.String("AUTO"),
+				},
+			},
+			// S3 healthy-bucket Athena workgroup (checkS3Athena pivot).
+			// Full config (ResultConfiguration.OutputLocation) lives in
+			// WorkGroupDetails below so the fetcher can populate
+			// Fields["result_output_location"] via GetWorkGroup.
+			{
+				Name:         aws.String("a9s-demo-s3-queries"),
+				State:        athenatypes.WorkGroupStateEnabled,
+				Description:  aws.String("Athena workgroup writing query results to s3://" + HealthyBucketName + "/athena-results/"),
+				CreationTime: aws.Time(mustParseAthenaTime("2025-02-01T08:00:00+00:00")),
+				EngineVersion: &athenatypes.EngineVersion{
+					EffectiveEngineVersion: aws.String("Athena engine version 3"),
+					SelectedEngineVersion:  aws.String("Athena engine version 3"),
+				},
+			},
+		},
+		WorkGroupDetails: map[string]*athena.GetWorkGroupOutput{
+			"a9s-demo-s3-queries": {
+				WorkGroup: &athenatypes.WorkGroup{
+					Name:  aws.String("a9s-demo-s3-queries"),
+					State: athenatypes.WorkGroupStateEnabled,
+					Configuration: &athenatypes.WorkGroupConfiguration{
+						ResultConfiguration: &athenatypes.ResultConfiguration{
+							OutputLocation: aws.String("s3://" + HealthyBucketName + "/athena-results/"),
+						},
+					},
 				},
 			},
 		},

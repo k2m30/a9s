@@ -97,7 +97,10 @@ func TestScenario_DBCVisual(t *testing.T) {
 
 	// -----------------------------------------------------------------
 	// Related panel — every §2 `count shown: yes` pivot returns ≥ 1 for the
-	// graph-root fixture (`acme-docdb-prod`).
+	// graph-root fixture (`acme-docdb-prod`). The "RDS Instances" pivot is
+	// registered universally for dbc but only meaningful for Aurora clusters
+	// (DocumentDB clusters never have RDS instance members per AWS), so it's
+	// asserted separately below on the Aurora fixture.
 	// -----------------------------------------------------------------
 	prod := selectDBCByID(t, scenario, demofixtures.ProdDbcID)
 	scenario.OpenDetailResource("dbc", prod)
@@ -105,6 +108,24 @@ func TestScenario_DBCVisual(t *testing.T) {
 	for _, displayName := range []string{
 		"Security Groups", "CloudWatch Alarms", "Log Groups", "KMS Key",
 		"Secrets Manager", "DocumentDB Snapshots", "Subnets", "VPC",
+	} {
+		scenario.ExpectRelatedRowCountAtLeast(displayName, 1)
+	}
+
+	// -----------------------------------------------------------------
+	// Aurora cluster — "all pivots non-zero" graph-root for dbc. Every
+	// registered §2 pivot resolves on a single fixture here, including
+	// "RDS Instances" (which DocDB graph-roots can't cover because
+	// DocumentDB clusters don't have RDS instance members).
+	// -----------------------------------------------------------------
+	scenario.Back()
+	aurora := selectDBCByID(t, scenario, "prod-aurora-cluster")
+	scenario.OpenDetailResource("dbc", aurora)
+	scenario.ExpectNoAPIError()
+	for _, displayName := range []string{
+		"Security Groups", "CloudWatch Alarms", "Log Groups", "KMS Key",
+		"Secrets Manager", "RDS Instances", "DocumentDB Snapshots",
+		"Subnets", "VPC",
 	} {
 		scenario.ExpectRelatedRowCountAtLeast(displayName, 1)
 	}

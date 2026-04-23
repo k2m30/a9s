@@ -96,13 +96,22 @@ func TestSetShowIssueBadge_False_HidesBadge(t *testing.T) {
 }
 
 func TestSetShowIssueBadge_True_ShowsBadge(t *testing.T) {
+	// Spec §4: S1 (issues:N badge) is MENU-only; it does NOT appear in the
+	// list title. showIssueBadge=true still opts the model into menu-level
+	// issue signaling (issueCount is tracked), but the title stays count-only.
 	resources := gapResources("running", "running", "stopped", "failed")
 	td := resource.ResourceTypeDef{ShortName: "ec2", Name: "EC2 Instances"}
 	m := views.NewResourceListFromCache(td, nil, keys.Default(), resources, nil, "", views.SortColNone, true, 0, 0, false)
 	m.SetShowIssueBadge(true)
 	title := m.FrameTitle()
-	if !strings.Contains(title, "issues") {
-		t.Errorf("FrameTitle() = %q, want 'issues' when showIssueBadge=true", title)
+	if title != "ec2(4)" {
+		t.Errorf("FrameTitle() = %q, want %q (title carries resource count only)", title, "ec2(4)")
+	}
+	if strings.Contains(title, "issue") {
+		t.Errorf("FrameTitle() = %q; spec §4 S1 is menu-only, no 'issue' in title", title)
+	}
+	if m.IssueCount() != 2 {
+		t.Errorf("IssueCount() = %d, want 2 (stopped+failed)", m.IssueCount())
 	}
 }
 

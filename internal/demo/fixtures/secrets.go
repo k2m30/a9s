@@ -50,6 +50,35 @@ func NewSecretsFixtures() *SecretsFixtures {
 			RotationRules:    &smtypes.RotationRulesType{AutomaticallyAfterDays: aws.Int64(7)},
 			Tags:             []smtypes.Tag{{Key: aws.String("aws:rds:primaryDBInstanceArn"), Value: aws.String(ProdDbiARN)}},
 		},
+		// RDS-managed secret for prod-dbi-aurora-1 — required so the Aurora
+		// dbi "all pivots non-zero" graph-root resolves the dbi→secrets pivot.
+		{
+			Name:             aws.String("rds!db-prod-dbi-aurora-1-GHIJKL"),
+			ARN:              aws.String(ProdDbiAuroraMasterSecretARN),
+			Description:      aws.String("RDS-managed master user password for prod-dbi-aurora-1"),
+			LastAccessedDate: aws.Time(time.Date(2026, 4, 20, 0, 0, 0, 0, time.UTC)),
+			LastChangedDate:  aws.Time(time.Date(2026, 4, 15, 12, 0, 0, 0, time.UTC)),
+			RotationEnabled:  aws.Bool(true),
+			CreatedDate:      aws.Time(time.Date(2025, 6, 1, 9, 0, 0, 0, time.UTC)),
+			KmsKeyId:         aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
+			RotationRules:    &smtypes.RotationRulesType{AutomaticallyAfterDays: aws.Int64(7)},
+			Tags:             []smtypes.Tag{{Key: aws.String("aws:rds:primaryDBInstanceArn"), Value: aws.String(ProdDbiAuroraARN)}},
+		},
+		// Cluster-level RDS-managed secret for prod-aurora-cluster —
+		// required so the Aurora dbc "all pivots non-zero" graph-root
+		// resolves the dbc→secrets pivot via checkDbcSecrets.
+		{
+			Name:             aws.String("rds!cluster-prod-aurora-cluster-MNOPQR"),
+			ARN:              aws.String(ProdDbcAuroraMasterSecretARN),
+			Description:      aws.String("RDS-managed master user password for prod-aurora-cluster"),
+			LastAccessedDate: aws.Time(time.Date(2026, 4, 20, 0, 0, 0, 0, time.UTC)),
+			LastChangedDate:  aws.Time(time.Date(2026, 4, 15, 12, 0, 0, 0, time.UTC)),
+			RotationEnabled:  aws.Bool(true),
+			CreatedDate:      aws.Time(time.Date(2025, 3, 1, 9, 0, 0, 0, time.UTC)),
+			KmsKeyId:         aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
+			RotationRules:    &smtypes.RotationRulesType{AutomaticallyAfterDays: aws.Int64(7)},
+			Tags:             []smtypes.Tag{{Key: aws.String("aws:rds:primaryDBClusterArn"), Value: aws.String("arn:aws:rds:us-east-1:123456789012:cluster:prod-aurora-cluster")}},
+		},
 		{
 			Name:              aws.String("prod/docdb/acme-docdb-prod"),
 			ARN:               aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/docdb/acme-docdb-prod-XyZaBc"),

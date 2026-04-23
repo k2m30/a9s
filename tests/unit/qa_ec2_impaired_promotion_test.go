@@ -27,6 +27,8 @@ import (
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -423,13 +425,16 @@ func TestMenuBadge_EC2_CountsImpairedRows(t *testing.T) {
 		Resources:    mixedResources,
 	})
 
-	// The frame title must show "issues:3" because impaired + initializing + stopped
-	// all have ec2.Color(r).IsIssue() == true.
-	// Pre-fix: badge shows "issues:1" because fetcher leaves impaired/initializing as "running"
-	// and the old global string-set didn't catch them.
+	// Spec §4: S1 "issues:N" is the MENU badge, not the list title. The
+	// invariant under test is that impaired + initializing + stopped all
+	// count as issues via ec2.Color(r).IsIssue() == true. Pop back to the
+	// main menu and verify the badge reads "issues:3".
+	// Pre-fix: badge was 1 because the fetcher left impaired/initializing as
+	// "running" and the old global string-set didn't catch them.
+	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	plain := stripANSI(rootViewContent(m))
-	if !strings.Contains(plain, "3 issues") {
-		t.Errorf("expected frame title to contain %q (impaired+initializing+stopped all count), got excerpt: %s",
-			"3 issues", plain[:min(400, len(plain))])
+	if !strings.Contains(plain, "issues:3") {
+		t.Errorf("expected menu badge 'issues:3' after popping to menu (impaired+initializing+stopped), got excerpt:\n%s",
+			plain[:min(600, len(plain))])
 	}
 }

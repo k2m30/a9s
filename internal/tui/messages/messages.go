@@ -173,6 +173,11 @@ type RelatedNavigateMsg struct {
 	TargetID       string            // specific ID for navigable field case (e.g., "vpc-0abc")
 	RelatedIDs     []string          // IDs from checker for right-column case
 	FetchFilter    map[string]string
+	// Checker is the originating RelatedDef.Checker. Carried forward so
+	// each subsequent page of the target type (m-loads-more) can re-run
+	// the predicate and extend the visible ID set — essential for
+	// approximate pivots whose initial count is a lower bound.
+	Checker resource.RelatedChecker
 }
 
 // AvailabilityCacheLoadedMsg delivers cached availability data loaded from disk.

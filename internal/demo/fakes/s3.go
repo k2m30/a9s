@@ -6,6 +6,8 @@ import (
 	"context"
 	"fmt"
 
+	smithy "github.com/aws/smithy-go"
+
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
@@ -90,12 +92,86 @@ func (f *S3Fake) GetBucketLocation(_ context.Context, input *s3.GetBucketLocatio
 	return &s3.GetBucketLocationOutput{}, nil
 }
 
-// GetPublicAccessBlock is a stub for the Wave 2 enrichment interface.
-// Returns an empty configuration (all four PAB flags nil/false) so demo buckets
-// appear as partially configured.
+// GetPublicAccessBlock dispatches per-bucket PAB configuration.
+// Semantics driven by PublicAccessBlockConfigs map in fixtures:
+//   - Key present, non-nil value → return that output (may have nil inner config).
+//   - Key present, nil value     → return NoSuchPublicAccessBlockConfiguration Smithy error.
+//   - Key absent                 → return all-flags-true output (healthy default).
+//
+// The healthy default for absent keys ensures non-spec buckets (CloudTrail-event
+// fixtures, name-pool fillers) don't noise up the S1 issues badge. Only the 4
+// spec-driven finding fixtures register explicit configs in the map.
 func (f *S3Fake) GetPublicAccessBlock(_ context.Context, input *s3.GetPublicAccessBlockInput, _ ...func(*s3.Options)) (*s3.GetPublicAccessBlockOutput, error) {
 	if input.Bucket == nil {
 		return nil, fmt.Errorf("GetPublicAccessBlock: bucket name is required")
 	}
-	return &s3.GetPublicAccessBlockOutput{}, nil
+	bucket := *input.Bucket
+	cfg, ok := f.fix.PublicAccessBlockConfigs[bucket]
+	if !ok {
+		t := true
+		return &s3.GetPublicAccessBlockOutput{
+			PublicAccessBlockConfiguration: &s3types.PublicAccessBlockConfiguration{
+				BlockPublicAcls:       &t,
+				IgnorePublicAcls:      &t,
+				BlockPublicPolicy:     &t,
+				RestrictPublicBuckets: &t,
+			},
+		}, nil
+	}
+	if cfg == nil {
+		// Explicit nil → simulate bucket with no PAB config set.
+		return nil, &smithy.GenericAPIError{
+			Code:    "NoSuchPublicAccessBlockConfiguration",
+			Message: "The public access block configuration was not found",
+		}
+	}
+	return cfg, nil
+}
+
+// GetBucketEncryption returns the server-side encryption configuration for a bucket.
+// If the bucket has no entry in EncryptionConfigs, returns ServerSideEncryptionConfigurationNotFoundError.
+func (f *S3Fake) GetBucketEncryption(_ context.Context, input *s3.GetBucketEncryptionInput, _ ...func(*s3.Options)) (*s3.GetBucketEncryptionOutput, error) {
+	if input.Bucket == nil {
+		return nil, fmt.Errorf("GetBucketEncryption: bucket name is required")
+	}
+	bucket := *input.Bucket
+	cfg, ok := f.fix.EncryptionConfigs[bucket]
+	if !ok {
+		return nil, &smithy.GenericAPIError{
+			Code:    "ServerSideEncryptionConfigurationNotFoundError",
+			Message: "The server side encryption configuration was not found",
+		}
+	}
+	return cfg, nil
+}
+
+// GetBucketTagging returns the tag set for a bucket.
+// If the bucket has no entry in TaggingConfigs, returns NoSuchTagSet.
+func (f *S3Fake) GetBucketTagging(_ context.Context, input *s3.GetBucketTaggingInput, _ ...func(*s3.Options)) (*s3.GetBucketTaggingOutput, error) {
+	if input.Bucket == nil {
+		return nil, fmt.Errorf("GetBucketTagging: bucket name is required")
+	}
+	bucket := *input.Bucket
+	cfg, ok := f.fix.TaggingConfigs[bucket]
+	if !ok {
+		return nil, &smithy.GenericAPIError{
+			Code:    "NoSuchTagSet",
+			Message: "The TagSet does not exist",
+		}
+	}
+	return cfg, nil
+}
+
+// GetBucketLogging returns the logging configuration for a bucket.
+// If the bucket has no entry in LoggingConfigs, returns an empty output (no logging configured).
+func (f *S3Fake) GetBucketLogging(_ context.Context, input *s3.GetBucketLoggingInput, _ ...func(*s3.Options)) (*s3.GetBucketLoggingOutput, error) {
+	if input.Bucket == nil {
+		return nil, fmt.Errorf("GetBucketLogging: bucket name is required")
+	}
+	bucket := *input.Bucket
+	cfg, ok := f.fix.LoggingConfigs[bucket]
+	if !ok {
+		return &s3.GetBucketLoggingOutput{}, nil
+	}
+	return cfg, nil
 }

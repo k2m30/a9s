@@ -57,6 +57,19 @@ func NewR53Fixtures() *R53Fixtures {
 					PrivateZone: false,
 				},
 			},
+			// S3 healthy-bucket alias zone (checkS3R53 pivot).
+			// alias_targets field is populated by the r53 fetcher in Phase 7.
+			// The record's AliasTarget.DNSName contains the S3 website endpoint.
+			{
+				Id:                     aws.String("/hostedzone/Z4567890123ABCDEFGHIJ"),
+				Name:                   aws.String("demo.acme-corp.com."),
+				CallerReference:        aws.String("2025-10-01T00:00:00Z"),
+				ResourceRecordSetCount: aws.Int64(3),
+				Config: &r53types.HostedZoneConfig{
+					Comment:     aws.String("Demo zone with S3-website alias for a9s-demo-healthy"),
+					PrivateZone: false,
+				},
+			},
 		},
 		RecordSets: map[string][]r53types.ResourceRecordSet{
 			"/hostedzone/Z0123456789ABCDEFGHIJ": {
@@ -168,6 +181,29 @@ func NewR53Fixtures() *R53Fixtures {
 					TTL:  aws.Int64(900),
 					ResourceRecords: []r53types.ResourceRecord{
 						{Value: aws.String("ns-999.awsdns-99.com. awsdns-hostmaster.amazon.com. 1 7200 900 1209600 86400")},
+					},
+				},
+			},
+			// S3 healthy-bucket record set.
+			// AliasTarget.DNSName contains the S3 website endpoint — used by checkS3R53
+			// once Phase 7 populates alias_targets in the r53 fetcher.
+			"/hostedzone/Z4567890123ABCDEFGHIJ": {
+				{
+					Name: aws.String("demo.acme-corp.com."),
+					Type: r53types.RRTypeA,
+					AliasTarget: &r53types.AliasTarget{
+						DNSName:              aws.String("s3-website-us-east-1.amazonaws.com."),
+						HostedZoneId:         aws.String("Z3AQBSTGFYJSTF"),
+						EvaluateTargetHealth: false,
+					},
+				},
+				{
+					Name: aws.String(HealthyBucketName + ".demo.acme-corp.com."),
+					Type: r53types.RRTypeA,
+					AliasTarget: &r53types.AliasTarget{
+						DNSName:              aws.String(HealthyBucketName + ".s3-website-us-east-1.amazonaws.com."),
+						HostedZoneId:         aws.String("Z3AQBSTGFYJSTF"),
+						EvaluateTargetHealth: false,
 					},
 				},
 			},

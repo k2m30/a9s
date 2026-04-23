@@ -12,6 +12,11 @@ type BackupFixtures struct {
 	Plans []backuptypes.BackupPlansListMember
 	// RecoveryPoints maps resource ARN → []RecoveryPointByResource.
 	RecoveryPoints map[string][]backuptypes.RecoveryPointByResource
+	// Selections maps plan ID → list of full BackupSelection objects (each
+	// already carries SelectionId + IamRoleArn + Resources). The fetcher
+	// reads these to populate Fields["resources"] so sibling pivots (s3,
+	// ddb, efs, …) can match via cache scan.
+	Selections map[string][]backuptypes.BackupSelection
 }
 
 func mustParseBackupTime(s string) time.Time {
@@ -25,6 +30,17 @@ func mustParseBackupTime(s string) time.Time {
 func buildBackupRecoveryPoints() map[string][]backuptypes.RecoveryPointByResource {
 	efsARN := "arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-0abc111111111111a"
 	return map[string][]backuptypes.RecoveryPointByResource{
+		// S3 healthy-bucket recovery point (checkS3Backup pivot).
+		// checkS3Backup reads bk.Fields["resource_arn"] which is populated in Phase 7.
+		// Adding the recovery point now so the graph is ready when Phase 7 wires the field.
+		HealthyBucketARN: {
+			{
+				RecoveryPointArn: aws.String("arn:aws:backup:us-east-1:123456789012:recovery-point:rp-s3-daily-20260416"),
+				BackupVaultName:  aws.String("Default"),
+				Status:           backuptypes.RecoveryPointStatusCompleted,
+				CreationDate:     aws.Time(mustParseBackupTime("2026-04-16T03:00:00+00:00")),
+			},
+		},
 		efsARN: {
 			{
 				RecoveryPointArn: aws.String("arn:aws:backup:us-east-1:123456789012:recovery-point:rp-efs-daily-20260416"),
@@ -44,8 +60,24 @@ func buildBackupRecoveryPoints() map[string][]backuptypes.RecoveryPointByResourc
 
 // NewBackupFixtures constructs BackupFixtures from the canonical demo data.
 func NewBackupFixtures() *BackupFixtures {
+	dailyPlanID := "1a2b3c4d-5e6f-7890-abcd-111111111111"
 	return &BackupFixtures{
 		RecoveryPoints: buildBackupRecoveryPoints(),
+		Selections: map[string][]backuptypes.BackupSelection{
+			// The daily plan selects the healthy bucket (and the acme-shared
+			// EFS filesystem) so the s3→backup and efs→backup pivots resolve
+			// via cache scan of Fields["resources"].
+			dailyPlanID: {
+				{
+					SelectionName: aws.String("acme-daily-s3-efs-selection"),
+					IamRoleArn:    aws.String("arn:aws:iam::123456789012:role/service-role/AWSBackupDefaultServiceRole"),
+					Resources: []string{
+						HealthyBucketARN,
+						"arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-0abc111111111111a",
+					},
+				},
+			},
+		},
 		Plans: []backuptypes.BackupPlansListMember{
 			{
 				BackupPlanName:    aws.String("acme-daily-backup"),

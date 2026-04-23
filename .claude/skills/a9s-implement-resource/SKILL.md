@@ -64,7 +64,7 @@ You may skim other files (message definitions, registry shape) to ground type si
 
 ## Phases
 
-Run in order. Phases 0–5 are analysis and planning done by the skill runner. Phases 6a/6b/7 dispatch agents. Phase 7.5 is the scope-diff gate. Phase 8 is the scenario-harness visual render gate.
+Run in order. Phases 0–5 are analysis and planning done by the skill runner. Phases 6a/6b/7 dispatch agents. Phase 7.5 is the scope-diff gate. Phase 8 is the scenario-harness visual render gate. Phase 9 is the final four-point report checklist — implementation is not "done" until 9 emits PASS on every item.
 
 ### Phase 0 — Intake
 
@@ -97,7 +97,9 @@ These rules are invariant across all resource types. They are enforced by phase 
 2. **Warning / Broken / Dim rows render the exact §4 "List text" phrase** from the resource's spec. No bare state keyword unless §4 explicitly approves it.
 3. **`!` / `~` glyph prefix appears only on Healthy (green) rows with a Wave 2 finding.** Non-green rows render no glyph regardless of any finding — the color is the signal. This is the LIST view (S3) rule only. In the DETAIL view's Attention section (S5), every entry is prefixed with `!` or `~` regardless of row color — there glyph is the per-entry severity marker, not a row-level flag.
 4. **Menu `issues:N` badge counts INSTANCES, not findings.** N = count of distinct resources that have at least one `!` severity finding attached. An instance with 3 `!` findings contributes 1. An instance with only `~` findings contributes 0. Therefore `N ≤ total instances in the list`. `~` never bumps the badge.
-5. **Related panel counts are non-zero for every §2 pivot with `count shown: yes`** when the fixture's AWS field references a target that exists. Pivots where §2 says `count shown: unknown` (e.g. windowed `ct-events`) are exempt.
+5. **Related panel counts are non-zero for every §2 pivot with `count shown: yes`** on the graph-root fixture. No exceptions, no "deferred pending sibling enrichment", no "follow-up ticket" excuses. A registered pivot that always returns `0` is a bug, not a deferred feature. If surfacing the pivot requires N+1 calls in the sibling fetcher (GetWorkGroup per workgroup, ListTargetsByRule per rule, ListResourceRecordSets per zone, etc.), do it — that cost is the cost of a working pivot, and it's the only version of the contract that renders a real operator graph. Pivots where §2 explicitly says `count shown: unknown` (e.g. windowed `ct-events`) are the only exemption, and even those must be documented in §2 with the reason.
+
+   **"Implement resource" means implement the whole contract.** No deferrals, no stubs that return 0, no "Phase 7 will wire this" comments. If a pivot can't be wired end-to-end (fetcher populates the field, fixture tags an entry at the graph-root bucket, checker resolves non-zero), the skill is not done. User guidance 2026-04-23: "related resources MUST work. if they don't it's a bug. simple."
 6. **Detail view (S5) renders findings through the unified `Attention (N)` section** — one section, at the top of the detail view, with a count in the header. There are NO per-type section names (`Pending Maintenance`, `Latest Build`, `Target Health`, etc. — those existed before 2026-04-22 and were collapsed into the single Attention section). Every Wave-1 phrase from `Resource.Issues` and the Wave-2 `EnrichmentFinding` render as entries inside it. The renderer (`injectAttentionSection` in `internal/tui/views/detail_fields.go`) handles this universally — no per-resource code required. Entry presentation: each primary entry is `<glyph> <phrase>` with the first letter capitalized for readability (data stays canonical lowercase; the capitalization is purely visual via `capitalizeFirst`). Rows render indented beneath the primary entry as `Label: Value` pairs.
 7. **Multiple findings on the same instance remain individually visible across S2–S5.** S1 and S3 aggregate to one per instance (one count, one glyph — `!` beats `~`, color picks worst severity). But no finding may silently disappear. When an instance carries more than one finding:
    - **S4** renders the highest-precedence phrase plus a `(+N)` suffix when others exist on the same row — e.g. `storage-full (+2)`. The operator sees there is more to open for.
@@ -599,6 +601,112 @@ t.Log("\n" + scenario.currentView())  // just before the ExpectViewContains asse
 ```
 
 This is the regression pin for the 2026-04-22 class of bugs where unit tests green, render-gate green, and the actual user screenshot shows that phrases are silently missing. Ship the rendered detail alongside the PASS report. If the rendered frame lacks any phrase asserted above, the gate fails regardless of what the `Expect*` calls returned.
+
+### Phase 9 — Final report checklist (runs AFTER phase 8 passes)
+
+This phase does not change any code. It is the closeout that proves the four user-facing invariants that have been paid for in blood across multiple shipped resources. Skip any of these four and the skill is NOT done — regardless of how green phases 6–8 look.
+
+Emit the checklist verbatim in the final report, with each item marked `PASS`, `FAIL`, or `N/A (<reason>)`. If any item is FAIL, keep the skill running until it is PASS. "N/A" is only valid when the resource spec genuinely has no instance of the thing being checked (e.g. no Wave-1 signals at all → no multi-issue fixture possible), and the reason must be cited.
+
+#### 9.1 No illegal UI elements — only S1–S5
+
+Walk the scenario-harness rendered frame from 8.4 and audit for anything outside the five approved surfaces:
+
+- S1 — main-menu `issues:N` badge.
+- S2 — row color (green / yellow / red / dim).
+- S3 — `!` / `~` glyph prefix on Healthy rows only.
+- S4 — Status column phrase (spec §4 text + optional `(+N)` suffix).
+- S5 — unified `Attention (N)` section in the detail view.
+
+Banned (any appearance = FAIL):
+- Banners, toasts, floating overlays summarizing findings.
+- `?` glyph (ambiguity glyph — never approved).
+- Parallel "flags", "policy", "CIS", "issues" columns.
+- `+` on the S1 badge (`issues:N+`). The `+` is reserved for operational count truncation on pagination, NOT on the finding count.
+- Any string where the Status cell of a Healthy row is non-blank (`OK`, `-`, `available`, etc.).
+
+Report format:
+
+```text
+9.1 illegal UI elements: PASS — S1-S5 only, no banners/?-glyph/jargon columns/S4-on-healthy
+```
+
+#### 9.2 Fixture coverage — every signal + one multi-issue instance
+
+- Every §3.1 Wave-1 signal has at least one dedicated fixture. Healthy baseline is a separate fixture.
+- Every §3.2 Wave-2 signal has at least one dedicated fixture.
+- **At least one fixture carries ≥2 active findings simultaneously** (Wave-1 multi, or Wave-1 + Wave-2). This is the rule-7 (+N) / stacking test vehicle. Without it, the multi-issue code paths never run against realistic demo data.
+
+Report format:
+
+```text
+9.2 fixture coverage:
+    Wave-1 signals: <N> required, <N> fixtures present — PASS
+    Wave-2 signals: <N> required, <N> fixtures present — PASS (or N/A — no Wave-2)
+    multi-issue fixture: <fixture-id> carries <finding-1>, <finding-2>, ... — PASS
+```
+
+#### 9.3 "All related resources non-zero" graph-root
+
+At least ONE fixture must resolve every registered `count shown: yes` pivot to ≥ 1. This is the showroom instance — an operator opens its detail view and sees every pivot populated, proving each registered panel entry actually works end-to-end. Document which fixture and list every pivot count.
+
+If the resource type has engine-split registrations (e.g. dbc covers both DocDB and Aurora, where some pivots are engine-specific), identify the graph-root that covers the union — add fixture entries as needed so one fixture carries the full set.
+
+Report format:
+
+```text
+9.3 graph-root all-pivots-non-zero: <fixture-id>
+    - <Pivot Display Name 1>: <count>
+    - <Pivot Display Name 2>: <count>
+    - ...
+    <N>/<total> registered `count shown: yes` pivots ≥ 1 — PASS
+    (ct-events and other `count shown: unknown` pivots exempt)
+```
+
+FAIL if any registered `count shown: yes` pivot is 0 on the nominated graph-root. Fix the fixture (or the sibling fetcher enrichment) until it's non-zero — do NOT accept a "best attempt" graph-root that covers 9 of 10 pivots.
+
+#### 9.4 Detail view surfaces every finding — with a test
+
+The unified `Attention (N)` section in the detail view must render every finding carried by the selected resource:
+
+- Every Wave-1 phrase from `Resource.Issues`, first letter capitalized, `!`/`~` prefixed per severity.
+- Every Wave-2 `EnrichmentFinding` — Summary line plus Rows beneath as indented `Label: Value` context.
+
+This must be asserted by a phase-8 scenario test that opens the multi-issue fixture's detail view and calls `ExpectViewContains(...)` for every expected phrase / row value. The test must target a fixture with ≥2 findings so the test proves no finding silently disappears (the 2026-04-22 regression class).
+
+Report format:
+
+```text
+9.4 detail-view completeness test: TestScenario_<Short>Visual#multi_issue_detail
+    Fixture: <multi-issue fixture-id>
+    Findings asserted in detail (via ExpectViewContains):
+      - <Wave-1 phrase A>
+      - <Wave-1 phrase B>
+      - <Wave-2 Summary>
+      - <Wave-2 Row: Label=Value>
+      ...
+    Rendered frame pasted into test log (t.Log(scenario.currentView())): YES
+    PASS
+```
+
+If any expected phrase is missing from the rendered detail frame (even with green unit tests) — FAIL. The rendered frame from 8.4 is the authority.
+
+#### 9.5 Final report format
+
+Aggregate the four items plus any skipped ones under a dedicated header in the PR-ready report:
+
+```text
+## Phase 9 Report Checklist
+
+9.1 illegal UI elements: PASS
+9.2 fixture coverage: PASS (Wave-1 N/N, Wave-2 N/N, multi-issue: <id>)
+9.3 graph-root all-pivots-non-zero: PASS (<fixture>, N/N pivots)
+9.4 detail-view completeness: PASS (test: <name>, rendered frame logged)
+
+Implementation: DONE.
+```
+
+If any item is FAIL, do NOT emit "DONE" — loop back to the phase that owns the gap (fixture gaps → phase 6a; test gaps → phase 6b; rendering gaps → phase 7 or the scenario test).
 
 ## What this skill never does
 

@@ -51,8 +51,19 @@ type BackupListRecoveryPointsByResourceAPI interface {
 	ListRecoveryPointsByResource(ctx context.Context, params *backup.ListRecoveryPointsByResourceInput, optFns ...func(*backup.Options)) (*backup.ListRecoveryPointsByResourceOutput, error)
 }
 
-// BackupAPI is the aggregate interface covering all Backup operations used by a9s fetchers.
-// *backup.Client structurally satisfies this interface.
+// BackupGetBackupSelectionAPI defines the interface for the Backup
+// GetBackupSelection operation. Used by the backup fetcher to enumerate the
+// resource ARNs each selection covers, populated into Fields["resources"]
+// so sibling pivots like s3→backup can resolve via cache scan.
+type BackupGetBackupSelectionAPI interface {
+	GetBackupSelection(ctx context.Context, params *backup.GetBackupSelectionInput, optFns ...func(*backup.Options)) (*backup.GetBackupSelectionOutput, error)
+}
+
+// BackupAPI is the aggregate interface covering all Backup operations used by
+// a9s fetchers. *backup.Client structurally satisfies this interface.
+// Note: BackupGetBackupSelectionAPI is NOT included here — fetchers that need
+// it type-assert on the concrete client at call time, so existing test fakes
+// that only implement a subset don't need mass updating.
 type BackupAPI interface {
 	BackupListBackupPlansAPI
 	BackupListBackupJobsAPI

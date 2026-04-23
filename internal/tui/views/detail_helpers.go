@@ -324,11 +324,58 @@ func (m DetailModel) SourceResource() resource.Resource {
 
 // SetEnrichmentFinding sets (or clears) the enrichment finding for this resource.
 // A nil value clears any existing finding (recovery case). Setting a new value
-// invalidates the field list and triggers a viewport re-render so the "Background
-// Check" section appears or disappears immediately.
+// invalidates the field list and triggers a viewport re-render so the Attention
+// section appears or disappears immediately.
+//
+// Cursor stability: the rebuild prepends / removes the Attention section
+// (detail_fields.go:injectAttentionSection), which would otherwise leave
+// m.fieldCursor pointing at a different logical item. The sequence is:
+//  1. Snapshot the cursor's FieldItem identity (Key + Path).
+//  2. Rebuild fieldList eagerly (NOT via refreshViewportContent — render
+//     would otherwise happen against the old cursor value, producing an
+//     off-by-N highlight for one frame).
+//  3. Relocate cursor to the snapshot's new index.
+//  4. syncViewportToCursor to scroll the viewport to the new position.
+//  5. refreshViewportContent renders with the already-correct cursor.
+//
+// Attention-internal rows (Path=="Attention") are deliberately not pinned —
+// if the selection was on an Attention entry that the rebuild removes, fall
+// back to cursor=0 rather than hunting for a gone row. Regression guards:
+// views.TestDetail_SetEnrichmentFinding_PreservesCursorIdentity and
+// views.TestDetail_SetEnrichmentFinding_RenderedSelectionFollowsCursor.
 func (m *DetailModel) SetEnrichmentFinding(f *resource.EnrichmentFinding) {
+	var beforeKey, beforePath string
+	haveSnapshot := false
+	if m.fieldList != nil && m.fieldCursor >= 0 && m.fieldCursor < len(m.fieldList) {
+		prev := m.fieldList[m.fieldCursor]
+		if prev.Path != "Attention" {
+			beforeKey = prev.Key
+			beforePath = prev.Path
+			haveSnapshot = true
+		}
+	}
+
 	m.enrichmentFinding = f
-	m.fieldList = nil // force rebuild on next render
+	m.fieldList = nil
+	m.buildFieldList() // eager rebuild BEFORE render — see sequence in docstring
+
+	if haveSnapshot {
+		located := false
+		for i, item := range m.fieldList {
+			if item.Key == beforeKey && item.Path == beforePath {
+				m.fieldCursor = i
+				located = true
+				break
+			}
+		}
+		if !located && m.fieldCursor >= len(m.fieldList) {
+			m.fieldCursor = 0
+		}
+	} else if m.fieldCursor >= len(m.fieldList) {
+		m.fieldCursor = 0
+	}
+
+	m.syncViewportToCursor()
 	m.refreshViewportContent()
 }
 

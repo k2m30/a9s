@@ -75,6 +75,25 @@ func NewCWLogsFixtures() *CWLogsFixtures {
 			RetentionInDays: aws.Int32(7),
 			CreationTime:    aws.Int64(1710000100000),
 		},
+		// prod-dbi-aurora-1 log group — required for the dbi→logs pivot on
+		// the Aurora dbi "all pivots non-zero" graph-root.
+		{
+			LogGroupName:    aws.String("/aws/rds/instance/prod-dbi-aurora-1/postgresql"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/rds/instance/prod-dbi-aurora-1/postgresql:*"),
+			StoredBytes:     aws.Int64(83886080),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1710000200000),
+			KmsKeyId:        aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
+		},
+		// prod-aurora-cluster log group — required for the dbc→logs pivot
+		// on the Aurora dbc "all pivots non-zero" graph-root.
+		{
+			LogGroupName:    aws.String("/aws/rds/cluster/prod-aurora-cluster/postgresql"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/rds/cluster/prod-aurora-cluster/postgresql:*"),
+			StoredBytes:     aws.Int64(52428800),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1710000300000),
+		},
 		// Issue: RetentionInDays=nil → Warning (log group never expires, unbounded cost)
 		{
 			LogGroupName: aws.String("/app/custom/no-retention"),

@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("eb-rule", []string{"name", "state", "event_bus", "schedule", "description"})
+	resource.RegisterFieldKeys("eb-rule", []string{"name", "state", "event_bus", "schedule", "description", "event_pattern"})
 
 	resource.RegisterPaginated("eb-rule", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -80,16 +80,22 @@ func FetchEventBridgeRulesPage(ctx context.Context, api EventBridgeListRulesAPI,
 			schedule = *rule.ScheduleExpression
 		}
 
+		eventPattern := ""
+		if rule.EventPattern != nil {
+			eventPattern = *rule.EventPattern
+		}
+
 		r := resource.Resource{
 			ID:     name,
 			Name:   name,
 			Status: state,
 			Fields: map[string]string{
-				"name":        name,
-				"state":       state,
-				"description": description,
-				"event_bus":   eventBus,
-				"schedule":    schedule,
+				"name":          name,
+				"state":         state,
+				"description":   description,
+				"event_bus":     eventBus,
+				"schedule":      schedule,
+				"event_pattern": eventPattern,
 			},
 			RawStruct: rule,
 		}

@@ -14,7 +14,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("role", []string{"role_name", "role_id", "path", "create_date", "description", "assume_role_policy_document", "trust_wildcard", "trust_summary"})
+	resource.RegisterFieldKeys("role", []string{"role_name", "role_id", "path", "create_date", "description", "assume_role_policy_document", "trust_wildcard", "trust_summary", "policy_resources"})
 
 	resource.RegisterPaginated("role", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -59,6 +59,9 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 		return resource.FetchResult{}, fmt.Errorf("fetching IAM roles: %w", err)
 	}
 
+	listPoliciesAPI, _ := api.(IAMListRolePoliciesAPI)
+	getPolicyAPI, _ := api.(IAMGetRolePolicyAPI)
+
 	var resources []resource.Resource
 	for _, role := range output.Roles {
 		roleName := ""
@@ -99,6 +102,11 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 		// Detect wildcard principal in trust policy.
 		trustWildcard, trustSummary := parseTrustWildcard(assumeRolePolicyDoc)
 
+		policyResources := ""
+		if listPoliciesAPI != nil && getPolicyAPI != nil && roleName != "" {
+			policyResources = enumerateRoleInlinePolicyResources(ctx, listPoliciesAPI, getPolicyAPI, roleName)
+		}
+
 		r := resource.Resource{
 			ID:     roleName,
 			Name:   roleName,
@@ -112,6 +120,7 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 				"assume_role_policy_document": assumeRolePolicyDoc,
 				"trust_wildcard":              trustWildcard,
 				"trust_summary":               trustSummary,
+				"policy_resources":            policyResources,
 			},
 			RawStruct: role,
 		}
@@ -140,6 +149,78 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// enumerateRoleInlinePolicyResources walks a role's inline policies and
+// returns a comma-separated list of every Statement[].Resource entry across
+// all documents. Emitted as Fields["policy_resources"] so sibling pivots
+// (s3, kms, secrets, …) can scan the list and match by ARN substring.
+// Cost: 1 ListRolePolicies + N GetRolePolicy per role.
+// Attached (managed) policies require a separate walk via
+// ListAttachedRolePolicies + GetPolicyVersion and are not enumerated here
+// yet; inline policies cover the s3-access-role case and are the minimum
+// needed to make the s3→role pivot resolve.
+func enumerateRoleInlinePolicyResources(
+	ctx context.Context,
+	listAPI IAMListRolePoliciesAPI,
+	getAPI IAMGetRolePolicyAPI,
+	roleName string,
+) string {
+	listOut, err := listAPI.ListRolePolicies(ctx, &iam.ListRolePoliciesInput{
+		RoleName: aws.String(roleName),
+	})
+	if err != nil || listOut == nil {
+		return ""
+	}
+	var allResources []string
+	for _, policyName := range listOut.PolicyNames {
+		getOut, getErr := getAPI.GetRolePolicy(ctx, &iam.GetRolePolicyInput{
+			RoleName:   aws.String(roleName),
+			PolicyName: aws.String(policyName),
+		})
+		if getErr != nil || getOut == nil || getOut.PolicyDocument == nil {
+			continue
+		}
+		doc := *getOut.PolicyDocument
+		if decoded, decErr := url.QueryUnescape(doc); decErr == nil {
+			doc = decoded
+		}
+		allResources = append(allResources, extractPolicyResources(doc)...)
+	}
+	return strings.Join(allResources, ",")
+}
+
+// extractPolicyResources parses a policy-document JSON string and returns
+// every Resource entry across all Statements, flattening string and []string
+// forms.
+func extractPolicyResources(doc string) []string {
+	if doc == "" {
+		return nil
+	}
+	var parsed struct {
+		Statement []struct {
+			Resource any `json:"Resource"`
+		} `json:"Statement"`
+	}
+	if err := json.Unmarshal([]byte(doc), &parsed); err != nil {
+		return nil
+	}
+	var out []string
+	for _, stmt := range parsed.Statement {
+		switch v := stmt.Resource.(type) {
+		case string:
+			if v != "" {
+				out = append(out, v)
+			}
+		case []any:
+			for _, item := range v {
+				if s, ok := item.(string); ok && s != "" {
+					out = append(out, s)
+				}
+			}
+		}
+	}
+	return out
 }
 
 // parseTrustWildcard examines a decoded AssumeRolePolicyDocument JSON string

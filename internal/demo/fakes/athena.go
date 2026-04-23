@@ -22,9 +22,14 @@ func (f *AthenaFake) ListWorkGroups(_ context.Context, _ *athena.ListWorkGroupsI
 	return &athena.ListWorkGroupsOutput{WorkGroups: f.fix.WorkGroups}, nil
 }
 
-// GetWorkGroup is a stub satisfying AthenaGetWorkGroupAPI.
-// Demo mode returns a workgroup with EnforceWorkGroupConfiguration enabled and encryption configured,
-// representing a healthy default workgroup.
-func (f *AthenaFake) GetWorkGroup(_ context.Context, _ *athena.GetWorkGroupInput, _ ...func(*athena.Options)) (*athena.GetWorkGroupOutput, error) {
+// GetWorkGroup returns the pre-built WorkGroup detail from fixtures for the
+// requested workgroup name, or an empty output when no fixture detail exists
+// (healthy default representation — list-only workgroups without per-config).
+func (f *AthenaFake) GetWorkGroup(_ context.Context, input *athena.GetWorkGroupInput, _ ...func(*athena.Options)) (*athena.GetWorkGroupOutput, error) {
+	if input != nil && input.WorkGroup != nil {
+		if out, ok := f.fix.WorkGroupDetails[*input.WorkGroup]; ok && out != nil {
+			return out, nil
+		}
+	}
 	return &athena.GetWorkGroupOutput{}, nil
 }

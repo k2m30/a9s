@@ -33,7 +33,14 @@ func init() {
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchS3BucketsPage(ctx, c.S3, continuationToken)
+		// Related-panel contract (docs/resources/s3.md §2): lambda/sns/sqs
+		// pivots must resolve non-zero when this bucket has a matching
+		// notification target. Those checkers read Fields["notification_*"],
+		// which can only be populated by GetBucketNotificationConfiguration
+		// — so the list path must run it per-bucket. Accepts N+1 per page
+		// (cheap API, typically ≤50 buckets per AWS account) in exchange
+		// for having the notification pivots actually work.
+		return FetchS3BucketsPageWithNotifications(ctx, c.S3, c.S3, continuationToken)
 	})
 
 	// Register S3 objects as a child type with its own fetcher.

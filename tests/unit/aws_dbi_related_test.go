@@ -354,10 +354,21 @@ func TestDBI_Related_Secrets_MatchesByMasterUserSecretARN(t *testing.T) {
 }
 
 // TestDBI_Related_Secrets_NoMasterUserSecret verifies Count=0 when
-// MasterUserSecret is nil (classic password-auth instance).
+// MasterUserSecret is nil (classic password-auth instance). Constructs a
+// minimal inline fixture because the production Aurora fixture now carries a
+// MasterUserSecret (required so the Aurora dbi graph-root covers every
+// related pivot — see scenario_dbi_visual_test.go).
 func TestDBI_Related_Secrets_NoMasterUserSecret(t *testing.T) {
-	// Aurora instance has nil MasterUserSecret in the fixture.
-	res := dbiAuroraResource(t)
+	raw := rdstypes.DBInstance{
+		DBInstanceIdentifier: aws.String("classic-password-auth-dbi"),
+		Engine:               aws.String("postgres"),
+		// MasterUserSecret intentionally nil.
+	}
+	res := resource.Resource{
+		ID:        "classic-password-auth-dbi",
+		Name:      "classic-password-auth-dbi",
+		RawStruct: raw,
+	}
 	checker := dbiCheckerByTarget(t, "secrets")
 
 	result := checker(context.Background(), &awsclient.ServiceClients{}, res, resource.ResourceCache{})
