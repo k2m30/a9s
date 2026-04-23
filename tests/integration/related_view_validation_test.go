@@ -83,9 +83,12 @@ func TestFullRelatedViewValidation(t *testing.T) {
 				res := result.Resources[idx]
 				t.Run(res.ID, func(t *testing.T) {
 					// Each resource gets its own scenario to isolate state.
+					// Reuse the already-connected clients from rootScenario so
+					// live-profile runs don't re-authenticate per sub-test
+					// (STS AssumeRole takes ~5-10s × hundreds of sub-tests).
 					var sc *fullIntegrationScenario
 					if profile != "" {
-						sc = fullIntegrationNewLiveScenario(t, profile, region)
+						sc = fullIntegrationNewLiveScenarioFromClients(t, profile, region, rootScenario.clients)
 					} else {
 						sc = fullIntegrationNewDemoScenario(t)
 					}
@@ -145,9 +148,10 @@ func TestFullRelatedViewValidation(t *testing.T) {
 							// Use a fresh scenario to avoid polluting the main scenario's state.
 							if uiMsg.Result.Count > 0 || (uiMsg.Result.Count == -1 && len(uiMsg.Result.FetchFilter) > 0) {
 								// Fresh scenario for navigation — avoids relatedCache hit problem on re-entry.
+								// Shares root scenario's clients to skip STS AssumeRole per sub-test.
 								var navSc *fullIntegrationScenario
 								if profile != "" {
-									navSc = fullIntegrationNewLiveScenario(t, profile, region)
+									navSc = fullIntegrationNewLiveScenarioFromClients(t, profile, region, rootScenario.clients)
 								} else {
 									navSc = fullIntegrationNewDemoScenario(t)
 								}

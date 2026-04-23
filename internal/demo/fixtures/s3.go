@@ -50,6 +50,10 @@ type S3Fixtures struct {
 	// TaggingConfigs maps bucket names to their tagging configuration output.
 	// A missing key means return NoSuchTagSet.
 	TaggingConfigs map[string]*s3.GetBucketTaggingOutput
+	// BucketPolicies maps bucket names to their resource-policy JSON.
+	// A missing key or empty value means return NoSuchBucketPolicy.
+	// Used by the s3→role pivot (checkS3Role parses Statement[].Principal.AWS).
+	BucketPolicies map[string]string
 	// Objects maps bucket name → prefix → slice of S3 objects at that prefix level.
 	Objects map[string]map[string][]s3types.Object
 	// CommonPrefixes maps bucket name → prefix → slice of common prefixes (folders).
@@ -74,6 +78,7 @@ func NewS3Fixtures() *S3Fixtures {
 		EncryptionConfigs:        buildS3EncryptionConfigs(),
 		LoggingConfigs:           buildS3LoggingConfigs(),
 		TaggingConfigs:           buildS3TaggingConfigs(),
+		BucketPolicies:           buildS3BucketPolicies(),
 		Objects:                  buildS3Objects(),
 		CommonPrefixes:           buildS3CommonPrefixes(),
 	}
@@ -308,6 +313,34 @@ func buildS3TaggingConfigs() map[string]*s3.GetBucketTaggingOutput {
 		"a9s-demo-partial-pab":   cfnTagged,
 		"a9s-demo-multifail-pab": cfnTagged,
 		"a9s-demo-nilcfg":        cfnTagged,
+	}
+}
+
+// buildS3BucketPolicies returns per-bucket resource-policy JSON strings.
+// The healthy bucket grants GetObject/ListBucket to the
+// a9s-demo-s3-access-role IAM role — this is the join key the s3→role
+// pivot resolves via checkS3Role (s3:GetBucketPolicy →
+// Statement[].Principal.AWS). Other spec buckets have no policy; their
+// GetBucketPolicy calls return NoSuchBucketPolicy (an honest 0).
+func buildS3BucketPolicies() map[string]string {
+	return map[string]string{
+		HealthyBucketName: `{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowDemoRoleReadAccess",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::123456789012:role/a9s-demo-s3-access-role"
+      },
+      "Action": ["s3:GetObject", "s3:ListBucket"],
+      "Resource": [
+        "arn:aws:s3:::` + HealthyBucketName + `",
+        "arn:aws:s3:::` + HealthyBucketName + `/*"
+      ]
+    }
+  ]
+}`,
 	}
 }
 

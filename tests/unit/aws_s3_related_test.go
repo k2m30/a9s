@@ -738,9 +738,13 @@ func TestS3_Related_R53_NoMatch(t *testing.T) {
 		"r53": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
 				{
-					ID:     "Z1D633PJN98FT9",
-					Name:   "Z1D633PJN98FT9",
-					Fields: map[string]string{"alias_targets": "other-bucket.s3-website-us-east-1.amazonaws.com"},
+					ID:   "Z1D633PJN98FT9",
+					Name: "Z1D633PJN98FT9",
+					Fields: map[string]string{
+						// S3-website alias exists, but for a different bucket FQDN.
+						"s3website_alias_names": "other-bucket",
+						"alias_targets":         "s3-website-us-east-1.amazonaws.com.",
+					},
 				},
 			},
 		},
@@ -748,22 +752,27 @@ func TestS3_Related_R53_NoMatch(t *testing.T) {
 	checker := s3CheckerByTarget(t, "r53")
 	result := checker(context.Background(), nil, healthyBucketResource(), cache)
 	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for r53 pivot with non-matching alias_targets", result.Count)
+		t.Errorf("Count = %d, want 0 for r53 pivot when no alias record name equals this bucket", result.Count)
 	}
 }
 
 // TestS3_Related_R53_Found verifies the r53 checker returns Count≥1 when a
-// hosted zone's alias_targets contains the bucket's S3 website endpoint probe.
+// hosted zone has an S3-website alias record whose NAME (FQDN) equals the
+// bucket name. Spec §2: bucket-name == FQDN is the only join key —
+// AliasTarget.DNSName is the regional endpoint and never carries the
+// bucket name in real AWS. The r53 fetcher pre-filters record sets for
+// S3-website aliases and emits the FQDNs into s3website_alias_names.
 func TestS3_Related_R53_Found(t *testing.T) {
-	// The checker probes for "BUCKETNAME.s3" as a substring of alias_targets.
-	probe := fixtures.HealthyBucketName + ".s3"
 	cache := resource.ResourceCache{
 		"r53": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
 				{
-					ID:     "Z1D633PJN98FT9",
-					Name:   "Z1D633PJN98FT9",
-					Fields: map[string]string{"alias_targets": probe + "-website-us-east-1.amazonaws.com"},
+					ID:   "Z1D633PJN98FT9",
+					Name: "Z1D633PJN98FT9",
+					Fields: map[string]string{
+						"s3website_alias_names": fixtures.HealthyBucketName,
+						"alias_targets":         "s3-website-us-east-1.amazonaws.com.",
+					},
 				},
 			},
 		},
@@ -771,48 +780,46 @@ func TestS3_Related_R53_Found(t *testing.T) {
 	checker := s3CheckerByTarget(t, "r53")
 	result := checker(context.Background(), nil, healthyBucketResource(), cache)
 	if result.Count < 1 {
-		t.Errorf("Count = %d, want ≥1 for r53 pivot when alias_targets contains %q", result.Count, probe)
+		t.Errorf("Count = %d, want ≥1 for r53 pivot when an alias record's NAME equals the bucket name %q",
+			result.Count, fixtures.HealthyBucketName)
 	}
 }
 
-// TestS3_Related_Role_NoMatch verifies the role checker returns Count=0 when
-// no role's policy_resources contains this bucket's ARN.
-func TestS3_Related_Role_NoMatch(t *testing.T) {
+// TestS3_Related_Role_NoBucketPolicy_Count0 verifies the spec-correct
+// direction: without a bucket policy, the role pivot returns 0 regardless
+// of what the role's own policies say. An ad-hoc bucket name (not in any
+// fixture) → s3:GetBucketPolicy returns NoSuchBucketPolicy → honest 0.
+func TestS3_Related_Role_NoBucketPolicy_Count0(t *testing.T) {
 	cache := resource.ResourceCache{
 		"role": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
-				{
-					ID:     "other-role",
-					Name:   "other-role",
-					Fields: map[string]string{"policy_resources": "arn:aws:s3:::other-bucket/*"},
-				},
+				{ID: "any-role", Name: "any-role"},
 			},
 		},
 	}
 	checker := s3CheckerByTarget(t, "role")
-	result := checker(context.Background(), nil, healthyBucketResource(), cache)
+	src := emptyBucketResource("test-only-no-policy-" + t.Name())
+	result := checker(context.Background(), s3FakeClients(), src, cache)
 	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 for role pivot with non-matching policy_resources", result.Count)
+		t.Errorf("Count = %d, want 0 for role pivot when bucket has no policy", result.Count)
 	}
 }
 
-// TestS3_Related_Role_Found verifies the role checker returns Count≥1 when a
-// role's policy_resources contains the bucket ARN.
-func TestS3_Related_Role_Found(t *testing.T) {
+// TestS3_Related_Role_BucketPolicyPrincipalResolves verifies the canonical
+// join: the healthy bucket's policy names a9s-demo-s3-access-role as a
+// Principal.AWS, and that role exists in the `role` cache — the pivot
+// resolves Count≥1.
+func TestS3_Related_Role_BucketPolicyPrincipalResolves(t *testing.T) {
 	cache := resource.ResourceCache{
 		"role": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
-				{
-					ID:     "s3-access-role",
-					Name:   "s3-access-role",
-					Fields: map[string]string{"policy_resources": fixtures.HealthyBucketARN + "/*"},
-				},
+				{ID: "a9s-demo-s3-access-role", Name: "a9s-demo-s3-access-role"},
 			},
 		},
 	}
 	checker := s3CheckerByTarget(t, "role")
-	result := checker(context.Background(), nil, healthyBucketResource(), cache)
+	result := checker(context.Background(), s3FakeClients(), healthyBucketResource(), cache)
 	if result.Count < 1 {
-		t.Errorf("Count = %d, want ≥1 for role pivot when policy_resources contains %q", result.Count, fixtures.HealthyBucketARN)
+		t.Errorf("Count = %d, want ≥1 for role pivot when bucket policy names the role as a principal", result.Count)
 	}
 }

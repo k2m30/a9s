@@ -87,16 +87,41 @@ func fullIntegrationNewLiveScenario(t *testing.T, profile, region string) *fullI
 	if !ok || clients == nil {
 		t.Fatalf("live scenario AWS connect returned clients %T, expected *aws.ServiceClients", clientsReady.Clients)
 	}
-
+	// Feed ClientsReadyMsg back into the model so it advances out of the
+	// "awaiting AWS" state. The shared-clients path does this inside
+	// fullIntegrationNewReadyModelWithClients; the fresh-connect path must
+	// do it explicitly here.
 	m, _ = fullIntegrationApplyMsg(m, clientsReady)
+	return fullIntegrationScenarioFromClients(t, profile, region, clients, m)
+}
 
+// fullIntegrationNewLiveScenarioFromClients constructs a live scenario that
+// reuses an already-resolved *ServiceClients instead of re-running
+// profile-resolution + STS AssumeRole. Essential for sub-test isolation in
+// TestFullRelatedViewValidation — every sub-scenario would otherwise pay a
+// ~5-10s STS round-trip, inflating the suite by two-plus orders of magnitude
+// on live AWS. Clients are concurrency-safe by SDK contract.
+func fullIntegrationNewLiveScenarioFromClients(t *testing.T, profile, region string, clients *awsclient.ServiceClients) *fullIntegrationScenario {
+	t.Helper()
+	m := fullIntegrationNewReadyModelWithClients(t, profile, region, clients)
+	return fullIntegrationScenarioFromClients(t, profile, region, clients, m)
+}
+
+// fullIntegrationScenarioFromClients wraps the shared post-connect scenario
+// init used by both the fresh-connect and shared-clients entry points. The
+// caller is responsible for ensuring the model has already observed a
+// ClientsReadyMsg (via Init+connect for the fresh path, or via
+// fullIntegrationNewReadyModelWithClients for the shared-clients path).
+func fullIntegrationScenarioFromClients(t *testing.T, profile, region string, clients *awsclient.ServiceClients, m tui.Model) *fullIntegrationScenario {
+	t.Helper()
+	ready := messages.ClientsReadyMsg{Clients: clients, Region: region}
 	return &fullIntegrationScenario{
 		t:                 t,
 		model:             m,
 		clients:           clients,
 		profile:           profile,
 		region:            region,
-		lastClientsReady:  &clientsReady,
+		lastClientsReady:  &ready,
 		lastRelatedByName: make(map[string]messages.RelatedCheckResultMsg),
 	}
 }
