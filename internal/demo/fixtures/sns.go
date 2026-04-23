@@ -21,6 +21,10 @@ func NewSNSFixtures() *SNSFixtures {
 		{TopicArn: aws.String("arn:aws:sns:us-east-1:123456789012:deploy-notifications")},
 		// S3 healthy-bucket event notifications topic (checkS3SNS pivot).
 		{TopicArn: aws.String("arn:aws:sns:us-east-1:123456789012:" + S3EventsTopicName)},
+		// Backup vault alert topic (checkBackupSNS pivot).
+		// GetBackupVaultNotifications("acme-prod-vault").SNSTopicArn points here.
+		// checkBackupSNS resolves this ARN against sns resource cache by name (last ":" segment).
+		{TopicArn: aws.String(BackupAlertsSNSTopicARN)},
 	}
 
 	subscriptions := []snstypes.Subscription{

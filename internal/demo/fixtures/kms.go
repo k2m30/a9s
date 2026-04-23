@@ -108,6 +108,22 @@ func NewKMSFixtures() *KMSFixtures {
 			CreationDate: aws.Time(time.Date(2024, 9, 5, 6, 0, 0, 0, time.UTC)),
 			Enabled:      false,
 		},
+		// Backup prod-vault encryption key (checkBackupKMS pivot).
+		// DescribeBackupVault("acme-prod-vault").EncryptionKeyArn points here.
+		// ID must match BackupProdVaultKMSKeyID in backup.go.
+		{
+			KeyId:        aws.String(BackupProdVaultKMSKeyID),
+			Arn:          aws.String("arn:aws:kms:us-east-1:123456789012:key/" + BackupProdVaultKMSKeyID),
+			Description:  aws.String("Encryption key for acme-prod-vault (AWS Backup)"),
+			KeyState:     kmstypes.KeyStateEnabled,
+			KeyManager:   kmstypes.KeyManagerTypeCustomer,
+			KeyUsage:     kmstypes.KeyUsageTypeEncryptDecrypt,
+			CreationDate: aws.Time(time.Date(2025, 4, 10, 9, 0, 0, 0, time.UTC)),
+			Enabled:      true,
+			EncryptionAlgorithms: []kmstypes.EncryptionAlgorithmSpec{kmstypes.EncryptionAlgorithmSpecSymmetricDefault},
+			MultiRegion:  aws.Bool(false),
+			Origin:       kmstypes.OriginTypeAwsKms,
+		},
 		// S3 healthy-bucket SSE-KMS key (checkS3KMS pivot).
 		// The checker strips everything up to the last "/" from the KMS key ARN,
 		// leaving the bare key ID. This must match S3BucketKMSKeyID in s3.go.
@@ -196,6 +212,12 @@ func NewKMSFixtures() *KMSFixtures {
 			AliasName:   aws.String("alias/" + S3BucketKMSKeyID),
 			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/" + S3BucketKMSKeyID),
 			TargetKeyId: aws.String(S3BucketKMSKeyID),
+		},
+		// Backup prod-vault KMS key alias.
+		{
+			AliasName:   aws.String("alias/acme-backup-prod-key"),
+			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/acme-backup-prod-key"),
+			TargetKeyId: aws.String(BackupProdVaultKMSKeyID),
 		},
 	}
 
