@@ -39,8 +39,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `ct-events`
 
 ### `lambda`
 
-- **Why related**: Lambda functions invoked by SES **inbound** receipt rules (`LambdaAction`) — the receiver-side workflow for inbound mail. SES v1 feature only; SESv2 does not expose receipt rules. — a9s-devops: in SESv2-only accounts this pivot will always render 0, which is still operator-honest because it documents the absence.
-- **How discovered**: call `ses:DescribeActiveReceiptRuleSet` (SES v1) → walk `Rules[].Actions[].LambdaAction.FunctionArn`. When the SDK client is SESv2-only, returns 0.
+- **Why related**: Lambda functions invoked by SES **inbound** receipt rules (`LambdaAction`) — the receiver-side workflow for inbound mail. SES v1 feature; a9s wires a dedicated SES v1 SDK client to surface this pivot.
+- **How discovered**: call `ses:DescribeActiveReceiptRuleSet` (SES v1) → walk `Rules[].Actions[].LambdaAction.FunctionArn`. Accounts with no active receipt rule set (pure outbound SES) render 0 — operator-honest absence.
 - **Count shown**: yes.
 
 ### `r53`
@@ -51,8 +51,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `ct-events`
 
 ### `s3`
 
-- **Why related**: S3 buckets where SES **inbound** receipt rules deposit received mail (`S3Action`). SES v1 feature only; SESv2 does not expose receipt rules.
-- **How discovered**: call `ses:DescribeActiveReceiptRuleSet` (SES v1) → walk `Rules[].Actions[].S3Action.BucketName`. When the SDK client is SESv2-only, returns 0.
+- **Why related**: S3 buckets where SES **inbound** receipt rules deposit received mail (`S3Action`). SES v1 feature; a9s wires the SES v1 SDK client to surface this pivot.
+- **How discovered**: call `ses:DescribeActiveReceiptRuleSet` (SES v1) → walk `Rules[].Actions[].S3Action.BucketName`. Accounts with no active receipt rule set render 0 — operator-honest absence.
 - **Count shown**: yes.
 
 ### `sns`
@@ -173,3 +173,4 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Account-wide findings should decorate every identity row's S4 with the `account ...` prefix, and S1 counts once — `a9s-devops (2026-04-20): possible=yes, worth=yes. EnforcementStatus=SHUTDOWN stops all SES sending account-wide; every identity on the list is affected. Honest attribution requires the per-row prefix "account PROBATION:" / "account SHUTDOWN:" so the operator does not misread a single identity as the culprit; counting the finding once in S1 avoids double-counting the same root cause across N rows.`
 - `SendingEnabled==false` on a verified identity is a yellow (Warning) row with `sending disabled`, not green + `~` glyph — `a9s-devops (2026-04-20): possible=yes, worth=yes. The ~ annotation is reserved for background checks on fully-healthy rows (e.g. maintenance scheduled). A paused identity cannot send, so it fails the "fully healthy right now" test; bucketing Warning/yellow matches operator intuition that something is operationally off.`
 - Read-only invariant (no write operations) — `docs/architecture.md` § "What is a9s?".
+- `user decision (2026-04-23)`: wire a dedicated SES v1 SDK client (`github.com/aws/aws-sdk-go-v2/service/ses`) to back the `lambda` and `s3` pivots via `ses:DescribeActiveReceiptRuleSet`. SES v1 receipt rules are a minority workflow (inbound email) but when present the pivot is genuinely load-bearing (3am debugging of `support@`/`invoices@`-style routers). Returning a silent 0 when the relationship does exist is worse than the one-call cost.

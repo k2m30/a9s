@@ -3,15 +3,17 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
+	sesv2types "github.com/aws/aws-sdk-go-v2/service/sesv2/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func init() {
-	resource.RegisterFieldKeys("ses", []string{"identity_name", "identity_type", "verification_status", "sending_enabled"})
+	resource.RegisterFieldKeys("ses", []string{"identity_name", "identity_type", "verification_status", "sending_enabled", "status"})
 
 	resource.RegisterPaginated("ses", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -73,18 +75,22 @@ func FetchSESIdentitiesPage(ctx context.Context, api SESv2ListEmailIdentitiesAPI
 		}
 
 		identityType := string(identity.IdentityType)
-		sendingEnabled := fmt.Sprintf("%t", identity.SendingEnabled)
+		sendingEnabled := strconv.FormatBool(identity.SendingEnabled)
 		verificationStatus := string(identity.VerificationStatus)
+
+		topPhrase, issues := computeSESStatusAndIssues(identity)
 
 		r := resource.Resource{
 			ID:     identityName,
 			Name:   identityName,
-			Status: verificationStatus,
+			Status: topPhrase,
+			Issues: issues,
 			Fields: map[string]string{
 				"identity_name":       identityName,
 				"identity_type":       identityType,
 				"sending_enabled":     sendingEnabled,
 				"verification_status": verificationStatus,
+				"status":              topPhrase,
 			},
 			RawStruct: identity,
 		}
@@ -113,4 +119,43 @@ func FetchSESIdentitiesPage(ctx context.Context, api SESv2ListEmailIdentitiesAPI
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// computeSESStatusAndIssues maps Wave-1 signals from an IdentityInfo to the
+// top S4 phrase (with `(+N)` suffix when multiple issues coexist) and the full
+// ordered issue slice (spec §4 precedence table, impl-plan §3.2).
+//
+// Precedence order:
+//  1. VerificationStatus==FAILED         → "verification failed" (Broken)
+//  2. VerificationStatus==TEMPORARY_FAILURE → "verify: temp failure" (Broken)
+//  3. VerificationStatus==NOT_STARTED    → "verification not started" (Broken)
+//  4. VerificationStatus==PENDING        → "pending verification" (Warning)
+//  5. SendingEnabled==false (any row)    → append "sending disabled" (Warning)
+//  6. Healthy (SUCCESS + enabled)        → "", nil
+func computeSESStatusAndIssues(identity sesv2types.IdentityInfo) (string, []string) {
+	var issues []string
+
+	switch identity.VerificationStatus {
+	case sesv2types.VerificationStatusFailed:
+		issues = append(issues, "verification failed")
+	case sesv2types.VerificationStatusTemporaryFailure:
+		issues = append(issues, "verify: temp failure")
+	case sesv2types.VerificationStatusNotStarted:
+		issues = append(issues, "verification not started")
+	case sesv2types.VerificationStatusPending:
+		issues = append(issues, "pending verification")
+	}
+
+	if !identity.SendingEnabled {
+		issues = append(issues, "sending disabled")
+	}
+
+	switch len(issues) {
+	case 0:
+		return "", nil
+	case 1:
+		return issues[0], issues
+	default:
+		return fmt.Sprintf("%s (+%d)", issues[0], len(issues)-1), issues
+	}
 }

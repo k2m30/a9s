@@ -21,6 +21,8 @@ func NewSNSFixtures() *SNSFixtures {
 		{TopicArn: aws.String("arn:aws:sns:us-east-1:123456789012:deploy-notifications")},
 		// S3 healthy-bucket event notifications topic (checkS3SNS pivot).
 		{TopicArn: aws.String("arn:aws:sns:us-east-1:123456789012:" + S3EventsTopicName)},
+		// SES bounce/complaint notifications topic (checkSESSns pivot).
+		{TopicArn: aws.String("arn:aws:sns:us-east-1:123456789012:" + SESBounceTopicName)},
 	}
 
 	subscriptions := []snstypes.Subscription{
