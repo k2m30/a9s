@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 
+	"github.com/aws/aws-sdk-go-v2/service/ses"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 )
 
@@ -34,4 +35,17 @@ type SESv2API interface {
 	SESv2GetAccountAPI
 	SESv2GetEmailIdentityAPI
 	SESv2GetConfigurationSetEventDestinationsAPI
+}
+
+// SESV1DescribeActiveReceiptRuleSetAPI defines the interface for the SES v1
+// DescribeActiveReceiptRuleSet operation, used to discover inbound receipt rules
+// (LambdaAction, S3Action) for the lambda and s3 related-panel pivots.
+type SESV1DescribeActiveReceiptRuleSetAPI interface {
+	DescribeActiveReceiptRuleSet(ctx context.Context, params *ses.DescribeActiveReceiptRuleSetInput, optFns ...func(*ses.Options)) (*ses.DescribeActiveReceiptRuleSetOutput, error)
+}
+
+// SESV1API is the aggregate interface covering all SES v1 operations used by a9s.
+// *ses.Client structurally satisfies this interface.
+type SESV1API interface {
+	SESV1DescribeActiveReceiptRuleSetAPI
 }

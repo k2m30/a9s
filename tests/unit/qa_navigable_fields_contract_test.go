@@ -88,10 +88,11 @@ var navigableContracts = []navContract{
 	{shortName: "ct-events", apiDoc: "https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_LookupEvents.html", fieldPath: "user", targetType: "iam-user", reasoning: "CloudTrail Event user identity (Type=IAMUser) links to IAM Users."},
 	{shortName: "ct-events", apiDoc: "https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_LookupEvents.html", fieldPath: "role_name", targetType: "role", reasoning: "CloudTrail Event user identity (Type=AssumedRole) session carries the role name."},
 
-	// dbc — DocumentDB Clusters
+	// dbc — DocumentDB Clusters. docdb_types.DBCluster.DBSubnetGroup is *string
+	// (just the subnet-group name), not a struct — VPC/Subnet navigation is
+	// surfaced via the related-panel checkers (checkDbcVPC, checkDbcSubnet),
+	// not navigable fields.
 	{shortName: "dbc", apiDoc: "https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBCluster.html", fieldPath: "VpcSecurityGroups.VpcSecurityGroupId", targetType: "sg", reasoning: "DBCluster.VpcSecurityGroups[].VpcSecurityGroupId references SGs attached to the cluster."},
-	{shortName: "dbc", apiDoc: "https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBCluster.html", fieldPath: "DBSubnetGroup.VpcId", targetType: "vpc", reasoning: "DBCluster subnet group VpcId — the VPC the cluster lives in."},
-	{shortName: "dbc", apiDoc: "https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBSubnetGroup.html", fieldPath: "DBSubnetGroup.Subnets.SubnetIdentifier", targetType: "subnet", reasoning: "DBSubnetGroup.Subnets[].SubnetIdentifier — subnets the cluster spans."},
 	{shortName: "dbc", apiDoc: "https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBCluster.html", fieldPath: "KmsKeyId", targetType: "kms", reasoning: "DBCluster.KmsKeyId is the KMS key used for storage encryption."},
 
 	// dbi — RDS DB Instances
@@ -204,8 +205,9 @@ var navigableContracts = []navContract{
 	{shortName: "opensearch", apiDoc: "https://docs.aws.amazon.com/opensearch-service/latest/APIReference/API_VPCDerivedInfo.html", fieldPath: "VPCOptions.SubnetIds", targetType: "subnet", reasoning: "DomainStatus.VPCOptions.SubnetIds — subnets the domain's ENIs live in."},
 	{shortName: "opensearch", apiDoc: "https://docs.aws.amazon.com/opensearch-service/latest/APIReference/API_VPCDerivedInfo.html", fieldPath: "VPCOptions.SecurityGroupIds", targetType: "sg", reasoning: "DomainStatus.VPCOptions.SecurityGroupIds — SGs attached to the domain ENIs."},
 
-	// redis — ElastiCache Redis
-	{shortName: "redis", apiDoc: "https://docs.aws.amazon.com/AmazonElastiCache/latest/APIReference/API_SecurityGroupMembership.html", fieldPath: "SecurityGroups.SecurityGroupId", targetType: "sg", reasoning: "ReplicationGroup.SecurityGroups[].SecurityGroupId — SGs attached to the replication group."},
+	// redis — ElastiCache Redis. Security Groups live on MemberCluster objects
+	// (DescribeCacheClusters), not on the ReplicationGroup RawStruct — SG
+	// navigation is surfaced via the checkRedisSG related-panel checker.
 	{shortName: "redis", apiDoc: "https://docs.aws.amazon.com/AmazonElastiCache/latest/APIReference/API_ReplicationGroup.html", fieldPath: "KmsKeyId", targetType: "kms", reasoning: "ReplicationGroup.KmsKeyId — KMS key for at-rest encryption."},
 
 	// rds-snap — RDS Snapshots

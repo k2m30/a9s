@@ -187,20 +187,24 @@ func serviceRouter(req *http.Request) (int, string) {
 	// ElastiCache (AWS Query)
 	if strings.Contains(host, "elasticache.") {
 		return 200, `<?xml version="1.0" encoding="UTF-8"?>
-<DescribeCacheClustersResponse xmlns="http://elasticache.amazonaws.com/doc/2015-02-02/">
-  <DescribeCacheClustersResult>
-    <CacheClusters>
-      <CacheCluster>
-        <CacheClusterId>mock-redis-1</CacheClusterId>
+<DescribeReplicationGroupsResponse xmlns="http://elasticache.amazonaws.com/doc/2015-02-02/">
+  <DescribeReplicationGroupsResult>
+    <ReplicationGroups>
+      <ReplicationGroup>
+        <ReplicationGroupId>prod-redis</ReplicationGroupId>
+        <Status>available</Status>
         <Engine>redis</Engine>
-        <EngineVersion>7.0</EngineVersion>
-        <CacheClusterStatus>available</CacheClusterStatus>
-        <CacheNodeType>cache.t3.micro</CacheNodeType>
-        <NumCacheNodes>1</NumCacheNodes>
-      </CacheCluster>
-    </CacheClusters>
-  </DescribeCacheClustersResult>
-</DescribeCacheClustersResponse>`
+        <MemberClusters>
+          <member>prod-redis-001</member>
+        </MemberClusters>
+        <ConfigurationEndpoint>
+          <Address>prod-redis.cfg.use1.cache.amazonaws.com</Address>
+          <Port>6379</Port>
+        </ConfigurationEndpoint>
+      </ReplicationGroup>
+    </ReplicationGroups>
+  </DescribeReplicationGroupsResult>
+</DescribeReplicationGroupsResponse>`
 	}
 
 	// EKS (REST-JSON)

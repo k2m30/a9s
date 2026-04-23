@@ -25,8 +25,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/acm"
 	acmtypes "github.com/aws/aws-sdk-go-v2/service/acm/types"
 	apigwtypes "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
-	"github.com/aws/aws-sdk-go-v2/service/backup"
-	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 	codeartifactsvc "github.com/aws/aws-sdk-go-v2/service/codeartifact"
 	codeartifacttypes "github.com/aws/aws-sdk-go-v2/service/codeartifact/types"
 	"github.com/aws/aws-sdk-go-v2/service/codebuild"
@@ -837,58 +835,10 @@ func TestEnrichGlueJobStatus_WritesLastRun(t *testing.T) {
 	}
 }
 
-// Test #14 — backup: last_status FieldUpdates (coder must add this)
-
-// backupFakeW implements BackupAPI for the last_status test.
-// (backupJobFake in aws_backup_enricher_test.go doesn't track by plan ID.)
-type backupFakeW struct {
-	awsclient.BackupAPI
-	jobs []backuptypes.BackupJob
-}
-
-func (f *backupFakeW) ListBackupJobs(
-	_ context.Context,
-	_ *backup.ListBackupJobsInput,
-	_ ...func(*backup.Options),
-) (*backup.ListBackupJobsOutput, error) {
-	return &backup.ListBackupJobsOutput{BackupJobs: f.jobs}, nil
-}
-
-// TestEnrichBackupJobs_WritesLastStatus verifies that EnrichBackupJobs
-// populates FieldUpdates[planID]["last_status"] containing "FAILED" when the
-// most recent job for that plan is in FAILED state.
-func TestEnrichBackupJobs_WritesLastStatus(t *testing.T) {
-	planID := "backup-plan-aabbccdd-1234"
-	now := time.Now()
-
-	fake := &backupFakeW{
-		jobs: []backuptypes.BackupJob{
-			{
-				BackupJobId:  aws.String("job-001"),
-				State:        backuptypes.BackupJobStateFailed,
-				CreationDate: &now,
-				CreatedBy: &backuptypes.RecoveryPointCreator{
-					BackupPlanId: aws.String(planID),
-				},
-			},
-		},
-	}
-
-	// EnrichBackupJobs ignores the resources slice (account-wide).
-	result, err := awsclient.EnrichBackupJobs(context.Background(), &awsclient.ServiceClients{Backup: fake}, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	fu, ok := result.FieldUpdates[planID]
-	if !ok {
-		t.Fatalf("FieldUpdates missing for backup plan %q — coder must add last_status FieldUpdates to EnrichBackupJobs", planID)
-	}
-	lastStatus := fu["last_status"]
-	if !strings.Contains(lastStatus, "FAILED") {
-		t.Errorf("backup last_status = %q, want value containing %q", lastStatus, "FAILED")
-	}
-}
+// Test #14 — retired. The backup resource no longer has a `last_status` field;
+// spec §4 (docs/resources/backup.md) routes job-state Wave-2 findings through
+// the unified Status column via `status` FieldUpdates + EnrichmentFinding.
+// The authoritative coverage lives in tests/unit/aws_backup_issue_enrichment_test.go.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Group 2: Pure Wave-1 column-source tests

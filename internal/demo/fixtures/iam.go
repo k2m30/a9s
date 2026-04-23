@@ -168,6 +168,19 @@ func buildIAMRoles() []iamtypes.Role {
 		},
 	}
 
+	// Backup prod role — required for backup→role related-panel pivot (checkBackupRole).
+	// ListBackupSelections for plan-broken-2failed returns this ARN in IamRoleArn.
+	// checkBackupRole extracts the role name as the last segment after "/".
+	roles = append(roles, iamtypes.Role{
+		RoleName:    aws.String("AcmeBackupRoleProd"),
+		RoleId:      aws.String("AROAEXAMPLEBKUPPROD01"),
+		Arn:         aws.String(AcmeBackupRoleARN),
+		Path:        aws.String("/"),
+		CreateDate:  aws.Time(time.Date(2025, 4, 10, 9, 0, 0, 0, time.UTC)),
+		Description: aws.String("IAM role assumed by AWS Backup for prod database and critical plan backups"),
+		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"backup.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
+	})
+
 	// RDS monitoring roles — required for dbi→role related-panel pivot.
 	// Matched by checkDbiRole via AssociatedRoles[].RoleArn and MonitoringRoleArn on prod-dbi-1.
 	roles = append(roles, iamtypes.Role{

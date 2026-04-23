@@ -12,8 +12,9 @@ type ElastiCacheDescribeCacheClustersAPI interface {
 }
 
 // ElastiCacheDescribeReplicationGroupsAPI defines the interface for the
-// ElastiCache DescribeReplicationGroups operation. Used by redis→kms (kms key)
-// and redis→secrets (AUTH token / user group ARN).
+// ElastiCache DescribeReplicationGroups operation. This is the primary list API
+// for the redis resource type — each row represents one ReplicationGroup.
+// Also used by related checkers for member-cluster resolution.
 type ElastiCacheDescribeReplicationGroupsAPI interface {
 	DescribeReplicationGroups(ctx context.Context, params *elasticache.DescribeReplicationGroupsInput, optFns ...func(*elasticache.Options)) (*elasticache.DescribeReplicationGroupsOutput, error)
 }

@@ -359,6 +359,11 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		m.relatedGen++      // cancel in-flight results from previous batch
 		m.enrichGen++       // cancel in-flight enrichment from previous batch
 		m.enrichResKey = "" // force gen bump on next enrichment dispatch
+		// Invalidate the SES v1 receipt rule set cache so Ctrl+R on a detail view
+		// picks up receipt-rule changes without requiring a profile/region switch.
+		if rt == "ses" {
+			awsclient.InvalidateSESRuleSetCache(m.clients)
+		}
 		m.flash = flashState{text: "Refreshing...", isError: false, active: true}
 
 		var cmds []tea.Cmd
@@ -385,6 +390,9 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	}
 	rt := rl.ResourceType()
 	delete(m.resourceCache, rt) // clear cache for refreshed type only
+	if rt == "ses" {
+		awsclient.InvalidateSESRuleSetCache(m.clients)
+	}
 	m.flash = flashState{text: "Refreshing...", isError: false, active: true}
 
 	// Top-level list with a registered enricher: bump per-type gen, clear
@@ -845,6 +853,9 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 // across both Wave-1 (IsIssue() status color) and Wave-2 (enrichment findings).
 // Two findings on the same instance count as one.
 //
+// Only `!`-severity findings contribute to the S1 badge. `~`-severity findings
+// are informational and must not bump the count.
+//
 // Invariant: result ≤ len(wave1Resources). Findings keyed by IDs not present
 // in wave1Resources are skipped (orphans) — they would otherwise inflate the
 // badge above the visible row count, e.g. an enricher dispatched for cluster
@@ -863,7 +874,10 @@ func unifiedIssueCount(wave1Resources []resource.Resource, td resource.ResourceT
 			ids[r.ID] = struct{}{}
 		}
 	}
-	for id := range findings {
+	for id, finding := range findings {
+		if finding.Severity != "!" {
+			continue
+		}
 		if _, ok := knownIDs[id]; ok {
 			ids[id] = struct{}{}
 		}

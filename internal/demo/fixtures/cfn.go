@@ -143,6 +143,21 @@ func NewCFNFixtures() *CFNFixtures {
 				{Key: aws.String("Environment"), Value: aws.String("production")},
 			},
 		},
+		// Redis prod CFN stack — required for redis→cfn related-panel pivot.
+		// The prod-redis-sessions RG carries the aws:cloudformation:stack-name tag
+		// pointing to ProdRedisCFNStack so checkRedisCFN resolves a non-zero count.
+		{
+			StackName:    aws.String(ProdRedisCFNStack),
+			StackStatus:  cfntypes.StackStatusCreateComplete,
+			CreationTime: aws.Time(mustParseCFNTime("2025-03-15T08:00:00+00:00")),
+			Description:  aws.String("ElastiCache Redis cluster for production session storage"),
+			StackId:      aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/" + ProdRedisCFNStack + "/aaaabbbb-cccc-dddd-eeee-ffffffffffff"),
+			RoleARN:      aws.String(prodCIDeployRoleARN),
+			Tags: []cfntypes.Tag{
+				{Key: aws.String("Environment"), Value: aws.String("production")},
+				{Key: aws.String("Service"), Value: aws.String("sessions")},
+			},
+		},
 	}
 
 	stackEvents := map[string][]cfntypes.StackEvent{

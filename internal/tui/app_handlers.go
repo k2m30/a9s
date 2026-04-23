@@ -240,6 +240,7 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 			m.clients = m.preSuppliedClients
 		}
 	} else if clients, ok := msg.Clients.(*awsclient.ServiceClients); ok {
+		awsclient.ClearAllSESRuleSetCaches() // drop stale SES rule-set cache from prior *ServiceClients
 		m.clients = clients
 	} else {
 		wrongTypeErr := fmt.Errorf("internal: unexpected ClientsReadyMsg.Clients type %T", msg.Clients)

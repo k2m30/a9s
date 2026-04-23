@@ -233,6 +233,54 @@ func NewCloudWatchFixtures() *CloudWatchFixtures {
 					{Name: aws.String("DBClusterIdentifier"), Value: aws.String("prod-aurora-cluster")},
 				},
 			},
+			// Redis prod alarm — required for redis→alarm related-panel pivot.
+			// Dimension CacheClusterId matches ProdRedisMemberClusterID so
+			// checkRedisAlarms resolves a non-zero count for the demo showroom.
+			{
+				AlarmName:             aws.String("redis-prod-cache-hits"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:redis-prod-cache-hits"),
+				AlarmDescription:      aws.String("Triggers when ElastiCache Redis cache-hit ratio drops below 80%"),
+				StateValue:            cwtypes.StateValueAlarm,
+				StateReason:           aws.String("Threshold Crossed: 1 datapoint [72.3] was less than or equal to the threshold (80.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 10, 14, 0, 0, 0, time.UTC)),
+				MetricName:            aws.String("CacheHitRate"),
+				Namespace:             aws.String("AWS/ElastiCache"),
+				Threshold:             aws.Float64(80.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorLessThanOrEqualToThreshold,
+				EvaluationPeriods:     aws.Int32(3),
+				DatapointsToAlarm:     aws.Int32(2),
+				Period:                aws.Int32(300),
+				Statistic:             cwtypes.StatisticAverage,
+				TreatMissingData:      aws.String("missing"),
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{ProdRedisSNSTopicARN},
+				OKActions:             []string{ProdRedisSNSTopicARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("CacheClusterId"), Value: aws.String(ProdRedisMemberClusterID)},
+				},
+			},
+			// orders-prod-throttle — DDB→alarm pivot: Dimensions[TableName=orders-prod].
+			{
+				AlarmName:             aws.String("orders-prod-throttle"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:orders-prod-throttle"),
+				AlarmDescription:      aws.String("Triggers when orders-prod DynamoDB read/write throttle events exceed threshold"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 3 datapoints were less than or equal to the threshold (100.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 20, 9, 0, 0, 0, time.UTC)),
+				MetricName:            aws.String("ThrottledRequests"),
+				Namespace:             aws.String("AWS/DynamoDB"),
+				Threshold:             aws.Float64(100.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanThreshold,
+				EvaluationPeriods:     aws.Int32(3),
+				Period:                aws.Int32(300),
+				Statistic:             cwtypes.StatisticSum,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				OKActions:             []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("TableName"), Value: aws.String(OrdersProdID)},
+				},
+			},
 			// Issue: OK state but ActionsEnabled=false → Warning (alarm silenced/muted)
 			{
 				AlarmName:             aws.String("alarm-muted"),

@@ -94,7 +94,7 @@
 | `rtb` | [API_RouteTable](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_RouteTable.html) | `cfn`, `ct-events`, `eni`, `igw`, `nat`, `subnet`, `tgw`, `vpc`, `vpce` |
 | `s3` | [API_ListBuckets](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListBuckets.html) | `athena`, `backup`, `cf`, `cfn`, `ct-events`, `eb-rule`, `glue`, `kms`, `lambda`, `r53`, `role`, `s3`, `sns`, `sqs`, `trail` |
 | `secrets` | [API_SecretListEntry](https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_SecretListEntry.html) | `cb`, `cfn`, `codeartifact`, `ct-events`, `dbi`, `eb`, `ecs-task`, `kms`, `lambda`, `logs`, `role`, `sns` |
-| `ses` | [API_IdentityInfo](https://docs.aws.amazon.com/ses/latest/APIReference-V2/API_IdentityInfo.html) | `ct-events`, `eb-rule`, `kinesis`, `lambda`, `r53`, `s3`, `sns` |
+| `ses` | [API_IdentityInfo](https://docs.aws.amazon.com/ses/latest/APIReference-V2/API_IdentityInfo.html) | `ct-events`, `eb-rule`, `lambda`, `r53`, `s3`, `sns` |
 | `sfn` | [API_StateMachineListItem](https://docs.aws.amazon.com/step-functions/latest/apireference/API_StateMachineListItem.html) | `alarm`, `ct-events`, `eb-rule`, `kms`, `lambda`, `logs`, `role` |
 | `sg` | [API_SecurityGroup](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_SecurityGroup.html) | `cfn`, `ct-events`, `ec2`, `elb`, `eni`, `lambda`, `sg`, `vpc` |
 | `sns` | [API_Topic](https://docs.aws.amazon.com/sns/latest/api/API_Topic.html) | `alarm`, `ct-events`, `kms`, `role`, `sns-sub` |
@@ -880,9 +880,8 @@ AWS API: https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_Secr
 AWS API: https://docs.aws.amazon.com/ses/latest/APIReference-V2/API_IdentityInfo.html
 
 - **`ct-events`** — Audit trail for identity changes.
-- **`eb-rule`** — sesv2:GetEmailIdentity → ConfigurationSetName → sesv2:GetConfigurationSetEventDestinations → EventBridgeDestination.EventBusArn.
-- **`kinesis`** — sesv2:GetEmailIdentity → ConfigurationSetName → sesv2:GetConfigurationSetEventDestinations → KinesisFirehoseDestination.DeliveryStreamArn (Firehose, not Kinesis Data Streams).
-- **`lambda`** — ses:DescribeActiveReceiptRuleSet → LambdaAction.FunctionArn (SES v1 only; not available via SESv2 SDK — returns 0).
+- **`eb-rule`** — sesv2:GetEmailIdentity → ConfigurationSetName → sesv2:GetConfigurationSetEventDestinations → EventBridgeDestination.EventBusArn; extract bus name and cross-reference the eb-rule cache on `EventBusName`. Returns rule names (not bus ARNs) so drilling filters correctly.
+- **`lambda`** — ses:DescribeActiveReceiptRuleSet → LambdaAction.FunctionArn (SES v1 only; not available via SESv2 SDK — returns 0). Function names extracted from ARNs to match the lambda cache's IDs.
 - **`r53`** — Identity domain (or domain portion of email address) matched against Route 53 hosted zone names.
 - **`s3`** — ses:DescribeActiveReceiptRuleSet → S3Action.BucketName (SES v1 only; not available via SESv2 SDK — returns 0).
 - **`sns`** — sesv2:GetEmailIdentity → ConfigurationSetName → sesv2:GetConfigurationSetEventDestinations → SnsDestination.TopicArn.
