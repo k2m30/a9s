@@ -137,9 +137,8 @@ func FetchRedisPage(ctx context.Context, api ElastiCacheDescribeReplicationGroup
 		statusPhrase := redisStatusPhrase(issues)
 
 		r := resource.Resource{
-			ID:     rgID,
-			Name:   rgID,
-			Status: statusPhrase,
+			ID:   rgID,
+			Name: rgID,
 			Fields: map[string]string{
 				"cluster_id": rgID,
 				"node_type":  nodeType,
