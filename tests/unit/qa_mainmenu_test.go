@@ -248,7 +248,7 @@ func TestQA_MainMenu_CursorStopsAtBottom(t *testing.T) {
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
 
-	// Press G to go to bottom (SES Identities), then j should stay at bottom
+	// Press G to go to bottom (Backup Plans), then j should stay at bottom
 	m, _ = rootApplyMsg(m, rootKeyPress("G"))
 	m, _ = rootApplyMsg(m, rootKeyPress("j"))
 
@@ -261,8 +261,8 @@ func TestQA_MainMenu_CursorStopsAtBottom(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
-	if nav.ResourceType != "ses" {
-		t.Errorf("j at bottom should stay on ses, got %q", nav.ResourceType)
+	if nav.ResourceType != "backup" {
+		t.Errorf("j at bottom should stay on backup, got %q", nav.ResourceType)
 	}
 }
 
@@ -305,8 +305,8 @@ func TestQA_MainMenu_PageUpMovesMultipleItems(t *testing.T) {
 	}
 	msg := cmd()
 	nav := msg.(messages.NavigateMsg)
-	if nav.ResourceType == "ses" {
-		t.Error("after PageUp from bottom, cursor should have moved up from ses")
+	if nav.ResourceType == "backup" {
+		t.Error("after PageUp from bottom, cursor should have moved up from backup")
 	}
 }
 
@@ -326,8 +326,8 @@ func TestQA_MainMenu_PageDownClampsAtBottom(t *testing.T) {
 	}
 	msg := cmd()
 	nav := msg.(messages.NavigateMsg)
-	if nav.ResourceType != "ses" {
-		t.Errorf("repeated PageDown should end on ses, got %q", nav.ResourceType)
+	if nav.ResourceType != "backup" {
+		t.Errorf("repeated PageDown should end on backup, got %q", nav.ResourceType)
 	}
 }
 
@@ -454,8 +454,8 @@ func TestQA_MainMenu_JumpToBottomWithShiftG(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
-	if nav.ResourceType != "ses" {
-		t.Errorf("after G, should be at bottom (ses), got %q", nav.ResourceType)
+	if nav.ResourceType != "backup" {
+		t.Errorf("after G, should be at bottom (backup), got %q", nav.ResourceType)
 	}
 }
 
@@ -496,8 +496,8 @@ func TestQA_MainMenu_ShiftGOnLastRowIsNoop(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
-	if nav.ResourceType != "ses" {
-		t.Errorf("G on last row should stay on ses, got %q", nav.ResourceType)
+	if nav.ResourceType != "backup" {
+		t.Errorf("G on last row should stay on backup, got %q", nav.ResourceType)
 	}
 }
 
@@ -828,11 +828,11 @@ func TestQA_MainMenu_FirstItemIsEC2(t *testing.T) {
 	}
 }
 
-func TestQA_MainMenu_LastItemIsSES(t *testing.T) {
+func TestQA_MainMenu_LastItemIsBackup(t *testing.T) {
 	allTypes := resource.AllResourceTypes()
 	last := allTypes[len(allTypes)-1]
-	if last.ShortName != "ses" {
-		t.Errorf("last resource type should be ses, got %q", last.ShortName)
+	if last.ShortName != "backup" {
+		t.Errorf("last resource type should be backup, got %q", last.ShortName)
 	}
 }
 

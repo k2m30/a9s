@@ -22,6 +22,76 @@ type NavigableField struct {
 	TargetType string // resource short name (e.g., "vpc")
 }
 
+// NavIDFromValue returns the bare resource ID suitable for target lookup,
+// given a raw field value. When the value is an AWS ARN and the target
+// resource type indexes on a bare name/UUID (not the ARN), this extracts
+// the correct lookup key so Enter navigation lands on the matching row.
+//
+// When no extractor is registered for the target type, or the value is
+// already bare (no "/" or ":" segment to strip), the value is returned
+// unchanged — the caller should fall back to the raw value.
+//
+// Registered extractors cover the target types where AWS consistently
+// emits ARNs in describe-response fields but a9s indexes on the bare
+// id/name. For target types whose IDs ARE ARNs (sns, for example), no
+// extractor is registered — navigation works directly.
+func NavIDFromValue(targetType, value string) string {
+	if value == "" {
+		return ""
+	}
+	if f, ok := navIDExtractors[targetType]; ok {
+		if extracted := f(value); extracted != "" {
+			return extracted
+		}
+	}
+	return value
+}
+
+// navIDExtractors maps target resource types to extractors that derive
+// the bare lookup ID from a raw field value (typically an ARN).
+var navIDExtractors = map[string]func(string) string{
+	"kms":      arnLastSlashSegment,
+	"role":     arnLastSlashSegment,
+	"ecs":      arnLastSlashSegment,
+	"logs":     arnLastColonSegment,
+	"s3":       s3BucketFromARN,
+	"iam-user": arnLastSlashSegment,
+}
+
+// arnLastSlashSegment returns the substring after the last "/".
+// Example: "arn:aws:kms:us-east-1:123:key/UUID" → "UUID".
+// Returns "" if the input has no "/" or if "/" is the final character.
+func arnLastSlashSegment(s string) string {
+	i := strings.LastIndex(s, "/")
+	if i < 0 || i == len(s)-1 {
+		return ""
+	}
+	return s[i+1:]
+}
+
+// arnLastColonSegment returns the substring after the last ":".
+// Example: "arn:aws:logs:us-east-1:123:log-group:/aws/lambda/fn" → "/aws/lambda/fn".
+// Returns "" if the input has no ":" or if ":" is the final character.
+func arnLastColonSegment(s string) string {
+	i := strings.LastIndex(s, ":")
+	if i < 0 || i == len(s)-1 {
+		return ""
+	}
+	return s[i+1:]
+}
+
+// s3BucketFromARN extracts the bucket name from an S3 bucket ARN.
+// Example: "arn:aws:s3:::my-bucket" → "my-bucket". "arn:aws:s3:::" → "".
+// Input without the "arn:aws:s3:::" prefix is returned unchanged so a bare
+// bucket name (the common case) passes through.
+func s3BucketFromARN(s string) string {
+	const prefix = "arn:aws:s3:::"
+	if rest, ok := strings.CutPrefix(s, prefix); ok {
+		return rest
+	}
+	return s
+}
+
 // RelatedCheckResult is returned by a RelatedChecker and carries all state
 // needed by the right-column panel to display a row and navigate on Enter.
 //

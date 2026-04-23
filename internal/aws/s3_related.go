@@ -118,7 +118,7 @@ func checkS3CFN(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
 	}
 	if cfnList == nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.ApproximateZero("cfn")
 	}
 	var ids []string
 	for _, cfnRes := range cfnList {
@@ -228,7 +228,7 @@ func checkS3Athena(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.RelatedCheckResult{TargetType: "athena", Count: -1, Err: err}
 	}
 	if wgList == nil {
-		return resource.RelatedCheckResult{TargetType: "athena", Count: -1}
+		return resource.ApproximateZero("athena")
 	}
 	var ids []string
 	for _, wg := range wgList {
@@ -254,7 +254,7 @@ func checkS3Glue(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "glue", Count: -1, Err: err}
 	}
 	if jobList == nil {
-		return resource.RelatedCheckResult{TargetType: "glue", Count: -1}
+		return resource.ApproximateZero("glue")
 	}
 	var ids []string
 	for _, jobRes := range jobList {
@@ -272,10 +272,16 @@ func checkS3Glue(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResult("glue", ids)
 }
 
-// checkS3Backup scans the backup cache for recovery points whose ResourceArn
-// identifies this bucket (arn:aws:s3:::BUCKET). The backup cache holds backup
-// plans/jobs, not per-resource recovery points — so a full scan rarely matches.
-// When the cache lacks the needed shape, Count: 0 (scan complete, no hits).
+// checkS3Backup scans the backup cache for plans that cover this bucket.
+// Two matching paths are applied per cached plan:
+//   - Legacy: Fields["resource_arn"] exactly equals the bucket ARN
+//     (recovery-point-shaped cache entries; unrelated to BackupSelection).
+//   - Selection: BackupPlanCoversARN checks Fields["resources"] (may contain
+//     wildcard patterns such as arn:aws:s3:::*) and Fields["not_resources"]
+//     (exclusion list). A plan covers this bucket iff any Resources entry
+//     matches AND no NotResources entry matches.
+//
+// No live API call is made — this is a pure cache scan.
 func checkS3Backup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
@@ -287,11 +293,11 @@ func checkS3Backup(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.RelatedCheckResult{TargetType: "backup", Count: -1, Err: err}
 	}
 	if bkList == nil {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
+		return resource.ApproximateZero("backup")
 	}
 	var ids []string
 	for _, bk := range bkList {
-		if bk.Fields["resource_arn"] == bucketARN || containsARNExact(bk.Fields["resources"], bucketARN) {
+		if bk.Fields["resource_arn"] == bucketARN || BackupPlanCoversARN(bk.Fields["resources"], bk.Fields["not_resources"], bucketARN) {
 			ids = append(ids, bk.ID)
 		}
 	}
@@ -299,18 +305,6 @@ func checkS3Backup(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.ApproximateZero("backup")
 	}
 	return relatedResult("backup", ids)
-}
-
-// containsARNExact splits a comma-joined ARN list and returns true if any
-// entry exactly equals target. This is required over strings.Contains
-// because ARNs share a ":::<name>" segment that collides on prefix
-// (e.g. bucket "prod" would match a selection covering
-// arn:aws:s3:::prod-logs).
-func containsARNExact(csv, target string) bool {
-	if csv == "" || target == "" {
-		return false
-	}
-	return slices.Contains(strings.Split(csv, ","), target)
 }
 
 // checkS3EBRule scans the eb-rule cache for rules whose EventPattern filters
@@ -328,7 +322,7 @@ func checkS3EBRule(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1, Err: err}
 	}
 	if ruleList == nil {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
+		return resource.ApproximateZero("eb-rule")
 	}
 	bucketQuoted := `"` + bucket + `"`
 	var ids []string
@@ -367,7 +361,7 @@ func checkS3R53(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.RelatedCheckResult{TargetType: "r53", Count: -1, Err: err}
 	}
 	if zoneList == nil {
-		return resource.RelatedCheckResult{TargetType: "r53", Count: -1}
+		return resource.ApproximateZero("r53")
 	}
 	var ids []string
 	for _, zone := range zoneList {
@@ -431,7 +425,7 @@ func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: rerr}
 	}
 	if roleList == nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.ApproximateZero("role")
 	}
 
 	// Match role ARNs against the loaded role cache. Anything that
@@ -516,7 +510,7 @@ func checkS3Trail(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.RelatedCheckResult{TargetType: "trail", Count: -1, Err: err}
 	}
 	if trailList == nil {
-		return resource.RelatedCheckResult{TargetType: "trail", Count: -1}
+		return resource.ApproximateZero("trail")
 	}
 
 	var ids []string
@@ -554,7 +548,7 @@ func checkS3CF(ctx context.Context, clients any, res resource.Resource, cache re
 		return resource.RelatedCheckResult{TargetType: "cf", Count: -1, Err: err}
 	}
 	if cfList == nil {
-		return resource.RelatedCheckResult{TargetType: "cf", Count: -1}
+		return resource.ApproximateZero("cf")
 	}
 
 	var ids []string
