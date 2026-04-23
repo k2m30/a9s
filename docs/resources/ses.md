@@ -23,24 +23,18 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `ct-events`, `eb-rule`, `kinesis`, `lambda`, `r53`, `s3`, `sns`.
+Expected targets from `docs/related-resources.md` Per-type contract: `ct-events`, `eb-rule`, `lambda`, `r53`, `s3`, `sns`.
 
 ### `eb-rule`
 
 - **Why related**: EventBridge rules that receive SES event-destination deliveries (bounce/complaint/delivery streams routed through EventBridge).
-- **How discovered**: call `sesv2:GetEmailIdentity` for the selected identity → read `ConfigurationSetName` → call `sesv2:GetConfigurationSetEventDestinations` → collect `EventBridgeDestination.EventBusArn` and pivot to those EventBridge buses / rules.
-- **Count shown**: yes.
-
-### `kinesis`
-
-- **Why related**: Kinesis Data Firehose delivery streams that receive SES event-destination deliveries (SES publishes to Firehose, not Kinesis Data Streams — the shortName is reused for UX because a9s groups Firehose under `kinesis`).
-- **How discovered**: call `sesv2:GetEmailIdentity` → `ConfigurationSetName` → `sesv2:GetConfigurationSetEventDestinations` → `KinesisFirehoseDestination.DeliveryStreamArn`.
+- **How discovered**: call `sesv2:GetEmailIdentity` for the selected identity → read `ConfigurationSetName` → call `sesv2:GetConfigurationSetEventDestinations` → for each destination with `EventBridgeDestination`, extract the bus name from `EventBusArn` (last path segment after `/`). Scan the `eb-rule` cache for rules whose `EventBusName` matches — those are the rules that can fire on SES events delivered to that bus. Returns rule IDs (not bus ARNs) to match the `eb-rule` resource type's ID format.
 - **Count shown**: yes.
 
 ### `lambda`
 
-- **Why related**: Lambda functions invoked by SES **inbound** receipt rules (`LambdaAction`) — the receiver-side workflow for inbound mail. SES v1 feature only; SESv2 does not expose receipt rules. — a9s-devops: in SESv2-only accounts this pivot will always render 0, which is still operator-honest because it documents the absence.
-- **How discovered**: call `ses:DescribeActiveReceiptRuleSet` (SES v1) → walk `Rules[].Actions[].LambdaAction.FunctionArn`. When the SDK client is SESv2-only, returns 0.
+- **Why related**: Lambda functions invoked by SES **inbound** receipt rules (`LambdaAction`) — the receiver-side workflow for inbound mail. SES v1 feature; a9s wires a dedicated SES v1 SDK client to surface this pivot.
+- **How discovered**: call `ses:DescribeActiveReceiptRuleSet` (SES v1) → walk `Rules[].Actions[].LambdaAction.FunctionArn`; extract the function name after `:function:` for cross-referencing the lambda list. Function names (not ARNs) are returned to match the `lambda` resource type's ID format. Accounts with no active receipt rule set (pure outbound SES) render 0 — operator-honest absence.
 - **Count shown**: yes.
 
 ### `r53`
@@ -51,8 +45,8 @@ Expected targets from `docs/related-resources.md` Per-type contract: `ct-events`
 
 ### `s3`
 
-- **Why related**: S3 buckets where SES **inbound** receipt rules deposit received mail (`S3Action`). SES v1 feature only; SESv2 does not expose receipt rules.
-- **How discovered**: call `ses:DescribeActiveReceiptRuleSet` (SES v1) → walk `Rules[].Actions[].S3Action.BucketName`. When the SDK client is SESv2-only, returns 0.
+- **Why related**: S3 buckets where SES **inbound** receipt rules deposit received mail (`S3Action`). SES v1 feature; a9s wires the SES v1 SDK client to surface this pivot.
+- **How discovered**: call `ses:DescribeActiveReceiptRuleSet` (SES v1) → walk `Rules[].Actions[].S3Action.BucketName`. Accounts with no active receipt rule set render 0 — operator-honest absence.
 - **Count shown**: yes.
 
 ### `sns`
@@ -157,11 +151,13 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` §"What is a9s?").
 - Related targets **deliberately not registered** for `ses` (from `docs/related-resources.md` Out-of-scope list): `acm` (SES uses DKIM, not ACM, for domain identities); `alarm` (general reverse-scan of CloudWatch alarms); `cfn` (tag-heuristic only); `kms` (configuration set / identity encryption is AWS-managed by default); `logs` (event destinations go to Firehose/SNS/EventBridge, not CW Logs directly); `role` (role usage is embedded in receipt-rule actions / Firehose destinations); `trail` (CloudTrail data-events link is indirect).
+- `kinesis`: SES event destinations use Kinesis Firehose, which is not currently modeled as an a9s resource type. Follow-up: tracked separately.
 
 ## 6. Citations
 
-- `ses` appears in related-resources.md per-type table — `docs/related-resources.md` § row `| ses | API_IdentityInfo | ct-events, eb-rule, kinesis, lambda, r53, s3, sns |`.
-- Per-target discovery mechanics for `eb-rule`, `kinesis`, `lambda`, `r53`, `s3`, `sns` — `docs/related-resources.md` § `### ses`.
+- `ses` appears in related-resources.md per-type table — `docs/related-resources.md` § row `| ses | API_IdentityInfo | ct-events, eb-rule, lambda, r53, s3, sns |`.
+- Per-target discovery mechanics for `eb-rule`, `lambda`, `r53`, `s3`, `sns` — `docs/related-resources.md` § `### ses`.
+- `kinesis` removed: SES event destinations use Kinesis Firehose; `kinesis` in a9s models Kinesis Data Streams — a different service. The pivot was producing dead drill-through results (Firehose ARN format does not match Data Streams IDs). Tracked separately for a potential `firehose` resource type.
 - Out-of-scope related targets (`acm`, `alarm`, `cfn`, `kms`, `logs`, `role`, `trail`) — `docs/related-resources.md` § Out-of-scope bullets for `ses`.
 - `ct-events` is a universal pivot — `docs/related-resources.md` § Policy.
 - Wave 1 and Wave 2 signal list — `docs/attention-signals.md` § Backup & Email, row `ses`.
@@ -173,3 +169,4 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Account-wide findings should decorate every identity row's S4 with the `account ...` prefix, and S1 counts once — `a9s-devops (2026-04-20): possible=yes, worth=yes. EnforcementStatus=SHUTDOWN stops all SES sending account-wide; every identity on the list is affected. Honest attribution requires the per-row prefix "account PROBATION:" / "account SHUTDOWN:" so the operator does not misread a single identity as the culprit; counting the finding once in S1 avoids double-counting the same root cause across N rows.`
 - `SendingEnabled==false` on a verified identity is a yellow (Warning) row with `sending disabled`, not green + `~` glyph — `a9s-devops (2026-04-20): possible=yes, worth=yes. The ~ annotation is reserved for background checks on fully-healthy rows (e.g. maintenance scheduled). A paused identity cannot send, so it fails the "fully healthy right now" test; bucketing Warning/yellow matches operator intuition that something is operationally off.`
 - Read-only invariant (no write operations) — `docs/architecture.md` § "What is a9s?".
+- `user decision (2026-04-23)`: wire a dedicated SES v1 SDK client (`github.com/aws/aws-sdk-go-v2/service/ses`) to back the `lambda` and `s3` pivots via `ses:DescribeActiveReceiptRuleSet`. SES v1 receipt rules are a minority workflow (inbound email) but when present the pivot is genuinely load-bearing (3am debugging of `support@`/`invoices@`-style routers). Returning a silent 0 when the relationship does exist is worse than the one-call cost.

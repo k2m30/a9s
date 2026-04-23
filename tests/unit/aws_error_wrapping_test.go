@@ -58,10 +58,10 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			},
 		},
 		{
-			name:     "Redis clusters",
-			contains: "fetching Redis clusters",
+			name:     "Redis replication groups",
+			contains: "fetching Redis replication groups",
 			call: func() error {
-				_, err := awsclient.FetchRedisClusters(ctx, &mockElastiCacheClient{err: sentinel})
+				_, err := awsclient.FetchRedis(ctx, &mockElastiCacheReplicationGroupsClient{err: sentinel})
 				return err
 			},
 		},

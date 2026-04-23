@@ -7,11 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.43.0] - 2026-04-24
+
+### Changed
+- Redis, DynamoDB, DBI (RDS instance), DBC (RDS cluster), S3, SES, and Backup resources re-implemented from spec (#295, #296) — spec-compliant §4 phrases, Wave-2 findings, graph-root pivot accuracy
+- Detail view: unified `Attention (N)` section replaces per-type issue sections (Pending Maintenance, Target Health, Latest Build, etc.) — one consistent format for every resource type
+- Redis fetcher now lists `ReplicationGroup` (was `CacheCluster`); engine filter excludes Valkey/Memcached
+- Backup enricher surfaces Wave-2 job-state findings via the unified Status column instead of a parallel column
+
 ### Added
-- API Gateway REST v1 APIs now appear in the `apigw` list alongside HTTP/WebSocket APIs (previously only v2 APIs were shown)
-- API Gateway detail view resolves ACM certificates attached via custom domain mappings (previously showed a permanent "?")
+- Shard-level Wave-1 phrases for cluster-mode-enabled Redis (e.g. `shard ng-1: modifying (+2)`)
+- Table-driven drill-through integration tests pin every registered related-panel pivot + navigable field across nine graph-root fixtures
+- Central `NavIDFromValue` registry normalizes ARNs to bare IDs at navigation time for KMS, IAM role, ECS cluster, CloudWatch Logs, S3, and IAM user
+- `ApproximateZero` / `Approximate=true` contract for truncated reverse-scan related checkers (DDB, S3, SES, Redis)
+- Backup plan coverage detection honors `arn:aws:<service>:*:*:<type>/*` wildcards, `NotResources` exclusions, and tag-based selections (#296)
+- API Gateway REST v1 APIs now appear in the `apigw` list alongside HTTP/WebSocket APIs
+- API Gateway detail view resolves ACM certificates attached via custom domain mappings
 
 ### Fixed
+- Navigable fields in detail view now land on the actual resource — highlighting a KMS ARN, role ARN, bucket name, or ECS cluster ARN and pressing enter previously produced empty landing lists
+- SES `DescribeActiveReceiptRuleSet` cache clears on profile/region switch — previously stale Lambda/S3 related-panel counts persisted after `Ctrl+R` or profile switch
+- SES related pivots: lambda/eb-rule ID-format mismatch, kinesis type mismatch, Ctrl+R staleness (#295)
+- S3 related-panel joins now use boundary-safe resource-ID matching (no more substring collisions)
+- Attention entry color capped at row's S2 color bucket (no more green glyphs on red rows)
+- Redis color function matches §4 phrases via `StripFindingSuffix` so the Status column paints correctly under multi-finding rows
 - EKS clusters whose `DescribeCluster` call fails now surface as a `DescribeFailed` row instead of silently vanishing from the list
 - KMS paginated fetcher fully paginates `ListAliases` so customer-managed keys on later alias pages no longer render with a blank alias
 - API Gateway enricher emits the documented "no deployed stages" warning when `GetStages` returns empty, matching `docs/attention-signals.md`

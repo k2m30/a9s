@@ -413,6 +413,12 @@ func (m *DetailModel) buildFieldList() {
 		if tt, ok := navMap[composedPath]; ok && subVal != "" {
 			items[i].IsNavigable = true
 			items[i].TargetType = tt
+			// Apply target-type ARN→ID extraction when the raw value is an ARN
+			// but the target resource type indexes on a bare id. Value stays the
+			// displayed ARN; NavID carries the bare lookup key.
+			if navID := resource.NavIDFromValue(tt, subVal); navID != "" && navID != subVal {
+				items[i].NavID = navID
+			}
 			// Preserve the YAML list marker so the navigable row aligns
 			// with sibling rows rendered via colorizeDetailLine.
 			if hasDash {
@@ -426,6 +432,18 @@ func (m *DetailModel) buildFieldList() {
 			ancestorByLevel[level] = subKey
 		}
 	}
+	// Post-process: apply NavIDFromValue to top-level scalar navigable items.
+	// ExtractFieldList marks them IsNavigable but does not know the target type's
+	// ID format — NavID must be resolved here where resource.NavIDFromValue is available.
+	// Only set NavID when the extractor actually changes the value (the value is an ARN).
+	for i, item := range items {
+		if item.IsNavigable && !item.IsSubField && item.TargetType != "" && item.Value != "" {
+			if navID := resource.NavIDFromValue(item.TargetType, item.Value); navID != "" && navID != item.Value {
+				items[i].NavID = navID
+			}
+		}
+	}
+
 	m.fieldList = items
 	if m.resourceType == "ec2" {
 		m.injectEC2StatusChecks()

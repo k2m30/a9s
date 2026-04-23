@@ -12,12 +12,11 @@ import (
 
 func init() {
 	registerIssueEnricher("ddb", EnrichDynamoDBPITR, 100)
-	resource.RegisterIssueEnricherFieldKeys("ddb", []string{"pitr_enabled"})
 }
 
 // EnrichDynamoDBPITR calls DescribeContinuousBackups for each table (cap EnrichmentCap)
 // and returns a Finding when PITR is not enabled.
-// Severity is "~" (informational); IssueCount counts PITR-disabled findings.
+// Severity is "~" (informational); PITR-disabled findings do not bump the menu badge.
 func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
@@ -54,17 +53,24 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 			continue
 		}
 		pitrEnabled := string(pitr.PointInTimeRecoveryStatus) == "ENABLED"
-		pitrVal := "false"
-		if pitrEnabled {
-			pitrVal = "true"
-		}
-		fieldUpdates[name] = map[string]string{
-			"pitr_enabled": pitrVal,
-		}
 		if !pitrEnabled {
-			findings[name] = resource.EnrichmentFinding{
+			// Compute the new status value: if the table already has a non-empty
+			// status phrase (e.g. "archived: kms key lost"), bump the suffix so the
+			// operator sees there is an additional finding. Otherwise the phrase is
+			// "PITR off" itself.
+			existingStatus := r.Fields["status"]
+			var newStatus string
+			if existingStatus != "" {
+				newStatus = resource.BumpFindingSuffix(existingStatus)
+			} else {
+				newStatus = "PITR off"
+			}
+			fieldUpdates[r.ID] = map[string]string{
+				"status": newStatus,
+			}
+			findings[r.ID] = resource.EnrichmentFinding{
 				Severity: "~",
-				Summary:  "PITR disabled",
+				Summary:  "PITR off",
 			}
 		}
 	}

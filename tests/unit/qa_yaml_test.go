@@ -229,13 +229,15 @@ func TestQA_YAML_Redis_ViewContainsFields(t *testing.T) {
 		out := yamlView(t, c, 120, 40)
 		if c.RawStruct != nil {
 			// When RawStruct is present, YAML renders SDK struct field names
-			expectedKeys := []string{"CacheClusterId", "EngineVersion", "CacheNodeType", "CacheClusterStatus", "NumCacheNodes"}
+			// Post-phase-7: RawStruct is ReplicationGroup, so field names changed.
+			// MemberClusters is omitted from fixture to keep YAML output as key:value pairs only.
+			expectedKeys := []string{"ReplicationGroupId", "Description", "Status", "CacheNodeType"}
 			for _, k := range expectedKeys {
 				if !strings.Contains(out, k) {
 					t.Errorf("Redis YAML for %q missing SDK struct key %q", c.ID, k)
 				}
 			}
-			expectedValues := []string{"test-redis-1", "7.0.7", "cache.t2.micro", "available"}
+			expectedValues := []string{"test-redis-1", "cache.t2.micro", "available"}
 			for _, v := range expectedValues {
 				if !strings.Contains(out, v) {
 					t.Errorf("Redis YAML for %q missing value %q", c.ID, v)

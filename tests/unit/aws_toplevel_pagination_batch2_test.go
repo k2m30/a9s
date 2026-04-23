@@ -1033,73 +1033,70 @@ func TestFetchTargetGroups_Pagination(t *testing.T) {
 }
 
 // ===========================================================================
-// Redis — ElastiCache DescribeCacheClusters (Marker)
+// Redis — ElastiCache DescribeReplicationGroups (Marker)
 // ===========================================================================
 
 type mockRedisPaginatedClient struct {
-	outputs []*elasticache.DescribeCacheClustersOutput
-	inputs  []*elasticache.DescribeCacheClustersInput
+	outputs []*elasticache.DescribeReplicationGroupsOutput
+	inputs  []*elasticache.DescribeReplicationGroupsInput
 	err     error
 	callIdx int
 }
 
-func (m *mockRedisPaginatedClient) DescribeCacheClusters(
+func (m *mockRedisPaginatedClient) DescribeReplicationGroups(
 	ctx context.Context,
-	params *elasticache.DescribeCacheClustersInput,
+	params *elasticache.DescribeReplicationGroupsInput,
 	optFns ...func(*elasticache.Options),
-) (*elasticache.DescribeCacheClustersOutput, error) {
+) (*elasticache.DescribeReplicationGroupsOutput, error) {
 	m.inputs = append(m.inputs, params)
 	if m.err != nil {
 		return nil, m.err
 	}
 	if m.callIdx >= len(m.outputs) {
-		return &elasticache.DescribeCacheClustersOutput{}, nil
+		return &elasticache.DescribeReplicationGroupsOutput{}, nil
 	}
 	out := m.outputs[m.callIdx]
 	m.callIdx++
 	return out, nil
 }
 
-func TestFetchRedisClusters_Pagination(t *testing.T) {
+func TestFetchRedis_Pagination(t *testing.T) {
 	mock := &mockRedisPaginatedClient{
-		outputs: []*elasticache.DescribeCacheClustersOutput{
+		outputs: []*elasticache.DescribeReplicationGroupsOutput{
 			{
 				Marker: aws.String("page2-marker"),
-				CacheClusters: []elasticachetypes.CacheCluster{
-					{CacheClusterId: aws.String("page1-redis-1"), Engine: aws.String("redis"), EngineVersion: aws.String("7.0"), CacheNodeType: aws.String("cache.t3.micro"), CacheClusterStatus: aws.String("available"), NumCacheNodes: aws.Int32(1)},
+				ReplicationGroups: []elasticachetypes.ReplicationGroup{
+					{ReplicationGroupId: aws.String("page1-redis-rg"), Status: aws.String("available"), Engine: aws.String("redis"), MemberClusters: []string{"page1-redis-rg-001"}},
 				},
 			},
 			{
-				CacheClusters: []elasticachetypes.CacheCluster{
-					{CacheClusterId: aws.String("page2-redis-1"), Engine: aws.String("redis"), EngineVersion: aws.String("6.2"), CacheNodeType: aws.String("cache.r6g.large"), CacheClusterStatus: aws.String("available"), NumCacheNodes: aws.Int32(3)},
-					// Non-redis cluster should be filtered out
-					{CacheClusterId: aws.String("page2-memcached-1"), Engine: aws.String("memcached"), EngineVersion: aws.String("1.6"), CacheNodeType: aws.String("cache.t3.small"), CacheClusterStatus: aws.String("available"), NumCacheNodes: aws.Int32(2)},
+				ReplicationGroups: []elasticachetypes.ReplicationGroup{
+					{ReplicationGroupId: aws.String("page2-redis-rg"), Status: aws.String("available"), Engine: aws.String("redis"), MemberClusters: []string{"page2-redis-rg-001", "page2-redis-rg-002"}},
 				},
 			},
 		},
 	}
 
-	resources, err := awsclient.FetchRedisClusters(context.Background(), mock)
+	resources, err := awsclient.FetchRedis(context.Background(), mock)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
 	t.Run("total_count", func(t *testing.T) {
-		// memcached cluster filtered out, so only 2 redis clusters
 		if len(resources) != 2 {
-			t.Fatalf("expected 2 redis resources across 2 pages (memcached filtered), got %d", len(resources))
+			t.Fatalf("expected 2 redis resources across 2 pages, got %d", len(resources))
 		}
 	})
 
 	t.Run("page1_redis", func(t *testing.T) {
-		if resources[0].ID != "page1-redis-1" {
-			t.Errorf("expected %q, got %q", "page1-redis-1", resources[0].ID)
+		if resources[0].ID != "page1-redis-rg" {
+			t.Errorf("expected %q, got %q", "page1-redis-rg", resources[0].ID)
 		}
 	})
 
 	t.Run("page2_redis", func(t *testing.T) {
-		if resources[1].ID != "page2-redis-1" {
-			t.Errorf("expected %q, got %q", "page2-redis-1", resources[1].ID)
+		if resources[1].ID != "page2-redis-rg" {
+			t.Errorf("expected %q, got %q", "page2-redis-rg", resources[1].ID)
 		}
 	})
 
@@ -1598,7 +1595,7 @@ func TestBatch2Pagination_ErrorPropagation(t *testing.T) {
 
 	t.Run("redis_error", func(t *testing.T) {
 		mock := &mockRedisPaginatedClient{err: testErr}
-		_, err := awsclient.FetchRedisClusters(context.Background(), mock)
+		_, err := awsclient.FetchRedis(context.Background(), mock)
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}

@@ -1,276 +1,295 @@
-package unit_test
+// aws_backup_related_test.go — related-target discovery tests for backup.
+//
+// Covers TEST: related_pivots_resolve_nonzero_on_graph_root (U9).
+//
+// Graph-root is ProdDatabasePlanID (plan-broken-2failed):
+//   - Rules → TargetBackupVaultName = "acme-prod-vault"
+//   - acme-prod-vault → EncryptionKeyArn = BackupProdVaultKMSKeyARN → ID "acme-prod-master-key"
+//   - acme-prod-vault → SNSTopicArn = BackupAlertsSNSTopicARN → name "acme-backup-alerts"
+//   - Selections → IamRoleArn = AcmeBackupRoleARN → name "AcmeBackupRoleProd"
+//
+// Non-graph-root baseline: HealthyDailyPlanID (plan-healthy-daily):
+//   - Rules → TargetBackupVaultName = "acme-default-vault"
+//   - acme-default-vault → no EncryptionKeyArn → kms count == 0
+//   - acme-default-vault → no SNS topic → sns count == 0
+//   - Selections → AWSBackupDefaultServiceRole → role count >= 1
+//
+// ct-events pivot is count-shown: unknown (spec §2) — exempt from assertions here.
+package unit
 
 import (
 	"context"
+	"strings"
 	"testing"
 
-	"github.com/aws/aws-sdk-go-v2/service/backup"
+	"github.com/stretchr/testify/require"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
+	_ "github.com/k2m30/a9s/v3/internal/aws" // register enrichers/related via init()
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/demo/fakes"
+	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// TestRelated_Backup_Registered verifies all related defs are registered with non-nil checkers.
-func TestRelated_Backup_Registered(t *testing.T) {
-	defs := resource.GetRelated("backup")
-	if len(defs) == 0 {
-		t.Fatal("no related defs registered for backup")
-	}
+// ---------------------------------------------------------------------------
+// helpers
+// ---------------------------------------------------------------------------
 
-	expected := map[string]string{
-		"role": "IAM Roles",
-		"kms":  "KMS Keys",
-		"sns":  "SNS Topics",
-	}
-	for target, wantDisplay := range expected {
-		found := false
-		for _, def := range defs {
-			if def.TargetType == target {
-				found = true
-				if def.Checker == nil {
-					t.Errorf("backup %q: Checker should not be nil", target)
-				}
-				if def.DisplayName != wantDisplay {
-					t.Errorf("backup %q: DisplayName = %q, want %q", target, def.DisplayName, wantDisplay)
-				}
-				break
-			}
-		}
-		if !found {
-			t.Errorf("expected related def for target %q not found", target)
-		}
-	}
-}
-
-// TestRelated_Backup_Role_Unknown documents why this checker cannot resolve
-// the IAM role from the ListBackupPlans response alone. The
-// backuptypes.BackupPlansListMember exposes only plan metadata (name, id, arn,
-// timestamps) — it does not include the IamRoleArn used by the plan's backup
-// rules. Resolving that would require per-plan GetBackupPlan /
-// GetBackupSelection calls which the fetcher does not perform. Real behavior:
-// Count=-1 (unknown), never Count=0, because we cannot answer.
-func TestRelated_Backup_Role_Unknown(t *testing.T) {
-	var checker resource.RelatedChecker
-	for _, def := range resource.GetRelated("backup") {
-		if def.TargetType == "role" {
-			checker = def.Checker
-		}
-	}
-	if checker == nil {
-		t.Fatal("backup→role checker not registered")
-	}
-
-	source := resource.Resource{
-		ID:   "abcd1234-1111-2222-3333-444455556666",
-		Name: "nightly-prod-plan",
-		Fields: map[string]string{
-			"plan_id":   "abcd1234-1111-2222-3333-444455556666",
-			"plan_name": "nightly-prod-plan",
-		},
-	}
-
-	// With an empty cache the answer is unknown (can't fetch the role).
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
-	if result.Count != -1 {
-		t.Errorf("empty cache: Count = %d, want -1 (unknown — GetBackupPlan required)", result.Count)
-	}
-	if result.TargetType != "role" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType, "role")
-	}
-
-	// Even with a populated role cache we still cannot decide without calling
-	// GetBackupPlan to retrieve BackupRule.IamRoleArn. Must remain unknown.
-	cache := resource.ResourceCache{
-		"role": resource.ResourceCacheEntry{Resources: []resource.Resource{
-			{ID: "AWSBackupDefaultServiceRole", Name: "AWSBackupDefaultServiceRole"},
-		}},
-	}
-	result2 := checker(context.Background(), nil, source, cache)
-	if result2.Count != -1 {
-		t.Errorf("populated cache: Count = %d, want -1 (unknown — tags not available)", result2.Count)
-	}
-}
-
-// backupCheckerByTarget returns the RelatedChecker for the given target type registered
-// under "backup". Fails immediately if the checker is nil or not found.
+// backupCheckerByTarget returns the RelatedChecker for the given target type
+// from the backup related registry. Fails if not found or checker is nil.
 func backupCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	t.Helper()
 	for _, def := range resource.GetRelated("backup") {
 		if def.TargetType == target {
-			if def.Checker == nil {
-				t.Fatalf("backup related checker for %s is nil", target)
-			}
+			require.NotNil(t, def.Checker,
+				"backup related checker for %s is registered but nil", target)
 			return def.Checker
 		}
 	}
-	t.Fatalf("backup related checker for %s not found", target)
+	t.Fatalf("backup related checker for %s not found in registry", target)
 	return nil
 }
 
-// backupPlanSrc returns a minimal backup plan resource.
-func backupPlanSrc() resource.Resource {
+// backupClientsFake returns ServiceClients with only the Backup fake populated.
+// Other service clients remain nil; the backup related checkers only use Backup.
+func backupClientsFake() *awsclient.ServiceClients {
+	return &awsclient.ServiceClients{Backup: fakes.NewBackup()}
+}
+
+// graphRootResource builds a resource.Resource for the graph-root plan
+// (plan-broken-2failed) using the fixture plan member as RawStruct.
+// The related checkers use res.ID for plan lookups, not RawStruct.
+func graphRootResource() resource.Resource {
+	fix := fixtures.NewBackupFixtures()
+	var raw interface{}
+	for _, p := range fix.Plans {
+		if p.BackupPlanId != nil && *p.BackupPlanId == fixtures.ProdDatabasePlanID {
+			raw = p
+			break
+		}
+	}
 	return resource.Resource{
-		ID:   "abcd1234-1111-2222-3333-444455556666",
-		Name: "nightly-prod-plan",
-		Fields: map[string]string{
-			"plan_id": "abcd1234-1111-2222-3333-444455556666",
-		},
+		ID:        fixtures.ProdDatabasePlanID,
+		Name:      "acme-prod-database",
+		RawStruct: raw,
+		Fields:    map[string]string{},
 	}
 }
 
+// healthyPlanResource builds a resource.Resource for the healthy daily plan.
+func healthyPlanResource() resource.Resource {
+	fix := fixtures.NewBackupFixtures()
+	var raw interface{}
+	for _, p := range fix.Plans {
+		if p.BackupPlanId != nil && *p.BackupPlanId == fixtures.HealthyDailyPlanID {
+			raw = p
+			break
+		}
+	}
+	return resource.Resource{
+		ID:        fixtures.HealthyDailyPlanID,
+		Name:      "acme-daily-backup",
+		RawStruct: raw,
+		Fields:    map[string]string{},
+	}
+}
+
+// sliceContainsSubstr returns true if any element of haystack contains needle as a substring.
+func sliceContainsSubstr(haystack []string, needle string) bool {
+	for _, s := range haystack {
+		if strings.Contains(s, needle) {
+			return true
+		}
+	}
+	return false
+}
+
 // ---------------------------------------------------------------------------
-// checkBackupRole — Pattern C: ListBackupSelections per plan ID
+// TEST: related_pivots_resolve_nonzero_on_graph_root (U9) — role pivot
 // ---------------------------------------------------------------------------
 
-// TestRelated_Backup_Role_Match verifies that a plan with a selection carrying
-// an IamRoleArn extracts the role name (last "/" segment).
-func TestRelated_Backup_Role_Match(t *testing.T) {
-	src := backupPlanSrc()
-	clients := &awsclient.ServiceClients{
-		Backup: &fakeBackupCR{
-			listSelectionsOutput: backupListSelectionsWithRole("arn:aws:iam::123456789012:role/AWSBackupDefaultServiceRole"),
-		},
-	}
+// TestBackup_Related_GraphRoot_RoleResolvesAtLeastOne verifies that the role
+// checker returns Count >= 1 for the graph-root plan and that the result
+// mentions "AcmeBackupRoleProd" in ResourceIDs (extracted from ARN by checker).
+func TestBackup_Related_GraphRoot_RoleResolvesAtLeastOne(t *testing.T) {
 	checker := backupCheckerByTarget(t, "role")
-	result := checker(context.Background(), clients, src, resource.ResourceCache{})
+	res := graphRootResource()
+	clients := backupClientsFake()
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
-	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "AWSBackupDefaultServiceRole" {
-		t.Errorf("ResourceIDs = %v, want [AWSBackupDefaultServiceRole]", result.ResourceIDs)
-	}
+	result := checker(context.Background(), clients, res, resource.ResourceCache{})
+
+	require.GreaterOrEqual(t, result.Count, 1,
+		"role pivot must resolve >= 1 for graph-root plan (plan-broken-2failed); got Count=%d", result.Count)
+	require.NotEmpty(t, result.ResourceIDs,
+		"role pivot must return non-empty ResourceIDs when Count >= 1")
+	require.True(t, sliceContainsSubstr(result.ResourceIDs, "AcmeBackupRoleProd"),
+		"role pivot ResourceIDs must contain 'AcmeBackupRoleProd'; got %v", result.ResourceIDs)
+	require.NoError(t, result.Err, "role pivot must not return an error for graph-root")
 }
 
-// TestRelated_Backup_Role_NoSelections verifies Count=0 when no backup selections exist.
-func TestRelated_Backup_Role_NoSelections(t *testing.T) {
-	src := backupPlanSrc()
-	clients := &awsclient.ServiceClients{
-		Backup: &fakeBackupCR{}, // returns empty ListBackupSelectionsOutput
-	}
+// ---------------------------------------------------------------------------
+// TEST: related_pivots_resolve_nonzero_on_graph_root (U9) — kms pivot
+// ---------------------------------------------------------------------------
+
+// TestBackup_Related_GraphRoot_KMSResolvesAtLeastOne verifies that the kms
+// checker returns Count >= 1 for the graph-root plan, resolving through
+// acme-prod-vault → EncryptionKeyArn → key ID "acme-prod-master-key".
+func TestBackup_Related_GraphRoot_KMSResolvesAtLeastOne(t *testing.T) {
+	checker := backupCheckerByTarget(t, "kms")
+	res := graphRootResource()
+	clients := backupClientsFake()
+
+	result := checker(context.Background(), clients, res, resource.ResourceCache{})
+
+	require.GreaterOrEqual(t, result.Count, 1,
+		"kms pivot must resolve >= 1 for graph-root plan; got Count=%d", result.Count)
+	require.NotEmpty(t, result.ResourceIDs,
+		"kms pivot must return non-empty ResourceIDs when Count >= 1")
+	require.True(t, sliceContainsSubstr(result.ResourceIDs, fixtures.BackupProdVaultKMSKeyID),
+		"kms pivot ResourceIDs must contain key ID %q; got %v",
+		fixtures.BackupProdVaultKMSKeyID, result.ResourceIDs)
+	require.NoError(t, result.Err, "kms pivot must not return an error for graph-root")
+}
+
+// ---------------------------------------------------------------------------
+// TEST: related_pivots_resolve_nonzero_on_graph_root (U9) — sns pivot
+// ---------------------------------------------------------------------------
+
+// TestBackup_Related_GraphRoot_SNSResolvesAtLeastOne verifies that the sns
+// checker returns Count >= 1 for the graph-root plan, resolving through
+// acme-prod-vault → GetBackupVaultNotifications → SNSTopicArn → "acme-backup-alerts".
+func TestBackup_Related_GraphRoot_SNSResolvesAtLeastOne(t *testing.T) {
+	checker := backupCheckerByTarget(t, "sns")
+	res := graphRootResource()
+	clients := backupClientsFake()
+
+	result := checker(context.Background(), clients, res, resource.ResourceCache{})
+
+	require.GreaterOrEqual(t, result.Count, 1,
+		"sns pivot must resolve >= 1 for graph-root plan; got Count=%d", result.Count)
+	require.NotEmpty(t, result.ResourceIDs,
+		"sns pivot must return non-empty ResourceIDs when Count >= 1")
+	require.True(t, sliceContainsSubstr(result.ResourceIDs, fixtures.BackupAlertsSNSTopicName),
+		"sns pivot ResourceIDs must contain topic name %q; got %v",
+		fixtures.BackupAlertsSNSTopicName, result.ResourceIDs)
+	require.NoError(t, result.Err, "sns pivot must not return an error for graph-root")
+}
+
+// ---------------------------------------------------------------------------
+// Baseline: healthy plan (acme-default-vault) — kms count == 0
+// ---------------------------------------------------------------------------
+
+// TestBackup_Related_HealthyPlan_KMS_DefaultVault_CountZero verifies that the
+// kms checker returns Count == 0 for the healthy daily plan, whose rules point
+// to acme-default-vault which has NO customer-managed EncryptionKeyArn (the
+// VaultEncryptionKeys map does not contain BackupDefaultVaultName).
+func TestBackup_Related_HealthyPlan_KMS_DefaultVault_CountZero(t *testing.T) {
+	checker := backupCheckerByTarget(t, "kms")
+	res := healthyPlanResource()
+	clients := backupClientsFake()
+
+	result := checker(context.Background(), clients, res, resource.ResourceCache{})
+
+	require.Equal(t, 0, result.Count,
+		"kms pivot must return Count=0 for healthy plan using acme-default-vault (no customer-managed key)")
+}
+
+// ---------------------------------------------------------------------------
+// Baseline: healthy plan (acme-default-vault) — sns count == 0
+// ---------------------------------------------------------------------------
+
+// TestBackup_Related_HealthyPlan_SNS_DefaultVault_CountZero verifies that the
+// sns checker returns Count == 0 for the healthy daily plan, whose vault has no
+// SNS notification configured (VaultSNSTopics does not contain BackupDefaultVaultName).
+// GetBackupVaultNotifications returns ResourceNotFoundException for this vault.
+func TestBackup_Related_HealthyPlan_SNS_DefaultVault_CountZero(t *testing.T) {
+	checker := backupCheckerByTarget(t, "sns")
+	res := healthyPlanResource()
+	clients := backupClientsFake()
+
+	result := checker(context.Background(), clients, res, resource.ResourceCache{})
+
+	require.Equal(t, 0, result.Count,
+		"sns pivot must return Count=0 for healthy plan using acme-default-vault (no SNS topic configured)")
+}
+
+// ---------------------------------------------------------------------------
+// Baseline: healthy plan — role count >= 1 (uses AWSBackupDefaultServiceRole)
+// ---------------------------------------------------------------------------
+
+// TestBackup_Related_HealthyPlan_Role_DefaultServiceRole_Resolves verifies that
+// the role checker returns Count >= 1 for the healthy daily plan.
+// Its selection uses AWSBackupDefaultServiceRole, which is a valid non-empty ARN.
+func TestBackup_Related_HealthyPlan_Role_DefaultServiceRole_Resolves(t *testing.T) {
 	checker := backupCheckerByTarget(t, "role")
-	result := checker(context.Background(), clients, src, resource.ResourceCache{})
+	res := healthyPlanResource()
+	clients := backupClientsFake()
 
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no selections)", result.Count)
+	result := checker(context.Background(), clients, res, resource.ResourceCache{})
+
+	require.GreaterOrEqual(t, result.Count, 1,
+		"role pivot must resolve >= 1 for healthy plan (uses AWSBackupDefaultServiceRole)")
+	require.True(t, sliceContainsSubstr(result.ResourceIDs, "AWSBackupDefaultServiceRole"),
+		"role pivot ResourceIDs must contain 'AWSBackupDefaultServiceRole'; got %v",
+		result.ResourceIDs)
+}
+
+// ---------------------------------------------------------------------------
+// Edge: empty plan ID — all pivots return Count == -1
+// ---------------------------------------------------------------------------
+
+// TestBackup_Related_EmptyPlanID_AllPivotsReturnUnknown verifies that when
+// the resource has an empty ID, every pivot returns Count == -1 (unknown)
+// rather than panicking or returning Count == 0 (which would be misleading).
+func TestBackup_Related_EmptyPlanID_AllPivotsReturnUnknown(t *testing.T) {
+	pivots := []string{"role", "kms", "sns"}
+	emptyRes := resource.Resource{
+		ID:     "", // empty plan ID
+		Name:   "orphan",
+		Fields: map[string]string{},
+	}
+	clients := backupClientsFake()
+
+	for _, pivot := range pivots {
+		pivot := pivot
+		t.Run(pivot, func(t *testing.T) {
+			checker := backupCheckerByTarget(t, pivot)
+			result := checker(context.Background(), clients, emptyRes, resource.ResourceCache{})
+			require.Equal(t, -1, result.Count,
+				"pivot %q must return Count=-1 for empty plan ID (unknown, not zero)", pivot)
+		})
 	}
 }
 
 // ---------------------------------------------------------------------------
-// checkBackupKMS — Pattern C: GetBackupPlan → DescribeBackupVault.EncryptionKeyArn
+// Registry: all registered backup pivots have non-nil checkers
 // ---------------------------------------------------------------------------
 
-// TestRelated_Backup_KMS_Match verifies KMS key extraction from vault descriptor.
-func TestRelated_Backup_KMS_Match(t *testing.T) {
-	src := backupPlanSrc()
-	const kmsARN = "arn:aws:kms:us-east-1:123456789012:key/deadbeef-1234-5678-abcd-000000000000"
-	clients := &awsclient.ServiceClients{
-		Backup: newFakeBackupCRWithVaultKMS("my-vault", kmsARN),
+// TestBackup_Related_RegistryComplete verifies that backup has registered
+// related definitions for role, kms, and sns — and that none have nil checkers.
+// ct-events is auto-registered via the universal zzz_ct_events_all_related.go init.
+func TestBackup_Related_RegistryComplete(t *testing.T) {
+	defs := resource.GetRelated("backup")
+	require.NotEmpty(t, defs, "backup must have related definitions registered")
+
+	required := map[string]bool{
+		"role": false,
+		"kms":  false,
+		"sns":  false,
 	}
-	checker := backupCheckerByTarget(t, "kms")
-	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 
-	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+	for _, def := range defs {
+		if _, ok := required[def.TargetType]; ok {
+			required[def.TargetType] = true
+		}
+		require.NotNil(t, def.Checker,
+			"registered backup related def for %q has nil Checker — structural bug", def.TargetType)
+		require.NotEmpty(t, def.DisplayName,
+			"registered backup related def for %q has empty DisplayName", def.TargetType)
 	}
-	if len(result.ResourceIDs) == 0 || result.ResourceIDs[0] != "deadbeef-1234-5678-abcd-000000000000" {
-		t.Errorf("ResourceIDs = %v, want [deadbeef-1234-5678-abcd-000000000000]", result.ResourceIDs)
-	}
-}
 
-// TestRelated_Backup_KMS_EmptyPlan verifies Count=-1 when the plan has no vault rules.
-// backupPlanVaults returns nil (not an empty slice) when no vault-named rules exist,
-// so checkBackupKMS returns -1 (unknown) rather than 0. The Count=0 branch in
-// checkBackupKMS is unreachable with the current backupPlanVaults implementation.
-func TestRelated_Backup_KMS_EmptyPlan(t *testing.T) {
-	src := backupPlanSrc()
-	clients := &awsclient.ServiceClients{
-		Backup: &fakeBackupCR{
-			// GetBackupPlan returns a plan with no Rules — backupPlanVaults returns nil
-			getBackupPlanOutput: backupEmptyPlan(),
-		},
-	}
-	checker := backupCheckerByTarget(t, "kms")
-	result := checker(context.Background(), clients, src, resource.ResourceCache{})
-
-	// nil return from backupPlanVaults → Count=-1 (unknown), not 0
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (nil vault list from empty plan)", result.Count)
-	}
-}
-
-// TestRelated_Backup_KMS_NilClients verifies Count=-1 when clients are nil.
-func TestRelated_Backup_KMS_NilClients(t *testing.T) {
-	src := backupPlanSrc()
-	checker := backupCheckerByTarget(t, "kms")
-	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// checkBackupSNS — Pattern C: GetBackupPlan → GetBackupVaultNotifications
-// ---------------------------------------------------------------------------
-
-// TestRelated_Backup_SNS_Match verifies SNS topic ARN extraction from vault notification config.
-func TestRelated_Backup_SNS_Match(t *testing.T) {
-	src := backupPlanSrc()
-	const topicARN = "arn:aws:sns:us-east-1:123456789012:backup-alerts"
-	clients := &awsclient.ServiceClients{
-		Backup: &fakeBackupCR{
-			getBackupPlanOutput:         backupPlanWithVault("notification-vault"),
-			getVaultNotificationsOutput: backupVaultNotificationWithSNS(topicARN),
-		},
-	}
-	checker := backupCheckerByTarget(t, "sns")
-	result := checker(context.Background(), clients, src, resource.ResourceCache{})
-
-	if result.Count == 0 {
-		t.Errorf("Count = %d, want > 0 (SNS notification configured)", result.Count)
-	}
-}
-
-// TestRelated_Backup_SNS_NoNotification verifies Count=0 when no SNS is configured.
-func TestRelated_Backup_SNS_NoNotification(t *testing.T) {
-	src := backupPlanSrc()
-	clients := &awsclient.ServiceClients{
-		Backup: &fakeBackupCR{
-			getBackupPlanOutput:         backupPlanWithVault("quiet-vault"),
-			getVaultNotificationsOutput: &backup.GetBackupVaultNotificationsOutput{}, // no SNSTopicArn
-		},
-	}
-	checker := backupCheckerByTarget(t, "sns")
-	result := checker(context.Background(), clients, src, resource.ResourceCache{})
-
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no SNS notification)", result.Count)
-	}
-}
-
-// TestRelated_Backup_Role_EmptyID verifies Count=-1 when the resource ID is empty.
-func TestRelated_Backup_Role_EmptyID(t *testing.T) {
-	src := resource.Resource{ID: "", Name: "no-id-plan", Fields: map[string]string{}}
-	clients := &awsclient.ServiceClients{
-		Backup: &fakeBackupCR{},
-	}
-	checker := backupCheckerByTarget(t, "role")
-	result := checker(context.Background(), clients, src, resource.ResourceCache{})
-
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (empty ID)", result.Count)
-	}
-}
-
-// TestRelated_Backup_SNS_NilClients verifies Count=-1 when clients are nil.
-func TestRelated_Backup_SNS_NilClients(t *testing.T) {
-	src := backupPlanSrc()
-	checker := backupCheckerByTarget(t, "sns")
-	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+	for target, found := range required {
+		require.True(t, found,
+			"backup related registry missing required target %q", target)
 	}
 }

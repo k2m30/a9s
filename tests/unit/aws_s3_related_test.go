@@ -823,3 +823,112 @@ func TestS3_Related_Role_BucketPolicyPrincipalResolves(t *testing.T) {
 		t.Errorf("Count = %d, want ≥1 for role pivot when bucket policy names the role as a principal", result.Count)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// backup — wildcard + NotResources exclusion regression (#296)
+// ---------------------------------------------------------------------------
+
+// s3ContainsID is a local helper: reports whether id appears in ids.
+func s3ContainsID(ids []string, id string) bool {
+	for _, v := range ids {
+		if v == id {
+			return true
+		}
+	}
+	return false
+}
+
+// TestCheckS3Backup_WildcardMatchingAndExclusion pins wildcard Resources and
+// NotResources exclusion behaviour for the S3 backup checker.
+//
+// Three plans:
+//   - plan-prefix:                arn:aws:s3:::prod-*   (no exclusions)
+//   - plan-catchall-except-quarantine: arn:aws:s3:::*  NOT arn:aws:s3:::quarantine-*
+//   - plan-specific:              arn:aws:s3:::specific-bucket (no exclusions)
+func TestCheckS3Backup_WildcardMatchingAndExclusion(t *testing.T) {
+	plans := []resource.Resource{
+		{ID: "plan-prefix", Fields: map[string]string{
+			"resources":     "arn:aws:s3:::prod-*",
+			"not_resources": "",
+		}},
+		{ID: "plan-catchall-except-quarantine", Fields: map[string]string{
+			"resources":     "arn:aws:s3:::*",
+			"not_resources": "arn:aws:s3:::quarantine-*",
+		}},
+		{ID: "plan-specific", Fields: map[string]string{
+			"resources":     "arn:aws:s3:::specific-bucket",
+			"not_resources": "",
+		}},
+	}
+	cache := resource.ResourceCache{
+		"backup": resource.ResourceCacheEntry{
+			Resources:   plans,
+			IsTruncated: false,
+		},
+	}
+	checker := s3CheckerByTarget(t, "backup")
+
+	t.Run("prod-logs covered by plan-prefix and plan-catchall-except-quarantine", func(t *testing.T) {
+		// S3 checker derives bucket ARN as "arn:aws:s3:::"+bucket.ID
+		res := resource.Resource{
+			ID:     "prod-logs",
+			Name:   "prod-logs",
+			Fields: map[string]string{"name": "prod-logs"},
+		}
+		result := checker(context.Background(), nil, res, cache)
+		if result.Count != 2 {
+			t.Errorf("Count = %d, want 2 (plan-prefix + plan-catchall-except-quarantine)", result.Count)
+		}
+		if !s3ContainsID(result.ResourceIDs, "plan-prefix") {
+			t.Errorf("ResourceIDs %v missing plan-prefix", result.ResourceIDs)
+		}
+		if !s3ContainsID(result.ResourceIDs, "plan-catchall-except-quarantine") {
+			t.Errorf("ResourceIDs %v missing plan-catchall-except-quarantine", result.ResourceIDs)
+		}
+	})
+
+	t.Run("staging-data covered only by plan-catchall-except-quarantine", func(t *testing.T) {
+		res := resource.Resource{
+			ID:     "staging-data",
+			Name:   "staging-data",
+			Fields: map[string]string{"name": "staging-data"},
+		}
+		result := checker(context.Background(), nil, res, cache)
+		if result.Count != 1 {
+			t.Errorf("Count = %d, want 1 (only plan-catchall-except-quarantine)", result.Count)
+		}
+		if !s3ContainsID(result.ResourceIDs, "plan-catchall-except-quarantine") {
+			t.Errorf("ResourceIDs %v missing plan-catchall-except-quarantine", result.ResourceIDs)
+		}
+	})
+
+	t.Run("quarantine-pii excluded from all plans", func(t *testing.T) {
+		res := resource.Resource{
+			ID:     "quarantine-pii",
+			Name:   "quarantine-pii",
+			Fields: map[string]string{"name": "quarantine-pii"},
+		}
+		result := checker(context.Background(), nil, res, cache)
+		if result.Count != 0 {
+			t.Errorf("Count = %d, want 0 (plan-catchall excludes quarantine-*, others miss the prefix)", result.Count)
+		}
+	})
+
+	t.Run("specific-bucket covered by plan-catchall-except-quarantine and plan-specific", func(t *testing.T) {
+		res := resource.Resource{
+			ID:     "specific-bucket",
+			Name:   "specific-bucket",
+			Fields: map[string]string{"name": "specific-bucket"},
+		}
+		result := checker(context.Background(), nil, res, cache)
+		if result.Count != 2 {
+			t.Errorf("Count = %d, want 2 (plan-catchall-except-quarantine + plan-specific)", result.Count)
+		}
+		if !s3ContainsID(result.ResourceIDs, "plan-catchall-except-quarantine") {
+			t.Errorf("ResourceIDs %v missing plan-catchall-except-quarantine", result.ResourceIDs)
+		}
+		if !s3ContainsID(result.ResourceIDs, "plan-specific") {
+			t.Errorf("ResourceIDs %v missing plan-specific", result.ResourceIDs)
+		}
+	})
+}

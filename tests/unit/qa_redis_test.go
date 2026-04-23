@@ -47,52 +47,54 @@ func loadedRedisModel(t *testing.T) views.ResourceListModel {
 	return m
 }
 
-// multiStatusRedisFixtures returns Redis clusters with different statuses for color tests.
+// multiStatusRedisFixtures returns Redis replication groups with different statuses for color tests.
+// Post-phase-7: RawStruct is ReplicationGroup (DescribeReplicationGroups).
+// Fields["status"] carries the §4 phrase (Healthy silence = empty string) per
+// docs/resources/redis.md §4, matching what the fetcher emits in production.
+// RawStruct.Status still holds the raw AWS enum value because that is what the
+// AWS SDK reports and any direct-RawStruct consumer will see.
 func multiStatusRedisFixtures() []resource.Resource {
 	return []resource.Resource{
 		{
 			ID: "redis-available", Name: "redis-available", Status: "available",
 			Fields: map[string]string{
-				"cluster_id": "redis-available", "engine_version": "7.0.7",
-				"node_type": "cache.t2.micro", "status": "available",
+				"cluster_id": "redis-available",
+				"node_type":  "cache.t2.micro", "status": "",
 				"nodes": "1", "endpoint": "",
 			},
-			RawStruct: elasticachetypes.CacheCluster{
-				CacheClusterId:     aws.String("redis-available"),
-				EngineVersion:      aws.String("7.0.7"),
+			RawStruct: elasticachetypes.ReplicationGroup{
+				ReplicationGroupId: aws.String("redis-available"),
+				Status:             aws.String("available"),
 				CacheNodeType:      aws.String("cache.t2.micro"),
-				CacheClusterStatus: aws.String("available"),
-				NumCacheNodes:      aws.Int32(1),
+				MemberClusters:     []string{"redis-available-001"},
 			},
 		},
 		{
 			ID: "redis-creating", Name: "redis-creating", Status: "creating",
 			Fields: map[string]string{
-				"cluster_id": "redis-creating", "engine_version": "7.0.7",
-				"node_type": "cache.t2.micro", "status": "creating",
+				"cluster_id": "redis-creating",
+				"node_type":  "cache.t2.micro", "status": "creating — new group",
 				"nodes": "1", "endpoint": "",
 			},
-			RawStruct: elasticachetypes.CacheCluster{
-				CacheClusterId:     aws.String("redis-creating"),
-				EngineVersion:      aws.String("7.0.7"),
+			RawStruct: elasticachetypes.ReplicationGroup{
+				ReplicationGroupId: aws.String("redis-creating"),
+				Status:             aws.String("creating"),
 				CacheNodeType:      aws.String("cache.t2.micro"),
-				CacheClusterStatus: aws.String("creating"),
-				NumCacheNodes:      aws.Int32(1),
+				MemberClusters:     []string{"redis-creating-001"},
 			},
 		},
 		{
 			ID: "redis-deleting", Name: "redis-deleting", Status: "deleting",
 			Fields: map[string]string{
-				"cluster_id": "redis-deleting", "engine_version": "7.0.7",
-				"node_type": "cache.t2.micro", "status": "deleting",
+				"cluster_id": "redis-deleting",
+				"node_type":  "cache.t2.micro", "status": "deleting — teardown",
 				"nodes": "1", "endpoint": "",
 			},
-			RawStruct: elasticachetypes.CacheCluster{
-				CacheClusterId:     aws.String("redis-deleting"),
-				EngineVersion:      aws.String("7.0.7"),
+			RawStruct: elasticachetypes.ReplicationGroup{
+				ReplicationGroupId: aws.String("redis-deleting"),
+				Status:             aws.String("deleting"),
 				CacheNodeType:      aws.String("cache.t2.micro"),
-				CacheClusterStatus: aws.String("deleting"),
-				NumCacheNodes:      aws.Int32(1),
+				MemberClusters:     []string{"redis-deleting-001"},
 			},
 		},
 	}
@@ -106,7 +108,7 @@ func TestQA_Redis_ListColumns(t *testing.T) {
 	m := loadedRedisModel(t)
 	out := m.View()
 
-	expectedHeaders := []string{"Cluster ID", "Version", "Node Type", "Status", "Nodes", "Endpoint"}
+	expectedHeaders := []string{"Cluster ID", "Node Type", "Status", "Nodes", "Endpoint"}
 	for _, header := range expectedHeaders {
 		if !strings.Contains(out, header) {
 			t.Errorf("Redis list view missing column header %q", header)
@@ -127,7 +129,6 @@ func TestQA_Redis_ListColumnData(t *testing.T) {
 	r := fixtures[0]
 	expectedValues := []string{
 		r.Fields["cluster_id"],
-		r.Fields["engine_version"],
 		r.Fields["node_type"],
 		r.Fields["status"],
 		r.Fields["nodes"],
@@ -439,20 +440,22 @@ func TestQA_Redis_DetailStatusColoring(t *testing.T) {
 		}
 	}
 
-	availableStyle := styles.ColorStyle(td.Color(redisRes("available")))
+	// Post-migration (2026-04-23): Fields["status"] carries §4 PHRASES, not
+	// bare keywords. Healthy = empty string.
+	availableStyle := styles.ColorStyle(td.Color(redisRes("")))
 	if availableStyle.GetForeground() != styles.ColRunning {
-		t.Errorf("redis 'available': expected ColRunning (#9ece6a), got %v", availableStyle.GetForeground())
+		t.Errorf("redis healthy (blank): expected ColRunning (#9ece6a), got %v", availableStyle.GetForeground())
 	}
 
-	creatingStyle := styles.ColorStyle(td.Color(redisRes("creating")))
+	creatingStyle := styles.ColorStyle(td.Color(redisRes("creating — new group")))
 	if creatingStyle.GetForeground() != styles.ColPending {
-		t.Errorf("redis 'creating': expected ColPending (#e0af68), got %v", creatingStyle.GetForeground())
+		t.Errorf("redis 'creating — new group': expected ColPending (#e0af68), got %v", creatingStyle.GetForeground())
 	}
 
 	// Per spec: redis deleting → Warning (not Broken).
-	deletingStyle := styles.ColorStyle(td.Color(redisRes("deleting")))
+	deletingStyle := styles.ColorStyle(td.Color(redisRes("deleting — teardown")))
 	if deletingStyle.GetForeground() != styles.ColPending {
-		t.Errorf("redis 'deleting': expected ColPending (Warning per spec), got %v", deletingStyle.GetForeground())
+		t.Errorf("redis 'deleting — teardown': expected ColPending (Warning per spec), got %v", deletingStyle.GetForeground())
 	}
 }
 
@@ -473,14 +476,16 @@ func TestQA_Redis_YAMLView(t *testing.T) {
 	}
 
 	// YAML view renders from RawStruct (SDK struct field names) when RawStruct is set
-	expectedKeys := []string{"CacheClusterId", "EngineVersion", "CacheNodeType", "CacheClusterStatus", "NumCacheNodes"}
+	// Post-phase-7: RawStruct is ReplicationGroup, so field names changed.
+	// MemberClusters is omitted from fixture to keep YAML output as key:value pairs only.
+	expectedKeys := []string{"ReplicationGroupId", "Description", "Status", "CacheNodeType"}
 	for _, key := range expectedKeys {
 		if !strings.Contains(out, key) {
 			t.Errorf("Redis YAML view missing SDK struct key %q", key)
 		}
 	}
 	// Values from the RawStruct should appear
-	expectedValues := []string{"test-redis-1", "7.0.7", "cache.t2.micro", "available"}
+	expectedValues := []string{"test-redis-1", "cache.t2.micro", "available"}
 	for _, val := range expectedValues {
 		if !strings.Contains(out, val) {
 			t.Errorf("Redis YAML view missing value %q", val)
@@ -520,7 +525,9 @@ func TestQA_Redis_YAMLRawContent(t *testing.T) {
 	}
 
 	// RawContent renders from RawStruct (SDK struct field names)
-	expectedKeys := []string{"CacheClusterId", "EngineVersion", "CacheNodeType", "CacheClusterStatus", "NumCacheNodes"}
+	// Post-phase-7: RawStruct is ReplicationGroup, so field names changed.
+	// MemberClusters is omitted from fixture to keep YAML output as key:value pairs only.
+	expectedKeys := []string{"ReplicationGroupId", "Description", "Status", "CacheNodeType"}
 	for _, key := range expectedKeys {
 		if !strings.Contains(raw, key) {
 			t.Errorf("Redis YAML RawContent missing SDK struct key %q", key)
