@@ -118,6 +118,8 @@ func buildS3Buckets() []s3types.Bucket {
 		{"a9s-demo-multifail-pab", "arn:aws:s3:::a9s-demo-multifail-pab", "us-east-1", "2025-04-20T14:00:00+00:00"},
 		// Informational: GetPublicAccessBlock returns nil config (no error).
 		{"a9s-demo-nilcfg", "arn:aws:s3:::a9s-demo-nilcfg", "us-east-1", "2025-05-05T11:00:00+00:00"},
+		// SES inbound mail bucket: receives mail via SES v1 receipt rule (checkSESS3 pivot).
+		{SESInboundBucketName, "arn:aws:s3:::" + SESInboundBucketName, "us-east-1", "2025-04-01T07:00:00+00:00"},
 	}
 
 	// Named legacy buckets with objects.

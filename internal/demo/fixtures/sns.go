@@ -25,6 +25,8 @@ func NewSNSFixtures() *SNSFixtures {
 		// The prod-redis-sessions member cluster NotificationConfiguration.TopicArn
 		// points here so checkRedisSNS resolves a non-zero count for the demo showroom.
 		{TopicArn: aws.String(ProdRedisSNSTopicARN)},
+		// SES bounce/complaint notifications topic (checkSESSns pivot).
+		{TopicArn: aws.String("arn:aws:sns:us-east-1:123456789012:" + SESBounceTopicName)},
 	}
 
 	subscriptions := []snstypes.Subscription{

@@ -4,9 +4,11 @@ package aws
 import (
 	"context"
 	"strings"
+	"sync"
 
+	"github.com/aws/aws-sdk-go-v2/service/ses"
+	sestypes "github.com/aws/aws-sdk-go-v2/service/ses/types"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
-	sesv2types "github.com/aws/aws-sdk-go-v2/service/sesv2/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -29,7 +31,8 @@ func checkSESR53(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "r53", Count: -1, Err: err}
 	}
 	if r53List == nil {
-		return resource.RelatedCheckResult{TargetType: "r53", Count: -1}
+		// Honest zero — target fetcher not registered or cache empty (r53 not yet fetched).
+		return resource.ApproximateZero("r53")
 	}
 
 	var ids []string
@@ -60,13 +63,6 @@ func sesIdentityDomain(res resource.Resource) string {
 	// DOMAIN: use as-is
 	return name
 }
-
-// SES identity list RawStruct (sesv2types.IdentityInfo) exposes only IdentityName,
-// IdentityType, SendingEnabled, VerificationStatus. Relationships to EventBridge,
-// Kinesis, Lambda, S3, and SNS require per-identity calls (GetEmailIdentity →
-// ConfigurationSetName, then GetConfigurationSetEventDestinations).
-// SES v1 receipt-rule APIs (DescribeActiveReceiptRuleSet, GetIdentityNotificationAttributes)
-// are not available in SESv2 SDK; their paths are noted below but not implemented.
 
 // sesRelatedResources returns the resource list for target from cache or by fetching the first page.
 func sesRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
@@ -111,6 +107,46 @@ func sesEventDestinations(ctx context.Context, c *ServiceClients, configSetName 
 		})
 	})
 	return out, err
+}
+
+// sesReceiptRuleSetCache is a per-ServiceClients cache for the SES v1
+// DescribeActiveReceiptRuleSet call. It is populated once per fetch batch and
+// shared across all N identity checkers so the API is called at most once
+// regardless of how many identities are in the list.
+type sesReceiptRuleSetCache struct {
+	once   sync.Once
+	output *ses.DescribeActiveReceiptRuleSetOutput
+	err    error
+}
+
+// sesRuleSetCacheMu protects sesRuleSetCaches map access.
+var sesRuleSetCacheMu sync.Mutex
+
+// sesRuleSetCaches maps *ServiceClients pointer to a per-clients cache so that
+// successive calls to checkSESLambda / checkSESS3 within the same fetch batch
+// hit the same cached result.
+var sesRuleSetCaches = map[*ServiceClients]*sesReceiptRuleSetCache{}
+
+// sesActiveReceiptRuleSet calls SES v1 DescribeActiveReceiptRuleSet exactly once
+// per ServiceClients instance, caching the result for reuse across all identity
+// rows in the batch.
+func sesActiveReceiptRuleSet(ctx context.Context, c *ServiceClients) (*ses.DescribeActiveReceiptRuleSetOutput, error) {
+	if c == nil || c.SES == nil {
+		return nil, nil //nolint:nilnil // no SES v1 client; caller treats nil as "no rule set"
+	}
+
+	sesRuleSetCacheMu.Lock()
+	cache, ok := sesRuleSetCaches[c]
+	if !ok {
+		cache = &sesReceiptRuleSetCache{}
+		sesRuleSetCaches[c] = cache
+	}
+	sesRuleSetCacheMu.Unlock()
+
+	cache.once.Do(func() {
+		cache.output, cache.err = c.SES.DescribeActiveReceiptRuleSet(ctx, &ses.DescribeActiveReceiptRuleSetInput{})
+	})
+	return cache.output, cache.err
 }
 
 // checkSESEbRule checks the SES identity's configuration-set event destinations for
@@ -192,54 +228,96 @@ func checkSESKinesis(ctx context.Context, clients any, res resource.Resource, _ 
 	return relatedResult("kinesis", ids)
 }
 
-// checkSESLambda checks the SES identity's configuration-set event destinations for
-// Lambda function ARNs. SES v1 receipt-rule LambdaAction is not available via SESv2 SDK;
-// only the SNS/EB/Kinesis paths are available. Returns 0 if no Lambda destinations found.
-// Note: ses:DescribeActiveReceiptRuleSet (SES v1 only) is not available in this client.
-func checkSESLambda(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	// SES v1 receipt-rule LambdaAction path (ses:DescribeActiveReceiptRuleSet) is
-	// unavailable in the SESv2 SDK. Only configuration-set event destinations are checked.
-	identityName := res.ID
-	if identityName == "" {
-		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
-	}
+// checkSESLambda discovers Lambda functions invoked by SES v1 inbound receipt rules.
+// Calls ses:DescribeActiveReceiptRuleSet (SES v1) once per fetch batch and walks
+// Rules[].Actions[].LambdaAction.FunctionArn. Returns Count: 0 for accounts with
+// no active receipt rule set (pure outbound SES) — operator-honest absence.
+func checkSESLambda(ctx context.Context, clients any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {
 		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
 	}
-	configSetName := sesConfigSetName(ctx, c, identityName)
-	if configSetName == "" {
+	out, err := sesActiveReceiptRuleSet(ctx, c)
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
+	}
+	if out == nil {
+		// No active rule set — pure outbound account. Operator-honest 0.
 		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
 	}
-	// SESv2 GetConfigurationSetEventDestinations does not expose a Lambda destination type.
-	// Lambda invocations come through SES v1 receipt rules only.
-	_ = configSetName
-	return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
+	arns := sesLambdaARNsFromRules(out.Rules)
+	return relatedResult("lambda", arns)
 }
 
-// checkSESS3 checks the SES identity's inbound receipt rules for S3 store actions.
-// SES v1 receipt-rule S3Action path (ses:DescribeActiveReceiptRuleSet) is unavailable
-// in the SESv2 SDK. Returns 0 for valid identities (cannot resolve S3 buckets).
-// Returns -1 for invalid RawStruct.
-// Note: ses:DescribeActiveReceiptRuleSet (SES v1 only) is not available in this client.
-func checkSESS3(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	// Validate that the resource is a real SES identity — wrong RawStruct signals -1.
-	if _, ok := assertStruct[sesv2types.IdentityInfo](res.RawStruct); !ok {
+// checkSESS3 discovers S3 buckets where SES v1 inbound receipt rules deposit received mail.
+// Calls ses:DescribeActiveReceiptRuleSet (SES v1) once per fetch batch and walks
+// Rules[].Actions[].S3Action.BucketName. Returns Count: 0 for accounts with no active
+// receipt rule set — operator-honest absence.
+func checkSESS3(ctx context.Context, clients any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil {
 		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
 	}
-	// SES v1 receipt-rule S3Action path (ses:DescribeActiveReceiptRuleSet) is
-	// unavailable in the SESv2 SDK. Cannot resolve S3 buckets from receipt rules.
-	return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+	out, err := sesActiveReceiptRuleSet(ctx, c)
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "s3", Count: -1, Err: err}
+	}
+	if out == nil {
+		// No active rule set — pure outbound account. Operator-honest 0.
+		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
+	}
+	buckets := sesS3BucketsFromRules(out.Rules)
+	return relatedResult("s3", buckets)
+}
+
+// sesLambdaARNsFromRules walks ReceiptRule actions and collects LambdaAction.FunctionArn values.
+func sesLambdaARNsFromRules(rules []sestypes.ReceiptRule) []string {
+	seen := map[string]struct{}{}
+	var arns []string
+	for _, rule := range rules {
+		for _, action := range rule.Actions {
+			if action.LambdaAction == nil || action.LambdaAction.FunctionArn == nil {
+				continue
+			}
+			arn := *action.LambdaAction.FunctionArn
+			if arn == "" {
+				continue
+			}
+			if _, exists := seen[arn]; !exists {
+				seen[arn] = struct{}{}
+				arns = append(arns, arn)
+			}
+		}
+	}
+	return arns
+}
+
+// sesS3BucketsFromRules walks ReceiptRule actions and collects S3Action.BucketName values.
+func sesS3BucketsFromRules(rules []sestypes.ReceiptRule) []string {
+	seen := map[string]struct{}{}
+	var buckets []string
+	for _, rule := range rules {
+		for _, action := range rule.Actions {
+			if action.S3Action == nil || action.S3Action.BucketName == nil {
+				continue
+			}
+			bucket := *action.S3Action.BucketName
+			if bucket == "" {
+				continue
+			}
+			if _, exists := seen[bucket]; !exists {
+				seen[bucket] = struct{}{}
+				buckets = append(buckets, bucket)
+			}
+		}
+	}
+	return buckets
 }
 
 // checkSESSns checks the SES identity's configuration-set event destinations for
-// SNS topics (SnsDestination.TopicArn). Also includes SES v1 notification attributes
-// and receipt-rule SNS actions, but those require the SES v1 API (GetIdentityNotificationAttributes,
-// DescribeActiveReceiptRuleSet) which is unavailable in the SESv2 SDK.
+// SNS topics (SnsDestination.TopicArn).
 // API: sesv2:GetEmailIdentity → ConfigurationSetName → sesv2:GetConfigurationSetEventDestinations → SnsDestination.TopicArn.
 func checkSESSns(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	// SES v1 GetIdentityNotificationAttributes and DescribeActiveReceiptRuleSet are
-	// unavailable in SESv2 SDK. Only configuration-set SnsDestination is checked.
 	identityName := res.ID
 	if identityName == "" {
 		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}

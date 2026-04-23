@@ -405,6 +405,30 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 		LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
 	})
 
+	// SES inbound parser: invoked by SES v1 receipt rule (checkSESLambda pivot).
+	fns = append(fns, lambdatypes.FunctionConfiguration{
+		FunctionName:     aws.String(SESInboundLambdaName),
+		FunctionArn:      aws.String("arn:aws:lambda:us-east-1:123456789012:function:" + SESInboundLambdaName),
+		Role:             aws.String(lambdaProdRoleARN),
+		Runtime:          lambdatypes.RuntimePython312,
+		MemorySize:       aws.Int32(256),
+		Timeout:          aws.Int32(30),
+		Handler:          aws.String("parser.lambda_handler"),
+		Description:      aws.String("Parses inbound mail delivered via SES v1 receipt rule to support@acme-corp.com"),
+		LastModified:     aws.String("2025-11-15T09:00:00+00:00"),
+		CodeSize:         1048576,
+		State:            lambdatypes.StateActive,
+		PackageType:      lambdatypes.PackageTypeZip,
+		Architectures:    []lambdatypes.Architecture{lambdatypes.ArchitectureX8664},
+		EphemeralStorage: &lambdatypes.EphemeralStorage{Size: aws.Int32(512)},
+		TracingConfig:    &lambdatypes.TracingConfigResponse{Mode: lambdatypes.TracingModePassThrough},
+		LoggingConfig: &lambdatypes.LoggingConfig{
+			LogGroup:  aws.String("/aws/lambda/" + SESInboundLambdaName),
+			LogFormat: lambdatypes.LogFormatText,
+		},
+		LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
+	})
+
 	// Generate 18 more functions to reach 26 total (including the image function above).
 	for i := range 18 {
 		name := lambdaNamePool[i]
