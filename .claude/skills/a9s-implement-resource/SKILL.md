@@ -100,6 +100,10 @@ These rules are invariant across all resource types. They are enforced by phase 
 5. **Related panel counts are non-zero for every §2 pivot with `count shown: yes`** on the graph-root fixture. No exceptions, no "deferred pending sibling enrichment", no "follow-up ticket" excuses. A registered pivot that always returns `0` is a bug, not a deferred feature. If surfacing the pivot requires N+1 calls in the sibling fetcher (GetWorkGroup per workgroup, ListTargetsByRule per rule, ListResourceRecordSets per zone, etc.), do it — that cost is the cost of a working pivot, and it's the only version of the contract that renders a real operator graph. Pivots where §2 explicitly says `count shown: unknown` (e.g. windowed `ct-events`) are the only exemption, and even those must be documented in §2 with the reason.
 
    **"Implement resource" means implement the whole contract.** No deferrals, no stubs that return 0, no "Phase 7 will wire this" comments. If a pivot can't be wired end-to-end (fetcher populates the field, fixture tags an entry at the graph-root bucket, checker resolves non-zero), the skill is not done. User guidance 2026-04-23: "related resources MUST work. if they don't it's a bug. simple."
+
+   **At least 50% of pivots with `count shown: yes` on the graph-root fixture must render Count ≥ 2 (not just ≥ 1).** A graph-root fixture where every pivot resolves to exactly 1 is a trivially-connected mock — it does not exercise the "which of these related resources is the one I care about" path and provides false confidence. Skill phase 9.3 reports both the Count ≥ 1 total and the Count ≥ 2 ratio; FAIL if the ≥ 2 ratio is below 50%.
+
+   **Every registered related pivot AND every registered navigable field must drill to a non-empty landing.** The phase-8 scenario harness includes a drill-through test that opens the graph-root instance's detail view, follows each related pivot via `DrillRelated`, follows each navigable field via `FollowNavigableField`, and asserts every landing is non-empty. IDs returned by checkers must match the target resource type's `Resource.ID` format. When AWS returns ARNs but the target indexes on bare names/UUIDs (kms, role, ecs, logs, s3, iam-user), use `resource.NavIDFromValue` or the per-checker ARN-to-name extraction helper.
 6. **Detail view (S5) renders findings through the unified `Attention (N)` section** — one section, at the top of the detail view, with a count in the header. There are NO per-type section names (`Pending Maintenance`, `Latest Build`, `Target Health`, etc. — those existed before 2026-04-22 and were collapsed into the single Attention section). Every Wave-1 phrase from `Resource.Issues` and the Wave-2 `EnrichmentFinding` render as entries inside it. The renderer (`injectAttentionSection` in `internal/tui/views/detail_fields.go`) handles this universally — no per-resource code required. Entry presentation: each primary entry is `<glyph> <phrase>` with the first letter capitalized for readability (data stays canonical lowercase; the capitalization is purely visual via `capitalizeFirst`). Rows render indented beneath the primary entry as `Label: Value` pairs.
 7. **Multiple findings on the same instance remain individually visible across S2–S5.** S1 and S3 aggregate to one per instance (one count, one glyph — `!` beats `~`, color picks worst severity). But no finding may silently disappear. When an instance carries more than one finding:
    - **S4** renders the highest-precedence phrase plus a `(+N)` suffix when others exist on the same row — e.g. `storage-full (+2)`. The operator sees there is more to open for.
@@ -525,7 +529,7 @@ The test drives the real `tui.Model.Update()` loop via `fullIntegrationNewDemoSc
 3. **Warning/Broken rows show §4 phrase**: for each fixture whose bucket ≠ Healthy, `scenario.ExpectRowStatusEquals(<fixture ID>, <exact §4 "List text" phrase>)`.
 4. **Glyph presence/absence**: for each fixture whose Wave 2 finding severity is `~` on a Healthy row, `scenario.ExpectRowNamePrefix(<fixture ID>, "~ ")`. For `!`, `"! "`. For any non-Healthy row, `scenario.ExpectRowNoGlyphPrefix(<fixture ID>)` regardless of finding presence.
 5. **S1 menu count**: `scenario.ExpectMenuIssueCount(<shortName>, <expected N>)` where N = count of distinct fixtures that have at least one `!` severity finding (NOT total finding count — a fixture with 3 `!` findings counts as 1). Must satisfy `N ≤ total fixture count for this type`. When the spec §3.2 has no Wave 2 `!` signals at all, N = 0 and the helper treats that as "badge absent" (no `issues:` string in the menu entry for this type).
-6. **Related pivot counts**: for each fixture, `scenario.OpenDetailResource(<shortName>, <fixture ID>)` then for each pivot in spec §2 whose "count shown" is `yes`, `scenario.ExpectRelatedRowCountAtLeast(<pivot display name>, 1)`. Pivots where §2 says `count shown: unknown` are skipped.
+6. **Related pivot counts**: for each fixture, `scenario.OpenDetailResource(<shortName>, <fixture ID>)` then for each pivot in spec §2 whose "count shown" is `yes`, `scenario.ExpectRelatedRowCountAtLeast(<pivot display name>, 1)`. Pivots where §2 says `count shown: unknown` are skipped. Additionally, for each pivot with `count shown: yes` and actual Count ≥ 1, call `scenario.DrillRelated(<pivot display name>)` and assert the returned slice is non-empty. For each `RegisterNavigableFields` entry, call `scenario.FollowNavigableField(<fieldPath>)` and assert a resource lands. These drill-through assertions go in a dedicated test file (`tests/integration/scenario_related_drill_through_test.go` for pivots, or an in-file sub-test for navigable fields) so they survive as regression pins independent of the visual render gate.
 7. **Multi-W1 suffix (U7a)**: for the `warn-<short>-multi` fixture, `scenario.ExpectRowStatusEquals(<id>, "<top> (+N-1)")`.
 8. **W1+W2 suffix (U7b)**: for the `warn-<short>-<w1>-plus-<w2>` fixture, `scenario.ExpectRowStatusEquals(<id>, "<w1> (+1)")`.
 9. **Healthy + ~ glyph (U3)**: `scenario.ExpectRowNamePrefix(<healthy+w2 id>, "~ ")`.
@@ -661,9 +665,18 @@ Report format:
     - ...
     <N>/<total> registered `count shown: yes` pivots ≥ 1 — PASS
     (ct-events and other `count shown: unknown` pivots exempt)
+    graph-root Count ≥ 2 ratio: <ratio>/<total> ≥ 50% — PASS/FAIL
+    drill-through test: TestScenario_RelatedDrillThrough_<Short> — PASS
+    navigable-field drill-through test: TestScenario_NavigableFieldDrillThrough_<Short> (if navigable fields registered) — PASS
 ```
 
 FAIL if any registered `count shown: yes` pivot is 0 on the nominated graph-root. Fix the fixture (or the sibling fetcher enrichment) until it's non-zero — do NOT accept a "best attempt" graph-root that covers 9 of 10 pivots.
+
+FAIL if the Count ≥ 2 ratio falls below 50%. A trivially-connected graph-root (every pivot exactly 1) does not exercise the multi-resource disambiguation path.
+
+FAIL if the drill-through test (`TestScenario_RelatedDrillThrough_<Short>`) does not PASS — a Count ≥ 1 that does not land a resource means the checker's ID format does not match the target's `Resource.ID` (the SES/DDB bug class).
+
+FAIL if navigable fields are registered (`resource.GetNavigableFields`) and the navigable-field drill-through test (`TestScenario_NavigableFieldDrillThrough_<Short>`) does not PASS — a navigable field whose Enter navigation produces an empty landing means `NavIDFromValue` is not applied or the wrong extractor is registered.
 
 #### 9.4 Detail view surfaces every finding — with a test
 

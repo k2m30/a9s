@@ -413,6 +413,12 @@ func (m *DetailModel) buildFieldList() {
 		if tt, ok := navMap[composedPath]; ok && subVal != "" {
 			items[i].IsNavigable = true
 			items[i].TargetType = tt
+			// Apply target-type ARN→ID extraction when the raw value is an ARN
+			// but the target resource type indexes on a bare id. Value stays the
+			// displayed ARN; NavID carries the bare lookup key.
+			if navID := resource.NavIDFromValue(tt, subVal); navID != "" && navID != subVal {
+				items[i].NavID = navID
+			}
 			// Preserve the YAML list marker so the navigable row aligns
 			// with sibling rows rendered via colorizeDetailLine.
 			if hasDash {
