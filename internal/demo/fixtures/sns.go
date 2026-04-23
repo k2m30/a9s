@@ -27,6 +27,10 @@ func NewSNSFixtures() *SNSFixtures {
 		{TopicArn: aws.String(ProdRedisSNSTopicARN)},
 		// SES bounce/complaint notifications topic (checkSESSns pivot).
 		{TopicArn: aws.String("arn:aws:sns:us-east-1:123456789012:" + SESBounceTopicName)},
+		// Backup vault alert topic (checkBackupSNS pivot).
+		// GetBackupVaultNotifications("acme-prod-vault").SNSTopicArn points here.
+		// checkBackupSNS resolves this ARN against sns resource cache by name (last ":" segment).
+		{TopicArn: aws.String(BackupAlertsSNSTopicARN)},
 	}
 
 	subscriptions := []snstypes.Subscription{

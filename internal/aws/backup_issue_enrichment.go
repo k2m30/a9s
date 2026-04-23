@@ -4,7 +4,6 @@ package aws
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/backup"
@@ -15,14 +14,16 @@ import (
 
 func init() {
 	registerIssueEnricher("backup", EnrichBackupJobs, 100)
-	resource.RegisterIssueEnricherFieldKeys("backup", []string{"last_status"})
+	resource.RegisterIssueEnricherFieldKeys("backup", []string{"status"})
 }
 
 // EnrichBackupJobs calls ListBackupJobs (account-wide, paginated) and returns a Finding
 // for each BackupPlanId that has a failed/aborted/expired/partial job in the last 24h.
 // Severity "!" for FAILED/ABORTED/EXPIRED, "~" for PARTIAL.
-// IssueCount counts only "!" findings. First failure per plan wins.
-// Pagination uses NextToken; walks up to EnrichmentCap pages.
+// IssueCount counts only "!" findings.
+//
+// Rule-7 suffix machinery (BumpFindingSuffix) is N/A for backup — spec §3.1 has zero
+// Wave-1 signals so there are no coexisting Wave-1 warnings to apply the (+N) arithmetic.
 func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
@@ -30,6 +31,7 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource
 	if clients.Backup == nil {
 		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
+
 	var allJobs []backuptypes.BackupJob
 	var nextToken *string
 	truncated := false
@@ -52,68 +54,131 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource
 		}
 		nextToken = out.NextToken
 	}
+
 	cutoff := time.Now().Add(-24 * time.Hour)
-	// Track newest job per plan regardless of age — last_status reflects the
-	// most-recent execution even for weekly/monthly schedules. Findings (the
-	// issue signal) still gate on the 24h cutoff.
-	type jobRef struct {
-		state    backuptypes.BackupJobState
-		createAt time.Time
+
+	// Bucket jobs by plan ID. Each plan tracks all in-window jobs.
+	type planBucket struct {
+		failedJobs  []backuptypes.BackupJob
+		partialJobs []backuptypes.BackupJob
+		totalCount  int
 	}
-	latestByPlan := make(map[string]jobRef)
+	planBuckets := make(map[string]*planBucket)
+
 	for _, job := range allJobs {
 		if job.CreationDate == nil {
 			continue
 		}
-		key := ""
-		if job.CreatedBy != nil && job.CreatedBy.BackupPlanId != nil && *job.CreatedBy.BackupPlanId != "" {
-			key = *job.CreatedBy.BackupPlanId
-		} else if job.BackupJobId != nil {
-			key = *job.BackupJobId
-		}
-		if key == "" {
+		if job.CreatedBy == nil || job.CreatedBy.BackupPlanId == nil {
 			continue
 		}
-		if existing, ok := latestByPlan[key]; !ok || job.CreationDate.After(existing.createAt) {
-			latestByPlan[key] = jobRef{state: job.State, createAt: *job.CreationDate}
+		planID := *job.CreatedBy.BackupPlanId
+		if planID == "" {
+			continue
 		}
 		if job.CreationDate.Before(cutoff) {
 			continue
 		}
-		// First failure wins — skip if already recorded as a finding.
-		if _, exists := findings[key]; exists {
-			continue
+		if _, ok := planBuckets[planID]; !ok {
+			planBuckets[planID] = &planBucket{}
 		}
+		b := planBuckets[planID]
+		b.totalCount++
 		switch job.State {
-		case backuptypes.BackupJobStateFailed, backuptypes.BackupJobStateAborted, backuptypes.BackupJobStateExpired:
-			stateStr := strings.ToLower(string(job.State))
-			findings[key] = resource.EnrichmentFinding{
-				Severity: "!",
-				Summary:  fmt.Sprintf("backup %s in last 24h", stateStr),
-				Rows: []resource.FindingRow{
-					{Label: "State", Value: string(job.State), Tier: "!"},
-				},
-			}
+		case backuptypes.BackupJobStateFailed,
+			backuptypes.BackupJobStateExpired,
+			backuptypes.BackupJobStateAborted:
+			b.failedJobs = append(b.failedJobs, job)
 		case backuptypes.BackupJobStatePartial:
-			findings[key] = resource.EnrichmentFinding{
-				Severity: "~",
-				Summary:  "backup PARTIAL in last 24h",
-				Rows: []resource.FindingRow{
-					{Label: "State", Value: string(job.State), Tier: "~"},
-				},
-			}
+			b.partialJobs = append(b.partialJobs, job)
 		}
 	}
-	// Emit last_status once per plan based on the newest job seen, regardless
-	// of whether that job triggered a finding.
-	for key, ref := range latestByPlan {
-		fieldUpdates[key] = map[string]string{"last_status": string(ref.state)}
-	}
+
 	issueCount := 0
-	for _, f := range findings {
-		if f.Severity == "!" {
+	for planID, b := range planBuckets {
+		failedCount := len(b.failedJobs)
+		partialCount := len(b.partialJobs)
+		totalCount := b.totalCount
+
+		if failedCount >= 1 {
+			summary := fmt.Sprintf("%d job%s failed in last 24h", failedCount, plural(failedCount))
+
+			// Cap displayed failed jobs at 5.
+			cap := min(failedCount, 5)
+			var rows []resource.FindingRow
+			for _, job := range b.failedJobs[:cap] {
+				rows = append(rows, resource.FindingRow{
+					Label: "State",
+					Value: string(job.State),
+					Tier:  "!",
+				})
+			}
+			// Most recent failed job creation date.
+			var mostRecent *time.Time
+			for _, j := range b.failedJobs {
+				if mostRecent == nil || j.CreationDate.After(*mostRecent) {
+					mostRecent = j.CreationDate
+				}
+			}
+			if mostRecent != nil {
+				rows = append(rows, resource.FindingRow{
+					Label: "Most recent",
+					Value: mostRecent.Format("2006-01-02 15:04 UTC"),
+					Tier:  "!",
+				})
+			}
+			// If there are also partial jobs, append a partial row so nothing silently disappears.
+			if partialCount > 0 {
+				rows = append(rows, resource.FindingRow{
+					Label: "Partial jobs",
+					Value: fmt.Sprintf("%d", partialCount),
+					Tier:  "~",
+				})
+			}
+
+			findings[planID] = resource.EnrichmentFinding{
+				Severity: "!",
+				Summary:  summary,
+				Rows:     rows,
+			}
+			if _, ok := fieldUpdates[planID]; !ok {
+				fieldUpdates[planID] = make(map[string]string)
+			}
+			fieldUpdates[planID]["status"] = summary
 			issueCount++
+		} else if partialCount >= 1 {
+			summary := fmt.Sprintf("partial: %d of %d resources skipped", partialCount, totalCount)
+			rows := []resource.FindingRow{
+				{Label: "Partial jobs", Value: fmt.Sprintf("%d", partialCount), Tier: "~"},
+				{Label: "Total jobs", Value: fmt.Sprintf("%d", totalCount), Tier: "~"},
+			}
+			findings[planID] = resource.EnrichmentFinding{
+				Severity: "~",
+				Summary:  summary,
+				Rows:     rows,
+			}
+			if _, ok := fieldUpdates[planID]; !ok {
+				fieldUpdates[planID] = make(map[string]string)
+			}
+			fieldUpdates[planID]["status"] = summary
+			// "~" findings do not count toward issueCount.
 		}
+		// Else: only COMPLETED jobs — no finding, no FieldUpdate.
 	}
-	return IssueEnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+
+	return IssueEnricherResult{
+		IssueCount:   issueCount,
+		Truncated:    truncated,
+		TruncatedIDs: truncatedIDs,
+		Findings:     findings,
+		FieldUpdates: fieldUpdates,
+	}, nil
+}
+
+// plural returns "s" when n != 1, "" otherwise.
+func plural(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
 }
