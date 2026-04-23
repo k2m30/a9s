@@ -118,7 +118,7 @@ func checkS3CFN(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
 	}
 	if cfnList == nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.ApproximateZero("cfn")
 	}
 	var ids []string
 	for _, cfnRes := range cfnList {
@@ -228,7 +228,7 @@ func checkS3Athena(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.RelatedCheckResult{TargetType: "athena", Count: -1, Err: err}
 	}
 	if wgList == nil {
-		return resource.RelatedCheckResult{TargetType: "athena", Count: -1}
+		return resource.ApproximateZero("athena")
 	}
 	var ids []string
 	for _, wg := range wgList {
@@ -254,7 +254,7 @@ func checkS3Glue(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "glue", Count: -1, Err: err}
 	}
 	if jobList == nil {
-		return resource.RelatedCheckResult{TargetType: "glue", Count: -1}
+		return resource.ApproximateZero("glue")
 	}
 	var ids []string
 	for _, jobRes := range jobList {
@@ -287,7 +287,7 @@ func checkS3Backup(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.RelatedCheckResult{TargetType: "backup", Count: -1, Err: err}
 	}
 	if bkList == nil {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
+		return resource.ApproximateZero("backup")
 	}
 	var ids []string
 	for _, bk := range bkList {
@@ -328,7 +328,7 @@ func checkS3EBRule(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1, Err: err}
 	}
 	if ruleList == nil {
-		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
+		return resource.ApproximateZero("eb-rule")
 	}
 	bucketQuoted := `"` + bucket + `"`
 	var ids []string
@@ -367,7 +367,7 @@ func checkS3R53(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.RelatedCheckResult{TargetType: "r53", Count: -1, Err: err}
 	}
 	if zoneList == nil {
-		return resource.RelatedCheckResult{TargetType: "r53", Count: -1}
+		return resource.ApproximateZero("r53")
 	}
 	var ids []string
 	for _, zone := range zoneList {
@@ -431,7 +431,7 @@ func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: rerr}
 	}
 	if roleList == nil {
-		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+		return resource.ApproximateZero("role")
 	}
 
 	// Match role ARNs against the loaded role cache. Anything that
@@ -516,7 +516,7 @@ func checkS3Trail(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.RelatedCheckResult{TargetType: "trail", Count: -1, Err: err}
 	}
 	if trailList == nil {
-		return resource.RelatedCheckResult{TargetType: "trail", Count: -1}
+		return resource.ApproximateZero("trail")
 	}
 
 	var ids []string
@@ -554,7 +554,7 @@ func checkS3CF(ctx context.Context, clients any, res resource.Resource, cache re
 		return resource.RelatedCheckResult{TargetType: "cf", Count: -1, Err: err}
 	}
 	if cfList == nil {
-		return resource.RelatedCheckResult{TargetType: "cf", Count: -1}
+		return resource.ApproximateZero("cf")
 	}
 
 	var ids []string

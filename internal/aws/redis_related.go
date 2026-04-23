@@ -73,7 +73,9 @@ func checkRedisAlarms(ctx context.Context, clients any, res resource.Resource, c
 		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1, Err: err}
 	}
 	if alarmList == nil {
-		return resource.RelatedCheckResult{TargetType: "alarm", Count: -1}
+		// Nil list from an unregistered / empty target cache is an honest zero,
+		// not an error. Matches commit 51b6646 approximate-zero contract.
+		return resource.ApproximateZero("alarm")
 	}
 
 	var ids []string
@@ -143,7 +145,7 @@ func checkRedisCFN(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
 	}
 	if cfnList == nil {
-		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
+		return resource.ApproximateZero("cfn")
 	}
 	var ids []string
 	for _, cfnRes := range cfnList {
@@ -190,7 +192,7 @@ func checkRedisCtEvents(ctx context.Context, clients any, res resource.Resource,
 		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, Err: err}
 	}
 	if evList == nil {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1}
+		return resource.ApproximateZero("ct-events")
 	}
 
 	var ids []string
@@ -266,7 +268,7 @@ func checkRedisLogs(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
 	}
 	if logList == nil {
-		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
+		return resource.ApproximateZero("logs")
 	}
 
 	wanted := make(map[string]struct{}, len(names))
@@ -313,7 +315,7 @@ func checkRedisSecrets(ctx context.Context, clients any, res resource.Resource, 
 		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1, Err: err}
 	}
 	if secretList == nil {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
+		return resource.ApproximateZero("secrets")
 	}
 
 	namingConvention := rgID + "/auth-token"
@@ -401,7 +403,7 @@ func checkRedisSNS(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.RelatedCheckResult{TargetType: "sns", Count: -1, Err: err}
 	}
 	if snsList == nil {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
+		return resource.ApproximateZero("sns")
 	}
 
 	// SNS topic ARN format: arn:aws:sns:region:account:topic-name
