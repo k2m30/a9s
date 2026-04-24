@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
@@ -29,6 +30,14 @@ func init() {
 			result.Pagination.PageSize = len(result.Resources)
 		}
 		return result, nil
+	})
+
+	resource.RegisterFetchByIDs("policy", func(ctx context.Context, clients any, ids []string) ([]resource.Resource, error) {
+		c, ok := clients.(*ServiceClients)
+		if !ok || c == nil {
+			return nil, fmt.Errorf("AWS clients not initialized")
+		}
+		return FetchIAMPoliciesByIDsFull(ctx, c.IAM, ids)
 	})
 
 	resource.RegisterRelated("policy", []resource.RelatedDef{
@@ -140,6 +149,173 @@ func FetchIAMPoliciesPage(ctx context.Context, api IAMListPoliciesAPI, continuat
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// allPoliciesCache memoizes the name→Resource map built from
+// ListPolicies(Scope=All). AWS-managed policy names are stable globally;
+// customer-managed names are stable within an account. The cache survives for
+// the lifetime of the process, which matches the `kms` cache semantics (key
+// IDs memoized across drills). The mutex guards concurrent rebuilds from
+// parallel related-checks targeting "policy".
+var (
+	allPoliciesMu    sync.Mutex
+	allPoliciesBuilt bool
+	allPoliciesByID  map[string]resource.Resource
+)
+
+// FetchIAMPoliciesByIDsFull is the production entry point called by the
+// related-panel lazy-add path. It resolves policy PolicyNames across BOTH
+// managed (customer + AWS) and inline group policies, so a checker that
+// emits an attached AWS-managed policy name (AdministratorAccess, …) OR an
+// inline group policy name (group/policy pair surfaced by
+// ListGroupPolicies) drills into a real entry.
+//
+// Managed resolution: ListPolicies(Scope=All) paginated on first call,
+// memoized in allPoliciesByID. Inline resolution: ListGroups +
+// ListGroupPolicies, memoized alongside.
+//
+// Invariant: the returned Resource shape matches FetchIAMPoliciesPage and
+// fetchInlineGroupPolicies (same Fields keys) so reverse-scan checkers
+// reading Fields on a lazily-added policy observe the same fields as on a
+// paginated-fetched policy.
+func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string) ([]resource.Resource, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	allPoliciesMu.Lock()
+	defer allPoliciesMu.Unlock()
+
+	if !allPoliciesBuilt {
+		allPoliciesByID = make(map[string]resource.Resource)
+		if err := buildAllManagedPolicies(ctx, api); err != nil {
+			return nil, err
+		}
+		// Include inline group policies so checkGroupPolicy (which emits
+		// both attached and inline names) finds the inline entries in
+		// cache too. fetchInlineGroupPolicies swallows errors per-group;
+		// partial results are preserved.
+		for _, r := range fetchInlineGroupPolicies(ctx, api) {
+			allPoliciesByID[r.ID] = r
+		}
+		allPoliciesBuilt = true
+	}
+
+	resources := make([]resource.Resource, 0, len(ids))
+	seen := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		if id == "" {
+			continue
+		}
+		if _, dup := seen[id]; dup {
+			continue
+		}
+		seen[id] = struct{}{}
+		if r, hit := allPoliciesByID[id]; hit {
+			resources = append(resources, r)
+		}
+	}
+	return resources, nil
+}
+
+// FetchIAMPoliciesByIDs is the narrower test-friendly variant: resolves
+// names from ListPolicies(Scope=All) only, no inlines. Useful when the
+// caller only has an IAMListPoliciesAPI (unit tests with a minimal mock).
+// Production code goes through FetchIAMPoliciesByIDsFull.
+func FetchIAMPoliciesByIDs(ctx context.Context, api IAMListPoliciesAPI, ids []string) ([]resource.Resource, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	allPoliciesMu.Lock()
+	defer allPoliciesMu.Unlock()
+
+	if !allPoliciesBuilt {
+		allPoliciesByID = make(map[string]resource.Resource)
+		if err := buildAllManagedPolicies(ctx, api); err != nil {
+			return nil, err
+		}
+		allPoliciesBuilt = true
+	}
+
+	resources := make([]resource.Resource, 0, len(ids))
+	seen := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		if id == "" {
+			continue
+		}
+		if _, dup := seen[id]; dup {
+			continue
+		}
+		seen[id] = struct{}{}
+		if r, hit := allPoliciesByID[id]; hit {
+			resources = append(resources, r)
+		}
+	}
+	return resources, nil
+}
+
+// buildAllManagedPolicies paginates ListPolicies(Scope=All) and populates
+// allPoliciesByID with every managed policy (customer + AWS). Caller MUST
+// hold allPoliciesMu.
+func buildAllManagedPolicies(ctx context.Context, api IAMListPoliciesAPI) error {
+	var marker *string
+	for {
+		out, err := api.ListPolicies(ctx, &iam.ListPoliciesInput{
+			Scope:    iamtypes.PolicyScopeTypeAll,
+			MaxItems: aws.Int32(DefaultPageSize),
+			Marker:   marker,
+		})
+		if err != nil {
+			return fmt.Errorf("listing all IAM policies for lazy-add: %w", err)
+		}
+		for _, p := range out.Policies {
+			policyName := ""
+			if p.PolicyName != nil {
+				policyName = *p.PolicyName
+			}
+			if policyName == "" {
+				continue
+			}
+			attachmentCount := "0"
+			if p.AttachmentCount != nil {
+				attachmentCount = fmt.Sprintf("%d", *p.AttachmentCount)
+			}
+			path := ""
+			if p.Path != nil {
+				path = *p.Path
+			}
+			createDate := ""
+			if p.CreateDate != nil {
+				createDate = p.CreateDate.Format("2006-01-02 15:04")
+			}
+			isAttachable := "false"
+			if p.IsAttachable {
+				isAttachable = "true"
+			}
+			policyType := "managed"
+			if p.Arn != nil && !IsCustomerManagedIAMPolicyARN(*p.Arn) {
+				policyType = "aws-managed"
+			}
+			allPoliciesByID[policyName] = resource.Resource{
+				ID:     policyName,
+				Name:   policyName,
+				Status: "",
+				Fields: map[string]string{
+					"policy_name":      policyName,
+					"policy_type":      policyType,
+					"attachment_count": attachmentCount,
+					"is_attachable":    isAttachable,
+					"path":             path,
+					"create_date":      createDate,
+				},
+				RawStruct: p,
+			}
+		}
+		if !out.IsTruncated || out.Marker == nil {
+			break
+		}
+		marker = out.Marker
+	}
+	return nil
 }
 
 func fetchInlineGroupPolicies(ctx context.Context, api IAMAPI) []resource.Resource {

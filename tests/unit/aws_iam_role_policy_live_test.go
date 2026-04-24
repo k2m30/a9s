@@ -70,10 +70,15 @@ func TestCheckRolePolicy_HappyPath(t *testing.T) {
 	}
 }
 
-// TestCheckRolePolicy_AWSManagedOnlyRole verifies that customerManagedAttachedPolicyNames
-// filters out all AWS-managed policies. acme-eks-node-role has only AmazonEKSWorkerNodePolicy
-// and AmazonEC2ContainerRegistryReadOnly — both have `:aws:policy/` in their ARNs.
-// Result must be Count=0, not -1.
+// TestCheckRolePolicy_AWSManagedOnlyRole verifies that checkRolePolicy emits
+// every attached policy name, including AWS-managed ones. The lazy-add path
+// (FetchIAMPoliciesByIDsFull) resolves AWS-managed names to real entries at
+// drill time — previously the checker pre-filtered by ARN which hid these
+// attachments from the operator entirely.
+//
+// acme-eks-node-role has AmazonEKSWorkerNodePolicy, AmazonEKS_CNI_Policy,
+// and AmazonEC2ContainerRegistryReadOnly attached — all AWS-managed.
+// Result must be Count=len(attached), not 0.
 func TestCheckRolePolicy_AWSManagedOnlyRole(t *testing.T) {
 	clients := demo.NewServiceClients()
 	checker := iamRolePolicyChecker(t)
@@ -87,11 +92,14 @@ func TestCheckRolePolicy_AWSManagedOnlyRole(t *testing.T) {
 	if result.TargetType != "policy" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "policy")
 	}
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0; acme-eks-node-role has only AWS-managed policies "+
-			"(AmazonEKSWorkerNodePolicy, AmazonEC2ContainerRegistryReadOnly) which are filtered "+
-			"by customerManagedAttachedPolicyNames (internal/aws/iam_roles_related.go:164)",
+	if result.Count < 1 {
+		t.Errorf("Count = %d, want ≥1; acme-eks-node-role has AWS-managed policies "+
+			"(AmazonEKSWorkerNodePolicy, AmazonEKS_CNI_Policy, AmazonEC2ContainerRegistryReadOnly) "+
+			"that the checker now emits as attached names (lazy-add resolves them at drill time)",
 			result.Count)
+	}
+	if len(result.ResourceIDs) != result.Count {
+		t.Errorf("ResourceIDs length = %d, want %d (every attached policy must surface by name)", len(result.ResourceIDs), result.Count)
 	}
 	if result.Err != nil {
 		t.Errorf("unexpected error: %v", result.Err)

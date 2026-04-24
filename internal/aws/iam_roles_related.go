@@ -275,7 +275,7 @@ func checkRolePolicy(ctx context.Context, clients any, res resource.Resource, _ 
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "policy", Count: -1, Err: err}
 	}
-	ids := customerManagedAttachedPolicyNames(out.AttachedPolicies)
+	ids := attachedPolicyNames(out.AttachedPolicies)
 	return relatedResult("policy", ids)
 }
 

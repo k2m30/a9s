@@ -26,37 +26,49 @@ func (f *iamUserPolicyOverrideFake) ListAttachedUserPolicies(_ context.Context, 
 	return &iam.ListAttachedUserPoliciesOutput{AttachedPolicies: f.attachedPolicies}, nil
 }
 
-func TestRelated_IAMGroup_Policy_FiltersAWSManagedPolicies(t *testing.T) {
+// These tests originally pinned the old behavior: the checker filtered
+// AWS-managed ARNs out of the emitted list so Count reflected only
+// customer-managed policies. That hid AWS-managed attachments from the
+// operator entirely.
+//
+// The lazy-add path now resolves AWS-managed policy names on demand via
+// FetchIAMPoliciesByIDsFull, so checkers emit every attached policy name
+// (managed or AWS-managed). The drill lands on real entries because the
+// orchestrator populates the cache with lazy-added AWS-managed policies.
+// The new assertion is: the checker returns the full attached-count and
+// every PolicyName appears in ResourceIDs.
+
+func TestRelated_IAMGroup_Policy_EmitsAllAttachedPolicies(t *testing.T) {
 	checker := iamGroupCheckerByTarget(t, "policy")
 	clients := &awsclient.ServiceClients{IAM: fakes.NewIAM()}
 	source := resource.Resource{ID: "admins", Name: "admins"}
 
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Fatalf("Count = %d, want 0 for AWS-managed-only attached policies", result.Count)
+	if result.Count < 1 {
+		t.Fatalf("Count = %d, want ≥1 (admins group has at least one attached policy in fixtures)", result.Count)
 	}
-	if len(result.ResourceIDs) != 0 {
-		t.Fatalf("ResourceIDs = %v, want none", result.ResourceIDs)
+	if len(result.ResourceIDs) != result.Count {
+		t.Errorf("ResourceIDs length = %d, want %d (each attached policy must surface by name)", len(result.ResourceIDs), result.Count)
 	}
 }
 
-func TestRelated_IAMRole_Policy_FiltersAWSManagedPolicies(t *testing.T) {
+func TestRelated_IAMRole_Policy_EmitsAllAttachedPolicies(t *testing.T) {
 	checker := roleCheckerByTarget(t, "policy")
 	clients := &awsclient.ServiceClients{IAM: fakes.NewIAM()}
 	source := resource.Resource{ID: "acme-eks-node-role", Name: "acme-eks-node-role"}
 
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Fatalf("Count = %d, want 0 for AWS-managed-only attached policies", result.Count)
+	if result.Count < 1 {
+		t.Fatalf("Count = %d, want ≥1 (acme-eks-node-role has AWS-managed EKSWorkerNode + CNI + ECRReadOnly attached)", result.Count)
 	}
-	if len(result.ResourceIDs) != 0 {
-		t.Fatalf("ResourceIDs = %v, want none", result.ResourceIDs)
+	if len(result.ResourceIDs) != result.Count {
+		t.Errorf("ResourceIDs length = %d, want %d", len(result.ResourceIDs), result.Count)
 	}
 }
 
-func TestRelated_IAMUser_Policy_FiltersAWSManagedPolicies(t *testing.T) {
+func TestRelated_IAMUser_Policy_EmitsAWSManagedAttachedPolicy(t *testing.T) {
 	checker := iamUserCheckerByTarget(t, "policy")
 	clients := &awsclient.ServiceClients{
 		IAM: &iamUserPolicyOverrideFake{
@@ -73,11 +85,11 @@ func TestRelated_IAMUser_Policy_FiltersAWSManagedPolicies(t *testing.T) {
 
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count != 0 {
-		t.Fatalf("Count = %d, want 0 for AWS-managed-only attached policies", result.Count)
+	if result.Count != 1 {
+		t.Fatalf("Count = %d, want 1 (AdministratorAccess attached, lazy-add resolves AWS-managed at drill time)", result.Count)
 	}
-	if len(result.ResourceIDs) != 0 {
-		t.Fatalf("ResourceIDs = %v, want none", result.ResourceIDs)
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "AdministratorAccess" {
+		t.Errorf("ResourceIDs = %v, want [AdministratorAccess]", result.ResourceIDs)
 	}
 }
 
