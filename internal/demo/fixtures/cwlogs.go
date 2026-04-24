@@ -159,6 +159,30 @@ func NewCWLogsFixtures() *CWLogsFixtures {
 			RetentionInDays: aws.Int32(90),
 			CreationTime:    aws.Int64(1746057600000), // 2025-05-01
 		},
+		// acme-warehouse Redshift log groups — required for redshift→logs related-panel pivot.
+		// checkRedshiftLogs returns /aws/redshift/cluster/acme-warehouse as the prefix ID;
+		// the three canonical CloudWatch audit log groups follow this naming convention.
+		{
+			LogGroupName:    aws.String("/aws/redshift/cluster/" + AcmeWarehouseID + "/connectionlog"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/redshift/cluster/" + AcmeWarehouseID + "/connectionlog:*"),
+			StoredBytes:     aws.Int64(52428800),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1741996800000), // 2025-03-15
+		},
+		{
+			LogGroupName:    aws.String("/aws/redshift/cluster/" + AcmeWarehouseID + "/userlog"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/redshift/cluster/" + AcmeWarehouseID + "/userlog:*"),
+			StoredBytes:     aws.Int64(20971520),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1741996800000), // 2025-03-15
+		},
+		{
+			LogGroupName:    aws.String("/aws/redshift/cluster/" + AcmeWarehouseID + "/useractivitylog"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/redshift/cluster/" + AcmeWarehouseID + "/useractivitylog:*"),
+			StoredBytes:     aws.Int64(10485760),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1741996800000), // 2025-03-15
+		},
 		// Redis prod slow-log group — required for redis→logs related-panel pivot.
 		// The prod-redis-sessions RG LogDeliveryConfigurations destination points here.
 		{

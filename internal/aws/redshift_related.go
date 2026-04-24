@@ -215,8 +215,8 @@ func checkRedshiftSecrets(ctx context.Context, clients any, res resource.Resourc
 
 // checkRedshiftLogs resolves the cluster's audit-log target via a single
 // redshift:DescribeLoggingStatus call (Pattern C). When LogDestinationType
-// is cloudwatch, LogExports names the log-class subtypes and the actual log
-// group follows the /aws/redshift/cluster/{clusterID} naming convention.
+// is cloudwatch, one log-group ID is emitted per enabled LogExports[] entry
+// following the /aws/redshift/cluster/{clusterID}/{logExport} naming convention.
 func checkRedshiftLogs(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	status := redshiftLoggingStatus(ctx, clients, res)
 	if status == nil {
@@ -229,13 +229,21 @@ func checkRedshiftLogs(ctx context.Context, clients any, res resource.Resource, 
 		// S3-only audit logging — no log group association.
 		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
 	}
-	// CloudWatch audit logs follow convention /aws/redshift/cluster/{clusterID}/{logtype}
-	// We return the parent log-group prefix for display; the UI can scope.
 	clusterID := res.ID
 	if clusterID == "" {
 		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
 	}
-	return relatedResult("logs", []string{"/aws/redshift/cluster/" + clusterID})
+	if len(status.LogExports) == 0 {
+		// CloudWatch logging enabled but no specific exports configured.
+		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+	}
+	// Emit one log-group ID per enabled export:
+	// /aws/redshift/cluster/{clusterID}/{logExport}
+	var ids []string
+	for _, export := range status.LogExports {
+		ids = append(ids, "/aws/redshift/cluster/"+clusterID+"/"+export)
+	}
+	return relatedResult("logs", ids)
 }
 
 // checkRedshiftS3 resolves the audit-log S3 bucket via a single

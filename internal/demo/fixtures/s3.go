@@ -120,6 +120,10 @@ func buildS3Buckets() []s3types.Bucket {
 		{"a9s-demo-nilcfg", "arn:aws:s3:::a9s-demo-nilcfg", "us-east-1", "2025-05-05T11:00:00+00:00"},
 		// SES inbound mail bucket: receives mail via SES v1 receipt rule (checkSESS3 pivot).
 		{SESInboundBucketName, "arn:aws:s3:::" + SESInboundBucketName, "us-east-1", "2025-04-01T07:00:00+00:00"},
+		// Redshift audit bucket — required for redshift→s3 related-panel pivot.
+		// acme-reporting cluster has S3-logging enabled with destination = RedshiftAuditBucket.
+		// DescribeLoggingStatus for acme-reporting returns BucketName=RedshiftAuditBucket.
+		{RedshiftAuditBucket, "arn:aws:s3:::" + RedshiftAuditBucket, "us-east-1", "2025-07-22T14:00:00+00:00"},
 	}
 
 	// Named legacy buckets with objects.

@@ -935,8 +935,8 @@ func (s *fullIntegrationScenario) DrillRelated(displayName string) []resource.Re
 	// Occurs when handleRelatedNavigate takes the RelatedIDs cache-hit branch and calls
 	// NewResourceListFromCache — which pushes a view and returns nil cmd, so no
 	// ResourcesLoadedMsg is ever dispatched. Detected by checking the rendered view title
-	// for "{targetType}(N)". Return synthetic resource stubs from the RelatedIDs; their
-	// IDs are the checker-emitted values — exactly what tests need for format assertions.
+	// for "{targetType}(N)" or "{ListTitle}(N)" — the latter handles types like `alarm`
+	// whose ListTitle differs from ShortName ("alarms" vs "alarm").
 	targetType := rel.TargetType
 	// FrameTitle prefers typeDef.ListTitle over ShortName — e.g. alarm → "alarms",
 	// eb-rule → "event-rules". Check both so the case-3 branch fires regardless.

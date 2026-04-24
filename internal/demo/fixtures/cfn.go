@@ -157,6 +157,34 @@ func NewCFNFixtures() *CFNFixtures {
 				{Key: aws.String("Service"), Value: aws.String("search")},
 			},
 		},
+		// Redshift acme-warehouse CFN stack — required for redshift→cfn related-panel pivot.
+		// The acme-warehouse cluster carries the aws:cloudformation:stack-name tag
+		// pointing to "acme-warehouse-stack" so checkRedshiftCFN resolves a non-zero count.
+		{
+			StackName:    aws.String("acme-warehouse-stack"),
+			StackStatus:  cfntypes.StackStatusCreateComplete,
+			CreationTime: aws.Time(mustParseCFNTime("2025-03-10T09:00:00+00:00")),
+			Description:  aws.String("Redshift analytics cluster stack for Acme Corp warehouse"),
+			StackId:      aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-warehouse-stack/aaaa1111-bbbb-2222-cccc-333333333333"),
+			RoleARN:      aws.String(prodCIDeployRoleARN),
+			Tags: []cfntypes.Tag{
+				{Key: aws.String("Environment"), Value: aws.String("production")},
+				{Key: aws.String("Service"), Value: aws.String("analytics")},
+			},
+		},
+		// Redshift acme-reporting CFN stack — required for redshift→cfn related-panel pivot (second graph-root).
+		{
+			StackName:    aws.String("acme-reporting-stack"),
+			StackStatus:  cfntypes.StackStatusCreateComplete,
+			CreationTime: aws.Time(mustParseCFNTime("2025-07-22T14:30:00+00:00")),
+			Description:  aws.String("Redshift reporting cluster stack for Acme Corp reporting"),
+			StackId:      aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-reporting-stack/dddd4444-eeee-5555-ffff-666666666666"),
+			RoleARN:      aws.String(prodCIDeployRoleARN),
+			Tags: []cfntypes.Tag{
+				{Key: aws.String("Environment"), Value: aws.String("production")},
+				{Key: aws.String("Service"), Value: aws.String("reporting")},
+			},
+		},
 		// Redis prod CFN stack — required for redis→cfn related-panel pivot.
 		// The prod-redis-sessions RG carries the aws:cloudformation:stack-name tag
 		// pointing to ProdRedisCFNStack so checkRedisCFN resolves a non-zero count.

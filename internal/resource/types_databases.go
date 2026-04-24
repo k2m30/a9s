@@ -316,9 +316,10 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "endpoint", Title: "Endpoint", Width: 44, Sortable: false},
 			},
 			Color: func(r Resource) Color {
-				// Base color from ClusterStatus.
+				// Base color from raw ClusterStatus (cluster_status field carries
+				// the unmodified AWS value; "status" carries the derived phrase).
 				var base Color
-				switch r.Fields["status"] {
+				switch r.Fields["cluster_status"] {
 				case "available":
 					base = ColorHealthy
 				case "creating", "modifying", "resizing", "rebooting", "renaming", "deleting":
