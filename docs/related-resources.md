@@ -37,6 +37,14 @@
 5. **Never bypass** — do NOT "temporarily" remove a row to unblock a refactor.
    Previous drift happened exactly this way. If the registration is blocking
    you, fix the registration, not the contract.
+6. **Error contract** — every checker MUST set `RelatedCheckResult.Err` on API
+   failure, using `aws.AggregateFailures(opName, failures, total)` for
+   per-item loops. Silent skip (`if err != nil { continue }` without
+   aggregation) is banned — see `.claude/skills/a9s-implement-resource/SKILL.md`
+   rules **E1–E6**. The app layer converts a non-nil `Result.Err` into a
+   `FlashMsg{IsError:true}` so the `!` error log captures the failure;
+   without this the pivot renders `?` with no actionable cause. Op-name
+   convention: `"<short>-related: <Verb>"` (e.g. `"s3-related: GetBucketPolicy"`).
 
 ## Per-type contract
 
