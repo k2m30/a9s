@@ -102,8 +102,12 @@ func TestDemoIAMFake_ListPolicies_HonorsLocalScope(t *testing.T) {
 }
 
 func TestDemoExpectedTopLevelCounts_Policy_ExcludesAWSManaged(t *testing.T) {
+	// Oracle mirrors the policy fetcher: customer-managed policies plus every
+	// inline group policy surfaced by ListGroupPolicies. AWS-managed policies
+	// are excluded by the Scope=Local filter in the fetcher and by
+	// IsCustomerManagedPolicyARN in countTopLevelIAMPolicies.
 	counts := fixtures.ExpectedTopLevelCounts()
-	if got, want := counts["policy"], 24; got != want {
+	if got, want := counts["policy"], 27; got != want {
 		t.Fatalf("policy count = %d, want %d", got, want)
 	}
 }

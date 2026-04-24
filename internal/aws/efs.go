@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("efs", []string{"file_system_id", "name", "status", "performance_mode", "encrypted", "mount_targets"})
+	resource.RegisterFieldKeys("efs", []string{"file_system_id", "name", "status", "performance_mode", "throughput_mode", "encrypted", "mount_targets"})
 
 	resource.RegisterPaginated("efs", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)

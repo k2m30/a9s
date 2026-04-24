@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	acmtypes "github.com/aws/aws-sdk-go-v2/service/acm/types"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/opensearch"
@@ -152,11 +153,19 @@ func TestRelated_OpenSearch_ACM(t *testing.T) {
 		},
 	}
 
+	// The ACM fetcher indexes Resource.ID by DomainName. The checker now
+	// reverse-scans the acm cache for a CertificateSummary whose ARN matches
+	// and returns the target Resource.ID (DomainName) so drill-through lands.
+	acmDomainName := "acme-logs.internal.com"
 	acmRes := resource.Resource{
-		ID:   fixtures.OpenSearchACMCertID,
-		Name: "acme-logs.internal.com",
+		ID:   acmDomainName,
+		Name: acmDomainName,
 		Fields: map[string]string{
-			"arn": fixtures.OpenSearchACMCertARN,
+			"domain_name": acmDomainName,
+		},
+		RawStruct: acmtypes.CertificateSummary{
+			DomainName:     aws.String(acmDomainName),
+			CertificateArn: aws.String(fixtures.OpenSearchACMCertARN),
 		},
 	}
 	cache := resource.ResourceCache{
@@ -169,8 +178,8 @@ func TestRelated_OpenSearch_ACM(t *testing.T) {
 	if result.Count != 1 {
 		t.Errorf("Count = %d, want 1", result.Count)
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != fixtures.OpenSearchACMCertID {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, fixtures.OpenSearchACMCertID)
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != acmDomainName {
+		t.Errorf("ResourceIDs = %v, want [%s] (ACM fetcher indexes by DomainName, not bare cert ID)", result.ResourceIDs, acmDomainName)
 	}
 }
 
@@ -339,8 +348,8 @@ func TestRelated_OpenSearch_Logs(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestRelated_OpenSearch_SG(t *testing.T) {
-	sgA := resource.Resource{ID: fixtures.OpenSearchSGA, Name: fixtures.OpenSearchSGA, Fields: map[string]string{}}
-	sgB := resource.Resource{ID: fixtures.OpenSearchSGB, Name: fixtures.OpenSearchSGB, Fields: map[string]string{}}
+	// SG checker uses forward-lookup from DomainStatus, not cache scan, so
+	// the cache is intentionally empty here.
 	cache := resource.ResourceCache{}
 
 	checker := opensearchCheckerByTarget(t, "sg")
@@ -360,7 +369,6 @@ func TestRelated_OpenSearch_SG(t *testing.T) {
 	if !ids[fixtures.OpenSearchSGB] {
 		t.Errorf("ResourceIDs = %v, missing %s", result.ResourceIDs, fixtures.OpenSearchSGB)
 	}
-	_, _ = sgA, sgB // SG checker uses forward-lookup from DomainStatus, not cache scan
 }
 
 // ---------------------------------------------------------------------------

@@ -293,6 +293,39 @@ func UnregisterRelated(shortName string) {
 	delete(relatedRegistry, shortName)
 }
 
+// FetchByIDsFunc fetches specific resource instances by ID, bypassing any
+// filter the top-level paginated fetcher applies. It exists to resolve the
+// filtered-target drill-to-empty bug class: when a reverse-scan target has a
+// selective list fetcher (kms customer-managed only, ami owners=self, ebs-snap
+// owners=self, policy scope=local, etc.) and a checker emits an ID that falls
+// outside that filter, the drill would otherwise land on an empty list. The
+// related-check orchestrator calls FetchByIDs with any IDs missing from the
+// cache, so AWS-managed KMS keys, public AMIs, cross-account snapshots, and
+// AWS-managed IAM policies can still be drilled into when some other
+// resource references them.
+//
+// Implementations MUST NOT apply the owner/scope/manager filter their
+// sibling paginated fetcher uses — returning an empty slice for an ID that
+// AWS knows about defeats the whole point.
+type FetchByIDsFunc func(ctx context.Context, clients any, ids []string) ([]Resource, error)
+
+// fetchByIDsRegistry maps target resource short name to its FetchByIDs helper.
+var fetchByIDsRegistry = map[string]FetchByIDsFunc{}
+
+// RegisterFetchByIDs stores the FetchByIDs helper for the given target short
+// name. Replaces any existing entry. Safe to call from an init() alongside
+// RegisterPaginated.
+func RegisterFetchByIDs(shortName string, fn FetchByIDsFunc) {
+	fetchByIDsRegistry[shortName] = fn
+}
+
+// GetFetchByIDs returns the FetchByIDs helper for the target short name, or
+// nil if none is registered. Targets without a registered FetchByIDs skip
+// the lazy-add path — their checkers run the same way they always have.
+func GetFetchByIDs(shortName string) FetchByIDsFunc {
+	return fetchByIDsRegistry[shortName]
+}
+
 // RegisterNavigableFields stores navigable field definitions for the given resource short name.
 // Replaces any existing entry.
 func RegisterNavigableFields(shortName string, fields []NavigableField) {

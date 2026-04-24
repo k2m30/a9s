@@ -392,6 +392,9 @@ func TestOpenSearch_Enrich_NilClients_NoPanic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnrichOpenSearchDomains with nil clients returned error: %v", err)
 	}
-	// Result should be valid (not panicked, fields not nil).
-	_ = result
+	// Contract: Findings must always be non-nil so downstream callers can iterate
+	// without a nil-check. An empty map is fine; nil is a structural bug.
+	if result.Findings == nil {
+		t.Fatalf("EnrichOpenSearchDomains with nil clients returned Findings == nil; want non-nil (possibly empty) map")
+	}
 }

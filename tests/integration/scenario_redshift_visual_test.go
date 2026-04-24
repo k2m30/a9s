@@ -220,7 +220,6 @@ func TestScenario_RedshiftVisual_DetailSurfacesAllIssues(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.id, func(t *testing.T) {
 			res := selectRedshiftByID(t, scenario, tc.id)
 			scenario.OpenDetailResource("redshift", res)
@@ -261,7 +260,6 @@ func TestScenario_RedshiftVisual_HealthyRowsHaveNoIssuesPhrases(t *testing.T) {
 		demofixtures.StagingDwhID,
 		demofixtures.RedshiftMaintenanceDeferredExpiredID,
 	} {
-		id := id
 		t.Run(id, func(t *testing.T) {
 			res := selectRedshiftByID(t, scenario, id)
 			scenario.OpenDetailResource("redshift", res)

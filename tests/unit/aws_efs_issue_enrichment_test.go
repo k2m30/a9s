@@ -23,15 +23,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
 )
 
-// ---------------------------------------------------------------------------
-// efsMTFakeFromFixtures builds an efsMountTargetFake from the canonical
-// fixture data. The fake serves results keyed by FileSystemId.
-// ---------------------------------------------------------------------------
-
-func efsMTFakeFromFixtures() *efsMountTargetFake {
-	fix := fixtures.NewEFSFixtures()
-	return &efsMountTargetFake{results: fix.MountTargets}
-}
+// Shared helper efsMTFakeFromFixtures lives in helpers_efs_test.go.
 
 // ---------------------------------------------------------------------------
 // TEST: TestEnrichEFSMountTargets_HealthyRowWithDown
@@ -358,6 +350,9 @@ func TestEnrichEFSMountTargets_IssueCount(t *testing.T) {
 		"fs-0warnupdmtdown001",
 	}
 	res := efsResources(findingFSIDs...)
+	if len(res) < 2 {
+		t.Fatalf("efsResources returned %d resources, expected %d (one per ID)", len(res), len(findingFSIDs))
+	}
 	res[1].Status = "updating"
 	res[1].Issues = []string{"updating"}
 

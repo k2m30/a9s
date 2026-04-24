@@ -174,7 +174,11 @@ func efsECSTaskCacheWithEFSIDs() resource.ResourceCache {
 //
 // GIVEN: graph-root EFS (ProdEFSID) with KmsKeyId = ProdEFSKmsKeyARN.
 // THEN:  checkEFSKMS returns Count=1, ResourceIDs contains ProdEFSKmsKeyID
-//        (the bare key ID stripped from the ARN).
+//        (the bare key ID stripped from the ARN). The checker emits blindly;
+//        the related-check orchestrator's lazy-add path populates the kms
+//        cache with the referenced key (customer-managed or AWS-managed) at
+//        dispatch time, so passing a nil cache here is the correct test
+//        shape.
 // ---------------------------------------------------------------------------
 
 func TestRelated_EFS_KMS_GraphRoot(t *testing.T) {
@@ -291,29 +295,59 @@ func TestRelated_EFS_Lambda_GraphRoot(t *testing.T) {
 // ---------------------------------------------------------------------------
 // TEST: TestRelated_EFS_Backup_GraphRoot
 //
-// GIVEN: graph-root EFS (ProdEFSARN); BackupFake returns 2 recovery points
-//        for ProdEFSARN: ProdEFSBackupARecoveryARN and ProdEFSBackupBRecoveryARN.
-// THEN:  checkEFSBackup returns Count=2 and both recovery ARNs in ResourceIDs.
+// GIVEN: graph-root EFS (ProdEFSARN); backup cache contains plans whose
+//        Fields["resources"] CSV lists ProdEFSARN.
+// THEN:  checkEFSBackup returns Count=2 and both plan IDs in ResourceIDs.
+//
+// The checker now reverse-scans the backup cache (ID-format matches the
+// backup fetcher's Resource.ID=BackupPlanId). Recovery-point ARNs are not
+// a valid target ID for the `backup` resource type — drill-through would
+// land empty if the checker returned them. See 2026-04-24 bug.
 // ---------------------------------------------------------------------------
 
 func TestRelated_EFS_Backup_GraphRoot(t *testing.T) {
 	source := efsGraphRootSource()
 	checker := efsCheckerByTarget(t, "backup")
 
-	backupFake := fakes.NewBackup()
-	clients := &awsclient.ServiceClients{Backup: backupFake}
+	// Build a backup cache with two plans that reference ProdEFSARN in their
+	// resources CSV, and one plan that does NOT.
+	cache := resource.ResourceCache{
+		"backup": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{
+				ID:   fixtures.HealthyDailyPlanID,
+				Name: "plan-healthy-daily",
+				Fields: map[string]string{
+					"resources": fixtures.HealthyBucketARN + "," + fixtures.ProdEFSARN + "," + fixtures.OrdersProdARN,
+				},
+			},
+			{
+				ID:   fixtures.AppDataPlanID,
+				Name: "plan-warning-partial",
+				Fields: map[string]string{
+					"resources": "arn:aws:dynamodb:us-east-1:123456789012:table/acme-app-sessions," + fixtures.ProdEFSARN,
+				},
+			},
+			{
+				ID:   fixtures.ProdCriticalPlanID,
+				Name: "plan-broken-1failed",
+				Fields: map[string]string{
+					"resources": "arn:aws:rds:us-east-1:123456789012:db:acme-prod-secondary",
+				},
+			},
+		}},
+	}
 
-	result := checker(context.Background(), clients, source, resource.ResourceCache{})
+	result := checker(context.Background(), nil, source, cache)
 
 	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2 (both EFS recovery points); ResourceIDs = %v", result.Count, result.ResourceIDs)
+		t.Errorf("Count = %d, want 2 (two plans protect the graph-root EFS); ResourceIDs = %v", result.Count, result.ResourceIDs)
 	}
-	wantARNs := []string{fixtures.ProdEFSBackupARecoveryARN, fixtures.ProdEFSBackupBRecoveryARN}
+	wantPlanIDs := []string{fixtures.HealthyDailyPlanID, fixtures.AppDataPlanID}
 	idSet := make(map[string]bool, len(result.ResourceIDs))
 	for _, id := range result.ResourceIDs {
 		idSet[id] = true
 	}
-	for _, want := range wantARNs {
+	for _, want := range wantPlanIDs {
 		if !idSet[want] {
 			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs)
 		}
@@ -472,25 +506,11 @@ func TestRelated_EFS_ECSTask_GraphRoot(t *testing.T) {
 
 // ---------------------------------------------------------------------------
 // TEST: TestRelated_EFS_EC2_GraphRoot
-//
-// GIVEN: graph-root EFS; ENI cache has 3 mount-target ENIs but NONE have
-//        Attachment.InstanceId set (mount-target ENIs are not EC2 instances).
-// THEN:  checkEFSEC2 returns Count=0 (intentional per spec §5).
+// EFS→EC2 pivot was removed (2026-04-24): the previous test asserted
+// Count=0 as "intentional per spec §5", but a registered pivot that always
+// returns 0 is a U9 violation regardless of the excuse. See
+// internal/aws/efs_related.go for the removal rationale.
 // ---------------------------------------------------------------------------
-
-func TestRelated_EFS_EC2_GraphRoot(t *testing.T) {
-	source := efsGraphRootSource()
-	checker := efsCheckerByTarget(t, "ec2")
-	cache := efsENICache()
-
-	result := checker(context.Background(), nil, source, cache)
-
-	// Spec §5: EFS mount-target ENIs have no Attachment.InstanceId — EC2 count is always 0.
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (mount-target ENIs have no EC2 instance attachment); ResourceIDs = %v",
-			result.Count, result.ResourceIDs)
-	}
-}
 
 // ---------------------------------------------------------------------------
 // Compile-time smoke: ensure all expected fixture IDs are referenced by the

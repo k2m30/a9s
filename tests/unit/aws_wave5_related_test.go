@@ -65,8 +65,7 @@ func TestRelated_KMS_Role_EmptyKeyID(t *testing.T) {
 	}
 }
 
-// opensearch_related.go coverage-fill moved to tests/unit/aws_opensearch_related_test.go
-// (rewritten by the a9s-implement-resource skill phase 6b handoff).
+// opensearch_related.go coverage tests moved to tests/unit/aws_opensearch_related_test.go.
 
 // ────────────────────────────────────────────────────────────────────────────
 // dbc_related.go — checkDbcSubnet (37.5%)

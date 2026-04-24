@@ -67,7 +67,7 @@
 | `ecs` | [API_Cluster](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Cluster.html) | `alarm`, `asg`, `cfn`, `ct-events`, `ec2`, `ecs-svc`, `ecs-task`, `kms`, `logs` |
 | `ecs-svc` | [API_Service](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Service.html) | `alarm`, `cfn`, `ct-events`, `eb-rule`, `ecr`, `ecs`, `ecs-task`, `elb`, `logs`, `role`, `secrets`, `sfn`, `sg`, `subnet`, `tg`, `vpc` |
 | `ecs-task` | [API_Task](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Task.html) | `alarm`, `ct-events`, `ec2`, `ecr`, `ecs`, `ecs-svc`, `eni`, `logs`, `role`, `secrets`, `sg`, `ssm`, `subnet` |
-| `efs` | [API_FileSystemDescription](https://docs.aws.amazon.com/efs/latest/ug/API_FileSystemDescription.html) | `alarm`, `backup`, `cfn`, `ct-events`, `ec2`, `ecs-task`, `eni`, `kms`, `lambda`, `sg`, `subnet`, `vpc` |
+| `efs` | [API_FileSystemDescription](https://docs.aws.amazon.com/efs/latest/ug/API_FileSystemDescription.html) | `alarm`, `backup`, `cfn`, `ct-events`, `ecs-task`, `eni`, `kms`, `lambda`, `sg`, `subnet`, `vpc` |
 | `eip` | [API_Address](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Address.html) | `alarm`, `asg`, `cfn`, `ct-events`, `ec2`, `ecs`, `ecs-svc`, `ecs-task`, `eni`, `logs`, `nat` |
 | `eks` | [API_Cluster](https://docs.aws.amazon.com/eks/latest/APIReference/API_Cluster.html) | `alarm`, `ami`, `asg`, `cfn`, `ct-events`, `ec2`, `kms`, `logs`, `ng`, `role`, `sg`, `subnet`, `vpc` |
 | `elb` | [API_LoadBalancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_LoadBalancer.html) | `acm`, `alarm`, `cf`, `cfn`, `ct-events`, `eni`, `r53`, `s3`, `sg`, `subnet`, `tg`, `vpc`, `waf` |
@@ -491,7 +491,12 @@ AWS API: https://docs.aws.amazon.com/efs/latest/ug/API_FileSystemDescription.htm
 - **`backup`** — AWS Backup recovery points.
 - **`cfn`** — CloudFormation stack that created the FS.
 - **`ct-events`** — Audit trail for FS changes.
-- **`ec2`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
+<!-- `ec2` pivot removed (2026-04-24): AWS exposes no API edge from an EC2
+instance to the EFS filesystems it mounts. Mount-target ENIs are
+RequesterManaged with no Attachment.InstanceId; mounting happens at the
+guest OS layer via DNS. Any registered checker can only return Count=0,
+which is a U9 violation. Operators can still correlate via subnet / VPC /
+sg pivots, which remain registered. -->
 - **`ecs-task`** — ECS tasks mounting EFS.
 - **`eni`** — Mount-target ENIs.
 - **`kms`** — FileSystemDescription.KmsKeyId.

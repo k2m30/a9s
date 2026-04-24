@@ -43,21 +43,19 @@ func checkS3Lambda(_ context.Context, _ any, res resource.Resource, _ resource.R
 
 // checkS3SNS returns the SNS topic from the bucket's notification configuration,
 // populated in Fields["notification_sns"] by GetBucketNotificationConfiguration.
+// The SNS fetcher indexes Resource.ID by full topic ARN (sns.go — TopicArn),
+// so this checker must return the ARN unchanged — stripping to the bare topic
+// name breaks drill-through.
 func checkS3SNS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	arn := res.Fields["notification_sns"]
 	if arn == "" {
 		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
 	}
-	// SNS topic ARN: arn:aws:sns:region:account:TopicName
-	parts := strings.Split(arn, ":")
-	if len(parts) < 6 {
+	// Basic ARN shape guard — arn:aws:sns:region:account:TopicName has 6 parts.
+	if parts := strings.Split(arn, ":"); len(parts) < 6 || parts[5] == "" {
 		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
 	}
-	name := parts[5]
-	if name == "" {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
-	}
-	return relatedResult("sns", []string{name})
+	return relatedResult("sns", []string{arn})
 }
 
 // checkS3SQS returns the SQS queue from the bucket's notification configuration,

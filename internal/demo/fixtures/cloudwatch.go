@@ -10,6 +10,11 @@ import (
 // CloudWatchFixtures holds typed fixture data for CloudWatch.
 type CloudWatchFixtures struct {
 	Alarms []cwtypes.MetricAlarm
+	// AlarmHistory maps AlarmName → history items (for DescribeAlarmHistory).
+	// A missing entry means no history (child view lands empty) — every
+	// graph-root-reachable alarm must have an entry so the alarm→alarm_history
+	// drill lands on non-empty content.
+	AlarmHistory map[string][]cwtypes.AlarmHistoryItem
 }
 
 const relatedAlarmSNSARN = "arn:aws:sns:us-east-1:123456789012:ops-alerts"
@@ -452,6 +457,48 @@ func NewCloudWatchFixtures() *CloudWatchFixtures {
 					{Name: aws.String("FileSystemId"), Value: aws.String(ProdEFSID)},
 				},
 			},
+		},
+		// AlarmHistory — every graph-root-reachable alarm needs at least one
+		// entry so alarm→alarm_history drill lands on non-empty content.
+		AlarmHistory: map[string][]cwtypes.AlarmHistoryItem{
+			"orders-prod-throttle":         minimalAlarmHistory("orders-prod-throttle"),
+			"rds-prod-dbi-aurora-1-cpu":    minimalAlarmHistory("rds-prod-dbi-aurora-1-cpu"),
+			"docdb-acme-prod-cpu":          minimalAlarmHistory("docdb-acme-prod-cpu"),
+			"aurora-prod-cluster-cpu":      minimalAlarmHistory("aurora-prod-cluster-cpu"),
+			"redis-prod-cache-hits":        minimalAlarmHistory("redis-prod-cache-hits"),
+			"redshift-acme-reporting-cpu":  minimalAlarmHistory("redshift-acme-reporting-cpu"),
+			"redshift-acme-warehouse-cpu":  minimalAlarmHistory("redshift-acme-warehouse-cpu"),
+			"redshift-acme-warehouse-disk": minimalAlarmHistory("redshift-acme-warehouse-disk"),
+			"acme-logs-cluster-red":        minimalAlarmHistory("acme-logs-cluster-red"),
+			"acme-logs-freestorage-low":    minimalAlarmHistory("acme-logs-freestorage-low"),
+			"prod-efs-burst-credit-low":    minimalAlarmHistory("prod-efs-burst-credit-low"),
+			"prod-efs-percent-io-high":     minimalAlarmHistory("prod-efs-percent-io-high"),
+		},
+	}
+}
+
+// minimalAlarmHistory returns a canonical 3-item state sequence
+// (OK → ALARM → OK) so the alarm_history child view has non-empty content.
+func minimalAlarmHistory(alarmName string) []cwtypes.AlarmHistoryItem {
+	t0 := time.Date(2026, 4, 20, 8, 0, 0, 0, time.UTC)
+	return []cwtypes.AlarmHistoryItem{
+		{
+			AlarmName:       aws.String(alarmName),
+			Timestamp:       aws.Time(t0.Add(2 * time.Hour)),
+			HistoryItemType: cwtypes.HistoryItemTypeStateUpdate,
+			HistorySummary:  aws.String("Alarm updated from ALARM to OK"),
+		},
+		{
+			AlarmName:       aws.String(alarmName),
+			Timestamp:       aws.Time(t0.Add(1 * time.Hour)),
+			HistoryItemType: cwtypes.HistoryItemTypeStateUpdate,
+			HistorySummary:  aws.String("Alarm updated from OK to ALARM"),
+		},
+		{
+			AlarmName:       aws.String(alarmName),
+			Timestamp:       aws.Time(t0),
+			HistoryItemType: cwtypes.HistoryItemTypeConfigurationUpdate,
+			HistorySummary:  aws.String("Alarm \"" + alarmName + "\" created"),
 		},
 	}
 }

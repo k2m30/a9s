@@ -247,7 +247,7 @@ func computeRedshiftStatusAndIssues(cluster redshifttypes.Cluster) (string, []st
 	}
 
 	// 4.2: DeferredMaintenanceWindows with active window (now ∈ [start, end]).
-	if hasActiveDeferredMaintenanceWindow(cluster.DeferredMaintenanceWindows) {
+	if hasActiveDeferredMaintenanceWindow(cluster.DeferredMaintenanceWindows, time.Now().UTC()) {
 		warnings = append(warnings, "maintenance deferred")
 	}
 
@@ -315,10 +315,10 @@ func hasPendingRedshiftModifiedValues(pmv *redshifttypes.PendingModifiedValues) 
 }
 
 // hasActiveDeferredMaintenanceWindow returns true when at least one window
-// contains the current UTC time within [DeferMaintenanceStartTime, DeferMaintenanceEndTime].
-// A nil start time is treated as active-from-epoch; a nil end time is treated as active-forever.
-func hasActiveDeferredMaintenanceWindow(windows []redshifttypes.DeferredMaintenanceWindow) bool {
-	now := time.Now().UTC()
+// contains `now` within [DeferMaintenanceStartTime, DeferMaintenanceEndTime].
+// A nil start time is treated as active-from-epoch; a nil end time is treated
+// as active-forever. `now` is injected so tests can pin boundary behavior.
+func hasActiveDeferredMaintenanceWindow(windows []redshifttypes.DeferredMaintenanceWindow, now time.Time) bool {
 	for _, w := range windows {
 		startActive := true
 		if w.DeferMaintenanceStartTime != nil {

@@ -14,6 +14,10 @@ import (
 
 var findingSuffixRe = regexp.MustCompile(` \(\+\d+\)$`)
 
+// findingSuffixWithCountRe captures both the base phrase and the count for
+// callers that need to read (and possibly mutate) the hidden count.
+var findingSuffixWithCountRe = regexp.MustCompile(`^(.*) \(\+(\d+)\)$`)
+
 // StripFindingSuffix removes any trailing " (+N)" from a Status phrase:
 //
 //	"publicly accessible (+1)"   → "publicly accessible"
@@ -34,8 +38,7 @@ func StripFindingSuffix(s string) string {
 //	"no automated backups (+1)"   → "no automated backups (+2)"
 //	"no automated backups (+2)"   → "no automated backups (+3)"
 func BumpFindingSuffix(s string) string {
-	re := regexp.MustCompile(`^(.*) \(\+(\d+)\)$`)
-	m := re.FindStringSubmatch(s)
+	m := findingSuffixWithCountRe.FindStringSubmatch(s)
 	if m == nil {
 		return s + " (+1)"
 	}
@@ -51,8 +54,7 @@ func BumpFindingSuffix(s string) string {
 //	"updating"               → phrase="updating",          hidden=0
 //	"error"                  → phrase="error",             hidden=0
 func SplitFindingSuffix(s string) (phrase string, hidden int) {
-	re := regexp.MustCompile(`^(.*) \(\+(\d+)\)$`)
-	m := re.FindStringSubmatch(s)
+	m := findingSuffixWithCountRe.FindStringSubmatch(s)
 	if m == nil {
 		return s, 0
 	}

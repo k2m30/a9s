@@ -51,11 +51,11 @@ func init() {
 // topPhrase is "" when all signals are absent (Healthy silence — rule 1).
 func computeOpenSearchStatusAndIssues(domain opensearchtypes.DomainStatus, now time.Time) (topPhrase string, issues []string) {
 	const (
-		phraseDeleting    = "deleting: removal in progress"
-		phraseIsolated    = "isolated: quarantined by AWS"
-		phraseProcessing  = "processing: config change in flight"
-		phraseUpdateSoon  = "software update forced soon"
-		phraseEncOff      = "encryption at rest off"
+		phraseDeleting   = "deleting: removal in progress"
+		phraseIsolated   = "isolated: quarantined by AWS"
+		phraseProcessing = "processing: config change in flight"
+		phraseUpdateSoon = "software update forced soon"
+		phraseEncOff     = "encryption at rest off"
 	)
 
 	// Classify each signal.
@@ -263,7 +263,7 @@ func fetchOpenSearchDomainsAt(
 				"domain_processing_status":          processingStatus,
 				"service_software_update_available": updateAvailable,
 				"encryption_at_rest_enabled":        encEnabled,
-				"automated_update_date":                       updateDate,
+				"automated_update_date":             updateDate,
 				"current_version":                   currentVersion,
 				"new_version":                       newVersion,
 			},

@@ -1,6 +1,7 @@
 package fixtures
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -426,6 +427,12 @@ func buildRedshiftClusters() []redshifttypes.Cluster {
 }
 
 func mustParseRedshiftTime(s string) time.Time {
-	t, _ := time.Parse(time.RFC3339, s)
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		// Panic surfaces fixture typos during development — the alternative is
+		// a silent zero-time which propagates into ClusterCreateTime and
+		// produces confusing UI output in the demo.
+		panic(fmt.Sprintf("mustParseRedshiftTime(%q): %v", s, err))
+	}
 	return t
 }

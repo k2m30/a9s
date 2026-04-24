@@ -2,6 +2,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
+	"github.com/aws/smithy-go"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -65,6 +67,11 @@ func fetchECSTasksPageWithJoin(
 
 	// Memoize DescribeTaskDefinition results across all clusters in this page.
 	seenTaskDefs := make(map[string]*ecstypes.TaskDefinition)
+	// joinIncomplete flips true when any DescribeTaskDefinition fails. The
+	// fetcher surfaces it as Pagination.IsTruncated so reverse-scan checkers
+	// that depend on efs_file_system_ids (e.g. checkEFSECSTask) mark their
+	// result Approximate instead of reporting a silently-wrong definite zero.
+	joinIncomplete := false
 
 	for _, clusterArn := range listOutput.ClusterArns {
 		taskListOutput, err := listTasksAPI.ListTasks(ctx, &ecs.ListTasksInput{
@@ -125,8 +132,14 @@ func fetchECSTasksPageWithJoin(
 			healthStatus := string(task.HealthStatus)
 
 			// Join task definition to extract EFS file-system IDs.
-			// Skipped gracefully when describeTaskDefAPI is nil.
-			efsFileSystemIDs := ecsJoinEFSVolumes(ctx, task, seenTaskDefs, describeTaskDefAPI)
+			// Skipped gracefully when describeTaskDefAPI is nil. A join failure
+			// flips joinIncomplete so the fetcher surfaces Pagination.IsTruncated
+			// — reverse-scan checkers then report Approximate instead of a
+			// silently-wrong definite zero.
+			efsFileSystemIDs, joinErr := ecsJoinEFSVolumes(ctx, task, seenTaskDefs, describeTaskDefAPI)
+			if joinErr != nil {
+				joinIncomplete = true
+			}
 
 			r := resource.Resource{
 				ID:     taskID,
@@ -158,6 +171,12 @@ func fetchECSTasksPageWithJoin(
 		nextToken = *listOutput.NextToken
 		isTruncated = true
 	}
+	// Join failures contribute to truncation — the efs_file_system_ids field
+	// is incomplete, so reverse-scan checkers (checkEFSECSTask) must not claim
+	// a definite zero. See joinIncomplete comment above.
+	if joinIncomplete {
+		isTruncated = true
+	}
 
 	return resource.FetchResult{
 		Resources: resources,
@@ -172,20 +191,22 @@ func fetchECSTasksPageWithJoin(
 
 // ecsJoinEFSVolumes resolves the task definition for a task (using the memoized
 // seenTaskDefs map) and extracts the unique EFS file-system IDs from its Volumes.
-// Returns a sorted, comma-separated string of file-system IDs, or "" if none.
-// When api is nil, returns "" immediately. Errors from DescribeTaskDefinition
-// are swallowed; they produce "" for that task.
+// Returns a sorted, comma-separated string of file-system IDs (or "" if none)
+// and an error when DescribeTaskDefinition failed. The caller surfaces the
+// error as pagination truncation so downstream reverse-scan checkers
+// (e.g. checkEFSECSTask) report Approximate rather than a silently-wrong
+// definite zero.
 func ecsJoinEFSVolumes(
 	ctx context.Context,
 	task ecstypes.Task,
 	seenTaskDefs map[string]*ecstypes.TaskDefinition,
 	api ECSDescribeTaskDefinitionAPI,
-) string {
+) (string, error) {
 	if api == nil {
-		return ""
+		return "", nil
 	}
 	if task.TaskDefinitionArn == nil || *task.TaskDefinitionArn == "" {
-		return ""
+		return "", nil
 	}
 	arn := *task.TaskDefinitionArn
 
@@ -194,16 +215,29 @@ func ecsJoinEFSVolumes(
 		out, err := api.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
 			TaskDefinition: &arn,
 		})
-		if err != nil || out == nil || out.TaskDefinition == nil {
-			// Gracefully tolerate errors — skip join for this task.
+		if err != nil {
 			seenTaskDefs[arn] = nil
-			return ""
+			// "Task definition does not exist" (ClientException) is a
+			// definitive absence, not an error worth surfacing as
+			// truncation — no volumes = no EFS IDs. Every other error
+			// (access denied, throttled, transient) is propagated so the
+			// fetcher marks Pagination.IsTruncated and reverse-scan
+			// checkers report Approximate.
+			var apiErr smithy.APIError
+			if errors.As(err, &apiErr) && apiErr.ErrorCode() == "ClientException" {
+				return "", nil
+			}
+			return "", fmt.Errorf("describing task definition %s: %w", arn, err)
+		}
+		if out == nil || out.TaskDefinition == nil {
+			seenTaskDefs[arn] = nil
+			return "", nil
 		}
 		seenTaskDefs[arn] = out.TaskDefinition
 		td = out.TaskDefinition
 	}
 	if td == nil {
-		return ""
+		return "", nil
 	}
 
 	// Collect unique EFS file-system IDs from Volumes.
@@ -216,7 +250,7 @@ func ecsJoinEFSVolumes(
 		}
 	}
 	if len(seen) == 0 {
-		return ""
+		return "", nil
 	}
 
 	ids := make([]string, 0, len(seen))
@@ -224,7 +258,7 @@ func ecsJoinEFSVolumes(
 		ids = append(ids, id)
 	}
 	sort.Strings(ids)
-	return strings.Join(ids, ",")
+	return strings.Join(ids, ","), nil
 }
 
 // FetchECSTasks performs a three-step fetch:

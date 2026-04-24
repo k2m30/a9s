@@ -117,19 +117,16 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 		}
 		findings[fsID] = finding
 
-		// FieldUpdates: bump existing status phrase with (+N) suffix per spec.
-		// existing == "" → single finding, use bare phrase.
-		// existing != "" → hidden count from existing suffix + 1.
-		existing := r.Fields["status"]
-		if existing == "" {
-			existing = r.Status
-		}
+		// FieldUpdates: the Wave-2 phrase becomes the top, the Wave-1 phrases
+		// carried in r.Issues become the hidden count N. Deriving N from
+		// len(r.Issues) keeps the enricher idempotent — re-running against
+		// already-merged FieldUpdates["status"] never double-bumps the suffix,
+		// because Issues is fetcher-owned and stable across enrichment runs.
 		var newStatus string
-		if existing == "" {
+		if len(r.Issues) == 0 {
 			newStatus = "mount target down"
 		} else {
-			_, hidden := resource.SplitFindingSuffix(existing)
-			newStatus = fmt.Sprintf("mount target down (+%d)", hidden+1)
+			newStatus = fmt.Sprintf("mount target down (+%d)", len(r.Issues))
 		}
 		fu := map[string]string{"status": newStatus}
 		fieldUpdates[fsID] = fu

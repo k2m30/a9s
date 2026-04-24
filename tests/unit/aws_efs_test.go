@@ -17,6 +17,7 @@ package unit
 
 import (
 	"context"
+	"sort"
 	"strings"
 	"testing"
 
@@ -363,6 +364,7 @@ func sortedKeys(m map[string]resource.Resource) []string {
 	for k := range m {
 		keys = append(keys, k)
 	}
+	sort.Strings(keys)
 	return keys
 }
 

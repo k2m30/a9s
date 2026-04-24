@@ -32,11 +32,23 @@ func (f *ELBFake) DescribeTargetHealth(_ context.Context, input *elbv2.DescribeT
 	if input.TargetGroupArn == nil {
 		return &elbv2.DescribeTargetHealthOutput{}, nil
 	}
-	health, ok := f.fix.TargetHealth[*input.TargetGroupArn]
-	if !ok {
+	// Only error if the target group itself does not exist. A TG with no
+	// registered targets legitimately returns an empty health list on the
+	// real AWS API, not an error.
+	if !f.hasTargetGroup(*input.TargetGroupArn) {
 		return nil, fmt.Errorf("target group %q not found", *input.TargetGroupArn)
 	}
+	health := f.fix.TargetHealth[*input.TargetGroupArn]
 	return &elbv2.DescribeTargetHealthOutput{TargetHealthDescriptions: health}, nil
+}
+
+func (f *ELBFake) hasTargetGroup(arn string) bool {
+	for _, tg := range f.fix.TargetGroups {
+		if tg.TargetGroupArn != nil && *tg.TargetGroupArn == arn {
+			return true
+		}
+	}
+	return false
 }
 
 func (f *ELBFake) DescribeListeners(_ context.Context, input *elbv2.DescribeListenersInput, _ ...func(*elbv2.Options)) (*elbv2.DescribeListenersOutput, error) {

@@ -35,6 +35,16 @@ func EnrichOpenSearchDomains(_ context.Context, _ *ServiceClients, resources []r
 			continue
 		}
 
+		// Deleted domains are being torn down — no actionable background findings.
+		// Without this guard a Deleted+UpdateAvailable domain would still emit a
+		// `!` finding, which unifiedIssueCount counts into the main-menu badge
+		// even though the row itself is Dim. Suppresses the badge contamination
+		// without affecting the Dim row's S4 "deleting: removal in progress" phrase
+		// (that comes from the fetcher and is independent of this enricher).
+		if r.Fields["deleted"] == "true" {
+			continue
+		}
+
 		updateAvailable := r.Fields["service_software_update_available"] == "true"
 		encOff := r.Fields["encryption_at_rest_enabled"] == "false"
 

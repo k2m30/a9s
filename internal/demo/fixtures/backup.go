@@ -342,9 +342,10 @@ func buildBackupJobs() []backuptypes.BackupJob {
 // The fetcher reads Resources to populate Fields["resources"] for sibling pivots (s3, efs).
 func buildBackupSelections() map[string][]backuptypes.BackupSelection {
 	return map[string][]backuptypes.BackupSelection{
-		// plan-healthy-daily: selects healthy S3 bucket, shared EFS, and the
-		// orders-prod DynamoDB table — preserves s3→backup, efs→backup, and
-		// ddb→backup pivots via cache scan of Fields["resources"].
+		// plan-healthy-daily: selects healthy S3 bucket, the legacy shared
+		// EFS, the graph-root EFS (ProdEFSARN), and the orders-prod DynamoDB
+		// table — preserves s3→backup, efs→backup, and ddb→backup pivots via
+		// cache scan of Fields["resources"].
 		HealthyDailyPlanID: {
 			{
 				SelectionName: aws.String("acme-daily-multi-selection"),
@@ -352,6 +353,7 @@ func buildBackupSelections() map[string][]backuptypes.BackupSelection {
 				Resources: []string{
 					HealthyBucketARN,
 					"arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-0abc111111111111a",
+					ProdEFSARN,
 					OrdersProdARN,
 				},
 			},
@@ -393,12 +395,17 @@ func buildBackupSelections() map[string][]backuptypes.BackupSelection {
 			},
 		},
 
-		// plan-broken-mixed: uses AcmeBackupRoleProd.
+		// plan-broken-mixed: uses AcmeBackupRoleProd. Also selects the
+		// graph-root EFS so efs→backup resolves to ≥2 plans (U9 ≥50%
+		// Count>=2 requirement).
 		ComplianceMixedPlanID: {
 			{
 				SelectionName: aws.String("acme-compliance-mixed-selection"),
 				IamRoleArn:    aws.String(AcmeBackupRoleARN),
-				Resources:     []string{"arn:aws:ec2:us-east-1:123456789012:instance/i-compliance001"},
+				Resources: []string{
+					"arn:aws:ec2:us-east-1:123456789012:instance/i-compliance001",
+					ProdEFSARN,
+				},
 			},
 		},
 

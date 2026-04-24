@@ -308,14 +308,35 @@ func databasesResourceTypes() []ResourceTypeDef {
 			Category:      "DATABASES & STORAGE",
 			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
-				{Key: "cluster_id", Title: "Cluster ID", Width: 28, Sortable: true},
-				{Key: "status", Title: "Status", Width: 14, Sortable: true},
+				// Widths match defaults_databases.go so fallback paths (tests,
+				// environments without a loaded view config) don't truncate the
+				// longest §4 phrase ("broken: incompatible-parameters" = 31 chars).
+				{Key: "cluster_id", Title: "Cluster ID", Width: 36, Sortable: true},
+				{Key: "status", Title: "Status", Width: 34, Sortable: true},
 				{Key: "node_type", Title: "Node Type", Width: 16, Sortable: true},
 				{Key: "num_nodes", Title: "Nodes", Width: 7, Sortable: true},
 				{Key: "db_name", Title: "Database", Width: 16, Sortable: true},
 				{Key: "endpoint", Title: "Endpoint", Width: 44, Sortable: false},
 			},
 			Color: func(r Resource) Color {
+				// Derived-phrase fallback: when only `status` is populated (e.g.
+				// when phraseTier probes via a synthetic Resource for the detail
+				// Attention section's per-entry severity), classify by the phrase
+				// prefix so broken/Warning entries don't fall through to Healthy.
+				// Strip any (+N) suffix first per rule-7.
+				phrase := StripFindingSuffix(r.Fields["status"])
+				if phrase == "" {
+					phrase = StripFindingSuffix(r.Status)
+				}
+				// Broken phrases → ColorBroken (beats any subsequent Healthy/Warning signal).
+				switch phrase {
+				case "unavailable", "failed":
+					return ColorBroken
+				}
+				if len(phrase) >= len("broken:") && phrase[:len("broken:")] == "broken:" {
+					return ColorBroken
+				}
+
 				// Base color from raw ClusterStatus (cluster_status field carries
 				// the unmodified AWS value; "status" carries the derived phrase).
 				var base Color
@@ -347,7 +368,21 @@ func databasesResourceTypes() []ResourceTypeDef {
 				if base == ColorBroken {
 					return ColorBroken
 				}
-				// Publicly accessible → upgrade to Warning.
+				// Derived-phrase Warning signals: the fetcher sets `status` to
+				// "pending change queued" / "maintenance deferred" when those
+				// signals fire, but they do not surface via cluster_status or
+				// cluster_availability_status. Without this check the row stays
+				// green and drops out of the issue badge / attention filter.
+				switch phrase {
+				case "pending change queued", "maintenance deferred",
+					"maintenance", "modifying",
+					"publicly accessible", "unencrypted at rest":
+					if base == ColorHealthy {
+						base = ColorWarning
+					}
+				}
+				// Publicly accessible → upgrade to Warning (fallback when
+				// publicly_accessible field is read directly, e.g. raw fixtures).
 				if r.Fields["publicly_accessible"] == "true" && base == ColorHealthy {
 					base = ColorWarning
 				}

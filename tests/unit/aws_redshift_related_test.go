@@ -758,7 +758,9 @@ func TestRelated_Redshift_VPC_NoVPCIDReturnsZero(t *testing.T) {
 // TestRelated_Redshift_AllPivotsRegistered verifies that all 10 expected pivot
 // target types are registered for the "redshift" resource type.
 func TestRelated_Redshift_AllPivotsRegistered(t *testing.T) {
-	expected := []string{"alarm", "sg", "vpc", "role", "kms", "cfn", "secrets", "logs", "s3", "subnet"}
+	// "ct-events" is appended to every resource type by zzz_ct_events_all_related.go,
+	// bringing the canonical Redshift pivot count to 11 per docs/related-resources.md.
+	expected := []string{"alarm", "sg", "vpc", "role", "kms", "cfn", "secrets", "logs", "s3", "subnet", "ct-events"}
 	registered := make(map[string]struct{})
 	for _, def := range resource.GetRelated("redshift") {
 		registered[def.TargetType] = struct{}{}

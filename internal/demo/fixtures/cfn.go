@@ -21,6 +21,51 @@ func mustParseCFNTime(s string) time.Time {
 	return t
 }
 
+// minimalCreateEventSequence returns the 4 canonical CREATE events for a stack:
+// stack-create-in-progress, primary-resource-create-in-progress,
+// primary-resource-create-complete, stack-create-complete. Used to satisfy the
+// cfn_events child view for every graph-root stack without hand-coding each.
+// startTime is the ISO-8601 timestamp of the first event; subsequent events are
+// spaced 15/45/48 minutes apart.
+func minimalCreateEventSequence(stackName, startTime, primaryResLogicalID, primaryResType string) []cfntypes.StackEvent {
+	t0 := mustParseCFNTime(startTime)
+	return []cfntypes.StackEvent{
+		{
+			EventId:              aws.String("evt-" + stackName + "-001"),
+			StackName:            aws.String(stackName),
+			Timestamp:            aws.Time(t0),
+			LogicalResourceId:    aws.String(stackName),
+			ResourceType:         aws.String("AWS::CloudFormation::Stack"),
+			ResourceStatus:       cfntypes.ResourceStatusCreateInProgress,
+			ResourceStatusReason: aws.String("User Initiated"),
+		},
+		{
+			EventId:           aws.String("evt-" + stackName + "-002"),
+			StackName:         aws.String(stackName),
+			Timestamp:         aws.Time(t0.Add(15 * time.Minute)),
+			LogicalResourceId: aws.String(primaryResLogicalID),
+			ResourceType:      aws.String(primaryResType),
+			ResourceStatus:    cfntypes.ResourceStatusCreateInProgress,
+		},
+		{
+			EventId:           aws.String("evt-" + stackName + "-003"),
+			StackName:         aws.String(stackName),
+			Timestamp:         aws.Time(t0.Add(45 * time.Minute)),
+			LogicalResourceId: aws.String(primaryResLogicalID),
+			ResourceType:      aws.String(primaryResType),
+			ResourceStatus:    cfntypes.ResourceStatusCreateComplete,
+		},
+		{
+			EventId:           aws.String("evt-" + stackName + "-004"),
+			StackName:         aws.String(stackName),
+			Timestamp:         aws.Time(t0.Add(48 * time.Minute)),
+			LogicalResourceId: aws.String(stackName),
+			ResourceType:      aws.String("AWS::CloudFormation::Stack"),
+			ResourceStatus:    cfntypes.ResourceStatusCreateComplete,
+		},
+	}
+}
+
 // NewCFNFixtures constructs CFNFixtures from the canonical demo data.
 func NewCFNFixtures() *CFNFixtures {
 	const prodCIDeployRoleARN = "arn:aws:iam::123456789012:role/prod-ci-deploy-role"
@@ -273,6 +318,23 @@ func NewCFNFixtures() *CFNFixtures {
 				ResourceStatus:    cfntypes.ResourceStatusUpdateComplete,
 			},
 		},
+		// acme-search-stack events — required so opensearch→cfn drill lands
+		// on a non-empty cfn_events child view. Without these, the cfn→cfn_events
+		// Children[Key="enter"] navigation from any opensearch→cfn pivot
+		// fetches DescribeStackEvents and gets nothing back.
+		OpenSearchCFNStackName: minimalCreateEventSequence(OpenSearchCFNStackName, "2026-02-10T09:00:00+00:00", "SearchDomain", "AWS::OpenSearchService::Domain"),
+		// All other graph-root CFN stacks — required so every parent→cfn drill
+		// lands on a non-empty cfn_events child view. These cover:
+		//   s3/healthy           → cfn=a9s-demo-stack
+		//   redis/prod-redis     → cfn=acme-prod-redis
+		//   efs/prod-app-data    → cfn=acme-efs-app-data
+		//   redshift/warehouse   → cfn=acme-warehouse-stack
+		//   redshift/reporting   → cfn=acme-reporting-stack
+		S3CFNStackName:         minimalCreateEventSequence(S3CFNStackName, "2025-01-10T10:00:00+00:00", "DemoBucket", "AWS::S3::Bucket"),
+		ProdRedisCFNStack:      minimalCreateEventSequence(ProdRedisCFNStack, "2025-07-04T12:00:00+00:00", "RedisCluster", "AWS::ElastiCache::ReplicationGroup"),
+		ProdEFSCFNStackName:    minimalCreateEventSequence(ProdEFSCFNStackName, "2025-09-01T08:00:00+00:00", "AppDataFS", "AWS::EFS::FileSystem"),
+		"acme-warehouse-stack": minimalCreateEventSequence("acme-warehouse-stack", "2025-11-12T15:00:00+00:00", "WarehouseCluster", "AWS::Redshift::Cluster"),
+		"acme-reporting-stack": minimalCreateEventSequence("acme-reporting-stack", "2025-11-20T15:00:00+00:00", "ReportingCluster", "AWS::Redshift::Cluster"),
 	}
 
 	stackResources := map[string][]cfntypes.StackResourceSummary{

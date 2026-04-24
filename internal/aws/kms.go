@@ -22,12 +22,20 @@ func init() {
 		return FetchKMSKeysPage(ctx, c, continuationToken)
 	})
 
+	resource.RegisterFetchByIDs("kms", func(ctx context.Context, clients any, ids []string) ([]resource.Resource, error) {
+		c, ok := clients.(*ServiceClients)
+		if !ok || c == nil {
+			return nil, fmt.Errorf("AWS clients not initialized")
+		}
+		return FetchKMSKeysByIDs(ctx, c, ids)
+	})
+
 	resource.RegisterRelated("kms", []resource.RelatedDef{
 		{TargetType: "ebs", DisplayName: "EBS Volumes", Checker: checkKMSEBS, NeedsTargetCache: true},
 		{TargetType: "dbi", DisplayName: "RDS Instances", Checker: checkKMSRDS, NeedsTargetCache: true},
 		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkKMSSecrets, NeedsTargetCache: true},
 		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkKMSS3, NeedsTargetCache: false},
-		{TargetType: "role", DisplayName: "IAM Roles (key policy grants)", Checker: checkKMSRole, NeedsTargetCache: false},
+		{TargetType: "role", DisplayName: "IAM Roles (grants)", Checker: checkKMSRole, NeedsTargetCache: false},
 	})
 }
 
@@ -144,6 +152,77 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 			TotalHint:   -1,
 		},
 	}, nil
+}
+
+// FetchKMSKeysByIDs fetches specific KMS keys by their key IDs, bypassing the
+// KeyManager=CUSTOMER filter the paginated fetcher applies. Used by the
+// related-panel lazy-add path so checkers referencing AWS-managed keys
+// (`aws/elasticfilesystem`, `aws/rds`, `aws/s3`, etc.) still drill into a
+// real entry instead of landing on an empty list.
+//
+// Each ID may be a bare UUID or a full ARN — DescribeKey accepts both. The
+// returned Resources use the bare KeyId as the ID (matching FetchKMSKeysPage)
+// and populate an alias when one is known.
+func FetchKMSKeysByIDs(ctx context.Context, c *ServiceClients, ids []string) ([]resource.Resource, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	aliasMap := make(map[string]string)
+	var aliasMarker *string
+	for {
+		out, err := c.KMS.ListAliases(ctx, &kms.ListAliasesInput{
+			Limit:  aws.Int32(DefaultPageSize),
+			Marker: aliasMarker,
+		})
+		if err != nil {
+			break
+		}
+		for _, a := range out.Aliases {
+			if a.TargetKeyId != nil && a.AliasName != nil {
+				aliasMap[*a.TargetKeyId] = *a.AliasName
+			}
+		}
+		if !out.Truncated {
+			break
+		}
+		aliasMarker = out.NextMarker
+	}
+
+	var resources []resource.Resource
+	for _, id := range ids {
+		if id == "" {
+			continue
+		}
+		out, err := c.KMS.DescribeKey(ctx, &kms.DescribeKeyInput{KeyId: aws.String(id)})
+		if err != nil || out == nil || out.KeyMetadata == nil {
+			continue
+		}
+		meta := out.KeyMetadata
+		keyID := ""
+		if meta.KeyId != nil {
+			keyID = *meta.KeyId
+		}
+		description := ""
+		if meta.Description != nil {
+			description = *meta.Description
+		}
+		status := string(meta.KeyState)
+		alias := aliasMap[keyID]
+		resources = append(resources, resource.Resource{
+			ID:     keyID,
+			Name:   alias,
+			Status: status,
+			Fields: map[string]string{
+				"key_id":      keyID,
+				"alias":       alias,
+				"status":      status,
+				"description": description,
+			},
+			RawStruct: meta,
+		})
+	}
+	return resources, nil
 }
 
 // FetchKMSKeys performs a multi-step fetch:

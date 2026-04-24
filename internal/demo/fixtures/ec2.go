@@ -1983,8 +1983,8 @@ func buildNetworkInterfaces() []ec2types.NetworkInterface {
 			RequesterManaged:   aws.Bool(true),
 			SourceDestCheck:    aws.Bool(false),
 			Groups: []ec2types.GroupIdentifier{
-				{GroupId: aws.String(ProdEFSSecurityGroupAID), GroupName: aws.String("efs-prod-app-data-sg-a")},
-				{GroupId: aws.String(ProdEFSSecurityGroupBID), GroupName: aws.String("efs-prod-app-data-sg-b")},
+				{GroupId: aws.String(ProdEFSSecurityGroupAID), GroupName: aws.String("acme-efs-prod-sg-a")},
+				{GroupId: aws.String(ProdEFSSecurityGroupBID), GroupName: aws.String("acme-efs-prod-sg-b")},
 			},
 			TagSet: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("efs-mt-prod-1a")},
@@ -2006,8 +2006,8 @@ func buildNetworkInterfaces() []ec2types.NetworkInterface {
 			RequesterManaged:   aws.Bool(true),
 			SourceDestCheck:    aws.Bool(false),
 			Groups: []ec2types.GroupIdentifier{
-				{GroupId: aws.String(ProdEFSSecurityGroupAID), GroupName: aws.String("efs-prod-app-data-sg-a")},
-				{GroupId: aws.String(ProdEFSSecurityGroupBID), GroupName: aws.String("efs-prod-app-data-sg-b")},
+				{GroupId: aws.String(ProdEFSSecurityGroupAID), GroupName: aws.String("acme-efs-prod-sg-a")},
+				{GroupId: aws.String(ProdEFSSecurityGroupBID), GroupName: aws.String("acme-efs-prod-sg-b")},
 			},
 			TagSet: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("efs-mt-prod-1b")},
@@ -2029,8 +2029,8 @@ func buildNetworkInterfaces() []ec2types.NetworkInterface {
 			RequesterManaged:   aws.Bool(true),
 			SourceDestCheck:    aws.Bool(false),
 			Groups: []ec2types.GroupIdentifier{
-				{GroupId: aws.String(ProdEFSSecurityGroupAID), GroupName: aws.String("efs-prod-app-data-sg-a")},
-				{GroupId: aws.String(ProdEFSSecurityGroupBID), GroupName: aws.String("efs-prod-app-data-sg-b")},
+				{GroupId: aws.String(ProdEFSSecurityGroupAID), GroupName: aws.String("acme-efs-prod-sg-a")},
+				{GroupId: aws.String(ProdEFSSecurityGroupBID), GroupName: aws.String("acme-efs-prod-sg-b")},
 			},
 			TagSet: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("efs-mt-prod-1c")},

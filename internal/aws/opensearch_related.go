@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	acmtypes "github.com/aws/aws-sdk-go-v2/service/acm/types"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/opensearch"
@@ -23,7 +24,7 @@ func init() {
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkOpenSearchKMS},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkOpenSearchCFN},
 		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkOpenSearchSubnet},
-		{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkOpenSearchACM},
+		{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkOpenSearchACM, NeedsTargetCache: true},
 	})
 
 	// opensearchtypes.DomainStatus: EncryptionAtRestOptions.KmsKeyId
@@ -235,9 +236,15 @@ func checkOpenSearchSubnet(_ context.Context, _ any, res resource.Resource, _ re
 }
 
 // checkOpenSearchACM calls opensearch:DescribeDomainConfig and returns the
-// ACM certificate ARN attached to the domain's custom endpoint
+// ACM certificate attached to the domain's custom endpoint
 // (DomainEndpointOptions.Options.CustomEndpointCertificateArn). Pattern C.
-func checkOpenSearchACM(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+//
+// The ACM fetcher (acm.go) indexes Resource.ID by DomainName. So this
+// checker looks up the cert ARN against the acm cache and returns the
+// matching Resource.ID (DomainName) so drill-through lands on it.
+// Returning the bare cert ID (last segment of the ARN) — as the original
+// implementation did — produces an unnavigable ID-format mismatch.
+func checkOpenSearchACM(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	domainName := res.ID
 	if domainName == "" {
 		return resource.RelatedCheckResult{TargetType: "acm", Count: 0}
@@ -264,12 +271,29 @@ func checkOpenSearchACM(ctx context.Context, clients any, res resource.Resource,
 	if arn == "" {
 		return resource.RelatedCheckResult{TargetType: "acm", Count: 0}
 	}
-	// ACM cert ARN: arn:aws:acm:REGION:ACCOUNT:certificate/ID — ID is the last segment.
-	certID := arn
-	if idx := strings.LastIndex(arn, "/"); idx >= 0 && idx < len(arn)-1 {
-		certID = arn[idx+1:]
+
+	// Reverse-scan the acm cache for a cert whose RawStruct.CertificateArn
+	// matches. Return the target Resource.ID (DomainName) so drill lands.
+	acmList, truncated, err := opensearchRelatedResources(ctx, clients, cache, "acm")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "acm", Count: -1, Err: err}
 	}
-	return relatedResult("acm", []string{certID})
+	if acmList == nil {
+		return resource.RelatedCheckResult{TargetType: "acm", Count: -1}
+	}
+	for _, acmRes := range acmList {
+		cert, ok := assertStruct[acmtypes.CertificateSummary](acmRes.RawStruct)
+		if !ok {
+			continue
+		}
+		if cert.CertificateArn != nil && *cert.CertificateArn == arn {
+			return relatedResult("acm", []string{acmRes.ID})
+		}
+	}
+	if truncated {
+		return resource.ApproximateZero("acm")
+	}
+	return resource.RelatedCheckResult{TargetType: "acm", Count: 0}
 }
 
 // opensearchRelatedResources returns the resource list for target from cache or by fetching the first page.

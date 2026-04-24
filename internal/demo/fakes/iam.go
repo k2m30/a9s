@@ -185,7 +185,14 @@ func (f *IAMFake) GetRole(_ context.Context, input *iam.GetRoleInput, _ ...func(
 			return &iam.GetRoleOutput{Role: &r}, nil
 		}
 	}
-	return nil, fmt.Errorf("GetRole: role %q not found", *input.RoleName)
+	// Match the real AWS IAM API shape so checkers that branch on
+	// apiErr.ErrorCode() == "NoSuchEntity" (e.g. checkTGWRole, checkXRole
+	// service-linked-role probes) can distinguish "role absent" (Count=0)
+	// from "unexpected error" (Count=-1). NoSuchEntityException satisfies
+	// the smithy APIError interface with ErrorCode() == "NoSuchEntity".
+	return nil, &iamtypes.NoSuchEntityException{
+		Message: aws.String("Role with name " + *input.RoleName + " cannot be found."),
+	}
 }
 
 func (f *IAMFake) GetRolePolicy(_ context.Context, input *iam.GetRolePolicyInput, _ ...func(*iam.Options)) (*iam.GetRolePolicyOutput, error) {

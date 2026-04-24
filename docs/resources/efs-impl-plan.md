@@ -130,7 +130,9 @@ FOR every §3 fixture, assert:
   - W1+W2 stacking fixture      → Issues == ["updating"] (only Wave-1).
 ```
 
-### Rule-7 precedence — `!` beats `~`: **N/A**. EFS §3.2 has only one Wave-2 signal and its severity is `!`. No `~` case exists. U7d skipped with justification recorded here.
+### Rule-7 precedence — `!` beats `~`: N/A
+
+EFS §3.2 has only one Wave-2 signal and its severity is `!`. No `~` case exists. U7d skipped with justification recorded here.
 
 ### Wave-3 anti-tests
 
@@ -261,7 +263,7 @@ FIXTURE: healthy-efs-with-mt-down  (distinct from warn-efs-updating-mt-down; cov
 | U2   | Warning/Broken §4 phrase | `warn-efs-creating` / `-updating` / `-deleting` / `broken-efs-error` / `broken-efs-no-mount-targets` / `healthy-efs-with-mt-down` | `ExpectRowStatusEquals` per |
 | U3   | `~` on Healthy+~ finding | **N/A — EFS has no `~` Wave-2** | — |
 | U4   | `!` on Healthy+! finding | **N/A — EFS's only W2 escalates to Broken, row color changes to red, rule 3 suppresses glyph** | — |
-| U5   | No glyph on non-green rows | every warn-* / broken-* and `healthy-efs-with-mt-down` | `ExpectRowNoGlyphPrefix` |
+| U5   | No glyph on non-green rows | every `warn-*` / `broken-*` and `healthy-efs-with-mt-down` | `ExpectRowNoGlyphPrefix` |
 | U6   | S1 badge counts `!`-instances | all fixtures | `ExpectMenuIssueCount` (expected = 2: `warn-efs-updating-mt-down` + `healthy-efs-with-mt-down`; `broken-efs-error` and `broken-efs-no-mount-targets` are Wave-1 Broken — Wave-1 does NOT bump S1 per §4 table) |
 | U7a  | Multi-W1 `(+N-1)` suffix | `warn-efs-multi` | `ExpectRowStatusEquals("warn-efs-multi", "no mount targets (+1)")` |
 | U7b  | W1+W2 stack bumps suffix | `warn-efs-updating-mt-down` | `ExpectRowStatusEquals(id, "mount target down (+1)")` |
@@ -319,6 +321,7 @@ What spec §2/§3/§4 demand vs. what `internal/aws/efs*.go` + `internal/config/
 
 - **Gap**: Current Color func reads `r.Fields["life_cycle_state"]` and `r.Fields["mount_targets"]`. Universal rule: read `r.Fields["status"]` (with fallback to `r.Status`), strip `(+N)` suffix via `resource.StripFindingSuffix`, and match against §4 phrases.
 - **Rewrite** to:
+
   ```go
   status := r.Fields["status"]
   if status == "" { status = r.Status }

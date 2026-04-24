@@ -54,50 +54,6 @@ func (m *mockOSDescribeDomainsAPI) DescribeDomains(
 }
 
 // ---------------------------------------------------------------------------
-// Helper — fetchOneDomain runs FetchOpenSearchDomains for a single DomainStatus
-// and returns the single resource, failing the test if count != 1.
-// ---------------------------------------------------------------------------
-
-func fetchOneDomain(t *testing.T, domain ostypes.DomainStatus) (*struct{ resources []interface{} }, interface{}) {
-	t.Helper()
-
-	domainName := ""
-	if domain.DomainName != nil {
-		domainName = *domain.DomainName
-	}
-
-	listMock := &mockOSListDomainNamesAPI{
-		output: &opensearch.ListDomainNamesOutput{
-			DomainNames: []ostypes.DomainInfo{
-				{DomainName: aws.String(domainName)},
-			},
-		},
-	}
-	describeMock := &mockOSDescribeDomainsAPI{
-		output: &opensearch.DescribeDomainsOutput{
-			DomainStatusList: []ostypes.DomainStatus{domain},
-		},
-	}
-
-	resources, err := awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock)
-	if err != nil {
-		t.Fatalf("FetchOpenSearchDomains error: %v", err)
-	}
-	if len(resources) != 1 {
-		t.Fatalf("expected 1 resource, got %d", len(resources))
-	}
-	return nil, resources[0]
-}
-
-// fetchOneDomainResult returns the resource from FetchOpenSearchDomains for a
-// single DomainStatus. This is the main helper used by tests.
-func fetchOneDomainResult(t *testing.T, domain ostypes.DomainStatus) interface{ /* resource.Resource */ } {
-	t.Helper()
-	_, r := fetchOneDomain(t, domain)
-	return r
-}
-
-// ---------------------------------------------------------------------------
 // Common base domain constructor (minimal healthy domain)
 // ---------------------------------------------------------------------------
 

@@ -76,11 +76,32 @@ func NewSNSFixtures() *SNSFixtures {
 		"arn:aws:sns:us-east-1:123456789012:alarm-notifications":  subscriptions[:2],
 		"arn:aws:sns:us-east-1:123456789012:order-events":         subscriptions[2:4],
 		"arn:aws:sns:us-east-1:123456789012:deploy-notifications": subscriptions[4:],
+		// Every graph-root-reachable topic must have at least one subscription
+		// so sns→sns_subscriptions drill lands on non-empty content.
+		"arn:aws:sns:us-east-1:123456789012:" + S3EventsTopicName: minimalSubscriptions("arn:aws:sns:us-east-1:123456789012:"+S3EventsTopicName, "sqs", "arn:aws:sqs:us-east-1:123456789012:s3-events-queue"),
+		ProdRedisSNSTopicARN:        minimalSubscriptions(ProdRedisSNSTopicARN, "email", "redis-oncall@acme-corp.com"),
+		"arn:aws:sns:us-east-1:123456789012:" + SESBounceTopicName: minimalSubscriptions("arn:aws:sns:us-east-1:123456789012:"+SESBounceTopicName, "lambda", "arn:aws:lambda:us-east-1:123456789012:function:ses-bounce-handler"),
+		BackupAlertsSNSTopicARN: minimalSubscriptions(BackupAlertsSNSTopicARN, "email", "backup-ops@acme-corp.com"),
 	}
 
 	return &SNSFixtures{
 		Topics:               topics,
 		Subscriptions:        subscriptions,
 		SubscriptionsByTopic: subsByTopic,
+	}
+}
+
+// minimalSubscriptions returns a single canonical confirmed subscription so
+// sns→sns_subscriptions drill lands on non-empty content. Used for every
+// graph-root-reachable topic ARN.
+func minimalSubscriptions(topicARN, protocol, endpoint string) []snstypes.Subscription {
+	return []snstypes.Subscription{
+		{
+			TopicArn:        aws.String(topicARN),
+			Protocol:        aws.String(protocol),
+			Endpoint:        aws.String(endpoint),
+			SubscriptionArn: aws.String(topicARN + ":11111111-2222-3333-4444-555555555555"),
+			Owner:           aws.String("123456789012"),
+		},
 	}
 }

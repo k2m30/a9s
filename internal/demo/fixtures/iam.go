@@ -537,6 +537,16 @@ func buildIAMRelations(f *IAMFixtures) {
 	// Resource mentions HealthyBucketARN. Enriched via ListRolePolicies +
 	// GetRolePolicy during the IAM roles fetch.
 	f.InlineRolePolicies["a9s-demo-s3-access-role"] = []string{"s3-bucket-access"}
+	// Graph-root roles that must list non-empty policies so the
+	// role→role_policies drill lands on content.
+	f.InlineRolePolicies["AcmeBackupRoleProd"] = []string{"backup-access"}
+	f.AttachedRolePolicies["AcmeBackupRoleProd"] = []iamtypes.AttachedPolicy{
+		{PolicyName: aws.String("AWSBackupServiceRolePolicyForBackup"), PolicyArn: aws.String("arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForBackup")},
+	}
+	f.InlineRolePolicies["redshift-reporting-copy-role"] = []string{"s3-audit-copy"}
+	f.AttachedRolePolicies["redshift-reporting-copy-role"] = []iamtypes.AttachedPolicy{
+		{PolicyName: aws.String("AmazonRedshiftAllCommandsFullAccess"), PolicyArn: aws.String("arn:aws:iam::aws:policy/AmazonRedshiftAllCommandsFullAccess")},
+	}
 
 	// Attached user policies
 	f.AttachedUserPolicies["alice.johnson"] = []iamtypes.AttachedPolicy{
