@@ -268,13 +268,23 @@ func TestScenario_RedshiftVisual_HealthyRowsHaveNoIssuesPhrases(t *testing.T) {
 			t.Log("\n" + view)
 
 			expectNoAttentionSection(t, view)
+			// The primary Healthy-silence guard is expectNoAttentionSection
+			// above — if the Attention section is absent, no Wave-1 phrase
+			// can be rendered in the detail body.
+			//
+			// The per-line phrase scan below is a belt-and-suspenders check
+			// against the phrase leaking into a non-Attention context on a
+			// Healthy row. It MUST skip the RELATED panel, which legitimately
+			// carries substrings like "modifying" inside stack-status columns
+			// (e.g. CloudFormation StackStatus=UPDATE_IN_PROGRESS) or
+			// "maintenance" in display names (e.g. "Maintenance deferred"
+			// pivot label on a parent that happens to be Healthy).
+			detailBody := view
+			if idx := strings.Index(detailBody, "RELATED"); idx >= 0 {
+				detailBody = detailBody[:idx]
+			}
 			for _, phrase := range wave1Phrases {
-				for _, line := range strings.Split(view, "\n") {
-					// Skip RELATED panel rows ("CloudFormation", etc.) which may
-					// legitimately contain substrings like "modifying" inside a
-					// stack-status column. Attention is section-header-gated by the
-					// preceding assertion; we're specifically guarding against the
-					// phrase leaking into any non-header context on a Healthy row.
+				for _, line := range strings.Split(detailBody, "\n") {
 					if strings.Contains(line, phrase) {
 						t.Errorf("Healthy row %q unexpectedly contains Wave-1 phrase %q in line: %q\nfull view:\n%s",
 							id, phrase, line, view)

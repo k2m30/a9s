@@ -326,6 +326,13 @@ func GetFetchByIDs(shortName string) FetchByIDsFunc {
 	return fetchByIDsRegistry[shortName]
 }
 
+// UnregisterFetchByIDs removes the FetchByIDs helper for the given short
+// name. Parity with UnregisterRelated — used only in tests for cleanup,
+// never from production code.
+func UnregisterFetchByIDs(shortName string) {
+	delete(fetchByIDsRegistry, shortName)
+}
+
 // RegisterNavigableFields stores navigable field definitions for the given resource short name.
 // Replaces any existing entry.
 func RegisterNavigableFields(shortName string, fields []NavigableField) {

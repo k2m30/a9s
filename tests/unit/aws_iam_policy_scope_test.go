@@ -45,11 +45,14 @@ func TestRelated_IAMGroup_Policy_EmitsAllAttachedPolicies(t *testing.T) {
 
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count < 1 {
-		t.Fatalf("Count = %d, want ≥1 (admins group has at least one attached policy in fixtures)", result.Count)
+	// Fixture: admins group has exactly one attached policy (AdministratorAccess,
+	// AWS-managed) and no inline group policies.
+	want := []string{"AdministratorAccess"}
+	if result.Count != len(want) {
+		t.Fatalf("Count = %d, want %d (attached=%v)", result.Count, len(want), want)
 	}
-	if len(result.ResourceIDs) != result.Count {
-		t.Errorf("ResourceIDs length = %d, want %d (each attached policy must surface by name)", len(result.ResourceIDs), result.Count)
+	if !stringSetEqual(result.ResourceIDs, want) {
+		t.Errorf("ResourceIDs = %v, want %v", result.ResourceIDs, want)
 	}
 }
 
@@ -60,12 +63,36 @@ func TestRelated_IAMRole_Policy_EmitsAllAttachedPolicies(t *testing.T) {
 
 	result := checker(context.Background(), clients, source, resource.ResourceCache{})
 
-	if result.Count < 1 {
-		t.Fatalf("Count = %d, want ≥1 (acme-eks-node-role has AWS-managed EKSWorkerNode + CNI + ECRReadOnly attached)", result.Count)
+	// Fixture: acme-eks-node-role has two AWS-managed attached policies
+	// (AmazonEKSWorkerNodePolicy, AmazonEC2ContainerRegistryReadOnly).
+	// Inline role policies (ListRolePolicies) are not surfaced by checkRolePolicy.
+	want := []string{"AmazonEKSWorkerNodePolicy", "AmazonEC2ContainerRegistryReadOnly"}
+	if result.Count != len(want) {
+		t.Fatalf("Count = %d, want %d (attached=%v)", result.Count, len(want), want)
 	}
-	if len(result.ResourceIDs) != result.Count {
-		t.Errorf("ResourceIDs length = %d, want %d", len(result.ResourceIDs), result.Count)
+	if !stringSetEqual(result.ResourceIDs, want) {
+		t.Errorf("ResourceIDs = %v, want %v (order-insensitive)", result.ResourceIDs, want)
 	}
+}
+
+// stringSetEqual reports whether a and b contain the same strings regardless
+// of order or duplication. Used for attached-policy list comparisons where
+// the AWS API order is not stable.
+func stringSetEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	seen := make(map[string]int, len(a))
+	for _, s := range a {
+		seen[s]++
+	}
+	for _, s := range b {
+		seen[s]--
+		if seen[s] < 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func TestRelated_IAMUser_Policy_EmitsAWSManagedAttachedPolicy(t *testing.T) {

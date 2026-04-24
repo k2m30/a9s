@@ -497,7 +497,7 @@ RequesterManaged with no Attachment.InstanceId; mounting happens at the
 guest OS layer via DNS. Any registered checker can only return Count=0,
 which is a U9 violation. Operators can still correlate via subnet / VPC /
 sg pivots, which remain registered. -->
-- **`ecs-task`** — ECS tasks mounting EFS.
+- **`ecs-task`** — ECS tasks mounting EFS via `TaskDefinition.Volumes[].EfsVolumeConfiguration.FileSystemId`. The ecs-task fetcher joins DescribeTaskDefinition and surfaces the joined ids on `Resource.Fields["efs_file_system_ids"]` (comma-separated) so `checkEFSECSTask` can reverse-scan.
 - **`eni`** — Mount-target ENIs.
 - **`kms`** — FileSystemDescription.KmsKeyId.
 - **`lambda`** — Lambdas mounting this file system.

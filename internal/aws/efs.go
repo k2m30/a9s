@@ -67,7 +67,12 @@ func efsW1Signals(lcs efstypes.LifeCycleState, numMT int32) []string {
 	// "available" and "deleted" produce no W1 phrase.
 	}
 
-	if numMT == 0 {
+	// "no mount targets" applies only while the filesystem exists. A deleted
+	// filesystem intrinsically has no mount targets — surfacing that as a
+	// broken-severity finding is noise (spec §4: "deleted" produces no W1
+	// phrase, and the absence of mount targets is a consequence of deletion,
+	// not an independent signal).
+	if numMT == 0 && lcs != efstypes.LifeCycleStateDeleted {
 		// Insert "no mount targets" before Warning phrases (it is Broken-severity).
 		// If "error" is already present, append after it. Otherwise prepend.
 		if len(phrases) > 0 && phrases[0] == "error" {

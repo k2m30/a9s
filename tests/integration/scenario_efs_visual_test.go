@@ -190,9 +190,13 @@ func TestScenario_EFSVisual(t *testing.T) {
 
 	// U11 regression pin — Summary must render as exact phrase, not a concatenation.
 	// The rendered frame must contain "Mount target down" on its own, not
-	// something like "mount target down: fsmt-...-B in us-east-1b".
-	if strings.Contains(view, efsMTDownPhrase+": ") {
-		t.Errorf("detail contains Summary concatenated with Row values (U11 violation): %q substring found", efsMTDownPhrase+": ")
+	// something like "mount target down: fsmt-...-B in us-east-1b". The detail
+	// renderer capitalizes the first letter so check both the raw phrase and
+	// the capitalized form — a concatenation bug could leak either.
+	for _, phrase := range []string{efsMTDownPhrase, efsMTDownDetailCapitalized} {
+		if strings.Contains(view, phrase+": ") {
+			t.Errorf("detail contains Summary concatenated with Row values (U11 violation): %q substring found", phrase+": ")
+		}
 	}
 }
 

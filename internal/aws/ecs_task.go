@@ -212,8 +212,10 @@ func ecsJoinEFSVolumes(
 
 	td, cached := seenTaskDefs[arn]
 	if !cached {
-		out, err := api.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
-			TaskDefinition: &arn,
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecs.DescribeTaskDefinitionOutput, error) {
+			return api.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
+				TaskDefinition: &arn,
+			})
 		})
 		if err != nil {
 			seenTaskDefs[arn] = nil

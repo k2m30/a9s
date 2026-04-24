@@ -96,7 +96,7 @@ const (
 
 	// updatingMTDownMountTargetBID is the MountTargetId for the creating MT in warn-efs-updating-mt-down.
 	// Exported so QA tests can assert on it.
-	UpdatedMTDownMountTargetBID = "fsmt-0warnupdmtdown001b"
+	UpdatingMTDownMountTargetBID = "fsmt-0warnupdmtdown001b"
 )
 
 func mustParseEFSTime(s string) time.Time {
@@ -431,7 +431,7 @@ func buildEFSMountTargets() map[string][]efstypes.MountTargetDescription {
 				IpAddress:            aws.String("10.0.1.60"),
 			},
 			{
-				MountTargetId:        aws.String(UpdatedMTDownMountTargetBID),
+				MountTargetId:        aws.String(UpdatingMTDownMountTargetBID),
 				FileSystemId:         aws.String("fs-0warnupdmtdown001"),
 				LifeCycleState:       efstypes.LifeCycleStateCreating,
 				SubnetId:             aws.String("subnet-0bbb222222222222b"),

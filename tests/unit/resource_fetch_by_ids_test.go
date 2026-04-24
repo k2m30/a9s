@@ -15,6 +15,7 @@ import (
 
 func TestRegisterFetchByIDs_RoundTrip(t *testing.T) {
 	const shortName = "test-lazy-add-roundtrip"
+	t.Cleanup(func() { resource.UnregisterFetchByIDs(shortName) })
 
 	want := []resource.Resource{
 		{ID: "id-a", Fields: map[string]string{"k": "v"}},

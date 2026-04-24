@@ -157,6 +157,14 @@ func FetchIAMPoliciesPage(ctx context.Context, api IAMListPoliciesAPI, continuat
 // the lifetime of the process, which matches the `kms` cache semantics (key
 // IDs memoized across drills). The mutex guards concurrent rebuilds from
 // parallel related-checks targeting "policy".
+//
+// Known limitation: long-running sessions that create or rename a policy
+// mid-session won't see the new name via this lazy-add path until the
+// process restarts. Policies are typically created via IaC at deploy time,
+// so a cache flush within a single session is rarely needed. If that
+// assumption breaks, add a TTL or plumb a Ctrl+R invalidation to reset
+// allPoliciesBuilt. The primary top-level policy list refreshes via the
+// paginated fetcher on demand and is unaffected.
 var (
 	allPoliciesMu    sync.Mutex
 	allPoliciesBuilt bool

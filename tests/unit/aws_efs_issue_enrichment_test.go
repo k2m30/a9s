@@ -181,8 +181,8 @@ func TestEnrichEFSMountTargets_W1WarningPlusW2Bumps(t *testing.T) {
 	for _, row := range finding.Rows {
 		rowLabels[row.Label] = row.Value
 	}
-	if mtVal := rowLabels["Mount Target"]; !strings.Contains(mtVal, fixtures.UpdatedMTDownMountTargetBID) {
-		t.Errorf("Rows[Mount Target] = %q, want it to contain %q", mtVal, fixtures.UpdatedMTDownMountTargetBID)
+	if mtVal := rowLabels["Mount Target"]; !strings.Contains(mtVal, fixtures.UpdatingMTDownMountTargetBID) {
+		t.Errorf("Rows[Mount Target] = %q, want it to contain %q", mtVal, fixtures.UpdatingMTDownMountTargetBID)
 	}
 
 	// Degraded row: 1 of 2 MTs unavailable.
