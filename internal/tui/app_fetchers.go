@@ -473,6 +473,8 @@ func (m *Model) demoPrefetchCounts() tea.Cmd {
 		issueCounts := make(map[string]int, len(allNames))
 		issueTruncated := make(map[string]bool)
 		retainedResources := make(map[string][]resource.Resource, len(allNames))
+		var failures []string
+		attempted := 0
 		for _, shortName := range allNames {
 			// Stop early if the app context is done (shutdown or profile/region switch).
 			if appCtx.Err() != nil {
@@ -482,10 +484,12 @@ func (m *Model) demoPrefetchCounts() tea.Cmd {
 			if pf == nil {
 				continue
 			}
+			attempted++
 			perFetchCtx, perFetchCancel := context.WithTimeout(appCtx, 5*time.Second)
 			result, err := pf(perFetchCtx, clients, "")
 			perFetchCancel()
 			if err != nil {
+				failures = append(failures, fmt.Sprintf("%s: %v", shortName, err))
 				continue
 			}
 			entries[shortName] = len(result.Resources)
@@ -513,6 +517,7 @@ func (m *Model) demoPrefetchCounts() tea.Cmd {
 			IssueTruncated: issueTruncated,
 			Resources:      retainedResources,
 			Gen:            gen,
+			PrefetchErr:    awsclient.AggregateFailures("availability-prefetch", failures, attempted),
 		}
 	}
 }

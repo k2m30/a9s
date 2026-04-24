@@ -560,20 +560,95 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Write-back: persist pages fetched on cold miss so the next detail view
 		// for any resource type gets a cache hit instead of re-fetching.
+		// CachedPages represent full authoritative first pages (NeedsTargetCache
+		// prefetch); insert verbatim when absent, leave alone when present.
+		// Also blocked when a lazy-cache entry exists for the same type: lazy-add
+		// entries are sparse but present, and a CachedPages overwrite would evict
+		// the lazy-fetched out-of-scope resources and corrupt subsequent drills.
 		for shortName, entry := range msg.CachedPages {
-			if _, exists := m.resourceCache[shortName]; !exists {
-				pagination := entry.Pagination
-				// Backward compat: callers that set IsTruncated=true but leave Pagination nil
-				// (e.g., test fixtures, demo mode) must still have truncation preserved so
-				// that buildResourceCacheSnapshot can reconstruct IsTruncated correctly.
-				if pagination == nil && entry.IsTruncated {
-					pagination = &resource.PaginationMeta{IsTruncated: true}
+			if _, exists := m.resourceCache[shortName]; exists {
+				continue
+			}
+			if _, lazyExists := m.lazyResourceCache[shortName]; lazyExists {
+				continue
+			}
+			pagination := entry.Pagination
+			// Backward compat: callers that set IsTruncated=true but leave Pagination nil
+			// (e.g., test fixtures, demo mode) must still have truncation preserved so
+			// that buildResourceCacheSnapshot can reconstruct IsTruncated correctly.
+			if pagination == nil && entry.IsTruncated {
+				pagination = &resource.PaginationMeta{IsTruncated: true}
+			}
+			m.resourceCache[shortName] = &resourceCacheEntry{
+				resources:  entry.Resources,
+				pagination: pagination,
+			}
+		}
+		// Lazy-added resources are sparse IDs pulled via FetchByIDs to resolve
+		// filtered-target drills (e.g. KMS customer-managed filter + checker
+		// emitting an AWS-managed key). They are stored in lazyResourceCache —
+		// a separate map consulted only by related-navigation. This keeps the
+		// out-of-scope entries (AWS-managed keys, public AMIs, shared snapshots)
+		// isolated from resourceCache so the main-menu scope-filtered list is
+		// never polluted by lazy-add results.
+		for shortName, extra := range msg.LazyAddedResources {
+			if len(extra) == 0 {
+				continue
+			}
+			existing := m.lazyResourceCache[shortName]
+			known := make(map[string]struct{}, len(existing))
+			for _, r := range existing {
+				known[r.ID] = struct{}{}
+			}
+			for _, r := range extra {
+				if _, dup := known[r.ID]; dup {
+					continue
 				}
-				m.resourceCache[shortName] = &resourceCacheEntry{
-					resources:  entry.Resources,
-					pagination: pagination,
+				known[r.ID] = struct{}{}
+				existing = append(existing, r)
+			}
+			m.lazyResourceCache[shortName] = existing
+		}
+		// Surface FetchByIDs failures as a visible flash error. Partial results
+		// are already merged above; the flash informs the operator that some IDs
+		// could not be resolved (throttling exhausted, permission denied, etc.).
+		if msg.LazyAddError != nil {
+			m2, viewCmd := m.updateActiveView(msg)
+			m = m2.(Model)
+			flashCmd := func() tea.Msg {
+				return messages.FlashMsg{
+					Text:    fmt.Sprintf("related-fetch: %v", msg.LazyAddError),
+					IsError: true,
 				}
 			}
+			// Also surface checker failure when both failure modes fire simultaneously.
+			if msg.Result.Err != nil {
+				checkerErr := msg.Result.Err
+				targetType := msg.Result.TargetType
+				checkerFlashCmd := func() tea.Msg {
+					return messages.FlashMsg{
+						Text:    fmt.Sprintf("related %s: %v", targetType, checkerErr),
+						IsError: true,
+					}
+				}
+				return m, tea.Batch(viewCmd, flashCmd, checkerFlashCmd)
+			}
+			return m, tea.Batch(viewCmd, flashCmd)
+		}
+		// Surface checker failures (row-level ? marker shows on the related panel;
+		// this adds the actionable error detail to the error log via ! key).
+		if msg.Result.Err != nil {
+			m2, viewCmd := m.updateActiveView(msg)
+			m = m2.(Model)
+			checkerErr := msg.Result.Err
+			targetType := msg.Result.TargetType
+			flashCmd := func() tea.Msg {
+				return messages.FlashMsg{
+					Text:    fmt.Sprintf("related %s: %v", targetType, checkerErr),
+					IsError: true,
+				}
+			}
+			return m, tea.Batch(viewCmd, flashCmd)
 		}
 		return m.updateActiveView(msg)
 	case messages.RelatedNavigateMsg:

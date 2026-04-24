@@ -606,10 +606,28 @@ func (m Model) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetchedM
 	// same production code path against fixture data — this is what gives the
 	// demo its `~` glyphs, `(+N)` suffix, and "maintenance scheduled" status.
 	enrichCmd := m.startEnrichment()
+
+	// Surface aggregated per-type prefetch failures to the error log so
+	// operators see permission / throttle issues instead of silently missing
+	// resource types in the availability counts.
+	var flashCmd tea.Cmd
+	if msg.PrefetchErr != nil {
+		err := msg.PrefetchErr
+		flashCmd = func() tea.Msg {
+			return messages.FlashMsg{
+				Text:    "availability: " + err.Error(),
+				IsError: true,
+			}
+		}
+	}
+
+	if enrichCmd != nil && flashCmd != nil {
+		return m, tea.Batch(flashCmd, enrichCmd)
+	}
 	if enrichCmd != nil {
 		return m, enrichCmd
 	}
-	return m, nil
+	return m, flashCmd
 }
 
 // handleAvailabilityChecked processes a single resource type's probe result.
@@ -729,6 +747,21 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 
 	m.enrichChecked++
 
+	// Surface enrichment failures as a flash error so operators see them in the
+	// error log (! key). A failed enrichment does not stall the pipeline — the
+	// queue continues to drain below.
+	var flashCmd tea.Cmd
+	if msg.Err != nil {
+		err := msg.Err
+		rt := msg.ResourceType
+		flashCmd = func() tea.Msg {
+			return messages.FlashMsg{
+				Text:    fmt.Sprintf("enrich %s: %v", rt, err),
+				IsError: true,
+			}
+		}
+	}
+
 	// Update findings and menu issue count on success.
 	if msg.Err == nil {
 		// Persist findings and mark enrichment as ran for this type.
@@ -833,7 +866,7 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 		delete(m.enrichmentFindings, next)
 		delete(m.enrichmentRan, next)
 		cmd := m.probeEnrichment(next, m.enrichmentGen)
-		return m, cmd
+		return m, tea.Batch(flashCmd, cmd)
 	}
 
 	// All enrichment done — clear progress, free retained resources, save cache
@@ -844,9 +877,9 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 		m.probeResources = nil
 		// Save cache with enrichment-updated issue counts.
 		cmd := m.saveAvailabilityCache()
-		return m, cmd
+		return m, tea.Batch(flashCmd, cmd)
 	}
-	return m, nil
+	return m, flashCmd
 }
 
 // unifiedIssueCount returns the distinct count of resource IDs with ≥1 issue

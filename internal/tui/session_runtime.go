@@ -51,10 +51,15 @@ type sessionRuntime struct {
 
 	// Session-scoped caches + stale-result guards.
 	resourceCache map[string]*resourceCacheEntry
-	relatedCache  *relatedCacheLRU
-	relatedGen    uint64 // bumped on refresh/profile/region switch
-	enrichGen     uint64 // bumped on refresh/profile/region switch (detail-enrichment only)
-	enrichResKey  string // "resourceType:resourceID" of last detail-enrichment dispatch
+	// lazyResourceCache holds resources pulled via FetchByIDs for filtered-target
+	// drills. Consulted by related-navigation only; NEVER by top-level list
+	// navigation. Ensures lazy-added out-of-scope entries (e.g. AWS-managed KMS
+	// keys) do not pollute the scope-filtered main-menu list.
+	lazyResourceCache map[string][]resource.Resource
+	relatedCache      *relatedCacheLRU
+	relatedGen        uint64 // bumped on refresh/profile/region switch
+	enrichGen         uint64 // bumped on refresh/profile/region switch (detail-enrichment only)
+	enrichResKey      string // "resourceType:resourceID" of last detail-enrichment dispatch
 
 	// Feature-specific session caches. These used to hang off *ServiceClients
 	// but that blurred the AWS-transport/session-state boundary; they live
@@ -74,6 +79,7 @@ func newSessionRuntime() sessionRuntime {
 		enrichmentTypeGen:      make(map[string]int),
 		enrichmentTruncatedIDs: make(map[string]map[string]bool),
 		resourceCache:          make(map[string]*resourceCacheEntry),
+		lazyResourceCache:      make(map[string][]resource.Resource),
 		relatedCache:           newRelatedCacheLRU(maxRelatedCacheEntries),
 		relatedGen:             1,
 		enrichGen:              1,
@@ -105,6 +111,7 @@ func (r *sessionRuntime) resetForSessionSwitch() {
 	r.enrichChecked = 0
 	r.enrichTotal = 0
 	r.resourceCache = make(map[string]*resourceCacheEntry)
+	r.lazyResourceCache = make(map[string][]resource.Resource)
 	r.enrichmentFindings = make(map[string]map[string]resource.EnrichmentFinding)
 	r.enrichmentRan = make(map[string]bool)
 	r.enrichmentTypeGen = make(map[string]int)
@@ -113,4 +120,10 @@ func (r *sessionRuntime) resetForSessionSwitch() {
 	// Feature caches: swap the PolicyDocumentCache for a fresh instance so
 	// documents fetched in the previous account cannot leak into the next.
 	r.policyDocCache = &awsclient.PolicyDocumentCache{}
+
+	// Process-wide lazy-add caches in internal/aws. These cache AWS names
+	// across drills within a session; they must be reset on session switch
+	// so stale entries from the prior account cannot satisfy FetchByIDs
+	// calls in the next one.
+	awsclient.ResetIAMPoliciesCache()
 }

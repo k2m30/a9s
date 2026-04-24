@@ -151,13 +151,28 @@ type RelatedCheckResultMsg struct {
 	DefDisplayName   string // unique def.DisplayName — disambiguates multiple defs sharing a TargetType (e.g. ct-events self-pivots)
 	Result           resource.RelatedCheckResult
 	Generation       uint64 // dispatch generation — discard if != Model.relatedGen
-	// CachedPages contains resource pages fetched from AWS on a cold cache miss,
-	// keyed by target resource short name. Non-nil only when FetchRelatedTarget
-	// executed a live fetch (i.e., target was absent from the ResourceCache snapshot
-	// passed to the checker). The app handler writes these entries into m.resourceCache
-	// so subsequent detail views for any resource type get a cache hit.
+	// CachedPages contains full top-level resource pages fetched from AWS on a
+	// cold cache miss, keyed by target resource short name. Non-nil only when
+	// the NeedsTargetCache prefetch executed a live fetch (i.e., target was
+	// absent from the ResourceCache snapshot passed to the checker). These
+	// pages represent authoritative first-page results from the paginated
+	// top-level fetcher and replace any absent cache entry verbatim.
 	// Nil on cache hit or in demo mode — the app handler skips nil maps.
 	CachedPages map[string]resource.ResourceCacheEntry
+	// LazyAddedResources contains resources pulled via FetchByIDs when a
+	// checker emitted target IDs outside the top-level fetcher's filter (KMS
+	// customer-managed, AMI Owners=self, EBS snapshot Owners=self, IAM Policy
+	// Scope=Local). Unlike CachedPages, these are NOT a complete first page —
+	// they are a sparse set of IDs. The app handler merges them (append dedup
+	// by ID) into any existing cache entry; if no entry exists, creates one
+	// marked IsTruncated=true so the next top-level navigation still fetches
+	// the full list authoritatively. Nil when no lazy-add occurred.
+	LazyAddedResources map[string][]resource.Resource
+	// LazyAddError is non-nil when FetchByIDs partially or fully failed during
+	// the lazy-add path. The partial results (if any) are still present in
+	// LazyAddedResources. The app handler converts this into a FlashMsg so
+	// operators see a visible error rather than a silent skip.
+	LazyAddError error
 }
 
 // RelatedNavigateMsg requests navigation to a related resource type.
@@ -203,6 +218,11 @@ type AvailabilityPrefetchedMsg struct {
 	IssueTruncated map[string]bool                // shortName -> true if issue count is lower bound
 	Resources      map[string][]resource.Resource // shortName -> retained first-page resources for Wave 2
 	Gen            int                            // availabilityGen captured at dispatch — stale if != current
+	// PrefetchErr is the composite error aggregating per-type fetch failures
+	// during the synchronous availability prefetch. Non-nil when any paginated
+	// fetcher errored; the app handler surfaces it as a FlashMsg so operators
+	// see permission/throttle issues rather than silently missing types.
+	PrefetchErr error
 }
 
 // AvailabilityCheckedMsg reports one resource type's background probe result.
