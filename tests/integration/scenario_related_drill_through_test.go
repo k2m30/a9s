@@ -47,6 +47,7 @@ var drillThroughFixtures = []struct {
 	{"s3/a9s-demo-healthy", "s3", demofixtures.HealthyBucketName},
 	{"backup/plan-broken-2failed", "backup", demofixtures.ProdDatabasePlanID},
 	{"efs/prod-app-data", "efs", demofixtures.ProdEFSID},
+	{"opensearch/acme-logs", "opensearch", demofixtures.GraphRootDomain},
 }
 
 // ---------------------------------------------------------------------------

@@ -98,8 +98,7 @@ func databasesDefaultViews() map[string]ViewDef {
 		"opensearch": {
 			List: []ListColumn{
 				{Title: "Domain Name", Path: "DomainName", Width: 28},
-				{Title: "Status", Key: "status", Width: 12},
-				{Title: "Processing", Key: "domain_processing_status", Width: 14},
+				{Title: "Status", Key: "status", Width: 40},
 				{Title: "Engine Version", Path: "EngineVersion", Width: 16},
 				{Title: "Instance Type", Path: "ClusterConfig.InstanceType", Width: 22},
 				{Title: "Instances", Path: "ClusterConfig.InstanceCount", Width: 10},
