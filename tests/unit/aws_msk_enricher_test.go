@@ -14,6 +14,7 @@ package unit
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -248,10 +249,11 @@ func TestEnrichMSKCluster_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	}
 }
 
-// TestEnrichMSKCluster_APIErrorSetsTruncatedNoError verifies that when the API call
-// for cluster-1 returns an error, the enricher sets Truncated=true, produces 0 findings
-// for that cluster, and does not propagate the error.
-func TestEnrichMSKCluster_APIErrorSetsTruncatedNoError(t *testing.T) {
+// TestEnrichMSKCluster_APIErrorSetsTruncatedAndSurfacesError verifies that when the
+// API call for cluster-1 returns an error, the enricher sets Truncated=true, produces
+// 0 findings for that cluster, and returns a composite error containing the enricher
+// prefix and the failing cluster ARN.
+func TestEnrichMSKCluster_APIErrorSetsTruncatedAndSurfacesError(t *testing.T) {
 	apiErr := errors.New("kafka: DescribeClusterV2 throttled")
 	fake := &mskDescribeClusterV2Fake{
 		errByArn: map[string]error{
@@ -265,8 +267,14 @@ func TestEnrichMSKCluster_APIErrorSetsTruncatedNoError(t *testing.T) {
 	resources := mskClusterResources(mskARN1, mskARN2)
 
 	result, err := awsclient.EnrichMSKCluster(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatal("enricher must surface a composite error when an API call fails")
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, "msk-enrich:") {
+		t.Errorf("composite error must contain \"msk-enrich:\", got: %q", errStr)
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, mskARN1) {
+		t.Errorf("composite error must contain the failing cluster ARN %q, got: %q", mskARN1, errStr)
 	}
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings on API error, got %d", len(result.Findings))

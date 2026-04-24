@@ -211,7 +211,8 @@ func TestEnrichECSServices_DeploymentRolloutFailedEmitsFinding(t *testing.T) {
 }
 
 // TestEnrichECSServices_APIErrorSetsTruncated verifies that an API error on
-// DescribeServices marks Truncated=true (no finding, no panic).
+// DescribeServices marks Truncated=true (no finding) and surfaces a composite error
+// containing the enricher prefix and the failing resource ID.
 func TestEnrichECSServices_APIErrorSetsTruncated(t *testing.T) {
 	fake := &ecsWave3Fake{
 		descSvcErr: errors.New("simulated DescribeServices error"),
@@ -229,8 +230,14 @@ func TestEnrichECSServices_APIErrorSetsTruncated(t *testing.T) {
 	}
 
 	result, err := awsclient.EnrichECSServices(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatal("enricher must surface a composite error when DescribeServices fails")
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, "ecs-svc-enrich:") {
+		t.Errorf("composite error must contain \"ecs-svc-enrich:\", got: %q", errStr)
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, "svc-err") {
+		t.Errorf("composite error must contain the failing service ID \"svc-err\", got: %q", errStr)
 	}
 	if !result.Truncated {
 		t.Error("expected Truncated=true on DescribeServices API error")
@@ -723,7 +730,8 @@ func TestEnrichCFNStackEvents_FailedEventEmitsBangFinding(t *testing.T) {
 }
 
 // TestEnrichCFNStackEvents_APIErrorSetsPerResourceTruncation verifies that an
-// API error on DescribeStackEvents marks TruncatedIDs for that resource.
+// API error on DescribeStackEvents marks TruncatedIDs for that resource and
+// surfaces a composite error containing the enricher prefix and the failing stack ID.
 func TestEnrichCFNStackEvents_APIErrorSetsPerResourceTruncation(t *testing.T) {
 	stackID := "arn:aws:cloudformation:us-east-1:123456789012:stack/err-stack/xyz"
 	fake := &cfnWave3Fake{
@@ -741,8 +749,14 @@ func TestEnrichCFNStackEvents_APIErrorSetsPerResourceTruncation(t *testing.T) {
 	}
 
 	result, err := awsclient.EnrichCFNStackEvents(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatal("enricher must surface a composite error when DescribeStackEvents fails")
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, "cfn-enrich:") {
+		t.Errorf("composite error must contain \"cfn-enrich:\", got: %q", errStr)
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, stackID) {
+		t.Errorf("composite error must contain the failing stack ID %q, got: %q", stackID, errStr)
 	}
 	if !result.Truncated {
 		t.Error("expected Truncated=true on DescribeStackEvents API error")

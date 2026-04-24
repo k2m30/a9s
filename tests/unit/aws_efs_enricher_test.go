@@ -13,6 +13,7 @@ package unit
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
@@ -103,10 +104,11 @@ func TestEnrichEFSMountTargets_NilClientReturnsEmptyFindingsNoError(t *testing.T
 	}
 }
 
-// TestEnrichEFSMountTargets_APIErrorSetsTruncatedNoError verifies that when the
-// API call for EFS-1 returns an error, the enricher sets Truncated=true, produces
-// 0 findings, and does not propagate the error.
-func TestEnrichEFSMountTargets_APIErrorSetsTruncatedNoError(t *testing.T) {
+// TestEnrichEFSMountTargets_APIErrorSetsTruncatedAndSurfacesError verifies that
+// when the API call for EFS-1 returns an error, the enricher sets Truncated=true,
+// produces 0 findings for that file system, and returns a composite error containing
+// the enricher prefix and the failing file system ID.
+func TestEnrichEFSMountTargets_APIErrorSetsTruncatedAndSurfacesError(t *testing.T) {
 	apiErr := errors.New("efs: DescribeMountTargets throttled")
 	fake := &efsMountTargetFake{
 		errByFS: map[string]error{
@@ -120,8 +122,14 @@ func TestEnrichEFSMountTargets_APIErrorSetsTruncatedNoError(t *testing.T) {
 	resources := efsResources("fs-00000001", "fs-00000002")
 
 	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatal("enricher must surface a composite error when an API call fails")
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, "efs-enrich:") {
+		t.Errorf("composite error must contain \"efs-enrich:\", got: %q", errStr)
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, "fs-00000001") {
+		t.Errorf("composite error must contain the failing file system ID \"fs-00000001\", got: %q", errStr)
 	}
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings on API error, got %d", len(result.Findings))

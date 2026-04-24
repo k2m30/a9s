@@ -402,8 +402,14 @@ func TestEnrichECRRepository_ListImagesErrorMarksTruncated(t *testing.T) {
 	resources := ecrEnrichResources(repoBad, repoOK)
 
 	result, err := awsclient.EnrichECRRepository(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatal("enricher must surface a composite error when ListImages fails for a repo")
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, "ecr-enrich:") {
+		t.Errorf("composite error must contain \"ecr-enrich:\", got: %q", errStr)
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, repoBad) {
+		t.Errorf("composite error must contain the failing repo name %q, got: %q", repoBad, errStr)
 	}
 	if !result.Truncated {
 		t.Error("Truncated must be true when ListImages fails for a repo")

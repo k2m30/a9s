@@ -295,7 +295,7 @@ func TestOpenSearch_Fetch_UpgradeProcessingWarning(t *testing.T) {
 
 func TestOpenSearch_Fetch_UpdateAvailableHealthyBang(t *testing.T) {
 	domain := osTestBaseDomain("acme-product-search")
-	// AutomatedUpdateDate in the past (2026-04-20 < 2026-04-24 today per spec).
+	// AutomatedUpdateDate in the past relative to the injected now below.
 	domain.ServiceSoftwareOptions = &ostypes.ServiceSoftwareOptions{
 		UpdateAvailable:     aws.Bool(true),
 		AutomatedUpdateDate: aws.Time(time.Date(2026, 4, 20, 0, 0, 0, 0, time.UTC)),
@@ -314,7 +314,10 @@ func TestOpenSearch_Fetch_UpdateAvailableHealthyBang(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchOpenSearchDomains(context.Background(), listMock, describeMock)
+	// Inject a fixed "now" — 2026-04-24 — so the "past AutomatedUpdateDate" branch
+	// is exercised deterministically regardless of the real wall clock.
+	fixedNow := time.Date(2026, 4, 24, 0, 0, 0, 0, time.UTC)
+	resources, err := awsclient.FetchOpenSearchDomainsAt(context.Background(), listMock, describeMock, fixedNow)
 	if err != nil {
 		t.Fatalf("FetchOpenSearchDomains error: %v", err)
 	}

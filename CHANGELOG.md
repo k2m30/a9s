@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Never-silent-skip rule** — every AWS SDK call across the codebase now wraps in `RetryOnThrottle` and surfaces per-item failures through the operator-visible error channel. Previously, ~50 files silently swallowed per-item describe/get errors, so a resource list could look complete while permission or throttling issues silently degraded the view. Operators now see aggregated composite errors via the `!` error log.
+- New shared helper `internal/aws/partial_errors.go` (`AggregateFailures`, `AggregateMissing`) standardizes composite-error formatting across fetchers, related checkers, and Wave-2 enrichers.
+- Wave-2 enrichers now set `Truncated`/`TruncatedIDs` (per-row `?` marker) AND return an aggregated top-level error (feeds `EnrichmentCheckedMsg.Err` → FlashMsg) — both channels fire on per-item failure.
+- Related-panel checkers (`*_related.go`) set `RelatedCheckResult.Err` to the aggregated composite; the app layer converts it to `FlashMsg{IsError:true}` so the error log captures the reason the pivot shows `?`.
+- Top-level fetchers (`backup.go`, `dbc.go`, `ddb.go`, `efs.go`, `eks.go`, `kms.go`, `ng.go`, `opensearch.go`, `redis.go`, `redshift.go`, `s3.go`, `sg.go`, `sqs.go`, plus the lazy-add fetchers) aggregate per-item describe failures; `ResourcesLoadedMsg.Err` already surfaces as a flash.
+- ECS-task fetcher decouples join-failure signaling from `Pagination.IsTruncated` — per-task `Fields["task_def_join_error"]="true"` marks affected tasks; `checkEFSECSTask` reports `Approximate=true` without the fetcher advertising a bogus "m: load more" footer.
+- `a9s-implement-resource` skill: new **Error handling and throttle rules** section (E1–E6) with banned-pattern list, category/surface-channel table, and enforcement hooks in phases 5, 7.5, 8, 9. Coverage matrix gains U12 (partial-failure FlashMsg) and U13 (throttle-wrap static audit).
+
+### Added
+- Lazy-add path for related-panel drill-through: when a checker emits IDs outside the top-level fetcher's scope filter (KMS customer-managed, AMI `Owners=self`, EBS snapshot `OwnerIds=self`, IAM Policy `Scope=Local`), the orchestrator calls `FetchByIDs` to resolve them and populates `lazyResourceCache`. Drilling into a KMS pivot for an `aws/rds` key, an AMI pivot for a public marketplace AMI, or an IAM role's `AdministratorAccess` now lands on a real entry instead of an empty list.
+- `lazyResourceCache` session map (separate from `resourceCache`) consulted only by related-navigation, never by main-menu top-level list. Prevents lazy-added out-of-scope entries from polluting the scope-filtered top-level view.
+- `ResetIAMPoliciesCache()` exported and wired into `sessionRuntime.resetForSessionSwitch` — IAM policy memoization now clears on profile/region switch so account-A policies never leak into account-B drills.
+- `RelatedCheckResultMsg.LazyAddError` field routes FetchByIDs failures into FlashMsg without masking partial successes.
+- `AvailabilityPrefetchedMsg.PrefetchErr` surfaces per-type failures from the synchronous availability prefetch in no-cache / demo mode.
+- User-story set `tests/stories/lazy_add.md` — 44 given/when/then stories across 9 sections covering cross-scope drill-through, session lifecycle, idempotence, race/timing, and size extremes.
+
+### Fixed
+- `handleEnrichmentChecked` no longer silently swallows `EnrichmentCheckedMsg.Err` — failures now emit `FlashMsg{IsError:true}` so the error log (`!` key) captures them.
+- `handleRelatedNavigate` cache-hit path now consults `lazyResourceCache` alongside `resourceCache`, so a drill through a cache-hit pivot finds lazy-added out-of-scope targets.
+- ENI list no longer renders `m: load more` on a fully-resolved exact-ID filter — `handleRelatedNavigate` strips `IsTruncated` on the pagination passed to the list view when every `RelatedIDs` entry matched.
+- `FetchKMSKeysPage` `DescribeKey` and `ListAliases` per-item failures now aggregate into a composite returned error instead of silently skipping keys or stopping the alias-page loop.
+- `FetchDynamoDBTablesPage` per-table `DescribeTable` failures aggregate into a composite error (previously: silent `continue`).
+- `sfnDescribe` signature returns `(out, err)` — `checkSFNRole`, `checkSFNKMS`, `checkSFNLambda`, and `ecs-svc` cross-references now set `Result.Err` on API failure instead of collapsing to bare `Count=-1`.
+- `redshiftLoggingStatus` signature returns `(status, err)` — `checkRedshiftLogs` and `checkRedshiftS3` surface the underlying error via `Result.Err`.
+- `checkEbTG` per-LB `DescribeLoadBalancers`/`DescribeListeners` failures aggregate into `Result.Err` (previously silent `continue`, undercounting TG relationships).
+- `secrets-related: DescribeTaskDefinition` treats ECS `ClientException` ("task definition does not exist") as definitive absence rather than a real error — mirrors the `ecs_task.go` carve-out so demo fixtures and real environments with soft-deleted task definitions don't spuriously flash.
+- Enricher tests pinning the old `err == nil` silent-skip contract updated to accept the new aggregated-error contract across ASG, CFN, ECR, ECS-svc, EFS, Logs, MSK, R53, SFN, SQS, TG, TGW, WAF, plus EKS top-level fetcher.
+
 ## [3.43.0] - 2026-04-24
 
 ### Changed

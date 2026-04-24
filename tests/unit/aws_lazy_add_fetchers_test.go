@@ -13,6 +13,7 @@ import (
 	"context"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -51,10 +52,8 @@ func TestFetchAMIsByIDs_PassesIDsUnfiltered(t *testing.T) {
 		},
 	}
 
+	// Mock returns only 1 of the 2 non-empty IDs — ami-public-0002 is missing.
 	got, err := awsclient.FetchAMIsByIDs(context.Background(), mock, []string{"ami-public-0001", "", "ami-public-0002"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
 
 	if mock.gotInput == nil {
 		t.Fatal("DescribeImages was not called")
@@ -67,13 +66,25 @@ func TestFetchAMIsByIDs_PassesIDsUnfiltered(t *testing.T) {
 	}
 	// Empty IDs get dropped but non-empty IDs pass through verbatim.
 	sort.Strings(mock.gotInput.ImageIds)
-	want := []string{"ami-public-0001", "ami-public-0002"}
-	if !reflect.DeepEqual(mock.gotInput.ImageIds, want) {
-		t.Errorf("DescribeImages input ImageIds = %v, want %v", mock.gotInput.ImageIds, want)
+	wantIDs := []string{"ami-public-0001", "ami-public-0002"}
+	if !reflect.DeepEqual(mock.gotInput.ImageIds, wantIDs) {
+		t.Errorf("DescribeImages input ImageIds = %v, want %v", mock.gotInput.ImageIds, wantIDs)
 	}
 
+	// Partial success: the 1 found resource is returned.
 	if len(got) != 1 || got[0].ID != "ami-public-0001" {
 		t.Errorf("got = %+v, want one resource with ID=ami-public-0001", got)
+	}
+
+	// Error must be non-nil and name the missing ID.
+	if err == nil {
+		t.Fatal("expected non-nil error for missing AMI ID ami-public-0002")
+	}
+	errStr := err.Error()
+	for _, want := range []string{"ami FetchByIDs: 1 of 2 IDs not found in response", "ami-public-0002"} {
+		if !strings.Contains(errStr, want) {
+			t.Errorf("error %q does not contain expected substring %q", errStr, want)
+		}
 	}
 }
 

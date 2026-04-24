@@ -13,6 +13,7 @@ package unit
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -57,20 +58,28 @@ func TestEnrichCodeBuildStatus_ListBuildsError_SetsTruncated(t *testing.T) {
 }
 
 // TestEnrichTargetGroupHealth_DescribeError_SetsTruncated verifies that a
-// DescribeTargetHealth error sets Truncated=true.
+// DescribeTargetHealth error sets Truncated=true and surfaces a composite error
+// containing the enricher prefix and the failing resource ID.
 func TestEnrichTargetGroupHealth_DescribeError_SetsTruncated(t *testing.T) {
+	tgARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/err-tg/bbb"
 	fake := &tgHealthFake{
 		err: errFakeAPI, // all calls return error
 	}
 	clients := &awsclient.ServiceClients{ELBv2: fake}
 	resources := []resource.Resource{
-		{ID: "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/err-tg/bbb"},
+		{ID: tgARN},
 		{ID: "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/err2-tg/ccc"},
 	}
 
 	result, err := awsclient.EnrichTargetGroupHealth(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("unexpected error (per-resource errors must not propagate): %v", err)
+	if err == nil {
+		t.Fatal("enricher must surface a composite error when DescribeTargetHealth fails")
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, "tg-enrich:") {
+		t.Errorf("composite error must contain \"tg-enrich:\", got: %q", errStr)
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, tgARN) {
+		t.Errorf("composite error must contain the failing target group ARN %q, got: %q", tgARN, errStr)
 	}
 	if !result.Truncated {
 		t.Error("Truncated must be true when DescribeTargetHealth fails — was the per-resource error handling reverted?")
@@ -78,7 +87,8 @@ func TestEnrichTargetGroupHealth_DescribeError_SetsTruncated(t *testing.T) {
 }
 
 // TestEnrichCodePipelineStatus_GetStateError_SetsTruncated verifies that a
-// GetPipelineState error sets Truncated=true.
+// GetPipelineState error sets Truncated=true and surfaces a composite error
+// containing the enricher prefix.
 func TestEnrichCodePipelineStatus_GetStateError_SetsTruncated(t *testing.T) {
 	fake := &pipelineStateFake{
 		err: errFakeAPI,
@@ -90,8 +100,11 @@ func TestEnrichCodePipelineStatus_GetStateError_SetsTruncated(t *testing.T) {
 	}
 
 	result, err := awsclient.EnrichCodePipelineStatus(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("unexpected error (per-resource errors must not propagate): %v", err)
+	if err == nil {
+		t.Fatal("enricher must surface a composite error when GetPipelineState fails")
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, "pipeline-enrich:") {
+		t.Errorf("composite error must contain \"pipeline-enrich:\", got: %q", errStr)
 	}
 	if !result.Truncated {
 		t.Error("Truncated must be true when GetPipelineState fails — was the per-resource error handling reverted?")
@@ -99,20 +112,28 @@ func TestEnrichCodePipelineStatus_GetStateError_SetsTruncated(t *testing.T) {
 }
 
 // TestEnrichStepFunctionsStatus_ListExecutionsError_SetsTruncated verifies that a
-// ListExecutions error sets Truncated=true.
+// ListExecutions error sets Truncated=true and surfaces a composite error containing
+// the enricher prefix and the failing state machine ARN.
 func TestEnrichStepFunctionsStatus_ListExecutionsError_SetsTruncated(t *testing.T) {
+	smARN := "arn:aws:states:us-east-1:123456789012:stateMachine:err-sm"
 	fake := &sfnEnrichFake{
 		err: errFakeAPI,
 	}
 	clients := &awsclient.ServiceClients{SFN: fake}
 	resources := []resource.Resource{
-		{ID: "arn:aws:states:us-east-1:123456789012:stateMachine:err-sm"},
+		{ID: smARN},
 		{ID: "arn:aws:states:us-east-1:123456789012:stateMachine:ok-sm"},
 	}
 
 	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("unexpected error (per-resource errors must not propagate): %v", err)
+	if err == nil {
+		t.Fatal("enricher must surface a composite error when ListExecutions fails")
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, "sfn-enrich:") {
+		t.Errorf("composite error must contain \"sfn-enrich:\", got: %q", errStr)
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, smARN) {
+		t.Errorf("composite error must contain the failing state machine ARN %q, got: %q", smARN, errStr)
 	}
 	if !result.Truncated {
 		t.Error("Truncated must be true when ListExecutions fails — was the per-resource error handling reverted?")

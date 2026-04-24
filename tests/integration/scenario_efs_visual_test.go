@@ -23,16 +23,16 @@ import (
 )
 
 const (
-	// Fixture IDs from internal/demo/fixtures/efs.go (these literals are the
-	// FileSystemId strings; no exported const exists for the warn/broken set).
-	efsWarnCreating         = "fs-0warncreating0001"
-	efsWarnUpdating         = "fs-0warnupdating0001"
-	efsWarnDeleting         = "fs-0warndeleting0001"
-	efsBrokenError          = "fs-0brokenerror00001"
-	efsBrokenNoMountTargets = "fs-0brokennomt000001"
-	efsWarnMulti            = "fs-0warnmulti0000001"
-	efsWarnUpdatingMTDown   = "fs-0warnupdmtdown001"
-	efsHealthyMTDown        = "fs-0healthymtdown001"
+	// Fixture IDs sourced from internal/demo/fixtures/efs.go so renames or
+	// fixture regeneration propagate to this test automatically.
+	efsWarnCreating         = demofixtures.WarnEFSCreatingID
+	efsWarnUpdating         = demofixtures.WarnEFSUpdatingID
+	efsWarnDeleting         = demofixtures.WarnEFSDeletingID
+	efsBrokenError          = demofixtures.BrokenEFSErrorID
+	efsBrokenNoMountTargets = demofixtures.BrokenEFSNoMountTargetsID
+	efsWarnMulti            = demofixtures.WarnEFSMultiID
+	efsWarnUpdatingMTDown   = demofixtures.WarnEFSUpdatingMTDownID
+	efsHealthyMTDown        = demofixtures.HealthyEFSMTDownID
 
 	// Wave-2 Summary phrase (must match enricher output exactly).
 	efsMTDownPhrase            = "mount target down"

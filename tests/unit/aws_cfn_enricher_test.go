@@ -12,6 +12,7 @@ package unit
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -202,10 +203,11 @@ func TestEnrichCFNDrift_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	}
 }
 
-// TestEnrichCFNDrift_APIErrorSetsTruncatedNoError verifies that when the API call
-// for stack-1 returns a generic error, the enricher sets Truncated=true, produces
-// 0 findings for that stack, and does not propagate the error.
-func TestEnrichCFNDrift_APIErrorSetsTruncatedNoError(t *testing.T) {
+// TestEnrichCFNDrift_APIErrorSetsTruncatedAndSurfacesError verifies that when the
+// API call for stack-1 returns a generic error, the enricher sets Truncated=true,
+// produces 0 findings for that stack, and returns a composite error containing the
+// failing stack ID.
+func TestEnrichCFNDrift_APIErrorSetsTruncatedAndSurfacesError(t *testing.T) {
 	apiErr := errors.New("cloudformation: DescribeStacks throttled")
 	fake := &cfnDescribeStacksDriftFake{
 		errByStack: map[string]error{
@@ -222,8 +224,14 @@ func TestEnrichCFNDrift_APIErrorSetsTruncatedNoError(t *testing.T) {
 	}
 
 	result, err := awsclient.EnrichCFNDrift(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatal("enricher must surface a composite error when at least one stack API call failed")
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, "cfn-enrich:") {
+		t.Errorf("composite error must contain \"cfn-enrich:\", got: %q", errStr)
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, cfnDriftStack1) {
+		t.Errorf("composite error must contain the failing stack ID %q, got: %q", cfnDriftStack1, errStr)
 	}
 	if _, ok := result.Findings[cfnDriftStack1]; ok {
 		t.Error("stack-1 must NOT appear in Findings on generic API error")
