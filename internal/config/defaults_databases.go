@@ -115,8 +115,16 @@ func databasesDefaultViews() map[string]ViewDef {
 		},
 		"redshift": {
 			List: []ListColumn{
-				{Title: "Cluster ID", Path: "ClusterIdentifier", Width: 28},
-				{Title: "Status", Path: "ClusterStatus", Width: 14},
+				// Cluster ID width 36 accommodates the longest realistic AWS Redshift
+				// cluster identifiers (up to 63 chars per AWS docs, but 36 covers
+				// typical operator naming like "prod-<service>-<environment>-<region>").
+				{Title: "Cluster ID", Path: "ClusterIdentifier", Width: 36},
+				// Status column renders the spec §4 derived phrase from Fields["status"]
+				// (blank on Healthy; `(+N)` suffix on multi-W1). Width 34 fits the longest
+				// §4 phrase ("broken: incompatible-parameters" = 31 chars) plus margin for
+				// future additions. SortPath keeps the raw ClusterStatus sortable by AWS
+				// enum order.
+				{Title: "Status", Key: "status", SortPath: "ClusterStatus", Width: 34},
 				{Title: "Pending", Path: "PendingModifiedValues.NodeType", Width: 14},
 				{Title: "Node Type", Path: "NodeType", Width: 16},
 				{Title: "Nodes", Path: "NumberOfNodes", Width: 7},

@@ -990,7 +990,11 @@ func TestQA_ListRawStruct_AllTypes(t *testing.T) {
 		{"glue", realisticGlueJob(), []string{"etl-daily-job", "4.0", "G.2X"}},
 		{"eb", realisticEB(), []string{"prod-api-env", "my-web-app", "Ready"}},
 		{"ses", realisticSESIdentity(), []string{"example.com", "DOMAIN"}},
-		{"redshift", realisticRedshift(), []string{"analytics-cluster", "available", "dc2.large"}},
+		// redshift Status column now reads Fields["status"] (derived §4 phrase from
+		// the fetcher), not RawStruct.ClusterStatus. A raw-struct-only Resource
+		// bypasses the fetcher — Status is blank. Identity/metadata columns still
+		// pull from RawStruct as before.
+		{"redshift", realisticRedshift(), []string{"analytics-cluster", "dc2.large"}},
 		{"trail", realisticTrail(), []string{"org-trail", "cloudtrail-logs-bucket"}},
 		{"athena", realisticAthena(), []string{"analytics-wg", "ENABLED"}},
 		{"codeartifact", realisticCodeArtifact(), []string{"shared-libs", "my-domain"}},

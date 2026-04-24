@@ -46,6 +46,12 @@ var drillThroughFixtures = []struct {
 	{"redis/prod-redis", "redis", demofixtures.ProdRedisID},
 	{"s3/a9s-demo-healthy", "s3", demofixtures.HealthyBucketName},
 	{"backup/plan-broken-2failed", "backup", demofixtures.ProdDatabasePlanID},
+	// redshift: two graph-roots because logs (CloudWatch) and s3 (audit bucket)
+	// are mutually exclusive per AWS LogDestinationType. Each root covers 10 of
+	// 11 `count shown: yes` pivots; together they cover all 11.
+	// See docs/resources/redshift-impl-plan.md §5.1.
+	{"redshift/acme-warehouse", "redshift", demofixtures.AcmeWarehouseID},
+	{"redshift/acme-reporting", "redshift", demofixtures.AcmeReportingID},
 }
 
 // ---------------------------------------------------------------------------
