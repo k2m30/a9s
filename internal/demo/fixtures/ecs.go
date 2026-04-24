@@ -462,6 +462,16 @@ func buildECSTaskDefinitions() map[string]*ecstypes.TaskDefinition {
 					},
 				},
 			},
+			// EFS volume — required for efs→ecs-task related-panel pivot.
+			// checkEFSECSTask scans Volumes[].EfsVolumeConfiguration.FileSystemId == ProdEFSID.
+			Volumes: []ecstypes.Volume{
+				{
+					Name: aws.String("efs-app-data"),
+					EfsVolumeConfiguration: &ecstypes.EFSVolumeConfiguration{
+						FileSystemId: aws.String(ProdEFSID),
+					},
+				},
+			},
 		},
 		"arn:aws:ecs:us-east-1:123456789012:task-definition/web-frontend:8": {
 			TaskDefinitionArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/web-frontend:8"),
@@ -478,6 +488,16 @@ func buildECSTaskDefinitions() map[string]*ecstypes.TaskDefinition {
 					Cpu:   256,
 					PortMappings: []ecstypes.PortMapping{
 						{ContainerPort: aws.Int32(3000), Protocol: ecstypes.TransportProtocolTcp},
+					},
+				},
+			},
+			// EFS volume — required for efs→ecs-task related-panel pivot.
+			// checkEFSECSTask scans Volumes[].EfsVolumeConfiguration.FileSystemId == ProdEFSID.
+			Volumes: []ecstypes.Volume{
+				{
+					Name: aws.String("efs-app-data"),
+					EfsVolumeConfiguration: &ecstypes.EFSVolumeConfiguration{
+						FileSystemId: aws.String(ProdEFSID),
 					},
 				},
 			},

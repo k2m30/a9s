@@ -524,6 +524,29 @@ func buildVpcs() []ec2types.Vpc {
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
 			},
 		},
+		// EFS prod VPC — required for efs→vpc related-panel pivot.
+		{
+			VpcId:           aws.String(ProdEFSVpcID),
+			CidrBlock:       aws.String("10.20.0.0/16"),
+			State:           ec2types.VpcStateAvailable,
+			IsDefault:       aws.Bool(false),
+			InstanceTenancy: ec2types.TenancyDefault,
+			DhcpOptionsId:   aws.String("dopt-0efs0prod0000001"),
+			OwnerId:         aws.String("123456789012"),
+			CidrBlockAssociationSet: []ec2types.VpcCidrBlockAssociation{
+				{
+					AssociationId: aws.String("vpc-cidr-assoc-efs-prod-01"),
+					CidrBlock:     aws.String("10.20.0.0/16"),
+					CidrBlockState: &ec2types.VpcCidrBlockState{
+						State: ec2types.VpcCidrBlockStateCodeAssociated,
+					},
+				},
+			},
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("acme-efs-prod")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+			},
+		},
 	}
 }
 
@@ -764,6 +787,55 @@ func buildSecurityGroups() []ec2types.SecurityGroup {
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
 			},
 		},
+		// EFS prod SG-A — required for efs→sg related-panel pivot (Count ≥ 2).
+		// Attached to all three EFS mount-target ENIs in the ProdEFSVpcID VPC.
+		{
+			GroupId:          aws.String(ProdEFSSecurityGroupAID),
+			GroupName:        aws.String("acme-efs-prod-sg-a"),
+			VpcId:            aws.String(ProdEFSVpcID),
+			Description:      aws.String("Primary security group for EFS prod mount targets — NFS port 2049"),
+			OwnerId:          aws.String("123456789012"),
+			SecurityGroupArn: aws.String("arn:aws:ec2:us-east-1:123456789012:security-group/" + ProdEFSSecurityGroupAID),
+			IpPermissions: []ec2types.IpPermission{
+				{
+					IpProtocol: aws.String("tcp"),
+					FromPort:   aws.Int32(2049),
+					ToPort:     aws.Int32(2049),
+					IpRanges:   []ec2types.IpRange{{CidrIp: aws.String("10.20.0.0/16"), Description: aws.String("NFS from EFS VPC")}},
+				},
+			},
+			IpPermissionsEgress: []ec2types.IpPermission{
+				{IpProtocol: aws.String("-1"), IpRanges: []ec2types.IpRange{{CidrIp: aws.String("0.0.0.0/0")}}},
+			},
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("acme-efs-prod-sg-a")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+			},
+		},
+		// EFS prod SG-B — second security group for efs→sg pivot so Count = 2.
+		{
+			GroupId:          aws.String(ProdEFSSecurityGroupBID),
+			GroupName:        aws.String("acme-efs-prod-sg-b"),
+			VpcId:            aws.String(ProdEFSVpcID),
+			Description:      aws.String("Secondary security group for EFS prod mount targets — monitoring"),
+			OwnerId:          aws.String("123456789012"),
+			SecurityGroupArn: aws.String("arn:aws:ec2:us-east-1:123456789012:security-group/" + ProdEFSSecurityGroupBID),
+			IpPermissions: []ec2types.IpPermission{
+				{
+					IpProtocol: aws.String("tcp"),
+					FromPort:   aws.Int32(2049),
+					ToPort:     aws.Int32(2049),
+					IpRanges:   []ec2types.IpRange{{CidrIp: aws.String("10.20.0.0/16"), Description: aws.String("NFS from EFS VPC")}},
+				},
+			},
+			IpPermissionsEgress: []ec2types.IpPermission{
+				{IpProtocol: aws.String("-1"), IpRanges: []ec2types.IpRange{{CidrIp: aws.String("0.0.0.0/0")}}},
+			},
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("acme-efs-prod-sg-b")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+			},
+		},
 	}
 
 	vpcIDs := []string{fixtProdVPCID, fixtProdVPCID, fixtProdVPCID, fixtStagingVPCID}
@@ -903,6 +975,61 @@ func buildSubnets() []ec2types.Subnet {
 				{Key: aws.String("Name"), Value: aws.String("redis-private-1b")},
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
 				{Key: aws.String("Tier"), Value: aws.String("cache")},
+			},
+		},
+		// EFS prod subnets — required for efs→subnet related-panel pivot (Count = 3).
+		{
+			SubnetId:                aws.String(ProdEFSSubnetAID),
+			VpcId:                   aws.String(ProdEFSVpcID),
+			CidrBlock:               aws.String("10.20.1.0/24"),
+			AvailabilityZone:        aws.String("us-east-1a"),
+			AvailabilityZoneId:      aws.String("use1-az1"),
+			State:                   ec2types.SubnetStateAvailable,
+			AvailableIpAddressCount: aws.Int32(251),
+			MapPublicIpOnLaunch:     aws.Bool(false),
+			DefaultForAz:            aws.Bool(false),
+			SubnetArn:               aws.String("arn:aws:ec2:us-east-1:123456789012:subnet/" + ProdEFSSubnetAID),
+			OwnerId:                 aws.String("123456789012"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("efs-private-1a")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+				{Key: aws.String("Tier"), Value: aws.String("storage")},
+			},
+		},
+		{
+			SubnetId:                aws.String(ProdEFSSubnetBID),
+			VpcId:                   aws.String(ProdEFSVpcID),
+			CidrBlock:               aws.String("10.20.2.0/24"),
+			AvailabilityZone:        aws.String("us-east-1b"),
+			AvailabilityZoneId:      aws.String("use1-az2"),
+			State:                   ec2types.SubnetStateAvailable,
+			AvailableIpAddressCount: aws.Int32(251),
+			MapPublicIpOnLaunch:     aws.Bool(false),
+			DefaultForAz:            aws.Bool(false),
+			SubnetArn:               aws.String("arn:aws:ec2:us-east-1:123456789012:subnet/" + ProdEFSSubnetBID),
+			OwnerId:                 aws.String("123456789012"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("efs-private-1b")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+				{Key: aws.String("Tier"), Value: aws.String("storage")},
+			},
+		},
+		{
+			SubnetId:                aws.String(ProdEFSSubnetCID),
+			VpcId:                   aws.String(ProdEFSVpcID),
+			CidrBlock:               aws.String("10.20.3.0/24"),
+			AvailabilityZone:        aws.String("us-east-1c"),
+			AvailabilityZoneId:      aws.String("use1-az3"),
+			State:                   ec2types.SubnetStateAvailable,
+			AvailableIpAddressCount: aws.Int32(251),
+			MapPublicIpOnLaunch:     aws.Bool(false),
+			DefaultForAz:            aws.Bool(false),
+			SubnetArn:               aws.String("arn:aws:ec2:us-east-1:123456789012:subnet/" + ProdEFSSubnetCID),
+			OwnerId:                 aws.String("123456789012"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("efs-private-1c")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+				{Key: aws.String("Tier"), Value: aws.String("storage")},
 			},
 		},
 		{
@@ -1555,6 +1682,77 @@ func buildNetworkInterfaces() []ec2types.NetworkInterface {
 			SourceDestCheck:    aws.Bool(true),
 			TagSet: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("detached-eni")},
+			},
+		},
+		// EFS mount-target ENIs — Description MUST contain ProdEFSID so efs→sg/subnet/vpc/eni
+		// checkers resolve via strings.Contains. No Attachment: mount-target ENIs are not EC2 instances.
+		{
+			NetworkInterfaceId: aws.String(ProdEFSEniAID),
+			Status:             ec2types.NetworkInterfaceStatusInUse,
+			InterfaceType:      ec2types.NetworkInterfaceTypeInterface,
+			VpcId:              aws.String(ProdEFSVpcID),
+			SubnetId:           aws.String(ProdEFSSubnetAID),
+			AvailabilityZone:   aws.String("us-east-1a"),
+			PrivateIpAddress:   aws.String("10.20.1.10"),
+			PrivateDnsName:     aws.String("ip-10-20-1-10.ec2.internal"),
+			MacAddress:         aws.String("0a:ef:00:00:00:0a"),
+			Description:        aws.String("EFS mount target for " + ProdEFSID),
+			OwnerId:            aws.String("123456789012"),
+			RequesterManaged:   aws.Bool(true),
+			SourceDestCheck:    aws.Bool(false),
+			Groups: []ec2types.GroupIdentifier{
+				{GroupId: aws.String(ProdEFSSecurityGroupAID), GroupName: aws.String("efs-prod-app-data-sg-a")},
+				{GroupId: aws.String(ProdEFSSecurityGroupBID), GroupName: aws.String("efs-prod-app-data-sg-b")},
+			},
+			TagSet: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("efs-mt-prod-1a")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+			},
+		},
+		{
+			NetworkInterfaceId: aws.String(ProdEFSEniBID),
+			Status:             ec2types.NetworkInterfaceStatusInUse,
+			InterfaceType:      ec2types.NetworkInterfaceTypeInterface,
+			VpcId:              aws.String(ProdEFSVpcID),
+			SubnetId:           aws.String(ProdEFSSubnetBID),
+			AvailabilityZone:   aws.String("us-east-1b"),
+			PrivateIpAddress:   aws.String("10.20.2.10"),
+			PrivateDnsName:     aws.String("ip-10-20-2-10.ec2.internal"),
+			MacAddress:         aws.String("0a:ef:00:00:00:0b"),
+			Description:        aws.String("EFS mount target for " + ProdEFSID),
+			OwnerId:            aws.String("123456789012"),
+			RequesterManaged:   aws.Bool(true),
+			SourceDestCheck:    aws.Bool(false),
+			Groups: []ec2types.GroupIdentifier{
+				{GroupId: aws.String(ProdEFSSecurityGroupAID), GroupName: aws.String("efs-prod-app-data-sg-a")},
+				{GroupId: aws.String(ProdEFSSecurityGroupBID), GroupName: aws.String("efs-prod-app-data-sg-b")},
+			},
+			TagSet: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("efs-mt-prod-1b")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+			},
+		},
+		{
+			NetworkInterfaceId: aws.String(ProdEFSEniCID),
+			Status:             ec2types.NetworkInterfaceStatusInUse,
+			InterfaceType:      ec2types.NetworkInterfaceTypeInterface,
+			VpcId:              aws.String(ProdEFSVpcID),
+			SubnetId:           aws.String(ProdEFSSubnetCID),
+			AvailabilityZone:   aws.String("us-east-1c"),
+			PrivateIpAddress:   aws.String("10.20.3.10"),
+			PrivateDnsName:     aws.String("ip-10-20-3-10.ec2.internal"),
+			MacAddress:         aws.String("0a:ef:00:00:00:0c"),
+			Description:        aws.String("EFS mount target for " + ProdEFSID),
+			OwnerId:            aws.String("123456789012"),
+			RequesterManaged:   aws.Bool(true),
+			SourceDestCheck:    aws.Bool(false),
+			Groups: []ec2types.GroupIdentifier{
+				{GroupId: aws.String(ProdEFSSecurityGroupAID), GroupName: aws.String("efs-prod-app-data-sg-a")},
+				{GroupId: aws.String(ProdEFSSecurityGroupBID), GroupName: aws.String("efs-prod-app-data-sg-b")},
+			},
+			TagSet: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("efs-mt-prod-1c")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
 			},
 		},
 	}

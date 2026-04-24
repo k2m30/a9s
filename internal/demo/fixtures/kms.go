@@ -184,6 +184,22 @@ func NewKMSFixtures() *KMSFixtures {
 			MultiRegion:          aws.Bool(false),
 			Origin:               kmstypes.OriginTypeAwsKms,
 		},
+		// EFS prod-app-data encryption key — required for efs→kms related-panel pivot.
+		// The prod-efs-app-data filesystem sets KmsKeyId = ProdEFSKmsKeyARN; the
+		// checker strips the ARN to the bare key ID and looks it up here.
+		{
+			KeyId:                aws.String(ProdEFSKmsKeyID),
+			Arn:                  aws.String(ProdEFSKmsKeyARN),
+			Description:          aws.String("Encryption key for prod-efs-app-data EFS filesystem"),
+			KeyState:             kmstypes.KeyStateEnabled,
+			KeyManager:           kmstypes.KeyManagerTypeCustomer,
+			KeyUsage:             kmstypes.KeyUsageTypeEncryptDecrypt,
+			CreationDate:         aws.Time(time.Date(2025, 2, 10, 9, 0, 0, 0, time.UTC)),
+			Enabled:              true,
+			EncryptionAlgorithms: []kmstypes.EncryptionAlgorithmSpec{kmstypes.EncryptionAlgorithmSpecSymmetricDefault},
+			MultiRegion:          aws.Bool(false),
+			Origin:               kmstypes.OriginTypeAwsKms,
+		},
 	}
 
 	keys := make(map[string]*kmstypes.KeyMetadata, len(keyMetadata))
@@ -261,6 +277,12 @@ func NewKMSFixtures() *KMSFixtures {
 			AliasName:   aws.String("alias/acme-backup-prod-key"),
 			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/acme-backup-prod-key"),
 			TargetKeyId: aws.String(BackupProdVaultKMSKeyID),
+		},
+		// EFS prod-app-data KMS key alias.
+		{
+			AliasName:   aws.String("alias/acme-efs-prod-app-data-key"),
+			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/acme-efs-prod-app-data-key"),
+			TargetKeyId: aws.String(ProdEFSKmsKeyID),
 		},
 	}
 

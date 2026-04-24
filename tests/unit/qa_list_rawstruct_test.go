@@ -981,7 +981,11 @@ func TestQA_ListRawStruct_AllTypes(t *testing.T) {
 		{"r53", realisticR53Zone(), []string{"/hostedzone/Z1234567890ABC", "example.com."}},
 		{"apigw", realisticAPIGW(), []string{"abc123def4", "prod-api", "HTTP"}},
 		{"ecr", realisticECR(), []string{"my-app", "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app"}},
-		{"efs", realisticEFS(), []string{"fs-0abc1234def56789a", "available"}},
+		// efs Status column is derived from Resource.Fields["status"], not from
+		// RawStruct.LifeCycleState — so only RawStruct-backed identity columns
+		// (File System ID, Name) are asserted here. See qa_efs_test.go for the
+		// derived-status contract.
+		{"efs", realisticEFS(), []string{"fs-0abc1234def56789a"}},
 		{"eb-rule", realisticEBRule(), []string{"daily-backup-rule", "ENABLED"}},
 		{"sfn", realisticSFN(), []string{"order-processing", "STANDARD"}},
 		{"pipeline", realisticPipeline(), []string{"deploy-pipeline", "V2"}},

@@ -3,11 +3,11 @@ package aws
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
-	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/efs"
 	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
@@ -268,8 +268,10 @@ func checkEFSLambda(ctx context.Context, clients any, res resource.Resource, cac
 }
 
 // checkEFSECSTask is a reverse-scan checker for the efs→ecs-task relationship.
-// Pattern C+reverse: iterate cache["ecs-task"]; for each task definition check
-// Volumes[].EfsVolumeConfiguration.FileSystemId == parent filesystem ID.
+// Pattern C+reverse: iterate cache["ecs-task"]; for each task read
+// Fields["efs_file_system_ids"] (comma-separated list of EFS file-system IDs
+// joined by the ecs-task fetcher via DescribeTaskDefinition) and match against
+// this filesystem's ID.
 // NeedsTargetCache: true.
 func checkEFSECSTask(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fsID := res.ID
@@ -284,17 +286,12 @@ func checkEFSECSTask(_ context.Context, _ any, res resource.Resource, cache reso
 
 	var ids []string
 	for _, tRes := range entry.Resources {
-		td, ok := assertStruct[ecstypes.TaskDefinition](tRes.RawStruct)
-		if !ok {
+		joined := tRes.Fields["efs_file_system_ids"]
+		if joined == "" {
 			continue
 		}
-		for _, v := range td.Volumes {
-			if v.EfsVolumeConfiguration != nil &&
-				v.EfsVolumeConfiguration.FileSystemId != nil &&
-				*v.EfsVolumeConfiguration.FileSystemId == fsID {
-				ids = append(ids, tRes.ID)
-				break
-			}
+		if slices.Contains(strings.Split(joined, ","), fsID) {
+			ids = append(ids, tRes.ID)
 		}
 	}
 	result := relatedResult("ecs-task", ids)

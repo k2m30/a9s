@@ -134,6 +134,22 @@ func buildBackupRecoveryPoints() map[string][]backuptypes.RecoveryPointByResourc
 				CreationDate:     aws.Time(mustParseBackupTime("2026-04-15T02:00:00Z")),
 			},
 		},
+		// EFS prod-app-data recovery points — required for efs→backup related-panel pivot (Count = 2).
+		// checkEFSBackup calls ListRecoveryPointsByResource(ResourceArn=ProdEFSARN).
+		ProdEFSARN: {
+			{
+				RecoveryPointArn: aws.String(ProdEFSBackupARecoveryARN),
+				BackupVaultName:  aws.String(BackupProdVaultName),
+				Status:           backuptypes.RecoveryPointStatusCompleted,
+				CreationDate:     aws.Time(mustParseBackupTime("2026-04-16T02:00:00Z")),
+			},
+			{
+				RecoveryPointArn: aws.String(ProdEFSBackupBRecoveryARN),
+				BackupVaultName:  aws.String(BackupProdVaultName),
+				Status:           backuptypes.RecoveryPointStatusCompleted,
+				CreationDate:     aws.Time(mustParseBackupTime("2026-04-15T02:00:00Z")),
+			},
+		},
 	}
 }
 

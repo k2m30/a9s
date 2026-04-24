@@ -79,12 +79,16 @@ func TestFetchEFSFileSystems_ParsesMultiple(t *testing.T) {
 	if r0.Name != "shared-data" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "shared-data", r0.Name)
 	}
-	if r0.Status != "available" {
-		t.Errorf("resource[0].Status: expected %q, got %q", "available", r0.Status)
+	// Healthy FS (LifeCycleState=available, NumberOfMountTargets=3) — blank Status per spec §4.
+	if r0.Status != "" {
+		t.Errorf("resource[0].Status: expected blank (healthy), got %q", r0.Status)
+	}
+	if len(r0.Issues) != 0 {
+		t.Errorf("resource[0].Issues: expected empty for healthy FS, got %v", r0.Issues)
 	}
 
-	// Verify required fields
-	requiredFields := []string{"file_system_id", "name", "life_cycle_state", "performance_mode", "throughput_mode", "encrypted", "mount_targets"}
+	// Verify required fields — derived `status` key replaced the AWS-raw `life_cycle_state` key.
+	requiredFields := []string{"file_system_id", "name", "status", "performance_mode", "throughput_mode", "encrypted", "mount_targets"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
 			if _, ok := r.Fields[key]; !ok {
@@ -106,10 +110,22 @@ func TestFetchEFSFileSystems_ParsesMultiple(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"performance_mode\"]: expected %q, got %q", "generalPurpose", r0.Fields["performance_mode"])
 	}
 
-	// Verify second file system (creating, no name)
+	// Verify second file system (LifeCycleState=creating + NumberOfMountTargets=0):
+	// two coexisting §3.1 W1 signals. Broken ("no mount targets") wins precedence;
+	// Warning ("creating") is hidden. Expected Status = "no mount targets (+1)",
+	// Issues = ["no mount targets", "creating"] per spec rule 7.
 	r1 := resources[1]
-	if r1.Status != "creating" {
-		t.Errorf("resource[1].Status: expected %q, got %q", "creating", r1.Status)
+	if r1.Status != "no mount targets (+1)" {
+		t.Errorf("resource[1].Status: expected %q, got %q", "no mount targets (+1)", r1.Status)
+	}
+	wantIssues := []string{"no mount targets", "creating"}
+	if len(r1.Issues) != len(wantIssues) {
+		t.Fatalf("resource[1].Issues: expected %v, got %v", wantIssues, r1.Issues)
+	}
+	for i, want := range wantIssues {
+		if r1.Issues[i] != want {
+			t.Errorf("resource[1].Issues[%d]: expected %q, got %q", i, want, r1.Issues[i])
+		}
 	}
 	if r1.Name != "" {
 		t.Errorf("resource[1].Name: expected empty, got %q", r1.Name)

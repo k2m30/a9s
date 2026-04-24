@@ -158,6 +158,21 @@ func NewCFNFixtures() *CFNFixtures {
 				{Key: aws.String("Service"), Value: aws.String("sessions")},
 			},
 		},
+		// EFS prod-app-data CFN stack — required for efs→cfn related-panel pivot.
+		// The prod-efs-app-data filesystem carries the aws:cloudformation:stack-name tag
+		// pointing to ProdEFSCFNStackName so checkEFSCFN resolves a non-zero count.
+		{
+			StackName:    aws.String(ProdEFSCFNStackName),
+			StackStatus:  cfntypes.StackStatusCreateComplete,
+			CreationTime: aws.Time(mustParseCFNTime("2025-02-01T10:00:00+00:00")),
+			Description:  aws.String("EFS filesystem for production app data shared storage"),
+			StackId:      aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/" + ProdEFSCFNStackName + "/bbbbcccc-dddd-eeee-ffff-000000000001"),
+			RoleARN:      aws.String(prodCIDeployRoleARN),
+			Tags: []cfntypes.Tag{
+				{Key: aws.String("Environment"), Value: aws.String("production")},
+				{Key: aws.String("Service"), Value: aws.String("storage")},
+			},
+		},
 	}
 
 	stackEvents := map[string][]cfntypes.StackEvent{

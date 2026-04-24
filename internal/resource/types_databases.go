@@ -371,26 +371,31 @@ func databasesResourceTypes() []ResourceTypeDef {
 			Columns: []Column{
 				{Key: "name", Title: "Name", Width: 28, Sortable: true},
 				{Key: "file_system_id", Title: "File System ID", Width: 22, Sortable: true},
-				{Key: "life_cycle_state", Title: "State", Width: 12, Sortable: true},
+				{Key: "status", Title: "Status", Width: 24, Sortable: true},
 				{Key: "performance_mode", Title: "Perf Mode", Width: 16, Sortable: true},
 				{Key: "encrypted", Title: "Encrypted", Width: 10, Sortable: true},
 				{Key: "mount_targets", Title: "Mounts", Width: 8, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				base := ColorHealthy
-				switch r.Fields["life_cycle_state"] {
-				case "available":
-					base = ColorHealthy
+				// Read the derived status field (set by fetcher and bumped by enricher).
+				// Fall back to r.Status for backward-compatibility.
+				status := r.Fields["status"]
+				if status == "" {
+					status = r.Status
+				}
+				// Strip the universal-rule-7 (+N) suffix before matching so that
+				// "no mount targets (+1)" still classifies as Broken.
+				phrase := StripFindingSuffix(status)
+				switch phrase {
+				case "":
+					return ColorHealthy
+				case "error", "no mount targets", "mount target down":
+					return ColorBroken
 				case "creating", "updating", "deleting":
-					base = ColorWarning
-				case "error":
-					base = ColorBroken
+					return ColorWarning
+				default:
+					return ColorHealthy
 				}
-				// Unreachable FS: no mount targets → upgrade to Broken.
-				if r.Fields["mount_targets"] == "0" {
-					base = ColorBroken
-				}
-				return base
 			},
 		},
 		{

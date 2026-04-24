@@ -6,12 +6,13 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/efs"
+	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func init() {
-	resource.RegisterFieldKeys("efs", []string{"file_system_id", "name", "life_cycle_state", "performance_mode", "encrypted", "mount_targets"})
+	resource.RegisterFieldKeys("efs", []string{"file_system_id", "name", "status", "performance_mode", "encrypted", "mount_targets"})
 
 	resource.RegisterPaginated("efs", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -41,6 +42,45 @@ func FetchEFSFileSystems(ctx context.Context, api EFSDescribeFileSystemsAPI) ([]
 	return all, nil
 }
 
+// efsW1Signals returns the active Wave-1 issue phrases for this filesystem in
+// §4 precedence order: Broken signals first (error, no mount targets), then
+// Warning signals (creating, updating, deleting).
+//
+// The first phrase is the "top" displayed in the Status column (plus (+N-1)
+// suffix when more than one phrase is active). All phrases are appended to
+// Resource.Issues so the detail view can render every signal individually.
+func efsW1Signals(lcs efstypes.LifeCycleState, numMT int32) []string {
+	// §4 precedence order (severity first, then table order within severity):
+	//   Broken: "error", "no mount targets"
+	//   Warning: "creating", "updating", "deleting"
+	var phrases []string
+
+	switch lcs {
+	case efstypes.LifeCycleStateError:
+		phrases = append(phrases, "error")
+	case efstypes.LifeCycleStateCreating:
+		phrases = append(phrases, "creating")
+	case efstypes.LifeCycleStateUpdating:
+		phrases = append(phrases, "updating")
+	case efstypes.LifeCycleStateDeleting:
+		phrases = append(phrases, "deleting")
+	// "available" and "deleted" produce no W1 phrase.
+	}
+
+	if numMT == 0 {
+		// Insert "no mount targets" before Warning phrases (it is Broken-severity).
+		// If "error" is already present, append after it. Otherwise prepend.
+		if len(phrases) > 0 && phrases[0] == "error" {
+			phrases = append([]string{phrases[0], "no mount targets"}, phrases[1:]...)
+		} else {
+			// "no mount targets" is Broken, so it precedes any Warning phrase.
+			phrases = append([]string{"no mount targets"}, phrases...)
+		}
+	}
+
+	return phrases
+}
+
 // FetchEFSFileSystemsPage fetches a single page of EFS file systems.
 func FetchEFSFileSystemsPage(ctx context.Context, api EFSDescribeFileSystemsAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &efs.DescribeFileSystemsInput{
@@ -68,7 +108,6 @@ func FetchEFSFileSystemsPage(ctx context.Context, api EFSDescribeFileSystemsAPI,
 			name = *fs.Name
 		}
 
-		lifeCycleState := string(fs.LifeCycleState)
 		performanceMode := string(fs.PerformanceMode)
 		throughputMode := string(fs.ThroughputMode)
 
@@ -79,14 +118,36 @@ func FetchEFSFileSystemsPage(ctx context.Context, api EFSDescribeFileSystemsAPI,
 
 		mountTargets := fmt.Sprintf("%d", fs.NumberOfMountTargets)
 
+		// Compute Wave-1 signals in §4 precedence order.
+		signals := efsW1Signals(fs.LifeCycleState, fs.NumberOfMountTargets)
+
+		// Derive Status (S4) and Issues from active signals.
+		var status string
+		var issues []string
+
+		switch len(signals) {
+		case 0:
+			// Healthy — blank S4.
+			status = ""
+			issues = nil
+		case 1:
+			status = signals[0]
+			issues = signals
+		default:
+			// Multiple W1 signals: top phrase + "(+N-1)" suffix where N-1 = len-1.
+			status = fmt.Sprintf("%s (+%d)", signals[0], len(signals)-1)
+			issues = signals
+		}
+
 		r := resource.Resource{
 			ID:     fsID,
 			Name:   name,
-			Status: lifeCycleState,
+			Status: status,
+			Issues: issues,
 			Fields: map[string]string{
 				"file_system_id":   fsID,
 				"name":             name,
-				"life_cycle_state": lifeCycleState,
+				"status":           status,
 				"performance_mode": performanceMode,
 				"throughput_mode":  throughputMode,
 				"encrypted":        encrypted,

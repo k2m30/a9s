@@ -42,3 +42,20 @@ func BumpFindingSuffix(s string) string {
 	n, _ := strconv.Atoi(m[2])
 	return fmt.Sprintf("%s (+%d)", m[1], n+1)
 }
+
+// SplitFindingSuffix parses the base phrase and the hidden-count N from a Status
+// string that may carry a trailing " (+N)" suffix. Used by Wave 2 enrichers that
+// need to know how many hidden findings already exist before bumping:
+//
+//	"no mount targets (+1)"  → phrase="no mount targets", hidden=1
+//	"updating"               → phrase="updating",          hidden=0
+//	"error"                  → phrase="error",             hidden=0
+func SplitFindingSuffix(s string) (phrase string, hidden int) {
+	re := regexp.MustCompile(`^(.*) \(\+(\d+)\)$`)
+	m := re.FindStringSubmatch(s)
+	if m == nil {
+		return s, 0
+	}
+	n, _ := strconv.Atoi(m[2])
+	return m[1], n
+}
