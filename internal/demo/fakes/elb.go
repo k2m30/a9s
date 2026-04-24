@@ -32,6 +32,9 @@ func (f *ELBFake) DescribeTargetHealth(_ context.Context, input *elbv2.DescribeT
 	if input.TargetGroupArn == nil {
 		return &elbv2.DescribeTargetHealthOutput{}, nil
 	}
+	if err := validateARN(*input.TargetGroupArn); err != nil {
+		return nil, err
+	}
 	// Only error if the target group itself does not exist. A TG with no
 	// registered targets legitimately returns an empty health list on the
 	// real AWS API, not an error.
@@ -60,6 +63,9 @@ func (f *ELBFake) DescribeListeners(_ context.Context, input *elbv2.DescribeList
 		}
 		return &elbv2.DescribeListenersOutput{Listeners: all}, nil
 	}
+	if err := validateARN(*input.LoadBalancerArn); err != nil {
+		return nil, err
+	}
 	listeners, ok := f.fix.Listeners[*input.LoadBalancerArn]
 	if !ok {
 		return &elbv2.DescribeListenersOutput{}, nil
@@ -70,6 +76,9 @@ func (f *ELBFake) DescribeListeners(_ context.Context, input *elbv2.DescribeList
 func (f *ELBFake) DescribeRules(_ context.Context, input *elbv2.DescribeRulesInput, _ ...func(*elbv2.Options)) (*elbv2.DescribeRulesOutput, error) {
 	if input.ListenerArn == nil {
 		return &elbv2.DescribeRulesOutput{}, nil
+	}
+	if err := validateARN(*input.ListenerArn); err != nil {
+		return nil, err
 	}
 	rules, ok := f.fix.Rules[*input.ListenerArn]
 	if !ok {

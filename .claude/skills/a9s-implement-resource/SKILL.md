@@ -220,6 +220,29 @@ Returning `(nil, err)` on partial failure erases the 3 successful results — do
 
 If `RetryOnThrottle` returns an error, the throttle-retry budget is exhausted. Do not re-wrap or retry again. Propagate per E3/E4.
 
+### Rule E7 — ID is ARN IFF the fetcher makes it so, and the contract is explicit
+
+This rule exists because three bugs of identical shape shipped unnoticed (tg 2026-04-24, sfn + elb + acm + msk 2026-04-25). In all five, the fetcher set `ID = bare name` (display-friendly), then the enricher / related checker passed `r.ID` as an AWS SDK `*Arn` parameter. Real AWS returned `InvalidArn` / `ValidationError`. Demo fakes were permissive and hid the bug. Unit tests constructed `Resource{ID: <ARN>}` directly and so agreed with their own fake instead of with production — a sealed echo chamber.
+
+**The rule:**
+
+1. The fetcher is the authority on the shape of `Resource.ID`. Most resource types set `ID = bare name / bare identifier` (display-friendly). A small minority set `ID = ARN` where the ARN is naturally the primary identifier (e.g. sns topics where the ARN IS the primary key the rest of AWS references them by).
+
+2. Enrichers, related checkers, detail enrichers, and FetchByIDs functions MUST read the ARN from `r.Fields["<key>_arn"]` (or `r.Fields["arn"]`), NOT from `r.ID`, unless the fetcher's resource.Resource literal construction explicitly sets `ID: <arn-value>` and a comment at that construction point says so.
+
+3. The fetcher must populate `Fields["<key>_arn"]` for every resource type whose enricher or related checker needs the ARN. If the ARN is only available via a second API call (e.g. CodePipeline list summaries don't expose ARNs), say so in a comment and arrange for the enricher / checker to resolve it — don't leave a stub field that's always empty.
+
+4. Indirection doesn't launder the pattern. `certARN := r.ID; ...Arn: aws.String(certARN)` is the same bug as `Arn: aws.String(r.ID)`. Both are flagged by the static guard.
+
+5. **Escape hatch.** If the fetcher genuinely emits `ID = ARN`, a comment near the local assignment containing the literal string `fetcher emits ID=ARN` quiets the static guard. Use this sparingly and only after verifying the fetcher.
+
+**Enforcement:**
+
+- **Unit test regression pin** per enricher / checker that takes an ARN param: use a **strict fake** that rejects non-ARN values (`strings.HasPrefix(got, "arn:aws:")` → return `ValidationError` / `InvalidArn`). The existing `strictELBv2Fake`, `strictSFNFake`, `strictACMFake`, `strictMSKFake` in `tests/unit/` are the pattern to copy.
+- **Static guard** `TestNoIDAsARN_StaticGuard` in `tests/unit/qa_no_id_as_arn_static_test.go` scans every `_issue_enrichment.go` / `_detail_enrichment.go` / `_related.go` / `_related_extra.go` file and flags direct (`Arn: aws.String(r.ID)`) and indirect (`local := r.ID` flowing into an `*Arn:` field) anti-patterns. Any addition of a new resource type must keep this test green.
+- **Strict demo fakes.** Every demo fake under `internal/demo/fakes/` validates `*Arn` input parameters and returns `ValidationError` / `InvalidArn` on non-ARN input, mirroring real AWS. This is what forces the echo chamber open: a unit or integration test that constructs a `Resource` with the wrong shape produces an enricher error instead of a silent empty result.
+- **Scenario harness assertion.** `fullIntegrationScenario.AssertNoEnrichmentErrors()` inspects every `EnrichmentCheckedMsg` drained during the scenario and fails on any non-nil `.Err`. Every scenario test that opens a resource list with wave-2 enrichment must call it before returning. Missing scenarios must be added for every resource type with a registered enricher.
+
 ### Enforcement
 
 - Phase 5 contract-surface audit: grep new code for `if err != nil {` followed within 3 lines by `continue`, `break`, `return nil`, or `return`. Any hit without a preceding `failures = append(failures, ...)` line is a reject.
@@ -251,6 +274,9 @@ Phase 3's "one case per signal" is NECESSARY but NOT SUFFICIENT. Rule 7 (`(+N)` 
 | **U11** | **Summary ≠ Rows content (EnrichmentFinding contract)** | **every fixture with a Wave-2 finding that has Rows** | **unit test: `finding.Summary == <short-phrase>` AND `!strings.Contains(finding.Summary, row.Value)` for every Row** |
 | **U12** | **Partial AWS failure surfaces a FlashMsg with `IsError=true`** | **1 fixture: N items total; describe/get call errors on 2 of them (AccessDenied / NotFound)** | **scenario test: (a) list renders N−2 rows, (b) `FlashMsg` with `IsError=true` was emitted, (c) `errorHistory` contains a composite error naming the 2 failed IDs and reasons** |
 | **U13** | **Every SDK call is wrapped in `RetryOnThrottle`** | **n/a — static audit** | **phase-5 + phase-7.5 grep: zero matches of unwrapped `api.Describe*` / `api.Get*` / `api.List*` in new code** |
+| **U14** | **No enricher / related checker passes `r.ID` as an ARN-typed param when the fetcher emits `ID = bare name`** | **1 fixture in real fetcher shape** | **unit test: `qa_<short>_uses_arn_from_fields_test.go` with a strict fake that rejects non-ARN input; PLUS `TestNoIDAsARN_StaticGuard` must stay green after adding the enricher/checker** |
+| **U15** | **Demo fake for every AWS operation accepting `*Arn` rejects non-ARN input** | **fake implementation** | **any test that constructs a `Resource` with the wrong ID shape (e.g. ID = bare name where fetcher actually emits ID = ARN) sees a `ValidationError` from the fake instead of silent success; new fakes must follow the pattern in `internal/demo/fakes/sfn.go` `validateSFNArn` / `internal/demo/fakes/elb.go` / etc.** |
+| **U16** | **Scenario test for the resource type asserts `AssertNoEnrichmentErrors` after draining wave-2** | **1 scenario file `tests/integration/scenario_<short>_visual_test.go`** | **scenario calls `sc.AssertNoEnrichmentErrors()` before returning; this is the integration-level guard that makes `make test` fail if any enricher emits an error against real demo fakes** |
 
 Demo mode runs Wave 2 enrichment end-to-end against typed fakes (the `!m.isDemo` guard was removed 2026-04-22 after it was caught hiding the `(+N)` / `~` / "maintenance scheduled" rendering in the actual demo). Every row in this table is therefore reachable via the scripted scenario harness without message injection, provided the harness drains the `AvailabilityPrefetchedMsg` → `EnrichmentCheckedMsg` chain (it does as of 2026-04-22).
 

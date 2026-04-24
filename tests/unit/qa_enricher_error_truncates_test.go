@@ -61,14 +61,15 @@ func TestEnrichCodeBuildStatus_ListBuildsError_SetsTruncated(t *testing.T) {
 // DescribeTargetHealth error sets Truncated=true and surfaces a composite error
 // containing the enricher prefix and the failing resource ID.
 func TestEnrichTargetGroupHealth_DescribeError_SetsTruncated(t *testing.T) {
-	tgARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/err-tg/bbb"
+	const tgName = "err-tg"
+	const tgARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/err-tg/bbb"
 	fake := &tgHealthFake{
 		err: errFakeAPI, // all calls return error
 	}
 	clients := &awsclient.ServiceClients{ELBv2: fake}
 	resources := []resource.Resource{
-		{ID: tgARN},
-		{ID: "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/err2-tg/ccc"},
+		{ID: tgName, Fields: map[string]string{"target_group_arn": tgARN}},
+		{ID: "err2-tg", Fields: map[string]string{"target_group_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/err2-tg/ccc"}},
 	}
 
 	result, err := awsclient.EnrichTargetGroupHealth(context.Background(), clients, resources)
@@ -78,8 +79,8 @@ func TestEnrichTargetGroupHealth_DescribeError_SetsTruncated(t *testing.T) {
 	if errStr := err.Error(); !strings.Contains(errStr, "tg-enrich:") {
 		t.Errorf("composite error must contain \"tg-enrich:\", got: %q", errStr)
 	}
-	if errStr := err.Error(); !strings.Contains(errStr, tgARN) {
-		t.Errorf("composite error must contain the failing target group ARN %q, got: %q", tgARN, errStr)
+	if errStr := err.Error(); !strings.Contains(errStr, tgName) {
+		t.Errorf("composite error must contain the failing target group ID %q, got: %q", tgName, errStr)
 	}
 	if !result.Truncated {
 		t.Error("Truncated must be true when DescribeTargetHealth fails — was the per-resource error handling reverted?")
@@ -115,14 +116,15 @@ func TestEnrichCodePipelineStatus_GetStateError_SetsTruncated(t *testing.T) {
 // ListExecutions error sets Truncated=true and surfaces a composite error containing
 // the enricher prefix and the failing state machine ARN.
 func TestEnrichStepFunctionsStatus_ListExecutionsError_SetsTruncated(t *testing.T) {
-	smARN := "arn:aws:states:us-east-1:123456789012:stateMachine:err-sm"
+	const smName = "err-sm"
+	const smARN = "arn:aws:states:us-east-1:123456789012:stateMachine:err-sm"
 	fake := &sfnEnrichFake{
 		err: errFakeAPI,
 	}
 	clients := &awsclient.ServiceClients{SFN: fake}
 	resources := []resource.Resource{
-		{ID: smARN},
-		{ID: "arn:aws:states:us-east-1:123456789012:stateMachine:ok-sm"},
+		{ID: smName, Fields: map[string]string{"arn": smARN}},
+		{ID: "ok-sm", Fields: map[string]string{"arn": "arn:aws:states:us-east-1:123456789012:stateMachine:ok-sm"}},
 	}
 
 	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), clients, resources)
@@ -132,8 +134,8 @@ func TestEnrichStepFunctionsStatus_ListExecutionsError_SetsTruncated(t *testing.
 	if errStr := err.Error(); !strings.Contains(errStr, "sfn-enrich:") {
 		t.Errorf("composite error must contain \"sfn-enrich:\", got: %q", errStr)
 	}
-	if errStr := err.Error(); !strings.Contains(errStr, smARN) {
-		t.Errorf("composite error must contain the failing state machine ARN %q, got: %q", smARN, errStr)
+	if errStr := err.Error(); !strings.Contains(errStr, smName) {
+		t.Errorf("composite error must contain the failing state machine ID %q, got: %q", smName, errStr)
 	}
 	if !result.Truncated {
 		t.Error("Truncated must be true when ListExecutions fails — was the per-resource error handling reverted?")

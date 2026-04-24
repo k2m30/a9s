@@ -62,15 +62,16 @@ func (f *mskDescribeClusterV2Fake) DescribeClusterV2(
 var _ awsclient.MSKAPI = (*mskDescribeClusterV2Fake)(nil)
 
 // mskClusterResources returns a slice of MSK Resource stubs with the given ARNs.
-// The ID and ARN field match real fetcher output.
+// Mirrors the fetcher contract: ID = bare cluster name, Fields["cluster_arn"] = full ARN.
 func mskClusterResources(arns ...string) []resource.Resource {
 	res := make([]resource.Resource, 0, len(arns))
 	for _, arn := range arns {
 		name := "msk-" + arn[len(arn)-8:]
 		res = append(res, resource.Resource{
-			ID:   arn,
+			ID:   name,
 			Name: name,
 			Fields: map[string]string{
+				"cluster_arn":  arn,
 				"cluster_name": name,
 				"cluster_type": "PROVISIONED",
 				"state":        "ACTIVE",
@@ -111,6 +112,12 @@ func serverlessCluster(arn string) *kafkatypes.Cluster {
 const (
 	mskARN1 = "arn:aws:kafka:us-east-1:123456789012:cluster/msk-cluster-1/aaaaaaaa"
 	mskARN2 = "arn:aws:kafka:us-east-1:123456789012:cluster/msk-cluster-2/bbbbbbbb"
+
+	// mskName* are the bare cluster names derived from the ARN suffix by mskClusterResources.
+	// They mirror what the fetcher sets as r.ID.
+	// Suffix formula: arn[len(arn)-8:] → "aaaaaaaa", "bbbbbbbb".
+	mskName1 = "msk-aaaaaaaa"
+	mskName2 = "msk-bbbbbbbb"
 )
 
 // TestEnrichMSKCluster_ModernTLSProducesNoFindings verifies that when both clusters
@@ -157,14 +164,14 @@ func TestEnrichMSKCluster_OutdatedVersionProducesFindingSevTilde(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[mskARN1]
+	f, ok := result.Findings[mskName1]
 	if !ok {
-		t.Fatalf("expected finding keyed by %q", mskARN1)
+		t.Fatalf("expected finding keyed by bare cluster name %q", mskName1)
 	}
 	if f.Severity != "~" {
 		t.Errorf("severity = %q, want %q", f.Severity, "~")
 	}
-	if _, ok := result.Findings[mskARN2]; ok {
+	if _, ok := result.Findings[mskName2]; ok {
 		t.Error("cluster-2 must NOT appear in Findings — it uses modern Kafka version")
 	}
 	// "~" findings do NOT contribute to IssueCount per the EnricherResult contract.
@@ -190,14 +197,14 @@ func TestEnrichMSKCluster_PlaintextEncryptionProducesFindingSevTilde(t *testing.
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[mskARN1]
+	f, ok := result.Findings[mskName1]
 	if !ok {
-		t.Fatalf("expected finding keyed by %q", mskARN1)
+		t.Fatalf("expected finding keyed by bare cluster name %q", mskName1)
 	}
 	if f.Severity != "~" {
 		t.Errorf("severity = %q, want %q", f.Severity, "~")
 	}
-	if _, ok := result.Findings[mskARN2]; ok {
+	if _, ok := result.Findings[mskName2]; ok {
 		t.Error("cluster-2 must NOT appear in Findings — it uses TLS")
 	}
 	if result.IssueCount != 0 {
@@ -273,8 +280,11 @@ func TestEnrichMSKCluster_APIErrorSetsTruncatedAndSurfacesError(t *testing.T) {
 	if errStr := err.Error(); !strings.Contains(errStr, "msk-enrich:") {
 		t.Errorf("composite error must contain \"msk-enrich:\", got: %q", errStr)
 	}
-	if errStr := err.Error(); !strings.Contains(errStr, mskARN1) {
-		t.Errorf("composite error must contain the failing cluster ARN %q, got: %q", mskARN1, errStr)
+	// Composite error reports the failing resource's ID (bare cluster name
+	// set by the msk fetcher), not the ARN, because that's what operators
+	// see in the Status column and map back to.
+	if errStr := err.Error(); !strings.Contains(errStr, mskName1) {
+		t.Errorf("composite error must contain the failing cluster ID %q, got: %q", mskName1, errStr)
 	}
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings on API error, got %d", len(result.Findings))

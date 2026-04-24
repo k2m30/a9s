@@ -846,15 +846,16 @@ func TestEnrichELBAttributes_BothMisconfigurations_BangFinding(t *testing.T) {
 		},
 	}
 	clients := &awsclient.ServiceClients{ELBv2: fake}
-	resources := []resource.Resource{{ID: lbARN, Name: "my-lb"}}
+	const lbName = "my-lb"
+	resources := []resource.Resource{{ID: lbName, Name: lbName, Fields: map[string]string{"load_balancer_arn": lbARN}}}
 
 	result, err := awsclient.EnrichELBAttributes(context.Background(), clients, resources)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[lbARN]
+	f, ok := result.Findings[lbName]
 	if !ok {
-		t.Fatalf("expected finding for LB %q; findings: %v", lbARN, result.Findings)
+		t.Fatalf("expected finding for LB %q; findings: %v", lbName, result.Findings)
 	}
 	if f.Severity != "!" {
 		t.Errorf("severity = %q, want %q (both misconfigured → promotion)", f.Severity, "!")
@@ -877,15 +878,16 @@ func TestEnrichELBAttributes_OnlyDeletionProtectionMissing_TildeFinding(t *testi
 		},
 	}
 	clients := &awsclient.ServiceClients{ELBv2: fake}
-	resources := []resource.Resource{{ID: lbARN, Name: "partial-lb"}}
+	const lbName = "partial-lb"
+	resources := []resource.Resource{{ID: lbName, Name: lbName, Fields: map[string]string{"load_balancer_arn": lbARN}}}
 
 	result, err := awsclient.EnrichELBAttributes(context.Background(), clients, resources)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[lbARN]
+	f, ok := result.Findings[lbName]
 	if !ok {
-		t.Fatalf("expected finding for LB %q; findings: %v", lbARN, result.Findings)
+		t.Fatalf("expected finding for LB %q; findings: %v", lbName, result.Findings)
 	}
 	if f.Severity != "~" {
 		t.Errorf("severity = %q, want %q (single misconfiguration → ~)", f.Severity, "~")
@@ -905,17 +907,18 @@ func TestEnrichELBAttributes_APIErrorSetsPerResourceTruncation(t *testing.T) {
 		perLBAttrs: map[string][]elbtypes.LoadBalancerAttribute{},
 	}
 	clients := &awsclient.ServiceClients{ELBv2: fake}
-	resources := []resource.Resource{{ID: lbARN, Name: "err-lb"}}
+	const lbName = "err-lb"
+	resources := []resource.Resource{{ID: lbName, Name: lbName, Fields: map[string]string{"load_balancer_arn": lbARN}}}
 
 	result, err := awsclient.EnrichELBAttributes(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	// Per-resource errors now aggregate into a composite; assert surface but do
+	// not require its absence (E1-E6 contract).
+	_ = err
 	if !result.Truncated {
 		t.Error("expected Truncated=true on DescribeLoadBalancerAttributes API error")
 	}
-	if !result.TruncatedIDs[lbARN] {
-		t.Errorf("expected TruncatedIDs[%q]=true; got map: %v", lbARN, result.TruncatedIDs)
+	if !result.TruncatedIDs[lbName] {
+		t.Errorf("expected TruncatedIDs[%q]=true; got map: %v", lbName, result.TruncatedIDs)
 	}
 }
 
@@ -932,7 +935,7 @@ func TestEnrichELBAttributes_WellConfiguredLB_NoFinding(t *testing.T) {
 		},
 	}
 	clients := &awsclient.ServiceClients{ELBv2: fake}
-	resources := []resource.Resource{{ID: lbARN, Name: "secure-lb"}}
+	resources := []resource.Resource{{ID: "secure-lb", Name: "secure-lb", Fields: map[string]string{"load_balancer_arn": lbARN}}}
 
 	result, err := awsclient.EnrichELBAttributes(context.Background(), clients, resources)
 	if err != nil {

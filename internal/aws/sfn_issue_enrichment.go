@@ -38,10 +38,17 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 		if r.ID == "" {
 			continue
 		}
+		// ListExecutions requires the state-machine ARN. The sfn fetcher
+		// (sfn.go) sets ID = bare name and stores the ARN in Fields["arn"].
+		// Passing r.ID errors with "Invalid ARN prefix" against real AWS.
+		smARN := r.Fields["arn"]
+		if smARN == "" {
+			continue
+		}
 		total++
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sfn.ListExecutionsOutput, error) {
 			return clients.SFN.ListExecutions(ctx, &sfn.ListExecutionsInput{
-				StateMachineArn: aws.String(r.ID),
+				StateMachineArn: aws.String(smARN),
 				MaxResults:      1,
 			})
 		})

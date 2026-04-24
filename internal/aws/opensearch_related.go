@@ -148,9 +148,17 @@ func checkOpenSearchVPC(_ context.Context, _ any, res resource.Resource, _ resou
 // EncryptionAtRestOptions.KmsKeyId field. Pattern F — no cache needed.
 func checkOpenSearchKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	domain, ok := assertStruct[opensearchtypes.DomainStatus](res.RawStruct)
-	if !ok || domain.EncryptionAtRestOptions == nil ||
+	if !ok {
+		// Structural assertion failure — RawStruct isn't a DomainStatus. This
+		// is "unknown" (cannot determine), not "no KMS key". Pattern-F
+		// contract: return -1 so the UI renders "?" rather than falsely
+		// reporting 0. Matches checkOpenSearchCFN / VPC / Subnet / SG / Logs.
+		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+	}
+	if domain.EncryptionAtRestOptions == nil ||
 		domain.EncryptionAtRestOptions.KmsKeyId == nil ||
 		*domain.EncryptionAtRestOptions.KmsKeyId == "" {
+		// Legitimately no KMS key configured (encryption-off) — 0 is correct.
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
 	keyID := *domain.EncryptionAtRestOptions.KmsKeyId

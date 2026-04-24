@@ -38,10 +38,18 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 		if r.ID == "" {
 			continue
 		}
+		// DescribeTargetHealth requires the full ARN, not the bare target-group
+		// name. Resource.ID is the name (set by the fetcher for display); the
+		// ARN lives in Fields["target_group_arn"]. Passing r.ID would always
+		// error with "target group not found" on both demo fake and real AWS.
+		tgARN := r.Fields["target_group_arn"]
+		if tgARN == "" {
+			continue
+		}
 		total++
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticloadbalancingv2.DescribeTargetHealthOutput, error) {
 			return clients.ELBv2.DescribeTargetHealth(ctx, &elasticloadbalancingv2.DescribeTargetHealthInput{
-				TargetGroupArn: aws.String(r.ID),
+				TargetGroupArn: aws.String(tgARN),
 			})
 		})
 		if err != nil {

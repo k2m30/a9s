@@ -3,6 +3,7 @@ package aws
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
@@ -26,6 +27,8 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
+	var failures []string
+	total := 0
 	for i, r := range resources {
 		if i >= EnrichmentCap {
 			break
@@ -33,10 +36,21 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 		if r.ID == "" {
 			continue
 		}
-		out, err := clients.ELBv2.DescribeLoadBalancerAttributes(ctx, &elasticloadbalancingv2.DescribeLoadBalancerAttributesInput{
-			LoadBalancerArn: aws.String(r.ID),
+		// DescribeLoadBalancerAttributes requires the LB ARN. The elb fetcher
+		// (elb.go) sets ID = bare name and stores the ARN in
+		// Fields["load_balancer_arn"]. Passing r.ID errors with ValidationError.
+		lbARN := r.Fields["load_balancer_arn"]
+		if lbARN == "" {
+			continue
+		}
+		total++
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticloadbalancingv2.DescribeLoadBalancerAttributesOutput, error) {
+			return clients.ELBv2.DescribeLoadBalancerAttributes(ctx, &elasticloadbalancingv2.DescribeLoadBalancerAttributesInput{
+				LoadBalancerArn: aws.String(lbARN),
+			})
 		})
 		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
 			truncatedIDs[r.ID] = true
 			continue
@@ -78,5 +92,6 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 			issueCount++
 		}
 	}
-	return IssueEnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	return IssueEnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings},
+		AggregateFailures("elb-enrich: DescribeLoadBalancerAttributes", failures, total)
 }

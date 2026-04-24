@@ -36,6 +36,15 @@ type fullIntegrationScenario struct {
 	lastResourcesLoaded *messages.ResourcesLoadedMsg
 	lastClientsReady    *messages.ClientsReadyMsg
 
+	// enrichmentErrors records every EnrichmentCheckedMsg.Err observed during
+	// the scenario. Populated as messages flow through observe(). Scenario
+	// tests call AssertNoEnrichmentErrors() to fail on any non-nil error —
+	// this is the harness-level guard against wave-2 wiring bugs (e.g. a
+	// fetcher emitting ID = bare name while the enricher passes r.ID as an
+	// ARN-typed API parameter). Without this, such bugs ship silently
+	// because permissive demo fakes ignore the malformed input.
+	enrichmentErrors map[string]error
+
 	currentListType       string
 	currentListResources  []resource.Resource
 	currentListPagination *resource.PaginationMeta
@@ -774,7 +783,36 @@ func (s *fullIntegrationScenario) observe(msg tea.Msg) {
 		s.profile = msg.Profile
 	case messages.RegionSelectedMsg:
 		s.region = msg.Region
+	case messages.EnrichmentCheckedMsg:
+		if msg.Err != nil {
+			if s.enrichmentErrors == nil {
+				s.enrichmentErrors = make(map[string]error)
+			}
+			s.enrichmentErrors[msg.ResourceType] = msg.Err
+		}
 	}
+}
+
+// AssertNoEnrichmentErrors fails the test if any EnrichmentCheckedMsg with a
+// non-nil Err was observed during the scenario. This is the harness-level
+// guard that catches the "fetcher emits ID=name, enricher passes r.ID as ARN"
+// bug class — and any other wave-2 wiring bug that real AWS would reject with
+// a ValidationError / InvalidArn. Permissive demo fakes used to swallow these
+// silently; with strict fakes + this assertion, every scenario test that
+// drains wave-2 becomes a real guard.
+//
+// Scenario tests that intentionally exercise an error path (e.g. an enricher
+// given a nil client) should NOT call this helper; otherwise all scenarios
+// that drain the availability/enrichment chain must call it before returning.
+func (s *fullIntegrationScenario) AssertNoEnrichmentErrors() {
+	s.t.Helper()
+	if len(s.enrichmentErrors) == 0 {
+		return
+	}
+	for rt, err := range s.enrichmentErrors {
+		s.t.Errorf("wave-2 enrichment for %q emitted error: %v", rt, err)
+	}
+	s.t.FailNow()
 }
 
 func (s *fullIntegrationScenario) relatedNavigateMsg(displayName string) messages.RelatedNavigateMsg {

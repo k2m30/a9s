@@ -101,6 +101,9 @@ func (f *IAMFake) ListEntitiesForPolicy(_ context.Context, input *iam.ListEntiti
 	if input.PolicyArn == nil {
 		return nil, fmt.Errorf("ListEntitiesForPolicy: policy ARN is required")
 	}
+	if err := validateARN(*input.PolicyArn); err != nil {
+		return nil, err
+	}
 	entities := f.fix.EntitiesForPolicy[*input.PolicyArn]
 	if entities == nil {
 		return &iam.ListEntitiesForPolicyOutput{}, nil
@@ -146,6 +149,9 @@ func (f *IAMFake) GetPolicy(_ context.Context, input *iam.GetPolicyInput, _ ...f
 	if input.PolicyArn == nil {
 		return nil, fmt.Errorf("GetPolicy: policy ARN is required")
 	}
+	if err := validateARN(*input.PolicyArn); err != nil {
+		return nil, err
+	}
 	for i := range f.fix.Policies {
 		if f.fix.Policies[i].Arn != nil && *f.fix.Policies[i].Arn == *input.PolicyArn {
 			p := f.fix.Policies[i]
@@ -158,6 +164,9 @@ func (f *IAMFake) GetPolicy(_ context.Context, input *iam.GetPolicyInput, _ ...f
 func (f *IAMFake) GetPolicyVersion(_ context.Context, input *iam.GetPolicyVersionInput, _ ...func(*iam.Options)) (*iam.GetPolicyVersionOutput, error) {
 	if input.PolicyArn == nil {
 		return nil, fmt.Errorf("GetPolicyVersion: policy ARN is required")
+	}
+	if err := validateARN(*input.PolicyArn); err != nil {
+		return nil, err
 	}
 	doc, ok := f.fix.PolicyDocuments[*input.PolicyArn]
 	if !ok {

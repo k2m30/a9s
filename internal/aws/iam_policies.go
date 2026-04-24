@@ -25,17 +25,16 @@ func init() {
 			return result, err
 		}
 		inlines, inlineErr := fetchInlineGroupPolicies(ctx, c.IAM)
-		if inlineErr != nil {
-			// Partial failure: inline group policy enumeration failed for some groups.
-			// Preserve whatever inline results were returned and log the failure as a
-			// non-fatal condition — the managed policies fetched above are still valid.
-			_ = inlineErr // callers see partial results; FlashMsg is emitted by the lazy-add path
-		}
+		// Partial failure: inline group policy enumeration failed for some
+		// groups. Preserve the inline results we did get, then propagate the
+		// composite error so app.go's ResourcesLoadedMsg handler surfaces it
+		// via FlashMsg → `!` log (per E1–E6). Managed policies above are
+		// still returned in result.Resources regardless.
 		result.Resources = append(result.Resources, inlines...)
 		if result.Pagination != nil {
 			result.Pagination.PageSize = len(result.Resources)
 		}
-		return result, nil
+		return result, inlineErr
 	})
 
 	resource.RegisterFetchByIDs("policy", func(ctx context.Context, clients any, ids []string) ([]resource.Resource, error) {

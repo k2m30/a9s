@@ -45,6 +45,9 @@ func (f *OpenSearchFake) ListTags(_ context.Context, in *opensearch.ListTagsInpu
 	if in == nil || in.ARN == nil {
 		return &opensearch.ListTagsOutput{}, nil
 	}
+	if err := validateARN(*in.ARN); err != nil {
+		return nil, err
+	}
 	if *in.ARN == fixtures.GraphRootDomainARN {
 		return &opensearch.ListTagsOutput{
 			TagList: []ostypes.Tag{

@@ -89,9 +89,13 @@ func FetchAMIsByIDs(ctx context.Context, api EC2DescribeImagesAPI, ids []string)
 	if len(filtered) == 0 {
 		return nil, nil
 	}
+	// IncludeDeprecated mirrors the single-ID FetchAMIByID path — batch drill
+	// from a related-panel pivot (ec2→ami, asg→ami, etc.) may reference a
+	// deprecated AMI; without this flag those IDs silently vanish from results.
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeImagesOutput, error) {
 		return api.DescribeImages(ctx, &ec2.DescribeImagesInput{
-			ImageIds: filtered,
+			ImageIds:          filtered,
+			IncludeDeprecated: aws.Bool(true),
 		})
 	})
 	if err != nil {

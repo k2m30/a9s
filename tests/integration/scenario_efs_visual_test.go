@@ -198,6 +198,9 @@ func TestScenario_EFSVisual(t *testing.T) {
 			t.Errorf("detail contains Summary concatenated with Row values (U11 violation): %q substring found", phrase+": ")
 		}
 	}
+
+	// U16 — no wave-2 enrichment errors leaked through during the scenario.
+	scenario.AssertNoEnrichmentErrors()
 }
 
 // selectEFSByID looks up a concrete efs Resource from the demo clients so the

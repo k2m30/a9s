@@ -37,7 +37,10 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 		if i >= EnrichmentCap {
 			break
 		}
-		clusterARN := r.ID
+		// DescribeClusterV2 requires the cluster ARN. The msk fetcher (msk.go)
+		// sets ID = cluster name and stores the ARN in Fields["cluster_arn"].
+		// Passing r.ID errors with ValidationError.
+		clusterARN := r.Fields["cluster_arn"]
 		if clusterARN == "" {
 			continue
 		}
@@ -64,18 +67,18 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 		// Check broker software version.
 		if prov.CurrentBrokerSoftwareInfo != nil && prov.CurrentBrokerSoftwareInfo.KafkaVersion != nil {
 			if isMSKVersionOutdated(*prov.CurrentBrokerSoftwareInfo.KafkaVersion) {
-				findings[clusterARN] = resource.EnrichmentFinding{
+				findings[r.ID] = resource.EnrichmentFinding{
 					Severity: "~",
 					Summary:  "broker software outdated",
 				}
 			}
 		}
 		// Check encryption in transit (only set finding if not already set).
-		if _, alreadyFound := findings[clusterARN]; !alreadyFound {
+		if _, alreadyFound := findings[r.ID]; !alreadyFound {
 			if prov.EncryptionInfo != nil &&
 				prov.EncryptionInfo.EncryptionInTransit != nil &&
 				prov.EncryptionInfo.EncryptionInTransit.ClientBroker != kafkatypes.ClientBrokerTls {
-				findings[clusterARN] = resource.EnrichmentFinding{
+				findings[r.ID] = resource.EnrichmentFinding{
 					Severity: "~",
 					Summary:  "encryption in transit not enforced",
 				}

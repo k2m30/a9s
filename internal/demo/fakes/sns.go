@@ -29,6 +29,9 @@ func (f *SNSFake) ListSubscriptions(_ context.Context, _ *sns.ListSubscriptionsI
 func (f *SNSFake) ListSubscriptionsByTopic(_ context.Context, input *sns.ListSubscriptionsByTopicInput, _ ...func(*sns.Options)) (*sns.ListSubscriptionsByTopicOutput, error) {
 	var topicARN string
 	if input != nil && input.TopicArn != nil {
+		if err := validateARN(*input.TopicArn); err != nil {
+			return nil, err
+		}
 		topicARN = *input.TopicArn
 	}
 	return &sns.ListSubscriptionsByTopicOutput{Subscriptions: f.fix.SubscriptionsByTopic[topicARN]}, nil

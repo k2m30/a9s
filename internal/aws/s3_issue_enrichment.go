@@ -81,6 +81,21 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 				fieldUpdates[name] = map[string]string{"status": "public access block incomplete"}
 				continue
 			}
+			// Cross-region buckets: ListBuckets returns ALL buckets globally, but
+			// per-bucket calls require the bucket's regional endpoint. AWS rejects
+			// with PermanentRedirect (301) or IllegalLocationConstraintException (400)
+			// when the configured client region differs from the bucket's region.
+			// This is a legitimate environmental condition (multi-region account),
+			// not a bug — mark data incomplete (TruncatedIDs → "?" row marker)
+			// but do NOT spam the failure log.
+			if errors.As(err, &apiErr) {
+				code := apiErr.ErrorCode()
+				if code == "PermanentRedirect" || code == "IllegalLocationConstraintException" {
+					truncated = true
+					truncatedIDs[r.ID] = true
+					continue
+				}
+			}
 			// Other errors: data incomplete — do not emit a finding.
 			truncated = true
 			truncatedIDs[r.ID] = true
