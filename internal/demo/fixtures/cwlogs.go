@@ -136,6 +136,29 @@ func NewCWLogsFixtures() *CWLogsFixtures {
 			RetentionInDays: aws.Int32(30),
 			CreationTime:    aws.Int64(1741996800000), // 2025-03-15
 		},
+		// OpenSearch graph-root log groups — required for opensearch→logs related-panel pivot.
+		// The acme-logs domain's LogPublishingOptions maps each log type to one of these groups.
+		{
+			LogGroupName:    aws.String(OpenSearchLogGroupSearchSlow),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:" + OpenSearchLogGroupSearchSlow + ":*"),
+			StoredBytes:     aws.Int64(52428800),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1746057600000), // 2025-05-01
+		},
+		{
+			LogGroupName:    aws.String(OpenSearchLogGroupIndexSlow),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:" + OpenSearchLogGroupIndexSlow + ":*"),
+			StoredBytes:     aws.Int64(26214400),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1746057600000), // 2025-05-01
+		},
+		{
+			LogGroupName:    aws.String(OpenSearchLogGroupAudit),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:" + OpenSearchLogGroupAudit + ":*"),
+			StoredBytes:     aws.Int64(10485760),
+			RetentionInDays: aws.Int32(90),
+			CreationTime:    aws.Int64(1746057600000), // 2025-05-01
+		},
 		// Redis prod slow-log group — required for redis→logs related-panel pivot.
 		// The prod-redis-sessions RG LogDeliveryConfigurations destination points here.
 		{

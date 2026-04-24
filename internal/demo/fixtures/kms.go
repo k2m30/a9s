@@ -168,6 +168,22 @@ func NewKMSFixtures() *KMSFixtures {
 			MultiRegion:          aws.Bool(false),
 			Origin:               kmstypes.OriginTypeAwsKms,
 		},
+		// OpenSearch graph-root encryption key — required for opensearch→kms related-panel pivot.
+		// The acme-logs domain sets EncryptionAtRestOptions.KmsKeyId = OpenSearchKMSKeyARN;
+		// checkOpenSearchKMS strips the ARN to bare key ID = OpenSearchKMSKeyID and looks it up here.
+		{
+			KeyId:                aws.String(OpenSearchKMSKeyID),
+			Arn:                  aws.String(OpenSearchKMSKeyARN),
+			Description:          aws.String("Encryption key for acme-logs OpenSearch domain (at-rest encryption)"),
+			KeyState:             kmstypes.KeyStateEnabled,
+			KeyManager:           kmstypes.KeyManagerTypeCustomer,
+			KeyUsage:             kmstypes.KeyUsageTypeEncryptDecrypt,
+			CreationDate:         aws.Time(time.Date(2025, 6, 1, 10, 0, 0, 0, time.UTC)),
+			Enabled:              true,
+			EncryptionAlgorithms: []kmstypes.EncryptionAlgorithmSpec{kmstypes.EncryptionAlgorithmSpecSymmetricDefault},
+			MultiRegion:          aws.Bool(false),
+			Origin:               kmstypes.OriginTypeAwsKms,
+		},
 		// PendingDeletion key — referenced by broken-dbi-encryption-locked fixture (KmsKeyId).
 		// This key was deleted while still in use by an RDS instance, causing
 		// the instance to enter the inaccessible-encryption-credentials state.
@@ -261,6 +277,12 @@ func NewKMSFixtures() *KMSFixtures {
 			AliasName:   aws.String("alias/acme-backup-prod-key"),
 			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/acme-backup-prod-key"),
 			TargetKeyId: aws.String(BackupProdVaultKMSKeyID),
+		},
+		// OpenSearch acme-logs at-rest encryption key alias.
+		{
+			AliasName:   aws.String("alias/acme-opensearch-key"),
+			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/acme-opensearch-key"),
+			TargetKeyId: aws.String(OpenSearchKMSKeyID),
 		},
 	}
 

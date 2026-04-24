@@ -501,6 +501,30 @@ func buildVpcs() []ec2types.Vpc {
 				{Key: aws.String("Name"), Value: aws.String("default")},
 			},
 		},
+		// OpenSearch graph-root VPC — required for opensearch→vpc related-panel pivot.
+		// The acme-logs domain's VPCOptions.VPCId = OpenSearchVPCID points here.
+		{
+			VpcId:           aws.String(OpenSearchVPCID),
+			CidrBlock:       aws.String("10.20.0.0/16"),
+			State:           ec2types.VpcStateAvailable,
+			IsDefault:       aws.Bool(false),
+			InstanceTenancy: ec2types.TenancyDefault,
+			DhcpOptionsId:   aws.String("dopt-0opensearch00001"),
+			OwnerId:         aws.String("123456789012"),
+			CidrBlockAssociationSet: []ec2types.VpcCidrBlockAssociation{
+				{
+					AssociationId: aws.String("vpc-cidr-assoc-os-01"),
+					CidrBlock:     aws.String("10.20.0.0/16"),
+					CidrBlockState: &ec2types.VpcCidrBlockState{
+						State: ec2types.VpcCidrBlockStateCodeAssociated,
+					},
+				},
+			},
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("acme-opensearch")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+			},
+		},
 		// Redis prod VPC — required for redis→vpc related-panel pivot.
 		{
 			VpcId:           aws.String(ProdRedisVpcID),
@@ -766,6 +790,55 @@ func buildSecurityGroups() []ec2types.SecurityGroup {
 		},
 	}
 
+	// OpenSearch graph-root security groups — required for opensearch→sg related-panel pivot.
+	// The acme-logs domain's VPCOptions.SecurityGroupIds = [sg-demo-a1, sg-demo-a2].
+	sgs = append(sgs, ec2types.SecurityGroup{
+		GroupId:          aws.String(OpenSearchSGA),
+		GroupName:        aws.String("opensearch-data-sg"),
+		VpcId:            aws.String(OpenSearchVPCID),
+		Description:      aws.String("Security group for acme-logs OpenSearch data nodes"),
+		OwnerId:          aws.String("123456789012"),
+		SecurityGroupArn: aws.String("arn:aws:ec2:us-east-1:123456789012:security-group/" + OpenSearchSGA),
+		IpPermissions: []ec2types.IpPermission{
+			{
+				IpProtocol: aws.String("tcp"),
+				FromPort:   aws.Int32(443),
+				ToPort:     aws.Int32(443),
+				IpRanges:   []ec2types.IpRange{{CidrIp: aws.String("10.20.0.0/16"), Description: aws.String("HTTPS from VPC")}},
+			},
+		},
+		IpPermissionsEgress: []ec2types.IpPermission{
+			{IpProtocol: aws.String("-1"), IpRanges: []ec2types.IpRange{{CidrIp: aws.String("0.0.0.0/0")}}},
+		},
+		Tags: []ec2types.Tag{
+			{Key: aws.String("Name"), Value: aws.String("opensearch-data-sg")},
+			{Key: aws.String("Environment"), Value: aws.String("prod")},
+		},
+	})
+	sgs = append(sgs, ec2types.SecurityGroup{
+		GroupId:          aws.String(OpenSearchSGB),
+		GroupName:        aws.String("opensearch-mgmt-sg"),
+		VpcId:            aws.String(OpenSearchVPCID),
+		Description:      aws.String("Security group for acme-logs OpenSearch management access"),
+		OwnerId:          aws.String("123456789012"),
+		SecurityGroupArn: aws.String("arn:aws:ec2:us-east-1:123456789012:security-group/" + OpenSearchSGB),
+		IpPermissions: []ec2types.IpPermission{
+			{
+				IpProtocol: aws.String("tcp"),
+				FromPort:   aws.Int32(9200),
+				ToPort:     aws.Int32(9200),
+				IpRanges:   []ec2types.IpRange{{CidrIp: aws.String("10.20.0.0/16"), Description: aws.String("OpenSearch API from VPC")}},
+			},
+		},
+		IpPermissionsEgress: []ec2types.IpPermission{
+			{IpProtocol: aws.String("-1"), IpRanges: []ec2types.IpRange{{CidrIp: aws.String("0.0.0.0/0")}}},
+		},
+		Tags: []ec2types.Tag{
+			{Key: aws.String("Name"), Value: aws.String("opensearch-mgmt-sg")},
+			{Key: aws.String("Environment"), Value: aws.String("prod")},
+		},
+	})
+
 	vpcIDs := []string{fixtProdVPCID, fixtProdVPCID, fixtProdVPCID, fixtStagingVPCID}
 	sgNames := []string{"app-sg", "cache-sg", "worker-sg", "monitoring-sg", "lambda-sg", "batch-sg", "data-sg", "analytics-sg", "admin-sg", "internal-sg"}
 	sgDescs := []string{"Application tier", "Cache tier", "Worker tier", "Monitoring", "Lambda functions", "Batch jobs", "Data pipeline", "Analytics", "Admin access", "Internal services"}
@@ -866,6 +939,44 @@ func buildSubnets() []ec2types.Subnet {
 				{Key: aws.String("Name"), Value: aws.String("prod-private-1b")},
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
 				{Key: aws.String("Tier"), Value: aws.String("private")},
+			},
+		},
+		// OpenSearch graph-root subnets — required for opensearch→subnet related-panel pivot.
+		// The acme-logs domain's VPCOptions.SubnetIds = [subnet-demo-a1, subnet-demo-a2].
+		{
+			SubnetId:                aws.String(OpenSearchSubnetA),
+			VpcId:                   aws.String(OpenSearchVPCID),
+			CidrBlock:               aws.String("10.20.1.0/24"),
+			AvailabilityZone:        aws.String("us-east-1a"),
+			AvailabilityZoneId:      aws.String("use1-az1"),
+			State:                   ec2types.SubnetStateAvailable,
+			AvailableIpAddressCount: aws.Int32(243),
+			MapPublicIpOnLaunch:     aws.Bool(false),
+			DefaultForAz:            aws.Bool(false),
+			SubnetArn:               aws.String("arn:aws:ec2:us-east-1:123456789012:subnet/" + OpenSearchSubnetA),
+			OwnerId:                 aws.String("123456789012"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("opensearch-private-1a")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+				{Key: aws.String("Tier"), Value: aws.String("search")},
+			},
+		},
+		{
+			SubnetId:                aws.String(OpenSearchSubnetB),
+			VpcId:                   aws.String(OpenSearchVPCID),
+			CidrBlock:               aws.String("10.20.2.0/24"),
+			AvailabilityZone:        aws.String("us-east-1b"),
+			AvailabilityZoneId:      aws.String("use1-az2"),
+			State:                   ec2types.SubnetStateAvailable,
+			AvailableIpAddressCount: aws.Int32(243),
+			MapPublicIpOnLaunch:     aws.Bool(false),
+			DefaultForAz:            aws.Bool(false),
+			SubnetArn:               aws.String("arn:aws:ec2:us-east-1:123456789012:subnet/" + OpenSearchSubnetB),
+			OwnerId:                 aws.String("123456789012"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("opensearch-private-1b")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+				{Key: aws.String("Tier"), Value: aws.String("search")},
 			},
 		},
 		// Redis prod subnets — required for redis→subnet related-panel pivot.

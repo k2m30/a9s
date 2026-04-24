@@ -258,52 +258,47 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "endpoint", Title: "Endpoint", Width: 48, Sortable: false},
 			},
 			// OpenSearch DomainStatus per docs/attention-signals.md.
-			// Precedence: terminal/admin (Dim) overridden by Broken; Broken overrides Warning.
+			// Precedence: Deleted → Dim; Isolated → Broken; Processing → Warning;
+			// background-check findings (! / ~) stay green — the glyph handles those.
 			// Field contract:
-			//   - domain_processing_status: from DescribeDomains.DomainProcessingStatus
-			//     (always populated by the fetcher; "Isolated" → Broken)
+			//   - deleted: "true" when Deleted==true
+			//   - domain_processing_status: string form of DomainProcessingStatusType
+			//     (fetcher always emits at least "Active" so the Isolated branch is deterministic)
+			//   - processing / upgrade_processing: "true"/"false" from DomainStatus
+			//   - status: top §4 phrase with optional (+N) suffix; stripped before matching
 			//   - cluster_health: Red/Yellow/Green from CloudWatch (Wave 3, not yet
 			//     implemented — branch kept for forward-compatibility, currently never fires)
 			Color: func(r Resource) Color {
+				// Deleted → Dim (highest precedence, no further checks needed).
 				if r.Fields["deleted"] == "true" {
 					return ColorDim
 				}
-				color := ColorHealthy
-				switch r.Fields["cluster_health"] {
-				case "Red":
-					color = ColorBroken
-				case "Yellow":
-					if color < ColorWarning {
-						color = ColorWarning
-					}
+
+				// Strip (+N) suffix before pattern matching.
+				status := r.Status
+				if status == "" {
+					status = r.Fields["status"]
 				}
-				if r.Fields["domain_processing_status"] == "Isolated" {
-					color = ColorBroken
+				stripped := StripFindingSuffix(status)
+
+				// Isolated → Broken.
+				if strings.HasPrefix(stripped, "isolated:") || r.Fields["domain_processing_status"] == "Isolated" {
+					return ColorBroken
 				}
-				if r.Fields["processing"] == "true" || r.Fields["upgrade_processing"] == "true" {
-					if color < ColorWarning {
-						color = ColorWarning
-					}
+
+				// Processing → Warning.
+				if strings.HasPrefix(stripped, "processing:") ||
+					r.Fields["processing"] == "true" ||
+					r.Fields["upgrade_processing"] == "true" {
+					return ColorWarning
 				}
-				switch r.Fields["status"] {
-				case "failed", "FAILED", "error", "ERROR":
-					color = ColorBroken
-				case "creating", "CREATING", "updating", "UPDATING", "deleting", "DELETING":
-					if color < ColorWarning {
-						color = ColorWarning
-					}
-				}
-				if r.Fields["service_software_update_available"] == "true" {
-					if color < ColorWarning {
-						color = ColorWarning
-					}
-				}
-				if r.Fields["encryption_at_rest_enabled"] == "false" {
-					if color < ColorWarning {
-						color = ColorWarning
-					}
-				}
-				return color
+
+				// Background-check signals (! / ~) stay green — the glyph signals
+				// the operator; the row color remains Healthy so the glyph renders.
+				// NOTE: do NOT add service_software_update_available or
+				// encryption_at_rest_enabled → Warning branches here.
+
+				return ColorHealthy
 			},
 		},
 		{

@@ -143,6 +143,20 @@ func NewCFNFixtures() *CFNFixtures {
 				{Key: aws.String("Environment"), Value: aws.String("production")},
 			},
 		},
+		// OpenSearch graph-root CFN stack — required for opensearch→cfn related-panel pivot.
+		// The acme-logs domain's ListTags fake returns aws:cloudformation:stack-name=acme-search-stack.
+		{
+			StackName:    aws.String(OpenSearchCFNStackName),
+			StackStatus:  cfntypes.StackStatusCreateComplete,
+			CreationTime: aws.Time(mustParseCFNTime("2025-09-01T10:00:00+00:00")),
+			Description:  aws.String("OpenSearch cluster for acme-logs (full-text search + audit logging)"),
+			StackId:      aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/" + OpenSearchCFNStackName + "/99999999-9999-9999-9999-999999999999"),
+			RoleARN:      aws.String(prodCIDeployRoleARN),
+			Tags: []cfntypes.Tag{
+				{Key: aws.String("Environment"), Value: aws.String("production")},
+				{Key: aws.String("Service"), Value: aws.String("search")},
+			},
+		},
 		// Redis prod CFN stack — required for redis→cfn related-panel pivot.
 		// The prod-redis-sessions RG carries the aws:cloudformation:stack-name tag
 		// pointing to ProdRedisCFNStack so checkRedisCFN resolves a non-zero count.

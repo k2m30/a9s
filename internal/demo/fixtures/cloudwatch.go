@@ -281,6 +281,51 @@ func NewCloudWatchFixtures() *CloudWatchFixtures {
 					{Name: aws.String("TableName"), Value: aws.String(OrdersProdID)},
 				},
 			},
+			// OpenSearch graph-root alarms — required for opensearch→alarm related-panel pivot.
+			// Namespace=AWS/ES with Dimensions.DomainName=acme-logs so checkOpenSearchAlarms
+			// resolves a count of 2 for the demo showroom.
+			{
+				AlarmName:             aws.String("acme-logs-cluster-red"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:acme-logs-cluster-red"),
+				AlarmDescription:      aws.String("Triggers when acme-logs OpenSearch cluster status is red"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 3 datapoints were less than or equal to the threshold (1.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 20, 9, 0, 0, 0, time.UTC)),
+				MetricName:            aws.String("ClusterStatus.red"),
+				Namespace:             aws.String("AWS/ES"),
+				Threshold:             aws.Float64(1.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanOrEqualToThreshold,
+				EvaluationPeriods:     aws.Int32(1),
+				Period:                aws.Int32(60),
+				Statistic:             cwtypes.StatisticMaximum,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				OKActions:             []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("DomainName"), Value: aws.String(GraphRootDomain)},
+				},
+			},
+			{
+				AlarmName:             aws.String("acme-logs-freestorage-low"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:acme-logs-freestorage-low"),
+				AlarmDescription:      aws.String("Triggers when acme-logs OpenSearch free storage drops below 10 GB"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 3 datapoints were greater than the threshold (10000000000.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 22, 14, 0, 0, 0, time.UTC)),
+				MetricName:            aws.String("FreeStorageSpace"),
+				Namespace:             aws.String("AWS/ES"),
+				Threshold:             aws.Float64(10_000_000_000),
+				ComparisonOperator:    cwtypes.ComparisonOperatorLessThanThreshold,
+				EvaluationPeriods:     aws.Int32(3),
+				Period:                aws.Int32(300),
+				Statistic:             cwtypes.StatisticAverage,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				OKActions:             []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("DomainName"), Value: aws.String(GraphRootDomain)},
+				},
+			},
 			// Issue: OK state but ActionsEnabled=false → Warning (alarm silenced/muted)
 			{
 				AlarmName:             aws.String("alarm-muted"),

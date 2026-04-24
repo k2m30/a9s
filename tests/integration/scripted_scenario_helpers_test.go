@@ -938,9 +938,29 @@ func (s *fullIntegrationScenario) DrillRelated(displayName string) []resource.Re
 	// for "{targetType}(N)". Return synthetic resource stubs from the RelatedIDs; their
 	// IDs are the checker-emitted values — exactly what tests need for format assertions.
 	targetType := rel.TargetType
+	// FrameTitle prefers typeDef.ListTitle over ShortName — e.g. alarm → "alarms",
+	// eb-rule → "event-rules". Check both so the case-3 branch fires regardless.
+	titleTokens := []string{targetType}
+	if td := resource.FindResourceType(targetType); td != nil && td.ListTitle != "" && td.ListTitle != targetType {
+		titleTokens = append(titleTokens, td.ListTitle)
+	}
 	rendered := s.currentView()
-	if strings.Contains(rendered, targetType+"(") {
-		if strings.Contains(rendered, targetType+"(0)") {
+	titleMatched := false
+	for _, tok := range titleTokens {
+		if strings.Contains(rendered, tok+"(") {
+			titleMatched = true
+			break
+		}
+	}
+	if titleMatched {
+		emptyCount := false
+		for _, tok := range titleTokens {
+			if strings.Contains(rendered, tok+"(0)") {
+				emptyCount = true
+				break
+			}
+		}
+		if emptyCount {
 			s.failf("DrillRelated(%q): cache-hit filtered list is empty — target type %q rendered with count 0 (RelatedIDs=%v)",
 				displayName, targetType, rel.RelatedIDs)
 		}
