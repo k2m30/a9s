@@ -31,6 +31,8 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
+	var failures []string
+	total := 0
 	for i, r := range resources {
 		if i >= EnrichmentCap {
 			break
@@ -39,10 +41,14 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 		if clusterARN == "" {
 			continue
 		}
-		out, err := clients.MSK.DescribeClusterV2(ctx, &kafkasvc.DescribeClusterV2Input{
-			ClusterArn: aws.String(clusterARN),
+		total++
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kafkasvc.DescribeClusterV2Output, error) {
+			return clients.MSK.DescribeClusterV2(ctx, &kafkasvc.DescribeClusterV2Input{
+				ClusterArn: aws.String(clusterARN),
+			})
 		})
 		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
 			truncatedIDs[r.ID] = true
 			continue
@@ -78,7 +84,8 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 	}
 	// All MSK findings are severity "~" (informational) and do not contribute to the
 	// attention menu badge. IssueCount is always 0 for this enricher.
-	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings},
+		AggregateFailures("msk-enrich: DescribeClusterV2", failures, total)
 }
 
 // isMSKVersionOutdated returns true when the given Kafka version string is below the

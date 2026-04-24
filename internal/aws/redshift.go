@@ -53,7 +53,9 @@ func FetchRedshiftClustersPage(ctx context.Context, api RedshiftDescribeClusters
 		input.Marker = &continuationToken
 	}
 
-	output, err := api.DescribeClusters(ctx, input)
+	output, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*redshift.DescribeClustersOutput, error) {
+		return api.DescribeClusters(ctx, input)
+	})
 	if err != nil {
 		return resource.FetchResult{}, fmt.Errorf("fetching Redshift clusters: %w", err)
 	}

@@ -72,6 +72,10 @@ func FetchAMIs(ctx context.Context, api EC2DescribeImagesAPI) ([]resource.Resour
 // of landing on an empty list. DescribeImages accepts ImageIds as a batched
 // filter, so this is a single API call regardless of how many IDs were
 // requested (up to the AWS per-request limit).
+//
+// The DescribeImages call is wrapped in RetryOnThrottle. IDs that are not
+// present in the response (e.g. deleted, cross-account without explicit share)
+// are collected into a composite error returned alongside the partial results.
 func FetchAMIsByIDs(ctx context.Context, api EC2DescribeImagesAPI, ids []string) ([]resource.Resource, error) {
 	if len(ids) == 0 {
 		return nil, nil
@@ -85,17 +89,31 @@ func FetchAMIsByIDs(ctx context.Context, api EC2DescribeImagesAPI, ids []string)
 	if len(filtered) == 0 {
 		return nil, nil
 	}
-	out, err := api.DescribeImages(ctx, &ec2.DescribeImagesInput{
-		ImageIds: filtered,
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeImagesOutput, error) {
+		return api.DescribeImages(ctx, &ec2.DescribeImagesInput{
+			ImageIds: filtered,
+		})
 	})
 	if err != nil {
 		return nil, fmt.Errorf("fetching AMIs by id: %w", err)
 	}
+
+	// Build a set of returned IDs to detect which requested IDs are missing.
+	returned := make(map[string]struct{}, len(out.Images))
 	resources := make([]resource.Resource, 0, len(out.Images))
 	for _, img := range out.Images {
-		resources = append(resources, imageResource(img))
+		r := imageResource(img)
+		resources = append(resources, r)
+		returned[r.ID] = struct{}{}
 	}
-	return resources, nil
+
+	var failures []string
+	for _, id := range filtered {
+		if _, found := returned[id]; !found {
+			failures = append(failures, id)
+		}
+	}
+	return resources, AggregateMissing("ami FetchByIDs", failures, len(filtered))
 }
 
 // FetchAMIsPage calls the EC2 DescribeImages API and returns a single page

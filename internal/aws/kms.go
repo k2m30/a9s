@@ -52,7 +52,9 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 		input.Marker = aws.String(continuationToken)
 	}
 
-	listOutput, err := c.KMS.ListKeys(ctx, input)
+	listOutput, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kms.ListKeysOutput, error) {
+		return c.KMS.ListKeys(ctx, input)
+	})
 	if err != nil {
 		return resource.FetchResult{}, fmt.Errorf("listing KMS keys: %w", err)
 	}
@@ -69,15 +71,22 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 		}, nil
 	}
 
-	// Build alias map by fully paginating ListAliases.
+	// Build alias map by fully paginating ListAliases. Failures here are
+	// soft-fallback (aliases become empty) but must surface to the operator
+	// via the composite error — silently stopping would hide a permissions
+	// issue or throttling that's actively degrading the view.
+	var failures []string
 	aliasMap := make(map[string]string)
 	var aliasMarker *string
 	for {
-		aliasOutput, aliasErr := c.KMS.ListAliases(ctx, &kms.ListAliasesInput{
-			Limit:  aws.Int32(DefaultPageSize),
-			Marker: aliasMarker,
+		aliasOutput, aliasErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kms.ListAliasesOutput, error) {
+			return c.KMS.ListAliases(ctx, &kms.ListAliasesInput{
+				Limit:  aws.Int32(DefaultPageSize),
+				Marker: aliasMarker,
+			})
 		})
 		if aliasErr != nil {
+			failures = append(failures, fmt.Sprintf("ListAliases: %v", aliasErr))
 			break
 		}
 		for _, alias := range aliasOutput.Aliases {
@@ -96,10 +105,13 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 		if key.KeyId == nil {
 			continue
 		}
-		descOutput, descErr := c.KMS.DescribeKey(ctx, &kms.DescribeKeyInput{
-			KeyId: aws.String(*key.KeyId),
+		descOutput, descErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kms.DescribeKeyOutput, error) {
+			return c.KMS.DescribeKey(ctx, &kms.DescribeKeyInput{
+				KeyId: aws.String(*key.KeyId),
+			})
 		})
 		if descErr != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", *key.KeyId, descErr))
 			continue
 		}
 		meta := descOutput.KeyMetadata
@@ -151,7 +163,7 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 			PageSize:    len(resources),
 			TotalHint:   -1,
 		},
-	}, nil
+	}, AggregateFailures("kms: FetchKMSKeysPage", failures, len(listOutput.Keys))
 }
 
 // FetchKMSKeysByIDs fetches specific KMS keys by their key IDs, bypassing the
@@ -163,19 +175,31 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 // Each ID may be a bare UUID or a full ARN — DescribeKey accepts both. The
 // returned Resources use the bare KeyId as the ID (matching FetchKMSKeysPage)
 // and populate an alias when one is known.
+//
+// Per-ID failures (after RetryOnThrottle exhaustion) are collected into a
+// composite error returned alongside the partial success list. The caller must
+// check both return values: non-nil error indicates some IDs could not be
+// resolved but the slice may still contain valid results.
 func FetchKMSKeysByIDs(ctx context.Context, c *ServiceClients, ids []string) ([]resource.Resource, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
 
+	var failures []string
+
 	aliasMap := make(map[string]string)
 	var aliasMarker *string
 	for {
-		out, err := c.KMS.ListAliases(ctx, &kms.ListAliasesInput{
-			Limit:  aws.Int32(DefaultPageSize),
-			Marker: aliasMarker,
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kms.ListAliasesOutput, error) {
+			return c.KMS.ListAliases(ctx, &kms.ListAliasesInput{
+				Limit:  aws.Int32(DefaultPageSize),
+				Marker: aliasMarker,
+			})
 		})
 		if err != nil {
+			// Soft-fallback: aliases become empty strings, but record the failure
+			// so operators know aliases may be missing.
+			failures = append(failures, fmt.Sprintf("ListAliases: %v", err))
 			break
 		}
 		for _, a := range out.Aliases {
@@ -194,8 +218,15 @@ func FetchKMSKeysByIDs(ctx context.Context, c *ServiceClients, ids []string) ([]
 		if id == "" {
 			continue
 		}
-		out, err := c.KMS.DescribeKey(ctx, &kms.DescribeKeyInput{KeyId: aws.String(id)})
-		if err != nil || out == nil || out.KeyMetadata == nil {
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kms.DescribeKeyOutput, error) {
+			return c.KMS.DescribeKey(ctx, &kms.DescribeKeyInput{KeyId: aws.String(id)})
+		})
+		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", id, err))
+			continue
+		}
+		if out == nil || out.KeyMetadata == nil {
+			failures = append(failures, fmt.Sprintf("%s: no metadata", id))
 			continue
 		}
 		meta := out.KeyMetadata
@@ -222,7 +253,8 @@ func FetchKMSKeysByIDs(ctx context.Context, c *ServiceClients, ids []string) ([]
 			RawStruct: meta,
 		})
 	}
-	return resources, nil
+
+	return resources, AggregateFailures("kms FetchByIDs", failures, len(ids))
 }
 
 // FetchKMSKeys performs a multi-step fetch:

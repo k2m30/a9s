@@ -51,6 +51,8 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 	}
 
 	truncated := len(resources) > EnrichmentCap
+	var failures []string
+	total := 0
 	for i, r := range resources {
 		if i >= EnrichmentCap {
 			break
@@ -67,18 +69,24 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 		if repoName == "" {
 			continue
 		}
+		total++
 
 		// Paginate ListImages, capped at ECRImagesCapPerRepo.
 		var imageIDs []ecrtypes.ImageIdentifier
 		var listToken *string
+		listFailed := false
 		for len(imageIDs) < ECRImagesCapPerRepo {
-			listOut, err := listAPI.ListImages(ctx, &ecr.ListImagesInput{
-				RepositoryName: aws.String(repoName),
-				NextToken:      listToken,
+			listOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecr.ListImagesOutput, error) {
+				return listAPI.ListImages(ctx, &ecr.ListImagesInput{
+					RepositoryName: aws.String(repoName),
+					NextToken:      listToken,
+				})
 			})
 			if err != nil {
+				failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 				truncated = true
 				truncatedIDs[r.ID] = true
+				listFailed = true
 				break
 			}
 			for _, id := range listOut.ImageIds {
@@ -95,6 +103,10 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 			listToken = listOut.NextToken
 		}
 
+		if listFailed {
+			continue
+		}
+
 		scannedCount := 0
 		var criticalTotal int32
 		var highTotal int32
@@ -102,9 +114,11 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 			if img.ImageDigest == nil {
 				continue
 			}
-			scanOut, err := scanAPI.DescribeImageScanFindings(ctx, &ecr.DescribeImageScanFindingsInput{
-				RepositoryName: aws.String(repoName),
-				ImageId:        &ecrtypes.ImageIdentifier{ImageDigest: img.ImageDigest},
+			scanOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecr.DescribeImageScanFindingsOutput, error) {
+				return scanAPI.DescribeImageScanFindings(ctx, &ecr.DescribeImageScanFindingsInput{
+					RepositoryName: aws.String(repoName),
+					ImageId:        &ecrtypes.ImageIdentifier{ImageDigest: img.ImageDigest},
+				})
 			})
 			if err != nil {
 				// ScanNotFoundException is routine for unscanned images — skip silently.
@@ -163,5 +177,6 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 			issueCount++
 		}
 	}
-	return IssueEnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates},
+		AggregateFailures("ecr-enrich: ListImages", failures, total)
 }

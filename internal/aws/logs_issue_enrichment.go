@@ -45,6 +45,8 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 	logStreamsAPI, hasStreams := clients.CloudWatchLogs.(CWLogsDescribeLogStreamsAPI)
 
 	truncated := len(resources) > EnrichmentCap
+	var failures []string
+	total := 0
 	for i, r := range resources {
 		if i >= EnrichmentCap {
 			break
@@ -56,8 +58,11 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 		if logGroupName == "" {
 			continue
 		}
+		total++
 
 		// Compute last_event_at by fetching the most-recently-written stream.
+		// safeDescribeLogStreams is best-effort — errors (including panic-recoveries from
+		// test fakes) are silently skipped so the metric filter check below still runs.
 		if hasStreams {
 			streamsOut, streamsErr := safeDescribeLogStreams(ctx, logStreamsAPI, logGroupName)
 			if streamsErr == nil && len(streamsOut.LogStreams) > 0 {
@@ -89,10 +94,13 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 			continue
 		}
 
-		out, err := metricFiltersAPI.DescribeMetricFilters(ctx, &cwlogssvc.DescribeMetricFiltersInput{
-			LogGroupName: aws.String(logGroupName),
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cwlogssvc.DescribeMetricFiltersOutput, error) {
+			return metricFiltersAPI.DescribeMetricFilters(ctx, &cwlogssvc.DescribeMetricFiltersInput{
+				LogGroupName: aws.String(logGroupName),
+			})
 		})
 		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
 			truncatedIDs[r.ID] = true
 			continue
@@ -112,7 +120,8 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 		}
 	}
 	// Metric filter findings are severity "~" (informational); IssueCount stays 0.
-	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates},
+		AggregateFailures("logs-enrich: DescribeMetricFilters", failures, total)
 }
 
 // safeDescribeLogStreams calls DescribeLogStreams on api and recovers from any panic

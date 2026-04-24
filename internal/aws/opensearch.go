@@ -126,18 +126,20 @@ func FetchOpenSearchDomains(
 	listAPI OpenSearchListDomainNamesAPI,
 	describeAPI OpenSearchDescribeDomainsAPI,
 ) ([]resource.Resource, error) {
-	return fetchOpenSearchDomainsAt(ctx, listAPI, describeAPI, time.Now())
+	return FetchOpenSearchDomainsAt(ctx, listAPI, describeAPI, time.Now())
 }
 
-// fetchOpenSearchDomainsAt is the time-injectable implementation used by FetchOpenSearchDomains
+// FetchOpenSearchDomainsAt is the time-injectable implementation used by FetchOpenSearchDomains
 // and directly by tests.
-func fetchOpenSearchDomainsAt(
+func FetchOpenSearchDomainsAt(
 	ctx context.Context,
 	listAPI OpenSearchListDomainNamesAPI,
 	describeAPI OpenSearchDescribeDomainsAPI,
 	now time.Time,
 ) ([]resource.Resource, error) {
-	listOutput, err := listAPI.ListDomainNames(ctx, &opensearch.ListDomainNamesInput{})
+	listOutput, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*opensearch.ListDomainNamesOutput, error) {
+		return listAPI.ListDomainNames(ctx, &opensearch.ListDomainNamesInput{})
+	})
 	if err != nil {
 		return nil, fmt.Errorf("listing OpenSearch domains: %w", err)
 	}
@@ -154,8 +156,10 @@ func fetchOpenSearchDomainsAt(
 		}
 	}
 
-	descOutput, err := describeAPI.DescribeDomains(ctx, &opensearch.DescribeDomainsInput{
-		DomainNames: domainNames,
+	descOutput, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*opensearch.DescribeDomainsOutput, error) {
+		return describeAPI.DescribeDomains(ctx, &opensearch.DescribeDomainsInput{
+			DomainNames: domainNames,
+		})
 	})
 	if err != nil {
 		return nil, fmt.Errorf("describing OpenSearch domains: %w", err)

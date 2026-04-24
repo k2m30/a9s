@@ -51,7 +51,9 @@ func FetchBackupPlansPage(ctx context.Context, api BackupListBackupPlansAPI, con
 		input.NextToken = &continuationToken
 	}
 
-	output, err := api.ListBackupPlans(ctx, input)
+	output, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*backup.ListBackupPlansOutput, error) {
+		return api.ListBackupPlans(ctx, input)
+	})
 	if err != nil {
 		return resource.FetchResult{}, fmt.Errorf("fetching Backup plans: %w", err)
 	}
@@ -144,8 +146,10 @@ func enumerateBackupPlanResources(
 	if selectionAPI == nil || getSelectionAPI == nil || planID == "" {
 		return "", ""
 	}
-	listOut, err := selectionAPI.ListBackupSelections(ctx, &backup.ListBackupSelectionsInput{
-		BackupPlanId: aws.String(planID),
+	listOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*backup.ListBackupSelectionsOutput, error) {
+		return selectionAPI.ListBackupSelections(ctx, &backup.ListBackupSelectionsInput{
+			BackupPlanId: aws.String(planID),
+		})
 	})
 	if err != nil || listOut == nil {
 		return "", ""
@@ -155,9 +159,11 @@ func enumerateBackupPlanResources(
 		if sel.SelectionId == nil {
 			continue
 		}
-		selOut, selErr := getSelectionAPI.GetBackupSelection(ctx, &backup.GetBackupSelectionInput{
-			BackupPlanId: aws.String(planID),
-			SelectionId:  sel.SelectionId,
+		selOut, selErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*backup.GetBackupSelectionOutput, error) {
+			return getSelectionAPI.GetBackupSelection(ctx, &backup.GetBackupSelectionInput{
+				BackupPlanId: aws.String(planID),
+				SelectionId:  sel.SelectionId,
+			})
 		})
 		if selErr != nil || selOut == nil || selOut.BackupSelection == nil {
 			// fail closed — partial enumeration would drop NotResources exclusions,

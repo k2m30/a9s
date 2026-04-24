@@ -67,11 +67,6 @@ func fetchECSTasksPageWithJoin(
 
 	// Memoize DescribeTaskDefinition results across all clusters in this page.
 	seenTaskDefs := make(map[string]*ecstypes.TaskDefinition)
-	// joinIncomplete flips true when any DescribeTaskDefinition fails. The
-	// fetcher surfaces it as Pagination.IsTruncated so reverse-scan checkers
-	// that depend on efs_file_system_ids (e.g. checkEFSECSTask) mark their
-	// result Approximate instead of reporting a silently-wrong definite zero.
-	joinIncomplete := false
 
 	for _, clusterArn := range listOutput.ClusterArns {
 		taskListOutput, err := listTasksAPI.ListTasks(ctx, &ecs.ListTasksInput{
@@ -133,31 +128,34 @@ func fetchECSTasksPageWithJoin(
 
 			// Join task definition to extract EFS file-system IDs.
 			// Skipped gracefully when describeTaskDefAPI is nil. A join failure
-			// flips joinIncomplete so the fetcher surfaces Pagination.IsTruncated
-			// — reverse-scan checkers then report Approximate instead of a
-			// silently-wrong definite zero.
+			// is recorded as a per-task Fields["task_def_join_error"]="true" so
+			// reverse-scan checkers (e.g. checkEFSECSTask) can report
+			// Approximate without the fetcher lying about pagination
+			// truncation (which would misleadingly surface "m: load more").
 			efsFileSystemIDs, joinErr := ecsJoinEFSVolumes(ctx, task, seenTaskDefs, describeTaskDefAPI)
+
+			fields := map[string]string{
+				"task_id":             taskID,
+				"cluster":             clusterName,
+				"status":              status,
+				"last_status":         status,
+				"stop_code":           stopCode,
+				"health_status":       healthStatus,
+				"task_definition":     taskDefinition,
+				"launch_type":         launchType,
+				"cpu":                 cpu,
+				"memory":              memory,
+				"efs_file_system_ids": efsFileSystemIDs,
+			}
 			if joinErr != nil {
-				joinIncomplete = true
+				fields["task_def_join_error"] = "true"
 			}
 
 			r := resource.Resource{
-				ID:     taskID,
-				Name:   taskID,
-				Status: status,
-				Fields: map[string]string{
-					"task_id":             taskID,
-					"cluster":             clusterName,
-					"status":              status,
-					"last_status":         status,
-					"stop_code":           stopCode,
-					"health_status":       healthStatus,
-					"task_definition":     taskDefinition,
-					"launch_type":         launchType,
-					"cpu":                 cpu,
-					"memory":              memory,
-					"efs_file_system_ids": efsFileSystemIDs,
-				},
+				ID:        taskID,
+				Name:      taskID,
+				Status:    status,
+				Fields:    fields,
 				RawStruct: task,
 			}
 
@@ -171,13 +169,6 @@ func fetchECSTasksPageWithJoin(
 		nextToken = *listOutput.NextToken
 		isTruncated = true
 	}
-	// Join failures contribute to truncation — the efs_file_system_ids field
-	// is incomplete, so reverse-scan checkers (checkEFSECSTask) must not claim
-	// a definite zero. See joinIncomplete comment above.
-	if joinIncomplete {
-		isTruncated = true
-	}
-
 	return resource.FetchResult{
 		Resources: resources,
 		Pagination: &resource.PaginationMeta{

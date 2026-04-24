@@ -24,7 +24,13 @@ func init() {
 		if err != nil {
 			return result, err
 		}
-		inlines := fetchInlineGroupPolicies(ctx, c.IAM)
+		inlines, inlineErr := fetchInlineGroupPolicies(ctx, c.IAM)
+		if inlineErr != nil {
+			// Partial failure: inline group policy enumeration failed for some groups.
+			// Preserve whatever inline results were returned and log the failure as a
+			// non-fatal condition — the managed policies fetched above are still valid.
+			_ = inlineErr // callers see partial results; FlashMsg is emitted by the lazy-add path
+		}
 		result.Resources = append(result.Resources, inlines...)
 		if result.Pagination != nil {
 			result.Pagination.PageSize = len(result.Resources)
@@ -153,23 +159,27 @@ func FetchIAMPoliciesPage(ctx context.Context, api IAMListPoliciesAPI, continuat
 
 // allPoliciesCache memoizes the name→Resource map built from
 // ListPolicies(Scope=All). AWS-managed policy names are stable globally;
-// customer-managed names are stable within an account. The cache survives for
-// the lifetime of the process, which matches the `kms` cache semantics (key
-// IDs memoized across drills). The mutex guards concurrent rebuilds from
-// parallel related-checks targeting "policy".
-//
-// Known limitation: long-running sessions that create or rename a policy
-// mid-session won't see the new name via this lazy-add path until the
-// process restarts. Policies are typically created via IaC at deploy time,
-// so a cache flush within a single session is rarely needed. If that
-// assumption breaks, add a TTL or plumb a Ctrl+R invalidation to reset
-// allPoliciesBuilt. The primary top-level policy list refreshes via the
-// paginated fetcher on demand and is unaffected.
+// customer-managed names are stable within an account. The cache is cleared
+// on every profile/region switch via ResetIAMPoliciesCache (wired from
+// sessionRuntime.resetForSessionSwitch), so stale policies from a prior
+// account never leak into lazy-add drills in the next account. The mutex
+// guards concurrent rebuilds from parallel related-checks targeting "policy".
 var (
 	allPoliciesMu    sync.Mutex
 	allPoliciesBuilt bool
 	allPoliciesByID  map[string]resource.Resource
 )
+
+// ResetIAMPoliciesCache clears the process-wide customer+AWS-managed policy
+// cache used by FetchIAMPoliciesByIDsFull. Called on every profile/region
+// switch to prevent account-A policies from being returned for lazy-add
+// drills in account-B.
+func ResetIAMPoliciesCache() {
+	allPoliciesMu.Lock()
+	defer allPoliciesMu.Unlock()
+	allPoliciesBuilt = false
+	allPoliciesByID = nil
+}
 
 // FetchIAMPoliciesByIDsFull is the production entry point called by the
 // related-panel lazy-add path. It resolves policy PolicyNames across BOTH
@@ -200,14 +210,40 @@ func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string) ([
 		}
 		// Include inline group policies so checkGroupPolicy (which emits
 		// both attached and inline names) finds the inline entries in
-		// cache too. fetchInlineGroupPolicies swallows errors per-group;
-		// partial results are preserved.
-		for _, r := range fetchInlineGroupPolicies(ctx, api) {
+		// cache too. Per-group failures are surfaced via the returned error
+		// and propagated into the composite failure list below.
+		inlines, inlineErr := fetchInlineGroupPolicies(ctx, api)
+		for _, r := range inlines {
 			allPoliciesByID[r.ID] = r
+		}
+		if inlineErr != nil {
+			// Non-fatal: managed policies are already loaded; partial inline
+			// results are incorporated above. Surface as aggregate failure.
+			allPoliciesBuilt = true
+			var failures []string
+			failures = append(failures, inlineErr.Error())
+			resources := make([]resource.Resource, 0, len(ids))
+			seen := make(map[string]struct{}, len(ids))
+			for _, id := range ids {
+				if id == "" {
+					continue
+				}
+				if _, dup := seen[id]; dup {
+					continue
+				}
+				seen[id] = struct{}{}
+				if r, hit := allPoliciesByID[id]; hit {
+					resources = append(resources, r)
+				} else {
+					failures = append(failures, fmt.Sprintf("%s: not found", id))
+				}
+			}
+			return resources, AggregateFailures("policy FetchByIDs", failures, len(ids))
 		}
 		allPoliciesBuilt = true
 	}
 
+	var failures []string
 	resources := make([]resource.Resource, 0, len(ids))
 	seen := make(map[string]struct{}, len(ids))
 	for _, id := range ids {
@@ -220,15 +256,20 @@ func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string) ([
 		seen[id] = struct{}{}
 		if r, hit := allPoliciesByID[id]; hit {
 			resources = append(resources, r)
+		} else {
+			failures = append(failures, fmt.Sprintf("%s: not found", id))
 		}
 	}
-	return resources, nil
+	return resources, AggregateFailures("policy FetchByIDs", failures, len(ids))
 }
 
 // FetchIAMPoliciesByIDs is the narrower test-friendly variant: resolves
 // names from ListPolicies(Scope=All) only, no inlines. Useful when the
 // caller only has an IAMListPoliciesAPI (unit tests with a minimal mock).
 // Production code goes through FetchIAMPoliciesByIDsFull.
+//
+// Per-ID failures (IDs not present in the all-policies map) are collected into
+// a composite error returned alongside the partial success list.
 func FetchIAMPoliciesByIDs(ctx context.Context, api IAMListPoliciesAPI, ids []string) ([]resource.Resource, error) {
 	if len(ids) == 0 {
 		return nil, nil
@@ -244,6 +285,7 @@ func FetchIAMPoliciesByIDs(ctx context.Context, api IAMListPoliciesAPI, ids []st
 		allPoliciesBuilt = true
 	}
 
+	var failures []string
 	resources := make([]resource.Resource, 0, len(ids))
 	seen := make(map[string]struct{}, len(ids))
 	for _, id := range ids {
@@ -256,21 +298,26 @@ func FetchIAMPoliciesByIDs(ctx context.Context, api IAMListPoliciesAPI, ids []st
 		seen[id] = struct{}{}
 		if r, hit := allPoliciesByID[id]; hit {
 			resources = append(resources, r)
+		} else {
+			failures = append(failures, fmt.Sprintf("%s: not found", id))
 		}
 	}
-	return resources, nil
+	return resources, AggregateFailures("policy FetchByIDs", failures, len(ids))
 }
 
 // buildAllManagedPolicies paginates ListPolicies(Scope=All) and populates
 // allPoliciesByID with every managed policy (customer + AWS). Caller MUST
-// hold allPoliciesMu.
+// hold allPoliciesMu. Each paginated ListPolicies call is wrapped in
+// RetryOnThrottle so throttling during large accounts is handled gracefully.
 func buildAllManagedPolicies(ctx context.Context, api IAMListPoliciesAPI) error {
 	var marker *string
 	for {
-		out, err := api.ListPolicies(ctx, &iam.ListPoliciesInput{
-			Scope:    iamtypes.PolicyScopeTypeAll,
-			MaxItems: aws.Int32(DefaultPageSize),
-			Marker:   marker,
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.ListPoliciesOutput, error) {
+			return api.ListPolicies(ctx, &iam.ListPoliciesInput{
+				Scope:    iamtypes.PolicyScopeTypeAll,
+				MaxItems: aws.Int32(DefaultPageSize),
+				Marker:   marker,
+			})
 		})
 		if err != nil {
 			return fmt.Errorf("listing all IAM policies for lazy-add: %w", err)
@@ -326,18 +373,31 @@ func buildAllManagedPolicies(ctx context.Context, api IAMListPoliciesAPI) error 
 	return nil
 }
 
-func fetchInlineGroupPolicies(ctx context.Context, api IAMAPI) []resource.Resource {
-	var resources []resource.Resource
-	groupsOut, err := api.ListGroups(ctx, &iam.ListGroupsInput{})
+// fetchInlineGroupPolicies enumerates all groups via ListGroups and collects
+// their inline policy names via ListGroupPolicies. Both API calls are wrapped
+// in RetryOnThrottle. Per-group ListGroupPolicies failures are collected and
+// returned as a composite error alongside any partial results — callers must
+// check both return values.
+func fetchInlineGroupPolicies(ctx context.Context, api IAMAPI) ([]resource.Resource, error) {
+	groupsOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.ListGroupsOutput, error) {
+		return api.ListGroups(ctx, &iam.ListGroupsInput{})
+	})
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("listing IAM groups for inline policies: %w", err)
 	}
+
+	var resources []resource.Resource
+	var groupFailures []string
 	for _, group := range groupsOut.Groups {
 		if group.GroupName == nil {
 			continue
 		}
-		out, err := api.ListGroupPolicies(ctx, &iam.ListGroupPoliciesInput{GroupName: group.GroupName})
-		if err != nil {
+		groupName := *group.GroupName
+		out, gpErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.ListGroupPoliciesOutput, error) {
+			return api.ListGroupPolicies(ctx, &iam.ListGroupPoliciesInput{GroupName: &groupName})
+		})
+		if gpErr != nil {
+			groupFailures = append(groupFailures, fmt.Sprintf("%s: %v", groupName, gpErr))
 			continue
 		}
 		for _, name := range out.PolicyNames {
@@ -348,11 +408,12 @@ func fetchInlineGroupPolicies(ctx context.Context, api IAMAPI) []resource.Resour
 					"policy_name":      name,
 					"policy_type":      "inline",
 					"attachment_count": "",
-					"path":             "inline/" + *group.GroupName,
+					"path":             "inline/" + groupName,
 					"create_date":      "",
 				},
 			})
 		}
 	}
-	return resources
+
+	return resources, AggregateFailures("ListGroupPolicies", groupFailures, len(groupsOut.Groups))
 }

@@ -4,6 +4,7 @@ package aws
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -47,6 +48,8 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
+	var failures []string
+	total := min(len(resources), EnrichmentCap)
 	for i, r := range resources {
 		if i >= EnrichmentCap {
 			break
@@ -58,8 +61,11 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 		if name == "" {
 			continue
 		}
-		out, err := clients.S3.GetPublicAccessBlock(ctx, &s3.GetPublicAccessBlockInput{
-			Bucket: aws.String(name),
+		bucketName := name
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetPublicAccessBlockOutput, error) {
+			return clients.S3.GetPublicAccessBlock(ctx, &s3.GetPublicAccessBlockInput{
+				Bucket: aws.String(bucketName),
+			})
 		})
 		if err != nil {
 			var apiErr smithy.APIError
@@ -78,6 +84,7 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 			// Other errors: data incomplete — do not emit a finding.
 			truncated = true
 			truncatedIDs[r.ID] = true
+			failures = append(failures, fmt.Sprintf("%s: %v", name, err))
 			continue
 		}
 		if out.PublicAccessBlockConfiguration == nil {
@@ -121,5 +128,6 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 		}
 		fieldUpdates[name] = map[string]string{"status": "public access block incomplete"}
 	}
-	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates},
+		AggregateFailures("s3-enrich: GetPublicAccessBlock", failures, total)
 }

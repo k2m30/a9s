@@ -231,8 +231,10 @@ func checkEFSLambda(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
 	}
 
-	apOut, err := c.EFS.DescribeAccessPoints(ctx, &efs.DescribeAccessPointsInput{
-		FileSystemId: &fsID,
+	apOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*efs.DescribeAccessPointsOutput, error) {
+		return c.EFS.DescribeAccessPoints(ctx, &efs.DescribeAccessPointsInput{
+			FileSystemId: &fsID,
+		})
 	})
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
@@ -296,7 +298,14 @@ func checkEFSECSTask(_ context.Context, _ any, res resource.Resource, cache reso
 	}
 
 	var ids []string
+	joinIncomplete := false
 	for _, tRes := range entry.Resources {
+		// A task whose DescribeTaskDefinition failed has incomplete
+		// efs_file_system_ids; treat its contribution as unknown and mark
+		// the overall result Approximate instead of a silently-wrong zero.
+		if tRes.Fields["task_def_join_error"] == "true" {
+			joinIncomplete = true
+		}
 		joined := tRes.Fields["efs_file_system_ids"]
 		if joined == "" {
 			continue
@@ -306,6 +315,6 @@ func checkEFSECSTask(_ context.Context, _ any, res resource.Resource, cache reso
 		}
 	}
 	result := relatedResult("ecs-task", ids)
-	result.Approximate = entry.IsTruncated
+	result.Approximate = entry.IsTruncated || joinIncomplete
 	return result
 }

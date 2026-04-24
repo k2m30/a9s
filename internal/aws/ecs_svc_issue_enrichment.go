@@ -34,6 +34,7 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 
 	// Group service names by cluster name. Both fields are populated by FetchECSServicesPage.
 	clusterServices := make(map[string][]string)
+	resourceByService := make(map[string]resource.Resource)
 	for _, r := range resources {
 		cluster := r.Fields["cluster"]
 		svcName := r.Fields["service_name"]
@@ -41,10 +42,13 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 			continue
 		}
 		clusterServices[cluster] = append(clusterServices[cluster], svcName)
+		resourceByService[svcName] = r
 	}
 
 	truncated := len(resources) > EnrichmentCap
 	checked := 0
+	var failures []string
+	total := 0
 
 	for clusterName, svcNames := range clusterServices {
 		// ECS DescribeServices accepts up to 10 services per call.
@@ -57,12 +61,21 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 			end := min(i+descBatch, len(svcNames))
 			batch := svcNames[i:end]
 			checked += len(batch)
+			total += len(batch)
 
-			out, err := clients.ECS.DescribeServices(ctx, &ecs.DescribeServicesInput{
-				Cluster:  aws.String(clusterName),
-				Services: batch,
+			out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecs.DescribeServicesOutput, error) {
+				return clients.ECS.DescribeServices(ctx, &ecs.DescribeServicesInput{
+					Cluster:  aws.String(clusterName),
+					Services: batch,
+				})
 			})
 			if err != nil {
+				for _, svcName := range batch {
+					failures = append(failures, fmt.Sprintf("%s/%s: %v", clusterName, svcName, err))
+					if r, ok := resourceByService[svcName]; ok {
+						truncatedIDs[r.ID] = true
+					}
+				}
 				truncated = true
 				continue
 			}
@@ -158,5 +171,6 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 		}
 	}
 
-	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings},
+		AggregateFailures("ecs-svc-enrich: DescribeServices", failures, total)
 }

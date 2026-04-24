@@ -35,6 +35,8 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
+	var failures []string
+	total := 0
 	for i, r := range resources {
 		if i >= EnrichmentCap {
 			break
@@ -43,11 +45,13 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 		if fsID == "" {
 			continue
 		}
+		total++
 		// Paginate mount targets per file system using Marker/NextMarker.
 		var allMountTargets []efstypes.MountTargetDescription
 		var mtMarker *string
 		mtPages := 0
 		mtTruncated := false
+		pageFailed := false
 		for {
 			if mtPages >= PerParentPageCap {
 				mtTruncated = true
@@ -55,14 +59,18 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 				truncatedIDs[r.ID] = true
 				break
 			}
-			out, err := clients.EFS.DescribeMountTargets(ctx, &efs.DescribeMountTargetsInput{
-				FileSystemId: aws.String(fsID),
-				Marker:       mtMarker,
+			out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*efs.DescribeMountTargetsOutput, error) {
+				return clients.EFS.DescribeMountTargets(ctx, &efs.DescribeMountTargetsInput{
+					FileSystemId: aws.String(fsID),
+					Marker:       mtMarker,
+				})
 			})
 			mtPages++
 			if err != nil {
+				failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 				truncated = true
 				truncatedIDs[r.ID] = true
+				pageFailed = true
 				break
 			}
 			allMountTargets = append(allMountTargets, out.MountTargets...)
@@ -71,7 +79,7 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 			}
 			mtMarker = out.NextMarker
 		}
-		if mtTruncated {
+		if mtTruncated || pageFailed {
 			continue
 		}
 
@@ -137,5 +145,5 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 		TruncatedIDs: truncatedIDs,
 		Findings:     findings,
 		FieldUpdates: fieldUpdates,
-	}, nil
+	}, AggregateFailures("efs-enrich: DescribeMountTargets", failures, total)
 }

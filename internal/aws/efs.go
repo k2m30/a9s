@@ -95,7 +95,9 @@ func FetchEFSFileSystemsPage(ctx context.Context, api EFSDescribeFileSystemsAPI,
 		input.Marker = &continuationToken
 	}
 
-	output, err := api.DescribeFileSystems(ctx, input)
+	output, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*efs.DescribeFileSystemsOutput, error) {
+		return api.DescribeFileSystems(ctx, input)
+	})
 	if err != nil {
 		return resource.FetchResult{}, fmt.Errorf("fetching EFS file systems: %w", err)
 	}

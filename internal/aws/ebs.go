@@ -267,6 +267,10 @@ func FetchEBSSnapshotsPage(ctx context.Context, api EC2DescribeSnapshotsAPI, con
 // lazy-add path so checkers referencing shared or public snapshots still drill
 // into a real entry. DescribeSnapshots accepts SnapshotIds as a batched
 // filter, so this is a single API call.
+//
+// The DescribeSnapshots call is wrapped in RetryOnThrottle. IDs not present in
+// the response are collected into a composite error returned alongside the
+// partial results.
 func FetchEBSSnapshotsByIDs(ctx context.Context, api EC2DescribeSnapshotsAPI, ids []string) ([]resource.Resource, error) {
 	if len(ids) == 0 {
 		return nil, nil
@@ -280,17 +284,31 @@ func FetchEBSSnapshotsByIDs(ctx context.Context, api EC2DescribeSnapshotsAPI, id
 	if len(filtered) == 0 {
 		return nil, nil
 	}
-	out, err := api.DescribeSnapshots(ctx, &ec2.DescribeSnapshotsInput{
-		SnapshotIds: filtered,
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeSnapshotsOutput, error) {
+		return api.DescribeSnapshots(ctx, &ec2.DescribeSnapshotsInput{
+			SnapshotIds: filtered,
+		})
 	})
 	if err != nil {
 		return nil, fmt.Errorf("fetching EBS snapshots by id: %w", err)
 	}
+
+	// Build a set of returned IDs to detect which requested IDs are missing.
+	returned := make(map[string]struct{}, len(out.Snapshots))
 	resources := make([]resource.Resource, 0, len(out.Snapshots))
 	for _, snap := range out.Snapshots {
-		resources = append(resources, snapshotToResource(snap))
+		r := snapshotToResource(snap)
+		resources = append(resources, r)
+		returned[r.ID] = struct{}{}
 	}
-	return resources, nil
+
+	var failures []string
+	for _, id := range filtered {
+		if _, found := returned[id]; !found {
+			failures = append(failures, id)
+		}
+	}
+	return resources, AggregateMissing("ebs-snap FetchByIDs", failures, len(filtered))
 }
 
 // snapshotToResource converts an ec2types.Snapshot to our generic Resource.

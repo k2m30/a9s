@@ -178,7 +178,9 @@ func checkOpenSearchCFN(ctx context.Context, clients any, res resource.Resource,
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
 	}
-	out, err := tagAPI.ListTags(ctx, &opensearch.ListTagsInput{ARN: aws.String(*domain.ARN)})
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*opensearch.ListTagsOutput, error) {
+		return tagAPI.ListTags(ctx, &opensearch.ListTagsInput{ARN: aws.String(*domain.ARN)})
+	})
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
 	}
@@ -257,7 +259,9 @@ func checkOpenSearchACM(ctx context.Context, clients any, res resource.Resource,
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "acm", Count: -1}
 	}
-	out, err := cfgAPI.DescribeDomainConfig(ctx, &opensearch.DescribeDomainConfigInput{DomainName: aws.String(domainName)})
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*opensearch.DescribeDomainConfigOutput, error) {
+		return cfgAPI.DescribeDomainConfig(ctx, &opensearch.DescribeDomainConfigInput{DomainName: aws.String(domainName)})
+	})
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "acm", Count: -1, Err: err}
 	}

@@ -93,7 +93,9 @@ func checkS3CFN(ctx context.Context, clients any, res resource.Resource, cache r
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
 	}
-	out, err := tagAPI.GetBucketTagging(ctx, &s3.GetBucketTaggingInput{Bucket: aws.String(bucket)})
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketTaggingOutput, error) {
+		return tagAPI.GetBucketTagging(ctx, &s3.GetBucketTaggingInput{Bucket: aws.String(bucket)})
+	})
 	if err != nil {
 		// NoSuchTagSet is a "no tags" response, not a hard failure.
 		if strings.Contains(err.Error(), "NoSuchTagSet") {
@@ -151,7 +153,9 @@ func checkS3KMS(ctx context.Context, clients any, res resource.Resource, _ resou
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
 	}
-	out, err := encAPI.GetBucketEncryption(ctx, &s3.GetBucketEncryptionInput{Bucket: aws.String(bucket)})
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketEncryptionOutput, error) {
+		return encAPI.GetBucketEncryption(ctx, &s3.GetBucketEncryptionInput{Bucket: aws.String(bucket)})
+	})
 	if err != nil {
 		// ServerSideEncryptionConfigurationNotFoundError means no encryption — honest 0.
 		if strings.Contains(err.Error(), "ServerSideEncryptionConfigurationNotFoundError") {
@@ -202,7 +206,9 @@ func checkS3Logs(ctx context.Context, clients any, res resource.Resource, _ reso
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
 	}
-	out, err := logAPI.GetBucketLogging(ctx, &s3.GetBucketLoggingInput{Bucket: aws.String(bucket)})
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketLoggingOutput, error) {
+		return logAPI.GetBucketLogging(ctx, &s3.GetBucketLoggingInput{Bucket: aws.String(bucket)})
+	})
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "s3", Count: -1, Err: err}
 	}
@@ -400,7 +406,9 @@ func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache 
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
 	}
-	out, err := policyAPI.GetBucketPolicy(ctx, &s3.GetBucketPolicyInput{Bucket: aws.String(bucket)})
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketPolicyOutput, error) {
+		return policyAPI.GetBucketPolicy(ctx, &s3.GetBucketPolicyInput{Bucket: aws.String(bucket)})
+	})
 	if err != nil {
 		// NoSuchBucketPolicy is a legitimate "no policy configured"
 		// response — honest 0, not error.

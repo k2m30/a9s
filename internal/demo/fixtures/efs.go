@@ -97,6 +97,18 @@ const (
 	// updatingMTDownMountTargetBID is the MountTargetId for the creating MT in warn-efs-updating-mt-down.
 	// Exported so QA tests can assert on it.
 	UpdatingMTDownMountTargetBID = "fsmt-0warnupdmtdown001b"
+
+	// Warn / Broken / Healthy-MTdown fixture FileSystemIds — exported so
+	// integration tests can reference them without hardcoding the literal,
+	// avoiding silent drift if this file is regenerated or renamed.
+	WarnEFSCreatingID         = "fs-0warncreating0001"
+	WarnEFSUpdatingID         = "fs-0warnupdating0001"
+	WarnEFSDeletingID         = "fs-0warndeleting0001"
+	BrokenEFSErrorID          = "fs-0brokenerror00001"
+	BrokenEFSNoMountTargetsID = "fs-0brokennomt000001"
+	WarnEFSMultiID            = "fs-0warnmulti0000001"
+	WarnEFSUpdatingMTDownID   = "fs-0warnupdmtdown001"
+	HealthyEFSMTDownID        = "fs-0healthymtdown001"
 )
 
 func mustParseEFSTime(s string) time.Time {
