@@ -1,7 +1,7 @@
 package unit
 
 // qa_pagination_services_test.go — pagination tests for service fetchers:
-// rds, redis, docdb, dbi-snap, docdb-snap, efs, r53, cf, acm, apigw, cfn, cb, pipeline, ecr, codeartifact
+// rds, redis, docdb, dbi-snap, dbc-snap, efs, r53, cf, acm, apigw, cfn, cb, pipeline, ecr, codeartifact
 
 import (
 	"context"
@@ -594,7 +594,7 @@ func TestQA_Pagination_FetchDocDBClusterSnapshotsPage_FirstPage(t *testing.T) {
 			return &docdb.DescribeDBClusterSnapshotsOutput{
 				DBClusterSnapshots: []docdbstypes.DBClusterSnapshot{
 					{
-						DBClusterSnapshotIdentifier: aws.String("prod-docdb-snap-2025-01-01"),
+						DBClusterSnapshotIdentifier: aws.String("prod-dbc-snap-2025-01-01"),
 						DBClusterIdentifier:         aws.String("prod-docdb"),
 						Status:                      aws.String("available"),
 						Engine:                      aws.String("docdb"),
@@ -625,8 +625,8 @@ func TestQA_Pagination_FetchDocDBClusterSnapshotsPage_FirstPage(t *testing.T) {
 	if len(result.Resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
-	if result.Resources[0].ID != "prod-docdb-snap-2025-01-01" {
-		t.Errorf("resource ID: expected %q, got %q", "prod-docdb-snap-2025-01-01", result.Resources[0].ID)
+	if result.Resources[0].ID != "prod-dbc-snap-2025-01-01" {
+		t.Errorf("resource ID: expected %q, got %q", "prod-dbc-snap-2025-01-01", result.Resources[0].ID)
 	}
 }
 
@@ -636,7 +636,7 @@ func TestQA_Pagination_FetchDocDBClusterSnapshotsPage_Continuation(t *testing.T)
 			return &docdb.DescribeDBClusterSnapshotsOutput{
 				DBClusterSnapshots: []docdbstypes.DBClusterSnapshot{
 					{
-						DBClusterSnapshotIdentifier: aws.String("staging-docdb-snap-2025-02-01"),
+						DBClusterSnapshotIdentifier: aws.String("staging-dbc-snap-2025-02-01"),
 						DBClusterIdentifier:         aws.String("staging-docdb"),
 						Status:                      aws.String("available"),
 						SnapshotType:                aws.String("automated"),

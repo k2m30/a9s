@@ -104,9 +104,9 @@ var navigableContracts = []navContract{
 	// ddb — DynamoDB Tables
 	{shortName: "ddb", apiDoc: "https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_SSEDescription.html", fieldPath: "SSEDescription.KMSMasterKeyArn", targetType: "kms", reasoning: "TableDescription.SSEDescription.KMSMasterKeyArn is the KMS key used for server-side encryption."},
 
-	// docdb-snap — DocumentDB Snapshots
-	{shortName: "docdb-snap", apiDoc: "https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBClusterSnapshot.html", fieldPath: "VpcId", targetType: "vpc", reasoning: "DBClusterSnapshot.VpcId — the VPC the source cluster was in."},
-	{shortName: "docdb-snap", apiDoc: "https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBClusterSnapshot.html", fieldPath: "KmsKeyId", targetType: "kms", reasoning: "DBClusterSnapshot.KmsKeyId — the KMS key used to encrypt the snapshot."},
+	// dbc-snap — DocumentDB Snapshots
+	{shortName: "dbc-snap", apiDoc: "https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBClusterSnapshot.html", fieldPath: "VpcId", targetType: "vpc", reasoning: "DBClusterSnapshot.VpcId — the VPC the source cluster was in."},
+	{shortName: "dbc-snap", apiDoc: "https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBClusterSnapshot.html", fieldPath: "KmsKeyId", targetType: "kms", reasoning: "DBClusterSnapshot.KmsKeyId — the KMS key used to encrypt the snapshot."},
 
 	// eb-rule — EventBridge Rules
 	{shortName: "eb-rule", apiDoc: "https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_Rule.html", fieldPath: "RoleArn", targetType: "role", reasoning: "Rule.RoleArn is the IAM role EventBridge assumes when invoking rule targets."},

@@ -54,7 +54,7 @@ func ExpectedTopLevelCounts() map[string]int {
 		"redshift":     len(NewRedshiftFixtures().Clusters),
 		"efs":          len(NewEFSFixtures().FileSystems),
 		"dbi-snap":     len(rds.DBSnapshots),
-		"docdb-snap":   len(docdb.DBClusterSnapshots),
+		"dbc-snap":   len(docdb.DBClusterSnapshots),
 		"alarm":        len(NewCloudWatchFixtures().Alarms),
 		"logs":         len(NewCWLogsFixtures().LogGroups),
 		"trail":        len(NewCloudTrailFixtures().Trails),

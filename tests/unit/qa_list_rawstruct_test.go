@@ -976,7 +976,7 @@ func TestQA_ListRawStruct_AllTypes(t *testing.T) {
 		// (key-only, no Path fallback), so an available+encrypted row carries
 		// Status="" and the list renders an empty cell at that column.
 		{"dbi-snap", realisticDBISnapshot(), []string{"dbi-snap-prod-20250615", "prod-db-01"}},
-		{"docdb-snap", realisticDocDBSnapshot(), []string{"docdb-snap-prod-20250615", "available"}},
+		{"dbc-snap", realisticDBCSnapshot(), []string{"dbc-snap-prod-20250615", "available"}},
 		{"sns-sub", realisticSNSSubscription(), []string{"email", "user@example.com"}},
 		// policy has no path: columns (all columns use key: from Fields) — tested in TestQA_List instead
 		{"iam-user", realisticIAMUser(), []string{"deploy-user", "AIDAEXAMPLEUSERID"}},

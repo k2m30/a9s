@@ -14,13 +14,13 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func TestQA_DocDBSnapshots_FetchSuccess(t *testing.T) {
+func TestQA_DBCSnapshots_FetchSuccess(t *testing.T) {
 	now := time.Now()
 	mock := &mockDocDBDescribeSnapshotsClient{
 		output: &docdb.DescribeDBClusterSnapshotsOutput{
 			DBClusterSnapshots: []docdbtypes.DBClusterSnapshot{
 				{
-					DBClusterSnapshotIdentifier: aws.String("docdb-snap-auto-001"),
+					DBClusterSnapshotIdentifier: aws.String("dbc-snap-auto-001"),
 					DBClusterIdentifier:         aws.String("my-docdb-cluster"),
 					Status:                      aws.String("available"),
 					Engine:                      aws.String("docdb"),
@@ -29,7 +29,7 @@ func TestQA_DocDBSnapshots_FetchSuccess(t *testing.T) {
 					StorageType:                 aws.String("standard"),
 				},
 				{
-					DBClusterSnapshotIdentifier: aws.String("docdb-snap-manual-001"),
+					DBClusterSnapshotIdentifier: aws.String("dbc-snap-manual-001"),
 					DBClusterIdentifier:         aws.String("my-docdb-cluster"),
 					Status:                      aws.String("creating"),
 					Engine:                      aws.String("docdb"),
@@ -50,17 +50,17 @@ func TestQA_DocDBSnapshots_FetchSuccess(t *testing.T) {
 	}
 
 	r := resources[0]
-	if r.ID != "docdb-snap-auto-001" {
-		t.Errorf("expected ID 'docdb-snap-auto-001', got %q", r.ID)
+	if r.ID != "dbc-snap-auto-001" {
+		t.Errorf("expected ID 'dbc-snap-auto-001', got %q", r.ID)
 	}
-	if r.Name != "docdb-snap-auto-001" {
-		t.Errorf("expected Name 'docdb-snap-auto-001', got %q", r.Name)
+	if r.Name != "dbc-snap-auto-001" {
+		t.Errorf("expected Name 'dbc-snap-auto-001', got %q", r.Name)
 	}
 	if r.Status != "available" {
 		t.Errorf("expected Status 'available', got %q", r.Status)
 	}
-	if r.Fields["snapshot_id"] != "docdb-snap-auto-001" {
-		t.Errorf("expected snapshot_id 'docdb-snap-auto-001', got %q", r.Fields["snapshot_id"])
+	if r.Fields["snapshot_id"] != "dbc-snap-auto-001" {
+		t.Errorf("expected snapshot_id 'dbc-snap-auto-001', got %q", r.Fields["snapshot_id"])
 	}
 	if r.Fields["cluster_id"] != "my-docdb-cluster" {
 		t.Errorf("expected cluster_id 'my-docdb-cluster', got %q", r.Fields["cluster_id"])
@@ -87,7 +87,7 @@ func TestQA_DocDBSnapshots_FetchSuccess(t *testing.T) {
 	}
 }
 
-func TestQA_DocDBSnapshots_FetchEmpty(t *testing.T) {
+func TestQA_DBCSnapshots_FetchEmpty(t *testing.T) {
 	mock := &mockDocDBDescribeSnapshotsClient{
 		output: &docdb.DescribeDBClusterSnapshotsOutput{
 			DBClusterSnapshots: []docdbtypes.DBClusterSnapshot{},
@@ -103,7 +103,7 @@ func TestQA_DocDBSnapshots_FetchEmpty(t *testing.T) {
 	}
 }
 
-func TestQA_DocDBSnapshots_FetchError(t *testing.T) {
+func TestQA_DBCSnapshots_FetchError(t *testing.T) {
 	mock := &mockDocDBDescribeSnapshotsClient{
 		err: fmt.Errorf("access denied"),
 	}
@@ -114,13 +114,13 @@ func TestQA_DocDBSnapshots_FetchError(t *testing.T) {
 	}
 }
 
-func TestQA_DocDBSnapshots_TypeDef(t *testing.T) {
-	rt := resource.FindResourceType("docdb-snap")
+func TestQA_DBCSnapshots_TypeDef(t *testing.T) {
+	rt := resource.FindResourceType("dbc-snap")
 	if rt == nil {
-		t.Fatal("resource type 'docdb-snap' not found")
+		t.Fatal("resource type 'dbc-snap' not found")
 	}
-	if rt.Name != "DocDB Snapshots" {
-		t.Errorf("expected Name 'DocDB Snapshots', got %q", rt.Name)
+	if rt.Name != "DB Cluster Snapshots" {
+		t.Errorf("expected Name 'DB Cluster Snapshots', got %q", rt.Name)
 	}
 	expected := []struct {
 		key   string

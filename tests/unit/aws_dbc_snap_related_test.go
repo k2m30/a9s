@@ -13,24 +13,24 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func docdbSnapCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
+func dbcSnapCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	t.Helper()
-	for _, def := range resource.GetRelated("docdb-snap") {
+	for _, def := range resource.GetRelated("dbc-snap") {
 		if def.TargetType == target {
 			if def.Checker == nil {
-				t.Fatalf("docdb-snap related checker for %s is nil", target)
+				t.Fatalf("dbc-snap related checker for %s is nil", target)
 			}
 			return def.Checker
 		}
 	}
-	t.Fatalf("docdb-snap related checker for %s not found", target)
+	t.Fatalf("dbc-snap related checker for %s not found", target)
 	return nil
 }
 
-func TestRelated_DocdbSnap_Registered(t *testing.T) {
-	defs := resource.GetRelated("docdb-snap")
+func TestRelated_DbcSnap_Registered(t *testing.T) {
+	defs := resource.GetRelated("dbc-snap")
 	if len(defs) == 0 {
-		t.Fatal("no related defs registered for docdb-snap")
+		t.Fatal("no related defs registered for dbc-snap")
 	}
 
 	type expectation struct {
@@ -47,13 +47,13 @@ func TestRelated_DocdbSnap_Registered(t *testing.T) {
 			if def.TargetType == target {
 				found = true
 				if want.hasChecker && def.Checker == nil {
-					t.Errorf("docdb-snap %q: Checker should not be nil", target)
+					t.Errorf("dbc-snap %q: Checker should not be nil", target)
 				}
 				if !want.hasChecker && def.Checker != nil {
-					t.Errorf("docdb-snap %q: Checker should be nil (stub)", target)
+					t.Errorf("dbc-snap %q: Checker should be nil (stub)", target)
 				}
 				if def.DisplayName != want.displayName {
-					t.Errorf("docdb-snap %q: DisplayName = %q, want %q", target, def.DisplayName, want.displayName)
+					t.Errorf("dbc-snap %q: DisplayName = %q, want %q", target, def.DisplayName, want.displayName)
 				}
 				break
 			}
@@ -66,33 +66,33 @@ func TestRelated_DocdbSnap_Registered(t *testing.T) {
 
 // --- Backup checker tests (Pattern A — direct API call) ---
 
-const docdbSnapTestARN = "arn:aws:rds:us-east-1:123456789012:cluster-snapshot:docdb-snap-abc123"
-const docdbSnapRecoveryARN1 = "arn:aws:backup:us-east-1:123456789012:recovery-point:rp-docdb-aaa"
-const docdbSnapRecoveryARN2 = "arn:aws:backup:us-east-1:123456789012:recovery-point:rp-docdb-bbb"
+const dbcSnapTestARN = "arn:aws:rds:us-east-1:123456789012:cluster-snapshot:dbc-snap-abc123"
+const dbcSnapRecoveryARN1 = "arn:aws:backup:us-east-1:123456789012:recovery-point:rp-docdb-aaa"
+const dbcSnapRecoveryARN2 = "arn:aws:backup:us-east-1:123456789012:recovery-point:rp-docdb-bbb"
 
-func docdbSnapSrcResource() resource.Resource {
+func dbcSnapSrcResource() resource.Resource {
 	return resource.Resource{
-		ID:     "docdb-snap-abc123",
-		Name:   "docdb-snap-abc123",
+		ID:     "dbc-snap-abc123",
+		Name:   "dbc-snap-abc123",
 		Fields: map[string]string{},
 		RawStruct: docdbtypes.DBClusterSnapshot{
-			DBClusterSnapshotIdentifier: aws.String("docdb-snap-abc123"),
-			DBClusterSnapshotArn:        aws.String(docdbSnapTestARN),
+			DBClusterSnapshotIdentifier: aws.String("dbc-snap-abc123"),
+			DBClusterSnapshotArn:        aws.String(dbcSnapTestARN),
 		},
 	}
 }
 
-// TestRelated_DocdbSnap_Backup_Match verifies that two recovery points returned
+// TestRelated_DbcSnap_Backup_Match verifies that two recovery points returned
 // by the fake produce Count=2 with both ARNs in ResourceIDs.
-func TestRelated_DocdbSnap_Backup_Match(t *testing.T) {
+func TestRelated_DbcSnap_Backup_Match(t *testing.T) {
 	fake := newFakeBackupWithRecoveryPoints([]backuptypes.RecoveryPointByResource{
-		{RecoveryPointArn: aws.String(docdbSnapRecoveryARN1)},
-		{RecoveryPointArn: aws.String(docdbSnapRecoveryARN2)},
+		{RecoveryPointArn: aws.String(dbcSnapRecoveryARN1)},
+		{RecoveryPointArn: aws.String(dbcSnapRecoveryARN2)},
 	})
 	clients := &awsclient.ServiceClients{Backup: fake}
-	res := docdbSnapSrcResource()
+	res := dbcSnapSrcResource()
 
-	checker := docdbSnapCheckerByTarget(t, "backup")
+	checker := dbcSnapCheckerByTarget(t, "backup")
 	result := checker(context.Background(), clients, res, nil)
 
 	if result.Count != 2 {
@@ -105,7 +105,7 @@ func TestRelated_DocdbSnap_Backup_Match(t *testing.T) {
 	for _, id := range result.ResourceIDs {
 		seen[id] = true
 	}
-	for _, want := range []string{docdbSnapRecoveryARN1, docdbSnapRecoveryARN2} {
+	for _, want := range []string{dbcSnapRecoveryARN1, dbcSnapRecoveryARN2} {
 		if !seen[want] {
 			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs)
 		}
@@ -115,13 +115,13 @@ func TestRelated_DocdbSnap_Backup_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_DocdbSnap_Backup_Empty verifies that zero recovery points produce Count=0.
-func TestRelated_DocdbSnap_Backup_Empty(t *testing.T) {
+// TestRelated_DbcSnap_Backup_Empty verifies that zero recovery points produce Count=0.
+func TestRelated_DbcSnap_Backup_Empty(t *testing.T) {
 	fake := newFakeBackupWithRecoveryPoints([]backuptypes.RecoveryPointByResource{})
 	clients := &awsclient.ServiceClients{Backup: fake}
-	res := docdbSnapSrcResource()
+	res := dbcSnapSrcResource()
 
-	checker := docdbSnapCheckerByTarget(t, "backup")
+	checker := dbcSnapCheckerByTarget(t, "backup")
 	result := checker(context.Background(), clients, res, nil)
 
 	if result.Count != 0 {
@@ -132,14 +132,14 @@ func TestRelated_DocdbSnap_Backup_Empty(t *testing.T) {
 	}
 }
 
-// TestRelated_DocdbSnap_Backup_WrongRawStruct verifies that a wrong RawStruct
+// TestRelated_DbcSnap_Backup_WrongRawStruct verifies that a wrong RawStruct
 // type returns Count=-1 (defensive guard, assertStruct fails).
-func TestRelated_DocdbSnap_Backup_WrongRawStruct(t *testing.T) {
+func TestRelated_DbcSnap_Backup_WrongRawStruct(t *testing.T) {
 	res := resource.Resource{
-		ID:        "docdb-snap-abc123",
+		ID:        "dbc-snap-abc123",
 		RawStruct: "not-a-snapshot",
 	}
-	checker := docdbSnapCheckerByTarget(t, "backup")
+	checker := dbcSnapCheckerByTarget(t, "backup")
 	result := checker(context.Background(), nil, res, nil)
 
 	if result.Count != -1 {

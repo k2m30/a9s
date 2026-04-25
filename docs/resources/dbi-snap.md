@@ -93,7 +93,7 @@ One bullet per distinct signal. Keep AWS field names verbatim.
 - **Signal**: cross-ref `dbi` — when the parent DB is present in the already-loaded `dbi` list, `SnapshotCreateTime` older than the parent `DBInstance.BackupRetentionPeriod` (in days) AND `SnapshotType == "automated"` → Warning (automated snapshot kept past its retention window — signals retention-policy drift or a stuck automated cycle).
   - **State bucket**: Warning.
   - **How obtained**: compute age from `DBSnapshot.SnapshotCreateTime` on the list response, cross-reference against the already-loaded `dbi` list by `DBInstanceIdentifier`, compare to `DBInstance.BackupRetentionPeriod`. Skip the rule when the parent DB is not in the loaded sibling list.
-  - **Threshold note**: dbi-snap fires on `age > retention` (no multiplier). The sister type `docdb-snap` uses `age > retention × 1.5` to suppress chatter on DocumentDB clusters whose automated cleanup runs less aggressively. The thresholds were authored at different times and the divergence is intentional, not an inconsistency to reconcile — RDS automated snapshots are evicted on a tight schedule, so any overshoot is operator-actionable; DocumentDB tolerates a half-cycle slip.
+  - **Threshold note**: dbi-snap fires on `age > retention` (no multiplier). The sister type `dbc-snap` uses `age > retention × 1.5` to suppress chatter on DocumentDB clusters whose automated cleanup runs less aggressively. The thresholds were authored at different times and the divergence is intentional, not an inconsistency to reconcile — RDS automated snapshots are evicted on a tight schedule, so any overshoot is operator-actionable; DocumentDB tolerates a half-cycle slip.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
@@ -156,7 +156,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 - All §3.3 Wave 3 signals (copied above).
 - Per-row `DescribeDBSnapshotAttributes` for public-snapshot or shared-account detection — a9s-devops persona: possible=yes (the API returns `DBSnapshotAttributes` with `AttributeName=="restore"` listing shared account IDs, `all` meaning public), worth=no as a Wave 2 list-row signal because it's a per-snapshot fan-out; the check belongs in a security-posture view, not on every list load.
-- Manual-snapshot cost-drift age rule (> 365d on `SnapshotType=="manual"`) — not present in `attention-signals.md § dbi-snap` for dbi-snap (it applies to `docdb-snap`); out of scope here until the golden doc adds it.
+- Manual-snapshot cost-drift age rule (> 365d on `SnapshotType=="manual"`) — not present in `attention-signals.md § dbi-snap` for dbi-snap (it applies to `dbc-snap`); out of scope here until the golden doc adds it.
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` §"What is a9s?").
 
