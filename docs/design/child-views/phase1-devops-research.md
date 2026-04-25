@@ -33,7 +33,7 @@ For each of the 62 implemented resource types listed below, evaluate whether a c
 COMPUTE: ec2, lambda, asg, eb (Elastic Beanstalk), ecs (clusters), ecs-svc, ecs-task
 CONTAINERS: eks, ng (node groups)
 NETWORKING: elb (load balancers), tg (target groups), sg (security groups), vpc, subnet, rtb (route tables), nat, igw, vpce (VPC endpoints), tgw (transit gateways), eni, eip
-DATABASES & STORAGE: s3 *(has child)*, dbi (RDS instances), redis, dbc (DocumentDB), ddb (DynamoDB), opensearch, redshift, efs, rds-snap, docdb-snap
+DATABASES & STORAGE: s3 *(has child)*, dbi (RDS instances), redis, dbc (DocumentDB), ddb (DynamoDB), opensearch, redshift, efs, dbi-snap, docdb-snap
 MONITORING: alarm (CloudWatch alarms), logs (CW Log Groups), trail (CloudTrail)
 MESSAGING: sqs, sns, sns-sub, eb-rule (EventBridge rules), kinesis, msk, sfn (Step Functions)
 SECRETS & CONFIG: secrets (Secrets Manager), ssm (SSM Parameters), kms

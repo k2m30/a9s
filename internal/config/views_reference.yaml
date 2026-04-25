@@ -1614,7 +1614,7 @@ policy:  # iamtypes.Policy
   - Tags[].Value
   - UpdateDate
 
-rds-snap:  # rdstypes.DBSnapshot
+dbi-snap:  # rdstypes.DBSnapshot
   - AdditionalStorageVolumes[].VolumeName
   - AdditionalStorageVolumes[].AllocatedStorage
   - AdditionalStorageVolumes[].IOPS

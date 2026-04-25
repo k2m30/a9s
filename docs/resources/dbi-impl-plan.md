@@ -164,7 +164,7 @@ For each fixture `prod-dbi-1` wired to the graph:
 - `checkDbiSubnets(res)` returns all `DBSubnetGroup.Subnets[].SubnetIdentifier`.
 - `checkDbiVPC(res)` returns `[DBSubnetGroup.VpcId]`.
 - `checkDbiAlarm(res, cache)` returns alarm IDs whose `Dimensions[].Name=="DBInstanceIdentifier"` matches `res.ID`.
-- `checkDbiRDSSnap(res, cache)` returns snapshot IDs whose `DBInstanceIdentifier == res.ID`.
+- `checkDbiDBISnap(res, cache)` returns snapshot IDs whose `DBInstanceIdentifier == res.ID`.
 - `checkDBILogs(res, cache)` returns log-group IDs that start with `/aws/rds/instance/<res.ID>/`.
 - `checkDbiSecrets(res, cache)` returns the secret ID when `MasterUserSecret.SecretArn` matches a cached secret's ARN.
 - `checkDbiDBC(res, cache)` returns `[DBClusterIdentifier]` when the cluster is cached; 0 for non-Aurora.
@@ -194,7 +194,7 @@ Assertion mechanism: tests use a mock CloudWatch API that records all calls and 
 All fixtures live in `internal/demo/fixtures/dbi.go` as a single `DBIFixtures` struct with a `NewDBIFixtures() *DBIFixtures` constructor. Tests and `./a9s --demo` import the same constants. Refactor existing `internal/demo/fixtures/rds.go` (currently `RDSFixtures` with DBInstances + DBSnapshots + Events):
 
 - Move `DBInstances` + related constants/helpers into new `dbi.go` under `DBIFixtures{Instances []rdstypes.DBInstance}`.
-- `DBSnapshots` stays in `rds.go` (or moves to `rds-snap.go`; owner type is `rds-snap`, out of this run's scope).
+- `DBSnapshots` stays in `rds.go` (or moves to `dbi-snap.go`; owner type is `dbi-snap`, out of this run's scope).
 - `Events` stays where it is.
 - Keep the old `NewRDSFixtures()` as a thin aggregator for backwards compatibility, OR update the two callers (`internal/demo/fakes/rds.go`, `internal/demo/fixtures/counts.go`). Coder chooses the least-invasive option.
 
@@ -218,7 +218,7 @@ Each fixture uses the account `123456789012`, region `us-east-1`, subnet group `
 
 Sibling graph must contain:
 - `alarm` with `MetricAlarm.Dimensions=[{Name:"DBInstanceIdentifier", Value:"prod-dbi-1"}]`.
-- `rds-snap` with `DBInstanceIdentifier = "prod-dbi-1"`.
+- `dbi-snap` with `DBInstanceIdentifier = "prod-dbi-1"`.
 - `logs` groups `/aws/rds/instance/prod-dbi-1/postgresql` and `/aws/rds/instance/prod-dbi-1/upgrade`.
 - `kms`, `sg`, `subnet`, `vpc`, `secrets`, `role` targets already referenced above (add if missing).
 - `ct-events` entries with `resource_name = "prod-dbi-1"`.
@@ -302,7 +302,7 @@ The coder's fixture work ensures every §2 pivot renders a non-zero count for th
 
 - `alarm` fixture — add a `DBInstanceIdentifier` dimension entry for `prod-dbi-1`.
 - `kms` fixture — already contains `a1b2c3d4-...` key; add disabled `deadbeef-...` for the broken-encryption fixture.
-- `rds-snap` fixture — add at least two snapshots with `DBInstanceIdentifier = "prod-dbi-1"`.
+- `dbi-snap` fixture — add at least two snapshots with `DBInstanceIdentifier = "prod-dbi-1"`.
 - `logs` fixture — add log groups `/aws/rds/instance/prod-dbi-1/postgresql` and `.../upgrade`.
 - `secrets` fixture — add the RDS-managed secret for `prod-dbi-1`.
 - `role` fixture — ensure `rds-monitoring-role` and `rds-enhanced-monitoring` exist.
@@ -421,7 +421,7 @@ Phase 6a (fixtures) allowed paths:
 - `internal/demo/fixtures/rds.go` (refactor — extract DBInstance bits)
 - `internal/demo/fakes/rds.go` (update NewRDSFake wiring if fixtures split)
 - `internal/demo/fixtures/counts.go` (update dbi count wiring)
-- sibling fixture edits in `internal/demo/fixtures/{alarm,kms,subnet,vpc,sg,secrets,role,rds-snap,logs,cloudtrail,dbc}.go` (any of these that must grow for graph completeness)
+- sibling fixture edits in `internal/demo/fixtures/{alarm,kms,subnet,vpc,sg,secrets,role,dbi-snap,logs,cloudtrail,dbc}.go` (any of these that must grow for graph completeness)
 
 Phase 6b (QA) allowed paths:
 - `tests/unit/aws_dbi_test.go` (fetcher + universal invariants)
@@ -450,4 +450,4 @@ Anything else touched = SCOPE VIOLATION.
 - No CloudWatch calls in the dbi fetcher or dbi enricher (Wave 3 out-of-scope).
 - No per-instance `DescribeDBInstances` (list API returns full shape).
 - No write operations.
-- No changes to rds / dbc / rds-snap specs or behaviors.
+- No changes to rds / dbc / dbi-snap specs or behaviors.

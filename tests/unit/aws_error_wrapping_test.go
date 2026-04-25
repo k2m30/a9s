@@ -315,7 +315,7 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 			name:     "RDS snapshots",
 			contains: "fetching RDS snapshots",
 			call: func() error {
-				_, err := awsclient.FetchRDSSnapshots(ctx, &mockRDSDescribeDBSnapshotsClient{err: sentinel})
+				_, err := awsclient.FetchDBISnapshots(ctx, &mockRDSDescribeDBSnapshotsClient{err: sentinel})
 				return err
 			},
 		},

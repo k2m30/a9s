@@ -300,7 +300,7 @@ func (m *Model) buildResourceCacheSnapshot() resource.ResourceCache {
 	// Then merge probeResources — first-page rows retained by the
 	// availability/Wave-1 probe pass that runs at app start, BEFORE the
 	// user opens any list view. Without this seeding, cross-ref enrichers
-	// running at probe time (e.g. rds-snap → dbi cache) would see an empty
+	// running at probe time (e.g. dbi-snap → dbi cache) would see an empty
 	// snapshot until the user navigates into another list. probeResources
 	// pages are first-page-only — mark IsTruncated=true so the orphan
 	// rule (in cross-ref enrichers) treats parent-not-found as

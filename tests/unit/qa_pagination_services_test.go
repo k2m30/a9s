@@ -1,7 +1,7 @@
 package unit
 
 // qa_pagination_services_test.go — pagination tests for service fetchers:
-// rds, redis, docdb, rds-snap, docdb-snap, efs, r53, cf, acm, apigw, cfn, cb, pipeline, ecr, codeartifact
+// rds, redis, docdb, dbi-snap, docdb-snap, efs, r53, cf, acm, apigw, cfn, cb, pipeline, ecr, codeartifact
 
 import (
 	"context"
@@ -452,10 +452,10 @@ func (m *mockRDSDescribeDBSnapshotsAPIPaginated) DescribeDBSnapshots(_ context.C
 }
 
 // ---------------------------------------------------------------------------
-// TestQA_Pagination_FetchRDSSnapshotsPage
+// TestQA_Pagination_FetchDBISnapshotsPage
 // ---------------------------------------------------------------------------
 
-func TestQA_Pagination_FetchRDSSnapshotsPage_FirstPage(t *testing.T) {
+func TestQA_Pagination_FetchDBISnapshotsPage_FirstPage(t *testing.T) {
 	mock := &mockRDSDescribeDBSnapshotsAPIPaginated{
 		PageFunc: func(_ int) (*rds.DescribeDBSnapshotsOutput, error) {
 			return &rds.DescribeDBSnapshotsOutput{
@@ -473,7 +473,7 @@ func TestQA_Pagination_FetchRDSSnapshotsPage_FirstPage(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchRDSSnapshotsPage(context.Background(), mock, "")
+	result, err := awsclient.FetchDBISnapshotsPage(context.Background(), mock, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -497,7 +497,7 @@ func TestQA_Pagination_FetchRDSSnapshotsPage_FirstPage(t *testing.T) {
 	}
 }
 
-func TestQA_Pagination_FetchRDSSnapshotsPage_Continuation(t *testing.T) {
+func TestQA_Pagination_FetchDBISnapshotsPage_Continuation(t *testing.T) {
 	mock := &mockRDSDescribeDBSnapshotsAPIPaginated{
 		PageFunc: func(_ int) (*rds.DescribeDBSnapshotsOutput, error) {
 			return &rds.DescribeDBSnapshotsOutput{
@@ -515,7 +515,7 @@ func TestQA_Pagination_FetchRDSSnapshotsPage_Continuation(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchRDSSnapshotsPage(context.Background(), mock, "marker-page-2")
+	result, err := awsclient.FetchDBISnapshotsPage(context.Background(), mock, "marker-page-2")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -533,7 +533,7 @@ func TestQA_Pagination_FetchRDSSnapshotsPage_Continuation(t *testing.T) {
 	}
 }
 
-func TestQA_Pagination_FetchRDSSnapshotsPage_Empty(t *testing.T) {
+func TestQA_Pagination_FetchDBISnapshotsPage_Empty(t *testing.T) {
 	mock := &mockRDSDescribeDBSnapshotsAPIPaginated{
 		PageFunc: func(_ int) (*rds.DescribeDBSnapshotsOutput, error) {
 			return &rds.DescribeDBSnapshotsOutput{
@@ -543,7 +543,7 @@ func TestQA_Pagination_FetchRDSSnapshotsPage_Empty(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.FetchRDSSnapshotsPage(context.Background(), mock, "")
+	result, err := awsclient.FetchDBISnapshotsPage(context.Background(), mock, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -555,14 +555,14 @@ func TestQA_Pagination_FetchRDSSnapshotsPage_Empty(t *testing.T) {
 	}
 }
 
-func TestQA_Pagination_FetchRDSSnapshotsPage_Error(t *testing.T) {
+func TestQA_Pagination_FetchDBISnapshotsPage_Error(t *testing.T) {
 	mock := &mockRDSDescribeDBSnapshotsAPIPaginated{
 		PageFunc: func(_ int) (*rds.DescribeDBSnapshotsOutput, error) {
 			return nil, errors.New("describe db snapshots failed")
 		},
 	}
 
-	_, err := awsclient.FetchRDSSnapshotsPage(context.Background(), mock, "")
+	_, err := awsclient.FetchDBISnapshotsPage(context.Background(), mock, "")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

@@ -8,97 +8,97 @@ import (
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 )
 
-// RDSSnapFixtures holds typed fixture data for RDS DB Snapshots.
-type RDSSnapFixtures struct {
+// DBISnapFixtures holds typed fixture data for RDS DB Snapshots.
+type DBISnapFixtures struct {
 	// Instances is the full list returned by DescribeDBSnapshots.
 	Instances []rdstypes.DBSnapshot
 }
 
 // Stable IDs and ARNs for RDS Snapshot fixtures — imported by sibling fixture files.
 //
-// §9.3 structural cap: rds-snap pivot data model is 1:1 for dbi, kms (a
+// §9.3 structural cap: dbi-snap pivot data model is 1:1 for dbi, kms (a
 // snapshot has exactly one source instance and one encryption key); the dbc
-// pivot has no realistic non-zero case for rds-snap because Aurora cluster
+// pivot has no realistic non-zero case for dbi-snap because Aurora cluster
 // snapshots live in dbc-snap (real AWS rejects CreateDBSnapshot on Aurora
 // cluster members). The universal "≥50% Count ≥ 2" rule is structurally
 // unsatisfiable for this resource type and is documented as an exemption
-// in docs/resources/rds-snap-impl-plan.md §9.3. The graph-root ProdRDSSnapID
+// in docs/resources/dbi-snap-impl-plan.md §9.3. The graph-root ProdDBISnapID
 // achieves Count ≥ 1 on every count-shown:yes pivot except dbc (which is
-// always Count=0 for rds-snap by AWS-API contract).
+// always Count=0 for dbi-snap by AWS-API contract).
 const (
-	// ProdRDSSnapID — graph-root for §9.3: Healthy non-Aurora automated snapshot of prod-dbi-1.
+	// ProdDBISnapID — graph-root for §9.3: Healthy non-Aurora automated snapshot of prod-dbi-1.
 	// dbi pivot: Count=1 (ProdDbiID). kms pivot: Count=1 (dbiKMSKeyID).
 	// dbc pivot: Count=0 (non-Aurora, no DBClusterIdentifier on parent — AWS-API truth).
 	// backup pivot: Count=1 (one recovery point in backup.go).
 	// ct-events pivot: count "unknown" (windowed) — exempt.
-	ProdRDSSnapID  = "rds:prod-dbi-1-2026-04-15"
-	ProdRDSSnapARN = "arn:aws:rds:us-east-1:123456789012:snapshot:rds:prod-dbi-1-2026-04-15"
+	ProdDBISnapID  = "rds:prod-dbi-1-2026-04-15"
+	ProdDBISnapARN = "arn:aws:rds:us-east-1:123456789012:snapshot:rds:prod-dbi-1-2026-04-15"
 
-	// WarnRDSSnapCreatingID — Wave-1 warning: Status=creating, PercentProgress=42.
-	WarnRDSSnapCreatingID  = "dev-feature-branch-snap"
-	WarnRDSSnapCreatingARN = "arn:aws:rds:us-east-1:123456789012:snapshot:dev-feature-branch-snap"
+	// WarnDBISnapCreatingID — Wave-1 warning: Status=creating, PercentProgress=42.
+	WarnDBISnapCreatingID  = "dev-feature-branch-snap"
+	WarnDBISnapCreatingARN = "arn:aws:rds:us-east-1:123456789012:snapshot:dev-feature-branch-snap"
 
-	// BrokenRDSSnapFailedID — Broken: Status=failed.
-	BrokenRDSSnapFailedID  = "prod-dbi-1-failed-snap"
-	BrokenRDSSnapFailedARN = "arn:aws:rds:us-east-1:123456789012:snapshot:prod-dbi-1-failed-snap"
+	// BrokenDBISnapFailedID — Broken: Status=failed.
+	BrokenDBISnapFailedID  = "prod-dbi-1-failed-snap"
+	BrokenDBISnapFailedARN = "arn:aws:rds:us-east-1:123456789012:snapshot:prod-dbi-1-failed-snap"
 
-	// BrokenRDSSnapIncompatibleID — Broken: Status=incompatible-restore.
-	BrokenRDSSnapIncompatibleID  = "legacy-mysql-snap-incompatible"
-	BrokenRDSSnapIncompatibleARN = "arn:aws:rds:us-east-1:123456789012:snapshot:legacy-mysql-snap-incompatible"
+	// BrokenDBISnapIncompatibleID — Broken: Status=incompatible-restore.
+	BrokenDBISnapIncompatibleID  = "legacy-mysql-snap-incompatible"
+	BrokenDBISnapIncompatibleARN = "arn:aws:rds:us-east-1:123456789012:snapshot:legacy-mysql-snap-incompatible"
 
-	// WarnRDSSnapUnencryptedID — Warning: Encrypted=false.
-	WarnRDSSnapUnencryptedID  = "unenc-pre-migration-snap"
-	WarnRDSSnapUnencryptedARN = "arn:aws:rds:us-east-1:123456789012:snapshot:unenc-pre-migration-snap"
+	// WarnDBISnapUnencryptedID — Warning: Encrypted=false.
+	WarnDBISnapUnencryptedID  = "unenc-pre-migration-snap"
+	WarnDBISnapUnencryptedARN = "arn:aws:rds:us-east-1:123456789012:snapshot:unenc-pre-migration-snap"
 
-	// WarnRDSSnapOrphanID — Warning orphan: parent DBInstanceIdentifier not in dbi list.
-	WarnRDSSnapOrphanID  = "orphan-deleted-db-snap"
-	WarnRDSSnapOrphanARN = "arn:aws:rds:us-east-1:123456789012:snapshot:orphan-deleted-db-snap"
+	// WarnDBISnapOrphanID — Warning orphan: parent DBInstanceIdentifier not in dbi list.
+	WarnDBISnapOrphanID  = "orphan-deleted-db-snap"
+	WarnDBISnapOrphanARN = "arn:aws:rds:us-east-1:123456789012:snapshot:orphan-deleted-db-snap"
 
-	// WarnRDSSnapPastRetentionID — Warning: automated snapshot older than parent's
+	// WarnDBISnapPastRetentionID — Warning: automated snapshot older than parent's
 	// BackupRetentionPeriod (parent = ProdDbiRetentionParentID with retention=7).
 	// SnapshotCreateTime is set to now-30d at fixture construction time so the
 	// retention check always fires regardless of test date.
-	WarnRDSSnapPastRetentionID  = "rds:retention-test-2026-03-25"
-	WarnRDSSnapPastRetentionARN = "arn:aws:rds:us-east-1:123456789012:snapshot:rds:retention-test-2026-03-25"
+	WarnDBISnapPastRetentionID  = "rds:retention-test-2026-03-25"
+	WarnDBISnapPastRetentionARN = "arn:aws:rds:us-east-1:123456789012:snapshot:rds:retention-test-2026-03-25"
 
-	// MultiW1RDSSnapID — U7a multi-W1: Encrypted=false + orphan (parent not in dbi list).
+	// MultiW1DBISnapID — U7a multi-W1: Encrypted=false + orphan (parent not in dbi list).
 	// Expected Status: "unencrypted (+1)".
-	MultiW1RDSSnapID  = "multi-orphan-unenc-snap"
-	MultiW1RDSSnapARN = "arn:aws:rds:us-east-1:123456789012:snapshot:multi-orphan-unenc-snap"
+	MultiW1DBISnapID  = "multi-orphan-unenc-snap"
+	MultiW1DBISnapARN = "arn:aws:rds:us-east-1:123456789012:snapshot:multi-orphan-unenc-snap"
 
-	// BackupCoveredRDSSnapID — AWS Backup-prefixed identifier; backup pivot pivot target.
-	BackupCoveredRDSSnapID  = "awsbackup:job-deadbeef-snap"
-	BackupCoveredRDSSnapARN = "arn:aws:rds:us-east-1:123456789012:snapshot:awsbackup:job-deadbeef-snap"
+	// BackupCoveredDBISnapID — AWS Backup-prefixed identifier; backup pivot pivot target.
+	BackupCoveredDBISnapID  = "awsbackup:job-deadbeef-snap"
+	BackupCoveredDBISnapARN = "arn:aws:rds:us-east-1:123456789012:snapshot:awsbackup:job-deadbeef-snap"
 
-	// SeverityBrokenWarnRDSSnapID — U8 severity: Broken beats Warning.
+	// SeverityBrokenWarnDBISnapID — U8 severity: Broken beats Warning.
 	// Status=failed + Encrypted=false → Status phrase = "failed" (Broken wins;
 	// Encrypted=false is suppressed when Status is a non-available end-state).
-	SeverityBrokenWarnRDSSnapID  = "failed-with-unenc-snap"
-	SeverityBrokenWarnRDSSnapARN = "arn:aws:rds:us-east-1:123456789012:snapshot:failed-with-unenc-snap"
+	SeverityBrokenWarnDBISnapID  = "failed-with-unenc-snap"
+	SeverityBrokenWarnDBISnapARN = "arn:aws:rds:us-east-1:123456789012:snapshot:failed-with-unenc-snap"
 )
 
-// NewRDSSnapFixtures constructs RDSSnapFixtures from the canonical demo data.
+// NewDBISnapFixtures constructs DBISnapFixtures from the canonical demo data.
 // Every fixture in the impl-plan §2 is represented here; adversarial fixtures
 // (nil DBSnapshotIdentifier, nil Status, malformed ARN, nil SnapshotCreateTime)
 // stay inline in tests/unit/aws_rds_snap_test.go.
-func NewRDSSnapFixtures() *RDSSnapFixtures {
-	return &RDSSnapFixtures{
-		Instances: buildRDSSnapInstances(),
+func NewDBISnapFixtures() *DBISnapFixtures {
+	return &DBISnapFixtures{
+		Instances: buildDBISnapInstances(),
 	}
 }
 
-func buildRDSSnapInstances() []rdstypes.DBSnapshot {
-	// now-30d for WarnRDSSnapPastRetentionID — always 30 days old relative to runtime.
+func buildDBISnapInstances() []rdstypes.DBSnapshot {
+	// now-30d for WarnDBISnapPastRetentionID — always 30 days old relative to runtime.
 	pastRetentionTime := time.Now().UTC().Add(-30 * 24 * time.Hour)
 	// now-3d for healthy automated snapshots — always within the 7-day BackupRetentionPeriod.
 	recentSnapTime := time.Now().UTC().Add(-3 * 24 * time.Hour)
 
 	return []rdstypes.DBSnapshot{
-		// 1. ProdRDSSnapID — Healthy non-Aurora automated snapshot of prod-dbi-1.
+		// 1. ProdDBISnapID — Healthy non-Aurora automated snapshot of prod-dbi-1.
 		// SnapshotCreateTime is dynamic (now-3d) to stay within the parent's 7-day retention.
 		{
-			DBSnapshotIdentifier: aws.String(ProdRDSSnapID),
-			DBSnapshotArn:        aws.String(ProdRDSSnapARN),
+			DBSnapshotIdentifier: aws.String(ProdDBISnapID),
+			DBSnapshotArn:        aws.String(ProdDBISnapARN),
 			DBInstanceIdentifier: aws.String(ProdDbiID),
 			Status:               aws.String("available"),
 			Engine:               aws.String("postgres"),
@@ -116,10 +116,10 @@ func buildRDSSnapInstances() []rdstypes.DBSnapshot {
 			SourceRegion:         aws.String("us-east-1"),
 		},
 
-		// 2. WarnRDSSnapCreatingID — Wave-1 warning: Status=creating, PercentProgress=42.
+		// 2. WarnDBISnapCreatingID — Wave-1 warning: Status=creating, PercentProgress=42.
 		{
-			DBSnapshotIdentifier: aws.String(WarnRDSSnapCreatingID),
-			DBSnapshotArn:        aws.String(WarnRDSSnapCreatingARN),
+			DBSnapshotIdentifier: aws.String(WarnDBISnapCreatingID),
+			DBSnapshotArn:        aws.String(WarnDBISnapCreatingARN),
 			DBInstanceIdentifier: aws.String("dev-feature-branch"),
 			Status:               aws.String("creating"),
 			Engine:               aws.String("aurora-postgresql"),
@@ -137,10 +137,10 @@ func buildRDSSnapInstances() []rdstypes.DBSnapshot {
 			SourceRegion:         aws.String("us-east-1"),
 		},
 
-		// 4. BrokenRDSSnapFailedID — Broken: Status=failed.
+		// 4. BrokenDBISnapFailedID — Broken: Status=failed.
 		{
-			DBSnapshotIdentifier: aws.String(BrokenRDSSnapFailedID),
-			DBSnapshotArn:        aws.String(BrokenRDSSnapFailedARN),
+			DBSnapshotIdentifier: aws.String(BrokenDBISnapFailedID),
+			DBSnapshotArn:        aws.String(BrokenDBISnapFailedARN),
 			DBInstanceIdentifier: aws.String(ProdDbiID),
 			Status:               aws.String("failed"),
 			Engine:               aws.String("postgres"),
@@ -158,10 +158,10 @@ func buildRDSSnapInstances() []rdstypes.DBSnapshot {
 			SourceRegion:         aws.String("us-east-1"),
 		},
 
-		// 5. BrokenRDSSnapIncompatibleID — Broken: Status=incompatible-restore.
+		// 5. BrokenDBISnapIncompatibleID — Broken: Status=incompatible-restore.
 		{
-			DBSnapshotIdentifier: aws.String(BrokenRDSSnapIncompatibleID),
-			DBSnapshotArn:        aws.String(BrokenRDSSnapIncompatibleARN),
+			DBSnapshotIdentifier: aws.String(BrokenDBISnapIncompatibleID),
+			DBSnapshotArn:        aws.String(BrokenDBISnapIncompatibleARN),
 			DBInstanceIdentifier: aws.String(ProdDbiID),
 			Status:               aws.String("incompatible-restore"),
 			Engine:               aws.String("mysql"),
@@ -179,10 +179,10 @@ func buildRDSSnapInstances() []rdstypes.DBSnapshot {
 			SourceRegion:         aws.String("us-east-1"),
 		},
 
-		// 6. WarnRDSSnapUnencryptedID — Warning: Encrypted=false, parent ProdDbiID present.
+		// 6. WarnDBISnapUnencryptedID — Warning: Encrypted=false, parent ProdDbiID present.
 		{
-			DBSnapshotIdentifier: aws.String(WarnRDSSnapUnencryptedID),
-			DBSnapshotArn:        aws.String(WarnRDSSnapUnencryptedARN),
+			DBSnapshotIdentifier: aws.String(WarnDBISnapUnencryptedID),
+			DBSnapshotArn:        aws.String(WarnDBISnapUnencryptedARN),
 			DBInstanceIdentifier: aws.String(ProdDbiID),
 			Status:               aws.String("available"),
 			Engine:               aws.String("postgres"),
@@ -200,10 +200,10 @@ func buildRDSSnapInstances() []rdstypes.DBSnapshot {
 			SourceRegion:         aws.String("us-east-1"),
 		},
 
-		// 7. WarnRDSSnapOrphanID — Warning orphan: parent "deleted-legacy-db" NOT in dbi list.
+		// 7. WarnDBISnapOrphanID — Warning orphan: parent "deleted-legacy-db" NOT in dbi list.
 		{
-			DBSnapshotIdentifier: aws.String(WarnRDSSnapOrphanID),
-			DBSnapshotArn:        aws.String(WarnRDSSnapOrphanARN),
+			DBSnapshotIdentifier: aws.String(WarnDBISnapOrphanID),
+			DBSnapshotArn:        aws.String(WarnDBISnapOrphanARN),
 			DBInstanceIdentifier: aws.String("deleted-legacy-db"),
 			Status:               aws.String("available"),
 			Engine:               aws.String("mysql"),
@@ -221,13 +221,13 @@ func buildRDSSnapInstances() []rdstypes.DBSnapshot {
 			SourceRegion:         aws.String("us-east-1"),
 		},
 
-		// 8. WarnRDSSnapPastRetentionID — Warning: automated, 30 days old,
+		// 8. WarnDBISnapPastRetentionID — Warning: automated, 30 days old,
 		// parent ProdDbiRetentionParentID with BackupRetentionPeriod=7.
 		// SnapshotCreateTime computed relative to time.Now() so the enricher
 		// always sees this as past-retention regardless of test date.
 		{
-			DBSnapshotIdentifier: aws.String(WarnRDSSnapPastRetentionID),
-			DBSnapshotArn:        aws.String(WarnRDSSnapPastRetentionARN),
+			DBSnapshotIdentifier: aws.String(WarnDBISnapPastRetentionID),
+			DBSnapshotArn:        aws.String(WarnDBISnapPastRetentionARN),
 			DBInstanceIdentifier: aws.String(ProdDbiRetentionParentID),
 			Status:               aws.String("available"),
 			Engine:               aws.String("postgres"),
@@ -245,12 +245,12 @@ func buildRDSSnapInstances() []rdstypes.DBSnapshot {
 			SourceRegion:         aws.String("us-east-1"),
 		},
 
-		// 9. MultiW1RDSSnapID — U7a multi-W1: Encrypted=false + orphan.
+		// 9. MultiW1DBISnapID — U7a multi-W1: Encrypted=false + orphan.
 		// DBInstanceIdentifier="deleted-legacy-db" is NOT in the dbi list.
 		// Expected Status: "unencrypted (+1)".
 		{
-			DBSnapshotIdentifier: aws.String(MultiW1RDSSnapID),
-			DBSnapshotArn:        aws.String(MultiW1RDSSnapARN),
+			DBSnapshotIdentifier: aws.String(MultiW1DBISnapID),
+			DBSnapshotArn:        aws.String(MultiW1DBISnapARN),
 			DBInstanceIdentifier: aws.String("deleted-legacy-db"),
 			Status:               aws.String("available"),
 			Engine:               aws.String("mysql"),
@@ -268,12 +268,12 @@ func buildRDSSnapInstances() []rdstypes.DBSnapshot {
 			SourceRegion:         aws.String("us-east-1"),
 		},
 
-		// 10. BackupCoveredRDSSnapID — AWS Backup-prefixed identifier.
+		// 10. BackupCoveredDBISnapID — AWS Backup-prefixed identifier.
 		// Verifies that identifiers with the "awsbackup:" prefix are handled correctly.
-		// backup pivot: 2 recovery points added to backup.go pointing at BackupCoveredRDSSnapARN.
+		// backup pivot: 2 recovery points added to backup.go pointing at BackupCoveredDBISnapARN.
 		{
-			DBSnapshotIdentifier: aws.String(BackupCoveredRDSSnapID),
-			DBSnapshotArn:        aws.String(BackupCoveredRDSSnapARN),
+			DBSnapshotIdentifier: aws.String(BackupCoveredDBISnapID),
+			DBSnapshotArn:        aws.String(BackupCoveredDBISnapARN),
 			DBInstanceIdentifier: aws.String(ProdDbiID),
 			Status:               aws.String("available"),
 			Engine:               aws.String("postgres"),
@@ -291,12 +291,12 @@ func buildRDSSnapInstances() []rdstypes.DBSnapshot {
 			SourceRegion:         aws.String("us-east-1"),
 		},
 
-		// 11. SeverityBrokenWarnRDSSnapID — U8 severity: Broken beats Warning.
+		// 11. SeverityBrokenWarnDBISnapID — U8 severity: Broken beats Warning.
 		// Status=failed + Encrypted=false → phrase = "failed" (Broken wins;
 		// Encrypted=false suppressed when Status is a non-available end-state).
 		{
-			DBSnapshotIdentifier: aws.String(SeverityBrokenWarnRDSSnapID),
-			DBSnapshotArn:        aws.String(SeverityBrokenWarnRDSSnapARN),
+			DBSnapshotIdentifier: aws.String(SeverityBrokenWarnDBISnapID),
+			DBSnapshotArn:        aws.String(SeverityBrokenWarnDBISnapARN),
 			DBInstanceIdentifier: aws.String(ProdDbiID),
 			Status:               aws.String("failed"),
 			Engine:               aws.String("postgres"),

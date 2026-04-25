@@ -110,21 +110,21 @@ func checkDbiAlarm(ctx context.Context, clients any, res resource.Resource, cach
 	return relatedResult("alarm", ids)
 }
 
-// checkDbiRDSSnap searches the rds-snap cache for snapshots whose DBInstanceIdentifier
+// checkDbiDBISnap searches the dbi-snap cache for snapshots whose DBInstanceIdentifier
 // matches this DB instance's identifier.
 // Pattern C — reverse cache lookup.
-func checkDbiRDSSnap(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkDbiDBISnap(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	dbIdentifier := res.ID
 	if dbIdentifier == "" {
-		return resource.RelatedCheckResult{TargetType: "rds-snap", Count: 0}
+		return resource.RelatedCheckResult{TargetType: "dbi-snap", Count: 0}
 	}
 
-	snapList, truncated, err := dbiRelatedResources(ctx, clients, cache, "rds-snap")
+	snapList, truncated, err := dbiRelatedResources(ctx, clients, cache, "dbi-snap")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "rds-snap", Count: -1, Err: err}
+		return resource.RelatedCheckResult{TargetType: "dbi-snap", Count: -1, Err: err}
 	}
 	if snapList == nil {
-		return resource.ApproximateZero("rds-snap")
+		return resource.ApproximateZero("dbi-snap")
 	}
 
 	var ids []string
@@ -138,9 +138,9 @@ func checkDbiRDSSnap(ctx context.Context, clients any, res resource.Resource, ca
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("rds-snap")
+		return resource.ApproximateZero("dbi-snap")
 	}
-	return relatedResult("rds-snap", ids)
+	return relatedResult("dbi-snap", ids)
 }
 
 // checkDBILogs searches the logs cache for log groups matching the RDS naming convention.

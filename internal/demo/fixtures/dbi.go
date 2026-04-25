@@ -71,7 +71,7 @@ const (
 	WarnDbiPublicMaintARN = "arn:aws:rds:us-east-1:123456789012:db:warn-dbi-public-maint"
 
 	// ProdDbiRetentionParentID — healthy DBI with BackupRetentionPeriod=7.
-	// Used by rds-snap fixtures to test the "automated snapshot past retention" enricher signal.
+	// Used by dbi-snap fixtures to test the "automated snapshot past retention" enricher signal.
 	ProdDbiRetentionParentID  = "prod-dbi-retention-parent"
 	ProdDbiRetentionParentARN = "arn:aws:rds:us-east-1:123456789012:db:prod-dbi-retention-parent"
 
@@ -250,7 +250,7 @@ func buildDBIInstances() []rdstypes.DBInstance {
 	warnPublicMaint.PubliclyAccessible = aws.Bool(true)
 
 	// 14. prod-dbi-retention-parent — Healthy DBI with BackupRetentionPeriod=7.
-	// Used as the parent of WarnRDSSnapPastRetentionID in rds-snap fixtures to
+	// Used as the parent of WarnDBISnapPastRetentionID in dbi-snap fixtures to
 	// trigger the "automated snapshot past BackupRetentionPeriod" enricher signal.
 	retentionParent := dbiBaselineHealthy(ProdDbiRetentionParentID, ProdDbiRetentionParentARN)
 	retentionParent.BackupRetentionPeriod = aws.Int32(7)

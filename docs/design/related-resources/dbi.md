@@ -15,7 +15,7 @@
 | Related Resource | How to Find | Scenario | Priority |
 |-----------------|-------------|----------|----------|
 | CloudWatch Alarms (alarm) | Search alarms with `DBInstanceIdentifier` dimension matching this instance ID. Common alarms: CPUUtilization, FreeableMemory, DatabaseConnections, FreeStorageSpace, ReplicaLag. | "What monitoring watches this DB?" During incidents, check if alarms already fired. | P0 |
-| RDS Snapshots (rds-snap) | `rds:DescribeDBSnapshots` with `DBInstanceIdentifier` filter. Returns both automated and manual snapshots. | "When was the last backup? Are there pre-migration safety snapshots?" | P0 |
+| DB Instance Snapshots (dbi-snap) | `rds:DescribeDBSnapshots` with `DBInstanceIdentifier` filter. Returns both automated and manual snapshots. | "When was the last backup? Are there pre-migration safety snapshots?" | P0 |
 | CloudFormation Stacks (cfn) | Check for `aws:cloudformation:stack-name` tag. | "Which IaC stack manages this DB?" | P2 |
 | Backup Recovery Points (not in a9s) | `backup:ListRecoveryPointsByResource` with this DB instance's ARN. | "Is this DB in an AWS Backup plan?" | P2 |
 

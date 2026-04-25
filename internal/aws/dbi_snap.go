@@ -13,38 +13,38 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("rds-snap", []string{"snapshot_id", "db_instance", "status", "engine", "snapshot_type", "created", "arn"})
+	resource.RegisterFieldKeys("dbi-snap", []string{"snapshot_id", "db_instance", "status", "engine", "snapshot_type", "created", "arn"})
 
 	// dbc pivot is intentionally NOT registered here: real AWS rejects
-	// CreateDBSnapshot on Aurora cluster members, so an rds-snap (DBSnapshot)
+	// CreateDBSnapshot on Aurora cluster members, so an dbi-snap (DBSnapshot)
 	// is structurally never associated with a DBCluster. Aurora cluster
 	// snapshots live in dbc-snap (DBClusterSnapshot). A registered pivot that
 	// always resolves Count=0 is dead UX — drop it.
-	resource.RegisterRelated("rds-snap", []resource.RelatedDef{
-		{TargetType: "dbi", DisplayName: "DB Instances", Checker: checkRDSSnapDBI, NeedsTargetCache: true},
-		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkRDSSnapKMS, NeedsTargetCache: true},
-		{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkRDSSnapBackup},
-		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkRDSSnapCTEvents, NeedsTargetCache: true},
+	resource.RegisterRelated("dbi-snap", []resource.RelatedDef{
+		{TargetType: "dbi", DisplayName: "DB Instances", Checker: checkDBISnapDBI, NeedsTargetCache: true},
+		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkDBISnapKMS, NeedsTargetCache: true},
+		{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkDBISnapBackup},
+		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkDBISnapCTEvents, NeedsTargetCache: true},
 	})
 
 	// rdstypes.DBSnapshot does not expose a VpcId field — only DBInstanceIdentifier
 	// and KmsKeyId resolve directly. The vpc pivot (when needed) is reachable via
 	// the dbi cross-ref.
-	resource.RegisterNavigableFields("rds-snap", []resource.NavigableField{
+	resource.RegisterNavigableFields("dbi-snap", []resource.NavigableField{
 		{FieldPath: "DBInstanceIdentifier", TargetType: "dbi"},
 		{FieldPath: "KmsKeyId", TargetType: "kms"},
 	})
 
-	resource.RegisterPaginated("rds-snap", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginated("dbi-snap", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchRDSSnapshotsPage(ctx, c.RDS, continuationToken)
+		return FetchDBISnapshotsPage(ctx, c.RDS, continuationToken)
 	})
 }
 
-// ComputeRDSSnapStatusAndIssues computes the §4 status phrase and ordered issues
+// ComputeDBISnapStatusAndIssues computes the §4 status phrase and ordered issues
 // slice for an RDS snapshot. Returns ("", nil) for a healthy (available + encrypted)
 // snapshot. The top phrase is used as Resource.Status; the full slice as Resource.Issues.
 //
@@ -56,7 +56,7 @@ func init() {
 //
 // Cross-ref signals (orphan, past-retention) are added by the Wave-1 issue enricher
 // which has access to the sibling dbi cache.
-func ComputeRDSSnapStatusAndIssues(snap rdstypes.DBSnapshot) (string, []string) {
+func ComputeDBISnapStatusAndIssues(snap rdstypes.DBSnapshot) (string, []string) {
 	rawStatus := ""
 	if snap.Status != nil {
 		rawStatus = *snap.Status
@@ -116,13 +116,13 @@ func buildStatusFromIssues(issues []string) string {
 	return resource.BumpFindingSuffix(issues[0])
 }
 
-// FetchRDSSnapshots calls the RDS DescribeDBSnapshots API and converts the
+// FetchDBISnapshots calls the RDS DescribeDBSnapshots API and converts the
 // response into a slice of generic Resource structs.
-func FetchRDSSnapshots(ctx context.Context, api RDSDescribeDBSnapshotsAPI) ([]resource.Resource, error) {
+func FetchDBISnapshots(ctx context.Context, api RDSDescribeDBSnapshotsAPI) ([]resource.Resource, error) {
 	var all []resource.Resource
 	token := ""
 	for {
-		result, err := FetchRDSSnapshotsPage(ctx, api, token)
+		result, err := FetchDBISnapshotsPage(ctx, api, token)
 		if err != nil {
 			return nil, err
 		}
@@ -135,8 +135,8 @@ func FetchRDSSnapshots(ctx context.Context, api RDSDescribeDBSnapshotsAPI) ([]re
 	return all, nil
 }
 
-// FetchRDSSnapshotsPage fetches a single page of RDS snapshots.
-func FetchRDSSnapshotsPage(ctx context.Context, api RDSDescribeDBSnapshotsAPI, continuationToken string) (resource.FetchResult, error) {
+// FetchDBISnapshotsPage fetches a single page of RDS snapshots.
+func FetchDBISnapshotsPage(ctx context.Context, api RDSDescribeDBSnapshotsAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &rds.DescribeDBSnapshotsInput{
 		MaxRecords: aws.Int32(DefaultPageSize),
 	}
@@ -195,7 +195,7 @@ func FetchRDSSnapshotsPage(ctx context.Context, api RDSDescribeDBSnapshotsAPI, c
 		// Compute §4 status phrase and ordered issues slice per §0.1 precedence ladder.
 		// computedStatus is empty for healthy (available+encrypted) snapshots.
 		// r.Status stores the §4 phrase (consistent with all other resource types).
-		computedStatus, allIssues := ComputeRDSSnapStatusAndIssues(snap)
+		computedStatus, allIssues := ComputeDBISnapStatusAndIssues(snap)
 
 		r := resource.Resource{
 			ID:     snapshotID,

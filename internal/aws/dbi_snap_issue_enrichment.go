@@ -1,6 +1,6 @@
-// rds_snap_issue_enrichment.go — cross-ref enricher for rds-snap.
+// rds_snap_issue_enrichment.go — cross-ref enricher for dbi-snap.
 //
-// The enricher detects two signals from docs/resources/rds-snap.md §3.1
+// The enricher detects two signals from docs/resources/dbi-snap.md §3.1
 // that require sibling-cache access (and therefore can't run inside the
 // fetcher):
 //
@@ -21,7 +21,7 @@
 // is non-idempotent on re-runs and would duplicate Attention entries that
 // already render via Findings.
 //
-// docs/resources/rds-snap.md §4 surface mapping was updated in the same
+// docs/resources/dbi-snap.md §4 surface mapping was updated in the same
 // commit to acknowledge cross-ref signals reach S1+S3+S5.
 package aws
 
@@ -36,13 +36,13 @@ import (
 )
 
 func init() {
-	registerIssueEnricher("rds-snap", enrichRDSSnapCrossRef, 100)
+	registerIssueEnricher("dbi-snap", enrichDBISnapCrossRef, 100)
 }
 
-// enrichRDSSnapCrossRef is the cross-ref enricher for RDS snapshots. Zero
+// enrichDBISnapCrossRef is the cross-ref enricher for RDS snapshots. Zero
 // API calls; nil clients are safe; idempotent on repeated runs (Findings
 // and FieldUpdates both overwrite per resource ID).
-func enrichRDSSnapCrossRef(
+func enrichDBISnapCrossRef(
 	_ context.Context,
 	_ *ServiceClients,
 	resources []resource.Resource,
