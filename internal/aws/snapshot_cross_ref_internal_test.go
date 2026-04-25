@@ -1,13 +1,14 @@
-// rds_snap_issue_enrichment_internal_test.go — internal package tests for the
-// unexported computeMergedStatus helper. Lives in internal/aws (not tests/unit)
-// so the test can name the unexported symbol directly.
+// snapshot_cross_ref_internal_test.go — internal package tests for the
+// unexported computeMergedStatus helper used by EnrichSnapshotCrossRef.
+// Lives in internal/aws (not tests/unit) so the test can name the
+// unexported symbol directly.
 //
 // The helper is currently unreachable in its multi-phrase branch from the
-// dbi-snap enricher itself (orphan and past-retention are mutually exclusive
-// by construction — parent absent XOR parent present). But Codex's review
-// flagged the function as a landmine for future cross-ref enrichers that
-// emit ≥2 phrases simultaneously. This test pins the contract loudly so a
-// future reviewer doesn't trip the off-by-one trap.
+// snapshot enrichers themselves (orphan and past-retention are mutually
+// exclusive by construction — parent absent XOR parent present). But
+// Codex's review flagged the function as a landmine for future cross-ref
+// enrichers that emit ≥2 phrases simultaneously. This test pins the
+// contract loudly so a future reviewer doesn't trip the off-by-one trap.
 package aws
 
 import (
