@@ -430,10 +430,10 @@ QA test that needs it.
 - `.a9s/views/backup.yaml` — regenerate.
 - `internal/demo/fixtures/backup.go` — replace with the §2 set.
 - `internal/demo/fakes/backup.go` — may need extension:
-    - `GetBackupPlan` must return the plan's Rules (currently returns empty).
-    - `DescribeBackupVault` must return EncryptionKeyArn (currently empty).
-    - `GetBackupVaultNotifications` must return SNSTopicArn when the vault has one.
-    - `ListBackupJobs` must return the fixture's Jobs slice (currently empty).
+  - `GetBackupPlan` must return the plan's Rules (currently returns empty).
+  - `DescribeBackupVault` must return EncryptionKeyArn (currently empty).
+  - `GetBackupVaultNotifications` must return SNSTopicArn when the vault has one.
+  - `ListBackupJobs` must return the fixture's Jobs slice (currently empty).
     The coder running the `a9s-create-demo-fixture` skill will add fields to the
     BackupFixtures struct and wire the fakes accordingly.
 

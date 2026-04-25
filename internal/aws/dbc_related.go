@@ -13,18 +13,92 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
+// dbcClusterIdentifier extracts DBClusterIdentifier from either
+// docdb_types.DBCluster or rdstypes.DBCluster RawStruct shape — the dbc
+// fetcher merges results from both engines.
+func dbcClusterIdentifier(raw any) string {
+	if c, ok := assertStruct[docdb_types.DBCluster](raw); ok && c.DBClusterIdentifier != nil {
+		return *c.DBClusterIdentifier
+	}
+	if c, ok := assertStruct[rdstypes.DBCluster](raw); ok && c.DBClusterIdentifier != nil {
+		return *c.DBClusterIdentifier
+	}
+	return ""
+}
+
+// dbcClusterVpcSecurityGroupIDs returns the VPC SG IDs from either shape.
+// Returns (ids, true) when the RawStruct is a recognised cluster shape (even if
+// no SGs are attached); returns (nil, false) when the type is unrecognised.
+func dbcClusterVpcSecurityGroupIDs(raw any) ([]string, bool) {
+	if c, ok := assertStruct[docdb_types.DBCluster](raw); ok {
+		var ids []string
+		for _, sg := range c.VpcSecurityGroups {
+			if sg.VpcSecurityGroupId != nil && *sg.VpcSecurityGroupId != "" {
+				ids = append(ids, *sg.VpcSecurityGroupId)
+			}
+		}
+		return ids, true
+	}
+	if c, ok := assertStruct[rdstypes.DBCluster](raw); ok {
+		var ids []string
+		for _, sg := range c.VpcSecurityGroups {
+			if sg.VpcSecurityGroupId != nil && *sg.VpcSecurityGroupId != "" {
+				ids = append(ids, *sg.VpcSecurityGroupId)
+			}
+		}
+		return ids, true
+	}
+	return nil, false
+}
+
+// dbcClusterKmsKeyID returns the KmsKeyId from either shape.
+func dbcClusterKmsKeyID(raw any) string {
+	if c, ok := assertStruct[docdb_types.DBCluster](raw); ok && c.KmsKeyId != nil {
+		return *c.KmsKeyId
+	}
+	if c, ok := assertStruct[rdstypes.DBCluster](raw); ok && c.KmsKeyId != nil {
+		return *c.KmsKeyId
+	}
+	return ""
+}
+
+// dbcClusterSubnetGroupName returns the DBSubnetGroup name from either shape.
+// Both docdb_types.DBCluster.DBSubnetGroup and rdstypes.DBCluster.DBSubnetGroup
+// are *string (the group name), not a struct pointer.
+func dbcClusterSubnetGroupName(raw any) string {
+	if c, ok := assertStruct[docdb_types.DBCluster](raw); ok && c.DBSubnetGroup != nil {
+		return *c.DBSubnetGroup
+	}
+	if c, ok := assertStruct[rdstypes.DBCluster](raw); ok && c.DBSubnetGroup != nil {
+		return *c.DBSubnetGroup
+	}
+	return ""
+}
+
+// dbcClusterMasterSecretARN returns the MasterUserSecret.SecretArn from either shape.
+func dbcClusterMasterSecretARN(raw any) string {
+	if c, ok := assertStruct[docdb_types.DBCluster](raw); ok {
+		if c.MasterUserSecret != nil && c.MasterUserSecret.SecretArn != nil {
+			return *c.MasterUserSecret.SecretArn
+		}
+		return ""
+	}
+	if c, ok := assertStruct[rdstypes.DBCluster](raw); ok {
+		if c.MasterUserSecret != nil && c.MasterUserSecret.SecretArn != nil {
+			return *c.MasterUserSecret.SecretArn
+		}
+		return ""
+	}
+	return ""
+}
+
 // checkDbcSG reads VpcSecurityGroups[] from the DBCluster RawStruct and returns their IDs.
+// Handles both docdb_types.DBCluster and rdstypes.DBCluster shapes.
 // Pattern F — no cache needed.
 func checkDbcSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	cluster, ok := assertStruct[docdb_types.DBCluster](res.RawStruct)
+	ids, ok := dbcClusterVpcSecurityGroupIDs(res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
-	}
-	var ids []string
-	for _, sg := range cluster.VpcSecurityGroups {
-		if sg.VpcSecurityGroupId != nil && *sg.VpcSecurityGroupId != "" {
-			ids = append(ids, *sg.VpcSecurityGroupId)
-		}
 	}
 	if len(ids) == 0 {
 		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
@@ -116,10 +190,11 @@ func dbcRelatedResources(ctx context.Context, clients any, cache resource.Resour
 // checkDbcDBI does a reverse lookup — scans the dbi cache for DBInstances
 // whose DBClusterIdentifier matches this cluster's identifier. Aurora /
 // DocumentDB clusters own one or more DBInstance members.
+// Handles both docdb_types.DBCluster and rdstypes.DBCluster shapes.
 func checkDbcDBI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterID := res.ID
-	if cluster, ok := assertStruct[docdb_types.DBCluster](res.RawStruct); ok && cluster.DBClusterIdentifier != nil && *cluster.DBClusterIdentifier != "" {
-		clusterID = *cluster.DBClusterIdentifier
+	if id := dbcClusterIdentifier(res.RawStruct); id != "" {
+		clusterID = id
 	}
 	if clusterID == "" {
 		return resource.RelatedCheckResult{TargetType: "dbi", Count: 0}
@@ -151,10 +226,12 @@ func checkDbcDBI(ctx context.Context, clients any, res resource.Resource, cache 
 
 // checkDbcDbcSnap does a reverse lookup — scans the dbc-snap cache for
 // snapshots whose DBClusterIdentifier matches this cluster's identifier.
+// Handles both docdb_types.DBCluster and rdstypes.DBCluster parent shapes, and
+// both docdb_types.DBClusterSnapshot and rdstypes.DBClusterSnapshot snapshot shapes.
 func checkDbcDbcSnap(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterID := res.ID
-	if cluster, ok := assertStruct[docdb_types.DBCluster](res.RawStruct); ok && cluster.DBClusterIdentifier != nil && *cluster.DBClusterIdentifier != "" {
-		clusterID = *cluster.DBClusterIdentifier
+	if id := dbcClusterIdentifier(res.RawStruct); id != "" {
+		clusterID = id
 	}
 	if clusterID == "" {
 		return resource.RelatedCheckResult{TargetType: "dbc-snap", Count: 0}
@@ -170,11 +247,14 @@ func checkDbcDbcSnap(ctx context.Context, clients any, res resource.Resource, ca
 
 	var ids []string
 	for _, snapRes := range snapList {
-		snap, ok := assertStruct[docdb_types.DBClusterSnapshot](snapRes.RawStruct)
-		if !ok {
-			continue
+		// The dbc-snap cache contains a mix of docdbtypes and rdstypes snapshots.
+		snapClusterID := ""
+		if snap, ok := assertStruct[docdb_types.DBClusterSnapshot](snapRes.RawStruct); ok && snap.DBClusterIdentifier != nil {
+			snapClusterID = *snap.DBClusterIdentifier
+		} else if snap, ok := assertStruct[rdstypes.DBClusterSnapshot](snapRes.RawStruct); ok && snap.DBClusterIdentifier != nil {
+			snapClusterID = *snap.DBClusterIdentifier
 		}
-		if snap.DBClusterIdentifier != nil && *snap.DBClusterIdentifier == clusterID {
+		if snapClusterID == clusterID {
 			ids = append(ids, snapRes.ID)
 		}
 	}
@@ -218,12 +298,19 @@ func checkDbcVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 // dbcSubnetGroup makes a single docdb:DescribeDBSubnetGroups call for this
 // cluster's DBSubnetGroup name, wrapped in RetryOnThrottle. Returns nil if
 // the call cannot be made or the group was not found.
+//
+// Known limitation: for rdstypes.DBCluster (Aurora) shapes, the subnet group
+// belongs to RDS, not DocDB. The current call goes to c.DocDB.DescribeDBSubnetGroups
+// which will return empty for an Aurora cluster's subnet group.
+// TODO: add a c.RDS.DescribeDBSubnetGroups fallback for rdstypes.DBCluster shapes so
+// that Aurora → subnet and Aurora → vpc pivots resolve correctly in real accounts.
+// For demo mode this is papered over by populating the DocDB fake's subnet group list
+// with the Aurora subnet group entry.
 func dbcSubnetGroup(ctx context.Context, clients any, res resource.Resource) *docdb_types.DBSubnetGroup {
-	cluster, ok := assertStruct[docdb_types.DBCluster](res.RawStruct)
-	if !ok || cluster.DBSubnetGroup == nil || *cluster.DBSubnetGroup == "" {
+	name := dbcClusterSubnetGroupName(res.RawStruct)
+	if name == "" {
 		return nil
 	}
-	name := *cluster.DBSubnetGroup
 
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.DocDB == nil {
@@ -243,15 +330,18 @@ func dbcSubnetGroup(ctx context.Context, clients any, res resource.Resource) *do
 // checkDbcSecrets resolves the Secrets Manager secret managed for this cluster's
 // master user password. DBCluster.MasterUserSecret.SecretArn holds the full
 // secret ARN; we match it against the secrets cache by ARN.
+// Handles both docdb_types.DBCluster and rdstypes.DBCluster shapes.
 func checkDbcSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	cluster, ok := assertStruct[docdb_types.DBCluster](res.RawStruct)
-	if !ok {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
-	}
-	if cluster.MasterUserSecret == nil || cluster.MasterUserSecret.SecretArn == nil || *cluster.MasterUserSecret.SecretArn == "" {
+	secretARN := dbcClusterMasterSecretARN(res.RawStruct)
+	if secretARN == "" {
+		// Check whether the raw struct was even a valid cluster shape.
+		if _, ok1 := assertStruct[docdb_types.DBCluster](res.RawStruct); !ok1 {
+			if _, ok2 := assertStruct[rdstypes.DBCluster](res.RawStruct); !ok2 {
+				return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
+			}
+		}
 		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
 	}
-	secretARN := *cluster.MasterUserSecret.SecretArn
 
 	secretList, truncated, err := dbcRelatedResources(ctx, clients, cache, "secrets")
 	if err != nil {
@@ -278,15 +368,15 @@ func checkDbcSecrets(ctx context.Context, clients any, res resource.Resource, ca
 	return relatedResult("secrets", ids)
 }
 
-// checkDbcKMS extracts the KMS key from the DocumentDB DBCluster's KmsKeyId field.
+// checkDbcKMS extracts the KMS key from the DBCluster's KmsKeyId field.
 // KmsKeyId is a KMS key ARN. Returns the key ID (last segment after "/").
+// Handles both docdb_types.DBCluster and rdstypes.DBCluster shapes.
 // Pattern F — no cache needed.
 func checkDbcKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	cluster, ok := assertStruct[docdb_types.DBCluster](res.RawStruct)
-	if !ok || cluster.KmsKeyId == nil || *cluster.KmsKeyId == "" {
+	keyID := dbcClusterKmsKeyID(res.RawStruct)
+	if keyID == "" {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
-	keyID := *cluster.KmsKeyId
 	if idx := strings.LastIndex(keyID, "/"); idx >= 0 && idx < len(keyID)-1 {
 		keyID = keyID[idx+1:]
 	}

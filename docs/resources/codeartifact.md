@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `codeartifact`
 - **Display name**: CodeArtifact Repos
-- **AWS API reference**: https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_Repository.html
+- **AWS API reference**: <https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_Repository.html>
 - **List API**: `ListRepositories` (returns `RepositorySummary[]`).
 - **Describe API (if any)**: `ListPackages(maxResults=1)` per repo for the Wave 2 "unused-repo" signal; `DescribeDomain` for the `kms` pivot. `DescribeRepository` is Wave 3 (out of scope) per `docs/attention-signals.md`.
 

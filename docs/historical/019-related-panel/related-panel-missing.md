@@ -122,7 +122,7 @@ Status: either no `RegisterRelated` entry exists, or the entry points to a delet
 | `tgw` | `vpc` | no registration | — |
 | `waf` | `role` | registered but function deleted | `checkWAFRole` |
 
-## For each (parent, related) pair, the DevOps reviewer must answer:
+## For each (parent, related) pair, the DevOps reviewer must answer
 
 **(a) Can the parent resource even have this related resource?** (yes / no / sometimes — explain)
 

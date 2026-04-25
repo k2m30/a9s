@@ -257,6 +257,7 @@ row := borderStyle.Render("|") + leftContent + separator + rightContent + border
 ```
 
 When the right column is hidden (`r` toggled off):
+
 ```
 row := borderStyle.Render("|") + renderDetailField(field, innerW) + borderStyle.Render("|")
 ```
@@ -862,6 +863,7 @@ Notes:
 ### View Stack Examples
 
 Simple: field navigation:
+
 ```
 push(MainMenu) -> push(ec2-list) -> push(ec2-detail:i-abc)
   -> [Enter on VpcId] push(vpc-detail:vpc-xxx)
@@ -869,6 +871,7 @@ push(MainMenu) -> push(ec2-list) -> push(ec2-detail:i-abc)
 ```
 
 Chained via right column:
+
 ```
 push(MainMenu) -> push(ec2-list) -> push(ec2-detail:i-abc)
   -> [Tab, Enter on "CloudWatch Alarms"] push(alarm-list:filtered-to-i-abc)
@@ -877,6 +880,7 @@ push(MainMenu) -> push(ec2-list) -> push(ec2-detail:i-abc)
 ```
 
 Mixed navigation:
+
 ```
 push(ec2-detail:i-abc) -> [Enter on sg-0ccc333] push(sg-detail:sg-0ccc333)
   -> [Tab, Enter on "EC2 Instances"] push(ec2-list:filtered-to-sg-0ccc333)

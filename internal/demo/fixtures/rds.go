@@ -17,6 +17,10 @@ type RDSFixtures struct {
 	DBSnapshots []rdstypes.DBSnapshot
 	// Events is a shared list of events returned by DescribeEvents.
 	Events []rdstypes.Event
+	// DBClusters is the full list returned by DescribeDBClusters (Aurora + Multi-AZ).
+	DBClusters []rdstypes.DBCluster
+	// DBClusterSnapshots is the full list returned by DescribeDBClusterSnapshots (Aurora + Multi-AZ).
+	DBClusterSnapshots []rdstypes.DBClusterSnapshot
 }
 
 // NewRDSFixtures builds and returns a fully-populated RDSFixtures struct.
@@ -27,9 +31,11 @@ func NewRDSFixtures() *RDSFixtures {
 	dbi := NewDBIFixtures()
 	legacy := buildRDSInstances()
 	return &RDSFixtures{
-		DBInstances: append(dbi.Instances, legacy...),
-		DBSnapshots: NewDBISnapFixtures().Instances,
-		Events:      buildRDSEvents(),
+		DBInstances:        append(dbi.Instances, legacy...),
+		DBSnapshots:        NewDBISnapFixtures().Instances,
+		Events:             buildRDSEvents(),
+		DBClusters:         buildRDSDBClusters(),
+		DBClusterSnapshots: buildRDSDBClusterSnapshots(),
 	}
 }
 
@@ -443,6 +449,68 @@ func buildRDSInstances() []rdstypes.DBInstance {
 	return named
 }
 
+
+// buildRDSDBClusters returns Aurora + Multi-AZ DB clusters for the RDS fake.
+// prod-aurora-cluster is the "all pivots non-zero" graph-root for the Aurora
+// dbc fixture: every registered dbc pivot resolves on it.
+func buildRDSDBClusters() []rdstypes.DBCluster {
+	return []rdstypes.DBCluster{
+		{
+			DBClusterIdentifier:        aws.String("prod-aurora-cluster"),
+			DBClusterArn:               aws.String("arn:aws:rds:us-east-1:123456789012:cluster:prod-aurora-cluster"),
+			Engine:                     aws.String("aurora-postgresql"),
+			EngineVersion:              aws.String("16.4"),
+			Status:                     aws.String("available"),
+			Endpoint:                   aws.String("prod-aurora-cluster.cluster-c9xyz123.us-east-1.rds.amazonaws.com"),
+			ReaderEndpoint:             aws.String("prod-aurora-cluster.cluster-ro-xyz.us-east-1.rds.amazonaws.com"),
+			Port:                       aws.Int32(5432),
+			StorageEncrypted:           aws.Bool(true),
+			KmsKeyId:                   aws.String(rdsKMSKeyID),
+			DeletionProtection:         aws.Bool(true),
+			BackupRetentionPeriod:      aws.Int32(7),
+			PreferredMaintenanceWindow: aws.String("sun:05:00-sun:06:00"),
+			DBSubnetGroup: aws.String(rdsSubnetGroup),
+			VpcSecurityGroups: []rdstypes.VpcSecurityGroupMembership{
+				{VpcSecurityGroupId: aws.String(rdsProdRDSSGID), Status: aws.String("active")},
+			},
+			DBClusterMembers: []rdstypes.DBClusterMember{
+				{DBInstanceIdentifier: aws.String("prod-dbi-aurora-1"), IsClusterWriter: aws.Bool(true)},
+			},
+			MasterUsername: aws.String("pgadmin"),
+			MasterUserSecret: &rdstypes.MasterUserSecret{
+				SecretArn: aws.String(ProdDbcAuroraMasterSecretARN),
+			},
+			MultiAZ:           aws.Bool(true),
+			ClusterCreateTime: aws.Time(time.Date(2025, 3, 1, 12, 0, 0, 0, time.UTC)),
+		},
+	}
+}
+
+// buildRDSDBClusterSnapshots returns Aurora + Multi-AZ DB cluster snapshots.
+// ProdDBCSnapAuroraID provides the Aurora dbc→dbc-snap pivot and the dbc-snap
+// graph-root for drill-through tests.
+func buildRDSDBClusterSnapshots() []rdstypes.DBClusterSnapshot {
+	return []rdstypes.DBClusterSnapshot{
+		{
+			DBClusterSnapshotIdentifier: aws.String(ProdDBCSnapAuroraID),
+			DBClusterIdentifier:         aws.String("prod-aurora-cluster"),
+			DBClusterSnapshotArn:        aws.String(ProdDBCSnapAuroraARN),
+			Status:                      aws.String("available"),
+			Engine:                      aws.String("aurora-postgresql"),
+			EngineVersion:               aws.String("16.4"),
+			SnapshotType:                aws.String("automated"),
+			SnapshotCreateTime:          aws.Time(time.Date(2026, 4, 15, 4, 0, 0, 0, time.UTC)),
+			ClusterCreateTime:           aws.Time(time.Date(2025, 3, 1, 12, 0, 0, 0, time.UTC)),
+			MasterUsername:              aws.String("pgadmin"),
+			Port:                        aws.Int32(5432),
+			KmsKeyId:                    aws.String(rdsKMSKeyID),
+			PercentProgress:             aws.Int32(100),
+			StorageType:                 aws.String("aurora"),
+			StorageEncrypted:            aws.Bool(true),
+			VpcId:                       aws.String(rdsProdVPCID),
+		},
+	}
+}
 
 func buildRDSEvents() []rdstypes.Event {
 	t1 := time.Date(2026, 3, 20, 10, 0, 0, 0, time.UTC)

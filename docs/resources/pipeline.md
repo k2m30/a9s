@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `pipeline`
 - **Display name**: CodePipelines
-- **AWS API reference**: https://docs.aws.amazon.com/codepipeline/latest/APIReference/API_PipelineDeclaration.html
+- **AWS API reference**: <https://docs.aws.amazon.com/codepipeline/latest/APIReference/API_PipelineDeclaration.html>
 - **List API**: `ListPipelines` — returns `PipelineSummary[]`. Per `attention-signals.md`, `ListPipelines` is config-only: the summary carries `Name`, `Version`, `Created`, `Updated`, `ExecutionMode`, `PipelineType` and nothing about execution health — so no Wave 1 health signal is reachable from the list alone.
 - **Describe API (if any)**: Two calls, both per-pipeline, used in Wave 2:
   - `GetPipelineState` — returns `stageStates[].latestExecution.status` used by every Wave 2 health signal.

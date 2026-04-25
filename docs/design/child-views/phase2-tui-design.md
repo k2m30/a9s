@@ -26,26 +26,31 @@ Child views follow the same pattern. See the `s3_objects` and `r53_records` entr
 
 Design child views for all MUST-HAVE and SHOULD-HAVE resources from the approved research.
 
-### Per child view, produce:
+### Per child view, produce
 
 #### 1. views.yaml entry
+
 The `list` and `detail` config, same format as `s3_objects` in `.a9s/views.yaml`. This is the primary deliverable — it defines what columns appear and what fields the detail view shows. Use web search to look up the actual AWS SDK response struct field names.
 
 #### 2. Navigation spec
+
 - **Entry**: how the user reaches this view (Enter on parent resource list)
 - **Frame title format**: e.g., `lambda-invocations(25) — my-function`
 - **View stack**: Esc returns to parent. If this child has its own children, describe the chain.
 - **New key bindings**: only if this child view needs keys beyond the standard set (j/k/g/G/Enter/d/y/c/Esc/filter/sort). Most won't.
 
 #### 3. ASCII wireframe
+
 One wireframe per view, same notation as `design.md` sections 4.1–4.8. Realistic data — names a DevOps engineer would recognize. Show normal + selected row states. Include status-colored rows only if the child resource has status semantics.
 
 #### 4. AWS API
+
 - Exact read-only API call(s) that populate this view
 - Pagination notes if relevant
 - Latency warnings if applicable (e.g., CloudWatch GetLogEvents can be slow for large groups)
 
 #### 5. Help screen
+
 Every child view gets its own context-sensitive help screen (shown via `?`). Design a help wireframe that lists:
 - All inherited key bindings that apply to this view (navigation, filter, sort, detail, YAML, copy, etc.)
 - Any **new key bindings** specific to this child view (e.g., `L` to jump to logs for a Lambda invocation)
@@ -56,11 +61,13 @@ Even if a child view adds no new keys, it still needs a help screen — the avai
 **Note on `c` (copy):** The `c` key copies the most useful content to clipboard. What it copies should be context-specific to the child view — it could be an ID, a name, or the actual content (e.g., a log line, a DNS record value, a policy document). Specify what `c` copies for each child view.
 
 #### 6. Nested children (if applicable)
+
 If this child view itself has children (e.g., Lambda invocations → log events), describe each level with the same 5 items above. Each nesting level = separate design file + separate GitHub issue.
 
 ### Output files
 
 One file per child view:
+
 ```
 docs/design/child-views/{parent-shortname}-{child-name}.md
 ```
@@ -77,6 +84,7 @@ For every child view screen (including nested children as separate issues), crea
 - **Title**: `feat: child view — {parent} → {child name}`
 - **Labels**: `enhancement`, `child-view`, and tier label (`must-have` or `should-have`)
 - **Body**:
+
   ```
   ## Summary
   {One paragraph: what this child view shows and why it's valuable}

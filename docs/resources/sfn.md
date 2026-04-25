@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `sfn`
 - **Display name**: Step Functions
-- **AWS API reference**: https://docs.aws.amazon.com/step-functions/latest/apireference/API_StateMachineListItem.html
+- **AWS API reference**: <https://docs.aws.amazon.com/step-functions/latest/apireference/API_StateMachineListItem.html>
 - **List API**: `ListStateMachines` — returns `StateMachineListItem[]` with `Name`, `StateMachineArn`, `Type` (STANDARD | EXPRESS), `CreationDate`. Per `attention-signals.md`, this list is config-only: the summary carries no status field, so **no Wave 1 health signal is reachable from the list alone**.
 - **Describe API (if any)**: Two calls, both per-state-machine, used in Wave 2 / related discovery:
   - `ListExecutions(statusFilter=FAILED, maxResults=1)` — the only Wave 2 attention call; returns the most recent failed execution so a9s can flag recent-failure or consecutive-failure state.

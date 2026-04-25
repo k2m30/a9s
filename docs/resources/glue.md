@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `glue`
 - **Display name**: Glue Jobs
-- **AWS API reference**: https://docs.aws.amazon.com/glue/latest/webapi/API_Job.html
+- **AWS API reference**: <https://docs.aws.amazon.com/glue/latest/webapi/API_Job.html>
 - **List API**: `GetJobs` — returns `Job[]`. Per `attention-signals.md` §Data & Analytics, this is a **configuration-only** shape: it carries the job definition (`Name`, `Role`, `Command`, `Connections`, `DefaultArguments`, `SecurityConfiguration`, `LogUri`, `CreatedOn`, `LastModifiedOn`, etc.) but no runtime state. Every attention signal therefore lives in Wave 2.
 - **Describe API (if any)**: `GetJobRuns(JobName, MaxResults=1)` per job — used in Wave 2 to read the latest `JobRun.JobRunState` and `JobRun.ErrorMessage`. The API returns runs ordered by `StartedOn` descending, so `MaxResults=1` yields the most recent execution.
 

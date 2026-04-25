@@ -73,6 +73,7 @@ Source struct: `ebtypes.Target` (from `eventbridge` or `cloudwatchevents` packag
 ```
 
 Another example — rule with ECS target:
+
 ```
  a9s v0.5.0  prod:us-east-1                                              ? for help
 ┌──────────── eb-targets(1) — scheduled-report-generator ────────────────────────┐
@@ -82,6 +83,7 @@ Another example — rule with ECS target:
 ```
 
 Scrolled right to show Input column:
+
 ```
 │ RESOURCE                       INPUT                                             │
 │ Lambda: data-pipeline-daily    {"mode": "full", "date": "<aws.scheduler.exec…   │

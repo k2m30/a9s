@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `opensearch`
 - **Display name**: OpenSearch Domains
-- **AWS API reference**: https://docs.aws.amazon.com/opensearch-service/latest/APIReference/API_DomainStatus.html
+- **AWS API reference**: <https://docs.aws.amazon.com/opensearch-service/latest/APIReference/API_DomainStatus.html>
 - **List API**: `ListDomainNames` (returns per-domain `DomainName` + `EngineType` only — no state, no config).
 - **Describe API (if any)**: `DescribeDomains` (bounded fan-out, up to 5 domain names per call; returns full `DomainStatus[]`). Used in Wave 2.
 
@@ -177,11 +177,11 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - AWS SDK Go v2 — `VPCDerivedInfo` fields — `AWS SDK Go v2 — opensearch/types.VPCDerivedInfo § VPCId, SubnetIds, SecurityGroupIds`.
 - AWS SDK Go v2 — `DomainEndpointOptions.CustomEndpointCertificateArn` — `AWS SDK Go v2 — opensearch/types.DomainEndpointOptions § CustomEndpointCertificateArn, CustomEndpointEnabled`.
 - AWS SDK Go v2 — `LogPublishingOption.CloudWatchLogsLogGroupArn` — `AWS SDK Go v2 — opensearch/types.LogPublishingOption § CloudWatchLogsLogGroupArn, Enabled`.
-- AWS API Reference — `DescribeDomains` (bounded fan-out, up to 5 domain names per call) — `AWS API Reference: DescribeDomains` (https://docs.aws.amazon.com/opensearch-service/latest/APIReference/API_DescribeDomains.html).
-- AWS API Reference — CloudWatch metrics for OpenSearch use the `AWS/ES` namespace with `DomainName` dimension — `AWS Developer Guide: Monitoring OpenSearch Service cluster metrics with Amazon CloudWatch` (https://docs.aws.amazon.com/opensearch-service/latest/developerguide/managedomains-cloudwatchmetrics.html).
+- AWS API Reference — `DescribeDomains` (bounded fan-out, up to 5 domain names per call) — `AWS API Reference: DescribeDomains` (<https://docs.aws.amazon.com/opensearch-service/latest/APIReference/API_DescribeDomains.html>).
+- AWS API Reference — CloudWatch metrics for OpenSearch use the `AWS/ES` namespace with `DomainName` dimension — `AWS Developer Guide: Monitoring OpenSearch Service cluster metrics with Amazon CloudWatch` (<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/managedomains-cloudwatchmetrics.html>).
 - a9s-devops consultation — `acm` discovery via `DomainEndpointOptions.CustomEndpointCertificateArn` — `a9s-devops (2026-04-20, persona): possible=yes, worth=yes. Cert is surfaced only when CustomEndpointEnabled; no cert for default *.es.amazonaws.com endpoints.`
 - a9s-devops consultation — `alarm` discovery via reverse-scan on `AWS/ES` namespace + `DomainName` dimension — `a9s-devops (2026-04-20, persona): possible=yes, worth=yes. OpenSearch retains the AWS/ES namespace for backward compatibility; the DomainName dimension is the join key.`
 - a9s-devops consultation — `cfn` discovery via `aws:cloudformation:stack-name` tag (requires `opensearch:ListTags`) — `a9s-devops (2026-04-20, persona): possible=yes, worth=yes. CFN tag is the canonical managed-by marker; DomainStatus carries no stack reference.`
 - a9s-devops consultation — Wave 2 batching with `DescribeDomains` (up to 5 domain names per call) — `a9s-devops (2026-04-20, persona): possible=yes, worth=yes. DescribeDomains is the only API that returns full DomainStatus; batching caps fan-out at N/5 calls, well within Wave 2 bounds.`
-- user decision — severity for `ServiceSoftwareOptions.UpdateAvailable` past `AutomatedUpdateDate` — `user (2026-04-20): decide → `!`. Rationale: AWS will auto-apply any day, causing a rolling restart; operator wants this flagged so the window can be planned. Consistent with ACM `!` for imminent cert expiry.`
-- user decision — severity for `EncryptionAtRestOptions.Enabled==false` — `user (2026-04-20): decide → `~`. Rationale: posture/compliance finding, not an outage risk. Consistent with RDS `StorageEncrypted==false` and S3 encryption defaults treated as background annotations.`
+- user decision — severity for `ServiceSoftwareOptions.UpdateAvailable` past `AutomatedUpdateDate` — `user (2026-04-20): decide →`!`. Rationale: AWS will auto-apply any day, causing a rolling restart; operator wants this flagged so the window can be planned. Consistent with ACM`!`for imminent cert expiry.`
+- user decision — severity for `EncryptionAtRestOptions.Enabled==false` — `user (2026-04-20): decide →`~`. Rationale: posture/compliance finding, not an outage risk. Consistent with RDS`StorageEncrypted==false`and S3 encryption defaults treated as background annotations.`

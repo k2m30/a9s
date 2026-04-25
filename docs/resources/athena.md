@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `athena`
 - **Display name**: Athena Workgroups
-- **AWS API reference**: https://docs.aws.amazon.com/athena/latest/APIReference/API_WorkGroup.html
+- **AWS API reference**: <https://docs.aws.amazon.com/athena/latest/APIReference/API_WorkGroup.html>
 - **List API**: `ListWorkGroups` — returns `WorkGroupSummary[]`. The SDK confirms `Name`, `State`, `CreationTime`, `Description`, `EngineVersion` are on the summary shape, so the Wave 1 `State` signal is reachable with zero extra calls.
 - **Describe API (if any)**: `GetWorkGroup` per workgroup — used in Wave 2 to read `Configuration.EnforceWorkGroupConfiguration`, `Configuration.ResultConfiguration.EncryptionConfiguration`, and `Configuration.BytesScannedCutoffPerQuery`, none of which are on `WorkGroupSummary`.
 

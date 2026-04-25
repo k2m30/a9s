@@ -72,6 +72,7 @@ Source struct: `autoscalingtypes.Activity`
 ```
 
 Scrolled right to reveal Cause column (via `l` key):
+
 ```
 │ DESCRIPTION                                      CAUSE                           │
 │ Launching a new EC2 instance: i-0abc123def456…   At 2026-03-22T03:15:00Z an al…  │

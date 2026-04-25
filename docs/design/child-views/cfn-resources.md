@@ -77,6 +77,7 @@ Source struct: `cftypes.StackResourceSummary`
 ```
 
 Scrolled right to reveal Status and Drift columns:
+
 ```
 │ TYPE                          STATUS                   DRIFT        UPDATED       │
 │ AWS::ELB::LoadBalancer        CREATE_COMPLETE          NOT_CHECKED  2026-03-20…   │

@@ -24,9 +24,11 @@ AWS CLI equivalents are cited so testers can verify data parity.
 | A.1.5 | The log group has thousands of streams and the API paginates multiple times. | The spinner remains visible until all pages are fetched. The frame title shows the running or final total once all pages complete. The user sees all streams, not just the first page. |
 
 **AWS comparison:**
+
 ```
 aws logs describe-log-streams --log-group-name /aws/lambda/payment-processor --order-by LastEventTime --descending
 ```
+
 Expected fields visible: Stream Name, Last Event, First Event, Size
 
 ### A.2 Empty State
@@ -50,9 +52,11 @@ Expected fields visible: Stream Name, Last Event, First Event, Size
 | A.3.7 | I verify the Size column shows human-readable sizes. | Stored bytes are displayed in a readable format (e.g., "14 KB", "2.3 MB") rather than raw byte counts. |
 
 **AWS comparison:**
+
 ```
 aws logs describe-log-streams --log-group-name /aws/lambda/my-function --order-by LastEventTime --descending --query 'logStreams[].{name:logStreamName,last:lastEventTimestamp,first:firstEventTimestamp,size:storedBytes}'
 ```
+
 Expected fields visible: Stream Name (LogStreamName, width 48), Last Event (LastEventTimestamp, width 22), First Event (FirstEventTimestamp, width 22), Size (StoredBytes, width 12)
 
 ### A.4 Frame Title
@@ -131,9 +135,11 @@ Expected fields visible: Stream Name (LogStreamName, width 48), Last Event (Last
 | A.10.5 | Keys are rendered in blue (#7aa2f7), values in white (#c0caf5). | Visual inspection confirms the key-value color coding from the design spec. |
 
 **AWS comparison:**
+
 ```
 aws logs describe-log-streams --log-group-name /aws/lambda/my-function --log-stream-name-prefix "2026/03/22/[$LATEST]8a4b2c1d"
 ```
+
 Expected detail fields: LogStreamName, LastEventTimestamp, FirstEventTimestamp, StoredBytes, UploadSequenceToken, CreationTime, Arn
 
 ### A.11 YAML Key (y)
@@ -225,9 +231,11 @@ Expected detail fields: LogStreamName, LastEventTimestamp, FirstEventTimestamp, 
 | B.1.5 | The stream contains a large volume of events (>10,000 events or >1MB). | The initial fetch returns the most recent events (up to API limits). The spinner is visible until the fetch completes. |
 
 **AWS comparison:**
+
 ```
 aws logs get-log-events --log-group-name /aws/lambda/payment-processor --log-stream-name "2026/03/22/[$LATEST]8a4b2c1d3e5f" --start-from-head false
 ```
+
 Expected fields visible: Timestamp, Message
 
 ### B.2 Empty State
@@ -248,9 +256,11 @@ Expected fields visible: Timestamp, Message
 | B.3.5 | A log message is longer than the available Message column width. | The message is truncated at the column boundary with an ellipsis or similar indicator. The full message is visible via the detail view (d) or by toggling word wrap (w). |
 
 **AWS comparison:**
+
 ```
 aws logs get-log-events --log-group-name GROUP --log-stream-name STREAM --start-from-head false --query 'events[].{timestamp:timestamp,message:message}'
 ```
+
 Expected fields visible: Timestamp (Timestamp, width 22), Message (Message, width 0 = fill remaining)
 
 ### B.4 Frame Title
@@ -363,9 +373,11 @@ Expected fields visible: Timestamp (Timestamp, width 22), Message (Message, widt
 | B.12.6 | The IngestionTime differs from the Timestamp. | Both values are displayed independently. IngestionTime is when CloudWatch received the event; Timestamp is when the application emitted it. |
 
 **AWS comparison:**
+
 ```
 aws logs get-log-events --log-group-name GROUP --log-stream-name STREAM --start-from-head false --query 'events[0]'
 ```
+
 Expected detail fields: Timestamp, IngestionTime, Message, EventId
 
 ### B.13 YAML Key (y)

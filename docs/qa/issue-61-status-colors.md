@@ -21,6 +21,7 @@ The following statuses already have row coloring. These stories verify the exist
 | A.1.5 | A Step Functions execution has Status `SUCCEEDED`. | The entire row renders in GREEN (`#9ece6a`). |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-instances --query 'Reservations[].Instances[].{ID:InstanceId,State:State.Name}'
 aws rds describe-db-instances --query 'DBInstances[].{ID:DBInstanceIdentifier,Status:DBInstanceStatus}'
@@ -62,9 +63,11 @@ aws rds describe-db-instances --query 'DBInstances[].{ID:DBInstanceIdentifier,St
 All stories below verify the tg_health child view row coloring.
 
 **AWS comparison:**
+
 ```
 aws elbv2 describe-target-health --target-group-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-tg/abc123
 ```
+
 Expected fields visible: Target ID, Port, AZ, Health, Reason, Description
 
 ### B.1 Health State Colors
@@ -88,9 +91,11 @@ Expected fields visible: Target ID, Port, AZ, Health, Reason, Description
 CloudFormation is the only resource requiring pattern-based matching because its status values contain suffixes like `_COMPLETE`, `_IN_PROGRESS`, and `_FAILED`.
 
 **AWS comparison:**
+
 ```
 aws cloudformation describe-stacks --query 'Stacks[].{Name:StackName,Status:StackStatus}'
 ```
+
 Expected fields visible: Stack Name, Status, Created, Updated, Description
 
 ### C.1 Completion Statuses (Green)
@@ -144,9 +149,11 @@ Expected fields visible: Stack Name, Status, Created, Updated, Description
 | C.5.4 | A CFN event has Status `DELETE_COMPLETE`. | The event row renders in GREEN. |
 
 **AWS comparison:**
+
 ```
 aws cloudformation describe-stack-events --stack-name my-stack --query 'StackEvents[].{LogicalId:LogicalResourceId,Status:ResourceStatus}'
 ```
+
 Expected fields visible: Timestamp, Logical ID, Type, Status, Reason
 
 ### C.6 CloudFormation Resources Child View
@@ -158,9 +165,11 @@ Expected fields visible: Timestamp, Logical ID, Type, Status, Reason
 | C.6.3 | A CFN resource has Status `DELETE_FAILED`. | The resource row renders in RED. |
 
 **AWS comparison:**
+
 ```
 aws cloudformation describe-stack-resources --stack-name my-stack --query 'StackResources[].{LogicalId:LogicalResourceId,Status:ResourceStatus}'
 ```
+
 Expected fields visible: Logical ID, Physical ID, Type, Status, Drift, Updated
 
 ### C.7 Mixed CloudFormation Stack List
@@ -176,9 +185,11 @@ Expected fields visible: Logical ID, Physical ID, Type, Status, Drift, Updated
 ## D. CloudWatch Alarms -- New Color Mappings
 
 **AWS comparison:**
+
 ```
 aws cloudwatch describe-alarms --query 'MetricAlarms[].{Name:AlarmName,State:StateValue}'
 ```
+
 Expected fields visible: Alarm Name, State, Metric, Namespace, Threshold
 
 ### D.1 Alarm State Colors
@@ -197,9 +208,11 @@ Expected fields visible: Alarm Name, State, Metric, Namespace, Threshold
 ## E. ECS Tasks (Child View) -- New Color Mappings
 
 **AWS comparison:**
+
 ```
 aws ecs describe-tasks --cluster my-cluster --tasks TASK_ARN --query 'tasks[].{ID:taskArn,Status:lastStatus}'
 ```
+
 Expected fields visible: Task ID, Status, Health, Task Definition, Started At, Stopped Reason
 
 ### E.1 ECS Task Status Colors
@@ -219,9 +232,11 @@ Expected fields visible: Task ID, Status, Health, Task Definition, Started At, S
 Elastic Beanstalk has both a `Status` field and a `Health` field. The `Health` field directly maps to color names.
 
 **AWS comparison:**
+
 ```
 aws elasticbeanstalk describe-environments --query 'Environments[].{Name:EnvironmentName,Status:Status,Health:Health}'
 ```
+
 Expected fields visible: Environment, Application, Status, Health, Version
 
 ### F.1 Beanstalk Health Colors
@@ -239,9 +254,11 @@ Expected fields visible: Environment, Application, Status, Health, Version
 ## G. ACM Certificates -- New Color Mappings
 
 **AWS comparison:**
+
 ```
 aws acm list-certificates --query 'CertificateSummaryList[].{Domain:DomainName,Status:Status}'
 ```
+
 Expected fields visible: Domain Name, Status, Type, Expires, In Use
 
 ### G.1 Certificate Status Colors
@@ -261,9 +278,11 @@ Expected fields visible: Domain Name, Status, Type, Expires, In Use
 ## H. CloudFront Distributions -- New Color Mappings
 
 **AWS comparison:**
+
 ```
 aws cloudfront list-distributions --query 'DistributionList.Items[].{Domain:DomainName,Status:Status,Enabled:Enabled}'
 ```
+
 Expected fields visible: Domain Name, Distribution ID, Status, Enabled, Aliases, Price Class
 
 ### H.1 CloudFront Status Colors
@@ -280,9 +299,11 @@ Expected fields visible: Domain Name, Distribution ID, Status, Enabled, Aliases,
 ## I. EventBridge Rules -- New Color Mappings
 
 **AWS comparison:**
+
 ```
 aws events list-rules --query 'Rules[].{Name:Name,State:State}'
 ```
+
 Expected fields visible: Rule Name, State, Event Bus, Schedule, Description
 
 ### I.1 EventBridge Rule State Colors
@@ -298,9 +319,11 @@ Expected fields visible: Rule Name, State, Event Bus, Schedule, Description
 ## J. KMS Keys -- New Color Mappings
 
 **AWS comparison:**
+
 ```
 aws kms describe-key --key-id KEY_ID --query 'KeyMetadata.{ID:KeyId,State:KeyState}'
 ```
+
 Expected fields visible: Alias, Key ID, Status, Description
 
 ### J.1 KMS Key Status Colors
@@ -317,9 +340,11 @@ Expected fields visible: Alias, Key ID, Status, Description
 ## K. MSK Clusters -- New Color Mappings
 
 **AWS comparison:**
+
 ```
 aws kafka list-clusters-v2 --query 'ClusterInfoList[].{Name:ClusterName,State:State}'
 ```
+
 Expected fields visible: Cluster Name, Type, State, Version
 
 ### K.1 MSK Cluster State Colors
@@ -338,9 +363,11 @@ Expected fields visible: Cluster Name, Type, State, Version
 ## L. NAT Gateways -- New Color Mappings
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-nat-gateways --query 'NatGateways[].{ID:NatGatewayId,State:State}'
 ```
+
 Expected fields visible: Name, NAT Gateway ID, VPC ID, Subnet ID, State, Public IP
 
 ### L.1 NAT Gateway State Colors
@@ -358,10 +385,12 @@ Expected fields visible: Name, NAT Gateway ID, VPC ID, Subnet ID, State, Public 
 ## M. SES Identities -- New Color Mappings
 
 **AWS comparison:**
+
 ```
 aws sesv2 list-email-identities --query 'EmailIdentities[].{Name:IdentityName,Type:IdentityType}'
 aws sesv2 get-email-identity --email-identity IDENTITY --query '{Status:VerificationStatus}'
 ```
+
 Expected fields visible: Identity, Type, Verification, Sending
 
 ### M.1 SES Verification Status Colors
@@ -379,9 +408,11 @@ Expected fields visible: Identity, Type, Verification, Sending
 ## N. Athena Workgroups -- New Color Mappings
 
 **AWS comparison:**
+
 ```
 aws athena list-work-groups --query 'WorkGroups[].{Name:Name,State:State}'
 ```
+
 Expected fields visible: Workgroup, State, Description, Engine
 
 ### N.1 Athena Workgroup State Colors
@@ -396,9 +427,11 @@ Expected fields visible: Workgroup, State, Description, Engine
 ## O. Redshift Clusters -- New Color Mappings
 
 **AWS comparison:**
+
 ```
 aws redshift describe-clusters --query 'Clusters[].{ID:ClusterIdentifier,Status:ClusterStatus}'
 ```
+
 Expected fields visible: Cluster ID, Status, Node Type, Nodes, Database, Endpoint
 
 ### O.1 Redshift Cluster Status Colors
@@ -417,9 +450,11 @@ Expected fields visible: Cluster ID, Status, Node Type, Nodes, Database, Endpoin
 ## P. Transit Gateways -- New Color Mappings
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-transit-gateways --query 'TransitGateways[].{ID:TransitGatewayId,State:State}'
 ```
+
 Expected fields visible: Name, TGW ID, State, Owner, Description
 
 ### P.1 Transit Gateway State Colors
@@ -436,9 +471,11 @@ Expected fields visible: Name, TGW ID, State, Owner, Description
 ## Q. VPC Endpoints -- New Color Mappings
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-vpc-endpoints --query 'VpcEndpoints[].{ID:VpcEndpointId,State:State}'
 ```
+
 Expected fields visible: Service Name, Endpoint ID, Type, State, VPC ID
 
 ### Q.1 VPC Endpoint State Colors

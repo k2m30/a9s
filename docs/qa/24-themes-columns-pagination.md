@@ -24,9 +24,11 @@ AWS CLI equivalents are cited so testers can verify data parity.
 | A.1.3 | `~/.a9s/config.yaml` exists but contains no `theme` key (e.g., only future settings). I launch a9s. | The application starts with Tokyo Night Dark as the default theme. No error or warning about missing theme configuration. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-instances --query 'Reservations[].Instances[].{ID:InstanceId,State:State.Name}'
 ```
+
 Expected fields visible: Name, Instance ID, State, Type, Private IP, Public IP, Launch Time (per views.yaml ec2 list).
 The color of each row should match the instance state: running=green, stopped=red, pending=yellow, terminated=dim.
 
@@ -47,11 +49,13 @@ The color of each row should match the instance state: running=green, stopped=re
 | A.2.11 | `~/.a9s/config.yaml` contains `theme: "solarized-light"`. I launch a9s and open the region selector (`:region`). | The region selector renders with Solarized Light: base3 background. Region names and descriptions are legible. The selected region has visually distinct highlighting appropriate for the Solarized Light palette. |
 
 **AWS comparison:**
+
 ```
 aws s3api list-buckets --query 'Buckets[].{Name:Name,Created:CreationDate}'
 aws ec2 describe-instances --output yaml
 aws lambda list-functions --query 'Functions[].{Name:FunctionName,Runtime:Runtime}'
 ```
+
 Expected: Data content identical regardless of theme. Only rendering colors change.
 
 ### A.3 Theme Rendering Across All View Types
@@ -93,9 +97,11 @@ For each of the 11 built-in themes, the following elements must render with visu
 | B.1.3 | I verify all 33 color slots are respected by checking each UI element against my custom palette. | Every color slot defined in the theme palette structure (per `docs/design/themes.md`) maps to at least one visible UI element. No hardcoded colors override custom theme values. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-instances --output table
 ```
+
 Expected: Same data content. Custom theme colors applied to all rendering.
 
 ### B.2 Partial Custom Theme
@@ -108,9 +114,11 @@ Expected: Same data content. Custom theme colors applied to all rendering.
 | B.2.4 | I create a custom theme with only `name: "My Theme"` and no colors section. I launch a9s. | The application uses all Tokyo Night Dark defaults. The theme name is accepted but no colors are overridden. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-instances --instance-ids i-abc123 --output yaml
 ```
+
 Expected: YAML content matches. Only YAML syntax highlighting colors differ.
 
 ### B.3 Invalid Custom Theme Files
@@ -148,9 +156,11 @@ Expected: YAML content matches. Only YAML syntax highlighting colors differ.
 | C.8 | `NO_COLOR` is set to empty string (`NO_COLOR=`). I launch a9s with a theme configured. | Per the NO_COLOR specification, any value (including empty) means no color. All output is monochrome. |
 
 **AWS comparison:**
+
 ```
 NO_COLOR=1 aws ec2 describe-instances --output table
 ```
+
 Expected: AWS CLI also respects NO_COLOR for its own formatting. a9s should behave equivalently.
 
 ---
@@ -242,9 +252,11 @@ These resource types currently have an ID column first and a Name column second.
 | E.1.5 | I press ctrl+r to refresh. | The spinner appears briefly, the API call completes, and the table repopulates. Total refresh time depends on AWS API latency, not on rendering overhead. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-instances --query 'Reservations[].Instances[] | length(@)'
 ```
+
 Expected: Result is 5. All 5 are displayed.
 
 ### E.2 Small S3 Set
@@ -255,6 +267,7 @@ Expected: Result is 5. All 5 are displayed.
 | E.2.2 | I enter a bucket with 50 objects. | All 50 objects load. Frame title shows bucket name with count 50. Objects are listed with Key, Size, Storage Class, Last Modified columns. |
 
 **AWS comparison:**
+
 ```
 aws s3api list-buckets --query 'Buckets | length(@)'
 aws s3api list-objects-v2 --bucket my-bucket --query 'KeyCount'
@@ -279,10 +292,12 @@ aws s3api list-objects-v2 --bucket my-bucket --query 'KeyCount'
 | F.1.9 | I press ctrl+r to refresh the 5,000-instance list. | The spinner appears. Multiple paginated API calls are made behind the scenes. The total refresh may take several seconds (AWS API pagination), but the UI remains responsive (the spinner animates). The table repopulates when all data arrives. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-instances --query 'Reservations[].Instances[] | length(@)'
 # May require multiple pages: aws ec2 describe-instances --max-results 1000
 ```
+
 Expected: a9s fetches all pages automatically, matching the total count from CLI.
 
 ### F.2 Large S3 Object List
@@ -297,6 +312,7 @@ Expected: a9s fetches all pages automatically, matching the total count from CLI
 | F.2.6 | I press ctrl+r to refresh a bucket with 100,000 objects. | The refresh re-fetches objects. If a fetch cap is in place, it refreshes up to the cap. The spinner indicates the refresh is in progress. |
 
 **AWS comparison:**
+
 ```
 aws s3api list-objects-v2 --bucket my-bucket --query 'KeyCount'
 aws s3api list-objects-v2 --bucket my-bucket --prefix "logs/" --query 'KeyCount'
@@ -312,6 +328,7 @@ aws s3api list-objects-v2 --bucket my-bucket --max-keys 1000
 | F.3.3 | I filter the 10,000 log streams by name. | The filter completes within 1 second. Only matching streams are displayed. |
 
 **AWS comparison:**
+
 ```
 aws logs describe-log-streams --log-group-name /my/log/group --query 'logStreams | length(@)'
 # Paginated: --limit 50 --next-token ...
@@ -337,9 +354,11 @@ aws logs describe-log-streams --log-group-name /my/log/group --query 'logStreams
 | F.5.6 | `max_items: 10` is configured. My account has 5 EC2 instances. | All 5 instances load. The cap of 10 is higher than the actual count, so the full set is displayed. Frame title shows "ec2-instances(5)". |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-instances --max-results 500 --query 'Reservations[].Instances[] | length(@)'
 ```
+
 Expected: a9s respects max_items similarly to `--max-results`.
 
 ---
@@ -381,6 +400,7 @@ Expected: a9s respects max_items similarly to `--max-results`.
 | H.2.1 | An ECS cluster has 500 running tasks. I drill into the cluster's tasks. | Tasks load via paginated API calls. The list renders with a count in the frame title. Navigation is smooth. |
 
 **AWS comparison:**
+
 ```
 aws ecs list-tasks --cluster my-cluster --query 'taskArns | length(@)'
 ```
@@ -393,6 +413,7 @@ aws ecs list-tasks --cluster my-cluster --query 'taskArns | length(@)'
 | H.3.2 | I scroll to the top of the loaded log events. | If "load older" is supported, a visual indicator prompts for loading earlier events. If not, the top of the loaded window is the first visible event. |
 
 **AWS comparison:**
+
 ```
 aws logs get-log-events --log-group-name /my/log --log-stream-name stream --limit 100
 ```

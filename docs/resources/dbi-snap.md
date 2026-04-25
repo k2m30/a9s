@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `dbi-snap`
 - **Display name**: DB Instance Snapshots
-- **AWS API reference**: https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBSnapshot.html
+- **AWS API reference**: <https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBSnapshot.html>
 - **List API**: `DescribeDBSnapshots`
 - **Describe API (if any)**: not used — all Wave 1 signals are carried on the list response; Wave 2 is `None` per `attention-signals.md § Databases & Storage § dbi-snap`.
 

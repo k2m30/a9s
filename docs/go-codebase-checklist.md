@@ -7,6 +7,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 ## Design Principles
 
 ### KISS (Keep It Simple, Stupid)
+
 - [ ] No abstraction without a concrete second use case — three similar lines > a premature helper
 - [ ] No configuration for things that have one correct value
 - [ ] No generics unless the type constraint eliminates real duplication across 3+ call sites
@@ -14,6 +15,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 - [ ] A new contributor can understand any file in under 5 minutes
 
 ### DRY (Don't Repeat Yourself)
+
 - [ ] Shared logic extracted only when identical code appears in 3+ places (not 2)
 - [ ] Extracted helpers live as close to their callers as possible (same package > utility package)
 - [ ] Test helpers live in `tests/unit/helpers_*.go` — not duplicated across test files
@@ -21,6 +23,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 - [ ] Style constants defined once in `styles/palette.go` — never inline hex strings
 
 ### YAGNI (You Aren't Gonna Need It)
+
 - [ ] No feature flags, plugin systems, or extension points that aren't actively used
 - [ ] No interfaces defined before they have 2+ implementations or a mock requirement
 - [ ] No backward-compatibility shims for removed features — delete cleanly
@@ -28,6 +31,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 - [ ] `views.yaml` overrides exist because users need them — not because they might someday
 
 ### TDA (Tell, Don't Ask)
+
 - [ ] Views receive messages and act — they don't query the root model for state
 - [ ] `Update()` returns commands — callers don't inspect model fields to decide what to do next
 - [ ] AWS fetchers receive clients and return resources — they don't reach into global state
@@ -64,6 +68,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 ---
 
 ## Package Design
+
 - [ ] Package name describes what it provides, not what it does (`resource` not `resourceutils`)
 - [ ] No circular imports between packages
 - [ ] `internal/` used to enforce API boundaries — all domain packages live under `internal/`
@@ -81,6 +86,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 ---
 
 ## Interfaces
+
 - [ ] AWS service interfaces are single-method, defined in the per-service file `internal/aws/<service>_interfaces.go` (one file per AWS service; `interfaces.go` itself holds only the package doc)
 - [ ] Each interface wraps exactly one SDK operation (e.g., `EC2DescribeInstancesAPI`)
 - [ ] Functions return concrete types, accept interfaces
@@ -91,6 +97,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 ---
 
 ## Error Handling
+
 - [ ] Errors wrapped with context: `fmt.Errorf("doing X: %w", err)`
 - [ ] AWS errors classified via `ClassifyAWSError()` before display
 - [ ] API errors surfaced to the user via `messages.APIErrorMsg` -> flash message
@@ -100,6 +107,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 ---
 
 ## Dependency Injection
+
 - [ ] Constructor injection via `New*()` functions — keys, config, and clients passed in
 - [ ] Composition root is `cmd/a9s/main.go` -> `tui.New()` -> view constructors
 - [ ] AWS clients created once in `connectAWS()` and stored on root model
@@ -108,6 +116,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 ---
 
 ## Bubble Tea v2 Architecture
+
 - [ ] `Init() tea.Cmd` (not `(tea.Model, tea.Cmd)` — that was BT v1)
 - [ ] Root `View() tea.View` via `tea.NewView(string)` — child views return `string`
 - [ ] Root `Update() (tea.Model, tea.Cmd)` — child views `Update() (ConcreteType, tea.Cmd)`
@@ -121,6 +130,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 ---
 
 ## View Stack
+
 - [ ] Views stored as `[]views.View` with push/pop, not a flat enum or router
 - [ ] Only the root model satisfies `tea.Model`; child views are plain structs
 - [ ] `SetSize(w, h)` called on every view in the stack when window resizes
@@ -132,6 +142,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 ---
 
 ## Message Contracts
+
 - [ ] Messages are data-only structs — no methods, no behavior
 - [ ] Messages defined in `internal/tui/messages/` with zero upward imports
 - [ ] `NavigateMsg` carries a `ViewTarget` enum + optional resource/type data
@@ -142,6 +153,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 ---
 
 ## Key Bindings
+
 - [ ] All bindings defined in `internal/tui/keys/keys.go` — no inline `key.NewBinding`
 - [ ] `key.NewBinding(key.WithKeys(...), key.WithHelp(...))` pattern used consistently
 - [ ] `key.Matches(msg, binding)` used for dispatch — never raw string comparison
@@ -150,6 +162,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 ---
 
 ## AWS Resource Types
+
 - [ ] Each resource type has a `ResourceTypeDef` in `internal/resource/types.go`
 - [ ] Each fetcher registered via `resource.RegisterPaginated()` in an `init()` function
 - [ ] Fetcher signature is `func(ctx context.Context, clients interface{}, continuationToken string) (FetchResult, error)`
@@ -162,6 +175,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 ---
 
 ## Resource Model
+
 - [ ] `resource.Resource` has `ID`, `Name`, `Status`, `RawStruct interface{}`, `Fields map[string]string`
 - [ ] `Fields` is the primary data source for list columns — populated by fetchers
 - [ ] `RawStruct` holds the original AWS SDK struct for detail/YAML views
@@ -171,6 +185,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 ---
 
 ## Reflection (fieldpath)
+
 - [ ] `fieldpath` package is FROZEN — never modify
 - [ ] Handles nil pointers, slices, maps, and nested structs gracefully
 - [ ] Returns empty string for missing/nil fields — never panics
@@ -179,6 +194,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 ---
 
 ## Config / YAML
+
 - [ ] Per-resource YAML files use ordered YAML maps for column definitions (parsed via `yaml.Node`)
 - [ ] Config lookup chain: `$A9S_CONFIG_FOLDER/views/*.yaml` (or `~/.a9s/views/*.yaml`) -> `.a9s/views/*.yaml` (per-resource overlays)
 - [ ] `GetViewDef()` merges user config with defaults — partial overrides supported
@@ -187,6 +203,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 ---
 
 ## Rendering
+
 - [ ] `lipgloss.Width(s)` for ANSI-aware string width — NEVER `len(s)` or `utf8.RuneCountInString(s)`
 - [ ] Frame constructed manually (not via `lipgloss.Border()`) per design spec
 - [ ] Header and frame composed by root `View()` — views only return inner content
@@ -196,6 +213,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 ---
 
 ## Concurrency
+
 - [ ] All AWS API calls run in `tea.Cmd` closures (goroutines managed by Bubble Tea)
 - [ ] No manual goroutine management — Bubble Tea's runtime handles scheduling
 - [ ] `context.Background()` used in `tea.Cmd` closures (not stored on structs)
@@ -205,6 +223,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 ---
 
 ## Project Structure
+
 - [ ] `/cmd` contains only binary entrypoints with thin `main()`
 - [ ] `/cmd/refgen` is a dev-time code generation tool (no AWS credentials needed)
 - [ ] `/internal` holds all domain packages
@@ -215,6 +234,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 ---
 
 ## init() Functions
+
 - [ ] `init()` in `internal/aws/*.go` is acceptable — registers fetchers in the resource registry
 - [ ] `init()` in `internal/demo/*.go` is acceptable — registers fixture generators in the demo data map
 - [ ] `init()` in `internal/tui/styles/` is acceptable — initializes computed style values
@@ -224,6 +244,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 ---
 
 ## Code Style
+
 - [ ] `context.Context` is always a function parameter — never stored in structs
 - [ ] Tests use table-driven `[]struct{ name, input, expected }` pattern
 - [ ] No naked returns
@@ -232,6 +253,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 ---
 
 ## Module / Dependency Management
+
 - [ ] One `go.mod` at the project root
 - [ ] stdlib preferred — every external dependency is justified
 - [ ] AWS SDK service imports are per-service (not the monolithic SDK)
@@ -240,6 +262,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 ---
 
 ## Testing
+
 - [ ] TDD: failing tests written BEFORE implementation code
 - [ ] All resource types tested — never just one representative type
 - [ ] Subtests use `t.Run(tc.name, ...)` for parallel-safe isolation
@@ -256,37 +279,44 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 ## Size Constraints
 
 ### File
+
 - [ ] No file exceeds 500 lines (views and test files may push this — flag for review)
 - [ ] Each file has one primary type; file is named after it
 - [ ] Test files may be larger than source (table-driven tests with fixtures are verbose)
 
 ### Function / Method
+
 - [ ] No function exceeds 50 lines (Update/View handlers may need more — flag for review)
 - [ ] No more than 3 levels of nesting — early returns used over else chains
 - [ ] No more than 5 parameters — options struct introduced beyond that
 - [ ] Cyclomatic complexity kept low — type switches in `updateActiveView` are an accepted exception
 
 ### Struct
+
 - [ ] No god structs — `Model` (root) is the known exception; its field count is monitored
 - [ ] View models hold only their own state — no references to other views
 - [ ] `ServiceClients` grows with resource types but each field is a typed SDK client
 
 ### Package
+
 - [ ] No package exports more than ~15 symbols (except `resource` and `messages`)
 - [ ] No package contains more than 10 source files (except `aws/` fetchers)
 
 ### Interface
+
 - [ ] No interface has more than 5 methods
 - [ ] AWS interfaces are strictly single-method
 - [ ] `View` interface has exactly 5 methods: `View`, `SetSize`, `FrameTitle`, `CopyContent`, `GetHelpContext`
 
 ### Test
+
 - [ ] No table test has more than 20 cases — split into logical groups otherwise
 - [ ] No more than 3 levels of `t.Run` nesting
 
 ---
 
 ## Linting
+
 - [ ] `.golangci.yml` configured at project root
 - [ ] `govet` enabled (with `fieldalignment` disabled)
 - [ ] `errcheck` enabled
@@ -298,6 +328,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 ---
 
 ## Meta
+
 - [ ] No pattern requires a comment to explain why it exists — abstraction is self-evident
 - [ ] Size limit violations are treated as domain model problems, not limit problems
 - [ ] Design spec (`docs/design/design.md`) is the visual truth — code conforms to it, not the other way around

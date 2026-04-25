@@ -18,6 +18,7 @@ Role, ECS Service, EKS, CloudWatch Alarm) and then spot-check the rest.
 ### Two-Column Layout
 
 #### Story: Right column visible by default on detail entry
+
 **Given:** the user is on any resource list with at least one resource
 **When:** the user presses `d` or `Enter` to open the detail view
 **Then:** a two-column layout appears: left column shows detail fields, right column shows related resource types separated by a thin vertical line
@@ -29,6 +30,7 @@ Expected fields visible: left column shows the resource's detail fields; right c
 ---
 
 #### Story: Right column toggle with `r`
+
 **Given:** the user is in a two-column detail view with the right column visible
 **When:** the user presses `r`
 **Then:** the right column disappears, the left column expands to fill the full frame width, and navigable field underlines remain visible
@@ -43,6 +45,7 @@ No AWS CLI equivalent -- this is a TUI navigation feature.
 ---
 
 #### Story: Toggle state persists across navigation
+
 **Given:** the user has pressed `r` to hide the right column
 **When:** the user presses Enter on a navigable field to open a new resource's detail view
 **Then:** the new detail view also has the right column hidden
@@ -57,6 +60,7 @@ No AWS CLI equivalent -- persistence of UI state across navigation.
 ---
 
 #### Story: Column separator changes color with focus
+
 **Given:** the user is in a two-column detail view with the left column focused
 **When:** the user looks at the vertical separator between the two columns
 **Then:** the separator is rendered in dim color (#414868)
@@ -71,6 +75,7 @@ No AWS CLI equivalent -- visual focus indicator.
 ---
 
 #### Story: Frame borders span full width unbroken
+
 **Given:** the user is in a two-column detail view
 **When:** the user looks at the top and bottom borders of the frame
 **Then:** both borders span the full terminal width without interruption; the column separator appears only in content rows between the side borders
@@ -81,6 +86,7 @@ No AWS CLI equivalent -- frame rendering.
 ---
 
 #### Story: Right column fixed width of 32 characters
+
 **Given:** the terminal is at least 100 columns wide
 **When:** the user opens a detail view with the right column visible
 **Then:** the right column occupies exactly 32 characters, the separator occupies 1 character, and the left column fills the remaining width
@@ -93,6 +99,7 @@ No AWS CLI equivalent -- layout geometry.
 ### Focus Switching
 
 #### Story: Tab switches focus between columns
+
 **Given:** the user is in a two-column detail view with the left column focused
 **When:** the user presses Tab
 **Then:** focus moves to the right column: the cursor appears on the first available (non-dim) row in the right column, and the left column cursor disappears
@@ -107,6 +114,7 @@ No AWS CLI equivalent -- TUI navigation.
 ---
 
 #### Story: h/l switches focus between columns
+
 **Given:** the user is in a two-column detail view with the left column focused
 **When:** the user presses `l`
 **Then:** focus moves to the right column (same as Tab)
@@ -129,6 +137,7 @@ No AWS CLI equivalent -- vim-style column switching.
 ---
 
 #### Story: Tab does nothing when right column is hidden
+
 **Given:** the user has hidden the right column with `r`
 **When:** the user presses Tab
 **Then:** nothing happens; the cursor stays in the left column
@@ -139,6 +148,7 @@ No AWS CLI equivalent.
 ---
 
 #### Story: Focus restores cursor position when switching back
+
 **Given:** the user is in the left column with the cursor on field row 15
 **When:** the user presses Tab to focus the right column, scrolls down to row 4, then presses Tab again
 **Then:** the left column cursor returns to field row 15; the right column remembers row 4 for the next Tab press
@@ -151,6 +161,7 @@ No AWS CLI equivalent -- cursor position memory.
 ### Left Column Navigation
 
 #### Story: Cursor moves one row at a time with j/k
+
 **Given:** the user is in the detail view with the left column focused and the cursor on any field row
 **When:** the user presses `j` or Down
 **Then:** the cursor moves down one row, including section headers, non-navigable fields, and navigable fields alike
@@ -165,6 +176,7 @@ The detail view shows all fields from the describe output. j/k scrolls through t
 ---
 
 #### Story: Jump to top and bottom with g/G
+
 **Given:** the user is in the left column with the cursor somewhere in the middle
 **When:** the user presses `g`
 **Then:** the cursor jumps to the first field row
@@ -178,6 +190,7 @@ No AWS CLI equivalent -- keyboard navigation.
 ---
 
 #### Story: Page up/down with pgup/pgdn and ctrl+u/ctrl+d
+
 **Given:** the user is in the left column with many fields (40+)
 **When:** the user presses PgDn or Ctrl+D
 **Then:** the cursor moves down by approximately one visible page
@@ -191,6 +204,7 @@ No AWS CLI equivalent -- pagination within detail view.
 ---
 
 #### Story: Word wrap is always on
+
 **Given:** the user is viewing a resource with a field value longer than the left column width (e.g., a long ARN or policy document excerpt)
 **When:** the value overflows the column width
 **Then:** the value wraps to the next visual line; the wrapped continuation is part of the same field row, not a separate selectable row; the cursor highlight covers all wrapped lines when the field is selected
@@ -204,6 +218,7 @@ Long ARNs and policy documents in the output would exceed column width.
 ### Navigable Fields (Left Column)
 
 #### Story: Navigable field values are underlined in accent color
+
 **Given:** the user is viewing an EC2 instance detail
 **When:** the user looks at a field whose value is a known resource ID (e.g., VpcId: vpc-0aaa111bbb222cc)
 **Then:** the value portion is rendered with underline styling in accent color (#7aa2f7); the key label is NOT underlined
@@ -223,6 +238,7 @@ Note: IamInstanceProfile.Arn is NOT navigable — instance profile ARNs are not 
 ---
 
 #### Story: Enter on a navigable field opens target resource detail
+
 **Given:** the user is in the left column with the cursor on a navigable field (e.g., VpcId: vpc-0aaa111)
 **When:** the user presses Enter
 **Then:** a new detail view is pushed onto the view stack showing the VPC resource's detail, with its own right column of related types
@@ -236,6 +252,7 @@ The detail view for the VPC shows its fields and its own related resource types.
 ---
 
 #### Story: Enter on a non-navigable field is a no-op
+
 **Given:** the user is in the left column with the cursor on a plain field (e.g., InstanceType: t3.large)
 **When:** the user presses Enter
 **Then:** nothing happens; no flash message, no error, no navigation
@@ -246,6 +263,7 @@ No AWS CLI equivalent -- the field "t3.large" is not a resource ID.
 ---
 
 #### Story: Section headers are selectable but not navigable
+
 **Given:** the user is in the left column and the cursor is on a section header (e.g., "Placement:" or "Tags:")
 **When:** the user presses Enter
 **Then:** nothing happens; section headers are not navigable
@@ -259,6 +277,7 @@ No AWS CLI equivalent -- section headers group nested fields.
 ---
 
 #### Story: Array items with navigable values are independently navigable
+
 **Given:** the user is viewing an EC2 detail with multiple SecurityGroups
 **When:** the user moves the cursor to the first GroupId (sg-0ccc333)
 **Then:** that value is underlined; pressing Enter opens the sg-0ccc333 security group detail
@@ -275,6 +294,7 @@ Each security group ID is a separate navigable target.
 ---
 
 #### Story: Navigable fields work with right column hidden
+
 **Given:** the user has pressed `r` to hide the right column
 **When:** the user presses Enter on a navigable field (e.g., SubnetId: subnet-0bbb222)
 **Then:** the target resource's detail view opens, identical to when the right column is visible
@@ -290,6 +310,7 @@ Right column visibility does not affect left column Enter behavior.
 ### Right Column Content and Display
 
 #### Story: Right column shows reverse and algorithmic relationships only
+
 **Given:** the user is viewing an EC2 instance detail
 **When:** the user looks at the right column
 **Then:** the right column lists resource types like Target Groups, Auto Scaling Groups, CloudWatch Alarms, EKS Node Groups, CloudFormation Stacks, EBS Snapshots, Elastic IPs, and CloudTrail Events; it does NOT list VPC, Subnet, Security Groups, or AMIs (those are forward relationships visible as navigable fields in the left column)
@@ -300,6 +321,7 @@ There is no single AWS CLI command that shows all reverse relationships. Each wo
 ---
 
 #### Story: CloudTrail Events always appears last in right column
+
 **Given:** the user opens any resource's detail view (any of the 66 types)
 **When:** the user looks at the right column
 **Then:** "CloudTrail Events" appears as the last row, always available (never dim), regardless of which resource type is being viewed
@@ -311,6 +333,7 @@ CloudTrail is universal -- every resource type has associated audit events.
 ---
 
 #### Story: Right column sort order follows priority
+
 **Given:** the user opens a detail view for a resource with multiple related types
 **When:** the user looks at the right column ordering
 **Then:** P0 relationships appear first (alphabetically within P0), then P1 (alphabetically), then P2 (alphabetically), then CloudTrail Events last
@@ -321,6 +344,7 @@ No AWS CLI equivalent -- display ordering is a UI design choice.
 ---
 
 #### Story: Relationships with known counts show inline count
+
 **Given:** the user is viewing a resource where some right-column entries have counts (i.e., the checker returned Count >= 0)
 **When:** the check completes (instantly for forward, asynchronously for reverse)
 **Then:** the row displays the resource type name followed by the count in parentheses, e.g., "Security Groups (3)", "Subnets (6)", "SQS Event Sources (2)"
@@ -333,6 +357,7 @@ No AWS CLI equivalent -- counts are derived from parsing the resource's API resp
 ---
 
 #### Story: Relationships without counts show name only
+
 **Given:** the user is viewing a resource with right-column entries whose checkers returned Count = -1 (no count available)
 **When:** the check completes (background API call returns)
 **Then:** the row shows only the resource type name without any count, e.g., "CloudWatch Alarms" (not "CloudWatch Alarms (5)")
@@ -347,6 +372,7 @@ No AWS CLI equivalent -- checkers decide per-relationship whether to enumerate o
 ### Right Column Scrolling
 
 #### Story: Right column scrolls independently when focused
+
 **Given:** the right column is focused and has more rows than the visible height (e.g., VPC with ~18 related types in a terminal with 15 visible rows)
 **When:** the user presses j/k
 **Then:** the right column scrolls independently; the left column stays at its current scroll position
@@ -360,6 +386,7 @@ No AWS CLI equivalent -- independent column scrolling.
 ---
 
 #### Story: Right column g/G jumps to first/last available row
+
 **Given:** the right column is focused with multiple available (non-dim) rows
 **When:** the user presses `g`
 **Then:** the cursor jumps to the first available row
@@ -375,6 +402,7 @@ No AWS CLI equivalent -- keyboard navigation within the related types list.
 ### Right Column States and Background Checking
 
 #### Story: All right column rows start dim during initial load
+
 **Given:** the user enters a detail view for the first time for a given resource
 **When:** the detail view first renders
 **Then:** all right-column rows appear in dim text (#565f89); forward relationship rows immediately resolve and light up; reverse/algorithmic rows remain dim until their background checks complete
@@ -385,6 +413,7 @@ No AWS CLI equivalent -- progressive loading indicator.
 ---
 
 #### Story: Rows light up silently as background checks complete
+
 **Given:** the user is in a detail view with dim right-column rows
 **When:** a background availability check for a related type completes successfully (resources found)
 **Then:** that row changes from dim to normal text (#c0caf5) without any spinner, flash message, or visual transition
@@ -398,6 +427,7 @@ No AWS CLI equivalent -- asynchronous availability probing.
 ---
 
 #### Story: Cursor skips dim rows in right column
+
 **Given:** the right column is focused and some rows are dim (unavailable or still checking)
 **When:** the user presses j/k to move the cursor
 **Then:** the cursor skips over dim rows and lands only on available (non-dim) rows
@@ -411,6 +441,7 @@ No AWS CLI equivalent -- cursor behavior.
 ---
 
 #### Story: Ctrl+R refreshes detail and re-checks related resources
+
 **Given:** the user is in a detail view with some right-column rows resolved
 **When:** the user presses Ctrl+R
 **Then:** the detail fields refresh from the API, all right-column rows reset to dim, and all background availability checks restart from scratch
@@ -422,6 +453,7 @@ Ctrl+R re-executes the describe call and re-probes all reverse relationships.
 ---
 
 #### Story: Results are cached for the session
+
 **Given:** the user viewed the detail for resource X and all checks completed
 **When:** the user presses Esc to go back, then re-enters resource X's detail
 **Then:** right-column rows show their cached availability instantly (no dim flicker, no re-checking)
@@ -435,6 +467,7 @@ No AWS CLI equivalent -- session-scoped caching.
 ---
 
 #### Story: Cache clears on profile or region switch
+
 **Given:** the user has cached related-resource availability for several resources
 **When:** the user switches AWS profile or region
 **Then:** the entire related-resource cache is cleared; entering any detail view triggers fresh checks
@@ -446,6 +479,7 @@ Switching profiles means different resources, so cached availability is stale.
 ---
 
 #### Story: Background check failure degrades gracefully
+
 **Given:** a background reverse-relationship check encounters an error (e.g., API throttling after retries exhausted)
 **When:** the check result returns with an error
 **Then:** the affected right-column row stays dim (same visual as "no related resources found"); no error flash message appears; the user can press Ctrl+R to retry later
@@ -458,6 +492,7 @@ No AWS CLI equivalent -- graceful degradation on API errors.
 ### Right Column Enter Behavior
 
 #### Story: Enter on a right-column type with count=1 opens detail directly
+
 **Given:** the right column is focused and the cursor is on a related type showing count 1 (e.g., "VPC (1)")
 **When:** the user presses Enter
 **Then:** the target resource's detail view is pushed onto the view stack (no intermediate list view)
@@ -471,6 +506,7 @@ When there is exactly one related resource, navigate directly to its detail.
 ---
 
 #### Story: Enter on a right-column type with count>1 opens filtered list
+
 **Given:** the right column is focused and the cursor is on a related type showing count greater than 1 (e.g., "Security Groups (3)")
 **When:** the user presses Enter
 **Then:** a resource list view is pushed showing only the related resources, with the frame title indicating the filter scope (e.g., "sg(3) -- i-0abc123 (web-prod)")
@@ -484,6 +520,7 @@ When there are multiple related resources, show them as a filtered list.
 ---
 
 #### Story: Enter on CloudTrail Events opens pre-filtered search
+
 **Given:** the right column is focused and the cursor is on "CloudTrail Events"
 **When:** the user presses Enter
 **Then:** the CloudTrail search view opens pre-filtered for the current resource's ID or name
@@ -495,6 +532,7 @@ CloudTrail search scoped to the current resource.
 ---
 
 #### Story: Enter on a dim right-column row is impossible
+
 **Given:** the right column is focused
 **When:** dim (unavailable) rows exist in the list
 **Then:** the cursor cannot land on dim rows, so pressing Enter on a dim row is not possible
@@ -507,6 +545,7 @@ No AWS CLI equivalent -- cursor behavior prevents interaction with unavailable t
 ### Copy Behavior
 
 #### Story: Copy from left column copies field value
+
 **Given:** the left column is focused and the cursor is on a field (e.g., InstanceId: i-0abc123def456789a)
 **When:** the user presses `c`
 **Then:** the field value "i-0abc123def456789a" is copied to the clipboard; the header shows "Copied!" flash in green (#9ece6a) for approximately 2 seconds
@@ -517,6 +556,7 @@ No AWS CLI equivalent -- clipboard integration.
 ---
 
 #### Story: Copy from right column copies resource type name
+
 **Given:** the right column is focused and the cursor is on "Auto Scaling Groups"
 **When:** the user presses `c`
 **Then:** the text "Auto Scaling Groups" is copied to the clipboard; the header shows "Copied!" flash
@@ -529,6 +569,7 @@ No AWS CLI equivalent -- clipboard integration.
 ### Navigation Chaining and View Stack
 
 #### Story: Chained navigation through forward fields
+
 **Given:** the user is in an EC2 instance detail view
 **When:** the user presses Enter on VpcId to open VPC detail, then in VPC detail presses Enter on a navigable field (if any), continuing to chain
 **Then:** each Enter pushes a new detail view onto the stack; Esc at each level pops back one view; the full chain unwinds correctly
@@ -543,6 +584,7 @@ Each navigation step is equivalent to a separate describe command.
 ---
 
 #### Story: Chained navigation through right column
+
 **Given:** the user is in an EC2 detail view
 **When:** the user presses Tab to focus the right column, selects "CloudWatch Alarms", and presses Enter
 **Then:** a filtered alarm list (or alarm detail if count=1) is pushed onto the view stack
@@ -558,6 +600,7 @@ Navigation chains through multiple resource types.
 ---
 
 #### Story: Mixed navigation between left and right columns
+
 **Given:** the user is in an EC2 detail
 **When:** the user presses Enter on sg-0ccc333 (left column, navigable field) to open the SG detail
 **Then:** in the SG detail, the right column shows SG's reverse relationships (EC2 Instances, RDS Instances, ELBs, etc.)
@@ -575,6 +618,7 @@ Mixed left-column (forward) and right-column (reverse) navigation.
 ---
 
 #### Story: Depth indicator shows when stack exceeds 4
+
 **Given:** the user has navigated through 5 or more levels (e.g., EC2 detail -> VPC detail -> Subnet list -> Subnet detail -> ENI detail)
 **When:** the user looks at the header
 **Then:** the version number is replaced by `[5]` (or whatever the current depth), e.g., "a9s [5]  prod:us-east-1"
@@ -588,6 +632,7 @@ No AWS CLI equivalent -- view stack depth indicator.
 ---
 
 #### Story: Esc from detail view goes back to previous view
+
 **Given:** the user is in a detail view (opened from a resource list)
 **When:** the user presses Esc (with no search or filter active)
 **Then:** the view pops back to the resource list that preceded it, with the cursor on the same resource
@@ -600,6 +645,7 @@ No AWS CLI equivalent -- view stack navigation.
 ### Search and Filter
 
 #### Story: `/` in left column activates text search
+
 **Given:** the left column is focused in the detail view
 **When:** the user presses `/`
 **Then:** the header right side changes to `/<cursor>` in amber bold (#e0af68)
@@ -613,6 +659,7 @@ No AWS CLI equivalent -- text search within detail output. Comparable to piping 
 ---
 
 #### Story: n/N navigates between search matches
+
 **Given:** a search is active in the left column with 3 matches
 **When:** the user presses `n`
 **Then:** the cursor jumps to the next match; the match indicator updates to `[2/3 matches]`; the new current match is highlighted in orange, the previous becomes amber
@@ -629,6 +676,7 @@ No AWS CLI equivalent -- match navigation.
 ---
 
 #### Story: Search highlights coexist with navigable field underlines
+
 **Given:** a search for "vpc" is active and a match falls on a navigable field value (e.g., VpcId: vpc-0aaa111)
 **When:** the user views the field
 **Then:** the search highlight (amber/orange background) takes precedence over the navigable underline
@@ -646,6 +694,7 @@ No AWS CLI equivalent -- interaction between search and navigation.
 ---
 
 #### Story: `/` in right column activates list filter
+
 **Given:** the right column is focused in the detail view
 **When:** the user presses `/`
 **Then:** the header right side changes to `/<cursor>` in amber bold
@@ -662,6 +711,7 @@ No AWS CLI equivalent -- filtering a list of related resource types.
 ---
 
 #### Story: Search/filter state persists across column switches
+
 **Given:** the user has an active search in the left column (highlights visible)
 **When:** the user presses Tab to switch to the right column
 **Then:** the search highlights remain visible in the left column; `n`/`N` are inactive; the header reverts to "? for help"
@@ -682,6 +732,7 @@ No AWS CLI equivalent -- per-column state persistence.
 ---
 
 #### Story: Header state reverts when switching to column without search
+
 **Given:** the left column has an active search and the header shows "? for help" (search was confirmed, not in input mode)
 **When:** the user switches to the right column which has no filter
 **Then:** the header continues to show "? for help"
@@ -696,6 +747,7 @@ No AWS CLI equivalent -- header context sensitivity.
 ---
 
 #### Story: Esc layering with search and filter
+
 **Given:** the user is typing a search query in the left column (search input active)
 **When:** the user presses Esc
 **Then:** the search input is cancelled; no highlights appear; the header reverts to "? for help"
@@ -722,6 +774,7 @@ No AWS CLI equivalent -- multi-layered escape behavior.
 ### YAML View Interaction
 
 #### Story: YAML view shows no right column
+
 **Given:** the user is in a two-column detail view
 **When:** the user presses `y` to switch to YAML view
 **Then:** the YAML view appears at full width with no right column, no separator, and no related resource types visible
@@ -733,6 +786,7 @@ YAML view shows the raw resource data without the related-resources column.
 ---
 
 #### Story: `r` in YAML view does nothing
+
 **Given:** the user is in the YAML view
 **When:** the user presses `r`
 **Then:** nothing happens; `r` has no effect in YAML view (the toggle is only meaningful in the detail view)
@@ -745,6 +799,7 @@ No AWS CLI equivalent -- YAML view ignores the column toggle.
 ### Responsive Layout
 
 #### Story: Stacked layout below 100 columns
+
 **Given:** the terminal is between 60 and 99 columns wide
 **When:** the user opens a detail view
 **Then:** the layout is stacked: detail fields appear on top, a dim separator line "-- Related ---" divides them from the related types list below; both sections are in a single scrollable stream
@@ -758,6 +813,7 @@ No AWS CLI equivalent -- responsive layout for narrow terminals.
 ---
 
 #### Story: Side-by-side layout at 100+ columns
+
 **Given:** the terminal is 100 or more columns wide
 **When:** the user opens a detail view
 **Then:** the layout is two columns side by side: left column fills remaining width, right column is 32 characters wide, separated by a thin vertical line
@@ -768,6 +824,7 @@ No AWS CLI equivalent -- responsive layout for wide terminals.
 ---
 
 #### Story: State preserved when crossing the 100-column threshold
+
 **Given:** the user is in a two-column detail view at 120 columns wide with the cursor on field 12, a search active with 3 matches, and the right column filter narrowed to "cloud"
 **When:** the terminal is resized to 90 columns (below the 100-col threshold)
 **Then:** the layout switches to stacked mode; the cursor remains on field 12; the search highlights and match index are preserved; the filter on the related section stays active; the focused section remains focused
@@ -783,6 +840,7 @@ No AWS CLI equivalent -- state preservation across layout transitions.
 ### Help Screen
 
 #### Story: Help screen shows two-column detail key bindings
+
 **Given:** the user is in a two-column detail view
 **When:** the user presses `?`
 **Then:** the help screen appears with four columns: DETAIL, RELATED, NAVIGATION, HOTKEYS; the DETAIL column shows Enter (Open link), Esc (Go back), h/l (Switch col), c (Copy value), y (YAML view), / (Search), n (Next match), N (Prev match); the RELATED column shows Tab (Switch col), r (Toggle col), / (Filter list)
@@ -798,6 +856,7 @@ No AWS CLI equivalent -- help overlay.
 ### Concurrency and Rate Limiting
 
 #### Story: Maximum 4 concurrent background checks
+
 **Given:** the user enters a detail view for a resource with 12 reverse/algorithmic related types
 **When:** the background checks begin
 **Then:** at most 4 checks run concurrently; as each completes, the next queued check starts immediately; all 12 complete progressively
@@ -808,6 +867,7 @@ No AWS CLI equivalent -- internal rate limiting for API calls.
 ---
 
 #### Story: Background checks have per-check timeout
+
 **Given:** a background reverse-relationship check is running
 **When:** the check takes longer than 10 seconds
 **Then:** the check times out; the affected row stays dim; no error is shown to the user
@@ -820,6 +880,7 @@ No AWS CLI equivalent -- timeout protection for slow API calls.
 ### CFN Stack Resources Key Remap
 
 #### Story: CloudFormation stack resources triggered by `R` (uppercase)
+
 **Given:** the user is on a CloudFormation stack in the resource list
 **When:** the user presses `R` (uppercase)
 **Then:** the stack resources child view opens (same behavior as before, but now with uppercase R instead of lowercase r)
@@ -846,6 +907,7 @@ verification. Only resources with non-trivial logic are covered here.
 ## Lambda
 
 ### Story: CW Log Group via naming convention
+
 **Given:** the user opens the detail view for a Lambda function named "process-orders"
 **When:** the right column availability checks complete
 **Then:** "CW Log Group" appears as an available (non-dim) row in the right column if a log group named `/aws/lambda/process-orders` exists
@@ -862,6 +924,7 @@ Lambda log groups follow the naming convention `/aws/lambda/{function-name}`.
 ---
 
 ### Story: Lambda LoggingConfig override
+
 **Given:** the user opens the detail view for a Lambda function that has a custom `LoggingConfig.LogGroup` set (overriding the default `/aws/lambda/{name}` convention)
 **When:** the right column resolves the CW Log Group relationship
 **Then:** the navigated log group matches the custom `LoggingConfig.LogGroup` value, not the default naming convention
@@ -875,6 +938,7 @@ If LoggingConfig.LogGroup is set, it overrides the default `/aws/lambda/{name}` 
 ---
 
 ### Story: SQS Event Source Mappings
+
 **Given:** the user opens the detail view for a Lambda function that polls SQS queues
 **When:** the right column resolves "SQS Event Sources"
 **Then:** the row appears as available, showing the count of event source mappings (e.g., "SQS Event Sources (2)")
@@ -891,6 +955,7 @@ Returns SQS queue ARNs that trigger this Lambda.
 ---
 
 ### Story: Lambda execution role as forward navigable field
+
 **Given:** the user is viewing a Lambda function detail
 **When:** the user looks at the "Role:" field
 **Then:** the Role ARN value is underlined in accent color (navigable)
@@ -910,6 +975,7 @@ Navigation from Lambda to its execution role's detail.
 ## EC2
 
 ### Story: EBS Snapshots via attached volumes (multi-hop)
+
 **Given:** the user opens the detail view for an EC2 instance with attached EBS volumes
 **When:** the right column resolves "EBS Snapshots"
 **Then:** the row becomes available if any snapshots exist for the attached volumes
@@ -927,6 +993,7 @@ Two-step lookup: instance -> volume IDs -> snapshots of those volumes.
 ---
 
 ### Story: Elastic IP association check
+
 **Given:** the user opens the detail view for an EC2 instance
 **When:** the right column resolves "Elastic IPs"
 **Then:** the row becomes available if an Elastic IP is associated with this instance; it stays dim if the instance only has an auto-assigned public IP
@@ -940,6 +1007,7 @@ Checks whether the instance's public IP is an Elastic IP or auto-assigned.
 ---
 
 ### Story: Auto Scaling Group reverse lookup
+
 **Given:** the user opens the detail view for an EC2 instance managed by an ASG
 **When:** the right column resolves "Auto Scaling Groups"
 **Then:** the row becomes available
@@ -956,6 +1024,7 @@ Returns the ASG name directly for a managed instance.
 ---
 
 ### Story: EKS Node Group detection via tags
+
 **Given:** the user opens the detail view for an EC2 instance that is an EKS worker node
 **When:** the right column resolves "EKS Node Groups"
 **Then:** the row becomes available if the instance has `eks:nodegroup-name` and `eks:cluster-name` tags
@@ -974,6 +1043,7 @@ Check for eks:nodegroup-name and eks:cluster-name tags.
 ## ECS Service
 
 ### Story: Load Balancer via target group chain (multi-hop)
+
 **Given:** the user opens the detail view for an ECS service with a load balancer configuration
 **When:** the right column resolves "Load Balancers"
 **Then:** the row becomes available if the multi-hop lookup succeeds: service -> targetGroupArn (from `loadBalancers[]`) -> DescribeTargetGroups -> LoadBalancerArns[]
@@ -992,6 +1062,7 @@ Three-step chain: ECS Service -> TG ARN -> TG -> ELB.
 ---
 
 ### Story: CW Log Group via task definition (multi-hop)
+
 **Given:** the user opens the detail view for an ECS service
 **When:** the right column resolves "CloudWatch Log Groups"
 **Then:** the row becomes available if the multi-hop lookup succeeds: service -> taskDefinition ARN -> DescribeTaskDefinition -> containerDefinitions[].logConfiguration.options["awslogs-group"]
@@ -1006,6 +1077,7 @@ Two-step lookup to find the log group from the task definition.
 ---
 
 ### Story: ECR Repository via task definition image URI (multi-hop)
+
 **Given:** the user opens the detail view for an ECS service
 **When:** the right column resolves "ECR Repositories"
 **Then:** the row becomes available if the task definition's container image URI matches an ECR repository pattern ({account}.dkr.ecr.{region}.amazonaws.com/{repo}:{tag})
@@ -1021,6 +1093,7 @@ Parse the image URI to extract the ECR repository name.
 ## IAM Role
 
 ### Story: Lambda functions using this role (reverse)
+
 **Given:** the user opens the detail view for an IAM Role
 **When:** the right column resolves "Lambda Functions"
 **Then:** the row becomes available if any Lambda functions have their `Role` field matching this role's ARN
@@ -1034,6 +1107,7 @@ Reverse lookup: find all Lambdas using this role.
 ---
 
 ### Story: EC2 instances using this role (reverse via instance profiles)
+
 **Given:** the user opens the detail view for an IAM Role
 **When:** the right column resolves "EC2 Instances"
 **Then:** the row becomes available if any EC2 instances have an instance profile associated with this role
@@ -1048,6 +1122,7 @@ Two-step: role -> instance profiles -> instances using those profiles.
 ---
 
 ### Story: Trust policy principal navigation
+
 **Given:** the user opens the detail view for an IAM Role
 **When:** the right column resolves "Trusted Principals"
 **Then:** the analysis of the trust policy shows which AWS services (e.g., lambda.amazonaws.com, ecs-tasks.amazonaws.com) and which accounts/roles can assume this role
@@ -1061,6 +1136,7 @@ Parse the trust policy to identify who can assume this role.
 ## S3
 
 ### Story: CloudFront distributions using this bucket as origin (reverse)
+
 **Given:** the user opens the detail view for an S3 bucket
 **When:** the right column resolves "CloudFront Distributions"
 **Then:** the row becomes available if any CloudFront distribution has an origin with DomainName matching this bucket (e.g., "{bucket}.s3.amazonaws.com" or "{bucket}.s3.{region}.amazonaws.com")
@@ -1074,6 +1150,7 @@ Reverse lookup: find distributions whose origins reference this bucket.
 ---
 
 ### Story: Event notifications (Lambda, SQS, SNS triggers)
+
 **Given:** the user opens the detail view for an S3 bucket with event notifications configured
 **When:** the right column resolves event notification relationships
 **Then:** the rows for Lambda Functions, SQS Queues, or SNS Topics become available if the bucket's notification configuration references them
@@ -1089,6 +1166,7 @@ Returns LambdaFunctionConfigurations[], QueueConfigurations[], TopicConfiguratio
 ## Route 53
 
 ### Story: DNS records pointing to ELBs (alias record parsing)
+
 **Given:** the user opens the detail view for a Route 53 hosted zone
 **When:** the right column resolves "Load Balancers"
 **Then:** the row becomes available if any alias records in this zone have a HostedZoneId matching known ELB hosted zone IDs (e.g., Z35SXDOTRQ7X7K for us-east-1 ALB) and a DNSName matching an ELB DNS name
@@ -1102,6 +1180,7 @@ Parse alias records to find those pointing to ELB endpoints.
 ---
 
 ### Story: DNS records pointing to CloudFront distributions
+
 **Given:** the user opens the detail view for a Route 53 hosted zone
 **When:** the right column resolves "CloudFront Distributions"
 **Then:** the row becomes available if any alias records have HostedZoneId=Z2FDTNDATAQYW2 (CloudFront's fixed hosted zone ID)
@@ -1115,6 +1194,7 @@ Alias records with CloudFront's fixed hosted zone ID indicate CF distributions.
 ---
 
 ### Story: DNS records pointing to S3 website endpoints
+
 **Given:** the user opens the detail view for a Route 53 hosted zone
 **When:** the right column resolves "S3 Buckets"
 **Then:** the row becomes available if alias records or CNAME records point to S3 website endpoints ({bucket}.s3-website-{region}.amazonaws.com)
@@ -1130,6 +1210,7 @@ Parse records for S3 website endpoint patterns.
 ## CloudTrail Events
 
 ### Story: Navigate to affected resource from event
+
 **Given:** the user opens the detail view for a CloudTrail event (e.g., TerminateInstances)
 **When:** the right column resolves "Affected Resource"
 **Then:** the row becomes available; the relationship is derived from parsing `Resources[].ResourceType` and `Resources[].ResourceName` (or `requestParameters` when Resources[] is empty) and mapping to an a9s resource type
@@ -1146,6 +1227,7 @@ The Resources[] field in the event identifies what was affected.
 ---
 
 ### Story: Navigate to IAM role from event's userIdentity
+
 **Given:** the user opens the detail view for a CloudTrail event where the actor assumed a role
 **When:** the right column resolves "IAM Role"
 **Then:** the row becomes available; the role ARN is parsed from `userIdentity.sessionContext.sessionIssuer.arn`
@@ -1164,6 +1246,7 @@ Parse the acting role from the event's identity chain.
 ## CloudWatch Alarm
 
 ### Story: Navigate to monitored resource from alarm dimensions
+
 **Given:** the user opens the detail view for a CloudWatch alarm with an InstanceId dimension
 **When:** the right column resolves "Monitored Resource"
 **Then:** the row becomes available; the alarm's Dimensions[] are parsed to identify the resource type (InstanceId -> EC2) and resource ID
@@ -1180,6 +1263,7 @@ Dimension name determines resource type: InstanceId=EC2, DBInstanceIdentifier=RD
 ---
 
 ### Story: Dimension-to-resource mapping covers major types
+
 **Given:** alarms exist with various dimension types
 **When:** the right column resolves the monitored resource for each
 **Then:** the following dimension mappings are supported:
@@ -1206,6 +1290,7 @@ Each alarm dimension type maps to a specific AWS resource type.
 ## Security Group
 
 ### Story: ENI-based universal reverse lookup
+
 **Given:** the user opens the detail view for a Security Group
 **When:** the right column resolves "Network Interfaces"
 **Then:** the row becomes available showing ENIs attached to this SG; the ENI lookup is the universal reverse relationship that covers all VPC resources using this SG (EC2, RDS, ELB, Lambda, ECS, EKS, VPC Endpoints)
@@ -1219,6 +1304,7 @@ Single API call returns all ENIs using this SG, regardless of owning service.
 ---
 
 ### Story: Cross-referenced security groups
+
 **Given:** the user opens the detail view for a Security Group
 **When:** the right column resolves "Security Groups" (self-referencing type)
 **Then:** the row becomes available if other SGs have rules referencing this SG as a source or destination
@@ -1234,6 +1320,7 @@ Finds rules in OTHER SGs that reference this SG.
 ## VPC
 
 ### Story: VPC has the most reverse relationships
+
 **Given:** the user opens the detail view for a VPC
 **When:** the right column fully resolves
 **Then:** the right column shows up to ~18 related resource types including: EC2 Instances, Subnets, Security Groups, Route Tables, NAT Gateways, Internet Gateways, VPC Endpoints, Transit Gateways, Load Balancers, Lambda Functions, EKS Clusters, DB Instances, ElastiCache, CloudTrail Events (and potentially more)
@@ -1251,6 +1338,7 @@ No single AWS CLI command shows all resources in a VPC. Each type requires a sep
 ## EKS
 
 ### Story: CW Log Group via naming convention
+
 **Given:** the user opens the detail view for an EKS cluster named "production"
 **When:** the right column resolves "CloudWatch Log Groups"
 **Then:** the row becomes available if a log group named `/aws/eks/production/cluster` exists and the cluster has control plane logging enabled
@@ -1265,6 +1353,7 @@ EKS control plane logs follow the naming convention `/aws/eks/{cluster-name}/clu
 ---
 
 ### Story: Node Groups reverse lookup
+
 **Given:** the user opens the detail view for an EKS cluster
 **When:** the right column resolves "EKS Node Groups"
 **Then:** the row becomes available showing node groups belonging to this cluster
@@ -1280,6 +1369,7 @@ Lists all node groups associated with the cluster.
 ## CloudFront
 
 ### Story: Origin parsing for S3 and ELB
+
 **Given:** the user opens the detail view for a CloudFront distribution
 **When:** the right column resolves origin-based relationships
 **Then:** "S3 Buckets" becomes available if any origin's DomainName matches an S3 pattern ({bucket}.s3.amazonaws.com or {bucket}.s3.{region}.amazonaws.com); "Load Balancers" becomes available if any origin's DomainName matches an ELB DNS name
@@ -1293,6 +1383,7 @@ Parse origin domain names to identify S3 buckets and ELBs.
 ---
 
 ### Story: Route 53 reverse lookup for distributions
+
 **Given:** the user opens the detail view for a CloudFront distribution
 **When:** the right column resolves "Route 53 Hosted Zones"
 **Then:** the row becomes available if any R53 hosted zone has alias records with HostedZoneId=Z2FDTNDATAQYW2 pointing to this distribution's domain name
@@ -1312,6 +1403,7 @@ Search for alias records with CloudFront's fixed hosted zone ID.
 ---
 
 ### Story: Two-column detail view for every resource type
+
 **Given:** any of the 66 resource types in a9s
 **When:** the user enters the detail view for any resource of that type
 **Then:** the left column shows resource-specific detail fields; the right column shows resource-type-specific related types (or just CloudTrail Events if no other relationships are defined); no resource type crashes or shows an empty right column without at least CloudTrail Events
@@ -1323,6 +1415,7 @@ Every resource type has a describe command and every resource has CloudTrail eve
 ---
 
 ### Story: Forward navigable fields are resource-type-specific
+
 **Given:** different resource types
 **When:** the user opens each one's detail view
 **Then:** each resource type has its own set of navigable fields based on its API response: EC2 has VpcId, SubnetId, SecurityGroups; RDS has VpcSecurityGroups, KmsKeyId, DBSubnetGroup.Subnets; Lambda has Role, VpcConfig.VpcId, VpcConfig.SubnetIds; VPC has very few (mostly just DhcpOptionsId which is not in a9s); the navigable field set is defined per resource type, not auto-detected from all fields
@@ -1333,6 +1426,7 @@ Each resource type's describe output contains different cross-references. Not al
 ---
 
 ### Story: Right column relationships are resource-type-specific
+
 **Given:** different resource types
 **When:** the user looks at the right column for each
 **Then:** each shows different related types: EC2 shows Target Groups, ASGs, Alarms, etc.; Lambda shows CW Log Group, SQS Event Sources, EventBridge Rules, etc.; VPC shows EC2 Instances, Subnets, SGs, NAT GWs, etc.; CloudTrail Events appears for all of them as the last row
@@ -1343,6 +1437,7 @@ Each resource type has different reverse dependencies in AWS. There is no single
 ---
 
 ### Story: No resource type shows duplicate relationships across columns
+
 **Given:** any resource type in a9s
 **When:** the user examines both the left column (navigable fields) and right column (related types)
 **Then:** no resource type appears in both columns: forward relationships are in the left column only, reverse/algorithmic relationships are in the right column only

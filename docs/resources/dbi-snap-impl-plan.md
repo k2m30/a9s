@@ -186,7 +186,7 @@ THEN:  got.Issues deep-equals expected slice in precedence order
 | U2 §4 phrase per signal | warning_*, broken_* | |
 | U3 `~` on Healthy+~ | N/A — no Wave 2 `~` signal | |
 | U4 `!` on Healthy+! | N/A — no Wave 2 `!` signal | |
-| U5 no glyph on non-green | every warning_* / broken_* test asserts | |
+| U5 no glyph on non-green | every warning_*/ broken_* test asserts | |
 | U6 S1 badge counts `!` instances | N/A — no `!` signals → expected N=0 | |
 | U7a multi-W1 (+N) | multi_w1_unencrypted_plus_orphan | |
 | U7b W1+W2 stack | N/A — Wave 2 = None | |

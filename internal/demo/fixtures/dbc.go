@@ -212,42 +212,6 @@ func buildDBCClusters() []docdbtypes.DBCluster {
 	noBkpPlusMaint.BackupRetentionPeriod = aws.Int32(0)
 	noBkpPlusMaint.ClusterCreateTime = aws.Time(mustTime("2025-02-10T08:00:00Z"))
 
-	// prod-aurora-cluster — Aurora PostgreSQL cluster. Acts as the
-	// "all pivots non-zero" graph-root for dbc (asserted in
-	// tests/integration/scenario_dbc_visual_test.go). Every registered
-	// dbc pivot resolves on this single fixture: sg (VpcSecurityGroups),
-	// alarm (cloudwatch fixture), logs (cwlogs fixture), kms (KmsKeyId),
-	// secrets (MasterUserSecret below), dbi (prod-dbi-aurora-1 is a member),
-	// dbc-snap (cluster snapshot fixture), subnet+vpc (subnet group).
-	aurora := docdbtypes.DBCluster{
-		DBClusterIdentifier:        aws.String("prod-aurora-cluster"),
-		DBClusterArn:               aws.String("arn:aws:rds:us-east-1:123456789012:cluster:prod-aurora-cluster"),
-		Engine:                     aws.String("aurora-postgresql"),
-		EngineVersion:              aws.String("16.4"),
-		Status:                     aws.String("available"),
-		Endpoint:                   aws.String("prod-aurora-cluster.cluster-c9xyz123.us-east-1.rds.amazonaws.com"),
-		ReaderEndpoint:             aws.String("prod-aurora-cluster.cluster-ro-xyz.us-east-1.rds.amazonaws.com"),
-		Port:                       aws.Int32(5432),
-		StorageEncrypted:           aws.Bool(true),
-		KmsKeyId:                   aws.String(dbcKMSKeyID),
-		DeletionProtection:         aws.Bool(true),
-		BackupRetentionPeriod:      aws.Int32(7),
-		PreferredMaintenanceWindow: aws.String("sun:05:00-sun:06:00"),
-		DBSubnetGroup:              aws.String(rdsSubnetGroup),
-		VpcSecurityGroups: []docdbtypes.VpcSecurityGroupMembership{
-			{VpcSecurityGroupId: aws.String(dbcSGID), Status: aws.String("active")},
-		},
-		DBClusterMembers: []docdbtypes.DBClusterMember{
-			{DBInstanceIdentifier: aws.String("prod-dbi-aurora-1"), IsClusterWriter: aws.Bool(true)},
-		},
-		MasterUsername: aws.String("pgadmin"),
-		MasterUserSecret: &docdbtypes.ClusterMasterUserSecret{
-			SecretArn: aws.String(ProdDbcAuroraMasterSecretARN),
-		},
-		MultiAZ:           aws.Bool(true),
-		ClusterCreateTime: aws.Time(mustTime("2025-03-01T12:00:00Z")),
-	}
-
 	return []docdbtypes.DBCluster{
 		prod,
 		modifying,
@@ -261,7 +225,6 @@ func buildDBCClusters() []docdbtypes.DBCluster {
 		multi,
 		maintOverdue,
 		noBkpPlusMaint,
-		aurora,
 	}
 }
 
@@ -285,28 +248,6 @@ func buildDBCSnapshots() []docdbtypes.DBClusterSnapshot {
 			SourceDBClusterSnapshotArn:  aws.String("arn:aws:rds:us-east-1:123456789012:cluster-snapshot:rds:acme-docdb-prod-2026-03-19"),
 			AvailabilityZones:           []string{"us-east-1a", "us-east-1b", "us-east-1c"},
 			StorageType:                 aws.String("standard"),
-			StorageEncrypted:            aws.Bool(true),
-			VpcId:                       aws.String(dbcVPCID),
-		},
-		// Automated snapshot for prod-aurora-cluster — required for the
-		// dbc→dbc-snap pivot on the Aurora "all pivots non-zero"
-		// graph-root. Aurora cluster snapshots share the DocDB API surface
-		// (DescribeDBClusterSnapshots) so they land in the same cache.
-		{
-			DBClusterSnapshotIdentifier: aws.String(ProdDBCSnapAuroraID),
-			DBClusterIdentifier:         aws.String("prod-aurora-cluster"),
-			DBClusterSnapshotArn:        aws.String(ProdDBCSnapAuroraARN),
-			Status:                      aws.String("available"),
-			Engine:                      aws.String("aurora-postgresql"),
-			EngineVersion:               aws.String("16.4"),
-			SnapshotType:                aws.String("automated"),
-			SnapshotCreateTime:          aws.Time(mustTime("2026-04-15T04:00:00Z")),
-			ClusterCreateTime:           aws.Time(mustTime("2025-03-01T12:00:00Z")),
-			MasterUsername:              aws.String("pgadmin"),
-			Port:                        aws.Int32(5432),
-			KmsKeyId:                    aws.String(dbcKMSKeyID),
-			PercentProgress:             aws.Int32(100),
-			StorageType:                 aws.String("aurora"),
 			StorageEncrypted:            aws.Bool(true),
 			VpcId:                       aws.String(dbcVPCID),
 		},

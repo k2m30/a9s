@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `kinesis`
 - **Display name**: Kinesis Streams
-- **AWS API reference**: https://docs.aws.amazon.com/kinesis/latest/APIReference/API_StreamDescription.html
+- **AWS API reference**: <https://docs.aws.amazon.com/kinesis/latest/APIReference/API_StreamDescription.html>
 - **List API**: `ListStreams` — returns `StreamSummaries []StreamSummary` plus a parallel `StreamNames []string`. `StreamSummary` carries `StreamARN`, `StreamName`, `StreamStatus`, `StreamCreationTimestamp`, `StreamModeDetails` — enough for the one Wave 1 signal (stream status). The SDK shape is authoritative here; the `attention-signals.md` "Source" column cites `DescribeStreamSummary`, which is the per-stream Wave 2 call (see next field).
 - **Describe API (if any)**: `DescribeStreamSummary` per stream — returns `StreamDescriptionSummary`, which is the only shape that carries `KeyId` (the CMK ARN used for server-side encryption) and `EncryptionType`. Not used by any Wave 2 attention signal in `attention-signals.md`, but required for the `kms` related-panel pivot (see §2).
 

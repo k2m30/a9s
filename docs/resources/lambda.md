@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `lambda`
 - **Display name**: Lambda Functions
-- **AWS API reference**: https://docs.aws.amazon.com/lambda/latest/api/API_FunctionConfiguration.html
+- **AWS API reference**: <https://docs.aws.amazon.com/lambda/latest/api/API_FunctionConfiguration.html>
 - **List API**: `ListFunctions` (returns `FunctionConfiguration` entries — same shape as `GetFunctionConfiguration`; includes `State`, `LastUpdateStatus`, `Runtime`, `DeadLetterConfig`, `VpcConfig`, `Role`, `KMSKeyArn`, `FileSystemConfigs`).
 - **Describe API (if any)**: not used. All Wave 1 fields are already on the `ListFunctions` response. `attention-signals.md` lists Wave 2 as `None`.
 

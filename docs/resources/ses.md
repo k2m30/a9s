@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `ses`
 - **Display name**: SES Identities
-- **AWS API reference**: https://docs.aws.amazon.com/ses/latest/APIReference-V2/API_IdentityInfo.html
+- **AWS API reference**: <https://docs.aws.amazon.com/ses/latest/APIReference-V2/API_IdentityInfo.html>
 - **List API**: `ListEmailIdentities` (SESv2) — returns `IdentityInfo[]` with `IdentityName`, `IdentityType`, `SendingEnabled`, `VerificationStatus`.
 - **Describe API (if any)**: `GetAccount` (SESv2, account-wide, one call — used for Wave 2 enforcement/quota signals). Per-identity enrichment (DKIM drift, etc.) is Wave 3 and not used.
 

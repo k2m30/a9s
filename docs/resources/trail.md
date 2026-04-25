@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `trail`
 - **Display name**: CloudTrail Trails
-- **AWS API reference**: https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_Trail.html
+- **AWS API reference**: <https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_Trail.html>
 - **List API**: `DescribeTrails` (returns `TrailList []types.Trail` with `Name`, `TrailARN`, `HomeRegion`, `S3BucketName`, `S3KeyPrefix`, `SnsTopicARN`, `KmsKeyId`, `CloudWatchLogsLogGroupArn`, `CloudWatchLogsRoleArn`, `LogFileValidationEnabled`, `IsMultiRegionTrail`, `IsOrganizationTrail`, `IncludeGlobalServiceEvents`, `HasCustomEventSelectors`, `HasInsightSelectors`).
 - **Describe API (if any)**: `GetTrailStatus` (per trail) — returns `IsLogging`, `LatestDeliveryError`, `LatestDeliveryTime`, `LatestDigestDeliveryError`, `LatestDigestDeliveryTime`, `LatestNotificationError`, `LatestCloudWatchLogsDeliveryError`, `LatestCloudWatchLogsDeliveryTime`, `StartLoggingTime`, `StopLoggingTime`.
 

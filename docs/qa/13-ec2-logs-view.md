@@ -160,6 +160,7 @@ No single CLI equivalent. The menu aggregates availability from:
 | C.3.4 | The terminal is narrower than the combined column widths. | Rightmost columns are hidden. Horizontal scroll with `h`/`l` is available. |
 
 **AWS comparison:**
+
 ```
 aws cloudtrail lookup-events \
   --lookup-attributes AttributeKey=ResourceType,AttributeValue=AWS::EC2::Instance \
@@ -167,6 +168,7 @@ aws cloudtrail lookup-events \
   --start-time $(date -d '24 hours ago' --iso-8601=seconds) \
   --end-time $(date --iso-8601=seconds)
 ```
+
 Expected fields visible: Time (EventTime), Event (EventName), User (Username), Source IP (SourceIPAddress)
 
 ### C.4 Navigation
@@ -190,7 +192,7 @@ Expected fields visible: Time (EventTime), Event (EventName), User (Username), S
 
 | # | Story | Expected |
 |---|-------|----------|
-| C.6.1 | I press `/` and type `Stop`. | The header right shows `/Stop|`. Only events whose name, user, or other visible columns contain "Stop" (case-insensitive) are shown. The frame title updates to `cloudtrail(M/N)`. |
+| C.6.1 | I press `/` and type `Stop`. | The header right shows `/Stop|`. Only events whose name, user, or other visible columns contain "Stop" (case-insensitive) are shown. The frame title updates to`cloudtrail(M/N)`. |
 | C.6.2 | I press `Esc` while filter is active. | The filter clears. All events reappear. The frame title reverts to `cloudtrail(N)`. |
 | C.6.3 | I type a filter that matches no events. | Zero rows are shown. The frame title shows `cloudtrail(0/N)`. |
 
@@ -204,9 +206,11 @@ Expected fields visible: Time (EventTime), Event (EventName), User (Username), S
 | C.7.4 | I scroll the detail view with `j`/`k`/`g`/`G`. | The viewport scrolls through the detail content. CloudTrailEvent (raw JSON) may be long. |
 
 **AWS comparison:**
+
 ```
 aws cloudtrail lookup-events --lookup-attributes AttributeKey=EventId,AttributeValue=EVENT_ID
 ```
+
 Expected detail fields: EventId, EventTime, EventName, EventSource, Username, SourceIPAddress, ReadOnly, AccessKeyId, CloudTrailEvent
 
 ### C.8 YAML View (y)
@@ -280,9 +284,11 @@ Expected detail fields: EventId, EventTime, EventName, EventSource, Username, So
 | D.1.3 | The API responds with an error. | The spinner disappears. A red error flash appears in the header. The frame content shows a centered dim error message. |
 
 **AWS comparison:**
+
 ```
 aws ec2 get-console-output --instance-id i-0abc123def456 --latest
 ```
+
 Expected: base64-decoded Output field rendered as scrollable text
 
 ### D.2 Empty State
@@ -371,10 +377,12 @@ Expected: base64-decoded Output field rendered as scrollable text
 | E.1.5 | Discovery hits the 30-second timeout. | Same dim hint as E.1.4, indicating the scan was truncated. |
 
 **AWS comparison:**
+
 ```
 aws logs describe-log-groups
 aws logs describe-log-streams --log-group-name /ec2/... --log-stream-name-prefix i-0abc123def456
 ```
+
 Expected fields visible: Log Group (LogGroupName), Streams (stream_count), Last Event (last_event_time)
 
 ### E.2 CW Log Group List -- Empty State
@@ -440,6 +448,7 @@ Expected fields visible: Log Group (LogGroupName), Streams (stream_count), Last 
 | E.10.3 | The API responds with an error. | The spinner disappears. A red error flash appears in the header. |
 
 **AWS comparison:**
+
 ```
 aws logs filter-log-events \
   --log-group-name /ec2/web-server/var/log/syslog \
@@ -447,6 +456,7 @@ aws logs filter-log-events \
   --start-time $(date -d '24 hours ago' +%s000) \
   --limit 100
 ```
+
 Expected: Each event's timestamp (dim) + message text
 
 ### E.11 CW Log Viewer -- Empty State
@@ -536,9 +546,11 @@ Expected: Each event's timestamp (dim) + message text
 | F.1.3 | The API responds with an error. | The spinner disappears. A red error flash appears in the header. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-instance-status --instance-ids i-0abc123def456 --include-all-instances
 ```
+
 Expected fields: InstanceState.Name, SystemStatus.Status, SystemStatus.Details[].Name/Status,
 InstanceStatus.Status, InstanceStatus.Details[].Name/Status, Events[].Code/Description/NotBefore/NotAfter
 
@@ -625,11 +637,13 @@ InstanceStatus.Status, InstanceStatus.Details[].Name/Status, Events[].Code/Descr
 | G.1.3 | The API responds with an error. | The spinner disappears. A red error flash appears in the header. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-network-interfaces --filters Name=attachment.instance-id,Values=i-0abc123def456
 aws ec2 describe-flow-logs --filter Name=resource-id,Values=SUBNET_OR_VPC_ID
 aws logs filter-log-events --log-group-name FLOW_LOG_GROUP --start-time ...
 ```
+
 Expected fields visible: Time (timestamp), ENI (eni_id), Src (src_addr), Dst (dst_addr), Port (dst_port), Proto (protocol), Action (action)
 
 ### G.2 Empty State
@@ -741,9 +755,11 @@ Expected fields visible: Time (timestamp), ENI (eni_id), Src (src_addr), Dst (ds
 | H.1.3 | The API responds with an error. | The spinner disappears. A red error flash appears in the header. |
 
 **AWS comparison:**
+
 ```
 aws ssm list-commands --instance-id i-0abc123def456
 ```
+
 Expected fields visible: Time (RequestedDateTime), Command (DocumentName), Status (StatusDetails), User (requested_by)
 
 ### H.2 Empty State
@@ -804,11 +820,13 @@ Expected fields visible: Time (RequestedDateTime), Command (DocumentName), Statu
 | H.8.4 | Both stdout and stderr are empty. | Both sections show "(empty)" in dim text. |
 
 **AWS comparison:**
+
 ```
 aws ssm get-command-invocation \
   --command-id COMMAND_ID \
   --instance-id i-0abc123def456
 ```
+
 Expected: StandardOutputContent and StandardErrorContent fields
 
 ### H.9 Detail (d)

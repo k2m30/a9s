@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `igw`
 - **Display name**: Internet Gateways
-- **AWS API reference**: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_InternetGateway.html
+- **AWS API reference**: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_InternetGateway.html>
 - **List API**: `DescribeInternetGateways` (returns the full `InternetGateway` shape per gateway, including `InternetGatewayId`, `OwnerId`, `Attachments[]` and `Tags[]`).
 - **Describe API (if any)**: not used — list response already carries everything the Wave 1 signals need.
 

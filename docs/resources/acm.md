@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `acm`
 - **Display name**: ACM Certificates
-- **AWS API reference**: https://docs.aws.amazon.com/acm/latest/APIReference/API_CertificateDetail.html
+- **AWS API reference**: <https://docs.aws.amazon.com/acm/latest/APIReference/API_CertificateDetail.html>
 - **List API**: `ListCertificates` — returns `CertificateSummary[]`. The SDK confirms `Status`, `NotAfter`, `NotBefore`, `InUse`, `DomainName`, `CertificateArn` are all on the summary shape, so every Wave 1 signal is reachable with zero extra calls.
 - **Describe API (if any)**: `DescribeCertificate` per cert — used in Wave 2 to read `RenewalSummary.RenewalStatus` and `DomainValidationOptions[].ValidationStatus`, which are **not** on the summary shape.
 

@@ -21,10 +21,12 @@ AWS CLI equivalents are cited so testers can verify data parity.
 | A.1.4 | The API responds with an error (e.g., AccessDeniedException, project not found). | The spinner disappears. A red error flash message appears in the header right side. The frame content area shows an appropriate empty or error state. |
 
 **AWS comparison:**
+
 ```
 aws codebuild list-builds-for-project --project-name payment-api-build
 aws codebuild batch-get-builds --ids <build-id-1> <build-id-2> ...
 ```
+
 Expected fields visible: Build #, Status, Start Time, Duration, Source Version, Initiator
 
 ### A.2 Empty State
@@ -35,9 +37,11 @@ Expected fields visible: Build #, Status, Start Time, Duration, Source Version, 
 | A.2.2 | I press ctrl+r on the empty state. | The loading spinner appears again while the refresh request is in flight. |
 
 **AWS comparison:**
+
 ```
 aws codebuild list-builds-for-project --project-name my-new-project
 ```
+
 Returns empty `ids` list.
 
 ### A.3 Column Layout
@@ -50,9 +54,11 @@ Returns empty `ids` list.
 | A.3.4 | The terminal is narrower than the combined column widths (10+14+22+12+14+24 = 96 plus borders/padding). | The rightmost column(s) are hidden (not truncated mid-value). Horizontal scroll with h/l is available to reveal hidden columns. |
 
 **AWS comparison:**
+
 ```
 aws codebuild batch-get-builds --ids <ids> --query 'builds[].{BuildNumber:buildNumber,BuildStatus:buildStatus,StartTime:startTime,EndTime:endTime,SourceVersion:sourceVersion,Initiator:initiator}'
 ```
+
 Expected fields visible: Build #, Status, Start Time, Duration, Source Version, Initiator
 
 ### A.4 Frame Title
@@ -77,9 +83,11 @@ Expected fields visible: Build #, Status, Start Time, Duration, Source Version, 
 | A.5.8 | I move selection away from a colored row. | The previously selected row reverts to its status-based coloring. |
 
 **AWS comparison:**
+
 ```
 aws codebuild batch-get-builds --ids <ids> --query 'builds[].buildStatus'
 ```
+
 Each returned status value determines the row color.
 
 ### A.6 IN_PROGRESS Build (Edge Case)
@@ -90,9 +98,11 @@ Each returned status value determines the row color.
 | A.6.2 | I press ctrl+r while a build is IN_PROGRESS. | The data refreshes. The Duration column updates to reflect the new elapsed time. If the build has since completed, the status and duration update accordingly. |
 
 **AWS comparison:**
+
 ```
 aws codebuild batch-get-builds --ids <in-progress-build-id> --query 'builds[0].{Status:buildStatus,StartTime:startTime,EndTime:endTime}'
 ```
+
 EndTime is null for IN_PROGRESS builds.
 
 ### A.7 STOPPED Build (Edge Case)
@@ -102,10 +112,12 @@ EndTime is null for IN_PROGRESS builds.
 | A.7.1 | A build was manually stopped mid-way. | The Status column shows "STOPPED". The Duration column shows the elapsed time from StartTime to the point it was stopped (e.g., "0m 45s"). The entire row is rendered dim (#565f89). |
 
 **AWS comparison:**
+
 ```
 aws codebuild stop-build --id <build-id>
 aws codebuild batch-get-builds --ids <build-id> --query 'builds[0].buildStatus'
 ```
+
 Returns "STOPPED".
 
 ### A.8 Build with No Source Version (Edge Case)
@@ -115,10 +127,12 @@ Returns "STOPPED".
 | A.8.1 | A build was triggered manually without specifying a source version. | The "Source Version" column displays an empty value, a dash, or is blank -- it does not crash or show an error. All other columns render normally. |
 
 **AWS comparison:**
+
 ```
 aws codebuild start-build --project-name my-project
 aws codebuild batch-get-builds --ids <build-id> --query 'builds[0].sourceVersion'
 ```
+
 Returns null when no source version was specified.
 
 ### A.9 Build Initiator Variants (Edge Case)
@@ -130,9 +144,11 @@ Returns null when no source version was specified.
 | A.9.3 | A build was triggered by a webhook (e.g., GitHub push). | The Initiator column shows the webhook/trigger information. |
 
 **AWS comparison:**
+
 ```
 aws codebuild batch-get-builds --ids <build-id> --query 'builds[0].initiator'
 ```
+
 Expected values: "codepipeline/<name>", "<user-identity>", or webhook identifier.
 
 ### A.10 Navigation
@@ -179,6 +195,7 @@ Expected values: "codepipeline/<name>", "<user-identity>", or webhook identifier
 | A.13.2 | I verify Enter opens Build Logs, NOT the detail view. | Pressing Enter on a build navigates into its CloudWatch build logs. It does NOT open the build detail/describe view. The detail view is accessed via `d`. |
 
 **AWS comparison:**
+
 ```
 aws codebuild batch-get-builds --ids <build-id> --query 'builds[0].logs.{GroupName:groupName,StreamName:streamName}'
 aws logs get-log-events --log-group-name <group> --log-stream-name <stream>
@@ -193,9 +210,11 @@ aws logs get-log-events --log-group-name <group> --log-stream-name <stream>
 | A.14.3 | I press Escape on the detail view. | I return to the builds list. The cursor position is preserved on the same build I had selected. |
 
 **AWS comparison:**
+
 ```
 aws codebuild batch-get-builds --ids <build-id>
 ```
+
 Expected fields visible: Id, Arn, BuildNumber, BuildStatus, StartTime, EndTime, CurrentPhase, SourceVersion, ResolvedSourceVersion, Initiator, Source, Environment, Phases, Logs, Cache, VpcConfig, ServiceRole, TimeoutInMinutes, QueuedTimeoutInMinutes, BuildBatchArn
 
 ### A.15 YAML Key (y)
@@ -216,9 +235,11 @@ Expected fields visible: Id, Arn, BuildNumber, BuildStatus, StartTime, EndTime, 
 | A.16.3 | I paste from clipboard into another application. | The pasted text matches the full build ID exactly (project-name:uuid format). |
 
 **AWS comparison:**
+
 ```
 aws codebuild batch-get-builds --ids <build-id> --query 'builds[0].id'
 ```
+
 Returns the full build ID in "project:uuid" format.
 
 ### A.17 Refresh (ctrl+r)
@@ -267,9 +288,11 @@ Returns the full build ID in "project:uuid" format.
 | A.22.1 | Builds load with default ordering. | Builds are displayed newest first (highest build number at top), matching the order returned by `ListBuildsForProject`. |
 
 **AWS comparison:**
+
 ```
 aws codebuild list-builds-for-project --project-name my-project --sort-order DESCENDING
 ```
+
 Returns IDs in descending chronological order.
 
 ---
@@ -285,10 +308,12 @@ Returns IDs in descending chronological order.
 | B.1.3 | The API responds with an error (e.g., ResourceNotFoundException, log group does not exist). | The spinner disappears. A red error flash appears in the header. |
 
 **AWS comparison:**
+
 ```
 aws codebuild batch-get-builds --ids <build-id> --query 'builds[0].logs'
 aws logs get-log-events --log-group-name /aws/codebuild/my-project --log-stream-name <stream-name>
 ```
+
 Expected fields visible: Timestamp, Message
 
 ### B.2 Build with No Log Group Configured (Edge Case)
@@ -299,9 +324,11 @@ Expected fields visible: Timestamp, Message
 | B.2.2 | I press Escape from the "logs not available" state. | I return to the builds list. |
 
 **AWS comparison:**
+
 ```
 aws codebuild batch-get-builds --ids <build-id> --query 'builds[0].logs.groupName'
 ```
+
 Returns null when logging is not configured to CloudWatch.
 
 ### B.3 Empty Logs
@@ -320,9 +347,11 @@ Returns null when logging is not configured to CloudWatch.
 | B.4.3 | A log message is longer than the remaining terminal width. | The message is truncated at the available width. The `w` key can be pressed to toggle word wrap. |
 
 **AWS comparison:**
+
 ```
 aws logs get-log-events --log-group-name <group> --log-stream-name <stream> --query 'events[].{Timestamp:timestamp,Message:message}'
 ```
+
 Expected fields visible: Timestamp, Message
 
 ### B.5 Frame Title
@@ -344,9 +373,11 @@ Expected fields visible: Timestamp, Message
 | B.6.6 | I move selection away from a colored log line. | The previously selected row reverts to its content-based coloring. |
 
 **AWS comparison:**
+
 ```
 aws logs get-log-events --log-group-name /aws/codebuild/my-project --log-stream-name <stream>
 ```
+
 The message content determines row coloring based on keyword matching.
 
 ### B.7 FAILED Build Logs (Edge Case)
@@ -392,9 +423,11 @@ The message content determines row coloring based on keyword matching.
 | B.12.2 | I paste from clipboard into another application. | The pasted text matches the message content of the selected log line exactly. |
 
 **AWS comparison:**
+
 ```
 aws logs get-log-events --log-group-name <group> --log-stream-name <stream> --query 'events[N].message'
 ```
+
 The copied text matches the message field of the Nth event.
 
 ### B.13 Detail Key (d)
@@ -406,9 +439,11 @@ The copied text matches the message field of the Nth event.
 | B.13.3 | I press Escape on the detail view. | I return to the build logs list. |
 
 **AWS comparison:**
+
 ```
 aws logs get-log-events --log-group-name <group> --log-stream-name <stream> --query 'events[N]'
 ```
+
 Expected fields visible: Timestamp, IngestionTime, Message, EventId
 
 ### B.14 YAML Key (y)
@@ -463,9 +498,11 @@ Expected fields visible: Timestamp, IngestionTime, Message, EventId
 | C.1.3 | The API responds with an error (e.g., PipelineNotFoundException). | The spinner disappears. A red error flash message appears in the header right side. |
 
 **AWS comparison:**
+
 ```
 aws codepipeline get-pipeline-state --name payment-service-deploy
 ```
+
 Expected fields visible: Stage, Stage Status, Action, Action Status, Last Changed, External URL
 
 ### C.2 Column Layout
@@ -479,9 +516,11 @@ Expected fields visible: Stage, Stage Status, Action, Action Status, Last Change
 | C.2.5 | The terminal is narrower than the combined column widths (20+14+24+14+22+40 = 134 plus borders/padding). | The rightmost column(s) are hidden (not truncated mid-value). Horizontal scroll with h/l is available to reveal hidden columns. |
 
 **AWS comparison:**
+
 ```
 aws codepipeline get-pipeline-state --name my-pipeline --query 'stageStates[].{Stage:stageName,Status:latestExecution.status,Actions:actionStates[].{Name:actionName,Status:latestExecution.status,LastChange:latestExecution.lastStatusChange,URL:latestExecution.externalExecutionUrl}}'
 ```
+
 Expected fields visible: Stage, Stage Status, Action, Action Status, Last Changed, External URL
 
 ### C.3 Flattened Stage-Action Rows
@@ -493,9 +532,11 @@ Expected fields visible: Stage, Stage Status, Action, Action Status, Last Change
 | C.3.3 | I verify the visual grouping. | Rows for the same stage are visually grouped by the blank Stage column on continuation rows, making it clear which actions belong to which stage. |
 
 **AWS comparison:**
+
 ```
 aws codepipeline get-pipeline-state --name my-pipeline --query 'stageStates[].{StageName:stageName,ActionCount:length(actionStates)}'
 ```
+
 Confirms which stages have multiple actions.
 
 ### C.4 Frame Title
@@ -517,9 +558,11 @@ Confirms which stages have multiple actions.
 | C.5.6 | I select any row regardless of its status color. | The selected row has full-width blue background (#7aa2f7) with dark foreground (#1a1b26), bold text. The status color is overridden. |
 
 **AWS comparison:**
+
 ```
 aws codepipeline get-pipeline-state --name my-pipeline --query 'stageStates[].actionStates[].latestExecution.status'
 ```
+
 Each returned status value determines the row color.
 
 ### C.6 All Stages Succeeded (Edge Case)
@@ -529,9 +572,11 @@ Each returned status value determines the row color.
 | C.6.1 | Every stage and action in the pipeline has status Succeeded. | All rows are rendered in green (#9ece6a). Every Stage Status column shows "Succeeded". Every Action Status column shows "Succeeded". Every action has a Last Changed timestamp. |
 
 **AWS comparison:**
+
 ```
 aws codepipeline get-pipeline-state --name my-pipeline
 ```
+
 All `latestExecution.status` values are "Succeeded".
 
 ### C.7 Pipeline Stuck at Approval (Edge Case)
@@ -544,9 +589,11 @@ All `latestExecution.status` values are "Succeeded".
 | C.7.4 | Stages after the pending approval. | The DeployProd stage shows no status. Both Stage Status and Action Status columns show dashes. The rows are dim (#565f89). |
 
 **AWS comparison:**
+
 ```
 aws codepipeline get-pipeline-state --name my-pipeline --query 'stageStates[?stageName==`Approval`].latestExecution'
 ```
+
 Status is "InProgress" for the Approval stage.
 
 ### C.8 Pipeline with Failed Stage (Edge Case)
@@ -557,9 +604,11 @@ Status is "InProgress" for the Approval stage.
 | C.8.2 | The failed Build action row shows the Last Changed time of the failure. | The timestamp reflects when the build failed. |
 
 **AWS comparison:**
+
 ```
 aws codepipeline get-pipeline-state --name my-pipeline
 ```
+
 Build stage `latestExecution.status` is "Failed". Subsequent stages have no `latestExecution`.
 
 ### C.9 Pipeline with InProgress Stage (Edge Case)
@@ -578,9 +627,11 @@ Build stage `latestExecution.status` is "Failed". Subsequent stages have no `lat
 | C.10.3 | I scroll horizontally with l to reveal the External URL column if it was hidden. | The column becomes visible, showing the URL for actions that have one. |
 
 **AWS comparison:**
+
 ```
 aws codepipeline get-pipeline-state --name my-pipeline --query 'stageStates[].actionStates[].latestExecution.externalExecutionUrl'
 ```
+
 Some actions have URLs (CodeBuild, CodeDeploy), some do not (manual approvals, source actions).
 
 ### C.11 Navigation
@@ -619,9 +670,11 @@ Some actions have URLs (CodeBuild, CodeDeploy), some do not (manual approvals, s
 | C.14.3 | I paste from clipboard into a browser. | If a URL was copied, it navigates to the CodeBuild/CodeDeploy console page for that action execution. |
 
 **AWS comparison:**
+
 ```
 aws codepipeline get-pipeline-state --name my-pipeline --query 'stageStates[].actionStates[].latestExecution.externalExecutionUrl'
 ```
+
 The copied value matches the externalExecutionUrl for that action, or the actionName if no URL exists.
 
 ### C.15 Detail Key (d)
@@ -633,9 +686,11 @@ The copied value matches the externalExecutionUrl for that action, or the action
 | C.15.3 | I press Escape on the detail view. | I return to the pipeline stages list. The cursor position is preserved. |
 
 **AWS comparison:**
+
 ```
 aws codepipeline get-pipeline-state --name my-pipeline
 ```
+
 Expected fields visible: stage_name, stage_status, action_name, action_status, last_change_time, external_url, action_token, action_error_details, revision_id, revision_summary
 
 ### C.16 YAML Key (y)
@@ -745,13 +800,17 @@ Expected fields visible: stage_name, stage_status, action_name, action_status, l
 | D.7.4 | I verify pipeline stage computed fields. | Stage, Stage Status, Action, Action Status, Last Changed, and External URL are all properly extracted from the hierarchical GetPipelineState response. |
 
 **AWS comparison (Duration):**
+
 ```
 aws codebuild batch-get-builds --ids <build-id> --query 'builds[0].{Start:startTime,End:endTime}'
 ```
+
 Duration = EndTime - StartTime, formatted as human-friendly string.
 
 **AWS comparison (Source Version):**
+
 ```
 aws codebuild batch-get-builds --ids <build-id> --query 'builds[0].{SV:sourceVersion,RSV:resolvedSourceVersion}'
 ```
+
 Displayed value = first 8 characters of sourceVersion or resolvedSourceVersion.

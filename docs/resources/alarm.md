@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `alarm`
 - **Display name**: CloudWatch Alarms
-- **AWS API reference**: https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_MetricAlarm.html
+- **AWS API reference**: <https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_MetricAlarm.html>
 - **List API**: `DescribeAlarms` — returns `MetricAlarm[]` (and `CompositeAlarm[]`; this spec is scoped to metric alarms, consistent with `related-resources.md`). The SDK confirms `StateValue`, `StateUpdatedTimestamp`, `ActionsEnabled`, `AlarmActions`, `OKActions`, `InsufficientDataActions`, `Dimensions`, `Namespace`, `MetricName`, `Period`, `StateReason` are all on the list shape, so every Wave 1 signal and every related-panel discovery path is reachable with zero extra calls.
 - **Describe API (if any)**: not used — `DescribeAlarms` already returns the full `MetricAlarm` shape.
 

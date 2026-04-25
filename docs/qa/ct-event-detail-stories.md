@@ -49,6 +49,7 @@ values. All inputs are synthetic.
 | B.1.1 | Event `e-a1b2c3d4`: `eventName=DescribeInstances`, `eventSource=ec2.amazonaws.com`, `userIdentity.type=AssumedRole`, `sessionIssuer.userName=KarpenterNodeRole`, principalId session suffix `karpenter-1759`, `sessionContext.ec2RoleDelivery="2.0"`, no error. | I open its detail. | Header: verb glyph `R` (dim read), eventName `DescribeInstances`, actor `KarpenterNodeRole → karpenter-1759` with badges `[SERVICE]` and `[IMDSv2]`, target `(no resource)` dim, outcome `OK` green, time and region on the right. WHO shows `Actor`, `Account 111111111111`, `Principal arn:aws:iam::111111111111:role/KarpenterNodeRole`, `Issuer role KarpenterNodeRole`, `Session karpenter-1759 (started ..., ... ago)`, `MFA no`, `Access key ASIAY44QH8DCKARPEXMP`, `User agent Go SDK v2`. WHAT shows `Read only true`, `Resources (no resource)`. WHERE shows `Region us-east-1`, `Source IP 10.0.14.221`, `TLS TLSv1.3 TLS_AES_128_GCM_SHA256`. REQUEST shows `filters` and `maxResults 1000`. |
 
 AWS CLI comparison:
+
 ```
 aws cloudtrail lookup-events --lookup-attributes \
     AttributeKey=EventName,AttributeValue=DescribeInstances
@@ -61,6 +62,7 @@ aws cloudtrail lookup-events --lookup-attributes \
 | B.2.1 | Event `e-b2c3d4e5`: `eventName=TerminateInstances`, `userIdentity.type=AssumedRole`, `sessionIssuer.arn` contains `AWSReservedSSO_AdminAccess_3c4d5e6f7a8b9c0d`, session name `alice@corp`, `mfaAuthenticated="true"`, `sourceIPAddress="AWS Internal"`, user agent is the console, `resources[]` contains one `AWS::EC2::Instance` `i-0f1e2d3c4b5a69788`. | I open its detail. | Header verb glyph `D` (red destructive), actor `sso:alice@corp (via AdminAccess)` with badges `[CONSOLE] [MFA]`. WHO shows `Actor` with both badges, `MFA yes`, `Source ident alice@corp`, `User agent Console (AWS Internal)`. WHAT `Read only false` and a `Resources` block with the instance ARN. WHERE shows `Source IP AWS Internal` plus `[AWS-INTERNAL]` dim badge. REQUEST shows `instancesSet` with two items `[0] i-0f1e2d3c4b5a69788` and `[1] i-0f1e2d3c4b5a69789`. RESPONSE shows `terminatingInstances [ i-0f1e2d3c4b5a69788: shutting-down ← running ]`. |
 
 AWS CLI comparison:
+
 ```
 aws cloudtrail lookup-events --lookup-attributes \
     AttributeKey=EventName,AttributeValue=TerminateInstances
@@ -73,6 +75,7 @@ aws cloudtrail lookup-events --lookup-attributes \
 | B.3.1 | Event `e-c3d4e5f6`: `eventName=PutObject`, `userIdentity.type=IAMUser`, `userName=bob`, `accessKeyId=AKIAIOSFODNN7BOB1XMP`, no `sessionContext`, `errorCode=AccessDenied`, `errorMessage="User: arn:aws:iam::333333333333:user/bob is not authorized to perform: s3:PutObject on resource: arn:aws:s3:::prod-logs/2026/04/07/app.log because no identity-based policy allows the s3:PutObject action"`. | I open its detail. | Header verb glyph `W` orange (mutating), actor `bob` with `[LONG-LIVED-KEY]` yellow badge, outcome `FAILED (AccessDenied)` bold red. WHO: `Actor bob [LONG-LIVED-KEY]`, `Account 333333333333`, `Principal arn:aws:iam::333333333333:user/bob`, `MFA no`, `Access key AKIAIOSFODNN7BOB1XMP`, `User agent AWS CLI v2`. WHAT `Category Data`, `Type AwsApiCall`, `Resources` block with bucket and object rows. There is NO `RESPONSE` header; instead an `ERROR` header (red) is shown with `AccessDenied` and the wrapped error message verbatim. |
 
 AWS CLI comparison:
+
 ```
 aws cloudtrail lookup-events --lookup-attributes \
     AttributeKey=EventName,AttributeValue=PutObject
@@ -85,6 +88,7 @@ aws cloudtrail lookup-events --lookup-attributes \
 | B.4.1 | Event `e-d4e5f6a7`: `eventType=AwsServiceEvent`, `eventName=RotateKey`, `userIdentity.type=AWSService`, `invokedBy=kms.amazonaws.com`, `resources[]` has `AWS::KMS::Key` entry, `serviceEventDetails={keyId,rotationType:AUTOMATIC,backingKeyGenerated:true}`, `sourceIPAddress="AWS Internal"`. | I open its detail. | Header verb glyph `S` blue (service), actor `kms.amazonaws.com` with `[SERVICE]` blue badge, outcome `OK`. WHO shows `Actor kms.amazonaws.com [SERVICE]`, `Account 444444444444`, `Invoked by kms.amazonaws.com`. There is no `Session`, no `MFA`, no `Access key` row. WHAT `Type AwsServiceEvent`. WHERE shows `Source IP AWS Internal [AWS-INTERNAL]`. The `REQUEST` header is replaced by `SERVICE EVENT DETAILS` (purple) showing `keyId`, `rotationType AUTOMATIC`, `backingKeyGenerated true`. There is no `RESPONSE` section. |
 
 AWS CLI comparison:
+
 ```
 aws cloudtrail lookup-events --lookup-attributes \
     AttributeKey=EventName,AttributeValue=RotateKey
@@ -98,6 +102,7 @@ aws cloudtrail lookup-events --lookup-attributes \
 | B.5.2 | Terminal width is under 60 columns and I open the Root event. | The Root banner renders. | The banner degrades to a single red line containing `ROOT USER ACTION — account 555555555555` (per §7 responsive spec). |
 
 AWS CLI comparison:
+
 ```
 aws cloudtrail lookup-events --lookup-attributes \
     AttributeKey=Username,AttributeValue=Root
@@ -110,6 +115,7 @@ aws cloudtrail lookup-events --lookup-attributes \
 | B.6.1 | Event `e-f6a7b8c9`: `eventName=GetObject`, `userIdentity.type=AssumedRole`, `sessionIssuer.userName=eks-checkout-svc-sa` displayed as `checkout-svc-sa`, session `1717156821993453824`, `webIdFederationData.federatedProvider="arn:aws:iam::666666666666:oidc-provider/oidc.eks.eu-west-1.amazonaws.com/id/EXAMPLE0D8C"`, `vpcEndpointId=vpce-0abc123def456`, success. | I open its detail. | Actor `checkout-svc-sa → 1717156821...` with badges `[SERVICE] [IRSA]`. WHO includes a `Web federation` row showing the OIDC provider ARN with an explicit dim suffix `(not navigable — OIDC providers not listed in a9s)`. WHERE shows `VPC endpoint vpce-0abc123def456 (acct 666666666666) [VPCE]` blue badge. REQUEST shows `bucketName checkout-config` and `key prod/config.json`. |
 
 AWS CLI comparison:
+
 ```
 aws cloudtrail lookup-events --lookup-attributes \
     AttributeKey=EventName,AttributeValue=GetObject
@@ -123,6 +129,7 @@ aws cloudtrail lookup-events --lookup-attributes \
 | B.7.2 | The cross-account event in B.7.1 is displayed. | I compare `userIdentity.accountId` to `recipientAccountId`. | When they differ, the `[X-ACCT]` badge is shown on the header line and a `Recipient` row appears in WHERE. When they match, no `[X-ACCT]` badge or Recipient row is shown. |
 
 AWS CLI comparison:
+
 ```
 aws cloudtrail lookup-events --lookup-attributes \
     AttributeKey=ResourceType,AttributeValue=AWS::S3::Object
@@ -135,6 +142,7 @@ aws cloudtrail lookup-events --lookup-attributes \
 | B.8.1 | Event `e-b8c9d0e1`: `eventCategory=Insight`, `eventType=AwsCloudTrailInsight`, `insightDetails.insightType=ApiCallRateInsight`, `state=Start`, `eventSource=ec2.amazonaws.com`, `eventName=RunInstances`, `insightContext.statistics.baseline.average=0.24`, `insight.average=18.70`, three attributions (`userIdentityArn`, `userAgent`, `errorCode`). | I open its detail. | Header verb glyph `I` purple (insight) with the label `INSIGHT ApiCallRateInsight Start` and target `(statistical)` dim. The usual WHO/WHAT/WHERE headers are replaced by purple-accent `INSIGHT`, `STATISTICS`, and `ATTRIBUTIONS` sections. STATISTICS shows `Baseline average 0.24 calls/min (7d window)` and `Insight average 18.70 calls/min (during anomaly)`. ATTRIBUTIONS lists each attribute with its `insight` and `baseline` values, including a `(none)` placeholder for empty `errorCode`. WHEN header is still present with `Event time`. No REQUEST or RESPONSE section is shown. |
 
 AWS CLI comparison:
+
 ```
 aws cloudtrail lookup-events --lookup-attributes \
     AttributeKey=EventCategory,AttributeValue=Insight
@@ -147,6 +155,7 @@ aws cloudtrail lookup-events --lookup-attributes \
 | B.9.1 | Event `e-c9d0e1f2`: `eventCategory=NetworkActivity`, `eventType=AwsVpceEvent`, `eventName=PutObject`, `vpcEndpointId=vpce-0ff11223344556677`, `errorCode=VpceAccessDenied`, `errorMessage="The VPC endpoint policy denies the s3:PutObject action on arn:aws:s3:::prod-lake/landing/2026/04/07/batch-0719.parquet"`, actor `DataPipelineRole → dp-0719`. | I open its detail. | Header outcome `FAILED (VpceAccessDenied)` red, actor badged `[VPCE]`. WHAT shows `Category NetworkActivity`, `Type AwsVpceEvent`. WHERE shows `VPC endpoint vpce-0ff11223344556677 (acct 111111111111) [VPCE]`. There is no `RESPONSE`; instead an `ERROR` header with `VpceAccessDenied` and the wrapped error message. |
 
 AWS CLI comparison:
+
 ```
 aws cloudtrail lookup-events --lookup-attributes \
     AttributeKey=EventCategory,AttributeValue=NetworkActivity

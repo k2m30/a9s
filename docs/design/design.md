@@ -88,6 +88,7 @@ Line budget:
 - Frame bottom border: 1 line
 
 Lipgloss composition:
+
 ```go
 lipgloss.JoinVertical(lipgloss.Left,
     header,    // full width, accent+dim text, right: hint/input/flash, Padding(0,1)
@@ -96,6 +97,7 @@ lipgloss.JoinVertical(lipgloss.Left,
 ```
 
 Frame construction (manual — lipgloss.Border() cannot embed a title):
+
 ```go
 // Top border with centered title: ┌─────── title ───────┐
 totalDashes := w - 2 - titleVis - 2  // minus corners, spaces around title
@@ -122,7 +124,7 @@ bottom := borderStyle.Render("└" + strings.Repeat("─", w-2) + "┘")
 Border: none. Placed directly above the frame — no separator line between them.
 Style: `lipgloss.NewStyle().Padding(0, 1).Width(termWidth)`
 
-Left side: `a9s` (accent bold) + ` v0.x.x` (dim) + `  profile:region` (bold).
+Left side: `a9s` (accent bold) + `v0.x.x` (dim) + `profile:region` (bold).
 Right side: context-sensitive, right-aligned. Variants:
 
 | Mode           | Right side content              | Color           |
@@ -142,6 +144,7 @@ Flash err:a9s v0.5.0  prod:us-east-1                          Error: no credenti
 ```
 
 Composition:
+
 ```go
 left  := accentStyle.Render("a9s") + dimStyle.Render(" v"+version) +
          boldStyle.Render("  "+profile+":"+region)
@@ -259,6 +262,7 @@ Category headers: `#e0af68` (ORANGE/YELLOW), uppercase, bold
 ### 4.2 View 2 — Resource List (EC2 Instances, 120 columns)
 
 Normal state (no filter, no command):
+
 ```
  [ACCENT]a9s[/] [DIM]v0.5.0[/]  [BOLD]prod:us-east-1[/]                                                                                                [DIM]? for help[/]
 ┌──────────────────────────────────── ec2-instances(42) ────────────────────────────────────────────────────────────────────┐
@@ -288,6 +292,7 @@ displayed. Everything else — colors, layout, columns, selection — is unchang
 No matched-text highlighting inside row cells.
 
 Command mode active:
+
 ```
  [ACCENT]a9s[/] [DIM]v0.5.0[/]  [BOLD]prod:us-east-1[/]                                       [YELLOW]:ec2█[/]
 ┌──────────────────── ec2-instances(42) ────────────────────────────────────┐
@@ -296,6 +301,7 @@ Command mode active:
 ```
 
 Flash message (transient, auto-clears after ~2s):
+
 ```
  [ACCENT]a9s[/] [DIM]v0.5.0[/]  [BOLD]prod:us-east-1[/]                                       [GREEN]Copied![/]
 ┌──────────────────── ec2-instances(42) ────────────────────────────────────┐
@@ -304,6 +310,7 @@ Flash message (transient, auto-clears after ~2s):
 ```
 
 Loading state:
+
 ```
  [ACCENT]a9s[/] [DIM]v0.5.0[/]  [BOLD]prod:us-east-1[/]                                    [DIM]? for help[/]
 ┌─────────────────── ec2-instances ─────────────────────────────────────────┐

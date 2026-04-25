@@ -21,9 +21,11 @@ AWS CLI equivalents are cited so testers can verify data parity.
 | A.1.4 | The API responds with an error (e.g., "Stack does not exist"). | The spinner disappears. A red error flash appears in the header right side (e.g., "Error: Stack does not exist"). |
 
 **AWS comparison:**
+
 ```
 aws cloudformation describe-stack-events --stack-name payment-service-prod
 ```
+
 Expected fields visible in list: Timestamp, LogicalResourceId, ResourceType, ResourceStatus, ResourceStatusReason
 
 ### A.2 Empty State
@@ -45,6 +47,7 @@ Expected fields visible in list: Timestamp, LogicalResourceId, ResourceType, Res
 | A.3.6 | The terminal is narrower than the combined column widths (22+28+28+24+40 = 142 plus borders/padding). | The rightmost columns (Status, Reason) are hidden. Horizontal scroll with h/l keys reveals them. Column headers scroll in sync with data. |
 
 **AWS comparison:**
+
 ```
 aws cloudformation describe-stack-events --stack-name payment-service-prod \
   --query 'StackEvents[].{Timestamp:Timestamp,LogicalId:LogicalResourceId,Type:ResourceType,Status:ResourceStatus,Reason:ResourceStatusReason}'
@@ -79,10 +82,12 @@ aws cloudformation describe-stack-events --stack-name payment-service-prod \
 | A.5.15 | I move the selection away from the red row. | The row reverts to its red status coloring. |
 
 **AWS comparison:**
+
 ```
 aws cloudformation describe-stack-events --stack-name payment-service-prod \
   --query 'StackEvents[].ResourceStatus' --output text
 ```
+
 Possible status values: CREATE_IN_PROGRESS, CREATE_COMPLETE, CREATE_FAILED, UPDATE_IN_PROGRESS, UPDATE_COMPLETE, UPDATE_FAILED, DELETE_IN_PROGRESS, DELETE_COMPLETE, DELETE_FAILED, ROLLBACK_IN_PROGRESS, ROLLBACK_COMPLETE, UPDATE_ROLLBACK_IN_PROGRESS, UPDATE_ROLLBACK_COMPLETE, UPDATE_ROLLBACK_COMPLETE_CLEANUP_IN_PROGRESS, IMPORT_IN_PROGRESS, IMPORT_COMPLETE, IMPORT_ROLLBACK_IN_PROGRESS, IMPORT_ROLLBACK_COMPLETE, IMPORT_ROLLBACK_FAILED
 
 ### A.6 Navigation
@@ -138,10 +143,12 @@ Possible status values: CREATE_IN_PROGRESS, CREATE_COMPLETE, CREATE_FAILED, UPDA
 | A.10.5 | I paste from clipboard after copying an event with no reason. | The pasted text is the LogicalResourceId (e.g., "ApiTargetGroup"). |
 
 **AWS comparison:**
+
 ```
 aws cloudformation describe-stack-events --stack-name payment-service-prod \
   --query 'StackEvents[?ResourceStatus==`CREATE_FAILED`].ResourceStatusReason'
 ```
+
 The copied text should match the reason string from this query.
 
 ### A.11 Detail Key (d)
@@ -157,10 +164,12 @@ The copied text should match the reason string from this query.
 | A.11.7 | I press Escape on the detail view. | I return to the Stack Events list. The cursor position is preserved on the same event I had selected. |
 
 **AWS comparison:**
+
 ```
 aws cloudformation describe-stack-events --stack-name payment-service-prod \
   --query 'StackEvents[0]'
 ```
+
 Expected detail fields: Timestamp, LogicalResourceId, PhysicalResourceId, ResourceType, ResourceStatus, ResourceStatusReason, ClientRequestToken, HookType, HookStatus, HookStatusReason, HookInvocationPoint, HookFailureMode, EventId
 
 ### A.12 YAML Key (y)
@@ -217,6 +226,7 @@ Expected detail fields: Timestamp, LogicalResourceId, PhysicalResourceId, Resour
 | B.1.3 | I press ctrl+r during the active deployment. | New events appear at the top. Resources that were IN_PROGRESS may now show as COMPLETE (green). The count may increase as new events are generated. |
 
 **AWS comparison:**
+
 ```
 aws cloudformation describe-stack-events --stack-name payment-service-prod \
   --query 'StackEvents[?contains(ResourceStatus, `IN_PROGRESS`)]'
@@ -243,6 +253,7 @@ aws cloudformation describe-stack-events --stack-name payment-service-prod \
 | B.3.8 | I observe UPDATE_ROLLBACK_COMPLETE_CLEANUP_IN_PROGRESS events. | This is a valid CFN status. The row is colored appropriately (red, due to ROLLBACK in the name). |
 
 **AWS comparison:**
+
 ```
 aws cloudformation describe-stack-events --stack-name failed-stack \
   --query 'StackEvents[?ResourceStatus==`CREATE_FAILED` || contains(ResourceStatus, `ROLLBACK`)]'
@@ -267,6 +278,7 @@ aws cloudformation describe-stack-events --stack-name failed-stack \
 | B.5.4 | A hook event has HookStatus "HOOK_COMPLETE_FAILED". | The event is visible in the list. The detail view shows the HookStatusReason explaining why the hook failed and the HookFailureMode indicating whether it was FAIL or WARN. |
 
 **AWS comparison:**
+
 ```
 aws cloudformation describe-stack-events --stack-name hooked-stack \
   --query 'StackEvents[?HookType!=null]'
@@ -294,9 +306,11 @@ aws cloudformation describe-stack-events --stack-name hooked-stack \
 | C.1.4 | The API responds with an error (e.g., "Stack does not exist", or permissions error). | The spinner disappears. A red error flash appears in the header right side. |
 
 **AWS comparison:**
+
 ```
 aws cloudformation list-stack-resources --stack-name payment-service-prod
 ```
+
 Expected fields visible in list: LogicalResourceId, PhysicalResourceId, ResourceType, ResourceStatus, DriftInformation.StackResourceDriftStatus, LastUpdatedTimestamp
 
 ### C.2 Empty State
@@ -317,6 +331,7 @@ Expected fields visible in list: LogicalResourceId, PhysicalResourceId, Resource
 | C.3.5 | The Drift column shows various values: "NOT_CHECKED", "IN_SYNC", "MODIFIED". | Each value fits within the 12-character width. Values are displayed as plain text within the column. |
 
 **AWS comparison:**
+
 ```
 aws cloudformation list-stack-resources --stack-name payment-service-prod \
   --query 'StackResourceSummaries[].{LogicalId:LogicalResourceId,PhysicalId:PhysicalResourceId,Type:ResourceType,Status:ResourceStatus,Drift:DriftInformation.StackResourceDriftStatus,Updated:LastUpdatedTimestamp}'
@@ -356,6 +371,7 @@ aws cloudformation list-stack-resources --stack-name payment-service-prod \
 | C.6.5 | I select a drifted (yellow) row. | The selected row shows blue background, overriding the yellow drift coloring. |
 
 **AWS comparison:**
+
 ```
 aws cloudformation detect-stack-drift --stack-name payment-service-prod
 aws cloudformation describe-stack-resource-drifts --stack-name payment-service-prod \
@@ -415,10 +431,12 @@ aws cloudformation describe-stack-resource-drifts --stack-name payment-service-p
 | C.11.5 | I select a resource whose PhysicalResourceId is a log group name (e.g., "/ecs/payment-api"). | Pressing c copies "/ecs/payment-api". |
 
 **AWS comparison:**
+
 ```
 aws cloudformation list-stack-resources --stack-name payment-service-prod \
   --query 'StackResourceSummaries[].PhysicalResourceId'
 ```
+
 The copied text should match one of these values exactly.
 
 ### C.12 Detail Key (d)
@@ -434,10 +452,12 @@ The copied text should match one of these values exactly.
 | C.12.7 | I press Escape on the detail view. | I return to the Stack Resources list. The cursor position is preserved on the same resource I had selected. |
 
 **AWS comparison:**
+
 ```
 aws cloudformation describe-stack-resource --stack-name payment-service-prod \
   --logical-resource-id ApiLoadBalancer
 ```
+
 Expected detail fields: LogicalResourceId, PhysicalResourceId, ResourceType, ResourceStatus, ResourceStatusReason, DriftInformation, LastUpdatedTimestamp, ModuleInfo, Description
 
 ### C.13 YAML Key (y)
@@ -494,6 +514,7 @@ Expected detail fields: LogicalResourceId, PhysicalResourceId, ResourceType, Res
 | D.1.3 | I press ctrl+r during the active deployment. | Resources that were IN_PROGRESS may now show as COMPLETE. The LastUpdatedTimestamp columns update for changed resources. |
 
 **AWS comparison:**
+
 ```
 aws cloudformation list-stack-resources --stack-name payment-service-prod \
   --query 'StackResourceSummaries[?contains(ResourceStatus, `IN_PROGRESS`)]'
@@ -517,6 +538,7 @@ aws cloudformation list-stack-resources --stack-name payment-service-prod \
 | D.3.5 | I select a drifted resource and press d. | The detail view shows the full DriftInformation section with StackResourceDriftStatus. |
 
 **AWS comparison:**
+
 ```
 aws cloudformation describe-stack-resource-drifts --stack-name payment-service-prod \
   --stack-resource-drift-status-filters MODIFIED

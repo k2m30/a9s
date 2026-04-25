@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `vpce`
 - **Display name**: VPC Endpoints
-- **AWS API reference**: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VpcEndpoint.html
+- **AWS API reference**: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VpcEndpoint.html>
 - **List API**: `DescribeVpcEndpoints` (returns the full `VpcEndpoint` shape per endpoint, including `VpcEndpointId`, `VpcEndpointType` (`Interface` | `Gateway` | `GatewayLoadBalancer` | `Resource` | `ServiceNetwork`), `State`, `VpcId`, `ServiceName`, `RouteTableIds[]`, `SubnetIds[]`, `Groups[].GroupId`, `NetworkInterfaceIds[]`, `DnsEntries[].{DnsName, HostedZoneId}`, `PrivateDnsEnabled`, `LastError.{Code, Message}`, `FailureReason`, `PolicyDocument`, `CreationTimestamp`, `Tags[]`).
 - **Describe API (if any)**: not used. Wave 1 signals are sufficient; there is no per-endpoint Describe call in the Wave 2 budget (endpoint-policy semantic analysis and DNS-resolution probes are Wave 3 — see §3.3).
 
@@ -240,7 +240,7 @@ At 3am, glancing at the list, a red vpce row with `interface: no ENIs — unreac
 - `DnsEntry.HostedZoneId` for the `r53` cross-reference — `AWS SDK Go v2 — service/ec2/types.DnsEntry § HostedZoneId`.
 - `ct-events` as universal pivot — `docs/related-resources.md` § Policy (line 34).
 - CloudTrail event-name filter (`CreateVpcEndpoint`, `DeleteVpcEndpoints`, `ModifyVpcEndpoint`, `AcceptVpcEndpointConnections`, `RejectVpcEndpointConnections`) — `a9s-devops (2026-04-20): possible=yes (CloudTrail records all endpoint management-plane calls), worth=yes. These event names are the filter operators run when investigating endpoint lifecycle and PrivateLink connection decisions.`
-- `acm` discovery is partial (no FK on VpcEndpoint) — `a9s-devops (2026-04-20): possible=partial, worth=yes for PrivateLink TLS-debug. The related-resources.md row reflects the niche-but-real pivot; the panel shows the full `acm` list without a deterministic count.`
+- `acm` discovery is partial (no FK on VpcEndpoint) — `a9s-devops (2026-04-20): possible=partial, worth=yes for PrivateLink TLS-debug. The related-resources.md row reflects the niche-but-real pivot; the panel shows the full`acm`list without a deterministic count.`
 - `alarm` discovery via dimension-scan on `VPC Endpoint Id` — `a9s-devops (2026-04-20): possible=yes, worth=yes. AWS/PrivateLinkEndpoints publishes per-endpoint metrics; dimension-based scan of the already-loaded alarm list is the cheap path.`
 - `cf` discovery is partial (FK lives on CloudFront side as VpcOriginConfig) — `a9s-devops (2026-04-20): possible=partial, worth=yes for VPC-origin distributions. Niche but high-signal when the attachment exists.`
 - `eni`, `rtb`, `sg`, `subnet`, `vpc` discovered via direct FK fields on `VpcEndpoint` (`NetworkInterfaceIds`, `RouteTableIds`, `Groups[].GroupId`, `SubnetIds`, `VpcId`) — `a9s-devops (2026-04-20): possible=yes, worth=yes. These are first-class FKs on every DescribeVpcEndpoints response and are the standard operator pivots.`

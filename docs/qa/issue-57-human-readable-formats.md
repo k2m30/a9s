@@ -26,9 +26,11 @@ instead of raw ISO 8601 strings like `2026-01-15T09:22:45Z`.
 | A.1.3 | I verify the Launch Time column data against `aws ec2 describe-instances`. | The "Launch Time" column maps to `.Reservations[].Instances[].LaunchTime`. The displayed human-readable value represents the same point in time as the raw API response. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-instances --query 'Reservations[].Instances[].[Tags[?Key==`Name`].Value|[0],State.Name,InstanceType,LaunchTime]' --output table
 ```
+
 Expected field visible: Launch Time (path: LaunchTime)
 
 ### A.2 S3 Buckets
@@ -39,9 +41,11 @@ Expected field visible: Launch Time (path: LaunchTime)
 | A.2.2 | I verify the Creation Date against `aws s3api list-buckets`. | The "Creation Date" column maps to `.Buckets[].CreationDate`. The displayed value corresponds to the same moment in time. |
 
 **AWS comparison:**
+
 ```
 aws s3api list-buckets --query 'Buckets[].[Name,CreationDate]' --output table
 ```
+
 Expected field visible: Creation Date (path: CreationDate)
 
 ### A.3 RDS Instances (dbi)
@@ -51,6 +55,7 @@ Expected field visible: Creation Date (path: CreationDate)
 | A.3.1 | I open the RDS instance list. No timestamp column is configured in the list view. | The RDS list shows DB Identifier, Engine, Version, Status, Class, Endpoint, Multi-AZ. No raw timestamps are visible in the list view. Timestamp fields appear only in the detail view. |
 
 **AWS comparison:**
+
 ```
 aws rds describe-db-instances --query 'DBInstances[].[DBInstanceIdentifier,Engine,EngineVersion,DBInstanceStatus]' --output table
 ```
@@ -64,9 +69,11 @@ aws rds describe-db-instances --query 'DBInstances[].[DBInstanceIdentifier,Engin
 | A.4.3 | I verify timestamps against `aws cloudformation describe-stacks`. | "Created" maps to `.Stacks[].CreationTime`. "Updated" maps to `.Stacks[].LastUpdatedTime`. |
 
 **AWS comparison:**
+
 ```
 aws cloudformation describe-stacks --query 'Stacks[].[StackName,StackStatus,CreationTime,LastUpdatedTime]' --output table
 ```
+
 Expected fields visible: Created (path: CreationTime), Updated (path: LastUpdatedTime)
 
 ### A.5 Lambda Functions
@@ -77,9 +84,11 @@ Expected fields visible: Created (path: CreationTime), Updated (path: LastUpdate
 | A.5.2 | I verify the Last Modified value against `aws lambda list-functions`. | "Last Modified" maps to `.Functions[].LastModified`. The displayed value represents the same moment. |
 
 **AWS comparison:**
+
 ```
 aws lambda list-functions --query 'Functions[].[FunctionName,Runtime,MemorySize,State,LastModified]' --output table
 ```
+
 Expected field visible: Last Modified (path: LastModified)
 
 ### A.6 CodeBuild Projects (cb)
@@ -89,10 +98,12 @@ Expected field visible: Last Modified (path: LastModified)
 | A.6.1 | I open the CodeBuild project list. A project was last modified 12 hours ago. | The "Last Modified" column shows "12h ago" or similar human-readable format. |
 
 **AWS comparison:**
+
 ```
 aws codebuild list-projects
 aws codebuild batch-get-projects --names PROJECT --query 'projects[].[name,source.type,lastModified]'
 ```
+
 Expected field visible: Last Modified (path: LastModified)
 
 ### A.7 Secrets Manager
@@ -103,9 +114,11 @@ Expected field visible: Last Modified (path: LastModified)
 | A.7.2 | A secret has never been accessed (LastAccessedDate is null). | The "Last Accessed" column shows a dash, "n/a", or is empty. No crash or "null" text. |
 
 **AWS comparison:**
+
 ```
 aws secretsmanager list-secrets --query 'SecretList[].[Name,LastAccessedDate,LastChangedDate]' --output table
 ```
+
 Expected fields visible: Last Accessed (path: LastAccessedDate), Last Changed (path: LastChangedDate)
 
 ### A.8 IAM Roles
@@ -116,9 +129,11 @@ Expected fields visible: Last Accessed (path: LastAccessedDate), Last Changed (p
 | A.8.2 | A role has never been used (RoleLastUsed.LastUsedDate is null). | The "Last Used" column shows a dash, "n/a", or is empty. |
 
 **AWS comparison:**
+
 ```
 aws iam list-roles --query 'Roles[].[RoleName,CreateDate,RoleLastUsed.LastUsedDate]' --output table
 ```
+
 Expected fields visible: Created (path: CreateDate), Last Used (path: RoleLastUsed.LastUsedDate)
 
 ### A.9 IAM Policies
@@ -128,9 +143,11 @@ Expected fields visible: Created (path: CreateDate), Last Used (path: RoleLastUs
 | A.9.1 | I open the IAM policies list. A policy was created 6 months ago. | The "Created" column shows "6mo ago" or "Sep 2025". |
 
 **AWS comparison:**
+
 ```
 aws iam list-policies --scope Local --query 'Policies[].[PolicyName,CreateDate]' --output table
 ```
+
 Expected field visible: Created (path: CreateDate)
 
 ### A.10 IAM Users
@@ -141,9 +158,11 @@ Expected field visible: Created (path: CreateDate)
 | A.10.2 | A user has never used a password (PasswordLastUsed is null). | The "Password Last Used" column shows a dash, "n/a", or is empty. |
 
 **AWS comparison:**
+
 ```
 aws iam list-users --query 'Users[].[UserName,CreateDate,PasswordLastUsed]' --output table
 ```
+
 Expected fields visible: Created (path: CreateDate), Password Last Used (path: PasswordLastUsed)
 
 ### A.11 IAM Groups
@@ -153,9 +172,11 @@ Expected fields visible: Created (path: CreateDate), Password Last Used (path: P
 | A.11.1 | I open the IAM groups list. A group was created 3 months ago. | The "Created" column shows "3mo ago" or "Dec 2025". |
 
 **AWS comparison:**
+
 ```
 aws iam list-groups --query 'Groups[].[GroupName,CreateDate]' --output table
 ```
+
 Expected field visible: Created (path: CreateDate)
 
 ### A.12 EKS Clusters
@@ -171,9 +192,11 @@ Expected field visible: Created (path: CreateDate)
 | A.13.1 | I open the ECR repository list. A repository was created 8 months ago. | The "Created" column shows "8mo ago" or "Jul 2025". |
 
 **AWS comparison:**
+
 ```
 aws ecr describe-repositories --query 'repositories[].[repositoryName,createdAt]' --output table
 ```
+
 Expected field visible: Created (path: CreatedAt)
 
 ### A.14 ELB / Load Balancers
@@ -190,9 +213,11 @@ Expected field visible: Created (path: CreatedAt)
 | A.15.2 | A backup plan has never been executed (LastExecutionDate is null). | The "Last Execution" column shows a dash, "n/a", or is empty. |
 
 **AWS comparison:**
+
 ```
 aws backup list-backup-plans --query 'BackupPlansList[].[BackupPlanName,CreationDate,LastExecutionDate]' --output table
 ```
+
 Expected fields visible: Created (path: CreationDate), Last Execution (path: LastExecutionDate)
 
 ### A.16 SSM Parameters
@@ -202,9 +227,11 @@ Expected fields visible: Created (path: CreationDate), Last Execution (path: Las
 | A.16.1 | I open the SSM parameter list. A parameter was last modified 10 minutes ago. | The "Last Modified" column shows "10m ago" or similar. |
 
 **AWS comparison:**
+
 ```
 aws ssm describe-parameters --query 'Parameters[].[Name,Type,LastModifiedDate]' --output table
 ```
+
 Expected field visible: Last Modified (path: LastModifiedDate)
 
 ### A.17 Step Functions (sfn)
@@ -214,9 +241,11 @@ Expected field visible: Last Modified (path: LastModifiedDate)
 | A.17.1 | I open the Step Functions list. A state machine was created 2 weeks ago. | The "Created" column shows "2w ago" or "Mar 13, 2026". |
 
 **AWS comparison:**
+
 ```
 aws stepfunctions list-state-machines --query 'stateMachines[].[name,creationDate]' --output table
 ```
+
 Expected field visible: Created (path: CreationDate)
 
 ### A.18 Glue Jobs
@@ -226,9 +255,11 @@ Expected field visible: Created (path: CreationDate)
 | A.18.1 | I open the Glue jobs list. A job was last modified 4 days ago. | The "Last Modified" column shows "4d ago" or "Mar 23, 2026". |
 
 **AWS comparison:**
+
 ```
 aws glue get-jobs --query 'Jobs[].[Name,LastModifiedOn]' --output table
 ```
+
 Expected field visible: Last Modified (path: LastModifiedOn)
 
 ### A.19 Pipelines (CodePipeline)
@@ -238,9 +269,11 @@ Expected field visible: Last Modified (path: LastModifiedOn)
 | A.19.1 | I open the CodePipeline list. A pipeline was created 60 days ago and updated 1 hour ago. | The "Created" column shows "60d ago" or "Jan 26, 2026". The "Updated" column shows "1h ago". |
 
 **AWS comparison:**
+
 ```
 aws codepipeline list-pipelines --query 'pipelines[].[name,created,updated]' --output table
 ```
+
 Expected fields visible: Created (path: Created), Updated (path: Updated)
 
 ### A.20 Kinesis Streams
@@ -250,9 +283,11 @@ Expected fields visible: Created (path: Created), Updated (path: Updated)
 | A.20.1 | I open the Kinesis streams list. A stream was created 100 days ago. | The "Created" column shows "100d ago" or "Dec 17, 2025". |
 
 **AWS comparison:**
+
 ```
 aws kinesis list-streams
 ```
+
 Expected field visible: Created (path: StreamCreationTimestamp)
 
 ### A.21 ACM Certificates
@@ -262,9 +297,11 @@ Expected field visible: Created (path: StreamCreationTimestamp)
 | A.21.1 | I open the ACM certificates list. A certificate expires in 30 days. | The "Expires" column shows a human-readable date like "Apr 26, 2026" or "in 30d". It does not show a raw ISO timestamp. |
 
 **AWS comparison:**
+
 ```
 aws acm list-certificates --query 'CertificateSummaryList[].[DomainName,Status,NotAfter]' --output table
 ```
+
 Expected field visible: Expires (path: NotAfter)
 
 ### A.22 CloudWatch Log Groups (logs)
@@ -274,9 +311,11 @@ Expected field visible: Expires (path: NotAfter)
 | A.22.1 | I open the CloudWatch Log Groups list. A log group was created 90 days ago. | The "Created" column shows "90d ago" or "Dec 27, 2025". The creation_time is rendered as human-readable. |
 
 **AWS comparison:**
+
 ```
 aws logs describe-log-groups --query 'logGroups[].[logGroupName,storedBytes,creationTime]' --output table
 ```
+
 Expected field visible: Created (key: creation_time)
 
 ### A.23 DocDB Snapshots and RDS Snapshots
@@ -287,10 +326,12 @@ Expected field visible: Created (key: creation_time)
 | A.23.2 | I open the DocumentDB snapshots list. A snapshot was created 14 days ago. | The "Created" column shows "14d ago" or "Mar 13, 2026". |
 
 **AWS comparison:**
+
 ```
 aws rds describe-db-snapshots --query 'DBSnapshots[].[DBSnapshotIdentifier,Status,SnapshotCreateTime]' --output table
 aws docdb describe-db-cluster-snapshots --query 'DBClusterSnapshots[].[DBClusterSnapshotIdentifier,Status,SnapshotCreateTime]' --output table
 ```
+
 Expected field visible: Created (path: SnapshotCreateTime)
 
 ---
@@ -310,9 +351,11 @@ Expected field visible: Created (path: SnapshotCreateTime)
 | B.2.1 | I drill into alarm history. A state change occurred 2 hours ago. | The "Timestamp" column shows "2h ago" or a formatted time -- not a raw ISO timestamp. |
 
 **AWS comparison:**
+
 ```
 aws cloudwatch describe-alarm-history --alarm-name ALARM --query 'AlarmHistoryItems[].[Timestamp,HistoryItemType,HistorySummary]'
 ```
+
 Expected field visible: Timestamp (key: timestamp)
 
 ### B.3 ASG Scaling Activities
@@ -322,9 +365,11 @@ Expected field visible: Timestamp (key: timestamp)
 | B.3.1 | I drill into ASG scaling activities. An activity started 30 minutes ago. | The "Start Time" column shows "30m ago" or a formatted time. |
 
 **AWS comparison:**
+
 ```
 aws autoscaling describe-scaling-activities --auto-scaling-group-name ASG --query 'Activities[].[StartTime,StatusCode,Description]'
 ```
+
 Expected field visible: Start Time (key: start_time)
 
 ### B.4 CFN Stack Events
@@ -334,9 +379,11 @@ Expected field visible: Start Time (key: start_time)
 | B.4.1 | I drill into CloudFormation stack events. An event occurred 5 minutes ago. | The "Timestamp" column shows "5m ago" or a formatted time. |
 
 **AWS comparison:**
+
 ```
 aws cloudformation describe-stack-events --stack-name STACK --query 'StackEvents[].[Timestamp,LogicalResourceId,ResourceStatus]'
 ```
+
 Expected field visible: Timestamp (key: timestamp)
 
 ### B.5 CFN Stack Resources
@@ -346,9 +393,11 @@ Expected field visible: Timestamp (key: timestamp)
 | B.5.1 | I drill into CloudFormation stack resources. A resource was last updated 1 hour ago. | The "Updated" column shows "1h ago" or a formatted time. |
 
 **AWS comparison:**
+
 ```
 aws cloudformation list-stack-resources --stack-name STACK --query 'StackResourceSummaries[].[LogicalResourceId,ResourceStatus,LastUpdatedTimestamp]'
 ```
+
 Expected field visible: Updated (key: last_updated)
 
 ### B.6 CodeBuild Builds
@@ -358,9 +407,11 @@ Expected field visible: Updated (key: last_updated)
 | B.6.1 | I drill into CodeBuild builds for a project. A build started 45 minutes ago. | The "Start Time" column shows "45m ago" or a formatted time. |
 
 **AWS comparison:**
+
 ```
 aws codebuild batch-get-builds --ids BUILD_ID --query 'builds[].[buildNumber,buildStatus,startTime]'
 ```
+
 Expected field visible: Start Time (key: start_time)
 
 ### B.7 ECS Service Events
@@ -370,9 +421,11 @@ Expected field visible: Start Time (key: start_time)
 | B.7.1 | I drill into ECS service events. An event occurred 10 seconds ago. | The "Timestamp" column shows "10s ago" or a formatted time. |
 
 **AWS comparison:**
+
 ```
 aws ecs describe-services --cluster CLUSTER --services SERVICE --query 'services[].events[].[createdAt,message]'
 ```
+
 Expected field visible: Timestamp (key: timestamp)
 
 ### B.8 ECS Tasks (ecs_tasks child view)
@@ -382,9 +435,11 @@ Expected field visible: Timestamp (key: timestamp)
 | B.8.1 | I drill into ECS service tasks. A task started 3 hours ago. | The "Started At" column shows "3h ago" or a formatted time. |
 
 **AWS comparison:**
+
 ```
 aws ecs describe-tasks --cluster CLUSTER --tasks TASK_ARN --query 'tasks[].[taskArn,lastStatus,startedAt]'
 ```
+
 Expected field visible: Started At (key: started_at)
 
 ### B.9 ECR Images
@@ -394,9 +449,11 @@ Expected field visible: Started At (key: started_at)
 | B.9.1 | I drill into ECR images for a repository. An image was pushed 2 days ago. | The "Pushed At" column shows "2d ago" or "Mar 25, 2026". |
 
 **AWS comparison:**
+
 ```
 aws ecr describe-images --repository-name REPO --query 'imageDetails[].[imageTags,imagePushedAt,imageSizeInBytes]'
 ```
+
 Expected field visible: Pushed At (key: pushed_at)
 
 ### B.10 SFN Executions
@@ -406,9 +463,11 @@ Expected field visible: Pushed At (key: pushed_at)
 | B.10.1 | I drill into Step Function executions. An execution started 20 minutes ago and stopped 18 minutes ago. | The "Start Date" column shows "20m ago" or a formatted time. The "Stop Date" column shows "18m ago" or a formatted time. |
 
 **AWS comparison:**
+
 ```
 aws stepfunctions list-executions --state-machine-arn ARN --query 'executions[].[name,status,startDate,stopDate]'
 ```
+
 Expected fields visible: Start Date (path: StartDate), Stop Date (path: StopDate)
 
 ### B.11 SFN Execution History
@@ -418,9 +477,11 @@ Expected fields visible: Start Date (path: StartDate), Stop Date (path: StopDate
 | B.11.1 | I drill into SFN execution history. A history event occurred 19 minutes ago. | The "Timestamp" column shows "19m ago" or a formatted time. |
 
 **AWS comparison:**
+
 ```
 aws stepfunctions get-execution-history --execution-arn ARN --query 'events[].[timestamp,type,id]'
 ```
+
 Expected field visible: Timestamp (path: Timestamp)
 
 ### B.12 Pipeline Stages
@@ -430,9 +491,11 @@ Expected field visible: Timestamp (path: Timestamp)
 | B.12.1 | I drill into pipeline stages. A stage last changed 4 hours ago. | The "Last Changed" column shows "4h ago" or a formatted time. |
 
 **AWS comparison:**
+
 ```
 aws codepipeline get-pipeline-state --name PIPELINE --query 'stageStates[].actionStates[].[actionName,latestExecution.lastStatusChange]'
 ```
+
 Expected field visible: Last Changed (key: last_change_time)
 
 ### B.13 Log Streams
@@ -442,9 +505,11 @@ Expected field visible: Last Changed (key: last_change_time)
 | B.13.1 | I drill into log streams for a log group. A stream's last event was 5 minutes ago. | The "Last Event" column shows "5m ago" or a formatted time. The "First Event" column shows a human-readable time. |
 
 **AWS comparison:**
+
 ```
 aws logs describe-log-streams --log-group-name GROUP --query 'logStreams[].[logStreamName,lastEventTimestamp,firstEventTimestamp]'
 ```
+
 Expected fields visible: Last Event (key: last_event), First Event (key: first_event)
 
 ### B.14 Log Events, Lambda Invocations, Build Logs, Container Logs
@@ -455,9 +520,11 @@ Expected fields visible: Last Event (key: last_event), First Event (key: first_e
 | B.14.2 | I view Lambda invocations. An invocation occurred 1 hour ago. | The "Timestamp" column shows "1h ago" or a formatted time. |
 
 **AWS comparison:**
+
 ```
 aws logs filter-log-events --log-group-name GROUP --query 'events[].[timestamp,message]'
 ```
+
 Expected field visible: Timestamp (key: timestamp)
 
 ### B.15 RDS / DocumentDB Instance Events
@@ -467,9 +534,11 @@ Expected field visible: Timestamp (key: timestamp)
 | B.15.1 | I drill into RDS instance events. An event occurred 6 hours ago. | The "Timestamp" column shows "6h ago" or a formatted time. |
 
 **AWS comparison:**
+
 ```
 aws rds describe-events --source-identifier DB_INSTANCE --source-type db-instance --query 'Events[].[Date,Message]'
 ```
+
 Expected field visible: Timestamp (path: Date)
 
 ### B.16 IAM Group Members
@@ -479,9 +548,11 @@ Expected field visible: Timestamp (path: Date)
 | B.16.1 | I drill into IAM group members. A user was created 1 year ago and last used their password 2 days ago. | The "Created" column shows "1y ago". The "Password Last Used" column shows "2d ago". |
 
 **AWS comparison:**
+
 ```
 aws iam get-group --group-name GROUP --query 'Users[].[UserName,CreateDate,PasswordLastUsed]'
 ```
+
 Expected fields visible: Created (key: create_date), Password Last Used (key: password_last_used)
 
 ### B.17 S3 Objects
@@ -491,9 +562,11 @@ Expected fields visible: Created (key: create_date), Password Last Used (key: pa
 | B.17.1 | I drill into an S3 bucket. An object was last modified 3 days ago. | The "Last Modified" column shows "3d ago" or "Mar 24, 2026". |
 
 **AWS comparison:**
+
 ```
 aws s3api list-objects-v2 --bucket BUCKET --query 'Contents[].[Key,Size,LastModified]'
 ```
+
 Expected field visible: Last Modified (path: LastModified)
 
 ---
@@ -511,9 +584,11 @@ Expected field visible: Last Modified (path: LastModified)
 | C.1.5 | I verify sizes against `aws s3api list-objects-v2 --bucket BUCKET`. | The "Size" column maps to `.Contents[].Size`. The human-readable value accurately represents the byte count. |
 
 **AWS comparison:**
+
 ```
 aws s3api list-objects-v2 --bucket BUCKET --query 'Contents[].[Key,Size]' --output table
 ```
+
 Expected field visible: Size (path: Size)
 
 ### C.2 ECR Images -- Size Column
@@ -525,9 +600,11 @@ Expected field visible: Size (path: Size)
 | C.2.3 | I verify sizes against `aws ecr describe-images`. | The "Size" column maps to `.imageDetails[].imageSizeInBytes`. |
 
 **AWS comparison:**
+
 ```
 aws ecr describe-images --repository-name REPO --query 'imageDetails[].[imageTags,imageSizeInBytes]' --output table
 ```
+
 Expected field visible: Size (key: image_size)
 
 ### C.3 DynamoDB Tables -- Size Column
@@ -539,10 +616,12 @@ Expected field visible: Size (key: image_size)
 | C.3.3 | I verify sizes against `aws dynamodb describe-table`. | The "Size" column maps to `.Table.TableSizeBytes`. |
 
 **AWS comparison:**
+
 ```
 aws dynamodb list-tables
 aws dynamodb describe-table --table-name TABLE --query 'Table.[TableName,TableSizeBytes,ItemCount]'
 ```
+
 Expected field visible: Size (key: size_bytes)
 
 ### C.4 CloudWatch Log Groups -- Size Column
@@ -554,9 +633,11 @@ Expected field visible: Size (key: size_bytes)
 | C.4.3 | I verify sizes against `aws logs describe-log-groups`. | The "Size" column maps to `.logGroups[].storedBytes`. |
 
 **AWS comparison:**
+
 ```
 aws logs describe-log-groups --query 'logGroups[].[logGroupName,storedBytes]' --output table
 ```
+
 Expected field visible: Size (key: stored_bytes)
 
 ### C.5 Lambda Functions -- CodeSize in Detail View
@@ -566,9 +647,11 @@ Expected field visible: Size (key: stored_bytes)
 | C.5.1 | I press `d` on a Lambda function. The function's code is 52,428,800 bytes (~50 MB). | The "CodeSize" field in the detail view shows "50.0 MB" or "50 MB" instead of "52428800". |
 
 **AWS comparison:**
+
 ```
 aws lambda get-function --function-name FUNC --query 'Configuration.CodeSize'
 ```
+
 Expected field visible: CodeSize (in detail view)
 
 ### C.6 EFS -- SizeInBytes in Detail View
@@ -578,9 +661,11 @@ Expected field visible: CodeSize (in detail view)
 | C.6.1 | I press `d` on an EFS file system. The file system size is 1,073,741,824 bytes (~1 GB). | The "SizeInBytes" field in the detail view shows a human-readable value like "1.0 GB". |
 
 **AWS comparison:**
+
 ```
 aws efs describe-file-systems --query 'FileSystems[].[FileSystemId,SizeInBytes]'
 ```
+
 Expected field visible: SizeInBytes (in detail view)
 
 ---

@@ -325,9 +325,11 @@ Adversarial cases (nil pointers, error paths, API-throttle) stay inline in the t
 This is the CIS jargon column (`PUB|UNENC|NOBKP|NOPROT`). The spec's universal UI rules forbid jargon columns. REMOVE.
 
 **Status column binding:** currently `{Title: "Status", Path: "DBInstanceStatus", Width: 14}`. Rebind to the fetcher's computed Status:
+
 ```text
 {Title: "Status", Key: "status", Path: "DBInstanceStatus", Width: 22},
 ```
+
 (Width bump from 14 → 22 to fit longest phrase `encryption key unavailable` = 26 chars. Round up.)
 Actually 26 > 22. Use `Width: 28`.
 

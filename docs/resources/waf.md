@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `waf`
 - **Display name**: WAF Web ACLs
-- **AWS API reference**: https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html
+- **AWS API reference**: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 - **List API**: `ListWebACLs` (returns `WebACLSummary` — config-only; no health fields)
 - **Describe API (if any)**: `GetWebACL` (per ACL; returns `WebACL` with `Rules`, `DefaultAction`, etc.)
 
