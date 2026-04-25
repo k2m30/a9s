@@ -111,9 +111,9 @@ Merged from 5 independent blind DevOps reviews. 115 parent→related pairs.
 ### `codeartifact` → `acm` — no (5/5 agree)
 
 - **Agent 1** (no): (CodeArtifact does not integrate with ACM — domains/repositories are reached via AWS-managed TLS only)
-- **Agent 2** (no): 
-- **Agent 3** (no): 
-- **Agent 4** (no): 
+- **Agent 2** (no):
+- **Agent 3** (no):
+- **Agent 4** (no):
 - **Agent 5** (no): — (CodeArtifact domains/repositories have no direct ACM certificate association)
 
 ### `codeartifact` → `cb` — sometimes (5/5 agree)
@@ -127,9 +127,9 @@ Merged from 5 independent blind DevOps reviews. 115 parent→related pairs.
 ### `codeartifact` → `kinesis` — no (5/5 agree)
 
 - **Agent 1** (no): (CodeArtifact has no Kinesis integration)
-- **Agent 2** (no): 
-- **Agent 3** (no): 
-- **Agent 4** (no): 
+- **Agent 2** (no):
+- **Agent 3** (no):
+- **Agent 4** (no):
 - **Agent 5** (no): — (CodeArtifact has no direct Kinesis integration)
 
 ### `codeartifact` → `kms` — yes (5/5 agree)
@@ -143,25 +143,25 @@ Merged from 5 independent blind DevOps reviews. 115 parent→related pairs.
 ### `codeartifact` → `lambda` — no (5/5 agree)
 
 - **Agent 1** (no): (CodeArtifact does not directly invoke or reference Lambda functions)
-- **Agent 2** (no): 
-- **Agent 3** (no): 
-- **Agent 4** (no): 
+- **Agent 2** (no):
+- **Agent 3** (no):
+- **Agent 4** (no):
 - **Agent 5** (no): — (no direct Lambda integration with CodeArtifact domain/repository)
 
 ### `codeartifact` → `logs` — no (5/5 agree)
 
 - **Agent 1** (no): (CodeArtifact does not write to a customer CloudWatch Logs group; only CloudTrail captures API events)
-- **Agent 2** (no): 
-- **Agent 3** (no): 
-- **Agent 4** (no): 
+- **Agent 2** (no):
+- **Agent 3** (no):
+- **Agent 4** (no):
 - **Agent 5** (no): — (CodeArtifact has no native CloudWatch Logs integration; only CloudTrail data events optionally to Logs)
 
 ### `codeartifact` → `r53` — no (5/5 agree)
 
 - **Agent 1** (no): (CodeArtifact endpoints are AWS-managed; no Route 53 relationship)
-- **Agent 2** (no): 
-- **Agent 3** (no): 
-- **Agent 4** (no): 
+- **Agent 2** (no):
+- **Agent 3** (no):
+- **Agent 4** (no):
 - **Agent 5** (no): — (CodeArtifact endpoints are AWS-managed; no Route 53 records required)
 
 ### `codeartifact` → `role` — sometimes (5/5 agree)
@@ -175,9 +175,9 @@ Merged from 5 independent blind DevOps reviews. 115 parent→related pairs.
 ### `codeartifact` → `waf` — no (5/5 agree)
 
 - **Agent 1** (no): (CodeArtifact endpoints are not protected by customer-managed WAF)
-- **Agent 2** (no): 
-- **Agent 3** (no): 
-- **Agent 4** (no): 
+- **Agent 2** (no):
+- **Agent 3** (no):
+- **Agent 4** (no):
 - **Agent 5** (no): — (CodeArtifact endpoints are not WAF-protectable)
 
 ### `ddb` → `backup` — yes (5/5 agree)
@@ -199,17 +199,17 @@ Merged from 5 independent blind DevOps reviews. 115 parent→related pairs.
 ### `ddb` → `secrets` — no (5/5 agree)
 
 - **Agent 1** (no): (DynamoDB has no direct Secrets Manager integration; at-rest uses KMS, not Secrets Manager)
-- **Agent 2** (no): 
-- **Agent 3** (no): 
-- **Agent 4** (no): 
+- **Agent 2** (no):
+- **Agent 3** (no):
+- **Agent 4** (no):
 - **Agent 5** (no): — (DynamoDB has no direct Secrets Manager association; any usage would be app-level)
 
 ### `ddb` → `sns` — no (4/5) — split: no:4, sometimes:1
 
 - **Agent 1** (sometimes): Indirect. `cloudwatch:DescribeAlarmsForMetric(Namespace=AWS/DynamoDB, Dimensions=TableName)` → `AlarmActions` with SNS topic ARNs. No direct DDB→SNS API.
-- **Agent 2** (no): 
-- **Agent 3** (no): 
-- **Agent 4** (no): 
+- **Agent 2** (no):
+- **Agent 3** (no):
+- **Agent 4** (no):
 - **Agent 5** (no): — (DynamoDB tables don't directly integrate with SNS; event notifications require Streams + Lambda or EventBridge Pipes)
 
 ### `docdb-snap` → `backup` — sometimes (4/5) — split: sometimes:4, yes:1
@@ -399,9 +399,9 @@ Merged from 5 independent blind DevOps reviews. 115 parent→related pairs.
 ### `eip` → `kms` — no (5/5 agree)
 
 - **Agent 1** (no): (Elastic IPs are not encrypted and have no KMS relationship)
-- **Agent 2** (no): 
-- **Agent 3** (no): 
-- **Agent 4** (no): 
+- **Agent 2** (no):
+- **Agent 3** (no):
+- **Agent 4** (no):
 - **Agent 5** (no): — (Elastic IPs are not encrypted; no KMS relationship)
 
 ### `eks` → `acm` — sometimes (5/5 agree)
@@ -503,9 +503,9 @@ Merged from 5 independent blind DevOps reviews. 115 parent→related pairs.
 ### `lambda` → `asg` — no (5/5 agree)
 
 - **Agent 1** (no): (Lambda functions have no direct ASG relationship; Lambda is serverless)
-- **Agent 2** (no): 
-- **Agent 3** (no): 
-- **Agent 4** (no): 
+- **Agent 2** (no):
+- **Agent 3** (no):
+- **Agent 4** (no):
 - **Agent 5** (no): — (Lambda functions have no direct Auto Scaling Group relationship; Lambda scaling is managed by the service)
 
 ### `lambda` → `ec2` — sometimes (5/5 agree)
@@ -535,7 +535,7 @@ Merged from 5 independent blind DevOps reviews. 115 parent→related pairs.
 ### `lambda` → `r53` — no (3/5) — split: no:3, sometimes:2
 
 - **Agent 1** (no): (Lambda has no native Route 53 linkage; custom domains go via API Gateway/CloudFront)
-- **Agent 2** (no): 
+- **Agent 2** (no):
 - **Agent 3** (sometimes): No direct API. Heuristic: find the function's API Gateway/ALB integration, then `route53:ListResourceRecordSets` across zones looking for alias targeting that domain
 - **Agent 4** (sometimes): No direct link. Function URL: `lambda:GetFunctionUrlConfig` gives an AWS-owned domain; to see if Route 53 points at it, iterate hosted zones (`route53:ListHostedZones` → `ListResourceRecordSets`) and match CNAMEs.
 - **Agent 5** (no): — (Lambda has no direct Route 53 relationship; would only be indirect via API Gateway/CloudFront custom domains)
@@ -631,7 +631,7 @@ Merged from 5 independent blind DevOps reviews. 115 parent→related pairs.
 ### `secrets` → `eb` — sometimes (4/5) — split: sometimes:4, no:1
 
 - **Agent 1** (sometimes): Reverse scan: `elasticbeanstalk:DescribeConfigurationSettings` across all envs → `OptionSettings` with values containing the secret ARN. Expensive.
-- **Agent 2** (no): 
+- **Agent 2** (no):
 - **Agent 3** (sometimes): No direct API. `elasticbeanstalk:DescribeConfigurationSettings` across envs → scan option settings for the secret ARN/name. Heuristic
 - **Agent 4** (sometimes): Iterate `elasticbeanstalk:DescribeConfigurationSettings` for all environments → scan `OptionSettings[].Value` for `{{resolve:secretsmanager:<arn>}}` matching the secret.
 - **Agent 5** (sometimes): List-all approach: `elasticbeanstalk:DescribeEnvironments` → `DescribeConfigurationSettings` → scan `OptionSettings` for env vars referencing the secret ARN. No native EB→secret API.
@@ -639,9 +639,9 @@ Merged from 5 independent blind DevOps reviews. 115 parent→related pairs.
 ### `secrets` → `ecr` — no (5/5 agree)
 
 - **Agent 1** (no): (Secrets Manager has no ECR linkage)
-- **Agent 2** (no): 
-- **Agent 3** (no): 
-- **Agent 4** (no): 
+- **Agent 2** (no):
+- **Agent 3** (no):
+- **Agent 4** (no):
 - **Agent 5** (no): — (no direct relationship; ECR pull creds may use secrets for non-AWS registries, not ECR itself)
 
 ### `secrets` → `ecs-task` — yes (4/5) — split: yes:4, sometimes:1
@@ -679,17 +679,17 @@ Merged from 5 independent blind DevOps reviews. 115 parent→related pairs.
 ### `secrets` → `s3` — no (5/5 agree)
 
 - **Agent 1** (no): (Secrets Manager has no direct S3 relationship; secret value is not stored in a customer bucket)
-- **Agent 2** (no): 
-- **Agent 3** (no): 
-- **Agent 4** (no): 
+- **Agent 2** (no):
+- **Agent 3** (no):
+- **Agent 4** (no):
 - **Agent 5** (no): — (no direct relationship)
 
 ### `secrets` → `sns` — sometimes (3/5) — split: sometimes:3, no:2
 
 - **Agent 1** (sometimes): No direct SecretsManager→SNS API. Via CW alarms: `cloudwatch:DescribeAlarms` on `AWS/SecretsManager` namespace and secret dimensions → `AlarmActions` SNS ARNs.
 - **Agent 2** (sometimes): `events:ListRules` + `events:ListTargetsByRule` where `EventPattern.source=aws.secretsmanager` and `Target.Arn` is SNS ARN; no direct Secrets Manager field
-- **Agent 3** (no): 
-- **Agent 4** (no): 
+- **Agent 3** (no):
+- **Agent 4** (no):
 - **Agent 5** (sometimes): `secretsmanager:DescribeSecret` → `RotationLambdaARN`. No direct SNS topic field on the secret. Check via EventBridge rules filtering `source: aws.secretsmanager`.
 
 ### `ses` → `acm` — sometimes (5/5 agree)
@@ -776,7 +776,7 @@ Merged from 5 independent blind DevOps reviews. 115 parent→related pairs.
 
 - **Agent 1** (yes): `sesv2:GetConfigurationSetEventDestinations(ConfigurationSetName)` → `EventDestinations[].SnsDestination.TopicArn`. Also `ses:DescribeActiveReceiptRuleSet` → `Rules[].Actions[].SNSAction.TopicArn`/`BounceAction.Sender` etc. And identity notifications: `ses:GetIdentityNotificationAttributes` → `BounceTopic`/`ComplaintTopic`/`DeliveryTopic`.
 - **Agent 2** (yes): `ses:DescribeActiveReceiptRuleSet` → rule `SNSAction.TopicArn`; `sesv2:GetConfigurationSetEventDestinations` → `SnsDestination.TopicArn`; also `ses:GetIdentityNotificationAttributes` → `BounceTopic`/`ComplaintTopic`/`DeliveryTopic`
-- **Agent 3** (yes): `ses:DescribeActiveReceiptRuleSet` → rules[].actions[].SNSAction.TopicArn`; also configuration-set event destinations: `sesv2:GetConfigurationSetEventDestinations` → `SnsDestination.TopicArn`
+- **Agent 3** (yes): `ses:DescribeActiveReceiptRuleSet` → rules[].actions[].SNSAction.TopicArn`; also configuration-set event destinations:`sesv2:GetConfigurationSetEventDestinations` → `SnsDestination.TopicArn`
 - **Agent 4** (sometimes): `sesv2:GetConfigurationSetEventDestinations` → `SnsDestination.TopicArn`. Legacy identity-level: `ses:GetIdentityNotificationAttributes` → `BounceTopic`/`ComplaintTopic`/`DeliveryTopic`.
 - **Agent 5** (sometimes): `ses:GetIdentityNotificationAttributes` → `BounceTopic`/`ComplaintTopic`/`DeliveryTopic`. Also `sesv2:GetConfigurationSetEventDestinations` → `SnsDestination.TopicArn`.
 
@@ -815,9 +815,9 @@ Merged from 5 independent blind DevOps reviews. 115 parent→related pairs.
 ### `sns-sub` → `ecs` — no (4/5) — split: no:4, sometimes:1
 
 - **Agent 1** (sometimes): No direct API. `sns:GetSubscriptionAttributes(SubscriptionArn)` → `Endpoint` field. If `Protocol=="sqs"`, trace SQS queue consumers via CloudWatch or inspect ECS task definitions referencing that queue URL in env — reverse iteration. Mostly `no`.
-- **Agent 2** (no): 
-- **Agent 3** (no): 
-- **Agent 4** (no): 
+- **Agent 2** (no):
+- **Agent 3** (no):
+- **Agent 4** (no):
 - **Agent 5** (no): — (SNS subscriptions don't target ECS clusters/services directly; only via EventBridge or Lambda shim)
 
 ### `sns-sub` → `kms` — sometimes (5/5 agree)
@@ -855,25 +855,25 @@ Merged from 5 independent blind DevOps reviews. 115 parent→related pairs.
 ### `tg` → `kms` — no (5/5 agree)
 
 - **Agent 1** (no): (ALB/NLB target groups have no KMS attribute; encryption is on the listener's ACM cert)
-- **Agent 2** (no): 
-- **Agent 3** (no): 
-- **Agent 4** (no): 
+- **Agent 2** (no):
+- **Agent 3** (no):
+- **Agent 4** (no):
 - **Agent 5** (no): — (ELBv2 target groups have no direct KMS encryption relationship)
 
 ### `tg` → `role` — no (3/5) — split: no:3, sometimes:2
 
 - **Agent 1** (no): (Target groups have no IAM role attribute)
 - **Agent 2** (sometimes): `elbv2:DescribeTargetGroups` → `TargetType`; if `lambda` → `elbv2:DescribeTargetHealth` → `Target.Id` (Lambda ARN) → `lambda:GetFunctionConfiguration.Role`
-- **Agent 3** (no): 
-- **Agent 4** (no): 
+- **Agent 3** (no):
+- **Agent 4** (no):
 - **Agent 5** (sometimes): `elbv2:DescribeTargetGroups` → `TargetType == "lambda"` → `elbv2:DescribeTargetHealth` → `Target.Id` = Lambda ARN → `lambda:GetFunctionConfiguration` → `Role`.
 
 ### `tg` → `secrets` — no (5/5 agree)
 
 - **Agent 1** (no): (Target groups have no Secrets Manager relationship)
-- **Agent 2** (no): 
-- **Agent 3** (no): 
-- **Agent 4** (no): 
+- **Agent 2** (no):
+- **Agent 3** (no):
+- **Agent 4** (no):
 - **Agent 5** (no): — (target groups have no secret association)
 
 ### `tgw` → `cfn` — sometimes (5/5 agree)
@@ -888,8 +888,8 @@ Merged from 5 independent blind DevOps reviews. 115 parent→related pairs.
 
 - **Agent 1** (sometimes): No per-TGW role attribute. SLR `AWSServiceRoleForVPCTransitGateway` via `iam:GetRole`. For RAM-shared TGWs: `ram:ListResources(resourceArns=[tgwArn])` → principals (accounts, not roles typically). Mostly `no` for a direct per-TGW role.
 - **Agent 2** (sometimes): `ram:GetResourceShares` + `ram:ListResources` filtered by TGW ARN → `ram:ListPrincipals` (returns accounts/OUs/roles); TGW itself has no role field
-- **Agent 3** (no): 
-- **Agent 4** (no): 
+- **Agent 3** (no):
+- **Agent 4** (no):
 - **Agent 5** (sometimes): `iam:GetRole` with name `AWSServiceRoleForVPCTransitGateway`. No TGW-ARN-scoped API returns it; relationship is implicit.
 
 ### `tgw` → `rtb` — yes (4/5) — split: yes:4, sometimes:1
@@ -1117,9 +1117,9 @@ Merged from 5 independent blind DevOps reviews. 115 parent→related pairs.
 ### `ddb` → `sns` — votes: a1=sometimes, a2=no, a3=no, a4=no, a5=no
 
 - **Agent 1** (sometimes): Indirect. `cloudwatch:DescribeAlarmsForMetric(Namespace=AWS/DynamoDB, Dimensions=TableName)` → `AlarmActions` with SNS topic ARNs. No direct DDB→SNS API.
-- **Agent 2** (no): 
-- **Agent 3** (no): 
-- **Agent 4** (no): 
+- **Agent 2** (no):
+- **Agent 3** (no):
+- **Agent 4** (no):
 - **Agent 5** (no): — (DynamoDB tables don't directly integrate with SNS; event notifications require Streams + Lambda or EventBridge Pipes)
 
 ### `docdb-snap` → `backup` — votes: a1=sometimes, a2=sometimes, a3=yes, a4=sometimes, a5=sometimes
@@ -1269,7 +1269,7 @@ Merged from 5 independent blind DevOps reviews. 115 parent→related pairs.
 ### `lambda` → `r53` — votes: a1=no, a2=no, a3=sometimes, a4=sometimes, a5=no
 
 - **Agent 1** (no): (Lambda has no native Route 53 linkage; custom domains go via API Gateway/CloudFront)
-- **Agent 2** (no): 
+- **Agent 2** (no):
 - **Agent 3** (sometimes): No direct API. Heuristic: find the function's API Gateway/ALB integration, then `route53:ListResourceRecordSets` across zones looking for alias targeting that domain
 - **Agent 4** (sometimes): No direct link. Function URL: `lambda:GetFunctionUrlConfig` gives an AWS-owned domain; to see if Route 53 points at it, iterate hosted zones (`route53:ListHostedZones` → `ListResourceRecordSets`) and match CNAMEs.
 - **Agent 5** (no): — (Lambda has no direct Route 53 relationship; would only be indirect via API Gateway/CloudFront custom domains)
@@ -1309,7 +1309,7 @@ Merged from 5 independent blind DevOps reviews. 115 parent→related pairs.
 ### `secrets` → `eb` — votes: a1=sometimes, a2=no, a3=sometimes, a4=sometimes, a5=sometimes
 
 - **Agent 1** (sometimes): Reverse scan: `elasticbeanstalk:DescribeConfigurationSettings` across all envs → `OptionSettings` with values containing the secret ARN. Expensive.
-- **Agent 2** (no): 
+- **Agent 2** (no):
 - **Agent 3** (sometimes): No direct API. `elasticbeanstalk:DescribeConfigurationSettings` across envs → scan option settings for the secret ARN/name. Heuristic
 - **Agent 4** (sometimes): Iterate `elasticbeanstalk:DescribeConfigurationSettings` for all environments → scan `OptionSettings[].Value` for `{{resolve:secretsmanager:<arn>}}` matching the secret.
 - **Agent 5** (sometimes): List-all approach: `elasticbeanstalk:DescribeEnvironments` → `DescribeConfigurationSettings` → scan `OptionSettings` for env vars referencing the secret ARN. No native EB→secret API.
@@ -1342,8 +1342,8 @@ Merged from 5 independent blind DevOps reviews. 115 parent→related pairs.
 
 - **Agent 1** (sometimes): No direct SecretsManager→SNS API. Via CW alarms: `cloudwatch:DescribeAlarms` on `AWS/SecretsManager` namespace and secret dimensions → `AlarmActions` SNS ARNs.
 - **Agent 2** (sometimes): `events:ListRules` + `events:ListTargetsByRule` where `EventPattern.source=aws.secretsmanager` and `Target.Arn` is SNS ARN; no direct Secrets Manager field
-- **Agent 3** (no): 
-- **Agent 4** (no): 
+- **Agent 3** (no):
+- **Agent 4** (no):
 - **Agent 5** (sometimes): `secretsmanager:DescribeSecret` → `RotationLambdaARN`. No direct SNS topic field on the secret. Check via EventBridge rules filtering `source: aws.secretsmanager`.
 
 ### `ses` → `eb-rule` — votes: a1=yes, a2=sometimes, a3=sometimes, a4=sometimes, a5=sometimes
@@ -1382,7 +1382,7 @@ Merged from 5 independent blind DevOps reviews. 115 parent→related pairs.
 
 - **Agent 1** (yes): `sesv2:GetConfigurationSetEventDestinations(ConfigurationSetName)` → `EventDestinations[].SnsDestination.TopicArn`. Also `ses:DescribeActiveReceiptRuleSet` → `Rules[].Actions[].SNSAction.TopicArn`/`BounceAction.Sender` etc. And identity notifications: `ses:GetIdentityNotificationAttributes` → `BounceTopic`/`ComplaintTopic`/`DeliveryTopic`.
 - **Agent 2** (yes): `ses:DescribeActiveReceiptRuleSet` → rule `SNSAction.TopicArn`; `sesv2:GetConfigurationSetEventDestinations` → `SnsDestination.TopicArn`; also `ses:GetIdentityNotificationAttributes` → `BounceTopic`/`ComplaintTopic`/`DeliveryTopic`
-- **Agent 3** (yes): `ses:DescribeActiveReceiptRuleSet` → rules[].actions[].SNSAction.TopicArn`; also configuration-set event destinations: `sesv2:GetConfigurationSetEventDestinations` → `SnsDestination.TopicArn`
+- **Agent 3** (yes): `ses:DescribeActiveReceiptRuleSet` → rules[].actions[].SNSAction.TopicArn`; also configuration-set event destinations:`sesv2:GetConfigurationSetEventDestinations` → `SnsDestination.TopicArn`
 - **Agent 4** (sometimes): `sesv2:GetConfigurationSetEventDestinations` → `SnsDestination.TopicArn`. Legacy identity-level: `ses:GetIdentityNotificationAttributes` → `BounceTopic`/`ComplaintTopic`/`DeliveryTopic`.
 - **Agent 5** (sometimes): `ses:GetIdentityNotificationAttributes` → `BounceTopic`/`ComplaintTopic`/`DeliveryTopic`. Also `sesv2:GetConfigurationSetEventDestinations` → `SnsDestination.TopicArn`.
 
@@ -1397,9 +1397,9 @@ Merged from 5 independent blind DevOps reviews. 115 parent→related pairs.
 ### `sns-sub` → `ecs` — votes: a1=sometimes, a2=no, a3=no, a4=no, a5=no
 
 - **Agent 1** (sometimes): No direct API. `sns:GetSubscriptionAttributes(SubscriptionArn)` → `Endpoint` field. If `Protocol=="sqs"`, trace SQS queue consumers via CloudWatch or inspect ECS task definitions referencing that queue URL in env — reverse iteration. Mostly `no`.
-- **Agent 2** (no): 
-- **Agent 3** (no): 
-- **Agent 4** (no): 
+- **Agent 2** (no):
+- **Agent 3** (no):
+- **Agent 4** (no):
 - **Agent 5** (no): — (SNS subscriptions don't target ECS clusters/services directly; only via EventBridge or Lambda shim)
 
 ### `sqs` → `eb-rule` — votes: a1=yes, a2=yes, a3=yes, a4=sometimes, a5=sometimes
@@ -1414,16 +1414,16 @@ Merged from 5 independent blind DevOps reviews. 115 parent→related pairs.
 
 - **Agent 1** (no): (Target groups have no IAM role attribute)
 - **Agent 2** (sometimes): `elbv2:DescribeTargetGroups` → `TargetType`; if `lambda` → `elbv2:DescribeTargetHealth` → `Target.Id` (Lambda ARN) → `lambda:GetFunctionConfiguration.Role`
-- **Agent 3** (no): 
-- **Agent 4** (no): 
+- **Agent 3** (no):
+- **Agent 4** (no):
 - **Agent 5** (sometimes): `elbv2:DescribeTargetGroups` → `TargetType == "lambda"` → `elbv2:DescribeTargetHealth` → `Target.Id` = Lambda ARN → `lambda:GetFunctionConfiguration` → `Role`.
 
 ### `tgw` → `role` — votes: a1=sometimes, a2=sometimes, a3=no, a4=no, a5=sometimes
 
 - **Agent 1** (sometimes): No per-TGW role attribute. SLR `AWSServiceRoleForVPCTransitGateway` via `iam:GetRole`. For RAM-shared TGWs: `ram:ListResources(resourceArns=[tgwArn])` → principals (accounts, not roles typically). Mostly `no` for a direct per-TGW role.
 - **Agent 2** (sometimes): `ram:GetResourceShares` + `ram:ListResources` filtered by TGW ARN → `ram:ListPrincipals` (returns accounts/OUs/roles); TGW itself has no role field
-- **Agent 3** (no): 
-- **Agent 4** (no): 
+- **Agent 3** (no):
+- **Agent 4** (no):
 - **Agent 5** (sometimes): `iam:GetRole` with name `AWSServiceRoleForVPCTransitGateway`. No TGW-ARN-scoped API returns it; relationship is implicit.
 
 ### `tgw` → `rtb` — votes: a1=yes, a2=yes, a3=sometimes, a4=yes, a5=yes

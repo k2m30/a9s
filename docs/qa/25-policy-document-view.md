@@ -27,6 +27,7 @@ All stories are written from a black-box perspective against the design spec and
 | A.1.3 | I press Esc on the Policy Document view. | I return to the Role Policies list. The cursor is on the same policy ("AmazonS3ReadOnlyAccess") that I had selected. |
 
 **AWS comparison:**
+
 ```
 aws iam get-policy --policy-arn arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
 # Note DefaultVersionId from output (e.g., "v1")
@@ -46,6 +47,7 @@ aws iam get-policy-version \
 | A.2.3 | I press Esc. | I return to the Role Policies list on the same inline policy row. |
 
 **AWS comparison:**
+
 ```
 aws iam get-role-policy \
   --role-name payment-service-execution-role \
@@ -61,6 +63,7 @@ aws iam get-role-policy \
 | A.3.1 | A managed policy "MyCustomPolicy" has 3 versions, with v3 as the default. I press Enter on it. | The frame title shows "policy-doc --- MyCustomPolicy (Managed v3)". The metadata line reads "Version: v3 (default) -- 3 version(s)". The document displayed is the default version's content. |
 
 **AWS comparison:**
+
 ```
 aws iam get-policy --policy-arn arn:aws:iam::123456789012:policy/MyCustomPolicy
 # Returns: Versions count and DefaultVersionId = "v3"
@@ -95,6 +98,7 @@ aws iam get-policy-version \
 | C.5 | A network timeout occurs during the GetPolicyVersion call. | A red error message describes the timeout. The "Press Esc to go back." hint is visible. No partial document is shown. |
 
 **AWS comparison:**
+
 ```
 aws iam get-policy --policy-arn arn:aws:iam::123456789012:policy/nonexistent
 # Returns: NoSuchEntity error
@@ -147,6 +151,7 @@ aws iam get-policy-version --policy-arn arn:aws:iam::aws:policy/AmazonS3ReadOnly
 | F.1.4 | The policy document has deeply nested Condition blocks. | All nested conditions (StringEquals, ArnLike, etc.) are properly indented at the correct depth with 2-space indent per level. |
 
 **AWS comparison:**
+
 ```
 aws iam get-policy-version \
   --policy-arn arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess \
@@ -175,6 +180,7 @@ aws iam get-policy-version \
 | F.2.12 | The document contains `null` (rare but possible). | null is rendered in dim (#565f89). |
 
 **AWS comparison:**
+
 ```
 aws iam get-policy-version \
   --policy-arn arn:aws:iam::aws:policy/AdministratorAccess \
@@ -247,6 +253,7 @@ aws iam get-policy-version \
 | H.3.6 | I press Enter on an empty search input. | No search is activated. The view returns to normal mode. |
 
 **AWS comparison:**
+
 ```
 aws iam get-policy-version \
   --policy-arn arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess \
@@ -272,6 +279,7 @@ print(f'Found {count} matches for s3:GetObject')
 | I.5 | I paste the copied JSON and compare to the AWS CLI output. | The pasted JSON matches the URL-decoded, pretty-printed (2-space indent) document exactly. |
 
 **AWS comparison:**
+
 ```
 aws iam get-policy-version \
   --policy-arn arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess \
@@ -398,6 +406,7 @@ aws iam get-policy-version \
 | R.1.4 | On the 4th policy, the search finds 2 matches for "s3:GetObject". I press n to navigate between them. | The first match is highlighted in orange. Pressing n moves to the second match (also orange), and the viewport scrolls to center it. I can inspect the Resource and Condition context around each match. |
 
 **AWS comparison:**
+
 ```
 # Without a9s, finding which of 12 policies grants s3:GetObject requires:
 aws iam list-attached-role-policies --role-name data-pipeline-role
@@ -417,6 +426,7 @@ aws iam get-policy-version --policy-arn POLICY_ARN --version-id vN \
 | R.2.3 | The Resource array is clearly visible with correct indentation. | I can immediately see: `"Resource": ["arn:aws:s3:::my-bucket/prod/*"]` -- the path restriction is obvious in the cyan-highlighted ARN. |
 
 **AWS comparison:**
+
 ```
 aws iam get-policy-version \
   --policy-arn arn:aws:iam::123456789012:policy/s3-read-policy \
@@ -436,6 +446,7 @@ aws iam get-policy-version \
 | R.3.4 | Without syntax highlighting, I would need to carefully read every line. | With highlighting, I immediately see red bold tokens and know this is a Deny-all policy without reading every word. |
 
 **AWS comparison:**
+
 ```
 aws iam get-role-policy \
   --role-name my-role \
@@ -454,6 +465,7 @@ aws iam get-role-policy \
 | R.4.4 | I paste the JSON into a report. | Clean JSON without ANSI codes: `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"*","Resource":"*"}]}` (pretty-printed with 2-space indent). |
 
 **AWS comparison:**
+
 ```
 aws iam get-policy-version \
   --policy-arn arn:aws:iam::aws:policy/AdministratorAccess \

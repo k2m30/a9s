@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `sg`
 - **Display name**: Security Groups
-- **AWS API reference**: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_SecurityGroup.html
+- **AWS API reference**: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_SecurityGroup.html>
 - **List API**: `DescribeSecurityGroups`
 - **Describe API (if any)**: not used — `DescribeSecurityGroups` returns the full `SecurityGroup` shape, including `IpPermissions[]` and `IpPermissionsEgress[]`. No Wave 2 call required.
 

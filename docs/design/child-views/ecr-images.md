@@ -81,6 +81,7 @@ Source struct: `ecrtypes.ImageDetail`
 ```
 
 Scrolled right to show Findings column:
+
 ```
 │ SCAN STATUS    FINDINGS             │
 │ COMPLETE       0C 0H 3M             │

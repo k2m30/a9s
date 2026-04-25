@@ -21,10 +21,12 @@ AWS pricing is region-specific. All cost estimates shown must reflect the curren
 | A.1.7 | I observe a terminated instance. | The cost column shows `$0.00` or `--`. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-instances --query 'Reservations[].Instances[].{ID:InstanceId,Type:InstanceType,State:State.Name,Lifecycle:InstanceLifecycle}'
 aws pricing get-products --service-code AmazonEC2 --filters Type=TERM_MATCH,Field=instanceType,Value=t3.medium Type=TERM_MATCH,Field=location,Value="US East (N. Virginia)"
 ```
+
 Expected fields visible: Name, State, Lifecycle, Type, Private IP, Public IP, Instance ID, Launch Time, Cost/mo (per views.yaml ec2 list + new cost column).
 
 ### A.2 EC2 Cost Accuracy
@@ -57,10 +59,12 @@ Expected fields visible: Name, State, Lifecycle, Type, Private IP, Public IP, In
 | B.1.5 | I observe a stopped RDS instance. | The cost column shows `$0.00` or indicates no compute cost (storage costs are not computed here). |
 
 **AWS comparison:**
+
 ```
 aws rds describe-db-instances --query 'DBInstances[].{ID:DBInstanceIdentifier,Class:DBInstanceClass,Engine:Engine,MultiAZ:MultiAZ,Status:DBInstanceStatus}'
 aws pricing get-products --service-code AmazonRDS --filters Type=TERM_MATCH,Field=instanceType,Value=db.t3.micro
 ```
+
 Expected fields visible: DB Identifier, Engine, Version, Status, Class, Endpoint, Multi-AZ, Cost/mo (per views.yaml dbi list + new cost column).
 
 ---
@@ -77,10 +81,12 @@ Expected fields visible: DB Identifier, Engine, Version, Status, Class, Endpoint
 | C.1.4 | I observe a cluster with 3 nodes vs 1 node of the same type. | The 3-node cluster shows approximately 3x the cost of the single-node cluster. |
 
 **AWS comparison:**
+
 ```
 aws elasticache describe-cache-clusters --query 'CacheClusters[].{ID:CacheClusterId,Type:CacheNodeType,Status:CacheClusterStatus,Nodes:NumCacheNodes}'
 aws pricing get-products --service-code AmazonElastiCache --filters Type=TERM_MATCH,Field=instanceType,Value=cache.t3.micro
 ```
+
 Expected fields visible: Cluster ID, Version, Node Type, Status, Nodes, Endpoint, Cost/mo (per views.yaml redis list + new cost column).
 
 ---
@@ -96,9 +102,11 @@ Expected fields visible: Cluster ID, Version, Node Type, Status, Nodes, Endpoint
 | D.1.3 | I observe a NAT gateway in "deleted" or "failed" state. | The cost column shows `$0.00` or `--`. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-nat-gateways --query 'NatGateways[].{ID:NatGatewayId,State:State,VpcId:VpcId}'
 ```
+
 Expected fields visible: Name, NAT Gateway ID, VPC ID, Subnet ID, State, Public IP, Cost/mo (per views.yaml nat list + new cost column).
 
 ---
@@ -115,9 +123,11 @@ Expected fields visible: Name, NAT Gateway ID, VPC ID, Subnet ID, State, Public 
 | E.1.4 | I observe a load balancer in a non-active state. | The cost column shows `$0.00` or `--`. |
 
 **AWS comparison:**
+
 ```
 aws elbv2 describe-load-balancers --query 'LoadBalancers[].{Name:LoadBalancerName,Type:Type,State:State.Code}'
 ```
+
 Expected fields visible: Name, Type, Scheme, State, DNS Name, VPC ID, Cost/mo (per views.yaml elb list + new cost column).
 
 ---
@@ -134,9 +144,11 @@ Expected fields visible: Name, Type, Scheme, State, DNS Name, VPC ID, Cost/mo (p
 | F.1.4 | I compare attached vs unattached EIPs side by side. | Attached EIPs show $0.00 while unattached EIPs show a non-zero cost, making idle EIPs immediately visible as cost sinks. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-addresses --query 'Addresses[].{AllocationId:AllocationId,PublicIp:PublicIp,AssociationId:AssociationId,InstanceId:InstanceId}'
 ```
+
 Expected fields visible: Name, Allocation ID, Public IP, Association, Instance, Domain, Cost/mo (per views.yaml eip list + new cost column).
 
 ---
@@ -152,9 +164,11 @@ Expected fields visible: Name, Allocation ID, Public IP, Association, Instance, 
 | G.1.3 | I compare a 2-node cluster to a 4-node cluster of the same type. | The 4-node cluster shows approximately double the cost of the 2-node cluster. |
 
 **AWS comparison:**
+
 ```
 aws redshift describe-clusters --query 'Clusters[].{ID:ClusterIdentifier,NodeType:NodeType,Nodes:NumberOfNodes,Status:ClusterStatus}'
 ```
+
 Expected fields visible: Cluster ID, Status, Node Type, Nodes, Database, Endpoint, Cost/mo (per views.yaml redshift list + new cost column).
 
 ---
@@ -170,9 +184,11 @@ Expected fields visible: Cluster ID, Status, Node Type, Nodes, Database, Endpoin
 | H.1.3 | I compare a domain with 3 instances to one with 1 instance of the same type. | The 3-instance domain shows approximately 3x the cost. |
 
 **AWS comparison:**
+
 ```
 aws opensearch describe-domains --domain-names my-domain --query 'DomainStatusList[].{Name:DomainName,Type:ClusterConfig.InstanceType,Count:ClusterConfig.InstanceCount}'
 ```
+
 Expected fields visible: Domain Name, Engine Version, Instance Type, Instances, Endpoint, Cost/mo (per views.yaml opensearch list + new cost column).
 
 ---
@@ -191,11 +207,13 @@ Expected fields visible: Domain Name, Engine Version, Instance Type, Instances, 
 | I.1.6 | I open any other resource type not listed in sections A-H (e.g., VPCs, Security Groups, IAM Roles, SQS Queues). | No "Cost/mo" column appears. These resources either have no direct cost or have purely usage-dependent pricing. |
 
 **AWS comparison:**
+
 ```
 aws s3api list-buckets
 aws lambda list-functions
 aws dynamodb list-tables
 ```
+
 Expected: Standard columns per views.yaml definitions. No cost column.
 
 ---

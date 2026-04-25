@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `asg`
 - **Display name**: Auto Scaling Groups
-- **AWS API reference**: https://docs.aws.amazon.com/autoscaling/ec2/APIReference/API_AutoScalingGroup.html
+- **AWS API reference**: <https://docs.aws.amazon.com/autoscaling/ec2/APIReference/API_AutoScalingGroup.html>
 - **List API**: `DescribeAutoScalingGroups`
 - **Describe API (if any)**: `DescribeScalingActivities` (Wave 2, one call per ASG with `MaxRecords=1`)
 

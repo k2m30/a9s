@@ -35,6 +35,7 @@ apply to all 66 resource types including EC2.
 ## Section 1 -- Left Column Navigation (j/k Cursor)
 
 ### Story EC2-001: Cursor starts on first field row
+
 **Priority**: P1
 **Depends on**: none
 
@@ -49,6 +50,7 @@ apply to all 66 resource types including EC2.
 ---
 
 ### Story EC2-002: j moves cursor down one row
+
 **Priority**: P1
 **Depends on**: EC2-001
 
@@ -61,6 +63,7 @@ apply to all 66 resource types including EC2.
 ---
 
 ### Story EC2-003: k moves cursor up one row
+
 **Priority**: P1
 **Depends on**: EC2-002
 
@@ -71,6 +74,7 @@ apply to all 66 resource types including EC2.
 ---
 
 ### Story EC2-004: k at first field is a no-op
+
 **Priority**: P1
 **Depends on**: EC2-001
 
@@ -81,6 +85,7 @@ apply to all 66 resource types including EC2.
 ---
 
 ### Story EC2-005: j at last field is a no-op
+
 **Priority**: P1
 **Depends on**: EC2-001
 
@@ -91,6 +96,7 @@ apply to all 66 resource types including EC2.
 ---
 
 ### Story EC2-006: Cursor scrolls viewport at edge of visible area
+
 **Priority**: P1
 **Depends on**: EC2-001
 
@@ -107,6 +113,7 @@ apply to all 66 resource types including EC2.
 ---
 
 ### Story EC2-007: g jumps to first row, G jumps to last row
+
 **Priority**: P2
 **Depends on**: EC2-001
 
@@ -121,6 +128,7 @@ apply to all 66 resource types including EC2.
 ---
 
 ### Story EC2-008: Cursor traverses section headers and sub-fields uniformly
+
 **Priority**: P1
 **Depends on**: EC2-001
 
@@ -137,6 +145,7 @@ apply to all 66 resource types including EC2.
 ## Section 2 -- Left Column Enter on Navigable Field
 
 ### Story EC2-009: Enter on VpcId opens VPC detail view
+
 **Priority**: P1
 **Depends on**: EC2-001
 
@@ -149,6 +158,7 @@ apply to all 66 resource types including EC2.
 **And** the right column shows VPC's own related resource types (EC2 Instances, Subnets, Security Groups, Route Tables, NAT Gateways, Internet Gateways, etc.)
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-vpcs --vpc-ids vpc-0abc123def456789a
 ```
@@ -156,6 +166,7 @@ aws ec2 describe-vpcs --vpc-ids vpc-0abc123def456789a
 ---
 
 ### Story EC2-010: Enter on SubnetId opens Subnet detail view
+
 **Priority**: P1
 **Depends on**: EC2-001
 
@@ -167,6 +178,7 @@ aws ec2 describe-vpcs --vpc-ids vpc-0abc123def456789a
 **And** the left column shows Subnet detail fields: SubnetId, VpcId, CidrBlock, AvailabilityZone, AvailabilityZoneId, State, AvailableIpAddressCount, MapPublicIpOnLaunch, DefaultForAz, SubnetArn, OwnerId, Tags
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-subnets --subnet-ids subnet-0aaa111111111111a
 ```
@@ -174,6 +186,7 @@ aws ec2 describe-subnets --subnet-ids subnet-0aaa111111111111a
 ---
 
 ### Story EC2-011: Enter on SecurityGroups sub-field GroupId opens SG detail
+
 **Priority**: P1
 **Depends on**: EC2-001
 
@@ -186,6 +199,7 @@ aws ec2 describe-subnets --subnet-ids subnet-0aaa111111111111a
 **And** the left column shows SG detail fields: GroupId, GroupName, VpcId, Description, OwnerId, SecurityGroupArn, IpPermissions, IpPermissionsEgress, Tags
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-security-groups --group-ids sg-0aaa111111111111a
 ```
@@ -193,6 +207,7 @@ aws ec2 describe-security-groups --group-ids sg-0aaa111111111111a
 ---
 
 ### Story EC2-012: Each SecurityGroup sub-field is independently navigable
+
 **Priority**: P1
 **Depends on**: EC2-011
 
@@ -208,6 +223,7 @@ aws ec2 describe-security-groups --group-ids sg-0aaa111111111111a
 ---
 
 ### Story EC2-013: Enter on ImageId opens AMI detail view
+
 **Priority**: P1
 **Depends on**: EC2-001
 
@@ -219,6 +235,7 @@ aws ec2 describe-security-groups --group-ids sg-0aaa111111111111a
 **And** the left column shows AMI detail fields: ImageId, Name, State, Description, Architecture, PlatformDetails, RootDeviceType, VirtualizationType, EnaSupport, BootMode, CreationDate, DeprecationTime, Public, OwnerId, ImageLocation, BlockDeviceMappings, Tags
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-images --image-ids ami-0abc123def456789a
 ```
@@ -226,6 +243,7 @@ aws ec2 describe-images --image-ids ami-0abc123def456789a
 ---
 
 ### Story EC2-014: Enter on a non-navigable field is a no-op
+
 **Priority**: P1
 **Depends on**: EC2-001
 
@@ -247,6 +265,7 @@ aws ec2 describe-images --image-ids ami-0abc123def456789a
 ---
 
 ### Story EC2-015: Enter on a section header is a no-op
+
 **Priority**: P1
 **Depends on**: EC2-008
 
@@ -266,6 +285,7 @@ aws ec2 describe-images --image-ids ami-0abc123def456789a
 ---
 
 ### Story EC2-016: IamInstanceProfile.Arn is NOT navigable
+
 **Priority**: P2
 **Depends on**: EC2-001
 
@@ -281,6 +301,7 @@ aws ec2 describe-images --image-ids ami-0abc123def456789a
 ---
 
 ### Story EC2-017: Navigable field underline disappears under cursor
+
 **Priority**: P2
 **Depends on**: EC2-009
 
@@ -301,6 +322,7 @@ aws ec2 describe-images --image-ids ami-0abc123def456789a
 ## Section 3 -- Right Column (RELATED Panel)
 
 ### Story EC2-018: Right column visible by default showing EC2 related types
+
 **Priority**: P1
 **Depends on**: EC2-001
 
@@ -313,6 +335,7 @@ aws ec2 describe-images --image-ids ami-0abc123def456789a
 
 **AWS comparison:**
 There is no single AWS CLI command that shows all reverse relationships for an EC2 instance. Each would require a separate call:
+
 ```
 aws elbv2 describe-target-health ...
 aws autoscaling describe-auto-scaling-instances --instance-ids i-0a1b2c3d4e5f60001
@@ -323,6 +346,7 @@ aws ec2 describe-addresses --filters Name=instance-id,Values=i-0a1b2c3d4e5f60001
 ---
 
 ### Story EC2-019: Right column rows start dim during initial load
+
 **Priority**: P1
 **Depends on**: EC2-018
 
@@ -335,6 +359,7 @@ aws ec2 describe-addresses --filters Name=instance-id,Values=i-0a1b2c3d4e5f60001
 ---
 
 ### Story EC2-020: Right column rows light up as counts arrive
+
 **Priority**: P1
 **Depends on**: EC2-019
 
@@ -353,6 +378,7 @@ aws ec2 describe-addresses --filters Name=instance-id,Values=i-0a1b2c3d4e5f60001
 ---
 
 ### Story EC2-021: Tab moves focus to right column
+
 **Priority**: P1
 **Depends on**: EC2-018
 
@@ -366,6 +392,7 @@ aws ec2 describe-addresses --filters Name=instance-id,Values=i-0a1b2c3d4e5f60001
 ---
 
 ### Story EC2-022: Tab returns focus to left column
+
 **Priority**: P1
 **Depends on**: EC2-021
 
@@ -378,6 +405,7 @@ aws ec2 describe-addresses --filters Name=instance-id,Values=i-0a1b2c3d4e5f60001
 ---
 
 ### Story EC2-023: r key toggles right column off and on
+
 **Priority**: P1
 **Depends on**: EC2-018
 
@@ -396,6 +424,7 @@ aws ec2 describe-addresses --filters Name=instance-id,Values=i-0a1b2c3d4e5f60001
 ---
 
 ### Story EC2-024: h/l switches focus between columns
+
 **Priority**: P2
 **Depends on**: EC2-021
 
@@ -416,6 +445,7 @@ aws ec2 describe-addresses --filters Name=instance-id,Values=i-0a1b2c3d4e5f60001
 ## Section 4 -- Right Column Enter (count=1)
 
 ### Story EC2-025: Enter on Target Groups (count=1) opens TG detail directly
+
 **Priority**: P1
 **Depends on**: EC2-021
 
@@ -427,6 +457,7 @@ aws ec2 describe-addresses --filters Name=instance-id,Values=i-0a1b2c3d4e5f60001
 **And** the right column shows the TG's own related types
 
 **AWS comparison:**
+
 ```
 aws elbv2 describe-target-groups --names web-prod-tg
 ```
@@ -434,6 +465,7 @@ aws elbv2 describe-target-groups --names web-prod-tg
 ---
 
 ### Story EC2-026: Esc from TG detail returns to EC2 detail at same cursor
+
 **Priority**: P1
 **Depends on**: EC2-025
 
@@ -446,6 +478,7 @@ aws elbv2 describe-target-groups --names web-prod-tg
 ---
 
 ### Story EC2-027: Enter on Auto Scaling Groups (count=1) opens ASG detail
+
 **Priority**: P1
 **Depends on**: EC2-021
 
@@ -456,6 +489,7 @@ aws elbv2 describe-target-groups --names web-prod-tg
 **And** the left column shows ASG detail fields: AutoScalingGroupName, AutoScalingGroupARN, MinSize, MaxSize, DesiredCapacity, AvailabilityZones, LaunchConfigurationName, HealthCheckType, HealthCheckGracePeriod, TargetGroupARNs, LoadBalancerNames, SuspendedProcesses, TerminationPolicies, VPCZoneIdentifier, CreatedTime, Tags
 
 **AWS comparison:**
+
 ```
 aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names web-prod-asg
 ```
@@ -463,6 +497,7 @@ aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names web-prod
 ---
 
 ### Story EC2-028: Enter on Elastic IPs (count=1) opens EIP detail
+
 **Priority**: P1
 **Depends on**: EC2-021
 
@@ -473,6 +508,7 @@ aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names web-prod
 **And** the left column shows EIP detail fields: AllocationId, PublicIp, AssociationId, InstanceId, Domain, NetworkBorderGroup, SubnetId, PrivateIpAddress, NetworkInterfaceId, Tags
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-addresses --allocation-ids eipalloc-0abc123def456789a
 ```
@@ -482,6 +518,7 @@ aws ec2 describe-addresses --allocation-ids eipalloc-0abc123def456789a
 ## Section 5 -- Right Column Enter (count>1)
 
 ### Story EC2-029: Enter on CloudWatch Alarms (count=2) opens filtered alarm list
+
 **Priority**: P1
 **Depends on**: EC2-021
 
@@ -493,14 +530,17 @@ aws ec2 describe-addresses --allocation-ids eipalloc-0abc123def456789a
 **And** the list columns show: Alarm Name, State, Metric, Namespace, Threshold
 
 **AWS comparison:**
+
 ```
 aws cloudwatch describe-alarms --dimensions Name=InstanceId,Value=i-0a1b2c3d4e5f60001
 ```
+
 Expected: exactly 2 alarms in the filtered result.
 
 ---
 
 ### Story EC2-030: Enter on alarm in filtered list opens alarm detail
+
 **Priority**: P1
 **Depends on**: EC2-029
 
@@ -512,6 +552,7 @@ Expected: exactly 2 alarms in the filtered result.
 **And** the left column shows alarm detail fields: AlarmName, AlarmArn, StateValue, StateReason, StateUpdatedTimestamp, StateTransitionedTimestamp, MetricName, Namespace, Statistic, Period, EvaluationPeriods, DatapointsToAlarm, Threshold, ComparisonOperator, TreatMissingData, Dimensions, AlarmDescription, AlarmActions, OKActions, InsufficientDataActions, ActionsEnabled
 
 **AWS comparison:**
+
 ```
 aws cloudwatch describe-alarms --alarm-names web-prod-cpu-high
 ```
@@ -519,6 +560,7 @@ aws cloudwatch describe-alarms --alarm-names web-prod-cpu-high
 ---
 
 ### Story EC2-031: Esc from alarm detail returns to filtered alarm list
+
 **Priority**: P1
 **Depends on**: EC2-030
 
@@ -531,6 +573,7 @@ aws cloudwatch describe-alarms --alarm-names web-prod-cpu-high
 ---
 
 ### Story EC2-032: Esc from filtered alarm list returns to EC2 detail
+
 **Priority**: P1
 **Depends on**: EC2-031
 
@@ -543,6 +586,7 @@ aws cloudwatch describe-alarms --alarm-names web-prod-cpu-high
 ---
 
 ### Story EC2-033: CloudFormation Stacks with count=0 -- Enter is a no-op
+
 **Priority**: P1
 **Depends on**: EC2-021
 
@@ -555,6 +599,7 @@ aws cloudwatch describe-alarms --alarm-names web-prod-cpu-high
 ---
 
 ### Story EC2-034: EBS Snapshots via multi-hop (count>1)
+
 **Priority**: P2
 **Depends on**: EC2-021
 
@@ -565,10 +610,12 @@ aws cloudwatch describe-alarms --alarm-names web-prod-cpu-high
 **And** each snapshot in the list shows: Name, Snapshot ID, State, Volume ID, Size (GiB), Encrypted, Description, Started, Progress
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-instances --instance-ids i-0a1b2c3d4e5f60001 --query 'Reservations[].Instances[].BlockDeviceMappings[].Ebs.VolumeId'
 aws ec2 describe-snapshots --filters Name=volume-id,Values=vol-xxx,vol-yyy
 ```
+
 Multi-hop: instance -> volume IDs -> snapshots of those volumes.
 
 ---
@@ -576,6 +623,7 @@ Multi-hop: instance -> volume IDs -> snapshots of those volumes.
 ## Section 6 -- Full Navigation Chain (Back and Forth)
 
 ### Story EC2-035: Chain A -- EC2 to VPC detail and back
+
 **Priority**: P1
 **Depends on**: EC2-009
 
@@ -605,6 +653,7 @@ Multi-hop: instance -> volume IDs -> snapshots of those volumes.
 ---
 
 ### Story EC2-036: Chain B -- EC2 to Subnet detail and back
+
 **Priority**: P1
 **Depends on**: EC2-010
 
@@ -627,6 +676,7 @@ Multi-hop: instance -> volume IDs -> snapshots of those volumes.
 ---
 
 ### Story EC2-037: Chain C -- EC2 to SecurityGroup detail and back
+
 **Priority**: P1
 **Depends on**: EC2-011
 
@@ -648,6 +698,7 @@ Multi-hop: instance -> volume IDs -> snapshots of those volumes.
 ---
 
 ### Story EC2-038: Chain D -- EC2 to right-col TG (count=1) and back
+
 **Priority**: P1
 **Depends on**: EC2-025, EC2-026
 
@@ -678,6 +729,7 @@ Multi-hop: instance -> volume IDs -> snapshots of those volumes.
 ---
 
 ### Story EC2-039: Chain E -- EC2 to filtered alarm list to alarm detail and back
+
 **Priority**: P1
 **Depends on**: EC2-029, EC2-030, EC2-031, EC2-032
 
@@ -713,6 +765,7 @@ Multi-hop: instance -> volume IDs -> snapshots of those volumes.
 ---
 
 ### Story EC2-040: Chain F -- EC2 to VPC to Subnet (depth=4) and unwind
+
 **Priority**: P1
 **Depends on**: EC2-009
 
@@ -764,6 +817,7 @@ Multi-hop: instance -> volume IDs -> snapshots of those volumes.
 ---
 
 ### Story EC2-041: Chain G -- Mixed left-and-right navigation
+
 **Priority**: P1
 **Depends on**: EC2-011, EC2-021
 
@@ -793,6 +847,7 @@ Multi-hop: instance -> volume IDs -> snapshots of those volumes.
 - Cursor on first GroupId sub-field
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-security-groups --group-ids sg-0aaa111111111111a
 aws ec2 describe-instances --filters Name=instance.group-id,Values=sg-0aaa111111111111a
@@ -803,6 +858,7 @@ aws ec2 describe-instances --filters Name=instance.group-id,Values=sg-0aaa111111
 ## Section 7 -- Edge Cases
 
 ### Story EC2-042: Navigable field target not in demo fixtures
+
 **Priority**: P2
 **Depends on**: EC2-009
 
@@ -815,6 +871,7 @@ aws ec2 describe-instances --filters Name=instance.group-id,Values=sg-0aaa111111
 ---
 
 ### Story EC2-043: Right column all count=0
+
 **Priority**: P2
 **Depends on**: EC2-019
 
@@ -828,6 +885,7 @@ aws ec2 describe-instances --filters Name=instance.group-id,Values=sg-0aaa111111
 ---
 
 ### Story EC2-044: Terminal width below 60 -- too narrow for right column
+
 **Priority**: P2
 **Depends on**: none
 
@@ -842,6 +900,7 @@ aws ec2 describe-instances --filters Name=instance.group-id,Values=sg-0aaa111111
 ---
 
 ### Story EC2-045: Stacked layout at 80-99 columns
+
 **Priority**: P2
 **Depends on**: EC2-018
 
@@ -855,6 +914,7 @@ aws ec2 describe-instances --filters Name=instance.group-id,Values=sg-0aaa111111
 ---
 
 ### Story EC2-046: Depth indicator at depth 6+
+
 **Priority**: P2
 **Depends on**: EC2-040
 
@@ -869,6 +929,7 @@ aws ec2 describe-instances --filters Name=instance.group-id,Values=sg-0aaa111111
 ---
 
 ### Story EC2-047: Esc at depth 1 returns to resource list
+
 **Priority**: P1
 **Depends on**: EC2-001
 
@@ -881,6 +942,7 @@ aws ec2 describe-instances --filters Name=instance.group-id,Values=sg-0aaa111111
 ---
 
 ### Story EC2-048: Right column toggle state persists across navigation
+
 **Priority**: P2
 **Depends on**: EC2-023, EC2-009
 
@@ -898,6 +960,7 @@ aws ec2 describe-instances --filters Name=instance.group-id,Values=sg-0aaa111111
 ---
 
 ### Story EC2-049: Navigable fields work with right column hidden
+
 **Priority**: P1
 **Depends on**: EC2-023, EC2-009
 
@@ -910,6 +973,7 @@ aws ec2 describe-instances --filters Name=instance.group-id,Values=sg-0aaa111111
 ---
 
 ### Story EC2-050: Copy field value from left column
+
 **Priority**: P2
 **Depends on**: EC2-001
 
@@ -925,6 +989,7 @@ aws ec2 describe-instances --filters Name=instance.group-id,Values=sg-0aaa111111
 ---
 
 ### Story EC2-051: Copy from right column copies type name
+
 **Priority**: P2
 **Depends on**: EC2-021
 
@@ -936,6 +1001,7 @@ aws ec2 describe-instances --filters Name=instance.group-id,Values=sg-0aaa111111
 ---
 
 ### Story EC2-052: Ctrl+R refreshes EC2 detail and re-checks all related
+
 **Priority**: P2
 **Depends on**: EC2-020
 
@@ -947,14 +1013,17 @@ aws ec2 describe-instances --filters Name=instance.group-id,Values=sg-0aaa111111
 **And** rows progressively light up as new results arrive
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-instances --instance-ids i-0a1b2c3d4e5f60001
 ```
+
 Plus all reverse-relationship checks re-executed.
 
 ---
 
 ### Story EC2-053: EC2 demo fixtures have fully populated fields
+
 **Priority**: P1
 **Depends on**: none
 
@@ -977,6 +1046,7 @@ Plus all reverse-relationship checks re-executed.
 ---
 
 ### Story EC2-054: Cross-reference IDs resolve to existing fixtures
+
 **Priority**: P1
 **Depends on**: EC2-053
 
@@ -1001,6 +1071,7 @@ Plus all reverse-relationship checks re-executed.
 ---
 
 ### Story EC2-055: Help screen shows two-column key bindings
+
 **Priority**: P2
 **Depends on**: EC2-001
 
@@ -1016,6 +1087,7 @@ Plus all reverse-relationship checks re-executed.
 ---
 
 ### Story EC2-056: YAML view hides right column
+
 **Priority**: P2
 **Depends on**: EC2-018
 
@@ -1031,6 +1103,7 @@ Plus all reverse-relationship checks re-executed.
 ---
 
 ### Story EC2-057: Page up/down in left column
+
 **Priority**: P2
 **Depends on**: EC2-001
 
@@ -1045,6 +1118,7 @@ Plus all reverse-relationship checks re-executed.
 ---
 
 ### Story EC2-058: CloudTrail Events opens pre-filtered search
+
 **Priority**: P2
 **Depends on**: EC2-021
 
@@ -1053,6 +1127,7 @@ Plus all reverse-relationship checks re-executed.
 **Then** the CloudTrail search view opens pre-filtered for `i-0a1b2c3d4e5f60001`
 
 **AWS comparison:**
+
 ```
 aws cloudtrail lookup-events --lookup-attributes AttributeKey=ResourceName,AttributeValue=i-0a1b2c3d4e5f60001
 ```
@@ -1060,6 +1135,7 @@ aws cloudtrail lookup-events --lookup-attributes AttributeKey=ResourceName,Attri
 ---
 
 ### Story EC2-059: Session cache prevents re-checking on re-entry
+
 **Priority**: P2
 **Depends on**: EC2-020
 

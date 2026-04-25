@@ -19,7 +19,7 @@ Note on resource shape: a ct-events row is one CloudTrail **event** (a point-in-
 
 - **shortName**: `ct-events`
 - **Display name**: CloudTrail Events
-- **AWS API reference**: https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_LookupEvents.html
+- **AWS API reference**: <https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_LookupEvents.html>
 - **List API**: `LookupEvents`
 - **Describe API (if any)**: not used — all event data arrives on the list response. The richest fields (`errorCode`, `errorMessage`, `userIdentity`, `requestParameters`) are embedded as a JSON string in `Event.CloudTrailEvent` and must be parsed client-side.
 

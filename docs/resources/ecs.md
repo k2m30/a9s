@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `ecs`
 - **Display name**: ECS Clusters
-- **AWS API reference**: https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Cluster.html
+- **AWS API reference**: <https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Cluster.html>
 - **List API**: `ListClusters` (returns cluster ARN strings) followed by `DescribeClusters` for the batch (standard ECS list-then-describe pattern — the per-cluster `status`, `pendingTasksCount`, `runningTasksCount`, `registeredContainerInstancesCount` used by Wave 1 are on the `Cluster` describe shape, not the bare list).
 - **Describe API (if any)**: `DescribeClusters(include=STATISTICS)` — Wave 2 enrichment adds task/instance counts to already-loaded clusters.
 
@@ -180,7 +180,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - AWS Go SDK v2 — `pendingTasksCount`, `runningTasksCount`, `registeredContainerInstancesCount`, `ActiveServicesCount` on the describe shape — `AWS SDK Go v2 — ecs/types.Cluster § PendingTasksCount, RunningTasksCount, RegisteredContainerInstancesCount, ActiveServicesCount`.
 - AWS Go SDK v2 — execute-command config carries the KMS key and CloudWatch log group references — `AWS SDK Go v2 — ecs/types.ClusterConfiguration § ExecuteCommandConfiguration` and `ecs/types.ExecuteCommandConfiguration § KmsKeyId, LogConfiguration`.
 - AWS Go SDK v2 — capacity-provider ASG link is indirect, through `CapacityProviders[]` → `DescribeCapacityProviders` → `AutoScalingGroupProvider.AutoScalingGroupArn` — `AWS SDK Go v2 — ecs/types.Cluster § CapacityProviders`.
-- AWS API Reference (fallback) — `ListServices`/`ListTasks` support a `cluster` filter — `AWS API Reference: ListServices` and `ListTasks` (https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_ListServices.html, https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_ListTasks.html).
-- AWS API Reference (fallback) — container-instance EC2 linkage via `DescribeContainerInstances.Ec2InstanceId` — `AWS API Reference: DescribeContainerInstances` (https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_DescribeContainerInstances.html).
-- AWS API Reference (fallback) — CloudFormation stack tag `aws:cloudformation:stack-name` is injected on resources created by a stack — `AWS API Reference: AWS resource and property types reference` (https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-resource-tags.html).
-- AWS API Reference (fallback) — CloudWatch Alarm `Dimensions` shape — `AWS API Reference: Dimension` (https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_Dimension.html).
+- AWS API Reference (fallback) — `ListServices`/`ListTasks` support a `cluster` filter — `AWS API Reference: ListServices` and `ListTasks` (<https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_ListServices.html>, <https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_ListTasks.html>).
+- AWS API Reference (fallback) — container-instance EC2 linkage via `DescribeContainerInstances.Ec2InstanceId` — `AWS API Reference: DescribeContainerInstances` (<https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_DescribeContainerInstances.html>).
+- AWS API Reference (fallback) — CloudFormation stack tag `aws:cloudformation:stack-name` is injected on resources created by a stack — `AWS API Reference: AWS resource and property types reference` (<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-resource-tags.html>).
+- AWS API Reference (fallback) — CloudWatch Alarm `Dimensions` shape — `AWS API Reference: Dimension` (<https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_Dimension.html>).

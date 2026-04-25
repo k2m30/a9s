@@ -106,7 +106,7 @@ left edge of nested blocks to visually connect parent/child relationships.
 
 ### Arrays
 
-Array items use the standard YAML `- ` prefix (dash followed by a space).
+Array items use the standard YAML `-` prefix (dash followed by a space).
 Subsequent keys on the same item are indented to align with the first key.
 
 ```
@@ -209,6 +209,7 @@ Pressing `c` copies the entire YAML document to the system clipboard.
 2. Press `y`
 
 **Expected YAML output structure:**
+
 ```
 Name: my-data-bucket
 CreationDate: 2023-06-15T10:30:00Z
@@ -241,6 +242,7 @@ BucketRegion: us-east-1
 2. Press `y`
 
 **Expected YAML output structure (representative fields):**
+
 ```
 AmiLaunchIndex: 0
 Architecture: x86_64
@@ -288,7 +290,7 @@ SubnetId: subnet-0123456789abcde
 **Frame title:** `i-0abc123def456789a yaml`
 
 **Nesting verification:**
-- `BlockDeviceMappings` is an array; items use `- ` prefix
+- `BlockDeviceMappings` is an array; items use `-` prefix
 - `Ebs` is a nested object under each block device; indented 4 spaces from array item
 - `Placement` is a nested object; `AvailabilityZone` is indented 2 spaces under it
 - `State` is a nested object; `Code` and `Name` are indented 2 spaces under it
@@ -322,6 +324,7 @@ SubnetId: subnet-0123456789abcde
 2. Press `y`
 
 **Expected YAML output structure (representative fields):**
+
 ```
 DBInstanceIdentifier: mydb-prod
 DBInstanceClass: db.r5.large
@@ -392,6 +395,7 @@ DBSubnetGroup:
 2. Press `y`
 
 **Expected YAML output structure (representative fields):**
+
 ```
 CacheClusterId: redis-cluster-01
 Engine: redis
@@ -456,6 +460,7 @@ ARN: arn:aws:elasticache:us-east-1:123456789012:cluster:redis-cluster-01
 2. Press `y`
 
 **Expected YAML output structure (representative fields):**
+
 ```
 DBClusterIdentifier: docdb-prod-cluster
 Engine: docdb
@@ -496,7 +501,7 @@ AvailabilityZones:
 **Nesting verification:**
 - `DBClusterMembers` is an array of objects with nested fields
 - `VpcSecurityGroups` is an array of objects
-- `AvailabilityZones` is a simple array of strings (each prefixed with `- `)
+- `AvailabilityZones` is a simple array of strings (each prefixed with `-`)
 - `AssociatedRoles` is an empty array rendered as `[]`
 
 **Edge cases:**
@@ -518,6 +523,7 @@ AvailabilityZones:
 2. Press `y`
 
 **Expected YAML output structure (representative fields):**
+
 ```
 Name: my-eks-cluster
 Version: "1.28"
@@ -598,6 +604,7 @@ CreatedAt: 2024-01-10T08:00:00Z
 2. Press `y`
 
 **Expected YAML output structure (representative fields):**
+
 ```
 Name: prod/api/database-password
 Description: Production database credentials

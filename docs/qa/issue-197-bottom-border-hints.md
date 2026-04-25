@@ -63,11 +63,13 @@ No direct CLI equivalent. This is a navigation aid for the resource type selecti
 | C.1.3 | I open the EKS Clusters list. | The bottom border shows: `└──y YAML──ctrl+r Refresh──...──┘`. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-instances
 aws ec2 describe-vpcs
 aws eks list-clusters
 ```
+
 Expected hints visible: `y YAML`, `ctrl+r Refresh`
 
 ### C.2 Resource List With Enter-Child Override
@@ -80,12 +82,14 @@ Expected hints visible: `y YAML`, `ctrl+r Refresh`
 | C.2.4 | I open the SNS Topics list. | The bottom border shows `enter Subscriptions` and `d Detail` among the hints, reflecting the enter-child override for SNS subscriptions. |
 
 **AWS comparison:**
+
 ```
 aws s3api list-buckets
 aws elbv2 describe-load-balancers
 aws rds describe-db-instances
 aws sns list-topics
 ```
+
 Expected hints visible: `enter {ChildName}`, `d Detail`, `y YAML`, `ctrl+r Refresh`
 
 ### C.3 Resource List With Additional Child Keys
@@ -97,11 +101,13 @@ Expected hints visible: `enter {ChildName}`, `d Detail`, `y YAML`, `ctrl+r Refre
 | C.3.3 | I open the CodeBuild Projects list. | The bottom border includes `enter Builds` plus any additional child keys (e.g., `L Logs`) defined for this resource type. |
 
 **AWS comparison:**
+
 ```
 aws ecs list-services --cluster <cluster>
 aws cloudformation list-stacks
 aws codebuild list-projects
 ```
+
 Expected hints visible: `enter {ChildName}`, `d Detail`, `y YAML`, `{childKey} {childLabel}`, `ctrl+r Refresh`
 
 ### C.4 Resource List With Reveal (Secrets)
@@ -112,10 +118,12 @@ Expected hints visible: `enter {ChildName}`, `d Detail`, `y YAML`, `{childKey} {
 | C.4.2 | I open the SSM Parameters list. | The bottom border shows: `└──x Reveal──y YAML──ctrl+r Refresh──...──┘`. Same pattern as Secrets Manager. |
 
 **AWS comparison:**
+
 ```
 aws secretsmanager list-secrets
 aws ssm describe-parameters
 ```
+
 Expected hints visible: `x Reveal`, `y YAML`, `ctrl+r Refresh`
 
 ### C.5 Child/Related List (escPops=true)
@@ -129,11 +137,13 @@ Expected hints visible: `x Reveal`, `y YAML`, `ctrl+r Refresh`
 | C.5.5 | I navigate into R53 Records from a Hosted Zone. | The bottom border starts with `esc Back`. |
 
 **AWS comparison:**
+
 ```
 aws s3api list-objects-v2 --bucket <bucket>
 aws ecs list-tasks --service <service> --cluster <cluster>
 aws cloudformation describe-stack-events --stack-name <stack>
 ```
+
 Expected hints visible: `esc Back`, then view-appropriate hints
 
 ### C.6 Resource List With Pagination
@@ -145,9 +155,11 @@ Expected hints visible: `esc Back`, then view-appropriate hints
 | C.6.3 | I open a resource list where all results fit in one page. | The `m More` hint does not appear in the bottom border. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-instances --max-items 50
 ```
+
 Expected additional hint when paginated: `m More`
 
 ---
@@ -162,9 +174,11 @@ Expected additional hint when paginated: `m More`
 | D.1.2 | I scroll down through the detail fields with `j`. | The hints remain `y YAML`, `ctrl+r Refresh`, `w Wrap` as long as the cursor is on non-navigable fields. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-vpcs --vpc-ids <vpc-id>
 ```
+
 Expected hints visible: `y YAML`, `ctrl+r Refresh`, `w Wrap`
 
 ### D.2 Navigable Field
@@ -178,9 +192,11 @@ Expected hints visible: `y YAML`, `ctrl+r Refresh`, `w Wrap`
 | D.2.5 | I navigate the cursor to a `SecurityGroups` field entry. | The bottom border shows `enter Security Group` (or appropriate display name) as the first hint. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-instances --instance-ids <id> --query 'Reservations[].Instances[].{VpcId:VpcId,SubnetId:SubnetId}'
 ```
+
 Expected hints visible (navigable): `enter {TargetType}`, `y YAML`, `ctrl+r Refresh`, `w Wrap`
 
 ### D.3 Detail With Related Resources
@@ -193,9 +209,11 @@ Expected hints visible (navigable): `enter {TargetType}`, `y YAML`, `ctrl+r Refr
 | D.3.4 | I am on a plain field with the related panel open. | The bottom border shows: `y YAML`, `r Related`, `tab Cols`, `ctrl+r Refresh`, `w Wrap`. No `enter` hint. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-instances --instance-ids <id>
 ```
+
 Expected hints visible (has related, panel open): `y YAML`, `r Related`, `tab Cols`, `ctrl+r Refresh`, `w Wrap`
 
 ### D.4 Right Column Focused
@@ -208,9 +226,11 @@ Expected hints visible (has related, panel open): `y YAML`, `r Related`, `tab Co
 | D.4.4 | I press `tab` again to return focus to the left (fields) column. | The bottom border reverts to the left-column hint set (with `tab Cols` instead of `tab Fields`). |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-instances --instance-ids <id>
 ```
+
 Expected hints visible (right col focused, selection): `enter {SelectedType}`, `tab Fields`, `y YAML`, `ctrl+r Refresh`
 
 ---
@@ -227,9 +247,11 @@ Expected hints visible (right col focused, selection): `enter {SelectedType}`, `
 | E.1.4 | I press `c` to copy the YAML content. | The header shows a "Copied!" flash message. The bottom border hints remain unchanged. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-instances --instance-ids <id> --output yaml
 ```
+
 Expected hints visible: `w Wrap`, `c Copy`
 
 ---

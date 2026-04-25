@@ -5,35 +5,49 @@ import (
 	"strings"
 
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
+	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // checkDbcSnapDBC reads DBClusterIdentifier from the DBClusterSnapshot RawStruct.
+// Handles both docdbtypes.DBClusterSnapshot and rdstypes.DBClusterSnapshot shapes.
 // Pattern F — no cache needed.
 func checkDbcSnapDBC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](res.RawStruct)
-	if !ok {
-		return resource.RelatedCheckResult{TargetType: "dbc", Count: -1}
+	if snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](res.RawStruct); ok {
+		if snap.DBClusterIdentifier == nil || *snap.DBClusterIdentifier == "" {
+			return resource.RelatedCheckResult{TargetType: "dbc", Count: 0}
+		}
+		return relatedResult("dbc", []string{*snap.DBClusterIdentifier})
 	}
-	if snap.DBClusterIdentifier == nil || *snap.DBClusterIdentifier == "" {
-		return resource.RelatedCheckResult{TargetType: "dbc", Count: 0}
+	if snap, ok := assertStruct[rdstypes.DBClusterSnapshot](res.RawStruct); ok {
+		if snap.DBClusterIdentifier == nil || *snap.DBClusterIdentifier == "" {
+			return resource.RelatedCheckResult{TargetType: "dbc", Count: 0}
+		}
+		return relatedResult("dbc", []string{*snap.DBClusterIdentifier})
 	}
-	return relatedResult("dbc", []string{*snap.DBClusterIdentifier})
+	return resource.RelatedCheckResult{TargetType: "dbc", Count: -1}
 }
 
 // checkDbcSnapKMS reads KmsKeyId from the DBClusterSnapshot RawStruct.
 // Extracts UUID after last '/' from the ARN.
+// Handles both docdbtypes.DBClusterSnapshot and rdstypes.DBClusterSnapshot shapes.
 // Pattern F — no cache needed.
 func checkDbcSnapKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](res.RawStruct)
-	if !ok {
+	var keyID string
+	if snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](res.RawStruct); ok {
+		if snap.KmsKeyId == nil || *snap.KmsKeyId == "" {
+			return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		}
+		keyID = *snap.KmsKeyId
+	} else if snap, ok := assertStruct[rdstypes.DBClusterSnapshot](res.RawStruct); ok {
+		if snap.KmsKeyId == nil || *snap.KmsKeyId == "" {
+			return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
+		}
+		keyID = *snap.KmsKeyId
+	} else {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
 	}
-	if snap.KmsKeyId == nil || *snap.KmsKeyId == "" {
-		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
-	}
-	keyID := *snap.KmsKeyId
 	if idx := strings.LastIndex(keyID, "/"); idx >= 0 {
 		keyID = keyID[idx+1:]
 	}
@@ -43,12 +57,22 @@ func checkDbcSnapKMS(_ context.Context, _ any, res resource.Resource, _ resource
 	return relatedResult("kms", []string{keyID})
 }
 
+// checkDbcSnapVPC reads VpcId from the DBClusterSnapshot RawStruct.
+// Handles both docdbtypes.DBClusterSnapshot and rdstypes.DBClusterSnapshot shapes.
 func checkDbcSnapVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](res.RawStruct)
-	if !ok || snap.VpcId == nil || *snap.VpcId == "" {
-		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+	if snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](res.RawStruct); ok {
+		if snap.VpcId == nil || *snap.VpcId == "" {
+			return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		}
+		return relatedResult("vpc", []string{*snap.VpcId})
 	}
-	return relatedResult("vpc", []string{*snap.VpcId})
+	if snap, ok := assertStruct[rdstypes.DBClusterSnapshot](res.RawStruct); ok {
+		if snap.VpcId == nil || *snap.VpcId == "" {
+			return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
+		}
+		return relatedResult("vpc", []string{*snap.VpcId})
+	}
+	return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
 }
 
 // checkDbcSnapBackup resolves AWS Backup PLANS that cover this DocumentDB or
@@ -77,8 +101,8 @@ func checkDbcSnapBackup(ctx context.Context, clients any, res resource.Resource,
 	}
 
 	// If the snapshot's RawStruct already exposes the parent cluster ARN we
-	// can skip the dbc-cache lookup. Fall back to scanning the dbc cache
-	// otherwise (some shapes only carry DBClusterIdentifier).
+	// can skip the dbc-cache lookup. rdstypes.DBClusterSnapshot carries
+	// DBClusterArn directly; docdbtypes does not.
 	if parentARN == "" {
 		dbcList, dbcTruncated, err := dbcRelatedResources(ctx, clients, cache, "dbc")
 		if err != nil {
@@ -126,25 +150,33 @@ func checkDbcSnapBackup(ctx context.Context, clients any, res resource.Resource,
 }
 
 // dbcSnapParentRefs extracts (parentClusterName, parentClusterARN) from a
-// docdbtypes.DBClusterSnapshot. ARN is always "" — the DocDB SDK shape does
-// not carry the parent cluster ARN on the snapshot; callers fall back to a
-// dbc-cache lookup.
+// DBClusterSnapshot. Neither docdbtypes.DBClusterSnapshot nor
+// rdstypes.DBClusterSnapshot carries the parent cluster ARN on the snapshot
+// shape — callers fall back to a dbc-cache lookup in both cases.
 func dbcSnapParentRefs(raw any) (name, arn string) {
-	snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](raw)
-	if !ok {
-		return "", ""
+	if snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](raw); ok {
+		if snap.DBClusterIdentifier != nil {
+			name = *snap.DBClusterIdentifier
+		}
+		return name, ""
 	}
-	if snap.DBClusterIdentifier != nil {
-		name = *snap.DBClusterIdentifier
+	if snap, ok := assertStruct[rdstypes.DBClusterSnapshot](raw); ok {
+		if snap.DBClusterIdentifier != nil {
+			name = *snap.DBClusterIdentifier
+		}
+		return name, ""
 	}
-	return name, ""
+	return "", ""
 }
 
-// dbcResourceARN extracts DBClusterArn from a dbc Resource's docdbtypes.DBCluster RawStruct.
+// dbcResourceARN extracts DBClusterArn from a dbc Resource's RawStruct.
+// Handles both docdb_types.DBCluster and rdstypes.DBCluster shapes.
 func dbcResourceARN(raw any) string {
-	c, ok := assertStruct[docdbtypes.DBCluster](raw)
-	if !ok || c.DBClusterArn == nil {
-		return ""
+	if c, ok := assertStruct[docdbtypes.DBCluster](raw); ok && c.DBClusterArn != nil {
+		return *c.DBClusterArn
 	}
-	return *c.DBClusterArn
+	if c, ok := assertStruct[rdstypes.DBCluster](raw); ok && c.DBClusterArn != nil {
+		return *c.DBClusterArn
+	}
+	return ""
 }

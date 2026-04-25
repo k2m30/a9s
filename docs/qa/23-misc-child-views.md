@@ -26,6 +26,7 @@ AWS CLI equivalents are cited so testers can verify data parity.
 | A.1.4 | The API responds with an error (e.g., TopicNotFound, no permissions). | The spinner disappears. A red error flash message appears in the header right side (e.g., "Error: topic not found"). |
 
 **AWS comparison:**
+
 ```
 aws sns list-subscriptions-by-topic --topic-arn arn:aws:sns:us-east-1:123456789012:critical-alerts-prod
 ```
@@ -47,9 +48,11 @@ aws sns list-subscriptions-by-topic --topic-arn arn:aws:sns:us-east-1:1234567890
 | A.3.4 | The terminal is narrower than the combined column widths (10+48+18+14 = 90 plus borders). | The rightmost column(s) are hidden (not truncated mid-value). Horizontal scroll with h/l is available to reveal hidden columns. |
 
 **AWS comparison:**
+
 ```
 aws sns list-subscriptions-by-topic --topic-arn arn:aws:sns:us-east-1:123456789012:critical-alerts-prod --query 'Subscriptions[].{Protocol:Protocol,Endpoint:Endpoint,SubscriptionArn:SubscriptionArn,Owner:Owner}'
 ```
+
 Expected fields visible: Protocol, Endpoint, Status (derived from SubscriptionArn), Owner
 
 ### A.4 Frame Title
@@ -73,14 +76,15 @@ Expected fields visible: Protocol, Endpoint, Status (derived from SubscriptionAr
 
 | ID | Story | Expected |
 |----|-------|----------|
-| A.6.1 | The topic has an email subscription. | The Protocol column shows "email" and the Endpoint column shows the email address (e.g., "oncall-team@company.com"). |
-| A.6.2 | The topic has an HTTPS subscription. | The Protocol column shows "https" and the Endpoint column shows the full URL (e.g., "https://hooks.slack.com/services/T01/B02/xyz"). |
+| A.6.1 | The topic has an email subscription. | The Protocol column shows "email" and the Endpoint column shows the email address (e.g., "<oncall-team@company.com>"). |
+| A.6.2 | The topic has an HTTPS subscription. | The Protocol column shows "https" and the Endpoint column shows the full URL (e.g., "<https://hooks.slack.com/services/T01/B02/xyz>"). |
 | A.6.3 | The topic has a Lambda subscription. | The Protocol column shows "lambda" and the Endpoint column shows the Lambda function ARN (e.g., "arn:aws:lambda:us-east-1:123456:function:alert-handler"). |
 | A.6.4 | The topic has an SQS subscription. | The Protocol column shows "sqs" and the Endpoint column shows the SQS queue ARN. |
 | A.6.5 | The topic has an SMS subscription. | The Protocol column shows "sms" and the Endpoint column shows the phone number. |
 | A.6.6 | AWS returns a partially obscured email endpoint (e.g., "***@example.com"). | The Endpoint column displays the obscured value exactly as returned by AWS. This is an AWS-side security behavior, not something a9s controls. |
 
 **AWS comparison:**
+
 ```
 aws sns list-subscriptions-by-topic --topic-arn arn:aws:sns:us-east-1:123456789012:mixed-protocol-topic
 ```
@@ -175,6 +179,7 @@ aws sns list-subscriptions-by-topic --topic-arn arn:aws:sns:us-east-1:1234567890
 | B.1.3 | The API responds with an error (e.g., ResourceNotFoundException). | The spinner disappears. A red error flash message appears in the header right side. |
 
 **AWS comparison:**
+
 ```
 aws events list-targets-by-rule --rule daily-etl-trigger
 ```
@@ -196,9 +201,11 @@ aws events list-targets-by-rule --rule daily-etl-trigger
 | B.3.4 | The terminal is narrower than the combined column widths (20+48+28+36 = 132 plus borders). | The rightmost column(s) are hidden. Horizontal scroll with h/l is available. |
 
 **AWS comparison:**
+
 ```
 aws events list-targets-by-rule --rule daily-etl-trigger --query 'Targets[].{Id:Id,Arn:Arn}'
 ```
+
 Expected fields visible: Target ID, Target ARN, Resource (computed), Input (computed)
 
 ### B.4 Frame Title
@@ -309,6 +316,7 @@ Expected fields visible: Target ID, Target ARN, Resource (computed), Input (comp
 | C.1.3 | The API responds with an error (e.g., EntityNotFoundException, no permissions). | The spinner disappears. A red error flash message appears in the header right side. |
 
 **AWS comparison:**
+
 ```
 aws glue get-job-runs --job-name nightly-etl-transform
 ```
@@ -330,9 +338,11 @@ aws glue get-job-runs --job-name nightly-etl-transform
 | C.3.4 | The terminal is narrower than the combined column widths (12+12+22+14+44+10 = 114 plus borders). | The rightmost columns are hidden. Horizontal scroll with h/l reveals the Error Message and DPU Hours columns. |
 
 **AWS comparison:**
+
 ```
 aws glue get-job-runs --job-name nightly-etl-transform --query 'JobRuns[].{Id:Id,JobRunState:JobRunState,StartedOn:StartedOn,ExecutionTime:ExecutionTime,ErrorMessage:ErrorMessage,DPUSeconds:DPUSeconds}'
 ```
+
 Expected fields visible: Run ID (truncated Id), State, Started, Execution Time (human), Error Message, DPU Hours (computed)
 
 ### C.4 Frame Title
@@ -470,6 +480,7 @@ Expected fields visible: Run ID (truncated Id), State, Started, Execution Time (
 | D.1.3 | The API responds with an error (e.g., NoSuchEntity, access denied). | The spinner disappears. A red error flash message appears in the header right side. |
 
 **AWS comparison:**
+
 ```
 aws iam get-group --group-name Admins --query 'Users[].{UserName:UserName,UserId:UserId,CreateDate:CreateDate,PasswordLastUsed:PasswordLastUsed}'
 ```
@@ -491,9 +502,11 @@ aws iam get-group --group-name Admins --query 'Users[].{UserName:UserName,UserId
 | D.3.4 | The terminal is narrower than the combined column widths (28+24+22+22 = 96 plus borders). | The rightmost column(s) are hidden. Horizontal scroll with h/l reveals the "Password Last Used" column. |
 
 **AWS comparison:**
+
 ```
 aws iam get-group --group-name Admins
 ```
+
 Expected fields visible: User Name, User ID, Created, Password Last Used
 
 ### D.4 Frame Title
@@ -610,6 +623,7 @@ This section covers the Level 2 child view: pressing Enter on a Listener row to 
 | E.1.4 | The API responds with an error (e.g., ListenerNotFound, access denied). | The spinner disappears. A red error flash message appears in the header right side. |
 
 **AWS comparison:**
+
 ```
 aws elbv2 describe-rules --listener-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/api-prod-alb/abc123/def456
 ```
@@ -631,9 +645,11 @@ aws elbv2 describe-rules --listener-arn arn:aws:elasticloadbalancing:us-east-1:1
 | E.3.4 | The terminal is narrower than the combined column widths (10+36+16+32 = 94 plus borders). | The rightmost column(s) are hidden. Horizontal scroll with h/l is available. |
 
 **AWS comparison:**
+
 ```
 aws elbv2 describe-rules --listener-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/api-prod-alb/abc123/def456 --query 'Rules[].{Priority:Priority,Conditions:Conditions,Actions:Actions,IsDefault:IsDefault}'
 ```
+
 Expected fields visible: Priority, Conditions (computed summary), Action (computed type), Target (computed target)
 
 ### E.4 Frame Title

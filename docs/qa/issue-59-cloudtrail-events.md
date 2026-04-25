@@ -42,9 +42,11 @@ AWS CLI equivalents are cited so testers can verify data parity.
 | B.1.4 | The API responds with an error (e.g., no credentials, AccessDenied, network timeout). | The spinner disappears. A red error flash message appears in the header right side (e.g., "Error: AccessDeniedException"). The frame content area shows an appropriate empty or error state. |
 
 **AWS comparison:**
+
 ```
 aws cloudtrail lookup-events --max-results 50
 ```
+
 Expected fields visible: Time, Event Name, User, Source, Resource Type, Resource Name, Read Only
 
 ### B.2 Empty State
@@ -65,9 +67,11 @@ Expected fields visible: Time, Event Name, User, Source, Resource Type, Resource
 | B.3.5 | The terminal is narrower than the combined column widths. | The rightmost column(s) are hidden (not truncated mid-value). Horizontal scroll with h/l is available to reveal hidden columns. |
 
 **AWS comparison:**
+
 ```
 aws cloudtrail lookup-events --query 'Events[].[EventTime,EventName,Username,EventSource,Resources[0].ResourceType,Resources[0].ResourceName,ReadOnly]' --output table
 ```
+
 Expected fields visible: Time, Event Name, User, Source, Resource Type, Resource Name, Read Only
 
 ### B.4 Frame Title
@@ -178,6 +182,7 @@ Expected fields visible: Time, Event Name, User, Source, Resource Type, Resource
 | C.1.3 | I verify the time window against AWS CLI. | `aws cloudtrail lookup-events --start-time $(date -u -v-1H +%Y-%m-%dT%H:%M:%SZ)` returns the same events as displayed in the list. |
 
 **AWS comparison:**
+
 ```
 aws cloudtrail lookup-events --start-time $(date -u -v-1H +%Y-%m-%dT%H:%M:%SZ) --max-results 50
 ```
@@ -191,6 +196,7 @@ aws cloudtrail lookup-events --start-time $(date -u -v-1H +%Y-%m-%dT%H:%M:%SZ) -
 | C.2.3 | I configure `logs.time_range: 7d`. | Events from the last 7 days are displayed. This may produce a large number of events subject to max_events limits. |
 
 **AWS comparison:**
+
 ```
 aws cloudtrail lookup-events --start-time $(date -u -v-6H +%Y-%m-%dT%H:%M:%SZ)
 ```
@@ -213,9 +219,11 @@ aws cloudtrail lookup-events --start-time $(date -u -v-6H +%Y-%m-%dT%H:%M:%SZ)
 | D.1.8 | I press Escape in the detail view. | I return to the CloudTrail Event History list. The cursor position is preserved. |
 
 **AWS comparison:**
+
 ```
 aws cloudtrail lookup-events --query 'Events[0]' --output json
 ```
+
 Expected fields visible: EventId, EventTime, EventName, EventSource, Username, ReadOnly, Resources
 
 ### D.2 YAML View (y key) -- Full CloudTrail Event JSON
@@ -230,6 +238,7 @@ Expected fields visible: EventId, EventTime, EventName, EventSource, Username, R
 | D.2.6 | I press Escape in the YAML view. | I return to the CloudTrail Event History list. |
 
 **AWS comparison:**
+
 ```
 aws cloudtrail lookup-events --query 'Events[0].CloudTrailEvent' --output text | python3 -m json.tool
 ```
@@ -247,6 +256,7 @@ aws cloudtrail lookup-events --query 'Events[0].CloudTrailEvent' --output text |
 | E.1.3 | I have `logs.max_events: 500` configured. I am viewing a busy account with thousands of events. | At most 500 events are loaded. When scrolling to the bottom after reaching the limit, a dim hint reads: "Showing 500 most recent -- more available". |
 
 **AWS comparison:**
+
 ```
 aws cloudtrail lookup-events --max-results 50
 # Note: max-results per page is 50. Multiple pages via NextToken.
@@ -277,7 +287,7 @@ aws cloudtrail lookup-events --max-results 50
 
 | ID | Story | Expected |
 |----|-------|----------|
-| F.2.1 | An event was performed by a human user via console. | The "User" column shows the IAM username (e.g., "admin@company.com"). |
+| F.2.1 | An event was performed by a human user via console. | The "User" column shows the IAM username (e.g., "<admin@company.com>"). |
 | F.2.2 | An event was performed by an assumed role. | The "User" column shows the role session name or a recognizable identifier. |
 | F.2.3 | An event was performed by an AWS service. | The "User" column shows the service identifier (e.g., "autoscaling.amazonaws.com", "elasticloadbalancing.amazonaws.com"). |
 | F.2.4 | An event has no Username (null). | The "User" column shows a dash "-" or is empty. No crash. |

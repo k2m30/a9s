@@ -109,6 +109,7 @@ network events, by a distinct `eventType` value.
   data stores).
 - **Shape difference.** Instead of `requestParameters`/`responseElements`,
   the meaningful payload lives in `insightDetails`:
+
   ```json
   "insightDetails": {
       "state": "Start",                       // "Start" or "End"
@@ -125,6 +126,7 @@ network events, by a distinct `eventType` value.
       }
   }
   ```
+
   Each Insight is delivered as a `Start` event and a matching `End` event.
 - **`resources[]`.** Not meaningful (the event is statistical).
 - **Volume.** Very low — by design only outliers.
@@ -231,6 +233,7 @@ access key (so most types can carry it).
 - Absent: `sessionContext`.
 - Render: `userName` (fall back to `arn`).
 - Example:
+
   ```json
   "userIdentity": {
       "type": "IAMUser",
@@ -268,6 +271,7 @@ access key (so most types can carry it).
   user identifier. That's how you distinguish "human via SSO" from
   "service via role".
 - Example:
+
   ```json
   "userIdentity": {
       "type": "AssumedRole",
@@ -290,6 +294,7 @@ access key (so most types can carry it).
       }
   }
   ```
+
 - Render: prefer `sessionContext.sessionIssuer.userName / <sessionName>`.
   When `AWSReservedSSO_*`, render as `sso:<sessionName>` and surface the
   permission set.
@@ -341,6 +346,7 @@ access key (so most types can carry it).
 - Absent: `sessionContext`, `sessionIssuer`.
 - Only on the `AssumeRoleWithWebIdentity` call itself.
 - Example:
+
   ```json
   "userIdentity": {
       "type": "WebIdentityUser",
@@ -363,6 +369,7 @@ access key (so most types can carry it).
   `AssumedRole` with an `AWSReservedSSO_*` issuer — see §4.3.
 - Render: `idc:<onBehalfOf.userId>`.
 - Example:
+
   ```json
   "userIdentity": {
       "type": "IdentityCenterUser",

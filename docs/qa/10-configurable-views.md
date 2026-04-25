@@ -13,6 +13,7 @@ All stories in this section use the real views.yaml shipped with the project.
 ### A1. S3 Buckets -- List View
 
 **Given:** this views.yaml s3 list config:
+
 ```yaml
 s3:
   list:
@@ -23,6 +24,7 @@ s3:
       path: CreationDate
       width: 22
 ```
+
 **When:** user navigates to the S3 resource list
 **Then:**
 - Column headers appear in order: "Bucket Name", "Creation Date"
@@ -40,6 +42,7 @@ s3:
 ### A2. S3 Buckets -- Detail View
 
 **Given:** this views.yaml s3 detail config:
+
 ```yaml
 s3:
   detail:
@@ -47,6 +50,7 @@ s3:
     - BucketRegion
     - CreationDate
 ```
+
 **When:** user selects an S3 bucket and presses `d` for the detail view
 **Then:**
 - Detail view shows exactly 3 fields in this order: BucketArn, BucketRegion, CreationDate
@@ -60,6 +64,7 @@ s3:
 ### A3. S3 Objects -- List View
 
 **Given:** this views.yaml s3_objects list config:
+
 ```yaml
 s3_objects:
   list:
@@ -73,6 +78,7 @@ s3_objects:
       path: LastModified
       width: 22
 ```
+
 **When:** user navigates into an S3 bucket to view its objects
 **Then:**
 - Column headers appear in order: "Key", "Size", "Last Modified"
@@ -93,6 +99,7 @@ s3_objects:
 ### A4. S3 Objects -- Detail View
 
 **Given:** this views.yaml s3_objects detail config:
+
 ```yaml
 s3_objects:
   detail:
@@ -100,6 +107,7 @@ s3_objects:
     - LastModified
     - Owner
 ```
+
 **When:** user selects an S3 object and presses `d` for the detail view
 **Then:**
 - Detail view shows exactly 3 fields in this order: Name, LastModified, Owner
@@ -111,6 +119,7 @@ s3_objects:
 ### A5. EC2 Instances -- List View
 
 **Given:** this views.yaml ec2 list config:
+
 ```yaml
 ec2:
   list:
@@ -133,6 +142,7 @@ ec2:
       path: LaunchTime
       width: 22
 ```
+
 **When:** user navigates to EC2 resource list
 **Then:**
 - Column headers appear in order: "Instance ID", "State", "Type", "Private IP", "Public IP", "Launch Time"
@@ -158,6 +168,7 @@ ec2:
 ### A6. EC2 Instances -- Detail View
 
 **Given:** this views.yaml ec2 detail config:
+
 ```yaml
 ec2:
   detail:
@@ -175,6 +186,7 @@ ec2:
     - Platform
     - Tags
 ```
+
 **When:** user selects an EC2 instance and presses `d`
 **Then:**
 - Detail view shows exactly 13 fields in this order: InstanceId, State, InstanceType, ImageId, VpcId, SubnetId, PrivateIpAddress, PublicIpAddress, SecurityGroups, LaunchTime, Architecture, Platform, Tags
@@ -191,6 +203,7 @@ ec2:
 ### A7. RDS Instances -- List View
 
 **Given:** this views.yaml rds list config:
+
 ```yaml
 rds:
   list:
@@ -216,6 +229,7 @@ rds:
       path: MultiAZ
       width: 10
 ```
+
 **When:** user navigates to RDS resource list
 **Then:**
 - Column headers appear in order: "DB Identifier", "Engine", "Version", "Status", "Class", "Endpoint", "Multi-AZ"
@@ -248,6 +262,7 @@ rds:
 ### A8. RDS Instances -- Detail View
 
 **Given:** this views.yaml rds detail config:
+
 ```yaml
 rds:
   detail:
@@ -262,6 +277,7 @@ rds:
     - StorageType
     - AvailabilityZone
 ```
+
 **When:** user selects an RDS instance and presses `d`
 **Then:**
 - Detail view shows exactly 10 fields in this order: DBInstanceIdentifier, Engine, EngineVersion, DBInstanceStatus, DBInstanceClass, Endpoint, MultiAZ, AllocatedStorage, StorageType, AvailabilityZone
@@ -276,6 +292,7 @@ rds:
 ### A9. Redis (ElastiCache) -- List View
 
 **Given:** this views.yaml redis list config:
+
 ```yaml
 redis:
   list:
@@ -298,6 +315,7 @@ redis:
       path: ConfigurationEndpoint.Address
       width: 40
 ```
+
 **When:** user navigates to Redis resource list
 **Then:**
 - Column headers appear in order: "Cluster ID", "Version", "Node Type", "Status", "Nodes", "Endpoint"
@@ -327,6 +345,7 @@ redis:
 ### A10. Redis (ElastiCache) -- Detail View
 
 **Given:** this views.yaml redis detail config:
+
 ```yaml
 redis:
   detail:
@@ -339,6 +358,7 @@ redis:
     - ConfigurationEndpoint
     - PreferredAvailabilityZone
 ```
+
 **When:** user selects a Redis cluster and presses `d`
 **Then:**
 - Detail view shows exactly 8 fields in this order: CacheClusterId, Engine, EngineVersion, CacheClusterStatus, CacheNodeType, NumCacheNodes, ConfigurationEndpoint, PreferredAvailabilityZone
@@ -351,6 +371,7 @@ redis:
 ### A11. DocumentDB -- List View
 
 **Given:** this views.yaml docdb list config:
+
 ```yaml
 docdb:
   list:
@@ -370,6 +391,7 @@ docdb:
       path: Endpoint
       width: 48
 ```
+
 **When:** user navigates to DocumentDB resource list
 **Then:**
 - Column headers appear in order: "Cluster ID", "Version", "Status", "Instances", "Endpoint"
@@ -396,6 +418,7 @@ docdb:
 ### A12. DocumentDB -- Detail View
 
 **Given:** this views.yaml docdb detail config:
+
 ```yaml
 docdb:
   detail:
@@ -409,6 +432,7 @@ docdb:
     - StorageEncrypted
     - DBClusterMembers
 ```
+
 **When:** user selects a DocumentDB cluster and presses `d`
 **Then:**
 - Detail view shows exactly 9 fields in this order: DBClusterIdentifier, Engine, EngineVersion, Status, Endpoint, ReaderEndpoint, Port, StorageEncrypted, DBClusterMembers
@@ -422,6 +446,7 @@ docdb:
 ### A13. EKS Clusters -- List View
 
 **Given:** this views.yaml eks list config:
+
 ```yaml
 eks:
   list:
@@ -441,6 +466,7 @@ eks:
       path: PlatformVersion
       width: 18
 ```
+
 **When:** user navigates to EKS resource list
 **Then:**
 - Column headers appear in order: "Cluster Name", "Version", "Status", "Endpoint", "Platform Version"
@@ -467,6 +493,7 @@ eks:
 ### A14. EKS Clusters -- Detail View
 
 **Given:** this views.yaml eks detail config:
+
 ```yaml
 eks:
   detail:
@@ -479,6 +506,7 @@ eks:
     - RoleArn
     - KubernetesNetworkConfig
 ```
+
 **When:** user selects an EKS cluster and presses `d`
 **Then:**
 - Detail view shows exactly 8 fields in this order: Name, Version, Status, Endpoint, PlatformVersion, Arn, RoleArn, KubernetesNetworkConfig
@@ -492,6 +520,7 @@ eks:
 ### A15. Secrets Manager -- List View
 
 **Given:** this views.yaml secrets list config:
+
 ```yaml
 secrets:
   list:
@@ -511,6 +540,7 @@ secrets:
       path: RotationEnabled
       width: 10
 ```
+
 **When:** user navigates to Secrets Manager resource list
 **Then:**
 - Column headers appear in order: "Secret Name", "Description", "Last Accessed", "Last Changed", "Rotation"
@@ -536,6 +566,7 @@ secrets:
 ### A16. Secrets Manager -- Detail View
 
 **Given:** this views.yaml secrets detail config:
+
 ```yaml
 secrets:
   detail:
@@ -548,6 +579,7 @@ secrets:
     - KmsKeyId
     - Tags
 ```
+
 **When:** user selects a secret and presses `d`
 **Then:**
 - Detail view shows exactly 8 fields in this order: Name, Description, LastAccessedDate, LastChangedDate, RotationEnabled, ARN, KmsKeyId, Tags
@@ -874,6 +906,7 @@ These stories test what happens when users modify the views.yaml from its curren
 ### E1. User adds a new column to ec2 list
 
 **Given:** user adds a "VPC" column to the ec2 list config:
+
 ```yaml
 ec2:
   list:
@@ -899,6 +932,7 @@ ec2:
       path: LaunchTime
       width: 22
 ```
+
 **When:** user restarts a9s and navigates to EC2 list
 **Then:** the list now shows 7 columns, with "VPC" appearing between "Type" and "Private IP", displaying VPC IDs like `vpc-0123456789abcdef0`
 
@@ -907,6 +941,7 @@ ec2:
 ### E2. User removes "Public IP" column from ec2 list
 
 **Given:** user removes the "Public IP" entry from the ec2 list config so it becomes:
+
 ```yaml
 ec2:
   list:
@@ -926,6 +961,7 @@ ec2:
       path: LaunchTime
       width: 22
 ```
+
 **When:** user restarts a9s and navigates to EC2 list
 **Then:** the list now shows 5 columns. There is no "Public IP" column anywhere. Column order is: Instance ID, State, Type, Private IP, Launch Time.
 
@@ -934,11 +970,13 @@ ec2:
 ### E3. User changes width of "Instance ID" from 20 to 30
 
 **Given:** user changes the ec2 list "Instance ID" width from 20 to 30:
+
 ```yaml
 Instance ID:
   path: InstanceId
   width: 30
 ```
+
 **When:** user restarts a9s and navigates to EC2 list
 **Then:** the "Instance ID" column is now 30 chars wide, giving more room for the full instance ID without truncation. All other column widths remain as configured.
 
@@ -947,6 +985,7 @@ Instance ID:
 ### E4. User reorders columns in ec2 list
 
 **Given:** user reorders the ec2 list config to put Launch Time first:
+
 ```yaml
 ec2:
   list:
@@ -969,6 +1008,7 @@ ec2:
       path: PublicIpAddress
       width: 16
 ```
+
 **When:** user restarts a9s and navigates to EC2 list
 **Then:** column order is now: Launch Time, Instance ID, State, Type, Private IP, Public IP. The columns follow the YAML key order, not any default or alphabetical ordering.
 
@@ -977,6 +1017,7 @@ ec2:
 ### E5. User adds "PlatformDetails" to ec2 detail
 
 **Given:** user appends `PlatformDetails` to the ec2 detail list:
+
 ```yaml
 ec2:
   detail:
@@ -995,6 +1036,7 @@ ec2:
     - Tags
     - PlatformDetails
 ```
+
 **When:** user restarts a9s and views EC2 instance detail
 **Then:** the detail view now shows 14 fields. "PlatformDetails" appears as the last field, after "Tags", showing a value like `Linux/UNIX` (which is a valid path per views_reference.yaml).
 
@@ -1003,6 +1045,7 @@ ec2:
 ### E6. User removes "Platform" from ec2 detail
 
 **Given:** user removes `Platform` from the ec2 detail list, leaving:
+
 ```yaml
 ec2:
   detail:
@@ -1019,6 +1062,7 @@ ec2:
     - Architecture
     - Tags
 ```
+
 **When:** user restarts a9s and views EC2 instance detail
 **Then:** the detail view now shows 12 fields. "Platform" does not appear anywhere. The field list jumps from "Architecture" directly to "Tags".
 
@@ -1027,6 +1071,7 @@ ec2:
 ### E7. S3 Objects "Storage Class" is commented out -- column does not appear
 
 **Given:** the actual views.yaml s3_objects list config has Storage Class commented out:
+
 ```yaml
 s3_objects:
   list:
@@ -1043,6 +1088,7 @@ s3_objects:
 #        path: StorageClass
 #        width: 16
 ```
+
 **When:** user navigates into an S3 bucket to view its objects
 **Then:** the object list shows exactly 3 columns: "Key", "Size", "Last Modified". There is no "Storage Class" column. The commented-out YAML is treated as if it does not exist.
 
@@ -1051,6 +1097,7 @@ s3_objects:
 ### E8. User uncomments "Storage Class" in s3_objects
 
 **Given:** user removes the comment markers from the Storage Class config:
+
 ```yaml
 s3_objects:
   list:
@@ -1067,6 +1114,7 @@ s3_objects:
       path: StorageClass
       width: 16
 ```
+
 **When:** user restarts a9s and navigates into an S3 bucket
 **Then:** the object list now shows 4 columns: "Key", "Size", "Last Modified", "Storage Class". The Storage Class column shows values like `STANDARD`, `GLACIER`, `INTELLIGENT_TIERING`.
 
@@ -1113,6 +1161,7 @@ These stories verify the interaction between views.yaml presence and built-in de
 ### F4. views.yaml with only s3 and ec2 -- those use config, rest use defaults
 
 **Given:** views.yaml contains only:
+
 ```yaml
 views:
   s3:
@@ -1162,6 +1211,7 @@ views:
       - Platform
       - Tags
 ```
+
 **When:** user navigates through all resource types
 **Then:**
 - S3 list shows 2 configured columns; S3 detail shows 3 configured fields
@@ -1178,6 +1228,7 @@ views:
 ### F5. views.yaml with list but no detail for ec2 -- detail falls back
 
 **Given:** views.yaml ec2 section has only list, no detail:
+
 ```yaml
 views:
   ec2:
@@ -1201,6 +1252,7 @@ views:
         path: LaunchTime
         width: 22
 ```
+
 **When:** user opens EC2 list, selects an instance, and presses `d`
 **Then:**
 - EC2 list shows the 6 configured columns from views.yaml
@@ -1211,6 +1263,7 @@ views:
 ### F6. views.yaml with detail but no list for rds -- list falls back
 
 **Given:** views.yaml rds section has only detail, no list:
+
 ```yaml
 views:
   rds:
@@ -1226,6 +1279,7 @@ views:
       - StorageType
       - AvailabilityZone
 ```
+
 **When:** user opens RDS list, selects an instance, and presses `d`
 **Then:**
 - RDS list shows built-in default columns (since no list section is configured)
@@ -1410,12 +1464,14 @@ These stories verify that column headers use the YAML map key, not the path.
 ### K2. Syntax error in views.yaml -- fallback to defaults with error
 
 **Given:** the views.yaml is corrupted with invalid YAML:
+
 ```
 views:
   ec2:
     list:
       - this is wrong: [[[
 ```
+
 **When:** user launches a9s
 **Then:** the application falls back to built-in defaults for all resource types. An error message is shown indicating the configuration file could not be parsed.
 
@@ -1424,9 +1480,11 @@ views:
 ### K3. Empty views.yaml -- defaults used, no error
 
 **Given:** views.yaml exists but contains only a comment:
+
 ```yaml
 # Empty configuration
 ```
+
 **When:** user launches a9s and opens any resource list
 **Then:** all resource types use built-in default columns and detail fields. No error is displayed.
 
@@ -1435,6 +1493,7 @@ views:
 ### K4. views.yaml with unknown resource type -- ignored gracefully
 
 **Given:** views.yaml contains a `lambda:` section alongside the real `ec2:` section:
+
 ```yaml
 views:
   lambda:
@@ -1448,6 +1507,7 @@ views:
         path: InstanceId
         width: 20
 ```
+
 **When:** user launches a9s
 **Then:** the `lambda` section is silently ignored. The `ec2` section is applied normally. No crash or error about the unknown type.
 
@@ -1486,6 +1546,7 @@ views:
 
 **Given:** views_reference.yaml lists `CpuOptions.CoreCount` under ec2
 **When:** user adds it to views.yaml:
+
 ```yaml
 ec2:
   list:
@@ -1493,6 +1554,7 @@ ec2:
       path: CpuOptions.CoreCount
       width: 10
 ```
+
 **Then:** the EC2 list shows a "CPU Cores" column that resolves the path to show the core count (or blank if nil on that instance)
 
 ---

@@ -51,6 +51,7 @@ After expansion, pagination is demonstrated across compute, storage, monitoring,
 - Token format: `"demo:<offset>"` — stateless, deterministic, survives back-navigation
 - Page size: `const PageSize = 20`
 - Shared pagination helper used by both top-level and child fetchers:
+
 ```go
 func paginate(all []resource.Resource, token string) resource.FetchResult {
     offset := parseDemoToken(token) // 0 if empty
@@ -70,6 +71,7 @@ func paginate(all []resource.Resource, token string) resource.FetchResult {
     }
 }
 ```
+
 - `func UnregisterFetchers()` — cleanup for tests
 
 ### 2. Modify `fetchResources` to try paginated fetcher first

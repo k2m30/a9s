@@ -45,39 +45,39 @@
 
 **Given** the help screen is displayed
 **Then** the RESOURCE column lists at minimum:
-  - `<esc>` with description "Back"
-  - `<q>` with description "Quit"
+- `<esc>` with description "Back"
+- `<q>` with description "Quit"
 
 ### HV-07: GENERAL column contents
 
 **Given** the help screen is displayed
 **Then** the GENERAL column lists at minimum:
-  - `<ctrl-r>` with description "Refresh"
-  - `<q>` with description "Quit"
-  - `<:>` with description "Command"
-  - `</>` with description "Filter"
+- `<ctrl-r>` with description "Refresh"
+- `<q>` with description "Quit"
+- `<:>` with description "Command"
+- `</>` with description "Filter"
 
 ### HV-08: NAVIGATION column contents
 
 **Given** the help screen is displayed
 **Then** the NAVIGATION column lists at minimum:
-  - `<j>` with description "Down"
-  - `<k>` with description "Up"
-  - `<g>` with description "Top"
-  - `<G>` with description "Bottom"
-  - `<h/l>` with description "Cols"
-  - `<enter>` with description "Open"
-  - `<d>` with description "Detail"
-  - `<y>` with description "YAML"
-  - `<c>` with description "Copy ID"
-  - `<N/S/A>` with description "Sort"
+- `<j>` with description "Down"
+- `<k>` with description "Up"
+- `<g>` with description "Top"
+- `<G>` with description "Bottom"
+- `<h/l>` with description "Cols"
+- `<enter>` with description "Open"
+- `<d>` with description "Detail"
+- `<y>` with description "YAML"
+- `<c>` with description "Copy ID"
+- `<N/S/A>` with description "Sort"
 
 ### HV-09: HOTKEYS column contents
 
 **Given** the help screen is displayed
 **Then** the HOTKEYS column lists at minimum:
-  - `<?>` with description "Help"
-  - `<:>` with description "Command" (or "Cmd")
+- `<?>` with description "Help"
+- `<:>` with description "Command" (or "Cmd")
 
 ### HV-10: Key styling in help
 
@@ -240,14 +240,14 @@
 
 **Given** the region selector is displayed
 **Then** I see standard AWS regions including at minimum:
-  - us-east-1
-  - us-east-2
-  - us-west-1
-  - us-west-2
-  - eu-west-1
-  - eu-central-1
-  - ap-southeast-1
-  - ap-northeast-1
+- us-east-1
+- us-east-2
+- us-west-1
+- us-west-2
+- eu-west-1
+- eu-central-1
+- ap-southeast-1
+- ap-northeast-1
 
 ### RS-03: Current region indicator
 

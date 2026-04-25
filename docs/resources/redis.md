@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `redis`
 - **Display name**: ElastiCache Redis
-- **AWS API reference**: https://docs.aws.amazon.com/AmazonElastiCache/latest/APIReference/API_ReplicationGroup.html
+- **AWS API reference**: <https://docs.aws.amazon.com/AmazonElastiCache/latest/APIReference/API_ReplicationGroup.html>
 - **List API**: `DescribeReplicationGroups`
 - **Describe API (if any)**: not used (Wave 2 is `None` for `redis`)
 

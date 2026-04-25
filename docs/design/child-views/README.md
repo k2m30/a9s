@@ -40,7 +40,7 @@ Twenty-four child view levels implemented: S3 Objects, R53 Records, Log Streams,
 | 20 | Glue Jobs (glue) | Job Runs | SHOULD-HAVE | Planned | [glue-runs.md](glue-runs.md) | No |
 | 21 | IAM Groups (iam-group) | Group Members | SHOULD-HAVE | Implemented | [iam-group-members.md](iam-group-members.md) | No |
 
-**Total: 21 parent-child relationships, 28 view levels (5 have nested level 2)**
+Total: 21 parent-child relationships, 28 view levels (5 have nested level 2).
 
 ---
 

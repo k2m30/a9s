@@ -68,6 +68,7 @@ For each candidate, ground your recommendation in at least one concrete scenario
 Categorize every resource into exactly one tier:
 
 #### MUST-HAVE
+
 Resources where a child view is essential — engineers would use it daily/weekly, and the AWS Console makes this painful. For each, provide:
 - **Resource**: name and short_name
 - **Child view name**: what the drill-down screen shows
@@ -77,12 +78,15 @@ Resources where a child view is essential — engineers would use it daily/weekl
 - **Nesting potential**: can this child itself have children? If yes, describe briefly
 
 #### SHOULD-HAVE
+
 Resources where a child view adds clear value but is not critical. Same format as MUST-HAVE.
 
 #### OPTIONAL
+
 Resources where a child view is nice but rarely needed. Brief justification only — one line per resource.
 
 #### NOT NEEDED
+
 Resources where the existing detail/YAML view is sufficient. Brief justification — one line per resource. This should be the largest category.
 
 ### Important guidelines

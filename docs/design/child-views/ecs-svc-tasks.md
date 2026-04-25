@@ -92,6 +92,7 @@ Source struct: `ecstypes.Task`
 ```
 
 Scrolled right to reveal Stopped Reason column (via `l` key):
+
 ```
 │ TASK DEF             STARTED                STOPPED REASON                       │
 │ payment-api:47       2026-03-22 02:48       —                                    │

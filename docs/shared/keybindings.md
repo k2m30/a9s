@@ -75,8 +75,8 @@ a9s surfaces background-health findings without making write calls. Markers and 
 
 | Marker | Meaning |
 |--------|---------|
-| `! ` prefix on a row | Broken / degraded (e.g. failed build, impaired volume, unhealthy target) |
-| `~ ` prefix on a row | Informational / scheduled (e.g. pending maintenance, non-urgent event) |
+| `!` prefix on a row | Broken / degraded (e.g. failed build, impaired volume, unhealthy target) |
+| `~` prefix on a row | Informational / scheduled (e.g. pending maintenance, non-urgent event) |
 | `issues:N` on main menu | `N` distinct resources of this type have an active finding |
 
 In the detail view, every Wave-1 warning and Wave-2 enrichment finding for the selected resource renders as an entry in a unified `Attention (N)` section at the top of the view. Each entry is prefixed with `!` (Broken) or `~` (Warning) and lists its supporting rows beneath. Press `Ctrl+Z` on the main menu to filter to only types with findings, or on a list to show only affected rows.

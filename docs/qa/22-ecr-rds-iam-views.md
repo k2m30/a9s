@@ -22,9 +22,11 @@ All stories are written from a black-box perspective against the design spec and
 | A.1.4 | The API responds with an error (e.g., RepositoryNotFoundException, no credentials). | The spinner disappears. A red error flash message appears in the header right side. The frame content area shows an appropriate empty or error state. |
 
 **AWS comparison:**
+
 ```
 aws ecr describe-images --repository-name payment-api
 ```
+
 Expected fields visible: Tag(s), Digest, Pushed At, Size, Scan Status, Findings
 
 ### A.2 Empty State
@@ -35,6 +37,7 @@ Expected fields visible: Tag(s), Digest, Pushed At, Size, Scan Status, Findings
 | A.2.2 | I press ctrl+r on the empty state. | The loading spinner appears again while the refresh request is in flight. |
 
 **AWS comparison:**
+
 ```
 aws ecr describe-images --repository-name empty-repo
 # Returns {"imageDetails": []}
@@ -50,9 +53,11 @@ aws ecr describe-images --repository-name empty-repo
 | A.3.4 | The terminal is narrower than the combined column widths (24+16+22+12+14+20=108 plus borders). | The rightmost column(s) are hidden (not truncated mid-value). Horizontal scroll with h/l is available to reveal hidden columns. |
 
 **AWS comparison:**
+
 ```
 aws ecr describe-images --repository-name payment-api --output table
 ```
+
 Expected fields visible: Tag(s), Digest, Pushed At, Size, Scan Status, Findings
 
 ### A.4 Frame Title
@@ -119,6 +124,7 @@ Expected fields visible: Tag(s), Digest, Pushed At, Size, Scan Status, Findings
 | A.9.9 | I move selection away from the CRITICAL findings row. | The row reverts to RED (#f7768e) coloring based on its finding severity. |
 
 **AWS comparison:**
+
 ```
 aws ecr describe-images --repository-name payment-api \
   --query 'imageDetails[].{tags:imageTags,scan:imageScanStatus.status,findings:imageScanFindingsSummary.findingSeverityCounts}'
@@ -134,6 +140,7 @@ aws ecr describe-images --repository-name payment-api \
 | A.10.4 | An image has many tags that exceed the 24-character column width. | The combined tag string is truncated at 24 characters. The full tag list is visible in the detail view (d) or YAML view (y). |
 
 **AWS comparison:**
+
 ```
 aws ecr describe-images --repository-name payment-api \
   --query 'imageDetails[].imageTags'
@@ -156,6 +163,7 @@ aws ecr describe-images --repository-name payment-api \
 | A.12.4 | The scan completed but failed. | The Scan Status column shows "FAILED". The Findings column is empty or shows a dash. The entire row is RED (#f7768e). |
 
 **AWS comparison:**
+
 ```
 aws ecr describe-images --repository-name payment-api \
   --query 'imageDetails[].{digest:imageDigest,scanStatus:imageScanStatus.status,findings:imageScanFindingsSummary}'
@@ -170,6 +178,7 @@ aws ecr describe-images --repository-name payment-api \
 | A.13.3 | An image is small (5.2 MB). | The Size column shows "5.2 MB" or similar. |
 
 **AWS comparison:**
+
 ```
 aws ecr describe-images --repository-name payment-api \
   --query 'imageDetails[].imageSizeInBytes'
@@ -187,6 +196,7 @@ aws ecr describe-images --repository-name payment-api \
 | A.14.5 | I paste from clipboard into another application. | The pasted text matches the full image URI exactly. This URI can be used directly in a Kubernetes deployment spec or ECS task definition. |
 
 **AWS comparison:**
+
 ```
 # No single CLI command returns the full URI; it is constructed from:
 # Account ID: aws sts get-caller-identity --query 'Account'
@@ -269,10 +279,12 @@ aws ecr describe-images --repository-name payment-api \
 | B.1.4 | The API responds with an error (e.g., DBInstanceNotFoundFault, no credentials). | The spinner disappears. A red error flash message appears in the header right side. The frame content area shows an appropriate empty or error state. |
 
 **AWS comparison:**
+
 ```
 aws rds describe-events --source-identifier prod-payments-db \
   --source-type db-instance --duration 10080
 ```
+
 Expected fields visible: Timestamp, Category, Message
 
 ### B.2 Empty State
@@ -284,6 +296,7 @@ Expected fields visible: Timestamp, Category, Message
 | B.2.3 | A newly created RDS instance has had no events yet. | Same behavior as B.2.1 — zero events displayed, no crash or error. |
 
 **AWS comparison:**
+
 ```
 aws rds describe-events --source-identifier brand-new-db \
   --source-type db-instance --duration 10080
@@ -300,10 +313,12 @@ aws rds describe-events --source-identifier brand-new-db \
 | B.3.4 | The terminal is narrower than the combined column widths (22+18+60=100 plus borders). | The rightmost column(s) are hidden (not truncated mid-value). Horizontal scroll with h/l is available to reveal the Message column. |
 
 **AWS comparison:**
+
 ```
 aws rds describe-events --source-identifier prod-payments-db \
   --source-type db-instance --duration 10080 --output table
 ```
+
 Expected fields visible: Timestamp, Category, Message
 
 ### B.4 Frame Title
@@ -366,6 +381,7 @@ Expected fields visible: Timestamp, Category, Message
 | B.9.9 | I move selection away from the failover event row. | The row reverts to RED (#f7768e) coloring. |
 
 **AWS comparison:**
+
 ```
 aws rds describe-events --source-identifier prod-payments-db \
   --source-type db-instance --duration 10080 \
@@ -392,6 +408,7 @@ aws rds describe-events --source-identifier prod-payments-db \
 | B.11.4 | I paste from clipboard into another application (e.g., an incident report). | The pasted text matches the complete event message exactly. |
 
 **AWS comparison:**
+
 ```
 aws rds describe-events --source-identifier prod-payments-db \
   --source-type db-instance --duration 10080 \
@@ -407,6 +424,7 @@ aws rds describe-events --source-identifier prod-payments-db \
 | B.12.3 | I press Escape on the detail view. | I return to the RDS events list. The cursor position is preserved on the same event I had selected. |
 
 **AWS comparison:**
+
 ```
 aws rds describe-events --source-identifier prod-payments-db \
   --source-type db-instance --duration 10080 \
@@ -428,6 +446,7 @@ aws rds describe-events --source-identifier prod-payments-db \
 | B.14.2 | An RDS instance had a failover 8 days ago but has routine backups in the last 7 days. | The failover event is NOT shown (outside the 7-day window). Only the recent backup events are displayed. |
 
 **AWS comparison:**
+
 ```
 aws rds describe-events --source-identifier prod-payments-db \
   --source-type db-instance --duration 10080
@@ -499,10 +518,12 @@ aws rds describe-events --source-identifier prod-payments-db \
 | C.1.4 | One or both API calls respond with an error. | The spinner disappears. A red error flash message appears in the header right side. |
 
 **AWS comparison:**
+
 ```
 aws iam list-attached-role-policies --role-name payment-service-execution-role
 aws iam list-role-policies --role-name payment-service-execution-role
 ```
+
 Expected fields visible: Policy Name, Policy ARN, Type
 
 ### C.2 Empty State
@@ -513,6 +534,7 @@ Expected fields visible: Policy Name, Policy ARN, Type
 | C.2.2 | I press ctrl+r on the empty state. | The loading spinner appears again while the refresh request is in flight. |
 
 **AWS comparison:**
+
 ```
 aws iam list-attached-role-policies --role-name empty-role
 # Returns {"AttachedPolicies": []}
@@ -532,10 +554,12 @@ aws iam list-role-policies --role-name empty-role
 | C.3.6 | The terminal is narrower than the combined column widths (40+56+10=106 plus borders). | The rightmost column(s) are hidden (not truncated mid-value). Horizontal scroll with h/l is available to reveal hidden columns. |
 
 **AWS comparison:**
+
 ```
 aws iam list-attached-role-policies --role-name payment-service-execution-role --output table
 aws iam list-role-policies --role-name payment-service-execution-role --output table
 ```
+
 Expected fields visible: Policy Name, Policy ARN, Type
 
 ### C.4 Frame Title
@@ -596,6 +620,7 @@ Expected fields visible: Policy Name, Policy ARN, Type
 | C.9.7 | I move selection away from the AdministratorAccess row. | The row reverts to RED (#f7768e) coloring. |
 
 **AWS comparison:**
+
 ```
 aws iam list-attached-role-policies --role-name admin-role \
   --query 'AttachedPolicies[?PolicyName==`AdministratorAccess`]'
@@ -611,6 +636,7 @@ aws iam list-attached-role-policies --role-name admin-role \
 | C.10.4 | A role has both managed and inline policies with the same name (unlikely but possible). | Both entries appear as separate rows. The Type column distinguishes them ("Managed" vs "Inline"). |
 
 **AWS comparison:**
+
 ```
 # Two separate API calls merged into one view:
 aws iam list-attached-role-policies --role-name my-role
@@ -636,6 +662,7 @@ aws iam list-role-policies --role-name my-role
 | C.12.4 | I paste from clipboard after copying a managed policy ARN. | The pasted text matches the full policy ARN exactly. This ARN can be used to look up the policy document via `aws iam get-policy`. |
 
 **AWS comparison:**
+
 ```
 aws iam list-attached-role-policies --role-name my-role \
   --query 'AttachedPolicies[0].PolicyArn' --output text

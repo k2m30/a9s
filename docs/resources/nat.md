@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `nat`
 - **Display name**: NAT Gateways
-- **AWS API reference**: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NatGateway.html
+- **AWS API reference**: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NatGateway.html>
 - **List API**: `DescribeNatGateways`
 - **Describe API (if any)**: not used — `DescribeNatGateways` returns the full `NatGateway` shape (including `State`, `FailureCode`, `FailureMessage`, `NatGatewayAddresses[]`), so Wave 2 is empty.
 

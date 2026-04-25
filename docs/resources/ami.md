@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `ami`
 - **Display name**: AMIs
-- **AWS API reference**: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Image.html
+- **AWS API reference**: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Image.html>
 - **List API**: `DescribeImages`
 - **Describe API (if any)**: not used — all attention signals are served from the `DescribeImages` response plus cross-reference against already-loaded sibling lists (Wave 1 only; Wave 2 is `None`).
 

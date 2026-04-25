@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `tgw`
 - **Display name**: Transit Gateways
-- **AWS API reference**: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_TransitGateway.html
+- **AWS API reference**: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_TransitGateway.html>
 - **List API**: `DescribeTransitGateways`
 - **Describe API (if any)**: `DescribeTransitGatewayAttachments` (Wave 2 — one call per TGW, filtered by `transit-gateway-id`)
 

@@ -17,6 +17,7 @@ All stories are written from a black-box perspective against the design spec and
 | A.1.3 | I type the command alias (e.g., `:ebs`) in command mode and press Enter. | The view navigates directly to the EBS Volumes list from any other view. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-volumes --query 'Volumes[].{Name:Tags[?Key==`Name`]|[0].Value,VolumeId:VolumeId,State:State}'
 ```
@@ -39,9 +40,11 @@ aws ec2 describe-volumes --query 'Volumes[].{Name:Tags[?Key==`Name`]|[0].Value,V
 | A.2.12 | Columns are space-aligned, not pipe-separated. | Columns are padded with whitespace. No vertical pipe characters between columns. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-volumes --query 'Volumes[].{Name:Tags[?Key==`Name`]|[0].Value,VolumeId:VolumeId,State:State,Size:Size,Type:VolumeType,IOPS:Iops,Encrypted:Encrypted,AttachedTo:Attachments[0].InstanceId,AZ:AvailabilityZone,Created:CreateTime}'
 ```
+
 Expected fields visible: Name, Volume ID, State, Size (GiB), Type, IOPS, Encrypted, Attached To, AZ, Created
 
 ### A.3 Frame and Title
@@ -73,6 +76,7 @@ Expected fields visible: Name, Volume ID, State, Size (GiB), Type, IOPS, Encrypt
 | A.5.7 | An account has volumes in `in-use`, `available`, and `deleting` states. | Looking at the list, each row is visually distinct: in-use volumes are green, available volumes are yellow (orphan warning), and deleting volumes are red. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-volumes --query 'Volumes[].{ID:VolumeId,State:State}'
 ```
@@ -168,6 +172,7 @@ aws ec2 describe-volumes --query 'Volumes[].{ID:VolumeId,State:State}'
 | B.2.12 | KmsKeyId field is shown (for encrypted volumes). | A line reads with key `KmsKeyId` and the KMS key ARN. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-volumes --volume-ids vol-0abc123def456789a --query 'Volumes[0]'
 ```
@@ -214,6 +219,7 @@ aws ec2 describe-volumes --volume-ids vol-0abc123def456789a --query 'Volumes[0]'
 | C.1.3 | YAML view shows the complete volume object. | All fields from `describe-volumes` are present: VolumeId, State, Size, VolumeType, Iops, Encrypted, AvailabilityZone, Attachments, CreateTime, Tags, Throughput, MultiAttachEnabled, etc. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-volumes --volume-ids vol-0abc123def456789a --output yaml
 ```
@@ -250,6 +256,7 @@ This child view shows snapshots created from the selected volume.
 | D.1.3 | Press `Esc`. | Return to the volumes list with the same volume still selected. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-snapshots --filters "Name=volume-id,Values=vol-0abc123" --owner-ids self
 ```
@@ -298,6 +305,7 @@ This child view allows jumping to the EC2 instance that the volume is attached t
 | E.1.3 | Press `Esc`. | Return to the volumes list. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-instances --instance-ids i-0abc123 --query 'Reservations[].Instances[].{ID:InstanceId,State:State.Name}'
 ```
@@ -322,6 +330,7 @@ aws ec2 describe-instances --instance-ids i-0abc123 --query 'Reservations[].Inst
 | F.1.3 | I type the command alias (e.g., `:snap`) in command mode and press Enter. | The view navigates directly to the snapshots list. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-snapshots --owner-ids self --query 'Snapshots[].{Name:Tags[?Key==`Name`]|[0].Value,SnapshotId:SnapshotId,State:State}'
 ```
@@ -343,9 +352,11 @@ aws ec2 describe-snapshots --owner-ids self --query 'Snapshots[].{Name:Tags[?Key
 | F.2.11 | Columns are space-aligned, not pipe-separated. | Standard column formatting. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-snapshots --owner-ids self --query 'Snapshots[].{Name:Tags[?Key==`Name`]|[0].Value,SnapshotId:SnapshotId,State:State,VolumeId:VolumeId,Size:VolumeSize,Encrypted:Encrypted,Description:Description,Started:StartTime,Progress:Progress}'
 ```
+
 Expected fields visible: Name, Snapshot ID, State, Volume ID, Size (GiB), Encrypted, Description, Started, Progress
 
 ### F.3 Frame and Title
@@ -452,6 +463,7 @@ Expected fields visible: Name, Snapshot ID, State, Volume ID, Size (GiB), Encryp
 | G.2.11 | KmsKeyId field is shown (for encrypted snapshots). | Key `KmsKeyId`, value shows the KMS key ARN. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-snapshots --snapshot-ids snap-0abc123def456789a --query 'Snapshots[0]'
 ```
@@ -490,6 +502,7 @@ aws ec2 describe-snapshots --snapshot-ids snap-0abc123def456789a --query 'Snapsh
 | H.1.3 | YAML view shows the complete snapshot object. | All fields from `describe-snapshots`: SnapshotId, State, VolumeId, VolumeSize, Encrypted, Description, StartTime, Progress, OwnerId, Tags, etc. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-snapshots --snapshot-ids snap-0abc123def456789a --output yaml
 ```
@@ -526,6 +539,7 @@ This child view shows AMIs that use the selected snapshot as a backing store.
 | I.1.3 | Press `Esc`. | Return to the snapshots list with the same snapshot still selected. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-images --owners self --filters "Name=block-device-mapping.snapshot-id,Values=snap-0abc123"
 ```

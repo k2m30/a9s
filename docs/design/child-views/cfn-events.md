@@ -78,6 +78,7 @@ Source struct: `cftypes.StackEvent`
 ```
 
 Scrolled right to reveal Status and Reason columns (via `l` key):
+
 ```
 │ TYPE                          STATUS                   REASON                    │
 │ AWS::CloudFormation::Stack    UPDATE_COMPLETE          —                          │
@@ -90,6 +91,7 @@ Scrolled right to reveal Status and Reason columns (via `l` key):
 ```
 
 Failed deployment example (the money view):
+
 ```
 │ TIMESTAMP              LOGICAL ID                   TYPE                        … │
 │ 2026-03-22 02:55       payment-service-prod         AWS::CloudFormation::Stack   │

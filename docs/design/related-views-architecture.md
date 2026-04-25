@@ -52,6 +52,7 @@ Go equates directories with packages. `internal/aws/ec2/` would be
 **2. Agent token waste is overestimated.**
 
 The CLAUDE.md already mandates targeted access patterns:
+
 ```
 Glob("internal/aws/{resource}*.go")   -- returns 1-3 files, not 101
 Grep("mock.*{Interface}", "tests/unit/mocks_test.go")  -- targeted
@@ -1637,11 +1638,13 @@ These files were in the v1 architecture (separate pushed view) and are
 Each phase builds on the previous. The dependency chain is strict.
 
 ### Phase 1: Registry Infrastructure (foundation)
+
 1. `resource/related.go` -- types, registries, helpers
 2. `resource/related_helpers.go` -- ForwardSingleField, etc.
 3. Tests for registry and helpers
 
 ### Phase 2: Detail View Refactor (foundation -- most invasive phase)
+
 1. New structured extraction pipeline (section 4.3.1): walk RawStruct
    producing `[]kvPair` with field paths, indent levels, headers
 2. Replace viewport with field-list model in `detail.go`
@@ -1650,6 +1653,7 @@ Each phase builds on the previous. The dependency chain is strict.
 5. All existing tests must still pass (View() output changes)
 
 ### Phase 3: Two-Column Layout Infrastructure
+
 1. Fixed 32-char right column, left takes remaining space
 2. Focus-colored separator
 3. Tab and h/l column switching
@@ -1657,6 +1661,7 @@ Each phase builds on the previous. The dependency chain is strict.
 5. State preservation on WindowSizeMsg crossing threshold
 
 ### Phase 4: Right Column Component
+
 1. Embedded rightColumnModel in DetailModel
 2. Flat list with dim unavailable rows, cursor-skip
 3. Background availability checking triggered on detail view entry
@@ -1664,11 +1669,13 @@ Each phase builds on the previous. The dependency chain is strict.
 5. `r` toggle visibility (default ON)
 
 ### Phase 5: Navigable Field Detection
+
 1. NavigableFieldDef registry
 2. Underline styling for navigable values
 3. Enter on navigable field opens target detail
 
 ### Phase 6: Key Binding Changes
+
 1. `ToggleRelated` binding (r in detail view)
 2. `StackResources` binding (R for CFN)
 3. CFN ChildViewDef `Key: "r"` -> `Key: "R"`
@@ -1676,12 +1683,14 @@ Each phase builds on the previous. The dependency chain is strict.
 5. `/` dual binding (Search vs. Filter based on focus)
 
 ### Phase 7: New Message Types
+
 1. `RelatedTypeCheckedMsg` in messages.go
 2. `NavigateToRelatedMsg` in messages.go
 3. App.go Update switch cases
 4. Handler implementations in app_handlers.go
 
 ### Phase 8: Search Integration
+
 1. Left column text search with match highlighting
 2. Right column list filter
 3. Per-column state persistence
@@ -1689,16 +1698,19 @@ Each phase builds on the previous. The dependency chain is strict.
 5. Header state management
 
 ### Phase 9: Skill Update
+
 1. Update `a9s-add-related-view` skill for two-column architecture
 2. Ensure skill covers BOTH columns per resource
 
 ### Phase 10: Per-Resource Rollout
+
 1. EC2 first (validates pattern end-to-end)
 2. VPC, SG, Lambda, RDS (highest-value resources)
 3. Remaining resources in batches of 5-10
 4. All tasks are Sonnet-executable, mechanical
 
 ### Phase 11: CloudTrail Integration (after #114)
+
 1. Wire CloudTrail row's Enter to ct-search view
 2. Currently: flash "coming soon"
 

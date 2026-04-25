@@ -62,6 +62,7 @@ Source struct: `iamtypes.User` (returned by `GetGroup`)
 ```
 
 Scrolled right to show Password Last Used:
+
 ```
 │ CREATED                PASSWORD LAST USED     │
 │ 2024-06-15 09:00       2026-03-22 01:30       │

@@ -66,9 +66,11 @@ log_streams:
 ```
 
 Selected row state:
+
 ```
 │ 2026/03/22/[$LATEST]8a4b2c1d3e5f                 2026-03-22 02:47       14 KB  │
 ```
+
 Selected row gets full-width blue background (`#7aa2f7` bg, `#1a1b26` fg, bold).
 
 No status-based row coloring — log streams have no health/status semantics.

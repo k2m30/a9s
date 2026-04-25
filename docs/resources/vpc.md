@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `vpc`
 - **Display name**: VPCs
-- **AWS API reference**: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Vpc.html
+- **AWS API reference**: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Vpc.html>
 - **List API**: `DescribeVpcs` (returns the full `Vpc` shape per VPC, including `VpcId`, `State`, `CidrBlock`, `IsDefault`, `OwnerId`, `DhcpOptionsId`, `InstanceTenancy`, `CidrBlockAssociationSet[]`, `Ipv6CidrBlockAssociationSet[]`, and `Tags[]`).
 - **Describe API (if any)**: not used for Wave 1 — list response already carries everything needed. Wave 2 uses `DescribeFlowLogs` (account-wide, client-side filter by `ResourceType=VPC`), not a per-VPC Describe call.
 
@@ -183,8 +183,8 @@ At 3am, glancing at the list, a yellow row with `pending: VPC being created` or 
 - `ct-events` as universal pivot — `docs/related-resources.md` § Policy (line 34).
 - CloudTrail event-name filter (`CreateVpc`, `DeleteVpc`, `ModifyVpcAttribute`, `AssociateVpcCidrBlock`, `CreateFlowLogs`, `DeleteFlowLogs`) — `a9s-devops (2026-04-20): possible=yes (CloudTrail records all VPC management-plane calls), worth=yes. These event names are the filter operators run when investigating a VPC state change.`
 - `cfn` discovery via `aws:cloudformation:stack-name` tag — `a9s-devops (2026-04-20): possible=yes, worth=yes. CloudFormation stamps this tag on every resource it creates; tag-based lookup avoids a per-VPC DescribeStackResources call.`
-- `ec2`, `elb`, `eni`, `nat`, `rtb`, `sg`, `subnet`, `vpce` discovered via reverse-scan of already-loaded lists on `VpcId` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Every one of these AWS list responses carries `VpcId` (or an equivalent) directly; scanning already-loaded lists is cheaper than any extra AWS call.`
-- `tgw` discovery via `DescribeTransitGatewayAttachments` filter — `a9s-devops (2026-04-20): possible=yes, worth=yes. TGW list responses do not carry child VPC IDs, so a single `DescribeTransitGatewayAttachments` call is the only path; most VPCs have ≤1 TGW attachment, so the cost is minimal.`
+- `ec2`, `elb`, `eni`, `nat`, `rtb`, `sg`, `subnet`, `vpce` discovered via reverse-scan of already-loaded lists on `VpcId` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Every one of these AWS list responses carries`VpcId`(or an equivalent) directly; scanning already-loaded lists is cheaper than any extra AWS call.`
+- `tgw` discovery via `DescribeTransitGatewayAttachments` filter — `a9s-devops (2026-04-20): possible=yes, worth=yes. TGW list responses do not carry child VPC IDs, so a single`DescribeTransitGatewayAttachments`call is the only path; most VPCs have ≤1 TGW attachment, so the cost is minimal.`
 - Wave 1 signals (`State`, empty-VPC cross-ref) and Wave 2 signal (`DescribeFlowLogs`) — `docs/attention-signals.md` § Networking row for `vpc`.
 - Wave 3 DNS-attribute probe out-of-scope — `docs/attention-signals.md` § Networking row for `vpc` Wave 3 cell.
 - Default-VPC detection out-of-scope rationale — `a9s-devops (2026-04-20): possible=yes (Vpc.IsDefault is on the list response), worth=no. Not a daily-driver signal; belongs in Security Hub / Config, not in the attention column.`

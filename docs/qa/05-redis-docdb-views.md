@@ -142,14 +142,14 @@ Covers LIST, DETAIL, and YAML views for Redis and DocumentDB resources.
 
 **Given** the Redis detail view is displayed for a cluster
 **Then** the following fields are shown as key-value pairs:
-  - CacheClusterId
-  - Engine
-  - EngineVersion
-  - CacheClusterStatus
-  - CacheNodeType
-  - NumCacheNodes
-  - ConfigurationEndpoint
-  - PreferredAvailabilityZone
+- CacheClusterId
+- Engine
+- EngineVersion
+- CacheClusterStatus
+- CacheNodeType
+- NumCacheNodes
+- ConfigurationEndpoint
+- PreferredAvailabilityZone
 **And** keys are colored blue (#7aa2f7) and values are colored plain white (#c0caf5)
 
 ---
@@ -244,17 +244,17 @@ Covers LIST, DETAIL, and YAML views for Redis and DocumentDB resources.
 
 **Given** the Redis YAML view is displayed
 **Then** the YAML output includes all non-nil fields from the API response, including but not limited to:
-  - ARN
-  - CacheClusterId
-  - CacheClusterStatus
-  - CacheNodeType
-  - CacheNodes (as a YAML array with nested objects)
-  - Engine
-  - EngineVersion
-  - NumCacheNodes
-  - ConfigurationEndpoint (with Address and Port sub-keys)
-  - PreferredAvailabilityZone
-  - SecurityGroups (as a YAML array)
+- ARN
+- CacheClusterId
+- CacheClusterStatus
+- CacheNodeType
+- CacheNodes (as a YAML array with nested objects)
+- Engine
+- EngineVersion
+- NumCacheNodes
+- ConfigurationEndpoint (with Address and Port sub-keys)
+- PreferredAvailabilityZone
+- SecurityGroups (as a YAML array)
 
 ---
 
@@ -446,15 +446,15 @@ Covers LIST, DETAIL, and YAML views for Redis and DocumentDB resources.
 
 **Given** the DocumentDB detail view is displayed for a cluster
 **Then** the following fields are shown as key-value pairs:
-  - DBClusterIdentifier
-  - Engine
-  - EngineVersion
-  - Status
-  - Endpoint
-  - ReaderEndpoint
-  - Port
-  - StorageEncrypted
-  - DBClusterMembers
+- DBClusterIdentifier
+- Engine
+- EngineVersion
+- Status
+- Endpoint
+- ReaderEndpoint
+- Port
+- StorageEncrypted
+- DBClusterMembers
 **And** keys are colored blue (#7aa2f7) and values are colored plain white (#c0caf5)
 
 ---
@@ -567,18 +567,18 @@ Covers LIST, DETAIL, and YAML views for Redis and DocumentDB resources.
 
 **Given** the DocumentDB YAML view is displayed
 **Then** the YAML output includes all non-nil fields from the API response, including but not limited to:
-  - DBClusterArn
-  - DBClusterIdentifier
-  - Engine
-  - EngineVersion
-  - Status
-  - Endpoint
-  - ReaderEndpoint
-  - Port
-  - StorageEncrypted
-  - DBClusterMembers (as a YAML array)
-  - AvailabilityZones (as a YAML array)
-  - VpcSecurityGroups (as a YAML array)
+- DBClusterArn
+- DBClusterIdentifier
+- Engine
+- EngineVersion
+- Status
+- Endpoint
+- ReaderEndpoint
+- Port
+- StorageEncrypted
+- DBClusterMembers (as a YAML array)
+- AvailabilityZones (as a YAML array)
+- VpcSecurityGroups (as a YAML array)
 
 ---
 

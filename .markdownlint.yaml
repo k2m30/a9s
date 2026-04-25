@@ -15,3 +15,22 @@ MD060: false
 
 # Allow lists without blank lines above (common pattern: bold label then list)
 MD032: false
+
+# Allow fenced code blocks without a language tag — many spec/transcript blocks
+# are language-agnostic (raw shell output, tree dumps, ASCII tables).
+MD040: false
+
+# Keep a Changelog format intentionally repeats Added/Changed/Fixed/Removed
+# section names per release entry; that's the schema, not duplication.
+MD024: false
+
+# docs/shared/ are Hugo include fragments and don't start with a top-level
+# heading by design; the parent template provides the H1.
+MD041: false
+
+# Allow heading levels to skip (e.g. ## directly to #### for grouped sub-blocks).
+MD001: false
+
+# Allow inconsistent table column counts — some spec tables use a varying number
+# of separator columns intentionally for visual grouping.
+MD056: false

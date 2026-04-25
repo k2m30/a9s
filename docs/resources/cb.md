@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `cb`
 - **Display name**: CodeBuild Projects
-- **AWS API reference**: https://docs.aws.amazon.com/codebuild/latest/APIReference/API_Project.html
+- **AWS API reference**: <https://docs.aws.amazon.com/codebuild/latest/APIReference/API_Project.html>
 - **List API**: `ListProjects` (returns project name strings only — config-only list; see attention-signals.md row `cb`).
 - **Describe API (if any)**: `BatchGetProjects` for project config; `ListBuildsForProject(maxResults=1)` + `BatchGetBuilds` for Wave 2 latest-build status.
 

@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `ssm`
 - **Display name**: SSM Parameters
-- **AWS API reference**: https://docs.aws.amazon.com/systems-manager/latest/APIReference/API_ParameterMetadata.html
+- **AWS API reference**: <https://docs.aws.amazon.com/systems-manager/latest/APIReference/API_ParameterMetadata.html>
 - **List API**: `DescribeParameters`
 - **Describe API (if any)**: not used (the list response is `[]ParameterMetadata` — name, type, tier, KeyId, LastModifiedDate, LastModifiedUser all present; no per-parameter Describe needed for Wave 1/2)
 

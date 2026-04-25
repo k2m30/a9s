@@ -22,9 +22,11 @@ All stories are written from a black-box perspective against the design spec and
 | A.1.4 | The API responds with an error (e.g., alarm not found, no credentials). | The spinner disappears. A red error flash message appears in the header right side. |
 
 **AWS comparison:**
+
 ```
 aws cloudwatch describe-alarm-history --alarm-name api-error-rate-high
 ```
+
 Expected fields visible: Timestamp, Type (HistoryItemType), Summary (HistorySummary)
 
 ### A.2 Empty State (Newly Created Alarm)
@@ -35,6 +37,7 @@ Expected fields visible: Timestamp, Type (HistoryItemType), Summary (HistorySumm
 | A.2.2 | I press ctrl+r on the empty state. | The loading spinner appears again while the refresh request is in flight. |
 
 **AWS comparison:**
+
 ```
 aws cloudwatch describe-alarm-history --alarm-name new-alarm-name
 # Returns empty AlarmHistoryItems array for a brand-new alarm
@@ -50,6 +53,7 @@ aws cloudwatch describe-alarm-history --alarm-name new-alarm-name
 | A.3.4 | The terminal is narrower than the combined column widths (22+18+60 = 100 plus borders/padding). | The rightmost column(s) are hidden (not truncated mid-value). Horizontal scroll with h/l is available to reveal hidden columns. |
 
 **AWS comparison:**
+
 ```
 aws cloudwatch describe-alarm-history --alarm-name api-error-rate-high \
   --query 'AlarmHistoryItems[*].[Timestamp,HistoryItemType,HistorySummary]' --output table
@@ -77,6 +81,7 @@ aws cloudwatch describe-alarm-history --alarm-name api-error-rate-high \
 | A.5.8 | I move selection away from a colored row. | The previously selected row reverts to its content-based coloring (RED, GREEN, YELLOW, DIM, or PLAIN). |
 
 **AWS comparison:**
+
 ```
 aws cloudwatch describe-alarm-history --alarm-name api-error-rate-high \
   --history-item-type StateUpdate
@@ -91,6 +96,7 @@ aws cloudwatch describe-alarm-history --alarm-name api-error-rate-high \
 | A.6.2 | The flapping alarm has 50+ history entries from rapid transitions. | All entries are listed (up to the 30-day retention). Navigation with j/k scrolls through all rows. The frame title shows the full count. |
 
 **AWS comparison:**
+
 ```
 aws cloudwatch describe-alarm-history --alarm-name flapping-alarm \
   --query 'AlarmHistoryItems | length(@)'
@@ -106,6 +112,7 @@ aws cloudwatch describe-alarm-history --alarm-name flapping-alarm \
 | A.7.3 | I filter by typing "/" then "action". | Only Action-type entries remain visible. StateUpdate and ConfigurationUpdate entries are hidden. The frame title shows the filtered count. |
 
 **AWS comparison:**
+
 ```
 aws cloudwatch describe-alarm-history --alarm-name my-alarm \
   --history-item-type Action
@@ -119,6 +126,7 @@ aws cloudwatch describe-alarm-history --alarm-name my-alarm \
 | A.8.2 | I view history for an alarm that has only been modified (configured) but never triggered. | All entries are ConfigurationUpdate type, all rendered in DIM. No RED or GREEN rows appear. |
 
 **AWS comparison:**
+
 ```
 aws cloudwatch describe-alarm-history --alarm-name my-alarm \
   --history-item-type ConfigurationUpdate
@@ -132,6 +140,7 @@ aws cloudwatch describe-alarm-history --alarm-name my-alarm \
 | A.9.2 | An alarm was created 10 days ago. I view its history. | All history entries since creation are visible, including the initial configuration creation entry. |
 
 **AWS comparison:**
+
 ```
 aws cloudwatch describe-alarm-history --alarm-name long-alarm \
   --start-date $(date -v-30d -u +%Y-%m-%dT%H:%M:%SZ) \
@@ -177,6 +186,7 @@ aws cloudwatch describe-alarm-history --alarm-name long-alarm \
 | A.13.3 | I paste from clipboard into another application. | The pasted text matches the HistorySummary of the entry I had selected (e.g., "Alarm updated from OK to ALARM"). |
 
 **AWS comparison:**
+
 ```
 aws cloudwatch describe-alarm-history --alarm-name my-alarm \
   --query 'AlarmHistoryItems[0].HistorySummary' --output text
@@ -193,6 +203,7 @@ aws cloudwatch describe-alarm-history --alarm-name my-alarm \
 | A.14.4 | I press Escape on the detail view. | I return to the alarm history list. The cursor position is preserved on the same entry. |
 
 **AWS comparison:**
+
 ```
 aws cloudwatch describe-alarm-history --alarm-name my-alarm \
   --query 'AlarmHistoryItems[0].[Timestamp,HistoryItemType,HistorySummary,HistoryData,AlarmName,AlarmType]'
@@ -258,10 +269,12 @@ aws cloudwatch describe-alarm-history --alarm-name my-alarm \
 | B.1.4 | The API responds with an error (e.g., state machine ARN invalid, no credentials). | The spinner disappears. A red error flash message appears in the header right side. |
 
 **AWS comparison:**
+
 ```
 aws stepfunctions list-executions \
   --state-machine-arn arn:aws:states:us-east-1:123456789012:stateMachine:order-processing-workflow
 ```
+
 Expected fields visible: Name, Status, Start Date, Stop Date, Duration
 
 ### B.2 EXPRESS State Machine (Not Supported)
@@ -273,6 +286,7 @@ Expected fields visible: Name, Status, Start Date, Stop Date, Duration
 | B.2.3 | I press ctrl+r on the EXPRESS message. | The message remains unchanged. No API call is made since EXPRESS state machines do not support execution listing. |
 
 **AWS comparison:**
+
 ```
 aws stepfunctions list-executions \
   --state-machine-arn arn:aws:states:us-east-1:123456789012:stateMachine:express-workflow
@@ -287,6 +301,7 @@ aws stepfunctions list-executions \
 | B.3.2 | I press ctrl+r on the empty state. | The loading spinner appears again while the refresh request is in flight. |
 
 **AWS comparison:**
+
 ```
 aws stepfunctions list-executions \
   --state-machine-arn arn:aws:states:us-east-1:123456789012:stateMachine:idle-workflow
@@ -303,6 +318,7 @@ aws stepfunctions list-executions \
 | B.4.4 | The terminal is narrower than the combined column widths (36+12+22+22+12=104 plus borders/padding). | The rightmost column(s) are hidden. Horizontal scroll with h/l is available. |
 
 **AWS comparison:**
+
 ```
 aws stepfunctions list-executions \
   --state-machine-arn arn:aws:states:us-east-1:123456789012:stateMachine:my-workflow \
@@ -339,6 +355,7 @@ aws stepfunctions list-executions \
 | B.7.3 | I press ctrl+r to refresh. | The Duration value updates to reflect the current elapsed time since the execution is still running. |
 
 **AWS comparison:**
+
 ```
 aws stepfunctions list-executions \
   --state-machine-arn arn:aws:states:us-east-1:123456789012:stateMachine:my-workflow \
@@ -353,6 +370,7 @@ aws stepfunctions list-executions \
 | B.8.1 | An execution timed out after 1 hour (the state machine timeout was 3600 seconds). | The row is RED. Status column shows "TIMED_OUT". The Duration column shows "1h 0m" or similar. Both Start Date and Stop Date are populated. |
 
 **AWS comparison:**
+
 ```
 aws stepfunctions list-executions \
   --state-machine-arn arn:aws:states:us-east-1:123456789012:stateMachine:my-workflow \
@@ -366,6 +384,7 @@ aws stepfunctions list-executions \
 | B.9.1 | An execution was manually aborted by a user. | The row is DIM (#565f89). Status column shows "ABORTED". Both dates and duration are populated. |
 
 **AWS comparison:**
+
 ```
 aws stepfunctions list-executions \
   --state-machine-arn arn:aws:states:us-east-1:123456789012:stateMachine:my-workflow \
@@ -389,6 +408,7 @@ aws stepfunctions list-executions \
 | B.11.2 | I scroll down through hundreds of executions. | Performance remains smooth. The table does not noticeably lag. |
 
 **AWS comparison:**
+
 ```
 aws stepfunctions list-executions \
   --state-machine-arn arn:aws:states:us-east-1:123456789012:stateMachine:busy-workflow \
@@ -440,6 +460,7 @@ aws stepfunctions list-executions \
 | B.16.2 | I paste from clipboard into another application. | The pasted text is a valid execution ARN (e.g., "arn:aws:states:us-east-1:123456789012:execution:order-processing-workflow:exec-2026-0322-0315-a1b2c3d4"). |
 
 **AWS comparison:**
+
 ```
 aws stepfunctions list-executions \
   --state-machine-arn arn:aws:states:us-east-1:123456789012:stateMachine:my-workflow \
@@ -458,6 +479,7 @@ aws stepfunctions list-executions \
 | B.17.5 | I press Escape on the detail view. | I return to the executions list. The cursor position is preserved. |
 
 **AWS comparison:**
+
 ```
 aws stepfunctions describe-execution \
   --execution-arn arn:aws:states:us-east-1:123456789012:execution:my-workflow:my-execution
@@ -523,10 +545,12 @@ aws stepfunctions describe-execution \
 | C.1.4 | The API responds with an error (e.g., execution ARN not found). | The spinner disappears. A red error flash message appears in the header right side. |
 
 **AWS comparison:**
+
 ```
 aws stepfunctions get-execution-history \
   --execution-arn arn:aws:states:us-east-1:123456789012:execution:my-workflow:exec-2026-0322-0115-c9d0e1f2
 ```
+
 Expected fields visible: Timestamp, Event Type, State, Detail
 
 ### C.2 EXPRESS Execution History (Not Supported)
@@ -536,6 +560,7 @@ Expected fields visible: Timestamp, Event Type, State, Detail
 | C.2.1 | I attempt to view execution history for an execution that belongs to an EXPRESS state machine. | An informational message is displayed indicating that execution history is not available for Express state machines. No API call to GetExecutionHistory is made. |
 
 **AWS comparison:**
+
 ```
 aws stepfunctions get-execution-history \
   --execution-arn arn:aws:states:us-east-1:123456789012:express:my-express-wf:exec-id:attempt-id
@@ -553,6 +578,7 @@ aws stepfunctions get-execution-history \
 | C.3.5 | The terminal is narrower than the combined column widths (22+24+24+40=110 plus borders/padding). | Rightmost columns are hidden. h/l horizontal scroll is available. |
 
 **AWS comparison:**
+
 ```
 aws stepfunctions get-execution-history \
   --execution-arn arn:aws:states:us-east-1:123456789012:execution:my-workflow:my-exec \
@@ -589,6 +615,7 @@ aws stepfunctions get-execution-history \
 | C.6.4 | I press c on the TaskFailed event. | The error detail text (error/cause) is copied to the clipboard. |
 
 **AWS comparison:**
+
 ```
 aws stepfunctions get-execution-history \
   --execution-arn arn:aws:states:us-east-1:123456789012:execution:my-workflow:failed-exec \
@@ -603,6 +630,7 @@ aws stepfunctions get-execution-history \
 | C.7.2 | A Map run failed. | A MapRunFailed event (RED) appears in the history. The Detail column shows the failure reason. |
 
 **AWS comparison:**
+
 ```
 aws stepfunctions get-execution-history \
   --execution-arn arn:aws:states:us-east-1:123456789012:execution:my-workflow:map-exec \
@@ -651,6 +679,7 @@ aws stepfunctions get-execution-history \
 | C.12.3 | I paste from clipboard. | The pasted text matches the Detail column content (or the full detail text if the column was truncated). |
 
 **AWS comparison:**
+
 ```
 aws stepfunctions get-execution-history \
   --execution-arn arn:aws:states:us-east-1:123456789012:execution:my-workflow:my-exec \
@@ -670,6 +699,7 @@ aws stepfunctions get-execution-history \
 | C.13.6 | I press Escape on the detail view. | I return to the execution history list. Cursor position is preserved. |
 
 **AWS comparison:**
+
 ```
 aws stepfunctions get-execution-history \
   --execution-arn arn:aws:states:us-east-1:123456789012:execution:my-workflow:my-exec \

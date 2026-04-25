@@ -256,6 +256,7 @@ fresh.
 ### Wireframe: Back-Navigation Preserved State
 
 Before drilling into detail (user loaded 3 pages):
+
 ```
  a9s v0.5.0  prod:us-east-1                                       ? for help
 ┌──────────────────────── ct-events(600+) ─────────────────────────────────────┐
@@ -267,6 +268,7 @@ Before drilling into detail (user loaded 3 pages):
 ```
 
 After Esc from detail (exact same state):
+
 ```
  a9s v0.5.0  prod:us-east-1                                       ? for help
 ┌──────────────────────── ct-events(600+) ─────────────────────────────────────┐

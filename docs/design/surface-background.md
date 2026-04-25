@@ -36,6 +36,7 @@ No `WithSelectedBg` helper needed — selected rows in menu/selector already wor
 Define the kind enum in the `layout` package to avoid import cycles (`tui` → `layout` already exists; `layout` cannot import `tui`):
 
 **`internal/tui/layout/header.go`** (new file, or in frame.go):
+
 ```go
 type HeaderRightKind int
 const (
@@ -70,6 +71,7 @@ const (
 **`internal/tui/layout/frame.go` — `RenderHeader()`** (line 268):
 - Accept `rightText string, rightKind HeaderRightKind` instead of `rightContent string`
 - Style right side per kind, each with `WithSurfaceBg`:
+
   ```go
   switch rightKind {
   case HeaderHelp:         right = styles.WithSurfaceBg(styles.DimText).Render(rightText)
@@ -80,6 +82,7 @@ const (
   case HeaderRevealWarn:   right = styles.WithSurfaceBg(styles.FlashError).Render(rightText)
   }
   ```
+
 - Style left segments per-fragment:
   - `styles.WithSurfaceBg(lipgloss.NewStyle().Foreground(styles.ColAccent).Bold(true)).Render("a9s")`
   - `styles.WithSurfaceBg(lipgloss.NewStyle().Foreground(styles.ColDim)).Render(" v" + version)`
@@ -148,6 +151,7 @@ Lines 303-384 have TWO rendering branches:
 - Inter-field gap `"  "`: `styles.SurfaceStyle().Render("  ")` (lines 343, 349)
 
 **Selected rows** — keep the rendering path (lines 303-330 plain text + line 383 outer wrapper). One change: add NO_COLOR guard at line 383:
+
 ```go
 if styles.NoColorActive() {
     line = lipgloss.NewStyle().Reverse(true).Render(line)
@@ -155,6 +159,7 @@ if styles.NoColorActive() {
     line = lipgloss.NewStyle().Background(styles.ColRowSelectedBg).Render(line)
 }
 ```
+
 This is needed because the current `Background(ColRowSelectedBg)` emits ANSI bg even under NO_COLOR (it's an ad-hoc style, not a composed style gated by initStyles). The reverse-video branch matches RowSelected's NO_COLOR behavior (`tui_styles_test.go:230-246`).
 
 Tests in `detail_selected_row_visibility_test.go` continue to pass: no key tint, no underline, has bg (or reverse under NO_COLOR).
@@ -200,6 +205,7 @@ Lines 220-250:
 - `descStyle := styles.WithSurfaceBg(styles.HelpDescStyle)`
 
 **`padCell()`** (line 92-96): the padding spaces at line 96 are raw `strings.Repeat(" ", ...)`. Change to:
+
 ```go
 return s + styles.SurfaceStyle().Render(strings.Repeat(" ", w-visible))
 ```
@@ -209,6 +215,7 @@ return s + styles.SurfaceStyle().Render(strings.Repeat(" ", w-visible))
 **Leading spaces** (line 129 `" " + catRow`, line 146 `" " + ...`): `styles.SurfaceStyle().Render(" ") + catRow`
 
 **`lipgloss.Place()`** calls (lines 158, 161): Place generates padding spaces that won't have bg. Replace with manual centering:
+
 ```go
 padLeft := (m.width - lipgloss.Width(themeLine)) / 2
 line := styles.SurfaceStyle().Render(strings.Repeat(" ", padLeft)) + themeLine + styles.SurfaceStyle().Render(strings.Repeat(" ", m.width-padLeft-lipgloss.Width(themeLine)))

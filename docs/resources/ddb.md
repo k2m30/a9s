@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `ddb`
 - **Display name**: DynamoDB Tables
-- **AWS API reference**: https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_TableDescription.html
+- **AWS API reference**: <https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_TableDescription.html>
 - **List API**: `ListTables` — returns table names only (no status, no size, no config).
 - **Describe API (if any)**: `DescribeTable` per table (N+1) for state and config; `DescribeContinuousBackups` per table for PITR posture.
 

@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `elb`
 - **Display name**: Load Balancers
-- **AWS API reference**: https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_LoadBalancer.html
+- **AWS API reference**: <https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_LoadBalancer.html>
 - **List API**: `DescribeLoadBalancers` (ELBv2). Classic (ELBv1) uses its own `DescribeLoadBalancers` on the `elasticloadbalancing` (v1) endpoint and returns a separate shape with no `State` field.
 - **Describe API (if any)**: not used (Wave 2 is `None` for this type).
 

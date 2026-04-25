@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `eb-rule`
 - **Display name**: EventBridge Rules
-- **AWS API reference**: https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_Rule.html
+- **AWS API reference**: <https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_Rule.html>
 - **List API**: `ListRules` — returns `[]Rule`. The SDK confirms `Name`, `State`, `EventBusName`, `EventPattern`, `ScheduleExpression`, `Description`, `RoleArn`, and `Arn` all ride on the `Rule` shape, so every Wave 1 signal is reachable with zero extra calls.
 - **Describe API (if any)**: `ListTargetsByRule` per rule — used in Wave 2 to read `Targets[]`, `Targets[].Arn`, and `Targets[].DeadLetterConfig`, none of which are on `ListRules`.
 

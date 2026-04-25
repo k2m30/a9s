@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `tg`
 - **Display name**: Target Groups
-- **AWS API reference**: https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_TargetGroup.html
+- **AWS API reference**: <https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_TargetGroup.html>
 - **List API**: `elbv2:DescribeTargetGroups` (ELBv2 — Application, Network, and Gateway Load Balancers). Classic (ELBv1) does not have target groups; instances are registered directly on the LB.
 - **Describe API (if any)**: `elbv2:DescribeTargetHealth(TargetGroupArn=<this>)` — one call per target group (Wave 2, bounded per-resource fan-out).
 

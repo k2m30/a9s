@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `efs`
 - **Display name**: EFS File Systems
-- **AWS API reference**: https://docs.aws.amazon.com/efs/latest/ug/API_FileSystemDescription.html
+- **AWS API reference**: <https://docs.aws.amazon.com/efs/latest/ug/API_FileSystemDescription.html>
 - **List API**: `DescribeFileSystems` — returns `FileSystemDescription[]`. The SDK confirms `LifeCycleState`, `NumberOfMountTargets`, `FileSystemId`, `FileSystemArn`, `Name`, `KmsKeyId`, `Encrypted`, `SizeInBytes`, `PerformanceMode`, `ThroughputMode` are all on the description shape, so both Wave 1 signals are reachable with zero extra calls.
 - **Describe API (if any)**: `DescribeMountTargets` per file system — used in Wave 2 to read each mount target's `LifeCycleState`, `SubnetId`, `VpcId`, `NetworkInterfaceId`. These fields do not exist on the file-system summary.
 
@@ -46,7 +46,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `b
 ### `ec2`
 
 - **Why related**: EC2 instances that mount this file system via NFS — the obvious set of consumers.
-- **How discovered**: `TBD — a9s-devops (2026-04-20): possible=weak, worth=no. There is no direct EFS→EC2 field; the only inference is "instances whose subnet matches a mount-target subnet", which is noisy (every instance in those subnets appears, not just mounters). Daily operators reach EC2 via the `subnet` or `eni` pivots instead, so a9s should not fabricate a consumer list here.` Render the pivot as an empty panel unless a field-backed mechanism is added upstream.
+- **How discovered**: `TBD — a9s-devops (2026-04-20): possible=weak, worth=no. There is no direct EFS→EC2 field; the only inference is "instances whose subnet matches a mount-target subnet", which is noisy (every instance in those subnets appears, not just mounters). Daily operators reach EC2 via the`subnet` or `eni`pivots instead, so a9s should not fabricate a consumer list here.` Render the pivot as an empty panel unless a field-backed mechanism is added upstream.
 - **Count shown**: unknown.
 
 ### `ecs-task`

@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `ec2`
 - **Display name**: EC2 Instances
-- **AWS API reference**: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Instance.html
+- **AWS API reference**: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Instance.html>
 - **List API**: `DescribeInstances`
 - **Describe API (if any)**: `DescribeInstanceStatus(IncludeAllInstances=true)` — one account-wide call used by the Wave 2 issue enricher; no per-instance `DescribeInstances` fan-out.
 
@@ -257,13 +257,13 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s golden doc — per-target reasoning (`alarm`, `ami`, `asg`, `backup`, `cfn`, `ct-events`, `ebs`, `ebs-snap`, `eip`, `eni`, `kms`, `logs`, `ng`, `role`, `sg`, `ssm`, `subnet`, `tg`, `vpc`) — `docs/related-resources.md` § Per-target reasoning / `ec2`.
 - a9s golden doc — `ct-events` as universal pivot — `docs/related-resources.md` § Policy (item 4).
 - a9s golden doc — read-only invariant — `docs/architecture.md` § "What is a9s?".
-- AWS API Reference — `State.Name`, `StateReason.Code`, `StateReason.Message`, `StateTransitionReason`, `ImageId`, `BlockDeviceMappings`, `NetworkInterfaces`, `SecurityGroups`, `SubnetId`, `VpcId`, `IamInstanceProfile`, `Tags` — `AWS API Reference: API_Instance` (https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Instance.html).
-- AWS API Reference — `InstanceStatusEvent.Code` values (`instance-reboot`, `system-reboot`, `system-maintenance`, `instance-retirement`, `instance-stop`), `NotBefore`, `NotAfter`, `NotBeforeDeadline` — `AWS API Reference: API_InstanceStatusEvent` (https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_InstanceStatusEvent.html).
-- AWS API Reference — `Volume.KmsKeyId` (kms pivot via volumes) — `AWS API Reference: API_Volume` (https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Volume.html).
-- AWS API Reference — `Address.InstanceId` and `Address.NetworkInterfaceId` (eip pivot) — `AWS API Reference: API_Address` (https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Address.html).
-- AWS API Reference — `MetricAlarm.Dimensions[]` (alarm pivot) — `AWS API Reference: API_MetricAlarm` (https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_MetricAlarm.html).
-- AWS API Reference — `TargetHealthDescription.Target.Id` (tg pivot) — `AWS API Reference: API_DescribeTargetHealth` (https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_DescribeTargetHealth.html).
-- AWS API Reference — `ssm:DescribeInstanceInformation` filtered by `InstanceIds` (ssm Managed-Instance pivot) — `AWS API Reference: API_DescribeInstanceInformation` (https://docs.aws.amazon.com/systems-manager/latest/APIReference/API_DescribeInstanceInformation.html).
+- AWS API Reference — `State.Name`, `StateReason.Code`, `StateReason.Message`, `StateTransitionReason`, `ImageId`, `BlockDeviceMappings`, `NetworkInterfaces`, `SecurityGroups`, `SubnetId`, `VpcId`, `IamInstanceProfile`, `Tags` — `AWS API Reference: API_Instance` (<https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Instance.html>).
+- AWS API Reference — `InstanceStatusEvent.Code` values (`instance-reboot`, `system-reboot`, `system-maintenance`, `instance-retirement`, `instance-stop`), `NotBefore`, `NotAfter`, `NotBeforeDeadline` — `AWS API Reference: API_InstanceStatusEvent` (<https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_InstanceStatusEvent.html>).
+- AWS API Reference — `Volume.KmsKeyId` (kms pivot via volumes) — `AWS API Reference: API_Volume` (<https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Volume.html>).
+- AWS API Reference — `Address.InstanceId` and `Address.NetworkInterfaceId` (eip pivot) — `AWS API Reference: API_Address` (<https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Address.html>).
+- AWS API Reference — `MetricAlarm.Dimensions[]` (alarm pivot) — `AWS API Reference: API_MetricAlarm` (<https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_MetricAlarm.html>).
+- AWS API Reference — `TargetHealthDescription.Target.Id` (tg pivot) — `AWS API Reference: API_DescribeTargetHealth` (<https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_DescribeTargetHealth.html>).
+- AWS API Reference — `ssm:DescribeInstanceInformation` filtered by `InstanceIds` (ssm Managed-Instance pivot) — `AWS API Reference: API_DescribeInstanceInformation` (<https://docs.aws.amazon.com/systems-manager/latest/APIReference/API_DescribeInstanceInformation.html>).
 - a9s-devops consultation — `alarm` discovery via `Dimensions{InstanceId,...}` on loaded alarm list — a9s-devops (2026-04-20): possible=yes, worth=yes. Dimensions are the canonical target pointer for CloudWatch alarms; cache-scan is zero-cost when alarms are loaded.
 - a9s-devops consultation — `asg` discovery via `aws:autoscaling:groupName` tag — a9s-devops (2026-04-20): possible=yes, worth=yes. AWS sets the reserved tag on every ASG-launched instance; tag lookup is the cheap pivot.
 - a9s-devops consultation — `backup` discovery via plan-selection tag match / `ListProtectedResources` — a9s-devops (2026-04-20): possible=yes, worth=yes. AWS Backup associates resources by tag-based selections; tag scan is zero-cost, API fallback covers ARN-based selections.

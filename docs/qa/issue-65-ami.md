@@ -17,6 +17,7 @@ All stories are written from a black-box perspective against the design spec and
 | A.1.3 | I type `:ami` in command mode and press Enter. | The view navigates directly to the AMI list view from any other view. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-images --owners self --query 'Images[].{Name:Name,ImageId:ImageId,State:State}'
 ```
@@ -37,9 +38,11 @@ aws ec2 describe-images --owners self --query 'Images[].{Name:Name,ImageId:Image
 | A.2.10 | Columns are space-aligned, not pipe-separated. | Columns are padded with whitespace; no vertical pipe characters appear between columns. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-images --owners self --query 'Images[].{Name:Name,ImageId:ImageId,State:State,Arch:Architecture,Platform:PlatformDetails,RootDeviceType:RootDeviceType,Created:CreationDate,Public:Public}'
 ```
+
 Expected fields visible: Name, Image ID, State, Architecture, Platform, Root Device Type, Creation Date, Public
 
 ### A.3 Frame and Title
@@ -69,6 +72,7 @@ Expected fields visible: Name, Image ID, State, Architecture, Platform, Root Dev
 | A.5.5 | I select a colored row. | The selected row shows full-width blue background (`#7aa2f7`) with dark foreground (`#1a1b26`), overriding the status color. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-images --owners self --query 'Images[].{Name:Name,State:State}'
 ```
@@ -169,6 +173,7 @@ aws ec2 describe-images --owners self --query 'Images[].{Name:Name,State:State}'
 | B.2.12 | Tags field is shown. | A section showing tag key-value pairs. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-images --image-ids ami-0abc123def456789a --query 'Images[0]'
 ```
@@ -230,6 +235,7 @@ aws ec2 describe-images --image-ids ami-0abc123def456789a --query 'Images[0]'
 | C.2.3 | Tags render as a YAML list. | Each tag appears as a list item with Key and Value fields. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-images --image-ids ami-0abc123def456789a --output yaml
 ```
@@ -268,6 +274,7 @@ This child view shows the EBS snapshots that back the selected AMI, derived from
 | D.1.3 | Press `Esc`. | Return to the AMI list with the same AMI still selected. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-images --image-ids ami-0abc123 --query 'Images[0].BlockDeviceMappings[].Ebs.SnapshotId'
 aws ec2 describe-snapshots --snapshot-ids snap-aaa snap-bbb snap-ccc
@@ -310,6 +317,7 @@ This child view shows EC2 instances that were launched from the selected AMI.
 | E.1.3 | Press `Esc`. | Return to the AMI list with the same AMI still selected. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-instances --filters "Name=image-id,Values=ami-0abc123" --query 'Reservations[].Instances[].{ID:InstanceId,State:State.Name}'
 ```

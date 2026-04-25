@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `cf`
 - **Display name**: CloudFront Distributions
-- **AWS API reference**: https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_Distribution.html
+- **AWS API reference**: <https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_Distribution.html>
 - **List API**: `ListDistributions`
 - **Describe API (if any)**: `GetDistributionConfig` per distribution (Wave 2: access-log enablement).
 
@@ -177,8 +177,8 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - AWS Go SDK v2 — `ViewerCertificate` + `CloudFrontDefaultCertificate` + `MinimumProtocolVersion` — `AWS SDK Go v2 — cloudfront/types.ViewerCertificate § CloudFrontDefaultCertificate, MinimumProtocolVersion, ACMCertificateArn`.
 - AWS Go SDK v2 — `Origins.Items[].DomainName` (cross-reference target) — `AWS SDK Go v2 — cloudfront/types.Origin § DomainName`.
 - AWS Go SDK v2 — `LoggingConfig.Enabled` + `Bucket` (Wave 2 access-log check and s3 sink pivot) — `AWS SDK Go v2 — cloudfront/types.LoggingConfig § Enabled, Bucket`.
-- AWS API Reference (fallback) — `ListDistributions` return shape — AWS API Reference: ListDistributions § DistributionList (https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_ListDistributions.html).
-- AWS API Reference (fallback) — `GetDistributionConfig` return shape — AWS API Reference: GetDistributionConfig § DistributionConfig (https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_GetDistributionConfig.html).
+- AWS API Reference (fallback) — `ListDistributions` return shape — AWS API Reference: ListDistributions § DistributionList (<https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_ListDistributions.html>).
+- AWS API Reference (fallback) — `GetDistributionConfig` return shape — AWS API Reference: GetDistributionConfig § DistributionConfig (<https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_GetDistributionConfig.html>).
 - a9s-devops consultation — `acm` pivot only meaningful when not using CloudFront default cert — a9s-devops (2026-04-20): possible=yes, worth=yes. Default-cert distributions have no ACM ARN to follow.
 - a9s-devops consultation — `alarm` discovery via CW `AWS/CloudFront` namespace + `DistributionId` dimension — a9s-devops (2026-04-20): possible=yes, worth=yes. Standard CW namespace, no extra API.
 - a9s-devops consultation — `elb` discovery via name-match of `Origins[].DomainName` against ELB `DNSName` — a9s-devops (2026-04-20): possible=yes, worth=yes. No direct ARN field on the origin; name match is the standard cross-reference.

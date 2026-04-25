@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `eip`
 - **Display name**: Elastic IPs
-- **AWS API reference**: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Address.html
+- **AWS API reference**: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Address.html>
 - **List API**: `DescribeAddresses`
 - **Describe API (if any)**: not used — Wave 2 is `None` in `docs/attention-signals.md`. `DescribeAddressesAttribute` (reverse-DNS) is listed but explicitly Wave 3 and out of scope.
 
@@ -170,7 +170,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s golden doc — Wave 2 `None`; Wave 3 `DescribeAddressesAttribute` (reverse-DNS) — `docs/attention-signals.md` § Networking / `eip`.
 - a9s golden doc — read-only invariant used in §5 — `docs/architecture.md` § What is a9s?.
 - AWS Go SDK v2 — `Address.AllocationId`, `Address.AssociationId`, `Address.InstanceId`, `Address.NetworkInterfaceId`, `Address.Tags` — `AWS SDK Go v2 — service/ec2/types.Address § AllocationId, AssociationId, InstanceId, NetworkInterfaceId, Tags`.
-- AWS API Reference — `Address` response shape — `AWS API Reference: API_Address` (https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Address.html).
+- AWS API Reference — `Address` response shape — `AWS API Reference: API_Address` (<https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Address.html>).
 - a9s-devops persona — `alarm` discovered via CloudWatch `Dimensions[]` on `AllocationId`/`NetworkInterfaceId` — persona (2026-04-20): possible=partial, worth=yes-narrow. CloudWatch has no EIP-scoped metric namespace; alarms in practice dimension on the ENI or NAT that carries the traffic, so cache-scan of loaded alarms is the correct pivot.
 - a9s-devops persona — `asg` via two-hop `ec2` lookup (`Address.InstanceId` → `Instance.Tags[aws:autoscaling:groupName]`) — persona (2026-04-20): possible=yes, worth=yes. Operator needs to know whether the underlying instance is replaceable by an ASG.
 - a9s-devops persona — `cfn` via `Address.Tags[aws:cloudformation:stack-name]` — persona (2026-04-20): possible=yes, worth=yes. CFN writes reserved tags on stack-managed resources; cheap cache pivot.

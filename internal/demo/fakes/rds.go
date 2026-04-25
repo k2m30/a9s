@@ -45,3 +45,13 @@ func (f *RDSFake) DescribePendingMaintenanceActions(_ context.Context, _ *rds.De
 func (f *RDSFake) DescribeDBSubnetGroups(_ context.Context, _ *rds.DescribeDBSubnetGroupsInput, _ ...func(*rds.Options)) (*rds.DescribeDBSubnetGroupsOutput, error) {
 	return &rds.DescribeDBSubnetGroupsOutput{}, nil
 }
+
+// DescribeDBClusters returns the Aurora + Multi-AZ DB clusters from fixture data.
+func (f *RDSFake) DescribeDBClusters(_ context.Context, _ *rds.DescribeDBClustersInput, _ ...func(*rds.Options)) (*rds.DescribeDBClustersOutput, error) {
+	return &rds.DescribeDBClustersOutput{DBClusters: f.fix.DBClusters}, nil
+}
+
+// DescribeDBClusterSnapshots returns the Aurora + Multi-AZ DB cluster snapshots from fixture data.
+func (f *RDSFake) DescribeDBClusterSnapshots(_ context.Context, _ *rds.DescribeDBClusterSnapshotsInput, _ ...func(*rds.Options)) (*rds.DescribeDBClusterSnapshotsOutput, error) {
+	return &rds.DescribeDBClusterSnapshotsOutput{DBClusterSnapshots: f.fix.DBClusterSnapshots}, nil
+}

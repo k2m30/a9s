@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `logs`
 - **Display name**: CloudWatch Log Groups
-- **AWS API reference**: https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_LogGroup.html
+- **AWS API reference**: <https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_LogGroup.html>
 - **List API**: `DescribeLogGroups` (per group returns `logGroupName`, `creationTime`, `retentionInDays`, `metricFilterCount`, `arn`, `storedBytes`, `kmsKeyId`, `dataProtectionStatus`, `logGroupClass`; no event-level data).
 - **Describe API (if any)**: `DescribeLogStreams` (per log group, ordered by `LastEventTime` descending, `limit=1`) — used in Wave 2 to read `lastEventTimestamp` for silent-service detection.
 

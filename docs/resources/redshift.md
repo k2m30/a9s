@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `redshift`
 - **Display name**: Redshift Clusters
-- **AWS API reference**: https://docs.aws.amazon.com/redshift/latest/APIReference/API_Cluster.html
+- **AWS API reference**: <https://docs.aws.amazon.com/redshift/latest/APIReference/API_Cluster.html>
 - **List API**: `DescribeClusters` (returns fully-populated `Cluster` shapes in one paged call; no per-resource Describe needed for Wave 1 signals).
 - **Describe API (if any)**: not used — Wave 2 is `None` per `attention-signals.md`. `DescribeLoggingStatus` is only invoked to resolve the `logs` / `s3` related-panel pivots, not for attention signals.
 

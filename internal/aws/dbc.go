@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
@@ -15,12 +16,71 @@ import (
 func init() {
 	resource.RegisterFieldKeys("dbc", []string{"cluster_id", "engine_version", "status", "instances", "endpoint", "arn", "has_writer", "writer_count", "deletion_protection", "storage_encrypted", "backup_retention_period"})
 
+	// dbc fetcher merges results from two separate SDK calls:
+	//   c.DocDB.DescribeDBClusters — DocumentDB clusters. The docdb SDK docstring
+	//     (docdb@v1.48.12/api_op_DescribeDBClusters.go:14-19) instructs callers to
+	//     use filterName=engine,Values=docdb for DocDB-only results — unfiltered
+	//     behavior is documented as ambiguous, not engine-agnostic.
+	//   c.RDS.DescribeDBClusters   — Aurora + Multi-AZ clusters
+	//     (rds@v1.116.3/api_op_DescribeDBClusters.go:19-28). May also return Neptune
+	//     / DocumentDB rows — both SDKs must be called to get complete coverage.
+	// Token format: "" or "docdb:<tok>" for DocDB pages, then "rds:" (sentinel) or
+	// "rds:<tok>" for RDS pages.
 	resource.RegisterPaginated("dbc", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchDocDBClustersPage(ctx, c.DocDB, continuationToken)
+
+		// RDS phase: continuation already transitioned to RDS side.
+		if rdsTok, ok2 := strings.CutPrefix(continuationToken, "rds:"); ok2 {
+			result, err := FetchRDSDBClustersPage(ctx, c.RDS, rdsTok)
+			if err != nil {
+				return resource.FetchResult{}, err
+			}
+			if result.Pagination != nil && result.Pagination.IsTruncated {
+				result.Pagination.NextToken = "rds:" + result.Pagination.NextToken
+			}
+			return result, nil
+		}
+
+		// DocDB phase (continuationToken == "" or "docdb:<tok>").
+		docdbTok, _ := strings.CutPrefix(continuationToken, "docdb:")
+		docResult, err := FetchDocDBClustersPage(ctx, c.DocDB, docdbTok)
+		if err != nil {
+			return resource.FetchResult{}, err
+		}
+		if docResult.Pagination != nil && docResult.Pagination.IsTruncated {
+			// DocDB still has more pages — return with docdb: prefix.
+			docResult.Pagination.NextToken = "docdb:" + docResult.Pagination.NextToken
+			return docResult, nil
+		}
+
+		// DocDB exhausted — fetch RDS page 1 and append.
+		rdsResult, err := FetchRDSDBClustersPage(ctx, c.RDS, "")
+		if err != nil {
+			return resource.FetchResult{}, err
+		}
+		docResult.Resources = append(docResult.Resources, rdsResult.Resources...)
+		if rdsResult.Pagination != nil && rdsResult.Pagination.IsTruncated {
+			return resource.FetchResult{
+				Resources: docResult.Resources,
+				Pagination: &resource.PaginationMeta{
+					IsTruncated: true,
+					NextToken:   "rds:" + rdsResult.Pagination.NextToken,
+					PageSize:    len(docResult.Resources),
+					TotalHint:   -1,
+				},
+			}, nil
+		}
+		return resource.FetchResult{
+			Resources: docResult.Resources,
+			Pagination: &resource.PaginationMeta{
+				IsTruncated: false,
+				PageSize:    len(docResult.Resources),
+				TotalHint:   len(docResult.Resources),
+			},
+		}, nil
 	})
 
 	resource.RegisterRelated("dbc", []resource.RelatedDef{
@@ -45,15 +105,13 @@ func init() {
 	})
 }
 
-// FetchDocDBClusters calls the DescribeDBClusters API and converts the
-// response into a slice of generic Resource structs.
-//
-// Coverage: returns ALL DB clusters (Aurora, DocumentDB, Neptune). Both the
-// docdb and rds SDK clients target rds.{region}.amazonaws.com — the
-// DescribeDBClusters API is engine-agnostic at the backend, the SDK only
-// chooses the deserialization namespace. Aurora rows arrive as
-// docdbtypes.DBCluster shapes here. Spec citation: docs/resources/dbc.md
-// (and dbc-snap.md §1 Coverage for the snapshot side).
+// FetchDocDBClusters calls the DocumentDB DescribeDBClusters API and converts the
+// response into a slice of generic Resource structs. This covers DocumentDB
+// clusters only. The docdb SDK docstring
+// (docdb@v1.48.12/api_op_DescribeDBClusters.go:14-19) instructs callers to use
+// filterName=engine,Values=docdb for DocDB-only results — unfiltered behavior is
+// documented as ambiguous, not engine-agnostic. Aurora + Multi-AZ clusters are
+// fetched separately via FetchRDSDBClustersPage.
 func FetchDocDBClusters(ctx context.Context, api DocDBDescribeDBClustersAPI) ([]resource.Resource, error) {
 	var all []resource.Resource
 	token := ""

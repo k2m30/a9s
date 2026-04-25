@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `role`
 - **Display name**: IAM Roles
-- **AWS API reference**: https://docs.aws.amazon.com/IAM/latest/APIReference/API_Role.html
+- **AWS API reference**: <https://docs.aws.amazon.com/IAM/latest/APIReference/API_Role.html>
 - **List API**: `ListRoles` (each list entry is a `Role` struct, including the URL-encoded `AssumeRolePolicyDocument`).
 - **Describe API (if any)**: `GetRole` — used in Wave 2 only, to fetch `RoleLastUsed.LastUsedDate` (the list response's `Role` does not carry `RoleLastUsed` reliably; `GetRole` is the canonical source).
 

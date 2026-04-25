@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `eks`
 - **Display name**: EKS Clusters
-- **AWS API reference**: https://docs.aws.amazon.com/eks/latest/APIReference/API_Cluster.html
+- **AWS API reference**: <https://docs.aws.amazon.com/eks/latest/APIReference/API_Cluster.html>
 - **List API**: `ListClusters` — returns cluster name strings only. The SDK confirms the list response carries nothing useful for attention: no status, no health, no VPC config. Every operator-visible signal requires the Describe.
 - **Describe API (if any)**: `DescribeCluster` per cluster (N+1 fan-out) — returns `types.Cluster` carrying `Status`, `Health.Issues[]`, `Version`, `PlatformVersion`, `RoleArn`, `ResourcesVpcConfig`, `EncryptionConfig[]`, `Tags`. All Wave 2 signals and most related-panel pivots read from this shape.
 

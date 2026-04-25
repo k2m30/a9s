@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `sns-sub`
 - **Display name**: SNS Subscriptions
-- **AWS API reference**: https://docs.aws.amazon.com/sns/latest/api/API_Subscription.html
+- **AWS API reference**: <https://docs.aws.amazon.com/sns/latest/api/API_Subscription.html>
 - **List API**: `ListSubscriptions`
 - **Describe API (if any)**: not used (Wave 2 is `None`; `GetSubscriptionAttributes` is documented as Wave 3 and stays out of scope)
 

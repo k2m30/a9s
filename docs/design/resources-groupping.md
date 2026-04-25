@@ -1,4 +1,3 @@
- 
 
  ┌───────────────┬─────────────────────────────────────────────────────────────────────┐
  │ COMPUTE       │ EC2, ECS Services, ECS Clusters, ECS Tasks, Lambda, ASG, Elastic    │

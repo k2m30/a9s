@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `policy`
 - **Display name**: IAM Policies
-- **AWS API reference**: https://docs.aws.amazon.com/IAM/latest/APIReference/API_Policy.html
+- **AWS API reference**: <https://docs.aws.amazon.com/IAM/latest/APIReference/API_Policy.html>
 - **List API**: `ListPolicies` (returns `Policy[]` with `Arn`, `PolicyName`, `AttachmentCount`, `DefaultVersionId`, `IsAttachable`, `Path`, `PermissionsBoundaryUsageCount`, `PolicyId`, `CreateDate`, `UpdateDate` — note: `Document` is NOT on the list response; it requires `GetPolicyVersion`).
 - **Describe API (if any)**: `GetPolicyVersion` (Wave 2; fetches the policy `Document` for the `DefaultVersionId` so the JSON can be scanned for wildcard-admin statements).
 

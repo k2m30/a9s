@@ -58,6 +58,7 @@ warn the user on first use.
 | C.1.4 | The API responds with an error (e.g., no permissions for ce:GetCostAndUsage). | The spinner disappears. A red error flash message appears in the header. |
 
 **AWS comparison:**
+
 ```
 aws ce get-cost-and-usage --time-period Start=2026-03-01,End=2026-03-27 --granularity MONTHLY --metrics UnblendedCost
 ```
@@ -72,10 +73,12 @@ aws ce get-cost-and-usage --time-period Start=2026-03-01,End=2026-03-27 --granul
 | C.2.4 | The delta (month-over-month comparison) is computed. | "Delta vs Last Month" shows the difference between current month total and last month total as both an absolute dollar amount and a percentage. |
 
 **AWS comparison:**
+
 ```
 aws ce get-cost-and-usage --time-period Start=2026-03-01,End=2026-03-28 --granularity MONTHLY --metrics UnblendedCost
 aws ce get-cost-forecast --time-period Start=2026-03-28,End=2026-04-01 --granularity MONTHLY --metric UNBLENDED_COST
 ```
+
 Expected fields visible: Period, Total Cost, Forecast, Delta vs Last Month, Top Service
 
 ### C.3 Delta Color Coding
@@ -134,6 +137,7 @@ Expected fields visible: Period, Total Cost, Forecast, Delta vs Last Month, Top 
 | D.1.3 | The API responds with an error. | A red error flash appears in the header. |
 
 **AWS comparison:**
+
 ```
 aws ce get-cost-and-usage --time-period Start=2026-03-01,End=2026-03-28 --granularity MONTHLY --metrics UnblendedCost --group-by Type=DIMENSION,Key=SERVICE
 ```
@@ -147,9 +151,11 @@ aws ce get-cost-and-usage --time-period Start=2026-03-01,End=2026-03-28 --granul
 | D.2.3 | Services with zero cost are either hidden or shown at the bottom in DIM text. | Zero-cost services do not clutter the display. |
 
 **AWS comparison:**
+
 ```
 aws ce get-cost-and-usage --time-period Start=2026-03-01,End=2026-03-28 --granularity MONTHLY --metrics UnblendedCost --group-by Type=DIMENSION,Key=SERVICE --query 'ResultsByTime[0].Groups[].[Keys[0],Metrics.UnblendedCost.Amount]' --output table
 ```
+
 Expected fields visible: Service, Cost, % of Total, Delta, Trend
 
 ### D.3 Sorting
@@ -197,6 +203,7 @@ Expected fields visible: Service, Cost, % of Total, Delta, Trend
 | E.1.2 | The API responds successfully. | The table renders with one row per day, showing daily cost totals. The frame title shows the period context (e.g., "daily-costs -- Mar 2026"). |
 
 **AWS comparison:**
+
 ```
 aws ce get-cost-and-usage --time-period Start=2026-03-01,End=2026-03-28 --granularity DAILY --metrics UnblendedCost
 ```
@@ -210,9 +217,11 @@ aws ce get-cost-and-usage --time-period Start=2026-03-01,End=2026-03-28 --granul
 | E.2.3 | The first day of the period has no previous day to compare. | The "Delta vs Prev Day" column shows "n/a" or a dash for the first row. |
 
 **AWS comparison:**
+
 ```
 aws ce get-cost-and-usage --time-period Start=2026-03-01,End=2026-03-28 --granularity DAILY --metrics UnblendedCost --query 'ResultsByTime[].[TimePeriod.Start,Total.UnblendedCost.Amount]' --output table
 ```
+
 Expected fields visible: Date, Cost, Delta vs Prev Day
 
 ### E.3 Delta Color Coding
@@ -250,6 +259,7 @@ Expected fields visible: Date, Cost, Delta vs Prev Day
 | F.2.2 | I configure `costs.metric: AmortizedCost`. | All cost values display amortized costs (spreads upfront fees like RI/SP across the period). |
 
 **AWS comparison:**
+
 ```
 aws ce get-cost-and-usage --time-period Start=2026-03-01,End=2026-03-28 --granularity MONTHLY --metrics BlendedCost
 aws ce get-cost-and-usage --time-period Start=2026-03-01,End=2026-03-28 --granularity MONTHLY --metrics AmortizedCost
@@ -407,6 +417,7 @@ aws ce get-cost-and-usage --time-period Start=2026-03-01,End=2026-03-28 --granul
 | N.1.2 | I navigate to a cost-by-account breakdown (if available as a child view or configuration option). | Columns include: "Account" (account name or ID), "Cost", "% of Total", "Delta". Each linked account appears as a row. |
 
 **AWS comparison:**
+
 ```
 aws ce get-cost-and-usage --time-period Start=2026-03-01,End=2026-03-28 --granularity MONTHLY --metrics UnblendedCost --group-by Type=DIMENSION,Key=LINKED_ACCOUNT
 ```

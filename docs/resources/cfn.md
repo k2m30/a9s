@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `cfn`
 - **Display name**: CloudFormation Stacks
-- **AWS API reference**: https://docs.aws.amazon.com/AWSCloudFormation/latest/APIReference/API_Stack.html
+- **AWS API reference**: <https://docs.aws.amazon.com/AWSCloudFormation/latest/APIReference/API_Stack.html>
 - **List API**: `DescribeStacks`
 - **Describe API (if any)**: `DescribeStackEvents` (Wave 2 — one per stack, client-side scan of the first page of recent events)
 

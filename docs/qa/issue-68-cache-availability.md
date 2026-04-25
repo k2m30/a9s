@@ -22,6 +22,7 @@ verify data parity.
 | A.1.4 | The background checks complete for all resource types. | The cache file is written to `~/.a9s/cache/<profile>.yaml` (where `<profile>` is the current AWS profile name). The file contains the profile name, region, timestamp, and per-resource-type boolean availability. |
 
 **AWS comparison:**
+
 ```
 # Equivalent of lightweight availability checks:
 aws ec2 describe-instances --max-items 1 --query 'Reservations[0].Instances[0].InstanceId'
@@ -122,6 +123,7 @@ aws lambda list-functions --max-items 1 --query 'Functions[0].FunctionName'
 | F.1.4 | I switch profiles rapidly (prod -> staging -> dev within seconds). | Each switch cancels the previous background checks and starts new ones for the current profile. No stale results from a previous profile's check appear. |
 
 **AWS comparison:**
+
 ```
 # Each profile switch is equivalent to:
 export AWS_PROFILE=staging
@@ -143,6 +145,7 @@ aws s3api list-buckets --query 'Buckets[0]'
 | G.1.3 | I switch back to us-east-1. | The cached state for us-east-1 is restored instantly. Resource types that were available before are shown in normal style. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-instances --region eu-west-1 --max-items 1
 aws s3api list-buckets  # S3 is global but bucket region is checked

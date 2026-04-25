@@ -69,6 +69,7 @@ Source struct: `elbtypes.TargetHealthDescription`
 ```
 
 With Description column scrolled into view (via `l` key):
+
 ```
 │ HEALTH         REASON                       DESCRIPTION                          │
 │ healthy        —                            —                                    │
@@ -78,6 +79,7 @@ With Description column scrolled into view (via `l` key):
 ```
 
 IP-type target group example:
+
 ```
 │ TARGET ID                PORT     AZ             HEALTH         REASON           │
 │ 10.0.1.47                8080     us-east-1a     healthy        —                │

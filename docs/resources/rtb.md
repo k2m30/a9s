@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `rtb`
 - **Display name**: Route Tables
-- **AWS API reference**: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_RouteTable.html
+- **AWS API reference**: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_RouteTable.html>
 - **List API**: `DescribeRouteTables`
 - **Describe API (if any)**: not used — Wave 1 only; `DescribeRouteTables` already returns the full `Routes[]`, `Associations[]`, and `Tags[]` needed for every signal and related-panel pivot.
 

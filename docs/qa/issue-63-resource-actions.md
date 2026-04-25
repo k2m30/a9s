@@ -21,11 +21,13 @@ verify data parity.
 | A.1.3 | I select a folder prefix "data/2026/" (displayed as a folder row) and press `c`. | The S3 URI for the prefix "s3://static-assets-prod/data/2026/" is copied. |
 
 **AWS comparison:**
+
 ```
 # No direct CLI equivalent -- the user would manually construct:
 # s3://static-assets-prod/images/logo.png
 # a9s copies this automatically
 ```
+
 Expected S3 object fields: Key (width 36), Size (width 12), Storage Class (width 16), Last Modified (width 22)
 
 ### A.2 Copy Secret Value
@@ -38,9 +40,11 @@ Expected S3 object fields: Key (width 36), Size (width 12), Storage Class (width
 | A.2.4 | I do not have permission to retrieve the secret value (missing `secretsmanager:GetSecretValue`). I press `c`. | A red error flash appears in the header: "Error: AccessDenied" (or similar). Nothing is copied to the clipboard. The application does not crash. |
 
 **AWS comparison:**
+
 ```
 aws secretsmanager get-secret-value --secret-id prod/api/database-password --query 'SecretString' --output text
 ```
+
 Expected Secrets Manager list fields: Secret Name (width 36), Description (width 30), Last Accessed (width 18), Last Changed (width 18), Rotation (width 10)
 
 ### A.3 Copy SSM Parameter Value
@@ -52,9 +56,11 @@ Expected Secrets Manager list fields: Secret Name (width 36), Description (width
 | A.3.3 | The parameter is of type "StringList" (e.g., "us-east-1,us-west-2,eu-west-1"). I press `c`. | The full comma-separated string is copied to the clipboard. |
 
 **AWS comparison:**
+
 ```
 aws ssm get-parameter --name /app/config/api-key --with-decryption --query 'Parameter.Value' --output text
 ```
+
 Expected SSM list fields: Name (width 40), Type (width 14), Version (width 8), Last Modified (width 22), Description (width 30)
 
 ### A.4 Copy Resource ARN (General)
@@ -68,6 +74,7 @@ Expected SSM list fields: Name (width 40), Type (width 14), Version (width 8), L
 | A.4.5 | I am viewing the CloudFormation stacks list. I select a stack and press `c`. | The stack ID (ARN) is copied to the clipboard. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-instances --instance-ids i-0abc123 --query 'Reservations[0].Instances[0].InstanceId'
 aws lambda get-function --function-name data-processor --query 'Configuration.FunctionArn'
@@ -88,9 +95,11 @@ aws lambda get-function --function-name data-processor --query 'Configuration.Fu
 | B.1.5 | The download destination disk is full. | An error flash appears indicating the disk space issue. Partial downloads are cleaned up. |
 
 **AWS comparison:**
+
 ```
 aws s3 cp s3://static-assets-prod/images/logo.png ~/Downloads/logo.png
 ```
+
 Expected S3 object fields: Key (width 36), Size (width 12), Storage Class (width 16), Last Modified (width 22)
 
 ---
@@ -108,9 +117,11 @@ Expected S3 object fields: Key (width 36), Size (width 12), Storage Class (width
 | C.1.5 | I do not have `ec2:StartInstances` permission. I confirm the start action. | A red error flash appears: "Error: UnauthorizedOperation" or "Error: insufficient permissions". The instance state does not change. |
 
 **AWS comparison:**
+
 ```
 aws ec2 start-instances --instance-ids i-0abc123
 ```
+
 Expected EC2 list fields: Name (width 24), State (width 12), Lifecycle (width 12), Type (width 14), Private IP (width 16), Public IP (width 16), Instance ID (width 20), Launch Time (width 22)
 
 ### C.2 Stop Instance
@@ -123,6 +134,7 @@ Expected EC2 list fields: Name (width 24), State (width 12), Lifecycle (width 12
 | C.2.4 | The instance is already "stopped". I press `s`. | Nothing happens or a flash indicates the instance is already stopped. |
 
 **AWS comparison:**
+
 ```
 aws ec2 stop-instances --instance-ids i-0abc123
 ```
@@ -136,6 +148,7 @@ aws ec2 stop-instances --instance-ids i-0abc123
 | C.3.3 | I press `N` or `Esc`. | The action is cancelled. No API call is made. |
 
 **AWS comparison:**
+
 ```
 aws ec2 reboot-instances --instance-ids i-0abc123
 ```
@@ -157,9 +170,11 @@ aws ec2 reboot-instances --instance-ids i-0abc123
 | D.1.3 | I cancel with `N` or `Esc`. | No API call is made. Service remains unchanged. |
 
 **AWS comparison:**
+
 ```
 aws ecs update-service --cluster CLUSTER --service api-service --force-new-deployment
 ```
+
 Expected ECS service list fields: Service Name (width 32), Cluster (width 24), Status (width 12), Desired (width 9), Running (width 9), Launch Type (width 12)
 
 ### D.2 Stop Task
@@ -171,6 +186,7 @@ Expected ECS service list fields: Service Name (width 32), Cluster (width 24), S
 | D.2.3 | I cancel. | No action taken. |
 
 **AWS comparison:**
+
 ```
 aws ecs stop-task --cluster CLUSTER --task TASK_ARN
 ```
@@ -191,9 +207,11 @@ aws ecs stop-task --cluster CLUSTER --task TASK_ARN
 | E.1.6 | I press `Esc` on the event payload prompt. | The invocation is cancelled. No API call is made. |
 
 **AWS comparison:**
+
 ```
 aws lambda invoke --function-name health-check --payload '{}' /dev/stdout
 ```
+
 Expected Lambda list fields: Function Name (width 36), Runtime (width 16), Memory (width 8), Timeout (width 8), State (width 10), Last Modified (width 22)
 
 ### E.2 Download Lambda Deployment Package
@@ -206,6 +224,7 @@ Expected Lambda list fields: Function Name (width 36), Runtime (width 16), Memor
 | E.2.4 | I lack `lambda:GetFunction` permission. | A red error flash: "Error: AccessDenied". |
 
 **AWS comparison:**
+
 ```
 aws lambda get-function --function-name data-processor --query 'Code.Location'
 # Then download from the presigned URL
@@ -227,9 +246,11 @@ aws lambda get-function --function-name data-processor --query 'Code.Location'
 | F.1.6 | I press Esc on the input prompt. | The action is cancelled. No change is made. |
 
 **AWS comparison:**
+
 ```
 aws autoscaling set-desired-capacity --auto-scaling-group-name api-prod-asg --desired-capacity 6
 ```
+
 Expected ASG list fields: ASG Name (width 36), Min (width 6), Max (width 6), Desired (width 8), Instances (width 10), Status (width 12)
 
 ---
@@ -246,9 +267,11 @@ Expected ASG list fields: ASG Name (width 36), Min (width 6), Max (width 6), Des
 | G.1.4 | The DB instance is not in "available" state (e.g., "modifying"). | The action is rejected with a flash: "Cannot reboot: instance is not available" or the API returns an error. |
 
 **AWS comparison:**
+
 ```
 aws rds reboot-db-instance --db-instance-identifier prod-database
 ```
+
 Expected RDS list fields: DB Identifier (width 28), Engine (width 12), Version (width 10), Status (width 14), Class (width 16), Endpoint (width 40), Multi-AZ (width 10)
 
 ---
@@ -265,10 +288,12 @@ Expected RDS list fields: DB Identifier (width 28), Engine (width 12), Version (
 | H.1.4 | I confirm. | The API call is made (cloudwatch:EnableAlarmActions). The header flashes "Actions enabled for high-cpu-prod". |
 
 **AWS comparison:**
+
 ```
 aws cloudwatch disable-alarm-actions --alarm-names high-cpu-prod
 aws cloudwatch enable-alarm-actions --alarm-names high-cpu-prod
 ```
+
 Expected Alarm list fields: Alarm Name (width 36), State (width 12), Metric (width 24), Namespace (width 24), Threshold (width 12)
 
 ---
