@@ -341,7 +341,7 @@ func firstLines(s string, n int) string {
 // report.
 //
 // Runs only against a live profile where DB instances with pending maintenance
-// actually exist (both <redacted-readonly-profile> and <redacted-readonly-profile> had
+// actually exist (both dev and prod read-only profiles had
 // findings on the last run: 2 and 3 respectively). Skips on profiles that
 // happen to have no pending maintenance.
 func TestLiveR_DBIDetailShowsPendingMaintenance(t *testing.T) {

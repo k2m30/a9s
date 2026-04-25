@@ -3,9 +3,9 @@ package unit
 // qa_s3_cross_region_test.go — Regression: EnrichS3PublicAccessBlock must handle
 // cross-region buckets without spamming the error log.
 //
-// Reported 2026-04-25 from `./a9s -p <redacted-profile>`:
+// Reported 2026-04-25 from a live profile:
 //   [HH:MM:SS] enrich s3: s3-enrich: GetPublicAccessBlock failed for 1 of 35 IDs:
-//     ses-incoming.prod.eu.<redacted-account>.cloud: ... api error PermanentRedirect: The bucket
+//     example-bucket-eu.example.cloud: ... api error PermanentRedirect: The bucket
 //     you are attempting to access must be addressed using the specified endpoint.
 //
 // And:
@@ -81,7 +81,7 @@ func (f *s3CrossRegionFake) GetPublicAccessBlock(
 // cross-region bucket (PermanentRedirect / IllegalLocationConstraintException)
 // does NOT contribute to the AggregateFailures error surfaced to the `!` log.
 func TestEnrichS3PublicAccessBlock_CrossRegionDoesNotSpamErrorLog(t *testing.T) {
-	const xRegionBucket = "ses-incoming.prod.eu.<redacted-account>.cloud"
+	const xRegionBucket = "example-bucket-eu.example.cloud"
 	fake := &s3CrossRegionFake{
 		s3PABFake: s3PABFake{configs: map[string]*s3.GetPublicAccessBlockOutput{}},
 		crossRegionBuckets: map[string]string{
@@ -110,7 +110,7 @@ func TestEnrichS3PublicAccessBlock_CrossRegionDoesNotSpamErrorLog(t *testing.T) 
 // TestEnrichS3PublicAccessBlock_IllegalLocationConstraintNotSpammed verifies the
 // other cross-region error class (eu-central-2 endpoint mismatch).
 func TestEnrichS3PublicAccessBlock_IllegalLocationConstraintNotSpammed(t *testing.T) {
-	const xRegionBucket = "dags-destination-<redacted-account>-euc2-prod"
+	const xRegionBucket = "example-dags-destination-euc2"
 	fake := &fakeS3IllegalLocation{bucket: xRegionBucket}
 	clients := &awsclient.ServiceClients{S3: fake}
 	resources := []resource.Resource{{ID: xRegionBucket, Name: xRegionBucket}}
