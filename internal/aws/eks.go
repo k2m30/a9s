@@ -27,8 +27,8 @@ func init() {
 
 // FetchEKSClustersPage fetches a single page of EKS clusters using the registered
 // paginated fetcher pattern. For each cluster name returned by ListClusters,
-// DescribeCluster is called. If DescribeCluster fails or returns nil, the cluster
-// is included as an error row with Status="DescribeFailed" rather than being dropped.
+// DescribeCluster is called. Per-item describe failures are aggregated into a
+// composite error returned alongside partial results (E2, E3, E5).
 func FetchEKSClustersPage(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 	input := &eks.ListClustersInput{
 		MaxResults: aws.Int32(DefaultPageSize),
@@ -37,42 +37,28 @@ func FetchEKSClustersPage(ctx context.Context, c *ServiceClients, continuationTo
 		input.NextToken = aws.String(continuationToken)
 	}
 
-	listOutput, err := c.EKS.ListClusters(ctx, input)
+	listOutput, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.ListClustersOutput, error) {
+		return c.EKS.ListClusters(ctx, input)
+	})
 	if err != nil {
 		return resource.FetchResult{}, fmt.Errorf("listing EKS clusters: %w", err)
 	}
 
+	total := len(listOutput.Clusters)
 	var resources []resource.Resource
+	var failures []string
 	for _, name := range listOutput.Clusters {
-		descOutput, descErr := c.EKS.DescribeCluster(ctx, &eks.DescribeClusterInput{
-			Name: aws.String(name),
+		descOutput, descErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.DescribeClusterOutput, error) {
+			return c.EKS.DescribeCluster(ctx, &eks.DescribeClusterInput{
+				Name: aws.String(name),
+			})
 		})
 		if descErr != nil {
-			// Surface describe failure as an error row rather than silently dropping.
-			resources = append(resources, resource.Resource{
-				ID:     name,
-				Name:   name,
-				Status: "DescribeFailed",
-				Fields: map[string]string{
-					"cluster_name":        name,
-					"status":              "DescribeFailed",
-					"health_issues_count": "0",
-					"describe_error":      descErr.Error(),
-				},
-			})
+			failures = append(failures, fmt.Sprintf("%s: %s", name, descErr.Error()))
 			continue
 		}
 		if descOutput.Cluster == nil {
-			resources = append(resources, resource.Resource{
-				ID:     name,
-				Name:   name,
-				Status: "DescribeFailed",
-				Fields: map[string]string{
-					"cluster_name":        name,
-					"status":              "DescribeFailed",
-					"health_issues_count": "0",
-				},
-			})
+			failures = append(failures, fmt.Sprintf("%s: nil cluster in response", name))
 			continue
 		}
 		resources = append(resources, buildEKSResource(name, descOutput.Cluster))
@@ -92,7 +78,7 @@ func FetchEKSClustersPage(ctx context.Context, c *ServiceClients, continuationTo
 			PageSize:    len(resources),
 			TotalHint:   -1,
 		},
-	}, nil
+	}, AggregateFailures("eks: DescribeCluster", failures, total)
 }
 
 // buildEKSResource constructs a Resource from a cluster name and EKS Cluster struct.

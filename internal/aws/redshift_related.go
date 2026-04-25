@@ -215,10 +215,13 @@ func checkRedshiftSecrets(ctx context.Context, clients any, res resource.Resourc
 
 // checkRedshiftLogs resolves the cluster's audit-log target via a single
 // redshift:DescribeLoggingStatus call (Pattern C). When LogDestinationType
-// is cloudwatch, LogExports names the log-class subtypes and the actual log
-// group follows the /aws/redshift/cluster/{clusterID} naming convention.
+// is cloudwatch, one log-group ID is emitted per enabled LogExports[] entry
+// following the /aws/redshift/cluster/{clusterID}/{logExport} naming convention.
 func checkRedshiftLogs(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	status := redshiftLoggingStatus(ctx, clients, res)
+	status, err := redshiftLoggingStatus(ctx, clients, res)
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "logs", Count: -1, Err: err}
+	}
 	if status == nil {
 		return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
 	}
@@ -229,20 +232,31 @@ func checkRedshiftLogs(ctx context.Context, clients any, res resource.Resource, 
 		// S3-only audit logging — no log group association.
 		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
 	}
-	// CloudWatch audit logs follow convention /aws/redshift/cluster/{clusterID}/{logtype}
-	// We return the parent log-group prefix for display; the UI can scope.
 	clusterID := res.ID
 	if clusterID == "" {
 		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
 	}
-	return relatedResult("logs", []string{"/aws/redshift/cluster/" + clusterID})
+	if len(status.LogExports) == 0 {
+		// CloudWatch logging enabled but no specific exports configured.
+		return resource.RelatedCheckResult{TargetType: "logs", Count: 0}
+	}
+	// Emit one log-group ID per enabled export:
+	// /aws/redshift/cluster/{clusterID}/{logExport}
+	var ids []string
+	for _, export := range status.LogExports {
+		ids = append(ids, "/aws/redshift/cluster/"+clusterID+"/"+export)
+	}
+	return relatedResult("logs", ids)
 }
 
 // checkRedshiftS3 resolves the audit-log S3 bucket via a single
 // redshift:DescribeLoggingStatus call (Pattern C). BucketName is set only
 // when the cluster logs to S3 (not CloudWatch).
 func checkRedshiftS3(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	status := redshiftLoggingStatus(ctx, clients, res)
+	status, err := redshiftLoggingStatus(ctx, clients, res)
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "s3", Count: -1, Err: err}
+	}
 	if status == nil {
 		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
 	}
@@ -288,25 +302,25 @@ func checkRedshiftSubnet(ctx context.Context, clients any, res resource.Resource
 }
 
 // redshiftLoggingStatus performs a single DescribeLoggingStatus call for this
-// cluster's identifier, wrapped in RetryOnThrottle.
-func redshiftLoggingStatus(ctx context.Context, clients any, res resource.Resource) *redshift.DescribeLoggingStatusOutput {
+// cluster's identifier, wrapped in RetryOnThrottle. Returns (nil, nil) when
+// the client is unavailable or the cluster ID is empty (no API call
+// attempted — callers render Count=-1 without a FlashMsg). Returns (nil, err)
+// on API failure so callers can surface the underlying error via Result.Err →
+// FlashMsg → error log.
+func redshiftLoggingStatus(ctx context.Context, clients any, res resource.Resource) (*redshift.DescribeLoggingStatusOutput, error) {
 	clusterID := res.ID
 	if clusterID == "" {
-		return nil
+		return nil, nil
 	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.Redshift == nil {
-		return nil
+		return nil, nil
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*redshift.DescribeLoggingStatusOutput, error) {
+	return RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*redshift.DescribeLoggingStatusOutput, error) {
 		return c.Redshift.DescribeLoggingStatus(ctx, &redshift.DescribeLoggingStatusInput{
 			ClusterIdentifier: &clusterID,
 		})
 	})
-	if err != nil {
-		return nil
-	}
-	return out
 }
 
 // redshiftRelatedResources returns the resource list for target from cache or by fetching the first page.

@@ -31,6 +31,9 @@ func (f *LambdaFake) ListEventSourceMappings(_ context.Context, input *lambda.Li
 	if input.EventSourceArn == nil {
 		return &lambda.ListEventSourceMappingsOutput{EventSourceMappings: f.fix.EventSourceMappings}, nil
 	}
+	if err := validateARN(*input.EventSourceArn); err != nil {
+		return nil, err
+	}
 	arn := aws.ToString(input.EventSourceArn)
 	var filtered []lambdatypes.EventSourceMappingConfiguration
 	for _, m := range f.fix.EventSourceMappings {

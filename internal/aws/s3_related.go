@@ -43,21 +43,19 @@ func checkS3Lambda(_ context.Context, _ any, res resource.Resource, _ resource.R
 
 // checkS3SNS returns the SNS topic from the bucket's notification configuration,
 // populated in Fields["notification_sns"] by GetBucketNotificationConfiguration.
+// The SNS fetcher indexes Resource.ID by full topic ARN (sns.go — TopicArn),
+// so this checker must return the ARN unchanged — stripping to the bare topic
+// name breaks drill-through.
 func checkS3SNS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	arn := res.Fields["notification_sns"]
 	if arn == "" {
 		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
 	}
-	// SNS topic ARN: arn:aws:sns:region:account:TopicName
-	parts := strings.Split(arn, ":")
-	if len(parts) < 6 {
+	// Basic ARN shape guard — arn:aws:sns:region:account:TopicName has 6 parts.
+	if parts := strings.Split(arn, ":"); len(parts) < 6 || parts[5] == "" {
 		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
 	}
-	name := parts[5]
-	if name == "" {
-		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
-	}
-	return relatedResult("sns", []string{name})
+	return relatedResult("sns", []string{arn})
 }
 
 // checkS3SQS returns the SQS queue from the bucket's notification configuration,
@@ -95,7 +93,9 @@ func checkS3CFN(ctx context.Context, clients any, res resource.Resource, cache r
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
 	}
-	out, err := tagAPI.GetBucketTagging(ctx, &s3.GetBucketTaggingInput{Bucket: aws.String(bucket)})
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketTaggingOutput, error) {
+		return tagAPI.GetBucketTagging(ctx, &s3.GetBucketTaggingInput{Bucket: aws.String(bucket)})
+	})
 	if err != nil {
 		// NoSuchTagSet is a "no tags" response, not a hard failure.
 		if strings.Contains(err.Error(), "NoSuchTagSet") {
@@ -153,7 +153,9 @@ func checkS3KMS(ctx context.Context, clients any, res resource.Resource, _ resou
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
 	}
-	out, err := encAPI.GetBucketEncryption(ctx, &s3.GetBucketEncryptionInput{Bucket: aws.String(bucket)})
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketEncryptionOutput, error) {
+		return encAPI.GetBucketEncryption(ctx, &s3.GetBucketEncryptionInput{Bucket: aws.String(bucket)})
+	})
 	if err != nil {
 		// ServerSideEncryptionConfigurationNotFoundError means no encryption — honest 0.
 		if strings.Contains(err.Error(), "ServerSideEncryptionConfigurationNotFoundError") {
@@ -204,7 +206,9 @@ func checkS3Logs(ctx context.Context, clients any, res resource.Resource, _ reso
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
 	}
-	out, err := logAPI.GetBucketLogging(ctx, &s3.GetBucketLoggingInput{Bucket: aws.String(bucket)})
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketLoggingOutput, error) {
+		return logAPI.GetBucketLogging(ctx, &s3.GetBucketLoggingInput{Bucket: aws.String(bucket)})
+	})
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "s3", Count: -1, Err: err}
 	}
@@ -402,7 +406,9 @@ func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache 
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
 	}
-	out, err := policyAPI.GetBucketPolicy(ctx, &s3.GetBucketPolicyInput{Bucket: aws.String(bucket)})
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketPolicyOutput, error) {
+		return policyAPI.GetBucketPolicy(ctx, &s3.GetBucketPolicyInput{Bucket: aws.String(bucket)})
+	})
 	if err != nil {
 		// NoSuchBucketPolicy is a legitimate "no policy configured"
 		// response — honest 0, not error.

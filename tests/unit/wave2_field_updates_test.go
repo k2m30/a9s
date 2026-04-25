@@ -112,9 +112,11 @@ func TestEnrichTargetGroupHealth_WritesHealthSummary(t *testing.T) {
 		},
 	}
 
+	const tgName1 = "tg-unhealthy"
+	const tgName2 = "tg-orphan"
 	resources := []resource.Resource{
-		{ID: tgARN1, Name: "tg-unhealthy"},
-		{ID: tgARN2, Name: "tg-orphan"},
+		{ID: tgName1, Name: tgName1, Fields: map[string]string{"target_group_arn": tgARN1}},
+		{ID: tgName2, Name: tgName2, Fields: map[string]string{"target_group_arn": tgARN2}},
 	}
 
 	result, err := awsclient.EnrichTargetGroupHealth(context.Background(), &awsclient.ServiceClients{ELBv2: fake}, resources)
@@ -122,25 +124,25 @@ func TestEnrichTargetGroupHealth_WritesHealthSummary(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// tgARN1: "1/2 healthy" pattern
-	fu1, ok := result.FieldUpdates[tgARN1]
+	// tgName1: "1/2 healthy" pattern (FieldUpdates is keyed by r.ID, which is the bare name)
+	fu1, ok := result.FieldUpdates[tgName1]
 	if !ok {
-		t.Errorf("FieldUpdates missing entry for tgARN1 %q", tgARN1)
+		t.Errorf("FieldUpdates missing entry for %q", tgName1)
 	} else {
 		hs := fu1["health_summary"]
 		matched, _ := regexp.MatchString(`^\d+/\d+ healthy$`, hs)
 		if !matched {
-			t.Errorf("tgARN1 health_summary = %q, want pattern %%d/%%d healthy", hs)
+			t.Errorf("%s health_summary = %q, want pattern %%d/%%d healthy", tgName1, hs)
 		}
 	}
 
-	// tgARN2: "ORPHAN"
-	fu2, ok := result.FieldUpdates[tgARN2]
+	// tgName2: "ORPHAN"
+	fu2, ok := result.FieldUpdates[tgName2]
 	if !ok {
-		t.Errorf("FieldUpdates missing entry for tgARN2 %q", tgARN2)
+		t.Errorf("FieldUpdates missing entry for %q", tgName2)
 	} else {
 		if fu2["health_summary"] != "ORPHAN" {
-			t.Errorf("tgARN2 health_summary = %q, want %q", fu2["health_summary"], "ORPHAN")
+			t.Errorf("%s health_summary = %q, want %q", tgName2, fu2["health_summary"], "ORPHAN")
 		}
 	}
 }
@@ -386,8 +388,9 @@ func TestEnrichStepFunctionsStatus_WritesLastRun(t *testing.T) {
 		},
 	}
 
+	const sfnName = "my-sfn"
 	resources := []resource.Resource{
-		{ID: sfnARN, Name: "my-sfn"},
+		{ID: sfnName, Name: sfnName, Fields: map[string]string{"arn": sfnARN}},
 	}
 
 	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), &awsclient.ServiceClients{SFN: fake}, resources)
@@ -395,9 +398,10 @@ func TestEnrichStepFunctionsStatus_WritesLastRun(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	fu, ok := result.FieldUpdates[sfnARN]
+	// FieldUpdates is keyed by r.ID (the bare name), per fetcher contract.
+	fu, ok := result.FieldUpdates[sfnName]
 	if !ok {
-		t.Fatalf("FieldUpdates missing entry for sfn %q — coder must add last_run FieldUpdates to EnrichStepFunctionsStatus", sfnARN)
+		t.Fatalf("FieldUpdates missing entry for sfn %q — coder must add last_run FieldUpdates to EnrichStepFunctionsStatus", sfnName)
 	}
 	lastRun := fu["last_run"]
 	if !strings.Contains(lastRun, "FAILED") {

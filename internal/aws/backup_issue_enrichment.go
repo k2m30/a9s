@@ -36,6 +36,7 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource
 	var nextToken *string
 	truncated := false
 	pages := 0
+	var failures []string
 	// Spec §3.2 — filter to the 24h window server-side so AWS returns only
 	// the jobs we care about. Without this, accounts with months of job
 	// history scan far more pages than needed and hit EnrichmentCap early,
@@ -46,13 +47,17 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource
 			truncated = true
 			break
 		}
-		out, err := clients.Backup.ListBackupJobs(ctx, &backup.ListBackupJobsInput{
-			ByCreatedAfter: &cutoff,
-			NextToken:      nextToken,
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*backup.ListBackupJobsOutput, error) {
+			return clients.Backup.ListBackupJobs(ctx, &backup.ListBackupJobsInput{
+				ByCreatedAfter: &cutoff,
+				NextToken:      nextToken,
+			})
 		})
 		pages++
 		if err != nil {
-			return IssueEnricherResult{TruncatedIDs: truncatedIDs}, err
+			truncated = true
+			failures = append(failures, fmt.Sprintf("page %d: %v", pages, err))
+			break
 		}
 		allJobs = append(allJobs, out.BackupJobs...)
 		if out.NextToken == nil {
@@ -176,7 +181,7 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource
 		TruncatedIDs: truncatedIDs,
 		Findings:     findings,
 		FieldUpdates: fieldUpdates,
-	}, nil
+	}, AggregateFailures("backup-enrich: ListBackupJobs", failures, pages)
 }
 
 // plural returns "s" when n != 1, "" otherwise.

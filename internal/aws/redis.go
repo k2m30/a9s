@@ -89,7 +89,9 @@ func FetchRedisPage(ctx context.Context, api ElastiCacheDescribeReplicationGroup
 		input.Marker = &continuationToken
 	}
 
-	output, err := api.DescribeReplicationGroups(ctx, input)
+	output, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticache.DescribeReplicationGroupsOutput, error) {
+		return api.DescribeReplicationGroups(ctx, input)
+	})
 	if err != nil {
 		return resource.FetchResult{}, fmt.Errorf("fetching Redis replication groups: %w", err)
 	}

@@ -3,6 +3,7 @@ package aws
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	r53svc "github.com/aws/aws-sdk-go-v2/service/route53"
@@ -29,6 +30,8 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
+	var failures []string
+	total := 0
 	for i, r := range resources {
 		if i >= EnrichmentCap {
 			break
@@ -40,10 +43,14 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 		if zoneID == "" {
 			continue
 		}
-		out, err := clients.Route53.GetHostedZone(ctx, &r53svc.GetHostedZoneInput{
-			Id: aws.String(zoneID),
+		total++
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*r53svc.GetHostedZoneOutput, error) {
+			return clients.Route53.GetHostedZone(ctx, &r53svc.GetHostedZoneInput{
+				Id: aws.String(zoneID),
+			})
 		})
 		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
 			truncatedIDs[r.ID] = true
 			continue
@@ -68,5 +75,6 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 		}
 	}
 	// All Route53 findings are severity "~" (informational).
-	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings},
+		AggregateFailures("r53-enrich: GetHostedZone", failures, total)
 }

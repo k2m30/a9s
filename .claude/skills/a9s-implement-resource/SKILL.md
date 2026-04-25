@@ -137,6 +137,119 @@ Every Wave 2 enricher emits `resource.EnrichmentFinding` objects whose shape mus
 
 Phase 6b QA must include a test per enricher that asserts both `Summary == <short-phrase>` AND `!strings.Contains(Summary, rowValue)` for every Row value the enricher emits. Phase 7 coder rejects tasks that build Summary from concatenation of Row fields.
 
+## Error handling and throttle rules (apply to every AWS call)
+
+These rules are universal — every fetcher, checker, enricher, and FetchByIDs function in `internal/aws/` must comply. Violating them produces silent operator-invisible failures: pivot counts go wrong, Attention sections go blank, drill-throughs return empty lists. The operator has no way to know an API call failed.
+
+### Rule E1 — Every AWS call is wrapped in `RetryOnThrottle`
+
+**Every** call to an AWS SDK method (`Describe*`, `Get*`, `List*`, `ListPoliciesForUser`, etc.) goes through:
+
+```go
+out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*svc.DescribeXOutput, error) {
+    return api.DescribeX(ctx, &svc.DescribeXInput{...})
+})
+```
+
+No exceptions. Paginated top-level fetchers, per-item describes inside a checker loop, enrichment probes, FetchByIDs batches — all wrapped. The canonical examples are in `internal/aws/kms_related.go:238-255`, `internal/aws/pipeline_related.go:32`, `internal/aws/r53_related.go:43`. Copy one of those call sites verbatim.
+
+Phase 7.5 scope-diff gate greps new code for unwrapped SDK calls. Any `api.Describe*` / `api.Get*` / `api.List*` call not enclosed in a `RetryOnThrottle(...)` closure is a coder reject.
+
+### Rule E2 — Errors are never silently dropped
+
+The banned patterns:
+
+```go
+// BANNED — silent per-item skip
+if err != nil {
+    continue
+}
+
+// BANNED — silent early-exit with partial results
+if err != nil {
+    break
+}
+
+// BANNED — silent all-fail
+if err != nil {
+    return nil
+}
+
+// BANNED — error assigned but not propagated
+_ = err
+```
+
+The app has a proper error-surfacing channel: every user-visible error routes through `messages.FlashMsg{Text, IsError: true}` → `handleFlash` records into `errorHistory` → operator presses `!` to see the full error log. Silent-skip defeats this by never emitting the FlashMsg. The operator loses visibility.
+
+### Rule E3 — Per-item failures aggregate into a composite returned error
+
+When a function iterates a list of IDs and each item may fail independently, the function must:
+
+1. Keep iterating — do NOT abort on first failure. Partial success is valuable.
+2. Collect each failure as `"id: reason"` into a `failures []string` slice.
+3. After the loop, if `len(failures) > 0`, build a composite error with `fmt.Errorf("%s failed for %d of %d items: %s", opName, len(failures), total, strings.Join(failures, "; "))`.
+4. Return `(partialResources, compositeError)`. Callers get both the partial results AND the error detail.
+
+The canonical helper lives in `internal/aws/partial_errors.go` (create if absent). Use it instead of inlining the format in every file.
+
+### Rule E4 — Surfacing path per function category
+
+Different function categories surface errors through different channels. All channels terminate in FlashMsg → errorHistory → `!` key.
+
+| Category | Signature | Error field | Where FlashMsg fires |
+|----------|-----------|-------------|----------------------|
+| **Paginated top-level fetcher** | `func(ctx, clients, token) (FetchResult, error)` | Top-level `error` return | `app.go` `ResourcesLoadedMsg` handler → `FlashMsg{IsError:true}` |
+| **FetchByIDs (lazy-add)** | `func(ctx, clients, ids) ([]Resource, error)` | Top-level `error` return (composite per E3) | `app_related.go` `handleRelatedCheckStarted` sets `RelatedCheckResultMsg.LazyAddError`; `app.go` converts to FlashMsg |
+| **Related checker** | `func(ctx, clients, src, cache) RelatedCheckResult` | `Result.Err` field on `RelatedCheckResult` | rightcolumn / app.go surfaces `Result.Err` as FlashMsg |
+| **Wave-2 issue enricher** | `func(ctx, clients, res) (IssueEnricherResult, error)` | **BOTH** `IssueEnricherResult.Truncated` + `IssueEnricherResult.TruncatedIDs[id]` (per-row `?` marker) **AND** the top-level `error` return (composite via `AggregateFailures`) | `EnrichmentCheckedMsg.Err` → `handleEnrichmentChecked` → FlashMsg |
+| **Detail enricher** | per-type signature | `DetailEnrichmentResult.Err` | app.go detail-enrichment handler → FlashMsg |
+
+If your category doesn't yet have an error-surfacing mechanism, ADD ONE. Do not silently drop; blocked work is better than invisible work.
+
+### Rule E5 — Partial success is preserved
+
+When 3 of 5 describe calls succeed and 2 fail:
+
+- Return the 3 successful `Resource`s in the slice.
+- Return a composite error naming the 2 failed IDs and reasons.
+- The UI renders 3 rows AND the operator sees an error log entry naming the 2 that didn't resolve.
+
+Returning `(nil, err)` on partial failure erases the 3 successful results — do not. Returning `(resources, nil)` silently hides the 2 failures — do not.
+
+### Rule E6 — `RetryOnThrottle` exhaustion is a terminal error
+
+If `RetryOnThrottle` returns an error, the throttle-retry budget is exhausted. Do not re-wrap or retry again. Propagate per E3/E4.
+
+### Rule E7 — ID is ARN IFF the fetcher makes it so, and the contract is explicit
+
+This rule exists because three bugs of identical shape shipped unnoticed (tg 2026-04-24, sfn + elb + acm + msk 2026-04-25). In all five, the fetcher set `ID = bare name` (display-friendly), then the enricher / related checker passed `r.ID` as an AWS SDK `*Arn` parameter. Real AWS returned `InvalidArn` / `ValidationError`. Demo fakes were permissive and hid the bug. Unit tests constructed `Resource{ID: <ARN>}` directly and so agreed with their own fake instead of with production — a sealed echo chamber.
+
+**The rule:**
+
+1. The fetcher is the authority on the shape of `Resource.ID`. Most resource types set `ID = bare name / bare identifier` (display-friendly). A small minority set `ID = ARN` where the ARN is naturally the primary identifier (e.g. sns topics where the ARN IS the primary key the rest of AWS references them by).
+
+2. Enrichers, related checkers, detail enrichers, and FetchByIDs functions MUST read the ARN from `r.Fields["<key>_arn"]` (or `r.Fields["arn"]`), NOT from `r.ID`, unless the fetcher's resource.Resource literal construction explicitly sets `ID: <arn-value>` and a comment at that construction point says so.
+
+3. The fetcher must populate `Fields["<key>_arn"]` for every resource type whose enricher or related checker needs the ARN. If the ARN is only available via a second API call (e.g. CodePipeline list summaries don't expose ARNs), say so in a comment and arrange for the enricher / checker to resolve it — don't leave a stub field that's always empty.
+
+4. Indirection doesn't launder the pattern. `certARN := r.ID; ...Arn: aws.String(certARN)` is the same bug as `Arn: aws.String(r.ID)`. Both are flagged by the static guard.
+
+5. **Escape hatch.** If the fetcher genuinely emits `ID = ARN`, a comment near the local assignment containing the literal string `fetcher emits ID=ARN` quiets the static guard. Use this sparingly and only after verifying the fetcher.
+
+**Enforcement:**
+
+- **Unit test regression pin** per enricher / checker that takes an ARN param: use a **strict fake** that rejects non-ARN values (`strings.HasPrefix(got, "arn:aws:")` → return `ValidationError` / `InvalidArn`). The existing `strictELBv2Fake`, `strictSFNFake`, `strictACMFake`, `strictMSKFake` in `tests/unit/` are the pattern to copy.
+- **Static guard** `TestNoIDAsARN_StaticGuard` in `tests/unit/qa_no_id_as_arn_static_test.go` scans every `_issue_enrichment.go` / `_detail_enrichment.go` / `_related.go` / `_related_extra.go` file and flags direct (`Arn: aws.String(r.ID)`) and indirect (`local := r.ID` flowing into an `*Arn:` field) anti-patterns. Any addition of a new resource type must keep this test green.
+- **Strict demo fakes.** Every demo fake under `internal/demo/fakes/` validates `*Arn` input parameters and returns `ValidationError` / `InvalidArn` on non-ARN input, mirroring real AWS. This is what forces the echo chamber open: a unit or integration test that constructs a `Resource` with the wrong shape produces an enricher error instead of a silent empty result.
+- **Scenario harness assertion.** `fullIntegrationScenario.AssertNoEnrichmentErrors()` inspects every `EnrichmentCheckedMsg` drained during the scenario and fails on any non-nil `.Err`. Every scenario test that opens a resource list with wave-2 enrichment must call it before returning. Missing scenarios must be added for every resource type with a registered enricher.
+
+### Enforcement
+
+- Phase 5 contract-surface audit: grep new code for `if err != nil {` followed within 3 lines by `continue`, `break`, `return nil`, or `return`. Any hit without a preceding `failures = append(failures, ...)` line is a reject.
+- Phase 7.5 scope-diff gate: same grep pattern on the coder's delivered files.
+- Phase 8 scenario harness: new test `TestScenario_<short>_PartialFailure` — inject a fake that errors on 2 of N describe calls, assert (a) the partial results render, (b) a FlashMsg with `IsError=true` fires, (c) the error-history contains the composite error text.
+- Phase 9 Rule E gate: report the grep-for-banned-patterns result + the partial-failure scenario test result. FAIL if either is non-clean.
+
 ## Universal coverage matrix (mandatory before phase 3)
 
 Phase 3's "one case per signal" is NECESSARY but NOT SUFFICIENT. Rule 7 (`(+N)` suffix + stacking) is a cross-signal invariant and will be missed if each signal is tested in isolation. Before writing the phase 3 pseudocode, produce this coverage table in the impl-plan doc. Every row MUST point to at least one fixture ID and one test case. If the table can't be filled, phase 3 is blocked.
@@ -159,6 +272,11 @@ Phase 3's "one case per signal" is NECESSARY but NOT SUFFICIENT. Rule 7 (`(+N)` 
 | U9 | Related pivot counts (`count shown: yes`) | 1 graph-root fixture | `ExpectRelatedRowCountAtLeast` per pivot |
 | U10 | No jargon columns | all fixtures | `ExpectViewNotContains("CIS", "Flags", …)` |
 | **U11** | **Summary ≠ Rows content (EnrichmentFinding contract)** | **every fixture with a Wave-2 finding that has Rows** | **unit test: `finding.Summary == <short-phrase>` AND `!strings.Contains(finding.Summary, row.Value)` for every Row** |
+| **U12** | **Partial AWS failure surfaces a FlashMsg with `IsError=true`** | **1 fixture: N items total; describe/get call errors on 2 of them (AccessDenied / NotFound)** | **scenario test: (a) list renders N−2 rows, (b) `FlashMsg` with `IsError=true` was emitted, (c) `errorHistory` contains a composite error naming the 2 failed IDs and reasons** |
+| **U13** | **Every SDK call is wrapped in `RetryOnThrottle`** | **n/a — static audit** | **phase-5 + phase-7.5 grep: zero matches of unwrapped `api.Describe*` / `api.Get*` / `api.List*` in new code** |
+| **U14** | **No enricher / related checker passes `r.ID` as an ARN-typed param when the fetcher emits `ID = bare name`** | **1 fixture in real fetcher shape** | **unit test: `qa_<short>_uses_arn_from_fields_test.go` with a strict fake that rejects non-ARN input; PLUS `TestNoIDAsARN_StaticGuard` must stay green after adding the enricher/checker** |
+| **U15** | **Demo fake for every AWS operation accepting `*Arn` rejects non-ARN input** | **fake implementation** | **any test that constructs a `Resource` with the wrong ID shape (e.g. ID = bare name where fetcher actually emits ID = ARN) sees a `ValidationError` from the fake instead of silent success; new fakes must follow the pattern in `internal/demo/fakes/sfn.go` `validateSFNArn` / `internal/demo/fakes/elb.go` / etc.** |
+| **U16** | **Scenario test for the resource type asserts `AssertNoEnrichmentErrors` after draining wave-2** | **1 scenario file `tests/integration/scenario_<short>_visual_test.go`** | **scenario calls `sc.AssertNoEnrichmentErrors()` before returning; this is the integration-level guard that makes `make test` fail if any enricher emits an error against real demo fakes** |
 
 Demo mode runs Wave 2 enrichment end-to-end against typed fakes (the `!m.isDemo` guard was removed 2026-04-22 after it was caught hiding the `(+N)` / `~` / "maintenance scheduled" rendering in the actual demo). Every row in this table is therefore reachable via the scripted scenario harness without message injection, provided the harness drains the `AvailabilityPrefetchedMsg` → `EnrichmentCheckedMsg` chain (it does as of 2026-04-22).
 

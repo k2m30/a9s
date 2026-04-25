@@ -13,6 +13,7 @@ package unit
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -192,10 +193,11 @@ func TestEnrichTGWAttachments_NilClientReturnsEmptyFindingsNoError(t *testing.T)
 	}
 }
 
-// TestEnrichTGWAttachments_APIErrorSetsTruncatedNoError verifies that when the
-// API call for TGW-1 returns an error, the enricher sets Truncated=true, produces
-// 0 findings, and does not propagate the error.
-func TestEnrichTGWAttachments_APIErrorSetsTruncatedNoError(t *testing.T) {
+// TestEnrichTGWAttachments_APIErrorSetsTruncatedAndSurfacesError verifies that when
+// the API call for TGW-1 returns an error, the enricher sets Truncated=true, produces
+// 0 findings for the failed TGW, and returns a composite error containing the enricher
+// prefix and the failing TGW ID.
+func TestEnrichTGWAttachments_APIErrorSetsTruncatedAndSurfacesError(t *testing.T) {
 	apiErr := errors.New("ec2: DescribeTransitGatewayAttachments throttled")
 	fake := &tgwAttachmentFake{
 		errByTGW: map[string]error{
@@ -209,8 +211,14 @@ func TestEnrichTGWAttachments_APIErrorSetsTruncatedNoError(t *testing.T) {
 	resources := tgwResources("tgw-00000001", "tgw-00000002")
 
 	result, err := awsclient.EnrichTGWAttachments(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatal("enricher must surface a composite error when an API call fails")
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, "tgw-enrich:") {
+		t.Errorf("composite error must contain \"tgw-enrich:\", got: %q", errStr)
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, "tgw-00000001") {
+		t.Errorf("composite error must contain the failing TGW ID \"tgw-00000001\", got: %q", errStr)
 	}
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings on API error, got %d", len(result.Findings))

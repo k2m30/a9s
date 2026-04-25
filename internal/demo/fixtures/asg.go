@@ -29,7 +29,6 @@ func NewASGFixtures() *ASGFixtures {
 }
 
 const (
-	asgVPCID   = "vpc-0abc123def456789a"
 	asgSubnetA = "subnet-0aaa111111111111a"
 	asgSubnetB = "subnet-0bbb222222222222b"
 	asgSubnetC = "subnet-0ccc333333333333c"

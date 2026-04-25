@@ -17,7 +17,16 @@ import (
 // certificate ARN matches this ACM certificate's ARN.
 // Pattern C — cache lookup via ViewerCertificate.ACMCertificateArn.
 func checkACMCF(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	certARN := res.ID
+	// The acm fetcher sets ID = domain name; the ARN is stored in
+	// Fields["certificate_arn"]. CloudFront's ACMCertificateArn is the
+	// full ARN, so matching must use the ARN, not the bare domain.
+	certARN := res.Fields["certificate_arn"]
+	if certARN == "" {
+		// Fall back to RawStruct for callers that pass sparse resources.
+		if raw, ok := assertStruct[acmtypes.CertificateSummary](res.RawStruct); ok && raw.CertificateArn != nil {
+			certARN = *raw.CertificateArn
+		}
+	}
 	if certARN == "" {
 		return resource.RelatedCheckResult{TargetType: "cf", Count: 0}
 	}

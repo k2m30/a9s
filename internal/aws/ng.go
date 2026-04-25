@@ -45,7 +45,9 @@ func init() {
 			clusterInput.NextToken = aws.String(continuationToken)
 		}
 
-		clusterOutput, err := c.EKS.ListClusters(ctx, clusterInput)
+		clusterOutput, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.ListClustersOutput, error) {
+			return c.EKS.ListClusters(ctx, clusterInput)
+		})
 		if err != nil {
 			return resource.FetchResult{}, fmt.Errorf("listing EKS clusters: %w", err)
 		}
@@ -54,17 +56,22 @@ func init() {
 		moreNodegroups := false
 		hitCap := false
 		var resources []resource.Resource
+		var failures []string
+		totalAttempted := 0
 
 		for _, cluster := range clusterOutput.Clusters {
 			if hitCap {
 				moreNodegroups = true
 				break
 			}
-			ngOutput, err := c.EKS.ListNodegroups(ctx, &eks.ListNodegroupsInput{
-				ClusterName: aws.String(cluster),
-				MaxResults:  aws.Int32(DefaultPageSize),
+			ngOutput, ngErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.ListNodegroupsOutput, error) {
+				return c.EKS.ListNodegroups(ctx, &eks.ListNodegroupsInput{
+					ClusterName: aws.String(cluster),
+					MaxResults:  aws.Int32(DefaultPageSize),
+				})
 			})
-			if err != nil {
+			if ngErr != nil {
+				failures = append(failures, fmt.Sprintf("%s: %s", cluster, ngErr.Error()))
 				continue
 			}
 			if ngOutput.NextToken != nil {
@@ -76,11 +83,19 @@ func init() {
 					moreNodegroups = true
 					break
 				}
-				descOutput, err := c.EKS.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{
-					ClusterName:   aws.String(cluster),
-					NodegroupName: aws.String(ngName),
+				totalAttempted++
+				descOutput, descErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.DescribeNodegroupOutput, error) {
+					return c.EKS.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{
+						ClusterName:   aws.String(cluster),
+						NodegroupName: aws.String(ngName),
+					})
 				})
-				if err != nil || descOutput.Nodegroup == nil {
+				if descErr != nil {
+					failures = append(failures, fmt.Sprintf("%s/%s: %s", cluster, ngName, descErr.Error()))
+					continue
+				}
+				if descOutput.Nodegroup == nil {
+					failures = append(failures, fmt.Sprintf("%s/%s: nil nodegroup in response", cluster, ngName))
 					continue
 				}
 				res := buildNodeGroupResource(cluster, ngName, descOutput.Nodegroup)
@@ -105,7 +120,7 @@ func init() {
 				PageSize:    len(resources),
 				TotalHint:   -1,
 			},
-		}, nil
+		}, AggregateFailures("ng: DescribeNodegroup", failures, totalAttempted)
 	})
 }
 

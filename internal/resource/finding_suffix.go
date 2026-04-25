@@ -14,6 +14,10 @@ import (
 
 var findingSuffixRe = regexp.MustCompile(` \(\+\d+\)$`)
 
+// findingSuffixWithCountRe captures both the base phrase and the count for
+// callers that need to read (and possibly mutate) the hidden count.
+var findingSuffixWithCountRe = regexp.MustCompile(`^(.*) \(\+(\d+)\)$`)
+
 // StripFindingSuffix removes any trailing " (+N)" from a Status phrase:
 //
 //	"publicly accessible (+1)"   → "publicly accessible"
@@ -34,11 +38,26 @@ func StripFindingSuffix(s string) string {
 //	"no automated backups (+1)"   → "no automated backups (+2)"
 //	"no automated backups (+2)"   → "no automated backups (+3)"
 func BumpFindingSuffix(s string) string {
-	re := regexp.MustCompile(`^(.*) \(\+(\d+)\)$`)
-	m := re.FindStringSubmatch(s)
+	m := findingSuffixWithCountRe.FindStringSubmatch(s)
 	if m == nil {
 		return s + " (+1)"
 	}
 	n, _ := strconv.Atoi(m[2])
 	return fmt.Sprintf("%s (+%d)", m[1], n+1)
+}
+
+// SplitFindingSuffix parses the base phrase and the hidden-count N from a Status
+// string that may carry a trailing " (+N)" suffix. Used by Wave 2 enrichers that
+// need to know how many hidden findings already exist before bumping:
+//
+//	"no mount targets (+1)"  → phrase="no mount targets", hidden=1
+//	"updating"               → phrase="updating",          hidden=0
+//	"error"                  → phrase="error",             hidden=0
+func SplitFindingSuffix(s string) (phrase string, hidden int) {
+	m := findingSuffixWithCountRe.FindStringSubmatch(s)
+	if m == nil {
+		return s, 0
+	}
+	n, _ := strconv.Atoi(m[2])
+	return m[1], n
 }
