@@ -1848,7 +1848,7 @@ iam-group:  # iamtypes.Group
   - GroupName
   - Path
 
-docdb-snap:  # docdbtypes.DBClusterSnapshot
+dbc-snap:  # docdbtypes.DBClusterSnapshot
   - AvailabilityZones[]
   - ClusterCreateTime
   - DBClusterIdentifier

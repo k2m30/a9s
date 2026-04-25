@@ -128,7 +128,7 @@ func main() {
 		{"sqs", "SQSQueueAttributes (synthetic)", reflect.TypeFor[SQSQueueAttributes]()},
 		{"iam-user", "iamtypes.User", reflect.TypeFor[iamtypes.User]()},
 		{"iam-group", "iamtypes.Group", reflect.TypeFor[iamtypes.Group]()},
-		{"docdb-snap", "docdbtypes.DBClusterSnapshot", reflect.TypeFor[docdbtypes.DBClusterSnapshot]()},
+		{"dbc-snap", "docdbtypes.DBClusterSnapshot", reflect.TypeFor[docdbtypes.DBClusterSnapshot]()},
 		{"cf", "cftypes.DistributionSummary", reflect.TypeFor[cftypes.DistributionSummary]()},
 		{"r53", "r53types.HostedZone", reflect.TypeFor[r53types.HostedZone]()},
 		{"r53_records", "r53types.ResourceRecordSet", reflect.TypeFor[r53types.ResourceRecordSet]()},

@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `dbi`, `docdb-snap`, `kms`, `logs`, `secrets`, `sg`, `subnet`, `vpc`, `ct-events`.
+Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `dbi`, `dbc-snap`, `kms`, `logs`, `secrets`, `sg`, `subnet`, `vpc`, `ct-events`.
 
 ### `alarm`
 
@@ -37,10 +37,10 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `d
 - **How discovered**: read `DBClusterMembers[].DBInstanceIdentifier` on the cluster; cross-reference the already-loaded `dbi` list by instance identifier.
 - **Count shown**: yes.
 
-### `docdb-snap`
+### `dbc-snap`
 
 - **Why related**: Cluster snapshots — point-in-time backups the operator may need to restore or audit.
-- **How discovered**: call `DescribeDBClusterSnapshots(DBClusterIdentifier=<cluster-id>)`, or cross-reference the already-loaded `docdb-snap` list by `DBClusterIdentifier`.
+- **How discovered**: call `DescribeDBClusterSnapshots(DBClusterIdentifier=<cluster-id>)`, or cross-reference the already-loaded `dbc-snap` list by `DBClusterIdentifier`.
 - **Count shown**: yes.
 
 ### `kms`
@@ -190,7 +190,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s golden doc — per-type contract for `dbc` lists 10 related targets — `docs/related-resources.md` § Per-type contract, row `dbc`.
 - a9s golden doc — `alarm` pivot is "Cluster CW alarms" — `docs/related-resources.md` § `dbc`.
 - a9s golden doc — `dbi` pivot is "Cluster member instances" — `docs/related-resources.md` § `dbc`.
-- a9s golden doc — `docdb-snap` pivot is "Cluster snapshots" — `docs/related-resources.md` § `dbc`.
+- a9s golden doc — `dbc-snap` pivot is "Cluster snapshots" — `docs/related-resources.md` § `dbc`.
 - a9s golden doc — `kms` pivot is "Cluster encryption key" — `docs/related-resources.md` § `dbc`.
 - a9s golden doc — `logs` pivot is "Cluster log exports" — `docs/related-resources.md` § `dbc`.
 - a9s golden doc — `secrets` pivot is "Master credentials in Secrets Manager" — `docs/related-resources.md` § `dbc`.

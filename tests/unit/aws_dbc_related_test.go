@@ -57,7 +57,7 @@ func TestRelated_DBC_Registered(t *testing.T) {
 		"kms":        {"KMS Key", true},
 		"secrets":    {"Secrets Manager", true},
 		"dbi":        {"RDS Instances", true},
-		"docdb-snap": {"DocumentDB Snapshots", true},
+		"dbc-snap": {"DocumentDB Snapshots", true},
 		"subnet":     {"Subnets", true},
 		"vpc":        {"VPC", true},
 	}
@@ -361,29 +361,29 @@ func TestRelated_DBC_DBI_EmptyID(t *testing.T) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// checkDbcDocdbSnap — reverse lookup (docdb-snap cache by DBClusterIdentifier)
+// checkDbcDbcSnap — reverse lookup (dbc-snap cache by DBClusterIdentifier)
 // ────────────────────────────────────────────────────────────────────────────
 
-// TestRelated_DBC_DocdbSnap_Found verifies that snapshots with matching
+// TestRelated_DBC_DbcSnap_Found verifies that snapshots with matching
 // DBClusterIdentifier are returned.
-func TestRelated_DBC_DocdbSnap_Found(t *testing.T) {
+func TestRelated_DBC_DbcSnap_Found(t *testing.T) {
 	const clusterID = "acme-docdb-prod"
 	snapRes := resource.Resource{
-		ID: "docdb-snap-acme-prod-20240101",
+		ID: "dbc-snap-acme-prod-20240101",
 		RawStruct: docdb_types.DBClusterSnapshot{
-			DBClusterSnapshotIdentifier: aws.String("docdb-snap-acme-prod-20240101"),
+			DBClusterSnapshotIdentifier: aws.String("dbc-snap-acme-prod-20240101"),
 			DBClusterIdentifier:         aws.String(clusterID),
 		},
 	}
 	otherSnap := resource.Resource{
-		ID: "docdb-snap-other-cluster",
+		ID: "dbc-snap-other-cluster",
 		RawStruct: docdb_types.DBClusterSnapshot{
-			DBClusterSnapshotIdentifier: aws.String("docdb-snap-other-cluster"),
+			DBClusterSnapshotIdentifier: aws.String("dbc-snap-other-cluster"),
 			DBClusterIdentifier:         aws.String("other-cluster"),
 		},
 	}
 	cache := resource.ResourceCache{
-		"docdb-snap": resource.ResourceCacheEntry{Resources: []resource.Resource{snapRes, otherSnap}},
+		"dbc-snap": resource.ResourceCacheEntry{Resources: []resource.Resource{snapRes, otherSnap}},
 	}
 	src := resource.Resource{
 		ID: clusterID,
@@ -392,28 +392,28 @@ func TestRelated_DBC_DocdbSnap_Found(t *testing.T) {
 		},
 	}
 
-	checker := dbcCheckerByTarget(t, "docdb-snap")
+	checker := dbcCheckerByTarget(t, "dbc-snap")
 	result := checker(context.Background(), nil, src, cache)
 
 	if result.Count != 1 {
 		t.Errorf("Count = %d, want 1", result.Count)
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "docdb-snap-acme-prod-20240101" {
-		t.Errorf("ResourceIDs = %v, want [docdb-snap-acme-prod-20240101]", result.ResourceIDs)
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "dbc-snap-acme-prod-20240101" {
+		t.Errorf("ResourceIDs = %v, want [dbc-snap-acme-prod-20240101]", result.ResourceIDs)
 	}
 }
 
-// TestRelated_DBC_DocdbSnap_Empty verifies Count=0 when no snapshots match.
-func TestRelated_DBC_DocdbSnap_Empty(t *testing.T) {
+// TestRelated_DBC_DbcSnap_Empty verifies Count=0 when no snapshots match.
+func TestRelated_DBC_DbcSnap_Empty(t *testing.T) {
 	otherSnap := resource.Resource{
-		ID: "docdb-snap-other-cluster",
+		ID: "dbc-snap-other-cluster",
 		RawStruct: docdb_types.DBClusterSnapshot{
-			DBClusterSnapshotIdentifier: aws.String("docdb-snap-other-cluster"),
+			DBClusterSnapshotIdentifier: aws.String("dbc-snap-other-cluster"),
 			DBClusterIdentifier:         aws.String("other-cluster"),
 		},
 	}
 	cache := resource.ResourceCache{
-		"docdb-snap": resource.ResourceCacheEntry{Resources: []resource.Resource{otherSnap}},
+		"dbc-snap": resource.ResourceCacheEntry{Resources: []resource.Resource{otherSnap}},
 	}
 	src := resource.Resource{
 		ID: "acme-docdb-prod",
@@ -422,7 +422,7 @@ func TestRelated_DBC_DocdbSnap_Empty(t *testing.T) {
 		},
 	}
 
-	checker := dbcCheckerByTarget(t, "docdb-snap")
+	checker := dbcCheckerByTarget(t, "dbc-snap")
 	result := checker(context.Background(), nil, src, cache)
 
 	if result.Count != 0 {

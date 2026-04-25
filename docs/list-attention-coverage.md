@@ -78,7 +78,7 @@ the column set fails to discriminate the cause.
 | `efs` | ✓ | Name, File System ID, **State**, Perf Mode, **Encrypted**, **Mounts** | NumberOfMountTargets visible. Mount target lifecycle (Wave 2) hidden. | None | Adequate; row color from Wave 2 sufficient |
 | `s3` | ✗ | Bucket Name, Region, Creation Date | **Public access risk** (Wave 2 GetPublicAccessBlock) hidden — critical security signal | **A** | Add `Public Access` column from Wave 2 enrichment ("BLOCKED" / "RISK" / "?") |
 | `dbi-snap` | ~ | Snapshot ID, DB Instance, **Status**, Engine, Type, Created | `Encrypted=false` (CIS RDS.4) hidden. Orphan (source DB deleted) hidden. | **A** | Add `Encrypted` column from SDK |
-| `docdb-snap` | ✓ | Snapshot ID, Cluster ID, **Status**, Engine, Type, Created, Storage | Manual snapshot age >365d (cost) | **B** | Add `Age` computed column with cost-warn over 365d |
+| `dbc-snap` | ✓ | Snapshot ID, Cluster ID, **Status**, Engine, Type, Created, Storage | Manual snapshot age >365d (cost) | **B** | Add `Age` computed column with cost-warn over 365d |
 
 ## Messaging
 

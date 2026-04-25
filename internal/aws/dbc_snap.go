@@ -12,9 +12,9 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("docdb-snap", []string{"snapshot_id", "cluster_id", "status", "engine", "snapshot_type", "snapshot_create_time", "storage_type", "storage_encrypted"})
+	resource.RegisterFieldKeys("dbc-snap", []string{"snapshot_id", "cluster_id", "status", "engine", "snapshot_type", "snapshot_create_time", "storage_type", "storage_encrypted"})
 
-	resource.RegisterPaginated("docdb-snap", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+	resource.RegisterPaginated("dbc-snap", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
@@ -22,15 +22,15 @@ func init() {
 		return FetchDocDBClusterSnapshotsPage(ctx, c.DocDB, continuationToken)
 	})
 
-	resource.RegisterRelated("docdb-snap", []resource.RelatedDef{
-		{TargetType: "dbc", DisplayName: "DocumentDB Cluster", Checker: checkDocdbSnapDBC},
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkDocdbSnapKMS},
-		{TargetType: "vpc", DisplayName: "VPC", Checker: checkDocdbSnapVPC},
-		{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkDocdbSnapBackup},
+	resource.RegisterRelated("dbc-snap", []resource.RelatedDef{
+		{TargetType: "dbc", DisplayName: "DocumentDB Cluster", Checker: checkDbcSnapDBC},
+		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkDbcSnapKMS},
+		{TargetType: "vpc", DisplayName: "VPC", Checker: checkDbcSnapVPC},
+		{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkDbcSnapBackup},
 	})
 
 	// docdbtypes.DBClusterSnapshot: VpcId, KmsKeyId
-	resource.RegisterNavigableFields("docdb-snap", []resource.NavigableField{
+	resource.RegisterNavigableFields("dbc-snap", []resource.NavigableField{
 		{FieldPath: "VpcId", TargetType: "vpc"},
 		{FieldPath: "KmsKeyId", TargetType: "kms"},
 	})

@@ -1,4 +1,4 @@
-# DocumentDB Snapshots (docdb-snap) — Related Resources
+# DocumentDB Snapshots (dbc-snap) — Related Resources
 
 ## Real-World Use Cases
 

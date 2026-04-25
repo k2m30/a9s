@@ -13,7 +13,7 @@
 | Related Resource | How to Find | Scenario | Priority |
 |-----------------|-------------|----------|----------|
 | CloudWatch Alarms (alarm) | Search alarms with `DBClusterIdentifier` dimension. | "What monitoring watches this cluster?" Common alarms: CPUUtilization, FreeableMemory, DatabaseConnections. | P0 |
-| DocDB Snapshots (docdb-snap) | `docdb:DescribeDBClusterSnapshots` with `DBClusterIdentifier` filter. | "When was the last backup?" | P1 |
+| DB Cluster Snapshots (dbc-snap) | `docdb:DescribeDBClusterSnapshots` with `DBClusterIdentifier` filter. | "When was the last backup?" | P1 |
 | CloudFormation Stacks (cfn) | Check for `aws:cloudformation:stack-name` tag. | "Which stack manages this cluster?" | P2 |
 
 ## Algorithmic Relationships

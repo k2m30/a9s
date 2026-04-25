@@ -65,7 +65,7 @@ func detailConfigForType(typeName string) *config.ViewsConfig {
 			"Status", "Engine", "EngineVersion", "SnapshotType",
 			"SnapshotCreateTime", "AllocatedStorage",
 		},
-		"docdb-snap": {
+		"dbc-snap": {
 			"DBClusterSnapshotIdentifier", "DBClusterIdentifier",
 			"Status", "Engine", "SnapshotType", "SnapshotCreateTime",
 		},
@@ -309,9 +309,9 @@ func realisticDBISnapshot() rdstypes.DBSnapshot {
 	}
 }
 
-func realisticDocDBSnapshot() docdbtypes.DBClusterSnapshot {
+func realisticDBCSnapshot() docdbtypes.DBClusterSnapshot {
 	return docdbtypes.DBClusterSnapshot{
-		DBClusterSnapshotIdentifier: new("docdb-snap-prod-20250615"),
+		DBClusterSnapshotIdentifier: new("dbc-snap-prod-20250615"),
 		DBClusterIdentifier:         new("docdb-prod-cluster"),
 		Status:                      new("available"),
 		Engine:                      new("docdb"),
@@ -957,16 +957,16 @@ func TestQA_Detail_DBISnap_FrameTitle(t *testing.T) {
 // 13. DocDB Snapshot
 // ===========================================================================
 
-func TestQA_Detail_DocDBSnap_ViewContainsExpectedFields(t *testing.T) {
+func TestQA_Detail_DBCSnap_ViewContainsExpectedFields(t *testing.T) {
 	ensureNoColor(t)
-	snap := realisticDocDBSnapshot()
-	res := buildResource("docdb-snap-prod-20250615", "docdb-snap-prod-20250615", snap)
-	cfg := detailConfigForType("docdb-snap")
-	m := newDetailModel(res, "docdb-snap", cfg)
+	snap := realisticDBCSnapshot()
+	res := buildResource("dbc-snap-prod-20250615", "dbc-snap-prod-20250615", snap)
+	cfg := detailConfigForType("dbc-snap")
+	m := newDetailModel(res, "dbc-snap", cfg)
 
 	view := m.View()
 	for _, expected := range []string{
-		"DBClusterSnapshotId", "docdb-snap-prod-20250615",
+		"DBClusterSnapshotId", "dbc-snap-prod-20250615",
 		"DBClusterIdentifier", "docdb-prod-cluster",
 		"Status", "available",
 		"Engine", "docdb",
@@ -974,32 +974,32 @@ func TestQA_Detail_DocDBSnap_ViewContainsExpectedFields(t *testing.T) {
 		"SnapshotCreateTime", "2025-06-15 10:30",
 	} {
 		if !strings.Contains(view, expected) {
-			t.Errorf("DocDBSnap detail should contain %q, got:\n%s", expected, view)
+			t.Errorf("DBCSnap detail should contain %q, got:\n%s", expected, view)
 		}
 	}
 }
 
-func TestQA_Detail_DocDBSnap_NilFields(t *testing.T) {
+func TestQA_Detail_DBCSnap_NilFields(t *testing.T) {
 	ensureNoColor(t)
 	snap := docdbtypes.DBClusterSnapshot{}
-	res := buildResource("empty-docdb-snap", "empty-docdb-snap", snap)
-	cfg := detailConfigForType("docdb-snap")
-	m := newDetailModel(res, "docdb-snap", cfg)
+	res := buildResource("empty-dbc-snap", "empty-dbc-snap", snap)
+	cfg := detailConfigForType("dbc-snap")
+	m := newDetailModel(res, "dbc-snap", cfg)
 
 	view := m.View()
 	if view == "" {
-		t.Error("DocDBSnap detail should not be empty even with nil fields")
+		t.Error("DBCSnap detail should not be empty even with nil fields")
 	}
 }
 
-func TestQA_Detail_DocDBSnap_FrameTitle(t *testing.T) {
-	snap := realisticDocDBSnapshot()
-	res := buildResource("docdb-snap-prod-20250615", "docdb-snap-prod-20250615", snap)
-	cfg := detailConfigForType("docdb-snap")
-	m := newDetailModel(res, "docdb-snap", cfg)
+func TestQA_Detail_DBCSnap_FrameTitle(t *testing.T) {
+	snap := realisticDBCSnapshot()
+	res := buildResource("dbc-snap-prod-20250615", "dbc-snap-prod-20250615", snap)
+	cfg := detailConfigForType("dbc-snap")
+	m := newDetailModel(res, "dbc-snap", cfg)
 
-	if title := m.FrameTitle(); title != "docdb-snap-prod-20250615" {
-		t.Errorf("DocDBSnap FrameTitle expected %q, got %q", "docdb-snap-prod-20250615", title)
+	if title := m.FrameTitle(); title != "dbc-snap-prod-20250615" {
+		t.Errorf("DBCSnap FrameTitle expected %q, got %q", "dbc-snap-prod-20250615", title)
 	}
 }
 

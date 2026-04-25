@@ -396,7 +396,7 @@ func (m *mockIAMListGroupsClient) ListGroups(ctx context.Context, params *iam.Li
 }
 
 // ---------------------------------------------------------------------------
-// DocDB Snapshots mocks
+// DB Cluster Snapshots mocks
 // ---------------------------------------------------------------------------
 
 type mockDocDBDescribeSnapshotsClient struct {

@@ -7,10 +7,10 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func TestDocdbSnapColor(t *testing.T) {
-	td := resource.FindResourceType("docdb-snap")
+func TestDbcSnapColor(t *testing.T) {
+	td := resource.FindResourceType("dbc-snap")
 	if td == nil {
-		t.Fatal("docdb-snap not registered")
+		t.Fatal("dbc-snap not registered")
 	}
 
 	twoYearsAgo := time.Now().AddDate(-2, 0, 0).Format("2006-01-02 15:04")

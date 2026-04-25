@@ -62,10 +62,10 @@
 | `cfn` | [API_Stack](https://docs.aws.amazon.com/AWSCloudFormation/latest/APIReference/API_Stack.html) | `cfn`, `ct-events`, `eb-rule`, `role`, `s3`, `sns` |
 | `codeartifact` | [API_Repository](https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_Repository.html) | `ct-events`, `kms` |
 | `ct-events` | [API_LookupEvents](https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_LookupEvents.html) | `cfn`, `ct-events`, `dbi`, `ddb`, `ec2`, `iam-user`, `kms`, `lambda`, `role`, `s3`, `secrets`, `sg`, `trail`, `vpce` |
-| `dbc` | [API_DBCluster](https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBCluster.html) | `alarm`, `ct-events`, `dbi`, `docdb-snap`, `kms`, `logs`, `secrets`, `sg`, `subnet`, `vpc` |
+| `dbc` | [API_DBCluster](https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBCluster.html) | `alarm`, `ct-events`, `dbi`, `dbc-snap`, `kms`, `logs`, `secrets`, `sg`, `subnet`, `vpc` |
 | `dbi` | [API_DBInstance](https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBInstance.html) | `alarm`, `ct-events`, `dbc`, `eni`, `kms`, `logs`, `dbi-snap`, `role`, `secrets`, `sg`, `subnet`, `vpc` |
 | `ddb` | [API_TableDescription](https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_TableDescription.html) | `alarm`, `backup`, `ct-events`, `kinesis`, `kms`, `lambda`, `logs`, `vpce` |
-| `docdb-snap` | [API_DBClusterSnapshot](https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBClusterSnapshot.html) | `backup`, `ct-events`, `dbc`, `kms`, `vpc` |
+| `dbc-snap` | [API_DBClusterSnapshot](https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBClusterSnapshot.html) | `backup`, `ct-events`, `dbc`, `kms`, `vpc` |
 | `eb` | [API_EnvironmentDescription](https://docs.aws.amazon.com/elasticbeanstalk/latest/api/API_EnvironmentDescription.html) | `alarm`, `asg`, `cfn`, `ct-events`, `ec2`, `elb`, `logs`, `role`, `s3`, `sg`, `tg` |
 | `eb-rule` | [API_Rule](https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_Rule.html) | `ct-events`, `kinesis`, `lambda`, `logs`, `role`, `sfn`, `sns`, `sqs` |
 | `ebs` | [API_Volume](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Volume.html) | `alarm`, `backup`, `cfn`, `ct-events`, `ebs-snap`, `ec2`, `kms` |
@@ -299,7 +299,7 @@ AWS API: https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBClus
 - **`alarm`** — Cluster CW alarms.
 - **`ct-events`** — Audit trail for cluster changes.
 - **`dbi`** — Cluster member instances.
-- **`docdb-snap`** — Cluster snapshots.
+- **`dbc-snap`** — Cluster snapshots.
 - **`kms`** — Cluster encryption key.
 - **`logs`** — Cluster log exports.
 - **`secrets`** — Master credentials in Secrets Manager.
@@ -337,7 +337,7 @@ AWS API: https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_Tabl
 - **`logs`** — ContributorInsights / Streams logs.
 - **`vpce`** — Gateway endpoint for DynamoDB.
 
-### `docdb-snap`
+### `dbc-snap`
 
 AWS API: https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBClusterSnapshot.html
 

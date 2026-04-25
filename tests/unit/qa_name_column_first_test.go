@@ -245,7 +245,7 @@ var idFirstExceptions = []struct {
 	{"dbc", "Cluster ID"},
 	{"redshift", "Cluster ID"},
 	{"dbi-snap", "Snapshot ID"},
-	{"docdb-snap", "Snapshot ID"},
+	{"dbc-snap", "Snapshot ID"},
 }
 
 func TestDocumentedExceptions_IDFirstIsCorrect(t *testing.T) {

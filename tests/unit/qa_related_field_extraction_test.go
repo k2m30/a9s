@@ -215,10 +215,10 @@ func TestRelatedFieldExtraction_DBI_VPC_ReturnsZeroWhenNilRawStruct(t *testing.T
 	}
 }
 
-// --- checkDocdbSnapVPC ---
-// checkDocdbSnapVPC reads from snap.VpcId in RawStruct.
+// --- checkDbcSnapVPC ---
+// checkDbcSnapVPC reads from snap.VpcId in RawStruct.
 
-func TestRelatedFieldExtraction_DocdbSnap_VPC_ReturnsVpcID(t *testing.T) {
+func TestRelatedFieldExtraction_DbcSnap_VPC_ReturnsVpcID(t *testing.T) {
 	res := resource.Resource{
 		ID:     "rds:cluster-snapshot:my-snap",
 		Fields: map[string]string{},
@@ -226,7 +226,7 @@ func TestRelatedFieldExtraction_DocdbSnap_VPC_ReturnsVpcID(t *testing.T) {
 			VpcId: aws.String("vpc-abc123"),
 		},
 	}
-	checker := fieldExtractionChecker(t, "docdb-snap", "vpc")
+	checker := fieldExtractionChecker(t, "dbc-snap", "vpc")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
 	if result.Count != 1 {
@@ -240,13 +240,13 @@ func TestRelatedFieldExtraction_DocdbSnap_VPC_ReturnsVpcID(t *testing.T) {
 	}
 }
 
-func TestRelatedFieldExtraction_DocdbSnap_VPC_ReturnsZeroWhenNilVpcID(t *testing.T) {
+func TestRelatedFieldExtraction_DbcSnap_VPC_ReturnsZeroWhenNilVpcID(t *testing.T) {
 	res := resource.Resource{
 		ID:        "rds:cluster-snapshot:my-snap",
 		Fields:    map[string]string{},
 		RawStruct: docdbtypes.DBClusterSnapshot{VpcId: nil},
 	}
-	checker := fieldExtractionChecker(t, "docdb-snap", "vpc")
+	checker := fieldExtractionChecker(t, "dbc-snap", "vpc")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
 	if result.Count != 0 {
@@ -254,12 +254,12 @@ func TestRelatedFieldExtraction_DocdbSnap_VPC_ReturnsZeroWhenNilVpcID(t *testing
 	}
 }
 
-func TestRelatedFieldExtraction_DocdbSnap_VPC_ReturnsZeroWhenNilRawStruct(t *testing.T) {
+func TestRelatedFieldExtraction_DbcSnap_VPC_ReturnsZeroWhenNilRawStruct(t *testing.T) {
 	res := resource.Resource{
 		ID:     "rds:cluster-snapshot:my-snap",
 		Fields: map[string]string{},
 	}
-	checker := fieldExtractionChecker(t, "docdb-snap", "vpc")
+	checker := fieldExtractionChecker(t, "dbc-snap", "vpc")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
 	if result.Count != 0 {
@@ -576,9 +576,9 @@ func TestRelatedFieldExtraction_DBI_KMS_ReturnsNegOneOnBadRawStruct(t *testing.T
 	}
 }
 
-// --- checkDocdbSnapKMS ---
+// --- checkDbcSnapKMS ---
 
-func TestRelatedFieldExtraction_DocdbSnap_KMS_ExtractsKeyIDFromARN(t *testing.T) {
+func TestRelatedFieldExtraction_DbcSnap_KMS_ExtractsKeyIDFromARN(t *testing.T) {
 	res := resource.Resource{
 		ID:     "rds:cluster-snapshot:my-snap",
 		Fields: map[string]string{},
@@ -586,7 +586,7 @@ func TestRelatedFieldExtraction_DocdbSnap_KMS_ExtractsKeyIDFromARN(t *testing.T)
 			KmsKeyId: aws.String("arn:aws:kms:us-east-1:123456789012:key/abc-123"),
 		},
 	}
-	checker := fieldExtractionChecker(t, "docdb-snap", "kms")
+	checker := fieldExtractionChecker(t, "dbc-snap", "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
 	if result.Count != 1 {
@@ -600,13 +600,13 @@ func TestRelatedFieldExtraction_DocdbSnap_KMS_ExtractsKeyIDFromARN(t *testing.T)
 	}
 }
 
-func TestRelatedFieldExtraction_DocdbSnap_KMS_ReturnsZeroWhenNilKey(t *testing.T) {
+func TestRelatedFieldExtraction_DbcSnap_KMS_ReturnsZeroWhenNilKey(t *testing.T) {
 	res := resource.Resource{
 		ID:        "rds:cluster-snapshot:my-snap",
 		Fields:    map[string]string{},
 		RawStruct: docdbtypes.DBClusterSnapshot{KmsKeyId: nil},
 	}
-	checker := fieldExtractionChecker(t, "docdb-snap", "kms")
+	checker := fieldExtractionChecker(t, "dbc-snap", "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
 	if result.Count != 0 {
@@ -614,13 +614,13 @@ func TestRelatedFieldExtraction_DocdbSnap_KMS_ReturnsZeroWhenNilKey(t *testing.T
 	}
 }
 
-func TestRelatedFieldExtraction_DocdbSnap_KMS_ReturnsNegOneOnBadRawStruct(t *testing.T) {
+func TestRelatedFieldExtraction_DbcSnap_KMS_ReturnsNegOneOnBadRawStruct(t *testing.T) {
 	res := resource.Resource{
 		ID:        "rds:cluster-snapshot:my-snap",
 		Fields:    map[string]string{},
 		RawStruct: "not-a-docdb-snapshot",
 	}
-	checker := fieldExtractionChecker(t, "docdb-snap", "kms")
+	checker := fieldExtractionChecker(t, "dbc-snap", "kms")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
 	if result.Count != -1 {

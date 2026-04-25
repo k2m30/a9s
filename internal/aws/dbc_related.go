@@ -149,23 +149,23 @@ func checkDbcDBI(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResult("dbi", ids)
 }
 
-// checkDbcDocdbSnap does a reverse lookup — scans the docdb-snap cache for
+// checkDbcDbcSnap does a reverse lookup — scans the dbc-snap cache for
 // snapshots whose DBClusterIdentifier matches this cluster's identifier.
-func checkDbcDocdbSnap(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkDbcDbcSnap(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterID := res.ID
 	if cluster, ok := assertStruct[docdb_types.DBCluster](res.RawStruct); ok && cluster.DBClusterIdentifier != nil && *cluster.DBClusterIdentifier != "" {
 		clusterID = *cluster.DBClusterIdentifier
 	}
 	if clusterID == "" {
-		return resource.RelatedCheckResult{TargetType: "docdb-snap", Count: 0}
+		return resource.RelatedCheckResult{TargetType: "dbc-snap", Count: 0}
 	}
 
-	snapList, truncated, err := dbcRelatedResources(ctx, clients, cache, "docdb-snap")
+	snapList, truncated, err := dbcRelatedResources(ctx, clients, cache, "dbc-snap")
 	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "docdb-snap", Count: -1, Err: err}
+		return resource.RelatedCheckResult{TargetType: "dbc-snap", Count: -1, Err: err}
 	}
 	if snapList == nil {
-		return resource.ApproximateZero("docdb-snap")
+		return resource.ApproximateZero("dbc-snap")
 	}
 
 	var ids []string
@@ -179,9 +179,9 @@ func checkDbcDocdbSnap(ctx context.Context, clients any, res resource.Resource, 
 		}
 	}
 	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("docdb-snap")
+		return resource.ApproximateZero("dbc-snap")
 	}
-	return relatedResult("docdb-snap", ids)
+	return relatedResult("dbc-snap", ids)
 }
 
 // checkDbcSubnet resolves the subnets inside the cluster's DBSubnetGroup via

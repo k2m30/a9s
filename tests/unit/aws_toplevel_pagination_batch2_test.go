@@ -1205,17 +1205,17 @@ func TestFetchDocDBClusters_Pagination(t *testing.T) {
 }
 
 // ===========================================================================
-// DocDB Snapshots — DocDB DescribeDBClusterSnapshots (Marker)
+// DB Cluster Snapshots — DocDB DescribeDBClusterSnapshots (Marker)
 // ===========================================================================
 
-type mockDocDBSnapshotsPaginatedClient struct {
+type mockDBCSnapshotsPaginatedClient struct {
 	outputs []*docdb.DescribeDBClusterSnapshotsOutput
 	inputs  []*docdb.DescribeDBClusterSnapshotsInput
 	err     error
 	callIdx int
 }
 
-func (m *mockDocDBSnapshotsPaginatedClient) DescribeDBClusterSnapshots(
+func (m *mockDBCSnapshotsPaginatedClient) DescribeDBClusterSnapshots(
 	ctx context.Context,
 	params *docdb.DescribeDBClusterSnapshotsInput,
 	optFns ...func(*docdb.Options),
@@ -1233,7 +1233,7 @@ func (m *mockDocDBSnapshotsPaginatedClient) DescribeDBClusterSnapshots(
 }
 
 func TestFetchDocDBClusterSnapshots_Pagination(t *testing.T) {
-	mock := &mockDocDBSnapshotsPaginatedClient{
+	mock := &mockDBCSnapshotsPaginatedClient{
 		outputs: []*docdb.DescribeDBClusterSnapshotsOutput{
 			{
 				Marker: aws.String("page2-marker"),
@@ -1610,7 +1610,7 @@ func TestBatch2Pagination_ErrorPropagation(t *testing.T) {
 	})
 
 	t.Run("docdb_snap_error", func(t *testing.T) {
-		mock := &mockDocDBSnapshotsPaginatedClient{err: testErr}
+		mock := &mockDBCSnapshotsPaginatedClient{err: testErr}
 		_, err := awsclient.FetchDocDBClusterSnapshots(context.Background(), mock)
 		if err == nil {
 			t.Fatal("expected error, got nil")

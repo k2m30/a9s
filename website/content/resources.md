@@ -57,7 +57,7 @@ a9s supports **66 AWS resource types** across **12 service categories**. All API
 | Redshift Clusters | `redshift` |
 | EFS File Systems | `efs` |
 | DB Instance Snapshots | `dbi-snap` |
-| DocDB Snapshots | `docdb-snap` |
+| DB Cluster Snapshots | `dbc-snap` |
 
 ## Monitoring
 

@@ -229,7 +229,7 @@ They should not be rendered as if they have equal certainty.
 | Redshift Clusters | L1 | not available, resizing/restoring too long, maintenance/problem states |
 | EFS File Systems | L4 | no strong generic issue semantics in v1 |
 | DB Instance Snapshots | L1 | failed, creating too long |
-| DocDB Snapshots | L1 | failed, creating too long |
+| DB Cluster Snapshots | L1 | failed, creating too long |
 
 ## 6.5 Monitoring
 
@@ -323,7 +323,7 @@ Ship issue counts and the first `!` mode for:
 - OpenSearch
 - Redshift
 - DB Instance Snapshots
-- DocDB Snapshots
+- DB Cluster Snapshots
 - CloudWatch Alarms
 - Kinesis Streams
 - MSK Clusters
