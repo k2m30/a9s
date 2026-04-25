@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
@@ -179,4 +180,64 @@ func dbcResourceARN(raw any) string {
 		return *c.DBClusterArn
 	}
 	return ""
+}
+
+// checkDbcSnapCTEvents looks up cached CloudTrail events for the snapshot's
+// DBClusterSnapshotIdentifier. Universal pivot — every registered type gets one;
+// see docs/related-resources.md §Policy. FetchFilter["ResourceName"] is always
+// set so the caller can do a filtered re-fetch; Count is "unknown" (windowed)
+// per the spec — the panel renders the visible page count rather than a total.
+// ResourceType is "AWS::RDS::DBClusterSnapshot" — both DocDB and Aurora cluster
+// snapshots share this CloudTrail resource type (docs/resources/dbc-snap.md §2 ct-events).
+func checkDbcSnapCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	snapID := res.ID
+	if snapID == "" {
+		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
+	}
+	fetchFilter := map[string]string{"ResourceName": snapID}
+	eventList, truncated, err := dbcSnapRelatedResources(ctx, clients, cache, "ct-events")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, Err: err, FetchFilter: fetchFilter}
+	}
+	if eventList == nil {
+		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, FetchFilter: fetchFilter}
+	}
+	var ids []string
+	for _, eventRes := range eventList {
+		// When a typed cloudtrail Event is present, its Resources slice is
+		// authoritative — the Fields["resource_name"] fallback below is only
+		// for resources without a typed RawStruct (test helpers, demo
+		// shortcuts). If the typed slice exists and contains no match for
+		// snapID, the event genuinely doesn't reference this snapshot;
+		// don't second-guess that via the text fallback.
+		if raw, ok := assertStruct[cloudtrailtypes.Event](eventRes.RawStruct); ok {
+			for _, rr := range raw.Resources {
+				if rr.ResourceName != nil && *rr.ResourceName == snapID {
+					ids = append(ids, eventRes.ID)
+					break
+				}
+			}
+			continue
+		}
+		if eventRes.Fields["resource_name"] == snapID {
+			ids = append(ids, eventRes.ID)
+		}
+	}
+	if truncated {
+		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, FetchFilter: fetchFilter}
+	}
+	result := relatedResult("ct-events", ids)
+	result.FetchFilter = fetchFilter
+	return result
+}
+
+// dbcSnapRelatedResources returns the resource list for target from cache or by fetching the first page.
+func dbcSnapRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
+	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
+	if err != nil {
+		if _, ok := clients.(*ServiceClients); !ok {
+			return nil, false, nil
+		}
+	}
+	return resources, isTruncated, err
 }

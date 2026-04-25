@@ -19,8 +19,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
+	"github.com/aws/aws-sdk-go-v2/service/rds"
+	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -407,5 +410,202 @@ func TestFetchDocDBClusters_MultiPageAccumulates(t *testing.T) {
 		if !ids[want] {
 			t.Errorf("expected resource %q from multi-page fetch, not found in %v", want, ids)
 		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// RDS cluster tests — computeRDSDBClusterStatusAndIssues via FetchRDSDBClustersPage
+// ---------------------------------------------------------------------------
+
+// mockRDSClustersClient satisfies RDSDescribeDBClustersAPI for a single page.
+type mockRDSClustersClient struct {
+	out *rds.DescribeDBClustersOutput
+	err error
+}
+
+func (m *mockRDSClustersClient) DescribeDBClusters(
+	_ context.Context, _ *rds.DescribeDBClustersInput, _ ...func(*rds.Options),
+) (*rds.DescribeDBClustersOutput, error) {
+	return m.out, m.err
+}
+
+// rdsClusterPage is a test helper that calls FetchRDSDBClustersPage with a
+// single-cluster page and returns the first resource + error.
+func rdsClusterPage(t *testing.T, cluster rdstypes.DBCluster) (resource.FetchResult, error) {
+	t.Helper()
+	mock := &mockRDSClustersClient{
+		out: &rds.DescribeDBClustersOutput{
+			DBClusters: []rdstypes.DBCluster{cluster},
+		},
+	}
+	return awsclient.FetchRDSDBClustersPage(context.Background(), mock, "")
+}
+
+// TestComputeRDSDBClusterStatusAndIssues validates computeRDSDBClusterStatusAndIssues
+// (unexported) via FetchRDSDBClustersPage — 11 cases mirroring the docdb table.
+func TestComputeRDSDBClusterStatusAndIssues(t *testing.T) {
+	boolPtr := func(b bool) *bool { return &b }
+	int32Ptr := func(i int32) *int32 { return &i }
+	writer := rdstypes.DBClusterMember{IsClusterWriter: boolPtr(true)}
+
+	cases := []struct {
+		name        string
+		cluster     rdstypes.DBCluster
+		wantStatus  string
+		wantIssues  []string
+	}{
+		{
+			name: "healthy_available_writer",
+			cluster: rdstypes.DBCluster{
+				DBClusterIdentifier:   aws.String("aurora-healthy"),
+				Status:                aws.String("available"),
+				DBClusterMembers:      []rdstypes.DBClusterMember{writer},
+				DeletionProtection:    boolPtr(true),
+				StorageEncrypted:      boolPtr(true),
+				BackupRetentionPeriod: int32Ptr(7),
+			},
+			wantStatus: "",
+			wantIssues: nil,
+		},
+		{
+			name: "available_zero_writers",
+			cluster: rdstypes.DBCluster{
+				DBClusterIdentifier:   aws.String("aurora-no-writer"),
+				Status:                aws.String("available"),
+				DBClusterMembers:      []rdstypes.DBClusterMember{},
+				DeletionProtection:    boolPtr(true),
+				StorageEncrypted:      boolPtr(true),
+				BackupRetentionPeriod: int32Ptr(7),
+			},
+			wantStatus: "no writer: reads only",
+			wantIssues: []string{"no writer: reads only"},
+		},
+		{
+			name: "available_deletion_protection_false",
+			cluster: rdstypes.DBCluster{
+				DBClusterIdentifier:   aws.String("aurora-nodp"),
+				Status:                aws.String("available"),
+				DBClusterMembers:      []rdstypes.DBClusterMember{writer},
+				DeletionProtection:    boolPtr(false),
+				StorageEncrypted:      boolPtr(true),
+				BackupRetentionPeriod: int32Ptr(7),
+			},
+			wantStatus: "delete-protection off",
+			wantIssues: []string{"delete-protection off"},
+		},
+		{
+			name: "available_storage_not_encrypted",
+			cluster: rdstypes.DBCluster{
+				DBClusterIdentifier:   aws.String("aurora-noenc"),
+				Status:                aws.String("available"),
+				DBClusterMembers:      []rdstypes.DBClusterMember{writer},
+				DeletionProtection:    boolPtr(true),
+				StorageEncrypted:      boolPtr(false),
+				BackupRetentionPeriod: int32Ptr(7),
+			},
+			wantStatus: "not encrypted at rest",
+			wantIssues: []string{"not encrypted at rest"},
+		},
+		{
+			name: "available_backup_retention_zero",
+			cluster: rdstypes.DBCluster{
+				DBClusterIdentifier:   aws.String("aurora-nobackup"),
+				Status:                aws.String("available"),
+				DBClusterMembers:      []rdstypes.DBClusterMember{writer},
+				DeletionProtection:    boolPtr(true),
+				StorageEncrypted:      boolPtr(true),
+				BackupRetentionPeriod: int32Ptr(0),
+			},
+			wantStatus: "no automated backups",
+			wantIssues: []string{"no automated backups"},
+		},
+		{
+			name: "available_all_three_warnings",
+			cluster: rdstypes.DBCluster{
+				DBClusterIdentifier:   aws.String("aurora-allwarn"),
+				Status:                aws.String("available"),
+				DBClusterMembers:      []rdstypes.DBClusterMember{writer},
+				DeletionProtection:    boolPtr(false),
+				StorageEncrypted:      boolPtr(false),
+				BackupRetentionPeriod: int32Ptr(0),
+			},
+			wantStatus: "delete-protection off (+2)",
+			wantIssues: []string{"delete-protection off", "not encrypted at rest", "no automated backups"},
+		},
+		{
+			name: "failed_status",
+			cluster: rdstypes.DBCluster{
+				DBClusterIdentifier: aws.String("aurora-failed"),
+				Status:              aws.String("failed"),
+				DBClusterMembers:    []rdstypes.DBClusterMember{writer},
+			},
+			wantStatus: "failed: cluster operation",
+			wantIssues: []string{"failed: cluster operation"},
+		},
+		{
+			name: "inaccessible_encryption_credentials",
+			cluster: rdstypes.DBCluster{
+				DBClusterIdentifier: aws.String("aurora-kms"),
+				Status:              aws.String("inaccessible-encryption-credentials"),
+				DBClusterMembers:    []rdstypes.DBClusterMember{writer},
+			},
+			wantStatus: "encryption key unreachable",
+			wantIssues: []string{"encryption key unreachable"},
+		},
+		{
+			name: "incompatible_parameters",
+			cluster: rdstypes.DBCluster{
+				DBClusterIdentifier: aws.String("aurora-param"),
+				Status:              aws.String("incompatible-parameters"),
+				DBClusterMembers:    []rdstypes.DBClusterMember{writer},
+			},
+			wantStatus: "parameter group incompatible",
+			wantIssues: []string{"parameter group incompatible"},
+		},
+		{
+			name: "modifying_transitional",
+			cluster: rdstypes.DBCluster{
+				DBClusterIdentifier: aws.String("aurora-modifying"),
+				Status:              aws.String("modifying"),
+				DBClusterMembers:    []rdstypes.DBClusterMember{writer},
+			},
+			wantStatus: "modifying: in progress",
+			wantIssues: []string{"modifying: in progress"},
+		},
+		{
+			name: "unknown_status_passthrough",
+			cluster: rdstypes.DBCluster{
+				DBClusterIdentifier: aws.String("aurora-unknown"),
+				Status:              aws.String("cross-region-copying"),
+				DBClusterMembers:    []rdstypes.DBClusterMember{writer},
+			},
+			wantStatus: "cross-region-copying",
+			wantIssues: []string{"cross-region-copying"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := rdsClusterPage(t, tc.cluster)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(result.Resources) != 1 {
+				t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+			}
+			r := result.Resources[0]
+			if r.Status != tc.wantStatus {
+				t.Errorf("Status = %q, want %q", r.Status, tc.wantStatus)
+			}
+			if len(r.Issues) != len(tc.wantIssues) {
+				t.Errorf("Issues = %v, want %v", r.Issues, tc.wantIssues)
+			} else {
+				for i, want := range tc.wantIssues {
+					if r.Issues[i] != want {
+						t.Errorf("Issues[%d] = %q, want %q", i, r.Issues[i], want)
+					}
+				}
+			}
+		})
 	}
 }

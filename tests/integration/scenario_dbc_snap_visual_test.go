@@ -91,6 +91,42 @@ func selectDBCSnapByID(t *testing.T, s *fullIntegrationScenario, id string) reso
 	return fullIntegrationMustFindResourceByID(t, s.clients, "dbc-snap", id)
 }
 
+// TestScenario_DBCSnapVisual_AuroraBackupPivot verifies the Aurora cluster
+// snapshot → Backup Plans related pivot resolves Count ≥ 1 end-to-end.
+//
+// ProdDBCSnapAuroraID (rds:prod-aurora-cluster-2026-04-15) is an rdstypes.
+// DBClusterSnapshot whose parent cluster is "prod-aurora-cluster". The backup
+// fixture (ProdDatabasePlanID) includes the Aurora cluster ARN in its
+// resources selection. checkDbcSnapBackup must:
+//  1. extract the parent name via dbcSnapParentRefs (rdstypes shape),
+//  2. locate the parent in the dbc cache (rdstypes.DBCluster),
+//  3. extract the cluster ARN via dbcResourceARN,
+//  4. scan the backup plan cache for plans covering that ARN.
+//
+// This test pins the dual-shape dispatch chain that the earlier unit tests
+// cover at the function level — verifying that the wiring holds end-to-end in
+// the full demo fixture graph.
+func TestScenario_DBCSnapVisual_AuroraBackupPivot(t *testing.T) {
+	scenario := fullIntegrationNewDemoScenario(t)
+	runDemoStartup(t, scenario)
+	scenario.OpenList("dbc-snap")
+
+	// Healthy Aurora snapshot must render with blank status (no cross-ref signals).
+	scenario.ExpectRowStatusBlank(demofixtures.ProdDBCSnapAuroraID)
+
+	// Open the detail view for the Aurora cluster snapshot.
+	res := selectDBCSnapByID(t, scenario, demofixtures.ProdDBCSnapAuroraID)
+	scenario.OpenDetailResource("dbc-snap", res)
+	scenario.ExpectNoAPIError()
+
+	// The Backup Plans related row must resolve Count ≥ 1 — the ProdDatabasePlanID
+	// plan covers the prod-aurora-cluster ARN via its resource selection.
+	scenario.ExpectRelatedRowCountAtLeast("Backup Plans", 1)
+
+	t.Log("\n" + scenario.currentView())
+	scenario.Back()
+}
+
 // TestScenario_DBCSnapVisual_FailedPlusManualOldStacks pins the multi-signal
 // visual rendering for WarnDBCSnapFailedAndManualOldID:
 //

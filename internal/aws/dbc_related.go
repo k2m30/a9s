@@ -4,14 +4,31 @@ import (
 	"context"
 	"strings"
 
+	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
 	docdb_types "github.com/aws/aws-sdk-go-v2/service/docdb/types"
+	"github.com/aws/aws-sdk-go-v2/service/rds"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
+
+// dbcSubnetGroupInfo is a minimal, engine-agnostic view of a DBSubnetGroup that
+// the dbc → subnet and dbc → vpc pivots need. Both dbcDocDBSubnetGroup and
+// dbcRDSSubnetGroup return this type so callers are not coupled to a specific SDK
+// shape.
+type dbcSubnetGroupInfo struct {
+	VpcId   *string
+	Subnets []dbcSubnetIdentifier
+}
+
+// dbcSubnetIdentifier carries the SubnetIdentifier field shared by both
+// docdb_types.Subnet and rdstypes.Subnet shapes.
+type dbcSubnetIdentifier struct {
+	SubnetIdentifier *string
+}
 
 // dbcClusterIdentifier extracts DBClusterIdentifier from either
 // docdb_types.DBCluster or rdstypes.DBCluster RawStruct shape — the dbc
@@ -265,9 +282,11 @@ func checkDbcDbcSnap(ctx context.Context, clients any, res resource.Resource, ca
 }
 
 // checkDbcSubnet resolves the subnets inside the cluster's DBSubnetGroup via
-// a single docdb:DescribeDBSubnetGroups call (Pattern C — live API). The
-// DBCluster response only carries the subnet-group name; this call resolves
-// it to the concrete Subnets slice.
+// a single DescribeDBSubnetGroups call (Pattern C — live API). The DBCluster
+// response only carries the subnet-group name; this call resolves it to the
+// concrete Subnets slice. For rdstypes.DBCluster (Aurora) shapes the call goes
+// to c.RDS; for docdb_types.DBCluster shapes it goes to c.DocDB.
+// See docs/resources/dbc.md §1 Coverage.
 func checkDbcSubnet(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	sng := dbcSubnetGroup(ctx, clients, res)
 	if sng == nil {
@@ -283,7 +302,8 @@ func checkDbcSubnet(ctx context.Context, clients any, res resource.Resource, _ r
 }
 
 // checkDbcVPC resolves the VPC that hosts the cluster's subnet group via a
-// single docdb:DescribeDBSubnetGroups call (Pattern C).
+// single DescribeDBSubnetGroups call (Pattern C). Engine dispatch mirrors
+// checkDbcSubnet — Aurora rows use c.RDS, DocDB rows use c.DocDB.
 func checkDbcVPC(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	sng := dbcSubnetGroup(ctx, clients, res)
 	if sng == nil {
@@ -295,23 +315,58 @@ func checkDbcVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 	return relatedResult("vpc", []string{*sng.VpcId})
 }
 
-// dbcSubnetGroup makes a single docdb:DescribeDBSubnetGroups call for this
-// cluster's DBSubnetGroup name, wrapped in RetryOnThrottle. Returns nil if
-// the call cannot be made or the group was not found.
+// dbcSubnetGroup dispatches to the appropriate engine-specific helper based on
+// the RawStruct shape:
+//   - rdstypes.DBCluster  → dbcRDSSubnetGroup  (Aurora / Multi-AZ; RDS API)
+//   - docdb_types.DBCluster → dbcDocDBSubnetGroup (DocumentDB; DocDB API)
 //
-// Known limitation: for rdstypes.DBCluster (Aurora) shapes, the subnet group
-// belongs to RDS, not DocDB. The current call goes to c.DocDB.DescribeDBSubnetGroups
-// which will return empty for an Aurora cluster's subnet group.
-// TODO: add a c.RDS.DescribeDBSubnetGroups fallback for rdstypes.DBCluster shapes so
-// that Aurora → subnet and Aurora → vpc pivots resolve correctly in real accounts.
-// For demo mode this is papered over by populating the DocDB fake's subnet group list
-// with the Aurora subnet group entry.
-func dbcSubnetGroup(ctx context.Context, clients any, res resource.Resource) *docdb_types.DBSubnetGroup {
+// Returns nil if the shape is unrecognised, the clients pointer is nil, or the
+// API call returns no groups.
+func dbcSubnetGroup(ctx context.Context, clients any, res resource.Resource) *dbcSubnetGroupInfo {
+	if _, ok := assertStruct[rdstypes.DBCluster](res.RawStruct); ok {
+		return dbcRDSSubnetGroup(ctx, clients, res)
+	}
+	if _, ok := assertStruct[docdb_types.DBCluster](res.RawStruct); ok {
+		return dbcDocDBSubnetGroup(ctx, clients, res)
+	}
+	return nil
+}
+
+// dbcRDSSubnetGroup resolves the subnet group for an Aurora / Multi-AZ DB
+// cluster (rdstypes.DBCluster shape) by calling c.RDS.DescribeDBSubnetGroups.
+// Aurora subnet groups belong to the RDS API, not the DocDB API.
+func dbcRDSSubnetGroup(ctx context.Context, clients any, res resource.Resource) *dbcSubnetGroupInfo {
 	name := dbcClusterSubnetGroupName(res.RawStruct)
 	if name == "" {
 		return nil
 	}
+	c, cok := clients.(*ServiceClients)
+	if !cok || c == nil || c.RDS == nil {
+		return nil
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*rds.DescribeDBSubnetGroupsOutput, error) {
+		return c.RDS.DescribeDBSubnetGroups(ctx, &rds.DescribeDBSubnetGroupsInput{
+			DBSubnetGroupName: &name,
+		})
+	})
+	if err != nil || out == nil || len(out.DBSubnetGroups) == 0 {
+		return nil
+	}
+	sg := out.DBSubnetGroups[0]
+	info := &dbcSubnetGroupInfo{VpcId: sg.VpcId}
+	for _, s := range sg.Subnets {
+		info.Subnets = append(info.Subnets, dbcSubnetIdentifier{SubnetIdentifier: s.SubnetIdentifier})
+	}
+	return info
+}
 
+// dbcDocDBSubnetGroup resolves the subnet group for a DocumentDB cluster
+// (docdb_types.DBCluster shape) by calling c.DocDB.DescribeDBSubnetGroups.
+func dbcDocDBSubnetGroup(ctx context.Context, clients any, res resource.Resource) *dbcSubnetGroupInfo {
+	name := dbcClusterSubnetGroupName(res.RawStruct)
+	if name == "" {
+		return nil
+	}
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil || c.DocDB == nil {
 		return nil
@@ -324,7 +379,12 @@ func dbcSubnetGroup(ctx context.Context, clients any, res resource.Resource) *do
 	if err != nil || out == nil || len(out.DBSubnetGroups) == 0 {
 		return nil
 	}
-	return &out.DBSubnetGroups[0]
+	sg := out.DBSubnetGroups[0]
+	info := &dbcSubnetGroupInfo{VpcId: sg.VpcId}
+	for _, s := range sg.Subnets {
+		info.Subnets = append(info.Subnets, dbcSubnetIdentifier{SubnetIdentifier: s.SubnetIdentifier})
+	}
+	return info
 }
 
 // checkDbcSecrets resolves the Secrets Manager secret managed for this cluster's
@@ -381,4 +441,58 @@ func checkDbcKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		keyID = keyID[idx+1:]
 	}
 	return relatedResult("kms", []string{keyID})
+}
+
+// checkDbcCTEvents looks up cached CloudTrail events for the cluster's
+// DBClusterIdentifier. Universal pivot — every registered type gets one;
+// see docs/related-resources.md §Policy. FetchFilter["ResourceName"] is always
+// set so the caller can do a filtered re-fetch; Count is "unknown" (windowed)
+// per the spec — the panel renders the visible page count rather than a total.
+// ResourceType is "AWS::RDS::DBCluster" — both DocDB and Aurora clusters share
+// this CloudTrail resource type (docs/resources/dbc.md §2 ct-events).
+// The ResourceName for LookupEvents is the cluster identifier extracted via
+// dbcClusterIdentifier (handles both docdb_types.DBCluster and rdstypes.DBCluster).
+func checkDbcCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	clusterID := dbcClusterIdentifier(res.RawStruct)
+	if clusterID == "" {
+		clusterID = res.ID
+	}
+	if clusterID == "" {
+		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
+	}
+	fetchFilter := map[string]string{"ResourceName": clusterID}
+	eventList, truncated, err := dbcRelatedResources(ctx, clients, cache, "ct-events")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, Err: err, FetchFilter: fetchFilter}
+	}
+	if eventList == nil {
+		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, FetchFilter: fetchFilter}
+	}
+	var ids []string
+	for _, eventRes := range eventList {
+		// When a typed cloudtrail Event is present, its Resources slice is
+		// authoritative — the Fields["resource_name"] fallback below is only
+		// for resources without a typed RawStruct (test helpers, demo
+		// shortcuts). If the typed slice exists and contains no match for
+		// clusterID, the event genuinely doesn't reference this cluster;
+		// don't second-guess that via the text fallback.
+		if raw, ok := assertStruct[cloudtrailtypes.Event](eventRes.RawStruct); ok {
+			for _, rr := range raw.Resources {
+				if rr.ResourceName != nil && *rr.ResourceName == clusterID {
+					ids = append(ids, eventRes.ID)
+					break
+				}
+			}
+			continue
+		}
+		if eventRes.Fields["resource_name"] == clusterID {
+			ids = append(ids, eventRes.ID)
+		}
+	}
+	if truncated {
+		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, FetchFilter: fetchFilter}
+	}
+	result := relatedResult("ct-events", ids)
+	result.FetchFilter = fetchFilter
+	return result
 }
