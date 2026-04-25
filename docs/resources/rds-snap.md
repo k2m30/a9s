@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `backup`, `dbc`, `dbi`, `kms`, `ct-events`.
+Expected targets from `docs/related-resources.md` Per-type contract: `backup`, `dbi`, `kms`, `ct-events`.
 
 ### `dbi`
 
@@ -37,11 +37,14 @@ Expected targets from `docs/related-resources.md` Per-type contract: `backup`, `
 - **How discovered**: read `DBSnapshot.KmsKeyId` from the list response, then cross-reference the already-loaded `kms` list by KeyId/KeyArn. No extra API call. Citation: `AWS SDK Go v2 — rds/types.DBSnapshot § KmsKeyId`.
 - **Count shown**: yes (0 or 1 — one key per encrypted snapshot; 0 when `Encrypted==false`).
 
-### `dbc`
+### `dbc` (intentionally absent)
 
-- **Why related**: marked in `related-resources.md § rds-snap` as "Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot" — weak signal. For Aurora instances the parent `dbi` belongs to a `DBCluster`, so jumping from an Aurora snapshot to the cluster is an occasionally-useful two-hop pivot. Non-Aurora snapshots have no cluster and the row is absent.
-- **How discovered**: a9s-devops persona (2026-04-20): possible=yes (indirect), worth=weak. `DBSnapshot` itself has no `DBClusterIdentifier` field — confirmed by `AWS SDK Go v2 — rds/types.DBSnapshot` field enumeration. The pivot is two-hop: resolve `DBSnapshot.DBInstanceIdentifier` against the already-loaded `dbi` list, read `DBInstance.DBClusterIdentifier` off that entry, then cross-reference the already-loaded `dbc` list by cluster ID. No extra API call. Skip when the source `dbi` is not in the loaded sibling list or when `DBClusterIdentifier` is empty (non-Aurora).
-- **Count shown**: yes (0 or 1 — populated only for Aurora-member source instances; 0 for stand-alone RDS).
+`rds-snap` does NOT register a `dbc` pivot. Real AWS rejects `CreateDBSnapshot`
+on Aurora cluster members — Aurora cluster snapshots live in `dbc-snap`
+(`DBClusterSnapshot`), which has its own pivots. A registered `rds-snap → dbc`
+pivot would always resolve `Count=0` (an `rds-snap` is never associated with a
+`DBCluster` in real AWS), which is dead UX. See `internal/aws/rds_snap.go` for
+the structural exclusion.
 
 ### `backup`
 

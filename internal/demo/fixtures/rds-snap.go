@@ -16,28 +16,23 @@ type RDSSnapFixtures struct {
 
 // Stable IDs and ARNs for RDS Snapshot fixtures — imported by sibling fixture files.
 //
-// §9.3 structural cap: rds-snap pivot data model is 1:1 for dbi, kms, and dbc (a
-// snapshot has exactly one source instance, one encryption key, and at most one
-// cluster). The universal "≥50% Count ≥ 2" rule is structurally unsatisfiable for
-// this resource type. The graph-root ProdRDSSnapAuroraID achieves backup=2 which is
-// the realistic maximum for any Count-≥-2 pivot. Phase 9.3 must accept this as a
-// documented structural exemption and not require ≥50% of count-shown:yes pivots
-// to reach Count ≥ 2.
+// §9.3 structural cap: rds-snap pivot data model is 1:1 for dbi, kms (a
+// snapshot has exactly one source instance and one encryption key); the dbc
+// pivot has no realistic non-zero case for rds-snap because Aurora cluster
+// snapshots live in dbc-snap (real AWS rejects CreateDBSnapshot on Aurora
+// cluster members). The universal "≥50% Count ≥ 2" rule is structurally
+// unsatisfiable for this resource type and is documented as an exemption
+// in docs/resources/rds-snap-impl-plan.md §9.3. The graph-root ProdRDSSnapID
+// achieves Count ≥ 1 on every count-shown:yes pivot except dbc (which is
+// always Count=0 for rds-snap by AWS-API contract).
 const (
-	// ProdRDSSnapID — Healthy non-Aurora automated snapshot of prod-dbi-1.
+	// ProdRDSSnapID — graph-root for §9.3: Healthy non-Aurora automated snapshot of prod-dbi-1.
 	// dbi pivot: Count=1 (ProdDbiID). kms pivot: Count=1 (dbiKMSKeyID).
-	// dbc pivot: Count=0 (non-Aurora, no DBClusterIdentifier on parent).
+	// dbc pivot: Count=0 (non-Aurora, no DBClusterIdentifier on parent — AWS-API truth).
+	// backup pivot: Count=1 (one recovery point in backup.go).
+	// ct-events pivot: count "unknown" (windowed) — exempt.
 	ProdRDSSnapID  = "rds:prod-dbi-1-2026-04-15"
 	ProdRDSSnapARN = "arn:aws:rds:us-east-1:123456789012:snapshot:rds:prod-dbi-1-2026-04-15"
-
-	// ProdRDSSnapAuroraID — graph-root for §9.3: Healthy Aurora automated snapshot.
-	// dbi pivot: Count=1 (ProdDbiAuroraID).
-	// kms pivot: Count=1 (dbiKMSKeyID).
-	// dbc pivot: Count=1 (prod-aurora-cluster / ProdDbcID).
-	// backup pivot: Count=2 (two recovery points added to backup.go).
-	// ct-events pivot: ≥3 events added to cloudtrail.go (count "unknown" / exempt).
-	ProdRDSSnapAuroraID  = "rds:prod-dbi-aurora-1-2026-04-15"
-	ProdRDSSnapAuroraARN = "arn:aws:rds:us-east-1:123456789012:snapshot:rds:prod-dbi-aurora-1-2026-04-15"
 
 	// WarnRDSSnapCreatingID — Wave-1 warning: Status=creating, PercentProgress=42.
 	WarnRDSSnapCreatingID  = "dev-feature-branch-snap"
@@ -121,46 +116,7 @@ func buildRDSSnapInstances() []rdstypes.DBSnapshot {
 			SourceRegion:         aws.String("us-east-1"),
 		},
 
-		// 2. ProdRDSSnapAuroraID — graph-root for §9.3. Aurora-engine
-		// automated snapshot — drives the dbi→dbc indirect pivot non-zero
-		// (parent ProdDbiAuroraID has DBClusterIdentifier set).
-		//
-		// AWS API note: real AWS rejects CreateDBSnapshot for Aurora cluster
-		// members and recommends CreateDBClusterSnapshot instead, so an
-		// rdstypes.DBSnapshot with Engine="aurora-postgresql" is uncommon
-		// in production but legal at the SDK type level. We use it here as
-		// the only way to exercise the rds-snap → dbc pivot in fixtures
-		// without introducing a separate dbc-snap resource type. See spec §2.
-		//
-		// dbi=ProdDbiAuroraID, kms=dbiKMSKeyID, dbc=prod-aurora-cluster
-		// (via auroraBase.DBClusterIdentifier).
-		// backup: ProdDbiAuroraARN appears in 2 plan selections in
-		// backup.go so the rds-snap→backup pivot resolves Count ≥ 2 here.
-		// ct-events: 3 events added to cloudtrail.go with
-		// ResourceName=ProdRDSSnapAuroraID.
-		// SnapshotCreateTime is dynamic (now-3d) to stay within the parent's
-		// 7-day retention so this fixture does NOT trigger past-retention.
-		{
-			DBSnapshotIdentifier: aws.String(ProdRDSSnapAuroraID),
-			DBSnapshotArn:        aws.String(ProdRDSSnapAuroraARN),
-			DBInstanceIdentifier: aws.String(ProdDbiAuroraID),
-			Status:               aws.String("available"),
-			Engine:               aws.String("aurora-postgresql"),
-			EngineVersion:        aws.String("16.4"),
-			SnapshotType:         aws.String("automated"),
-			SnapshotCreateTime:   aws.Time(recentSnapTime),
-			AllocatedStorage:     aws.Int32(100),
-			StorageType:          aws.String("aurora"),
-			Encrypted:            aws.Bool(true),
-			KmsKeyId:             aws.String(dbiKMSKeyID),
-			AvailabilityZone:     aws.String("us-east-1a"),
-			MasterUsername:       aws.String("pgadmin"),
-			LicenseModel:         aws.String("postgresql-license"),
-			PercentProgress:      aws.Int32(100),
-			SourceRegion:         aws.String("us-east-1"),
-		},
-
-		// 3. WarnRDSSnapCreatingID — Wave-1 warning: Status=creating, PercentProgress=42.
+		// 2. WarnRDSSnapCreatingID — Wave-1 warning: Status=creating, PercentProgress=42.
 		{
 			DBSnapshotIdentifier: aws.String(WarnRDSSnapCreatingID),
 			DBSnapshotArn:        aws.String(WarnRDSSnapCreatingARN),
