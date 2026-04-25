@@ -176,7 +176,7 @@ func databasesDefaultViews() map[string]ViewDef {
 				{Path: "PercentProgress"}, {Path: "SourceRegion"},
 			},
 		},
-		"docdb-snap": {
+		"dbc-snap": {
 			List: []ListColumn{
 				{Title: "Snapshot ID", Path: "DBClusterSnapshotIdentifier", Width: 36},
 				{Title: "Cluster ID", Path: "DBClusterIdentifier", Width: 28},

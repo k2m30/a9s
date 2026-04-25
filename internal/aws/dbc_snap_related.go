@@ -10,9 +10,9 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// checkDocdbSnapDBC reads DBClusterIdentifier from the DBClusterSnapshot RawStruct.
+// checkDbcSnapDBC reads DBClusterIdentifier from the DBClusterSnapshot RawStruct.
 // Pattern F — no cache needed.
-func checkDocdbSnapDBC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkDbcSnapDBC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "dbc", Count: -1}
@@ -23,10 +23,10 @@ func checkDocdbSnapDBC(_ context.Context, _ any, res resource.Resource, _ resour
 	return relatedResult("dbc", []string{*snap.DBClusterIdentifier})
 }
 
-// checkDocdbSnapKMS reads KmsKeyId from the DBClusterSnapshot RawStruct.
+// checkDbcSnapKMS reads KmsKeyId from the DBClusterSnapshot RawStruct.
 // Extracts UUID after last '/' from the ARN.
 // Pattern F — no cache needed.
-func checkDocdbSnapKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkDbcSnapKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
@@ -44,7 +44,7 @@ func checkDocdbSnapKMS(_ context.Context, _ any, res resource.Resource, _ resour
 	return relatedResult("kms", []string{keyID})
 }
 
-func checkDocdbSnapVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkDbcSnapVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](res.RawStruct)
 	if !ok || snap.VpcId == nil || *snap.VpcId == "" {
 		return resource.RelatedCheckResult{TargetType: "vpc", Count: 0}
@@ -52,10 +52,10 @@ func checkDocdbSnapVPC(_ context.Context, _ any, res resource.Resource, _ resour
 	return relatedResult("vpc", []string{*snap.VpcId})
 }
 
-// checkDocdbSnapBackup resolves AWS Backup recovery points for this DocumentDB
+// checkDbcSnapBackup resolves AWS Backup recovery points for this DocumentDB
 // cluster snapshot via backup:ListRecoveryPointsByResource (Pattern A: 1 API call).
 // The snapshot ARN is read from DBClusterSnapshotArn in RawStruct.
-func checkDocdbSnapBackup(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkDbcSnapBackup(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}

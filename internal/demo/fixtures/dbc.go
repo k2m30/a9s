@@ -184,7 +184,7 @@ func buildDBCClusters() []docdbtypes.DBCluster {
 	// dbc pivot resolves on this single fixture: sg (VpcSecurityGroups),
 	// alarm (cloudwatch fixture), logs (cwlogs fixture), kms (KmsKeyId),
 	// secrets (MasterUserSecret below), dbi (prod-dbi-aurora-1 is a member),
-	// docdb-snap (cluster snapshot fixture), subnet+vpc (subnet group).
+	// dbc-snap (cluster snapshot fixture), subnet+vpc (subnet group).
 	aurora := docdbtypes.DBCluster{
 		DBClusterIdentifier:        aws.String("prod-aurora-cluster"),
 		DBClusterArn:               aws.String("arn:aws:rds:us-east-1:123456789012:cluster:prod-aurora-cluster"),
@@ -233,7 +233,7 @@ func buildDBCClusters() []docdbtypes.DBCluster {
 
 func buildDBCSnapshots() []docdbtypes.DBClusterSnapshot {
 	return []docdbtypes.DBClusterSnapshot{
-		// Automated daily snapshot for acme-docdb-prod — satisfies dbc→docdb-snap pivot (count≥1).
+		// Automated daily snapshot for acme-docdb-prod — satisfies dbc→dbc-snap pivot (count≥1).
 		{
 			DBClusterSnapshotIdentifier: aws.String("rds:acme-docdb-prod-2026-03-20"),
 			DBClusterIdentifier:         aws.String(ProdDbcID),
@@ -255,7 +255,7 @@ func buildDBCSnapshots() []docdbtypes.DBClusterSnapshot {
 			VpcId:                       aws.String(dbcVPCID),
 		},
 		// Automated snapshot for prod-aurora-cluster — required for the
-		// dbc→docdb-snap pivot on the Aurora "all pivots non-zero"
+		// dbc→dbc-snap pivot on the Aurora "all pivots non-zero"
 		// graph-root. Aurora cluster snapshots share the DocDB API surface
 		// (DescribeDBClusterSnapshots) so they land in the same cache.
 		{
@@ -278,9 +278,9 @@ func buildDBCSnapshots() []docdbtypes.DBClusterSnapshot {
 		},
 		// Manual pre-upgrade snapshot for warn-dbc-modifying.
 		{
-			DBClusterSnapshotIdentifier: aws.String("pre-upgrade-docdb-snap"),
+			DBClusterSnapshotIdentifier: aws.String("pre-upgrade-dbc-snap"),
 			DBClusterIdentifier:         aws.String("warn-dbc-modifying"),
-			DBClusterSnapshotArn:        aws.String("arn:aws:rds:us-east-1:123456789012:cluster-snapshot:pre-upgrade-docdb-snap"),
+			DBClusterSnapshotArn:        aws.String("arn:aws:rds:us-east-1:123456789012:cluster-snapshot:pre-upgrade-dbc-snap"),
 			Status:                      aws.String("available"),
 			Engine:                      aws.String("docdb"),
 			EngineVersion:               aws.String("4.0.0"),
@@ -290,7 +290,7 @@ func buildDBCSnapshots() []docdbtypes.DBClusterSnapshot {
 			StorageEncrypted:            aws.Bool(true),
 			VpcId:                       aws.String(dbcVPCID),
 		},
-		// Automated snapshot for analytics cluster (unrelated, populates docdb-snap list count).
+		// Automated snapshot for analytics cluster (unrelated, populates dbc-snap list count).
 		{
 			DBClusterSnapshotIdentifier: aws.String("rds:analytics-docdb-2026-03-20"),
 			DBClusterIdentifier:         aws.String("analytics-docdb"),

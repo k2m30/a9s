@@ -469,9 +469,9 @@ func databasesResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:          "DocDB Snapshots",
-			ShortName:     "docdb-snap",
-			Aliases:       []string{"docdb-snap", "docdb-snapshots", "cluster-snapshots"},
+			Name:          "DB Cluster Snapshots",
+			ShortName:     "dbc-snap",
+			Aliases:       []string{"dbc-snap", "docdb-snapshots", "cluster-snapshots"},
 			Category:      "DATABASES & STORAGE",
 			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{

@@ -446,8 +446,8 @@ func TestRelated_DBC_SG_ExtractsSecurityGroups(t *testing.T) {
 
 // --- DocDB Snapshot → DBC ---
 
-func TestRelated_DocdbSnap_DBC_ExtractsCluster(t *testing.T) {
-	checker := checkerByTargetUncovered(t, "docdb-snap", "dbc")
+func TestRelated_DbcSnap_DBC_ExtractsCluster(t *testing.T) {
+	checker := checkerByTargetUncovered(t, "dbc-snap", "dbc")
 	res := resource.Resource{
 		ID:     "snap-001",
 		Fields: map[string]string{},
@@ -464,8 +464,8 @@ func TestRelated_DocdbSnap_DBC_ExtractsCluster(t *testing.T) {
 	}
 }
 
-func TestRelated_DocdbSnap_DBC_NoCluster(t *testing.T) {
-	checker := checkerByTargetUncovered(t, "docdb-snap", "dbc")
+func TestRelated_DbcSnap_DBC_NoCluster(t *testing.T) {
+	checker := checkerByTargetUncovered(t, "dbc-snap", "dbc")
 	res := resource.Resource{
 		ID:        "snap-001",
 		Fields:    map[string]string{},
@@ -479,8 +479,8 @@ func TestRelated_DocdbSnap_DBC_NoCluster(t *testing.T) {
 
 // --- DocDB Snapshot → KMS ---
 
-func TestRelated_DocdbSnap_KMS_ExtractsKey(t *testing.T) {
-	checker := checkerByTargetUncovered(t, "docdb-snap", "kms")
+func TestRelated_DbcSnap_KMS_ExtractsKey(t *testing.T) {
+	checker := checkerByTargetUncovered(t, "dbc-snap", "kms")
 	res := resource.Resource{
 		ID:     "snap-001",
 		Fields: map[string]string{},
@@ -497,8 +497,8 @@ func TestRelated_DocdbSnap_KMS_ExtractsKey(t *testing.T) {
 	}
 }
 
-func TestRelated_DocdbSnap_KMS_NoKey(t *testing.T) {
-	checker := checkerByTargetUncovered(t, "docdb-snap", "kms")
+func TestRelated_DbcSnap_KMS_NoKey(t *testing.T) {
+	checker := checkerByTargetUncovered(t, "dbc-snap", "kms")
 	res := resource.Resource{
 		ID:        "snap-001",
 		Fields:    map[string]string{},

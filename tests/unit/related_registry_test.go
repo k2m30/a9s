@@ -455,13 +455,13 @@ func TestRelated_DDB_Registered(t *testing.T) {
 	}
 }
 
-func TestRelated_DocdbSnap_Registered(t *testing.T) {
-	defs := resource.GetRelated("docdb-snap")
+func TestRelated_DbcSnap_Registered(t *testing.T) {
+	defs := resource.GetRelated("dbc-snap")
 	if len(defs) == 0 {
-		t.Fatal("no related defs registered for docdb-snap")
+		t.Fatal("no related defs registered for dbc-snap")
 	}
 	if len(defs) < 2 {
-		t.Errorf("expected at least 2 related defs for docdb-snap, got %d", len(defs))
+		t.Errorf("expected at least 2 related defs for dbc-snap, got %d", len(defs))
 	}
 }
 

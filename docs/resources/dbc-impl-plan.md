@@ -199,8 +199,8 @@ GIVEN: dbi cache with one DBInstance whose DBClusterIdentifier == cluster id
        and one unrelated instance
 THEN:  Count == 1
 
-TEST: checkDbcDocdbSnap_reverse_lookup_by_DBClusterIdentifier
-GIVEN: docdb-snap cache with two snapshots whose DBClusterIdentifier == cluster id
+TEST: checkDbcDbcSnap_reverse_lookup_by_DBClusterIdentifier
+GIVEN: dbc-snap cache with two snapshots whose DBClusterIdentifier == cluster id
 THEN:  Count == 2
 
 TEST: checkDbcSubnet_resolves_via_DescribeDBSubnetGroups
@@ -231,7 +231,7 @@ THEN:  got.Issues has no lag-related entry, Fields has no lag keys
 
 ## 2. Fixture list (`internal/demo/fixtures/dbc.go`)
 
-Single-source file, graph-connected. Replaces `docdb.go` (which currently holds both cluster and cluster-snapshot fixtures — snapshots are left where they are for now and continue to be served by `DocDBFake`; the renaming / splitting of `docdb-snap` into its own file is out of scope for this run).
+Single-source file, graph-connected. Replaces `docdb.go` (which currently holds both cluster and cluster-snapshot fixtures — snapshots are left where they are for now and continue to be served by `DocDBFake`; the renaming / splitting of `dbc-snap` into its own file is out of scope for this run).
 
 **Required exports:**
 - `type DBCFixtures struct { DBClusters []docdbtypes.DBCluster; DBClusterSnapshots []docdbtypes.DBClusterSnapshot; DBSubnetGroups []docdbtypes.DBSubnetGroup; PendingMaintenanceActions []docdbtypes.ResourcePendingMaintenanceActions }`
@@ -261,7 +261,7 @@ Single-source file, graph-connected. Replaces `docdb.go` (which currently holds 
 - `alarm` fixtures (`internal/demo/fixtures/alarm.go`) — add one alarm with Dimensions=[{Name:"DBClusterIdentifier", Value:"acme-docdb-prod"}, Namespace="AWS/DocDB"].
 - `logs` fixtures (`internal/demo/fixtures/logs.go`) — add two log groups `/aws/docdb/acme-docdb-prod/audit` and `/aws/docdb/acme-docdb-prod/profiler`.
 - `dbi` fixtures — one DBInstance with `DBClusterIdentifier="acme-docdb-prod"` already provisioned? (The existing `prod-dbi-aurora-1` references `prod-aurora-cluster`, not `acme-docdb-prod`. If needed, add a matching DocumentDB member DBInstance.) Skipped for this run — DocumentDB cluster members are not modelled as RDS DBInstances; the pivot returns 0 for DocumentDB clusters, which is correct.
-- `docdb-snap` fixtures — the existing `rds:acme-docdb-prod-2026-03-20` already references `acme-docdb-prod`. Count ≥ 1. OK.
+- `dbc-snap` fixtures — the existing `rds:acme-docdb-prod-2026-03-20` already references `acme-docdb-prod`. Count ≥ 1. OK.
 - `kms` fixtures (`internal/demo/fixtures/kms.go`) — verify key id `a1b2c3d4-5678-90ab-cdef-111111111111` exists. Add if missing.
 - `secrets` fixtures — add one SecretListEntry with ARN referenced from `acme-docdb-prod.MasterUserSecret.SecretArn`. Update `acme-docdb-prod` fixture to set `MasterUserSecret.SecretArn` to that ARN.
 - `sg` fixtures — verify `sg-0ccc333333333333c` exists. Add if missing.
@@ -287,7 +287,7 @@ These stay inline in `tests/unit/aws_dbc_*_test.go` per skill's anti-fixture-cor
 
 ### `dbc_related.go`
 
-- Current: 9 related checkers (`sg, alarm, logs, kms, secrets, dbi, docdb-snap, subnet, vpc`).
+- Current: 9 related checkers (`sg, alarm, logs, kms, secrets, dbi, dbc-snap, subnet, vpc`).
 - Spec §2 expects 10 targets including `ct-events`.
 - Gap: no explicit `ct-events` checker. But `ct-events` is registered as a universal pivot — confirm in `relations_ct_events.go` or equivalent. If absent, no per-dbc action needed (skill: universal pivots don't need per-type checkers). **Verify during phase 7, no change expected.**
 - Delta: none assuming universal ct-events registration exists.
@@ -370,6 +370,6 @@ detail: (unchanged)
 ## 5. Out-of-scope reminders
 
 - Wave 3 CloudWatch metrics (DBInstanceReplicaLag, DatabaseConnections).
-- DocumentDB `docdb-snap` resource type (own spec, own impl run).
+- DocumentDB `dbc-snap` resource type (own spec, own impl run).
 - CIS header row visualization (banned per universal rules).
 - Writer-count column (redundant with `no writer: reads only` Status phrase).
