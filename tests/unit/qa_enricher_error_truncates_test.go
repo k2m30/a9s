@@ -48,7 +48,7 @@ func TestEnrichCodeBuildStatus_ListBuildsError_SetsTruncated(t *testing.T) {
 	clients := &awsclient.ServiceClients{CodeBuild: fake}
 	resources := []resource.Resource{{ID: "proj-error"}, {ID: "proj-ok"}}
 
-	result, err := awsclient.EnrichCodeBuildStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCodeBuildStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error (per-resource errors must not propagate): %v", err)
 	}
@@ -72,7 +72,7 @@ func TestEnrichTargetGroupHealth_DescribeError_SetsTruncated(t *testing.T) {
 		{ID: "err2-tg", Fields: map[string]string{"target_group_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/err2-tg/ccc"}},
 	}
 
-	result, err := awsclient.EnrichTargetGroupHealth(context.Background(), clients, resources)
+	result, err := awsclient.EnrichTargetGroupHealth(context.Background(), clients, resources, nil)
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when DescribeTargetHealth fails")
 	}
@@ -100,7 +100,7 @@ func TestEnrichCodePipelineStatus_GetStateError_SetsTruncated(t *testing.T) {
 		{Name: "another-pipeline"},
 	}
 
-	result, err := awsclient.EnrichCodePipelineStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCodePipelineStatus(context.Background(), clients, resources, nil)
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when GetPipelineState fails")
 	}
@@ -127,7 +127,7 @@ func TestEnrichStepFunctionsStatus_ListExecutionsError_SetsTruncated(t *testing.
 		{ID: "ok-sm", Fields: map[string]string{"arn": "arn:aws:states:us-east-1:123456789012:stateMachine:ok-sm"}},
 	}
 
-	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), clients, resources, nil)
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when ListExecutions fails")
 	}
@@ -154,7 +154,7 @@ func TestEnrichGlueJobStatus_GetJobRunsError_SetsTruncated(t *testing.T) {
 		{ID: "arn:aws:glue:us-east-1:123456789012:job/ok-job", Name: "ok-job"},
 	}
 
-	result, err := awsclient.EnrichGlueJobStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichGlueJobStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error (per-resource errors must not propagate): %v", err)
 	}

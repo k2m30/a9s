@@ -124,7 +124,7 @@ func TestEnrichIAMRoleLastUsed_RecentlyUsedProducesNoFindings(t *testing.T) {
 	clients := &awsclient.ServiceClients{IAM: fake}
 	resources := iamRoleResources()
 
-	result, err := awsclient.EnrichIAMRoleLastUsed(context.Background(), clients, resources)
+	result, err := awsclient.EnrichIAMRoleLastUsed(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -153,7 +153,7 @@ func TestEnrichIAMRoleLastUsed_DormantProducesFindingSevTilde(t *testing.T) {
 	clients := &awsclient.ServiceClients{IAM: fake}
 	resources := iamRoleResources()
 
-	result, err := awsclient.EnrichIAMRoleLastUsed(context.Background(), clients, resources)
+	result, err := awsclient.EnrichIAMRoleLastUsed(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -190,7 +190,7 @@ func TestEnrichIAMRoleLastUsed_NeverUsedProducesFindingSevTilde(t *testing.T) {
 	clients := &awsclient.ServiceClients{IAM: fake}
 	resources := iamRoleResources()
 
-	result, err := awsclient.EnrichIAMRoleLastUsed(context.Background(), clients, resources)
+	result, err := awsclient.EnrichIAMRoleLastUsed(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -233,7 +233,7 @@ func TestEnrichIAMRoleLastUsed_ServiceLinkedRoleSkipped(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{IAM: fake}
 
-	result, err := awsclient.EnrichIAMRoleLastUsed(context.Background(), clients, svcLinkedResources)
+	result, err := awsclient.EnrichIAMRoleLastUsed(context.Background(), clients, svcLinkedResources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -251,7 +251,7 @@ func TestEnrichIAMRoleLastUsed_ServiceLinkedRoleSkipped(t *testing.T) {
 func TestEnrichIAMRoleLastUsed_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{IAM: nil}
 
-	result, err := awsclient.EnrichIAMRoleLastUsed(context.Background(), clients, iamRoleResources())
+	result, err := awsclient.EnrichIAMRoleLastUsed(context.Background(), clients, iamRoleResources(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -25,7 +25,7 @@ func init() {
 //   - deployment circuit-breaker triggered → "!" finding
 //   - runningCount < desiredCount with no IN_PROGRESS deployment → "!" finding
 //   - Recent events (last 10m) containing "unable to place" or "ELB health checks failed" → "!" finding
-func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.ECS == nil || len(resources) == 0 {

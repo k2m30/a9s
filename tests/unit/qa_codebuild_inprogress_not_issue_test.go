@@ -37,7 +37,7 @@ func TestEnrichCodeBuildStatus_InProgressBuild_NotAnIssue(t *testing.T) {
 	clients := &awsclient.ServiceClients{CodeBuild: fake}
 	resources := []resource.Resource{{ID: "active-project"}}
 
-	result, err := awsclient.EnrichCodeBuildStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCodeBuildStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -76,7 +76,7 @@ func TestEnrichCodeBuildStatus_InProgressAndFailed_OnlyFailedIsIssue(t *testing.
 		{ID: "failed-project"},
 	}
 
-	result, err := awsclient.EnrichCodeBuildStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCodeBuildStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

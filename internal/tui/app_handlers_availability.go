@@ -378,6 +378,30 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 			}
 		}
 
+		// Merge IssueAppends into probeResources and resourceCache.
+		// IssueAppends carries Wave-1 cross-ref phrases (e.g. "orphan: source DB deleted")
+		// that could not be computed at fetch time because they require sibling cache access.
+		// These are appended to Resource.Issues after fetcher-set phrases.
+		if len(msg.IssueAppends) > 0 {
+			if m.probeResources == nil {
+				m.probeResources = make(map[string][]resource.Resource)
+			}
+			slice := m.probeResources[msg.ResourceType]
+			for i := range slice {
+				if phrases, ok := msg.IssueAppends[slice[i].ID]; ok {
+					slice[i].Issues = append(slice[i].Issues, phrases...)
+				}
+			}
+			m.probeResources[msg.ResourceType] = slice
+			if entry, ok := m.resourceCache[msg.ResourceType]; ok {
+				for i := range entry.resources {
+					if phrases, ok := msg.IssueAppends[entry.resources[i].ID]; ok {
+						entry.resources[i].Issues = append(entry.resources[i].Issues, phrases...)
+					}
+				}
+			}
+		}
+
 		if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 			// Wave 2 is authoritative: compute distinct-instance count across both waves.
 			td := resource.FindResourceType(msg.ResourceType)

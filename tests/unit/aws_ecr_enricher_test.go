@@ -145,7 +145,7 @@ func TestEnrichECRRepository_NoFindingsWhenAllCountsZero(t *testing.T) {
 	clients := &awsclient.ServiceClients{ECR: fake}
 	resources := ecrRepoResources(ecrRepo1, ecrRepo2)
 
-	result, err := awsclient.EnrichECRRepository(context.Background(), clients, resources)
+	result, err := awsclient.EnrichECRRepository(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -180,7 +180,7 @@ func TestEnrichECRRepository_CriticalFindingsProduceSevBang(t *testing.T) {
 	clients := &awsclient.ServiceClients{ECR: fake}
 	resources := ecrRepoResources(ecrRepo1, ecrRepo2)
 
-	result, err := awsclient.EnrichECRRepository(context.Background(), clients, resources)
+	result, err := awsclient.EnrichECRRepository(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -219,7 +219,7 @@ func TestEnrichECRRepository_HighFindingsProduceSevTilde(t *testing.T) {
 	clients := &awsclient.ServiceClients{ECR: fake}
 	resources := ecrRepoResources(ecrRepo1, ecrRepo2)
 
-	result, err := awsclient.EnrichECRRepository(context.Background(), clients, resources)
+	result, err := awsclient.EnrichECRRepository(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -261,7 +261,7 @@ func TestEnrichECRRepository_UnscannedImagesSkipped(t *testing.T) {
 	clients := &awsclient.ServiceClients{ECR: fake}
 	resources := ecrRepoResources(ecrRepo1, ecrRepo2)
 
-	result, err := awsclient.EnrichECRRepository(context.Background(), clients, resources)
+	result, err := awsclient.EnrichECRRepository(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -281,7 +281,7 @@ func TestEnrichECRRepository_UnscannedImagesSkipped(t *testing.T) {
 func TestEnrichECRRepository_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{ECR: nil}
 
-	result, err := awsclient.EnrichECRRepository(context.Background(), clients, ecrRepoResources(ecrRepo1, ecrRepo2))
+	result, err := awsclient.EnrichECRRepository(context.Background(), clients, ecrRepoResources(ecrRepo1, ecrRepo2), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -314,7 +314,7 @@ func TestEnrichECRRepository_APIErrorSetsTruncatedNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{ECR: fake}
 	resources := ecrRepoResources(ecrRepo1, ecrRepo2)
 
-	result, err := awsclient.EnrichECRRepository(context.Background(), clients, resources)
+	result, err := awsclient.EnrichECRRepository(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

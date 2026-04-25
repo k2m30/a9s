@@ -28,7 +28,7 @@ func init() {
 //
 // IssueCount stays 0 (severity "~" only).
 // Skip when clients.CloudWatchLogs == nil or does not implement CWLogsDescribeMetricFiltersAPI.
-func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)

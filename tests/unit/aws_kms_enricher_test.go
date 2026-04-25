@@ -87,7 +87,7 @@ func TestEnrichKMSRotation_DisabledProducesFindings(t *testing.T) {
 	clients := &awsclient.ServiceClients{KMS: fake}
 	resources := makeKMSResources("key-aaa", "key-bbb", "key-ccc")
 
-	result, err := awsclient.EnrichKMSRotation(context.Background(), clients, resources)
+	result, err := awsclient.EnrichKMSRotation(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -119,7 +119,7 @@ func TestEnrichKMSRotation_EnabledProducesNoFinding(t *testing.T) {
 	clients := &awsclient.ServiceClients{KMS: fake}
 	resources := makeKMSResources("key-x", "key-y", "key-z")
 
-	result, err := awsclient.EnrichKMSRotation(context.Background(), clients, resources)
+	result, err := awsclient.EnrichKMSRotation(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestEnrichKMSRotation_AWSManagedKeySkippedSilently(t *testing.T) {
 	clients := &awsclient.ServiceClients{KMS: fake}
 	resources := makeKMSResources("aws-managed-key", "key-enabled-1", "key-enabled-2")
 
-	result, err := awsclient.EnrichKMSRotation(context.Background(), clients, resources)
+	result, err := awsclient.EnrichKMSRotation(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -164,7 +164,7 @@ func TestEnrichKMSRotation_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{KMS: nil}
 	resources := makeKMSResources("irrelevant-key")
 
-	result, err := awsclient.EnrichKMSRotation(context.Background(), clients, resources)
+	result, err := awsclient.EnrichKMSRotation(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -196,7 +196,7 @@ func TestEnrichKMSRotation_MixedDisabledEnabledError(t *testing.T) {
 	clients := &awsclient.ServiceClients{KMS: fake}
 	resources := makeKMSResources("key-disabled", "key-enabled", "key-error")
 
-	result, err := awsclient.EnrichKMSRotation(context.Background(), clients, resources)
+	result, err := awsclient.EnrichKMSRotation(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected top-level error: %v", err)
 	}

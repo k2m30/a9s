@@ -28,7 +28,7 @@ func init() {
 //   - Any active access key with CreateDate >90d → "~" finding "access key >90d (rotation)"
 //
 // Skip when clients.IAM == nil.
-func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)

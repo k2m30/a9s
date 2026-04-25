@@ -112,7 +112,7 @@ func TestEnrichAPIGatewayStage_ThrottledWithLogsProducesNoFindings(t *testing.T)
 	clients := &awsclient.ServiceClients{APIGatewayV2: fake}
 	resources := apigwResources(apigwAPIID1, apigwAPIID2)
 
-	result, err := awsclient.EnrichAPIGatewayStage(context.Background(), clients, resources)
+	result, err := awsclient.EnrichAPIGatewayStage(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -150,7 +150,7 @@ func TestEnrichAPIGatewayStage_NoThrottlingProducesFindingSevTilde(t *testing.T)
 	clients := &awsclient.ServiceClients{APIGatewayV2: fake}
 	resources := apigwResources(apigwAPIID1, apigwAPIID2)
 
-	result, err := awsclient.EnrichAPIGatewayStage(context.Background(), clients, resources)
+	result, err := awsclient.EnrichAPIGatewayStage(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -194,7 +194,7 @@ func TestEnrichAPIGatewayStage_NoAccessLogsProducesFindingSevTilde(t *testing.T)
 	clients := &awsclient.ServiceClients{APIGatewayV2: fake}
 	resources := apigwResources(apigwAPIID1, apigwAPIID2)
 
-	result, err := awsclient.EnrichAPIGatewayStage(context.Background(), clients, resources)
+	result, err := awsclient.EnrichAPIGatewayStage(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -222,7 +222,7 @@ func TestEnrichAPIGatewayStage_NoAccessLogsProducesFindingSevTilde(t *testing.T)
 func TestEnrichAPIGatewayStage_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{APIGatewayV2: nil}
 
-	result, err := awsclient.EnrichAPIGatewayStage(context.Background(), clients, apigwResources(apigwAPIID1, apigwAPIID2))
+	result, err := awsclient.EnrichAPIGatewayStage(context.Background(), clients, apigwResources(apigwAPIID1, apigwAPIID2), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -258,7 +258,7 @@ func TestEnrichAPIGatewayStage_ZeroStagesEmitsWarning(t *testing.T) {
 	clients := &awsclient.ServiceClients{APIGatewayV2: fake}
 	resources := apigwResources(emptyAPIID)
 
-	result, err := awsclient.EnrichAPIGatewayStage(context.Background(), clients, resources)
+	result, err := awsclient.EnrichAPIGatewayStage(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -298,7 +298,7 @@ func TestEnrichAPIGatewayStage_APIErrorSetsTruncatedNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{APIGatewayV2: fake}
 	resources := apigwResources(apigwAPIID1, apigwAPIID2)
 
-	result, err := awsclient.EnrichAPIGatewayStage(context.Background(), clients, resources)
+	result, err := awsclient.EnrichAPIGatewayStage(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

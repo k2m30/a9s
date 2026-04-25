@@ -118,7 +118,7 @@ func TestEnrichRoute53Zone_PublicZonesProduceNoFindings(t *testing.T) {
 	clients := &awsclient.ServiceClients{Route53: fake}
 	resources := r53ZoneResources(r53ZoneID1, r53ZoneID2)
 
-	result, err := awsclient.EnrichRoute53Zone(context.Background(), clients, resources)
+	result, err := awsclient.EnrichRoute53Zone(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -142,7 +142,7 @@ func TestEnrichRoute53Zone_PrivateZoneWithVPCsProducesNoFindings(t *testing.T) {
 	clients := &awsclient.ServiceClients{Route53: fake}
 	resources := r53ZoneResources(r53ZoneID1, r53ZoneID2)
 
-	result, err := awsclient.EnrichRoute53Zone(context.Background(), clients, resources)
+	result, err := awsclient.EnrichRoute53Zone(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -164,7 +164,7 @@ func TestEnrichRoute53Zone_PrivateOrphanZoneProducesFindingSevTilde(t *testing.T
 	clients := &awsclient.ServiceClients{Route53: fake}
 	resources := r53ZoneResources(r53ZoneID1, r53ZoneID2)
 
-	result, err := awsclient.EnrichRoute53Zone(context.Background(), clients, resources)
+	result, err := awsclient.EnrichRoute53Zone(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -189,7 +189,7 @@ func TestEnrichRoute53Zone_PrivateOrphanZoneProducesFindingSevTilde(t *testing.T
 func TestEnrichRoute53Zone_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{Route53: nil}
 
-	result, err := awsclient.EnrichRoute53Zone(context.Background(), clients, r53ZoneResources(r53ZoneID1, r53ZoneID2))
+	result, err := awsclient.EnrichRoute53Zone(context.Background(), clients, r53ZoneResources(r53ZoneID1, r53ZoneID2), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -216,7 +216,7 @@ func TestEnrichRoute53Zone_APIErrorSetsTruncatedAndSurfacesError(t *testing.T) {
 	clients := &awsclient.ServiceClients{Route53: fake}
 	resources := r53ZoneResources(r53ZoneID1, r53ZoneID2)
 
-	result, err := awsclient.EnrichRoute53Zone(context.Background(), clients, resources)
+	result, err := awsclient.EnrichRoute53Zone(context.Background(), clients, resources, nil)
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when an API call fails")
 	}

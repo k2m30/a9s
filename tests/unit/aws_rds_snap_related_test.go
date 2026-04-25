@@ -5,11 +5,9 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -253,15 +251,16 @@ func TestRelated_RDSSnap_KMS_CacheMissNoClients(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// checkRDSSnapBackup — Pattern C: ListRecoveryPointsByResource on snapshot ARN
+// checkRDSSnapBackup — Pattern C: cache scan of backup PLAN list,
+// matching snapshot ARN against each plan's Fields["resources"] / ["not_resources"].
 // ---------------------------------------------------------------------------
 
-// TestRelated_RDSSnap_Backup_Match verifies that a snapshot with a known ARN,
-// and a Backup fake returning 2 recovery points, yields Count=2.
+// TestRelated_RDSSnap_Backup_Match verifies that the checker returns plan IDs
+// (not recovery-point ARNs) when the loaded backup PLAN cache contains plans
+// whose Resources include the snapshot's ARN. Drill-through requires plan IDs
+// because the backup target's Resource.ID space is plan IDs.
 func TestRelated_RDSSnap_Backup_Match(t *testing.T) {
 	const snapARN = "arn:aws:rds:us-east-1:123456789012:snapshot:rds:mydb-2025-01-15-03-00"
-	rp1 := "arn:aws:backup:us-east-1:123456789012:recovery-point:00000001"
-	rp2 := "arn:aws:backup:us-east-1:123456789012:recovery-point:00000002"
 
 	src := resource.Resource{
 		ID:   "rds:mydb-2025-01-15-03-00",
@@ -274,20 +273,50 @@ func TestRelated_RDSSnap_Backup_Match(t *testing.T) {
 			DBInstanceIdentifier: aws.String("mydb"),
 		},
 	}
-	clients := &awsclient.ServiceClients{
-		Backup: newFakeBackupWithRecoveryPoints([]backuptypes.RecoveryPointByResource{
-			{RecoveryPointArn: &rp1},
-			{RecoveryPointArn: &rp2},
-		}),
+	cache := resource.ResourceCache{
+		"backup": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{
+				{
+					ID:   "plan-covers-snap-A",
+					Name: "covers-snap-A",
+					Fields: map[string]string{
+						"resources":     snapARN,
+						"not_resources": "",
+					},
+				},
+				{
+					ID:   "plan-covers-snap-B",
+					Name: "covers-snap-B",
+					Fields: map[string]string{
+						"resources":     snapARN,
+						"not_resources": "",
+					},
+				},
+				{
+					ID:   "plan-other-target",
+					Name: "other",
+					Fields: map[string]string{
+						"resources":     "arn:aws:s3:::unrelated",
+						"not_resources": "",
+					},
+				},
+			},
+		},
 	}
+
 	checker := rdsSnapCheckerByTarget(t, "backup")
-	result := checker(context.Background(), clients, src, resource.ResourceCache{})
+	result := checker(context.Background(), nil, src, cache)
 
 	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2", result.Count)
+		t.Errorf("Count = %d, want 2 (two plans cover the snapshot)", result.Count)
 	}
 	if len(result.ResourceIDs) != 2 {
-		t.Errorf("ResourceIDs = %v, want 2 entries", result.ResourceIDs)
+		t.Errorf("ResourceIDs = %v, want 2 plan IDs", result.ResourceIDs)
+	}
+	for _, id := range result.ResourceIDs {
+		if id == "plan-other-target" {
+			t.Errorf("ResourceIDs unexpectedly contains plan-other-target (its Resources do not match the snapshot ARN)")
+		}
 	}
 }
 
@@ -311,22 +340,26 @@ func TestRelated_RDSSnap_Backup_Empty(t *testing.T) {
 	}
 }
 
-// TestRelated_RDSSnap_Backup_WrongRawStruct verifies that a snapshot with a
-// valid ARN field but nil clients returns Count=-1 (no Backup client).
-func TestRelated_RDSSnap_Backup_WrongRawStruct(t *testing.T) {
+// TestRelated_RDSSnap_Backup_NoPlansLoaded verifies that the checker returns
+// UnknownRelated (Count=-1) when the backup PLAN cache is not loaded — better
+// than silently returning 0 since the operator hasn't yet visited the backup
+// list and the answer is genuinely unknown.
+func TestRelated_RDSSnap_Backup_NoPlansLoaded(t *testing.T) {
 	src := resource.Resource{
 		ID:   "rds:mydb-2025-01-15-03-00",
 		Name: "rds:mydb-2025-01-15-03-00",
 		Fields: map[string]string{
 			"arn": "arn:aws:rds:us-east-1:123456789012:snapshot:rds:mydb-2025-01-15-03-00",
 		},
-		RawStruct: "not-a-snapshot",
+		RawStruct: rdstypes.DBSnapshot{
+			DBSnapshotIdentifier: aws.String("rds:mydb-2025-01-15-03-00"),
+		},
 	}
 	checker := rdsSnapCheckerByTarget(t, "backup")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
 	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
+		t.Errorf("Count = %d, want -1 (UnknownRelated when backup cache not loaded)", result.Count)
 	}
 }
 

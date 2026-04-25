@@ -165,7 +165,7 @@ func TestDBI_Wave3_EnrichDBIMaintenance_NoCloudWatchCalls(t *testing.T) {
 	}
 
 	resources := buildDbiResources(t)
-	_, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources)
+	_, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichDBIMaintenance returned unexpected error: %v", err)
 	}
@@ -189,7 +189,7 @@ func TestDBI_Wave3_EnrichDBIMaintenance_NilCloudWatchNoPanic(t *testing.T) {
 	}
 
 	resources := buildDbiResources(t)
-	_, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources)
+	_, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichDBIMaintenance returned unexpected error with nil CW client: %v", err)
 	}
@@ -255,7 +255,7 @@ func TestDBI_Wave3_OutOfScopeMetricFieldsAbsentFromEnrichment(t *testing.T) {
 		CloudWatch: &recordingCWClient{},
 	}
 	resources := buildDbiResources(t)
-	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources)
+	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichDBIMaintenance returned unexpected error: %v", err)
 	}

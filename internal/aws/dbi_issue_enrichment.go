@@ -23,7 +23,7 @@ func init() {
 // the short cause. When Wave 1 already populated Status, the enricher bumps the
 // (+N) suffix on the existing phrase (universal rule 7) so the operator sees
 // there is more to open for.
-func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	fieldUpdates := make(map[string]map[string]string)

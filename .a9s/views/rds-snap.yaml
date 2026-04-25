@@ -6,11 +6,8 @@ list:
     path: DBInstanceIdentifier
     width: 28
   Status:
-    path: Status
-    width: 12
-  Encrypted:
-    path: Encrypted
-    width: 10
+    key: status
+    width: 32
   Engine:
     path: Engine
     width: 12

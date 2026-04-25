@@ -23,7 +23,7 @@ func init() {
 // resource with ResourceStatus ending in "_FAILED". A failed resource event produces
 // a "!" finding: "recent resource failure: <ResourceType>/<LogicalResourceId>".
 // This surfaces hidden failures that are not reflected in the top-level StackStatus.
-func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.CloudFormation == nil {
@@ -111,9 +111,9 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 // On ID conflict, CFNStackEvents findings take precedence (they carry "!" severity).
 // IssueCount = CFNStackEvents.IssueCount (drift adds 0). Truncated = either truncated.
 // Partial findings from each sub-enricher are preserved even when they return an error (E5).
-func EnrichCFNCombined(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
-	eventsResult, eventsErr := EnrichCFNStackEvents(ctx, clients, resources)
-	driftResult, driftErr := EnrichCFNDrift(ctx, clients, resources)
+func EnrichCFNCombined(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
+	eventsResult, eventsErr := EnrichCFNStackEvents(ctx, clients, resources, nil)
+	driftResult, driftErr := EnrichCFNDrift(ctx, clients, resources, nil)
 
 	// Combine sub-enricher errors; partial findings are preserved below (E5).
 	var combinedErr error
@@ -160,7 +160,7 @@ func EnrichCFNCombined(ctx context.Context, clients *ServiceClients, resources [
 // read DriftInformation.StackDriftStatus. A status of DRIFTED produces a "~" finding
 // "stack drifted from template". IN_SYNC and NOT_CHECKED stacks produce no finding.
 // Severity "~" findings do not contribute to IssueCount.
-func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)

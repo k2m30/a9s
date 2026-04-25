@@ -27,7 +27,7 @@ func init() {
 //   - FieldUpdates[fsID]["status"]:
 //     — existing status == "" → "mount target down"
 //     — otherwise             → "mount target down (+N)" where N = hidden+1 from existing suffix
-func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)

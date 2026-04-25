@@ -167,7 +167,7 @@ func TestEnrichIAMPolicy_SafePolicyProducesNoFindings(t *testing.T) {
 		iamPolicyResource(iamPolicyARN3, "MyOtherPolicy"),
 	}
 
-	result, err := awsclient.EnrichIAMPolicy(context.Background(), clients, resources)
+	result, err := awsclient.EnrichIAMPolicy(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -205,7 +205,7 @@ func TestEnrichIAMPolicy_AdminStarProducesFindingSevBang(t *testing.T) {
 		iamPolicyResource(iamPolicyARN3, "MyOtherPolicy"),
 	}
 
-	result, err := awsclient.EnrichIAMPolicy(context.Background(), clients, resources)
+	result, err := awsclient.EnrichIAMPolicy(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -257,7 +257,7 @@ func TestEnrichIAMPolicy_AWSManagedSkipped(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{IAM: fake}
 
-	result, err := awsclient.EnrichIAMPolicy(context.Background(), clients, []resource.Resource{awsManagedResource})
+	result, err := awsclient.EnrichIAMPolicy(context.Background(), clients, []resource.Resource{awsManagedResource}, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -283,7 +283,7 @@ func TestEnrichIAMPolicy_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 		iamPolicyResource(iamPolicyARN3, "MyOtherPolicy"),
 	}
 
-	result, err := awsclient.EnrichIAMPolicy(context.Background(), clients, resources)
+	result, err := awsclient.EnrichIAMPolicy(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -60,7 +60,7 @@ func TestEnrichMSKCluster_UsesARNFromFields(t *testing.T) {
 		Fields: map[string]string{"cluster_arn": clusterARN},
 	}}
 
-	_, err := awsclient.EnrichMSKCluster(context.Background(), clients, resources)
+	_, err := awsclient.EnrichMSKCluster(context.Background(), clients, resources, nil)
 	if err != nil && strings.Contains(err.Error(), "ValidationError") {
 		t.Fatalf("enricher passed bare cluster name to AWS instead of ARN; got: %v", err)
 	}

@@ -73,7 +73,7 @@ func TestEnrichRDSDocDBMaintenance_OnlyEmitsForProbedResources(t *testing.T) {
 		{ID: "rds-instance-b"},
 	}
 
-	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, probeResources)
+	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, probeResources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

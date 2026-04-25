@@ -73,7 +73,7 @@ func TestEnrichEC2InstanceStatus_InstanceStatusImpairedProducesFindingSevBang(t 
 	clients := &awsclient.ServiceClients{EC2: fake}
 	resources := []resource.Resource{{ID: "i-0aaaa1111bbbbb222", Fields: map[string]string{"state": "running"}}}
 
-	result, err := awsclient.EnrichEC2InstanceStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichEC2InstanceStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestEnrichEC2InstanceStatus_SystemStatusImpairedProducesFindingSevBang(t *t
 	clients := &awsclient.ServiceClients{EC2: fake}
 	resources := []resource.Resource{{ID: "i-0bbbb2222ccccc333", Fields: map[string]string{"state": "running"}}}
 
-	result, err := awsclient.EnrichEC2InstanceStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichEC2InstanceStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -149,7 +149,7 @@ func TestEnrichEC2InstanceStatus_ScheduledEventSoonProducesFindingSevTilde(t *te
 	clients := &awsclient.ServiceClients{EC2: fake}
 	resources := []resource.Resource{{ID: "i-0cccc3333ddddd444", Fields: map[string]string{"state": "running"}}}
 
-	result, err := awsclient.EnrichEC2InstanceStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichEC2InstanceStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -181,7 +181,7 @@ func TestEnrichEC2InstanceStatus_HealthyInstanceProducesNoFinding(t *testing.T) 
 	clients := &awsclient.ServiceClients{EC2: fake}
 	resources := []resource.Resource{{ID: "i-0dddd4444eeeee555", Fields: map[string]string{"state": "running"}}}
 
-	result, err := awsclient.EnrichEC2InstanceStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichEC2InstanceStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -199,7 +199,7 @@ func TestEnrichEC2InstanceStatus_HealthyInstanceProducesNoFinding(t *testing.T) 
 func TestEnrichEC2InstanceStatus_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{EC2: nil}
 
-	result, err := awsclient.EnrichEC2InstanceStatus(context.Background(), clients, nil)
+	result, err := awsclient.EnrichEC2InstanceStatus(context.Background(), clients, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -218,7 +218,7 @@ func TestEnrichEC2InstanceStatus_APIErrorIsPropagated(t *testing.T) {
 	fake := &ec2InstanceStatusFake{err: apiErr}
 	clients := &awsclient.ServiceClients{EC2: fake}
 
-	_, err := awsclient.EnrichEC2InstanceStatus(context.Background(), clients, nil)
+	_, err := awsclient.EnrichEC2InstanceStatus(context.Background(), clients, nil, nil)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

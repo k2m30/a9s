@@ -50,7 +50,7 @@ func TestEnrichEFSMountTargets_HealthyRowWithDown(t *testing.T) {
 	res[0].Status = ""
 	res[0].Issues = nil
 
-	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res)
+	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -148,7 +148,7 @@ func TestEnrichEFSMountTargets_W1WarningPlusW2Bumps(t *testing.T) {
 	res[0].Status = "updating"
 	res[0].Issues = []string{"updating"}
 
-	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res)
+	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -206,7 +206,7 @@ func TestEnrichEFSMountTargets_AllHealthyMounts_NoFinding(t *testing.T) {
 	res[0].Status = ""
 	res[0].Issues = nil
 
-	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res)
+	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -238,7 +238,7 @@ func TestEnrichEFSMountTargets_SummaryDoesNotContainRowValues(t *testing.T) {
 
 	res := efsResources(findingFSIDs...)
 
-	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res)
+	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -276,7 +276,7 @@ func TestEnrichEFSMountTargets_FindingRowsStructure(t *testing.T) {
 
 	res := efsResources(fsID)
 
-	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res)
+	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -323,7 +323,7 @@ func TestEnrichEFSMountTargets_FieldUpdates_NotNil(t *testing.T) {
 	// Run with a finding-producing fixture.
 	res := efsResources("fs-0healthymtdown001")
 
-	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res)
+	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -356,7 +356,7 @@ func TestEnrichEFSMountTargets_IssueCount(t *testing.T) {
 	res[1].Status = "updating"
 	res[1].Issues = []string{"updating"}
 
-	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res)
+	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -379,7 +379,7 @@ func TestEnrichEFSMountTargets_HealthyFSProducesNoFieldUpdates(t *testing.T) {
 
 	res := efsResources(fixtures.ProdEFSID)
 
-	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res)
+	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -407,7 +407,7 @@ func TestEnrichEFSMountTargets_DetailContent_U7c(t *testing.T) {
 	res[0].Status = "updating"
 	res[0].Issues = []string{"updating"}
 
-	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res)
+	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -27,7 +27,7 @@ func init() {
 //
 // Findings are aggregated per API (one finding per API, covering all stages).
 // Skip if clients.APIGatewayV2 == nil. Per-API errors → truncated.
-func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)

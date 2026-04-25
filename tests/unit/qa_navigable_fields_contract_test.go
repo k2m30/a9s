@@ -213,7 +213,7 @@ var navigableContracts = []navContract{
 	// rds-snap — RDS Snapshots
 	{shortName: "rds-snap", apiDoc: "https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBSnapshot.html", fieldPath: "DBInstanceIdentifier", targetType: "dbi", reasoning: "DBSnapshot.DBInstanceIdentifier — source DB instance."},
 	{shortName: "rds-snap", apiDoc: "https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBSnapshot.html", fieldPath: "KmsKeyId", targetType: "kms", reasoning: "DBSnapshot.KmsKeyId — KMS key the snapshot is encrypted with."},
-	{shortName: "rds-snap", apiDoc: "https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBSnapshot.html", fieldPath: "VpcId", targetType: "vpc", reasoning: "DBSnapshot.VpcId — VPC the source DB instance was in."},
+	// DBSnapshot has no VpcId field per the AWS SDK — vpc pivot is reachable via the dbi cross-ref, not a direct nav field.
 
 	// rtb — Route Tables
 	{shortName: "rtb", apiDoc: "https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_RouteTable.html", fieldPath: "VpcId", targetType: "vpc", reasoning: "RouteTable.VpcId — VPC the route table belongs to."},

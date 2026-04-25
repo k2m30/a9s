@@ -118,7 +118,7 @@ func TestEnrichSNSSubscriptions_BothWithSubsProducesNoFindings(t *testing.T) {
 	clients := &awsclient.ServiceClients{SNS: fake}
 	resources := snsTopicResources("my-topic-1", "my-topic-2")
 
-	result, err := awsclient.EnrichSNSSubscriptions(context.Background(), clients, resources)
+	result, err := awsclient.EnrichSNSSubscriptions(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestEnrichSNSSubscriptions_OrphanTopicProducesFindingSevTilde(t *testing.T)
 	clients := &awsclient.ServiceClients{SNS: fake}
 	resources := snsTopicResources("my-topic-1", "my-topic-2")
 
-	result, err := awsclient.EnrichSNSSubscriptions(context.Background(), clients, resources)
+	result, err := awsclient.EnrichSNSSubscriptions(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -191,7 +191,7 @@ func TestEnrichSNSSubscriptions_AllPendingProducesFindingSevTilde(t *testing.T) 
 	clients := &awsclient.ServiceClients{SNS: fake}
 	resources := snsTopicResources("my-topic-1", "my-topic-2")
 
-	result, err := awsclient.EnrichSNSSubscriptions(context.Background(), clients, resources)
+	result, err := awsclient.EnrichSNSSubscriptions(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -215,7 +215,7 @@ func TestEnrichSNSSubscriptions_AllPendingProducesFindingSevTilde(t *testing.T) 
 func TestEnrichSNSSubscriptions_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{SNS: nil}
 
-	result, err := awsclient.EnrichSNSSubscriptions(context.Background(), clients, snsTopicResources("my-topic-1", "my-topic-2"))
+	result, err := awsclient.EnrichSNSSubscriptions(context.Background(), clients, snsTopicResources("my-topic-1", "my-topic-2"), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -248,7 +248,7 @@ func TestEnrichSNSSubscriptions_APIErrorSetsTruncatedNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{SNS: fake}
 	resources := snsTopicResources("my-topic-1", "my-topic-2")
 
-	result, err := awsclient.EnrichSNSSubscriptions(context.Background(), clients, resources)
+	result, err := awsclient.EnrichSNSSubscriptions(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

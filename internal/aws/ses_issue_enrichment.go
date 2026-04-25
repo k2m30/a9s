@@ -30,7 +30,7 @@ func init() {
 // IssueCount is 1 when severity is "!", else 0 — counted once for the whole
 // account regardless of how many identity rows are in the list (spec §4
 // "S1 counts the account-level finding once, not N times").
-func EnrichSESAccount(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichSESAccount(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	fieldUpdates := make(map[string]map[string]string)

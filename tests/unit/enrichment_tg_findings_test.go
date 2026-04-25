@@ -76,7 +76,7 @@ func TestEnrichTargetGroupHealth_FindingKeyedByID(t *testing.T) {
 		Fields: map[string]string{"target_group_arn": tgARN},
 	}}
 
-	result, err := awsclient.EnrichTargetGroupHealth(context.Background(), clients, resources)
+	result, err := awsclient.EnrichTargetGroupHealth(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -110,7 +110,7 @@ func TestEnrichTargetGroupHealth_SummaryUnhealthyXofY(t *testing.T) {
 		Fields: map[string]string{"target_group_arn": tgARN},
 	}}
 
-	result, err := awsclient.EnrichTargetGroupHealth(context.Background(), clients, resources)
+	result, err := awsclient.EnrichTargetGroupHealth(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestEnrichTargetGroupHealth_AllHealthyExcluded(t *testing.T) {
 		Fields: map[string]string{"target_group_arn": tgARN},
 	}}
 
-	result, err := awsclient.EnrichTargetGroupHealth(context.Background(), clients, resources)
+	result, err := awsclient.EnrichTargetGroupHealth(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -178,7 +178,7 @@ func TestEnrichTargetGroupHealth_TruncatedWhenResourcesExceedCap(t *testing.T) {
 	fake := &tgHealthFake{outputs: outputs}
 	clients := &awsclient.ServiceClients{ELBv2: fake}
 
-	result, err := awsclient.EnrichTargetGroupHealth(context.Background(), clients, resources)
+	result, err := awsclient.EnrichTargetGroupHealth(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -194,7 +194,7 @@ func TestEnrichTargetGroupHealth_EmptyResourcesReturnsEmptyFindings(t *testing.T
 	fake := &tgHealthFake{outputs: map[string]*elbv2.DescribeTargetHealthOutput{}}
 	clients := &awsclient.ServiceClients{ELBv2: fake}
 
-	result, err := awsclient.EnrichTargetGroupHealth(context.Background(), clients, nil)
+	result, err := awsclient.EnrichTargetGroupHealth(context.Background(), clients, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

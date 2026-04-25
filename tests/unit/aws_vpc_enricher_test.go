@@ -107,7 +107,7 @@ func TestEnrichVPCFlowLogs_BothActiveProducesNoFindings(t *testing.T) {
 	clients := &awsclient.ServiceClients{EC2: fake}
 	resources := vpcResources("vpc-00000001", "vpc-00000002")
 
-	result, err := awsclient.EnrichVPCFlowLogs(context.Background(), clients, resources)
+	result, err := awsclient.EnrichVPCFlowLogs(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -131,7 +131,7 @@ func TestEnrichVPCFlowLogs_NoLogsProducesFindingSevTilde(t *testing.T) {
 	clients := &awsclient.ServiceClients{EC2: fake}
 	resources := vpcResources("vpc-00000001", "vpc-00000002")
 
-	result, err := awsclient.EnrichVPCFlowLogs(context.Background(), clients, resources)
+	result, err := awsclient.EnrichVPCFlowLogs(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -163,7 +163,7 @@ func TestEnrichVPCFlowLogs_InactiveOnlyProducesFindingForAffectedVPC(t *testing.
 	clients := &awsclient.ServiceClients{EC2: fake}
 	resources := vpcResources("vpc-00000001", "vpc-00000002")
 
-	result, err := awsclient.EnrichVPCFlowLogs(context.Background(), clients, resources)
+	result, err := awsclient.EnrichVPCFlowLogs(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -190,7 +190,7 @@ func TestEnrichVPCFlowLogs_InactiveOnlyProducesFindingForAffectedVPC(t *testing.
 func TestEnrichVPCFlowLogs_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{EC2: nil}
 
-	result, err := awsclient.EnrichVPCFlowLogs(context.Background(), clients, vpcResources("vpc-00000001", "vpc-00000002"))
+	result, err := awsclient.EnrichVPCFlowLogs(context.Background(), clients, vpcResources("vpc-00000001", "vpc-00000002"), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -218,7 +218,7 @@ func TestEnrichVPCFlowLogs_APIErrorSetsTruncatedFindsOtherVPC(t *testing.T) {
 	clients := &awsclient.ServiceClients{EC2: fake}
 	resources := vpcResources("vpc-00000001", "vpc-00000002")
 
-	result, err := awsclient.EnrichVPCFlowLogs(context.Background(), clients, resources)
+	result, err := awsclient.EnrichVPCFlowLogs(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

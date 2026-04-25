@@ -179,7 +179,7 @@ func TestEnrichWAFLogging_GetWebACLPathPopulatesBlockRulesSummary(t *testing.T) 
 	clients := &awsclient.ServiceClients{WAFv2: fake}
 	resources := []resource.Resource{wafWebACLResourceWithNameID(arn, name, id, "")}
 
-	result, err := awsclient.EnrichWAFLogging(context.Background(), clients, resources)
+	result, err := awsclient.EnrichWAFLogging(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -232,7 +232,7 @@ func TestEnrichWAFLogging_EmptyScopeDefaultsToREGIONAL(t *testing.T) {
 	// Resource has NO "scope" field — should default to REGIONAL.
 	resources := []resource.Resource{wafWebACLResourceWithNameID(arn, name, id, "")}
 
-	result, err := awsclient.EnrichWAFLogging(context.Background(), clients, resources)
+	result, err := awsclient.EnrichWAFLogging(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -292,7 +292,7 @@ func TestEnrichWAFLogging_ListResourcesErrorSetsTruncatedAndSurfacesError(t *tes
 	clients := &awsclient.ServiceClients{WAFv2: fake}
 	resources := wafWebACLResources(wafACLARN1, wafACLARN2)
 
-	result, err := awsclient.EnrichWAFLogging(context.Background(), clients, resources)
+	result, err := awsclient.EnrichWAFLogging(context.Background(), clients, resources, nil)
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when ListResourcesForWebACL fails")
 	}
@@ -344,7 +344,7 @@ func TestEnrichWAFLogging_TypeAssertionFailsRulesSummaryZero(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{WAFv2: fake}
 
-	result, err := awsclient.EnrichWAFLogging(context.Background(), clients, resources)
+	result, err := awsclient.EnrichWAFLogging(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -483,7 +483,7 @@ func TestEnrichLogsMetricFilters_NoStreamsAPISkipsLastEventAt(t *testing.T) {
 	clients := &awsclient.ServiceClients{CloudWatchLogs: fake}
 	resources := []resource.Resource{logsGroupResource(auditGroup)}
 
-	result, err := awsclient.EnrichLogsMetricFilters(context.Background(), clients, resources)
+	result, err := awsclient.EnrichLogsMetricFilters(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -514,7 +514,7 @@ func TestEnrichLogsMetricFilters_StreamsErrorNoLastEventAt(t *testing.T) {
 	clients := &awsclient.ServiceClients{CloudWatchLogs: fake}
 	resources := []resource.Resource{logsGroupResource(auditGroup)}
 
-	result, err := awsclient.EnrichLogsMetricFilters(context.Background(), clients, resources)
+	result, err := awsclient.EnrichLogsMetricFilters(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -546,7 +546,7 @@ func TestEnrichLogsMetricFilters_DescribeMetricFiltersErrorSetsTruncated(t *test
 	clients := &awsclient.ServiceClients{CloudWatchLogs: fake}
 	resources := []resource.Resource{logsGroupResource(auditGroup)}
 
-	result, err := awsclient.EnrichLogsMetricFilters(context.Background(), clients, resources)
+	result, err := awsclient.EnrichLogsMetricFilters(context.Background(), clients, resources, nil)
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when DescribeMetricFilters fails")
 	}
@@ -586,7 +586,7 @@ func TestEnrichLogsMetricFilters_LastEventAt_MinutesAgo(t *testing.T) {
 	clients := &awsclient.ServiceClients{CloudWatchLogs: fake}
 	resources := []resource.Resource{logsGroupResource(logGroup)}
 
-	result, err := awsclient.EnrichLogsMetricFilters(context.Background(), clients, resources)
+	result, err := awsclient.EnrichLogsMetricFilters(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -619,7 +619,7 @@ func TestEnrichLogsMetricFilters_LastEventAt_HoursAgo(t *testing.T) {
 	clients := &awsclient.ServiceClients{CloudWatchLogs: fake}
 	resources := []resource.Resource{logsGroupResource(logGroup)}
 
-	result, err := awsclient.EnrichLogsMetricFilters(context.Background(), clients, resources)
+	result, err := awsclient.EnrichLogsMetricFilters(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -652,7 +652,7 @@ func TestEnrichLogsMetricFilters_LastEventAt_DaysAgo(t *testing.T) {
 	clients := &awsclient.ServiceClients{CloudWatchLogs: fake}
 	resources := []resource.Resource{logsGroupResource(logGroup)}
 
-	result, err := awsclient.EnrichLogsMetricFilters(context.Background(), clients, resources)
+	result, err := awsclient.EnrichLogsMetricFilters(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -685,7 +685,7 @@ func TestEnrichLogsMetricFilters_LastEventAt_DateFormat(t *testing.T) {
 	clients := &awsclient.ServiceClients{CloudWatchLogs: fake}
 	resources := []resource.Resource{logsGroupResource(logGroup)}
 
-	result, err := awsclient.EnrichLogsMetricFilters(context.Background(), clients, resources)
+	result, err := awsclient.EnrichLogsMetricFilters(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -713,7 +713,7 @@ func TestEnrichLogsMetricFilters_LastEventAt_DateFormat(t *testing.T) {
 func TestEnrichEBSVolumeStatus_NilEC2ClientReturnsEmptyNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{EC2: nil}
 
-	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, nil)
+	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -736,7 +736,7 @@ func TestEnrichEBSVolumeStatus_APIErrorReturnsError(t *testing.T) {
 	fake := &ebsStatusFake{volumeErr: apiErr}
 	clients := &awsclient.ServiceClients{EC2: fake}
 
-	_, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, nil)
+	_, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, nil, nil)
 	if err == nil {
 		t.Fatal("expected error from DescribeVolumeStatus, got nil")
 	}
@@ -759,7 +759,7 @@ func TestEnrichEBSVolumeStatus_WarningStatusProducesFinding(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{EC2: &ebsStatusFake{volumeOutput: out}}
 
-	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, nil)
+	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -806,7 +806,7 @@ func TestEnrichEBSVolumeStatus_EventAndActionRowsPopulated(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{EC2: &ebsStatusFake{volumeOutput: out}}
 
-	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, nil)
+	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -864,7 +864,7 @@ func TestEnrichEBSVolumeStatus_KnownIDsFilterExcludesUnmatchedVolumes(t *testing
 		{ID: "vol-known", Name: "known-volume"},
 	}
 
-	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -894,7 +894,7 @@ func TestEnrichEBSVolumeStatus_NilVolumeIdSkipped(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{EC2: &ebsStatusFake{volumeOutput: out}}
 
-	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, nil)
+	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

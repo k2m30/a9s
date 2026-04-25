@@ -66,7 +66,7 @@ func TestAllEnrichers_IssueCountNeverExceedsResources(t *testing.T) {
 						t.Logf("skipped %s: panic with nil clients: %v", shortName, r)
 					}
 				}()
-				result, err = fn(context.Background(), nilClients, minimalResources)
+				result, err = fn(context.Background(), nilClients, minimalResources, nil)
 			}()
 
 			if t.Failed() {

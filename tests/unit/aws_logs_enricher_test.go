@@ -85,7 +85,7 @@ func TestEnrichLogsMetricFilters_AuditWithFiltersProducesNoFindings(t *testing.T
 		logsGroupResource(lambdaGroup),
 	}
 
-	result, err := awsclient.EnrichLogsMetricFilters(context.Background(), clients, resources)
+	result, err := awsclient.EnrichLogsMetricFilters(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -116,7 +116,7 @@ func TestEnrichLogsMetricFilters_AuditNoFiltersProducesFindingSevTilde(t *testin
 		logsGroupResource(lambdaGroup),
 	}
 
-	result, err := awsclient.EnrichLogsMetricFilters(context.Background(), clients, resources)
+	result, err := awsclient.EnrichLogsMetricFilters(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -152,7 +152,7 @@ func TestEnrichLogsMetricFilters_NonAuditGroupSkipped(t *testing.T) {
 		logsGroupResource("/custom/app-logs"),
 	}
 
-	result, err := awsclient.EnrichLogsMetricFilters(context.Background(), clients, resources)
+	result, err := awsclient.EnrichLogsMetricFilters(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -175,7 +175,7 @@ func TestEnrichLogsMetricFilters_NilClientReturnsEmptyFindingsNoError(t *testing
 		logsGroupResource("/app/service/api"),
 	}
 
-	result, err := awsclient.EnrichLogsMetricFilters(context.Background(), clients, resources)
+	result, err := awsclient.EnrichLogsMetricFilters(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

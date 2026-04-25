@@ -128,7 +128,7 @@ func TestEnrichCFNDrift_DriftedStackProducesFindingSevTilde(t *testing.T) {
 		cfnDriftStackResource(cfnDriftStack2, "UPDATE_COMPLETE"),
 	}
 
-	result, err := awsclient.EnrichCFNDrift(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCFNDrift(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -166,7 +166,7 @@ func TestEnrichCFNDrift_InSyncStackProducesNoFinding(t *testing.T) {
 		cfnDriftStackResource(cfnDriftStack2, "CREATE_COMPLETE"),
 	}
 
-	result, err := awsclient.EnrichCFNDrift(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCFNDrift(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -191,7 +191,7 @@ func TestEnrichCFNDrift_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 		cfnDriftStackResource(cfnDriftStack2, "UPDATE_COMPLETE"),
 	}
 
-	result, err := awsclient.EnrichCFNDrift(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCFNDrift(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -223,7 +223,7 @@ func TestEnrichCFNDrift_APIErrorSetsTruncatedAndSurfacesError(t *testing.T) {
 		cfnDriftStackResource(cfnDriftStack2, "UPDATE_COMPLETE"),
 	}
 
-	result, err := awsclient.EnrichCFNDrift(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCFNDrift(context.Background(), clients, resources, nil)
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when at least one stack API call failed")
 	}

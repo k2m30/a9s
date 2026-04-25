@@ -17,7 +17,7 @@ func init() {
 // EnrichEBSVolumeStatus calls DescribeVolumeStatus (account-wide, paginated) and returns
 // a Finding for every volume with non-ok status.
 // Severity is "!" (broken/degraded). Walks up to EnrichmentCap pages via NextToken.
-func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.EC2 == nil {

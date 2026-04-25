@@ -113,7 +113,7 @@ func TestOpenSearch_Enrich_UpdateAvailable_EmitsBangFinding(t *testing.T) {
 		buildOSResource(updateDomain, "software update forced soon"),
 	}
 
-	result, err := awsclient.EnrichOpenSearchDomains(context.Background(), nil, resources)
+	result, err := awsclient.EnrichOpenSearchDomains(context.Background(), nil, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichOpenSearchDomains error: %v", err)
 	}
@@ -179,7 +179,7 @@ func TestOpenSearch_Enrich_EncryptionOff_EmitsTildeFinding(t *testing.T) {
 		buildOSResource(encOffDomain, "encryption at rest off"),
 	}
 
-	result, err := awsclient.EnrichOpenSearchDomains(context.Background(), nil, resources)
+	result, err := awsclient.EnrichOpenSearchDomains(context.Background(), nil, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichOpenSearchDomains error: %v", err)
 	}
@@ -228,7 +228,7 @@ func TestOpenSearch_Enrich_MultiBackground_TopWinsHiddenSurfacesAsRow(t *testing
 		buildOSResource(multiDomain, "software update forced soon (+1)"),
 	}
 
-	result, err := awsclient.EnrichOpenSearchDomains(context.Background(), nil, resources)
+	result, err := awsclient.EnrichOpenSearchDomains(context.Background(), nil, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichOpenSearchDomains error: %v", err)
 	}
@@ -290,7 +290,7 @@ func TestOpenSearch_Enrich_HardStatePlusBackground_NoFieldUpdate(t *testing.T) {
 		buildOSResource(procPlusUpdateDomain, "processing: config change in flight (+1)"),
 	}
 
-	result, err := awsclient.EnrichOpenSearchDomains(context.Background(), nil, resources)
+	result, err := awsclient.EnrichOpenSearchDomains(context.Background(), nil, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichOpenSearchDomains error: %v", err)
 	}
@@ -345,7 +345,7 @@ func TestOpenSearch_Enrich_NoSignals_NoFinding(t *testing.T) {
 		buildOSResource(healthyDomain, ""),
 	}
 
-	result, err := awsclient.EnrichOpenSearchDomains(context.Background(), nil, resources)
+	result, err := awsclient.EnrichOpenSearchDomains(context.Background(), nil, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichOpenSearchDomains error: %v", err)
 	}
@@ -388,7 +388,7 @@ func TestOpenSearch_Enrich_NilClients_NoPanic(t *testing.T) {
 
 	// Must not panic even with nil ServiceClients.
 	var clients *awsclient.ServiceClients
-	result, err := awsclient.EnrichOpenSearchDomains(context.Background(), clients, resources)
+	result, err := awsclient.EnrichOpenSearchDomains(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichOpenSearchDomains with nil clients returned error: %v", err)
 	}
