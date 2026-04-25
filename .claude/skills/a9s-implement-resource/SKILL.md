@@ -857,9 +857,144 @@ Report format:
 
 If any expected phrase is missing from the rendered detail frame (even with green unit tests) — FAIL. The rendered frame from 8.4 is the authority.
 
-#### 9.6 Final report format
+#### 9.6 Throttle wrap + no silent error skip (Rule E gate — MANDATORY)
 
-Aggregate the five check items plus any skipped ones under a dedicated header in the PR-ready report:
+This is the closeout audit for Rules E1–E6 (`## Error handling and throttle rules` above) and U12/U13 (universal coverage matrix). Every shipped resource has lost operator visibility to silent-skip regressions; this gate is the dam. Run all four checks against the resource's new files (fetcher + related + enricher + detail-enricher + lazy-add). FAIL on any non-clean output — DO NOT release.
+
+Files in scope (replace `<short>`):
+
+```text
+internal/aws/<short>.go
+internal/aws/<short>_related.go
+internal/aws/<short>_related_extra.go         (if present)
+internal/aws/<short>_issue_enrichment.go      (if not NoOp)
+internal/aws/<short>_detail_enrichment.go     (if present)
+```
+
+##### 9.6.a Static throttle-wrap audit (E1 + U13)
+
+Every `api.Describe*` / `api.Get*` / `api.List*` / `api.Lookup*` call MUST be inside a `RetryOnThrottle(ctx, DefaultRetryConfig(), func() (...) { ... })` closure. Run:
+
+```bash
+# Inside any of the in-scope files: lines that name an SDK method but do NOT
+# already sit inside a RetryOnThrottle closure body.
+for f in internal/aws/<short>.go internal/aws/<short>_related*.go \
+         internal/aws/<short>_*_enrichment.go; do
+  [ -f "$f" ] || continue
+  awk '
+    /RetryOnThrottle\(/ { in_retry = 1; depth = 0 }
+    in_retry { depth += gsub(/\{/, "{") - gsub(/\}/, "}"); if (depth <= 0 && /\}\)/) in_retry = 0; next }
+    /api\.(Describe|Get|List|Lookup)[A-Z]/ { print FILENAME":"NR": "$0 }
+  ' "$f"
+done
+```
+
+Expected output: **empty**. Any line printed is an unwrapped SDK call → coder reject; loop back to phase 7. Add the `RetryOnThrottle(...)` closure verbatim from `internal/aws/kms_related.go:238-255`.
+
+Report:
+
+```text
+9.6.a throttle wrap: PASS — 0 unwrapped SDK calls in <N> files
+```
+
+##### 9.6.b Static silent-skip audit (E2)
+
+The four banned patterns from Rule E2 must NOT appear in the new files:
+
+```bash
+for f in internal/aws/<short>.go internal/aws/<short>_related*.go \
+         internal/aws/<short>_*_enrichment.go; do
+  [ -f "$f" ] || continue
+  # Pattern: `if err != nil {` followed within 3 lines by `continue` /
+  # `break` / `return nil` / bare `return` / `_ = err`, with NO preceding
+  # `failures = append(failures, ...)` line in the same block.
+  awk '
+    /if err != nil/ { in_block = 1; line_count = 0; saw_aggregate = 0; next }
+    in_block && /failures *= *append/ { saw_aggregate = 1 }
+    in_block { line_count++ }
+    in_block && /(continue|break|return nil|return$|_ = err)/ {
+      if (!saw_aggregate) print FILENAME":"NR": SILENT-SKIP — "$0
+      in_block = 0
+    }
+    in_block && line_count > 5 { in_block = 0 }
+  ' "$f"
+done
+```
+
+Expected output: **empty**. Any line printed is a silent-skip violation → coder reject; loop back to phase 7. Replace with the partial-success pattern from Rule E3 (collect into `failures` slice + `AggregateFailures(...)` at function exit).
+
+Report:
+
+```text
+9.6.b silent skip: PASS — 0 banned `if err != nil { continue/break/return nil }` blocks without aggregation in <N> files
+```
+
+##### 9.6.c Per-category surfacing audit (E4)
+
+For every function category present in the new files, confirm the error reaches a FlashMsg-bound channel per the table in Rule E4. Cite the call site explicitly:
+
+| Category | Where the error must be set | Verification command |
+|---|---|---|
+| Paginated top-level fetcher | `RegisterPaginated` closure returns `(FetchResult, err)` where `err` is the composite | `grep -n "AggregateFailures" internal/aws/<short>.go` |
+| FetchByIDs | `RegisterFetchByIDs` closure returns `([]Resource, err)` composite | `grep -n "AggregateFailures\|AggregateMissing" internal/aws/<short>.go` |
+| Related checker | `RelatedCheckResult{... Err: <composite>}` on every API-error path | `grep -n "Err:" internal/aws/<short>_related*.go` |
+| Wave-2 enricher | `IssueEnricherResult{... TruncatedIDs: ..., Truncated: ...}` AND top-level `error` return | `grep -n "TruncatedIDs\[" internal/aws/<short>_issue_enrichment.go` and `grep -n "AggregateFailures" internal/aws/<short>_issue_enrichment.go` |
+| Detail enricher | `DetailEnrichmentResult.Err` set on failure path | `grep -n "Err:" internal/aws/<short>_detail_enrichment.go` |
+
+If any present category has no surfacing path: FAIL. Either add the surfacing field per E4 or — if no error can ever happen here — add a one-line comment justifying it (e.g. `// no AWS call; pure RawStruct extraction — no Err field needed`).
+
+Report:
+
+```text
+9.6.c surfacing path:
+    paginated fetcher: AggregateFailures at <file>:<line> — PASS
+    FetchByIDs:        AggregateMissing at <file>:<line> — PASS (or N/A — no FetchByIDs)
+    related checkers:  Result.Err set on N of N error paths — PASS
+    Wave-2 enricher:   TruncatedIDs[id] set on N of N per-row paths AND AggregateFailures at exit — PASS (or N/A)
+    detail enricher:   Err on every fail path — PASS (or N/A)
+```
+
+##### 9.6.d Partial-failure scenario test exists and passes (U12)
+
+Per Rule E enforcement (line 250 of this skill) and U12 in the coverage matrix, every resource must have `TestScenario_<short>_PartialFailure` that:
+
+1. Injects a fake that errors on 2 of N describe / get calls (AccessDenied or NotFound).
+2. Asserts the list renders the surviving N−2 rows.
+3. Asserts a `FlashMsg{IsError:true}` was emitted naming the failing IDs.
+4. Asserts the error-history transcript contains the composite error text.
+
+Run:
+
+```bash
+go test ./tests/integration/ -tags integration -run "TestScenario_<short>_PartialFailure" -count=1 -v
+```
+
+Expected: PASS with the composite-error text logged. If the test does not exist, write it before claiming the skill done — loop back to phase 8 (it is a phase-8 deliverable per `## Error handling and throttle rules` § Enforcement).
+
+Report:
+
+```text
+9.6.d partial-failure scenario: TestScenario_<short>_PartialFailure — PASS
+    composite error logged: "<short>: <op> failed for 2 of N items: <id1>: AccessDenied; <id2>: NotFound"
+```
+
+##### 9.6 aggregate result
+
+```text
+9.6 throttle wrap + no silent error skip:
+    9.6.a throttle wrap (E1/U13):       PASS — 0 unwrapped SDK calls
+    9.6.b silent skip (E2):             PASS — 0 banned patterns
+    9.6.c surfacing path (E4):          PASS — per-category table above
+    9.6.d partial-failure scenario (U12): PASS — TestScenario_<short>_PartialFailure
+```
+
+If 9.6.a or 9.6.b is FAIL → loop back to phase 7 (coder fix); do NOT release.
+If 9.6.c is FAIL → loop back to phase 7; if a category genuinely has no error path, document it inline.
+If 9.6.d is FAIL → loop back to phase 8 (QA writes the partial-failure scenario test); coder must add the inject-2-failures fake variant if missing.
+
+#### 9.7 Final report format
+
+Aggregate the six check items plus any skipped ones under a dedicated header in the PR-ready report:
 
 ```text
 ## Phase 9 Report Checklist
@@ -869,11 +1004,12 @@ Aggregate the five check items plus any skipped ones under a dedicated header in
 9.3 graph-root pivot counts: PASS (<fixture>, N/N non-zero, M/total ≥ 2)
 9.4 drill-through: PASS (related: <pass|N/A>, navigable: <pass|skipped>)
 9.5 detail-view completeness: PASS (test: <name>, rendered frame logged)
+9.6 throttle wrap + no silent error skip: PASS (E1/E2/E4/U12/U13)
 
 Implementation: DONE.
 ```
 
-If any item is FAIL, do NOT emit "DONE" — loop back to the phase that owns the gap (fixture gaps → phase 6a; test gaps → phase 6b; rendering gaps → phase 7; drill-through gaps → phase 7 coder + one `drillThroughFixtures` row).
+If any item is FAIL, do NOT emit "DONE" — loop back to the phase that owns the gap (fixture gaps → phase 6a; test gaps → phase 6b; rendering gaps → phase 7; drill-through gaps → phase 7 coder + one `drillThroughFixtures` row; **silent-skip / unwrapped-SDK / missing-partial-scenario gaps → phase 7 coder for the fix and phase 8 QA for the scenario test**).
 
 ### Phase 10 — Post-push review loop (runs AFTER user-approved push)
 
