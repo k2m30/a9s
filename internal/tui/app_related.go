@@ -306,9 +306,11 @@ func (m *Model) buildResourceCacheSnapshot() resource.ResourceCache {
 	// rule (in cross-ref enrichers) treats parent-not-found as
 	// "unknown, skip" rather than "definitively deleted" per spec §3.1.
 	for shortName, rows := range m.probeResources {
+		probeTrunc := m.probeTruncated[shortName] // false when absent (complete single page)
 		if existing, ok := snap[shortName]; ok {
 			// lazyResourceCache already seeded — merge probe rows for any
 			// new IDs (probe is first-page authoritative; lazy is sparse).
+			// IsTruncated: either source being truncated makes the merged entry truncated.
 			known := make(map[string]struct{}, len(existing.Resources))
 			for _, r := range existing.Resources {
 				known[r.ID] = struct{}{}
@@ -321,12 +323,12 @@ func (m *Model) buildResourceCacheSnapshot() resource.ResourceCache {
 			}
 			snap[shortName] = resource.ResourceCacheEntry{
 				Resources:   merged,
-				IsTruncated: true,
+				IsTruncated: existing.IsTruncated || probeTrunc,
 			}
 		} else {
 			snap[shortName] = resource.ResourceCacheEntry{
 				Resources:   rows,
-				IsTruncated: true,
+				IsTruncated: probeTrunc,
 			}
 		}
 	}
@@ -334,6 +336,10 @@ func (m *Model) buildResourceCacheSnapshot() resource.ResourceCache {
 		// resourceCache is authoritative — overwrite anything from lazy/probe.
 		// Carry the entry's pagination state (IsTruncated) verbatim so
 		// callers can distinguish "complete cache" from "first page only".
+		// Preserve the probe's IsTruncated signal via OR: if the probe reported
+		// truncation for this type but the resourceCache entry carries nil
+		// pagination (seeded before the probe fix landed), honour the probe.
+		cacheIsTruncated := (entry.pagination != nil && entry.pagination.IsTruncated) || m.probeTruncated[shortName]
 		if existing, ok := snap[shortName]; ok {
 			// Merge: resourceCache rows win on collision; append non-cache IDs.
 			known := make(map[string]struct{}, len(entry.resources))
@@ -348,12 +354,12 @@ func (m *Model) buildResourceCacheSnapshot() resource.ResourceCache {
 			}
 			snap[shortName] = resource.ResourceCacheEntry{
 				Resources:   merged,
-				IsTruncated: entry.pagination != nil && entry.pagination.IsTruncated,
+				IsTruncated: cacheIsTruncated,
 			}
 		} else {
 			snap[shortName] = resource.ResourceCacheEntry{
 				Resources:   entry.resources,
-				IsTruncated: entry.pagination != nil && entry.pagination.IsTruncated,
+				IsTruncated: cacheIsTruncated,
 			}
 		}
 	}

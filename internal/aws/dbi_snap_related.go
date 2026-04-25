@@ -1,11 +1,10 @@
-// rds_snap_related.go contains related-resource checker functions for RDS snapshots.
+// dbi_snap_related.go contains related-resource checker functions for RDS DB instance snapshots.
 package aws
 
 import (
 	"context"
 	"strings"
 
-	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -180,44 +179,7 @@ func checkDBISnapBackup(ctx context.Context, clients any, res resource.Resource,
 // see docs/related-resources.md §Policy. FetchFilter["ResourceName"] is always
 // set so the caller can do a filtered re-fetch; Count is "unknown" (windowed)
 // per the spec — the panel renders the visible page count rather than a total.
-func checkDBISnapCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	snapID := res.ID
-	if snapID == "" {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
-	}
-	fetchFilter := map[string]string{"ResourceName": snapID}
-	eventList, truncated, err := dbiSnapRelatedResources(ctx, clients, cache, "ct-events")
-	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, Err: err, FetchFilter: fetchFilter}
-	}
-	if eventList == nil {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, FetchFilter: fetchFilter}
-	}
-	var ids []string
-	for _, eventRes := range eventList {
-		// When a typed cloudtrail Event is present, its Resources slice is
-		// authoritative — the Fields["resource_name"] fallback below is only
-		// for resources without a typed RawStruct (test helpers, demo
-		// shortcuts). If the typed slice exists and contains no match for
-		// snapID, the event genuinely doesn't reference this snapshot;
-		// don't second-guess that via the text fallback.
-		if raw, ok := assertStruct[cloudtrailtypes.Event](eventRes.RawStruct); ok {
-			for _, rr := range raw.Resources {
-				if rr.ResourceName != nil && *rr.ResourceName == snapID {
-					ids = append(ids, eventRes.ID)
-					break
-				}
-			}
-			continue
-		}
-		if eventRes.Fields["resource_name"] == snapID {
-			ids = append(ids, eventRes.ID)
-		}
-	}
-	if truncated {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, FetchFilter: fetchFilter}
-	}
-	result := relatedResult("ct-events", ids)
-	result.FetchFilter = fetchFilter
-	return result
-}
+// Built via BuildCTEventsPivotChecker — see ct_events_pivot.go for the shared logic.
+var checkDBISnapCTEvents = BuildCTEventsPivotChecker(CTEventsPivotConfig{
+	IDExtractor: func(res resource.Resource) string { return res.ID },
+})

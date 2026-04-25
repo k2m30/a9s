@@ -37,8 +37,9 @@ type sessionRuntime struct {
 	availTotal      int      // total types to probe in current gen
 
 	// Wave 2 issue-enrichment dispatch.
-	probeResources map[string][]resource.Resource // retained first-page resources from Wave 1
-	enrichQueue    []string                       // resource types pending Wave 2 enrichment
+	probeResources  map[string][]resource.Resource // retained first-page resources from Wave 1
+	probeTruncated  map[string]bool                // per-type truncation signal from Wave 1 probe
+	enrichQueue     []string                       // resource types pending Wave 2 enrichment
 	enrichmentGen  int                            // session-wide gen counter for Wave 2
 	enrichChecked  int                            // number of enrichment probes completed in current gen
 	enrichTotal    int                            // total enrichment probes to run in current gen
@@ -105,6 +106,7 @@ func (r *sessionRuntime) resetForSessionSwitch() {
 
 	r.enrichQueue = nil
 	r.probeResources = nil
+	r.probeTruncated = nil
 	r.availQueue = nil
 	r.availChecked = 0
 	r.availTotal = 0

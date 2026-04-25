@@ -189,7 +189,7 @@ func TestComputeRDSDBClusterSnapshotStatusAndIssues(t *testing.T) {
 		{
 			name: "healthy_available",
 			snap: rdstypes.DBClusterSnapshot{
-				DBClusterSnapshotIdentifier: aws.String("rds-snap-healthy"),
+				DBClusterSnapshotIdentifier: aws.String("dbc-snap-healthy"),
 				Status:                      aws.String("available"),
 				SnapshotType:                aws.String("automated"),
 				SnapshotCreateTime:          &age10d,
@@ -200,7 +200,7 @@ func TestComputeRDSDBClusterSnapshotStatusAndIssues(t *testing.T) {
 		{
 			name: "creating_status",
 			snap: rdstypes.DBClusterSnapshot{
-				DBClusterSnapshotIdentifier: aws.String("rds-snap-creating"),
+				DBClusterSnapshotIdentifier: aws.String("dbc-snap-creating"),
 				Status:                      aws.String("creating"),
 				SnapshotType:                aws.String("manual"),
 				SnapshotCreateTime:          &age10d,
@@ -211,7 +211,7 @@ func TestComputeRDSDBClusterSnapshotStatusAndIssues(t *testing.T) {
 		{
 			name: "failed_status",
 			snap: rdstypes.DBClusterSnapshot{
-				DBClusterSnapshotIdentifier: aws.String("rds-snap-failed"),
+				DBClusterSnapshotIdentifier: aws.String("dbc-snap-failed"),
 				Status:                      aws.String("failed"),
 				SnapshotType:                aws.String("manual"),
 				SnapshotCreateTime:          &age10d,
@@ -222,7 +222,7 @@ func TestComputeRDSDBClusterSnapshotStatusAndIssues(t *testing.T) {
 		{
 			name: "incompatible_restore_status",
 			snap: rdstypes.DBClusterSnapshot{
-				DBClusterSnapshotIdentifier: aws.String("rds-snap-incompat"),
+				DBClusterSnapshotIdentifier: aws.String("dbc-snap-incompat"),
 				Status:                      aws.String("incompatible-restore"),
 				SnapshotType:                aws.String("manual"),
 				SnapshotCreateTime:          &age10d,
@@ -235,7 +235,7 @@ func TestComputeRDSDBClusterSnapshotStatusAndIssues(t *testing.T) {
 			// 400d old → phrase is "manual, unused 400d".
 			name: "manual_old_available",
 			snap: rdstypes.DBClusterSnapshot{
-				DBClusterSnapshotIdentifier: aws.String("rds-snap-manual-old"),
+				DBClusterSnapshotIdentifier: aws.String("dbc-snap-manual-old"),
 				Status:                      aws.String("available"),
 				SnapshotType:                aws.String("manual"),
 				SnapshotCreateTime:          &age400d,
@@ -247,7 +247,7 @@ func TestComputeRDSDBClusterSnapshotStatusAndIssues(t *testing.T) {
 			// manual-young: available + manual + age=10d → healthy (no issue).
 			name: "manual_young_available",
 			snap: rdstypes.DBClusterSnapshot{
-				DBClusterSnapshotIdentifier: aws.String("rds-snap-manual-young"),
+				DBClusterSnapshotIdentifier: aws.String("dbc-snap-manual-young"),
 				Status:                      aws.String("available"),
 				SnapshotType:                aws.String("manual"),
 				SnapshotCreateTime:          &age10d,
@@ -260,7 +260,7 @@ func TestComputeRDSDBClusterSnapshotStatusAndIssues(t *testing.T) {
 			// An automated snapshot 400d old is healthy at the fetcher level.
 			name: "automated_old_available_healthy",
 			snap: rdstypes.DBClusterSnapshot{
-				DBClusterSnapshotIdentifier: aws.String("rds-snap-auto-old"),
+				DBClusterSnapshotIdentifier: aws.String("dbc-snap-auto-old"),
 				Status:                      aws.String("available"),
 				SnapshotType:                aws.String("automated"),
 				SnapshotCreateTime:          &age400d,
@@ -272,7 +272,7 @@ func TestComputeRDSDBClusterSnapshotStatusAndIssues(t *testing.T) {
 			// Broken precedence: failed suppresses the manual-age Warning.
 			name: "failed_with_manual_age_suppressed",
 			snap: rdstypes.DBClusterSnapshot{
-				DBClusterSnapshotIdentifier: aws.String("rds-snap-failed-manual-old"),
+				DBClusterSnapshotIdentifier: aws.String("dbc-snap-failed-manual-old"),
 				Status:                      aws.String("failed"),
 				SnapshotType:                aws.String("manual"),
 				SnapshotCreateTime:          &age400d,
@@ -284,7 +284,7 @@ func TestComputeRDSDBClusterSnapshotStatusAndIssues(t *testing.T) {
 			// nil Status: should not panic; returns ("", nil).
 			name: "nil_status",
 			snap: rdstypes.DBClusterSnapshot{
-				DBClusterSnapshotIdentifier: aws.String("rds-snap-nil-status"),
+				DBClusterSnapshotIdentifier: aws.String("dbc-snap-nil-status"),
 				Status:                      nil,
 				SnapshotType:                aws.String("automated"),
 				SnapshotCreateTime:          &age10d,

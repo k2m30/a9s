@@ -488,27 +488,35 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "storage_type", Title: "Storage", Width: 10, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				status := r.Fields["status"]
-				c := ColorHealthy
-				switch status {
-				case "failed":
-					c = ColorBroken
-				case "creating":
-					c = ColorWarning
+				// Strip (+N) suffix so "failed (+1)" still maps to ColorBroken.
+				phrase := StripFindingSuffix(r.Fields["status"])
+				// Broken end-states (highest severity — cannot be overridden below).
+				if phrase == "failed" {
+					return ColorBroken
 				}
+				if strings.HasPrefix(phrase, "incompatible-") {
+					return ColorBroken
+				}
+				// Non-broken non-empty phrase (e.g. "creating", "creating: 47%") → Warning.
+				// Healthy: "" (§4 phrase — healthy snapshots produce empty status) or
+				// "available" (raw AWS status injected by test helpers / RawStruct fallback).
+				if phrase != "" && phrase != "available" {
+					return ColorWarning
+				}
+				// Healthy phrase — apply secondary override checks.
 				// Unencrypted snapshot → warning
-				if c != ColorBroken && r.Fields["storage_encrypted"] == "false" {
-					c = ColorWarning
+				if r.Fields["storage_encrypted"] == "false" {
+					return ColorWarning
 				}
 				// Long-lived manual snapshot (>365 days) → warning (cost signal)
-				if c != ColorBroken && r.Fields["snapshot_type"] == "manual" {
+				if r.Fields["snapshot_type"] == "manual" {
 					if ts, err := time.Parse("2006-01-02 15:04", r.Fields["snapshot_create_time"]); err == nil {
 						if time.Since(ts) > 365*24*time.Hour {
-							c = ColorWarning
+							return ColorWarning
 						}
 					}
 				}
-				return c
+				return ColorHealthy
 			},
 		},
 	}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"strings"
 
-	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
 	docdb_types "github.com/aws/aws-sdk-go-v2/service/docdb/types"
@@ -450,49 +449,13 @@ func checkDbcKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 // per the spec — the panel renders the visible page count rather than a total.
 // ResourceType is "AWS::RDS::DBCluster" — both DocDB and Aurora clusters share
 // this CloudTrail resource type (docs/resources/dbc.md §2 ct-events).
-// The ResourceName for LookupEvents is the cluster identifier extracted via
-// dbcClusterIdentifier (handles both docdb_types.DBCluster and rdstypes.DBCluster).
-func checkDbcCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	clusterID := dbcClusterIdentifier(res.RawStruct)
-	if clusterID == "" {
-		clusterID = res.ID
-	}
-	if clusterID == "" {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
-	}
-	fetchFilter := map[string]string{"ResourceName": clusterID}
-	eventList, truncated, err := dbcRelatedResources(ctx, clients, cache, "ct-events")
-	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, Err: err, FetchFilter: fetchFilter}
-	}
-	if eventList == nil {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, FetchFilter: fetchFilter}
-	}
-	var ids []string
-	for _, eventRes := range eventList {
-		// When a typed cloudtrail Event is present, its Resources slice is
-		// authoritative — the Fields["resource_name"] fallback below is only
-		// for resources without a typed RawStruct (test helpers, demo
-		// shortcuts). If the typed slice exists and contains no match for
-		// clusterID, the event genuinely doesn't reference this cluster;
-		// don't second-guess that via the text fallback.
-		if raw, ok := assertStruct[cloudtrailtypes.Event](eventRes.RawStruct); ok {
-			for _, rr := range raw.Resources {
-				if rr.ResourceName != nil && *rr.ResourceName == clusterID {
-					ids = append(ids, eventRes.ID)
-					break
-				}
-			}
-			continue
+// Built via BuildCTEventsPivotChecker — see ct_events_pivot.go for the shared logic.
+var checkDbcCTEvents = BuildCTEventsPivotChecker(CTEventsPivotConfig{
+	IDExtractor: func(res resource.Resource) string {
+		id := dbcClusterIdentifier(res.RawStruct)
+		if id == "" {
+			id = res.ID
 		}
-		if eventRes.Fields["resource_name"] == clusterID {
-			ids = append(ids, eventRes.ID)
-		}
-	}
-	if truncated {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, FetchFilter: fetchFilter}
-	}
-	result := relatedResult("ct-events", ids)
-	result.FetchFilter = fetchFilter
-	return result
-}
+		return id
+	},
+})

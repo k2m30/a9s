@@ -87,6 +87,49 @@ func TestDbcSnapColor(t *testing.T) {
 			fields: map[string]string{"status": ""},
 			want:   resource.ColorHealthy,
 		},
+		// --- Regression pins for Issue 2: dbc-snap Color blind to enriched phrases ---
+		// Bug: dbc-snap Color only matches exact "failed" and "creating".
+		// Cross-ref enricher writes "failed (+1)" (multi-finding suffix) and AWS DocDB
+		// writes "incompatible-restore" / "incompatible-parameters" — all slip through
+		// as ColorHealthy. These FAIL today; they pass once the fix applies
+		// StripFindingSuffix + strings.HasPrefix("incompatible-") to dbc-snap.Color.
+		{
+			// "failed (+1)" has the (+1) suffix appended by BumpFindingSuffix when a
+			// second finding is added. StripFindingSuffix must strip it so the base
+			// phrase "failed" still maps to ColorBroken.
+			// FAILS today: switch only matches exact "failed", returns ColorHealthy.
+			// DBC-SNAP-COLOR-BLIND BUG: enriched "failed (+1)" slips through as green
+			name:   "failed_with_finding_suffix",
+			fields: map[string]string{"status": "failed (+1)"},
+			want:   resource.ColorBroken,
+		},
+		{
+			// AWS status "incompatible-restore" is a hard failure for DocDB cluster snapshots.
+			// dbi-snap Color handles this via strings.HasPrefix(phrase, "incompatible-");
+			// dbc-snap Color does not — it returns ColorHealthy.
+			// FAILS today: returns ColorHealthy. DBC-SNAP-COLOR-BLIND BUG.
+			name:   "incompatible_restore",
+			fields: map[string]string{"status": "incompatible-restore"},
+			want:   resource.ColorBroken,
+		},
+		{
+			// FAILS today: returns ColorHealthy. DBC-SNAP-COLOR-BLIND BUG.
+			name:   "incompatible_parameters",
+			fields: map[string]string{"status": "incompatible-parameters"},
+			want:   resource.ColorBroken,
+		},
+		{
+			// "creating: 47%" is a progress phrase that does NOT match the switch's
+			// exact "creating", so it falls through to the non-broken, non-empty path.
+			// With the fix this should map to ColorWarning (non-empty, non-broken phrase).
+			// FAILS today: "creating: 47%" does not match exact "creating", falls to
+			// default path — but the default in the current switch is no match, so the
+			// function reaches the unencrypted/date checks and returns ColorHealthy.
+			// DBC-SNAP-COLOR-BLIND BUG: "creating: 47%" treated as healthy.
+			name:   "creating_with_percent_suffix",
+			fields: map[string]string{"status": "creating: 47%"},
+			want:   resource.ColorWarning,
+		},
 	}
 
 	for _, tc := range cases {

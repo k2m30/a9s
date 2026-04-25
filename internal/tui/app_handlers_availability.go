@@ -122,6 +122,14 @@ func (m Model) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetchedM
 			m.probeResources = make(map[string][]resource.Resource, len(msg.Resources))
 		}
 		maps.Copy(m.probeResources, msg.Resources)
+		// Record per-type truncation from the probe so buildResourceCacheSnapshot
+		// can stamp the correct IsTruncated value on probe-only cache entries.
+		// Without this, all probe entries get IsTruncated=true regardless of
+		// whether the probe fetched a complete single page (Issue 1 / P1 fix).
+		if m.probeTruncated == nil {
+			m.probeTruncated = make(map[string]bool, len(msg.Truncated))
+		}
+		maps.Copy(m.probeTruncated, msg.Truncated)
 		// Seed resourceCache from the prefetch too. Without this, Wave 2
 		// FieldUpdates that the enricher merges into the cache entry
 		// (handleEnrichmentChecked tail) have no entry to land on when the
@@ -137,7 +145,8 @@ func (m Model) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetchedM
 				continue
 			}
 			m.resourceCache[rt] = &resourceCacheEntry{
-				resources: resources,
+				resources:  resources,
+				pagination: &resource.PaginationMeta{IsTruncated: msg.Truncated[rt]},
 			}
 		}
 	}
@@ -194,6 +203,10 @@ func (m Model) handleAvailabilityChecked(msg messages.AvailabilityCheckedMsg) (t
 			m.probeResources = make(map[string][]resource.Resource)
 		}
 		m.probeResources[msg.ResourceType] = msg.Resources
+		if m.probeTruncated == nil {
+			m.probeTruncated = make(map[string]bool)
+		}
+		m.probeTruncated[msg.ResourceType] = msg.Truncated
 	}
 
 	// Surface partial-success failures as flash errors so operators see them.
@@ -446,6 +459,7 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 			menu.SetEnrichProgress(0, 0)
 		}
 		m.probeResources = nil
+		m.probeTruncated = nil
 		// Save cache with enrichment-updated issue counts.
 		cmd := m.saveAvailabilityCache()
 		return m, tea.Batch(flashCmd, cmd)

@@ -245,7 +245,7 @@ Sibling cross-references required for graph-connected non-zero pivots:
 | `BackupCoveredDBISnapID` | `awsbackup:job-deadbeef-snap` | Status=available, Encrypted=true, parent ProdDbiID | Realism: AWS Backup-created identifier prefix; backup pivot already drives non-zero on graph-root |
 | `SeverityBrokenWarnDBISnapID` | `failed-with-unenc-snap` | Status=failed, Encrypted=false | Covers severity_broken_beats_warning (U8) |
 
-Adversarial fixtures (NOT in this file — stay inline in `tests/unit/aws_rds_snap_test.go`):
+Adversarial fixtures (NOT in this file — stay inline in `tests/unit/aws_dbi_snap_test.go`):
 - nil `DBSnapshotIdentifier`
 - nil `Status`
 - malformed ARN
@@ -290,7 +290,7 @@ These are scoped for phase 6a in addition to writing `dbi-snap.go`:
 | Errors propagate via raw `fmt.Errorf` | Use `AggregateFailures` if multiple snapshots fail individually | Page-level errors are already top-level returns; per-row failures don't apply (the SDK returns the whole page or errors) |
 | `RegisterPaginated` returns top-level err verbatim | unchanged | Keep |
 
-### §3.2 Related panel (`internal/aws/rds_snap_related.go`)
+### §3.2 Related panel (`internal/aws/dbi_snap_related.go`)
 
 | Current | Required | Action |
 |---|---|---|
@@ -299,7 +299,7 @@ These are scoped for phase 6a in addition to writing `dbi-snap.go`:
 | `checkDBISnapBackup` calls `ListRecoveryPointsByResource` directly with `RetryOnThrottle` | OK per E1 | No change |
 | All checkers wrap any per-item AWS calls | OK | No change |
 
-### §3.3 Issue enricher (`internal/aws/rds_snap_issue_enrichment.go`)
+### §3.3 Issue enricher (`internal/aws/dbi_snap_issue_enrichment.go`)
 
 | Current | Required | Action |
 |---|---|---|
@@ -363,7 +363,7 @@ IssueAppends map[string][]string
 - `internal/aws/issue_enrichment.go` — type def + `NoOpIssueEnricher` signature + `IssueEnricherResult` struct.
 - `internal/aws/issue_enrichment_test.go` — update mock signatures.
 - `internal/aws/*_issue_enrichment.go` (43 files with custom enrichers) — add `_ resource.ResourceCache` param to each enricher func.
-- `internal/aws/rds_snap_issue_enrichment.go` — replace NoOp registration with the real cross-ref enricher.
+- `internal/aws/dbi_snap_issue_enrichment.go` — replace NoOp registration with the real cross-ref enricher.
 - `internal/tui/messages/messages.go` — add `IssueAppends` field on `EnrichmentCheckedMsg`.
 - `internal/tui/app_probes.go` — capture `m.buildResourceCacheSnapshot()` at dispatch and pass into the enricher closure; populate `EnrichmentCheckedMsg.IssueAppends`.
 - `internal/tui/app_handlers_availability.go` — merge `IssueAppends` into both `probeResources[shortName]` and `resourceCache[shortName].resources` Issues slices (parallel to the existing FieldUpdates merge loop).
@@ -378,7 +378,7 @@ Every non-dbi-snap enricher receives the `cache` param and ignores it via `_`. B
 
 1. **Phase 6a (this plan's §2)** — fixture file + sibling updates.
 2. **Phase 4-arch** — IssueEnricherFunc signature refactor (one focused coder dispatch, mechanical only).
-3. **Phase 6b** (parallel with 7) — QA tests in `tests/unit/aws_rds_snap_*_test.go`.
+3. **Phase 6b** (parallel with 7) — QA tests in `tests/unit/aws_dbi_snap_*_test.go`.
 4. **Phase 7** — coder implements: fetcher rewrite, view config, real cross-ref enricher, ct-events related registration.
 5. **Phase 7.5** — scope-diff gate.
 6. **Phase 8** — scenario-harness visual render gate (dbi-snap visual test + drill-through row + partial-failure scenario).

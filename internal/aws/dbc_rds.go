@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
@@ -119,6 +120,16 @@ func FetchRDSDBClustersPage(ctx context.Context, api RDSDescribeDBClustersAPI, c
 	var resources []resource.Resource
 
 	for _, cluster := range output.DBClusters {
+		// Per AWS SDK docstring (rds@v1.116.3/api_op_DescribeDBClusters.go:19-28),
+		// DescribeDBClusters may return Neptune and DocDB rows alongside Aurora/Multi-AZ.
+		// Skip engines that are handled by their own SDK paths (docdb SDK) or are
+		// not supported as dbc resource types (neptune). Use deny-list so future
+		// Aurora variants (e.g. "aurora-limitless") are not accidentally dropped.
+		engine := strings.ToLower(aws.ToString(cluster.Engine))
+		if engine == "neptune" || engine == "docdb" {
+			continue
+		}
+
 		clusterID := ""
 		if cluster.DBClusterIdentifier != nil {
 			clusterID = *cluster.DBClusterIdentifier

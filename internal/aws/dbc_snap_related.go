@@ -4,30 +4,53 @@ import (
 	"context"
 	"strings"
 
-	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// checkDbcSnapDBC reads DBClusterIdentifier from the DBClusterSnapshot RawStruct.
+// checkDbcSnapDBC extracts DBClusterIdentifier from the DBClusterSnapshot RawStruct
+// and searches the dbc cache for the parent cluster.
 // Handles both docdbtypes.DBClusterSnapshot and rdstypes.DBClusterSnapshot shapes.
-// Pattern F — no cache needed.
-func checkDbcSnapDBC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// Pattern C — needs target cache.
+func checkDbcSnapDBC(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	var clusterID string
 	if snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](res.RawStruct); ok {
 		if snap.DBClusterIdentifier == nil || *snap.DBClusterIdentifier == "" {
 			return resource.RelatedCheckResult{TargetType: "dbc", Count: 0}
 		}
-		return relatedResult("dbc", []string{*snap.DBClusterIdentifier})
-	}
-	if snap, ok := assertStruct[rdstypes.DBClusterSnapshot](res.RawStruct); ok {
+		clusterID = *snap.DBClusterIdentifier
+	} else if snap, ok := assertStruct[rdstypes.DBClusterSnapshot](res.RawStruct); ok {
 		if snap.DBClusterIdentifier == nil || *snap.DBClusterIdentifier == "" {
 			return resource.RelatedCheckResult{TargetType: "dbc", Count: 0}
 		}
-		return relatedResult("dbc", []string{*snap.DBClusterIdentifier})
+		clusterID = *snap.DBClusterIdentifier
+	} else {
+		return resource.RelatedCheckResult{TargetType: "dbc", Count: -1}
 	}
-	return resource.RelatedCheckResult{TargetType: "dbc", Count: -1}
+
+	dbcList, truncated, err := dbcSnapRelatedResources(ctx, clients, cache, "dbc")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "dbc", Count: -1, Err: err}
+	}
+	if dbcList == nil {
+		// Cache not loaded and fetcher unavailable (nil/non-AWS clients) — fall back
+		// to the forward result: we know the cluster ID from the snapshot itself.
+		return relatedResult("dbc", []string{clusterID})
+	}
+
+	var ids []string
+	for _, dbcRes := range dbcList {
+		if dbcRes.Name == clusterID || dbcRes.ID == clusterID {
+			ids = append(ids, dbcRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		// Cache is truncated — parent may be in a later page; answer is unknown.
+		return resource.UnknownRelated("dbc")
+	}
+	return relatedResult("dbc", ids)
 }
 
 // checkDbcSnapKMS reads KmsKeyId from the DBClusterSnapshot RawStruct.
@@ -189,47 +212,10 @@ func dbcResourceARN(raw any) string {
 // per the spec — the panel renders the visible page count rather than a total.
 // ResourceType is "AWS::RDS::DBClusterSnapshot" — both DocDB and Aurora cluster
 // snapshots share this CloudTrail resource type (docs/resources/dbc-snap.md §2 ct-events).
-func checkDbcSnapCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	snapID := res.ID
-	if snapID == "" {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
-	}
-	fetchFilter := map[string]string{"ResourceName": snapID}
-	eventList, truncated, err := dbcSnapRelatedResources(ctx, clients, cache, "ct-events")
-	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, Err: err, FetchFilter: fetchFilter}
-	}
-	if eventList == nil {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, FetchFilter: fetchFilter}
-	}
-	var ids []string
-	for _, eventRes := range eventList {
-		// When a typed cloudtrail Event is present, its Resources slice is
-		// authoritative — the Fields["resource_name"] fallback below is only
-		// for resources without a typed RawStruct (test helpers, demo
-		// shortcuts). If the typed slice exists and contains no match for
-		// snapID, the event genuinely doesn't reference this snapshot;
-		// don't second-guess that via the text fallback.
-		if raw, ok := assertStruct[cloudtrailtypes.Event](eventRes.RawStruct); ok {
-			for _, rr := range raw.Resources {
-				if rr.ResourceName != nil && *rr.ResourceName == snapID {
-					ids = append(ids, eventRes.ID)
-					break
-				}
-			}
-			continue
-		}
-		if eventRes.Fields["resource_name"] == snapID {
-			ids = append(ids, eventRes.ID)
-		}
-	}
-	if truncated {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, FetchFilter: fetchFilter}
-	}
-	result := relatedResult("ct-events", ids)
-	result.FetchFilter = fetchFilter
-	return result
-}
+// Built via BuildCTEventsPivotChecker — see ct_events_pivot.go for the shared logic.
+var checkDbcSnapCTEvents = BuildCTEventsPivotChecker(CTEventsPivotConfig{
+	IDExtractor: func(res resource.Resource) string { return res.ID },
+})
 
 // dbcSnapRelatedResources returns the resource list for target from cache or by fetching the first page.
 func dbcSnapRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
