@@ -529,9 +529,9 @@ func TestRDSSnap_Enricher_FullFixtures_OrphanAndRetentionFound(t *testing.T) {
 		t.Errorf("WarnRDSSnapPastRetentionID: Findings[%q].Summary = %q, want \"automated, Nd past retention\"", retentionID, retFinding.Summary)
 	}
 
-	// Healthy fixtures (ProdRDSSnapID, ProdRDSSnapAuroraID) with parent in dbi cache
+	// Healthy fixtures (ProdRDSSnapID) with parent in dbi cache
 	// must produce no orphan or retention findings.
-	for _, id := range []string{fixtures.ProdRDSSnapID, fixtures.ProdRDSSnapAuroraID} {
+	for _, id := range []string{fixtures.ProdRDSSnapID} {
 		if f, has := result.Findings[id]; has {
 			if strings.Contains(f.Summary, "orphan") || strings.Contains(f.Summary, "past retention") {
 				t.Errorf("healthy snap %q: unexpected finding %q", id, f.Summary)

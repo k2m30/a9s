@@ -95,7 +95,7 @@
 | `pipeline` | [API_PipelineDeclaration](https://docs.aws.amazon.com/codepipeline/latest/APIReference/API_PipelineDeclaration.html) | `cb`, `cfn`, `codeartifact`, `ct-events`, `eb-rule`, `ecr`, `ecs-svc`, `kms`, `lambda`, `role`, `s3`, `sns` |
 | `policy` | [API_Policy](https://docs.aws.amazon.com/IAM/latest/APIReference/API_Policy.html) | `ct-events`, `iam-group`, `iam-user`, `role` |
 | `r53` | [API_HostedZone](https://docs.aws.amazon.com/Route53/latest/APIReference/API_HostedZone.html) | `acm`, `apigw`, `cf`, `ct-events`, `elb`, `logs`, `s3`, `vpc` |
-| `rds-snap` | [API_DBSnapshot](https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBSnapshot.html) | `backup`, `ct-events`, `dbc`, `dbi`, `kms` |
+| `rds-snap` | [API_DBSnapshot](https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBSnapshot.html) | `backup`, `ct-events`, `dbi`, `kms` |
 | `redis` | [API_ReplicationGroup](https://docs.aws.amazon.com/AmazonElastiCache/latest/APIReference/API_ReplicationGroup.html) | `alarm`, `cfn`, `ct-events`, `kms`, `logs`, `secrets`, `sg`, `sns`, `subnet`, `vpc` |
 | `redshift` | [API_Cluster](https://docs.aws.amazon.com/redshift/latest/APIReference/API_Cluster.html) | `alarm`, `cfn`, `ct-events`, `kms`, `logs`, `role`, `s3`, `secrets`, `sg`, `subnet`, `vpc` |
 | `role` | [API_Role](https://docs.aws.amazon.com/IAM/latest/APIReference/API_Role.html) | `ct-events`, `ec2`, `eks`, `glue`, `iam-group`, `iam-user`, `lambda`, `ng`, `policy` |
@@ -786,9 +786,14 @@ AWS API: https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBSnapsho
 
 - **`backup`** — Snapshots covered by AWS Backup.
 - **`ct-events`** — Audit trail for snapshot create/restore/copy.
-- **`dbc`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`dbi`** — Source DB instance.
 - **`kms`** — Encryption key.
+
+> Note: `dbc` is intentionally absent. Real AWS rejects `CreateDBSnapshot` on
+> Aurora cluster members; Aurora cluster snapshots live in `dbc-snap`
+> (`DBClusterSnapshot`). A registered `rds-snap → dbc` pivot would always
+> resolve `Count=0`, which is dead UX. See `internal/aws/rds_snap.go` for the
+> structural exclusion comment.
 
 ### `redis`
 
