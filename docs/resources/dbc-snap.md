@@ -82,6 +82,10 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Broken.
   - **How obtained**: `DBClusterSnapshot.Status` on the list response.
 
+- **Signal**: `Status` matches `incompatible-*` (e.g. `incompatible-restore`) — the snapshot exists but cannot be restored without manual intervention.
+  - **State bucket**: Broken.
+  - **How obtained**: `DBClusterSnapshot.Status` prefix match on the list response. AWS does not officially enumerate this status family for `DBClusterSnapshot` in the public API reference, but it surfaces in practice (mirrors the documented `DBSnapshot.Status` family) and `dbi-snap` handles it identically. Defensive parity — keep the keyword verbatim per the §4 table rules.
+
 - **Signal**: manual snapshot age > 365d (cost drift — forgotten long-lived manual snapshot).
   - **State bucket**: Warning.
   - **How obtained**: compute `now() - DBClusterSnapshot.SnapshotCreateTime` on the list response; gate on `SnapshotType == "manual"`.
@@ -129,6 +133,7 @@ One row per signal from §3:
 |---|---|---|---|---|---|---|
 | `Status == creating` | 1 | Warning | n/a | S2, S4 | `creating` | — |
 | `Status == failed` | 1 | Broken | n/a | S2, S4 | `failed` | — |
+| `Status` matches `incompatible-*` | 1 | Broken | n/a | S2, S4 | `incompatible-restore` (keyword verbatim) | — |
 | manual age > 365d | 1 | Warning | n/a | S2, S4 | `manual, unused 400d` | — |
 | orphan: source cluster deleted | 1 (cross-ref) | Warning | n/a | S1, S2, S4, S5 | `orphan: source cluster deleted` | `orphan: source cluster deleted` + Source Cluster row |
 | automated age > parent `BackupRetentionPeriod` | 1 (cross-ref) | Warning | n/a | S1, S2, S4, S5 | `automated, <N>d past retention` | `automated, <N>d past retention` + Source Cluster / Retention / Created rows |

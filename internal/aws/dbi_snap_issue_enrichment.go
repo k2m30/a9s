@@ -59,8 +59,8 @@ var enrichDBISnapCrossRef = EnrichSnapshotCrossRef(SnapshotCrossRefConfig{
 		}
 		return *db.BackupRetentionPeriod, true
 	},
-	OrphanPhrase:     "orphan: source DB deleted",
-	OrphanRowLabel:   "Source DB",
+	OrphanPhrase:   "orphan: source DB deleted",
+	ParentRowLabel: "Source DB",
 	RetentionPhrase:  func(d int) string { return fmt.Sprintf("automated, %dd past retention", d) },
 	RetentionEnabled: true,
 })

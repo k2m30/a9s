@@ -55,15 +55,11 @@ func TestComputeMergedStatus_MultiPhraseSuffix(t *testing.T) {
 			newPhrases: []string{"orphan: source DB deleted"},
 			want:       "orphan: source DB deleted",
 		},
-		// Fetcher-emits-raw-AWS-state case: dbc-snap sets Status="available"
-		// directly (no §4 phrase computed), Issues empty. Cross-ref enricher
-		// adds an orphan phrase — should override the raw "available".
 		{
-			name:           "raw_status_no_issues_overridden_by_new_phrase",
-			existingStatus: "available",
-			existingIssues: nil,
-			newPhrases:     []string{"orphan: source cluster deleted"},
-			want:           "orphan: source cluster deleted",
+			name:           "fetcher_emits_phrase_keeps_phrase",
+			existingStatus: "failed",
+			existingIssues: []string{"failed"},
+			want:           "failed",
 		},
 		{
 			name:           "single_existing_no_new",
@@ -110,6 +106,43 @@ func TestComputeMergedStatus_MultiPhraseSuffix(t *testing.T) {
 			existingIssues: []string{"unencrypted", "another-fetcher-phrase"},
 			newPhrases:     []string{"orphan: source DB deleted", "another-cross-ref"},
 			want:           "unencrypted (+3)",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := computeMergedStatus(tc.existingStatus, tc.existingIssues, tc.newPhrases)
+			if got != tc.want {
+				t.Errorf("computeMergedStatus(%q, %v, %v)\n  got:  %q\n  want: %q",
+					tc.existingStatus, tc.existingIssues, tc.newPhrases, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestComputeMergedStatus_FetcherFailedPlusOrphanKeepsFailedTop pins the B1
+// regression: a fetcher-emitted Broken phrase ("failed") MUST survive cross-ref
+// enrichment. When the enricher adds a single orphan phrase, the output must be
+// "failed (+1)" — not "orphan: source cluster deleted" or any other reordering.
+//
+// This is the key correctness contract for WarnDBCSnapFailedAndManualOldID:
+// the fetcher sets Status="failed" (Broken), the enricher adds "orphan:
+// source cluster deleted", and the merged status must preserve the Broken
+// phrase as the top with the orphan stacked as +1.
+func TestComputeMergedStatus_MultiPhraseSuffix_FetcherFailedPlusOrphan(t *testing.T) {
+	cases := []struct {
+		name           string
+		existingStatus string
+		existingIssues []string
+		newPhrases     []string
+		want           string
+	}{
+		{
+			name:           "fetcher_failed_plus_orphan_keeps_failed_top",
+			existingStatus: "failed",
+			existingIssues: []string{"failed"},
+			newPhrases:     []string{"orphan: source cluster deleted"},
+			want:           "failed (+1)",
 		},
 	}
 
