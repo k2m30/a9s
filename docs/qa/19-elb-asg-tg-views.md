@@ -24,9 +24,11 @@ All stories are written from a black-box perspective against the design spec and
 | A.1.4 | The API responds with an error (e.g., target group deleted while viewing, expired credentials). | The spinner disappears. A red error flash message appears in the header right side. The frame content area shows an appropriate empty or error state. |
 
 **AWS comparison:**
+
 ```
 aws elbv2 describe-target-health --target-group-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/api-prod-tg/abc123
 ```
+
 Expected fields visible: Target ID, Port, AZ, Health, Reason, Description
 
 ### A.2 Empty State (Zero Registered Targets)
@@ -38,9 +40,11 @@ Expected fields visible: Target ID, Port, AZ, Health, Reason, Description
 | A.2.3 | The target group was just created and has not had any targets registered. | Same behavior as A.2.1 -- the empty state is gracefully handled with a meaningful message. |
 
 **AWS comparison:**
+
 ```
 aws elbv2 describe-target-health --target-group-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/empty-tg/abc123
 ```
+
 Returns `{ "TargetHealthDescriptions": [] }`
 
 ### A.3 Column Layout
@@ -54,6 +58,7 @@ Returns `{ "TargetHealthDescriptions": [] }`
 | A.3.5 | The Description column is visible (scrolled right with `l` key). | The Description column shows the full human-readable text from the API (e.g., "Health checks failed"). Long descriptions are truncated to the 36-character column width. |
 
 **AWS comparison:**
+
 ```
 aws elbv2 describe-target-health --target-group-arn ARN --query 'TargetHealthDescriptions[].{TargetId:Target.Id,Port:Target.Port,AZ:Target.AvailabilityZone,Health:TargetHealth.State,Reason:TargetHealth.Reason,Desc:TargetHealth.Description}'
 ```
@@ -81,6 +86,7 @@ aws elbv2 describe-target-health --target-group-arn ARN --query 'TargetHealthDes
 | A.5.9 | Targets have mixed health states: 2 healthy, 1 unhealthy, 1 draining. | Rows display in mixed colors: two GREEN, one RED, one YELLOW. The selected row always shows blue regardless of its health state. |
 
 **AWS comparison:**
+
 ```
 aws elbv2 describe-target-health --target-group-arn ARN --query 'TargetHealthDescriptions[].TargetHealth.State'
 ```
@@ -96,11 +102,14 @@ aws elbv2 describe-target-health --target-group-arn ARN --query 'TargetHealthDes
 | A.6.5 | I press `c` on an IP-type target. | The IP address (e.g., "10.0.1.47") is copied to the clipboard. |
 
 **AWS comparison (instance-type):**
+
 ```
 aws elbv2 describe-target-health --target-group-arn ARN
 # Returns Target.Id like "i-0a1b2c3d4e5f67890"
 ```
+
 **AWS comparison (IP-type):**
+
 ```
 aws elbv2 describe-target-health --target-group-arn ARN
 # Returns Target.Id like "10.0.1.47"
@@ -167,9 +176,11 @@ aws elbv2 describe-target-health --target-group-arn ARN
 | A.13.3 | I press Escape on the detail view. | I return to the target health list. The cursor position is preserved. |
 
 **AWS comparison:**
+
 ```
 aws elbv2 describe-target-health --target-group-arn ARN --targets Id=i-0a1b2c3d4e5f67890,Port=8080
 ```
+
 Expected detail fields: Target.Id, Target.Port, Target.AvailabilityZone, TargetHealth.State, TargetHealth.Reason, TargetHealth.Description, HealthCheckPort, AnomalyDetection
 
 ### A.14 YAML View (y)
@@ -232,9 +243,11 @@ Expected detail fields: Target.Id, Target.Port, Target.AvailabilityZone, TargetH
 | B.1.4 | The API responds with an error (e.g., ASG deleted, expired credentials). | The spinner disappears. A red error flash message appears in the header right side. |
 
 **AWS comparison:**
+
 ```
 aws autoscaling describe-scaling-activities --auto-scaling-group-name api-prod-asg
 ```
+
 Expected fields visible: Start Time, Status, Description, Cause
 
 ### B.2 Empty State (No Scaling Activities)
@@ -245,9 +258,11 @@ Expected fields visible: Start Time, Status, Description, Cause
 | B.2.2 | I press ctrl+r on the empty state. | The loading spinner appears again while the refresh request is in flight. |
 
 **AWS comparison:**
+
 ```
 aws autoscaling describe-scaling-activities --auto-scaling-group-name new-asg
 ```
+
 Returns `{ "Activities": [] }`
 
 ### B.3 Column Layout
@@ -261,6 +276,7 @@ Returns `{ "Activities": [] }`
 | B.3.5 | I scroll right with `l` to reveal the Cause column. | The Cause column shows the reason for the scaling activity (e.g., "At 2026-03-22T03:15:00Z an alarm triggered..."). Column headers scroll in sync with data. |
 
 **AWS comparison:**
+
 ```
 aws autoscaling describe-scaling-activities --auto-scaling-group-name asg-name --query 'Activities[].{StartTime:StartTime,Status:StatusCode,Description:Description,Cause:Cause}'
 ```
@@ -291,6 +307,7 @@ aws autoscaling describe-scaling-activities --auto-scaling-group-name asg-name -
 | B.5.12 | I select a row. | The selected row has full-width blue background (#7aa2f7), dark foreground (#1a1b26), bold text. Status coloring is overridden by the selection style. |
 
 **AWS comparison:**
+
 ```
 aws autoscaling describe-scaling-activities --auto-scaling-group-name asg-name --query 'Activities[].StatusCode'
 ```
@@ -312,9 +329,11 @@ aws autoscaling describe-scaling-activities --auto-scaling-group-name asg-name -
 | B.7.3 | I verify the detail fields match views.yaml asg_activities detail config. | The detail view shows: ActivityId, StartTime, EndTime, StatusCode, StatusMessage, Description, Cause, Details, Progress, AutoScalingGroupName, AutoScalingGroupARN, AutoScalingGroupState. |
 
 **AWS comparison:**
+
 ```
 aws autoscaling describe-scaling-activities --auto-scaling-group-name asg-name --query 'Activities[?StatusCode==`Failed`]'
 ```
+
 Expected detail fields: ActivityId, StartTime, EndTime, StatusCode, StatusMessage, Description, Cause, Details, Progress, AutoScalingGroupName, AutoScalingGroupARN, AutoScalingGroupState
 
 ### B.8 In-Progress Scaling Activity
@@ -440,9 +459,11 @@ Expected detail fields: ActivityId, StartTime, EndTime, StatusCode, StatusMessag
 | C.1.4 | The API responds with an error (e.g., load balancer deleted). | The spinner disappears. A red error flash message appears in the header right side. |
 
 **AWS comparison:**
+
 ```
 aws elbv2 describe-listeners --load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/api-prod-alb/abc123
 ```
+
 Expected fields visible: Port, Protocol, Action, Target, SSL Policy, Certificate
 
 ### C.2 Empty State
@@ -465,6 +486,7 @@ Expected fields visible: Port, Protocol, Action, Target, SSL Policy, Certificate
 | C.3.8 | The terminal is narrower than the combined column widths (8+10+16+32+24+32=122 plus borders). | The rightmost column(s) are hidden. Horizontal scroll with h/l is available. |
 
 **AWS comparison:**
+
 ```
 aws elbv2 describe-listeners --load-balancer-arn ARN --query 'Listeners[].{Port:Port,Protocol:Protocol,DefaultActions:DefaultActions[0].Type,SslPolicy:SslPolicy}'
 ```
@@ -496,10 +518,13 @@ aws elbv2 describe-listeners --load-balancer-arn ARN --query 'Listeners[].{Port:
 | C.6.4 | An NLB listener uses TCP protocol. | The Protocol column shows "TCP". The SSL Policy column shows empty/dash. The Certificate column shows empty/dash. |
 
 **AWS comparison (ALB):**
+
 ```
 aws elbv2 describe-listeners --load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/abc123
 ```
+
 **AWS comparison (NLB):**
+
 ```
 aws elbv2 describe-listeners --load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/net/my-nlb/abc123
 ```
@@ -512,6 +537,7 @@ aws elbv2 describe-listeners --load-balancer-arn arn:aws:elasticloadbalancing:us
 | C.7.2 | I press d on the HTTP redirect listener. | The detail view opens. DefaultActions shows the redirect configuration including protocol, port, host, path, query, and status code (301 or 302). |
 
 **AWS comparison:**
+
 ```
 aws elbv2 describe-listeners --load-balancer-arn ARN --query 'Listeners[?Port==`80`].DefaultActions'
 ```
@@ -531,6 +557,7 @@ aws elbv2 describe-listeners --load-balancer-arn ARN --query 'Listeners[?Port==`
 | C.9.2 | I press d on the listener with multiple certificates. | The detail view's Certificates field shows all certificates (default and additional), each with their ARN. |
 
 **AWS comparison:**
+
 ```
 aws elbv2 describe-listener-certificates --listener-arn ARN
 ```
@@ -543,6 +570,7 @@ aws elbv2 describe-listener-certificates --listener-arn ARN
 | C.10.2 | I press d to view the detail. | The DefaultActions section shows the FixedResponseConfig with StatusCode, ContentType, and MessageBody. |
 
 **AWS comparison:**
+
 ```
 aws elbv2 describe-listeners --load-balancer-arn ARN --query 'Listeners[?DefaultActions[0].Type==`fixed-response`]'
 ```
@@ -595,9 +623,11 @@ aws elbv2 describe-listeners --load-balancer-arn ARN --query 'Listeners[?Default
 | C.15.5 | I press Escape on the detail view. | I return to the listeners list. The cursor position is preserved. |
 
 **AWS comparison:**
+
 ```
 aws elbv2 describe-listeners --load-balancer-arn ARN --query 'Listeners[?Port==`443`]'
 ```
+
 Expected detail fields: ListenerArn, Port, Protocol, DefaultActions, SslPolicy, Certificates, AlpnPolicy, MutualAuthentication
 
 ### C.16 YAML View (y)
@@ -658,9 +688,11 @@ Expected detail fields: ListenerArn, Port, Protocol, DefaultActions, SslPolicy, 
 | D.1.3 | The API responds with an error. | The spinner disappears. A red error flash message appears in the header right side. |
 
 **AWS comparison:**
+
 ```
 aws elbv2 describe-rules --listener-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/api-prod-alb/abc123/def456
 ```
+
 Expected fields visible: Priority, Conditions, Action, Target
 
 ### D.2 Column Layout
@@ -674,6 +706,7 @@ Expected fields visible: Priority, Conditions, Action, Target
 | D.2.5 | I verify the Target column (computed field). | For forward actions, shows the target group name. For redirect actions, shows the redirect URL. For fixed-response, shows the status code and content type. |
 
 **AWS comparison:**
+
 ```
 aws elbv2 describe-rules --listener-arn ARN --query 'Rules[].{Priority:Priority,Conditions:Conditions,Actions:Actions[0].Type}'
 ```
@@ -724,9 +757,11 @@ aws elbv2 describe-rules --listener-arn ARN --query 'Rules[].{Priority:Priority,
 | D.8.5 | I select a rule and press c. | The conditions summary is copied to the clipboard (e.g., "path: /api/v1/*"). A "Copied!" flash appears. |
 
 **AWS comparison:**
+
 ```
 aws elbv2 describe-rules --listener-arn ARN --query 'Rules[?Priority!=`default`]'
 ```
+
 Expected detail fields: RuleArn, Priority, Conditions, Actions, IsDefault
 
 ### D.9 Filter

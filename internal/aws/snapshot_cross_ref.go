@@ -85,6 +85,12 @@ type SnapshotCrossRefConfig struct {
 	// rule fires; GetParentRetention/GetSnapshotType/GetCreatedAt/RetentionPhrase
 	// may be nil.
 	RetentionEnabled bool
+
+	// Severity is the severity tier emitted on every FindingRow and on the
+	// EnrichmentFinding.Severity for this enricher's output. "!" for the
+	// existing snapshot consumers (orphan + past-retention are operator-
+	// actionable). Future consumers may use "~" for informational signals.
+	Severity string
 }
 
 // EnrichSnapshotCrossRef returns an IssueEnricherFunc that applies the
@@ -96,6 +102,12 @@ type SnapshotCrossRefConfig struct {
 // fetcher-emitted value, never a previously-merged one).
 func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 	return func(_ context.Context, _ *ServiceClients, resources []resource.Resource, cache resource.ResourceCache) (IssueEnricherResult, error) {
+		// Default severity to "!" (operator-actionable) when callers omit the field.
+		severity := cfg.Severity
+		if severity == "" {
+			severity = "!"
+		}
+
 		result := IssueEnricherResult{
 			Findings:     make(map[string]resource.EnrichmentFinding),
 			TruncatedIDs: make(map[string]bool),
@@ -138,7 +150,7 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 				rows = append(rows, resource.FindingRow{
 					Label: cfg.ParentRowLabel,
 					Value: parentID + " (not in loaded list)",
-					Tier:  "!",
+					Tier:  severity,
 				})
 			case cfg.RetentionEnabled:
 				// Past-retention rule: only for "automated" snapshots whose
@@ -162,17 +174,17 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 				rows = append(rows, resource.FindingRow{
 					Label: cfg.ParentRowLabel,
 					Value: parentID,
-					Tier:  "!",
+					Tier:  severity,
 				})
 				rows = append(rows, resource.FindingRow{
 					Label: "Retention",
 					Value: fmt.Sprintf("%d days", retention),
-					Tier:  "!",
+					Tier:  severity,
 				})
 				rows = append(rows, resource.FindingRow{
 					Label: "Created",
 					Value: createdAt.Format("2006-01-02"),
-					Tier:  "!",
+					Tier:  severity,
 				})
 			default:
 				// Parent found but retention rule disabled — nothing to emit.
@@ -192,7 +204,7 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 
 			// Findings emits the entries for the detail-view Attention section.
 			result.Findings[res.ID] = resource.EnrichmentFinding{
-				Severity: "!",
+				Severity: severity,
 				Summary:  newPhrases[0],
 				Rows:     rows,
 			}

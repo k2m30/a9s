@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `ecr`
 - **Display name**: ECR Repositories
-- **AWS API reference**: https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_Repository.html
+- **AWS API reference**: <https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_Repository.html>
 - **List API**: `DescribeRepositories` (returns `Repository` objects with `RepositoryName`, `RepositoryArn`, `RepositoryUri`, `RegistryId`, `CreatedAt`, `ImageTagMutability`, `ImageScanningConfiguration`, `EncryptionConfiguration` — no runtime state field; a repo is always "available" once created).
 - **Describe API (if any)**: `DescribeImages` (per repository, used in Wave 2 to fetch the latest image and read its `imageScanFindingsSummary`).
 
@@ -160,12 +160,12 @@ One bullet per claim in §§2–4.1.
 - List API `DescribeRepositories` and Repository shape — `AWS SDK Go v2 — ecr/types.Repository § RepositoryName, RepositoryArn, RepositoryUri, EncryptionConfiguration, ImageScanningConfiguration`.
 - Wave 2 API `DescribeImages` — `docs/attention-signals.md` §CI/CD, `ecr` row Wave 2 cell.
 - `cb` related target — `docs/related-resources.md` §`ecr` — "CodeBuild projects that push images."
-- `cb` discovery via `Environment.Image` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Project environment image URI is the cheapest deterministic link; `buildspec` scanning needs artifact reads and is out of scope.`
+- `cb` discovery via `Environment.Image` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Project environment image URI is the cheapest deterministic link;`buildspec`scanning needs artifact reads and is out of scope.`
 - `cfn` related target — `docs/related-resources.md` §`ecr` — "CloudFormation stack that created the repo."
-- `cfn` discovery via tag — `a9s-devops (2026-04-20): possible=yes, worth=yes. The `aws:cloudformation:stack-name` tag is the canonical CFN-managed marker; requires `ecr:ListTagsForResource` per repo.`
+- `cfn` discovery via tag — `a9s-devops (2026-04-20): possible=yes, worth=yes. The`aws:cloudformation:stack-name` tag is the canonical CFN-managed marker; requires `ecr:ListTagsForResource`per repo.`
 - `ct-events` universal pivot — `docs/related-resources.md` §Policy #4.
 - `eb-rule` related target — `docs/related-resources.md` §`ecr` — "Image-scan EventBridge events."
-- `eb-rule` discovery via `aws.ecr` event pattern — `a9s-devops (2026-04-20): possible=yes, worth=yes. Event source `aws.ecr` (Image Scan / Image Action) with repository-name filter is the definitive reverse-scan link.`
+- `eb-rule` discovery via `aws.ecr` event pattern — `a9s-devops (2026-04-20): possible=yes, worth=yes. Event source`aws.ecr`(Image Scan / Image Action) with repository-name filter is the definitive reverse-scan link.`
 - `ecs-task` related target — `docs/related-resources.md` §`ecr` — "Task defs pull from repo."
 - `ecs-task` discovery via `ContainerDefinitions[].Image` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Image URI on container definition is the central "who runs this image?" pivot.`
 - `kms` related target and field — `docs/related-resources.md` §`ecr` — "EncryptionConfiguration.KmsKey."
@@ -173,7 +173,7 @@ One bullet per claim in §§2–4.1.
 - `lambda` related target — `docs/related-resources.md` §`ecr` — "Lambda functions using container image from this repo."
 - `lambda` discovery via `Code.ImageUri` with `PackageType==Image` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Container-image Lambda pointer is on FunctionConfiguration; skip zip-packaged functions.`
 - `pipeline` related target — `docs/related-resources.md` §`ecr` — "Pipelines pushing to this repo."
-- `pipeline` discovery via `ActionTypeId.Provider==ECR` — `a9s-devops (2026-04-20): possible=yes, worth=yes. ECR source-provider action is the only first-class pipeline→ECR linkage; push-via-CodeBuild is covered by the `cb` pivot.`
+- `pipeline` discovery via `ActionTypeId.Provider==ECR` — `a9s-devops (2026-04-20): possible=yes, worth=yes. ECR source-provider action is the only first-class pipeline→ECR linkage; push-via-CodeBuild is covered by the`cb`pivot.`
 - `role` related target — `docs/related-resources.md` §`ecr` — "Pull/push IAM roles."
 - `role` discovery via `GetRepositoryPolicy` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Repository policy is the authoritative per-repo principal source; walking the role cache with per-role calls is Wave 3.`
 - Wave 1 signal `scanOnPush==false` — `docs/attention-signals.md` §CI/CD, `ecr` row Wave 1 cell.

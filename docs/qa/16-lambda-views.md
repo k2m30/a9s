@@ -23,11 +23,13 @@ AWS CLI equivalents are cited so testers can verify data parity.
 | A.1.6 | The Lambda function has no log group at all (newly created, never invoked). | The API returns an error (ResourceNotFoundException for the log group). A user-friendly message appears indicating no log group exists, rather than a raw API error. |
 
 **AWS comparison:**
+
 ```
 aws logs filter-log-events \
   --log-group-name /aws/lambda/my-function \
   --filter-pattern "REPORT RequestId"
 ```
+
 Expected fields visible: Timestamp, Request ID, Status, Duration, Memory, Cold Start
 
 ### A.2 Empty State
@@ -52,12 +54,14 @@ Expected fields visible: Timestamp, Request ID, Status, Duration, Memory, Cold S
 | A.3.9 | The terminal is narrower than the combined column widths (22+12+8+10+14+10=76 plus borders/padding). | The rightmost column(s) are hidden (not truncated mid-value). Horizontal scroll with h/l is available to reveal hidden columns. |
 
 **AWS comparison:**
+
 ```
 aws logs filter-log-events \
   --log-group-name /aws/lambda/my-function \
   --filter-pattern "REPORT RequestId" \
   --limit 25
 ```
+
 Parse each REPORT line: `REPORT RequestId: abc123  Duration: 2103.45 ms  Billed Duration: 2200 ms  Memory Size: 256 MB  Max Memory Used: 128 MB  Init Duration: 312.52 ms`
 
 ### A.4 Frame Title
@@ -134,12 +138,14 @@ Parse each REPORT line: `REPORT RequestId: abc123  Duration: 2103.45 ms  Billed 
 | A.10.5 | I press Escape on the detail view. | I return to the invocations list. The cursor position is preserved on the same invocation I had selected. |
 
 **AWS comparison:**
+
 ```
 aws logs filter-log-events \
   --log-group-name /aws/lambda/my-function \
   --filter-pattern "REPORT RequestId" \
   --limit 1
 ```
+
 Expected detail fields: request_id, timestamp, status, duration_ms, billed_duration_ms, memory_size_mb, memory_used_mb, init_duration_ms, xray_trace_id
 
 ### A.11 YAML Key (y)
@@ -211,6 +217,7 @@ Expected detail fields: request_id, timestamp, status, duration_ms, billed_durat
 | A.18.6 | A REPORT line does NOT contain an XRAY TraceId field. | The xray_trace_id detail field shows empty/null/dash. No error or crash occurs. |
 
 **AWS comparison:**
+
 ```
 # Get REPORT lines
 aws logs filter-log-events \
@@ -248,11 +255,13 @@ aws logs filter-log-events \
 | B.1.3 | The API responds with an error (e.g., AccessDenied). | The spinner disappears. A red error flash appears in the header. |
 
 **AWS comparison:**
+
 ```
 aws logs filter-log-events \
   --log-group-name /aws/lambda/my-function \
   --filter-pattern '"RequestId: a1b2c3d4-e5f6-7890-abcd-ef1234567890"'
 ```
+
 Expected fields visible: Timestamp, Message
 
 ### B.2 Empty State
@@ -332,11 +341,13 @@ Expected fields visible: Timestamp, Message
 | B.10.4 | I press Escape on the detail view. | I return to the log lines list. The cursor position is preserved on the same log line. |
 
 **AWS comparison:**
+
 ```
 aws logs filter-log-events \
   --log-group-name /aws/lambda/my-function \
   --filter-pattern '"RequestId: a1b2c3d4-e5f6-7890-abcd-ef1234567890"'
 ```
+
 Expected detail fields: Timestamp, IngestionTime, Message, EventId
 
 ### B.11 YAML Key (y)
@@ -400,6 +411,7 @@ Expected detail fields: Timestamp, IngestionTime, Message, EventId
 | C.1.3 | The download fails (e.g., network error, presigned URL expired). | The spinner disappears. A red error flash appears in the header. An appropriate error message is shown in the content area. |
 
 **AWS comparison:**
+
 ```
 aws lambda get-function --function-name my-function
 # Check Code.Location for presigned URL
@@ -461,6 +473,7 @@ aws lambda get-function --function-name my-function
 | C.6.6 | I press Escape. | I return to the previous view (Lambda list or invocations). |
 
 **AWS comparison:**
+
 ```
 aws lambda get-function --function-name my-container-function
 # Configuration.PackageType will be "Image"
@@ -480,6 +493,7 @@ aws lambda get-function --function-name my-container-function
 | C.7.7 | I press Escape. | I return to the previous view. |
 
 **AWS comparison:**
+
 ```
 aws lambda get-function --function-name my-large-function
 # Configuration.CodeSize shows bytes, compare to 5242880 (5 * 1024 * 1024)
@@ -524,7 +538,7 @@ aws lambda get-function --function-name my-large-function
 | ID | Story | Expected |
 |----|-------|----------|
 | C.11.1 | I press c while viewing source code with the cursor on line 42. | The text of line 42 is copied to the clipboard WITHOUT the line number prefix or pipe separator. Only the code text (including leading whitespace) is copied. A green "Copied!" flash appears. |
-| C.11.2 | I paste from clipboard. | The pasted text is `    raise ValueError(f"Invalid amount: {amount}")` (with leading whitespace preserved), not `42 | raise ValueError(...)`. |
+| C.11.2 | I paste from clipboard. | The pasted text is `raise ValueError(f"Invalid amount: {amount}")` (with leading whitespace preserved), not `42 | raise ValueError(...)`. |
 
 ### C.12 Caching and Re-download
 

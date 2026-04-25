@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `secrets`
 - **Display name**: Secrets Manager
-- **AWS API reference**: https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_SecretListEntry.html
+- **AWS API reference**: <https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_SecretListEntry.html>
 - **List API**: `ListSecrets`
 - **Describe API (if any)**: `DescribeSecret` (Wave 2 only — per-secret, to inspect `VersionIdsToStages` for stuck `AWSPENDING` versions)
 

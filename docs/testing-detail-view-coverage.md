@@ -70,20 +70,24 @@ An empty fixture set MUST fail (`t.Fatalf`), not skip. An empty set is a bug: ei
 For resource type **X**, build this matrix before writing any tests:
 
 ### 3.1 Case corpus
+
 Every wireframe case / demo fixture of X. One row per fixture. For ct-events this was 9 cases (A–I). For a simpler resource type it might be 1–3 cases.
 
 ### 3.2 Per-case navigable field inventory
+
 For each case, enumerate:
 - **Left-column navigable fields**: rows in the detail body where `IsNavigable == true` (Principal, Bucket, Object, Instance, Key, Role, User, etc.)
 - **Negative coverage**: fields that should NOT be navigable (e.g. Root principal, AWSService row)
 
 ### 3.3 Per-case expected related groups
+
 For each case, enumerate:
 - **Typed groups**: each entry in `RegisterRelated("X", ...)` with the expected `Count` for that specific event
 - **Pivot rows**: each entry with `Count: -1` and a `FetchFilter`
 - **Negative coverage**: groups expected to be `Count: 0` (visible but dim)
 
 ### 3.4 Expected target IDs
+
 For every navigable pair (case, field), the exact `TargetID` string that navigation will dispatch. This is the source of truth the test asserts against — no inference, no "whatever the current code produces."
 
 Example ct-events Case C:
@@ -145,33 +149,39 @@ Per `CLAUDE.md`: `go build -o a9s ./cmd/a9s/` after every production change. Oth
 For each resource type X being covered, dispatch atomic QA tasks in this order. Each is independent and parallel-safe unless noted.
 
 ### Pre-flight (architect reads these before dispatching)
+
 - [ ] Demo fixtures for X exist and render a usable detail view
 - [ ] `RegisterRelated("X", ...)` is called and the expected TypedGroup set is documented in a design doc
 - [ ] The expected pivot rows are documented
 - [ ] Every ID referenced in X's demo event payloads exists in the corresponding target type's fixture set (fixture alignment invariant — §2)
 
 ### Layer 1: Golden snapshots (one dispatch per case)
+
 - [ ] For each case, a `TestXDemoGolden_CaseK` function that loads the demo fixture, renders `View()` at a wide terminal (e.g. 180×40), strips ANSI, compares against a committed file under `tests/testdata/golden/x_demo_case_k.txt`
 - [ ] First run: `UPDATE_GOLDEN=1 go test` to seed, then commit the golden file
 - [ ] Golden files are inspected visually at commit time — don't rubber-stamp
 
 ### Layer 2: Section structure (one or two dispatches)
+
 - [ ] Section ordering: expected order per design doc (e.g. ACTOR → ACTION → TARGET → CONTEXT → ERROR → REQUEST → RESPONSE)
 - [ ] Conditional sections (e.g. ERROR only when error present) appear in the right position
 - [ ] Empty-section omission rule: sections with zero rows are dropped entirely
 - [ ] Drop-boring-defaults: specific rows that should never appear regardless of input
 
 ### Layer 3: Left-column navigation dispatch (one dispatch per case)
+
 - [ ] For every navigable field in every case: cursor walk + enter → captures a `RelatedNavigateMsg`
 - [ ] Assert exact `TargetType`, `TargetID`, `SourceType` — the matrix from §3.4 is the source of truth
 - [ ] Negative coverage: non-navigable rows (Root, Service, etc.) dispatch nil or a non-navigate message
 
 ### Layer 4: Navigation resolution (extend Layer 3 subtests)
+
 - [ ] For every navigable subtest, after capturing the dispatch, call `assertTargetResolves(t, nav)` which looks up `nav.TargetID` in `demo.GetResources(nav.TargetType)`
 - [ ] Empty fixture set is a hard fail, not skip
 - [ ] Failure message shows the expected TargetID + available fixture IDs
 
 ### Layer 5: End-to-end navigation follow-through
+
 - [ ] For each navigable pair, run the dispatched `tea.Cmd` through the root `Model.Update`
 - [ ] Assert the view stack has a new view pushed
 - [ ] Assert the new view is the expected type (resource list, detail, filtered list)
@@ -179,6 +189,7 @@ For each resource type X being covered, dispatch atomic QA tasks in this order. 
 - [ ] **Limitation**: if `Model` has all unexported fields and no `export_test.go` test helpers, this layer requires a refactor to extract a testable helper (e.g. `resource.ResolveNavigationTarget` was extracted during this session for this reason). Document the refactor as a separate dispatch.
 
 ### Layer 6: Right-column related groups
+
 - [ ] Registration test: `TestXRelatedGroups_AllTypedRegistered` asserts every expected TargetType from the design doc is in `GetRelated("X")`
 - [ ] Per-case count test: for each case, for each registered group, assert the expected count (many will be zero — that's fine, it's negative coverage)
 - [ ] Per-case dispatch test: cursor to each non-zero related row + enter → captures the correct `RelatedNavigateMsg`
@@ -190,35 +201,45 @@ For each resource type X being covered, dispatch atomic QA tasks in this order. 
 ## 6. Pitfalls (learned the hard way)
 
 ### 6.1 Stale gopls diagnostics
+
 The editor's LSP cache lags behind the actual file state during rapid agent iterations. 15+ times in this session a diagnostic said "undefined X" or "X imported not used" while `go build` was clean. **Always verify with `rtk go build` before acting on a diagnostic.** Never dispatch a "fix" based on a diagnostic alone.
 
 ### 6.2 ARN vs bare-name TargetID
+
 CloudTrail ARNs look like `arn:aws:sts::123:assumed-role/RoleName/session`. If the extractor stores the full ARN in `Row.Value` and the navigation dispatch uses `item.Value` as TargetID, navigation will never match because a9s's role registry keys by bare name.
 
 Fix pattern: add a separate `NavID` field to `Row` / `FieldItem` for the navigation identifier, keeping `Value` as the display string (per wireframe).
 
 ### 6.3 Child types vs top-level types
+
 `resource.FindResourceType(name)` only searches top-level types. Child types (e.g. `s3_objects`) registered via `RegisterChildType` are invisible to it. `handleRelatedNavigate` must fall back to `GetChildType` or use a unified `ResolveNavigationTarget` helper, otherwise pressing enter on a child-type related row produces "unknown resource type: s3_objects".
 
 ### 6.4 `fmt.Sprintf("%v", mapValue)` in a generic walk
+
 Go's default formatting of `map[string]any` produces `map[k1:v1 k2:v2]` — ugly, unstable, unfit for UI. Use explicit type switches in summarizers and render slices/maps with readable formatting (JSON-like compact form or one row per key).
 
 ### 6.5 `assertTargetResolves` is not the same as actual resolution
+
 Looking up `TargetID` in `demo.GetResources(TargetType)` is Layer 4 — it verifies the ID matches a fixture. It does NOT verify that `handleRelatedNavigate` actually pushes the right view (Layer 5). Both layers catch different bugs. Don't conflate them.
 
 ### 6.6 "Nothing changed" = you didn't rebuild the binary
+
 If the user runs `--demo` and says "nothing changed," 90% of the time it's because no one ran `go build -o a9s ./cmd/a9s/` after the last fix. Put the rebuild in the verification checklist of every coder dispatch.
 
 ### 6.7 Async agent file collisions
+
 Parallel agents editing the same file (e.g. 7 golden-test dispatches all appending to `ctdetail_demo_golden_test.go`) will collide on stale reads and silently drop each other's edits. If collisions are possible, serialize them or split into different files from the start.
 
 ### 6.8 Right-column checker counts in demo mode
+
 `RegisterRelatedDemo` overrides the production `Checker` with a demo-mode flat-return. If the override returns `Count=0` for every group regardless of event, the right column renders stubs forever. Each case needs a per-event switch in the demo checker to produce the right counts.
 
 ### 6.9 Design doc section references can be stale
+
 Design docs referencing "§7b.10 registers 14 typed groups" may not match the current code's 2 registered groups. When in doubt, grep the actual registrations and treat the doc as advisory until verified.
 
 ### 6.10 "Already covered by existing test" is a dangerous claim
+
 When QA scores a test as low because an existing test "already covers it," verify the overlap claim explicitly. This session had multiple cases where "already covered" meant "a different test touches the same function" — not actually the same contract. If your coverage judgment has been wrong recently, override the low score and write the duplicate test as cheap insurance.
 
 ---

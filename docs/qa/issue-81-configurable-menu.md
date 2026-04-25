@@ -18,9 +18,11 @@ Resource short names referenced below match `views.yaml` keys (e.g., `ec2`, `s3`
 | A.1.4 | `~/.a9s/config.yaml` has profiles defined but none match my current AWS profile, and no `default` section exists. I launch a9s. | The main menu shows all resource types (fall-through to show-all). |
 
 **AWS comparison:**
+
 ```
 aws configure list-profiles
 ```
+
 Expected: Full menu with all categories and resource types visible, same as launching without any config.yaml.
 
 ---
@@ -39,11 +41,13 @@ Expected: Full menu with all categories and resource types visible, same as laun
 | B.1.6 | Same config as B.1.4. I press `G` (jump to bottom). | Selection jumps to the last visible resource type (CloudWatch Alarms or whichever is last in the configured order). |
 
 **AWS comparison:**
+
 ```
 aws configure list-profiles
 # Verify the profile name matches
 echo $AWS_PROFILE
 ```
+
 Expected fields visible: Only the resource types listed in `include`. Category headings auto-adjust.
 
 ### B.2 Include with Command Mode
@@ -77,10 +81,12 @@ Expected fields visible: Only the resource types listed in `include`. Category h
 | C.1.5 | I navigate with `j`/`k` in the excluded menu. | Excluded resource types are not reachable. Navigation skips over them seamlessly. |
 
 **AWS comparison:**
+
 ```
 echo $AWS_PROFILE
 # sandbox -> show everything except ses, backup, codeartifact
 ```
+
 Expected: All resource types minus the excluded ones, with category headings auto-hiding when all resources in that category are excluded.
 
 ### C.2 Exclude All Resources in a Category
@@ -116,6 +122,7 @@ Expected: All resource types minus the excluded ones, with category headings aut
 | E.1.4 | Config has `default: menu: all`. I launch with any unmatched profile. | All resource types are shown (explicit `all`). |
 
 **AWS comparison:**
+
 ```
 echo $AWS_PROFILE
 # Verify which profile is active to determine which config block applies
@@ -141,6 +148,7 @@ echo $AWS_PROFILE
 | F.1.3 | I switch profiles at runtime using `:ctx`, selecting a profile that has a different menu config. | After the profile switch, the main menu updates to reflect the new profile's menu configuration. Resource types appear or disappear according to the newly selected profile's include/exclude rules. |
 
 **AWS comparison:**
+
 ```
 aws configure list-profiles
 aws sts get-caller-identity --profile staging
@@ -168,6 +176,7 @@ aws sts get-caller-identity --profile staging
 | G.1.4 | `.a9s/config.yaml` exists with `profiles: prod: menu: include: [rds]` and `~/.a9s/config.yaml` has `profiles: prod: menu: include: [ec2, s3]`. I launch with `AWS_PROFILE=prod`. | The menu shows only RDS (project-level profile config takes precedence). |
 
 **AWS comparison:**
+
 ```
 ls -la .a9s/config.yaml
 ls -la ~/.a9s/config.yaml
@@ -195,6 +204,7 @@ echo $AWS_PROFILE
 | H.1.4 | Config has `profiles: team: menu: categories: [CONTAINERS]`. I launch. | Only EKS Clusters and EKS Node Groups are shown. |
 
 **AWS comparison:**
+
 ```
 echo $AWS_PROFILE
 # Verify category membership against docs/design/resources-groupping.md

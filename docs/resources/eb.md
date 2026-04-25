@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `eb`
 - **Display name**: Elastic Beanstalk
-- **AWS API reference**: https://docs.aws.amazon.com/elasticbeanstalk/latest/api/API_EnvironmentDescription.html
+- **AWS API reference**: <https://docs.aws.amazon.com/elasticbeanstalk/latest/api/API_EnvironmentDescription.html>
 - **List API**: `DescribeEnvironments`
 - **Describe API (if any)**: `DescribeEnvironmentHealth` (Wave 2, per-environment); `DescribeEnvironmentResources` (related-target discovery for `elb` / `tg`); `DescribeConfigurationSettings` (related-target discovery for `role` / `sg`); `DescribeApplicationVersions` (related-target discovery for `s3`).
 

@@ -90,6 +90,7 @@ Source struct: `gluetypes.JobRun`
 ```
 
 Scrolled right to show DPU Hours column:
+
 ```
 │ ERROR MESSAGE                                      DPU HOURS  │
 │ —                                                  12.5       │

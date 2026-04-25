@@ -54,6 +54,7 @@ lambda_invocations:
 ```
 
 Note: This view is NOT backed by a single AWS SDK struct. It is parsed from CloudWatch Logs REPORT lines. Fields use `key:` (computed) rather than `path:` (struct field). Each REPORT line from `/aws/lambda/{FunctionName}` is parsed into these fields:
+
 ```
 REPORT RequestId: abc123  Duration: 2103.45 ms  Billed Duration: 2200 ms  Memory Size: 256 MB  Max Memory Used: 128 MB  Init Duration: 312.52 ms
 ```
@@ -369,7 +370,7 @@ Note: `d`, `y`, `/`, and `enter` are NOT active in the code view. The code view 
  42 │     raise ValueError(f"Invalid amount: {amount}")
 ```
 
-Then `c` copies: `    raise ValueError(f"Invalid amount: {amount}")` (with leading whitespace preserved, without line number or pipe).
+Then `c` copies: `raise ValueError(f"Invalid amount: {amount}")` (with leading whitespace preserved, without line number or pipe).
 
 Header flashes "Copied!" in green on successful copy.
 

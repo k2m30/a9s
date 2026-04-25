@@ -38,7 +38,7 @@ AWS CLI equivalent: `aws ec2 describe-instances` returning `.Reservations[].Inst
 
 | # | Story | Expected |
 |---|-------|----------|
-| A.3.1 | Header left shows app identity and AWS context | Left side reads: `a9s` (blue bold accent) + ` v0.x.x` (dim) + `  profile:region` (bold) |
+| A.3.1 | Header left shows app identity and AWS context | Left side reads: `a9s` (blue bold accent) + `v0.x.x` (dim) + `profile:region` (bold) |
 | A.3.2 | Header right shows help hint in normal mode | Right side reads `? for help` in dim gray (#565f89) |
 | A.3.3 | Header is a single unframed line above the frame | No border, no separator between header and frame top border |
 
@@ -300,8 +300,8 @@ AWS CLI equivalent: `aws ec2 describe-instances` returning `.Reservations[].Inst
 |---|-------|----------|
 | C.2.1 | YAML view shows the complete EC2 instance object | All fields from the `describe-instances` response for this instance are present, not just the 13 detail fields |
 | C.2.2 | Top-level keys are present | Keys like `InstanceId`, `InstanceType`, `State`, `ImageId`, `LaunchTime`, `BlockDeviceMappings`, `NetworkInterfaces`, `Tags`, `SecurityGroups`, `Placement`, etc. all appear |
-| C.2.3 | Nested objects render with proper YAML indentation | e.g. `State:` on one line, then `  Name: running` and `  Code: 16` indented below |
-| C.2.4 | Arrays render with YAML list syntax | e.g. `Tags:` followed by `- Key: Name` / `  Value: api-prod-01` entries using the `- ` prefix |
+| C.2.3 | Nested objects render with proper YAML indentation | e.g. `State:` on one line, then `Name: running` and `Code: 16` indented below |
+| C.2.4 | Arrays render with YAML list syntax | e.g. `Tags:` followed by `- Key: Name` / `Value: api-prod-01` entries using the `-` prefix |
 | C.2.5 | Content matches `aws ec2 describe-instances --instance-ids i-xxx --output yaml` | The YAML structure and field names correspond to the AWS CLI YAML output for the same instance |
 | C.2.6 | Deeply nested structures render correctly | Fields like `BlockDeviceMappings[].Ebs.VolumeId` or `NetworkInterfaces[].Attachment.AttachmentId` appear at the correct nesting depth |
 

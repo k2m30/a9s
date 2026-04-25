@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `dbi`
 - **Display name**: DB Instances
-- **AWS API reference**: https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBInstance.html
+- **AWS API reference**: <https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBInstance.html>
 - **List API**: `DescribeDBInstances`
 - **Describe API (if any)**: `DescribePendingMaintenanceActions` (one account-wide call) — used by Wave 2 to discover scheduled maintenance. No per-instance `Describe*` is required on top of the list API; `DescribeDBInstances` already returns the full `DBInstance` shape.
 
@@ -220,10 +220,10 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s golden doc — dbi Per-type contract row and AWS API URL — `docs/related-resources.md` § `Per-type contract` (dbi row) and § `dbi`.
 - a9s golden doc — dbi reasoning for each related target (`alarm`, `dbc`, `eni`, `kms`, `logs`, `dbi-snap`, `role`, `secrets`, `sg`, `subnet`, `vpc`, `ct-events`) — `docs/related-resources.md` § `dbi`.
 - a9s golden doc — Wave 1 / Wave 2 / Wave 3 signal cells — `docs/attention-signals.md` § Databases & Storage → `dbi` row.
-- AWS API Reference — `DBInstance.DBInstanceStatus`, `.BackupRetentionPeriod`, `.PubliclyAccessible`, `.StorageEncrypted`, `.DeletionProtection`, `.KmsKeyId`, `.VpcSecurityGroups[].VpcSecurityGroupId`, `.DBSubnetGroup.{VpcId,Subnets[].SubnetIdentifier}`, `.DBClusterIdentifier`, `.EnabledCloudwatchLogsExports[]`, `.MonitoringRoleArn`, `.AssociatedRoles[].RoleArn`, `.MasterUserSecret.SecretArn` — `AWS API Reference: API_DBInstance` (https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBInstance.html).
-- AWS API Reference — `DescribePendingMaintenanceActions` (account-wide) — (https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DescribePendingMaintenanceActions.html).
-- AWS API Reference — `DescribeDBSnapshots` with `DBInstanceIdentifier` filter — (https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DescribeDBSnapshots.html).
-- AWS API Reference — `LookupEvents` with `ResourceName` attribute for ct-events pivot — (https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_LookupEvents.html).
+- AWS API Reference — `DBInstance.DBInstanceStatus`, `.BackupRetentionPeriod`, `.PubliclyAccessible`, `.StorageEncrypted`, `.DeletionProtection`, `.KmsKeyId`, `.VpcSecurityGroups[].VpcSecurityGroupId`, `.DBSubnetGroup.{VpcId,Subnets[].SubnetIdentifier}`, `.DBClusterIdentifier`, `.EnabledCloudwatchLogsExports[]`, `.MonitoringRoleArn`, `.AssociatedRoles[].RoleArn`, `.MasterUserSecret.SecretArn` — `AWS API Reference: API_DBInstance` (<https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBInstance.html>).
+- AWS API Reference — `DescribePendingMaintenanceActions` (account-wide) — (<https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DescribePendingMaintenanceActions.html>).
+- AWS API Reference — `DescribeDBSnapshots` with `DBInstanceIdentifier` filter — (<https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DescribeDBSnapshots.html>).
+- AWS API Reference — `LookupEvents` with `ResourceName` attribute for ct-events pivot — (<https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_LookupEvents.html>).
 - Read-only invariant — `docs/architecture.md` § `What is a9s?`.
 - S1–S5 surface rules — skill `a9s-resource-spec` § `Allowed visualization surfaces (exactly five)`.
 - `alarm` discovery mechanism (sibling-list dimension scan) — a9s-devops (2026-04-20): possible=yes, worth=yes. `DescribeAlarms` is already cached from the alarm top-level list; filtering its `Dimensions[].Name=="DBInstanceIdentifier"` is cheaper and more accurate than calling alarm APIs per DB.

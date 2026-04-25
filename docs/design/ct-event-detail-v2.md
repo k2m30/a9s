@@ -53,7 +53,7 @@ those flows the user has not seen the row's severity color. The Event row
 is the natural single-anchor point.
 
 **Why only one row**: any more re-introduces the per-cell rainbow that
-#246 tore out. One colored cell in a 12-row body reads as accent, not
+PR #246 tore out. One colored cell in a 12-row body reads as accent, not
 chatter.
 
 Every other row in the body is neutral. The frame title is plain
@@ -189,12 +189,12 @@ rule.
 | `Region`         | `awsRegion`                             | Always (when present) |
 | `Source IP`      | `sourceIPAddress` — literal `AWS Internal` text when applicable | Always (when present) |
 | `VPC endpoint`   | `vpcEndpointId`                         | When present (NetworkActivity events; navigable to `vpce`) |
-| `Recipient`      | `recipientAccountId`, suffixed with ` (cross-account)` | Only when `accountId != recipientAccountId` |
+| `Recipient`      | `recipientAccountId`, suffixed with `(cross-account)` | Only when `accountId != recipientAccountId` |
 | `Time`           | `eventTime` in RFC3339 form `2026-04-07T14:02:11Z` | Always |
 
 **Cross-account rule**: the principal ARN already encodes the caller account,
 so the new `Recipient:` row surfaces the missing recipient half. This adapts
-#246's prefix logic (which prefixed the actor cell with the counterparty
+PR #246's prefix logic (which prefixed the actor cell with the counterparty
 account in the constrained list-view cell) to the detail view's row format.
 
 **No display-form timestamp**: forensics > scannability inside the detail

@@ -46,21 +46,25 @@ Dismissal: `esc` or any key (matches help screen behavior).
 ### 2.3 Header Format
 
 Current header:
+
 ```
  a9s v3.11.0  prod-admin:us-east-1                              ? for help
 ```
 
 New header with account context and role name:
+
 ```
  a9s v3.11.0  prod-admin:us-east-1 (acme-prod) admin-role       ? for help
 ```
 
 Fallback when no alias is available:
+
 ```
  a9s v3.11.0  prod-admin:us-east-1 (123456789012) admin-role    ? for help
 ```
 
 IAM user (no role):
+
 ```
  a9s v3.11.0  my-dev:us-east-1 (111222333444) deploy-bot@example.com  ? for help
 ```
@@ -97,6 +101,7 @@ the profile:region and the gap.
 ```
 
 Composition (pseudo-Go):
+
 ```go
 left  := accentStyle.Render("a9s") +
          dimStyle.Render(" v"+version) +
@@ -132,31 +137,37 @@ since the full info is available via `i`.
 ### 3.5 ASCII Wireframes -- Header Variants
 
 Assumed role (120 cols, alias available):
+
 ```
  a9s v3.11.0  prod-admin:us-east-1 (acme-prod) admin-role                                             ? for help
 ```
 
 Assumed role (120 cols, no alias):
+
 ```
  a9s v3.11.0  staging-admin:eu-west-1 (555666777888) AccountAccessRole                            ? for help
 ```
 
 IAM user (120 cols, no alias):
+
 ```
  a9s v3.11.0  my-dev:us-east-1 (111222333444) deploy-bot@example.com                                  ? for help
 ```
 
 Narrow terminal (70 cols, badge + role omitted):
+
 ```
  a9s v3.11.0  prod-admin:us-east-1                            ? for help
 ```
 
 Filter active (badge + role stay):
+
 ```
  a9s v3.11.0  prod-admin:us-east-1 (acme-prod) admin-role                                             /running█
 ```
 
 Flash message (badge + role stay):
+
 ```
  a9s v3.11.0  prod-admin:us-east-1 (acme-prod) admin-role                                             Copied!
 ```

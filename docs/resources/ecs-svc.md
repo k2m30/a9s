@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `ecs-svc`
 - **Display name**: ECS Services
-- **AWS API reference**: https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Service.html
+- **AWS API reference**: <https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Service.html>
 - **List API**: `DescribeServices` (invoked per cluster after `ListServices` returns ARNs; `ListServices` itself returns ARNs only — every field a9s renders on the list row comes from the `DescribeServices` response).
 - **Describe API (if any)**: Same `DescribeServices` output also carries Wave 2 fields (`deployments[].rolloutState`, `events[]`) — no additional per-service API call. a9s-devops-persona: ECS exposes service state only through `DescribeServices`, batched up to 10 service ARNs per call, so "list" and "describe" are the same wire call in practice.
 

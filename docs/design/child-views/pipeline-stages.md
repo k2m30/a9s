@@ -83,6 +83,7 @@ Source: `codepipeline:GetPipelineState` response (not a single SDK struct — it
 ```
 
 Real-world deployment stuck at approval:
+
 ```
 │ STAGE                STAGE STATUS   ACTION                   ACTION STATUS       │
 │ Source               Succeeded      GitHub                   Succeeded           │
@@ -94,6 +95,7 @@ Real-world deployment stuck at approval:
 ```
 
 Failed pipeline:
+
 ```
 │ STAGE                STAGE STATUS   ACTION                   ACTION STATUS       │
 │ Source               Succeeded      GitHub                   Succeeded           │

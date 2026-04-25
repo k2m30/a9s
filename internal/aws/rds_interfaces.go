@@ -11,6 +11,24 @@ type RDSDescribeDBInstancesAPI interface {
 	DescribeDBInstances(ctx context.Context, params *rds.DescribeDBInstancesInput, optFns ...func(*rds.Options)) (*rds.DescribeDBInstancesOutput, error)
 }
 
+// RDSDescribeDBClustersAPI defines the interface for the RDS DescribeDBClusters
+// operation. Used by the dbc fetcher to cover Aurora + Multi-AZ DB clusters
+// (see docs/resources/dbc.md §1 Coverage). Per AWS SDK docstring
+// (rds@v1.116.3/api_op_DescribeDBClusters.go:19-28), this returns Aurora +
+// Multi-AZ explicitly and may also return Neptune / DocumentDB rows.
+type RDSDescribeDBClustersAPI interface {
+	DescribeDBClusters(ctx context.Context, params *rds.DescribeDBClustersInput, optFns ...func(*rds.Options)) (*rds.DescribeDBClustersOutput, error)
+}
+
+// RDSDescribeDBClusterSnapshotsAPI defines the interface for the RDS
+// DescribeDBClusterSnapshots operation. Required because the docdb-side call
+// is DocDB-scoped — Aurora and Multi-AZ cluster snapshots only return through
+// this RDS-side operation per AWS SDK docstring
+// (rds@v1.116.3/api_op_DescribeDBClusterSnapshots.go:19-25).
+type RDSDescribeDBClusterSnapshotsAPI interface {
+	DescribeDBClusterSnapshots(ctx context.Context, params *rds.DescribeDBClusterSnapshotsInput, optFns ...func(*rds.Options)) (*rds.DescribeDBClusterSnapshotsOutput, error)
+}
+
 // RDSDescribeDBSubnetGroupsAPI defines the interface for the RDS
 // DescribeDBSubnetGroups operation. Used by dbi→eni path for VPC/subnet
 // resolution when the subnet group is needed.
@@ -41,4 +59,6 @@ type RDSAPI interface {
 	RDSDescribeEventsAPI
 	RDSDescribePendingMaintenanceAPI // Wave 2 enrichment
 	RDSDescribeDBSubnetGroupsAPI
+	RDSDescribeDBClustersAPI
+	RDSDescribeDBClusterSnapshotsAPI
 }

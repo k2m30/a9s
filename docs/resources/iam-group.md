@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `iam-group`
 - **Display name**: IAM Groups
-- **AWS API reference**: https://docs.aws.amazon.com/IAM/latest/APIReference/API_Group.html
+- **AWS API reference**: <https://docs.aws.amazon.com/IAM/latest/APIReference/API_Group.html>
 - **List API**: `ListGroups` — returns `Group` entries with `GroupName`, `GroupId`, `Arn`, `Path`, `CreateDate`. No attention-relevant runtime state is carried on the list response (this is what `attention-signals.md` calls "config-only").
 - **Describe API (if any)**: `GetGroup` — used in Wave 2 to read the `Users[]` membership list.
 

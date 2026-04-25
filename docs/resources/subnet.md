@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `subnet`
 - **Display name**: Subnets
-- **AWS API reference**: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Subnet.html
+- **AWS API reference**: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Subnet.html>
 - **List API**: `DescribeSubnets`
 - **Describe API (if any)**: not used — all Wave 1 signals derive from the list response
 

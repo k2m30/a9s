@@ -17,12 +17,69 @@ import (
 func init() {
 	resource.RegisterFieldKeys("dbc-snap", []string{"snapshot_id", "cluster_id", "status", "engine", "snapshot_type", "snapshot_create_time", "storage_type", "storage_encrypted"})
 
+	// dbc-snap fetcher merges results from two separate SDK calls:
+	//   c.DocDB.DescribeDBClusterSnapshots — DocumentDB cluster snapshots only
+	//     (docdb@v1.48.12/api_op_DescribeDBClusterSnapshots.go:14)
+	//   c.RDS.DescribeDBClusterSnapshots  — Aurora + Multi-AZ cluster snapshots
+	//     (rds@v1.116.3/api_op_DescribeDBClusterSnapshots.go:19-25)
+	// The two SDKs are NOT interchangeable — each scopes its response to its own
+	// engine family. Token format: "" or "docdb:<tok>" for DocDB pages, then
+	// "rds:" (sentinel) or "rds:<tok>" for RDS pages.
 	resource.RegisterPaginated("dbc-snap", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchDocDBClusterSnapshotsPage(ctx, c.DocDB, continuationToken)
+
+		// RDS phase: continuation already transitioned to RDS side.
+		if rdsTok, ok2 := strings.CutPrefix(continuationToken, "rds:"); ok2 {
+			result, err := FetchRDSDBClusterSnapshotsPage(ctx, c.RDS, rdsTok)
+			if err != nil {
+				return resource.FetchResult{}, err
+			}
+			if result.Pagination != nil && result.Pagination.IsTruncated {
+				result.Pagination.NextToken = "rds:" + result.Pagination.NextToken
+			}
+			return result, nil
+		}
+
+		// DocDB phase (continuationToken == "" or "docdb:<tok>").
+		docdbTok, _ := strings.CutPrefix(continuationToken, "docdb:")
+		docResult, err := FetchDocDBClusterSnapshotsPage(ctx, c.DocDB, docdbTok)
+		if err != nil {
+			return resource.FetchResult{}, err
+		}
+		if docResult.Pagination != nil && docResult.Pagination.IsTruncated {
+			// DocDB still has more pages — return with docdb: prefix.
+			docResult.Pagination.NextToken = "docdb:" + docResult.Pagination.NextToken
+			return docResult, nil
+		}
+
+		// DocDB exhausted — fetch RDS page 1 and append.
+		rdsResult, err := FetchRDSDBClusterSnapshotsPage(ctx, c.RDS, "")
+		if err != nil {
+			return resource.FetchResult{}, err
+		}
+		docResult.Resources = append(docResult.Resources, rdsResult.Resources...)
+		if rdsResult.Pagination != nil && rdsResult.Pagination.IsTruncated {
+			return resource.FetchResult{
+				Resources: docResult.Resources,
+				Pagination: &resource.PaginationMeta{
+					IsTruncated: true,
+					NextToken:   "rds:" + rdsResult.Pagination.NextToken,
+					PageSize:    len(docResult.Resources),
+					TotalHint:   -1,
+				},
+			}, nil
+		}
+		return resource.FetchResult{
+			Resources: docResult.Resources,
+			Pagination: &resource.PaginationMeta{
+				IsTruncated: false,
+				PageSize:    len(docResult.Resources),
+				TotalHint:   len(docResult.Resources),
+			},
+		}, nil
 	})
 
 	resource.RegisterRelated("dbc-snap", []resource.RelatedDef{
@@ -90,13 +147,9 @@ func ComputeDBCSnapStatusAndIssues(snap docdbtypes.DBClusterSnapshot) (string, [
 }
 
 // FetchDocDBClusterSnapshots calls the DocumentDB DescribeDBClusterSnapshots API and converts the
-// response into a slice of generic Resource structs.
-//
-// Backend note: both the docdb and rds SDK clients target rds.{region}.amazonaws.com.
-// DescribeDBClusterSnapshots is engine-agnostic at the backend; the SDK only chooses
-// the deserialization namespace. Aurora cluster snapshots therefore arrive here as
-// docdbtypes.DBClusterSnapshot shapes. No separate RDS-side fetcher is needed or
-// correct — adding one would duplicate results. Spec citation: docs/resources/dbc-snap.md §1.
+// response into a slice of generic Resource structs. This covers DocumentDB cluster
+// snapshots only (docdb@v1.48.12/api_op_DescribeDBClusterSnapshots.go:14).
+// Aurora + Multi-AZ snapshots are fetched separately via FetchRDSDBClusterSnapshotsPage.
 func FetchDocDBClusterSnapshots(ctx context.Context, api DocDBDescribeDBClusterSnapshotsAPI) ([]resource.Resource, error) {
 	var all []resource.Resource
 	token := ""

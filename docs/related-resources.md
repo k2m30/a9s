@@ -1,22 +1,22 @@
 # Related Resources — Golden Contract
 
 > ⚠️ **SINGLE SOURCE OF TRUTH — DO NOT EDIT AD-HOC**
-> 
+>
 > This document defines, for every registered a9s resource type, the AWS
 > resources that MUST appear in the detail-view RELATED panel (right column).
-> 
+>
 > The contract is anchored to:
 > - The **AWS API Reference** for each resource type (URL cited per section).
 > - **DevOps operational pivots** — resources an engineer reaches for during
 > incident response, audit, capacity review, or infra debugging.
-> 
+>
 > **How this document was built.** Six independent senior-DevOps audits ran
 > blind (no access to existing a9s code or tests), each producing a complete
 > expected-related-panel table from AWS API docs + operational knowledge.
 > Results were merged: every pivot listed by ≥1 of the 6 audits was included
 > unless manual AWS-API verification confirmed it was resource-local (e.g.
 > bucket policy, queue policy) or an otherwise niche path.
-> 
+>
 > **Drift has already happened once — don't let it happen again.** Features
 > previously registered were removed during refactors and never restored.
 > This doc is the backstop.
@@ -124,7 +124,7 @@ API field (preferred) or a concrete DevOps workflow.
 
 ### `acm`
 
-AWS API: https://docs.aws.amazon.com/acm/latest/APIReference/API_CertificateDetail.html
+AWS API: <https://docs.aws.amazon.com/acm/latest/APIReference/API_CertificateDetail.html>
 
 - **`apigw`** — API Gateway custom domains using this cert.
 - **`cf`** — CloudFront distributions using this cert.
@@ -134,7 +134,7 @@ AWS API: https://docs.aws.amazon.com/acm/latest/APIReference/API_CertificateDeta
 
 ### `alarm`
 
-AWS API: https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_MetricAlarm.html
+AWS API: <https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_MetricAlarm.html>
 
 - **`apigw`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`asg`** — MetricAlarm.AlarmActions pointing at ASG scaling policies.
@@ -154,7 +154,7 @@ AWS API: https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_Me
 
 ### `ami`
 
-AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Image.html
+AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Image.html>
 
 - **`asg`** — Mentioned by 3/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`cfn`** — AMIs often consumed by CloudFormation templates.
@@ -166,7 +166,7 @@ AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Image.html
 
 ### `apigw`
 
-AWS API: https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/apis.html
+AWS API: <https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/apis.html>
 
 - **`acm`** — Custom-domain TLS certificate.
 - **`alarm`** — Stage latency/error alarms.
@@ -185,7 +185,7 @@ AWS API: https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/apis.html
 
 ### `asg`
 
-AWS API: https://docs.aws.amazon.com/autoscaling/ec2/APIReference/API_AutoScalingGroup.html
+AWS API: <https://docs.aws.amazon.com/autoscaling/ec2/APIReference/API_AutoScalingGroup.html>
 
 - **`alarm`** — Alarms that trigger scaling policies.
 - **`ami`** — LaunchConfiguration.ImageId or LaunchTemplate.LaunchTemplateData.ImageId — AMI used by instances.
@@ -202,7 +202,7 @@ AWS API: https://docs.aws.amazon.com/autoscaling/ec2/APIReference/API_AutoScalin
 
 ### `athena`
 
-AWS API: https://docs.aws.amazon.com/athena/latest/APIReference/API_WorkGroup.html
+AWS API: <https://docs.aws.amazon.com/athena/latest/APIReference/API_WorkGroup.html>
 
 - **`ct-events`** — Audit trail for workgroup changes.
 - **`glue`** — Glue Data Catalog backing Athena.
@@ -213,7 +213,7 @@ AWS API: https://docs.aws.amazon.com/athena/latest/APIReference/API_WorkGroup.ht
 
 ### `backup`
 
-AWS API: https://docs.aws.amazon.com/aws-backup/latest/devguide/API_BackupPlan.html
+AWS API: <https://docs.aws.amazon.com/aws-backup/latest/devguide/API_BackupPlan.html>
 
 - **`ct-events`** — Audit trail for plan/selection/job events.
 - **`kms`** — Recovery-point encryption key.
@@ -222,7 +222,7 @@ AWS API: https://docs.aws.amazon.com/aws-backup/latest/devguide/API_BackupPlan.h
 
 ### `cb`
 
-AWS API: https://docs.aws.amazon.com/codebuild/latest/APIReference/API_Project.html
+AWS API: <https://docs.aws.amazon.com/codebuild/latest/APIReference/API_Project.html>
 
 - **`alarm`** — Build-failure alarms.
 - **`ct-events`** — Audit trail for build events.
@@ -240,7 +240,7 @@ AWS API: https://docs.aws.amazon.com/codebuild/latest/APIReference/API_Project.h
 
 ### `cf`
 
-AWS API: https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_Distribution.html
+AWS API: <https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_Distribution.html>
 
 - **`acm`** — Distribution.ViewerCertificate.AcmCertificateArn.
 - **`alarm`** — Distribution error-rate alarms.
@@ -254,7 +254,7 @@ AWS API: https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_Distribu
 
 ### `cfn`
 
-AWS API: https://docs.aws.amazon.com/AWSCloudFormation/latest/APIReference/API_Stack.html
+AWS API: <https://docs.aws.amazon.com/AWSCloudFormation/latest/APIReference/API_Stack.html>
 
 - **`cfn`** — Nested stacks.
 - **`ct-events`** — Audit trail for stack events.
@@ -265,14 +265,14 @@ AWS API: https://docs.aws.amazon.com/AWSCloudFormation/latest/APIReference/API_S
 
 ### `codeartifact`
 
-AWS API: https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_Repository.html
+AWS API: <https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_Repository.html>
 
 - **`ct-events`** — Audit trail for repo policy/package events.
 - **`kms`** — Domain `EncryptionKey` (resolved via `DescribeDomain` using the repo's `DomainName` + `DomainOwner`); CodeArtifact encryption is a domain-level, not repository-level, property. <!-- amended by a9s-resource-spec during codeartifact gen: AWS SDK Go v2 shows EncryptionKey lives on DomainDescription/DomainSummary, not RepositoryDescription/RepositorySummary -->
 
 ### `ct-events`
 
-AWS API: https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_LookupEvents.html
+AWS API: <https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_LookupEvents.html>
 
 - **`iam-user`** — `userIdentity.userName` (Type=IAMUser) — events performed by this IAM user.
 - **`role`** — `userIdentity.sessionContext.sessionIssuer.arn` (Type=AssumedRole) — events performed under this role.
@@ -294,7 +294,7 @@ AWS API: https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_Looku
 
 ### `dbc`
 
-AWS API: https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBCluster.html
+AWS API: <https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBCluster.html>
 
 - **`alarm`** — Cluster CW alarms.
 - **`ct-events`** — Audit trail for cluster changes.
@@ -309,7 +309,7 @@ AWS API: https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBClus
 
 ### `dbi`
 
-AWS API: https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBInstance.html
+AWS API: <https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBInstance.html>
 
 - **`alarm`** — CloudWatch alarms on CPU/Storage/Connections.
 - **`ct-events`** — Audit trail for DB config / modifyDBInstance.
@@ -326,7 +326,7 @@ AWS API: https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBInstanc
 
 ### `ddb`
 
-AWS API: https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_TableDescription.html
+AWS API: <https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_TableDescription.html>
 
 - **`alarm`** — Throttle/error/ReadCapacity alarms.
 - **`backup`** — AWS Backup recovery points.
@@ -339,7 +339,7 @@ AWS API: https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_Tabl
 
 ### `dbc-snap`
 
-AWS API: https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBClusterSnapshot.html
+AWS API: <https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBClusterSnapshot.html>
 
 - **`backup`** — Snapshots covered by Backup vaults.
 - **`ct-events`** — Audit trail for snapshot events.
@@ -349,7 +349,7 @@ AWS API: https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBClus
 
 ### `eb`
 
-AWS API: https://docs.aws.amazon.com/elasticbeanstalk/latest/api/API_EnvironmentDescription.html
+AWS API: <https://docs.aws.amazon.com/elasticbeanstalk/latest/api/API_EnvironmentDescription.html>
 
 - **`alarm`** — Health alarms.
 - **`asg`** — Environment's backing ASG (elasticbeanstalk:environment-name tag on ASG).
@@ -365,7 +365,7 @@ AWS API: https://docs.aws.amazon.com/elasticbeanstalk/latest/api/API_Environment
 
 ### `eb-rule`
 
-AWS API: https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_Rule.html
+AWS API: <https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_Rule.html>
 
 - **`ct-events`** — Audit trail for rule changes.
 - **`kinesis`** — Rule → Kinesis target.
@@ -378,7 +378,7 @@ AWS API: https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_Rule.ht
 
 ### `ebs`
 
-AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Volume.html
+AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Volume.html>
 
 - **`alarm`** — Volume CW alarms (throughput/IOPS).
 - **`backup`** — Volumes covered by AWS Backup.
@@ -390,7 +390,7 @@ AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Volume.html
 
 ### `ebs-snap`
 
-AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Snapshot.html
+AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Snapshot.html>
 
 - **`ami`** — AMIs derived from this snapshot.
 - **`backup`** — Snapshots covered by AWS Backup.
@@ -401,7 +401,7 @@ AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Snapshot.htm
 
 ### `ec2`
 
-AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Instance.html
+AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Instance.html>
 
 - **`alarm`** — CloudWatch alarms watching this instance — first signal of impact.
 - **`ami`** — Instance.ImageId — provenance of the running image; compare against latest approved AMI.
@@ -425,7 +425,7 @@ AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Instance.htm
 
 ### `ecr`
 
-AWS API: https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_Repository.html
+AWS API: <https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_Repository.html>
 
 - **`cb`** — CodeBuild projects that push images.
 - **`cfn`** — CloudFormation stack that created the repo.
@@ -440,7 +440,7 @@ AWS API: https://docs.aws.amazon.com/AmazonECR/latest/APIReference/API_Repositor
 
 ### `ecs`
 
-AWS API: https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Cluster.html
+AWS API: <https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Cluster.html>
 
 - **`alarm`** — Cluster-level alarms on resource utilization.
 - **`asg`** — Container-instance ASG.
@@ -454,7 +454,7 @@ AWS API: https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Cluster.h
 
 ### `ecs-svc`
 
-AWS API: https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Service.html
+AWS API: <https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Service.html>
 
 - **`alarm`** — Service alarms (CPU/Memory/PendingTasks).
 - **`cfn`** — CloudFormation stack that created the service.
@@ -475,7 +475,7 @@ AWS API: https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Service.h
 
 ### `ecs-task`
 
-AWS API: https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Task.html
+AWS API: <https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Task.html>
 
 - **`alarm`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`ct-events`** — Audit trail for task start/stop events.
@@ -493,7 +493,7 @@ AWS API: https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Task.html
 
 ### `efs`
 
-AWS API: https://docs.aws.amazon.com/efs/latest/ug/API_FileSystemDescription.html
+AWS API: <https://docs.aws.amazon.com/efs/latest/ug/API_FileSystemDescription.html>
 
 - **`alarm`** — BurstCreditBalance / PercentIOLimit alarms.
 - **`backup`** — AWS Backup recovery points.
@@ -515,7 +515,7 @@ sg pivots, which remain registered. -->
 
 ### `eip`
 
-AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Address.html
+AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Address.html>
 
 - **`alarm`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`asg`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
@@ -531,7 +531,7 @@ AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Address.html
 
 ### `eks`
 
-AWS API: https://docs.aws.amazon.com/eks/latest/APIReference/API_Cluster.html
+AWS API: <https://docs.aws.amazon.com/eks/latest/APIReference/API_Cluster.html>
 
 - **`alarm`** — CloudWatch alarms on cluster/control-plane metrics.
 - **`ami`** — AMIs applied to worker nodes.
@@ -549,7 +549,7 @@ AWS API: https://docs.aws.amazon.com/eks/latest/APIReference/API_Cluster.html
 
 ### `elb`
 
-AWS API: https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_LoadBalancer.html
+AWS API: <https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_LoadBalancer.html>
 
 - **`acm`** — HTTPS listener certificate.
 - **`alarm`** — CloudWatch alarms on LB metrics (4xx/5xx/latency).
@@ -567,7 +567,7 @@ AWS API: https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/AP
 
 ### `eni`
 
-AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NetworkInterface.html
+AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NetworkInterface.html>
 
 - **`ct-events`** — Audit trail for ENI attach/detach.
 - **`ec2`** — Attached instance (if any).
@@ -582,7 +582,7 @@ AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NetworkInter
 
 ### `glue`
 
-AWS API: https://docs.aws.amazon.com/glue/latest/webapi/API_Job.html
+AWS API: <https://docs.aws.amazon.com/glue/latest/webapi/API_Job.html>
 
 - **`alarm`** — Job-run failure alarms.
 - **`athena`** — Athena queries Glue Catalog.
@@ -596,7 +596,7 @@ AWS API: https://docs.aws.amazon.com/glue/latest/webapi/API_Job.html
 
 ### `iam-group`
 
-AWS API: https://docs.aws.amazon.com/IAM/latest/APIReference/API_Group.html
+AWS API: <https://docs.aws.amazon.com/IAM/latest/APIReference/API_Group.html>
 
 - **`ct-events`** — Audit trail for group membership changes.
 - **`iam-user`** — Members of this group.
@@ -604,7 +604,7 @@ AWS API: https://docs.aws.amazon.com/IAM/latest/APIReference/API_Group.html
 
 ### `iam-user`
 
-AWS API: https://docs.aws.amazon.com/IAM/latest/APIReference/API_User.html
+AWS API: <https://docs.aws.amazon.com/IAM/latest/APIReference/API_User.html>
 
 - **`ct-events`** — Audit trail for user actions and credential changes.
 - **`iam-group`** — Groups the user belongs to.
@@ -612,7 +612,7 @@ AWS API: https://docs.aws.amazon.com/IAM/latest/APIReference/API_User.html
 
 ### `igw`
 
-AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_InternetGateway.html
+AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_InternetGateway.html>
 
 - **`ct-events`** — Audit trail for attach/detach events.
 - **`rtb`** — Route tables with 0.0.0.0/0 → igw default routes.
@@ -620,7 +620,7 @@ AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_InternetGate
 
 ### `kinesis`
 
-AWS API: https://docs.aws.amazon.com/kinesis/latest/APIReference/API_StreamDescription.html
+AWS API: <https://docs.aws.amazon.com/kinesis/latest/APIReference/API_StreamDescription.html>
 
 - **`alarm`** — IteratorAge / IncomingRecords alarms.
 - **`cfn`** — CloudFormation stack that created the stream.
@@ -631,7 +631,7 @@ AWS API: https://docs.aws.amazon.com/kinesis/latest/APIReference/API_StreamDescr
 
 ### `kms`
 
-AWS API: https://docs.aws.amazon.com/kms/latest/APIReference/API_KeyMetadata.html
+AWS API: <https://docs.aws.amazon.com/kms/latest/APIReference/API_KeyMetadata.html>
 
 - **`ct-events`** — Audit trail for key usage (Encrypt/Decrypt calls).
 - **`dbi`** — RDS instances using this key.
@@ -642,7 +642,7 @@ AWS API: https://docs.aws.amazon.com/kms/latest/APIReference/API_KeyMetadata.htm
 
 ### `lambda`
 
-AWS API: https://docs.aws.amazon.com/lambda/latest/api/API_FunctionConfiguration.html
+AWS API: <https://docs.aws.amazon.com/lambda/latest/api/API_FunctionConfiguration.html>
 
 - **`alarm`** — Errors/Throttles/Duration alarms watching the function.
 - **`apigw`** — API Gateway integrations.
@@ -672,7 +672,7 @@ AWS API: https://docs.aws.amazon.com/lambda/latest/api/API_FunctionConfiguration
 
 ### `logs`
 
-AWS API: https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_LogGroup.html
+AWS API: <https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_LogGroup.html>
 
 - **`alarm`** — Metric-filter-driven alarms.
 - **`apigw`** — APIGW access logs.
@@ -685,7 +685,7 @@ AWS API: https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/AP
 
 ### `msk`
 
-AWS API: https://docs.aws.amazon.com/msk/1.0/apireference/v1-clusters.html
+AWS API: <https://docs.aws.amazon.com/msk/1.0/apireference/v1-clusters.html>
 
 - **`alarm`** — MSK broker CW alarms.
 - **`cfn`** — CloudFormation stack that created the cluster.
@@ -703,7 +703,7 @@ AWS API: https://docs.aws.amazon.com/msk/1.0/apireference/v1-clusters.html
 
 ### `nat`
 
-AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NatGateway.html
+AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NatGateway.html>
 
 - **`alarm`** — NAT bandwidth/error alarms.
 - **`ct-events`** — Audit trail for NAT changes.
@@ -715,7 +715,7 @@ AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_NatGateway.h
 
 ### `ng`
 
-AWS API: https://docs.aws.amazon.com/eks/latest/APIReference/API_Nodegroup.html
+AWS API: <https://docs.aws.amazon.com/eks/latest/APIReference/API_Nodegroup.html>
 
 - **`ami`** — Nodegroup LaunchTemplate ImageId via ec2:DescribeLaunchTemplateVersions.
 - **`asg`** — Nodegroup.Resources.AutoScalingGroups — backing ASG.
@@ -729,7 +729,7 @@ AWS API: https://docs.aws.amazon.com/eks/latest/APIReference/API_Nodegroup.html
 
 ### `opensearch`
 
-AWS API: https://docs.aws.amazon.com/opensearch-service/latest/APIReference/API_DomainStatus.html
+AWS API: <https://docs.aws.amazon.com/opensearch-service/latest/APIReference/API_DomainStatus.html>
 
 - **`acm`** — Custom endpoint TLS cert.
 - **`alarm`** — Cluster health alarms.
@@ -743,7 +743,7 @@ AWS API: https://docs.aws.amazon.com/opensearch-service/latest/APIReference/API_
 
 ### `pipeline`
 
-AWS API: https://docs.aws.amazon.com/codepipeline/latest/APIReference/API_PipelineDeclaration.html
+AWS API: <https://docs.aws.amazon.com/codepipeline/latest/APIReference/API_PipelineDeclaration.html>
 
 - **`cb`** — CodeBuild projects used as pipeline actions.
 - **`cfn`** — Deploy CFN action.
@@ -760,7 +760,7 @@ AWS API: https://docs.aws.amazon.com/codepipeline/latest/APIReference/API_Pipeli
 
 ### `policy`
 
-AWS API: https://docs.aws.amazon.com/IAM/latest/APIReference/API_Policy.html
+AWS API: <https://docs.aws.amazon.com/IAM/latest/APIReference/API_Policy.html>
 
 - **`ct-events`** — Audit trail for policy version / attach events.
 - **`iam-group`** — Groups with this policy attached.
@@ -769,7 +769,7 @@ AWS API: https://docs.aws.amazon.com/IAM/latest/APIReference/API_Policy.html
 
 ### `r53`
 
-AWS API: https://docs.aws.amazon.com/Route53/latest/APIReference/API_HostedZone.html
+AWS API: <https://docs.aws.amazon.com/Route53/latest/APIReference/API_HostedZone.html>
 
 - **`acm`** — DNS-validated certs reference this zone.
 - **`apigw`** — APIGW custom domain aliases.
@@ -782,7 +782,7 @@ AWS API: https://docs.aws.amazon.com/Route53/latest/APIReference/API_HostedZone.
 
 ### `dbi-snap`
 
-AWS API: https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBSnapshot.html
+AWS API: <https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBSnapshot.html>
 
 - **`backup`** — Snapshots covered by AWS Backup.
 - **`ct-events`** — Audit trail for snapshot create/restore/copy.
@@ -797,7 +797,7 @@ AWS API: https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBSnapsho
 
 ### `redis`
 
-AWS API: https://docs.aws.amazon.com/AmazonElastiCache/latest/APIReference/API_ReplicationGroup.html
+AWS API: <https://docs.aws.amazon.com/AmazonElastiCache/latest/APIReference/API_ReplicationGroup.html>
 
 - **`alarm`** — Replication-group CW alarms.
 - **`cfn`** — CloudFormation stack that created the group.
@@ -812,7 +812,7 @@ AWS API: https://docs.aws.amazon.com/AmazonElastiCache/latest/APIReference/API_R
 
 ### `redshift`
 
-AWS API: https://docs.aws.amazon.com/redshift/latest/APIReference/API_Cluster.html
+AWS API: <https://docs.aws.amazon.com/redshift/latest/APIReference/API_Cluster.html>
 
 - **`alarm`** — Cluster CW alarms (CPU/DiskSpaceUsed).
 - **`cfn`** — CloudFormation stack that created the cluster.
@@ -828,7 +828,7 @@ AWS API: https://docs.aws.amazon.com/redshift/latest/APIReference/API_Cluster.ht
 
 ### `role`
 
-AWS API: https://docs.aws.amazon.com/IAM/latest/APIReference/API_Role.html
+AWS API: <https://docs.aws.amazon.com/IAM/latest/APIReference/API_Role.html>
 
 - **`ct-events`** — Audit trail for role AssumeRole / policy attach events.
 - **`ec2`** — EC2 instances assuming this role via instance profile.
@@ -842,7 +842,7 @@ AWS API: https://docs.aws.amazon.com/IAM/latest/APIReference/API_Role.html
 
 ### `rtb`
 
-AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_RouteTable.html
+AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_RouteTable.html>
 
 - **`cfn`** — CloudFormation stack that created the route table.
 - **`ct-events`** — Audit trail for route changes.
@@ -856,7 +856,7 @@ AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_RouteTable.h
 
 ### `s3`
 
-AWS API: https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListBuckets.html
+AWS API: <https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListBuckets.html>
 
 - **`athena`** — Athena queries over S3 data.
 - **`backup`** — S3 covered by AWS Backup.
@@ -878,7 +878,7 @@ AWS API: https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListBuckets.html
 
 ### `secrets`
 
-AWS API: https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_SecretListEntry.html
+AWS API: <https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_SecretListEntry.html>
 
 - **`cb`** — Reverse-scan: CodeBuild Project.Environment.EnvironmentVariables where Type=SECRETS_MANAGER and Value==ARN or name prefix.
 - **`cfn`** — SecretListEntry.Tags["aws:cloudformation:stack-name"] matched against CFN stack cache.
@@ -895,7 +895,7 @@ AWS API: https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_Secr
 
 ### `ses`
 
-AWS API: https://docs.aws.amazon.com/ses/latest/APIReference-V2/API_IdentityInfo.html
+AWS API: <https://docs.aws.amazon.com/ses/latest/APIReference-V2/API_IdentityInfo.html>
 
 - **`ct-events`** — Audit trail for identity changes.
 - **`eb-rule`** — sesv2:GetEmailIdentity → ConfigurationSetName → sesv2:GetConfigurationSetEventDestinations → EventBridgeDestination.EventBusArn; extract bus name and cross-reference the eb-rule cache on `EventBusName`. Returns rule names (not bus ARNs) so drilling filters correctly.
@@ -906,7 +906,7 @@ AWS API: https://docs.aws.amazon.com/ses/latest/APIReference-V2/API_IdentityInfo
 
 ### `sfn`
 
-AWS API: https://docs.aws.amazon.com/step-functions/latest/apireference/API_StateMachineListItem.html
+AWS API: <https://docs.aws.amazon.com/step-functions/latest/apireference/API_StateMachineListItem.html>
 
 - **`alarm`** — Execution-failure alarms.
 - **`ct-events`** — Audit trail for state-machine changes.
@@ -918,7 +918,7 @@ AWS API: https://docs.aws.amazon.com/step-functions/latest/apireference/API_Stat
 
 ### `sg`
 
-AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_SecurityGroup.html
+AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_SecurityGroup.html>
 
 - **`cfn`** — CloudFormation stack that created the SG.
 - **`ct-events`** — Audit trail for rule changes.
@@ -931,7 +931,7 @@ AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_SecurityGrou
 
 ### `sns`
 
-AWS API: https://docs.aws.amazon.com/sns/latest/api/API_Topic.html
+AWS API: <https://docs.aws.amazon.com/sns/latest/api/API_Topic.html>
 
 - **`alarm`** — Topic delivery/failure alarms.
 - **`ct-events`** — Audit trail for topic changes.
@@ -941,7 +941,7 @@ AWS API: https://docs.aws.amazon.com/sns/latest/api/API_Topic.html
 
 ### `sns-sub`
 
-AWS API: https://docs.aws.amazon.com/sns/latest/api/API_Subscription.html
+AWS API: <https://docs.aws.amazon.com/sns/latest/api/API_Subscription.html>
 
 - **`ct-events`** — Audit trail for subscription changes.
 - **`lambda`** — Lambda endpoint subscriber.
@@ -950,7 +950,7 @@ AWS API: https://docs.aws.amazon.com/sns/latest/api/API_Subscription.html
 
 ### `sqs`
 
-AWS API: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_GetQueueAttributes.html
+AWS API: <https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_GetQueueAttributes.html>
 
 - **`alarm`** — ApproximateAgeOfOldestMessage / MessagesVisible alarms.
 - **`ct-events`** — Audit trail for queue attribute changes.
@@ -963,14 +963,14 @@ AWS API: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/A
 
 ### `ssm`
 
-AWS API: https://docs.aws.amazon.com/systems-manager/latest/APIReference/API_ParameterMetadata.html
+AWS API: <https://docs.aws.amazon.com/systems-manager/latest/APIReference/API_ParameterMetadata.html>
 
 - **`ct-events`** — Audit trail for parameter reads/writes.
 - **`kms`** — KeyId — KMS key for SecureString.
 
 ### `subnet`
 
-AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Subnet.html
+AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Subnet.html>
 
 - **`asg`** — ASGs referencing this subnet.
 - **`cfn`** — CloudFormation stack that created the subnet.
@@ -987,7 +987,7 @@ AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Subnet.html
 
 ### `tg`
 
-AWS API: https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_TargetGroup.html
+AWS API: <https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_TargetGroup.html>
 
 - **`alarm`** — TG health/unhealthy-host count alarms.
 - **`asg`** — ASGs registering into this TG.
@@ -1008,7 +1008,7 @@ AWS API: https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/AP
 
 ### `tgw`
 
-AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_TransitGateway.html
+AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_TransitGateway.html>
 
 - **`ct-events`** — Audit trail for attachment changes.
 - **`role`** — Cross-account RAM share roles.
@@ -1018,7 +1018,7 @@ AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_TransitGatew
 
 ### `trail`
 
-AWS API: https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_Trail.html
+AWS API: <https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_Trail.html>
 
 - **`ct-events`** — Audit trail for trail config changes (meta!).
 - **`kms`** — Trail.KmsKeyId — log-file encryption key.
@@ -1029,7 +1029,7 @@ AWS API: https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_Trail
 
 ### `vpc`
 
-AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Vpc.html
+AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Vpc.html>
 
 - **`cfn`** — CloudFormation stack that created the VPC.
 - **`ct-events`** — Audit trail for VPC-level changes.
@@ -1046,7 +1046,7 @@ AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Vpc.html
 
 ### `vpce`
 
-AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VpcEndpoint.html
+AWS API: <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VpcEndpoint.html>
 
 - **`acm`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`alarm`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot.
@@ -1065,7 +1065,7 @@ AWS API: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_VpcEndpoint.
 
 ### `waf`
 
-AWS API: https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html
+AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 
 - **`alarm`** — Blocked-request alarms.
 - **`apigw`** — API Gateways with this WebACL attached.

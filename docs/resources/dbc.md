@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `dbc`
 - **Display name**: DocumentDB Clusters
-- **AWS API reference**: https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBCluster.html
+- **AWS API reference**: <https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBCluster.html>
 - **List API**: `DescribeDBClusters` (DocumentDB — filter `engine=docdb` to exclude RDS engines sharing the control plane)
 - **Describe API (if any)**: `DescribePendingMaintenanceActions` (one account-wide call, shared with `dbi`)
 
@@ -204,6 +204,6 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - AWS Go SDK v2 — `DBCluster.Status` / `DBClusterMembers[].IsClusterWriter` / `DeletionProtection` / `StorageEncrypted` / `BackupRetentionPeriod` / `KmsKeyId` / `MasterUserSecret.SecretArn` / `EnabledCloudwatchLogsExports` / `VpcSecurityGroups[].VpcSecurityGroupId` / `DBSubnetGroup` all present on the list response shape — `AWS SDK Go v2 — service/docdb/types.DBCluster`.
 - AWS Go SDK v2 — `DBClusterMember.IsClusterWriter *bool` — `AWS SDK Go v2 — service/docdb/types.DBClusterMember § IsClusterWriter`.
 - AWS Go SDK v2 — DocumentDB `DescribeDBClusters` is the list operation (not RDS's) — `AWS SDK Go v2 — service/docdb § DescribeDBClusters`.
-- AWS API Reference (fallback) — DocumentDB `DescribeDBClusters` — https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DescribeDBClusters.html.
-- AWS API Reference (fallback) — DocumentDB `DescribeDBSubnetGroups` (used to resolve subnets + VPC behind `DBSubnetGroup`) — https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DescribeDBSubnetGroups.html.
+- AWS API Reference (fallback) — DocumentDB `DescribeDBClusters` — <https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DescribeDBClusters.html>.
+- AWS API Reference (fallback) — DocumentDB `DescribeDBSubnetGroups` (used to resolve subnets + VPC behind `DBSubnetGroup`) — <https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DescribeDBSubnetGroups.html>.
 - amendment — the Source URL and display name for `dbc` in `docs/attention-signals.md` were corrected from RDS (`API_DescribeDBClusters` under `AmazonRDS`) to DocumentDB (`API_DescribeDBClusters` under `documentdb`), and the Wave 3 CloudWatch metric `AuroraReplicaLag` was replaced with `DBInstanceReplicaLag` to match the DocumentDB namespace. Rationale: `docs/related-resources.md` anchors `dbc` at `documentdb/latest/developerguide/API_DBCluster.html` and the user specification is `dbc (DocumentDB Cluster)`. Field names listed in the Wave 1 cell (`Status`, `DBClusterMembers`, `IsClusterWriter`, `DeletionProtection`, `StorageEncrypted`, `BackupRetentionPeriod`) match `service/docdb/types.DBCluster` verbatim, so no field edits were needed.

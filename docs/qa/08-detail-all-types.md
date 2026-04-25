@@ -78,10 +78,10 @@ These interactions apply identically regardless of resource type.
 
 | # | Story | Expected |
 |---|-------|----------|
-| C-60 | Open any detail view | Keys are left-aligned, rendered in blue (#7aa2f7); values rendered in white (#c0caf5); each line formatted as ` Key:` padded to fixed width then value, with 1-space indent |
-| C-61 | Detail view contains a multi-line / nested field | The field name appears alone on its line as ` FieldName:` (1-space indent, section header style) and sub-lines appear indented by 5 spaces below it |
-| C-62 | A field has an empty or null value (config-driven rendering) | The field shows as ` FieldName:` padded to fixed width then `-` (dash placeholder). The field is NOT omitted from the view. |
-| C-63 | A pointer field is nil in the AWS SDK struct | The field shows as ` FieldName:` with `-` (dash); it is NOT omitted from the view |
+| C-60 | Open any detail view | Keys are left-aligned, rendered in blue (#7aa2f7); values rendered in white (#c0caf5); each line formatted as `Key:` padded to fixed width then value, with 1-space indent |
+| C-61 | Detail view contains a multi-line / nested field | The field name appears alone on its line as `FieldName:` (1-space indent, section header style) and sub-lines appear indented by 5 spaces below it |
+| C-62 | A field has an empty or null value (config-driven rendering) | The field shows as `FieldName:` padded to fixed width then `-` (dash placeholder). The field is NOT omitted from the view. |
+| C-63 | A pointer field is nil in the AWS SDK struct | The field shows as `FieldName:` with `-` (dash); it is NOT omitted from the view |
 
 ---
 
@@ -105,7 +105,7 @@ These interactions apply identically regardless of resource type.
 |---|-------|----------|
 | S3-D10 | Open detail for a bucket | Three fields appear: BucketArn, BucketRegion, CreationDate, in that order |
 | S3-D11 | BucketArn contains a long ARN | Full ARN shown on one line; `w` toggles wrap to keep it visible without horizontal scroll |
-| S3-D12 | BucketRegion is empty (legacy bucket without region metadata) | Line shows `  BucketRegion: ` (empty) |
+| S3-D12 | BucketRegion is empty (legacy bucket without region metadata) | Line shows ` BucketRegion: ` (empty) |
 | S3-D13 | CreationDate is a timestamp | Rendered as `YYYY-MM-DD HH:MM:SS` (not ISO 8601 with T/Z) |
 | S3-D14 | All three fields fit on screen | No scrolling needed; `j`/`k` have no visible effect |
 
@@ -130,8 +130,8 @@ These interactions apply identically regardless of resource type.
 | # | Story | Expected |
 |---|-------|----------|
 | OBJ-D10 | Open detail for an S3 object | Three fields: Name, LastModified, Owner in that order |
-| OBJ-D11 | Owner field is populated | Because Owner is a struct (with DisplayName and ID sub-fields), it renders as a multi-line block: `  Owner:` on its own line, then indented YAML-formatted sub-fields below (e.g. `    DisplayName: someone`, `    ID: abc123...`) |
-| OBJ-D12 | Owner field is nil (common when bucket owner not requested) | Line shows `  Owner: ` (empty string) |
+| OBJ-D11 | Owner field is populated | Because Owner is a struct (with DisplayName and ID sub-fields), it renders as a multi-line block: `Owner:` on its own line, then indented YAML-formatted sub-fields below (e.g. `DisplayName: someone`, `ID: abc123...`) |
+| OBJ-D12 | Owner field is nil (common when bucket owner not requested) | Line shows ` Owner: ` (empty string) |
 | OBJ-D13 | Object key contains slashes (deep prefix path) | Full key shown as-is; no truncation |
 | OBJ-D14 | LastModified renders as formatted timestamp | `YYYY-MM-DD HH:MM:SS` format |
 
@@ -167,31 +167,31 @@ These interactions apply identically regardless of resource type.
 
 | # | Story | Expected |
 |---|-------|----------|
-| EC2-D20 | State field for a running instance | Renders as multi-line block: `  State:` then indented sub-fields `    Code: 16` and `    Name: running` (zero-valued fields omitted) |
-| EC2-D21 | State field for a terminated instance | Sub-fields show `    Code: 48` and `    Name: terminated` |
+| EC2-D20 | State field for a running instance | Renders as multi-line block: `State:` then indented sub-fields `Code: 16` and `Name: running` (zero-valued fields omitted) |
+| EC2-D21 | State field for a terminated instance | Sub-fields show `Code: 48` and `Name: terminated` |
 
 #### SecurityGroups (array of structs)
 
 | # | Story | Expected |
 |---|-------|----------|
-| EC2-D30 | Instance has 2 security groups | Renders as multi-line: `  SecurityGroups:` on its own line, followed by YAML-formatted array: `    - GroupId: sg-aaa` / `      GroupName: web-sg` / `    - GroupId: sg-bbb` / `      GroupName: db-sg` |
-| EC2-D31 | Instance has 0 security groups | Line shows `  SecurityGroups: ` (empty; zero-length slices render as empty) |
+| EC2-D30 | Instance has 2 security groups | Renders as multi-line: `SecurityGroups:` on its own line, followed by YAML-formatted array: `- GroupId: sg-aaa` / `GroupName: web-sg` / `- GroupId: sg-bbb` / `GroupName: db-sg` |
+| EC2-D31 | Instance has 0 security groups | Line shows ` SecurityGroups: ` (empty; zero-length slices render as empty) |
 | EC2-D32 | Instance has 5+ security groups | All groups rendered; vertical scroll (`j`/`k`) needed if list exceeds frame height |
 
 #### Tags (array of Key/Value structs)
 
 | # | Story | Expected |
 |---|-------|----------|
-| EC2-D40 | Instance has 3 tags | Renders as multi-line: `  Tags:` then indented YAML: `    - Key: Name` / `      Value: api-prod-01` / `    - Key: Environment` / `      Value: production` / etc. |
-| EC2-D41 | Instance has 0 tags | Line shows `  Tags: ` (empty) |
+| EC2-D40 | Instance has 3 tags | Renders as multi-line: `Tags:` then indented YAML: `- Key: Name` / `Value: api-prod-01` / `- Key: Environment` / `Value: production` / etc. |
+| EC2-D41 | Instance has 0 tags | Line shows ` Tags: ` (empty) |
 | EC2-D42 | A tag value is very long (e.g. a description) | Full value shown on one line; `w` wraps it within frame width |
 
 ### 4.3 Edge cases
 
 | # | Story | Expected |
 |---|-------|----------|
-| EC2-D50 | PublicIpAddress is nil (instance in private subnet) | Line shows `  PublicIpAddress: ` (empty string) |
-| EC2-D51 | Platform is nil (Linux instances do not set this) | Line shows `  Platform: ` (empty string) |
+| EC2-D50 | PublicIpAddress is nil (instance in private subnet) | Line shows ` PublicIpAddress: ` (empty string) |
+| EC2-D51 | Platform is nil (Linux instances do not set this) | Line shows ` Platform: ` (empty string) |
 | EC2-D52 | All 13 fields displayed at 80-col, 24-row terminal | Some fields extend below visible area; `j`/`G` scroll to see Tags at the bottom |
 
 ---
@@ -223,17 +223,17 @@ These interactions apply identically regardless of resource type.
 
 | # | Story | Expected |
 |---|-------|----------|
-| RDS-D20 | Endpoint is populated | Renders as multi-line: `  Endpoint:` then indented sub-fields: `    Address: mydb-prod.c9abcdef.us-east-1.rds.amazonaws.com` / `    HostedZoneId: Z2R2ITUGPM61AM` / `    Port: 3306` (zero-valued sub-fields omitted) |
-| RDS-D21 | Endpoint is nil (instance still creating) | Line shows `  Endpoint: ` (empty) |
+| RDS-D20 | Endpoint is populated | Renders as multi-line: `Endpoint:` then indented sub-fields: `Address: mydb-prod.c9abcdef.us-east-1.rds.amazonaws.com` / `HostedZoneId: Z2R2ITUGPM61AM` / `Port: 3306` (zero-valued sub-fields omitted) |
+| RDS-D21 | Endpoint is nil (instance still creating) | Line shows ` Endpoint: ` (empty) |
 | RDS-D22 | Endpoint Address is a long FQDN | Full address shown; `w` wraps to keep it within frame width |
 
 ### 5.3 Scalar rendering
 
 | # | Story | Expected |
 |---|-------|----------|
-| RDS-D30 | MultiAZ is true | Rendered as `  MultiAZ: Yes` (booleans render as Yes/No) |
-| RDS-D31 | MultiAZ is false | Rendered as `  MultiAZ: No` |
-| RDS-D32 | AllocatedStorage is 100 | Rendered as `  AllocatedStorage: 100` (integer, no units) |
+| RDS-D30 | MultiAZ is true | Rendered as `MultiAZ: Yes` (booleans render as Yes/No) |
+| RDS-D31 | MultiAZ is false | Rendered as `MultiAZ: No` |
+| RDS-D32 | AllocatedStorage is 100 | Rendered as `AllocatedStorage: 100` (integer, no units) |
 | RDS-D33 | All 10 fields fit on one screen | All visible without scrolling at 24+ row terminal |
 
 ---
@@ -263,15 +263,15 @@ These interactions apply identically regardless of resource type.
 
 | # | Story | Expected |
 |---|-------|----------|
-| RED-D20 | ConfigurationEndpoint is populated (cluster mode enabled) | Renders as multi-line: `  ConfigurationEndpoint:` then `    Address: prod-redis-001.abcdef.clustercfg.use1.cache.amazonaws.com` / `    Port: 6379` |
-| RED-D21 | ConfigurationEndpoint is nil (cluster mode disabled or non-clustered) | Line shows `  ConfigurationEndpoint: ` (empty) |
+| RED-D20 | ConfigurationEndpoint is populated (cluster mode enabled) | Renders as multi-line: `ConfigurationEndpoint:` then `Address: prod-redis-001.abcdef.clustercfg.use1.cache.amazonaws.com` / `Port: 6379` |
+| RED-D21 | ConfigurationEndpoint is nil (cluster mode disabled or non-clustered) | Line shows ` ConfigurationEndpoint: ` (empty) |
 | RED-D22 | Address is a long cluster-mode FQDN | Full address shown; `w` wraps |
 
 ### 6.3 Scalar rendering
 
 | # | Story | Expected |
 |---|-------|----------|
-| RED-D30 | NumCacheNodes is 3 | Rendered as `  NumCacheNodes: 3` |
+| RED-D30 | NumCacheNodes is 3 | Rendered as `NumCacheNodes: 3` |
 | RED-D31 | All 8 fields fit on one screen | All visible without scrolling |
 
 ---
@@ -302,24 +302,24 @@ These interactions apply identically regardless of resource type.
 
 | # | Story | Expected |
 |---|-------|----------|
-| DOC-D20 | Cluster has 3 members | Renders as multi-line: `  DBClusterMembers:` then YAML array: `    - DBClusterParameterGroupStatus: in-sync` / `      DBInstanceIdentifier: prod-docdb-1` / `      IsClusterWriter: Yes` / `      PromotionTier: 1` / `    - DBInstanceIdentifier: prod-docdb-2` / `      IsClusterWriter: No` / etc. |
-| DOC-D21 | Cluster has 0 members (newly created) | Line shows `  DBClusterMembers: ` (empty; zero-length slices render as empty) |
+| DOC-D20 | Cluster has 3 members | Renders as multi-line: `DBClusterMembers:` then YAML array: `- DBClusterParameterGroupStatus: in-sync` / `DBInstanceIdentifier: prod-docdb-1` / `IsClusterWriter: Yes` / `PromotionTier: 1` / `- DBInstanceIdentifier: prod-docdb-2` / `IsClusterWriter: No` / etc. |
+| DOC-D21 | Cluster has 0 members (newly created) | Line shows ` DBClusterMembers: ` (empty; zero-length slices render as empty) |
 | DOC-D22 | Cluster has 5 members and terminal is 24 rows | Members list extends below visible area; `j`/`G` needed to scroll to see all |
 
 #### Endpoint and ReaderEndpoint (strings in DocumentDB, not structs)
 
 | # | Story | Expected |
 |---|-------|----------|
-| DOC-D30 | Endpoint is a long FQDN | Rendered as a single scalar line: `  Endpoint: prod-docdb.cluster-c9abcdef.us-east-1.docdb.amazonaws.com`; `w` wraps |
+| DOC-D30 | Endpoint is a long FQDN | Rendered as a single scalar line: `Endpoint: prod-docdb.cluster-c9abcdef.us-east-1.docdb.amazonaws.com`; `w` wraps |
 | DOC-D31 | ReaderEndpoint is a long FQDN | Same scalar rendering with wrap support |
 
 ### 7.3 Scalar rendering
 
 | # | Story | Expected |
 |---|-------|----------|
-| DOC-D40 | StorageEncrypted is true | `  StorageEncrypted: Yes` |
-| DOC-D41 | StorageEncrypted is false | `  StorageEncrypted: No` |
-| DOC-D42 | Port is 27017 | `  Port: 27017` |
+| DOC-D40 | StorageEncrypted is true | `StorageEncrypted: Yes` |
+| DOC-D41 | StorageEncrypted is false | `StorageEncrypted: No` |
+| DOC-D42 | Port is 27017 | `Port: 27017` |
 
 ---
 
@@ -348,10 +348,10 @@ These interactions apply identically regardless of resource type.
 
 | # | Story | Expected |
 |---|-------|----------|
-| EKS-D20 | KubernetesNetworkConfig is populated | Renders as multi-line: `  KubernetesNetworkConfig:` then indented sub-fields: `    IpFamily: ipv4` / `    ServiceIpv4Cidr: 172.20.0.0/16` (zero-valued sub-fields like ServiceIpv6Cidr and nested ElasticLoadBalancing are omitted if nil/zero) |
-| EKS-D21 | KubernetesNetworkConfig has both IPv4 and IPv6 CIDRs | Both appear: `    ServiceIpv4Cidr: 172.20.0.0/16` and `    ServiceIpv6Cidr: fd00::/108` |
-| EKS-D22 | KubernetesNetworkConfig includes ElasticLoadBalancing | Nested sub-struct appears: `    ElasticLoadBalancing:` / `      Enabled: Yes` |
-| EKS-D23 | KubernetesNetworkConfig is nil (should not happen for active clusters) | Line shows `  KubernetesNetworkConfig: ` (empty) |
+| EKS-D20 | KubernetesNetworkConfig is populated | Renders as multi-line: `KubernetesNetworkConfig:` then indented sub-fields: `IpFamily: ipv4` / `ServiceIpv4Cidr: 172.20.0.0/16` (zero-valued sub-fields like ServiceIpv6Cidr and nested ElasticLoadBalancing are omitted if nil/zero) |
+| EKS-D21 | KubernetesNetworkConfig has both IPv4 and IPv6 CIDRs | Both appear: `ServiceIpv4Cidr: 172.20.0.0/16` and `ServiceIpv6Cidr: fd00::/108` |
+| EKS-D22 | KubernetesNetworkConfig includes ElasticLoadBalancing | Nested sub-struct appears: `ElasticLoadBalancing:` / `Enabled: Yes` |
+| EKS-D23 | KubernetesNetworkConfig is nil (should not happen for active clusters) | Line shows ` KubernetesNetworkConfig: ` (empty) |
 
 #### Long scalar values
 
@@ -394,18 +394,18 @@ These interactions apply identically regardless of resource type.
 
 | # | Story | Expected |
 |---|-------|----------|
-| SEC-D20 | Secret has 2 tags | Renders as multi-line: `  Tags:` then YAML array: `    - Key: Environment` / `      Value: production` / `    - Key: Team` / `      Value: platform` |
-| SEC-D21 | Secret has 0 tags | Line shows `  Tags: ` (empty) |
+| SEC-D20 | Secret has 2 tags | Renders as multi-line: `Tags:` then YAML array: `- Key: Environment` / `Value: production` / `- Key: Team` / `Value: platform` |
+| SEC-D21 | Secret has 0 tags | Line shows ` Tags: ` (empty) |
 | SEC-D22 | A tag has a very long value | Full value on one line; `w` wraps |
 
 ### 9.3 Scalar rendering
 
 | # | Story | Expected |
 |---|-------|----------|
-| SEC-D30 | RotationEnabled is true | `  RotationEnabled: Yes` |
-| SEC-D31 | RotationEnabled is false | `  RotationEnabled: No` |
-| SEC-D32 | Description is empty string | `  Description: ` (empty) |
-| SEC-D33 | KmsKeyId is nil (using default AWS-managed key) | `  KmsKeyId: ` (empty) |
+| SEC-D30 | RotationEnabled is true | `RotationEnabled: Yes` |
+| SEC-D31 | RotationEnabled is false | `RotationEnabled: No` |
+| SEC-D32 | Description is empty string | ` Description: ` (empty) |
+| SEC-D33 | KmsKeyId is nil (using default AWS-managed key) | ` KmsKeyId: ` (empty) |
 | SEC-D34 | ARN is a long string | Full ARN; `w` wraps; `h`/`l` scrolls horizontally when wrap is off |
 | SEC-D35 | LastAccessedDate is a date with time truncated to midnight by AWS | Rendered as `YYYY-MM-DD 00:00:00` |
 
@@ -446,16 +446,16 @@ These interactions apply identically regardless of resource type.
 
 | # | Story | Expected |
 |---|-------|----------|
-| X-30 | Any struct field (State, Endpoint, KubernetesNetworkConfig, Owner) | Field name appears alone: `  FieldName:` then each non-zero exported sub-field is indented below in YAML format |
-| X-31 | A struct where all sub-fields are zero/nil | Line shows `  FieldName: ` (empty; ToSafeValue returns nil for all-zero structs) |
+| X-30 | Any struct field (State, Endpoint, KubernetesNetworkConfig, Owner) | Field name appears alone: `FieldName:` then each non-zero exported sub-field is indented below in YAML format |
+| X-31 | A struct where all sub-fields are zero/nil | Line shows ` FieldName: ` (empty; ToSafeValue returns nil for all-zero structs) |
 | X-32 | Nested struct within a struct (e.g. ElasticLoadBalancing inside KubernetesNetworkConfig) | Further indented YAML nesting |
 
 ### 10.5 Array/slice rendering (general pattern)
 
 | # | Story | Expected |
 |---|-------|----------|
-| X-40 | Any array field with N > 0 elements (SecurityGroups, Tags, DBClusterMembers) | Field name on its own line: `  FieldName:` then each element rendered as a YAML array item with `    - key: value` indentation |
-| X-41 | Any array field with 0 elements | Line shows `  FieldName: ` (empty; zero-length slices render as empty) |
+| X-40 | Any array field with N > 0 elements (SecurityGroups, Tags, DBClusterMembers) | Field name on its own line: `FieldName:` then each element rendered as a YAML array item with `- key: value` indentation |
+| X-41 | Any array field with 0 elements | Line shows ` FieldName: ` (empty; zero-length slices render as empty) |
 | X-42 | Array of structs where each struct has mixed populated/empty fields | Only non-zero sub-fields appear in each array item |
 
 ### 10.6 Field ordering

@@ -49,12 +49,14 @@ Ensure the parent's `init()` in `<parent>.go` or `<parent>_related.go` contains 
 
 If you add a new SDK call:
 1. Add a narrow interface to `internal/aws/interfaces.go` at the end of the file:
+
    ```go
    // XyzAbcAPI defines the interface for Xyz:Abc.
    type XyzAbcAPI interface {
        Abc(ctx context.Context, params *xyz.AbcInput, optFns ...func(*xyz.Options)) (*xyz.AbcOutput, error)
    }
    ```
+
 2. Add method receiver on the aggregate `XyzAPI` interface (also in `interfaces.go`) so `*xyz.Client` satisfies it.
 3. Add a fake implementation in `internal/demo/fakes/<service>.go` so demo mode builds — return a minimal empty-but-non-nil output. Demo mode won't exercise the new behavior; this is purely to keep the build green.
 

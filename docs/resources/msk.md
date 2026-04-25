@@ -17,7 +17,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `msk`
 - **Display name**: MSK Clusters
-- **AWS API reference**: https://docs.aws.amazon.com/msk/1.0/apireference/v1-clusters.html
+- **AWS API reference**: <https://docs.aws.amazon.com/msk/1.0/apireference/v1-clusters.html>
 - **List API**: `ListClustersV2` — returns `Cluster[]`. The SDK confirms `ClusterArn`, `ClusterName`, `State`, `StateInfo`, `ClusterType`, `Provisioned`, `Serverless`, `CurrentVersion`, and `CreationTime` are all on the list shape, so the Wave 1 state signal is reachable with zero extra calls. The full broker configuration (`BrokerNodeGroupInfo.SecurityGroups`, `BrokerNodeGroupInfo.ClientSubnets`, `EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId`, `LoggingInfo.BrokerLogs`, `ClientAuthentication`) is nested under `Provisioned` (or `Serverless`) on the same response — related-panel discovery requires no extra API call per cluster.
 - **Describe API (if any)**: not used for attention (Wave 2 is `None`). `DescribeClusterV2` returns the same `Cluster` shape and is not needed for signals. `ListScramSecrets` per cluster is required to resolve the `secrets` related target when SASL/SCRAM is enabled — see §2 `secrets` discovery.
 

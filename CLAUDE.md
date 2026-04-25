@@ -1,10 +1,13 @@
 # a9s Development Guidelines
+
 Your work will be review by Codex.
 
 ## GitHub
+
 - Repository: `k2m30/a9s` — always use this owner/repo for GitHub API calls, issues, and PRs
 
 ## Active Technologies
+
 - Go 1.26+, Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2, yaml.v3, clipboard
 - YAML config on disk (`~/.a9s/config.yaml`, `~/.a9s/themes/*.yaml`, `~/.a9s/views/`)
 - YAML cache on disk (`~/.a9s/cache/<profile>--<region>.yaml`), in-memory maps
@@ -112,12 +115,12 @@ specs/           # feature specifications
 | `a9s-devops` | AWS practitioner — resource priorities, feature advice | All | N/A |
 | `a9s-consistency-checker` | Verifies consistency across code, tests, README, website, config | Nothing (read-only) | N/A |
 
-
 ## Agent File Access Rules
 
 Agents MUST use targeted file access — never broad globs on large directories.
 
 ### DO
+
 - Use Explore agent wherever reasonable
 - `Glob("internal/aws/{resource}*.go")` — find a specific fetcher
 - `Glob("tests/unit/*{resource}*")` — find tests for a specific resource
@@ -127,6 +130,7 @@ Agents MUST use targeted file access — never broad globs on large directories.
 - `Grep("func Test.*{Resource}", "tests/unit/qa_detail_child_views_test.go")` — find append point
 
 ### DON'T
+
 - `Glob("tests/unit/*.go")` — returns 148 files, most irrelevant
 - `Glob("internal/aws/*.go")` — returns 77 files, most irrelevant
 - `Glob("internal/demo/*.go")` — only 3 files remain (client.go, handlers.go, transport.go)
@@ -163,7 +167,6 @@ When a single task would require reading 5+ files totaling >500 lines, OR when y
 - README is generated: edit `docs/README.tmpl.md` or `docs/shared/*.md`, then run `go run ./cmd/readmegen/ > README.md`
 - Website uses Hugo `{{< include >}}` shortcodes that resolve to `docs/shared/` via module mount
 - **Never edit README.md directly** — it will be overwritten by readmegen
-
 
 When code changes affect any of the following, update the shared source and regenerate:
 - Key bindings added/removed/changed → `docs/shared/keybindings.md`

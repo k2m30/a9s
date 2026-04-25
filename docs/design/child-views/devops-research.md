@@ -518,16 +518,19 @@ Resources where a child view has some value but low frequency of need. Brief jus
 Resources where the existing detail/YAML view is sufficient, or where no meaningful operational child entity exists.
 
 ### COMPUTE
+
 - **EC2 (ec2):** Parent struct is 170+ fields including SecurityGroups[], NetworkInterfaces[], BlockDeviceMappings[], State, StateReason. The operational data (status checks) is covered in SHOULD-HAVE #22. No separate list entity.
 - **Lambda (lambda):** Covered by MUST-HAVE #1 (invocations via CloudWatch Logs). No additional Lambda API child needed.
 - **Elastic Beanstalk (eb):** Health, status, platform info are in parent. `elasticbeanstalk:DescribeEvents` exists but EB is legacy. Low priority.
 - **ECS Tasks (ecs-task):** Parent struct already has `Containers[]` with detailed status, exit codes, network info, and `StoppedReason`. A containers sub-view is covered as nesting under ecs-svc Tasks (#2b).
 
 ### CONTAINERS
+
 - **EKS (eks):** Node groups exist as top-level resource. Cluster add-ons and Fargate profiles are low frequency.
 - **Node Groups (ng):** Parent struct has scaling config, instance types, health issues, labels. No operational child entity.
 
 ### NETWORKING
+
 - **Security Groups (sg):** See OPTIONAL. Rules already in `IpPermissions[]`.
 - **VPC (vpc):** Subnets, route tables, SGs exist as separate resources. No child entity.
 - **Subnet (subnet):** Parent has CIDR, AZ, available IPs. No child entity.
@@ -540,6 +543,7 @@ Resources where the existing detail/YAML view is sufficient, or where no meaning
 - **EIP (eip):** Simple resource. No child entity.
 
 ### DATABASES & STORAGE
+
 - **S3 (s3):** Already has child view (S3 Objects). Done.
 - **RDS Instances (dbi):** Covered by SHOULD-HAVE #15 (RDS Events). The parent struct handles everything else.
 - **Redis (redis):** Parent has cache nodes with endpoints, parameter groups, SGs. No operational child entity. Slow logs would require `elasticache:DescribeSlowLog` but this is very niche.
@@ -552,29 +556,35 @@ Resources where the existing detail/YAML view is sufficient, or where no meaning
 - **DB Cluster Snapshots (dbc-snap):** Leaf resource. No child entity.
 
 ### MONITORING
+
 - **CloudTrail (trail):** Trail configuration is in parent. Trail events (`cloudtrail:LookupEvents`) have enormous volume and require filtering. Better served by CloudWatch Logs Insights or Athena.
 
 ### MESSAGING
+
 - **SQS (sqs):** Queue attributes (message count, DLQ config) in parent. `sqs:ReceiveMessage` consumes messages -- not suitable for read-only browsing.
 - **SNS Subscriptions (sns-sub):** This IS the child entity type. No further drill-down.
 - **Kinesis (kinesis):** Shard details via `kinesis:ListShards` could be useful but shards are rarely inspected. Data records require iterator management unsuitable for TUI.
 - **MSK (msk):** Topics are a Kafka protocol operation, not an AWS API. No suitable child view.
 
 ### SECRETS & CONFIG
+
 - **Secrets Manager (secrets):** Secret value is fetched via GetSecretValue, already handled by the detail view's "reveal" feature. No child entity.
 - **SSM Parameters (ssm):** Value is fetched separately, detail view concern. Parameter history (`ssm:GetParameterHistory`) could be a child but very low frequency.
 - **KMS (kms):** Key metadata, grants, policies -- rarely inspected in a TUI.
 
 ### DNS & CDN
+
 - **Route 53 (r53):** Already has child view (R53 Records). Done.
 - **CloudFront (cf):** See OPTIONAL for invalidations. Parent struct is huge with origins, cache behaviors, etc.
 - **ACM (acm):** Certificate details are in parent. No child entity.
 
 ### SECURITY & IAM
+
 - **IAM Users (iam-user):** Access keys, MFA devices could be children for security audits, but this is infrequent. Better handled by IAM Access Analyzer.
 - **WAF (waf):** See OPTIONAL.
 
 ### CI/CD
+
 - **CloudFormation (cfn):** Covered by MUST-HAVE #4 and #5 (Stack Events and Stack Resources).
 - **CodePipeline (pipeline):** Covered by SHOULD-HAVE #13 (Pipeline State).
 - **CodeBuild (cb):** Covered by SHOULD-HAVE #12 (Builds).
@@ -582,10 +592,12 @@ Resources where the existing detail/YAML view is sufficient, or where no meaning
 - **CodeArtifact (codeartifact):** Package listing via `codeartifact:ListPackages` is possible but CodeArtifact is rarely inspected interactively.
 
 ### DATA & ANALYTICS
+
 - **Glue (glue):** Covered by SHOULD-HAVE #19 (Job Runs).
 - **Athena (athena):** Athena is used via query editor, not resource browser. Low value.
 
 ### BACKUP & EMAIL
+
 - **Backup (backup):** Backup jobs/recovery points are infrequent. Low value.
 - **SES (ses):** Sparse parent, but SES identities are rarely inspected interactively.
 
@@ -618,29 +630,29 @@ The order is driven by **incident value** -- what would have helped me most at 2
 
 ### Phase 2: "Show me the timeline" (deployment and debugging workflows)
 
-7. **`cfn` --> Stack Resources** -- "What is stuck?"
-8. **`asg` --> Scaling Activities** -- "Why did we scale / not scale?"
-9. **`alarm` --> Alarm History** -- "When did this fire? Is it flapping?"
-10. **`elb` --> Listeners** -- "How is traffic routed?"
-11. **`ecs-svc` --> Container Logs (CW cross-service)** -- "Show me the application output."
+1. **`cfn` --> Stack Resources** -- "What is stuck?"
+2. **`asg` --> Scaling Activities** -- "Why did we scale / not scale?"
+3. **`alarm` --> Alarm History** -- "When did this fire? Is it flapping?"
+4. **`elb` --> Listeners** -- "How is traffic routed?"
+5. **`ecs-svc` --> Container Logs (CW cross-service)** -- "Show me the application output."
 
 ### Phase 3: "Show me the context" (CI/CD and investigation)
 
-12. **`sfn` --> Executions** -- "Did the workflow run?"
-13. **`cb` --> Builds** -- "Is CI passing?"
-14. **`pipeline` --> Pipeline State** -- "Where is my deploy?"
-15. **`ecr` --> Images** -- "What tags exist?"
-16. **`dbi` --> RDS Events** -- "Was there a failover?"
+1. **`sfn` --> Executions** -- "Did the workflow run?"
+2. **`cb` --> Builds** -- "Is CI passing?"
+3. **`pipeline` --> Pipeline State** -- "Where is my deploy?"
+4. **`ecr` --> Images** -- "What tags exist?"
+5. **`dbi` --> RDS Events** -- "Was there a failover?"
 
 ### Phase 4: "Show me the structure" (security and audit)
 
-17. **`role` --> Policies** -- "What permissions does this role have?"
-18. **`sns` --> Subscriptions** -- "Who gets notified?"
-19. **`eb-rule` --> Targets** -- "What does this rule trigger?"
-20. **`glue` --> Job Runs** -- "Did the ETL run?"
-21. **`iam-group` --> Members** -- "Who is in this group?"
-22. **`elb` --> Listeners --> Rules** -- "How is path routing configured?"
-23. **`sfn` --> Executions --> History** -- "Which step failed?"
+1. **`role` --> Policies** -- "What permissions does this role have?"
+2. **`sns` --> Subscriptions** -- "Who gets notified?"
+3. **`eb-rule` --> Targets** -- "What does this rule trigger?"
+4. **`glue` --> Job Runs** -- "Did the ETL run?"
+5. **`iam-group` --> Members** -- "Who is in this group?"
+6. **`elb` --> Listeners --> Rules** -- "How is path routing configured?"
+7. **`sfn` --> Executions --> History** -- "Which step failed?"
 
 ---
 

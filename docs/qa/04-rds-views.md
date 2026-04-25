@@ -267,10 +267,10 @@ The detail view shows key-value pairs. Keys are blue (`#7aa2f7`), values are pla
 
 | # | Story | Steps | Expected |
 |---|-------|-------|----------|
-| C.4.1 | Valid YAML syntax | Mentally parse (or copy and validate) the displayed content. | The content is valid YAML. Indentation is consistent (2-space indent for nested levels). Lists use `- ` prefix. |
+| C.4.1 | Valid YAML syntax | Mentally parse (or copy and validate) the displayed content. | The content is valid YAML. Indentation is consistent (2-space indent for nested levels). Lists use `-` prefix. |
 | C.4.2 | Alphabetical or logical key ordering | Observe the order of top-level keys. | Keys appear in a consistent order (either alphabetical or matching the AWS SDK struct field order). |
 | C.4.3 | Nested indentation | Observe nested objects like Endpoint, DBSubnetGroup. | Each nesting level is indented consistently (2 additional spaces per level). |
-| C.4.4 | Array rendering | Observe array fields (VpcSecurityGroups, TagList, DBParameterGroups). | Arrays are rendered with YAML list syntax: each item prefixed with `- `, sub-fields indented under the list item. |
+| C.4.4 | Array rendering | Observe array fields (VpcSecurityGroups, TagList, DBParameterGroups). | Arrays are rendered with YAML list syntax: each item prefixed with `-`, sub-fields indented under the list item. |
 | C.4.5 | Empty array rendering | If a list field has no items (e.g., `ReadReplicaDBInstanceIdentifiers` for a non-source instance). | The field is present with an empty list representation (`[]` or no items listed). |
 
 ### C.5 YAML View Scrolling

@@ -27,9 +27,11 @@ verify data parity.
 | A.1.5 | I press `R` while in the main menu (not a resource list). | Nothing happens. The `R` key has no effect on the main menu. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-instances --instance-ids i-0abc123 --query 'Reservations[0].Instances[0].{VpcId:VpcId,SubnetId:SubnetId,SecurityGroups:SecurityGroups[*].GroupId,IamInstanceProfile:IamInstanceProfile.Arn}'
 ```
+
 Expected fields used to derive related resources: VpcId, SubnetId, SecurityGroups, IamInstanceProfile, PublicIpAddress (for EIP correlation)
 
 ### A.2 Picker Display and Navigation
@@ -53,6 +55,7 @@ Expected fields used to derive related resources: VpcId, SubnetId, SecurityGroup
 | A.3.4 | The picker is open for an EC2 instance with an IAM Instance Profile. I select the IAM Role entry and press Enter. | The application navigates to the IAM Roles list view, pre-filtered to the role associated with the instance profile. Columns visible: Role Name (width 36), Last Used (width 22), Path (width 20), Created (width 22), Description (width 30). |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-vpcs --vpc-ids vpc-0abc123
 aws ec2 describe-security-groups --group-ids sg-0111
@@ -76,9 +79,11 @@ aws iam get-instance-profile --instance-profile-name PROFILE_NAME
 | B.1.6 | EC2 instance has associated ENIs. I press `R` and select ENI. | I navigate to ENI list, filtered to show ENIs attached to this instance. ENI columns visible: Name (width 24), ENI ID (width 26), Status (width 12), Type (width 14), VPC ID (width 24), Private IP (width 16). |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-instances --instance-ids i-0abc123 --query 'Reservations[0].Instances[0].{VpcId:VpcId,SubnetId:SubnetId,SecurityGroups:SecurityGroups,PublicIpAddress:PublicIpAddress,IamInstanceProfile:IamInstanceProfile,NetworkInterfaces:NetworkInterfaces}'
 ```
+
 Expected EC2 detail fields providing navigation data: VpcId, SubnetId, SecurityGroups, PublicIpAddress, IamInstanceProfile, NetworkInterfaces
 
 ---
@@ -98,6 +103,7 @@ Expected EC2 detail fields providing navigation data: VpcId, SubnetId, SecurityG
 | C.1.7 | I select "VPC Endpoints" and press Enter. | I navigate to the VPC Endpoints list, filtered to VPC "vpc-0abc123". Columns visible: Service Name (width 40), Endpoint ID (width 26), Type (width 12), State (width 12), VPC ID (width 24). |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-subnets --filters "Name=vpc-id,Values=vpc-0abc123"
 aws ec2 describe-route-tables --filters "Name=vpc-id,Values=vpc-0abc123"
@@ -121,9 +127,11 @@ aws ec2 describe-vpc-endpoints --filters "Name=vpc-id,Values=vpc-0abc123"
 | D.1.4 | I select "IAM Role" and press Enter. | I navigate to IAM Roles, filtered to the execution role ARN from the ECS service configuration. |
 
 **AWS comparison:**
+
 ```
 aws ecs describe-services --cluster CLUSTER --services api-service --query 'services[0].{LoadBalancers:loadBalancers,NetworkConfig:networkConfiguration,RoleArn:roleArn}'
 ```
+
 Expected ECS service detail fields providing navigation data: ClusterArn, LoadBalancers, NetworkConfiguration, RoleArn
 
 ---
@@ -141,9 +149,11 @@ Expected ECS service detail fields providing navigation data: ClusterArn, LoadBa
 | E.1.5 | Lambda function "simple-handler" has NO VPC configuration. I press `R`. | The picker shows only: IAM Role, Log Group. No VPC, Subnet, or Security Group entries appear. |
 
 **AWS comparison:**
+
 ```
 aws lambda get-function-configuration --function-name data-processor --query '{VpcConfig:VpcConfig,Role:Role,LoggingConfig:LoggingConfig}'
 ```
+
 Expected Lambda detail fields providing navigation data: VpcConfig, Role, LoggingConfig
 
 ---
@@ -159,9 +169,11 @@ Expected Lambda detail fields providing navigation data: VpcConfig, Role, Loggin
 | F.1.3 | I select "VPC" and press Enter. | I navigate to VPCs, filtered to the VPC ID from the RDS instance's DBSubnetGroup. |
 
 **AWS comparison:**
+
 ```
 aws rds describe-db-instances --db-instance-identifier prod-database --query 'DBInstances[0].{VpcSecurityGroups:VpcSecurityGroups,DBSubnetGroup:DBSubnetGroup}'
 ```
+
 Expected RDS detail fields providing navigation data: VpcSecurityGroups, DBSubnetGroup
 
 ---
@@ -178,10 +190,12 @@ Expected RDS detail fields providing navigation data: VpcSecurityGroups, DBSubne
 | G.1.4 | I select "IAM Role" and press Enter. | I navigate to IAM Roles, filtered to the role from the EKS cluster's RoleArn. |
 
 **AWS comparison:**
+
 ```
 aws eks describe-cluster --name prod-cluster --query 'cluster.{ResourcesVpcConfig:resourcesVpcConfig,RoleArn:roleArn}'
 aws eks list-nodegroups --cluster-name prod-cluster
 ```
+
 Expected EKS detail fields providing navigation data: ResourcesVpcConfig, RoleArn
 
 ---
@@ -198,10 +212,12 @@ Expected EKS detail fields providing navigation data: ResourcesVpcConfig, RoleAr
 | H.1.4 | I select "Security Groups" and press Enter. | I navigate to Security Groups, filtered to the SGs listed in the ELB's SecurityGroups field. |
 
 **AWS comparison:**
+
 ```
 aws elbv2 describe-load-balancers --names api-prod-alb --query 'LoadBalancers[0].{VpcId:VpcId,SecurityGroups:SecurityGroups,AvailabilityZones:AvailabilityZones}'
 aws elbv2 describe-target-groups --load-balancer-arn ARN
 ```
+
 Expected ELB detail fields providing navigation data: VpcId, SecurityGroups, AvailabilityZones
 
 ---
@@ -217,9 +233,11 @@ Expected ELB detail fields providing navigation data: VpcId, SecurityGroups, Ava
 | I.1.3 | I select "VPC" and press Enter. | I navigate to VPCs, filtered to the target group's VpcId. |
 
 **AWS comparison:**
+
 ```
 aws elbv2 describe-target-groups --names api-prod-tg --query 'TargetGroups[0].{LoadBalancerArns:LoadBalancerArns,VpcId:VpcId}'
 ```
+
 Expected TG detail fields providing navigation data: LoadBalancerArns, VpcId
 
 ---
@@ -236,6 +254,7 @@ Expected TG detail fields providing navigation data: LoadBalancerArns, VpcId
 | J.1.4 | I select "RDS Instance: prod-database (referenced-by)" and press Enter. | I navigate to the RDS instances list, filtered to "prod-database". Columns visible: DB Identifier (width 28), Engine (width 12), Version (width 10), Status (width 14), Class (width 16), Endpoint (width 40), Multi-AZ (width 10). |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-instances --filters "Name=instance.group-id,Values=sg-0111"
 aws rds describe-db-instances --query 'DBInstances[?VpcSecurityGroups[?VpcSecurityGroupId==`sg-0111`]]'
@@ -255,6 +274,7 @@ aws elbv2 describe-load-balancers --query 'LoadBalancers[?SecurityGroups[?contai
 | K.1.3 | I select "Route Table" and press Enter. | I navigate to Route Tables, filtered to the route table associated with this subnet. |
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-subnets --subnet-ids subnet-0def456 --query 'Subnets[0].VpcId'
 aws ec2 describe-route-tables --filters "Name=association.subnet-id,Values=subnet-0def456"
@@ -271,6 +291,7 @@ aws ec2 describe-route-tables --filters "Name=association.subnet-id,Values=subne
 | L.1.1 | I am viewing the S3 list. I select bucket "static-assets-prod" and press `R`. | The picker shows related resources such as CloudFront Distribution (if the bucket is configured as an origin) and any Lambda notification targets. |
 
 **AWS comparison:**
+
 ```
 aws s3api get-bucket-notification-configuration --bucket static-assets-prod
 aws cloudfront list-distributions --query 'DistributionList.Items[?Origins.Items[?DomainName==`static-assets-prod.s3.amazonaws.com`]]'
@@ -285,6 +306,7 @@ aws cloudfront list-distributions --query 'DistributionList.Items[?Origins.Items
 | L.2.3 | I select "ACM Certificate" and press Enter. | I navigate to ACM Certificates list, filtered to the certificate. Columns visible: Domain Name (width 40), Status (width 14), Type (width 14), Expires (width 22), In Use (width 8). |
 
 **AWS comparison:**
+
 ```
 aws cloudfront get-distribution --id DIST_ID --query 'Distribution.DistributionConfig.{Origins:Origins,ViewerCertificate:ViewerCertificate,WebACLId:WebACLId}'
 ```
@@ -296,6 +318,7 @@ aws cloudfront get-distribution --id DIST_ID --query 'Distribution.DistributionC
 | L.3.1 | I am viewing the Route53 list. I select a hosted zone and press `R`. | The picker shows alias targets that point to ELBs, CloudFront, EIPs, or S3 endpoints. The relationship is "points-to". |
 
 **AWS comparison:**
+
 ```
 aws route53 list-resource-record-sets --hosted-zone-id ZONE_ID --query 'ResourceRecordSets[?AliasTarget]'
 ```
@@ -308,6 +331,7 @@ aws route53 list-resource-record-sets --hosted-zone-id ZONE_ID --query 'Resource
 | L.4.2 | I select "Attached Policies" and press Enter. | I navigate to the Role Policies child view (which already exists as a parent-child drill-down). |
 
 **AWS comparison:**
+
 ```
 aws iam list-attached-role-policies --role-name payment-service-role
 aws lambda list-functions --query 'Functions[?Role==`arn:aws:iam::123456789012:role/payment-service-role`]'
@@ -326,9 +350,11 @@ aws lambda list-functions --query 'Functions[?Role==`arn:aws:iam::123456789012:r
 | M.1.3 | I select "EC2 Instances" and press Enter. | I navigate to EC2 list, filtered to show instances belonging to this ASG. |
 
 **AWS comparison:**
+
 ```
 aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names api-prod-asg --query 'AutoScalingGroups[0].{TargetGroupARNs:TargetGroupARNs,VPCZoneIdentifier:VPCZoneIdentifier,Instances:Instances}'
 ```
+
 Expected ASG detail fields providing navigation data: TargetGroupARNs, VPCZoneIdentifier, Instances
 
 ---

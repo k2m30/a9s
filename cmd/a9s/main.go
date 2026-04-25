@@ -32,6 +32,14 @@ func init() {
 	date = buildinfo.ResolveDate(date)
 }
 
+// renameHints maps deprecated resource aliases to their current short names.
+// Breaking renames introduced in commits 4b5175b/2ac417f (dbc-snap) and the
+// corresponding dbi-snap rename from rds-snap.
+var renameHints = map[string]string{
+	"rds-snap":   "dbi-snap",
+	"docdb-snap": "dbc-snap",
+}
+
 func main() {
 	var (
 		profile     string
@@ -121,7 +129,11 @@ func main() {
 	if command != "" {
 		rt := resource.FindResourceType(command)
 		if rt == nil {
-			fmt.Fprintf(os.Stderr, "Error: unknown resource type: %s\n", command)
+			if newName, renamed := renameHints[command]; renamed {
+				fmt.Fprintf(os.Stderr, "Error: %q was renamed to %q (see CHANGELOG.md). Try: -c %s\n", command, newName, newName)
+			} else {
+				fmt.Fprintf(os.Stderr, "Error: unknown resource type: %s\n", command)
+			}
 			os.Exit(1)
 		}
 		resolvedCommand = rt.ShortName

@@ -11,7 +11,7 @@ rather than filtering rows in a table.
 > covers the *generic component behavior* that applies identically across all
 > view types. Section H stories should be read as specializations of the stories
 > here.
-
+>
 > **Supersedes QA-11 stories 11-17 and 11-18.** Those stories state that `/` is
 > ignored in detail and YAML views. Once this component is integrated, `/`
 > activates in-document search in those views instead. QA-11 stories 11-17 and
@@ -41,10 +41,12 @@ rather than filtering rows in a table.
 **And:** the detail content remains unchanged (no highlights yet)
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-instances --instance-ids i-0abc123 --output yaml
 # Then grep for a term -- a9s provides interactive search instead
 ```
+
 Expected fields visible: all fields from views.yaml ec2 detail section
 
 ### 26-A02: Press `/` in YAML view activates search input
@@ -55,6 +57,7 @@ Expected fields visible: all fields from views.yaml ec2 detail section
 **And:** the YAML content remains unchanged
 
 **AWS comparison:**
+
 ```
 aws rds describe-db-instances --db-instance-identifier mydb --output yaml | grep "search-term"
 ```
@@ -66,6 +69,7 @@ aws rds describe-db-instances --db-instance-identifier mydb --output yaml | grep
 **Then:** the header right side changes from "? for help" to "/" (amber #e0af68, bold)
 
 **AWS comparison:**
+
 ```
 aws iam get-policy-version --policy-arn ARN --version-id v1 --query 'PolicyVersion.Document' --output text
 # URL-decode, pretty-print, then grep -- a9s replaces this with interactive search
@@ -78,9 +82,11 @@ aws iam get-policy-version --policy-arn ARN --version-id v1 --query 'PolicyVersi
 **Then:** the header right side changes from "? for help" to "/" (amber #e0af68, bold) with a text cursor
 
 **AWS comparison:**
+
 ```
 aws logs get-log-events --log-group-name GROUP --log-stream-name STREAM | grep "search-term"
 ```
+
 Expected fields visible: Timestamp (width 22), Message (width 120)
 
 ### 26-A05: Press `/` in build logs view activates search input
@@ -90,9 +96,11 @@ Expected fields visible: Timestamp (width 22), Message (width 120)
 **Then:** the header right side changes from "? for help" to "/" (amber #e0af68, bold) with a text cursor
 
 **AWS comparison:**
+
 ```
 aws logs get-log-events --log-group-name /aws/codebuild/project --log-stream-name BUILD_ID | grep "ERROR"
 ```
+
 Expected fields visible: Timestamp (width 22), Message (width 120)
 
 ---
@@ -346,6 +354,7 @@ Expected fields visible: Timestamp (width 22), Message (width 120)
 **And:** the match count includes both
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-instances --output yaml | grep -i "run"
 # Case-insensitive search -- a9s should match this behavior
@@ -538,6 +547,7 @@ These stories verify that the search component behaves identically across all 5 
 **Then:** the search component works correctly for every resource type -- matches are highlighted, `n`/`N` navigates, Esc clears
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-instances --instance-ids i-xxx --output yaml | grep -i "search-term"
 aws rds describe-db-instances --db-instance-identifier X --output yaml | grep -i "search-term"
@@ -678,6 +688,7 @@ aws eks describe-cluster --name X --output yaml | grep -i "search-term"
 **And:** the viewport scrolls to make the match visible if it was off-screen
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-instances --instance-ids i-xxx --query 'Reservations[0].Instances[0].PrivateIpAddress'
 # a9s provides this with interactive search instead of memorizing query paths
@@ -691,6 +702,7 @@ aws ec2 describe-instances --instance-ids i-xxx --query 'Reservations[0].Instanc
 **And:** the viewport scrolls to the match if the array is deep in the YAML
 
 **AWS comparison:**
+
 ```
 aws ec2 describe-instances --instance-ids i-xxx --output yaml | grep "sg-0abc123"
 ```
@@ -704,6 +716,7 @@ aws ec2 describe-instances --instance-ids i-xxx --output yaml | grep "sg-0abc123
 **And:** the viewport scrolls to center each match as the user navigates
 
 **AWS comparison:**
+
 ```
 aws logs get-log-events --log-group-name /aws/codebuild/project --log-stream-name BUILD --query 'events[].message' | grep -i "FAILED"
 ```
@@ -716,6 +729,7 @@ aws logs get-log-events --log-group-name /aws/codebuild/project --log-stream-nam
 **And:** pressing `n` moves through them chronologically
 
 **AWS comparison:**
+
 ```
 aws logs filter-log-events --log-group-name /aws/lambda/my-function --filter-pattern "c4b2a1d3-e5f6-7890-abcd-ef1234567890"
 ```

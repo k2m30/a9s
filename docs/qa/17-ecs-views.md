@@ -24,9 +24,11 @@ AWS CLI equivalents are cited so testers can verify data parity.
 | A.1.4 | I press keys (j, k, /, N) while the spinner is visible. | No navigation or sort occurs. Keypresses are ignored or queued until data loads. The spinner continues uninterrupted. |
 
 **AWS comparison:**
+
 ```
 aws ecs describe-services --cluster CLUSTER --services SERVICE --query 'services[0].events'
 ```
+
 Expected fields visible: Timestamp (from CreatedAt), Message
 
 ### A.2 Empty State
@@ -113,6 +115,7 @@ Expected fields visible: Timestamp (from CreatedAt), Message
 | A.9.4 | An event message was truncated in the list display due to terminal width. | The copied text contains the FULL untruncated message, not the truncated display version. |
 
 **AWS comparison:**
+
 ```
 aws ecs describe-services --cluster CLUSTER --services SERVICE --query 'services[0].events[0].message' --output text
 ```
@@ -128,9 +131,11 @@ aws ecs describe-services --cluster CLUSTER --services SERVICE --query 'services
 | A.10.5 | I press Escape in the detail view. | I return to the events list. The cursor position is preserved on the same event I had selected. |
 
 **AWS comparison:**
+
 ```
 aws ecs describe-services --cluster CLUSTER --services SERVICE --query 'services[0].events[0].{Id:id,CreatedAt:createdAt,Message:message}'
 ```
+
 Expected fields visible: CreatedAt, Message, Id
 
 ### A.11 YAML View (y)
@@ -192,10 +197,12 @@ Expected fields visible: CreatedAt, Message, Id
 | B.1.4 | I press keys (j, k, /, N) while the spinner is visible. | No navigation or sort occurs. Keypresses are ignored or queued until data loads. |
 
 **AWS comparison:**
+
 ```
 aws ecs list-tasks --cluster CLUSTER --service-name SERVICE
 aws ecs describe-tasks --cluster CLUSTER --tasks TASK_ARN_1 TASK_ARN_2 ...
 ```
+
 Expected fields visible: Task ID (task_id_short), Status (LastStatus), Health (HealthStatus), Task Def (task_def_short), Started (StartedAt), Stopped Reason (StoppedReason)
 
 ### B.2 Empty State
@@ -220,6 +227,7 @@ Expected fields visible: Task ID (task_id_short), Status (LastStatus), Health (H
 | B.3.9 | I press l (or right-arrow) to scroll right. | The visible column window shifts. The Stopped Reason column becomes visible. Column headers scroll in sync with data columns. |
 
 **AWS comparison:**
+
 ```
 aws ecs describe-tasks --cluster CLUSTER --tasks $(aws ecs list-tasks --cluster CLUSTER --service-name SERVICE --query 'taskArns' --output text) --query 'tasks[].{TaskArn:taskArn,LastStatus:lastStatus,HealthStatus:healthStatus,TaskDefinitionArn:taskDefinitionArn,StartedAt:startedAt,StoppedReason:stoppedReason}'
 ```
@@ -304,6 +312,7 @@ aws ecs describe-tasks --cluster CLUSTER --tasks $(aws ecs list-tasks --cluster 
 | B.10.3 | I paste from clipboard into another application. | The pasted text is the full ARN (e.g., "arn:aws:ecs:us-east-1:123456789012:task/my-cluster/a1b2c3d4e5f67890"), not the short task ID displayed in the list. |
 
 **AWS comparison:**
+
 ```
 aws ecs list-tasks --cluster CLUSTER --service-name SERVICE --query 'taskArns[0]' --output text
 ```
@@ -324,9 +333,11 @@ aws ecs list-tasks --cluster CLUSTER --service-name SERVICE --query 'taskArns[0]
 | B.11.10 | I press Escape in the detail view. | I return to the tasks list. The cursor position is preserved. |
 
 **AWS comparison:**
+
 ```
 aws ecs describe-tasks --cluster CLUSTER --tasks TASK_ARN --query 'tasks[0]'
 ```
+
 Expected fields visible: TaskArn, LastStatus, DesiredStatus, HealthStatus, TaskDefinitionArn, StartedAt, StoppedAt, StoppedReason, StopCode, StartedBy, Group, LaunchType, PlatformVersion, Cpu, Memory, Connectivity, Containers, Attachments, AvailabilityZone, CreatedAt, Tags
 
 ### B.12 YAML View (y)
@@ -406,10 +417,12 @@ Expected fields visible: TaskArn, LastStatus, DesiredStatus, HealthStatus, TaskD
 | C.1.5 | I press keys (j, k, /, N) while the spinner is visible. | No navigation or sort occurs. Keypresses are ignored or queued. |
 
 **AWS comparison:**
+
 ```
 aws ecs describe-task-definition --task-definition TASK_DEF_ARN --query 'taskDefinition.containerDefinitions[0].logConfiguration'
 aws logs filter-log-events --log-group-name LOG_GROUP --log-stream-name-prefix STREAM_PREFIX --limit 100
 ```
+
 Expected fields visible: Timestamp, Stream (stream_short), Message
 
 ### C.2 Empty State
@@ -439,6 +452,7 @@ Expected fields visible: Timestamp, Stream (stream_short), Message
 | C.4.6 | The terminal is narrow (80 columns). | The Message column gets whatever space remains after Timestamp (22) and Stream (20) plus borders. If insufficient, the Message column may be very narrow or hidden, scrollable with h/l. |
 
 **AWS comparison:**
+
 ```
 aws logs filter-log-events --log-group-name /ecs/payment-api --log-stream-name-prefix ecs/payment-api --limit 100 --query 'events[].{timestamp:timestamp,logStreamName:logStreamName,message:message}'
 ```
@@ -509,6 +523,7 @@ aws logs filter-log-events --log-group-name /ecs/payment-api --log-stream-name-p
 | C.10.4 | A very long error message with a multi-line stack trace was stored as a single log event. | The full message including all stack trace lines is copied. |
 
 **AWS comparison:**
+
 ```
 aws logs filter-log-events --log-group-name LOG_GROUP --log-stream-name-prefix PREFIX --limit 1 --query 'events[0].message' --output text
 ```
@@ -535,9 +550,11 @@ aws logs filter-log-events --log-group-name LOG_GROUP --log-stream-name-prefix P
 | C.12.8 | I press Escape in the detail view. | I return to the logs list. The cursor position is preserved. |
 
 **AWS comparison:**
+
 ```
 aws logs filter-log-events --log-group-name LOG_GROUP --limit 1 --query 'events[0].{timestamp:timestamp,ingestionTime:ingestionTime,logStreamName:logStreamName,message:message,eventId:eventId}'
 ```
+
 Expected fields visible: Timestamp, IngestionTime, LogStreamName, Message, EventId
 
 ### C.13 YAML View (y)

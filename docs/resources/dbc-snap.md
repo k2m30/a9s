@@ -17,16 +17,19 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 - **shortName**: `dbc-snap`
 - **Display name**: DB Cluster Snapshots
-- **AWS API reference**: https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBClusterSnapshot.html
+- **AWS API reference**: <https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBClusterSnapshot.html>
 - **List API**: `DescribeDBClusterSnapshots`
 - **Describe API (if any)**: not used — all Wave 1 signals are carried on the list response.
 - **Coverage**: this resource type covers BOTH DocumentDB cluster snapshots
-  AND Aurora cluster snapshots (RDS Aurora — `aurora-postgresql`,
-  `aurora-mysql`). They share the AWS API: `DescribeDBClusterSnapshots`
-  returns both engines, with the engine name on each row. Real AWS rejects
+  AND Aurora + Multi-AZ DB cluster snapshots. **The DocDB and RDS SDKs are
+  NOT interchangeable** — each scopes its DescribeDBClusterSnapshots response
+  to its own engine family per the AWS SDK Go v2 docstrings (docdb-side
+  returns DocDB only; rds-side explicitly returns Aurora + Multi-AZ). The
+  a9s fetcher therefore calls both `c.DocDB.DescribeDBClusterSnapshots` and
+  `c.RDS.DescribeDBClusterSnapshots` and merges results. Real AWS rejects
   `CreateDBSnapshot` on Aurora cluster members; Aurora cluster-level
-  snapshots only exist as `DBClusterSnapshot`s, which is why they live
-  here and not in `dbi-snap`.
+  snapshots only exist as `DBClusterSnapshot`s on the RDS side, which is
+  why they live here and not in `dbi-snap`.
 
 ## 2. Related Resources Panel (detail view, right column)
 
