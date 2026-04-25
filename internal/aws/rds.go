@@ -49,6 +49,14 @@ func init() {
 
 // FetchRDSInstances calls the RDS DescribeDBInstances API and converts the
 // response into a slice of generic Resource structs.
+//
+// Engine coverage: per the AWS SDK Go v2 docstring on
+// rds.DescribeDBInstances ("Describes provisioned RDS instances. ... This
+// operation can also return information for Amazon Neptune DB instances and
+// Amazon DocumentDB instances."), the rds-side call returns RDS + Neptune +
+// DocDB instances. No companion docdb-side fetcher is needed for the dbi
+// resource type — single source covers all engines. See
+// docs/resources/dbi.md §1 Coverage for the user-facing claim.
 func FetchRDSInstances(ctx context.Context, api RDSDescribeDBInstancesAPI) ([]resource.Resource, error) {
 	var all []resource.Resource
 	token := ""

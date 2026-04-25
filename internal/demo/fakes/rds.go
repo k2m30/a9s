@@ -6,6 +6,7 @@ import (
 	"context"
 
 	"github.com/aws/aws-sdk-go-v2/service/rds"
+	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
 )
@@ -40,10 +41,21 @@ func (f *RDSFake) DescribePendingMaintenanceActions(_ context.Context, _ *rds.De
 	}, nil
 }
 
-// DescribeDBSubnetGroups returns an empty list — demo mode does not model
-// RDS subnet groups.
-func (f *RDSFake) DescribeDBSubnetGroups(_ context.Context, _ *rds.DescribeDBSubnetGroupsInput, _ ...func(*rds.Options)) (*rds.DescribeDBSubnetGroupsOutput, error) {
-	return &rds.DescribeDBSubnetGroupsOutput{}, nil
+// DescribeDBSubnetGroups returns matching subnet groups from fixture data.
+// When DBSubnetGroupName is set in the input, it filters to that single group.
+// This supports the dbc related checker's Aurora-side subnet-group resolution
+// (c.RDS.DescribeDBSubnetGroups for rdstypes.DBCluster shapes).
+func (f *RDSFake) DescribeDBSubnetGroups(_ context.Context, in *rds.DescribeDBSubnetGroupsInput, _ ...func(*rds.Options)) (*rds.DescribeDBSubnetGroupsOutput, error) {
+	if in != nil && in.DBSubnetGroupName != nil && *in.DBSubnetGroupName != "" {
+		name := *in.DBSubnetGroupName
+		for _, sg := range f.fix.DBSubnetGroups {
+			if sg.DBSubnetGroupName != nil && *sg.DBSubnetGroupName == name {
+				return &rds.DescribeDBSubnetGroupsOutput{DBSubnetGroups: []rdstypes.DBSubnetGroup{sg}}, nil
+			}
+		}
+		return &rds.DescribeDBSubnetGroupsOutput{}, nil
+	}
+	return &rds.DescribeDBSubnetGroupsOutput{DBSubnetGroups: f.fix.DBSubnetGroups}, nil
 }
 
 // DescribeDBClusters returns the Aurora + Multi-AZ DB clusters from fixture data.

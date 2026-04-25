@@ -19,6 +19,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
+	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
@@ -93,15 +94,15 @@ func TestDBCSnap_Orphan_DocDB(t *testing.T) {
 }
 
 // TestDBCSnap_Orphan_Aurora verifies the orphan signal fires for an Aurora
-// cluster snapshot whose parent is missing. Aurora cluster snapshots arrive via
-// the DocDB SDK (docdbtypes.DBClusterSnapshot) — both Aurora and DocDB clusters
-// use the same DescribeDBClusterSnapshots backend; the SDK chooses the
-// deserialization namespace, not the engine. The Engine field carries
-// "aurora-postgresql" to distinguish the engine at the application layer.
+// cluster snapshot (rdstypes.DBClusterSnapshot) whose parent is missing from the
+// dbc cache. Aurora cluster snapshots arrive via the RDS SDK
+// (rdstypes.DBClusterSnapshot), not the DocDB SDK. The enricher's dual-shape
+// extractor (dbcSnapParentID) handles both SDK shapes.
 func TestDBCSnap_Orphan_Aurora(t *testing.T) {
 	enricher := dbcSnapEnricher(t)
 
-	otherCluster := docdbtypes.DBCluster{
+	// Cache has an rdstypes.DBCluster parent but NOT the one referenced by the snap.
+	otherCluster := rdstypes.DBCluster{
 		DBClusterIdentifier:   aws.String("other-aurora"),
 		BackupRetentionPeriod: aws.Int32(14),
 	}
@@ -114,7 +115,9 @@ func TestDBCSnap_Orphan_Aurora(t *testing.T) {
 		},
 	}
 
-	snap := docdbtypes.DBClusterSnapshot{
+	// Aurora snapshot uses rdstypes.DBClusterSnapshot — this is the shape the
+	// RDS-side fetcher (FetchRDSDBClusterSnapshotsPage) emits.
+	snap := rdstypes.DBClusterSnapshot{
 		DBClusterSnapshotIdentifier: aws.String("orphan-aurora-snap"),
 		DBClusterIdentifier:         aws.String("deleted-aurora"),
 		Engine:                      aws.String("aurora-postgresql"),
@@ -131,9 +134,14 @@ func TestDBCSnap_Orphan_Aurora(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if finding, ok := result.Findings["orphan-aurora-snap"]; !ok {
-		t.Fatal("expected orphan finding for Aurora snapshot, got none")
+		t.Fatal("expected orphan finding for Aurora snapshot (rdstypes.DBClusterSnapshot), got none")
 	} else if finding.Summary != "orphan: source cluster deleted" {
 		t.Errorf("Summary = %q, want %q", finding.Summary, "orphan: source cluster deleted")
+	}
+	// FieldUpdates must carry the orphan phrase as the merged status.
+	if fu := result.FieldUpdates["orphan-aurora-snap"]; fu == nil || fu["status"] != "orphan: source cluster deleted" {
+		t.Errorf("FieldUpdates[\"orphan-aurora-snap\"][\"status\"] = %q, want %q",
+			result.FieldUpdates["orphan-aurora-snap"]["status"], "orphan: source cluster deleted")
 	}
 }
 

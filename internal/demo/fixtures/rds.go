@@ -21,6 +21,10 @@ type RDSFixtures struct {
 	DBClusters []rdstypes.DBCluster
 	// DBClusterSnapshots is the full list returned by DescribeDBClusterSnapshots (Aurora + Multi-AZ).
 	DBClusterSnapshots []rdstypes.DBClusterSnapshot
+	// DBSubnetGroups is returned by DescribeDBSubnetGroups (filtered by name).
+	// Covers Aurora cluster subnet groups — the dbc related checker calls
+	// c.RDS.DescribeDBSubnetGroups for rdstypes.DBCluster (Aurora) shapes.
+	DBSubnetGroups []rdstypes.DBSubnetGroup
 }
 
 // NewRDSFixtures builds and returns a fully-populated RDSFixtures struct.
@@ -36,6 +40,7 @@ func NewRDSFixtures() *RDSFixtures {
 		Events:             buildRDSEvents(),
 		DBClusters:         buildRDSDBClusters(),
 		DBClusterSnapshots: buildRDSDBClusterSnapshots(),
+		DBSubnetGroups:     buildRDSDBSubnetGroups(),
 	}
 }
 
@@ -508,6 +513,39 @@ func buildRDSDBClusterSnapshots() []rdstypes.DBClusterSnapshot {
 			StorageType:                 aws.String("aurora"),
 			StorageEncrypted:            aws.Bool(true),
 			VpcId:                       aws.String(rdsProdVPCID),
+		},
+	}
+}
+
+// buildRDSDBSubnetGroups returns the RDS-side subnet groups for Aurora clusters.
+// The dbc related checker calls c.RDS.DescribeDBSubnetGroups for rdstypes.DBCluster
+// (Aurora) shapes — this list is the source for those calls in demo mode.
+// Reuses the same subnet IDs as the DocDB fixture (dbcSubnetA/B, aliased via
+// rdsSubnetA/B) so the subnet count oracle in counts.go is not affected.
+func buildRDSDBSubnetGroups() []rdstypes.DBSubnetGroup {
+	return []rdstypes.DBSubnetGroup{
+		{
+			DBSubnetGroupName:        aws.String(rdsSubnetGroup),
+			DBSubnetGroupDescription: aws.String("Subnet group for prod-aurora-cluster"),
+			DBSubnetGroupArn:         aws.String("arn:aws:rds:us-east-1:123456789012:subgrp:" + rdsSubnetGroup),
+			VpcId:                    aws.String(rdsProdVPCID),
+			SubnetGroupStatus:        aws.String("Complete"),
+			Subnets: []rdstypes.Subnet{
+				{
+					SubnetIdentifier: aws.String("subnet-0ccc333333333333c"),
+					SubnetStatus:     aws.String("Active"),
+					SubnetAvailabilityZone: &rdstypes.AvailabilityZone{
+						Name: aws.String("us-east-1a"),
+					},
+				},
+				{
+					SubnetIdentifier: aws.String("subnet-0ddd444444444444d"),
+					SubnetStatus:     aws.String("Active"),
+					SubnetAvailabilityZone: &rdstypes.AvailabilityZone{
+						Name: aws.String("us-east-1b"),
+					},
+				},
+			},
 		},
 	}
 }
