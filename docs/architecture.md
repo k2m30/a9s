@@ -288,8 +288,8 @@ Some resource types hide problems behind extra API calls (e.g., EC2 with impaire
 **Architecture:**
 - `internal/aws/issue_enrichment.go` — Wave 2 infrastructure: `IssueEnricherRegistry` map, unexported `registerIssueEnricher` helper (panics on empty name, nil fn, duplicate short name), `NoOpIssueEnricher`, `IssueEnricher` struct, `IssueEnricherFunc` / `IssueEnricherResult` types, shared helpers, `EnrichmentCap` / `PerParentPageCap`.
 - `internal/aws/*_issue_enrichment.go` — 67 enricher-registry entries across 66 registered short names (`dbi` registers twice: once under `dbi` for its per-instance enricher and once under `rds` as an alias for the shared maintenance enricher). 43 entries are real enricher functions; the remaining 24 are `NoOpIssueEnricher` registrations for types with Wave 2 = "None" per `docs/attention-signals.md`. Each file's `init()` calls `registerIssueEnricher(<shortname>, <fn>, <priority>)` and — if the enricher writes `FieldUpdates` — `resource.RegisterIssueEnricherFieldKeys(<shortname>, [...])`.
-- `internal/tui/app_fetchers.go` — `buildEnrichQueue()`, `probeEnrichment()`
-- `internal/tui/app_handlers_navigate.go` — `startEnrichment()`, `handleEnrichmentChecked()` with only-increase guard
+- `internal/tui/app_probes.go` — `buildEnrichQueue()`, `probeEnrichment()`
+- `internal/tui/app_handlers_availability.go` — `startEnrichment()`, `handleEnrichmentChecked()` with only-increase guard
 
 **Flow:**
 

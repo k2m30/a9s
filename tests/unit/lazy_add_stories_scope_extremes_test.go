@@ -677,8 +677,7 @@ func Test_LA_072_IDSetGrowsAcrossRedrill(t *testing.T) {
 	id3 := "policy-la072-003"
 
 	// checkerIDs is swapped between the two drill phases.
-	var checkerIDs []string
-	checkerIDs = []string{id1, id2}
+	checkerIDs := []string{id1, id2}
 
 	resource.RegisterRelated(srcType, []resource.RelatedDef{
 		{

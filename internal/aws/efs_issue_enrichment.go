@@ -89,7 +89,7 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 		unavailableCount := 0
 		for j := range allMountTargets {
 			mt := &allMountTargets[j]
-			if mt.LifeCycleState != "available" {
+			if mt.LifeCycleState != efstypes.LifeCycleStateAvailable {
 				unavailableCount++
 				if firstBad == nil {
 					firstBad = mt

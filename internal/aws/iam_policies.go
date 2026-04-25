@@ -164,9 +164,10 @@ func FetchIAMPoliciesPage(ctx context.Context, api IAMListPoliciesAPI, continuat
 // account never leak into lazy-add drills in the next account. The mutex
 // guards concurrent rebuilds from parallel related-checks targeting "policy".
 var (
-	allPoliciesMu    sync.Mutex
-	allPoliciesBuilt bool
-	allPoliciesByID  map[string]resource.Resource
+	allPoliciesMu          sync.Mutex
+	allManagedPoliciesBuilt bool
+	allInlinePoliciesBuilt  bool
+	allPoliciesByID         map[string]resource.Resource
 )
 
 // ResetIAMPoliciesCache clears the process-wide customer+AWS-managed policy
@@ -176,7 +177,8 @@ var (
 func ResetIAMPoliciesCache() {
 	allPoliciesMu.Lock()
 	defer allPoliciesMu.Unlock()
-	allPoliciesBuilt = false
+	allManagedPoliciesBuilt = false
+	allInlinePoliciesBuilt = false
 	allPoliciesByID = nil
 }
 
@@ -202,11 +204,15 @@ func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string) ([
 	allPoliciesMu.Lock()
 	defer allPoliciesMu.Unlock()
 
-	if !allPoliciesBuilt {
+	if !allManagedPoliciesBuilt {
 		allPoliciesByID = make(map[string]resource.Resource)
 		if err := buildAllManagedPolicies(ctx, api); err != nil {
+			// Managed is the trunk — without it we can't resolve any policy.
 			return nil, err
 		}
+		allManagedPoliciesBuilt = true
+	}
+	if !allInlinePoliciesBuilt {
 		// Include inline group policies so checkGroupPolicy (which emits
 		// both attached and inline names) finds the inline entries in
 		// cache too. Per-group failures are surfaced via the returned error
@@ -217,8 +223,10 @@ func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string) ([
 		}
 		if inlineErr != nil {
 			// Non-fatal: managed policies are already loaded; partial inline
-			// results are incorporated above. Surface as aggregate failure.
-			allPoliciesBuilt = true
+			// results are incorporated above. Leave allInlinePoliciesBuilt=false
+			// so next call retries the inline fetch — it might succeed after a
+			// transient throttle. Surface as aggregate failure with the partial
+			// results we did recover.
 			var failures []string
 			failures = append(failures, inlineErr.Error())
 			resources := make([]resource.Resource, 0, len(ids))
@@ -239,7 +247,7 @@ func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string) ([
 			}
 			return resources, AggregateFailures("policy FetchByIDs", failures, len(ids))
 		}
-		allPoliciesBuilt = true
+		allInlinePoliciesBuilt = true
 	}
 
 	var failures []string
@@ -276,12 +284,12 @@ func FetchIAMPoliciesByIDs(ctx context.Context, api IAMListPoliciesAPI, ids []st
 	allPoliciesMu.Lock()
 	defer allPoliciesMu.Unlock()
 
-	if !allPoliciesBuilt {
+	if !allManagedPoliciesBuilt {
 		allPoliciesByID = make(map[string]resource.Resource)
 		if err := buildAllManagedPolicies(ctx, api); err != nil {
 			return nil, err
 		}
-		allPoliciesBuilt = true
+		allManagedPoliciesBuilt = true
 	}
 
 	var failures []string
@@ -349,7 +357,7 @@ func buildAllManagedPolicies(ctx context.Context, api IAMListPoliciesAPI) error 
 			if p.Arn != nil && !IsCustomerManagedIAMPolicyARN(*p.Arn) {
 				policyType = "aws-managed"
 			}
-			allPoliciesByID[policyName] = resource.Resource{
+			r := resource.Resource{
 				ID:     policyName,
 				Name:   policyName,
 				Status: "",
@@ -362,6 +370,13 @@ func buildAllManagedPolicies(ctx context.Context, api IAMListPoliciesAPI) error 
 					"create_date":      createDate,
 				},
 				RawStruct: p,
+			}
+			// Index by PolicyName AND by ARN so callers that emit ARN-based IDs
+			// (e.g. checkers that embed policy.Arn from SDK structs) can still
+			// resolve the policy via FetchIAMPoliciesByIDsFull.
+			allPoliciesByID[policyName] = r
+			if p.Arn != nil && *p.Arn != policyName {
+				allPoliciesByID[*p.Arn] = r
 			}
 		}
 		if !out.IsTruncated || out.Marker == nil {

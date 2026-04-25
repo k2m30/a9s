@@ -38,7 +38,17 @@ func init() {
 //   Rows: one entry per false flag: {Label:"<FlagName>", Value:"false"},
 //         plus {Label:"Account-level PAB", Value:"may still apply"}
 //
-// On any other API error: no finding emitted; TruncatedIDs[id] = true.
+// On PermanentRedirect (301) / IllegalLocationConstraintException (400):
+//   The bucket lives in a different region than the configured S3 client.
+//   ListBuckets returns ALL buckets globally regardless of region, but
+//   per-bucket calls require the bucket's regional endpoint. Mark
+//   TruncatedIDs[id]=true (data incomplete → row "?" marker) but do NOT
+//   add to the failure-aggregate error: cross-region buckets are
+//   operational, not bugs, and surfacing them in the `!` log produces
+//   noise on multi-region accounts.
+//
+// On any other API error: no finding emitted; TruncatedIDs[id] = true and
+// the failure aggregates into the returned composite error.
 // IssueCount stays 0 (framework counts "!" findings directly).
 func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)

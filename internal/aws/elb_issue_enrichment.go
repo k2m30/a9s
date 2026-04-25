@@ -20,6 +20,11 @@ func init() {
 // each LB missing deletion protection or access logging.
 // The worst finding per LB is promoted to "!" if both attributes are missing;
 // otherwise "~" is used. IssueCount counts findings with Severity "!".
+//
+// Per-LB API failures aggregate into a composite error returned alongside
+// the partial findings (E1–E6 contract). LoadBalancerArn is read from
+// r.Fields["load_balancer_arn"] — the elb fetcher emits ID = bare LB name
+// and stores the ARN in Fields. Each call is wrapped in RetryOnThrottle.
 func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)

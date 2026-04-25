@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.44.0] - 2026-04-25
+
 ### Changed
+- **Partial-success contract end-to-end** — paginated fetchers, the synchronous demo prefetch, the per-type availability probe, and Wave-2 enrichers all now preserve partial results when an error accompanies them. `ResourcesLoadedMsg`, `AvailabilityCheckedMsg`, and `EnrichmentCheckedMsg` carry the partial slice + composite error simultaneously; the app surfaces the error via `FlashMsg` while still applying the partial state. Previously a single per-item failure inside any of these layers blanked the menu badge or list view for that resource type.
 - **Never-silent-skip rule** — every AWS SDK call across the codebase now wraps in `RetryOnThrottle` and surfaces per-item failures through the operator-visible error channel. Previously, ~50 files silently swallowed per-item describe/get errors, so a resource list could look complete while permission or throttling issues silently degraded the view. Operators now see aggregated composite errors via the `!` error log.
 - New shared helper `internal/aws/partial_errors.go` (`AggregateFailures`, `AggregateMissing`) standardizes composite-error formatting across fetchers, related checkers, and Wave-2 enrichers.
 - Wave-2 enrichers now set `Truncated`/`TruncatedIDs` (per-row `?` marker) AND return an aggregated top-level error (feeds `EnrichmentCheckedMsg.Err` → FlashMsg) — both channels fire on per-item failure.
@@ -15,8 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Top-level fetchers (`backup.go`, `dbc.go`, `ddb.go`, `efs.go`, `eks.go`, `kms.go`, `ng.go`, `opensearch.go`, `redis.go`, `redshift.go`, `s3.go`, `sg.go`, `sqs.go`, plus the lazy-add fetchers) aggregate per-item describe failures; `ResourcesLoadedMsg.Err` already surfaces as a flash.
 - ECS-task fetcher decouples join-failure signaling from `Pagination.IsTruncated` — per-task `Fields["task_def_join_error"]="true"` marks affected tasks; `checkEFSECSTask` reports `Approximate=true` without the fetcher advertising a bogus "m: load more" footer.
 - `a9s-implement-resource` skill: new **Error handling and throttle rules** section (E1–E6) with banned-pattern list, category/surface-channel table, and enforcement hooks in phases 5, 7.5, 8, 9. Coverage matrix gains U12 (partial-failure FlashMsg) and U13 (throttle-wrap static audit).
+- Lazy-add cache snapshot now marks lazy-only entries as `IsTruncated:true` (sparse, not authoritative). The related-panel prefetch decision uses a `mainCacheKeys` set built from `resourceCache` only — a lazy-only entry no longer suppresses the real first-page fetch when a `NeedsTargetCache:true` checker scans it.
+- IAM policy `FetchIAMPoliciesByIDsFull` builds also index entries by ARN alongside `PolicyName` so checkers that emit ARN form (e.g. role → managed policy) drill into the cached row.
 
 ### Added
+- `tui` package split into smaller files to keep each under the 500-line file-size budget: `app_probes.go` (availability + enrichment probes), `app_handlers_availability.go` (their handlers + `unifiedIssueCount`), `app_handlers_related_navigate.go` (`handleRelatedNavigate` and child variant), `related_cache.go` (LRU + replay helpers).
+- `EnrichmentCheckedMsg.Err` (existing) and new `ResourcesLoadedMsg.Err` carry partial-success errors alongside resources.
+- Lazy-only fast path in related navigation now requires ALL requested IDs to short-circuit (`len(filtered) == len(result.RelatedIDs)`); partial coverage falls through to a full fetch instead of rendering only the lazily-cached subset.
 - Lazy-add path for related-panel drill-through: when a checker emits IDs outside the top-level fetcher's scope filter (KMS customer-managed, AMI `Owners=self`, EBS snapshot `OwnerIds=self`, IAM Policy `Scope=Local`), the orchestrator calls `FetchByIDs` to resolve them and populates `lazyResourceCache`. Drilling into a KMS pivot for an `aws/rds` key, an AMI pivot for a public marketplace AMI, or an IAM role's `AdministratorAccess` now lands on a real entry instead of an empty list.
 - `lazyResourceCache` session map (separate from `resourceCache`) consulted only by related-navigation, never by main-menu top-level list. Prevents lazy-added out-of-scope entries from polluting the scope-filtered top-level view.
 - `ResetIAMPoliciesCache()` exported and wired into `sessionRuntime.resetForSessionSwitch` — IAM policy memoization now clears on profile/region switch so account-A policies never leak into account-B drills.
@@ -25,6 +33,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - User-story set `tests/stories/lazy_add.md` — 44 given/when/then stories across 9 sections covering cross-scope drill-through, session lifecycle, idempotence, race/timing, and size extremes.
 
 ### Fixed
+- `probeEnrichment` no longer drops the `IssueEnricherResult` when the enricher returns a composite error alongside partial findings — Wave-2 menu badges, FieldUpdates, and per-row `?` markers now survive across per-item failures.
+- `probeResourceAvailability` no longer drops the partial resource list when the fetcher returns a composite error — the menu count + `Issues` badge update from the partial slice and a FlashMsg surfaces the error.
+- `handleEnrichmentChecked` and `handleAvailabilityChecked` now apply state changes when the message carries partial success (Err+Resources/Findings populated). Pure failure (Err alone) still leaves the menu entry as "unknown".
+- `FetchAMIsByIDs` now sets `IncludeDeprecated: true` to match the single-ID `FetchAMIByID` path; deprecated AMIs referenced from EC2 / ASG / EKS pivots no longer silently vanish from batch drills.
+- `efs_issue_enrichment` uses the typed `efstypes.LifeCycleStateAvailable` constant instead of the string literal `"available"` for safer future SDK upgrades.
+- `EnrichEC2InstanceStatus` no longer panics when called with a nil `*ServiceClients` — `probeEnrichment` re-instates the nil-clients guard and returns a clear "AWS clients not initialized" error.
 - `handleEnrichmentChecked` no longer silently swallows `EnrichmentCheckedMsg.Err` — failures now emit `FlashMsg{IsError:true}` so the error log (`!` key) captures them.
 - `handleRelatedNavigate` cache-hit path now consults `lazyResourceCache` alongside `resourceCache`, so a drill through a cache-hit pivot finds lazy-added out-of-scope targets.
 - ENI list no longer renders `m: load more` on a fully-resolved exact-ID filter — `handleRelatedNavigate` strips `IsTruncated` on the pagination passed to the list view when every `RelatedIDs` entry matched.

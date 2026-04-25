@@ -45,6 +45,16 @@ type ResourcesLoadedMsg struct {
 	// write-through block — checks this field; if it matches the current
 	// per-type gen, it seeds probeResources and dispatches probeEnrichment.
 	TypeGen int
+	// Err is non-nil when the paginated fetcher returned a partial-success
+	// composite error: SOME resources made it back AND something failed
+	// (e.g. one inline-group-policy enumeration call timed out). The handler
+	// renders Resources as usual AND routes Err through FlashMsg so the `!`
+	// log records the partial failure. Without this field a non-nil err
+	// from the fetcher caused the dispatcher to emit APIErrorMsg and drop
+	// the partial Resources entirely — a regression of the never-silent-skip
+	// rule that produced an empty list when one of N inline-policy calls
+	// failed.
+	Err error
 }
 
 // LoadMoreMsg triggers loading the next page of a paginated resource list.
@@ -233,8 +243,8 @@ type AvailabilityCheckedMsg struct {
 	Truncated    bool                // true if count is from a truncated first page
 	Err          error               // non-nil means "couldn't check" -- treat as unknown, don't grey out
 	Gen          int                 // generation counter -- ignore if != current availabilityGen
-	Issues       int                 // count of IsIssueRowColor() resources (red/yellow only)
-	Resources    []resource.Resource // retained first-page resources for Wave 2 enricher consumption
+	Issues    int                 // count of IsIssueRowColor() resources (red/yellow only)
+	Resources []resource.Resource // Populated on success AND on partial-success (Err non-nil but partial results present)
 }
 
 // EnrichmentCheckedMsg reports one resource type's Wave 2 enrichment result.
@@ -243,12 +253,13 @@ type EnrichmentCheckedMsg struct {
 	Issues       int  // updated issue count after enrichment (menu badge — ! severity only)
 	Truncated    bool // whether the enrichment count is a lower bound
 	// Findings is the per-resource finding map for this type, keyed by
-	// resource.Resource.ID. Populated on success; nil/empty when Err != nil.
-	// May include findings for resources off-page (account-wide enrichers).
+	// resource.Resource.ID. Populated on success AND on partial-success (Err
+	// non-nil but partial results present). May include findings for resources
+	// off-page (account-wide enrichers).
 	Findings map[string]resource.EnrichmentFinding
 	// FieldUpdates carries per-resource Fields[] mutations to merge into
-	// cached rows. Keyed by resource ID then by field key. Nil when the
-	// enricher produced no field updates.
+	// cached rows. Keyed by resource ID then by field key. Populated on success
+	// AND on partial-success (Err non-nil but partial results present).
 	FieldUpdates map[string]map[string]string
 	// TruncatedIDs carries the per-resource truncation signal from the enricher.
 	// Keyed by Resource.ID. Rows in this set are rendered as "?" because the

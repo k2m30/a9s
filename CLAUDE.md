@@ -173,9 +173,3 @@ When code changes affect any of the following, update the shared source and rege
 - Install methods changed → `docs/shared/install.md`
 - Resource types added/removed/renamed → `docs/README.tmpl.md` services table + `website/content/resources.md`
 - Go version bumped → `docs/shared/install.md`, CONTRIBUTING.md
-
-## Recent Changes
-- 019-related-panel-checkers: Added Go 1.26+ (CLAUDE.md) + AWS SDK Go v2 (service clients for autoscaling, codeartifact, codebuild, codepipeline, dynamodb, ec2, ecr, ecs, efs, elasticbeanstalk, elbv2, events, iam, kms, lambda, rds, secretsmanager, ses, sesv2, sfn, sns, ssm, events/eventbridge, backup), Bubble Tea v2.0.2, Lipgloss v2.0.2, yaml.v3
-
-- 018-enrichment-visibility: Added Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2, yaml.v3
-- 017-issue-counts-attention-filter: Added Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2, yaml.v3
