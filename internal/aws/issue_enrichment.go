@@ -139,4 +139,20 @@ type IssueEnricherResult struct {
 // Non-cross-ref enrichers ignore the cache via `_ resource.ResourceCache`.
 // This is the Wave 2 issue-enrichment contract; distinct from on-demand DetailEnricher
 // (internal/resource/enricher.go) which enriches a single resource for detail views.
+//
+// Cache invariant — read-only shallow snapshot:
+// The dispatcher (internal/tui/app_probes.go probeEnrichment) builds the cache
+// once at dispatch time via m.buildResourceCacheSnapshot() and passes the
+// resulting map by value. The map and its ResourceCacheEntry structs are
+// freshly allocated, but the .Resources slice header is COPIED — its backing
+// array is shared with the live m.resourceCache / m.probeResources / m.lazyResourceCache
+// state. Enrichers MUST treat the cache as read-only:
+//   - DO NOT append to cache[k].Resources (would mutate the shared backing array
+//     when len < cap, surfacing as phantom rows in the live view).
+//   - DO NOT mutate fields on cache[k].Resources[i] or cache[k].Resources[i].RawStruct
+//     (those are pointers / interface values shared with the running app).
+//   - DO read field values, lengths, and IsTruncated freely.
+// Violations are not currently caught at compile time. Future contributors
+// who need to derive a mutable view should append([]Resource{}, slice...) into
+// a local slice first.
 type IssueEnricherFunc func(ctx context.Context, clients *ServiceClients, resources []resource.Resource, cache resource.ResourceCache) (IssueEnricherResult, error)
