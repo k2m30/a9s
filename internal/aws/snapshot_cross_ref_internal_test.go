@@ -55,6 +55,16 @@ func TestComputeMergedStatus_MultiPhraseSuffix(t *testing.T) {
 			newPhrases: []string{"orphan: source DB deleted"},
 			want:       "orphan: source DB deleted",
 		},
+		// Fetcher-emits-raw-AWS-state case: dbc-snap sets Status="available"
+		// directly (no §4 phrase computed), Issues empty. Cross-ref enricher
+		// adds an orphan phrase — should override the raw "available".
+		{
+			name:           "raw_status_no_issues_overridden_by_new_phrase",
+			existingStatus: "available",
+			existingIssues: nil,
+			newPhrases:     []string{"orphan: source cluster deleted"},
+			want:           "orphan: source cluster deleted",
+		},
 		{
 			name:           "single_existing_no_new",
 			existingStatus: "unencrypted",

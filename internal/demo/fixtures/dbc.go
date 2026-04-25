@@ -54,6 +54,17 @@ const (
 	ProdDBCSnapDocDBID  = "rds:acme-docdb-prod-2026-03-20"
 	ProdDBCSnapDocDBARN = "arn:aws:rds:us-east-1:123456789012:cluster-snapshot:rds:acme-docdb-prod-2026-03-20"
 
+	// WarnDBCSnapOrphanID — orphan: parent cluster NOT in dbc list.
+	// Pins the SnapshotCrossRef helper's orphan rule for dbc-snap.
+	WarnDBCSnapOrphanID  = "orphan-deleted-cluster-snap"
+	WarnDBCSnapOrphanARN = "arn:aws:rds:us-east-1:123456789012:cluster-snapshot:orphan-deleted-cluster-snap"
+
+	// WarnDBCSnapPastRetentionID — automated snapshot 30 days old whose
+	// parent cluster (ProdDbcID = acme-docdb-prod, BackupRetentionPeriod=7)
+	// is in the dbc cache. Pins the past-retention rule on dbc-snap.
+	WarnDBCSnapPastRetentionID  = "rds:dbc-retention-test"
+	WarnDBCSnapPastRetentionARN = "arn:aws:rds:us-east-1:123456789012:cluster-snapshot:rds:dbc-retention-test"
+
 	// shared internal constants
 	dbcKMSKeyID = "arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"
 	dbcSGID     = "sg-0ccc333333333333c"
@@ -298,6 +309,39 @@ func buildDBCSnapshots() []docdbtypes.DBClusterSnapshot {
 			EngineVersion:               aws.String("4.0.0"),
 			SnapshotType:                aws.String("manual"),
 			SnapshotCreateTime:          aws.Time(mustTime("2026-03-18T20:00:00Z")),
+			StorageType:                 aws.String("standard"),
+			StorageEncrypted:            aws.Bool(true),
+			VpcId:                       aws.String(dbcVPCID),
+		},
+		// Orphan snapshot — parent cluster "deleted-legacy-cluster" NOT in dbc list.
+		// Pins the SnapshotCrossRef helper orphan rule for dbc-snap.
+		{
+			DBClusterSnapshotIdentifier: aws.String(WarnDBCSnapOrphanID),
+			DBClusterIdentifier:         aws.String("deleted-legacy-cluster"),
+			DBClusterSnapshotArn:        aws.String(WarnDBCSnapOrphanARN),
+			Status:                      aws.String("available"),
+			Engine:                      aws.String("docdb"),
+			EngineVersion:               aws.String("4.0.0"),
+			SnapshotType:                aws.String("manual"),
+			SnapshotCreateTime:          aws.Time(mustTime("2026-03-15T03:00:00Z")),
+			StorageType:                 aws.String("standard"),
+			StorageEncrypted:            aws.Bool(true),
+			VpcId:                       aws.String(dbcVPCID),
+		},
+		// Past-retention snapshot — automated, 30 days old, parent
+		// ProdDbcID (acme-docdb-prod, BackupRetentionPeriod=7) IS in the dbc cache.
+		// SnapshotCreateTime is dynamic (now-30d) so the enricher always sees
+		// it as past-retention regardless of test date.
+		{
+			DBClusterSnapshotIdentifier: aws.String(WarnDBCSnapPastRetentionID),
+			DBClusterIdentifier:         aws.String(ProdDbcID),
+			DBClusterSnapshotArn:        aws.String(WarnDBCSnapPastRetentionARN),
+			Status:                      aws.String("available"),
+			Engine:                      aws.String("docdb"),
+			EngineVersion:               aws.String("5.0.0"),
+			SnapshotType:                aws.String("automated"),
+			SnapshotCreateTime:          aws.Time(time.Now().UTC().Add(-30 * 24 * time.Hour)),
+			KmsKeyId:                    aws.String(dbcKMSKeyID),
 			StorageType:                 aws.String("standard"),
 			StorageEncrypted:            aws.Bool(true),
 			VpcId:                       aws.String(dbcVPCID),
