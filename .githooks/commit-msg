@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Commit-msg hook: block commit messages that match sensitive patterns.
+# Bypassing with --no-verify is FORBIDDEN.
+set -euo pipefail
+
+msg_file="$1"
+repo_root="$(git rev-parse --show-toplevel)"
+patterns="$repo_root/.githooks/sensitive_patterns.txt"
+
+if [[ ! -f "$patterns" ]]; then
+  echo "[commit-msg] missing $patterns; refusing to commit" >&2
+  exit 1
+fi
+
+# Strip comments and blank lines from the patterns file before feeding to
+# grep — an empty pattern matches every line and would block everything.
+effective_patterns="$(grep -vE '^[[:space:]]*(#|$)' "$patterns")"
+
+matches="$(grep -niE "$effective_patterns" "$msg_file" || true)"
+
+if [[ -n "$matches" ]]; then
+  echo "============================================================" >&2
+  echo "[commit-msg] BLOCKED: commit message contains sensitive data" >&2
+  echo "============================================================" >&2
+  echo "$matches" >&2
+  echo "" >&2
+  echo "Edit the message to use placeholders. Bypass with --no-verify" >&2
+  echo "is FORBIDDEN." >&2
+  exit 1
+fi
+
+exit 0
