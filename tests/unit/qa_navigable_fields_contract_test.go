@@ -104,7 +104,7 @@ var navigableContracts = []navContract{
 	// ddb — DynamoDB Tables
 	{shortName: "ddb", apiDoc: "https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_SSEDescription.html", fieldPath: "SSEDescription.KMSMasterKeyArn", targetType: "kms", reasoning: "TableDescription.SSEDescription.KMSMasterKeyArn is the KMS key used for server-side encryption."},
 
-	// dbc-snap — DocumentDB Snapshots
+	// dbc-snap — DB Cluster Snapshots
 	{shortName: "dbc-snap", apiDoc: "https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBClusterSnapshot.html", fieldPath: "VpcId", targetType: "vpc", reasoning: "DBClusterSnapshot.VpcId — the VPC the source cluster was in."},
 	{shortName: "dbc-snap", apiDoc: "https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBClusterSnapshot.html", fieldPath: "KmsKeyId", targetType: "kms", reasoning: "DBClusterSnapshot.KmsKeyId — the KMS key used to encrypt the snapshot."},
 

@@ -57,7 +57,7 @@ func TestRelated_DBC_Registered(t *testing.T) {
 		"kms":        {"KMS Key", true},
 		"secrets":    {"Secrets Manager", true},
 		"dbi":        {"RDS Instances", true},
-		"dbc-snap": {"DocumentDB Snapshots", true},
+		"dbc-snap": {"DB Cluster Snapshots", true},
 		"subnet":     {"Subnets", true},
 		"vpc":        {"VPC", true},
 	}

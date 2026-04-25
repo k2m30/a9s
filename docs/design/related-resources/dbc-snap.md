@@ -1,4 +1,4 @@
-# DocumentDB Snapshots (dbc-snap) — Related Resources
+# DB Cluster Snapshots (dbc-snap) — Related Resources
 
 ## Real-World Use Cases
 

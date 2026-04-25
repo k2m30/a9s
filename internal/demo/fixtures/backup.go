@@ -180,6 +180,25 @@ func buildBackupRecoveryPoints() map[string][]backuptypes.RecoveryPointByResourc
 				CreationDate:     aws.Time(mustParseBackupTime("2026-04-20T03:00:00Z")),
 			},
 		},
+		// dbc-snap → backup pivot: AWS Backup can produce DBClusterSnapshots
+		// (DocumentDB and Aurora both). Recovery points keyed on the snapshot
+		// ARN drive the dbc-snap→backup pivot to Count ≥ 1 on the graph-roots.
+		ProdDBCSnapAuroraARN: {
+			{
+				RecoveryPointArn: aws.String("arn:aws:backup:us-east-1:123456789012:recovery-point:rp-aurora-cluster-daily-20260415"),
+				BackupVaultName:  aws.String(BackupProdVaultName),
+				Status:           backuptypes.RecoveryPointStatusCompleted,
+				CreationDate:     aws.Time(mustParseBackupTime("2026-04-15T04:00:00Z")),
+			},
+		},
+		ProdDBCSnapDocDBARN: {
+			{
+				RecoveryPointArn: aws.String("arn:aws:backup:us-east-1:123456789012:recovery-point:rp-docdb-cluster-daily-20260320"),
+				BackupVaultName:  aws.String(BackupProdVaultName),
+				Status:           backuptypes.RecoveryPointStatusCompleted,
+				CreationDate:     aws.Time(mustParseBackupTime("2026-03-20T04:00:00Z")),
+			},
+		},
 	}
 }
 
@@ -403,11 +422,12 @@ func buildBackupSelections() map[string][]backuptypes.BackupSelection {
 			},
 		},
 
-		// plan-broken-2failed (graph-root for backup; also covers dbi-snap pivots):
-		// uses AcmeBackupRoleProd — role pivot resolves ≥1 on U9.
+		// plan-broken-2failed (graph-root for backup; also covers dbi-snap and
+		// dbc-snap pivots): uses AcmeBackupRoleProd — role pivot resolves ≥1 on U9.
 		// Resources covers the dbi-snap parent DBs (ProdDbiID + ProdDbiAuroraID)
-		// so every dbi-snap whose parent is one of those DBs gets the backup
-		// pivot Count ≥ 1. AWS Backup selects parent DBs, not snapshots.
+		// AND the dbc-snap parent clusters (ProdDbcARN + Aurora cluster ARN), so
+		// every snapshot whose parent is one of those resources gets the backup
+		// pivot Count ≥ 1. AWS Backup selects parent DBs/clusters, not snapshots.
 		ProdDatabasePlanID: {
 			{
 				SelectionName: aws.String("acme-prod-db-selection"),
@@ -416,6 +436,8 @@ func buildBackupSelections() map[string][]backuptypes.BackupSelection {
 					"arn:aws:rds:us-east-1:123456789012:db:acme-prod-primary",
 					ProdDbiARN,
 					ProdDbiAuroraARN,
+					ProdDbcARN,
+					"arn:aws:rds:us-east-1:123456789012:cluster:prod-aurora-cluster",
 				},
 			},
 		},
