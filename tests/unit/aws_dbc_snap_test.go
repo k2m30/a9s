@@ -31,6 +31,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
+	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 )
@@ -165,6 +166,151 @@ func TestComputeDBCSnapStatusAndIssues(t *testing.T) {
 			for i, want := range tc.wantIssues {
 				if gotIssues[i] != want {
 					t.Errorf("ComputeDBCSnapStatusAndIssues issues[%d]:\n  got:  %q\n  want: %q", i, gotIssues[i], want)
+				}
+			}
+		})
+	}
+}
+
+// TestComputeRDSDBClusterSnapshotStatusAndIssues pins the §4 phrase output and
+// Issues slice for ComputeRDSDBClusterSnapshotStatusAndIssues (rdstypes shape).
+// Algorithm mirrors ComputeDBCSnapStatusAndIssues — same precedence ladder.
+func TestComputeRDSDBClusterSnapshotStatusAndIssues(t *testing.T) {
+	now := time.Now().UTC()
+	age400d := now.Add(-400 * 24 * time.Hour)
+	age10d := now.Add(-10 * 24 * time.Hour)
+
+	cases := []struct {
+		name       string
+		snap       rdstypes.DBClusterSnapshot
+		wantStatus string
+		wantIssues []string
+	}{
+		{
+			name: "healthy_available",
+			snap: rdstypes.DBClusterSnapshot{
+				DBClusterSnapshotIdentifier: aws.String("rds-snap-healthy"),
+				Status:                      aws.String("available"),
+				SnapshotType:                aws.String("automated"),
+				SnapshotCreateTime:          &age10d,
+			},
+			wantStatus: "",
+			wantIssues: nil,
+		},
+		{
+			name: "creating_status",
+			snap: rdstypes.DBClusterSnapshot{
+				DBClusterSnapshotIdentifier: aws.String("rds-snap-creating"),
+				Status:                      aws.String("creating"),
+				SnapshotType:                aws.String("manual"),
+				SnapshotCreateTime:          &age10d,
+			},
+			wantStatus: "creating",
+			wantIssues: []string{"creating"},
+		},
+		{
+			name: "failed_status",
+			snap: rdstypes.DBClusterSnapshot{
+				DBClusterSnapshotIdentifier: aws.String("rds-snap-failed"),
+				Status:                      aws.String("failed"),
+				SnapshotType:                aws.String("manual"),
+				SnapshotCreateTime:          &age10d,
+			},
+			wantStatus: "failed",
+			wantIssues: []string{"failed"},
+		},
+		{
+			name: "incompatible_restore_status",
+			snap: rdstypes.DBClusterSnapshot{
+				DBClusterSnapshotIdentifier: aws.String("rds-snap-incompat"),
+				Status:                      aws.String("incompatible-restore"),
+				SnapshotType:                aws.String("manual"),
+				SnapshotCreateTime:          &age10d,
+			},
+			wantStatus: "incompatible-restore",
+			wantIssues: []string{"incompatible-restore"},
+		},
+		{
+			// manual-old: available + manual + age > 365d → "manual, unused Nd".
+			// 400d old → phrase is "manual, unused 400d".
+			name: "manual_old_available",
+			snap: rdstypes.DBClusterSnapshot{
+				DBClusterSnapshotIdentifier: aws.String("rds-snap-manual-old"),
+				Status:                      aws.String("available"),
+				SnapshotType:                aws.String("manual"),
+				SnapshotCreateTime:          &age400d,
+			},
+			wantStatus: "manual, unused 400d",
+			wantIssues: []string{"manual, unused 400d"},
+		},
+		{
+			// manual-young: available + manual + age=10d → healthy (no issue).
+			name: "manual_young_available",
+			snap: rdstypes.DBClusterSnapshot{
+				DBClusterSnapshotIdentifier: aws.String("rds-snap-manual-young"),
+				Status:                      aws.String("available"),
+				SnapshotType:                aws.String("manual"),
+				SnapshotCreateTime:          &age10d,
+			},
+			wantStatus: "",
+			wantIssues: nil,
+		},
+		{
+			// automated-old: manual-age rule applies ONLY to manual snapshots.
+			// An automated snapshot 400d old is healthy at the fetcher level.
+			name: "automated_old_available_healthy",
+			snap: rdstypes.DBClusterSnapshot{
+				DBClusterSnapshotIdentifier: aws.String("rds-snap-auto-old"),
+				Status:                      aws.String("available"),
+				SnapshotType:                aws.String("automated"),
+				SnapshotCreateTime:          &age400d,
+			},
+			wantStatus: "",
+			wantIssues: nil,
+		},
+		{
+			// Broken precedence: failed suppresses the manual-age Warning.
+			name: "failed_with_manual_age_suppressed",
+			snap: rdstypes.DBClusterSnapshot{
+				DBClusterSnapshotIdentifier: aws.String("rds-snap-failed-manual-old"),
+				Status:                      aws.String("failed"),
+				SnapshotType:                aws.String("manual"),
+				SnapshotCreateTime:          &age400d,
+			},
+			wantStatus: "failed",
+			wantIssues: []string{"failed"},
+		},
+		{
+			// nil Status: should not panic; returns ("", nil).
+			name: "nil_status",
+			snap: rdstypes.DBClusterSnapshot{
+				DBClusterSnapshotIdentifier: aws.String("rds-snap-nil-status"),
+				Status:                      nil,
+				SnapshotType:                aws.String("automated"),
+				SnapshotCreateTime:          &age10d,
+			},
+			wantStatus: "",
+			wantIssues: nil,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotStatus, gotIssues := awsclient.ComputeRDSDBClusterSnapshotStatusAndIssues(tc.snap)
+
+			if gotStatus != tc.wantStatus {
+				t.Errorf("ComputeRDSDBClusterSnapshotStatusAndIssues status:\n  got:  %q\n  want: %q", gotStatus, tc.wantStatus)
+			}
+
+			if len(gotIssues) != len(tc.wantIssues) {
+				t.Errorf("ComputeRDSDBClusterSnapshotStatusAndIssues issues length:\n  got:  %v (len=%d)\n  want: %v (len=%d)",
+					gotIssues, len(gotIssues), tc.wantIssues, len(tc.wantIssues))
+				return
+			}
+			for i, want := range tc.wantIssues {
+				if gotIssues[i] != want {
+					t.Errorf("ComputeRDSDBClusterSnapshotStatusAndIssues issues[%d]:\n  got:  %q\n  want: %q",
+						i, gotIssues[i], want)
 				}
 			}
 		})

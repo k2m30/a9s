@@ -33,6 +33,9 @@ func init() {
 		}
 
 		// RDS phase: continuation already transitioned to RDS side.
+		// Partial DocDB rows were already returned in the prior page; this is a
+		// single-side fetch with no prior-state append — an RDS error here returns
+		// an empty result with the error so the operator can retry by re-opening the list.
 		if rdsTok, ok2 := strings.CutPrefix(continuationToken, "rds:"); ok2 {
 			result, err := FetchRDSDBClustersPage(ctx, c.RDS, rdsTok)
 			if err != nil {
@@ -56,10 +59,20 @@ func init() {
 			return docResult, nil
 		}
 
-		// DocDB exhausted — fetch RDS page 1 and append.
-		rdsResult, err := FetchRDSDBClustersPage(ctx, c.RDS, "")
-		if err != nil {
-			return resource.FetchResult{}, err
+		// Rule E5: preserve partial DocDB rows on RDS failure — return what we have
+		// with IsTruncated=true so the operator sees the DocDB rows and a composite
+		// error rather than an empty result with a silent discard.
+		rdsResult, rdsErr := FetchRDSDBClustersPage(ctx, c.RDS, "")
+		if rdsErr != nil {
+			return resource.FetchResult{
+				Resources: docResult.Resources,
+				Pagination: &resource.PaginationMeta{
+					IsTruncated: true,
+					NextToken:   "rds:",
+					PageSize:    len(docResult.Resources),
+					TotalHint:   -1,
+				},
+			}, fmt.Errorf("dbc: RDS-side cluster fetch failed: %w", rdsErr)
 		}
 		docResult.Resources = append(docResult.Resources, rdsResult.Resources...)
 		if rdsResult.Pagination != nil && rdsResult.Pagination.IsTruncated {
@@ -93,6 +106,7 @@ func init() {
 		{TargetType: "dbc-snap", DisplayName: "DB Cluster Snapshots", Checker: checkDbcDbcSnap, NeedsTargetCache: true},
 		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkDbcSubnet},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkDbcVPC},
+		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkDbcCTEvents},
 	})
 
 	// docdb_types.DBCluster: VpcSecurityGroups[].VpcSecurityGroupId (list),

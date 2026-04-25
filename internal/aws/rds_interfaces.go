@@ -30,8 +30,11 @@ type RDSDescribeDBClusterSnapshotsAPI interface {
 }
 
 // RDSDescribeDBSubnetGroupsAPI defines the interface for the RDS
-// DescribeDBSubnetGroups operation. Used by dbi→eni path for VPC/subnet
-// resolution when the subnet group is needed.
+// DescribeDBSubnetGroups operation. Used by the dbi→eni path for VPC/subnet
+// resolution when the subnet group is needed, and by the dbc fetcher for
+// Aurora-side subnet-group resolution (rdstypes.DBCluster rows). DocDB-side
+// rows (docdb_types.DBCluster) resolve via c.DocDB.DescribeDBSubnetGroups.
+// See docs/resources/dbc.md §1 Coverage.
 type RDSDescribeDBSubnetGroupsAPI interface {
 	DescribeDBSubnetGroups(ctx context.Context, params *rds.DescribeDBSubnetGroupsInput, optFns ...func(*rds.Options)) (*rds.DescribeDBSubnetGroupsOutput, error)
 }

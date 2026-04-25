@@ -101,6 +101,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   window, the checker now returns `UnknownRelated("backup")` instead
   of `Count: 0`. Previously the pivot lied with a definitive zero
   for snapshots whose parent cluster fell past page 1 of `dbc`.
+- **`dbc → subnet` and `dbc → vpc` pivots now resolve correctly for Aurora
+  clusters** — the subnet-group lookup now dispatches by RawStruct shape:
+  Aurora rows (`rdstypes.DBCluster`) call `c.RDS.DescribeDBSubnetGroups`,
+  DocDB rows (`docdbtypes.DBCluster`) call `c.DocDB.DescribeDBSubnetGroups`.
+  Previously the DocDB-only call returned empty for Aurora rows.
 
 ### Spec
 

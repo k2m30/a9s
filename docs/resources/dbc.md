@@ -16,10 +16,19 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 ## 1. Identity
 
 - **shortName**: `dbc`
-- **Display name**: DocumentDB Clusters
+- **Display name**: DB Clusters
 - **AWS API reference**: <https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBCluster.html>
-- **List API**: `DescribeDBClusters` (DocumentDB — filter `engine=docdb` to exclude RDS engines sharing the control plane)
+- **List API**: BOTH `c.DocDB.DescribeDBClusters` AND `c.RDS.DescribeDBClusters`, results merged via the `docdb:` / `rds:` continuation-token prefix scheme.
 - **Describe API (if any)**: `DescribePendingMaintenanceActions` (one account-wide call, shared with `dbi`)
+- **Coverage**: this resource type covers BOTH DocumentDB clusters AND Aurora + Multi-AZ DB clusters.
+  **The DocDB and RDS SDKs are NOT interchangeable** — the docdb-side SDK
+  (docdb@v1.48.12/api_op_DescribeDBClusters.go:14-19) instructs callers to use
+  `filterName=engine,Values=docdb` for DocDB-only results; unfiltered behavior is
+  documented as ambiguous, not engine-agnostic. The rds-side SDK
+  (rds@v1.116.3/api_op_DescribeDBClusters.go:19-28) returns Aurora + Multi-AZ clusters;
+  it may also return Neptune / DocumentDB rows per the official RDS docstring. Both SDKs
+  must be called to get complete coverage. The a9s fetcher calls both and merges results
+  using the `docdb:` / `rds:` continuation-token prefix scheme.
 
 ## 2. Related Resources Panel (detail view, right column)
 

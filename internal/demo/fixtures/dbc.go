@@ -373,34 +373,6 @@ func buildDBCSubnetGroups() []docdbtypes.DBSubnetGroup {
 				},
 			},
 		},
-		// Subnet group for prod-aurora-cluster — required for the dbc→subnet
-		// and dbc→vpc pivots on the Aurora "all pivots non-zero" graph-root.
-		// Aurora uses rdsSubnetGroup ("acme-rds-subnet-group") in the dbc
-		// fixture; the group must exist in the DocDB-API-backed cache since
-		// the checker calls DescribeDBSubnetGroups on c.DocDB.
-		{
-			DBSubnetGroupName:        aws.String(rdsSubnetGroup),
-			DBSubnetGroupDescription: aws.String("Subnet group for prod-aurora-cluster"),
-			DBSubnetGroupArn:         aws.String("arn:aws:rds:us-east-1:123456789012:subgrp:" + rdsSubnetGroup),
-			VpcId:                    aws.String(dbcVPCID),
-			SubnetGroupStatus:        aws.String("Complete"),
-			Subnets: []docdbtypes.Subnet{
-				{
-					SubnetIdentifier: aws.String(dbcSubnetA),
-					SubnetStatus:     aws.String("Active"),
-					SubnetAvailabilityZone: &docdbtypes.AvailabilityZone{
-						Name: aws.String("us-east-1a"),
-					},
-				},
-				{
-					SubnetIdentifier: aws.String(dbcSubnetB),
-					SubnetStatus:     aws.String("Active"),
-					SubnetAvailabilityZone: &docdbtypes.AvailabilityZone{
-						Name: aws.String("us-east-1b"),
-					},
-				},
-			},
-		},
 	}
 }
 
