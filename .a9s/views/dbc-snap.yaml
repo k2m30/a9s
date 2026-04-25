@@ -6,8 +6,8 @@ list:
     path: DBClusterIdentifier
     width: 28
   Status:
-    path: Status
-    width: 12
+    key: status
+    width: 32
   Engine:
     path: Engine
     width: 12

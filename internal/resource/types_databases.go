@@ -477,7 +477,11 @@ func databasesResourceTypes() []ResourceTypeDef {
 			Columns: []Column{
 				{Key: "snapshot_id", Title: "Snapshot ID", Width: 36, Sortable: true},
 				{Key: "cluster_id", Title: "Cluster ID", Width: 28, Sortable: true},
-				{Key: "status", Title: "Status", Width: 12, Sortable: true},
+				// Status column reads from Fields["status"] (set by the
+				// fetcher to the §4 phrase, then overwritten by the cross-ref
+				// enricher's FieldUpdates). Width 32 matches dbi-snap so
+				// "automated, Nd past retention" fits without truncation.
+				{Key: "status", Title: "Status", Width: 32, Sortable: true},
 				{Key: "engine", Title: "Engine", Width: 12, Sortable: true},
 				{Key: "snapshot_type", Title: "Type", Width: 12, Sortable: true},
 				{Key: "snapshot_create_time", Title: "Created", Width: 22, Sortable: true},
