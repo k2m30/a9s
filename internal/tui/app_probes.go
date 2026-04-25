@@ -339,18 +339,14 @@ func (m *Model) probeEnrichment(shortName string, gen int) tea.Cmd {
 	if enricherFn == nil {
 		return nil
 	}
-	// Build a resource.ResourceCache snapshot from the TUI cache so cross-ref
-	// enrichers (e.g. rds-snap) can read sibling resource lists without extra API calls.
-	cacheSnap := make(resource.ResourceCache, len(m.resourceCache))
-	for k, entry := range m.resourceCache {
-		if entry != nil {
-			isTruncated := entry.pagination != nil && entry.pagination.IsTruncated
-			cacheSnap[k] = resource.ResourceCacheEntry{
-				Resources:   entry.resources,
-				IsTruncated: isTruncated,
-			}
-		}
-	}
+	// Build a resource.ResourceCache snapshot via buildResourceCacheSnapshot
+	// — it merges m.probeResources (first-page rows retained by the
+	// availability probe) AND m.lazyResourceCache AND m.resourceCache.
+	// On the normal startup path m.resourceCache is empty until the user
+	// opens a list, so building from m.resourceCache alone here would leave
+	// the first enrichment pass blind to siblings.
+	// Regression pin: TestProbeEnrichment_CacheSnapshotMergesProbeResources.
+	cacheSnap := m.buildResourceCacheSnapshot()
 	return func() tea.Msg {
 		if clients == nil {
 			return messages.EnrichmentCheckedMsg{
