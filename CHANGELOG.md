@@ -61,6 +61,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`dbc-snap → backup` pivot** now resolves plan IDs via cache scan
   instead of recovery-point ARNs via API call. Drilling into the pivot
   lands on a non-empty backup-plan list (was empty).
+- **`dbc-snap` fetcher now populates `Resource.Issues` and computes the
+  §4 phrase via `ComputeDBCSnapStatusAndIssues`** — mirroring the
+  `dbi-snap` pattern. Adds `failed`, `incompatible-*` (Broken),
+  `creating` (Warning), and `manual age > 365d` (Warning) signals.
+  Previously the fetcher set `Status` to a raw AWS keyword passthrough
+  and left `Issues=nil`, breaking universal rule U7f and the detail-view
+  Attention section.
+- **`computeMergedStatus` reverted to honor the fetcher's §4 phrase** —
+  removed a defensive gate added in ab1d7c1 that masked the missing-Issues
+  bug above by silently letting cross-ref phrases override
+  fetcher-emitted Broken phrases (a `failed + orphan` row would render
+  as just `orphan: source cluster deleted`, losing the Broken signal).
+  The fetcher contract (Issues populated for every active Wave-1 phrase)
+  is now load-bearing; the helper trusts it.
+- **`SnapshotCrossRefConfig.OrphanRowLabel` renamed to `ParentRowLabel`** —
+  the field is used both for the orphan citation row AND the
+  past-retention parent-cite row; the original name implied
+  orphan-specific use.
+- **Dead `rdstypes` fallback branches deleted** from
+  `dbc_snap_issue_enrichment.go` and `dbc_snap_related.go`. The DocDB
+  SDK and RDS SDK both target `rds.{region}.amazonaws.com`; Aurora
+  cluster snapshots arrive deserialized as `docdbtypes.DBClusterSnapshot`,
+  so a single shape covers both engines. `dbc.go` /  `dbc_snap.go`
+  comments tightened to document this backend-sharing invariant.
+- **`checkDbcSnapBackup` truncation handling** — when the dbc cache is
+  truncated AND the parent ARN cannot be resolved from the visible
+  window, the checker now returns `UnknownRelated("backup")` instead
+  of `Count: 0`. Previously the pivot lied with a definitive zero
+  for snapshots whose parent cluster fell past page 1 of `dbc`.
+
+### Spec
+- `docs/resources/dbc-snap.md` §3.1 + §4 now list the `incompatible-*`
+  Broken signal (defensive parity with the documented `DBSnapshot`
+  status family).
 
 ## [3.44.0] - 2026-04-25
 

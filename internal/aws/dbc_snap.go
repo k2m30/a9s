@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
+	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -36,21 +39,64 @@ func init() {
 	})
 }
 
-// computeDBCSnapPhrase returns the §4 status phrase for a DocDB / Aurora
-// cluster snapshot given the raw AWS Status keyword. Healthy = "available"
-// → blank. Transitional and Broken states carry their keyword verbatim
-// (no per-row failure-reason field exists on DBClusterSnapshot).
-func computeDBCSnapPhrase(rawStatus string) string {
-	switch rawStatus {
-	case "available", "":
-		return ""
-	default:
-		return rawStatus
+// ComputeDBCSnapStatusAndIssues computes the §4 status phrase and ordered
+// issues slice for a DocDB / Aurora cluster snapshot. Returns ("", nil) for a
+// healthy (available) snapshot. The top phrase becomes Resource.Status; the
+// full slice becomes Resource.Issues.
+//
+// §0.1 / §3.1 precedence ladder (Broken > Warning, table order within severity):
+//  1. Broken: Status == "failed" → phrase "failed"
+//  2. Broken: strings.HasPrefix(Status, "incompatible-") → phrase verbatim
+//  3. Warning: Status == "creating" → phrase "creating" (DBClusterSnapshot
+//     has no PercentProgress field — §4 table omits it)
+//  4. Warning: manual snapshot older than 365d → "manual, unused <N>d" where
+//     N = int(time.Since(SnapshotCreateTime).Hours()/24).
+//     Gate: SnapshotType == "manual" AND SnapshotCreateTime != nil AND age > 365.
+//
+// Cross-ref signals (orphan, past-retention) are added by the Wave-1 issue
+// enricher (ComputeDBCSnapStatusAndIssues) via FieldUpdates, never here.
+func ComputeDBCSnapStatusAndIssues(snap docdbtypes.DBClusterSnapshot) (string, []string) {
+	rawStatus := ""
+	if snap.Status != nil {
+		rawStatus = *snap.Status
 	}
+
+	var issues []string
+
+	// Broken checks first (severity wins).
+	if rawStatus == "failed" {
+		issues = append(issues, "failed")
+		return buildStatusFromIssues(issues), issues
+	}
+	if strings.HasPrefix(rawStatus, "incompatible-") {
+		issues = append(issues, rawStatus)
+		return buildStatusFromIssues(issues), issues
+	}
+
+	// Warning: creating (transitional). DBClusterSnapshot has no PercentProgress.
+	if rawStatus == "creating" {
+		issues = append(issues, "creating")
+	}
+
+	// Warning: manual snapshot unused for > 365 days.
+	if snap.SnapshotType != nil && *snap.SnapshotType == "manual" && snap.SnapshotCreateTime != nil {
+		ageD := int(time.Since(*snap.SnapshotCreateTime).Hours() / 24)
+		if ageD > 365 {
+			issues = append(issues, fmt.Sprintf("manual, unused %dd", ageD))
+		}
+	}
+
+	return buildStatusFromIssues(issues), issues
 }
 
 // FetchDocDBClusterSnapshots calls the DocumentDB DescribeDBClusterSnapshots API and converts the
 // response into a slice of generic Resource structs.
+//
+// Backend note: both the docdb and rds SDK clients target rds.{region}.amazonaws.com.
+// DescribeDBClusterSnapshots is engine-agnostic at the backend; the SDK only chooses
+// the deserialization namespace. Aurora cluster snapshots therefore arrive here as
+// docdbtypes.DBClusterSnapshot shapes. No separate RDS-side fetcher is needed or
+// correct — adding one would duplicate results. Spec citation: docs/resources/dbc-snap.md §1.
 func FetchDocDBClusterSnapshots(ctx context.Context, api DocDBDescribeDBClusterSnapshotsAPI) ([]resource.Resource, error) {
 	var all []resource.Resource
 	token := ""
@@ -97,14 +143,11 @@ func FetchDocDBClusterSnapshotsPage(ctx context.Context, api DocDBDescribeDBClus
 
 		// Per spec §4 (docs/resources/dbc-snap.md), Status is the §4 phrase, not
 		// raw AWS state. Healthy snapshots render BLANK. Wave-1 fetcher-local
-		// signals (creating, failed) carry the §4 phrase. Cross-ref signals
-		// (orphan, past-retention) come from the issue enricher and overwrite
-		// via FieldUpdates.
-		rawStatus := ""
-		if snapshot.Status != nil {
-			rawStatus = *snapshot.Status
-		}
-		status := computeDBCSnapPhrase(rawStatus)
+		// signals (failed, incompatible-*, creating, manual-unused) are computed
+		// by ComputeDBCSnapStatusAndIssues and stored in Issues. Cross-ref signals
+		// (orphan, past-retention) come from enrichDBCSnapCrossRef and overwrite
+		// via FieldUpdates / merge with computeMergedStatus.
+		computedStatus, allIssues := ComputeDBCSnapStatusAndIssues(snapshot)
 
 		engine := ""
 		if snapshot.Engine != nil {
@@ -134,11 +177,12 @@ func FetchDocDBClusterSnapshotsPage(ctx context.Context, api DocDBDescribeDBClus
 		r := resource.Resource{
 			ID:     snapshotID,
 			Name:   snapshotID,
-			Status: status,
+			Status: computedStatus,
+			Issues: allIssues,
 			Fields: map[string]string{
 				"snapshot_id":          snapshotID,
 				"cluster_id":           clusterID,
-				"status":               status,
+				"status":               computedStatus,
 				"engine":               engine,
 				"snapshot_type":        snapshotType,
 				"snapshot_create_time": snapshotCreateTime,

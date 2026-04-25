@@ -65,6 +65,17 @@ const (
 	WarnDBCSnapPastRetentionID  = "rds:dbc-retention-test"
 	WarnDBCSnapPastRetentionARN = "arn:aws:rds:us-east-1:123456789012:cluster-snapshot:rds:dbc-retention-test"
 
+	// WarnDBCSnapFailedAndManualOldID — failed AND manual >365d AND parent
+	// missing → stacks 3 Wave-1 phrases. Pins the dbc-snap fetcher Issues
+	// contract + the helper computeMergedStatus precedence.
+	WarnDBCSnapFailedAndManualOldID  = "broken-dbc-snap-failed-manual-old"
+	WarnDBCSnapFailedAndManualOldARN = "arn:aws:rds:us-east-1:123456789012:cluster-snapshot:broken-dbc-snap-failed-manual-old"
+
+	// WarnDBCSnapIncompatibleRestoreID — Status=incompatible-restore
+	// (Broken precedence). Pins the dbc-snap incompatible-* signal.
+	WarnDBCSnapIncompatibleRestoreID  = "broken-dbc-snap-incompat-restore"
+	WarnDBCSnapIncompatibleRestoreARN = "arn:aws:rds:us-east-1:123456789012:cluster-snapshot:broken-dbc-snap-incompat-restore"
+
 	// shared internal constants
 	dbcKMSKeyID = "arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"
 	dbcSGID     = "sg-0ccc333333333333c"
@@ -357,6 +368,37 @@ func buildDBCSnapshots() []docdbtypes.DBClusterSnapshot {
 			SnapshotType:                aws.String("automated"),
 			SnapshotCreateTime:          aws.Time(mustTime("2026-03-20T04:30:00Z")),
 			StorageType:                 aws.String("iopt1"),
+			StorageEncrypted:            aws.Bool(true),
+			VpcId:                       aws.String(dbcVPCID),
+		},
+		// failed + manual + 400d age + parent missing — three Wave-1 phrases.
+		// Status=failed (Broken) early-returns from ComputeDBCSnapStatusAndIssues,
+		// so only the "failed" phrase is in Issues (Broken wins). Orphan signal
+		// from cross-ref enricher stacks via computeMergedStatus.
+		{
+			DBClusterSnapshotIdentifier: aws.String(WarnDBCSnapFailedAndManualOldID),
+			DBClusterIdentifier:         aws.String("deleted-legacy-cluster"), // orphan: same parent as WarnDBCSnapOrphanID
+			DBClusterSnapshotArn:        aws.String(WarnDBCSnapFailedAndManualOldARN),
+			Status:                      aws.String("failed"),
+			Engine:                      aws.String("docdb"),
+			EngineVersion:               aws.String("4.0.0"),
+			SnapshotType:                aws.String("manual"),
+			SnapshotCreateTime:          aws.Time(time.Now().UTC().Add(-400 * 24 * time.Hour)),
+			StorageType:                 aws.String("standard"),
+			StorageEncrypted:            aws.Bool(true),
+			VpcId:                       aws.String(dbcVPCID),
+		},
+		// incompatible-restore (Broken).
+		{
+			DBClusterSnapshotIdentifier: aws.String(WarnDBCSnapIncompatibleRestoreID),
+			DBClusterIdentifier:         aws.String(ProdDbcID),
+			DBClusterSnapshotArn:        aws.String(WarnDBCSnapIncompatibleRestoreARN),
+			Status:                      aws.String("incompatible-restore"),
+			Engine:                      aws.String("docdb"),
+			EngineVersion:               aws.String("5.0.0"),
+			SnapshotType:                aws.String("manual"),
+			SnapshotCreateTime:          aws.Time(time.Now().UTC().Add(-30 * 24 * time.Hour)),
+			StorageType:                 aws.String("standard"),
 			StorageEncrypted:            aws.Bool(true),
 			VpcId:                       aws.String(dbcVPCID),
 		},

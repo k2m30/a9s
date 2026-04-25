@@ -19,7 +19,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
-	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
@@ -94,12 +93,15 @@ func TestDBCSnap_Orphan_DocDB(t *testing.T) {
 }
 
 // TestDBCSnap_Orphan_Aurora verifies the orphan signal fires for an Aurora
-// cluster snapshot (rdstypes.DBClusterSnapshot shape) whose parent is missing.
-// dbc-snap covers BOTH DocumentDB and Aurora cluster snapshots.
+// cluster snapshot whose parent is missing. Aurora cluster snapshots arrive via
+// the DocDB SDK (docdbtypes.DBClusterSnapshot) — both Aurora and DocDB clusters
+// use the same DescribeDBClusterSnapshots backend; the SDK chooses the
+// deserialization namespace, not the engine. The Engine field carries
+// "aurora-postgresql" to distinguish the engine at the application layer.
 func TestDBCSnap_Orphan_Aurora(t *testing.T) {
 	enricher := dbcSnapEnricher(t)
 
-	otherCluster := rdstypes.DBCluster{
+	otherCluster := docdbtypes.DBCluster{
 		DBClusterIdentifier:   aws.String("other-aurora"),
 		BackupRetentionPeriod: aws.Int32(14),
 	}
@@ -112,7 +114,7 @@ func TestDBCSnap_Orphan_Aurora(t *testing.T) {
 		},
 	}
 
-	snap := rdstypes.DBClusterSnapshot{
+	snap := docdbtypes.DBClusterSnapshot{
 		DBClusterSnapshotIdentifier: aws.String("orphan-aurora-snap"),
 		DBClusterIdentifier:         aws.String("deleted-aurora"),
 		Engine:                      aws.String("aurora-postgresql"),

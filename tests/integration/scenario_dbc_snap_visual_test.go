@@ -90,3 +90,61 @@ func selectDBCSnapByID(t *testing.T, s *fullIntegrationScenario, id string) reso
 	t.Helper()
 	return fullIntegrationMustFindResourceByID(t, s.clients, "dbc-snap", id)
 }
+
+// TestScenario_DBCSnapVisual_FailedPlusManualOldStacks pins the multi-signal
+// visual rendering for WarnDBCSnapFailedAndManualOldID:
+//
+//   Status="failed" + SnapshotType="manual" + age=400d + parent="deleted-legacy-cluster"
+//   → two Wave-1 signals: failed (Broken) + orphan (Warning); manual-age is suppressed
+//   → rendered status column: "failed (+1)"
+//
+// Broken (failed) wins precedence; the manual-age Warning is suppressed;
+// the orphan cross-ref still stacks → 'failed (+1)'.
+//
+// Also asserts that WarnDBCSnapIncompatibleRestoreID renders
+// "incompatible-restore" (single Broken phrase, no multi-suffix).
+//
+// These tests FAIL until the coder ships:
+//   - ComputeDBCSnapStatusAndIssues in internal/aws/dbc_snap.go
+//   - WarnDBCSnapFailedAndManualOldID fixture in internal/demo/fixtures/dbc.go
+//   - WarnDBCSnapIncompatibleRestoreID fixture in internal/demo/fixtures/dbc.go
+func TestScenario_DBCSnapVisual_FailedPlusManualOldStacks(t *testing.T) {
+	scenario := fullIntegrationNewDemoScenario(t)
+	runDemoStartup(t, scenario)
+
+	scenario.OpenList("dbc-snap")
+
+	// Two signals: failed (Broken) + orphan (Warning); manual-age suppressed by
+	// Broken precedence → top="failed", suffix=(+1).
+	view := scenario.currentView()
+	failedMultiID := demofixtures.WarnDBCSnapFailedAndManualOldID
+
+	scenario.ExpectRowStatusEquals(failedMultiID, "failed (+1)")
+
+	// WarnDBCSnapIncompatibleRestoreID: single Broken phrase, no suffix.
+	scenario.ExpectRowStatusEquals(demofixtures.WarnDBCSnapIncompatibleRestoreID, "incompatible-restore")
+
+	_ = view // used for logging below
+
+	// -----------------------------------------------------------------
+	// Detail view: Attention section must carry the Broken phrase and the
+	// orphan cross-ref finding. The manual-age Warning is suppressed under
+	// Broken precedence and must NOT appear.
+	// -----------------------------------------------------------------
+	res := selectDBCSnapByID(t, scenario, failedMultiID)
+	scenario.OpenDetailResource("dbc-snap", res)
+	scenario.ExpectNoAPIError()
+	detailView := scenario.currentView()
+	t.Log("\n" + detailView)
+
+	// "Failed" (Broken) and the orphan cross-ref appear; "manual, unused" does not.
+	expectAttentionSection(t, detailView, []string{
+		"Failed",                        // Broken phrase (capitalized by injectAttentionSection)
+		"Orphan: source cluster deleted", // cross-ref finding Summary (capitalized by injectAttentionSection)
+		"deleted-legacy-cluster",        // orphan parent identifier in the Source Cluster row
+	})
+
+	scenario.Back()
+	t.Log("\n" + scenario.currentView())
+}
+
