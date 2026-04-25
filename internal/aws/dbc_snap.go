@@ -36,6 +36,19 @@ func init() {
 	})
 }
 
+// computeDBCSnapPhrase returns the §4 status phrase for a DocDB / Aurora
+// cluster snapshot given the raw AWS Status keyword. Healthy = "available"
+// → blank. Transitional and Broken states carry their keyword verbatim
+// (no per-row failure-reason field exists on DBClusterSnapshot).
+func computeDBCSnapPhrase(rawStatus string) string {
+	switch rawStatus {
+	case "available", "":
+		return ""
+	default:
+		return rawStatus
+	}
+}
+
 // FetchDocDBClusterSnapshots calls the DocumentDB DescribeDBClusterSnapshots API and converts the
 // response into a slice of generic Resource structs.
 func FetchDocDBClusterSnapshots(ctx context.Context, api DocDBDescribeDBClusterSnapshotsAPI) ([]resource.Resource, error) {
@@ -82,10 +95,16 @@ func FetchDocDBClusterSnapshotsPage(ctx context.Context, api DocDBDescribeDBClus
 			clusterID = *snapshot.DBClusterIdentifier
 		}
 
-		status := ""
+		// Per spec §4 (docs/resources/dbc-snap.md), Status is the §4 phrase, not
+		// raw AWS state. Healthy snapshots render BLANK. Wave-1 fetcher-local
+		// signals (creating, failed) carry the §4 phrase. Cross-ref signals
+		// (orphan, past-retention) come from the issue enricher and overwrite
+		// via FieldUpdates.
+		rawStatus := ""
 		if snapshot.Status != nil {
-			status = *snapshot.Status
+			rawStatus = *snapshot.Status
 		}
+		status := computeDBCSnapPhrase(rawStatus)
 
 		engine := ""
 		if snapshot.Engine != nil {

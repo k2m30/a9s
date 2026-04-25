@@ -221,10 +221,12 @@ func computeMergedStatus(existingStatus string, existingIssues []string, newPhra
 		return ""
 	}
 	if totalIssues == 1 {
-		// Exactly one phrase across both sides. If it came from the fetcher,
-		// existingStatus is non-empty; if it came from us, fall back to the
-		// new phrase.
-		if existingStatus != "" {
+		// Exactly one phrase across both sides. If the fetcher emitted Issues
+		// (len > 0), existingStatus encodes the §4 phrase — preserve it. If
+		// the fetcher did NOT emit Issues but did set Status (e.g. fetchers
+		// that pass raw AWS state through, like dbc-snap's "available"), the
+		// new cross-ref phrase wins per spec §4 Healthy-blank rule.
+		if len(existingIssues) > 0 && existingStatus != "" {
 			return existingStatus
 		}
 		return newPhrases[0]

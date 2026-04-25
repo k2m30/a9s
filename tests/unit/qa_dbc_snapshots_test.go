@@ -56,8 +56,11 @@ func TestQA_DBCSnapshots_FetchSuccess(t *testing.T) {
 	if r.Name != "dbc-snap-auto-001" {
 		t.Errorf("expected Name 'dbc-snap-auto-001', got %q", r.Name)
 	}
-	if r.Status != "available" {
-		t.Errorf("expected Status 'available', got %q", r.Status)
+	// Per spec §4 (docs/resources/dbc-snap.md): Healthy snapshots render
+	// blank in the §4 column. The fetcher's computeDBCSnapPhrase maps the
+	// raw AWS keyword "available" → "" so the Status column stays blank.
+	if r.Status != "" {
+		t.Errorf("expected Status '' for healthy (raw=available), got %q", r.Status)
 	}
 	if r.Fields["snapshot_id"] != "dbc-snap-auto-001" {
 		t.Errorf("expected snapshot_id 'dbc-snap-auto-001', got %q", r.Fields["snapshot_id"])

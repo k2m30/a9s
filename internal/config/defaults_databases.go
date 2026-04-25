@@ -180,7 +180,12 @@ func databasesDefaultViews() map[string]ViewDef {
 			List: []ListColumn{
 				{Title: "Snapshot ID", Path: "DBClusterSnapshotIdentifier", Width: 36},
 				{Title: "Cluster ID", Path: "DBClusterIdentifier", Width: 28},
-				{Title: "Status", Path: "Status", Width: 12},
+				// Status reads exclusively from Fields["status"] — set by
+				// the cross-ref enricher's FieldUpdates (orphan,
+				// past-retention). NO Path fallback per spec §4 — Healthy
+				// rows must render blank, and Path: "Status" would pull the
+				// raw AWS keyword "available" and break that contract.
+				{Title: "Status", Key: "status", Width: 32},
 				{Title: "Engine", Path: "Engine", Width: 12},
 				{Title: "Type", Path: "SnapshotType", Width: 12},
 				{Title: "Created", Path: "SnapshotCreateTime", Width: 22},
