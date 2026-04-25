@@ -73,7 +73,7 @@ func makeCrossRefCfg(retentionEnabled bool) awsclient.SnapshotCrossRefConfig {
 			return p.BackupRetentionPeriod, p.BackupRetentionPeriod > 0
 		},
 		OrphanPhrase:    "orphan: source parent deleted",
-		OrphanRowLabel:  "Source Parent",
+		ParentRowLabel:  "Source Parent",
 		RetentionPhrase: func(d int) string { return fmt.Sprintf("automated, %dd past retention", d) },
 		RetentionEnabled: retentionEnabled,
 	}

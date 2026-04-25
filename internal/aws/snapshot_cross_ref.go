@@ -68,10 +68,11 @@ type SnapshotCrossRefConfig struct {
 	// from the loaded cache (and the cache is NOT truncated).
 	OrphanPhrase string
 
-	// OrphanRowLabel is the FindingRow label used to cite the parent in the
+	// ParentRowLabel is the FindingRow label used to cite the parent in the
 	// detail-view Attention section (e.g. "Source DB" for dbi, "Source
-	// Cluster" for dbc).
-	OrphanRowLabel string
+	// Cluster" for dbc). It is reused for both the orphan citation row AND
+	// the past-retention parent-cite row.
+	ParentRowLabel string
 
 	// RetentionPhrase formats the past-retention status phrase given days-over.
 	// Example: func(d int) string { return fmt.Sprintf("automated, %dd past retention", d) }
@@ -135,7 +136,7 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 				}
 				newPhrases = append(newPhrases, cfg.OrphanPhrase)
 				rows = append(rows, resource.FindingRow{
-					Label: cfg.OrphanRowLabel,
+					Label: cfg.ParentRowLabel,
 					Value: parentID + " (not in loaded list)",
 					Tier:  "!",
 				})
@@ -159,7 +160,7 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 				overD := ageD - retentionD
 				newPhrases = append(newPhrases, cfg.RetentionPhrase(overD))
 				rows = append(rows, resource.FindingRow{
-					Label: cfg.OrphanRowLabel,
+					Label: cfg.ParentRowLabel,
 					Value: parentID,
 					Tier:  "!",
 				})
@@ -214,6 +215,12 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 //
 // Returned status = top phrase + " (+N-1)" where N is the total count, or the
 // bare top phrase when N == 1.
+//
+// Single-issue rule: when totalIssues == 1, reading existingStatus when
+// non-empty preserves the fetcher's §4 phrase. The fetcher contract (U7f)
+// requires Issues to be populated for every active Wave-1 phrase, so an
+// existingStatus with empty Issues should not occur — if it does, that's a
+// fetcher bug, not a helper concern.
 func computeMergedStatus(existingStatus string, existingIssues []string, newPhrases []string) string {
 	totalIssues := len(existingIssues) + len(newPhrases)
 
@@ -221,12 +228,7 @@ func computeMergedStatus(existingStatus string, existingIssues []string, newPhra
 		return ""
 	}
 	if totalIssues == 1 {
-		// Exactly one phrase across both sides. If the fetcher emitted Issues
-		// (len > 0), existingStatus encodes the §4 phrase — preserve it. If
-		// the fetcher did NOT emit Issues but did set Status (e.g. fetchers
-		// that pass raw AWS state through, like dbc-snap's "available"), the
-		// new cross-ref phrase wins per spec §4 Healthy-blank rule.
-		if len(existingIssues) > 0 && existingStatus != "" {
+		if existingStatus != "" {
 			return existingStatus
 		}
 		return newPhrases[0]

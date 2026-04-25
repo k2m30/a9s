@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
-	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -66,6 +65,10 @@ func checkDbcSnapVPC(_ context.Context, _ any, res resource.Resource, _ resource
 // but break drill-through (the target list filter could not match the IDs).
 // Recovery points are not first-class a9s resources at present. This mirrors
 // the dbi-snap → backup checker pattern.
+//
+// Truncated-cache rule: when the dbc cache is truncated AND the parent ARN
+// cannot be resolved from the visible window, we cannot determine whether
+// the parent is in a later page — return UnknownRelated rather than Count:0.
 func checkDbcSnapBackup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	parentName, parentARN := dbcSnapParentRefs(res.RawStruct)
 	if parentName == "" {
@@ -77,7 +80,7 @@ func checkDbcSnapBackup(ctx context.Context, clients any, res resource.Resource,
 	// can skip the dbc-cache lookup. Fall back to scanning the dbc cache
 	// otherwise (some shapes only carry DBClusterIdentifier).
 	if parentARN == "" {
-		dbcList, _, err := dbcRelatedResources(ctx, clients, cache, "dbc")
+		dbcList, dbcTruncated, err := dbcRelatedResources(ctx, clients, cache, "dbc")
 		if err != nil {
 			return resource.RelatedCheckResult{TargetType: "backup", Count: -1, Err: err}
 		}
@@ -91,11 +94,15 @@ func checkDbcSnapBackup(ctx context.Context, clients any, res resource.Resource,
 			parentARN = dbcResourceARN(dbcRes.RawStruct)
 			break
 		}
-	}
-	if parentARN == "" {
-		// Parent cluster not in cache (orphan) or no ARN field on this shape —
-		// pivot has no answer; Backup tracks the parent cluster.
-		return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
+		if parentARN == "" {
+			// Parent not found in visible window.
+			if dbcTruncated {
+				// Cache is truncated — parent may be in a later page; answer is unknown.
+				return resource.UnknownRelated("backup")
+			}
+			// Cache is complete — parent is genuinely absent (orphan or no ARN field).
+			return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
+		}
 	}
 
 	planList, truncated, err := dbcRelatedResources(ctx, clients, cache, "backup")
@@ -118,40 +125,26 @@ func checkDbcSnapBackup(ctx context.Context, clients any, res resource.Resource,
 	return relatedResult("backup", ids)
 }
 
-// dbcSnapParentRefs extracts (parentClusterName, parentClusterARN) from
-// either docdb or rds DBClusterSnapshot SDK shape. ARN may be "" when the
-// shape doesn't carry it (e.g. legacy DocDB responses) — caller then falls
-// back to a dbc-cache lookup.
+// dbcSnapParentRefs extracts (parentClusterName, parentClusterARN) from a
+// docdbtypes.DBClusterSnapshot. ARN is always "" — the DocDB SDK shape does
+// not carry the parent cluster ARN on the snapshot; callers fall back to a
+// dbc-cache lookup.
 func dbcSnapParentRefs(raw any) (name, arn string) {
-	if snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](raw); ok {
-		if snap.DBClusterIdentifier != nil {
-			name = *snap.DBClusterIdentifier
-		}
-		return name, ""
+	snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](raw)
+	if !ok {
+		return "", ""
 	}
-	if snap, ok := assertStruct[rdstypes.DBClusterSnapshot](raw); ok {
-		if snap.DBClusterIdentifier != nil {
-			name = *snap.DBClusterIdentifier
-		}
-		return name, ""
+	if snap.DBClusterIdentifier != nil {
+		name = *snap.DBClusterIdentifier
 	}
-	return "", ""
+	return name, ""
 }
 
-// dbcResourceARN extracts DBClusterArn from a dbc Resource's RawStruct
-// (handles both docdb and rds DBCluster SDK shapes).
+// dbcResourceARN extracts DBClusterArn from a dbc Resource's docdbtypes.DBCluster RawStruct.
 func dbcResourceARN(raw any) string {
-	if c, ok := assertStruct[docdbtypes.DBCluster](raw); ok {
-		if c.DBClusterArn != nil {
-			return *c.DBClusterArn
-		}
+	c, ok := assertStruct[docdbtypes.DBCluster](raw)
+	if !ok || c.DBClusterArn == nil {
 		return ""
 	}
-	if c, ok := assertStruct[rdstypes.DBCluster](raw); ok {
-		if c.DBClusterArn != nil {
-			return *c.DBClusterArn
-		}
-		return ""
-	}
-	return ""
+	return *c.DBClusterArn
 }

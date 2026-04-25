@@ -45,9 +45,15 @@ func init() {
 	})
 }
 
-// FetchDocDBClusters calls the DescribeDBClusters API and converts
-// the response into a slice of generic Resource structs.
-// Returns all DB clusters (Aurora, DocumentDB, Neptune) — no engine filter.
+// FetchDocDBClusters calls the DescribeDBClusters API and converts the
+// response into a slice of generic Resource structs.
+//
+// Coverage: returns ALL DB clusters (Aurora, DocumentDB, Neptune). Both the
+// docdb and rds SDK clients target rds.{region}.amazonaws.com — the
+// DescribeDBClusters API is engine-agnostic at the backend, the SDK only
+// chooses the deserialization namespace. Aurora rows arrive as
+// docdbtypes.DBCluster shapes here. Spec citation: docs/resources/dbc.md
+// (and dbc-snap.md §1 Coverage for the snapshot side).
 func FetchDocDBClusters(ctx context.Context, api DocDBDescribeDBClustersAPI) ([]resource.Resource, error) {
 	var all []resource.Resource
 	token := ""
