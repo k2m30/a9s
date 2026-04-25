@@ -53,7 +53,7 @@ func ExpectedTopLevelCounts() map[string]int {
 		"opensearch":   len(NewOpenSearchFixtures().Domains),
 		"redshift":     len(NewRedshiftFixtures().Clusters),
 		"efs":          len(NewEFSFixtures().FileSystems),
-		"rds-snap":     len(rds.DBSnapshots),
+		"dbi-snap":     len(rds.DBSnapshots),
 		"docdb-snap":   len(docdb.DBClusterSnapshots),
 		"alarm":        len(NewCloudWatchFixtures().Alarms),
 		"logs":         len(NewCWLogsFixtures().LogGroups),

@@ -11,35 +11,35 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func rdsSnapCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
+func dbiSnapCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	t.Helper()
-	for _, def := range resource.GetRelated("rds-snap") {
+	for _, def := range resource.GetRelated("dbi-snap") {
 		if def.TargetType == target {
 			if def.Checker == nil {
-				t.Fatalf("rds-snap related checker for %s is nil", target)
+				t.Fatalf("dbi-snap related checker for %s is nil", target)
 			}
 			return def.Checker
 		}
 	}
-	t.Fatalf("rds-snap related checker for %s not found", target)
+	t.Fatalf("dbi-snap related checker for %s not found", target)
 	return nil
 }
 
 // --- Navigable Fields ---
 
-func TestNavigableFields_RDSSnap_Registered(t *testing.T) {
-	nav := resource.IsFieldNavigable("rds-snap", "DBInstanceIdentifier")
+func TestNavigableFields_DBISnap_Registered(t *testing.T) {
+	nav := resource.IsFieldNavigable("dbi-snap", "DBInstanceIdentifier")
 	if nav == nil {
-		t.Error("expected navigable field DBInstanceIdentifier for rds-snap, got nil")
+		t.Error("expected navigable field DBInstanceIdentifier for dbi-snap, got nil")
 	} else if nav.TargetType != "dbi" {
 		t.Errorf("DBInstanceIdentifier TargetType = %q, want %q", nav.TargetType, "dbi")
 	}
 }
 
-func TestNavigableFields_RDSSnap_FieldPathsResolve(t *testing.T) {
-	fields := resource.GetNavigableFields("rds-snap")
+func TestNavigableFields_DBISnap_FieldPathsResolve(t *testing.T) {
+	fields := resource.GetNavigableFields("dbi-snap")
 	if len(fields) == 0 {
-		t.Fatal("no navigable fields registered for rds-snap")
+		t.Fatal("no navigable fields registered for dbi-snap")
 	}
 
 	// DBInstanceIdentifier must resolve to dbi.
@@ -50,13 +50,13 @@ func TestNavigableFields_RDSSnap_FieldPathsResolve(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Error("navigable field DBInstanceIdentifier → dbi not registered for rds-snap")
+		t.Error("navigable field DBInstanceIdentifier → dbi not registered for dbi-snap")
 	}
 }
 
 // --- DBI checker (Pattern C — cache-based, matches DBInstanceIdentifier) ---
 
-func TestRelated_RDSSnap_DBI_Found(t *testing.T) {
+func TestRelated_DBISnap_DBI_Found(t *testing.T) {
 	dbiRes := resource.Resource{
 		ID:   "mydb",
 		Name: "mydb",
@@ -79,7 +79,7 @@ func TestRelated_RDSSnap_DBI_Found(t *testing.T) {
 		},
 	}
 
-	checker := rdsSnapCheckerByTarget(t, "dbi")
+	checker := dbiSnapCheckerByTarget(t, "dbi")
 	result := checker(context.Background(), nil, source, cache)
 
 	if result.Count != 1 {
@@ -93,7 +93,7 @@ func TestRelated_RDSSnap_DBI_Found(t *testing.T) {
 	}
 }
 
-func TestRelated_RDSSnap_DBI_NotFound(t *testing.T) {
+func TestRelated_DBISnap_DBI_NotFound(t *testing.T) {
 	dbiRes := resource.Resource{
 		ID:   "otherdb",
 		Name: "otherdb",
@@ -116,7 +116,7 @@ func TestRelated_RDSSnap_DBI_NotFound(t *testing.T) {
 		},
 	}
 
-	checker := rdsSnapCheckerByTarget(t, "dbi")
+	checker := dbiSnapCheckerByTarget(t, "dbi")
 	result := checker(context.Background(), nil, source, cache)
 
 	if result.Count != 0 {
@@ -127,7 +127,7 @@ func TestRelated_RDSSnap_DBI_NotFound(t *testing.T) {
 	}
 }
 
-func TestRelated_RDSSnap_DBI_CacheMissNoClients(t *testing.T) {
+func TestRelated_DBISnap_DBI_CacheMissNoClients(t *testing.T) {
 	source := resource.Resource{
 		ID:   "rds:mydb:2025-01-15-03-00",
 		Name: "rds:mydb:2025-01-15-03-00",
@@ -140,7 +140,7 @@ func TestRelated_RDSSnap_DBI_CacheMissNoClients(t *testing.T) {
 		},
 	}
 
-	checker := rdsSnapCheckerByTarget(t, "dbi")
+	checker := dbiSnapCheckerByTarget(t, "dbi")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
 	if result.Count != -1 {
@@ -150,13 +150,13 @@ func TestRelated_RDSSnap_DBI_CacheMissNoClients(t *testing.T) {
 
 // --- KMS checker (Pattern C — cache-based, KmsKeyId ARN suffix) ---
 
-func TestRelated_RDSSnap_KMS_Found(t *testing.T) {
+func TestRelated_DBISnap_KMS_Found(t *testing.T) {
 	const keyID = "d4e5f6a7-8901-23de-fghi-444444444444"
 	arn := "arn:aws:kms:us-east-1:123456789012:key/" + keyID
 
 	kmsRes := resource.Resource{
 		ID:   keyID,
-		Name: "alias/rds-snap-key",
+		Name: "alias/dbi-snap-key",
 		Fields: map[string]string{
 			"key_id": keyID,
 		},
@@ -177,7 +177,7 @@ func TestRelated_RDSSnap_KMS_Found(t *testing.T) {
 		},
 	}
 
-	checker := rdsSnapCheckerByTarget(t, "kms")
+	checker := dbiSnapCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, cache)
 
 	if result.Count != 1 {
@@ -191,7 +191,7 @@ func TestRelated_RDSSnap_KMS_Found(t *testing.T) {
 	}
 }
 
-func TestRelated_RDSSnap_KMS_NotFound(t *testing.T) {
+func TestRelated_DBISnap_KMS_NotFound(t *testing.T) {
 	const keyID = "d4e5f6a7-8901-23de-fghi-444444444444"
 
 	kmsRes := resource.Resource{
@@ -217,7 +217,7 @@ func TestRelated_RDSSnap_KMS_NotFound(t *testing.T) {
 		},
 	}
 
-	checker := rdsSnapCheckerByTarget(t, "kms")
+	checker := dbiSnapCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, cache)
 
 	if result.Count != 0 {
@@ -225,7 +225,7 @@ func TestRelated_RDSSnap_KMS_NotFound(t *testing.T) {
 	}
 }
 
-func TestRelated_RDSSnap_KMS_CacheMissNoClients(t *testing.T) {
+func TestRelated_DBISnap_KMS_CacheMissNoClients(t *testing.T) {
 	const keyID = "d4e5f6a7-8901-23de-fghi-444444444444"
 	arn := "arn:aws:kms:us-east-1:123456789012:key/" + keyID
 
@@ -242,7 +242,7 @@ func TestRelated_RDSSnap_KMS_CacheMissNoClients(t *testing.T) {
 		},
 	}
 
-	checker := rdsSnapCheckerByTarget(t, "kms")
+	checker := dbiSnapCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
 	if result.Count != -1 {
@@ -251,18 +251,18 @@ func TestRelated_RDSSnap_KMS_CacheMissNoClients(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// checkRDSSnapBackup — Pattern C: cache scan of backup PLAN list,
+// checkDBISnapBackup — Pattern C: cache scan of backup PLAN list,
 // matching snapshot ARN against each plan's Fields["resources"] / ["not_resources"].
 // ---------------------------------------------------------------------------
 
-// TestRelated_RDSSnap_Backup_Match verifies that the checker returns plan IDs
+// TestRelated_DBISnap_Backup_Match verifies that the checker returns plan IDs
 // (not recovery-point ARNs) when the loaded backup PLAN cache contains plans
 // whose Resources include the snapshot's PARENT DB ARN. AWS Backup tracks the
 // parent DB instance, not individual snapshots, so the checker resolves
 // snap.DBInstanceIdentifier through the dbi cache to get DBInstanceArn, then
 // reverse-scans plan selections for that parent ARN. Drill-through requires
 // plan IDs because the backup target's Resource.ID space is plan IDs.
-func TestRelated_RDSSnap_Backup_Match(t *testing.T) {
+func TestRelated_DBISnap_Backup_Match(t *testing.T) {
 	const parentDBName = "mydb"
 	const parentDBARN = "arn:aws:rds:us-east-1:123456789012:db:mydb"
 
@@ -323,7 +323,7 @@ func TestRelated_RDSSnap_Backup_Match(t *testing.T) {
 		},
 	}
 
-	checker := rdsSnapCheckerByTarget(t, "backup")
+	checker := dbiSnapCheckerByTarget(t, "backup")
 	result := checker(context.Background(), nil, src, cache)
 
 	if result.Count != 2 {
@@ -339,11 +339,11 @@ func TestRelated_RDSSnap_Backup_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_RDSSnap_Backup_NoParentInDbi verifies that an orphan snapshot
+// TestRelated_DBISnap_Backup_NoParentInDbi verifies that an orphan snapshot
 // (parent not in the loaded dbi cache) returns Count=0 — there's no parent ARN
 // to match against plan selections, and AWS Backup would never have covered a
 // snapshot whose parent is gone.
-func TestRelated_RDSSnap_Backup_NoParentInDbi(t *testing.T) {
+func TestRelated_DBISnap_Backup_NoParentInDbi(t *testing.T) {
 	src := resource.Resource{
 		ID:   "rds:mydb-2025-01-15-03-00",
 		Name: "rds:mydb-2025-01-15-03-00",
@@ -370,7 +370,7 @@ func TestRelated_RDSSnap_Backup_NoParentInDbi(t *testing.T) {
 		},
 		"backup": resource.ResourceCacheEntry{Resources: []resource.Resource{}},
 	}
-	checker := rdsSnapCheckerByTarget(t, "backup")
+	checker := dbiSnapCheckerByTarget(t, "backup")
 	result := checker(context.Background(), nil, src, cache)
 
 	if result.Count != 0 {
@@ -378,10 +378,10 @@ func TestRelated_RDSSnap_Backup_NoParentInDbi(t *testing.T) {
 	}
 }
 
-// TestRelated_RDSSnap_Backup_NoDbiCacheLoaded verifies that the checker returns
+// TestRelated_DBISnap_Backup_NoDbiCacheLoaded verifies that the checker returns
 // UnknownRelated (Count=-1) when the dbi cache hasn't been loaded yet — without
 // the parent DB ARN we can't say whether any plan covers the snapshot.
-func TestRelated_RDSSnap_Backup_NoDbiCacheLoaded(t *testing.T) {
+func TestRelated_DBISnap_Backup_NoDbiCacheLoaded(t *testing.T) {
 	src := resource.Resource{
 		ID:   "rds:mydb-2025-01-15-03-00",
 		Name: "rds:mydb-2025-01-15-03-00",
@@ -393,7 +393,7 @@ func TestRelated_RDSSnap_Backup_NoDbiCacheLoaded(t *testing.T) {
 			DBInstanceIdentifier: aws.String("mydb"),
 		},
 	}
-	checker := rdsSnapCheckerByTarget(t, "backup")
+	checker := dbiSnapCheckerByTarget(t, "backup")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
 	if result.Count != -1 {
@@ -401,10 +401,10 @@ func TestRelated_RDSSnap_Backup_NoDbiCacheLoaded(t *testing.T) {
 	}
 }
 
-// TestRelated_RDSSnap_Backup_NoPlansLoaded verifies that the checker returns
+// TestRelated_DBISnap_Backup_NoPlansLoaded verifies that the checker returns
 // UnknownRelated (Count=-1) when the dbi cache resolves the parent ARN but the
 // backup PLAN cache hasn't been loaded yet.
-func TestRelated_RDSSnap_Backup_NoPlansLoaded(t *testing.T) {
+func TestRelated_DBISnap_Backup_NoPlansLoaded(t *testing.T) {
 	const parentDBName = "mydb"
 	src := resource.Resource{
 		ID:   "rds:mydb-2025-01-15-03-00",
@@ -432,7 +432,7 @@ func TestRelated_RDSSnap_Backup_NoPlansLoaded(t *testing.T) {
 		},
 		// backup cache absent — checker must report UnknownRelated.
 	}
-	checker := rdsSnapCheckerByTarget(t, "backup")
+	checker := dbiSnapCheckerByTarget(t, "backup")
 	result := checker(context.Background(), nil, src, cache)
 
 	if result.Count != -1 {
@@ -440,9 +440,9 @@ func TestRelated_RDSSnap_Backup_NoPlansLoaded(t *testing.T) {
 	}
 }
 
-// TestRelated_RDSSnap_Backup_NoParentReference verifies a snapshot with no
+// TestRelated_DBISnap_Backup_NoParentReference verifies a snapshot with no
 // DBInstanceIdentifier returns Count=0 (cannot pivot without a parent reference).
-func TestRelated_RDSSnap_Backup_NoParentReference(t *testing.T) {
+func TestRelated_DBISnap_Backup_NoParentReference(t *testing.T) {
 	src := resource.Resource{
 		ID:     "rds:orphan-no-parent-ref",
 		Name:   "rds:orphan-no-parent-ref",
@@ -452,7 +452,7 @@ func TestRelated_RDSSnap_Backup_NoParentReference(t *testing.T) {
 			// no DBInstanceIdentifier
 		},
 	}
-	checker := rdsSnapCheckerByTarget(t, "backup")
+	checker := dbiSnapCheckerByTarget(t, "backup")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
 	if result.Count != 0 {
@@ -460,6 +460,6 @@ func TestRelated_RDSSnap_Backup_NoParentReference(t *testing.T) {
 	}
 }
 
-// dbc pivot is intentionally NOT registered for rds-snap — Aurora cluster
-// snapshots live in dbc-snap (DBClusterSnapshot), not rds-snap (DBSnapshot).
-// Real AWS rejects CreateDBSnapshot on Aurora cluster members. See rds_snap.go.
+// dbc pivot is intentionally NOT registered for dbi-snap — Aurora cluster
+// snapshots live in dbc-snap (DBClusterSnapshot), not dbi-snap (DBSnapshot).
+// Real AWS rejects CreateDBSnapshot on Aurora cluster members. See dbi_snap.go.

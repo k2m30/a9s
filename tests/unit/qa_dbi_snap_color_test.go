@@ -6,10 +6,10 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func TestRdsSnapColor(t *testing.T) {
-	td := resource.FindResourceType("rds-snap")
+func TestDbiSnapColor(t *testing.T) {
+	td := resource.FindResourceType("dbi-snap")
 	if td == nil {
-		t.Fatal("rds-snap not registered")
+		t.Fatal("dbi-snap not registered")
 	}
 
 	cases := []struct {

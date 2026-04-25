@@ -1,9 +1,9 @@
 package unit
 
-// aws_rds_snap_test.go — Fetcher tests for rds-snap resource type.
+// aws_rds_snap_test.go — Fetcher tests for dbi-snap resource type.
 //
-// Spec: docs/resources/rds-snap.md §3.1 + §4 + impl-plan §1.1/§1.4.
-// Tests call FetchRDSSnapshotsPage via a strict mock, asserting:
+// Spec: docs/resources/dbi-snap.md §3.1 + §4 + impl-plan §1.1/§1.4.
+// Tests call FetchDBISnapshotsPage via a strict mock, asserting:
 //   - Resource.Status = §4 phrase for each signal (healthy = "").
 //   - Resource.Issues = ordered slice per §0.1 precedence ladder.
 //   - Fields["arn"] populated for the backup-pivot (per §3.1 gap fix).
@@ -51,9 +51,9 @@ func snapOutput(snaps ...rdstypes.DBSnapshot) *rds.DescribeDBSnapshotsOutput {
 func fetchSnap(t *testing.T, snaps ...rdstypes.DBSnapshot) []resourceRow {
 	t.Helper()
 	mock := &mockDescribeDBSnapshots{output: snapOutput(snaps...)}
-	result, err := awsclient.FetchRDSSnapshotsPage(context.Background(), mock, "")
+	result, err := awsclient.FetchDBISnapshotsPage(context.Background(), mock, "")
 	if err != nil {
-		t.Fatalf("FetchRDSSnapshotsPage: unexpected error: %v", err)
+		t.Fatalf("FetchDBISnapshotsPage: unexpected error: %v", err)
 	}
 	rows := make([]resourceRow, len(result.Resources))
 	for i, r := range result.Resources {
@@ -75,9 +75,9 @@ type resourceRow struct {
 // §1.1 Per-signal cases
 // ---------------------------------------------------------------------------
 
-// TestRDSSnap_Fetcher_HealthyAvailable_BlankS4 verifies that a healthy
+// TestDBISnap_Fetcher_HealthyAvailable_BlankS4 verifies that a healthy
 // available+encrypted snapshot produces Status="" and no issues.
-func TestRDSSnap_Fetcher_HealthyAvailable_BlankS4(t *testing.T) {
+func TestDBISnap_Fetcher_HealthyAvailable_BlankS4(t *testing.T) {
 	rows := fetchSnap(t, rdstypes.DBSnapshot{
 		DBSnapshotIdentifier: aws.String("snap-healthy"),
 		DBSnapshotArn:        aws.String("arn:aws:rds:us-east-1:123456789012:snapshot:snap-healthy"),
@@ -97,12 +97,12 @@ func TestRDSSnap_Fetcher_HealthyAvailable_BlankS4(t *testing.T) {
 	}
 }
 
-// TestRDSSnap_Fetcher_Creating_CarriesPercent verifies that Status=creating
+// TestDBISnap_Fetcher_Creating_CarriesPercent verifies that Status=creating
 // produces "creating: 42%" with PercentProgress embedded.
-func TestRDSSnap_Fetcher_Creating_CarriesPercent(t *testing.T) {
+func TestDBISnap_Fetcher_Creating_CarriesPercent(t *testing.T) {
 	rows := fetchSnap(t, rdstypes.DBSnapshot{
-		DBSnapshotIdentifier: aws.String(fixtures.WarnRDSSnapCreatingID),
-		DBSnapshotArn:        aws.String(fixtures.WarnRDSSnapCreatingARN),
+		DBSnapshotIdentifier: aws.String(fixtures.WarnDBISnapCreatingID),
+		DBSnapshotArn:        aws.String(fixtures.WarnDBISnapCreatingARN),
 		Status:               aws.String("creating"),
 		Encrypted:            aws.Bool(true),
 		PercentProgress:      aws.Int32(42),
@@ -119,12 +119,12 @@ func TestRDSSnap_Fetcher_Creating_CarriesPercent(t *testing.T) {
 	}
 }
 
-// TestRDSSnap_Fetcher_Failed_BareKeyword verifies that Status=failed
+// TestDBISnap_Fetcher_Failed_BareKeyword verifies that Status=failed
 // produces bare "failed" keyword per spec §4 (no cause available from SDK).
-func TestRDSSnap_Fetcher_Failed_BareKeyword(t *testing.T) {
+func TestDBISnap_Fetcher_Failed_BareKeyword(t *testing.T) {
 	rows := fetchSnap(t, rdstypes.DBSnapshot{
-		DBSnapshotIdentifier: aws.String(fixtures.BrokenRDSSnapFailedID),
-		DBSnapshotArn:        aws.String(fixtures.BrokenRDSSnapFailedARN),
+		DBSnapshotIdentifier: aws.String(fixtures.BrokenDBISnapFailedID),
+		DBSnapshotArn:        aws.String(fixtures.BrokenDBISnapFailedARN),
 		Status:               aws.String("failed"),
 		Encrypted:            aws.Bool(true),
 		PercentProgress:      aws.Int32(0),
@@ -141,9 +141,9 @@ func TestRDSSnap_Fetcher_Failed_BareKeyword(t *testing.T) {
 	}
 }
 
-// TestRDSSnap_Fetcher_IncompatibleKeywordPreserved verifies that
+// TestDBISnap_Fetcher_IncompatibleKeywordPreserved verifies that
 // incompatible-* statuses preserve the exact AWS keyword verbatim.
-func TestRDSSnap_Fetcher_IncompatibleKeywordPreserved(t *testing.T) {
+func TestDBISnap_Fetcher_IncompatibleKeywordPreserved(t *testing.T) {
 	for _, status := range []string{"incompatible-restore", "incompatible-parameters"} {
 		t.Run(status, func(t *testing.T) {
 			rows := fetchSnap(t, rdstypes.DBSnapshot{
@@ -167,12 +167,12 @@ func TestRDSSnap_Fetcher_IncompatibleKeywordPreserved(t *testing.T) {
 	}
 }
 
-// TestRDSSnap_Fetcher_Unencrypted verifies that Encrypted=false produces
+// TestDBISnap_Fetcher_Unencrypted verifies that Encrypted=false produces
 // Status="unencrypted" (CIS RDS.4).
-func TestRDSSnap_Fetcher_Unencrypted(t *testing.T) {
+func TestDBISnap_Fetcher_Unencrypted(t *testing.T) {
 	rows := fetchSnap(t, rdstypes.DBSnapshot{
-		DBSnapshotIdentifier: aws.String(fixtures.WarnRDSSnapUnencryptedID),
-		DBSnapshotArn:        aws.String(fixtures.WarnRDSSnapUnencryptedARN),
+		DBSnapshotIdentifier: aws.String(fixtures.WarnDBISnapUnencryptedID),
+		DBSnapshotArn:        aws.String(fixtures.WarnDBISnapUnencryptedARN),
 		Status:               aws.String("available"),
 		Encrypted:            aws.Bool(false),
 		PercentProgress:      aws.Int32(100),
@@ -189,13 +189,13 @@ func TestRDSSnap_Fetcher_Unencrypted(t *testing.T) {
 	}
 }
 
-// TestRDSSnap_Fetcher_SeverityBrokenBeatsWarning verifies that a Broken status
+// TestDBISnap_Fetcher_SeverityBrokenBeatsWarning verifies that a Broken status
 // (failed) wins over a Warning (Encrypted=false). Encrypted=false is suppressed
 // when the snapshot is in a non-available end-state per §0.1/§1.4.
-func TestRDSSnap_Fetcher_SeverityBrokenBeatsWarning(t *testing.T) {
+func TestDBISnap_Fetcher_SeverityBrokenBeatsWarning(t *testing.T) {
 	rows := fetchSnap(t, rdstypes.DBSnapshot{
-		DBSnapshotIdentifier: aws.String(fixtures.SeverityBrokenWarnRDSSnapID),
-		DBSnapshotArn:        aws.String(fixtures.SeverityBrokenWarnRDSSnapARN),
+		DBSnapshotIdentifier: aws.String(fixtures.SeverityBrokenWarnDBISnapID),
+		DBSnapshotArn:        aws.String(fixtures.SeverityBrokenWarnDBISnapARN),
 		Status:               aws.String("failed"),
 		Encrypted:            aws.Bool(false),
 		PercentProgress:      aws.Int32(0),
@@ -212,12 +212,12 @@ func TestRDSSnap_Fetcher_SeverityBrokenBeatsWarning(t *testing.T) {
 	}
 }
 
-// TestRDSSnap_Fetcher_PopulatesARNField verifies that Fields["arn"] is
+// TestDBISnap_Fetcher_PopulatesARNField verifies that Fields["arn"] is
 // populated from DBSnapshotArn so the backup pivot can read it.
-func TestRDSSnap_Fetcher_PopulatesARNField(t *testing.T) {
-	wantARN := fixtures.ProdRDSSnapARN
+func TestDBISnap_Fetcher_PopulatesARNField(t *testing.T) {
+	wantARN := fixtures.ProdDBISnapARN
 	rows := fetchSnap(t, rdstypes.DBSnapshot{
-		DBSnapshotIdentifier: aws.String(fixtures.ProdRDSSnapID),
+		DBSnapshotIdentifier: aws.String(fixtures.ProdDBISnapID),
 		DBSnapshotArn:        aws.String(wantARN),
 		Status:               aws.String("available"),
 		Encrypted:            aws.Bool(true),
@@ -231,14 +231,14 @@ func TestRDSSnap_Fetcher_PopulatesARNField(t *testing.T) {
 	}
 }
 
-// TestRDSSnap_Fetcher_IssuesPopulatedInPrecedenceOrder verifies (U7f) that
+// TestDBISnap_Fetcher_IssuesPopulatedInPrecedenceOrder verifies (U7f) that
 // Resource.Issues is ordered per §0.1 for each signal case:
 //   - Healthy → empty
 //   - failed → ["failed"]
 //   - incompatible-restore → ["incompatible-restore"]
 //   - creating → ["creating: 60%"]
 //   - unencrypted → ["unencrypted"]
-func TestRDSSnap_Fetcher_IssuesPopulatedInPrecedenceOrder(t *testing.T) {
+func TestDBISnap_Fetcher_IssuesPopulatedInPrecedenceOrder(t *testing.T) {
 	cases := []struct {
 		name        string
 		snap        rdstypes.DBSnapshot
@@ -325,13 +325,13 @@ func TestRDSSnap_Fetcher_IssuesPopulatedInPrecedenceOrder(t *testing.T) {
 	}
 }
 
-// TestRDSSnap_Fetcher_MultiW1_TopPlusSuffix verifies that when creating
+// TestDBISnap_Fetcher_MultiW1_TopPlusSuffix verifies that when creating
 // (Warning top in precedence) is present together with unencrypted (Warning),
 // the Status carries "creating: <pct>%" because creating ranks above unencrypted
 // in §0.1 (transitional beats CIS). Issues has both phrases in order.
 // Note: The multi-W1 snapshot in fixtures uses Encrypted=false + orphan (not creating),
 // so we construct an adversarial inline snapshot for this specific case.
-func TestRDSSnap_Fetcher_MultiW1_TopPlusSuffix(t *testing.T) {
+func TestDBISnap_Fetcher_MultiW1_TopPlusSuffix(t *testing.T) {
 	// creating + Encrypted=false: creating wins per §0.1 (creating is first among Warnings).
 	rows := fetchSnap(t, rdstypes.DBSnapshot{
 		DBSnapshotIdentifier: aws.String("snap-creating-unenc"),
@@ -371,10 +371,10 @@ func TestRDSSnap_Fetcher_MultiW1_TopPlusSuffix(t *testing.T) {
 // Adversarial rows — must not panic
 // ---------------------------------------------------------------------------
 
-// TestRDSSnap_Fetcher_NilDBSnapshotIdentifier verifies that a snapshot with
+// TestDBISnap_Fetcher_NilDBSnapshotIdentifier verifies that a snapshot with
 // nil DBSnapshotIdentifier is skipped (ID == "") or produces an empty-ID row,
 // either way without panicking.
-func TestRDSSnap_Fetcher_NilDBSnapshotIdentifier(t *testing.T) {
+func TestDBISnap_Fetcher_NilDBSnapshotIdentifier(t *testing.T) {
 	rows := fetchSnap(t, rdstypes.DBSnapshot{
 		DBSnapshotIdentifier: nil,
 		Status:               aws.String("available"),
@@ -389,8 +389,8 @@ func TestRDSSnap_Fetcher_NilDBSnapshotIdentifier(t *testing.T) {
 	}
 }
 
-// TestRDSSnap_Fetcher_NilStatus verifies that nil Status is treated as "" (Healthy).
-func TestRDSSnap_Fetcher_NilStatus(t *testing.T) {
+// TestDBISnap_Fetcher_NilStatus verifies that nil Status is treated as "" (Healthy).
+func TestDBISnap_Fetcher_NilStatus(t *testing.T) {
 	rows := fetchSnap(t, rdstypes.DBSnapshot{
 		DBSnapshotIdentifier: aws.String("snap-nil-status"),
 		DBSnapshotArn:        aws.String("arn:aws:rds:us-east-1:123456789012:snapshot:snap-nil-status"),
@@ -406,10 +406,10 @@ func TestRDSSnap_Fetcher_NilStatus(t *testing.T) {
 	}
 }
 
-// TestRDSSnap_Fetcher_NilSnapshotCreateTime verifies that a snapshot with
+// TestDBISnap_Fetcher_NilSnapshotCreateTime verifies that a snapshot with
 // nil SnapshotCreateTime does not panic — the past-retention rule in the
 // enricher must skip it cleanly.
-func TestRDSSnap_Fetcher_NilSnapshotCreateTime(t *testing.T) {
+func TestDBISnap_Fetcher_NilSnapshotCreateTime(t *testing.T) {
 	rows := fetchSnap(t, rdstypes.DBSnapshot{
 		DBSnapshotIdentifier: aws.String("snap-nil-time"),
 		DBSnapshotArn:        aws.String("arn:aws:rds:us-east-1:123456789012:snapshot:snap-nil-time"),
@@ -430,13 +430,13 @@ func TestRDSSnap_Fetcher_NilSnapshotCreateTime(t *testing.T) {
 // Full fixture set smoke test
 // ---------------------------------------------------------------------------
 
-// TestRDSSnap_Fetcher_AllFixtures_NoError verifies that the full set of
-// demo fixtures passes through FetchRDSSnapshotsPage without error and
+// TestDBISnap_Fetcher_AllFixtures_NoError verifies that the full set of
+// demo fixtures passes through FetchDBISnapshotsPage without error and
 // produces the expected number of rows.
-func TestRDSSnap_Fetcher_AllFixtures_NoError(t *testing.T) {
-	fix := fixtures.NewRDSSnapFixtures()
+func TestDBISnap_Fetcher_AllFixtures_NoError(t *testing.T) {
+	fix := fixtures.NewDBISnapFixtures()
 	mock := &mockDescribeDBSnapshots{output: snapOutput(fix.Instances...)}
-	result, err := awsclient.FetchRDSSnapshotsPage(context.Background(), mock, "")
+	result, err := awsclient.FetchDBISnapshotsPage(context.Background(), mock, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -455,14 +455,14 @@ func TestRDSSnap_Fetcher_AllFixtures_NoError(t *testing.T) {
 // U13 throttle static audit
 // ---------------------------------------------------------------------------
 
-// TestRDSSnap_StaticAudit_AllSDKCallsThrottleWrapped scans rds_snap*.go files
+// TestDBISnap_StaticAudit_AllSDKCallsThrottleWrapped scans dbi_snap*.go files
 // under internal/aws and asserts that every direct RDS/Backup API call appears
 // inside a RetryOnThrottle closure. Per universal rule U13, callers must never
 // call AWS APIs directly from enricher or fetcher bodies outside throttle wraps.
 //
 // Scan strategy: any line that calls api.Describe*/api.Get*/api.List*/api.Lookup*
 // directly (not as the argument to RetryOnThrottle) is a violation.
-func TestRDSSnap_StaticAudit_AllSDKCallsThrottleWrapped(t *testing.T) {
+func TestDBISnap_StaticAudit_AllSDKCallsThrottleWrapped(t *testing.T) {
 	root := findRepoFile(t, "internal/aws")
 
 	var violations []string
@@ -475,7 +475,7 @@ func TestRDSSnap_StaticAudit_AllSDKCallsThrottleWrapped(t *testing.T) {
 			return nil
 		}
 		name := info.Name()
-		if !strings.HasPrefix(name, "rds_snap") || !strings.HasSuffix(name, ".go") {
+		if !strings.HasPrefix(name, "dbi_snap") || !strings.HasSuffix(name, ".go") {
 			return nil
 		}
 		body, readErr := os.ReadFile(path)
@@ -519,16 +519,16 @@ func TestRDSSnap_StaticAudit_AllSDKCallsThrottleWrapped(t *testing.T) {
 	}
 
 	if len(violations) > 0 {
-		t.Errorf("U13: direct SDK calls found outside RetryOnThrottle in rds_snap files (%d):\n  %s",
+		t.Errorf("U13: direct SDK calls found outside RetryOnThrottle in dbi_snap files (%d):\n  %s",
 			len(violations), strings.Join(violations, "\n  "))
 	}
 }
 
-// TestRDSSnap_Backup_UsesArnFromFields verifies (U14 variant) that the ARN
+// TestDBISnap_Backup_UsesArnFromFields verifies (U14 variant) that the ARN
 // value stored in Fields["arn"] by the fetcher is the DBSnapshotArn — not r.ID.
-// This ensures checkRDSSnapBackup reads from Fields["arn"] (populated by fetcher),
+// This ensures checkDBISnapBackup reads from Fields["arn"] (populated by fetcher),
 // not from the bare snapshot identifier that r.ID carries.
-func TestRDSSnap_Backup_UsesArnFromFields(t *testing.T) {
+func TestDBISnap_Backup_UsesArnFromFields(t *testing.T) {
 	wantARN := "arn:aws:rds:us-east-1:123456789012:snapshot:rds:test-snap"
 	rows := fetchSnap(t, rdstypes.DBSnapshot{
 		DBSnapshotIdentifier: aws.String("rds:test-snap"),

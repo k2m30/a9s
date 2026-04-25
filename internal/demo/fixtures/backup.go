@@ -150,15 +150,15 @@ func buildBackupRecoveryPoints() map[string][]backuptypes.RecoveryPointByResourc
 				CreationDate:     aws.Time(mustParseBackupTime("2026-04-15T02:00:00Z")),
 			},
 		},
-		// rds-snap pivot — required for the rds-snap→backup related-panel pivot.
-		// checkRDSSnapBackup calls ListRecoveryPointsByResource(ResourceArn=res.Fields["arn"]).
-		// The graph-root ProdRDSSnapARN gets 1 recovery point. BackupCoveredRDSSnapARN
+		// dbi-snap pivot — required for the dbi-snap→backup related-panel pivot.
+		// checkDBISnapBackup calls ListRecoveryPointsByResource(ResourceArn=res.Fields["arn"]).
+		// The graph-root ProdDBISnapARN gets 1 recovery point. BackupCoveredDBISnapARN
 		// gets 2 to validate the universal ≥1 contract independently of graph-root.
-		// Per §9.3 structural exemption: rds-snap pivots are 1:1 by AWS data model
+		// Per §9.3 structural exemption: dbi-snap pivots are 1:1 by AWS data model
 		// (a snapshot has exactly one source instance, one encryption key, and at
 		// most zero clusters since Aurora cluster snapshots live in dbc-snap), so
 		// the universal "≥50% Count ≥ 2" relaxation is unsatisfiable for this type.
-		ProdRDSSnapARN: {
+		ProdDBISnapARN: {
 			{
 				RecoveryPointArn: aws.String("arn:aws:backup:us-east-1:123456789012:recovery-point:rp-rds1-daily-20260415"),
 				BackupVaultName:  aws.String(BackupProdVaultName),
@@ -166,7 +166,7 @@ func buildBackupRecoveryPoints() map[string][]backuptypes.RecoveryPointByResourc
 				CreationDate:     aws.Time(mustParseBackupTime("2026-04-15T03:00:00Z")),
 			},
 		},
-		BackupCoveredRDSSnapARN: {
+		BackupCoveredDBISnapARN: {
 			{
 				RecoveryPointArn: aws.String("arn:aws:backup:us-east-1:123456789012:recovery-point:rp-bkcov-daily-20260418"),
 				BackupVaultName:  aws.String(BackupProdVaultName),
@@ -376,10 +376,10 @@ func buildBackupSelections() map[string][]backuptypes.BackupSelection {
 		// EFS, the graph-root EFS (ProdEFSARN), and the orders-prod DynamoDB
 		// table — preserves s3→backup, efs→backup, and ddb→backup pivots via
 		// cache scan of Fields["resources"]. Also includes the Aurora parent DB
-		// (ProdDbiAuroraARN) so the rds-snap→backup pivot resolves Count ≥ 2
+		// (ProdDbiAuroraARN) so the dbi-snap→backup pivot resolves Count ≥ 2
 		// for snapshots whose parent is that DB (this plan + ProdDatabasePlanID
 		// below).  AWS Backup selects parent DB instances, not individual
-		// snapshots — checkRDSSnapBackup walks the snapshot's parent DB ARN.
+		// snapshots — checkDBISnapBackup walks the snapshot's parent DB ARN.
 		HealthyDailyPlanID: {
 			{
 				SelectionName: aws.String("acme-daily-multi-selection"),
@@ -403,10 +403,10 @@ func buildBackupSelections() map[string][]backuptypes.BackupSelection {
 			},
 		},
 
-		// plan-broken-2failed (graph-root for backup; also covers rds-snap pivots):
+		// plan-broken-2failed (graph-root for backup; also covers dbi-snap pivots):
 		// uses AcmeBackupRoleProd — role pivot resolves ≥1 on U9.
-		// Resources covers the rds-snap parent DBs (ProdDbiID + ProdDbiAuroraID)
-		// so every rds-snap whose parent is one of those DBs gets the backup
+		// Resources covers the dbi-snap parent DBs (ProdDbiID + ProdDbiAuroraID)
+		// so every dbi-snap whose parent is one of those DBs gets the backup
 		// pivot Count ≥ 1. AWS Backup selects parent DBs, not snapshots.
 		ProdDatabasePlanID: {
 			{

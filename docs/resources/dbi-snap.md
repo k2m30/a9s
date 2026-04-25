@@ -1,6 +1,6 @@
 ---
-shortName: rds-snap
-name: RDS Snapshots
+shortName: dbi-snap
+name: DB Instance Snapshots
 awsApiRef: https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBSnapshot.html
 generatedFrom:
   - docs/architecture.md
@@ -9,17 +9,17 @@ generatedFrom:
   - docs/enrichment-visibility.md
 ---
 
-# rds-snap — Resource Spec
+# dbi-snap — Resource Spec
 
 Golden UX/UI doc for this resource, written from the operator's perspective. Describes what the list row, Status column, glyphs, and detail view should look like — the should-be, not the is. Implementation conforms to this doc; tests assert against it. When code and this doc disagree, the code is wrong.
 
 ## 1. Identity
 
-- **shortName**: `rds-snap`
-- **Display name**: RDS Snapshots
+- **shortName**: `dbi-snap`
+- **Display name**: DB Instance Snapshots
 - **AWS API reference**: https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBSnapshot.html
 - **List API**: `DescribeDBSnapshots`
-- **Describe API (if any)**: not used — all Wave 1 signals are carried on the list response; Wave 2 is `None` per `attention-signals.md § Databases & Storage § rds-snap`.
+- **Describe API (if any)**: not used — all Wave 1 signals are carried on the list response; Wave 2 is `None` per `attention-signals.md § Databases & Storage § dbi-snap`.
 
 ## 2. Related Resources Panel (detail view, right column)
 
@@ -27,29 +27,29 @@ Expected targets from `docs/related-resources.md` Per-type contract: `backup`, `
 
 ### `dbi`
 
-- **Why related**: the source DB instance this snapshot was taken from — the operator's first question ("where did this come from, is it still alive?") is always about the parent instance. Citation: `related-resources.md § rds-snap` ("Source DB instance").
+- **Why related**: the source DB instance this snapshot was taken from — the operator's first question ("where did this come from, is it still alive?") is always about the parent instance. Citation: `related-resources.md § dbi-snap` ("Source DB instance").
 - **How discovered**: read `DBSnapshot.DBInstanceIdentifier` from the list response, then cross-reference the already-loaded `dbi` list by that identifier. No extra API call. Citation: `AWS SDK Go v2 — rds/types.DBSnapshot § DBInstanceIdentifier`.
 - **Count shown**: yes (0 or 1 — a snapshot has exactly one source instance; 0 when the parent has been deleted, which is itself the orphan signal in §3.1).
 
 ### `kms`
 
-- **Why related**: the encryption key protecting the snapshot. If the key is disabled or pending deletion, the snapshot cannot be restored — a silent restore-blocker the operator needs to catch early. Citation: `related-resources.md § rds-snap` ("Encryption key").
+- **Why related**: the encryption key protecting the snapshot. If the key is disabled or pending deletion, the snapshot cannot be restored — a silent restore-blocker the operator needs to catch early. Citation: `related-resources.md § dbi-snap` ("Encryption key").
 - **How discovered**: read `DBSnapshot.KmsKeyId` from the list response, then cross-reference the already-loaded `kms` list by KeyId/KeyArn. No extra API call. Citation: `AWS SDK Go v2 — rds/types.DBSnapshot § KmsKeyId`.
 - **Count shown**: yes (0 or 1 — one key per encrypted snapshot; 0 when `Encrypted==false`).
 
 ### `dbc` (intentionally absent)
 
-`rds-snap` does NOT register a `dbc` pivot. Real AWS rejects `CreateDBSnapshot`
+`dbi-snap` does NOT register a `dbc` pivot. Real AWS rejects `CreateDBSnapshot`
 on Aurora cluster members — Aurora cluster snapshots live in `dbc-snap`
-(`DBClusterSnapshot`), which has its own pivots. A registered `rds-snap → dbc`
-pivot would always resolve `Count=0` (an `rds-snap` is never associated with a
-`DBCluster` in real AWS), which is dead UX. See `internal/aws/rds_snap.go` for
+(`DBClusterSnapshot`), which has its own pivots. A registered `dbi-snap → dbc`
+pivot would always resolve `Count=0` (an `dbi-snap` is never associated with a
+`DBCluster` in real AWS), which is dead UX. See `internal/aws/dbi_snap.go` for
 the structural exclusion.
 
 ### `backup`
 
-- **Why related**: AWS Backup can create RDS snapshots on behalf of a backup plan; knowing whether a snapshot was produced by AWS Backup (vs automated by the DB instance or manual) tells the operator which retention policy governs its lifecycle and which audit trail applies. Citation: `related-resources.md § rds-snap` ("Snapshots covered by AWS Backup").
-- **How discovered**: a9s-devops persona (2026-04-20): possible=yes, worth=yes (narrow). AWS Backup-created RDS snapshots carry the identifier prefix `awsbackup:job-<uuid>` on `DBSnapshotIdentifier`; AWS Backup records the snapshot ARN on its recovery-point list (`backup:ListRecoveryPointsByResource` with the snapshot or parent-instance ARN). The cheap Wave-1-safe path is a string-prefix match on `DBSnapshotIdentifier` — no extra API call required. Rationale (per `docs/historical/019-related-panel/related-panel-devops-consensus.md § rds-snap → backup`): AWS Backup tracks the parent DB instance rather than each manual snapshot individually, so a live cross-API call is high-cost for thin value; the identifier prefix is free on the list response and answers the same operator question.
+- **Why related**: AWS Backup can create RDS snapshots on behalf of a backup plan; knowing whether a snapshot was produced by AWS Backup (vs automated by the DB instance or manual) tells the operator which retention policy governs its lifecycle and which audit trail applies. Citation: `related-resources.md § dbi-snap` ("Snapshots covered by AWS Backup").
+- **How discovered**: a9s-devops persona (2026-04-20): possible=yes, worth=yes (narrow). AWS Backup-created RDS snapshots carry the identifier prefix `awsbackup:job-<uuid>` on `DBSnapshotIdentifier`; AWS Backup records the snapshot ARN on its recovery-point list (`backup:ListRecoveryPointsByResource` with the snapshot or parent-instance ARN). The cheap Wave-1-safe path is a string-prefix match on `DBSnapshotIdentifier` — no extra API call required. Rationale (per `docs/historical/019-related-panel/related-panel-devops-consensus.md § dbi-snap → backup`): AWS Backup tracks the parent DB instance rather than each manual snapshot individually, so a live cross-API call is high-cost for thin value; the identifier prefix is free on the list response and answers the same operator question.
 - **Count shown**: yes (0 or 1 — a snapshot is either a Backup-created recovery point or it is not).
 
 ### `ct-events`
@@ -60,7 +60,7 @@ the structural exclusion.
 
 ## 3. Attention / Issues Algorithm
 
-Transcribed from `docs/attention-signals.md § Databases & Storage § rds-snap`.
+Transcribed from `docs/attention-signals.md § Databases & Storage § dbi-snap`.
 
 ### 3.1 Wave 1 — zero extra API calls
 
@@ -93,7 +93,7 @@ One bullet per distinct signal. Keep AWS field names verbatim.
 - **Signal**: cross-ref `dbi` — when the parent DB is present in the already-loaded `dbi` list, `SnapshotCreateTime` older than the parent `DBInstance.BackupRetentionPeriod` (in days) AND `SnapshotType == "automated"` → Warning (automated snapshot kept past its retention window — signals retention-policy drift or a stuck automated cycle).
   - **State bucket**: Warning.
   - **How obtained**: compute age from `DBSnapshot.SnapshotCreateTime` on the list response, cross-reference against the already-loaded `dbi` list by `DBInstanceIdentifier`, compare to `DBInstance.BackupRetentionPeriod`. Skip the rule when the parent DB is not in the loaded sibling list.
-  - **Threshold note**: rds-snap fires on `age > retention` (no multiplier). The sister type `docdb-snap` uses `age > retention × 1.5` to suppress chatter on DocumentDB clusters whose automated cleanup runs less aggressively. The thresholds were authored at different times and the divergence is intentional, not an inconsistency to reconcile — RDS automated snapshots are evicted on a tight schedule, so any overshoot is operator-actionable; DocumentDB tolerates a half-cycle slip.
+  - **Threshold note**: dbi-snap fires on `age > retention` (no multiplier). The sister type `docdb-snap` uses `age > retention × 1.5` to suppress chatter on DocumentDB clusters whose automated cleanup runs less aggressively. The thresholds were authored at different times and the divergence is intentional, not an inconsistency to reconcile — RDS automated snapshots are evicted on a tight schedule, so any overshoot is operator-actionable; DocumentDB tolerates a half-cycle slip.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
@@ -156,7 +156,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 - All §3.3 Wave 3 signals (copied above).
 - Per-row `DescribeDBSnapshotAttributes` for public-snapshot or shared-account detection — a9s-devops persona: possible=yes (the API returns `DBSnapshotAttributes` with `AttributeName=="restore"` listing shared account IDs, `all` meaning public), worth=no as a Wave 2 list-row signal because it's a per-snapshot fan-out; the check belongs in a security-posture view, not on every list load.
-- Manual-snapshot cost-drift age rule (> 365d on `SnapshotType=="manual"`) — not present in `attention-signals.md § rds-snap` for rds-snap (it applies to `docdb-snap`); out of scope here until the golden doc adds it.
+- Manual-snapshot cost-drift age rule (> 365d on `SnapshotType=="manual"`) — not present in `attention-signals.md § dbi-snap` for dbi-snap (it applies to `docdb-snap`); out of scope here until the golden doc adds it.
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` §"What is a9s?").
 
@@ -164,15 +164,15 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 
 One bullet per claim in §§2–4.1. Citation sources, in order of authority:
 
-- a9s golden doc — related-panel contract for `rds-snap` (targets `backup`, `ct-events`, `dbc`, `dbi`, `kms`; per-type contract table row) — `docs/related-resources.md § Per-type contract` (rds-snap row) and `§ rds-snap`.
-- a9s golden doc — Wave 1 signals (`Status` buckets, `Encrypted==false`, orphan cross-ref `dbi`, automated-past-retention cross-ref `dbi`) — `docs/attention-signals.md § Databases & Storage § rds-snap` (Wave 1 cell).
-- a9s golden doc — Wave 2 cell is `None` — `docs/attention-signals.md § Databases & Storage § rds-snap` (Wave 2 cell).
-- a9s golden doc — Wave 3 exclusion (`DescribeDBSnapshotAttributes` per snapshot, public-snapshot) — `docs/attention-signals.md § Databases & Storage § rds-snap` (Wave 3 cell).
+- a9s golden doc — related-panel contract for `dbi-snap` (targets `backup`, `ct-events`, `dbc`, `dbi`, `kms`; per-type contract table row) — `docs/related-resources.md § Per-type contract` (dbi-snap row) and `§ dbi-snap`.
+- a9s golden doc — Wave 1 signals (`Status` buckets, `Encrypted==false`, orphan cross-ref `dbi`, automated-past-retention cross-ref `dbi`) — `docs/attention-signals.md § Databases & Storage § dbi-snap` (Wave 1 cell).
+- a9s golden doc — Wave 2 cell is `None` — `docs/attention-signals.md § Databases & Storage § dbi-snap` (Wave 2 cell).
+- a9s golden doc — Wave 3 exclusion (`DescribeDBSnapshotAttributes` per snapshot, public-snapshot) — `docs/attention-signals.md § Databases & Storage § dbi-snap` (Wave 3 cell).
 - a9s golden doc — `ct-events` universal-pivot policy — `docs/related-resources.md § Policy`.
-- a9s golden doc — `dbc` marked weak (1/6 DevOps audits) — `docs/related-resources.md § rds-snap` ("Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot").
+- a9s golden doc — `dbc` marked weak (1/6 DevOps audits) — `docs/related-resources.md § dbi-snap` ("Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot").
 - a9s golden doc — read-only invariant — `docs/architecture.md § What is a9s?`.
 - AWS Go SDK v2 — `DBSnapshot.DBInstanceIdentifier`, `.KmsKeyId`, `.Encrypted`, `.Status`, `.SnapshotType`, `.SnapshotCreateTime`, `.PercentProgress`, `.DBSnapshotIdentifier`, `.DBSnapshotArn` fields — `AWS SDK Go v2 — rds/types.DBSnapshot`.
-- AWS Go SDK v2 — `DBSnapshot` has no `DBClusterIdentifier` field (Aurora cluster pivot is indirect via `dbi`) — `AWS SDK Go v2 — rds/types.DBSnapshot` (field enumeration). `DBClusterSnapshot` is the cluster-level sibling and is surfaced as a separate shortName, not through `rds-snap`.
+- AWS Go SDK v2 — `DBSnapshot` has no `DBClusterIdentifier` field (Aurora cluster pivot is indirect via `dbi`) — `AWS SDK Go v2 — rds/types.DBSnapshot` (field enumeration). `DBClusterSnapshot` is the cluster-level sibling and is surfaced as a separate shortName, not through `dbi-snap`.
 - AWS Go SDK v2 — `DBSnapshot` has no `StatusInfos`/`StatusReason`/`FailureMessage` field (operator must pivot to `ct-events` for failure cause) — `AWS SDK Go v2 — rds/types.DBSnapshot` (field enumeration).
 - AWS API Reference (authoritative list-API page) — `DescribeDBSnapshots` — `https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DescribeDBSnapshots.html`.
 - AWS API Reference — `DescribeDBSnapshotAttributes` (Wave 3 exclusion context) — `https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DescribeDBSnapshotAttributes.html`.

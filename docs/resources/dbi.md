@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `dbc`, `eni`, `kms`, `logs`, `rds-snap`, `role`, `secrets`, `sg`, `subnet`, `vpc`, `ct-events`.
+Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `dbc`, `eni`, `kms`, `logs`, `dbi-snap`, `role`, `secrets`, `sg`, `subnet`, `vpc`, `ct-events`.
 
 ### `alarm`
 
@@ -55,7 +55,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `d
 - **How discovered**: derive log group names from `DBInstanceIdentifier` + `EnabledCloudwatchLogsExports[]` using the AWS-documented pattern `/aws/rds/instance/<DBInstanceIdentifier>/<export-type>`; look up the already-loaded `logs` list by exact log-group name — a9s-devops: the names are deterministic from two fields that come for free on `DescribeDBInstances`; possible=yes, worth=yes because engine logs are the primary non-metric observability surface for RDS.
 - **Count shown**: yes — equals `len(EnabledCloudwatchLogsExports)`.
 
-### `rds-snap`
+### `dbi-snap`
 
 - **Why related**: Snapshots of this instance — operators pivot here to verify recent backup success or to plan a restore.
 - **How discovered**: `DescribeDBSnapshots(DBInstanceIdentifier=<id>)` (server-side filter) — a9s-devops: this is the documented RDS lookup; possible=yes, worth=yes because snapshot health is part of every DB incident post-mortem.
@@ -218,7 +218,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 ## 6. Citations
 
 - a9s golden doc — dbi Per-type contract row and AWS API URL — `docs/related-resources.md` § `Per-type contract` (dbi row) and § `dbi`.
-- a9s golden doc — dbi reasoning for each related target (`alarm`, `dbc`, `eni`, `kms`, `logs`, `rds-snap`, `role`, `secrets`, `sg`, `subnet`, `vpc`, `ct-events`) — `docs/related-resources.md` § `dbi`.
+- a9s golden doc — dbi reasoning for each related target (`alarm`, `dbc`, `eni`, `kms`, `logs`, `dbi-snap`, `role`, `secrets`, `sg`, `subnet`, `vpc`, `ct-events`) — `docs/related-resources.md` § `dbi`.
 - a9s golden doc — Wave 1 / Wave 2 / Wave 3 signal cells — `docs/attention-signals.md` § Databases & Storage → `dbi` row.
 - AWS API Reference — `DBInstance.DBInstanceStatus`, `.BackupRetentionPeriod`, `.PubliclyAccessible`, `.StorageEncrypted`, `.DeletionProtection`, `.KmsKeyId`, `.VpcSecurityGroups[].VpcSecurityGroupId`, `.DBSubnetGroup.{VpcId,Subnets[].SubnetIdentifier}`, `.DBClusterIdentifier`, `.EnabledCloudwatchLogsExports[]`, `.MonitoringRoleArn`, `.AssociatedRoles[].RoleArn`, `.MasterUserSecret.SecretArn` — `AWS API Reference: API_DBInstance` (https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBInstance.html).
 - AWS API Reference — `DescribePendingMaintenanceActions` (account-wide) — (https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DescribePendingMaintenanceActions.html).
@@ -229,9 +229,9 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `alarm` discovery mechanism (sibling-list dimension scan) — a9s-devops (2026-04-20): possible=yes, worth=yes. `DescribeAlarms` is already cached from the alarm top-level list; filtering its `Dimensions[].Name=="DBInstanceIdentifier"` is cheaper and more accurate than calling alarm APIs per DB.
 - `eni` discovery mechanism (service-owned requester-id filter) — a9s-devops (2026-04-20): possible=yes, worth=yes. `DescribeNetworkInterfaces` supports `Filters=[{Name=requester-id,Values=amazon-rds}]`; description-prefix matching narrows to the specific DB instance.
 - `logs` discovery mechanism (derived log-group name) — a9s-devops (2026-04-20): possible=yes, worth=yes. RDS log-export group names follow the deterministic pattern `/aws/rds/instance/<DBInstanceIdentifier>/<export-type>` driven by `DBInstanceIdentifier` + `EnabledCloudwatchLogsExports[]`.
-- `rds-snap` discovery mechanism (server-side DBInstanceIdentifier filter) — a9s-devops (2026-04-20): possible=yes, worth=yes. `DescribeDBSnapshots` accepts `DBInstanceIdentifier` as a server-side filter.
+- `dbi-snap` discovery mechanism (server-side DBInstanceIdentifier filter) — a9s-devops (2026-04-20): possible=yes, worth=yes. `DescribeDBSnapshots` accepts `DBInstanceIdentifier` as a server-side filter.
 - `secrets` discovery mechanism (`MasterUserSecret.SecretArn`) — a9s-devops (2026-04-20): possible=yes, worth=yes. Field is populated only when RDS-managed passwords are enabled; absence is meaningful and expected for classic password-auth instances.
-- Count-shown values for the related panel — a9s-devops (2026-04-20): possible=yes (most), worth=yes. For cached-sibling lookups (`alarm`, `kms`, `role`, `sg`, `subnet`, `vpc`, `dbc`, `logs`, `secrets`) exact counts are free and valuable; for `rds-snap` and `eni` counts come from live API responses and are still cheap enough; `ct-events` is windowed and a count would be misleading.
+- Count-shown values for the related panel — a9s-devops (2026-04-20): possible=yes (most), worth=yes. For cached-sibling lookups (`alarm`, `kms`, `role`, `sg`, `subnet`, `vpc`, `dbc`, `logs`, `secrets`) exact counts are free and valuable; for `dbi-snap` and `eni` counts come from live API responses and are still cheap enough; `ct-events` is windowed and a count would be misleading.
 - Cause text for failure statuses — a9s-devops (2026-04-20): possible=partial, worth=yes. `DescribeDBInstances` does not expose a structured reason for primary-instance failures (`StatusInfos[]` is read-replica-scoped); the status keyword itself is operator-meaningful and the S5 sentence names the operator remedy rather than fabricating a reason string.
 - Pending maintenance S4 text (`maintenance scheduled`) and S5 sentence shape — a9s-devops (2026-04-20): possible=yes, worth=yes. `PendingMaintenanceAction.Action` + `.Description` + `.ForcedApplyDate`/`.AutoAppliedAfterDate` from `DescribePendingMaintenanceActions` provide the fields needed for a short human-readable summary.
 - Transitional-status UX gap (bare `modifying`) and recommended fix — a9s-devops (2026-04-20): possible=yes, worth=yes. `PendingModifiedValues` on `DBInstance` carries the actual pending change set (e.g. `DBInstanceClass`, `AllocatedStorage`, `EngineVersion`); surfacing the first non-empty key gives the operator a readable "what's being changed" without opening detail.

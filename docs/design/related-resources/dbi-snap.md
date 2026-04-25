@@ -1,4 +1,4 @@
-# RDS Snapshots (rds-snap) — Related Resources
+# DB Instance Snapshots (dbi-snap) — Related Resources
 
 ## Real-World Use Cases
 

@@ -1,6 +1,6 @@
 // aws_tg_related_extra_test.go covers TG related checkers skipped in prior wave:
 // checkTGVPC, checkTGBackup, checkTGCFN, checkTGDBC, checkTGDBI, checkTGEC2,
-// checkTGLambda, checkTGLogs, checkTGRDSSnap, checkTGSG, checkTGSubnet.
+// checkTGLambda, checkTGLogs, checkTGDBISnap, checkTGSG, checkTGSubnet.
 package unit_test
 
 import (
@@ -130,12 +130,12 @@ func TestRelated_TG_Logs_NoARN(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// checkTGRDSSnap — same boundary as Logs
+// checkTGDBISnap — same boundary as Logs
 // ---------------------------------------------------------------------------
 
-func TestRelated_TG_RDSSnap_HasARN(t *testing.T) {
+func TestRelated_TG_DBISnap_HasARN(t *testing.T) {
 	res := tgSrcResource()
-	checker := tgCheckerByTarget(t, "rds-snap")
+	checker := tgCheckerByTarget(t, "dbi-snap")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1", result.Count)

@@ -4,7 +4,7 @@ package tui
 // snapshot containing m.probeResources to the enricher closure, even when
 // m.resourceCache is empty.
 //
-// Codex review (2026-04-25): the cross-ref enricher (e.g. rds-snap orphan
+// Codex review (2026-04-25): the cross-ref enricher (e.g. dbi-snap orphan
 // detection) cannot fire on the initial enrichment pass if the cache snapshot
 // is built from m.resourceCache alone, because that map is empty until the
 // user opens a list. probeResources holds the first-page rows retained by the
@@ -31,7 +31,7 @@ import (
 // m.resourceCache. Pre-fix this test FAILS because the inline snapshot at
 // app_probes.go:344-353 builds only from m.resourceCache.
 func TestProbeEnrichment_CacheSnapshotMergesProbeResources(t *testing.T) {
-	const sentinelType = "rds-snap-probe-cache-pin"
+	const sentinelType = "dbi-snap-probe-cache-pin"
 
 	// Capture the cache the enricher saw on its single invocation.
 	var (

@@ -653,7 +653,7 @@ type, and the right column shows RDS-specific reverse relationships.
 +-------------------------------- detail -- mydb-prod --------------------------------------------------------+
 | DBInstanceIdentifier: mydb-prod                             | [DIM]RELATED[/]                                  |
 | Engine:               postgres                              |   CloudWatch Alarms                            |
-| EngineVersion:        15.4                                  |   RDS Snapshots                                |
+| EngineVersion:        15.4                                  |   DB Instance Snapshots                                |
 | DBInstanceStatus:     available                             |   Secrets Manager                              |
 | DBInstanceClass:      db.t3.medium                          |   CloudWatch Log Groups                        |
 | Endpoint:                                                   |   CloudTrail Events                            |

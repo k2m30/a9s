@@ -11,10 +11,10 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// checkRDSSnapDBI extracts DBInstanceIdentifier from the DBSnapshot RawStruct
+// checkDBISnapDBI extracts DBInstanceIdentifier from the DBSnapshot RawStruct
 // and searches the dbi cache for a matching instance name.
 // Pattern C — needs target cache.
-func checkRDSSnapDBI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkDBISnapDBI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	snap, ok := assertStruct[rdstypes.DBSnapshot](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "dbi", Count: -1}
@@ -24,7 +24,7 @@ func checkRDSSnapDBI(ctx context.Context, clients any, res resource.Resource, ca
 	}
 	dbName := *snap.DBInstanceIdentifier
 
-	dbiList, truncated, err := rdsSnapRelatedResources(ctx, clients, cache, "dbi")
+	dbiList, truncated, err := dbiSnapRelatedResources(ctx, clients, cache, "dbi")
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "dbi", Count: -1, Err: err}
 	}
@@ -44,10 +44,10 @@ func checkRDSSnapDBI(ctx context.Context, clients any, res resource.Resource, ca
 	return relatedResult("dbi", ids)
 }
 
-// checkRDSSnapKMS extracts KmsKeyId from the DBSnapshot RawStruct and matches
+// checkDBISnapKMS extracts KmsKeyId from the DBSnapshot RawStruct and matches
 // it against the kms cache. Handles full ARN format (arn:aws:kms:…/key-id).
 // Pattern C — needs target cache.
-func checkRDSSnapKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkDBISnapKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	snap, ok := assertStruct[rdstypes.DBSnapshot](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
@@ -64,7 +64,7 @@ func checkRDSSnapKMS(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
 
-	kmsList, truncated, err := rdsSnapRelatedResources(ctx, clients, cache, "kms")
+	kmsList, truncated, err := dbiSnapRelatedResources(ctx, clients, cache, "kms")
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: -1, Err: err}
 	}
@@ -84,8 +84,8 @@ func checkRDSSnapKMS(ctx context.Context, clients any, res resource.Resource, ca
 	return relatedResult("kms", ids)
 }
 
-// rdsSnapRelatedResources returns cached resources for the target type, or fetches the first page.
-func rdsSnapRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
+// dbiSnapRelatedResources returns cached resources for the target type, or fetches the first page.
+func dbiSnapRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
 	if err != nil {
 		if _, ok := clients.(*ServiceClients); !ok {
@@ -95,7 +95,7 @@ func rdsSnapRelatedResources(ctx context.Context, clients any, cache resource.Re
 	return resources, isTruncated, err
 }
 
-// checkRDSSnapBackup resolves AWS Backup PLANS that cover this RDS snapshot's
+// checkDBISnapBackup resolves AWS Backup PLANS that cover this RDS snapshot's
 // PARENT DB INSTANCE by reverse-scanning the already-loaded backup PLAN cache
 // (Pattern C — cache scan, zero extra API calls).
 //
@@ -113,7 +113,7 @@ func rdsSnapRelatedResources(ctx context.Context, clients any, cache resource.Re
 // space is plan IDs. Returning recovery-point ARNs would resolve Count > 0
 // but break drill-through (the target list filter could not match the IDs).
 // Recovery points are not first-class a9s resources at present.
-func checkRDSSnapBackup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkDBISnapBackup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	snap, ok := assertStruct[rdstypes.DBSnapshot](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
@@ -129,7 +129,7 @@ func checkRDSSnapBackup(ctx context.Context, clients any, res resource.Resource,
 
 	// Resolve parent DBInstanceArn via the dbi cache. If the cache isn't loaded,
 	// the parent ARN is unavailable and the answer is genuinely unknown.
-	dbiList, _, err := rdsSnapRelatedResources(ctx, clients, cache, "dbi")
+	dbiList, _, err := dbiSnapRelatedResources(ctx, clients, cache, "dbi")
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "backup", Count: -1, Err: err}
 	}
@@ -154,7 +154,7 @@ func checkRDSSnapBackup(ctx context.Context, clients any, res resource.Resource,
 		return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
 	}
 
-	planList, truncated, err := rdsSnapRelatedResources(ctx, clients, cache, "backup")
+	planList, truncated, err := dbiSnapRelatedResources(ctx, clients, cache, "backup")
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "backup", Count: -1, Err: err}
 	}
@@ -175,18 +175,18 @@ func checkRDSSnapBackup(ctx context.Context, clients any, res resource.Resource,
 }
 
 
-// checkRDSSnapCTEvents looks up cached CloudTrail events for the snapshot's
+// checkDBISnapCTEvents looks up cached CloudTrail events for the snapshot's
 // DBSnapshotIdentifier. Universal pivot — every registered type gets one;
 // see docs/related-resources.md §Policy. FetchFilter["ResourceName"] is always
 // set so the caller can do a filtered re-fetch; Count is "unknown" (windowed)
 // per the spec — the panel renders the visible page count rather than a total.
-func checkRDSSnapCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+func checkDBISnapCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	snapID := res.ID
 	if snapID == "" {
 		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
 	}
 	fetchFilter := map[string]string{"ResourceName": snapID}
-	eventList, truncated, err := rdsSnapRelatedResources(ctx, clients, cache, "ct-events")
+	eventList, truncated, err := dbiSnapRelatedResources(ctx, clients, cache, "ct-events")
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, Err: err, FetchFilter: fetchFilter}
 	}

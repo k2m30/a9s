@@ -29,7 +29,7 @@ func init() {
 		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkTGEC2},
 		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkTGLambda},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkTGLogs},
-		{TargetType: "rds-snap", DisplayName: "RDS Snapshots", Checker: checkTGRDSSnap},
+		{TargetType: "dbi-snap", DisplayName: "DB Instance Snapshots", Checker: checkTGDBISnap},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkTGSG},
 		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkTGSubnet},
 	})
@@ -379,14 +379,14 @@ func checkTGLogs(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	return resource.RelatedCheckResult{TargetType: "logs", Count: -1}
 }
 
-// checkTGRDSSnap reports RDS snapshots related to RDS instances targeted by
+// checkTGDBISnap reports RDS snapshots related to RDS instances targeted by
 // this TG. Requires two hops (target instance → snapshots) and per-TG target
 // enumeration. Returns Count: -1.
-func checkTGRDSSnap(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+func checkTGDBISnap(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	if tgARN(res) == "" {
-		return resource.RelatedCheckResult{TargetType: "rds-snap", Count: 0}
+		return resource.RelatedCheckResult{TargetType: "dbi-snap", Count: 0}
 	}
-	return resource.RelatedCheckResult{TargetType: "rds-snap", Count: -1}
+	return resource.RelatedCheckResult{TargetType: "dbi-snap", Count: -1}
 }
 
 // checkTGSG reports security groups of the TG's targets. DescribeTargetGroups

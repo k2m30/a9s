@@ -110,7 +110,7 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"dbi", "kms"}:      "KMS Key",
 		{"dbi", "subnet"}:   "Subnets",
 		{"dbi", "alarm"}:    "CloudWatch Alarms",
-		{"dbi", "rds-snap"}: "RDS Snapshots",
+		{"dbi", "dbi-snap"}: "DB Instance Snapshots",
 		{"dbi", "secrets"}:  "Secrets Manager",
 		{"dbi", "logs"}:     "Log Groups",
 
@@ -361,9 +361,9 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"ami", "ebs-snap"}: "EBS Snapshots",
 		{"ami", "asg"}:      "Auto Scaling Groups",
 
-		// rds-snap
-		{"rds-snap", "dbi"}: "DB Instances",
-		{"rds-snap", "kms"}: "KMS Keys",
+		// dbi-snap
+		{"dbi-snap", "dbi"}: "DB Instances",
+		{"dbi-snap", "kms"}: "KMS Keys",
 
 		// docdb-snap
 		{"docdb-snap", "dbc"}: "DocumentDB Cluster",

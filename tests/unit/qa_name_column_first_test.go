@@ -244,7 +244,7 @@ var idFirstExceptions = []struct {
 	{"redis", "Cluster ID"},
 	{"dbc", "Cluster ID"},
 	{"redshift", "Cluster ID"},
-	{"rds-snap", "Snapshot ID"},
+	{"dbi-snap", "Snapshot ID"},
 	{"docdb-snap", "Snapshot ID"},
 }
 

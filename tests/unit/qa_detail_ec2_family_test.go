@@ -60,7 +60,7 @@ func detailConfigForType(typeName string) *config.ViewsConfig {
 			"VpcId", "SubnetId", "PrivateIpAddress",
 			"MacAddress", "Description", "Groups", "TagSet",
 		},
-		"rds-snap": {
+		"dbi-snap": {
 			"DBSnapshotIdentifier", "DBInstanceIdentifier",
 			"Status", "Engine", "EngineVersion", "SnapshotType",
 			"SnapshotCreateTime", "AllocatedStorage",
@@ -296,9 +296,9 @@ func realisticENI() ec2types.NetworkInterface {
 	}
 }
 
-func realisticRDSSnapshot() rdstypes.DBSnapshot {
+func realisticDBISnapshot() rdstypes.DBSnapshot {
 	return rdstypes.DBSnapshot{
-		DBSnapshotIdentifier: new("rds-snap-prod-20250615"),
+		DBSnapshotIdentifier: new("dbi-snap-prod-20250615"),
 		DBInstanceIdentifier: new("prod-db-01"),
 		Status:               new("available"),
 		Engine:               new("mysql"),
@@ -905,16 +905,16 @@ func TestQA_Detail_ENI_FrameTitle(t *testing.T) {
 // 12. RDS Snapshot
 // ===========================================================================
 
-func TestQA_Detail_RDSSnap_ViewContainsExpectedFields(t *testing.T) {
+func TestQA_Detail_DBISnap_ViewContainsExpectedFields(t *testing.T) {
 	ensureNoColor(t)
-	snap := realisticRDSSnapshot()
-	res := buildResource("rds-snap-prod-20250615", "rds-snap-prod-20250615", snap)
-	cfg := detailConfigForType("rds-snap")
-	m := newDetailModel(res, "rds-snap", cfg)
+	snap := realisticDBISnapshot()
+	res := buildResource("dbi-snap-prod-20250615", "dbi-snap-prod-20250615", snap)
+	cfg := detailConfigForType("dbi-snap")
+	m := newDetailModel(res, "dbi-snap", cfg)
 
 	view := m.View()
 	for _, expected := range []string{
-		"DBSnapshotIdentifier", "rds-snap-prod-20250615",
+		"DBSnapshotIdentifier", "dbi-snap-prod-20250615",
 		"DBInstanceIdentifier", "prod-db-01",
 		"Status", "available",
 		"Engine", "mysql",
@@ -924,32 +924,32 @@ func TestQA_Detail_RDSSnap_ViewContainsExpectedFields(t *testing.T) {
 		"AllocatedStorage", "100",
 	} {
 		if !strings.Contains(view, expected) {
-			t.Errorf("RDSSnap detail should contain %q, got:\n%s", expected, view)
+			t.Errorf("DBISnap detail should contain %q, got:\n%s", expected, view)
 		}
 	}
 }
 
-func TestQA_Detail_RDSSnap_NilFields(t *testing.T) {
+func TestQA_Detail_DBISnap_NilFields(t *testing.T) {
 	ensureNoColor(t)
 	snap := rdstypes.DBSnapshot{}
 	res := buildResource("empty-snap", "empty-snap", snap)
-	cfg := detailConfigForType("rds-snap")
-	m := newDetailModel(res, "rds-snap", cfg)
+	cfg := detailConfigForType("dbi-snap")
+	m := newDetailModel(res, "dbi-snap", cfg)
 
 	view := m.View()
 	if view == "" {
-		t.Error("RDSSnap detail should not be empty even with nil fields")
+		t.Error("DBISnap detail should not be empty even with nil fields")
 	}
 }
 
-func TestQA_Detail_RDSSnap_FrameTitle(t *testing.T) {
-	snap := realisticRDSSnapshot()
-	res := buildResource("rds-snap-prod-20250615", "rds-snap-prod-20250615", snap)
-	cfg := detailConfigForType("rds-snap")
-	m := newDetailModel(res, "rds-snap", cfg)
+func TestQA_Detail_DBISnap_FrameTitle(t *testing.T) {
+	snap := realisticDBISnapshot()
+	res := buildResource("dbi-snap-prod-20250615", "dbi-snap-prod-20250615", snap)
+	cfg := detailConfigForType("dbi-snap")
+	m := newDetailModel(res, "dbi-snap", cfg)
 
-	if title := m.FrameTitle(); title != "rds-snap-prod-20250615" {
-		t.Errorf("RDSSnap FrameTitle expected %q, got %q", "rds-snap-prod-20250615", title)
+	if title := m.FrameTitle(); title != "dbi-snap-prod-20250615" {
+		t.Errorf("DBISnap FrameTitle expected %q, got %q", "dbi-snap-prod-20250615", title)
 	}
 }
 

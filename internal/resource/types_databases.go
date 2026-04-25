@@ -430,9 +430,9 @@ func databasesResourceTypes() []ResourceTypeDef {
 			},
 		},
 		{
-			Name:          "RDS Snapshots",
-			ShortName:     "rds-snap",
-			Aliases:       []string{"rds-snap", "rds-snapshots", "db-snapshots"},
+			Name:          "DB Instance Snapshots",
+			ShortName:     "dbi-snap",
+			Aliases:       []string{"dbi-snap", "rds-snapshots", "db-snapshots"},
 			Category:      "DATABASES & STORAGE",
 			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{

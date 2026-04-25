@@ -152,7 +152,7 @@ func databasesDefaultViews() map[string]ViewDef {
 				{Path: "FileSystemArn"}, {Path: "OwnerId"}, {Path: "SizeInBytes"}, {Path: "CreationTime"}, {Path: "Tags"},
 			},
 		},
-		"rds-snap": {
+		"dbi-snap": {
 			List: []ListColumn{
 				{Title: "Snapshot ID", Path: "DBSnapshotIdentifier", Width: 36},
 				{Title: "DB Instance", Path: "DBInstanceIdentifier", Width: 28},

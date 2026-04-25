@@ -228,7 +228,7 @@ They should not be rendered as if they have equal certainty.
 | OpenSearch Domains | L1 | processing/degraded/failed, cluster not active |
 | Redshift Clusters | L1 | not available, resizing/restoring too long, maintenance/problem states |
 | EFS File Systems | L4 | no strong generic issue semantics in v1 |
-| RDS Snapshots | L1 | failed, creating too long |
+| DB Instance Snapshots | L1 | failed, creating too long |
 | DocDB Snapshots | L1 | failed, creating too long |
 
 ## 6.5 Monitoring
@@ -322,7 +322,7 @@ Ship issue counts and the first `!` mode for:
 - DB Clusters
 - OpenSearch
 - Redshift
-- RDS Snapshots
+- DB Instance Snapshots
 - DocDB Snapshots
 - CloudWatch Alarms
 - Kinesis Streams

@@ -11,7 +11,7 @@
  │               │ Endpoints, Transit Gateways, Network Interfaces                     │
  ├───────────────┼─────────────────────────────────────────────────────────────────────┤
  │ DATABASES &   │ DB Instances, S3 Buckets, ElastiCache Redis, DB Clusters, DynamoDB, │
- │ STORAGE       │ OpenSearch, Redshift, EFS, RDS Snapshots, DocDB Snapshots           │
+ │ STORAGE       │ OpenSearch, Redshift, EFS, DB Instance Snapshots, DocDB Snapshots           │
  ├───────────────┼─────────────────────────────────────────────────────────────────────┤
  │ MONITORING    │ CloudWatch Alarms, CloudWatch Log Groups, CloudTrail Trails,        │
  │               │ CloudTrail Events                                                   │

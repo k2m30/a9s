@@ -1293,17 +1293,17 @@ func TestFetchDocDBClusterSnapshots_Pagination(t *testing.T) {
 }
 
 // ===========================================================================
-// RDS Snapshots — RDS DescribeDBSnapshots (Marker)
+// DB Instance Snapshots — RDS DescribeDBSnapshots (Marker)
 // ===========================================================================
 
-type mockRDSSnapshotsPaginatedClient struct {
+type mockDBISnapshotsPaginatedClient struct {
 	outputs []*rds.DescribeDBSnapshotsOutput
 	inputs  []*rds.DescribeDBSnapshotsInput
 	err     error
 	callIdx int
 }
 
-func (m *mockRDSSnapshotsPaginatedClient) DescribeDBSnapshots(
+func (m *mockDBISnapshotsPaginatedClient) DescribeDBSnapshots(
 	ctx context.Context,
 	params *rds.DescribeDBSnapshotsInput,
 	optFns ...func(*rds.Options),
@@ -1320,8 +1320,8 @@ func (m *mockRDSSnapshotsPaginatedClient) DescribeDBSnapshots(
 	return out, nil
 }
 
-func TestFetchRDSSnapshots_Pagination(t *testing.T) {
-	mock := &mockRDSSnapshotsPaginatedClient{
+func TestFetchDBISnapshots_Pagination(t *testing.T) {
+	mock := &mockDBISnapshotsPaginatedClient{
 		outputs: []*rds.DescribeDBSnapshotsOutput{
 			{
 				Marker: aws.String("page2-marker"),
@@ -1338,7 +1338,7 @@ func TestFetchRDSSnapshots_Pagination(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchRDSSnapshots(context.Background(), mock)
+	resources, err := awsclient.FetchDBISnapshots(context.Background(), mock)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -1618,8 +1618,8 @@ func TestBatch2Pagination_ErrorPropagation(t *testing.T) {
 	})
 
 	t.Run("rds_snap_error", func(t *testing.T) {
-		mock := &mockRDSSnapshotsPaginatedClient{err: testErr}
-		_, err := awsclient.FetchRDSSnapshots(context.Background(), mock)
+		mock := &mockDBISnapshotsPaginatedClient{err: testErr}
+		_, err := awsclient.FetchDBISnapshots(context.Background(), mock)
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}

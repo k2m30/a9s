@@ -689,7 +689,7 @@ func mockRDSDetail() string {
 	related := []relatedRow{
 		{label: "RELATED", state: rowHeader},
 		{label: "CloudWatch Alarms", state: rowAvailable},
-		{label: "RDS Snapshots", count: "(5)", state: rowAvailable},
+		{label: "DB Instance Snapshots", count: "(5)", state: rowAvailable},
 		{label: "Secrets Manager", state: rowAvailable},
 		{label: "CW Log Groups", count: "(2)", state: rowAvailable},
 		{label: "CloudTrail Events", state: rowAvailable},

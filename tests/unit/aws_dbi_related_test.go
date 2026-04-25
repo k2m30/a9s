@@ -247,14 +247,14 @@ func TestDBI_Related_Alarm_MatchesByDBInstanceIdentifierDimension(t *testing.T) 
 }
 
 // ---------------------------------------------------------------------------
-// rds-snap
+// dbi-snap
 // ---------------------------------------------------------------------------
 
-// TestDBI_Related_RDSSnap_MatchesByDBInstanceIdentifier verifies
-// checkDbiRDSSnap finds snapshots whose DBInstanceIdentifier matches res.ID.
-func TestDBI_Related_RDSSnap_MatchesByDBInstanceIdentifier(t *testing.T) {
+// TestDBI_Related_DBISnap_MatchesByDBInstanceIdentifier verifies
+// checkDbiDBISnap finds snapshots whose DBInstanceIdentifier matches res.ID.
+func TestDBI_Related_DBISnap_MatchesByDBInstanceIdentifier(t *testing.T) {
 	res := dbiProdResource(t)
-	checker := dbiCheckerByTarget(t, "rds-snap")
+	checker := dbiCheckerByTarget(t, "dbi-snap")
 
 	snap1ID := "rds:" + fixtures.ProdDbiID + "-2026-04-15"
 	snap2ID := "pre-migration-" + fixtures.ProdDbiID
@@ -271,7 +271,7 @@ func TestDBI_Related_RDSSnap_MatchesByDBInstanceIdentifier(t *testing.T) {
 		RawStruct: rdstypes.DBSnapshot{DBInstanceIdentifier: aws.String("other-db")},
 	}
 	cache := resource.ResourceCache{
-		"rds-snap": resource.ResourceCacheEntry{
+		"dbi-snap": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{snap1, snap2, otherSnap},
 		},
 	}

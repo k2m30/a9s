@@ -68,7 +68,7 @@ func TestDetailPaths_AllConfiguredFieldsRendered(t *testing.T) {
 		"tgw":          buildResource("tgw-0abc1234def56789a", "prod-tgw", realisticTransitGateway()),
 		"vpce":         buildResource("vpce-0abc1234def56789a", "s3-endpoint", realisticVPCEndpoint()),
 		"eni":          buildResource("eni-0abc1234def56789a", "prod-eni", realisticENI()),
-		"rds-snap":     buildResource("rds-snap-prod-20250615", "rds-snap-prod-20250615", realisticRDSSnapshot()),
+		"dbi-snap":     buildResource("dbi-snap-prod-20250615", "dbi-snap-prod-20250615", realisticDBISnapshot()),
 		"docdb-snap":   buildResource("docdb-snap-prod-20250615", "docdb-snap-prod-20250615", realisticDocDBSnapshot()),
 		"sns-sub":      buildResource("sub-12345", "sub-12345", realisticSNSSubscription()),
 		"policy":       buildResource("ReadOnlyAccess", "ReadOnlyAccess", realisticIAMPolicy()),

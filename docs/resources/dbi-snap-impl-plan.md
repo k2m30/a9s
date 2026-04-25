@@ -1,13 +1,13 @@
 ---
-shortName: rds-snap
-spec: docs/resources/rds-snap.md
+shortName: dbi-snap
+spec: docs/resources/dbi-snap.md
 generatedBy: a9s-implement-resource skill
 date: 2026-04-25
 ---
 
-# rds-snap — Implementation Plan
+# dbi-snap — Implementation Plan
 
-Working contract for the implementation of `rds-snap` against `docs/resources/rds-snap.md`. Tests assert against §1; fixtures live in §2; coder works against §3 (gap analysis) and §4 (architectural extension).
+Working contract for the implementation of `dbi-snap` against `docs/resources/dbi-snap.md`. Tests assert against §1; fixtures live in §2; coder works against §3 (gap analysis) and §4 (architectural extension).
 
 ## §0 Spec snapshot
 
@@ -134,7 +134,7 @@ TEST: arn_field_populated_for_backup_pivot
 GIVEN: DBSnapshot{DBSnapshotArn:"arn:aws:rds:us-east-1:123:snapshot:rds:foo"}
 WHEN:  list is fetched
 THEN:  Resource.Fields["arn"] == "arn:aws:rds:us-east-1:123:snapshot:rds:foo"
-       (consumed by checkRDSSnapBackup)
+       (consumed by checkDBISnapBackup)
 ```
 
 ### §1.2 Multi-finding cases (rule 7)
@@ -171,11 +171,11 @@ THEN:
 
 TEST: fetcher_populates_resource_issues           (covers U7f)
 GIVEN: each §3.1 fixture
-WHEN:  FetchRDSSnapshotsPage runs
+WHEN:  FetchDBISnapshotsPage runs
 THEN:  got.Issues deep-equals expected slice in precedence order
        (Healthy → empty; single warning → single phrase; multi → top first)
 
-# U7b/U7c/U7d/U8: N/A — Wave 2 = None for rds-snap, no Wave-1+Wave-2 stack possible.
+# U7b/U7c/U7d/U8: N/A — Wave 2 = None for dbi-snap, no Wave-1+Wave-2 stack possible.
 ```
 
 ### §1.3 Universal coverage matrix mapping
@@ -222,7 +222,7 @@ THEN:
 
 ## §2 Fixtures
 
-Single-source fixture file: `internal/demo/fixtures/rds-snap.go` — exports a `RDSSnapFixtures` struct + `NewRDSSnapFixtures()` constructor + per-fixture exported ID/ARN consts. The existing inline `buildRDSSnapshots()` block in `internal/demo/fixtures/rds.go` (lines 446–~600) is folded into this new file and removed from `rds.go` (the RDS fake's reference is updated to call into the new package symbol).
+Single-source fixture file: `internal/demo/fixtures/dbi-snap.go` — exports a `DBISnapFixtures` struct + `NewDBISnapFixtures()` constructor + per-fixture exported ID/ARN consts. The existing inline `buildDBISnapshots()` block in `internal/demo/fixtures/rds.go` (lines 446–~600) is folded into this new file and removed from `rds.go` (the RDS fake's reference is updated to call into the new package symbol).
 
 Sibling cross-references required for graph-connected non-zero pivots:
 - `kms.go` — graph-root snapshot's `KmsKeyId` must match an existing `KMSFixtures` key (already covered by `dbiKMSKeyID`).
@@ -234,16 +234,16 @@ Sibling cross-references required for graph-connected non-zero pivots:
 
 | ID const | Identifier | State | Purpose |
 |---|---|---|---|
-| `ProdRDSSnapID` (graph-root) | `rds:prod-dbi-1-2026-04-15` | Healthy + Encrypted=true + automated, parent `ProdDbiID` present, `KmsKeyId=dbiKMSKeyID` | Graph-root for §9.3 — drives `dbi`, `kms`, `backup` pivots non-zero. `dbc` pivot is intentionally absent (Aurora cluster snapshots live in `dbc-snap`, not `rds-snap`). |
-| `WarnRDSSnapCreatingID` | `dev-feature-branch-snap` | Status=creating, PercentProgress=42, Encrypted=true | Covers Wave-1 `creating: 42%` signal |
-| `BrokenRDSSnapFailedID` | `prod-dbi-1-failed-snap` | Status=failed, Encrypted=true, parent ProdDbiID | Covers Broken `failed` |
-| `BrokenRDSSnapIncompatibleID` | `legacy-mysql-snap-incompatible` | Status=incompatible-restore, Encrypted=true | Covers Broken `incompatible-restore` |
-| `WarnRDSSnapUnencryptedID` | `unenc-pre-migration-snap` | Status=available, Encrypted=false, parent ProdDbiID | Covers Warning `unencrypted` |
-| `WarnRDSSnapOrphanID` | `orphan-deleted-db-snap` | Status=available, Encrypted=true, DBInstanceIdentifier="deleted-legacy-db" (NOT in dbi list) | Covers Warning `orphan: source DB deleted` |
-| `WarnRDSSnapPastRetentionID` | `rds:past-retention-db-2026-03-15` | Status=available, automated, Encrypted=true, parent set to a NEW `dbi.go` fixture with `BackupRetentionPeriod=7`, SnapshotCreateTime = NOW - 30 days | Covers Warning `automated, 23d past retention` |
-| `MultiW1RDSSnapID` (multi-W1) | `multi-orphan-unenc-snap` | Status=available, Encrypted=false, DBInstanceIdentifier="deleted-legacy-db" | U7a/U7e — `unencrypted (+1)` |
-| `BackupCoveredRDSSnapID` | `awsbackup:job-deadbeef-snap` | Status=available, Encrypted=true, parent ProdDbiID | Realism: AWS Backup-created identifier prefix; backup pivot already drives non-zero on graph-root |
-| `SeverityBrokenWarnRDSSnapID` | `failed-with-unenc-snap` | Status=failed, Encrypted=false | Covers severity_broken_beats_warning (U8) |
+| `ProdDBISnapID` (graph-root) | `rds:prod-dbi-1-2026-04-15` | Healthy + Encrypted=true + automated, parent `ProdDbiID` present, `KmsKeyId=dbiKMSKeyID` | Graph-root for §9.3 — drives `dbi`, `kms`, `backup` pivots non-zero. `dbc` pivot is intentionally absent (Aurora cluster snapshots live in `dbc-snap`, not `dbi-snap`). |
+| `WarnDBISnapCreatingID` | `dev-feature-branch-snap` | Status=creating, PercentProgress=42, Encrypted=true | Covers Wave-1 `creating: 42%` signal |
+| `BrokenDBISnapFailedID` | `prod-dbi-1-failed-snap` | Status=failed, Encrypted=true, parent ProdDbiID | Covers Broken `failed` |
+| `BrokenDBISnapIncompatibleID` | `legacy-mysql-snap-incompatible` | Status=incompatible-restore, Encrypted=true | Covers Broken `incompatible-restore` |
+| `WarnDBISnapUnencryptedID` | `unenc-pre-migration-snap` | Status=available, Encrypted=false, parent ProdDbiID | Covers Warning `unencrypted` |
+| `WarnDBISnapOrphanID` | `orphan-deleted-db-snap` | Status=available, Encrypted=true, DBInstanceIdentifier="deleted-legacy-db" (NOT in dbi list) | Covers Warning `orphan: source DB deleted` |
+| `WarnDBISnapPastRetentionID` | `rds:past-retention-db-2026-03-15` | Status=available, automated, Encrypted=true, parent set to a NEW `dbi.go` fixture with `BackupRetentionPeriod=7`, SnapshotCreateTime = NOW - 30 days | Covers Warning `automated, 23d past retention` |
+| `MultiW1DBISnapID` (multi-W1) | `multi-orphan-unenc-snap` | Status=available, Encrypted=false, DBInstanceIdentifier="deleted-legacy-db" | U7a/U7e — `unencrypted (+1)` |
+| `BackupCoveredDBISnapID` | `awsbackup:job-deadbeef-snap` | Status=available, Encrypted=true, parent ProdDbiID | Realism: AWS Backup-created identifier prefix; backup pivot already drives non-zero on graph-root |
+| `SeverityBrokenWarnDBISnapID` | `failed-with-unenc-snap` | Status=failed, Encrypted=false | Covers severity_broken_beats_warning (U8) |
 
 Adversarial fixtures (NOT in this file — stay inline in `tests/unit/aws_rds_snap_test.go`):
 - nil `DBSnapshotIdentifier`
@@ -253,37 +253,37 @@ Adversarial fixtures (NOT in this file — stay inline in `tests/unit/aws_rds_sn
 
 ### §2.2 Graph-root structural exemption (§9.3 ≥50% Count ≥ 2)
 
-`ProdRDSSnapID` is the graph-root. The pivots resolve as follows:
+`ProdDBISnapID` is the graph-root. The pivots resolve as follows:
 
 - `dbi` — Count = 1 (a snapshot has exactly one source instance; capped at 1 by AWS).
 - `kms` — Count = 1 (a snapshot has exactly one encryption key; capped at 1).
-- `backup` — Count = 1 on the graph-root (one recovery point pointing at `ProdRDSSnapARN`).
+- `backup` — Count = 1 on the graph-root (one recovery point pointing at `ProdDBISnapARN`).
 - `ct-events` — count "unknown" (windowed; exempt per universal rule).
 
-**Structural exemption**: `rds-snap` pivots are 1:1 by AWS data model. The dbc
+**Structural exemption**: `dbi-snap` pivots are 1:1 by AWS data model. The dbc
 pivot is intentionally NOT registered (Aurora cluster snapshots live in
-`dbc-snap`, never in `rds-snap` — real AWS rejects `CreateDBSnapshot` on
+`dbc-snap`, never in `dbi-snap` — real AWS rejects `CreateDBSnapshot` on
 Aurora cluster members). The universal §9.3 rule "≥50% Count ≥ 2" is
 unsatisfiable for this resource type and is documented as an exemption in
-the phase 9.3 report. The `BackupCoveredRDSSnapID` fixture independently
+the phase 9.3 report. The `BackupCoveredDBISnapID` fixture independently
 exercises Count ≥ 2 on the `backup` pivot via two recovery points so that
 code path is still tested.
 
 ### §2.3 Sibling-fixture updates required (graph plan)
 
-These are scoped for phase 6a in addition to writing `rds-snap.go`:
+These are scoped for phase 6a in addition to writing `dbi-snap.go`:
 
 1. `dbi.go` — add `ProdDbiRetentionParentID` fixture (BackupRetentionPeriod=7) so the past-retention test has a parent. Stable ID + ARN constants.
-2. `backup.go` — add 1 `RecoveryPoint` entry with `ResourceArn` matching `ProdRDSSnapID`'s DBSnapshotArn (graph-root pivot ≥ 1) and 2 entries for `BackupCoveredRDSSnapARN` (independent ≥ 2 coverage).
-3. `ct_events.go` — add 3 CloudTrail event entries with `ResourceName = ProdRDSSnapID` (event names: `CreateDBSnapshot`, `ModifyDBSnapshotAttribute`, `CopyDBSnapshot`).
+2. `backup.go` — add 1 `RecoveryPoint` entry with `ResourceArn` matching `ProdDBISnapID`'s DBSnapshotArn (graph-root pivot ≥ 1) and 2 entries for `BackupCoveredDBISnapARN` (independent ≥ 2 coverage).
+3. `ct_events.go` — add 3 CloudTrail event entries with `ResourceName = ProdDBISnapID` (event names: `CreateDBSnapshot`, `ModifyDBSnapshotAttribute`, `CopyDBSnapshot`).
 
 ## §3 Contract surface gap analysis
 
-### §3.1 Fetcher (`internal/aws/rds_snap.go`)
+### §3.1 Fetcher (`internal/aws/dbi_snap.go`)
 
 | Current | Required | Action |
 |---|---|---|
-| Status = raw AWS keyword | Status = §4 phrase per precedence; healthy = `""` | Replace with `computeRDSSnapStatusAndIssues(snap)` |
+| Status = raw AWS keyword | Status = §4 phrase per precedence; healthy = `""` | Replace with `computeDBISnapStatusAndIssues(snap)` |
 | `Resource.Issues` not populated | Populated in §4 precedence order | Add ordered slice |
 | `Fields["arn"]` not populated | Populated from `DBSnapshotArn` | Add field |
 | `DescribeDBSnapshots` not throttle-wrapped | wrapped in `RetryOnThrottle` | E1/U13 fix |
@@ -295,8 +295,8 @@ These are scoped for phase 6a in addition to writing `rds-snap.go`:
 | Current | Required | Action |
 |---|---|---|
 | 4 pivots: dbi, kms, dbc, backup | + `ct-events` (universal pivot) | Register `ct-events` |
-| `checkRDSSnapBackup` reads `Fields["arn"]` then falls back to RawStruct | Same; verify fetcher populates `Fields["arn"]` | Fetcher fix above closes the gap |
-| `checkRDSSnapBackup` calls `ListRecoveryPointsByResource` directly with `RetryOnThrottle` | OK per E1 | No change |
+| `checkDBISnapBackup` reads `Fields["arn"]` then falls back to RawStruct | Same; verify fetcher populates `Fields["arn"]` | Fetcher fix above closes the gap |
+| `checkDBISnapBackup` calls `ListRecoveryPointsByResource` directly with `RetryOnThrottle` | OK per E1 | No change |
 | All checkers wrap any per-item AWS calls | OK | No change |
 
 ### §3.3 Issue enricher (`internal/aws/rds_snap_issue_enrichment.go`)
@@ -317,13 +317,13 @@ The new enricher:
 
 Not needed (spec §2 has no extra-API field requirements beyond what `DescribeDBSnapshots` returns).
 
-### §3.5 View config (`internal/config/defaults.go` + `.a9s/views/rds-snap.yaml`)
+### §3.5 View config (`internal/config/defaults.go` + `.a9s/views/dbi-snap.yaml`)
 
 | Current | Required | Action |
 |---|---|---|
 | `Status` column reads `path: Status` (raw AWS field) | Reads `path: status` (computed Fields key) | Change path |
 | `Encrypted` column (true/false) | DELETE — folded into Status as `unencrypted` per §4 | Remove from defaults.go entry; regenerate yaml |
-| No `rds-snap` entry in `defaultViews` | Add full entry | New code |
+| No `dbi-snap` entry in `defaultViews` | Add full entry | New code |
 | Identity columns: Snapshot ID, DB Instance, Engine, Type, Created | Keep (universal rule allows identity/metadata columns) | No change |
 
 Final column set (in order): Snapshot ID, DB Instance, **Status** (computed), Engine, Type, Created.
@@ -350,7 +350,7 @@ type IssueEnricherFunc func(ctx context.Context, clients *ServiceClients, resour
 
 ```go
 // IssueAppends carries per-resource phrases to append to Resource.Issues
-// at dispatch-merge time. Used by cross-ref Wave-1 enrichers (e.g. rds-snap)
+// at dispatch-merge time. Used by cross-ref Wave-1 enrichers (e.g. dbi-snap)
 // to land Wave-1 phrases that require sibling-cache access. Phrases must
 // match the §4 spec text verbatim. The dispatcher appends these AFTER
 // fetcher-populated phrases preserving §4 precedence (caller's responsibility
@@ -372,7 +372,7 @@ IssueAppends map[string][]string
 
 ### §4.4 Backward compatibility
 
-Every non-rds-snap enricher receives the `cache` param and ignores it via `_`. Behavior is identical. NoOp is identical. Tests for non-rds-snap enrichers are not touched beyond signature.
+Every non-dbi-snap enricher receives the `cache` param and ignores it via `_`. Behavior is identical. NoOp is identical. Tests for non-dbi-snap enrichers are not touched beyond signature.
 
 ## §5 Implementation phases (post-impl-plan approval)
 
@@ -381,5 +381,5 @@ Every non-rds-snap enricher receives the `cache` param and ignores it via `_`. B
 3. **Phase 6b** (parallel with 7) — QA tests in `tests/unit/aws_rds_snap_*_test.go`.
 4. **Phase 7** — coder implements: fetcher rewrite, view config, real cross-ref enricher, ct-events related registration.
 5. **Phase 7.5** — scope-diff gate.
-6. **Phase 8** — scenario-harness visual render gate (rds-snap visual test + drill-through row + partial-failure scenario).
+6. **Phase 8** — scenario-harness visual render gate (dbi-snap visual test + drill-through row + partial-failure scenario).
 7. **Phase 9** — final report checklist (with §9.3 structural-cap exemption recorded).

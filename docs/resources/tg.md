@@ -23,7 +23,7 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 
 ## 2. Related Resources Panel (detail view, right column)
 
-Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `asg`, `backup`, `cfn`, `ct-events`, `dbc`, `dbi`, `ec2`, `ecs-svc`, `elb`, `lambda`, `logs`, `rds-snap`, `sg`, `subnet`, `vpc`.
+Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `asg`, `backup`, `cfn`, `ct-events`, `dbc`, `dbi`, `ec2`, `ecs-svc`, `elb`, `lambda`, `logs`, `dbi-snap`, `sg`, `subnet`, `vpc`.
 
 ### `alarm`
 
@@ -91,7 +91,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `a
 - **How discovered**: no AWS field on `TargetGroup` references a CloudWatch log group. — a9s-devops: possible=no, worth=no. Recorded in §5.
 - **Count shown**: unknown.
 
-### `rds-snap`
+### `dbi-snap`
 
 - **Why related**: listed by related-resources.md contract (2/6 audit mention). Same reasoning as `dbi`/`dbc` — RDS snapshots are not a TG target and share no AWS-API field with TGs.
 - **How discovered**: no AWS field on `TargetGroup` or `DescribeTargetHealth` references an RDS snapshot. — a9s-devops: possible=no, worth=no. Recorded in §5.
@@ -193,14 +193,14 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Any UI element not listed in §4 — e.g. new columns, new icons, new views, new key bindings.
 - Any write operation. a9s is read-only by design (`architecture.md` §"What is a9s?").
 - `backup` as a related target — a9s-devops: possible=no, worth=no. AWS Backup does not list target groups as a supported resource; TGs are configuration, not stateful data. Contract-level entry in `related-resources.md` appears to be audit-pattern inertia.
-- `dbc`, `dbi`, `rds-snap` as related targets — a9s-devops: possible=no, worth=no. TG target types (`instance`, `ip`, `lambda`, `alb` per `types.TargetTypeEnum`) do not include RDS/DocumentDB; no AWS field links a TG to a DB instance, DB cluster, or RDS snapshot.
+- `dbc`, `dbi`, `dbi-snap` as related targets — a9s-devops: possible=no, worth=no. TG target types (`instance`, `ip`, `lambda`, `alb` per `types.TargetTypeEnum`) do not include RDS/DocumentDB; no AWS field links a TG to a DB instance, DB cluster, or RDS snapshot.
 - `logs` as a related target — a9s-devops: possible=no, worth=no. Target groups do not emit CloudWatch Logs; ELB access logs go to S3 via `DescribeLoadBalancerAttributes` on the parent `elb`, not to a log group on the TG.
 - `sg` as a related target **at the TG level** — a9s-devops: possible=no, worth=no. `TargetGroup` has no `SecurityGroups` field; the SG pivot belongs to the parent `elb` (ALB `SecurityGroups[]`) or to the registered instances/ENIs.
 - `subnet` as a related target **at the TG level** — a9s-devops: possible=no, worth=no. `TargetGroup` has no subnet field; the subnet pivot belongs to the parent `elb` via `AvailabilityZones[].SubnetId`.
 
 ## 6. Citations
 
-- a9s golden doc — related panel contract (16 targets: `alarm`, `asg`, `backup`, `cfn`, `ct-events`, `dbc`, `dbi`, `ec2`, `ecs-svc`, `elb`, `lambda`, `logs`, `rds-snap`, `sg`, `subnet`, `vpc`) — `docs/related-resources.md` § "Per-type contract" table row for `tg` and § `### tg`.
+- a9s golden doc — related panel contract (16 targets: `alarm`, `asg`, `backup`, `cfn`, `ct-events`, `dbc`, `dbi`, `ec2`, `ecs-svc`, `elb`, `lambda`, `logs`, `dbi-snap`, `sg`, `subnet`, `vpc`) — `docs/related-resources.md` § "Per-type contract" table row for `tg` and § `### tg`.
 - a9s golden doc — universal pivot `ct-events` — `docs/related-resources.md` § "Policy" (universal pivots clause).
 - a9s golden doc — Wave 1 / Wave 2 / Wave 3 signals and source API (`DescribeTargetHealth`) — `docs/attention-signals.md` § "Networking" table row for `tg`.
 - a9s golden doc — read-only invariant — `docs/architecture.md` § "What is a9s?".
@@ -214,7 +214,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — `cfn` discovery via `aws:cloudformation:stack-name` tag fetched with `elbv2:DescribeTags` — `a9s-devops (2026-04-20): possible=yes, worth=yes. CFN stamps this tag on every created resource including ELBv2 TGs.`
 - a9s-devops consultation — `lambda` discovery via `DescribeTargetHealth` when `TargetType == lambda`, `Target.Id` is the function ARN — `a9s-devops (2026-04-20): possible=yes, worth=yes. Documented ALB→Lambda path.`
 - a9s-devops consultation — `backup` not a real pivot — `a9s-devops (2026-04-20): possible=no, worth=no. AWS Backup does not support target groups; TGs are configuration, not stateful data.`
-- a9s-devops consultation — `dbc` / `dbi` / `rds-snap` not real pivots — `a9s-devops (2026-04-20): possible=no, worth=no. TG TargetType enum is instance/ip/lambda/alb; databases are not a routable target.`
+- a9s-devops consultation — `dbc` / `dbi` / `dbi-snap` not real pivots — `a9s-devops (2026-04-20): possible=no, worth=no. TG TargetType enum is instance/ip/lambda/alb; databases are not a routable target.`
 - a9s-devops consultation — `logs` not a real pivot — `a9s-devops (2026-04-20): possible=no, worth=no. TGs do not emit CloudWatch Logs; access logs live on the parent ELB in S3 via DescribeLoadBalancerAttributes.`
 - a9s-devops consultation — `sg` not a TG-level pivot — `a9s-devops (2026-04-20): possible=no, worth=no. TargetGroup has no SecurityGroups field; SG pivot belongs to the parent ALB or the registered instances.`
 - a9s-devops consultation — `subnet` not a TG-level pivot — `a9s-devops (2026-04-20): possible=no, worth=no. TargetGroup has no subnet field; subnet pivot lives on the parent ELB AvailabilityZones.SubnetId.`
