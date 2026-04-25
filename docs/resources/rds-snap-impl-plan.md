@@ -280,7 +280,7 @@ But that's still only 1/4 ≥ 2. Universal §9.3 demands 50%. **REVISED MITIGATI
 
 These are scoped for phase 6a in addition to writing `rds-snap.go`:
 
-1. `dbi.go` — add `WarnDbiPastRetentionParentID` fixture (BackupRetentionPeriod=7) so the past-retention test has a parent. Stable ID + ARN constants.
+1. `dbi.go` — add `ProdDbiRetentionParentID` fixture (BackupRetentionPeriod=7) so the past-retention test has a parent. Stable ID + ARN constants.
 2. `backup.go` — add 2 `RecoveryPoint` entries with `ResourceArn` matching `ProdRDSSnapAuroraID`'s DBSnapshotArn (graph-root for backup pivot). Existing entries for other resource types are not touched.
 3. `ct_events.go` — add 3 CloudTrail event entries with `ResourceName = ProdRDSSnapAuroraID` (event names: `CreateDBSnapshot`, `ModifyDBSnapshotAttribute`, `CopyDBSnapshot`).
 

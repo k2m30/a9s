@@ -465,14 +465,6 @@ func TestRDSSnap_Fetcher_AllFixtures_NoError(t *testing.T) {
 func TestRDSSnap_StaticAudit_AllSDKCallsThrottleWrapped(t *testing.T) {
 	root := findRepoFile(t, "internal/aws")
 
-	// Patterns that match direct API calls outside a RetryOnThrottle body.
-	// We detect: `api.DescribeXxx(` or `api.ListXxx(` or `api.GetXxx(` or `api.LookupXxx(`
-	// on a line that does NOT appear as the anonymous function body of RetryOnThrottle.
-	directCallPattern := strings.NewReplacer(
-	// just build the prefix to match
-	).Replace("")
-	_ = directCallPattern
-
 	var violations []string
 
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
