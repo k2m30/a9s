@@ -23,7 +23,7 @@ func init() {
 //     "private zone with no VPC associations (orphan)"
 //
 // Skip if clients.Route53 == nil. Per-zone errors → Truncated.
-func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.Route53 == nil {

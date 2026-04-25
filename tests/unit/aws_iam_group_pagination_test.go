@@ -205,7 +205,7 @@ func TestEnrichIAMGroup_PaginatesGetGroupMembers(t *testing.T) {
 	clients := &awsclient.ServiceClients{IAM: fake}
 	resources := iamGroupResources(groupName)
 
-	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources)
+	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -272,7 +272,7 @@ func TestEnrichIAMGroup_PaginatesAttachedPolicies(t *testing.T) {
 	clients := &awsclient.ServiceClients{IAM: fake}
 	resources := iamGroupResources(groupName)
 
-	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources)
+	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -331,7 +331,7 @@ func TestEnrichIAMGroup_PaginatesInlinePolicies(t *testing.T) {
 	clients := &awsclient.ServiceClients{IAM: fake}
 	resources := iamGroupResources(groupName)
 
-	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources)
+	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -387,7 +387,7 @@ func TestEnrichIAMGroup_CappedAtPerParentPageCap(t *testing.T) {
 	clients := &awsclient.ServiceClients{IAM: fake}
 	resources := iamGroupResources(groupName)
 
-	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources)
+	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -446,7 +446,7 @@ func TestEnrichIAMGroup_ZeroMembersAcrossPages(t *testing.T) {
 	clients := &awsclient.ServiceClients{IAM: fake}
 	resources := iamGroupResources(groupName)
 
-	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources)
+	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

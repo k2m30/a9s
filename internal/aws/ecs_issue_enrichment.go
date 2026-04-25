@@ -25,7 +25,7 @@ func init() {
 // Note: IssueCount is 0 for this enricher because all findings are severity "~"
 // (informational) and do not contribute to the attention menu badge per the
 // IssueEnricherResult contract.
-func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.ECS == nil || len(resources) == 0 {

@@ -67,7 +67,7 @@ func TestEnrichStepFunctionsStatus_FailedFindingKeyedByID(t *testing.T) {
 	clients := &awsclient.ServiceClients{SFN: fake}
 	resources := []resource.Resource{{ID: smName, Fields: map[string]string{"arn": smARN}}}
 
-	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -84,7 +84,7 @@ func TestEnrichStepFunctionsStatus_SummaryContainsFAILED(t *testing.T) {
 	clients := &awsclient.ServiceClients{SFN: fake}
 	resources := []resource.Resource{{ID: smName, Fields: map[string]string{"arn": smARN}}}
 
-	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestEnrichStepFunctionsStatus_SummaryTimedOut(t *testing.T) {
 	clients := &awsclient.ServiceClients{SFN: fake}
 	resources := []resource.Resource{{ID: smName, Fields: map[string]string{"arn": smARN}}}
 
-	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -121,7 +121,7 @@ func TestEnrichStepFunctionsStatus_SummaryAborted(t *testing.T) {
 	clients := &awsclient.ServiceClients{SFN: fake}
 	resources := []resource.Resource{{ID: smName, Fields: map[string]string{"arn": smARN}}}
 
-	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -140,7 +140,7 @@ func TestEnrichStepFunctionsStatus_SucceededExcluded(t *testing.T) {
 	clients := &awsclient.ServiceClients{SFN: fake}
 	resources := []resource.Resource{{ID: smName, Fields: map[string]string{"arn": smARN}}}
 
-	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -161,7 +161,7 @@ func TestEnrichStepFunctionsStatus_RunningExcluded(t *testing.T) {
 	clients := &awsclient.ServiceClients{SFN: fake}
 	resources := []resource.Resource{{ID: smName, Fields: map[string]string{"arn": smARN}}}
 
-	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -187,7 +187,7 @@ func TestEnrichStepFunctionsStatus_TruncatedWhenResourcesExceedCap(t *testing.T)
 	fake := &sfnEnrichFake{executions: executions}
 	clients := &awsclient.ServiceClients{SFN: fake}
 
-	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -203,7 +203,7 @@ func TestEnrichStepFunctionsStatus_EmptyResourcesReturnsEmptyFindings(t *testing
 	fake := &sfnEnrichFake{executions: map[string]sfntypes.ExecutionStatus{}}
 	clients := &awsclient.ServiceClients{SFN: fake}
 
-	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), clients, nil)
+	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), clients, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

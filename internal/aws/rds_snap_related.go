@@ -5,7 +5,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/service/backup"
+	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -148,10 +148,21 @@ func rdsSnapRelatedResources(ctx context.Context, clients any, cache resource.Re
 	return resources, isTruncated, err
 }
 
-// checkRDSSnapBackup resolves AWS Backup recovery points for this RDS snapshot
-// via backup:ListRecoveryPointsByResource (Pattern C: 1 API call).
-// The snapshot ARN is read from res.Fields["arn"]. Count = number of recovery points.
-func checkRDSSnapBackup(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// checkRDSSnapBackup resolves AWS Backup PLANS that cover this RDS snapshot
+// by reverse-scanning the already-loaded backup PLAN cache (Pattern C —
+// cache scan, zero extra API calls). For each cached plan, Fields["resources"]
+// holds a comma-separated list of resource ARNs / wildcard patterns from the
+// plan's BackupSelection. A plan covers the snapshot iff any Resources entry
+// matches the snapshot's ARN AND no NotResources entry matches.
+//
+// Why plan IDs (not recovery-point ARNs): the backup fetcher's Resource.ID
+// space is plan IDs. Returning recovery-point ARNs would resolve Count > 0
+// but break drill-through (the target list filter could not match the IDs).
+// Recovery points are not first-class a9s resources at present.
+//
+// As a fallback (no backup-plan cache loaded), return UnknownRelated so the
+// UI shows the pivot but can't yet count it — preferable to silently 0.
+func checkRDSSnapBackup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	snapARN := res.Fields["arn"]
 	if snapARN == "" {
 		// Derive ARN from RawStruct if available.
@@ -163,25 +174,70 @@ func checkRDSSnapBackup(ctx context.Context, clients any, res resource.Resource,
 	if snapARN == "" {
 		return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
 	}
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil || c.Backup == nil {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
-	}
-	api, ok := c.Backup.(BackupListRecoveryPointsByResourceAPI)
-	if !ok {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
-	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*backup.ListRecoveryPointsByResourceOutput, error) {
-		return api.ListRecoveryPointsByResource(ctx, &backup.ListRecoveryPointsByResourceInput{ResourceArn: &snapARN})
-	})
+
+	planList, truncated, err := rdsSnapRelatedResources(ctx, clients, cache, "backup")
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "backup", Count: -1, Err: err}
 	}
+	if planList == nil {
+		return resource.UnknownRelated("backup")
+	}
+
 	var ids []string
-	for _, rp := range out.RecoveryPoints {
-		if rp.RecoveryPointArn != nil && *rp.RecoveryPointArn != "" {
-			ids = append(ids, *rp.RecoveryPointArn)
+	for _, planRes := range planList {
+		if BackupPlanCoversARN(planRes.Fields["resources"], planRes.Fields["not_resources"], snapARN) {
+			ids = append(ids, planRes.ID)
 		}
 	}
+	if len(ids) == 0 && truncated {
+		return resource.ApproximateZero("backup")
+	}
 	return relatedResult("backup", ids)
+}
+
+
+// checkRDSSnapCTEvents looks up cached CloudTrail events for the snapshot's
+// DBSnapshotIdentifier. Universal pivot — every registered type gets one;
+// see docs/related-resources.md §Policy. FetchFilter["ResourceName"] is always
+// set so the caller can do a filtered re-fetch; Count is "unknown" (windowed)
+// per the spec — the panel renders the visible page count rather than a total.
+func checkRDSSnapCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	snapID := res.ID
+	if snapID == "" {
+		return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
+	}
+	fetchFilter := map[string]string{"ResourceName": snapID}
+	eventList, truncated, err := rdsSnapRelatedResources(ctx, clients, cache, "ct-events")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, Err: err, FetchFilter: fetchFilter}
+	}
+	if eventList == nil {
+		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, FetchFilter: fetchFilter}
+	}
+	var ids []string
+	for _, eventRes := range eventList {
+		raw, ok := assertStruct[cloudtrailtypes.Event](eventRes.RawStruct)
+		if ok {
+			matched := false
+			for _, rr := range raw.Resources {
+				if rr.ResourceName != nil && *rr.ResourceName == snapID {
+					matched = true
+					break
+				}
+			}
+			if matched {
+				ids = append(ids, eventRes.ID)
+			}
+			continue
+		}
+		if eventRes.Fields["resource_name"] == snapID {
+			ids = append(ids, eventRes.ID)
+		}
+	}
+	if truncated {
+		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, FetchFilter: fetchFilter}
+	}
+	result := relatedResult("ct-events", ids)
+	result.FetchFilter = fetchFilter
+	return result
 }

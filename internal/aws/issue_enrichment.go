@@ -39,10 +39,11 @@ var IssueEnricherRegistry = map[string]IssueEnricher{}
 // docs/attention-signals.md is "None". It makes the "no Wave 2 signal"
 // classification explicit in the registry rather than implicit-by-absence.
 // Returns zero findings, zero issues, not truncated — never fails.
-func NoOpIssueEnricher(_ context.Context, _ *ServiceClients, _ []resource.Resource) (IssueEnricherResult, error) {
+func NoOpIssueEnricher(_ context.Context, _ *ServiceClients, _ []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	return IssueEnricherResult{
 		Findings:     map[string]resource.EnrichmentFinding{},
 		TruncatedIDs: map[string]bool{},
+		IssueAppends: map[string][]string{},
 		IssueCount:   0,
 		Truncated:    false,
 	}, nil
@@ -129,12 +130,22 @@ type IssueEnricherResult struct {
 	// MUST NOT be nil if the enricher writes any updates; use
 	// make(map[string]map[string]string).
 	FieldUpdates map[string]map[string]string
+	// IssueAppends carries per-resource phrases to append to Resource.Issues
+	// at dispatch-merge time. Used by cross-ref Wave-1 enrichers (e.g. rds-snap)
+	// to land Wave-1 phrases that require sibling-cache access. Phrases must
+	// match the §4 spec text verbatim. The dispatcher appends these AFTER
+	// fetcher-populated phrases preserving §4 precedence (caller's responsibility
+	// to compute the merged status string and emit it via FieldUpdates["status"]).
+	// MUST NOT be nil if the enricher writes any appends; use make(map[string][]string).
+	IssueAppends map[string][]string
 }
 
 // IssueEnricherFunc is a pluggable function that makes additional API calls
 // for a resource type and returns a typed IssueEnricherResult. The resources
-// slice contains retained first-page resources from Wave 1 probes. This is the
-// Wave 2 issue-enrichment contract; distinct from on-demand DetailEnricher
-// (internal/resource/enricher.go) which enriches a single resource for detail
-// views.
-type IssueEnricherFunc func(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error)
+// slice contains retained first-page resources from Wave 1 probes. The cache
+// parameter provides sibling-type ResourceCache entries for cross-ref enrichers
+// (e.g. rds-snap reads cache["dbi"] to detect orphan/past-retention signals).
+// Non-cross-ref enrichers ignore the cache via `_ resource.ResourceCache`.
+// This is the Wave 2 issue-enrichment contract; distinct from on-demand DetailEnricher
+// (internal/resource/enricher.go) which enriches a single resource for detail views.
+type IssueEnricherFunc func(ctx context.Context, clients *ServiceClients, resources []resource.Resource, cache resource.ResourceCache) (IssueEnricherResult, error)

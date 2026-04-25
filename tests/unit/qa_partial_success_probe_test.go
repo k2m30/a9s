@@ -150,7 +150,7 @@ func TestProbeEnrichment_PartialSuccess(t *testing.T) {
 	// Register a synthetic enricher that returns a partial result AND an error.
 	awsclient.IssueEnricherRegistry[shortName] = awsclient.IssueEnricher{
 		Priority: 100,
-		Fn: func(_ context.Context, _ *awsclient.ServiceClients, _ []resource.Resource) (awsclient.IssueEnricherResult, error) {
+		Fn: func(_ context.Context, _ *awsclient.ServiceClients, _ []resource.Resource, _ resource.ResourceCache) (awsclient.IssueEnricherResult, error) {
 			return partialResult, partialErr
 		},
 	}

@@ -43,7 +43,7 @@ func TestEnrichRDSDocDBMaintenance_NotTruncated(t *testing.T) {
 	clients := &awsclient.ServiceClients{RDS: fake}
 
 	probeResources := []resource.Resource{{ID: "prod-db"}}
-	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, probeResources)
+	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, probeResources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -69,7 +69,7 @@ func TestEnrichRDSDocDBMaintenance_Truncated(t *testing.T) {
 		{ID: "prod-db-1"},
 		{ID: "prod-db-2"},
 	}
-	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, probeResources)
+	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, probeResources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

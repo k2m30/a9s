@@ -89,7 +89,7 @@ func TestEnrichRDSDocDBMaintenance_FindingsContainMatchingResources(t *testing.T
 		{ID: "rds-eu-west-2-dev-instance", Name: "rds-eu-west-2-dev-instance"},
 	}
 
-	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, probeResources)
+	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, probeResources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -113,7 +113,7 @@ func TestEnrichRDSDocDBMaintenance_UnprobedResourcesAppearsAsArnSuffix(t *testin
 		{ID: "unrelated-instance", Name: "unrelated-instance"},
 	}
 
-	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, probeResources)
+	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, probeResources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

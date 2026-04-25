@@ -138,7 +138,7 @@ func TestEnrichECSServices_StuckServiceEmitsBangFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichECSServices(context.Background(), clients, resources)
+	result, err := awsclient.EnrichECSServices(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -194,7 +194,7 @@ func TestEnrichECSServices_DeploymentRolloutFailedEmitsFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichECSServices(context.Background(), clients, resources)
+	result, err := awsclient.EnrichECSServices(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -229,7 +229,7 @@ func TestEnrichECSServices_APIErrorSetsTruncated(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichECSServices(context.Background(), clients, resources)
+	result, err := awsclient.EnrichECSServices(context.Background(), clients, resources, nil)
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when DescribeServices fails")
 	}
@@ -274,7 +274,7 @@ func TestEnrichECSServices_HealthyServiceNoFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichECSServices(context.Background(), clients, resources)
+	result, err := awsclient.EnrichECSServices(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -317,7 +317,7 @@ func TestEnrichECSServices_RecentEventUnableToPlaceEmitsFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichECSServices(context.Background(), clients, resources)
+	result, err := awsclient.EnrichECSServices(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -357,7 +357,7 @@ func TestEnrichECSClusters_PendingTasksEmitsFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichECSClusters(context.Background(), clients, resources)
+	result, err := awsclient.EnrichECSClusters(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -404,7 +404,7 @@ func TestEnrichECSClusters_NoRunningTasksWithInstancesEmitsFinding(t *testing.T)
 		},
 	}
 
-	result, err := awsclient.EnrichECSClusters(context.Background(), clients, resources)
+	result, err := awsclient.EnrichECSClusters(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -429,7 +429,7 @@ func TestEnrichECSClusters_APIErrorSetsTruncated(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichECSClusters(context.Background(), clients, resources)
+	result, err := awsclient.EnrichECSClusters(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -465,7 +465,7 @@ func TestEnrichECSClusters_HealthyClusterNoFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichECSClusters(context.Background(), clients, resources)
+	result, err := awsclient.EnrichECSClusters(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -505,7 +505,7 @@ func TestEnrichECSTasks_TaskFailedToStartEmitsFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichECSTasks(context.Background(), clients, resources)
+	result, err := awsclient.EnrichECSTasks(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -558,7 +558,7 @@ func TestEnrichECSTasks_ContainerNonZeroExitEmitsFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichECSTasks(context.Background(), clients, resources)
+	result, err := awsclient.EnrichECSTasks(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -584,7 +584,7 @@ func TestEnrichECSTasks_APIErrorSetsTruncated(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichECSTasks(context.Background(), clients, resources)
+	result, err := awsclient.EnrichECSTasks(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -626,7 +626,7 @@ func TestEnrichECSTasks_HealthyTaskNoFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichECSTasks(context.Background(), clients, resources)
+	result, err := awsclient.EnrichECSTasks(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -710,7 +710,7 @@ func TestEnrichCFNStackEvents_FailedEventEmitsBangFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichCFNStackEvents(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCFNStackEvents(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -748,7 +748,7 @@ func TestEnrichCFNStackEvents_APIErrorSetsPerResourceTruncation(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichCFNStackEvents(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCFNStackEvents(context.Background(), clients, resources, nil)
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when DescribeStackEvents fails")
 	}
@@ -790,7 +790,7 @@ func TestEnrichCFNStackEvents_NoFailedEventsNoFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichCFNStackEvents(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCFNStackEvents(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -849,7 +849,7 @@ func TestEnrichELBAttributes_BothMisconfigurations_BangFinding(t *testing.T) {
 	const lbName = "my-lb"
 	resources := []resource.Resource{{ID: lbName, Name: lbName, Fields: map[string]string{"load_balancer_arn": lbARN}}}
 
-	result, err := awsclient.EnrichELBAttributes(context.Background(), clients, resources)
+	result, err := awsclient.EnrichELBAttributes(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -881,7 +881,7 @@ func TestEnrichELBAttributes_OnlyDeletionProtectionMissing_TildeFinding(t *testi
 	const lbName = "partial-lb"
 	resources := []resource.Resource{{ID: lbName, Name: lbName, Fields: map[string]string{"load_balancer_arn": lbARN}}}
 
-	result, err := awsclient.EnrichELBAttributes(context.Background(), clients, resources)
+	result, err := awsclient.EnrichELBAttributes(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -910,7 +910,7 @@ func TestEnrichELBAttributes_APIErrorSetsPerResourceTruncation(t *testing.T) {
 	const lbName = "err-lb"
 	resources := []resource.Resource{{ID: lbName, Name: lbName, Fields: map[string]string{"load_balancer_arn": lbARN}}}
 
-	result, err := awsclient.EnrichELBAttributes(context.Background(), clients, resources)
+	result, err := awsclient.EnrichELBAttributes(context.Background(), clients, resources, nil)
 	// Per-resource errors now aggregate into a composite; assert surface but do
 	// not require its absence (E1-E6 contract).
 	_ = err
@@ -937,7 +937,7 @@ func TestEnrichELBAttributes_WellConfiguredLB_NoFinding(t *testing.T) {
 	clients := &awsclient.ServiceClients{ELBv2: fake}
 	resources := []resource.Resource{{ID: "secure-lb", Name: "secure-lb", Fields: map[string]string{"load_balancer_arn": lbARN}}}
 
-	result, err := awsclient.EnrichELBAttributes(context.Background(), clients, resources)
+	result, err := awsclient.EnrichELBAttributes(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1000,7 +1000,7 @@ func TestEnrichEBEnvironmentHealth_CausesEmitsTildeFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichEBEnvironmentHealth(context.Background(), clients, resources)
+	result, err := awsclient.EnrichEBEnvironmentHealth(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1040,7 +1040,7 @@ func TestEnrichEBEnvironmentHealth_APIErrorSetsPerResourceTruncation(t *testing.
 		},
 	}
 
-	result, err := awsclient.EnrichEBEnvironmentHealth(context.Background(), clients, resources)
+	result, err := awsclient.EnrichEBEnvironmentHealth(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1073,7 +1073,7 @@ func TestEnrichEBEnvironmentHealth_NoCauses_NoFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichEBEnvironmentHealth(context.Background(), clients, resources)
+	result, err := awsclient.EnrichEBEnvironmentHealth(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1121,7 +1121,7 @@ func TestEnrichCFNCombined_EventsAndDriftMerged(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichCFNCombined(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCFNCombined(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1176,7 +1176,7 @@ func TestEnrichCFNCombined_DriftOnlyNoEventFailure_TildeFinding(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichCFNCombined(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCFNCombined(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1201,7 +1201,7 @@ func TestEnrichCFNCombined_NilClient_ReturnsEmpty(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichCFNCombined(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCFNCombined(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

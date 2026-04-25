@@ -19,7 +19,7 @@ func init() {
 // EnrichASGScalingActivities calls DescribeScalingActivities(MaxRecords=1) for each ASG
 // (cap EnrichmentCap) and returns a Finding when the latest activity StatusCode == Failed.
 // Severity is "!" (broken/degraded). Summary: "latest scaling activity failed: <statusMessage>".
-func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.AutoScaling == nil {

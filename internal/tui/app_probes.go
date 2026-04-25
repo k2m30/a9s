@@ -339,6 +339,18 @@ func (m *Model) probeEnrichment(shortName string, gen int) tea.Cmd {
 	if enricherFn == nil {
 		return nil
 	}
+	// Build a resource.ResourceCache snapshot from the TUI cache so cross-ref
+	// enrichers (e.g. rds-snap) can read sibling resource lists without extra API calls.
+	cacheSnap := make(resource.ResourceCache, len(m.resourceCache))
+	for k, entry := range m.resourceCache {
+		if entry != nil {
+			isTruncated := entry.pagination != nil && entry.pagination.IsTruncated
+			cacheSnap[k] = resource.ResourceCacheEntry{
+				Resources:   entry.resources,
+				IsTruncated: isTruncated,
+			}
+		}
+	}
 	return func() tea.Msg {
 		if clients == nil {
 			return messages.EnrichmentCheckedMsg{
@@ -352,7 +364,7 @@ func (m *Model) probeEnrichment(shortName string, gen int) tea.Cmd {
 		defer cancel()
 
 		result, err := awsclient.RetryOnThrottle(ctx, awsclient.DefaultRetryConfig(), func() (awsclient.IssueEnricherResult, error) {
-			return enricherFn(ctx, clients, resources)
+			return enricherFn(ctx, clients, resources, cacheSnap)
 		})
 		// Always populate fields from result regardless of err. RetryOnThrottle
 		// preserves partial result on non-retryable errors (partial-success
@@ -364,6 +376,7 @@ func (m *Model) probeEnrichment(shortName string, gen int) tea.Cmd {
 			Truncated:    result.Truncated,
 			Findings:     result.Findings,
 			FieldUpdates: result.FieldUpdates,
+			IssueAppends: result.IssueAppends,
 			TruncatedIDs: result.TruncatedIDs,
 			Gen:          gen,
 			TypeGen:      typeGen,

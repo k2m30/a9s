@@ -23,7 +23,7 @@ func init() {
 // queue (per-row `?` marker) AND aggregate into the returned composite error
 // via AggregateFailures so the operator sees the failure in the error log (!).
 // Partial findings are returned alongside the composite error on partial fail.
-func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)

@@ -971,7 +971,11 @@ func TestQA_ListRawStruct_AllTypes(t *testing.T) {
 		{"tgw", realisticTransitGateway(), []string{"tgw-0abc1234def56789a", "available"}},
 		{"vpce", realisticVPCEndpoint(), []string{"vpce-0abc1234def56789a", "com.amazonaws.us-east-1.s3"}},
 		{"eni", realisticENI(), []string{"eni-0abc1234def56789a", "in-use", "10.0.1.42"}},
-		{"rds-snap", realisticRDSSnapshot(), []string{"rds-snap-prod-20250615", "prod-db-01", "available"}},
+		// rds-snap deliberately omits "available" — per spec §4 a Healthy snapshot
+		// renders a blank Status cell. The Status column reads ONLY Fields["status"]
+		// (key-only, no Path fallback), so an available+encrypted row carries
+		// Status="" and the list renders an empty cell at that column.
+		{"rds-snap", realisticRDSSnapshot(), []string{"rds-snap-prod-20250615", "prod-db-01"}},
 		{"docdb-snap", realisticDocDBSnapshot(), []string{"docdb-snap-prod-20250615", "available"}},
 		{"sns-sub", realisticSNSSubscription(), []string{"email", "user@example.com"}},
 		// policy has no path: columns (all columns use key: from Fields) — tested in TestQA_List instead

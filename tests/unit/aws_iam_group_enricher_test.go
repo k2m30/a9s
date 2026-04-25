@@ -129,7 +129,7 @@ func TestEnrichIAMGroup_PopulatedGroupProducesNoFindings(t *testing.T) {
 	clients := &awsclient.ServiceClients{IAM: fake}
 	resources := iamGroupResources("dev-team", "ops-team")
 
-	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources)
+	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -162,7 +162,7 @@ func TestEnrichIAMGroup_NoMembersProducesFindingSevTilde(t *testing.T) {
 	clients := &awsclient.ServiceClients{IAM: fake}
 	resources := iamGroupResources("dev-team", "ops-team")
 
-	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources)
+	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -201,7 +201,7 @@ func TestEnrichIAMGroup_NoPoliciesProducesFindingSevTilde(t *testing.T) {
 	clients := &awsclient.ServiceClients{IAM: fake}
 	resources := iamGroupResources("dev-team", "ops-team")
 
-	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources)
+	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -225,7 +225,7 @@ func TestEnrichIAMGroup_NoPoliciesProducesFindingSevTilde(t *testing.T) {
 func TestEnrichIAMGroup_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{IAM: nil}
 
-	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, iamGroupResources("dev-team", "ops-team"))
+	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, iamGroupResources("dev-team", "ops-team"), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

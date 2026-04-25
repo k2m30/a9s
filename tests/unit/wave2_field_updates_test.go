@@ -119,7 +119,7 @@ func TestEnrichTargetGroupHealth_WritesHealthSummary(t *testing.T) {
 		{ID: tgName2, Name: tgName2, Fields: map[string]string{"target_group_arn": tgARN2}},
 	}
 
-	result, err := awsclient.EnrichTargetGroupHealth(context.Background(), &awsclient.ServiceClients{ELBv2: fake}, resources)
+	result, err := awsclient.EnrichTargetGroupHealth(context.Background(), &awsclient.ServiceClients{ELBv2: fake}, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -189,7 +189,7 @@ func TestEnrichVPCFlowLogs_WritesFlowLogsField(t *testing.T) {
 		{ID: vpcID, Name: vpcID},
 	}
 
-	result, err := awsclient.EnrichVPCFlowLogs(context.Background(), &awsclient.ServiceClients{EC2: fake}, resources)
+	result, err := awsclient.EnrichVPCFlowLogs(context.Background(), &awsclient.ServiceClients{EC2: fake}, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -224,7 +224,7 @@ func TestEnrichTGWAttachments_WritesAttStatus(t *testing.T) {
 	}
 
 	resources := tgwResources(tgwID)
-	result, err := awsclient.EnrichTGWAttachments(context.Background(), &awsclient.ServiceClients{EC2: fake}, resources)
+	result, err := awsclient.EnrichTGWAttachments(context.Background(), &awsclient.ServiceClients{EC2: fake}, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -261,7 +261,7 @@ func TestEnrichSQSAttributes_WritesDLQField(t *testing.T) {
 	}
 
 	resources := sqsResources(nameWithDLQ, nameWithoutDLQ)
-	result, err := awsclient.EnrichSQSAttributes(context.Background(), &awsclient.ServiceClients{SQS: fake}, resources)
+	result, err := awsclient.EnrichSQSAttributes(context.Background(), &awsclient.ServiceClients{SQS: fake}, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -330,7 +330,7 @@ func TestEnrichSNSSubscriptions_WritesSubsCount(t *testing.T) {
 		{ID: topicARN, Name: "my-topic"},
 	}
 
-	result, err := awsclient.EnrichSNSSubscriptions(context.Background(), &awsclient.ServiceClients{SNS: fake}, resources)
+	result, err := awsclient.EnrichSNSSubscriptions(context.Background(), &awsclient.ServiceClients{SNS: fake}, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -393,7 +393,7 @@ func TestEnrichStepFunctionsStatus_WritesLastRun(t *testing.T) {
 		{ID: sfnName, Name: sfnName, Fields: map[string]string{"arn": sfnARN}},
 	}
 
-	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), &awsclient.ServiceClients{SFN: fake}, resources)
+	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), &awsclient.ServiceClients{SFN: fake}, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -454,7 +454,7 @@ func TestEnrichIAMPolicy_WritesRiskField(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichIAMPolicy(context.Background(), &awsclient.ServiceClients{IAM: fake}, resources)
+	result, err := awsclient.EnrichIAMPolicy(context.Background(), &awsclient.ServiceClients{IAM: fake}, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -487,7 +487,7 @@ func TestEnrichWAF_WritesRulesSummary(t *testing.T) {
 		{ID: wafARN, Name: "my-waf", Fields: map[string]string{"arn": wafARN}},
 	}
 
-	result, err := awsclient.EnrichWAFLogging(context.Background(), &awsclient.ServiceClients{WAFv2: fake}, resources)
+	result, err := awsclient.EnrichWAFLogging(context.Background(), &awsclient.ServiceClients{WAFv2: fake}, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -533,7 +533,7 @@ func TestEnrichAPIGatewayStage_WritesStagesCount(t *testing.T) {
 	}
 
 	resources := apigwResources(apiID1, apiID2)
-	result, err := awsclient.EnrichAPIGatewayStage(context.Background(), &awsclient.ServiceClients{APIGatewayV2: fake}, resources)
+	result, err := awsclient.EnrichAPIGatewayStage(context.Background(), &awsclient.ServiceClients{APIGatewayV2: fake}, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -608,7 +608,7 @@ func TestEnrichCodePipelineStatus_WritesLastStatus(t *testing.T) {
 		{ID: pipelineName, Name: pipelineName},
 	}
 
-	result, err := awsclient.EnrichCodePipelineStatus(context.Background(), &awsclient.ServiceClients{CodePipeline: fake}, resources)
+	result, err := awsclient.EnrichCodePipelineStatus(context.Background(), &awsclient.ServiceClients{CodePipeline: fake}, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -688,7 +688,7 @@ func TestEnrichCodeBuildStatus_WritesLastBuild(t *testing.T) {
 		{ID: projectName, Name: projectName},
 	}
 
-	result, err := awsclient.EnrichCodeBuildStatus(context.Background(), &awsclient.ServiceClients{CodeBuild: fake}, resources)
+	result, err := awsclient.EnrichCodeBuildStatus(context.Background(), &awsclient.ServiceClients{CodeBuild: fake}, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -764,7 +764,7 @@ func TestEnrichCodeArtifactRepository_WritesPackageCount(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichCodeArtifactRepository(context.Background(), &awsclient.ServiceClients{CodeArtifact: fake}, resources)
+	result, err := awsclient.EnrichCodeArtifactRepository(context.Background(), &awsclient.ServiceClients{CodeArtifact: fake}, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -824,7 +824,7 @@ func TestEnrichGlueJobStatus_WritesLastRun(t *testing.T) {
 		{ID: jobName, Name: jobName},
 	}
 
-	result, err := awsclient.EnrichGlueJobStatus(context.Background(), &awsclient.ServiceClients{Glue: fake}, resources)
+	result, err := awsclient.EnrichGlueJobStatus(context.Background(), &awsclient.ServiceClients{Glue: fake}, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

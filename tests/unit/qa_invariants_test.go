@@ -298,7 +298,7 @@ type enricherInvariantCase struct {
 	name      string
 	clients   *awsclient.ServiceClients
 	resources []resource.Resource
-	enrich    func(context.Context, *awsclient.ServiceClients, []resource.Resource) (awsclient.IssueEnricherResult, error)
+	enrich    func(context.Context, *awsclient.ServiceClients, []resource.Resource, resource.ResourceCache) (awsclient.IssueEnricherResult, error)
 }
 
 // TestEnrichmentFinding_AllKeptEnrichersPopulateRows verifies that every enricher in
@@ -422,7 +422,7 @@ func TestEnrichmentFinding_AllKeptEnrichersPopulateRows(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := tc.enrich(context.Background(), tc.clients, tc.resources)
+			result, err := tc.enrich(context.Background(), tc.clients, tc.resources, nil)
 			if err != nil {
 				t.Fatalf("enricher returned unexpected error: %v", err)
 			}

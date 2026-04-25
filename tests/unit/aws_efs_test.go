@@ -440,7 +440,7 @@ func TestEFS_NoCloudWatchMetricCalls_Enricher(t *testing.T) {
 	clients := &awsclient.ServiceClients{EFS: fake}
 	resources := efsResources("fs-nocw-enrich001")
 
-	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, resources)
+	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichEFSMountTargets must not call CloudWatch; error: %v", err)
 	}

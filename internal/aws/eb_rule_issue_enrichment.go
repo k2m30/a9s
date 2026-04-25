@@ -23,7 +23,7 @@ func init() {
 //   - Rule state == ENABLED AND len(Targets) == 0 → "!" finding (rule matches but goes nowhere)
 //   - Rule state == DISABLED AND len(Targets) > 0 → "~" finding (disabled rule still has targets — drift)
 //   - Any target without DeadLetterConfig → "~" finding (no DLQ on target)
-func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)

@@ -37,7 +37,7 @@ func TestEnrichEFSMountTargets_AllAvailableProducesNoFindings(t *testing.T) {
 	clients := &awsclient.ServiceClients{EFS: fake}
 	resources := efsResources("fs-00000001", "fs-00000002")
 
-	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, resources)
+	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -68,7 +68,7 @@ func TestEnrichEFSMountTargets_OneUnavailableMTProducesFindingSevBang(t *testing
 	clients := &awsclient.ServiceClients{EFS: fake}
 	resources := efsResources("fs-00000001", "fs-00000002")
 
-	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, resources)
+	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestEnrichEFSMountTargets_OneUnavailableMTProducesFindingSevBang(t *testing
 func TestEnrichEFSMountTargets_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{EFS: nil}
 
-	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, efsResources("fs-00000001", "fs-00000002"))
+	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, efsResources("fs-00000001", "fs-00000002"), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -121,7 +121,7 @@ func TestEnrichEFSMountTargets_APIErrorSetsTruncatedAndSurfacesError(t *testing.
 	clients := &awsclient.ServiceClients{EFS: fake}
 	resources := efsResources("fs-00000001", "fs-00000002")
 
-	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, resources)
+	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, resources, nil)
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when an API call fails")
 	}

@@ -89,7 +89,7 @@ func TestCodeArtifact_PackageCount_FollowsAllPages(t *testing.T) {
 		ID:     "repo1",
 		Fields: map[string]string{"repo_name": "repo1", "domain_name": "shared"},
 	}}
-	result, err := awsclient.EnrichCodeArtifactRepository(context.Background(), clients, res)
+	result, err := awsclient.EnrichCodeArtifactRepository(context.Background(), clients, res, nil)
 	if err != nil {
 		t.Fatalf("unexpected: %v", err)
 	}
@@ -138,7 +138,7 @@ func TestSNS_SubsCount_FollowsAllPages(t *testing.T) {
 	fake := &snsPagedFake{}
 	clients := &awsclient.ServiceClients{SNS: fake}
 	res := []resource.Resource{{ID: "arn:aws:sns:us-east-1:123456789012:topic1"}}
-	result, err := awsclient.EnrichSNSSubscriptions(context.Background(), clients, res)
+	result, err := awsclient.EnrichSNSSubscriptions(context.Background(), clients, res, nil)
 	if err != nil {
 		t.Fatalf("unexpected: %v", err)
 	}

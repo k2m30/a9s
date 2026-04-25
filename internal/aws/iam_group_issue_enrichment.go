@@ -24,7 +24,7 @@ func init() {
 //   - ListAttachedGroupPolicies empty AND ListGroupPolicies empty → "~" finding "group has no policies (no-op group)"
 //
 // Skip when clients.IAM == nil.
-func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)

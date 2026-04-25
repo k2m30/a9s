@@ -110,7 +110,7 @@ func TestEnrichECRRepository_N1_OneCallPerRepo(t *testing.T) {
 	clients := &awsclient.ServiceClients{ECR: fake}
 	resources := []resource.Resource{ecrRepoResourceN1(repoA), ecrRepoResourceN1(repoB)}
 
-	_, err := awsclient.EnrichECRRepository(context.Background(), clients, resources)
+	_, err := awsclient.EnrichECRRepository(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -144,7 +144,7 @@ func TestEnrichECRRepository_N1_CriticalAggregatesAcrossImages(t *testing.T) {
 	clients := &awsclient.ServiceClients{ECR: fake}
 	resources := []resource.Resource{ecrRepoResourceN1(repo)}
 
-	result, err := awsclient.EnrichECRRepository(context.Background(), clients, resources)
+	result, err := awsclient.EnrichECRRepository(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -185,7 +185,7 @@ func TestEnrichECRRepository_N1_HighOnlyEmitsTilde(t *testing.T) {
 	clients := &awsclient.ServiceClients{ECR: fake}
 	resources := []resource.Resource{ecrRepoResourceN1(repo)}
 
-	result, err := awsclient.EnrichECRRepository(context.Background(), clients, resources)
+	result, err := awsclient.EnrichECRRepository(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -218,7 +218,7 @@ func TestEnrichECRRepository_N1_CleanRepoEmitsNoFinding(t *testing.T) {
 	clients := &awsclient.ServiceClients{ECR: fake}
 	resources := []resource.Resource{ecrRepoResourceN1(repo)}
 
-	result, err := awsclient.EnrichECRRepository(context.Background(), clients, resources)
+	result, err := awsclient.EnrichECRRepository(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -245,7 +245,7 @@ func TestEnrichECRRepository_N1_EmptyRepoNoPanic(t *testing.T) {
 	clients := &awsclient.ServiceClients{ECR: fake}
 	resources := []resource.Resource{ecrRepoResourceN1(repo)}
 
-	result, err := awsclient.EnrichECRRepository(context.Background(), clients, resources)
+	result, err := awsclient.EnrichECRRepository(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -271,7 +271,7 @@ func TestEnrichECRRepository_N1_DescribeImagesErrorSurfaces(t *testing.T) {
 	clients := &awsclient.ServiceClients{ECR: fake}
 	resources := []resource.Resource{ecrRepoResourceN1(okRepo), ecrRepoResourceN1(errRepo)}
 
-	result, err := awsclient.EnrichECRRepository(context.Background(), clients, resources)
+	result, err := awsclient.EnrichECRRepository(context.Background(), clients, resources, nil)
 	if err == nil {
 		t.Fatal("expected composite error when one repo fails")
 	}
@@ -306,7 +306,7 @@ func TestEnrichECRRepository_N1_RespectsEnrichmentCap(t *testing.T) {
 	fake := &ecrDescribeImagesFake{detailsByRepo: details}
 	clients := &awsclient.ServiceClients{ECR: fake}
 
-	result, err := awsclient.EnrichECRRepository(context.Background(), clients, resources)
+	result, err := awsclient.EnrichECRRepository(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -332,7 +332,7 @@ func TestEnrichECRRepository_N1_RespectsEnrichmentCap(t *testing.T) {
 func TestEnrichECRRepository_N1_NilClient(t *testing.T) {
 	resources := []resource.Resource{ecrRepoResourceN1("any-repo")}
 
-	result, err := awsclient.EnrichECRRepository(context.Background(), &awsclient.ServiceClients{ECR: nil}, resources)
+	result, err := awsclient.EnrichECRRepository(context.Background(), &awsclient.ServiceClients{ECR: nil}, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

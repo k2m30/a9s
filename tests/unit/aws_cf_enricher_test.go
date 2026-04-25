@@ -126,7 +126,7 @@ func TestEnrichCloudFrontDistribution_HTTPSRedirectAndTLSOriginsProducesNoFindin
 	clients := &awsclient.ServiceClients{CloudFront: fake}
 	resources := cfDistroResources(cfDistroID1, cfDistroID2)
 
-	result, err := awsclient.EnrichCloudFrontDistribution(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCloudFrontDistribution(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -176,7 +176,7 @@ func TestEnrichCloudFrontDistribution_AllowAllViewerProtocolProducesFindingSevTi
 	clients := &awsclient.ServiceClients{CloudFront: fake}
 	resources := cfDistroResources(cfDistroID1, cfDistroID2)
 
-	result, err := awsclient.EnrichCloudFrontDistribution(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCloudFrontDistribution(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -234,7 +234,7 @@ func TestEnrichCloudFrontDistribution_HTTPOnlyOriginProducesFindingSevTilde(t *t
 	clients := &awsclient.ServiceClients{CloudFront: fake}
 	resources := cfDistroResources(cfDistroID1, cfDistroID2)
 
-	result, err := awsclient.EnrichCloudFrontDistribution(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCloudFrontDistribution(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -265,7 +265,7 @@ func TestEnrichCloudFrontDistribution_HTTPOnlyOriginProducesFindingSevTilde(t *t
 func TestEnrichCloudFrontDistribution_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{CloudFront: nil}
 
-	result, err := awsclient.EnrichCloudFrontDistribution(context.Background(), clients, cfDistroResources(cfDistroID1, cfDistroID2))
+	result, err := awsclient.EnrichCloudFrontDistribution(context.Background(), clients, cfDistroResources(cfDistroID1, cfDistroID2), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -293,7 +293,7 @@ func TestEnrichCloudFrontDistribution_APIErrorSetsTruncatedNoError(t *testing.T)
 	clients := &awsclient.ServiceClients{CloudFront: fake}
 	resources := cfDistroResources(cfDistroID1, cfDistroID2)
 
-	result, err := awsclient.EnrichCloudFrontDistribution(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCloudFrontDistribution(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -146,7 +146,7 @@ func TestDBC_Enrich_MaintenanceOverdue_HealthyRow(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{DocDB: fake}
 
-	result, err := awsclient.EnrichDBCMaintenance(context.Background(), clients, resources)
+	result, err := awsclient.EnrichDBCMaintenance(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichDBCMaintenance error: %v", err)
 	}
@@ -203,7 +203,7 @@ func TestDBC_Enrich_FutureDate_NoFinding(t *testing.T) {
 		{ID: clusterID, Status: "", Fields: map[string]string{"status": ""}},
 	}
 
-	result, err := awsclient.EnrichDBCMaintenance(context.Background(), clients, resources)
+	result, err := awsclient.EnrichDBCMaintenance(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichDBCMaintenance error: %v", err)
 	}
@@ -249,7 +249,7 @@ func TestDBC_Enrich_InstanceARN_Filtered(t *testing.T) {
 		// The instance is NOT in the dbc resource list.
 	}
 
-	result, err := awsclient.EnrichDBCMaintenance(context.Background(), clients, resources)
+	result, err := awsclient.EnrichDBCMaintenance(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichDBCMaintenance error: %v", err)
 	}
@@ -267,7 +267,7 @@ func TestDBC_Enrich_InstanceARN_Filtered(t *testing.T) {
 // client is nil — returns an empty result without error.
 func TestDBC_Enrich_NilDocDBClient(t *testing.T) {
 	clients := &awsclient.ServiceClients{DocDB: nil}
-	result, err := awsclient.EnrichDBCMaintenance(context.Background(), clients, nil)
+	result, err := awsclient.EnrichDBCMaintenance(context.Background(), clients, nil, nil)
 	if err != nil {
 		t.Fatalf("EnrichDBCMaintenance error: %v", err)
 	}
@@ -309,7 +309,7 @@ func TestDBC_Enrich_Wave1PlusWave2_BumpsSuffix(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichDBCMaintenance(context.Background(), clients, resources)
+	result, err := awsclient.EnrichDBCMaintenance(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichDBCMaintenance error: %v", err)
 	}
@@ -354,7 +354,7 @@ func TestDBC_Enrich_NoMatchNoFinding(t *testing.T) {
 		{ID: "other-cluster", Status: "", Fields: map[string]string{}},
 	}
 
-	result, err := awsclient.EnrichDBCMaintenance(context.Background(), clients, resources)
+	result, err := awsclient.EnrichDBCMaintenance(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichDBCMaintenance error: %v", err)
 	}
@@ -395,7 +395,7 @@ func TestDBC_Enrich_Pagination(t *testing.T) {
 		{ID: cluster2, Status: "", Fields: map[string]string{"status": ""}},
 	}
 
-	result, err := awsclient.EnrichDBCMaintenance(context.Background(), clients, resources)
+	result, err := awsclient.EnrichDBCMaintenance(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichDBCMaintenance error: %v", err)
 	}
@@ -439,7 +439,7 @@ func TestDBC_Enrich_FindingRows(t *testing.T) {
 		{ID: clusterID, Status: "", Fields: map[string]string{"status": ""}},
 	}
 
-	result, err := awsclient.EnrichDBCMaintenance(context.Background(), clients, resources)
+	result, err := awsclient.EnrichDBCMaintenance(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichDBCMaintenance error: %v", err)
 	}
@@ -495,7 +495,7 @@ func TestDBC_Enrich_ForcedApplyDate_Overdue(t *testing.T) {
 		{ID: clusterID, Status: "", Fields: map[string]string{"status": ""}},
 	}
 
-	result, err := awsclient.EnrichDBCMaintenance(context.Background(), clients, resources)
+	result, err := awsclient.EnrichDBCMaintenance(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichDBCMaintenance error: %v", err)
 	}

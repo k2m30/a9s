@@ -613,7 +613,7 @@ func TestCR273_Item12_CodeBuild_STOPPED_ExcludedFromFindings(t *testing.T) {
 	clients := &awsclient.ServiceClients{CodeBuild: fake}
 	resources := []resource.Resource{{ID: "cancelled-pipeline"}}
 
-	result, err := awsclient.EnrichCodeBuildStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCodeBuildStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -656,7 +656,7 @@ func TestCR273_Item13_CodeBuild_STOPPED_WithFailed_OnlyFailedCounted(t *testing.
 		{ID: "broken-job"},
 	}
 
-	result, err := awsclient.EnrichCodeBuildStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCodeBuildStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

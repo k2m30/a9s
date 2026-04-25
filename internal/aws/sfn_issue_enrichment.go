@@ -21,7 +21,7 @@ func init() {
 // EnrichStepFunctionsStatus calls ListExecutions(max:1) for each state machine (1 per SFN, cap ~50).
 // Returns a Finding for each state machine whose latest execution is FAILED, TIMED_OUT, or ABORTED.
 // Severity is "!" (broken/degraded). Summary: "latest execution <STATUS>".
-func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)

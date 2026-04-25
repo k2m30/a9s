@@ -88,7 +88,7 @@ func TestEnrichSESAccount_ShutdownFindingPerRow(t *testing.T) {
 		sesResourceRow("noreply@acme-corp.com", ""),
 	}
 
-	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows)
+	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -124,7 +124,7 @@ func TestEnrichSESAccount_ShutdownIssueCountIsOneNotN(t *testing.T) {
 		sesResourceRow("id5@acme-corp.com", ""),
 	}
 
-	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows)
+	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestEnrichSESAccount_ShutdownNilResources(t *testing.T) {
 	fake := &sesEnrichmentFake{enforcementStatus: aws.String("SHUTDOWN")}
 	clients := &awsclient.ServiceClients{SESv2: fake}
 
-	result, err := awsclient.EnrichSESAccount(context.Background(), clients, nil)
+	result, err := awsclient.EnrichSESAccount(context.Background(), clients, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -160,7 +160,7 @@ func TestEnrichSESAccount_ShutdownFindingRowActionable(t *testing.T) {
 	clients := &awsclient.ServiceClients{SESv2: fake}
 	rows := []resource.Resource{sesResourceRow("acme-corp.com", "")}
 
-	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows)
+	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -196,7 +196,7 @@ func TestEnrichSESAccount_ProbationFindingPerRow(t *testing.T) {
 		sesResourceRow("acme-corp.com", ""),
 	}
 
-	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows)
+	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -221,7 +221,7 @@ func TestEnrichSESAccount_ProbationIssueCountIsOne(t *testing.T) {
 	clients := &awsclient.ServiceClients{SESv2: fake}
 	rows := []resource.Resource{sesResourceRow("acme-corp.com", "")}
 
-	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows)
+	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -238,7 +238,7 @@ func TestEnrichSESAccount_ProbationFindingRowActionable(t *testing.T) {
 	clients := &awsclient.ServiceClients{SESv2: fake}
 	rows := []resource.Resource{sesResourceRow("acme-corp.com", "")}
 
-	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows)
+	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -276,7 +276,7 @@ func TestEnrichSESAccount_QuotaOver80PercentProducesTildeFindings(t *testing.T) 
 	clients := &awsclient.ServiceClients{SESv2: fake}
 	rows := []resource.Resource{sesResourceRow("acme-corp.com", "")}
 
-	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows)
+	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -304,7 +304,7 @@ func TestEnrichSESAccount_QuotaOver80PercentIssueCountIsZero(t *testing.T) {
 	clients := &awsclient.ServiceClients{SESv2: fake}
 	rows := []resource.Resource{sesResourceRow("acme-corp.com", "")}
 
-	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows)
+	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -326,7 +326,7 @@ func TestEnrichSESAccount_QuotaExactly80PercentNoFinding(t *testing.T) {
 	clients := &awsclient.ServiceClients{SESv2: fake}
 	rows := []resource.Resource{sesResourceRow("acme-corp.com", "")}
 
-	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows)
+	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -352,7 +352,7 @@ func TestEnrichSESAccount_ProbationBeatsQuota(t *testing.T) {
 	clients := &awsclient.ServiceClients{SESv2: fake}
 	rows := []resource.Resource{sesResourceRow("acme-corp.com", "")}
 
-	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows)
+	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -376,7 +376,7 @@ func TestEnrichSESAccount_FieldUpdatesHealthyRowSetToSummary(t *testing.T) {
 	clients := &awsclient.ServiceClients{SESv2: fake}
 	rows := []resource.Resource{sesResourceRow("acme-corp.com", "")} // Status = ""
 
-	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows)
+	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -400,7 +400,7 @@ func TestEnrichSESAccount_FieldUpdatesNonHealthyRowBumped(t *testing.T) {
 	// Row already has a Wave-1 status phrase.
 	rows := []resource.Resource{sesResourceRow("broken.acme-corp.com", "verification failed")}
 
-	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows)
+	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -419,7 +419,7 @@ func TestEnrichSESAccount_FieldUpdatesNonNilOnHealthyAccount(t *testing.T) {
 	fake := &sesEnrichmentFake{enforcementStatus: aws.String("HEALTHY")}
 	clients := &awsclient.ServiceClients{SESv2: fake}
 
-	result, err := awsclient.EnrichSESAccount(context.Background(), clients, nil)
+	result, err := awsclient.EnrichSESAccount(context.Background(), clients, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -445,7 +445,7 @@ func TestEnrichSESAccount_HealthyNoQuotaProducesNoFindings(t *testing.T) {
 	clients := &awsclient.ServiceClients{SESv2: fake}
 	rows := []resource.Resource{sesResourceRow("acme-corp.com", "")}
 
-	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows)
+	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -466,7 +466,7 @@ func TestEnrichSESAccount_HealthyNoQuotaProducesNoFindings(t *testing.T) {
 func TestEnrichSESAccount_NilSESv2ReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{SESv2: nil}
 
-	result, err := awsclient.EnrichSESAccount(context.Background(), clients, nil)
+	result, err := awsclient.EnrichSESAccount(context.Background(), clients, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -492,7 +492,7 @@ func TestEnrichSESAccount_APIErrorPropagated(t *testing.T) {
 	fake := &sesEnrichmentFake{err: sentinel}
 	clients := &awsclient.ServiceClients{SESv2: fake}
 
-	_, err := awsclient.EnrichSESAccount(context.Background(), clients, nil)
+	_, err := awsclient.EnrichSESAccount(context.Background(), clients, nil, nil)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -512,7 +512,7 @@ func TestEnrichSESAccount_ShutdownSummaryDoesNotContainRowValue(t *testing.T) {
 	clients := &awsclient.ServiceClients{SESv2: fake}
 	rows := []resource.Resource{sesResourceRow("acme-corp.com", "")}
 
-	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows)
+	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -530,7 +530,7 @@ func TestEnrichSESAccount_ProbationSummaryDoesNotContainRowValue(t *testing.T) {
 	clients := &awsclient.ServiceClients{SESv2: fake}
 	rows := []resource.Resource{sesResourceRow("acme-corp.com", "")}
 
-	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows)
+	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -554,7 +554,7 @@ func TestEnrichSESAccount_QuotaSummaryDoesNotContainSentOrMaxValues(t *testing.T
 	clients := &awsclient.ServiceClients{SESv2: fake}
 	rows := []resource.Resource{sesResourceRow("acme-corp.com", "")}
 
-	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows)
+	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -587,7 +587,7 @@ func TestEnrichSESAccount_TruncatedIDsNonNilOnAllPaths(t *testing.T) {
 	for _, p := range paths {
 		p := p
 		t.Run(p.name, func(t *testing.T) {
-			result, err := awsclient.EnrichSESAccount(context.Background(), p.clients, nil)
+			result, err := awsclient.EnrichSESAccount(context.Background(), p.clients, nil, nil)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -616,7 +616,7 @@ func TestEnrichSESAccount_FixtureHealthyAccountProducesNoFindings(t *testing.T) 
 	// Pass a row representing the graph-root identity.
 	rows := []resource.Resource{sesResourceRow(fixtures.SESGraphRootIdentity, "")}
 
-	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows)
+	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows, nil)
 	if err != nil {
 		t.Fatalf("unexpected error with fixture healthy account: %v", err)
 	}

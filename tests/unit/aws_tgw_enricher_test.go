@@ -100,7 +100,7 @@ func TestEnrichTGWAttachments_AllAvailableProducesNoFindings(t *testing.T) {
 	clients := &awsclient.ServiceClients{EC2: fake}
 	resources := tgwResources("tgw-00000001", "tgw-00000002")
 
-	result, err := awsclient.EnrichTGWAttachments(context.Background(), clients, resources)
+	result, err := awsclient.EnrichTGWAttachments(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -128,7 +128,7 @@ func TestEnrichTGWAttachments_FailedAttachmentProducesFindingSevBang(t *testing.
 	clients := &awsclient.ServiceClients{EC2: fake}
 	resources := tgwResources("tgw-00000001", "tgw-00000002")
 
-	result, err := awsclient.EnrichTGWAttachments(context.Background(), clients, resources)
+	result, err := awsclient.EnrichTGWAttachments(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -160,7 +160,7 @@ func TestEnrichTGWAttachments_ModifyingAttachmentProducesFindingSevTilde(t *test
 	clients := &awsclient.ServiceClients{EC2: fake}
 	resources := tgwResources("tgw-00000001", "tgw-00000002")
 
-	result, err := awsclient.EnrichTGWAttachments(context.Background(), clients, resources)
+	result, err := awsclient.EnrichTGWAttachments(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -181,7 +181,7 @@ func TestEnrichTGWAttachments_ModifyingAttachmentProducesFindingSevTilde(t *test
 func TestEnrichTGWAttachments_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{EC2: nil}
 
-	result, err := awsclient.EnrichTGWAttachments(context.Background(), clients, tgwResources("tgw-00000001", "tgw-00000002"))
+	result, err := awsclient.EnrichTGWAttachments(context.Background(), clients, tgwResources("tgw-00000001", "tgw-00000002"), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -210,7 +210,7 @@ func TestEnrichTGWAttachments_APIErrorSetsTruncatedAndSurfacesError(t *testing.T
 	clients := &awsclient.ServiceClients{EC2: fake}
 	resources := tgwResources("tgw-00000001", "tgw-00000002")
 
-	result, err := awsclient.EnrichTGWAttachments(context.Background(), clients, resources)
+	result, err := awsclient.EnrichTGWAttachments(context.Background(), clients, resources, nil)
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when an API call fails")
 	}

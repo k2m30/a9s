@@ -100,7 +100,7 @@ func TestDBI_Enrich_MaintenancePending_HealthyRow(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{RDS: fake}
 
-	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources)
+	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichDBIMaintenance error: %v", err)
 	}
@@ -173,7 +173,7 @@ func TestDBI_Enrich_MaintenancePending_NilDescription(t *testing.T) {
 		{ID: resourceID, Name: resourceID, Status: "", Fields: map[string]string{"status": ""}},
 	}
 
-	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources)
+	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichDBIMaintenance error: %v", err)
 	}
@@ -227,7 +227,7 @@ func TestDBI_Enrich_NonHealthyStatus_BumpsSuffix(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources)
+	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichDBIMaintenance error: %v", err)
 	}
@@ -269,7 +269,7 @@ func TestDBI_Enrich_NoMatchNoFinding(t *testing.T) {
 		{ID: "other-instance", Status: "", Fields: map[string]string{}},
 	}
 
-	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources)
+	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichDBIMaintenance error: %v", err)
 	}
@@ -282,7 +282,7 @@ func TestDBI_Enrich_NoMatchNoFinding(t *testing.T) {
 // result without error (degraded gracefully).
 func TestDBI_Enrich_NilRDSClient(t *testing.T) {
 	clients := &awsclient.ServiceClients{RDS: nil}
-	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, nil)
+	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, nil, nil)
 	if err != nil {
 		t.Fatalf("EnrichDBIMaintenance error: %v", err)
 	}
@@ -323,7 +323,7 @@ func TestDBI_Enrich_Pagination(t *testing.T) {
 		{ID: "dbi-page2", Status: "", Fields: map[string]string{"status": ""}},
 	}
 
-	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources)
+	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichDBIMaintenance error: %v", err)
 	}
@@ -370,7 +370,7 @@ func TestDBI_Enrich_Wave1PlusWave2_BumpsSuffix(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources)
+	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichDBIMaintenance error: %v", err)
 	}
@@ -432,7 +432,7 @@ func TestDBI_Enrich_Wave1MultiPlusWave2_BumpsExistingSuffix(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources)
+	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichDBIMaintenance error: %v", err)
 	}
@@ -459,7 +459,7 @@ func TestDBI_Enrich_HealthyPlusWave2_NoSuffix_Regression(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{RDS: fake}
 
-	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources)
+	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichDBIMaintenance error: %v", err)
 	}
@@ -534,7 +534,7 @@ func TestDBI_Enrich_BumpFindingSuffix_EdgeCases(t *testing.T) {
 				},
 			}
 
-			result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources)
+			result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources, nil)
 			if err != nil {
 				t.Fatalf("EnrichDBIMaintenance error: %v", err)
 			}

@@ -33,7 +33,7 @@ func TestEnrichGlueJobStatus_FindingKeyedByID_NotByName(t *testing.T) {
 	// r.ID is an ARN-like string; r.Name is the human-readable job name.
 	resources := []resource.Resource{{ID: jobARN, Name: jobName}}
 
-	result, err := awsclient.EnrichGlueJobStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichGlueJobStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

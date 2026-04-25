@@ -60,7 +60,7 @@ func TestEnrichELBAttributes_UsesARNFromFields(t *testing.T) {
 		Fields: map[string]string{"load_balancer_arn": lbARN},
 	}}
 
-	_, err := awsclient.EnrichELBAttributes(context.Background(), clients, resources)
+	_, err := awsclient.EnrichELBAttributes(context.Background(), clients, resources, nil)
 	if err != nil && strings.Contains(err.Error(), "ValidationError") {
 		t.Fatalf("enricher passed bare name to AWS instead of ARN; got: %v", err)
 	}

@@ -20,7 +20,7 @@ func init() {
 // Severity is "~" (informational per CIS KMS.1); IssueCount counts rotation-disabled findings.
 // AWS-managed keys reject GetKeyRotationStatus with AccessDeniedException — that error is
 // silently skipped without marking Truncated. Other per-key errors set Truncated=true.
-func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)

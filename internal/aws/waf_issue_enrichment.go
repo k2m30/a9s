@@ -28,7 +28,7 @@ func init() {
 // Also writes FieldUpdates["rules_summary"] = "<N> rules BLOCK" or "0 rules ALLOW".
 // Skip if clients.WAFv2 == nil. Per-WebACL errors (other than WAFNonexistentItemException) are
 // aggregated and returned as a composite error alongside partial findings (E3, E4, E5).
-func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)

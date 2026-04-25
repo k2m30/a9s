@@ -73,7 +73,7 @@ func TestEnrichCodePipelineStatus_FailedStageKeyedByResourceID(t *testing.T) {
 	clients := &awsclient.ServiceClients{CodePipeline: fake}
 	resources := []resource.Resource{{ID: "pipe-id", Name: "my-pipeline"}}
 
-	result, err := awsclient.EnrichCodePipelineStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCodePipelineStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestEnrichCodePipelineStatus_SummaryContainsStageName(t *testing.T) {
 	clients := &awsclient.ServiceClients{CodePipeline: fake}
 	resources := []resource.Resource{{Name: "summary-pipeline"}}
 
-	result, err := awsclient.EnrichCodePipelineStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCodePipelineStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -135,7 +135,7 @@ func TestEnrichCodePipelineStatus_NoFailedStageExcluded(t *testing.T) {
 	clients := &awsclient.ServiceClients{CodePipeline: fake}
 	resources := []resource.Resource{{Name: "ok-pipeline"}}
 
-	result, err := awsclient.EnrichCodePipelineStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCodePipelineStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -162,7 +162,7 @@ func TestEnrichCodePipelineStatus_TruncatedWhenResourcesExceedCap(t *testing.T) 
 	fake := &pipelineStateFake{states: states}
 	clients := &awsclient.ServiceClients{CodePipeline: fake}
 
-	result, err := awsclient.EnrichCodePipelineStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCodePipelineStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -178,7 +178,7 @@ func TestEnrichCodePipelineStatus_EmptyResourcesReturnsEmptyFindings(t *testing.
 	fake := &pipelineStateFake{states: map[string]*codepipeline.GetPipelineStateOutput{}}
 	clients := &awsclient.ServiceClients{CodePipeline: fake}
 
-	result, err := awsclient.EnrichCodePipelineStatus(context.Background(), clients, nil)
+	result, err := awsclient.EnrichCodePipelineStatus(context.Background(), clients, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

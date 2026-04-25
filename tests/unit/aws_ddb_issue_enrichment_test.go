@@ -129,7 +129,7 @@ func TestDDB_Enrich_PITREnabled_NoFinding(t *testing.T) {
 	clients := buildDDBEnricherClients(fake)
 	resources := []resource.Resource{makeDDBResource(fixtures.OrdersProdID, "")}
 
-	result, err := awsclient.EnrichDynamoDBPITR(context.Background(), clients, resources)
+	result, err := awsclient.EnrichDynamoDBPITR(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichDynamoDBPITR error: %v", err)
 	}
@@ -159,7 +159,7 @@ func TestDDB_Enrich_PITRDisabled_HealthyRow(t *testing.T) {
 	// audit-pitr-off is ACTIVE; fetcher produces Status="" (Healthy silence).
 	resources := []resource.Resource{makeDDBResource(fixtures.AuditPITROffID, "")}
 
-	result, err := awsclient.EnrichDynamoDBPITR(context.Background(), clients, resources)
+	result, err := awsclient.EnrichDynamoDBPITR(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichDynamoDBPITR error: %v", err)
 	}
@@ -203,7 +203,7 @@ func TestDDB_Enrich_PITRDisabled_NonHealthyRow(t *testing.T) {
 	clients := buildDDBEnricherClients(fake)
 	resources := []resource.Resource{makeDDBResource(fixtures.LegacyArchivedID, existingStatus)}
 
-	result, err := awsclient.EnrichDynamoDBPITR(context.Background(), clients, resources)
+	result, err := awsclient.EnrichDynamoDBPITR(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichDynamoDBPITR error: %v", err)
 	}
@@ -246,7 +246,7 @@ func TestDDB_Enrich_SummaryNotRows_Contract(t *testing.T) {
 	clients := buildDDBEnricherClients(fake)
 	resources := []resource.Resource{makeDDBResource(fixtures.AuditPITROffID, "")}
 
-	result, err := awsclient.EnrichDynamoDBPITR(context.Background(), clients, resources)
+	result, err := awsclient.EnrichDynamoDBPITR(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichDynamoDBPITR error: %v", err)
 	}
@@ -278,7 +278,7 @@ func TestDDB_Enrich_ErrorPath_TruncatedID(t *testing.T) {
 	clients := buildDDBEnricherClients(fake)
 	resources := []resource.Resource{makeDDBResource(errorTableID, "")}
 
-	result, err := awsclient.EnrichDynamoDBPITR(context.Background(), clients, resources)
+	result, err := awsclient.EnrichDynamoDBPITR(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichDynamoDBPITR error: %v", err)
 	}
@@ -316,7 +316,7 @@ func TestDDB_Enrich_BumpFindingSuffix_ExistingPlusSuffix(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichDynamoDBPITR(context.Background(), clients, resources)
+	result, err := awsclient.EnrichDynamoDBPITR(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichDynamoDBPITR error: %v", err)
 	}
@@ -335,7 +335,7 @@ func TestDDB_Enrich_BumpFindingSuffix_ExistingPlusSuffix(t *testing.T) {
 // result gracefully without error.
 func TestDDB_Enrich_NilDynamoDBClient(t *testing.T) {
 	clients := &awsclient.ServiceClients{DynamoDB: nil}
-	result, err := awsclient.EnrichDynamoDBPITR(context.Background(), clients, nil)
+	result, err := awsclient.EnrichDynamoDBPITR(context.Background(), clients, nil, nil)
 	if err != nil {
 		t.Fatalf("EnrichDynamoDBPITR error with nil client: %v", err)
 	}

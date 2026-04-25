@@ -26,7 +26,7 @@ func init() {
 //
 // Per-WG errors mark Truncated=true and are skipped.
 // Skip when clients.Athena == nil.
-func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.Athena == nil {

@@ -132,7 +132,7 @@ func TestEnrichMSKCluster_ModernTLSProducesNoFindings(t *testing.T) {
 	clients := &awsclient.ServiceClients{MSK: fake}
 	resources := mskClusterResources(mskARN1, mskARN2)
 
-	result, err := awsclient.EnrichMSKCluster(context.Background(), clients, resources)
+	result, err := awsclient.EnrichMSKCluster(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -160,7 +160,7 @@ func TestEnrichMSKCluster_OutdatedVersionProducesFindingSevTilde(t *testing.T) {
 	clients := &awsclient.ServiceClients{MSK: fake}
 	resources := mskClusterResources(mskARN1, mskARN2)
 
-	result, err := awsclient.EnrichMSKCluster(context.Background(), clients, resources)
+	result, err := awsclient.EnrichMSKCluster(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -193,7 +193,7 @@ func TestEnrichMSKCluster_PlaintextEncryptionProducesFindingSevTilde(t *testing.
 	clients := &awsclient.ServiceClients{MSK: fake}
 	resources := mskClusterResources(mskARN1, mskARN2)
 
-	result, err := awsclient.EnrichMSKCluster(context.Background(), clients, resources)
+	result, err := awsclient.EnrichMSKCluster(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -224,7 +224,7 @@ func TestEnrichMSKCluster_ServerlessClusterSkipped(t *testing.T) {
 	clients := &awsclient.ServiceClients{MSK: fake}
 	resources := mskClusterResources(mskARN1, mskARN2)
 
-	result, err := awsclient.EnrichMSKCluster(context.Background(), clients, resources)
+	result, err := awsclient.EnrichMSKCluster(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -244,7 +244,7 @@ func TestEnrichMSKCluster_ServerlessClusterSkipped(t *testing.T) {
 func TestEnrichMSKCluster_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{MSK: nil}
 
-	result, err := awsclient.EnrichMSKCluster(context.Background(), clients, mskClusterResources(mskARN1, mskARN2))
+	result, err := awsclient.EnrichMSKCluster(context.Background(), clients, mskClusterResources(mskARN1, mskARN2), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -273,7 +273,7 @@ func TestEnrichMSKCluster_APIErrorSetsTruncatedAndSurfacesError(t *testing.T) {
 	clients := &awsclient.ServiceClients{MSK: fake}
 	resources := mskClusterResources(mskARN1, mskARN2)
 
-	result, err := awsclient.EnrichMSKCluster(context.Background(), clients, resources)
+	result, err := awsclient.EnrichMSKCluster(context.Background(), clients, resources, nil)
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when an API call fails")
 	}

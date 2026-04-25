@@ -21,7 +21,7 @@ func init() {
 // Returns a Finding for each TG with at least one unhealthy target.
 // Severity is "!" (broken/degraded). Summary: "unhealthy targets: X/Y".
 // Per-TG errors are aggregated and returned as a composite error alongside partial findings (E3, E4, E5).
-func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)

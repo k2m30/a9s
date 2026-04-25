@@ -24,7 +24,7 @@ func init() {
 //   - Any Origin with CustomOriginConfig.OriginProtocolPolicy == "http-only" → "origin without TLS"
 //
 // Skip if clients.CloudFront == nil. Per-distribution errors → truncated.
-func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.CloudFront == nil {

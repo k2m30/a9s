@@ -54,8 +54,11 @@ func TestQA_RDSSnapshots_FetchSuccess(t *testing.T) {
 	if r.Name != "rds-snap-auto-001" {
 		t.Errorf("expected Name 'rds-snap-auto-001', got %q", r.Name)
 	}
-	if r.Status != "available" {
-		t.Errorf("expected Status 'available', got %q", r.Status)
+	// §4 phrase design: r.Status holds the §4 phrase, not the raw AWS status.
+	// Healthy snapshots (available + nil-encrypted treated as no unencrypted signal)
+	// produce r.Status == "" (healthy silence).
+	if r.Status != "" {
+		t.Errorf("expected Status '' (healthy silence), got %q", r.Status)
 	}
 	if r.Fields["snapshot_id"] != "rds-snap-auto-001" {
 		t.Errorf("expected snapshot_id 'rds-snap-auto-001', got %q", r.Fields["snapshot_id"])

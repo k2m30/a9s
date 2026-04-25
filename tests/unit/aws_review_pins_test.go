@@ -102,7 +102,7 @@ func TestEnrichEFSMountTargets_Idempotent(t *testing.T) {
 	res[0].Status = "updating"
 	res[0].Issues = []string{"updating"}
 
-	r1, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res)
+	r1, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res, nil)
 	if err != nil {
 		t.Fatalf("first run: %v", err)
 	}
@@ -117,7 +117,7 @@ func TestEnrichEFSMountTargets_Idempotent(t *testing.T) {
 	res[0].Fields["status"] = r1.FieldUpdates[fsID]["status"]
 	res[0].Status = r1.FieldUpdates[fsID]["status"]
 
-	r2, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res)
+	r2, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res, nil)
 	if err != nil {
 		t.Fatalf("second run: %v", err)
 	}
@@ -218,7 +218,7 @@ func TestOpenSearch_Enrich_DeletedDomain_SkipsFinding(t *testing.T) {
 		RawStruct: domain,
 	}
 
-	result, err := awsclient.EnrichOpenSearchDomains(context.Background(), nil, []resource.Resource{r})
+	result, err := awsclient.EnrichOpenSearchDomains(context.Background(), nil, []resource.Resource{r}, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -235,7 +235,7 @@ func TestOpenSearch_Enrich_DeletedDomain_SkipsFinding(t *testing.T) {
 	r.Fields["deleted"] = "false"
 	domain.Deleted = aws.Bool(false)
 	r.RawStruct = domain
-	result2, err := awsclient.EnrichOpenSearchDomains(context.Background(), nil, []resource.Resource{r})
+	result2, err := awsclient.EnrichOpenSearchDomains(context.Background(), nil, []resource.Resource{r}, nil)
 	if err != nil {
 		t.Fatalf("unexpected error (non-deleted): %v", err)
 	}

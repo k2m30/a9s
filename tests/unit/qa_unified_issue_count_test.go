@@ -43,7 +43,7 @@ type allEnrichersCase struct {
 	name    string
 	clients *awsclient.ServiceClients
 	probes  []resource.Resource
-	call    func(context.Context, *awsclient.ServiceClients, []resource.Resource) (awsclient.IssueEnricherResult, error)
+	call    func(context.Context, *awsclient.ServiceClients, []resource.Resource, resource.ResourceCache) (awsclient.IssueEnricherResult, error)
 }
 
 // TestAllEnrichers_IssueCountMatchesFindings verifies that every registered enricher
@@ -153,7 +153,7 @@ func TestAllEnrichers_IssueCountMatchesFindings(t *testing.T) {
 	for _, tc := range cases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := tc.call(context.Background(), tc.clients, tc.probes)
+			result, err := tc.call(context.Background(), tc.clients, tc.probes, nil)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

@@ -128,7 +128,7 @@ func TestEnrichAPIGatewayStage_PaginatesStages(t *testing.T) {
 	clients := &awsclient.ServiceClients{APIGatewayV2: fake}
 	resources := apigwResources(apiID)
 
-	result, err := awsclient.EnrichAPIGatewayStage(context.Background(), clients, resources)
+	result, err := awsclient.EnrichAPIGatewayStage(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -181,7 +181,7 @@ func TestEnrichAPIGatewayStage_CappedAtPerParentPageCap(t *testing.T) {
 	clients := &awsclient.ServiceClients{APIGatewayV2: fake}
 	resources := apigwResources(apiID)
 
-	result, err := awsclient.EnrichAPIGatewayStage(context.Background(), clients, resources)
+	result, err := awsclient.EnrichAPIGatewayStage(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -230,7 +230,7 @@ func TestEnrichAPIGatewayStage_ZeroStagesAcrossPages(t *testing.T) {
 	clients := &awsclient.ServiceClients{APIGatewayV2: fake}
 	resources := apigwResources(apiID)
 
-	result, err := awsclient.EnrichAPIGatewayStage(context.Background(), clients, resources)
+	result, err := awsclient.EnrichAPIGatewayStage(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

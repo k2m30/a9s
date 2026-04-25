@@ -19,7 +19,7 @@ func init() {
 // EnrichSNSSubscriptions calls ListSubscriptionsByTopic per topic (cap EnrichmentCap)
 // to surface orphan topics and topics with all-pending-confirmation subscribers.
 // Per-topic errors are treated as truncated (skip silently).
-func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)

@@ -249,7 +249,7 @@ func TestEnrichBackupJobs_PaginatesListBackupJobs(t *testing.T) {
 	)
 
 	clients := &awsclient.ServiceClients{Backup: fake}
-	result, err := awsclient.EnrichBackupJobs(context.Background(), clients, backupResources())
+	result, err := awsclient.EnrichBackupJobs(context.Background(), clients, backupResources(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -318,7 +318,7 @@ func TestEnrichBackupJobs_CapsAtEnrichmentCap(t *testing.T) {
 	fake := newBackupPaginatedFake(pages...)
 
 	clients := &awsclient.ServiceClients{Backup: fake}
-	result, err := awsclient.EnrichBackupJobs(context.Background(), clients, backupResources())
+	result, err := awsclient.EnrichBackupJobs(context.Background(), clients, backupResources(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -372,7 +372,7 @@ func TestEnrichEC2InstanceStatus_PaginatesDescribeInstanceStatus(t *testing.T) {
 	allIDs := append(p1Impaired, p2Impaired...)
 	allIDs = append(allIDs, "i-aaa003", "i-bbb002")
 	clients := &awsclient.ServiceClients{EC2: fake}
-	result, err := awsclient.EnrichEC2InstanceStatus(context.Background(), clients, ec2InstanceResources(allIDs...))
+	result, err := awsclient.EnrichEC2InstanceStatus(context.Background(), clients, ec2InstanceResources(allIDs...), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -425,7 +425,7 @@ func TestEnrichEC2InstanceStatus_CapsAtEnrichmentCap(t *testing.T) {
 	fake.instanceStatusPages = pages
 
 	clients := &awsclient.ServiceClients{EC2: fake}
-	result, err := awsclient.EnrichEC2InstanceStatus(context.Background(), clients, ec2InstanceResources())
+	result, err := awsclient.EnrichEC2InstanceStatus(context.Background(), clients, ec2InstanceResources(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -476,7 +476,7 @@ func TestEnrichEBSVolumeStatus_PaginatesDescribeVolumeStatus(t *testing.T) {
 	allIDs := append(p1Degraded, p2Degraded...)
 	allIDs = append(allIDs, "vol-aaa003", "vol-bbb002")
 	clients := &awsclient.ServiceClients{EC2: fake}
-	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, ebsVolumeResources(allIDs...))
+	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, ebsVolumeResources(allIDs...), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -529,7 +529,7 @@ func TestEnrichEBSVolumeStatus_CapsAtEnrichmentCap(t *testing.T) {
 	fake.volumeStatusPages = pages
 
 	clients := &awsclient.ServiceClients{EC2: fake}
-	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, ebsVolumeResources())
+	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, ebsVolumeResources(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

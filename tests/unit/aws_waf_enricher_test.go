@@ -144,7 +144,7 @@ func TestEnrichWAFLogging_LoggedAndAssociatedProducesNoFindings(t *testing.T) {
 	clients := &awsclient.ServiceClients{WAFv2: fake}
 	resources := wafWebACLResources(wafACLARN1, wafACLARN2)
 
-	result, err := awsclient.EnrichWAFLogging(context.Background(), clients, resources)
+	result, err := awsclient.EnrichWAFLogging(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -178,7 +178,7 @@ func TestEnrichWAFLogging_NoLoggingProducesFindingSevTilde(t *testing.T) {
 	clients := &awsclient.ServiceClients{WAFv2: fake}
 	resources := wafWebACLResources(wafACLARN1, wafACLARN2)
 
-	result, err := awsclient.EnrichWAFLogging(context.Background(), clients, resources)
+	result, err := awsclient.EnrichWAFLogging(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -218,7 +218,7 @@ func TestEnrichWAFLogging_OrphanACLProducesFindingSevTilde(t *testing.T) {
 	clients := &awsclient.ServiceClients{WAFv2: fake}
 	resources := wafWebACLResources(wafACLARN1, wafACLARN2)
 
-	result, err := awsclient.EnrichWAFLogging(context.Background(), clients, resources)
+	result, err := awsclient.EnrichWAFLogging(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -245,7 +245,7 @@ func TestEnrichWAFLogging_OrphanACLProducesFindingSevTilde(t *testing.T) {
 func TestEnrichWAFLogging_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{WAFv2: nil}
 
-	result, err := awsclient.EnrichWAFLogging(context.Background(), clients, wafWebACLResources(wafACLARN1, wafACLARN2))
+	result, err := awsclient.EnrichWAFLogging(context.Background(), clients, wafWebACLResources(wafACLARN1, wafACLARN2), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -272,7 +272,7 @@ func TestEnrichWAFLogging_APIErrorSetsTruncatedAndSurfacesError(t *testing.T) {
 	clients := &awsclient.ServiceClients{WAFv2: fake}
 	resources := wafWebACLResources(wafACLARN1, wafACLARN2)
 
-	result, err := awsclient.EnrichWAFLogging(context.Background(), clients, resources)
+	result, err := awsclient.EnrichWAFLogging(context.Background(), clients, resources, nil)
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when an API call fails")
 	}

@@ -141,7 +141,8 @@ func assertNoFinding(t *testing.T, fake *backupJobsOnlyFake, planID string) {
 		context.Background(),
 		backupJobsFakeClients(fake),
 		nil,
-	)
+			nil,
+		)
 	require.NoError(t, err)
 	require.NotContains(t, result.Findings, planID,
 		"expected no finding for plan %s (found one: %+v)", planID, result.Findings[planID])
@@ -162,7 +163,7 @@ func TestBackup_Enricher_OneFailed_ShowsBrokenPhrase(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil)
+	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
 	require.NoError(t, err)
 
 	finding, ok := result.Findings[planID]
@@ -229,7 +230,7 @@ func TestBackup_Enricher_TwoFailed_CountsCorrectly(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil)
+	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
 	require.NoError(t, err)
 
 	finding, ok := result.Findings[planID]
@@ -279,7 +280,7 @@ func TestBackup_Enricher_OneAborted_IsAlsoBroken(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil)
+	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
 	require.NoError(t, err)
 
 	finding, ok := result.Findings[planID]
@@ -319,7 +320,7 @@ func TestBackup_Enricher_PartialOnly_IsWarning(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil)
+	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
 	require.NoError(t, err)
 
 	finding, ok := result.Findings[planID]
@@ -401,7 +402,7 @@ func TestBackup_Enricher_MixedFailedAndPartial_BrokenWins(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil)
+	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
 	require.NoError(t, err)
 
 	finding, ok := result.Findings[planID]
@@ -478,7 +479,7 @@ func TestBackup_Enricher_JobOutsideWindow_IsIgnored(t *testing.T) {
 	}
 	assertNoFinding(t, fake, planID)
 
-	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil)
+	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
 	require.NoError(t, err)
 
 	// No FieldUpdates for a status phrase either.
@@ -509,7 +510,7 @@ func TestBackup_Enricher_NilBackupPlanID_NotBucketed(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil)
+	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
 	require.NoError(t, err)
 
 	require.Empty(t, result.Findings,
@@ -532,7 +533,7 @@ func TestBackup_Enricher_BannedWords_NeverAppear(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil)
+	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
 	require.NoError(t, err)
 
 	finding, ok := result.Findings[planID]
@@ -595,7 +596,7 @@ func TestBackup_Enricher_CadenceComparison_IsSilent(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil)
+	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
 	require.NoError(t, err)
 
 	require.NotContains(t, result.Findings, planID,
@@ -630,7 +631,7 @@ func TestBackup_Enricher_JobWithNilCreationDate_IsSkipped(t *testing.T) {
 	}
 
 	// Must not panic.
-	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil)
+	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
 	require.NoError(t, err)
 	require.NotContains(t, result.Findings, planID,
 		"job with nil CreationDate must not produce a finding (enricher skips nil-date jobs)")
@@ -655,7 +656,7 @@ func TestBackup_Enricher_JobWithNilCreatedBy_IsSkipped(t *testing.T) {
 	}
 
 	// Must not panic.
-	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil)
+	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
 	require.NoError(t, err)
 	require.Empty(t, result.Findings,
 		"job with nil CreatedBy must not produce any findings; got: %v",
@@ -675,7 +676,7 @@ func TestBackup_Enricher_ListBackupJobsError_IsReturned(t *testing.T) {
 		listErr: sentinelErr,
 	}
 
-	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil)
+	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
 	require.Error(t, err,
 		"enricher must surface the ListBackupJobs error, not swallow it")
 	require.True(t, strings.Contains(err.Error(), "ThrottlingException") ||
@@ -727,7 +728,7 @@ func TestBackup_Enricher_FailedBucket_AllStatesMapToBang(t *testing.T) {
 				},
 			}
 
-			result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil)
+			result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
 			require.NoError(t, err)
 
 			finding, ok := result.Findings[tc.planID]
@@ -805,7 +806,7 @@ func TestBackup_Enricher_U11_SummaryNeverContainsRowValues(t *testing.T) {
 	}
 
 	fake := &backupJobsOnlyFake{jobs: allJobs}
-	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil)
+	result, err := awsclient.EnrichBackupJobs(context.Background(), backupJobsFakeClients(fake), nil, nil)
 	require.NoError(t, err)
 
 	for planID, finding := range result.Findings {

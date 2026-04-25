@@ -21,7 +21,7 @@ func init() {
 // "~" finding for each environment with a non-empty Causes slice.
 // Summary: "EB causes: <first cause>". IssueCount is always 0 — causes are
 // informational signals, not broken-state indicators.
-func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.ElasticBeanstalk == nil {

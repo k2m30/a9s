@@ -20,7 +20,7 @@ func init() {
 // EnrichGlueJobStatus calls GetJobRuns(max:1) for each job (1 per job, cap ~50).
 // Returns a Finding for each job whose latest run is FAILED, ERROR, or TIMEOUT.
 // Severity is "!" (broken/degraded). Summary: "latest run <STATUS>".
-func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)

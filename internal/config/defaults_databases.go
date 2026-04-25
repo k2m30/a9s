@@ -156,8 +156,13 @@ func databasesDefaultViews() map[string]ViewDef {
 			List: []ListColumn{
 				{Title: "Snapshot ID", Path: "DBSnapshotIdentifier", Width: 36},
 				{Title: "DB Instance", Path: "DBInstanceIdentifier", Width: 28},
-				{Title: "Status", Path: "Status", Width: 12},
-				{Title: "Encrypted", Path: "Encrypted", Width: 10},
+				// Status reads exclusively from the computed Fields["status"]
+				// (set by the fetcher to the §4 phrase, then overwritten by
+				// the cross-ref enricher's FieldUpdates). NO Path fallback —
+				// per spec §4 a Healthy snapshot's S4 cell is intentionally
+				// blank, but Path: "Status" would pull the raw AWS keyword
+				// "available" out of RawStruct and break that contract.
+				{Title: "Status", Key: "status", Width: 32},
 				{Title: "Engine", Path: "Engine", Width: 12},
 				{Title: "Type", Path: "SnapshotType", Width: 12},
 				{Title: "Created", Path: "SnapshotCreateTime", Width: 22},

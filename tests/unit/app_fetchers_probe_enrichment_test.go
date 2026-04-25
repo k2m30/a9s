@@ -102,7 +102,7 @@ func TestProbeEnrichment_EnricherError_ReturnsErrorMsg(t *testing.T) {
 	// Temporarily replace the dbi enricher with one that always errors.
 	original := awsclient.IssueEnricherRegistry["dbi"]
 	awsclient.IssueEnricherRegistry["dbi"] = awsclient.IssueEnricher{
-		Fn: func(_ context.Context, _ *awsclient.ServiceClients, _ []resource.Resource) (awsclient.IssueEnricherResult, error) {
+		Fn: func(_ context.Context, _ *awsclient.ServiceClients, _ []resource.Resource, _ resource.ResourceCache) (awsclient.IssueEnricherResult, error) {
 			return awsclient.IssueEnricherResult{}, fmt.Errorf("simulated enricher failure")
 		},
 		Priority: original.Priority,

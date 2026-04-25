@@ -90,7 +90,7 @@ func TestEnrichASGScalingActivities_AllSuccessfulProducesNoFindings(t *testing.T
 		{ID: "my-worker-asg", Name: "my-worker-asg", Fields: map[string]string{"asg_name": "my-worker-asg"}},
 	}
 
-	result, err := awsclient.EnrichASGScalingActivities(context.Background(), clients, resources)
+	result, err := awsclient.EnrichASGScalingActivities(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -132,7 +132,7 @@ func TestEnrichASGScalingActivities_OneFailedProducesFindingSevBang(t *testing.T
 		{ID: "my-failing-asg", Name: "my-failing-asg", Fields: map[string]string{"asg_name": "my-failing-asg"}},
 	}
 
-	result, err := awsclient.EnrichASGScalingActivities(context.Background(), clients, resources)
+	result, err := awsclient.EnrichASGScalingActivities(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -157,7 +157,7 @@ func TestEnrichASGScalingActivities_OneFailedProducesFindingSevBang(t *testing.T
 func TestEnrichASGScalingActivities_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{AutoScaling: nil}
 
-	result, err := awsclient.EnrichASGScalingActivities(context.Background(), clients, nil)
+	result, err := awsclient.EnrichASGScalingActivities(context.Background(), clients, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -194,7 +194,7 @@ func TestEnrichASGScalingActivities_APIErrorOnFirstContinuesToSecond(t *testing.
 		{ID: "my-ok-asg", Name: "my-ok-asg", Fields: map[string]string{"asg_name": "my-ok-asg"}},
 	}
 
-	result, err := awsclient.EnrichASGScalingActivities(context.Background(), clients, resources)
+	result, err := awsclient.EnrichASGScalingActivities(context.Background(), clients, resources, nil)
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when at least one ASG API call failed")
 	}

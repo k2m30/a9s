@@ -50,7 +50,7 @@ func init() {
 // On any other API error: no finding emitted; TruncatedIDs[id] = true and
 // the failure aggregates into the returned composite error.
 // IssueCount stays 0 (framework counts "!" findings directly).
-func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)

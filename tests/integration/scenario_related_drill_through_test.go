@@ -77,6 +77,9 @@ var drillThroughFixtures = []struct {
 	// See docs/resources/redshift-impl-plan.md §5.1.
 	{"redshift/acme-warehouse", "redshift", demofixtures.AcmeWarehouseID},
 	{"redshift/acme-reporting", "redshift", demofixtures.AcmeReportingID},
+	// rds-snap: Aurora-engine source covers the dbc pivot; non-Aurora source
+	// has no DBClusterIdentifier so dbc=0 there. See rds-snap-impl-plan §2.2.
+	{"rds-snap/prod-aurora", "rds-snap", demofixtures.ProdRDSSnapAuroraID},
 }
 
 // drillThroughGroups collapses the flat fixture list into groups sharing a

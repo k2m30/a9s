@@ -63,7 +63,7 @@ func TestEnrichACMCertificate_UsesARNFromFields(t *testing.T) {
 		Fields: map[string]string{"certificate_arn": certARN},
 	}}
 
-	_, err := awsclient.EnrichACMCertificate(context.Background(), clients, resources)
+	_, err := awsclient.EnrichACMCertificate(context.Background(), clients, resources, nil)
 	if err != nil && strings.Contains(err.Error(), "ValidationError") {
 		t.Fatalf("enricher passed bare domain to AWS instead of ARN; got: %v", err)
 	}

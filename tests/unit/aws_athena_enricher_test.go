@@ -121,7 +121,7 @@ func TestEnrichAthenaWorkGroup_EnforcedEncryptedProducesNoFindings(t *testing.T)
 	clients := &awsclient.ServiceClients{Athena: fake}
 	resources := athenaWorkGroupResources(athenaWG1, athenaWG2)
 
-	result, err := awsclient.EnrichAthenaWorkGroup(context.Background(), clients, resources)
+	result, err := awsclient.EnrichAthenaWorkGroup(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -150,7 +150,7 @@ func TestEnrichAthenaWorkGroup_NotEnforcedProducesFindingSevTilde(t *testing.T) 
 	clients := &awsclient.ServiceClients{Athena: fake}
 	resources := athenaWorkGroupResources(athenaWG1, athenaWG2)
 
-	result, err := awsclient.EnrichAthenaWorkGroup(context.Background(), clients, resources)
+	result, err := awsclient.EnrichAthenaWorkGroup(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -187,7 +187,7 @@ func TestEnrichAthenaWorkGroup_NoEncryptionProducesFindingSevTilde(t *testing.T)
 	clients := &awsclient.ServiceClients{Athena: fake}
 	resources := athenaWorkGroupResources(athenaWG1, athenaWG2)
 
-	result, err := awsclient.EnrichAthenaWorkGroup(context.Background(), clients, resources)
+	result, err := awsclient.EnrichAthenaWorkGroup(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -215,7 +215,7 @@ func TestEnrichAthenaWorkGroup_NoEncryptionProducesFindingSevTilde(t *testing.T)
 func TestEnrichAthenaWorkGroup_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{Athena: nil}
 
-	result, err := awsclient.EnrichAthenaWorkGroup(context.Background(), clients, athenaWorkGroupResources(athenaWG1, athenaWG2))
+	result, err := awsclient.EnrichAthenaWorkGroup(context.Background(), clients, athenaWorkGroupResources(athenaWG1, athenaWG2), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -243,7 +243,7 @@ func TestEnrichAthenaWorkGroup_APIErrorSetsTruncatedNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{Athena: fake}
 	resources := athenaWorkGroupResources(athenaWG1, athenaWG2)
 
-	result, err := awsclient.EnrichAthenaWorkGroup(context.Background(), clients, resources)
+	result, err := awsclient.EnrichAthenaWorkGroup(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -73,7 +73,7 @@ func TestEnrichIAMRoleLastUsed_NilRoleOutputSkipped(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichIAMRoleLastUsed(context.Background(), clients, resources)
+	result, err := awsclient.EnrichIAMRoleLastUsed(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestEnrichIAMRoleLastUsed_APIErrorSetsTruncatedContinues(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichIAMRoleLastUsed(context.Background(), clients, resources)
+	result, err := awsclient.EnrichIAMRoleLastUsed(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("enricher must not propagate GetRole errors: %v", err)
 	}
@@ -175,7 +175,7 @@ func TestEnrichIAMRoleLastUsed_RoleNameFallsBackToID(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichIAMRoleLastUsed(context.Background(), clients, resources)
+	result, err := awsclient.EnrichIAMRoleLastUsed(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -198,7 +198,7 @@ func TestEnrichIAMRoleLastUsed_EmptyIDAndNameSkipped(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichIAMRoleLastUsed(context.Background(), clients, resources)
+	result, err := awsclient.EnrichIAMRoleLastUsed(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -214,7 +214,7 @@ func TestEnrichIAMRoleLastUsed_IAMClientNotGetRoleAPI(t *testing.T) {
 	bare := &iamBareAPI{}
 	clients := &awsclient.ServiceClients{IAM: bare}
 
-	result, err := awsclient.EnrichIAMRoleLastUsed(context.Background(), clients, iamRoleResources())
+	result, err := awsclient.EnrichIAMRoleLastUsed(context.Background(), clients, iamRoleResources(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -247,7 +247,7 @@ func TestEnrichIAMPolicy_APIErrorSetsTruncatedNoError(t *testing.T) {
 		iamPolicyResource(iamPolicyARN1, "SafePolicy"),
 	}
 
-	result, err := awsclient.EnrichIAMPolicy(context.Background(), clients, resources)
+	result, err := awsclient.EnrichIAMPolicy(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("enricher must not propagate FetchManagedPolicyDocument errors: %v", err)
 	}
@@ -288,7 +288,7 @@ func TestEnrichIAMPolicy_NoRawStructARNFallbackFromID(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichIAMPolicy(context.Background(), clients, resources)
+	result, err := awsclient.EnrichIAMPolicy(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -318,7 +318,7 @@ func TestEnrichIAMPolicy_EmptyARNSkipped(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichIAMPolicy(context.Background(), clients, resources)
+	result, err := awsclient.EnrichIAMPolicy(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -412,7 +412,7 @@ func TestEnrichIAMGroup_GetGroupAPIErrorSkipsGroup(t *testing.T) {
 	clients := &awsclient.ServiceClients{IAM: fake}
 	resources := iamGroupResources("broken-group", "ok-group")
 
-	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources)
+	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("enricher must not propagate GetGroup errors: %v", err)
 	}
@@ -448,7 +448,7 @@ func TestEnrichIAMGroup_EmptyGroupNameSkipped(t *testing.T) {
 		},
 	}
 
-	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources)
+	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -473,7 +473,7 @@ func TestEnrichASGScalingActivities_EmptyActivitiesProducesNoFindings(t *testing
 		{ID: "quiet-asg", Name: "quiet-asg"},
 	}
 
-	result, err := awsclient.EnrichASGScalingActivities(context.Background(), clients, resources)
+	result, err := awsclient.EnrichASGScalingActivities(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -509,7 +509,7 @@ func TestEnrichASGScalingActivities_FailedWithStatusMessageSummarized(t *testing
 		{ID: "capacity-asg", Name: "capacity-asg"},
 	}
 
-	result, err := awsclient.EnrichASGScalingActivities(context.Background(), clients, resources)
+	result, err := awsclient.EnrichASGScalingActivities(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -574,7 +574,7 @@ func TestEnrichASGScalingActivities_FailedWithoutStatusMessagePlainSummary(t *te
 		{ID: "silent-fail-asg", Name: "silent-fail-asg"},
 	}
 
-	result, err := awsclient.EnrichASGScalingActivities(context.Background(), clients, resources)
+	result, err := awsclient.EnrichASGScalingActivities(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -604,7 +604,7 @@ func TestEnrichASGScalingActivities_EmptyIDSkipped(t *testing.T) {
 		{ID: "", Name: "unnamed-asg"}, // empty ID → must be skipped
 	}
 
-	result, err := awsclient.EnrichASGScalingActivities(context.Background(), clients, resources)
+	result, err := awsclient.EnrichASGScalingActivities(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -624,7 +624,7 @@ func TestEnrichCodePipelineStatus_EmptyNameSkipped(t *testing.T) {
 		{ID: "pipe-id", Name: ""}, // empty name → must be skipped
 	}
 
-	result, err := awsclient.EnrichCodePipelineStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCodePipelineStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -651,7 +651,7 @@ func TestEnrichCodePipelineStatus_EmptyIDKeyedByName(t *testing.T) {
 		{ID: "", Name: "nameless-id-pipeline"},
 	}
 
-	result, err := awsclient.EnrichCodePipelineStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCodePipelineStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -695,7 +695,7 @@ func TestEnrichCodePipelineStatus_ActionErrorDetailsAppended(t *testing.T) {
 		{ID: "err-pipe-id", Name: "err-detail-pipeline"},
 	}
 
-	result, err := awsclient.EnrichCodePipelineStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCodePipelineStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -742,7 +742,7 @@ func TestEnrichCodePipelineStatus_ActionNilExecutionSkipped(t *testing.T) {
 		{ID: "nil-exec-pipe", Name: "nil-exec-pipeline"},
 	}
 
-	result, err := awsclient.EnrichCodePipelineStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCodePipelineStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -812,7 +812,7 @@ func TestEnrichMSKCluster_VersionBoundaries(t *testing.T) {
 			clients := &awsclient.ServiceClients{MSK: fake}
 			resources := mskClusterResources(arn)
 
-			result, err := awsclient.EnrichMSKCluster(context.Background(), clients, resources)
+			result, err := awsclient.EnrichMSKCluster(context.Background(), clients, resources, nil)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

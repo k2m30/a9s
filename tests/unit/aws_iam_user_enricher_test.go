@@ -137,7 +137,7 @@ func TestEnrichIAMUserMFA_WithMFAProducesNoFindings(t *testing.T) {
 	clients := &awsclient.ServiceClients{IAM: fake}
 	resources := iamUserResources("alice", "bob")
 
-	result, err := awsclient.EnrichIAMUserMFA(context.Background(), clients, resources)
+	result, err := awsclient.EnrichIAMUserMFA(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -166,7 +166,7 @@ func TestEnrichIAMUserMFA_NoMFAProducesFindingSevBang(t *testing.T) {
 	clients := &awsclient.ServiceClients{IAM: fake}
 	resources := iamUserResources("alice", "bob")
 
-	result, err := awsclient.EnrichIAMUserMFA(context.Background(), clients, resources)
+	result, err := awsclient.EnrichIAMUserMFA(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -203,7 +203,7 @@ func TestEnrichIAMUserMFA_NoConsoleNoOldKeysProducesNoFindings(t *testing.T) {
 	clients := &awsclient.ServiceClients{IAM: fake}
 	resources := iamUserResources("alice", "bob")
 
-	result, err := awsclient.EnrichIAMUserMFA(context.Background(), clients, resources)
+	result, err := awsclient.EnrichIAMUserMFA(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -233,7 +233,7 @@ func TestEnrichIAMUserMFA_OldAccessKeyProducesFindingSevTilde(t *testing.T) {
 	clients := &awsclient.ServiceClients{IAM: fake}
 	resources := iamUserResources("alice", "bob")
 
-	result, err := awsclient.EnrichIAMUserMFA(context.Background(), clients, resources)
+	result, err := awsclient.EnrichIAMUserMFA(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -258,7 +258,7 @@ func TestEnrichIAMUserMFA_OldAccessKeyProducesFindingSevTilde(t *testing.T) {
 func TestEnrichIAMUserMFA_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{IAM: nil}
 
-	result, err := awsclient.EnrichIAMUserMFA(context.Background(), clients, iamUserResources("alice", "bob"))
+	result, err := awsclient.EnrichIAMUserMFA(context.Background(), clients, iamUserResources("alice", "bob"), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

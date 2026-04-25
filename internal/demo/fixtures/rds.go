@@ -28,7 +28,7 @@ func NewRDSFixtures() *RDSFixtures {
 	legacy := buildRDSInstances()
 	return &RDSFixtures{
 		DBInstances: append(dbi.Instances, legacy...),
-		DBSnapshots: buildRDSSnapshots(),
+		DBSnapshots: NewRDSSnapFixtures().Instances,
 		Events:      buildRDSEvents(),
 	}
 }
@@ -443,123 +443,6 @@ func buildRDSInstances() []rdstypes.DBInstance {
 	return named
 }
 
-func buildRDSSnapshots() []rdstypes.DBSnapshot {
-	return []rdstypes.DBSnapshot{
-		// Snapshots for prod-dbi-1 — required for the dbi→rds-snap related-panel pivot.
-		{
-			DBSnapshotIdentifier: aws.String("rds:" + ProdDbiID + "-2026-04-15"),
-			DBInstanceIdentifier: aws.String(ProdDbiID),
-			DBSnapshotArn:        aws.String("arn:aws:rds:us-east-1:123456789012:snapshot:rds:" + ProdDbiID + "-2026-04-15"),
-			Status:               aws.String("available"),
-			Engine:               aws.String("postgres"),
-			EngineVersion:        aws.String("16.2"),
-			SnapshotType:         aws.String("automated"),
-			SnapshotCreateTime:   aws.Time(mustTime("2026-04-15T03:00:00Z")),
-			AllocatedStorage:     aws.Int32(100),
-			StorageType:          aws.String("gp3"),
-			Encrypted:            aws.Bool(true),
-			KmsKeyId:             aws.String(dbiKMSKeyID),
-			AvailabilityZone:     aws.String("us-east-1a"),
-			MasterUsername:       aws.String("pgadmin"),
-			LicenseModel:         aws.String("postgresql-license"),
-			PercentProgress:      aws.Int32(100),
-			SourceRegion:         aws.String("us-east-1"),
-		},
-		{
-			DBSnapshotIdentifier: aws.String("pre-migration-" + ProdDbiID),
-			DBInstanceIdentifier: aws.String(ProdDbiID),
-			DBSnapshotArn:        aws.String("arn:aws:rds:us-east-1:123456789012:snapshot:pre-migration-" + ProdDbiID),
-			Status:               aws.String("available"),
-			Engine:               aws.String("postgres"),
-			EngineVersion:        aws.String("16.2"),
-			SnapshotType:         aws.String("manual"),
-			SnapshotCreateTime:   aws.Time(mustTime("2026-04-10T22:00:00Z")),
-			AllocatedStorage:     aws.Int32(100),
-			StorageType:          aws.String("gp3"),
-			Encrypted:            aws.Bool(true),
-			KmsKeyId:             aws.String(dbiKMSKeyID),
-			AvailabilityZone:     aws.String("us-east-1a"),
-			MasterUsername:       aws.String("pgadmin"),
-			LicenseModel:         aws.String("postgresql-license"),
-			PercentProgress:      aws.Int32(100),
-			SourceRegion:         aws.String("us-east-1"),
-		},
-		// Snapshot for prod-dbi-aurora-1 — required for the Aurora dbi
-		// fixture to cover the rds-snap pivot (all-pivots-non-zero contract).
-		{
-			DBSnapshotIdentifier: aws.String("rds:" + ProdDbiAuroraID + "-2026-04-15"),
-			DBInstanceIdentifier: aws.String(ProdDbiAuroraID),
-			DBSnapshotArn:        aws.String("arn:aws:rds:us-east-1:123456789012:snapshot:rds:" + ProdDbiAuroraID + "-2026-04-15"),
-			Status:               aws.String("available"),
-			Engine:               aws.String("aurora-postgresql"),
-			EngineVersion:        aws.String("16.4"),
-			SnapshotType:         aws.String("automated"),
-			SnapshotCreateTime:   aws.Time(mustTime("2026-04-15T03:00:00Z")),
-			AllocatedStorage:     aws.Int32(100),
-			StorageType:          aws.String("aurora"),
-			Encrypted:            aws.Bool(true),
-			KmsKeyId:             aws.String(dbiKMSKeyID),
-			AvailabilityZone:     aws.String("us-east-1a"),
-			MasterUsername:       aws.String("pgadmin"),
-			LicenseModel:         aws.String("postgresql-license"),
-			PercentProgress:      aws.Int32(100),
-			SourceRegion:         aws.String("us-east-1"),
-		},
-		{
-			DBSnapshotIdentifier: aws.String("rds:prod-api-primary-2026-03-20"),
-			DBInstanceIdentifier: aws.String("prod-api-primary"),
-			Status:               aws.String("available"),
-			Engine:               aws.String("aurora-postgresql"),
-			EngineVersion:        aws.String("16.4"),
-			SnapshotType:         aws.String("automated"),
-			SnapshotCreateTime:   aws.Time(mustTime("2026-03-20T03:00:00Z")),
-			AllocatedStorage:     aws.Int32(100),
-			StorageType:          aws.String("gp3"),
-			Encrypted:            aws.Bool(true),
-			KmsKeyId:             aws.String(rdsKMSKeyID),
-			AvailabilityZone:     aws.String("us-east-1a"),
-			MasterUsername:       aws.String("pgadmin"),
-			LicenseModel:         aws.String("postgresql-license"),
-			Iops:                 aws.Int32(3000),
-			PercentProgress:      aws.Int32(100),
-			SourceRegion:         aws.String("us-east-1"),
-			DBSnapshotArn:        aws.String("arn:aws:rds:us-east-1:123456789012:snapshot:rds:prod-api-primary-2026-03-20"),
-		},
-		{
-			DBSnapshotIdentifier: aws.String("rds:analytics-warehouse-2026-03-20"),
-			DBInstanceIdentifier: aws.String("analytics-warehouse"),
-			Status:               aws.String("available"),
-			Engine:               aws.String("postgres"),
-			EngineVersion:        aws.String("16.2"),
-			SnapshotType:         aws.String("automated"),
-			SnapshotCreateTime:   aws.Time(mustTime("2026-03-20T03:30:00Z")),
-			AllocatedStorage:     aws.Int32(500),
-			DBSnapshotArn:        aws.String("arn:aws:rds:us-east-1:123456789012:snapshot:rds:analytics-warehouse-2026-03-20"),
-		},
-		{
-			DBSnapshotIdentifier: aws.String("pre-migration-snapshot"),
-			DBInstanceIdentifier: aws.String("staging-mysql"),
-			Status:               aws.String("available"),
-			Engine:               aws.String("mysql"),
-			EngineVersion:        aws.String("8.0.36"),
-			SnapshotType:         aws.String("manual"),
-			SnapshotCreateTime:   aws.Time(mustTime("2026-03-15T22:00:00Z")),
-			AllocatedStorage:     aws.Int32(50),
-			DBSnapshotArn:        aws.String("arn:aws:rds:us-east-1:123456789012:snapshot:pre-migration-snapshot"),
-		},
-		{
-			DBSnapshotIdentifier: aws.String("dev-feature-branch-snap"),
-			DBInstanceIdentifier: aws.String("dev-feature-branch"),
-			Status:               aws.String("creating"),
-			Engine:               aws.String("aurora-postgresql"),
-			EngineVersion:        aws.String("16.4"),
-			SnapshotType:         aws.String("manual"),
-			SnapshotCreateTime:   aws.Time(mustTime("2026-03-21T10:30:00Z")),
-			AllocatedStorage:     aws.Int32(20),
-			DBSnapshotArn:        aws.String("arn:aws:rds:us-east-1:123456789012:snapshot:dev-feature-branch-snap"),
-		},
-	}
-}
 
 func buildRDSEvents() []rdstypes.Event {
 	t1 := time.Date(2026, 3, 20, 10, 0, 0, 0, time.UTC)

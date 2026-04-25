@@ -4,7 +4,7 @@ package unit
 // and EnrichmentCap constant behavior.
 //
 // Updated for the IssueEnricherResult return type:
-//   IssueEnricherFunc = func(ctx, clients, resources) (IssueEnricherResult, error)
+//   IssueEnricherFunc = func(ctx, clients, resources, cache) (IssueEnricherResult, error)
 
 import (
 	"context"
@@ -15,12 +15,13 @@ import (
 )
 
 // TestIssueEnricherFuncSignatureReturnsResult verifies that IssueEnricherFunc accepts
-// functions with the new signature (ctx, clients, resources) → (IssueEnricherResult, error).
+// functions with the new signature (ctx, clients, resources, cache) → (IssueEnricherResult, error).
 func TestIssueEnricherFuncSignatureReturnsResult(t *testing.T) {
 	fn := awsclient.IssueEnricherFunc(func(
 		_ context.Context,
 		_ *awsclient.ServiceClients,
 		_ []resource.Resource,
+		_ resource.ResourceCache,
 	) (awsclient.IssueEnricherResult, error) {
 		return awsclient.IssueEnricherResult{
 			IssueCount: 3,
@@ -29,7 +30,7 @@ func TestIssueEnricherFuncSignatureReturnsResult(t *testing.T) {
 		}, nil
 	})
 
-	result, err := fn(context.Background(), nil, nil)
+	result, err := fn(context.Background(), nil, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error from test enricher: %v", err)
 	}
@@ -51,6 +52,7 @@ func TestIssueEnricherFuncSignatureReturnsFalseWhenNotTruncated(t *testing.T) {
 		_ context.Context,
 		_ *awsclient.ServiceClients,
 		_ []resource.Resource,
+		_ resource.ResourceCache,
 	) (awsclient.IssueEnricherResult, error) {
 		return awsclient.IssueEnricherResult{
 			IssueCount: 0,
@@ -59,7 +61,7 @@ func TestIssueEnricherFuncSignatureReturnsFalseWhenNotTruncated(t *testing.T) {
 		}, nil
 	})
 
-	result, err := fn(context.Background(), nil, nil)
+	result, err := fn(context.Background(), nil, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -87,6 +89,7 @@ func TestEnrichmentCapTruncation(t *testing.T) {
 		_ context.Context,
 		_ *awsclient.ServiceClients,
 		resources []resource.Resource,
+		_ resource.ResourceCache,
 	) (awsclient.IssueEnricherResult, error) {
 		return awsclient.IssueEnricherResult{
 			IssueCount: 0,
@@ -109,7 +112,7 @@ func TestEnrichmentCapTruncation(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			resources := make([]resource.Resource, tc.count)
-			result, err := fn(context.Background(), nil, resources)
+			result, err := fn(context.Background(), nil, resources, nil)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

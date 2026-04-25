@@ -117,7 +117,7 @@ func TestEnrichCodeArtifactRepository_GoodPolicyProducesNoFindings(t *testing.T)
 	clients := &awsclient.ServiceClients{CodeArtifact: fake}
 	resources := codeArtifactRepoResources(caRepo1, caRepo2)
 
-	result, err := awsclient.EnrichCodeArtifactRepository(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCodeArtifactRepository(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestEnrichCodeArtifactRepository_NoPolicyProducesFindingSevTilde(t *testing
 	clients := &awsclient.ServiceClients{CodeArtifact: fake}
 	resources := codeArtifactRepoResources(caRepo1, caRepo2)
 
-	result, err := awsclient.EnrichCodeArtifactRepository(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCodeArtifactRepository(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -187,7 +187,7 @@ func TestEnrichCodeArtifactRepository_PublicPolicyProducesFindingSevBang(t *test
 	clients := &awsclient.ServiceClients{CodeArtifact: fake}
 	resources := codeArtifactRepoResources(caRepo1, caRepo2)
 
-	result, err := awsclient.EnrichCodeArtifactRepository(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCodeArtifactRepository(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -215,7 +215,7 @@ func TestEnrichCodeArtifactRepository_PublicPolicyProducesFindingSevBang(t *test
 func TestEnrichCodeArtifactRepository_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{CodeArtifact: nil}
 
-	result, err := awsclient.EnrichCodeArtifactRepository(context.Background(), clients, codeArtifactRepoResources(caRepo1, caRepo2))
+	result, err := awsclient.EnrichCodeArtifactRepository(context.Background(), clients, codeArtifactRepoResources(caRepo1, caRepo2), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -244,7 +244,7 @@ func TestEnrichCodeArtifactRepository_APIErrorSetsTruncatedNoError(t *testing.T)
 	clients := &awsclient.ServiceClients{CodeArtifact: fake}
 	resources := codeArtifactRepoResources(caRepo1, caRepo2)
 
-	result, err := awsclient.EnrichCodeArtifactRepository(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCodeArtifactRepository(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
