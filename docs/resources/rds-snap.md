@@ -114,7 +114,8 @@ Every signal from §3.1 and §3.2 must land on one or more of these five existin
 Wave → surface mapping:
 
 - **Wave 1 Healthy** → no §4 row (omit). S2 renders green, S4 renders blank. Silence is the UX.
-- **Wave 1 Warning / Broken / Dim** → S2 (color) + S4 (cause text). No S1, S3, S5.
+- **Wave 1 Warning / Broken / Dim, fetcher-detected** → S2 (color) + S4 (cause text). No S1, S3, S5. Applies to the four signals computable from the `DescribeDBSnapshots` row alone (creating / failed / incompatible / unencrypted).
+- **Wave 1 Warning, cross-ref-detected** → S1 (counted as an issue instance), S2 (color), S4 (cause text), S5 (Attention entry with the same phrase plus structured Rows). Applies to `orphan: source DB deleted` and `automated, <N>d past retention`. Wave classification is unchanged (zero AWS API calls — the enricher only reads the in-memory dbi cache); the surface set is broader because the cross-ref enricher is the only enricher-output channel that reaches S5, so the implementation routes these phrases through the `Findings` map for S5 visibility while simultaneously emitting `FieldUpdates["status"]` for S4. See `internal/aws/rds_snap_issue_enrichment.go` for the contract.
 - **Wave 2 background finding on a Healthy row, important** → `!` glyph on green row. S1, S3, S4 (short cause), S5 (full sentence).
 - **Wave 2 background finding on a Healthy row, informational** → `~` glyph on green row. S3, S4 (short cause), S5 (full sentence). No S1.
 - **Wave 2 finding on an already yellow/red/dim row** → redundant with color; S3 suppressed, S4 deduplicates with existing cause, S5 still carries the full sentence, S1 still counts if `!`.
@@ -127,8 +128,8 @@ One row per signal from §3:
 | `Status == failed` | 1 | Broken | n/a | S2, S4 | `failed` | — |
 | `Status == incompatible-*` | 1 | Broken | n/a | S2, S4 | `incompatible-restore` (or current keyword) | — |
 | `Encrypted == false` | 1 | Warning | n/a | S2, S4 | `unencrypted` | — |
-| orphan: source DB deleted | 1 | Warning | n/a | S2, S4 | `orphan: source DB deleted` | — |
-| automated age > parent `BackupRetentionPeriod` | 1 | Warning | n/a | S2, S4 | `automated, <N>d past retention` | — |
+| orphan: source DB deleted | 1 (cross-ref) | Warning | n/a | S1, S2, S4, S5 | `orphan: source DB deleted` | `orphan: source DB deleted` + Source DB row |
+| automated age > parent `BackupRetentionPeriod` | 1 (cross-ref) | Warning | n/a | S1, S2, S4, S5 | `automated, <N>d past retention` | `automated, <N>d past retention` + Source DB / Retention / Created rows |
 
 Rules for filling list and detail text:
 

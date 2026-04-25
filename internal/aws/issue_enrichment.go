@@ -43,7 +43,6 @@ func NoOpIssueEnricher(_ context.Context, _ *ServiceClients, _ []resource.Resour
 	return IssueEnricherResult{
 		Findings:     map[string]resource.EnrichmentFinding{},
 		TruncatedIDs: map[string]bool{},
-		IssueAppends: map[string][]string{},
 		IssueCount:   0,
 		Truncated:    false,
 	}, nil
@@ -130,14 +129,6 @@ type IssueEnricherResult struct {
 	// MUST NOT be nil if the enricher writes any updates; use
 	// make(map[string]map[string]string).
 	FieldUpdates map[string]map[string]string
-	// IssueAppends carries per-resource phrases to append to Resource.Issues
-	// at dispatch-merge time. Used by cross-ref Wave-1 enrichers (e.g. rds-snap)
-	// to land Wave-1 phrases that require sibling-cache access. Phrases must
-	// match the §4 spec text verbatim. The dispatcher appends these AFTER
-	// fetcher-populated phrases preserving §4 precedence (caller's responsibility
-	// to compute the merged status string and emit it via FieldUpdates["status"]).
-	// MUST NOT be nil if the enricher writes any appends; use make(map[string][]string).
-	IssueAppends map[string][]string
 }
 
 // IssueEnricherFunc is a pluggable function that makes additional API calls

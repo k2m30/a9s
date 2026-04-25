@@ -261,11 +261,6 @@ type EnrichmentCheckedMsg struct {
 	// cached rows. Keyed by resource ID then by field key. Populated on success
 	// AND on partial-success (Err non-nil but partial results present).
 	FieldUpdates map[string]map[string]string
-	// IssueAppends carries per-resource phrases to append to Resource.Issues
-	// at merge time. Used by cross-ref Wave-1 enrichers (e.g. rds-snap).
-	// Phrases match the §4 spec text verbatim. The handler appends these AFTER
-	// fetcher-populated phrases preserving §4 precedence order.
-	IssueAppends map[string][]string
 	// TruncatedIDs carries the per-resource truncation signal from the enricher.
 	// Keyed by Resource.ID. Rows in this set are rendered as "?" because the
 	// enricher could not fully inspect them (per-resource API error or page cap).

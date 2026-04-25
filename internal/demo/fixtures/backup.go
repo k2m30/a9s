@@ -389,9 +389,11 @@ func buildBackupSelections() map[string][]backuptypes.BackupSelection {
 		// plan-healthy-daily: selects healthy S3 bucket, the legacy shared
 		// EFS, the graph-root EFS (ProdEFSARN), and the orders-prod DynamoDB
 		// table — preserves s3→backup, efs→backup, and ddb→backup pivots via
-		// cache scan of Fields["resources"]. Also includes the rds-snap Aurora
-		// graph-root so the rds-snap→backup pivot resolves Count ≥ 2 (this
-		// plan + ProdDatabasePlanID below).
+		// cache scan of Fields["resources"]. Also includes the Aurora parent DB
+		// (ProdDbiAuroraARN) so the rds-snap→backup pivot resolves Count ≥ 2
+		// for snapshots whose parent is that DB (this plan + ProdDatabasePlanID
+		// below).  AWS Backup selects parent DB instances, not individual
+		// snapshots — checkRDSSnapBackup walks the snapshot's parent DB ARN.
 		HealthyDailyPlanID: {
 			{
 				SelectionName: aws.String("acme-daily-multi-selection"),
@@ -401,7 +403,7 @@ func buildBackupSelections() map[string][]backuptypes.BackupSelection {
 					"arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-0abc111111111111a",
 					ProdEFSARN,
 					OrdersProdARN,
-					ProdRDSSnapAuroraARN,
+					ProdDbiAuroraARN,
 				},
 			},
 		},
@@ -415,20 +417,19 @@ func buildBackupSelections() map[string][]backuptypes.BackupSelection {
 			},
 		},
 
-		// plan-broken-2failed (graph-root for both backup and rds-snap pivots):
+		// plan-broken-2failed (graph-root for backup; also covers rds-snap pivots):
 		// uses AcmeBackupRoleProd — role pivot resolves ≥1 on U9.
-		// Resources also enumerates the rds-snap graph-root + adjacent fixtures
-		// so the rds-snap→backup pivot resolves Count ≥ 2 on the Aurora
-		// graph-root and ≥ 1 on the non-Aurora and BackupCovered fixtures.
+		// Resources covers the rds-snap parent DBs (ProdDbiID + ProdDbiAuroraID)
+		// so every rds-snap whose parent is one of those DBs gets the backup
+		// pivot Count ≥ 1. AWS Backup selects parent DBs, not snapshots.
 		ProdDatabasePlanID: {
 			{
 				SelectionName: aws.String("acme-prod-db-selection"),
 				IamRoleArn:    aws.String(AcmeBackupRoleARN),
 				Resources: []string{
 					"arn:aws:rds:us-east-1:123456789012:db:acme-prod-primary",
-					ProdRDSSnapAuroraARN,
-					ProdRDSSnapARN,
-					BackupCoveredRDSSnapARN,
+					ProdDbiARN,
+					ProdDbiAuroraARN,
 				},
 			},
 		},
