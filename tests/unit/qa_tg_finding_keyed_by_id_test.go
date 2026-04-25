@@ -47,7 +47,7 @@ func TestEnrichTargetGroupHealth_UsesARNFromFields(t *testing.T) {
 		Fields: map[string]string{"target_group_arn": tgARN},
 	}}
 
-	result, err := awsclient.EnrichTargetGroupHealth(context.Background(), clients, resources)
+	result, err := awsclient.EnrichTargetGroupHealth(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

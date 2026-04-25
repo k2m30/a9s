@@ -438,27 +438,34 @@ func databasesResourceTypes() []ResourceTypeDef {
 			Columns: []Column{
 				{Key: "snapshot_id", Title: "Snapshot ID", Width: 36, Sortable: true},
 				{Key: "db_instance", Title: "DB Instance", Width: 28, Sortable: true},
-				{Key: "status", Title: "Status", Width: 12, Sortable: true},
+				{Key: "status", Title: "Status", Width: 32, Sortable: true},
 				{Key: "engine", Title: "Engine", Width: 12, Sortable: true},
 				{Key: "snapshot_type", Title: "Type", Width: 12, Sortable: true},
 				{Key: "created", Title: "Created", Width: 22, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				status := r.Fields["status"]
-				c := ColorHealthy
-				switch {
-				case status == "failed":
-					c = ColorBroken
-				case strings.HasPrefix(status, "incompatible-"):
-					c = ColorBroken
-				case status == "creating" || status == "copying":
-					c = ColorWarning
+				// Strip (+N) suffix so "failed (+1)" still maps to ColorBroken.
+				phrase := StripFindingSuffix(r.Fields["status"])
+				// Broken end-states.
+				if phrase == "failed" {
+					return ColorBroken
 				}
-				// CIS RDS.4: unencrypted snapshot → warning (Broken takes precedence)
-				if c != ColorBroken && r.Fields["encrypted"] == "false" {
-					c = ColorWarning
+				if strings.HasPrefix(phrase, "incompatible-") {
+					return ColorBroken
 				}
-				return c
+				// Healthy: "" (§4 phrase — healthy snapshots produce empty status) or
+				// "available" (raw AWS status injected by test helpers / RawStruct fallback).
+				// Unencrypted override: when encrypted=="false", color is Warning even if
+				// status appears healthy — the snapshot exists but lacks encryption (CIS RDS.4).
+				if phrase == "" || phrase == "available" {
+					if r.Fields["encrypted"] == "false" {
+						return ColorWarning
+					}
+					return ColorHealthy
+				}
+				// Any non-empty, non-Broken, non-healthy phrase is a Warning signal:
+				// "creating: <pct>%", "unencrypted", "orphan: ...", etc.
+				return ColorWarning
 			},
 		},
 		{

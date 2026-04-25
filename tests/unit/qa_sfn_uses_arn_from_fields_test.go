@@ -71,7 +71,7 @@ func TestEnrichStepFunctions_UsesARNFromFields(t *testing.T) {
 		Fields: map[string]string{"arn": smARN},
 	}}
 
-	_, err := awsclient.EnrichStepFunctionsStatus(context.Background(), clients, resources)
+	_, err := awsclient.EnrichStepFunctionsStatus(context.Background(), clients, resources, nil)
 	if err != nil && strings.Contains(err.Error(), "InvalidArn") {
 		t.Fatalf("enricher passed the bare name to AWS instead of the ARN; got: %v", err)
 	}

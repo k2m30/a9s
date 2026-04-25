@@ -25,7 +25,7 @@ func init() {
 //   - StopCode == TaskFailedToStart → task never launched
 //   - StopCode == EssentialContainerExited → essential container died
 //   - Any container with a non-zero ExitCode → container crash detected
-func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.ECS == nil || len(resources) == 0 {

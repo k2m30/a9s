@@ -69,7 +69,7 @@ func TestNamingContract_IssueEnricherRegistry_IsMap(t *testing.T) {
 // TestNamingContract_NoOpIssueEnricher_ReturnsEmptyResult pins the no-op
 // Wave 2 issue enricher used for resource types with no Wave 2 coverage.
 func TestNamingContract_NoOpIssueEnricher_ReturnsEmptyResult(t *testing.T) {
-	res, err := awsclient.NoOpIssueEnricher(context.Background(), nil, nil)
+	res, err := awsclient.NoOpIssueEnricher(context.Background(), nil, nil, nil)
 	if err != nil {
 		t.Fatalf("NoOpIssueEnricher must not error, got %v", err)
 	}

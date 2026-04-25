@@ -23,7 +23,7 @@ func init() {
 // Severity "!" for failed/failing; severity "~" for modifying/pendingAcceptance/rollingBack.
 // When multiple issues exist on the same TGW, the worst severity ("!") takes precedence.
 // Per-TGW errors are aggregated and returned as a composite error alongside partial findings (E3, E4, E5).
-func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)

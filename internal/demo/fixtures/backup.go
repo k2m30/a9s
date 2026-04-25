@@ -150,6 +150,50 @@ func buildBackupRecoveryPoints() map[string][]backuptypes.RecoveryPointByResourc
 				CreationDate:     aws.Time(mustParseBackupTime("2026-04-15T02:00:00Z")),
 			},
 		},
+		// rds-snap pivot — required for the rds-snap→backup related-panel pivot.
+		// checkRDSSnapBackup calls ListRecoveryPointsByResource(ResourceArn=res.Fields["arn"]).
+		// The graph-root ProdRDSSnapAuroraARN gets 2 recovery points to satisfy
+		// the §9.3 "≥50% Count ≥ 2" relaxation: this is the only rds-snap pivot
+		// that can structurally carry Count ≥ 2 (dbi/kms/dbc are 1:1 by AWS data
+		// model). The non-Aurora baseline ProdRDSSnapARN gets 1 to keep its
+		// pivot ≥ 1. BackupCoveredRDSSnapARN gets 2 to validate the universal
+		// ≥1 contract independently of graph-root.
+		ProdRDSSnapAuroraARN: {
+			{
+				RecoveryPointArn: aws.String("arn:aws:backup:us-east-1:123456789012:recovery-point:rp-rdsa-daily-20260416"),
+				BackupVaultName:  aws.String(BackupProdVaultName),
+				Status:           backuptypes.RecoveryPointStatusCompleted,
+				CreationDate:     aws.Time(mustParseBackupTime("2026-04-16T03:00:00Z")),
+			},
+			{
+				RecoveryPointArn: aws.String("arn:aws:backup:us-east-1:123456789012:recovery-point:rp-rdsa-weekly-20260420"),
+				BackupVaultName:  aws.String(BackupProdVaultName),
+				Status:           backuptypes.RecoveryPointStatusCompleted,
+				CreationDate:     aws.Time(mustParseBackupTime("2026-04-20T03:00:00Z")),
+			},
+		},
+		ProdRDSSnapARN: {
+			{
+				RecoveryPointArn: aws.String("arn:aws:backup:us-east-1:123456789012:recovery-point:rp-rds1-daily-20260415"),
+				BackupVaultName:  aws.String(BackupProdVaultName),
+				Status:           backuptypes.RecoveryPointStatusCompleted,
+				CreationDate:     aws.Time(mustParseBackupTime("2026-04-15T03:00:00Z")),
+			},
+		},
+		BackupCoveredRDSSnapARN: {
+			{
+				RecoveryPointArn: aws.String("arn:aws:backup:us-east-1:123456789012:recovery-point:rp-bkcov-daily-20260418"),
+				BackupVaultName:  aws.String(BackupProdVaultName),
+				Status:           backuptypes.RecoveryPointStatusCompleted,
+				CreationDate:     aws.Time(mustParseBackupTime("2026-04-18T03:00:00Z")),
+			},
+			{
+				RecoveryPointArn: aws.String("arn:aws:backup:us-east-1:123456789012:recovery-point:rp-bkcov-weekly-20260420"),
+				BackupVaultName:  aws.String(BackupProdVaultName),
+				Status:           backuptypes.RecoveryPointStatusCompleted,
+				CreationDate:     aws.Time(mustParseBackupTime("2026-04-20T03:00:00Z")),
+			},
+		},
 	}
 }
 
@@ -345,7 +389,9 @@ func buildBackupSelections() map[string][]backuptypes.BackupSelection {
 		// plan-healthy-daily: selects healthy S3 bucket, the legacy shared
 		// EFS, the graph-root EFS (ProdEFSARN), and the orders-prod DynamoDB
 		// table — preserves s3→backup, efs→backup, and ddb→backup pivots via
-		// cache scan of Fields["resources"].
+		// cache scan of Fields["resources"]. Also includes the rds-snap Aurora
+		// graph-root so the rds-snap→backup pivot resolves Count ≥ 2 (this
+		// plan + ProdDatabasePlanID below).
 		HealthyDailyPlanID: {
 			{
 				SelectionName: aws.String("acme-daily-multi-selection"),
@@ -355,6 +401,7 @@ func buildBackupSelections() map[string][]backuptypes.BackupSelection {
 					"arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-0abc111111111111a",
 					ProdEFSARN,
 					OrdersProdARN,
+					ProdRDSSnapAuroraARN,
 				},
 			},
 		},
@@ -368,12 +415,21 @@ func buildBackupSelections() map[string][]backuptypes.BackupSelection {
 			},
 		},
 
-		// plan-broken-2failed (graph-root): uses AcmeBackupRoleProd — role pivot resolves ≥1 on U9.
+		// plan-broken-2failed (graph-root for both backup and rds-snap pivots):
+		// uses AcmeBackupRoleProd — role pivot resolves ≥1 on U9.
+		// Resources also enumerates the rds-snap graph-root + adjacent fixtures
+		// so the rds-snap→backup pivot resolves Count ≥ 2 on the Aurora
+		// graph-root and ≥ 1 on the non-Aurora and BackupCovered fixtures.
 		ProdDatabasePlanID: {
 			{
 				SelectionName: aws.String("acme-prod-db-selection"),
 				IamRoleArn:    aws.String(AcmeBackupRoleARN),
-				Resources:     []string{"arn:aws:rds:us-east-1:123456789012:db:acme-prod-primary"},
+				Resources: []string{
+					"arn:aws:rds:us-east-1:123456789012:db:acme-prod-primary",
+					ProdRDSSnapAuroraARN,
+					ProdRDSSnapARN,
+					BackupCoveredRDSSnapARN,
+				},
 			},
 		},
 

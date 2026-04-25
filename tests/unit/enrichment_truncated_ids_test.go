@@ -125,7 +125,7 @@ func TestEnrichIAMGroup_TruncatedIDsPopulatedOnPerResourceError(t *testing.T) {
 	clients := &awsclient.ServiceClients{IAM: fake}
 	resources := iamGroupResources(firstGroup, secondGroup)
 
-	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources)
+	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected top-level error: %v", err)
 	}
@@ -181,7 +181,7 @@ func TestEnrichEventBridgeRuleTargets_TruncatedIDsPopulatedOnCapHit(t *testing.T
 
 	clients := &awsclient.ServiceClients{EventBridge: fake}
 
-	result, err := awsclient.EnrichEventBridgeRuleTargets(context.Background(), clients, rules)
+	result, err := awsclient.EnrichEventBridgeRuleTargets(context.Background(), clients, rules, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -234,7 +234,7 @@ func TestEnricher_TruncatedIDs_IsSubsetOfResourceIDs(t *testing.T) {
 	clients := &awsclient.ServiceClients{IAM: fake}
 	resources := iamGroupResources(firstGroup, secondGroup)
 
-	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources)
+	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

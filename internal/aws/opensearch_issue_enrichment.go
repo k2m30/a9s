@@ -26,7 +26,7 @@ func init() {
 //
 // No FieldUpdates — the fetcher is authoritative for Status on opensearch.
 // clients may be nil; no API calls are made.
-func EnrichOpenSearchDomains(_ context.Context, _ *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichOpenSearchDomains(_ context.Context, _ *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	bangCount := 0
 

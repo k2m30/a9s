@@ -63,7 +63,7 @@ func TestEnrichRDSDocDBMaintenance_FindingsKeyedByResourceID(t *testing.T) {
 	clients := &awsclient.ServiceClients{RDS: fake}
 	resources := []resource.Resource{{ID: "prod-db"}}
 
-	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, resources)
+	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -90,7 +90,7 @@ func TestEnrichRDSDocDBMaintenance_SeverityTilde(t *testing.T) {
 	clients := &awsclient.ServiceClients{RDS: fake}
 	resources := []resource.Resource{{ID: "my-db"}}
 
-	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, resources)
+	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -119,7 +119,7 @@ func TestEnrichRDSDocDBMaintenance_SummaryFormat(t *testing.T) {
 	clients := &awsclient.ServiceClients{RDS: fake}
 	resources := []resource.Resource{{ID: "my-db"}}
 
-	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, resources)
+	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -158,7 +158,7 @@ func TestEnrichRDSDocDBMaintenance_OffPageFindingsAreSkipped(t *testing.T) {
 	clients := &awsclient.ServiceClients{RDS: fake}
 	resources := []resource.Resource{{ID: "on-page-db"}}
 
-	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, resources)
+	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -179,7 +179,7 @@ func TestEnrichRDSDocDBMaintenance_EmptyReturnsNonNilMap(t *testing.T) {
 	fake := &enrichRDSFake{actions: nil, marker: nil}
 	clients := &awsclient.ServiceClients{RDS: fake}
 
-	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, nil)
+	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -211,7 +211,7 @@ func TestEnrichRDSDocDBMaintenance_TruncatedWhenMarkerPresent(t *testing.T) {
 	clients := &awsclient.ServiceClients{RDS: fake}
 	resources := []resource.Resource{{ID: "db-1"}}
 
-	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, resources)
+	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -224,7 +224,7 @@ func TestEnrichRDSDocDBMaintenance_TruncatedWhenMarkerPresent(t *testing.T) {
 // returns non-nil empty Findings (not an error — degraded gracefully).
 func TestEnrichRDSDocDBMaintenance_NilRDSClientReturnsEmptyFindings(t *testing.T) {
 	clients := &awsclient.ServiceClients{RDS: nil}
-	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, nil)
+	result, err := awsclient.EnrichRDSDocDBMaintenance(context.Background(), clients, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

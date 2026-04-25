@@ -67,7 +67,7 @@ func TestEnrichEBSVolumeStatus_FindingsKeyedByVolumeID(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{EC2: &ebsStatusFake{volumeOutput: out}}
 
-	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, nil)
+	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -88,7 +88,7 @@ func TestEnrichEBSVolumeStatus_SummaryVolumeIODegraded(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{EC2: &ebsStatusFake{volumeOutput: out}}
 
-	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, nil)
+	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -115,7 +115,7 @@ func TestEnrichEBSVolumeStatus_OkVolumesExcluded(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{EC2: &ebsStatusFake{volumeOutput: out}}
 
-	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, nil)
+	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -138,7 +138,7 @@ func TestEnrichEBSVolumeStatus_IssueCountEqualsImpairedVolumeCount(t *testing.T)
 	}
 	clients := &awsclient.ServiceClients{EC2: &ebsStatusFake{volumeOutput: out}}
 
-	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, nil)
+	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -161,7 +161,7 @@ func TestEnrichEBSVolumeStatus_TruncatedWhenNextTokenPresent(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{EC2: &ebsStatusFake{volumeOutput: out}}
 
-	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, nil)
+	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -175,7 +175,7 @@ func TestEnrichEBSVolumeStatus_EmptyReturnsNonNilMap(t *testing.T) {
 	out := &ec2.DescribeVolumeStatusOutput{}
 	clients := &awsclient.ServiceClients{EC2: &ebsStatusFake{volumeOutput: out}}
 
-	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, nil)
+	result, err := awsclient.EnrichEBSVolumeStatus(context.Background(), clients, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

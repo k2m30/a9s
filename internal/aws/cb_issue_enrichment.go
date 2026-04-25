@@ -21,7 +21,7 @@ func init() {
 // EnrichCodeBuildStatus calls BatchGetBuilds for the latest build of each project
 // and returns a Finding for every project whose latest build is not SUCCEEDED.
 // Severity is "!" (broken/degraded). Summary: "latest build FAILED (<date>)".
-func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)

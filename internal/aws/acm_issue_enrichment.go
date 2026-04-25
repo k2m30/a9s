@@ -24,7 +24,7 @@ func init() {
 //
 // IssueCount counts only "!" severity findings — "~" (informational) are excluded from the badge.
 // Skip if clients.ACM == nil. Per-cert errors → Truncated.
-func EnrichACMCertificate(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichACMCertificate(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.ACM == nil {

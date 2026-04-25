@@ -25,7 +25,7 @@ func init() {
 // the partial findings (E1–E6 contract). LoadBalancerArn is read from
 // r.Fields["load_balancer_arn"] — the elb fetcher emits ID = bare LB name
 // and stores the ARN in Fields. Each call is wrapped in RetryOnThrottle.
-func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.ELBv2 == nil {

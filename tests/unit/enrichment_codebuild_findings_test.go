@@ -90,7 +90,7 @@ func TestEnrichCodeBuildStatus_FailedBuildFindingKeyedByProjectName(t *testing.T
 	clients := &awsclient.ServiceClients{CodeBuild: fake}
 	resources := []resource.Resource{{ID: "my-project"}}
 
-	result, err := awsclient.EnrichCodeBuildStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCodeBuildStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -120,7 +120,7 @@ func TestEnrichCodeBuildStatus_SummaryContainsDateAndStatus(t *testing.T) {
 	clients := &awsclient.ServiceClients{CodeBuild: fake}
 	resources := []resource.Resource{{ID: "proj-a"}}
 
-	result, err := awsclient.EnrichCodeBuildStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCodeBuildStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -150,7 +150,7 @@ func TestEnrichCodeBuildStatus_SucceededBuildExcluded(t *testing.T) {
 	clients := &awsclient.ServiceClients{CodeBuild: fake}
 	resources := []resource.Resource{{ID: "ok-project"}}
 
-	result, err := awsclient.EnrichCodeBuildStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCodeBuildStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -183,7 +183,7 @@ func TestEnrichCodeBuildStatus_IssueCountEqualsFailedProjectCount(t *testing.T) 
 		{ID: "ok-c"},
 	}
 
-	result, err := awsclient.EnrichCodeBuildStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCodeBuildStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -216,7 +216,7 @@ func TestEnrichCodeBuildStatus_TruncatedWhenResourcesExceedCap(t *testing.T) {
 	fake := &codeBuildEnrichFake{projectBuilds: projectBuilds, builds: builds}
 	clients := &awsclient.ServiceClients{CodeBuild: fake}
 
-	result, err := awsclient.EnrichCodeBuildStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCodeBuildStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -246,7 +246,7 @@ func TestEnrichCodeBuildStatus_AtCapNotTruncated(t *testing.T) {
 	fake := &codeBuildEnrichFake{projectBuilds: projectBuilds, builds: builds}
 	clients := &awsclient.ServiceClients{CodeBuild: fake}
 
-	result, err := awsclient.EnrichCodeBuildStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichCodeBuildStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -262,7 +262,7 @@ func TestEnrichCodeBuildStatus_EmptyResourcesReturnsEmptyFindings(t *testing.T) 
 	fake := &codeBuildEnrichFake{}
 	clients := &awsclient.ServiceClients{CodeBuild: fake}
 
-	result, err := awsclient.EnrichCodeBuildStatus(context.Background(), clients, nil)
+	result, err := awsclient.EnrichCodeBuildStatus(context.Background(), clients, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

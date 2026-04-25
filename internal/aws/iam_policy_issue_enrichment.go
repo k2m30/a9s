@@ -23,7 +23,7 @@ func init() {
 //
 // AWS-managed policies (ARN starts with "arn:aws:iam::aws:policy/") are skipped.
 // Skip when clients.IAM == nil.
-func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.IAM == nil {

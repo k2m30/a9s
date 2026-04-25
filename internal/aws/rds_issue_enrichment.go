@@ -19,7 +19,7 @@ func init() {
 // Severity is "~" (informational); IssueCount is always 0 (excluded from menu badge).
 // The API returns maintenance actions for all RDS/DocDB resources (clusters AND instances).
 // Pagination uses Marker; walks up to EnrichmentCap pages.
-func EnrichRDSDocDBMaintenance(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichRDSDocDBMaintenance(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
 	if clients.RDS == nil {

@@ -163,7 +163,7 @@ func TestS3_Enrich_HealthyBucket_NoFinding(t *testing.T) {
 	clients := &awsclient.ServiceClients{S3: fake}
 	resources := []resource.Resource{pabResource("healthy-bucket")}
 
-	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources)
+	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichS3PublicAccessBlock error: %v", err)
 	}
@@ -192,7 +192,7 @@ func TestS3_Enrich_NoPAB_Configuration(t *testing.T) {
 	clients := &awsclient.ServiceClients{S3: fake}
 	resources := []resource.Resource{pabResource("a9s-demo-nopab")}
 
-	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources)
+	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichS3PublicAccessBlock error: %v", err)
 	}
@@ -245,7 +245,7 @@ func TestS3_Enrich_PartialPAB_SingleFlagFalse(t *testing.T) {
 	clients := &awsclient.ServiceClients{S3: fake}
 	resources := []resource.Resource{pabResource("a9s-demo-partial-pab")}
 
-	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources)
+	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichS3PublicAccessBlock error: %v", err)
 	}
@@ -293,7 +293,7 @@ func TestS3_Enrich_PartialPAB_MultipleFlagsFalse(t *testing.T) {
 	clients := &awsclient.ServiceClients{S3: fake}
 	resources := []resource.Resource{pabResource("a9s-demo-multifail-pab")}
 
-	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources)
+	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichS3PublicAccessBlock error: %v", err)
 	}
@@ -336,7 +336,7 @@ func TestS3_Enrich_NilPABConfiguration_TreatedAsNoPAB(t *testing.T) {
 	clients := &awsclient.ServiceClients{S3: fake}
 	resources := []resource.Resource{pabResource("a9s-demo-nilcfg")}
 
-	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources)
+	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichS3PublicAccessBlock error: %v", err)
 	}
@@ -371,7 +371,7 @@ func TestS3_Enrich_UnknownAPIError_NoFinding(t *testing.T) {
 	clients := &awsclient.ServiceClients{S3: fake}
 	resources := []resource.Resource{pabResource("error-bucket")}
 
-	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources)
+	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources, nil)
 	if err == nil {
 		t.Fatal("expected non-nil composite error when GetPublicAccessBlock returns generic error; got nil")
 	}
@@ -394,7 +394,7 @@ func TestS3_Enrich_UnknownAPIError_NoFinding(t *testing.T) {
 // an empty result without error (degraded gracefully).
 func TestS3_Enrich_NilS3Client_GracefulEmpty(t *testing.T) {
 	clients := &awsclient.ServiceClients{S3: nil}
-	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, nil)
+	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, nil, nil)
 	if err != nil {
 		t.Fatalf("EnrichS3PublicAccessBlock error: %v", err)
 	}
@@ -457,7 +457,7 @@ func TestS3_Enrich_IssueCount_FourBuckets(t *testing.T) {
 		pabResource("a9s-demo-nilcfg"),
 	}
 
-	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources)
+	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichS3PublicAccessBlock error: %v", err)
 	}
@@ -516,7 +516,7 @@ func TestS3_Enrich_U11_SummaryStable_NeverContainsRowValues(t *testing.T) {
 		pabResource("a9s-demo-nilcfg"),
 	}
 
-	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources)
+	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichS3PublicAccessBlock error: %v", err)
 	}

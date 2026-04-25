@@ -63,7 +63,7 @@ func TestEnrichGlueJobStatus_FailedFindingKeyedByJobName(t *testing.T) {
 	clients := &awsclient.ServiceClients{Glue: fake}
 	resources := []resource.Resource{{Name: "my-glue-job"}}
 
-	result, err := awsclient.EnrichGlueJobStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichGlueJobStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestEnrichGlueJobStatus_SummaryContainsFAILED(t *testing.T) {
 	clients := &awsclient.ServiceClients{Glue: fake}
 	resources := []resource.Resource{{Name: "fail-job"}}
 
-	result, err := awsclient.EnrichGlueJobStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichGlueJobStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestEnrichGlueJobStatus_SummaryContainsERROR(t *testing.T) {
 	clients := &awsclient.ServiceClients{Glue: fake}
 	resources := []resource.Resource{{Name: "err-job"}}
 
-	result, err := awsclient.EnrichGlueJobStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichGlueJobStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -122,7 +122,7 @@ func TestEnrichGlueJobStatus_SummaryContainsTIMEOUT(t *testing.T) {
 	clients := &awsclient.ServiceClients{Glue: fake}
 	resources := []resource.Resource{{Name: "timeout-job"}}
 
-	result, err := awsclient.EnrichGlueJobStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichGlueJobStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -142,7 +142,7 @@ func TestEnrichGlueJobStatus_SucceededExcluded(t *testing.T) {
 	clients := &awsclient.ServiceClients{Glue: fake}
 	resources := []resource.Resource{{Name: "ok-job"}}
 
-	result, err := awsclient.EnrichGlueJobStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichGlueJobStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -164,7 +164,7 @@ func TestEnrichGlueJobStatus_RunningExcluded(t *testing.T) {
 	clients := &awsclient.ServiceClients{Glue: fake}
 	resources := []resource.Resource{{Name: "running-job"}}
 
-	result, err := awsclient.EnrichGlueJobStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichGlueJobStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -192,7 +192,7 @@ func TestEnrichGlueJobStatus_IssueCountEqualsFindings(t *testing.T) {
 		{Name: "ok-c"},
 	}
 
-	result, err := awsclient.EnrichGlueJobStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichGlueJobStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -217,7 +217,7 @@ func TestEnrichGlueJobStatus_TruncatedWhenResourcesExceedCap(t *testing.T) {
 	fake := &glueJobFake{jobRuns: jobRuns}
 	clients := &awsclient.ServiceClients{Glue: fake}
 
-	result, err := awsclient.EnrichGlueJobStatus(context.Background(), clients, resources)
+	result, err := awsclient.EnrichGlueJobStatus(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -233,7 +233,7 @@ func TestEnrichGlueJobStatus_EmptyResourcesReturnsEmptyFindings(t *testing.T) {
 	fake := &glueJobFake{jobRuns: map[string]gluetypes.JobRunState{}}
 	clients := &awsclient.ServiceClients{Glue: fake}
 
-	result, err := awsclient.EnrichGlueJobStatus(context.Background(), clients, nil)
+	result, err := awsclient.EnrichGlueJobStatus(context.Background(), clients, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

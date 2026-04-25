@@ -45,7 +45,7 @@ const ECRImagesPerRepo = 10
 // Per-repo errors aggregate into a composite returned error (E1–E6 contract).
 // Repositories without scan data (unscanned images) contribute zero counts
 // silently — AWS returns a nil ImageScanFindingsSummary for those.
-func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)

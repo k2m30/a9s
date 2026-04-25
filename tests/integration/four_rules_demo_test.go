@@ -182,7 +182,7 @@ func TestFourRules_Demo_R1_SpecificTypesShowIssueCounts(t *testing.T) {
 	pins := []string{
 		"EC2 Instances (27) issues:14",
 		"ECS Services (25) issues:6",
-		"DB Instances (40) issues:34",
+		"DB Instances (41) issues:34",
 		"EBS Volumes (8) issues:5",
 		"Elastic Beanstalk (6) issues:3",
 		"EBS Snapshots (7) issues:2",

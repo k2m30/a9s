@@ -17,7 +17,7 @@ func init() {
 // EnrichDynamoDBPITR calls DescribeContinuousBackups for each table (cap EnrichmentCap)
 // and returns a Finding when PITR is not enabled.
 // Severity is "~" (informational); PITR-disabled findings do not bump the menu badge.
-func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
+func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)

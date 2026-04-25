@@ -94,7 +94,7 @@ func TestEnrichS3PublicAccessBlock_CrossRegionDoesNotSpamErrorLog(t *testing.T) 
 		{ID: "same-region-bucket", Name: "same-region-bucket"},
 	}
 
-	_, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources)
+	_, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources, nil)
 	if err == nil {
 		return
 	}
@@ -115,7 +115,7 @@ func TestEnrichS3PublicAccessBlock_IllegalLocationConstraintNotSpammed(t *testin
 	clients := &awsclient.ServiceClients{S3: fake}
 	resources := []resource.Resource{{ID: xRegionBucket, Name: xRegionBucket}}
 
-	_, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources)
+	_, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources, nil)
 	if err != nil && strings.Contains(err.Error(), "IllegalLocationConstraint") {
 		t.Errorf("IllegalLocationConstraintException must not appear in error log; got: %v", err)
 	}

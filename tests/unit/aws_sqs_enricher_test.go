@@ -100,7 +100,7 @@ func TestEnrichSQSAttributes_BothConfiguredProducesNoFindings(t *testing.T) {
 	clients := &awsclient.ServiceClients{SQS: fake}
 	resources := sqsResources("my-queue-1", "my-queue-2")
 
-	result, err := awsclient.EnrichSQSAttributes(context.Background(), clients, resources)
+	result, err := awsclient.EnrichSQSAttributes(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -134,7 +134,7 @@ func TestEnrichSQSAttributes_MissingRedrivePolicyProducesFindingSevTilde(t *test
 	clients := &awsclient.ServiceClients{SQS: fake}
 	resources := sqsResources("my-queue-1", "my-queue-2")
 
-	result, err := awsclient.EnrichSQSAttributes(context.Background(), clients, resources)
+	result, err := awsclient.EnrichSQSAttributes(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -169,7 +169,7 @@ func TestEnrichSQSAttributes_MissingEncryptionProducesFindingSevTilde(t *testing
 	clients := &awsclient.ServiceClients{SQS: fake}
 	resources := sqsResources("my-queue-1", "my-queue-2")
 
-	result, err := awsclient.EnrichSQSAttributes(context.Background(), clients, resources)
+	result, err := awsclient.EnrichSQSAttributes(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -190,7 +190,7 @@ func TestEnrichSQSAttributes_MissingEncryptionProducesFindingSevTilde(t *testing
 func TestEnrichSQSAttributes_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{SQS: nil}
 
-	result, err := awsclient.EnrichSQSAttributes(context.Background(), clients, sqsResources("my-queue-1", "my-queue-2"))
+	result, err := awsclient.EnrichSQSAttributes(context.Background(), clients, sqsResources("my-queue-1", "my-queue-2"), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -222,7 +222,7 @@ func TestEnrichSQSAttributes_APIErrorSetsTruncatedAndSurfacesError(t *testing.T)
 	clients := &awsclient.ServiceClients{SQS: fake}
 	resources := sqsResources("my-queue-1", "my-queue-2")
 
-	result, err := awsclient.EnrichSQSAttributes(context.Background(), clients, resources)
+	result, err := awsclient.EnrichSQSAttributes(context.Background(), clients, resources, nil)
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when an API call fails")
 	}

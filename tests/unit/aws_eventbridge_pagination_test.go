@@ -165,7 +165,7 @@ func TestEnrichEventBridgeRule_PaginatesTargets(t *testing.T) {
 
 	clients := &awsclient.ServiceClients{EventBridge: fake}
 
-	result, err := awsclient.EnrichEventBridgeRuleTargets(context.Background(), clients, rules)
+	result, err := awsclient.EnrichEventBridgeRuleTargets(context.Background(), clients, rules, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -222,7 +222,7 @@ func TestEnrichEventBridgeRule_CappedAtPerParentPageCap(t *testing.T) {
 
 	clients := &awsclient.ServiceClients{EventBridge: fake}
 
-	result, err := awsclient.EnrichEventBridgeRuleTargets(context.Background(), clients, rules)
+	result, err := awsclient.EnrichEventBridgeRuleTargets(context.Background(), clients, rules, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -281,7 +281,7 @@ func TestEnrichEventBridgeRule_DLQCheckAcrossAllPages(t *testing.T) {
 
 	clients := &awsclient.ServiceClients{EventBridge: fake}
 
-	result, err := awsclient.EnrichEventBridgeRuleTargets(context.Background(), clients, rules)
+	result, err := awsclient.EnrichEventBridgeRuleTargets(context.Background(), clients, rules, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -333,7 +333,7 @@ func TestEnrichEventBridgeRule_EnabledWithZeroTargetsAcrossPages(t *testing.T) {
 
 	clients := &awsclient.ServiceClients{EventBridge: fake}
 
-	result, err := awsclient.EnrichEventBridgeRuleTargets(context.Background(), clients, rules)
+	result, err := awsclient.EnrichEventBridgeRuleTargets(context.Background(), clients, rules, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

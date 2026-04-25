@@ -125,7 +125,7 @@ func TestEnrichACMCertificate_ValidInUseProducesNoFindings(t *testing.T) {
 	clients := &awsclient.ServiceClients{ACM: fake}
 	resources := acmCertResources(acmARN1, acmARN2, acmARN3)
 
-	result, err := awsclient.EnrichACMCertificate(context.Background(), clients, resources)
+	result, err := awsclient.EnrichACMCertificate(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -154,7 +154,7 @@ func TestEnrichACMCertificate_ExpiringSoonProducesFindingSevBang(t *testing.T) {
 	clients := &awsclient.ServiceClients{ACM: fake}
 	resources := acmCertResources(acmARN1, acmARN2, acmARN3)
 
-	result, err := awsclient.EnrichACMCertificate(context.Background(), clients, resources)
+	result, err := awsclient.EnrichACMCertificate(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -193,7 +193,7 @@ func TestEnrichACMCertificate_ExpiredProducesFindingSevBang(t *testing.T) {
 	clients := &awsclient.ServiceClients{ACM: fake}
 	resources := acmCertResources(acmARN1, acmARN2, acmARN3)
 
-	result, err := awsclient.EnrichACMCertificate(context.Background(), clients, resources)
+	result, err := awsclient.EnrichACMCertificate(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -229,7 +229,7 @@ func TestEnrichACMCertificate_OrphanIssuedProducesFindingSevTilde(t *testing.T) 
 	clients := &awsclient.ServiceClients{ACM: fake}
 	resources := acmCertResources(acmARN1, acmARN2, acmARN3)
 
-	result, err := awsclient.EnrichACMCertificate(context.Background(), clients, resources)
+	result, err := awsclient.EnrichACMCertificate(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -257,7 +257,7 @@ func TestEnrichACMCertificate_OrphanIssuedProducesFindingSevTilde(t *testing.T) 
 func TestEnrichACMCertificate_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{ACM: nil}
 
-	result, err := awsclient.EnrichACMCertificate(context.Background(), clients, acmCertResources(acmARN1, acmARN2, acmARN3))
+	result, err := awsclient.EnrichACMCertificate(context.Background(), clients, acmCertResources(acmARN1, acmARN2, acmARN3), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -286,7 +286,7 @@ func TestEnrichACMCertificate_APIErrorSetsTruncatedNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{ACM: fake}
 	resources := acmCertResources(acmARN1, acmARN2, acmARN3)
 
-	result, err := awsclient.EnrichACMCertificate(context.Background(), clients, resources)
+	result, err := awsclient.EnrichACMCertificate(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
