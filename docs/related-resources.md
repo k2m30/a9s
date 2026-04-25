@@ -63,7 +63,7 @@
 | `codeartifact` | [API_Repository](https://docs.aws.amazon.com/codeartifact/latest/APIReference/API_Repository.html) | `ct-events`, `kms` |
 | `ct-events` | [API_LookupEvents](https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_LookupEvents.html) | `cfn`, `ct-events`, `dbi`, `ddb`, `ec2`, `iam-user`, `kms`, `lambda`, `role`, `s3`, `secrets`, `sg`, `trail`, `vpce` |
 | `dbc` | [API_DBCluster](https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBCluster.html) | `alarm`, `ct-events`, `dbi`, `docdb-snap`, `kms`, `logs`, `secrets`, `sg`, `subnet`, `vpc` |
-| `dbi` | [API_DBInstance](https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBInstance.html) | `alarm`, `ct-events`, `dbc`, `eni`, `kms`, `logs`, `rds-snap`, `role`, `secrets`, `sg`, `subnet`, `vpc` |
+| `dbi` | [API_DBInstance](https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBInstance.html) | `alarm`, `ct-events`, `dbc`, `eni`, `kms`, `logs`, `dbi-snap`, `role`, `secrets`, `sg`, `subnet`, `vpc` |
 | `ddb` | [API_TableDescription](https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_TableDescription.html) | `alarm`, `backup`, `ct-events`, `kinesis`, `kms`, `lambda`, `logs`, `vpce` |
 | `docdb-snap` | [API_DBClusterSnapshot](https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBClusterSnapshot.html) | `backup`, `ct-events`, `dbc`, `kms`, `vpc` |
 | `eb` | [API_EnvironmentDescription](https://docs.aws.amazon.com/elasticbeanstalk/latest/api/API_EnvironmentDescription.html) | `alarm`, `asg`, `cfn`, `ct-events`, `ec2`, `elb`, `logs`, `role`, `s3`, `sg`, `tg` |
@@ -95,7 +95,7 @@
 | `pipeline` | [API_PipelineDeclaration](https://docs.aws.amazon.com/codepipeline/latest/APIReference/API_PipelineDeclaration.html) | `cb`, `cfn`, `codeartifact`, `ct-events`, `eb-rule`, `ecr`, `ecs-svc`, `kms`, `lambda`, `role`, `s3`, `sns` |
 | `policy` | [API_Policy](https://docs.aws.amazon.com/IAM/latest/APIReference/API_Policy.html) | `ct-events`, `iam-group`, `iam-user`, `role` |
 | `r53` | [API_HostedZone](https://docs.aws.amazon.com/Route53/latest/APIReference/API_HostedZone.html) | `acm`, `apigw`, `cf`, `ct-events`, `elb`, `logs`, `s3`, `vpc` |
-| `rds-snap` | [API_DBSnapshot](https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBSnapshot.html) | `backup`, `ct-events`, `dbi`, `kms` |
+| `dbi-snap` | [API_DBSnapshot](https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBSnapshot.html) | `backup`, `ct-events`, `dbi`, `kms` |
 | `redis` | [API_ReplicationGroup](https://docs.aws.amazon.com/AmazonElastiCache/latest/APIReference/API_ReplicationGroup.html) | `alarm`, `cfn`, `ct-events`, `kms`, `logs`, `secrets`, `sg`, `sns`, `subnet`, `vpc` |
 | `redshift` | [API_Cluster](https://docs.aws.amazon.com/redshift/latest/APIReference/API_Cluster.html) | `alarm`, `cfn`, `ct-events`, `kms`, `logs`, `role`, `s3`, `secrets`, `sg`, `subnet`, `vpc` |
 | `role` | [API_Role](https://docs.aws.amazon.com/IAM/latest/APIReference/API_Role.html) | `ct-events`, `ec2`, `eks`, `glue`, `iam-group`, `iam-user`, `lambda`, `ng`, `policy` |
@@ -110,7 +110,7 @@
 | `sqs` | [API_GetQueueAttributes](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_GetQueueAttributes.html) | `alarm`, `ct-events`, `eb-rule`, `kms`, `lambda`, `sns`, `sns-sub`, `sqs` |
 | `ssm` | [API_ParameterMetadata](https://docs.aws.amazon.com/systems-manager/latest/APIReference/API_ParameterMetadata.html) | `ct-events`, `kms` |
 | `subnet` | [API_Subnet](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Subnet.html) | `asg`, `cfn`, `ct-events`, `ec2`, `efs`, `eks`, `elb`, `eni`, `nat`, `rtb`, `vpc`, `vpce` |
-| `tg` | [API_TargetGroup](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_TargetGroup.html) | `alarm`, `asg`, `backup`, `cfn`, `ct-events`, `dbc`, `dbi`, `ec2`, `ecs-svc`, `elb`, `lambda`, `logs`, `rds-snap`, `sg`, `subnet`, `vpc` |
+| `tg` | [API_TargetGroup](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_TargetGroup.html) | `alarm`, `asg`, `backup`, `cfn`, `ct-events`, `dbc`, `dbi`, `ec2`, `ecs-svc`, `elb`, `lambda`, `logs`, `dbi-snap`, `sg`, `subnet`, `vpc` |
 | `tgw` | [API_TransitGateway](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_TransitGateway.html) | `ct-events`, `role`, `rtb`, `subnet`, `vpc` |
 | `trail` | [API_Trail](https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_Trail.html) | `ct-events`, `kms`, `logs`, `role`, `s3`, `sns` |
 | `vpc` | [API_Vpc](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_Vpc.html) | `cfn`, `ct-events`, `ec2`, `elb`, `eni`, `igw`, `nat`, `rtb`, `sg`, `subnet`, `tgw`, `vpce` |
@@ -317,7 +317,7 @@ AWS API: https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBInstanc
 - **`eni`** — DB instances back onto ENIs.
 - **`kms`** — KmsKeyId — storage encryption key.
 - **`logs`** — DB engine log exports (e.g. /aws/rds/instance/<id>/error).
-- **`rds-snap`** — Snapshots of this instance.
+- **`dbi-snap`** — Snapshots of this instance.
 - **`role`** — MonitoringRoleArn / S3-integration role.
 - **`secrets`** — Secrets Manager entries holding master credentials.
 - **`sg`** — VpcSecurityGroups — SGs attached to the instance.
@@ -780,7 +780,7 @@ AWS API: https://docs.aws.amazon.com/Route53/latest/APIReference/API_HostedZone.
 - **`s3`** — Alias to S3 website endpoint.
 - **`vpc`** — Private hosted zones VPC association.
 
-### `rds-snap`
+### `dbi-snap`
 
 AWS API: https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBSnapshot.html
 
@@ -791,8 +791,8 @@ AWS API: https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBSnapsho
 
 > Note: `dbc` is intentionally absent. Real AWS rejects `CreateDBSnapshot` on
 > Aurora cluster members; Aurora cluster snapshots live in `dbc-snap`
-> (`DBClusterSnapshot`). A registered `rds-snap → dbc` pivot would always
-> resolve `Count=0`, which is dead UX. See `internal/aws/rds_snap.go` for the
+> (`DBClusterSnapshot`). A registered `dbi-snap → dbc` pivot would always
+> resolve `Count=0`, which is dead UX. See `internal/aws/dbi_snap.go` for the
 > structural exclusion comment.
 
 ### `redis`
@@ -1001,7 +1001,7 @@ AWS API: https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/AP
 - **`elb`** — Load balancers using this TG.
 - **`lambda`** — Lambda targets.
 - **`logs`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot.
-- **`rds-snap`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot.
+- **`dbi-snap`** — Mentioned by 2/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`sg`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`subnet`** — Mentioned by 1/6 independent DevOps audits as an AWS-API or operational pivot.
 - **`vpc`** — TargetGroup.VpcId.

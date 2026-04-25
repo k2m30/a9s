@@ -135,7 +135,7 @@ type IssueEnricherResult struct {
 // for a resource type and returns a typed IssueEnricherResult. The resources
 // slice contains retained first-page resources from Wave 1 probes. The cache
 // parameter provides sibling-type ResourceCache entries for cross-ref enrichers
-// (e.g. rds-snap reads cache["dbi"] to detect orphan/past-retention signals).
+// (e.g. dbi-snap reads cache["dbi"] to detect orphan/past-retention signals).
 // Non-cross-ref enrichers ignore the cache via `_ resource.ResourceCache`.
 // This is the Wave 2 issue-enrichment contract; distinct from on-demand DetailEnricher
 // (internal/resource/enricher.go) which enriches a single resource for detail views.

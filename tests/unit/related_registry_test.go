@@ -1266,10 +1266,10 @@ func TestRelated_R53_Registered(t *testing.T) {
 	}
 }
 
-func TestRelated_RDSSnap_Registered(t *testing.T) {
-	defs := resource.GetRelated("rds-snap")
+func TestRelated_DBISnap_Registered(t *testing.T) {
+	defs := resource.GetRelated("dbi-snap")
 	if len(defs) == 0 {
-		t.Fatal("no related defs registered for rds-snap")
+		t.Fatal("no related defs registered for dbi-snap")
 	}
 
 	expected := []string{"dbi", "kms"}
@@ -1282,7 +1282,7 @@ func TestRelated_RDSSnap_Registered(t *testing.T) {
 			}
 		}
 		if !found {
-			t.Errorf("expected related def for target %q not found for rds-snap", exp)
+			t.Errorf("expected related def for target %q not found for dbi-snap", exp)
 		}
 	}
 
@@ -1291,7 +1291,7 @@ func TestRelated_RDSSnap_Registered(t *testing.T) {
 		switch def.TargetType {
 		case "dbi", "kms":
 			if def.Checker == nil {
-				t.Errorf("rds-snap %q: Checker should not be nil", def.TargetType)
+				t.Errorf("dbi-snap %q: Checker should not be nil", def.TargetType)
 			}
 		}
 	}

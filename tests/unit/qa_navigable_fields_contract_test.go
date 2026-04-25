@@ -210,9 +210,9 @@ var navigableContracts = []navContract{
 	// navigation is surfaced via the checkRedisSG related-panel checker.
 	{shortName: "redis", apiDoc: "https://docs.aws.amazon.com/AmazonElastiCache/latest/APIReference/API_ReplicationGroup.html", fieldPath: "KmsKeyId", targetType: "kms", reasoning: "ReplicationGroup.KmsKeyId — KMS key for at-rest encryption."},
 
-	// rds-snap — RDS Snapshots
-	{shortName: "rds-snap", apiDoc: "https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBSnapshot.html", fieldPath: "DBInstanceIdentifier", targetType: "dbi", reasoning: "DBSnapshot.DBInstanceIdentifier — source DB instance."},
-	{shortName: "rds-snap", apiDoc: "https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBSnapshot.html", fieldPath: "KmsKeyId", targetType: "kms", reasoning: "DBSnapshot.KmsKeyId — KMS key the snapshot is encrypted with."},
+	// dbi-snap — DB Instance Snapshots
+	{shortName: "dbi-snap", apiDoc: "https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBSnapshot.html", fieldPath: "DBInstanceIdentifier", targetType: "dbi", reasoning: "DBSnapshot.DBInstanceIdentifier — source DB instance."},
+	{shortName: "dbi-snap", apiDoc: "https://docs.aws.amazon.com/AmazonRDS/latest/APIReference/API_DBSnapshot.html", fieldPath: "KmsKeyId", targetType: "kms", reasoning: "DBSnapshot.KmsKeyId — KMS key the snapshot is encrypted with."},
 	// DBSnapshot has no VpcId field per the AWS SDK — vpc pivot is reachable via the dbi cross-ref, not a direct nav field.
 
 	// rtb — Route Tables

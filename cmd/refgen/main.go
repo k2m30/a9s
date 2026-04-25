@@ -119,7 +119,7 @@ func main() {
 		{"asg", "asgtypes.AutoScalingGroup", reflect.TypeFor[asgtypes.AutoScalingGroup]()},
 		{"ecs-task", "ecstypes.Task", reflect.TypeFor[ecstypes.Task]()},
 		{"policy", "iamtypes.Policy", reflect.TypeFor[iamtypes.Policy]()},
-		{"rds-snap", "rdstypes.DBSnapshot", reflect.TypeFor[rdstypes.DBSnapshot]()},
+		{"dbi-snap", "rdstypes.DBSnapshot", reflect.TypeFor[rdstypes.DBSnapshot]()},
 		{"tgw", "ec2types.TransitGateway", reflect.TypeFor[ec2types.TransitGateway]()},
 		{"vpce", "ec2types.VpcEndpoint", reflect.TypeFor[ec2types.VpcEndpoint]()},
 		{"eni", "ec2types.NetworkInterface", reflect.TypeFor[ec2types.NetworkInterface]()},

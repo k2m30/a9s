@@ -28,7 +28,7 @@ func NewRDSFixtures() *RDSFixtures {
 	legacy := buildRDSInstances()
 	return &RDSFixtures{
 		DBInstances: append(dbi.Instances, legacy...),
-		DBSnapshots: NewRDSSnapFixtures().Instances,
+		DBSnapshots: NewDBISnapFixtures().Instances,
 		Events:      buildRDSEvents(),
 	}
 }

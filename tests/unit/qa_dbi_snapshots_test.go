@@ -14,13 +14,13 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func TestQA_RDSSnapshots_FetchSuccess(t *testing.T) {
+func TestQA_DBISnapshots_FetchSuccess(t *testing.T) {
 	now := time.Now()
 	mock := &mockRDSDescribeDBSnapshotsClient{
 		output: &rds.DescribeDBSnapshotsOutput{
 			DBSnapshots: []rdstypes.DBSnapshot{
 				{
-					DBSnapshotIdentifier: aws.String("rds-snap-auto-001"),
+					DBSnapshotIdentifier: aws.String("dbi-snap-auto-001"),
 					DBInstanceIdentifier: aws.String("my-db-instance"),
 					Status:               aws.String("available"),
 					Engine:               aws.String("mysql"),
@@ -28,7 +28,7 @@ func TestQA_RDSSnapshots_FetchSuccess(t *testing.T) {
 					SnapshotCreateTime:   &now,
 				},
 				{
-					DBSnapshotIdentifier: aws.String("rds-snap-manual-001"),
+					DBSnapshotIdentifier: aws.String("dbi-snap-manual-001"),
 					DBInstanceIdentifier: aws.String("my-db-instance"),
 					Status:               aws.String("creating"),
 					Engine:               aws.String("postgres"),
@@ -39,7 +39,7 @@ func TestQA_RDSSnapshots_FetchSuccess(t *testing.T) {
 		},
 	}
 
-	resources, err := awsclient.FetchRDSSnapshots(context.Background(), mock)
+	resources, err := awsclient.FetchDBISnapshots(context.Background(), mock)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -48,11 +48,11 @@ func TestQA_RDSSnapshots_FetchSuccess(t *testing.T) {
 	}
 
 	r := resources[0]
-	if r.ID != "rds-snap-auto-001" {
-		t.Errorf("expected ID 'rds-snap-auto-001', got %q", r.ID)
+	if r.ID != "dbi-snap-auto-001" {
+		t.Errorf("expected ID 'dbi-snap-auto-001', got %q", r.ID)
 	}
-	if r.Name != "rds-snap-auto-001" {
-		t.Errorf("expected Name 'rds-snap-auto-001', got %q", r.Name)
+	if r.Name != "dbi-snap-auto-001" {
+		t.Errorf("expected Name 'dbi-snap-auto-001', got %q", r.Name)
 	}
 	// §4 phrase design: r.Status holds the §4 phrase, not the raw AWS status.
 	// Healthy snapshots (available + nil-encrypted treated as no unencrypted signal)
@@ -60,8 +60,8 @@ func TestQA_RDSSnapshots_FetchSuccess(t *testing.T) {
 	if r.Status != "" {
 		t.Errorf("expected Status '' (healthy silence), got %q", r.Status)
 	}
-	if r.Fields["snapshot_id"] != "rds-snap-auto-001" {
-		t.Errorf("expected snapshot_id 'rds-snap-auto-001', got %q", r.Fields["snapshot_id"])
+	if r.Fields["snapshot_id"] != "dbi-snap-auto-001" {
+		t.Errorf("expected snapshot_id 'dbi-snap-auto-001', got %q", r.Fields["snapshot_id"])
 	}
 	if r.Fields["db_instance"] != "my-db-instance" {
 		t.Errorf("expected db_instance 'my-db-instance', got %q", r.Fields["db_instance"])
@@ -77,14 +77,14 @@ func TestQA_RDSSnapshots_FetchSuccess(t *testing.T) {
 	}
 }
 
-func TestQA_RDSSnapshots_FetchEmpty(t *testing.T) {
+func TestQA_DBISnapshots_FetchEmpty(t *testing.T) {
 	mock := &mockRDSDescribeDBSnapshotsClient{
 		output: &rds.DescribeDBSnapshotsOutput{
 			DBSnapshots: []rdstypes.DBSnapshot{},
 		},
 	}
 
-	resources, err := awsclient.FetchRDSSnapshots(context.Background(), mock)
+	resources, err := awsclient.FetchDBISnapshots(context.Background(), mock)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -93,24 +93,24 @@ func TestQA_RDSSnapshots_FetchEmpty(t *testing.T) {
 	}
 }
 
-func TestQA_RDSSnapshots_FetchError(t *testing.T) {
+func TestQA_DBISnapshots_FetchError(t *testing.T) {
 	mock := &mockRDSDescribeDBSnapshotsClient{
 		err: fmt.Errorf("access denied"),
 	}
 
-	_, err := awsclient.FetchRDSSnapshots(context.Background(), mock)
+	_, err := awsclient.FetchDBISnapshots(context.Background(), mock)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
 }
 
-func TestQA_RDSSnapshots_TypeDef(t *testing.T) {
-	rt := resource.FindResourceType("rds-snap")
+func TestQA_DBISnapshots_TypeDef(t *testing.T) {
+	rt := resource.FindResourceType("dbi-snap")
 	if rt == nil {
-		t.Fatal("resource type 'rds-snap' not found")
+		t.Fatal("resource type 'dbi-snap' not found")
 	}
-	if rt.Name != "RDS Snapshots" {
-		t.Errorf("expected Name 'RDS Snapshots', got %q", rt.Name)
+	if rt.Name != "DB Instance Snapshots" {
+		t.Errorf("expected Name 'DB Instance Snapshots', got %q", rt.Name)
 	}
 	expected := []struct {
 		key   string

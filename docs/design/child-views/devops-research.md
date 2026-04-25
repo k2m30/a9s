@@ -548,7 +548,7 @@ Resources where the existing detail/YAML view is sufficient, or where no meaning
 - **OpenSearch (opensearch):** Parent is 100+ fields. No child entity.
 - **Redshift (redshift):** Parent has cluster nodes, endpoints, VPC info. No child entity.
 - **EFS (efs):** Mount targets could be a child but EFS is infrequently inspected. Low value.
-- **RDS Snapshots (rds-snap):** Leaf resource. No child entity.
+- **DB Instance Snapshots (dbi-snap):** Leaf resource. No child entity.
 - **DocumentDB Snapshots (docdb-snap):** Leaf resource. No child entity.
 
 ### MONITORING

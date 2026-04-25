@@ -1,11 +1,11 @@
 package unit
 
-// aws_rds_snap_issue_enrichment_test.go — Cross-ref enricher tests for rds-snap.
+// aws_rds_snap_issue_enrichment_test.go — Cross-ref enricher tests for dbi-snap.
 //
-// Spec: docs/resources/rds-snap.md §3.1 (orphan + past-retention signals) +
+// Spec: docs/resources/dbi-snap.md §3.1 (orphan + past-retention signals) +
 //       impl-plan §1.1 (enricher test cases) + §3.3 (enricher contract).
 //
-// The enricher is registered in IssueEnricherRegistry["rds-snap"]. Tests drive
+// The enricher is registered in IssueEnricherRegistry["dbi-snap"]. Tests drive
 // it by retrieving the registered function, NOT by importing the production file
 // directly. This ensures we are testing the wired function, not an unregistered one.
 //
@@ -36,15 +36,15 @@ import (
 // Helpers
 // ---------------------------------------------------------------------------
 
-// rdsSnapEnricher retrieves the registered rds-snap IssueEnricherFunc.
-func rdsSnapEnricher(t *testing.T) awsclient.IssueEnricherFunc {
+// dbiSnapEnricher retrieves the registered dbi-snap IssueEnricherFunc.
+func dbiSnapEnricher(t *testing.T) awsclient.IssueEnricherFunc {
 	t.Helper()
-	e, ok := awsclient.IssueEnricherRegistry["rds-snap"]
+	e, ok := awsclient.IssueEnricherRegistry["dbi-snap"]
 	if !ok {
-		t.Fatal("IssueEnricherRegistry[\"rds-snap\"] not registered")
+		t.Fatal("IssueEnricherRegistry[\"dbi-snap\"] not registered")
 	}
 	if e.Fn == nil {
-		t.Fatal("IssueEnricherRegistry[\"rds-snap\"].Fn is nil")
+		t.Fatal("IssueEnricherRegistry[\"dbi-snap\"].Fn is nil")
 	}
 	return e.Fn
 }
@@ -59,7 +59,7 @@ func snapResource(snap rdstypes.DBSnapshot) resource.Resource {
 	status := ""
 	// Apply fetcher-level status computation: for the enricher tests we
 	// only need the status the fetcher would have set. We keep it simple here
-	// since the enricher operates on Resources produced by FetchRDSSnapshotsPage.
+	// since the enricher operates on Resources produced by FetchDBISnapshotsPage.
 	r := resource.Resource{
 		ID:        id,
 		Name:      id,
@@ -123,16 +123,16 @@ func dbiCacheWith(instances []rdstypes.DBInstance) resource.ResourceCache {
 // Tests
 // ---------------------------------------------------------------------------
 
-// TestRDSSnap_Enricher_Orphan_DbiMissingFromCache verifies that when the dbi
+// TestDBISnap_Enricher_Orphan_DbiMissingFromCache verifies that when the dbi
 // cache is loaded but does NOT contain the snapshot's parent instance,
 // Findings carries a finding with Summary "orphan: source DB deleted" and
 // FieldUpdates sets the status phrase.
-func TestRDSSnap_Enricher_Orphan_DbiMissingFromCache(t *testing.T) {
-	enricher := rdsSnapEnricher(t)
+func TestDBISnap_Enricher_Orphan_DbiMissingFromCache(t *testing.T) {
+	enricher := dbiSnapEnricher(t)
 
 	// Snapshot whose parent "deleted-legacy-db" is absent from the dbi cache.
 	snap := rdstypes.DBSnapshot{
-		DBSnapshotIdentifier: aws.String(fixtures.WarnRDSSnapOrphanID),
+		DBSnapshotIdentifier: aws.String(fixtures.WarnDBISnapOrphanID),
 		DBInstanceIdentifier: aws.String("deleted-legacy-db"),
 		Status:               aws.String("available"),
 		Encrypted:            aws.Bool(true),
@@ -149,7 +149,7 @@ func TestRDSSnap_Enricher_Orphan_DbiMissingFromCache(t *testing.T) {
 		t.Fatalf("enricher returned unexpected error: %v", err)
 	}
 
-	snapID := fixtures.WarnRDSSnapOrphanID
+	snapID := fixtures.WarnDBISnapOrphanID
 	finding, hasFinding := result.Findings[snapID]
 	if !hasFinding {
 		t.Fatalf("Findings[%q] missing, want a finding with Summary matching the §4 phrase", snapID)
@@ -166,11 +166,11 @@ func TestRDSSnap_Enricher_Orphan_DbiMissingFromCache(t *testing.T) {
 	}
 }
 
-// TestRDSSnap_Enricher_AutomatedPastRetention_BasicCase verifies that when the
+// TestDBISnap_Enricher_AutomatedPastRetention_BasicCase verifies that when the
 // parent dbi has BackupRetentionPeriod=7 and the snapshot is automated and
 // 30 days old, Findings carries Summary matching "automated, 23d past retention".
-func TestRDSSnap_Enricher_AutomatedPastRetention_BasicCase(t *testing.T) {
-	enricher := rdsSnapEnricher(t)
+func TestDBISnap_Enricher_AutomatedPastRetention_BasicCase(t *testing.T) {
+	enricher := dbiSnapEnricher(t)
 
 	// "prod-dbi-retention-parent" is the value of fixtures.WarnDbiPastRetentionParentID
 	// (defined in internal/demo/fixtures/dbi.go by the coder). Using the literal here
@@ -179,7 +179,7 @@ func TestRDSSnap_Enricher_AutomatedPastRetention_BasicCase(t *testing.T) {
 	// Snapshot: automated, 30 days old, parent has 7-day retention.
 	pastTime := time.Now().UTC().Add(-30 * 24 * time.Hour)
 	snap := rdstypes.DBSnapshot{
-		DBSnapshotIdentifier: aws.String(fixtures.WarnRDSSnapPastRetentionID),
+		DBSnapshotIdentifier: aws.String(fixtures.WarnDBISnapPastRetentionID),
 		DBInstanceIdentifier: aws.String(parentID),
 		Status:               aws.String("available"),
 		Encrypted:            aws.Bool(true),
@@ -201,7 +201,7 @@ func TestRDSSnap_Enricher_AutomatedPastRetention_BasicCase(t *testing.T) {
 		t.Fatalf("enricher returned unexpected error: %v", err)
 	}
 
-	snapID := fixtures.WarnRDSSnapPastRetentionID
+	snapID := fixtures.WarnDBISnapPastRetentionID
 	finding, hasFinding := result.Findings[snapID]
 	if !hasFinding {
 		t.Fatalf("Findings[%q] missing, want past-retention finding", snapID)
@@ -219,11 +219,11 @@ func TestRDSSnap_Enricher_AutomatedPastRetention_BasicCase(t *testing.T) {
 	}
 }
 
-// TestRDSSnap_Enricher_SkipOrphan_WhenDbiCacheMissing verifies that when
+// TestDBISnap_Enricher_SkipOrphan_WhenDbiCacheMissing verifies that when
 // the ResourceCache does NOT contain the "dbi" key at all, the orphan rule
 // is skipped entirely (no false-positive orphan flags).
-func TestRDSSnap_Enricher_SkipOrphan_WhenDbiCacheMissing(t *testing.T) {
-	enricher := rdsSnapEnricher(t)
+func TestDBISnap_Enricher_SkipOrphan_WhenDbiCacheMissing(t *testing.T) {
+	enricher := dbiSnapEnricher(t)
 
 	snap := rdstypes.DBSnapshot{
 		DBSnapshotIdentifier: aws.String("snap-x"),
@@ -248,12 +248,12 @@ func TestRDSSnap_Enricher_SkipOrphan_WhenDbiCacheMissing(t *testing.T) {
 	}
 }
 
-// TestRDSSnap_Enricher_SkipPastRetention_WhenParentNotInCache verifies that
+// TestDBISnap_Enricher_SkipPastRetention_WhenParentNotInCache verifies that
 // when the dbi cache is loaded but the parent is NOT present, the orphan rule
 // fires but the past-retention rule does NOT (spec §3.1: "skip when parent
 // not in loaded sibling list"). The orphan rule is the only finding.
-func TestRDSSnap_Enricher_SkipPastRetention_WhenParentNotInCache(t *testing.T) {
-	enricher := rdsSnapEnricher(t)
+func TestDBISnap_Enricher_SkipPastRetention_WhenParentNotInCache(t *testing.T) {
+	enricher := dbiSnapEnricher(t)
 
 	// Automated snapshot — past-retention rule would apply IF parent were present.
 	pastTime := time.Now().UTC().Add(-30 * 24 * time.Hour)
@@ -300,14 +300,14 @@ func TestRDSSnap_Enricher_SkipPastRetention_WhenParentNotInCache(t *testing.T) {
 	}
 }
 
-// TestRDSSnap_Enricher_MultiW1_UnencryptedPlusOrphan_Suffix verifies (U7a) that
+// TestDBISnap_Enricher_MultiW1_UnencryptedPlusOrphan_Suffix verifies (U7a) that
 // when the fetcher already set Status="unencrypted" and the enricher finds the
 // orphan signal, BumpFindingSuffix is applied: final status = "unencrypted (+1)".
-func TestRDSSnap_Enricher_MultiW1_UnencryptedPlusOrphan_Suffix(t *testing.T) {
-	enricher := rdsSnapEnricher(t)
+func TestDBISnap_Enricher_MultiW1_UnencryptedPlusOrphan_Suffix(t *testing.T) {
+	enricher := dbiSnapEnricher(t)
 
 	snap := rdstypes.DBSnapshot{
-		DBSnapshotIdentifier: aws.String(fixtures.MultiW1RDSSnapID),
+		DBSnapshotIdentifier: aws.String(fixtures.MultiW1DBISnapID),
 		DBInstanceIdentifier: aws.String("deleted-legacy-db"),
 		Status:               aws.String("available"),
 		Encrypted:            aws.Bool(false),
@@ -326,7 +326,7 @@ func TestRDSSnap_Enricher_MultiW1_UnencryptedPlusOrphan_Suffix(t *testing.T) {
 		t.Fatalf("enricher returned unexpected error: %v", err)
 	}
 
-	snapID := fixtures.MultiW1RDSSnapID
+	snapID := fixtures.MultiW1DBISnapID
 	finding, hasFinding := result.Findings[snapID]
 	if !hasFinding {
 		t.Fatalf("Findings[%q] missing, want orphan finding", snapID)
@@ -344,14 +344,14 @@ func TestRDSSnap_Enricher_MultiW1_UnencryptedPlusOrphan_Suffix(t *testing.T) {
 	}
 }
 
-// TestRDSSnap_Enricher_NoOp_WhenNoCrossRefSignalsApply verifies that a Healthy
+// TestDBISnap_Enricher_NoOp_WhenNoCrossRefSignalsApply verifies that a Healthy
 // snapshot whose parent IS in the dbi cache and is a manual type produces no
 // findings, and the result maps are non-nil but empty.
-func TestRDSSnap_Enricher_NoOp_WhenNoCrossRefSignalsApply(t *testing.T) {
-	enricher := rdsSnapEnricher(t)
+func TestDBISnap_Enricher_NoOp_WhenNoCrossRefSignalsApply(t *testing.T) {
+	enricher := dbiSnapEnricher(t)
 
 	snap := rdstypes.DBSnapshot{
-		DBSnapshotIdentifier: aws.String(fixtures.ProdRDSSnapID),
+		DBSnapshotIdentifier: aws.String(fixtures.ProdDBISnapID),
 		DBInstanceIdentifier: aws.String(fixtures.ProdDbiID),
 		Status:               aws.String("available"),
 		Encrypted:            aws.Bool(true),
@@ -371,7 +371,7 @@ func TestRDSSnap_Enricher_NoOp_WhenNoCrossRefSignalsApply(t *testing.T) {
 		t.Fatalf("enricher returned unexpected error: %v", err)
 	}
 
-	snapID := fixtures.ProdRDSSnapID
+	snapID := fixtures.ProdDBISnapID
 	if _, has := result.Findings[snapID]; has {
 		t.Errorf("Findings[%q] present, want absent (no cross-ref signals)", snapID)
 	}
@@ -390,7 +390,7 @@ func TestRDSSnap_Enricher_NoOp_WhenNoCrossRefSignalsApply(t *testing.T) {
 	}
 }
 
-// TestRDSSnap_Enricher_FindingMirrorsIssueAppend verifies that the enricher
+// TestDBISnap_Enricher_FindingMirrorsIssueAppend verifies that the enricher
 // emits an EnrichmentFinding for every cross-ref signal. The Findings channel
 // drives the detail-view Attention section; without Findings, the Attention
 // section would be invisible for orphan/past-retention rows.
@@ -398,8 +398,8 @@ func TestRDSSnap_Enricher_NoOp_WhenNoCrossRefSignalsApply(t *testing.T) {
 // Spec §3.2 says "Wave 2 = None" because no extra AWS API calls are made;
 // emitting through the Findings channel is an internal routing decision,
 // not a Wave-2 API claim.
-func TestRDSSnap_Enricher_FindingMirrorsIssueAppend(t *testing.T) {
-	enricher := rdsSnapEnricher(t)
+func TestDBISnap_Enricher_FindingMirrorsIssueAppend(t *testing.T) {
+	enricher := dbiSnapEnricher(t)
 
 	snap := rdstypes.DBSnapshot{
 		DBSnapshotIdentifier: aws.String("snap-orphan-check"),
@@ -431,10 +431,10 @@ func TestRDSSnap_Enricher_FindingMirrorsIssueAppend(t *testing.T) {
 	}
 }
 
-// TestRDSSnap_Enricher_PartialFailure_NoAPICalls verifies that the enricher
+// TestDBISnap_Enricher_PartialFailure_NoAPICalls verifies that the enricher
 // makes zero API calls and never returns a non-nil error, even when clients is nil.
-func TestRDSSnap_Enricher_PartialFailure_NoAPICalls(t *testing.T) {
-	enricher := rdsSnapEnricher(t)
+func TestDBISnap_Enricher_PartialFailure_NoAPICalls(t *testing.T) {
+	enricher := dbiSnapEnricher(t)
 
 	// Various cache states — all should succeed with nil error.
 	caches := []struct {
@@ -468,14 +468,14 @@ func TestRDSSnap_Enricher_PartialFailure_NoAPICalls(t *testing.T) {
 // Additional: verify full fixture round-trip through enricher
 // ---------------------------------------------------------------------------
 
-// TestRDSSnap_Enricher_FullFixtures_OrphanAndRetentionFound verifies that
+// TestDBISnap_Enricher_FullFixtures_OrphanAndRetentionFound verifies that
 // running the full fixture set + dbi cache produces orphan findings for
 // fixtures with "deleted-legacy-db" as parent and past-retention findings
-// for WarnRDSSnapPastRetentionID.
-func TestRDSSnap_Enricher_FullFixtures_OrphanAndRetentionFound(t *testing.T) {
-	enricher := rdsSnapEnricher(t)
+// for WarnDBISnapPastRetentionID.
+func TestDBISnap_Enricher_FullFixtures_OrphanAndRetentionFound(t *testing.T) {
+	enricher := dbiSnapEnricher(t)
 
-	fix := fixtures.NewRDSSnapFixtures()
+	fix := fixtures.NewDBISnapFixtures()
 	dbiCache := dbiCacheFromFixtures(t)
 
 	// Convert all snap fixtures to Resources (status pre-set from fetcher values).
@@ -500,38 +500,38 @@ func TestRDSSnap_Enricher_FullFixtures_OrphanAndRetentionFound(t *testing.T) {
 		t.Fatalf("enricher returned unexpected error: %v", err)
 	}
 
-	// WarnRDSSnapOrphanID ("orphan-deleted-db-snap") has parent "deleted-legacy-db"
+	// WarnDBISnapOrphanID ("orphan-deleted-db-snap") has parent "deleted-legacy-db"
 	// which is NOT in the dbi fixtures → orphan finding expected.
-	orphanID := fixtures.WarnRDSSnapOrphanID
+	orphanID := fixtures.WarnDBISnapOrphanID
 	orphanFinding, hasOrphan := result.Findings[orphanID]
 	if !hasOrphan {
-		t.Errorf("WarnRDSSnapOrphanID: Findings[%q] missing, want orphan finding", orphanID)
+		t.Errorf("WarnDBISnapOrphanID: Findings[%q] missing, want orphan finding", orphanID)
 	} else if orphanFinding.Summary != "orphan: source DB deleted" {
-		t.Errorf("WarnRDSSnapOrphanID: Findings[%q].Summary = %q, want \"orphan: source DB deleted\"", orphanID, orphanFinding.Summary)
+		t.Errorf("WarnDBISnapOrphanID: Findings[%q].Summary = %q, want \"orphan: source DB deleted\"", orphanID, orphanFinding.Summary)
 	}
 
-	// MultiW1RDSSnapID also has "deleted-legacy-db" as parent → orphan.
-	multiID := fixtures.MultiW1RDSSnapID
+	// MultiW1DBISnapID also has "deleted-legacy-db" as parent → orphan.
+	multiID := fixtures.MultiW1DBISnapID
 	multiFinding, hasMulti := result.Findings[multiID]
 	if !hasMulti {
-		t.Errorf("MultiW1RDSSnapID: Findings[%q] missing, want orphan finding", multiID)
+		t.Errorf("MultiW1DBISnapID: Findings[%q] missing, want orphan finding", multiID)
 	} else if multiFinding.Summary != "orphan: source DB deleted" {
-		t.Errorf("MultiW1RDSSnapID: Findings[%q].Summary = %q, want \"orphan: source DB deleted\"", multiID, multiFinding.Summary)
+		t.Errorf("MultiW1DBISnapID: Findings[%q].Summary = %q, want \"orphan: source DB deleted\"", multiID, multiFinding.Summary)
 	}
 
-	// WarnRDSSnapPastRetentionID has parent WarnDbiPastRetentionParentID (in dbi cache)
+	// WarnDBISnapPastRetentionID has parent WarnDbiPastRetentionParentID (in dbi cache)
 	// with BackupRetentionPeriod=7 and SnapshotCreateTime=now-30d → past-retention expected.
-	retentionID := fixtures.WarnRDSSnapPastRetentionID
+	retentionID := fixtures.WarnDBISnapPastRetentionID
 	retFinding, hasRetention := result.Findings[retentionID]
 	if !hasRetention {
-		t.Errorf("WarnRDSSnapPastRetentionID: Findings[%q] missing, want past-retention finding", retentionID)
+		t.Errorf("WarnDBISnapPastRetentionID: Findings[%q] missing, want past-retention finding", retentionID)
 	} else if !strings.Contains(retFinding.Summary, "automated") || !strings.Contains(retFinding.Summary, "past retention") {
-		t.Errorf("WarnRDSSnapPastRetentionID: Findings[%q].Summary = %q, want \"automated, Nd past retention\"", retentionID, retFinding.Summary)
+		t.Errorf("WarnDBISnapPastRetentionID: Findings[%q].Summary = %q, want \"automated, Nd past retention\"", retentionID, retFinding.Summary)
 	}
 
-	// Healthy fixtures (ProdRDSSnapID) with parent in dbi cache
+	// Healthy fixtures (ProdDBISnapID) with parent in dbi cache
 	// must produce no orphan or retention findings.
-	for _, id := range []string{fixtures.ProdRDSSnapID} {
+	for _, id := range []string{fixtures.ProdDBISnapID} {
 		if f, has := result.Findings[id]; has {
 			if strings.Contains(f.Summary, "orphan") || strings.Contains(f.Summary, "past retention") {
 				t.Errorf("healthy snap %q: unexpected finding %q", id, f.Summary)
