@@ -441,6 +441,274 @@ func rdsClusterPage(t *testing.T, cluster rdstypes.DBCluster) (resource.FetchRes
 	return awsclient.FetchRDSDBClustersPage(context.Background(), mock, "")
 }
 
+// ---------------------------------------------------------------------------
+// T-DBC-08: dual-SDK pagination — DocDB token sequence transitions to RDS.
+// Issue 5 regression pin.
+// ---------------------------------------------------------------------------
+
+// fullDocDBMock implements awsclient.DocDBAPI. Only DescribeDBClusters is
+// exercised by the dbc fetcher; all other methods return empty no-ops.
+type fullDocDBMock struct {
+	dbClustersPages []docdb.DescribeDBClustersOutput
+	dbClustersCall  int
+}
+
+func (m *fullDocDBMock) DescribeDBClusters(
+	_ context.Context,
+	_ *docdb.DescribeDBClustersInput,
+	_ ...func(*docdb.Options),
+) (*docdb.DescribeDBClustersOutput, error) {
+	if m.dbClustersCall >= len(m.dbClustersPages) {
+		return &docdb.DescribeDBClustersOutput{}, nil
+	}
+	out := m.dbClustersPages[m.dbClustersCall]
+	m.dbClustersCall++
+	return &out, nil
+}
+
+func (m *fullDocDBMock) DescribeDBClusterSnapshots(
+	_ context.Context,
+	_ *docdb.DescribeDBClusterSnapshotsInput,
+	_ ...func(*docdb.Options),
+) (*docdb.DescribeDBClusterSnapshotsOutput, error) {
+	return &docdb.DescribeDBClusterSnapshotsOutput{}, nil
+}
+
+func (m *fullDocDBMock) DescribeDBSubnetGroups(
+	_ context.Context,
+	_ *docdb.DescribeDBSubnetGroupsInput,
+	_ ...func(*docdb.Options),
+) (*docdb.DescribeDBSubnetGroupsOutput, error) {
+	return &docdb.DescribeDBSubnetGroupsOutput{}, nil
+}
+
+func (m *fullDocDBMock) DescribePendingMaintenanceActions(
+	_ context.Context,
+	_ *docdb.DescribePendingMaintenanceActionsInput,
+	_ ...func(*docdb.Options),
+) (*docdb.DescribePendingMaintenanceActionsOutput, error) {
+	return &docdb.DescribePendingMaintenanceActionsOutput{}, nil
+}
+
+// fullRDSMock implements awsclient.RDSAPI. Only DescribeDBClusters is
+// exercised by the dbc fetcher; all other methods return empty no-ops.
+type fullRDSMock struct {
+	dbClustersPages []rds.DescribeDBClustersOutput
+	dbClustersCall  int
+}
+
+func (m *fullRDSMock) DescribeDBClusters(
+	_ context.Context,
+	_ *rds.DescribeDBClustersInput,
+	_ ...func(*rds.Options),
+) (*rds.DescribeDBClustersOutput, error) {
+	if m.dbClustersCall >= len(m.dbClustersPages) {
+		return &rds.DescribeDBClustersOutput{}, nil
+	}
+	out := m.dbClustersPages[m.dbClustersCall]
+	m.dbClustersCall++
+	return &out, nil
+}
+
+func (m *fullRDSMock) DescribeDBInstances(
+	_ context.Context,
+	_ *rds.DescribeDBInstancesInput,
+	_ ...func(*rds.Options),
+) (*rds.DescribeDBInstancesOutput, error) {
+	return &rds.DescribeDBInstancesOutput{}, nil
+}
+
+func (m *fullRDSMock) DescribeDBClusterSnapshots(
+	_ context.Context,
+	_ *rds.DescribeDBClusterSnapshotsInput,
+	_ ...func(*rds.Options),
+) (*rds.DescribeDBClusterSnapshotsOutput, error) {
+	return &rds.DescribeDBClusterSnapshotsOutput{}, nil
+}
+
+func (m *fullRDSMock) DescribeDBSubnetGroups(
+	_ context.Context,
+	_ *rds.DescribeDBSubnetGroupsInput,
+	_ ...func(*rds.Options),
+) (*rds.DescribeDBSubnetGroupsOutput, error) {
+	return &rds.DescribeDBSubnetGroupsOutput{}, nil
+}
+
+func (m *fullRDSMock) DescribeDBSnapshots(
+	_ context.Context,
+	_ *rds.DescribeDBSnapshotsInput,
+	_ ...func(*rds.Options),
+) (*rds.DescribeDBSnapshotsOutput, error) {
+	return &rds.DescribeDBSnapshotsOutput{}, nil
+}
+
+func (m *fullRDSMock) DescribeEvents(
+	_ context.Context,
+	_ *rds.DescribeEventsInput,
+	_ ...func(*rds.Options),
+) (*rds.DescribeEventsOutput, error) {
+	return &rds.DescribeEventsOutput{}, nil
+}
+
+func (m *fullRDSMock) DescribePendingMaintenanceActions(
+	_ context.Context,
+	_ *rds.DescribePendingMaintenanceActionsInput,
+	_ ...func(*rds.Options),
+) (*rds.DescribePendingMaintenanceActionsOutput, error) {
+	return &rds.DescribePendingMaintenanceActionsOutput{}, nil
+}
+
+// buildDocDBCluster is a minimal DocDB cluster builder for pagination tests.
+func buildDocDBCluster(id string) docdbtypes.DBCluster {
+	return docdbtypes.DBCluster{
+		DBClusterIdentifier: aws.String(id),
+		Status:              aws.String("available"),
+		StorageEncrypted:    aws.Bool(true),
+		DeletionProtection:  aws.Bool(true),
+	}
+}
+
+// TestDbc_Pagination_MultiPage_Success drives the registered "dbc" paginated
+// fetcher through the full DocDB→RDS token-prefix transition and verifies:
+//
+//   - tick 1 (token=""): fetches DocDB page 1 (has more); no RDS call yet.
+//     Result: DocDB page 1 rows, NextToken="docdb:d1", IsTruncated=true.
+//
+//   - tick 2 (token="docdb:d1"): fetches DocDB page 2 (last DocDB page),
+//     then immediately fetches RDS page 1 (has more). Result: DocDB page 2
+//     rows + RDS page 1 rows concatenated, NextToken="rds:r1", IsTruncated=true.
+//
+//   - tick 3 (token="rds:r1"): fetches RDS page 2 (last page, no Marker).
+//     Result: RDS page 2 rows only, NextToken="", IsTruncated=false.
+//
+// This is a regression pin for Issue 5: verifies that the token-prefix logic
+// in dbc.go correctly sequences DocDB and RDS pages and that the combined
+// result assembles correctly without losing rows.
+func TestDbc_Pagination_MultiPage_Success(t *testing.T) {
+	docdbMock := &fullDocDBMock{
+		dbClustersPages: []docdb.DescribeDBClustersOutput{
+			{
+				// Page 1: one cluster, has more.
+				DBClusters: []docdbtypes.DBCluster{
+					buildDocDBCluster("docdb-p1"),
+				},
+				Marker: aws.String("d1"),
+			},
+			{
+				// Page 2: one cluster, no more.
+				DBClusters: []docdbtypes.DBCluster{
+					buildDocDBCluster("docdb-p2"),
+				},
+			},
+		},
+	}
+	rdsMock := &fullRDSMock{
+		dbClustersPages: []rds.DescribeDBClustersOutput{
+			{
+				// RDS page 1: one aurora cluster, has more.
+				DBClusters: []rdstypes.DBCluster{
+					{
+						DBClusterIdentifier: aws.String("rds-p1"),
+						Engine:              aws.String("aurora-mysql"),
+						Status:              aws.String("available"),
+					},
+				},
+				Marker: aws.String("r1"),
+			},
+			{
+				// RDS page 2: one aurora cluster, no more.
+				DBClusters: []rdstypes.DBCluster{
+					{
+						DBClusterIdentifier: aws.String("rds-p2"),
+						Engine:              aws.String("aurora-postgresql"),
+						Status:              aws.String("available"),
+					},
+				},
+			},
+		},
+	}
+
+	clients := &awsclient.ServiceClients{
+		DocDB: docdbMock,
+		RDS:   rdsMock,
+	}
+
+	fetcher := resource.GetPaginatedFetcher("dbc")
+	if fetcher == nil {
+		t.Fatal("no paginated fetcher registered for dbc — init() not invoked")
+	}
+
+	// --- tick 1: token="" ---
+	result1, err := fetcher(context.Background(), clients, "")
+	if err != nil {
+		t.Fatalf("tick 1 error: %v", err)
+	}
+	if result1.Pagination == nil {
+		t.Fatal("tick 1: Pagination must not be nil")
+	}
+	if !result1.Pagination.IsTruncated {
+		t.Error("tick 1: IsTruncated = false, want true (DocDB has a second page)")
+	}
+	if result1.Pagination.NextToken != "docdb:d1" {
+		t.Errorf("tick 1: NextToken = %q, want %q", result1.Pagination.NextToken, "docdb:d1")
+	}
+	if len(result1.Resources) != 1 {
+		t.Errorf("tick 1: len(Resources) = %d, want 1 (docdb-p1 only)", len(result1.Resources))
+	} else if result1.Resources[0].ID != "docdb-p1" {
+		t.Errorf("tick 1: Resources[0].ID = %q, want %q", result1.Resources[0].ID, "docdb-p1")
+	}
+
+	// --- tick 2: token="docdb:d1" ---
+	result2, err := fetcher(context.Background(), clients, "docdb:d1")
+	if err != nil {
+		t.Fatalf("tick 2 error: %v", err)
+	}
+	if result2.Pagination == nil {
+		t.Fatal("tick 2: Pagination must not be nil")
+	}
+	if !result2.Pagination.IsTruncated {
+		t.Error("tick 2: IsTruncated = false, want true (RDS has a second page)")
+	}
+	if result2.Pagination.NextToken != "rds:r1" {
+		t.Errorf("tick 2: NextToken = %q, want %q", result2.Pagination.NextToken, "rds:r1")
+	}
+	// DocDB page 2 row + RDS page 1 row.
+	if len(result2.Resources) != 2 {
+		t.Errorf("tick 2: len(Resources) = %d, want 2 (docdb-p2 + rds-p1)", len(result2.Resources))
+	} else {
+		got2 := map[string]bool{}
+		for _, r := range result2.Resources {
+			got2[r.ID] = true
+		}
+		if !got2["docdb-p2"] {
+			t.Errorf("tick 2: expected docdb-p2 in result, got %v", got2)
+		}
+		if !got2["rds-p1"] {
+			t.Errorf("tick 2: expected rds-p1 in result, got %v", got2)
+		}
+	}
+
+	// --- tick 3: token="rds:r1" ---
+	result3, err := fetcher(context.Background(), clients, "rds:r1")
+	if err != nil {
+		t.Fatalf("tick 3 error: %v", err)
+	}
+	if result3.Pagination == nil {
+		t.Fatal("tick 3: Pagination must not be nil")
+	}
+	if result3.Pagination.IsTruncated {
+		t.Error("tick 3: IsTruncated = true, want false (no more RDS pages)")
+	}
+	if result3.Pagination.NextToken != "" {
+		t.Errorf("tick 3: NextToken = %q, want empty (last page)", result3.Pagination.NextToken)
+	}
+	if len(result3.Resources) != 1 {
+		t.Errorf("tick 3: len(Resources) = %d, want 1 (rds-p2 only)", len(result3.Resources))
+	} else if result3.Resources[0].ID != "rds-p2" {
+		t.Errorf("tick 3: Resources[0].ID = %q, want %q", result3.Resources[0].ID, "rds-p2")
+	}
+}
+
 // TestComputeRDSDBClusterStatusAndIssues validates computeRDSDBClusterStatusAndIssues
 // (unexported) via FetchRDSDBClustersPage — 11 cases mirroring the docdb table.
 func TestComputeRDSDBClusterStatusAndIssues(t *testing.T) {
