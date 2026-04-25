@@ -412,6 +412,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					updatedModel.probeResources = make(map[string][]resource.Resource)
 				}
 				updatedModel.probeResources[msg.ResourceType] = msg.Resources
+				if updatedModel.probeTruncated == nil {
+					updatedModel.probeTruncated = make(map[string]bool)
+				}
+				updatedModel.probeTruncated[msg.ResourceType] = msg.Pagination != nil && msg.Pagination.IsTruncated
 				cmd = tea.Batch(cmd, updatedModel.probeEnrichment(msg.ResourceType, updatedModel.enrichmentGen))
 			}
 			return updatedModel, cmd

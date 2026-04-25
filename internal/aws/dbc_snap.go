@@ -73,6 +73,7 @@ func init() {
 				},
 			}, fmt.Errorf("dbc-snap: RDS-side cluster snapshot fetch failed: %w", rdsErr)
 		}
+		// Combined success: DocDB page + RDS page concatenated. Page size may exceed DefaultPageSize when both SDKs return full pages on the same fetch tick — this is a deliberate trade so the operator sees a unified list rather than waiting for a second tick. Pagination tokens stay correct (docdb: vs rds: prefix tracks side authoritatively).
 		docResult.Resources = append(docResult.Resources, rdsResult.Resources...)
 		if rdsResult.Pagination != nil && rdsResult.Pagination.IsTruncated {
 			return resource.FetchResult{
@@ -96,7 +97,7 @@ func init() {
 	})
 
 	resource.RegisterRelated("dbc-snap", []resource.RelatedDef{
-		{TargetType: "dbc", DisplayName: "DocumentDB Cluster", Checker: checkDbcSnapDBC},
+		{TargetType: "dbc", DisplayName: "DocumentDB Cluster", Checker: checkDbcSnapDBC, NeedsTargetCache: true},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkDbcSnapKMS},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkDbcSnapVPC},
 		{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkDbcSnapBackup},

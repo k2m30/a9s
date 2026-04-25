@@ -339,6 +339,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		m.enrichmentTypeGen = make(map[string]int)
 		m.enrichmentTruncatedIDs = make(map[string]map[string]bool)
 		m.probeResources = make(map[string][]resource.Resource)
+		m.probeTruncated = make(map[string]bool)
 		// Reset the menu's view-side state (availability, issue counts) in
 		// lockstep with the model-side maps above.
 		if menu, ok := m.stack[0].(*views.MainMenuModel); ok {

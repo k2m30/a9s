@@ -1,6 +1,6 @@
 ---
 shortName: dbc
-name: DocumentDB Clusters
+name: DB Clusters
 awsApiRef: https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DBCluster.html
 generatedFrom:
   - docs/architecture.md
