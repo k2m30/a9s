@@ -257,38 +257,57 @@ func TestRelated_RDSSnap_KMS_CacheMissNoClients(t *testing.T) {
 
 // TestRelated_RDSSnap_Backup_Match verifies that the checker returns plan IDs
 // (not recovery-point ARNs) when the loaded backup PLAN cache contains plans
-// whose Resources include the snapshot's ARN. Drill-through requires plan IDs
-// because the backup target's Resource.ID space is plan IDs.
+// whose Resources include the snapshot's PARENT DB ARN. AWS Backup tracks the
+// parent DB instance, not individual snapshots, so the checker resolves
+// snap.DBInstanceIdentifier through the dbi cache to get DBInstanceArn, then
+// reverse-scans plan selections for that parent ARN. Drill-through requires
+// plan IDs because the backup target's Resource.ID space is plan IDs.
 func TestRelated_RDSSnap_Backup_Match(t *testing.T) {
-	const snapARN = "arn:aws:rds:us-east-1:123456789012:snapshot:rds:mydb-2025-01-15-03-00"
+	const parentDBName = "mydb"
+	const parentDBARN = "arn:aws:rds:us-east-1:123456789012:db:mydb"
 
 	src := resource.Resource{
 		ID:   "rds:mydb-2025-01-15-03-00",
 		Name: "rds:mydb-2025-01-15-03-00",
 		Fields: map[string]string{
-			"arn": snapARN,
+			"arn": "arn:aws:rds:us-east-1:123456789012:snapshot:rds:mydb-2025-01-15-03-00",
 		},
 		RawStruct: rdstypes.DBSnapshot{
 			DBSnapshotIdentifier: aws.String("rds:mydb-2025-01-15-03-00"),
-			DBInstanceIdentifier: aws.String("mydb"),
+			DBInstanceIdentifier: aws.String(parentDBName),
 		},
 	}
 	cache := resource.ResourceCache{
+		// dbi cache resolves the parent DB → ARN.
+		"dbi": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{
+				{
+					ID:   parentDBName,
+					Name: parentDBName,
+					RawStruct: rdstypes.DBInstance{
+						DBInstanceIdentifier: aws.String(parentDBName),
+						DBInstanceArn:        aws.String(parentDBARN),
+					},
+				},
+			},
+		},
+		// backup plan cache — Resources lists the parent DB ARN (real
+		// AWS Backup behaviour), NOT the snapshot ARN.
 		"backup": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
 				{
-					ID:   "plan-covers-snap-A",
-					Name: "covers-snap-A",
+					ID:   "plan-covers-parent-A",
+					Name: "covers-parent-A",
 					Fields: map[string]string{
-						"resources":     snapARN,
+						"resources":     parentDBARN,
 						"not_resources": "",
 					},
 				},
 				{
-					ID:   "plan-covers-snap-B",
-					Name: "covers-snap-B",
+					ID:   "plan-covers-parent-B",
+					Name: "covers-parent-B",
 					Fields: map[string]string{
-						"resources":     snapARN,
+						"resources":     parentDBARN,
 						"not_resources": "",
 					},
 				},
@@ -308,43 +327,23 @@ func TestRelated_RDSSnap_Backup_Match(t *testing.T) {
 	result := checker(context.Background(), nil, src, cache)
 
 	if result.Count != 2 {
-		t.Errorf("Count = %d, want 2 (two plans cover the snapshot)", result.Count)
+		t.Errorf("Count = %d, want 2 (two plans cover the snapshot's parent DB)", result.Count)
 	}
 	if len(result.ResourceIDs) != 2 {
 		t.Errorf("ResourceIDs = %v, want 2 plan IDs", result.ResourceIDs)
 	}
 	for _, id := range result.ResourceIDs {
 		if id == "plan-other-target" {
-			t.Errorf("ResourceIDs unexpectedly contains plan-other-target (its Resources do not match the snapshot ARN)")
+			t.Errorf("ResourceIDs unexpectedly contains plan-other-target (its Resources do not match the parent DB ARN)")
 		}
 	}
 }
 
-// TestRelated_RDSSnap_Backup_Empty verifies that a snapshot with no ARN field
-// and no DBSnapshotArn in RawStruct returns Count=0.
-func TestRelated_RDSSnap_Backup_Empty(t *testing.T) {
-	src := resource.Resource{
-		ID:     "rds:mydb-2025-01-15-03-00",
-		Name:   "rds:mydb-2025-01-15-03-00",
-		Fields: map[string]string{},
-		RawStruct: rdstypes.DBSnapshot{
-			DBSnapshotIdentifier: aws.String("rds:mydb-2025-01-15-03-00"),
-			// No DBSnapshotArn set — empty ARN.
-		},
-	}
-	checker := rdsSnapCheckerByTarget(t, "backup")
-	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty snapshot ARN)", result.Count)
-	}
-}
-
-// TestRelated_RDSSnap_Backup_NoPlansLoaded verifies that the checker returns
-// UnknownRelated (Count=-1) when the backup PLAN cache is not loaded — better
-// than silently returning 0 since the operator hasn't yet visited the backup
-// list and the answer is genuinely unknown.
-func TestRelated_RDSSnap_Backup_NoPlansLoaded(t *testing.T) {
+// TestRelated_RDSSnap_Backup_NoParentInDbi verifies that an orphan snapshot
+// (parent not in the loaded dbi cache) returns Count=0 — there's no parent ARN
+// to match against plan selections, and AWS Backup would never have covered a
+// snapshot whose parent is gone.
+func TestRelated_RDSSnap_Backup_NoParentInDbi(t *testing.T) {
 	src := resource.Resource{
 		ID:   "rds:mydb-2025-01-15-03-00",
 		Name: "rds:mydb-2025-01-15-03-00",
@@ -353,13 +352,111 @@ func TestRelated_RDSSnap_Backup_NoPlansLoaded(t *testing.T) {
 		},
 		RawStruct: rdstypes.DBSnapshot{
 			DBSnapshotIdentifier: aws.String("rds:mydb-2025-01-15-03-00"),
+			DBInstanceIdentifier: aws.String("orphan-parent"),
+		},
+	}
+	cache := resource.ResourceCache{
+		"dbi": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{
+				{
+					ID:   "other-db",
+					Name: "other-db",
+					RawStruct: rdstypes.DBInstance{
+						DBInstanceIdentifier: aws.String("other-db"),
+						DBInstanceArn:        aws.String("arn:aws:rds:us-east-1:123456789012:db:other-db"),
+					},
+				},
+			},
+		},
+		"backup": resource.ResourceCacheEntry{Resources: []resource.Resource{}},
+	}
+	checker := rdsSnapCheckerByTarget(t, "backup")
+	result := checker(context.Background(), nil, src, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (orphan snapshot — parent gone)", result.Count)
+	}
+}
+
+// TestRelated_RDSSnap_Backup_NoDbiCacheLoaded verifies that the checker returns
+// UnknownRelated (Count=-1) when the dbi cache hasn't been loaded yet — without
+// the parent DB ARN we can't say whether any plan covers the snapshot.
+func TestRelated_RDSSnap_Backup_NoDbiCacheLoaded(t *testing.T) {
+	src := resource.Resource{
+		ID:   "rds:mydb-2025-01-15-03-00",
+		Name: "rds:mydb-2025-01-15-03-00",
+		Fields: map[string]string{
+			"arn": "arn:aws:rds:us-east-1:123456789012:snapshot:rds:mydb-2025-01-15-03-00",
+		},
+		RawStruct: rdstypes.DBSnapshot{
+			DBSnapshotIdentifier: aws.String("rds:mydb-2025-01-15-03-00"),
+			DBInstanceIdentifier: aws.String("mydb"),
 		},
 	}
 	checker := rdsSnapCheckerByTarget(t, "backup")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
 	if result.Count != -1 {
+		t.Errorf("Count = %d, want -1 (UnknownRelated when dbi cache not loaded)", result.Count)
+	}
+}
+
+// TestRelated_RDSSnap_Backup_NoPlansLoaded verifies that the checker returns
+// UnknownRelated (Count=-1) when the dbi cache resolves the parent ARN but the
+// backup PLAN cache hasn't been loaded yet.
+func TestRelated_RDSSnap_Backup_NoPlansLoaded(t *testing.T) {
+	const parentDBName = "mydb"
+	src := resource.Resource{
+		ID:   "rds:mydb-2025-01-15-03-00",
+		Name: "rds:mydb-2025-01-15-03-00",
+		Fields: map[string]string{
+			"arn": "arn:aws:rds:us-east-1:123456789012:snapshot:rds:mydb-2025-01-15-03-00",
+		},
+		RawStruct: rdstypes.DBSnapshot{
+			DBSnapshotIdentifier: aws.String("rds:mydb-2025-01-15-03-00"),
+			DBInstanceIdentifier: aws.String(parentDBName),
+		},
+	}
+	cache := resource.ResourceCache{
+		"dbi": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{
+				{
+					ID:   parentDBName,
+					Name: parentDBName,
+					RawStruct: rdstypes.DBInstance{
+						DBInstanceIdentifier: aws.String(parentDBName),
+						DBInstanceArn:        aws.String("arn:aws:rds:us-east-1:123456789012:db:" + parentDBName),
+					},
+				},
+			},
+		},
+		// backup cache absent — checker must report UnknownRelated.
+	}
+	checker := rdsSnapCheckerByTarget(t, "backup")
+	result := checker(context.Background(), nil, src, cache)
+
+	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (UnknownRelated when backup cache not loaded)", result.Count)
+	}
+}
+
+// TestRelated_RDSSnap_Backup_NoParentReference verifies a snapshot with no
+// DBInstanceIdentifier returns Count=0 (cannot pivot without a parent reference).
+func TestRelated_RDSSnap_Backup_NoParentReference(t *testing.T) {
+	src := resource.Resource{
+		ID:     "rds:orphan-no-parent-ref",
+		Name:   "rds:orphan-no-parent-ref",
+		Fields: map[string]string{},
+		RawStruct: rdstypes.DBSnapshot{
+			DBSnapshotIdentifier: aws.String("rds:orphan-no-parent-ref"),
+			// no DBInstanceIdentifier
+		},
+	}
+	checker := rdsSnapCheckerByTarget(t, "backup")
+	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no parent reference)", result.Count)
 	}
 }
 

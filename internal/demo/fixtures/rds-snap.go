@@ -60,7 +60,7 @@ const (
 	WarnRDSSnapOrphanARN = "arn:aws:rds:us-east-1:123456789012:snapshot:orphan-deleted-db-snap"
 
 	// WarnRDSSnapPastRetentionID — Warning: automated snapshot older than parent's
-	// BackupRetentionPeriod (parent = WarnDbiPastRetentionParentID with retention=7).
+	// BackupRetentionPeriod (parent = ProdDbiRetentionParentID with retention=7).
 	// SnapshotCreateTime is set to now-30d at fixture construction time so the
 	// retention check always fires regardless of test date.
 	WarnRDSSnapPastRetentionID  = "rds:retention-test-2026-03-25"
@@ -121,11 +121,25 @@ func buildRDSSnapInstances() []rdstypes.DBSnapshot {
 			SourceRegion:         aws.String("us-east-1"),
 		},
 
-		// 2. ProdRDSSnapAuroraID — graph-root for §9.3. Healthy Aurora automated snapshot.
-		// dbi=ProdDbiAuroraID, kms=dbiKMSKeyID, dbc=prod-aurora-cluster (via auroraBase.DBClusterIdentifier).
-		// backup: 2 recovery points added to backup.go pointing at ProdRDSSnapAuroraARN.
-		// ct-events: 3 events added to cloudtrail.go with ResourceName=ProdRDSSnapAuroraID.
-		// SnapshotCreateTime is dynamic (now-3d) to stay within the parent's 7-day retention.
+		// 2. ProdRDSSnapAuroraID — graph-root for §9.3. Aurora-engine
+		// automated snapshot — drives the dbi→dbc indirect pivot non-zero
+		// (parent ProdDbiAuroraID has DBClusterIdentifier set).
+		//
+		// AWS API note: real AWS rejects CreateDBSnapshot for Aurora cluster
+		// members and recommends CreateDBClusterSnapshot instead, so an
+		// rdstypes.DBSnapshot with Engine="aurora-postgresql" is uncommon
+		// in production but legal at the SDK type level. We use it here as
+		// the only way to exercise the rds-snap → dbc pivot in fixtures
+		// without introducing a separate dbc-snap resource type. See spec §2.
+		//
+		// dbi=ProdDbiAuroraID, kms=dbiKMSKeyID, dbc=prod-aurora-cluster
+		// (via auroraBase.DBClusterIdentifier).
+		// backup: ProdDbiAuroraARN appears in 2 plan selections in
+		// backup.go so the rds-snap→backup pivot resolves Count ≥ 2 here.
+		// ct-events: 3 events added to cloudtrail.go with
+		// ResourceName=ProdRDSSnapAuroraID.
+		// SnapshotCreateTime is dynamic (now-3d) to stay within the parent's
+		// 7-day retention so this fixture does NOT trigger past-retention.
 		{
 			DBSnapshotIdentifier: aws.String(ProdRDSSnapAuroraID),
 			DBSnapshotArn:        aws.String(ProdRDSSnapAuroraARN),
@@ -252,13 +266,13 @@ func buildRDSSnapInstances() []rdstypes.DBSnapshot {
 		},
 
 		// 8. WarnRDSSnapPastRetentionID — Warning: automated, 30 days old,
-		// parent WarnDbiPastRetentionParentID with BackupRetentionPeriod=7.
+		// parent ProdDbiRetentionParentID with BackupRetentionPeriod=7.
 		// SnapshotCreateTime computed relative to time.Now() so the enricher
 		// always sees this as past-retention regardless of test date.
 		{
 			DBSnapshotIdentifier: aws.String(WarnRDSSnapPastRetentionID),
 			DBSnapshotArn:        aws.String(WarnRDSSnapPastRetentionARN),
-			DBInstanceIdentifier: aws.String(WarnDbiPastRetentionParentID),
+			DBInstanceIdentifier: aws.String(ProdDbiRetentionParentID),
 			Status:               aws.String("available"),
 			Engine:               aws.String("postgres"),
 			EngineVersion:        aws.String("16.2"),

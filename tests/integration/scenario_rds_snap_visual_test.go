@@ -168,7 +168,6 @@ func TestScenario_RDSSnapVisual_DetailSurfacesAllIssues(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.id, func(t *testing.T) {
 			res := selectRDSSnapByID(t, scenario, tc.id)
 			scenario.OpenDetailResource("rds-snap", res)
@@ -204,7 +203,6 @@ func TestScenario_RDSSnapVisual_HealthyRowHasNoIssuesPhrases(t *testing.T) {
 	}
 
 	for _, id := range []string{demofixtures.ProdRDSSnapID, demofixtures.ProdRDSSnapAuroraID} {
-		id := id
 		t.Run(id, func(t *testing.T) {
 			res := selectRDSSnapByID(t, scenario, id)
 			scenario.OpenDetailResource("rds-snap", res)

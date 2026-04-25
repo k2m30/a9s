@@ -376,7 +376,6 @@ func (m *Model) probeEnrichment(shortName string, gen int) tea.Cmd {
 			Truncated:    result.Truncated,
 			Findings:     result.Findings,
 			FieldUpdates: result.FieldUpdates,
-			IssueAppends: result.IssueAppends,
 			TruncatedIDs: result.TruncatedIDs,
 			Gen:          gen,
 			TypeGen:      typeGen,

@@ -286,7 +286,7 @@ func relatedTitleSuffix(src resource.Resource) string {
 // out-of-scope entries pulled via FetchByIDs). On ID collision, resourceCache
 // wins (it is the scope-filtered authoritative source).
 func (m *Model) buildResourceCacheSnapshot() resource.ResourceCache {
-	snap := make(resource.ResourceCache, len(m.resourceCache)+len(m.lazyResourceCache))
+	snap := make(resource.ResourceCache, len(m.resourceCache)+len(m.lazyResourceCache)+len(m.probeResources))
 	// Seed from lazyResourceCache first; resourceCache entries will overwrite.
 	// Lazy-only entries are sparse (FetchByIDs, not a full first page), so mark
 	// IsTruncated=true — the next top-level navigation will still fetch
@@ -297,15 +297,51 @@ func (m *Model) buildResourceCacheSnapshot() resource.ResourceCache {
 			IsTruncated: true,
 		}
 	}
+	// Then merge probeResources — first-page rows retained by the
+	// availability/Wave-1 probe pass that runs at app start, BEFORE the
+	// user opens any list view. Without this seeding, cross-ref enrichers
+	// running at probe time (e.g. rds-snap → dbi cache) would see an empty
+	// snapshot until the user navigates into another list. probeResources
+	// pages are first-page-only — mark IsTruncated=true so the orphan
+	// rule (in cross-ref enrichers) treats parent-not-found as
+	// "unknown, skip" rather than "definitively deleted" per spec §3.1.
+	for shortName, rows := range m.probeResources {
+		if existing, ok := snap[shortName]; ok {
+			// lazyResourceCache already seeded — merge probe rows for any
+			// new IDs (probe is first-page authoritative; lazy is sparse).
+			known := make(map[string]struct{}, len(existing.Resources))
+			for _, r := range existing.Resources {
+				known[r.ID] = struct{}{}
+			}
+			merged := append([]resource.Resource(nil), existing.Resources...)
+			for _, r := range rows {
+				if _, dup := known[r.ID]; !dup {
+					merged = append(merged, r)
+				}
+			}
+			snap[shortName] = resource.ResourceCacheEntry{
+				Resources:   merged,
+				IsTruncated: true,
+			}
+		} else {
+			snap[shortName] = resource.ResourceCacheEntry{
+				Resources:   rows,
+				IsTruncated: true,
+			}
+		}
+	}
 	for shortName, entry := range m.resourceCache {
-		if lazy, ok := snap[shortName]; ok {
-			// Merge: resourceCache rows win on collision; append lazy-only IDs.
+		// resourceCache is authoritative — overwrite anything from lazy/probe.
+		// Carry the entry's pagination state (IsTruncated) verbatim so
+		// callers can distinguish "complete cache" from "first page only".
+		if existing, ok := snap[shortName]; ok {
+			// Merge: resourceCache rows win on collision; append non-cache IDs.
 			known := make(map[string]struct{}, len(entry.resources))
 			for _, r := range entry.resources {
 				known[r.ID] = struct{}{}
 			}
 			merged := append([]resource.Resource(nil), entry.resources...)
-			for _, r := range lazy.Resources {
+			for _, r := range existing.Resources {
 				if _, dup := known[r.ID]; !dup {
 					merged = append(merged, r)
 				}

@@ -1,8 +1,8 @@
-// rds_snap_issue_enrichment.go — Wave-1 cross-ref enricher for rds-snap.
+// rds_snap_issue_enrichment.go — cross-ref enricher for rds-snap.
 //
-// The enricher is "Wave 2 = None" per docs/attention-signals.md (no background
-// API calls). Instead it performs pure cross-ref logic against the dbi
-// ResourceCache to detect two Wave-1 signals that require sibling-cache access:
+// The enricher detects two signals from docs/resources/rds-snap.md §3.1
+// that require sibling-cache access (and therefore can't run inside the
+// fetcher):
 //
 //  1. orphan: parent DBInstanceIdentifier is NOT found in the loaded dbi cache.
 //     Phrase: "orphan: source DB deleted"
@@ -11,9 +11,18 @@
 //     BackupRetentionPeriod. Only checked when the parent IS in the dbi cache.
 //     Phrase: "automated, <N>d past retention"
 //
-// Both signals are emitted via IssueAppends (not Findings). FieldUpdates carries
-// the merged §4 status phrase (BumpFindingSuffix applied when pre-existing issues exist).
-// Findings is always empty; nil error always returned.
+// Wave classification (zero AWS API calls) is unchanged: this enricher makes
+// no SDK calls — it scans the in-memory dbi ResourceCache. The signals are
+// emitted via the IssueEnricherResult.Findings channel (with Rows) plus
+// FieldUpdates["status"], because Findings is the only enricher-output
+// channel that reaches the detail view's Attention section AND survives
+// repeated enrichment passes (Findings is overwritten per run, not appended).
+// IssueAppends is intentionally NOT used here — appending to Resource.Issues
+// is non-idempotent on re-runs and would duplicate Attention entries that
+// already render via Findings.
+//
+// docs/resources/rds-snap.md §4 surface mapping was updated in the same
+// commit to acknowledge cross-ref signals reach S1+S3+S5.
 package aws
 
 import (
@@ -30,9 +39,9 @@ func init() {
 	registerIssueEnricher("rds-snap", enrichRDSSnapCrossRef, 100)
 }
 
-// enrichRDSSnapCrossRef is the Wave-1 cross-ref enricher for RDS snapshots.
-// It detects orphan and past-retention signals via the dbi ResourceCache.
-// Zero API calls; nil clients are safe.
+// enrichRDSSnapCrossRef is the cross-ref enricher for RDS snapshots. Zero
+// API calls; nil clients are safe; idempotent on repeated runs (Findings
+// and FieldUpdates both overwrite per resource ID).
 func enrichRDSSnapCrossRef(
 	_ context.Context,
 	_ *ServiceClients,
@@ -42,14 +51,14 @@ func enrichRDSSnapCrossRef(
 	result := IssueEnricherResult{
 		Findings:     make(map[string]resource.EnrichmentFinding),
 		TruncatedIDs: make(map[string]bool),
-		IssueAppends: make(map[string][]string),
 		FieldUpdates: make(map[string]map[string]string),
 		IssueCount:   0,
 		Truncated:    false,
 	}
 
 	// If the dbi cache is not loaded, cross-ref rules cannot fire (orphan
-	// and past-retention both require a loaded sibling list). Return empty result.
+	// and past-retention both require a loaded sibling list). Spec §3.1:
+	// "Skip the rule when the dbi list has not been loaded in this session."
 	dbiEntry, dbiLoaded := cache["dbi"]
 	if !dbiLoaded {
 		return result, nil
@@ -87,7 +96,14 @@ func enrichRDSSnapCrossRef(
 
 		parent, parentFound := dbiByID[parentID]
 		if !parentFound {
-			// Orphan rule: parent not in the loaded dbi cache.
+			// Orphan rule (P2): when the dbi cache is truncated AND the
+			// parent isn't in the visible window, absence is not definitive
+			// — the parent may be on a later page. Skip the orphan signal
+			// in that case rather than emit a false positive. Same applies
+			// to past-retention (the rule below is gated on parentFound).
+			if dbiEntry.IsTruncated {
+				continue
+			}
 			newPhrases = append(newPhrases, "orphan: source DB deleted")
 		} else {
 			// Past-retention rule: only for automated snapshots with a parent
@@ -115,30 +131,15 @@ func enrichRDSSnapCrossRef(
 			continue
 		}
 
-		result.IssueAppends[res.ID] = newPhrases
-
-		// Build merged §4 status phrase.
-		// Pre-existing status from Wave-1 fetcher (res.Status) is the top phrase.
-		// New phrases from this enricher are appended. BumpFindingSuffix is applied
-		// once for each additional phrase beyond the first.
+		// FieldUpdates carries the merged §4 status phrase.
+		// Idempotent: existingStatus reads res.Status (the FETCHER-emitted
+		// value, not a previous merge), so re-runs converge.
 		mergedStatus := computeMergedStatus(res.Status, res.Issues, newPhrases)
-		if result.FieldUpdates[res.ID] == nil {
-			result.FieldUpdates[res.ID] = make(map[string]string)
-		}
-		result.FieldUpdates[res.ID]["status"] = mergedStatus
+		result.FieldUpdates[res.ID] = map[string]string{"status": mergedStatus}
 
-		// Emit a Wave-2 EnrichmentFinding for the detail-view's Attention
-		// section. The cross-ref signals are conceptually Wave-1 (zero AWS
-		// API calls — pure cache cross-ref), but the only path that reaches
-		// the detail view from inside the enricher hook is via Findings —
-		// the dispatcher wires `m.enrichmentFindings[type][id]` into
-		// DetailModel at view-open time (app_handlers_navigate.go:110).
-		// Severity "!" is used so unifiedIssueCount agrees with the Wave-1
-		// ResolveColor path (both contribute the same instance, deduped).
-		// Summary carries the §4 phrase verbatim — same string operators
-		// see in the Status column. Rows expose the per-instance context
-		// so the operator doesn't have to pivot to the dbi list to find
-		// out which parent's retention window was overshot.
+		// Findings emits the entries for the detail-view Attention section.
+		// Idempotent: handleEnrichmentChecked overwrites m.enrichmentFindings
+		// keyed by resource ID per run (no append).
 		summary := newPhrases[0]
 		rows := []resource.FindingRow{}
 		if !parentFound {
@@ -178,36 +179,49 @@ func enrichRDSSnapCrossRef(
 	return result, nil
 }
 
-// computeMergedStatus builds the final §4 status phrase when the enricher appends
-// new phrases to an existing set of issues.
+// computeMergedStatus builds the §4 status phrase when the cross-ref enricher
+// adds phrases to an existing fetcher-emitted set of Wave-1 phrases.
 //
-// Logic:
-//   - If existingIssues is empty (no pre-existing Wave-1 issues), the first new phrase
-//     becomes the status phrase. If there are more new phrases, BumpFindingSuffix is
-//     applied. existingStatus is ignored in this case — for healthy snaps it is ""
-//     (§4 phrase design: empty = healthy), and the cross-ref phrase replaces it.
-//   - If existingIssues is non-empty, the existing top phrase (existingStatus) remains
-//     the status but BumpFindingSuffix is applied once per new phrase added (since each
-//     new phrase expands the hidden-count).
+//   - existingStatus is the FETCHER's Resource.Status (the §4 top phrase plus
+//     any (+N) suffix the fetcher already emitted).  Reading from this — not
+//     from a previously-merged value — keeps the function idempotent: the
+//     enricher can run repeatedly and the suffix never accumulates.
+//   - existingIssues is the fetcher's Resource.Issues slice (count of fetcher
+//     phrases). Used only for total-count math.
+//   - newPhrases are the phrases this enricher contributes.
+//
+// Returned status = top phrase + " (+N-1)" where N is the total count, or the
+// bare top phrase when N == 1.
 func computeMergedStatus(existingStatus string, existingIssues []string, newPhrases []string) string {
 	totalIssues := len(existingIssues) + len(newPhrases)
 
-	if len(existingIssues) == 0 {
-		// No pre-existing Wave-1 issues — new phrases are the only issues.
-		if len(newPhrases) == 0 {
-			return ""
-		}
-		topPhrase := newPhrases[0]
-		if totalIssues == 1 {
-			return topPhrase
-		}
-		return resource.BumpFindingSuffix(topPhrase)
+	if totalIssues == 0 {
+		return ""
 	}
-
-	// Pre-existing Wave-1 issues exist: the existing top phrase is the status.
-	// Apply BumpFindingSuffix for each new phrase appended.
-	status := existingStatus
-	for range newPhrases {
+	if totalIssues == 1 {
+		// Exactly one phrase across both sides. If it came from the fetcher,
+		// existingStatus is non-empty; if it came from us, fall back to the
+		// new phrase.
+		if existingStatus != "" {
+			return existingStatus
+		}
+		return newPhrases[0]
+	}
+	// N ≥ 2: pick the top phrase (fetcher's, if present; else the first new
+	// phrase) and apply BumpFindingSuffix once per *additional* phrase beyond
+	// it, so the suffix matches (totalIssues - 1).
+	top := existingStatus
+	startBumps := len(newPhrases)
+	if top == "" {
+		top = newPhrases[0]
+		// First new phrase IS the top; remaining new phrases each bump.
+		startBumps = len(newPhrases) - 1
+	}
+	// existingIssues beyond index 0 already contributed to the fetcher's
+	// suffix encoded in existingStatus (e.g. "publicly accessible (+1)"), so
+	// we only bump once per *new* phrase the enricher adds.
+	status := top
+	for i := 0; i < startBumps; i++ {
 		status = resource.BumpFindingSuffix(status)
 	}
 	return status
