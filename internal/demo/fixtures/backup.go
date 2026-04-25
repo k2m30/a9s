@@ -152,26 +152,12 @@ func buildBackupRecoveryPoints() map[string][]backuptypes.RecoveryPointByResourc
 		},
 		// rds-snap pivot — required for the rds-snap→backup related-panel pivot.
 		// checkRDSSnapBackup calls ListRecoveryPointsByResource(ResourceArn=res.Fields["arn"]).
-		// The graph-root ProdRDSSnapAuroraARN gets 2 recovery points to satisfy
-		// the §9.3 "≥50% Count ≥ 2" relaxation: this is the only rds-snap pivot
-		// that can structurally carry Count ≥ 2 (dbi/kms/dbc are 1:1 by AWS data
-		// model). The non-Aurora baseline ProdRDSSnapARN gets 1 to keep its
-		// pivot ≥ 1. BackupCoveredRDSSnapARN gets 2 to validate the universal
-		// ≥1 contract independently of graph-root.
-		ProdRDSSnapAuroraARN: {
-			{
-				RecoveryPointArn: aws.String("arn:aws:backup:us-east-1:123456789012:recovery-point:rp-rdsa-daily-20260416"),
-				BackupVaultName:  aws.String(BackupProdVaultName),
-				Status:           backuptypes.RecoveryPointStatusCompleted,
-				CreationDate:     aws.Time(mustParseBackupTime("2026-04-16T03:00:00Z")),
-			},
-			{
-				RecoveryPointArn: aws.String("arn:aws:backup:us-east-1:123456789012:recovery-point:rp-rdsa-weekly-20260420"),
-				BackupVaultName:  aws.String(BackupProdVaultName),
-				Status:           backuptypes.RecoveryPointStatusCompleted,
-				CreationDate:     aws.Time(mustParseBackupTime("2026-04-20T03:00:00Z")),
-			},
-		},
+		// The graph-root ProdRDSSnapARN gets 1 recovery point. BackupCoveredRDSSnapARN
+		// gets 2 to validate the universal ≥1 contract independently of graph-root.
+		// Per §9.3 structural exemption: rds-snap pivots are 1:1 by AWS data model
+		// (a snapshot has exactly one source instance, one encryption key, and at
+		// most zero clusters since Aurora cluster snapshots live in dbc-snap), so
+		// the universal "≥50% Count ≥ 2" relaxation is unsatisfiable for this type.
 		ProdRDSSnapARN: {
 			{
 				RecoveryPointArn: aws.String("arn:aws:backup:us-east-1:123456789012:recovery-point:rp-rds1-daily-20260415"),

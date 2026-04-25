@@ -59,7 +59,6 @@ func TestScenario_RDSSnapVisual(t *testing.T) {
 	// -----------------------------------------------------------------
 	// Healthy: blank Status.
 	scenario.ExpectRowStatusBlank(demofixtures.ProdRDSSnapID)
-	scenario.ExpectRowStatusBlank(demofixtures.ProdRDSSnapAuroraID)
 	scenario.ExpectRowStatusBlank(demofixtures.BackupCoveredRDSSnapID)
 
 	// Transitional Warning.
@@ -91,7 +90,6 @@ func TestScenario_RDSSnapVisual(t *testing.T) {
 	// healthy rows — both should render glyph-free.
 	for _, id := range []string{
 		demofixtures.ProdRDSSnapID,
-		demofixtures.ProdRDSSnapAuroraID,
 		demofixtures.BackupCoveredRDSSnapID,
 		demofixtures.WarnRDSSnapCreatingID,
 		demofixtures.BrokenRDSSnapFailedID,
@@ -106,22 +104,22 @@ func TestScenario_RDSSnapVisual(t *testing.T) {
 	}
 
 	// -----------------------------------------------------------------
-	// Related panel — graph-root = ProdRDSSnapAuroraID. Per impl-plan §2.2
-	// the spec §2 contract caps dbi/kms/dbc at 1:1 by AWS data model, so
-	// the universal "≥50% Count ≥ 2" rule is structurally exempted for
-	// rds-snap. We assert ≥1 on every count-shown:yes pivot here.
+	// Related panel — graph-root = ProdRDSSnapID. Per impl-plan §9.3
+	// rds-snap has a structural exemption: dbi/kms are 1:1 by AWS data
+	// model, dbc is always Count=0 (Aurora cluster snapshots live in
+	// dbc-snap, not rds-snap — real AWS rejects CreateDBSnapshot on
+	// Aurora cluster members). The universal "≥50% Count ≥ 2" rule is
+	// unsatisfiable; we assert ≥1 on the pivots that have a non-zero
+	// case for rds-snap and accept Count=0 on dbc.
 	// -----------------------------------------------------------------
-	aurora := selectRDSSnapByID(t, scenario, demofixtures.ProdRDSSnapAuroraID)
-	scenario.OpenDetailResource("rds-snap", aurora)
+	root := selectRDSSnapByID(t, scenario, demofixtures.ProdRDSSnapID)
+	scenario.OpenDetailResource("rds-snap", root)
 	scenario.ExpectNoAPIError()
 	for _, displayName := range []string{
-		"DB Instances", "KMS Keys", "RDS Clusters", "Backup Plans",
+		"DB Instances", "KMS Keys", "Backup Plans",
 	} {
 		scenario.ExpectRelatedRowCountAtLeast(displayName, 1)
 	}
-	// `backup` is the one pivot that achieves Count ≥ 2 on the graph-root —
-	// pin it explicitly so a future fixture edit can't silently regress.
-	scenario.ExpectRelatedRowCountAtLeast("Backup Plans", 2)
 
 	scenario.Back()
 
@@ -147,7 +145,6 @@ func TestScenario_RDSSnapVisual_DetailSurfacesAllIssues(t *testing.T) {
 	cases := []issueCase{
 		// Healthy baseline — Attention section must be absent.
 		{demofixtures.ProdRDSSnapID, nil},
-		{demofixtures.ProdRDSSnapAuroraID, nil},
 		// Single Wave-1 phrases.
 		{demofixtures.WarnRDSSnapCreatingID, []string{"Creating: 42%"}},
 		{demofixtures.BrokenRDSSnapFailedID, []string{"Failed"}},
@@ -202,7 +199,7 @@ func TestScenario_RDSSnapVisual_HealthyRowHasNoIssuesPhrases(t *testing.T) {
 		"past retention",
 	}
 
-	for _, id := range []string{demofixtures.ProdRDSSnapID, demofixtures.ProdRDSSnapAuroraID} {
+	for _, id := range []string{demofixtures.ProdRDSSnapID} {
 		t.Run(id, func(t *testing.T) {
 			res := selectRDSSnapByID(t, scenario, id)
 			scenario.OpenDetailResource("rds-snap", res)

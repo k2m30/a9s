@@ -113,17 +113,20 @@ func TestScenario_DBIVisual(t *testing.T) {
 		scenario.ExpectRelatedRowCountAtLeast(displayName, 1)
 	}
 
-	// Aurora member → every §2 `count shown: yes` pivot ≥ 1.
-	// prod-dbi-aurora-1 is the "all pivots non-zero" graph-root — it covers
-	// every registered dbi pivot on a single fixture. ct-events is exempt
-	// per §5 (count shown: unknown for windowed LookupEvents).
+	// Aurora member → every §2 `count shown: yes` pivot that applies to
+	// Aurora cluster members must resolve ≥ 1. Aurora cluster instances do
+	// NOT take rds-snap (DescribeDBSnapshots rejects on Aurora cluster
+	// members — Aurora cluster snapshots live in dbc-snap), so the
+	// "RDS Snapshots" pivot is absent from this graph-root and is covered
+	// by the non-Aurora ProdDbiID above instead. ct-events is exempt per
+	// §5 (count shown: unknown for windowed LookupEvents).
 	scenario.Back()
 	aurora := selectDBIByID(t, scenario, demofixtures.ProdDbiAuroraID)
 	scenario.OpenDetailResource("dbi", aurora)
 	scenario.ExpectNoAPIError()
 	for _, displayName := range []string{
 		"Security Groups", "KMS Key", "Subnets", "CloudWatch Alarms",
-		"RDS Snapshots", "Log Groups", "VPC", "Secrets Manager",
+		"Log Groups", "VPC", "Secrets Manager",
 		"IAM Roles", "Network Interfaces", "RDS Clusters",
 	} {
 		scenario.ExpectRelatedRowCountAtLeast(displayName, 1)

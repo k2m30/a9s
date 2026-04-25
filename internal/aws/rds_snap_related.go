@@ -84,59 +84,6 @@ func checkRDSSnapKMS(ctx context.Context, clients any, res resource.Resource, ca
 	return relatedResult("kms", ids)
 }
 
-// checkRDSSnapDBC resolves the owning Aurora/RDS cluster by two-hop lookup
-// through the dbi cache (no extra API call — reuses the dbi list):
-// snap.DBInstanceIdentifier → dbi entry → dbi.DBClusterIdentifier → dbc.
-// Returns Count=0 when the source instance is standalone (no cluster).
-func checkRDSSnapDBC(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	snap, ok := assertStruct[rdstypes.DBSnapshot](res.RawStruct)
-	if !ok {
-		return resource.RelatedCheckResult{TargetType: "dbc", Count: -1}
-	}
-	if snap.DBInstanceIdentifier == nil || *snap.DBInstanceIdentifier == "" {
-		return resource.RelatedCheckResult{TargetType: "dbc", Count: 0}
-	}
-	dbName := *snap.DBInstanceIdentifier
-
-	dbiList, truncated, err := rdsSnapRelatedResources(ctx, clients, cache, "dbi")
-	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "dbc", Count: -1, Err: err}
-	}
-	if dbiList == nil {
-		return resource.RelatedCheckResult{TargetType: "dbc", Count: -1}
-	}
-
-	var clusterID string
-	dbiFound := false
-	for _, dbiRes := range dbiList {
-		if dbiRes.Name != dbName && dbiRes.ID != dbName {
-			continue
-		}
-		dbiFound = true
-		db, ok := assertStruct[rdstypes.DBInstance](dbiRes.RawStruct)
-		if !ok {
-			break
-		}
-		if db.DBClusterIdentifier != nil && *db.DBClusterIdentifier != "" {
-			clusterID = *db.DBClusterIdentifier
-		}
-		break
-	}
-	if clusterID == "" {
-		// UnknownRelated ONLY when the DBI cache was truncated AND we didn't
-		// find the source DB instance in the visible window — in that case
-		// we never reached the dbc lookup at all. If the source DBI IS in the
-		// cache (dbiFound) but has no DBClusterIdentifier, the snapshot is
-		// confirmed standalone → Count:0 (definitive), regardless of whether
-		// OTHER dbi entries may exist off-page.
-		if !dbiFound && truncated {
-			return resource.UnknownRelated("dbc")
-		}
-		return resource.RelatedCheckResult{TargetType: "dbc", Count: 0}
-	}
-	return relatedResult("dbc", []string{clusterID})
-}
-
 // rdsSnapRelatedResources returns cached resources for the target type, or fetches the first page.
 func rdsSnapRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)

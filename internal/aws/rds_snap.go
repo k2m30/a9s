@@ -15,10 +15,14 @@ import (
 func init() {
 	resource.RegisterFieldKeys("rds-snap", []string{"snapshot_id", "db_instance", "status", "engine", "snapshot_type", "created", "arn"})
 
+	// dbc pivot is intentionally NOT registered here: real AWS rejects
+	// CreateDBSnapshot on Aurora cluster members, so an rds-snap (DBSnapshot)
+	// is structurally never associated with a DBCluster. Aurora cluster
+	// snapshots live in dbc-snap (DBClusterSnapshot). A registered pivot that
+	// always resolves Count=0 is dead UX — drop it.
 	resource.RegisterRelated("rds-snap", []resource.RelatedDef{
 		{TargetType: "dbi", DisplayName: "DB Instances", Checker: checkRDSSnapDBI, NeedsTargetCache: true},
 		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkRDSSnapKMS, NeedsTargetCache: true},
-		{TargetType: "dbc", DisplayName: "RDS Clusters", Checker: checkRDSSnapDBC},
 		{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkRDSSnapBackup},
 		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkRDSSnapCTEvents, NeedsTargetCache: true},
 	})
