@@ -549,7 +549,7 @@ Resources where the existing detail/YAML view is sufficient, or where no meaning
 - **Redshift (redshift):** Parent has cluster nodes, endpoints, VPC info. No child entity.
 - **EFS (efs):** Mount targets could be a child but EFS is infrequently inspected. Low value.
 - **DB Instance Snapshots (dbi-snap):** Leaf resource. No child entity.
-- **DocumentDB Snapshots (dbc-snap):** Leaf resource. No child entity.
+- **DB Cluster Snapshots (dbc-snap):** Leaf resource. No child entity.
 
 ### MONITORING
 - **CloudTrail (trail):** Trail configuration is in parent. Trail events (`cloudtrail:LookupEvents`) have enormous volume and require filtering. Better served by CloudWatch Logs Insights or Athena.

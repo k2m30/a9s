@@ -30,7 +30,7 @@ func init() {
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkDbcKMS},
 		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkDbcSecrets, NeedsTargetCache: true},
 		{TargetType: "dbi", DisplayName: "RDS Instances", Checker: checkDbcDBI, NeedsTargetCache: true},
-		{TargetType: "dbc-snap", DisplayName: "DocumentDB Snapshots", Checker: checkDbcDbcSnap, NeedsTargetCache: true},
+		{TargetType: "dbc-snap", DisplayName: "DB Cluster Snapshots", Checker: checkDbcDbcSnap, NeedsTargetCache: true},
 		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkDbcSubnet},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkDbcVPC},
 	})

@@ -107,7 +107,7 @@ func TestScenario_DBCVisual(t *testing.T) {
 	scenario.ExpectNoAPIError()
 	for _, displayName := range []string{
 		"Security Groups", "CloudWatch Alarms", "Log Groups", "KMS Key",
-		"Secrets Manager", "DocumentDB Snapshots", "Subnets", "VPC",
+		"Secrets Manager", "DB Cluster Snapshots", "Subnets", "VPC",
 	} {
 		scenario.ExpectRelatedRowCountAtLeast(displayName, 1)
 	}
@@ -124,7 +124,7 @@ func TestScenario_DBCVisual(t *testing.T) {
 	scenario.ExpectNoAPIError()
 	for _, displayName := range []string{
 		"Security Groups", "CloudWatch Alarms", "Log Groups", "KMS Key",
-		"Secrets Manager", "RDS Instances", "DocumentDB Snapshots",
+		"Secrets Manager", "RDS Instances", "DB Cluster Snapshots",
 		"Subnets", "VPC",
 	} {
 		scenario.ExpectRelatedRowCountAtLeast(displayName, 1)

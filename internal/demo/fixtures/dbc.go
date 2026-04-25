@@ -42,6 +42,18 @@ const (
 	WarnDbcNoBkpMaintID  = "warn-dbc-no-bkp-plus-maint"
 	WarnDbcNoBkpMaintARN = "arn:aws:rds:us-east-1:123456789012:cluster:warn-dbc-no-bkp-plus-maint"
 
+	// ProdDBCSnapAuroraID — Aurora cluster snapshot for prod-aurora-cluster.
+	// Imported by tests/integration/scenario_related_drill_through_test.go as
+	// the dbc-snap graph-root: drilling its dbc back-pivot lands on
+	// prod-aurora-cluster (the Aurora dbc graph-root).
+	ProdDBCSnapAuroraID  = "rds:prod-aurora-cluster-2026-04-15"
+	ProdDBCSnapAuroraARN = "arn:aws:rds:us-east-1:123456789012:cluster-snapshot:rds:prod-aurora-cluster-2026-04-15"
+
+	// ProdDBCSnapDocDBID — DocumentDB cluster snapshot for acme-docdb-prod.
+	// Provides a non-Aurora dbc-snap drill-through case.
+	ProdDBCSnapDocDBID  = "rds:acme-docdb-prod-2026-03-20"
+	ProdDBCSnapDocDBARN = "arn:aws:rds:us-east-1:123456789012:cluster-snapshot:rds:acme-docdb-prod-2026-03-20"
+
 	// shared internal constants
 	dbcKMSKeyID = "arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"
 	dbcSGID     = "sg-0ccc333333333333c"
@@ -235,9 +247,9 @@ func buildDBCSnapshots() []docdbtypes.DBClusterSnapshot {
 	return []docdbtypes.DBClusterSnapshot{
 		// Automated daily snapshot for acme-docdb-prod — satisfies dbc→dbc-snap pivot (count≥1).
 		{
-			DBClusterSnapshotIdentifier: aws.String("rds:acme-docdb-prod-2026-03-20"),
+			DBClusterSnapshotIdentifier: aws.String(ProdDBCSnapDocDBID),
 			DBClusterIdentifier:         aws.String(ProdDbcID),
-			DBClusterSnapshotArn:        aws.String("arn:aws:rds:us-east-1:123456789012:cluster-snapshot:rds:acme-docdb-prod-2026-03-20"),
+			DBClusterSnapshotArn:        aws.String(ProdDBCSnapDocDBARN),
 			Status:                      aws.String("available"),
 			Engine:                      aws.String("docdb"),
 			EngineVersion:               aws.String("5.0.0"),
@@ -259,9 +271,9 @@ func buildDBCSnapshots() []docdbtypes.DBClusterSnapshot {
 		// graph-root. Aurora cluster snapshots share the DocDB API surface
 		// (DescribeDBClusterSnapshots) so they land in the same cache.
 		{
-			DBClusterSnapshotIdentifier: aws.String("rds:prod-aurora-cluster-2026-04-15"),
+			DBClusterSnapshotIdentifier: aws.String(ProdDBCSnapAuroraID),
 			DBClusterIdentifier:         aws.String("prod-aurora-cluster"),
-			DBClusterSnapshotArn:        aws.String("arn:aws:rds:us-east-1:123456789012:cluster-snapshot:rds:prod-aurora-cluster-2026-04-15"),
+			DBClusterSnapshotArn:        aws.String(ProdDBCSnapAuroraARN),
 			Status:                      aws.String("available"),
 			Engine:                      aws.String("aurora-postgresql"),
 			EngineVersion:               aws.String("16.4"),

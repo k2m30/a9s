@@ -81,6 +81,12 @@ var drillThroughFixtures = []struct {
 	// no realistic non-zero case for dbi-snap (Aurora cluster snapshots live
 	// in dbc-snap), so dbc=0 is the AWS-API truth here. See dbi-snap-impl-plan §9.3.
 	{"dbi-snap/prod", "dbi-snap", demofixtures.ProdDBISnapID},
+	// dbc-snap: covers BOTH Aurora and DocumentDB cluster snapshots
+	// (DescribeDBClusterSnapshots is engine-agnostic). Aurora root covers
+	// the dbc back-pivot to prod-aurora-cluster; DocDB root covers the
+	// non-Aurora case.
+	{"dbc-snap/aurora", "dbc-snap", demofixtures.ProdDBCSnapAuroraID},
+	{"dbc-snap/docdb", "dbc-snap", demofixtures.ProdDBCSnapDocDBID},
 }
 
 // drillThroughGroups collapses the flat fixture list into groups sharing a

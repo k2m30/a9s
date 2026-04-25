@@ -9,7 +9,6 @@ import (
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -64,85 +63,113 @@ func TestRelated_DbcSnap_Registered(t *testing.T) {
 	}
 }
 
-// --- Backup checker tests (Pattern A — direct API call) ---
+// --- Backup checker tests (Pattern C — cache scan, zero API calls) ---
+//
+// The dbc-snap → backup pivot now mirrors the dbi-snap → backup pattern:
+// resolve the snapshot's parent cluster ARN via the dbc cache, then scan the
+// loaded backup PLAN cache for plans whose Fields["resources"] cover that
+// cluster ARN. Returns plan IDs (not recovery-point ARNs) so drill-through
+// lands on the backup-plan list.
 
-const dbcSnapTestARN = "arn:aws:rds:us-east-1:123456789012:cluster-snapshot:dbc-snap-abc123"
-const dbcSnapRecoveryARN1 = "arn:aws:backup:us-east-1:123456789012:recovery-point:rp-docdb-aaa"
-const dbcSnapRecoveryARN2 = "arn:aws:backup:us-east-1:123456789012:recovery-point:rp-docdb-bbb"
+const dbcSnapTestClusterID = "acme-docdb-prod"
+const dbcSnapTestClusterARN = "arn:aws:rds:us-east-1:123456789012:cluster:acme-docdb-prod"
 
-func dbcSnapSrcResource() resource.Resource {
+func dbcSnapBackupSrcResource() resource.Resource {
 	return resource.Resource{
-		ID:     "dbc-snap-abc123",
-		Name:   "dbc-snap-abc123",
+		ID:     "rds:acme-docdb-prod-2026-03-20",
+		Name:   "rds:acme-docdb-prod-2026-03-20",
 		Fields: map[string]string{},
 		RawStruct: docdbtypes.DBClusterSnapshot{
-			DBClusterSnapshotIdentifier: aws.String("dbc-snap-abc123"),
-			DBClusterSnapshotArn:        aws.String(dbcSnapTestARN),
+			DBClusterSnapshotIdentifier: aws.String("rds:acme-docdb-prod-2026-03-20"),
+			DBClusterIdentifier:         aws.String(dbcSnapTestClusterID),
 		},
 	}
 }
 
-// TestRelated_DbcSnap_Backup_Match verifies that two recovery points returned
-// by the fake produce Count=2 with both ARNs in ResourceIDs.
-func TestRelated_DbcSnap_Backup_Match(t *testing.T) {
-	fake := newFakeBackupWithRecoveryPoints([]backuptypes.RecoveryPointByResource{
-		{RecoveryPointArn: aws.String(dbcSnapRecoveryARN1)},
-		{RecoveryPointArn: aws.String(dbcSnapRecoveryARN2)},
-	})
-	clients := &awsclient.ServiceClients{Backup: fake}
-	res := dbcSnapSrcResource()
-
-	checker := dbcSnapCheckerByTarget(t, "backup")
-	result := checker(context.Background(), clients, res, nil)
-
-	if result.Count != 2 {
-		t.Fatalf("Count = %d, want 2", result.Count)
+func dbcSnapBackupCache(planResources string) resource.ResourceCache {
+	dbcParent := docdbtypes.DBCluster{
+		DBClusterIdentifier: aws.String(dbcSnapTestClusterID),
+		DBClusterArn:        aws.String(dbcSnapTestClusterARN),
 	}
-	if len(result.ResourceIDs) != 2 {
-		t.Fatalf("ResourceIDs length = %d, want 2: %v", len(result.ResourceIDs), result.ResourceIDs)
-	}
-	seen := map[string]bool{}
-	for _, id := range result.ResourceIDs {
-		seen[id] = true
-	}
-	for _, want := range []string{dbcSnapRecoveryARN1, dbcSnapRecoveryARN2} {
-		if !seen[want] {
-			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs)
-		}
-	}
-	if result.Err != nil {
-		t.Errorf("unexpected Err: %v", result.Err)
+	return resource.ResourceCache{
+		"dbc": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{
+				{
+					ID:        dbcSnapTestClusterID,
+					Name:      dbcSnapTestClusterID,
+					RawStruct: dbcParent,
+				},
+			},
+		},
+		"backup": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{
+				{
+					ID:   "plan-aaa",
+					Name: "plan-aaa",
+					Fields: map[string]string{
+						"resources": planResources,
+					},
+				},
+				{
+					ID:   "plan-bbb",
+					Name: "plan-bbb",
+					Fields: map[string]string{
+						"resources": "arn:aws:rds:us-east-1:123456789012:cluster:other-cluster",
+					},
+				},
+			},
+		},
 	}
 }
 
-// TestRelated_DbcSnap_Backup_Empty verifies that zero recovery points produce Count=0.
-func TestRelated_DbcSnap_Backup_Empty(t *testing.T) {
-	fake := newFakeBackupWithRecoveryPoints([]backuptypes.RecoveryPointByResource{})
-	clients := &awsclient.ServiceClients{Backup: fake}
-	res := dbcSnapSrcResource()
+// TestRelated_DbcSnap_Backup_Match verifies a single plan whose resources
+// cover the parent cluster ARN resolves to Count=1 with that plan's ID.
+func TestRelated_DbcSnap_Backup_Match(t *testing.T) {
+	res := dbcSnapBackupSrcResource()
+	cache := dbcSnapBackupCache(dbcSnapTestClusterARN)
 
 	checker := dbcSnapCheckerByTarget(t, "backup")
-	result := checker(context.Background(), clients, res, nil)
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 1 {
+		t.Fatalf("Count = %d, want 1", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "plan-aaa" {
+		t.Errorf("ResourceIDs = %v, want [plan-aaa]", result.ResourceIDs)
+	}
+}
+
+// TestRelated_DbcSnap_Backup_Empty verifies Count=0 when no plan covers the
+// parent cluster ARN.
+func TestRelated_DbcSnap_Backup_Empty(t *testing.T) {
+	res := dbcSnapBackupSrcResource()
+	cache := dbcSnapBackupCache("arn:aws:rds:us-east-1:123456789012:cluster:unrelated")
+
+	checker := dbcSnapCheckerByTarget(t, "backup")
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no recovery points)", result.Count)
-	}
-	if len(result.ResourceIDs) != 0 {
-		t.Errorf("ResourceIDs = %v, want empty", result.ResourceIDs)
+		t.Errorf("Count = %d, want 0 (no plan matches)", result.Count)
 	}
 }
 
-// TestRelated_DbcSnap_Backup_WrongRawStruct verifies that a wrong RawStruct
-// type returns Count=-1 (defensive guard, assertStruct fails).
-func TestRelated_DbcSnap_Backup_WrongRawStruct(t *testing.T) {
+// TestRelated_DbcSnap_Backup_NoParentReference verifies Count=0 when the
+// snapshot has no DBClusterIdentifier (manual/shared snapshot).
+func TestRelated_DbcSnap_Backup_NoParentReference(t *testing.T) {
 	res := resource.Resource{
-		ID:        "dbc-snap-abc123",
-		RawStruct: "not-a-snapshot",
+		ID: "snap-1",
+		RawStruct: docdbtypes.DBClusterSnapshot{
+			DBClusterSnapshotIdentifier: aws.String("snap-1"),
+			// DBClusterIdentifier intentionally nil
+		},
 	}
 	checker := dbcSnapCheckerByTarget(t, "backup")
-	result := checker(context.Background(), nil, res, nil)
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no parent reference)", result.Count)
 	}
 }
+
+// Suppress unused-import warning when backuptypes is no longer needed.
+var _ = backuptypes.RecoveryPointByResource{}
