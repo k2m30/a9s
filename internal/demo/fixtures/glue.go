@@ -150,6 +150,18 @@ func NewGlueFixtures() *GlueFixtures {
 					DPUSeconds:    &dpuError,
 				},
 			},
+			// Graph-root S3→glue pivot drills into this job — needs one run.
+			"a9s-demo-s3-etl": {
+				{
+					Id:            aws.String("jr_demo1111-2222-3333-4444-555555555555"),
+					JobName:       aws.String("a9s-demo-s3-etl"),
+					JobRunState:   gluetypes.JobRunStateSucceeded,
+					StartedOn:     aws.Time(mustParseGlueTime("2026-04-20T07:00:00+00:00")),
+					CompletedOn:   aws.Time(mustParseGlueTime("2026-04-20T07:12:00+00:00")),
+					ExecutionTime: 720,
+					DPUSeconds:    &dpuSucceeded,
+				},
+			},
 		},
 	}
 }

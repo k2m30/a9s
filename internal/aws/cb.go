@@ -30,7 +30,7 @@ func init() {
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkCbKMS},
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkCbAlarm, NeedsTargetCache: true},
 		{TargetType: "ecr", DisplayName: "ECR Repositories", Checker: checkCbECR, NeedsTargetCache: true},
-		{TargetType: "s3", DisplayName: "S3 Buckets (source/artifacts)", Checker: checkCbS3, NeedsTargetCache: true},
+		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkCbS3, NeedsTargetCache: true},
 		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkCbSecrets, NeedsTargetCache: false},
 		{TargetType: "ssm", DisplayName: "SSM Parameters", Checker: checkCbSSM, NeedsTargetCache: false},
 	})

@@ -61,22 +61,12 @@ func TestScenario_DDBVisual(t *testing.T) {
 	// S1 menu badge — assert BEFORE OpenList while the main menu is
 	// still the current view.
 	//
-	// Expected: 7 = 6 Warning/Broken fixtures + 1 Healthy-with-finding
-	// fixture (`audit-pitr-off` carries a `~` PITR finding).
-	//
-	// Note: the strict spec wording in docs/resources/ddb.md §4 rule 4
-	// says "`~` never bumps the badge." The live S1 aggregator
-	// `unifiedIssueCount` (internal/tui/app_handlers_navigate.go) does
-	// not filter findings by severity — every resource with either a
-	// Warning/Broken Color OR any EnrichmentFinding contributes one to
-	// the count. That is a cross-resource infrastructure behavior (see
-	// scenario_dbc_visual_test.go which expects 11 for the same
-	// reason) — out of scope for this skill invocation. The expected
-	// count below pins the actual rendered behavior so this file
-	// stays green; fixing the aggregator to filter by `!` severity is
-	// a separate infrastructure change.
+	// Expected: 6 = the `!`-severity Wave-2 fixtures only. Per universal
+	// rule 4, `~` severity findings never bump the badge, so
+	// `audit-pitr-off` (Healthy + `~`) does not contribute.
+	// `unifiedIssueCount` filters by `!` severity.
 	// ---------------------------------------------------------------
-	scenario.ExpectMenuIssueCount("ddb", 7)
+	scenario.ExpectMenuIssueCount("ddb", 6)
 
 	scenario.OpenList("ddb")
 

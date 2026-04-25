@@ -37,7 +37,10 @@ func EnrichACMCertificate(ctx context.Context, clients *ServiceClients, resource
 		if i >= EnrichmentCap {
 			break
 		}
-		certARN := r.ID
+		// DescribeCertificate requires the certificate ARN. The acm fetcher
+		// (acm.go) sets ID = domain name and stores the ARN in
+		// Fields["certificate_arn"]. Passing r.ID errors with ValidationError.
+		certARN := r.Fields["certificate_arn"]
 		if certARN == "" {
 			continue
 		}
@@ -65,7 +68,7 @@ func EnrichACMCertificate(ctx context.Context, clients *ServiceClients, resource
 					days := int(remaining.Hours() / 24)
 					summary = fmt.Sprintf("expires in %d days", days)
 				}
-				findings[certARN] = resource.EnrichmentFinding{
+				findings[r.ID] = resource.EnrichmentFinding{
 					Severity: "!",
 					Summary:  summary,
 				}
@@ -75,7 +78,7 @@ func EnrichACMCertificate(ctx context.Context, clients *ServiceClients, resource
 		}
 		// Orphan check — only for ISSUED certs not already flagged.
 		if cert.Status == acmtypes.CertificateStatusIssued && len(cert.InUseBy) == 0 {
-			findings[certARN] = resource.EnrichmentFinding{
+			findings[r.ID] = resource.EnrichmentFinding{
 				Severity: "~",
 				Summary:  "certificate not in use (orphan)",
 			}

@@ -40,6 +40,7 @@ func NewServiceClients() *awsclient.ServiceClients {
 	clients.CloudFront = fakes.NewCloudFront()
 	clients.Route53 = fakes.NewR53()
 	clients.APIGatewayV2 = fakes.NewAPIGW()
+	clients.APIGatewayV1 = fakes.NewAPIGWV1()
 	clients.ECR = fakes.NewECR()
 	clients.EFS = fakes.NewEFS()
 	clients.EventBridge = fakes.NewEventBridge()

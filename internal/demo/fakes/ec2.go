@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/smithy-go"
 
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
 )
@@ -200,4 +201,26 @@ func toSet(ss []string) map[string]bool {
 		m[s] = true
 	}
 	return m
+}
+
+// validateARN returns an error when val is set but does not look like an AWS ARN.
+// Accepts the three standard AWS partition prefixes: arn:aws:, arn:aws-us-gov:, arn:aws-cn:.
+// Returns nil when val is empty (caller is responsible for nil-guarding the pointer).
+func validateARN(val string) error {
+	if val == "" {
+		return nil
+	}
+	if len(val) >= 8 && val[:8] == "arn:aws:" {
+		return nil
+	}
+	if len(val) >= 16 && val[:16] == "arn:aws-us-gov:" {
+		return nil
+	}
+	if len(val) >= 11 && val[:11] == "arn:aws-cn:" {
+		return nil
+	}
+	return &smithy.GenericAPIError{
+		Code:    "ValidationError",
+		Message: "'" + val + "' is not a valid ARN",
+	}
 }

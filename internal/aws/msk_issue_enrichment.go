@@ -31,18 +31,27 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
+	var failures []string
+	total := 0
 	for i, r := range resources {
 		if i >= EnrichmentCap {
 			break
 		}
-		clusterARN := r.ID
+		// DescribeClusterV2 requires the cluster ARN. The msk fetcher (msk.go)
+		// sets ID = cluster name and stores the ARN in Fields["cluster_arn"].
+		// Passing r.ID errors with ValidationError.
+		clusterARN := r.Fields["cluster_arn"]
 		if clusterARN == "" {
 			continue
 		}
-		out, err := clients.MSK.DescribeClusterV2(ctx, &kafkasvc.DescribeClusterV2Input{
-			ClusterArn: aws.String(clusterARN),
+		total++
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kafkasvc.DescribeClusterV2Output, error) {
+			return clients.MSK.DescribeClusterV2(ctx, &kafkasvc.DescribeClusterV2Input{
+				ClusterArn: aws.String(clusterARN),
+			})
 		})
 		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
 			truncatedIDs[r.ID] = true
 			continue
@@ -58,18 +67,18 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 		// Check broker software version.
 		if prov.CurrentBrokerSoftwareInfo != nil && prov.CurrentBrokerSoftwareInfo.KafkaVersion != nil {
 			if isMSKVersionOutdated(*prov.CurrentBrokerSoftwareInfo.KafkaVersion) {
-				findings[clusterARN] = resource.EnrichmentFinding{
+				findings[r.ID] = resource.EnrichmentFinding{
 					Severity: "~",
 					Summary:  "broker software outdated",
 				}
 			}
 		}
 		// Check encryption in transit (only set finding if not already set).
-		if _, alreadyFound := findings[clusterARN]; !alreadyFound {
+		if _, alreadyFound := findings[r.ID]; !alreadyFound {
 			if prov.EncryptionInfo != nil &&
 				prov.EncryptionInfo.EncryptionInTransit != nil &&
 				prov.EncryptionInfo.EncryptionInTransit.ClientBroker != kafkatypes.ClientBrokerTls {
-				findings[clusterARN] = resource.EnrichmentFinding{
+				findings[r.ID] = resource.EnrichmentFinding{
 					Severity: "~",
 					Summary:  "encryption in transit not enforced",
 				}
@@ -78,7 +87,8 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 	}
 	// All MSK findings are severity "~" (informational) and do not contribute to the
 	// attention menu badge. IssueCount is always 0 for this enricher.
-	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings},
+		AggregateFailures("msk-enrich: DescribeClusterV2", failures, total)
 }
 
 // isMSKVersionOutdated returns true when the given Kafka version string is below the

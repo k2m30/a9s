@@ -153,11 +153,12 @@ func TestEC2_008_NavChain_JMovesFieldCursor(t *testing.T) {
 // TestEC2_008_NavChain_RightCol_Count1_OpensDetail
 // ---------------------------------------------------------------------------
 
-// TestEC2_008_NavChain_RightCol_Count1_OpensDetail verifies that when a
-// RelatedNavigateMsg with TargetID arrives, the model pushes a detail view.
-//
-// FAILS AT RUNTIME until handleRelatedNavigate pushes TargetDetail for single IDs.
-func TestEC2_008_NavChain_RightCol_Count1_OpensDetail(t *testing.T) {
+// TestEC2_008_NavChain_RightCol_Count1_OpensDrillTarget verifies that when a
+// RelatedNavigateMsg with TargetID arrives, the model mirrors manual Enter
+// on the target row. tg has Children[Key="enter"] → tg_health so the fast
+// path must enter that child view rather than push generic detail (rule
+// 2026-04-24: count-1 drill does exactly what Enter would do).
+func TestEC2_008_NavChain_RightCol_Count1_OpensDrillTarget(t *testing.T) {
 	m := newNavDemoModel(t)
 
 	ec2Res := firstEC2Resource(t)
@@ -168,25 +169,39 @@ func TestEC2_008_NavChain_RightCol_Count1_OpensDetail(t *testing.T) {
 	})
 
 	// Pre-populate TG cache
-	tgRes := resource.Resource{ID: "tg-ec2chain-001", Name: "prod-api-tg", Status: "active"}
+	tgRes := resource.Resource{
+		ID:     "tg-ec2chain-001",
+		Name:   "prod-api-tg",
+		Status: "active",
+		Fields: map[string]string{"target_group_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/prod-api-tg/abc123"},
+	}
 	m, _ = navApplyMsg(m, messages.ResourcesLoadedMsg{
 		ResourceType: "tg",
 		Resources:    []resource.Resource{tgRes},
 	})
 
 	// Deliver RelatedNavigateMsg with TargetID (count=1 path)
-	m, _ = navApplyMsg(m, messages.RelatedNavigateMsg{
+	m, cmd := navApplyMsg(m, messages.RelatedNavigateMsg{
 		TargetType: "tg",
 		TargetID:   "tg-ec2chain-001",
 	})
+	// Drain EnterChildViewMsg dispatch so the child view is pushed.
+	if cmd != nil {
+		if msg := cmd(); msg != nil {
+			m, _ = navApplyMsg(m, msg)
+		}
+	}
 
 	view := navStripANSI(navViewContent(m))
 
-	if !strings.Contains(view, "prod-api-tg") {
-		t.Errorf("after RelatedNavigateMsg(TargetID), view must show TG detail with name %q; got:\n%s", "prod-api-tg", view)
+	if !strings.Contains(view, "tg_health") {
+		t.Errorf("after RelatedNavigateMsg(TargetID) on tg (enter-child registered), view must enter tg_health child view; got:\n%s", view)
 	}
 	if strings.Contains(view, "tg(1)") {
-		t.Errorf("RelatedNavigateMsg(TargetID) must open DETAIL not list; found list indicator in view:\n%s", view)
+		t.Errorf("RelatedNavigateMsg(TargetID) must not open a filtered list; got:\n%s", view)
+	}
+	if strings.Contains(view, "detail -- tg-ec2chain-001") {
+		t.Errorf("RelatedNavigateMsg for tg (with enter-child) must not push plain detail; got:\n%s", view)
 	}
 }
 

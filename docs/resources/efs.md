@@ -52,7 +52,7 @@ Expected targets from `docs/related-resources.md` Per-type contract: `alarm`, `b
 ### `ecs-task`
 
 - **Why related**: ECS tasks mounting this file system via EFS volume configuration.
-- **How discovered**: cross-reference the already-loaded `ecs-task` list for tasks whose task definition has `volumes[].efsVolumeConfiguration.FileSystemId == <fs-id>` — a9s-devops: the mount reference lives on the task-definition, not the running task row, so this pivot requires task-definition data to already be joined onto the loaded ecs-task list. If task-defs are not joined in this sweep, degrade to `TBD — ecs-task join not available`.
+- **How discovered**: cross-reference the already-loaded `ecs-task` list for tasks whose task definition has `volumes[].efsVolumeConfiguration.FileSystemId == <fs-id>`. The ecs-task fetcher joins task-definitions upstream — once per unique `TaskDefinitionArn` in the sweep via `DescribeTaskDefinition` — and attaches the resolved `Volumes` onto the task Resource so the EFS checker reads `FileSystemId` values without any per-detail-view call. See §6 citation `user decision (2026-04-24)`.
 - **Count shown**: yes.
 
 ### `eni`
@@ -208,6 +208,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — `cfn` discovery via `aws:cloudformation:stack-name` tag on FS — `a9s-devops (2026-04-20): possible=yes, worth=yes. EFS returns tags on the description; CFN-managed resources always carry this tag.`
 - a9s-devops consultation — `ec2` discovery is weak and noisy; deferred — `a9s-devops (2026-04-20): possible=weak, worth=no. No direct EFS→EC2 field; subnet-based inference is noisy. Recorded in §5 Out of Scope.`
 - a9s-devops consultation — `ecs-task` discovery via task-def `volumes[].efsVolumeConfiguration.FileSystemId` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Requires task-def join onto loaded ecs-task list; degrade to TBD if not joined.`
+- user decision (2026-04-24) — Upgrade the ecs-task fetcher to join task-definitions (one `DescribeTaskDefinition` per unique `TaskDefinitionArn` per sweep, result cached on each task's Resource) so the EFS `ecs-task` pivot renders a non-zero count without per-detail-view probing. Ties this skill's scope to a second resource's fetcher; that change is approved in-scope for this PR.
 - a9s-devops consultation — `lambda` discovery via `FunctionConfiguration.FileSystemConfigs[].Arn` — `a9s-devops (2026-04-20): possible=yes, worth=yes. FileSystemConfigs[].Arn is an access-point ARN that embeds the FS id; prefix-match so both forms resolve.`
 - a9s-devops consultation — `sg` discovery via `DescribeMountTargetSecurityGroups` or ENI `Groups` join — `a9s-devops (2026-04-20): possible=yes, worth=yes. Both paths return the same SG set; prefer ENI join when eni list is already loaded.`
 - a9s-devops consultation — `eni`/`subnet`/`vpc` discovery via `DescribeMountTargets` fields `NetworkInterfaceId`/`SubnetId`/`VpcId` — `a9s-devops (2026-04-20): possible=yes, worth=yes. All three are direct SDK fields on MountTargetDescription; one DescribeMountTargets call covers all three pivots.`

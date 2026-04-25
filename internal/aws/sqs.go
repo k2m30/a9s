@@ -66,21 +66,28 @@ func FetchSQSQueuesPage(ctx context.Context, listAPI SQSListQueuesAPI, attrAPI S
 		input.NextToken = &continuationToken
 	}
 
-	listOutput, err := listAPI.ListQueues(ctx, input)
+	listOutput, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sqs.ListQueuesOutput, error) {
+		return listAPI.ListQueues(ctx, input)
+	})
 	if err != nil {
 		return resource.FetchResult{}, fmt.Errorf("listing SQS queues: %w", err)
 	}
 
+	total := len(listOutput.QueueUrls)
 	var resources []resource.Resource
+	var failures []string
 	for _, queueURL := range listOutput.QueueUrls {
-		attrOutput, err := attrAPI.GetQueueAttributes(ctx, &sqs.GetQueueAttributesInput{
-			QueueUrl: &queueURL,
-			AttributeNames: []sqstypes.QueueAttributeName{
-				sqstypes.QueueAttributeNameAll,
-			},
+		attrOutput, attrErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sqs.GetQueueAttributesOutput, error) {
+			return attrAPI.GetQueueAttributes(ctx, &sqs.GetQueueAttributesInput{
+				QueueUrl: &queueURL,
+				AttributeNames: []sqstypes.QueueAttributeName{
+					sqstypes.QueueAttributeNameAll,
+				},
+			})
 		})
-		if err != nil {
-			return resource.FetchResult{}, fmt.Errorf("fetching SQS queue attributes for %s: %w", queueURL, err)
+		if attrErr != nil {
+			failures = append(failures, fmt.Sprintf("%s: %s", queueURL, attrErr.Error()))
+			continue
 		}
 
 		attrs := attrOutput.Attributes
@@ -139,5 +146,5 @@ func FetchSQSQueuesPage(ctx context.Context, listAPI SQSListQueuesAPI, attrAPI S
 			PageSize:    len(resources),
 			TotalHint:   totalHint,
 		},
-	}, nil
+	}, AggregateFailures("sqs: GetQueueAttributes", failures, total)
 }

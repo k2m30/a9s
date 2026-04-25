@@ -23,8 +23,13 @@ func (f *CloudWatchFake) DescribeAlarms(_ context.Context, _ *cloudwatch.Describ
 	return &cloudwatch.DescribeAlarmsOutput{MetricAlarms: f.fix.Alarms}, nil
 }
 
-func (f *CloudWatchFake) DescribeAlarmHistory(_ context.Context, _ *cloudwatch.DescribeAlarmHistoryInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.DescribeAlarmHistoryOutput, error) {
-	return &cloudwatch.DescribeAlarmHistoryOutput{
-		AlarmHistoryItems: []cwtypes.AlarmHistoryItem{},
-	}, nil
+func (f *CloudWatchFake) DescribeAlarmHistory(_ context.Context, in *cloudwatch.DescribeAlarmHistoryInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.DescribeAlarmHistoryOutput, error) {
+	if in == nil || in.AlarmName == nil {
+		return &cloudwatch.DescribeAlarmHistoryOutput{AlarmHistoryItems: []cwtypes.AlarmHistoryItem{}}, nil
+	}
+	items, ok := f.fix.AlarmHistory[*in.AlarmName]
+	if !ok {
+		return &cloudwatch.DescribeAlarmHistoryOutput{AlarmHistoryItems: []cwtypes.AlarmHistoryItem{}}, nil
+	}
+	return &cloudwatch.DescribeAlarmHistoryOutput{AlarmHistoryItems: items}, nil
 }

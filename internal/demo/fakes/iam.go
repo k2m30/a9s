@@ -101,6 +101,9 @@ func (f *IAMFake) ListEntitiesForPolicy(_ context.Context, input *iam.ListEntiti
 	if input.PolicyArn == nil {
 		return nil, fmt.Errorf("ListEntitiesForPolicy: policy ARN is required")
 	}
+	if err := validateARN(*input.PolicyArn); err != nil {
+		return nil, err
+	}
 	entities := f.fix.EntitiesForPolicy[*input.PolicyArn]
 	if entities == nil {
 		return &iam.ListEntitiesForPolicyOutput{}, nil
@@ -146,6 +149,9 @@ func (f *IAMFake) GetPolicy(_ context.Context, input *iam.GetPolicyInput, _ ...f
 	if input.PolicyArn == nil {
 		return nil, fmt.Errorf("GetPolicy: policy ARN is required")
 	}
+	if err := validateARN(*input.PolicyArn); err != nil {
+		return nil, err
+	}
 	for i := range f.fix.Policies {
 		if f.fix.Policies[i].Arn != nil && *f.fix.Policies[i].Arn == *input.PolicyArn {
 			p := f.fix.Policies[i]
@@ -158,6 +164,9 @@ func (f *IAMFake) GetPolicy(_ context.Context, input *iam.GetPolicyInput, _ ...f
 func (f *IAMFake) GetPolicyVersion(_ context.Context, input *iam.GetPolicyVersionInput, _ ...func(*iam.Options)) (*iam.GetPolicyVersionOutput, error) {
 	if input.PolicyArn == nil {
 		return nil, fmt.Errorf("GetPolicyVersion: policy ARN is required")
+	}
+	if err := validateARN(*input.PolicyArn); err != nil {
+		return nil, err
 	}
 	doc, ok := f.fix.PolicyDocuments[*input.PolicyArn]
 	if !ok {
@@ -185,7 +194,14 @@ func (f *IAMFake) GetRole(_ context.Context, input *iam.GetRoleInput, _ ...func(
 			return &iam.GetRoleOutput{Role: &r}, nil
 		}
 	}
-	return nil, fmt.Errorf("GetRole: role %q not found", *input.RoleName)
+	// Match the real AWS IAM API shape so checkers that branch on
+	// apiErr.ErrorCode() == "NoSuchEntity" (e.g. checkTGWRole, checkXRole
+	// service-linked-role probes) can distinguish "role absent" (Count=0)
+	// from "unexpected error" (Count=-1). NoSuchEntityException satisfies
+	// the smithy APIError interface with ErrorCode() == "NoSuchEntity".
+	return nil, &iamtypes.NoSuchEntityException{
+		Message: aws.String("Role with name " + *input.RoleName + " cannot be found."),
+	}
 }
 
 func (f *IAMFake) GetRolePolicy(_ context.Context, input *iam.GetRolePolicyInput, _ ...func(*iam.Options)) (*iam.GetRolePolicyOutput, error) {

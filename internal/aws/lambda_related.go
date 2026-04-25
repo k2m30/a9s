@@ -3,6 +3,7 @@ package aws
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
@@ -199,8 +200,10 @@ func checkLambdaSQS(ctx context.Context, clients any, res resource.Resource, _ r
 	if !ok || c == nil || c.Lambda == nil {
 		return resource.RelatedCheckResult{TargetType: "sqs", Count: -1}
 	}
-	out, err := c.Lambda.ListEventSourceMappings(ctx, &lambda.ListEventSourceMappingsInput{
-		FunctionName: &functionName,
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.ListEventSourceMappingsOutput, error) {
+		return c.Lambda.ListEventSourceMappings(ctx, &lambda.ListEventSourceMappingsInput{
+			FunctionName: &functionName,
+		})
 	})
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "sqs", Count: -1, Err: err}
@@ -240,7 +243,9 @@ func checkLambdaCFN(ctx context.Context, clients any, res resource.Resource, cac
 	if !sok || c == nil || c.Lambda == nil {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
 	}
-	tagsOut, err := c.Lambda.ListTags(ctx, &lambda.ListTagsInput{Resource: fn.FunctionArn})
+	tagsOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.ListTagsOutput, error) {
+		return c.Lambda.ListTags(ctx, &lambda.ListTagsInput{Resource: fn.FunctionArn})
+	})
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
 	}
@@ -347,6 +352,7 @@ func checkLambdaEBRule(ctx context.Context, clients any, res resource.Resource, 
 		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: -1}
 	}
 	idSet := make(map[string]struct{})
+	var failures []string
 	for _, ruleRes := range ruleList {
 		parentCtx := map[string]string{
 			"rule_name": ruleRes.ID,
@@ -354,6 +360,7 @@ func checkLambdaEBRule(ctx context.Context, clients any, res resource.Resource, 
 		}
 		targets, err := FetchEventBridgeRuleTargets(ctx, c.EventBridge, parentCtx, "")
 		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", ruleRes.ID, err))
 			continue
 		}
 		for _, tgt := range targets.Resources {
@@ -371,6 +378,9 @@ func checkLambdaEBRule(ctx context.Context, clients any, res resource.Resource, 
 	ids := make([]string, 0, len(idSet))
 	for id := range idSet {
 		ids = append(ids, id)
+	}
+	if aggErr := AggregateFailures("lambda-related: ListTargetsByRule", failures, len(ruleList)); aggErr != nil {
+		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: len(ids), ResourceIDs: ids, Err: aggErr}
 	}
 	if len(ids) == 0 && truncated {
 		return resource.ApproximateZero("eb-rule")

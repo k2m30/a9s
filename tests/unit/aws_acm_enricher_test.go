@@ -63,20 +63,22 @@ func (f *acmDescribeCertificateFake) DescribeCertificate(
 var _ awsclient.ACMAPI = (*acmDescribeCertificateFake)(nil)
 
 // acmCertResources returns a slice of ACM Resource stubs with the given ARNs.
+// Mirrors the fetcher contract: ID = bare domain, Fields["certificate_arn"] = full ARN.
 func acmCertResources(arns ...string) []resource.Resource {
 	res := make([]resource.Resource, 0, len(arns))
 	for _, arn := range arns {
 		domain := "example-" + arn[len(arn)-8:] + ".com"
 		res = append(res, resource.Resource{
-			ID:     arn,
+			ID:     domain,
 			Name:   domain,
 			Status: "ISSUED",
 			Fields: map[string]string{
-				"domain_name": domain,
-				"status":      "ISSUED",
-				"type":        "AMAZON_ISSUED",
-				"not_after":   "",
-				"in_use":      "true",
+				"certificate_arn": arn,
+				"domain_name":     domain,
+				"status":          "ISSUED",
+				"type":            "AMAZON_ISSUED",
+				"not_after":       "",
+				"in_use":          "true",
 			},
 		})
 	}
@@ -97,9 +99,16 @@ func acmCertDetail(arn string, notAfterOffset time.Duration, inUseBy []string, s
 }
 
 const (
-	acmARN1 = "arn:aws:acm:us-east-1:123456789012:certificate/aaaaaaaa-1111-2222-3333-444444444444"
-	acmARN2 = "arn:aws:acm:us-east-1:123456789012:certificate/bbbbbbbb-1111-2222-3333-444444444444"
-	acmARN3 = "arn:aws:acm:us-east-1:123456789012:certificate/cccccccc-1111-2222-3333-444444444444"
+	acmARN1 = "arn:aws:acm:us-east-1:123456789012:certificate/aaaaaaaa-1111-2222-3333-cert00000001"
+	acmARN2 = "arn:aws:acm:us-east-1:123456789012:certificate/bbbbbbbb-1111-2222-3333-cert00000002"
+	acmARN3 = "arn:aws:acm:us-east-1:123456789012:certificate/cccccccc-1111-2222-3333-cert00000003"
+
+	// acmDomain* are the bare domain IDs derived from the ARN suffix by acmCertResources.
+	// They mirror what the fetcher sets as r.ID.
+	// Suffix formula: arn[len(arn)-8:] → "00000001", "00000002", "00000003".
+	acmDomain1 = "example-00000001.com"
+	acmDomain2 = "example-00000002.com"
+	acmDomain3 = "example-00000003.com"
 )
 
 // TestEnrichACMCertificate_ValidInUseProducesNoFindings verifies that when all certs
@@ -149,9 +158,9 @@ func TestEnrichACMCertificate_ExpiringSoonProducesFindingSevBang(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[acmARN1]
+	f, ok := result.Findings[acmDomain1]
 	if !ok {
-		t.Fatalf("expected finding keyed by %q", acmARN1)
+		t.Fatalf("expected finding keyed by bare domain %q", acmDomain1)
 	}
 	if f.Severity != "!" {
 		t.Errorf("severity = %q, want %q", f.Severity, "!")
@@ -159,10 +168,10 @@ func TestEnrichACMCertificate_ExpiringSoonProducesFindingSevBang(t *testing.T) {
 	if !strings.Contains(strings.ToLower(f.Summary), "expires") {
 		t.Errorf("summary %q must contain \"expires\"", f.Summary)
 	}
-	if _, ok := result.Findings[acmARN2]; ok {
+	if _, ok := result.Findings[acmDomain2]; ok {
 		t.Error("cert-2 must NOT appear in Findings — it is not expiring soon")
 	}
-	if _, ok := result.Findings[acmARN3]; ok {
+	if _, ok := result.Findings[acmDomain3]; ok {
 		t.Error("cert-3 must NOT appear in Findings — it is not expiring soon")
 	}
 	if result.IssueCount != 1 {
@@ -188,17 +197,17 @@ func TestEnrichACMCertificate_ExpiredProducesFindingSevBang(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[acmARN1]
+	f, ok := result.Findings[acmDomain1]
 	if !ok {
-		t.Fatalf("expected finding keyed by %q", acmARN1)
+		t.Fatalf("expected finding keyed by bare domain %q", acmDomain1)
 	}
 	if f.Severity != "!" {
 		t.Errorf("severity = %q, want %q", f.Severity, "!")
 	}
-	if _, ok := result.Findings[acmARN2]; ok {
+	if _, ok := result.Findings[acmDomain2]; ok {
 		t.Error("cert-2 must NOT appear in Findings — it is valid")
 	}
-	if _, ok := result.Findings[acmARN3]; ok {
+	if _, ok := result.Findings[acmDomain3]; ok {
 		t.Error("cert-3 must NOT appear in Findings — it is valid")
 	}
 	if result.IssueCount != 1 {
@@ -224,17 +233,17 @@ func TestEnrichACMCertificate_OrphanIssuedProducesFindingSevTilde(t *testing.T) 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[acmARN1]
+	f, ok := result.Findings[acmDomain1]
 	if !ok {
-		t.Fatalf("expected finding keyed by %q (orphan cert)", acmARN1)
+		t.Fatalf("expected finding keyed by bare domain %q (orphan cert)", acmDomain1)
 	}
 	if f.Severity != "~" {
 		t.Errorf("severity = %q, want %q", f.Severity, "~")
 	}
-	if _, ok := result.Findings[acmARN2]; ok {
+	if _, ok := result.Findings[acmDomain2]; ok {
 		t.Error("cert-2 must NOT appear in Findings — it is in use")
 	}
-	if _, ok := result.Findings[acmARN3]; ok {
+	if _, ok := result.Findings[acmDomain3]; ok {
 		t.Error("cert-3 must NOT appear in Findings — it is in use")
 	}
 	// "~" findings do NOT contribute to IssueCount per the EnricherResult contract.

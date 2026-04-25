@@ -120,6 +120,10 @@ func buildS3Buckets() []s3types.Bucket {
 		{"a9s-demo-nilcfg", "arn:aws:s3:::a9s-demo-nilcfg", "us-east-1", "2025-05-05T11:00:00+00:00"},
 		// SES inbound mail bucket: receives mail via SES v1 receipt rule (checkSESS3 pivot).
 		{SESInboundBucketName, "arn:aws:s3:::" + SESInboundBucketName, "us-east-1", "2025-04-01T07:00:00+00:00"},
+		// Redshift audit bucket — required for redshift→s3 related-panel pivot.
+		// acme-reporting cluster has S3-logging enabled with destination = RedshiftAuditBucket.
+		// DescribeLoggingStatus for acme-reporting returns BucketName=RedshiftAuditBucket.
+		{RedshiftAuditBucket, "arn:aws:s3:::" + RedshiftAuditBucket, "us-east-1", "2025-07-22T14:00:00+00:00"},
 	}
 
 	// Named legacy buckets with objects.
@@ -541,6 +545,27 @@ func buildS3Objects() map[string]map[string][]s3types.Object {
 				{Key: aws.String("landing/2026/04/07/batch-0719.parquet"), Size: aws.Int64(134963814), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustTime("2026-04-07T19:05:44Z"))},
 				{Key: aws.String("landing/2026/04/07/batch-0718.parquet"), Size: aws.Int64(137597338), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustTime("2026-04-07T18:05:11Z"))},
 				{Key: aws.String("landing/2026/04/07/batch-0717.parquet"), Size: aws.Int64(132578918), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustTime("2026-04-07T17:05:02Z"))},
+			},
+		},
+		// Graph-root-drilled buckets: every pivot with TargetType=s3 emits
+		// these IDs, so each must have at least one object so s3→s3_objects
+		// drill lands on non-empty content.
+		LogsBucketName: {
+			"": {
+				{Key: aws.String("access-2026-04-20.log"), Size: aws.Int64(1048576), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustTime("2026-04-20T06:00:00Z"))},
+				{Key: aws.String("access-2026-04-19.log"), Size: aws.Int64(1000000), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustTime("2026-04-19T06:00:00Z"))},
+			},
+		},
+		SESInboundBucketName: {
+			"": {
+				{Key: aws.String("incoming/20260420-000001.eml"), Size: aws.Int64(4096), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustTime("2026-04-20T10:00:00Z"))},
+				{Key: aws.String("incoming/20260420-000002.eml"), Size: aws.Int64(8192), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustTime("2026-04-20T10:05:00Z"))},
+			},
+		},
+		RedshiftAuditBucket: {
+			"": {
+				{Key: aws.String("AWSLogs/123456789012/redshift/us-east-1/2026/04/20/acme-reporting-20260420.log.gz"), Size: aws.Int64(262144), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustTime("2026-04-20T07:00:00Z"))},
+				{Key: aws.String("AWSLogs/123456789012/redshift/us-east-1/2026/04/19/acme-reporting-20260419.log.gz"), Size: aws.Int64(229376), StorageClass: s3types.ObjectStorageClassStandard, LastModified: aws.Time(mustTime("2026-04-19T07:00:00Z"))},
 			},
 		},
 	}

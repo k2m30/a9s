@@ -5,6 +5,8 @@ package aws
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"strings"
 
 	ecspkg "github.com/aws/aws-sdk-go-v2/service/ecs"
@@ -14,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	secretstypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
+	"github.com/aws/smithy-go"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -94,6 +97,8 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 
 	resolveRef := "{{resolve:secretsmanager:" + secretARN
 	var ids []string
+	var failures []string
+	total := len(entry.Resources)
 	for _, ebRes := range entry.Resources {
 		eb, ok := assertStruct[ebtypes.EnvironmentDescription](ebRes.RawStruct)
 		if !ok {
@@ -117,6 +122,7 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 			})
 		})
 		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", ebRes.ID, err))
 			continue
 		}
 		for _, cfg := range cfgOut.ConfigurationSettings {
@@ -135,6 +141,7 @@ func checkSecretsEB(ctx context.Context, clients any, res resource.Resource, cac
 
 	result := relatedResult("eb", ids)
 	result.Approximate = entry.IsTruncated
+	result.Err = AggregateFailures("secrets-related: DescribeConfigurationSettings", failures, total)
 	return result
 }
 
@@ -173,6 +180,8 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 	}
 
 	var ids []string
+	var failures []string
+	total := len(entry.Resources)
 	for _, taskRes := range entry.Resources {
 		// Cache stores ecstypes.Task — extract TaskDefinitionArn
 		task, ok := assertStruct[ecstypes.Task](taskRes.RawStruct)
@@ -195,7 +204,19 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 				TaskDefinition: &taskDefARN,
 			})
 		})
-		if err != nil || tdOut == nil || tdOut.TaskDefinition == nil {
+		if err != nil {
+			// "Task definition does not exist" (ClientException) is definitive
+			// absence, not a real failure — skip without aggregating. Every
+			// other error (AccessDenied, Throttling, transient) aggregates per
+			// the E3 rule. Mirrors ecsJoinEFSVolumes in ecs_task.go.
+			var apiErr smithy.APIError
+			if errors.As(err, &apiErr) && apiErr.ErrorCode() == "ClientException" {
+				continue
+			}
+			failures = append(failures, fmt.Sprintf("%s: %v", taskRes.ID, err))
+			continue
+		}
+		if tdOut == nil || tdOut.TaskDefinition == nil {
 			continue
 		}
 		if secretsECSTaskRefsSecret(*tdOut.TaskDefinition, secretARN) {
@@ -205,6 +226,7 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 
 	result := relatedResult("ecs-task", ids)
 	result.Approximate = entry.IsTruncated
+	result.Err = AggregateFailures("secrets-related: DescribeTaskDefinition", failures, total)
 	return result
 }
 

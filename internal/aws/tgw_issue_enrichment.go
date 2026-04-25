@@ -22,6 +22,7 @@ func init() {
 // attachments in a failed or transitional state.
 // Severity "!" for failed/failing; severity "~" for modifying/pendingAcceptance/rollingBack.
 // When multiple issues exist on the same TGW, the worst severity ("!") takes precedence.
+// Per-TGW errors are aggregated and returned as a composite error alongside partial findings (E3, E4, E5).
 func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
@@ -30,6 +31,8 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
+	var failures []string
+	total := 0
 	for i, r := range resources {
 		if i >= EnrichmentCap {
 			break
@@ -38,6 +41,7 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 		if tgwID == "" {
 			continue
 		}
+		total++
 		// Paginate attachments per TGW using NextToken.
 		var allAttachments []ec2types.TransitGatewayAttachment
 		var attNextToken *string
@@ -50,14 +54,17 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 				truncatedIDs[r.ID] = true
 				break
 			}
-			out, err := clients.EC2.DescribeTransitGatewayAttachments(ctx, &ec2svc.DescribeTransitGatewayAttachmentsInput{
-				Filters: []ec2types.Filter{
-					{Name: aws.String("transit-gateway-id"), Values: []string{tgwID}},
-				},
-				NextToken: attNextToken,
+			out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2svc.DescribeTransitGatewayAttachmentsOutput, error) {
+				return clients.EC2.DescribeTransitGatewayAttachments(ctx, &ec2svc.DescribeTransitGatewayAttachmentsInput{
+					Filters: []ec2types.Filter{
+						{Name: aws.String("transit-gateway-id"), Values: []string{tgwID}},
+					},
+					NextToken: attNextToken,
+				})
 			})
 			attPages++
 			if err != nil {
+				failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 				truncated = true
 				truncatedIDs[r.ID] = true
 				break
@@ -122,5 +129,6 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 			findings[tgwID] = *worst
 		}
 	}
-	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates},
+		AggregateFailures("tgw-enrich: DescribeTransitGatewayAttachments", failures, total)
 }

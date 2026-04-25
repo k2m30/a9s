@@ -3,6 +3,7 @@ package aws
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -138,14 +139,20 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 
 	amiSet := make(map[string]struct{})
+	var failures []string
+	total := len(ngOut.Nodegroups)
 	for _, ngName := range ngOut.Nodegroups {
-		descOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.DescribeNodegroupOutput, error) {
+		descOut, descErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.DescribeNodegroupOutput, error) {
 			return c.EKS.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{
 				ClusterName:   aws.String(clusterName),
 				NodegroupName: aws.String(ngName),
 			})
 		})
-		if err != nil || descOut.Nodegroup == nil {
+		if descErr != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", ngName, descErr))
+			continue
+		}
+		if descOut.Nodegroup == nil {
 			continue
 		}
 		ng := descOut.Nodegroup
@@ -158,13 +165,14 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 		if ng.LaunchTemplate.Version != nil && *ng.LaunchTemplate.Version != "" {
 			version = ng.LaunchTemplate.Version
 		}
-		ltOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeLaunchTemplateVersionsOutput, error) {
+		ltOut, ltErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeLaunchTemplateVersionsOutput, error) {
 			return c.EC2.DescribeLaunchTemplateVersions(ctx, &ec2.DescribeLaunchTemplateVersionsInput{
 				LaunchTemplateId: ng.LaunchTemplate.Id,
 				Versions:         []string{*version},
 			})
 		})
-		if err != nil {
+		if ltErr != nil {
+			failures = append(failures, fmt.Sprintf("%s/lt: %v", ngName, ltErr))
 			continue
 		}
 		for _, v := range ltOut.LaunchTemplateVersions {
@@ -178,7 +186,9 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 	for id := range amiSet {
 		ids = append(ids, id)
 	}
-	return relatedResult("ami", ids)
+	result := relatedResult("ami", ids)
+	result.Err = AggregateFailures("eks-related: DescribeNodegroup", failures, total)
+	return result
 }
 
 // checkEKSEC2 resolves EC2 instances running in this EKS cluster via node group ASGs.
@@ -212,6 +222,8 @@ func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 
 	var asgNames []string
+	var ngFailures []string
+	ngTotal := len(ngOut.Nodegroups)
 	for _, ngName := range ngOut.Nodegroups {
 		descOut, descErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.DescribeNodegroupOutput, error) {
 			return c.EKS.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{
@@ -219,7 +231,11 @@ func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ reso
 				NodegroupName: aws.String(ngName),
 			})
 		})
-		if descErr != nil || descOut.Nodegroup == nil || descOut.Nodegroup.Resources == nil {
+		if descErr != nil {
+			ngFailures = append(ngFailures, fmt.Sprintf("%s: %v", ngName, descErr))
+			continue
+		}
+		if descOut.Nodegroup == nil || descOut.Nodegroup.Resources == nil {
 			continue
 		}
 		for _, asg := range descOut.Nodegroup.Resources.AutoScalingGroups {
@@ -229,11 +245,15 @@ func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 	}
 
+	ngAggErr := AggregateFailures("eks-related: DescribeNodegroup", ngFailures, ngTotal)
 	if len(asgNames) == 0 {
+		if ngAggErr != nil {
+			return resource.RelatedCheckResult{TargetType: "ec2", Count: -1, Err: ngAggErr}
+		}
 		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
 	}
 	if c.AutoScaling == nil {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1, Err: ngAggErr}
 	}
 
 	asgOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*autoscalingPkg.DescribeAutoScalingGroupsOutput, error) {
@@ -257,7 +277,9 @@ func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ reso
 	for id := range seen {
 		ids = append(ids, id)
 	}
-	return relatedResult("ec2", ids)
+	result := relatedResult("ec2", ids)
+	result.Err = ngAggErr
+	return result
 }
 
 // eksRelatedResourcesExtra — companion helper so we don't duplicate the

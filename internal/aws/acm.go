@@ -100,17 +100,23 @@ func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, c
 			}
 		}
 
+		certARN := ""
+		if cert.CertificateArn != nil {
+			certARN = *cert.CertificateArn
+		}
+
 		r := resource.Resource{
 			ID:     domainName,
 			Name:   domainName,
 			Status: status,
 			Fields: map[string]string{
-				"domain_name": domainName,
-				"status":      status,
-				"type":        certType,
-				"not_after":   notAfter,
-				"in_use":      inUse,
-				"days_left":   daysLeft,
+				"domain_name":     domainName,
+				"certificate_arn": certARN,
+				"status":          status,
+				"type":            certType,
+				"not_after":       notAfter,
+				"in_use":          inUse,
+				"days_left":       daysLeft,
 			},
 			RawStruct: cert,
 		}

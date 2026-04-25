@@ -1,6 +1,10 @@
 package fixtures
 
-import kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
+import (
+	"strings"
+
+	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
+)
 
 // ExpectedTopLevelCounts returns an independent top-level count oracle for demo
 // integration tests, derived directly from the typed fixture datasets rather
@@ -43,7 +47,7 @@ func ExpectedTopLevelCounts() map[string]int {
 		"eni":          len(ec2.NetworkInterfaces),
 		"dbi":          len(rds.DBInstances),
 		"s3":           len(s3.Buckets),
-		"redis":        len(NewRedisFixtures().ReplicationGroups),
+		"redis":        countRedisEngineReplicationGroups(NewRedisFixtures()),
 		"dbc":          len(docdb.DBClusters),
 		"ddb":          len(NewDDBFixtures().Tables),
 		"opensearch":   len(NewOpenSearchFixtures().Domains),
@@ -70,7 +74,7 @@ func ExpectedTopLevelCounts() map[string]int {
 		"acm":          len(NewACMFixtures().Certificates),
 		"apigw":        len(NewAPIGWFixtures().APIs),
 		"role":         len(iam.Roles),
-		"policy":       countCustomerManagedIAMPolicies(iam),
+		"policy":       countTopLevelIAMPolicies(iam),
 		"iam-user":     len(iam.Users),
 		"iam-group":    len(iam.Groups),
 		"waf":          len(NewWAFFixtures().WebACLSummaries),
@@ -112,12 +116,43 @@ func countCustomerManagedKMSKeys(f *KMSFixtures) int {
 	return total
 }
 
+// countRedisEngineReplicationGroups mirrors the redis fetcher's engine filter
+// (internal/aws/redis.go uses strings.EqualFold): RGs with Engine != "redis"
+// (e.g. valkey, memcached fixtures) are excluded from the top-level list. The
+// oracle must apply the same case-insensitive filter so the main-menu count
+// matches what the fetcher renders regardless of casing in fixture or live
+// data.
+func countRedisEngineReplicationGroups(f *RedisFixtures) int {
+	total := 0
+	for _, rg := range f.ReplicationGroups {
+		if rg.Engine == nil {
+			continue
+		}
+		if strings.EqualFold(*rg.Engine, "redis") {
+			total++
+		}
+	}
+	return total
+}
+
 func countCustomerManagedIAMPolicies(f *IAMFixtures) int {
 	total := 0
 	for _, policy := range f.Policies {
 		if policy.Arn != nil && IsCustomerManagedPolicyARN(*policy.Arn) {
 			total++
 		}
+	}
+	return total
+}
+
+// countTopLevelIAMPolicies mirrors the policy fetcher's output shape (see
+// internal/aws/iam_policies.go): customer-managed policies plus every inline
+// group policy surfaced by ListGroupPolicies. The oracle must include both so
+// the main-menu count matches what operators see.
+func countTopLevelIAMPolicies(f *IAMFixtures) int {
+	total := countCustomerManagedIAMPolicies(f)
+	for _, names := range f.InlineGroupPolicies {
+		total += len(names)
 	}
 	return total
 }

@@ -180,19 +180,19 @@ func TestFourRules_Demo_R1_SpecificTypesShowIssueCounts(t *testing.T) {
 	// main menu after Wave 1 completes. Counts are pinned against the demo
 	// fixture data that ships with the binary.
 	pins := []string{
-		"EC2 Instances (27) issues:13",
-		"ECS Services (23) issues:2",
-		"DB Instances (23) issues:5",
-		"EBS Volumes (5) issues:1",
-		"Elastic Beanstalk (4) issues:1",
-		"EBS Snapshots (4) issues:1",
-		"EKS Clusters (3) issues:1",
-		"ElastiCache Redis (4) issues:1",
+		"EC2 Instances (27) issues:14",
+		"ECS Services (25) issues:6",
+		"DB Instances (40) issues:34",
+		"EBS Volumes (8) issues:5",
+		"Elastic Beanstalk (6) issues:3",
+		"EBS Snapshots (7) issues:2",
+		"EKS Clusters (5) issues:3",
+		"ElastiCache Redis (12) issues:9",
 		"DB Clusters (13) issues:10",
-		"EFS File Systems (3) issues:1",
-		"NAT Gateways (3) issues:1",
-		"AMIs (4) issues:1",
-		"Load Balancers (22) issues:1",
+		"EFS File Systems (9) issues:7",
+		"NAT Gateways (5) issues:3",
+		"AMIs (6) issues:1",
+		"Load Balancers (24) issues:3",
 	}
 
 	var missing []string

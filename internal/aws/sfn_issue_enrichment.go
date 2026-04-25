@@ -29,6 +29,8 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
+	var failures []string
+	total := 0
 	for i, r := range resources {
 		if i >= EnrichmentCap {
 			break
@@ -36,11 +38,22 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 		if r.ID == "" {
 			continue
 		}
-		out, err := clients.SFN.ListExecutions(ctx, &sfn.ListExecutionsInput{
-			StateMachineArn: aws.String(r.ID),
-			MaxResults:      1,
+		// ListExecutions requires the state-machine ARN. The sfn fetcher
+		// (sfn.go) sets ID = bare name and stores the ARN in Fields["arn"].
+		// Passing r.ID errors with "Invalid ARN prefix" against real AWS.
+		smARN := r.Fields["arn"]
+		if smARN == "" {
+			continue
+		}
+		total++
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sfn.ListExecutionsOutput, error) {
+			return clients.SFN.ListExecutions(ctx, &sfn.ListExecutionsInput{
+				StateMachineArn: aws.String(smARN),
+				MaxResults:      1,
+			})
 		})
 		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
 			truncatedIDs[r.ID] = true
 			continue
@@ -77,5 +90,6 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 			}
 		}
 	}
-	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates},
+		AggregateFailures("sfn-enrich: ListExecutions", failures, total)
 }

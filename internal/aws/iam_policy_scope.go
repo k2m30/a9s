@@ -12,13 +12,17 @@ func IsCustomerManagedIAMPolicyARN(policyARN string) bool {
 	return policyARN != "" && !strings.Contains(policyARN, ":aws:policy/")
 }
 
-func customerManagedAttachedPolicyNames(policies []iamtypes.AttachedPolicy) []string {
+// attachedPolicyNames returns every PolicyName in the slice, AWS-managed and
+// customer-managed alike. The related-panel lazy-add path (RegisterFetchByIDs
+// for "policy") resolves AWS-managed names on demand so the drill lands on a
+// real entry even though the paginated policy fetcher filters Scope=Local.
+// Previously this helper pre-filtered by ARN to match the fetcher's Scope=Local
+// filter, which kept Count and drill consistent but hid AWS-managed attachments
+// from the operator entirely.
+func attachedPolicyNames(policies []iamtypes.AttachedPolicy) []string {
 	ids := make([]string, 0, len(policies))
 	for _, p := range policies {
 		if p.PolicyName == nil {
-			continue
-		}
-		if p.PolicyArn != nil && !IsCustomerManagedIAMPolicyARN(*p.PolicyArn) {
 			continue
 		}
 		ids = append(ids, *p.PolicyName)

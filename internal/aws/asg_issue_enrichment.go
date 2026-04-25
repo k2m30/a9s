@@ -26,6 +26,8 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
+	var failures []string
+	total := 0
 	for i, r := range resources {
 		if i >= EnrichmentCap {
 			break
@@ -33,12 +35,16 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 		if r.ID == "" {
 			continue
 		}
+		total++
 		name := r.ID
-		out, err := clients.AutoScaling.DescribeScalingActivities(ctx, &autoscaling.DescribeScalingActivitiesInput{
-			AutoScalingGroupName: &name,
-			MaxRecords:           aws.Int32(1),
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*autoscaling.DescribeScalingActivitiesOutput, error) {
+			return clients.AutoScaling.DescribeScalingActivities(ctx, &autoscaling.DescribeScalingActivitiesInput{
+				AutoScalingGroupName: &name,
+				MaxRecords:           aws.Int32(1),
+			})
 		})
 		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
 			truncatedIDs[r.ID] = true
 			continue
@@ -76,5 +82,6 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 			Rows:     rows,
 		}
 	}
-	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings},
+		AggregateFailures("asg-enrich: DescribeScalingActivities", failures, total)
 }

@@ -190,8 +190,10 @@ func logsSubscriptionFilters(ctx context.Context, clients any, logGroupName stri
 	if !ok {
 		return nil
 	}
-	out, err := filterAPI.DescribeSubscriptionFilters(ctx, &cloudwatchlogs.DescribeSubscriptionFiltersInput{
-		LogGroupName: aws.String(logGroupName),
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cloudwatchlogs.DescribeSubscriptionFiltersOutput, error) {
+		return filterAPI.DescribeSubscriptionFilters(ctx, &cloudwatchlogs.DescribeSubscriptionFiltersInput{
+			LogGroupName: aws.String(logGroupName),
+		})
 	})
 	if err != nil || out == nil {
 		return nil

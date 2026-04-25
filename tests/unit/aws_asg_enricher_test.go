@@ -14,6 +14,7 @@ package unit
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -171,7 +172,7 @@ func TestEnrichASGScalingActivities_NilClientReturnsEmptyFindingsNoError(t *test
 // TestEnrichASGScalingActivities_APIErrorOnFirstContinuesToSecond verifies the
 // bounded-fan-out partial-error behavior: an API error for one ASG sets
 // Truncated=true and does not prevent processing subsequent ASGs. The overall
-// enricher does not return an error.
+// enricher surfaces a composite error containing the failing ID.
 func TestEnrichASGScalingActivities_APIErrorOnFirstContinuesToSecond(t *testing.T) {
 	fake := &asgScalingActivitiesFake{
 		activities: map[string][]asgtypes.Activity{
@@ -194,8 +195,14 @@ func TestEnrichASGScalingActivities_APIErrorOnFirstContinuesToSecond(t *testing.
 	}
 
 	result, err := awsclient.EnrichASGScalingActivities(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("enricher must not propagate individual ASG errors: %v", err)
+	if err == nil {
+		t.Fatal("enricher must surface a composite error when at least one ASG API call failed")
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, "asg-enrich:") {
+		t.Errorf("composite error must contain \"asg-enrich:\", got: %q", errStr)
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, "my-error-asg") {
+		t.Errorf("composite error must contain the failing ASG ID \"my-error-asg\", got: %q", errStr)
 	}
 	if !result.Truncated {
 		t.Error("Truncated must be true when at least one ASG API call failed")

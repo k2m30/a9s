@@ -5,9 +5,9 @@ list:
   File System ID:
     path: FileSystemId
     width: 22
-  State:
-    path: LifeCycleState
-    width: 12
+  Status:
+    key: status
+    width: 24
   Perf Mode:
     path: PerformanceMode
     width: 16

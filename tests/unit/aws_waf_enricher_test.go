@@ -257,10 +257,11 @@ func TestEnrichWAFLogging_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	}
 }
 
-// TestEnrichWAFLogging_APIErrorSetsTruncatedNoError verifies that when the API call
-// returns a generic error, the enricher sets Truncated=true, produces 0 findings,
-// and does not propagate the error.
-func TestEnrichWAFLogging_APIErrorSetsTruncatedNoError(t *testing.T) {
+// TestEnrichWAFLogging_APIErrorSetsTruncatedAndSurfacesError verifies that when the
+// API call returns a generic error, the enricher sets Truncated=true, produces 0
+// findings, and returns a composite error containing the enricher prefix and the
+// failing WebACL ARN.
+func TestEnrichWAFLogging_APIErrorSetsTruncatedAndSurfacesError(t *testing.T) {
 	apiErr := errors.New("wafv2: GetLoggingConfiguration throttled")
 	fake := &wafLoggingFake{
 		loggingErrByARN: map[string]error{
@@ -272,8 +273,14 @@ func TestEnrichWAFLogging_APIErrorSetsTruncatedNoError(t *testing.T) {
 	resources := wafWebACLResources(wafACLARN1, wafACLARN2)
 
 	result, err := awsclient.EnrichWAFLogging(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatal("enricher must surface a composite error when an API call fails")
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, "waf-enrich") {
+		t.Errorf("composite error must contain \"waf-enrich\", got: %q", errStr)
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, wafACLARN1) {
+		t.Errorf("composite error must contain the failing WebACL ARN %q, got: %q", wafACLARN1, errStr)
 	}
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings on API error, got %d", len(result.Findings))

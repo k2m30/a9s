@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -29,6 +30,20 @@ func (m Model) handleRelatedCheckStarted(msg messages.RelatedCheckStartedMsg) (t
 
 	cache := m.buildResourceCacheSnapshot()
 	gen := m.relatedGen
+
+	// Build a set of keys from the main resourceCache (scope-filtered,
+	// authoritative first-page results). This set is used for the prefetch
+	// decision inside each checker goroutine so that:
+	//   (a) lazy-only entries (IsTruncated=true in snapshot, not in mainCacheKeys)
+	//       still trigger a prefetch even though they appear in the snapshot, and
+	//   (b) real first-page entries (in mainCacheKeys) suppress the prefetch.
+	// Captures the map by value into each closure; the map is read-only after
+	// construction so concurrent access is safe without a mutex.
+	mainCacheKeys := make(map[string]struct{}, len(m.resourceCache))
+	for k := range m.resourceCache {
+		mainCacheKeys[k] = struct{}{}
+	}
+
 	// Per-call semaphore: cap concurrent probes to maxConcurrentProbes so a
 	// resource type with many defs (e.g., EC2 with 10) doesn't saturate the
 	// goroutine pool. Created fresh per call so each detail-view open gets its
@@ -77,10 +92,21 @@ func (m Model) handleRelatedCheckStarted(msg messages.RelatedCheckStartedMsg) (t
 			// ignore the cache entirely, so fetching would be wasted AWS API calls.
 			var cachedPages map[string]resource.ResourceCacheEntry
 			if def.NeedsTargetCache {
-				if _, inCache := localCache[def.TargetType]; !inCache {
+				// Prefetch fires when the target is absent from the main resourceCache.
+				// Use mainCacheKeys (scope-filtered, authoritative first-page results) for
+				// the decision — after fix 5, lazy-only entries appear in the snapshot
+				// with IsTruncated=true, but they are sparse and still need a real prefetch.
+				if _, inMainCache := mainCacheKeys[def.TargetType]; !inMainCache {
 					if pf := resource.GetPaginatedFetcher(def.TargetType); pf != nil {
 						if fr, err := pf(ctx, m.clients, ""); err == nil {
 							isTrunc := fr.Pagination != nil && fr.Pagination.IsTruncated
+							// If the snapshot already had a lazy-only entry (IsTruncated=true),
+							// preserve that signal: the prefetch fetched a real first page but
+							// the lazy entry told us the type was sparse. Keep IsTruncated=true
+							// so the checker knows there may be more data beyond this first page.
+							if prev, hasPrev := localCache[def.TargetType]; hasPrev && prev.IsTruncated {
+								isTrunc = true
+							}
 							entry := resource.ResourceCacheEntry{
 								Resources:   fr.Resources,
 								IsTruncated: isTrunc,
@@ -99,13 +125,51 @@ func (m Model) handleRelatedCheckStarted(msg messages.RelatedCheckStartedMsg) (t
 
 			result := def.Checker(ctx, m.clients, msg.SourceResource, localCache)
 			result.TargetType = def.TargetType
+
+			// Lazy-add: if the checker emitted IDs not in the target cache,
+			// ask the target type to fetch them by ID. Resolves the
+			// filtered-target drill-to-empty bug class (kms customer-managed
+			// filter, ami owners=self, ebs-snap owners=self, iam policy
+			// scope=local). Without this, a checker can emit an AWS-managed
+			// KMS key or a public AMI ID, the count renders > 0, but the
+			// drill lands on an empty list because the top-level list fetcher
+			// filters those targets out.
+			//
+			// Lazy-added rows travel on LazyAddedResources, not CachedPages —
+			// they are a sparse set of IDs and must NOT replace or masquerade
+			// as a complete first page.
+			var lazyAdded map[string][]resource.Resource
+			var lazyAddError error
+			if len(result.ResourceIDs) > 0 {
+				if ff := resource.GetFetchByIDs(def.TargetType); ff != nil {
+					missing := missingFromCache(localCache, def.TargetType, result.ResourceIDs)
+					if len(missing) > 0 {
+						extra, fetchErr := ff(ctx, m.clients, missing)
+						if fetchErr != nil {
+							lazyAddError = fetchErr
+						}
+						if len(extra) > 0 {
+							entry := localCache[def.TargetType]
+							entry.Resources = append(append([]resource.Resource(nil), entry.Resources...), extra...)
+							enriched := make(resource.ResourceCache, len(localCache)+1)
+							maps.Copy(enriched, localCache)
+							enriched[def.TargetType] = entry
+							localCache = enriched
+							lazyAdded = map[string][]resource.Resource{def.TargetType: extra}
+						}
+					}
+				}
+			}
+
 			return messages.RelatedCheckResultMsg{
-				ResourceType:     msg.ResourceType,
-				SourceResourceID: msg.SourceResource.ID,
-				DefDisplayName:   def.DisplayName,
-				Result:           result,
-				Generation:       gen,
-				CachedPages:      cachedPages,
+				ResourceType:       msg.ResourceType,
+				SourceResourceID:   msg.SourceResource.ID,
+				DefDisplayName:     def.DisplayName,
+				Result:             result,
+				Generation:         gen,
+				CachedPages:        cachedPages,
+				LazyAddedResources: lazyAdded,
+				LazyAddError:       lazyAddError,
 			}
 		})
 	}
@@ -113,252 +177,65 @@ func (m Model) handleRelatedCheckStarted(msg messages.RelatedCheckStartedMsg) (t
 	return m, tea.Batch(cmds...)
 }
 
-// handleRelatedNavigate pushes a resource list view for the related target type.
-// Pre-filters the list when a specific target ID or related IDs are available.
-// It delegates type-resolution and branch logic to ResolveRelatedNavigate, then
-// dispatches to the appropriate view-stack push based on the result Kind.
-func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model, tea.Cmd) {
-	result := ResolveRelatedNavigate(msg, m.snapshotCache())
 
-	switch result.Kind {
-	case KindFlash:
-		return m, func() tea.Msg {
-			return messages.FlashMsg{
-				Text:    result.FlashMessage,
-				IsError: result.FlashIsError,
-			}
+// missingFromCache returns the subset of ids that are not already present as
+// Resource.ID entries in cache[targetType]. Empty-string IDs are filtered
+// out (a result never identifies an empty ID). Used by the lazy-add path in
+// handleRelatedCheckStarted to avoid a FetchByIDs call when every emitted ID
+// is already covered by the cache.
+func missingFromCache(cache resource.ResourceCache, targetType string, ids []string) []string {
+	known := make(map[string]struct{})
+	if entry, ok := cache[targetType]; ok {
+		for _, r := range entry.Resources {
+			known[r.ID] = struct{}{}
 		}
-
-	case KindEnterChildView:
-		return m.handleRelatedNavigateChild(msg)
-
-	case KindFilteredList:
-		rt := resource.FindResourceType(msg.TargetType)
-		if rt == nil {
-			return m, func() tea.Msg {
-				return messages.FlashMsg{
-					Text:    fmt.Sprintf("unknown resource type: %s", msg.TargetType),
-					IsError: true,
-				}
-			}
-		}
-
-		// FetchFilter path: use server-side filtered fetcher.
-		if len(result.FetchFilter) > 0 {
-			rl := views.NewResourceList(*rt, m.viewConfig, m.keys)
-			rl.SetTitleSuffix(relatedTitleSuffix(msg.SourceResource))
-			rl.SetFetchFilter(result.FetchFilter)
-			rl.SetEscPops(true)
-			rl.SetSize(m.innerSize())
-			rl, initCmd := rl.Init()
-			m.pushView(&rl)
-			return m, tea.Batch(initCmd, m.fetchResourcesFiltered(msg.TargetType, result.FetchFilter))
-		}
-
-		// TargetID-based filtered list (cache miss).
-		if result.TargetID != "" {
-			// Exact AMI navigation should fetch by image ID instead of
-			// falling back to the owned-AMI list, which misses public and third-party images.
-			if msg.TargetType == "ami" && m.clients != nil {
-				cmd := m.fetchAMIDetail(result.TargetID)
-				return m, cmd
-			}
-			m.flash = flashState{
-				text:    fmt.Sprintf("Resource %s not in cache; loading %s list", result.TargetID, msg.TargetType),
-				isError: false,
-				active:  true,
-			}
-			initCmd := m.newRelatedList(*rt, msg.SourceResource, relatedListOpts{
-				pendingFilter:        result.TargetID,
-				relatedIDs:           []string{result.TargetID},
-				autoOpenSingleDetail: true,
-				reapplyChecker:       msg.Checker,
-			})
-			return m, tea.Batch(initCmd, m.fetchResources(msg.TargetType))
-		}
-
-		// RelatedIDs-based filtered list (multi or single cache miss).
-		if len(result.RelatedIDs) > 0 {
-			if entry, ok := m.resourceCache[msg.TargetType]; ok {
-				idSet := make(map[string]bool, len(result.RelatedIDs))
-				for _, id := range result.RelatedIDs {
-					idSet[id] = true
-				}
-				var filtered []resource.Resource
-				for _, r := range entry.resources {
-					if idSet[r.ID] {
-						filtered = append(filtered, r)
-					}
-				}
-				// If some IDs are missing and cache may have more pages, fetch the rest.
-				// Pre-populate the list with already-cached filtered rows so they remain
-				// visible when subsequent pages arrive via Append:true ResourcesLoadedMsg.
-				if len(filtered) < len(result.RelatedIDs) && entry.pagination != nil && entry.pagination.IsTruncated {
-					rl := views.NewResourceListFromCache(
-						*rt, m.viewConfig, m.keys,
-						filtered, entry.pagination,
-						"",
-						entry.sortColIdx, entry.sortAsc,
-						0, 0,
-						false,
-					)
-					rl.SetTitleSuffix(relatedTitleSuffix(msg.SourceResource))
-					rl.SetRelatedIDFilter(result.RelatedIDs)
-					if msg.Checker != nil {
-						rl.SetReapplyChecker(msg.Checker, msg.SourceResource)
-					}
-					rl.SetEscPops(true)
-					rl.SetSize(m.innerSize())
-					m.pushView(&rl)
-					fetchCmd := m.fetchMoreResources(messages.LoadMoreMsg{
-						ResourceType:      msg.TargetType,
-						ContinuationToken: entry.pagination.NextToken,
-					})
-					return m, fetchCmd
-				}
-				rl := views.NewResourceListFromCache(
-					*rt, m.viewConfig, m.keys,
-					filtered, entry.pagination,
-					"", // no text filter needed, already filtered by ID
-					entry.sortColIdx, entry.sortAsc,
-					0, 0,
-					false,
-				)
-				rl.SetTitleSuffix(relatedTitleSuffix(msg.SourceResource))
-				rl.SetRelatedIDFilter(result.RelatedIDs)
-				if msg.Checker != nil {
-					rl.SetReapplyChecker(msg.Checker, msg.SourceResource)
-				}
-				rl.SetEscPops(true)
-				rl.SetSize(m.innerSize())
-				m.pushView(&rl)
-				return m, nil
-			}
-			// Cache miss: fetch and preserve exact-ID filtering.
-			var opts relatedListOpts
-			if len(result.RelatedIDs) == 1 {
-				opts = relatedListOpts{
-					pendingFilter:        result.RelatedIDs[0],
-					relatedIDs:           result.RelatedIDs,
-					autoOpenSingleDetail: true,
-					reapplyChecker:       msg.Checker,
-				}
-			} else {
-				opts = relatedListOpts{relatedIDs: result.RelatedIDs, reapplyChecker: msg.Checker}
-			}
-			initCmd := m.newRelatedList(*rt, msg.SourceResource, opts)
-			return m, tea.Batch(initCmd, m.fetchResources(msg.TargetType))
-		}
-
-	case KindDetail:
-		rt := resource.FindResourceType(msg.TargetType)
-		if rt == nil {
-			return m, func() tea.Msg {
-				return messages.FlashMsg{
-					Text:    fmt.Sprintf("unknown resource type: %s", msg.TargetType),
-					IsError: true,
-				}
-			}
-		}
-
-		// Find resource in cache and push detail directly.
-		targetID := result.TargetID
-		if targetID == "" && len(result.RelatedIDs) == 1 {
-			targetID = result.RelatedIDs[0]
-		}
-		if entry, ok := m.resourceCache[msg.TargetType]; ok {
-			for _, r := range entry.resources {
-				if r.ID == targetID {
-					detail := views.NewDetail(r, msg.TargetType, m.viewConfig, m.keys)
-					detail.SetSize(m.innerSize())
-					m.pushView(&detail)
-					if detail.NeedsRelatedCheck() {
-						ck := relatedCacheKey(msg.TargetType, r.ID)
-						if cached, ok := m.relatedCache.get(ck); ok && len(cached) > 0 {
-							detail.ApplyRelatedResults(relatedCacheReplay(msg.TargetType, cached))
-							return m, nil
-						}
-						srcRes := r
-						return m, func() tea.Msg {
-							return messages.RelatedCheckStartedMsg{
-								ResourceType:   msg.TargetType,
-								SourceResource: srcRes,
-							}
-						}
-					}
-					return m, nil
-				}
-			}
-		}
-
-	case KindResourceList:
-		rt := resource.FindResourceType(msg.TargetType)
-		if rt == nil {
-			return m, func() tea.Msg {
-				return messages.FlashMsg{
-					Text:    fmt.Sprintf("unknown resource type: %s", msg.TargetType),
-					IsError: true,
-				}
-			}
-		}
-		// Approximate-zero (0+) path: zero known IDs but the reverse-scan
-		// cache was truncated. Navigate with the checker so each loaded page
-		// re-applies the predicate and matches accumulate.
-		initCmd := m.newRelatedList(*rt, msg.SourceResource, relatedListOpts{
-			reapplyChecker: msg.Checker,
-		})
-		return m, tea.Batch(initCmd, m.fetchResources(msg.TargetType))
 	}
-
-	return m, nil
+	seen := make(map[string]struct{}, len(ids))
+	var missing []string
+	for _, id := range ids {
+		if id == "" {
+			continue
+		}
+		if _, dup := seen[id]; dup {
+			continue
+		}
+		seen[id] = struct{}{}
+		if _, hit := known[id]; hit {
+			continue
+		}
+		missing = append(missing, id)
+	}
+	return missing
 }
 
 // snapshotCache returns a flat map[string][]resource.Resource snapshot of the
-// current resource cache, suitable for passing to pure resolver functions.
+// current resource cache and lazyResourceCache combined, suitable for passing
+// to pure resolver functions. On ID collision, resourceCache wins.
 func (m *Model) snapshotCache() map[string][]resource.Resource {
-	snap := make(map[string][]resource.Resource, len(m.resourceCache))
+	snap := make(map[string][]resource.Resource, len(m.resourceCache)+len(m.lazyResourceCache))
+	// Seed from lazy entries first; resourceCache entries overwrite on collision.
+	maps.Copy(snap, m.lazyResourceCache)
 	for shortName, entry := range m.resourceCache {
-		snap[shortName] = entry.resources
+		if existing, ok := snap[shortName]; ok {
+			// Merge: resourceCache rows take precedence; append lazy-only IDs.
+			known := make(map[string]struct{}, len(entry.resources))
+			for _, r := range entry.resources {
+				known[r.ID] = struct{}{}
+			}
+			merged := append([]resource.Resource(nil), entry.resources...)
+			for _, r := range existing {
+				if _, dup := known[r.ID]; !dup {
+					merged = append(merged, r)
+				}
+			}
+			snap[shortName] = merged
+		} else {
+			snap[shortName] = entry.resources
+		}
 	}
 	return snap
 }
 
-// handleRelatedNavigateChild handles navigation to a child resource type from
-// the related panel. It dispatches an EnterChildViewMsg so that the existing
-// child-view machinery handles the push and fetch.
-func (m Model) handleRelatedNavigateChild(msg messages.RelatedNavigateMsg) (tea.Model, tea.Cmd) {
-	childDef := resource.GetChildType(msg.TargetType)
-	if childDef == nil {
-		return m, func() tea.Msg {
-			return messages.FlashMsg{
-				Text:    fmt.Sprintf("unknown child type: %s", msg.TargetType),
-				IsError: true,
-			}
-		}
-	}
-
-	// Extract parent context from related IDs using the child type's extractor.
-	var parentCtx map[string]string
-	if childDef.RelatedContextFromIDs != nil {
-		parentCtx = childDef.RelatedContextFromIDs(msg.RelatedIDs)
-	}
-	if parentCtx == nil {
-		parentCtx = map[string]string{}
-	}
-
-	displayName := msg.TargetType
-	if childDef.Name != "" {
-		displayName = childDef.Name
-	}
-
-	return m, func() tea.Msg {
-		return messages.EnterChildViewMsg{
-			ChildType:     msg.TargetType,
-			ParentContext: parentCtx,
-			DisplayName:   displayName,
-		}
-	}
-}
 
 // relatedListOpts configures a related-navigation resource list.
 type relatedListOpts struct {
@@ -404,14 +281,91 @@ func relatedTitleSuffix(src resource.Resource) string {
 }
 
 // buildResourceCacheSnapshot returns a read-only snapshot of currently-loaded
-// resource lists, keyed by resource short name. Used by related checkers.
+// resource lists, keyed by resource short name. Merges resourceCache and
+// lazyResourceCache so related checkers see the full set (including
+// out-of-scope entries pulled via FetchByIDs). On ID collision, resourceCache
+// wins (it is the scope-filtered authoritative source).
 func (m *Model) buildResourceCacheSnapshot() resource.ResourceCache {
-	snap := make(resource.ResourceCache, len(m.resourceCache))
-	for shortName, entry := range m.resourceCache {
+	snap := make(resource.ResourceCache, len(m.resourceCache)+len(m.lazyResourceCache))
+	// Seed from lazyResourceCache first; resourceCache entries will overwrite.
+	// Lazy-only entries are sparse (FetchByIDs, not a full first page), so mark
+	// IsTruncated=true — the next top-level navigation will still fetch
+	// authoritatively instead of treating this sparse set as complete.
+	for shortName, rows := range m.lazyResourceCache {
 		snap[shortName] = resource.ResourceCacheEntry{
-			Resources:   entry.resources,
-			IsTruncated: entry.pagination != nil && entry.pagination.IsTruncated,
+			Resources:   rows,
+			IsTruncated: true,
+		}
+	}
+	for shortName, entry := range m.resourceCache {
+		if lazy, ok := snap[shortName]; ok {
+			// Merge: resourceCache rows win on collision; append lazy-only IDs.
+			known := make(map[string]struct{}, len(entry.resources))
+			for _, r := range entry.resources {
+				known[r.ID] = struct{}{}
+			}
+			merged := append([]resource.Resource(nil), entry.resources...)
+			for _, r := range lazy.Resources {
+				if _, dup := known[r.ID]; !dup {
+					merged = append(merged, r)
+				}
+			}
+			snap[shortName] = resource.ResourceCacheEntry{
+				Resources:   merged,
+				IsTruncated: entry.pagination != nil && entry.pagination.IsTruncated,
+			}
+		} else {
+			snap[shortName] = resource.ResourceCacheEntry{
+				Resources:   entry.resources,
+				IsTruncated: entry.pagination != nil && entry.pagination.IsTruncated,
+			}
 		}
 	}
 	return snap
+}
+
+// enterChildForResource returns the ChildViewDef registered under Key="enter"
+// for a resource type, or nil if none is registered or its DrillCondition
+// vetoes the given row. Mirror of (ResourceListModel).enterChildFor — used
+// when related-navigation takes the cache-hit fast path (KindDetail) and
+// must replicate manual-Enter behavior without instantiating a list view.
+func enterChildForResource(td *resource.ResourceTypeDef, r resource.Resource) *resource.ChildViewDef {
+	if td == nil {
+		return nil
+	}
+	for i := range td.Children {
+		c := &td.Children[i]
+		if c.Key != "enter" {
+			continue
+		}
+		if c.DrillCondition != nil && !c.DrillCondition(r) {
+			return nil
+		}
+		return c
+	}
+	return nil
+}
+
+// buildChildContextForResource resolves ContextKeys for a ChildViewDef given
+// the selected resource. Mirror of (ResourceListModel).buildChildContext for
+// the KindDetail fast path, without parent-context chaining ("@parent.*"
+// sources collapse to empty because related-navigation starts from a fresh
+// detail drill, not a nested child stack).
+func buildChildContextForResource(child resource.ChildViewDef, r resource.Resource) map[string]string {
+	ctx := make(map[string]string, len(child.ContextKeys))
+	for param, source := range child.ContextKeys {
+		switch {
+		case source == "ID":
+			ctx[param] = r.ID
+		case source == "Name":
+			ctx[param] = r.Name
+		case strings.HasPrefix(source, "@parent."):
+			// Unreachable from a related-navigation KindDetail entry — the
+			// source resource is not a child view. Leave empty rather than
+			// reading uninitialised parent context.
+		default:
+			ctx[param] = r.Fields[source]
+		}
+	}
+	return ctx
 }

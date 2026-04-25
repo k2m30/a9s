@@ -600,6 +600,39 @@ func buildCTEvents() []cloudtrailtypes.Event {
 			},
 			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/ci-service-account","accountId":"123456789012","userName":"ci-service-account"},"eventSource":"cloudformation.amazonaws.com","eventName":"UpdateStack","requestParameters":{"stackName":"acme-vpc-stack"}}`),
 		},
+		// acme-warehouse Redshift events — required for redshift→ct-events related-panel pivot.
+		// ResourceName matches AcmeWarehouseID so checkRedshiftCTEvents can filter by
+		// fields["resource_name"] == res.ID (the cluster identifier).
+		{
+			EventId:     aws.String("evt-redshift-warehouse-001"),
+			EventName:   aws.String("ModifyCluster"),
+			EventSource: aws.String("redshift.amazonaws.com"),
+			EventTime:   aws.Time(time.Date(2026, 4, 15, 10, 30, 0, 0, time.UTC)),
+			Username:    aws.String("ci-service-account"),
+			ReadOnly:    aws.String("false"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::Redshift::Cluster"), ResourceName: aws.String(AcmeWarehouseID)},
+			},
+			CloudTrailEvent: aws.String(fmt.Sprintf(
+				`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/ci-service-account","accountId":"123456789012","userName":"ci-service-account"},"eventSource":"redshift.amazonaws.com","eventName":"ModifyCluster","requestParameters":{"clusterIdentifier":%q,"numberOfNodes":4}}`,
+				AcmeWarehouseID,
+			)),
+		},
+		{
+			EventId:     aws.String("evt-redshift-warehouse-002"),
+			EventName:   aws.String("RebootCluster"),
+			EventSource: aws.String("redshift.amazonaws.com"),
+			EventTime:   aws.Time(time.Date(2026, 4, 10, 8, 0, 0, 0, time.UTC)),
+			Username:    aws.String("ci-service-account"),
+			ReadOnly:    aws.String("false"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::Redshift::Cluster"), ResourceName: aws.String(AcmeWarehouseID)},
+			},
+			CloudTrailEvent: aws.String(fmt.Sprintf(
+				`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/ci-service-account","accountId":"123456789012","userName":"ci-service-account"},"eventSource":"redshift.amazonaws.com","eventName":"RebootCluster","requestParameters":{"clusterIdentifier":%q}}`,
+				AcmeWarehouseID,
+			)),
+		},
 		// prod-redis-sessions events — ready for redis→ct-events related-panel pivot (phase-7).
 		// ResourceName matches ProdRedisID so checkRedisCTEvents (phase-7) can filter by
 		// fields["resource_name"] == res.ID (the replication group ID).

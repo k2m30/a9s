@@ -28,6 +28,8 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
+	var failures []string
+	total := 0
 	for i, r := range resources {
 		if i >= EnrichmentCap {
 			break
@@ -35,10 +37,14 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 		if r.Name == "" {
 			continue
 		}
-		out, err := clients.CodePipeline.GetPipelineState(ctx, &codepipeline.GetPipelineStateInput{
-			Name: aws.String(r.Name),
+		total++
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*codepipeline.GetPipelineStateOutput, error) {
+			return clients.CodePipeline.GetPipelineState(ctx, &codepipeline.GetPipelineStateInput{
+				Name: aws.String(r.Name),
+			})
 		})
 		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
 			truncatedIDs[r.ID] = true
 			continue
@@ -86,5 +92,6 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 		}
 		fieldUpdates[key] = map[string]string{"last_status": lastStatus}
 	}
-	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates},
+		AggregateFailures("pipeline-enrich: GetPipelineState", failures, total)
 }

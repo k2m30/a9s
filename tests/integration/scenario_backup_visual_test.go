@@ -59,17 +59,9 @@ func TestScenario_BackupVisual(t *testing.T) {
 	// 4 plans carry `!` severity findings (plan-broken-1failed,
 	// plan-broken-2failed, plan-broken-aborted, plan-broken-mixed) and
 	// 1 plan carries a `~` severity finding (plan-warning-partial).
-	//
-	// Spec rule 4 (docs/resources/backup.md §4 and the universal UI
-	// rules in a9s-implement-resource) says `~` never bumps the badge,
-	// so the strict expectation would be 4. The current product
-	// aggregator (`unifiedIssueCount` in internal/tui/app_handlers_navigate.go)
-	// counts every resource that has a finding regardless of severity,
-	// so the badge renders `issues:5`. That aggregator is product-wide
-	// (affects every resource type) and fixing it is out of scope for
-	// the backup implementation; this test asserts the CURRENT product
-	// behavior and the divergence is tracked as a separate defect.
-	scenario.ExpectMenuIssueCount("backup", 5)
+	// Per universal rule 4, only `!` severity bumps the badge, so the
+	// expected count is 4. `unifiedIssueCount` filters by `!` severity.
+	scenario.ExpectMenuIssueCount("backup", 4)
 
 	scenario.OpenList("backup")
 

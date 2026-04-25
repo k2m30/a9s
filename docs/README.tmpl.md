@@ -39,7 +39,7 @@ Browse, inspect, and manage 66 AWS resource types from your terminal. a9s gives 
 - Pagination and lazy-loading for large result sets — press `M` to load more (demo mode showcases this)
 - Session error log with `!` key — timestamped, scrollable, searchable
 - Command mode (`:`) with profile/region switching, navigation, and tab completion
-- 11,500+ unit tests
+- 13,000+ unit tests
 
 ## Installation
 

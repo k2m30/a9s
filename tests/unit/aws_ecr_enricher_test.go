@@ -16,7 +16,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	ecrsvc "github.com/aws/aws-sdk-go-v2/service/ecr"
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 
@@ -55,6 +54,41 @@ func (f *ecrScanFindingsFake) DescribeImageScanFindings(
 		return &ecrsvc.DescribeImageScanFindingsOutput{}, nil
 	}
 	return &ecrsvc.DescribeImageScanFindingsOutput{ImageScanFindings: findings}, nil
+}
+
+// DescribeImages is the path the post-rewrite EnrichECRRepository calls
+// (one DescribeImages per repo, reading ImageScanFindingsSummary inline).
+// The fake synthesises an ImageDetails entry whose ImageScanFindingsSummary
+// mirrors f.results[repo] so existing tests that populate `results` continue
+// to exercise the aggregate-severity path.
+func (f *ecrScanFindingsFake) DescribeImages(
+	_ context.Context,
+	in *ecrsvc.DescribeImagesInput,
+	_ ...func(*ecrsvc.Options),
+) (*ecrsvc.DescribeImagesOutput, error) {
+	name := ""
+	if in != nil && in.RepositoryName != nil {
+		name = *in.RepositoryName
+	}
+	if f.errByRepo != nil {
+		if err, ok := f.errByRepo[name]; ok {
+			return nil, err
+		}
+	}
+	findings, ok := f.results[name]
+	if !ok || findings == nil {
+		return &ecrsvc.DescribeImagesOutput{}, nil
+	}
+	return &ecrsvc.DescribeImagesOutput{
+		ImageDetails: []ecrtypes.ImageDetail{
+			{
+				RepositoryName: in.RepositoryName,
+				ImageScanFindingsSummary: &ecrtypes.ImageScanFindingsSummary{
+					FindingSeverityCounts: findings.FindingSeverityCounts,
+				},
+			},
+		},
+	}, nil
 }
 
 // Compile-time check: ecrScanFindingsFake satisfies ECRAPI.
@@ -205,18 +239,18 @@ func TestEnrichECRRepository_HighFindingsProduceSevTilde(t *testing.T) {
 	}
 }
 
-// TestEnrichECRRepository_ScanNotFoundIsSkippedSilently verifies that when repo-1
-// returns ScanNotFoundException the enricher produces 0 findings for that repo,
-// does NOT set Truncated, and does not propagate the error. The scan simply hasn't
-// run yet — this is a normal operational state.
-func TestEnrichECRRepository_ScanNotFoundIsSkippedSilently(t *testing.T) {
-	scanErr := &ecrtypes.ScanNotFoundException{
-		Message: aws.String("Image scan not found for repository " + ecrRepo1),
-	}
+// TestEnrichECRRepository_UnscannedImagesSkipped verifies that when a repo's
+// DescribeImages response contains images whose ImageScanFindingsSummary is
+// nil (scan-on-push disabled or scan not yet completed), those images are
+// silently skipped — no finding, no Truncated, no error. Under the old
+// ListImages→DescribeImageScanFindings architecture this was ScanNotFoundException;
+// under the N+1 DescribeImages architecture, it's simply a nil summary field
+// in the inline response.
+func TestEnrichECRRepository_UnscannedImagesSkipped(t *testing.T) {
 	fake := &ecrScanFindingsFake{
-		errByRepo: map[string]error{
-			ecrRepo1: scanErr,
-		},
+		// repo-1 gets a response with only nil-summary images (unscanned) via
+		// the extended DescribeImages fake method which synthesises from results:
+		// we set results[repo-1] = nil to simulate "no scan data".
 		results: map[string]*ecrtypes.ImageScanFindings{
 			ecrRepo2: ecrScanFindings(map[string]int32{
 				string(ecrtypes.FindingSeverityCritical): 0,
@@ -232,10 +266,10 @@ func TestEnrichECRRepository_ScanNotFoundIsSkippedSilently(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if _, ok := result.Findings[ecrRepo1]; ok {
-		t.Error("repo-1 must NOT appear in Findings — scan not found is a silent skip")
+		t.Error("repo-1 must NOT appear in Findings — unscanned repo produces no finding")
 	}
 	if result.Truncated {
-		t.Error("Truncated must be false when ScanNotFoundException is silently skipped")
+		t.Error("Truncated must be false — missing scan data is operational, not an error")
 	}
 	if result.IssueCount != 0 {
 		t.Errorf("IssueCount = %d, want 0", result.IssueCount)

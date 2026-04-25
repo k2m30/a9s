@@ -48,7 +48,7 @@ func checkGroupPolicy(ctx context.Context, clients any, res resource.Resource, _
 	// Attached managed policies
 	attached, err := c.IAM.ListAttachedGroupPolicies(ctx, &iam.ListAttachedGroupPoliciesInput{GroupName: &groupName})
 	if err == nil {
-		ids = append(ids, customerManagedAttachedPolicyNames(attached.AttachedPolicies)...)
+		ids = append(ids, attachedPolicyNames(attached.AttachedPolicies)...)
 	}
 	// Inline policies
 	inline, err2 := c.IAM.ListGroupPolicies(ctx, &iam.ListGroupPoliciesInput{GroupName: &groupName})

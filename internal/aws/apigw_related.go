@@ -4,6 +4,7 @@ package aws
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
@@ -41,6 +42,8 @@ func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, _ re
 		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
 	}
 	seen := make(map[string]struct{})
+	var failures []string
+	total := 0
 	for _, item := range items {
 		if item.IntegrationUri == nil || !strings.Contains(*item.IntegrationUri, ":function:") {
 			continue
@@ -58,17 +61,25 @@ func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, _ re
 		if rest == "" {
 			continue
 		}
+		total++
 		out, lerr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambdapkg.GetFunctionOutput, error) {
 			return lambdaAPI.GetFunction(ctx, &lambdapkg.GetFunctionInput{FunctionName: &rest})
 		})
-		if lerr != nil || out == nil || out.Configuration == nil {
+		if lerr != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", rest, lerr))
+			continue
+		}
+		if out == nil || out.Configuration == nil {
 			continue
 		}
 		if out.Configuration.KMSKeyArn != nil && *out.Configuration.KMSKeyArn != "" {
 			seen[arnLastSegment(*out.Configuration.KMSKeyArn)] = struct{}{}
 		}
 	}
-	return relatedResult("kms", mapKeys(seen))
+	ids := mapKeys(seen)
+	result := relatedResult("kms", ids)
+	result.Err = AggregateFailures("apigw-related: GetFunction", failures, total)
+	return result
 }
 
 // checkApigwLogs searches the logs cache for log groups associated with this
@@ -218,15 +229,22 @@ func checkApigwACM(ctx context.Context, clients any, res resource.Resource, _ re
 		return resource.RelatedCheckResult{TargetType: "acm", Count: -1, Err: err}
 	}
 	seen := make(map[string]struct{})
+	var failures []string
+	total := 0
 	for _, d := range dn.Items {
 		if d.DomainName == nil {
 			continue
 		}
+		total++
 		// Per domain: get its mappings; check if any maps to this API.
 		m, merr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*apigatewayv2.GetApiMappingsOutput, error) {
 			return mapAPI.GetApiMappings(ctx, &apigatewayv2.GetApiMappingsInput{DomainName: d.DomainName})
 		})
-		if merr != nil || m == nil {
+		if merr != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", *d.DomainName, merr))
+			continue
+		}
+		if m == nil {
 			continue
 		}
 		matched := false
@@ -246,7 +264,10 @@ func checkApigwACM(ctx context.Context, clients any, res resource.Resource, _ re
 			}
 		}
 	}
-	return relatedResult("acm", mapKeys(seen))
+	ids := mapKeys(seen)
+	result := relatedResult("acm", ids)
+	result.Err = AggregateFailures("apigw-related: GetApiMappings", failures, total)
+	return result
 }
 
 // checkApigwAlarm reports CloudWatch alarms on this API. API Gateway alarms

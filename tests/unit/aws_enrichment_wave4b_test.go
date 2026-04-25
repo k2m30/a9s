@@ -764,7 +764,10 @@ func TestEnrichCodePipelineStatus_ActionNilExecutionSkipped(t *testing.T) {
 // provisioned cluster's KafkaVersion string. A finding with Summary
 // "broker software outdated" is produced only when the version is outdated.
 
-const mskARNForVersionTests = "arn:aws:kafka:us-east-1:123456789012:cluster/msk-vtest/vvvvvvvv"
+const (
+	mskARNForVersionTests  = "arn:aws:kafka:us-east-1:123456789012:cluster/msk-vtest/vvvvvvvv"
+	mskNameForVersionTests = "msk-vvvvvvvv" // bare cluster name = r.ID = "msk-" + arn[len-8:]
+)
 
 // TestEnrichMSKCluster_VersionBoundaries exercises all branches of the internal
 // isMSKVersionOutdated and parseVersionPart helpers via EnrichMSKCluster with
@@ -814,7 +817,8 @@ func TestEnrichMSKCluster_VersionBoundaries(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			f, hasFinding := result.Findings[arn]
+			// Findings are keyed by r.ID = bare cluster name, not the ARN.
+			f, hasFinding := result.Findings[mskNameForVersionTests]
 			isOutdatedFinding := hasFinding && f.Summary == "broker software outdated"
 
 			if tc.wantOutdated && !isOutdatedFinding {

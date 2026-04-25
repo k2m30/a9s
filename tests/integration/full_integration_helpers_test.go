@@ -324,6 +324,21 @@ func fullIntegrationEnterRelatedSingleDetail(t *testing.T, m *tui.Model, targetT
 	if cmd == nil {
 		t.Fatalf("related %q navigation returned nil cmd; expected fetch+auto-open detail", displayName)
 	}
+
+	// Fast path: related-panel KindDetail (cache hit) pushes the detail view
+	// directly and emits RelatedCheckStartedMsg without going through
+	// ResourcesLoadedMsg / NavigateMsg. Detect by scanning for that message
+	// in the returned cmd.
+	for _, inner := range fullIntegrationCollectCmdMessages(cmd) {
+		started, ok := inner.(messages.RelatedCheckStartedMsg)
+		if !ok {
+			continue
+		}
+		res := started.SourceResource
+		results := fullIntegrationApplyStartedAndCollectResults(t, m, started, targetType)
+		return res, results
+	}
+
 	raw := fullIntegrationExtractMsg(t, cmd, func(msg tea.Msg) bool {
 		_, ok := msg.(messages.ResourcesLoadedMsg)
 		return ok
@@ -379,11 +394,22 @@ func fullIntegrationEnterFocusedRelated(t *testing.T, m *tui.Model, targetType, 
 
 func fullIntegrationRunRelatedChecksFromStartCmd(t *testing.T, m *tui.Model, startCmd tea.Cmd, resourceType string) []messages.RelatedCheckResultMsg {
 	t.Helper()
-	raw := fullIntegrationRequireCmdMsg(t, startCmd, "related check start "+resourceType)
+	// startCmd may be a tea.BatchMsg carrying other detail-load messages
+	// (e.g. EnrichDetailMsg) alongside RelatedCheckStartedMsg — find the
+	// related-check message regardless of where it sits in the batch.
+	raw := fullIntegrationExtractMsg(t, startCmd, func(msg tea.Msg) bool {
+		_, ok := msg.(messages.RelatedCheckStartedMsg)
+		return ok
+	})
 	started, ok := raw.(messages.RelatedCheckStartedMsg)
 	if !ok {
 		t.Fatalf("related check start for %s returned %T, expected messages.RelatedCheckStartedMsg", resourceType, raw)
 	}
+	return fullIntegrationApplyStartedAndCollectResults(t, m, started, resourceType)
+}
+
+func fullIntegrationApplyStartedAndCollectResults(t *testing.T, m *tui.Model, started messages.RelatedCheckStartedMsg, resourceType string) []messages.RelatedCheckResultMsg {
+	t.Helper()
 	var cmd tea.Cmd
 	*m, cmd = fullIntegrationApplyMsg(*m, started)
 	results := fullIntegrationCollectRelatedCheckResults(cmd)

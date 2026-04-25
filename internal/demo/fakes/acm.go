@@ -23,6 +23,12 @@ func (f *ACMFake) ListCertificates(_ context.Context, _ *acm.ListCertificatesInp
 }
 
 // DescribeCertificate is a no-op stub — the demo transport does not exercise Wave 2 enrichment.
-func (f *ACMFake) DescribeCertificate(_ context.Context, _ *acm.DescribeCertificateInput, _ ...func(*acm.Options)) (*acm.DescribeCertificateOutput, error) {
+// ARN validation is still enforced so that callers passing a bare certificate name are caught early.
+func (f *ACMFake) DescribeCertificate(_ context.Context, input *acm.DescribeCertificateInput, _ ...func(*acm.Options)) (*acm.DescribeCertificateOutput, error) {
+	if input != nil && input.CertificateArn != nil {
+		if err := validateARN(*input.CertificateArn); err != nil {
+			return nil, err
+		}
+	}
 	return &acm.DescribeCertificateOutput{}, nil
 }

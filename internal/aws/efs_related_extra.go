@@ -6,7 +6,6 @@ import (
 	"context"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/service/backup"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
@@ -46,45 +45,6 @@ func checkEFSAlarm(ctx context.Context, clients any, res resource.Resource, cach
 		return resource.ApproximateZero("alarm")
 	}
 	return relatedResult("alarm", ids)
-}
-
-// checkEFSEC2 scans ec2 cache for instances whose ENIs mount this filesystem.
-// Cross-reference via the eni cache (EFS mount targets have ENIs with the
-// filesystem ID in their description, and are attached to an EC2 when an
-// instance mounts them).
-func checkEFSEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	fsID := res.ID
-	if fsID == "" {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
-	}
-	eniList, truncated, err := efsRelatedResources(ctx, clients, cache, "eni")
-	if err != nil {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: -1, Err: err}
-	}
-	if eniList == nil {
-		return resource.RelatedCheckResult{TargetType: "ec2", Count: 0}
-	}
-	instanceSet := make(map[string]struct{})
-	for _, eniRes := range eniList {
-		eni, ok := assertStruct[ec2types.NetworkInterface](eniRes.RawStruct)
-		if !ok {
-			continue
-		}
-		if eni.Description == nil || !strings.Contains(*eni.Description, fsID) {
-			continue
-		}
-		if eni.Attachment != nil && eni.Attachment.InstanceId != nil && *eni.Attachment.InstanceId != "" {
-			instanceSet[*eni.Attachment.InstanceId] = struct{}{}
-		}
-	}
-	var ids []string
-	for id := range instanceSet {
-		ids = append(ids, id)
-	}
-	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("ec2")
-	}
-	return relatedResult("ec2", ids)
 }
 
 // checkEFSENI scans eni cache for mount-target ENIs (description contains fs-id).
@@ -152,40 +112,39 @@ func checkEFSVPC(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResult("vpc", ids)
 }
 
-// checkEFSBackup resolves AWS Backup recovery points for this EFS file system via
-// backup:ListRecoveryPointsByResource (Pattern A: 1 API call).
-// The EFS ARN is read from FileSystemArn in RawStruct.
-func checkEFSBackup(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// checkEFSBackup resolves AWS Backup PLANS that protect this EFS file system.
+// The backup fetcher (backup.go) indexes Resource.ID by BackupPlanId and
+// carries the plan's selected resource ARNs in Fields["resources"] as a CSV,
+// so this checker reverse-scans the backup cache for plans whose resources
+// CSV contains the EFS ARN. Returning recovery-point ARNs (the previous
+// implementation) produced an ID-format mismatch — drill-through landed
+// empty because recovery points are a different resource class and the
+// backup list is keyed by plan id.
+func checkEFSBackup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	// Missing RawStruct → we can't derive the source ARN. That's an early-exit
+	// (Count=0), not an error (Count=-1). Returning -1 here when the caller
+	// handed us a valid truncated cache would drop the honest lower bound.
 	fs, ok := assertStruct[efstypes.FileSystemDescription](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
+		return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
 	}
 	if fs.FileSystemArn == nil || *fs.FileSystemArn == "" {
 		return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
 	}
 	fsARN := *fs.FileSystemArn
 
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil || c.Backup == nil {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
-	}
-	api, ok := c.Backup.(BackupListRecoveryPointsByResourceAPI)
-	if !ok {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
-	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*backup.ListRecoveryPointsByResourceOutput, error) {
-		return api.ListRecoveryPointsByResource(ctx, &backup.ListRecoveryPointsByResourceInput{
-			ResourceArn: &fsARN,
-		})
-	})
+	plans, truncated, err := efsRelatedResources(ctx, clients, cache, "backup")
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "backup", Count: -1, Err: err}
 	}
 	var ids []string
-	for _, rp := range out.RecoveryPoints {
-		if rp.RecoveryPointArn != nil && *rp.RecoveryPointArn != "" {
-			ids = append(ids, *rp.RecoveryPointArn)
+	for _, plan := range plans {
+		if BackupPlanCoversARN(plan.Fields["resources"], plan.Fields["not_resources"], fsARN) {
+			ids = append(ids, plan.ID)
 		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.ApproximateZero("backup")
 	}
 	return relatedResult("backup", ids)
 }

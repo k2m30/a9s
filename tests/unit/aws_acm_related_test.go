@@ -102,8 +102,9 @@ func TestRelated_ACM_ELB_EmptyInput(t *testing.T) {
 func TestRelated_ACM_CF_Found(t *testing.T) {
 	certARN := "arn:aws:acm:us-east-1:111122223333:certificate/abc-123"
 	source := resource.Resource{
-		ID:   certARN,
-		Name: "example.com",
+		ID:     "example.com",
+		Name:   "example.com",
+		Fields: map[string]string{"certificate_arn": certARN},
 	}
 
 	matchingDist := resource.Resource{
@@ -175,8 +176,9 @@ func TestRelated_ACM_CF_NotFound(t *testing.T) {
 
 func TestRelated_ACM_CF_CacheMiss(t *testing.T) {
 	source := resource.Resource{
-		ID:   "arn:aws:acm:us-east-1:111122223333:certificate/abc-123",
-		Name: "example.com",
+		ID:     "example.com",
+		Name:   "example.com",
+		Fields: map[string]string{"certificate_arn": "arn:aws:acm:us-east-1:111122223333:certificate/abc-123"},
 	}
 
 	checker := acmCheckerByTarget(t, "cf")
@@ -265,8 +267,9 @@ func TestRelated_ACM_R53_EmptyCertARNInRawStruct(t *testing.T) {
 func TestRelated_ACM_CF_TruncatedCacheNoMatch(t *testing.T) {
 	certARN := "arn:aws:acm:us-east-1:111122223333:certificate/abc-123"
 	source := resource.Resource{
-		ID:   certARN,
-		Name: "example.com",
+		ID:     "example.com",
+		Name:   "example.com",
+		Fields: map[string]string{"certificate_arn": certARN},
 	}
 
 	// Distribution with a different cert — no match.
@@ -298,8 +301,9 @@ func TestRelated_ACM_CF_TruncatedCacheNoMatch(t *testing.T) {
 func TestRelated_ACM_CF_NilViewerCertificate(t *testing.T) {
 	certARN := "arn:aws:acm:us-east-1:111122223333:certificate/abc-123"
 	source := resource.Resource{
-		ID:   certARN,
-		Name: "example.com",
+		ID:     "example.com",
+		Name:   "example.com",
+		Fields: map[string]string{"certificate_arn": certARN},
 	}
 
 	noViewerCert := resource.Resource{

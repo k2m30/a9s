@@ -30,6 +30,8 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
+	var failures []string
+	total := 0
 	for i, r := range resources {
 		if i >= EnrichmentCap {
 			break
@@ -41,10 +43,14 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 		if stackName == "" {
 			continue
 		}
-		out, err := clients.CloudFormation.DescribeStackEvents(ctx, &cloudformation.DescribeStackEventsInput{
-			StackName: aws.String(stackName),
+		total++
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cloudformation.DescribeStackEventsOutput, error) {
+			return clients.CloudFormation.DescribeStackEvents(ctx, &cloudformation.DescribeStackEventsInput{
+				StackName: aws.String(stackName),
+			})
 		})
 		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
 			truncatedIDs[r.ID] = true
 			continue
@@ -95,7 +101,8 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 			Rows:     failedRows,
 		}
 	}
-	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings},
+		AggregateFailures("cfn-enrich: DescribeStackEvents", failures, total)
 }
 
 // EnrichCFNCombined merges findings from EnrichCFNStackEvents and EnrichCFNDrift.
@@ -103,15 +110,22 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 // adds "~" findings for stacks that have drifted from their template.
 // On ID conflict, CFNStackEvents findings take precedence (they carry "!" severity).
 // IssueCount = CFNStackEvents.IssueCount (drift adds 0). Truncated = either truncated.
+// Partial findings from each sub-enricher are preserved even when they return an error (E5).
 func EnrichCFNCombined(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
-	eventsResult, err := EnrichCFNStackEvents(ctx, clients, resources)
-	if err != nil {
-		return IssueEnricherResult{}, err
+	eventsResult, eventsErr := EnrichCFNStackEvents(ctx, clients, resources)
+	driftResult, driftErr := EnrichCFNDrift(ctx, clients, resources)
+
+	// Combine sub-enricher errors; partial findings are preserved below (E5).
+	var combinedErr error
+	switch {
+	case eventsErr != nil && driftErr != nil:
+		combinedErr = fmt.Errorf("%v; %v", eventsErr, driftErr)
+	case eventsErr != nil:
+		combinedErr = eventsErr
+	case driftErr != nil:
+		combinedErr = driftErr
 	}
-	driftResult, err := EnrichCFNDrift(ctx, clients, resources)
-	if err != nil {
-		return IssueEnricherResult{}, err
-	}
+
 	merged := make(map[string]resource.EnrichmentFinding, len(eventsResult.Findings)+len(driftResult.Findings))
 	// Drift findings go in first; stack-events findings overwrite on conflict.
 	maps.Copy(merged, driftResult.Findings)
@@ -139,7 +153,7 @@ func EnrichCFNCombined(ctx context.Context, clients *ServiceClients, resources [
 		TruncatedIDs: mergedTruncatedIDs,
 		Findings:     merged,
 		FieldUpdates: mergedUpdates,
-	}, nil
+	}, combinedErr
 }
 
 // EnrichCFNDrift calls DescribeStacks per stack (up to EnrichmentCap stacks) to
@@ -154,6 +168,8 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
+	var failures []string
+	total := 0
 	for i, r := range resources {
 		if i >= EnrichmentCap {
 			break
@@ -165,10 +181,14 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 		if stackName == "" {
 			continue
 		}
-		out, err := clients.CloudFormation.DescribeStacks(ctx, &cloudformation.DescribeStacksInput{
-			StackName: aws.String(stackName),
+		total++
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cloudformation.DescribeStacksOutput, error) {
+			return clients.CloudFormation.DescribeStacks(ctx, &cloudformation.DescribeStacksInput{
+				StackName: aws.String(stackName),
+			})
 		})
 		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
 			truncatedIDs[r.ID] = true
 			continue
@@ -198,5 +218,6 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 		}
 	}
 	// "~" findings do not contribute to IssueCount per the IssueEnricherResult contract.
-	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates},
+		AggregateFailures("cfn-enrich: DescribeStacks", failures, total)
 }

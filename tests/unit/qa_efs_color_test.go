@@ -6,6 +6,10 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
+// TestEfsColor verifies the EFS Color function reads Resource.Fields["status"]
+// (the derived §4 phrase written by the fetcher + Wave-2 enricher), strips any
+// (+N) suffix, and maps to the spec's state bucket. Written against the current
+// contract: Color is phrase-driven, not field-derived from life_cycle_state.
 func TestEfsColor(t *testing.T) {
 	td := resource.FindResourceType("efs")
 	if td == nil {
@@ -13,73 +17,30 @@ func TestEfsColor(t *testing.T) {
 	}
 
 	cases := []struct {
-		name           string
-		lifeCycleState string
-		mountTargets   string
-		want           resource.Color
+		name   string
+		status string
+		want   resource.Color
 	}{
-		{
-			name:           "available",
-			lifeCycleState: "available",
-			mountTargets:   "2",
-			want:           resource.ColorHealthy,
-		},
-		{
-			name:           "no_mount_targets",
-			lifeCycleState: "available",
-			mountTargets:   "0",
-			want:           resource.ColorBroken,
-		},
-		{
-			name:           "creating",
-			lifeCycleState: "creating",
-			mountTargets:   "2",
-			want:           resource.ColorWarning,
-		},
-		{
-			name:           "updating",
-			lifeCycleState: "updating",
-			mountTargets:   "2",
-			want:           resource.ColorWarning,
-		},
-		{
-			name:           "deleting",
-			lifeCycleState: "deleting",
-			mountTargets:   "2",
-			want:           resource.ColorWarning,
-		},
-		{
-			name:           "error",
-			lifeCycleState: "error",
-			mountTargets:   "2",
-			want:           resource.ColorBroken,
-		},
-		{
-			name:           "broken_overrides",
-			lifeCycleState: "error",
-			mountTargets:   "0",
-			want:           resource.ColorBroken,
-		},
-		{
-			name:           "empty",
-			lifeCycleState: "",
-			mountTargets:   "",
-			want:           resource.ColorHealthy,
-		},
+		{name: "healthy_blank", status: "", want: resource.ColorHealthy},
+		{name: "creating_warning", status: "creating", want: resource.ColorWarning},
+		{name: "updating_warning", status: "updating", want: resource.ColorWarning},
+		{name: "deleting_warning", status: "deleting", want: resource.ColorWarning},
+		{name: "error_broken", status: "error", want: resource.ColorBroken},
+		{name: "no_mount_targets_broken", status: "no mount targets", want: resource.ColorBroken},
+		{name: "mount_target_down_broken", status: "mount target down", want: resource.ColorBroken},
+		{name: "multi_w1_suffix_stripped", status: "no mount targets (+1)", want: resource.ColorBroken},
+		{name: "w1_w2_stack_suffix_stripped", status: "mount target down (+1)", want: resource.ColorBroken},
+		{name: "warning_with_suffix", status: "updating (+1)", want: resource.ColorWarning},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := resource.Resource{
-				Fields: map[string]string{
-					"life_cycle_state": tc.lifeCycleState,
-					"mount_targets":    tc.mountTargets,
-				},
+				Fields: map[string]string{"status": tc.status},
 			}
 			got := td.Color(r)
 			if got != tc.want {
-				t.Errorf("Color(life_cycle_state=%q, mount_targets=%q) = %v, want %v",
-					tc.lifeCycleState, tc.mountTargets, got, tc.want)
+				t.Errorf("Color(status=%q) = %v, want %v", tc.status, got, tc.want)
 			}
 		})
 	}

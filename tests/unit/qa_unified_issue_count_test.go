@@ -105,7 +105,7 @@ func TestAllEnrichers_IssueCountMatchesFindings(t *testing.T) {
 					},
 				},
 			},
-			probes: []resource.Resource{{ID: tgARN}},
+			probes: []resource.Resource{{ID: "ucm-tg", Fields: map[string]string{"target_group_arn": tgARN}}},
 			call:   awsclient.EnrichTargetGroupHealth,
 		},
 		{
@@ -133,7 +133,7 @@ func TestAllEnrichers_IssueCountMatchesFindings(t *testing.T) {
 					},
 				},
 			},
-			probes: []resource.Resource{{ID: smARN}},
+			probes: []resource.Resource{{ID: "ucm-sm", Fields: map[string]string{"arn": smARN}}},
 			call:   awsclient.EnrichStepFunctionsStatus,
 		},
 		{

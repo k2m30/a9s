@@ -2,6 +2,7 @@ package aws
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk"
@@ -93,6 +94,8 @@ func checkEbTG(ctx context.Context, clients any, res resource.Resource, _ resour
 
 	// Collect LB names, resolve each to ARN via DescribeLoadBalancers.
 	var tgARNs []string
+	var failures []string
+	totalLBs := len(resOut.EnvironmentResources.LoadBalancers)
 	for _, lb := range resOut.EnvironmentResources.LoadBalancers {
 		if lb.Name == nil || *lb.Name == "" {
 			continue
@@ -105,7 +108,11 @@ func checkEbTG(ctx context.Context, clients any, res resource.Resource, _ resour
 				Names: []string{lbName},
 			})
 		})
-		if lbErr != nil || len(lbOut.LoadBalancers) == 0 {
+		if lbErr != nil {
+			failures = append(failures, fmt.Sprintf("%s: DescribeLoadBalancers: %v", lbName, lbErr))
+			continue
+		}
+		if len(lbOut.LoadBalancers) == 0 {
 			continue
 		}
 		lbARNPtr := lbOut.LoadBalancers[0].LoadBalancerArn
@@ -120,6 +127,7 @@ func checkEbTG(ctx context.Context, clients any, res resource.Resource, _ resour
 			})
 		})
 		if lsnErr != nil {
+			failures = append(failures, fmt.Sprintf("%s: DescribeListeners: %v", lbName, lsnErr))
 			continue
 		}
 		for _, l := range lsnOut.Listeners {
@@ -137,7 +145,9 @@ func checkEbTG(ctx context.Context, clients any, res resource.Resource, _ resour
 			}
 		}
 	}
-	return relatedResult("tg", tgARNs)
+	result := relatedResult("tg", tgARNs)
+	result.Err = AggregateFailures("eb-related: LB/Listener lookup", failures, totalLBs)
+	return result
 }
 
 // checkEbSG resolves security groups configured for this EB environment via configuration settings.

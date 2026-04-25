@@ -3,7 +3,8 @@ package unit
 // enrichment_tg_findings_test.go — Behavioral tests for EnrichTargetGroupHealth.
 //
 // Contract assertions (enricher-contract.md):
-//   - Returns EnricherResult.Findings keyed by r.ID (target group ARN).
+//   - Returns EnricherResult.Findings keyed by r.ID (target group name set by tg fetcher).
+//   - DescribeTargetHealth is called with r.Fields["target_group_arn"] (full ARN required by AWS).
 //   - Severity "!" for all findings.
 //   - Summary format: "unhealthy targets: X/Y".
 //   - IssueCount = len(Findings) (one entry per TG with any unhealthy targets).
@@ -54,8 +55,10 @@ func tgHealthDesc(state elbtypes.TargetHealthStateEnum) elbtypes.TargetHealthDes
 	}
 }
 
-// TestEnrichTargetGroupHealth_FindingKeyedByARN verifies findings are keyed by r.ID (TG ARN).
-func TestEnrichTargetGroupHealth_FindingKeyedByARN(t *testing.T) {
+// TestEnrichTargetGroupHealth_FindingKeyedByID verifies findings are keyed by r.ID (TG name)
+// while DescribeTargetHealth is called with the ARN from Fields["target_group_arn"].
+func TestEnrichTargetGroupHealth_FindingKeyedByID(t *testing.T) {
+	tgName := "my-tg"
 	tgARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-tg/abc123"
 	fake := &tgHealthFake{
 		outputs: map[string]*elbv2.DescribeTargetHealthOutput{
@@ -68,19 +71,27 @@ func TestEnrichTargetGroupHealth_FindingKeyedByARN(t *testing.T) {
 		},
 	}
 	clients := &awsclient.ServiceClients{ELBv2: fake}
-	resources := []resource.Resource{{ID: tgARN}}
+	resources := []resource.Resource{{
+		ID:     tgName,
+		Fields: map[string]string{"target_group_arn": tgARN},
+	}}
 
 	result, err := awsclient.EnrichTargetGroupHealth(context.Background(), clients, resources)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, ok := result.Findings[tgARN]; !ok {
-		t.Errorf("expected finding keyed by TG ARN %q", tgARN)
+	if _, ok := result.Findings[tgName]; !ok {
+		gotKeys := make([]string, 0, len(result.Findings))
+		for k := range result.Findings {
+			gotKeys = append(gotKeys, k)
+		}
+		t.Errorf("expected finding keyed by TG name %q (got keys: %v)", tgName, gotKeys)
 	}
 }
 
 // TestEnrichTargetGroupHealth_SummaryUnhealthyXofY verifies the summary format.
 func TestEnrichTargetGroupHealth_SummaryUnhealthyXofY(t *testing.T) {
+	tgName := "sum-tg"
 	tgARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/sum-tg/111"
 	fake := &tgHealthFake{
 		outputs: map[string]*elbv2.DescribeTargetHealthOutput{
@@ -94,13 +105,16 @@ func TestEnrichTargetGroupHealth_SummaryUnhealthyXofY(t *testing.T) {
 		},
 	}
 	clients := &awsclient.ServiceClients{ELBv2: fake}
-	resources := []resource.Resource{{ID: tgARN}}
+	resources := []resource.Resource{{
+		ID:     tgName,
+		Fields: map[string]string{"target_group_arn": tgARN},
+	}}
 
 	result, err := awsclient.EnrichTargetGroupHealth(context.Background(), clients, resources)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f := result.Findings[tgARN]
+	f := result.Findings[tgName]
 	// Summary must be "unhealthy targets: 2/3"
 	if !strings.HasPrefix(f.Summary, "unhealthy targets:") {
 		t.Errorf("summary %q must start with %q", f.Summary, "unhealthy targets:")
@@ -113,6 +127,7 @@ func TestEnrichTargetGroupHealth_SummaryUnhealthyXofY(t *testing.T) {
 // TestEnrichTargetGroupHealth_AllHealthyExcluded verifies TGs with all-healthy targets
 // do not appear in Findings.
 func TestEnrichTargetGroupHealth_AllHealthyExcluded(t *testing.T) {
+	tgName := "ok-tg"
 	tgARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/ok-tg/222"
 	fake := &tgHealthFake{
 		outputs: map[string]*elbv2.DescribeTargetHealthOutput{
@@ -125,13 +140,16 @@ func TestEnrichTargetGroupHealth_AllHealthyExcluded(t *testing.T) {
 		},
 	}
 	clients := &awsclient.ServiceClients{ELBv2: fake}
-	resources := []resource.Resource{{ID: tgARN}}
+	resources := []resource.Resource{{
+		ID:     tgName,
+		Fields: map[string]string{"target_group_arn": tgARN},
+	}}
 
 	result, err := awsclient.EnrichTargetGroupHealth(context.Background(), clients, resources)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, ok := result.Findings[tgARN]; ok {
+	if _, ok := result.Findings[tgName]; ok {
 		t.Error("all-healthy TG must NOT appear in Findings")
 	}
 	if result.IssueCount != 0 {
@@ -145,8 +163,12 @@ func TestEnrichTargetGroupHealth_TruncatedWhenResourcesExceedCap(t *testing.T) {
 	resources := make([]resource.Resource, count)
 	outputs := make(map[string]*elbv2.DescribeTargetHealthOutput, count)
 	for i := range count {
+		name := fmt.Sprintf("tg-%03d", i)
 		arn := fmt.Sprintf("arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/tg-%03d/%03d", i, i)
-		resources[i] = resource.Resource{ID: arn}
+		resources[i] = resource.Resource{
+			ID:     name,
+			Fields: map[string]string{"target_group_arn": arn},
+		}
 		outputs[arn] = &elbv2.DescribeTargetHealthOutput{
 			TargetHealthDescriptions: []elbtypes.TargetHealthDescription{
 				tgHealthDesc(elbtypes.TargetHealthStateEnumHealthy),

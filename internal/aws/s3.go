@@ -129,7 +129,9 @@ func FetchS3BucketsPageWithNotifications(
 		input.ContinuationToken = &continuationToken
 	}
 
-	output, err := listAPI.ListBuckets(ctx, input)
+	output, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.ListBucketsOutput, error) {
+		return listAPI.ListBuckets(ctx, input)
+	})
 	if err != nil {
 		return resource.FetchResult{}, fmt.Errorf("fetching S3 buckets: %w", err)
 	}
@@ -197,8 +199,10 @@ func firstS3NotificationTargets(
 	api S3GetBucketNotificationConfigurationAPI,
 	bucket string,
 ) (lambdaArn, sqsArn, snsArn string, _ error) {
-	out, err := api.GetBucketNotificationConfiguration(ctx, &s3.GetBucketNotificationConfigurationInput{
-		Bucket: aws.String(bucket),
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketNotificationConfigurationOutput, error) {
+		return api.GetBucketNotificationConfiguration(ctx, &s3.GetBucketNotificationConfigurationInput{
+			Bucket: aws.String(bucket),
+		})
 	})
 	if err != nil {
 		// Best effort enrichment: keep list results even if this lookup fails.
@@ -239,7 +243,9 @@ func FetchS3Objects(ctx context.Context, api S3ListObjectsV2API, bucket, prefix 
 		input.ContinuationToken = &continuationToken
 	}
 
-	output, err := api.ListObjectsV2(ctx, input)
+	output, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.ListObjectsV2Output, error) {
+		return api.ListObjectsV2(ctx, input)
+	})
 	if err != nil {
 		return resource.FetchResult{}, fmt.Errorf("fetching S3 objects: %w", err)
 	}

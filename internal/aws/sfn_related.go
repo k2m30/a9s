@@ -13,24 +13,22 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// sfnDescribe wraps DescribeStateMachine in RetryOnThrottle. Returns nil on any
-// failure (unsupported client, API error, empty output).
-func sfnDescribe(ctx context.Context, clients any, stateMachineARN string) *sfn.DescribeStateMachineOutput {
+// sfnDescribe wraps DescribeStateMachine in RetryOnThrottle. Returns (nil, nil)
+// when the client is unsupported or absent (no API call attempted — the caller
+// renders Count=-1 without a FlashMsg). Returns (nil, err) on API failure so
+// callers can surface the underlying error via Result.Err → FlashMsg → error log.
+func sfnDescribe(ctx context.Context, clients any, stateMachineARN string) (*sfn.DescribeStateMachineOutput, error) {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil || c.SFN == nil {
-		return nil
+		return nil, nil
 	}
 	api, ok := c.SFN.(SFNDescribeStateMachineAPI)
 	if !ok {
-		return nil
+		return nil, nil
 	}
-	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sfn.DescribeStateMachineOutput, error) {
+	return RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sfn.DescribeStateMachineOutput, error) {
 		return api.DescribeStateMachine(ctx, &sfn.DescribeStateMachineInput{StateMachineArn: &stateMachineARN})
 	})
-	if err != nil {
-		return nil
-	}
-	return out
 }
 
 // checkSFNLogs searches the logs cache for the vendedlogs log group associated
@@ -107,7 +105,10 @@ func checkSFNRole(ctx context.Context, clients any, res resource.Resource, _ res
 	if arn == "" {
 		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 	}
-	out := sfnDescribe(ctx, clients, arn)
+	out, err := sfnDescribe(ctx, clients, arn)
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: err}
+	}
 	if out == nil {
 		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
 	}
@@ -124,7 +125,10 @@ func checkSFNKMS(ctx context.Context, clients any, res resource.Resource, _ reso
 	if arn == "" {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
-	out := sfnDescribe(ctx, clients, arn)
+	out, err := sfnDescribe(ctx, clients, arn)
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "kms", Count: -1, Err: err}
+	}
 	if out == nil {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
 	}
@@ -143,7 +147,10 @@ func checkSFNLambda(ctx context.Context, clients any, res resource.Resource, _ r
 	if arn == "" {
 		return resource.RelatedCheckResult{TargetType: "lambda", Count: 0}
 	}
-	out := sfnDescribe(ctx, clients, arn)
+	out, err := sfnDescribe(ctx, clients, arn)
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
+	}
 	if out == nil {
 		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
 	}

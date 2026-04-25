@@ -46,23 +46,6 @@ func TestDemoFullIntegration_RelatedHopScenarios(t *testing.T) {
 	clients := demo.NewServiceClients()
 	expectedTopLevel := fullIntegrationCountExpectationsFromCounts(demofixtures.ExpectedTopLevelCounts())
 
-	m := tui.New(
-		demo.DemoProfile,
-		demo.DemoRegion,
-		tui.WithClients(clients),
-		tui.WithNoCache(true),
-	)
-	m, _ = fullIntegrationApplyMsg(m, tea.WindowSizeMsg{Width: 240, Height: 220})
-
-	initMsg := fullIntegrationRequireCmdMsg(t, m.Init(), "demo Init")
-	var cmd tea.Cmd
-	m, cmd = fullIntegrationApplyMsg(m, initMsg)
-	availMsg := fullIntegrationExtractMsg(t, cmd, func(msg tea.Msg) bool {
-		_, ok := msg.(messages.AvailabilityPrefetchedMsg)
-		return ok
-	})
-	m, _ = fullIntegrationApplyMsg(m, availMsg)
-
 	scenarios := []fullIntegrationRelatedHopScenario{
 		{
 			name:              "ecs-service-cluster-service",
@@ -76,6 +59,11 @@ func TestDemoFullIntegration_RelatedHopScenarios(t *testing.T) {
 	for _, scenario := range scenarios {
 		scenario := scenario
 		t.Run(scenario.name, func(t *testing.T) {
+			// Fresh model per scenario with an empty resourceCache. The baseline
+			// test builds cache lazily via NavigateMsg fetches; mirroring that
+			// avoids the AvailabilityPrefetchedMsg pre-seeding path which would
+			// make NavigateMsg resolve from cache and skip ResourcesLoadedMsg.
+			m := fullIntegrationNewReadyModelWithClients(t, demo.DemoProfile, demo.DemoRegion, clients)
 			fullIntegrationRunRelatedHopScenario(t, clients, &m, expectedTopLevel, scenario)
 		})
 	}

@@ -13,6 +13,7 @@ package unit
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
@@ -201,11 +202,11 @@ func TestEnrichSQSAttributes_NilClientReturnsEmptyFindingsNoError(t *testing.T) 
 	}
 }
 
-// TestEnrichSQSAttributes_APIErrorSetsTruncatedNoError verifies that when the
-// GetQueueAttributes call for queue-1 returns an error, the enricher sets
-// Truncated=true, produces 0 findings for the failed queue, and does not
-// propagate the error.
-func TestEnrichSQSAttributes_APIErrorSetsTruncatedNoError(t *testing.T) {
+// TestEnrichSQSAttributes_APIErrorSetsTruncatedAndSurfacesError verifies that when
+// the GetQueueAttributes call for queue-1 returns an error, the enricher sets
+// Truncated=true, produces 0 findings for the failed queue, and returns a composite
+// error containing the enricher prefix and the failing queue ID.
+func TestEnrichSQSAttributes_APIErrorSetsTruncatedAndSurfacesError(t *testing.T) {
 	apiErr := errors.New("sqs: GetQueueAttributes throttled")
 	fake := &sqsGetQueueAttributesFake{
 		errByURL: map[string]error{
@@ -222,8 +223,14 @@ func TestEnrichSQSAttributes_APIErrorSetsTruncatedNoError(t *testing.T) {
 	resources := sqsResources("my-queue-1", "my-queue-2")
 
 	result, err := awsclient.EnrichSQSAttributes(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatal("enricher must surface a composite error when an API call fails")
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, "sqs-enrich:") {
+		t.Errorf("composite error must contain \"sqs-enrich:\", got: %q", errStr)
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, "my-queue-1") {
+		t.Errorf("composite error must contain the failing queue ID \"my-queue-1\", got: %q", errStr)
 	}
 	if _, ok := result.Findings["my-queue-1"]; ok {
 		t.Error("my-queue-1 must NOT have a finding when the API call fails")

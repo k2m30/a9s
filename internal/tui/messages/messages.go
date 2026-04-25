@@ -45,6 +45,16 @@ type ResourcesLoadedMsg struct {
 	// write-through block — checks this field; if it matches the current
 	// per-type gen, it seeds probeResources and dispatches probeEnrichment.
 	TypeGen int
+	// Err is non-nil when the paginated fetcher returned a partial-success
+	// composite error: SOME resources made it back AND something failed
+	// (e.g. one inline-group-policy enumeration call timed out). The handler
+	// renders Resources as usual AND routes Err through FlashMsg so the `!`
+	// log records the partial failure. Without this field a non-nil err
+	// from the fetcher caused the dispatcher to emit APIErrorMsg and drop
+	// the partial Resources entirely — a regression of the never-silent-skip
+	// rule that produced an empty list when one of N inline-policy calls
+	// failed.
+	Err error
 }
 
 // LoadMoreMsg triggers loading the next page of a paginated resource list.
@@ -151,13 +161,28 @@ type RelatedCheckResultMsg struct {
 	DefDisplayName   string // unique def.DisplayName — disambiguates multiple defs sharing a TargetType (e.g. ct-events self-pivots)
 	Result           resource.RelatedCheckResult
 	Generation       uint64 // dispatch generation — discard if != Model.relatedGen
-	// CachedPages contains resource pages fetched from AWS on a cold cache miss,
-	// keyed by target resource short name. Non-nil only when FetchRelatedTarget
-	// executed a live fetch (i.e., target was absent from the ResourceCache snapshot
-	// passed to the checker). The app handler writes these entries into m.resourceCache
-	// so subsequent detail views for any resource type get a cache hit.
+	// CachedPages contains full top-level resource pages fetched from AWS on a
+	// cold cache miss, keyed by target resource short name. Non-nil only when
+	// the NeedsTargetCache prefetch executed a live fetch (i.e., target was
+	// absent from the ResourceCache snapshot passed to the checker). These
+	// pages represent authoritative first-page results from the paginated
+	// top-level fetcher and replace any absent cache entry verbatim.
 	// Nil on cache hit or in demo mode — the app handler skips nil maps.
 	CachedPages map[string]resource.ResourceCacheEntry
+	// LazyAddedResources contains resources pulled via FetchByIDs when a
+	// checker emitted target IDs outside the top-level fetcher's filter (KMS
+	// customer-managed, AMI Owners=self, EBS snapshot Owners=self, IAM Policy
+	// Scope=Local). Unlike CachedPages, these are NOT a complete first page —
+	// they are a sparse set of IDs. The app handler merges them (append dedup
+	// by ID) into any existing cache entry; if no entry exists, creates one
+	// marked IsTruncated=true so the next top-level navigation still fetches
+	// the full list authoritatively. Nil when no lazy-add occurred.
+	LazyAddedResources map[string][]resource.Resource
+	// LazyAddError is non-nil when FetchByIDs partially or fully failed during
+	// the lazy-add path. The partial results (if any) are still present in
+	// LazyAddedResources. The app handler converts this into a FlashMsg so
+	// operators see a visible error rather than a silent skip.
+	LazyAddError error
 }
 
 // RelatedNavigateMsg requests navigation to a related resource type.
@@ -203,6 +228,11 @@ type AvailabilityPrefetchedMsg struct {
 	IssueTruncated map[string]bool                // shortName -> true if issue count is lower bound
 	Resources      map[string][]resource.Resource // shortName -> retained first-page resources for Wave 2
 	Gen            int                            // availabilityGen captured at dispatch — stale if != current
+	// PrefetchErr is the composite error aggregating per-type fetch failures
+	// during the synchronous availability prefetch. Non-nil when any paginated
+	// fetcher errored; the app handler surfaces it as a FlashMsg so operators
+	// see permission/throttle issues rather than silently missing types.
+	PrefetchErr error
 }
 
 // AvailabilityCheckedMsg reports one resource type's background probe result.
@@ -213,8 +243,8 @@ type AvailabilityCheckedMsg struct {
 	Truncated    bool                // true if count is from a truncated first page
 	Err          error               // non-nil means "couldn't check" -- treat as unknown, don't grey out
 	Gen          int                 // generation counter -- ignore if != current availabilityGen
-	Issues       int                 // count of IsIssueRowColor() resources (red/yellow only)
-	Resources    []resource.Resource // retained first-page resources for Wave 2 enricher consumption
+	Issues    int                 // count of IsIssueRowColor() resources (red/yellow only)
+	Resources []resource.Resource // Populated on success AND on partial-success (Err non-nil but partial results present)
 }
 
 // EnrichmentCheckedMsg reports one resource type's Wave 2 enrichment result.
@@ -223,12 +253,13 @@ type EnrichmentCheckedMsg struct {
 	Issues       int  // updated issue count after enrichment (menu badge — ! severity only)
 	Truncated    bool // whether the enrichment count is a lower bound
 	// Findings is the per-resource finding map for this type, keyed by
-	// resource.Resource.ID. Populated on success; nil/empty when Err != nil.
-	// May include findings for resources off-page (account-wide enrichers).
+	// resource.Resource.ID. Populated on success AND on partial-success (Err
+	// non-nil but partial results present). May include findings for resources
+	// off-page (account-wide enrichers).
 	Findings map[string]resource.EnrichmentFinding
 	// FieldUpdates carries per-resource Fields[] mutations to merge into
-	// cached rows. Keyed by resource ID then by field key. Nil when the
-	// enricher produced no field updates.
+	// cached rows. Keyed by resource ID then by field key. Populated on success
+	// AND on partial-success (Err non-nil but partial results present).
 	FieldUpdates map[string]map[string]string
 	// TruncatedIDs carries the per-resource truncation signal from the enricher.
 	// Keyed by Resource.ID. Rows in this set are rendered as "?" because the

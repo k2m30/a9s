@@ -3,6 +3,7 @@ package aws
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	sqssvc "github.com/aws/aws-sdk-go-v2/service/sqs"
@@ -18,7 +19,10 @@ func init() {
 
 // EnrichSQSAttributes calls GetQueueAttributes per queue (cap EnrichmentCap)
 // to surface missing DLQ and missing KMS encryption as Wave 2 findings.
-// Per-queue errors are treated as truncated (skip silently).
+// Per-queue errors set Truncated=true + TruncatedIDs[id]=true for the affected
+// queue (per-row `?` marker) AND aggregate into the returned composite error
+// via AggregateFailures so the operator sees the failure in the error log (!).
+// Partial findings are returned alongside the composite error on partial fail.
 func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
@@ -27,6 +31,8 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
+	var failures []string
+	total := 0
 	for i, r := range resources {
 		if i >= EnrichmentCap {
 			break
@@ -35,15 +41,19 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 		if queueURL == "" {
 			continue
 		}
-		out, err := clients.SQS.GetQueueAttributes(ctx, &sqssvc.GetQueueAttributesInput{
-			QueueUrl: aws.String(queueURL),
-			AttributeNames: []sqstypes.QueueAttributeName{
-				sqstypes.QueueAttributeNameRedrivePolicy,
-				sqstypes.QueueAttributeNameVisibilityTimeout,
-				sqstypes.QueueAttributeNameKmsMasterKeyId,
-			},
+		total++
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sqssvc.GetQueueAttributesOutput, error) {
+			return clients.SQS.GetQueueAttributes(ctx, &sqssvc.GetQueueAttributesInput{
+				QueueUrl: aws.String(queueURL),
+				AttributeNames: []sqstypes.QueueAttributeName{
+					sqstypes.QueueAttributeNameRedrivePolicy,
+					sqstypes.QueueAttributeNameVisibilityTimeout,
+					sqstypes.QueueAttributeNameKmsMasterKeyId,
+				},
+			})
 		})
 		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
 			truncatedIDs[r.ID] = true
 			continue
@@ -80,5 +90,6 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 			Rows:     rows,
 		}
 	}
-	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates},
+		AggregateFailures("sqs-enrich: GetQueueAttributes", failures, total)
 }

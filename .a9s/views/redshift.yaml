@@ -1,10 +1,10 @@
 list:
   Cluster ID:
     path: ClusterIdentifier
-    width: 28
+    width: 36
   Status:
-    path: ClusterStatus
-    width: 14
+    key: status
+    width: 34
   Pending:
     path: PendingModifiedValues.NodeType
     width: 14

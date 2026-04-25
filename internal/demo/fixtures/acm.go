@@ -120,6 +120,26 @@ func NewACMFixtures() *ACMFixtures {
 				},
 				RenewalEligibility: acmtypes.RenewalEligibilityIneligible,
 			},
+			// OpenSearch graph-root custom endpoint cert — required for opensearch→acm pivot.
+			// checkOpenSearchACM calls DescribeDomainConfig and reads
+			// DomainEndpointOptions.Options.CustomEndpointCertificateArn = OpenSearchACMCertARN.
+			// The checker strips the ARN to the bare cert ID = OpenSearchACMCertID and looks it up here.
+			{
+				DomainName:     aws.String("acme-logs.internal.com"),
+				CertificateArn: aws.String(OpenSearchACMCertARN),
+				Status:         acmtypes.CertificateStatusIssued,
+				Type:           acmtypes.CertificateTypeAmazonIssued,
+				NotAfter:       aws.Time(mustParseACMTime("2028-06-01T23:59:59+00:00")),
+				NotBefore:      aws.Time(mustParseACMTime("2026-06-01T00:00:00+00:00")),
+				IssuedAt:       aws.Time(time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)),
+				InUse:          aws.Bool(true),
+				CreatedAt:      aws.Time(time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)),
+				KeyAlgorithm:   acmtypes.KeyAlgorithmRsa2048,
+				SubjectAlternativeNameSummaries: []string{
+					"acme-logs.internal.com",
+				},
+				RenewalEligibility: acmtypes.RenewalEligibilityEligible,
+			},
 			// Issue: Status=VALIDATION_TIMED_OUT → Broken (DNS record never added)
 			{
 				DomainName:     aws.String("timeout.acme-corp.com"),

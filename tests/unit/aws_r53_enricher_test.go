@@ -13,6 +13,7 @@ package unit
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -200,10 +201,11 @@ func TestEnrichRoute53Zone_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	}
 }
 
-// TestEnrichRoute53Zone_APIErrorSetsTruncatedNoError verifies that when the API
-// call for zone-1 returns an error, the enricher sets Truncated=true, produces 0
-// findings, and does not propagate the error.
-func TestEnrichRoute53Zone_APIErrorSetsTruncatedNoError(t *testing.T) {
+// TestEnrichRoute53Zone_APIErrorSetsTruncatedAndSurfacesError verifies that when the
+// API call for zone-1 returns an error, the enricher sets Truncated=true, produces 0
+// findings for the failed zones, and returns a composite error containing the enricher
+// prefix and the failing zone ID.
+func TestEnrichRoute53Zone_APIErrorSetsTruncatedAndSurfacesError(t *testing.T) {
 	apiErr := errors.New("route53: GetHostedZone throttled")
 	fake := &r53GetHostedZoneFake{
 		errByID: map[string]error{
@@ -215,8 +217,14 @@ func TestEnrichRoute53Zone_APIErrorSetsTruncatedNoError(t *testing.T) {
 	resources := r53ZoneResources(r53ZoneID1, r53ZoneID2)
 
 	result, err := awsclient.EnrichRoute53Zone(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatal("enricher must surface a composite error when an API call fails")
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, "r53-enrich:") {
+		t.Errorf("composite error must contain \"r53-enrich:\", got: %q", errStr)
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, r53ZoneID1) {
+		t.Errorf("composite error must contain the failing zone ID %q, got: %q", r53ZoneID1, errStr)
 	}
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings on API error, got %d", len(result.Findings))

@@ -10,6 +10,11 @@ import (
 // CloudWatchFixtures holds typed fixture data for CloudWatch.
 type CloudWatchFixtures struct {
 	Alarms []cwtypes.MetricAlarm
+	// AlarmHistory maps AlarmName → history items (for DescribeAlarmHistory).
+	// A missing entry means no history (child view lands empty) — every
+	// graph-root-reachable alarm must have an entry so the alarm→alarm_history
+	// drill lands on non-empty content.
+	AlarmHistory map[string][]cwtypes.AlarmHistoryItem
 }
 
 const relatedAlarmSNSARN = "arn:aws:sns:us-east-1:123456789012:ops-alerts"
@@ -281,6 +286,114 @@ func NewCloudWatchFixtures() *CloudWatchFixtures {
 					{Name: aws.String("TableName"), Value: aws.String(OrdersProdID)},
 				},
 			},
+			// OpenSearch graph-root alarms — required for opensearch→alarm related-panel pivot.
+			// Namespace=AWS/ES with Dimensions.DomainName=acme-logs so checkOpenSearchAlarms
+			// resolves a count of 2 for the demo showroom.
+			{
+				AlarmName:             aws.String("acme-logs-cluster-red"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:acme-logs-cluster-red"),
+				AlarmDescription:      aws.String("Triggers when acme-logs OpenSearch cluster status is red"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 3 datapoints were less than or equal to the threshold (1.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 20, 9, 0, 0, 0, time.UTC)),
+				MetricName:            aws.String("ClusterStatus.red"),
+				Namespace:             aws.String("AWS/ES"),
+				Threshold:             aws.Float64(1.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanOrEqualToThreshold,
+				EvaluationPeriods:     aws.Int32(1),
+				Period:                aws.Int32(60),
+				Statistic:             cwtypes.StatisticMaximum,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				OKActions:             []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("DomainName"), Value: aws.String(GraphRootDomain)},
+				},
+			},
+			{
+				AlarmName:             aws.String("acme-logs-freestorage-low"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:acme-logs-freestorage-low"),
+				AlarmDescription:      aws.String("Triggers when acme-logs OpenSearch free storage drops below 10 GB"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 3 datapoints were greater than the threshold (10000000000.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 22, 14, 0, 0, 0, time.UTC)),
+				MetricName:            aws.String("FreeStorageSpace"),
+				Namespace:             aws.String("AWS/ES"),
+				Threshold:             aws.Float64(10_000_000_000),
+				ComparisonOperator:    cwtypes.ComparisonOperatorLessThanThreshold,
+				EvaluationPeriods:     aws.Int32(3),
+				Period:                aws.Int32(300),
+				Statistic:             cwtypes.StatisticAverage,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				OKActions:             []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("DomainName"), Value: aws.String(GraphRootDomain)},
+				},
+			},
+			// acme-warehouse alarms — required for redshift→alarm related-panel pivot.
+			// Dimension ClusterIdentifier=acme-warehouse matches checkRedshiftAlarms.
+			{
+				AlarmName:             aws.String("redshift-acme-warehouse-cpu"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:redshift-acme-warehouse-cpu"),
+				AlarmDescription:      aws.String("Triggers when acme-warehouse CPU utilization exceeds 80%"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 5 datapoints were less than the threshold (80.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 20, 9, 0, 0, 0, time.UTC)),
+				MetricName:            aws.String("CPUUtilization"),
+				Namespace:             aws.String("AWS/Redshift"),
+				Threshold:             aws.Float64(80.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanOrEqualToThreshold,
+				EvaluationPeriods:     aws.Int32(5),
+				Period:                aws.Int32(60),
+				Statistic:             cwtypes.StatisticAverage,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("ClusterIdentifier"), Value: aws.String(AcmeWarehouseID)},
+				},
+			},
+			{
+				AlarmName:             aws.String("redshift-acme-warehouse-disk"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:redshift-acme-warehouse-disk"),
+				AlarmDescription:      aws.String("Triggers when acme-warehouse disk space utilization exceeds 85%"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 3 datapoints were less than the threshold (85.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 19, 12, 0, 0, 0, time.UTC)),
+				MetricName:            aws.String("PercentageDiskSpaceUsed"),
+				Namespace:             aws.String("AWS/Redshift"),
+				Threshold:             aws.Float64(85.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanOrEqualToThreshold,
+				EvaluationPeriods:     aws.Int32(3),
+				Period:                aws.Int32(300),
+				Statistic:             cwtypes.StatisticAverage,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("ClusterIdentifier"), Value: aws.String(AcmeWarehouseID)},
+				},
+			},
+			// acme-reporting alarm — required for redshift→alarm related-panel pivot (second graph-root).
+			{
+				AlarmName:             aws.String("redshift-acme-reporting-cpu"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:redshift-acme-reporting-cpu"),
+				AlarmDescription:      aws.String("Triggers when acme-reporting CPU utilization exceeds 75%"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 5 datapoints were less than the threshold (75.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 18, 10, 0, 0, 0, time.UTC)),
+				MetricName:            aws.String("CPUUtilization"),
+				Namespace:             aws.String("AWS/Redshift"),
+				Threshold:             aws.Float64(75.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanOrEqualToThreshold,
+				EvaluationPeriods:     aws.Int32(5),
+				Period:                aws.Int32(60),
+				Statistic:             cwtypes.StatisticAverage,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("ClusterIdentifier"), Value: aws.String(AcmeReportingID)},
+				},
+			},
 			// Issue: OK state but ActionsEnabled=false → Warning (alarm silenced/muted)
 			{
 				AlarmName:             aws.String("alarm-muted"),
@@ -300,6 +413,92 @@ func NewCloudWatchFixtures() *CloudWatchFixtures {
 				AlarmActions:          []string{relatedAlarmSNSARN},
 				OKActions:             []string{relatedAlarmSNSARN},
 			},
+			// EFS prod-app-data alarms — required for efs→alarm related-panel pivot (Count = 2).
+			// checkEFSAlarm matches Namespace=AWS/EFS AND Dimensions[Name=FileSystemId, Value=ProdEFSID].
+			{
+				AlarmName:             aws.String(ProdEFSAlarmAID),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:" + ProdEFSAlarmAID),
+				AlarmDescription:      aws.String("Triggers when EFS burst credit balance drops below threshold"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 3 datapoints were greater than the threshold (1000000000.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 20, 8, 0, 0, 0, time.UTC)),
+				MetricName:            aws.String("BurstCreditBalance"),
+				Namespace:             aws.String("AWS/EFS"),
+				Threshold:             aws.Float64(1_000_000_000.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorLessThanThreshold,
+				EvaluationPeriods:     aws.Int32(3),
+				Period:                aws.Int32(300),
+				Statistic:             cwtypes.StatisticMinimum,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				OKActions:             []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("FileSystemId"), Value: aws.String(ProdEFSID)},
+				},
+			},
+			{
+				AlarmName:             aws.String(ProdEFSAlarmBID),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:" + ProdEFSAlarmBID),
+				AlarmDescription:      aws.String("Triggers when EFS PercentIOLimit exceeds 90% sustained"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 3 datapoints were less than the threshold (90.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 20, 8, 0, 0, 0, time.UTC)),
+				MetricName:            aws.String("PercentIOLimit"),
+				Namespace:             aws.String("AWS/EFS"),
+				Threshold:             aws.Float64(90.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanThreshold,
+				EvaluationPeriods:     aws.Int32(3),
+				Period:                aws.Int32(300),
+				Statistic:             cwtypes.StatisticAverage,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				OKActions:             []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("FileSystemId"), Value: aws.String(ProdEFSID)},
+				},
+			},
+		},
+		// AlarmHistory — every graph-root-reachable alarm needs at least one
+		// entry so alarm→alarm_history drill lands on non-empty content.
+		AlarmHistory: map[string][]cwtypes.AlarmHistoryItem{
+			"orders-prod-throttle":         minimalAlarmHistory("orders-prod-throttle"),
+			"rds-prod-dbi-aurora-1-cpu":    minimalAlarmHistory("rds-prod-dbi-aurora-1-cpu"),
+			"docdb-acme-prod-cpu":          minimalAlarmHistory("docdb-acme-prod-cpu"),
+			"aurora-prod-cluster-cpu":      minimalAlarmHistory("aurora-prod-cluster-cpu"),
+			"redis-prod-cache-hits":        minimalAlarmHistory("redis-prod-cache-hits"),
+			"redshift-acme-reporting-cpu":  minimalAlarmHistory("redshift-acme-reporting-cpu"),
+			"redshift-acme-warehouse-cpu":  minimalAlarmHistory("redshift-acme-warehouse-cpu"),
+			"redshift-acme-warehouse-disk": minimalAlarmHistory("redshift-acme-warehouse-disk"),
+			"acme-logs-cluster-red":        minimalAlarmHistory("acme-logs-cluster-red"),
+			"acme-logs-freestorage-low":    minimalAlarmHistory("acme-logs-freestorage-low"),
+			"prod-efs-burst-credit-low":    minimalAlarmHistory("prod-efs-burst-credit-low"),
+			"prod-efs-percent-io-high":     minimalAlarmHistory("prod-efs-percent-io-high"),
+		},
+	}
+}
+
+// minimalAlarmHistory returns a canonical 3-item state sequence
+// (OK → ALARM → OK) so the alarm_history child view has non-empty content.
+func minimalAlarmHistory(alarmName string) []cwtypes.AlarmHistoryItem {
+	t0 := time.Date(2026, 4, 20, 8, 0, 0, 0, time.UTC)
+	return []cwtypes.AlarmHistoryItem{
+		{
+			AlarmName:       aws.String(alarmName),
+			Timestamp:       aws.Time(t0.Add(2 * time.Hour)),
+			HistoryItemType: cwtypes.HistoryItemTypeStateUpdate,
+			HistorySummary:  aws.String("Alarm updated from ALARM to OK"),
+		},
+		{
+			AlarmName:       aws.String(alarmName),
+			Timestamp:       aws.Time(t0.Add(1 * time.Hour)),
+			HistoryItemType: cwtypes.HistoryItemTypeStateUpdate,
+			HistorySummary:  aws.String("Alarm updated from OK to ALARM"),
+		},
+		{
+			AlarmName:       aws.String(alarmName),
+			Timestamp:       aws.Time(t0),
+			HistoryItemType: cwtypes.HistoryItemTypeConfigurationUpdate,
+			HistorySummary:  aws.String("Alarm \"" + alarmName + "\" created"),
 		},
 	}
 }
