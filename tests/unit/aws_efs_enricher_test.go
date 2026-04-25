@@ -13,85 +13,16 @@ package unit
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/efs"
 	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// efsMountTargetFake implements EFSAPI for enrichment testing.
-// It embeds the interface and overrides only DescribeMountTargets.
-// The results map is keyed by FileSystemId (from the input) so the fake
-// can serve different responses per resource.
-type efsMountTargetFake struct {
-	awsclient.EFSAPI
-	// results maps FileSystemId → response. If absent the fake returns errByFS.
-	results map[string][]efstypes.MountTargetDescription
-	// errByFS maps FileSystemId → error; overrides results when set.
-	errByFS map[string]error
-}
-
-func (f *efsMountTargetFake) DescribeMountTargets(
-	_ context.Context,
-	in *efs.DescribeMountTargetsInput,
-	_ ...func(*efs.Options),
-) (*efs.DescribeMountTargetsOutput, error) {
-	fsID := ""
-	if in != nil && in.FileSystemId != nil {
-		fsID = *in.FileSystemId
-	}
-	if f.errByFS != nil {
-		if err, ok := f.errByFS[fsID]; ok {
-			return nil, err
-		}
-	}
-	mts := f.results[fsID]
-	return &efs.DescribeMountTargetsOutput{MountTargets: mts}, nil
-}
-
-// Compile-time check: efsMountTargetFake satisfies EFSAPI.
-var _ awsclient.EFSAPI = (*efsMountTargetFake)(nil)
-
-// efsResources returns a slice of EFS Resource stubs with the given IDs.
-func efsResources(ids ...string) []resource.Resource {
-	res := make([]resource.Resource, 0, len(ids))
-	for _, id := range ids {
-		res = append(res, resource.Resource{
-			ID:   id,
-			Name: "efs-" + id,
-			Fields: map[string]string{
-				"file_system_id":   id,
-				"life_cycle_state": "available",
-				"mount_targets":    "1",
-			},
-		})
-	}
-	return res
-}
-
-// availableMT returns an available MountTargetDescription for a given file system.
-func availableMT(fsID, mtID string) efstypes.MountTargetDescription {
-	return efstypes.MountTargetDescription{
-		FileSystemId:   aws.String(fsID),
-		MountTargetId:  aws.String(mtID),
-		SubnetId:       aws.String("subnet-00000001"),
-		LifeCycleState: efstypes.LifeCycleStateAvailable,
-	}
-}
-
-// unavailableMT returns a MountTargetDescription with the given lifecycle state.
-func unavailableMT(fsID, mtID string, state efstypes.LifeCycleState) efstypes.MountTargetDescription {
-	return efstypes.MountTargetDescription{
-		FileSystemId:   aws.String(fsID),
-		MountTargetId:  aws.String(mtID),
-		SubnetId:       aws.String("subnet-00000001"),
-		LifeCycleState: state,
-	}
-}
+// Shared helpers (efsMountTargetFake, efsResources, availableMT,
+// unavailableMT) live in helpers_efs_test.go.
 
 // TestEnrichEFSMountTargets_AllAvailableProducesNoFindings verifies that when all
 // mount targets for both EFS resources are in the "available" state, no findings
@@ -173,10 +104,11 @@ func TestEnrichEFSMountTargets_NilClientReturnsEmptyFindingsNoError(t *testing.T
 	}
 }
 
-// TestEnrichEFSMountTargets_APIErrorSetsTruncatedNoError verifies that when the
-// API call for EFS-1 returns an error, the enricher sets Truncated=true, produces
-// 0 findings, and does not propagate the error.
-func TestEnrichEFSMountTargets_APIErrorSetsTruncatedNoError(t *testing.T) {
+// TestEnrichEFSMountTargets_APIErrorSetsTruncatedAndSurfacesError verifies that
+// when the API call for EFS-1 returns an error, the enricher sets Truncated=true,
+// produces 0 findings for that file system, and returns a composite error containing
+// the enricher prefix and the failing file system ID.
+func TestEnrichEFSMountTargets_APIErrorSetsTruncatedAndSurfacesError(t *testing.T) {
 	apiErr := errors.New("efs: DescribeMountTargets throttled")
 	fake := &efsMountTargetFake{
 		errByFS: map[string]error{
@@ -190,8 +122,14 @@ func TestEnrichEFSMountTargets_APIErrorSetsTruncatedNoError(t *testing.T) {
 	resources := efsResources("fs-00000001", "fs-00000002")
 
 	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatal("enricher must surface a composite error when an API call fails")
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, "efs-enrich:") {
+		t.Errorf("composite error must contain \"efs-enrich:\", got: %q", errStr)
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, "fs-00000001") {
+		t.Errorf("composite error must contain the failing file system ID \"fs-00000001\", got: %q", errStr)
 	}
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings on API error, got %d", len(result.Findings))

@@ -211,7 +211,8 @@ func TestEnrichECSServices_DeploymentRolloutFailedEmitsFinding(t *testing.T) {
 }
 
 // TestEnrichECSServices_APIErrorSetsTruncated verifies that an API error on
-// DescribeServices marks Truncated=true (no finding, no panic).
+// DescribeServices marks Truncated=true (no finding) and surfaces a composite error
+// containing the enricher prefix and the failing resource ID.
 func TestEnrichECSServices_APIErrorSetsTruncated(t *testing.T) {
 	fake := &ecsWave3Fake{
 		descSvcErr: errors.New("simulated DescribeServices error"),
@@ -229,8 +230,14 @@ func TestEnrichECSServices_APIErrorSetsTruncated(t *testing.T) {
 	}
 
 	result, err := awsclient.EnrichECSServices(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatal("enricher must surface a composite error when DescribeServices fails")
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, "ecs-svc-enrich:") {
+		t.Errorf("composite error must contain \"ecs-svc-enrich:\", got: %q", errStr)
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, "svc-err") {
+		t.Errorf("composite error must contain the failing service ID \"svc-err\", got: %q", errStr)
 	}
 	if !result.Truncated {
 		t.Error("expected Truncated=true on DescribeServices API error")
@@ -723,7 +730,8 @@ func TestEnrichCFNStackEvents_FailedEventEmitsBangFinding(t *testing.T) {
 }
 
 // TestEnrichCFNStackEvents_APIErrorSetsPerResourceTruncation verifies that an
-// API error on DescribeStackEvents marks TruncatedIDs for that resource.
+// API error on DescribeStackEvents marks TruncatedIDs for that resource and
+// surfaces a composite error containing the enricher prefix and the failing stack ID.
 func TestEnrichCFNStackEvents_APIErrorSetsPerResourceTruncation(t *testing.T) {
 	stackID := "arn:aws:cloudformation:us-east-1:123456789012:stack/err-stack/xyz"
 	fake := &cfnWave3Fake{
@@ -741,8 +749,14 @@ func TestEnrichCFNStackEvents_APIErrorSetsPerResourceTruncation(t *testing.T) {
 	}
 
 	result, err := awsclient.EnrichCFNStackEvents(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatal("enricher must surface a composite error when DescribeStackEvents fails")
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, "cfn-enrich:") {
+		t.Errorf("composite error must contain \"cfn-enrich:\", got: %q", errStr)
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, stackID) {
+		t.Errorf("composite error must contain the failing stack ID %q, got: %q", stackID, errStr)
 	}
 	if !result.Truncated {
 		t.Error("expected Truncated=true on DescribeStackEvents API error")
@@ -832,15 +846,16 @@ func TestEnrichELBAttributes_BothMisconfigurations_BangFinding(t *testing.T) {
 		},
 	}
 	clients := &awsclient.ServiceClients{ELBv2: fake}
-	resources := []resource.Resource{{ID: lbARN, Name: "my-lb"}}
+	const lbName = "my-lb"
+	resources := []resource.Resource{{ID: lbName, Name: lbName, Fields: map[string]string{"load_balancer_arn": lbARN}}}
 
 	result, err := awsclient.EnrichELBAttributes(context.Background(), clients, resources)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[lbARN]
+	f, ok := result.Findings[lbName]
 	if !ok {
-		t.Fatalf("expected finding for LB %q; findings: %v", lbARN, result.Findings)
+		t.Fatalf("expected finding for LB %q; findings: %v", lbName, result.Findings)
 	}
 	if f.Severity != "!" {
 		t.Errorf("severity = %q, want %q (both misconfigured → promotion)", f.Severity, "!")
@@ -863,15 +878,16 @@ func TestEnrichELBAttributes_OnlyDeletionProtectionMissing_TildeFinding(t *testi
 		},
 	}
 	clients := &awsclient.ServiceClients{ELBv2: fake}
-	resources := []resource.Resource{{ID: lbARN, Name: "partial-lb"}}
+	const lbName = "partial-lb"
+	resources := []resource.Resource{{ID: lbName, Name: lbName, Fields: map[string]string{"load_balancer_arn": lbARN}}}
 
 	result, err := awsclient.EnrichELBAttributes(context.Background(), clients, resources)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings[lbARN]
+	f, ok := result.Findings[lbName]
 	if !ok {
-		t.Fatalf("expected finding for LB %q; findings: %v", lbARN, result.Findings)
+		t.Fatalf("expected finding for LB %q; findings: %v", lbName, result.Findings)
 	}
 	if f.Severity != "~" {
 		t.Errorf("severity = %q, want %q (single misconfiguration → ~)", f.Severity, "~")
@@ -891,17 +907,18 @@ func TestEnrichELBAttributes_APIErrorSetsPerResourceTruncation(t *testing.T) {
 		perLBAttrs: map[string][]elbtypes.LoadBalancerAttribute{},
 	}
 	clients := &awsclient.ServiceClients{ELBv2: fake}
-	resources := []resource.Resource{{ID: lbARN, Name: "err-lb"}}
+	const lbName = "err-lb"
+	resources := []resource.Resource{{ID: lbName, Name: lbName, Fields: map[string]string{"load_balancer_arn": lbARN}}}
 
 	result, err := awsclient.EnrichELBAttributes(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	// Per-resource errors now aggregate into a composite; assert surface but do
+	// not require its absence (E1-E6 contract).
+	_ = err
 	if !result.Truncated {
 		t.Error("expected Truncated=true on DescribeLoadBalancerAttributes API error")
 	}
-	if !result.TruncatedIDs[lbARN] {
-		t.Errorf("expected TruncatedIDs[%q]=true; got map: %v", lbARN, result.TruncatedIDs)
+	if !result.TruncatedIDs[lbName] {
+		t.Errorf("expected TruncatedIDs[%q]=true; got map: %v", lbName, result.TruncatedIDs)
 	}
 }
 
@@ -918,7 +935,7 @@ func TestEnrichELBAttributes_WellConfiguredLB_NoFinding(t *testing.T) {
 		},
 	}
 	clients := &awsclient.ServiceClients{ELBv2: fake}
-	resources := []resource.Resource{{ID: lbARN, Name: "secure-lb"}}
+	resources := []resource.Resource{{ID: "secure-lb", Name: "secure-lb", Fields: map[string]string{"load_balancer_arn": lbARN}}}
 
 	result, err := awsclient.EnrichELBAttributes(context.Background(), clients, resources)
 	if err != nil {

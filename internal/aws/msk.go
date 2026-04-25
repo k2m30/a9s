@@ -71,12 +71,18 @@ func FetchMSKClustersPage(ctx context.Context, api MSKListClustersV2API, continu
 			version = *cluster.CurrentVersion
 		}
 
+		clusterARN := ""
+		if cluster.ClusterArn != nil {
+			clusterARN = *cluster.ClusterArn
+		}
+
 		r := resource.Resource{
 			ID:     clusterName,
 			Name:   clusterName,
 			Status: state,
 			Fields: map[string]string{
 				"cluster_name": clusterName,
+				"cluster_arn":  clusterARN,
 				"cluster_type": clusterType,
 				"state":        state,
 				"version":      version,

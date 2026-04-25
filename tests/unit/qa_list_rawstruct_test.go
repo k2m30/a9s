@@ -981,7 +981,11 @@ func TestQA_ListRawStruct_AllTypes(t *testing.T) {
 		{"r53", realisticR53Zone(), []string{"/hostedzone/Z1234567890ABC", "example.com."}},
 		{"apigw", realisticAPIGW(), []string{"abc123def4", "prod-api", "HTTP"}},
 		{"ecr", realisticECR(), []string{"my-app", "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app"}},
-		{"efs", realisticEFS(), []string{"fs-0abc1234def56789a", "available"}},
+		// efs Status column is derived from Resource.Fields["status"], not from
+		// RawStruct.LifeCycleState — so only RawStruct-backed identity columns
+		// (File System ID, Name) are asserted here. See qa_efs_test.go for the
+		// derived-status contract.
+		{"efs", realisticEFS(), []string{"fs-0abc1234def56789a"}},
 		{"eb-rule", realisticEBRule(), []string{"daily-backup-rule", "ENABLED"}},
 		{"sfn", realisticSFN(), []string{"order-processing", "STANDARD"}},
 		{"pipeline", realisticPipeline(), []string{"deploy-pipeline", "V2"}},
@@ -990,7 +994,11 @@ func TestQA_ListRawStruct_AllTypes(t *testing.T) {
 		{"glue", realisticGlueJob(), []string{"etl-daily-job", "4.0", "G.2X"}},
 		{"eb", realisticEB(), []string{"prod-api-env", "my-web-app", "Ready"}},
 		{"ses", realisticSESIdentity(), []string{"example.com", "DOMAIN"}},
-		{"redshift", realisticRedshift(), []string{"analytics-cluster", "available", "dc2.large"}},
+		// redshift Status column now reads Fields["status"] (derived §4 phrase from
+		// the fetcher), not RawStruct.ClusterStatus. A raw-struct-only Resource
+		// bypasses the fetcher — Status is blank. Identity/metadata columns still
+		// pull from RawStruct as before.
+		{"redshift", realisticRedshift(), []string{"analytics-cluster", "dc2.large"}},
 		{"trail", realisticTrail(), []string{"org-trail", "cloudtrail-logs-bucket"}},
 		{"athena", realisticAthena(), []string{"analytics-wg", "ENABLED"}},
 		{"codeartifact", realisticCodeArtifact(), []string{"shared-libs", "my-domain"}},

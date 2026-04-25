@@ -429,6 +429,70 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 		LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
 	})
 
+	// EFS-mounted Lambda functions — required for efs→lambda related-panel pivot (Count = 2).
+	// checkEFSLambda calls DescribeAccessPoints(FileSystemId=ProdEFSID), then scans lambda
+	// cache matching FunctionConfiguration.FileSystemConfigs[].Arn against AP ARNs.
+	fns = append(fns, lambdatypes.FunctionConfiguration{
+		FunctionName:     aws.String(ProdEFSLambdaAName),
+		FunctionArn:      aws.String("arn:aws:lambda:us-east-1:123456789012:function:" + ProdEFSLambdaAName),
+		Role:             aws.String(lambdaProdRoleARN),
+		Runtime:          lambdatypes.RuntimePython312,
+		MemorySize:       aws.Int32(512),
+		Timeout:          aws.Int32(300),
+		Handler:          aws.String("processor.handler"),
+		Description:      aws.String("Processes files written to EFS app-data filesystem"),
+		LastModified:     aws.String("2026-02-10T09:00:00+00:00"),
+		CodeSize:         2097152,
+		State:            lambdatypes.StateActive,
+		PackageType:      lambdatypes.PackageTypeZip,
+		Architectures:    []lambdatypes.Architecture{lambdatypes.ArchitectureX8664},
+		EphemeralStorage: &lambdatypes.EphemeralStorage{Size: aws.Int32(512)},
+		TracingConfig:    &lambdatypes.TracingConfigResponse{Mode: lambdatypes.TracingModePassThrough},
+		FileSystemConfigs: []lambdatypes.FileSystemConfig{
+			{Arn: aws.String(ProdEFSAccessPointAARN), LocalMountPath: aws.String("/mnt/app-data")},
+		},
+		VpcConfig: &lambdatypes.VpcConfigResponse{
+			VpcId:            aws.String(ProdEFSVpcID),
+			SubnetIds:        []string{ProdEFSSubnetAID},
+			SecurityGroupIds: []string{ProdEFSSecurityGroupAID},
+		},
+		LoggingConfig: &lambdatypes.LoggingConfig{
+			LogGroup:  aws.String("/aws/lambda/" + ProdEFSLambdaAName),
+			LogFormat: lambdatypes.LogFormatText,
+		},
+		LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
+	})
+	fns = append(fns, lambdatypes.FunctionConfiguration{
+		FunctionName:     aws.String(ProdEFSLambdaBName),
+		FunctionArn:      aws.String("arn:aws:lambda:us-east-1:123456789012:function:" + ProdEFSLambdaBName),
+		Role:             aws.String(lambdaProdRoleARN),
+		Runtime:          lambdatypes.RuntimePython312,
+		MemorySize:       aws.Int32(256),
+		Timeout:          aws.Int32(120),
+		Handler:          aws.String("report.handler"),
+		Description:      aws.String("Generates reports from EFS app-data shared filesystem"),
+		LastModified:     aws.String("2026-02-15T11:00:00+00:00"),
+		CodeSize:         1048576,
+		State:            lambdatypes.StateActive,
+		PackageType:      lambdatypes.PackageTypeZip,
+		Architectures:    []lambdatypes.Architecture{lambdatypes.ArchitectureX8664},
+		EphemeralStorage: &lambdatypes.EphemeralStorage{Size: aws.Int32(512)},
+		TracingConfig:    &lambdatypes.TracingConfigResponse{Mode: lambdatypes.TracingModePassThrough},
+		FileSystemConfigs: []lambdatypes.FileSystemConfig{
+			{Arn: aws.String(ProdEFSAccessPointBARN), LocalMountPath: aws.String("/mnt/reports")},
+		},
+		VpcConfig: &lambdatypes.VpcConfigResponse{
+			VpcId:            aws.String(ProdEFSVpcID),
+			SubnetIds:        []string{ProdEFSSubnetBID},
+			SecurityGroupIds: []string{ProdEFSSecurityGroupAID},
+		},
+		LoggingConfig: &lambdatypes.LoggingConfig{
+			LogGroup:  aws.String("/aws/lambda/" + ProdEFSLambdaBName),
+			LogFormat: lambdatypes.LogFormatText,
+		},
+		LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
+	})
+
 	// Generate 18 more functions to reach 26 total (including the image function above).
 	for i := range 18 {
 		name := lambdaNamePool[i]

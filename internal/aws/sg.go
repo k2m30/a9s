@@ -177,7 +177,9 @@ func FetchSecurityGroupsPage(ctx context.Context, api EC2DescribeSecurityGroupsA
 		input.NextToken = &continuationToken
 	}
 
-	output, err := api.DescribeSecurityGroups(ctx, input)
+	output, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeSecurityGroupsOutput, error) {
+		return api.DescribeSecurityGroups(ctx, input)
+	})
 	if err != nil {
 		return resource.FetchResult{}, fmt.Errorf("fetching security groups: %w", err)
 	}

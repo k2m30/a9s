@@ -91,18 +91,26 @@ func FetchDynamoDBTablesPage(ctx context.Context, listAPI DDBListTablesAPI, desc
 		input.ExclusiveStartTableName = &continuationToken
 	}
 
-	listOutput, err := listAPI.ListTables(ctx, input)
+	listOutput, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*dynamodb.ListTablesOutput, error) {
+		return listAPI.ListTables(ctx, input)
+	})
 	if err != nil {
 		return resource.FetchResult{}, fmt.Errorf("listing DynamoDB tables: %w", err)
 	}
 
+	var failures []string
 	var resources []resource.Resource
 	for _, tableName := range listOutput.TableNames {
-		descOutput, err := describeAPI.DescribeTable(ctx, &dynamodb.DescribeTableInput{
-			TableName: aws.String(tableName),
+		descOutput, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*dynamodb.DescribeTableOutput, error) {
+			return describeAPI.DescribeTable(ctx, &dynamodb.DescribeTableInput{
+				TableName: aws.String(tableName),
+			})
 		})
 		if err != nil {
-			continue // skip tables we can't describe (e.g. permission denied)
+			// Surface per-table failures to the error log so operators see
+			// permission/throttle issues instead of a silently short list.
+			failures = append(failures, fmt.Sprintf("%s: %v", tableName, err))
+			continue
 		}
 
 		table := descOutput.Table
@@ -182,5 +190,5 @@ func FetchDynamoDBTablesPage(ctx context.Context, listAPI DDBListTablesAPI, desc
 			PageSize:    len(resources),
 			TotalHint:   totalHint,
 		},
-	}, nil
+	}, AggregateFailures("ddb: DescribeTable", failures, len(listOutput.TableNames))
 }

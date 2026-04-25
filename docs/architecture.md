@@ -118,10 +118,10 @@ Key messages:
 | `EnrichDetailMsg` | Start async detail enrichment (e.g., policy doc fetch) |
 | `EnrichDetailResultMsg` | Deliver enriched resource back to detail/YAML/JSON view |
 | `RelatedCheckStartedMsg` | Start async related-resource checks |
-| `RelatedCheckResultMsg` | Deliver one related-check result to detail view |
+| `RelatedCheckResultMsg` | Deliver one related-check result to detail view — carries `Result.Err` (checker failure), `LazyAddError` (FetchByIDs failure), `LazyAddedResources` (out-of-scope targets resolved via `FetchByIDs`), `CachedPages` (cold-miss prefetch); app handler routes errors to `FlashMsg{IsError:true}` so the `!` error log captures them |
 | **Availability & Issue Counts** | |
 | `AvailabilityCacheLoadedMsg` | Deliver disk-cached availability + issue count data (includes `IssueCounts`, `IssueKnown` maps) |
-| `AvailabilityPrefetchedMsg` | No-cache-mode availability + issue counts + retained resources for Wave 2 |
+| `AvailabilityPrefetchedMsg` | No-cache-mode availability + issue counts + retained resources for Wave 2; `PrefetchErr` carries per-type fetch failures aggregated across all registered paginated fetchers, surfaced via FlashMsg |
 | `AvailabilityCheckedMsg` | One resource type's background probe result (includes `Issues` count + retained `Resources`) |
 | `EnrichmentCheckedMsg` | One resource type's Wave 2 enrichment result (issue count + truncated flag + per-resource `Findings` map; dual-generation guard via `Gen` + `TypeGen`) |
 | **UI feedback** | |
@@ -288,8 +288,8 @@ Some resource types hide problems behind extra API calls (e.g., EC2 with impaire
 **Architecture:**
 - `internal/aws/issue_enrichment.go` — Wave 2 infrastructure: `IssueEnricherRegistry` map, unexported `registerIssueEnricher` helper (panics on empty name, nil fn, duplicate short name), `NoOpIssueEnricher`, `IssueEnricher` struct, `IssueEnricherFunc` / `IssueEnricherResult` types, shared helpers, `EnrichmentCap` / `PerParentPageCap`.
 - `internal/aws/*_issue_enrichment.go` — 67 enricher-registry entries across 66 registered short names (`dbi` registers twice: once under `dbi` for its per-instance enricher and once under `rds` as an alias for the shared maintenance enricher). 43 entries are real enricher functions; the remaining 24 are `NoOpIssueEnricher` registrations for types with Wave 2 = "None" per `docs/attention-signals.md`. Each file's `init()` calls `registerIssueEnricher(<shortname>, <fn>, <priority>)` and — if the enricher writes `FieldUpdates` — `resource.RegisterIssueEnricherFieldKeys(<shortname>, [...])`.
-- `internal/tui/app_fetchers.go` — `buildEnrichQueue()`, `probeEnrichment()`
-- `internal/tui/app_handlers_navigate.go` — `startEnrichment()`, `handleEnrichmentChecked()` with only-increase guard
+- `internal/tui/app_probes.go` — `buildEnrichQueue()`, `probeEnrichment()`
+- `internal/tui/app_handlers_availability.go` — `startEnrichment()`, `handleEnrichmentChecked()` with only-increase guard
 
 **Flow:**
 
@@ -340,6 +340,7 @@ Representative fields owned by `sessionRuntime`:
 - `enrichmentRan map[string]bool` — banner visibility signal; `true` only after Wave 2 completed for that type.
 - `enrichmentTypeGen map[string]int` — per-type generation counter; guards against stale in-flight rerun results.
 - `resourceCache`, `relatedCache`, `probeResources`, `availQueue`, `enrichQueue` — session-scoped caches and dispatch queues.
+- `lazyResourceCache map[string][]resource.Resource` — sparse per-type cache populated by the related-panel lazy-add path when a checker emits IDs outside the top-level fetcher's scope filter (e.g. AWS-managed KMS key, public AMI, IAM `AdministratorAccess`). Consulted by `handleRelatedNavigate` (union-read with `resourceCache`, `resourceCache` wins on ID collision) but NEVER by the main-menu top-level list — so drill-through lands on real entries without polluting the scope-filtered list view. Cleared on profile/region switch.
 
 ---
 

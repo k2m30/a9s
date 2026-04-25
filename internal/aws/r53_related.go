@@ -97,14 +97,16 @@ func checkR53ELB(ctx context.Context, clients any, res resource.Resource, cache 
 	if len(wanted) == 0 {
 		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
 	}
-	elbList, _, _ := FetchRelatedTarget(ctx, clients, cache, "elb")
+	elbList, _, fetchErr := FetchRelatedTarget(ctx, clients, cache, "elb")
 	if elbList == nil {
 		// Fallback: return the alias DNS names as Ids when cache is unavailable.
 		ids := make([]string, 0, len(wanted))
 		for d := range wanted {
 			ids = append(ids, d)
 		}
-		return relatedResult("elb", ids)
+		r := relatedResult("elb", ids)
+		r.Err = fetchErr
+		return r
 	}
 	var ids []string
 	for _, elbRes := range elbList {
@@ -152,13 +154,15 @@ func checkR53CF(ctx context.Context, clients any, res resource.Resource, cache r
 	if len(wanted) == 0 {
 		return resource.RelatedCheckResult{TargetType: "cf", Count: 0}
 	}
-	cfList, _, _ := FetchRelatedTarget(ctx, clients, cache, "cf")
+	cfList, _, fetchErr := FetchRelatedTarget(ctx, clients, cache, "cf")
 	if cfList == nil {
 		ids := make([]string, 0, len(wanted))
 		for d := range wanted {
 			ids = append(ids, d)
 		}
-		return relatedResult("cf", ids)
+		r := relatedResult("cf", ids)
+		r.Err = fetchErr
+		return r
 	}
 	var ids []string
 	for _, cfRes := range cfList {
@@ -202,13 +206,15 @@ func checkR53APIGW(ctx context.Context, clients any, res resource.Resource, cach
 	if len(wantedIDs) == 0 {
 		return resource.RelatedCheckResult{TargetType: "apigw", Count: 0}
 	}
-	apigwList, _, _ := FetchRelatedTarget(ctx, clients, cache, "apigw")
+	apigwList, _, fetchErr := FetchRelatedTarget(ctx, clients, cache, "apigw")
 	if apigwList == nil {
 		ids := make([]string, 0, len(wantedIDs))
 		for id := range wantedIDs {
 			ids = append(ids, id)
 		}
-		return relatedResult("apigw", ids)
+		r := relatedResult("apigw", ids)
+		r.Err = fetchErr
+		return r
 	}
 	var ids []string
 	for _, apigwRes := range apigwList {
@@ -248,13 +254,15 @@ func checkR53S3(ctx context.Context, clients any, res resource.Resource, cache r
 	if len(wantedBuckets) == 0 {
 		return resource.RelatedCheckResult{TargetType: "s3", Count: 0}
 	}
-	s3List, _, _ := FetchRelatedTarget(ctx, clients, cache, "s3")
+	s3List, _, fetchErr := FetchRelatedTarget(ctx, clients, cache, "s3")
 	if s3List == nil {
 		ids := make([]string, 0, len(wantedBuckets))
 		for b := range wantedBuckets {
 			ids = append(ids, b)
 		}
-		return relatedResult("s3", ids)
+		r := relatedResult("s3", ids)
+		r.Err = fetchErr
+		return r
 	}
 	var ids []string
 	for _, s3Res := range s3List {

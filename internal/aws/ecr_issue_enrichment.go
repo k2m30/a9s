@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
@@ -19,24 +18,33 @@ func init() {
 	resource.RegisterIssueEnricherFieldKeys("ecr", []string{"critical_vulns", "high_vulns", "images_scanned"})
 }
 
-// ECRImagesCapPerRepo is the maximum number of images scanned per repository
-// during Wave 2 enrichment. Caps the per-repo ListImages + DescribeImageScanFindings
-// fanout so that large registries do not cause excessive API call counts.
-const ECRImagesCapPerRepo = 10
+// ECRImagesPerRepo caps how many recent images are inspected per repository.
+// DescribeImages returns ImageScanFindingsSummary inline, so the enricher pays
+// exactly one AWS call per repo regardless of how many images it samples —
+// restoring the wave-2 N+1 budget (previously 11N: ListImages + ≤10
+// DescribeImageScanFindings per repo). This value caps how many images are
+// included in the single DescribeImages response; AWS returns the most
+// recent images by default.
+const ECRImagesPerRepo = 10
 
-// EnrichECRRepository enumerates up to ECRImagesCapPerRepo images per repository
-// using ListImages, then calls DescribeImageScanFindings for each image to surface
-// CRITICAL and HIGH vulnerability findings.
+// EnrichECRRepository issues ONE DescribeImages call per repository with
+// maxResults=ECRImagesPerRepo and aggregates CRITICAL / HIGH counts from
+// ImageDetails[].ImageScanFindingsSummary.FindingSeverityCounts — which AWS
+// populates inline when scan-on-push is enabled on the repo.
+//
+// Wave-2 budget: 1 call per repo (N), 0 ancillary per-image calls. This
+// matches the N+1 design every other enricher follows. The previous
+// implementation fanned out up to 11 calls per repo which blew the 10s
+// enrichment context on any account with >10 repos.
 //
 // Findings:
-//   - Any CRITICAL findings across scanned images → "!" severity.
-//   - Any HIGH findings (no critical) → "~" severity.
+//   - Any CRITICAL across scanned images → "!" severity (bumps S1 badge).
+//   - Any HIGH (no CRITICAL) → "~" severity.
 //
 // fieldUpdates keys: "critical_vulns", "high_vulns", "images_scanned".
-// Repositories without scan data (unscanned images) are skipped silently.
-// Per-image ScanNotFoundException is routine and not treated as an error.
-// Skip when clients is nil or clients.ECR does not implement ECRListImagesAPI
-// or ECRDescribeImageScanFindingsAPI.
+// Per-repo errors aggregate into a composite returned error (E1–E6 contract).
+// Repositories without scan data (unscanned images) contribute zero counts
+// silently — AWS returns a nil ImageScanFindingsSummary for those.
 func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	fieldUpdates := make(map[string]map[string]string)
@@ -44,81 +52,57 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 	if clients == nil || clients.ECR == nil {
 		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
-	listAPI, okL := clients.ECR.(ECRListImagesAPI)
-	scanAPI, okS := clients.ECR.(ECRDescribeImageScanFindingsAPI)
-	if !okL || !okS {
+	describeAPI, ok := clients.ECR.(ECRDescribeImagesAPI)
+	if !ok {
 		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 
 	truncated := len(resources) > EnrichmentCap
+	var failures []string
+	total := 0
 	for i, r := range resources {
 		if i >= EnrichmentCap {
 			break
 		}
 		repoName := r.Name
 		if repoName == "" {
-			// ID is usually an ARN; last segment after '/' is the repository name.
-			if idx := strings.LastIndex(r.ID, "/"); idx >= 0 && idx < len(r.ID)-1 {
-				repoName = r.ID[idx+1:]
-			} else {
-				repoName = r.ID
-			}
+			repoName = r.ID
 		}
 		if repoName == "" {
 			continue
 		}
+		total++
 
-		// Paginate ListImages, capped at ECRImagesCapPerRepo.
-		var imageIDs []ecrtypes.ImageIdentifier
-		var listToken *string
-		for len(imageIDs) < ECRImagesCapPerRepo {
-			listOut, err := listAPI.ListImages(ctx, &ecr.ListImagesInput{
+		// ONE call per repo. Returns up to ECRImagesPerRepo most-recent images
+		// with ImageScanFindingsSummary populated inline.
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecr.DescribeImagesOutput, error) {
+			return describeAPI.DescribeImages(ctx, &ecr.DescribeImagesInput{
 				RepositoryName: aws.String(repoName),
-				NextToken:      listToken,
+				MaxResults:     aws.Int32(int32(ECRImagesPerRepo)),
 			})
-			if err != nil {
-				truncated = true
-				truncatedIDs[r.ID] = true
-				break
-			}
-			for _, id := range listOut.ImageIds {
-				if len(imageIDs) >= ECRImagesCapPerRepo {
-					truncated = true
-					truncatedIDs[r.ID] = true
-					break
-				}
-				imageIDs = append(imageIDs, id)
-			}
-			if listOut.NextToken == nil {
-				break
-			}
-			listToken = listOut.NextToken
+		})
+		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
+			truncated = true
+			truncatedIDs[r.ID] = true
+			continue
 		}
 
 		scannedCount := 0
 		var criticalTotal int32
 		var highTotal int32
-		for _, img := range imageIDs {
-			if img.ImageDigest == nil {
-				continue
-			}
-			scanOut, err := scanAPI.DescribeImageScanFindings(ctx, &ecr.DescribeImageScanFindingsInput{
-				RepositoryName: aws.String(repoName),
-				ImageId:        &ecrtypes.ImageIdentifier{ImageDigest: img.ImageDigest},
-			})
-			if err != nil {
-				// ScanNotFoundException is routine for unscanned images — skip silently.
+		for _, img := range out.ImageDetails {
+			summary := img.ImageScanFindingsSummary
+			if summary == nil {
 				continue
 			}
 			scannedCount++
-			if scanOut.ImageScanFindings != nil {
-				for sev, n := range scanOut.ImageScanFindings.FindingSeverityCounts {
-					switch sev {
-					case string(ecrtypes.FindingSeverityCritical):
-						criticalTotal += n
-					case string(ecrtypes.FindingSeverityHigh):
-						highTotal += n
-					}
+			for sev, n := range summary.FindingSeverityCounts {
+				switch sev {
+				case string(ecrtypes.FindingSeverityCritical):
+					criticalTotal += n
+				case string(ecrtypes.FindingSeverityHigh):
+					highTotal += n
 				}
 			}
 		}
@@ -163,5 +147,6 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 			issueCount++
 		}
 	}
-	return IssueEnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates},
+		AggregateFailures("ecr-enrich: DescribeImages", failures, total)
 }

@@ -214,6 +214,37 @@ func buildIAMRoles() []iamtypes.Role {
 		MaxSessionDuration:       aws.Int32(3600),
 	})
 
+	// Redshift IAM roles — required for redshift→role related-panel pivot.
+	// checkRedshiftRole matches IamRoles[].IamRoleArn on the cluster; the checker
+	// extracts the role name as the last segment after "/" from each ARN.
+	roles = append(roles, iamtypes.Role{
+		RoleName:    aws.String("redshift-copy-role"),
+		RoleId:      aws.String("AROAEXAMPLERSSHIFT001"),
+		Arn:         aws.String(RedshiftCopyRoleARN),
+		Path:        aws.String("/"),
+		CreateDate:  aws.Time(time.Date(2025, 3, 1, 9, 0, 0, 0, time.UTC)),
+		Description: aws.String("IAM role allowing acme-warehouse Redshift to COPY data from S3"),
+		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"redshift.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
+	})
+	roles = append(roles, iamtypes.Role{
+		RoleName:    aws.String("redshift-unload-role"),
+		RoleId:      aws.String("AROAEXAMPLERSSHIFT002"),
+		Arn:         aws.String(RedshiftUnloadRoleARN),
+		Path:        aws.String("/"),
+		CreateDate:  aws.Time(time.Date(2025, 3, 1, 9, 5, 0, 0, time.UTC)),
+		Description: aws.String("IAM role allowing acme-warehouse Redshift to UNLOAD data to S3"),
+		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"redshift.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
+	})
+	roles = append(roles, iamtypes.Role{
+		RoleName:    aws.String("redshift-reporting-copy-role"),
+		RoleId:      aws.String("AROAEXAMPLERSSHIFT003"),
+		Arn:         aws.String(RedshiftReportingCopyRoleARN),
+		Path:        aws.String("/"),
+		CreateDate:  aws.Time(time.Date(2025, 7, 22, 9, 0, 0, 0, time.UTC)),
+		Description: aws.String("IAM role allowing acme-reporting Redshift to COPY data from S3"),
+		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"redshift.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
+	})
+
 	// S3 healthy-bucket access role (checkS3Role pivot).
 	// checkS3Role matches roles whose policy_resources field contains the bucket ARN.
 	// policy_resources is populated by the IAM roles fetcher in Phase 7.
@@ -506,6 +537,16 @@ func buildIAMRelations(f *IAMFixtures) {
 	// Resource mentions HealthyBucketARN. Enriched via ListRolePolicies +
 	// GetRolePolicy during the IAM roles fetch.
 	f.InlineRolePolicies["a9s-demo-s3-access-role"] = []string{"s3-bucket-access"}
+	// Graph-root roles that must list non-empty policies so the
+	// role→role_policies drill lands on content.
+	f.InlineRolePolicies["AcmeBackupRoleProd"] = []string{"backup-access"}
+	f.AttachedRolePolicies["AcmeBackupRoleProd"] = []iamtypes.AttachedPolicy{
+		{PolicyName: aws.String("AWSBackupServiceRolePolicyForBackup"), PolicyArn: aws.String("arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForBackup")},
+	}
+	f.InlineRolePolicies["redshift-reporting-copy-role"] = []string{"s3-audit-copy"}
+	f.AttachedRolePolicies["redshift-reporting-copy-role"] = []iamtypes.AttachedPolicy{
+		{PolicyName: aws.String("AmazonRedshiftAllCommandsFullAccess"), PolicyArn: aws.String("arn:aws:iam::aws:policy/AmazonRedshiftAllCommandsFullAccess")},
+	}
 
 	// Attached user policies
 	f.AttachedUserPolicies["alice.johnson"] = []iamtypes.AttachedPolicy{

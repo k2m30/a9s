@@ -3,6 +3,7 @@ package aws
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -54,16 +55,21 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 	pages := 0
 	issueCount := 0
 	now := nowFunc()
+	var failures []string
 
 	for {
 		if pages >= EnrichmentCap {
 			truncated = true
 			break
 		}
-		out, err := clients.DocDB.DescribePendingMaintenanceActions(ctx, &docdb.DescribePendingMaintenanceActionsInput{Marker: marker})
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*docdb.DescribePendingMaintenanceActionsOutput, error) {
+			return clients.DocDB.DescribePendingMaintenanceActions(ctx, &docdb.DescribePendingMaintenanceActionsInput{Marker: marker})
+		})
 		pages++
 		if err != nil {
-			return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, FieldUpdates: fieldUpdates}, err
+			truncated = true
+			failures = append(failures, fmt.Sprintf("page %d: %v", pages, err))
+			break
 		}
 
 		for _, action := range out.PendingMaintenanceActions {
@@ -157,7 +163,7 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 		TruncatedIDs: truncatedIDs,
 		Findings:     findings,
 		FieldUpdates: fieldUpdates,
-	}, nil
+	}, AggregateFailures("dbc-enrich: DescribePendingMaintenanceActions", failures, pages)
 }
 
 // isClusterARN returns true when the ARN's resource-type segment is "cluster".

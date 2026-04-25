@@ -18,8 +18,6 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
-	ostypes "github.com/aws/aws-sdk-go-v2/service/opensearch/types"
-
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -67,105 +65,7 @@ func TestRelated_KMS_Role_EmptyKeyID(t *testing.T) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// opensearch_related.go — checkOpenSearchCFN (8.1%) + checkOpenSearchACM (0.0%)
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestRelated_OpenSearch_CFN_NilARN verifies checkOpenSearchCFN returns Count=0
-// when the domain has a nil ARN.
-func TestRelated_OpenSearch_CFN_NilARN(t *testing.T) {
-	src := resource.Resource{
-		ID: "my-domain",
-		RawStruct: ostypes.DomainStatus{
-			DomainName: aws.String("my-domain"),
-			ARN:        nil,
-		},
-	}
-	checker := opensearchCheckerByTarget(t, "cfn")
-	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	// nil ARN → Count=0 (no tag call possible)
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (nil ARN)", result.Count)
-	}
-}
-
-// TestRelated_OpenSearch_CFN_EmptyARN verifies checkOpenSearchCFN returns Count=0
-// when the domain has an empty ARN string.
-func TestRelated_OpenSearch_CFN_EmptyARN(t *testing.T) {
-	src := resource.Resource{
-		ID: "my-domain",
-		RawStruct: ostypes.DomainStatus{
-			DomainName: aws.String("my-domain"),
-			ARN:        aws.String(""),
-		},
-	}
-	checker := opensearchCheckerByTarget(t, "cfn")
-	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty ARN)", result.Count)
-	}
-}
-
-// TestRelated_OpenSearch_CFN_NilClients verifies checkOpenSearchCFN returns Count=-1
-// when the domain has a valid ARN but no OpenSearch client is available.
-func TestRelated_OpenSearch_CFN_NilClients(t *testing.T) {
-	src := resource.Resource{
-		ID: "my-domain",
-		RawStruct: ostypes.DomainStatus{
-			DomainName: aws.String("my-domain"),
-			ARN:        aws.String("arn:aws:es:us-east-1:123456789012:domain/my-domain"),
-		},
-	}
-	checker := opensearchCheckerByTarget(t, "cfn")
-	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	// nil clients → Count=-1 (cannot call ListTags)
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
-	}
-}
-
-// TestRelated_OpenSearch_CFN_WrongRawStruct verifies checkOpenSearchCFN returns
-// Count=-1 when RawStruct is not a DomainStatus.
-func TestRelated_OpenSearch_CFN_WrongRawStruct(t *testing.T) {
-	src := resource.Resource{
-		ID:        "my-domain",
-		RawStruct: "not-a-domain",
-	}
-	checker := opensearchCheckerByTarget(t, "cfn")
-	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
-	}
-}
-
-// TestRelated_OpenSearch_ACM_EmptyDomainID verifies checkOpenSearchACM returns
-// Count=0 when res.ID is empty (early exit — no domain name to query).
-func TestRelated_OpenSearch_ACM_EmptyDomainID(t *testing.T) {
-	src := resource.Resource{
-		ID:        "",
-		RawStruct: ostypes.DomainStatus{},
-	}
-	checker := opensearchCheckerByTarget(t, "acm")
-	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (empty domain ID)", result.Count)
-	}
-}
-
-// TestRelated_OpenSearch_ACM_NilClients verifies checkOpenSearchACM returns Count=-1
-// when the domain ID is set but no OpenSearch client is available.
-func TestRelated_OpenSearch_ACM_NilClients(t *testing.T) {
-	src := resource.Resource{
-		ID:        "my-domain",
-		RawStruct: ostypes.DomainStatus{DomainName: aws.String("my-domain")},
-	}
-	checker := opensearchCheckerByTarget(t, "acm")
-	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	// nil clients → Count=-1 (cannot call DescribeDomainConfig)
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (nil clients)", result.Count)
-	}
-}
+// opensearch_related.go coverage tests moved to tests/unit/aws_opensearch_related_test.go.
 
 // ────────────────────────────────────────────────────────────────────────────
 // dbc_related.go — checkDbcSubnet (37.5%)

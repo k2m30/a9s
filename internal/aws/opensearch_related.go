@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	acmtypes "github.com/aws/aws-sdk-go-v2/service/acm/types"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/opensearch"
@@ -23,7 +24,7 @@ func init() {
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkOpenSearchKMS},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkOpenSearchCFN},
 		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkOpenSearchSubnet},
-		{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkOpenSearchACM},
+		{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkOpenSearchACM, NeedsTargetCache: true},
 	})
 
 	// opensearchtypes.DomainStatus: EncryptionAtRestOptions.KmsKeyId
@@ -147,9 +148,17 @@ func checkOpenSearchVPC(_ context.Context, _ any, res resource.Resource, _ resou
 // EncryptionAtRestOptions.KmsKeyId field. Pattern F — no cache needed.
 func checkOpenSearchKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	domain, ok := assertStruct[opensearchtypes.DomainStatus](res.RawStruct)
-	if !ok || domain.EncryptionAtRestOptions == nil ||
+	if !ok {
+		// Structural assertion failure — RawStruct isn't a DomainStatus. This
+		// is "unknown" (cannot determine), not "no KMS key". Pattern-F
+		// contract: return -1 so the UI renders "?" rather than falsely
+		// reporting 0. Matches checkOpenSearchCFN / VPC / Subnet / SG / Logs.
+		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
+	}
+	if domain.EncryptionAtRestOptions == nil ||
 		domain.EncryptionAtRestOptions.KmsKeyId == nil ||
 		*domain.EncryptionAtRestOptions.KmsKeyId == "" {
+		// Legitimately no KMS key configured (encryption-off) — 0 is correct.
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
 	keyID := *domain.EncryptionAtRestOptions.KmsKeyId
@@ -177,7 +186,9 @@ func checkOpenSearchCFN(ctx context.Context, clients any, res resource.Resource,
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
 	}
-	out, err := tagAPI.ListTags(ctx, &opensearch.ListTagsInput{ARN: aws.String(*domain.ARN)})
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*opensearch.ListTagsOutput, error) {
+		return tagAPI.ListTags(ctx, &opensearch.ListTagsInput{ARN: aws.String(*domain.ARN)})
+	})
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
 	}
@@ -235,9 +246,15 @@ func checkOpenSearchSubnet(_ context.Context, _ any, res resource.Resource, _ re
 }
 
 // checkOpenSearchACM calls opensearch:DescribeDomainConfig and returns the
-// ACM certificate ARN attached to the domain's custom endpoint
+// ACM certificate attached to the domain's custom endpoint
 // (DomainEndpointOptions.Options.CustomEndpointCertificateArn). Pattern C.
-func checkOpenSearchACM(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+//
+// The ACM fetcher (acm.go) indexes Resource.ID by DomainName. So this
+// checker looks up the cert ARN against the acm cache and returns the
+// matching Resource.ID (DomainName) so drill-through lands on it.
+// Returning the bare cert ID (last segment of the ARN) — as the original
+// implementation did — produces an unnavigable ID-format mismatch.
+func checkOpenSearchACM(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	domainName := res.ID
 	if domainName == "" {
 		return resource.RelatedCheckResult{TargetType: "acm", Count: 0}
@@ -250,7 +267,9 @@ func checkOpenSearchACM(ctx context.Context, clients any, res resource.Resource,
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "acm", Count: -1}
 	}
-	out, err := cfgAPI.DescribeDomainConfig(ctx, &opensearch.DescribeDomainConfigInput{DomainName: aws.String(domainName)})
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*opensearch.DescribeDomainConfigOutput, error) {
+		return cfgAPI.DescribeDomainConfig(ctx, &opensearch.DescribeDomainConfigInput{DomainName: aws.String(domainName)})
+	})
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "acm", Count: -1, Err: err}
 	}
@@ -264,12 +283,29 @@ func checkOpenSearchACM(ctx context.Context, clients any, res resource.Resource,
 	if arn == "" {
 		return resource.RelatedCheckResult{TargetType: "acm", Count: 0}
 	}
-	// ACM cert ARN: arn:aws:acm:REGION:ACCOUNT:certificate/ID — ID is the last segment.
-	certID := arn
-	if idx := strings.LastIndex(arn, "/"); idx >= 0 && idx < len(arn)-1 {
-		certID = arn[idx+1:]
+
+	// Reverse-scan the acm cache for a cert whose RawStruct.CertificateArn
+	// matches. Return the target Resource.ID (DomainName) so drill lands.
+	acmList, truncated, err := opensearchRelatedResources(ctx, clients, cache, "acm")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "acm", Count: -1, Err: err}
 	}
-	return relatedResult("acm", []string{certID})
+	if acmList == nil {
+		return resource.RelatedCheckResult{TargetType: "acm", Count: -1}
+	}
+	for _, acmRes := range acmList {
+		cert, ok := assertStruct[acmtypes.CertificateSummary](acmRes.RawStruct)
+		if !ok {
+			continue
+		}
+		if cert.CertificateArn != nil && *cert.CertificateArn == arn {
+			return relatedResult("acm", []string{acmRes.ID})
+		}
+	}
+	if truncated {
+		return resource.ApproximateZero("acm")
+	}
+	return resource.RelatedCheckResult{TargetType: "acm", Count: 0}
 }
 
 // opensearchRelatedResources returns the resource list for target from cache or by fetching the first page.

@@ -376,7 +376,7 @@ func TestEnrichmentFinding_AllKeptEnrichersPopulateRows(t *testing.T) {
 					},
 				},
 			}},
-			resources: []resource.Resource{{ID: tgARN}},
+			resources: []resource.Resource{{ID: "inv-tg", Fields: map[string]string{"target_group_arn": tgARN}}},
 			enrich:    awsclient.EnrichTargetGroupHealth,
 		},
 		{
@@ -405,7 +405,7 @@ func TestEnrichmentFinding_AllKeptEnrichersPopulateRows(t *testing.T) {
 					smARN: sfntypes.ExecutionStatusFailed,
 				},
 			}},
-			resources: []resource.Resource{{ID: smARN}},
+			resources: []resource.Resource{{ID: "inv-sm", Fields: map[string]string{"arn": smARN}}},
 			enrich:    awsclient.EnrichStepFunctionsStatus,
 		},
 		{

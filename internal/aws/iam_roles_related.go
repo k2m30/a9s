@@ -26,8 +26,8 @@ func init() {
 		{TargetType: "policy", DisplayName: "IAM Policies", Checker: checkRolePolicy, NeedsTargetCache: false},
 		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkRoleEC2, NeedsTargetCache: true},
 		{TargetType: "eks", DisplayName: "EKS Clusters", Checker: checkRoleEKS, NeedsTargetCache: true},
-		{TargetType: "iam-group", DisplayName: "IAM Groups (via AssumeRolePolicy)", Checker: checkRoleIamGroup, NeedsTargetCache: false},
-		{TargetType: "iam-user", DisplayName: "IAM Users (via AssumeRolePolicy)", Checker: checkRoleIamUser, NeedsTargetCache: false},
+		{TargetType: "iam-group", DisplayName: "IAM Groups (trust)", Checker: checkRoleIamGroup, NeedsTargetCache: false},
+		{TargetType: "iam-user", DisplayName: "IAM Users (trust)", Checker: checkRoleIamUser, NeedsTargetCache: false},
 	})
 }
 
@@ -275,7 +275,7 @@ func checkRolePolicy(ctx context.Context, clients any, res resource.Resource, _ 
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "policy", Count: -1, Err: err}
 	}
-	ids := customerManagedAttachedPolicyNames(out.AttachedPolicies)
+	ids := attachedPolicyNames(out.AttachedPolicies)
 	return relatedResult("policy", ids)
 }
 

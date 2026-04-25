@@ -118,12 +118,13 @@ func chainEsc(m tui.Model) tui.Model {
 // Section 4 — Right Column Enter (count=1): EC2-027, EC2-028
 // ---------------------------------------------------------------------------
 
-// TestEC2_027_ASG_Count1_OpensDetail verifies that a RelatedNavigateMsg with
-// TargetType "asg" and a single TargetID causes the model to push an ASG detail
-// view rather than a filtered list.
-//
-// FAILS AT RUNTIME until handleRelatedNavigate pushes TargetDetail for count=1.
-func TestEC2_027_ASG_Count1_OpensDetail(t *testing.T) {
+// TestEC2_027_ASG_Count1_OpensChildView verifies that a RelatedNavigateMsg with
+// TargetType "asg" and a single TargetID mirrors manual Enter on that row.
+// The asg resource type registers Children[Key="enter"] → asg_activities,
+// so single-result auto-drill must enter that child view rather than push
+// the generic detail (rule 2026-04-24: related-count-1 does exactly what
+// Enter on the target list would do).
+func TestEC2_027_ASG_Count1_OpensChildView(t *testing.T) {
 	m := newChainDemoModel(t)
 	m = chainNavigateToEC2Detail(t, m)
 
@@ -133,6 +134,7 @@ func TestEC2_027_ASG_Count1_OpensDetail(t *testing.T) {
 		Status: "InService",
 		Fields: map[string]string{
 			"name":             "web-prod-asg",
+			"asg_name":         "web-prod-asg",
 			"min_size":         "2",
 			"max_size":         "10",
 			"desired_capacity": "3",
@@ -140,20 +142,31 @@ func TestEC2_027_ASG_Count1_OpensDetail(t *testing.T) {
 	}
 	m = chainPreloadResources(m, "asg", []resource.Resource{asgRes})
 
-	m, _ = chainApplyMsg(m, messages.RelatedNavigateMsg{
+	m, cmd := chainApplyMsg(m, messages.RelatedNavigateMsg{
 		TargetType: "asg",
 		TargetID:   "web-prod-asg",
 	})
+	// Drain the EnterChildViewMsg command so the view reflects the push.
+	if cmd != nil {
+		if msg := cmd(); msg != nil {
+			m, _ = chainApplyMsg(m, msg)
+		}
+	}
 
 	view := chainStrip(chainViewContent(m))
 
+	// asg_activities child view renders its header with the parent asg_name.
 	if !strings.Contains(view, "web-prod-asg") {
-		t.Errorf("EC2-027: after RelatedNavigateMsg(TargetType=asg, TargetID=web-prod-asg), view must show ASG detail with name %q; got:\n%s",
+		t.Errorf("EC2-027: after RelatedNavigateMsg(TargetType=asg, TargetID=web-prod-asg), child view must show parent asg name %q; got:\n%s",
 			"web-prod-asg", view)
 	}
-	// Must NOT show a filtered list title like "asg(1)"
+	// Must NOT show a filtered list title like "asg(1)" — we should be in the child view.
 	if strings.Contains(view, "asg(1)") {
-		t.Errorf("EC2-027: RelatedNavigateMsg with TargetID must open detail view, not a filtered list; found list indicator in view:\n%s", view)
+		t.Errorf("EC2-027: RelatedNavigateMsg with TargetID must enter child view, not show a filtered list; got:\n%s", view)
+	}
+	// Must NOT show the generic asg detail — we should be inside asg_activities.
+	if strings.Contains(view, "detail -- web-prod-asg") {
+		t.Errorf("EC2-027: RelatedNavigateMsg for asg (with enter-child) must NOT push plain detail — it must enter asg_activities; got:\n%s", view)
 	}
 }
 
@@ -482,10 +495,10 @@ func TestEC2_037_ChainC_EC2ToSGAndBack(t *testing.T) {
 	}
 }
 
-// TestEC2_038_ChainD_EC2TabToTGAndBack verifies EC2 detail → TG detail (right column,
-// count=1) → Esc → EC2 detail.
-//
-// FAILS AT RUNTIME until handleRelatedNavigate pushes TargetDetail for count=1.
+// TestEC2_038_ChainD_EC2TabToTGAndBack verifies EC2 detail → TG child view
+// (right column, count=1) → Esc → EC2 detail. The tg type registers
+// Children[Key="enter"] → tg_health, so single-result auto-drill must
+// enter that child view rather than push generic detail (rule 2026-04-24).
 func TestEC2_038_ChainD_EC2TabToTGAndBack(t *testing.T) {
 	m := newChainDemoModel(t)
 	m = chainNavigateToEC2Detail(t, m)
@@ -495,23 +508,35 @@ func TestEC2_038_ChainD_EC2TabToTGAndBack(t *testing.T) {
 		Name:   "web-prod-tg",
 		Status: "active",
 		Fields: map[string]string{
-			"name":     "web-prod-tg",
-			"port":     "80",
-			"protocol": "HTTP",
+			"name":             "web-prod-tg",
+			"target_group_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/web-prod-tg/abc123",
+			"port":             "80",
+			"protocol":         "HTTP",
 		},
 	}
 	m = chainPreloadResources(m, "tg", []resource.Resource{tgRes})
 
 	// Simulate right-column Enter on TG (count=1 path uses TargetID)
-	m, _ = chainApplyMsg(m, messages.RelatedNavigateMsg{
+	m, cmd := chainApplyMsg(m, messages.RelatedNavigateMsg{
 		TargetType: "tg",
 		TargetID:   "tg-web-prod",
 	})
+	// Drain EnterChildViewMsg dispatch so the child view is pushed.
+	if cmd != nil {
+		if msg := cmd(); msg != nil {
+			m, _ = chainApplyMsg(m, msg)
+		}
+	}
 
 	viewTG := chainStrip(chainViewContent(m))
-	if !strings.Contains(viewTG, "web-prod-tg") {
-		t.Errorf("EC2-038: after RelatedNavigateMsg to TG, view must show TG detail with name %q; got:\n%s",
-			"web-prod-tg", viewTG)
+	// tg has Children[Key="enter"] → tg_health. The fast path must push
+	// that child view — header reads "tg_health".
+	if !strings.Contains(viewTG, "tg_health") {
+		t.Errorf("EC2-038: after RelatedNavigateMsg to TG (with enter-child), view must enter tg_health child view; got:\n%s", viewTG)
+	}
+	// Must NOT show the generic tg detail — enter-child exists so fast path must use it.
+	if strings.Contains(viewTG, "detail -- tg-web-prod") {
+		t.Errorf("EC2-038: RelatedNavigateMsg for tg (with enter-child) must enter tg_health, not push plain detail; got:\n%s", viewTG)
 	}
 
 	// Esc → EC2 detail
@@ -519,7 +544,7 @@ func TestEC2_038_ChainD_EC2TabToTGAndBack(t *testing.T) {
 
 	viewEC2 := chainStrip(chainViewContent(m))
 	if !strings.Contains(viewEC2, "web-prod-01") {
-		t.Errorf("EC2-038: after Esc from TG detail, view must show EC2 detail with name %q; got:\n%s",
+		t.Errorf("EC2-038: after Esc from TG child view, view must show EC2 detail with name %q; got:\n%s",
 			"web-prod-01", viewEC2)
 	}
 }

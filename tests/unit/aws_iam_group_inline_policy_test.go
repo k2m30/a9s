@@ -373,18 +373,19 @@ func callPolicyFetcher(t *testing.T, stub *stubGroupPolicyIAM) ([]resource.Resou
 }
 
 // TestFetchInlineGroupPolicies_ListGroupsError verifies that when ListGroups
-// returns an error, fetchInlineGroupPolicies returns nil (no inline resources).
-// The overall policy fetch still succeeds (ListPolicies returned empty), so
-// the function returns an empty list rather than an error.
+// returns an error, the composite inline-enumeration error is now propagated
+// to the caller (per E1-E6: no silent drop). Managed policies from
+// ListPolicies are still returned in resources — partial success is preserved.
 func TestFetchInlineGroupPolicies_ListGroupsError(t *testing.T) {
 	stub := &stubGroupPolicyIAM{
 		listGroupsErr: fmt.Errorf("iam: ListGroups access denied"),
 	}
 	resources, err := callPolicyFetcher(t, stub)
-	if err != nil {
-		t.Errorf("unexpected error from fetcher: %v", err)
+	if err == nil {
+		t.Error("expected ListGroups error to propagate (per E1-E6); got nil")
 	}
-	// ListGroups failed → fetchInlineGroupPolicies returns nil → no inline resources
+	// No inline resources (the enumeration failed) but managed policies from
+	// ListPolicies are still valid.
 	for _, r := range resources {
 		if r.Fields["policy_type"] == "inline" {
 			t.Errorf("expected no inline resources when ListGroups fails, got: %v", r.Name)
@@ -431,8 +432,8 @@ func TestFetchInlineGroupPolicies_ListGroupPoliciesError(t *testing.T) {
 		listGroupPoliciesErr: fmt.Errorf("iam: ListGroupPolicies throttled"),
 	}
 	resources, err := callPolicyFetcher(t, stub)
-	if err != nil {
-		t.Errorf("unexpected error from fetcher: %v", err)
+	if err == nil {
+		t.Error("expected ListGroupPolicies error to propagate (per E1-E6); got nil")
 	}
 	// ListGroupPolicies errors → continue for both groups → no inline resources emitted
 	for _, r := range resources {
