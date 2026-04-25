@@ -6,6 +6,7 @@ package aws
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"slices"
 	"strings"
 
@@ -399,12 +400,17 @@ func checkECSSvcSFN(ctx context.Context, clients any, res resource.Resource, cac
 	}
 
 	var ids []string
+	var failures []string
 	for _, sfnRes := range entry.Resources {
 		sfnARN := sfnRes.Fields["arn"]
 		if sfnARN == "" {
 			continue
 		}
-		sm := sfnDescribe(ctx, clients, sfnARN)
+		sm, err := sfnDescribe(ctx, clients, sfnARN)
+		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", sfnRes.ID, err))
+			continue
+		}
 		if sm == nil || sm.Definition == nil || *sm.Definition == "" {
 			continue
 		}
@@ -414,6 +420,7 @@ func checkECSSvcSFN(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	result := relatedResult("sfn", ids)
 	result.Approximate = entry.IsTruncated
+	result.Err = AggregateFailures("ecs-svc-related: DescribeStateMachine", failures, len(entry.Resources))
 	return result
 }
 

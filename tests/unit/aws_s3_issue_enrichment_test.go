@@ -359,8 +359,10 @@ func TestS3_Enrich_NilPABConfiguration_TreatedAsNoPAB(t *testing.T) {
 
 // TestS3_Enrich_UnknownAPIError_NoFinding verifies that when GetPublicAccessBlock
 // returns a generic non-NoSuchPublicAccessBlockConfiguration error (e.g.
-// AccessDenied), the enricher emits NO finding (data is incomplete — cannot
-// claim PAB is missing) and marks the bucket in TruncatedIDs.
+// AccessDenied), the enricher:
+//  1. emits NO finding (data is incomplete — cannot claim PAB is missing),
+//  2. marks the bucket in TruncatedIDs (per-row `?` marker),
+//  3. returns a composite error via AggregateFailures so the error log (!) surfaces it.
 func TestS3_Enrich_UnknownAPIError_NoFinding(t *testing.T) {
 	fake := &s3PABFake{
 		configs:      map[string]*s3.GetPublicAccessBlockOutput{},
@@ -370,8 +372,14 @@ func TestS3_Enrich_UnknownAPIError_NoFinding(t *testing.T) {
 	resources := []resource.Resource{pabResource("error-bucket")}
 
 	result, err := awsclient.EnrichS3PublicAccessBlock(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("EnrichS3PublicAccessBlock error: %v", err)
+	if err == nil {
+		t.Fatal("expected non-nil composite error when GetPublicAccessBlock returns generic error; got nil")
+	}
+	if !strings.Contains(err.Error(), "s3-enrich: GetPublicAccessBlock") {
+		t.Errorf("err must contain \"s3-enrich: GetPublicAccessBlock\"; got %q", err.Error())
+	}
+	if !strings.Contains(err.Error(), "error-bucket") {
+		t.Errorf("err must name the failing bucket \"error-bucket\"; got %q", err.Error())
 	}
 
 	if _, ok := result.Findings["error-bucket"]; ok {

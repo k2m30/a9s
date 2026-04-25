@@ -1,10 +1,12 @@
 package unit
 
-// qa_tg_finding_keyed_by_id_test.go — Regression: EnrichTargetGroupHealth keys findings by r.ID.
+// qa_tg_finding_keyed_by_id_test.go — Regression: EnrichTargetGroupHealth keys findings by r.ID
+// (the bare TG name set by the tg fetcher) and calls DescribeTargetHealth with
+// r.Fields["target_group_arn"] (the full ARN, which is what AWS requires).
 //
-// The existing TestEnrichTargetGroupHealth_FindingKeyedByARN uses a resource where
-// r.Name is empty so it cannot distinguish between keying by ID vs by Name.
-// This test uses r.ID != r.Name to pin that the key is r.ID (the TG ARN).
+// This regression exists because an earlier version passed r.ID directly to
+// DescribeTargetHealth — which produced "target group not found" against both real AWS
+// and the demo fake, since r.ID is the bare name and AWS requires the ARN.
 
 import (
 	"context"
@@ -17,9 +19,10 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// TestEnrichTargetGroupHealth_FindingKeyedByID_NotByName verifies findings are keyed
-// by r.ID (ARN) when r.ID != r.Name. Regresses if the enricher switches to findings[r.Name].
-func TestEnrichTargetGroupHealth_FindingKeyedByID_NotByName(t *testing.T) {
+// TestEnrichTargetGroupHealth_UsesARNFromFields verifies the enricher calls
+// DescribeTargetHealth with the ARN from Fields["target_group_arn"], not r.ID,
+// and keys findings back by r.ID (the bare name set by the tg fetcher).
+func TestEnrichTargetGroupHealth_UsesARNFromFields(t *testing.T) {
 	const tgARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/prod-api-tg/deadbeef1234"
 	const tgName = "prod-api-tg"
 
@@ -37,19 +40,24 @@ func TestEnrichTargetGroupHealth_FindingKeyedByID_NotByName(t *testing.T) {
 		},
 	}
 	clients := &awsclient.ServiceClients{ELBv2: fake}
-	// r.ID is the ARN; r.Name is the human-readable TG name.
-	resources := []resource.Resource{{ID: tgARN, Name: tgName}}
+	// Mirrors what tg.go fetcher emits: ID/Name = bare TG name, ARN in Fields.
+	resources := []resource.Resource{{
+		ID:     tgName,
+		Name:   tgName,
+		Fields: map[string]string{"target_group_arn": tgARN},
+	}}
 
 	result, err := awsclient.EnrichTargetGroupHealth(context.Background(), clients, resources)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Finding must be keyed by r.ID (the ARN).
-	if _, ok := result.Findings[tgARN]; !ok {
-		t.Errorf("finding must be keyed by r.ID=%q — was the key changed from ARN to name?", tgARN)
+	// Finding must be keyed by r.ID (the bare name), so downstream consumers
+	// (S2/S3/S4 row resolution) can join against the resource list.
+	if _, ok := result.Findings[tgName]; !ok {
+		t.Errorf("finding must be keyed by r.ID=%q (bare TG name)", tgName)
 	}
-	if _, ok := result.Findings[tgName]; ok {
-		t.Errorf("finding must NOT be keyed by r.Name=%q — enricher must use r.ID as the key", tgName)
+	if _, ok := result.Findings[tgARN]; ok {
+		t.Errorf("finding must NOT be keyed by ARN=%q — keys must match r.ID", tgARN)
 	}
 }

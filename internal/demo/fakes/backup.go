@@ -159,6 +159,9 @@ func (f *BackupFake) ListRecoveryPointsByResource(_ context.Context, input *back
 	if input.ResourceArn == nil {
 		return &backup.ListRecoveryPointsByResourceOutput{}, nil
 	}
+	if err := validateARN(*input.ResourceArn); err != nil {
+		return nil, err
+	}
 	rps, ok := f.fix.RecoveryPoints[*input.ResourceArn]
 	if !ok {
 		return &backup.ListRecoveryPointsByResourceOutput{}, nil

@@ -254,19 +254,18 @@ func TestChecker_Approximate_PropagatedFromCache(t *testing.T) {
 				FileSystemId: aws.String(fsID),
 			},
 		}
+		// checkEFSECSTask reads the joined EFS file-system IDs from
+		// Fields["efs_file_system_ids"] (populated by the ecs-task fetcher's
+		// DescribeTaskDefinition join — see internal/aws/ecs_task.go).
 		taskRes := resource.Resource{
 			ID:   "efs-boundary-task",
 			Name: "efs-boundary-task",
-			RawStruct: ecstypes.TaskDefinition{
+			Fields: map[string]string{
+				"efs_file_system_ids": fsID,
+			},
+			RawStruct: ecstypes.Task{
+				TaskArn:           aws.String("arn:aws:ecs:us-east-1:123456789012:task/efs-boundary-task"),
 				TaskDefinitionArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/efs-boundary-task:1"),
-				Volumes: []ecstypes.Volume{
-					{
-						Name: aws.String("efs-vol"),
-						EfsVolumeConfiguration: &ecstypes.EFSVolumeConfiguration{
-							FileSystemId: aws.String(fsID),
-						},
-					},
-				},
 			},
 		}
 

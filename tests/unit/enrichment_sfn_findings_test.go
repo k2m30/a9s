@@ -3,7 +3,8 @@ package unit
 // enrichment_sfn_findings_test.go — Behavioral tests for EnrichStepFunctionsStatus.
 //
 // Contract assertions (enricher-contract.md):
-//   - Returns EnricherResult.Findings keyed by state machine ARN (r.ID).
+//   - Returns EnricherResult.Findings keyed by r.ID (the bare state-machine name
+//     set by the sfn fetcher); ListExecutions is called with r.Fields["arn"].
 //   - Severity "!" for all findings.
 //   - Summary: "latest execution FAILED" / "latest execution TIMED_OUT" / "latest execution ABORTED".
 //   - IssueCount = len(Findings).
@@ -52,9 +53,11 @@ func (f *sfnEnrichFake) ListExecutions(
 	return &sfn.ListExecutionsOutput{}, nil
 }
 
-// TestEnrichStepFunctionsStatus_FailedFindingKeyedByARN verifies findings are
-// keyed by state machine ARN (r.ID).
-func TestEnrichStepFunctionsStatus_FailedFindingKeyedByARN(t *testing.T) {
+// TestEnrichStepFunctionsStatus_FailedFindingKeyedByID verifies findings are
+// keyed by r.ID (the bare state-machine name set by the sfn fetcher) while
+// ListExecutions is called with r.Fields["arn"] (the full ARN).
+func TestEnrichStepFunctionsStatus_FailedFindingKeyedByID(t *testing.T) {
+	smName := "my-sm"
 	smARN := "arn:aws:states:us-east-1:123456789012:stateMachine:my-sm"
 	fake := &sfnEnrichFake{
 		executions: map[string]sfntypes.ExecutionStatus{
@@ -62,29 +65,30 @@ func TestEnrichStepFunctionsStatus_FailedFindingKeyedByARN(t *testing.T) {
 		},
 	}
 	clients := &awsclient.ServiceClients{SFN: fake}
-	resources := []resource.Resource{{ID: smARN}}
+	resources := []resource.Resource{{ID: smName, Fields: map[string]string{"arn": smARN}}}
 
 	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), clients, resources)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, ok := result.Findings[smARN]; !ok {
-		t.Errorf("expected finding keyed by state machine ARN %q", smARN)
+	if _, ok := result.Findings[smName]; !ok {
+		t.Errorf("expected finding keyed by state machine name %q", smName)
 	}
 }
 
 // TestEnrichStepFunctionsStatus_SummaryContainsFAILED verifies the summary for FAILED status.
 func TestEnrichStepFunctionsStatus_SummaryContainsFAILED(t *testing.T) {
+	smName := "sum-sm"
 	smARN := "arn:aws:states:us-east-1:123456789012:stateMachine:sum-sm"
 	fake := &sfnEnrichFake{executions: map[string]sfntypes.ExecutionStatus{smARN: sfntypes.ExecutionStatusFailed}}
 	clients := &awsclient.ServiceClients{SFN: fake}
-	resources := []resource.Resource{{ID: smARN}}
+	resources := []resource.Resource{{ID: smName, Fields: map[string]string{"arn": smARN}}}
 
 	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), clients, resources)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	summary := result.Findings[smARN].Summary
+	summary := result.Findings[smName].Summary
 	if !strings.Contains(summary, "FAILED") {
 		t.Errorf("summary %q must contain %q", summary, "FAILED")
 	}
@@ -92,16 +96,17 @@ func TestEnrichStepFunctionsStatus_SummaryContainsFAILED(t *testing.T) {
 
 // TestEnrichStepFunctionsStatus_SummaryTimedOut verifies the summary for TIMED_OUT.
 func TestEnrichStepFunctionsStatus_SummaryTimedOut(t *testing.T) {
+	smName := "to-sm"
 	smARN := "arn:aws:states:us-east-1:123456789012:stateMachine:to-sm"
 	fake := &sfnEnrichFake{executions: map[string]sfntypes.ExecutionStatus{smARN: sfntypes.ExecutionStatusTimedOut}}
 	clients := &awsclient.ServiceClients{SFN: fake}
-	resources := []resource.Resource{{ID: smARN}}
+	resources := []resource.Resource{{ID: smName, Fields: map[string]string{"arn": smARN}}}
 
 	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), clients, resources)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	summary := result.Findings[smARN].Summary
+	summary := result.Findings[smName].Summary
 	// Status token from SDK is "TIMED_OUT" — just verify it contains the key distinguisher
 	if !strings.Contains(summary, "TIMED_OUT") {
 		t.Errorf("summary %q must contain %q", summary, "TIMED_OUT")
@@ -110,16 +115,17 @@ func TestEnrichStepFunctionsStatus_SummaryTimedOut(t *testing.T) {
 
 // TestEnrichStepFunctionsStatus_SummaryAborted verifies the summary for ABORTED.
 func TestEnrichStepFunctionsStatus_SummaryAborted(t *testing.T) {
+	smName := "ab-sm"
 	smARN := "arn:aws:states:us-east-1:123456789012:stateMachine:ab-sm"
 	fake := &sfnEnrichFake{executions: map[string]sfntypes.ExecutionStatus{smARN: sfntypes.ExecutionStatusAborted}}
 	clients := &awsclient.ServiceClients{SFN: fake}
-	resources := []resource.Resource{{ID: smARN}}
+	resources := []resource.Resource{{ID: smName, Fields: map[string]string{"arn": smARN}}}
 
 	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), clients, resources)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	summary := result.Findings[smARN].Summary
+	summary := result.Findings[smName].Summary
 	if !strings.Contains(summary, "ABORTED") {
 		t.Errorf("summary %q must contain %q", summary, "ABORTED")
 	}
@@ -128,16 +134,17 @@ func TestEnrichStepFunctionsStatus_SummaryAborted(t *testing.T) {
 // TestEnrichStepFunctionsStatus_SucceededExcluded verifies SUCCEEDED state machines
 // do not appear in Findings.
 func TestEnrichStepFunctionsStatus_SucceededExcluded(t *testing.T) {
+	smName := "ok-sm"
 	smARN := "arn:aws:states:us-east-1:123456789012:stateMachine:ok-sm"
 	fake := &sfnEnrichFake{executions: map[string]sfntypes.ExecutionStatus{smARN: sfntypes.ExecutionStatusSucceeded}}
 	clients := &awsclient.ServiceClients{SFN: fake}
-	resources := []resource.Resource{{ID: smARN}}
+	resources := []resource.Resource{{ID: smName, Fields: map[string]string{"arn": smARN}}}
 
 	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), clients, resources)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, ok := result.Findings[smARN]; ok {
+	if _, ok := result.Findings[smName]; ok {
 		t.Error("SUCCEEDED state machine must NOT appear in Findings")
 	}
 	if result.IssueCount != 0 {
@@ -148,16 +155,17 @@ func TestEnrichStepFunctionsStatus_SucceededExcluded(t *testing.T) {
 // TestEnrichStepFunctionsStatus_RunningExcluded verifies RUNNING state machines
 // do not appear in Findings (still in-progress executions are not issues).
 func TestEnrichStepFunctionsStatus_RunningExcluded(t *testing.T) {
+	smName := "running-sm"
 	smARN := "arn:aws:states:us-east-1:000000000000:stateMachine:running-sm"
 	fake := &sfnEnrichFake{executions: map[string]sfntypes.ExecutionStatus{smARN: sfntypes.ExecutionStatusRunning}}
 	clients := &awsclient.ServiceClients{SFN: fake}
-	resources := []resource.Resource{{ID: smARN}}
+	resources := []resource.Resource{{ID: smName, Fields: map[string]string{"arn": smARN}}}
 
 	result, err := awsclient.EnrichStepFunctionsStatus(context.Background(), clients, resources)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, ok := result.Findings[smARN]; ok {
+	if _, ok := result.Findings[smName]; ok {
 		t.Error("RUNNING state machine must NOT appear in Findings")
 	}
 	if result.IssueCount != 0 {
@@ -171,8 +179,9 @@ func TestEnrichStepFunctionsStatus_TruncatedWhenResourcesExceedCap(t *testing.T)
 	resources := make([]resource.Resource, count)
 	executions := make(map[string]sfntypes.ExecutionStatus, count)
 	for i := range count {
+		name := fmt.Sprintf("sm-%03d", i)
 		arn := fmt.Sprintf("arn:aws:states:us-east-1:123456789012:stateMachine:sm-%03d", i)
-		resources[i] = resource.Resource{ID: arn}
+		resources[i] = resource.Resource{ID: name, Fields: map[string]string{"arn": arn}}
 		executions[arn] = sfntypes.ExecutionStatusSucceeded
 	}
 	fake := &sfnEnrichFake{executions: executions}

@@ -136,6 +136,53 @@ func NewCWLogsFixtures() *CWLogsFixtures {
 			RetentionInDays: aws.Int32(30),
 			CreationTime:    aws.Int64(1741996800000), // 2025-03-15
 		},
+		// OpenSearch graph-root log groups — required for opensearch→logs related-panel pivot.
+		// The acme-logs domain's LogPublishingOptions maps each log type to one of these groups.
+		{
+			LogGroupName:    aws.String(OpenSearchLogGroupSearchSlow),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:" + OpenSearchLogGroupSearchSlow + ":*"),
+			StoredBytes:     aws.Int64(52428800),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1746057600000), // 2025-05-01
+		},
+		{
+			LogGroupName:    aws.String(OpenSearchLogGroupIndexSlow),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:" + OpenSearchLogGroupIndexSlow + ":*"),
+			StoredBytes:     aws.Int64(26214400),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1746057600000), // 2025-05-01
+		},
+		{
+			LogGroupName:    aws.String(OpenSearchLogGroupAudit),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:" + OpenSearchLogGroupAudit + ":*"),
+			StoredBytes:     aws.Int64(10485760),
+			RetentionInDays: aws.Int32(90),
+			CreationTime:    aws.Int64(1746057600000), // 2025-05-01
+		},
+		// acme-warehouse Redshift log groups — required for redshift→logs related-panel pivot.
+		// checkRedshiftLogs returns /aws/redshift/cluster/acme-warehouse as the prefix ID;
+		// the three canonical CloudWatch audit log groups follow this naming convention.
+		{
+			LogGroupName:    aws.String("/aws/redshift/cluster/" + AcmeWarehouseID + "/connectionlog"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/redshift/cluster/" + AcmeWarehouseID + "/connectionlog:*"),
+			StoredBytes:     aws.Int64(52428800),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1741996800000), // 2025-03-15
+		},
+		{
+			LogGroupName:    aws.String("/aws/redshift/cluster/" + AcmeWarehouseID + "/userlog"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/redshift/cluster/" + AcmeWarehouseID + "/userlog:*"),
+			StoredBytes:     aws.Int64(20971520),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1741996800000), // 2025-03-15
+		},
+		{
+			LogGroupName:    aws.String("/aws/redshift/cluster/" + AcmeWarehouseID + "/useractivitylog"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/redshift/cluster/" + AcmeWarehouseID + "/useractivitylog:*"),
+			StoredBytes:     aws.Int64(10485760),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1741996800000), // 2025-03-15
+		},
 		// Redis prod slow-log group — required for redis→logs related-panel pivot.
 		// The prod-redis-sessions RG LogDeliveryConfigurations destination points here.
 		{
@@ -187,6 +234,22 @@ func NewCWLogsFixtures() *CWLogsFixtures {
 				StoredBytes:         aws.Int64(2048),
 			},
 		},
+		// Graph-root log groups that must have streams so logs→log_streams drill lands non-empty.
+		"/aws/dynamodb/tables/" + OrdersProdID + "/insights/default":     minimalLogStreams("ddb-insights"),
+		"/aws/rds/instance/prod-dbi-aurora-1/postgresql":                 minimalLogStreams("dbi-aurora-pg"),
+		"/aws/rds/cluster/prod-aurora-cluster/postgresql":                minimalLogStreams("dbc-aurora-pg"),
+		ProdRedisLogGroup:                                                minimalLogStreams("redis-slow"),
+		OpenSearchLogGroupAudit:                                          minimalLogStreams("os-audit"),
+		OpenSearchLogGroupIndexSlow:                                      minimalLogStreams("os-index-slow"),
+		OpenSearchLogGroupSearchSlow:                                     minimalLogStreams("os-search-slow"),
+		"/aws/redshift/cluster/" + AcmeWarehouseID + "/connectionlog":    minimalLogStreams("rs-conn"),
+		"/aws/redshift/cluster/" + AcmeWarehouseID + "/userlog":          minimalLogStreams("rs-user"),
+		"/aws/redshift/cluster/" + AcmeWarehouseID + "/useractivitylog":  minimalLogStreams("rs-useract"),
+		// Lambda log groups for graph-root-drilled functions — required for
+		// lambda→lambda_invocations (parses REPORT lines from FilterLogEvents).
+		"/aws/lambda/a9s-demo-s3-notifier": minimalLogStreams("lambda-s3-notifier"),
+		"/aws/lambda/acme-inbound-parser":  minimalLogStreams("lambda-inbound-parser"),
+		"/aws/lambda/orders-projector":     minimalLogStreams("lambda-orders-projector"),
 	}
 
 	logEvents := map[string][]cwlogstypes.OutputLogEvent{
@@ -261,9 +324,56 @@ func NewCWLogsFixtures() *CWLogsFixtures {
 		},
 	}
 
+	// Lambda REPORT lines for the three graph-root-drilled functions so
+	// lambda→lambda_invocations parses at least one invocation each.
+	lambdaInvocationReport := func(functionName string) []cwlogstypes.OutputLogEvent {
+		base := int64(1774253700000)
+		return []cwlogstypes.OutputLogEvent{
+			{
+				Timestamp:     aws.Int64(base),
+				Message:       aws.String("START RequestId: " + functionName + "-req-001 Version: $LATEST"),
+				IngestionTime: aws.Int64(base + 100),
+			},
+			{
+				Timestamp:     aws.Int64(base + 1000),
+				Message:       aws.String("INFO " + functionName + " processing event"),
+				IngestionTime: aws.Int64(base + 1100),
+			},
+			{
+				Timestamp:     aws.Int64(base + 2000),
+				Message:       aws.String("REPORT RequestId: " + functionName + "-req-001 Duration: 82.50 ms Billed Duration: 83 ms Memory Size: 256 MB Max Memory Used: 94 MB"),
+				IngestionTime: aws.Int64(base + 2100),
+			},
+			{
+				Timestamp:     aws.Int64(base - 60000),
+				Message:       aws.String("REPORT RequestId: " + functionName + "-req-000 Duration: 110.20 ms Billed Duration: 111 ms Memory Size: 256 MB Max Memory Used: 98 MB Init Duration: 245.18 ms"),
+				IngestionTime: aws.Int64(base - 59900),
+			},
+		}
+	}
+	logEvents["/aws/lambda/a9s-demo-s3-notifier"] = lambdaInvocationReport("a9s-demo-s3-notifier")
+	logEvents["/aws/lambda/acme-inbound-parser"] = lambdaInvocationReport("acme-inbound-parser")
+	logEvents["/aws/lambda/orders-projector"] = lambdaInvocationReport("orders-projector")
+
 	return &CWLogsFixtures{
 		LogGroups:  logGroups,
 		LogStreams: logStreams,
 		LogEvents:  logEvents,
+	}
+}
+
+// minimalLogStreams returns one canonical "2026/04/20/[$LATEST]<suffix>"
+// log stream so logs→log_streams drill lands on non-empty content for any
+// graph-root-reachable log group.
+func minimalLogStreams(suffix string) []cwlogstypes.LogStream {
+	ts := int64(1774253700000)
+	return []cwlogstypes.LogStream{
+		{
+			LogStreamName:       aws.String("2026/04/20/[$LATEST]" + suffix),
+			CreationTime:        aws.Int64(ts),
+			FirstEventTimestamp: aws.Int64(ts),
+			LastEventTimestamp:  aws.Int64(ts + 60000),
+			StoredBytes:         aws.Int64(1024),
+		},
 	}
 }

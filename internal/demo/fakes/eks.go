@@ -7,6 +7,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
+	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	"github.com/aws/smithy-go"
 
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
@@ -43,6 +44,24 @@ func (f *EKSFake) DescribeCluster(_ context.Context, input *eks.DescribeClusterI
 	}
 }
 
+// ngsForCluster returns all nodegroups in the fixture whose ClusterName
+// field matches clusterName, regardless of which map-key they are nested
+// under. Fixture authors may group variant-scenario nodegroups under
+// descriptive pseudo-keys like "acme-prod-issue-ngs" while keeping the
+// ClusterName set to the real cluster; filtering by ClusterName uniformly
+// across every bucket surfaces them correctly without trusting map keys.
+func (f *EKSFake) ngsForCluster(clusterName string) []ekstypes.Nodegroup {
+	var out []ekstypes.Nodegroup
+	for _, ngs := range f.fix.Nodegroups {
+		for _, ng := range ngs {
+			if aws.ToString(ng.ClusterName) == clusterName {
+				out = append(out, ng)
+			}
+		}
+	}
+	return out
+}
+
 func (f *EKSFake) ListNodegroups(_ context.Context, input *eks.ListNodegroupsInput, _ ...func(*eks.Options)) (*eks.ListNodegroupsOutput, error) {
 	clusterName := aws.ToString(input.ClusterName)
 	found := false
@@ -58,7 +77,7 @@ func (f *EKSFake) ListNodegroups(_ context.Context, input *eks.ListNodegroupsInp
 			Message: "No cluster found for name: " + clusterName,
 		}
 	}
-	ngs := f.fix.Nodegroups[clusterName]
+	ngs := f.ngsForCluster(clusterName)
 	names := make([]string, 0, len(ngs))
 	for _, ng := range ngs {
 		names = append(names, aws.ToString(ng.NodegroupName))
@@ -69,13 +88,7 @@ func (f *EKSFake) ListNodegroups(_ context.Context, input *eks.ListNodegroupsInp
 func (f *EKSFake) DescribeNodegroup(_ context.Context, input *eks.DescribeNodegroupInput, _ ...func(*eks.Options)) (*eks.DescribeNodegroupOutput, error) {
 	clusterName := aws.ToString(input.ClusterName)
 	ngName := aws.ToString(input.NodegroupName)
-	ngs, ok := f.fix.Nodegroups[clusterName]
-	if !ok {
-		return nil, &smithy.GenericAPIError{
-			Code:    "ResourceNotFoundException",
-			Message: "No nodegroup found for name: " + ngName,
-		}
-	}
+	ngs := f.ngsForCluster(clusterName)
 	for i := range ngs {
 		if aws.ToString(ngs[i].NodegroupName) == ngName {
 			ng := ngs[i]

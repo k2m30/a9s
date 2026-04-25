@@ -3,6 +3,7 @@ package unit
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -10,7 +11,6 @@ import (
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -141,21 +141,10 @@ func TestFetchEKSClusters_EmptyResponse(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// TestFetchEKSClusters_DescribeFailureSurfacesError
-//
-// CODER CHECKLIST — new export required from internal/aws/eks.go:
-//
-//   func FetchEKSClustersPage(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error)
-//
-// This helper must be extracted from (or replace) the init() registered closure
-// at eks.go:19-63. The registered closure currently `continue`s on DescribeCluster
-// error, silently dropping the cluster from results. The new behavior required:
-//
-//   When DescribeCluster fails for a cluster, the cluster MUST appear in
-//   result.Resources with Status == "DescribeFailed" (exact sentinel the coder will define).
-//   It must NOT be silently dropped.
-//
-// This test asserts that behavior via FetchEKSClustersPage directly.
+// TestFetchEKSClusters_DescribeFailureSurfacesError verifies that
+// FetchEKSClustersPage returns partial results for successful clusters AND a
+// composite error for failed DescribeCluster calls. The failed cluster is not
+// silently dropped — the caller receives the error via the second return value.
 // ---------------------------------------------------------------------------
 
 // eksTestFake implements awsclient.EKSAPI for registered-fetcher tests.
@@ -212,9 +201,6 @@ func (f *eksDescribeFailFake) DescribeNodegroup(
 var _ awsclient.EKSAPI = (*eksDescribeFailFake)(nil)
 
 func TestFetchEKSClusters_DescribeFailureSurfacesError(t *testing.T) {
-	// CODER NOTE: This test will fail to compile until FetchEKSClustersPage is
-	// exported from internal/aws/eks.go. That is intentional — TDD red phase.
-
 	eksFake := &eksDescribeFailFake{
 		clusters: []string{"cluster-ok", "cluster-bad"},
 		outputs: map[string]*eks.DescribeClusterOutput{
@@ -235,33 +221,27 @@ func TestFetchEKSClusters_DescribeFailureSurfacesError(t *testing.T) {
 
 	clients := &awsclient.ServiceClients{EKS: eksFake}
 
-	// FetchEKSClustersPage is the new exported helper the coder must add.
-	// It replaces (or wraps) the init() closure so both can be tested directly.
 	result, err := awsclient.FetchEKSClustersPage(context.Background(), clients, "")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+
+	// The fetcher must surface a composite error for the failing cluster.
+	if err == nil {
+		t.Fatal("FetchEKSClustersPage must return a non-nil error when DescribeCluster fails for a cluster")
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, "eks: DescribeCluster") {
+		t.Errorf("composite error must contain \"eks: DescribeCluster\", got: %q", errStr)
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, "cluster-bad") {
+		t.Errorf("composite error must contain the failing cluster name \"cluster-bad\", got: %q", errStr)
 	}
 
-	// Both clusters must appear — "cluster-bad" as an error-row, not silently dropped.
-	if len(result.Resources) != 2 {
+	// The successful cluster must still appear in partial results.
+	if len(result.Resources) != 1 {
 		t.Errorf(
-			"EKS describe failure must surface cluster as error row, not silently drop — got %d rows, want 2",
+			"FetchEKSClustersPage must return partial results — got %d rows, want 1 (cluster-ok only)",
 			len(result.Resources),
 		)
 	}
-
-	// Find the error row for "cluster-bad" and verify its Status sentinel.
-	var badRow *resource.Resource
-	for i := range result.Resources {
-		if result.Resources[i].ID == "cluster-bad" {
-			badRow = &result.Resources[i]
-			break
-		}
-	}
-	if badRow == nil {
-		t.Fatal("\"cluster-bad\" cluster not found in result.Resources — describe error must produce an error row")
-	}
-	if badRow.Status != "DescribeFailed" {
-		t.Errorf("error row Status = %q, want \"DescribeFailed\"", badRow.Status)
+	if len(result.Resources) == 1 && result.Resources[0].ID != "cluster-ok" {
+		t.Errorf("partial result must contain \"cluster-ok\", got ID %q", result.Resources[0].ID)
 	}
 }

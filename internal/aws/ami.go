@@ -23,6 +23,14 @@ func init() {
 		return FetchAMIsPage(ctx, c.EC2, continuationToken)
 	})
 
+	resource.RegisterFetchByIDs("ami", func(ctx context.Context, clients any, ids []string) ([]resource.Resource, error) {
+		c, ok := clients.(*ServiceClients)
+		if !ok || c == nil {
+			return nil, fmt.Errorf("AWS clients not initialized")
+		}
+		return FetchAMIsByIDs(ctx, c.EC2, ids)
+	})
+
 	resource.RegisterRelated("ami", []resource.RelatedDef{
 		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkAMIEC2, NeedsTargetCache: true},
 		{TargetType: "ebs-snap", DisplayName: "EBS Snapshots", Checker: checkAMIEBSSnaps, NeedsTargetCache: false},
@@ -55,6 +63,61 @@ func FetchAMIs(ctx context.Context, api EC2DescribeImagesAPI) ([]resource.Resour
 		token = result.Pagination.NextToken
 	}
 	return all, nil
+}
+
+// FetchAMIsByIDs fetches specific AMIs by image ID, bypassing the
+// Owners=self filter the paginated fetcher applies. Used by the related-panel
+// lazy-add path so checkers referencing public or cross-account AMIs
+// (ec2→ami, asg→ami, eks→ami, ng→ami) still drill into a real entry instead
+// of landing on an empty list. DescribeImages accepts ImageIds as a batched
+// filter, so this is a single API call regardless of how many IDs were
+// requested (up to the AWS per-request limit).
+//
+// The DescribeImages call is wrapped in RetryOnThrottle. IDs that are not
+// present in the response (e.g. deleted, cross-account without explicit share)
+// are collected into a composite error returned alongside the partial results.
+func FetchAMIsByIDs(ctx context.Context, api EC2DescribeImagesAPI, ids []string) ([]resource.Resource, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	filtered := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if id != "" {
+			filtered = append(filtered, id)
+		}
+	}
+	if len(filtered) == 0 {
+		return nil, nil
+	}
+	// IncludeDeprecated mirrors the single-ID FetchAMIByID path — batch drill
+	// from a related-panel pivot (ec2→ami, asg→ami, etc.) may reference a
+	// deprecated AMI; without this flag those IDs silently vanish from results.
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeImagesOutput, error) {
+		return api.DescribeImages(ctx, &ec2.DescribeImagesInput{
+			ImageIds:          filtered,
+			IncludeDeprecated: aws.Bool(true),
+		})
+	})
+	if err != nil {
+		return nil, fmt.Errorf("fetching AMIs by id: %w", err)
+	}
+
+	// Build a set of returned IDs to detect which requested IDs are missing.
+	returned := make(map[string]struct{}, len(out.Images))
+	resources := make([]resource.Resource, 0, len(out.Images))
+	for _, img := range out.Images {
+		r := imageResource(img)
+		resources = append(resources, r)
+		returned[r.ID] = struct{}{}
+	}
+
+	var failures []string
+	for _, id := range filtered {
+		if _, found := returned[id]; !found {
+			failures = append(failures, id)
+		}
+	}
+	return resources, AggregateMissing("ami FetchByIDs", failures, len(filtered))
 }
 
 // FetchAMIsPage calls the EC2 DescribeImages API and returns a single page

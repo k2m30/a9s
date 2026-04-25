@@ -4,6 +4,7 @@ package aws
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -37,7 +38,17 @@ func init() {
 //   Rows: one entry per false flag: {Label:"<FlagName>", Value:"false"},
 //         plus {Label:"Account-level PAB", Value:"may still apply"}
 //
-// On any other API error: no finding emitted; TruncatedIDs[id] = true.
+// On PermanentRedirect (301) / IllegalLocationConstraintException (400):
+//   The bucket lives in a different region than the configured S3 client.
+//   ListBuckets returns ALL buckets globally regardless of region, but
+//   per-bucket calls require the bucket's regional endpoint. Mark
+//   TruncatedIDs[id]=true (data incomplete → row "?" marker) but do NOT
+//   add to the failure-aggregate error: cross-region buckets are
+//   operational, not bugs, and surfacing them in the `!` log produces
+//   noise on multi-region accounts.
+//
+// On any other API error: no finding emitted; TruncatedIDs[id] = true and
+// the failure aggregates into the returned composite error.
 // IssueCount stays 0 (framework counts "!" findings directly).
 func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, resources []resource.Resource) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
@@ -47,6 +58,8 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
 	}
 	truncated := len(resources) > EnrichmentCap
+	var failures []string
+	total := min(len(resources), EnrichmentCap)
 	for i, r := range resources {
 		if i >= EnrichmentCap {
 			break
@@ -58,8 +71,11 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 		if name == "" {
 			continue
 		}
-		out, err := clients.S3.GetPublicAccessBlock(ctx, &s3.GetPublicAccessBlockInput{
-			Bucket: aws.String(name),
+		bucketName := name
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetPublicAccessBlockOutput, error) {
+			return clients.S3.GetPublicAccessBlock(ctx, &s3.GetPublicAccessBlockInput{
+				Bucket: aws.String(bucketName),
+			})
 		})
 		if err != nil {
 			var apiErr smithy.APIError
@@ -75,9 +91,25 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 				fieldUpdates[name] = map[string]string{"status": "public access block incomplete"}
 				continue
 			}
+			// Cross-region buckets: ListBuckets returns ALL buckets globally, but
+			// per-bucket calls require the bucket's regional endpoint. AWS rejects
+			// with PermanentRedirect (301) or IllegalLocationConstraintException (400)
+			// when the configured client region differs from the bucket's region.
+			// This is a legitimate environmental condition (multi-region account),
+			// not a bug — mark data incomplete (TruncatedIDs → "?" row marker)
+			// but do NOT spam the failure log.
+			if errors.As(err, &apiErr) {
+				code := apiErr.ErrorCode()
+				if code == "PermanentRedirect" || code == "IllegalLocationConstraintException" {
+					truncated = true
+					truncatedIDs[r.ID] = true
+					continue
+				}
+			}
 			// Other errors: data incomplete — do not emit a finding.
 			truncated = true
 			truncatedIDs[r.ID] = true
+			failures = append(failures, fmt.Sprintf("%s: %v", name, err))
 			continue
 		}
 		if out.PublicAccessBlockConfiguration == nil {
@@ -121,5 +153,6 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 		}
 		fieldUpdates[name] = map[string]string{"status": "public access block incomplete"}
 	}
-	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates},
+		AggregateFailures("s3-enrich: GetPublicAccessBlock", failures, total)
 }

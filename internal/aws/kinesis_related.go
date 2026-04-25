@@ -3,6 +3,7 @@ package aws
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -108,7 +109,9 @@ func checkKinesisCFN(ctx context.Context, clients any, res resource.Resource, ca
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
 	}
-	out, err := tagAPI.ListTagsForStream(ctx, &kinesis.ListTagsForStreamInput{StreamName: aws.String(streamName)})
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kinesis.ListTagsForStreamOutput, error) {
+		return tagAPI.ListTagsForStream(ctx, &kinesis.ListTagsForStreamInput{StreamName: aws.String(streamName)})
+	})
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
 	}
@@ -161,7 +164,9 @@ func checkKinesisKMS(ctx context.Context, clients any, res resource.Resource, _ 
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
 	}
-	out, err := descAPI.DescribeStreamSummary(ctx, &kinesis.DescribeStreamSummaryInput{StreamName: aws.String(streamName)})
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kinesis.DescribeStreamSummaryOutput, error) {
+		return descAPI.DescribeStreamSummary(ctx, &kinesis.DescribeStreamSummaryInput{StreamName: aws.String(streamName)})
+	})
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: -1, Err: err}
 	}
@@ -212,6 +217,8 @@ func checkKinesisDDB(ctx context.Context, clients any, res resource.Resource, ca
 	}
 
 	var ids []string
+	var failures []string
+	total := len(entry.Resources)
 	for _, ddbRes := range entry.Resources {
 		tableName := ddbRes.ID
 		if tableName == "" {
@@ -223,6 +230,7 @@ func checkKinesisDDB(ctx context.Context, clients any, res resource.Resource, ca
 			})
 		})
 		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", tableName, err))
 			continue
 		}
 		for _, dest := range out.KinesisDataStreamDestinations {
@@ -234,5 +242,6 @@ func checkKinesisDDB(ctx context.Context, clients any, res resource.Resource, ca
 	}
 	result := relatedResult("ddb", ids)
 	result.Approximate = entry.IsTruncated
+	result.Err = AggregateFailures("kinesis-related: DescribeKinesisStreamingDestination", failures, total)
 	return result
 }

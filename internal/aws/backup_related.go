@@ -3,9 +3,12 @@ package aws
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/backup"
+	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -120,6 +123,7 @@ func checkBackupSNS(ctx context.Context, clients any, res resource.Resource, cac
 	}
 	seen := make(map[string]struct{})
 	var topicARNs []string
+	var failures []string
 	for _, v := range vaults {
 		name := v
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*backup.GetBackupVaultNotificationsOutput, error) {
@@ -128,8 +132,11 @@ func checkBackupSNS(ctx context.Context, clients any, res resource.Resource, cac
 			})
 		})
 		if err != nil {
-			// ResourceNotFoundException is returned when no notifications are
-			// configured on the vault — treat as empty, not an error.
+			// ResourceNotFoundException means the vault has no notifications configured — treat as empty.
+			if _, ok := errors.AsType[*backuptypes.ResourceNotFoundException](err); ok {
+				continue
+			}
+			failures = append(failures, fmt.Sprintf("%s: %v", name, err))
 			continue
 		}
 		if out == nil || out.SNSTopicArn == nil || *out.SNSTopicArn == "" {
@@ -142,7 +149,11 @@ func checkBackupSNS(ctx context.Context, clients any, res resource.Resource, cac
 		seen[arn] = struct{}{}
 		topicARNs = append(topicARNs, arn)
 	}
+	aggErr := AggregateFailures("backup-related: GetBackupVaultNotifications", failures, len(vaults))
 	if len(topicARNs) == 0 {
+		if aggErr != nil {
+			return resource.RelatedCheckResult{TargetType: "sns", Count: -1, Err: aggErr}
+		}
 		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
 	}
 
@@ -174,7 +185,9 @@ func checkBackupSNS(ctx context.Context, clients any, res resource.Resource, cac
 	if len(ids) == 0 && truncated {
 		return resource.ApproximateZero("sns")
 	}
-	return relatedResult("sns", ids)
+	result := relatedResult("sns", ids)
+	result.Err = aggErr
+	return result
 }
 
 // backupPlanVaults returns the unique TargetBackupVaultName values from the

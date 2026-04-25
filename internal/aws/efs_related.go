@@ -3,11 +3,11 @@ package aws
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
-	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/efs"
 	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
@@ -27,8 +27,13 @@ func init() {
 		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkEFSSubnet, NeedsTargetCache: false},
 		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkEFSLambda, NeedsTargetCache: false},
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkEFSAlarm, NeedsTargetCache: true},
-		{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkEFSBackup},
-		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkEFSEC2, NeedsTargetCache: true},
+		{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkEFSBackup, NeedsTargetCache: true},
+		// EC2 pivot intentionally removed: EC2→EFS mounting happens at the
+		// guest OS level via DNS lookup of mt ENIs. AWS exposes no API edge
+		// linking instance → filesystem — mount-target ENIs are
+		// RequesterManaged with no Attachment.InstanceId, so a checker can
+		// only return zero or heuristic noise. Honest drop beats a registered
+		// pivot that always returns Count=0 (U9 violation).
 		{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkEFSECSTask, NeedsTargetCache: true},
 		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkEFSENI, NeedsTargetCache: true},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkEFSVPC, NeedsTargetCache: true},
@@ -37,6 +42,13 @@ func init() {
 
 // checkEFSKMS returns the KMS key used to encrypt this EFS file system (Pattern F).
 // KmsKeyId may be either a full ARN (arn:aws:kms:...:key/{id}) or a bare key ID.
+//
+// The checker emits the key ID blindly; the related-check orchestrator's
+// lazy-add path (RegisterFetchByIDs for "kms") fetches the key metadata on
+// demand when the ID is not already in the customer-managed kms cache. That
+// keeps this checker simple AND lets AWS-managed keys (aws/elasticfilesystem,
+// etc.) drill into a real entry — both the count and the drill land on the
+// same resource.
 func checkEFSKMS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	fs, ok := assertStruct[efstypes.FileSystemDescription](res.RawStruct)
 	if !ok {
@@ -50,7 +62,6 @@ func checkEFSKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	var keyID string
 	switch {
 	case idx < 0:
-		// Bare key ID (no ARN prefix)
 		keyID = val
 	case idx == len(val)-1:
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
@@ -220,8 +231,10 @@ func checkEFSLambda(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
 	}
 
-	apOut, err := c.EFS.DescribeAccessPoints(ctx, &efs.DescribeAccessPointsInput{
-		FileSystemId: &fsID,
+	apOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*efs.DescribeAccessPointsOutput, error) {
+		return c.EFS.DescribeAccessPoints(ctx, &efs.DescribeAccessPointsInput{
+			FileSystemId: &fsID,
+		})
 	})
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
@@ -268,8 +281,10 @@ func checkEFSLambda(ctx context.Context, clients any, res resource.Resource, cac
 }
 
 // checkEFSECSTask is a reverse-scan checker for the efs→ecs-task relationship.
-// Pattern C+reverse: iterate cache["ecs-task"]; for each task definition check
-// Volumes[].EfsVolumeConfiguration.FileSystemId == parent filesystem ID.
+// Pattern C+reverse: iterate cache["ecs-task"]; for each task read
+// Fields["efs_file_system_ids"] (comma-separated list of EFS file-system IDs
+// joined by the ecs-task fetcher via DescribeTaskDefinition) and match against
+// this filesystem's ID.
 // NeedsTargetCache: true.
 func checkEFSECSTask(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fsID := res.ID
@@ -279,25 +294,27 @@ func checkEFSECSTask(_ context.Context, _ any, res resource.Resource, cache reso
 
 	entry, ok := cache["ecs-task"]
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ecs-task"}
+		return resource.UnknownRelated("ecs-task")
 	}
 
 	var ids []string
+	joinIncomplete := false
 	for _, tRes := range entry.Resources {
-		td, ok := assertStruct[ecstypes.TaskDefinition](tRes.RawStruct)
-		if !ok {
+		// A task whose DescribeTaskDefinition failed has incomplete
+		// efs_file_system_ids; treat its contribution as unknown and mark
+		// the overall result Approximate instead of a silently-wrong zero.
+		if tRes.Fields["task_def_join_error"] == "true" {
+			joinIncomplete = true
+		}
+		joined := tRes.Fields["efs_file_system_ids"]
+		if joined == "" {
 			continue
 		}
-		for _, v := range td.Volumes {
-			if v.EfsVolumeConfiguration != nil &&
-				v.EfsVolumeConfiguration.FileSystemId != nil &&
-				*v.EfsVolumeConfiguration.FileSystemId == fsID {
-				ids = append(ids, tRes.ID)
-				break
-			}
+		if slices.Contains(strings.Split(joined, ","), fsID) {
+			ids = append(ids, tRes.ID)
 		}
 	}
 	result := relatedResult("ecs-task", ids)
-	result.Approximate = entry.IsTruncated
+	result.Approximate = entry.IsTruncated || joinIncomplete
 	return result
 }

@@ -151,6 +151,7 @@ When a single task would require reading 5+ files totaling >500 lines, OR when y
 - BEFORE any push, run the `test-coverage-analyzer` agent to check for coverage gaps
 - BEFORE any push, run the `a9s-architect` agent to verify architecture against `docs/go-codebase-checklist.md` (target: 8.5+/10)
 - BEFORE any push, run the full validation integration test against a REAL AWS profile (ask user for the profile name): `A9S_CT_PROFILE=<profile> go test -tags integration ./tests/integration/ -run TestFullRelatedViewValidation -count=1 -v -timeout 600s`. If region is not set, the profile's default region is used. No push without this passing.
+- BEFORE any release, run `make integration` — full demo-mode integration suite (no AWS profile needed when `A9S_CT_PROFILE` is unset). Catches cross-cutting regressions (cache seeding, badge aggregator, checker sentinels, enter-child fast path) that per-package unit tests miss.
 - BEFORE any release, update `CHANGELOG.md` with a new version entry (follow [Keep a Changelog](https://keepachangelog.com/) format) and create a matching `releases/vX.Y.Z.md` file with user-facing release notes. Every tagged version MUST have both a changelog entry and a release notes file.
 - BEFORE any release, align `docs/architecture.md` with the current codebase. Verify: layer boundaries, message types, view stack, caching layers, key handling, message-driven invariants, and any newly added subsystems accurately reflect reality. Outdated architecture docs mislead future contributors — treat divergence from the codebase as a release blocker.
 - BEFORE any release, audit every test added or modified in the release for busywork. Reject and delete tests that: round-trip a struct literal back to itself (tautology); assert a fake against input the test itself passed (mock-its-own-assertion); verify struct shape instead of behavior; assert on stub output without exercising production dispatch; duplicate another test in the release; construct unused variables or dead setup; or exist solely to tick a coverage counter. Regression pins for real invariants, compile-time invariant tests, and focused bug repros are NOT busywork. Delete busywork rather than keep it — coverage earned by busywork is a liability.
@@ -172,9 +173,3 @@ When code changes affect any of the following, update the shared source and rege
 - Install methods changed → `docs/shared/install.md`
 - Resource types added/removed/renamed → `docs/README.tmpl.md` services table + `website/content/resources.md`
 - Go version bumped → `docs/shared/install.md`, CONTRIBUTING.md
-
-## Recent Changes
-- 019-related-panel-checkers: Added Go 1.26+ (CLAUDE.md) + AWS SDK Go v2 (service clients for autoscaling, codeartifact, codebuild, codepipeline, dynamodb, ec2, ecr, ecs, efs, elasticbeanstalk, elbv2, events, iam, kms, lambda, rds, secretsmanager, ses, sesv2, sfn, sns, ssm, events/eventbridge, backup), Bubble Tea v2.0.2, Lipgloss v2.0.2, yaml.v3
-
-- 018-enrichment-visibility: Added Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2, yaml.v3
-- 017-issue-counts-attention-filter: Added Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2, yaml.v3

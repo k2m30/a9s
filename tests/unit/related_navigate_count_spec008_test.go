@@ -78,12 +78,13 @@ func applyRelatedResourcesLoaded(m tui.Model, resourceType string, resources []r
 // Count=1: single related resource should open DETAIL view, not list
 // ---------------------------------------------------------------------------
 
-// TestApp_008_RelatedNavigate_SingleID_OpensDetail verifies that when a
+// TestApp_008_RelatedNavigate_SingleID_OpensDrillTarget verifies that when a
 // RelatedNavigateMsg arrives with a single TargetID (count=1 path), the model
-// pushes a detail view for that resource rather than a filtered list.
-//
-// FAILS AT RUNTIME until handleRelatedNavigate pushes TargetDetail for single IDs.
-func TestApp_008_RelatedNavigate_SingleID_OpensDetail(t *testing.T) {
+// mirrors manual Enter on the target's list row: for types with
+// Children[Key="enter"] registered, it must enter that child view rather
+// than push generic detail or a filtered list. tg's enter-child is
+// tg_health.
+func TestApp_008_RelatedNavigate_SingleID_OpensDrillTarget(t *testing.T) {
 	m := newRelatedDemoModel(t)
 
 	ec2Res := resource.Resource{
@@ -94,22 +95,36 @@ func TestApp_008_RelatedNavigate_SingleID_OpensDetail(t *testing.T) {
 	}
 	m = navigateToEC2DetailRelated(t, m, ec2Res)
 
-	tgRes := resource.Resource{ID: "tg-spec008-single", Name: "my-target-group", Status: "active"}
+	tgRes := resource.Resource{
+		ID:     "tg-spec008-single",
+		Name:   "my-target-group",
+		Status: "active",
+		Fields: map[string]string{"target_group_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-target-group/abc123"},
+	}
 	m = applyRelatedResourcesLoaded(m, "tg", []resource.Resource{tgRes})
 
 	// Deliver RelatedNavigateMsg with TargetID set (single resource navigation).
-	m, _ = relatedApplyMsg(m, messages.RelatedNavigateMsg{
+	m, cmd := relatedApplyMsg(m, messages.RelatedNavigateMsg{
 		TargetType: "tg",
 		TargetID:   "tg-spec008-single",
 	})
+	if cmd != nil {
+		if msg := cmd(); msg != nil {
+			m, _ = relatedApplyMsg(m, msg)
+		}
+	}
 
 	view := stripAnsi(relatedViewContent(m))
 
-	if !strings.Contains(view, "my-target-group") {
-		t.Errorf("RelatedNavigateMsg with TargetID should open detail view for %q, got view:\n%s", "my-target-group", view)
+	// tg registers Children[Key="enter"] → tg_health, so fast path enters it.
+	if !strings.Contains(view, "tg_health") {
+		t.Errorf("RelatedNavigateMsg with TargetID on tg (enter-child registered) must enter tg_health child view; got:\n%s", view)
 	}
 	if strings.Contains(view, "tg(1)") {
-		t.Errorf("RelatedNavigateMsg with TargetID=%q must open DETAIL, not filtered list; got:\n%s", "tg-spec008-single", view)
+		t.Errorf("RelatedNavigateMsg with TargetID=%q must not open a filtered list; got:\n%s", "tg-spec008-single", view)
+	}
+	if strings.Contains(view, "detail -- tg-spec008-single") {
+		t.Errorf("RelatedNavigateMsg for tg (with enter-child) must not push plain detail; got:\n%s", view)
 	}
 }
 

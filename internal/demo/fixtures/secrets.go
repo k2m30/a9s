@@ -144,6 +144,32 @@ func NewSecretsFixtures() *SecretsFixtures {
 				{Key: aws.String("Environment"), Value: aws.String("production")},
 			},
 		},
+		// Redshift-managed secret for acme-warehouse — required for redshift→secrets related-panel pivot.
+		// ARN matches AcmeWarehouseSecretARN (MasterPasswordSecretArn on acme-warehouse cluster).
+		// checkRedshiftSecrets matches secretRes.Fields["arn"] == MasterPasswordSecretArn.
+		{
+			Name:             aws.String("redshift!acme-warehouse-AbCdEf"),
+			ARN:              aws.String(AcmeWarehouseSecretARN),
+			Description:      aws.String("Redshift-managed master user password for acme-warehouse"),
+			LastAccessedDate: aws.Time(time.Date(2026, 4, 20, 0, 0, 0, 0, time.UTC)),
+			LastChangedDate:  aws.Time(time.Date(2026, 4, 15, 12, 0, 0, 0, time.UTC)),
+			RotationEnabled:  aws.Bool(true),
+			CreatedDate:      aws.Time(time.Date(2025, 3, 10, 9, 0, 0, 0, time.UTC)),
+			KmsKeyId:         aws.String(RedshiftKMSKeyARN1),
+			RotationRules:    &smtypes.RotationRulesType{AutomaticallyAfterDays: aws.Int64(7)},
+		},
+		// Redshift-managed secret for acme-reporting — required for redshift→secrets related-panel pivot (second graph-root).
+		{
+			Name:             aws.String("redshift!acme-reporting-XxYyZz"),
+			ARN:              aws.String(AcmeReportingSecretARN),
+			Description:      aws.String("Redshift-managed master user password for acme-reporting"),
+			LastAccessedDate: aws.Time(time.Date(2026, 4, 20, 0, 0, 0, 0, time.UTC)),
+			LastChangedDate:  aws.Time(time.Date(2026, 4, 15, 12, 0, 0, 0, time.UTC)),
+			RotationEnabled:  aws.Bool(true),
+			CreatedDate:      aws.Time(time.Date(2025, 7, 22, 9, 0, 0, 0, time.UTC)),
+			KmsKeyId:         aws.String(RedshiftKMSKeyARN2),
+			RotationRules:    &smtypes.RotationRulesType{AutomaticallyAfterDays: aws.Int64(7)},
+		},
 		{
 			Name:             aws.String("staging/database/mysql"),
 			ARN:              aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:staging/database/mysql-StUvWx"),

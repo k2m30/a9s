@@ -168,6 +168,54 @@ func NewKMSFixtures() *KMSFixtures {
 			MultiRegion:          aws.Bool(false),
 			Origin:               kmstypes.OriginTypeAwsKms,
 		},
+		// OpenSearch graph-root encryption key — required for opensearch→kms related-panel pivot.
+		// The acme-logs domain sets EncryptionAtRestOptions.KmsKeyId = OpenSearchKMSKeyARN;
+		// checkOpenSearchKMS strips the ARN to bare key ID = OpenSearchKMSKeyID and looks it up here.
+		{
+			KeyId:                aws.String(OpenSearchKMSKeyID),
+			Arn:                  aws.String(OpenSearchKMSKeyARN),
+			Description:          aws.String("Encryption key for acme-logs OpenSearch domain (at-rest encryption)"),
+			KeyState:             kmstypes.KeyStateEnabled,
+			KeyManager:           kmstypes.KeyManagerTypeCustomer,
+			KeyUsage:             kmstypes.KeyUsageTypeEncryptDecrypt,
+			CreationDate:         aws.Time(time.Date(2025, 6, 1, 10, 0, 0, 0, time.UTC)),
+			Enabled:              true,
+			EncryptionAlgorithms: []kmstypes.EncryptionAlgorithmSpec{kmstypes.EncryptionAlgorithmSpecSymmetricDefault},
+			MultiRegion:          aws.Bool(false),
+			Origin:               kmstypes.OriginTypeAwsKms,
+		},
+		// Redshift acme-warehouse encryption key — required for redshift→kms related-panel pivot.
+		// The acme-warehouse cluster sets KmsKeyId = RedshiftKMSKeyARN1; the
+		// checker strips the ARN to the bare key ID (RedshiftKMSKeyID1) and looks it up here.
+		{
+			KeyId:                aws.String(RedshiftKMSKeyID1),
+			Arn:                  aws.String(RedshiftKMSKeyARN1),
+			Description:          aws.String("Encryption key for acme-warehouse Redshift analytics cluster"),
+			KeyState:             kmstypes.KeyStateEnabled,
+			KeyManager:           kmstypes.KeyManagerTypeCustomer,
+			KeyUsage:             kmstypes.KeyUsageTypeEncryptDecrypt,
+			CreationDate:         aws.Time(time.Date(2025, 3, 1, 9, 0, 0, 0, time.UTC)),
+			Enabled:              true,
+			EncryptionAlgorithms: []kmstypes.EncryptionAlgorithmSpec{kmstypes.EncryptionAlgorithmSpecSymmetricDefault},
+			MultiRegion:          aws.Bool(false),
+			Origin:               kmstypes.OriginTypeAwsKms,
+		},
+		// Redshift acme-reporting encryption key — required for redshift→kms related-panel pivot (second graph-root).
+		// The acme-reporting cluster sets KmsKeyId = RedshiftKMSKeyARN2; the
+		// checker strips the ARN to the bare key ID (RedshiftKMSKeyID2) and looks it up here.
+		{
+			KeyId:                aws.String(RedshiftKMSKeyID2),
+			Arn:                  aws.String(RedshiftKMSKeyARN2),
+			Description:          aws.String("Encryption key for acme-reporting Redshift reporting cluster"),
+			KeyState:             kmstypes.KeyStateEnabled,
+			KeyManager:           kmstypes.KeyManagerTypeCustomer,
+			KeyUsage:             kmstypes.KeyUsageTypeEncryptDecrypt,
+			CreationDate:         aws.Time(time.Date(2025, 7, 1, 10, 0, 0, 0, time.UTC)),
+			Enabled:              true,
+			EncryptionAlgorithms: []kmstypes.EncryptionAlgorithmSpec{kmstypes.EncryptionAlgorithmSpecSymmetricDefault},
+			MultiRegion:          aws.Bool(false),
+			Origin:               kmstypes.OriginTypeAwsKms,
+		},
 		// PendingDeletion key — referenced by broken-dbi-encryption-locked fixture (KmsKeyId).
 		// This key was deleted while still in use by an RDS instance, causing
 		// the instance to enter the inaccessible-encryption-credentials state.
@@ -180,6 +228,22 @@ func NewKMSFixtures() *KMSFixtures {
 			KeyUsage:             kmstypes.KeyUsageTypeEncryptDecrypt,
 			CreationDate:         aws.Time(time.Date(2024, 1, 10, 8, 0, 0, 0, time.UTC)),
 			Enabled:              false,
+			EncryptionAlgorithms: []kmstypes.EncryptionAlgorithmSpec{kmstypes.EncryptionAlgorithmSpecSymmetricDefault},
+			MultiRegion:          aws.Bool(false),
+			Origin:               kmstypes.OriginTypeAwsKms,
+		},
+		// EFS prod-app-data encryption key — required for efs→kms related-panel pivot.
+		// The prod-efs-app-data filesystem sets KmsKeyId = ProdEFSKmsKeyARN; the
+		// checker strips the ARN to the bare key ID and looks it up here.
+		{
+			KeyId:                aws.String(ProdEFSKmsKeyID),
+			Arn:                  aws.String(ProdEFSKmsKeyARN),
+			Description:          aws.String("Encryption key for prod-efs-app-data EFS filesystem"),
+			KeyState:             kmstypes.KeyStateEnabled,
+			KeyManager:           kmstypes.KeyManagerTypeCustomer,
+			KeyUsage:             kmstypes.KeyUsageTypeEncryptDecrypt,
+			CreationDate:         aws.Time(time.Date(2025, 2, 10, 9, 0, 0, 0, time.UTC)),
+			Enabled:              true,
 			EncryptionAlgorithms: []kmstypes.EncryptionAlgorithmSpec{kmstypes.EncryptionAlgorithmSpecSymmetricDefault},
 			MultiRegion:          aws.Bool(false),
 			Origin:               kmstypes.OriginTypeAwsKms,
@@ -256,11 +320,35 @@ func NewKMSFixtures() *KMSFixtures {
 			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/orders-prod-cmk"),
 			TargetKeyId: aws.String(OrdersProdKMSKeyID),
 		},
+		// Redshift acme-warehouse KMS key alias.
+		{
+			AliasName:   aws.String("alias/acme-redshift-warehouse-key"),
+			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/acme-redshift-warehouse-key"),
+			TargetKeyId: aws.String(RedshiftKMSKeyID1),
+		},
+		// Redshift acme-reporting KMS key alias.
+		{
+			AliasName:   aws.String("alias/acme-redshift-reporting-key"),
+			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/acme-redshift-reporting-key"),
+			TargetKeyId: aws.String(RedshiftKMSKeyID2),
+		},
 		// Backup prod-vault KMS key alias.
 		{
 			AliasName:   aws.String("alias/acme-backup-prod-key"),
 			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/acme-backup-prod-key"),
 			TargetKeyId: aws.String(BackupProdVaultKMSKeyID),
+		},
+		// EFS prod-app-data KMS key alias.
+		{
+			AliasName:   aws.String("alias/acme-efs-prod-app-data-key"),
+			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/acme-efs-prod-app-data-key"),
+			TargetKeyId: aws.String(ProdEFSKmsKeyID),
+		},
+		// OpenSearch acme-logs at-rest encryption key alias.
+		{
+			AliasName:   aws.String("alias/acme-opensearch-key"),
+			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/acme-opensearch-key"),
+			TargetKeyId: aws.String(OpenSearchKMSKeyID),
 		},
 	}
 

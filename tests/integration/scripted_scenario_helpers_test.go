@@ -36,6 +36,15 @@ type fullIntegrationScenario struct {
 	lastResourcesLoaded *messages.ResourcesLoadedMsg
 	lastClientsReady    *messages.ClientsReadyMsg
 
+	// enrichmentErrors records every EnrichmentCheckedMsg.Err observed during
+	// the scenario. Populated as messages flow through observe(). Scenario
+	// tests call AssertNoEnrichmentErrors() to fail on any non-nil error —
+	// this is the harness-level guard against wave-2 wiring bugs (e.g. a
+	// fetcher emitting ID = bare name while the enricher passes r.ID as an
+	// ARN-typed API parameter). Without this, such bugs ship silently
+	// because permissive demo fakes ignore the malformed input.
+	enrichmentErrors map[string]error
+
 	currentListType       string
 	currentListResources  []resource.Resource
 	currentListPagination *resource.PaginationMeta
@@ -774,7 +783,36 @@ func (s *fullIntegrationScenario) observe(msg tea.Msg) {
 		s.profile = msg.Profile
 	case messages.RegionSelectedMsg:
 		s.region = msg.Region
+	case messages.EnrichmentCheckedMsg:
+		if msg.Err != nil {
+			if s.enrichmentErrors == nil {
+				s.enrichmentErrors = make(map[string]error)
+			}
+			s.enrichmentErrors[msg.ResourceType] = msg.Err
+		}
 	}
+}
+
+// AssertNoEnrichmentErrors fails the test if any EnrichmentCheckedMsg with a
+// non-nil Err was observed during the scenario. This is the harness-level
+// guard that catches the "fetcher emits ID=name, enricher passes r.ID as ARN"
+// bug class — and any other wave-2 wiring bug that real AWS would reject with
+// a ValidationError / InvalidArn. Permissive demo fakes used to swallow these
+// silently; with strict fakes + this assertion, every scenario test that
+// drains wave-2 becomes a real guard.
+//
+// Scenario tests that intentionally exercise an error path (e.g. an enricher
+// given a nil client) should NOT call this helper; otherwise all scenarios
+// that drain the availability/enrichment chain must call it before returning.
+func (s *fullIntegrationScenario) AssertNoEnrichmentErrors() {
+	s.t.Helper()
+	if len(s.enrichmentErrors) == 0 {
+		return
+	}
+	for rt, err := range s.enrichmentErrors {
+		s.t.Errorf("wave-2 enrichment for %q emitted error: %v", rt, err)
+	}
+	s.t.FailNow()
 }
 
 func (s *fullIntegrationScenario) relatedNavigateMsg(displayName string) messages.RelatedNavigateMsg {
@@ -935,12 +973,32 @@ func (s *fullIntegrationScenario) DrillRelated(displayName string) []resource.Re
 	// Occurs when handleRelatedNavigate takes the RelatedIDs cache-hit branch and calls
 	// NewResourceListFromCache — which pushes a view and returns nil cmd, so no
 	// ResourcesLoadedMsg is ever dispatched. Detected by checking the rendered view title
-	// for "{targetType}(N)". Return synthetic resource stubs from the RelatedIDs; their
-	// IDs are the checker-emitted values — exactly what tests need for format assertions.
+	// for "{targetType}(N)" or "{ListTitle}(N)" — the latter handles types like `alarm`
+	// whose ListTitle differs from ShortName ("alarms" vs "alarm").
 	targetType := rel.TargetType
+	// FrameTitle prefers typeDef.ListTitle over ShortName — e.g. alarm → "alarms",
+	// eb-rule → "event-rules". Check both so the case-3 branch fires regardless.
+	titleTokens := []string{targetType}
+	if td := resource.FindResourceType(targetType); td != nil && td.ListTitle != "" && td.ListTitle != targetType {
+		titleTokens = append(titleTokens, td.ListTitle)
+	}
 	rendered := s.currentView()
-	if strings.Contains(rendered, targetType+"(") {
-		if strings.Contains(rendered, targetType+"(0)") {
+	titleMatched := false
+	for _, tok := range titleTokens {
+		if strings.Contains(rendered, tok+"(") {
+			titleMatched = true
+			break
+		}
+	}
+	if titleMatched {
+		emptyCount := false
+		for _, tok := range titleTokens {
+			if strings.Contains(rendered, tok+"(0)") {
+				emptyCount = true
+				break
+			}
+		}
+		if emptyCount {
 			s.failf("DrillRelated(%q): cache-hit filtered list is empty — target type %q rendered with count 0 (RelatedIDs=%v)",
 				displayName, targetType, rel.RelatedIDs)
 		}

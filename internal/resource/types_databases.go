@@ -258,52 +258,47 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "endpoint", Title: "Endpoint", Width: 48, Sortable: false},
 			},
 			// OpenSearch DomainStatus per docs/attention-signals.md.
-			// Precedence: terminal/admin (Dim) overridden by Broken; Broken overrides Warning.
+			// Precedence: Deleted → Dim; Isolated → Broken; Processing → Warning;
+			// background-check findings (! / ~) stay green — the glyph handles those.
 			// Field contract:
-			//   - domain_processing_status: from DescribeDomains.DomainProcessingStatus
-			//     (always populated by the fetcher; "Isolated" → Broken)
+			//   - deleted: "true" when Deleted==true
+			//   - domain_processing_status: string form of DomainProcessingStatusType
+			//     (fetcher always emits at least "Active" so the Isolated branch is deterministic)
+			//   - processing / upgrade_processing: "true"/"false" from DomainStatus
+			//   - status: top §4 phrase with optional (+N) suffix; stripped before matching
 			//   - cluster_health: Red/Yellow/Green from CloudWatch (Wave 3, not yet
 			//     implemented — branch kept for forward-compatibility, currently never fires)
 			Color: func(r Resource) Color {
+				// Deleted → Dim (highest precedence, no further checks needed).
 				if r.Fields["deleted"] == "true" {
 					return ColorDim
 				}
-				color := ColorHealthy
-				switch r.Fields["cluster_health"] {
-				case "Red":
-					color = ColorBroken
-				case "Yellow":
-					if color < ColorWarning {
-						color = ColorWarning
-					}
+
+				// Strip (+N) suffix before pattern matching.
+				status := r.Status
+				if status == "" {
+					status = r.Fields["status"]
 				}
-				if r.Fields["domain_processing_status"] == "Isolated" {
-					color = ColorBroken
+				stripped := StripFindingSuffix(status)
+
+				// Isolated → Broken.
+				if strings.HasPrefix(stripped, "isolated:") || r.Fields["domain_processing_status"] == "Isolated" {
+					return ColorBroken
 				}
-				if r.Fields["processing"] == "true" || r.Fields["upgrade_processing"] == "true" {
-					if color < ColorWarning {
-						color = ColorWarning
-					}
+
+				// Processing → Warning.
+				if strings.HasPrefix(stripped, "processing:") ||
+					r.Fields["processing"] == "true" ||
+					r.Fields["upgrade_processing"] == "true" {
+					return ColorWarning
 				}
-				switch r.Fields["status"] {
-				case "failed", "FAILED", "error", "ERROR":
-					color = ColorBroken
-				case "creating", "CREATING", "updating", "UPDATING", "deleting", "DELETING":
-					if color < ColorWarning {
-						color = ColorWarning
-					}
-				}
-				if r.Fields["service_software_update_available"] == "true" {
-					if color < ColorWarning {
-						color = ColorWarning
-					}
-				}
-				if r.Fields["encryption_at_rest_enabled"] == "false" {
-					if color < ColorWarning {
-						color = ColorWarning
-					}
-				}
-				return color
+
+				// Background-check signals (! / ~) stay green — the glyph signals
+				// the operator; the row color remains Healthy so the glyph renders.
+				// NOTE: do NOT add service_software_update_available or
+				// encryption_at_rest_enabled → Warning branches here.
+
+				return ColorHealthy
 			},
 		},
 		{
@@ -313,17 +308,39 @@ func databasesResourceTypes() []ResourceTypeDef {
 			Category:      "DATABASES & STORAGE",
 			CloudTrailKey: "ResourceName:ID",
 			Columns: []Column{
-				{Key: "cluster_id", Title: "Cluster ID", Width: 28, Sortable: true},
-				{Key: "status", Title: "Status", Width: 14, Sortable: true},
+				// Widths match defaults_databases.go so fallback paths (tests,
+				// environments without a loaded view config) don't truncate the
+				// longest §4 phrase ("broken: incompatible-parameters" = 31 chars).
+				{Key: "cluster_id", Title: "Cluster ID", Width: 36, Sortable: true},
+				{Key: "status", Title: "Status", Width: 34, Sortable: true},
 				{Key: "node_type", Title: "Node Type", Width: 16, Sortable: true},
 				{Key: "num_nodes", Title: "Nodes", Width: 7, Sortable: true},
 				{Key: "db_name", Title: "Database", Width: 16, Sortable: true},
 				{Key: "endpoint", Title: "Endpoint", Width: 44, Sortable: false},
 			},
 			Color: func(r Resource) Color {
-				// Base color from ClusterStatus.
+				// Derived-phrase fallback: when only `status` is populated (e.g.
+				// when phraseTier probes via a synthetic Resource for the detail
+				// Attention section's per-entry severity), classify by the phrase
+				// prefix so broken/Warning entries don't fall through to Healthy.
+				// Strip any (+N) suffix first per rule-7.
+				phrase := StripFindingSuffix(r.Fields["status"])
+				if phrase == "" {
+					phrase = StripFindingSuffix(r.Status)
+				}
+				// Broken phrases → ColorBroken (beats any subsequent Healthy/Warning signal).
+				switch phrase {
+				case "unavailable", "failed":
+					return ColorBroken
+				}
+				if len(phrase) >= len("broken:") && phrase[:len("broken:")] == "broken:" {
+					return ColorBroken
+				}
+
+				// Base color from raw ClusterStatus (cluster_status field carries
+				// the unmodified AWS value; "status" carries the derived phrase).
 				var base Color
-				switch r.Fields["status"] {
+				switch r.Fields["cluster_status"] {
 				case "available":
 					base = ColorHealthy
 				case "creating", "modifying", "resizing", "rebooting", "renaming", "deleting":
@@ -351,7 +368,21 @@ func databasesResourceTypes() []ResourceTypeDef {
 				if base == ColorBroken {
 					return ColorBroken
 				}
-				// Publicly accessible → upgrade to Warning.
+				// Derived-phrase Warning signals: the fetcher sets `status` to
+				// "pending change queued" / "maintenance deferred" when those
+				// signals fire, but they do not surface via cluster_status or
+				// cluster_availability_status. Without this check the row stays
+				// green and drops out of the issue badge / attention filter.
+				switch phrase {
+				case "pending change queued", "maintenance deferred",
+					"maintenance", "modifying",
+					"publicly accessible", "unencrypted at rest":
+					if base == ColorHealthy {
+						base = ColorWarning
+					}
+				}
+				// Publicly accessible → upgrade to Warning (fallback when
+				// publicly_accessible field is read directly, e.g. raw fixtures).
 				if r.Fields["publicly_accessible"] == "true" && base == ColorHealthy {
 					base = ColorWarning
 				}
@@ -371,26 +402,31 @@ func databasesResourceTypes() []ResourceTypeDef {
 			Columns: []Column{
 				{Key: "name", Title: "Name", Width: 28, Sortable: true},
 				{Key: "file_system_id", Title: "File System ID", Width: 22, Sortable: true},
-				{Key: "life_cycle_state", Title: "State", Width: 12, Sortable: true},
+				{Key: "status", Title: "Status", Width: 24, Sortable: true},
 				{Key: "performance_mode", Title: "Perf Mode", Width: 16, Sortable: true},
 				{Key: "encrypted", Title: "Encrypted", Width: 10, Sortable: true},
 				{Key: "mount_targets", Title: "Mounts", Width: 8, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				base := ColorHealthy
-				switch r.Fields["life_cycle_state"] {
-				case "available":
-					base = ColorHealthy
+				// Read the derived status field (set by fetcher and bumped by enricher).
+				// Fall back to r.Status for backward-compatibility.
+				status := r.Fields["status"]
+				if status == "" {
+					status = r.Status
+				}
+				// Strip the universal-rule-7 (+N) suffix before matching so that
+				// "no mount targets (+1)" still classifies as Broken.
+				phrase := StripFindingSuffix(status)
+				switch phrase {
+				case "":
+					return ColorHealthy
+				case "error", "no mount targets", "mount target down":
+					return ColorBroken
 				case "creating", "updating", "deleting":
-					base = ColorWarning
-				case "error":
-					base = ColorBroken
+					return ColorWarning
+				default:
+					return ColorHealthy
 				}
-				// Unreachable FS: no mount targets → upgrade to Broken.
-				if r.Fields["mount_targets"] == "0" {
-					base = ColorBroken
-				}
-				return base
 			},
 		},
 		{

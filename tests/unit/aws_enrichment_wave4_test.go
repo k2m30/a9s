@@ -272,11 +272,12 @@ func (f *scopeCaptureFake) GetWebACL(
 var _ awsclient.WAFv2API = (*scopeCaptureFake)(nil)
 var _ awsclient.WAFv2GetWebACLAPI = (*scopeCaptureFake)(nil)
 
-// TestEnrichWAFLogging_ListResourcesErrorSetsTruncatedNoFindings verifies that when
-// ListResourcesForWebACL returns an error, the enricher sets Truncated=true and
-// TruncatedIDs[ID]=true, then continues to the next resource without a finding.
+// TestEnrichWAFLogging_ListResourcesErrorSetsTruncatedAndSurfacesError verifies that
+// when ListResourcesForWebACL returns an error, the enricher sets Truncated=true and
+// TruncatedIDs[ID]=true, continues to the next resource without a finding, and
+// surfaces a composite error containing the enricher prefix and the failing ARN.
 // Covers EnrichWAFLogging ListResourcesForWebACL error branch.
-func TestEnrichWAFLogging_ListResourcesErrorSetsTruncatedNoFindings(t *testing.T) {
+func TestEnrichWAFLogging_ListResourcesErrorSetsTruncatedAndSurfacesError(t *testing.T) {
 	assocErr := errors.New("wafv2: ListResourcesForWebACL throttled")
 	fake := &wafLoggingFake{
 		loggingResults: map[string]*wafv2svc.GetLoggingConfigurationOutput{
@@ -292,8 +293,14 @@ func TestEnrichWAFLogging_ListResourcesErrorSetsTruncatedNoFindings(t *testing.T
 	resources := wafWebACLResources(wafACLARN1, wafACLARN2)
 
 	result, err := awsclient.EnrichWAFLogging(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatal("enricher must surface a composite error when ListResourcesForWebACL fails")
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, "waf-enrich") {
+		t.Errorf("composite error must contain \"waf-enrich\", got: %q", errStr)
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, wafACLARN1) {
+		t.Errorf("composite error must contain failing ARN %q, got: %q", wafACLARN1, errStr)
 	}
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings on ListResourcesForWebACL error, got %d", len(result.Findings))
@@ -528,7 +535,8 @@ func TestEnrichLogsMetricFilters_StreamsErrorNoLastEventAt(t *testing.T) {
 
 // TestEnrichLogsMetricFilters_DescribeMetricFiltersErrorSetsTruncated verifies
 // that when DescribeMetricFilters returns an error the enricher sets
-// Truncated=true and TruncatedIDs[ID]=true.
+// Truncated=true and TruncatedIDs[ID]=true, and surfaces a composite error
+// containing the enricher prefix and the failing log group ID.
 // Covers EnrichLogsMetricFilters DescribeMetricFilters error branch.
 func TestEnrichLogsMetricFilters_DescribeMetricFiltersErrorSetsTruncated(t *testing.T) {
 	auditGroup := "/aws/cloudtrail/mf-err"
@@ -539,8 +547,14 @@ func TestEnrichLogsMetricFilters_DescribeMetricFiltersErrorSetsTruncated(t *test
 	resources := []resource.Resource{logsGroupResource(auditGroup)}
 
 	result, err := awsclient.EnrichLogsMetricFilters(context.Background(), clients, resources)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil {
+		t.Fatal("enricher must surface a composite error when DescribeMetricFilters fails")
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, "logs-enrich:") {
+		t.Errorf("composite error must contain \"logs-enrich:\", got: %q", errStr)
+	}
+	if errStr := err.Error(); !strings.Contains(errStr, auditGroup) {
+		t.Errorf("composite error must contain the failing log group ID %q, got: %q", auditGroup, errStr)
 	}
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings on DescribeMetricFilters error, got %d", len(result.Findings))
