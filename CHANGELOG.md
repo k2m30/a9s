@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (BREAKING — resource type renames, no aliases)
+- **`rds-snap` → `dbi-snap`** — the RDS DBSnapshot resource type was
+  renamed to match its parent shortName (`dbi`). The shortName is the
+  primary identifier for views, themes, scripts, etc; users who scripted
+  against the old name must update. No backward-compat alias is provided.
+- **`docdb-snap` → `dbc-snap`** — the cluster-snapshot resource type was
+  renamed to match its parent shortName (`dbc`). This resource type covers
+  BOTH DocumentDB cluster snapshots AND Aurora cluster snapshots — they
+  share the AWS API (`DescribeDBClusterSnapshots`). Display name is now
+  `DB Cluster Snapshots`. No backward-compat alias.
+- **Display names** — `RDS Snapshots` → `DB Instance Snapshots`,
+  `DocDB Snapshots` → `DB Cluster Snapshots`. Aligns with parent display
+  names (`DB Instances` / `DB Clusters`).
+
+### Added
+- **Generic `SnapshotCrossRef` enricher helper**
+  (`internal/aws/snapshot_cross_ref.go`) parameterized by parent shortName,
+  parent-ID extractor, parent-retention extractor, and a retention-rule
+  flag. Covers the orphan + past-retention pattern shared across snapshot
+  types. Both `dbi-snap` and `dbc-snap` enrichers are now thin
+  configuration wrappers (~60 lines each); the future `ebs-snap` consumer
+  can disable the retention rule (`ec2.Volume` has no
+  `BackupRetentionPeriod`).
+- **`dbc-snap` cross-ref enricher activated** — was `NoOpIssueEnricher`.
+  Orphan and past-retention signals now fire for both DocumentDB and
+  Aurora cluster snapshots whose parent cluster is missing or past its
+  declared retention period.
+- **`dbc-snap` drill-through coverage** —
+  `tests/integration/scenario_related_drill_through_test.go` now includes
+  Aurora and DocumentDB graph-roots; the `dbc-snap → backup` pivot was
+  rewritten to use cache scan + plan-IDs (was returning recovery-point
+  ARNs that didn't drill).
+
+### Removed (no aliases)
+- The `rds-snap → dbc` (now `dbi-snap → dbc`) related-pivot registration
+  and its checker are gone. Aurora cluster snapshots are not stored as
+  `DBSnapshot`s in real AWS (`CreateDBSnapshot` is rejected on Aurora
+  cluster members), so the pivot had no realistic non-zero case. Aurora
+  cluster snapshots live in `dbc-snap`.
+- The bogus `ProdRDSSnapAuroraID` / `ARN` demo fixture and its associated
+  backup recovery points. CodeRabbit flagged this in a prior review; we
+  waved it away with a "legal at SDK type level" comment. The fixture
+  shape is rejected by real AWS — drop it. The `dbi-snap` graph-root is
+  now `ProdDBISnapID`.
+
+### Fixed
+- **Retention threshold reconciled to 1.0×** for both `dbi-snap` and
+  `dbc-snap`. The previous `dbc-snap` 1.5× multiplier was authoring drift —
+  `BackupRetentionPeriod` IS the operator's declared retention policy; any
+  snapshot kept past it is policy drift regardless of engine. The N4
+  "intentional divergence" note in the spec doc has been deleted.
+- **`dbc-snap → backup` pivot** now resolves plan IDs via cache scan
+  instead of recovery-point ARNs via API call. Drilling into the pivot
+  lands on a non-empty backup-plan list (was empty).
+
 ## [3.44.0] - 2026-04-25
 
 ### Changed
