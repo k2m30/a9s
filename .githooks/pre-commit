@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Pre-commit hook: block staged additions that match sensitive patterns.
+# Bypassing with --no-verify is FORBIDDEN. CI re-runs the same scan on push.
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+patterns="$repo_root/.githooks/sensitive_patterns.txt"
+
+if [[ ! -f "$patterns" ]]; then
+  echo "[pre-commit] missing $patterns; refusing to commit" >&2
+  exit 1
+fi
+
+# Scan only staged additions. Exclude the patterns file itself (it
+# legitimately contains the forbidden strings as regex patterns).
+diff_output="$(git diff --cached --no-color --diff-filter=ACM -U0 \
+  -- ':(top)' ':(top,exclude).githooks/sensitive_patterns.txt')"
+
+# Extract added lines only (lines that start with '+' but not '+++').
+added="$(printf '%s\n' "$diff_output" | grep -E '^\+[^+]' || true)"
+
+if [[ -z "$added" ]]; then
+  exit 0
+fi
+
+# Strip comments and blank lines from the patterns file before feeding to
+# grep — an empty pattern matches every line and would block everything.
+effective_patterns="$(grep -vE '^[[:space:]]*(#|$)' "$patterns")"
+
+# Match against the regex pattern file, case-insensitive.
+matches="$(printf '%s\n' "$added" | grep -niE "$effective_patterns" || true)"
+
+if [[ -n "$matches" ]]; then
+  echo "============================================================" >&2
+  echo "[pre-commit] BLOCKED: staged changes contain sensitive data" >&2
+  echo "============================================================" >&2
+  echo "$matches" >&2
+  echo "" >&2
+  echo "Sanitize the content (use placeholder names like" >&2
+  echo "<redacted-profile>, 123456789012, example-*) and re-stage." >&2
+  echo "" >&2
+  echo "Patterns are defined in .githooks/sensitive_patterns.txt" >&2
+  echo "Bypassing this hook with --no-verify is FORBIDDEN." >&2
+  exit 1
+fi
+
+exit 0
