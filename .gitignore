@@ -64,3 +64,8 @@ docs/demos/social/
 website/public/
 website/.hugo_build.lock
 website/resources/
+
+# Local-only sensitive-pattern allowlist for .githooks/. The hook scripts
+# are tracked; the patterns file is not — it lists words/data we never
+# want in git history.
+.githooks/sensitive_patterns.txt
