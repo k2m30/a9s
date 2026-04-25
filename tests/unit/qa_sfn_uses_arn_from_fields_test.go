@@ -4,7 +4,7 @@ package unit
 // call ListExecutions with the state-machine ARN from r.Fields["arn"], NOT the
 // bare name in r.ID.
 //
-// Reported 2026-04-25 from `./a9s -p <redacted-profile>`:
+// Reported 2026-04-25 from a live profile:
 //   [HH:MM:SS] enrich sfn: sfn-enrich: ListExecutions failed for 3 of 3 IDs:
 //     example-state-machine: ... InvalidArn: Invalid Arn:
 //     'Invalid ARN prefix: example-state-machine'
