@@ -86,9 +86,14 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **State bucket**: Warning.
   - **How obtained**: compute `now() - DBClusterSnapshot.SnapshotCreateTime` on the list response; gate on `SnapshotType == "manual"`.
 
-- **Signal**: cross-ref `dbc` — when the parent cluster is present in the already-loaded `dbc` list, `SnapshotCreateTime` older than `DBCluster.BackupRetentionPeriod × 1.5` AND `SnapshotType == "automated"` → stale-automated-beyond-retention (signals retention policy drift or a stuck automated cycle).
+- **Signal**: cross-ref `dbc` — source cluster no longer present in the already-loaded `dbc` list → Warning (orphan snapshot whose parent was deleted).
+  - **State bucket**: Warning.
+  - **How obtained**: read `DBClusterSnapshot.DBClusterIdentifier`; treat as orphan when the identifier is absent from the loaded `dbc` list. Skip the rule when the `dbc` list has not been loaded in this session (avoids false-positive orphan flags).
+
+- **Signal**: cross-ref `dbc` — when the parent cluster is present in the already-loaded `dbc` list, `SnapshotCreateTime` older than `DBCluster.BackupRetentionPeriod` AND `SnapshotType == "automated"` → Warning (automated snapshot kept past its retention window — signals retention-policy drift or a stuck automated cycle).
   - **State bucket**: Warning.
   - **How obtained**: compute age from `DBClusterSnapshot.SnapshotCreateTime` on the list response, cross-referenced against the already-loaded `dbc` list by `DBClusterIdentifier`. Skip the rule when the parent cluster is not in the loaded sibling list.
+  - **Threshold**: fires on `age > retention` (1.0× — no multiplier). `BackupRetentionPeriod` IS the operator's declared retention policy; any snapshot kept past it is policy drift regardless of engine. Same threshold applies to `dbi-snap`.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
@@ -125,7 +130,8 @@ One row per signal from §3:
 | `Status == creating` | 1 | Warning | n/a | S2, S4 | `creating` | — |
 | `Status == failed` | 1 | Broken | n/a | S2, S4 | `failed` | — |
 | manual age > 365d | 1 | Warning | n/a | S2, S4 | `manual, unused 400d` | — |
-| automated age > parent retention × 1.5 | 1 | Warning | n/a | S2, S4 | `automated, 22d past retention` | — |
+| orphan: source cluster deleted | 1 (cross-ref) | Warning | n/a | S1, S2, S4, S5 | `orphan: source cluster deleted` | `orphan: source cluster deleted` + Source Cluster row |
+| automated age > parent `BackupRetentionPeriod` | 1 (cross-ref) | Warning | n/a | S1, S2, S4, S5 | `automated, <N>d past retention` | `automated, <N>d past retention` + Source Cluster / Retention / Created rows |
 
 Rules for filling list and detail text:
 
