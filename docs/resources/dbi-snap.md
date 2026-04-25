@@ -93,7 +93,7 @@ One bullet per distinct signal. Keep AWS field names verbatim.
 - **Signal**: cross-ref `dbi` — when the parent DB is present in the already-loaded `dbi` list, `SnapshotCreateTime` older than the parent `DBInstance.BackupRetentionPeriod` (in days) AND `SnapshotType == "automated"` → Warning (automated snapshot kept past its retention window — signals retention-policy drift or a stuck automated cycle).
   - **State bucket**: Warning.
   - **How obtained**: compute age from `DBSnapshot.SnapshotCreateTime` on the list response, cross-reference against the already-loaded `dbi` list by `DBInstanceIdentifier`, compare to `DBInstance.BackupRetentionPeriod`. Skip the rule when the parent DB is not in the loaded sibling list.
-  - **Threshold note**: dbi-snap fires on `age > retention` (no multiplier). The sister type `dbc-snap` uses `age > retention × 1.5` to suppress chatter on DocumentDB clusters whose automated cleanup runs less aggressively. The thresholds were authored at different times and the divergence is intentional, not an inconsistency to reconcile — RDS automated snapshots are evicted on a tight schedule, so any overshoot is operator-actionable; DocumentDB tolerates a half-cycle slip.
+  - **Threshold**: fires on `age > retention` (1.0× — no multiplier). `BackupRetentionPeriod` IS the operator's declared retention policy; any snapshot kept past it is policy drift regardless of engine. Same threshold applies to `dbc-snap`.
 
 ### 3.2 Wave 2 — bounded extra API calls
 
