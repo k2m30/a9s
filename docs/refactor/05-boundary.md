@@ -1,4 +1,4 @@
-# Phase 05 — Runtime/UI boundary; gen unification; message taxonomy
+# Phase 05 — Platform-agnostic app core; TUI boundary; gen unification; message taxonomy
 
 **3 PRs, all mandatory. Depends on Phase 04 (catalog).**
 
@@ -6,85 +6,194 @@ The Color → severity collapse is handled inline in Phase 04 per-category PRs (
 
 ## Goal
 
-Close the runtime/UI boundary. Right now `internal/tui/` owns three things at once: the view stack and key handling (UI shell), the message handlers and orchestration (runtime), and the embedded session state (data). This phase splits them.
+Close the runtime/UI boundary and make the shared app core renderer-agnostic. Right now `internal/tui/` owns three things at once: the view stack and key handling (UI shell), the message handlers and orchestration (runtime), and the embedded session state (data). This phase splits them.
 
 After this phase:
 
-- **`internal/runtime/`** owns `Session`, message dispatch, fetcher invocation, generation stamping. It is the orchestrator.
-- **`internal/tui/`** owns view stack, key resolution, lipgloss rendering. It is the UI shell. It does not embed `Session`. It does not dispatch fetchers. It receives view-ready state and emits messages back.
+- **`internal/runtime/`** owns `Session`, app-core dispatch, fetcher invocation, selectors, queries, tasks, and generation stamping. It is platform-agnostic. It does not import Bubble Tea or any future desktop renderer toolkit.
+- **`internal/tui/`** owns the Bubble Tea adapter: view stack, key resolution, lipgloss rendering, and translation between Bubble Tea messages/commands and the shared app-core events/tasks.
+- **Future desktop delivery** plugs in as a second adapter. Candidate shells include Wails, Tauri with a Go sidecar, or an Electron-like main/renderer split. This phase does not pick one; it preserves the ability to add one later without re-architecting the core.
 - **`internal/domain/Gen`** is the single generation-counter type used everywhere. The `int` / `uint64` salad of `availabilityGen` / `enrichmentGen` / `relatedGen` / `enrichGen` / `enrichmentTypeGen` collapses to one type.
-- Messages are typed as either commands (UI → runtime: "do this") or events (runtime → UI: "this happened"), with gen-stamping enforced at the type system level. **This is mandatory, not polish.** Type-level gen-stamping prevents an entire bug class (handlers forgetting to gen-check) and "optional structural correctness" is itself the kind of compromise this refactor exists to remove.
+- Messages are typed as either commands (UI adapter → app core: "do this") or events (app core → adapter: "this happened"), with gen-stamping enforced at the type system level. **This is mandatory, not polish.** Type-level gen-stamping prevents an entire bug class (handlers forgetting to gen-check) and "optional structural correctness" is itself the kind of compromise this refactor exists to remove.
+- **Screen registration is declarative.** New deep workflows register screen IDs/descriptors with the app core; adapters decide how a given screen is rendered.
+- **Slow async work uses one task contract.** Enrichment, related resolution, discovery flows, and future query scans share one runtime-owned background-task model for progress, cancellation, cache policy, and partial-completion state.
 
-Views remain passive. They render state and emit messages. They do not consume use-case interfaces. The boundary is between message handlers and the view layer, not between views and a service API. (See cross-phase invariant #7 in `00-overview.md`.)
+Views remain passive. They render state and emit messages. They do not consume use-case interfaces. The boundary is between the shared app core and the renderer adapters, with Bubble Tea as one adapter implementation. (See cross-phase invariants #7 and #9 in `00-overview.md`.)
 
-## ViewIntent contract — how the runtime tells the UI to update views
+## Screen and task contracts
 
-Today's handlers walk the view stack and mutate views in place — `app_handlers_availability.go:387,421,433` are concrete examples: a single Wave 2 message updates `m.probeResources`, then iterates `m.stack` updating any matching `*ResourceListModel.SetEnrichmentState(...)` and any matching `*DetailModel.SetEnrichmentFinding(...)`. After 5a-extract the runtime no longer owns `m.stack`, so we need an explicit contract for "update every view of kind X for resource type Y."
+`UIIntent` solves "how does the app core tell an adapter to update UI state?". This phase also introduces two adjacent app-core contracts needed by the open-issue roadmap:
 
-The contract: **runtime emits `[]ViewIntent` from each handler; UI shell applies them across `m.stack`.**
+- **Screen descriptors** — the structural home for multi-screen workflows such as logs, CloudTrail investigation, and cost views. New screens register declaratively instead of requiring more central shell branching.
+- **Background tasks** — the structural home for slow work such as enrichment, related checks, log-source discovery, and future query scans. A task carries status, progress, cancellation handle, freshness/cache policy, and any view-ready summary state the UI needs to render.
+
+Phase 05 does **not** implement those product features. It creates the app-core/adapter contracts they need so they can land without punching holes back through the boundary. It also does **not** choose the future desktop shell; that decision stays explicitly deferred until product/UI direction is clearer.
+
+Minimum contract sketches:
+
+```go
+// internal/runtime/screens.go
+package runtime
+
+type ScreenID string
+
+type ScreenContext struct {
+    ResourceType string
+    ResourceID   string
+    Capability   domain.CapabilityID
+    Query        domain.QuerySpec // zero value when the screen is not query-driven
+}
+
+type ScreenDescriptor struct {
+    ID    ScreenID
+    Title string
+}
+
+type ScreenRegistry interface {
+    Register(ScreenDescriptor)
+    Get(ScreenID) (ScreenDescriptor, bool)
+    ScreenForCapability(domain.CapabilityID) (ScreenID, bool)
+}
+```
+
+```go
+// internal/tui/screens.go
+package tui
+
+type ScreenBuilder func(runtime.ScreenContext) tea.Model
+
+type ScreenBuilders interface {
+    Build(runtime.ScreenID, runtime.ScreenContext) (tea.Model, bool)
+}
+```
+
+The TUI adapter populates `ScreenBuilders` during `tui.New(...)` with a fixed `runtime.ScreenID -> ScreenBuilder` map. Adding a new screen in the current program means adding one builder registration there; future adapters own their own builder maps.
+
+```go
+// internal/runtime/tasks.go
+package runtime
+
+type TaskKind string
+
+type TaskKey struct {
+    Kind  TaskKind // "enrich" | "related" | "logsource-discover" | ...
+    Scope string   // resource-type / resource-id / query-id; kind-specific
+}
+
+type TaskStatus int
+
+const (
+    TaskPending TaskStatus = iota
+    TaskRunning
+    TaskPartial
+    TaskComplete
+    TaskFailed
+    TaskCancelled
+)
+
+type CachePolicy int
+
+const (
+    CacheNone CachePolicy = iota
+    CacheSession
+    CacheUntilRotate
+)
+
+type TaskState struct {
+    Key       TaskKey
+    Status    TaskStatus
+    Progress  float64 // 0..1; -1 = indeterminate
+    StartedAt time.Time
+    Cache     CachePolicy
+    Cancel    context.CancelFunc
+    Err       error
+}
+
+type TaskRequest struct {
+    Key   TaskKey
+    Cache CachePolicy
+}
+```
+
+Capability dispatch rule: `ResourceTypeDef.Capabilities` declares that a type supports a cross-cutting capability; app core checks that opt-in list, resolves `CapabilityID -> ScreenID` through `ScreenRegistry`, and emits a screen request. The adapter then uses its local builder registry (`ScreenID -> ScreenBuilder`) to construct the concrete UI object. That keeps capability handlers out of `ResourceTypeDef` while still avoiding central type switches and keeps Bubble Tea types out of the shared core.
+
+## UIIntent contract — how the app core tells an adapter to update UI state
+
+Today's handlers walk the view stack and mutate views in place — `app_handlers_availability.go:387,421,433` are concrete examples: a single Wave 2 message updates `m.probeResources`, then iterates `m.stack` updating any matching `*ResourceListModel.SetEnrichmentState(...)` and any matching `*DetailModel.SetEnrichmentFinding(...)`. After 5a-extract the shared core no longer owns `m.stack`, so we need an explicit contract for "tell the adapter what changed" without importing renderer types.
+
+The contract: **app core emits `[]UIIntent` plus `[]TaskRequest`; the adapter applies intents to its local UI tree and turns task requests into platform-specific async work.**
 
 ```go
 // internal/runtime/intent.go
 package runtime
 
-type ViewIntent interface { isIntent() }
+type UIIntent interface { isIntent() }
 
-// UpdateResourceList: every ResourceListModel for ResourceType receives Update.
-type UpdateResourceList struct {
+// PatchResourceList: every resource-list view for ResourceType applies the data patch.
+type PatchResourceList struct {
     ResourceType string
-    Update       func(rl ResourceListView) // narrow interface, see below
+    Issues       *IssueBadgePatch
+    Enrichment   *ListEnrichmentPatch
 }
-func (UpdateResourceList) isIntent() {}
+func (PatchResourceList) isIntent() {}
 
-// UpdateDetail: every DetailModel for ResourceType (and ResourceID, if non-empty) receives Update.
-type UpdateDetail struct {
+// PatchDetail: every detail view for ResourceType/ResourceID applies the data patch.
+type PatchDetail struct {
     ResourceType string
     ResourceID   string  // empty = all detail views of that type
-    Update       func(d DetailView)
+    Findings     []domain.Finding
+    Attention    map[domain.FindingCode]attention.AttentionDetail
+    FieldUpdates map[string]string
 }
-func (UpdateDetail) isIntent() {}
+func (PatchDetail) isIntent() {}
 
-// UpdateMenu: the singleton MainMenuModel receives Update.
-type UpdateMenu struct {
-    Update func(m MenuView)
+type PatchMenu struct {
+    ResourceType string
+    Issues       int
+    Truncated    bool
 }
-func (UpdateMenu) isIntent() {}
+func (PatchMenu) isIntent() {}
 
-// PushView, PopView, ReplaceView: structural changes to the stack.
-type PushView   struct { View tea.Model }
-type PopView    struct{}
-type ReplaceView struct { View tea.Model }
+// PushScreen, PopScreen, ReplaceScreen: structural changes described without renderer types.
+type PushScreen struct {
+    ID      ScreenID
+    Context ScreenContext
+}
+type PopScreen struct{}
+type ReplaceScreen struct {
+    ID      ScreenID
+    Context ScreenContext
+}
 ```
 
-The narrow interfaces (`ResourceListView`, `DetailView`, `MenuView`) are defined by the UI shell (`internal/tui/views/`) and exported for runtime use. They expose only the methods runtime needs to call (`SetEnrichmentState`, `SetEnrichmentFinding`, `ApplyFieldUpdates`, `SetIssues`, etc.) — not the full Bubble Tea `Update` / `View` surface. This keeps runtime decoupled from rendering details.
-
-Runtime handler signature:
+App-core handler signature:
 
 ```go
-func (r *Runtime) HandleMsg(msg tea.Msg) ([]ViewIntent, tea.Cmd) {
+func (c *Core) HandleEvent(ev event.Event) ([]UIIntent, []TaskRequest) {
     // ... mutate Session state ...
-    return []ViewIntent{
-        UpdateMenu{Update: func(m MenuView) { m.SetIssues(rt, count, trunc) }},
-        UpdateResourceList{ResourceType: rt, Update: func(rl ResourceListView) { rl.SetEnrichmentState(...) }},
-        UpdateDetail{ResourceType: rt, Update: func(d DetailView) { d.SetEnrichmentFinding(&f) }},
+    return []UIIntent{
+        PatchMenu{ResourceType: rt, Issues: count, Truncated: trunc},
+        PatchResourceList{ResourceType: rt, Enrichment: &patch},
+        PatchDetail{ResourceType: rt, ResourceID: id, Findings: findings, Attention: attn},
     }, nil
 }
 ```
 
-UI shell apply loop:
+Bubble Tea adapter loop:
 
 ```go
 // internal/tui/app.go
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-    intents, cmd := m.runtime.HandleMsg(msg)
+    ev := translateMsg(msg)
+    intents, tasks := m.core.HandleEvent(ev)
     for _, intent := range intents {
-        m.applyIntent(intent)  // walks m.stack, dispatches to matching views
+        m.applyIntent(intent)  // walks m.stack, patches matching views
     }
-    return m, cmd
+    return m, toTeaCmd(tasks)
 }
 ```
 
-This preserves today's stack-walking semantics — every matching view in the stack receives the update — while making the contract between runtime and UI explicit and testable. The runtime can be unit-tested by asserting on the returned `[]ViewIntent` without standing up a UI; the UI can be unit-tested by feeding it synthetic intents without standing up a runtime.
+This preserves today's stack-walking semantics — every matching view in the stack receives the update — while making the contract between app core and adapters explicit and testable. The shared core can be unit-tested by asserting on returned `[]UIIntent` / `[]TaskRequest` without standing up Bubble Tea. A future desktop adapter can consume the same intents over IPC without importing TUI code.
 
 ## PR breakdown
 
@@ -92,24 +201,27 @@ This preserves today's stack-walking semantics — every matching view in the st
 
 ### PR-05a-extract — Runtime extraction; un-embed Session
 
-**Goal.** Move all message handlers, fetcher dispatch, and session ownership out of `internal/tui/` into a new `internal/runtime/` package. `tui.Model` stops embedding `sessionRuntime` (now `internal/session.Session` after Phase 02). The Bubble Tea `Update` loop in the UI shell becomes a thin pass-through that forwards messages to the runtime and applies returned UI updates.
+**Goal.** Move all message handlers, fetcher dispatch, and session ownership out of `internal/tui/` into a new platform-agnostic `internal/runtime/` core package. `tui.Model` stops embedding `sessionRuntime` (now `internal/session.Session` after Phase 02). The Bubble Tea `Update` loop in the UI shell becomes a thin adapter that translates `tea.Msg` values into app-core events, forwards them to the core, applies returned UI intents, and turns task requests into `tea.Cmd`s.
 
 **Files added**
 
-- `internal/runtime/orchestrator.go` — owns `*session.Session`, message dispatch entry point, fetcher invocation. Replaces the bulk of `internal/tui/app.go`.
+- `internal/runtime/orchestrator.go` — owns `*session.Session`, app-core dispatch entry point, fetcher invocation. Replaces the bulk of `internal/tui/app.go`. **No Bubble Tea imports.**
+- `internal/runtime/screens.go` — screen-descriptor definitions used to register stackable workflows without growing central shell switches.
+- `internal/runtime/tasks.go` — background-task types (`TaskKey`, `TaskStatus`, `TaskProgress`, cache/freshness policy) used by enrichment, related resolution, and future discovery/query flows.
 - `internal/runtime/handlers.go` — moved from `internal/tui/app_handlers.go`.
 - `internal/runtime/handlers_availability.go` — moved from `internal/tui/app_handlers_availability.go`.
 - `internal/runtime/handlers_navigate.go` — moved from `internal/tui/app_handlers_navigate.go`.
 - `internal/runtime/handlers_related.go` — moved from `internal/tui/app_handlers_related_navigate.go`.
 - `internal/runtime/probes.go`, `enrich.go`, `related.go`, `fetchers.go` — moved from corresponding `app_*.go` files.
-- `internal/runtime/state.go` — `RuntimeState` struct: the view-ready state the UI shell renders. Snapshot of caches, current findings, queue progress, etc.
+- `internal/runtime/state.go` — `RuntimeState` struct: the view-ready state the UI shell renders. Snapshot of caches, current findings, queue progress, task state, etc.
+- `internal/tui/screens.go` — Bubble Tea screen builders (`runtime.ScreenID -> tea.Model`) used by the TUI adapter only.
 
 **Files modified**
 
-- `internal/tui/app.go` (currently ~880 lines / ~28 KB) — shrinks substantially. Realistic target: **300–400 lines**. The shell still owns view stack management, key resolver wiring, the `RuntimeState` field, the `Update` loop's intent-application code, and `View()` rendering. The earlier draft's "under 200 lines" target was unrealistic given those responsibilities; calibrate to 300–400 instead and verify post-PR.
+- `internal/tui/app.go` (currently ~880 lines / ~28 KB) — shrinks substantially. Realistic target: **300–400 lines**. The shell still owns view stack management, key resolver wiring, Bubble Tea message translation, screen-builder lookup, the `RuntimeState` field, the intent-application code, and `View()` rendering. The earlier draft's "under 200 lines" target was unrealistic given those responsibilities; calibrate to 300–400 instead and verify post-PR.
 - `internal/tui/app_input.go` — stays in tui (input mode is UI concern).
 - `internal/tui/app_handlers*.go` — content moved to `internal/runtime/`; files deleted from `internal/tui/`.
-- `cmd/a9s/main.go` — wires `runtime.New(session.New(), catalog.ResourceTypes)` and passes the orchestrator to `tui.New()`.
+- `cmd/a9s/main.go` — wires `runtime.New(session.New(), catalog.ResourceTypes)` and passes the core plus TUI adapter wiring to `tui.New()`.
 
 **Files deleted**
 
@@ -132,9 +244,19 @@ ls internal/tui/app_handlers*.go 2>&1
 ls internal/runtime/handlers*.go
 # expected: present
 
-# Runtime owns the orchestration:
-rg 'func.*HandleMsg' internal/runtime/
+# Shared core owns the orchestration:
+rg 'func.*HandleEvent' internal/runtime/
 # expected: present
+
+# Screen/task contracts exist concretely:
+rg 'type ScreenDescriptor struct|type ScreenRegistry interface' internal/runtime/screens.go
+# expected: present
+rg 'type TaskKey struct|type TaskState struct|type TaskStatus' internal/runtime/tasks.go
+# expected: present
+
+# Shared core packages are Bubble Tea-free:
+rg 'tea\\.|bubbletea' internal/runtime/ internal/domain/ internal/session/ internal/aws/ internal/catalog/ internal/semantics/
+# expected: zero hits
 
 # tui/app.go is small:
 wc -l internal/tui/app.go
@@ -191,7 +313,7 @@ Behavior verification:
 
 **Mandatory.** Type-level gen-stamping prevents handlers from forgetting to gen-check; that prevention is structural, not stylistic. "Optional structural correctness" is the kind of compromise this refactor exists to remove.
 
-**Goal.** Split the 28 `*Msg` types in `internal/tui/messages/messages.go` into two clearly named families:
+**Goal.** Split the 28 `*Msg` types in `internal/tui/messages/messages.go` into two clearly named families of platform-agnostic app-core contracts:
 
 ```go
 // internal/runtime/cmd
@@ -209,7 +331,7 @@ type EnrichmentChecked struct { Gen domain.Gen; ... }
 type Flash             struct { ... }
 ```
 
-Generation stamping moves into an `Event` base (or a generated wrapper) so handlers can no longer forget to gen-check.
+Generation stamping moves into an `Event` base (or a generated wrapper) so handlers can no longer forget to gen-check. These types are plain app-core contracts; renderer adapters translate to and from Bubble Tea, Electron IPC, or any future transport at the boundary.
 
 **Files added**
 
@@ -244,6 +366,7 @@ rg 'type \w+ struct' internal/runtime/event/types.go
 ## Out of scope
 
 - Renaming `internal/aws/` → `internal/transport/`. **Decision: no rename, ever, in this program** (see `04-catalog.md` "Out of scope" for rationale). `internal/aws/` is the permanent home of transport functions.
+- Implementing logs, CloudTrail search/debug, cost explorer, or mutating actions. Phase 05 creates the screen/task boundary those features need; it does not ship the features themselves.
 - Further view-layer reorganization (`views/shell/`, `views/components/`). Cosmetic; defer.
 - Theme system overhaul. Out of refactor scope.
 
@@ -261,4 +384,4 @@ rg 'type \w+ struct' internal/runtime/event/types.go
 | Tests that constructed `tui.Model` with embedded session break | Most tests use `tui.New(...)` constructor with options. Audit `tests/unit/` for direct `tui.Model{...}` literal construction; convert to `tui.New()`. |
 | Gen unification flushes out latent races caught by `-race` | Good — that's the point. Land 05a-gens with `make test-race` as a hard gate. Any race surfaced is a bug fixed by the unification, not introduced by it. |
 | 05b done in pieces leaves messages package half-migrated | 05b is one PR. Don't half-migrate; the cmd/event split is atomic. |
-| Narrow view interfaces (`ResourceListView`, `DetailView`, `MenuView`) drift from concrete view types | Each view type implements its narrow interface explicitly with a compile-time assertion (`var _ runtime.ResourceListView = (*views.ResourceListModel)(nil)`). Adding a method to the interface fails to compile in any view that doesn't implement it. |
+| Patch-data structs (`IssueBadgePatch`, `ListEnrichmentPatch`, `PatchDetail`) drift from what views actually need to render | Test the adapter, not compile-time callback interfaces. Unit tests feed each `Patch*` variant into the TUI adapter and assert the resulting view-state diff; view tests assert the patch payloads carry enough data to render list badges, enrichment state, and detail Attention rows without reaching back into runtime. |

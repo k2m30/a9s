@@ -12,6 +12,46 @@ For the target "no legacy / no lazy compromise" architecture and the migration p
 - [`docs/refactor/00-overview.md`](refactor/00-overview.md) — program-level goals and invariants
 - [`docs/refactor/01-projection-hook.md`](refactor/01-projection-hook.md) through [`docs/refactor/05-boundary.md`](refactor/05-boundary.md) — phase-by-phase target architecture
 
+Latest target-architecture additions in the refactor docs:
+
+- cross-cutting capabilities (logs, investigation, cost, future actions) stay separate from the resource catalog
+- shared query-contract types live in `internal/domain`
+- shared selector/matcher logic lives in `internal/semantics/selector`
+- runtime owns screen descriptors and background-task contracts
+- new capabilities must be test-bounded, not validated by unbounded full-account crawls
+
+## High School Student Version
+
+If you want the simplest possible mental model, think about a9s like this:
+
+- AWS has many "things" such as EC2 instances, S3 buckets, and RDS databases. In a9s, each one shown on screen is a `Resource`.
+- A `ResourceTypeDef` is the recipe for one kind of thing: how to fetch it, which columns to show, how detail view works, and what other resources it can jump to.
+- The app has one big state object, the Bubble Tea `Model`. It remembers the current screen, the current AWS profile/region, cached data, and what background work is running.
+- A `View` is just a screen.
+- A `Msg` is a note that says "something happened."
+- A `Cmd` is background work. It talks to AWS and later sends a `Msg` back.
+- A `Fetcher` loads the first version of the data.
+- An `Enricher` does slower extra checks after the fast first load.
+- A related checker answers "what else is connected to this thing?"
+
+The app loop is:
+
+1. User presses a key.
+2. The active view emits a message.
+3. The root model decides what to do.
+4. If AWS work is needed, it runs in a background command.
+5. The result comes back as another message.
+6. The screen redraws.
+
+Important interaction rules:
+
+- Views do not call AWS directly.
+- `Update()` must not block; AWS/network work goes in `tea.Cmd`.
+- Old async results are dropped if the user refreshed or switched profile/region.
+- Cache lifetime follows the session; switching account or region must rotate session state.
+- On `main` today, a lot of behavior is still wired through registries and `sessionRuntime`.
+- In the target refactor architecture, those patterns are replaced by an explicit catalog, shared selectors and query contracts, capability modules, and runtime-owned screen/task contracts.
+
 ## What is a9s?
 
 a9s is a read-only terminal UI for AWS. Think k9s for Kubernetes, but for AWS services. It uses [Bubble Tea v2](https://github.com/charmbracelet/bubbletea) (the Elm Architecture for Go) and renders with [Lipgloss v2](https://github.com/charmbracelet/lipgloss).
@@ -40,7 +80,7 @@ if it "works" — the gen guards, registry completeness checks, and related
 validators in `tests/unit/architecture_conformance_test.go` fail loudly when
 any of these drift.
 
-These are **current-state invariants**, not promises about the final architecture. In particular, the refactor plan under `docs/refactor/` intentionally replaces the embedded `sessionRuntime` model, package-`init()` registry wiring, the `Status`-centered resource model, and markdown-as-input contracts.
+These are **current-state invariants**, not promises about the final architecture. In particular, the refactor plan under `docs/refactor/` intentionally replaces the embedded `sessionRuntime` model, package-`init()` registry wiring, the `Status`-centered resource model, and markdown-as-input contracts, and adds explicit capability modules, selector/query contracts, and runtime-owned screen/task boundaries.
 
 1. **One root application model owns session state and orchestration.**
    UI shell concerns and session-runtime state both live on `tui.Model`
