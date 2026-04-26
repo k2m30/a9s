@@ -21,26 +21,50 @@ Closing this boundary before any larger phase adds to it means later phases neve
 ## What this phase delivers
 
 - `internal/session/` package — owns `Session` struct with typed cache fields, `Rotate()` method.
-- Capability interfaces in `internal/transport/` — `PolicyStore`, `IdentityStore`, `RuleSetStore`. Transport functions take capabilities, not `*Session`.
+- Capability interfaces in `internal/session/` (the package that defines them; `internal/aws/` consumes them via function signatures). `PolicyStore`, `IdentityStore`, `RuleSetStore`. Transport functions in `internal/aws/` take capabilities, not `*Session`. Note: `internal/aws/` is not renamed in this program — see `04-catalog.md` "Out of scope".
 - Three deletions: `iam_policies.go` global, `identity_cache.go` global, `ses_related.go` rule-set globals.
 - One canonical reset path: `Session.Rotate()` replaces every `Reset*Cache` / `Clear*Cache` / `Invalidate*Cache` symbol.
 
 ## PR breakdown
 
-### PR-02a — Session skeleton + capability interfaces
+### PR-02a — Session skeleton + capability interfaces + cross-package promoted-selector compat
 
-**Goal.** Define `Session` and the three capability interfaces, but don't yet replace the globals. This PR is purely additive: new types compile and are usable, but nothing consumes them.
+**Goal.** Define `Session` and the three capability interfaces, and mechanically migrate every existing access site from the embedded `sessionRuntime` (with unexported fields) to an embedded `*session.Session` (with exported fields). This PR is structurally additive at the type level but touches every site that currently uses promoted selectors like `m.resourceCache`, `m.probeResources`, `m.relatedGen`. It is one PR specifically because half-migrating breaks compilation across `internal/tui/`.
+
+**The promoted-selector problem (concrete).** Today, `internal/tui/session_runtime.go:13` defines `sessionRuntime` with unexported fields like `resourceCache`, `probeResources`, `enrichmentFindings`, `relatedGen`. `tui.Model` embeds `sessionRuntime` *by value*, so call sites read `m.resourceCache`, `m.probeResources` via Go's field promotion — those selectors work because the field is unexported but the access site is in the same package (`internal/tui`). Once the type body moves to `internal/session/Session`, the same fields become unexported in a *foreign* package; promoted selectors stop compiling.
+
+**Compatibility approach (chosen).** Capitalize the formerly-unexported fields when moving to `internal/session/Session`, and rename every call site mechanically in the same PR. `m.resourceCache` becomes `m.ResourceCache`; `m.probeResources` becomes `m.ProbeResources`; `m.relatedGen` becomes `m.RelatedGen`. This is one mechanical rename across `internal/tui/`. Three alternatives were rejected:
+
+- **(a) Re-export `sessionRuntime` from `internal/tui` as a wrapper around `*session.Session`.** Either the wrapper still has the unexported fields (dual state, violates invariant #1) or it forwards to exported fields on `*Session` — in which case we still capitalize at call sites, just with more layers. Rejected.
+- **(b) Move fields to `internal/session/Session` but keep them unexported, accessing via methods.** Every `m.resourceCache[k] = v` becomes `m.Session().ResourceCacheSet(k, v)`. Order of magnitude more churn than capitalization, with worse readability. Rejected.
+- **(c) Keep `sessionRuntime` in `internal/tui/` indefinitely.** Defeats the phase. Rejected.
 
 **Files added**
 
-- `internal/session/session.go` — `Session` struct, `New()`, `Rotate()`. Initially holds the existing fields from `internal/tui/session_runtime.go` plus stub fields for the three new caches.
+- `internal/session/session.go` — `Session` struct with exported fields (capitalized from `sessionRuntime`'s former unexported fields). `New()`, `Rotate()` constructors and methods.
 - `internal/session/policy_store.go` — `PolicyStore` interface + thread-safe map-backed implementation.
 - `internal/session/identity_store.go` — `IdentityStore` interface + impl.
 - `internal/session/rule_set_store.go` — `RuleSetStore` interface + impl.
 
 **Files modified**
 
-- `internal/tui/session_runtime.go` — re-export from `internal/session`, or thin wrapper (still embedded in `tui.Model` for now). The Model embed stays in this PR; un-embedding is Phase 5a.
+- `internal/tui/session_runtime.go` — type body deleted; the file may itself be removed entirely, with `tui.Model` updated in `internal/tui/app.go` to embed `*session.Session` directly. The embed pattern preserves promoted-selector access (now to capitalized field names).
+- `internal/tui/app.go`, `internal/tui/app_handlers*.go`, `internal/tui/app_fetchers.go`, `internal/tui/app_probes.go`, `internal/tui/app_related.go`, and any other file in `internal/tui/` that reads or writes promoted fields — mechanical capitalization. Sample concrete renames:
+
+  | Before | After |
+  |---|---|
+  | `m.resourceCache` | `m.ResourceCache` |
+  | `m.probeResources` | `m.ProbeResources` |
+  | `m.enrichmentFindings` | `m.EnrichmentFindings` |
+  | `m.enrichmentRan` | `m.EnrichmentRan` |
+  | `m.enrichmentTypeGen` | `m.EnrichmentTypeGen` |
+  | `m.relatedGen` | `m.RelatedGen` |
+  | `m.availabilityGen` | `m.AvailabilityGen` |
+  | `m.enrichGen` | `m.EnrichGen` |
+
+  The full list is whatever the current `sessionRuntime` type body enumerates as fields. Audit the type body before the mechanical rename so nothing is missed.
+
+- `tests/unit/*.go` — any test that constructs `tui.Model{...}` literals with formerly-lowercase field initializers updates to capitalized.
 
 **Exit criteria**
 
@@ -48,11 +72,24 @@ Closing this boundary before any larger phase adds to it means later phases neve
 ls internal/session/
 # expected: session.go, policy_store.go, identity_store.go, rule_set_store.go (+ tests)
 
+# Type body fully migrated:
+rg '^type sessionRuntime struct' internal/tui/
+# expected: zero hits
+
+# Promoted selectors still work via embed:
 go build ./...
 # expected: clean compile
+
+# No lingering lowercase references to former-private fields outside internal/session:
+rg '\bm\.resourceCache\b|\bm\.probeResources\b|\bm\.relatedGen\b|\bm\.enrichmentFindings\b' internal/
+# expected: zero hits
+
+# Capability interfaces compile but are not yet load-bearing:
+rg 'PolicyStore|IdentityStore|RuleSetStore' internal/aws/
+# expected: zero hits — wired up in PR-02b/c/d
 ```
 
-The new code is unused at this point. Subsequent PRs in this phase make it load-bearing.
+The capability interfaces are unused at this point. Subsequent PRs in this phase make them load-bearing.
 
 ---
 
@@ -142,19 +179,19 @@ rg 'sesRuleSetCacheMu|sesReceiptRuleSetCache' internal/aws/
 
 ### PR-02e — Single rotation path; cleanup
 
-**Goal.** `Session.Rotate()` is the sole reset entry point. All `Reset*Cache` / `Clear*Cache` / `Invalidate*Cache` exported symbols in `internal/aws/` are deleted (the work in 02b/c/d removed three; this PR finds and removes any stragglers, e.g. `iam_policy_doc_cache.go` if it has any). The `internal/tui/session_runtime.go` file stops calling into `internal/aws/` for resets entirely.
+**Goal.** `Session.Rotate()` is the sole reset entry point. All `Reset*Cache` / `Clear*Cache` / `Invalidate*Cache` exported symbols in `internal/aws/` are deleted (02b/c/d removed three; this PR finds any stragglers, e.g. `iam_policy_doc_cache.go` if it has any).
 
-Also: `internal/tui/session_runtime.go` becomes a thin alias for `internal/session.Session` — its content moves into the new package, the file may be deleted or kept as a one-line re-export depending on whether `tui.Model` still uses the old name.
+Note: PR-02a already moved `sessionRuntime`'s body to `internal/session/Session` and capitalized every promoted-selector access site. PR-02e does NOT re-do that work; it finishes the cache-reset story and finalizes any obsolete test-only helpers that were targeting the deleted `Reset*Cache` symbols.
 
 **Files modified**
 
-- `internal/tui/session_runtime.go` — content moved to `internal/session/`. File deleted or stub.
-- `internal/tui/app.go` — `Model` embeds `session.Session` (or holds a pointer; we'll see what's cleaner).
 - `internal/tui/app_handlers.go` — any remaining inline cache resets are replaced with `m.Session.Rotate()`.
+- `internal/aws/ses_cache_test_accessor_test.go` and `internal/aws/ses_clear_cache_test.go` — these tests existed solely to verify `ClearAllSESRuleSetCaches`, deleted in PR-02d. **Migrate them**: re-target the same invariants ("rotate clears all entries"; "rotate on empty store is a no-op") at the new `RuleSetStore` capability, OR delete them if equivalent coverage exists in the new `internal/session/rule_set_store_test.go`. Do not leave them dangling.
 
 **Files deleted**
 
 - Whatever `Reset*Cache` / `Clear*Cache` / `Invalidate*Cache` exported symbols remain in `internal/aws/`.
+- `internal/aws/ses_cache_test_accessor_test.go` and `internal/aws/ses_clear_cache_test.go` (assuming the migration above lands their replacements in `internal/session/`).
 
 **Exit criteria**
 
@@ -178,8 +215,8 @@ Behavior verification:
 
 ## Out of scope
 
-- The `sessionRuntime` embed in `tui.Model` STAYS in this phase. Phase 5a un-embeds it. Phase 02 just relocates the content from `internal/tui/session_runtime.go` into `internal/session/Session`.
-- Renaming `internal/aws/` → `internal/transport/`. Stays as `internal/aws/` through this phase. The capability interfaces live in `internal/session/` for now; if a separate `internal/transport/` package is wanted, it's a Phase 04 or post-refactor cleanup.
+- The `*session.Session` embed in `tui.Model` STAYS in this phase. Phase 5a-extract un-embeds it. Phase 02 relocates the content from `internal/tui/session_runtime.go` into `internal/session/Session` and capitalizes the field names so embedded promotion still works.
+- Renaming `internal/aws/` → `internal/transport/`. **Decision: no rename, ever** (see `04-catalog.md`). Capability interfaces live in `internal/session/` permanently.
 - Generation type unification (`int` vs `uint64`). Phase 5a-gens.
 - Any change to `Resource.Status` / `Findings`. Phase 03.
 - Any catalog or markdown work. Phase 04.

@@ -1,21 +1,36 @@
-# Phase 01 — Typed projection hook
+# Phase 01 — Domain bootstrap + typed projection hook
 
 **1 PR. Mandatory. No prerequisites.**
 
 ## Goal
 
-Replace the `if resType == "ct-events"` branches in `internal/tui/views/detail_fields.go` with a declarative `DetailProjector` hook on `ResourceTypeDef`. Detail rendering becomes a uniform pipeline: `Resource → []Section → rendered cells`. ct-events is just one type that registers a non-default projector.
+Replace the `m.resourceType == "ct-events"` branches in `internal/tui/views/detail_fields.go` with a declarative `DetailProjector` hook on `ResourceTypeDef`. Detail rendering becomes a uniform pipeline: `Resource → []Section → rendered cells`. ct-events is just one type that registers a non-default projector.
 
-This phase also introduces `domain.Severity` — the typed enum used by every subsequent phase. It lands here because Phase 02 needs it for `Item.Severity`, and bringing it forward avoids a second touch later.
+This phase also introduces the `internal/domain` leaf package — the foundation every subsequent phase builds on. It carries `Severity`, `Resource` (moved from `internal/resource/resource.go`), and the `Section` / `Item` / `DetailProjector` type declarations.
+
+The motivation for bundling these into one PR is structural: if `DetailProjector` is declared in `internal/semantics/projection/` and typed against `resource.Resource`, then setting `ResourceTypeDef.Project = ctevent.Project` creates an `internal/resource → internal/semantics/ctevent → internal/semantics/projection → internal/resource` import cycle. Putting the type *declarations* in `internal/domain` (a leaf package with no internal imports) and keeping the *implementations* in `internal/semantics/*` breaks the cycle structurally — `internal/semantics/*` and `internal/resource/` both import `internal/domain`, and neither imports the other for types.
 
 ## What this phase delivers
 
-- `internal/domain/severity.go` — `Severity` enum (`SevOK | SevWarn | SevBroken | SevDim`), `IsIssue()` method, no presentation imports.
-- `internal/semantics/projection/` package — owns `Section`, `Item`, `DetailProjector` type. Imports `internal/domain` (one-way).
-- `internal/semantics/ctevent/` package — moved from `internal/aws/ctdetail/`. Exposes `Project(Resource) []projection.Section`.
-- `ResourceTypeDef.Project DetailProjector` field — optional; nil means "use generic projection from `Fields` + `RawStruct`".
-- `internal/semantics/projection/generic.go` — the default projector; reads `Resource.Fields` and reflects over `RawStruct` per the existing detail-view logic.
-- `internal/tui/views/detail_render.go` — refactored to consume `[]projection.Section` regardless of resource type. ct-events branches deleted.
+### Domain layer (new)
+
+- `internal/domain/severity.go` — `Severity` enum (`SevOK | SevWarn | SevBroken | SevDim`), `IsIssue()` method. No presentation imports.
+- `internal/domain/resource.go` — `Resource` struct, **moved** from `internal/resource/resource.go`. Same fields (`ID`, `Name`, `Status`, `Issues`, `Fields`, `RawStruct`) — the migration of `Status` / `Issues` to `Findings` is Phase 03's concern, not this phase's.
+- `internal/domain/projection.go` — `Section`, `Item`, and the `DetailProjector func(domain.Resource) []domain.Section` type declaration. Type declarations only.
+- `internal/domain/contracts.go` — type declarations for every shared contract the catalog references in Phase 04. Function signatures: `PaginatedFetcher`, `FilteredPaginatedFetcher`, `PaginatedChildFetcher`, `RevealFetcher`, `FetchByIDsFn`, `IssueEnricher` / `IssueEnricherFunc`, `DetailEnricher`, `RelatedChecker`. Struct types: `Column`, `ChildViewDef`, `RelatedDef`, `NavigableField`, `FetchResult`, `ParentContext`, `ResourceCache`. Currently scattered across `internal/resource/types.go` (`Column`, `ChildViewDef`), `internal/resource/registry.go` (`ParentContext` and the function types), `internal/resource/related.go` (`RelatedDef`, `RelatedChecker`, `ResourceCache`), `internal/resource/enricher.go` (`DetailEnricher`), `internal/resource/pagination.go` (`FetchResult`), and `internal/aws/issue_enrichment.go` (`IssueEnricherFunc`). Move the declarations into `internal/domain/contracts.go`; implementations, registry maps, and registration functions stay where they are. Each original file keeps a `type X = domain.X` re-export alias so existing call sites compile without churn. The aliases die with the legacy registry in PR-04n.
+
+  Without this move, `internal/catalog` would have to import `internal/resource` and `internal/aws` for the type names, recreating the cycle Phase 01 exists to break.
+
+### Semantics layer (new)
+
+- `internal/semantics/projection/generic.go` — the default projector implementation; reads `Resource.Fields` and reflects over `RawStruct` per the existing detail-view logic. Returns `[]domain.Section`. Imports `internal/domain` only.
+- `internal/semantics/ctevent/` — entire `internal/aws/ctdetail/` directory **moved** here. Exposes `Project(domain.Resource) []domain.Section`. Imports `internal/domain` only.
+
+### Existing layers (modified)
+
+- `internal/resource/resource.go` — collapses to a single line: `type Resource = domain.Resource` (Go type alias). Every existing import of `internal/resource` continues to compile. The alias is deleted in PR-04n alongside `internal/resource/registry.go`.
+- `ResourceTypeDef.Project domain.DetailProjector` field — optional; nil means "use generic projection from `Fields` + `RawStruct`".
+- `internal/tui/views/detail_fields.go` and `detail_render.go` — consume `[]domain.Section` uniformly. ct-events branches deleted.
 
 ## FieldItem audit — what `Section` and `Item` must carry
 
@@ -42,29 +57,31 @@ Implication: PR-01 scope is larger than the original 10–15 file estimate. Real
 
 This phase ships as **one PR**. The work is tightly coupled (`Severity` must exist before `Item.Severity`, `Section` must exist before the renderer change), and the per-feature helpers in the audit above all touch the same rendering path. Splitting produces dependency confusion without size benefit.
 
-### PR-01 — Introduce projection hook
+### PR-01 — Domain bootstrap + introduce projection hook
 
 **Files added**
 
-- `internal/domain/severity.go` (~30 LOC)
-- `internal/semantics/projection/types.go` — `Section`, `Item`, `DetailProjector` (~40 LOC)
-- `internal/semantics/projection/generic.go` — default projector (extracted from current `detail_fields.go` Fields/RawStruct logic) (~150 LOC)
+- `internal/domain/severity.go` — `Severity` enum + `IsIssue()` (~30 LOC)
+- `internal/domain/resource.go` — `Resource` struct moved from `internal/resource/resource.go` (~25 LOC)
+- `internal/domain/projection.go` — `Section`, `Item`, `DetailProjector` type declarations (~40 LOC)
+- `internal/semantics/projection/generic.go` — default projector implementation, returns `[]domain.Section` (extracted from current `detail_fields.go` Fields/RawStruct logic) (~150 LOC)
 - `internal/semantics/ctevent/` — entire `internal/aws/ctdetail/` directory, moved
-- `internal/semantics/ctevent/projector.go` — wraps existing `BuildSections` to return `[]projection.Section`
+- `internal/semantics/ctevent/projector.go` — wraps existing `BuildSections` to return `[]domain.Section`
 
 **Files modified**
 
-- `internal/resource/types.go` — add `Project DetailProjector` field to `ResourceTypeDef`
+- `internal/resource/resource.go` — replace struct definition with single line: `type Resource = domain.Resource` (alias). Every consumer of `resource.Resource` continues to compile.
+- `internal/resource/types.go` — add `Project domain.DetailProjector` field to `ResourceTypeDef`
 - `internal/resource/types_monitoring.go` — set `Project: ctevent.Project` on the ct-events type def
 - `internal/tui/views/detail_fields.go` — replace ct-events branch with single uniform call: `sections := td.Project(r); if td.Project == nil { sections = projection.Generic(r) }`
-- `internal/tui/views/detail_render.go` — consumes `[]projection.Section` (already does morally, just typed now)
+- `internal/tui/views/detail_render.go` — consumes `[]domain.Section` (already does morally, just typed now)
 - Every `internal/tui/views/detail_*_test.go` that asserts on rendered detail content — verify still passing
 
 **Files deleted**
 
 - The shortName branch in `detail_fields.go` lines 234–253 (ct-events special case)
-- `sectionsToFieldItems` shim in `detail_fields.go:470` (no longer needed; everyone returns `Section` now)
-- `internal/aws/ctdetail/` directory (moved, not deleted, but the path goes away)
+- `sectionsToFieldItems` shim at `detail_fields.go:470` (no longer needed; everyone returns `[]domain.Section` now)
+- `internal/aws/ctdetail/` directory (moved to `internal/semantics/ctevent/`, not deleted, but the old path goes away)
 
 **What this PR explicitly does NOT do**
 
@@ -79,11 +96,12 @@ A PR is mergeable only when all of these are true. Verification commands run fro
 
 1. **No shortName dispatch in detail rendering.**
    ```bash
-   rg '"ct-events"' internal/tui/views/
+   rg '== "ct-events"|"ct-events" ==' internal/tui/views/
    # expected: zero hits
-   rg 'resType == "' internal/tui/views/detail_*.go
+   rg '\b(resType|resourceType|m\.resourceType)\s*==\s*"' internal/tui/views/detail_*.go
    # expected: zero hits
    ```
+   (The previous draft used `resType == "` — the live code uses `m.resourceType ==`. Match both, plus the simpler "literal-against-shortname" pattern.)
 
 2. **`internal/aws/ctdetail/` is deleted.**
    ```bash
@@ -91,23 +109,58 @@ A PR is mergeable only when all of these are true. Verification commands run fro
    # expected: "No such file or directory"
    ```
 
-3. **`internal/ui/` (still `internal/tui/views/` at this phase) does not import `internal/semantics/ctevent`.**
+3. **`internal/tui/views/` does not import `internal/semantics/ctevent`.**
    ```bash
    rg 'semantics/ctevent' internal/tui/
    # expected: zero hits — only the type def in internal/resource/ may reference ctevent.Project
    ```
 
-4. **Severity enum is presentation-free.**
+4. **`internal/domain` is presentation-free and imports nothing internal.**
    ```bash
    rg 'lipgloss|tcell|color\.' internal/domain/
    # expected: zero hits
+
+   rg 'github\.com/k2m30/a9s' internal/domain/
+   # expected: zero hits — domain is a leaf package
    ```
 
-5. **Generic projector covers every non-ct-events type.**
-   - `make test` passes.
-   - `./a9s --demo` renders detail views for at least: ec2, s3, rds, iam-role, alarm, sg. Manual verification: pixel-diff against `cmd/preview-detail` output is acceptable evidence; running the demo and visually comparing each detail to a recorded screenshot is the cheap path.
+5. **No import cycle from `internal/resource` to `internal/semantics/*`.**
+   ```bash
+   go list -f '{{.Imports}}' github.com/k2m30/a9s/v3/internal/semantics/ctevent | tr ' ' '\n' | grep 'internal/resource'
+   # expected: zero hits
+   go list -f '{{.Imports}}' github.com/k2m30/a9s/v3/internal/semantics/projection | tr ' ' '\n' | grep 'internal/resource'
+   # expected: zero hits
+   ```
 
-6. **ct-events detail unchanged from user perspective.**
+6. **`Resource` lives in `internal/domain`; `internal/resource` re-exports.**
+   ```bash
+   rg '^type Resource struct' internal/domain/resource.go
+   # expected: present
+   rg '^type Resource =' internal/resource/resource.go
+   # expected: present (single-line type alias)
+   rg '^type Resource struct' internal/resource/resource.go
+   # expected: zero hits
+   ```
+
+7. **Generic projector covers every type — structural test, not a smoke list.**
+   ```go
+   // tests/unit/projection_coverage_test.go
+   func TestProjectorCoverageAllTypes(t *testing.T) {
+       for _, td := range resource.AllResourceTypes() {
+           fix := demo.Fixture(td.ShortName) // first fixture per type
+           if fix == nil { continue }
+           sections := td.Project
+           if sections == nil { sections = projection.Generic }
+           got := sections(fix)
+           if len(got) == 0 {
+               t.Errorf("%s: projector returned zero sections", td.ShortName)
+           }
+       }
+   }
+   ```
+   This loop replaces the previous "verify ec2/s3/rds/..." smoke list. `make test` runs it; any regression in any of the 66 types fails the gate.
+
+8. **ct-events detail unchanged from user perspective.**
    - Run `./a9s --demo`, navigate to ct-events, drill into an event detail. Sections (Identity, Action, Target, Context, Raw) render identically to before. This is the most visible regression risk.
 
 ## Out of scope
@@ -115,14 +168,14 @@ A PR is mergeable only when all of these are true. Verification commands run fro
 - `Finding`, `FindingCode`, `AttentionDetail` types. Phase 03.
 - `Resource.Status` removal or `(+N)` algebra. Phase 03.
 - Catalog migration or generator binaries. Phase 04.
-- `internal/transport` rename or capability interfaces. Phase 03 introduces transport package; this phase still uses `internal/aws/`.
-- Removing package globals (IAM policies, identity cache, SES rule sets). Phase 03.
+- `internal/transport/<svc>/` package layout. The `internal/aws/ctdetail/` directory MOVES to `internal/semantics/ctevent/` in this phase (because it stops being a transport concern and becomes a semantics-layer concern), but `internal/aws/<svc>.go` fetcher files stay where they are. **Decision: `internal/aws/` is not renamed in this program** (see `04-catalog.md` "Out of scope").
+- Removing package globals (IAM policies, identity cache, SES rule sets). Phase 02 (was previously listed as Phase 03 — Phase 02 is the session-owner phase that closes the global-cache boundary).
+- Deleting per-category `Color` functions. They co-exist with `Severity` through this phase. Phase 04 per-category PRs collapse them inline (the new catalog struct has no `Color` field).
 
 ## Cross-references
 
-- **Enables Phase 03**: `Severity` enum is required for `Finding.Severity`.
-- **Enables Phase 04**: `DetailProjector` is one of the catalog struct fields. Phase 04 just declares it; Phase 01 makes it work.
-- **Independent of Phase 02**: Phase 02 (session owner) can land in parallel with no conflicts.
+- **Enables every later phase**: `internal/domain` is the leaf package every later phase imports. `Severity`, `Resource`, and the projection types declared here are referenced by Phase 02 (session caches keyed by `domain.Resource`), Phase 03 (`Finding.Severity`, `AttentionDetail` carries `domain.DetailRow`), Phase 04 (catalog struct fields), and Phase 05 (`domain.Gen`).
+- **Independent of Phase 02**: Phase 02 (session owner) can land in parallel with no conflicts. Phase 02 imports `internal/domain` for `Resource` but does not depend on the projection types.
 
 ## Risk register
 

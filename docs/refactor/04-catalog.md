@@ -8,9 +8,9 @@ Replace the `Register*` API with a static, declarative `internal/catalog` packag
 
 - `var ResourceTypes = []ResourceTypeDef{...}` is the single source of truth for every resource type.
 - Each `ResourceTypeDef` literal carries direct function references for `Fetcher`, `Wave2`, `Project`, `Related`, `Navigable`, plus declarative tables for `Findings []FindingDef`, `Columns`, `Children`, `LifecycleKey`, `CloudTrail`, etc.
-- `cmd/catalogen` is a `go generate`–driven binary that emits:
-  - `internal/aws/registry_generated.go` — compatibility scaffolding for any consumer not yet migrated off the legacy registry API.
+- `cmd/catalogen` is a `go generate`–driven binary that emits **markdown only** — no generated Go code:
   - `docs/attention-signals.md`, `docs/related-resources.md`, `docs/resources/<short>.md` — generated specs.
+  - Catalog-backed wrappers (PR-04a) handle legacy-registry compatibility at runtime; there is no generated `internal/aws/registry_generated.go`.
 - CI runs the generator and `git diff --exit-code`; drift fails the build.
 
 After this phase, the **mechanical-resource-implementation acceptance test** from `00-overview.md` is satisfiable: a new resource is one catalog struct literal, one transport file, optional Wave 2 / related files, demo fixtures, tests. No `init()`. No `Register*`. No markdown edits.
@@ -101,20 +101,67 @@ var ResourceTypes = []ResourceTypeDef{
   - `docs/related-resources.md` — generated from `Related` defs.
   - `docs/resources/<short>.md` — per-resource markdown using **section markers**: `<!-- BEGIN GENERATED: <section> -->` / `<!-- END GENERATED: <section> -->`. Generated sections (Findings table, Related table, Columns table, Children) are replaced in place; prose between markers stays untouched. **No whole-file overwrite, ever.** (See "Per-resource markdown contract" below.)
 
+**Wrapper coverage — every legacy registry surface, not just type defs.**
+
+The per-category PRs delete `init()` registrations not only for `RegisterResourceType` but for every other registry the consumers depend on (fetchers, related, navigable fields, Wave 2 enrichers). If only `FindResourceType` / `AllResourceTypes` are wrapped, then 04b deleting compute-category `RegisterPaginated` / `RegisterRelated` / etc. breaks every compute consumer. **All registry surfaces below get catalog-backed wrappers in PR-04a, with legacy fallback active during 04b–m.** The fallback branches close in PR-04n.
+
+The full wrapper set added to `internal/resource/registry.go` (or moved into `internal/catalog/wrappers.go` if cleaner — pick one in the PR):
+
+| Wrapper | Replaces | Live consumers (verify and migrate in 04a) |
+|---|---|---|
+| `FindResourceType(name) *ResourceTypeDef` | iteration of `resourceTypes` slice | `internal/tui/app_probes.go:112`, `internal/resource/navigation.go:27` |
+| `AllResourceTypes() []ResourceTypeDef` | direct read of `resourceTypes` | `tests/unit/architecture_conformance_test.go`, projector coverage test |
+| `AllShortNames() []string` | derived from `resourceTypes` | `internal/tui/app_probes.go:214` |
+| `GetPaginatedFetcher(short) PaginatedFetcher` | `paginatedFetchers` registry map | `internal/tui/app_fetchers.go:21`, `internal/tui/app_probes.go:227`, `internal/resource/navigation.go` (fetcher-only types path) |
+| `GetFilteredPaginatedFetcher(short) FilteredPaginatedFetcher` | `filteredPaginatedFetchers` registry map | `internal/tui/app_fetchers.go:61` |
+| `GetPaginatedChildFetcher(short) PaginatedChildFetcher` | `childFetchers` registry map | `internal/tui/app_fetchers.go:122` |
+| `GetRevealFetcher(short) RevealFetcher` | `revealFetchers` registry map | `internal/tui/app_fetchers.go:263` |
+| `HasRevealFetcher(short) bool` | `revealFetchers` registry presence | wherever the UI predicates on reveal availability (audit pre-PR) |
+| `GetFetchByIDs(short) FetchByIDsFn` | `fetchByIDsRegistry` map | `internal/tui/app_related.go:144` |
+| `GetDetailEnricher(short) DetailEnricher` | `detailEnrichers` registry map | `internal/tui/app_enrich.go:23` |
+| `HasDetailEnricher(short) bool` | `detailEnrichers` registry presence | wherever the UI predicates on enrichment availability (audit pre-PR) |
+| `GetChildType(short) *ResourceTypeDef` | `childTypes` registry map | `internal/tui/app_handlers.go:451`, `internal/tui/app_handlers_navigate.go:454`, `internal/resource/navigation.go:18` |
+| `GetFieldKeys(short) []string` | `fieldKeysRegistry` | `internal/tui/views/detail_fields.go:284` |
+| `ApplyFieldAliases(short, fields) map[string]string` | `fieldAliases` registry | `internal/tui/views/detail_fields.go:284` |
+| `GetRelated(short) []RelatedDef` | `relatedRegistry` map | `internal/tui/app_related.go:26` |
+| `GetNavigableFields(short) []NavigableField` | `navigableFieldsRegistry` map | `internal/tui/views/detail_fields.go:272` |
+| `GetIssueEnricher(short) IssueEnricher` | `IssueEnricherRegistry` map | wherever `internal/tui/` invokes Wave 2 enrichers (audit pre-PR) |
+
+The wrapper set must close every consumer the per-category PRs (04b–m) will strand by deleting `init()` calls. If any registry surface is missing from this list, the migrated category breaks the moment its `init()` is removed. Audit pre-PR with:
+
+```bash
+rg '^func\s+(Get|Find|All|Apply|Has)\w+\(' internal/resource/ internal/aws/issue_enrichment.go
+```
+
+Every public `Get*` / `Find*` / `All*` / `Apply*` / `Has*` accessor in those files must have a corresponding wrapper. The grep above is the audit gate; do not skip it.
+
+**Wrapper template:**
+
+```go
+func FindResourceType(name string) *ResourceTypeDef {
+    if t := catalog.Find(name); t != nil { return adaptCatalog(t) }
+    // fallback for short names not yet in catalog (only meaningful 04a–04m)
+    return findInLegacyRegistry(name)
+}
+
+func GetPaginatedFetcher(short string) PaginatedFetcher {
+    if t := catalog.Find(short); t != nil && t.Fetcher != nil { return t.Fetcher }
+    return legacyPaginatedFetchers[short]
+}
+// ... etc., one per wrapper above
+```
+
+After PR-04m, the fallback branch in every wrapper is unreachable; PR-04n deletes the fallbacks along with the legacy registry maps.
+
 **Files modified**
 
-- `internal/resource/registry.go` (or sibling) — `FindResourceType`, `AllResourceTypes`, `AllShortNames` become wrappers:
-  ```go
-  // before
-  func FindResourceType(name string) *ResourceTypeDef { /* iterate resourceTypes */ }
-  // after
-  func FindResourceType(name string) *ResourceTypeDef {
-      if t := catalog.Find(name); t != nil { return adaptCatalog(t) }
-      // fallback for short names not yet in catalog (only meaningful 04a–04m)
-      return findInLegacyRegistry(name)
-  }
+- `internal/resource/registry.go` (or new `internal/catalog/wrappers.go`) — adds every wrapper above.
+- **Consumer migration in this PR**: `internal/tui/app_fetchers.go`, `internal/tui/app_probes.go`, `internal/tui/app_related.go`, `internal/tui/views/detail_fields.go`, `internal/resource/navigation.go`, plus any other site found by:
+  ```bash
+  rg 'resource\.(GetPaginatedFetcher|FindResourceType|GetRelated|GetNavigableFields|AllShortNames|GetTypeByShortName|AllResourceTypes|GetIssueEnricher)\b' internal/
   ```
-  After PR-04m, the fallback branch is unreachable; PR-04n deletes it along with the legacy registry.
+  Every match either keeps using `resource.<API>` (which is now a wrapper) — acceptable, since the wrapper handles routing — or switches to `catalog.<API>` if the wrappers live in `internal/catalog/`. Pick one location and stick with it; do not split wrappers across two packages.
+- **Import-cycle audit**: `internal/catalog` imports `internal/domain` for the type aliases. `internal/resource` imports `internal/catalog` for wrappers. `internal/catalog` MUST NOT import `internal/resource` — verify with `go list -f '{{.Imports}}' github.com/k2m30/a9s/v3/internal/catalog | grep internal/resource` (expected: zero hits).
 - `Makefile` — `make generate` runs `go generate ./...` invoking `cmd/catalogen`; CI runs `make generate` then `git diff --exit-code`.
 - `internal/catalog/doc.go` — `//go:generate go run ../../cmd/catalogen` directive (catalog drives the generator, since catalog is the input).
 
@@ -174,8 +221,9 @@ make test
 4. Deletes `internal/resource/types_<category>.go` once the legacy `buildResourceTypes()` no longer references its function.
 5. For Wave 1 fetcher / Wave 2 enricher / related-def / navigable-field registrations: removes the `init()` calls in `internal/aws/<svc>*.go` for every type in this category. Replaces them with direct field assignments in the catalog struct literal. Each per-category PR shrinks `init()` count in `internal/aws/` for that category to zero.
 6. Deletes any `internal/aws/<svc>_issue_enrichment.go` file whose entire content was a `NoOpIssueEnricher` registration. (Files that contain real enricher functions stay; the function is now referenced from the catalog `Wave2` field.)
-7. Runs `make generate`. Verifies the generated markdown for this category is updated and committed.
-8. Updates the corresponding tests in `tests/unit/`. Most tests will be unaffected (they go through public APIs that now route via catalog wrappers); the ones that directly construct `ResourceTypeDef` literals or call legacy registration functions need migration. Estimated per-category test diff: 5–15 files, 100–300 lines.
+7. **Color → severity inline.** The new catalog `ResourceTypeDef` has no `Color` field. For every type in this category, delete the per-type `Color` helper (`func ec2Color`, `func rdsColor`, etc.) and replace `td.Color(r)` call sites in `internal/tui/views/` with `styles.SeverityStyle(rowSeverity(r, td))` — `internal/ui/styles/severity.go` is added in PR-04a alongside the catalog skeleton. The first per-category PR (04b) creates `internal/ui/styles/severity.go`; subsequent PRs reuse it.
+8. Runs `make generate`. Verifies the generated markdown for this category is updated and committed.
+9. Updates the corresponding tests in `tests/unit/`. Most tests will be unaffected (they go through public APIs that now route via catalog wrappers); the ones that directly construct `ResourceTypeDef` literals or call legacy registration functions need migration. Estimated per-category test diff: 5–15 files, 100–300 lines.
 
 **Per-PR exit criteria.** For category `<X>` in PR-04<X>:
 
@@ -323,15 +371,14 @@ rg 'parseMarkdownTable|attention-signals\.md' tests/unit/
 Mechanical-resource-implementation acceptance test passes (overview's program-wide criterion):
 - Cherry-pick a hypothetical CloudHSM resource type addition. Confirm the file set is exactly:
   - `internal/catalog/types_security.go` (one struct literal added to slice)
-  - `internal/transport/cloudhsm/fetch.go` (new; or `internal/aws/cloudhsm.go` until renamed)
-  - optionally `wave2.go`, `related.go`
+  - `internal/aws/cloudhsm.go` (new file: the paginated fetcher and any related/Wave2 functions referenced by the catalog literal)
   - `internal/demo/fixtures/cloudhsm.go`
   - `tests/unit/cloudhsm_*.go`
 - No `init()`, no `Register*`, no markdown edits, no `app.go` touches. `make generate` produces the markdown.
 
 ## Out of scope
 
-- Renaming `internal/aws/` → `internal/transport/`. The catalog references functions in their current location; if a rename is wanted, it's a post-Phase-04 mechanical PR.
+- Renaming `internal/aws/` → `internal/transport/`. **Decision: no rename, ever, in this program.** Earlier drafts deferred this to "post-refactor mechanical PR"; the deferral was never going to be cheap (323 files in `internal/aws/` today, all import paths in `internal/catalog/` and `internal/tui/` reference `internal/aws/...`) and the rename adds zero structural value beyond aesthetics. The catalog references functions at their `internal/aws/<svc>.go` paths permanently. If `internal/aws/` becomes a misleading name (because half the files are no longer "AWS clients" but generic transport), rename it then. Until then, leave it.
 - `internal/runtime` extraction. Phase 5a-extract.
 - Gen type unification. Phase 5a-gens.
 - Command/event message split. Phase 5b.
@@ -348,6 +395,6 @@ Mechanical-resource-implementation acceptance test passes (overview's program-wi
 |---|---|
 | Generator output changes during a PR but contributor forgets `make generate` | CI gate: `make generate && git diff --exit-code`. Pre-commit hook in `.git/hooks/pre-commit` invokes the same gate locally. |
 | Catalog struct gets unwieldy as fields accumulate | If `ResourceTypeDef` exceeds ~30 fields, split into nested sub-structs (`Display`, `Behavior`, `Pivots`). The struct literal stays readable; field grouping mirrors the documentation sections. |
-| Static `var ResourceTypes` requires all package imports of `internal/transport/<svc>` for function references — risk of import cycles | Catalog imports `internal/transport`; transport must not import catalog. If it does (e.g. for `ResourceTypeDef`), the type definition itself moves to a leaf package (`internal/domain` or `internal/types`) that both can depend on. |
+| Static `var ResourceTypes` requires `internal/catalog` to import `internal/aws/<svc>` for function references — risk of import cycle if `internal/aws/` ever imports `internal/catalog/` | Constraint: `internal/aws/` MUST NOT import `internal/catalog/`. Type definitions referenced from both sides (`PaginatedFetcher`, `IssueEnricher`, `RelatedDef`, `NavigableField`) live in the leaf `internal/domain/` package. Verify with `go list -f '{{.Imports}}' github.com/k2m30/a9s/v3/internal/aws | grep internal/catalog` (expected: zero hits). |
 | 22 NoOp enricher files contain non-trivial init logic that's not just registration | Audit before deletion: `cat internal/aws/<svc>_issue_enrichment.go` for each NoOp file. If the file has anything beyond a `registerIssueEnricher(short, NoOpIssueEnricher, prio)` call, defer that file's deletion to a separate cleanup. |
 | `cmd/catalogen` runs slowly because it imports the whole `catalog` package | This is fine — the generator runs at build time, not runtime. Slow generators are acceptable; runtime `init()` storms are not. |

@@ -1,6 +1,6 @@
 # Phase 03 — Canonical finding model
 
-**16 PRs. Mandatory. Depends on Phase 01 (`Severity` enum) and Phase 02 (`Session` owner).**
+**17 PRs. Mandatory. Depends on Phase 01 (`Severity` enum + `internal/domain` bootstrap) and Phase 02 (`Session` owner with exported fields).**
 
 ## Goal
 
@@ -71,7 +71,7 @@ type ResourceTypeDef struct {
 
 ## PR breakdown
 
-16 PRs total: 3 setup PRs (split for reviewability) + 12 per-category cutover + 1 cleanup.
+17 PRs total: 4 setup PRs (split for reviewability) + 12 per-category cutover + 1 cleanup.
 
 ### Resource entry points — the shim must cover every one
 
@@ -81,12 +81,15 @@ Resources enter view-visible state through several distinct paths. PR-03a-shim m
 |---|---|---|
 | Top-level fetcher result | `app_fetchers.go` `LoadResourcesMsg` handler → `ResourcesLoadedMsg` | wrap `[]Resource` before publishing into resource cache |
 | Wave 1 probe retention | `app_handlers_availability.go:124` `maps.Copy(m.probeResources, msg.Resources)` | derive across `msg.Resources` before `maps.Copy` |
+| Wave 2 enrichment result | `app_handlers_availability.go:340` `m.enrichmentFindings[msg.ResourceType] = msg.Findings` (the `EnrichmentCheckedMsg` handler) | derive across cached rows for the resource type *after* the parallel map is updated, so each row's `Findings` reflects the just-arrived Wave 2 results |
 | Cold-miss related prefetch (`CachedPages`) | `app.go:485` `m.resourceCache[shortName] = &resourceCacheEntry{resources: entry.Resources, ...}` | derive across `entry.Resources` before storing |
 | Lazy-add (`LazyAddedResources`) | `app.go:511` writes into `m.lazyResourceCache` | derive across each `extra` slice before storing |
 | Child-view fetcher result | `app_handlers_navigate.go` child fetch path | derive before passing to child `ResourceListModel` |
 | Detail enricher result (when it returns extra resources) | `EnrichDetailResultMsg` handler | derive before merging into resource state |
 
-Each entry point gets exactly one `attention.DeriveFindings` call. The shim is **idempotent**: calling it on a resource whose `Findings` is already populated is a no-op (early-return). After PR-03a-shim, the only ways a resource can reach view state without `Findings` populated are via direct test construction (acceptable; tests opt in) or via a missed entry point (a bug — covered by PR-03a-views' exit grep).
+Each entry point gets exactly one `attention.DeriveFindings` call. The shim is **deterministic, not early-return idempotent**: every call re-derives `r.Findings` and `r.AttentionDetails` from `r.Status` + `r.Issues` + the parallel `m.enrichmentFindings` map. Re-derivation is harmless on Wave-1-only paths (same inputs, same outputs) and *required* on the Wave 2 path (the parallel map's contents change when `EnrichmentCheckedMsg` arrives, and the shim must re-merge to surface them).
+
+After PR-03a-shim, the only ways a resource can reach view state without `Findings` populated are via direct test construction (acceptable; tests opt in) or via a missed entry point (a bug — covered by PR-03a-views' exit grep).
 
 ### PR-03a-types — Domain and projection types only
 
@@ -99,7 +102,7 @@ Each entry point gets exactly one `attention.DeriveFindings` call. The shim is *
 
 **Files modified**
 
-- `internal/resource/resource.go` — add `Findings []Finding` and `AttentionDetails map[FindingCode]AttentionDetail` fields. `Status` and `Issues` stay untouched.
+- `internal/domain/resource.go` — add `Findings []Finding` and `AttentionDetails map[FindingCode]AttentionDetail` fields. `Status` and `Issues` stay untouched. (Phase 01 moved the struct body here; `internal/resource/resource.go` is the alias and is not edited.)
 - `internal/resource/types.go` — add `LifecycleKey string` field to `ResourceTypeDef`.
 - All 12 `internal/resource/types_*.go` files — set `LifecycleKey` on every type def. Empty string defaults to `"state"`. Audit which types use a non-default key.
 
@@ -107,7 +110,7 @@ Each entry point gets exactly one `attention.DeriveFindings` call. The shim is *
 
 ```bash
 # Fields exist on Resource:
-rg 'Findings\s+\[\]\w+\.Finding|AttentionDetails\s+map' internal/resource/resource.go
+rg 'Findings\s+\[\]\w+\.Finding|AttentionDetails\s+map' internal/domain/resource.go
 # expected: present
 
 # LifecycleKey is set (or explicitly empty-default) on every type def:
@@ -131,12 +134,13 @@ make test
 
 **Files added**
 
-- `internal/semantics/attention/derive.go` — `func DeriveFindings(r *Resource, td ResourceTypeDef)`. Reads `r.Status`, `r.Issues`, and any cached `EnrichmentFinding`. Synthesizes a `FindingCode` from a per-type lookup table built before the per-category PR for that type begins. **Never writes back to `Status`/`Issues`. Idempotent: returns immediately if `r.Findings` is already populated.**
+- `internal/semantics/attention/derive.go` — `func DeriveFindings(r *Resource, td ResourceTypeDef, enrichmentFindings map[string]EnrichmentFinding)`. Reads `r.Status`, `r.Issues`, and the supplied `enrichmentFindings` (keyed by resource ID; the caller passes the relevant slice of `m.enrichmentFindings`). Synthesizes a `FindingCode` from a per-type lookup table built before the per-category PR for that type begins. **Never writes back to `Status`/`Issues`. Deterministic: re-derives `r.Findings` and `r.AttentionDetails` from inputs each call — no early-return.** Re-derivation is safe because the inputs are the legacy fields and the parallel map; same inputs yield same outputs. The Wave 2 bridge depends on this: it calls `DeriveFindings` after `m.enrichmentFindings[type]` has been updated, and the shim must re-merge — an early-return on "Findings already populated" would skip the merge.
 
 **Files modified**
 
 - `internal/tui/app_fetchers.go` — wrap fetcher results: derive across `[]Resource` before publishing.
 - `internal/tui/app_handlers_availability.go` (around line 124) — derive across `msg.Resources` before `maps.Copy(m.probeResources, ...)`.
+- `internal/tui/app_handlers_availability.go` (around line 340, the `EnrichmentCheckedMsg` handler) — after writing `m.enrichmentFindings[msg.ResourceType] = msg.Findings`, walk the cached rows of that type and call `DeriveFindings` on each, so each row picks up the just-arrived Wave 2 results. This is the bridge until PR-03a-fold deletes the parallel map and writes findings directly.
 - `internal/tui/app.go` (around line 485) — derive across `entry.Resources` from `CachedPages` before writing to `m.resourceCache`.
 - `internal/tui/app.go` (around line 511) — derive across `extra` from `LazyAddedResources` before writing to `m.lazyResourceCache`.
 - `internal/tui/app_handlers_navigate.go` — child-view fetcher path: derive before passing resources to the child list.
@@ -147,11 +151,11 @@ make test
 ```bash
 # Every entry point calls DeriveFindings:
 rg 'attention\.DeriveFindings\b' internal/tui/
-# expected: exactly six call sites (one per entry-point row above; commit message must list them)
+# expected: exactly seven call sites (one per entry-point row above; commit message must list them)
 
-# Shim itself is idempotent:
-rg 'len\(r\.Findings\) > 0' internal/semantics/attention/derive.go
-# expected: present (the early-return guard)
+# Shim is deterministic, not early-return idempotent:
+rg 'len\(r\.Findings\)\s*>\s*0' internal/semantics/attention/derive.go
+# expected: zero hits — the shim must re-derive on every call so the Wave 2 bridge works.
 
 # No code path injects resources into a cache without going through derive:
 # Manual audit: grep for assignments into m.resourceCache, m.lazyResourceCache, m.probeResources
@@ -199,6 +203,74 @@ Behavior verification:
 - `make test` and `make test-race` pass.
 
 **Independently revertable**: yes — but reverting requires reverting tests/unit/ updates too. Cleaner: revert the full PR atomically.
+
+---
+
+### PR-03a-fold — Wave 2 row mutation; delete the parallel `m.enrichmentFindings` map
+
+**Goal.** Replace the parallel `m.enrichmentFindings map[string]map[string]EnrichmentFinding` with direct mutation of cached rows. The `EnrichmentCheckedMsg` handler stops writing to the parallel map and instead walks `m.ResourceCache[resourceType]` (and any sibling caches: `lazyResourceCache`, `probeResources`), updating each row's `Findings` and `AttentionDetails` in place. Views, which already read `r.Findings` after PR-03a-views, immediately reflect the post-enrichment state without a parallel-map lookup.
+
+**Why this is its own PR (and not folded into 03a-views).** Reviewer P1 #2: if PR-03a-views ships without a Wave 2 row-mutation path, post-enrichment findings disappear from list/detail rendering between 03a-views landing and the per-category PRs replacing the legacy enrichers. PR-03a-shim mitigates this by deriving `Findings` from the parallel map at every entry point, including `EnrichmentCheckedMsg` — but the shim is a bridge, not the destination. PR-03a-fold makes direct row mutation the structural pattern; from then on, *every* Wave 2 enricher in the per-category PRs writes via the same fold path.
+
+**The fold function.**
+
+```go
+// internal/runtime/fold.go (or internal/tui/app_enrich.go for now;
+// moves to internal/runtime/ in PR-05a-extract)
+
+// applyEnrichment merges Wave 2 findings into every cached row of the given
+// resource type. Replaces the row's Wave 2 findings (Source == "wave2:*")
+// with the new set; preserves Wave 1 findings (Source == "wave1") in place.
+// Bumps a generation counter so views re-render. Returns the set of caches
+// touched, for the handler to dispatch downstream UI updates.
+func (m *Model) applyEnrichment(
+    resourceType string,
+    perResource map[string][]Finding,             // resource ID → new wave 2 findings
+    perResourceAttn map[string]map[FindingCode]AttentionDetail,
+)
+```
+
+**Files added**
+
+- `internal/tui/app_enrich_fold.go` (or extension to `app_handlers_availability.go`) — `applyEnrichment` defined as documented above.
+
+**Files modified**
+
+- `internal/tui/app_handlers_availability.go` — the `EnrichmentCheckedMsg` handler stops writing to `m.EnrichmentFindings` (now uppercase from PR-02a) and instead calls `m.applyEnrichment(...)`. The downstream `SetEnrichmentState` calls on `ResourceListModel` and `DetailModel` views read from updated cache rows; the `msg.Findings` argument is no longer plumbed through view APIs (or it stays for backward-compat, with views ignoring it — confirm during PR review).
+- `internal/tui/views/resourcelist.go` — `SetEnrichmentState`'s third argument (the `findings` map) becomes vestigial; either drop the argument here OR keep it accepted-but-ignored until PR-03n removes the API entirely. Pick one and stick with it for the per-category PRs that follow.
+- `internal/session/session.go` — delete the `EnrichmentFindings map[string]map[string]EnrichmentFinding` field from `Session`. Its purpose is gone.
+- `internal/semantics/attention/derive.go` — remove the `EnrichmentCheckedMsg` derivation branch added in PR-03a-shim. It is now dead code: cached rows already have post-enrichment `Findings` written directly. Other shim branches (Wave 1 fetcher path, probe path, etc.) stay until per-category PRs migrate them.
+
+**Files deleted (symbols)**
+
+- `Session.EnrichmentFindings` field.
+- Any helper that read or constructed the parallel map (e.g. `getEnrichmentFindingsFor(resourceType, resourceID)`).
+
+**Exit criteria**
+
+```bash
+# Parallel map is gone:
+rg '\bEnrichmentFindings\b' internal/
+# expected: zero hits — neither field nor parameter
+
+# Fold function exists and is the sole writer for Wave 2 results into rows:
+rg 'applyEnrichment\b' internal/tui/
+# expected: definition + at least one call site (the EnrichmentCheckedMsg handler)
+
+# Shim's enrichment branch is dead code, removed:
+rg 'EnrichmentChecked|enrichmentFindings' internal/semantics/attention/derive.go
+# expected: zero hits
+
+# View renders pull from r.Findings, not a separate map argument:
+rg 'SetEnrichmentState\(' internal/tui/views/
+# expected: the function may still exist transitionally, but its body reads r.Findings — no map dereference
+```
+
+Behavior verification:
+- `./a9s --demo`: trigger Wave 2 enrichment (cmd: `:enrich`) on every resource type that has an enricher. List view shows post-enrichment phrases on each affected row; detail view shows attention rows. Snapshot tests for ec2 / rds / sg / iam-role / alarm regenerate-and-match.
+- `make test-race` passes — race detector is the critical guard for the new in-place row-mutation path; concurrent enrichment + render must be safe.
+
+**Independently revertable**: yes. Reverting restores the parallel map and the shim's enrichment-derivation branch; the cached rows lose their Wave 2 `Findings` but the shim re-populates from the parallel map. PR-03a-views remains landed.
 
 ---
 
@@ -268,7 +340,7 @@ Behavior verification:
 
 **Files modified**
 
-- `internal/resource/resource.go` — delete `Status`, `Issues` fields.
+- `internal/domain/resource.go` — delete `Status`, `Issues` fields. (`internal/resource/resource.go` is still just the alias.)
 - `internal/resource/enrichment.go` — either delete entirely (if all consumers now use `Finding` + `AttentionDetail`), or shrink to a deprecation alias if there's a transitional consumer not yet migrated.
 
 **Files deleted**
@@ -281,11 +353,11 @@ Behavior verification:
 
 ```bash
 # Status field is gone:
-rg '\bStatus\s+string\b' internal/resource/resource.go
+rg '\bStatus\s+string\b' internal/domain/resource.go
 # expected: zero hits
 
 # Issues field is gone:
-rg '\bIssues\s+\[\]string\b' internal/resource/resource.go
+rg '\bIssues\s+\[\]string\b' internal/domain/resource.go
 # expected: zero hits
 
 # (+N) algebra deleted:
@@ -348,3 +420,5 @@ If those three uses don't materialize in Phase 04, `FindingDef` is wasted indire
 | Shim derives wrong code for a Wave 2 finding because original `Summary` text drifted | The shim uses a fixed lookup table from known Summary phrases to codes (built per category before the per-category PR begins). New findings in the migrated path bypass the shim entirely. |
 | Tests assert on `r.Status` content | All test conversions land in PR-03a alongside view conversions. `tests/unit/` greps for `r.Status` / `res.Status` / `Status:` and updates them all to `Findings[0].Phrase` / `Fields[lifecycle key]`. |
 | `EnrichmentFinding.Rows` content gets lost during migration | The shim populates `AttentionDetails` from existing `EnrichmentFinding.Rows` for every type. Each per-category PR confirms detail-view rendering matches before stopping shim coverage. Detail-view tests assert on specific row labels and values, providing per-resource regression guards. |
+| **Cache YAML format break: `~/.a9s/cache/<profile>--<region>.yaml` may serialize `Resource.Status` / `Resource.Issues`.** Deleting these fields in PR-03n changes the on-disk schema. Existing user caches become unreadable. | **Audit before PR-03n**: grep `internal/aws/cache*` for `yaml.Marshal`/`yaml.Unmarshal` against `Resource`. If `Status`/`Issues` are persisted, choose one: (a) treat the cache as disposable on upgrade — bump a cache version and clear stale files at startup with a one-line user notice; or (b) keep `Status`/`Issues` as deprecated fields written *only* during YAML serialization (a one-way derive on the way out, mirroring the shim on the way in) and stripped at the next cache rebuild. Decide in PR-03n's design and cite the chosen approach in the PR description. |
+| Per-category file globs (`internal/aws/<x-services>*.go`) don't match a flat directory | `internal/aws/` is flat — there are no per-category file prefixes. The per-category PR template above writes globs as `<x-services>*.go` for shorthand; in practice each per-category PR ships with an explicit file manifest in its description. The reference manifest is the one currently embedded in `internal/resource/types_<category>.go` (the resource type defs name their fetcher functions; reverse-resolve to source files). Do not let the grep-style exit criteria lull a reviewer into expecting a glob to work — the manifest is authoritative. |
