@@ -17,7 +17,7 @@ The motivation for bundling these into one PR is structural: if `DetailProjector
 - `internal/domain/severity.go` — `Severity` enum (`SevOK | SevWarn | SevBroken | SevDim`), `IsIssue()` method. No presentation imports.
 - `internal/domain/resource.go` — `Resource` struct, **moved** from `internal/resource/resource.go`. Same fields (`ID`, `Name`, `Status`, `Issues`, `Fields`, `RawStruct`) — the migration of `Status` / `Issues` to `Findings` is Phase 03's concern, not this phase's.
 - `internal/domain/projection.go` — `Section`, `Item`, and the `DetailProjector func(domain.Resource) []domain.Section` type declaration. Type declarations only.
-- `internal/domain/contracts.go` — type declarations for every shared contract the catalog references in Phase 04. Function signatures: `PaginatedFetcher`, `FilteredPaginatedFetcher`, `PaginatedChildFetcher`, `RevealFetcher`, `FetchByIDsFn`, `IssueEnricher` / `IssueEnricherFunc`, `DetailEnricher`, `RelatedChecker`. Struct types: `Column`, `ChildViewDef`, `RelatedDef`, `NavigableField`, `FetchResult`, `ParentContext`, `ResourceCache`. Currently scattered across `internal/resource/types.go` (`Column`, `ChildViewDef`), `internal/resource/registry.go` (`ParentContext` and the function types), `internal/resource/related.go` (`RelatedDef`, `RelatedChecker`, `ResourceCache`), `internal/resource/enricher.go` (`DetailEnricher`), `internal/resource/pagination.go` (`FetchResult`), and `internal/aws/issue_enrichment.go` (`IssueEnricherFunc`). Move the declarations into `internal/domain/contracts.go`; implementations, registry maps, and registration functions stay where they are. Each original file keeps a `type X = domain.X` re-export alias so existing call sites compile without churn. The aliases die with the legacy registry in PR-04n.
+- `internal/domain/contracts.go` — type declarations for every shared contract the catalog and runtime reference in later phases. Function signatures: `PaginatedFetcher`, `FilteredPaginatedFetcher`, `PaginatedChildFetcher`, `RevealFetcher`, `FetchByIDsFn`, `IssueEnricher` / `IssueEnricherFunc`, `DetailEnricher`, `RelatedChecker`. Struct/types: `Column`, `ChildViewDef`, `RelatedDef`, `NavigableField`, `FetchResult`, `ParentContext`, `ResourceCache`, `CapabilityID`, and the shared query-contract declarations (`QueryFilter`, `TimeRange`, `Cursor`, `QueryLimit`, `QuerySpec`). Currently scattered across `internal/resource/types.go` (`Column`, `ChildViewDef`), `internal/resource/registry.go` (`ParentContext` and the function types), `internal/resource/related.go` (`RelatedDef`, `RelatedChecker`, `ResourceCache`), `internal/resource/enricher.go` (`DetailEnricher`), `internal/resource/pagination.go` (`FetchResult`), and `internal/aws/issue_enrichment.go` (`IssueEnricherFunc`). Move the declarations into `internal/domain/contracts.go`; implementations, registry maps, and registration functions stay where they are. Each original file keeps a `type X = domain.X` re-export alias so existing call sites compile without churn. The aliases die with the legacy registry in PR-04n.
 
   Without this move, `internal/catalog` would have to import `internal/resource` and `internal/aws` for the type names, recreating the cycle Phase 01 exists to break.
 
@@ -25,6 +25,7 @@ The motivation for bundling these into one PR is structural: if `DetailProjector
 
 - `internal/semantics/projection/generic.go` — the default projector implementation; reads `Resource.Fields` and reflects over `RawStruct` per the existing detail-view logic. Returns `[]domain.Section`. Imports `internal/domain` only.
 - `internal/semantics/ctevent/` — entire `internal/aws/ctdetail/` directory **moved** here. Exposes `Project(domain.Resource) []domain.Section`. Imports `internal/domain` only.
+- `internal/semantics/selector/` — shared matcher home for non-trivial resource-selection semantics. Minimum contract: `type Matcher interface { Matches(domain.Resource) bool }`. Initial constructors cover wildcard ARN matching and tag-condition matching so future related/checker work does not re-invent string matching in place.
 
 ### Existing layers (modified)
 
@@ -64,7 +65,9 @@ This phase ships as **one PR**. The work is tightly coupled (`Severity` must exi
 - `internal/domain/severity.go` — `Severity` enum + `IsIssue()` (~30 LOC)
 - `internal/domain/resource.go` — `Resource` struct moved from `internal/resource/resource.go` (~25 LOC)
 - `internal/domain/projection.go` — `Section`, `Item`, `DetailProjector` type declarations (~40 LOC)
+- `internal/domain/contracts.go` — shared catalog/runtime contract declarations (including `CapabilityID` and query-spec types) (~60 LOC)
 - `internal/semantics/projection/generic.go` — default projector implementation, returns `[]domain.Section` (extracted from current `detail_fields.go` Fields/RawStruct logic) (~150 LOC)
+- `internal/semantics/selector/` — matcher home (`Matcher` interface plus initial wildcard/tag matchers) (~80 LOC)
 - `internal/semantics/ctevent/` — entire `internal/aws/ctdetail/` directory, moved
 - `internal/semantics/ctevent/projector.go` — wraps existing `BuildSections` to return `[]domain.Section`
 
@@ -168,6 +171,7 @@ A PR is mergeable only when all of these are true. Verification commands run fro
 - `Finding`, `FindingCode`, `AttentionDetail` types. Phase 03.
 - `Resource.Status` removal or `(+N)` algebra. Phase 03.
 - Catalog migration or generator binaries. Phase 04.
+- Query/evidence screens (logs, CloudTrail search/debug, cost views). `DetailProjector` is for rendering one resource's detail payload, not for time-bounded searches or multi-step investigation UIs. Those land on the runtime/screen contracts in Phase 05.
 - `internal/transport/<svc>/` package layout. The `internal/aws/ctdetail/` directory MOVES to `internal/semantics/ctevent/` in this phase (because it stops being a transport concern and becomes a semantics-layer concern), but `internal/aws/<svc>.go` fetcher files stay where they are. **Decision: `internal/aws/` is not renamed in this program** (see `04-catalog.md` "Out of scope").
 - Removing package globals (IAM policies, identity cache, SES rule sets). Phase 02 (was previously listed as Phase 03 — Phase 02 is the session-owner phase that closes the global-cache boundary).
 - Deleting per-category `Color` functions. They co-exist with `Severity` through this phase. Phase 04 per-category PRs collapse them inline (the new catalog struct has no `Color` field).

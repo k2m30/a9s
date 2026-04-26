@@ -24,6 +24,20 @@ Specifically, after this refactor:
 - Zero package-globals in `internal/aws/`. Caches are session-owned; transport receives narrow capability interfaces.
 - Zero `if shortName == "x"` branches in dispatch code. Per-type behavior is declarative.
 - Zero per-category `Color` functions. A single `styles.SeverityStyle(domain.Severity) lipgloss.Style` mapping is the only severity-to-presentation translator. (Migrated inline by Phase 04 per-category PRs; no standalone PR.)
+- A future desktop renderer can be added as an adapter on top of the same app core; it does not require rewriting orchestration, selectors, queries, tasks, or session logic.
+
+## Issue-driven target amendments
+
+As of **2026-04-26**, the open issue set shows architectural pressure that goes beyond cleanup of today's legacy wiring. These are amendments to the target architecture, not new standalone phases in this program:
+
+- **Cross-cutting capabilities are separate from the resource catalog.** `internal/catalog` remains resource-shaped metadata. Logs, CloudTrail investigation, cost views, and any future action system do not accrete as ad-hoc behavior fields on `ResourceTypeDef`; catalog entries declare support via `Capabilities []domain.CapabilityID`, while implementations live in explicit capability modules. Pressure: #18, #20, #21, #60, #63, #73, #112.
+- **Query/evidence views are first-class contracts.** Time-bounded searches, event/debug views, log streams, and cost breakdowns are not disguised as plain resource lists or child views. They use explicit query specs (`Filter`, `TimeRange`, `Cursor`, `Limit`) with their own pagination and cache semantics; the shared type declarations live in `internal/domain`. Pressure: #18, #20, #60, #112.
+- **Selector/matcher logic is shared semantics, not checker-local string code.** Wildcard ARN matching, tag-condition matching, and future resource-selection predicates are modeled in `internal/semantics/selector/` and reused by related-checkers and coverage logic. Pressure: #296, #297.
+- **Slow work uses one background-task contract.** Enrichment, related resolution, log-source discovery, and future query scans report progress, support cancellation, define cache policy, and surface partial completion the same way. Pressure: #21, #261, #292, #293.
+- **Screen registration is declarative.** New deep views register screen descriptors with runtime; they do not require growing central type switches in the UI shell. Pressure: #18, #60, #112, #206.
+- **Feature paths must be test-bounded.** Every new capability must admit unit/demo coverage and a bounded live smoke path; no feature may require an unbounded full-account crawl to be considered validated. Pressure: #253, #293.
+- **Shared app core is renderer-agnostic.** Bubble Tea is a TUI adapter, not the architectural center. Future desktop delivery must be able to drive the same core through plain Go/domain contracts without importing Bubble Tea into shared packages. Candidate adapter paths include a Go-first shell such as Wails, a Tauri shell with a Go sidecar, or an Electron-like shell. This program chooses the seam, not the product.
+- **Mutating actions, if ever accepted, live behind an explicit action layer.** They do not leak into the read-only browsing core or silently reuse read-path contracts. Pressure: #63.
 
 ## Phase summary
 
@@ -75,13 +89,17 @@ These are non-negotiable. A PR that violates any of these is wrong, regardless o
 
 3. **Stable IDs, not display strings, for keys.** `FindingCode` keys `AttentionDetails`, never `Finding.Phrase`. Phrase is display text and may change without the underlying finding changing.
 
-4. **Severity is domain, color is presentation.** `domain.Severity` is the typed enum (`SevOK | SevWarn | SevBroken | SevDim`); `lipgloss.Style` mappings live in `internal/ui/styles/`. `IsIssue()` is a method on `Severity`, not on `Color`.
+4. **Severity is domain, color is presentation.** `domain.Severity` is the typed enum (`SevOK | SevWarn | SevBroken | SevDim`). Each renderer adapter owns its own severity-to-presentation mapping; the TUI adapter's `domain.Severity -> lipgloss.Style` mapping lives in `internal/tui/styles/`. `IsIssue()` is a method on `Severity`, not on `Color`.
 
 5. **Compile-time codegen, not runtime `init()`.** Generated files (markdown specs) are checked in, diffable, reviewable. CI runs the generator and fails if output drifts from the committed file. **End state**: zero `init()` in feature wiring. **Migration window**: during Phase 04, legacy `init()`-based registrations in unmigrated categories continue to fire — this is in-flight migration, not a permanent state. PR-04n's exit criterion is the moment "zero `init()`" becomes structurally true.
 
 6. **No package-globals in `internal/aws/`.** Capability interfaces flow from runtime. `internal/aws/` (the transport package, name unchanged in this program) never imports `internal/session`.
 
 7. **Views stay passive.** Views render state and emit messages. They do not consume use-case interfaces. The runtime/UI boundary is between the message handlers and the view layer, not between the views and a service API.
+
+8. **Features are test-bounded.** Every new capability lands with (a) unit coverage, (b) demo-mode coverage, and (c) a bounded live smoke path that completes in under 60s on a representative account. A feature that requires an unbounded full-account crawl to be considered "validated" is architecturally wrong.
+
+9. **Shared core contracts are platform-agnostic.** `internal/domain`, `internal/runtime`, `internal/session`, `internal/aws`, `internal/catalog`, and `internal/semantics/*` must not depend on Bubble Tea, browser/DOM APIs, Electron, or renderer-specific IPC types. `internal/tui` is the Bubble Tea adapter and may translate those concerns at the boundary.
 
 ## How to use this folder
 
