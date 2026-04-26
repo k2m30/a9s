@@ -17,9 +17,30 @@ This phase also introduces `domain.Severity` — the typed enum used by every su
 - `internal/semantics/projection/generic.go` — the default projector; reads `Resource.Fields` and reflects over `RawStruct` per the existing detail-view logic.
 - `internal/tui/views/detail_render.go` — refactored to consume `[]projection.Section` regardless of resource type. ct-events branches deleted.
 
+## FieldItem audit — what `Section` and `Item` must carry
+
+Before scoping PR-01, the existing detail-view pipeline (`internal/fieldpath/extract.go` + `internal/tui/views/detail_fields.go`) carries the following metadata on each `FieldItem`. The new `Section`/`Item` abstraction must preserve every one of these:
+
+| Behavior | Where it lives today | New home |
+|---|---|---|
+| Navigability flag (`Underline + Enter → RelatedNavigateMsg`) | `FieldItem.Navigable` | `Item.Navigable bool` |
+| Target type for navigation (`"vpc"`, `"role"`, etc.) | `FieldItem.TargetType` | `Item.TargetType string` |
+| Section / sub-section / spacer tagging | `FieldItem.Kind` (Field, Header, Subfield, Spacer) | `Section.Items[].Kind` enum |
+| Nav ID overrides via `resource.NavIDFromValue` | applied in `buildFieldList` (`detail_fields.go`) | applied in `projection.Generic` and projector wrappers |
+| Tag flattening (each tag becomes its own row) | `flattenTags` in `detail_fields.go` | helper in `projection/generic.go` |
+| Embedded JSON expansion (e.g. policy documents) | `expandJSON` branch in `detail_fields.go` | helper in `projection/generic.go` |
+| Wave 2 attention injection (leading "Background Check" section) | `injectAttention` in `detail_fields.go` | rendered separately by detail view; projector returns a "main" `[]Section`, attention is layered above (NOT a section returned by `Project`) |
+| ct-event color tiers (`"!"`, `"~"`, `"impaired"`, `"initializing"`, `"ct-danger"`, `"ct-attention"`, `"ct-info"`) | `FieldItem.Tier` string | `Item.Tier string` (same string vocabulary; `TierColorStyle` already maps to lipgloss) |
+| List-typed scalar extraction (e.g. `Subnets.SubnetId` first element) | `fieldpath.ExtractFirstListScalar` | unchanged; called from `projection.Generic` |
+| Per-type field ordering and inclusion (per `~/.a9s/views/<type>.yaml`) | `ViewsConfig` consulted in `buildFieldList` | `projection.Generic` reads same config |
+
+**Out of `Section` / `Item`**: Wave 2 attention rendering remains a separate path. The detail view first renders `r.AttentionDetails` as the "Background Check" section (when present), THEN renders `td.Project(r)` (or `projection.Generic(r)` if nil) below it. The projector is responsible for *core* fields only. This keeps the projector's contract simple — it doesn't need to know about Wave 2 — and matches today's `injectAttention` placement.
+
+Implication: PR-01 scope is larger than the original 10–15 file estimate. Realistic surface is **25–40 files**, including `fieldpath` test updates, `detail_*_test.go` updates that assert on `FieldItem` shape, and the per-feature helpers above. If any audit row turns out to require deep restructuring (e.g. JSON expansion produces sub-trees instead of flat rows), defer that row to a follow-up PR-01-followups in the same phase.
+
 ## PR breakdown
 
-This phase ships as **one PR**. The work is small enough (~10–15 files) and tightly coupled enough that splitting it produces dependency confusion (`Severity` must exist before `Item.Severity`, `Section` must exist before the renderer change) without enough size to justify the overhead.
+This phase ships as **one PR**. The work is tightly coupled (`Severity` must exist before `Item.Severity`, `Section` must exist before the renderer change), and the per-feature helpers in the audit above all touch the same rendering path. Splitting produces dependency confusion without size benefit.
 
 ### PR-01 — Introduce projection hook
 
@@ -107,6 +128,7 @@ A PR is mergeable only when all of these are true. Verification commands run fro
 
 | Risk | Mitigation |
 |---|---|
-| Generic projector loses fidelity for some resource type that currently has implicit special-casing in `detail_fields.go` | Audit `detail_fields.go` for any per-type field-ordering or formatting logic before deleting; lift it into `projection.Generic` if found. The grep target is `if .*Type == "` and `switch .*Type` patterns within detail-rendering code. |
+| Generic projector loses fidelity for some resource type that currently has implicit special-casing in `detail_fields.go` | The audit table above is the explicit list. Each row is a feature the projector path must preserve. PR-01 verifies each by running detail-view tests; any feature failing the test gates the PR. |
+| FieldItem behaviors don't all map cleanly to `Section`/`Item` (e.g. JSON expansion produces a tree where `Item` is flat) | If any row in the audit fails to fit, defer that row's migration to a follow-up PR within Phase 01. The audit is the truth; the abstraction adapts to it, not vice versa. |
 | ct-events `Section` shape doesn't perfectly match `projection.Section` | Compare `internal/aws/ctdetail/types.go` `Section` definition with the new `projection.Section`; if they differ, adjust the new type to be a strict superset and provide a one-line adapter in `ctevent/projector.go`. |
 | `Severity` enum collides with existing `Color` symbols at call sites | Land `Severity` and `Color` side by side in this phase. `Color` stays in `internal/resource/`. Phase 03 promotes `Severity` to canonical; this phase is additive. |
