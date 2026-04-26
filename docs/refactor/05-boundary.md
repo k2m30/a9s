@@ -2,6 +2,8 @@
 
 **3 PRs, all mandatory. Depends on Phase 04 (catalog).**
 
+The Color → severity collapse is handled inline in Phase 04 per-category PRs (the new catalog struct has no `Color` field; per-category PRs replace `td.Color(r)` call sites with `styles.SeverityStyle(rowSeverity(r, td))` in the same PR that builds the catalog literal). No standalone 5a-color PR is needed.
+
 ## Goal
 
 Close the runtime/UI boundary. Right now `internal/tui/` owns three things at once: the view stack and key handling (UI shell), the message handlers and orchestration (runtime), and the embedded session state (data). This phase splits them.
@@ -104,7 +106,7 @@ This preserves today's stack-walking semantics — every matching view in the st
 
 **Files modified**
 
-- `internal/tui/app.go` (currently 28 KB) — shrinks to ~3–5 KB. Holds `tui.Model` with view stack, key resolver, current `RuntimeState`. `Update(msg)` calls `runtime.HandleMsg(msg, &state)` and updates the view stack; nothing else.
+- `internal/tui/app.go` (currently ~880 lines / ~28 KB) — shrinks substantially. Realistic target: **300–400 lines**. The shell still owns view stack management, key resolver wiring, the `RuntimeState` field, the `Update` loop's intent-application code, and `View()` rendering. The earlier draft's "under 200 lines" target was unrealistic given those responsibilities; calibrate to 300–400 instead and verify post-PR.
 - `internal/tui/app_input.go` — stays in tui (input mode is UI concern).
 - `internal/tui/app_handlers*.go` — content moved to `internal/runtime/`; files deleted from `internal/tui/`.
 - `cmd/a9s/main.go` — wires `runtime.New(session.New(), catalog.ResourceTypes)` and passes the orchestrator to `tui.New()`.
@@ -136,7 +138,7 @@ rg 'func.*HandleMsg' internal/runtime/
 
 # tui/app.go is small:
 wc -l internal/tui/app.go
-# expected: under 200 lines (was ~700)
+# expected: 300–400 lines (was ~880)
 ```
 
 Behavior verification:
@@ -241,7 +243,7 @@ rg 'type \w+ struct' internal/runtime/event/types.go
 
 ## Out of scope
 
-- Renaming `internal/aws/` → `internal/transport/`. Mechanical, post-refactor.
+- Renaming `internal/aws/` → `internal/transport/`. **Decision: no rename, ever, in this program** (see `04-catalog.md` "Out of scope" for rationale). `internal/aws/` is the permanent home of transport functions.
 - Further view-layer reorganization (`views/shell/`, `views/components/`). Cosmetic; defer.
 - Theme system overhaul. Out of refactor scope.
 
@@ -249,7 +251,7 @@ rg 'type \w+ struct' internal/runtime/event/types.go
 
 - **Depends on Phase 02**: `Session` exists as a clean type — un-embedding from `tui.Model` is mechanical.
 - **Depends on Phase 04**: catalog is the source of truth that the runtime reads; no registry-coupling concerns at this point.
-- **Closes the program**: when 05a-extract and 05a-gens land, the mechanical-resource-implementation acceptance test from `00-overview.md` is the final exit criterion. 05b is optional polish.
+- **Closes the program**: when all three PRs land (5a-extract, 5a-gens, 5b), the mechanical-resource-implementation acceptance test from `00-overview.md` is the final exit criterion.
 
 ## Risk register
 
