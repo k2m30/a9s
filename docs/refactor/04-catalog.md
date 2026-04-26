@@ -8,6 +8,7 @@ Replace the `Register*` API with a static, declarative `internal/catalog` packag
 
 - `var ResourceTypes = []ResourceTypeDef{...}` is the single source of truth for every resource type.
 - Each `ResourceTypeDef` literal carries direct function references for `Fetcher`, `Wave2`, `Project`, `Related`, `Navigable`, plus declarative tables for `Findings []FindingDef`, `Columns`, `Children`, `LifecycleKey`, `CloudTrail`, etc.
+- `internal/catalog` remains **resource-shaped metadata only**. Cross-cutting capabilities such as logs, investigation/search workflows, cost views, and any future action system do not accrete as behavior handlers on `ResourceTypeDef`; the only catalog-side hook is declarative support metadata (`Capabilities`), while implementations bind separately by resource type.
 - `cmd/catalogen` is a `go generate`–driven binary that emits **markdown only** — no generated Go code:
   - `docs/attention-signals.md`, `docs/related-resources.md`, `docs/resources/<short>.md` — generated specs.
   - Catalog-backed wrappers (PR-04a) handle legacy-registry compatibility at runtime; there is no generated `internal/aws/registry_generated.go`.
@@ -62,6 +63,7 @@ type ResourceTypeDef struct {
     DetailEnrich DetailEnricher  // optional; e.g. policy-doc fetch
 
     // Cross-cutting
+    Capabilities         []domain.CapabilityID  // opt-in to logs, ct-investigate, cost, actions; handlers live outside catalog
     CloudTrailKey         string
     ExcludeFromIssueBadge bool
     StubCreator           func(string) domain.Resource
@@ -83,6 +85,8 @@ var ResourceTypes = []ResourceTypeDef{
     // ... populated per-category in PR-04b onward
 }
 ```
+
+Boundary rule: if behavior is intrinsic to a resource type's list/detail/reveal/related/navigation metadata, it belongs in `ResourceTypeDef`. If it is a cross-cutting capability with its own screens, queries, or task model (logs, CloudTrail investigation, cost analysis, future actions), it gets its own module keyed by resource type, not another optional behavior field on the catalog struct. The one catalog-side hook is `Capabilities []domain.CapabilityID`: declarative support metadata only. Runtime uses that opt-in list when dispatching to capability modules in Phase 05.
 
 ## PR breakdown
 
@@ -379,6 +383,7 @@ Mechanical-resource-implementation acceptance test passes (overview's program-wi
 ## Out of scope
 
 - Renaming `internal/aws/` → `internal/transport/`. **Decision: no rename, ever, in this program.** Earlier drafts deferred this to "post-refactor mechanical PR"; the deferral was never going to be cheap (323 files in `internal/aws/` today, all import paths in `internal/catalog/` and `internal/tui/` reference `internal/aws/...`) and the rename adds zero structural value beyond aesthetics. The catalog references functions at their `internal/aws/<svc>.go` paths permanently. If `internal/aws/` becomes a misleading name (because half the files are no longer "AWS clients" but generic transport), rename it then. Until then, leave it.
+- Logs/investigation/cost/action capability modules. Phase 04 defines the resource catalog boundary; it does not model capability handlers/screens inside the catalog beyond declarative support metadata (`Capabilities`).
 - `internal/runtime` extraction. Phase 5a-extract.
 - Gen type unification. Phase 5a-gens.
 - Command/event message split. Phase 5b.
@@ -394,7 +399,7 @@ Mechanical-resource-implementation acceptance test passes (overview's program-wi
 | Risk | Mitigation |
 |---|---|
 | Generator output changes during a PR but contributor forgets `make generate` | CI gate: `make generate && git diff --exit-code`. Pre-commit hook in `.git/hooks/pre-commit` invokes the same gate locally. |
-| Catalog struct gets unwieldy as fields accumulate | If `ResourceTypeDef` exceeds ~30 fields, split into nested sub-structs (`Display`, `Behavior`, `Pivots`). The struct literal stays readable; field grouping mirrors the documentation sections. |
+| Catalog struct gets unwieldy as fields accumulate | First ask whether the proposed field belongs in the catalog at all; cross-cutting capability contracts live outside `ResourceTypeDef`. If the remaining resource metadata still exceeds ~30 fields, split into nested sub-structs (`Display`, `Behavior`, `Pivots`). The struct literal stays readable; field grouping mirrors the documentation sections. |
 | Static `var ResourceTypes` requires `internal/catalog` to import `internal/aws/<svc>` for function references — risk of import cycle if `internal/aws/` ever imports `internal/catalog/` | Constraint: `internal/aws/` MUST NOT import `internal/catalog/`. Type definitions referenced from both sides (`PaginatedFetcher`, `IssueEnricher`, `RelatedDef`, `NavigableField`) live in the leaf `internal/domain/` package. Verify with `go list -f '{{.Imports}}' github.com/k2m30/a9s/v3/internal/aws | grep internal/catalog` (expected: zero hits). |
 | 22 NoOp enricher files contain non-trivial init logic that's not just registration | Audit before deletion: `cat internal/aws/<svc>_issue_enrichment.go` for each NoOp file. If the file has anything beyond a `registerIssueEnricher(short, NoOpIssueEnricher, prio)` call, defer that file's deletion to a separate cleanup. |
 | `cmd/catalogen` runs slowly because it imports the whole `catalog` package | This is fine — the generator runs at build time, not runtime. Slow generators are acceptable; runtime `init()` storms are not. |

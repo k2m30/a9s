@@ -6,6 +6,8 @@
 
 Every session-scoped cache becomes a typed field on a single `Session` struct. `internal/aws/` (still its current name; rename happens here) gives up its package-globals: the IAM policies cache, the identity cache, and the SES rule-set cache all move to `Session`-owned types accessed through narrow capability interfaces.
 
+`Session` is also the only valid owner for future capability-scoped caches and long-running task state. This phase migrates today's three concrete globals; later features (for example log-source discovery caches or query cursors/progress) must reuse `Session`, not invent new package-level state.
+
 After this phase, **`Session.Rotate()` is the only place that bumps generation counters and clears caches.** Profile/region switch invokes one method; nothing else needs to remember to call cleanup helpers.
 
 ## Why this phase is second
@@ -20,10 +22,11 @@ Closing this boundary before any larger phase adds to it means later phases neve
 
 ## What this phase delivers
 
-- `internal/session/` package — owns `Session` struct with typed cache fields, `Rotate()` method.
+- `internal/session/` package — owns `Session` struct with typed cache fields, `Rotate()` method, and the architectural ownership point for future capability/task-scoped state.
 - Capability interfaces in `internal/session/` (the package that defines them; `internal/aws/` consumes them via function signatures). `PolicyStore`, `IdentityStore`, `RuleSetStore`. Transport functions in `internal/aws/` take capabilities, not `*Session`. Note: `internal/aws/` is not renamed in this program — see `04-catalog.md` "Out of scope".
 - Three deletions: `iam_policies.go` global, `identity_cache.go` global, `ses_related.go` rule-set globals.
 - One canonical reset path: `Session.Rotate()` replaces every `Reset*Cache` / `Clear*Cache` / `Invalidate*Cache` symbol.
+- A standing rule for later phases: if a feature needs session-lifetime memoization or in-flight task bookkeeping, it lives on `Session` (or a typed store owned by `Session`), not in `internal/aws/` package globals.
 
 ## PR breakdown
 
