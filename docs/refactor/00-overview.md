@@ -31,13 +31,15 @@ Specifically, after this refactor:
 |---|---|---|---|---|
 | 2 | Projection hook | 1 | yes | shortName branching in detail rendering |
 | 3 | Session owner | 5 | yes | package-globals in `internal/aws/`; ad-hoc cache resets |
-| 1' | Finding model | 14 | yes | `Status`/`Issues`/`(+N)` triple; severity-as-color conflation |
+| 1' | Finding model | 16 | yes | `Status`/`Issues`/`(+N)` triple; severity-as-color conflation |
 | 4 | Catalog | 14 | yes | `Register*` API; markdown-as-source-of-truth |
 | 5a-extract | Runtime extraction | 1 | yes | sessionRuntime embed in UI shell |
 | 5a-gens | Gen unification | 1 | yes | `int` vs `uint64` gen-counter salad |
-| 5b | Message taxonomy | 1 | optional | command vs event ambiguity |
+| 5b | Message taxonomy | 1 | yes | command/event ambiguity; type-level gen-stamping |
 
-Total: **33 PRs**, 32 mandatory.
+Total: **35 PRs, all mandatory.**
+
+Phase 1' is 16 PRs (was 14): the original PR-03a is split into 03a-types, 03a-shim, 03a-views per the reviewability constraint — see `03-finding-model.md`. Phase 5b is mandatory (was previously listed as optional); type-level gen-stamping prevents an entire bug class, and "optional structural correctness" is itself the kind of compromise this refactor exists to remove.
 
 Phase numbering reflects original priority labels (Phase 2 was the second item in the original priority order; Phase 1' is the redesign of Phase 1 around the lifecycle correction). Filename numbering reflects execution order.
 
@@ -53,9 +55,15 @@ Justification for this order:
 
 - **`01-projection-hook` first**, because it's small, validates the semantics-layer direction, and introduces `Severity` (which `03-finding-model` then grows around). Discovery is cheap; if `Section`/`Item` shape is wrong, we revert ten files.
 - **`02-session-owner` second**, because it closes the ownership boundary before any larger phase adds to it. Doing this before `03-finding-model` means the largest domain-shape change lands on top of a clean session boundary, not a porous one.
-- **`03-finding-model` third**, after both infrastructure pieces. Depends on `01-projection-hook`'s `Severity` enum. Carries the largest surface (~150 files) and ships across 14 PRs. Acknowledged refit cost: `02-session-owner`'s session-owned cache types may need shape adjustments when `EnrichmentFinding` splits — accepted because the alternative (do `03` first) means landing the biggest domain change on the porous session boundary.
+- **`03-finding-model` third**, after both infrastructure pieces. Depends on `01-projection-hook`'s `Severity` enum. Carries the largest surface (~150 files) and ships across 16 PRs. Acknowledged refit cost: `02-session-owner`'s session-owned cache types may need shape adjustments when `EnrichmentFinding` splits — accepted because the alternative (do `03` first) means landing the biggest domain change on the porous session boundary.
 - **`04-catalog` fourth**, after the domain shape is canonical. Catalog entries reference `Severity`, `Finding`, `LifecycleKey`, `DetailProjector`, all introduced in earlier phases.
-- **`05-boundary` last**, because by then everything else is stable. `5a-extract` removes the `sessionRuntime` embed that earlier phases have been working around; `5a-gens` unifies what's left of the gen-counter zoo; `5b-msg-taxonomy` is optional polish.
+- **`05-boundary` last**, because by then everything else is stable. `5a-extract` removes the `sessionRuntime` embed that earlier phases have been working around; `5a-gens` unifies what's left of the gen-counter zoo; `5b-msg-taxonomy` lands the type-level command/event split.
+
+## Rollback granularity
+
+Every PR in this program is independently revertable. PRs within a phase do depend on prior PRs (e.g. PR-03b expects PR-03a-shim to have landed), but reverting PR-03f does not require reverting PR-03b through 03e. The shim from 03a-shim covers any category not yet migrated *or* a category whose migration was reverted: it derives `Findings` from legacy `Status` + `Issues` + `EnrichmentFinding` for any unmigrated type. Reverting a per-category PR puts that category back under shim coverage; downstream PRs that don't touch the reverted category remain landed.
+
+This is the explicit alternative to "revert the whole phase." Each phase file's per-PR spec carries an "Independently revertable" assertion in the exit-criteria block.
 
 ## Cross-phase invariants
 
@@ -69,7 +77,7 @@ These are non-negotiable. A PR that violates any of these is wrong, regardless o
 
 4. **Severity is domain, color is presentation.** `domain.Severity` is the typed enum (`SevOK | SevWarn | SevBroken | SevDim`); `lipgloss.Style` mappings live in `internal/ui/styles/`. `IsIssue()` is a method on `Severity`, not on `Color`.
 
-5. **Compile-time codegen, not runtime `init()`.** Generated files are checked in, diffable, reviewable. CI runs the generator and fails if output drifts from the committed file.
+5. **Compile-time codegen, not runtime `init()`.** Generated files (markdown specs) are checked in, diffable, reviewable. CI runs the generator and fails if output drifts from the committed file. **End state**: zero `init()` in feature wiring. **Migration window**: during Phase 04, legacy `init()`-based registrations in unmigrated categories continue to fire — this is in-flight migration, not a permanent state. PR-04n's exit criterion is the moment "zero `init()`" becomes structurally true.
 
 6. **No package-globals in transport.** Capability interfaces flow from runtime. Transport never imports `internal/session`.
 
@@ -124,6 +132,11 @@ If at the end of the program this test fails — if adding a resource still requ
 | 04-catalog | not started | |
 | 05a-extract | not started | |
 | 05a-gens | not started | |
-| 05b-msg-taxonomy | not started | optional |
+| 05b-msg-taxonomy | not started | |
 
 Update this table as phases complete.
+
+## Notes on counts and verification
+
+- Per-resource markdown count: at the time of writing, `ls docs/resources/ | grep -v impl-plan | wc -l` returns 66; total file count is 77 (including 9 `*-impl-plan.md` files and any other narrative docs). The Phase 04 exit criterion is "every catalog entry has a corresponding `docs/resources/<short>.md`" — verified by enumerating the catalog, not by hard-coding 66. **Verify the live count in the migration PR; the number above is informational.**
+- Per-resource markdown content: existing `docs/resources/<short>.md` files contain DevOps prose ("why this matters", workflow notes) that is NOT trivially derivable from a struct. Phase 04 preserves prose between `<!-- BEGIN GENERATED -->` / `<!-- END GENERATED -->` markers; only structured sections (findings table, related table, columns) are regenerated. See `04-catalog.md` for the marker convention.

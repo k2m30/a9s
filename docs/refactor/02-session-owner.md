@@ -194,6 +194,6 @@ Behavior verification:
 
 | Risk | Mitigation |
 |---|---|
-| `*ServiceClients` keyed in `sesRuleSetCaches` map encodes important identity that capability-based caches lose | Inspect the SES test suite before 02d — if tests rely on per-clients cache isolation, the `RuleSetStore` impl needs equivalent isolation (e.g. one store per `Session`, not per process). |
+| `*ServiceClients` keyed in `sesRuleSetCaches` map encodes important identity that capability-based caches lose | **`RuleSetStore` is keyed per-Session, not per-clients and not per-process.** Today's `map[*ServiceClients]*sesReceiptRuleSetCache` exists because `*ServiceClients` is the only handle the package globals could lock onto for isolation. After Phase 02, each `Session` owns one `RuleSetStore` instance; the map keying disappears entirely (a `Session`'s store has one slot for the active rule-set cache). On profile/region switch, `Session.Rotate()` replaces the store with a fresh one. The SES test suite must be updated to construct test-local `RuleSetStore` instances instead of asserting on per-clients map contents. |
 | Any third party (test helper, integration test, demo wiring) calls `ResetIAMPoliciesCache` etc. directly | `rg` for the symbol names before deletion in each PR. Replace with `Session.Rotate()` or test-scoped capability swap. |
 | `internal/tui/session_runtime.go` deletion breaks tests that import the old type name | Provide a one-line re-export for the duration of Phase 02; delete the re-export in Phase 5a-extract. |

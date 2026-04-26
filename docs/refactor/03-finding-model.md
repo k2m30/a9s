@@ -1,6 +1,6 @@
 # Phase 03 — Canonical finding model
 
-**14 PRs. Mandatory. Depends on Phase 01 (`Severity` enum) and Phase 02 (`Session` owner).**
+**16 PRs. Mandatory. Depends on Phase 01 (`Severity` enum) and Phase 02 (`Session` owner).**
 
 ## Goal
 
@@ -71,48 +71,134 @@ type ResourceTypeDef struct {
 
 ## PR breakdown
 
-14 PRs total: 1 setup + 12 per-category cutover + 1 cleanup.
+16 PRs total: 3 setup PRs (split for reviewability) + 12 per-category cutover + 1 cleanup.
 
-### PR-03a — Types, shim, view-side conversion
+### Resource entry points — the shim must cover every one
 
-**Goal.** Introduce all new types. Add a one-way derive shim that synthesizes `Findings` and `AttentionDetails` from existing `Status` + `Issues` + `EnrichmentFinding` at fetch boundary. Convert every view-side `r.Status` read to the new model. After this PR, no view code reads `Resource.Status`.
+Resources enter view-visible state through several distinct paths. PR-03a-shim must invoke `DeriveFindings` at *each* of these boundaries before resources reach views; otherwise the "no view code reads `r.Status`" exit criterion is unsafe for cached/probe/related resources:
 
-This is the largest and riskiest single PR in the program. The shim is the safety net that makes the per-category cutover (PR-03b through PR-03m) safe.
+| Entry point | Source | Where to apply shim |
+|---|---|---|
+| Top-level fetcher result | `app_fetchers.go` `LoadResourcesMsg` handler → `ResourcesLoadedMsg` | wrap `[]Resource` before publishing into resource cache |
+| Wave 1 probe retention | `app_handlers_availability.go:124` `maps.Copy(m.probeResources, msg.Resources)` | derive across `msg.Resources` before `maps.Copy` |
+| Cold-miss related prefetch (`CachedPages`) | `app.go:485` `m.resourceCache[shortName] = &resourceCacheEntry{resources: entry.Resources, ...}` | derive across `entry.Resources` before storing |
+| Lazy-add (`LazyAddedResources`) | `app.go:511` writes into `m.lazyResourceCache` | derive across each `extra` slice before storing |
+| Child-view fetcher result | `app_handlers_navigate.go` child fetch path | derive before passing to child `ResourceListModel` |
+| Detail enricher result (when it returns extra resources) | `EnrichDetailResultMsg` handler | derive before merging into resource state |
+
+Each entry point gets exactly one `attention.DeriveFindings` call. The shim is **idempotent**: calling it on a resource whose `Findings` is already populated is a no-op (early-return). After PR-03a-shim, the only ways a resource can reach view state without `Findings` populated are via direct test construction (acceptable; tests opt in) or via a missed entry point (a bug — covered by PR-03a-views' exit grep).
+
+### PR-03a-types — Domain and projection types only
+
+**Goal.** Add the new types. No consumers, no shim, no view changes. Purely additive; the codebase compiles and behaves identically because nothing reads the new fields.
 
 **Files added**
 
 - `internal/domain/finding.go` — `FindingCode`, `Finding`
 - `internal/semantics/attention/types.go` — `AttentionDetail`, `DetailRow`
-- `internal/semantics/attention/derive.go` — **the one-way shim.** `func DeriveFindings(r Resource, td ResourceTypeDef) ([]Finding, map[FindingCode]AttentionDetail)`. Reads `r.Status`, `r.Issues`, and any per-resource `EnrichmentFinding`. Synthesizes a `FindingCode` from the source phrase using a deterministic hash or registry. **Never writes back.**
 
 **Files modified**
 
-- `internal/resource/resource.go` — add `Findings`, `AttentionDetails`. Keep `Status`, `Issues` for now; they become legacy fields written by unmigrated fetchers.
-- `internal/resource/types.go` — add `LifecycleKey` to `ResourceTypeDef`.
-- All 12 `internal/resource/types_*.go` files — set `LifecycleKey` on every type def. Default empty means "state". Audit which types use a non-default key (e.g. some types may use `"phase"` or `"status"`).
-- `internal/tui/views/resourcelist.go`, `resourcelist_helpers.go`, `table_render.go` — list-view Status column and color logic now reads `Findings[0].Phrase` / `Findings[0].Severity`, falling back to `Fields[td.LifecycleKey]`. NEVER reads `r.Status`.
-- `internal/tui/views/detail.go`, `detail_fields.go`, `detail_helpers.go`, `rightcolumn.go` — Attention section reads `r.AttentionDetails[code]` for each `r.Findings[i]`. NEVER reads `EnrichmentFinding` directly.
-- `internal/tui/views/mainmenu.go` — issue-count badges count `len(filter(r.Findings, IsIssue))` per resource, not `r.Status`-string interpretation.
+- `internal/resource/resource.go` — add `Findings []Finding` and `AttentionDetails map[FindingCode]AttentionDetail` fields. `Status` and `Issues` stay untouched.
+- `internal/resource/types.go` — add `LifecycleKey string` field to `ResourceTypeDef`.
+- All 12 `internal/resource/types_*.go` files — set `LifecycleKey` on every type def. Empty string defaults to `"state"`. Audit which types use a non-default key.
+
+**Exit criteria**
+
+```bash
+# Fields exist on Resource:
+rg 'Findings\s+\[\]\w+\.Finding|AttentionDetails\s+map' internal/resource/resource.go
+# expected: present
+
+# LifecycleKey is set (or explicitly empty-default) on every type def:
+rg 'LifecycleKey:' internal/resource/types_*.go | wc -l
+# expected: matches the count of registered top-level types (or every non-default case)
+
+go build ./...
+# expected: clean
+
+make test
+# expected: passes — types are unread, no behavior change
+```
+
+**Independently revertable**: yes. Reverting drops the type fields; nothing else depends on them.
+
+---
+
+### PR-03a-shim — Idempotent derive function, applied at every entry point
+
+**Goal.** Add the one-way derive shim and wire it into every entry point listed above. After this PR, every `Resource` reaching view state has `Findings` and `AttentionDetails` populated — derived from legacy `Status` + `Issues` + `EnrichmentFinding`. View code does not yet read the new fields; consumer migration is PR-03a-views.
+
+**Files added**
+
+- `internal/semantics/attention/derive.go` — `func DeriveFindings(r *Resource, td ResourceTypeDef)`. Reads `r.Status`, `r.Issues`, and any cached `EnrichmentFinding`. Synthesizes a `FindingCode` from a per-type lookup table built before the per-category PR for that type begins. **Never writes back to `Status`/`Issues`. Idempotent: returns immediately if `r.Findings` is already populated.**
+
+**Files modified**
+
+- `internal/tui/app_fetchers.go` — wrap fetcher results: derive across `[]Resource` before publishing.
+- `internal/tui/app_handlers_availability.go` (around line 124) — derive across `msg.Resources` before `maps.Copy(m.probeResources, ...)`.
+- `internal/tui/app.go` (around line 485) — derive across `entry.Resources` from `CachedPages` before writing to `m.resourceCache`.
+- `internal/tui/app.go` (around line 511) — derive across `extra` from `LazyAddedResources` before writing to `m.lazyResourceCache`.
+- `internal/tui/app_handlers_navigate.go` — child-view fetcher path: derive before passing resources to the child list.
+- `internal/tui/app_enrich.go` — `EnrichDetailResultMsg` path: derive before merging the enriched resource.
+
+**Exit criteria**
+
+```bash
+# Every entry point calls DeriveFindings:
+rg 'attention\.DeriveFindings\b' internal/tui/
+# expected: exactly six call sites (one per entry-point row above; commit message must list them)
+
+# Shim itself is idempotent:
+rg 'len\(r\.Findings\) > 0' internal/semantics/attention/derive.go
+# expected: present (the early-return guard)
+
+# No code path injects resources into a cache without going through derive:
+# Manual audit: grep for assignments into m.resourceCache, m.lazyResourceCache, m.probeResources
+# Each must be preceded (or wrapped) by DeriveFindings. Document each in PR description.
+```
+
+**Independently revertable**: yes. Reverting removes the shim calls; resources reach views without `Findings`, but views still read `Status`/`Issues` (PR-03a-views hasn't landed yet), so behavior is unchanged.
+
+---
+
+### PR-03a-views — Switch all view-side reads to the new model
+
+**Goal.** Convert every `r.Status` / `r.Issues` / direct `EnrichmentFinding` read in `internal/tui/` to use `Findings` and `AttentionDetails`. After this PR, no view code reads the legacy fields. Fetchers and enrichers still *write* `Status`/`Issues` (the per-category cutover migrates them); the shim from 03a-shim ensures `Findings` is populated by the time views read it.
+
+**Files modified**
+
+- `internal/tui/views/resourcelist.go`, `resourcelist_helpers.go`, `table_render.go` — list-view Status column and color logic read `Findings[0].Phrase` / `Findings[0].Severity`, falling back to `Fields[td.LifecycleKey]`.
+- `internal/tui/views/detail.go`, `detail_fields.go`, `detail_helpers.go`, `rightcolumn.go` — Attention section reads `r.AttentionDetails[code]` for each `r.Findings[i]`.
+- `internal/tui/views/mainmenu.go` — issue-count badges count `len(filter(r.Findings, IsIssue))`.
 - `internal/tui/views/attention.go` — filter predicate reads `Findings`.
-- `internal/tui/app_handlers_availability.go`, `app_probes.go`, `app_enrich.go` — anywhere a `Resource` is constructed or mutated post-fetch, ensure `Findings` is populated via the shim before the resource flows into views. Concretely: `app_fetchers.go` wraps fetcher results and runs `attention.DeriveFindings` before publishing.
+- `tests/unit/` — update every test that asserts on `r.Status` content. Concrete files: `resourcelist_*_test.go`, `detail_*_test.go`, `mainmenu_*_test.go`, `attention_*_test.go`, `qa_*_test.go`. **Test migration is in scope for this PR.** Counted budget: ~30 test files, each touching 1–5 assertions. Estimated test diff: 200–400 lines.
 
 **Exit criteria**
 
 ```bash
 # View code does not read Resource.Status:
-rg '\br?\.Status\b|\bres\.Status\b|resource\.Resource\{[^}]*Status:' internal/tui/
+rg '\br?\.Status\b|\bres\.Status\b' internal/tui/
 # expected: zero hits
 
-# Fetchers and enrichers still write Status (legacy path) — that's fine for now:
-rg 'Status:\s*\w' internal/aws/ | wc -l
-# expected: many hits — these are migrated in 03b through 03m
+# View code does not read Resource.Issues:
+rg '\br?\.Issues\b' internal/tui/
+# expected: zero hits
 
-# View code does not read EnrichmentFinding directly (everything goes through AttentionDetail):
+# View code does not read EnrichmentFinding directly:
 rg 'EnrichmentFinding|\.Summary\b|\.Rows\b' internal/tui/
-# expected: only the legacy compatibility shim references; zero direct field reads
+# expected: zero hits in non-test code
+
+# Tests pass without legacy field reads:
+rg 'r\.Status|res\.Status|\.Issues' tests/unit/
+# expected: zero hits in updated test files
 ```
 
-Behavior verification: `./a9s --demo` produces visually identical list and detail output to pre-PR. The shim's job is to make this PR a no-op visually.
+Behavior verification:
+- `./a9s --demo` produces visually identical list and detail output to pre-Phase-03 output. **Snapshot-test harness:** before this PR lands, capture canonical-resource detail/list renders for ec2, s3, rds, iam-role, alarm, sg via `cmd/preview-detail` (or similar) into `tests/testdata/snapshots/<short>.txt`. PR-03a-views' exit gate includes: regenerated snapshots match committed snapshots byte-for-byte. The same harness is reused in every PR-03b-m to detect regressions per category.
+- `make test` and `make test-race` pass.
+
+**Independently revertable**: yes — but reverting requires reverting tests/unit/ updates too. Cleaner: revert the full PR atomically.
 
 ---
 
@@ -140,8 +226,9 @@ Behavior verification: `./a9s --demo` produces visually identical list and detai
 1. Updates every fetcher in `internal/aws/<category-services>.go` to populate `Resource.Findings` and `Resource.AttentionDetails` directly. Stops setting `Resource.Status` and `Resource.Issues`.
 2. Updates every Wave 2 issue enricher in `internal/aws/<svc>_issue_enrichment.go` to append to `Findings` and write to `AttentionDetails[code]`. Stops calling `BumpFindingSuffix` on `Status`. Stops returning `EnrichmentFinding` — returns `[]Finding` + `map[FindingCode]AttentionDetail` updates.
 3. Updates every `Color` function in the corresponding `types_<category>.go` to read `Findings[0].Severity` first, falling back to `lifecycleSeverity(r.Fields[td.LifecycleKey])`. Drops any `r.Status` reads.
-4. Declares `FindingCode` constants in `internal/transport/<svc>/codes.go` (or sibling file). Per-enricher namespacing: `ec2.CodeImpaired = "ec2.impaired"`, `rds.CodeMaintPending = "rds.maint.pending"`, etc. Phase 04 graduates these to a declarative table; in Phase 03 they are typed constants per enricher.
-5. The shim in `attention/derive.go` no longer fires for migrated types (it has a per-type early-return: "if `r.Findings` already populated by fetcher, skip"). Verify the early-return covers each migrated category before merging.
+4. Declares `FindingCode` constants in `internal/aws/<svc>_codes.go` (a sibling file in the same package as the fetcher). Per-service namespacing: `awsclient.CodeEC2Impaired = "ec2.impaired"`, `awsclient.CodeRDSMaintPending = "rds.maint.pending"`, etc. **The constants stay in `internal/aws/` for the entire program** — the speculative `internal/aws/` → `internal/transport/` rename is out of scope. If that rename ever happens, it's a single `gofmt`-style refactor across the package, post-program.
+5. The idempotent shim continues covering any unmigrated path (the early-return condition `len(r.Findings) > 0` is what makes migrated types bypass the shim automatically).
+6. Updates the corresponding tests in `tests/unit/` — typically the per-resource fetcher tests (`<svc>_test.go`), Wave 2 enricher tests (`<svc>_issue_enrichment_test.go`), and any view tests scoped to the migrated category. **Test migration is in scope.** Estimated per-category test diff: 5–15 test files modified, 100–300 lines.
 
 **Per-PR exit criteria.** For category `<X>` in PR-03<X>:
 
@@ -159,13 +246,19 @@ rg '\br\.Status\b' internal/resource/types_<x>.go
 # expected: zero hits
 
 # FindingCode constants exist for every enricher in <X>:
-ls internal/transport/<svc>/codes.go
+ls internal/aws/<svc>_codes.go
 # expected: present for every service in the category that has a Wave 2 enricher
+
+# Snapshot tests for every resource type in this category match (regenerate then diff):
+go test ./tests/unit/ -run TestSnapshot_<X> -count=1
+# expected: pass
 ```
 
 Behavior verification:
 - `./a9s --demo`: every resource type in the migrated category renders list and detail correctly.
-- Per-resource integration test (where one exists): findings present, codes stable, attention details populated.
+- Per-resource snapshot test (added in PR-03a-views): findings present, phrases stable, attention details rendered correctly.
+
+**Independently revertable**: yes. Each per-category PR is independent of the others. If PR-03f surfaces a finding-derivation bug in security types, revert just that PR; the shim re-covers security resources because they no longer populate `Findings` directly. PR-03b through 03e and 03g–m remain landed.
 
 ---
 
@@ -225,10 +318,20 @@ Behavior verification:
 ## Out of scope
 
 - Catalog migration (`internal/resource/` → `internal/catalog/`). Phase 04.
-- `FindingDef` declarative table on `ResourceTypeDef`. Phase 04 graduates `FindingCode` constants into this.
+- `FindingDef` declarative table on `ResourceTypeDef`. Phase 04 graduates `FindingCode` constants into this — see motivation below.
 - Markdown spec generation. Phase 04.
 - Removing the `sessionRuntime` embed. Phase 5a-extract.
 - Generation type unification. Phase 5a-gens.
+- The `internal/aws/` → `internal/transport/` rename. Out of program scope. `FindingCode` constants stay in `internal/aws/<svc>_codes.go` permanently as far as this refactor is concerned.
+
+### Why FindingCode is constants in 03 and a `FindingDef` table in 04
+
+The graduation is motivated, not cosmetic:
+
+- **Phase 03 (constants per enricher).** Each enricher declares its codes inline next to the function that emits them. Compiler-checked, distributed ownership. No registry yet — phase 03 has no machinery to enforce that "every emitted code is declared somewhere central." Adding such machinery in 03 would require a registry, which contradicts the catalog-first direction of phase 04.
+- **Phase 04 (declarative `FindingDef` table on `ResourceTypeDef`).** The catalog enumerates every possible finding for a type: code, phrase, severity, source class. This enables three things constants alone cannot: (1) `cmd/catalogen` generates per-resource markdown listing every finding the type can produce; (2) static validation that every `FindingCode` an enricher emits is declared in the type's `Findings []FindingDef` table — drift becomes a build error; (3) optional human-readable description per finding for the markdown.
+
+If those three uses don't materialize in Phase 04, `FindingDef` is wasted indirection and should be dropped in favor of constants-only. The Phase 04 spec (`04-catalog.md`) is the place to commit or drop. Phase 03 ships constants regardless.
 
 ## Cross-references
 

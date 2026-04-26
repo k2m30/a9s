@@ -1,6 +1,6 @@
-# Phase 05 — Runtime/UI boundary; gen unification; (optional) message taxonomy
+# Phase 05 — Runtime/UI boundary; gen unification; message taxonomy
 
-**3 PRs (2 mandatory, 1 optional). Depends on Phase 04 (catalog).**
+**3 PRs, all mandatory. Depends on Phase 04 (catalog).**
 
 ## Goal
 
@@ -11,13 +11,82 @@ After this phase:
 - **`internal/runtime/`** owns `Session`, message dispatch, fetcher invocation, generation stamping. It is the orchestrator.
 - **`internal/tui/`** owns view stack, key resolution, lipgloss rendering. It is the UI shell. It does not embed `Session`. It does not dispatch fetchers. It receives view-ready state and emits messages back.
 - **`internal/domain/Gen`** is the single generation-counter type used everywhere. The `int` / `uint64` salad of `availabilityGen` / `enrichmentGen` / `relatedGen` / `enrichGen` / `enrichmentTypeGen` collapses to one type.
-- **(Optional)** Messages are typed as either commands (UI → runtime: "do this") or events (runtime → UI: "this happened"), with gen-stamping enforced at the type system level.
+- Messages are typed as either commands (UI → runtime: "do this") or events (runtime → UI: "this happened"), with gen-stamping enforced at the type system level. **This is mandatory, not polish.** Type-level gen-stamping prevents an entire bug class (handlers forgetting to gen-check) and "optional structural correctness" is itself the kind of compromise this refactor exists to remove.
 
 Views remain passive. They render state and emit messages. They do not consume use-case interfaces. The boundary is between message handlers and the view layer, not between views and a service API. (See cross-phase invariant #7 in `00-overview.md`.)
 
+## ViewIntent contract — how the runtime tells the UI to update views
+
+Today's handlers walk the view stack and mutate views in place — `app_handlers_availability.go:387,421,433` are concrete examples: a single Wave 2 message updates `m.probeResources`, then iterates `m.stack` updating any matching `*ResourceListModel.SetEnrichmentState(...)` and any matching `*DetailModel.SetEnrichmentFinding(...)`. After 5a-extract the runtime no longer owns `m.stack`, so we need an explicit contract for "update every view of kind X for resource type Y."
+
+The contract: **runtime emits `[]ViewIntent` from each handler; UI shell applies them across `m.stack`.**
+
+```go
+// internal/runtime/intent.go
+package runtime
+
+type ViewIntent interface { isIntent() }
+
+// UpdateResourceList: every ResourceListModel for ResourceType receives Update.
+type UpdateResourceList struct {
+    ResourceType string
+    Update       func(rl ResourceListView) // narrow interface, see below
+}
+func (UpdateResourceList) isIntent() {}
+
+// UpdateDetail: every DetailModel for ResourceType (and ResourceID, if non-empty) receives Update.
+type UpdateDetail struct {
+    ResourceType string
+    ResourceID   string  // empty = all detail views of that type
+    Update       func(d DetailView)
+}
+func (UpdateDetail) isIntent() {}
+
+// UpdateMenu: the singleton MainMenuModel receives Update.
+type UpdateMenu struct {
+    Update func(m MenuView)
+}
+func (UpdateMenu) isIntent() {}
+
+// PushView, PopView, ReplaceView: structural changes to the stack.
+type PushView   struct { View tea.Model }
+type PopView    struct{}
+type ReplaceView struct { View tea.Model }
+```
+
+The narrow interfaces (`ResourceListView`, `DetailView`, `MenuView`) are defined by the UI shell (`internal/tui/views/`) and exported for runtime use. They expose only the methods runtime needs to call (`SetEnrichmentState`, `SetEnrichmentFinding`, `ApplyFieldUpdates`, `SetIssues`, etc.) — not the full Bubble Tea `Update` / `View` surface. This keeps runtime decoupled from rendering details.
+
+Runtime handler signature:
+
+```go
+func (r *Runtime) HandleMsg(msg tea.Msg) ([]ViewIntent, tea.Cmd) {
+    // ... mutate Session state ...
+    return []ViewIntent{
+        UpdateMenu{Update: func(m MenuView) { m.SetIssues(rt, count, trunc) }},
+        UpdateResourceList{ResourceType: rt, Update: func(rl ResourceListView) { rl.SetEnrichmentState(...) }},
+        UpdateDetail{ResourceType: rt, Update: func(d DetailView) { d.SetEnrichmentFinding(&f) }},
+    }, nil
+}
+```
+
+UI shell apply loop:
+
+```go
+// internal/tui/app.go
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+    intents, cmd := m.runtime.HandleMsg(msg)
+    for _, intent := range intents {
+        m.applyIntent(intent)  // walks m.stack, dispatches to matching views
+    }
+    return m, cmd
+}
+```
+
+This preserves today's stack-walking semantics — every matching view in the stack receives the update — while making the contract between runtime and UI explicit and testable. The runtime can be unit-tested by asserting on the returned `[]ViewIntent` without standing up a UI; the UI can be unit-tested by feeding it synthetic intents without standing up a runtime.
+
 ## PR breakdown
 
-3 PRs total: 2 mandatory + 1 optional.
+3 PRs total, all mandatory.
 
 ### PR-05a-extract — Runtime extraction; un-embed Session
 
@@ -116,9 +185,9 @@ Behavior verification:
 
 ---
 
-### PR-05b — Command vs event message taxonomy (optional)
+### PR-05b — Command vs event message taxonomy
 
-**Status: optional.** Architectural hygiene, not boundary-closing. Defer indefinitely if appetite is low.
+**Mandatory.** Type-level gen-stamping prevents handlers from forgetting to gen-check; that prevention is structural, not stylistic. "Optional structural correctness" is the kind of compromise this refactor exists to remove.
 
 **Goal.** Split the 28 `*Msg` types in `internal/tui/messages/messages.go` into two clearly named families:
 
@@ -189,4 +258,5 @@ rg 'type \w+ struct' internal/runtime/event/types.go
 | 05a-extract sprawls because handler files are large (~64 KB total handler code) | If a single PR feels too wide, split per-handler-file (one PR per `app_handlers*.go` migration). The ordering doesn't matter — each handler is independent — so multiple small PRs work. |
 | Tests that constructed `tui.Model` with embedded session break | Most tests use `tui.New(...)` constructor with options. Audit `tests/unit/` for direct `tui.Model{...}` literal construction; convert to `tui.New()`. |
 | Gen unification flushes out latent races caught by `-race` | Good — that's the point. Land 05a-gens with `make test-race` as a hard gate. Any race surfaced is a bug fixed by the unification, not introduced by it. |
-| 05b done in pieces leaves messages package half-migrated | 05b is one PR or zero PRs. Don't half-migrate. If appetite isn't there for the full split, skip 05b entirely; the `*Msg` types are functional as-is. |
+| 05b done in pieces leaves messages package half-migrated | 05b is one PR. Don't half-migrate; the cmd/event split is atomic. |
+| Narrow view interfaces (`ResourceListView`, `DetailView`, `MenuView`) drift from concrete view types | Each view type implements its narrow interface explicitly with a compile-time assertion (`var _ runtime.ResourceListView = (*views.ResourceListModel)(nil)`). Adding a method to the interface fails to compile in any view that doesn't implement it. |
