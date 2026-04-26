@@ -1,12 +1,16 @@
 # a9s Architecture Guide
 
-> **SINGLE SOURCE OF TRUTH.** This document is both the descriptive guide
-> (how the system is built today) and the normative contract (how new
-> changes must behave). When the implementation diverges from this doc,
-> either the implementation is wrong or this doc must be amended in the
-> same PR.
+> **CURRENT-STATE ARCHITECTURE.** This document describes how `main` is
+> built today. It is normative for code that still lives in the current
+> architecture, but it is not the target-state design document for the
+> refactor program under `docs/refactor/`.
 
-This document is the first thing you should read when joining the project. It covers the runtime architecture and the invariants new code must honor.
+This document is the first thing you should read when joining the project. It explains the runtime architecture that exists on `main` today, the constraints that current code must still honor, and the major implementation seams that the refactor plan is intentionally replacing.
+
+For the target "no legacy / no lazy compromise" architecture and the migration plan, read:
+
+- [`docs/refactor/00-overview.md`](refactor/00-overview.md) — program-level goals and invariants
+- [`docs/refactor/01-projection-hook.md`](refactor/01-projection-hook.md) through [`docs/refactor/05-boundary.md`](refactor/05-boundary.md) — phase-by-phase target architecture
 
 ## What is a9s?
 
@@ -18,14 +22,14 @@ a9s is a read-only terminal UI for AWS. Think k9s for Kubernetes, but for AWS se
 
 ## Architectural Direction
 
-The current codebase is already organized around a useful separation of concerns. When adding new code, prefer changes that reinforce these boundaries rather than blur them.
+The current codebase has a real separation of concerns, but several of those boundaries are still legacy-shaped. This section documents the boundaries that exist on `main` so contributors can reason about the current implementation and avoid accidental cross-layer coupling while the refactor is in flight.
 
-### Desired Layer Boundaries
+### Current Layer Boundaries On `main`
 
 - **`cmd/a9s`** — bootstrap only: parse flags, validate startup inputs, load config/theme, wire clients and options, start Bubble Tea.
 - **`internal/tui`** — UI shell and orchestration: view stack, global key handling, message routing, sizing, transient UI state, and session-scoped cache ownership.
 - **`internal/resource`** — declarative registry: resource types, child-view metadata, related defs, navigable fields, and fetcher/enricher registration.
-- **`internal/aws`** — adapter layer: call AWS SDK APIs and transform responses into `resource.Resource`. This layer should not know about Bubble Tea views.
+- **`internal/aws`** — primarily the adapter layer: call AWS SDK APIs, transform responses into `resource.Resource`, and host a few non-UI helper subsystems that have not yet been split out. This layer should not know about Bubble Tea views.
 - **`internal/cache`** — persistence only: on-disk availability cache and TTL rules.
 - **`internal/demo`** — injected fake transport for development and tests, not a parallel feature architecture.
 
@@ -35,6 +39,8 @@ The invariants below are normative. Code that violates them is wrong even
 if it "works" — the gen guards, registry completeness checks, and related
 validators in `tests/unit/architecture_conformance_test.go` fail loudly when
 any of these drift.
+
+These are **current-state invariants**, not promises about the final architecture. In particular, the refactor plan under `docs/refactor/` intentionally replaces the embedded `sessionRuntime` model, package-`init()` registry wiring, the `Status`-centered resource model, and markdown-as-input contracts.
 
 1. **One root application model owns session state and orchestration.**
    UI shell concerns and session-runtime state both live on `tui.Model`
@@ -48,9 +54,9 @@ any of these drift.
    Wave 2 issue enrichers are all registered at package init. There is no
    hand-maintained allowlist in dispatch code — background systems iterate
    registry state and sort by declarative priority metadata.
-4. **AWS adapter code translates SDK types into `resource.Resource`.**
-   `internal/aws` does not own navigation or UI policy. It does not
-   import `internal/tui`.
+4. **`internal/aws` stays non-UI.** It primarily translates SDK types into
+   `resource.Resource` and hosts a few helper subsystems, but it does not
+   own navigation or Bubble Tea policy. It does not import `internal/tui`.
 5. **Every async result carries enough identity to reject stale updates.**
    Every Msg with a `Gen` or `TypeGen` field must be stamped at dispatch
    time. Handlers MUST drop messages whose generation does not match the
@@ -59,9 +65,10 @@ any of these drift.
    switch paths all rotate the session runtime via `resetForSessionSwitch`:
    every gen counter is bumped and every map/queue is rebuilt in one place.
 7. **Feature-specific caches do not hang off transport objects.**
-   `*awsclient.ServiceClients` carries AWS clients only. Session-scoped
-   caches (e.g. the IAM policy document cache) live on `sessionRuntime` and
-   reach detail enrichers via `*awsclient.DetailEnrichmentCtx`.
+   `*awsclient.ServiceClients` carries AWS clients only. Most session-scoped
+   caches live on `sessionRuntime` and reach detail enrichers via
+   `*awsclient.DetailEnrichmentCtx`; a few legacy package-global caches still
+   exist in `internal/aws` and are treated as debt, not the desired pattern.
 8. **Global keys are order-sensitive.** `Esc` is the back/dismiss key. `q`
    is the quit key in normal mode; it is not a navigation primitive.
    Input-mode and search-mode semantics take precedence over view-local
@@ -191,21 +198,28 @@ tests/
 
 ## Resource Model
 
+This section describes the current resource model on `main`. It is intentionally conservative: it explains the struct the codebase uses today, not the canonical finding model planned in [`docs/refactor/03-finding-model.md`](refactor/03-finding-model.md).
+
 ```go
 // internal/resource/resource.go
 type Resource struct {
     ID        string            // primary identifier
     Name      string            // display name
     Status    string            // lifecycle state (used for row coloring)
+    Issues    []string          // active Wave 1 issue phrases in precedence order
     Fields    map[string]string // pre-extracted string values for table columns
     RawStruct any               // original AWS SDK typed struct
 }
 ```
 
+- **Issues** — the full ordered set of active Wave 1 phrases for the row. Detail view uses this to render the leading Attention section instead of relying only on the top phrase in `Status`.
 - **Fields** — flat key-value pairs populated by each fetcher. Used for list table columns and simple detail rendering. Keys are snake_case (e.g., `"instance_id"`, `"vpc_id"`).
 - **RawStruct** — the actual AWS SDK struct (e.g., `ec2types.Instance`, `s3types.Bucket`). Used by detail/YAML/JSON views via reflection for deep field path traversal (e.g., `"State.Name"`, `"Placement.AvailabilityZone"`).
+- **Current limitation** — `Status` and `Issues` split one concept across two fields on `main`: `Status` carries the top phrase for row display, while `Issues` carries the full ordered set. That coupling is documented here because it exists today, not because it is the intended end state. The refactor plan moves issue semantics into canonical findings and lifecycle display into typed field selection.
 
 ### Resource Type Registration
+
+This is the current registration model on `main`. It is being replaced by the explicit catalog in [`docs/refactor/04-catalog.md`](refactor/04-catalog.md).
 
 Each AWS service registers itself in `init()` via `internal/resource/`:
 
@@ -221,6 +235,8 @@ resource.RegisterFieldAliases("ec2", map[string]string{"id": "instance_id", "az"
 ```
 
 **Field registry** (`RegisterFieldKeys`, `RegisterFieldAliases`): Each fetcher declares the `Fields` map keys it emits and any user-facing aliases for them. `RegisterFieldKeys` lists the canonical keys (used by detail-view field ordering, YAML rendering, and column validation). `RegisterFieldAliases` maps alternative names to canonical keys (used by filter/search input and column config). Builtins are recorded on first registration; later calls (e.g., from tests) override without mutating the builtin snapshot, which keeps test registrations from leaking across suites.
+
+Package-`init()` registration is a property of the current implementation, not a pattern new architecture work should preserve indefinitely. While `main` still uses it, current changes must keep registry state coherent. The target direction is explicit catalog wiring with no hidden registration side effects.
 
 ### Resource Type Definitions
 
@@ -244,6 +260,8 @@ type ResourceTypeDef struct {
     CellDecorators map[string]func(r Resource, value string) string // transforms cell values per column before render
 }
 ```
+
+On `main`, `Color func(Resource) Color` is part of the type definition and drives row classification directly. The refactor plan intentionally demotes color to presentation and moves severity into domain data; this section is documenting the current shape, not defending it as the final model.
 
 Types are built once at package init by `buildResourceTypes()`. Categories map to type definition files:
 
@@ -285,9 +303,11 @@ Each fetcher takes `clients any` and type-asserts to `*aws.ServiceClients` inter
 
 Some resource types hide problems behind extra API calls (e.g., EC2 with impaired status checks, RDS with pending maintenance). Wave 2 enrichment discovers these hidden issues after Wave 1 probes complete.
 
+This section documents the current Wave 2 implementation on `main`. The refactor plan in [`docs/refactor/03-finding-model.md`](refactor/03-finding-model.md) and [`docs/refactor/04-catalog.md`](refactor/04-catalog.md) replaces this registry-and-markdown-driven model with canonical findings and catalog-owned metadata.
+
 **Architecture:**
 - `internal/aws/issue_enrichment.go` — Wave 2 infrastructure: `IssueEnricherRegistry` map, unexported `registerIssueEnricher` helper (panics on empty name, nil fn, duplicate short name), `NoOpIssueEnricher`, `IssueEnricher` struct, `IssueEnricherFunc` / `IssueEnricherResult` types, shared helpers, `EnrichmentCap` / `PerParentPageCap`.
-- `internal/aws/*_issue_enrichment.go` — 67 enricher-registry entries across 66 registered short names (`dbi` registers twice: once under `dbi` for its per-instance enricher and once under `rds` as an alias for the shared maintenance enricher). 43 entries are real enricher functions; the remaining 24 are `NoOpIssueEnricher` registrations for types with Wave 2 = "None" per `docs/attention-signals.md`. Each file's `init()` calls `registerIssueEnricher(<shortname>, <fn>, <priority>)` and — if the enricher writes `FieldUpdates` — `resource.RegisterIssueEnricherFieldKeys(<shortname>, [...])`.
+- `internal/aws/*_issue_enrichment.go` — per-type enricher registrations, including real enrichers and `NoOpIssueEnricher` placeholders for types whose Wave 2 column is currently "None". Each file's `init()` calls `registerIssueEnricher(<shortname>, <fn>, <priority>)` and — if the enricher writes `FieldUpdates` — `resource.RegisterIssueEnricherFieldKeys(<shortname>, [...])`.
 - `internal/tui/app_probes.go` — `buildEnrichQueue()`, `probeEnrichment()`
 - `internal/tui/app_handlers_availability.go` — `startEnrichment()`, `handleEnrichmentChecked()` with only-increase guard
 
@@ -303,13 +323,13 @@ Wave 1 probes complete
   → all done: clear probeResources, save cache with enriched counts (when caching enabled)
 ```
 
-**Registry**: All 66 registered resource types have an `IssueEnricherRegistry` entry per `docs/attention-signals.md`, with one additional entry (`rds`) aliasing the shared `dbi` maintenance enricher — 67 entries total. 43 entries are real enricher functions; the remaining 24 are `NoOpIssueEnricher` (zero findings, zero issues) for types whose Wave 2 column is "None". `NoOpIssueEnricher` entries make the "no Wave 2 signal" classification explicit and testable (`TestAttentionSignalsDoc` enforces every documented row has a registry entry). Some types with `NoOpIssueEnricher` perform in-fetcher Wave 2 — their fetchers already make per-resource Describe calls and populate health fields at fetch time (e.g., EKS `health_issues_count`, CloudTrail `is_logging`, OpenSearch `cluster_health`).
+**Registry**: On `main`, Wave 2 capability is expressed through `IssueEnricherRegistry` entries, including `NoOpIssueEnricher` placeholders that make "no Wave 2 signal" explicit and testable. Some types with `NoOpIssueEnricher` still perform in-fetcher Wave 2 work — their fetchers already make per-resource Describe calls and populate health fields at fetch time (e.g., EKS `health_issues_count`, CloudTrail `is_logging`, OpenSearch `cluster_health`).
 
 **Priority order** (`buildEnrichQueue`): Batchable enrichers that make account-wide calls are dispatched first (e.g., RDS/DocDB maintenance, EC2 instance status). Per-resource enrichers (e.g., DynamoDB PITR, KMS rotation, S3 PAB) iterate over resource IDs/ARNs, capped at `EnrichmentCap` (50). The registry key for each enricher must match the `ShortName` Wave 1 uses to store probe resources — a mismatch silently skips the enricher.
 
 **Resource identity**: Enrichers receive retained first-page resources from Wave 1 probes (`probeResources map[string][]resource.Resource`). Account-wide enrichers make a single API call covering all resources. Per-resource enrichers fan out to individual resources, capped at `EnrichmentCap` (50).
 
-**Golden contract**: [`docs/attention-signals.md`](attention-signals.md) is the single source of truth for Wave 1 (Color func) and Wave 2 (issue-enricher) assignments per resource type. `TestAttentionSignalsDoc` parses the markdown table and enforces: every type with Wave 1 != "None" has a non-nil `Color` func, and every type with Wave 2 != "None" has an `IssueEnricherRegistry` entry. Adding or removing issue enrichers requires updating the doc.
+**Current contract on `main`**: [`docs/attention-signals.md`](attention-signals.md) is the hand-maintained source of truth for Wave 1 (Color func) and Wave 2 (issue-enricher) assignments per resource type. `TestAttentionSignalsDoc` parses the markdown table and enforces: every type with Wave 1 != "None" has a non-nil `Color` func, and every type with Wave 2 != "None" has an `IssueEnricherRegistry` entry. The refactor plan replaces this with generated docs from catalog data.
 
 **Skip condition**: Wave 2 runs only when `isDemo=false`. Demo mode has no real AWS to query. `--no-cache` on live AWS still runs Wave 2 (it only disables disk persistence, not capabilities).
 
@@ -333,7 +353,7 @@ After Wave 2 issue enrichment runs, findings are surfaced in list and detail vie
 **Stacked-view live-update pattern:**
 - `handleEnrichmentChecked` iterates the full view stack, not just the active view. This allows enrichment messages to update non-active `ResourceListModel` and `DetailModel` instances for the affected type. A user can navigate away to a detail view while Wave 2 runs and both the list (behind) and the detail receive the findings without requiring a re-open.
 
-**Session-scoped state lives on the embedded `sessionRuntime` struct** (`internal/tui/session_runtime.go`), not on the UI shell portion of `Model`. The split makes ownership explicit: caches, Wave 1/Wave 2 queues, findings, and generation counters are all owned by `sessionRuntime`. Field promotion keeps the access syntax (`m.resourceCache`, `m.probeResources`, `m.enrichmentFindings`) unchanged. Profile/region switches call `m.resetForSessionSwitch()` which bumps every generation counter and rebuilds the maps — in-flight async messages tagged with the pre-switch gens are then rejected by the handlers' gen guards.
+**Current-state ownership**: session-scoped state lives on the embedded `sessionRuntime` struct (`internal/tui/session_runtime.go`), not on the UI shell portion of `Model`. The split makes ownership explicit within today's architecture: caches, Wave 1/Wave 2 queues, findings, and generation counters are all owned by `sessionRuntime`. Field promotion keeps the access syntax (`m.resourceCache`, `m.probeResources`, `m.enrichmentFindings`) unchanged. Profile/region switches call `m.resetForSessionSwitch()` which bumps every generation counter and rebuilds the maps — in-flight async messages tagged with the pre-switch gens are then rejected by the handlers' gen guards. This is current implementation, not the target steady-state ownership model.
 
 Representative fields owned by `sessionRuntime`:
 - `enrichmentFindings map[string]map[string]resource.EnrichmentFinding` — per-type per-resource findings; cleared per-type on rerun start, cleared entirely on profile/region switch.
@@ -596,7 +616,9 @@ When triggered, `EnterChildViewMsg` is emitted. `handleEnterChildView` construct
 
 ## Caching Layers
 
-The app has four distinct caches, each serving a different purpose:
+The app has four distinct caches plus one enrichment-visibility state store:
+
+This table describes the caches that exist on `main` today. The refactor plan's target is stricter ownership through an explicit session/runtime boundary; until that lands, the cache behavior below is the current contract.
 
 | Cache | Location | Scope | Invalidation |
 |-------|----------|-------|-------------|
@@ -708,10 +730,12 @@ main.go → parseFlags → tui.New(profile, region, opts...)
 
 ## Extension Guide
 
+The steps below describe how to extend the current `main` architecture. They are intentionally not the target contributor workflow after the refactor lands. For the target shape, see [`docs/refactor/00-overview.md`](refactor/00-overview.md) and [`docs/refactor/04-catalog.md`](refactor/04-catalog.md).
+
 ### Adding a New Resource Type
 
 1. Add or update the `ResourceTypeDef` and built-in default view config.
-2. Implement the fetcher in `internal/aws/` so it returns stable `resource.Resource` values with meaningful `ID`, `Name`, `Status`, `Fields`, and `RawStruct`.
+2. Implement the fetcher in `internal/aws/` so it returns stable `resource.Resource` values with meaningful `ID`, `Name`, `Status`, `Issues`, `Fields`, and `RawStruct` for the current resource model on `main`.
 3. Register the resource behavior in `internal/resource/`:
    - paginated fetcher
    - child fetchers, if any
@@ -733,8 +757,9 @@ main.go → parseFlags → tui.New(profile, region, opts...)
 1. Keep the base list/detail fetch path fast; defer expensive or optional data to the enricher.
 2. Make the enricher idempotent and safe to re-run.
 3. Ensure stale results are rejectable by generation plus resource context.
-4. If the enricher caches, document its scope and invalidation rules.
-5. Add tests for success, error, stale-result rejection, and cache invalidation paths.
+4. Treat this `Register*`/Wave-2 path as current-state implementation guidance, not the long-term target API. New refactor work should follow the phased design under `docs/refactor/`.
+5. If the enricher caches, document its scope and invalidation rules.
+6. Add tests for success, error, stale-result rejection, and cache invalidation paths.
 
 ---
 
