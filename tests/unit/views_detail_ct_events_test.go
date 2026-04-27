@@ -229,6 +229,18 @@ func TestDetailViewCTEvents_NoRawJSON_RendersFlatFields(t *testing.T) {
 	if view == "" {
 		t.Error("ct-events detail View() returned empty string for bare stub resource")
 	}
+	// Regression pin: when ctevent.Project returns nil for stub resources
+	// (no raw event body), buildFieldList must fall back to the generic
+	// projector so r.Fields still renders. Without the fallback the pane
+	// shows "No detail data available" instead.
+	if strings.Contains(view, "No detail data available") {
+		t.Errorf("stub ct-events resource rendered as 'No detail data available'; "+
+			"expected fallback to generic projector to render r.Fields. View:\n%s", view)
+	}
+	if !strings.Contains(view, "FallbackEvent") {
+		t.Errorf("stub ct-events resource missing event_name value 'FallbackEvent' in View; "+
+			"generic projector must render r.Fields when ctevent.Project yields nil. View:\n%s", view)
+	}
 }
 
 // TestDetailViewCTEvents_BrokenRawJSON_SurfacesExplicitError pins #280: when a
