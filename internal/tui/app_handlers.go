@@ -233,8 +233,9 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 		var cmds []tea.Cmd
 		cmds = append(cmds, clearFlash)
 		if m.clients != nil {
-			m.clients.IAMPolicies = m.IAMPolicies
-			m.clients.IdentityStore = m.Identity
+			m.clients.SetIAMPolicies(m.IAMPolicies)
+			m.clients.SetIdentityStore(m.Identity)
+			m.clients.SetRuleSets(m.RuleSets)
 			m.identityFetching = true
 			cmds = append(cmds, m.fetchIdentity())
 			if m.noCache {
@@ -248,14 +249,20 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 	if msg.Clients == nil {
 		if m.clients == nil && m.preSuppliedClients != nil {
 			// Fall back to pre-supplied clients (demo path) when msg carries no clients.
-			m.preSuppliedClients.IAMPolicies = m.IAMPolicies   // wire per-session policy store
-			m.preSuppliedClients.IdentityStore = m.Identity    // wire per-session identity cache
+			// Wire per-session capability stores into the transport layer.
+			m.preSuppliedClients.SetIAMPolicies(m.IAMPolicies)
+			m.preSuppliedClients.SetIdentityStore(m.Identity)
+			m.preSuppliedClients.SetRuleSets(m.RuleSets)
 			m.clients = m.preSuppliedClients
 		}
 	} else if clients, ok := msg.Clients.(*awsclient.ServiceClients); ok {
-		awsclient.ClearAllSESRuleSetCaches() // drop stale SES rule-set cache from prior *ServiceClients
-		clients.IAMPolicies = m.IAMPolicies  // wire per-session policy store into transport layer
-		clients.IdentityStore = m.Identity   // wire per-session identity cache into transport layer
+		// Per-session stores: SES rule sets, IAM policies, and identity all
+		// live on m.{RuleSets,IAMPolicies,Identity} after PR-02b/c/d. The
+		// legacy ClearAllSESRuleSetCaches global-clear is gone — fresh
+		// session = fresh store, wired here via thread-safe setters.
+		clients.SetIAMPolicies(m.IAMPolicies)
+		clients.SetIdentityStore(m.Identity)
+		clients.SetRuleSets(m.RuleSets)
 		m.clients = clients
 	} else {
 		wrongTypeErr := fmt.Errorf("internal: unexpected ClientsReadyMsg.Clients type %T", msg.Clients)

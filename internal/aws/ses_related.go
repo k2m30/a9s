@@ -4,7 +4,6 @@ package aws
 import (
 	"context"
 	"strings"
-	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/service/ses"
 	sestypes "github.com/aws/aws-sdk-go-v2/service/ses/types"
@@ -12,6 +11,16 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
+
+// ruleSetStore is the unexported shape internal/aws expects from a
+// per-Session SES rule set cache. session.RuleSetStore satisfies this via
+// duck-typing — internal/aws cannot import internal/session without a cycle,
+// so the local interface mirrors the methods needed here.
+type ruleSetStore interface {
+	Get() (any, bool)
+	Set(any)
+	Clear()
+}
 
 // checkSESR53 searches the R53 cache for hosted zones whose domain matches the
 // SES identity domain. Pattern N — naming convention.
@@ -112,50 +121,49 @@ func sesEventDestinations(ctx context.Context, c *ServiceClients, configSetName 
 	return out, err
 }
 
-// sesReceiptRuleSetCache is a per-ServiceClients cache for the SES v1
-// DescribeActiveReceiptRuleSet call. Successful responses are memoized per
-// *ServiceClients; errors are not memoized so transient failures retry on the
-// next call instead of locking the client for its lifetime.
-type sesReceiptRuleSetCache struct {
-	mu     sync.Mutex
-	output *ses.DescribeActiveReceiptRuleSetOutput
-}
-
-// sesRuleSetCacheMu protects sesRuleSetCaches map access.
-var sesRuleSetCacheMu sync.Mutex
-
-// sesRuleSetCaches maps *ServiceClients pointer to a per-clients cache so that
-// successive calls to checkSESLambda / checkSESS3 within the same fetch batch
-// hit the same cached result.
-var sesRuleSetCaches = map[*ServiceClients]*sesReceiptRuleSetCache{}
-
-// sesActiveReceiptRuleSet calls SES v1 DescribeActiveReceiptRuleSet at most once
-// per ServiceClients instance when the call succeeds. Errors are not cached: a
-// follow-up call after an error retries the API. A follow-up call after a
-// successful response returns the cached output without a network round-trip.
+// sesActiveReceiptRuleSet calls SES v1 DescribeActiveReceiptRuleSet at most
+// once per session when the call succeeds. The cached output is read on
+// subsequent calls without a network round-trip. Errors are not cached: a
+// follow-up call after an error retries the API.
+//
+// The cache lives on the per-Session RuleSetStore (c.RuleSets()); the legacy
+// process-wide map keyed by *ServiceClients pointer is gone.
+//
+// Invalidation safety (P2 finding): the store reference is CAPTURED ONCE at
+// function entry into a local `store` variable. If a refresh handler swaps
+// `c.RuleSets` for a fresh store while this fetch is blocked on the SES
+// API, the Set below writes to the captured (now orphaned) store rather
+// than re-poisoning the new active slot. This is the swap-vs-clear contract:
+// callers wanting to invalidate MUST REPLACE `c.RuleSets`, not call
+// Clear() on the existing store — otherwise an in-flight late writer would
+// repopulate the same store with the pre-refresh data and the next
+// checker batch would see stale Lambda/S3 relationships.
+//
+// Concurrency trade-off (acknowledged, same as PR-02b/02c): no top-level
+// lock across check-fetch-set. Two concurrent checkSES* calls may both
+// observe an empty store and both invoke the SES API; the store remains
+// correct (mutex-guarded writes; last-write-wins on idempotent Sets). Acceptable
+// because related-panel checks are not high-volume.
 func sesActiveReceiptRuleSet(ctx context.Context, c *ServiceClients) (*ses.DescribeActiveReceiptRuleSetOutput, error) {
 	if c == nil || c.SES == nil {
 		return nil, nil //nolint:nilnil // no SES v1 client; caller treats nil as "no rule set"
 	}
-
-	sesRuleSetCacheMu.Lock()
-	cache, ok := sesRuleSetCaches[c]
-	if !ok {
-		cache = &sesReceiptRuleSetCache{}
-		sesRuleSetCaches[c] = cache
-	}
-	sesRuleSetCacheMu.Unlock()
-
-	cache.mu.Lock()
-	defer cache.mu.Unlock()
-	if cache.output != nil {
-		return cache.output, nil
+	store := c.RuleSets() // capture once — see godoc above
+	if store != nil {
+		if cached, ok := store.Get(); ok {
+			out, isOutput := cached.(*ses.DescribeActiveReceiptRuleSetOutput)
+			if isOutput {
+				return out, nil
+			}
+		}
 	}
 	out, err := c.SES.DescribeActiveReceiptRuleSet(ctx, &ses.DescribeActiveReceiptRuleSetInput{})
 	if err != nil {
 		return nil, err
 	}
-	cache.output = out
+	if store != nil && out != nil {
+		store.Set(out)
+	}
 	return out, nil
 }
 
@@ -487,24 +495,3 @@ func truncatedResultSES(target string, ids []string) resource.RelatedCheckResult
 	return resource.RelatedCheckResult{TargetType: target, Count: len(ids), ResourceIDs: ids, Approximate: true}
 }
 
-// InvalidateSESRuleSetCache drops the cached DescribeActiveReceiptRuleSet
-// response for the given client. Called from the Ctrl+R handler so that
-// receipt-rule changes are picked up without waiting for a profile/region
-// switch to rebuild *ServiceClients.
-func InvalidateSESRuleSetCache(c *ServiceClients) {
-	if c == nil {
-		return
-	}
-	sesRuleSetCacheMu.Lock()
-	delete(sesRuleSetCaches, c)
-	sesRuleSetCacheMu.Unlock()
-}
-
-// ClearAllSESRuleSetCaches drops every cached receipt rule set across all
-// *ServiceClients keys. Called from the profile/region-switch handler so
-// stale session state cannot leak across reconnects.
-func ClearAllSESRuleSetCaches() {
-	sesRuleSetCacheMu.Lock()
-	sesRuleSetCaches = make(map[*ServiceClients]*sesReceiptRuleSetCache)
-	sesRuleSetCacheMu.Unlock()
-}

@@ -54,10 +54,10 @@ func init() {
 		if !ok || c == nil {
 			return nil, fmt.Errorf("AWS clients not initialized")
 		}
-		if c.IAMPolicies == nil {
+		if c.IAMPolicies() == nil {
 			return nil, fmt.Errorf("IAMPolicies store not initialized on ServiceClients")
 		}
-		return FetchIAMPoliciesByIDsFull(ctx, c.IAM, ids, c.IAMPolicies)
+		return FetchIAMPoliciesByIDsFull(ctx, c.IAM, ids, c.IAMPolicies())
 	})
 
 	resource.RegisterRelated("policy", []resource.RelatedDef{
@@ -195,8 +195,9 @@ func FetchIAMPoliciesPage(ctx context.Context, api IAMListPoliciesAPI, continuat
 // ListPolicies pagination walks may run in parallel before one wins the
 // MarkManagedBuilt race. The previous package-global `allPoliciesMu`
 // serialized this. Acceptable here because: (a) lazy-add is the
-// related-panel drill-in path, not high-volume; (b) duplicate Sets converge
-// to the same final cache state; (c) introducing a sync.Once or
+// related-panel drill-in path, not high-volume; (b) duplicate Sets are
+// last-write-wins on identical data, so the final cache state is consistent;
+// (c) introducing a sync.Once or
 // build-in-progress flag would re-couple the transport layer to a session
 // concern that PR-02b explicitly removed. Same applies to InlineBuilt.
 func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string, store iamPolicyStore) ([]resource.Resource, error) {

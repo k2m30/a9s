@@ -1,98 +1,108 @@
 package session_test
 
 import (
-	"fmt"
 	"sync"
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/session"
 )
 
-// TestRuleSetStore_GetMissing verifies that a fresh RuleSetStore returns
-// (nil, false) for any key.
-func TestRuleSetStore_GetMissing(t *testing.T) {
+// TestRuleSetStore_FreshIsEmpty pins that a freshly constructed store
+// reports no cached value: Get returns (nil, false).
+func TestRuleSetStore_FreshIsEmpty(t *testing.T) {
 	t.Parallel()
 
 	store := session.NewRuleSetStore()
 
-	got, ok := store.Get("no-such-key")
+	got, ok := store.Get()
 	if ok {
-		t.Error("expected ok=false for absent key, got true")
+		t.Errorf("Get on fresh store: ok=true, want false")
 	}
 	if got != nil {
-		t.Errorf("expected nil for absent key, got %v", got)
+		t.Errorf("Get on fresh store: value=%v, want nil", got)
 	}
 }
 
-// TestRuleSetStore_SetGet verifies the Set + Get round-trip: a stored value
-// is returned verbatim with ok=true.
+// TestRuleSetStore_SetGet pins the round-trip: the value passed to Set is
+// returned verbatim by Get, with ok=true.
 func TestRuleSetStore_SetGet(t *testing.T) {
 	t.Parallel()
 
 	store := session.NewRuleSetStore()
-	const key = "ses-rule-set:default"
-	const value = "rule-set-payload"
-
-	store.Set(key, value)
-
-	got, ok := store.Get(key)
-	if !ok {
-		t.Fatal("expected ok=true after Set, got false")
+	type ruleSetPayload struct {
+		Name  string
+		Rules []string
 	}
-	if got != value {
-		t.Errorf("Get returned %v, want %q", got, value)
+	want := ruleSetPayload{Name: "default-inbound", Rules: []string{"rule-a", "rule-b"}}
+
+	store.Set(want)
+
+	got, ok := store.Get()
+	if !ok {
+		t.Fatal("Get after Set: ok=false, want true")
+	}
+	gotPayload, isPayload := got.(ruleSetPayload)
+	if !isPayload {
+		t.Fatalf("Get type: got %T, want ruleSetPayload", got)
+	}
+	if gotPayload.Name != want.Name || len(gotPayload.Rules) != len(want.Rules) {
+		t.Errorf("Get value: got %+v, want %+v", gotPayload, want)
 	}
 }
 
-// TestRuleSetStore_Delete verifies that Delete removes the target key while
-// leaving unrelated keys intact.
-func TestRuleSetStore_Delete(t *testing.T) {
+// TestRuleSetStore_Overwrite pins that Set replaces the prior cached value.
+func TestRuleSetStore_Overwrite(t *testing.T) {
 	t.Parallel()
 
 	store := session.NewRuleSetStore()
 
-	store.Set("k1", "v1")
-	store.Set("k2", "v2")
+	store.Set("first")
+	store.Set("second")
 
-	store.Delete("k1")
-
-	if _, ok := store.Get("k1"); ok {
-		t.Error("expected k1 to be absent after Delete, but Get returned ok=true")
-	}
-	got, ok := store.Get("k2")
+	got, ok := store.Get()
 	if !ok {
-		t.Fatal("expected k2 to still exist after deleting k1")
+		t.Fatal("Get after overwrite: ok=false, want true")
 	}
-	if got != "v2" {
-		t.Errorf("k2 value = %v, want %q", got, "v2")
+	if got != "second" {
+		t.Errorf("Get after overwrite: got %v, want %q", got, "second")
 	}
 }
 
-// TestRuleSetStore_Clear verifies that Clear() removes all entries so all
-// subsequent Gets return (nil, false).
+// TestRuleSetStore_Clear pins that Clear empties the store so subsequent Get
+// returns (nil, false). Important for: Session.Rotate on profile/region
+// switch and Ctrl+R on the SES detail view.
 func TestRuleSetStore_Clear(t *testing.T) {
 	t.Parallel()
 
 	store := session.NewRuleSetStore()
-
-	keys := []string{"a", "b", "c"}
-	for _, k := range keys {
-		store.Set(k, "payload")
-	}
-
+	store.Set("payload")
 	store.Clear()
 
-	for _, k := range keys {
-		got, ok := store.Get(k)
-		if ok {
-			t.Errorf("expected ok=false for %q after Clear(), got true (value=%v)", k, got)
-		}
+	got, ok := store.Get()
+	if ok {
+		t.Errorf("Get after Clear: ok=true, want false (value=%v)", got)
+	}
+	if got != nil {
+		t.Errorf("Get after Clear: value=%v, want nil", got)
 	}
 }
 
-// TestRuleSetStore_ConcurrentSafe verifies that the RuleSetStore
-// implementation is safe for concurrent use. 100 goroutines perform Set/Get
-// operations on disjoint keys; the race detector validates no data race occurs.
+// TestRuleSetStore_ClearIdempotent pins that Clear() on a fresh store and
+// twice in a row do not panic.
+func TestRuleSetStore_ClearIdempotent(t *testing.T) {
+	t.Parallel()
+
+	store := session.NewRuleSetStore()
+	store.Clear()
+	store.Clear()
+
+	store.Set("x")
+	store.Clear()
+	store.Clear()
+}
+
+// TestRuleSetStore_ConcurrentSafe runs 100 goroutines mixing Set/Get/Clear;
+// the race detector validates no data race.
 func TestRuleSetStore_ConcurrentSafe(t *testing.T) {
 	t.Parallel()
 
@@ -105,9 +115,14 @@ func TestRuleSetStore_ConcurrentSafe(t *testing.T) {
 	for i := range workers {
 		go func(n int) {
 			defer wg.Done()
-			key := fmt.Sprintf("rule-set-%d", n)
-			store.Set(key, n)
-			_, _ = store.Get(key)
+			switch n % 3 {
+			case 0:
+				store.Set(n)
+			case 1:
+				_, _ = store.Get()
+			case 2:
+				store.Clear()
+			}
 		}(i)
 	}
 
