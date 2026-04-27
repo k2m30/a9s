@@ -4,8 +4,6 @@ import (
 	"maps"
 	"sort"
 	"strings"
-
-	aws "github.com/k2m30/a9s/v3/internal/aws"
 )
 
 // ExtractTarget derives the TARGET section rows for a CloudTrail event.
@@ -101,7 +99,7 @@ func navFromLabel(label string) (bool, string) {
 // For S3 bucket ARNs (empty account segment), the resource portion is returned as-is.
 func resourceRefToRow(ref ResourceRef, recipientAccountID string) Row {
 	key := labelFromType(ref.Type, ref.ARN)
-	val := aws.FormatCTTarget(ref.ARN, recipientAccountID)
+	val := FormatCTTarget(ref.ARN, recipientAccountID)
 	if val == "" {
 		val = ref.ARN
 	}
@@ -217,14 +215,14 @@ func extractByEventName(eventName string, params map[string]any, cleanedParams m
 
 	case "GetSecretValue":
 		if id, _ := params["secretId"].(string); id != "" {
-			val := aws.FormatCTTarget(id, "")
+			val := FormatCTTarget(id, "")
 			isNav, target := navFromLabel("Secret")
 			return []Row{{Key: "Secret", Value: val, IsNavigable: isNav, TargetType: target}}, removeKeys(cleanedParams, "secretId")
 		}
 
 	case "Decrypt":
 		if id, _ := params["keyId"].(string); id != "" {
-			val := aws.FormatCTTarget(id, "")
+			val := FormatCTTarget(id, "")
 			isNav, target := navFromLabel("Key")
 			return []Row{{Key: "Key", Value: val, IsNavigable: isNav, TargetType: target}}, removeKeys(cleanedParams, "keyId")
 		}
@@ -233,7 +231,7 @@ func extractByEventName(eventName string, params map[string]any, cleanedParams m
 
 	case "AssumeRole", "AssumeRoleWithSAML", "AssumeRoleWithWebIdentity":
 		if arn, _ := params["roleArn"].(string); arn != "" {
-			val := aws.FormatCTTarget(arn, "")
+			val := FormatCTTarget(arn, "")
 			isNav, target := navFromLabel("Role")
 			return []Row{{Key: "Role", Value: val, IsNavigable: isNav, TargetType: target}}, removeKeys(cleanedParams, "roleArn")
 		}
@@ -259,7 +257,7 @@ func extractByEventName(eventName string, params map[string]any, cleanedParams m
 
 	case "RotateKey":
 		if id, _ := params["keyId"].(string); id != "" {
-			val := aws.FormatCTTarget(id, "")
+			val := FormatCTTarget(id, "")
 			if val == "" {
 				val = id
 			}
@@ -371,7 +369,7 @@ func catchAllScan(params map[string]any, cleanedParams map[string]any) ([]Row, m
 			continue
 		}
 		if strings.HasSuffix(k, "Id") || strings.HasSuffix(k, "Name") || strings.HasSuffix(k, "Arn") {
-			val := aws.FormatCTTarget(s, "")
+			val := FormatCTTarget(s, "")
 			if val == "" {
 				val = s
 			}

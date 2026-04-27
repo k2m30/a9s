@@ -28,7 +28,7 @@ func init() {
 		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkNGSubnet},
 	})
 
-	resource.RegisterNavigableFields("ng", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("ng", []resource.NavigableField{
 		{FieldPath: "ClusterName", TargetType: "eks"},
 		{FieldPath: "NodeRole", TargetType: "role"},
 		{FieldPath: "Subnets", TargetType: "subnet"},

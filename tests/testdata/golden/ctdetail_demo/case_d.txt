@@ -13,28 +13,28 @@
  REQUEST                                                                                                                                           │  CloudFormation Stacks
  backingKey:           true                                                                                                                        │  CloudTrail Trails
  rotationType:         AUTOMATIC                                                                                                                   │  CT events by AccessKeyId
-                                                                                                                                                   │  CT events by Username
-                                                                                                                                                   │  CT events by EventName
-                                                                                                                                                   │  CT events by SharedEventId
-                                                                                                                                                   │
-                                                                                                                                                   │
-                                                                                                                                                   │
-                                                                                                                                                   │
-                                                                                                                                                   │
-                                                                                                                                                   │
-                                                                                                                                                   │
-                                                                                                                                                   │
-                                                                                                                                                   │
-                                                                                                                                                   │
-                                                                                                                                                   │
-                                                                                                                                                   │
-                                                                                                                                                   │
-                                                                                                                                                   │
-                                                                                                                                                   │
-                                                                                                                                                   │
-                                                                                                                                                   │
-                                                                                                                                                   │
-                                                                                                                                                   │
-                                                                                                                                                   │
-                                                                                                                                                   │
-                                                                                                                                                   │
+ ENVELOPE                                                                                                                                          │  CT events by Username
+ EventId:              e-d4e5f6a7                                                                                                                  │  CT events by EventName
+ EventName:            RotateKey                                                                                                                   │  CT events by SharedEventId
+ EventSource:          kms.amazonaws.com                                                                                                           │
+ EventTime:            2026-04-07T02:00:07Z                                                                                                        │
+ ReadOnly:             false                                                                                                                       │
+ RAW EVENT                                                                                                                                         │
+ awsRegion:            us-east-1                                                                                                                   │
+ eventCategory:        Management                                                                                                                  │
+ eventID:              e-d4e5f6a7                                                                                                                  │
+ eventName:            RotateKey                                                                                                                   │
+ eventSource:          kms.amazonaws.com                                                                                                           │
+ eventTime:            "2026-04-07T02:00:07Z"                                                                                                      │
+ eventType:            AwsServiceEvent                                                                                                             │
+ eventVersion:         "1.08"                                                                                                                      │
+ readOnly:             false                                                                                                                       │
+ recipientAccountId:   "444444444444"                                                                                                              │
+ requestParameters:                                                                                                                                │
+         :     backingKey: true                                                                                                                    │
+         :     keyId: arn:aws:kms:us-east-1:444444444444:key/2f7e9a5b-8c1d-4e3f-9a0b-1c2d3e4f5a6b                                                  │
+         :     rotationType: AUTOMATIC                                                                                                             │
+ responseElements:     null                                                                                                                        │
+ sourceIPAddress:      AWS Internal                                                                                                                │
+ userIdentity:                                                                                                                                     │
+         :     invokedBy: kms.amazonaws.com                                                                                                        │

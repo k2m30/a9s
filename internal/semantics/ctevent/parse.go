@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"time"
-
-	"github.com/k2m30/a9s/v3/internal/aws"
 )
 
 // Parse parses a raw CloudTrail event JSON blob into an Event struct.
@@ -86,7 +84,7 @@ func Parse(rawJSON string) (*Event, error) {
 	}
 
 	// Classify verb via existing function
-	ev.Verb = aws.ClassifyCTVerb(ev.EventName, ev.EventCategory, ev.EventType)
+	ev.Verb = ClassifyCTVerb(ev.EventName, ev.EventCategory, ev.EventType)
 
 	return ev, nil
 }

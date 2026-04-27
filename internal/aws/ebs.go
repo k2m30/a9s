@@ -47,7 +47,7 @@ func init() {
 		{TargetType: "backup", DisplayName: "Backup", Checker: checkEBSBackup},
 		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkEBSCFN, NeedsTargetCache: true},
 	})
-	resource.RegisterNavigableFields("ebs", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("ebs", []resource.NavigableField{
 		{FieldPath: "Attachments.InstanceId", TargetType: "ec2"},
 		{FieldPath: "KmsKeyId", TargetType: "kms"},
 	})
@@ -59,7 +59,7 @@ func init() {
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkEBSSnapKMS, NeedsTargetCache: false},
 		{TargetType: "backup", DisplayName: "Backup", Checker: checkEBSSnapBackup},
 	})
-	resource.RegisterNavigableFields("ebs-snap", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("ebs-snap", []resource.NavigableField{
 		{FieldPath: "VolumeId", TargetType: "ebs"},
 		{FieldPath: "KmsKeyId", TargetType: "kms"},
 	})

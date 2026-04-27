@@ -14,6 +14,12 @@ type Resource struct {
 	ID string
 	// Name is the display name (from Name tag or identifier).
 	Name string
+	// Type is the resource short name (e.g. "ec2", "rds", "s3"). Set by
+	// fetchers and by the detail view before calling a DetailProjector.
+	// Used by projection.Generic to look up per-type view config, navigable
+	// fields, and field aliases. Empty string = unknown type (falls back to
+	// Fields-only rendering with no navigability).
+	Type string
 	// Status is the current state/status of the resource. Carries the top
 	// phrase (with optional `(+N)` suffix) for the list view.
 	// Phase 03 migrates this to Findings.

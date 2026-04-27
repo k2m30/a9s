@@ -13,7 +13,7 @@ import (
 func init() {
 	resource.RegisterFieldKeys("igw", []string{"igw_id", "name", "vpc_id", "state", "attachments_count"})
 
-	resource.RegisterNavigableFields("igw", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("igw", []resource.NavigableField{
 		{FieldPath: "Attachments.VpcId", TargetType: "vpc"},
 	})
 

@@ -19,7 +19,7 @@ func init() {
 		{TargetType: "role", DisplayName: "IAM Role", Checker: checkTrailRole},
 	})
 
-	resource.RegisterNavigableFields("trail", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("trail", []resource.NavigableField{
 		{FieldPath: "S3BucketName", TargetType: "s3"},
 		{FieldPath: "KmsKeyId", TargetType: "kms"},
 		{FieldPath: "SnsTopicARN", TargetType: "sns"},

@@ -239,8 +239,26 @@ func NoopChecker(_ context.Context, _ any, _ Resource, _ ResourceCache) RelatedC
 // relatedRegistry maps resource short names to their related resource definitions.
 var relatedRegistry = map[string][]RelatedDef{}
 
-// navigableFieldRegistry maps resource short names to their navigable field definitions.
+// navigableFieldRegistry maps resource short names to their active navigable
+// field definitions. This is the mutable "session" registry: it starts empty
+// and is populated only by explicit RegisterNavigableFields calls (from tests
+// or from BootstrapActiveNavFields at app startup). This keeps unit tests that
+// do not call RegisterNavigableFields isolated from production init-time defaults.
 var navigableFieldRegistry = map[string][]NavigableField{}
+
+// navigableFieldPrevious saves the registration state before the most recent
+// RegisterNavigableFields call for a given short name. Used by
+// UnregisterNavigableFields to restore the previous state (e.g. restore
+// explicitly-registered nav fields after a test override).
+var navigableFieldPrevious = map[string][]NavigableField{}
+
+// defaultNavFieldRegistry is an immutable-by-convention registry populated at
+// init time by aws/*.go packages via RegisterDefaultNavFields. It is never
+// modified after package initialisation. NavFieldsProvider (used by
+// projection.Generic) reads from this registry. DetailModel reads from the
+// mutable navigableFieldRegistry so that tests can construct models without
+// any nav field registrations.
+var defaultNavFieldRegistry = map[string][]NavigableField{}
 
 // RegisterRelated stores related definitions for the given resource short
 // name. Panics at init-time if any RelatedDef has a nil Checker or empty
@@ -300,21 +318,54 @@ func UnregisterFetchByIDs(shortName string) {
 	delete(fetchByIDsRegistry, shortName)
 }
 
-// RegisterNavigableFields stores navigable field definitions for the given resource short name.
-// Replaces any existing entry.
+// RegisterNavigableFields stores navigable field definitions for the given
+// resource short name. Replaces any existing entry.
+//
+// When a registration for shortName already exists, the previous registration
+// is saved in navigableFieldPrevious so that UnregisterNavigableFields can
+// restore it. This allows test overrides to be rolled back without affecting
+// the production (init-time) registration that aws/*.go init() functions set up.
 func RegisterNavigableFields(shortName string, fields []NavigableField) {
+	if existing, ok := navigableFieldRegistry[shortName]; ok {
+		navigableFieldPrevious[shortName] = existing
+	}
 	navigableFieldRegistry[shortName] = fields
 }
 
-// GetNavigableFields returns the navigable field definitions for the given resource short name,
-// or nil if none are registered.
+// GetNavigableFields returns the navigable field definitions for the given
+// resource short name, or nil if none are registered.
+// GetNavigableFields returns the navigable field definitions for the given
+// resource short name from the active registry. If the active registry has no
+// entry for shortName, it falls back to the default (init-time) registry.
+// Returns nil only when neither registry has an entry.
+//
+// This merged view ensures callers such as IsFieldNavigable and tests that
+// verify init-time registrations see the expected fields regardless of whether
+// BootstrapActiveNavFields has been called.
 func GetNavigableFields(shortName string) []NavigableField {
+	if fields := navigableFieldRegistry[shortName]; len(fields) > 0 {
+		return fields
+	}
+	return defaultNavFieldRegistry[shortName]
+}
+
+// GetActiveNavigableFields returns the navigable field definitions for the
+// given resource short name from the active registry ONLY. Unlike
+// GetNavigableFields, this function does NOT fall back to the default registry.
+// Returns nil when no explicit RegisterNavigableFields call has been made for
+// shortName.
+//
+// Used by DetailModel.buildFieldList so that navigable affordances in the
+// detail view require an explicit registration (from tests or from
+// BootstrapActiveNavFields at app startup). This prevents init-time default
+// entries from being visible in test models that deliberately omit nav fields.
+func GetActiveNavigableFields(shortName string) []NavigableField {
 	return navigableFieldRegistry[shortName]
 }
 
 // IsFieldNavigable returns the NavigableField for the given field path, or nil if not registered.
 func IsFieldNavigable(shortName, fieldPath string) *NavigableField {
-	for _, f := range navigableFieldRegistry[shortName] {
+	for _, f := range GetNavigableFields(shortName) {
 		if f.FieldPath == fieldPath {
 			return &f
 		}
@@ -322,10 +373,59 @@ func IsFieldNavigable(shortName, fieldPath string) *NavigableField {
 	return nil
 }
 
-// UnregisterNavigableFields removes navigable field definitions for the given short name.
-// Used only in tests for cleanup.
+// UnregisterNavigableFields removes the navigable field registration for the
+// given short name. Used only in tests for cleanup.
+//
+// If a previous registration was saved by RegisterNavigableFields (i.e. the
+// caller overwrote an existing entry), it is restored. This preserves
+// init-time aws/*.go registrations after a test override is removed.
+//
+// If there was no prior registration (e.g. the test registered a brand-new
+// short name), the entry is fully removed and GetNavigableFields returns nil.
 func UnregisterNavigableFields(shortName string) {
-	delete(navigableFieldRegistry, shortName)
+	if prev, ok := navigableFieldPrevious[shortName]; ok {
+		navigableFieldRegistry[shortName] = prev
+		delete(navigableFieldPrevious, shortName)
+	} else {
+		delete(navigableFieldRegistry, shortName)
+	}
+}
+
+// RegisterDefaultNavFields stores the canonical (production) navigable field
+// definitions for a resource type into the immutable-by-convention default
+// registry. Called from aws/*.go init() functions instead of
+// RegisterNavigableFields so that the mutable active registry (read by
+// DetailModel) stays empty until BootstrapActiveNavFields is invoked at app
+// startup. Tests that construct DetailModels directly never see init-time nav
+// fields unless they explicitly call RegisterNavigableFields.
+func RegisterDefaultNavFields(shortName string, fields []NavigableField) {
+	defaultNavFieldRegistry[shortName] = fields
+}
+
+// GetDefaultNavFields returns the default (init-time) navigable field definitions
+// for the given resource short name. Returns nil if none were registered at init.
+// Used by NavFieldsProvider so that projection.Generic always sees the canonical
+// nav fields regardless of the active-registry state.
+func GetDefaultNavFields(shortName string) []NavigableField {
+	return defaultNavFieldRegistry[shortName]
+}
+
+// BootstrapActiveNavFields copies all entries from the default nav field
+// registry into the active registry. Called once at app startup (from
+// cmd/a9s/main.go) so that DetailModel navigability works in production.
+// Must be called after all init() functions have run (i.e. inside main()).
+// Noop in test binaries that never call this function.
+func BootstrapActiveNavFields() {
+	for k, v := range defaultNavFieldRegistry {
+		// Only populate entries that have not already been explicitly set via
+		// RegisterNavigableFields. This preserves test-supplied overrides when
+		// BootstrapActiveNavFields is called inside tui.New (e.g. by golden
+		// scenario helpers that register custom nav fields before constructing
+		// the TUI model).
+		if _, exists := navigableFieldRegistry[k]; !exists {
+			navigableFieldRegistry[k] = v
+		}
+	}
 }
 
 // AppendRelated adds a single RelatedDef to the existing registration for shortName.

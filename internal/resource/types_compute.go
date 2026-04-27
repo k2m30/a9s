@@ -99,6 +99,7 @@ func computeResourceTypes() []ResourceTypeDef {
 					return v
 				},
 			},
+			Augment: augmentEC2StatusChecks,
 		},
 		{
 			Name:          "ECS Services",

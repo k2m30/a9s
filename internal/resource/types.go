@@ -130,6 +130,17 @@ type ResourceTypeDef struct {
 	// Key = column key; value = decorator func receiving the full resource and the
 	// already-extracted cell string, returning the replacement. nil map = no decorators.
 	CellDecorators map[string]func(r Resource, value string) string
+
+	// Project is an optional custom DetailProjector for this resource type.
+	// When nil, projection.Generic is used as the fallback projector.
+	// Set on types whose detail view requires specialised rendering that the
+	// generic field-path projector cannot produce (e.g. ct-events).
+	Project domain.DetailProjector
+
+	// Augment is an optional post-projector hook that injects additional sections
+	// after the main projector has run (e.g. EC2 status checks). When nil, no
+	// augmentation is applied. Pure function.
+	Augment domain.Augmenter
 }
 
 // resourceTypes holds all registered resource type definitions in menu display order.

@@ -23,7 +23,7 @@ func init() {
 	})
 
 	// eventbridgetypes.Rule: RoleArn (execution role for the rule target)
-	resource.RegisterNavigableFields("eb-rule", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("eb-rule", []resource.NavigableField{
 		{FieldPath: "RoleArn", TargetType: "role"},
 	})
 }

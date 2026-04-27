@@ -21,7 +21,7 @@ func init() {
 		return FetchNatGatewaysPage(ctx, c.EC2, continuationToken)
 	})
 
-	resource.RegisterNavigableFields("nat", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("nat", []resource.NavigableField{
 		{FieldPath: "VpcId", TargetType: "vpc"},
 		{FieldPath: "SubnetId", TargetType: "subnet"},
 		{FieldPath: "NatGatewayAddresses.AllocationId", TargetType: "eip"},

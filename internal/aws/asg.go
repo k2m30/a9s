@@ -41,7 +41,7 @@ func init() {
 	})
 
 	// autoscalingtypes.Group: TargetGroupARNs[] — list of TG ARNs; VPCZoneIdentifier — CSV subnet IDs
-	resource.RegisterNavigableFields("asg", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("asg", []resource.NavigableField{
 		{FieldPath: "TargetGroupARNs", TargetType: "tg"},
 		{FieldPath: "VPCZoneIdentifier", TargetType: "subnet"},
 	})
