@@ -8,10 +8,10 @@ package unit
 // error. This meant a transient ListGroupPolicies throttle permanently prevented
 // inline policy resolution on subsequent calls within the same session.
 //
-// Contract after fix (internal/aws/iam_policies.go:224-228):
+// Contract after fix (internal/aws/iam_policies.go):
 //   - When fetchInlineGroupPolicies returns (inlines, inlineErr) with inlineErr != nil,
-//     allInlinePoliciesBuilt remains false → next call retries the inline fetch.
-//   - When fetchInlineGroupPolicies succeeds, allInlinePoliciesBuilt=true → cached.
+//     store.InlineBuilt() remains false → next call retries the inline fetch.
+//   - When fetchInlineGroupPolicies succeeds, store.MarkInlineBuilt() is called → cached.
 //   - Partial inline results from the first (errored) call are incorporated AND
 //     the composite error is propagated (never-silent-skip).
 //   - The second call (after retry succeeds) finds the inline policy by name.
@@ -26,6 +26,7 @@ import (
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/session"
 )
 
 // iamPolicyRetryFake implements IAMAPI for the inline retry test.
@@ -56,7 +57,7 @@ func (f *iamPolicyRetryFake) ListPolicies(
 	_ ...func(*iam.Options),
 ) (*iam.ListPoliciesOutput, error) {
 	return &iam.ListPoliciesOutput{
-		Policies:   f.managedPolicies,
+		Policies:    f.managedPolicies,
 		IsTruncated: false,
 	}, nil
 }
@@ -87,15 +88,14 @@ func (f *iamPolicyRetryFake) ListGroupPolicies(
 }
 
 // TestFetchIAMPoliciesByIDsFull_InlineRetryOnError verifies the retry contract:
-// first call fails inline fetch → allInlinePoliciesBuilt stays false;
+// first call fails inline fetch → store.InlineBuilt() stays false;
 // second call succeeds → inline policy found in result.
 //
-// Fails pre-fix: allInlinePoliciesBuilt was set true on error, so the second
+// Fails pre-fix: InlineBuilt was set true on error, so the second
 // call skipped inline fetch and never found the inline policy by name.
-// Passes post-fix: allInlinePoliciesBuilt remains false → second call retries.
+// Passes post-fix: InlineBuilt remains false → second call retries.
 func TestFetchIAMPoliciesByIDsFull_InlineRetryOnError(t *testing.T) {
-	awsclient.ResetIAMPoliciesCache()
-	t.Cleanup(awsclient.ResetIAMPoliciesCache)
+	store := session.NewPolicyStore()
 
 	const (
 		managedPolicyID   = "arn:aws:iam::123456789012:policy/MyManagedPolicy"
@@ -130,8 +130,8 @@ func TestFetchIAMPoliciesByIDsFull_InlineRetryOnError(t *testing.T) {
 	// Contract:
 	//   - Managed policy is found (buildAllManagedPolicies succeeds).
 	//   - Inline fetch fails → composite error returned alongside partial results.
-	//   - allInlinePoliciesBuilt must remain false.
-	results1, err1 := awsclient.FetchIAMPoliciesByIDsFull(ctx, fake, []string{managedPolicyID})
+	//   - store.InlineBuilt() must remain false.
+	results1, err1 := awsclient.FetchIAMPoliciesByIDsFull(ctx, fake, []string{managedPolicyID}, store)
 
 	// Managed policy should be found even with inline failure.
 	if len(results1) == 0 {
@@ -156,7 +156,7 @@ func TestFetchIAMPoliciesByIDsFull_InlineRetryOnError(t *testing.T) {
 	// Now remove the inline error so retry can succeed.
 	fake.listGroupPoliciesErr = nil
 
-	results2, err2 := awsclient.FetchIAMPoliciesByIDsFull(ctx, fake, []string{inlinePolicyName})
+	results2, err2 := awsclient.FetchIAMPoliciesByIDsFull(ctx, fake, []string{inlinePolicyName}, store)
 
 	if err2 != nil {
 		t.Errorf("call 2: expected no error after inline retry; got %v", err2)
@@ -168,24 +168,23 @@ func TestFetchIAMPoliciesByIDsFull_InlineRetryOnError(t *testing.T) {
 		}
 	}
 	if !foundInline {
-		// CONTRACT ASSERTION: this fails pre-fix (allInlinePoliciesBuilt=true meant
+		// CONTRACT ASSERTION: this fails pre-fix (InlineBuilt=true meant
 		// inline fetch never retried, so inlinePolicyName was never added to cache).
-		t.Errorf("call 2: inline policy %q not found — " +
-			"PRE-FIX BUG: allInlinePoliciesBuilt was set true on error, preventing retry; " +
-			"allInlinePoliciesBuilt must stay false on inline error so next call retries",
+		t.Errorf("call 2: inline policy %q not found — "+
+			"PRE-FIX BUG: InlineBuilt was set true on error, preventing retry; "+
+			"InlineBuilt must stay false on inline error so next call retries",
 			inlinePolicyName)
 	}
 }
 
 // TestFetchIAMPoliciesByIDsFull_InlineCachedOnSuccess verifies that when
-// inline fetch succeeds, allInlinePoliciesBuilt=true is set, and subsequent
+// inline fetch succeeds, store.InlineBuilt() is set to true, and subsequent
 // calls do NOT re-invoke ListGroupPolicies (cache hit).
 func TestFetchIAMPoliciesByIDsFull_InlineCachedOnSuccess(t *testing.T) {
-	awsclient.ResetIAMPoliciesCache()
-	t.Cleanup(awsclient.ResetIAMPoliciesCache)
+	store := session.NewPolicyStore()
 
 	const inlinePolicyName = "inline-cached-policy"
-	const inlineGroupName  = "dev-team"
+	const inlineGroupName = "dev-team"
 
 	listGroupPoliciesCallCount := 0
 	fake := &iamPolicyRetryFake{
@@ -208,7 +207,7 @@ func TestFetchIAMPoliciesByIDsFull_InlineCachedOnSuccess(t *testing.T) {
 	ctx := context.Background()
 
 	// Call 1: inline fetch succeeds → should call ListGroupPolicies.
-	_, err1 := awsclient.FetchIAMPoliciesByIDsFull(ctx, countingFake, []string{inlinePolicyName})
+	_, err1 := awsclient.FetchIAMPoliciesByIDsFull(ctx, countingFake, []string{inlinePolicyName}, store)
 	if err1 != nil {
 		t.Errorf("call 1: unexpected error: %v", err1)
 	}
@@ -218,7 +217,7 @@ func TestFetchIAMPoliciesByIDsFull_InlineCachedOnSuccess(t *testing.T) {
 	callsAfterFirst := listGroupPoliciesCallCount
 
 	// Call 2: inline cache should be warm — ListGroupPolicies must NOT be called again.
-	_, err2 := awsclient.FetchIAMPoliciesByIDsFull(ctx, countingFake, []string{inlinePolicyName})
+	_, err2 := awsclient.FetchIAMPoliciesByIDsFull(ctx, countingFake, []string{inlinePolicyName}, store)
 	if err2 != nil {
 		t.Errorf("call 2: unexpected error: %v", err2)
 	}
