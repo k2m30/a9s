@@ -85,6 +85,14 @@ type Session struct {
 	// internal/aws/iam_policies.go. Wired into *ServiceClients.IAMPolicies on
 	// every ClientsReadyMsg so FetchIAMPoliciesByIDsFull uses the session store.
 	IAMPolicies PolicyStore
+
+	// Identity is the per-session cache for the AWS caller's account ID.
+	// Replaces the package-level globals previously in
+	// internal/aws/identity_cache.go (identityCacheMu / cachedAccountID /
+	// cachedAccountErr). Wired into *ServiceClients.IdentityStore on every
+	// ClientsReadyMsg so Pattern-C related checkers (Glue tags, EBS Backup)
+	// see a per-profile/region scoped cache rather than a process-global one.
+	Identity IdentityStore
 }
 
 // New constructs a fresh Session with all maps initialized and generation
@@ -106,6 +114,7 @@ func New() *Session {
 		EnrichmentGen:          1,
 		PolicyDocCache:         &awsclient.PolicyDocumentCache{},
 		IAMPolicies:            NewPolicyStore(),
+		Identity:               NewIdentityStore(),
 	}
 }
 
@@ -147,4 +156,8 @@ func (s *Session) Rotate() {
 	// IAMPolicies: reset to a fresh store so managed/inline entries from the
 	// prior account/profile cannot leak into the next session.
 	s.IAMPolicies = NewPolicyStore()
+
+	// Identity: reset to a fresh store so the cached account ID + sticky
+	// failure (if any) from the prior session cannot leak into the next.
+	s.Identity = NewIdentityStore()
 }

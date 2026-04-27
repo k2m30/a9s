@@ -221,9 +221,20 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 
 		// The switch attempt cleared identity, resource cache, and availability.
 		// Restore them using the still-valid old clients.
+		//
+		// IMPORTANT: Session.Rotate already swapped in fresh PolicyStore /
+		// IdentityStore on m, so the retained transport clients (m.clients)
+		// still point at the PRE-rotate stores. Without rewiring here,
+		// Pattern-C related checks (Glue tags, EBS Backup) and IAM lazy-add
+		// would read sticky state from the now-discarded old stores — the
+		// header's identity reload could succeed against the new fresh
+		// stores while related-panel rows stayed broken until the next
+		// successful reconnect. Rewire on rollback too. (P3 finding.)
 		var cmds []tea.Cmd
 		cmds = append(cmds, clearFlash)
 		if m.clients != nil {
+			m.clients.IAMPolicies = m.IAMPolicies
+			m.clients.IdentityStore = m.Identity
 			m.identityFetching = true
 			cmds = append(cmds, m.fetchIdentity())
 			if m.noCache {
@@ -237,12 +248,14 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 	if msg.Clients == nil {
 		if m.clients == nil && m.preSuppliedClients != nil {
 			// Fall back to pre-supplied clients (demo path) when msg carries no clients.
-			m.preSuppliedClients.IAMPolicies = m.IAMPolicies // wire per-session policy store
+			m.preSuppliedClients.IAMPolicies = m.IAMPolicies   // wire per-session policy store
+			m.preSuppliedClients.IdentityStore = m.Identity    // wire per-session identity cache
 			m.clients = m.preSuppliedClients
 		}
 	} else if clients, ok := msg.Clients.(*awsclient.ServiceClients); ok {
 		awsclient.ClearAllSESRuleSetCaches() // drop stale SES rule-set cache from prior *ServiceClients
 		clients.IAMPolicies = m.IAMPolicies  // wire per-session policy store into transport layer
+		clients.IdentityStore = m.Identity   // wire per-session identity cache into transport layer
 		m.clients = clients
 	} else {
 		wrongTypeErr := fmt.Errorf("internal: unexpected ClientsReadyMsg.Clients type %T", msg.Clients)

@@ -53,12 +53,21 @@ import (
 )
 
 // ServiceClients holds AWS service clients for all supported services.
-// IAMPolicies must be set to the session's PolicyStore before any
-// FetchIAMPoliciesByIDsFull calls; see internal/tui/app_handlers.go.
+// IAMPolicies and IdentityStore must be set to the session's stores before
+// any FetchIAMPoliciesByIDsFull / Pattern-C related-check call; see
+// internal/tui/app_handlers.go.
 type ServiceClients struct {
 	// IAMPolicies is the session-scoped IAM policy resource cache. Set by the
 	// TUI layer from session.Session.IAMPolicies on every ClientsReadyMsg.
 	IAMPolicies iamPolicyStore
+
+	// IdentityStore is the session-scoped caller-identity (account ID) cache.
+	// Used by Pattern-C related checkers (Glue tags, EBS Backup) to construct
+	// resource ARNs from the account ID. Set by the TUI layer from
+	// session.Session.Identity on every ClientsReadyMsg. Nil-safe at the
+	// call-site: accountIDFromClients falls back to a fresh STS call if the
+	// store is nil (defensive — production wires it).
+	IdentityStore identityStore
 
 	EC2              EC2API
 	S3               S3API
