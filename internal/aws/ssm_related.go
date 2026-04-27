@@ -15,7 +15,7 @@ func init() {
 	})
 
 	// ssmtypes.ParameterMetadata: KeyId (present for SecureString parameters)
-	resource.RegisterNavigableFields("ssm", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("ssm", []resource.NavigableField{
 		{FieldPath: "KeyId", TargetType: "kms"},
 	})
 }

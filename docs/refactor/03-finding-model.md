@@ -124,7 +124,7 @@ make test
 # expected: passes — types are unread, no behavior change
 ```
 
-**Independently revertable**: yes. Reverting drops the type fields; nothing else depends on them.
+**Stabilization checkpoint**: PR-03n. This PR is purely additive (the new fields are unread); it lands cleanly even though downstream PRs in this phase may carry intermediate test/render failures that close at PR-03n. Per `00-overview.md` "Migration discipline", do not add compatibility scaffolding here whose only purpose is to make a future intermediate revert clean.
 
 ---
 
@@ -162,7 +162,7 @@ rg 'len\(r\.Findings\)\s*>\s*0' internal/semantics/attention/derive.go
 # Each must be preceded (or wrapped) by DeriveFindings. Document each in PR description.
 ```
 
-**Independently revertable**: yes. Reverting removes the shim calls; resources reach views without `Findings`, but views still read `Status`/`Issues` (PR-03a-views hasn't landed yet), so behavior is unchanged.
+**Stabilization checkpoint**: PR-03n. This PR adds derive-shim calls; on its own it does not change observable behavior because views still read `Status`/`Issues`. Acceptable to land even if a sibling PR is mid-flight; the shim is ALSO an internal forward-compat path that downstream PRs depend on, so reverting it once PR-03a-views or later has landed will break view rendering — the unit of revert is the phase, not the PR.
 
 ---
 
@@ -199,10 +199,10 @@ rg 'r\.Status|res\.Status|\.Issues' tests/unit/
 ```
 
 Behavior verification:
-- `./a9s --demo` produces visually identical list and detail output to pre-Phase-03 output. **Snapshot-test harness:** before this PR lands, capture canonical-resource detail/list renders for ec2, s3, rds, iam-role, alarm, sg via `cmd/preview-detail` (or similar) into `tests/testdata/snapshots/<short>.txt`. PR-03a-views' exit gate includes: regenerated snapshots match committed snapshots byte-for-byte. The same harness is reused in every PR-03b-m to detect regressions per category.
+- `./a9s --demo` produces visually identical list and detail output to pre-Phase-03 output AT THE PHASE-EXIT CHECKPOINT (PR-03n). Intermediate PRs (PR-03a-views, the per-category PR-03b–m series) may land with bounded golden drift documented in the PR description. **Snapshot-test harness:** capture canonical-resource detail/list renders for ec2, s3, rds, iam-role, alarm, sg via `cmd/preview-detail` (or similar) into `tests/testdata/snapshots/<short>.txt` at the start of the phase. The phase-exit gate (PR-03n) requires snapshots to match committed baselines byte-for-byte. Per-category PRs may regenerate goldens locally to track migration progress; the canonical baselines are re-asserted at PR-03n.
 - `make test` and `make test-race` pass.
 
-**Independently revertable**: yes — but reverting requires reverting tests/unit/ updates too. Cleaner: revert the full PR atomically.
+**Stabilization checkpoint**: PR-03n. Revert unit is the phase, not this PR. Test updates and view changes ship together; partial revert is not supported.
 
 ---
 
@@ -270,7 +270,7 @@ Behavior verification:
 - `./a9s --demo`: trigger Wave 2 enrichment (cmd: `:enrich`) on every resource type that has an enricher. List view shows post-enrichment phrases on each affected row; detail view shows attention rows. Snapshot tests for ec2 / rds / sg / iam-role / alarm regenerate-and-match.
 - `make test-race` passes — race detector is the critical guard for the new in-place row-mutation path; concurrent enrichment + render must be safe.
 
-**Independently revertable**: yes. Reverting restores the parallel map and the shim's enrichment-derivation branch; the cached rows lose their Wave 2 `Findings` but the shim re-populates from the parallel map. PR-03a-views remains landed.
+**Stabilization checkpoint**: PR-03n. This PR introduces the row-mutation pattern that downstream per-category PRs depend on. Do NOT keep the parallel map as a fallback "in case of revert" — that would be permanent dual-source-of-truth scaffolding (forbidden by `00-overview.md` hard-safety #3). The unit of revert is the phase; mid-phase reverts roll back to the start of Phase 03.
 
 ---
 
@@ -299,7 +299,7 @@ Behavior verification:
 2. Updates every Wave 2 issue enricher in `internal/aws/<svc>_issue_enrichment.go` to append to `Findings` and write to `AttentionDetails[code]`. Stops calling `BumpFindingSuffix` on `Status`. Stops returning `EnrichmentFinding` — returns `[]Finding` + `map[FindingCode]AttentionDetail` updates.
 3. Updates every `Color` function in the corresponding `types_<category>.go` to read `Findings[0].Severity` first, falling back to `lifecycleSeverity(r.Fields[td.LifecycleKey])`. Drops any `r.Status` reads.
 4. Declares `FindingCode` constants in `internal/aws/<svc>_codes.go` (a sibling file in the same package as the fetcher). Per-service namespacing: `awsclient.CodeEC2Impaired = "ec2.impaired"`, `awsclient.CodeRDSMaintPending = "rds.maint.pending"`, etc. **The constants stay in `internal/aws/` for the entire program** — the speculative `internal/aws/` → `internal/transport/` rename is out of scope. If that rename ever happens, it's a single `gofmt`-style refactor across the package, post-program.
-5. The idempotent shim continues covering any unmigrated path (the early-return condition `len(r.Findings) > 0` is what makes migrated types bypass the shim automatically).
+5. The shim continues covering any unmigrated path. **Bypass for migrated types is input-driven, not state-driven.** A migrated fetcher stops writing `Status` and `Issues`, so when the shim runs over a migrated row the inputs (`r.Status`, `r.Issues`, parallel-map entry post-PR-03a-fold = none) are all empty. The shim's derivation contract is: *if all legacy inputs are empty, do not touch `Findings` or `AttentionDetails`* — preserving the directly-written values. This is **not** an early-return on `len(r.Findings) > 0` (which would skip Wave 2 re-merges and break the deterministic-re-derive guarantee from PR-03a-shim). The bypass happens because there is nothing to derive, not because findings are already populated.
 6. Updates the corresponding tests in `tests/unit/` — typically the per-resource fetcher tests (`<svc>_test.go`), Wave 2 enricher tests (`<svc>_issue_enrichment_test.go`), and any view tests scoped to the migrated category. **Test migration is in scope.** Estimated per-category test diff: 5–15 test files modified, 100–300 lines.
 
 **Per-PR exit criteria.** For category `<X>` in PR-03<X>:
@@ -330,7 +330,7 @@ Behavior verification:
 - `./a9s --demo`: every resource type in the migrated category renders list and detail correctly.
 - Per-resource snapshot test (added in PR-03a-views): findings present, phrases stable, attention details rendered correctly.
 
-**Independently revertable**: yes. Each per-category PR is independent of the others. If PR-03f surfaces a finding-derivation bug in security types, revert just that PR; the shim re-covers security resources because they no longer populate `Findings` directly. PR-03b through 03e and 03g–m remain landed.
+**Stabilization checkpoint**: PR-03n. Per-category PRs are *scopeable* in parallel — different developers can author 03b through 03m concurrently without file collisions — but they are NOT independently revertable: each per-category cutover deletes the legacy `Status`/`Issues` write path for its category and depends on PR-03a-shim's derive logic for any sibling category not yet migrated. If a per-category PR surfaces a bug in production after merge, the fix is a forward-fix PR, not a revert; revert at the phase boundary if the whole approach needs to roll back. Per `00-overview.md` "Migration discipline", do NOT add per-category fallback scaffolding whose only purpose is to make individual revert cleaner.
 
 ---
 
@@ -415,7 +415,7 @@ If those three uses don't materialize in Phase 04, `FindingDef` is wasted indire
 
 | Risk | Mitigation |
 |---|---|
-| `(+N)` suffix appears in user-facing strings during the dual-write window if shim and migrated fetcher disagree | The shim has a per-type early-return ("if `Findings` populated, skip"). PR-03b sets the flag for compute, etc. Test: render every demo resource list after each per-category PR; visually verify Status column matches pre-Phase-03 output. |
+| `(+N)` suffix appears in user-facing strings during the dual-write window if shim and migrated fetcher disagree | The shim is **input-driven**, not state-driven: when all legacy inputs (`r.Status`, `r.Issues`, parallel enrichment map entry) are empty for a row, the shim does not touch `Findings`. Migrated fetchers stop writing those legacy fields, so migrated rows are bypassed by construction. The shim never compares `len(r.Findings) > 0` — that would skip required Wave 2 re-merges (see PR-03a-shim's exit grep `rg 'len\(r\.Findings\)\s*>\s*0' internal/semantics/attention/derive.go` returning zero hits). Test: render every demo resource list after each per-category PR; visually verify Status column matches pre-Phase-03 output. |
 | `FindingCode` namespacing collisions between services | Convention: codes start with the resource short-name (`ec2.impaired`, `rds.maint.pending`). The Phase 04 catalog validator will enforce this; in Phase 03 it's by convention. |
 | Shim derives wrong code for a Wave 2 finding because original `Summary` text drifted | The shim uses a fixed lookup table from known Summary phrases to codes (built per category before the per-category PR begins). New findings in the migrated path bypass the shim entirely. |
 | Tests assert on `r.Status` content | All test conversions land in PR-03a alongside view conversions. `tests/unit/` greps for `r.Status` / `res.Status` / `Status:` and updates them all to `Findings[0].Phrase` / `Fields[lifecycle key]`. |

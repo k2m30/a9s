@@ -56,7 +56,7 @@ func init() {
 	})
 
 	// ddbtypes.TableDescription: SSEDescription.KMSMasterKeyArn
-	resource.RegisterNavigableFields("ddb", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("ddb", []resource.NavigableField{
 		{FieldPath: "SSEDescription.KMSMasterKeyArn", TargetType: "kms"},
 	})
 }

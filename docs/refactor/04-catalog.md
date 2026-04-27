@@ -194,7 +194,7 @@ make test
 # expected: passes — catalog is empty, accessors fall back to legacy registries, behavior unchanged
 ```
 
-**Independently revertable**: yes. Reverting removes the catalog package and the wrappers; legacy accessors return to direct iteration of `resourceTypes`.
+**Stabilization checkpoint**: PR-04n. PR-04a installs the catalog skeleton and the wrapper layer that downstream per-category PRs (04b–m) depend on. Once any per-category PR has landed, reverting PR-04a alone breaks every migrated category; the unit of revert is the phase. Per `00-overview.md` "Migration discipline", do not preserve dual-iteration paths (legacy `resourceTypes` slice AND `catalog.ResourceTypes`) beyond what the migration window strictly needs — the wrappers are one-way compat for the duration of the phase, and PR-04n removes them.
 
 ---
 
@@ -221,7 +221,7 @@ make test
 
 1. Creates `internal/catalog/types_<category>.go` with a slice of `ResourceTypeDef` literals — one per resource type in the category. Direct function references for `Fetcher`, `Wave2`, `Project`, `Related`, `Navigable`. Direct table for `Findings`.
 2. Appends `types_<category>ResourceTypes...` (or equivalent) to `var ResourceTypes` in `internal/catalog/catalog.go`.
-3. Removes the corresponding `<category>ResourceTypes()` call from `buildResourceTypes()` in `internal/resource/types.go` in the *same* PR. **The category function and its file are deleted only when the catalog has the full type set for that category.** This is what prevents the build break the original draft would have caused: the legacy `buildResourceTypes()` and the catalog are kept consistent at every PR boundary — never both empty, never both populated.
+3. Removes the corresponding `<category>ResourceTypes()` call from `buildResourceTypes()` in `internal/resource/types.go` in the *same* PR. **The category function and its file are deleted only when the catalog has the full type set for that category.** This keeps `go build ./...` clean (the hard-safety #1 from `00-overview.md`'s migration discipline). It does NOT mean the legacy `buildResourceTypes()` and the catalog must agree on every test or render at every PR — only that the tree compiles. Test/render parity for migrated categories is asserted at the phase-exit checkpoint (PR-04n).
 4. Deletes `internal/resource/types_<category>.go` once the legacy `buildResourceTypes()` no longer references its function.
 5. For Wave 1 fetcher / Wave 2 enricher / related-def / navigable-field registrations: removes the `init()` calls in `internal/aws/<svc>*.go` for every type in this category. Replaces them with direct field assignments in the catalog struct literal. Each per-category PR shrinks `init()` count in `internal/aws/` for that category to zero.
 6. Deletes any `internal/aws/<svc>_issue_enrichment.go` file whose entire content was a `NoOpIssueEnricher` registration. (Files that contain real enricher functions stay; the function is now referenced from the catalog `Wave2` field.)
@@ -267,7 +267,7 @@ Behavior verification:
 - Findings tables in the catalog match what the runtime emits (Phase 03's shim is gone by now; Findings come straight from the enricher).
 - Snapshot tests for every type in this category (added in Phase 03) match.
 
-**Independently revertable**: yes. Each per-category PR is independent. Reverting one puts that category back under the legacy registry path; the catalog's accessor wrappers fall back to legacy lookup for any short name not in `catalog.ResourceTypes`. Other migrated categories are unaffected.
+**Stabilization checkpoint**: PR-04n. Per-category PRs are *scopeable* in parallel (different developers can author 04b through 04m concurrently without file collisions) but they are NOT independently revertable. Each per-category PR deletes the legacy `init()` registrations for its category; reverting one PR after subsequent PRs have built on the empty `buildResourceTypes()` body breaks the build. The fallback in catalog wrappers is migration-window scaffolding that PR-04n removes — do not preserve it as a permanent escape hatch (forbidden by `00-overview.md` hard-safety #3, no permanent dual-source-of-truth).
 
 ---
 

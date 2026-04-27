@@ -29,7 +29,7 @@ func init() {
 
 	// opensearchtypes.DomainStatus: EncryptionAtRestOptions.KmsKeyId
 	// VPCOptions: VPCId, SubnetIds, SecurityGroupIds
-	resource.RegisterNavigableFields("opensearch", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("opensearch", []resource.NavigableField{
 		{FieldPath: "EncryptionAtRestOptions.KmsKeyId", TargetType: "kms"},
 		{FieldPath: "VPCOptions.VPCId", TargetType: "vpc"},
 		{FieldPath: "VPCOptions.SubnetIds", TargetType: "subnet"},

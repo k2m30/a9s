@@ -20,6 +20,7 @@ type DetailModel struct {
 	res                    resource.Resource
 	resourceType           string // e.g. "ec2", "s3", "rds" — used to look up correct ViewDef
 	viewConfig             *config.ViewsConfig
+	navProvider            func(string) []resource.NavigableField // returns navigable fields for a resource type; defaults to GetActiveNavigableFields
 	viewport               viewport.Model
 	ready                  bool
 	wrap                   bool
@@ -40,6 +41,8 @@ type DetailModel struct {
 
 // NewDetail creates a DetailModel for the given resource.
 // resourceType identifies which ViewDef to use from the config (e.g. "ec2", "rds").
+// By default, navProvider is resource.GetActiveNavigableFields (ACTIVE-only).
+// TUI handlers that need merged DEFAULT+ACTIVE should call d.SetNavProvider(resource.GetNavigableFields).
 func NewDetail(res resource.Resource, resourceType string, viewConfig *config.ViewsConfig, k keys.Map) DetailModel {
 	if resourceType == "" {
 		resourceType = inferDetailResourceType(res)
@@ -48,9 +51,19 @@ func NewDetail(res resource.Resource, resourceType string, viewConfig *config.Vi
 		resourceType:  resourceType,
 		res:           res,
 		viewConfig:    viewConfig,
+		navProvider:   resource.GetActiveNavigableFields,
 		keys:          k,
 		rightColWidth: 32,
 	}
+}
+
+// SetNavProvider overrides the nav field provider used by buildFieldList.
+// TUI construction paths call this with resource.GetNavigableFields (merged
+// ACTIVE+DEFAULT) so that prod code sees all registered navigable fields.
+// Test-direct paths retain the ACTIVE-only default to stay isolated from
+// init-time registrations.
+func (m *DetailModel) SetNavProvider(p func(string) []resource.NavigableField) {
+	m.navProvider = p
 }
 
 // inferDetailResourceType provides a conservative fallback for routes that

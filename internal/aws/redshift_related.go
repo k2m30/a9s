@@ -28,7 +28,7 @@ func init() {
 	})
 
 	// redshifttypes.Cluster: VpcId
-	resource.RegisterNavigableFields("redshift", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("redshift", []resource.NavigableField{
 		{FieldPath: "VpcId", TargetType: "vpc"},
 	})
 }

@@ -38,7 +38,7 @@ func init() {
 	// objects returned by DescribeCacheClusters, not on ReplicationGroup, so
 	// SG navigation is surfaced via the checkRedisSG related-panel checker,
 	// not via a navigable field.
-	resource.RegisterNavigableFields("redis", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("redis", []resource.NavigableField{
 		{FieldPath: "KmsKeyId", TargetType: "kms"},
 	})
 }

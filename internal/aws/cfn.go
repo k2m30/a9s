@@ -29,7 +29,7 @@ func init() {
 	})
 
 	// cfntypes.Stack: RoleARN (execution role), NotificationARNs (SNS topics for stack events)
-	resource.RegisterNavigableFields("cfn", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("cfn", []resource.NavigableField{
 		{FieldPath: "RoleARN", TargetType: "role"},
 		{FieldPath: "NotificationARNs", TargetType: "sns"},
 	})

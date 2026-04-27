@@ -193,6 +193,11 @@ func main() {
 
 	tui.Version = version
 
+	// Populate the ACTIVE nav field registry from the DEFAULT registry so that
+	// DetailModel navigability works in production. This runs after all init()
+	// functions have populated the DEFAULT registry via RegisterDefaultNavFields.
+	resource.BootstrapActiveNavFields()
+
 	if err := runProgram(profile, region, extraOpts, activeTheme); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)

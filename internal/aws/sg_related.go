@@ -23,7 +23,7 @@ func init() {
 		{TargetType: "sg", DisplayName: "Referencing SGs", Checker: checkSGSG, NeedsTargetCache: true},
 	})
 
-	resource.RegisterNavigableFields("sg", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("sg", []resource.NavigableField{
 		{FieldPath: "VpcId", TargetType: "vpc"},
 	})
 }

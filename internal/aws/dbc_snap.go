@@ -105,7 +105,7 @@ func init() {
 	})
 
 	// docdbtypes.DBClusterSnapshot: VpcId, KmsKeyId
-	resource.RegisterNavigableFields("dbc-snap", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("dbc-snap", []resource.NavigableField{
 		{FieldPath: "VpcId", TargetType: "vpc"},
 		{FieldPath: "KmsKeyId", TargetType: "kms"},
 	})

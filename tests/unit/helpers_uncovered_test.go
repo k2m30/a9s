@@ -21,7 +21,7 @@ import (
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/aws/ctdetail"
+	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
 	"github.com/k2m30/a9s/v3/internal/buildinfo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -206,15 +206,15 @@ func TestRelated_SQS_SQS_NoRelationship(t *testing.T) {
 // TestCTDetailActor_IAMUser_ARNOnly verifies that Actor() falls back to
 // arnLastSegment when UserName is empty but ARN has a "/user/name" suffix.
 func TestCTDetailActor_IAMUser_ARNOnly(t *testing.T) {
-	event := &ctdetail.Event{
-		UserIdentity: ctdetail.UserIdentity{
+	event := &ctevent.Event{
+		UserIdentity: ctevent.UserIdentity{
 			Type:     "IAMUser",
 			UserName: "",
 			ARN:      "arn:aws:iam::123456789012:user/alice",
 		},
 	}
 
-	got := ctdetail.Actor(event)
+	got := ctevent.Actor(event)
 	want := "IAMUser: alice"
 	if got != want {
 		t.Errorf("Actor() = %q, want %q", got, want)
@@ -224,15 +224,15 @@ func TestCTDetailActor_IAMUser_ARNOnly(t *testing.T) {
 // TestCTDetailActor_IAMUser_ARNNoSlash verifies Actor() when ARN has no "/" —
 // arnLastSegment returns "" and Actor falls back to the raw ARN.
 func TestCTDetailActor_IAMUser_ARNNoSlash(t *testing.T) {
-	event := &ctdetail.Event{
-		UserIdentity: ctdetail.UserIdentity{
+	event := &ctevent.Event{
+		UserIdentity: ctevent.UserIdentity{
 			Type:     "IAMUser",
 			UserName: "",
 			ARN:      "arn:aws:iam::123456789012:root",
 		},
 	}
 
-	got := ctdetail.Actor(event)
+	got := ctevent.Actor(event)
 	// arnLastSegment returns "" for "arn:aws:iam::123456789012:root" (no "/"),
 	// so Actor falls back to the raw ARN.
 	if got == "" {
@@ -250,14 +250,14 @@ func TestCTDetailActor_IAMUser_ARNNoSlash(t *testing.T) {
 // TestCTDetailExtractTarget_LabelFromARN_IAMRole verifies that an IAM role ARN
 // in the resources[] envelope gets label "Role" via labelFromARN.
 func TestCTDetailExtractTarget_LabelFromARN_IAMRole(t *testing.T) {
-	resources := []ctdetail.ResourceRef{
+	resources := []ctevent.ResourceRef{
 		{
 			ARN:  "arn:aws:iam::123456789012:role/my-execution-role",
 			Type: "", // no type string → forces labelFromARN fallback
 		},
 	}
 
-	rows, _ := ctdetail.ExtractTarget("AssumeRole", "sts.amazonaws.com", "123456789012", resources, nil)
+	rows, _ := ctevent.ExtractTarget("AssumeRole", "sts.amazonaws.com", "123456789012", resources, nil)
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row")
 	}
@@ -269,14 +269,14 @@ func TestCTDetailExtractTarget_LabelFromARN_IAMRole(t *testing.T) {
 // TestCTDetailExtractTarget_LabelFromARN_IAMUser verifies that an IAM user ARN
 // gets label "User" via labelFromARN.
 func TestCTDetailExtractTarget_LabelFromARN_IAMUser(t *testing.T) {
-	resources := []ctdetail.ResourceRef{
+	resources := []ctevent.ResourceRef{
 		{
 			ARN:  "arn:aws:iam::123456789012:user/bob",
 			Type: "",
 		},
 	}
 
-	rows, _ := ctdetail.ExtractTarget("CreateUser", "iam.amazonaws.com", "123456789012", resources, nil)
+	rows, _ := ctevent.ExtractTarget("CreateUser", "iam.amazonaws.com", "123456789012", resources, nil)
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row")
 	}
@@ -288,14 +288,14 @@ func TestCTDetailExtractTarget_LabelFromARN_IAMUser(t *testing.T) {
 // TestCTDetailExtractTarget_LabelFromARN_KMSKey verifies that a KMS key ARN
 // gets label "Key" via labelFromARN.
 func TestCTDetailExtractTarget_LabelFromARN_KMSKey(t *testing.T) {
-	resources := []ctdetail.ResourceRef{
+	resources := []ctevent.ResourceRef{
 		{
 			ARN:  "arn:aws:kms:us-east-1:123456789012:key/abc-123-def",
 			Type: "",
 		},
 	}
 
-	rows, _ := ctdetail.ExtractTarget("Decrypt", "kms.amazonaws.com", "123456789012", resources, nil)
+	rows, _ := ctevent.ExtractTarget("Decrypt", "kms.amazonaws.com", "123456789012", resources, nil)
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row")
 	}
@@ -307,14 +307,14 @@ func TestCTDetailExtractTarget_LabelFromARN_KMSKey(t *testing.T) {
 // TestCTDetailExtractTarget_LabelFromARN_S3Bucket verifies that an S3 bucket ARN
 // (no object key) gets label "Bucket" via labelFromARN.
 func TestCTDetailExtractTarget_LabelFromARN_S3Bucket(t *testing.T) {
-	resources := []ctdetail.ResourceRef{
+	resources := []ctevent.ResourceRef{
 		{
 			ARN:  "arn:aws:s3:::my-data-bucket",
 			Type: "",
 		},
 	}
 
-	rows, _ := ctdetail.ExtractTarget("PutBucketPolicy", "s3.amazonaws.com", "", resources, nil)
+	rows, _ := ctevent.ExtractTarget("PutBucketPolicy", "s3.amazonaws.com", "", resources, nil)
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row")
 	}
@@ -326,14 +326,14 @@ func TestCTDetailExtractTarget_LabelFromARN_S3Bucket(t *testing.T) {
 // TestCTDetailExtractTarget_LabelFromARN_S3Object verifies that an S3 ARN with
 // an object key gets label "Object" via labelFromARN.
 func TestCTDetailExtractTarget_LabelFromARN_S3Object(t *testing.T) {
-	resources := []ctdetail.ResourceRef{
+	resources := []ctevent.ResourceRef{
 		{
 			ARN:  "arn:aws:s3:::my-data-bucket/prefix/object.json",
 			Type: "",
 		},
 	}
 
-	rows, _ := ctdetail.ExtractTarget("GetObject", "s3.amazonaws.com", "", resources, nil)
+	rows, _ := ctevent.ExtractTarget("GetObject", "s3.amazonaws.com", "", resources, nil)
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row")
 	}
@@ -345,14 +345,14 @@ func TestCTDetailExtractTarget_LabelFromARN_S3Object(t *testing.T) {
 // TestCTDetailExtractTarget_LabelFromARN_UnknownService verifies that an ARN
 // from an unknown service falls back to "Resource".
 func TestCTDetailExtractTarget_LabelFromARN_UnknownService(t *testing.T) {
-	resources := []ctdetail.ResourceRef{
+	resources := []ctevent.ResourceRef{
 		{
 			ARN:  "arn:aws:some-unknown-service:us-east-1:123456789012:thing/xyz",
 			Type: "",
 		},
 	}
 
-	rows, _ := ctdetail.ExtractTarget("DoSomething", "some-unknown-service.amazonaws.com", "", resources, nil)
+	rows, _ := ctevent.ExtractTarget("DoSomething", "some-unknown-service.amazonaws.com", "", resources, nil)
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row")
 	}

@@ -33,7 +33,7 @@ func init() {
 		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkECRRole},
 	})
 
-	resource.RegisterNavigableFields("ecr", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("ecr", []resource.NavigableField{
 		{FieldPath: "EncryptionConfiguration.KmsKey", TargetType: "kms"},
 	})
 }

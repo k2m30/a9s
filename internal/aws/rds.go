@@ -31,7 +31,7 @@ func init() {
 
 	// rdstypes.DBInstance: VpcSecurityGroups[].VpcSecurityGroupId, DBSubnetGroup.VpcId,
 	// DBSubnetGroup.Subnets[].SubnetIdentifier, KmsKeyId
-	resource.RegisterNavigableFields("dbi", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("dbi", []resource.NavigableField{
 		{FieldPath: "VpcSecurityGroups.VpcSecurityGroupId", TargetType: "sg"},
 		{FieldPath: "DBSubnetGroup.VpcId", TargetType: "vpc"},
 		{FieldPath: "DBSubnetGroup.Subnets.SubnetIdentifier", TargetType: "subnet"},
