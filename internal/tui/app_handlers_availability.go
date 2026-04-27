@@ -122,6 +122,11 @@ func (m Model) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetchedM
 		if m.ProbeResources == nil {
 			m.ProbeResources = make(map[string][]resource.Resource, len(msg.Resources))
 		}
+		// Site 2: derive findings across each resource type's slice before
+		// copying into ProbeResources (PR-03a-shim wire-up).
+		for short, rows := range msg.Resources {
+			(&m).deriveFindingsForType(short, rows)
+		}
 		maps.Copy(m.ProbeResources, msg.Resources)
 		// Record per-type truncation from the probe so buildResourceCacheSnapshot
 		// can stamp the correct IsTruncated value on probe-only cache entries.
@@ -212,6 +217,9 @@ func (m Model) handleAvailabilityChecked(msg messages.AvailabilityCheckedMsg) (t
 		if m.ProbeResources == nil {
 			m.ProbeResources = make(map[string][]resource.Resource)
 		}
+		// Site 2: derive findings across probe resources before storing so all
+		// retained resources have Findings populated (PR-03a-shim wire-up).
+		(&m).deriveFindingsForType(msg.ResourceType, msg.Resources)
 		m.ProbeResources[msg.ResourceType] = msg.Resources
 		if m.ProbeTruncated == nil {
 			m.ProbeTruncated = make(map[string]bool)
@@ -362,6 +370,21 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 			m.EnrichmentTruncatedIDs = make(map[string]map[string]bool)
 		}
 		m.EnrichmentTruncatedIDs[msg.ResourceType] = msg.TruncatedIDs
+
+		// Site 3 (Wave-2 bridge, CRITICAL): after m.EnrichmentFindings is updated,
+		// re-derive findings on every cached row of this type so each row picks up
+		// the just-arrived Wave 2 results. DeriveFindings is deterministic (no
+		// early-return) so the re-derive correctly merges wave1 + wave2 findings.
+		// This is the path TestShim_EnrichmentCheckedBridgesWave2Findings exercises.
+		if entry, ok := m.ResourceCache[msg.ResourceType]; ok {
+			(&m).deriveFindingsForType(msg.ResourceType, entry.Resources)
+		}
+		if lazySlice, ok := m.LazyResourceCache[msg.ResourceType]; ok {
+			(&m).deriveFindingsForType(msg.ResourceType, lazySlice)
+		}
+		if probeSlice, ok := m.ProbeResources[msg.ResourceType]; ok {
+			(&m).deriveFindingsForType(msg.ResourceType, probeSlice)
+		}
 
 		// Merge FieldUpdates into ProbeResources so the cached rows carry
 		// Wave-2-derived fields. These are then visible to list columns that

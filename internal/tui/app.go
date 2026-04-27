@@ -337,6 +337,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleAPIError(msg)
 	case messages.ResourcesLoadedMsg:
 		m.flash.active = false
+		// Site 1: derive findings across fetcher results before the view and
+		// write-through cache process them (PR-03a-shim wire-up).
+		(&m).deriveFindingsForType(msg.ResourceType, msg.Resources)
 		updated, cmd := m.updateActiveView(msg)
 		// Partial-success: when the fetcher returned BOTH resources AND a
 		// composite error, surface the error via FlashMsg → errorHistory
@@ -436,6 +439,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return messages.FlashMsg{Text: "enrich failed: " + msg.Err.Error(), IsError: true}
 			}
 		}
+		// Site 7: derive findings on the enriched detail resource before the
+		// view processes it (PR-03a-shim wire-up). Uses deriveFindingsForResource
+		// from derive_helper.go so the detail view's on-screen resource has
+		// Findings populated even when it doesn't write back to ResourceCache.
+		(&m).deriveFindingsForResource(msg.ResourceType, &msg.EnrichedRes)
 		return m.updateActiveView(msg)
 	case messages.RelatedCheckStartedMsg:
 		return m.handleRelatedCheckStarted(msg)
@@ -479,6 +487,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if _, lazyExists := m.LazyResourceCache[shortName]; lazyExists {
 				continue
 			}
+			// Site 4: derive findings before storing in ResourceCache so cached
+			// resources always have Findings populated (PR-03a-shim wire-up).
+			(&m).deriveFindingsForType(shortName, entry.Resources)
 			pagination := entry.Pagination
 			// Backward compat: callers that set IsTruncated=true but leave Pagination nil
 			// (e.g., test fixtures, demo mode) must still have truncation preserved so
@@ -502,6 +513,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(extra) == 0 {
 				continue
 			}
+			// Site 5: derive findings across the new slice before merging into
+			// LazyResourceCache (PR-03a-shim wire-up).
+			(&m).deriveFindingsForType(shortName, extra)
 			existing := m.LazyResourceCache[shortName]
 			known := make(map[string]struct{}, len(existing))
 			for _, r := range existing {
