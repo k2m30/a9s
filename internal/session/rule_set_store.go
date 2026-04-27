@@ -5,7 +5,11 @@
 // by *ServiceClients pointer).
 package session
 
-import "sync"
+import (
+	"sync"
+
+	"golang.org/x/sync/singleflight"
+)
 
 // RuleSetStore is a session-scoped, single-slot cache for the SES v1
 // DescribeActiveReceiptRuleSet response. Each Session owns one store; the
@@ -34,12 +38,18 @@ type RuleSetStore interface {
 	// switch and by Ctrl+R on the SES detail view (so receipt-rule changes
 	// are picked up without waiting for a full reconnect).
 	Clear()
+
+	// GetOrFetch returns the cached value if present; otherwise calls fetcher
+	// once across all concurrent callers (single-flight) and caches its result.
+	// The "active" key is fixed because this store has a single slot.
+	GetOrFetch(fetcher func() (any, error)) (any, error)
 }
 
 type ruleSetStore struct {
 	mu      sync.RWMutex
 	ruleSet any
 	ok      bool
+	sf      singleflight.Group
 }
 
 // NewRuleSetStore returns a new thread-safe RuleSetStore.
@@ -65,4 +75,27 @@ func (s *ruleSetStore) Clear() {
 	defer s.mu.Unlock()
 	s.ruleSet = nil
 	s.ok = false
+}
+
+// GetOrFetch returns the cached value if present; otherwise calls fetcher
+// once across all concurrent callers (single-flight) and caches its result.
+// The "active" key is fixed because this store has a single slot.
+func (s *ruleSetStore) GetOrFetch(fetcher func() (any, error)) (any, error) {
+	if v, ok := s.Get(); ok {
+		return v, nil
+	}
+	v, err, _ := s.sf.Do("active", func() (any, error) {
+		// Re-check inside the singleflight in case another caller filled it
+		// between our miss and acquiring the flight. Cheap.
+		if v, ok := s.Get(); ok {
+			return v, nil
+		}
+		v, err := fetcher()
+		if err != nil {
+			return nil, err
+		}
+		s.Set(v)
+		return v, nil
+	})
+	return v, err
 }

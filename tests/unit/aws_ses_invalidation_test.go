@@ -6,11 +6,29 @@
 // Also contains Pin 2: regression pin verifying that Ctrl+R on a detail view for
 // a ses resource type calls InvalidateSESRuleSetCache, so the next related-panel
 // check re-fetches the receipt-rule-set instead of serving stale cached data.
+//
+// Also contains Pin 3: singleflight coalescing regression pin verifying that N
+// concurrent callers of SESActiveReceiptRuleSetForTest (which delegates to the
+// unexported sesActiveReceiptRuleSet) result in exactly 1 upstream API call when
+// singleflight is in place.
+//
+// NOTE TO CODER: This test requires the following exported test helper to be added
+// to internal/aws/ses_related.go (or a new ses_related_export_test.go file):
+//
+//	// SESActiveReceiptRuleSetForTest is a test-only export of sesActiveReceiptRuleSet.
+//	func SESActiveReceiptRuleSetForTest(ctx context.Context, c *ServiceClients) (*ses.DescribeActiveReceiptRuleSetOutput, error) {
+//	    return sesActiveReceiptRuleSet(ctx, c)
+//	}
+//
+// The test will fail to compile until this export exists.
 package unit_test
 
 import (
 	"context"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ses"
@@ -332,5 +350,134 @@ func TestSESRuleSetSwap_LateWriterDoesNotPoisonNewStore(t *testing.T) {
 	// passing).
 	if _, ok := oldStore.Get(); !ok {
 		t.Errorf("orphaned old store has NO cached entry — late writer didn't fire; test is vacuous")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// PIN 3 — singleflight coalescing of concurrent sesActiveReceiptRuleSet callers
+// ---------------------------------------------------------------------------
+// Pre-fix: two concurrent callers both observe a cache miss and both invoke
+// DescribeActiveReceiptRuleSet. When one succeeds and the sibling transiently
+// fails (throttle / 5xx), the failing checker returns Count:-1 even though the
+// cache now holds the successful result.
+//
+// Post-fix: singleflight ensures exactly one upstream call is issued; all
+// concurrent waiters share the single result.
+//
+// This test calls the unexported sesActiveReceiptRuleSet via the exported
+// test wrapper SESActiveReceiptRuleSetForTest. The coder MUST add that
+// wrapper to internal/aws/ses_related.go (see the package-level NOTE at the
+// top of this file). Until the wrapper exists the test fails to compile —
+// that IS the intended red light for Plan B.
+
+// atomicBlockingSESV1 is a goroutine-safe SES v1 mock that:
+//   - counts calls atomically
+//   - blocks every DescribeActiveReceiptRuleSet call on releaseCh
+//   - signals inFlightCh when at least one call is in progress
+type atomicBlockingSESV1 struct {
+	calls      atomic.Int32
+	releaseCh  chan struct{}
+	inFlightCh chan struct{} // closed once the first call enters the stub
+	closeOnce  sync.Once
+	output     *ses.DescribeActiveReceiptRuleSetOutput
+}
+
+func (a *atomicBlockingSESV1) DescribeActiveReceiptRuleSet(
+	_ context.Context,
+	_ *ses.DescribeActiveReceiptRuleSetInput,
+	_ ...func(*ses.Options),
+) (*ses.DescribeActiveReceiptRuleSetOutput, error) {
+	a.calls.Add(1)
+	a.closeOnce.Do(func() { close(a.inFlightCh) })
+	<-a.releaseCh
+	return a.output, nil
+}
+
+// Compile-time check: atomicBlockingSESV1 satisfies SESV1API.
+var _ awsclient.SESV1API = (*atomicBlockingSESV1)(nil)
+
+// TestSESActiveReceiptRuleSet_Singleflight_CoalescesConcurrentMisses verifies
+// that N concurrent callers of sesActiveReceiptRuleSet result in exactly 1
+// upstream API invocation when singleflight coalescing is in place.
+//
+// Expected red light (pre-fix): a.calls == 5 (one per goroutine) — the assertion
+// `a.calls.Load() == 1` fires, failing the test.
+//
+// Expected green light (post-fix): a.calls == 1; all goroutines received the
+// same successful output.
+func TestSESActiveReceiptRuleSet_Singleflight_CoalescesConcurrentMisses(t *testing.T) {
+	const N = 5
+
+	ruleSetOutput := &ses.DescribeActiveReceiptRuleSetOutput{
+		Rules: []sestypes.ReceiptRule{
+			{
+				Name:       aws.String("coalesced-rule"),
+				Recipients: nil, // global — applies to all identities
+				Actions: []sestypes.ReceiptAction{
+					{LambdaAction: &sestypes.LambdaAction{
+						FunctionArn: aws.String("arn:aws:lambda:us-east-1:123456789012:function:coalesced"),
+					}},
+				},
+			},
+		},
+	}
+
+	mock := &atomicBlockingSESV1{
+		releaseCh:  make(chan struct{}),
+		inFlightCh: make(chan struct{}),
+		output:     ruleSetOutput,
+	}
+
+	clients := &awsclient.ServiceClients{SES: mock}
+	clients.SetRuleSets(session.NewRuleSetStore())
+
+	type result struct {
+		out *ses.DescribeActiveReceiptRuleSetOutput
+		err error
+	}
+	results := make([]result, N)
+	var wg sync.WaitGroup
+	wg.Add(N)
+
+	for i := range N {
+		go func(idx int) {
+			defer wg.Done()
+			out, err := awsclient.SESActiveReceiptRuleSetForTest(context.Background(), clients)
+			results[idx] = result{out: out, err: err}
+		}(i)
+	}
+
+	// Allow goroutines time to enter the blocking stub before releasing it.
+	// 50 ms matches the style used in TestSESRuleSetSwap_LateWriterDoesNotPoisonNewStore.
+	<-mock.inFlightCh
+	time.Sleep(50 * time.Millisecond)
+
+	// Release all blocked callers.
+	close(mock.releaseCh)
+	wg.Wait()
+
+	// With singleflight, the API must have been called exactly once.
+	if got := mock.calls.Load(); got != 1 {
+		t.Errorf("DescribeActiveReceiptRuleSet called %d times, want 1 — singleflight not coalescing concurrent misses", got)
+	}
+
+	// Every goroutine must have received a non-nil, non-error result with the
+	// expected rule-set name (no caller should see a failure while another succeeded).
+	for i, r := range results {
+		if r.err != nil {
+			t.Errorf("goroutine %d: unexpected error: %v", i, r.err)
+			continue
+		}
+		if r.out == nil {
+			t.Errorf("goroutine %d: got nil output, want non-nil", i)
+			continue
+		}
+		if len(r.out.Rules) == 0 {
+			t.Errorf("goroutine %d: got empty Rules, want at least 1", i)
+			continue
+		}
+		if got, want := aws.ToString(r.out.Rules[0].Name), "coalesced-rule"; got != want {
+			t.Errorf("goroutine %d: rule name = %q, want %q", i, got, want)
+		}
 	}
 }
