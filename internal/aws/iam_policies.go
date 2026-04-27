@@ -186,6 +186,19 @@ func FetchIAMPoliciesPage(ctx context.Context, api IAMListPoliciesAPI, continuat
 // fetchInlineGroupPolicies (same Fields keys) so reverse-scan checkers
 // reading Fields on a lazily-added policy observe the same fields as on a
 // paginated-fetched policy.
+//
+// Concurrency trade-off (acknowledged): no top-level lock is held across the
+// check-build-mark sequence. Two concurrent lazy-add calls can both observe
+// `store.ManagedBuilt() == false` and both invoke buildAllManagedPolicies.
+// The store itself remains correct (writes are mutex-guarded inside the
+// PolicyStore impl), so duplicate Set calls are idempotent — but two AWS
+// ListPolicies pagination walks may run in parallel before one wins the
+// MarkManagedBuilt race. The previous package-global `allPoliciesMu`
+// serialized this. Acceptable here because: (a) lazy-add is the
+// related-panel drill-in path, not high-volume; (b) duplicate Sets converge
+// to the same final cache state; (c) introducing a sync.Once or
+// build-in-progress flag would re-couple the transport layer to a session
+// concern that PR-02b explicitly removed. Same applies to InlineBuilt.
 func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string, store iamPolicyStore) ([]resource.Resource, error) {
 	if len(ids) == 0 {
 		return nil, nil
