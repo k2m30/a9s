@@ -116,6 +116,16 @@ type ResourceTypeDef struct {
 	// title equal to "Name" or the type Name → column index 0.
 	// Set this only when the cascade would pick the wrong column.
 	IdentityKey string
+	// LifecycleKey names the Resource.Fields key holding lifecycle state
+	// (e.g. "running", "stopped", "available", "deleted"). Used as the
+	// list-view Status column fallback when r.Findings is empty:
+	//
+	//   list view: r.Findings[0].Phrase if non-empty, else r.Fields[LifecycleKey]
+	//
+	// Empty string defaults to "state" at read time. Per-category PRs
+	// in Phase 03 set explicit non-default values where the structural
+	// Color func already reads a different key.
+	LifecycleKey string
 
 	// Color classifies the row's health. REQUIRED for all registered types.
 	// Reads the resource's structural fields directly.
