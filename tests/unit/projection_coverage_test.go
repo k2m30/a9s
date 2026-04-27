@@ -69,7 +69,7 @@ func TestProjectorCoverageAllTypes(t *testing.T) {
 			}
 			got := proj(r)
 			if len(got) == 0 {
-				t.Errorf("projection.Generic returned zero sections for %s", td.ShortName)
+				t.Errorf("projector returned zero sections for %s", td.ShortName)
 			}
 		})
 	}

@@ -337,6 +337,11 @@ func UnregisterFetchByIDs(shortName string) {
 // The current value for shortName (which may be nil) is pushed onto a per-key
 // stack in navigableFieldPrevious so that nested Register calls can all be
 // rolled back in order by successive UnregisterNavigableFields calls.
+//
+// Contract: every Register MUST be paired with an Unregister, otherwise the
+// per-key snapshot stack grows unbounded for the lifetime of the process. In
+// practice every test that registers also unregisters via t.Cleanup; production
+// callers register once at init and never unregister.
 func RegisterNavigableFields(shortName string, fields []NavigableField) {
 	navigableFieldMu.Lock()
 	defer navigableFieldMu.Unlock()
@@ -441,6 +446,13 @@ func GetDefaultNavFields(shortName string) []NavigableField {
 // cmd/a9s/main.go) so that DetailModel navigability works in production.
 // Must be called after all init() functions have run (i.e. inside main()).
 // Noop in test binaries that never call this function.
+//
+// Concurrency: NOT safe to call concurrently with RegisterDefaultNavFields.
+// Bootstrap snapshots the default registry under one lock, releases it, and
+// then takes the active registry's lock — there is a small window where a
+// concurrent RegisterDefaultNavFields would not be reflected in the snapshot.
+// In production this is fine because Bootstrap runs after init() in the
+// single-threaded main goroutine, before any concurrent activity begins.
 func BootstrapActiveNavFields() {
 	defaultNavFieldMu.RLock()
 	snapshot := make(map[string][]NavigableField, len(defaultNavFieldRegistry))

@@ -1,6 +1,7 @@
 package ctevent
 
 import (
+	"bytes"
 	"encoding/json"
 	"strings"
 	"time"
@@ -10,6 +11,13 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/domain"
 )
+
+// yamlIndentSpaces is the indent width emitted by jsonToYAMLLines and matched
+// by the leading-space arithmetic in buildRawJSONSection. yaml.Marshal's default
+// is 4 — we override to 2 via yaml.NewEncoder.SetIndent so the level math here
+// (level := leading / yamlIndentSpaces) stays correct and so RAW EVENT renders
+// match the 2-space convention used elsewhere in the projection layer.
+const yamlIndentSpaces = 2
 
 // Project implements domain.DetailProjector for CloudTrail event resources.
 // It parses the raw event JSON from r.RawStruct (expected to be a *Event or
@@ -160,7 +168,7 @@ func buildRawJSONSection(rawJSON string) domain.Section {
 			continue
 		}
 		leading := len(line) - len(strings.TrimLeft(line, " "))
-		level := leading / 2
+		level := leading / yamlIndentSpaces
 
 		trimmed := strings.TrimSpace(line)
 		_, _, hasSep := strings.Cut(trimmed, ":")
@@ -215,11 +223,16 @@ func jsonToYAMLLines(s string) []string {
 			return nil
 		}
 	}
-	out, err := yaml.Marshal(parsed)
-	if err != nil {
+	var buf bytes.Buffer
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(yamlIndentSpaces)
+	if err := enc.Encode(parsed); err != nil {
 		return nil
 	}
-	raw := strings.TrimRight(string(out), "\n")
+	if err := enc.Close(); err != nil {
+		return nil
+	}
+	raw := strings.TrimRight(buf.String(), "\n")
 	if raw == "" {
 		return nil
 	}

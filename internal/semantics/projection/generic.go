@@ -275,7 +275,7 @@ func buildItems(r domain.Resource, cfg *config.ViewsConfig, navProvider func(str
 		}
 		level := 0
 		if leading := len(rawLine) - len(strings.TrimLeft(rawLine, " ")); leading > 0 {
-			level = leading / 2
+			level = leading / text.YAMLIndentSpaces
 		}
 		hasDash := strings.HasPrefix(trimmed, "- ")
 		trimmed = strings.TrimPrefix(trimmed, "- ")
@@ -537,7 +537,7 @@ func expandJSONItems(items []fieldpath.FieldItem) []fieldpath.FieldItem {
 			})
 			for _, line := range lines {
 				leading := len(line) - len(strings.TrimLeft(line, " "))
-				level := leading/2 + item.IndentLevel + 1
+				level := leading/text.YAMLIndentSpaces + item.IndentLevel + 1
 				result = append(result, fieldpath.FieldItem{
 					Path:        item.Path,
 					Key:         line,
@@ -560,7 +560,7 @@ func expandJSONItems(items []fieldpath.FieldItem) []fieldpath.FieldItem {
 		})
 		for _, line := range lines {
 			leading := len(line) - len(strings.TrimLeft(line, " "))
-			level := leading/2 + 1
+			level := leading/text.YAMLIndentSpaces + 1
 			result = append(result, fieldpath.FieldItem{
 				Path:        item.Path,
 				Key:         line,

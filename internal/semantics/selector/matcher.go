@@ -20,9 +20,16 @@ func (noopMatcher) Matches(_ domain.Resource) bool { return false }
 // WildcardARN returns a Matcher that matches resources whose ID or ARN
 // matches the given glob-style pattern. Real implementation lands later;
 // until then it returns a no-op matcher that always returns false.
+//
+// TODO(phase-04): wire glob matching to Resource.ARN/ID per docs/refactor/04-catalog.md.
+// Until then any caller that constructs a WildcardARN will see all resources
+// fail to match — fail-closed is intentional.
 func WildcardARN(_ string) Matcher { return noopMatcher{} }
 
 // Tags returns a Matcher that matches resources satisfying all provided
 // tag conditions. Real implementation lands later; until then it returns
 // a no-op matcher that always returns false.
+//
+// TODO(phase-04): implement TagCondition evaluation against Resource.Tags
+// per docs/refactor/04-catalog.md. Fail-closed until then.
 func Tags(_ []TagCondition) Matcher { return noopMatcher{} }

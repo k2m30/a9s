@@ -10,6 +10,7 @@ package unit_test
 
 import (
 	"context"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -47,18 +48,32 @@ func firstEC2WithVPC(resources []domain.Resource) (domain.Resource, bool) {
 	return domain.Resource{}, false
 }
 
-// firstEC2WithTags returns the first EC2 resource that has tags in its RawStruct.
+// firstEC2WithTags returns the first EC2 resource whose RawStruct carries at
+// least one tag. We inspect the struct via reflection rather than just checking
+// for RawStruct != nil so the downstream tag-flattening assertion isn't fooled
+// by a tag-less resource (which would fail for the wrong reason).
 func firstEC2WithTags(resources []domain.Resource) (domain.Resource, bool) {
 	for _, r := range resources {
-		if r.RawStruct != nil {
+		if r.RawStruct == nil {
+			continue
+		}
+		v := reflect.ValueOf(r.RawStruct)
+		if v.Kind() == reflect.Pointer {
+			v = v.Elem()
+		}
+		if !v.IsValid() || v.Kind() != reflect.Struct {
+			continue
+		}
+		tags := v.FieldByName("Tags")
+		if tags.IsValid() && (tags.Kind() == reflect.Slice || tags.Kind() == reflect.Array) && tags.Len() > 0 {
 			return r, true
 		}
 	}
 	return domain.Resource{}, false
 }
 
-// projectResource calls projection.Generic and returns the flat list of all Items
-// across all sections.
+// allItems flattens a slice of domain.Section into a single slice of domain.Item
+// in section order, dropping the section boundary information.
 func allItems(sections []domain.Section) []domain.Item {
 	var items []domain.Item
 	for _, s := range sections {
@@ -172,8 +187,8 @@ func TestProjectionFieldAudit_TagFlattening(t *testing.T) {
 	// produce at least one ItemField or ItemSubfield in a Tags section.
 	tagItems := collectTagItems(sections)
 	if len(tagItems) == 0 {
-		t.Errorf("tag flattening: no tag Items found in projected output; "+
-			"each tag must produce exactly one Item row (Label=tag-key, Value=tag-value)")
+		t.Errorf("tag flattening: no tag Items found in projected output; " +
+			"at least one tag Item (Label=tag-key, Value=tag-value) must be emitted")
 	}
 }
 

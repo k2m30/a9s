@@ -88,7 +88,7 @@ func augmentEC2StatusChecks(r domain.Resource, sections []domain.Section) []doma
 			var tail *domain.Section
 			if endOfState < len(sec.Items) {
 				tail = &domain.Section{
-					Title: "", // continuation; matches legacy unnamed-section behaviour
+					Title: sec.Title, // forward-safe: preserve title in case future projector emits State header inside a titled section
 					Items: sec.Items[endOfState:],
 				}
 			}

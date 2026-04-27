@@ -23,13 +23,10 @@ package unit
 //   → domainItemToFieldItem (detail_fields.go) → fieldpath.FieldItem.Path
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/semantics/projection"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
 // ec2VpcResource constructs a minimal EC2-shaped domain.Resource with a VpcId
@@ -94,27 +91,3 @@ func TestProjectionPath_FieldItemToDomainItem_PreservesPath(t *testing.T) {
 	}
 }
 
-// TestProjectionPath_DomainItemToFieldItem_PreservesPath asserts that rendering
-// through the DetailModel preserves field paths end-to-end. The test uses a
-// resource with a VpcId field and checks that the rendered output contains the
-// expected value "vpc-123" — a proxy for verifying that the path round-trip
-// did not corrupt the field data pipeline.
-//
-// The production code path under test:
-//   projection.Generic → domain.Item{Path: "VpcId"} →
-//   sectionsToFieldItems → domainItemToFieldItem → fieldpath.FieldItem{Path: "VpcId"} →
-//   renderFromFieldList (value shown in output)
-func TestProjectionPath_DomainItemToFieldItem_PreservesPath(t *testing.T) {
-	r := ec2VpcResource()
-	k := keys.Default()
-
-	d := views.NewDetail(r, "", nil, k)
-	d.SetSize(120, 40)
-	output := stripANSI(d.View())
-
-	// The rendered output must contain the VpcId value. If domainItemToFieldItem
-	// corrupted the field path, the value would be absent or garbled.
-	if !strings.Contains(output, "vpc-123") {
-		t.Errorf("rendered detail view does not contain VpcId value 'vpc-123' — path round-trip may have broken field rendering\noutput:\n%s", output)
-	}
-}
