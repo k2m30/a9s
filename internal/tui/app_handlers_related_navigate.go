@@ -17,6 +17,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/session"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -49,7 +50,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 			// This preserves the never-use-fast-path-for-partial-coverage invariant even
 			// when the type has no visual definition.
 			if len(result.RelatedIDs) > 0 {
-				if lazyRows, hasLazy := m.lazyResourceCache[msg.TargetType]; hasLazy {
+				if lazyRows, hasLazy := m.LazyResourceCache[msg.TargetType]; hasLazy {
 					idSet := make(map[string]bool, len(result.RelatedIDs))
 					for _, id := range result.RelatedIDs {
 						idSet[id] = true
@@ -112,13 +113,13 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 
 		// RelatedIDs-based filtered list (multi or single cache miss).
 		if len(result.RelatedIDs) > 0 {
-			if entry, ok := m.resourceCache[msg.TargetType]; ok {
+			if entry, ok := m.ResourceCache[msg.TargetType]; ok {
 				idSet := make(map[string]bool, len(result.RelatedIDs))
 				for _, id := range result.RelatedIDs {
 					idSet[id] = true
 				}
 				var filtered []resource.Resource
-				for _, r := range entry.resources {
+				for _, r := range entry.Resources {
 					if idSet[r.ID] {
 						filtered = append(filtered, r)
 					}
@@ -126,8 +127,8 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 				// Augment with lazy-cached resources for this type. These are
 				// out-of-scope entries (AWS-managed KMS keys, public AMIs, shared
 				// snapshots) that the top-level fetcher filtered out. Prefer
-				// resourceCache on ID collision (already covered above).
-				if lazyRows, hasLazy := m.lazyResourceCache[msg.TargetType]; hasLazy {
+				// ResourceCache on ID collision (already covered above).
+				if lazyRows, hasLazy := m.LazyResourceCache[msg.TargetType]; hasLazy {
 					found := make(map[string]struct{}, len(filtered))
 					for _, r := range filtered {
 						found[r.ID] = struct{}{}
@@ -144,12 +145,12 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 				// If some IDs are missing and cache may have more pages, fetch the rest.
 				// Pre-populate the list with already-cached filtered rows so they remain
 				// visible when subsequent pages arrive via Append:true ResourcesLoadedMsg.
-				if len(filtered) < len(result.RelatedIDs) && entry.pagination != nil && entry.pagination.IsTruncated {
+				if len(filtered) < len(result.RelatedIDs) && entry.Pagination != nil && entry.Pagination.IsTruncated {
 					rl := views.NewResourceListFromCache(
 						*rt, m.viewConfig, m.keys,
-						filtered, entry.pagination,
+						filtered, entry.Pagination,
 						"",
-						entry.sortColIdx, entry.sortAsc,
+						entry.SortColIdx, entry.SortAsc,
 						0, 0,
 						false,
 					)
@@ -163,7 +164,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 					m.pushView(&rl)
 					fetchCmd := m.fetchMoreResources(messages.LoadMoreMsg{
 						ResourceType:      msg.TargetType,
-						ContinuationToken: entry.pagination.NextToken,
+						ContinuationToken: entry.Pagination.NextToken,
 					})
 					return m, fetchCmd
 				}
@@ -172,7 +173,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 				// view. Otherwise the list inherits the upstream cache's
 				// truncation flag and renders a misleading "m: load more"
 				// footer for a fully-resolved exact-ID filter.
-				paginationForView := entry.pagination
+				paginationForView := entry.Pagination
 				if paginationForView != nil && paginationForView.IsTruncated {
 					clone := *paginationForView
 					clone.IsTruncated = false
@@ -183,7 +184,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 					*rt, m.viewConfig, m.keys,
 					filtered, paginationForView,
 					"", // no text filter needed, already filtered by ID
-					entry.sortColIdx, entry.sortAsc,
+					entry.SortColIdx, entry.SortAsc,
 					0, 0,
 					false,
 				)
@@ -197,10 +198,10 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 				m.pushView(&rl)
 				return m, nil
 			}
-			// resourceCache miss: check lazyResourceCache before triggering a fetch.
+			// ResourceCache miss: check LazyResourceCache before triggering a fetch.
 			// This handles the case where all requested IDs were pulled via FetchByIDs
-			// (e.g. AWS-managed KMS key drill — never in resourceCache).
-			if lazyRows, hasLazy := m.lazyResourceCache[msg.TargetType]; hasLazy {
+			// (e.g. AWS-managed KMS key drill — never in ResourceCache).
+			if lazyRows, hasLazy := m.LazyResourceCache[msg.TargetType]; hasLazy {
 				idSet := make(map[string]bool, len(result.RelatedIDs))
 				for _, id := range result.RelatedIDs {
 					idSet[id] = true
@@ -280,11 +281,11 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 		}
 		var detailRes resource.Resource
 		var detailFound bool
-		if entry, ok := m.resourceCache[msg.TargetType]; ok {
-			detailRes, detailFound = resolveDetailResource(entry.resources)
+		if entry, ok := m.ResourceCache[msg.TargetType]; ok {
+			detailRes, detailFound = resolveDetailResource(entry.Resources)
 		}
 		if !detailFound {
-			if lazyRows, ok := m.lazyResourceCache[msg.TargetType]; ok {
+			if lazyRows, ok := m.LazyResourceCache[msg.TargetType]; ok {
 				detailRes, detailFound = resolveDetailResource(lazyRows)
 			}
 		}
@@ -315,9 +316,9 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 			detail.SetSize(m.innerSize())
 			m.pushView(&detail)
 			if detail.NeedsRelatedCheck() {
-				ck := relatedCacheKey(msg.TargetType, r.ID)
-				if cached, ok := m.relatedCache.get(ck); ok && len(cached) > 0 {
-					detail.ApplyRelatedResults(relatedCacheReplay(msg.TargetType, cached))
+				ck := session.RelatedCacheKey(msg.TargetType, r.ID)
+				if cached, ok := m.RelatedCache.Get(ck); ok && len(cached) > 0 {
+					detail.ApplyRelatedResults(session.RelatedCacheReplay(msg.TargetType, cached))
 					return m, nil
 				}
 				srcRes := r

@@ -21,6 +21,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/session"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -72,21 +73,21 @@ func (m Model) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 
 	// Build queue of all resource types to check in background
 	allNames := resource.AllShortNames()
-	m.availQueue = allNames
-	m.availChecked = 0
-	m.availTotal = len(allNames)
+	m.AvailQueue = allNames
+	m.AvailChecked = 0
+	m.AvailTotal = len(allNames)
 
 	// Update menu progress
 	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
-		menu.SetCheckProgress(0, m.availTotal)
+		menu.SetCheckProgress(0, m.AvailTotal)
 	}
 
 	// Fire first batch of concurrent probes (up to 4)
 	var cmds []tea.Cmd
-	for i := 0; i < 4 && len(m.availQueue) > 0; i++ {
-		shortName := m.availQueue[0]
-		m.availQueue = m.availQueue[1:]
-		cmds = append(cmds, m.probeResourceAvailability(shortName, m.availabilityGen))
+	for i := 0; i < 4 && len(m.AvailQueue) > 0; i++ {
+		shortName := m.AvailQueue[0]
+		m.AvailQueue = m.AvailQueue[1:]
+		cmds = append(cmds, m.probeResourceAvailability(shortName, m.AvailabilityGen))
 	}
 
 	return m, tea.Batch(cmds...)
@@ -99,7 +100,7 @@ func (m Model) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetchedM
 	// Gen guard: drop stale results produced before a profile/region switch.
 	// Gen=0 is the zero value (pre-guard dispatch) — accepted unconditionally
 	// to preserve backwards-compatible test injection.
-	if msg.Gen != 0 && msg.Gen != m.availabilityGen {
+	if msg.Gen != 0 && msg.Gen != m.AvailabilityGen {
 		return m, nil
 	}
 	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
@@ -118,35 +119,35 @@ func (m Model) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetchedM
 	}
 	// T034: retain prefetch resources for Wave 2 enrichment (--no-cache live AWS).
 	if msg.Resources != nil {
-		if m.probeResources == nil {
-			m.probeResources = make(map[string][]resource.Resource, len(msg.Resources))
+		if m.ProbeResources == nil {
+			m.ProbeResources = make(map[string][]resource.Resource, len(msg.Resources))
 		}
-		maps.Copy(m.probeResources, msg.Resources)
+		maps.Copy(m.ProbeResources, msg.Resources)
 		// Record per-type truncation from the probe so buildResourceCacheSnapshot
 		// can stamp the correct IsTruncated value on probe-only cache entries.
 		// Without this, all probe entries get IsTruncated=true regardless of
 		// whether the probe fetched a complete single page (Issue 1 / P1 fix).
-		if m.probeTruncated == nil {
-			m.probeTruncated = make(map[string]bool, len(msg.Truncated))
+		if m.ProbeTruncated == nil {
+			m.ProbeTruncated = make(map[string]bool, len(msg.Truncated))
 		}
-		maps.Copy(m.probeTruncated, msg.Truncated)
-		// Seed resourceCache from the prefetch too. Without this, Wave 2
+		maps.Copy(m.ProbeTruncated, msg.Truncated)
+		// Seed ResourceCache from the prefetch too. Without this, Wave 2
 		// FieldUpdates that the enricher merges into the cache entry
 		// (handleEnrichmentChecked tail) have no entry to land on when the
 		// user hasn't opened the list yet — the enrichment runs before any
-		// OpenList, so FieldUpdates would otherwise die in probeResources
+		// OpenList, so FieldUpdates would otherwise die in ProbeResources
 		// and vanish on the first fetch. Seeding here keeps the cache
 		// entry alive so FieldUpdates survive across navigation.
-		if m.resourceCache == nil {
-			m.resourceCache = make(map[string]*resourceCacheEntry, len(msg.Resources))
+		if m.ResourceCache == nil {
+			m.ResourceCache = make(map[string]*session.ResourceCacheEntry, len(msg.Resources))
 		}
 		for rt, resources := range msg.Resources {
-			if _, exists := m.resourceCache[rt]; exists {
+			if _, exists := m.ResourceCache[rt]; exists {
 				continue
 			}
-			m.resourceCache[rt] = &resourceCacheEntry{
-				resources:  resources,
-				pagination: &resource.PaginationMeta{IsTruncated: msg.Truncated[rt]},
+			m.ResourceCache[rt] = &session.ResourceCacheEntry{
+				Resources:  resources,
+				Pagination: &resource.PaginationMeta{IsTruncated: msg.Truncated[rt]},
 			}
 		}
 	}
@@ -182,11 +183,11 @@ func (m Model) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetchedM
 // handleAvailabilityChecked processes a single resource type's probe result.
 func (m Model) handleAvailabilityChecked(msg messages.AvailabilityCheckedMsg) (tea.Model, tea.Cmd) {
 	// Ignore stale results from a previous generation (profile/region switch)
-	if msg.Gen != m.availabilityGen {
+	if msg.Gen != m.AvailabilityGen {
 		return m, nil
 	}
 
-	m.availChecked++
+	m.AvailChecked++
 
 	// Update menu availability on full success (Err==nil) or partial-success
 	// (Err!=nil but Resources non-empty). Pure failures (Err!=nil, Resources
@@ -199,14 +200,14 @@ func (m Model) handleAvailabilityChecked(msg messages.AvailabilityCheckedMsg) (t
 			menu.SetIssues(msg.ResourceType, msg.Issues, msg.Truncated)
 		}
 		// T032: retain probe resources for Wave 2 enrichment.
-		if m.probeResources == nil {
-			m.probeResources = make(map[string][]resource.Resource)
+		if m.ProbeResources == nil {
+			m.ProbeResources = make(map[string][]resource.Resource)
 		}
-		m.probeResources[msg.ResourceType] = msg.Resources
-		if m.probeTruncated == nil {
-			m.probeTruncated = make(map[string]bool)
+		m.ProbeResources[msg.ResourceType] = msg.Resources
+		if m.ProbeTruncated == nil {
+			m.ProbeTruncated = make(map[string]bool)
 		}
-		m.probeTruncated[msg.ResourceType] = msg.Truncated
+		m.ProbeTruncated[msg.ResourceType] = msg.Truncated
 	}
 
 	// Surface partial-success failures as flash errors so operators see them.
@@ -224,20 +225,20 @@ func (m Model) handleAvailabilityChecked(msg messages.AvailabilityCheckedMsg) (t
 
 	// Update progress on menu
 	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
-		menu.SetCheckProgress(m.availChecked, m.availTotal)
+		menu.SetCheckProgress(m.AvailChecked, m.AvailTotal)
 	}
 
 	// If queue has more items, fire next probe
-	if len(m.availQueue) > 0 {
-		next := m.availQueue[0]
-		m.availQueue = m.availQueue[1:]
-		cmd := m.probeResourceAvailability(next, m.availabilityGen)
+	if len(m.AvailQueue) > 0 {
+		next := m.AvailQueue[0]
+		m.AvailQueue = m.AvailQueue[1:]
+		cmd := m.probeResourceAvailability(next, m.AvailabilityGen)
 		return m, tea.Batch(flashCmd, cmd)
 	}
 
 	// Queue is drained but other probes may still be in flight.
 	// Only finalize when ALL probes have returned.
-	if m.availChecked < m.availTotal {
+	if m.AvailChecked < m.AvailTotal {
 		return m, flashCmd
 	}
 
@@ -261,16 +262,16 @@ func (m Model) handleAvailabilityChecked(msg messages.AvailabilityCheckedMsg) (t
 // findings and ran flag (clear-on-rerun-start), then captures the new gen into
 // the probeEnrichment call.
 func (m *Model) startEnrichment() tea.Cmd {
-	m.enrichQueue = m.buildEnrichQueue()
-	if len(m.enrichQueue) == 0 {
+	m.EnrichQueue = m.buildEnrichQueue()
+	if len(m.EnrichQueue) == 0 {
 		return nil
 	}
-	m.enrichmentGen++
-	m.enrichChecked = 0
-	m.enrichTotal = len(m.enrichQueue)
+	m.Session.EnrichmentGen++
+	m.EnrichChecked = 0
+	m.EnrichTotal = len(m.EnrichQueue)
 
 	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
-		menu.SetEnrichProgress(0, m.enrichTotal)
+		menu.SetEnrichProgress(0, m.EnrichTotal)
 	}
 
 	// Dispatch all enrichers at once so priority ordering is observable in a
@@ -278,14 +279,14 @@ func (m *Model) startEnrichment() tea.Cmd {
 	// EnrichmentCheckedMsg values. handleEnrichmentChecked drains any residual
 	// queue entries added by future requeue operations.
 	var cmds []tea.Cmd
-	for len(m.enrichQueue) > 0 {
-		name := m.enrichQueue[0]
-		m.enrichQueue = m.enrichQueue[1:]
+	for len(m.EnrichQueue) > 0 {
+		name := m.EnrichQueue[0]
+		m.EnrichQueue = m.EnrichQueue[1:]
 		// Clear-on-rerun-start: bump type gen, wipe stale findings and ran flag.
-		m.enrichmentTypeGen[name]++
-		delete(m.enrichmentFindings, name)
-		delete(m.enrichmentRan, name)
-		cmds = append(cmds, m.probeEnrichment(name, m.enrichmentGen))
+		m.EnrichmentTypeGen[name]++
+		delete(m.EnrichmentFindings, name)
+		delete(m.EnrichmentRan, name)
+		cmds = append(cmds, m.probeEnrichment(name, m.Session.EnrichmentGen))
 	}
 	return tea.Batch(cmds...)
 }
@@ -302,18 +303,18 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 	}
 	// Session-wide generation guard — drop stale messages from prior profile/region.
 	// Gen=0 is the documented test-injection bypass: accepted regardless of enrichmentGen.
-	if msg.Gen != 0 && msg.Gen != m.enrichmentGen {
+	if msg.Gen != 0 && msg.Gen != m.Session.EnrichmentGen {
 		return m, nil
 	}
 	// Per-type generation guard — drop stale probes superseded by a newer rerun.
 	// TypeGen=0 is the symmetric test-injection bypass (production always dispatches
-	// with TypeGen≥1 because startEnrichment bumps enrichmentTypeGen[name] before
+	// with TypeGen≥1 because startEnrichment bumps EnrichmentTypeGen[name] before
 	// capturing typeGen in probeEnrichment).
-	if msg.TypeGen != 0 && msg.TypeGen != m.enrichmentTypeGen[msg.ResourceType] {
+	if msg.TypeGen != 0 && msg.TypeGen != m.EnrichmentTypeGen[msg.ResourceType] {
 		return m, nil
 	}
 
-	m.enrichChecked++
+	m.EnrichChecked++
 
 	// Surface enrichment failures as a flash error so operators see them in the
 	// error log (! key). A failed enrichment does not stall the pipeline — the
@@ -337,30 +338,30 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 		// Persist findings and mark enrichment as ran for this type.
 		// Guard against nil maps: these are initialized in handleSessionStart
 		// but may be nil in early or test-injected model states.
-		if m.enrichmentFindings == nil {
-			m.enrichmentFindings = make(map[string]map[string]resource.EnrichmentFinding)
+		if m.EnrichmentFindings == nil {
+			m.EnrichmentFindings = make(map[string]map[string]resource.EnrichmentFinding)
 		}
-		m.enrichmentFindings[msg.ResourceType] = msg.Findings
-		if m.enrichmentRan == nil {
-			m.enrichmentRan = make(map[string]bool)
+		m.EnrichmentFindings[msg.ResourceType] = msg.Findings
+		if m.EnrichmentRan == nil {
+			m.EnrichmentRan = make(map[string]bool)
 		}
-		m.enrichmentRan[msg.ResourceType] = true
+		m.EnrichmentRan[msg.ResourceType] = true
 		// Always replace, including with empty/nil maps — a successful rerun
 		// MUST clear prior "?" row markers. Using `if len > 0` would leave
 		// stale markers from a previous attempt.
-		if m.enrichmentTruncatedIDs == nil {
-			m.enrichmentTruncatedIDs = make(map[string]map[string]bool)
+		if m.EnrichmentTruncatedIDs == nil {
+			m.EnrichmentTruncatedIDs = make(map[string]map[string]bool)
 		}
-		m.enrichmentTruncatedIDs[msg.ResourceType] = msg.TruncatedIDs
+		m.EnrichmentTruncatedIDs[msg.ResourceType] = msg.TruncatedIDs
 
-		// Merge FieldUpdates into probeResources so the cached rows carry
+		// Merge FieldUpdates into ProbeResources so the cached rows carry
 		// Wave-2-derived fields. These are then visible to list columns that
 		// reference the updated keys.
 		if len(msg.FieldUpdates) > 0 {
-			if m.probeResources == nil {
-				m.probeResources = make(map[string][]resource.Resource)
+			if m.ProbeResources == nil {
+				m.ProbeResources = make(map[string][]resource.Resource)
 			}
-			slice := m.probeResources[msg.ResourceType]
+			slice := m.ProbeResources[msg.ResourceType]
 			for i := range slice {
 				if updates, ok := msg.FieldUpdates[slice[i].ID]; ok {
 					if slice[i].Fields == nil {
@@ -369,17 +370,17 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 					maps.Copy(slice[i].Fields, updates)
 				}
 			}
-			m.probeResources[msg.ResourceType] = slice
-			// Persist FieldUpdates into resourceCache so that navigating away
+			m.ProbeResources[msg.ResourceType] = slice
+			// Persist FieldUpdates into ResourceCache so that navigating away
 			// and back restores the Wave-2-derived fields (e.g. last_build,
 			// dlq, rotation_enabled) instead of rendering them blank.
-			if entry, ok := m.resourceCache[msg.ResourceType]; ok {
-				for i := range entry.resources {
-					if updates, ok := msg.FieldUpdates[entry.resources[i].ID]; ok {
-						if entry.resources[i].Fields == nil {
-							entry.resources[i].Fields = make(map[string]string, len(updates))
+			if entry, ok := m.ResourceCache[msg.ResourceType]; ok {
+				for i := range entry.Resources {
+					if updates, ok := msg.FieldUpdates[entry.Resources[i].ID]; ok {
+						if entry.Resources[i].Fields == nil {
+							entry.Resources[i].Fields = make(map[string]string, len(updates))
 						}
-						maps.Copy(entry.resources[i].Fields, updates)
+						maps.Copy(entry.Resources[i].Fields, updates)
 					}
 				}
 			}
@@ -396,7 +397,7 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 			td := resource.FindResourceType(msg.ResourceType)
 			var unified int
 			if td != nil {
-				unified = unifiedIssueCount(m.probeResources[msg.ResourceType], *td, msg.Findings)
+				unified = unifiedIssueCount(m.ProbeResources[msg.ResourceType], *td, msg.Findings)
 			} else {
 				unified = msg.Issues
 			}
@@ -415,7 +416,7 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 				issueTruncated = true
 			}
 			menu.SetIssues(msg.ResourceType, unified, issueTruncated)
-			menu.SetEnrichProgress(m.enrichChecked, m.enrichTotal)
+			menu.SetEnrichProgress(m.EnrichChecked, m.EnrichTotal)
 
 			// Live-update ALL ResourceListModel views in the stack showing this type.
 			for _, v := range m.stack {
@@ -442,24 +443,24 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 	} // end anonymous block (partial-success safe: empty maps are no-ops)
 
 	// Fire next from queue — bump per-type gen before each dispatch.
-	if len(m.enrichQueue) > 0 {
-		next := m.enrichQueue[0]
-		m.enrichQueue = m.enrichQueue[1:]
+	if len(m.EnrichQueue) > 0 {
+		next := m.EnrichQueue[0]
+		m.EnrichQueue = m.EnrichQueue[1:]
 		// Clear-on-rerun-start for the next type.
-		m.enrichmentTypeGen[next]++
-		delete(m.enrichmentFindings, next)
-		delete(m.enrichmentRan, next)
-		cmd := m.probeEnrichment(next, m.enrichmentGen)
+		m.EnrichmentTypeGen[next]++
+		delete(m.EnrichmentFindings, next)
+		delete(m.EnrichmentRan, next)
+		cmd := m.probeEnrichment(next, m.Session.EnrichmentGen)
 		return m, tea.Batch(flashCmd, cmd)
 	}
 
 	// All enrichment done — clear progress, free retained resources, save cache
-	if m.enrichChecked >= m.enrichTotal {
+	if m.EnrichChecked >= m.EnrichTotal {
 		if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 			menu.SetEnrichProgress(0, 0)
 		}
-		m.probeResources = nil
-		m.probeTruncated = nil
+		m.ProbeResources = nil
+		m.ProbeTruncated = nil
 		// Save cache with enrichment-updated issue counts.
 		cmd := m.saveAvailabilityCache()
 		return m, tea.Batch(flashCmd, cmd)

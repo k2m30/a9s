@@ -715,7 +715,7 @@ func Test_LA_042_EscUnrelatedNav_ReDrill_Stable(t *testing.T) {
 // Test_LA_043_SourceDetailReEntry_UsesCachedResult documents that relatedCache
 // is a per-message routing cache (not a checker-memoization layer) — the checker
 // function runs on every RelatedCheckStartedMsg dispatch, but the RESULT cache
-// (m.relatedCache, keyed by resourceType:resourceID) enables re-entry fast paths.
+// (m.RelatedCache, keyed by resourceType:resourceID) enables re-entry fast paths.
 //
 // Observable pin: the second dispatch produces the same ResourceIDs as the first.
 // relatedCache is at the message-routing level (see app.go:553-560), not a

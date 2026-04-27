@@ -147,7 +147,7 @@ type RefreshMsg struct{}
 
 // RelatedCheckStartedMsg requests that the root model dispatch related-resource checkers.
 // Emitted by DetailModel when user presses 'r'. The root model handles this because
-// it owns m.clients and m.resourceCache — views cannot dispatch AWS calls directly.
+// it owns m.clients and m.ResourceCache — views cannot dispatch AWS calls directly.
 type RelatedCheckStartedMsg struct {
 	ResourceType   string
 	SourceResource resource.Resource // the resource being viewed
@@ -160,7 +160,7 @@ type RelatedCheckResultMsg struct {
 	SourceResourceID string // ID of the source resource (for cache keying)
 	DefDisplayName   string // unique def.DisplayName — disambiguates multiple defs sharing a TargetType (e.g. ct-events self-pivots)
 	Result           resource.RelatedCheckResult
-	Generation       uint64 // dispatch generation — discard if != Model.relatedGen
+	Generation       uint64 // dispatch generation — discard if != Model.RelatedGen
 	// CachedPages contains full top-level resource pages fetched from AWS on a
 	// cold cache miss, keyed by target resource short name. Non-nil only when
 	// the NeedsTargetCache prefetch executed a live fetch (i.e., target was

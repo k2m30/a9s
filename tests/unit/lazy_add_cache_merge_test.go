@@ -241,7 +241,7 @@ func TestLazyAdd_MergesIntoExistingCacheEntry_DedupByID(t *testing.T) {
 // collectECSTaskCacheViaChecker is a helper that runs the relatedCheckStarted
 // cycle and collects the ecs-task resources that the live cache holds by
 // doing a direct checker call with the cache snapshot built from the model.
-// Since we can't read m.resourceCache directly, we infer the cache contents
+// Since we can't read m.ResourceCache directly, we infer the cache contents
 // by querying the checker with a controlled cache constructed from what
 // the write-back should have produced.
 //

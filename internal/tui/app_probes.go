@@ -209,7 +209,7 @@ func (m *Model) saveAvailabilityCache() tea.Cmd {
 func (m *Model) demoPrefetchCounts() tea.Cmd {
 	clients := m.clients
 	appCtx := m.appCtx
-	gen := m.availabilityGen
+	gen := m.AvailabilityGen
 	return func() tea.Msg {
 		allNames := resource.AllShortNames()
 		entries := make(map[string]int, len(allNames))
@@ -308,7 +308,7 @@ func (m *Model) buildEnrichQueue() []string {
 
 	var ps []pair
 	for name, e := range awsclient.IssueEnricherRegistry {
-		if _, ok := m.probeResources[name]; !ok {
+		if _, ok := m.ProbeResources[name]; !ok {
 			continue
 		}
 		ps = append(ps, pair{name: name, priority: e.Priority})
@@ -333,17 +333,17 @@ func (m *Model) buildEnrichQueue() []string {
 func (m *Model) probeEnrichment(shortName string, gen int) tea.Cmd {
 	clients := m.clients
 	appCtx := m.appCtx
-	resources := m.probeResources[shortName]
+	resources := m.ProbeResources[shortName]
 	enricherFn := awsclient.IssueEnricherRegistry[shortName].Fn
-	typeGen := m.enrichmentTypeGen[shortName]
+	typeGen := m.EnrichmentTypeGen[shortName]
 	if enricherFn == nil {
 		return nil
 	}
 	// Build a resource.ResourceCache snapshot via buildResourceCacheSnapshot
-	// — it merges m.probeResources (first-page rows retained by the
-	// availability probe) AND m.lazyResourceCache AND m.resourceCache.
-	// On the normal startup path m.resourceCache is empty until the user
-	// opens a list, so building from m.resourceCache alone here would leave
+	// — it merges m.ProbeResources (first-page rows retained by the
+	// availability probe) AND m.LazyResourceCache AND m.ResourceCache.
+	// On the normal startup path m.ResourceCache is empty until the user
+	// opens a list, so building from m.ResourceCache alone here would leave
 	// the first enrichment pass blind to siblings.
 	// Regression pin: TestProbeEnrichment_CacheSnapshotMergesProbeResources.
 	cacheSnap := m.buildResourceCacheSnapshot()

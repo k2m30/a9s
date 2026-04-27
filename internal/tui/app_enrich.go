@@ -25,10 +25,10 @@ func (m Model) handleEnrichDetail(msg messages.EnrichDetailMsg) (tea.Model, tea.
 		return m, nil
 	}
 
-	gen := m.enrichGen
+	gen := m.EnrichGen
 	dctx := &awsclient.DetailEnrichmentCtx{
 		Clients:    m.clients,
-		PolicyDocs: m.policyDocCache,
+		PolicyDocs: m.PolicyDocCache,
 	}
 	return m, func() tea.Msg {
 		ctx, cancel := context.WithTimeout(m.appCtx, 10*time.Second)

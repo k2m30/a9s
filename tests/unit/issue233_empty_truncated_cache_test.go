@@ -83,7 +83,7 @@ func setupLiveModeEC2Detail(t *testing.T) (tui.Model, []resource.Resource) {
 // Returns (result, found).
 //
 // In non-demo mode, handleRelatedCheckStarted:
-//  1. Calls buildResourceCacheSnapshot() — reads from m.resourceCache (set by write-back)
+//  1. Calls buildResourceCacheSnapshot() — reads from m.ResourceCache (set by write-back)
 //  2. For each RelatedDef: if target is already in cache, calls the real checker directly
 //  3. Returns a tea.BatchMsg of cmds, each returning RelatedCheckResultMsg
 //
@@ -175,7 +175,7 @@ func TestContract_EmptyTruncatedPage_PreservesIsTruncated(t *testing.T) {
 
 	// Step 2: Trigger a fresh related check to observe what the write-back persisted.
 	// handleRelatedCheckStarted calls buildResourceCacheSnapshot() which reads
-	// m.resourceCache["tg"].pagination to reconstruct IsTruncated.
+	// m.ResourceCache["tg"].pagination to reconstruct IsTruncated.
 	// If the write-back preserved it: IsTruncated=true → {Count:0, Approximate:true} (correct)
 	// If the write-back dropped it:   IsTruncated=false → {Count:0, Approximate:false} (bug)
 	got, found := execRelatedCheckAndCollectTGResult(t, m, firstInstance)

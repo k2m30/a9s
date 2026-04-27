@@ -4,7 +4,7 @@ package unit
 // probeResources truncation per-shortName is lost in buildResourceCacheSnapshot.
 //
 // Bug location: internal/tui/app_related.go (~line 308-330).
-// The loop `for shortName, rows := range m.probeResources` always stamps
+// The loop `for shortName, rows := range m.ProbeResources` always stamps
 // IsTruncated=true wholesale, discarding the per-type truncation signal that
 // internal/tui/app_probes.go:247 correctly records in AvailabilityPrefetchedMsg.Truncated.
 //
@@ -14,7 +14,7 @@ package unit
 // orphan — so orphan findings are suppressed at startup for those accounts.
 //
 // Fix contract: handleAvailabilityPrefetched must store per-type truncation
-// (e.g. m.probeTruncated map[string]bool) and buildResourceCacheSnapshot must
+// (e.g. m.ProbeTruncated map[string]bool) and buildResourceCacheSnapshot must
 // consult it to stamp IsTruncated correctly for probe-only entries.
 //
 // Test approach: follows the checker-capture pattern from
@@ -40,7 +40,7 @@ import (
 // that when AvailabilityPrefetchedMsg delivers a probe with Truncated=false for
 // a type, buildResourceCacheSnapshot stamps the probe-only entry IsTruncated=false.
 //
-// PASSES today: handleAvailabilityPrefetched seeds m.resourceCache with nil
+// PASSES today: handleAvailabilityPrefetched seeds m.ResourceCache with nil
 // pagination; buildResourceCacheSnapshot's resourceCache merge path evaluates
 // IsTruncated = (pagination != nil && pagination.IsTruncated) = false, so the
 // single-page-complete case accidentally returns false already.
