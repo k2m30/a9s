@@ -195,3 +195,102 @@ func TestAugmentEC2StatusChecks_NonRunningNoInjection(t *testing.T) {
 		t.Errorf("stopped instance should NOT have Status Checks injected; found at index %d", idx)
 	}
 }
+
+// TestAugmentEC2StatusChecks_TolerateSpacerInStateBlock asserts that an
+// ItemSpacer between the State header and its subfields does not cause
+// Status Checks to land mid-block. The augmenter must advance through both
+// subfields and spacers when finding endOfState, so Status Checks still lands
+// AFTER the entire State cluster (header + spacer + subfields), not mid-block.
+//
+// This test FAILS on pre-fix code (augmenter stops at the ItemSpacer and splits
+// the State block, placing Status Checks between the spacer and the subfields)
+// and PASSES after the coder's fix to advance through ItemSpacer as well.
+func TestAugmentEC2StatusChecks_TolerateSpacerInStateBlock(t *testing.T) {
+	td := resource.FindResourceType("ec2")
+	if td == nil {
+		t.Fatal("resource type 'ec2' not registered — cannot access Augment hook")
+	}
+	if td.Augment == nil {
+		t.Fatal("ec2 ResourceTypeDef has no Augment hook — nothing to test")
+	}
+
+	sections := []domain.Section{
+		{
+			Title: "", // unnamed leading section
+			Items: []domain.Item{
+				{Kind: domain.ItemField, Label: "InstanceId", Value: "i-spacer000000001"},
+				{Kind: domain.ItemHeader, Label: "State"},
+				{Kind: domain.ItemSpacer},                                     // spacer between header and subfields
+				{Kind: domain.ItemSubfield, Label: "Name", Value: "running"},
+				{Kind: domain.ItemSubfield, Label: "Code", Value: "16"},
+				{Kind: domain.ItemField, Label: "InstanceType", Value: "t3.medium"},
+			},
+		},
+	}
+
+	r := domain.Resource{
+		ID:   "i-spacer000000001",
+		Type: "ec2",
+		Fields: map[string]string{
+			"state":           "running",
+			"system_status":   "impaired",
+			"instance_status": "ok",
+		},
+	}
+
+	result := td.Augment(r, sections)
+
+	statusChecksIdx := sectionIndexByTitle(result, "Status Checks")
+	if statusChecksIdx == -1 {
+		t.Fatalf("augmenter did not inject 'Status Checks' section; got sections: %v", sectionTitles(result))
+	}
+
+	// Expect 3 sections: leading (with InstanceId, State, Spacer, Name, Code)
+	// + Status Checks + tail (with InstanceType).
+	if len(result) != 3 {
+		t.Fatalf("expected 3 sections (leading + status checks + tail), got %d: %v",
+			len(result), sectionTitles(result))
+	}
+
+	// Section 0: the leading unnamed section — must contain both the State
+	// header+spacer+subfields AND the InstanceId field.
+	// Section 1: Status Checks — injected after the full State cluster.
+	// Section 2: tail — must start with InstanceType (not cut inside State block).
+	if result[1].Title != "Status Checks" {
+		t.Errorf("expected section[1].Title == 'Status Checks', got %q", result[1].Title)
+	}
+
+	tailItems := result[2].Items
+	if len(tailItems) == 0 {
+		t.Fatal("tail section (result[2]) has no items — InstanceType was lost")
+	}
+	if tailItems[0].Label != "InstanceType" {
+		t.Errorf("tail section[0].Label = %q, want 'InstanceType' — Status Checks may have split the State block mid-way",
+			tailItems[0].Label)
+	}
+
+	// The leading section must still contain the State header and its subfields.
+	leadItems := result[0].Items
+	hasStateHeader := false
+	hasNameSubfield := false
+	hasCodeSubfield := false
+	for _, it := range leadItems {
+		switch {
+		case it.Kind == domain.ItemHeader && it.Label == "State":
+			hasStateHeader = true
+		case it.Kind == domain.ItemSubfield && it.Label == "Name":
+			hasNameSubfield = true
+		case it.Kind == domain.ItemSubfield && it.Label == "Code":
+			hasCodeSubfield = true
+		}
+	}
+	if !hasStateHeader {
+		t.Error("leading section lost the State header after augmentation")
+	}
+	if !hasNameSubfield {
+		t.Error("leading section lost the State.Name subfield after augmentation — spacer caused premature split")
+	}
+	if !hasCodeSubfield {
+		t.Error("leading section lost the State.Code subfield after augmentation — spacer caused premature split")
+	}
+}

@@ -5,7 +5,7 @@ import "strings"
 // Actor computes the actor display string for the ACTOR section of the detail view,
 // covering all 12 userIdentity variants from taxonomy §4.
 //
-// See specs/013-ct-event-detail-v2/contracts/ctdetail-api.md for the full contract,
+// See specs/013-ct-event-detail-v2/contracts/ctevent-api.md for the full contract,
 // and specs/013-ct-event-detail-v2/data-model.md for the UserIdentity type definition.
 //
 // Guarantees:

@@ -11,7 +11,7 @@ import (
 // The input is the value of cloudtrailtypes.Event.CloudTrailEvent from
 // github.com/aws/aws-sdk-go-v2/service/cloudtrail/types.
 //
-// See specs/013-ct-event-detail-v2/contracts/ctdetail-api.md for the full contract,
+// See specs/013-ct-event-detail-v2/contracts/ctevent-api.md for the full contract,
 // and specs/013-ct-event-detail-v2/data-model.md for the Event type definition.
 //
 // Guarantees:

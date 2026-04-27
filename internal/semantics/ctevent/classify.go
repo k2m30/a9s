@@ -12,6 +12,9 @@ import "strings"
 //  3. eventType == "AwsServiceEvent" → "S"
 //  4. BatchGet* prefix → "R" (must beat Batch write prefix)
 //  5. KMS use-key exact names → "R" (Decrypt, Encrypt, Sign, Verify, ReEncrypt, GenerateDataKey*)
+//  5b. SES Verify* exact override → "W" (VerifyEmailIdentity / VerifyDomainIdentity / VerifyEmailAddress /
+//     VerifyDomainDkim trigger AWS to send a verification email and create a verification record —
+//     state-mutating writes despite the "Verify" prefix; exact-match beats the read-prefix table)
 //  6. Destructive prefix table → "D"
 //  7. Read prefix table → "R"
 //  8. Write prefix table → "W" ("Assume" prefix catches non-STS Assume* events; all AssumeRole* are exact-match R above)
@@ -46,6 +49,14 @@ func ClassifyCTVerb(eventName, eventCategory, eventType string) string {
 		"ReEncrypt", "GenerateDataKey", "GenerateDataKeyWithoutPlaintext",
 		"AssumeRole", "AssumeRoleWithSAML", "AssumeRoleWithWebIdentity":
 		return "R"
+	}
+
+	// SES verification operations are mutating writes, not reads, despite the
+	// "Verify" prefix. Exact-match override beats the read-prefix table.
+	switch eventName {
+	case "VerifyEmailIdentity", "VerifyDomainIdentity",
+		"VerifyEmailAddress", "VerifyDomainDkim":
+		return "W"
 	}
 
 	// Destructive prefix table (§2.1 row 1).

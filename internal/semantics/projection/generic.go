@@ -368,6 +368,7 @@ func fieldItemToDomainItem(fi fieldpath.FieldItem) domain.Item {
 		Kind:        kind,
 		Label:       label,
 		Value:       fi.Value,
+		Path:        fi.Path,
 		Tier:        fi.ColorTier,
 		Navigable:   fi.IsNavigable,
 		TargetType:  fi.TargetType,

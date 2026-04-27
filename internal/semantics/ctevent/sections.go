@@ -8,7 +8,7 @@ import (
 // BuildSections builds the ordered list of detail sections for the given parsed event.
 // Section order: ACTOR → ACTION → TARGET → CONTEXT → ERROR (if present) → REQUEST → RESPONSE.
 //
-// See specs/013-ct-event-detail-v2/contracts/ctdetail-api.md for the full contract,
+// See specs/013-ct-event-detail-v2/contracts/ctevent-api.md for the full contract,
 // and specs/013-ct-event-detail-v2/data-model.md for the Section and Row type definitions.
 //
 // Guarantees:

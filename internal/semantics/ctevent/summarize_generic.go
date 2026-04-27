@@ -16,7 +16,7 @@ import (
 // summarizer is registered for event.EventSource. It is never registered in
 // summarizerByService — it is always available as a direct call.
 //
-// See specs/013-ct-event-detail-v2/contracts/ctdetail-api.md for the Summarizer contract.
+// See specs/013-ct-event-detail-v2/contracts/ctevent-api.md for the Summarizer contract.
 //
 // Guarantees:
 //   - Returns a non-nil slice (empty []Row{} when params is nil or empty).

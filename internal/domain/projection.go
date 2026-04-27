@@ -23,6 +23,7 @@ type Item struct {
 	Kind        ItemKind
 	Label       string
 	Value       string
+	Path        string // field path from the projector (e.g. "VpcId", "Tags.Name"); preserved through the projector boundary so callers that read Path after projection see real data, not synthesized "sectionTitle.Label" strings
 	Severity    Severity
 	Tier        string // "!" | "~" | "" — matches ct-event coloring vocabulary
 	Navigable   bool

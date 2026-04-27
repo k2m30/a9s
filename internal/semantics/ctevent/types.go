@@ -1,6 +1,6 @@
 // Package ctevent implements the CloudTrail event detail view data model.
 // See specs/013-ct-event-detail-v2/data-model.md for the full type specification
-// and specs/013-ct-event-detail-v2/contracts/ctdetail-api.md for the public API contracts.
+// and specs/013-ct-event-detail-v2/contracts/ctevent-api.md for the public API contracts.
 package ctevent
 
 import "time"

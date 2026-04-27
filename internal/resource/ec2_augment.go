@@ -2,9 +2,13 @@ package resource
 
 import "github.com/k2m30/a9s/v3/internal/domain"
 
-// augmentEC2StatusChecks is the Augmenter for the EC2 resource type.
-// It injects a "Status Checks" section after the projector's output when
-// the instance is running and has non-trivial (non-ok) status checks.
+// augmentEC2StatusChecks inserts a Status Checks section immediately after the
+// State block. The State block is the State header item plus all consecutive
+// ItemSubfield and ItemSpacer items that follow it. ItemField or another
+// ItemHeader terminates the State block.
+//
+// It injects the section when the instance is running and has non-trivial
+// (non-ok) status checks.
 //
 // The section is omitted entirely for:
 //   - Instances that are not in the "running" state.
@@ -65,9 +69,15 @@ func augmentEC2StatusChecks(r domain.Resource, sections []domain.Section) []doma
 			if item.Kind != domain.ItemHeader || item.Label != "State" {
 				continue
 			}
-			// Find end of State block: scan forward through consecutive ItemSubfield items.
+			// Find end of State block: scan forward through consecutive
+			// ItemSubfield and ItemSpacer items. A future projector may
+			// insert spacers between the State header and its sub-fields;
+			// accepting both kinds ensures the insertion point is correct.
+			// ItemField or another ItemHeader terminates the block.
 			endOfState := j + 1
-			for endOfState < len(sec.Items) && sec.Items[endOfState].Kind == domain.ItemSubfield {
+			for endOfState < len(sec.Items) &&
+				(sec.Items[endOfState].Kind == domain.ItemSubfield ||
+					sec.Items[endOfState].Kind == domain.ItemSpacer) {
 				endOfState++
 			}
 			// Split the matched section into [leading+state block] and optional [tail].

@@ -78,20 +78,30 @@ func sectionsToFieldItems(sections []domain.Section) []fieldpath.FieldItem {
 
 // domainItemToFieldItem maps a domain.Item back to a fieldpath.FieldItem so
 // the unchanged renderFromFieldList renderer can consume projector output.
+//
+// Path is taken directly from it.Path when set, preserving the real field path
+// from the projector. Fallback to synthesized paths is used only when it.Path
+// is empty, maintaining backward-compatible behaviour for any Items constructed
+// without a Path value.
 func domainItemToFieldItem(it domain.Item, sectionTitle string) fieldpath.FieldItem {
 	fi := fieldpath.FieldItem{
 		Key:         it.Label,
 		Value:       it.Value,
-		Path:        sectionTitle + "." + it.Label,
+		Path:        it.Path,
 		IsNavigable: it.Navigable,
 		TargetType:  it.TargetType,
 		ColorTier:   it.Tier,
 		NavID:       it.NavID,
 	}
+	if fi.Path == "" {
+		fi.Path = sectionTitle + "." + it.Label
+	}
 	switch it.Kind {
 	case domain.ItemHeader:
 		fi.IsHeader = true
-		fi.Path = it.Label // headers use their own label as path (matches ExtractFieldList)
+		if it.Path == "" {
+			fi.Path = it.Label // headers use their own label as path (matches ExtractFieldList)
+		}
 	case domain.ItemSubfield:
 		fi.IsSubField = true
 		fi.IndentLevel = it.IndentLevel
@@ -101,7 +111,9 @@ func domainItemToFieldItem(it domain.Item, sectionTitle string) fieldpath.FieldI
 			// plain-line branch (no stray ": " prefix).
 			fi.Key = it.Value
 			// Path: no trailing dot for empty-label subfields.
-			fi.Path = sectionTitle
+			if it.Path == "" {
+				fi.Path = sectionTitle
+			}
 		}
 	case domain.ItemSpacer:
 		fi.IsSpacer = true
