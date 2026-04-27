@@ -124,7 +124,7 @@ make test
 # expected: passes — types are unread, no behavior change
 ```
 
-**Independently revertable**: yes. Reverting drops the type fields; nothing else depends on them.
+**Stabilization checkpoint**: PR-03n. This PR is purely additive (the new fields are unread); it lands cleanly even though downstream PRs in this phase may carry intermediate test/render failures that close at PR-03n. Per `00-overview.md` "Migration discipline", do not add compatibility scaffolding here whose only purpose is to make a future intermediate revert clean.
 
 ---
 
@@ -162,7 +162,7 @@ rg 'len\(r\.Findings\)\s*>\s*0' internal/semantics/attention/derive.go
 # Each must be preceded (or wrapped) by DeriveFindings. Document each in PR description.
 ```
 
-**Independently revertable**: yes. Reverting removes the shim calls; resources reach views without `Findings`, but views still read `Status`/`Issues` (PR-03a-views hasn't landed yet), so behavior is unchanged.
+**Stabilization checkpoint**: PR-03n. This PR adds derive-shim calls; on its own it does not change observable behavior because views still read `Status`/`Issues`. Acceptable to land even if a sibling PR is mid-flight; the shim is ALSO an internal forward-compat path that downstream PRs depend on, so reverting it once PR-03a-views or later has landed will break view rendering — the unit of revert is the phase, not the PR.
 
 ---
 
@@ -199,10 +199,10 @@ rg 'r\.Status|res\.Status|\.Issues' tests/unit/
 ```
 
 Behavior verification:
-- `./a9s --demo` produces visually identical list and detail output to pre-Phase-03 output. **Snapshot-test harness:** before this PR lands, capture canonical-resource detail/list renders for ec2, s3, rds, iam-role, alarm, sg via `cmd/preview-detail` (or similar) into `tests/testdata/snapshots/<short>.txt`. PR-03a-views' exit gate includes: regenerated snapshots match committed snapshots byte-for-byte. The same harness is reused in every PR-03b-m to detect regressions per category.
+- `./a9s --demo` produces visually identical list and detail output to pre-Phase-03 output AT THE PHASE-EXIT CHECKPOINT (PR-03n). Intermediate PRs (PR-03a-views, the per-category PR-03b–m series) may land with bounded golden drift documented in the PR description. **Snapshot-test harness:** capture canonical-resource detail/list renders for ec2, s3, rds, iam-role, alarm, sg via `cmd/preview-detail` (or similar) into `tests/testdata/snapshots/<short>.txt` at the start of the phase. The phase-exit gate (PR-03n) requires snapshots to match committed baselines byte-for-byte. Per-category PRs may regenerate goldens locally to track migration progress; the canonical baselines are re-asserted at PR-03n.
 - `make test` and `make test-race` pass.
 
-**Independently revertable**: yes — but reverting requires reverting tests/unit/ updates too. Cleaner: revert the full PR atomically.
+**Stabilization checkpoint**: PR-03n. Revert unit is the phase, not this PR. Test updates and view changes ship together; partial revert is not supported.
 
 ---
 
@@ -270,7 +270,7 @@ Behavior verification:
 - `./a9s --demo`: trigger Wave 2 enrichment (cmd: `:enrich`) on every resource type that has an enricher. List view shows post-enrichment phrases on each affected row; detail view shows attention rows. Snapshot tests for ec2 / rds / sg / iam-role / alarm regenerate-and-match.
 - `make test-race` passes — race detector is the critical guard for the new in-place row-mutation path; concurrent enrichment + render must be safe.
 
-**Independently revertable**: yes. Reverting restores the parallel map and the shim's enrichment-derivation branch; the cached rows lose their Wave 2 `Findings` but the shim re-populates from the parallel map. PR-03a-views remains landed.
+**Stabilization checkpoint**: PR-03n. This PR introduces the row-mutation pattern that downstream per-category PRs depend on. Do NOT keep the parallel map as a fallback "in case of revert" — that would be permanent dual-source-of-truth scaffolding (forbidden by `00-overview.md` hard-safety #3). The unit of revert is the phase; mid-phase reverts roll back to the start of Phase 03.
 
 ---
 
@@ -330,7 +330,7 @@ Behavior verification:
 - `./a9s --demo`: every resource type in the migrated category renders list and detail correctly.
 - Per-resource snapshot test (added in PR-03a-views): findings present, phrases stable, attention details rendered correctly.
 
-**Independently revertable**: yes. Each per-category PR is independent of the others. If PR-03f surfaces a finding-derivation bug in security types, revert just that PR; the shim re-covers security resources because they no longer populate `Findings` directly. PR-03b through 03e and 03g–m remain landed.
+**Stabilization checkpoint**: PR-03n. Per-category PRs are *scopeable* in parallel — different developers can author 03b through 03m concurrently without file collisions — but they are NOT independently revertable: each per-category cutover deletes the legacy `Status`/`Issues` write path for its category and depends on PR-03a-shim's derive logic for any sibling category not yet migrated. If a per-category PR surfaces a bug in production after merge, the fix is a forward-fix PR, not a revert; revert at the phase boundary if the whole approach needs to roll back. Per `00-overview.md` "Migration discipline", do NOT add per-category fallback scaffolding whose only purpose is to make individual revert cleaner.
 
 ---
 
