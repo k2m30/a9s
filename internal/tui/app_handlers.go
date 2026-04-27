@@ -320,7 +320,7 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 // handleProfileSelected switches the AWS profile, pops the profile selector,
 // and reconnects.
 func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model, tea.Cmd) {
-	m.resetForSessionSwitch()
+	m.Rotate()
 	m.connectGen++
 	// Only save prev on first switch; rapid A→B→C keeps A as rollback target
 	if !m.hasPrevState {
@@ -347,7 +347,7 @@ func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model
 // handleRegionSelected switches the AWS region, pops the region selector,
 // and reconnects.
 func (m Model) handleRegionSelected(msg messages.RegionSelectedMsg) (tea.Model, tea.Cmd) {
-	m.resetForSessionSwitch()
+	m.Rotate()
 	m.connectGen++
 	// Only save prev on first switch; rapid switches keep original as rollback target
 	if !m.hasPrevState {

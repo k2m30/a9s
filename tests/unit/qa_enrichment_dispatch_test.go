@@ -83,7 +83,7 @@ func newTestModel() tui.Model {
 }
 
 // TestEnrichmentCheckedMsg_StaleSessionGenDropped verifies that an
-// EnrichmentCheckedMsg with Gen != model.enrichmentGen is silently dropped:
+// EnrichmentCheckedMsg with Gen != model.EnrichmentGen is silently dropped:
 // Update returns the unchanged model and no command.
 //
 // A fresh tui.Model has enrichmentGen=0; sending Gen=999 is always stale.

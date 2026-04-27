@@ -940,7 +940,7 @@ func TestCR273_Item5_CFN_IMPORT_ROLLBACK_COMPLETE_ExplicitCase_NotSuffix(t *test
 // in the CodeRabbit review. Code inspection confirms:
 //
 //   Item 7:  probeResources cleared on refresh — app_handlers_navigate.go:333
-//            m.probeResources = make(map[string][]resource.Resource)
+//            m.ProbeResources = make(map[string][]resource.Resource)
 //
 //   Item 8:  Per-type Ctrl+R sets menu badge via handleEnrichmentChecked →
 //            menu.SetIssues(unified, ...) with no only-increase guard (fixed).

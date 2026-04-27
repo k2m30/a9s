@@ -13,6 +13,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/session"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -45,13 +46,13 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		// as canonical navigation.
 		canon := rt.ShortName
 		// Check resource cache before creating a new view and fetching.
-		if entry, ok := m.resourceCache[msg.ResourceType]; ok {
+		if entry, ok := m.ResourceCache[msg.ResourceType]; ok {
 			rl := views.NewResourceListFromCache(
 				*rt, m.viewConfig, m.keys,
-				entry.resources, entry.pagination,
-				entry.filterText, entry.sortColIdx, entry.sortAsc,
-				entry.cursorPos, entry.hScrollOffset,
-				entry.attentionOnly,
+				entry.Resources, entry.Pagination,
+				entry.FilterText, entry.SortColIdx, entry.SortAsc,
+				entry.CursorPos, entry.HScrollOffset,
+				entry.AttentionOnly,
 			)
 			if requestedAlias != "" {
 				rl.SetDisplayName(requestedAlias)
@@ -64,8 +65,8 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 				issueCount = menu.GetIssueCounts()[canon]
 				issueTrunc = menu.GetIssueTruncated()[canon]
 			}
-			rl.SetEnrichmentState(issueCount, issueTrunc, m.enrichmentFindings[canon])
-			rl.SetTruncatedIDs(m.enrichmentTruncatedIDs[canon])
+			rl.SetEnrichmentState(issueCount, issueTrunc, m.EnrichmentFindings[canon])
+			rl.SetTruncatedIDs(m.EnrichmentTruncatedIDs[canon])
 			m.pushView(&rl)
 			return m, nil
 		}
@@ -81,8 +82,8 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 			issueCount = menu.GetIssueCounts()[canon]
 			issueTrunc = menu.GetIssueTruncated()[canon]
 		}
-		rl.SetEnrichmentState(issueCount, issueTrunc, m.enrichmentFindings[canon])
-		rl.SetTruncatedIDs(m.enrichmentTruncatedIDs[canon])
+		rl.SetEnrichmentState(issueCount, issueTrunc, m.EnrichmentFindings[canon])
+		rl.SetTruncatedIDs(m.EnrichmentTruncatedIDs[canon])
 		rl, initCmd := rl.Init()
 		m.pushView(&rl)
 		return m, tea.Batch(initCmd, m.fetchResources(msg.ResourceType))
@@ -109,7 +110,7 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		d.SetNavProvider(resource.GetNavigableFields)
 		d.SetSize(m.innerSize())
 		// Wire enrichment finding if one exists for this resource.
-		if findings, ok := m.enrichmentFindings[resType]; ok {
+		if findings, ok := m.EnrichmentFindings[resType]; ok {
 			if f, exists := findings[msg.Resource.ID]; exists {
 				d.SetEnrichmentFinding(&f)
 			}
@@ -123,9 +124,9 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		// an in-flight enrichment from the detail view open.
 		if resource.HasDetailEnricher(resType) {
 			key := resType + ":" + msg.Resource.ID
-			if key != m.enrichResKey {
-				m.enrichGen++
-				m.enrichResKey = key
+			if key != m.EnrichResKey {
+				m.EnrichGen++
+				m.EnrichResKey = key
 			}
 			cmds = append(cmds, func() tea.Msg {
 				return messages.EnrichDetailMsg{
@@ -137,9 +138,9 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 
 		// Dispatch related checks (existing logic)
 		if d.NeedsRelatedCheck() {
-			ck := relatedCacheKey(resType, msg.Resource.ID)
-			if cached, ok := m.relatedCache.get(ck); ok && len(cached) > 0 {
-				d.ApplyRelatedResults(relatedCacheReplay(resType, cached))
+			ck := session.RelatedCacheKey(resType, msg.Resource.ID)
+			if cached, ok := m.RelatedCache.Get(ck); ok && len(cached) > 0 {
+				d.ApplyRelatedResults(session.RelatedCacheReplay(resType, cached))
 			} else {
 				cmds = append(cmds, func() tea.Msg {
 					return messages.RelatedCheckStartedMsg{
@@ -177,9 +178,9 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		// Dispatch enrichment so YAML view updates when result arrives.
 		if resource.HasDetailEnricher(resType) {
 			key := resType + ":" + msg.Resource.ID
-			if key != m.enrichResKey {
-				m.enrichGen++
-				m.enrichResKey = key
+			if key != m.EnrichResKey {
+				m.EnrichGen++
+				m.EnrichResKey = key
 			}
 			return m, func() tea.Msg {
 				return messages.EnrichDetailMsg{
@@ -212,9 +213,9 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		// Dispatch enrichment so JSON view updates when result arrives.
 		if resource.HasDetailEnricher(resType) {
 			key := resType + ":" + msg.Resource.ID
-			if key != m.enrichResKey {
-				m.enrichGen++
-				m.enrichResKey = key
+			if key != m.EnrichResKey {
+				m.EnrichGen++
+				m.EnrichResKey = key
 			}
 			return m, func() tea.Msg {
 				return messages.EnrichDetailMsg{
@@ -333,14 +334,14 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		// Increment gen to cancel any in-flight probes and enrichment
-		m.availabilityGen++
-		m.enrichmentGen++
-		m.enrichmentFindings = make(map[string]map[string]resource.EnrichmentFinding)
-		m.enrichmentRan = make(map[string]bool)
-		m.enrichmentTypeGen = make(map[string]int)
-		m.enrichmentTruncatedIDs = make(map[string]map[string]bool)
-		m.probeResources = make(map[string][]resource.Resource)
-		m.probeTruncated = make(map[string]bool)
+		m.AvailabilityGen++
+		m.Session.EnrichmentGen++
+		m.EnrichmentFindings = make(map[string]map[string]resource.EnrichmentFinding)
+		m.EnrichmentRan = make(map[string]bool)
+		m.EnrichmentTypeGen = make(map[string]int)
+		m.EnrichmentTruncatedIDs = make(map[string]map[string]bool)
+		m.ProbeResources = make(map[string][]resource.Resource)
+		m.ProbeTruncated = make(map[string]bool)
 		// Reset the menu's view-side state (availability, issue counts) in
 		// lockstep with the model-side maps above.
 		if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
@@ -356,10 +357,10 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		d.ResetRightColumn()
 		rt := d.ResourceType()
 		srcRes := d.SourceResource()
-		m.relatedCache.delete(relatedCacheKey(rt, srcRes.ID))
-		m.relatedGen++      // cancel in-flight results from previous batch
-		m.enrichGen++       // cancel in-flight enrichment from previous batch
-		m.enrichResKey = "" // force gen bump on next enrichment dispatch
+		m.RelatedCache.Delete(session.RelatedCacheKey(rt, srcRes.ID))
+		m.RelatedGen++      // cancel in-flight results from previous batch
+		m.EnrichGen++       // cancel in-flight enrichment from previous batch
+		m.EnrichResKey = "" // force gen bump on next enrichment dispatch
 		// Invalidate the SES v1 receipt rule set cache so Ctrl+R on a detail view
 		// picks up receipt-rule changes without requiring a profile/region switch.
 		if rt == "ses" {
@@ -390,7 +391,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	rt := rl.ResourceType()
-	delete(m.resourceCache, rt) // clear cache for refreshed type only
+	delete(m.ResourceCache, rt) // clear cache for refreshed type only
 	if rt == "ses" {
 		awsclient.InvalidateSESRuleSetCache(m.clients)
 	}
@@ -402,13 +403,13 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	// probeResources and dispatch probeEnrichment on success.
 	if rl.ParentContext() == nil && !rl.EscPops() {
 		if _, hasEnricher := awsclient.IssueEnricherRegistry[rt]; hasEnricher {
-			m.enrichmentTypeGen[rt]++
-			tok := m.enrichmentTypeGen[rt]
-			delete(m.enrichmentFindings, rt)
-			delete(m.enrichmentRan, rt)
+			m.EnrichmentTypeGen[rt]++
+			tok := m.EnrichmentTypeGen[rt]
+			delete(m.EnrichmentFindings, rt)
+			delete(m.EnrichmentRan, rt)
 			// Clear per-resource truncation markers too: if the refresh errors
 			// out, stale "?" prefixes must not persist across the rerun.
-			delete(m.enrichmentTruncatedIDs, rt)
+			delete(m.EnrichmentTruncatedIDs, rt)
 			// Propagate the cleared state to the active ResourceListModel so
 			// row markers disappear immediately at Ctrl+R — otherwise stale markers
 			// would remain visible until the rerun completes (and indefinitely if
@@ -420,8 +421,8 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		}
 		// Top-level list without an enricher: clear any stale findings immediately
 		// so row markers don't persist across a Ctrl+R refresh.
-		if _, hasFindings := m.enrichmentFindings[rt]; hasFindings {
-			delete(m.enrichmentFindings, rt)
+		if _, hasFindings := m.EnrichmentFindings[rt]; hasFindings {
+			delete(m.EnrichmentFindings, rt)
 			rl.SetEnrichmentState(0, false, nil)
 		}
 	}
