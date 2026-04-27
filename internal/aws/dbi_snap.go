@@ -30,7 +30,7 @@ func init() {
 	// rdstypes.DBSnapshot does not expose a VpcId field — only DBInstanceIdentifier
 	// and KmsKeyId resolve directly. The vpc pivot (when needed) is reachable via
 	// the dbi cross-ref.
-	resource.RegisterNavigableFields("dbi-snap", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("dbi-snap", []resource.NavigableField{
 		{FieldPath: "DBInstanceIdentifier", TargetType: "dbi"},
 		{FieldPath: "KmsKeyId", TargetType: "kms"},
 	})

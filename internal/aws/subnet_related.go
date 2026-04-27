@@ -13,7 +13,7 @@ import (
 )
 
 func init() {
-	resource.RegisterNavigableFields("subnet", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("subnet", []resource.NavigableField{
 		{FieldPath: "VpcId", TargetType: "vpc"},
 	})
 

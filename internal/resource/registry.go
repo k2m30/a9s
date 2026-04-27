@@ -1,9 +1,10 @@
 package resource
 
 import (
-	"context"
 	"maps"
 	"strings"
+
+	"github.com/k2m30/a9s/v3/internal/domain"
 )
 
 // DefaultPageSize is the number of resources fetched per paginated API call.
@@ -13,8 +14,9 @@ import (
 const DefaultPageSize = 50
 
 // ParentContext holds key-value pairs passed from a parent view to a child
-// fetcher. For example, {"bucket": "my-bucket", "prefix": "data/"}.
-type ParentContext map[string]string
+// fetcher. Declaration lives in internal/domain/contracts.go; this alias keeps
+// existing consumers compiling. Deleted in PR-04n.
+type ParentContext = domain.ParentContext
 
 // fieldKeyRegistry maps resource short names to their valid Fields keys.
 // Populated by RegisterFieldKeys calls in each aws/*.go init().
@@ -198,10 +200,14 @@ func UnregisterChildType(shortName string) {
 }
 
 // PaginatedFetcher returns a single page of resources.
-type PaginatedFetcher func(ctx context.Context, clients any, continuationToken string) (FetchResult, error)
+// Declaration lives in internal/domain/contracts.go; this alias keeps
+// existing consumers compiling. Deleted in PR-04n.
+type PaginatedFetcher = domain.PaginatedFetcher
 
 // PaginatedChildFetcher returns a single page of child resources.
-type PaginatedChildFetcher func(ctx context.Context, clients any, parentCtx ParentContext, continuationToken string) (FetchResult, error)
+// Declaration lives in internal/domain/contracts.go; this alias keeps
+// existing consumers compiling. Deleted in PR-04n.
+type PaginatedChildFetcher = domain.PaginatedChildFetcher
 
 // paginatedRegistry maps resource short names to their paginated fetcher functions.
 var paginatedRegistry = map[string]PaginatedFetcher{}
@@ -244,8 +250,9 @@ func UnregisterPaginatedChild(shortName string) {
 }
 
 // FilteredPaginatedFetcher returns a single page of resources filtered server-side.
-// The filter map keys are service-specific attribute names (e.g., "Username" for CloudTrail).
-type FilteredPaginatedFetcher func(ctx context.Context, clients any, filter map[string]string, continuationToken string) (FetchResult, error)
+// Declaration lives in internal/domain/contracts.go; this alias keeps
+// existing consumers compiling. Deleted in PR-04n.
+type FilteredPaginatedFetcher = domain.FilteredPaginatedFetcher
 
 var filteredPaginatedRegistry = map[string]FilteredPaginatedFetcher{}
 
@@ -266,9 +273,9 @@ func UnregisterFilteredPaginated(shortName string) {
 }
 
 // RevealFetcher is the function signature for reveal value fetchers.
-// Each resource type that supports reveal (x key) registers a fetcher
-// that takes a context, clients, and resource ID, returning the value string.
-type RevealFetcher func(ctx context.Context, clients any, resourceID string) (string, error)
+// Declaration lives in internal/domain/contracts.go; this alias keeps
+// existing consumers compiling. Deleted in PR-04n.
+type RevealFetcher = domain.RevealFetcher
 
 // revealRegistry maps resource short names to their reveal fetcher functions.
 var revealRegistry = map[string]RevealFetcher{}

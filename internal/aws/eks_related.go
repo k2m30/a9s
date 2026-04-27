@@ -15,7 +15,7 @@ import (
 func init() {
 	// Cluster.ResourcesVpcConfig: VpcId, ClusterSecurityGroupId, SubnetIds, SecurityGroupIds
 	// Cluster: RoleArn (IAM role for cluster operations)
-	resource.RegisterNavigableFields("eks", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("eks", []resource.NavigableField{
 		{FieldPath: "ResourcesVpcConfig.VpcId", TargetType: "vpc"},
 		{FieldPath: "ResourcesVpcConfig.ClusterSecurityGroupId", TargetType: "sg"},
 		{FieldPath: "ResourcesVpcConfig.SubnetIds", TargetType: "subnet"},

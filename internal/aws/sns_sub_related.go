@@ -15,7 +15,7 @@ func init() {
 		{TargetType: "sqs", DisplayName: "SQS Queue", Checker: checkSNSSubSQS, NeedsTargetCache: true},
 	})
 
-	resource.RegisterNavigableFields("sns-sub", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("sns-sub", []resource.NavigableField{
 		{FieldPath: "TopicArn", TargetType: "sns"},
 	})
 }

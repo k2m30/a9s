@@ -16,7 +16,7 @@ import (
 )
 
 func init() {
-	resource.RegisterNavigableFields("efs", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("efs", []resource.NavigableField{
 		{FieldPath: "KmsKeyId", TargetType: "kms"},
 	})
 

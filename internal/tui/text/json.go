@@ -1,21 +1,29 @@
 package text
 
 import (
+	"bytes"
 	"encoding/json"
 	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
+// YAMLIndentSpaces is the indent width emitted by TryJSONToYAMLLines. Callers
+// that infer nesting depth from leading-space counts MUST divide by this
+// constant rather than hard-coding 2 — it is configured via yaml.NewEncoder
+// because yaml.Marshal's default is 4.
+const YAMLIndentSpaces = 2
+
 // TryJSONToYAMLLines attempts to parse s as JSON. On success, it converts the
 // parsed structure to YAML and returns the individual lines. Returns nil if s
 // is not valid JSON, or represents an empty object ({}) or empty array ([]).
+//
+// Lines are indented at YAMLIndentSpaces spaces per nesting level.
 func TryJSONToYAMLLines(s string) []string {
 	s = strings.TrimSpace(s)
 	if len(s) == 0 {
 		return nil
 	}
-	// Quick reject: must start with { or [
 	if s[0] != '{' && s[0] != '[' {
 		return nil
 	}
@@ -23,7 +31,6 @@ func TryJSONToYAMLLines(s string) []string {
 	if err := json.Unmarshal([]byte(s), &parsed); err != nil {
 		return nil
 	}
-	// Skip empty objects and arrays
 	switch v := parsed.(type) {
 	case map[string]any:
 		if len(v) == 0 {
@@ -34,11 +41,16 @@ func TryJSONToYAMLLines(s string) []string {
 			return nil
 		}
 	}
-	out, err := yaml.Marshal(parsed)
-	if err != nil {
+	var buf bytes.Buffer
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(YAMLIndentSpaces)
+	if err := enc.Encode(parsed); err != nil {
 		return nil
 	}
-	raw := strings.TrimRight(string(out), "\n")
+	if err := enc.Close(); err != nil {
+		return nil
+	}
+	raw := strings.TrimRight(buf.String(), "\n")
 	if raw == "" {
 		return nil
 	}

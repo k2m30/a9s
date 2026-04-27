@@ -1,4 +1,4 @@
-.PHONY: build install test test-race lint gofix fmt run clean cover integration security coverage verify-readonly demo readme check-readme mdlint
+.PHONY: build install test test-race lint gofix fmt run clean cover integration security coverage verify-readonly demo readme check-readme mdlint snapshot snapshot-update
 
 BINARY   = a9s
 CMD      = ./cmd/a9s
@@ -90,3 +90,15 @@ check-readme:
 	diff -q README.md "$$tmpfile" > /dev/null 2>&1 || (rm -f "$$tmpfile"; echo "FAIL: README.md is out of sync — run 'make readme'" && exit 1); \
 	rm -f "$$tmpfile"
 	@echo "PASS: README.md is in sync with docs/shared/"
+
+# Snapshot tests run the existing golden-file tests (issue119, issue140,
+# ec2_related_view, ctdetail_demo, scenario_*_visual_test.go) and verify the
+# rendered output matches the committed golden files byte-for-byte.
+# Use `make snapshot-update` to regenerate goldens after intentional changes.
+snapshot:
+	go test ./tests/unit/ -run 'Golden|Scenario' -count=1
+	go test -tags integration ./tests/integration/ -run 'Visual|Scenario' -count=1
+
+snapshot-update:
+	UPDATE_GOLDEN=1 go test ./tests/unit/ -run 'Golden|Scenario' -count=1
+	UPDATE_GOLDEN=1 go test -tags integration ./tests/integration/ -run 'Visual|Scenario' -count=1

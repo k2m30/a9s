@@ -3,6 +3,8 @@ package resource
 import (
 	"strconv"
 	"time"
+
+	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
 )
 
 func monitoringResourceTypes() []ResourceTypeDef {
@@ -136,6 +138,7 @@ func monitoringResourceTypes() []ResourceTypeDef {
 				return ColorDim
 			},
 			ExcludeFromIssueBadge: true,
+			Project:               ctevent.Project,
 		},
 	}
 }

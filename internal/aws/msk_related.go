@@ -30,7 +30,7 @@ func init() {
 	})
 
 	// kafkatypes.Cluster: Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId → kms
-	resource.RegisterNavigableFields("msk", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("msk", []resource.NavigableField{
 		{FieldPath: "Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId", TargetType: "kms"},
 	})
 }

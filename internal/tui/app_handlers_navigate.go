@@ -106,6 +106,7 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 		d := views.NewDetail(*msg.Resource, resType, m.viewConfig, m.keys)
+		d.SetNavProvider(resource.GetNavigableFields)
 		d.SetSize(m.innerSize())
 		// Wire enrichment finding if one exists for this resource.
 		if findings, ok := m.enrichmentFindings[resType]; ok {

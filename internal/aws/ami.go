@@ -41,7 +41,7 @@ func init() {
 	})
 
 	// ec2types.Image: BlockDeviceMappings[].Ebs.SnapshotId
-	resource.RegisterNavigableFields("ami", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("ami", []resource.NavigableField{
 		{FieldPath: "BlockDeviceMappings.Ebs.SnapshotId", TargetType: "ebs-snap"},
 	})
 }

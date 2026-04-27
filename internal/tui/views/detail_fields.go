@@ -9,572 +9,116 @@ import (
 	"unicode"
 
 	lipgloss "charm.land/lipgloss/v2"
-	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
-	"github.com/k2m30/a9s/v3/internal/aws/ctdetail"
-	"github.com/k2m30/a9s/v3/internal/config"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/semantics/projection"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/text"
 )
 
-// flattenTagItems post-processes field items to render tag sections as
-// flat Key: Value pairs instead of verbose Key/Value struct sub-fields.
-// Only sections with Path "Tags" or "TagList" are flattened.
-// YAML/JSON views are unaffected because they don't use fieldList.
-func flattenTagItems(items []fieldpath.FieldItem) []fieldpath.FieldItem {
-	if len(items) == 0 {
-		return items
-	}
-	result := make([]fieldpath.FieldItem, 0, len(items))
-	i := 0
-	for i < len(items) {
-		item := items[i]
-		// Only flatten tag section headers.
-		if item.IsHeader && (item.Path == "Tags" || item.Path == "TagList") {
-			result = append(result, item)
-			i++
-			parentPath := item.Path
-			// Collect all sub-fields belonging to this header.
-			var subs []fieldpath.FieldItem
-			for i < len(items) && items[i].IsSubField && items[i].Path == parentPath {
-				subs = append(subs, items[i])
-				i++
-			}
-			if len(subs) == 0 {
-				// Empty tag section — leave header as-is, nothing to flatten.
-				continue
-			}
-			// Detect simple Key/Value struct-list format: every field in the struct
-			// must be either "Key" or "Value". If any element has additional metadata
-			// (e.g., ASG TagDescription with PropagateAtLaunch), skip flattening to
-			// preserve that information.
-			isSimpleTagList := false
-			hasExtraFields := false
-			for _, sub := range subs {
-				trimmed := strings.TrimSpace(sub.Value)
-				if rest, ok := strings.CutPrefix(trimmed, "- "); ok {
-					k, _, hasSep := strings.Cut(rest, ":")
-					if hasSep && strings.EqualFold(strings.TrimSpace(k), "key") {
-						isSimpleTagList = true
-					}
-				} else {
-					k, _, hasSep := strings.Cut(trimmed, ":")
-					if hasSep {
-						field := strings.ToLower(strings.TrimSpace(k))
-						if field != "key" && field != "value" {
-							hasExtraFields = true
-						}
-					}
-				}
-			}
-			if !isSimpleTagList || hasExtraFields {
-				// Not a simple Key/Value tag list, or has extra metadata — pass through.
-				result = append(result, subs...)
-				continue
-			}
-			// Parse the YAML struct-list lines to extract Key/Value tag pairs.
-			var currentKey string
-			emitPending := func() {
-				if currentKey != "" {
-					result = append(result, fieldpath.FieldItem{
-						IsSubField:  true,
-						IndentLevel: 1,
-						Key:         currentKey,
-						Value:       "",
-						Path:        parentPath,
-					})
-					currentKey = ""
-				}
-			}
-			for _, sub := range subs {
-				line := sub.Value
-				trimmed := strings.TrimSpace(line)
-				if trimmed == "" {
-					continue
-				}
-				// Detect new list element: starts with "- "
-				if rest, ok := strings.CutPrefix(trimmed, "- "); ok {
-					// Flush any pending key without a Value line (nil Value).
-					emitPending()
-					k, v, hasSep := strings.Cut(rest, ":")
-					if !hasSep {
-						continue
-					}
-					k = strings.TrimSpace(k)
-					v = strings.TrimSpace(v)
-					// Only handle the "Key:" line of a tag struct element.
-					if strings.EqualFold(k, "key") {
-						currentKey = v
-					}
-				} else {
-					// Continuation line: "  Value: Y" or other fields (PropagateAtLaunch, etc.)
-					k, v, hasSep := strings.Cut(trimmed, ":")
-					if !hasSep {
-						continue
-					}
-					k = strings.TrimSpace(k)
-					v = strings.TrimSpace(v)
-					if strings.EqualFold(k, "value") && currentKey != "" {
-						// Emit flat tag item.
-						result = append(result, fieldpath.FieldItem{
-							IsSubField:  true,
-							IndentLevel: 1,
-							Key:         currentKey,
-							Value:       v,
-							Path:        parentPath,
-						})
-						currentKey = ""
-					}
-					// Ignore extra fields (PropagateAtLaunch, ResourceId, etc.)
-				}
-			}
-			// Flush final pending key (last tag had nil Value).
-			emitPending()
-			continue
-		}
-		result = append(result, item)
-		i++
-	}
-	return result
-}
-
-// expandJSONItems post-processes field items to detect JSON strings in values
-// and expand them as YAML-formatted sub-fields. Handles both:
-//   - top-level scalar items (not IsHeader, not IsSubField, not IsSection) whose Value is JSON
-//   - sub-field items whose value portion is JSON
-//
-// Called after flattenTagItems() but before navigable post-processing.
-func expandJSONItems(items []fieldpath.FieldItem) []fieldpath.FieldItem {
-	if len(items) == 0 {
-		return items
-	}
-	result := make([]fieldpath.FieldItem, 0, len(items))
-	for _, item := range items {
-		// Pass through unchanged: headers, sections, navigable items.
-		if item.IsHeader || item.IsSection || item.IsNavigable {
-			result = append(result, item)
-			continue
-		}
-		if item.IsSubField {
-			// Extract value portion after the first ":" separator.
-			rawLine := item.Value
-			trimmed := strings.TrimSpace(rawLine)
-			trimmed = strings.TrimPrefix(trimmed, "- ")
-			_, valuePart, hasSep := strings.Cut(trimmed, ":")
-			if !hasSep {
-				result = append(result, item)
-				continue
-			}
-			valuePart = strings.TrimSpace(valuePart)
-			lines := text.TryJSONToYAMLLines(valuePart)
-			if lines == nil {
-				result = append(result, item)
-				continue
-			}
-			// Emit the key line as a sub-field header (key with empty value).
-			// Format as "key:" so parseYAMLLine recognizes it.
-			keyPart, _, _ := strings.Cut(trimmed, ":")
-			keyLine := keyPart + ":"
-			result = append(result, fieldpath.FieldItem{
-				Path:        item.Path,
-				Key:         keyLine,
-				Value:       keyLine,
-				IsSubField:  true,
-				IndentLevel: item.IndentLevel,
-			})
-			// Emit expanded YAML lines at IndentLevel + 1.
-			for _, line := range lines {
-				leading := len(line) - len(strings.TrimLeft(line, " "))
-				level := leading/2 + item.IndentLevel + 1
-				result = append(result, fieldpath.FieldItem{
-					Path:        item.Path,
-					Key:         line,
-					Value:       line,
-					IsSubField:  true,
-					IndentLevel: level,
-				})
-			}
-			continue
-		}
-		// Top-level scalar item: check if Value is JSON.
-		lines := text.TryJSONToYAMLLines(item.Value)
-		if lines == nil {
-			result = append(result, item)
-			continue
-		}
-		// Replace scalar with a header + sub-field lines.
-		result = append(result, fieldpath.FieldItem{
-			Path:     item.Path,
-			Key:      item.Key,
-			IsHeader: true,
-		})
-		for _, line := range lines {
-			leading := len(line) - len(strings.TrimLeft(line, " "))
-			level := leading/2 + 1
-			result = append(result, fieldpath.FieldItem{
-				Path:        item.Path,
-				Key:         line,
-				Value:       line,
-				IsSubField:  true,
-				IndentLevel: level,
-			})
-		}
-	}
-	return result
-}
-
-// buildFieldList computes m.fieldList from the view config and navigable field registry.
-// Sets m.fieldList to nil when no config or detail paths are available (falls through to renderFromConfig).
-// After calling ExtractFieldList, post-processes sub-fields to mark navigable ones:
-// a sub-field under path P whose key K matches navMap["P.K"] is marked IsNavigable
-// with TargetType from the navMap, and its Value is set to the extracted sub-value.
+// buildFieldList computes m.fieldList by delegating to the per-type DetailProjector
+// (or projection.GenericWithConfig as fallback), then converts the returned
+// []domain.Section into []fieldpath.FieldItem for the existing renderFromFieldList
+// renderer.
 func (m *DetailModel) buildFieldList() {
-	if m.resourceType == "ct-events" && m.res.Status != "" {
-		raw := extractRawCTEventJSON(m.res)
-		if raw != "" {
-			event, err := ctdetail.Parse(raw)
-			if err != nil {
-				// A CT event resource arrived with a raw JSON blob that cannot be
-				// parsed — that's a broken contract (the fetcher guarantees valid
-				// JSON). Surface it explicitly instead of silently degrading to
-				// the flat Fields path and pretending the page is fine.
-				m.fieldList = []fieldpath.FieldItem{{
-					Key:   "Error",
-					Value: fmt.Sprintf("unable to parse CloudTrail event JSON: %v", err),
-				}}
-				return
-			}
-			event.Status = m.res.Status // propagate severity status into the parsed event
-			sections := ctdetail.BuildSections(event)
-			m.fieldList = sectionsToFieldItems(sections)
-			return
-		}
-		// raw == "" is still a soft fallback: the cache can hold a bare CT event
-		// stub (ID/Name/Status only) when the user drill-ins without the full
-		// event body. Render what Fields we have instead of erroring out.
+	// Inject type so projector can look up per-type metadata.
+	r := m.res
+	if r.Type == "" {
+		r.Type = m.resourceType
 	}
-	// Extract detail field definitions; split into path-form and key-form.
-	var detailFields []config.DetailField
-	if m.viewConfig != nil {
-		vd := config.GetViewDef(m.viewConfig, m.resourceType)
-		detailFields = vd.Detail
+	td := resource.FindResourceType(m.resourceType)
+	var proj domain.DetailProjector
+	if td != nil && td.Project != nil {
+		proj = td.Project
+	} else {
+		// Use m.navProvider to resolve navigable fields. The default (set in
+		// NewDetail) is resource.GetActiveNavigableFields (ACTIVE-only), which
+		// keeps tests isolated from init-time DEFAULT registry entries.
+		// TUI construction paths override this with resource.GetNavigableFields
+		// (merged ACTIVE+DEFAULT) via SetNavProvider.
+		navProv := m.navProvider
+		if navProv == nil {
+			navProv = resource.GetActiveNavigableFields
+		}
+		proj = projection.GenericWithConfigAndNavProvider(m.viewConfig, navProv)
 	}
-	// Build the []string slice of Path values for ExtractFieldList (path-form only).
-	// Key-form fields (df.Key != "") live in Fields[] and are injected after.
-	var detailPaths []string
-	for _, df := range detailFields {
-		if df.Path != "" {
-			detailPaths = append(detailPaths, df.Path)
-		}
+	sections := proj(r)
+	if td != nil && td.Augment != nil {
+		sections = td.Augment(r, sections)
 	}
-	navFields := resource.GetNavigableFields(m.resourceType)
-	navMap := make(map[string]string, len(navFields))
-	for _, nf := range navFields {
-		navMap[nf.FieldPath] = nf.TargetType
-	}
-	// When the resource has neither a Fields map nor a RawStruct, synthesize a minimal
-	// Fields map from the resource's own ID/Name/Status so that bare resources (e.g.,
-	// cached stubs navigated to directly) still render their key identifiers.
-	// Only apply when RawStruct is nil — if RawStruct is present, ExtractFieldList will
-	// extract the correct values from it directly.
-	fields := m.res.Fields
-	if len(fields) == 0 && m.res.RawStruct == nil && (m.res.ID != "" || m.res.Name != "" || m.res.Status != "") {
-		fieldKeys := resource.GetFieldKeys(m.resourceType)
-		synth := make(map[string]string, 3)
-		if m.res.ID != "" && len(fieldKeys) > 0 {
-			// First registered field key is the primary ID field (e.g., "subnet_id").
-			synth[fieldKeys[0]] = m.res.ID
-		}
-		if m.res.Name != "" && len(fieldKeys) > 1 {
-			synth[fieldKeys[1]] = m.res.Name
-		}
-		if m.res.Status != "" && len(fieldKeys) > 2 {
-			synth[fieldKeys[2]] = m.res.Status
-		}
-		if len(synth) > 0 {
-			fields = synth
-		}
-	}
-	// Bridge snake_case fetcher output to canonical PascalCase view keys so
-	// detail paths and navigable fields continue to work for registered resource types.
-	fields = resource.ApplyFieldAliases(m.resourceType, fields)
-	if len(detailPaths) == 0 {
-		if len(fields) == 0 {
-			m.fieldList = nil
-			return
-		}
-		keys := make([]string, 0, len(fields))
-		for k := range fields {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		m.fieldList = expandJSONItems(flattenTagItems(fieldpath.ExtractFieldList(nil, fields, keys, nil)))
-		if m.resourceType == "ec2" {
-			m.injectEC2StatusChecks()
-		}
-		m.injectAttentionSection()
-		return
-	}
-	// Build items from path-form fields.
-	pathItems := expandJSONItems(flattenTagItems(fieldpath.ExtractFieldList(m.res.RawStruct, fields, detailPaths, navMap)))
-
-	// Build a map from path → slice of FieldItems for O(1) lookup when interleaving.
-	pathItemsByPath := make(map[string][]fieldpath.FieldItem, len(detailPaths))
-	for _, item := range pathItems {
-		p := item.Path
-		pathItemsByPath[p] = append(pathItemsByPath[p], item)
-	}
-
-	// Build the final ordered items list preserving detailFields order.
-	// Key-form fields are injected as plain key-value rows.
-	// Path-form fields use the items extracted by ExtractFieldList.
-	var items []fieldpath.FieldItem
-	emittedPath := make(map[string]bool, len(detailPaths))
-	for _, df := range detailFields {
-		if df.Key != "" {
-			// Key-form: read from Fields[].
-			val := "-"
-			if v, ok := m.res.Fields[df.Key]; ok && v != "" {
-				val = v
-			}
-			items = append(items, fieldpath.FieldItem{
-				Key:   df.DisplayLabel(),
-				Value: val,
-				Path:  df.Key,
-			})
-		} else if !emittedPath[df.Path] {
-			// Path-form: emit all FieldItems with this path (may be header + sub-fields).
-			// When df.Label is set, override the first (header) item's label so the
-			// user-provided "label:" in YAML actually shows up. Sub-field labels are
-			// derived from the struct shape and are not overridden.
-			emittedPath[df.Path] = true
-			pathItems := pathItemsByPath[df.Path]
-			if df.Label != "" && len(pathItems) > 0 {
-				// Clone to avoid mutating the cached slice — pathItemsByPath may be
-				// referenced again on re-render.
-				pathItems = append([]fieldpath.FieldItem(nil), pathItems...)
-				pathItems[0].Key = df.Label
-			}
-			items = append(items, pathItems...)
-		}
-	}
-
-	// Post-process: annotate sub-fields that match a navigable path.
-	// ExtractFieldList only checks top-level paths; sub-fields need separate matching.
-	// Track YAML indentation so nested values like BlockDeviceMappings.Ebs.VolumeId
-	// remain navigable without being duplicated as top-level fields.
-	currentPath := ""
-	ancestorByLevel := map[int]string{}
-	for i, item := range items {
-		if item.IsHeader {
-			currentPath = item.Path
-			clear(ancestorByLevel)
-			continue
-		}
-		if !item.IsSubField {
-			continue
-		}
-		if item.Path != currentPath {
-			currentPath = item.Path
-			clear(ancestorByLevel)
-		}
-		rawLine := item.Value
-		trimmed := strings.TrimSpace(rawLine)
-		if trimmed == "" {
-			continue
-		}
-		level := 0
-		if leading := len(rawLine) - len(strings.TrimLeft(rawLine, " ")); leading > 0 {
-			level = leading / 2
-		}
-		hasDash := strings.HasPrefix(trimmed, "- ")
-		trimmed = strings.TrimPrefix(trimmed, "- ")
-		subKey, subVal, hasSep := strings.Cut(trimmed, ":")
-		if !hasSep {
-			continue
-		}
-		subKey = strings.TrimSpace(subKey)
-		subVal = strings.TrimSpace(subVal)
-		for depth := range ancestorByLevel {
-			if depth >= level {
-				delete(ancestorByLevel, depth)
-			}
-		}
-		pathParts := []string{item.Path}
-		for depth := 0; depth < level; depth++ {
-			if ancestor, ok := ancestorByLevel[depth]; ok && ancestor != "" {
-				pathParts = append(pathParts, ancestor)
-			}
-		}
-		pathParts = append(pathParts, subKey)
-		composedPath := strings.Join(pathParts, ".")
-		if tt, ok := navMap[composedPath]; ok && subVal != "" {
-			items[i].IsNavigable = true
-			items[i].TargetType = tt
-			// Apply target-type ARN→ID extraction when the raw value is an ARN
-			// but the target resource type indexes on a bare id. Value stays the
-			// displayed ARN; NavID carries the bare lookup key.
-			if navID := resource.NavIDFromValue(tt, subVal); navID != "" && navID != subVal {
-				items[i].NavID = navID
-			}
-			// Preserve the YAML list marker so the navigable row aligns
-			// with sibling rows rendered via colorizeDetailLine.
-			if hasDash {
-				items[i].Key = "- " + subKey
-			} else {
-				items[i].Key = subKey
-			}
-			items[i].Value = subVal
-		}
-		if subVal == "" {
-			ancestorByLevel[level] = subKey
-		}
-	}
-	// Post-process: apply NavIDFromValue to top-level scalar navigable items.
-	// ExtractFieldList marks them IsNavigable but does not know the target type's
-	// ID format — NavID must be resolved here where resource.NavIDFromValue is available.
-	// Only set NavID when the extractor actually changes the value (the value is an ARN).
-	for i, item := range items {
-		if item.IsNavigable && !item.IsSubField && item.TargetType != "" && item.Value != "" {
-			if navID := resource.NavIDFromValue(item.TargetType, item.Value); navID != "" && navID != item.Value {
-				items[i].NavID = navID
-			}
-		}
-	}
-
-	m.fieldList = items
-	if m.resourceType == "ec2" {
-		m.injectEC2StatusChecks()
-	}
+	m.fieldList = sectionsToFieldItems(sections)
 	m.injectAttentionSection()
 }
 
-// extractRawCTEventJSON pulls the raw JSON string out of a ct-events resource.
-// Returns "" if RawStruct is nil or not a cloudtrailtypes.Event or has nil CloudTrailEvent.
-func extractRawCTEventJSON(res resource.Resource) string {
-	if res.RawStruct == nil {
-		return ""
+// sectionsToFieldItems converts []domain.Section to []fieldpath.FieldItem for
+// the existing renderFromFieldList renderer.  Each section with a non-empty
+// Title emits a leading FieldItem{IsSection: true}; then each domain.Item is
+// converted via domainItemToFieldItem.
+func sectionsToFieldItems(sections []domain.Section) []fieldpath.FieldItem {
+	if len(sections) == 0 {
+		return nil
 	}
-	ev, ok := res.RawStruct.(cloudtrailtypes.Event)
-	if !ok {
-		return ""
-	}
-	if ev.CloudTrailEvent == nil {
-		return ""
-	}
-	return *ev.CloudTrailEvent
-}
-
-// sectionsToFieldItems flattens a []ctdetail.Section to []fieldpath.FieldItem.
-// Emits one FieldItem{IsSection: true, Key: section.Name} per section header,
-// followed by one FieldItem per Row with IsNavigable/TargetType/ColorTier propagated.
-func sectionsToFieldItems(sections []ctdetail.Section) []fieldpath.FieldItem {
 	var items []fieldpath.FieldItem
 	for _, sec := range sections {
-		items = append(items, fieldpath.FieldItem{
-			IsSection: true,
-			Key:       sec.Name,
-			Path:      sec.Name,
-		})
-		for _, row := range sec.Rows {
+		if sec.Title != "" {
 			items = append(items, fieldpath.FieldItem{
-				Key:         row.Key,
-				Value:       row.Value,
-				Path:        sec.Name + "." + row.Key,
-				IsNavigable: row.IsNavigable,
-				TargetType:  row.TargetType,
-				ColorTier:   row.Severity,
-				NavID:       row.NavID,
+				IsSection: true,
+				Key:       sec.Title,
+				Path:      sec.Title,
 			})
+		}
+		for _, it := range sec.Items {
+			items = append(items, domainItemToFieldItem(it, sec.Title))
 		}
 	}
 	return items
 }
 
-// statusCheckTier maps an EC2 status check value to a ColorTier string
-// for deferred styling via TierColorStyle in the render path.
-func statusCheckTier(status string) string {
-	switch status {
-	case "ok":
-		return "ok"
-	case "impaired":
-		return "impaired"
-	case "initializing":
-		return "initializing"
-	default:
-		return ""
+// domainItemToFieldItem maps a domain.Item back to a fieldpath.FieldItem so
+// the unchanged renderFromFieldList renderer can consume projector output.
+//
+// Path is taken directly from it.Path when set, preserving the real field path
+// from the projector. Fallback to synthesized paths is used only when it.Path
+// is empty, maintaining backward-compatible behaviour for any Items constructed
+// without a Path value.
+func domainItemToFieldItem(it domain.Item, sectionTitle string) fieldpath.FieldItem {
+	fi := fieldpath.FieldItem{
+		Key:         it.Label,
+		Value:       it.Value,
+		Path:        it.Path,
+		IsNavigable: it.Navigable,
+		TargetType:  it.TargetType,
+		ColorTier:   it.Tier,
+		NavID:       it.NavID,
 	}
-}
-
-// injectEC2StatusChecks injects a "Status Checks" section into m.fieldList
-// after the "State" section when the instance is running and checks are non-trivial.
-func (m *DetailModel) injectEC2StatusChecks() {
-	if len(m.fieldList) == 0 {
-		return
+	if fi.Path == "" {
+		fi.Path = sectionTitle + "." + it.Label
 	}
-	// Only inject when instance is running.
-	state := m.res.Fields["state"]
-	if state != "running" {
-		return
-	}
-	sysStatus := m.res.Fields["system_status"]
-	instStatus := m.res.Fields["instance_status"]
-
-	// Omit when both fields are empty.
-	if sysStatus == "" && instStatus == "" {
-		return
-	}
-	// Omit when both are "ok" (healthy — no noise).
-	if sysStatus == "ok" && instStatus == "ok" {
-		return
-	}
-
-	// Build the items to inject.
-	sysVal := sysStatus
-	if sysVal == "" {
-		sysVal = "—"
-	}
-	instVal := instStatus
-	if instVal == "" {
-		instVal = "—"
-	}
-	inject := []fieldpath.FieldItem{
-		{Key: "Status Checks", IsHeader: true, Path: "StatusChecks"},
-		{Key: "System", Value: sysVal, IsSubField: true, Path: "StatusChecks", IndentLevel: 1, ColorTier: statusCheckTier(sysStatus)},
-		{Key: "Instance", Value: instVal, IsSubField: true, Path: "StatusChecks", IndentLevel: 1, ColorTier: statusCheckTier(instStatus)},
-	}
-
-	// Find the insertion point: after the "State" section header and its sub-fields.
-	insertAt := -1
-	inStateSection := false
-	for i, item := range m.fieldList {
-		if item.IsHeader && item.Key == "State" {
-			inStateSection = true
-			continue
+	switch it.Kind {
+	case domain.ItemHeader:
+		fi.IsHeader = true
+		if it.Path == "" {
+			fi.Path = it.Label // headers use their own label as path (matches ExtractFieldList)
 		}
-		if inStateSection {
-			if item.IsHeader {
-				// Found the next section header — insert before it.
-				insertAt = i
-				break
+	case domain.ItemSubfield:
+		fi.IsSubField = true
+		fi.IndentLevel = it.IndentLevel
+		if it.Label == "" {
+			// Raw YAML continuation line. Legacy buildFieldList convention:
+			// raw lines have Key == Value so renderFromFieldList takes the
+			// plain-line branch (no stray ": " prefix).
+			fi.Key = it.Value
+			// Path: no trailing dot for empty-label subfields.
+			if it.Path == "" {
+				fi.Path = sectionTitle
 			}
-			// Continue scanning sub-fields of State section.
 		}
+	case domain.ItemSpacer:
+		fi.IsSpacer = true
 	}
-	if insertAt == -1 {
-		// State section was last, or not found — append at end.
-		m.fieldList = append(m.fieldList, inject...)
-		return
-	}
-
-	// Insert at the found position.
-	result := make([]fieldpath.FieldItem, 0, len(m.fieldList)+len(inject))
-	result = append(result, m.fieldList[:insertAt]...)
-	result = append(result, inject...)
-	result = append(result, m.fieldList[insertAt:]...)
-	m.fieldList = result
+	return fi
 }
 
 // injectAttentionSection prepends a unified "Attention" section to the field

@@ -34,7 +34,7 @@ func init() {
 	})
 
 	// ecstypes.Service: ClusterArn, RoleArn, NetworkConfiguration subnets/SGs, LoadBalancer TG ARNs
-	resource.RegisterNavigableFields("ecs-svc", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("ecs-svc", []resource.NavigableField{
 		{FieldPath: "ClusterArn", TargetType: "ecs"},
 		{FieldPath: "RoleArn", TargetType: "role"},
 		{FieldPath: "NetworkConfiguration.AwsvpcConfiguration.Subnets", TargetType: "subnet"},

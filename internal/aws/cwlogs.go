@@ -32,7 +32,7 @@ func init() {
 	})
 
 	// cloudwatchlogstypes.LogGroup: KmsKeyId
-	resource.RegisterNavigableFields("logs", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("logs", []resource.NavigableField{
 		{FieldPath: "KmsKeyId", TargetType: "kms"},
 	})
 }

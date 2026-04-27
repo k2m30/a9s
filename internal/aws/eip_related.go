@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	resource.RegisterNavigableFields("eip", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("eip", []resource.NavigableField{
 		{FieldPath: "InstanceId", TargetType: "ec2"},
 		{FieldPath: "NetworkInterfaceId", TargetType: "eni"},
 	})

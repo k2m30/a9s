@@ -33,7 +33,7 @@ func init() {
 	// list RawStruct) lacks it — the navigable-field registration is an intent
 	// contract: "if the raw struct exposes RoleArn, treat it as a role navigation".
 	// It resolves only when enriched detail (DescribeStateMachine) is present.
-	resource.RegisterNavigableFields("sfn", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("sfn", []resource.NavigableField{
 		{FieldPath: "RoleArn", TargetType: "role"},
 	})
 }

@@ -73,11 +73,37 @@ Justification for this order:
 - **`04-catalog` fourth**, after the domain shape is canonical. Catalog entries reference `Severity`, `Finding`, `LifecycleKey`, `DetailProjector`, all introduced in earlier phases.
 - **`05-boundary` last**, because by then everything else is stable. `5a-extract` removes the `sessionRuntime` embed that earlier phases have been working around; `5a-gens` unifies what's left of the gen-counter zoo; `5b-msg-taxonomy` lands the type-level command/event split.
 
-## Rollback granularity
+## Migration discipline — stabilization checkpoints, not per-PR atomicity
 
-Every PR in this program is independently revertable. PRs within a phase do depend on prior PRs (e.g. PR-03b expects PR-03a-shim to have landed), but reverting PR-03f does not require reverting PR-03b through 03e. The shim from 03a-shim covers any category not yet migrated *or* a category whose migration was reverted: it derives `Findings` from legacy `Status` + `Issues` + `EnrichmentFinding` for any unmigrated type. Reverting a per-category PR puts that category back under shim coverage; downstream PRs that don't touch the reverted category remain landed.
+This program executes as 40 PRs across 5 phases. **Intermediate PRs are NOT required to keep `make test`, `make test-race`, snapshot suites, integration goldens, or `./a9s --demo` rendering fully green.** Test and render regressions during a migration window are accepted IF they are (a) bounded in surface, (b) expected at the time the PR lands, and (c) resolved by the next planned stabilization checkpoint listed below. **Compile failures are NOT relaxed** — see hard-safety #1 below. Reviewers should not require extra compatibility scaffolding — extra shims, dual-write paths, test-only forwarders, or per-PR golden regenerations — whose only purpose is to preserve mid-migration test or UX parity. Forward progress toward the target architecture is preferred over polishing intermediate states.
 
-This is the explicit alternative to "revert the whole phase." Each phase file's per-PR spec carries an "Independently revertable" assertion in the exit-criteria block.
+### Stabilization checkpoints (where correctness IS enforced)
+
+Every phase ends with a checkpoint where the full gate suite (`make test`, `make test-race`, `make lint`, `make security`, `make gofix`, snapshot suite, demo integration suite, real-AWS integration test, pre-push agents) MUST pass. Phase 01 is a single-PR phase, so its checkpoint coincides with PR-01 itself.
+
+| Checkpoint | What is verifiably true at this commit |
+|---|---|
+| End of Phase 01 (PR-01) | `internal/domain` is the leaf type-declaration package; `internal/semantics/{projection,ctevent,selector}/` exist with stub or real implementations; `ResourceTypeDef.Project` field wired; ct-events shortName branch deleted from `internal/tui/views/`; full test/render parity preserved. Phase 01 ships as a single PR per `01-projection-hook.md`, so this checkpoint coincides with PR-01 itself. |
+| End of Phase 02 (PR-02e) | `Session.Rotate()` is the single reset entry point; `internal/aws/` carries no mutable globals; live profile-switch test passes against a real AWS profile; `make test` green. |
+| End of Phase 03 (PR-03n) | Canonical `Findings` model is the only model; `Resource.Status`/`Resource.Issues` deleted; the on-disk cache YAML format break is migrated crash-free per the PR-03n risk-register decision; `make test-race` clean. |
+| End of Phase 04 (PR-04n) | Catalog is authoritative; zero `init()` and zero `Register*` in feature wiring; `make generate && git diff --exit-code` clean; mechanical-resource-implementation acceptance test passes. |
+| End of Phase 05 (PR-05b) | Shared core compiles without Bubble Tea / lipgloss imports; generation counters unified; cmd/event message taxonomy with type-level gen-stamping. |
+| Program exit | All of the above hold simultaneously plus the four-file CloudHSM acceptance test from "Mechanical-resource-implementation acceptance test" below. |
+
+### Hard safety guarantees (these hold AT EVERY PR, regardless of checkpoint)
+
+These are non-negotiable even in mid-migration commits. Violating any of these is a blocker no matter how partial the PR is:
+
+1. **HEAD compiles.** `go build ./...` is clean on every committed state. A non-compiling tree blocks all parallel work in the program; the program assumes contributors can branch off any landed commit.
+2. **No irreversible data loss or cache corruption.** The on-disk cache YAML format break is *migrated* (clear-on-upgrade with a one-line user notice, or one-way deprecated-field write per PR-03n's choice), never silently dropped.
+3. **No permanent dual-source-of-truth contract.** One-way derive shims are acceptable as transitional compatibility; bidirectional mirror-back is not. A shim that writes both directions is a permanent second source of truth wearing a costume — reject it regardless of which PR introduces it.
+4. **No misleading permanent API.** If a PR introduces a new exported API, function signature, or struct field whose intended lifetime is permanent, that API MUST be the intended end-state shape — not a transitional shape that a later PR will rename. Renaming carries a churn cost the program cannot afford to pay twice. **Carve-out**: short-lived, explicitly documented forwarding wrappers (e.g. `internal/aws/ct_verb_format.go` — three-line delegations to `internal/semantics/ctevent` introduced in PR-01 to keep test imports compiling without a same-PR test-import migration) are NOT permanent APIs and do not violate this rule. Such wrappers MUST carry a godoc line explicitly stating "transitional forwarding wrapper for <reason>" and MUST be removed in a stabilization-checkpoint PR within the same phase or the next phase.
+
+### What this means in practice
+
+- "Independently revertable: yes" assertions previously attached to intermediate PRs are downgraded to "**stabilization-checkpoint commit**": the PR's intermediate state may not be revertable in isolation. To revert mid-phase, revert the entire phase or wait for the next checkpoint.
+- "Every PR exits with `make test` green" is downgraded to "**every stabilization checkpoint exits with `make test` green**; intermediate PRs may carry expected, bounded, documented test failures whose closure is owned by a downstream PR within the same phase."
+- "Per-category PRs are independent and parallelizable" is **preserved as a scoping property** — per-category migrations remain independently scopeable so multiple developers can work in parallel — but parallelism does not imply each per-category PR must be test-green when landed in isolation. The phase-end stabilization PR (PR-03n, PR-04n) is where the category fleet snaps green together.
 
 ## Cross-phase invariants
 
