@@ -75,12 +75,15 @@ Justification for this order:
 
 ## Migration discipline — stabilization checkpoints, not per-PR atomicity
 
-This program executes as 40 PRs across 5 phases. **Intermediate PRs are NOT required to keep `make test`, `make test-race`, snapshot suites, integration goldens, or `./a9s --demo` rendering fully green.** Compile / test / render regressions during a migration window are accepted IF they are (a) bounded in surface, (b) expected at the time the PR lands, and (c) resolved by the next planned stabilization checkpoint listed below. Reviewers should not require extra compatibility scaffolding — extra shims, dual-write paths, test-only forwarders, or per-PR golden regenerations — whose only purpose is to preserve mid-migration test or UX parity. Forward progress toward the target architecture is preferred over polishing intermediate states.
+This program executes as 40 PRs across 5 phases. **Intermediate PRs are NOT required to keep `make test`, `make test-race`, snapshot suites, integration goldens, or `./a9s --demo` rendering fully green.** Test and render regressions during a migration window are accepted IF they are (a) bounded in surface, (b) expected at the time the PR lands, and (c) resolved by the next planned stabilization checkpoint listed below. **Compile failures are NOT relaxed** — see hard-safety #1 below. Reviewers should not require extra compatibility scaffolding — extra shims, dual-write paths, test-only forwarders, or per-PR golden regenerations — whose only purpose is to preserve mid-migration test or UX parity. Forward progress toward the target architecture is preferred over polishing intermediate states.
 
 ### Stabilization checkpoints (where correctness IS enforced)
 
+Every phase ends with a checkpoint where the full gate suite (`make test`, `make test-race`, `make lint`, `make security`, `make gofix`, snapshot suite, demo integration suite, real-AWS integration test, pre-push agents) MUST pass. Phase 01 is a single-PR phase, so its checkpoint coincides with PR-01 itself.
+
 | Checkpoint | What is verifiably true at this commit |
 |---|---|
+| End of Phase 01 (PR-01) | `internal/domain` is the leaf type-declaration package; `internal/semantics/{projection,ctevent,selector}/` exist with stub or real implementations; `ResourceTypeDef.Project` field wired; ct-events shortName branch deleted from `internal/tui/views/`; full test/render parity preserved. Phase 01 ships as a single PR per `01-projection-hook.md`, so this checkpoint coincides with PR-01 itself. |
 | End of Phase 02 (PR-02e) | `Session.Rotate()` is the single reset entry point; `internal/aws/` carries no mutable globals; live profile-switch test passes against a real AWS profile; `make test` green. |
 | End of Phase 03 (PR-03n) | Canonical `Findings` model is the only model; `Resource.Status`/`Resource.Issues` deleted; the on-disk cache YAML format break is migrated crash-free per the PR-03n risk-register decision; `make test-race` clean. |
 | End of Phase 04 (PR-04n) | Catalog is authoritative; zero `init()` and zero `Register*` in feature wiring; `make generate && git diff --exit-code` clean; mechanical-resource-implementation acceptance test passes. |
