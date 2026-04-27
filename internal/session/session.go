@@ -79,6 +79,12 @@ type Session struct {
 	// but that blurred the AWS-transport/session-state boundary; they live
 	// here instead and are passed to detail enrichers via DetailEnrichmentCtx.
 	PolicyDocCache *awsclient.PolicyDocumentCache
+
+	// IAMPolicies is the per-session cache for IAM policy resources, keyed by
+	// both PolicyName and ARN. Replaces the package-level globals previously in
+	// internal/aws/iam_policies.go. Wired into *ServiceClients.IAMPolicies on
+	// every ClientsReadyMsg so FetchIAMPoliciesByIDsFull uses the session store.
+	IAMPolicies PolicyStore
 }
 
 // New constructs a fresh Session with all maps initialized and generation
@@ -99,6 +105,7 @@ func New() *Session {
 		EnrichGen:              1,
 		EnrichmentGen:          1,
 		PolicyDocCache:         &awsclient.PolicyDocumentCache{},
+		IAMPolicies:            NewPolicyStore(),
 	}
 }
 
@@ -137,9 +144,7 @@ func (s *Session) Rotate() {
 	// documents fetched in the previous account cannot leak into the next.
 	s.PolicyDocCache = &awsclient.PolicyDocumentCache{}
 
-	// Process-wide lazy-add caches in internal/aws. These cache AWS names
-	// across drills within a session; they must be reset on session switch
-	// so stale entries from the prior account cannot satisfy FetchByIDs
-	// calls in the next one.
-	awsclient.ResetIAMPoliciesCache()
+	// IAMPolicies: reset to a fresh store so managed/inline entries from the
+	// prior account/profile cannot leak into the next session.
+	s.IAMPolicies = NewPolicyStore()
 }

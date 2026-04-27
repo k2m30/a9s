@@ -3,7 +3,6 @@ package aws
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
@@ -11,6 +10,19 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
+
+// iamPolicyStore is the subset of session.PolicyStore consumed by this file.
+// Defined locally to avoid an import cycle (internal/session imports internal/aws).
+// session.PolicyStore satisfies this interface via Go's structural typing.
+type iamPolicyStore interface {
+	Lookup(key string) (resource.Resource, bool)
+	Set(key string, r resource.Resource)
+	ManagedBuilt() bool
+	MarkManagedBuilt()
+	InlineBuilt() bool
+	MarkInlineBuilt()
+	Clear()
+}
 
 func init() {
 	resource.RegisterFieldKeys("policy", []string{"policy_name", "policy_type", "attachment_count", "is_attachable", "path", "create_date"})
@@ -42,7 +54,10 @@ func init() {
 		if !ok || c == nil {
 			return nil, fmt.Errorf("AWS clients not initialized")
 		}
-		return FetchIAMPoliciesByIDsFull(ctx, c.IAM, ids)
+		if c.IAMPolicies == nil {
+			return nil, fmt.Errorf("IAMPolicies store not initialized on ServiceClients")
+		}
+		return FetchIAMPoliciesByIDsFull(ctx, c.IAM, ids, c.IAMPolicies)
 	})
 
 	resource.RegisterRelated("policy", []resource.RelatedDef{
@@ -156,32 +171,6 @@ func FetchIAMPoliciesPage(ctx context.Context, api IAMListPoliciesAPI, continuat
 	}, nil
 }
 
-// allPoliciesCache memoizes the name→Resource map built from
-// ListPolicies(Scope=All). AWS-managed policy names are stable globally;
-// customer-managed names are stable within an account. The cache is cleared
-// on every profile/region switch via ResetIAMPoliciesCache (wired from
-// sessionRuntime.resetForSessionSwitch), so stale policies from a prior
-// account never leak into lazy-add drills in the next account. The mutex
-// guards concurrent rebuilds from parallel related-checks targeting "policy".
-var (
-	allPoliciesMu          sync.Mutex
-	allManagedPoliciesBuilt bool
-	allInlinePoliciesBuilt  bool
-	allPoliciesByID         map[string]resource.Resource
-)
-
-// ResetIAMPoliciesCache clears the process-wide customer+AWS-managed policy
-// cache used by FetchIAMPoliciesByIDsFull. Called on every profile/region
-// switch to prevent account-A policies from being returned for lazy-add
-// drills in account-B.
-func ResetIAMPoliciesCache() {
-	allPoliciesMu.Lock()
-	defer allPoliciesMu.Unlock()
-	allManagedPoliciesBuilt = false
-	allInlinePoliciesBuilt = false
-	allPoliciesByID = nil
-}
-
 // FetchIAMPoliciesByIDsFull is the production entry point called by the
 // related-panel lazy-add path. It resolves policy PolicyNames across BOTH
 // managed (customer + AWS) and inline group policies, so a checker that
@@ -190,40 +179,50 @@ func ResetIAMPoliciesCache() {
 // ListGroupPolicies) drills into a real entry.
 //
 // Managed resolution: ListPolicies(Scope=All) paginated on first call,
-// memoized in allPoliciesByID. Inline resolution: ListGroups +
-// ListGroupPolicies, memoized alongside.
+// memoized via store.MarkManagedBuilt(). Inline resolution: ListGroups +
+// ListGroupPolicies, memoized via store.MarkInlineBuilt().
 //
 // Invariant: the returned Resource shape matches FetchIAMPoliciesPage and
 // fetchInlineGroupPolicies (same Fields keys) so reverse-scan checkers
 // reading Fields on a lazily-added policy observe the same fields as on a
 // paginated-fetched policy.
-func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string) ([]resource.Resource, error) {
+//
+// Concurrency trade-off (acknowledged): no top-level lock is held across the
+// check-build-mark sequence. Two concurrent lazy-add calls can both observe
+// `store.ManagedBuilt() == false` and both invoke buildAllManagedPolicies.
+// The store itself remains correct (writes are mutex-guarded inside the
+// PolicyStore impl), so duplicate Set calls are idempotent — but two AWS
+// ListPolicies pagination walks may run in parallel before one wins the
+// MarkManagedBuilt race. The previous package-global `allPoliciesMu`
+// serialized this. Acceptable here because: (a) lazy-add is the
+// related-panel drill-in path, not high-volume; (b) duplicate Sets converge
+// to the same final cache state; (c) introducing a sync.Once or
+// build-in-progress flag would re-couple the transport layer to a session
+// concern that PR-02b explicitly removed. Same applies to InlineBuilt.
+func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string, store iamPolicyStore) ([]resource.Resource, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
-	allPoliciesMu.Lock()
-	defer allPoliciesMu.Unlock()
 
-	if !allManagedPoliciesBuilt {
-		allPoliciesByID = make(map[string]resource.Resource)
-		if err := buildAllManagedPolicies(ctx, api); err != nil {
+	if !store.ManagedBuilt() {
+		if err := buildAllManagedPolicies(ctx, api, store); err != nil {
 			// Managed is the trunk — without it we can't resolve any policy.
 			return nil, err
 		}
-		allManagedPoliciesBuilt = true
+		store.MarkManagedBuilt()
 	}
-	if !allInlinePoliciesBuilt {
+	if !store.InlineBuilt() {
 		// Include inline group policies so checkGroupPolicy (which emits
 		// both attached and inline names) finds the inline entries in
 		// cache too. Per-group failures are surfaced via the returned error
 		// and propagated into the composite failure list below.
 		inlines, inlineErr := fetchInlineGroupPolicies(ctx, api)
 		for _, r := range inlines {
-			allPoliciesByID[r.ID] = r
+			store.Set(r.ID, r)
 		}
 		if inlineErr != nil {
 			// Non-fatal: managed policies are already loaded; partial inline
-			// results are incorporated above. Leave allInlinePoliciesBuilt=false
+			// results are incorporated above. Leave InlineBuilt=false
 			// so next call retries the inline fetch — it might succeed after a
 			// transient throttle. Surface as aggregate failure with the partial
 			// results we did recover.
@@ -239,7 +238,7 @@ func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string) ([
 					continue
 				}
 				seen[id] = struct{}{}
-				if r, hit := allPoliciesByID[id]; hit {
+				if r, hit := store.Lookup(id); hit {
 					resources = append(resources, r)
 				} else {
 					failures = append(failures, fmt.Sprintf("%s: not found", id))
@@ -247,7 +246,7 @@ func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string) ([
 			}
 			return resources, AggregateFailures("policy FetchByIDs", failures, len(ids))
 		}
-		allInlinePoliciesBuilt = true
+		store.MarkInlineBuilt()
 	}
 
 	var failures []string
@@ -261,7 +260,7 @@ func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string) ([
 			continue
 		}
 		seen[id] = struct{}{}
-		if r, hit := allPoliciesByID[id]; hit {
+		if r, hit := store.Lookup(id); hit {
 			resources = append(resources, r)
 		} else {
 			failures = append(failures, fmt.Sprintf("%s: not found", id))
@@ -277,19 +276,16 @@ func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string) ([
 //
 // Per-ID failures (IDs not present in the all-policies map) are collected into
 // a composite error returned alongside the partial success list.
-func FetchIAMPoliciesByIDs(ctx context.Context, api IAMListPoliciesAPI, ids []string) ([]resource.Resource, error) {
+func FetchIAMPoliciesByIDs(ctx context.Context, api IAMListPoliciesAPI, ids []string, store iamPolicyStore) ([]resource.Resource, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
-	allPoliciesMu.Lock()
-	defer allPoliciesMu.Unlock()
 
-	if !allManagedPoliciesBuilt {
-		allPoliciesByID = make(map[string]resource.Resource)
-		if err := buildAllManagedPolicies(ctx, api); err != nil {
+	if !store.ManagedBuilt() {
+		if err := buildAllManagedPolicies(ctx, api, store); err != nil {
 			return nil, err
 		}
-		allManagedPoliciesBuilt = true
+		store.MarkManagedBuilt()
 	}
 
 	var failures []string
@@ -303,7 +299,7 @@ func FetchIAMPoliciesByIDs(ctx context.Context, api IAMListPoliciesAPI, ids []st
 			continue
 		}
 		seen[id] = struct{}{}
-		if r, hit := allPoliciesByID[id]; hit {
+		if r, hit := store.Lookup(id); hit {
 			resources = append(resources, r)
 		} else {
 			failures = append(failures, fmt.Sprintf("%s: not found", id))
@@ -313,10 +309,10 @@ func FetchIAMPoliciesByIDs(ctx context.Context, api IAMListPoliciesAPI, ids []st
 }
 
 // buildAllManagedPolicies paginates ListPolicies(Scope=All) and populates
-// allPoliciesByID with every managed policy (customer + AWS). Caller MUST
-// hold allPoliciesMu. Each paginated ListPolicies call is wrapped in
-// RetryOnThrottle so throttling during large accounts is handled gracefully.
-func buildAllManagedPolicies(ctx context.Context, api IAMListPoliciesAPI) error {
+// the store with every managed policy (customer + AWS). Each paginated
+// ListPolicies call is wrapped in RetryOnThrottle so throttling during
+// large accounts is handled gracefully.
+func buildAllManagedPolicies(ctx context.Context, api IAMListPoliciesAPI, store iamPolicyStore) error {
 	var marker *string
 	for {
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.ListPoliciesOutput, error) {
@@ -374,9 +370,9 @@ func buildAllManagedPolicies(ctx context.Context, api IAMListPoliciesAPI) error 
 			// Index by PolicyName AND by ARN so callers that emit ARN-based IDs
 			// (e.g. checkers that embed policy.Arn from SDK structs) can still
 			// resolve the policy via FetchIAMPoliciesByIDsFull.
-			allPoliciesByID[policyName] = r
+			store.Set(policyName, r)
 			if p.Arn != nil && *p.Arn != policyName {
-				allPoliciesByID[*p.Arn] = r
+				store.Set(*p.Arn, r)
 			}
 		}
 		if !out.IsTruncated || out.Marker == nil {
