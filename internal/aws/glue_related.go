@@ -124,7 +124,7 @@ func checkGlueCFN(ctx context.Context, clients any, res resource.Resource, cache
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
 	}
 	region := regionFromEnv()
-	account := accountIDFromClients(ctx, c)
+	account := accountIDFromClients(ctx, c, c.IdentityStore)
 	if region == "" || account == "" {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
 	}
