@@ -5,11 +5,12 @@ import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/session"
 )
 
-// testResults returns a non-nil slice of relatedCacheResult for use as a cache value.
-func testResults(count int) []relatedCacheResult {
-	return []relatedCacheResult{{
+// testResults returns a non-nil slice of session.RelatedCacheResult for use as a cache value.
+func testResults(count int) []session.RelatedCacheResult {
+	return []session.RelatedCacheResult{{
 		DefDisplayName: "",
 		Result:         resource.RelatedCheckResult{TargetType: "ec2", Count: count},
 	}}
@@ -19,62 +20,62 @@ func testResults(count int) []relatedCacheResult {
 // the oldest entry so the cache never exceeds its capacity.
 func TestRelatedCacheLRU_CapEnforced(t *testing.T) {
 	const cap = 500
-	c := newRelatedCacheLRU(cap)
+	c := session.NewRelatedCacheLRU(cap)
 
 	for i := 0; i <= cap; i++ {
-		c.set(fmt.Sprintf("key-%d", i), testResults(i))
+		c.Set(fmt.Sprintf("key-%d", i), testResults(i))
 	}
 
-	got := c.len()
+	got := c.Len()
 	if got != cap {
 		t.Errorf("expected len %d after inserting %d entries into cap=%d cache, got %d", cap, cap+1, cap, got)
 	}
 }
 
 // TestRelatedCacheLRU_LRUEviction verifies that the least-recently-used entry
-// is evicted when the cache is full, and that a recent get() promotes an entry.
+// is evicted when the cache is full, and that a recent Get() promotes an entry.
 func TestRelatedCacheLRU_LRUEviction(t *testing.T) {
-	c := newRelatedCacheLRU(3)
+	c := session.NewRelatedCacheLRU(3)
 
-	c.set("a", testResults(1))
-	c.set("b", testResults(2))
-	c.set("c", testResults(3))
+	c.Set("a", testResults(1))
+	c.Set("b", testResults(2))
+	c.Set("c", testResults(3))
 
 	// Access "a" to make it the most recently used.
-	if _, ok := c.get("a"); !ok {
+	if _, ok := c.Get("a"); !ok {
 		t.Fatal("expected 'a' to exist before eviction test")
 	}
 
 	// Insert "d" — should evict "b" (least recently used).
-	c.set("d", testResults(4))
+	c.Set("d", testResults(4))
 
-	if _, ok := c.get("a"); !ok {
+	if _, ok := c.Get("a"); !ok {
 		t.Error("expected 'a' to still exist after eviction")
 	}
-	if _, ok := c.get("b"); ok {
+	if _, ok := c.Get("b"); ok {
 		t.Error("expected 'b' to have been evicted (LRU)")
 	}
-	if _, ok := c.get("c"); !ok {
+	if _, ok := c.Get("c"); !ok {
 		t.Error("expected 'c' to still exist after eviction")
 	}
-	if _, ok := c.get("d"); !ok {
+	if _, ok := c.Get("d"); !ok {
 		t.Error("expected 'd' to exist after insertion")
 	}
 }
 
-// TestRelatedCacheLRU_Clear verifies that clear() removes all entries and
+// TestRelatedCacheLRU_Clear verifies that Clear() removes all entries and
 // resets the length to zero.
 func TestRelatedCacheLRU_Clear(t *testing.T) {
-	c := newRelatedCacheLRU(10)
+	c := session.NewRelatedCacheLRU(10)
 
 	for i := range 5 {
-		c.set(fmt.Sprintf("k%d", i), testResults(i))
+		c.Set(fmt.Sprintf("k%d", i), testResults(i))
 	}
 
-	c.clear()
+	c.Clear()
 
-	if got := c.len(); got != 0 {
-		t.Errorf("expected len 0 after clear(), got %d", got)
+	if got := c.Len(); got != 0 {
+		t.Errorf("expected len 0 after Clear(), got %d", got)
 	}
 }
 
@@ -91,18 +92,18 @@ func TestRelatedCacheLRU_Clear(t *testing.T) {
 // rightcolumn's strict-match fallback refused to bind when matches > 1
 // for the shared TargetType="ct-events".
 func TestRelatedCacheReplay_PreservesDefDisplayName(t *testing.T) {
-	c := newRelatedCacheLRU(10)
-	key := relatedCacheKey("ct-events", "src-evt-0001")
+	c := session.NewRelatedCacheLRU(10)
+	key := session.RelatedCacheKey("ct-events", "src-evt-0001")
 
-	in := []relatedCacheResult{
+	in := []session.RelatedCacheResult{
 		{DefDisplayName: "CT events by AccessKeyId", Result: resource.RelatedCheckResult{TargetType: "ct-events", Count: 3, ResourceIDs: []string{"e1"}}},
 		{DefDisplayName: "CT events by Username", Result: resource.RelatedCheckResult{TargetType: "ct-events", Count: 2, ResourceIDs: []string{"e2"}}},
 		{DefDisplayName: "CT events by EventName", Result: resource.RelatedCheckResult{TargetType: "ct-events", Count: 1, ResourceIDs: []string{"e3"}}},
 		{DefDisplayName: "CT events by SharedEventId", Result: resource.RelatedCheckResult{TargetType: "ct-events", Count: 4, ResourceIDs: []string{"e4"}}},
 	}
-	c.set(key, in)
+	c.Set(key, in)
 
-	got, ok := c.get(key)
+	got, ok := c.Get(key)
 	if !ok {
 		t.Fatal("expected cached entry")
 	}
@@ -110,9 +111,9 @@ func TestRelatedCacheReplay_PreservesDefDisplayName(t *testing.T) {
 		t.Fatalf("len(cached) = %d, want %d", len(got), len(in))
 	}
 
-	// relatedCacheReplay must project cached entries back into messages
+	// session.RelatedCacheReplay must project cached entries back into messages
 	// carrying the original DefDisplayName so every row resolves.
-	msgs := relatedCacheReplay("ct-events", got)
+	msgs := session.RelatedCacheReplay("ct-events", got)
 	if len(msgs) != len(in) {
 		t.Fatalf("len(replay) = %d, want %d", len(msgs), len(in))
 	}
@@ -130,27 +131,27 @@ func TestRelatedCacheReplay_PreservesDefDisplayName(t *testing.T) {
 	}
 }
 
-// TestRelatedCacheLRU_Delete verifies that delete() removes a specific key
+// TestRelatedCacheLRU_Delete verifies that Delete() removes a specific key
 // while leaving other entries intact.
 func TestRelatedCacheLRU_Delete(t *testing.T) {
-	c := newRelatedCacheLRU(10)
+	c := session.NewRelatedCacheLRU(10)
 
-	c.set("x", testResults(1))
-	c.set("y", testResults(2))
-	c.set("z", testResults(3))
+	c.Set("x", testResults(1))
+	c.Set("y", testResults(2))
+	c.Set("z", testResults(3))
 
-	c.delete("y")
+	c.Delete("y")
 
-	if _, ok := c.get("y"); ok {
+	if _, ok := c.Get("y"); ok {
 		t.Error("expected 'y' to be deleted")
 	}
-	if _, ok := c.get("x"); !ok {
+	if _, ok := c.Get("x"); !ok {
 		t.Error("expected 'x' to still exist after deleting 'y'")
 	}
-	if _, ok := c.get("z"); !ok {
+	if _, ok := c.Get("z"); !ok {
 		t.Error("expected 'z' to still exist after deleting 'y'")
 	}
-	if got := c.len(); got != 2 {
+	if got := c.Len(); got != 2 {
 		t.Errorf("expected len 2 after deleting one of three entries, got %d", got)
 	}
 }

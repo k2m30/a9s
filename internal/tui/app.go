@@ -13,6 +13,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/session"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
@@ -46,32 +47,18 @@ type errorEntry struct {
 	message string
 }
 
-// resourceCacheEntry stores the state of a previously-viewed resource list.
-// Used to restore the list when the user re-enters the same resource type
-// from the main menu, avoiding redundant API calls.
-type resourceCacheEntry struct {
-	resources     []resource.Resource
-	pagination    *resource.PaginationMeta
-	filterText    string
-	attentionOnly bool // §7.3: ctrl+z toggle persisted across view re-entry
-	sortColIdx    int
-	sortAsc       bool
-	cursorPos     int
-	hScrollOffset int
-}
-
 // Model is the root Bubble Tea model. It owns the view stack, header state,
 // AWS clients, and routes all messages to the active child view.
 //
 // The Model pairs a UI shell (view stack, header, input mode, flash, theme)
-// with an embedded sessionRuntime that owns the in-memory orchestration state
-// tied to the active profile/region session. Field promotion means all access
-// sites like `m.resourceCache` resolve transparently to the embedded
-// sessionRuntime — see internal/tui/session_runtime.go for the ownership
-// contract. handleProfileSelected / handleRegionSelected rotate the
-// sessionRuntime to invalidate in-flight async results on switch.
+// with an embedded *session.Session that owns the in-memory orchestration
+// state tied to the active profile/region session. Field promotion means all
+// access sites like `m.ResourceCache` resolve transparently to the embedded
+// Session — see internal/session/session.go for the ownership contract.
+// handleProfileSelected / handleRegionSelected call m.Rotate() to invalidate
+// in-flight async results on switch.
 type Model struct {
-	sessionRuntime // embedded: session-scoped orchestration state
+	*session.Session // embedded: session-scoped orchestration state
 
 	// --- UI shell state ---
 	width  int
@@ -198,8 +185,8 @@ func New(profile, region string, opts ...Option) Model {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	m := Model{
-		sessionRuntime: newSessionRuntime(),
-		profile:        profile,
+		Session: session.New(),
+		profile: profile,
 		region:         region,
 		keys:           k,
 		stack:          []views.View{&menu},
@@ -232,8 +219,11 @@ func (m Model) Cancel() {
 // EnrichmentGen returns the current session-wide enrichment generation counter.
 // This accessor is used by tests to capture the pre-switch gen value and verify
 // that post-switch messages carrying the old gen are correctly discarded.
+//
+// Note: the method name shadows the promoted Session.EnrichmentGen field.
+// All write sites MUST use m.Session.EnrichmentGen explicitly.
 func (m Model) EnrichmentGen() int {
-	return m.enrichmentGen
+	return m.Session.EnrichmentGen
 }
 
 // Init implements tea.Model. Fires a command to establish the AWS session.
@@ -376,24 +366,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if rl.ParentContext() == nil && !rl.EscPops() {
 					rt := rl.ResourceType()
 					sortColIdx, sortAsc := rl.SortState()
-					updatedModel.resourceCache[rt] = &resourceCacheEntry{
-						resources:     rl.AllResources(),
-						pagination:    rl.PaginationState(),
-						filterText:    rl.FilterText(),
-						attentionOnly: rl.AttentionOnly(),
-						sortColIdx:    sortColIdx,
-						sortAsc:       sortAsc,
-						cursorPos:     rl.CursorPosition(),
-						hScrollOffset: rl.HScrollOffset(),
+					updatedModel.ResourceCache[rt] = &session.ResourceCacheEntry{
+						Resources:     rl.AllResources(),
+						Pagination:    rl.PaginationState(),
+						FilterText:    rl.FilterText(),
+						AttentionOnly: rl.AttentionOnly(),
+						SortColIdx:    sortColIdx,
+						SortAsc:       sortAsc,
+						CursorPos:     rl.CursorPosition(),
+						HScrollOffset: rl.HScrollOffset(),
 					}
 				}
 			} else if msg.ResourceType != "" && !msg.Append {
 				// Active view is not a ResourceList for this type (e.g., detail or menu).
 				// Cache resources directly from the message so handleRelatedNavigate
 				// can find them when navigating to a related resource type.
-				if _, alreadyCached := updatedModel.resourceCache[msg.ResourceType]; !alreadyCached {
-					updatedModel.resourceCache[msg.ResourceType] = &resourceCacheEntry{
-						resources: msg.Resources,
+				if _, alreadyCached := updatedModel.ResourceCache[msg.ResourceType]; !alreadyCached {
+					updatedModel.ResourceCache[msg.ResourceType] = &session.ResourceCacheEntry{
+						Resources: msg.Resources,
 					}
 				}
 			}
@@ -407,16 +397,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// NOTE: This check runs regardless of which view is currently active —
 			// the user may have navigated away from the resource list before the
 			// fetch returned, but the rerun must still fire.
-			if msg.TypeGen != 0 && msg.TypeGen == updatedModel.enrichmentTypeGen[msg.ResourceType] {
-				if updatedModel.probeResources == nil {
-					updatedModel.probeResources = make(map[string][]resource.Resource)
+			if msg.TypeGen != 0 && msg.TypeGen == updatedModel.EnrichmentTypeGen[msg.ResourceType] {
+				if updatedModel.ProbeResources == nil {
+					updatedModel.ProbeResources = make(map[string][]resource.Resource)
 				}
-				updatedModel.probeResources[msg.ResourceType] = msg.Resources
-				if updatedModel.probeTruncated == nil {
-					updatedModel.probeTruncated = make(map[string]bool)
+				updatedModel.ProbeResources[msg.ResourceType] = msg.Resources
+				if updatedModel.ProbeTruncated == nil {
+					updatedModel.ProbeTruncated = make(map[string]bool)
 				}
-				updatedModel.probeTruncated[msg.ResourceType] = msg.Pagination != nil && msg.Pagination.IsTruncated
-				cmd = tea.Batch(cmd, updatedModel.probeEnrichment(msg.ResourceType, updatedModel.enrichmentGen))
+				updatedModel.ProbeTruncated[msg.ResourceType] = msg.Pagination != nil && msg.Pagination.IsTruncated
+				cmd = tea.Batch(cmd, updatedModel.probeEnrichment(msg.ResourceType, updatedModel.Session.EnrichmentGen))
 			}
 			return updatedModel, cmd
 		}
@@ -437,7 +427,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleEnrichDetail(msg)
 	case messages.EnrichDetailResultMsg:
 		// Discard stale enrichment results (same convention as relatedGen).
-		if msg.Generation != 0 && msg.Generation != m.enrichGen {
+		if msg.Generation != 0 && msg.Generation != m.EnrichGen {
 			return m, nil
 		}
 		// Surface enrichment errors as a flash message.
@@ -455,7 +445,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// stamps Generation=0 onto results. Generation=0 is therefore the safe
 		// sentinel for test/manual injection (always accepted). Any non-zero
 		// generation that doesn't match the current relatedGen is stale and dropped.
-		if msg.Generation != 0 && msg.Generation != m.relatedGen {
+		if msg.Generation != 0 && msg.Generation != m.RelatedGen {
 			return m, nil
 		}
 		// Accumulate in relatedCache so re-entering the same detail skips re-dispatch.
@@ -468,9 +458,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		if sourceID != "" {
-			ck := relatedCacheKey(msg.ResourceType, sourceID)
-			existing, _ := m.relatedCache.get(ck)
-			m.relatedCache.set(ck, append(existing, relatedCacheResult{
+			ck := session.RelatedCacheKey(msg.ResourceType, sourceID)
+			existing, _ := m.RelatedCache.Get(ck)
+			m.RelatedCache.Set(ck, append(existing, session.RelatedCacheResult{
 				DefDisplayName: msg.DefDisplayName,
 				Result:         msg.Result,
 			}))
@@ -483,10 +473,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// entries are sparse but present, and a CachedPages overwrite would evict
 		// the lazy-fetched out-of-scope resources and corrupt subsequent drills.
 		for shortName, entry := range msg.CachedPages {
-			if _, exists := m.resourceCache[shortName]; exists {
+			if _, exists := m.ResourceCache[shortName]; exists {
 				continue
 			}
-			if _, lazyExists := m.lazyResourceCache[shortName]; lazyExists {
+			if _, lazyExists := m.LazyResourceCache[shortName]; lazyExists {
 				continue
 			}
 			pagination := entry.Pagination
@@ -496,9 +486,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if pagination == nil && entry.IsTruncated {
 				pagination = &resource.PaginationMeta{IsTruncated: true}
 			}
-			m.resourceCache[shortName] = &resourceCacheEntry{
-				resources:  entry.Resources,
-				pagination: pagination,
+			m.ResourceCache[shortName] = &session.ResourceCacheEntry{
+				Resources:  entry.Resources,
+				Pagination: pagination,
 			}
 		}
 		// Lazy-added resources are sparse IDs pulled via FetchByIDs to resolve
@@ -512,7 +502,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(extra) == 0 {
 				continue
 			}
-			existing := m.lazyResourceCache[shortName]
+			existing := m.LazyResourceCache[shortName]
 			known := make(map[string]struct{}, len(existing))
 			for _, r := range existing {
 				known[r.ID] = struct{}{}
@@ -524,7 +514,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				known[r.ID] = struct{}{}
 				existing = append(existing, r)
 			}
-			m.lazyResourceCache[shortName] = existing
+			m.LazyResourceCache[shortName] = existing
 		}
 		// Surface FetchByIDs failures as a visible flash error. Partial results
 		// are already merged above; the flash informs the operator that some IDs
@@ -784,15 +774,15 @@ func (m *Model) cacheTopLevelResourceList(rl views.ResourceListModel) {
 	}
 	rt := rl.ResourceType()
 	sortColIdx, sortAsc := rl.SortState()
-	m.resourceCache[rt] = &resourceCacheEntry{
-		resources:     rl.AllResources(),
-		pagination:    rl.PaginationState(),
-		filterText:    rl.FilterText(),
-		attentionOnly: rl.AttentionOnly(),
-		sortColIdx:    sortColIdx,
-		sortAsc:       sortAsc,
-		cursorPos:     rl.CursorPosition(),
-		hScrollOffset: rl.HScrollOffset(),
+	m.ResourceCache[rt] = &session.ResourceCacheEntry{
+		Resources:     rl.AllResources(),
+		Pagination:    rl.PaginationState(),
+		FilterText:    rl.FilterText(),
+		AttentionOnly: rl.AttentionOnly(),
+		SortColIdx:    sortColIdx,
+		SortAsc:       sortAsc,
+		CursorPos:     rl.CursorPosition(),
+		HScrollOffset: rl.HScrollOffset(),
 	}
 }
 
