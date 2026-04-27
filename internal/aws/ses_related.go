@@ -127,18 +127,30 @@ func sesEventDestinations(ctx context.Context, c *ServiceClients, configSetName 
 // follow-up call after an error retries the API.
 //
 // The cache lives on the per-Session RuleSetStore (c.RuleSets); the legacy
-// process-wide map keyed by *ServiceClients pointer is gone. Concurrency
-// trade-off (acknowledged, same as PR-02b/02c): no top-level lock is held
-// across the check-fetch-set sequence. Two concurrent checkSES* calls may
-// both observe an empty store and both invoke the SES API; the store
-// remains correct (writes mutex-guarded) and duplicate Set calls converge.
-// Acceptable because related-panel checks are not high-volume.
+// process-wide map keyed by *ServiceClients pointer is gone.
+//
+// Invalidation safety (P2 finding): the store reference is CAPTURED ONCE at
+// function entry into a local `store` variable. If a refresh handler swaps
+// `c.RuleSets` for a fresh store while this fetch is blocked on the SES
+// API, the Set below writes to the captured (now orphaned) store rather
+// than re-poisoning the new active slot. This is the swap-vs-clear contract:
+// callers wanting to invalidate MUST REPLACE `c.RuleSets`, not call
+// Clear() on the existing store — otherwise an in-flight late writer would
+// repopulate the same store with the pre-refresh data and the next
+// checker batch would see stale Lambda/S3 relationships.
+//
+// Concurrency trade-off (acknowledged, same as PR-02b/02c): no top-level
+// lock across check-fetch-set. Two concurrent checkSES* calls may both
+// observe an empty store and both invoke the SES API; the store remains
+// correct (mutex-guarded writes; idempotent Sets converge). Acceptable
+// because related-panel checks are not high-volume.
 func sesActiveReceiptRuleSet(ctx context.Context, c *ServiceClients) (*ses.DescribeActiveReceiptRuleSetOutput, error) {
 	if c == nil || c.SES == nil {
 		return nil, nil //nolint:nilnil // no SES v1 client; caller treats nil as "no rule set"
 	}
-	if c.RuleSets != nil {
-		if cached, ok := c.RuleSets.Get(); ok {
+	store := c.RuleSets // capture once — see godoc above
+	if store != nil {
+		if cached, ok := store.Get(); ok {
 			out, isOutput := cached.(*ses.DescribeActiveReceiptRuleSetOutput)
 			if isOutput {
 				return out, nil
@@ -149,8 +161,8 @@ func sesActiveReceiptRuleSet(ctx context.Context, c *ServiceClients) (*ses.Descr
 	if err != nil {
 		return nil, err
 	}
-	if c.RuleSets != nil && out != nil {
-		c.RuleSets.Set(out)
+	if store != nil && out != nil {
+		store.Set(out)
 	}
 	return out, nil
 }
@@ -483,17 +495,15 @@ func truncatedResultSES(target string, ids []string) resource.RelatedCheckResult
 	return resource.RelatedCheckResult{TargetType: target, Count: len(ids), ResourceIDs: ids, Approximate: true}
 }
 
-// InvalidateSESRuleSetCache drops the cached DescribeActiveReceiptRuleSet
-// response on the given client's per-session RuleSetStore. Called from the
-// Ctrl+R handler so that receipt-rule changes are picked up without waiting
-// for a profile/region switch to rebuild the Session.
+// InvalidateSESRuleSetCache is REMOVED in PR-02d's P2 fix. It used to call
+// c.RuleSets.Clear() in place — but that did not protect against in-flight
+// blocked fetches: a slow `sesActiveReceiptRuleSet` call could return AFTER
+// Clear() and re-Set the just-cleared store with the pre-refresh data,
+// re-poisoning the cache.
 //
-// Equivalent to c.RuleSets.Clear() — kept as a named function so existing
-// call sites in internal/tui/app_handlers_navigate.go don't need awareness
-// of the store API.
-func InvalidateSESRuleSetCache(c *ServiceClients) {
-	if c == nil || c.RuleSets == nil {
-		return
-	}
-	c.RuleSets.Clear()
-}
+// Replacement: callers MUST swap the store entirely (assign a fresh
+// `session.NewRuleSetStore()` to both the Session.RuleSets slot and to
+// `clients.RuleSets`). `sesActiveReceiptRuleSet` captures its store
+// reference at entry, so a late writer pollutes the orphaned old store
+// rather than the new active one. See `internal/tui/app_handlers_navigate.go`
+// (Ctrl+R refresh) for the canonical swap pattern.

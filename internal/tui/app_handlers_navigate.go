@@ -363,8 +363,15 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		m.EnrichResKey = "" // force gen bump on next enrichment dispatch
 		// Invalidate the SES v1 receipt rule set cache so Ctrl+R on a detail view
 		// picks up receipt-rule changes without requiring a profile/region switch.
+		// Swap (not Clear) so that any in-flight blocked DescribeActiveReceiptRuleSet
+		// call writes to the orphaned old store on completion rather than
+		// repopulating the new active one — sesActiveReceiptRuleSet captures
+		// its store reference at entry; we replace the slot here.
 		if rt == "ses" {
-			awsclient.InvalidateSESRuleSetCache(m.clients)
+			m.RuleSets = session.NewRuleSetStore()
+			if m.clients != nil {
+				m.clients.RuleSets = m.RuleSets
+			}
 		}
 		m.flash = flashState{text: "Refreshing...", isError: false, active: true}
 
@@ -393,7 +400,12 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	rt := rl.ResourceType()
 	delete(m.ResourceCache, rt) // clear cache for refreshed type only
 	if rt == "ses" {
-		awsclient.InvalidateSESRuleSetCache(m.clients)
+		// Swap (see detail-view path above): protects against in-flight
+		// blocked DescribeActiveReceiptRuleSet fetchers re-poisoning the cache.
+		m.RuleSets = session.NewRuleSetStore()
+		if m.clients != nil {
+			m.clients.RuleSets = m.RuleSets
+		}
 	}
 	m.flash = flashState{text: "Refreshing...", isError: false, active: true}
 

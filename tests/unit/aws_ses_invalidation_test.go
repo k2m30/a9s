@@ -98,8 +98,11 @@ func TestInvalidateSESRuleSetCache(t *testing.T) {
 		t.Errorf("after call 2: mock.calls = %d, want 1 (cache must absorb call 2)", v1Mock.calls)
 	}
 
-	// ---- Invalidate the cache. ----
-	awsclient.InvalidateSESRuleSetCache(clients)
+	// ---- Invalidate the cache by swapping the store. ----
+	// Post-PR-02d (P2 fix): swap rather than Clear() so in-flight blocked
+	// fetchers can't re-poison the active store. Production code does this
+	// on Ctrl+R for SES detail/list views; the test mirrors that pattern.
+	clients.RuleSets = session.NewRuleSetStore()
 
 	// ---- Call 3: cache miss after invalidation; API must be called again. ----
 	result3 := checker(context.Background(), clients, src, resource.ResourceCache{})
@@ -228,6 +231,111 @@ func TestHandleRefresh_SESDetailViewInvalidatesRuleSetCache(t *testing.T) {
 	}
 	if v1Mock.calls != 2 {
 		t.Errorf("after Ctrl+R on ses detail view: mock.calls = %d, want 2 "+
-			"(handleRefresh must call InvalidateSESRuleSetCache for ses detail views)", v1Mock.calls)
+			"(handleRefresh must swap the RuleSets store for ses detail views)", v1Mock.calls)
+	}
+}
+
+// blockingSESV1 implements SESV1API but blocks the call inside
+// DescribeActiveReceiptRuleSet until releaseCh is closed. Used to
+// simulate a slow upstream API that doesn't return until after a
+// concurrent refresh has invalidated the cache.
+type blockingSESV1 struct {
+	releaseCh chan struct{}
+	enteredCh chan struct{} // closed once the call is in-flight
+	output    *ses.DescribeActiveReceiptRuleSetOutput
+	calls     int
+}
+
+func (b *blockingSESV1) DescribeActiveReceiptRuleSet(
+	_ context.Context,
+	_ *ses.DescribeActiveReceiptRuleSetInput,
+	_ ...func(*ses.Options),
+) (*ses.DescribeActiveReceiptRuleSetOutput, error) {
+	b.calls++
+	select {
+	case <-b.enteredCh:
+		// already closed
+	default:
+		close(b.enteredCh)
+	}
+	<-b.releaseCh
+	return b.output, nil
+}
+
+// TestSESRuleSetSwap_LateWriterDoesNotPoisonNewStore pins the P2 fix:
+// when an in-flight DescribeActiveReceiptRuleSet call is blocked, and the
+// caller swaps `c.RuleSets` for a fresh store (the production
+// invalidation pattern from Ctrl+R), the late writer's Set must land on
+// the orphaned old store — NOT on the new active slot. Otherwise the
+// next checker run would see stale Lambda/S3 relationships even after
+// the user explicitly refreshed.
+//
+// Pre-fix behaviour (in-place Clear()): Set lands on the same store and
+// repopulates the active cache → next checker sees stale data.
+//
+// Post-fix behaviour (swap + capture): Set lands on the captured (now
+// orphaned) store → new active store stays empty → next checker fetches
+// fresh.
+func TestSESRuleSetSwap_LateWriterDoesNotPoisonNewStore(t *testing.T) {
+	staleOutput := &ses.DescribeActiveReceiptRuleSetOutput{
+		Rules: []sestypes.ReceiptRule{{
+			Name:       aws.String("stale-rule"),
+			Recipients: nil,
+			Actions: []sestypes.ReceiptAction{
+				{LambdaAction: &sestypes.LambdaAction{
+					FunctionArn: aws.String("arn:aws:lambda:us-east-1:123456789012:function:stale"),
+				}},
+			},
+		}},
+	}
+
+	v1Mock := &blockingSESV1{
+		releaseCh: make(chan struct{}),
+		enteredCh: make(chan struct{}),
+		output:    staleOutput,
+	}
+
+	clients := &awsclient.ServiceClients{
+		SES:      v1Mock,
+		RuleSets: session.NewRuleSetStore(),
+	}
+
+	src := resource.Resource{
+		ID:     "any@example.com",
+		Fields: map[string]string{"identity_type": "EMAIL_ADDRESS"},
+	}
+	checker := sesCheckerByTarget(t, "lambda")
+
+	// Goroutine A: blocked checker.
+	checkerDone := make(chan struct{})
+	go func() {
+		defer close(checkerDone)
+		_ = checker(context.Background(), clients, src, resource.ResourceCache{})
+	}()
+
+	// Wait for the blocked call to enter the SES API stub.
+	<-v1Mock.enteredCh
+
+	// Capture the OLD store reference so we can verify the late writer
+	// targeted it (not the new one).
+	oldStore := clients.RuleSets
+
+	// Refresh: swap to a fresh store (production Ctrl+R pattern).
+	clients.RuleSets = session.NewRuleSetStore()
+
+	// Release the blocked call. Goroutine A returns and writes its result.
+	close(v1Mock.releaseCh)
+	<-checkerDone
+
+	// Pin: the new active store is empty. The late writer pollute the
+	// orphaned old store, not the new one.
+	if _, ok := clients.RuleSets.Get(); ok {
+		t.Errorf("new RuleSets store has cached entry — late writer poisoned the active slot")
+	}
+	// Confirm the orphaned store DID receive the write (so we know the
+	// fake actually executed Set; otherwise the test could be vacuously
+	// passing).
+	if _, ok := oldStore.Get(); !ok {
+		t.Errorf("orphaned old store has NO cached entry — late writer didn't fire; test is vacuous")
 	}
 }
