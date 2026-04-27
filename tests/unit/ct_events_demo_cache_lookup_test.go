@@ -8,7 +8,7 @@ package unit_test
 //
 // Exact bug flow:
 //  1. In demo mode, def.Checker is called with nil clients and a partial cache
-//     (m.resourceCache may not yet contain iam-user/role if those lists haven't
+//     (m.ResourceCache may not yet contain iam-user/role if those lists haven't
 //     been loaded).
 //  2. FetchRelatedTarget: cache miss → calls paginated fetcher with nil clients.
 //  3. Paginated fetcher fails (nil clients) → error.
@@ -49,7 +49,7 @@ import (
 // called with nil clients and an EMPTY cache do NOT return Count=-1.
 //
 // An empty cache simulates the real demo-mode scenario where ct-events detail is
-// opened before iam-user/role resource lists have been loaded into m.resourceCache.
+// opened before iam-user/role resource lists have been loaded into m.ResourceCache.
 // The short-circuit in ctEventsRelatedResources returns nil on nil clients + error,
 // which causes the checker to return Count=-1 (Bug E).
 //
