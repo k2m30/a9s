@@ -217,6 +217,7 @@ func (m *Model) demoPrefetchCounts() tea.Cmd {
 		issueCounts := make(map[string]int, len(allNames))
 		issueTruncated := make(map[string]bool)
 		retainedResources := make(map[string][]resource.Resource, len(allNames))
+		pagination := make(map[string]*resource.PaginationMeta, len(allNames))
 		var failures []string
 		attempted := 0
 		for _, shortName := range allNames {
@@ -244,6 +245,12 @@ func (m *Model) demoPrefetchCounts() tea.Cmd {
 				}
 			}
 			entries[shortName] = len(result.Resources)
+			// Preserve full pagination meta (NextToken etc.) so the seeded
+			// ResourceCache entry's pagination state is authoritative — a later
+			// load-more or navigate must be able to advance past page 1.
+			if result.Pagination != nil {
+				pagination[shortName] = result.Pagination
+			}
 			isTrunc := result.Pagination != nil && result.Pagination.IsTruncated
 			if isTrunc {
 				truncated[shortName] = true
@@ -267,6 +274,7 @@ func (m *Model) demoPrefetchCounts() tea.Cmd {
 			IssueCounts:    issueCounts,
 			IssueTruncated: issueTruncated,
 			Resources:      retainedResources,
+			Pagination:     pagination,
 			Gen:            gen,
 			PrefetchErr:    awsclient.AggregateFailures("availability-prefetch", failures, attempted),
 		}
