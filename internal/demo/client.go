@@ -64,5 +64,6 @@ func NewServiceClients() *awsclient.ServiceClients {
 	clients.Backup = fakes.NewBackup()
 	clients.IAMPolicies = session.NewPolicyStore()
 	clients.IdentityStore = session.NewIdentityStore()
+	clients.RuleSets = session.NewRuleSetStore()
 	return clients
 }

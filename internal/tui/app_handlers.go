@@ -235,6 +235,7 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 		if m.clients != nil {
 			m.clients.IAMPolicies = m.IAMPolicies
 			m.clients.IdentityStore = m.Identity
+			m.clients.RuleSets = m.RuleSets
 			m.identityFetching = true
 			cmds = append(cmds, m.fetchIdentity())
 			if m.noCache {
@@ -250,12 +251,17 @@ func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.
 			// Fall back to pre-supplied clients (demo path) when msg carries no clients.
 			m.preSuppliedClients.IAMPolicies = m.IAMPolicies   // wire per-session policy store
 			m.preSuppliedClients.IdentityStore = m.Identity    // wire per-session identity cache
+			m.preSuppliedClients.RuleSets = m.RuleSets         // wire per-session SES rule set cache
 			m.clients = m.preSuppliedClients
 		}
 	} else if clients, ok := msg.Clients.(*awsclient.ServiceClients); ok {
-		awsclient.ClearAllSESRuleSetCaches() // drop stale SES rule-set cache from prior *ServiceClients
-		clients.IAMPolicies = m.IAMPolicies  // wire per-session policy store into transport layer
-		clients.IdentityStore = m.Identity   // wire per-session identity cache into transport layer
+		// Per-session stores: SES rule sets, IAM policies, and identity all
+		// live on m.{RuleSets,IAMPolicies,Identity} after PR-02b/c/d. The
+		// legacy ClearAllSESRuleSetCaches global-clear is gone — fresh
+		// session = fresh store, wired here.
+		clients.IAMPolicies = m.IAMPolicies   // wire per-session policy store into transport layer
+		clients.IdentityStore = m.Identity    // wire per-session identity cache into transport layer
+		clients.RuleSets = m.RuleSets         // wire per-session SES rule set cache into transport layer
 		m.clients = clients
 	} else {
 		wrongTypeErr := fmt.Errorf("internal: unexpected ClientsReadyMsg.Clients type %T", msg.Clients)

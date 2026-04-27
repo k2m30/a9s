@@ -19,6 +19,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/session"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 )
@@ -58,8 +59,13 @@ func TestInvalidateSESRuleSetCache(t *testing.T) {
 		},
 	}
 
-	// Use a single *ServiceClients pointer — sesRuleSetCaches uses the pointer as key.
-	clients := &awsclient.ServiceClients{SES: v1Mock}
+	// Wire a per-test RuleSets store so the cache works (post-PR-02d the
+	// rule set cache lives on c.RuleSets rather than a process-global map
+	// keyed by *ServiceClients pointer).
+	clients := &awsclient.ServiceClients{
+		SES:      v1Mock,
+		RuleSets: session.NewRuleSetStore(),
+	}
 
 	src := resource.Resource{
 		ID:     "any@example.com",
@@ -148,9 +154,13 @@ func TestHandleRefresh_SESDetailViewInvalidatesRuleSetCache(t *testing.T) {
 		},
 	}
 
-	// Each *ServiceClients pointer is a distinct cache key; reuse one instance
-	// so that the TUI model and the checker share the same cache entry.
-	clients := &awsclient.ServiceClients{SES: v1Mock}
+	// Wire a per-test RuleSets store so the cache works (post-PR-02d the
+	// rule set cache lives on c.RuleSets). Reuse one *ServiceClients pointer
+	// so that the TUI model and the checker share the same store reference.
+	clients := &awsclient.ServiceClients{
+		SES:      v1Mock,
+		RuleSets: session.NewRuleSetStore(),
+	}
 
 	src := resource.Resource{
 		ID:     "any@example.com",

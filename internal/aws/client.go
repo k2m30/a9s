@@ -69,6 +69,13 @@ type ServiceClients struct {
 	// store is nil (defensive — production wires it).
 	IdentityStore identityStore
 
+	// RuleSets is the session-scoped, single-slot cache for the SES v1
+	// DescribeActiveReceiptRuleSet response. Used by checkSESLambda /
+	// checkSESS3. Set by the TUI layer from session.Session.RuleSets on
+	// every ClientsReadyMsg. Nil-safe: sesActiveReceiptRuleSet falls back
+	// to an uncached fetch when the store is nil.
+	RuleSets ruleSetStore
+
 	EC2              EC2API
 	S3               S3API
 	RDS              RDSAPI

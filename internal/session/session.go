@@ -93,6 +93,14 @@ type Session struct {
 	// ClientsReadyMsg so Pattern-C related checkers (Glue tags, EBS Backup)
 	// see a per-profile/region scoped cache rather than a process-global one.
 	Identity IdentityStore
+
+	// RuleSets is the per-session, single-slot cache for the SES v1
+	// DescribeActiveReceiptRuleSet response. Replaces the package-level
+	// globals previously in internal/aws/ses_related.go (sesRuleSetCacheMu
+	// + sesRuleSetCaches map keyed by *ServiceClients pointer). Wired into
+	// *ServiceClients.RuleSets on every ClientsReadyMsg so checkSESLambda /
+	// checkSESS3 see a session-scoped cache rather than a process-global map.
+	RuleSets RuleSetStore
 }
 
 // New constructs a fresh Session with all maps initialized and generation
@@ -115,6 +123,7 @@ func New() *Session {
 		PolicyDocCache:         &awsclient.PolicyDocumentCache{},
 		IAMPolicies:            NewPolicyStore(),
 		Identity:               NewIdentityStore(),
+		RuleSets:               NewRuleSetStore(),
 	}
 }
 
@@ -160,4 +169,8 @@ func (s *Session) Rotate() {
 	// Identity: reset to a fresh store so the cached account ID + sticky
 	// failure (if any) from the prior session cannot leak into the next.
 	s.Identity = NewIdentityStore()
+
+	// RuleSets: reset to a fresh store so the cached SES rule set from the
+	// prior session cannot leak into the next.
+	s.RuleSets = NewRuleSetStore()
 }
