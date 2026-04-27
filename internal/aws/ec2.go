@@ -61,7 +61,7 @@ func init() {
 		{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkEC2Backup, NeedsTargetCache: true},
 	})
 
-	resource.RegisterNavigableFields("ec2", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("ec2", []resource.NavigableField{
 		{FieldPath: "VpcId", TargetType: "vpc"},
 		{FieldPath: "SubnetId", TargetType: "subnet"},
 		{FieldPath: "ImageId", TargetType: "ami"},
@@ -168,6 +168,7 @@ func FetchEC2InstancesPage(ctx context.Context, api EC2FetchInstancesAPI, contin
 			r := resource.Resource{
 				ID:     instanceID,
 				Name:   name,
+				Type:   "ec2",
 				Status: state,
 				Fields: map[string]string{
 					"instance_id": instanceID,

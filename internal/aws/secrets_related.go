@@ -30,7 +30,7 @@ func init() {
 
 	// smtypes.SecretListEntry: KmsKeyId (full ARN — UI resolves UUID suffix to kms cache),
 	// RotationLambdaARN (full ARN — UI resolves function name suffix to lambda cache)
-	resource.RegisterNavigableFields("secrets", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("secrets", []resource.NavigableField{
 		{FieldPath: "KmsKeyId", TargetType: "kms"},
 		{FieldPath: "RotationLambdaARN", TargetType: "lambda"},
 	})

@@ -22,7 +22,7 @@ func init() {
 		return FetchGlueJobsPage(ctx, c.Glue, continuationToken)
 	})
 
-	resource.RegisterNavigableFields("glue", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("glue", []resource.NavigableField{
 		{FieldPath: "Role", TargetType: "role"},
 	})
 

@@ -311,6 +311,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 				}
 			}
 			detail := views.NewDetail(r, msg.TargetType, m.viewConfig, m.keys)
+			detail.SetNavProvider(resource.GetNavigableFields)
 			detail.SetSize(m.innerSize())
 			m.pushView(&detail)
 			if detail.NeedsRelatedCheck() {

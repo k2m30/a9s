@@ -36,7 +36,7 @@ func init() {
 	})
 
 	// cbtypes.Project: ServiceRole, EncryptionKey (KMS), VpcConfig.{VpcId,Subnets,SecurityGroupIds}
-	resource.RegisterNavigableFields("cb", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("cb", []resource.NavigableField{
 		{FieldPath: "ServiceRole", TargetType: "role"},
 		{FieldPath: "EncryptionKey", TargetType: "kms"},
 		{FieldPath: "VpcConfig.VpcId", TargetType: "vpc"},

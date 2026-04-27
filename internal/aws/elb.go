@@ -21,7 +21,7 @@ func init() {
 		return FetchLoadBalancersPage(ctx, c.ELBv2, continuationToken)
 	})
 
-	resource.RegisterNavigableFields("elb", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("elb", []resource.NavigableField{
 		{FieldPath: "VpcId", TargetType: "vpc"},
 		{FieldPath: "SecurityGroups", TargetType: "sg"},
 		{FieldPath: "AvailabilityZones.SubnetId", TargetType: "subnet"},

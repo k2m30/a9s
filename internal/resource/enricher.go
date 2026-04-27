@@ -1,19 +1,15 @@
 package resource
 
 import (
-	"context"
 	"fmt"
+
+	"github.com/k2m30/a9s/v3/internal/domain"
 )
 
 // DetailEnricher is the function signature for on-demand detail enrichers.
-// It receives the current resource and returns an enriched copy with additional
-// fields populated (e.g., RawStruct updated with fetched data).
-//
-// Detail enrichment runs synchronously when the user opens a detail, YAML, or
-// JSON view for a single resource. It is separate from Wave 2 issue enrichment
-// (see internal/aws/*_issue_enrichment.go), which scans the retained page in the
-// background to surface attention signals.
-type DetailEnricher func(ctx context.Context, clients any, res Resource) (Resource, error)
+// Declaration lives in internal/domain/contracts.go; this alias keeps
+// existing consumers compiling. Deleted in PR-04n.
+type DetailEnricher = domain.DetailEnricher
 
 var detailEnricherRegistry = map[string]DetailEnricher{}
 

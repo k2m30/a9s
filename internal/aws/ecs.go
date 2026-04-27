@@ -33,7 +33,7 @@ func init() {
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkECSLogs, NeedsTargetCache: true},
 	})
 
-	resource.RegisterNavigableFields("ecs", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("ecs", []resource.NavigableField{
 		{FieldPath: "Configuration.ExecuteCommandConfiguration.KmsKeyId", TargetType: "kms"},
 	})
 }

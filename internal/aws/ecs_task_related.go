@@ -28,7 +28,7 @@ func init() {
 	})
 
 	// ecstypes.Task: ClusterArn (parent cluster for this task execution)
-	resource.RegisterNavigableFields("ecs-task", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("ecs-task", []resource.NavigableField{
 		{FieldPath: "ClusterArn", TargetType: "ecs"},
 	})
 }

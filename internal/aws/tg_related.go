@@ -34,7 +34,7 @@ func init() {
 		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkTGSubnet},
 	})
 
-	resource.RegisterNavigableFields("tg", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("tg", []resource.NavigableField{
 		{FieldPath: "VpcId", TargetType: "vpc"},
 		{FieldPath: "LoadBalancerArns", TargetType: "elb"},
 	})

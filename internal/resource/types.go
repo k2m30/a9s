@@ -1,6 +1,10 @@
 package resource
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/k2m30/a9s/v3/internal/domain"
+)
 
 // Color classifies a resource's health for display, filtering, and badges.
 type Color uint8
@@ -58,42 +62,14 @@ func (d ResourceTypeDef) ResolveColor(r Resource) Color {
 }
 
 // Column defines a column in a resource table view.
-type Column struct {
-	// Key is the field key used to extract the value from Resource.Fields.
-	Key string
-	// Title is the column header display text.
-	Title string
-	// Width is the fixed column width; 0 means flexible.
-	Width int
-	// Sortable indicates whether this column supports sorting.
-	Sortable bool
-}
+// Declaration lives in internal/domain/contracts.go; this alias keeps
+// existing consumers compiling. Deleted in PR-04n.
+type Column = domain.Column
 
 // ChildViewDef describes a child view that can be drilled into from a parent
-// resource list. Used to make child-view navigation data-driven instead of
-// hardcoded per resource type.
-type ChildViewDef struct {
-	// ChildType is the registered child type short name (e.g., "s3_objects").
-	ChildType string
-	// Key is the trigger key name (e.g., "enter", "e", "L").
-	Key string
-	// ContextKeys maps child-fetcher parameter names to source expressions:
-	//   "ID"         → parent resource's ID
-	//   "Name"       → parent resource's Name
-	//   "@parent.x"  → value from the parent view's ParentContext["x"]
-	//   anything else → parent resource's Fields[key]
-	ContextKeys map[string]string
-	// DisplayNameKey is the context key whose value becomes the child view's
-	// display name (frame title). For example "bucket" shows the bucket name.
-	DisplayNameKey string
-	// DrillCondition is an optional predicate. When non-nil, the child view
-	// is only entered if the predicate returns true for the selected resource.
-	// A nil DrillCondition means always drill.
-	DrillCondition func(Resource) bool
-	// DrillBlockMessage is the flash text shown when DrillCondition returns false.
-	// Empty means silent skip (no flash).
-	DrillBlockMessage string
-}
+// resource list. Declaration lives in internal/domain/contracts.go; this alias
+// keeps existing consumers compiling. Deleted in PR-04n.
+type ChildViewDef = domain.ChildViewDef
 
 // ResourceTypeDef defines a category of AWS resources the app can browse.
 type ResourceTypeDef struct {
@@ -154,6 +130,17 @@ type ResourceTypeDef struct {
 	// Key = column key; value = decorator func receiving the full resource and the
 	// already-extracted cell string, returning the replacement. nil map = no decorators.
 	CellDecorators map[string]func(r Resource, value string) string
+
+	// Project is an optional custom DetailProjector for this resource type.
+	// When nil, projection.Generic is used as the fallback projector.
+	// Set on types whose detail view requires specialised rendering that the
+	// generic field-path projector cannot produce (e.g. ct-events).
+	Project domain.DetailProjector
+
+	// Augment is an optional post-projector hook that injects additional sections
+	// after the main projector has run (e.g. EC2 status checks). When nil, no
+	// augmentation is applied. Pure function.
+	Augment domain.Augmenter
 }
 
 // resourceTypes holds all registered resource type definitions in menu display order.

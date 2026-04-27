@@ -39,7 +39,7 @@ func init() {
 	// as its ID for the infrastructure integrity check to pass.
 	// VpcConfig: VpcId, SubnetIds, SecurityGroupIds — present when function runs in a VPC.
 	// KMSKeyArn — KMS key for environment variable encryption.
-	resource.RegisterNavigableFields("lambda", []resource.NavigableField{
+	resource.RegisterDefaultNavFields("lambda", []resource.NavigableField{
 		{FieldPath: "Role", TargetType: "role"},
 		{FieldPath: "KMSKeyArn", TargetType: "kms"},
 		{FieldPath: "VpcConfig.VpcId", TargetType: "vpc"},
