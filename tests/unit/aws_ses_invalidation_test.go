@@ -668,3 +668,78 @@ func TestSESActiveReceiptRuleSet_Singleflight_LeaderCancelDoesNotPoisonFollower(
 	// leader outcome intentionally not asserted — see package-level comment.
 	_ = resA
 }
+
+// ---------------------------------------------------------------------------
+// PIN 5 — nil result must NOT be cached as a successful entry
+// ---------------------------------------------------------------------------
+// Regression introduced in the GetOrFetch refactor (PR-307): GetOrFetch calls
+// s.Set(v) whenever err == nil, even when v == nil. This stores (ruleSet=nil,
+// ok=true). Subsequent Get() calls return (nil, true) and the fetcher is
+// never invoked again — the nil result is sticky.
+//
+// AWS SES DescribeActiveReceiptRuleSet legitimately returns (nil, nil) when
+// no rule set is active, so this regression is reachable in production.
+//
+// Pre-fix expected failure mode: mock.calls == 1 after the second call
+// (the nil was cached on the first call; the fetcher is never invoked again).
+//
+// Post-fix expected pass mode: mock.calls == 2 (the nil result was not cached;
+// the fetcher is invoked on the second call too).
+
+// nilReturnSESV1 is a minimal SESV1API mock that always returns (nil, nil)
+// — emulating an AWS account with no active SES receipt rule set.
+// calls is an atomic counter so the test can assert exact invocation count.
+type nilReturnSESV1 struct {
+	calls atomic.Int32
+}
+
+func (n *nilReturnSESV1) DescribeActiveReceiptRuleSet(
+	_ context.Context,
+	_ *ses.DescribeActiveReceiptRuleSetInput,
+	_ ...func(*ses.Options),
+) (*ses.DescribeActiveReceiptRuleSetOutput, error) {
+	n.calls.Add(1)
+	return nil, nil
+}
+
+// Compile-time check: nilReturnSESV1 satisfies SESV1API.
+var _ awsclient.SESV1API = (*nilReturnSESV1)(nil)
+
+// TestSESActiveReceiptRuleSet_NilResultIsNotCached is the regression pin for the
+// nil-caching bug in GetOrFetch.
+//
+// The invariant pinned: when the AWS API returns (nil, nil), the store must NOT
+// record a successful cache entry. The next call must invoke the fetcher again.
+func TestSESActiveReceiptRuleSet_NilResultIsNotCached(t *testing.T) {
+	mock := &nilReturnSESV1{}
+
+	clients := &awsclient.ServiceClients{SES: mock}
+	clients.SetRuleSets(session.NewRuleSetStore())
+
+	ctx := context.Background()
+
+	// ---- Call 1: fetcher returns (nil, nil). ----
+	out1, err1 := awsclient.SESActiveReceiptRuleSetForTest(ctx, clients)
+	if err1 != nil {
+		t.Fatalf("call 1: unexpected error: %v", err1)
+	}
+	if out1 != nil {
+		t.Fatalf("call 1: expected nil output, got %v", out1)
+	}
+	if got := mock.calls.Load(); got != 1 {
+		t.Fatalf("after call 1: mock.calls = %d, want 1", got)
+	}
+
+	// ---- Call 2: nil must NOT have been cached — fetcher must be called again. ----
+	out2, err2 := awsclient.SESActiveReceiptRuleSetForTest(ctx, clients)
+	if err2 != nil {
+		t.Fatalf("call 2: unexpected error: %v", err2)
+	}
+	if out2 != nil {
+		t.Fatalf("call 2: expected nil output, got %v", out2)
+	}
+	// REGRESSION PIN: pre-fix mock.calls == 1 (sticky nil); post-fix mock.calls == 2.
+	if got := mock.calls.Load(); got != 2 {
+		t.Errorf("mock.calls = %d, want 2 — nil result was cached as a success (sticky nil regression)", got)
+	}
+}

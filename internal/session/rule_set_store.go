@@ -7,6 +7,7 @@ package session
 
 import (
 	"context"
+	"reflect"
 	"sync"
 	"time"
 
@@ -63,6 +64,22 @@ type ruleSetStore struct {
 // NewRuleSetStore returns a new thread-safe RuleSetStore.
 func NewRuleSetStore() RuleSetStore {
 	return &ruleSetStore{}
+}
+
+// isNilAny reports whether v is nil or is a nil pointer (or other nilable kind)
+// wrapped inside an any/interface value. A plain == nil check is insufficient
+// because a typed nil pointer stored as any produces a non-nil interface value.
+func isNilAny(v any) bool {
+	if v == nil {
+		return true
+	}
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.Pointer, reflect.Interface, reflect.Slice,
+		reflect.Map, reflect.Chan, reflect.Func:
+		return rv.IsNil()
+	}
+	return false
 }
 
 func (s *ruleSetStore) Get() (any, bool) {
@@ -127,6 +144,16 @@ func (s *ruleSetStore) GetOrFetch(ctx context.Context, fetcher func(context.Cont
 		v, err := fetcher(fetchCtx)
 		if err != nil {
 			return nil, err
+		}
+		if isNilAny(v) {
+			// Don't cache nil successes — `(nil, nil)` is a legitimate "no
+			// active rule set" response from AWS SES; caching it would make
+			// the absence sticky and prevent future refetches when a rule
+			// set is later activated. A typed nil pointer (e.g.
+			// (*DescribeActiveReceiptRuleSetOutput)(nil) wrapped in any) must
+			// also be treated as absent — a non-nil interface holding a nil
+			// pointer is not nil under ==. See PIN 5 regression test.
+			return nil, nil
 		}
 		// Only commit the value if the store has not been cleared since we
 		// started — a bumped generation means a profile/region switch happened
