@@ -1,6 +1,6 @@
 package unit_test
 
-// ctdetail_demo_golden_case_d_test.go — golden snapshot test for ct-events detail view,
+// ctevent_demo_golden_case_d_test.go — golden snapshot test for ct-events detail view,
 // Case D: kms:RotateKey AwsServiceEvent.
 //
 // Uses demo fixture "e-d4e5f6a7" from internal/demo/fixtures_monitoring.go.

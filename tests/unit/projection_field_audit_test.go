@@ -7,9 +7,6 @@ package unit_test
 // or two canonical fixtures per row.
 //
 // Source of truth: docs/refactor/01-projection-hook.md lines 38–55.
-//
-// EXPECTED failure today: projection.Generic is a stub returning nil.
-// All tests here fail with a nil-section assertion until the PR-01 impl step lands.
 
 import (
 	"context"
@@ -88,7 +85,7 @@ func TestProjectionFieldAudit_NavigableItem(t *testing.T) {
 
 	sections := projection.Generic(r)
 	if len(sections) == 0 {
-		t.Fatalf("projection.Generic(ec2) returned zero sections — stub not yet implemented")
+		t.Fatalf("projection.Generic returned zero sections for ec2")
 	}
 
 	items := allItems(sections)
@@ -124,7 +121,7 @@ func TestProjectionFieldAudit_ItemKindTagging(t *testing.T) {
 
 	sections := projection.Generic(r)
 	if len(sections) == 0 {
-		t.Fatalf("projection.Generic(ec2) returned zero sections — stub not yet implemented")
+		t.Fatalf("projection.Generic returned zero sections for ec2")
 	}
 
 	items := allItems(sections)
@@ -167,41 +164,17 @@ func TestProjectionFieldAudit_TagFlattening(t *testing.T) {
 
 	sections := projection.Generic(r)
 	if len(sections) == 0 {
-		t.Fatalf("projection.Generic(ec2) returned zero sections — stub not yet implemented")
+		t.Fatalf("projection.Generic returned zero sections for ec2")
 	}
 
-	// Count how many tags the fixture actually has.
-	tagCount := countEC2Tags(r)
-	if tagCount == 0 {
-		t.Skip("EC2 fixture has RawStruct but no tags — skipping tag-flattening count check")
-	}
-
-	// Find the Tags section (or a section containing tag items).
+	// Assert that at least one tag Item exists in the projected output.
+	// EC2 demo fixtures include a Name tag at minimum; tag flattening must
+	// produce at least one ItemField or ItemSubfield in a Tags section.
 	tagItems := collectTagItems(sections)
-	if len(tagItems) < tagCount {
-		t.Errorf("tag flattening: got %d tag Items for %d tags; each tag must produce exactly one Item row",
-			len(tagItems), tagCount)
+	if len(tagItems) == 0 {
+		t.Errorf("tag flattening: no tag Items found in projected output; "+
+			"each tag must produce exactly one Item row (Label=tag-key, Value=tag-value)")
 	}
-}
-
-// countEC2Tags counts the tags on the EC2 instance in r.RawStruct.
-func countEC2Tags(r domain.Resource) int {
-	type tagHolder interface {
-		GetTags() interface{ Len() int }
-	}
-	// Use reflection-free approach: parse from r.RawStruct via type assertion.
-	// EC2 RawStruct is ec2types.Instance.
-	type hasTags interface {
-		GetTagSliceLen() int
-	}
-	// Fall back to counting via the Fields map — look for tag-like keys.
-	// The precise count is only important post-implementation; for now any
-	// non-zero tag count is sufficient.
-	_ = r
-	// We use the raw struct type assertion below in the real test after impl.
-	// For now, return a sentinel indicating "has some tags" by checking RawStruct != nil.
-	// The full assertion fires after projection.Generic is implemented.
-	return 1 // any fixture with RawStruct is assumed to have at least one Name tag
 }
 
 // collectTagItems extracts Items that represent individual tag key/value pairs
@@ -276,7 +249,7 @@ func TestProjectionFieldAudit_JSONExpansion(t *testing.T) {
 
 	sections := projection.Generic(*target)
 	if len(sections) == 0 {
-		t.Fatalf("projection.Generic(role) returned zero sections — stub not yet implemented")
+		t.Fatalf("projection.Generic returned zero sections for role")
 	}
 
 	// Assert: at least one field whose label contains "Policy" expanded into multiple sub-items.
@@ -329,7 +302,7 @@ func TestProjectionFieldAudit_ListScalarExtraction(t *testing.T) {
 
 	sections := projection.Generic(r)
 	if len(sections) == 0 {
-		t.Fatalf("projection.Generic(ec2) returned zero sections — stub not yet implemented")
+		t.Fatalf("projection.Generic returned zero sections for ec2")
 	}
 
 	items := allItems(sections)
@@ -338,16 +311,13 @@ func TestProjectionFieldAudit_ListScalarExtraction(t *testing.T) {
 	// subnet-xxxx value, not a slice representation.
 	for _, item := range items {
 		if strings.Contains(strings.ToLower(item.Label), "subnet") && item.Kind == domain.ItemField {
-			if strings.HasPrefix(item.Value, "[") || strings.Contains(item.Value, "subnet-") == false {
-				if strings.HasPrefix(item.Value, "[") {
-					t.Errorf("SubnetId item has slice representation %q; projector must extract the first scalar element",
-						item.Value)
-				}
-				// If non-slice but also doesn't contain "subnet-", that's also wrong.
-				if !strings.Contains(item.Value, "subnet-") && item.Value != "" {
-					t.Errorf("SubnetId item value %q does not look like a subnet ID; expected subnet-xxxx format",
-						item.Value)
-				}
+			if strings.HasPrefix(item.Value, "[") {
+				t.Errorf("SubnetId item has slice representation %q; projector must extract the first scalar element",
+					item.Value)
+			}
+			if !strings.Contains(item.Value, "subnet-") && item.Value != "" {
+				t.Errorf("SubnetId item value %q does not look like a subnet ID; expected subnet-xxxx format",
+					item.Value)
 			}
 			return
 		}
@@ -386,7 +356,7 @@ func TestProjectionFieldAudit_FieldOrdering(t *testing.T) {
 
 	sections := projection.Generic(r)
 	if len(sections) == 0 {
-		t.Fatalf("projection.Generic(ec2) returned zero sections — stub not yet implemented")
+		t.Fatalf("projection.Generic returned zero sections for ec2")
 	}
 
 	items := allItems(sections)

@@ -5,16 +5,6 @@ package unit_test
 // TestProjectorCoverageAllTypes asserts that every registered resource type has a
 // working projector (either td.Project, or the Generic fallback) that returns
 // non-empty sections for at least one demo fixture.
-//
-// EXPECTED failure today: projection.Generic is a stub returning nil.
-// This test fails with "%s: projector returned zero sections" for every type until
-// projection.Generic is implemented in the PR-01 impl step.
-//
-// When td.Project is added to ResourceTypeDef (PR-01), the loop becomes:
-//
-//	projector := td.Project
-//	if projector == nil { projector = projection.Generic }
-//	got := projector(r)
 
 import (
 	"context"
@@ -73,14 +63,13 @@ func TestProjectorCoverageAllTypes(t *testing.T) {
 				r = minimalResource(td.ShortName)
 			}
 
-			// td.Project is not yet a field (added in PR-01 impl step).
-			// After the impl step this should become:
-			//   projector := td.Project
-			//   if projector == nil { projector = projection.Generic }
-			//   got := projector(r)
-			got := projection.Generic(r)
+			proj := projection.Generic
+			if td.Project != nil {
+				proj = td.Project
+			}
+			got := proj(r)
 			if len(got) == 0 {
-				t.Errorf("%s: projector returned zero sections (projection.Generic stub returns nil — impl step needed)", td.ShortName)
+				t.Errorf("projection.Generic returned zero sections for %s", td.ShortName)
 			}
 		})
 	}

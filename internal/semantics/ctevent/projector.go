@@ -90,6 +90,7 @@ func projectSDKEvent(sdkEv cloudtrailtypes.Event, r domain.Resource) []domain.Se
 // errorSection returns a single section containing an explicit error message.
 func errorSection(err error) []domain.Section {
 	return []domain.Section{{
+		Title: "ERROR",
 		Items: []domain.Item{{
 			Kind:  domain.ItemField,
 			Label: "Error",

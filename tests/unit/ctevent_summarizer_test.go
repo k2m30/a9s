@@ -1,6 +1,6 @@
 package unit
 
-// ctdetail_summarizer_test.go covers RegisterSummarizer in
+// ctevent_summarizer_test.go covers RegisterSummarizer in
 // internal/semantics/ctevent/summarizer.go.
 //
 // The only uncovered branch is the duplicate-registration panic.

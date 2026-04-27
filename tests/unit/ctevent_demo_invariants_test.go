@@ -1,6 +1,6 @@
 package unit_test
 
-// ctdetail_demo_invariants_test.go — table-driven invariant tests over all 12
+// ctevent_demo_invariants_test.go — table-driven invariant tests over all 12
 // demo ct-events fixtures (Cases A–L).
 //
 // Three top-level tests:

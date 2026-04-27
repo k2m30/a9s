@@ -1,7 +1,6 @@
 package resource
 
 import (
-	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/semantics/projection"
 )
 
@@ -10,16 +9,12 @@ import (
 // resolvers, and field-alias normalisers without importing internal/resource
 // (which would create an import cycle).
 func init() {
-	// NavFieldsProvider reads the active registry first; falls back to the
-	// default (init-time) registry. This ensures projection.Generic always
-	// sees canonical nav fields (for audit tests and projection.Generic callers)
-	// while respecting explicit overrides from tests or the active session.
-	projection.NavFieldsProvider = func(shortName string) []domain.NavigableField {
-		if fields := GetNavigableFields(shortName); len(fields) > 0 {
-			return fields
-		}
-		return GetDefaultNavFields(shortName)
-	}
+	// NavFieldsProvider reads from the immutable default registry only.
+	// Tests that need to override nav fields use GenericWithConfigAndNavProvider
+	// to inject a custom provider; they do NOT mutate the global default.
+	// This eliminates the active-registry test-pollution surface that caused
+	// Ubuntu CI failures (see PR #301 review).
+	projection.NavFieldsProvider = GetDefaultNavFields
 	projection.NavIDProvider = NavIDFromValue
 	projection.FieldAliasProvider = ApplyFieldAliases
 	projection.FieldKeysProvider = GetFieldKeys

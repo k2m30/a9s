@@ -336,13 +336,14 @@ func TestCTEventProjectorMatchesBuildSections(t *testing.T) {
 // ctevent Row.Severity (a tier string) to both domain.Item.Tier and domain.Item.Severity.
 func TestCTEventProjectorTierMapping(t *testing.T) {
 	cases := []struct {
-		tier     string
-		wantSev  domain.Severity
+		tier    string
+		wantSev domain.Severity
 	}{
 		{"ct-danger", domain.SevBroken},
 		{"ct-attention", domain.SevWarn},
 		{"ct-info", domain.SevOK},
 		{"", domain.SevOK},
+		{"unknown-tier", domain.SevOK}, // default arm: any unrecognized tier maps to SevOK
 	}
 
 	for _, tc := range cases {
