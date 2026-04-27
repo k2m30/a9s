@@ -370,7 +370,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		if rt == "ses" {
 			m.RuleSets = session.NewRuleSetStore()
 			if m.clients != nil {
-				m.clients.RuleSets = m.RuleSets
+				m.clients.SetRuleSets(m.RuleSets)
 			}
 		}
 		m.flash = flashState{text: "Refreshing...", isError: false, active: true}
@@ -404,7 +404,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		// blocked DescribeActiveReceiptRuleSet fetchers re-poisoning the cache.
 		m.RuleSets = session.NewRuleSetStore()
 		if m.clients != nil {
-			m.clients.RuleSets = m.RuleSets
+			m.clients.SetRuleSets(m.RuleSets)
 		}
 	}
 	m.flash = flashState{text: "Refreshing...", isError: false, active: true}

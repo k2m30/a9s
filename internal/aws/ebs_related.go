@@ -159,7 +159,7 @@ func checkEBSBackup(ctx context.Context, clients any, res resource.Resource, _ r
 		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
 	}
 	region := regionFromEnv()
-	account := accountIDFromClients(ctx, c, c.IdentityStore)
+	account := accountIDFromClients(ctx, c, c.IdentityStore())
 	if region == "" || account == "" {
 		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
 	}

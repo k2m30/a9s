@@ -60,12 +60,11 @@ func TestInvalidateSESRuleSetCache(t *testing.T) {
 	}
 
 	// Wire a per-test RuleSets store so the cache works (post-PR-02d the
-	// rule set cache lives on c.RuleSets rather than a process-global map
-	// keyed by *ServiceClients pointer).
-	clients := &awsclient.ServiceClients{
-		SES:      v1Mock,
-		RuleSets: session.NewRuleSetStore(),
-	}
+	// rule set cache lives on c.RuleSets() rather than a process-global map
+	// keyed by *ServiceClients pointer). Use SetRuleSets because the field
+	// is unexported (CR-flagged race fix).
+	clients := &awsclient.ServiceClients{SES: v1Mock}
+	clients.SetRuleSets(session.NewRuleSetStore())
 
 	src := resource.Resource{
 		ID:     "any@example.com",
@@ -102,7 +101,7 @@ func TestInvalidateSESRuleSetCache(t *testing.T) {
 	// Post-PR-02d (P2 fix): swap rather than Clear() so in-flight blocked
 	// fetchers can't re-poison the active store. Production code does this
 	// on Ctrl+R for SES detail/list views; the test mirrors that pattern.
-	clients.RuleSets = session.NewRuleSetStore()
+	clients.SetRuleSets(session.NewRuleSetStore())
 
 	// ---- Call 3: cache miss after invalidation; API must be called again. ----
 	result3 := checker(context.Background(), clients, src, resource.ResourceCache{})
@@ -158,12 +157,10 @@ func TestHandleRefresh_SESDetailViewInvalidatesRuleSetCache(t *testing.T) {
 	}
 
 	// Wire a per-test RuleSets store so the cache works (post-PR-02d the
-	// rule set cache lives on c.RuleSets). Reuse one *ServiceClients pointer
+	// rule set cache lives on c.RuleSets()). Reuse one *ServiceClients pointer
 	// so that the TUI model and the checker share the same store reference.
-	clients := &awsclient.ServiceClients{
-		SES:      v1Mock,
-		RuleSets: session.NewRuleSetStore(),
-	}
+	clients := &awsclient.ServiceClients{SES: v1Mock}
+	clients.SetRuleSets(session.NewRuleSetStore())
 
 	src := resource.Resource{
 		ID:     "any@example.com",
@@ -295,10 +292,8 @@ func TestSESRuleSetSwap_LateWriterDoesNotPoisonNewStore(t *testing.T) {
 		output:    staleOutput,
 	}
 
-	clients := &awsclient.ServiceClients{
-		SES:      v1Mock,
-		RuleSets: session.NewRuleSetStore(),
-	}
+	clients := &awsclient.ServiceClients{SES: v1Mock}
+	clients.SetRuleSets(session.NewRuleSetStore())
 
 	src := resource.Resource{
 		ID:     "any@example.com",
@@ -318,10 +313,10 @@ func TestSESRuleSetSwap_LateWriterDoesNotPoisonNewStore(t *testing.T) {
 
 	// Capture the OLD store reference so we can verify the late writer
 	// targeted it (not the new one).
-	oldStore := clients.RuleSets
+	oldStore := clients.RuleSets()
 
 	// Refresh: swap to a fresh store (production Ctrl+R pattern).
-	clients.RuleSets = session.NewRuleSetStore()
+	clients.SetRuleSets(session.NewRuleSetStore())
 
 	// Release the blocked call. Goroutine A returns and writes its result.
 	close(v1Mock.releaseCh)
@@ -329,7 +324,7 @@ func TestSESRuleSetSwap_LateWriterDoesNotPoisonNewStore(t *testing.T) {
 
 	// Pin: the new active store is empty. The late writer pollute the
 	// orphaned old store, not the new one.
-	if _, ok := clients.RuleSets.Get(); ok {
+	if _, ok := clients.RuleSets().Get(); ok {
 		t.Errorf("new RuleSets store has cached entry — late writer poisoned the active slot")
 	}
 	// Confirm the orphaned store DID receive the write (so we know the

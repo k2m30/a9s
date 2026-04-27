@@ -504,14 +504,13 @@ var _ awsclient.SESV1API = (*fakeSESV1)(nil)
 
 // sesV1Clients returns a *awsclient.ServiceClients with the given SESV1API
 // wired plus a fresh per-test session.RuleSetStore. Post-PR-02d the SES
-// rule-set cache lives on c.RuleSets (per-Session) rather than a process-wide
+// rule-set cache lives on c.RuleSets() (per-Session) rather than a process-wide
 // map keyed by *ServiceClients pointer, so each test gets an isolated store
 // without needing fresh pointers.
 func sesV1Clients(v1 awsclient.SESV1API) *awsclient.ServiceClients {
-	return &awsclient.ServiceClients{
-		SES:      v1,
-		RuleSets: session.NewRuleSetStore(),
-	}
+	c := &awsclient.ServiceClients{SES: v1}
+	c.SetRuleSets(session.NewRuleSetStore())
+	return c
 }
 
 // sesLambdaARN returns a plausible Lambda ARN string for test data.

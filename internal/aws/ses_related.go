@@ -126,7 +126,7 @@ func sesEventDestinations(ctx context.Context, c *ServiceClients, configSetName 
 // subsequent calls without a network round-trip. Errors are not cached: a
 // follow-up call after an error retries the API.
 //
-// The cache lives on the per-Session RuleSetStore (c.RuleSets); the legacy
+// The cache lives on the per-Session RuleSetStore (c.RuleSets()); the legacy
 // process-wide map keyed by *ServiceClients pointer is gone.
 //
 // Invalidation safety (P2 finding): the store reference is CAPTURED ONCE at
@@ -142,13 +142,13 @@ func sesEventDestinations(ctx context.Context, c *ServiceClients, configSetName 
 // Concurrency trade-off (acknowledged, same as PR-02b/02c): no top-level
 // lock across check-fetch-set. Two concurrent checkSES* calls may both
 // observe an empty store and both invoke the SES API; the store remains
-// correct (mutex-guarded writes; idempotent Sets converge). Acceptable
+// correct (mutex-guarded writes; last-write-wins on idempotent Sets). Acceptable
 // because related-panel checks are not high-volume.
 func sesActiveReceiptRuleSet(ctx context.Context, c *ServiceClients) (*ses.DescribeActiveReceiptRuleSetOutput, error) {
 	if c == nil || c.SES == nil {
 		return nil, nil //nolint:nilnil // no SES v1 client; caller treats nil as "no rule set"
 	}
-	store := c.RuleSets // capture once — see godoc above
+	store := c.RuleSets() // capture once — see godoc above
 	if store != nil {
 		if cached, ok := store.Get(); ok {
 			out, isOutput := cached.(*ses.DescribeActiveReceiptRuleSetOutput)
@@ -495,15 +495,3 @@ func truncatedResultSES(target string, ids []string) resource.RelatedCheckResult
 	return resource.RelatedCheckResult{TargetType: target, Count: len(ids), ResourceIDs: ids, Approximate: true}
 }
 
-// InvalidateSESRuleSetCache is REMOVED in PR-02d's P2 fix. It used to call
-// c.RuleSets.Clear() in place — but that did not protect against in-flight
-// blocked fetches: a slow `sesActiveReceiptRuleSet` call could return AFTER
-// Clear() and re-Set the just-cleared store with the pre-refresh data,
-// re-poisoning the cache.
-//
-// Replacement: callers MUST swap the store entirely (assign a fresh
-// `session.NewRuleSetStore()` to both the Session.RuleSets slot and to
-// `clients.RuleSets`). `sesActiveReceiptRuleSet` captures its store
-// reference at entry, so a late writer pollutes the orphaned old store
-// rather than the new active one. See `internal/tui/app_handlers_navigate.go`
-// (Ctrl+R refresh) for the canonical swap pattern.
