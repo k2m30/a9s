@@ -145,9 +145,18 @@ func (m Model) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetchedM
 			if _, exists := m.ResourceCache[rt]; exists {
 				continue
 			}
+			// Prefer the full PaginationMeta from the prefetcher when available
+			// (carries NextToken so a later load-more / drill can advance past
+			// page 1). Fall back to the truncation-only synthetic only when the
+			// prefetcher didn't supply pagination metadata — that path keeps
+			// pre-fix behavior for any test or message that omits Pagination.
+			pageMeta := msg.Pagination[rt]
+			if pageMeta == nil {
+				pageMeta = &resource.PaginationMeta{IsTruncated: msg.Truncated[rt]}
+			}
 			m.ResourceCache[rt] = &session.ResourceCacheEntry{
 				Resources:  resources,
-				Pagination: &resource.PaginationMeta{IsTruncated: msg.Truncated[rt]},
+				Pagination: pageMeta,
 			}
 		}
 	}

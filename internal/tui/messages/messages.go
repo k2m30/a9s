@@ -222,12 +222,13 @@ type AvailabilityCacheLoadedMsg struct {
 // AvailabilityCacheLoadedMsg it does NOT trigger background probes — all counts
 // are already populated.
 type AvailabilityPrefetchedMsg struct {
-	Entries        map[string]int                 // shortName -> resource count
-	Truncated      map[string]bool                // shortName -> true if truncated
-	IssueCounts    map[string]int                 // shortName -> issue-status resource count
-	IssueTruncated map[string]bool                // shortName -> true if issue count is lower bound
-	Resources      map[string][]resource.Resource // shortName -> retained first-page resources for Wave 2
-	Gen            int                            // availabilityGen captured at dispatch — stale if != current
+	Entries        map[string]int                       // shortName -> resource count
+	Truncated      map[string]bool                      // shortName -> true if truncated
+	IssueCounts    map[string]int                       // shortName -> issue-status resource count
+	IssueTruncated map[string]bool                      // shortName -> true if issue count is lower bound
+	Resources      map[string][]resource.Resource       // shortName -> retained first-page resources for Wave 2
+	Pagination     map[string]*resource.PaginationMeta  // shortName -> full pagination meta (NextToken, etc.) for cache seeding
+	Gen            int                                  // availabilityGen captured at dispatch — stale if != current
 	// PrefetchErr is the composite error aggregating per-type fetch failures
 	// during the synchronous availability prefetch. Non-nil when any paginated
 	// fetcher errored; the app handler surfaces it as a FlashMsg so operators
