@@ -29,22 +29,33 @@ func (m *DetailModel) buildFieldList() {
 		r.Type = m.resourceType
 	}
 	td := resource.FindResourceType(m.resourceType)
+	// Use m.navProvider to resolve navigable fields. The default (set in
+	// NewDetail) is resource.GetActiveNavigableFields (ACTIVE-only), which
+	// keeps tests isolated from init-time DEFAULT registry entries.
+	// TUI construction paths override this with resource.GetNavigableFields
+	// (merged ACTIVE+DEFAULT) via SetNavProvider.
+	navProv := m.navProvider
+	if navProv == nil {
+		navProv = resource.GetActiveNavigableFields
+	}
+	generic := projection.GenericWithConfigAndNavProvider(m.viewConfig, navProv)
+
 	var proj domain.DetailProjector
 	if td != nil && td.Project != nil {
 		proj = td.Project
 	} else {
-		// Use m.navProvider to resolve navigable fields. The default (set in
-		// NewDetail) is resource.GetActiveNavigableFields (ACTIVE-only), which
-		// keeps tests isolated from init-time DEFAULT registry entries.
-		// TUI construction paths override this with resource.GetNavigableFields
-		// (merged ACTIVE+DEFAULT) via SetNavProvider.
-		navProv := m.navProvider
-		if navProv == nil {
-			navProv = resource.GetActiveNavigableFields
-		}
-		proj = projection.GenericWithConfigAndNavProvider(m.viewConfig, navProv)
+		proj = generic
 	}
 	sections := proj(r)
+	// Fallback: a custom projector may legitimately return nil for resource
+	// shapes it can't render (e.g. ctevent.Project against a stub ct-events
+	// resource that only has ID/Name from a related-cache hit, with no raw
+	// event body). Without this fallback the detail pane regresses to
+	// "No detail data available". The generic projector renders such stubs
+	// from r.Fields just fine.
+	if len(sections) == 0 && td != nil && td.Project != nil {
+		sections = generic(r)
+	}
 	if td != nil && td.Augment != nil {
 		sections = td.Augment(r, sections)
 	}
