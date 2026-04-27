@@ -20,7 +20,7 @@ type ruleSetStore interface {
 	Get() (any, bool)
 	Set(any)
 	Clear()
-	GetOrFetch(fetcher func() (any, error)) (any, error)
+	GetOrFetch(context.Context, func(context.Context) (any, error)) (any, error)
 }
 
 // checkSESR53 searches the R53 cache for hosted zones whose domain matches the
@@ -136,8 +136,8 @@ func sesActiveReceiptRuleSet(ctx context.Context, c *ServiceClients) (*ses.Descr
 		// without caching or coalescing.
 		return c.SES.DescribeActiveReceiptRuleSet(ctx, &ses.DescribeActiveReceiptRuleSetInput{})
 	}
-	v, err := store.GetOrFetch(func() (any, error) {
-		return c.SES.DescribeActiveReceiptRuleSet(ctx, &ses.DescribeActiveReceiptRuleSetInput{})
+	v, err := store.GetOrFetch(ctx, func(fetchCtx context.Context) (any, error) {
+		return c.SES.DescribeActiveReceiptRuleSet(fetchCtx, &ses.DescribeActiveReceiptRuleSetInput{})
 	})
 	if err != nil {
 		return nil, err

@@ -25,6 +25,7 @@ package unit_test
 
 import (
 	"context"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -439,18 +440,33 @@ func TestSESActiveReceiptRuleSet_Singleflight_CoalescesConcurrentMisses(t *testi
 	var wg sync.WaitGroup
 	wg.Add(N)
 
+	// started is a hard barrier: each goroutine signals it BEFORE entering
+	// the SES helper, giving us a strong guarantee that all N goroutines have
+	// been scheduled before we release the stub. This eliminates the flaky
+	// 50ms sleep while still being bounded (100 Gosched iterations cap the
+	// wait so a stuck test fails fast instead of hanging the suite).
+	started := make(chan struct{}, N)
 	for i := range N {
 		go func(idx int) {
 			defer wg.Done()
+			started <- struct{}{} // signal: "I'm about to call"
 			out, err := awsclient.SESActiveReceiptRuleSetForTest(context.Background(), clients)
 			results[idx] = result{out: out, err: err}
 		}(i)
 	}
 
-	// Allow goroutines time to enter the blocking stub before releasing it.
-	// 50 ms matches the style used in TestSESRuleSetSwap_LateWriterDoesNotPoisonNewStore.
+	// Wait for all N goroutines to signal they are about to call.
+	for range N {
+		<-started
+	}
+	// Wait for the leader to enter the blocking stub.
 	<-mock.inFlightCh
-	time.Sleep(50 * time.Millisecond)
+	// Yield repeatedly to give the remaining N-1 goroutines a chance to reach
+	// the singleflight wait point before we release. Bounded at 100 iterations
+	// so a stuck test fails fast rather than hanging the suite indefinitely.
+	for i := 0; i < 100; i++ {
+		runtime.Gosched()
+	}
 
 	// Release all blocked callers.
 	close(mock.releaseCh)
@@ -480,4 +496,166 @@ func TestSESActiveReceiptRuleSet_Singleflight_CoalescesConcurrentMisses(t *testi
 			t.Errorf("goroutine %d: rule name = %q, want %q", i, got, want)
 		}
 	}
+}
+
+// ---------------------------------------------------------------------------
+// PIN 4 — singleflight ctx-coupling: leader cancellation must NOT poison followers
+// ---------------------------------------------------------------------------
+// Bug (post-PR-307): sesActiveReceiptRuleSet passes the caller's ctx directly
+// into the singleflight.Group.Do closure. When the leader's ctx is canceled,
+// the singleflight fetcher aborts with context.Canceled and propagates that
+// error to every follower — even followers whose own ctx was not canceled.
+//
+// Pre-fix behaviour: follower receives errB == context.Canceled (leader's error).
+// Post-fix behaviour: follower receives a successful result despite leader cancellation.
+
+// ctxAwareSESV1 is a ctx-respecting SES v1 mock used only for PIN 4.
+// It blocks each call on releaseCh OR the call's ctx.Done — whichever fires first.
+// When ctx fires, it returns ctx.Err() so the caller observes cancellation.
+// calls is atomic so concurrent goroutines can increment it safely.
+type ctxAwareSESV1 struct {
+	calls      atomic.Int32
+	releaseCh  chan struct{}
+	inFlightCh chan struct{} // closed once the first call enters
+	closeOnce  sync.Once
+	output     *ses.DescribeActiveReceiptRuleSetOutput
+}
+
+func (c *ctxAwareSESV1) DescribeActiveReceiptRuleSet(
+	ctx context.Context,
+	_ *ses.DescribeActiveReceiptRuleSetInput,
+	_ ...func(*ses.Options),
+) (*ses.DescribeActiveReceiptRuleSetOutput, error) {
+	c.calls.Add(1)
+	c.closeOnce.Do(func() { close(c.inFlightCh) })
+	select {
+	case <-c.releaseCh:
+		return c.output, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+// Compile-time check: ctxAwareSESV1 satisfies SESV1API.
+var _ awsclient.SESV1API = (*ctxAwareSESV1)(nil)
+
+// TestSESActiveReceiptRuleSet_Singleflight_LeaderCancelDoesNotPoisonFollower
+// is the regression pin for the ctx-coupling bug introduced in PR #307.
+//
+// The invariant pinned here is: a follower goroutine with a long-lived ctx
+// must succeed even when the singleflight leader's ctx is canceled before
+// the upstream API call completes.
+//
+// Regarding call count: we accept 1 or 2 upstream calls. A correct fix may
+// either (a) detach the fetcher from the leader's ctx so the single in-flight
+// call completes for everyone (1 call), or (b) retry with a context-independent
+// ctx when the leader's ctx fires (2 calls). Both are valid — we pin only the
+// follower-success invariant, not the exact implementation strategy.
+//
+// Leader outcome (errA): NOT asserted strictly. Depending on the fix, the leader
+// may receive context.Canceled (if it cancelled before the API responded) or a
+// successful result (if the fix retries on a background ctx and shares the result).
+// Leader's outcome is an impl-detail; follower's success is the regression pin.
+func TestSESActiveReceiptRuleSet_Singleflight_LeaderCancelDoesNotPoisonFollower(t *testing.T) {
+	ruleSetOutput := &ses.DescribeActiveReceiptRuleSetOutput{
+		Rules: []sestypes.ReceiptRule{
+			{
+				Name:       aws.String("follower-rule"),
+				Recipients: nil, // global — applies to all identities
+				Actions: []sestypes.ReceiptAction{
+					{LambdaAction: &sestypes.LambdaAction{
+						FunctionArn: aws.String("arn:aws:lambda:us-east-1:123456789012:function:follower"),
+					}},
+				},
+			},
+		},
+	}
+
+	mock := &ctxAwareSESV1{
+		releaseCh:  make(chan struct{}),
+		inFlightCh: make(chan struct{}),
+		output:     ruleSetOutput,
+	}
+
+	clients := &awsclient.ServiceClients{SES: mock}
+	clients.SetRuleSets(session.NewRuleSetStore())
+
+	type result struct {
+		out *ses.DescribeActiveReceiptRuleSetOutput
+		err error
+	}
+	var (
+		resA, resB result
+		wg         sync.WaitGroup
+	)
+	wg.Add(2)
+
+	// Goroutine A — the leader. Its ctx will be canceled while the API is blocking.
+	ctxA, cancelA := context.WithCancel(context.Background())
+	go func() {
+		defer wg.Done()
+		out, err := awsclient.SESActiveReceiptRuleSetForTest(ctxA, clients)
+		resA = result{out: out, err: err}
+	}()
+
+	// Wait for goroutine A to enter the blocking stub.
+	<-mock.inFlightCh
+
+	// Brief barrier — matches the 50ms convention used in PIN 3 — to let A park
+	// inside the singleflight .Do before we start goroutine B.
+	time.Sleep(30 * time.Millisecond)
+
+	// Goroutine B — the follower. Uses a long-lived context (never canceled).
+	go func() {
+		defer wg.Done()
+		out, err := awsclient.SESActiveReceiptRuleSetForTest(context.Background(), clients)
+		resB = result{out: out, err: err}
+	}()
+
+	// Brief barrier — let B park waiting on the singleflight result before we cancel A.
+	time.Sleep(30 * time.Millisecond)
+
+	// Cancel the leader's ctx. This is the trigger that exposes the bug:
+	// a naive singleflight implementation propagates ctxA's error to B.
+	cancelA()
+
+	// Let the leader observe its cancellation and return from .Do.
+	time.Sleep(30 * time.Millisecond)
+
+	// Release the mock so any continuing or retry fetch can complete.
+	close(mock.releaseCh)
+
+	// Wait for both goroutines to finish.
+	wg.Wait()
+
+	// ---- REGRESSION PIN (follower must succeed) ----
+
+	// errB must be nil: the follower's context was never canceled.
+	// Pre-fix failure: errB == context.Canceled (poisoned by leader).
+	if resB.err != nil {
+		t.Errorf("follower errB = %v, want nil — follower's ctx was not canceled; leader cancellation must not propagate to follower", resB.err)
+	}
+
+	// outB must be non-nil when errB is nil.
+	if resB.out == nil {
+		t.Errorf("follower outB = nil, want non-nil successful result")
+	}
+
+	// outB must carry the expected fixture data (not a zero-value struct).
+	if resB.out != nil {
+		if len(resB.out.Rules) == 0 {
+			t.Errorf("follower outB.Rules is empty, want at least 1 rule")
+		} else if got, want := aws.ToString(resB.out.Rules[0].Name), "follower-rule"; got != want {
+			t.Errorf("follower outB.Rules[0].Name = %q, want %q", got, want)
+		}
+	}
+
+	// call count must be 1 or 2 — see comment above for rationale.
+	// Fewer than 1 is impossible; more than 2 suggests an unbounded retry loop.
+	if got := mock.calls.Load(); got < 1 || got > 2 {
+		t.Errorf("DescribeActiveReceiptRuleSet called %d times, want 1 or 2 (coalesced or detached re-fetch)", got)
+	}
+
+	// leader outcome intentionally not asserted — see package-level comment.
+	_ = resA
 }
