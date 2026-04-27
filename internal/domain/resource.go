@@ -32,4 +32,12 @@ type Resource struct {
 	// RawStruct holds the original AWS SDK typed struct for reflection-based
 	// field extraction.
 	RawStruct any
+	// Findings is the canonical finding list. Phase 03 populates this; views
+	// read Findings[0].Phrase / Findings[0].Severity for list rendering.
+	// Empty for healthy rows.
+	Findings []Finding
+	// AttentionDetails carries supporting structured facts per finding,
+	// keyed by Finding.Code. Consumed only by the detail view's Attention
+	// section. Nil/empty for rows with no findings or no extra facts.
+	AttentionDetails map[FindingCode]AttentionDetail
 }
