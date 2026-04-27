@@ -49,10 +49,24 @@ var (
 )
 
 // loadConfig returns the cached view config, loading it on first call.
-// Errors are silently swallowed: Generic degrades to Fields-only rendering.
+//
+// Lookup order:
+//  1. config.Load() — discovers per-resource YAML in $A9S_CONFIG_DIR/views/,
+//     ~/.a9s/views/, and .a9s/views/ in CWD.
+//  2. config.DefaultConfig() — built-in defaults compiled into the binary.
+//
+// The defaults fallback is what makes Generic deterministic across
+// environments: a CI runner with no ~/.a9s/views/ produces the same projection
+// shape as an operator's machine with a populated config. Without the
+// fallback, Generic would silently degrade to flat alphabetical Fields-only
+// rendering — losing per-type ordering, headers, navigability, tag flattening,
+// and JSON expansion.
 func loadConfig() *config.ViewsConfig {
 	viewConfigOnce.Do(func() {
 		cfg, _ := config.Load()
+		if cfg == nil {
+			cfg = config.DefaultConfig()
+		}
 		viewConfig = cfg
 	})
 	return viewConfig
