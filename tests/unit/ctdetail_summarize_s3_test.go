@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/aws/ctdetail"
+	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
 )
 
 // TestCTDetailSummarizeS3_PutObject verifies that SummarizeS3 emits the residual metadata
@@ -15,7 +15,7 @@ func TestCTDetailSummarizeS3_PutObject(t *testing.T) {
 	params := map[string]any{
 		"contentLength": float64(1234),
 	}
-	rows := ctdetail.SummarizeS3("PutObject", params)
+	rows := ctevent.SummarizeS3("PutObject", params)
 	found := false
 	for _, r := range rows {
 		if r.Key == "contentLength" {
@@ -36,7 +36,7 @@ func TestCTDetailSummarizeS3_GetObject(t *testing.T) {
 	params := map[string]any{
 		"range": "bytes=0-1023",
 	}
-	rows := ctdetail.SummarizeS3("GetObject", params)
+	rows := ctevent.SummarizeS3("GetObject", params)
 	found := false
 	for _, r := range rows {
 		if r.Key == "range" {
@@ -57,7 +57,7 @@ func TestCTDetailSummarizeS3_PutBucketPolicy(t *testing.T) {
 	params := map[string]any{
 		"policy": `{"Version":"2012-10-17"}`,
 	}
-	rows := ctdetail.SummarizeS3("PutBucketPolicy", params)
+	rows := ctevent.SummarizeS3("PutBucketPolicy", params)
 	found := false
 	for _, r := range rows {
 		if r.Key == "policy" {
@@ -75,7 +75,7 @@ func TestCTDetailSummarizeS3_PutBucketPolicy(t *testing.T) {
 // TestCTDetailSummarizeS3_ListBuckets verifies that empty params returns a non-nil empty slice.
 // ListBuckets has no request parameters after TARGET extraction.
 func TestCTDetailSummarizeS3_ListBuckets(t *testing.T) {
-	rows := ctdetail.SummarizeS3("ListBuckets", map[string]any{})
+	rows := ctevent.SummarizeS3("ListBuckets", map[string]any{})
 	if rows == nil {
 		t.Fatal("SummarizeS3(ListBuckets, {}) returned nil; want non-nil []Row{}")
 	}
@@ -97,7 +97,7 @@ func TestCTDetailSummarizeS3_ResidualRowsNotNavigable(t *testing.T) {
 		{"PutBucketPolicy", map[string]any{"policy": `{"Version":"2012-10-17"}`}},
 	}
 	for _, tc := range cases {
-		rows := ctdetail.SummarizeS3(tc.eventName, tc.params)
+		rows := ctevent.SummarizeS3(tc.eventName, tc.params)
 		for i, r := range rows {
 			if r.IsNavigable {
 				t.Errorf("[%s] row[%d] key=%q: IsNavigable=true; S3 residual rows must not be navigable",
@@ -123,7 +123,7 @@ func TestCTDetailSummarizeS3_NoBucketKeyReExtraction(t *testing.T) {
 		"key":           "should-be-target-too",
 		"contentLength": float64(99),
 	}
-	rows := ctdetail.SummarizeS3("PutObject", params)
+	rows := ctevent.SummarizeS3("PutObject", params)
 	for _, r := range rows {
 		if r.Key == "Bucket" || r.Key == "Object" {
 			t.Errorf("PutObject: summarizer emitted TARGET-style row Key=%q; TARGET extraction handles these upstream", r.Key)
@@ -140,7 +140,7 @@ func TestCTDetailSummarizeS3_PurityNoMutation(t *testing.T) {
 		"nested":               map[string]any{"x": "y"},
 	}
 	before := deepCopyParams(params)
-	_ = ctdetail.SummarizeS3("PutObject", params)
+	_ = ctevent.SummarizeS3("PutObject", params)
 	if !reflect.DeepEqual(params, before) {
 		t.Fatalf("SummarizeS3 mutated input params: got %v, want %v", params, before)
 	}
@@ -150,14 +150,14 @@ func TestCTDetailSummarizeS3_PurityNoMutation(t *testing.T) {
 // does not panic and returns a non-nil slice.
 func TestCTDetailSummarizeS3_UnknownEvent(t *testing.T) {
 	params := map[string]any{"someField": "someValue"}
-	var rows []ctdetail.Row
+	var rows []ctevent.Row
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
 				t.Fatalf("SummarizeS3 panicked on unknown event: %v", r)
 			}
 		}()
-		rows = ctdetail.SummarizeS3("CompletelyUnknownS3Event", params)
+		rows = ctevent.SummarizeS3("CompletelyUnknownS3Event", params)
 	}()
 	if rows == nil {
 		t.Fatal("SummarizeS3(unknown event) returned nil; want non-nil slice")
@@ -177,7 +177,7 @@ func TestCTDetailSummarizeS3_SeverityNeverSet(t *testing.T) {
 		{"ListBuckets", map[string]any{}},
 	}
 	for _, tc := range cases {
-		rows := ctdetail.SummarizeS3(tc.eventName, tc.params)
+		rows := ctevent.SummarizeS3(tc.eventName, tc.params)
 		for i, r := range rows {
 			if r.Severity != "" {
 				t.Errorf("[%s] row[%d] key=%q: Severity=%q; summarizers must never set Severity",

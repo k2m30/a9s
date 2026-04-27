@@ -4,23 +4,19 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"github.com/k2m30/a9s/v3/internal/domain"
 )
 
 // RelatedDef defines one related resource class for a given resource type.
-type RelatedDef struct {
-	TargetType  string // target resource short name (e.g., "tg", "alarm")
-	DisplayName string // right-column row label (e.g., "Target Groups")
-	// TODO(no-middle-state): a registered RelatedDef must have a real Checker.
-	// Treat nil as a structural bug, not as a supported "stub" state.
-	Checker          RelatedChecker // async checker function
-	NeedsTargetCache bool           // true if checker reads target type from ResourceCache
-}
+// Declaration lives in internal/domain/contracts.go; this alias keeps
+// existing consumers compiling. Deleted in PR-04n.
+type RelatedDef = domain.RelatedDef
 
 // NavigableField associates a detail view field path with a target resource type.
-type NavigableField struct {
-	FieldPath  string // matches a path in ViewDef.Detail (e.g., "VpcId")
-	TargetType string // resource short name (e.g., "vpc")
-}
+// Declaration lives in internal/domain/contracts.go; this alias keeps
+// existing consumers compiling. Deleted in PR-04n.
+type NavigableField = domain.NavigableField
 
 // NavIDFromValue returns the bare resource ID suitable for target lookup,
 // given a raw field value. When the value is an AWS ARN and the target
@@ -94,51 +90,32 @@ func s3BucketFromARN(s string) string {
 
 // RelatedCheckResult is returned by a RelatedChecker and carries all state
 // needed by the right-column panel to display a row and navigate on Enter.
+// Declaration lives in internal/domain/contracts.go; this alias keeps
+// existing consumers compiling. Deleted in PR-04n.
 //
 // Semantics (FR-008 / FR-014):
 //
-//   - Count == -1: unknown — the checker could not determine a count (wrong
-//     RawStruct type, nil clients, API error, or a stubbed checker). The UI
-//     renders "?" for the row.
-//   - Count == 0: definitively zero related resources of this type. The UI
-//     dims the row.
-//   - Count >= 1: confirmed N related resources. The UI highlights the row.
-//   - Approximate == true: Count was derived from a truncated cache page; more
-//     matches may exist beyond the cached window. The UI renders "N+" (or
-//     "0+"). Only valid on reverse-scan checkers (NeedsTargetCache: true);
-//     forward checkers MUST leave this false. Invariant: Approximate == true ⇒
-//     Count >= 0.
-//   - FetchFilter non-nil: navigation drill-in should use a server-side
-//     filtered paginated fetcher rather than a relatedIDSet jump.
-type RelatedCheckResult struct {
-	TargetType  string   // echoed from RelatedDef.TargetType
-	Count       int      // -1 = unknown; 0+ = count
-	ResourceIDs []string // IDs of found related resources (empty when Count <= 0)
-	Err         error    // non-nil = error
-	// FetchFilter when non-nil signals navigation to use a server-side filtered fetcher instead of relatedIDSet.
-	FetchFilter map[string]string
-	// Approximate is true when Count was derived from a truncated reverse-scan cache entry.
-	// Pairs only with Count >= 0; UI renders "N+" / "0+". Forward checkers MUST leave this false.
-	Approximate bool
-}
+//   - Count == -1: unknown — the checker could not determine a count.
+//   - Count == 0: definitively zero related resources of this type.
+//   - Count >= 1: confirmed N related resources.
+//   - Approximate == true: Count was derived from a truncated cache page.
+//   - FetchFilter non-nil: navigation should use a server-side filtered fetcher.
+type RelatedCheckResult = domain.RelatedCheckResult
 
 // ResourceCacheEntry holds a snapshot of one resource type's list plus
-// truncation state. IsTruncated=true means the snapshot is a partial page;
-// related checkers should return Count=-1 (unknown) when 0 local matches found.
-type ResourceCacheEntry struct {
-	Resources   []Resource
-	IsTruncated bool
-	Pagination  *PaginationMeta // full pagination from cold-miss fetch; nil when derived from snapshot
-}
+// truncation state. Declaration lives in internal/domain/contracts.go; this
+// alias keeps existing consumers compiling. Deleted in PR-04n.
+type ResourceCacheEntry = domain.ResourceCacheEntry
 
 // ResourceCache is a read-only snapshot of already-loaded resource lists,
-// keyed by resource short name. Each entry carries truncation state so that
-// related checkers can distinguish "0 matches in complete list" (Count=0)
-// from "0 matches in partial list" (Count=-1).
-type ResourceCache map[string]ResourceCacheEntry
+// keyed by resource short name. Declaration lives in internal/domain/contracts.go;
+// this alias keeps existing consumers compiling. Deleted in PR-04n.
+type ResourceCache = domain.ResourceCache
 
 // RelatedChecker returns a count of related resources of a specific type.
-type RelatedChecker func(ctx context.Context, clients any, res Resource, cache ResourceCache) RelatedCheckResult
+// Declaration lives in internal/domain/contracts.go; this alias keeps
+// existing consumers compiling. Deleted in PR-04n.
+type RelatedChecker = domain.RelatedChecker
 
 // ValidateRelatedResult sanity-checks that a checker's result is internally
 // consistent with its declared TargetType. Catches bugs where a checker
@@ -294,20 +271,10 @@ func UnregisterRelated(shortName string) {
 }
 
 // FetchByIDsFunc fetches specific resource instances by ID, bypassing any
-// filter the top-level paginated fetcher applies. It exists to resolve the
-// filtered-target drill-to-empty bug class: when a reverse-scan target has a
-// selective list fetcher (kms customer-managed only, ami owners=self, ebs-snap
-// owners=self, policy scope=local, etc.) and a checker emits an ID that falls
-// outside that filter, the drill would otherwise land on an empty list. The
-// related-check orchestrator calls FetchByIDs with any IDs missing from the
-// cache, so AWS-managed KMS keys, public AMIs, cross-account snapshots, and
-// AWS-managed IAM policies can still be drilled into when some other
-// resource references them.
-//
-// Implementations MUST NOT apply the owner/scope/manager filter their
-// sibling paginated fetcher uses — returning an empty slice for an ID that
-// AWS knows about defeats the whole point.
-type FetchByIDsFunc func(ctx context.Context, clients any, ids []string) ([]Resource, error)
+// filter the top-level paginated fetcher applies.
+// Declaration lives in internal/domain/contracts.go; this alias keeps
+// existing consumers compiling. Deleted in PR-04n.
+type FetchByIDsFunc = domain.FetchByIDsFunc
 
 // fetchByIDsRegistry maps target resource short name to its FetchByIDs helper.
 var fetchByIDsRegistry = map[string]FetchByIDsFunc{}

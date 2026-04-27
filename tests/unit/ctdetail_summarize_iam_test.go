@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/aws/ctdetail"
+	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
 )
 
 // TestCTDetailSummarizeIAM_CreateRole verifies that SummarizeIAM emits rows for residual
@@ -19,7 +19,7 @@ func TestCTDetailSummarizeIAM_CreateRole(t *testing.T) {
 		"path":                     "/",
 		"description":              "Admin access",
 	}
-	rows := ctdetail.SummarizeIAM("CreateRole", params)
+	rows := ctevent.SummarizeIAM("CreateRole", params)
 	if rows == nil {
 		t.Fatal("SummarizeIAM(CreateRole) returned nil; want non-nil slice")
 	}
@@ -44,7 +44,7 @@ func TestCTDetailSummarizeIAM_CreateRole(t *testing.T) {
 // (catch-all: ends in "Name"), the summarizer receives empty params and returns []Row{}.
 func TestCTDetailSummarizeIAM_DeleteRole(t *testing.T) {
 	// cleaned params after TARGET extraction removes roleName
-	rows := ctdetail.SummarizeIAM("DeleteRole", map[string]any{})
+	rows := ctevent.SummarizeIAM("DeleteRole", map[string]any{})
 	if rows == nil {
 		t.Fatal("SummarizeIAM(DeleteRole, {}) returned nil; want non-nil []Row{}")
 	}
@@ -61,11 +61,11 @@ func TestCTDetailSummarizeIAM_AttachRolePolicy(t *testing.T) {
 	params := map[string]any{
 		"policyArn": "arn:aws:iam::aws:policy/AdministratorAccess",
 	}
-	rows := ctdetail.SummarizeIAM("AttachRolePolicy", params)
+	rows := ctevent.SummarizeIAM("AttachRolePolicy", params)
 	if rows == nil {
 		t.Fatal("SummarizeIAM(AttachRolePolicy) returned nil; want non-nil slice")
 	}
-	var policyRow *ctdetail.Row
+	var policyRow *ctevent.Row
 	for i := range rows {
 		if rows[i].Key == "policyArn" {
 			policyRow = &rows[i]
@@ -98,12 +98,12 @@ func TestCTDetailSummarizeIAM_CreateAccessKey(t *testing.T) {
 	paramsWithUser := map[string]any{
 		"userName": "bob",
 	}
-	rows := ctdetail.SummarizeIAM("CreateAccessKey", paramsWithUser)
+	rows := ctevent.SummarizeIAM("CreateAccessKey", paramsWithUser)
 	if rows == nil {
 		t.Fatal("SummarizeIAM(CreateAccessKey, with userName) returned nil")
 	}
 	// Scenario B: userName already lifted (empty cleaned params)
-	rowsEmpty := ctdetail.SummarizeIAM("CreateAccessKey", map[string]any{})
+	rowsEmpty := ctevent.SummarizeIAM("CreateAccessKey", map[string]any{})
 	if rowsEmpty == nil {
 		t.Fatal("SummarizeIAM(CreateAccessKey, {}) returned nil")
 	}
@@ -114,7 +114,7 @@ func TestCTDetailSummarizeIAM_CreateAccessKey(t *testing.T) {
 // in target.go, so cleaned params arrive empty.
 func TestCTDetailSummarizeIAM_PassRole(t *testing.T) {
 	// cleaned params: roleArn lifted by extractByEventName (AssumeRole table)
-	rows := ctdetail.SummarizeIAM("PassRole", map[string]any{})
+	rows := ctevent.SummarizeIAM("PassRole", map[string]any{})
 	if rows == nil {
 		t.Fatal("SummarizeIAM(PassRole, {}) returned nil; want non-nil []Row{}")
 	}
@@ -137,7 +137,7 @@ func TestCTDetailSummarizeIAM_PolicyArnNavigability(t *testing.T) {
 		params := map[string]any{
 			"policyArn": "arn:aws:iam::111111111111:policy/MyPolicy",
 		}
-		rows := ctdetail.SummarizeIAM(tc.eventName, params)
+		rows := ctevent.SummarizeIAM(tc.eventName, params)
 		for i, r := range rows {
 			if r.Key == "policyArn" {
 				if r.IsNavigable && r.TargetType != "policy" {
@@ -163,7 +163,7 @@ func TestCTDetailSummarizeIAM_PurityNoMutation(t *testing.T) {
 		"nested":                   map[string]any{"k": "v"},
 	}
 	before := deepCopyParams(params)
-	_ = ctdetail.SummarizeIAM("CreateRole", params)
+	_ = ctevent.SummarizeIAM("CreateRole", params)
 	if !reflect.DeepEqual(params, before) {
 		t.Fatalf("SummarizeIAM mutated input params: got %v, want %v", params, before)
 	}
@@ -181,7 +181,7 @@ func TestCTDetailSummarizeIAM_SeverityNeverSet(t *testing.T) {
 		{"DeleteRole", map[string]any{}},
 	}
 	for _, tc := range cases {
-		rows := ctdetail.SummarizeIAM(tc.eventName, tc.params)
+		rows := ctevent.SummarizeIAM(tc.eventName, tc.params)
 		for i, r := range rows {
 			if r.Severity != "" {
 				t.Errorf("[%s] row[%d] key=%q: Severity=%q; summarizers must never set Severity",
@@ -195,14 +195,14 @@ func TestCTDetailSummarizeIAM_SeverityNeverSet(t *testing.T) {
 // does not panic and returns a non-nil slice.
 func TestCTDetailSummarizeIAM_UnknownEvent(t *testing.T) {
 	params := map[string]any{"someField": "someValue"}
-	var rows []ctdetail.Row
+	var rows []ctevent.Row
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
 				t.Fatalf("SummarizeIAM panicked on unknown event: %v", r)
 			}
 		}()
-		rows = ctdetail.SummarizeIAM("SomeUnrecognizedIAMEvent", params)
+		rows = ctevent.SummarizeIAM("SomeUnrecognizedIAMEvent", params)
 	}()
 	if rows == nil {
 		t.Fatal("SummarizeIAM(unknown event) returned nil; want non-nil slice")

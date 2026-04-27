@@ -4,41 +4,41 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/aws/ctdetail"
+	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
 )
 
-// sessionIssuer is a helper to build a *ctdetail.SessionContext with a SessionIssuer.
-func sessionIssuer(issuerUserName string) *ctdetail.SessionContext {
-	return &ctdetail.SessionContext{
-		SessionIssuer: &ctdetail.SessionIssuer{
+// sessionIssuer is a helper to build a *ctevent.SessionContext with a SessionIssuer.
+func sessionIssuer(issuerUserName string) *ctevent.SessionContext {
+	return &ctevent.SessionContext{
+		SessionIssuer: &ctevent.SessionIssuer{
 			UserName: issuerUserName,
 		},
 	}
 }
 
-// sessionIssuerWithIdentity builds a *ctdetail.SessionContext with both
+// sessionIssuerWithIdentity builds a *ctevent.SessionContext with both
 // a SessionIssuer and a SourceIdentity (used for IdentityCenter/SSO).
-func sessionIssuerWithIdentity(issuerUserName, sourceIdentity string) *ctdetail.SessionContext {
-	return &ctdetail.SessionContext{
-		SessionIssuer: &ctdetail.SessionIssuer{
+func sessionIssuerWithIdentity(issuerUserName, sourceIdentity string) *ctevent.SessionContext {
+	return &ctevent.SessionContext{
+		SessionIssuer: &ctevent.SessionIssuer{
 			UserName: issuerUserName,
 		},
 		SourceIdentity: sourceIdentity,
 	}
 }
 
-// sessionWithWebID builds a *ctdetail.SessionContext with WebIDFederationData (used for IRSA).
-func sessionWithWebID(federatedProvider string) *ctdetail.SessionContext {
-	return &ctdetail.SessionContext{
-		WebIDFederationData: &ctdetail.WebIDFederationData{
+// sessionWithWebID builds a *ctevent.SessionContext with WebIDFederationData (used for IRSA).
+func sessionWithWebID(federatedProvider string) *ctevent.SessionContext {
+	return &ctevent.SessionContext{
+		WebIDFederationData: &ctevent.WebIDFederationData{
 			FederatedProvider: federatedProvider,
 		},
 	}
 }
 
 // eventWithIdentity is a convenience constructor: all other Event fields are zero values.
-func eventWithIdentity(ui ctdetail.UserIdentity) *ctdetail.Event {
-	return &ctdetail.Event{UserIdentity: ui}
+func eventWithIdentity(ui ctevent.UserIdentity) *ctevent.Event {
+	return &ctevent.Event{UserIdentity: ui}
 }
 
 // TestCTDetailActor covers all 12 userIdentity variants (taxonomy §4) plus edge cases.
@@ -46,7 +46,7 @@ func eventWithIdentity(ui ctdetail.UserIdentity) *ctdetail.Event {
 func TestCTDetailActor(t *testing.T) {
 	type tc struct {
 		name     string
-		identity ctdetail.UserIdentity
+		identity ctevent.UserIdentity
 		// mustContain lists substrings that MUST appear in the result.
 		mustContain []string
 	}
@@ -56,7 +56,7 @@ func TestCTDetailActor(t *testing.T) {
 		// ARN format: arn:aws:iam::<account>:user/<username>
 		{
 			name: "IAMUser",
-			identity: ctdetail.UserIdentity{
+			identity: ctevent.UserIdentity{
 				Type:     "IAMUser",
 				ARN:      "arn:aws:iam::333333333333:user/bob",
 				UserName: "bob",
@@ -68,7 +68,7 @@ func TestCTDetailActor(t *testing.T) {
 		// ARN format: arn:aws:sts::<account>:assumed-role/<role-name>/<session-label>
 		{
 			name: "AssumedRole",
-			identity: ctdetail.UserIdentity{
+			identity: ctevent.UserIdentity{
 				Type:           "AssumedRole",
 				ARN:            "arn:aws:sts::111111111111:assumed-role/KarpenterNodeRole/karpenter-1759",
 				SessionContext: sessionIssuer("KarpenterNodeRole"),
@@ -80,7 +80,7 @@ func TestCTDetailActor(t *testing.T) {
 		// SourceIdentity is the human email; the role name encodes the permission set.
 		{
 			name: "IdentityCenterUser_SSO",
-			identity: ctdetail.UserIdentity{
+			identity: ctevent.UserIdentity{
 				Type: "AssumedRole",
 				ARN:  "arn:aws:sts::222222222222:assumed-role/AWSReservedSSO_AdminAccess_3c4d5e6f7a8b9c0d/alice@corp",
 				SessionContext: sessionIssuerWithIdentity(
@@ -94,7 +94,7 @@ func TestCTDetailActor(t *testing.T) {
 		// Case 4 — Root
 		{
 			name: "Root",
-			identity: ctdetail.UserIdentity{
+			identity: ctevent.UserIdentity{
 				Type: "Root",
 				ARN:  "arn:aws:iam::555555555555:root",
 			},
@@ -105,7 +105,7 @@ func TestCTDetailActor(t *testing.T) {
 		// There is no ARN for service events; InvokedBy carries the service FQDN.
 		{
 			name: "AWSService",
-			identity: ctdetail.UserIdentity{
+			identity: ctevent.UserIdentity{
 				Type:      "AWSService",
 				InvokedBy: "kms.amazonaws.com",
 			},
@@ -115,7 +115,7 @@ func TestCTDetailActor(t *testing.T) {
 		// Case 6 — WebIdentityUser / IRSA (Kubernetes service account via OIDC)
 		{
 			name: "WebIdentityUser_IRSA",
-			identity: ctdetail.UserIdentity{
+			identity: ctevent.UserIdentity{
 				Type: "AssumedRole",
 				ARN:  "arn:aws:sts::666666666666:assumed-role/eks-checkout-svc-sa/1717156821993453824",
 				SessionContext: sessionWithWebID(
@@ -128,7 +128,7 @@ func TestCTDetailActor(t *testing.T) {
 		// Case 7 — FederatedUser
 		{
 			name: "FederatedUser",
-			identity: ctdetail.UserIdentity{
+			identity: ctevent.UserIdentity{
 				Type:     "FederatedUser",
 				UserName: "alice",
 			},
@@ -138,7 +138,7 @@ func TestCTDetailActor(t *testing.T) {
 		// Case 8 — SAMLUser
 		{
 			name: "SAMLUser",
-			identity: ctdetail.UserIdentity{
+			identity: ctevent.UserIdentity{
 				Type:     "SAMLUser",
 				UserName: "alice@example.com",
 			},
@@ -148,7 +148,7 @@ func TestCTDetailActor(t *testing.T) {
 		// Case 9 — AWSAccount (cross-account delegation, no role assumption)
 		{
 			name: "AWSAccount",
-			identity: ctdetail.UserIdentity{
+			identity: ctevent.UserIdentity{
 				Type:      "AWSAccount",
 				AccountID: "999988887777",
 			},
@@ -159,7 +159,7 @@ func TestCTDetailActor(t *testing.T) {
 		// Must not panic and must return a non-empty string.
 		{
 			name: "UnknownType_Directory",
-			identity: ctdetail.UserIdentity{
+			identity: ctevent.UserIdentity{
 				Type:      "Directory",
 				AccountID: "444444444444",
 			},
@@ -170,7 +170,7 @@ func TestCTDetailActor(t *testing.T) {
 		// The function MUST NOT return "".
 		{
 			name:        "EmptyUserIdentity",
-			identity:    ctdetail.UserIdentity{},
+			identity:    ctevent.UserIdentity{},
 			mustContain: []string{}, // only non-empty is asserted below
 		},
 
@@ -179,7 +179,7 @@ func TestCTDetailActor(t *testing.T) {
 		// CONTEXT concern (design §2.4), so the result must contain "bob" regardless.
 		{
 			name: "CrossAccount_DoesNotChangeActor",
-			identity: ctdetail.UserIdentity{
+			identity: ctevent.UserIdentity{
 				Type:     "IAMUser",
 				ARN:      "arn:aws:iam::333333333333:user/bob",
 				UserName: "bob",
@@ -191,7 +191,7 @@ func TestCTDetailActor(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			event := eventWithIdentity(c.identity)
-			got := ctdetail.Actor(event)
+			got := ctevent.Actor(event)
 
 			// Primary contract: never return an empty string.
 			if got == "" {
@@ -212,26 +212,26 @@ func TestCTDetailActor(t *testing.T) {
 // cross-account flag (recipientAccountId != accountId) does not alter the
 // Actor string — per design doc §2.4, cross-account is a CONTEXT concern.
 func TestCTDetailActor_CrossAccountIdenticalToSameAccount(t *testing.T) {
-	identity := ctdetail.UserIdentity{
+	identity := ctevent.UserIdentity{
 		Type:      "IAMUser",
 		ARN:       "arn:aws:iam::333333333333:user/bob",
 		UserName:  "bob",
 		AccountID: "333333333333",
 	}
 
-	sameAccount := &ctdetail.Event{
+	sameAccount := &ctevent.Event{
 		UserIdentity:       identity,
 		AccountID:          "333333333333",
 		RecipientAccountID: "333333333333",
 	}
-	crossAccount := &ctdetail.Event{
+	crossAccount := &ctevent.Event{
 		UserIdentity:       identity,
 		AccountID:          "333333333333",
 		RecipientAccountID: "777777777777",
 	}
 
-	same := ctdetail.Actor(sameAccount)
-	cross := ctdetail.Actor(crossAccount)
+	same := ctevent.Actor(sameAccount)
+	cross := ctevent.Actor(crossAccount)
 
 	if same != cross {
 		t.Errorf("Actor() differs for cross-account vs same-account:\n  same-account = %q\n  cross-account = %q\n  want identical", same, cross)

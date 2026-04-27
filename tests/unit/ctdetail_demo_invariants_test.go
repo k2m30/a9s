@@ -28,7 +28,7 @@ import (
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/aws/ctdetail"
+	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
@@ -56,9 +56,9 @@ func loadAllCTFixtures(t *testing.T) []resource.Resource {
 }
 
 // parseCTEventForFixture parses the CloudTrailEvent JSON blob from the fixture's
-// RawStruct and returns a *ctdetail.Event via ctdetail.Parse.
+// RawStruct and returns a *ctevent.Event via ctevent.Parse.
 // Fatals if the fixture has no RawStruct, no CloudTrailEvent, or parse fails.
-func parseCTEventForFixture(t *testing.T, res resource.Resource) *ctdetail.Event {
+func parseCTEventForFixture(t *testing.T, res resource.Resource) *ctevent.Event {
 	t.Helper()
 	evt, ok := res.RawStruct.(cloudtrailtypes.Event)
 	if !ok {
@@ -67,9 +67,9 @@ func parseCTEventForFixture(t *testing.T, res resource.Resource) *ctdetail.Event
 	if evt.CloudTrailEvent == nil || *evt.CloudTrailEvent == "" {
 		t.Fatalf("fixture %q: CloudTrailEvent JSON is empty", res.ID)
 	}
-	parsed, err := ctdetail.Parse(*evt.CloudTrailEvent)
+	parsed, err := ctevent.Parse(*evt.CloudTrailEvent)
 	if err != nil {
-		t.Fatalf("fixture %q: ctdetail.Parse failed: %v", res.ID, err)
+		t.Fatalf("fixture %q: ctevent.Parse failed: %v", res.ID, err)
 	}
 	return parsed
 }
@@ -170,7 +170,7 @@ func isRootFixture(res resource.Resource) bool {
 // ---------------------------------------------------------------------------
 
 // TestCtEventsDemoLeftColumnNavigable iterates all 12 demo fixtures × every
-// navigable row produced by ctdetail.BuildSections and asserts:
+// navigable row produced by ctevent.BuildSections and asserts:
 //
 //	L1: IsNavigable rows must have a non-empty TargetType.
 //	L2: TargetType must resolve via resource.ResolveNavigationTarget.
@@ -189,7 +189,7 @@ func TestCtEventsDemoLeftColumnNavigable(t *testing.T) {
 	for _, res := range fixtures {
 		t.Run(res.ID, func(t *testing.T) {
 			parsed := parseCTEventForFixture(t, res)
-			sections := ctdetail.BuildSections(parsed)
+			sections := ctevent.BuildSections(parsed)
 
 			isRoot := isRootFixture(res)
 
@@ -209,7 +209,7 @@ func TestCtEventsDemoLeftColumnNavigable(t *testing.T) {
 					}
 
 					// L4 (Bug D): Root-identity events must not have a navigable Principal.
-					if isRoot && section.Name == ctdetail.SectionActor && row.Key == "Principal" {
+					if isRoot && section.Name == ctevent.SectionActor && row.Key == "Principal" {
 						t.Errorf("L4 (Bug D) FAIL: Root event has navigable Principal row — %s", rowLabel)
 					}
 

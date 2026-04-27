@@ -1,6 +1,6 @@
 package unit
 
-// Tests for ctdetail.ExtractTarget — the TARGET section extraction function.
+// Tests for ctevent.ExtractTarget — the TARGET section extraction function.
 //
 // Contract (per specs/013-ct-event-detail-v2/contracts/ctdetail-api.md and
 // docs/design/ct-event-detail-v2.md §2.3):
@@ -19,7 +19,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/aws/ctdetail"
+	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
 )
 
 // ---------------------------------------------------------------------------
@@ -38,8 +38,8 @@ func copyParams(m map[string]any) map[string]any {
 	return out
 }
 
-// rowKeys extracts the Key fields from a []ctdetail.Row for compact assertions.
-func rowKeys(rows []ctdetail.Row) []string {
+// rowKeys extracts the Key fields from a []ctevent.Row for compact assertions.
+func rowKeys(rows []ctevent.Row) []string {
 	out := make([]string, len(rows))
 	for i, r := range rows {
 		out[i] = r.Key
@@ -47,8 +47,8 @@ func rowKeys(rows []ctdetail.Row) []string {
 	return out
 }
 
-// rowValues extracts the Value fields from a []ctdetail.Row.
-func rowValues(rows []ctdetail.Row) []string {
+// rowValues extracts the Value fields from a []ctevent.Row.
+func rowValues(rows []ctevent.Row) []string {
 	out := make([]string, len(rows))
 	for i, r := range rows {
 		out[i] = r.Value
@@ -57,7 +57,7 @@ func rowValues(rows []ctdetail.Row) []string {
 }
 
 // findRowValue returns the first Row.Value whose Row.Key equals key, or "".
-func findRowValue(rows []ctdetail.Row, key string) string {
+func findRowValue(rows []ctevent.Row, key string) string {
 	for _, r := range rows {
 		if r.Key == key {
 			return r.Value
@@ -72,10 +72,10 @@ func findRowValue(rows []ctdetail.Row, key string) string {
 
 func TestCTDetailExtractTarget_ResourcesEnvelope_SingleBucketARN(t *testing.T) {
 	// arn:aws:s3:::prod-logs → stripped to "prod-logs", Key = "Bucket"
-	resources := []ctdetail.ResourceRef{
+	resources := []ctevent.ResourceRef{
 		{ARN: "arn:aws:s3:::prod-logs", AccountID: "", Type: "AWS::S3::Bucket"},
 	}
-	rows, _ := ctdetail.ExtractTarget("GetObject", "s3.amazonaws.com", "", resources, nil)
+	rows, _ := ctevent.ExtractTarget("GetObject", "s3.amazonaws.com", "", resources, nil)
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row from resources[] envelope, got 0")
 	}
@@ -86,14 +86,14 @@ func TestCTDetailExtractTarget_ResourcesEnvelope_SingleBucketARN(t *testing.T) {
 
 func TestCTDetailExtractTarget_ResourcesEnvelope_InstanceARN(t *testing.T) {
 	// arn:aws:ec2:eu-west-1:222222222222:instance/i-foo → "instance/i-foo", Key = "Instance"
-	resources := []ctdetail.ResourceRef{
+	resources := []ctevent.ResourceRef{
 		{
 			ARN:       "arn:aws:ec2:eu-west-1:222222222222:instance/i-foo",
 			AccountID: "222222222222",
 			Type:      "AWS::EC2::Instance",
 		},
 	}
-	rows, _ := ctdetail.ExtractTarget("TerminateInstances", "ec2.amazonaws.com", "", resources, nil)
+	rows, _ := ctevent.ExtractTarget("TerminateInstances", "ec2.amazonaws.com", "", resources, nil)
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row from resources[] envelope, got 0")
 	}
@@ -105,11 +105,11 @@ func TestCTDetailExtractTarget_ResourcesEnvelope_InstanceARN(t *testing.T) {
 
 func TestCTDetailExtractTarget_ResourcesEnvelope_MultipleInstances_TwoRows(t *testing.T) {
 	// Case B: two instance resources → two Rows, both labeled "Instance"
-	resources := []ctdetail.ResourceRef{
+	resources := []ctevent.ResourceRef{
 		{ARN: "arn:aws:ec2:us-east-1:333333333333:instance/i-aaa", AccountID: "333333333333", Type: "AWS::EC2::Instance"},
 		{ARN: "arn:aws:ec2:us-east-1:333333333333:instance/i-bbb", AccountID: "333333333333", Type: "AWS::EC2::Instance"},
 	}
-	rows, _ := ctdetail.ExtractTarget("TerminateInstances", "ec2.amazonaws.com", "", resources, nil)
+	rows, _ := ctevent.ExtractTarget("TerminateInstances", "ec2.amazonaws.com", "", resources, nil)
 	if len(rows) != 2 {
 		t.Fatalf("expected 2 rows for 2 resources[], got %d", len(rows))
 	}
@@ -128,10 +128,10 @@ func TestCTDetailExtractTarget_ResourcesEnvelope_MultipleInstances_TwoRows(t *te
 }
 
 func TestCTDetailExtractTarget_ResourcesEnvelope_RoleARN(t *testing.T) {
-	resources := []ctdetail.ResourceRef{
+	resources := []ctevent.ResourceRef{
 		{ARN: "arn:aws:iam::222222222222:role/Admin", AccountID: "222222222222", Type: "AWS::IAM::Role"},
 	}
-	rows, _ := ctdetail.ExtractTarget("AssumeRole", "sts.amazonaws.com", "", resources, nil)
+	rows, _ := ctevent.ExtractTarget("AssumeRole", "sts.amazonaws.com", "", resources, nil)
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row from resources[] envelope, got 0")
 	}
@@ -144,10 +144,10 @@ func TestCTDetailExtractTarget_ResourcesEnvelope_RoleARN(t *testing.T) {
 }
 
 func TestCTDetailExtractTarget_ResourcesEnvelope_UserARN(t *testing.T) {
-	resources := []ctdetail.ResourceRef{
+	resources := []ctevent.ResourceRef{
 		{ARN: "arn:aws:iam::555555555555:user/bob", AccountID: "555555555555", Type: "AWS::IAM::User"},
 	}
-	rows, _ := ctdetail.ExtractTarget("GetUser", "iam.amazonaws.com", "", resources, nil)
+	rows, _ := ctevent.ExtractTarget("GetUser", "iam.amazonaws.com", "", resources, nil)
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row from resources[] envelope, got 0")
 	}
@@ -160,10 +160,10 @@ func TestCTDetailExtractTarget_ResourcesEnvelope_UserARN(t *testing.T) {
 }
 
 func TestCTDetailExtractTarget_ResourcesEnvelope_KMSKeyARN(t *testing.T) {
-	resources := []ctdetail.ResourceRef{
+	resources := []ctevent.ResourceRef{
 		{ARN: "arn:aws:kms:us-east-1:444444444444:key/uuid-1234", AccountID: "444444444444", Type: "AWS::KMS::Key"},
 	}
-	rows, _ := ctdetail.ExtractTarget("Decrypt", "kms.amazonaws.com", "", resources, nil)
+	rows, _ := ctevent.ExtractTarget("Decrypt", "kms.amazonaws.com", "", resources, nil)
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row from resources[] envelope, got 0")
 	}
@@ -176,10 +176,10 @@ func TestCTDetailExtractTarget_ResourcesEnvelope_KMSKeyARN(t *testing.T) {
 }
 
 func TestCTDetailExtractTarget_ResourcesEnvelope_SecretARN(t *testing.T) {
-	resources := []ctdetail.ResourceRef{
+	resources := []ctevent.ResourceRef{
 		{ARN: "arn:aws:secretsmanager:us-east-1:111111111111:secret:foo-AbCd", AccountID: "111111111111", Type: "AWS::SecretsManager::Secret"},
 	}
-	rows, _ := ctdetail.ExtractTarget("GetSecretValue", "secretsmanager.amazonaws.com", "", resources, nil)
+	rows, _ := ctevent.ExtractTarget("GetSecretValue", "secretsmanager.amazonaws.com", "", resources, nil)
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row from resources[] envelope, got 0")
 	}
@@ -197,10 +197,10 @@ func TestCTDetailExtractTarget_ResourcesEnvelope_SecretARN(t *testing.T) {
 
 func TestCTDetailExtractTarget_ARNStrip_S3BucketARN(t *testing.T) {
 	// arn:aws:s3:::prod-logs → "prod-logs" (empty account segment)
-	resources := []ctdetail.ResourceRef{
+	resources := []ctevent.ResourceRef{
 		{ARN: "arn:aws:s3:::prod-logs", AccountID: "", Type: "AWS::S3::Bucket"},
 	}
-	rows, _ := ctdetail.ExtractTarget("PutObject", "s3.amazonaws.com", "", resources, nil)
+	rows, _ := ctevent.ExtractTarget("PutObject", "s3.amazonaws.com", "", resources, nil)
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row, got 0")
 	}
@@ -219,10 +219,10 @@ func TestCTDetailExtractTarget_ARNStrip_S3BucketARN(t *testing.T) {
 
 func TestCTDetailExtractTarget_ARNStrip_EC2InstanceARN(t *testing.T) {
 	// arn:aws:ec2:eu-west-1:222222222222:instance/i-foo → "instance/i-foo"
-	resources := []ctdetail.ResourceRef{
+	resources := []ctevent.ResourceRef{
 		{ARN: "arn:aws:ec2:eu-west-1:222222222222:instance/i-foo", AccountID: "222222222222", Type: "AWS::EC2::Instance"},
 	}
-	rows, _ := ctdetail.ExtractTarget("DescribeInstances", "ec2.amazonaws.com", "", resources, nil)
+	rows, _ := ctevent.ExtractTarget("DescribeInstances", "ec2.amazonaws.com", "", resources, nil)
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row, got 0")
 	}
@@ -233,10 +233,10 @@ func TestCTDetailExtractTarget_ARNStrip_EC2InstanceARN(t *testing.T) {
 
 func TestCTDetailExtractTarget_ARNStrip_KMSKeyARN(t *testing.T) {
 	// arn:aws:kms:us-east-1:444444444444:key/uuid → "key/uuid"
-	resources := []ctdetail.ResourceRef{
+	resources := []ctevent.ResourceRef{
 		{ARN: "arn:aws:kms:us-east-1:444444444444:key/uuid", AccountID: "444444444444", Type: "AWS::KMS::Key"},
 	}
-	rows, _ := ctdetail.ExtractTarget("Decrypt", "kms.amazonaws.com", "", resources, nil)
+	rows, _ := ctevent.ExtractTarget("Decrypt", "kms.amazonaws.com", "", resources, nil)
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row, got 0")
 	}
@@ -247,10 +247,10 @@ func TestCTDetailExtractTarget_ARNStrip_KMSKeyARN(t *testing.T) {
 
 func TestCTDetailExtractTarget_ARNStrip_IAMUserARN(t *testing.T) {
 	// arn:aws:iam::555555555555:user/bob → "user/bob"
-	resources := []ctdetail.ResourceRef{
+	resources := []ctevent.ResourceRef{
 		{ARN: "arn:aws:iam::555555555555:user/bob", AccountID: "555555555555", Type: "AWS::IAM::User"},
 	}
-	rows, _ := ctdetail.ExtractTarget("GetUser", "iam.amazonaws.com", "", resources, nil)
+	rows, _ := ctevent.ExtractTarget("GetUser", "iam.amazonaws.com", "", resources, nil)
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row, got 0")
 	}
@@ -278,7 +278,7 @@ func TestCTDetailExtractTarget_CrossAccountARN_RetainsAccountPrefix(t *testing.T
 	// the cross-account detection relies on the ARN account being non-empty and
 	// resources[].AccountID being checked against the event's recipientAccountId.
 	// We assert the output contains "888888888888" to verify cross-account retention.
-	resources := []ctdetail.ResourceRef{
+	resources := []ctevent.ResourceRef{
 		{
 			ARN:       "arn:aws:iam::888888888888:role/CrossAccountRole",
 			AccountID: "888888888888", // cross-account — differs from caller's 777777777777
@@ -288,7 +288,7 @@ func TestCTDetailExtractTarget_CrossAccountARN_RetainsAccountPrefix(t *testing.T
 	// The event's recipient account is 777777777777 — passed as recipientAccountID.
 	// The implementation detects the mismatch: ARN account (888888888888) != recipientAccountID (777777777777).
 	// We verify the Value contains the cross-account indicator.
-	rows, _ := ctdetail.ExtractTarget("AssumeRole", "sts.amazonaws.com", "777777777777", resources, nil)
+	rows, _ := ctevent.ExtractTarget("AssumeRole", "sts.amazonaws.com", "777777777777", resources, nil)
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row, got 0")
 	}
@@ -415,7 +415,7 @@ func TestCTDetailExtractTarget_FallbackTable(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			rows, _ := ctdetail.ExtractTarget(c.eventName, c.eventSource, "", nil, c.params)
+			rows, _ := ctevent.ExtractTarget(c.eventName, c.eventSource, "", nil, c.params)
 
 			if c.wantRowCount > 0 && len(rows) < c.wantRowCount {
 				t.Errorf("len(rows) = %d; want >= %d", len(rows), c.wantRowCount)
@@ -462,7 +462,7 @@ func TestCTDetailExtractTarget_PutObject_BucketAndObjectRows(t *testing.T) {
 		"bucketName": "logs",
 		"key":        "app.log",
 	}
-	rows, _ := ctdetail.ExtractTarget("PutObject", "s3.amazonaws.com", "", nil, params)
+	rows, _ := ctevent.ExtractTarget("PutObject", "s3.amazonaws.com", "", nil, params)
 	if len(rows) < 2 {
 		t.Fatalf("expected >= 2 rows for PutObject (Bucket + Object), got %d", len(rows))
 	}
@@ -484,7 +484,7 @@ func TestCTDetailExtractTarget_GetObject_BucketAndObjectRows(t *testing.T) {
 		"bucketName": "assets",
 		"key":        "images/logo.png",
 	}
-	rows, _ := ctdetail.ExtractTarget("GetObject", "s3.amazonaws.com", "", nil, params)
+	rows, _ := ctevent.ExtractTarget("GetObject", "s3.amazonaws.com", "", nil, params)
 	if len(rows) < 2 {
 		t.Fatalf("expected >= 2 rows for GetObject (Bucket + Object), got %d", len(rows))
 	}
@@ -504,7 +504,7 @@ func TestCTDetailExtractTarget_DeleteObject_BucketAndObjectRows(t *testing.T) {
 		"bucketName": "backups",
 		"key":        "2026/report.zip",
 	}
-	rows, _ := ctdetail.ExtractTarget("DeleteObject", "s3.amazonaws.com", "", nil, params)
+	rows, _ := ctevent.ExtractTarget("DeleteObject", "s3.amazonaws.com", "", nil, params)
 	if len(rows) < 2 {
 		t.Fatalf("expected >= 2 rows for DeleteObject (Bucket + Object), got %d", len(rows))
 	}
@@ -526,7 +526,7 @@ func TestCTDetailExtractTarget_Dedup_PutObject_RemovesBucketAndKey(t *testing.T)
 		"key":        "app.log",
 		"versionId":  "abc",
 	}
-	_, cleaned := ctdetail.ExtractTarget("PutObject", "s3.amazonaws.com", "", nil, params)
+	_, cleaned := ctevent.ExtractTarget("PutObject", "s3.amazonaws.com", "", nil, params)
 
 	if cleaned == nil {
 		t.Fatal("cleanedParams is nil; want non-nil map")
@@ -552,7 +552,7 @@ func TestCTDetailExtractTarget_Dedup_TerminateInstances_RemovesInstanceIds(t *te
 			},
 		},
 	}
-	_, cleaned := ctdetail.ExtractTarget("TerminateInstances", "ec2.amazonaws.com", "", nil, params)
+	_, cleaned := ctevent.ExtractTarget("TerminateInstances", "ec2.amazonaws.com", "", nil, params)
 
 	if cleaned == nil {
 		t.Fatal("cleanedParams is nil; want non-nil map")
@@ -577,7 +577,7 @@ func TestCTDetailExtractTarget_Dedup_NoExtractableParams_CleanedUnchanged(t *tes
 	params := map[string]any{
 		"filterSet": map[string]any{"items": []any{}},
 	}
-	_, cleaned := ctdetail.ExtractTarget("DescribeInstances", "ec2.amazonaws.com", "", nil, params)
+	_, cleaned := ctevent.ExtractTarget("DescribeInstances", "ec2.amazonaws.com", "", nil, params)
 	if cleaned == nil {
 		t.Fatal("cleanedParams is nil; want non-nil map (same as input)")
 	}
@@ -598,7 +598,7 @@ func TestCTDetailExtractTarget_Purity_PutObject_DoesNotMutateInput(t *testing.T)
 	}
 	snapshot := copyParams(params)
 
-	ctdetail.ExtractTarget("PutObject", "s3.amazonaws.com", "", nil, params)
+	ctevent.ExtractTarget("PutObject", "s3.amazonaws.com", "", nil, params)
 
 	if !reflect.DeepEqual(params, snapshot) {
 		t.Errorf("params was mutated by ExtractTarget:\n  before: %v\n  after:  %v", snapshot, params)
@@ -612,7 +612,7 @@ func TestCTDetailExtractTarget_Purity_AssumeRole_DoesNotMutateInput(t *testing.T
 	}
 	snapshot := copyParams(params)
 
-	ctdetail.ExtractTarget("AssumeRole", "sts.amazonaws.com", "", nil, params)
+	ctevent.ExtractTarget("AssumeRole", "sts.amazonaws.com", "", nil, params)
 
 	if !reflect.DeepEqual(params, snapshot) {
 		t.Errorf("params was mutated by ExtractTarget:\n  before: %v\n  after:  %v", snapshot, params)
@@ -621,7 +621,7 @@ func TestCTDetailExtractTarget_Purity_AssumeRole_DoesNotMutateInput(t *testing.T
 
 func TestCTDetailExtractTarget_Purity_NilParams_ReturnsNonNilCleaned(t *testing.T) {
 	// Guarantees: cleanedParams is always non-nil.
-	_, cleaned := ctdetail.ExtractTarget("ListBuckets", "s3.amazonaws.com", "", nil, nil)
+	_, cleaned := ctevent.ExtractTarget("ListBuckets", "s3.amazonaws.com", "", nil, nil)
 	if cleaned == nil {
 		t.Error("cleanedParams is nil when params is nil; contract requires non-nil return")
 	}
@@ -634,56 +634,56 @@ func TestCTDetailExtractTarget_Purity_NilParams_ReturnsNonNilCleaned(t *testing.
 func TestCTDetailExtractTarget_LabelDerivation_Table(t *testing.T) {
 	type tc struct {
 		name      string
-		resources []ctdetail.ResourceRef
+		resources []ctevent.ResourceRef
 		wantKey   string
 	}
 
 	cases := []tc{
 		{
 			name: "BucketARN_LabelBucket",
-			resources: []ctdetail.ResourceRef{
+			resources: []ctevent.ResourceRef{
 				{ARN: "arn:aws:s3:::my-bucket", Type: "AWS::S3::Bucket"},
 			},
 			wantKey: "Bucket",
 		},
 		{
 			name: "ObjectARN_LabelObject",
-			resources: []ctdetail.ResourceRef{
+			resources: []ctevent.ResourceRef{
 				{ARN: "arn:aws:s3:::my-bucket/obj.txt", Type: "AWS::S3::Object"},
 			},
 			wantKey: "Object",
 		},
 		{
 			name: "InstanceARN_LabelInstance",
-			resources: []ctdetail.ResourceRef{
+			resources: []ctevent.ResourceRef{
 				{ARN: "arn:aws:ec2:us-east-1:333333333333:instance/i-abc", AccountID: "333333333333", Type: "AWS::EC2::Instance"},
 			},
 			wantKey: "Instance",
 		},
 		{
 			name: "RoleARN_LabelRole",
-			resources: []ctdetail.ResourceRef{
+			resources: []ctevent.ResourceRef{
 				{ARN: "arn:aws:iam::222222222222:role/Admin", AccountID: "222222222222", Type: "AWS::IAM::Role"},
 			},
 			wantKey: "Role",
 		},
 		{
 			name: "UserARN_LabelUser",
-			resources: []ctdetail.ResourceRef{
+			resources: []ctevent.ResourceRef{
 				{ARN: "arn:aws:iam::555555555555:user/bob", AccountID: "555555555555", Type: "AWS::IAM::User"},
 			},
 			wantKey: "User",
 		},
 		{
 			name: "KMSKeyARN_LabelKey",
-			resources: []ctdetail.ResourceRef{
+			resources: []ctevent.ResourceRef{
 				{ARN: "arn:aws:kms:us-east-1:444444444444:key/uuid", AccountID: "444444444444", Type: "AWS::KMS::Key"},
 			},
 			wantKey: "Key",
 		},
 		{
 			name: "SecretARN_LabelSecret",
-			resources: []ctdetail.ResourceRef{
+			resources: []ctevent.ResourceRef{
 				{ARN: "arn:aws:secretsmanager:us-east-1:111111111111:secret:foo-AbCd", AccountID: "111111111111", Type: "AWS::SecretsManager::Secret"},
 			},
 			wantKey: "Secret",
@@ -692,7 +692,7 @@ func TestCTDetailExtractTarget_LabelDerivation_Table(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			rows, _ := ctdetail.ExtractTarget("TestEvent", "test.amazonaws.com", "", c.resources, nil)
+			rows, _ := ctevent.ExtractTarget("TestEvent", "test.amazonaws.com", "", c.resources, nil)
 			if len(rows) == 0 {
 				t.Fatalf("got 0 rows; want at least 1 with Key = %q", c.wantKey)
 			}
@@ -708,7 +708,7 @@ func TestCTDetailExtractTarget_LabelDerivation_AmbiguousCatchAll_LabelResource(t
 	params := map[string]any{
 		"thingyId": "t-xyz",
 	}
-	rows, _ := ctdetail.ExtractTarget("FrobnicateThingy", "example.amazonaws.com", "", nil, params)
+	rows, _ := ctevent.ExtractTarget("FrobnicateThingy", "example.amazonaws.com", "", nil, params)
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row from catch-all scan, got 0")
 	}
@@ -727,14 +727,14 @@ func TestCTDetailExtractTarget_LabelDerivation_AmbiguousCatchAll_LabelResource(t
 func TestCTDetailExtractTarget_Precedence_ResourcesWinOverFallback(t *testing.T) {
 	// When resources[] is populated, use it — ignore requestParameters even if
 	// the per-event-name table would also produce a result.
-	resources := []ctdetail.ResourceRef{
+	resources := []ctevent.ResourceRef{
 		{ARN: "arn:aws:iam::222222222222:role/EnvelopeRole", AccountID: "222222222222", Type: "AWS::IAM::Role"},
 	}
 	params := map[string]any{
 		"roleArn":         "arn:aws:iam::222222222222:role/FallbackRole",
 		"roleSessionName": "session",
 	}
-	rows, _ := ctdetail.ExtractTarget("AssumeRole", "sts.amazonaws.com", "", resources, params)
+	rows, _ := ctevent.ExtractTarget("AssumeRole", "sts.amazonaws.com", "", resources, params)
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row, got 0")
 	}
@@ -751,7 +751,7 @@ func TestCTDetailExtractTarget_Precedence_ResourcesWinOverFallback(t *testing.T)
 
 func TestCTDetailExtractTarget_CatchAll_IdSuffix(t *testing.T) {
 	params := map[string]any{"thingyId": "t-1"}
-	rows, _ := ctdetail.ExtractTarget("FrobnicateThingy", "example.amazonaws.com", "", nil, params)
+	rows, _ := ctevent.ExtractTarget("FrobnicateThingy", "example.amazonaws.com", "", nil, params)
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row from catch-all, got 0")
 	}
@@ -762,7 +762,7 @@ func TestCTDetailExtractTarget_CatchAll_IdSuffix(t *testing.T) {
 
 func TestCTDetailExtractTarget_CatchAll_NameSuffix(t *testing.T) {
 	params := map[string]any{"widgetName": "my-widget"}
-	rows, _ := ctdetail.ExtractTarget("CreateWidget", "example.amazonaws.com", "", nil, params)
+	rows, _ := ctevent.ExtractTarget("CreateWidget", "example.amazonaws.com", "", nil, params)
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row from catch-all, got 0")
 	}
@@ -773,7 +773,7 @@ func TestCTDetailExtractTarget_CatchAll_NameSuffix(t *testing.T) {
 
 func TestCTDetailExtractTarget_CatchAll_ArnSuffix(t *testing.T) {
 	params := map[string]any{"targetArn": "arn:aws:sns:us-east-1:111111111111:my-topic"}
-	rows, _ := ctdetail.ExtractTarget("Subscribe", "sns.amazonaws.com", "", nil, params)
+	rows, _ := ctevent.ExtractTarget("Subscribe", "sns.amazonaws.com", "", nil, params)
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row from catch-all, got 0")
 	}
@@ -790,7 +790,7 @@ func TestCTDetailExtractTarget_CatchAll_ArnSuffix(t *testing.T) {
 func TestCTDetailExtractTarget_EmptyResources_FallsBackToParams(t *testing.T) {
 	// Empty resources[] slice — must fall through to params heuristics.
 	params := map[string]any{"secretId": "my-secret"}
-	rows, _ := ctdetail.ExtractTarget("GetSecretValue", "secretsmanager.amazonaws.com", "", []ctdetail.ResourceRef{}, params)
+	rows, _ := ctevent.ExtractTarget("GetSecretValue", "secretsmanager.amazonaws.com", "", []ctevent.ResourceRef{}, params)
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row when resources[] is empty, got 0")
 	}
@@ -801,7 +801,7 @@ func TestCTDetailExtractTarget_EmptyResources_FallsBackToParams(t *testing.T) {
 
 func TestCTDetailExtractTarget_NilParams_NilResources_ListBuckets(t *testing.T) {
 	// ListBuckets with nil params and nil resources → "(none)"
-	rows, cleaned := ctdetail.ExtractTarget("ListBuckets", "s3.amazonaws.com", "", nil, nil)
+	rows, cleaned := ctevent.ExtractTarget("ListBuckets", "s3.amazonaws.com", "", nil, nil)
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row for ListBuckets, got 0")
 	}
@@ -823,7 +823,7 @@ func TestCTDetailExtractTarget_Navigability_S3PutObject_BucketAndObject(t *testi
 		"bucketName": "my-bucket",
 		"key":        "path/to/file.txt",
 	}
-	rows, _ := ctdetail.ExtractTarget("PutObject", "s3.amazonaws.com", "", nil, params)
+	rows, _ := ctevent.ExtractTarget("PutObject", "s3.amazonaws.com", "", nil, params)
 	if len(rows) < 2 {
 		t.Fatalf("expected >= 2 rows, got %d", len(rows))
 	}
@@ -852,10 +852,10 @@ func TestCTDetailExtractTarget_Navigability_S3PutObject_BucketAndObject(t *testi
 
 func TestCTDetailExtractTarget_Navigability_S3ResourcesEnvelope_Bucket(t *testing.T) {
 	// Bucket via resources[] envelope: IsNavigable=true, TargetType="s3"
-	resources := []ctdetail.ResourceRef{
+	resources := []ctevent.ResourceRef{
 		{ARN: "arn:aws:s3:::prod-logs", AccountID: "", Type: "AWS::S3::Bucket"},
 	}
-	rows, _ := ctdetail.ExtractTarget("GetObject", "s3.amazonaws.com", "", resources, nil)
+	rows, _ := ctevent.ExtractTarget("GetObject", "s3.amazonaws.com", "", resources, nil)
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row, got 0")
 	}
@@ -877,7 +877,7 @@ func TestCTDetailExtractTarget_Navigability_EC2TerminateInstances(t *testing.T) 
 			},
 		},
 	}
-	rows, _ := ctdetail.ExtractTarget("TerminateInstances", "ec2.amazonaws.com", "", nil, params)
+	rows, _ := ctevent.ExtractTarget("TerminateInstances", "ec2.amazonaws.com", "", nil, params)
 	if len(rows) < 2 {
 		t.Fatalf("expected >= 2 rows, got %d", len(rows))
 	}
@@ -893,10 +893,10 @@ func TestCTDetailExtractTarget_Navigability_EC2TerminateInstances(t *testing.T) 
 
 func TestCTDetailExtractTarget_Navigability_IAMRole_ResourcesEnvelope(t *testing.T) {
 	// Role via resources[] envelope: IsNavigable=true, TargetType="role"
-	resources := []ctdetail.ResourceRef{
+	resources := []ctevent.ResourceRef{
 		{ARN: "arn:aws:iam::222222222222:role/Admin", AccountID: "222222222222", Type: "AWS::IAM::Role"},
 	}
-	rows, _ := ctdetail.ExtractTarget("AssumeRole", "sts.amazonaws.com", "", resources, nil)
+	rows, _ := ctevent.ExtractTarget("AssumeRole", "sts.amazonaws.com", "", resources, nil)
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row, got 0")
 	}
@@ -910,10 +910,10 @@ func TestCTDetailExtractTarget_Navigability_IAMRole_ResourcesEnvelope(t *testing
 
 func TestCTDetailExtractTarget_Navigability_IAMUser_ResourcesEnvelope(t *testing.T) {
 	// User via resources[] envelope: IsNavigable=true, TargetType="iam-user"
-	resources := []ctdetail.ResourceRef{
+	resources := []ctevent.ResourceRef{
 		{ARN: "arn:aws:iam::555555555555:user/bob", AccountID: "555555555555", Type: "AWS::IAM::User"},
 	}
-	rows, _ := ctdetail.ExtractTarget("GetUser", "iam.amazonaws.com", "", resources, nil)
+	rows, _ := ctevent.ExtractTarget("GetUser", "iam.amazonaws.com", "", resources, nil)
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row, got 0")
 	}
@@ -930,7 +930,7 @@ func TestCTDetailExtractTarget_Navigability_Secret_Fallback(t *testing.T) {
 	params := map[string]any{
 		"secretId": "arn:aws:secretsmanager:us-east-1:111111111111:secret:foo-AbCd",
 	}
-	rows, _ := ctdetail.ExtractTarget("GetSecretValue", "secretsmanager.amazonaws.com", "", nil, params)
+	rows, _ := ctevent.ExtractTarget("GetSecretValue", "secretsmanager.amazonaws.com", "", nil, params)
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row, got 0")
 	}
@@ -945,7 +945,7 @@ func TestCTDetailExtractTarget_Navigability_Secret_Fallback(t *testing.T) {
 func TestCTDetailExtractTarget_Navigability_CatchAll_NotNavigable(t *testing.T) {
 	// catch-all "Resource" label must NOT be navigable
 	params := map[string]any{"thingyId": "t-xyz"}
-	rows, _ := ctdetail.ExtractTarget("FrobnicateThingy", "example.amazonaws.com", "", nil, params)
+	rows, _ := ctevent.ExtractTarget("FrobnicateThingy", "example.amazonaws.com", "", nil, params)
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row from catch-all, got 0")
 	}

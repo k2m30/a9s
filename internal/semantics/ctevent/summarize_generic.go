@@ -1,4 +1,4 @@
-package ctdetail
+package ctevent
 
 import (
 	"encoding/json"

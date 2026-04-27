@@ -11,7 +11,7 @@ import (
 	lipgloss "charm.land/lipgloss/v2"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
-	"github.com/k2m30/a9s/v3/internal/aws/ctdetail"
+	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -234,7 +234,7 @@ func (m *DetailModel) buildFieldList() {
 	if m.resourceType == "ct-events" && m.res.Status != "" {
 		raw := extractRawCTEventJSON(m.res)
 		if raw != "" {
-			event, err := ctdetail.Parse(raw)
+			event, err := ctevent.Parse(raw)
 			if err != nil {
 				// A CT event resource arrived with a raw JSON blob that cannot be
 				// parsed — that's a broken contract (the fetcher guarantees valid
@@ -247,7 +247,7 @@ func (m *DetailModel) buildFieldList() {
 				return
 			}
 			event.Status = m.res.Status // propagate severity status into the parsed event
-			sections := ctdetail.BuildSections(event)
+			sections := ctevent.BuildSections(event)
 			m.fieldList = sectionsToFieldItems(sections)
 			return
 		}
@@ -467,10 +467,10 @@ func extractRawCTEventJSON(res resource.Resource) string {
 	return *ev.CloudTrailEvent
 }
 
-// sectionsToFieldItems flattens a []ctdetail.Section to []fieldpath.FieldItem.
+// sectionsToFieldItems flattens a []ctevent.Section to []fieldpath.FieldItem.
 // Emits one FieldItem{IsSection: true, Key: section.Name} per section header,
 // followed by one FieldItem per Row with IsNavigable/TargetType/ColorTier propagated.
-func sectionsToFieldItems(sections []ctdetail.Section) []fieldpath.FieldItem {
+func sectionsToFieldItems(sections []ctevent.Section) []fieldpath.FieldItem {
 	var items []fieldpath.FieldItem
 	for _, sec := range sections {
 		items = append(items, fieldpath.FieldItem{

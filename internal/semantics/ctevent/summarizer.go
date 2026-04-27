@@ -1,4 +1,4 @@
-package ctdetail
+package ctevent
 
 // Summarizer is the per-service request-parameters summarizer signature.
 // See specs/013-ct-event-detail-v2/contracts/ctdetail-api.md for the contract.

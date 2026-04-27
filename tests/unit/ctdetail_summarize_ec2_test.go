@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/aws/ctdetail"
+	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
 )
 
 // TestCTDetailSummarizeEC2_RunInstances_AllFieldsEmitted verifies that SummarizeEC2 emits
@@ -20,12 +20,12 @@ func TestCTDetailSummarizeEC2_RunInstances_AllFieldsEmitted(t *testing.T) {
 		"securityGroupIds": []any{"sg-00001111", "sg-22223333"},
 		"keyName":          "my-key",
 	}
-	rows := ctdetail.SummarizeEC2("RunInstances", params)
+	rows := ctevent.SummarizeEC2("RunInstances", params)
 	if rows == nil {
 		t.Fatal("SummarizeEC2(RunInstances) returned nil; want non-nil slice")
 	}
 
-	emittedKeys := make(map[string]ctdetail.Row)
+	emittedKeys := make(map[string]ctevent.Row)
 	for _, r := range rows {
 		emittedKeys[r.Key] = r
 	}
@@ -70,7 +70,7 @@ func TestCTDetailSummarizeEC2_RunInstances_SecurityGroupNavigability(t *testing.
 	params := map[string]any{
 		"securityGroupIds": []any{"sg-00001111", "sg-22223333"},
 	}
-	rows := ctdetail.SummarizeEC2("RunInstances", params)
+	rows := ctevent.SummarizeEC2("RunInstances", params)
 	if rows == nil {
 		t.Fatal("SummarizeEC2(RunInstances, sg only) returned nil")
 	}
@@ -87,7 +87,7 @@ func TestCTDetailSummarizeEC2_RunInstances_SecurityGroupNavigability(t *testing.
 // cleaned params and returns a non-nil empty slice.
 func TestCTDetailSummarizeEC2_TerminateInstances(t *testing.T) {
 	// cleaned params: instancesSet already removed by extractInstancesSetEvent in target.go
-	rows := ctdetail.SummarizeEC2("TerminateInstances", map[string]any{})
+	rows := ctevent.SummarizeEC2("TerminateInstances", map[string]any{})
 	if rows == nil {
 		t.Fatal("SummarizeEC2(TerminateInstances, {}) returned nil; want non-nil []Row{}")
 	}
@@ -106,7 +106,7 @@ func TestCTDetailSummarizeEC2_DescribeInstances(t *testing.T) {
 		"filters":    []any{map[string]any{"Name": "instance-state-name", "Values": []any{"running"}}},
 		"maxResults": float64(1000),
 	}
-	rows := ctdetail.SummarizeEC2("DescribeInstances", params)
+	rows := ctevent.SummarizeEC2("DescribeInstances", params)
 	if rows == nil {
 		t.Fatal("SummarizeEC2(DescribeInstances) returned nil; want non-nil slice")
 	}
@@ -133,7 +133,7 @@ func TestCTDetailSummarizeEC2_CreateSecurityGroup(t *testing.T) {
 		"vpcId":       "vpc-0abc1234",
 		"description": "web tier",
 	}
-	rows := ctdetail.SummarizeEC2("CreateSecurityGroup", params)
+	rows := ctevent.SummarizeEC2("CreateSecurityGroup", params)
 	if rows == nil {
 		t.Fatal("SummarizeEC2(CreateSecurityGroup) returned nil; want non-nil slice")
 	}
@@ -155,7 +155,7 @@ func TestCTDetailSummarizeEC2_CreateSecurityGroup(t *testing.T) {
 // of instancesSet returns a non-nil empty slice for StartInstances and StopInstances.
 func TestCTDetailSummarizeEC2_StartStop(t *testing.T) {
 	for _, eventName := range []string{"StartInstances", "StopInstances"} {
-		rows := ctdetail.SummarizeEC2(eventName, map[string]any{})
+		rows := ctevent.SummarizeEC2(eventName, map[string]any{})
 		if rows == nil {
 			t.Fatalf("SummarizeEC2(%s, {}) returned nil; want non-nil []Row{}", eventName)
 		}
@@ -175,7 +175,7 @@ func TestCTDetailSummarizeEC2_PurityNoMutation(t *testing.T) {
 		"nested":           map[string]any{"k": "v"},
 	}
 	before := deepCopyParams(params)
-	_ = ctdetail.SummarizeEC2("RunInstances", params)
+	_ = ctevent.SummarizeEC2("RunInstances", params)
 	if !reflect.DeepEqual(params, before) {
 		t.Fatalf("SummarizeEC2 mutated input params: got %v, want %v", params, before)
 	}
@@ -193,7 +193,7 @@ func TestCTDetailSummarizeEC2_SeverityNeverSet(t *testing.T) {
 		{"TerminateInstances", map[string]any{}},
 	}
 	for _, tc := range cases {
-		rows := ctdetail.SummarizeEC2(tc.eventName, tc.params)
+		rows := ctevent.SummarizeEC2(tc.eventName, tc.params)
 		for i, r := range rows {
 			if r.Severity != "" {
 				t.Errorf("[%s] row[%d] key=%q: Severity=%q; summarizers must never set Severity",
@@ -207,14 +207,14 @@ func TestCTDetailSummarizeEC2_SeverityNeverSet(t *testing.T) {
 // does not panic and returns a non-nil slice.
 func TestCTDetailSummarizeEC2_UnknownEvent(t *testing.T) {
 	params := map[string]any{"someField": "someValue"}
-	var rows []ctdetail.Row
+	var rows []ctevent.Row
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
 				t.Fatalf("SummarizeEC2 panicked on unknown event: %v", r)
 			}
 		}()
-		rows = ctdetail.SummarizeEC2("SomeUnrecognizedEC2Event", params)
+		rows = ctevent.SummarizeEC2("SomeUnrecognizedEC2Event", params)
 	}()
 	if rows == nil {
 		t.Fatal("SummarizeEC2(unknown event) returned nil; want non-nil slice")

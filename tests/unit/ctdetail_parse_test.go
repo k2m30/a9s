@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/aws/ctdetail"
+	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
 )
 
 // ---------------------------------------------------------------------------
@@ -13,9 +13,9 @@ import (
 
 // mustParseEvent calls Parse and fails immediately if it returns an error or nil.
 // Use only in happy-path subtests.
-func mustParseEvent(t *testing.T, rawJSON string) *ctdetail.Event {
+func mustParseEvent(t *testing.T, rawJSON string) *ctevent.Event {
 	t.Helper()
-	ev, err := ctdetail.Parse(rawJSON)
+	ev, err := ctevent.Parse(rawJSON)
 	if err != nil {
 		t.Fatalf("Parse returned error: %v", err)
 	}
@@ -634,7 +634,7 @@ func TestCTDetailParse_MissingOptionalFields(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCTDetailParse_Error_EmptyInput(t *testing.T) {
-	_, err := ctdetail.Parse("")
+	_, err := ctevent.Parse("")
 	if err == nil {
 		t.Fatal("Parse(\"\") returned nil error, expected error")
 	}
@@ -644,7 +644,7 @@ func TestCTDetailParse_Error_EmptyInput(t *testing.T) {
 }
 
 func TestCTDetailParse_Error_MalformedJSON(t *testing.T) {
-	_, err := ctdetail.Parse(`{"eventVersion": "1.11", "eventName": `)
+	_, err := ctevent.Parse(`{"eventVersion": "1.11", "eventName": `)
 	if err == nil {
 		t.Fatal("Parse(malformed JSON) returned nil error, expected error")
 	}
@@ -759,7 +759,7 @@ func TestCTDetailParse_UserIdentity_FuturePrincipal(t *testing.T) {
 			"accountId": "111111111111"
 		}
 	}`
-	ev, err := ctdetail.Parse(raw)
+	ev, err := ctevent.Parse(raw)
 	if err != nil {
 		t.Fatalf("Parse returned unexpected error for unknown identity type: %v", err)
 	}

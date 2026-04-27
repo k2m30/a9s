@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/aws/ctdetail"
+	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
 )
 
 // deepCopyParams returns a deep copy of a map[string]any for mutation-guard comparisons.
@@ -38,7 +38,7 @@ func TestCTDetailSummarizeGeneric_PurityNoMutation(t *testing.T) {
 		"nested": map[string]any{"x": 1, "y": "hello"},
 	}
 	before := deepCopyParams(params)
-	_ = ctdetail.SummarizeGeneric("SomeEvent", params)
+	_ = ctevent.SummarizeGeneric("SomeEvent", params)
 	if !reflect.DeepEqual(params, before) {
 		t.Fatalf("SummarizeGeneric mutated input params: got %v, want %v", params, before)
 	}
@@ -47,7 +47,7 @@ func TestCTDetailSummarizeGeneric_PurityNoMutation(t *testing.T) {
 // TestCTDetailSummarizeGeneric_NilInput verifies that nil params returns a non-nil empty slice.
 // BuildSections relies on non-nil for empty-section omission logic.
 func TestCTDetailSummarizeGeneric_NilInput(t *testing.T) {
-	rows := ctdetail.SummarizeGeneric("SomeEvent", nil)
+	rows := ctevent.SummarizeGeneric("SomeEvent", nil)
 	if rows == nil {
 		t.Fatal("SummarizeGeneric(nil) returned nil slice; want non-nil []Row{}")
 	}
@@ -55,7 +55,7 @@ func TestCTDetailSummarizeGeneric_NilInput(t *testing.T) {
 
 // TestCTDetailSummarizeGeneric_EmptyInput verifies that an empty params map returns a non-nil empty slice.
 func TestCTDetailSummarizeGeneric_EmptyInput(t *testing.T) {
-	rows := ctdetail.SummarizeGeneric("SomeEvent", map[string]any{})
+	rows := ctevent.SummarizeGeneric("SomeEvent", map[string]any{})
 	if rows == nil {
 		t.Fatal("SummarizeGeneric(empty map) returned nil slice; want non-nil []Row{}")
 	}
@@ -70,7 +70,7 @@ func TestCTDetailSummarizeGeneric_NoNavigableRows(t *testing.T) {
 		"region":     "us-east-1",
 		"roleArn":    "arn:aws:iam::123456789012:role/MyRole",
 	}
-	rows := ctdetail.SummarizeGeneric("SomeEvent", params)
+	rows := ctevent.SummarizeGeneric("SomeEvent", params)
 	for i, row := range rows {
 		if row.IsNavigable {
 			t.Errorf("row[%d] key=%q: IsNavigable=true; generic summarizer must never mark rows navigable", i, row.Key)
@@ -93,7 +93,7 @@ func TestCTDetailSummarizeGeneric_HeterogeneousTypes(t *testing.T) {
 		"sliceVal":  []any{"a", "b", 3},
 		"nestedMap": map[string]any{"deep": "value"},
 	}
-	var rows []ctdetail.Row
+	var rows []ctevent.Row
 	// Must not panic.
 	func() {
 		defer func() {
@@ -101,7 +101,7 @@ func TestCTDetailSummarizeGeneric_HeterogeneousTypes(t *testing.T) {
 				t.Fatalf("SummarizeGeneric panicked on heterogeneous types: %v", r)
 			}
 		}()
-		rows = ctdetail.SummarizeGeneric("ComplexEvent", params)
+		rows = ctevent.SummarizeGeneric("ComplexEvent", params)
 	}()
 	if rows == nil {
 		t.Fatal("SummarizeGeneric returned nil on heterogeneous params; want non-nil slice")
@@ -114,8 +114,8 @@ func TestCTDetailSummarizeGeneric_HeterogeneousTypes(t *testing.T) {
 func TestCTDetailSummarizeGeneric_EventNameIgnored(t *testing.T) {
 	params := map[string]any{"key": "value"}
 
-	rowsEmpty := ctdetail.SummarizeGeneric("", params)
-	rowsArbitrary := ctdetail.SummarizeGeneric("SomeRandomEvent", params)
+	rowsEmpty := ctevent.SummarizeGeneric("", params)
+	rowsArbitrary := ctevent.SummarizeGeneric("SomeRandomEvent", params)
 
 	if rowsEmpty == nil {
 		t.Fatal("SummarizeGeneric(\"\", params) returned nil; want non-nil slice")

@@ -1,7 +1,7 @@
 package unit
 
 // ctdetail_summarizer_test.go covers RegisterSummarizer in
-// internal/aws/ctdetail/summarizer.go.
+// internal/semantics/ctevent/summarizer.go.
 //
 // The only uncovered branch is the duplicate-registration panic.
 // The happy path (successful registration) is already exercised by the
@@ -11,18 +11,18 @@ package unit
 import (
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/aws/ctdetail"
+	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
 )
 
 // TestRegisterSummarizer_DuplicatePanics verifies that registering a summarizer
 // for an event source that is already registered causes a panic.
 // This guards against accidentally overwriting a summarizer during init.
 func TestRegisterSummarizer_DuplicatePanics(t *testing.T) {
-	noop := func(_ string, _ map[string]any) []ctdetail.Row { return nil }
+	noop := func(_ string, _ map[string]any) []ctevent.Row { return nil }
 
 	// Register once under a unique test-only key.
 	const testKey = "test.duplicate.panic.guard"
-	ctdetail.RegisterSummarizer(testKey, noop)
+	ctevent.RegisterSummarizer(testKey, noop)
 
 	// A second registration for the same key must panic.
 	defer func() {
@@ -31,5 +31,5 @@ func TestRegisterSummarizer_DuplicatePanics(t *testing.T) {
 			t.Fatal("RegisterSummarizer: expected panic on duplicate registration, got none")
 		}
 	}()
-	ctdetail.RegisterSummarizer(testKey, noop)
+	ctevent.RegisterSummarizer(testKey, noop)
 }
