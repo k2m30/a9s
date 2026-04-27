@@ -61,11 +61,10 @@ func TestIdentityStore_SetFailureThenErr(t *testing.T) {
 	}
 }
 
-// TestIdentityStore_OverwriteSet pins last-write-wins semantics under
-// non-concurrent overwrite — Set followed by another Set replaces the prior
-// value. Important for: a transient error followed by a successful retry
-// (rare in practice — Err() suppresses retry — but the API allows it after
-// Clear or in test setups).
+// TestIdentityStore_OverwriteSet pins last-write-wins semantics for a
+// SUCCESS overwrite: Set("", err) followed by Set(id, nil) replaces the
+// prior failure. (The failure-overwrite-success case is anti-poisoned —
+// see TestIdentityStore_FailureDoesNotPoisonSuccess.)
 func TestIdentityStore_OverwriteSet(t *testing.T) {
 	t.Parallel()
 
@@ -79,6 +78,54 @@ func TestIdentityStore_OverwriteSet(t *testing.T) {
 	}
 	if err := store.Err(); err != nil {
 		t.Errorf("Err() after success overwrite: got %v, want nil", err)
+	}
+}
+
+// TestIdentityStore_FailureDoesNotPoisonSuccess pins the anti-poison
+// contract (P2 finding): when a successful AccountID is already cached, a
+// subsequent failure-flavored Set("", err) is silently DROPPED.
+//
+// Scenario: handleRelatedCheckStarted runs Pattern-C probes concurrently.
+// Two checks enter accountIDFromClients at the same time when the store is
+// empty; both call STS.GetCallerIdentity. One succeeds and Set(id, nil);
+// the slower one times out and Set("", err). Without anti-poison, the late
+// failure would overwrite the good AccountID — Glue/EBS related checks
+// would then return Count:-1 for the rest of the session.
+func TestIdentityStore_FailureDoesNotPoisonSuccess(t *testing.T) {
+	t.Parallel()
+
+	store := session.NewIdentityStore()
+	const acct = "999999999999"
+
+	store.Set(acct, nil) // earlier-completing successful fetch
+	// Slower fetch times out and tries to record the failure.
+	store.Set("", errors.New("checker context deadline exceeded"))
+
+	if got := store.AccountID(); got != acct {
+		t.Errorf("AccountID() after concurrent failure: got %q, want %q (cache poisoned)", got, acct)
+	}
+	if err := store.Err(); err != nil {
+		t.Errorf("Err() after concurrent failure: got %v, want nil (success must not be marked failed)", err)
+	}
+}
+
+// TestIdentityStore_FailureBeforeSuccess pins the symmetric path: when a
+// failure is cached first (e.g. initial probe failed), a subsequent
+// successful Set DOES overwrite. The anti-poison rule applies only when
+// success is already cached AND the new write is a failure.
+func TestIdentityStore_FailureBeforeSuccess(t *testing.T) {
+	t.Parallel()
+
+	store := session.NewIdentityStore()
+
+	store.Set("", errors.New("transient throttle"))
+	store.Set("888888888888", nil)
+
+	if got := store.AccountID(); got != "888888888888" {
+		t.Errorf("AccountID() after success-after-failure: got %q, want %q", got, "888888888888")
+	}
+	if err := store.Err(); err != nil {
+		t.Errorf("Err() after success-after-failure: got %v, want nil", err)
 	}
 }
 

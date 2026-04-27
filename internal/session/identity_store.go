@@ -30,7 +30,15 @@ type IdentityStore interface {
 
 	// Set records the result of a fetch. id == "" + err == nil is invalid
 	// (use Clear() instead). On success: id non-empty, err nil. On failure:
-	// id empty, err non-nil. Last-write-wins under contention.
+	// id empty, err non-nil.
+	//
+	// Concurrent-safety contract: a failure-flavored Set (id == "" + err !=
+	// nil) is silently DROPPED if AccountID() is already non-empty. This
+	// prevents a slow-failing Pattern-C check from overwriting a successful
+	// AccountID written by an earlier-completing concurrent fetch — naive
+	// last-writer-wins would otherwise poison the cache for the rest of
+	// the session. Successful Set (id != "") always overwrites — this
+	// preserves the "Clear then transient-error then retry succeeds" path.
 	Set(id string, err error)
 
 	// Clear resets the cache so the next call falls through to a fresh
@@ -64,6 +72,15 @@ func (s *identityStore) Err() error {
 func (s *identityStore) Set(id string, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	// Anti-poison: refuse to overwrite an already-cached successful
+	// AccountID with a later failure. Two concurrent Pattern-C checks may
+	// both observe an empty store and both call STS.GetCallerIdentity;
+	// if the slower one times out (10s checker context) AFTER the faster
+	// one cached a good account ID, the naive write would erase the good
+	// value and leave the session stuck at Count:-1. See store godoc.
+	if id == "" && err != nil && s.accountID != "" {
+		return
+	}
 	s.accountID = id
 	s.err = err
 }
