@@ -7,6 +7,8 @@ Your work will be review by Codex.
 - Repository: `k2m30/a9s` — always use this owner/repo for GitHub API calls, issues, and PRs
 
 ## Active Technologies
+- Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2 (autoscaling, codeartifact, codebuild, codepipeline, dynamodb, ec2, ecr, ecs, efs, elasticbeanstalk, elbv2, events, iam, kms, lambda, rds, secretsmanager, ses, sesv2, sfn, sns, ssm, eventbridge, backup), yaml.v3, clipboard (020-architecture-refactor)
+- YAML config on disk (`~/.a9s/config.yaml`, `~/.a9s/themes/*.yaml`, `~/.a9s/views/`); YAML cache on disk (`~/.a9s/cache/<profile>--<region>.yaml`); session-scoped in-memory state owned by `internal/session.Session` after Phase 02 (020-architecture-refactor)
 
 - Go 1.26+, Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2, yaml.v3, clipboard
 - YAML config on disk (`~/.a9s/config.yaml`, `~/.a9s/themes/*.yaml`, `~/.a9s/views/`)
@@ -176,3 +178,6 @@ When code changes affect any of the following, update the shared source and rege
 - Install methods changed → `docs/shared/install.md`
 - Resource types added/removed/renamed → `docs/README.tmpl.md` services table + `website/content/resources.md`
 - Go version bumped → `docs/shared/install.md`, CONTRIBUTING.md
+
+## Recent Changes
+- 020-architecture-refactor: Added Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2 (autoscaling, codeartifact, codebuild, codepipeline, dynamodb, ec2, ecr, ecs, efs, elasticbeanstalk, elbv2, events, iam, kms, lambda, rds, secretsmanager, ses, sesv2, sfn, sns, ssm, eventbridge, backup), yaml.v3, clipboard
