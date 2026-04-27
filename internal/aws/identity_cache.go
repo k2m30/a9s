@@ -13,8 +13,8 @@
 // "check store / fetch / set" sequence. Two concurrent Pattern C checks may
 // both observe AccountID()=="" + Err()==nil and both invoke
 // STS.GetCallerIdentity. The store itself remains correct; duplicate Set
-// calls converge. Acceptable because related-panel checks are not
-// high-volume.
+// calls are last-write-wins on identical successful results. Acceptable
+// because related-panel checks are not high-volume.
 package aws
 
 import (
@@ -25,7 +25,7 @@ import (
 )
 
 // identityStore is the unexported shape internal/aws expects from a
-// per-Session identity cache. session.IdentityStore satisfies this via
+// per-Session identity cache. session.IdentityStore() satisfies this via
 // duck-typing — internal/aws cannot import internal/session without a cycle,
 // so the local interface mirrors the methods needed here.
 type identityStore interface {
@@ -38,7 +38,7 @@ type identityStore interface {
 // cached via STS GetCallerIdentity on first call. Returns "" on any failure
 // so callers emit Count: -1.
 //
-// The store argument carries per-session state; pass c.IdentityStore at the
+// The store argument carries per-session state; pass c.IdentityStore() at the
 // call site so each profile/region session uses an isolated cache.
 func accountIDFromClients(ctx context.Context, c *ServiceClients, store identityStore) string {
 	if store == nil {
