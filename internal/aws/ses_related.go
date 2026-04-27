@@ -20,6 +20,7 @@ type ruleSetStore interface {
 	Get() (any, bool)
 	Set(any)
 	Clear()
+	GetOrFetch(context.Context, func(context.Context) (any, error)) (any, error)
 }
 
 // checkSESR53 searches the R53 cache for hosted zones whose domain matches the
@@ -121,48 +122,32 @@ func sesEventDestinations(ctx context.Context, c *ServiceClients, configSetName 
 	return out, err
 }
 
-// sesActiveReceiptRuleSet calls SES v1 DescribeActiveReceiptRuleSet at most
-// once per session when the call succeeds. The cached output is read on
-// subsequent calls without a network round-trip. Errors are not cached: a
-// follow-up call after an error retries the API.
-//
-// The cache lives on the per-Session RuleSetStore (c.RuleSets()); the legacy
-// process-wide map keyed by *ServiceClients pointer is gone.
-//
-// Invalidation safety (P2 finding): the store reference is CAPTURED ONCE at
-// function entry into a local `store` variable. If a refresh handler swaps
-// `c.RuleSets` for a fresh store while this fetch is blocked on the SES
-// API, the Set below writes to the captured (now orphaned) store rather
-// than re-poisoning the new active slot. This is the swap-vs-clear contract:
-// callers wanting to invalidate MUST REPLACE `c.RuleSets`, not call
-// Clear() on the existing store — otherwise an in-flight late writer would
-// repopulate the same store with the pre-refresh data and the next
-// checker batch would see stale Lambda/S3 relationships.
-//
-// Concurrency trade-off (acknowledged, same as PR-02b/02c): no top-level
-// lock across check-fetch-set. Two concurrent checkSES* calls may both
-// observe an empty store and both invoke the SES API; the store remains
-// correct (mutex-guarded writes; last-write-wins on idempotent Sets). Acceptable
-// because related-panel checks are not high-volume.
+// sesActiveReceiptRuleSet returns the active SES v1 receipt rule set for this
+// session. The store is per-session; singleflight coalesces concurrent misses
+// into one upstream call. Swap (not Clear) is required on Ctrl+R refresh so
+// late-completing fetches land on the orphaned old store, never the new one.
 func sesActiveReceiptRuleSet(ctx context.Context, c *ServiceClients) (*ses.DescribeActiveReceiptRuleSetOutput, error) {
 	if c == nil || c.SES == nil {
 		return nil, nil //nolint:nilnil // no SES v1 client; caller treats nil as "no rule set"
 	}
-	store := c.RuleSets() // capture once — see godoc above
-	if store != nil {
-		if cached, ok := store.Get(); ok {
-			out, isOutput := cached.(*ses.DescribeActiveReceiptRuleSetOutput)
-			if isOutput {
-				return out, nil
-			}
-		}
+	store := c.RuleSets()
+	if store == nil {
+		// No store wired (test path or pre-init); fall back to direct fetch
+		// without caching or coalescing.
+		return c.SES.DescribeActiveReceiptRuleSet(ctx, &ses.DescribeActiveReceiptRuleSetInput{})
 	}
-	out, err := c.SES.DescribeActiveReceiptRuleSet(ctx, &ses.DescribeActiveReceiptRuleSetInput{})
+	v, err := store.GetOrFetch(ctx, func(fetchCtx context.Context) (any, error) {
+		return c.SES.DescribeActiveReceiptRuleSet(fetchCtx, &ses.DescribeActiveReceiptRuleSetInput{})
+	})
 	if err != nil {
 		return nil, err
 	}
-	if store != nil && out != nil {
-		store.Set(out)
+	if v == nil {
+		return nil, nil //nolint:nilnil
+	}
+	out, ok := v.(*ses.DescribeActiveReceiptRuleSetOutput)
+	if !ok {
+		return nil, nil //nolint:nilnil // type mismatch; treat as "no rule set"
 	}
 	return out, nil
 }
