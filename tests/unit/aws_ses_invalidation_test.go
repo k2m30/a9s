@@ -29,7 +29,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ses"
@@ -600,29 +599,39 @@ func TestSESActiveReceiptRuleSet_Singleflight_LeaderCancelDoesNotPoisonFollower(
 
 	// Wait for goroutine A to enter the blocking stub.
 	<-mock.inFlightCh
-
-	// Brief barrier — matches the 50ms convention used in PIN 3 — to let A park
-	// inside the singleflight .Do before we start goroutine B.
-	time.Sleep(30 * time.Millisecond)
+	// A is now inside the fetcher closure inside singleflight.Do. A few yields
+	// for paranoia (singleflight bookkeeping after fetcher invocation).
+	for range 10 {
+		runtime.Gosched()
+	}
 
 	// Goroutine B — the follower. Uses a long-lived context (never canceled).
+	// bStarted is closed immediately before B calls the helper, giving us a
+	// deterministic signal that B has been scheduled.
+	bStarted := make(chan struct{})
 	go func() {
 		defer wg.Done()
+		close(bStarted)
 		out, err := awsclient.SESActiveReceiptRuleSetForTest(context.Background(), clients)
 		resB = result{out: out, err: err}
 	}()
 
-	// Brief barrier — let B park waiting on the singleflight result before we cancel A.
-	time.Sleep(30 * time.Millisecond)
+	// Wait for B to start, then yield aggressively to let it reach the
+	// singleflight DoChan wait point before we cancel A.
+	// 100 yields matches PIN 3's barrier idiom; bounded so a stuck test
+	// fails fast rather than hanging the suite indefinitely.
+	<-bStarted
+	for range 100 {
+		runtime.Gosched()
+	}
 
 	// Cancel the leader's ctx. This is the trigger that exposes the bug:
 	// a naive singleflight implementation propagates ctxA's error to B.
 	cancelA()
 
-	// Let the leader observe its cancellation and return from .Do.
-	time.Sleep(30 * time.Millisecond)
-
-	// Release the mock so any continuing or retry fetch can complete.
+	// Release the mock — any continuing detached fetch (Fix 1: WithoutCancel)
+	// finishes the work for B. wg.Wait() below ensures both goroutines finish
+	// before we check results, so no sleep is needed after cancelA.
 	close(mock.releaseCh)
 
 	// Wait for both goroutines to finish.
