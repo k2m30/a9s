@@ -95,6 +95,14 @@ func domainItemToFieldItem(it domain.Item, sectionTitle string) fieldpath.FieldI
 	case domain.ItemSubfield:
 		fi.IsSubField = true
 		fi.IndentLevel = it.IndentLevel
+		if it.Label == "" {
+			// Raw YAML continuation line. Legacy buildFieldList convention:
+			// raw lines have Key == Value so renderFromFieldList takes the
+			// plain-line branch (no stray ": " prefix).
+			fi.Key = it.Value
+			// Path: no trailing dot for empty-label subfields.
+			fi.Path = sectionTitle
+		}
 	case domain.ItemSpacer:
 		fi.IsSpacer = true
 	}

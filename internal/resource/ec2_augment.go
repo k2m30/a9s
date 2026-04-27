@@ -57,18 +57,44 @@ func augmentEC2StatusChecks(r domain.Resource, sections []domain.Section) []doma
 		},
 	}
 
-	// Find the insertion point: after the "State" section.
+	// Find the insertion point: scan for an ItemHeader{Label:"State"} within any
+	// section.  projection.Generic does not produce a Section with Title=="State";
+	// instead, State is emitted as an ItemHeader inside the unnamed leading section.
 	for i, sec := range sections {
-		if sec.Title == "State" {
-			result := make([]domain.Section, 0, len(sections)+1)
-			result = append(result, sections[:i+1]...)
+		for j, item := range sec.Items {
+			if item.Kind != domain.ItemHeader || item.Label != "State" {
+				continue
+			}
+			// Find end of State block: scan forward through consecutive ItemSubfield items.
+			endOfState := j + 1
+			for endOfState < len(sec.Items) && sec.Items[endOfState].Kind == domain.ItemSubfield {
+				endOfState++
+			}
+			// Split the matched section into [leading+state block] and optional [tail].
+			leading := domain.Section{
+				Title: sec.Title,
+				Items: sec.Items[:endOfState],
+			}
+			var tail *domain.Section
+			if endOfState < len(sec.Items) {
+				tail = &domain.Section{
+					Title: "", // continuation; matches legacy unnamed-section behaviour
+					Items: sec.Items[endOfState:],
+				}
+			}
+			result := make([]domain.Section, 0, len(sections)+2)
+			result = append(result, sections[:i]...)
+			result = append(result, leading)
 			result = append(result, statusSection)
+			if tail != nil {
+				result = append(result, *tail)
+			}
 			result = append(result, sections[i+1:]...)
 			return result
 		}
 	}
 
-	// State section not found — append at end.
+	// State header not found — append at end.
 	return append(sections, statusSection)
 }
 

@@ -31,10 +31,10 @@
  readOnly:             false                                                                                                                       │
  recipientAccountId:   "444444444444"                                                                                                              │
  requestParameters:                                                                                                                                │
-         :     backingKey: true                                                                                                                    │
-         :     keyId: arn:aws:kms:us-east-1:444444444444:key/2f7e9a5b-8c1d-4e3f-9a0b-1c2d3e4f5a6b                                                  │
-         :     rotationType: AUTOMATIC                                                                                                             │
+         backingKey: true                                                                                                                          │
+         keyId: arn:aws:kms:us-east-1:444444444444:key/2f7e9a5b-8c1d-4e3f-9a0b-1c2d3e4f5a6b                                                        │
+         rotationType: AUTOMATIC                                                                                                                   │
  responseElements:     null                                                                                                                        │
  sourceIPAddress:      AWS Internal                                                                                                                │
  userIdentity:                                                                                                                                     │
-         :     invokedBy: kms.amazonaws.com                                                                                                        │
+         invokedBy: kms.amazonaws.com                                                                                                              │
