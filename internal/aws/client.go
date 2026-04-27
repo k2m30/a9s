@@ -53,7 +53,13 @@ import (
 )
 
 // ServiceClients holds AWS service clients for all supported services.
+// IAMPolicies must be set to the session's PolicyStore before any
+// FetchIAMPoliciesByIDsFull calls; see internal/tui/app_handlers.go.
 type ServiceClients struct {
+	// IAMPolicies is the session-scoped IAM policy resource cache. Set by the
+	// TUI layer from session.Session.IAMPolicies on every ClientsReadyMsg.
+	IAMPolicies iamPolicyStore
+
 	EC2              EC2API
 	S3               S3API
 	RDS              RDSAPI
