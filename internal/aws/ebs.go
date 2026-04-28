@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -152,9 +153,9 @@ func FetchEBSVolumesPage(ctx context.Context, api EC2DescribeVolumesAPI, continu
 		}
 
 		r := resource.Resource{
-			ID:     volumeID,
-			Name:   name,
-			Status: state,
+			ID:   volumeID,
+			Name: name,
+			// Status: removed — PR-03b migrates fetcher to Findings for lifecycle states.
 			Fields: map[string]string{
 				"volume_id":   volumeID,
 				"name":        name,
@@ -168,6 +169,22 @@ func FetchEBSVolumesPage(ctx context.Context, api EC2DescribeVolumesAPI, continu
 				"created":     created,
 			},
 			RawStruct: vol,
+		}
+
+		// Phase 03 PR-03b: emit canonical Findings for non-healthy volume states.
+		// in-use and available are healthy (no Finding). deleting is terminal (no Finding).
+		// creating → SevWarn. error → SevBroken.
+		switch vol.State {
+		case ec2types.VolumeStateCreating:
+			r.Findings = []domain.Finding{{
+				Code: CodeEBSStateCreating, Phrase: "creating",
+				Severity: domain.SevWarn, Source: "wave1",
+			}}
+		case ec2types.VolumeStateError:
+			r.Findings = []domain.Finding{{
+				Code: CodeEBSStateError, Phrase: "error",
+				Severity: domain.SevBroken, Source: "wave1",
+			}}
 		}
 
 		resources = append(resources, r)
@@ -355,10 +372,10 @@ func snapshotToResource(snap ec2types.Snapshot) resource.Resource {
 	if snap.Progress != nil {
 		progress = *snap.Progress
 	}
-	return resource.Resource{
-		ID:     snapshotID,
-		Name:   name,
-		Status: state,
+	r := resource.Resource{
+		ID:   snapshotID,
+		Name: name,
+		// Status: removed — PR-03b migrates fetcher to Findings for lifecycle states.
 		Fields: map[string]string{
 			"snapshot_id": snapshotID,
 			"name":        name,
@@ -372,4 +389,22 @@ func snapshotToResource(snap ec2types.Snapshot) resource.Resource {
 		},
 		RawStruct: snap,
 	}
+
+	// Phase 03 PR-03b: emit canonical Findings for non-healthy snapshot states.
+	// completed → healthy (no Finding). pending → SevWarn.
+	// error / recoverable / recovering → SevBroken.
+	switch snap.State {
+	case ec2types.SnapshotStatePending:
+		r.Findings = []domain.Finding{{
+			Code: CodeEBSSnapStatePending, Phrase: "pending",
+			Severity: domain.SevWarn, Source: "wave1",
+		}}
+	case ec2types.SnapshotStateError, ec2types.SnapshotStateRecoverable, ec2types.SnapshotStateRecovering:
+		r.Findings = []domain.Finding{{
+			Code: CodeEBSSnapStateError, Phrase: "error",
+			Severity: domain.SevBroken, Source: "wave1",
+		}}
+	}
+
+	return r
 }

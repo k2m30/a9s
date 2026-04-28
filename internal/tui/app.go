@@ -226,10 +226,11 @@ func (m Model) EnrichmentGen() int {
 	return m.Session.EnrichmentGen
 }
 
-// ActiveDetailResource returns the resource held by the top-of-stack
-// DetailModel, if any. Used by tests to inspect shim wire-ups on the
-// detail-view path (Phase 03 PR-03a-shim Site 7). Returns ok=false
-// when the active view is not a DetailModel.
+// ActiveDetailResource is an exported test-only accessor for the top-of-stack
+// DetailModel resource — production code does not call it.
+// Lives outside _test.go because tests in tests/unit/ are package unit_test
+// and can't see same-package test helpers.
+// Returns ok=false when the active view is not a DetailModel.
 func (m Model) ActiveDetailResource() (resource.Resource, bool) {
 	if d, ok := m.activeView().(*views.DetailModel); ok {
 		return d.SourceResource(), true
@@ -237,10 +238,11 @@ func (m Model) ActiveDetailResource() (resource.Resource, bool) {
 	return resource.Resource{}, false
 }
 
-// ActiveListResources returns the resource slice currently held by the
-// top-of-stack ResourceListModel, or nil if the active view is not a
-// ResourceListModel. Used by tests to inspect the rl's internal state
-// after Ctrl+R (Phase 03 PR-03a-fold).
+// ActiveListResources is an exported test-only accessor for the top-of-stack
+// ResourceListModel's resource slice — production code does not call it.
+// Lives outside _test.go because tests in tests/unit/ are package unit_test
+// and can't see same-package test helpers.
+// Returns nil if the active view is not a ResourceListModel.
 func (m Model) ActiveListResources() []resource.Resource {
 	if rl, ok := m.activeView().(*views.ResourceListModel); ok {
 		return rl.AllResources()
