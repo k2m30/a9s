@@ -8,5 +8,6 @@ const (
 	CodeMSKMaintenance     domain.FindingCode = "msk.warn.maintenance"
 	CodeMSKRebootingBroker domain.FindingCode = "msk.warn.rebooting_broker"
 	CodeMSKHealing         domain.FindingCode = "msk.warn.healing"
+	CodeMSKDeleting        domain.FindingCode = "msk.warn.deleting"
 	CodeMSKFailed          domain.FindingCode = "msk.broken.failed"
 )

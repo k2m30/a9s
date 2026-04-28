@@ -128,6 +128,9 @@ func FetchDynamoDBTablesPage(ctx context.Context, listAPI DDBListTablesAPI, desc
 		statusPhrase := ""
 		if len(findings) > 0 {
 			statusPhrase = findings[0].Phrase
+			if len(findings) > 1 {
+				statusPhrase = fmt.Sprintf("%s (+%d)", statusPhrase, len(findings)-1)
+			}
 		}
 
 		itemCount := ""

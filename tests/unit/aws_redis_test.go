@@ -309,7 +309,7 @@ func TestRedis_Fetch_MultiW1_ModifyingPlusNoFailover(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	const wantStatus = "modifying \u2014 config change"
+	const wantStatus = "modifying \u2014 config change (+1)"
 	if r.Fields["status"] != wantStatus {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantStatus)
 	}
@@ -612,7 +612,7 @@ func TestRedis_Fetch_MultiShard_TwoShardsTransitioning(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	const wantStatus = "shard 0001: modifying"
+	const wantStatus = "shard 0001: modifying (+1)"
 	if r.Fields["status"] != wantStatus {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantStatus)
 	}
@@ -689,7 +689,7 @@ func TestRedis_Fetch_MultiShard_ShardPlusMultiAZNoFailover(t *testing.T) {
 
 	// Alphabetical: "multi-AZ without auto-failover" < "shard 0001: modifying".
 	// Top phrase: "multi-AZ without auto-failover"; hidden count: 1.
-	const wantStatus = "multi-AZ without auto-failover"
+	const wantStatus = "multi-AZ without auto-failover (+1)"
 	if r.Fields["status"] != wantStatus {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantStatus)
 	}

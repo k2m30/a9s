@@ -243,13 +243,12 @@ func TestFetchEFSFileSystems_MultiW1_NomountsPlusDeleting(t *testing.T) {
 		t.Fatalf("fixture %q not found in fetcher output", fsID)
 	}
 
-	wantStatus := "no mount targets"
-	// Fetcher does not write Resource.Status — it is always "".
+	wantStatus := "no mount targets (+1)"
 	if r.Status != "" {
 		t.Errorf("Status = %q, want %q (fetcher must not write Status)", r.Status, "")
 	}
 	if statusField := r.Fields["status"]; statusField != wantStatus {
-		t.Errorf("Fields[\"status\"] = %q, want %q (Broken finding phrase; no (+N) suffix)", statusField, wantStatus)
+		t.Errorf("Fields[\"status\"] = %q, want %q (top phrase + (+N) suffix)", statusField, wantStatus)
 	}
 	wantPhrases := []string{"no mount targets", "deleting"}
 	if len(r.Findings) != len(wantPhrases) {

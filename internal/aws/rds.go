@@ -200,10 +200,15 @@ func FetchRDSInstancesPage(ctx context.Context, api RDSDescribeDBInstancesAPI, c
 
 // transitionalStatusSet contains RDS instance statuses that indicate a
 // transitional (Warning) state. These show a pending modification key suffix when applicable.
+//
+// "stopped" is intentionally classified Warn (not Broken) — it is admin
+// action, not failure, mirroring EC2 stopped semantics. Pre-PR-03e mapped
+// stopped→Broken via a structural Color arm; that arm is now dead because
+// Findings drive Color. The shift is intentional.
 var transitionalStatusSet = map[string]struct{}{
 	"creating": {}, "modifying": {}, "backing-up": {}, "rebooting": {},
 	"renaming": {}, "resetting-master-credentials": {}, "starting": {},
-	"stopping": {}, "upgrading": {}, "maintenance": {},
+	"stopping": {}, "stopped": {}, "upgrading": {}, "maintenance": {},
 	"configuring-enhanced-monitoring": {}, "configuring-iam-database-auth": {},
 	"configuring-log-exports": {}, "converting-to-vpc": {}, "moving-to-vpc": {},
 	"storage-optimization": {},

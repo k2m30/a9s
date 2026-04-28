@@ -38,7 +38,7 @@ func TestRelated_DbcSnap_Registered(t *testing.T) {
 		hasChecker  bool
 	}
 	expected := map[string]expectation{
-		"dbc": {"DocumentDB Cluster", true},
+		"dbc": {"DB Cluster", true},
 		"kms": {"KMS Key", true},
 	}
 	for target, want := range expected {

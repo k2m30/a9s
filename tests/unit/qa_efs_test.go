@@ -119,8 +119,8 @@ func TestFetchEFSFileSystems_ParsesMultiple(t *testing.T) {
 	if r1.Status != "" {
 		t.Errorf("resource[1].Status: expected %q (fetcher must not write Status), got %q", "", r1.Status)
 	}
-	if r1.Fields["status"] != "no mount targets" {
-		t.Errorf("resource[1].Fields[\"status\"]: expected %q, got %q", "no mount targets", r1.Fields["status"])
+	if r1.Fields["status"] != "no mount targets (+1)" {
+		t.Errorf("resource[1].Fields[\"status\"]: expected %q, got %q", "no mount targets (+1)", r1.Fields["status"])
 	}
 	if len(r1.Findings) != 2 {
 		t.Fatalf("resource[1].Findings: expected 2 findings, got %d: %v", len(r1.Findings), r1.Findings)

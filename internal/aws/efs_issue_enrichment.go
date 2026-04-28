@@ -125,16 +125,16 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 		}
 		findings[fsID] = finding
 
-		// FieldUpdates: the Wave-2 phrase becomes the top, the Wave-1 phrases
-		// carried in r.Issues become the hidden count N. Deriving N from
-		// len(r.Issues) keeps the enricher idempotent — re-running against
-		// already-merged FieldUpdates["status"] never double-bumps the suffix,
-		// because Issues is fetcher-owned and stable across enrichment runs.
+		// FieldUpdates: the Wave-2 phrase becomes the top, the Wave-1 findings
+		// become the hidden count N. Post-PR-03e: derive N from r.Findings
+		// (was len(r.Issues)). Findings is fetcher-owned and stable across
+		// enrichment runs, so re-running against already-merged FieldUpdates
+		// never double-bumps.
 		var newStatus string
-		if len(r.Issues) == 0 {
+		if len(r.Findings) == 0 {
 			newStatus = "mount target down"
 		} else {
-			newStatus = fmt.Sprintf("mount target down (+%d)", len(r.Issues))
+			newStatus = fmt.Sprintf("mount target down (+%d)", len(r.Findings))
 		}
 		fu := map[string]string{"status": newStatus}
 		fieldUpdates[fsID] = fu

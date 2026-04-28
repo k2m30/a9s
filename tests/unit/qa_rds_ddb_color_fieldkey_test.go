@@ -24,13 +24,14 @@ import (
 func TestRDSColor_StatusFailed_IsColorBroken(t *testing.T) {
 	td := resource.FindResourceType("dbi")
 	r := resource.Resource{
-		ID:     "arn:aws:rds:us-east-1:123456789012:db:prod-db",
+		ID:     "arn:aws:rds:us-east-1:000000000000:db:prod-db",
 		Name:   "prod-db",
 		Fields: map[string]string{"status": "stopped"},
 	}
 	got := td.Color(r)
-	if got != resource.ColorBroken {
-		t.Errorf("dbi Color with Fields[status]=stopped = %v, want ColorBroken", got)
+	// stopped is intentional admin action, not failure — Warning, mirrors EC2 stopped.
+	if got != resource.ColorWarning {
+		t.Errorf("dbi Color with Fields[status]=stopped = %v, want ColorWarning", got)
 	}
 }
 

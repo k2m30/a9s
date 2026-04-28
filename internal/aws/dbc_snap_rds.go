@@ -57,9 +57,9 @@ func computeRDSDBClusterSnapshotFindings(snap rdstypes.DBClusterSnapshot) []doma
 }
 
 // ComputeRDSDBClusterSnapshotStatusAndIssues is the exported compatibility
-// wrapper around computeRDSDBClusterSnapshotFindings. Returns
-// (statusPhrase, issuesPhrases) matching the legacy (string, []string)
-// contract expected by external callers and tests.
+// wrapper around computeRDSDBClusterSnapshotFindings. The status phrase
+// carries the (+N) suffix to match what FetchRDSDBClusterSnapshotsPage writes
+// to Fields["status"].
 func ComputeRDSDBClusterSnapshotStatusAndIssues(snap rdstypes.DBClusterSnapshot) (string, []string) {
 	findings := computeRDSDBClusterSnapshotFindings(snap)
 	if len(findings) == 0 {
@@ -69,7 +69,11 @@ func ComputeRDSDBClusterSnapshotStatusAndIssues(snap rdstypes.DBClusterSnapshot)
 	for i, f := range findings {
 		phrases[i] = f.Phrase
 	}
-	return phrases[0], phrases
+	statusPhrase := phrases[0]
+	if len(phrases) > 1 {
+		statusPhrase = fmt.Sprintf("%s (+%d)", statusPhrase, len(phrases)-1)
+	}
+	return statusPhrase, phrases
 }
 
 // FetchRDSDBClusterSnapshotsPage fetches a single page of Aurora + Multi-AZ DB

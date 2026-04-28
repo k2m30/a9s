@@ -31,8 +31,7 @@ func databasesResourceTypes() []ResourceTypeDef {
 				// phrase written by the fetcher.
 				phrase := StripFindingSuffix(r.Fields["status"])
 				switch phrase {
-				case "failed", "storage-full", "stopped",
-					"inaccessible-encryption-credentials", "restore-error":
+				case "failed", "storage-full", "encryption key unavailable", "restore-error":
 					return ColorBroken
 				}
 				if strings.HasPrefix(phrase, "incompatible-") {
@@ -40,7 +39,7 @@ func databasesResourceTypes() []ResourceTypeDef {
 				}
 				switch phrase {
 				case "creating", "modifying", "backing-up", "rebooting",
-					"upgrading", "stopping", "starting", "deleting", "renaming":
+					"upgrading", "stopping", "stopped", "starting", "deleting", "renaming":
 					return ColorWarning
 				}
 				// Field-level checks for structurally healthy instances.
