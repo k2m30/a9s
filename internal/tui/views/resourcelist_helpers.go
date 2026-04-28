@@ -12,14 +12,13 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 )
 
-// resolveRowColor returns the resource.Color for row styling. PR-03a-views:
-// when r.Findings is non-empty, the first finding's Severity drives the color
-// so that view-layer colors are decoupled from the legacy r.Status field.
-// Falls back to td.ResolveColor(r) (lifecycle/Status path) when Findings is empty.
+// resolveRowColor returns the resource.Color for row styling.
+// Per-type Color funcs encode richer logic than the shim's coarse
+// phrase→severity mapping. td.ResolveColor is always authoritative.
+// EC2's Color reads state_reason_code patterns; ECS treats INACTIVE
+// differently from the fallback. Findings-based severity cannot replicate
+// this, so it is not consulted here.
 func resolveRowColor(td resource.ResourceTypeDef, r resource.Resource) resource.Color {
-	if len(r.Findings) > 0 {
-		return resource.ColorFromSeverity(r.Findings[0].Severity)
-	}
 	return td.ResolveColor(r)
 }
 
@@ -632,16 +631,17 @@ func (m *ResourceListModel) applyFilter() {
 	m.scroll.SetTotal(len(m.filteredResources))
 
 	// Recompute issue count from allResources (not filtered — represents the full page).
-	// PR-03a-views: prefer Findings-based predicate; fall back to canonical
-	// AWS status vocabulary (resource.FallbackColor) when Findings is empty.
-	// FallbackColor is used instead of td.ResolveColor so that per-type Color
-	// funcs that map lifecycle terminal states (e.g. "terminated") to ColorBroken
-	// do not inflate the badge — canonical lifecycle ends are always ColorDim.
+	// PR-03a-views: prefer Findings-based predicate; fall back to per-type
+	// td.ResolveColor(r) when Findings is empty. td.ResolveColor itself falls
+	// back to FallbackColor(r.Status) when no per-type Color func is set, so
+	// canonical lifecycle steady-states remain ColorDim. Using td.ResolveColor
+	// instead of FallbackColor ensures per-type Color logic (e.g. ECS INACTIVE →
+	// ColorBroken, EC2 Server.* stopped → ColorBroken) is respected.
 	ic := 0
 	for _, r := range m.allResources {
 		if hasIssueFinding(r) {
 			ic++
-		} else if len(r.Findings) == 0 && resource.FallbackColor(r.Status).IsIssue() {
+		} else if len(r.Findings) == 0 && m.typeDef.ResolveColor(r).IsIssue() {
 			ic++
 		}
 	}

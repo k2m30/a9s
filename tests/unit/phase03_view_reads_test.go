@@ -181,23 +181,28 @@ func TestViews_ListStatusColumn_FallsBackToLifecycleKey(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Test 3 — row color reads Findings[0].Severity, not r.Status lifecycle
+// Test 3 — row color delegates to td.ResolveColor(r), not Findings.Severity
 // ---------------------------------------------------------------------------
 
-// TestViews_ListColor_ReadsFindingsSeverity verifies that a resource with
-// Findings[0].Severity == SevBroken renders as broken-colored (not healthy)
-// even though its Status (and Fields["status"]) says "running".
+// TestViews_ListColor_DelegatesToTypeColor verifies that row color is always
+// determined by td.ResolveColor(r) (i.e. the per-type Color func), regardless
+// of what Findings[0].Severity says.
 //
-// Pre-fix: view calls td.ResolveColor(r) which reads Fields["status"]="running"
-// → ColorHealthy. All non-cursor rows with the same status have identical ANSI
-// color prefix → healthy-A and broken-A rows look the same → assertion fails.
-// Post-fix: view uses Findings[0].Severity = SevBroken → ColorBroken → rows differ.
+// Setup: td.Color returns ColorHealthy for Fields["status"]="running".
+//   - healthyRow: Findings=nil, status="running" → td.Color → ColorHealthy
+//   - findingsBrokenRow: Findings[0].Severity=SevBroken, status="running"
+//     → td.Color still returns ColorHealthy (status field wins over Findings)
+//
+// Post-fix: both non-cursor rows share the same healthy ANSI prefix because
+// td.Color is authoritative and both have status="running" → PASS.
+// Pre-fix: view reads Findings.Severity for color → findingsBrokenRow gets
+// broken color → ANSI prefix differs from healthyRow → FAIL.
 //
 // Design note: cursor row (position 0) renders with RowSelected style, masking
 // color differences. We place a "padding" resource at cursor position 0 and put
-// the two resources we care about at positions 1 (healthy) and 2 (broken) so
-// both render without cursor overlay and their base styles are comparable.
-func TestViews_ListColor_ReadsFindingsSeverity(t *testing.T) {
+// the two resources we care about at positions 1 (healthy) and 2 (findings-broken)
+// so both render without cursor overlay and their base styles are comparable.
+func TestViews_ListColor_DelegatesToTypeColor(t *testing.T) {
 	// Ensure NO_COLOR is absent so lipgloss emits ANSI escape sequences.
 	old, wasSet := os.LookupEnv("NO_COLOR")
 	os.Unsetenv("NO_COLOR") //nolint:errcheck
@@ -211,34 +216,37 @@ func TestViews_ListColor_ReadsFindingsSeverity(t *testing.T) {
 		styles.Reinit()
 	})
 
-	td := minimalTypeDef("ec2-col-test") // unique name avoids registered-type config override
+	// td.Color returns ColorHealthy for status="running" — any resource with
+	// Fields["status"]="running" is green regardless of Findings.
+	td := minimalTypeDef("ec2-delegate-color-test")
 
-	// cursor-row resource at position 0: RowSelected style masks color, so we
-	// do not use it in comparisons. It just holds the cursor.
+	// cursor-row at position 0: RowSelected style masks color, do not compare.
 	padding := resource.Resource{
 		ID:     "i-cursor",
 		Name:   "cursor-holder",
 		Status: "running",
 		Fields: map[string]string{"status": "running"},
 	}
-	// healthy-A at position 1: Findings=nil → post-fix ColorHealthy.
-	healthyA := resource.Resource{
-		ID:     "i-healthy-A",
-		Name:   "healthy-A",
-		Status: "running",
-		Fields: map[string]string{"status": "running"},
+	// healthyRow at position 1: Findings=nil, td.Color → ColorHealthy.
+	healthyRow := resource.Resource{
+		ID:       "i-healthy",
+		Name:     "healthy-row",
+		Status:   "running",
+		Fields:   map[string]string{"status": "running"},
 		Findings: nil,
 	}
-	// broken-A at position 2: Findings[0].Severity=SevBroken but status="running"
-	// → pre-fix ColorHealthy (same as healthyA), post-fix ColorBroken (different).
-	brokenA := resource.Resource{
-		ID:     "i-broken-A",
-		Name:   "broken-A",
-		Status: "running", // decoy: Color func reads this as Healthy pre-fix
+	// findingsBrokenRow at position 2: Findings[0].Severity=SevBroken but
+	// td.Color reads Fields["status"]="running" → ColorHealthy.
+	// Pre-fix: view reads Findings.Severity → broken color → different from healthyRow.
+	// Post-fix: view reads td.Color → healthy color → same as healthyRow.
+	findingsBrokenRow := resource.Resource{
+		ID:     "i-findings-broken",
+		Name:   "findings-broken-row",
+		Status: "running",
 		Fields: map[string]string{"status": "running"},
 		Findings: []domain.Finding{
 			{
-				Code:     "ec2.broken",
+				Code:     "ec2.impaired",
 				Phrase:   "instance impaired",
 				Severity: domain.SevBroken,
 				Source:   "wave1",
@@ -246,40 +254,42 @@ func TestViews_ListColor_ReadsFindingsSeverity(t *testing.T) {
 		},
 	}
 
-	m := loadList(td, []resource.Resource{padding, healthyA, brokenA})
+	m := loadList(td, []resource.Resource{padding, healthyRow, findingsBrokenRow})
 
 	rawOut := m.View()
 	lines := strings.Split(rawOut, "\n")
 
-	var healthyLine, brokenLine string
+	var healthyLine, brokenFindingsLine string
 	for _, l := range lines {
 		plain := stripAnsi(l)
-		if strings.Contains(plain, "healthy-A") {
+		if strings.Contains(plain, "healthy-row") {
 			healthyLine = l
 		}
-		if strings.Contains(plain, "broken-A") {
-			brokenLine = l
+		if strings.Contains(plain, "findings-broken-row") {
+			brokenFindingsLine = l
 		}
 	}
 
 	if healthyLine == "" {
-		t.Fatalf("could not find healthy-A row in rendered list:\n%s", stripAnsi(rawOut))
+		t.Fatalf("could not find healthy-row in rendered list:\n%s", stripAnsi(rawOut))
 	}
-	if brokenLine == "" {
-		t.Fatalf("could not find broken-A row in rendered list:\n%s", stripAnsi(rawOut))
+	if brokenFindingsLine == "" {
+		t.Fatalf("could not find findings-broken-row in rendered list:\n%s", stripAnsi(rawOut))
 	}
 
-	// Post-fix: broken-A must have a different ANSI color prefix than healthy-A.
-	// Pre-fix: both rows are ColorHealthy (status="running") → identical prefix → FAIL.
-	healthyANSIPrefix := extractANSIPrefix(healthyLine)
-	brokenANSIPrefix := extractANSIPrefix(brokenLine)
+	// Post-fix: both rows must share the same healthy ANSI prefix because
+	// td.Color is authoritative (status="running" → ColorHealthy for both).
+	// Pre-fix: findingsBrokenRow has broken ANSI prefix → differs → FAIL.
+	healthyPrefix := extractANSIPrefix(healthyLine)
+	findingsBrokenPrefix := extractANSIPrefix(brokenFindingsLine)
 
-	if healthyANSIPrefix == brokenANSIPrefix {
-		t.Errorf("broken-A (Findings.Severity=SevBroken) must render with a different color than healthy-A (Findings=nil); "+
-			"both rows have identical ANSI prefix — view is not reading Findings.Severity for row color.\n"+
-			"healthy-A raw line: %q\n"+
-			"broken-A  raw line: %q",
-			healthyLine, brokenLine)
+	if healthyPrefix != findingsBrokenPrefix {
+		t.Errorf("TestViews_ListColor_DelegatesToTypeColor: findingsBrokenRow must render with the SAME color as healthyRow "+
+			"because td.Color is authoritative and both have status=\"running\"; "+
+			"ANSI prefixes differ — view is reading Findings.Severity instead of td.ResolveColor(r).\n"+
+			"healthy-row       raw line: %q\n"+
+			"findings-broken-row raw line: %q",
+			healthyLine, brokenFindingsLine)
 	}
 }
 
@@ -685,29 +695,33 @@ func TestViews_ListStatusColumn_LifecycleKeyDefaultIsState(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Test 11 — IssueCount: terminated is not an issue
+// Test 11 — IssueCount respects per-type Color override (CR finding #3)
 // ---------------------------------------------------------------------------
 
-// TestViews_IssueCount_TerminatedIsNotAnIssue verifies that a resource with
-// Status="terminated" and no Findings does not contribute to IssueCount().
+// TestViews_IssueCount_RespectsTypeColorOverride verifies that when a type's
+// Color func classifies a resource as ColorBroken, IssueCount() counts it —
+// even when the resource's Status is a lifecycle terminal keyword that
+// FallbackColor would map to ColorDim (not an issue).
 //
-// "terminated" is a lifecycle terminal state, not an actionable issue.
-// IssueCount() counts resources whose Findings contain IsIssue()-severity
-// entries. A resource with Findings=nil must count as 0.
+// This pins that per-type Color is authoritative for issue classification in
+// the empty-Findings fallback path: IssueCount must use td.ResolveColor(r),
+// NOT FallbackColor(r.Status).
 //
-// Pre-fix: if IssueCount reads the legacy color (terminated → SevBroken via
-// the Color func), or if DeriveFindings emitted a "terminated" Finding that
-// was then counted, this would return 1.
-// Post-fix: Findings=nil (lifecycle filtered) → IssueCount() = 0.
-func TestViews_IssueCount_TerminatedIsNotAnIssue(t *testing.T) {
+// Setup: td.Color maps Fields["state"]="terminated" to ColorBroken. A resource
+// with that state and Findings=nil is loaded. IssueCount must return 1.
+//
+// Pre-fix: IssueCount fallback uses FallbackColor("terminated") → ColorDim →
+// IsIssue()=false → count=0 → FAIL.
+// Post-fix: IssueCount fallback uses td.ResolveColor(r) → ColorBroken →
+// IsIssue()=true → count=1 → PASS.
+func TestViews_IssueCount_RespectsTypeColorOverride(t *testing.T) {
 	ensureNoColor(t)
 
-	td := minimalTypeDef("ec2-terminated-test")
-	// Tighten the Color func so the LEGACY path would classify "terminated" as
-	// ColorBroken → IsIssue() = true. Pre-fix (IssueCount reads Color) returns 1.
-	// Post-fix (IssueCount reads Findings, which is nil) returns 0.
-	// Without this override the test passes vacuously because minimalTypeDef's
-	// default Color func returns ColorHealthy for "terminated".
+	td := minimalTypeDef("ec2-color-override-test")
+	// Override Color so "terminated" maps to ColorBroken. This represents a
+	// type-specific policy (e.g. a resource that should never be in terminated
+	// state in a healthy account). FallbackColor("terminated") would return
+	// ColorDim — this test pins that td.Color, not FallbackColor, is used.
 	td.Color = func(r resource.Resource) resource.Color {
 		if r.Fields["state"] == "terminated" {
 			return resource.ColorBroken
@@ -715,20 +729,20 @@ func TestViews_IssueCount_TerminatedIsNotAnIssue(t *testing.T) {
 		return resource.ColorHealthy
 	}
 	r := resource.Resource{
-		ID:     "i-term",
-		Name:   "terminated-instance",
+		ID:     "i-term-broken",
+		Name:   "terminated-broken",
 		Status: "terminated",
 		Fields: map[string]string{"state": "terminated"},
-		// Findings deliberately nil — if DeriveFindings filtered "terminated"
-		// correctly, Findings stays nil and IssueCount should be 0.
+		// Findings=nil forces the fallback path: IssueCount must use td.ResolveColor.
 		Findings: nil,
 	}
 
 	m := loadList(td, []resource.Resource{r})
 	got := m.IssueCount()
 
-	if got != 0 {
-		t.Errorf("IssueCount() = %d, want 0 (terminated is a lifecycle state, not an issue; Findings=nil)", got)
+	if got != 1 {
+		t.Errorf("IssueCount() = %d, want 1 (td.Color classifies \"terminated\" as ColorBroken → IsIssue()=true; "+
+			"pre-fix value is 0 because FallbackColor(\"terminated\") = ColorDim)", got)
 	}
 }
 
@@ -798,5 +812,129 @@ func TestViews_HasIssueFinding_ScansAllFindings(t *testing.T) {
 	if got := m.IssueCount(); got != 2 {
 		t.Errorf("IssueCount() = %d, want 2 (A has SevBroken at index 1, B has SevWarn at index 0 — both IsIssue()). "+
 			"Pre-fix value is 1 because hasIssueFinding only checks Findings[0] and A.Findings[0].Severity=SevOK.", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Test 13 — ECS INACTIVE classifies as broken via td.Color (CR finding #1)
+// ---------------------------------------------------------------------------
+
+// TestViews_ListColor_ECSInactiveIsBroken pins that an ECS service with
+// Fields["status"]="INACTIVE" is classified as broken (ColorBroken) even
+// though "inactive" / "INACTIVE" is a lifecycle keyword that FallbackColor
+// maps to ColorDim (not an issue).
+//
+// The ECS service type def (ShortName "ecs-svc") has an explicit Color func
+// that returns ColorBroken for "INACTIVE" (types_compute.go). IssueCount
+// must respect this via td.ResolveColor(r), not fall back to FallbackColor.
+//
+// Pre-fix: empty-Findings path uses FallbackColor("INACTIVE") → ColorDim →
+// IsIssue()=false → IssueCount()=0 → FAIL.
+// Post-fix: empty-Findings path uses td.ResolveColor(r) → reads
+// Fields["status"]="INACTIVE" → ColorBroken → IsIssue()=true → IssueCount()=1 → PASS.
+func TestViews_ListColor_ECSInactiveIsBroken(t *testing.T) {
+	ensureNoColor(t)
+
+	td := resource.FindResourceType("ecs-svc")
+	if td == nil {
+		t.Fatal("ecs-svc type def not registered — update short name if it changed")
+	}
+
+	// Confirm the invariant this test relies on: td.Color must classify INACTIVE
+	// as ColorBroken. If this assertion fails, the type def has changed and the
+	// test needs updating.
+	inactiveProbe := resource.Resource{
+		ID:     "svc-probe",
+		Name:   "probe",
+		Fields: map[string]string{"status": "INACTIVE"},
+	}
+	if got := td.ResolveColor(inactiveProbe); got != resource.ColorBroken {
+		t.Fatalf("precondition: ecs-svc.ResolveColor for INACTIVE = %v, want ColorBroken; "+
+			"update this test if the type def changed", got)
+	}
+
+	r := resource.Resource{
+		ID:   "svc-inactive",
+		Name: "inactive-service",
+		// Status field intentionally matches the ECS status key.
+		Status: "INACTIVE",
+		Fields: map[string]string{
+			"service_name": "inactive-service",
+			"status":       "INACTIVE",
+		},
+		// Findings=nil forces the fallback path: IssueCount must use td.ResolveColor.
+		Findings: nil,
+	}
+
+	m := loadList(*td, []resource.Resource{r})
+	got := m.IssueCount()
+
+	if got != 1 {
+		t.Errorf("IssueCount() = %d, want 1 (ECS INACTIVE is ColorBroken per td.Color; "+
+			"pre-fix value is 0 because FallbackColor(\"INACTIVE\") = ColorDim)", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Test 14 — empty-Findings fallback uses td.ResolveColor, not FallbackColor
+// (CR finding #3)
+// ---------------------------------------------------------------------------
+
+// TestViews_IssueCount_FallbackUsesTypeResolveColor pins that the empty-Findings
+// fallback in IssueCount uses td.ResolveColor(r) (which reads full Fields), not
+// the coarser FallbackColor(r.Status).
+//
+// Setup: EC2 type def; resource has Status="" (FallbackColor → ColorHealthy) but
+// Fields["state"]="stopped" and Fields["state_reason_code"]="Server.InternalError"
+// (AWS forced stop). td.ResolveColor reads Fields and returns ColorBroken.
+//
+// Pre-fix: IssueCount fallback calls FallbackColor("") → ColorHealthy →
+// IsIssue()=false → count=0 → FAIL.
+// Post-fix: IssueCount fallback calls td.ResolveColor(r) → reads Fields →
+// ColorBroken → IsIssue()=true → count=1 → PASS.
+func TestViews_IssueCount_FallbackUsesTypeResolveColor(t *testing.T) {
+	ensureNoColor(t)
+
+	td := resource.FindResourceType("ec2")
+	if td == nil {
+		t.Fatal("ec2 type def not registered — update short name if it changed")
+	}
+
+	// Confirm the invariant: ec2 Color func must return ColorBroken for a stopped
+	// instance with a Server.* state_reason_code.
+	brokenProbe := resource.Resource{
+		ID:     "i-probe",
+		Name:   "probe",
+		Status: "",
+		Fields: map[string]string{
+			"state":             "stopped",
+			"state_reason_code": "Server.InternalError",
+		},
+	}
+	if got := td.ResolveColor(brokenProbe); got != resource.ColorBroken {
+		t.Fatalf("precondition: ec2.ResolveColor for stopped/Server.InternalError = %v, want ColorBroken; "+
+			"update Fields if the type def changed", got)
+	}
+
+	r := resource.Resource{
+		ID:   "i-server-stopped",
+		Name: "server-stopped-instance",
+		// Status is deliberately empty so FallbackColor("") → ColorHealthy.
+		// td.ResolveColor reads Fields["state"]="stopped" + Server.* reason → ColorBroken.
+		Status: "",
+		Fields: map[string]string{
+			"state":             "stopped",
+			"state_reason_code": "Server.InternalError",
+		},
+		// Findings=nil forces the fallback path: IssueCount must use td.ResolveColor.
+		Findings: nil,
+	}
+
+	m := loadList(*td, []resource.Resource{r})
+	got := m.IssueCount()
+
+	if got != 1 {
+		t.Errorf("IssueCount() = %d, want 1 (td.ResolveColor reads Fields and returns ColorBroken for "+
+			"stopped/Server.InternalError; pre-fix value is 0 because FallbackColor(\"\") = ColorHealthy)", got)
 	}
 }
