@@ -429,6 +429,13 @@ func (m DetailModel) renderFromFieldList() string {
 				// Navigable or injected sub-fields have Key != Value (pre-split by buildFieldList).
 				// General sub-fields have Key == Value (raw YAML line).
 				if item.Key != item.Value {
+					// Attention phrase rows (IndentLevel == 1) collapse to value-only on
+					// the cursor row too — consistent with the non-cursor branch.
+					// AttentionDetails rows (IndentLevel == 3) keep Key: Value labels.
+					if item.Path == "Attention" && item.IndentLevel == 1 {
+						line = indent + item.Value
+						break
+					}
 					line = indent + item.Key + ": " + item.Value
 					break
 				}
@@ -461,13 +468,16 @@ func (m DetailModel) renderFromFieldList() string {
 				}
 				// Injected sub-fields with separate Key/Value (e.g., EC2 status checks).
 				if item.Key != item.Value {
-					// Attention-section entries use splitKeyValue: Key = raw phrase (for
-					// search/clipboard), Value = glyph + capitalized phrase (for display).
-					// In TUI mode (plainMode=false) render only the Value — the short form
-					// fits the viewport without truncation. In plainMode (PlainContent/
-					// clipboard) render Key: Value so the raw lowercase phrase is present
-					// alongside the capitalized display form.
-					if item.Path == "Attention" && !m.plainMode {
+					// Attention phrase rows (IndentLevel == 1) use splitKeyValue:
+					// Key = raw phrase (for search/clipboard), Value = glyph +
+					// capitalized phrase (for display). In TUI mode (plainMode=false)
+					// render only the Value — the short form fits the viewport without
+					// truncation. In plainMode (PlainContent/clipboard) render Key: Value
+					// so the raw lowercase phrase is present alongside the capitalized
+					// display form. IndentLevel == 1 distinguishes phrase rows from
+					// AttentionDetails rows (IndentLevel == 3) which must always render
+					// as Key: Value to preserve their labels (e.g. "Action: reboot").
+					if item.Path == "Attention" && item.IndentLevel == 1 && !m.plainMode {
 						val := item.Value
 						if item.ColorTier != "" {
 							val = styles.TierColorStyle(item.ColorTier).Render(val)

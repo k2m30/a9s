@@ -311,19 +311,11 @@ func (m ResourceListModel) renderDataRow(cols []listCol, r resource.Resource, ba
 				}
 			}
 		}
-		// PR-03a-views: when a status/lifecycle column carries a Findings phrase,
-		// allow the cell to be as wide as the phrase so it is never truncated.
-		// The phrase comes directly from the data layer and may legitimately
-		// exceed the default column width declared in typeDef.Columns.
-		padWidth := c.width
-		isStatusColHere := c.key == "status" || c.key == lifecycleColumnKey(m.typeDef)
-		if isStatusColHere && len(r.Findings) > 0 {
-			if nat := lipgloss.Width(val); nat > padWidth {
-				padWidth = nat
-			}
-		}
-		padded := text.PadOrTrunc(val, padWidth)
-		used += padWidth
+		// Column width is already correct: widenLifecycleColumn pre-widened the
+		// lifecycle/status column before fitColumns ran, so c.width is the max
+		// across all rows. No per-row widening needed here.
+		padded := text.PadOrTrunc(val, c.width)
+		used += c.width
 		b.WriteString(base.Render(padded))
 	}
 	// Trailing pad to totalWidth for the cursor row so the cursor bg fills the entire line.
@@ -407,4 +399,47 @@ func lifecycleColumnKey(td resource.ResourceTypeDef) string {
 		return td.LifecycleKey
 	}
 	return "state"
+}
+
+// widenLifecycleColumn scans all rows and widens the lifecycle/status column
+// so its declared width covers the longest Findings phrase across every row.
+// Returns a new slice; the original is unmodified.
+//
+// This must run BEFORE fitColumns and renderHeaderRow so that the header and
+// all data rows use the same (widened) column width. Without this pre-pass,
+// renderDataRow would widen per-row in isolation, causing the header to show
+// the original (narrower) width while data rows overflow — a visible desync
+// between header labels and data cells.
+func (m ResourceListModel) widenLifecycleColumn(cols []listCol, rows []resource.Resource) []listCol {
+	if len(cols) == 0 || len(rows) == 0 {
+		return cols
+	}
+	lifecycleKey := lifecycleColumnKey(m.typeDef)
+	idx := -1
+	for i, c := range cols {
+		if c.key == "status" || c.key == lifecycleKey {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return cols
+	}
+	maxW := cols[idx].width
+	for _, r := range rows {
+		if len(r.Findings) == 0 {
+			continue
+		}
+		phrase := r.Findings[0].Phrase
+		if nat := lipgloss.Width(phrase); nat > maxW {
+			maxW = nat
+		}
+	}
+	if maxW == cols[idx].width {
+		return cols // no widening needed
+	}
+	out := make([]listCol, len(cols))
+	copy(out, cols)
+	out[idx].width = maxW
+	return out
 }

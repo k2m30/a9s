@@ -7,7 +7,6 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
@@ -19,24 +18,23 @@ import (
 // Falls back to td.ResolveColor(r) (lifecycle/Status path) when Findings is empty.
 func resolveRowColor(td resource.ResourceTypeDef, r resource.Resource) resource.Color {
 	if len(r.Findings) > 0 {
-		switch r.Findings[0].Severity {
-		case domain.SevBroken:
-			return resource.ColorBroken
-		case domain.SevWarn:
-			return resource.ColorWarning
-		case domain.SevOK:
-			return resource.ColorHealthy
-		case domain.SevDim:
-			return resource.ColorDim
-		}
+		return resource.ColorFromSeverity(r.Findings[0].Severity)
 	}
 	return td.ResolveColor(r)
 }
 
 // hasIssueFinding reports whether r has at least one finding with IsIssue() severity.
 // PR-03a-views: used by attention filter and issue-count computation.
+// Scans ALL findings — not only Findings[0] — so that a resource whose
+// primary finding is SevOK but carries a later SevBroken/SevWarn entry is
+// still correctly classified as an issue.
 func hasIssueFinding(r resource.Resource) bool {
-	return len(r.Findings) > 0 && r.Findings[0].Severity.IsIssue()
+	for _, f := range r.Findings {
+		if resource.IsIssueSeverity(f.Severity) {
+			return true
+		}
+	}
+	return false
 }
 
 // applySortAndFilter re-applies filter and then sorts the filtered results.
@@ -634,13 +632,16 @@ func (m *ResourceListModel) applyFilter() {
 	m.scroll.SetTotal(len(m.filteredResources))
 
 	// Recompute issue count from allResources (not filtered — represents the full page).
-	// PR-03a-views: prefer Findings-based predicate; fall back to legacy color check
-	// when Findings is empty (r.Status / r.Fields path).
+	// PR-03a-views: prefer Findings-based predicate; fall back to canonical
+	// AWS status vocabulary (resource.FallbackColor) when Findings is empty.
+	// FallbackColor is used instead of td.ResolveColor so that per-type Color
+	// funcs that map lifecycle terminal states (e.g. "terminated") to ColorBroken
+	// do not inflate the badge — canonical lifecycle ends are always ColorDim.
 	ic := 0
 	for _, r := range m.allResources {
 		if hasIssueFinding(r) {
 			ic++
-		} else if len(r.Findings) == 0 && m.typeDef.ResolveColor(r).IsIssue() {
+		} else if len(r.Findings) == 0 && resource.FallbackColor(r.Status).IsIssue() {
 			ic++
 		}
 	}

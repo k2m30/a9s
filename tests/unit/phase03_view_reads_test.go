@@ -703,6 +703,17 @@ func TestViews_IssueCount_TerminatedIsNotAnIssue(t *testing.T) {
 	ensureNoColor(t)
 
 	td := minimalTypeDef("ec2-terminated-test")
+	// Tighten the Color func so the LEGACY path would classify "terminated" as
+	// ColorBroken → IsIssue() = true. Pre-fix (IssueCount reads Color) returns 1.
+	// Post-fix (IssueCount reads Findings, which is nil) returns 0.
+	// Without this override the test passes vacuously because minimalTypeDef's
+	// default Color func returns ColorHealthy for "terminated".
+	td.Color = func(r resource.Resource) resource.Color {
+		if r.Fields["state"] == "terminated" {
+			return resource.ColorBroken
+		}
+		return resource.ColorHealthy
+	}
 	r := resource.Resource{
 		ID:     "i-term",
 		Name:   "terminated-instance",
@@ -718,5 +729,74 @@ func TestViews_IssueCount_TerminatedIsNotAnIssue(t *testing.T) {
 
 	if got != 0 {
 		t.Errorf("IssueCount() = %d, want 0 (terminated is a lifecycle state, not an issue; Findings=nil)", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Test 12 — hasIssueFinding scans ALL findings, not only Findings[0]
+// ---------------------------------------------------------------------------
+
+// TestViews_HasIssueFinding_ScansAllFindings pins that issue classification
+// considers EVERY finding in the slice, not just Findings[0]. Pre-fix
+// hasIssueFinding only checks index 0; post-fix it scans all entries.
+//
+// Reachable via:
+//   - ResourceListModel.IssueCount() — must count rows whose Findings has
+//     ANY issue-severity entry, not just at index 0.
+//   - Attention filter (ctrl+z) — must keep rows whose Findings has any
+//     issue-severity entry visible.
+//
+// Pre-fix: hasIssueFinding returns len>0 && Findings[0].IsIssue().
+//   Row A has Findings[0].Severity=SevOK → false → not counted.
+//   Only row B (SevWarn at index 0) is counted → IssueCount()=1.
+//
+// Post-fix: hasIssueFinding scans all entries.
+//   Row A has Findings[1].Severity=SevBroken → true → counted.
+//   Row B has Findings[0].Severity=SevWarn → true → counted.
+//   IssueCount()=2.
+//
+// Forward-compat note: production paths post-fix filter lifecycle findings
+// before populating r.Findings, so a real resource will not carry [SevOK,
+// SevBroken] ordering in production today. This test is a defensive regression
+// pin for future per-category PRs that may emit lifecycle Findings explicitly,
+// or for any code path that appends findings without pre-sorting by severity.
+func TestViews_HasIssueFinding_ScansAllFindings(t *testing.T) {
+	ensureNoColor(t)
+
+	td := minimalTypeDef("ec2-mixed-findings")
+
+	// Row A — Findings[0] is non-issue (SevOK), Findings[1] is broken.
+	// Pre-fix: hasIssueFinding checks only Findings[0].Severity == SevOK → not an issue.
+	// Post-fix: scan all; Findings[1].Severity == SevBroken → is an issue.
+	resA := resource.Resource{
+		ID:   "i-mixed-1",
+		Name: "mixed-findings-1",
+		Fields: map[string]string{"state": "running"},
+		Findings: []domain.Finding{
+			{Code: "ec2.lifecycle", Phrase: "running", Severity: domain.SevOK, Source: "wave1"},
+			{Code: "ec2.maint", Phrase: "pending maintenance", Severity: domain.SevBroken, Source: "wave2:ec2"},
+		},
+	}
+	// Row B — only Findings[0]; SevWarn — both pre-fix and post-fix count this.
+	resB := resource.Resource{
+		ID:   "i-mixed-2",
+		Name: "mixed-findings-2",
+		Fields: map[string]string{"state": "running"},
+		Findings: []domain.Finding{
+			{Code: "ec2.warn", Phrase: "node group degraded", Severity: domain.SevWarn, Source: "wave2:ec2"},
+		},
+	}
+	// Row C — no findings; must not be counted.
+	resC := resource.Resource{
+		ID:   "i-mixed-3",
+		Name: "mixed-findings-3",
+		Fields: map[string]string{"state": "running"},
+	}
+
+	m := loadList(td, []resource.Resource{resA, resB, resC})
+
+	if got := m.IssueCount(); got != 2 {
+		t.Errorf("IssueCount() = %d, want 2 (A has SevBroken at index 1, B has SevWarn at index 0 — both IsIssue()). "+
+			"Pre-fix value is 1 because hasIssueFinding only checks Findings[0] and A.Findings[0].Severity=SevOK.", got)
 	}
 }

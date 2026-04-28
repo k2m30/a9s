@@ -9,7 +9,6 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/semantics/attention"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
@@ -357,21 +356,6 @@ func (m *DetailModel) SetEnrichmentFinding(f *resource.EnrichmentFinding) {
 	}
 
 	m.enrichmentFinding = f
-	var (
-		td     resource.ResourceTypeDef
-		enrich map[string]resource.EnrichmentFinding
-	)
-	if found := resource.FindResourceType(m.resourceType); found != nil {
-		td = *found
-	} else {
-		td = resource.ResourceTypeDef{ShortName: m.resourceType}
-	}
-	if f != nil && f.Summary != "" {
-		enrich = map[string]resource.EnrichmentFinding{
-			m.res.ID: *f,
-		}
-	}
-	attention.DeriveFindings(&m.res, td, enrich)
 	m.fieldList = nil
 	m.buildFieldList() // eager rebuild BEFORE render — see sequence in docstring
 

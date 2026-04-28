@@ -438,6 +438,12 @@ func (m *ResourceListModel) View() string {
 		cols = nil
 	}
 
+	// Pre-widen the lifecycle/status column to the max natural phrase width
+	// across ALL rows BEFORE fitColumns and renderHeaderRow. This ensures the
+	// header and all data rows use the same (widened) column width; per-row
+	// widening in renderDataRow is therefore no longer needed.
+	cols = m.widenLifecycleColumn(cols, m.filteredResources)
+
 	// Hide rightmost columns that don't fit in width.
 	cols = m.fitColumns(cols)
 
