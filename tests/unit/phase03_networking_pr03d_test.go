@@ -1,28 +1,8 @@
 package unit_test
 
-// phase03_networking_pr03d_test.go — failing TDD pins for Wave 1 finding
-// migration across 7 networking types: vpc, subnet, elb, igw, nat, vpce, tgw.
-// Plus rtb special-case (Status: isMain → drop entirely).
-//
-// Migration contract (PR-03d — NOT YET IMPLEMENTED):
-//   - Fetchers STOP writing Resource.Status for lifecycle states.
-//   - Fetchers EMIT canonical Finding entries (Source: "wave1") for
-//     non-healthy, non-terminal states.
-//   - Each type has a corresponding internal/aws/<svc>_codes.go with constants.
-//   - Each type's Color func reads Findings first, then falls back to
-//     structural fields.
-//
-// Design decisions:
-//   - _HealthyEmitsNoFinding tests are intentionally omitted here.
-//     The existing TestFetch<Type>_* tests in aws_<type>_test.go own the
-//     healthy invariant; once those are migrated (separate coder dispatch),
-//     they will assert r.Status == "" && len(r.Findings) == 0 for healthy.
-//   - rtb has no lifecycle state — Status: isMain is structural metadata, not
-//     a health signal. The migration drops the Status write; Fields["is_main"]
-//     remains. No Findings are emitted for rtb.
-//   - tgw "failed" does not appear in the SDK TransitGatewayState enum but IS
-//     used as a string case in types_networking.go Color func. The test uses a
-//     raw cast ec2types.TransitGatewayState("failed") to match the Color branch.
+// Why: tgw "failed" is not in the SDK TransitGatewayState enum but is
+// handled as a string case in types_networking.go Color func — the test
+// uses a raw ec2types.TransitGatewayState("failed") cast to match.
 
 import (
 	"context"
@@ -42,13 +22,6 @@ import (
 // =============================================================================
 // VPC
 // =============================================================================
-
-// TestPR03d_VPCCodes_ConstantsExist verifies that vpc_codes.go declares
-// Wave 1 finding constants. Fails to compile until the file is created.
-func TestPR03d_VPCCodes_ConstantsExist(t *testing.T) {
-	t.Helper()
-	var _ domain.FindingCode = awsclient.CodeVPCStatePending
-}
 
 // TestPR03d_VPCFetcher_PendingEmitsWarnFinding asserts that a VPC in the
 // "pending" state emits one SevWarn Finding with CodeVPCStatePending and
@@ -140,16 +113,6 @@ func (m *pr03dVPCMock) DescribeVpcs(
 // =============================================================================
 // SUBNET
 // =============================================================================
-
-// TestPR03d_SubnetCodes_ConstantsExist verifies that subnet_codes.go declares
-// Wave 1 finding constants. Fails to compile until the file is created.
-func TestPR03d_SubnetCodes_ConstantsExist(t *testing.T) {
-	t.Helper()
-	var _ domain.FindingCode = awsclient.CodeSubnetStatePending
-	var _ domain.FindingCode = awsclient.CodeSubnetStateUnavailable
-	var _ domain.FindingCode = awsclient.CodeSubnetStateFailed
-	var _ domain.FindingCode = awsclient.CodeSubnetStateFailedInsufficientCapacity
-}
 
 // TestPR03d_SubnetFetcher_PendingEmitsWarnFinding asserts that a subnet in
 // "pending" state emits one SevWarn Finding with CodeSubnetStatePending.
@@ -280,15 +243,6 @@ func (m *pr03dSubnetMock) DescribeSubnets(
 // =============================================================================
 // ELB (Elastic Load Balancer v2)
 // =============================================================================
-
-// TestPR03d_ELBCodes_ConstantsExist verifies that elb_codes.go declares
-// Wave 1 finding constants. Fails to compile until the file is created.
-func TestPR03d_ELBCodes_ConstantsExist(t *testing.T) {
-	t.Helper()
-	var _ domain.FindingCode = awsclient.CodeELBStateProvisioning
-	var _ domain.FindingCode = awsclient.CodeELBStateActiveImpaired
-	var _ domain.FindingCode = awsclient.CodeELBStateFailed
-}
 
 // TestPR03d_ELBFetcher_ProvisioningEmitsWarnFinding asserts that a load
 // balancer in "provisioning" state emits one SevWarn Finding with
@@ -426,18 +380,6 @@ func (m *pr03dELBMock) DescribeLoadBalancers(
 // IGW (Internet Gateway)
 // =============================================================================
 
-// TestPR03d_IGWCodes_ConstantsExist verifies that igw_codes.go declares
-// Wave 1 finding constants. Fails to compile until the file is created.
-//
-// NOTE: IGW has no SevBroken lifecycle state. "attachments_count == 0" is
-// a structural orphan check owned by Color, not a wave1 Finding. The only
-// wave1 Findings are for transitional attachment states: attaching/detaching.
-func TestPR03d_IGWCodes_ConstantsExist(t *testing.T) {
-	t.Helper()
-	var _ domain.FindingCode = awsclient.CodeIGWStateAttaching
-	var _ domain.FindingCode = awsclient.CodeIGWStateDetaching
-}
-
 // TestPR03d_IGWFetcher_AttachingEmitsWarnFinding asserts that an IGW in the
 // "attaching" attachment state emits one SevWarn Finding with
 // CodeIGWStateAttaching.
@@ -529,15 +471,6 @@ func (m *pr03dIGWMock) DescribeInternetGateways(
 // =============================================================================
 // NAT (NAT Gateway)
 // =============================================================================
-
-// TestPR03d_NATCodes_ConstantsExist verifies that nat_codes.go declares
-// Wave 1 finding constants. Fails to compile until the file is created.
-func TestPR03d_NATCodes_ConstantsExist(t *testing.T) {
-	t.Helper()
-	var _ domain.FindingCode = awsclient.CodeNATStatePending
-	var _ domain.FindingCode = awsclient.CodeNATStateDeleting
-	var _ domain.FindingCode = awsclient.CodeNATStateFailed
-}
 
 // TestPR03d_NATFetcher_PendingEmitsWarnFinding asserts that a NAT gateway in
 // "pending" state emits one SevWarn Finding with CodeNATStatePending.
@@ -667,19 +600,6 @@ func (m *pr03dNATMock) DescribeNatGateways(
 // VPCE (VPC Endpoint)
 // =============================================================================
 
-// TestPR03d_VPCECodes_ConstantsExist verifies that vpce_codes.go declares
-// Wave 1 finding constants. Fails to compile until the file is created.
-func TestPR03d_VPCECodes_ConstantsExist(t *testing.T) {
-	t.Helper()
-	var _ domain.FindingCode = awsclient.CodeVPCEStatePendingAcceptance
-	var _ domain.FindingCode = awsclient.CodeVPCEStatePending
-	var _ domain.FindingCode = awsclient.CodeVPCEStateDeleting
-	var _ domain.FindingCode = awsclient.CodeVPCEStateFailed
-	var _ domain.FindingCode = awsclient.CodeVPCEStateRejected
-	var _ domain.FindingCode = awsclient.CodeVPCEStateExpired
-	var _ domain.FindingCode = awsclient.CodeVPCEStatePartial
-}
-
 // TestPR03d_VPCEFetcher_PendingEmitsWarnFinding asserts that a VPC endpoint
 // in "Pending" state emits one SevWarn Finding with CodeVPCEStatePending.
 func TestPR03d_VPCEFetcher_PendingEmitsWarnFinding(t *testing.T) {
@@ -806,21 +726,6 @@ func (m *pr03dVPCEMock) DescribeVpcEndpoints(
 // =============================================================================
 // TGW (Transit Gateway)
 // =============================================================================
-
-// TestPR03d_TGWCodes_ConstantsExist verifies that tgw_codes.go declares
-// Wave 1 finding constants. Fails to compile until the file is created.
-//
-// NOTE: TransitGatewayState SDK enum does not include "failed" as of
-// aws-sdk-go-v2 ec2@v1.296.0 — but the Color func in types_networking.go
-// does handle it as a string case. The constant is tested here; the fetcher
-// uses a raw ec2types.TransitGatewayState("failed") cast below.
-func TestPR03d_TGWCodes_ConstantsExist(t *testing.T) {
-	t.Helper()
-	var _ domain.FindingCode = awsclient.CodeTGWStatePending
-	var _ domain.FindingCode = awsclient.CodeTGWStateModifying
-	var _ domain.FindingCode = awsclient.CodeTGWStateDeleting
-	var _ domain.FindingCode = awsclient.CodeTGWStateFailed
-}
 
 // TestPR03d_TGWFetcher_PendingEmitsWarnFinding asserts that a transit gateway
 // in "pending" state emits one SevWarn Finding with CodeTGWStatePending.

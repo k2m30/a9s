@@ -22,7 +22,7 @@ func TestFetchInternetGateways_ParsesMultipleIGWs(t *testing.T) {
 			InternetGateways: []ec2types.InternetGateway{
 				{
 					InternetGatewayId: aws.String("igw-0001"),
-					OwnerId:           aws.String("123456789012"),
+					OwnerId:           aws.String("000000000000"),
 					Attachments: []ec2types.InternetGatewayAttachment{
 						{
 							VpcId: aws.String("vpc-aaa"),
@@ -36,7 +36,7 @@ func TestFetchInternetGateways_ParsesMultipleIGWs(t *testing.T) {
 				},
 				{
 					InternetGatewayId: aws.String("igw-0002"),
-					OwnerId:           aws.String("123456789012"),
+					OwnerId:           aws.String("000000000000"),
 					Attachments: []ec2types.InternetGatewayAttachment{
 						{
 							VpcId: aws.String("vpc-bbb"),
@@ -67,7 +67,7 @@ func TestFetchInternetGateways_ParsesMultipleIGWs(t *testing.T) {
 		t.Errorf("resource[0].Name: expected %q, got %q", "main-igw", r0.Name)
 	}
 	if r0.Status != "" {
-		t.Errorf("resource[0].Status: expected empty (PR-03d migration), got %q", r0.Status)
+		t.Errorf("resource[0].Status: expected empty, got %q", r0.Status)
 	}
 
 	// Verify Fields on all resources
@@ -103,7 +103,7 @@ func TestFetchInternetGateways_ParsesMultipleIGWs(t *testing.T) {
 		t.Errorf("resource[1].Name: expected empty string, got %q", r1.Name)
 	}
 	if r1.Status != "" {
-		t.Errorf("resource[1].Status: expected empty (PR-03d migration), got %q", r1.Status)
+		t.Errorf("resource[1].Status: expected empty, got %q", r1.Status)
 	}
 	if r1.Fields["vpc_id"] != "vpc-bbb" {
 		t.Errorf("resource[1].Fields[\"vpc_id\"]: expected %q, got %q", "vpc-bbb", r1.Fields["vpc_id"])

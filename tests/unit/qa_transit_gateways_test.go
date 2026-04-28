@@ -52,7 +52,7 @@ func TestQA_TransitGateways_FetchSuccess(t *testing.T) {
 		t.Errorf("expected Name 'main-tgw', got %q", r.Name)
 	}
 	if r.Status != "" {
-		t.Errorf("expected empty Status (PR-03d migration), got %q", r.Status)
+		t.Errorf("expected empty Status, got %q", r.Status)
 	}
 	if r.Fields["state"] != "available" {
 		t.Errorf("expected Fields[\"state\"]='available', got %q", r.Fields["state"])

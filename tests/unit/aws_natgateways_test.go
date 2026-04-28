@@ -69,7 +69,7 @@ func TestFetchNatGateways_ParsesMultipleNatGateways(t *testing.T) {
 		t.Errorf("resource[0].Name: expected %q, got %q", "main-nat", r0.Name)
 	}
 	if r0.Status != "" {
-		t.Errorf("resource[0].Status: expected empty (PR-03d migration), got %q", r0.Status)
+		t.Errorf("resource[0].Status: expected empty, got %q", r0.Status)
 	}
 
 	// Verify Fields on all resources
@@ -111,7 +111,7 @@ func TestFetchNatGateways_ParsesMultipleNatGateways(t *testing.T) {
 		t.Errorf("resource[1].Name: expected empty string, got %q", r1.Name)
 	}
 	if r1.Status != "" {
-		t.Errorf("resource[1].Status: expected empty (PR-03d migration), got %q", r1.Status)
+		t.Errorf("resource[1].Status: expected empty, got %q", r1.Status)
 	}
 	if r1.Fields["state"] != "pending" {
 		t.Errorf("resource[1].Fields[\"state\"]: expected %q, got %q", "pending", r1.Fields["state"])

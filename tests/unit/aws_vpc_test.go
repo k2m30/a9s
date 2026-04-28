@@ -28,7 +28,7 @@ func TestFetchVPCs_ParsesMultipleVPCs(t *testing.T) {
 					IsDefault:       aws.Bool(true),
 					DhcpOptionsId:   aws.String("dopt-abc123"),
 					InstanceTenancy: ec2types.TenancyDefault,
-					OwnerId:         aws.String("123456789012"),
+					OwnerId:         aws.String("000000000000"),
 					Tags: []ec2types.Tag{
 						{Key: aws.String("Name"), Value: aws.String("main-vpc")},
 						{Key: aws.String("Env"), Value: aws.String("prod")},
@@ -41,7 +41,7 @@ func TestFetchVPCs_ParsesMultipleVPCs(t *testing.T) {
 					IsDefault:       aws.Bool(false),
 					DhcpOptionsId:   aws.String("dopt-def456"),
 					InstanceTenancy: ec2types.TenancyDedicated,
-					OwnerId:         aws.String("123456789012"),
+					OwnerId:         aws.String("000000000000"),
 					Tags:            []ec2types.Tag{},
 				},
 			},
@@ -66,7 +66,7 @@ func TestFetchVPCs_ParsesMultipleVPCs(t *testing.T) {
 		t.Errorf("resource[0].Name: expected %q, got %q", "main-vpc", r0.Name)
 	}
 	if r0.Status != "" {
-		t.Errorf("resource[0].Status: expected empty (PR-03d migration), got %q", r0.Status)
+		t.Errorf("resource[0].Status: expected empty, got %q", r0.Status)
 	}
 
 	// Verify Fields
@@ -105,7 +105,7 @@ func TestFetchVPCs_ParsesMultipleVPCs(t *testing.T) {
 		t.Errorf("resource[1].Name: expected empty string, got %q", r1.Name)
 	}
 	if r1.Status != "" {
-		t.Errorf("resource[1].Status: expected empty (PR-03d migration), got %q", r1.Status)
+		t.Errorf("resource[1].Status: expected empty, got %q", r1.Status)
 	}
 	if r1.Fields["state"] != "pending" {
 		t.Errorf("resource[1].Fields[\"state\"]: expected %q, got %q", "pending", r1.Fields["state"])
@@ -216,7 +216,7 @@ func TestFetchVPCs_RealAWSData(t *testing.T) {
 		t.Errorf("resource[0].Name: expected %q, got %q", "dev-vpc", r0.Name)
 	}
 	if r0.Status != "" {
-		t.Errorf("resource[0].Status: expected empty (PR-03d migration), got %q", r0.Status)
+		t.Errorf("resource[0].Status: expected empty, got %q", r0.Status)
 	}
 	if r0.Fields["vpc_id"] != "vpc-0aaa1111bbb2222cc" {
 		t.Errorf("resource[0].Fields[\"vpc_id\"]: expected %q, got %q", "vpc-0aaa1111bbb2222cc", r0.Fields["vpc_id"])
@@ -255,7 +255,7 @@ func TestFetchVPCs_RealAWSData(t *testing.T) {
 		t.Errorf("resource[1].Name: expected empty (no Name tag on default VPC), got %q", r1.Name)
 	}
 	if r1.Status != "" {
-		t.Errorf("resource[1].Status: expected empty (PR-03d migration), got %q", r1.Status)
+		t.Errorf("resource[1].Status: expected empty, got %q", r1.Status)
 	}
 	if r1.Fields["state"] != "available" {
 		t.Errorf("resource[1].Fields[\"state\"]: expected %q, got %q", "available", r1.Fields["state"])

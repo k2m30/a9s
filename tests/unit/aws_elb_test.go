@@ -32,7 +32,7 @@ func TestFetchLoadBalancers_ParsesMultipleLoadBalancers(t *testing.T) {
 						Code: elbv2types.LoadBalancerStateEnumActive,
 					},
 					VpcId:                 aws.String("vpc-abc123"),
-					LoadBalancerArn:       aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/prod-alb/abc123"),
+					LoadBalancerArn:       aws.String("arn:aws:elasticloadbalancing:us-east-1:000000000000:loadbalancer/app/prod-alb/abc123"),
 					CanonicalHostedZoneId: aws.String("Z35SXDOTRQ7X7K"),
 					CreatedTime:           &createdTime,
 					IpAddressType:         elbv2types.IpAddressTypeIpv4,
@@ -46,7 +46,7 @@ func TestFetchLoadBalancers_ParsesMultipleLoadBalancers(t *testing.T) {
 						Code: elbv2types.LoadBalancerStateEnumActive,
 					},
 					VpcId:           aws.String("vpc-def456"),
-					LoadBalancerArn: aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/net/internal-nlb/def456"),
+					LoadBalancerArn: aws.String("arn:aws:elasticloadbalancing:us-east-1:000000000000:loadbalancer/net/internal-nlb/def456"),
 					IpAddressType:   elbv2types.IpAddressTypeIpv4,
 				},
 			},
@@ -81,7 +81,7 @@ func TestFetchLoadBalancers_ParsesMultipleLoadBalancers(t *testing.T) {
 		t.Errorf("resource[0].Name: expected %q, got %q", "prod-alb", r0.Name)
 	}
 	if r0.Status != "" {
-		t.Errorf("resource[0].Status: expected empty (PR-03d migration), got %q", r0.Status)
+		t.Errorf("resource[0].Status: expected empty, got %q", r0.Status)
 	}
 	if r0.Fields["name"] != "prod-alb" {
 		t.Errorf("resource[0].Fields[\"name\"]: expected %q, got %q", "prod-alb", r0.Fields["name"])
