@@ -226,6 +226,17 @@ func (m Model) EnrichmentGen() int {
 	return m.Session.EnrichmentGen
 }
 
+// ActiveDetailResource returns the resource held by the top-of-stack
+// DetailModel, if any. Used by tests to inspect shim wire-ups on the
+// detail-view path (Phase 03 PR-03a-shim Site 7). Returns ok=false
+// when the active view is not a DetailModel.
+func (m Model) ActiveDetailResource() (resource.Resource, bool) {
+	if d, ok := m.activeView().(*views.DetailModel); ok {
+		return d.SourceResource(), true
+	}
+	return resource.Resource{}, false
+}
+
 // Init implements tea.Model. Fires a command to establish the AWS session.
 // When pre-supplied clients are present (demo mode or tests), emits a synthetic
 // ClientsReadyMsg immediately. Otherwise initiates the live AWS connection flow.

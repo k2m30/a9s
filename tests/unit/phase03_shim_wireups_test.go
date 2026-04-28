@@ -626,6 +626,48 @@ func TestShim_DeriveHelpersResolveAlias_SingleResource(t *testing.T) {
 	}
 }
 
+// ── Wire-up sites added in this append block ────────────────────────────────
+//
+// Site 1  (app.go:342)  — ResourcesLoadedMsg → non-list cache write-through.
+// Site 6  — child-view navigate cache-miss: already covered by the combination
+//            of TestShim_NavigateAliasHitsCanonicalCache (cache-hit path at
+//            app_handlers_navigate.go:56) and TestShim_ResourcesLoadedPopulatesFindings
+//            (cache-miss path returns a fetchResources command whose eventual
+//            ResourcesLoadedMsg result is handled by the Site 1 handler). No
+//            redundant test written.
+// Site 7  (app.go:446)  — EnrichDetailResultMsg → deriveFindingsForResource.
+//            Requires tui.Model.ActiveDetailResource() accessor (see note below).
+//
+// ── Note on Site 7 accessor requirement ────────────────────────────────────
+//
+//   views.DetailModel already has a public SourceResource() accessor. However,
+//   tui.Model.stack is unexported and there is no public ActiveView() method,
+//   so the test cannot retrieve the active DetailModel from a tui.Model after
+//   Update(). Two approaches are available:
+//     (a) Add a public accessor to tui.Model — e.g.,
+//            func (m Model) ActiveDetailResource() (resource.Resource, bool)
+//         This is the approach chosen here. The test calls m.ActiveDetailResource()
+//         so it fails to COMPILE until the coder adds the accessor. This
+//         satisfies the TDD red-light requirement without modifying production
+//         logic.
+//     (b) Inspect via View() string rendering (brittle, not used).
+//   Choice: option (a). The accessor is a read-only helper with zero risk of
+//   changing production behavior; detail-model accessors are already present
+//   in the views layer.
+//
+//   Coder action required: add to internal/tui/app.go (or a new accessor file):
+//
+//       // ActiveDetailResource returns the resource held by the top-of-stack
+//       // DetailModel, if any. Used by tests to inspect shim wire-ups.
+//       func (m Model) ActiveDetailResource() (resource.Resource, bool) {
+//           if d, ok := m.activeView().(*views.DetailModel); ok {
+//               return d.SourceResource(), true
+//           }
+//           return resource.Resource{}, false
+//       }
+//
+// ──────────────────────────────────────────────────────────────────────────
+
 // TestShim_NavigateAliasHitsCanonicalCache verifies that handleNavigate resolves
 // an alias to the canonical ShortName before looking up m.ResourceCache.
 //
@@ -685,5 +727,189 @@ func TestShim_NavigateAliasHitsCanonicalCache(t *testing.T) {
 	}
 	if f.Source != "wave1" {
 		t.Errorf("Findings[0].Source: got %q, want %q", f.Source, "wave1")
+	}
+}
+
+// ── Site 1: ResourcesLoadedMsg ───────────────────────────────────────────────
+
+// TestShim_ResourcesLoadedPopulatesFindings verifies that when
+// ResourcesLoadedMsg is handled and the active view is NOT a ResourceListModel
+// (initial model state: main menu), the resources cached via the non-list
+// write-through path (app.go:383-391) have their Findings field populated by
+// the DeriveFindings shim at app.go:342.
+//
+// Wire-up site: app.go:342 — (&m).deriveFindingsForType(msg.ResourceType, msg.Resources)
+// called before updateActiveView and the write-through cache block.
+//
+// Red-light expectation: if the shim at line 342 is removed, Findings will be
+// nil on the cached resources because the write-through stores msg.Resources
+// verbatim (no separate derive call).
+func TestShim_ResourcesLoadedPopulatesFindings(t *testing.T) {
+	cases := []struct {
+		name, canonShort, alias, status, expectedSlug string
+	}{
+		{"ec2-canonical", "ec2", "", "impaired", "impaired"},
+		{"s3-canonical", "s3", "", "bucket public", "bucket.public"},
+		{"rds-aliased", "dbi", "rds", "maintenance pending", "maintenance.pending"},
+		{"redis-aliased", "redis", "elasticache", "failover pending", "failover.pending"},
+		{"sg-canonical", "sg", "", "overly permissive", "overly.permissive"},
+		{"kms-canonical", "kms", "", "pending deletion", "pending.deletion"},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			m := newShimModel()
+			// Active view is the main menu — no ResourceListModel on stack.
+			// This drives the non-list write-through path at app.go:383-391.
+
+			effective := tc.canonShort
+			if tc.alias != "" {
+				effective = tc.alias
+			}
+
+			res := resource.Resource{
+				ID:     "r-loaded-" + tc.canonShort,
+				Name:   "loaded-" + tc.canonShort,
+				Status: tc.status,
+			}
+
+			m = shimApplyMsg(m, messages.ResourcesLoadedMsg{
+				ResourceType: effective,
+				Resources:    []resource.Resource{res},
+			})
+
+			// The non-list write-through path caches under msg.ResourceType (may be
+			// an alias). The canonical test: check both canonical and alias keys to
+			// find where the entry landed, then assert Findings.
+			var entry *session.ResourceCacheEntry
+			if e, ok := m.ResourceCache[tc.canonShort]; ok {
+				entry = e
+			} else if tc.alias != "" {
+				if e, ok := m.ResourceCache[effective]; ok {
+					entry = e
+				}
+			}
+
+			if entry == nil || len(entry.Resources) == 0 {
+				t.Fatalf("ResourceCache has no entry for type %q (canonShort=%q, alias=%q) after ResourcesLoadedMsg — write-through path not triggered",
+					effective, tc.canonShort, tc.alias)
+			}
+
+			got := entry.Resources[0]
+			if len(got.Findings) == 0 {
+				t.Errorf(
+					"ResourceCache entry for %q: Resources[0].Findings is empty — "+
+						"shim at app.go:342 not called or findings not propagated to cached slice; "+
+						"want wave1 Finding with Code %q",
+					effective, tc.canonShort+"."+tc.expectedSlug,
+				)
+				return
+			}
+
+			f := got.Findings[0]
+			wantCode := domain.FindingCode(tc.canonShort + "." + tc.expectedSlug)
+			if f.Code != wantCode {
+				t.Errorf("Findings[0].Code: got %q, want %q", f.Code, wantCode)
+			}
+			if f.Phrase != tc.status {
+				t.Errorf("Findings[0].Phrase: got %q, want %q", f.Phrase, tc.status)
+			}
+			if f.Source != "wave1" {
+				t.Errorf("Findings[0].Source: got %q, want %q", f.Source, "wave1")
+			}
+		})
+	}
+}
+
+// ── Site 7: EnrichDetailResultMsg ───────────────────────────────────────────
+
+// TestShim_EnrichDetailResultPopulatesFindings verifies that when
+// EnrichDetailResultMsg is processed, the shim at app.go:446 calls
+// deriveFindingsForResource on msg.EnrichedRes before handing it to the
+// detail view. After handling, the detail view's resource must have its
+// Findings field populated.
+//
+// Wire-up site: app.go:446 — (&m).deriveFindingsForResource(msg.ResourceType, &msg.EnrichedRes)
+//
+// This test requires tui.Model.ActiveDetailResource() — a public read-only
+// accessor that returns the resource held by the top-of-stack DetailModel.
+// See the coder action note at the top of this append block. The test will
+// FAIL TO COMPILE until the accessor is added, satisfying the TDD red-light
+// requirement.
+//
+// Red-light expectation: if the shim at line 446 is removed, msg.EnrichedRes
+// reaches the detail view without Findings, so ActiveDetailResource().Findings
+// will be nil.
+func TestShim_EnrichDetailResultPopulatesFindings(t *testing.T) {
+	const (
+		resID      = "i-enrich-001"
+		resType    = "ec2"
+		resStatus  = "impaired"
+		wantPhrase = "impaired"
+		wantCode   = domain.FindingCode("ec2.impaired")
+		wantSource = "wave1"
+	)
+
+	m := newShimModel()
+
+	// Navigate to detail view so the stack has a DetailModel on top.
+	res := resource.Resource{
+		ID:     resID,
+		Name:   "enrich-test-instance",
+		Status: resStatus,
+	}
+	m = shimApplyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetDetail,
+		Resource:     &res,
+		ResourceType: resType,
+	})
+
+	// Build the enriched resource carrying the same ID so the guard in
+	// DetailModel.Update() (msg.ResourceID == m.res.ID) passes.
+	enriched := resource.Resource{
+		ID:     resID,
+		Name:   "enrich-test-instance-enriched",
+		Status: resStatus,
+	}
+
+	// Send EnrichDetailResultMsg with Generation=0 (always accepted by the
+	// stale-check guard at app.go:432-434).
+	m = shimApplyMsg(m, messages.EnrichDetailResultMsg{
+		ResourceType: resType,
+		ResourceID:   resID,
+		EnrichedRes:  enriched,
+		Err:          nil,
+		Generation:   0,
+	})
+
+	// Retrieve the resource from the active DetailModel via the public accessor.
+	// This line intentionally fails to compile until the coder adds
+	//   func (m Model) ActiveDetailResource() (resource.Resource, bool)
+	// to internal/tui/app.go (see coder action note above).
+	got, ok := m.ActiveDetailResource()
+	if !ok {
+		t.Fatal("ActiveDetailResource: no DetailModel on view stack — NavigateMsg to TargetDetail did not push a detail view")
+	}
+
+	if len(got.Findings) == 0 {
+		t.Errorf(
+			"ActiveDetailResource().Findings: got empty — "+
+				"shim at app.go:446 not called or findings not reaching detail view; "+
+				"want wave1 Finding with Phrase=%q Code=%q Source=%q",
+			wantPhrase, wantCode, wantSource,
+		)
+		return
+	}
+
+	f := got.Findings[0]
+	if f.Code != wantCode {
+		t.Errorf("Findings[0].Code: got %q, want %q", f.Code, wantCode)
+	}
+	if f.Phrase != wantPhrase {
+		t.Errorf("Findings[0].Phrase: got %q, want %q", f.Phrase, wantPhrase)
+	}
+	if f.Source != wantSource {
+		t.Errorf("Findings[0].Source: got %q, want %q", f.Source, wantSource)
 	}
 }
