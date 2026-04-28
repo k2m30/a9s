@@ -185,17 +185,17 @@ func New(profile, region string, opts ...Option) Model {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	m := Model{
-		Session: session.New(),
-		profile: profile,
-		region:         region,
-		keys:           k,
-		stack:          []views.View{&menu},
-		cmdInput:       ti,
-		viewConfig:     cfg,
-		configErr:      cfgErr,
-		activeTheme:    "tokyo-night.yaml",
-		appCtx:         ctx,
-		appCancel:      cancel,
+		Session:     session.New(),
+		profile:     profile,
+		region:      region,
+		keys:        k,
+		stack:       []views.View{&menu},
+		cmdInput:    ti,
+		viewConfig:  cfg,
+		configErr:   cfgErr,
+		activeTheme: "tokyo-night.yaml",
+		appCtx:      ctx,
+		appCancel:   cancel,
 	}
 	for _, opt := range opts {
 		opt(&m)

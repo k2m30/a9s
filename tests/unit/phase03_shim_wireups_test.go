@@ -73,7 +73,6 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/semantics/attention"
 	"github.com/k2m30/a9s/v3/internal/session"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
@@ -437,17 +436,21 @@ func TestShim_LazyAddedPopulatesFindings(t *testing.T) {
 	}
 }
 
-// TestShim_DeriveHelpersResolveAlias verifies that deriveFindingsForType resolves
-// an alias to its canonical ShortName before looking up m.EnrichmentFindings.
+// TestShim_DeriveHelpersResolveAlias verifies that after applyEnrichment is called
+// via EnrichmentCheckedMsg, ProbeResources rows for a canonically-keyed type carry
+// both wave1 (from AvailabilityCheckedMsg) and wave2 (from EnrichmentCheckedMsg)
+// findings.
 //
-// Bug: derive_helper.go reads m.EnrichmentFindings[short] where short may be an
-// alias — Wave-2 findings keyed under canonical ShortName ("dbi") are dropped
-// when the caller passes alias "rds".
+// After PR-03a-fold: deriveFindingsForType no longer reads m.EnrichmentFindings.
+// Instead, wave2 data flows through EnrichmentCheckedMsg → applyEnrichment which
+// calls DeriveFindings with the full findings map on all cached rows. The alias
+// resolution bug ("rds" → "dbi") is exercised through the EnrichmentCheckedMsg
+// alias-normalization path in handleEnrichmentChecked.
 //
-// Setup: seed m.EnrichmentFindings["dbi"] with a wave2 finding for rid. Build a
-// Resource with that ID and Issues=["impaired"] (wave1). Call
-// deriveFindingsForType("rds", []Resource{r}). Post-fix: r.Findings has 2 entries.
-// Pre-fix: only wave1 (enrichment map miss).
+// Setup: send AvailabilityCheckedMsg{ResourceType: "rds"} to populate
+// ProbeResources["dbi"] with wave1. Then send EnrichmentCheckedMsg{ResourceType: "dbi"}
+// with a wave2 finding. applyEnrichment must mutate ProbeResources["dbi"][0] to
+// hold 2 findings (wave1 + wave2).
 func TestShim_DeriveHelpersResolveAlias(t *testing.T) {
 	m := newShimModel()
 
@@ -459,10 +462,6 @@ func TestShim_DeriveHelpersResolveAlias(t *testing.T) {
 			{Label: "Action", Value: "reboot"},
 		},
 	}
-	// Seed enrichment findings under the CANONICAL short name ("dbi").
-	m.EnrichmentFindings["dbi"] = map[string]resource.EnrichmentFinding{
-		rid: wave2Finding,
-	}
 
 	res := resource.Resource{
 		ID:     rid,
@@ -471,23 +470,33 @@ func TestShim_DeriveHelpersResolveAlias(t *testing.T) {
 		Issues: []string{"impaired"},
 	}
 
-	// Pre-seed wave1 finding so test setup is valid regardless of shim status.
-	td := resource.ResourceTypeDef{ShortName: "dbi"}
-	attention.DeriveFindings(&res, td, nil)
-	if len(res.Findings) != 1 {
-		t.Fatalf("test setup: DeriveFindings (wave1) produced %d findings, want 1", len(res.Findings))
-	}
-
-	// Drive the slice through AvailabilityCheckedMsg using the ALIAS "rds".
-	// The shim must resolve "rds" → "dbi" to find enrichment findings.
+	// Step 1: send AvailabilityCheckedMsg with alias "rds" → ProbeResources["dbi"]
+	// is populated with wave1 findings (deriveFindingsForType called by handler).
 	m = shimApplyMsg(m, messages.AvailabilityCheckedMsg{
-		ResourceType: "rds", // alias
+		ResourceType: "rds", // alias — handler normalizes to canonical "dbi"
 		HasResources: true,
 		Count:        1,
 		Truncated:    false,
 		Gen:          0,
 		Issues:       1,
 		Resources:    []resource.Resource{res},
+	})
+
+	// Step 2: send EnrichmentCheckedMsg with canonical "dbi" carrying wave2 finding.
+	// handleEnrichmentChecked stores findings then calls applyEnrichment which
+	// calls DeriveFindings (wave1+wave2) on ProbeResources["dbi"] rows in-place.
+	//
+	// Set EnrichTotal > 1 so the "all enrichment done" branch (EnrichChecked >= EnrichTotal)
+	// does not fire after processing this single message, which would nil out ProbeResources
+	// before we can inspect it.
+	m.EnrichTotal = 2
+	m = shimApplyMsg(m, messages.EnrichmentCheckedMsg{
+		ResourceType: "dbi",
+		Findings: map[string]resource.EnrichmentFinding{
+			rid: wave2Finding,
+		},
+		Gen:     0,
+		TypeGen: 0,
 	})
 
 	probeSlice, ok := m.ProbeResources["dbi"]
@@ -499,7 +508,7 @@ func TestShim_DeriveHelpersResolveAlias(t *testing.T) {
 	if len(got.Findings) < 2 {
 		t.Errorf(
 			"ProbeResources[\"dbi\"][0].Findings: got %d finding(s), want 2 (wave1 + wave2) — "+
-				"deriveFindingsForType not resolving alias \"rds\" to canonical \"dbi\" for EnrichmentFindings lookup",
+				"applyEnrichment must have merged wave2 findings from EnrichmentCheckedMsg into ProbeResources rows",
 			len(got.Findings),
 		)
 		return
@@ -527,23 +536,21 @@ func TestShim_DeriveHelpersResolveAlias(t *testing.T) {
 	}
 }
 
-// TestShim_DeriveHelpersResolveAlias_SingleResource verifies that the derive
-// helpers resolve an alias to its canonical ShortName when reading m.EnrichmentFindings
-// on the single-resource path.
+// TestShim_DeriveHelpersResolveAlias_SingleResource verifies that after
+// applyEnrichment is called via EnrichmentCheckedMsg (using the alias "rds"),
+// ProbeResources["dbi"] rows carry both wave1 and wave2 findings.
 //
-// Bug: derive_helper.go reads m.EnrichmentFindings[short] where short may be an
-// alias — Wave-2 findings keyed under canonical ShortName ("dbi") are dropped
-// when the caller passes alias "rds". This path fires when AvailabilityCheckedMsg
-// carries resources for an aliased type AND m.EnrichmentFindings already holds
-// wave2 findings from a prior enrichment run under the canonical key.
+// After PR-03a-fold: deriveFindingsForType no longer reads m.EnrichmentFindings.
+// Wave2 data flows through EnrichmentCheckedMsg → handleEnrichmentChecked which
+// normalizes the alias ("rds" → "dbi") then calls applyEnrichment, which calls
+// DeriveFindings with the full findings map on all cached rows.
 //
-// Setup: seed m.EnrichmentFindings["dbi"] with wave2 findings. Send
-// AvailabilityCheckedMsg{ResourceType: "rds"} with a resource that has Status
-// "impaired" (wave1). The handler calls deriveFindingsForType("rds", resources).
-// The helper must resolve "rds" → "dbi" before reading m.EnrichmentFindings.
+// Setup: send AvailabilityCheckedMsg{ResourceType: "rds"} to seed ProbeResources
+// with wave1. Then send EnrichmentCheckedMsg{ResourceType: "rds"} (alias) with
+// a wave2 finding. handleEnrichmentChecked normalizes "rds" → "dbi" and
+// applyEnrichment merges wave2 into ProbeResources["dbi"][0].
 //
-// Pre-fix: only 1 wave1 finding (enrichment lookup reads EnrichmentFindings["rds"] = nil).
-// Post-fix: 2 findings (wave1 + wave2), "rds" resolved to "dbi" for enrichment lookup.
+// Expected: 2 findings (wave1 + wave2).
 func TestShim_DeriveHelpersResolveAlias_SingleResource(t *testing.T) {
 	m := newShimModel()
 
@@ -555,12 +562,6 @@ func TestShim_DeriveHelpersResolveAlias_SingleResource(t *testing.T) {
 			{Label: "Action", Value: "reboot"},
 		},
 	}
-	// Seed wave2 enrichment findings under the CANONICAL short name ("dbi").
-	// After fix, deriveFindingsForType("rds", ...) must resolve "rds" → "dbi"
-	// before reading m.EnrichmentFindings to find this wave2 data.
-	m.EnrichmentFindings["dbi"] = map[string]resource.EnrichmentFinding{
-		rid: wave2Finding,
-	}
 
 	res := resource.Resource{
 		ID:     rid,
@@ -569,12 +570,9 @@ func TestShim_DeriveHelpersResolveAlias_SingleResource(t *testing.T) {
 		Issues: []string{"impaired"},
 	}
 
-	// Send AvailabilityCheckedMsg with the alias "rds" (not canonical "dbi").
-	// The handler calls deriveFindingsForType("rds", [res]) which must read
-	// m.EnrichmentFindings["dbi"] (canonical), not m.EnrichmentFindings["rds"]
-	// (alias), to pick up the wave2 finding.
+	// Step 1: AvailabilityCheckedMsg with alias "rds" → ProbeResources["dbi"] with wave1.
 	m = shimApplyMsg(m, messages.AvailabilityCheckedMsg{
-		ResourceType: "rds", // alias — triggers the derive helper alias regression
+		ResourceType: "rds", // alias — handler normalizes to canonical "dbi"
 		HasResources: true,
 		Count:        1,
 		Truncated:    false,
@@ -583,22 +581,34 @@ func TestShim_DeriveHelpersResolveAlias_SingleResource(t *testing.T) {
 		Resources:    []resource.Resource{res},
 	})
 
-	// The handler stores under m.ProbeResources[msg.ResourceType = "rds"].
-	// After fix (canonical normalization), the resource should be under "dbi".
+	// Step 2: EnrichmentCheckedMsg with alias "rds" (mirrors real production path
+	// where the enricher might be dispatched with the alias). handleEnrichmentChecked
+	// normalizes "rds" → "dbi", then applyEnrichment merges wave2 into
+	// ProbeResources["dbi"] rows.
+	//
+	// Set EnrichTotal > 1 so the "all enrichment done" branch (EnrichChecked >= EnrichTotal)
+	// does not fire after processing this single message, which would nil out ProbeResources
+	// before we can inspect it.
+	m.EnrichTotal = 2
+	m = shimApplyMsg(m, messages.EnrichmentCheckedMsg{
+		ResourceType: "rds", // alias — exercises alias normalization in handleEnrichmentChecked
+		Findings: map[string]resource.EnrichmentFinding{
+			rid: wave2Finding,
+		},
+		Gen:     0,
+		TypeGen: 0,
+	})
+
 	probeSlice, ok := m.ProbeResources["dbi"]
 	if !ok || len(probeSlice) == 0 {
-		// Pre-fix: resources are stored under the alias key "rds", not "dbi".
-		// This is Bug 1 (navigate) manifesting here too — the availability handler
-		// does NOT normalize msg.ResourceType before the ProbeResources write.
-		t.Fatal("ProbeResources[\"dbi\"] is empty — AvailabilityCheckedMsg with alias \"rds\" stored under alias key instead of canonical")
+		t.Fatal("ProbeResources[\"dbi\"] is empty after AvailabilityCheckedMsg with alias \"rds\"")
 	}
 
 	got := probeSlice[0]
 	if len(got.Findings) < 2 {
 		t.Errorf(
 			"ProbeResources[\"dbi\"][0].Findings: got %d finding(s), want 2 (wave1 + wave2) — "+
-				"derive helper not resolving alias \"rds\" to canonical \"dbi\" for EnrichmentFindings lookup; "+
-				"wave2 finding pre-seeded under \"dbi\" not visible via alias path",
+				"applyEnrichment via EnrichmentCheckedMsg alias \"rds\" must merge wave2 into ProbeResources[\"dbi\"] rows",
 			len(got.Findings),
 		)
 		return

@@ -67,12 +67,15 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 			rl.SetShowIssueBadge(true) // top-level list from main menu
 			rl.SetSize(m.innerSize())
 			// Wire enrichment state so markers reflect current findings.
+			// findingsFromRows rebuilds the per-resource EnrichmentFinding map from
+			// wave2 entries in the cached rows — replaces the deleted m.EnrichmentFindings
+			// parallel map. Cached rows are the authoritative source after PR-03a-fold.
 			issueCount, issueTrunc := 0, false
 			if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 				issueCount = menu.GetIssueCounts()[canon]
 				issueTrunc = menu.GetIssueTruncated()[canon]
 			}
-			rl.SetEnrichmentState(issueCount, issueTrunc, m.EnrichmentFindings[canon])
+			rl.SetEnrichmentState(issueCount, issueTrunc, findingsFromRows(entry.Resources))
 			rl.SetTruncatedIDs(m.EnrichmentTruncatedIDs[canon])
 			m.pushView(&rl)
 			return m, nil
@@ -83,13 +86,17 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		}
 		rl.SetShowIssueBadge(true) // top-level list from main menu
 		rl.SetSize(m.innerSize())
-		// Wire enrichment state so markers reflect current findings.
+		// Wire enrichment state. No cache entry exists yet; rows will load via
+		// fetchResources. Enrichment re-runs when ResourcesLoadedMsg completes
+		// and applyEnrichment stamps r.Findings on each row. Pass nil here —
+		// the live-update path (handleEnrichmentChecked → SetEnrichmentState)
+		// populates findingsByID once enrichment results arrive.
 		issueCount, issueTrunc := 0, false
 		if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
 			issueCount = menu.GetIssueCounts()[canon]
 			issueTrunc = menu.GetIssueTruncated()[canon]
 		}
-		rl.SetEnrichmentState(issueCount, issueTrunc, m.EnrichmentFindings[canon])
+		rl.SetEnrichmentState(issueCount, issueTrunc, nil)
 		rl.SetTruncatedIDs(m.EnrichmentTruncatedIDs[canon])
 		rl, initCmd := rl.Init()
 		m.pushView(&rl)
@@ -117,10 +124,11 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		d.SetNavProvider(resource.GetNavigableFields)
 		d.SetSize(m.innerSize())
 		// Wire enrichment finding if one exists for this resource.
-		if findings, ok := m.EnrichmentFindings[resType]; ok {
-			if f, exists := findings[msg.Resource.ID]; exists {
-				d.SetEnrichmentFinding(&f)
-			}
+		// After PR-03a-fold the authoritative source is r.Findings on the row itself;
+		// findingsFromRow extracts the wave2 entry (if any) to reconstruct an
+		// EnrichmentFinding for the detail view without the deleted m.EnrichmentFindings map.
+		if ef := findingFromResource(*msg.Resource); ef != nil {
+			d.SetEnrichmentFinding(ef)
 		}
 		m.pushView(&d)
 		var cmds []tea.Cmd
@@ -343,7 +351,6 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		// Increment gen to cancel any in-flight probes and enrichment
 		m.AvailabilityGen++
 		m.Session.EnrichmentGen++
-		m.EnrichmentFindings = make(map[string]map[string]resource.EnrichmentFinding)
 		m.EnrichmentRan = make(map[string]bool)
 		m.EnrichmentTypeGen = make(map[string]int)
 		m.EnrichmentTruncatedIDs = make(map[string]map[string]bool)
@@ -424,11 +431,14 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		if _, hasEnricher := awsclient.IssueEnricherRegistry[rt]; hasEnricher {
 			m.EnrichmentTypeGen[rt]++
 			tok := m.EnrichmentTypeGen[rt]
-			delete(m.EnrichmentFindings, rt)
 			delete(m.EnrichmentRan, rt)
 			// Clear per-resource truncation markers too: if the refresh errors
 			// out, stale "?" prefixes must not persist across the rerun.
 			delete(m.EnrichmentTruncatedIDs, rt)
+			// Strip wave2 from any rows still in ProbeResources/LazyResourceCache
+			// (ResourceCache[rt] was already deleted above on line 415). Rows are the
+			// authoritative source after PR-03a-fold; no parallel map to delete.
+			(&m).applyEnrichment(rt, nil)
 			// Propagate the cleared state to the active ResourceListModel so
 			// row markers disappear immediately at Ctrl+R — otherwise stale markers
 			// would remain visible until the rerun completes (and indefinitely if
@@ -438,12 +448,12 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 			cmd := m.refreshResourceListWithEnrichmentRerun(*rl, tok)
 			return m, cmd
 		}
-		// Top-level list without an enricher: clear any stale findings immediately
-		// so row markers don't persist across a Ctrl+R refresh.
-		if _, hasFindings := m.EnrichmentFindings[rt]; hasFindings {
-			delete(m.EnrichmentFindings, rt)
-			rl.SetEnrichmentState(0, false, nil)
-		}
+		// Top-level list without an enricher: clear any stale wave2 findings from
+		// cached rows and propagate to the view so row markers don't persist across
+		// a Ctrl+R refresh. applyEnrichment with nil strips wave2 unconditionally
+		// (no-op when there are no wave2 entries — no guard needed after fold).
+		(&m).applyEnrichment(rt, nil)
+		rl.SetEnrichmentState(0, false, nil)
 	}
 	return m, m.refreshResourceList(*rl)
 }
