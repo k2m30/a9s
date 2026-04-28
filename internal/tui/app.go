@@ -480,7 +480,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Also blocked when a lazy-cache entry exists for the same type: lazy-add
 		// entries are sparse but present, and a CachedPages overwrite would evict
 		// the lazy-fetched out-of-scope resources and corrupt subsequent drills.
-		for shortName, entry := range msg.CachedPages {
+		for aliasName, entry := range msg.CachedPages {
+			// Canonicalize: CachedPages keys may be aliases (e.g. "rds" instead of
+			// "dbi"). Resolve to the canonical ShortName so cache lookups are
+			// consistent with ResourceCache which is always keyed canonically.
+			shortName := aliasName
+			if td := resource.FindResourceType(aliasName); td != nil {
+				shortName = td.ShortName
+			}
 			if _, exists := m.ResourceCache[shortName]; exists {
 				continue
 			}
@@ -509,9 +516,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// out-of-scope entries (AWS-managed keys, public AMIs, shared snapshots)
 		// isolated from resourceCache so the main-menu scope-filtered list is
 		// never polluted by lazy-add results.
-		for shortName, extra := range msg.LazyAddedResources {
+		for aliasName, extra := range msg.LazyAddedResources {
 			if len(extra) == 0 {
 				continue
+			}
+			// Canonicalize: LazyAddedResources keys may be aliases. Resolve to the
+			// canonical ShortName so LazyResourceCache is keyed consistently.
+			shortName := aliasName
+			if td := resource.FindResourceType(aliasName); td != nil {
+				shortName = td.ShortName
 			}
 			// Site 5: derive findings across the new slice before merging into
 			// LazyResourceCache (PR-03a-shim wire-up).

@@ -46,7 +46,9 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		// as canonical navigation.
 		canon := rt.ShortName
 		// Check resource cache before creating a new view and fetching.
-		if entry, ok := m.ResourceCache[msg.ResourceType]; ok {
+		// Use the canonical ShortName (canon) so alias navigation hits the same
+		// cache entry as canonical navigation (e.g. "rds" finds "dbi"'s entry).
+		if entry, ok := m.ResourceCache[canon]; ok {
 			// Site 6: re-derive findings on cached resources before displaying —
 			// covers child-view and related-navigation cache-hit paths
 			// (PR-03a-shim wire-up). Idempotent: re-derive is safe and ensures

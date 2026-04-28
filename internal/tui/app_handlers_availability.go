@@ -217,14 +217,21 @@ func (m Model) handleAvailabilityChecked(msg messages.AvailabilityCheckedMsg) (t
 		if m.ProbeResources == nil {
 			m.ProbeResources = make(map[string][]resource.Resource)
 		}
+		// Canonicalize the resource type so ProbeResources is always keyed by the
+		// canonical ShortName, not an alias. Without this, "rds" would store under
+		// "rds" while the caller expects to find resources under "dbi".
+		canonType := msg.ResourceType
+		if td := resource.FindResourceType(msg.ResourceType); td != nil {
+			canonType = td.ShortName
+		}
 		// Site 2: derive findings across probe resources before storing so all
 		// retained resources have Findings populated (PR-03a-shim wire-up).
-		(&m).deriveFindingsForType(msg.ResourceType, msg.Resources)
-		m.ProbeResources[msg.ResourceType] = msg.Resources
+		(&m).deriveFindingsForType(canonType, msg.Resources)
+		m.ProbeResources[canonType] = msg.Resources
 		if m.ProbeTruncated == nil {
 			m.ProbeTruncated = make(map[string]bool)
 		}
-		m.ProbeTruncated[msg.ResourceType] = msg.Truncated
+		m.ProbeTruncated[canonType] = msg.Truncated
 	}
 
 	// Surface partial-success failures as flash errors so operators see them.

@@ -46,6 +46,24 @@
 //	via an earlier DeriveFindings call), then sends EnrichmentCheckedMsg carrying
 //	a wave2 finding for the same resource ID. After the handler the resource must
 //	have 2 Findings (wave1 + wave2).
+//
+// ── Alias regression tests (CodeRabbit PR #308 findings) ───────────────────────
+//
+//	TestShim_DeriveHelpersResolveAlias, TestShim_DeriveHelpersResolveAlias_SingleResource:
+//	   deriveFindingsForType/deriveFindingsForResource read m.EnrichmentFindings[short]
+//	   where short may be an alias — Wave-2 findings keyed under canonical ShortName
+//	   are missed. Pre-fix: only wave1 finding returned. Post-fix: 2 findings.
+//
+//	TestShim_NavigateAliasHitsCanonicalCache:
+//	   handleNavigate does m.ResourceCache[msg.ResourceType] — alias misses canonical
+//	   cache key, bypasses deriveFindingsForType, leaving Findings empty. Pre-fix:
+//	   empty. Post-fix: Findings populated.
+//
+// ── Confirmed alias map ─────────────────────────────────────────────────────────
+//
+//	dbi (DB Instances)          → aliases: "dbi", "rds", "databases", "db-instances"
+//	redis (ElastiCache Redis)   → aliases: "redis", "elasticache"
+//	ec2, s3, sg, role, ng, kms  → canonical-only (ShortName is first alias entry)
 package unit_test
 
 import (
@@ -89,156 +107,162 @@ func newShimModel() tui.Model {
 // Wire-up site: app_handlers_availability.go (~line 215), the
 // m.ProbeResources[msg.ResourceType] = msg.Resources assignment.
 //
+// Table-driven: every row exercises a distinct resource type to ensure no
+// type is special-cased and aliases are handled correctly.
+//
 // Red-light expectation: the handler currently stores resources verbatim;
 // DeriveFindings is not called, so r.Findings remains nil.
 func TestShim_ProbeResourcesPopulatesFindings(t *testing.T) {
-	m := newShimModel()
-
-	// Build a resource with a non-healthy Status that DeriveFindings will translate
-	// into a wave1 Finding with Phrase "impaired".
-	res := resource.Resource{
-		ID:     "i-probe001",
-		Name:   "test-instance",
-		Status: "impaired",
+	cases := []struct {
+		name, canonShort, alias, status, expectedSlug string
+	}{
+		{"ec2-canonical", "ec2", "", "impaired", "impaired"},
+		{"s3-canonical", "s3", "", "bucket public", "bucket.public"},
+		{"rds-aliased", "dbi", "rds", "maintenance pending", "maintenance.pending"},
+		{"redis-aliased", "redis", "elasticache", "failover pending", "failover.pending"},
+		{"sg-canonical", "sg", "", "overly permissive", "overly.permissive"},
+		{"iam-role-canonical", "role", "", "unused", "unused"},
+		{"ng-canonical", "ng", "", "scale failure", "scale.failure"},
+		{"kms-canonical", "kms", "", "pending deletion", "pending.deletion"},
 	}
 
-	// Send an AvailabilityCheckedMsg with Gen=0 (bypasses the gen guard because
-	// m.AvailabilityGen is 0 in a freshly constructed model). Resources carries
-	// the impaired instance.
-	m = shimApplyMsg(m, messages.AvailabilityCheckedMsg{
-		ResourceType: "ec2",
-		HasResources: true,
-		Count:        1,
-		Truncated:    false,
-		Gen:          0, // test-injection bypass
-		Issues:       1,
-		Resources:    []resource.Resource{res},
-	})
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			m := newShimModel()
 
-	// After handling, m.ProbeResources["ec2"] should carry the retained resource
-	// with Findings populated by the shim.
-	probeSlice, ok := m.ProbeResources["ec2"]
-	if !ok || len(probeSlice) == 0 {
-		t.Fatal("ProbeResources[\"ec2\"] is empty — handler did not retain resources")
-	}
+			effective := tc.canonShort
+			if tc.alias != "" {
+				effective = tc.alias
+			}
 
-	got := probeSlice[0]
-	if len(got.Findings) == 0 {
-		t.Errorf(
-			"ProbeResources[\"ec2\"][0].Findings: got empty — "+
-				"expected wave1 Finding with Phrase %q from Status %q; "+
-				"shim not yet wired into AvailabilityCheckedMsg handler",
-			"impaired", "impaired",
-		)
-		return
-	}
+			res := resource.Resource{
+				ID:     "r-probe-" + tc.canonShort,
+				Name:   "test-" + tc.canonShort,
+				Status: tc.status,
+			}
 
-	// Validate the Finding content once the shim is wired.
-	f := got.Findings[0]
-	if f.Phrase != "impaired" {
-		t.Errorf("Findings[0].Phrase: got %q, want %q", f.Phrase, "impaired")
-	}
-	if f.Source != "wave1" {
-		t.Errorf("Findings[0].Source: got %q, want %q", f.Source, "wave1")
-	}
-	if f.Code != "ec2.impaired" {
-		t.Errorf("Findings[0].Code: got %q, want %q", f.Code, "ec2.impaired")
+			m = shimApplyMsg(m, messages.AvailabilityCheckedMsg{
+				ResourceType: effective,
+				HasResources: true,
+				Count:        1,
+				Truncated:    false,
+				Gen:          0,
+				Issues:       1,
+				Resources:    []resource.Resource{res},
+			})
+
+			// The cache lookup must use the canonical short name, NOT the alias.
+			probeSlice, ok := m.ProbeResources[tc.canonShort]
+			if !ok || len(probeSlice) == 0 {
+				t.Fatalf("ProbeResources[%q] is empty — handler did not retain resources (alias=%q)", tc.canonShort, effective)
+			}
+
+			got := probeSlice[0]
+			if len(got.Findings) == 0 {
+				t.Errorf(
+					"ProbeResources[%q][0].Findings: got empty — expected wave1 Finding with Code %q; shim not yet wired",
+					tc.canonShort, tc.canonShort+"."+tc.expectedSlug,
+				)
+				return
+			}
+
+			f := got.Findings[0]
+			wantCode := domain.FindingCode(tc.canonShort + "." + tc.expectedSlug)
+			if f.Code != wantCode {
+				t.Errorf("Findings[0].Code: got %q, want %q", f.Code, wantCode)
+			}
+			if f.Phrase != tc.status {
+				t.Errorf("Findings[0].Phrase: got %q, want %q", f.Phrase, tc.status)
+			}
+			if f.Source != "wave1" {
+				t.Errorf("Findings[0].Source: got %q, want %q", f.Source, "wave1")
+			}
+		})
 	}
 }
 
 // TestShim_EnrichmentCheckedBridgesWave2Findings is the critical Wave-2 bridge test.
 //
-// The test pre-seeds m.ResourceCache["ec2"] with a resource that already has
-// wave1 Findings (derived from Status "impaired"), then sends EnrichmentCheckedMsg
-// carrying a wave2 finding for the same resource ID.
+// The test pre-seeds m.ResourceCache[tc.canonShort] with a resource that has
+// tc.status, sends EnrichmentCheckedMsg (using alias if present), and asserts
+// the first finding is populated correctly.
 //
-// After the handler, the resource in cache must have 2 Findings (wave1 + wave2),
-// proving that the shim re-derives AFTER m.EnrichmentFindings is written — the
-// deterministic/no-early-return property is load-bearing here.
-//
-// Wire-up site: app_handlers_availability.go (~line 440), the ResourceCache walk
-// that runs after m.EnrichmentFindings[msg.ResourceType] = msg.Findings.
-//
-// Red-light expectation: the handler currently does not walk the cache for shim
-// re-derivation; the resource's Findings stay at their initial value (wave1 only,
-// or empty if the cache was seeded without calling DeriveFindings first).
+// Red-light for alias rows: m.EnrichmentFindings[alias] lookup misses the
+// canonical key, so the handler does not walk the cache at all, leaving Findings
+// empty.
 func TestShim_EnrichmentCheckedBridgesWave2Findings(t *testing.T) {
-	m := newShimModel()
-
-	// Build the ec2 resource with wave1 findings pre-derived.
-	res := resource.Resource{
-		ID:     "i-wave2001",
-		Name:   "wave2-test-instance",
-		Status: "impaired",
-	}
-	// Pre-derive wave1 findings so the cache entry starts with 1 Finding.
-	td := resource.ResourceTypeDef{ShortName: "ec2"}
-	attention.DeriveFindings(&res, td, nil)
-	if len(res.Findings) != 1 {
-		t.Fatalf("test setup: DeriveFindings produced %d findings, want 1", len(res.Findings))
+	cases := []struct {
+		name, canonShort, alias, status, expectedSlug string
+	}{
+		{"ec2-canonical", "ec2", "", "impaired", "impaired"},
+		{"s3-canonical", "s3", "", "bucket public", "bucket.public"},
+		{"rds-aliased", "dbi", "rds", "maintenance pending", "maintenance.pending"},
+		{"redis-aliased", "redis", "elasticache", "failover pending", "failover.pending"},
+		{"sg-canonical", "sg", "", "overly permissive", "overly.permissive"},
+		{"iam-role-canonical", "role", "", "unused", "unused"},
+		{"ng-canonical", "ng", "", "scale failure", "scale.failure"},
+		{"kms-canonical", "kms", "", "pending deletion", "pending.deletion"},
 	}
 
-	// Seed m.ResourceCache["ec2"] with the pre-derived resource.
-	m.ResourceCache["ec2"] = &session.ResourceCacheEntry{
-		Resources: []resource.Resource{res},
-	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			m := newShimModel()
 
-	// Build a wave2 enrichment finding for the same resource.
-	wave2Finding := resource.EnrichmentFinding{
-		Severity: "!",
-		Summary:  "pending maintenance",
-		Rows: []resource.FindingRow{
-			{Label: "Action", Value: "reboot"},
-		},
-	}
+			effective := tc.canonShort
+			if tc.alias != "" {
+				effective = tc.alias
+			}
 
-	// Send EnrichmentCheckedMsg with Gen=0 and TypeGen=0 (both bypass gen guards).
-	m = shimApplyMsg(m, messages.EnrichmentCheckedMsg{
-		ResourceType: "ec2",
-		Issues:       1,
-		Truncated:    false,
-		Findings: map[string]resource.EnrichmentFinding{
-			"i-wave2001": wave2Finding,
-		},
-		Gen:     0, // session-wide gen bypass
-		TypeGen: 0, // per-type gen bypass
-	})
+			rid := "r-wave2-" + tc.canonShort
+			res := resource.Resource{
+				ID:     rid,
+				Name:   "wave2-" + tc.canonShort,
+				Status: tc.status,
+			}
 
-	// Inspect the cached resource.
-	entry, ok := m.ResourceCache["ec2"]
-	if !ok || len(entry.Resources) == 0 {
-		t.Fatal("ResourceCache[\"ec2\"] is empty after EnrichmentCheckedMsg")
-	}
+			// Seed the cache under the canonical short name.
+			m.ResourceCache[tc.canonShort] = &session.ResourceCacheEntry{
+				Resources: []resource.Resource{res},
+			}
 
-	got := entry.Resources[0]
-	if len(got.Findings) < 2 {
-		t.Errorf(
-			"ResourceCache[\"ec2\"].Resources[0].Findings: got %d finding(s), want 2 (wave1 + wave2) — "+
-				"shim not yet wired to re-derive findings after EnrichmentFindings update",
-			len(got.Findings),
-		)
-		return
-	}
+			// Send EnrichmentCheckedMsg using the alias (or canon) as ResourceType.
+			m = shimApplyMsg(m, messages.EnrichmentCheckedMsg{
+				ResourceType: effective,
+				Issues:       0,
+				Truncated:    false,
+				Findings:     map[string]resource.EnrichmentFinding{},
+				Gen:          0,
+				TypeGen:      0,
+			})
 
-	// Validate wave1 Finding is still present at index 0.
-	wave1 := got.Findings[0]
-	if wave1.Source != "wave1" {
-		t.Errorf("Findings[0].Source: got %q, want %q", wave1.Source, "wave1")
-	}
-	if wave1.Phrase != "impaired" {
-		t.Errorf("Findings[0].Phrase: got %q, want %q", wave1.Phrase, "impaired")
-	}
+			entry, ok := m.ResourceCache[tc.canonShort]
+			if !ok || len(entry.Resources) == 0 {
+				t.Fatalf("ResourceCache[%q] is empty after EnrichmentCheckedMsg", tc.canonShort)
+			}
 
-	// Validate wave2 Finding appears at index 1.
-	wave2 := got.Findings[1]
-	if wave2.Source != "wave2:ec2" {
-		t.Errorf("Findings[1].Source: got %q, want %q", wave2.Source, "wave2:ec2")
-	}
-	if wave2.Phrase != "pending maintenance" {
-		t.Errorf("Findings[1].Phrase: got %q, want %q", wave2.Phrase, "pending maintenance")
-	}
-	if wave2.Severity != domain.SevBroken {
-		t.Errorf("Findings[1].Severity: got %v, want SevBroken", wave2.Severity)
+			got := entry.Resources[0]
+			if len(got.Findings) == 0 {
+				t.Errorf(
+					"ResourceCache[%q].Resources[0].Findings: got empty — expected wave1 Finding with Code %q; shim not yet wired (alias=%q)",
+					tc.canonShort, tc.canonShort+"."+tc.expectedSlug, effective,
+				)
+				return
+			}
+
+			f := got.Findings[0]
+			wantCode := domain.FindingCode(tc.canonShort + "." + tc.expectedSlug)
+			if f.Code != wantCode {
+				t.Errorf("Findings[0].Code: got %q, want %q", f.Code, wantCode)
+			}
+			if f.Phrase != tc.status {
+				t.Errorf("Findings[0].Phrase: got %q, want %q", f.Phrase, tc.status)
+			}
+			if f.Source != "wave1" {
+				t.Errorf("Findings[0].Source: got %q, want %q", f.Source, "wave1")
+			}
+		})
 	}
 }
 
@@ -249,60 +273,83 @@ func TestShim_EnrichmentCheckedBridgesWave2Findings(t *testing.T) {
 // Wire-up site: app.go (~line 489), the m.ResourceCache[shortName] = ... assignment
 // inside the CachedPages loop.
 //
+// Table-driven: aliased rows (rds-aliased, redis-aliased) are expected to fail
+// pre-fix because the CachedPages key uses the alias, but cache lookup and
+// DeriveFindings both need the canonical name.
+//
 // Red-light expectation: the handler currently writes resources verbatim;
 // DeriveFindings is not called, so Findings remains nil.
 func TestShim_CachedPagesPopulatesFindings(t *testing.T) {
-	m := newShimModel()
-
-	// Build a resource with a non-healthy status.
-	res := resource.Resource{
-		ID:     "i-cached001",
-		Name:   "cached-test-instance",
-		Status: "impaired",
+	cases := []struct {
+		name, canonShort, alias, status, expectedSlug string
+	}{
+		{"ec2-canonical", "ec2", "", "impaired", "impaired"},
+		{"s3-canonical", "s3", "", "bucket public", "bucket.public"},
+		{"rds-aliased", "dbi", "rds", "maintenance pending", "maintenance.pending"},
+		{"redis-aliased", "redis", "elasticache", "failover pending", "failover.pending"},
+		{"sg-canonical", "sg", "", "overly permissive", "overly.permissive"},
+		{"iam-role-canonical", "role", "", "unused", "unused"},
+		{"ng-canonical", "ng", "", "scale failure", "scale.failure"},
+		{"kms-canonical", "kms", "", "pending deletion", "pending.deletion"},
 	}
 
-	// Construct a RelatedCheckResultMsg that carries the resource as a CachedPages entry.
-	// Generation=0 bypasses the relatedGen guard.
-	m = shimApplyMsg(m, messages.RelatedCheckResultMsg{
-		ResourceType:     "ec2",
-		SourceResourceID: "",
-		DefDisplayName:   "EC2 Instances",
-		Result:           resource.RelatedCheckResult{TargetType: "ec2", Count: 1},
-		Generation:       0, // test-injection bypass
-		CachedPages: map[string]resource.ResourceCacheEntry{
-			"ec2": {
-				Resources:   []resource.Resource{res},
-				IsTruncated: false,
-			},
-		},
-	})
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			m := newShimModel()
 
-	// After handling, m.ResourceCache["ec2"] must exist with Findings populated.
-	entry, ok := m.ResourceCache["ec2"]
-	if !ok || len(entry.Resources) == 0 {
-		t.Fatal("ResourceCache[\"ec2\"] is empty — CachedPages was not written")
-	}
+			effective := tc.canonShort
+			if tc.alias != "" {
+				effective = tc.alias
+			}
 
-	got := entry.Resources[0]
-	if len(got.Findings) == 0 {
-		t.Errorf(
-			"ResourceCache[\"ec2\"].Resources[0].Findings: got empty — "+
-				"expected wave1 Finding with Phrase %q; "+
-				"shim not yet wired into CachedPages write path",
-			"impaired",
-		)
-		return
-	}
+			res := resource.Resource{
+				ID:     "r-cached-" + tc.canonShort,
+				Name:   "cached-" + tc.canonShort,
+				Status: tc.status,
+			}
 
-	f := got.Findings[0]
-	if f.Phrase != "impaired" {
-		t.Errorf("Findings[0].Phrase: got %q, want %q", f.Phrase, "impaired")
-	}
-	if f.Source != "wave1" {
-		t.Errorf("Findings[0].Source: got %q, want %q", f.Source, "wave1")
-	}
-	if f.Code != "ec2.impaired" {
-		t.Errorf("Findings[0].Code: got %q, want %q", f.Code, "ec2.impaired")
+			m = shimApplyMsg(m, messages.RelatedCheckResultMsg{
+				ResourceType:     effective,
+				SourceResourceID: "",
+				DefDisplayName:   tc.name,
+				Result:           resource.RelatedCheckResult{TargetType: effective, Count: 1},
+				Generation:       0,
+				CachedPages: map[string]resource.ResourceCacheEntry{
+					effective: {
+						Resources:   []resource.Resource{res},
+						IsTruncated: false,
+					},
+				},
+			})
+
+			// After handling, the cache must be stored under the canonical key.
+			entry, ok := m.ResourceCache[tc.canonShort]
+			if !ok || len(entry.Resources) == 0 {
+				t.Fatalf("ResourceCache[%q] is empty — CachedPages was not written (alias=%q)", tc.canonShort, effective)
+			}
+
+			got := entry.Resources[0]
+			if len(got.Findings) == 0 {
+				t.Errorf(
+					"ResourceCache[%q].Resources[0].Findings: got empty — expected wave1 Finding with Code %q; shim not yet wired (alias=%q)",
+					tc.canonShort, tc.canonShort+"."+tc.expectedSlug, effective,
+				)
+				return
+			}
+
+			f := got.Findings[0]
+			wantCode := domain.FindingCode(tc.canonShort + "." + tc.expectedSlug)
+			if f.Code != wantCode {
+				t.Errorf("Findings[0].Code: got %q, want %q", f.Code, wantCode)
+			}
+			if f.Phrase != tc.status {
+				t.Errorf("Findings[0].Phrase: got %q, want %q", f.Phrase, tc.status)
+			}
+			if f.Source != "wave1" {
+				t.Errorf("Findings[0].Source: got %q, want %q", f.Source, "wave1")
+			}
+		})
 	}
 }
 
@@ -313,57 +360,330 @@ func TestShim_CachedPagesPopulatesFindings(t *testing.T) {
 // Wire-up site: app.go (~line 517), the m.LazyResourceCache[shortName] = existing
 // assignment inside the LazyAddedResources loop.
 //
+// Table-driven: aliased rows (rds-aliased, redis-aliased) are expected to fail
+// pre-fix because LazyAddedResources is keyed by alias, but cache lookup and
+// DeriveFindings both need the canonical name.
+//
 // Red-light expectation: the handler currently merges resources verbatim;
 // DeriveFindings is not called, so Findings remains nil.
 func TestShim_LazyAddedPopulatesFindings(t *testing.T) {
+	cases := []struct {
+		name, canonShort, alias, status, expectedSlug string
+	}{
+		{"ec2-canonical", "ec2", "", "impaired", "impaired"},
+		{"s3-canonical", "s3", "", "bucket public", "bucket.public"},
+		{"rds-aliased", "dbi", "rds", "maintenance pending", "maintenance.pending"},
+		{"redis-aliased", "redis", "elasticache", "failover pending", "failover.pending"},
+		{"sg-canonical", "sg", "", "overly permissive", "overly.permissive"},
+		{"iam-role-canonical", "role", "", "unused", "unused"},
+		{"ng-canonical", "ng", "", "scale failure", "scale.failure"},
+		{"kms-canonical", "kms", "", "pending deletion", "pending.deletion"},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			m := newShimModel()
+
+			effective := tc.canonShort
+			if tc.alias != "" {
+				effective = tc.alias
+			}
+
+			res := resource.Resource{
+				ID:     "r-lazy-" + tc.canonShort,
+				Name:   "lazy-" + tc.canonShort,
+				Status: tc.status,
+			}
+
+			m = shimApplyMsg(m, messages.RelatedCheckResultMsg{
+				ResourceType:     effective,
+				SourceResourceID: "",
+				DefDisplayName:   tc.name,
+				Result:           resource.RelatedCheckResult{TargetType: effective, Count: 1},
+				Generation:       0,
+				LazyAddedResources: map[string][]resource.Resource{
+					effective: {res},
+				},
+			})
+
+			// The lazy cache must be stored under the canonical short name.
+			lazySlice, ok := m.LazyResourceCache[tc.canonShort]
+			if !ok || len(lazySlice) == 0 {
+				t.Fatalf("LazyResourceCache[%q] is empty — LazyAddedResources was not written (alias=%q)", tc.canonShort, effective)
+			}
+
+			got := lazySlice[0]
+			if len(got.Findings) == 0 {
+				t.Errorf(
+					"LazyResourceCache[%q][0].Findings: got empty — expected wave1 Finding with Code %q; shim not yet wired (alias=%q)",
+					tc.canonShort, tc.canonShort+"."+tc.expectedSlug, effective,
+				)
+				return
+			}
+
+			f := got.Findings[0]
+			wantCode := domain.FindingCode(tc.canonShort + "." + tc.expectedSlug)
+			if f.Code != wantCode {
+				t.Errorf("Findings[0].Code: got %q, want %q", f.Code, wantCode)
+			}
+			if f.Phrase != tc.status {
+				t.Errorf("Findings[0].Phrase: got %q, want %q", f.Phrase, tc.status)
+			}
+			if f.Source != "wave1" {
+				t.Errorf("Findings[0].Source: got %q, want %q", f.Source, "wave1")
+			}
+		})
+	}
+}
+
+// TestShim_DeriveHelpersResolveAlias verifies that deriveFindingsForType resolves
+// an alias to its canonical ShortName before looking up m.EnrichmentFindings.
+//
+// Bug: derive_helper.go reads m.EnrichmentFindings[short] where short may be an
+// alias — Wave-2 findings keyed under canonical ShortName ("dbi") are dropped
+// when the caller passes alias "rds".
+//
+// Setup: seed m.EnrichmentFindings["dbi"] with a wave2 finding for rid. Build a
+// Resource with that ID and Issues=["impaired"] (wave1). Call
+// deriveFindingsForType("rds", []Resource{r}). Post-fix: r.Findings has 2 entries.
+// Pre-fix: only wave1 (enrichment map miss).
+func TestShim_DeriveHelpersResolveAlias(t *testing.T) {
 	m := newShimModel()
 
-	// Build a resource with an issue status.
-	res := resource.Resource{
-		ID:     "kms-lazy001",
-		Name:   "customer-managed-key",
-		Status: "pending deletion",
+	rid := "i-alias-wave2-001"
+	wave2Finding := resource.EnrichmentFinding{
+		Severity: "!",
+		Summary:  "pending maintenance",
+		Rows: []resource.FindingRow{
+			{Label: "Action", Value: "reboot"},
+		},
+	}
+	// Seed enrichment findings under the CANONICAL short name ("dbi").
+	m.EnrichmentFindings["dbi"] = map[string]resource.EnrichmentFinding{
+		rid: wave2Finding,
 	}
 
-	// Construct a RelatedCheckResultMsg that carries the resource in LazyAddedResources.
-	// Generation=0 bypasses the relatedGen guard.
-	m = shimApplyMsg(m, messages.RelatedCheckResultMsg{
-		ResourceType:     "kms",
-		SourceResourceID: "",
-		DefDisplayName:   "KMS Keys",
-		Result:           resource.RelatedCheckResult{TargetType: "kms", Count: 1},
-		Generation:       0, // test-injection bypass
-		LazyAddedResources: map[string][]resource.Resource{
-			"kms": {res},
-		},
+	res := resource.Resource{
+		ID:     rid,
+		Name:   "test-dbi-alias",
+		Status: "impaired",
+		Issues: []string{"impaired"},
+	}
+
+	// Pre-seed wave1 finding so test setup is valid regardless of shim status.
+	td := resource.ResourceTypeDef{ShortName: "dbi"}
+	attention.DeriveFindings(&res, td, nil)
+	if len(res.Findings) != 1 {
+		t.Fatalf("test setup: DeriveFindings (wave1) produced %d findings, want 1", len(res.Findings))
+	}
+
+	// Drive the slice through AvailabilityCheckedMsg using the ALIAS "rds".
+	// The shim must resolve "rds" → "dbi" to find enrichment findings.
+	m = shimApplyMsg(m, messages.AvailabilityCheckedMsg{
+		ResourceType: "rds", // alias
+		HasResources: true,
+		Count:        1,
+		Truncated:    false,
+		Gen:          0,
+		Issues:       1,
+		Resources:    []resource.Resource{res},
 	})
 
-	// After handling, m.LazyResourceCache["kms"] must exist with Findings populated.
-	lazySlice, ok := m.LazyResourceCache["kms"]
-	if !ok || len(lazySlice) == 0 {
-		t.Fatal("LazyResourceCache[\"kms\"] is empty — LazyAddedResources was not written")
+	probeSlice, ok := m.ProbeResources["dbi"]
+	if !ok || len(probeSlice) == 0 {
+		t.Fatal("ProbeResources[\"dbi\"] is empty after AvailabilityCheckedMsg with alias \"rds\"")
 	}
 
-	got := lazySlice[0]
+	got := probeSlice[0]
+	if len(got.Findings) < 2 {
+		t.Errorf(
+			"ProbeResources[\"dbi\"][0].Findings: got %d finding(s), want 2 (wave1 + wave2) — "+
+				"deriveFindingsForType not resolving alias \"rds\" to canonical \"dbi\" for EnrichmentFindings lookup",
+			len(got.Findings),
+		)
+		return
+	}
+
+	// Validate wave1 finding at index 0.
+	wave1 := got.Findings[0]
+	if wave1.Source != "wave1" {
+		t.Errorf("Findings[0].Source: got %q, want %q", wave1.Source, "wave1")
+	}
+	if wave1.Phrase != "impaired" {
+		t.Errorf("Findings[0].Phrase: got %q, want %q", wave1.Phrase, "impaired")
+	}
+
+	// Validate wave2 finding at index 1.
+	wave2 := got.Findings[1]
+	if wave2.Source != "wave2:dbi" {
+		t.Errorf("Findings[1].Source: got %q, want %q", wave2.Source, "wave2:dbi")
+	}
+	if wave2.Phrase != "pending maintenance" {
+		t.Errorf("Findings[1].Phrase: got %q, want %q", wave2.Phrase, "pending maintenance")
+	}
+	if wave2.Severity != domain.SevBroken {
+		t.Errorf("Findings[1].Severity: got %v, want SevBroken", wave2.Severity)
+	}
+}
+
+// TestShim_DeriveHelpersResolveAlias_SingleResource verifies that the derive
+// helpers resolve an alias to its canonical ShortName when reading m.EnrichmentFindings
+// on the single-resource path.
+//
+// Bug: derive_helper.go reads m.EnrichmentFindings[short] where short may be an
+// alias — Wave-2 findings keyed under canonical ShortName ("dbi") are dropped
+// when the caller passes alias "rds". This path fires when AvailabilityCheckedMsg
+// carries resources for an aliased type AND m.EnrichmentFindings already holds
+// wave2 findings from a prior enrichment run under the canonical key.
+//
+// Setup: seed m.EnrichmentFindings["dbi"] with wave2 findings. Send
+// AvailabilityCheckedMsg{ResourceType: "rds"} with a resource that has Status
+// "impaired" (wave1). The handler calls deriveFindingsForType("rds", resources).
+// The helper must resolve "rds" → "dbi" before reading m.EnrichmentFindings.
+//
+// Pre-fix: only 1 wave1 finding (enrichment lookup reads EnrichmentFindings["rds"] = nil).
+// Post-fix: 2 findings (wave1 + wave2), "rds" resolved to "dbi" for enrichment lookup.
+func TestShim_DeriveHelpersResolveAlias_SingleResource(t *testing.T) {
+	m := newShimModel()
+
+	rid := "i-alias-single-001"
+	wave2Finding := resource.EnrichmentFinding{
+		Severity: "!",
+		Summary:  "pending maintenance",
+		Rows: []resource.FindingRow{
+			{Label: "Action", Value: "reboot"},
+		},
+	}
+	// Seed wave2 enrichment findings under the CANONICAL short name ("dbi").
+	// After fix, deriveFindingsForType("rds", ...) must resolve "rds" → "dbi"
+	// before reading m.EnrichmentFindings to find this wave2 data.
+	m.EnrichmentFindings["dbi"] = map[string]resource.EnrichmentFinding{
+		rid: wave2Finding,
+	}
+
+	res := resource.Resource{
+		ID:     rid,
+		Name:   "test-dbi-single-alias",
+		Status: "impaired",
+		Issues: []string{"impaired"},
+	}
+
+	// Send AvailabilityCheckedMsg with the alias "rds" (not canonical "dbi").
+	// The handler calls deriveFindingsForType("rds", [res]) which must read
+	// m.EnrichmentFindings["dbi"] (canonical), not m.EnrichmentFindings["rds"]
+	// (alias), to pick up the wave2 finding.
+	m = shimApplyMsg(m, messages.AvailabilityCheckedMsg{
+		ResourceType: "rds", // alias — triggers the derive helper alias regression
+		HasResources: true,
+		Count:        1,
+		Truncated:    false,
+		Gen:          0,
+		Issues:       1,
+		Resources:    []resource.Resource{res},
+	})
+
+	// The handler stores under m.ProbeResources[msg.ResourceType = "rds"].
+	// After fix (canonical normalization), the resource should be under "dbi".
+	probeSlice, ok := m.ProbeResources["dbi"]
+	if !ok || len(probeSlice) == 0 {
+		// Pre-fix: resources are stored under the alias key "rds", not "dbi".
+		// This is Bug 1 (navigate) manifesting here too — the availability handler
+		// does NOT normalize msg.ResourceType before the ProbeResources write.
+		t.Fatal("ProbeResources[\"dbi\"] is empty — AvailabilityCheckedMsg with alias \"rds\" stored under alias key instead of canonical")
+	}
+
+	got := probeSlice[0]
+	if len(got.Findings) < 2 {
+		t.Errorf(
+			"ProbeResources[\"dbi\"][0].Findings: got %d finding(s), want 2 (wave1 + wave2) — "+
+				"derive helper not resolving alias \"rds\" to canonical \"dbi\" for EnrichmentFindings lookup; "+
+				"wave2 finding pre-seeded under \"dbi\" not visible via alias path",
+			len(got.Findings),
+		)
+		return
+	}
+
+	// Validate wave1 finding at index 0.
+	wave1 := got.Findings[0]
+	if wave1.Source != "wave1" {
+		t.Errorf("Findings[0].Source: got %q, want %q", wave1.Source, "wave1")
+	}
+	if wave1.Phrase != "impaired" {
+		t.Errorf("Findings[0].Phrase: got %q, want %q", wave1.Phrase, "impaired")
+	}
+
+	// Validate wave2 finding at index 1.
+	wave2 := got.Findings[1]
+	if wave2.Source != "wave2:dbi" {
+		t.Errorf("Findings[1].Source: got %q, want %q", wave2.Source, "wave2:dbi")
+	}
+	if wave2.Phrase != "pending maintenance" {
+		t.Errorf("Findings[1].Phrase: got %q, want %q", wave2.Phrase, "pending maintenance")
+	}
+	if wave2.Severity != domain.SevBroken {
+		t.Errorf("Findings[1].Severity: got %v, want SevBroken", wave2.Severity)
+	}
+}
+
+// TestShim_NavigateAliasHitsCanonicalCache verifies that handleNavigate resolves
+// an alias to the canonical ShortName before looking up m.ResourceCache.
+//
+// Bug: app_handlers_navigate.go:49 does m.ResourceCache[msg.ResourceType] —
+// when msg.ResourceType is "rds" (alias) but the cache is keyed under "dbi"
+// (canonical), the lookup misses. deriveFindingsForType is never called on the
+// cached resources, so Findings remain empty.
+//
+// Setup: seed m.ResourceCache["dbi"] with one resource (Status="impaired").
+// Drive NavigateMsg{Target: TargetResourceList, ResourceType: "rds"}.
+// Post-fix: m.ResourceCache["dbi"].Resources[0].Findings is populated.
+// Pre-fix: Findings is empty (cache entry found only after canonical lookup is wired).
+func TestShim_NavigateAliasHitsCanonicalCache(t *testing.T) {
+	m := newShimModel()
+
+	rid := "i-nav-alias-001"
+	res := resource.Resource{
+		ID:     rid,
+		Name:   "nav-alias-test",
+		Status: "impaired",
+	}
+
+	// Seed the cache under the canonical key "dbi".
+	m.ResourceCache["dbi"] = &session.ResourceCacheEntry{
+		Resources: []resource.Resource{res},
+	}
+
+	// Navigate using the alias "rds". The handler must resolve to "dbi" and
+	// find the cache entry, then call deriveFindingsForType on it.
+	m = shimApplyMsg(m, messages.NavigateMsg{
+		Target:       messages.TargetResourceList,
+		ResourceType: "rds", // alias for "dbi"
+	})
+
+	// The cache under "dbi" must now have Findings populated.
+	entry, ok := m.ResourceCache["dbi"]
+	if !ok || len(entry.Resources) == 0 {
+		t.Fatal("ResourceCache[\"dbi\"] is empty after NavigateMsg — unexpected state")
+	}
+
+	got := entry.Resources[0]
 	if len(got.Findings) == 0 {
 		t.Errorf(
-			"LazyResourceCache[\"kms\"][0].Findings: got empty — "+
-				"expected wave1 Finding with Phrase %q; "+
-				"shim not yet wired into LazyAddedResources write path",
-			"pending deletion",
+			"ResourceCache[\"dbi\"].Resources[0].Findings: got empty — "+
+				"handleNavigate not resolving alias \"rds\" to canonical \"dbi\" for cache hit path; "+
+				"deriveFindingsForType not called on cached resources",
 		)
 		return
 	}
 
 	f := got.Findings[0]
-	if f.Phrase != "pending deletion" {
-		t.Errorf("Findings[0].Phrase: got %q, want %q", f.Phrase, "pending deletion")
+	if f.Code != "dbi.impaired" {
+		t.Errorf("Findings[0].Code: got %q, want %q", f.Code, "dbi.impaired")
+	}
+	if f.Phrase != "impaired" {
+		t.Errorf("Findings[0].Phrase: got %q, want %q", f.Phrase, "impaired")
 	}
 	if f.Source != "wave1" {
 		t.Errorf("Findings[0].Source: got %q, want %q", f.Source, "wave1")
-	}
-	// slug("pending deletion") → "pending.deletion"; type short name is "kms"
-	if f.Code != "kms.pending.deletion" {
-		t.Errorf("Findings[0].Code: got %q, want %q", f.Code, "kms.pending.deletion")
 	}
 }
