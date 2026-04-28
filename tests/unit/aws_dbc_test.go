@@ -1,15 +1,14 @@
 package unit
 
 // aws_dbc_test.go — fetcher tests for the dbc (DocumentDB cluster) resource type.
-//
-// Tests exercise FetchDocDBClusters and FetchDocDBClustersPage, verifying:
-//   - All required Fields are populated with correct values.
-//   - CIS flags (cis_flags) are computed correctly from StorageEncrypted,
-//     BackupRetentionPeriod, and DeletionProtection.
-//   - has_writer / writer_count are set correctly for various member configs.
-//   - Pagination: Marker is threaded correctly; IsTruncated is set when present.
-//   - Error propagation returns a wrapped error.
-//   - Empty API response returns empty Resources slice (not nil).
+// // Tests exercise FetchDocDBClusters and FetchDocDBClustersPage, verifying:
+// - All required Fields are populated with correct values.
+// - CIS flags (cis_flags) are computed correctly from StorageEncrypted,
+// BackupRetentionPeriod, and DeletionProtection.
+// - has_writer / writer_count are set correctly for various member configs.
+// - Pagination: Marker is threaded correctly; IsTruncated is set when present.
+// - Error propagation returns a wrapped error.
+// - Empty API response returns empty Resources slice (not nil).
 
 import (
 	"context"
@@ -106,9 +105,9 @@ func TestFetchDocDBClusters_FieldMapping(t *testing.T) {
 	if r.Name != "prod-docdb-01" {
 		t.Errorf("Name = %q, want %q", r.Name, "prod-docdb-01")
 	}
-	// PR-03e: Status is always "" (phrases moved to Findings + Fields["status"]).
+	// Status is always "" (phrases moved to Findings + Fields["status"]).
 	if r.Status != "" {
-		t.Errorf("Status = %q, want blank (PR-03e: fetcher must not write Status)", r.Status)
+		t.Errorf("Status = %q, want blank", r.Status)
 	}
 	if len(r.Findings) != 0 {
 		phrases := make([]string, len(r.Findings))
@@ -575,18 +574,14 @@ func buildDocDBCluster(id string) docdbtypes.DBCluster {
 
 // TestDbc_Pagination_MultiPage_Success drives the registered "dbc" paginated
 // fetcher through the full DocDB→RDS token-prefix transition and verifies:
-//
-//   - tick 1 (token=""): fetches DocDB page 1 (has more); no RDS call yet.
-//     Result: DocDB page 1 rows, NextToken="docdb:d1", IsTruncated=true.
-//
-//   - tick 2 (token="docdb:d1"): fetches DocDB page 2 (last DocDB page),
-//     then immediately fetches RDS page 1 (has more). Result: DocDB page 2
-//     rows + RDS page 1 rows concatenated, NextToken="rds:r1", IsTruncated=true.
-//
-//   - tick 3 (token="rds:r1"): fetches RDS page 2 (last page, no Marker).
-//     Result: RDS page 2 rows only, NextToken="", IsTruncated=false.
-//
-// This is a regression pin for Issue 5: verifies that the token-prefix logic
+// // - tick 1 (token=""): fetches DocDB page 1 (has more); no RDS call yet.
+// Result: DocDB page 1 rows, NextToken="docdb:d1", IsTruncated=true.
+// // - tick 2 (token="docdb:d1"): fetches DocDB page 2 (last DocDB page),
+// then immediately fetches RDS page 1 (has more). Result: DocDB page 2
+// rows + RDS page 1 rows concatenated, NextToken="rds:r1", IsTruncated=true.
+// // - tick 3 (token="rds:r1"): fetches RDS page 2 (last page, no Marker).
+// Result: RDS page 2 rows only, NextToken="", IsTruncated=false.
+// // This is a regression pin for Issue 5: verifies that the token-prefix logic
 // in dbc.go correctly sequences DocDB and RDS pages and that the combined
 // result assembles correctly without losing rows.
 func TestDbc_Pagination_MultiPage_Success(t *testing.T) {
@@ -716,7 +711,7 @@ func TestDbc_Pagination_MultiPage_Success(t *testing.T) {
 
 // TestComputeRDSDBClusterStatusAndFindings validates computeRDSDBClusterStatusAndIssues
 // (unexported) via FetchRDSDBClustersPage — 11 cases mirroring the docdb table.
-// PR-03e: assertions migrated from Status/Issues to Fields["status"]/Findings.
+// assertions migrated from Status/Issues to Fields["status"]/Findings.
 func TestComputeRDSDBClusterStatusAndFindings(t *testing.T) {
 	boolPtr := func(b bool) *bool { return &b }
 	int32Ptr := func(i int32) *int32 { return &i }
@@ -868,9 +863,9 @@ func TestComputeRDSDBClusterStatusAndFindings(t *testing.T) {
 				t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 			}
 			r := result.Resources[0]
-			// PR-03e: Status must always be "".
+			// Status must always be "".
 			if r.Status != "" {
-				t.Errorf("Status = %q, want %q (PR-03e: fetcher must not write Status)", r.Status, "")
+				t.Errorf("Status = %q, want %q", r.Status, "")
 			}
 			if r.Fields["status"] != tc.wantPhrase {
 				t.Errorf("Fields[status] = %q, want %q", r.Fields["status"], tc.wantPhrase)

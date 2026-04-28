@@ -1,12 +1,10 @@
 // aws_redshift_test.go — Unit tests for the Redshift fetcher.
-//
-// Tests assert on the contract surface of FetchRedshiftClustersPage:
-//   - Resource.Status  always "" (PR-03e: phrases moved to Findings and Fields["status"])
-//   - Resource.Findings (slice of domain.Finding in §4 precedence order, Source="wave1")
-//   - Resource.Fields["status"]          (§4 display phrase — drives list-view color)
-//   - Resource.Fields["cluster_status"]  (raw ClusterStatus value — read by Color func)
-//
-// Wave 1 signals only (Wave 2 = None per spec).
+// // Tests assert on the contract surface of FetchRedshiftClustersPage:
+// - Resource.Status  always ""
+// - Resource.Findings (slice of domain.Finding in §4 precedence order, Source="wave1")
+// - Resource.Fields["status"]          (§4 display phrase — drives list-view color)
+// - Resource.Fields["cluster_status"]  (raw ClusterStatus value — read by Color func)
+// // Wave 1 signals only (Wave 2 = None per spec).
 // Anti-tests verify no CloudWatch-derived phrases surface (§3.3 out of scope).
 // Severity-precedence tests verify Broken beats Warning (U8).
 // Multi-finding tests verify rule-7 "(+N)" suffix and Findings ordering.
@@ -65,12 +63,12 @@ func fetchSingleCluster(t *testing.T, cluster redshifttypes.Cluster) resource.Re
 	return result.Resources[0]
 }
 
-// assertStatus asserts Resource.Status is always empty (PR-03e) and
+// assertStatus asserts Resource.Status is always empty () and
 // Resource.Fields["status"] carries the display phrase.
 func assertStatus(t *testing.T, r resource.Resource, wantPhrase string) {
 	t.Helper()
 	if r.Status != "" {
-		t.Errorf("Resource.Status = %q, want %q (PR-03e: fetcher must not write Status)", r.Status, "")
+		t.Errorf("Resource.Status = %q, want %q", r.Status, "")
 	}
 	if r.Fields["status"] != wantPhrase {
 		t.Errorf("Resource.Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)

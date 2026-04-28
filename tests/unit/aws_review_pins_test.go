@@ -98,7 +98,7 @@ func TestEnrichEFSMountTargets_Idempotent(t *testing.T) {
 	fake := efsMTFakeFromFixtures()
 	clients := &awsclient.ServiceClients{EFS: fake}
 
-	// Fetcher output: W1 Warning "updating" lives in Findings post-PR-03e.
+	// Fetcher output: W1 Warning "updating" lives in Findings .
 	res := efsResources(fsID)
 	res[0].Findings = []domain.Finding{
 		{Code: awsclient.CodeEFSUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"},

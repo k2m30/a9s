@@ -126,7 +126,7 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 		findings[fsID] = finding
 
 		// FieldUpdates: the Wave-2 phrase becomes the top, the Wave-1 findings
-		// become the hidden count N. Post-PR-03e: derive N from r.Findings
+		// become the hidden count N. derive N from r.Findings
 		// (was len(r.Issues)). Findings is fetcher-owned and stable across
 		// enrichment runs, so re-running against already-merged FieldUpdates
 		// never double-bumps.

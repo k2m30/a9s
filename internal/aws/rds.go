@@ -202,7 +202,7 @@ func FetchRDSInstancesPage(ctx context.Context, api RDSDescribeDBInstancesAPI, c
 // transitional (Warning) state. These show a pending modification key suffix when applicable.
 //
 // "stopped" is intentionally classified Warn (not Broken) — it is admin
-// action, not failure, mirroring EC2 stopped semantics. Pre-PR-03e mapped
+// action, not failure, mirroring EC2 stopped semantics. previously mapped
 // stopped→Broken via a structural Color arm; that arm is now dead because
 // Findings drive Color. The shift is intentional.
 var transitionalStatusSet = map[string]struct{}{

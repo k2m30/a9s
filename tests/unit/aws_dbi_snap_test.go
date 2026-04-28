@@ -1,14 +1,13 @@
 package unit
 
 // aws_rds_snap_test.go — Fetcher tests for dbi-snap resource type.
-//
-// Spec: docs/resources/dbi-snap.md §3.1 + §4 + impl-plan §1.1/§1.4.
+// // Spec: docs/resources/dbi-snap.md §3.1 + §4 + impl-plan §1.1/§1.4.
 // Tests call FetchDBISnapshotsPage via a strict mock, asserting:
-//   - Resource.Status = "" (PR-03e: fetcher must not write Status).
-//   - Resource.Fields["status"] = §4 phrase for each signal (healthy = "").
-//   - Resource.Findings = ordered slice per §0.1 precedence ladder (source: "wave1").
-//   - Fields["arn"] populated for the backup-pivot (per §3.1 gap fix).
-//   - Adversarial rows (nil ID, nil Status, nil SnapshotCreateTime) do not panic.
+// - Resource.Status = "".
+// - Resource.Fields["status"] = §4 phrase for each signal (healthy = "").
+// - Resource.Findings = ordered slice per §0.1 precedence ladder (source: "wave1").
+// - Fields["arn"] populated for the backup-pivot (per §3.1 gap fix).
+// - Adversarial rows (nil ID, nil Status, nil SnapshotCreateTime) do not panic.
 
 import (
 	"context"
@@ -50,7 +49,7 @@ func snapOutput(snaps ...rdstypes.DBSnapshot) *rds.DescribeDBSnapshotsOutput {
 }
 
 // fetchSnap fetches a page from a single-page mock holding the provided snapshots.
-// PR-03e: resourceRow.status is populated from r.Fields["status"] (not r.Status).
+// resourceRow.status is populated from r.Fields["status"] (not r.Status).
 func fetchSnap(t *testing.T, snaps ...rdstypes.DBSnapshot) []resourceRow {
 	t.Helper()
 	mock := &mockDescribeDBSnapshots{output: snapOutput(snaps...)}
@@ -72,7 +71,7 @@ func fetchSnap(t *testing.T, snaps ...rdstypes.DBSnapshot) []resourceRow {
 
 // resourceRow captures the fields we assert on — avoids depending on the
 // full resource.Resource struct layout in tests.
-// PR-03e: status is now r.Fields["status"]; issues replaced by findings.
+// status is now r.Fields["status"]; issues replaced by findings.
 type resourceRow struct {
 	id       string
 	status   string
@@ -265,12 +264,12 @@ func TestDBISnap_Fetcher_PopulatesARNField(t *testing.T) {
 }
 
 // TestDBISnap_Fetcher_FindingsPopulatedInPrecedenceOrder verifies (U7f) that
-// Resource.Findings is ordered per §0.1 for each signal case (PR-03e):
-//   - Healthy → empty
-//   - failed → ["failed"]
-//   - incompatible-restore → ["incompatible-restore"]
-//   - creating → ["creating: 60%"]
-//   - unencrypted → ["unencrypted"]
+// Resource.Findings is ordered per §0.1 for each signal case ():
+// - Healthy → empty
+// - failed → ["failed"]
+// - incompatible-restore → ["incompatible-restore"]
+// - creating → ["creating: 60%"]
+// - unencrypted → ["unencrypted"]
 func TestDBISnap_Fetcher_FindingsPopulatedInPrecedenceOrder(t *testing.T) {
 	cases := []struct {
 		name         string
@@ -507,8 +506,7 @@ func TestDBISnap_Fetcher_AllFixtures_NoError(t *testing.T) {
 // under internal/aws and asserts that every direct RDS/Backup API call appears
 // inside a RetryOnThrottle closure. Per universal rule U13, callers must never
 // call AWS APIs directly from enricher or fetcher bodies outside throttle wraps.
-//
-// Scan strategy: any line that calls api.Describe*/api.Get*/api.List*/api.Lookup*
+// // Scan strategy: any line that calls api.Describe*/api.Get*/api.List*/api.Lookup*
 // directly (not as the argument to RetryOnThrottle) is a violation.
 func TestDBISnap_StaticAudit_AllSDKCallsThrottleWrapped(t *testing.T) {
 	root := findRepoFile(t, "internal/aws")
