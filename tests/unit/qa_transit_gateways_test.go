@@ -54,6 +54,9 @@ func TestQA_TransitGateways_FetchSuccess(t *testing.T) {
 	if r.Status != "" {
 		t.Errorf("expected empty Status, got %q", r.Status)
 	}
+	if len(r.Findings) != 0 {
+		t.Errorf("expected no Findings for available TGW, got %d", len(r.Findings))
+	}
 	if r.Fields["state"] != "available" {
 		t.Errorf("expected Fields[\"state\"]='available', got %q", r.Fields["state"])
 	}

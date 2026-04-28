@@ -19,10 +19,8 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				for _, f := range r.Findings {
-					if f.Source == "wave1" {
-						return ColorFromSeverity(f.Severity)
-					}
+				if c, ok := ColorFromWave1(r); ok {
+					return c
 				}
 				switch r.Fields["state"] {
 				case "active", "":
@@ -100,10 +98,8 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "is_default", Title: "Default", Width: 9, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				for _, f := range r.Findings {
-					if f.Source == "wave1" {
-						return ColorFromSeverity(f.Severity)
-					}
+				if c, ok := ColorFromWave1(r); ok {
+					return c
 				}
 				switch r.Fields["state"] {
 				case "available", "":
@@ -130,10 +126,8 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "available_ips", Title: "Available IPs", Width: 14, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				for _, f := range r.Findings {
-					if f.Source == "wave1" {
-						return ColorFromSeverity(f.Severity)
-					}
+				if c, ok := ColorFromWave1(r); ok {
+					return c
 				}
 				switch r.Fields["state"] {
 				case "available", "":
@@ -186,10 +180,8 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "public_ip", Title: "Public IP", Width: 16, Sortable: false},
 			},
 			Color: func(r Resource) Color {
-				for _, f := range r.Findings {
-					if f.Source == "wave1" {
-						return ColorFromSeverity(f.Severity)
-					}
+				if c, ok := ColorFromWave1(r); ok {
+					return c
 				}
 				switch r.Fields["state"] {
 				case "available", "":
@@ -217,10 +209,8 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "state", Title: "State", Width: 12, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				for _, f := range r.Findings {
-					if f.Source == "wave1" {
-						return ColorFromSeverity(f.Severity)
-					}
+				if c, ok := ColorFromWave1(r); ok {
+					return c
 				}
 				switch r.Fields["state"] {
 				case "attaching", "detaching":
@@ -250,13 +240,9 @@ func networkingResourceTypes() []ResourceTypeDef {
 			// Elastic IPs without an association are allocated-but-unused and
 			// continue to incur hourly charges. Surface those as warning.
 			Color: func(r Resource) Color {
-				// PR-03b: Findings-first for wave1 lifecycle entries.
-				for _, f := range r.Findings {
-					if f.Source == "wave1" {
-						return ColorFromSeverity(f.Severity)
-					}
+				if c, ok := ColorFromWave1(r); ok {
+					return c
 				}
-
 				if r.Fields["association_id"] == "" && r.Fields["instance_id"] == "" {
 					return ColorWarning
 				}
@@ -277,10 +263,8 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				for _, f := range r.Findings {
-					if f.Source == "wave1" {
-						return ColorFromSeverity(f.Severity)
-					}
+				if c, ok := ColorFromWave1(r); ok {
+					return c
 				}
 				switch r.Fields["state"] {
 				case "Available", "":
@@ -309,10 +293,8 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "description", Title: "Description", Width: 30, Sortable: false},
 			},
 			Color: func(r Resource) Color {
-				for _, f := range r.Findings {
-					if f.Source == "wave1" {
-						return ColorFromSeverity(f.Severity)
-					}
+				if c, ok := ColorFromWave1(r); ok {
+					return c
 				}
 				switch r.Fields["state"] {
 				case "available", "":
@@ -342,13 +324,9 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "private_ip", Title: "Private IP", Width: 16, Sortable: false},
 			},
 			Color: func(r Resource) Color {
-				// PR-03b: Findings-first for wave1 lifecycle entries.
-				for _, f := range r.Findings {
-					if f.Source == "wave1" {
-						return ColorFromSeverity(f.Severity)
-					}
+				if c, ok := ColorFromWave1(r); ok {
+					return c
 				}
-
 				switch r.Fields["status"] {
 				case "in-use":
 					return ColorHealthy

@@ -68,6 +68,9 @@ func TestFetchVPCs_ParsesMultipleVPCs(t *testing.T) {
 	if r0.Status != "" {
 		t.Errorf("resource[0].Status: expected empty, got %q", r0.Status)
 	}
+	if len(r0.Findings) != 0 {
+		t.Errorf("resource[0].Findings: expected none for available VPC, got %d", len(r0.Findings))
+	}
 
 	// Verify Fields
 	requiredFields := []string{"vpc_id", "name", "cidr_block", "state", "is_default"}
@@ -218,6 +221,9 @@ func TestFetchVPCs_RealAWSData(t *testing.T) {
 	if r0.Status != "" {
 		t.Errorf("resource[0].Status: expected empty, got %q", r0.Status)
 	}
+	if len(r0.Findings) != 0 {
+		t.Errorf("resource[0].Findings: expected none for available VPC, got %d", len(r0.Findings))
+	}
 	if r0.Fields["vpc_id"] != "vpc-0aaa1111bbb2222cc" {
 		t.Errorf("resource[0].Fields[\"vpc_id\"]: expected %q, got %q", "vpc-0aaa1111bbb2222cc", r0.Fields["vpc_id"])
 	}
@@ -256,6 +262,9 @@ func TestFetchVPCs_RealAWSData(t *testing.T) {
 	}
 	if r1.Status != "" {
 		t.Errorf("resource[1].Status: expected empty, got %q", r1.Status)
+	}
+	if len(r1.Findings) != 0 {
+		t.Errorf("resource[1].Findings: expected none for available VPC, got %d", len(r1.Findings))
 	}
 	if r1.Fields["state"] != "available" {
 		t.Errorf("resource[1].Fields[\"state\"]: expected %q, got %q", "available", r1.Fields["state"])

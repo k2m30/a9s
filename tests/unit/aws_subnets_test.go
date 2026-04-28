@@ -72,6 +72,9 @@ func TestFetchSubnets_ParsesMultipleSubnets(t *testing.T) {
 	if r0.Status != "" {
 		t.Errorf("resource[0].Status: expected empty, got %q", r0.Status)
 	}
+	if len(r0.Findings) != 0 {
+		t.Errorf("resource[0].Findings: expected none for available subnet, got %d", len(r0.Findings))
+	}
 
 	// Verify Fields on all resources
 	requiredFields := []string{"subnet_id", "name", "vpc_id", "cidr_block", "availability_zone", "state", "available_ips"}

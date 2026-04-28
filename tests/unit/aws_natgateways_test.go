@@ -71,6 +71,9 @@ func TestFetchNatGateways_ParsesMultipleNatGateways(t *testing.T) {
 	if r0.Status != "" {
 		t.Errorf("resource[0].Status: expected empty, got %q", r0.Status)
 	}
+	if len(r0.Findings) != 0 {
+		t.Errorf("resource[0].Findings: expected none for available NAT, got %d", len(r0.Findings))
+	}
 
 	// Verify Fields on all resources
 	requiredFields := []string{"nat_gateway_id", "name", "vpc_id", "subnet_id", "state", "public_ip"}

@@ -69,6 +69,9 @@ func TestFetchInternetGateways_ParsesMultipleIGWs(t *testing.T) {
 	if r0.Status != "" {
 		t.Errorf("resource[0].Status: expected empty, got %q", r0.Status)
 	}
+	if len(r0.Findings) != 0 {
+		t.Errorf("resource[0].Findings: expected none for attached IGW, got %d", len(r0.Findings))
+	}
 
 	// Verify Fields on all resources
 	requiredFields := []string{"igw_id", "name", "vpc_id", "state"}

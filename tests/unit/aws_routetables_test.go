@@ -70,6 +70,9 @@ func TestFetchRouteTables_ParsesMultipleRouteTables(t *testing.T) {
 	if r0.Status != "" {
 		t.Errorf("resource[0].Status: expected empty, got %q", r0.Status)
 	}
+	if len(r0.Findings) != 0 {
+		t.Errorf("resource[0].Findings: expected none for rtb (never emits), got %d", len(r0.Findings))
+	}
 	if r0.Fields["is_main"] != "true" {
 		t.Errorf("resource[0].Fields[\"is_main\"]: expected %q, got %q", "true", r0.Fields["is_main"])
 	}
