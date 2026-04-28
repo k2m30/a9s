@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -108,10 +109,24 @@ func FetchECSClustersPage(ctx context.Context, listAPI ECSListClustersAPI, descr
 		pendingTasks := fmt.Sprintf("%d", cluster.PendingTasksCount)
 		servicesCount := fmt.Sprintf("%d", cluster.ActiveServicesCount)
 
+		// PR-03c: emit wave1 Findings for non-healthy lifecycle states.
+		// ACTIVE → no Finding (healthy). Fields["status"] is still populated
+		// so the existing structural Color path works as fallback.
+		var findings []domain.Finding
+		switch status {
+		case "PROVISIONING":
+			findings = []domain.Finding{{Code: CodeECSStateProvisioning, Phrase: "provisioning", Severity: domain.SevWarn, Source: "wave1"}}
+		case "DEPROVISIONING":
+			findings = []domain.Finding{{Code: CodeECSStateDeprovisioning, Phrase: "deprovisioning", Severity: domain.SevWarn, Source: "wave1"}}
+		case "FAILED":
+			findings = []domain.Finding{{Code: CodeECSStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+		case "INACTIVE":
+			findings = []domain.Finding{{Code: CodeECSStateInactive, Phrase: "inactive", Severity: domain.SevBroken, Source: "wave1"}}
+		}
+
 		r := resource.Resource{
-			ID:     clusterName,
-			Name:   clusterName,
-			Status: status,
+			ID:   clusterName,
+			Name: clusterName,
 			Fields: map[string]string{
 				"cluster_name":   clusterName,
 				"status":         status,
@@ -119,6 +134,7 @@ func FetchECSClustersPage(ctx context.Context, listAPI ECSListClustersAPI, descr
 				"pending_tasks":  pendingTasks,
 				"services_count": servicesCount,
 			},
+			Findings:  findings,
 			RawStruct: cluster,
 		}
 
