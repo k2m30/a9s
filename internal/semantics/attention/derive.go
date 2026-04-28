@@ -14,6 +14,7 @@
 package attention
 
 import (
+	"maps"
 	"regexp"
 	"strings"
 
@@ -89,6 +90,49 @@ func DeriveFindings(r *domain.Resource, td resource.ResourceTypeDef, enrichmentF
 
 	r.Findings = findings
 	r.AttentionDetails = attn
+}
+
+// DeriveWave1Only re-derives only the wave1 portion of r.Findings from r.Status
+// and r.Issues, preserving any existing wave2 entries (Source has "wave2:" prefix)
+// and their AttentionDetails. Used by non-EnrichmentChecked entry points so that
+// wave2 findings written by applyEnrichment (PR-03a-fold) are not wiped when a
+// resource is re-derived at a later site (e.g. cache-hit navigation, lazy add).
+//
+// The EnrichmentChecked handler uses applyEnrichment which calls the full
+// DeriveFindings with the new wave2 inputs.
+//
+// Safe on nil r (no-op).
+func DeriveWave1Only(r *domain.Resource, td resource.ResourceTypeDef) {
+	if r == nil {
+		return
+	}
+	// Save any existing wave2 entries before the full re-derive wipes them.
+	var wave2 []domain.Finding
+	for _, f := range r.Findings {
+		if strings.HasPrefix(f.Source, "wave2:") {
+			wave2 = append(wave2, f)
+		}
+	}
+	var wave2Attn map[domain.FindingCode]domain.AttentionDetail
+	if len(wave2) > 0 && r.AttentionDetails != nil {
+		wave2Attn = make(map[domain.FindingCode]domain.AttentionDetail, len(wave2))
+		for _, f := range wave2 {
+			if d, ok := r.AttentionDetails[f.Code]; ok {
+				wave2Attn[f.Code] = d
+			}
+		}
+	}
+	// Re-derive wave1 only (nil enrichment = no wave2 emitted).
+	DeriveFindings(r, td, nil)
+	// Re-append the saved wave2 entries.
+	r.Findings = append(r.Findings, wave2...)
+	if len(wave2Attn) > 0 {
+		if r.AttentionDetails == nil {
+			r.AttentionDetails = wave2Attn
+		} else {
+			maps.Copy(r.AttentionDetails, wave2Attn)
+		}
+	}
 }
 
 // severityFromMarker maps an EnrichmentFinding.Severity glyph to a domain.Severity.

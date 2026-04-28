@@ -185,17 +185,17 @@ func New(profile, region string, opts ...Option) Model {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	m := Model{
-		Session: session.New(),
-		profile: profile,
-		region:         region,
-		keys:           k,
-		stack:          []views.View{&menu},
-		cmdInput:       ti,
-		viewConfig:     cfg,
-		configErr:      cfgErr,
-		activeTheme:    "tokyo-night.yaml",
-		appCtx:         ctx,
-		appCancel:      cancel,
+		Session:     session.New(),
+		profile:     profile,
+		region:      region,
+		keys:        k,
+		stack:       []views.View{&menu},
+		cmdInput:    ti,
+		viewConfig:  cfg,
+		configErr:   cfgErr,
+		activeTheme: "tokyo-night.yaml",
+		appCtx:      ctx,
+		appCancel:   cancel,
 	}
 	for _, opt := range opts {
 		opt(&m)
@@ -235,6 +235,17 @@ func (m Model) ActiveDetailResource() (resource.Resource, bool) {
 		return d.SourceResource(), true
 	}
 	return resource.Resource{}, false
+}
+
+// ActiveListResources returns the resource slice currently held by the
+// top-of-stack ResourceListModel, or nil if the active view is not a
+// ResourceListModel. Used by tests to inspect the rl's internal state
+// after Ctrl+R (Phase 03 PR-03a-fold).
+func (m Model) ActiveListResources() []resource.Resource {
+	if rl, ok := m.activeView().(*views.ResourceListModel); ok {
+		return rl.AllResources()
+	}
+	return nil
 }
 
 // Init implements tea.Model. Fires a command to establish the AWS session.

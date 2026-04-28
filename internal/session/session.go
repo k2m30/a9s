@@ -12,10 +12,12 @@
 //   - Only session-scoped orchestration state belongs here. UI shell concerns
 //     (view stack, header, input mode, theme) stay on the surrounding Model.
 //   - Maps that handler paths write into directly (ResourceCache,
-//     EnrichmentFindings, EnrichmentRan, EnrichmentTypeGen,
-//     EnrichmentTruncatedIDs) MUST be constructed by New().
-//     ProbeResources and the availability/enrich queues stay nil until a
-//     probe retains its first batch — they are built in place.
+//     EnrichmentRan, EnrichmentTypeGen, EnrichmentTruncatedIDs) MUST be
+//     constructed by New(). ProbeResources and the availability/enrich queues
+//     stay nil until a probe retains its first batch — they are built in place.
+//   - EnrichmentFindings was removed in PR-03a-fold; it now lives directly on
+//     tui.Model so it is not subject to Session.Rotate() clearing. The Model
+//     owner (handleProfileSelected / handleRegionSelected) clears it explicitly.
 //   - Session rotation (profile/region switch) MUST bump every generation and
 //     replace/clear the caches, so in-flight messages tagged with old gens are
 //     discarded by the handlers' gen guards.
@@ -58,7 +60,10 @@ type Session struct {
 	EnrichTotal     int                            // total enrichment probes to run in current gen
 
 	// Per-type Wave 2 finding state (feature 018-enrichment-visibility).
-	EnrichmentFindings     map[string]map[string]resource.EnrichmentFinding
+	// NOTE: EnrichmentFindings was moved to tui.Model in PR-03a-fold so that
+	// it survives Session.Rotate() and is cleared explicitly by the profile/
+	// region switch handlers. The remaining maps stay here because they do not
+	// need to persist across a Rotate().
 	EnrichmentRan          map[string]bool
 	EnrichmentTypeGen      map[string]int
 	EnrichmentTruncatedIDs map[string]map[string]bool
@@ -110,7 +115,6 @@ type Session struct {
 func New() *Session {
 	return &Session{
 		ProbeResources:         nil, // initialized lazily on first probe retention
-		EnrichmentFindings:     make(map[string]map[string]resource.EnrichmentFinding),
 		EnrichmentRan:          make(map[string]bool),
 		EnrichmentTypeGen:      make(map[string]int),
 		EnrichmentTruncatedIDs: make(map[string]map[string]bool),
@@ -153,7 +157,6 @@ func (s *Session) Rotate() {
 	s.EnrichTotal = 0
 	s.ResourceCache = make(map[string]*ResourceCacheEntry)
 	s.LazyResourceCache = make(map[string][]resource.Resource)
-	s.EnrichmentFindings = make(map[string]map[string]resource.EnrichmentFinding)
 	s.EnrichmentRan = make(map[string]bool)
 	s.EnrichmentTypeGen = make(map[string]int)
 	s.EnrichmentTruncatedIDs = make(map[string]map[string]bool)
