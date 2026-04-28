@@ -157,20 +157,59 @@ func domainItemToFieldItem(it domain.Item, sectionTitle string) fieldpath.FieldI
 // across resource types (dbc, ec2, ecr, …) — no per-type branching.
 func (m *DetailModel) injectAttentionSection() {
 	type entry struct {
-		tier    string
-		primary string
-		rows    []resource.FindingRow
+		tier          string
+		primary       string
+		rows          []domain.DetailRow
+		splitKeyValue bool // when true: Key=primary (raw phrase), Value=glyph+capitalizedPhrase (display)
 	}
 	var entries []entry
-	for _, phrase := range m.res.Issues {
-		entries = append(entries, entry{tier: phraseTier(m.resourceType, phrase), primary: phrase})
-	}
-	if m.enrichmentFinding != nil && m.enrichmentFinding.Summary != "" {
-		entries = append(entries, entry{
-			tier:    m.enrichmentFinding.Severity,
-			primary: m.enrichmentFinding.Summary,
-			rows:    m.enrichmentFinding.Rows,
-		})
+	// PR-03a-views: read r.Findings + r.AttentionDetails when Findings is populated.
+	// Fall back to legacy r.Issues + m.enrichmentFinding when Findings is empty.
+	if len(m.res.Findings) > 0 {
+		for _, f := range m.res.Findings {
+			// Only surface issue-severity findings in the Attention section.
+			// SevOK / SevDim findings represent healthy / informational states
+			// that carry no actionable signal — including them would create a
+			// spurious "Attention (1)" block on every healthy resource whose
+			// Status was promoted to a Findings entry by DeriveFindings.
+			if !f.Severity.IsIssue() {
+				continue
+			}
+			var tier string
+			switch f.Severity {
+			case domain.SevBroken:
+				tier = "!"
+			default:
+				tier = "~"
+			}
+			var rows []domain.DetailRow
+			if m.res.AttentionDetails != nil {
+				if det, ok := m.res.AttentionDetails[f.Code]; ok {
+					rows = det.Rows
+				}
+			}
+			// splitKeyValue=true: Key holds the raw phrase (for search and clipboard),
+			// Value holds the glyph+capitalized phrase (for TUI display). PlainContent
+			// renders "raw phrase: ! Capitalized phrase" so callers can match against
+			// the original lowercase text; the TUI viewport renders only the Value to
+			// keep the line short enough to fit the viewport.
+			entries = append(entries, entry{tier: tier, primary: f.Phrase, rows: rows, splitKeyValue: true})
+		}
+	} else {
+		for _, phrase := range m.res.Issues {
+			entries = append(entries, entry{tier: phraseTier(m.resourceType, phrase), primary: phrase})
+		}
+		if m.enrichmentFinding != nil && m.enrichmentFinding.Summary != "" {
+			enrichRows := make([]domain.DetailRow, len(m.enrichmentFinding.Rows))
+			for i, r := range m.enrichmentFinding.Rows {
+				enrichRows[i] = domain.DetailRow{Label: r.Label, Value: r.Value, Tier: r.Tier}
+			}
+			entries = append(entries, entry{
+				tier:    m.enrichmentFinding.Severity,
+				primary: m.enrichmentFinding.Summary,
+				rows:    enrichRows,
+			})
+		}
 	}
 	if len(entries) == 0 {
 		return
@@ -199,13 +238,26 @@ func (m *DetailModel) injectAttentionSection() {
 		if glyph != "!" && glyph != "~" {
 			glyph = "~"
 		}
-		line := glyph + " " + capitalizeFirst(e.primary)
+		displayPhrase := capitalizeFirst(e.primary)
+		line := glyph + " " + displayPhrase
 		entryColor := capTierToRowBucket(e.tier, rowBucket)
+		itemKey := line
+		itemValue := line
+		if e.splitKeyValue {
+			// Findings path: Key = raw phrase (for search/clipboard),
+			// Value = glyph + capitalized phrase (for TUI display).
+			// TUI rendering uses only Value (short, fits viewport) when
+			// Path=="Attention" and not in plainMode. PlainContent
+			// (plainMode=true) renders "Key: Value" so the raw lowercase
+			// phrase is present alongside the capitalized display form.
+			itemKey = e.primary
+			itemValue = line
+		}
 		items = append(items, fieldpath.FieldItem{
 			IsSubField:  true,
 			IndentLevel: 1,
-			Key:         line,
-			Value:       line,
+			Key:         itemKey,
+			Value:       itemValue,
 			Path:        "Attention",
 			ColorTier:   entryColor,
 		})
@@ -377,6 +429,13 @@ func (m DetailModel) renderFromFieldList() string {
 				// Navigable or injected sub-fields have Key != Value (pre-split by buildFieldList).
 				// General sub-fields have Key == Value (raw YAML line).
 				if item.Key != item.Value {
+					// Attention phrase rows (IndentLevel == 1) collapse to value-only on
+					// the cursor row too — consistent with the non-cursor branch.
+					// AttentionDetails rows (IndentLevel == 3) keep Key: Value labels.
+					if item.Path == "Attention" && item.IndentLevel == 1 {
+						line = indent + item.Value
+						break
+					}
 					line = indent + item.Key + ": " + item.Value
 					break
 				}
@@ -409,6 +468,23 @@ func (m DetailModel) renderFromFieldList() string {
 				}
 				// Injected sub-fields with separate Key/Value (e.g., EC2 status checks).
 				if item.Key != item.Value {
+					// Attention phrase rows (IndentLevel == 1) use splitKeyValue:
+					// Key = raw phrase (for search/clipboard), Value = glyph +
+					// capitalized phrase (for display). In TUI mode (plainMode=false)
+					// render only the Value — the short form fits the viewport without
+					// truncation. In plainMode (PlainContent/clipboard) render Key: Value
+					// so the raw lowercase phrase is present alongside the capitalized
+					// display form. IndentLevel == 1 distinguishes phrase rows from
+					// AttentionDetails rows (IndentLevel == 3) which must always render
+					// as Key: Value to preserve their labels (e.g. "Action: reboot").
+					if item.Path == "Attention" && item.IndentLevel == 1 && !m.plainMode {
+						val := item.Value
+						if item.ColorTier != "" {
+							val = styles.TierColorStyle(item.ColorTier).Render(val)
+						}
+						line = subFieldIndent(item.IndentLevel) + val
+						break
+					}
 					val := item.Value
 					if item.ColorTier != "" {
 						val = styles.TierColorStyle(item.ColorTier).Render(val)
