@@ -34,7 +34,10 @@ func (m DetailModel) RawYAML() string {
 }
 
 // PlainContent returns the detail content as plain text (no ANSI) for clipboard copy.
+// Sets plainMode=true on a local copy so renderFromFieldList emits Attention entries
+// as "Key: Value" (raw phrase + capitalized display) rather than the shortened TUI form.
 func (m DetailModel) PlainContent() string {
+	m.plainMode = true
 	content := m.renderContent()
 	// Strip ANSI escape codes
 	result := make([]byte, 0, len(content))
