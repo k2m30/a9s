@@ -64,6 +64,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // =============================================================================
@@ -786,4 +787,72 @@ func (m *pr03cECSDescribeTasksMock) DescribeTasks(
 	_ ...func(*ecssvc.Options),
 ) (*ecssvc.DescribeTasksOutput, error) {
 	return &ecssvc.DescribeTasksOutput{Tasks: m.tasks}, nil
+}
+
+// =============================================================================
+// ECS-TASKS child type (per-service task list)
+// =============================================================================
+
+// TestPR03c_EcsTasksChildType_ColorReadsFindings asserts that the "ecs_tasks"
+// child type has a Color func that (a) reads wave1 Findings first and (b) applies
+// structural overrides for UNHEALTHY health status and STOPPED + non-UserInitiated
+// stop_code. Without the Color func the child type falls back to fallbackColor,
+// which returns ColorHealthy for every status — masking PROVISIONING/STOPPING/
+// DEPROVISIONING tasks in the per-service task list view.
+func TestPR03c_EcsTasksChildType_ColorReadsFindings(t *testing.T) {
+	td := resource.GetChildType("ecs_tasks")
+	if td == nil {
+		t.Fatal("ecs_tasks child type not registered")
+	}
+	if td.Color == nil {
+		t.Fatal("ecs_tasks child type Color func not set — CR P2 regression")
+	}
+
+	// PROVISIONING via wave1 Finding → ColorWarning
+	r := resource.Resource{
+		Type: "ecs_tasks",
+		Findings: []domain.Finding{
+			{Code: awsclient.CodeECSTaskStateProvisioning, Phrase: "provisioning", Severity: domain.SevWarn, Source: "wave1"},
+		},
+		Fields: map[string]string{"status": "PROVISIONING"},
+	}
+	if got := td.Color(r); got != resource.ColorWarning {
+		t.Errorf("PROVISIONING task: Color = %v, want ColorWarning", got)
+	}
+
+	// STOPPED + non-UserInitiated stop_code → ColorBroken (structural override).
+	r2 := resource.Resource{
+		Type:     "ecs_tasks",
+		Findings: nil,
+		Fields: map[string]string{
+			"status":    "STOPPED",
+			"stop_code": "EssentialContainerExited",
+		},
+	}
+	if got := td.Color(r2); got != resource.ColorBroken {
+		t.Errorf("STOPPED + non-UserInitiated stop_code: Color = %v, want ColorBroken", got)
+	}
+
+	// RUNNING → ColorHealthy
+	r3 := resource.Resource{
+		Type:     "ecs_tasks",
+		Findings: nil,
+		Fields:   map[string]string{"status": "RUNNING"},
+	}
+	if got := td.Color(r3); got != resource.ColorHealthy {
+		t.Errorf("RUNNING task: Color = %v, want ColorHealthy", got)
+	}
+
+	// health == UNHEALTHY → ColorBroken (structural override).
+	r4 := resource.Resource{
+		Type:     "ecs_tasks",
+		Findings: nil,
+		Fields: map[string]string{
+			"status": "RUNNING",
+			"health": "UNHEALTHY",
+		},
+	}
+	if got := td.Color(r4); got != resource.ColorBroken {
+		t.Errorf("UNHEALTHY task: Color = %v, want ColorBroken", got)
+	}
 }
