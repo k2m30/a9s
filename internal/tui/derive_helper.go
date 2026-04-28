@@ -14,48 +14,44 @@ import (
 	"github.com/k2m30/a9s/v3/internal/semantics/attention"
 )
 
-// deriveFindingsForType derives findings across rows in-place for the given
-// resource type. Pulls the type def via the registry and the per-type enrichment
-// map from the model. Safe to call on empty or nil inputs.
+// deriveFindingsForType re-derives wave1 findings across rows in-place for the
+// given resource type, preserving any existing wave2 entries populated by a
+// prior applyEnrichment call. Safe to call on empty or nil inputs.
 //
 // The short parameter may be an alias (e.g. "rds") or the canonical ShortName
-// (e.g. "dbi"). FindResourceType resolves aliases to their canonical type def,
-// and the enrichment lookup always uses the canonical ShortName so Wave-2
-// findings stored under the canonical key are visible regardless of which alias
-// the caller passes.
+// (e.g. "dbi"). FindResourceType resolves aliases to their canonical type def.
+//
+// After PR-03a-fold, this helper calls DeriveWave1Only (not DeriveFindings) so
+// that wave2 findings already on r.Findings are preserved across subsequent
+// derive calls at non-EnrichmentChecked entry points.
 //
 // Used by Sites 1–5 (slice-shaped entry points):
 //   - Site 1: ResourcesLoadedMsg handler in app.go
 //   - Site 2: AvailabilityCheckedMsg → ProbeResources in app_handlers_availability.go
-//   - Site 3: EnrichmentCheckedMsg Wave-2 bridge in app_handlers_availability.go
+//   - Site 3: EnrichmentCheckedMsg Wave-2 bridge in app_handlers_availability.go (replaced by applyEnrichment)
 //   - Site 4: RelatedCheckResultMsg CachedPages in app.go
 //   - Site 5: RelatedCheckResultMsg LazyAddedResources in app.go
 func (m *Model) deriveFindingsForType(short string, rows []resource.Resource) {
 	if len(rows) == 0 {
 		return
 	}
-	var (
-		td    resource.ResourceTypeDef
-		canon = short
-	)
+	var td resource.ResourceTypeDef
 	if t := resource.FindResourceType(short); t != nil {
 		td = *t
-		canon = t.ShortName
 	} else {
 		td = resource.ResourceTypeDef{ShortName: short}
 	}
-	enrich := m.EnrichmentFindings[canon]
 	for i := range rows {
-		attention.DeriveFindings(&rows[i], td, enrich)
+		attention.DeriveWave1Only(&rows[i], td)
 	}
 }
 
-// deriveFindingsForResource derives findings on a single resource in-place.
-// Pulls the type def and enrichment map from the model.
+// deriveFindingsForResource re-derives wave1 findings on a single resource
+// in-place, preserving any existing wave2 entries populated by a prior
+// applyEnrichment call.
 //
-// The short parameter may be an alias or the canonical ShortName; the enrichment
-// lookup always uses the resolved canonical ShortName (same alias-safe pattern as
-// deriveFindingsForType).
+// After PR-03a-fold, this helper calls DeriveWave1Only so wave2 findings
+// already on r.Findings are preserved.
 //
 // Used by Sites 6–7 (single-resource entry points):
 //   - Site 6: child-view fetcher path in app_handlers_navigate.go
@@ -64,15 +60,11 @@ func (m *Model) deriveFindingsForResource(short string, r *resource.Resource) {
 	if r == nil {
 		return
 	}
-	var (
-		td    resource.ResourceTypeDef
-		canon = short
-	)
+	var td resource.ResourceTypeDef
 	if t := resource.FindResourceType(short); t != nil {
 		td = *t
-		canon = t.ShortName
 	} else {
 		td = resource.ResourceTypeDef{ShortName: short}
 	}
-	attention.DeriveFindings(r, td, m.EnrichmentFindings[canon])
+	attention.DeriveWave1Only(r, td)
 }
