@@ -311,8 +311,19 @@ func (m ResourceListModel) renderDataRow(cols []listCol, r resource.Resource, ba
 				}
 			}
 		}
-		padded := text.PadOrTrunc(val, c.width)
-		used += c.width
+		// PR-03a-views: when a status/lifecycle column carries a Findings phrase,
+		// allow the cell to be as wide as the phrase so it is never truncated.
+		// The phrase comes directly from the data layer and may legitimately
+		// exceed the default column width declared in typeDef.Columns.
+		padWidth := c.width
+		isStatusColHere := c.key == "status" || (m.typeDef.LifecycleKey != "" && c.key == m.typeDef.LifecycleKey)
+		if isStatusColHere && len(r.Findings) > 0 {
+			if nat := lipgloss.Width(val); nat > padWidth {
+				padWidth = nat
+			}
+		}
+		padded := text.PadOrTrunc(val, padWidth)
+		used += padWidth
 		b.WriteString(base.Render(padded))
 	}
 	// Trailing pad to totalWidth for the cursor row so the cursor bg fills the entire line.
@@ -329,6 +340,24 @@ func (m ResourceListModel) extractCellValue(c listCol, r resource.Resource) stri
 	// Special key "@id" maps to the resource's canonical ID field.
 	if c.key == "@id" {
 		return r.ID
+	}
+	// PR-03a-views: status/lifecycle column reads Findings first, then
+	// Fields[LifecycleKey] as fallback — never r.Status or the raw key value.
+	// The status column is identified by c.key == "status" (conventional) or
+	// c.key == td.LifecycleKey when an explicit lifecycle key is set.
+	lifecycleKey := m.typeDef.LifecycleKey
+	if lifecycleKey == "" {
+		lifecycleKey = "state"
+	}
+	isStatusCol := c.key == "status" || (m.typeDef.LifecycleKey != "" && c.key == m.typeDef.LifecycleKey)
+	if isStatusCol {
+		if len(r.Findings) > 0 {
+			return r.Findings[0].Phrase
+		}
+		if v := r.Fields[lifecycleKey]; v != "" {
+			return v
+		}
+		// Fall through to normal extraction if neither Findings nor LifecycleKey value is set.
 	}
 	// Fields map (key-based columns) takes priority over raw struct fields.
 	// This ensures Wave-2 enriched values always win over struct literals,

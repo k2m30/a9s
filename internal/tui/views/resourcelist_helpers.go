@@ -7,10 +7,37 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 )
+
+// resolveRowColor returns the resource.Color for row styling. PR-03a-views:
+// when r.Findings is non-empty, the first finding's Severity drives the color
+// so that view-layer colors are decoupled from the legacy r.Status field.
+// Falls back to td.ResolveColor(r) (lifecycle/Status path) when Findings is empty.
+func resolveRowColor(td resource.ResourceTypeDef, r resource.Resource) resource.Color {
+	if len(r.Findings) > 0 {
+		switch r.Findings[0].Severity {
+		case domain.SevBroken:
+			return resource.ColorBroken
+		case domain.SevWarn:
+			return resource.ColorWarning
+		case domain.SevOK:
+			return resource.ColorHealthy
+		case domain.SevDim:
+			return resource.ColorDim
+		}
+	}
+	return td.ResolveColor(r)
+}
+
+// hasIssueFinding reports whether r has at least one finding with IsIssue() severity.
+// PR-03a-views: used by attention filter and issue-count computation.
+func hasIssueFinding(r resource.Resource) bool {
+	return len(r.Findings) > 0 && r.Findings[0].Severity.IsIssue()
+}
 
 // applySortAndFilter re-applies filter and then sorts the filtered results.
 func (m *ResourceListModel) applySortAndFilter() {
@@ -318,6 +345,7 @@ func (m ResourceListModel) IssueCount() int {
 	return m.issueCount
 }
 
+
 // SetShowIssueBadge enables the "issues:N" badge in FrameTitle.
 // Set by main menu navigation for top-level resource lists.
 func (m *ResourceListModel) SetShowIssueBadge(v bool) {
@@ -583,12 +611,20 @@ func (m *ResourceListModel) applyFilter() {
 	if m.IsEnabled() {
 		kept := make([]resource.Resource, 0, len(result))
 		for _, r := range result {
-			if m.typeDef.ResolveColor(r).IsIssue() {
+			// PR-03a-views: prefer Findings-based predicate; fall back to legacy color
+			// check (which reads r.Status / r.Fields) when Findings is empty.
+			if hasIssueFinding(r) {
 				kept = append(kept, r)
 				continue
 			}
-			if _, hasFinding := m.findingsByID[r.ID]; hasFinding {
-				kept = append(kept, r)
+			if len(r.Findings) == 0 {
+				if m.typeDef.ResolveColor(r).IsIssue() {
+					kept = append(kept, r)
+					continue
+				}
+				if _, hasFinding := m.findingsByID[r.ID]; hasFinding {
+					kept = append(kept, r)
+				}
 			}
 		}
 		result = kept
@@ -598,9 +634,13 @@ func (m *ResourceListModel) applyFilter() {
 	m.scroll.SetTotal(len(m.filteredResources))
 
 	// Recompute issue count from allResources (not filtered — represents the full page).
+	// PR-03a-views: prefer Findings-based predicate; fall back to legacy color check
+	// when Findings is empty (r.Status / r.Fields path).
 	ic := 0
 	for _, r := range m.allResources {
-		if m.typeDef.ResolveColor(r).IsIssue() {
+		if hasIssueFinding(r) {
+			ic++
+		} else if len(r.Findings) == 0 && m.typeDef.ResolveColor(r).IsIssue() {
 			ic++
 		}
 	}
@@ -609,6 +649,9 @@ func (m *ResourceListModel) applyFilter() {
 }
 
 // FilterResources returns resources matching the query (case-insensitive).
+// PR-03a-views: searches r.ID, r.Name, r.Fields values, and r.Findings[i].Phrase.
+// r.Status is no longer searched directly; its value is present in r.Fields and,
+// after DeriveFindings, in r.Findings[i].Phrase.
 // Exported so tests can call it directly.
 func FilterResources(query string, resources []resource.Resource) []resource.Resource {
 	if query == "" {
@@ -618,13 +661,23 @@ func FilterResources(query string, resources []resource.Resource) []resource.Res
 	result := make([]resource.Resource, 0)
 	for _, r := range resources {
 		if strings.Contains(strings.ToLower(r.ID), q) ||
-			strings.Contains(strings.ToLower(r.Name), q) ||
-			strings.Contains(strings.ToLower(r.Status), q) {
+			strings.Contains(strings.ToLower(r.Name), q) {
 			result = append(result, r)
 			continue
 		}
+		matched := false
 		for _, v := range r.Fields {
 			if strings.Contains(strings.ToLower(v), q) {
+				matched = true
+				break
+			}
+		}
+		if matched {
+			result = append(result, r)
+			continue
+		}
+		for _, f := range r.Findings {
+			if strings.Contains(strings.ToLower(f.Phrase), q) {
 				result = append(result, r)
 				break
 			}

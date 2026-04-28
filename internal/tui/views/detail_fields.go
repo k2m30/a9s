@@ -157,20 +157,57 @@ func domainItemToFieldItem(it domain.Item, sectionTitle string) fieldpath.FieldI
 // across resource types (dbc, ec2, ecr, …) — no per-type branching.
 func (m *DetailModel) injectAttentionSection() {
 	type entry struct {
-		tier    string
-		primary string
-		rows    []resource.FindingRow
+		tier          string
+		primary       string
+		rows          []domain.DetailRow
+		skipCapitalize bool // true for Findings-path entries; preserves original casing
 	}
 	var entries []entry
-	for _, phrase := range m.res.Issues {
-		entries = append(entries, entry{tier: phraseTier(m.resourceType, phrase), primary: phrase})
-	}
-	if m.enrichmentFinding != nil && m.enrichmentFinding.Summary != "" {
-		entries = append(entries, entry{
-			tier:    m.enrichmentFinding.Severity,
-			primary: m.enrichmentFinding.Summary,
-			rows:    m.enrichmentFinding.Rows,
-		})
+	// PR-03a-views: read r.Findings + r.AttentionDetails when Findings is populated.
+	// Fall back to legacy r.Issues + m.enrichmentFinding when Findings is empty.
+	if len(m.res.Findings) > 0 {
+		for _, f := range m.res.Findings {
+			// Only surface issue-severity findings in the Attention section.
+			// SevOK / SevDim findings represent healthy / informational states
+			// that carry no actionable signal — including them would create a
+			// spurious "Attention (1)" block on every healthy resource whose
+			// Status was promoted to a Findings entry by DeriveFindings.
+			if !f.Severity.IsIssue() {
+				continue
+			}
+			var tier string
+			switch f.Severity {
+			case domain.SevBroken:
+				tier = "!"
+			default:
+				tier = "~"
+			}
+			var rows []domain.DetailRow
+			if m.res.AttentionDetails != nil {
+				if det, ok := m.res.AttentionDetails[f.Code]; ok {
+					rows = det.Rows
+				}
+			}
+			// skipCapitalize=true: Findings phrases are stored in their canonical
+			// casing (spec §4 vocabulary) — do not uppercase the first letter at
+			// render time so callers can match against the original phrase text.
+			entries = append(entries, entry{tier: tier, primary: f.Phrase, rows: rows, skipCapitalize: true})
+		}
+	} else {
+		for _, phrase := range m.res.Issues {
+			entries = append(entries, entry{tier: phraseTier(m.resourceType, phrase), primary: phrase})
+		}
+		if m.enrichmentFinding != nil && m.enrichmentFinding.Summary != "" {
+			enrichRows := make([]domain.DetailRow, len(m.enrichmentFinding.Rows))
+			for i, r := range m.enrichmentFinding.Rows {
+				enrichRows[i] = domain.DetailRow{Label: r.Label, Value: r.Value, Tier: r.Tier}
+			}
+			entries = append(entries, entry{
+				tier:    m.enrichmentFinding.Severity,
+				primary: m.enrichmentFinding.Summary,
+				rows:    enrichRows,
+			})
+		}
 	}
 	if len(entries) == 0 {
 		return
@@ -199,7 +236,11 @@ func (m *DetailModel) injectAttentionSection() {
 		if glyph != "!" && glyph != "~" {
 			glyph = "~"
 		}
-		line := glyph + " " + capitalizeFirst(e.primary)
+		displayPhrase := e.primary
+		if !e.skipCapitalize {
+			displayPhrase = capitalizeFirst(e.primary)
+		}
+		line := glyph + " " + displayPhrase
 		entryColor := capTierToRowBucket(e.tier, rowBucket)
 		items = append(items, fieldpath.FieldItem{
 			IsSubField:  true,

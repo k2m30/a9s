@@ -491,7 +491,7 @@ func (m *ResourceListModel) View() string {
 			if isSelected {
 				base = styles.RowSelected
 			} else {
-				base = styles.ColorStyle(m.typeDef.ResolveColor(r))
+				base = styles.ColorStyle(resolveRowColor(m.typeDef, r))
 			}
 			styled = m.renderDataRow(cols, r, base, m.width, isSelected, markerColIdx)
 			if m.styledRowCache == nil {
