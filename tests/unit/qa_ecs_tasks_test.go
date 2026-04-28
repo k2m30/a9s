@@ -73,8 +73,16 @@ func TestQA_ECSTasks_FetchSuccess(t *testing.T) {
 	if r.Name != "abc123def456" {
 		t.Errorf("expected Name 'abc123def456', got %q", r.Name)
 	}
-	if r.Status != "RUNNING" {
-		t.Errorf("expected Status 'RUNNING', got %q", r.Status)
+	// Post-PR-03c: fetcher no longer writes Status for RUNNING tasks.
+	// State lives in Fields["status"]; RUNNING tasks emit no Finding.
+	if r.Status != "" {
+		t.Errorf("Status leaked: got %q, want %q (fetcher must stop writing Status for RUNNING task)", r.Status, "")
+	}
+	if r.Fields["status"] != "RUNNING" {
+		t.Errorf("Fields[status]: expected %q, got %q", "RUNNING", r.Fields["status"])
+	}
+	if len(r.Findings) != 0 {
+		t.Errorf("Findings: got %d, want 0 for RUNNING task", len(r.Findings))
 	}
 	if r.Fields["task_id"] != "abc123def456" {
 		t.Errorf("expected task_id 'abc123def456', got %q", r.Fields["task_id"])
@@ -93,8 +101,16 @@ func TestQA_ECSTasks_FetchSuccess(t *testing.T) {
 	}
 
 	r2 := resources[1]
-	if r2.Status != "STOPPED" {
-		t.Errorf("expected Status 'STOPPED', got %q", r2.Status)
+	// Post-PR-03c: fetcher no longer writes Status for STOPPED tasks.
+	// STOPPED is lifecycle-terminal — no Finding emitted; stop_code carries actionable info.
+	if r2.Status != "" {
+		t.Errorf("r2 Status leaked: got %q, want %q (fetcher must stop writing Status for STOPPED task)", r2.Status, "")
+	}
+	if r2.Fields["status"] != "STOPPED" {
+		t.Errorf("r2 Fields[status]: expected %q, got %q", "STOPPED", r2.Fields["status"])
+	}
+	if len(r2.Findings) != 0 {
+		t.Errorf("r2 Findings: got %d, want 0 for STOPPED task (stop_code carries actionable info)", len(r2.Findings))
 	}
 	if r2.RawStruct == nil {
 		t.Error("expected RawStruct to be set")

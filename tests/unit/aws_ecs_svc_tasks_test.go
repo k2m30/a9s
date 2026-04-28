@@ -221,15 +221,32 @@ func TestFetchEcsSvcTasks_MixedStatus(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(result.Resources))
 	}
 
+	// Post-PR-03c: fetcher no longer writes Status for RUNNING/STOPPED tasks.
+	// RUNNING and STOPPED are healthy/terminal states — no Finding emitted.
+	// State lives in Fields["status"].
 	t.Run("running_task_status", func(t *testing.T) {
-		if result.Resources[0].Status != "RUNNING" {
-			t.Errorf("Status: expected %q, got %q", "RUNNING", result.Resources[0].Status)
+		r := result.Resources[0]
+		if r.Status != "" {
+			t.Errorf("Status leaked: got %q, want %q (fetcher must stop writing Status for RUNNING task)", r.Status, "")
+		}
+		if r.Fields["status"] != "RUNNING" {
+			t.Errorf("Fields[status]: expected %q, got %q", "RUNNING", r.Fields["status"])
+		}
+		if len(r.Findings) != 0 {
+			t.Errorf("Findings: got %d, want 0 for RUNNING task", len(r.Findings))
 		}
 	})
 
 	t.Run("stopped_task_status", func(t *testing.T) {
-		if result.Resources[1].Status != "STOPPED" {
-			t.Errorf("Status: expected %q, got %q", "STOPPED", result.Resources[1].Status)
+		r := result.Resources[1]
+		if r.Status != "" {
+			t.Errorf("Status leaked: got %q, want %q (fetcher must stop writing Status for STOPPED task)", r.Status, "")
+		}
+		if r.Fields["status"] != "STOPPED" {
+			t.Errorf("Fields[status]: expected %q, got %q", "STOPPED", r.Fields["status"])
+		}
+		if len(r.Findings) != 0 {
+			t.Errorf("Findings: got %d, want 0 for STOPPED task (stop_code carries actionable info)", len(r.Findings))
 		}
 	})
 

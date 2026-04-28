@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -265,10 +266,28 @@ func buildNodeGroupResource(clusterName, ngName string, ng *ekstypes.Nodegroup) 
 		}
 	}
 
+	// PR-03c: emit wave1 Findings for non-healthy lifecycle states.
+	// ACTIVE → no Finding (healthy). Fields["status"] is still populated
+	// so the existing structural Color path works for the wave2 fallback.
+	var findings []domain.Finding
+	switch status {
+	case "CREATING":
+		findings = []domain.Finding{{Code: CodeNGStateCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"}}
+	case "UPDATING":
+		findings = []domain.Finding{{Code: CodeNGStateUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"}}
+	case "DELETING":
+		findings = []domain.Finding{{Code: CodeNGStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"}}
+	case "CREATE_FAILED":
+		findings = []domain.Finding{{Code: CodeNGStateCreateFailed, Phrase: "create failed", Severity: domain.SevBroken, Source: "wave1"}}
+	case "DELETE_FAILED":
+		findings = []domain.Finding{{Code: CodeNGStateDeleteFailed, Phrase: "delete failed", Severity: domain.SevBroken, Source: "wave1"}}
+	case "DEGRADED":
+		findings = []domain.Finding{{Code: CodeNGStateDegraded, Phrase: "degraded", Severity: domain.SevBroken, Source: "wave1"}}
+	}
+
 	return resource.Resource{
-		ID:     nodegroupName,
-		Name:   nodegroupName,
-		Status: status,
+		ID:   nodegroupName,
+		Name: nodegroupName,
 		Fields: map[string]string{
 			"nodegroup_name":      nodegroupName,
 			"cluster_name":        ngClusterName,
@@ -278,6 +297,7 @@ func buildNodeGroupResource(clusterName, ngName string, ng *ekstypes.Nodegroup) 
 			"health_issues_count": strconv.Itoa(healthIssuesCount),
 			"health_issues":       strings.Join(issueCodes, ","),
 		},
+		Findings:  findings,
 		RawStruct: ng,
 	}
 }

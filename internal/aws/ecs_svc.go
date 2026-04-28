@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -95,10 +96,20 @@ func FetchECSServicesPage(
 				taskDefinition = *svc.TaskDefinition
 			}
 
+			// PR-03c: emit wave1 Findings for non-healthy lifecycle states.
+			// ACTIVE → no Finding (healthy). Fields["status"] is still populated
+			// so the existing structural Color path works as fallback.
+			var findings []domain.Finding
+			switch status {
+			case "DRAINING":
+				findings = []domain.Finding{{Code: CodeECSSvcStateDraining, Phrase: "draining", Severity: domain.SevWarn, Source: "wave1"}}
+			case "INACTIVE":
+				findings = []domain.Finding{{Code: CodeECSSvcStateInactive, Phrase: "inactive", Severity: domain.SevBroken, Source: "wave1"}}
+			}
+
 			r := resource.Resource{
-				ID:     serviceName,
-				Name:   serviceName,
-				Status: status,
+				ID:   serviceName,
+				Name: serviceName,
 				Fields: map[string]string{
 					"service_name":    serviceName,
 					"cluster":         clusterName,
@@ -108,6 +119,7 @@ func FetchECSServicesPage(
 					"launch_type":     launchType,
 					"task_definition": taskDefinition,
 				},
+				Findings:  findings,
 				RawStruct: svc,
 			}
 

@@ -11,6 +11,7 @@ import (
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/tests/testdata"
 )
 
@@ -119,8 +120,13 @@ func TestFetchNodeGroups_ParsesMultipleClustersAndGroups(t *testing.T) {
 	if r0.Name != "ng-web" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "ng-web", r0.Name)
 	}
-	if r0.Status != "ACTIVE" {
-		t.Errorf("resource[0].Status: expected %q, got %q", "ACTIVE", r0.Status)
+	// Post-PR-03c: fetcher no longer writes Status for ACTIVE node groups.
+	// State lives in Fields["status"]; ACTIVE node groups emit no Finding.
+	if r0.Status != "" {
+		t.Errorf("resource[0].Status leaked: got %q, want %q (fetcher must stop writing Status)", r0.Status, "")
+	}
+	if len(r0.Findings) != 0 {
+		t.Errorf("resource[0].Findings: got %d, want 0 for ACTIVE node group", len(r0.Findings))
 	}
 	if r0.Fields["nodegroup_name"] != "ng-web" {
 		t.Errorf("resource[0].Fields[\"nodegroup_name\"]: expected %q, got %q", "ng-web", r0.Fields["nodegroup_name"])
@@ -161,8 +167,22 @@ func TestFetchNodeGroups_ParsesMultipleClustersAndGroups(t *testing.T) {
 	if r2.Fields["cluster_name"] != "cluster-b" {
 		t.Errorf("resource[2].Fields[\"cluster_name\"]: expected %q, got %q", "cluster-b", r2.Fields["cluster_name"])
 	}
-	if r2.Status != "CREATING" {
-		t.Errorf("resource[2].Status: expected %q, got %q", "CREATING", r2.Status)
+	// Post-PR-03c: CREATING is a transitional state — fetcher emits SevWarn Finding,
+	// stops writing Status. State lives in Fields["status"].
+	if r2.Status != "" {
+		t.Errorf("resource[2].Status leaked: got %q, want %q (fetcher must stop writing Status for CREATING)", r2.Status, "")
+	}
+	if r2.Fields["status"] != "CREATING" {
+		t.Errorf("resource[2].Fields[status]: expected %q, got %q", "CREATING", r2.Fields["status"])
+	}
+	if len(r2.Findings) != 1 {
+		t.Fatalf("resource[2].Findings: got %d, want 1 for CREATING node group", len(r2.Findings))
+	}
+	if r2.Findings[0].Code != awsclient.CodeNGStateCreating {
+		t.Errorf("resource[2].Findings[0].Code: got %q, want %q", r2.Findings[0].Code, awsclient.CodeNGStateCreating)
+	}
+	if r2.Findings[0].Severity != domain.SevWarn {
+		t.Errorf("resource[2].Findings[0].Severity: got %v, want domain.SevWarn", r2.Findings[0].Severity)
 	}
 }
 
@@ -437,8 +457,22 @@ func TestFetchNodeGroups_RealAWSData(t *testing.T) {
 		t.Fatal("missing gpu node group in results")
 	}
 	gpu := resources[gpuIdx]
-	if gpu.Status != "CREATE_FAILED" {
-		t.Errorf("gpu node group Status: expected %q, got %q", "CREATE_FAILED", gpu.Status)
+	// Post-PR-03c: CREATE_FAILED is a broken state — fetcher emits SevBroken Finding,
+	// stops writing Status. State lives in Fields["status"].
+	if gpu.Status != "" {
+		t.Errorf("gpu node group Status leaked: got %q, want %q (fetcher must stop writing Status)", gpu.Status, "")
+	}
+	if gpu.Fields["status"] != "CREATE_FAILED" {
+		t.Errorf("gpu node group Fields[status]: expected %q, got %q", "CREATE_FAILED", gpu.Fields["status"])
+	}
+	if len(gpu.Findings) != 1 {
+		t.Fatalf("gpu node group Findings: got %d, want 1 for CREATE_FAILED", len(gpu.Findings))
+	}
+	if gpu.Findings[0].Code != awsclient.CodeNGStateCreateFailed {
+		t.Errorf("gpu Findings[0].Code: got %q, want %q", gpu.Findings[0].Code, awsclient.CodeNGStateCreateFailed)
+	}
+	if gpu.Findings[0].Severity != domain.SevBroken {
+		t.Errorf("gpu Findings[0].Severity: got %v, want domain.SevBroken", gpu.Findings[0].Severity)
 	}
 	if gpu.Fields["cluster_name"] != "test-cluster-1" {
 		t.Errorf("gpu node group cluster_name: expected %q, got %q", "test-cluster-1", gpu.Fields["cluster_name"])
@@ -471,8 +505,12 @@ func TestFetchNodeGroups_RealAWSData(t *testing.T) {
 		t.Fatal("missing kafka node group in results")
 	}
 	kafka := resources[kafkaIdx]
-	if kafka.Status != "ACTIVE" {
-		t.Errorf("kafka node group Status: expected %q, got %q", "ACTIVE", kafka.Status)
+	// Post-PR-03c: fetcher no longer writes Status for ACTIVE node groups.
+	if kafka.Status != "" {
+		t.Errorf("kafka node group Status leaked: got %q, want %q (fetcher must stop writing Status)", kafka.Status, "")
+	}
+	if len(kafka.Findings) != 0 {
+		t.Errorf("kafka node group Findings: got %d, want 0 for ACTIVE", len(kafka.Findings))
 	}
 	if kafka.Fields["instance_types"] != "t3.large" {
 		t.Errorf("kafka node group instance_types: expected %q, got %q", "t3.large", kafka.Fields["instance_types"])
@@ -506,8 +544,12 @@ func TestFetchNodeGroups_RealAWSData(t *testing.T) {
 		t.Fatal("missing system node group in results")
 	}
 	system := resources[systemIdx]
-	if system.Status != "ACTIVE" {
-		t.Errorf("system node group Status: expected %q, got %q", "ACTIVE", system.Status)
+	// Post-PR-03c: fetcher no longer writes Status for ACTIVE node groups.
+	if system.Status != "" {
+		t.Errorf("system node group Status leaked: got %q, want %q (fetcher must stop writing Status)", system.Status, "")
+	}
+	if len(system.Findings) != 0 {
+		t.Errorf("system node group Findings: got %d, want 0 for ACTIVE", len(system.Findings))
 	}
 	if system.Fields["instance_types"] != "t3.large" {
 		t.Errorf("system instance_types: expected %q, got %q", "t3.large", system.Fields["instance_types"])

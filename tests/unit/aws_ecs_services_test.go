@@ -96,8 +96,13 @@ func TestFetchECSServices_ParsesMultipleServices(t *testing.T) {
 	if r0.Name != "web-service" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "web-service", r0.Name)
 	}
-	if r0.Status != "ACTIVE" {
-		t.Errorf("resource[0].Status: expected %q, got %q", "ACTIVE", r0.Status)
+	// Post-PR-03c: fetcher no longer writes Status for ACTIVE services.
+	// State lives in Fields["status"]; ACTIVE services emit no Finding.
+	if r0.Status != "" {
+		t.Errorf("resource[0].Status leaked: got %q, want %q (fetcher must stop writing Status)", r0.Status, "")
+	}
+	if len(r0.Findings) != 0 {
+		t.Errorf("resource[0].Findings: got %d, want 0 for ACTIVE service", len(r0.Findings))
 	}
 	if r0.Fields["service_name"] != "web-service" {
 		t.Errorf("resource[0].Fields[\"service_name\"]: expected %q, got %q", "web-service", r0.Fields["service_name"])

@@ -128,6 +128,14 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "launch_type", Title: "Launch Type", Width: 12, Sortable: true},
 			},
 			Color: func(r Resource) Color {
+				// PR-03c: wave1 Findings (lifecycle/state) drive color first.
+				for _, f := range r.Findings {
+					if f.Source == "wave1" {
+						return ColorFromSeverity(f.Severity)
+					}
+				}
+				// Structural fallback: covers lifecycle states when Findings is
+				// empty (e.g. test probes with nil Findings) and wave2 signals.
 				switch r.Fields["status"] {
 				case "INACTIVE":
 					return ColorBroken
@@ -182,6 +190,13 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "services_count", Title: "Services", Width: 10, Sortable: true},
 			},
 			Color: func(r Resource) Color {
+				// PR-03c: wave1 Findings (lifecycle/state) drive color first.
+				for _, f := range r.Findings {
+					if f.Source == "wave1" {
+						return ColorFromSeverity(f.Severity)
+					}
+				}
+				// Structural fallback: covers healthy/terminal states when Findings is empty.
 				switch r.Fields["status"] {
 				case "ACTIVE":
 					return ColorHealthy
@@ -209,20 +224,29 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "memory", Title: "Memory", Width: 8, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				// health_status == UNHEALTHY overrides everything (Broken wins).
+				// Structural broken overrides — precedence over wave1 Findings.
+				// health_status == UNHEALTHY and stopped-with-non-user-stop-code
+				// are wave2-class signals that always win.
 				if r.Fields["health_status"] == "UNHEALTHY" {
 					return ColorBroken
 				}
+				if r.Fields["last_status"] == "STOPPED" && r.Fields["stop_code"] != "" && r.Fields["stop_code"] != "UserInitiated" {
+					return ColorBroken
+				}
+				// PR-03c: wave1 Findings (transitional lifecycle states) drive color.
+				for _, f := range r.Findings {
+					if f.Source == "wave1" {
+						return ColorFromSeverity(f.Severity)
+					}
+				}
+				// Structural fallback: covers all lifecycle states when Findings
+				// is empty (e.g. test probes with nil Findings).
 				switch r.Fields["last_status"] {
 				case "RUNNING":
 					return ColorHealthy
 				case "PROVISIONING", "PENDING", "ACTIVATING", "DEACTIVATING", "STOPPING", "DEPROVISIONING":
 					return ColorWarning
 				case "STOPPED":
-					sc := r.Fields["stop_code"]
-					if sc != "" && sc != "UserInitiated" {
-						return ColorBroken
-					}
 					return ColorDim
 				}
 				return ColorHealthy

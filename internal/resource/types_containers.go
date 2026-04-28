@@ -66,12 +66,14 @@ func containersResourceTypes() []ResourceTypeDef {
 				{Key: "desired_size", Title: "Desired", Width: 9, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				// Status-failed states are Broken (highest precedence).
-				if r.Fields["status"] == "CREATE_FAILED" ||
-					r.Fields["status"] == "DELETE_FAILED" ||
-					r.Fields["status"] == "DEGRADED" {
-					return ColorBroken
+				// PR-03c: wave1 Findings (lifecycle/state) drive color first.
+				for _, f := range r.Findings {
+					if f.Source == "wave1" {
+						return ColorFromSeverity(f.Severity)
+					}
 				}
+				// Structural fallback: covers wave2 signals (health_issues_count)
+				// and healthy/terminal lifecycle states when Findings is empty.
 				hasIssues := false
 				if n, err := strconv.Atoi(r.Fields["health_issues_count"]); err == nil && n > 0 {
 					hasIssues = true
@@ -84,6 +86,8 @@ func containersResourceTypes() []ResourceTypeDef {
 					return ColorHealthy
 				case "CREATING", "UPDATING", "DELETING":
 					return ColorWarning
+				case "CREATE_FAILED", "DELETE_FAILED", "DEGRADED":
+					return ColorBroken
 				}
 				// Empty / unknown status: healthy unless health.issues set.
 				if hasIssues {
