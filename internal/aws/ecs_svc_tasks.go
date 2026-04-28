@@ -15,7 +15,7 @@ import (
 func init() {
 	resource.RegisterFieldKeys("ecs_tasks", []string{
 		"task_id_short", "status", "health", "task_def_short",
-		"started_at", "stopped_reason",
+		"started_at", "stopped_reason", "stop_code",
 	})
 
 	resource.RegisterPaginatedChild("ecs_tasks", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
@@ -30,6 +30,34 @@ func init() {
 		Name:      "Service Tasks",
 		ShortName: "ecs_tasks",
 		Columns:   resource.EcsSvcTaskColumns(),
+		Color: func(r resource.Resource) resource.Color {
+			// Structural broken overrides (precedence over wave1).
+			if r.Fields["health"] == "UNHEALTHY" {
+				return resource.ColorBroken
+			}
+			if r.Fields["status"] == "STOPPED" {
+				sc := r.Fields["stop_code"]
+				if sc != "" && sc != "UserInitiated" {
+					return resource.ColorBroken
+				}
+			}
+			// Wave1 Findings.
+			for _, f := range r.Findings {
+				if f.Source == "wave1" {
+					return resource.ColorFromSeverity(f.Severity)
+				}
+			}
+			// Structural lifecycle fallback.
+			switch r.Fields["status"] {
+			case "RUNNING":
+				return resource.ColorHealthy
+			case "STOPPED":
+				return resource.ColorDim
+			case "PROVISIONING", "PENDING", "ACTIVATING", "DEACTIVATING", "STOPPING", "DEPROVISIONING":
+				return resource.ColorWarning
+			}
+			return resource.ColorHealthy
+		},
 	})
 }
 
@@ -151,10 +179,15 @@ func convertEcsTask(task ecstypes.Task) resource.Resource {
 		stoppedReason = strings.ReplaceAll(*task.StoppedReason, "\n", " ")
 	}
 
+	// PR-03c: emit wave1 Findings for non-healthy transitional states.
+	// RUNNING and STOPPED → no Finding (lifecycle; stop_code handled structurally).
+	findings := ecsTaskWave1Findings(status)
+
+	stopCode := string(task.StopCode)
+
 	return resource.Resource{
-		ID:     taskIDShort,
-		Name:   taskIDShort,
-		Status: status,
+		ID:   taskIDShort,
+		Name: taskIDShort,
 		Fields: map[string]string{
 			"task_id_short":  taskIDShort,
 			"status":         status,
@@ -162,7 +195,9 @@ func convertEcsTask(task ecstypes.Task) resource.Resource {
 			"task_def_short": taskDefShort,
 			"started_at":     startedAt,
 			"stopped_reason": stoppedReason,
+			"stop_code":      stopCode,
 		},
+		Findings:  findings,
 		RawStruct: task,
 	}
 }
