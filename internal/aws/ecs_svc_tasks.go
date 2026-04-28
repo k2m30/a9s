@@ -9,7 +9,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
-	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -154,21 +153,7 @@ func convertEcsTask(task ecstypes.Task) resource.Resource {
 
 	// PR-03c: emit wave1 Findings for non-healthy transitional states.
 	// RUNNING and STOPPED → no Finding (lifecycle; stop_code handled structurally).
-	var findings []domain.Finding
-	switch status {
-	case "PROVISIONING":
-		findings = []domain.Finding{{Code: CodeECSTaskStateProvisioning, Phrase: "provisioning", Severity: domain.SevWarn, Source: "wave1"}}
-	case "PENDING":
-		findings = []domain.Finding{{Code: CodeECSTaskStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"}}
-	case "ACTIVATING":
-		findings = []domain.Finding{{Code: CodeECSTaskStateActivating, Phrase: "activating", Severity: domain.SevWarn, Source: "wave1"}}
-	case "DEACTIVATING":
-		findings = []domain.Finding{{Code: CodeECSTaskStateDeactivating, Phrase: "deactivating", Severity: domain.SevWarn, Source: "wave1"}}
-	case "STOPPING":
-		findings = []domain.Finding{{Code: CodeECSTaskStateStopping, Phrase: "stopping", Severity: domain.SevWarn, Source: "wave1"}}
-	case "DEPROVISIONING":
-		findings = []domain.Finding{{Code: CodeECSTaskStateDeprovisioning, Phrase: "deprovisioning", Severity: domain.SevWarn, Source: "wave1"}}
-	}
+	findings := ecsTaskWave1Findings(status)
 
 	return resource.Resource{
 		ID:   taskIDShort,

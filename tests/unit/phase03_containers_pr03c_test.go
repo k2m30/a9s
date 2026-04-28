@@ -73,7 +73,6 @@ import (
 // TestPR03c_NGCodes_ConstantsExist verifies that ng_codes.go declares the Wave 1
 // finding constants. Fails to compile until the file is created.
 func TestPR03c_NGCodes_ConstantsExist(t *testing.T) {
-	t.Helper()
 	var _ domain.FindingCode = awsclient.CodeNGStateCreating
 	var _ domain.FindingCode = awsclient.CodeNGStateUpdating
 	var _ domain.FindingCode = awsclient.CodeNGStateDeleting
@@ -272,7 +271,6 @@ func (m *pr03cEKSDescribeNodegroupMock) DescribeNodegroup(
 // TestPR03c_ECSCodes_ConstantsExist verifies that ecs_codes.go declares the Wave 1
 // finding constants. Fails to compile until the file is created.
 func TestPR03c_ECSCodes_ConstantsExist(t *testing.T) {
-	t.Helper()
 	var _ domain.FindingCode = awsclient.CodeECSStateProvisioning
 	var _ domain.FindingCode = awsclient.CodeECSStateDeprovisioning
 	var _ domain.FindingCode = awsclient.CodeECSStateFailed
@@ -432,7 +430,6 @@ func (m *pr03cECSDescribeClustersMock) DescribeClusters(
 // TestPR03c_ECSSvcCodes_ConstantsExist verifies that ecs_svc_codes.go declares
 // the Wave 1 finding constants. Fails to compile until the file is created.
 func TestPR03c_ECSSvcCodes_ConstantsExist(t *testing.T) {
-	t.Helper()
 	var _ domain.FindingCode = awsclient.CodeECSSvcStateInactive
 	var _ domain.FindingCode = awsclient.CodeECSSvcStateDraining
 }
@@ -615,7 +612,6 @@ func (m *pr03cECSDescribeServicesMock) DescribeServices(
 // The structural Color func reads stop_code directly; emitting a wave1 Finding for
 // STOPPED would interfere with that override (same precedent as Lambda Inactive).
 func TestPR03c_ECSTaskCodes_ConstantsExist(t *testing.T) {
-	t.Helper()
 	var _ domain.FindingCode = awsclient.CodeECSTaskStateProvisioning
 	var _ domain.FindingCode = awsclient.CodeECSTaskStatePending
 	var _ domain.FindingCode = awsclient.CodeECSTaskStateActivating
