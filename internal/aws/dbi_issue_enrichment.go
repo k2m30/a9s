@@ -60,7 +60,7 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 	for _, r := range resources {
 		if r.ID != "" {
 			probeIDs = append(probeIDs, r.ID)
-			// Post-PR-03e: r.Status is empty; the fetcher writes the display
+			// r.Status is empty; the fetcher writes the display
 			// phrase to Fields["status"] instead.
 			statusByID[r.ID] = r.Fields["status"]
 		}

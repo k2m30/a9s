@@ -1,15 +1,14 @@
 package unit
 
 // aws_dbi_test.go — fetcher behavior tests for RDS DB Instances.
-//
-// Tests drive FetchRDSInstancesPage with a mock RDS client and assert
-// that Resource.Findings and Resource.Fields follow spec §4 precedence (PR-03e):
-//   - Resource.Status is always "" (PR-03e: phrases moved to Findings+Fields).
-//   - Healthy available row → blank Fields["status"], nil Findings (silence).
-//   - Transitional statuses → Fields["status"] = bare keyword or "keyword: PendingModifiedValues key".
-//   - Broken statuses → Findings with exact keyword (inaccessible-encryption-credentials remapped).
-//   - Config warnings on available → Findings in first-wins precedence order.
-//   - cis_flags field must NOT be present (no jargon columns).
+// // Tests drive FetchRDSInstancesPage with a mock RDS client and assert
+// that Resource.Findings and Resource.Fields follow spec §4 precedence ():
+// - Resource.Status is always "".
+// - Healthy available row → blank Fields["status"], nil Findings (silence).
+// - Transitional statuses → Fields["status"] = bare keyword or "keyword: PendingModifiedValues key".
+// - Broken statuses → Findings with exact keyword (inaccessible-encryption-credentials remapped).
+// - Config warnings on available → Findings in first-wins precedence order.
+// - cis_flags field must NOT be present (no jargon columns).
 
 import (
 	"context"
@@ -61,7 +60,7 @@ func findDBI(t *testing.T, id string) rdstypes.DBInstance {
 }
 
 // fetchSingle calls FetchRDSInstancesPage with one instance and returns
-// status (always "" post-PR-03e), fields, and findings.
+// status (always "" ), fields, and findings.
 func fetchSingle(t *testing.T, inst rdstypes.DBInstance) (status string, fields map[string]string, findings []domain.Finding) {
 	t.Helper()
 	mock := &mockRDSPageClient{instances: []rdstypes.DBInstance{inst}}
@@ -87,7 +86,7 @@ func TestDBI_Fetch_AvailableHealthy_StatusBlank(t *testing.T) {
 	status, fields, findings := fetchSingle(t, inst)
 
 	if status != "" {
-		t.Errorf("Status = %q, want %q (PR-03e: fetcher must not write Status)", status, "")
+		t.Errorf("Status = %q, want %q", status, "")
 	}
 	for _, banned := range []string{"OK", "available", "ACTIVE", "running", "healthy", "-"} {
 		if fields["status"] == banned {
@@ -115,7 +114,7 @@ func TestDBI_Fetch_Modifying_WithPendingClassChange(t *testing.T) {
 
 	want := "modifying: DBInstanceClass"
 	if status != "" {
-		t.Errorf("Status = %q, want %q (PR-03e: fetcher must not write Status)", status, "")
+		t.Errorf("Status = %q, want %q", status, "")
 	}
 	if fields["status"] != want {
 		t.Errorf("Fields[status] = %q, want %q", fields["status"], want)
@@ -129,7 +128,7 @@ func TestDBI_Fetch_Rebooting_NoPending(t *testing.T) {
 	status, fields, _ := fetchSingle(t, inst)
 
 	if status != "" {
-		t.Errorf("Status = %q, want %q (PR-03e: fetcher must not write Status)", status, "")
+		t.Errorf("Status = %q, want %q", status, "")
 	}
 	if fields["status"] != "rebooting" {
 		t.Errorf("Fields[status] = %q, want %q", fields["status"], "rebooting")
@@ -160,7 +159,7 @@ func TestDBI_Fetch_TransitionalKeywords_AllBare(t *testing.T) {
 			}
 			status, fields, _ := fetchSingle(t, inst)
 			if status != "" {
-				t.Errorf("Status = %q, want %q (PR-03e: fetcher must not write Status)", status, "")
+				t.Errorf("Status = %q, want %q", status, "")
 			}
 			if fields["status"] != kw {
 				t.Errorf("Fields[status] = %q, want bare keyword %q", fields["status"], kw)
@@ -203,7 +202,7 @@ func TestDBI_Fetch_BrokenStatuses(t *testing.T) {
 			}
 			status, fields, _ := fetchSingle(t, inst)
 			if status != "" {
-				t.Errorf("Status = %q, want %q (PR-03e: fetcher must not write Status)", status, "")
+				t.Errorf("Status = %q, want %q", status, "")
 			}
 			if fields["status"] != tc.want {
 				t.Errorf("Fields[status] = %q, want %q", fields["status"], tc.want)
@@ -221,7 +220,7 @@ func TestDBI_Fetch_InaccessibleEncryptionCredentials_Remap(t *testing.T) {
 
 	want := "encryption key unavailable"
 	if status != "" {
-		t.Errorf("Status = %q, want %q (PR-03e: fetcher must not write Status)", status, "")
+		t.Errorf("Status = %q, want %q", status, "")
 	}
 	if fields["status"] != want {
 		t.Errorf("Fields[status] = %q, want %q", fields["status"], want)
@@ -243,7 +242,7 @@ func TestDBI_Fetch_BrokenPrecedenceOverConfigWarnings(t *testing.T) {
 	status, fields, _ := fetchSingle(t, inst)
 
 	if status != "" {
-		t.Errorf("Status = %q, want %q (PR-03e: fetcher must not write Status)", status, "")
+		t.Errorf("Status = %q, want %q", status, "")
 	}
 	if fields["status"] != "storage-full" {
 		t.Errorf("Fields[status] = %q, want %q (broken beats config warnings)", fields["status"], "storage-full")
@@ -261,7 +260,7 @@ func TestDBI_Fetch_NoAutomatedBackups(t *testing.T) {
 	status, fields, _ := fetchSingle(t, inst)
 
 	if status != "" {
-		t.Errorf("Status = %q, want %q (PR-03e: fetcher must not write Status)", status, "")
+		t.Errorf("Status = %q, want %q", status, "")
 	}
 	if fields["status"] != "no automated backups" {
 		t.Errorf("Fields[status] = %q, want %q", fields["status"], "no automated backups")
@@ -275,7 +274,7 @@ func TestDBI_Fetch_PubliclyAccessible(t *testing.T) {
 	status, fields, _ := fetchSingle(t, inst)
 
 	if status != "" {
-		t.Errorf("Status = %q, want %q (PR-03e: fetcher must not write Status)", status, "")
+		t.Errorf("Status = %q, want %q", status, "")
 	}
 	if fields["status"] != "publicly accessible" {
 		t.Errorf("Fields[status] = %q, want %q", fields["status"], "publicly accessible")
@@ -289,7 +288,7 @@ func TestDBI_Fetch_UnencryptedStorage(t *testing.T) {
 	status, fields, _ := fetchSingle(t, inst)
 
 	if status != "" {
-		t.Errorf("Status = %q, want %q (PR-03e: fetcher must not write Status)", status, "")
+		t.Errorf("Status = %q, want %q", status, "")
 	}
 	if fields["status"] != "unencrypted storage" {
 		t.Errorf("Fields[status] = %q, want %q", fields["status"], "unencrypted storage")
@@ -303,7 +302,7 @@ func TestDBI_Fetch_DeletionProtectionOff(t *testing.T) {
 	status, fields, _ := fetchSingle(t, inst)
 
 	if status != "" {
-		t.Errorf("Status = %q, want %q (PR-03e: fetcher must not write Status)", status, "")
+		t.Errorf("Status = %q, want %q", status, "")
 	}
 	if fields["status"] != "deletion protection off" {
 		t.Errorf("Fields[status] = %q, want %q", fields["status"], "deletion protection off")
@@ -326,7 +325,7 @@ func TestDBI_Fetch_WarningPrecedence(t *testing.T) {
 	status, fields, _ := fetchSingle(t, inst)
 
 	if status != "" {
-		t.Errorf("Status = %q, want %q (PR-03e: fetcher must not write Status)", status, "")
+		t.Errorf("Status = %q, want %q", status, "")
 	}
 	// All 4 warnings → top phrase wins + "(+3)" for the 3 hidden warnings.
 	if fields["status"] != "no automated backups (+3)" {
@@ -351,7 +350,7 @@ func TestDBI_Fetch_MultiW1Warnings_SuffixThree(t *testing.T) {
 
 	want := "no automated backups (+2)"
 	if status != "" {
-		t.Errorf("Status = %q, want %q (PR-03e: fetcher must not write Status)", status, "")
+		t.Errorf("Status = %q, want %q", status, "")
 	}
 	if fields["status"] != want {
 		t.Errorf("Fields[status] = %q, want %q (3 warnings: backups+public+unencrypted, deletion-protection=true)", fields["status"], want)
@@ -374,7 +373,7 @@ func TestDBI_Fetch_MultiW1Warnings_SuffixFour(t *testing.T) {
 
 	want := "no automated backups (+3)"
 	if status != "" {
-		t.Errorf("Status = %q, want %q (PR-03e: fetcher must not write Status)", status, "")
+		t.Errorf("Status = %q, want %q", status, "")
 	}
 	if fields["status"] != want {
 		t.Errorf("Fields[status] = %q, want %q (all 4 warnings stacked)", fields["status"], want)
@@ -399,7 +398,7 @@ func TestDBI_Fetch_MultiW1Warnings_PrecedenceOrder(t *testing.T) {
 
 	want := "publicly accessible (+1)"
 	if status != "" {
-		t.Errorf("Status = %q, want %q (PR-03e: fetcher must not write Status)", status, "")
+		t.Errorf("Status = %q, want %q", status, "")
 	}
 	if fields["status"] != want {
 		t.Errorf("Fields[status] = %q, want %q (public beats deletion-protection per §4 precedence)", fields["status"], want)
@@ -415,7 +414,7 @@ func TestDBI_Fetch_SingleW1Warning_NoSuffix_Regression(t *testing.T) {
 
 	want := "publicly accessible"
 	if status != "" {
-		t.Errorf("Status = %q, want %q (PR-03e: fetcher must not write Status)", status, "")
+		t.Errorf("Status = %q, want %q", status, "")
 	}
 	if fields["status"] != want {
 		t.Errorf("Fields[status] = %q, want %q (single warning must not have suffix)", fields["status"], want)
@@ -429,7 +428,7 @@ func TestDBI_Fetch_HealthyInstance_NoSuffix(t *testing.T) {
 	status, fields, _ := fetchSingle(t, inst)
 
 	if status != "" {
-		t.Errorf("Status = %q, want %q (PR-03e: fetcher must not write Status)", status, "")
+		t.Errorf("Status = %q, want %q", status, "")
 	}
 	if fields["status"] != "" {
 		t.Errorf("Fields[status] = %q, want %q (healthy instance must produce blank)", fields["status"], "")
@@ -717,8 +716,7 @@ func TestDBI_Fetch_DetailFieldsPopulated(t *testing.T) {
 // Resource.Findings phrases are exactly correct for every named DBI fixture. Nil expected
 // phrases means the fixture is Healthy and must produce empty Findings (spec §4:
 // Healthy silence). Non-nil expected phrases must match in exact §4 precedence order.
-//
-// Uses reflect.DeepEqual for slice equality — catches both missing phrases and
+// // Uses reflect.DeepEqual for slice equality — catches both missing phrases and
 // ordering bugs that the existing per-fixture spot-checks would miss.
 func TestDBI_Fetch_FindingsPopulated_EveryFixture(t *testing.T) {
 	type findingCase struct {

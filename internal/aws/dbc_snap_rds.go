@@ -56,10 +56,11 @@ func computeRDSDBClusterSnapshotFindings(snap rdstypes.DBClusterSnapshot) []doma
 	return findings
 }
 
-// ComputeRDSDBClusterSnapshotStatusAndIssues is the exported compatibility
-// wrapper around computeRDSDBClusterSnapshotFindings. The status phrase
+// ComputeRDSDBClusterSnapshotStatusAndIssues exists solely so tests in package
+// unit can exercise computeRDSDBClusterSnapshotFindings. The status phrase
 // carries the (+N) suffix to match what FetchRDSDBClusterSnapshotsPage writes
-// to Fields["status"].
+// to Fields["status"]. No production code calls this — production paths use
+// computeRDSDBClusterSnapshotFindings directly.
 func ComputeRDSDBClusterSnapshotStatusAndIssues(snap rdstypes.DBClusterSnapshot) (string, []string) {
 	findings := computeRDSDBClusterSnapshotFindings(snap)
 	if len(findings) == 0 {

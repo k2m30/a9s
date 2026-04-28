@@ -79,9 +79,9 @@ func TestQA_DBCSnapshots_FetchSuccess(t *testing.T) {
 	}
 
 	r2 := resources[1]
-	// PR-03e: fetcher must not write Status; phrase lives in Fields["status"].
+	// fetcher must not write Status; phrase lives in Fields["status"].
 	if r2.Status != "" {
-		t.Errorf("expected Status %q (PR-03e: fetcher must not write Status), got %q", "", r2.Status)
+		t.Errorf("expected Status %q, got %q", "", r2.Status)
 	}
 	if r2.Fields["status"] != "creating" {
 		t.Errorf("expected Fields[\"status\"] 'creating', got %q", r2.Fields["status"])

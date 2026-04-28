@@ -158,10 +158,11 @@ func computeDBCSnapFindings(snap docdbtypes.DBClusterSnapshot) []domain.Finding 
 	return findings
 }
 
-// ComputeDBCSnapStatusAndIssues is the exported compatibility wrapper around
-// computeDBCSnapFindings. Returns (statusPhrase, issuesPhrases) matching the
-// legacy (string, []string) contract — the status phrase carries the (+N)
-// suffix to match what FetchDocDBClusterSnapshotsPage writes to Fields["status"].
+// ComputeDBCSnapStatusAndIssues exists solely so tests in package unit can
+// exercise computeDBCSnapFindings without importing internal/aws as a package.
+// The status phrase carries the (+N) suffix to match what
+// FetchDocDBClusterSnapshotsPage writes to Fields["status"]. No production
+// code calls this — production paths use computeDBCSnapFindings directly.
 func ComputeDBCSnapStatusAndIssues(snap docdbtypes.DBClusterSnapshot) (string, []string) {
 	findings := computeDBCSnapFindings(snap)
 	if len(findings) == 0 {

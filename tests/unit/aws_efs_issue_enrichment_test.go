@@ -145,7 +145,7 @@ func TestEnrichEFSMountTargets_W1WarningPlusW2Bumps(t *testing.T) {
 	clients := &awsclient.ServiceClients{EFS: fake}
 
 	// Resource represents the fetcher output for this W1-Warning fixture.
-	// Post-PR-03e: enricher reads len(r.Findings) for the (+N) count.
+	// enricher reads len(r.Findings) for the (+N) count.
 	res := efsResources(fsID)
 	res[0].Findings = []domain.Finding{
 		{Code: awsclient.CodeEFSUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"},
