@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -141,18 +142,23 @@ func FetchRDSInstancesPage(ctx context.Context, api RDSDescribeDBInstancesAPI, c
 			backupRetentionPeriod = fmt.Sprintf("%d", *db.BackupRetentionPeriod)
 		}
 
-		computedStatus, computedIssues := computeDBIStatusAndIssues(db)
+		findings := computeDBIStatusAndIssues(db)
+		statusPhrase := ""
+		if len(findings) > 0 {
+			statusPhrase = findings[0].Phrase
+			if len(findings) > 1 {
+				statusPhrase = fmt.Sprintf("%s (+%d)", statusPhrase, len(findings)-1)
+			}
+		}
 
 		r := resource.Resource{
-			ID:     dbIdentifier,
-			Name:   dbIdentifier,
-			Status: computedStatus,
-			Issues: computedIssues,
+			ID:   dbIdentifier,
+			Name: dbIdentifier,
 			Fields: map[string]string{
 				"db_identifier":           dbIdentifier,
 				"engine":                  engine,
 				"engine_version":          engineVersion,
-				"status":                  computedStatus,
+				"status":                  statusPhrase,
 				"class":                   class,
 				"endpoint":                endpoint,
 				"multi_az":                multiAZ,
@@ -162,6 +168,7 @@ func FetchRDSInstancesPage(ctx context.Context, api RDSDescribeDBInstancesAPI, c
 				"deletion_protection":     deletionProtection,
 				"backup_retention_period": backupRetentionPeriod,
 			},
+			Findings:  findings,
 			RawStruct: db,
 		}
 
@@ -191,19 +198,6 @@ func FetchRDSInstancesPage(ctx context.Context, api RDSDescribeDBInstancesAPI, c
 	}, nil
 }
 
-// brokenStatusPhrase maps RDS instance statuses that represent hard failures to
-// their display phrases. "inaccessible-encryption-credentials" is remapped per spec §4.
-var brokenStatusPhrase = map[string]string{
-	"failed":                              "failed",
-	"storage-full":                        "storage-full",
-	"incompatible-network":                "incompatible-network",
-	"incompatible-option-group":           "incompatible-option-group",
-	"incompatible-parameters":             "incompatible-parameters",
-	"incompatible-restore":                "incompatible-restore",
-	"restore-error":                       "restore-error",
-	"inaccessible-encryption-credentials": "encryption key unavailable",
-}
-
 // transitionalStatusSet contains RDS instance statuses that indicate a
 // transitional (Warning) state. These show a pending modification key suffix when applicable.
 var transitionalStatusSet = map[string]struct{}{
@@ -215,49 +209,70 @@ var transitionalStatusSet = map[string]struct{}{
 	"storage-optimization": {},
 }
 
-// computeDBIStatusAndIssues returns the top S4 phrase (with `(+N)` suffix when
-// multiple warnings stack) AND the full ordered list of every active issue
-// phrase. The second return feeds Resource.Issues so the detail view can
-// render all active warnings individually (spec rule 7: "every finding
-// individually visible"). Broken / transitional / healthy states each produce
-// at most one phrase.
-func computeDBIStatusAndIssues(db rdstypes.DBInstance) (string, []string) {
+// computeDBIStatusAndIssues returns the ordered Wave-1 findings for a DB instance.
+// Returns nil for healthy instances. Broken / transitional / healthy states each
+// produce at most one finding; warning states may stack multiple findings.
+func computeDBIStatusAndIssues(db rdstypes.DBInstance) []domain.Finding {
 	status := aws.ToString(db.DBInstanceStatus)
-	if phrase, ok := brokenStatusPhrase[status]; ok {
-		return phrase, []string{phrase}
+
+	// Broken statuses — map to specific codes.
+	var brokenCode domain.FindingCode
+	var brokenPhrase string
+	switch status {
+	case "failed":
+		brokenCode, brokenPhrase = CodeDBIFailed, "failed"
+	case "storage-full":
+		brokenCode, brokenPhrase = CodeDBIStorageFull, "storage-full"
+	case "incompatible-network":
+		brokenCode, brokenPhrase = CodeDBIIncompatibleNetwork, "incompatible-network"
+	case "incompatible-option-group":
+		brokenCode, brokenPhrase = CodeDBIIncompatibleOptionGroup, "incompatible-option-group"
+	case "incompatible-parameters":
+		brokenCode, brokenPhrase = CodeDBIIncompatibleParameters, "incompatible-parameters"
+	case "incompatible-restore":
+		brokenCode, brokenPhrase = CodeDBIIncompatibleRestore, "incompatible-restore"
+	case "restore-error":
+		brokenCode, brokenPhrase = CodeDBIRestoreError, "restore-error"
+	case "inaccessible-encryption-credentials":
+		brokenCode, brokenPhrase = CodeDBIEncryptionKeyUnavailable, "encryption key unavailable"
 	}
+	if brokenCode != "" {
+		return []domain.Finding{{Code: brokenCode, Phrase: brokenPhrase, Severity: domain.SevBroken, Source: "wave1"}}
+	}
+
+	// Transitional statuses.
 	if _, ok := transitionalStatusSet[status]; ok {
 		key := firstNonEmptyPendingModifiedValueKey(db.PendingModifiedValues)
-		if key == "" {
-			return status, []string{status}
+		phrase := status
+		if key != "" {
+			phrase = status + ": " + key
 		}
-		phrase := status + ": " + key
-		return phrase, []string{phrase}
+		return []domain.Finding{{Code: CodeDBITransitional, Phrase: phrase, Severity: domain.SevWarn, Source: "wave1"}}
 	}
+
+	// Available: collect Wave-1 warnings.
 	if status == "available" {
-		var warnings []string
+		var findings []domain.Finding
 		if db.BackupRetentionPeriod != nil && *db.BackupRetentionPeriod == 0 {
-			warnings = append(warnings, "no automated backups")
+			findings = append(findings, domain.Finding{Code: CodeDBINoAutomatedBackups, Phrase: "no automated backups", Severity: domain.SevWarn, Source: "wave1"})
 		}
 		if db.PubliclyAccessible != nil && *db.PubliclyAccessible {
-			warnings = append(warnings, "publicly accessible")
+			findings = append(findings, domain.Finding{Code: CodeDBIPubliclyAccessible, Phrase: "publicly accessible", Severity: domain.SevWarn, Source: "wave1"})
 		}
 		if db.StorageEncrypted != nil && !*db.StorageEncrypted {
-			warnings = append(warnings, "unencrypted storage")
+			findings = append(findings, domain.Finding{Code: CodeDBIUnencryptedStorage, Phrase: "unencrypted storage", Severity: domain.SevWarn, Source: "wave1"})
 		}
 		if db.DeletionProtection != nil && !*db.DeletionProtection {
-			warnings = append(warnings, "deletion protection off")
+			findings = append(findings, domain.Finding{Code: CodeDBIDeletionProtectionOff, Phrase: "deletion protection off", Severity: domain.SevWarn, Source: "wave1"})
 		}
-		switch len(warnings) {
-		case 0:
-			return "", nil
-		case 1:
-			return warnings[0], warnings
-		default:
-			return fmt.Sprintf("%s (+%d)", warnings[0], len(warnings)-1), warnings
-		}
+		return findings
 	}
-	return status, []string{status} // unknown status — pass through
+
+	// Unknown status — pass through as transitional.
+	if status != "" {
+		return []domain.Finding{{Code: CodeDBITransitional, Phrase: status, Severity: domain.SevWarn, Source: "wave1"}}
+	}
+	return nil
 }
 
 // firstNonEmptyPendingModifiedValueKey inspects PendingModifiedValues fields in spec-defined order

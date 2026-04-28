@@ -15,7 +15,6 @@ package unit
 import (
 	"context"
 	"net/url"
-	"reflect"
 	"regexp"
 	"strings"
 	"testing"
@@ -1094,21 +1093,31 @@ func TestFetchDBC_MultiWarningStatusPhrase(t *testing.T) {
 		t.Error("Fields[\"cis_flags\"] unexpectedly present — universal rule U10 requires its removal")
 	}
 
+	// Fetcher does not write Resource.Status — always "".
+	if r.Status != "" {
+		t.Errorf("Status = %q, want %q (fetcher must not write Status)", r.Status, "")
+	}
+
 	// §4 top phrase for delete-protection off + unencrypted + no backups:
 	// precedence order = delete-protection first, then not-encrypted, then
 	// no-automated-backups — so the top is "delete-protection off" with (+2).
 	const want = "delete-protection off (+2)"
-	if r.Status != want {
-		t.Errorf("Status = %q, want %q (spec §4 multi-warning top phrase)", r.Status, want)
-	}
 	if r.Fields["status"] != want {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], want)
+		t.Errorf("Fields[\"status\"] = %q, want %q (spec §4 multi-warning top phrase)", r.Fields["status"], want)
 	}
 
-	// Issues slice enumerates every active warning (rule 7 — detail view renders each individually).
-	wantIssues := []string{"delete-protection off", "not encrypted at rest", "no automated backups"}
-	if !reflect.DeepEqual(r.Issues, wantIssues) {
-		t.Errorf("Issues = %v, want %v", r.Issues, wantIssues)
+	// Findings slice enumerates every active warning (rule 7 — detail view renders each individually).
+	if len(r.Findings) != 3 {
+		t.Fatalf("Findings = %v, want 3 findings", r.Findings)
+	}
+	wantPhrases := []string{"delete-protection off", "not encrypted at rest", "no automated backups"}
+	for i, want := range wantPhrases {
+		if r.Findings[i].Phrase != want {
+			t.Errorf("Findings[%d].Phrase = %q, want %q", i, r.Findings[i].Phrase, want)
+		}
+		if r.Findings[i].Source != "wave1" {
+			t.Errorf("Findings[%d].Source = %q, want %q", i, r.Findings[i].Source, "wave1")
+		}
 	}
 }
 

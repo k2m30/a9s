@@ -11,50 +11,65 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// ComputeRDSDBClusterSnapshotStatusAndIssues computes the §4 status phrase and
-// ordered issues slice for an Aurora / Multi-AZ DB cluster snapshot fetched via
-// the RDS SDK. Returns ("", nil) for a healthy (available) snapshot.
+// computeRDSDBClusterSnapshotFindings computes the ordered Wave-1 findings
+// for an Aurora / Multi-AZ DB cluster snapshot fetched via the RDS SDK.
+// Returns nil for a healthy (available) snapshot.
 //
-// Algorithm mirrors ComputeDBCSnapStatusAndIssues — same §4 precedence ladder:
+// Algorithm mirrors computeDBCSnapFindings — same §4 precedence ladder:
 //  1. Broken: Status == "failed" → phrase "failed"
 //  2. Broken: strings.HasPrefix(Status, "incompatible-") → phrase verbatim
 //  3. Warning: Status == "creating" → phrase "creating"
 //  4. Warning: manual snapshot older than 365d → "manual, unused <N>d"
-func ComputeRDSDBClusterSnapshotStatusAndIssues(snap rdstypes.DBClusterSnapshot) (string, []string) {
+func computeRDSDBClusterSnapshotFindings(snap rdstypes.DBClusterSnapshot) []domain.Finding {
 	rawStatus := ""
 	if snap.Status != nil {
 		rawStatus = *snap.Status
 	}
 
-	var issues []string
-
 	// Broken checks first (severity wins).
 	if rawStatus == "failed" {
-		issues = append(issues, "failed")
-		return buildStatusFromIssues(issues), issues
+		return []domain.Finding{{Code: CodeDBCSnapFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
 	}
 	if strings.HasPrefix(rawStatus, "incompatible-") {
-		issues = append(issues, rawStatus)
-		return buildStatusFromIssues(issues), issues
+		return []domain.Finding{{Code: CodeDBCSnapIncompatible, Phrase: rawStatus, Severity: domain.SevBroken, Source: "wave1"}}
 	}
+
+	var findings []domain.Finding
 
 	// Warning: creating (transitional). DBClusterSnapshot has no PercentProgress.
 	if rawStatus == "creating" {
-		issues = append(issues, "creating")
+		findings = append(findings, domain.Finding{Code: CodeDBCSnapCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"})
 	}
 
 	// Warning: manual snapshot unused for > 365 days.
 	if snap.SnapshotType != nil && *snap.SnapshotType == "manual" && snap.SnapshotCreateTime != nil {
 		ageD := int(time.Since(*snap.SnapshotCreateTime).Hours() / 24)
 		if ageD > 365 {
-			issues = append(issues, fmt.Sprintf("manual, unused %dd", ageD))
+			findings = append(findings, domain.Finding{Code: CodeDBCSnapManualUnused, Phrase: fmt.Sprintf("manual, unused %dd", ageD), Severity: domain.SevWarn, Source: "wave1"})
 		}
 	}
 
-	return buildStatusFromIssues(issues), issues
+	return findings
+}
+
+// ComputeRDSDBClusterSnapshotStatusAndIssues is the exported compatibility
+// wrapper around computeRDSDBClusterSnapshotFindings. Returns
+// (statusPhrase, issuesPhrases) matching the legacy (string, []string)
+// contract expected by external callers and tests.
+func ComputeRDSDBClusterSnapshotStatusAndIssues(snap rdstypes.DBClusterSnapshot) (string, []string) {
+	findings := computeRDSDBClusterSnapshotFindings(snap)
+	if len(findings) == 0 {
+		return "", nil
+	}
+	phrases := make([]string, len(findings))
+	for i, f := range findings {
+		phrases[i] = f.Phrase
+	}
+	return phrases[0], phrases
 }
 
 // FetchRDSDBClusterSnapshotsPage fetches a single page of Aurora + Multi-AZ DB
@@ -92,7 +107,14 @@ func FetchRDSDBClusterSnapshotsPage(ctx context.Context, api RDSDescribeDBCluste
 			clusterID = *snapshot.DBClusterIdentifier
 		}
 
-		computedStatus, allIssues := ComputeRDSDBClusterSnapshotStatusAndIssues(snapshot)
+		findings := computeRDSDBClusterSnapshotFindings(snapshot)
+		statusPhrase := ""
+		if len(findings) > 0 {
+			statusPhrase = findings[0].Phrase
+			if len(findings) > 1 {
+				statusPhrase = fmt.Sprintf("%s (+%d)", statusPhrase, len(findings)-1)
+			}
+		}
 
 		engine := ""
 		if snapshot.Engine != nil {
@@ -120,20 +142,19 @@ func FetchRDSDBClusterSnapshotsPage(ctx context.Context, api RDSDescribeDBCluste
 		}
 
 		r := resource.Resource{
-			ID:     snapshotID,
-			Name:   snapshotID,
-			Status: computedStatus,
-			Issues: allIssues,
+			ID:   snapshotID,
+			Name: snapshotID,
 			Fields: map[string]string{
 				"snapshot_id":          snapshotID,
 				"cluster_id":           clusterID,
-				"status":               computedStatus,
+				"status":               statusPhrase,
 				"engine":               engine,
 				"snapshot_type":        snapshotType,
 				"snapshot_create_time": snapshotCreateTime,
 				"storage_type":         storageType,
 				"storage_encrypted":    storageEncrypted,
 			},
+			Findings:  findings,
 			RawStruct: snapshot,
 		}
 

@@ -6,7 +6,9 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kinesis"
+	kinesistypes "github.com/aws/aws-sdk-go-v2/service/kinesis/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -20,6 +22,23 @@ func init() {
 		}
 		return FetchKinesisStreamsPage(ctx, c.Kinesis, continuationToken)
 	})
+}
+
+// computeKinesisFindings returns the Wave-1 findings for a Kinesis stream status.
+// Returns nil for ACTIVE (healthy) streams.
+func computeKinesisFindings(status kinesistypes.StreamStatus) []domain.Finding {
+	switch status {
+	case kinesistypes.StreamStatusActive:
+		return nil
+	case kinesistypes.StreamStatusCreating:
+		return []domain.Finding{{Code: CodeKinesisCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"}}
+	case kinesistypes.StreamStatusUpdating:
+		return []domain.Finding{{Code: CodeKinesisUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"}}
+	case kinesistypes.StreamStatusDeleting:
+		return []domain.Finding{{Code: CodeKinesisDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"}}
+	default:
+		return nil
+	}
 }
 
 // FetchKinesisStreams calls the Kinesis ListStreams API and converts the
@@ -81,17 +100,24 @@ func FetchKinesisStreamsPage(ctx context.Context, api KinesisListStreamsAPI, con
 			streamMode = string(stream.StreamModeDetails.StreamMode)
 		}
 
+		findings := computeKinesisFindings(stream.StreamStatus)
+		statusPhrase := ""
+		if len(findings) > 0 {
+			statusPhrase = findings[0].Phrase
+		}
+
 		r := resource.Resource{
-			ID:     streamName,
-			Name:   streamName,
-			Status: status,
+			ID:   streamName,
+			Name: streamName,
 			Fields: map[string]string{
 				"stream_name":   streamName,
-				"status":        status,
+				"status":        statusPhrase,
+				"stream_status": status,
 				"stream_arn":    streamARN,
 				"creation_time": creationTime,
 				"stream_mode":   streamMode,
 			},
+			Findings:  findings,
 			RawStruct: stream,
 		}
 

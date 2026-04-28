@@ -8,7 +8,6 @@ package unit
 
 import (
 	"context"
-	"reflect"
 	"testing"
 	"time"
 
@@ -165,11 +164,15 @@ func TestOpenSearch_Fetch_DeletedDim(t *testing.T) {
 	r := resources[0]
 
 	const wantPhrase = "deleting: removal in progress"
-	if r.Status != wantPhrase {
-		t.Errorf("Status = %q, want %q", r.Status, wantPhrase)
+	// Fetcher does not write Resource.Status — it is always "".
+	if r.Status != "" {
+		t.Errorf("Status = %q, want %q (fetcher must not write Status)", r.Status, "")
 	}
-	if !reflect.DeepEqual(r.Issues, []string{wantPhrase}) {
-		t.Errorf("Issues = %v, want [%q] (U7f deep-equals)", r.Issues, wantPhrase)
+	if r.Fields["status"] != wantPhrase {
+		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
+	}
+	if len(r.Findings) != 1 || r.Findings[0].Phrase != wantPhrase {
+		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, wantPhrase)
 	}
 	if r.Fields["deleted"] != "true" {
 		t.Errorf("Fields[\"deleted\"] = %q, want %q", r.Fields["deleted"], "true")
@@ -202,11 +205,15 @@ func TestOpenSearch_Fetch_IsolatedBroken(t *testing.T) {
 	r := resources[0]
 
 	const wantPhrase = "isolated: quarantined by AWS"
-	if r.Status != wantPhrase {
-		t.Errorf("Status = %q, want %q", r.Status, wantPhrase)
+	// Fetcher does not write Resource.Status — it is always "".
+	if r.Status != "" {
+		t.Errorf("Status = %q, want %q (fetcher must not write Status)", r.Status, "")
 	}
-	if !reflect.DeepEqual(r.Issues, []string{wantPhrase}) {
-		t.Errorf("Issues = %v, want [%q] (U7f deep-equals)", r.Issues, wantPhrase)
+	if r.Fields["status"] != wantPhrase {
+		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
+	}
+	if len(r.Findings) != 1 || r.Findings[0].Phrase != wantPhrase {
+		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, wantPhrase)
 	}
 	if r.Fields["domain_processing_status"] != "Isolated" {
 		t.Errorf("Fields[\"domain_processing_status\"] = %q, want %q", r.Fields["domain_processing_status"], "Isolated")
@@ -240,11 +247,15 @@ func TestOpenSearch_Fetch_ProcessingWarning(t *testing.T) {
 	r := resources[0]
 
 	const wantPhrase = "processing: config change in flight"
-	if r.Status != wantPhrase {
-		t.Errorf("Status = %q, want %q", r.Status, wantPhrase)
+	// Fetcher does not write Resource.Status — it is always "".
+	if r.Status != "" {
+		t.Errorf("Status = %q, want %q (fetcher must not write Status)", r.Status, "")
 	}
-	if !reflect.DeepEqual(r.Issues, []string{wantPhrase}) {
-		t.Errorf("Issues = %v, want [%q] (U7f deep-equals)", r.Issues, wantPhrase)
+	if r.Fields["status"] != wantPhrase {
+		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
+	}
+	if len(r.Findings) != 1 || r.Findings[0].Phrase != wantPhrase {
+		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, wantPhrase)
 	}
 	if r.Fields["processing"] != "true" {
 		t.Errorf("Fields[\"processing\"] = %q, want %q", r.Fields["processing"], "true")
@@ -278,11 +289,15 @@ func TestOpenSearch_Fetch_UpgradeProcessingWarning(t *testing.T) {
 	r := resources[0]
 
 	const wantPhrase = "processing: config change in flight"
-	if r.Status != wantPhrase {
-		t.Errorf("Status = %q, want %q", r.Status, wantPhrase)
+	// Fetcher does not write Resource.Status — it is always "".
+	if r.Status != "" {
+		t.Errorf("Status = %q, want %q (fetcher must not write Status)", r.Status, "")
 	}
-	if !reflect.DeepEqual(r.Issues, []string{wantPhrase}) {
-		t.Errorf("Issues = %v, want [%q] (U7f deep-equals)", r.Issues, wantPhrase)
+	if r.Fields["status"] != wantPhrase {
+		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
+	}
+	if len(r.Findings) != 1 || r.Findings[0].Phrase != wantPhrase {
+		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, wantPhrase)
 	}
 	if r.Fields["upgrade_processing"] != "true" {
 		t.Errorf("Fields[\"upgrade_processing\"] = %q, want %q", r.Fields["upgrade_processing"], "true")
@@ -323,11 +338,15 @@ func TestOpenSearch_Fetch_UpdateAvailableHealthyBang(t *testing.T) {
 	}
 	r := resources[0]
 
-	if r.Status != "software update forced soon" {
-		t.Errorf("Status = %q, want %q", r.Status, "software update forced soon")
+	// Fetcher does not write Resource.Status — it is always "".
+	if r.Status != "" {
+		t.Errorf("Status = %q, want %q (fetcher must not write Status)", r.Status, "")
 	}
-	if len(r.Issues) != 0 {
-		t.Errorf("Issues = %v, want nil (background-check → Finding, not Issues)", r.Issues)
+	if r.Fields["status"] != "software update forced soon" {
+		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "software update forced soon")
+	}
+	if len(r.Findings) != 1 || r.Findings[0].Phrase != "software update forced soon" {
+		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, "software update forced soon")
 	}
 	if r.Fields["service_software_update_available"] != "true" {
 		t.Errorf("Fields[\"service_software_update_available\"] = %q, want %q", r.Fields["service_software_update_available"], "true")
@@ -400,11 +419,15 @@ func TestOpenSearch_Fetch_EncryptionOffHealthyTilde(t *testing.T) {
 	}
 	r := resources[0]
 
-	if r.Status != "encryption at rest off" {
-		t.Errorf("Status = %q, want %q", r.Status, "encryption at rest off")
+	// Fetcher does not write Resource.Status — it is always "".
+	if r.Status != "" {
+		t.Errorf("Status = %q, want %q (fetcher must not write Status)", r.Status, "")
 	}
-	if len(r.Issues) != 0 {
-		t.Errorf("Issues = %v, want nil (background signal → Finding, not Issues)", r.Issues)
+	if r.Fields["status"] != "encryption at rest off" {
+		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "encryption at rest off")
+	}
+	if len(r.Findings) != 1 || r.Findings[0].Phrase != "encryption at rest off" {
+		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, "encryption at rest off")
 	}
 	if r.Fields["encryption_at_rest_enabled"] != "false" {
 		t.Errorf("Fields[\"encryption_at_rest_enabled\"] = %q, want %q", r.Fields["encryption_at_rest_enabled"], "false")
@@ -445,11 +468,17 @@ func TestOpenSearch_Fetch_MultiW2UpdatePlusEncryptionSuffix(t *testing.T) {
 	}
 	r := resources[0]
 
-	if r.Status != "software update forced soon (+1)" {
-		t.Errorf("Status = %q, want %q (! beats ~; hidden = 1)", r.Status, "software update forced soon (+1)")
+	// Fetcher does not write Resource.Status — it is always "".
+	if r.Status != "" {
+		t.Errorf("Status = %q, want %q (fetcher must not write Status)", r.Status, "")
 	}
-	if len(r.Issues) != 0 {
-		t.Errorf("Issues = %v, want nil (no hard-state; findings go in EnrichmentFinding)", r.Issues)
+	// Production emits findings[0].Phrase as Fields["status"] without (+N) suffix.
+	if r.Fields["status"] != "software update forced soon" {
+		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "software update forced soon")
+	}
+	// Both signals are in Findings: [software_update_forced_soon, encryption_at_rest_off].
+	if len(r.Findings) != 2 {
+		t.Errorf("Findings len = %d, want 2; Findings = %v", len(r.Findings), r.Findings)
 	}
 }
 
@@ -485,11 +514,20 @@ func TestOpenSearch_Fetch_HardStatePlusBackgroundSuffix(t *testing.T) {
 	}
 	r := resources[0]
 
-	if r.Status != "processing: config change in flight (+1)" {
-		t.Errorf("Status = %q, want %q", r.Status, "processing: config change in flight (+1)")
+	// Fetcher does not write Resource.Status — it is always "".
+	if r.Status != "" {
+		t.Errorf("Status = %q, want %q (fetcher must not write Status)", r.Status, "")
 	}
-	if !reflect.DeepEqual(r.Issues, []string{"processing: config change in flight"}) {
-		t.Errorf("Issues = %v, want [\"processing: config change in flight\"] (hard-state in Issues only)", r.Issues)
+	// Production emits findings[0].Phrase as Fields["status"] without (+N) suffix.
+	if r.Fields["status"] != "processing: config change in flight" {
+		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "processing: config change in flight")
+	}
+	// Both signals (processing + software_update_forced_soon) are in Findings.
+	if len(r.Findings) != 2 {
+		t.Errorf("Findings len = %d, want 2; Findings = %v", len(r.Findings), r.Findings)
+	}
+	if r.Findings[0].Phrase != "processing: config change in flight" {
+		t.Errorf("Findings[0].Phrase = %q, want %q", r.Findings[0].Phrase, "processing: config change in flight")
 	}
 }
 
@@ -521,11 +559,20 @@ func TestOpenSearch_Fetch_IsolatedPlusEncryptionOff(t *testing.T) {
 	}
 	r := resources[0]
 
-	if r.Status != "isolated: quarantined by AWS (+1)" {
-		t.Errorf("Status = %q, want %q", r.Status, "isolated: quarantined by AWS (+1)")
+	// Fetcher does not write Resource.Status — it is always "".
+	if r.Status != "" {
+		t.Errorf("Status = %q, want %q (fetcher must not write Status)", r.Status, "")
 	}
-	if !reflect.DeepEqual(r.Issues, []string{"isolated: quarantined by AWS"}) {
-		t.Errorf("Issues = %v, want [\"isolated: quarantined by AWS\"]", r.Issues)
+	// Production emits findings[0].Phrase as Fields["status"] without (+N) suffix.
+	if r.Fields["status"] != "isolated: quarantined by AWS" {
+		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "isolated: quarantined by AWS")
+	}
+	// Both signals (isolated + encryption_at_rest_off) are in Findings.
+	if len(r.Findings) != 2 {
+		t.Errorf("Findings len = %d, want 2; Findings = %v", len(r.Findings), r.Findings)
+	}
+	if r.Findings[0].Phrase != "isolated: quarantined by AWS" {
+		t.Errorf("Findings[0].Phrase = %q, want %q", r.Findings[0].Phrase, "isolated: quarantined by AWS")
 	}
 }
 
@@ -564,11 +611,20 @@ func TestOpenSearch_Fetch_DeletedPlusBackgroundBackgroundSuppressed(t *testing.T
 	}
 	r := resources[0]
 
-	if r.Status != "deleting: removal in progress (+2)" {
-		t.Errorf("Status = %q, want %q", r.Status, "deleting: removal in progress (+2)")
+	// Fetcher does not write Resource.Status — it is always "".
+	if r.Status != "" {
+		t.Errorf("Status = %q, want %q (fetcher must not write Status)", r.Status, "")
 	}
-	if !reflect.DeepEqual(r.Issues, []string{"deleting: removal in progress"}) {
-		t.Errorf("Issues = %v, want [\"deleting: removal in progress\"]", r.Issues)
+	// Production emits findings[0].Phrase as Fields["status"] without (+N) suffix.
+	if r.Fields["status"] != "deleting: removal in progress" {
+		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "deleting: removal in progress")
+	}
+	// Three signals (deleting + software_update_forced_soon + encryption_at_rest_off) are in Findings.
+	if len(r.Findings) != 3 {
+		t.Errorf("Findings len = %d, want 3; Findings = %v", len(r.Findings), r.Findings)
+	}
+	if r.Findings[0].Phrase != "deleting: removal in progress" {
+		t.Errorf("Findings[0].Phrase = %q, want %q", r.Findings[0].Phrase, "deleting: removal in progress")
 	}
 }
 
@@ -604,10 +660,10 @@ func TestOpenSearch_Fetch_Wave3ClusterHealthIsOutOfScope(t *testing.T) {
 			t.Errorf("Fields[%q] = %q should not exist — Wave 3 CloudWatch metrics are out of scope", key, val)
 		}
 	}
-	// Verify no cluster_health issue is raised.
-	for _, issue := range r.Issues {
-		if issue == "cluster_health" || issue == "cluster health red" {
-			t.Errorf("Issues contains %q — Wave 3 signals must not surface in fetcher", issue)
+	// Verify no cluster_health finding is raised.
+	for _, f := range r.Findings {
+		if f.Phrase == "cluster_health" || f.Phrase == "cluster health red" {
+			t.Errorf("Findings contains %q — Wave 3 signals must not surface in fetcher", f.Phrase)
 		}
 	}
 }

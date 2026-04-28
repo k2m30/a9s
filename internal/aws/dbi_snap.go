@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -44,9 +45,8 @@ func init() {
 	})
 }
 
-// ComputeDBISnapStatusAndIssues computes the §4 status phrase and ordered issues
-// slice for an RDS snapshot. Returns ("", nil) for a healthy (available + encrypted)
-// snapshot. The top phrase is used as Resource.Status; the full slice as Resource.Issues.
+// ComputeDBISnapStatusAndIssues computes the ordered Wave-1 findings for an RDS snapshot.
+// Returns nil for a healthy (available + encrypted) snapshot.
 //
 // §0.1 precedence ladder (Broken > Warning, table order within severity):
 //  1. Broken: failed
@@ -56,23 +56,21 @@ func init() {
 //
 // Cross-ref signals (orphan, past-retention) are added by the Wave-1 issue enricher
 // which has access to the sibling dbi cache.
-func ComputeDBISnapStatusAndIssues(snap rdstypes.DBSnapshot) (string, []string) {
+func ComputeDBISnapStatusAndIssues(snap rdstypes.DBSnapshot) []domain.Finding {
 	rawStatus := ""
 	if snap.Status != nil {
 		rawStatus = *snap.Status
 	}
 
-	var issues []string
-
 	// Broken checks first (severity wins).
 	if rawStatus == "failed" {
-		issues = append(issues, "failed")
-		return buildStatusFromIssues(issues), issues
+		return []domain.Finding{{Code: CodeDBISnapFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
 	}
 	if strings.HasPrefix(rawStatus, "incompatible-") {
-		issues = append(issues, rawStatus)
-		return buildStatusFromIssues(issues), issues
+		return []domain.Finding{{Code: CodeDBISnapIncompatible, Phrase: rawStatus, Severity: domain.SevBroken, Source: "wave1"}}
 	}
+
+	var findings []domain.Finding
 
 	// Warning: creating (transitional).
 	if rawStatus == "creating" {
@@ -81,20 +79,20 @@ func ComputeDBISnapStatusAndIssues(snap rdstypes.DBSnapshot) (string, []string) 
 			pct = *snap.PercentProgress
 		}
 		phrase := fmt.Sprintf("creating: %d%%", pct)
-		issues = append(issues, phrase)
+		findings = append(findings, domain.Finding{Code: CodeDBISnapCreating, Phrase: phrase, Severity: domain.SevWarn, Source: "wave1"})
 		// Unencrypted can also apply during creating.
 		if isSnapUnencrypted(snap) {
-			issues = append(issues, "unencrypted")
+			findings = append(findings, domain.Finding{Code: CodeDBISnapUnencrypted, Phrase: "unencrypted", Severity: domain.SevWarn, Source: "wave1"})
 		}
-		return buildStatusFromIssues(issues), issues
+		return findings
 	}
 
 	// Warning: unencrypted (only for available/other non-broken states).
 	if isSnapUnencrypted(snap) {
-		issues = append(issues, "unencrypted")
+		findings = append(findings, domain.Finding{Code: CodeDBISnapUnencrypted, Phrase: "unencrypted", Severity: domain.SevWarn, Source: "wave1"})
 	}
 
-	return buildStatusFromIssues(issues), issues
+	return findings
 }
 
 // isSnapUnencrypted returns true when the snapshot's Encrypted field is
@@ -102,18 +100,6 @@ func ComputeDBISnapStatusAndIssues(snap rdstypes.DBSnapshot) (string, []string) 
 // Per spec §4: the unencrypted signal fires on Encrypted == false only.
 func isSnapUnencrypted(snap rdstypes.DBSnapshot) bool {
 	return snap.Encrypted != nil && !*snap.Encrypted
-}
-
-// buildStatusFromIssues returns the top phrase with a (+N) suffix when there
-// are multiple issues, or empty string when there are none.
-func buildStatusFromIssues(issues []string) string {
-	if len(issues) == 0 {
-		return ""
-	}
-	if len(issues) == 1 {
-		return issues[0]
-	}
-	return resource.BumpFindingSuffix(issues[0])
 }
 
 // FetchDBISnapshots calls the RDS DescribeDBSnapshots API and converts the
@@ -192,26 +178,31 @@ func FetchDBISnapshotsPage(ctx context.Context, api RDSDescribeDBSnapshotsAPI, c
 			encryptedStr = "false"
 		}
 
-		// Compute §4 status phrase and ordered issues slice per §0.1 precedence ladder.
-		// computedStatus is empty for healthy (available+encrypted) snapshots.
-		// r.Status stores the §4 phrase (consistent with all other resource types).
-		computedStatus, allIssues := ComputeDBISnapStatusAndIssues(snap)
+		// Compute Wave-1 findings per §0.1 precedence ladder.
+		// The first finding's Phrase drives Fields["status"] for display.
+		findings := ComputeDBISnapStatusAndIssues(snap)
+		statusPhrase := ""
+		if len(findings) > 0 {
+			statusPhrase = findings[0].Phrase
+			if len(findings) > 1 {
+				statusPhrase = fmt.Sprintf("%s (+%d)", statusPhrase, len(findings)-1)
+			}
+		}
 
 		r := resource.Resource{
-			ID:     snapshotID,
-			Name:   snapshotID,
-			Status: computedStatus,
-			Issues: allIssues,
+			ID:   snapshotID,
+			Name: snapshotID,
 			Fields: map[string]string{
 				"snapshot_id":   snapshotID,
 				"db_instance":   dbInstance,
-				"status":        computedStatus,
+				"status":        statusPhrase,
 				"encrypted":     encryptedStr,
 				"engine":        engine,
 				"snapshot_type": snapshotType,
 				"created":       created,
 				"arn":           snapARN,
 			},
+			Findings:  findings,
 			RawStruct: snap,
 		}
 

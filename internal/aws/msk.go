@@ -6,7 +6,9 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kafka"
+	kafkatypes "github.com/aws/aws-sdk-go-v2/service/kafka/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -20,6 +22,29 @@ func init() {
 		}
 		return FetchMSKClustersPage(ctx, c.MSK, continuationToken)
 	})
+}
+
+// computeMSKFindings returns the Wave-1 findings for an MSK cluster state.
+// Returns nil for ACTIVE (healthy) clusters.
+func computeMSKFindings(state kafkatypes.ClusterState) []domain.Finding {
+	switch state {
+	case kafkatypes.ClusterStateActive:
+		return nil
+	case kafkatypes.ClusterStateCreating:
+		return []domain.Finding{{Code: CodeMSKCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"}}
+	case kafkatypes.ClusterStateUpdating:
+		return []domain.Finding{{Code: CodeMSKUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"}}
+	case kafkatypes.ClusterStateMaintenance:
+		return []domain.Finding{{Code: CodeMSKMaintenance, Phrase: "maintenance", Severity: domain.SevWarn, Source: "wave1"}}
+	case kafkatypes.ClusterStateRebootingBroker:
+		return []domain.Finding{{Code: CodeMSKRebootingBroker, Phrase: "rebooting_broker", Severity: domain.SevWarn, Source: "wave1"}}
+	case kafkatypes.ClusterStateHealing:
+		return []domain.Finding{{Code: CodeMSKHealing, Phrase: "healing", Severity: domain.SevWarn, Source: "wave1"}}
+	case kafkatypes.ClusterStateFailed:
+		return []domain.Finding{{Code: CodeMSKFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+	default:
+		return nil
+	}
 }
 
 // FetchMSKClusters calls the MSK ListClustersV2 API and returns a slice of
@@ -76,17 +101,24 @@ func FetchMSKClustersPage(ctx context.Context, api MSKListClustersV2API, continu
 			clusterARN = *cluster.ClusterArn
 		}
 
+		findings := computeMSKFindings(cluster.State)
+		statusPhrase := ""
+		if len(findings) > 0 {
+			statusPhrase = findings[0].Phrase
+		}
+
 		r := resource.Resource{
-			ID:     clusterName,
-			Name:   clusterName,
-			Status: state,
+			ID:   clusterName,
+			Name: clusterName,
 			Fields: map[string]string{
 				"cluster_name": clusterName,
 				"cluster_arn":  clusterARN,
 				"cluster_type": clusterType,
 				"state":        state,
+				"status":       statusPhrase,
 				"version":      version,
 			},
+			Findings:  findings,
 			RawStruct: cluster,
 		}
 

@@ -107,13 +107,11 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "creation_time", Title: "Created", Width: 22, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				switch r.Fields["stream_status"] {
-				case "ACTIVE":
-					return ColorHealthy
-				case "CREATING", "UPDATING", "DELETING":
-					return ColorWarning
+				if c, ok := ColorFromWave1(r); ok {
+					return c
 				}
-				switch r.Fields["status"] {
+				// Structural fallback for raw stream_status values (uppercase AWS enum).
+				switch r.Fields["stream_status"] {
 				case "ACTIVE":
 					return ColorHealthy
 				case "CREATING", "UPDATING", "DELETING":
@@ -135,6 +133,10 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "version", Title: "Version", Width: 14, Sortable: true},
 			},
 			Color: func(r Resource) Color {
+				if c, ok := ColorFromWave1(r); ok {
+					return c
+				}
+				// Structural fallback for raw state values (uppercase AWS enum).
 				switch r.Fields["state"] {
 				case "ACTIVE":
 					return ColorHealthy
