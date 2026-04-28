@@ -29,8 +29,8 @@ func TestFetchSubnets_ParsesMultipleSubnets(t *testing.T) {
 					AvailableIpAddressCount: aws.Int32(251),
 					MapPublicIpOnLaunch:     aws.Bool(true),
 					DefaultForAz:            aws.Bool(false),
-					OwnerId:                 aws.String("123456789012"),
-					SubnetArn:               aws.String("arn:aws:ec2:us-east-1:123456789012:subnet/subnet-0001"),
+					OwnerId:                 aws.String("000000000000"),
+					SubnetArn:               aws.String("arn:aws:ec2:us-east-1:000000000000:subnet/subnet-0001"),
 					Tags: []ec2types.Tag{
 						{Key: aws.String("Name"), Value: aws.String("public-subnet-1a")},
 						{Key: aws.String("Env"), Value: aws.String("prod")},
@@ -45,7 +45,7 @@ func TestFetchSubnets_ParsesMultipleSubnets(t *testing.T) {
 					AvailableIpAddressCount: aws.Int32(245),
 					MapPublicIpOnLaunch:     aws.Bool(false),
 					DefaultForAz:            aws.Bool(false),
-					OwnerId:                 aws.String("123456789012"),
+					OwnerId:                 aws.String("000000000000"),
 					Tags:                    []ec2types.Tag{},
 				},
 			},
@@ -69,8 +69,11 @@ func TestFetchSubnets_ParsesMultipleSubnets(t *testing.T) {
 	if r0.Name != "public-subnet-1a" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "public-subnet-1a", r0.Name)
 	}
-	if r0.Status != "available" {
-		t.Errorf("resource[0].Status: expected %q, got %q", "available", r0.Status)
+	if r0.Status != "" {
+		t.Errorf("resource[0].Status: expected empty, got %q", r0.Status)
+	}
+	if len(r0.Findings) != 0 {
+		t.Errorf("resource[0].Findings: expected none for available subnet, got %d", len(r0.Findings))
 	}
 
 	// Verify Fields on all resources
@@ -114,8 +117,11 @@ func TestFetchSubnets_ParsesMultipleSubnets(t *testing.T) {
 	if r1.Name != "" {
 		t.Errorf("resource[1].Name: expected empty string, got %q", r1.Name)
 	}
-	if r1.Status != "pending" {
-		t.Errorf("resource[1].Status: expected %q, got %q", "pending", r1.Status)
+	if r1.Status != "" {
+		t.Errorf("resource[1].Status: expected empty, got %q", r1.Status)
+	}
+	if r1.Fields["state"] != "pending" {
+		t.Errorf("resource[1].Fields[\"state\"]: expected %q, got %q", "pending", r1.Fields["state"])
 	}
 	if r1.Fields["vpc_id"] != "vpc-bbb" {
 		t.Errorf("resource[1].Fields[\"vpc_id\"]: expected %q, got %q", "vpc-bbb", r1.Fields["vpc_id"])

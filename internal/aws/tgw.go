@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -86,10 +87,21 @@ func FetchTransitGatewaysPage(ctx context.Context, api EC2DescribeTransitGateway
 			description = *tgw.Description
 		}
 
+		var findings []domain.Finding
+		switch state {
+		case "pending":
+			findings = []domain.Finding{{Code: CodeTGWStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"}}
+		case "modifying":
+			findings = []domain.Finding{{Code: CodeTGWStateModifying, Phrase: "modifying", Severity: domain.SevWarn, Source: "wave1"}}
+		case "deleting":
+			findings = []domain.Finding{{Code: CodeTGWStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"}}
+		case "failed":
+			findings = []domain.Finding{{Code: CodeTGWStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+		}
+
 		r := resource.Resource{
-			ID:     tgwID,
-			Name:   name,
-			Status: state,
+			ID:   tgwID,
+			Name: name,
 			Fields: map[string]string{
 				"tgw_id":      tgwID,
 				"name":        name,
@@ -97,6 +109,7 @@ func FetchTransitGatewaysPage(ctx context.Context, api EC2DescribeTransitGateway
 				"owner_id":    ownerID,
 				"description": description,
 			},
+			Findings:  findings,
 			RawStruct: tgw,
 		}
 
