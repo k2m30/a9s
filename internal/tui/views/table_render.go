@@ -316,7 +316,7 @@ func (m ResourceListModel) renderDataRow(cols []listCol, r resource.Resource, ba
 		// The phrase comes directly from the data layer and may legitimately
 		// exceed the default column width declared in typeDef.Columns.
 		padWidth := c.width
-		isStatusColHere := c.key == "status" || (m.typeDef.LifecycleKey != "" && c.key == m.typeDef.LifecycleKey)
+		isStatusColHere := c.key == "status" || c.key == lifecycleColumnKey(m.typeDef)
 		if isStatusColHere && len(r.Findings) > 0 {
 			if nat := lipgloss.Width(val); nat > padWidth {
 				padWidth = nat
@@ -345,11 +345,8 @@ func (m ResourceListModel) extractCellValue(c listCol, r resource.Resource) stri
 	// Fields[LifecycleKey] as fallback — never r.Status or the raw key value.
 	// The status column is identified by c.key == "status" (conventional) or
 	// c.key == td.LifecycleKey when an explicit lifecycle key is set.
-	lifecycleKey := m.typeDef.LifecycleKey
-	if lifecycleKey == "" {
-		lifecycleKey = "state"
-	}
-	isStatusCol := c.key == "status" || (m.typeDef.LifecycleKey != "" && c.key == m.typeDef.LifecycleKey)
+	lifecycleKey := lifecycleColumnKey(m.typeDef)
+	isStatusCol := c.key == "status" || c.key == lifecycleKey
 	if isStatusCol {
 		if len(r.Findings) > 0 {
 			return r.Findings[0].Phrase
@@ -403,4 +400,11 @@ func (m ResourceListModel) extractCellValue(c listCol, r resource.Resource) stri
 		return r.Name
 	}
 	return ""
+}
+
+func lifecycleColumnKey(td resource.ResourceTypeDef) string {
+	if td.LifecycleKey != "" {
+		return td.LifecycleKey
+	}
+	return "state"
 }

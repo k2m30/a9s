@@ -160,7 +160,7 @@ func (m *DetailModel) injectAttentionSection() {
 		tier          string
 		primary       string
 		rows          []domain.DetailRow
-		skipCapitalize bool // true for Findings-path entries; preserves original casing
+		splitKeyValue bool // when true: Key=primary (raw phrase), Value=glyph+capitalizedPhrase (display)
 	}
 	var entries []entry
 	// PR-03a-views: read r.Findings + r.AttentionDetails when Findings is populated.
@@ -188,10 +188,12 @@ func (m *DetailModel) injectAttentionSection() {
 					rows = det.Rows
 				}
 			}
-			// skipCapitalize=true: Findings phrases are stored in their canonical
-			// casing (spec §4 vocabulary) — do not uppercase the first letter at
-			// render time so callers can match against the original phrase text.
-			entries = append(entries, entry{tier: tier, primary: f.Phrase, rows: rows, skipCapitalize: true})
+			// splitKeyValue=true: Key holds the raw phrase (for search and clipboard),
+			// Value holds the glyph+capitalized phrase (for TUI display). PlainContent
+			// renders "raw phrase: ! Capitalized phrase" so callers can match against
+			// the original lowercase text; the TUI viewport renders only the Value to
+			// keep the line short enough to fit the viewport.
+			entries = append(entries, entry{tier: tier, primary: f.Phrase, rows: rows, splitKeyValue: true})
 		}
 	} else {
 		for _, phrase := range m.res.Issues {
@@ -236,17 +238,26 @@ func (m *DetailModel) injectAttentionSection() {
 		if glyph != "!" && glyph != "~" {
 			glyph = "~"
 		}
-		displayPhrase := e.primary
-		if !e.skipCapitalize {
-			displayPhrase = capitalizeFirst(e.primary)
-		}
+		displayPhrase := capitalizeFirst(e.primary)
 		line := glyph + " " + displayPhrase
 		entryColor := capTierToRowBucket(e.tier, rowBucket)
+		itemKey := line
+		itemValue := line
+		if e.splitKeyValue {
+			// Findings path: Key = raw phrase (for search/clipboard),
+			// Value = glyph + capitalized phrase (for TUI display).
+			// TUI rendering uses only Value (short, fits viewport) when
+			// Path=="Attention" and not in plainMode. PlainContent
+			// (plainMode=true) renders "Key: Value" so the raw lowercase
+			// phrase is present alongside the capitalized display form.
+			itemKey = e.primary
+			itemValue = line
+		}
 		items = append(items, fieldpath.FieldItem{
 			IsSubField:  true,
 			IndentLevel: 1,
-			Key:         line,
-			Value:       line,
+			Key:         itemKey,
+			Value:       itemValue,
 			Path:        "Attention",
 			ColorTier:   entryColor,
 		})
@@ -450,6 +461,20 @@ func (m DetailModel) renderFromFieldList() string {
 				}
 				// Injected sub-fields with separate Key/Value (e.g., EC2 status checks).
 				if item.Key != item.Value {
+					// Attention-section entries use splitKeyValue: Key = raw phrase (for
+					// search/clipboard), Value = glyph + capitalized phrase (for display).
+					// In TUI mode (plainMode=false) render only the Value — the short form
+					// fits the viewport without truncation. In plainMode (PlainContent/
+					// clipboard) render Key: Value so the raw lowercase phrase is present
+					// alongside the capitalized display form.
+					if item.Path == "Attention" && !m.plainMode {
+						val := item.Value
+						if item.ColorTier != "" {
+							val = styles.TierColorStyle(item.ColorTier).Render(val)
+						}
+						line = subFieldIndent(item.IndentLevel) + val
+						break
+					}
 					val := item.Value
 					if item.ColorTier != "" {
 						val = styles.TierColorStyle(item.ColorTier).Render(val)

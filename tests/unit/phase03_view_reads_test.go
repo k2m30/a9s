@@ -515,3 +515,208 @@ func TestViews_AttentionFilter_ReadsFindings(t *testing.T) {
 		t.Errorf("attention filter must hide resource B (Findings=nil, Status=running); got:\n%s", out)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Test 8 — SetEnrichmentFinding late-update re-derives and shows in detail
+// ---------------------------------------------------------------------------
+
+// TestViews_DetailEnrichmentLateUpdatePicksUpFindings verifies that calling
+// SetEnrichmentFinding AFTER the detail view is first rendered causes a
+// re-derive so the new enrichment finding appears in the Attention section.
+//
+// Setup: resource has Status="impaired" (real wave1 Finding, so Findings is
+// non-empty). Detail is opened and rendered initially (no enrichment finding).
+// Then SetEnrichmentFinding is called with a wave2 finding. The second render
+// must include "pending maintenance" and "reboot" in the Attention section.
+//
+// Pre-fix: SetEnrichmentFinding only stores the finding; it does not re-derive
+// r.Findings/r.AttentionDetails, so AttentionDetails stays as it was after
+// the first load (nil for wave2 data). The new entry does not appear.
+// Post-fix: SetEnrichmentFinding triggers re-derive; wave2 entry is present.
+func TestViews_DetailEnrichmentLateUpdatePicksUpFindings(t *testing.T) {
+	ensureNoColor(t)
+
+	r := resource.Resource{
+		ID:   "i-late",
+		Name: "late-instance",
+		Fields: map[string]string{
+			"InstanceId": "i-late",
+		},
+		// "impaired" is a real issue phrase — wave1 Finding will be derived.
+		Status: "impaired",
+	}
+
+	k := keys.Default()
+	m := views.NewDetail(r, "ec2", nil, k)
+	m.SetSize(200, 100)
+
+	// First render: no enrichment finding yet.
+	firstOut := m.PlainContent()
+	_ = firstOut // only used to confirm we can render
+
+	// Simulate Wave-2 result arriving later.
+	ef := resource.EnrichmentFinding{
+		Severity: "!",
+		Summary:  "pending maintenance",
+		Rows:     []resource.FindingRow{{Label: "Action", Value: "reboot"}},
+	}
+	m.SetEnrichmentFinding(&ef)
+
+	// Second render: enrichment finding must now appear.
+	secondOut := m.PlainContent()
+	// The view capitalizes the first letter of phrases for display (e.g.
+	// "pending maintenance" → "Pending maintenance"). Use case-insensitive
+	// check so the test is not brittle to capitalization rules.
+	secondOutLower := strings.ToLower(secondOut)
+
+	if !strings.Contains(secondOutLower, "pending maintenance") {
+		t.Errorf("detail Attention section must show wave2 phrase \"pending maintenance\" after SetEnrichmentFinding; got:\n%s", secondOut)
+	}
+	if !strings.Contains(secondOut, "reboot") {
+		t.Errorf("detail Attention section must show wave2 row value \"reboot\" after SetEnrichmentFinding; got:\n%s", secondOut)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Test 9 — list Status column: Wave 2 overrides lifecycle
+// ---------------------------------------------------------------------------
+
+// TestViews_ListStatusColumn_Wave2OverridesLifecycle verifies that when a
+// resource has Status="running" (lifecycle steady-state, no wave1 Finding) and
+// an enrichment finding is present, the list Status column shows the wave2
+// summary ("pending maintenance"), NOT the lifecycle phrase ("running").
+//
+// After DeriveFindings: lifecycle is filtered → Findings[0] = wave2 entry.
+// The list extractCellValue reads Findings[0].Phrase = "pending maintenance".
+//
+// Pre-fix: "running" is emitted as Findings[0] (wave1), or DeriveFindings was
+// never called so extractCellValue falls back to Fields["state"]="running".
+// Either way the column shows "running".
+// Post-fix: lifecycle filtered; wave2 is Findings[0]; column shows "pending maintenance".
+func TestViews_ListStatusColumn_Wave2OverridesLifecycle(t *testing.T) {
+	ensureNoColor(t)
+
+	td := minimalTypeDef("ec2-w2-lifecycle-test")
+	r := resource.Resource{
+		ID:   "i-w2-lc",
+		Name: "w2-lifecycle",
+		// Status is a lifecycle steady-state — must be filtered by DeriveFindings.
+		Status: "running",
+		Fields: map[string]string{
+			"name":  "w2-lifecycle",
+			"state": "running",
+		},
+		// Wave2 Finding populated by DeriveFindings after enrichment is applied.
+		Findings: []domain.Finding{
+			{
+				Code:     "ec2.pending.maintenance",
+				Phrase:   "pending maintenance",
+				Severity: domain.SevBroken,
+				Source:   "wave2:ec2",
+			},
+		},
+	}
+
+	m := loadList(td, []resource.Resource{r})
+	out := renderList(m)
+
+	if !strings.Contains(out, "pending maintenance") {
+		t.Errorf("list Status column must show wave2 phrase \"pending maintenance\" when Findings[0] is wave2; got:\n%s", out)
+	}
+	if strings.Contains(out, "running") {
+		t.Errorf("list Status column must NOT show lifecycle phrase \"running\" when Findings is non-empty; got:\n%s", out)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Test 10 — list Status column: LifecycleKey default is "state"
+// ---------------------------------------------------------------------------
+
+// TestViews_ListStatusColumn_LifecycleKeyDefaultIsState verifies that when
+// Findings is nil and LifecycleKey is empty on the typeDef, the status column
+// still resolves to Fields["state"] because the extractCellValue default is
+// "state" (not the column key, not r.Status).
+//
+// Tested across 6 representative type shorts to ensure the default applies
+// regardless of which type is used.
+//
+// Pre-fix: lifecycleKey = typeDef.LifecycleKey = "" means the condition
+// `if lifecycleKey == "" { lifecycleKey = "state" }` may not exist; the
+// fallback reads Fields[c.key] = Fields["status"] = "" → blank cell.
+// Post-fix: default "state" key is used → Fields["state"] = "running" → visible.
+func TestViews_ListStatusColumn_LifecycleKeyDefaultIsState(t *testing.T) {
+	ensureNoColor(t)
+
+	// These type shorts all share the same structural test — minimalTypeDef
+	// always sets LifecycleKey to "" (no explicit lifecycle key), so the
+	// default "state" fallback must kick in.
+	typeShorts := []string{"ec2", "s3", "sg", "role", "ng", "kms"}
+
+	for _, short := range typeShorts {
+		short := short
+		t.Run(short, func(t *testing.T) {
+			// Use a unique non-registered name to avoid registry overriding columns.
+			td := minimalTypeDef(short + "-lkdefault-test")
+			// Explicitly confirm LifecycleKey is empty (minimalTypeDef default).
+			if td.LifecycleKey != "" {
+				t.Fatalf("test precondition failed: minimalTypeDef set LifecycleKey=%q, want empty", td.LifecycleKey)
+			}
+
+			r := resource.Resource{
+				ID:   short + "-lk-default",
+				Name: short + "-lk-default",
+				Fields: map[string]string{
+					// "status" is absent — pre-fix extractCellValue reads this, gets blank.
+					// "state" is present — post-fix fallback reads this.
+					"state": "running",
+				},
+				Findings: nil,
+			}
+
+			m := loadList(td, []resource.Resource{r})
+			out := renderList(m)
+
+			if !strings.Contains(out, "running") {
+				t.Errorf("[%s] Status column must show Fields[\"state\"]=\"running\" when Findings=nil and LifecycleKey is empty (default=\"state\"); got:\n%s",
+					short, out)
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Test 11 — IssueCount: terminated is not an issue
+// ---------------------------------------------------------------------------
+
+// TestViews_IssueCount_TerminatedIsNotAnIssue verifies that a resource with
+// Status="terminated" and no Findings does not contribute to IssueCount().
+//
+// "terminated" is a lifecycle terminal state, not an actionable issue.
+// IssueCount() counts resources whose Findings contain IsIssue()-severity
+// entries. A resource with Findings=nil must count as 0.
+//
+// Pre-fix: if IssueCount reads the legacy color (terminated → SevBroken via
+// the Color func), or if DeriveFindings emitted a "terminated" Finding that
+// was then counted, this would return 1.
+// Post-fix: Findings=nil (lifecycle filtered) → IssueCount() = 0.
+func TestViews_IssueCount_TerminatedIsNotAnIssue(t *testing.T) {
+	ensureNoColor(t)
+
+	td := minimalTypeDef("ec2-terminated-test")
+	r := resource.Resource{
+		ID:     "i-term",
+		Name:   "terminated-instance",
+		Status: "terminated",
+		Fields: map[string]string{"state": "terminated"},
+		// Findings deliberately nil — if DeriveFindings filtered "terminated"
+		// correctly, Findings stays nil and IssueCount should be 0.
+		Findings: nil,
+	}
+
+	m := loadList(td, []resource.Resource{r})
+	got := m.IssueCount()
+
+	if got != 0 {
+		t.Errorf("IssueCount() = %d, want 0 (terminated is a lifecycle state, not an issue; Findings=nil)", got)
+	}
+}

@@ -123,22 +123,105 @@ func TestDerive_IssuesList_OneFindingPerIssue(t *testing.T) {
 }
 
 // TestDerive_IssuesEmpty_StatusFallback verifies that when r.Issues is nil but
-// r.Status is non-empty, a single wave1 Finding is derived from the Status
-// phrase. Note: the shim does NOT filter lifecycle-healthy phrases like
-// "running" or "available" — that filtering is the responsibility of per-
-// category PRs (03b–m) which introduce per-type lifecycle tables. The shim
-// renders all non-empty Status values as Findings unconditionally.
+// r.Status is a lifecycle steady-state phrase like "running", NO Finding is
+// produced. Lifecycle steady-states are not issues — the shim must filter them.
+// Findings must be nil and AttentionDetails must be nil.
+//
+// Pre-fix: shim emits one wave1 Finding with Phrase="running".
+// Post-fix: "running" is recognized as a lifecycle phrase → Findings == nil.
 func TestDerive_IssuesEmpty_StatusFallback(t *testing.T) {
 	r := domain.Resource{ID: "i-004", Status: "running", Issues: nil}
 	attention.DeriveFindings(&r, ec2TD, nil)
+	if len(r.Findings) != 0 {
+		t.Fatalf("len(Findings): got %d, want 0 (lifecycle steady-state must not produce a Finding)", len(r.Findings))
+	}
+	if r.AttentionDetails != nil {
+		t.Errorf("AttentionDetails: got %v, want nil", r.AttentionDetails)
+	}
+}
+
+// TestDerive_LifecyclePhrasesAreNotEmittedAsFindings verifies that all known
+// lifecycle steady-state phrases — both healthy and terminal — produce zero
+// Findings when passed as r.Status. These are lifecycle state labels, not
+// issues, and must be filtered by the shim before creating wave1 Findings.
+//
+// Pre-fix: every non-empty Status produces a Finding.
+// Post-fix: lifecycle phrases are detected and skipped → Findings == nil.
+func TestDerive_LifecyclePhrasesAreNotEmittedAsFindings(t *testing.T) {
+	phrases := []string{
+		"running", "available", "active", "in-service", "healthy",
+		"terminated", "deleted", "shutting-down", "deregistered", "inactive",
+	}
+	for _, phrase := range phrases {
+		phrase := phrase
+		t.Run(phrase, func(t *testing.T) {
+			r := domain.Resource{ID: "i", Status: phrase}
+			attention.DeriveFindings(&r, ec2TD, nil)
+			if len(r.Findings) != 0 {
+				t.Errorf("Status=%q: got %d Findings, want 0 (lifecycle phrase must not emit a Finding)",
+					phrase, len(r.Findings))
+			}
+		})
+	}
+}
+
+// TestDerive_LifecyclePhrasesInIssuesAreAlsoSkipped verifies that lifecycle
+// filter applies to both the Status path AND the Issues path. When r.Issues
+// contains a mix of lifecycle phrases and real issue phrases, only the real
+// issue phrases produce Findings.
+//
+// Setup: Issues = ["running", "impaired", "terminated"]
+// Expected: exactly 1 Finding with Phrase="impaired" and Severity=SevBroken.
+//
+// Pre-fix: all three issues produce Findings (shim does not filter by phrase).
+// Post-fix: "running" and "terminated" are filtered; only "impaired" survives.
+func TestDerive_LifecyclePhrasesInIssuesAreAlsoSkipped(t *testing.T) {
+	r := domain.Resource{
+		ID:     "i-mixed",
+		Issues: []string{"running", "impaired", "terminated"},
+	}
+	attention.DeriveFindings(&r, ec2TD, nil)
 	if len(r.Findings) != 1 {
-		t.Fatalf("len(Findings): got %d, want 1 (shim does not filter lifecycle phrases)", len(r.Findings))
+		t.Fatalf("len(Findings): got %d, want 1 (only non-lifecycle phrase 'impaired' must produce a Finding)", len(r.Findings))
 	}
-	if r.Findings[0].Phrase != "running" {
-		t.Errorf("Phrase: got %q, want %q", r.Findings[0].Phrase, "running")
+	if r.Findings[0].Phrase != "impaired" {
+		t.Errorf("Findings[0].Phrase: got %q, want %q", r.Findings[0].Phrase, "impaired")
 	}
-	if r.Findings[0].Source != "wave1" {
-		t.Errorf("Source: got %q, want %q", r.Findings[0].Source, "wave1")
+	if r.Findings[0].Severity != domain.SevBroken {
+		t.Errorf("Findings[0].Severity: got %v, want SevBroken", r.Findings[0].Severity)
+	}
+}
+
+// TestDerive_Wave2OnTopOfLifecycleStatus verifies that when r.Status is a
+// lifecycle steady-state ("running") and an EnrichmentFinding is present, the
+// result contains exactly one Finding — the wave2 entry — because the lifecycle
+// Status was filtered and did not produce a wave1 Finding.
+//
+// This means Wave 2 is Findings[0] (index 0), not Findings[1].
+//
+// Pre-fix: "running" produces Findings[0] (wave1) and enrichment is Findings[1].
+// Post-fix: "running" is filtered; enrichment becomes the sole Findings[0].
+func TestDerive_Wave2OnTopOfLifecycleStatus(t *testing.T) {
+	r := domain.Resource{ID: "i-w2", Status: "running"}
+	ef := map[string]resource.EnrichmentFinding{
+		"i-w2": {
+			Severity: "!",
+			Summary:  "pending maintenance",
+			Rows:     []resource.FindingRow{{Label: "Action", Value: "reboot"}},
+		},
+	}
+	attention.DeriveFindings(&r, ec2TD, ef)
+	if len(r.Findings) != 1 {
+		t.Fatalf("len(Findings): got %d, want 1 (lifecycle filtered; wave2 is the only Finding)", len(r.Findings))
+	}
+	if r.Findings[0].Phrase != "pending maintenance" {
+		t.Errorf("Findings[0].Phrase: got %q, want %q", r.Findings[0].Phrase, "pending maintenance")
+	}
+	if r.Findings[0].Severity != domain.SevBroken {
+		t.Errorf("Findings[0].Severity: got %v, want SevBroken", r.Findings[0].Severity)
+	}
+	if r.Findings[0].Source != "wave2:ec2" {
+		t.Errorf("Findings[0].Source: got %q, want %q", r.Findings[0].Source, "wave2:ec2")
 	}
 }
 
