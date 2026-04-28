@@ -37,9 +37,11 @@ func computeMSKFindings(state kafkatypes.ClusterState) []domain.Finding {
 	case kafkatypes.ClusterStateMaintenance:
 		return []domain.Finding{{Code: CodeMSKMaintenance, Phrase: "maintenance", Severity: domain.SevWarn, Source: "wave1"}}
 	case kafkatypes.ClusterStateRebootingBroker:
-		return []domain.Finding{{Code: CodeMSKRebootingBroker, Phrase: "rebooting_broker", Severity: domain.SevWarn, Source: "wave1"}}
+		return []domain.Finding{{Code: CodeMSKRebootingBroker, Phrase: "rebooting broker", Severity: domain.SevWarn, Source: "wave1"}}
 	case kafkatypes.ClusterStateHealing:
 		return []domain.Finding{{Code: CodeMSKHealing, Phrase: "healing", Severity: domain.SevWarn, Source: "wave1"}}
+	case kafkatypes.ClusterStateDeleting:
+		return []domain.Finding{{Code: CodeMSKDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"}}
 	case kafkatypes.ClusterStateFailed:
 		return []domain.Finding{{Code: CodeMSKFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
 	default:
@@ -105,6 +107,9 @@ func FetchMSKClustersPage(ctx context.Context, api MSKListClustersV2API, continu
 		statusPhrase := ""
 		if len(findings) > 0 {
 			statusPhrase = findings[0].Phrase
+			if len(findings) > 1 {
+				statusPhrase = fmt.Sprintf("%s (+%d)", statusPhrase, len(findings)-1)
+			}
 		}
 
 		r := resource.Resource{

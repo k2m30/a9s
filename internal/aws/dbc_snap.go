@@ -98,7 +98,7 @@ func init() {
 	})
 
 	resource.RegisterRelated("dbc-snap", []resource.RelatedDef{
-		{TargetType: "dbc", DisplayName: "DocumentDB Cluster", Checker: checkDbcSnapDBC, NeedsTargetCache: true},
+		{TargetType: "dbc", DisplayName: "DB Cluster", Checker: checkDbcSnapDBC, NeedsTargetCache: true},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkDbcSnapKMS},
 		{TargetType: "vpc", DisplayName: "VPC", Checker: checkDbcSnapVPC},
 		{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkDbcSnapBackup},
@@ -160,7 +160,8 @@ func computeDBCSnapFindings(snap docdbtypes.DBClusterSnapshot) []domain.Finding 
 
 // ComputeDBCSnapStatusAndIssues is the exported compatibility wrapper around
 // computeDBCSnapFindings. Returns (statusPhrase, issuesPhrases) matching the
-// legacy (string, []string) contract expected by external callers and tests.
+// legacy (string, []string) contract — the status phrase carries the (+N)
+// suffix to match what FetchDocDBClusterSnapshotsPage writes to Fields["status"].
 func ComputeDBCSnapStatusAndIssues(snap docdbtypes.DBClusterSnapshot) (string, []string) {
 	findings := computeDBCSnapFindings(snap)
 	if len(findings) == 0 {
@@ -170,7 +171,11 @@ func ComputeDBCSnapStatusAndIssues(snap docdbtypes.DBClusterSnapshot) (string, [
 	for i, f := range findings {
 		phrases[i] = f.Phrase
 	}
-	return phrases[0], phrases
+	statusPhrase := phrases[0]
+	if len(phrases) > 1 {
+		statusPhrase = fmt.Sprintf("%s (+%d)", statusPhrase, len(phrases)-1)
+	}
+	return statusPhrase, phrases
 }
 
 // FetchDocDBClusterSnapshots calls the DocumentDB DescribeDBClusterSnapshots API and converts the

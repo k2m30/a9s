@@ -345,8 +345,10 @@ func TestOpenSearch_Fetch_UpdateAvailableHealthyBang(t *testing.T) {
 	if r.Fields["status"] != "software update forced soon" {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "software update forced soon")
 	}
-	if len(r.Findings) != 1 || r.Findings[0].Phrase != "software update forced soon" {
-		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, "software update forced soon")
+	// UpdateForcedSoon is a background-check signal owned by the Wave 2
+	// enricher — it appears in Fields["status"] for display but not in Findings.
+	if len(r.Findings) != 0 {
+		t.Errorf("Findings = %v, want none (UpdateForcedSoon is enricher territory, not wave1)", r.Findings)
 	}
 	if r.Fields["service_software_update_available"] != "true" {
 		t.Errorf("Fields[\"service_software_update_available\"] = %q, want %q", r.Fields["service_software_update_available"], "true")
@@ -426,8 +428,10 @@ func TestOpenSearch_Fetch_EncryptionOffHealthyTilde(t *testing.T) {
 	if r.Fields["status"] != "encryption at rest off" {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "encryption at rest off")
 	}
-	if len(r.Findings) != 1 || r.Findings[0].Phrase != "encryption at rest off" {
-		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, "encryption at rest off")
+	// EncryptionOff is a background-check signal owned by the Wave 2 enricher —
+	// it appears in Fields["status"] for display but not in Findings.
+	if len(r.Findings) != 0 {
+		t.Errorf("Findings = %v, want none (EncryptionOff is enricher territory, not wave1)", r.Findings)
 	}
 	if r.Fields["encryption_at_rest_enabled"] != "false" {
 		t.Errorf("Fields[\"encryption_at_rest_enabled\"] = %q, want %q", r.Fields["encryption_at_rest_enabled"], "false")
@@ -472,13 +476,13 @@ func TestOpenSearch_Fetch_MultiW2UpdatePlusEncryptionSuffix(t *testing.T) {
 	if r.Status != "" {
 		t.Errorf("Status = %q, want %q (fetcher must not write Status)", r.Status, "")
 	}
-	// Production emits findings[0].Phrase as Fields["status"] without (+N) suffix.
-	if r.Fields["status"] != "software update forced soon" {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "software update forced soon")
+	// Display column carries both background-check signals with (+N) suffix.
+	if r.Fields["status"] != "software update forced soon (+1)" {
+		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "software update forced soon (+1)")
 	}
-	// Both signals are in Findings: [software_update_forced_soon, encryption_at_rest_off].
-	if len(r.Findings) != 2 {
-		t.Errorf("Findings len = %d, want 2; Findings = %v", len(r.Findings), r.Findings)
+	// Both signals are background-checks owned by Wave 2 — neither in Findings.
+	if len(r.Findings) != 0 {
+		t.Errorf("Findings = %v, want none (background-checks are enricher territory)", r.Findings)
 	}
 }
 
@@ -518,15 +522,15 @@ func TestOpenSearch_Fetch_HardStatePlusBackgroundSuffix(t *testing.T) {
 	if r.Status != "" {
 		t.Errorf("Status = %q, want %q (fetcher must not write Status)", r.Status, "")
 	}
-	// Production emits findings[0].Phrase as Fields["status"] without (+N) suffix.
-	if r.Fields["status"] != "processing: config change in flight" {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "processing: config change in flight")
+	// Display: processing (hard-state) + software update (background) → suffix (+1).
+	if r.Fields["status"] != "processing: config change in flight (+1)" {
+		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "processing: config change in flight (+1)")
 	}
-	// Both signals (processing + software_update_forced_soon) are in Findings.
-	if len(r.Findings) != 2 {
-		t.Errorf("Findings len = %d, want 2; Findings = %v", len(r.Findings), r.Findings)
+	// Only the hard-state (processing) is in Findings; UpdateForcedSoon is enricher territory.
+	if len(r.Findings) != 1 {
+		t.Errorf("Findings len = %d, want 1 (only processing); Findings = %v", len(r.Findings), r.Findings)
 	}
-	if r.Findings[0].Phrase != "processing: config change in flight" {
+	if len(r.Findings) > 0 && r.Findings[0].Phrase != "processing: config change in flight" {
 		t.Errorf("Findings[0].Phrase = %q, want %q", r.Findings[0].Phrase, "processing: config change in flight")
 	}
 }
@@ -563,15 +567,15 @@ func TestOpenSearch_Fetch_IsolatedPlusEncryptionOff(t *testing.T) {
 	if r.Status != "" {
 		t.Errorf("Status = %q, want %q (fetcher must not write Status)", r.Status, "")
 	}
-	// Production emits findings[0].Phrase as Fields["status"] without (+N) suffix.
-	if r.Fields["status"] != "isolated: quarantined by AWS" {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "isolated: quarantined by AWS")
+	// Display: isolated (hard-state) + encryption-off (background) → suffix (+1).
+	if r.Fields["status"] != "isolated: quarantined by AWS (+1)" {
+		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "isolated: quarantined by AWS (+1)")
 	}
-	// Both signals (isolated + encryption_at_rest_off) are in Findings.
-	if len(r.Findings) != 2 {
-		t.Errorf("Findings len = %d, want 2; Findings = %v", len(r.Findings), r.Findings)
+	// Only the hard-state (isolated) is in Findings; EncryptionOff is enricher territory.
+	if len(r.Findings) != 1 {
+		t.Errorf("Findings len = %d, want 1 (only isolated); Findings = %v", len(r.Findings), r.Findings)
 	}
-	if r.Findings[0].Phrase != "isolated: quarantined by AWS" {
+	if len(r.Findings) > 0 && r.Findings[0].Phrase != "isolated: quarantined by AWS" {
 		t.Errorf("Findings[0].Phrase = %q, want %q", r.Findings[0].Phrase, "isolated: quarantined by AWS")
 	}
 }
@@ -615,15 +619,15 @@ func TestOpenSearch_Fetch_DeletedPlusBackgroundBackgroundSuppressed(t *testing.T
 	if r.Status != "" {
 		t.Errorf("Status = %q, want %q (fetcher must not write Status)", r.Status, "")
 	}
-	// Production emits findings[0].Phrase as Fields["status"] without (+N) suffix.
-	if r.Fields["status"] != "deleting: removal in progress" {
-		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "deleting: removal in progress")
+	// Display: deleted (hard-state) + 2 background-checks → suffix (+2).
+	if r.Fields["status"] != "deleting: removal in progress (+2)" {
+		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "deleting: removal in progress (+2)")
 	}
-	// Three signals (deleting + software_update_forced_soon + encryption_at_rest_off) are in Findings.
-	if len(r.Findings) != 3 {
-		t.Errorf("Findings len = %d, want 3; Findings = %v", len(r.Findings), r.Findings)
+	// Only the hard-state (deleting, SevDim) is in Findings; background-checks are enricher territory.
+	if len(r.Findings) != 1 {
+		t.Errorf("Findings len = %d, want 1 (only deleting); Findings = %v", len(r.Findings), r.Findings)
 	}
-	if r.Findings[0].Phrase != "deleting: removal in progress" {
+	if len(r.Findings) > 0 && r.Findings[0].Phrase != "deleting: removal in progress" {
 		t.Errorf("Findings[0].Phrase = %q, want %q", r.Findings[0].Phrase, "deleting: removal in progress")
 	}
 }

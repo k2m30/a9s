@@ -13,7 +13,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("kinesis", []string{"stream_name", "status", "stream_mode", "creation_time"})
+	resource.RegisterFieldKeys("kinesis", []string{"stream_name", "status", "stream_status", "stream_mode", "creation_time"})
 
 	resource.RegisterPaginated("kinesis", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -104,6 +104,9 @@ func FetchKinesisStreamsPage(ctx context.Context, api KinesisListStreamsAPI, con
 		statusPhrase := ""
 		if len(findings) > 0 {
 			statusPhrase = findings[0].Phrase
+			if len(findings) > 1 {
+				statusPhrase = fmt.Sprintf("%s (+%d)", statusPhrase, len(findings)-1)
+			}
 		}
 
 		r := resource.Resource{

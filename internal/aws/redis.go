@@ -140,6 +140,9 @@ func FetchRedisPage(ctx context.Context, api ElastiCacheDescribeReplicationGroup
 		statusPhrase := ""
 		if len(findings) > 0 {
 			statusPhrase = findings[0].Phrase
+			if len(findings) > 1 {
+				statusPhrase = fmt.Sprintf("%s (+%d)", statusPhrase, len(findings)-1)
+			}
 		}
 
 		r := resource.Resource{

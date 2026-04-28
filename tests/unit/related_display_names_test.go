@@ -366,7 +366,7 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 		{"dbi-snap", "kms"}: "KMS Keys",
 
 		// dbc-snap
-		{"dbc-snap", "dbc"}: "DocumentDB Cluster",
+		{"dbc-snap", "dbc"}: "DB Cluster",
 
 		// ssm
 		{"ssm", "kms"}: "KMS Key",
