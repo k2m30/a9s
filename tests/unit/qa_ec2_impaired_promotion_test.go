@@ -1,24 +1,24 @@
 package unit
 
-// qa_ec2_impaired_promotion_test.go — RED tests for Bug 1: EC2 impaired/initializing
-// status promotion.
+// qa_ec2_impaired_promotion_test.go — tests for EC2 impaired/initializing
+// status classification.
 //
-// Bug: FetchEC2InstancesPage sets Resource.Status = raw instance state (e.g. "running")
-// even when DescribeInstanceStatus reports system_status or instance_status == "impaired"
-// or "initializing". The current code only merges those fields into Fields[] without
-// promoting Resource.Status, so IsIssueRowColor("running") is false and the menu badge
-// undercounts issues while ctrl+z hides these rows.
+// Post-cleanup contract (PR-03b): FetchEC2Instances no longer writes Resource.Status.
+// All lifecycle state is surfaced via:
+//   - r.Findings (wave1: stopped/terminated/pending)
+//   - r.Fields["system_status"] and r.Fields["instance_status"] (wave2 enrichment)
 //
-// Demanded behavior (post-fix): when a running instance has an impaired or initializing
-// system/instance status, Resource.Status is promoted to "impaired" or "initializing"
-// respectively so that IsIssueRowColor returns true.
+// Color classification is delegated to ec2td.Color(r), which reads Fields directly:
+//   - system_status or instance_status == "impaired"  → ColorBroken  (IsIssue=true)
+//   - system_status or instance_status == "initializing" → ColorWarning (IsIssue=true)
+//   - both == "ok" → ColorHealthy (IsIssue=false)
 //
 // Tests T060–T066:
-//   T060 — system_status=impaired → Resource.Status promoted to "impaired"
-//   T061 — instance_status=impaired → Resource.Status promoted to "impaired"
-//   T062 — instance_status=initializing → Resource.Status promoted to "initializing"
-//   T063 — both ok → Resource.Status remains "running"
-//   T064 — state=stopped, sys=impaired → Resource.Status stays "stopped" (no masking)
+//   T060 — system_status=impaired → Fields["system_status"]=="impaired", Color==ColorBroken
+//   T061 — instance_status=impaired → Fields["instance_status"]=="impaired", Color==ColorBroken
+//   T062 — instance_status=initializing → Fields["instance_status"]=="initializing", Color==ColorWarning
+//   T063 — both ok → Resource.Status remains "" (no dual-write)
+//   T064 — state=stopped, sys=impaired → Resource.Status stays "" (stopped handled by Findings)
 //   T065 — ctrl+z behavioral: impaired/initializing rows visible after toggle
 //   T066 — menu badge: impaired + initializing + stopped all counted as issues
 
@@ -105,12 +105,10 @@ func instanceStatus(id, sysStatus, instStatus string) ec2types.InstanceStatus {
 
 // TestFetchEC2_PromotesStatusToImpairedWhenSystemStatusImpaired verifies that
 // a running instance with SystemStatus="impaired" and InstanceStatus="ok"
-// has its Resource.Status promoted to "impaired" and its Fields preserved.
+// has Fields["system_status"] set and is classified as ColorBroken.
 //
-// Pre-fix: Resource.Status == "running", Fields["system_status"] == "impaired".
-// Post-fix: Resource.Status == "impaired", Fields["system_status"] == "impaired",
-//
-//	Fields["state"] == "running".
+// Post-cleanup contract: Resource.Status is always "" (no dual-write).
+// Color classification is driven by ec2td.Color(r) reading Fields directly.
 func TestFetchEC2_PromotesStatusToImpairedWhenSystemStatusImpaired(t *testing.T) {
 	const id = "i-sys-impaired-001"
 	stub := &stubEC2WithStatusChecks{
@@ -130,13 +128,12 @@ func TestFetchEC2_PromotesStatusToImpairedWhenSystemStatusImpaired(t *testing.T)
 
 	r := resources[0]
 
-	// POST-FIX ASSERTION: Status must be promoted to "impaired".
-	// PRE-FIX: this fails because Status == "running".
-	if r.Status != "impaired" {
-		t.Errorf("expected Resource.Status == %q, got %q (system_status=impaired must promote Resource.Status)", "impaired", r.Status)
+	// Post-cleanup: Resource.Status is never written by the fetcher.
+	if r.Status != "" {
+		t.Errorf("expected Resource.Status == %q (empty — no dual-write), got %q", "", r.Status)
 	}
 
-	// Preservation checks: original data must still be accessible.
+	// The wave2 enrichment field must carry the impaired signal.
 	if r.Fields["system_status"] != "impaired" {
 		t.Errorf("expected Fields[\"system_status\"] == %q, got %q", "impaired", r.Fields["system_status"])
 	}
@@ -144,12 +141,14 @@ func TestFetchEC2_PromotesStatusToImpairedWhenSystemStatusImpaired(t *testing.T)
 		t.Errorf("expected Fields[\"state\"] == %q (original raw state preserved), got %q", "running", r.Fields["state"])
 	}
 
-	// Verify the EC2 Color func classifies this resource as an issue.
-	// The Color func reads Fields["system_status"] directly, so Status promotion
-	// is not required — the structural field is the source of truth.
+	// Color func reads Fields["system_status"] directly → ColorBroken → IsIssue=true.
 	ec2td := resource.FindResourceType("ec2")
 	if ec2td != nil && ec2td.Color != nil {
-		if !ec2td.Color(r).IsIssue() {
+		got := ec2td.Color(r)
+		if got != resource.ColorBroken {
+			t.Errorf("ec2.Color(r) = %v, want ColorBroken (system_status=%q must classify as broken)", got, r.Fields["system_status"])
+		}
+		if !got.IsIssue() {
 			t.Errorf("ec2.Color(r).IsIssue() must be true so the menu badge counts this instance (system_status=%q)", r.Fields["system_status"])
 		}
 	}
@@ -161,10 +160,10 @@ func TestFetchEC2_PromotesStatusToImpairedWhenSystemStatusImpaired(t *testing.T)
 
 // TestFetchEC2_PromotesStatusToImpairedWhenInstanceStatusImpaired verifies that
 // a running instance with SystemStatus="ok" and InstanceStatus="impaired"
-// has its Resource.Status promoted to "impaired".
+// has Fields["instance_status"] set and is classified as ColorBroken.
 //
-// Pre-fix: Resource.Status == "running".
-// Post-fix: Resource.Status == "impaired".
+// Post-cleanup contract: Resource.Status is always "" (no dual-write).
+// Color classification is driven by ec2td.Color(r) reading Fields directly.
 func TestFetchEC2_PromotesStatusToImpairedWhenInstanceStatusImpaired(t *testing.T) {
 	const id = "i-inst-impaired-001"
 	stub := &stubEC2WithStatusChecks{
@@ -184,17 +183,26 @@ func TestFetchEC2_PromotesStatusToImpairedWhenInstanceStatusImpaired(t *testing.
 
 	r := resources[0]
 
-	// POST-FIX ASSERTION: Status must be promoted to "impaired".
-	// PRE-FIX: this fails because Status == "running".
-	if r.Status != "impaired" {
-		t.Errorf("expected Resource.Status == %q, got %q (instance_status=impaired must promote Resource.Status)", "impaired", r.Status)
+	// Post-cleanup: Resource.Status is never written by the fetcher.
+	if r.Status != "" {
+		t.Errorf("expected Resource.Status == %q (empty — no dual-write), got %q", "", r.Status)
 	}
 
+	// The wave2 enrichment field must carry the impaired signal.
 	if r.Fields["instance_status"] != "impaired" {
 		t.Errorf("expected Fields[\"instance_status\"] == %q, got %q", "impaired", r.Fields["instance_status"])
 	}
 	if r.Fields["state"] != "running" {
 		t.Errorf("expected Fields[\"state\"] == %q (original raw state preserved), got %q", "running", r.Fields["state"])
+	}
+
+	// Color func reads Fields["instance_status"] directly → ColorBroken → IsIssue=true.
+	ec2td := resource.FindResourceType("ec2")
+	if ec2td != nil && ec2td.Color != nil {
+		got := ec2td.Color(r)
+		if got != resource.ColorBroken {
+			t.Errorf("ec2.Color(r) = %v, want ColorBroken (instance_status=%q must classify as broken)", got, r.Fields["instance_status"])
+		}
 	}
 }
 
@@ -204,10 +212,10 @@ func TestFetchEC2_PromotesStatusToImpairedWhenInstanceStatusImpaired(t *testing.
 
 // TestFetchEC2_PromotesStatusToInitializingWhenInstanceStatusInitializing verifies
 // that a running instance with SystemStatus="ok" and InstanceStatus="initializing"
-// has its Resource.Status promoted to "initializing".
+// has Fields["instance_status"] set and is classified as ColorWarning.
 //
-// Pre-fix: Resource.Status == "running".
-// Post-fix: Resource.Status == "initializing".
+// Post-cleanup contract: Resource.Status is always "" (no dual-write).
+// Color classification is driven by ec2td.Color(r) reading Fields directly.
 func TestFetchEC2_PromotesStatusToInitializingWhenInstanceStatusInitializing(t *testing.T) {
 	const id = "i-initializing-001"
 	stub := &stubEC2WithStatusChecks{
@@ -227,20 +235,24 @@ func TestFetchEC2_PromotesStatusToInitializingWhenInstanceStatusInitializing(t *
 
 	r := resources[0]
 
-	// POST-FIX ASSERTION: Status must be promoted to "initializing".
-	// PRE-FIX: this fails because Status == "running".
-	if r.Status != "initializing" {
-		t.Errorf("expected Resource.Status == %q, got %q (instance_status=initializing must promote Resource.Status)", "initializing", r.Status)
+	// Post-cleanup: Resource.Status is never written by the fetcher.
+	if r.Status != "" {
+		t.Errorf("expected Resource.Status == %q (empty — no dual-write), got %q", "", r.Status)
 	}
 
+	// The wave2 enrichment field must carry the initializing signal.
 	if r.Fields["instance_status"] != "initializing" {
 		t.Errorf("expected Fields[\"instance_status\"] == %q, got %q", "initializing", r.Fields["instance_status"])
 	}
 
-	// Verify the EC2 Color func classifies this resource as an issue (ctrl+z keeps it visible).
+	// Color func reads Fields["instance_status"] directly → ColorWarning → IsIssue=true.
 	ec2tdInit := resource.FindResourceType("ec2")
 	if ec2tdInit != nil && ec2tdInit.Color != nil {
-		if !ec2tdInit.Color(r).IsIssue() {
+		got := ec2tdInit.Color(r)
+		if got != resource.ColorWarning {
+			t.Errorf("ec2.Color(r) = %v, want ColorWarning (instance_status=%q must classify as warning)", got, r.Fields["instance_status"])
+		}
+		if !got.IsIssue() {
 			t.Errorf("ec2.Color(r).IsIssue() must be true so ctrl+z keeps this row visible (instance_status=%q)", r.Fields["instance_status"])
 		}
 	}
@@ -359,15 +371,15 @@ func TestCtrlZ_EC2_ImpairedRowsVisibleAfterPromotion(t *testing.T) {
 	m := newRootSizedModel()
 	m = navigateToEC2List(m)
 
-	// Simulate post-promotion resources: status is "impaired"/"initializing"
-	// (as the fixed fetcher would produce).
+	// Post-cleanup: fetcher emits Status=="" and encodes degraded state in Fields.
+	// Color func reads Fields["system_status"]/["instance_status"] directly.
 	promotedResources := []resource.Resource{
-		{ID: "i-impaired-001", Name: "web-server-impaired", Status: "impaired", Fields: map[string]string{
+		{ID: "i-impaired-001", Name: "web-server-impaired", Fields: map[string]string{
 			"state":         "running",
 			"system_status": "impaired",
 			"name":          "web-server-impaired",
 		}},
-		{ID: "i-initializing-001", Name: "web-server-init", Status: "initializing", Fields: map[string]string{
+		{ID: "i-initializing-001", Name: "web-server-init", Fields: map[string]string{
 			"state":           "running",
 			"instance_status": "initializing",
 			"name":            "web-server-init",
@@ -433,12 +445,13 @@ func TestMenuBadge_EC2_CountsImpairedRows(t *testing.T) {
 		ResourceType: "ec2",
 	})
 
-	// Load resources with status already promoted (as the fixed fetcher would produce).
+	// Post-cleanup: fetcher emits Status=="" for all EC2 instances.
+	// Color classification is driven by Fields (system_status/instance_status/state).
 	mixedResources := []resource.Resource{
-		{ID: "i-running-001", Name: "healthy-server", Status: "running", Fields: map[string]string{"state": "running", "name": "healthy-server"}},
-		{ID: "i-impaired-001", Name: "impaired-server", Status: "impaired", Fields: map[string]string{"state": "running", "system_status": "impaired", "name": "impaired-server"}},
-		{ID: "i-initializing-001", Name: "init-server", Status: "initializing", Fields: map[string]string{"state": "running", "instance_status": "initializing", "name": "init-server"}},
-		{ID: "i-stopped-001", Name: "stopped-server", Status: "stopped", Fields: map[string]string{"state": "stopped", "name": "stopped-server"}},
+		{ID: "i-running-001", Name: "healthy-server", Fields: map[string]string{"state": "running", "name": "healthy-server"}},
+		{ID: "i-impaired-001", Name: "impaired-server", Fields: map[string]string{"state": "running", "system_status": "impaired", "name": "impaired-server"}},
+		{ID: "i-initializing-001", Name: "init-server", Fields: map[string]string{"state": "running", "instance_status": "initializing", "name": "init-server"}},
+		{ID: "i-stopped-001", Name: "stopped-server", Fields: map[string]string{"state": "stopped", "name": "stopped-server"}},
 	}
 
 	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{

@@ -376,3 +376,50 @@ func (m *pr03bEC2Mock) DescribeInstanceStatus(
 ) (*ec2svc.DescribeInstanceStatusOutput, error) {
 	return &ec2svc.DescribeInstanceStatusOutput{}, nil
 }
+
+// ---------------------------------------------------------------------------
+// T03b-9 — stopping state → SevWarn Finding (missing coverage)
+// ---------------------------------------------------------------------------
+
+// TestEC2Fetcher_StoppingStateEmitsWarnFinding asserts that an instance in the
+// "stopping" transient state emits one SevWarn Finding with CodeEC2StateStopping.
+// This state is distinct from "stopped" — the instance is mid-shutdown.
+//
+// Pre-fix: stopping state may fall through with no Finding (gap in switch).
+// Post-fix: CodeEC2StateStopping / SevWarn / Source:"wave1" must be emitted.
+func TestEC2Fetcher_StoppingStateEmitsWarnFinding(t *testing.T) {
+	mock := newEC2MockForPR03b([]ec2types.Instance{
+		{
+			InstanceId:       aws.String("i-0stop123def456abc"),
+			InstanceType:     ec2types.InstanceTypeT3Micro,
+			State:            &ec2types.InstanceState{Name: ec2types.InstanceStateNameStopping},
+			PrivateIpAddress: aws.String("10.0.2.50"),
+		},
+	})
+
+	resources, err := awsclient.FetchEC2Instances(context.Background(), mock)
+	if err != nil {
+		t.Fatalf("FetchEC2Instances: unexpected error: %v", err)
+	}
+	if len(resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(resources))
+	}
+	r := resources[0]
+
+	if r.Status != "" {
+		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for stopping)", r.Status, "")
+	}
+	if len(r.Findings) != 1 {
+		t.Fatalf("Findings: got %d, want 1 for stopping state", len(r.Findings))
+	}
+	f := r.Findings[0]
+	if f.Code != awsclient.CodeEC2StateStopping {
+		t.Errorf("Findings[0].Code: got %q, want %q", f.Code, awsclient.CodeEC2StateStopping)
+	}
+	if f.Severity != domain.SevWarn {
+		t.Errorf("Findings[0].Severity: got %v, want domain.SevWarn", f.Severity)
+	}
+	if f.Source != "wave1" {
+		t.Errorf("Findings[0].Source: got %q, want %q", f.Source, "wave1")
+	}
+}

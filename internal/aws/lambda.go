@@ -16,6 +16,7 @@ func init() {
 	resource.RegisterFieldKeys("lambda", []string{
 		"function_name",
 		"runtime",
+		"state",
 		"memory",
 		"timeout",
 		"handler",
@@ -189,17 +190,14 @@ func FetchLambdaFunctionsPageWithEventSources(
 		}
 
 		// Phase 03 PR-03b: emit canonical Findings for non-healthy lifecycle states.
-		// Active is healthy — no Finding. Inactive is recoverable (evicted from memory)
-		// → SevWarn. Pending and Failed are non-healthy → SevWarn / SevBroken.
+		// Active is healthy — no Finding. Inactive is lifecycle-class (evicted from
+		// memory after 14 days idle) — no Finding; Color func returns ColorDim via the
+		// structural Inactive case in Fields["state"]. Pending and Failed are
+		// non-healthy → SevWarn / SevBroken.
 		switch fn.State {
 		case lambdatypes.StatePending:
 			r.Findings = []domain.Finding{{
 				Code: CodeLambdaStatePending, Phrase: "pending",
-				Severity: domain.SevWarn, Source: "wave1",
-			}}
-		case lambdatypes.StateInactive:
-			r.Findings = []domain.Finding{{
-				Code: CodeLambdaStateInactive, Phrase: "inactive",
 				Severity: domain.SevWarn, Source: "wave1",
 			}}
 		case lambdatypes.StateFailed:
@@ -208,6 +206,8 @@ func FetchLambdaFunctionsPageWithEventSources(
 				Severity: domain.SevBroken, Source: "wave1",
 			}}
 		}
+		// Inactive is lifecycle-class — no Finding; Color func returns ColorDim
+		// via the structural fallback reading Fields["state"] == "Inactive".
 
 		resources = append(resources, r)
 	}

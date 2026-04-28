@@ -13,7 +13,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("ec2", []string{"instance_id", "name", "state", "type", "private_ip", "public_ip", "launch_time", "lifecycle", "image_id", "vpc_id", "system_status", "instance_status"})
+	resource.RegisterFieldKeys("ec2", []string{"instance_id", "name", "state", "type", "private_ip", "public_ip", "launch_time", "lifecycle", "image_id", "vpc_id", "system_status", "instance_status", "state_reason_code"})
 
 	resource.RegisterFieldAliases("ec2", map[string]string{
 		"instance_id":  "InstanceId",
@@ -317,20 +317,6 @@ func enrichEC2StatusChecks(ctx context.Context, api EC2DescribeInstanceStatusAPI
 			}
 			if instStatus != "" {
 				resources[i].Fields["instance_status"] = instStatus
-			}
-			// Promote Resource.Status for running instances only.
-			// A running instance whose status checks report "impaired" or
-			// "initializing" must surface as an issue in the menu badge and
-			// ctrl+z filter. We promote Status so the Color func's fallback path
-			// (via r.Status) also works for test doubles without a Color func.
-			if resources[i].Fields["state"] == "running" {
-				if sysStatus == "impaired" || instStatus == "impaired" {
-					resources[i].Status = "impaired"
-				} else if sysStatus == "initializing" || instStatus == "initializing" {
-					if resources[i].Status != "impaired" { // impaired has priority
-						resources[i].Status = "initializing"
-					}
-				}
 			}
 		}
 	}

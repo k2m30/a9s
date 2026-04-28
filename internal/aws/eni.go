@@ -13,7 +13,7 @@ import (
 )
 
 func init() {
-	resource.RegisterFieldKeys("eni", []string{"eni_id", "name", "status", "type", "vpc_id", "private_ip"})
+	resource.RegisterFieldKeys("eni", []string{"eni_id", "name", "status", "type", "vpc_id", "private_ip", "requester_managed"})
 
 	resource.RegisterPaginated("eni", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
@@ -89,17 +89,23 @@ func FetchNetworkInterfacesPage(ctx context.Context, api EC2DescribeNetworkInter
 			privateIP = *eni.PrivateIpAddress
 		}
 
+		requesterManaged := "false"
+		if eni.RequesterManaged != nil && aws.ToBool(eni.RequesterManaged) {
+			requesterManaged = "true"
+		}
+
 		r := resource.Resource{
 			ID:   eniID,
 			Name: name,
 			// Status: removed — PR-03b migrates fetcher to Findings for lifecycle states.
 			Fields: map[string]string{
-				"eni_id":     eniID,
-				"name":       name,
-				"status":     status,
-				"type":       interfaceType,
-				"vpc_id":     vpcID,
-				"private_ip": privateIP,
+				"eni_id":            eniID,
+				"name":              name,
+				"status":            status,
+				"type":              interfaceType,
+				"vpc_id":            vpcID,
+				"private_ip":        privateIP,
+				"requester_managed": requesterManaged,
 			},
 			RawStruct: eni,
 		}
@@ -112,7 +118,9 @@ func FetchNetworkInterfacesPage(ctx context.Context, api EC2DescribeNetworkInter
 		case ec2types.NetworkInterfaceStatusAvailable:
 			// Requester-managed interfaces (e.g. VPC endpoints, ELB NICs) that are
 			// "available" are controlled by AWS — do not flag as wasteful.
-			if interfaceType != "requester-managed" {
+			// Use the RequesterManaged bool field — InterfaceType alone is insufficient
+			// since EFS mount targets and other AWS-managed ENIs use InterfaceType="interface".
+			if eni.RequesterManaged == nil || !aws.ToBool(eni.RequesterManaged) {
 				r.Findings = []domain.Finding{{
 					Code: CodeENIStateAvailable, Phrase: "available",
 					Severity: domain.SevWarn, Source: "wave1",

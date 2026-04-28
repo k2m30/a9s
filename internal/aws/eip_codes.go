@@ -1,6 +1,6 @@
 // eip_codes.go — canonical FindingCode constants for the eip resource type.
 // Phase 03 PR-03b. The fetcher writes Findings using these codes; the
-// EIP Color func reads Findings[0].Severity to color rows.
+// EIP Color func reads wave1 Findings (Source == "wave1") to color rows.
 package aws
 
 import "github.com/k2m30/a9s/v3/internal/domain"

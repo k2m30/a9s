@@ -1,17 +1,15 @@
 package unit_test
 
-// phase03_compute_pr03b_test.go — TDD failing tests for Wave 1 finding migration,
+// phase03_compute_pr03b_test.go — regression-pin tests for Wave 1 finding migration,
 // covering the 9 remaining compute types in PR-03b:
 // lambda, eks, asg, eb, ebs, ami, eip, eni, ebs-snap.
 //
-// Migration target (PR-03b):
+// Migration contract (PR-03b — implemented):
 //   - Fetchers STOP writing Resource.Status for lifecycle states.
 //   - Fetchers EMIT canonical Finding entries (Source: "wave1") for non-healthy,
 //     non-terminal states.
 //   - Each type has a corresponding internal/aws/<svc>_codes.go with constants.
-//   - Each type's Color func gets a Findings-first branch.
-//
-// These tests are RED until the coder implements the migration.
+//   - Each type's Color func reads Findings first, then falls back to structural fields.
 //
 // Per-type vocabulary (derived from Color func in types_compute.go /
 // types_containers.go / types_networking.go):
@@ -67,7 +65,6 @@ func TestPR03b_LambdaCodes_ConstantsExist(t *testing.T) {
 	t.Helper()
 	var _ domain.FindingCode = awsclient.CodeLambdaStatePending
 	var _ domain.FindingCode = awsclient.CodeLambdaStateFailed
-	var _ domain.FindingCode = awsclient.CodeLambdaStateInactive
 }
 
 // TestPR03b_LambdaFetcher_ActiveEmitsNoFinding asserts that an Active lambda
@@ -563,7 +560,7 @@ func TestPR03b_AMIFetcher_AvailableEmitsNoFinding(t *testing.T) {
 				Name:         aws.String("my-golden-ami-v1"),
 				State:        ec2types.ImageStateAvailable,
 				Architecture: ec2types.ArchitectureValuesX8664,
-				OwnerId:      aws.String("123456789012"),
+				OwnerId:      aws.String("000000000000"),
 				Public:       aws.Bool(false),
 			},
 		},
@@ -599,7 +596,7 @@ func TestPR03b_AMIFetcher_FailedEmitsBrokenFinding(t *testing.T) {
 				Name:         aws.String("broken-build-ami"),
 				State:        ec2types.ImageStateFailed,
 				Architecture: ec2types.ArchitectureValuesX8664,
-				OwnerId:      aws.String("123456789012"),
+				OwnerId:      aws.String("000000000000"),
 				Public:       aws.Bool(false),
 			},
 		},
@@ -896,7 +893,7 @@ func TestPR03b_EBSSnapFetcher_CompletedEmitsNoFinding(t *testing.T) {
 				State:      ec2types.SnapshotStateCompleted,
 				Encrypted:  aws.Bool(true),
 				VolumeSize: aws.Int32(100),
-				OwnerId:    aws.String("123456789012"),
+				OwnerId:    aws.String("000000000000"),
 			},
 		},
 	}
@@ -932,7 +929,7 @@ func TestPR03b_EBSSnapFetcher_ErrorEmitsBrokenFinding(t *testing.T) {
 				State:      ec2types.SnapshotStateError,
 				Encrypted:  aws.Bool(true),
 				VolumeSize: aws.Int32(200),
-				OwnerId:    aws.String("123456789012"),
+				OwnerId:    aws.String("000000000000"),
 			},
 		},
 	}
@@ -1000,7 +997,7 @@ func TestPR03b_LambdaColor_BrokenOverridesWave1(t *testing.T) {
 	// Inactive function with deprecated runtime → must be Broken (deprecated wins).
 	r := resource.Resource{
 		Type: "lambda",
-		Findings: []domain.Finding{{Code: awsclient.CodeLambdaStateInactive, Phrase: "inactive", Severity: domain.SevWarn, Source: "wave1"}},
+		Findings: []domain.Finding{{Code: awsclient.CodeLambdaStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"}},
 		Fields:   map[string]string{"state": "Inactive", "runtime": "python3.7"},
 	}
 	if got := td.Color(r); got != resource.ColorBroken {
@@ -1015,6 +1012,89 @@ func TestPR03b_LambdaColor_BrokenOverridesWave1(t *testing.T) {
 	}
 	if got := td.Color(r2); got != resource.ColorBroken {
 		t.Errorf("pending + last_update_status=Failed: Color = %v, want ColorBroken", got)
+	}
+}
+
+// TestPR03b_ENIFetcher_RequesterManagedSuppressesAvailableFinding pins that
+// AWS-managed ENIs flagged via the RequesterManaged *bool field do NOT emit a
+// CodeENIStateAvailable Finding even when Status is "available".
+//
+// Pre-fix: fetcher checks interfaceType != "requester-managed" (a string
+// comparison against InterfaceType), which misses ENIs whose InterfaceType is
+// "interface" or any other non-"requester-managed" string but whose
+// RequesterManaged boolean is true (EFS, VPC endpoints, ELB managed by AWS).
+// Post-fix: fetcher reads eni.RequesterManaged to detect AWS-managed ENIs.
+func TestPR03b_ENIFetcher_RequesterManagedSuppressesAvailableFinding(t *testing.T) {
+	// ENI with Status=available, RequesterManaged=true, InterfaceType="interface"
+	// — this represents a real AWS-managed ENI (e.g. EFS mount target) that has
+	// InterfaceType="interface" but is controlled by AWS via RequesterManaged.
+	mock := &pr03bENIMock{
+		enis: []ec2types.NetworkInterface{
+			{
+				NetworkInterfaceId: aws.String("eni-0123abcdef456789a"),
+				Status:             ec2types.NetworkInterfaceStatusAvailable,
+				InterfaceType:      ec2types.NetworkInterfaceTypeInterface, // NOT "requester-managed"
+				RequesterManaged:   aws.Bool(true),                         // but IS requester-managed
+				VpcId:              aws.String("vpc-0abc1234"),
+				PrivateIpAddress:   aws.String("10.0.3.10"),
+			},
+		},
+	}
+
+	result, err := awsclient.FetchNetworkInterfacesPage(context.Background(), mock, "")
+	if err != nil {
+		t.Fatalf("FetchNetworkInterfacesPage: unexpected error: %v", err)
+	}
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+	r := result.Resources[0]
+
+	// AWS-managed ENI: must NOT emit a warning finding
+	if len(r.Findings) != 0 {
+		t.Errorf("Findings count = %d, want 0 — RequesterManaged=true ENI must not emit CodeENIStateAvailable (AWS controls this interface)", len(r.Findings))
+	}
+}
+
+// TestPR03b_ENIFetcher_AvailableNonRequesterEmitsFinding pins the inverse:
+// non-requester-managed ENIs in available state DO get the cost-waste warning.
+// This is the baseline case — the test confirms the fix does not suppress
+// legitimate warnings for user-managed idle ENIs.
+func TestPR03b_ENIFetcher_AvailableNonRequesterEmitsFinding(t *testing.T) {
+	// ENI with Status=available, RequesterManaged=false — user-owned idle ENI
+	mock := &pr03bENIMock{
+		enis: []ec2types.NetworkInterface{
+			{
+				NetworkInterfaceId: aws.String("eni-0abc987def654321b"),
+				Status:             ec2types.NetworkInterfaceStatusAvailable,
+				InterfaceType:      ec2types.NetworkInterfaceTypeInterface,
+				RequesterManaged:   aws.Bool(false),
+				VpcId:              aws.String("vpc-0def5678"),
+				PrivateIpAddress:   aws.String("10.0.4.20"),
+			},
+		},
+	}
+
+	result, err := awsclient.FetchNetworkInterfacesPage(context.Background(), mock, "")
+	if err != nil {
+		t.Fatalf("FetchNetworkInterfacesPage: unexpected error: %v", err)
+	}
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+	r := result.Resources[0]
+
+	if len(r.Findings) != 1 {
+		t.Fatalf("Findings count = %d, want 1 — non-requester-managed available ENI must emit CodeENIStateAvailable", len(r.Findings))
+	}
+	if r.Findings[0].Code != awsclient.CodeENIStateAvailable {
+		t.Errorf("Findings[0].Code = %q, want %q", r.Findings[0].Code, awsclient.CodeENIStateAvailable)
+	}
+	if r.Findings[0].Severity != domain.SevWarn {
+		t.Errorf("Findings[0].Severity = %v, want domain.SevWarn", r.Findings[0].Severity)
+	}
+	if r.Findings[0].Source != "wave1" {
+		t.Errorf("Findings[0].Source = %q, want wave1", r.Findings[0].Source)
 	}
 }
 
@@ -1074,4 +1154,86 @@ func TestPR03b_EBFetcher_DoesNotEmitHealthAsWave1Finding(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TODO(follow-up): consolidate per-type single-method mock adapters
+// (pr03bLambdaMock, pr03bEKSListMock, pr03bASGMock, etc.) into shared helpers
+// in tests/unit/helpers_*.go — each is a trivial struct satisfying a one-method
+// interface. Consolidation is intentionally deferred to avoid disrupting the
+// current coder → QA diff cycle.
+
+// =============================================================================
+// A1 — Lambda Inactive emits NO Finding
+// =============================================================================
+
+// TestPR03b_LambdaFetcher_InactiveEmitsNoFinding pins that Lambda Inactive
+// state is treated as lifecycle-class (ColorDim) — NOT promoted to a wave1
+// Finding. Lambda Inactive functions are non-broken and excluded from the
+// issue badge / ctrl+z filter; emitting a SevWarn Finding would reverse
+// that intent and make the legacy "Inactive": ColorDim case unreachable.
+func TestPR03b_LambdaFetcher_InactiveEmitsNoFinding(t *testing.T) {
+	mock := &pr03bLambdaMock{
+		fns: []lambdatypes.FunctionConfiguration{
+			{
+				FunctionName: aws.String("evicted-worker"),
+				Runtime:      lambdatypes.RuntimeNodejs20x,
+				State:        lambdatypes.StateInactive,
+				StateReason:  aws.String("The function was not invoked for 14 days"),
+			},
+		},
+	}
+
+	result, err := awsclient.FetchLambdaFunctionsPage(context.Background(), mock, "")
+	if err != nil {
+		t.Fatalf("FetchLambdaFunctionsPage: unexpected error: %v", err)
+	}
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+	r := result.Resources[0]
+
+	// Inactive is lifecycle-class — NOT an actionable issue.
+	if len(r.Findings) != 0 {
+		t.Errorf("Inactive function: Findings = %d, want 0 (Inactive is lifecycle-class, not an issue)", len(r.Findings))
+	}
+	// State field must still be written so the Color func can return ColorDim.
+	if r.Fields["state"] != "Inactive" {
+		t.Errorf("Fields[\"state\"] = %q, want \"Inactive\"", r.Fields["state"])
+	}
+}
+
+// =============================================================================
+// A2 — EC2 state_reason_code registered in GetFieldKeys
+// =============================================================================
+
+// TestPR03b_EC2Fields_StateReasonCodeRegistered asserts that "state_reason_code"
+// is declared in the EC2 RegisterFieldKeys call. The EC2 fetcher writes this key
+// (used by Color's Server.* branch), so it must be registered to appear in view
+// column projections and pass the TestColumnKeysHaveProducers check.
+func TestPR03b_EC2Fields_StateReasonCodeRegistered(t *testing.T) {
+	keys := resource.GetFieldKeys("ec2")
+	for _, k := range keys {
+		if k == "state_reason_code" {
+			return
+		}
+	}
+	t.Errorf("ec2 RegisterFieldKeys must include \"state_reason_code\" (written by FetchEC2Instances per PR-03b); registered keys: %v", keys)
+}
+
+// =============================================================================
+// A3 — Lambda state registered in GetFieldKeys
+// =============================================================================
+
+// TestPR03b_LambdaFields_StateRegistered asserts that "state" is declared in the
+// Lambda RegisterFieldKeys call. The Lambda fetcher writes Fields["state"] for
+// every function (used by Color's lifecycle-class branch); the key must be
+// registered to flow through column projections correctly.
+func TestPR03b_LambdaFields_StateRegistered(t *testing.T) {
+	keys := resource.GetFieldKeys("lambda")
+	for _, k := range keys {
+		if k == "state" {
+			return
+		}
+	}
+	t.Errorf("lambda RegisterFieldKeys must include \"state\" (written by FetchLambdaFunctions per PR-03b); registered keys: %v", keys)
 }

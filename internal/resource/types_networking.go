@@ -318,7 +318,7 @@ func networkingResourceTypes() []ResourceTypeDef {
 				case "in-use":
 					return ColorHealthy
 				case "available":
-					if r.Fields["type"] == "requester-managed" {
+					if r.Fields["requester_managed"] == "true" {
 						return ColorHealthy
 					}
 					return ColorWarning
