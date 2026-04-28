@@ -122,6 +122,11 @@ func (m Model) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetchedM
 		if m.ProbeResources == nil {
 			m.ProbeResources = make(map[string][]resource.Resource, len(msg.Resources))
 		}
+		// Site 2: derive findings across each resource type's slice before
+		// copying into ProbeResources (PR-03a-shim wire-up).
+		for short, rows := range msg.Resources {
+			(&m).deriveFindingsForType(short, rows)
+		}
 		maps.Copy(m.ProbeResources, msg.Resources)
 		// Record per-type truncation from the probe so buildResourceCacheSnapshot
 		// can stamp the correct IsTruncated value on probe-only cache entries.
@@ -212,11 +217,21 @@ func (m Model) handleAvailabilityChecked(msg messages.AvailabilityCheckedMsg) (t
 		if m.ProbeResources == nil {
 			m.ProbeResources = make(map[string][]resource.Resource)
 		}
-		m.ProbeResources[msg.ResourceType] = msg.Resources
+		// Canonicalize the resource type so ProbeResources is always keyed by the
+		// canonical ShortName, not an alias. Without this, "rds" would store under
+		// "rds" while the caller expects to find resources under "dbi".
+		canonType := msg.ResourceType
+		if td := resource.FindResourceType(msg.ResourceType); td != nil {
+			canonType = td.ShortName
+		}
+		// Site 2: derive findings across probe resources before storing so all
+		// retained resources have Findings populated (PR-03a-shim wire-up).
+		(&m).deriveFindingsForType(canonType, msg.Resources)
+		m.ProbeResources[canonType] = msg.Resources
 		if m.ProbeTruncated == nil {
 			m.ProbeTruncated = make(map[string]bool)
 		}
-		m.ProbeTruncated[msg.ResourceType] = msg.Truncated
+		m.ProbeTruncated[canonType] = msg.Truncated
 	}
 
 	// Surface partial-success failures as flash errors so operators see them.
@@ -362,6 +377,21 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 			m.EnrichmentTruncatedIDs = make(map[string]map[string]bool)
 		}
 		m.EnrichmentTruncatedIDs[msg.ResourceType] = msg.TruncatedIDs
+
+		// Site 3 (Wave-2 bridge, CRITICAL): after m.EnrichmentFindings is updated,
+		// re-derive findings on every cached row of this type so each row picks up
+		// the just-arrived Wave 2 results. DeriveFindings is deterministic (no
+		// early-return) so the re-derive correctly merges wave1 + wave2 findings.
+		// This is the path TestShim_EnrichmentCheckedBridgesWave2Findings exercises.
+		if entry, ok := m.ResourceCache[msg.ResourceType]; ok {
+			(&m).deriveFindingsForType(msg.ResourceType, entry.Resources)
+		}
+		if lazySlice, ok := m.LazyResourceCache[msg.ResourceType]; ok {
+			(&m).deriveFindingsForType(msg.ResourceType, lazySlice)
+		}
+		if probeSlice, ok := m.ProbeResources[msg.ResourceType]; ok {
+			(&m).deriveFindingsForType(msg.ResourceType, probeSlice)
+		}
 
 		// Merge FieldUpdates into ProbeResources so the cached rows carry
 		// Wave-2-derived fields. These are then visible to list columns that
