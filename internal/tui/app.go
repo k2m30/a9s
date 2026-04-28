@@ -226,6 +226,17 @@ func (m Model) EnrichmentGen() int {
 	return m.Session.EnrichmentGen
 }
 
+// ActiveDetailResource returns the resource held by the top-of-stack
+// DetailModel, if any. Used by tests to inspect shim wire-ups on the
+// detail-view path (Phase 03 PR-03a-shim Site 7). Returns ok=false
+// when the active view is not a DetailModel.
+func (m Model) ActiveDetailResource() (resource.Resource, bool) {
+	if d, ok := m.activeView().(*views.DetailModel); ok {
+		return d.SourceResource(), true
+	}
+	return resource.Resource{}, false
+}
+
 // Init implements tea.Model. Fires a command to establish the AWS session.
 // When pre-supplied clients are present (demo mode or tests), emits a synthetic
 // ClientsReadyMsg immediately. Otherwise initiates the live AWS connection flow.
@@ -337,6 +348,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleAPIError(msg)
 	case messages.ResourcesLoadedMsg:
 		m.flash.active = false
+		// Site 1: derive findings across fetcher results before the view and
+		// write-through cache process them (PR-03a-shim wire-up).
+		(&m).deriveFindingsForType(msg.ResourceType, msg.Resources)
 		updated, cmd := m.updateActiveView(msg)
 		// Partial-success: when the fetcher returned BOTH resources AND a
 		// composite error, surface the error via FlashMsg → errorHistory
@@ -436,6 +450,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return messages.FlashMsg{Text: "enrich failed: " + msg.Err.Error(), IsError: true}
 			}
 		}
+		// Site 7: derive findings on the enriched detail resource before the
+		// view processes it (PR-03a-shim wire-up). Uses deriveFindingsForResource
+		// from derive_helper.go so the detail view's on-screen resource has
+		// Findings populated even when it doesn't write back to ResourceCache.
+		(&m).deriveFindingsForResource(msg.ResourceType, &msg.EnrichedRes)
 		return m.updateActiveView(msg)
 	case messages.RelatedCheckStartedMsg:
 		return m.handleRelatedCheckStarted(msg)
@@ -472,13 +491,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Also blocked when a lazy-cache entry exists for the same type: lazy-add
 		// entries are sparse but present, and a CachedPages overwrite would evict
 		// the lazy-fetched out-of-scope resources and corrupt subsequent drills.
-		for shortName, entry := range msg.CachedPages {
+		for aliasName, entry := range msg.CachedPages {
+			// Canonicalize: CachedPages keys may be aliases (e.g. "rds" instead of
+			// "dbi"). Resolve to the canonical ShortName so cache lookups are
+			// consistent with ResourceCache which is always keyed canonically.
+			shortName := aliasName
+			if td := resource.FindResourceType(aliasName); td != nil {
+				shortName = td.ShortName
+			}
 			if _, exists := m.ResourceCache[shortName]; exists {
 				continue
 			}
 			if _, lazyExists := m.LazyResourceCache[shortName]; lazyExists {
 				continue
 			}
+			// Site 4: derive findings before storing in ResourceCache so cached
+			// resources always have Findings populated (PR-03a-shim wire-up).
+			(&m).deriveFindingsForType(shortName, entry.Resources)
 			pagination := entry.Pagination
 			// Backward compat: callers that set IsTruncated=true but leave Pagination nil
 			// (e.g., test fixtures, demo mode) must still have truncation preserved so
@@ -498,10 +527,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// out-of-scope entries (AWS-managed keys, public AMIs, shared snapshots)
 		// isolated from resourceCache so the main-menu scope-filtered list is
 		// never polluted by lazy-add results.
-		for shortName, extra := range msg.LazyAddedResources {
+		for aliasName, extra := range msg.LazyAddedResources {
 			if len(extra) == 0 {
 				continue
 			}
+			// Canonicalize: LazyAddedResources keys may be aliases. Resolve to the
+			// canonical ShortName so LazyResourceCache is keyed consistently.
+			shortName := aliasName
+			if td := resource.FindResourceType(aliasName); td != nil {
+				shortName = td.ShortName
+			}
+			// Site 5: derive findings across the new slice before merging into
+			// LazyResourceCache (PR-03a-shim wire-up).
+			(&m).deriveFindingsForType(shortName, extra)
 			existing := m.LazyResourceCache[shortName]
 			known := make(map[string]struct{}, len(existing))
 			for _, r := range existing {
