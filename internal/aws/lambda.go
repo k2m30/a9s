@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -129,14 +130,6 @@ func FetchLambdaFunctionsPageWithEventSources(
 		}
 
 		runtime := string(fn.Runtime)
-		// Use State as Status when it signals a real problem (Failed, Pending).
-		// Inactive is not promoted — it means the function was evicted from
-		// memory after an idle period, not that it's broken. Fall back to
-		// runtime for healthy/inactive functions.
-		status := runtime
-		if fn.State == lambdatypes.StateFailed || fn.State == lambdatypes.StatePending {
-			status = string(fn.State)
-		}
 
 		memory := ""
 		if fn.MemorySize != nil {
@@ -175,12 +168,13 @@ func FetchLambdaFunctionsPageWithEventSources(
 		}
 
 		r := resource.Resource{
-			ID:     functionName,
-			Name:   functionName,
-			Status: status,
+			ID:   functionName,
+			Name: functionName,
+			// Status: removed — PR-03b migrates fetcher to Findings for lifecycle states.
 			Fields: map[string]string{
 				"function_name":    functionName,
 				"runtime":          runtime,
+				"state":            string(fn.State),
 				"memory":           memory,
 				"timeout":          timeout,
 				"handler":          handler,
@@ -192,6 +186,27 @@ func FetchLambdaFunctionsPageWithEventSources(
 				"arn":              aws.ToString(fn.FunctionArn),
 			},
 			RawStruct: fn,
+		}
+
+		// Phase 03 PR-03b: emit canonical Findings for non-healthy lifecycle states.
+		// Active is healthy — no Finding. Inactive is recoverable (evicted from memory)
+		// → SevWarn. Pending and Failed are non-healthy → SevWarn / SevBroken.
+		switch fn.State {
+		case lambdatypes.StatePending:
+			r.Findings = []domain.Finding{{
+				Code: CodeLambdaStatePending, Phrase: "pending",
+				Severity: domain.SevWarn, Source: "wave1",
+			}}
+		case lambdatypes.StateInactive:
+			r.Findings = []domain.Finding{{
+				Code: CodeLambdaStateInactive, Phrase: "inactive",
+				Severity: domain.SevWarn, Source: "wave1",
+			}}
+		case lambdatypes.StateFailed:
+			r.Findings = []domain.Finding{{
+				Code: CodeLambdaStateFailed, Phrase: "failed",
+				Severity: domain.SevBroken, Source: "wave1",
+			}}
 		}
 
 		resources = append(resources, r)

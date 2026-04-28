@@ -18,6 +18,13 @@ func containersResourceTypes() []ResourceTypeDef {
 				{Key: "platform_version", Title: "Platform Version", Width: 18, Sortable: true},
 			},
 			Color: func(r Resource) Color {
+				// PR-03b: Findings-first for wave1 lifecycle entries.
+				for _, f := range r.Findings {
+					if f.Source == "wave1" {
+						return ColorFromSeverity(f.Severity)
+					}
+				}
+
 				// Status-FAILED is Broken (highest precedence).
 				if r.Fields["status"] == "FAILED" {
 					return ColorBroken

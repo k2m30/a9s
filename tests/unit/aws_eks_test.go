@@ -74,8 +74,12 @@ func TestFetchEKSClusters_ParsesMultipleClusters(t *testing.T) {
 	if r0.Name != "cluster-a" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "cluster-a", r0.Name)
 	}
-	if r0.Status != "ACTIVE" {
-		t.Errorf("resource[0].Status: expected %q, got %q", "ACTIVE", r0.Status)
+	// Post-fold contract: ACTIVE state is healthy → no Status, no Finding.
+	if r0.Status != "" {
+		t.Errorf("resource[0].Status: expected %q (fetcher must not write Status), got %q", "", r0.Status)
+	}
+	if len(r0.Findings) != 0 {
+		t.Errorf("resource[0].Findings: expected 0 for ACTIVE cluster, got %d", len(r0.Findings))
 	}
 	if r0.Fields["cluster_name"] != "cluster-a" {
 		t.Errorf("resource[0].Fields[\"cluster_name\"]: expected %q, got %q", "cluster-a", r0.Fields["cluster_name"])

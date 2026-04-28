@@ -53,8 +53,12 @@ func TestQA_ENI_FetchSuccess(t *testing.T) {
 	if r.Name != "my-eni" {
 		t.Errorf("expected Name 'my-eni', got %q", r.Name)
 	}
-	if r.Status != "in-use" {
-		t.Errorf("expected Status 'in-use', got %q", r.Status)
+	// Post-fold contract: in-use state is healthy → no Status, no Finding.
+	if r.Status != "" {
+		t.Errorf("expected Status %q (fetcher must not write Status), got %q", "", r.Status)
+	}
+	if len(r.Findings) != 0 {
+		t.Errorf("expected 0 Findings for in-use ENI, got %d", len(r.Findings))
 	}
 	if r.Fields["eni_id"] != "eni-0123456789abcdef0" {
 		t.Errorf("expected eni_id, got %q", r.Fields["eni_id"])

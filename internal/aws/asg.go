@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	autoscalingtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -130,9 +131,9 @@ func FetchAutoScalingGroupsPage(ctx context.Context, api ASGDescribeAutoScalingG
 		suspendedProcesses := strings.Join(suspendedNames, ",")
 
 		r := resource.Resource{
-			ID:     asgName,
-			Name:   asgName,
-			Status: status,
+			ID:   asgName,
+			Name: asgName,
+			// Status: removed — PR-03b migrates fetcher to Findings for lifecycle states.
 			Fields: map[string]string{
 				"asg_name":                  asgName,
 				"min_size":                  minSize,
@@ -145,6 +146,16 @@ func FetchAutoScalingGroupsPage(ctx context.Context, api ASGDescribeAutoScalingG
 				"suspended_processes":       suspendedProcesses,
 			},
 			RawStruct: asg,
+		}
+
+		// Phase 03 PR-03b: emit canonical Findings for "Delete in progress".
+		// Empty status → healthy (no Finding). Structural signals (unhealthy
+		// instance count, in_service < min) are handled by the Color func.
+		if status == "Delete in progress" {
+			r.Findings = []domain.Finding{{
+				Code: CodeASGStateDeleting, Phrase: "delete in progress",
+				Severity: domain.SevWarn, Source: "wave1",
+			}}
 		}
 
 		resources = append(resources, r)

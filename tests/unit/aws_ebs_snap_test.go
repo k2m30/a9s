@@ -11,6 +11,7 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 )
 
 // ---------------------------------------------------------------------------
@@ -67,8 +68,12 @@ func TestFetchEBSSnapshots_ParsesMultipleSnapshots(t *testing.T) {
 	if r0.Name != "prod-snap-daily" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "prod-snap-daily", r0.Name)
 	}
-	if r0.Status != "completed" {
-		t.Errorf("resource[0].Status: expected %q, got %q", "completed", r0.Status)
+	// Post-fold contract: completed state is healthy → no Status, no Finding.
+	if r0.Status != "" {
+		t.Errorf("resource[0].Status: expected %q (fetcher must not write Status), got %q", "", r0.Status)
+	}
+	if len(r0.Findings) != 0 {
+		t.Errorf("resource[0].Findings: expected 0 for completed snapshot, got %d", len(r0.Findings))
 	}
 
 	// Verify second snapshot (pending, no Name tag)
@@ -79,8 +84,18 @@ func TestFetchEBSSnapshots_ParsesMultipleSnapshots(t *testing.T) {
 	if r1.Name != "" {
 		t.Errorf("resource[1].Name: expected empty string (no Name tag), got %q", r1.Name)
 	}
-	if r1.Status != "pending" {
-		t.Errorf("resource[1].Status: expected %q, got %q", "pending", r1.Status)
+	// Post-fold contract: pending state emits SevWarn Finding, not Status.
+	if r1.Status != "" {
+		t.Errorf("resource[1].Status: expected %q (fetcher must not write Status), got %q", "", r1.Status)
+	}
+	if len(r1.Findings) != 1 {
+		t.Fatalf("resource[1].Findings: expected 1 for pending snapshot, got %d", len(r1.Findings))
+	}
+	if r1.Findings[0].Code != awsclient.CodeEBSSnapStatePending {
+		t.Errorf("resource[1].Findings[0].Code: expected %q, got %q", awsclient.CodeEBSSnapStatePending, r1.Findings[0].Code)
+	}
+	if r1.Findings[0].Severity != domain.SevWarn {
+		t.Errorf("resource[1].Findings[0].Severity: expected domain.SevWarn, got %v", r1.Findings[0].Severity)
 	}
 }
 

@@ -34,6 +34,7 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
@@ -250,8 +251,9 @@ func TestFetchEC2_PromotesStatusToInitializingWhenInstanceStatusInitializing(t *
 // ─────────────────────────────────────────────────────────────────────────────
 
 // TestFetchEC2_LeavesStatusAsRunningWhenBothOk verifies that a running instance
-// with SystemStatus="ok" and InstanceStatus="ok" keeps Resource.Status == "running".
-// This is the happy-path control: promotion must NOT fire for healthy instances.
+// with SystemStatus="ok" and InstanceStatus="ok" emits no Findings and has its
+// state surfaced via Fields["state"]. PR-03b: fetcher no longer writes Resource.Status;
+// the list-view falls back to Fields[LifecycleKey] for healthy instances.
 func TestFetchEC2_LeavesStatusAsRunningWhenBothOk(t *testing.T) {
 	const id = "i-both-ok-001"
 	stub := &stubEC2WithStatusChecks{
@@ -270,8 +272,15 @@ func TestFetchEC2_LeavesStatusAsRunningWhenBothOk(t *testing.T) {
 	}
 
 	r := resources[0]
-	if r.Status != "running" {
-		t.Errorf("expected Resource.Status == %q for healthy instance, got %q", "running", r.Status)
+	// PR-03b: fetcher no longer writes Resource.Status; lifecycle is in Fields["state"].
+	if r.Status != "" {
+		t.Errorf("expected Resource.Status == %q (empty) for healthy running instance, got %q", "", r.Status)
+	}
+	if len(r.Findings) != 0 {
+		t.Errorf("expected 0 Findings for healthy running instance, got %d", len(r.Findings))
+	}
+	if r.Fields["state"] != "running" {
+		t.Errorf("expected Fields[\"state\"] == %q, got %q", "running", r.Fields["state"])
 	}
 }
 
@@ -280,12 +289,14 @@ func TestFetchEC2_LeavesStatusAsRunningWhenBothOk(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // TestFetchEC2_DoesNotPromoteStoppedInstance verifies that a stopped instance
-// whose DescribeInstanceStatus reports system_status=impaired (defensively — AWS
-// normally doesn't return this for stopped instances, but the fetcher must handle
-// it without masking the real "stopped" state).
+// whose DescribeInstanceStatus defensively reports system_status=impaired is
+// handled correctly: the fetcher must emit a stopped-state Finding (not an
+// impaired-promotion Finding) and must never write Resource.Status.
 //
-// Post-fix: Status must remain "stopped" even if status checks say impaired.
-// Promotion logic must only apply to instances in "running" state.
+// PR-03b: Resource.Status is always empty; stopped instances emit
+// CodeEC2StateStopped/SevWarn (no Server.* state reason in fixture →
+// user-initiated stop, not server fault). The impaired status-check data
+// must not override the lifecycle-state Finding.
 func TestFetchEC2_DoesNotPromoteStoppedInstance(t *testing.T) {
 	const id = "i-stopped-sys-impaired"
 	stoppedInst := ec2types.Instance{
@@ -310,9 +321,19 @@ func TestFetchEC2_DoesNotPromoteStoppedInstance(t *testing.T) {
 	}
 
 	r := resources[0]
-	// Status must remain "stopped" — promotion must not override real lifecycle state.
-	if r.Status != "stopped" {
-		t.Errorf("expected Resource.Status == %q for stopped instance, got %q (stopped state must not be overridden by impaired status checks)", "stopped", r.Status)
+	// PR-03b: fetcher no longer writes Resource.Status; state is surfaced via Findings.
+	if r.Status != "" {
+		t.Errorf("expected Resource.Status == %q (empty) for stopped instance, got %q", "", r.Status)
+	}
+	// Stopped instance with no Server.* state reason → CodeEC2StateStopped / SevWarn.
+	if len(r.Findings) != 1 {
+		t.Fatalf("expected 1 Finding for stopped instance, got %d", len(r.Findings))
+	}
+	if r.Findings[0].Code != awsclient.CodeEC2StateStopped {
+		t.Errorf("Findings[0].Code: expected %q, got %q", awsclient.CodeEC2StateStopped, r.Findings[0].Code)
+	}
+	if r.Findings[0].Severity != domain.SevWarn {
+		t.Errorf("Findings[0].Severity: expected SevWarn, got %v (stopped state must not be promoted to SevBroken without Server.* reason)", r.Findings[0].Severity)
 	}
 }
 
