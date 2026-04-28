@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -233,10 +234,10 @@ func imageResource(img ec2types.Image) resource.Resource {
 		}
 	}
 
-	return resource.Resource{
-		ID:     imageID,
-		Name:   name,
-		Status: state,
+	r := resource.Resource{
+		ID:   imageID,
+		Name: name,
+		// Status: removed — PR-03b migrates fetcher to Findings for lifecycle states.
 		Fields: map[string]string{
 			"image_id":         imageID,
 			"name":             name,
@@ -250,4 +251,22 @@ func imageResource(img ec2types.Image) resource.Resource {
 		},
 		RawStruct: img,
 	}
+
+	// Phase 03 PR-03b: emit canonical Findings for non-healthy AMI states.
+	// available → healthy (no Finding). deregistered / disabled → terminal (no Finding).
+	// pending / transient → SevWarn. failed / error / invalid → SevBroken.
+	switch img.State {
+	case ec2types.ImageStatePending, ec2types.ImageStateTransient:
+		r.Findings = []domain.Finding{{
+			Code: CodeAMIStatePending, Phrase: "pending",
+			Severity: domain.SevWarn, Source: "wave1",
+		}}
+	case ec2types.ImageStateFailed, ec2types.ImageStateError, ec2types.ImageStateInvalid:
+		r.Findings = []domain.Finding{{
+			Code: CodeAMIStateFailed, Phrase: "failed",
+			Severity: domain.SevBroken, Source: "wave1",
+		}}
+	}
+
+	return r
 }

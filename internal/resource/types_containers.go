@@ -18,7 +18,15 @@ func containersResourceTypes() []ResourceTypeDef {
 				{Key: "platform_version", Title: "Platform Version", Width: 18, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				// Status-FAILED is Broken (highest precedence).
+				// Color: wave1 Findings (CREATING/UPDATING/FAILED from the fetcher) drive
+				// row color; structural fallback covers ACTIVE / DELETING (no Finding).
+				for _, f := range r.Findings {
+					if f.Source == "wave1" {
+						return ColorFromSeverity(f.Severity)
+					}
+				}
+
+				// Structural fallback: FAILED without a wave1 Finding.
 				if r.Fields["status"] == "FAILED" {
 					return ColorBroken
 				}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -69,28 +70,39 @@ func FetchElasticIPs(ctx context.Context, api EC2DescribeAddressesAPI) ([]resour
 			instanceID = *addr.InstanceId
 		}
 
-		domain := string(addr.Domain)
+		addrDomain := string(addr.Domain)
 
 		// Compute attachment status: UNATTACHED if no association/instance/NIC.
 		eipStatus := "ATTACHED"
-		if addr.AssociationId == nil && addr.InstanceId == nil && addr.NetworkInterfaceId == nil {
+		unassociated := addr.AssociationId == nil && addr.InstanceId == nil && addr.NetworkInterfaceId == nil
+		if unassociated {
 			eipStatus = "UNATTACHED"
 		}
 
 		r := resource.Resource{
-			ID:     allocationID,
-			Name:   name,
-			Status: domain,
+			ID:   allocationID,
+			Name: name,
+			// Status: removed — PR-03b migrates fetcher to Findings.
+			// Legacy Status=domain (vpc/standard) was not a health state.
 			Fields: map[string]string{
 				"allocation_id":  allocationID,
 				"name":           name,
 				"public_ip":      publicIP,
 				"association_id": associationID,
 				"instance_id":    instanceID,
-				"domain":         domain,
+				"domain":         addrDomain,
 				"status":         eipStatus,
 			},
 			RawStruct: addr,
+		}
+
+		// Phase 03 PR-03b: emit CodeEIPUnassociated Finding when the EIP is
+		// allocated but not associated with any instance, ENI, or NAT gateway.
+		if unassociated {
+			r.Findings = []domain.Finding{{
+				Code: CodeEIPUnassociated, Phrase: "unassociated",
+				Severity: domain.SevWarn, Source: "wave1",
+			}}
 		}
 
 		resources = append(resources, r)

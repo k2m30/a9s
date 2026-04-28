@@ -11,6 +11,7 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 )
 
 // ---------------------------------------------------------------------------
@@ -83,7 +84,7 @@ func TestFetchEC2Instances_ParsesMultipleReservations(t *testing.T) {
 		t.Fatalf("expected 3 resources, got %d", len(resources))
 	}
 
-	// Verify first instance
+	// Verify first instance (running — PR-03b: Status is empty, state surfaced via Fields)
 	r0 := resources[0]
 	if r0.ID != "i-0001" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "i-0001", r0.ID)
@@ -91,11 +92,18 @@ func TestFetchEC2Instances_ParsesMultipleReservations(t *testing.T) {
 	if r0.Name != "web-server-1" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "web-server-1", r0.Name)
 	}
-	if r0.Status != "running" {
-		t.Errorf("resource[0].Status: expected %q, got %q", "running", r0.Status)
+	// PR-03b: fetcher no longer writes Resource.Status; lifecycle is in Fields["state"].
+	if r0.Status != "" {
+		t.Errorf("resource[0].Status: expected %q (empty), got %q", "", r0.Status)
+	}
+	if len(r0.Findings) != 0 {
+		t.Errorf("resource[0].Findings: expected 0 findings for running instance, got %d", len(r0.Findings))
+	}
+	if r0.Fields["state"] != "running" {
+		t.Errorf("resource[0].Fields[\"state\"]: expected %q, got %q", "running", r0.Fields["state"])
 	}
 
-	// Verify second instance
+	// Verify second instance (stopped — no Server.* reason → CodeEC2StateStopped / SevWarn)
 	r1 := resources[1]
 	if r1.ID != "i-0002" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "i-0002", r1.ID)
@@ -103,11 +111,21 @@ func TestFetchEC2Instances_ParsesMultipleReservations(t *testing.T) {
 	if r1.Name != "web-server-2" {
 		t.Errorf("resource[1].Name: expected %q, got %q", "web-server-2", r1.Name)
 	}
-	if r1.Status != "stopped" {
-		t.Errorf("resource[1].Status: expected %q, got %q", "stopped", r1.Status)
+	// PR-03b: fetcher no longer writes Resource.Status; stopped state → Finding emitted.
+	if r1.Status != "" {
+		t.Errorf("resource[1].Status: expected %q (empty), got %q", "", r1.Status)
+	}
+	if len(r1.Findings) != 1 {
+		t.Fatalf("resource[1].Findings: expected 1 finding for stopped instance, got %d", len(r1.Findings))
+	}
+	if r1.Findings[0].Code != awsclient.CodeEC2StateStopped {
+		t.Errorf("resource[1].Findings[0].Code: expected %q, got %q", awsclient.CodeEC2StateStopped, r1.Findings[0].Code)
+	}
+	if r1.Findings[0].Severity != domain.SevWarn {
+		t.Errorf("resource[1].Findings[0].Severity: expected SevWarn, got %v", r1.Findings[0].Severity)
 	}
 
-	// Verify third instance
+	// Verify third instance (running — no findings)
 	r2 := resources[2]
 	if r2.ID != "i-0003" {
 		t.Errorf("resource[2].ID: expected %q, got %q", "i-0003", r2.ID)
@@ -115,8 +133,15 @@ func TestFetchEC2Instances_ParsesMultipleReservations(t *testing.T) {
 	if r2.Name != "api-server" {
 		t.Errorf("resource[2].Name: expected %q, got %q", "api-server", r2.Name)
 	}
-	if r2.Status != "running" {
-		t.Errorf("resource[2].Status: expected %q, got %q", "running", r2.Status)
+	// PR-03b: fetcher no longer writes Resource.Status.
+	if r2.Status != "" {
+		t.Errorf("resource[2].Status: expected %q (empty), got %q", "", r2.Status)
+	}
+	if len(r2.Findings) != 0 {
+		t.Errorf("resource[2].Findings: expected 0 findings for running instance, got %d", len(r2.Findings))
+	}
+	if r2.Fields["state"] != "running" {
+		t.Errorf("resource[2].Fields[\"state\"]: expected %q, got %q", "running", r2.Fields["state"])
 	}
 
 	// Verify Fields contain the expected keys

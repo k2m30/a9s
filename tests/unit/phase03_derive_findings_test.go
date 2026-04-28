@@ -480,3 +480,69 @@ func TestDerive_InactiveIsEmittedAsFinding(t *testing.T) {
 		t.Errorf("Findings[0].Severity = %v, expected IsIssue() == true (so ctrl+z and detail attention surface it)", r.Findings[0].Severity)
 	}
 }
+
+// TestDerive_MigratedRowPreservesFetcherFindings pins that DeriveFindings
+// does NOT clobber wave1 Findings emitted directly by a migrated fetcher.
+//
+// Pre-fix: r.Status="" and r.Issues=nil → shim derives empty wave1, replaces
+// r.Findings → fetcher's emissions wiped.
+// Post-fix: shim early-returns or preserves wave1 when both legacy inputs
+// are empty.
+func TestDerive_MigratedRowPreservesFetcherFindings(t *testing.T) {
+	r := domain.Resource{
+		ID:     "i-1",
+		Type:   "ec2",
+		Status: "",  // migrated fetcher writes nothing
+		Issues: nil,
+		Fields: map[string]string{"state": "stopped"},
+		Findings: []domain.Finding{
+			{Code: "ec2.state.stopped.server", Phrase: "stopped", Severity: domain.SevBroken, Source: "wave1"},
+		},
+	}
+	td := resource.ResourceTypeDef{ShortName: "ec2"}
+	attention.DeriveFindings(&r, td, nil)
+
+	if len(r.Findings) != 1 {
+		t.Fatalf("len(Findings) = %d, want 1 — shim must preserve fetcher-emitted wave1 entries when r.Status/r.Issues are empty", len(r.Findings))
+	}
+	if r.Findings[0].Code != "ec2.state.stopped.server" {
+		t.Errorf("Findings[0].Code = %q, want %q (migrated row should keep fetcher emission)", r.Findings[0].Code, "ec2.state.stopped.server")
+	}
+	if r.Findings[0].Severity != domain.SevBroken {
+		t.Errorf("Findings[0].Severity = %v, want SevBroken", r.Findings[0].Severity)
+	}
+}
+
+// TestDerive_MigratedRowMergesWave2WithFetcherWave1 pins that wave2 enrichment
+// STILL merges correctly even when the row is from a migrated fetcher
+// (wave1 from fetcher + wave2 from enrichment map).
+//
+// Pre-fix: shim re-derives wave1 from empty Status/Issues → produces empty
+// wave1, then appends wave2 → only wave2 survives (fetcher wave1 wiped).
+// Post-fix: shim detects pre-populated Findings with Source="wave1" and uses
+// them as-is, then appends wave2 → two entries total.
+func TestDerive_MigratedRowMergesWave2WithFetcherWave1(t *testing.T) {
+	r := domain.Resource{
+		ID:   "i-1",
+		Type: "ec2",
+		Findings: []domain.Finding{
+			{Code: "ec2.state.stopping", Phrase: "stopping", Severity: domain.SevWarn, Source: "wave1"},
+		},
+	}
+	td := resource.ResourceTypeDef{ShortName: "ec2"}
+	enrich := map[string]resource.EnrichmentFinding{
+		"i-1": {Severity: "!", Summary: "instance status: impaired", Rows: []resource.FindingRow{{Label: "Instance Status", Value: "impaired"}}},
+	}
+	attention.DeriveFindings(&r, td, enrich)
+
+	if len(r.Findings) != 2 {
+		t.Fatalf("len(Findings) = %d, want 2 (wave1 from fetcher + wave2 from enrichment)", len(r.Findings))
+	}
+	// Order: wave1 first, wave2 second
+	if r.Findings[0].Source != "wave1" {
+		t.Errorf("Findings[0].Source = %q, want wave1", r.Findings[0].Source)
+	}
+	if r.Findings[1].Source != "wave2:ec2" {
+		t.Errorf("Findings[1].Source = %q, want wave2:ec2", r.Findings[1].Source)
+	}
+}

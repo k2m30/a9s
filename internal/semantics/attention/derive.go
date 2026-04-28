@@ -42,25 +42,40 @@ func DeriveFindings(r *domain.Resource, td resource.ResourceTypeDef, enrichmentF
 	}
 	var findings []domain.Finding
 
-	// Wave 1: prefer r.Issues; fall back to r.Status if Issues empty.
-	issues := r.Issues
-	if len(issues) == 0 && r.Status != "" {
-		issues = []string{resource.StripFindingSuffix(r.Status)}
-	}
-	for _, raw := range issues {
-		phrase := resource.StripFindingSuffix(raw)
-		if phrase == "" {
-			continue
+	// Detect whether this row was written by a migrated fetcher (PR-03b+).
+	// Migrated fetchers write neither r.Status nor r.Issues — they emit
+	// Findings directly. When both legacy fields are empty, preserve any
+	// existing wave1 entries rather than re-deriving (and wiping) them.
+	migrated := r.Status == "" && len(r.Issues) == 0
+
+	if migrated {
+		// Preserve fetcher-emitted wave1 entries verbatim.
+		for _, f := range r.Findings {
+			if f.Source == "wave1" {
+				findings = append(findings, f)
+			}
 		}
-		if isLifecyclePhrase(phrase) {
-			continue
+	} else {
+		// Legacy path: derive wave1 from r.Status / r.Issues.
+		issues := r.Issues
+		if len(issues) == 0 && r.Status != "" {
+			issues = []string{resource.StripFindingSuffix(r.Status)}
 		}
-		findings = append(findings, domain.Finding{
-			Code:     domain.FindingCode(td.ShortName + "." + slug(phrase)),
-			Phrase:   phrase,
-			Severity: phraseSeverity(phrase),
-			Source:   "wave1",
-		})
+		for _, raw := range issues {
+			phrase := resource.StripFindingSuffix(raw)
+			if phrase == "" {
+				continue
+			}
+			if isLifecyclePhrase(phrase) {
+				continue
+			}
+			findings = append(findings, domain.Finding{
+				Code:     domain.FindingCode(td.ShortName + "." + slug(phrase)),
+				Phrase:   phrase,
+				Severity: phraseSeverity(phrase),
+				Source:   "wave1",
+			})
+		}
 	}
 
 	// Wave 2: at most one finding per resource per type.

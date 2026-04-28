@@ -48,6 +48,18 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "launch_time", Title: "Launch Time", Width: 22, Sortable: true},
 			},
 			Color: func(r Resource) Color {
+				// PR-03b: Findings-first reading. The fetcher emits canonical Wave 1
+				// Findings for non-healthy lifecycle states; this branch covers them.
+				// Only wave1 findings drive Color — wave2 enrichment findings (Source
+				// prefix "wave2:") carry glyph markers and must not override Color.
+				for i := range r.Findings {
+					if r.Findings[i].Source == "wave1" {
+						return ColorFromSeverity(r.Findings[i].Severity)
+					}
+				}
+
+				// Existing structural fallback — covers Wave 2 status_impaired and
+				// healthy lifecycle states (running/terminated have no Finding).
 				sys := r.Fields["system_status"]
 				inst := r.Fields["instance_status"]
 				if sys == "impaired" || inst == "impaired" {
@@ -231,38 +243,44 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "last_modified", Title: "Last Modified", Width: 22, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				// Compute state-based color first.
-				var stateColor Color
-				switch r.Fields["state"] {
-				case "Active":
-					stateColor = ColorHealthy
-				case "Pending":
-					stateColor = ColorWarning
-				case "Inactive":
-					stateColor = ColorDim
-				case "Failed":
-					stateColor = ColorBroken
-				default:
-					stateColor = ColorHealthy
-				}
-				// Override signals — Broken wins over Warning wins over Dim.
-				// last_update_status=Failed → Broken.
+				// PR-03b CR fix: structural broken overrides take precedence over wave1
+				// (which from the fetcher only knows about lifecycle state Pending/Inactive/Failed).
+				// Lambda has additional broken signals beyond lifecycle:
+				//   - last_update_status == Failed (deployment failed)
+				//   - deprecated runtime
 				if r.Fields["last_update_status"] == "Failed" {
 					return ColorBroken
 				}
-				// Deprecated runtime → Broken.
 				if _, ok := deprecatedLambdaRuntimes[r.Fields["runtime"]]; ok {
 					return ColorBroken
 				}
-				// State-based Broken is already set; return it before Warning upgrades.
-				if stateColor == ColorBroken {
-					return ColorBroken
+
+				// Wave1 Findings come second — they cover state lifecycle (Pending/Inactive/Failed).
+				for _, f := range r.Findings {
+					if f.Source == "wave1" {
+						return ColorFromSeverity(f.Severity)
+					}
 				}
-				// No dead-letter queue → Warning (unless already Broken).
+
+				// Structural fallback for any state without a Finding.
+				state := r.Fields["state"]
+				if state == "" {
+					state = r.Status
+				}
+				switch state {
+				case "Failed":
+					return ColorBroken
+				case "Pending":
+					return ColorWarning
+				}
+				// Active, Inactive, or unknown states: missing DLQ upgrades to Warning.
 				if r.Fields["dlq_target_arn"] == "" {
 					return ColorWarning
 				}
-				return stateColor
+				if state == "Inactive" {
+					return ColorDim
+				}
+				return ColorHealthy
 			},
 			Children: []ChildViewDef{
 				{
@@ -288,6 +306,13 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "status", Title: "Status", Width: 12, Sortable: true},
 			},
 			Color: func(r Resource) Color {
+				// PR-03b: Findings-first for wave1 lifecycle entries.
+				for _, f := range r.Findings {
+					if f.Source == "wave1" {
+						return ColorFromSeverity(f.Severity)
+					}
+				}
+
 				// status="" → Healthy; "Delete in progress" → Warning (transitional, noteworthy).
 				status := r.Fields["status"]
 				if status == "Delete in progress" {
@@ -339,6 +364,13 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "version_label", Title: "Version", Width: 16, Sortable: true},
 			},
 			Color: func(r Resource) Color {
+				// PR-03b: Findings-first for wave1 lifecycle entries.
+				for _, f := range r.Findings {
+					if f.Source == "wave1" {
+						return ColorFromSeverity(f.Severity)
+					}
+				}
+
 				// Environment health takes precedence over status when available.
 				// Grey means EB hasn't collected health data yet — treat as transitional Warning.
 				var healthColor Color
@@ -395,6 +427,13 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "created", Title: "Created", Width: 18, Sortable: true},
 			},
 			Color: func(r Resource) Color {
+				// PR-03b: Findings-first for wave1 lifecycle entries.
+				for _, f := range r.Findings {
+					if f.Source == "wave1" {
+						return ColorFromSeverity(f.Severity)
+					}
+				}
+
 				// Base color from volume state.
 				var base Color
 				switch r.Fields["state"] {
@@ -446,6 +485,13 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "progress", Title: "Progress", Width: 10, Sortable: false},
 			},
 			Color: func(r Resource) Color {
+				// PR-03b: Findings-first for wave1 lifecycle entries.
+				for _, f := range r.Findings {
+					if f.Source == "wave1" {
+						return ColorFromSeverity(f.Severity)
+					}
+				}
+
 				// Base color from snapshot state.
 				var base Color
 				switch r.Fields["state"] {
@@ -500,6 +546,13 @@ func computeResourceTypes() []ResourceTypeDef {
 				{Key: "public", Title: "Public", Width: 8, Sortable: true},
 			},
 			Color: func(r Resource) Color {
+				// PR-03b: Findings-first for wave1 lifecycle entries.
+				for _, f := range r.Findings {
+					if f.Source == "wave1" {
+						return ColorFromSeverity(f.Severity)
+					}
+				}
+
 				// Compute state-based color first.
 				var stateColor Color
 				switch r.Fields["state"] {

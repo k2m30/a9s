@@ -11,6 +11,7 @@ import (
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -118,8 +119,18 @@ func TestFetchAutoScalingGroups_ParsesMultipleGroups(t *testing.T) {
 	if r1.ID != "staging-api-asg" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "staging-api-asg", r1.ID)
 	}
-	if r1.Status != "Delete in progress" {
-		t.Errorf("resource[1].Status: expected %q, got %q", "Delete in progress", r1.Status)
+	// Post-fold contract: fetcher stops writing Status; emits wave1 Finding instead.
+	if r1.Status != "" {
+		t.Errorf("resource[1].Status: expected %q (fetcher must not write Status), got %q", "", r1.Status)
+	}
+	if len(r1.Findings) != 1 {
+		t.Fatalf("resource[1].Findings: expected 1 for deleting ASG, got %d", len(r1.Findings))
+	}
+	if r1.Findings[0].Code != awsclient.CodeASGStateDeleting {
+		t.Errorf("resource[1].Findings[0].Code: expected %q, got %q", awsclient.CodeASGStateDeleting, r1.Findings[0].Code)
+	}
+	if r1.Findings[0].Severity != domain.SevWarn {
+		t.Errorf("resource[1].Findings[0].Severity: expected domain.SevWarn, got %v", r1.Findings[0].Severity)
 	}
 	if r1.Fields["instances"] != "2" {
 		t.Errorf("resource[1].Fields[\"instances\"]: expected %q, got %q", "2", r1.Fields["instances"])

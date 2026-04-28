@@ -83,8 +83,13 @@ func TestFetchLambdaFunctions_ParsesMultipleFunctions(t *testing.T) {
 	if r0.Name != "my-go-function" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "my-go-function", r0.Name)
 	}
-	if r0.Status != "go1.x" {
-		t.Errorf("resource[0].Status: expected %q, got %q", "go1.x", r0.Status)
+	// Post-fold contract: fetcher stops writing Status (runtime is in Fields["runtime"], not Status).
+	// Active/default state → no wave1 Finding.
+	if r0.Status != "" {
+		t.Errorf("resource[0].Status: expected %q (fetcher must not write Status), got %q", "", r0.Status)
+	}
+	if len(r0.Findings) != 0 {
+		t.Errorf("resource[0].Findings: expected 0 for Active function, got %d", len(r0.Findings))
 	}
 	if r0.Fields["function_name"] != "my-go-function" {
 		t.Errorf("resource[0].Fields[\"function_name\"]: expected %q, got %q", "my-go-function", r0.Fields["function_name"])

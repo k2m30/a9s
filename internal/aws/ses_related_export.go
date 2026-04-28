@@ -6,9 +6,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ses"
 )
 
-// SESActiveReceiptRuleSetForTest is a test-only export of sesActiveReceiptRuleSet.
-// It exists in a non-test file so tests/unit/ (a different package) can call it.
-// The production binary cost is negligible — one extra exported symbol.
+// SESActiveReceiptRuleSetForTest is an exported test-only wrapper for the
+// unexported sesActiveReceiptRuleSet — production code does not call it.
+// Lives outside _test.go because tests in tests/unit/ are package unit_test
+// and can't see same-package test helpers.
 func SESActiveReceiptRuleSetForTest(ctx context.Context, c *ServiceClients) (*ses.DescribeActiveReceiptRuleSetOutput, error) {
 	return sesActiveReceiptRuleSet(ctx, c)
 }
