@@ -86,8 +86,20 @@ func databasesResourceTypes() []ResourceTypeDef {
 			Columns: []Column{
 				{Key: "name", Title: "Bucket Name", Width: 40, Sortable: true},
 				{Key: "creation_date", Title: "Creation Date", Width: 22, Sortable: true},
+				{Key: "status", Title: "Status", Width: 32, Sortable: true},
 			},
-			Color: func(_ Resource) Color { return ColorHealthy },
+			// S3 has no Wave 1 lifecycle signals; Color is driven entirely by
+			// Wave 2 enrichment (EnrichS3PublicAccessBlock). ColorFromWave1
+			// returns false here — the loop below also picks up wave2 entries
+			// so list rows match the unifiedIssueCount badge.
+			Color: func(r Resource) Color {
+				for _, f := range r.Findings {
+					if IsIssueSeverity(f.Severity) {
+						return ColorFromSeverity(f.Severity)
+					}
+				}
+				return ColorHealthy
+			},
 			Children: []ChildViewDef{{
 				ChildType:      "s3_objects",
 				Key:            "enter",

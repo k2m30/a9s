@@ -1190,19 +1190,22 @@ func TestQA_S3_Copy_BucketSelectedID(t *testing.T) {
 
 // Test that S3 bucket list has exactly 2 columns (Bucket Name, Creation Date)
 
-func TestQA_S3_BucketList_ExactlyTwoColumns(t *testing.T) {
+func TestQA_S3_BucketList_HasNameCreationDateAndStatusColumns(t *testing.T) {
 	rt := resource.FindResourceType("s3")
 	if rt == nil {
 		t.Fatal("resource type 's3' not found")
 	}
-	if len(rt.Columns) != 2 {
-		t.Errorf("S3 bucket list should have exactly 2 columns, got %d", len(rt.Columns))
+	if len(rt.Columns) != 3 {
+		t.Errorf("S3 bucket list should have 3 columns (Name, Creation Date, Status), got %d", len(rt.Columns))
 	}
 	if rt.Columns[0].Title != "Bucket Name" {
 		t.Errorf("first column should be 'Bucket Name', got %q", rt.Columns[0].Title)
 	}
 	if rt.Columns[1].Title != "Creation Date" {
 		t.Errorf("second column should be 'Creation Date', got %q", rt.Columns[1].Title)
+	}
+	if rt.Columns[2].Title != "Status" {
+		t.Errorf("third column should be 'Status' (carries Wave 2 PAB phrase), got %q", rt.Columns[2].Title)
 	}
 }
 

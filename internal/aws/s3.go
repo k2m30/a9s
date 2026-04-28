@@ -16,6 +16,7 @@ func init() {
 		"name",
 		"bucket_name",
 		"creation_date",
+		"status",
 		"notification_lambda",
 		"notification_sqs",
 		"notification_sns",
