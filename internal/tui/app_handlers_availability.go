@@ -306,10 +306,13 @@ func (m *Model) startEnrichment() tea.Cmd {
 	for len(m.EnrichQueue) > 0 {
 		name := m.EnrichQueue[0]
 		m.EnrichQueue = m.EnrichQueue[1:]
-		// Clear-on-rerun-start: bump type gen, wipe stale findings and ran flag.
+		// Clear-on-rerun-start: bump type gen, wipe stale ran flag, and strip
+		// wave2 from cached rows so stale markers disappear immediately.
 		m.EnrichmentTypeGen[name]++
-		delete(m.EnrichmentFindings, name)
 		delete(m.EnrichmentRan, name)
+		// clearEnrichmentFor strips wave2 findings from cached rows; rows are now
+		// the authoritative source — no parallel m.EnrichmentFindings map to delete.
+		m.clearEnrichmentFor(name)
 		cmds = append(cmds, m.probeEnrichment(name, m.Session.EnrichmentGen))
 	}
 	return tea.Batch(cmds...)
@@ -359,13 +362,9 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 	// Looping over empty maps is a no-op, so this block is safe to run even
 	// when Err != nil — the flash above already records the failure.
 	{
-		// Persist findings and mark enrichment as ran for this type.
+		// Mark enrichment as ran for this type.
 		// Guard against nil maps: these are initialized in handleSessionStart
 		// but may be nil in early or test-injected model states.
-		if m.EnrichmentFindings == nil {
-			m.EnrichmentFindings = make(map[string]map[string]resource.EnrichmentFinding)
-		}
-		m.EnrichmentFindings[msg.ResourceType] = msg.Findings
 		if m.EnrichmentRan == nil {
 			m.EnrichmentRan = make(map[string]bool)
 		}
@@ -378,20 +377,11 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 		}
 		m.EnrichmentTruncatedIDs[msg.ResourceType] = msg.TruncatedIDs
 
-		// Site 3 (Wave-2 bridge, CRITICAL): after m.EnrichmentFindings is updated,
-		// re-derive findings on every cached row of this type so each row picks up
-		// the just-arrived Wave 2 results. DeriveFindings is deterministic (no
-		// early-return) so the re-derive correctly merges wave1 + wave2 findings.
-		// This is the path TestShim_EnrichmentCheckedBridgesWave2Findings exercises.
-		if entry, ok := m.ResourceCache[msg.ResourceType]; ok {
-			(&m).deriveFindingsForType(msg.ResourceType, entry.Resources)
-		}
-		if lazySlice, ok := m.LazyResourceCache[msg.ResourceType]; ok {
-			(&m).deriveFindingsForType(msg.ResourceType, lazySlice)
-		}
-		if probeSlice, ok := m.ProbeResources[msg.ResourceType]; ok {
-			(&m).deriveFindingsForType(msg.ResourceType, probeSlice)
-		}
+		// Site 3 (Wave-2 bridge, PR-03a-fold): applyEnrichment directly mutates
+		// r.Findings and r.AttentionDetails on every cached row of this type,
+		// replacing the prior re-derive loops that read m.EnrichmentFindings.
+		// Rows in ResourceCache, LazyResourceCache, and ProbeResources are all updated.
+		(&m).applyEnrichment(msg.ResourceType, msg.Findings)
 
 		// Merge FieldUpdates into ProbeResources so the cached rows carry
 		// Wave-2-derived fields. These are then visible to list columns that
@@ -487,8 +477,10 @@ func (m Model) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) (tea.M
 		m.EnrichQueue = m.EnrichQueue[1:]
 		// Clear-on-rerun-start for the next type.
 		m.EnrichmentTypeGen[next]++
-		delete(m.EnrichmentFindings, next)
 		delete(m.EnrichmentRan, next)
+		// clearEnrichmentFor strips wave2 findings from cached rows; rows are the
+		// authoritative source — no parallel m.EnrichmentFindings map to delete.
+		(&m).clearEnrichmentFor(next)
 		cmd := m.probeEnrichment(next, m.Session.EnrichmentGen)
 		return m, tea.Batch(flashCmd, cmd)
 	}

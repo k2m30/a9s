@@ -18,9 +18,8 @@ func TestSession_New_InitializesMaps(t *testing.T) {
 		t.Fatal("session.New() returned nil")
 	}
 
-	if s.EnrichmentFindings == nil {
-		t.Error("EnrichmentFindings must be non-nil after New()")
-	}
+	// EnrichmentFindings was moved to tui.Model in PR-03a-fold; it is no
+	// longer a Session field and is not initialized here.
 	if s.EnrichmentRan == nil {
 		t.Error("EnrichmentRan must be non-nil after New()")
 	}
@@ -94,16 +93,16 @@ func TestSession_Rotate_ClearsCaches(t *testing.T) {
 	s := session.New()
 
 	// Populate caches with data from a fictional "old session".
+	// Note: EnrichmentFindings was moved to tui.Model in PR-03a-fold and is
+	// no longer on Session; it is cleared explicitly by profile/region switch
+	// handlers in handleProfileSelected / handleRegionSelected.
 	s.ResourceCache["ec2"] = &session.ResourceCacheEntry{}
 	s.LazyResourceCache["ec2"] = nil
-	s.EnrichmentFindings["ec2"] = map[string]resource.EnrichmentFinding{
-		"i-001": {Severity: "!", Summary: "impaired"},
-	}
 	s.EnrichmentRan["ec2"] = true
 	s.EnrichmentTypeGen["ec2"] = 42
 	s.EnrichmentTruncatedIDs["ec2"] = map[string]bool{"i-x": true}
 	s.RelatedCache.Set("ec2:i-001", []session.RelatedCacheResult{
-		{DefDisplayName: "VPCs", Result: resource.RelatedCheckResult{TargetType: "vpc", Count: 1}},
+		{DefDisplayName: "VPCs"},
 	})
 
 	s.Rotate()
@@ -114,9 +113,8 @@ func TestSession_Rotate_ClearsCaches(t *testing.T) {
 	if len(s.LazyResourceCache) != 0 {
 		t.Errorf("LazyResourceCache not empty after Rotate(): len=%d", len(s.LazyResourceCache))
 	}
-	if len(s.EnrichmentFindings) != 0 {
-		t.Errorf("EnrichmentFindings not empty after Rotate(): len=%d", len(s.EnrichmentFindings))
-	}
+	// EnrichmentFindings is on tui.Model (not Session) after PR-03a-fold;
+	// Session.Rotate() no longer clears it — the handler does so explicitly.
 	if len(s.EnrichmentRan) != 0 {
 		t.Errorf("EnrichmentRan not empty after Rotate(): len=%d", len(s.EnrichmentRan))
 	}
