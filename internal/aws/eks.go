@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -115,10 +116,10 @@ func buildEKSResource(name string, cluster *ekstypes.Cluster) resource.Resource 
 		}
 	}
 
-	return resource.Resource{
-		ID:     name,
-		Name:   clusterName,
-		Status: status,
+	r := resource.Resource{
+		ID:   name,
+		Name: clusterName,
+		// Status: removed — PR-03b migrates fetcher to Findings for lifecycle states.
 		Fields: map[string]string{
 			"cluster_name":        clusterName,
 			"version":             version,
@@ -131,6 +132,29 @@ func buildEKSResource(name string, cluster *ekstypes.Cluster) resource.Resource 
 		},
 		RawStruct: cluster,
 	}
+
+	// Phase 03 PR-03b: emit canonical Findings for non-healthy lifecycle states.
+	// ACTIVE is healthy — no Finding. DELETING is terminal — no Finding.
+	// CREATING and UPDATING are transitional → SevWarn. FAILED → SevBroken.
+	switch cluster.Status {
+	case ekstypes.ClusterStatusCreating:
+		r.Findings = []domain.Finding{{
+			Code: CodeEKSStateCreating, Phrase: "creating",
+			Severity: domain.SevWarn, Source: "wave1",
+		}}
+	case ekstypes.ClusterStatusUpdating:
+		r.Findings = []domain.Finding{{
+			Code: CodeEKSStateUpdating, Phrase: "updating",
+			Severity: domain.SevWarn, Source: "wave1",
+		}}
+	case ekstypes.ClusterStatusFailed:
+		r.Findings = []domain.Finding{{
+			Code: CodeEKSStateFailed, Phrase: "failed",
+			Severity: domain.SevBroken, Source: "wave1",
+		}}
+	}
+
+	return r
 }
 
 // FetchEKSClusters performs a two-step fetch: ListClusters to get cluster names

@@ -619,8 +619,9 @@ func TestCheckSESLambda_ScopesByRecipient(t *testing.T) {
 	for _, st := range subtests {
 		st := st
 		t.Run(st.name, func(t *testing.T) {
-			// Fresh pointer per subtest: sesRuleSetCaches uses pointer as key,
-			// so a new pointer starts with no cached entry.
+			// Fresh pointer per subtest: each ServiceClients instance carries its own
+			// in-function rule-set cache (swap-not-clear contract from PR-02d), so
+			// a new pointer starts with no cached entry.
 			clients := sesV1Clients(&fakeSESV1{
 				responses: []sesV1Response{{output: ruleSetOutput, err: nil}},
 			})
@@ -765,7 +766,9 @@ func TestCheckSESS3_ScopesByRecipient(t *testing.T) {
 	for _, st := range subtests {
 		st := st
 		t.Run(st.name, func(t *testing.T) {
-			// Fresh pointer per subtest avoids sesRuleSetCaches leaking between subtests.
+			// Fresh pointer per subtest: each ServiceClients instance carries its own
+			// in-function rule-set cache (swap-not-clear contract from PR-02d), so
+			// a new pointer guarantees no state leaks between subtests.
 			clients := sesV1Clients(&fakeSESV1{
 				responses: []sesV1Response{{output: ruleSetOutput, err: nil}},
 			})
@@ -827,8 +830,9 @@ func TestSESActiveReceiptRuleSet_RetriesAfterTransientError(t *testing.T) {
 			{output: ruleSetOutput, err: nil},
 		},
 	}
-	// Use a fixed *ServiceClients pointer for all three calls — must be the same
-	// pointer for the sesRuleSetCaches key to be consistent.
+	// Use a fixed *ServiceClients pointer for all three calls — the in-function
+	// rule-set cache is keyed by pointer identity (swap-not-clear contract from
+	// PR-02d), so the same pointer is required for retry deduplication to work.
 	clients := sesV1Clients(v1Mock)
 
 	src := resource.Resource{

@@ -3,15 +3,17 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func init() {
-	resource.RegisterFieldKeys("ec2", []string{"instance_id", "name", "state", "type", "private_ip", "public_ip", "launch_time", "lifecycle", "image_id", "vpc_id", "system_status", "instance_status"})
+	resource.RegisterFieldKeys("ec2", []string{"instance_id", "name", "state", "type", "private_ip", "public_ip", "launch_time", "lifecycle", "image_id", "vpc_id", "system_status", "instance_status", "state_reason_code"})
 
 	resource.RegisterFieldAliases("ec2", map[string]string{
 		"instance_id":  "InstanceId",
@@ -165,24 +167,59 @@ func FetchEC2InstancesPage(ctx context.Context, api EC2FetchInstancesAPI, contin
 				vpcID = *inst.VpcId
 			}
 
+			// Read state_reason_code from the SDK Instance struct.
+			stateReasonCode := ""
+			if inst.StateReason != nil && inst.StateReason.Code != nil {
+				stateReasonCode = *inst.StateReason.Code
+			}
+
 			r := resource.Resource{
-				ID:     instanceID,
-				Name:   name,
-				Type:   "ec2",
-				Status: state,
+				ID:   instanceID,
+				Name: name,
+				Type: "ec2",
+				// Status: state — removed; PR-03b migrates fetcher to Findings
 				Fields: map[string]string{
-					"instance_id": instanceID,
-					"name":        name,
-					"state":       state,
-					"type":        instanceType,
-					"private_ip":  privateIP,
-					"public_ip":   publicIP,
-					"launch_time": launchTime,
-					"lifecycle":   lifecycle,
-					"image_id":    imageID,
-					"vpc_id":      vpcID,
+					"instance_id":       instanceID,
+					"name":              name,
+					"state":             state,
+					"type":              instanceType,
+					"private_ip":        privateIP,
+					"public_ip":         publicIP,
+					"launch_time":       launchTime,
+					"lifecycle":         lifecycle,
+					"image_id":          imageID,
+					"vpc_id":            vpcID,
+					"state_reason_code": stateReasonCode,
 				},
 				RawStruct: inst,
+			}
+
+			// Phase 03 PR-03b: emit canonical Findings for non-healthy lifecycle states.
+			// Healthy ("running") and terminal ("terminated", "shutting-down") lifecycle
+			// states have no Finding — rendered via Fields[LifecycleKey] fallback.
+			switch state {
+			case "pending":
+				r.Findings = []domain.Finding{{
+					Code: CodeEC2StatePending, Phrase: "pending",
+					Severity: domain.SevWarn, Source: "wave1",
+				}}
+			case "stopping":
+				r.Findings = []domain.Finding{{
+					Code: CodeEC2StateStopping, Phrase: "stopping",
+					Severity: domain.SevWarn, Source: "wave1",
+				}}
+			case "stopped":
+				if strings.HasPrefix(stateReasonCode, "Server.") {
+					r.Findings = []domain.Finding{{
+						Code: CodeEC2StateStoppedServer, Phrase: "stopped",
+						Severity: domain.SevBroken, Source: "wave1",
+					}}
+				} else {
+					r.Findings = []domain.Finding{{
+						Code: CodeEC2StateStopped, Phrase: "stopped",
+						Severity: domain.SevWarn, Source: "wave1",
+					}}
+				}
 			}
 
 			resources = append(resources, r)
@@ -280,20 +317,6 @@ func enrichEC2StatusChecks(ctx context.Context, api EC2DescribeInstanceStatusAPI
 			}
 			if instStatus != "" {
 				resources[i].Fields["instance_status"] = instStatus
-			}
-			// Promote Resource.Status for running instances only.
-			// A running instance whose status checks report "impaired" or
-			// "initializing" must surface as an issue in the menu badge and
-			// ctrl+z filter. We promote Status so the Color func's fallback path
-			// (via r.Status) also works for test doubles without a Color func.
-			if resources[i].Fields["state"] == "running" {
-				if sysStatus == "impaired" || instStatus == "impaired" {
-					resources[i].Status = "impaired"
-				} else if sysStatus == "initializing" || instStatus == "initializing" {
-					if resources[i].Status != "impaired" { // impaired has priority
-						resources[i].Status = "initializing"
-					}
-				}
 			}
 		}
 	}

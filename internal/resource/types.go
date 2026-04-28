@@ -19,15 +19,6 @@ const (
 // IsIssue reports whether this color contributes to attention filtering and issue badges.
 func (c Color) IsIssue() bool { return c == ColorWarning || c == ColorBroken }
 
-// FallbackColor classifies a resource status string using the canonical AWS
-// vocabulary regardless of any per-type Color func. Used by the issue-count
-// legacy fallback in ResourceListModel so that lifecycle terminal states
-// (e.g. "terminated" → ColorDim) are never counted as issues even when a
-// custom Color func returns ColorBroken for the same status.
-func FallbackColor(status string) Color {
-	return fallbackColor(status)
-}
-
 // fallbackColor classifies a resource status string when no per-type Color func
 // is set. Covers the common AWS vocabulary so ad-hoc test ResourceTypeDef
 // instances (which omit Color) behave sensibly without requiring every test to
