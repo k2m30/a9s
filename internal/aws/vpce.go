@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -76,10 +77,27 @@ func FetchVPCEndpointsPage(ctx context.Context, api EC2DescribeVpcEndpointsAPI, 
 			vpcID = *vpce.VpcId
 		}
 
+		var findings []domain.Finding
+		switch state {
+		case "PendingAcceptance":
+			findings = []domain.Finding{{Code: CodeVPCEStatePendingAcceptance, Phrase: "pending acceptance", Severity: domain.SevWarn, Source: "wave1"}}
+		case "Pending":
+			findings = []domain.Finding{{Code: CodeVPCEStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"}}
+		case "Deleting":
+			findings = []domain.Finding{{Code: CodeVPCEStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"}}
+		case "Failed":
+			findings = []domain.Finding{{Code: CodeVPCEStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+		case "Rejected":
+			findings = []domain.Finding{{Code: CodeVPCEStateRejected, Phrase: "rejected", Severity: domain.SevBroken, Source: "wave1"}}
+		case "Expired":
+			findings = []domain.Finding{{Code: CodeVPCEStateExpired, Phrase: "expired", Severity: domain.SevBroken, Source: "wave1"}}
+		case "Partial":
+			findings = []domain.Finding{{Code: CodeVPCEStatePartial, Phrase: "partial", Severity: domain.SevBroken, Source: "wave1"}}
+		}
+
 		r := resource.Resource{
-			ID:     vpceID,
-			Name:   serviceName,
-			Status: state,
+			ID:   vpceID,
+			Name: serviceName,
 			Fields: map[string]string{
 				"vpce_id":      vpceID,
 				"service_name": serviceName,
@@ -87,6 +105,7 @@ func FetchVPCEndpointsPage(ctx context.Context, api EC2DescribeVpcEndpointsAPI, 
 				"state":        state,
 				"vpc_id":       vpcID,
 			},
+			Findings:  findings,
 			RawStruct: vpce,
 		}
 

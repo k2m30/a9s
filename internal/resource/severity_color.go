@@ -23,3 +23,15 @@ func ColorFromSeverity(sev domain.Severity) Color {
 		return ColorHealthy
 	}
 }
+
+// ColorFromWave1 returns the Color implied by the first wave1 Finding on r and
+// ok=true. ok=false signals no wave1 Finding — the caller should fall through
+// to its structural classifier.
+func ColorFromWave1(r Resource) (Color, bool) {
+	for i := range r.Findings {
+		if r.Findings[i].Source == "wave1" {
+			return ColorFromSeverity(r.Findings[i].Severity), true
+		}
+	}
+	return ColorHealthy, false
+}

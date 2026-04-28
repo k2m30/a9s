@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -108,10 +109,19 @@ func FetchNatGatewaysPage(ctx context.Context, api EC2DescribeNatGatewaysAPI, co
 			}
 		}
 
+		var findings []domain.Finding
+		switch state {
+		case "pending":
+			findings = []domain.Finding{{Code: CodeNATStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"}}
+		case "deleting":
+			findings = []domain.Finding{{Code: CodeNATStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"}}
+		case "failed":
+			findings = []domain.Finding{{Code: CodeNATStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+		}
+
 		r := resource.Resource{
-			ID:     natID,
-			Name:   name,
-			Status: state,
+			ID:   natID,
+			Name: name,
 			Fields: map[string]string{
 				"nat_gateway_id": natID,
 				"name":           name,
@@ -120,6 +130,7 @@ func FetchNatGatewaysPage(ctx context.Context, api EC2DescribeNatGatewaysAPI, co
 				"state":          state,
 				"public_ip":      publicIP,
 			},
+			Findings:  findings,
 			RawStruct: nat,
 		}
 

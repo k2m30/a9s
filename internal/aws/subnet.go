@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -95,10 +96,21 @@ func FetchSubnetsPage(ctx context.Context, api EC2DescribeSubnetsAPI, continuati
 			availableIPs = fmt.Sprintf("%d", *subnet.AvailableIpAddressCount)
 		}
 
+		var findings []domain.Finding
+		switch state {
+		case "pending":
+			findings = []domain.Finding{{Code: CodeSubnetStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"}}
+		case "unavailable":
+			findings = []domain.Finding{{Code: CodeSubnetStateUnavailable, Phrase: "unavailable", Severity: domain.SevBroken, Source: "wave1"}}
+		case "failed":
+			findings = []domain.Finding{{Code: CodeSubnetStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+		case "failed-insufficient-capacity":
+			findings = []domain.Finding{{Code: CodeSubnetStateFailedInsufficientCapacity, Phrase: "failed-insufficient-capacity", Severity: domain.SevBroken, Source: "wave1"}}
+		}
+
 		r := resource.Resource{
-			ID:     subnetID,
-			Name:   name,
-			Status: state,
+			ID:   subnetID,
+			Name: name,
 			Fields: map[string]string{
 				"subnet_id":         subnetID,
 				"name":              name,
@@ -108,6 +120,7 @@ func FetchSubnetsPage(ctx context.Context, api EC2DescribeSubnetsAPI, continuati
 				"state":             state,
 				"available_ips":     availableIPs,
 			},
+			Findings:  findings,
 			RawStruct: subnet,
 		}
 

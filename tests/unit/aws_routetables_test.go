@@ -23,7 +23,7 @@ func TestFetchRouteTables_ParsesMultipleRouteTables(t *testing.T) {
 				{
 					RouteTableId: aws.String("rtb-0001"),
 					VpcId:        aws.String("vpc-aaa"),
-					OwnerId:      aws.String("123456789012"),
+					OwnerId:      aws.String("000000000000"),
 					Routes: []ec2types.Route{
 						{DestinationCidrBlock: aws.String("0.0.0.0/0")},
 						{DestinationCidrBlock: aws.String("10.0.0.0/16")},
@@ -39,7 +39,7 @@ func TestFetchRouteTables_ParsesMultipleRouteTables(t *testing.T) {
 				{
 					RouteTableId: aws.String("rtb-0002"),
 					VpcId:        aws.String("vpc-bbb"),
-					OwnerId:      aws.String("123456789012"),
+					OwnerId:      aws.String("000000000000"),
 					Routes: []ec2types.Route{
 						{DestinationCidrBlock: aws.String("10.1.0.0/16")},
 					},
@@ -67,9 +67,14 @@ func TestFetchRouteTables_ParsesMultipleRouteTables(t *testing.T) {
 	if r0.Name != "main-rtb" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "main-rtb", r0.Name)
 	}
-	// Status is "true" when Main association exists, "false" otherwise
-	if r0.Status != "true" {
-		t.Errorf("resource[0].Status: expected %q, got %q", "true", r0.Status)
+	if r0.Status != "" {
+		t.Errorf("resource[0].Status: expected empty, got %q", r0.Status)
+	}
+	if len(r0.Findings) != 0 {
+		t.Errorf("resource[0].Findings: expected none for rtb (never emits), got %d", len(r0.Findings))
+	}
+	if r0.Fields["is_main"] != "true" {
+		t.Errorf("resource[0].Fields[\"is_main\"]: expected %q, got %q", "true", r0.Fields["is_main"])
 	}
 
 	// Verify Fields on all resources
@@ -107,8 +112,11 @@ func TestFetchRouteTables_ParsesMultipleRouteTables(t *testing.T) {
 	if r1.Name != "" {
 		t.Errorf("resource[1].Name: expected empty string, got %q", r1.Name)
 	}
-	if r1.Status != "false" {
-		t.Errorf("resource[1].Status: expected %q, got %q", "false", r1.Status)
+	if r1.Status != "" {
+		t.Errorf("resource[1].Status: expected empty, got %q", r1.Status)
+	}
+	if r1.Fields["is_main"] != "false" {
+		t.Errorf("resource[1].Fields[\"is_main\"]: expected %q, got %q", "false", r1.Fields["is_main"])
 	}
 	if r1.Fields["vpc_id"] != "vpc-bbb" {
 		t.Errorf("resource[1].Fields[\"vpc_id\"]: expected %q, got %q", "vpc-bbb", r1.Fields["vpc_id"])
