@@ -145,12 +145,16 @@ func TestDerive_IssuesEmpty_StatusFallback(t *testing.T) {
 // Findings when passed as r.Status. These are lifecycle state labels, not
 // issues, and must be filtered by the shim before creating wave1 Findings.
 //
+// Note: "inactive" is intentionally absent from this list. Several resource
+// types (ECS services, ECS clusters) classify INACTIVE as broken, so it must
+// not be universally filtered. See TestDerive_InactiveIsEmittedAsFinding.
+//
 // Pre-fix: every non-empty Status produces a Finding.
 // Post-fix: lifecycle phrases are detected and skipped → Findings == nil.
 func TestDerive_LifecyclePhrasesAreNotEmittedAsFindings(t *testing.T) {
 	phrases := []string{
 		"running", "available", "active", "in-service", "healthy",
-		"terminated", "deleted", "shutting-down", "deregistered", "inactive",
+		"terminated", "deleted", "shutting-down", "deregistered",
 	}
 	for _, phrase := range phrases {
 		phrase := phrase
@@ -444,5 +448,35 @@ func TestDerive_NoEarlyReturnOnExistingFindings(t *testing.T) {
 	attention.DeriveFindings(&r, ec2TD, nil)
 	if len(r.Findings) != 0 {
 		t.Errorf("len(Findings): got %d, want 0 (shim must replace stale entries on healthy row)", len(r.Findings))
+	}
+}
+
+// TestDerive_InactiveIsEmittedAsFinding pins that "inactive" is NOT
+// universally ignorable lifecycle noise. Several types — notably ECS
+// services and ECS clusters in internal/resource/types_compute.go —
+// classify INACTIVE as broken. The shim must emit a Finding so the
+// downstream IsIssue / detail-view paths can surface it.
+//
+// The shim's coarse phrase→severity mapping classifies "inactive" via
+// the default branch (SevWarn). Per-category PRs (03c containers) will
+// refine the canonical code/severity for ECS specifically. Until then,
+// SevWarn is sufficient: row color follows td.ResolveColor (which ECS
+// types map to ColorBroken) and IsIssue is true for SevWarn.
+func TestDerive_InactiveIsEmittedAsFinding(t *testing.T) {
+	r := domain.Resource{ID: "i", Status: "inactive"}
+	td := resource.ResourceTypeDef{ShortName: "ecs-svc"}
+	attention.DeriveFindings(&r, td, nil)
+
+	if len(r.Findings) != 1 {
+		t.Fatalf("Findings count = %d, want 1 (inactive must emit a Finding — see ECS type policy)", len(r.Findings))
+	}
+	if r.Findings[0].Phrase != "inactive" {
+		t.Errorf("Findings[0].Phrase = %q, want %q", r.Findings[0].Phrase, "inactive")
+	}
+	if r.Findings[0].Source != "wave1" {
+		t.Errorf("Findings[0].Source = %q, want %q", r.Findings[0].Source, "wave1")
+	}
+	if !r.Findings[0].Severity.IsIssue() {
+		t.Errorf("Findings[0].Severity = %v, expected IsIssue() == true (so ctrl+z and detail attention surface it)", r.Findings[0].Severity)
 	}
 }

@@ -118,9 +118,13 @@ func phraseSeverity(phrase string) domain.Severity {
 	switch p {
 	case "running", "available", "active", "in-service", "healthy":
 		return domain.SevOK
-	case "terminated", "deleted", "shutting-down", "deregistered", "inactive":
+	case "terminated", "deleted", "shutting-down", "deregistered":
 		return domain.SevDim
 	}
+	// "inactive" intentionally absent — ECS service/cluster types classify
+	// INACTIVE as broken (see internal/resource/types_compute.go:102, 171).
+	// Falls through to the default branch (SevWarn) so the shim emits a
+	// Finding; per-category PR-03c will assign canonical Severity.
 	if strings.Contains(p, "fail") || strings.Contains(p, "impaired") ||
 		strings.Contains(p, "error") || strings.Contains(p, "broken") ||
 		strings.Contains(p, "stopped") {
@@ -132,7 +136,11 @@ func phraseSeverity(phrase string) domain.Severity {
 func isLifecyclePhrase(phrase string) bool {
 	switch strings.ToLower(phrase) {
 	case "running", "available", "active", "in-service", "healthy",
-		"terminated", "deleted", "shutting-down", "deregistered", "inactive":
+		"terminated", "deleted", "shutting-down", "deregistered":
+		// "inactive" is intentionally absent from this list. Several resource
+		// types (ECS service, ECS cluster) classify INACTIVE as broken rather
+		// than lifecycle steady-state. Filtering it here would suppress those
+		// Findings. See TestDerive_InactiveIsEmittedAsFinding.
 		return true
 	default:
 		return false
