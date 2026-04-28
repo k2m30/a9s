@@ -23,51 +23,27 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "multi_az", Title: "Multi-AZ", Width: 10, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				status := r.Fields["status"]
-				// Strip the universal-rule-7 (+N) suffix before matching:
-				//   "publicly accessible (+1)" → "publicly accessible"
-				//   "no automated backups (+2)" → "no automated backups"
-				// The suffix only records hidden-finding count for the operator;
-				// color precedence is driven by the TOP (shown) phrase.
-				stripped := StripFindingSuffix(status)
-				// Broken statuses (including remapped "encryption key unavailable").
-				switch stripped {
-				case "failed", "storage-full", "restore-error", "stopped",
-					"incompatible-network", "incompatible-option-group",
-					"incompatible-parameters", "incompatible-restore",
-					"encryption key unavailable":
+				if c, ok := ColorFromWave1(r); ok {
+					return c
+				}
+				// Phrase-based structural fallback (for fixture/test data where
+				// Findings are not populated). Fields["status"] carries the §4
+				// phrase written by the fetcher.
+				phrase := StripFindingSuffix(r.Fields["status"])
+				switch phrase {
+				case "failed", "storage-full", "stopped",
+					"inaccessible-encryption-credentials", "restore-error":
 					return ColorBroken
 				}
-				if strings.HasPrefix(stripped, "incompatible-") || strings.HasPrefix(stripped, "inaccessible-") {
+				if strings.HasPrefix(phrase, "incompatible-") {
 					return ColorBroken
 				}
-				// Config-warning phrases encoded by the new fetcher → Warning.
-				// NOTE: "maintenance scheduled" is NOT here — it is the Wave-2 `~`
-				// text rendered on a Healthy (green) row per spec §4 rule 3.
-				switch stripped {
-				case "no automated backups", "publicly accessible",
-					"unencrypted storage", "deletion protection off":
+				switch phrase {
+				case "creating", "modifying", "backing-up", "rebooting",
+					"upgrading", "stopping", "starting", "deleting", "renaming":
 					return ColorWarning
 				}
-				// Transitional statuses → Warning (including "keyword: pending-key" suffix form).
-				if stripped != "" && stripped != "available" && stripped != "maintenance scheduled" {
-					if strings.Contains(stripped, ":") {
-						return ColorWarning
-					}
-					switch stripped {
-					case "creating", "modifying", "backing-up", "rebooting",
-						"renaming", "resetting-master-credentials", "starting",
-						"stopping", "upgrading", "maintenance",
-						"configuring-enhanced-monitoring", "configuring-iam-database-auth",
-						"configuring-log-exports", "converting-to-vpc", "moving-to-vpc",
-						"storage-optimization", "deleting":
-						return ColorWarning
-					}
-				}
-				// status == "" (healthy silence from new fetcher), "available"
-				// (legacy / backward-compat), or "maintenance scheduled" (Wave-2
-				// on Healthy row). All are base-healthy, but individual
-				// field-level checks may upgrade to Warning.
+				// Field-level checks for structurally healthy instances.
 				base := ColorHealthy
 				// CIS RDS.2: publicly accessible → Warning.
 				if r.Fields["publicly_accessible"] == "true" {
@@ -134,39 +110,31 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "endpoint", Title: "Endpoint", Width: 40, Sortable: false},
 			},
 			Color: func(r Resource) Color {
-				// Strip the universal-rule-7 (+N) suffix so both raw AWS keywords
-				// (stored by DescribeReplicationGroups) and §4 phrases (constructed
-				// by computeRedisIssues) classify correctly.
-				// Examples:
-				//   "creating — new group" (§4)        → ColorWarning
-				//   "create failed — see events" (§4)  → ColorBroken
-				//   "shard 0001: modifying" (§4)       → ColorWarning
-				//   "deleted" (terminal)                → ColorDim
-				//   "" (healthy silence)                → ColorHealthy
+				if c, ok := ColorFromWave1(r); ok {
+					return c
+				}
+				// Phrase-based structural fallback (for fixture/test data where
+				// Findings are not populated). Fields["status"] carries the §4
+				// phrase written by the fetcher.
 				phrase := StripFindingSuffix(r.Fields["status"])
-				// Terminal state — dim, not broken.
 				if phrase == "deleted" {
 					return ColorDim
 				}
-				// Broken: §4 phrases.
-				switch phrase {
-				case "create failed \u2014 see events":
+				if phrase == "create failed — see events" {
 					return ColorBroken
 				}
-				// Warning: §4 phrases.
-				switch phrase {
-				case "creating \u2014 new group",
-					"modifying \u2014 config change",
-					"snapshotting \u2014 backup running",
-					"deleting \u2014 teardown",
-					"multi-AZ without auto-failover":
-					return ColorWarning
-				}
-				// Multi-shard shard-level phrases: "shard <id>: <state>" — all Warning.
+				// Shard-level phrases (cluster-mode multi-shard RGs).
 				if strings.HasPrefix(phrase, "shard ") {
 					return ColorWarning
 				}
-				// "" (healthy silence) → Healthy.
+				// §4 warning phrases — em-dash variants set by the fetcher.
+				if strings.HasPrefix(phrase, "creating —") ||
+					strings.HasPrefix(phrase, "modifying —") ||
+					strings.HasPrefix(phrase, "snapshotting —") ||
+					strings.HasPrefix(phrase, "deleting —") ||
+					phrase == "multi-AZ without auto-failover" {
+					return ColorWarning
+				}
 				return ColorHealthy
 			},
 		},
@@ -184,31 +152,32 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "endpoint", Title: "Endpoint", Width: 48, Sortable: false},
 			},
 			Color: func(r Resource) Color {
-				// Strip (+N) suffix so phrase matching works regardless of stacking.
+				if c, ok := ColorFromWave1(r); ok {
+					return c
+				}
+				// Phrase-based structural fallback (for fixture/test data where
+				// Findings are not populated). Fields["status"] carries the §4
+				// phrase written by the fetcher; strip any (+N) suffix first.
 				phrase := StripFindingSuffix(r.Fields["status"])
 				switch phrase {
 				case "":
 					return ColorHealthy
-				// Broken phrases (§4 "List text" column).
-				case "failed: cluster operation",
-					"encryption key unreachable",
-					"parameter group incompatible",
-					"no writer: reads only":
-					return ColorBroken
-				// Warning phrases (§4 "List text" column).
-				case "delete-protection off",
-					"not encrypted at rest",
-					"no automated backups":
-					return ColorWarning
 				// Wave 2 phrase on a Healthy row — stays green so the `!` glyph renders.
 				case "maintenance overdue":
 					return ColorHealthy
+				// §4 Broken phrases.
+				case "failed: cluster operation", "encryption key unreachable",
+					"parameter group incompatible", "no writer: reads only":
+					return ColorBroken
+				// §4 Warning phrases — structural config signals.
+				case "delete-protection off", "not encrypted at rest", "no automated backups":
+					return ColorWarning
 				}
 				// Transitional — format is "<status>: in progress".
 				if strings.HasSuffix(phrase, ": in progress") {
 					return ColorWarning
 				}
-				// Unknown phrase → treat as Healthy (future-proof for new AWS statuses).
+				// Unknown phrase → treat as Healthy (future-proof).
 				return ColorHealthy
 			},
 		},
@@ -226,16 +195,20 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "billing_mode", Title: "Billing", Width: 16, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				// Strip the universal-rule-7 (+N) suffix before matching so that
-				// "archived: kms key lost (+1)" still maps to ColorBroken.
+				if c, ok := ColorFromWave1(r); ok {
+					return c
+				}
+				// Phrase-based structural fallback (for fixture/test data where
+				// Findings are not populated). Fields["status"] carries the §4
+				// phrase written by the fetcher.
 				phrase := StripFindingSuffix(r.Fields["status"])
 				switch phrase {
-				case "":
-					return ColorHealthy
-				case "creating", "updating", "deleting", "archiving":
-					return ColorWarning
 				case "kms key inaccessible", "archived: kms key lost":
 					return ColorBroken
+				case "creating", "updating", "deleting", "archiving":
+					return ColorWarning
+				case "":
+					return ColorHealthy
 				case "PITR off":
 					// Wave-2 ~ finding on a Healthy row — the `~` glyph does the
 					// signaling; the row color stays green so the glyph renders.
@@ -260,44 +233,20 @@ func databasesResourceTypes() []ResourceTypeDef {
 			// OpenSearch DomainStatus per docs/attention-signals.md.
 			// Precedence: Deleted → Dim; Isolated → Broken; Processing → Warning;
 			// background-check findings (! / ~) stay green — the glyph handles those.
-			// Field contract:
-			//   - deleted: "true" when Deleted==true
-			//   - domain_processing_status: string form of DomainProcessingStatusType
-			//     (fetcher always emits at least "Active" so the Isolated branch is deterministic)
-			//   - processing / upgrade_processing: "true"/"false" from DomainStatus
-			//   - status: top §4 phrase with optional (+N) suffix; stripped before matching
-			//   - cluster_health: Red/Yellow/Green from CloudWatch (Wave 3, not yet
-			//     implemented — branch kept for forward-compatibility, currently never fires)
 			Color: func(r Resource) Color {
-				// Deleted → Dim (highest precedence, no further checks needed).
+				if c, ok := ColorFromWave1(r); ok {
+					return c
+				}
+				// Structural fallback: read raw fields for legacy/fixture data.
 				if r.Fields["deleted"] == "true" {
 					return ColorDim
 				}
-
-				// Strip (+N) suffix before pattern matching.
-				status := r.Status
-				if status == "" {
-					status = r.Fields["status"]
-				}
-				stripped := StripFindingSuffix(status)
-
-				// Isolated → Broken.
-				if strings.HasPrefix(stripped, "isolated:") || r.Fields["domain_processing_status"] == "Isolated" {
+				if r.Fields["domain_processing_status"] == "Isolated" {
 					return ColorBroken
 				}
-
-				// Processing → Warning.
-				if strings.HasPrefix(stripped, "processing:") ||
-					r.Fields["processing"] == "true" ||
-					r.Fields["upgrade_processing"] == "true" {
+				if r.Fields["processing"] == "true" || r.Fields["upgrade_processing"] == "true" {
 					return ColorWarning
 				}
-
-				// Background-check signals (! / ~) stay green — the glyph signals
-				// the operator; the row color remains Healthy so the glyph renders.
-				// NOTE: do NOT add service_software_update_available or
-				// encryption_at_rest_enabled → Warning branches here.
-
 				return ColorHealthy
 			},
 		},
@@ -310,7 +259,7 @@ func databasesResourceTypes() []ResourceTypeDef {
 			Columns: []Column{
 				// Widths match defaults_databases.go so fallback paths (tests,
 				// environments without a loaded view config) don't truncate the
-				// longest §4 phrase ("broken: incompatible-parameters" = 31 chars).
+				// longest phrase ("broken: incompatible-parameters" = 31 chars).
 				{Key: "cluster_id", Title: "Cluster ID", Width: 36, Sortable: true},
 				{Key: "status", Title: "Status", Width: 34, Sortable: true},
 				{Key: "node_type", Title: "Node Type", Width: 16, Sortable: true},
@@ -319,26 +268,27 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "endpoint", Title: "Endpoint", Width: 44, Sortable: false},
 			},
 			Color: func(r Resource) Color {
-				// Derived-phrase fallback: when only `status` is populated (e.g.
-				// when phraseTier probes via a synthetic Resource for the detail
-				// Attention section's per-entry severity), classify by the phrase
-				// prefix so broken/Warning entries don't fall through to Healthy.
-				// Strip any (+N) suffix first per rule-7.
+				if c, ok := ColorFromWave1(r); ok {
+					return c
+				}
+				// Phrase-based structural fallback (for fixture/test data where
+				// Findings are not populated). Fields["status"] carries the §4
+				// phrase written by the fetcher; strip any (+N) suffix first.
 				phrase := StripFindingSuffix(r.Fields["status"])
-				if phrase == "" {
-					phrase = StripFindingSuffix(r.Status)
+				if phrase != "" {
+					switch phrase {
+					case "unavailable", "failed":
+						return ColorBroken
+					case "pending change queued", "maintenance deferred",
+						"publicly accessible", "unencrypted at rest":
+						return ColorWarning
+					}
+					if strings.HasPrefix(phrase, "broken: ") {
+						return ColorBroken
+					}
 				}
-				// Broken phrases → ColorBroken (beats any subsequent Healthy/Warning signal).
-				switch phrase {
-				case "unavailable", "failed":
-					return ColorBroken
-				}
-				if len(phrase) >= len("broken:") && phrase[:len("broken:")] == "broken:" {
-					return ColorBroken
-				}
-
-				// Base color from raw ClusterStatus (cluster_status field carries
-				// the unmodified AWS value; "status" carries the derived phrase).
+				// Structural fallback for raw ClusterStatus / ClusterAvailabilityStatus
+				// values (e.g. from raw fixtures or legacy cache entries).
 				var base Color
 				switch r.Fields["cluster_status"] {
 				case "available":
@@ -351,11 +301,9 @@ func databasesResourceTypes() []ResourceTypeDef {
 				default:
 					base = ColorHealthy
 				}
-				// Do not downgrade Broken.
 				if base == ColorBroken {
 					return ColorBroken
 				}
-				// ClusterAvailabilityStatus upgrades.
 				switch r.Fields["cluster_availability_status"] {
 				case "Unavailable", "Failed":
 					return ColorBroken
@@ -364,25 +312,10 @@ func databasesResourceTypes() []ResourceTypeDef {
 						base = ColorWarning
 					}
 				}
-				// Re-check after availability upgrade.
 				if base == ColorBroken {
 					return ColorBroken
 				}
-				// Derived-phrase Warning signals: the fetcher sets `status` to
-				// "pending change queued" / "maintenance deferred" when those
-				// signals fire, but they do not surface via cluster_status or
-				// cluster_availability_status. Without this check the row stays
-				// green and drops out of the issue badge / attention filter.
-				switch phrase {
-				case "pending change queued", "maintenance deferred",
-					"maintenance", "modifying",
-					"publicly accessible", "unencrypted at rest":
-					if base == ColorHealthy {
-						base = ColorWarning
-					}
-				}
-				// Publicly accessible → upgrade to Warning (fallback when
-				// publicly_accessible field is read directly, e.g. raw fixtures).
+				// Publicly accessible → upgrade to Warning.
 				if r.Fields["publicly_accessible"] == "true" && base == ColorHealthy {
 					base = ColorWarning
 				}
@@ -408,22 +341,26 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "mount_targets", Title: "Mounts", Width: 8, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				// Read the derived status field (set by fetcher and bumped by enricher).
-				// Fall back to r.Status for backward-compatibility.
-				status := r.Fields["status"]
-				if status == "" {
-					status = r.Status
+				if c, ok := ColorFromWave1(r); ok {
+					return c
 				}
-				// Strip the universal-rule-7 (+N) suffix before matching so that
-				// "no mount targets (+1)" still classifies as Broken.
-				phrase := StripFindingSuffix(status)
+				// Structural fallback — checks both the canonical phrase key
+				// ("status") and the raw life-cycle-state key ("life_cycle_state")
+				// so that test data injected via either field is classified correctly.
+				// For the canonical path, strip any (+N) suffix before matching.
+				phrase := StripFindingSuffix(r.Fields["status"])
+				if phrase == "" {
+					// Fallback to raw enum for resources whose Findings are not
+					// populated (e.g. test probes via the typeContracts table).
+					phrase = r.Fields["life_cycle_state"]
+				}
 				switch phrase {
-				case "":
-					return ColorHealthy
 				case "error", "no mount targets", "mount target down":
 					return ColorBroken
 				case "creating", "updating", "deleting":
 					return ColorWarning
+				case "available", "":
+					return ColorHealthy
 				default:
 					return ColorHealthy
 				}
@@ -444,28 +381,27 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "created", Title: "Created", Width: 22, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				// Strip (+N) suffix so "failed (+1)" still maps to ColorBroken.
+				if c, ok := ColorFromWave1(r); ok {
+					return c
+				}
+				// Phrase-based structural fallback (for fixture/test data where
+				// Findings are not populated). Fields["status"] carries the §4
+				// phrase written by the fetcher.
 				phrase := StripFindingSuffix(r.Fields["status"])
-				// Broken end-states.
 				if phrase == "failed" {
 					return ColorBroken
 				}
 				if strings.HasPrefix(phrase, "incompatible-") {
 					return ColorBroken
 				}
-				// Healthy: "" (§4 phrase — healthy snapshots produce empty status) or
-				// "available" (raw AWS status injected by test helpers / RawStruct fallback).
-				// Unencrypted override: when encrypted=="false", color is Warning even if
-				// status appears healthy — the snapshot exists but lacks encryption (CIS RDS.4).
-				if phrase == "" || phrase == "available" {
-					if r.Fields["encrypted"] == "false" {
-						return ColorWarning
-					}
-					return ColorHealthy
+				if phrase == "creating" || phrase == "copying" {
+					return ColorWarning
 				}
-				// Any non-empty, non-Broken, non-healthy phrase is a Warning signal:
-				// "creating: <pct>%", "unencrypted", "orphan: ...", etc.
-				return ColorWarning
+				// Structural fallback: unencrypted snapshot (CIS RDS.4).
+				if r.Fields["encrypted"] == "false" {
+					return ColorWarning
+				}
+				return ColorHealthy
 			},
 		},
 		{
@@ -478,7 +414,7 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "snapshot_id", Title: "Snapshot ID", Width: 36, Sortable: true},
 				{Key: "cluster_id", Title: "Cluster ID", Width: 28, Sortable: true},
 				// Status column reads from Fields["status"] (set by the
-				// fetcher to the §4 phrase, then overwritten by the cross-ref
+				// fetcher to the phrase, then overwritten by the cross-ref
 				// enricher's FieldUpdates). Width 32 matches dbi-snap so
 				// "automated, Nd past retention" fits without truncation.
 				{Key: "status", Title: "Status", Width: 32, Sortable: true},
@@ -488,27 +424,28 @@ func databasesResourceTypes() []ResourceTypeDef {
 				{Key: "storage_type", Title: "Storage", Width: 10, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				// Strip (+N) suffix so "failed (+1)" still maps to ColorBroken.
+				if c, ok := ColorFromWave1(r); ok {
+					return c
+				}
+				// Phrase-based structural fallback (for fixture/test data where
+				// Findings are not populated). Fields["status"] carries the §4
+				// phrase written by the fetcher.
 				phrase := StripFindingSuffix(r.Fields["status"])
-				// Broken end-states (highest severity — cannot be overridden below).
 				if phrase == "failed" {
 					return ColorBroken
 				}
 				if strings.HasPrefix(phrase, "incompatible-") {
 					return ColorBroken
 				}
-				// Non-broken non-empty phrase (e.g. "creating", "creating: 47%") → Warning.
-				// Healthy: "" (§4 phrase — healthy snapshots produce empty status) or
-				// "available" (raw AWS status injected by test helpers / RawStruct fallback).
-				if phrase != "" && phrase != "available" {
+				// "creating" and progress variants (e.g. "creating: 47%") → Warning.
+				if strings.HasPrefix(phrase, "creating") {
 					return ColorWarning
 				}
-				// Healthy phrase — apply secondary override checks.
-				// Unencrypted snapshot → warning
+				// Structural fallback: unencrypted snapshot → warning.
 				if r.Fields["storage_encrypted"] == "false" {
 					return ColorWarning
 				}
-				// Long-lived manual snapshot (>365 days) → warning (cost signal)
+				// Long-lived manual snapshot (>365 days) → warning (cost signal).
 				if r.Fields["snapshot_type"] == "manual" {
 					if ts, err := time.Parse("2006-01-02 15:04", r.Fields["snapshot_create_time"]); err == nil {
 						if time.Since(ts) > 365*24*time.Hour {

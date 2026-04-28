@@ -74,7 +74,7 @@ func fixtureRDSInstancesExtended() []resource.Resource {
 		resource.Resource{
 			ID:     "stopped-db",
 			Name:   "stopped-db",
-			Status: "stopped",
+			Status: "", // PR-03e: fetcher writes phrase to Fields["status"], not Status
 			Fields: map[string]string{
 				"db_identifier":  "stopped-db",
 				"engine":         "mysql",
@@ -88,7 +88,7 @@ func fixtureRDSInstancesExtended() []resource.Resource {
 		resource.Resource{
 			ID:     "creating-db",
 			Name:   "creating-db",
-			Status: "creating",
+			Status: "", // PR-03e: fetcher writes phrase to Fields["status"], not Status
 			Fields: map[string]string{
 				"db_identifier":  "creating-db",
 				"engine":         "postgres",
@@ -102,7 +102,7 @@ func fixtureRDSInstancesExtended() []resource.Resource {
 		resource.Resource{
 			ID:     "prod-postgres-primary",
 			Name:   "prod-postgres-primary",
-			Status: "available",
+			Status: "", // PR-03e: fetcher writes phrase to Fields["status"], not Status
 			Fields: map[string]string{
 				"db_identifier":  "prod-postgres-primary",
 				"engine":         "postgres",

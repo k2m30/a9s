@@ -4,8 +4,9 @@ package unit
 //
 // Spec: docs/resources/dbi-snap.md §3.1 + §4 + impl-plan §1.1/§1.4.
 // Tests call FetchDBISnapshotsPage via a strict mock, asserting:
-//   - Resource.Status = §4 phrase for each signal (healthy = "").
-//   - Resource.Issues = ordered slice per §0.1 precedence ladder.
+//   - Resource.Status = "" (PR-03e: fetcher must not write Status).
+//   - Resource.Fields["status"] = §4 phrase for each signal (healthy = "").
+//   - Resource.Findings = ordered slice per §0.1 precedence ladder (source: "wave1").
 //   - Fields["arn"] populated for the backup-pivot (per §3.1 gap fix).
 //   - Adversarial rows (nil ID, nil Status, nil SnapshotCreateTime) do not panic.
 
@@ -23,6 +24,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
+	"github.com/k2m30/a9s/v3/internal/domain"
 )
 
 // ---------------------------------------------------------------------------
@@ -48,6 +50,7 @@ func snapOutput(snaps ...rdstypes.DBSnapshot) *rds.DescribeDBSnapshotsOutput {
 }
 
 // fetchSnap fetches a page from a single-page mock holding the provided snapshots.
+// PR-03e: resourceRow.status is populated from r.Fields["status"] (not r.Status).
 func fetchSnap(t *testing.T, snaps ...rdstypes.DBSnapshot) []resourceRow {
 	t.Helper()
 	mock := &mockDescribeDBSnapshots{output: snapOutput(snaps...)}
@@ -57,18 +60,24 @@ func fetchSnap(t *testing.T, snaps ...rdstypes.DBSnapshot) []resourceRow {
 	}
 	rows := make([]resourceRow, len(result.Resources))
 	for i, r := range result.Resources {
-		rows[i] = resourceRow{status: r.Status, issues: r.Issues, fields: r.Fields, id: r.ID}
+		rows[i] = resourceRow{
+			status:   r.Fields["status"],
+			findings: r.Findings,
+			fields:   r.Fields,
+			id:       r.ID,
+		}
 	}
 	return rows
 }
 
 // resourceRow captures the fields we assert on — avoids depending on the
 // full resource.Resource struct layout in tests.
+// PR-03e: status is now r.Fields["status"]; issues replaced by findings.
 type resourceRow struct {
-	id     string
-	status string
-	issues []string
-	fields map[string]string
+	id       string
+	status   string
+	findings []domain.Finding
+	fields   map[string]string
 }
 
 // ---------------------------------------------------------------------------
@@ -92,8 +101,12 @@ func TestDBISnap_Fetcher_HealthyAvailable_BlankS4(t *testing.T) {
 	if r.status != "" {
 		t.Errorf("Status = %q, want empty (healthy silence)", r.status)
 	}
-	if len(r.issues) != 0 {
-		t.Errorf("Issues = %v, want empty for healthy row", r.issues)
+	if len(r.findings) != 0 {
+		phrases := make([]string, len(r.findings))
+		for i, f := range r.findings {
+			phrases[i] = f.Phrase
+		}
+		t.Errorf("Findings = %v, want empty for healthy row", phrases)
 	}
 }
 
@@ -114,8 +127,12 @@ func TestDBISnap_Fetcher_Creating_CarriesPercent(t *testing.T) {
 	if r.status != "creating: 42%" {
 		t.Errorf("Status = %q, want %q", r.status, "creating: 42%")
 	}
-	if len(r.issues) != 1 || r.issues[0] != "creating: 42%" {
-		t.Errorf("Issues = %v, want [creating: 42%%]", r.issues)
+	if len(r.findings) != 1 || r.findings[0].Phrase != "creating: 42%" {
+		phrases := make([]string, len(r.findings))
+		for i, f := range r.findings {
+			phrases[i] = f.Phrase
+		}
+		t.Errorf("Findings = %v, want [creating: 42%%]", phrases)
 	}
 }
 
@@ -136,8 +153,12 @@ func TestDBISnap_Fetcher_Failed_BareKeyword(t *testing.T) {
 	if r.status != "failed" {
 		t.Errorf("Status = %q, want %q", r.status, "failed")
 	}
-	if len(r.issues) != 1 || r.issues[0] != "failed" {
-		t.Errorf("Issues = %v, want [failed]", r.issues)
+	if len(r.findings) != 1 || r.findings[0].Phrase != "failed" {
+		phrases := make([]string, len(r.findings))
+		for i, f := range r.findings {
+			phrases[i] = f.Phrase
+		}
+		t.Errorf("Findings = %v, want [failed]", phrases)
 	}
 }
 
@@ -160,8 +181,12 @@ func TestDBISnap_Fetcher_IncompatibleKeywordPreserved(t *testing.T) {
 			if r.status != status {
 				t.Errorf("Status = %q, want %q (keyword must be preserved verbatim)", r.status, status)
 			}
-			if len(r.issues) != 1 || r.issues[0] != status {
-				t.Errorf("Issues = %v, want [%s]", r.issues, status)
+			if len(r.findings) != 1 || r.findings[0].Phrase != status {
+				phrases := make([]string, len(r.findings))
+				for i, f := range r.findings {
+					phrases[i] = f.Phrase
+				}
+				t.Errorf("Findings = %v, want [%s]", phrases, status)
 			}
 		})
 	}
@@ -184,8 +209,12 @@ func TestDBISnap_Fetcher_Unencrypted(t *testing.T) {
 	if r.status != "unencrypted" {
 		t.Errorf("Status = %q, want %q", r.status, "unencrypted")
 	}
-	if len(r.issues) != 1 || r.issues[0] != "unencrypted" {
-		t.Errorf("Issues = %v, want [unencrypted]", r.issues)
+	if len(r.findings) != 1 || r.findings[0].Phrase != "unencrypted" {
+		phrases := make([]string, len(r.findings))
+		for i, f := range r.findings {
+			phrases[i] = f.Phrase
+		}
+		t.Errorf("Findings = %v, want [unencrypted]", phrases)
 	}
 }
 
@@ -207,8 +236,12 @@ func TestDBISnap_Fetcher_SeverityBrokenBeatsWarning(t *testing.T) {
 	if r.status != "failed" {
 		t.Errorf("Status = %q, want %q (Broken wins; unencrypted suppressed when Status=failed)", r.status, "failed")
 	}
-	if len(r.issues) != 1 || r.issues[0] != "failed" {
-		t.Errorf("Issues = %v, want [failed] (Broken suppresses Warning in same row)", r.issues)
+	if len(r.findings) != 1 || r.findings[0].Phrase != "failed" {
+		phrases := make([]string, len(r.findings))
+		for i, f := range r.findings {
+			phrases[i] = f.Phrase
+		}
+		t.Errorf("Findings = %v, want [failed] (Broken suppresses Warning in same row)", phrases)
 	}
 }
 
@@ -231,19 +264,19 @@ func TestDBISnap_Fetcher_PopulatesARNField(t *testing.T) {
 	}
 }
 
-// TestDBISnap_Fetcher_IssuesPopulatedInPrecedenceOrder verifies (U7f) that
-// Resource.Issues is ordered per §0.1 for each signal case:
+// TestDBISnap_Fetcher_FindingsPopulatedInPrecedenceOrder verifies (U7f) that
+// Resource.Findings is ordered per §0.1 for each signal case (PR-03e):
 //   - Healthy → empty
 //   - failed → ["failed"]
 //   - incompatible-restore → ["incompatible-restore"]
 //   - creating → ["creating: 60%"]
 //   - unencrypted → ["unencrypted"]
-func TestDBISnap_Fetcher_IssuesPopulatedInPrecedenceOrder(t *testing.T) {
+func TestDBISnap_Fetcher_FindingsPopulatedInPrecedenceOrder(t *testing.T) {
 	cases := []struct {
-		name        string
-		snap        rdstypes.DBSnapshot
-		wantStatus  string
-		wantIssues  []string
+		name         string
+		snap         rdstypes.DBSnapshot
+		wantPhrase   string
+		wantFindings []string
 	}{
 		{
 			name: "healthy_empty",
@@ -253,8 +286,8 @@ func TestDBISnap_Fetcher_IssuesPopulatedInPrecedenceOrder(t *testing.T) {
 				Encrypted:            aws.Bool(true),
 				PercentProgress:      aws.Int32(100),
 			},
-			wantStatus: "",
-			wantIssues: nil,
+			wantPhrase:   "",
+			wantFindings: nil,
 		},
 		{
 			name: "failed_single",
@@ -264,8 +297,8 @@ func TestDBISnap_Fetcher_IssuesPopulatedInPrecedenceOrder(t *testing.T) {
 				Encrypted:            aws.Bool(true),
 				PercentProgress:      aws.Int32(0),
 			},
-			wantStatus: "failed",
-			wantIssues: []string{"failed"},
+			wantPhrase:   "failed",
+			wantFindings: []string{"failed"},
 		},
 		{
 			name: "incompatible_restore",
@@ -275,8 +308,8 @@ func TestDBISnap_Fetcher_IssuesPopulatedInPrecedenceOrder(t *testing.T) {
 				Encrypted:            aws.Bool(true),
 				PercentProgress:      aws.Int32(0),
 			},
-			wantStatus: "incompatible-restore",
-			wantIssues: []string{"incompatible-restore"},
+			wantPhrase:   "incompatible-restore",
+			wantFindings: []string{"incompatible-restore"},
 		},
 		{
 			name: "creating_60pct",
@@ -286,8 +319,8 @@ func TestDBISnap_Fetcher_IssuesPopulatedInPrecedenceOrder(t *testing.T) {
 				Encrypted:            aws.Bool(true),
 				PercentProgress:      aws.Int32(60),
 			},
-			wantStatus: "creating: 60%",
-			wantIssues: []string{"creating: 60%"},
+			wantPhrase:   "creating: 60%",
+			wantFindings: []string{"creating: 60%"},
 		},
 		{
 			name: "unencrypted",
@@ -297,8 +330,8 @@ func TestDBISnap_Fetcher_IssuesPopulatedInPrecedenceOrder(t *testing.T) {
 				Encrypted:            aws.Bool(false),
 				PercentProgress:      aws.Int32(100),
 			},
-			wantStatus: "unencrypted",
-			wantIssues: []string{"unencrypted"},
+			wantPhrase:   "unencrypted",
+			wantFindings: []string{"unencrypted"},
 		},
 	}
 
@@ -309,15 +342,26 @@ func TestDBISnap_Fetcher_IssuesPopulatedInPrecedenceOrder(t *testing.T) {
 				t.Fatalf("expected 1 row, got %d", len(rows))
 			}
 			r := rows[0]
-			if r.status != tc.wantStatus {
-				t.Errorf("Status = %q, want %q", r.status, tc.wantStatus)
+			if r.status != tc.wantPhrase {
+				t.Errorf("Fields[status] = %q, want %q", r.status, tc.wantPhrase)
 			}
-			if len(r.issues) != len(tc.wantIssues) {
-				t.Errorf("Issues length = %d, want %d; got %v", len(r.issues), len(tc.wantIssues), r.issues)
+			gotPhrases := make([]string, len(r.findings))
+			for i, f := range r.findings {
+				gotPhrases[i] = f.Phrase
+			}
+			if len(gotPhrases) == 0 {
+				gotPhrases = nil
+			}
+			wantF := tc.wantFindings
+			if len(wantF) == 0 {
+				wantF = nil
+			}
+			if len(gotPhrases) != len(wantF) {
+				t.Errorf("Findings length = %d, want %d; got %v", len(gotPhrases), len(wantF), gotPhrases)
 			} else {
-				for i, want := range tc.wantIssues {
-					if r.issues[i] != want {
-						t.Errorf("Issues[%d] = %q, want %q", i, r.issues[i], want)
+				for i, want := range wantF {
+					if gotPhrases[i] != want {
+						t.Errorf("Findings[%d].Phrase = %q, want %q", i, gotPhrases[i], want)
 					}
 				}
 			}
@@ -354,15 +398,19 @@ func TestDBISnap_Fetcher_MultiW1_TopPlusSuffix(t *testing.T) {
 	if !strings.Contains(r.status, "(+1)") {
 		t.Errorf("Status = %q, want (+1) suffix (multi-W1 indicator)", r.status)
 	}
-	// Issues: creating phrase first, then unencrypted.
-	if len(r.issues) < 2 {
-		t.Errorf("Issues = %v, want at least 2 (creating + unencrypted)", r.issues)
-	} else {
-		if !strings.HasPrefix(r.issues[0], "creating: 15%") {
-			t.Errorf("Issues[0] = %q, want creating phrase first (§0.1 precedence)", r.issues[0])
+	// Findings: creating phrase first, then unencrypted.
+	if len(r.findings) < 2 {
+		phrases := make([]string, len(r.findings))
+		for i, f := range r.findings {
+			phrases[i] = f.Phrase
 		}
-		if r.issues[1] != "unencrypted" {
-			t.Errorf("Issues[1] = %q, want %q", r.issues[1], "unencrypted")
+		t.Errorf("Findings = %v, want at least 2 (creating + unencrypted)", phrases)
+	} else {
+		if !strings.HasPrefix(r.findings[0].Phrase, "creating: 15%") {
+			t.Errorf("Findings[0].Phrase = %q, want creating phrase first (§0.1 precedence)", r.findings[0].Phrase)
+		}
+		if r.findings[1].Phrase != "unencrypted" {
+			t.Errorf("Findings[1].Phrase = %q, want %q", r.findings[1].Phrase, "unencrypted")
 		}
 	}
 }

@@ -14,6 +14,7 @@ package unit
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -105,12 +106,16 @@ func TestFetchDocDBClusters_FieldMapping(t *testing.T) {
 	if r.Name != "prod-docdb-01" {
 		t.Errorf("Name = %q, want %q", r.Name, "prod-docdb-01")
 	}
-	// Healthy clusters render a blank Status phrase per spec §4 (silence is the UX).
+	// PR-03e: Status is always "" (phrases moved to Findings + Fields["status"]).
 	if r.Status != "" {
-		t.Errorf("Status = %q, want blank (healthy silence)", r.Status)
+		t.Errorf("Status = %q, want blank (PR-03e: fetcher must not write Status)", r.Status)
 	}
-	if len(r.Issues) != 0 {
-		t.Errorf("Issues = %v, want empty slice for healthy cluster", r.Issues)
+	if len(r.Findings) != 0 {
+		phrases := make([]string, len(r.Findings))
+		for i, f := range r.Findings {
+			phrases[i] = f.Phrase
+		}
+		t.Errorf("Findings = %v, want empty slice for healthy cluster", phrases)
 	}
 
 	// Required field keys. cis_flags is intentionally absent (jargon column removed).
@@ -709,9 +714,10 @@ func TestDbc_Pagination_MultiPage_Success(t *testing.T) {
 	}
 }
 
-// TestComputeRDSDBClusterStatusAndIssues validates computeRDSDBClusterStatusAndIssues
+// TestComputeRDSDBClusterStatusAndFindings validates computeRDSDBClusterStatusAndIssues
 // (unexported) via FetchRDSDBClustersPage — 11 cases mirroring the docdb table.
-func TestComputeRDSDBClusterStatusAndIssues(t *testing.T) {
+// PR-03e: assertions migrated from Status/Issues to Fields["status"]/Findings.
+func TestComputeRDSDBClusterStatusAndFindings(t *testing.T) {
 	boolPtr := func(b bool) *bool { return &b }
 	int32Ptr := func(i int32) *int32 { return &i }
 	writer := rdstypes.DBClusterMember{IsClusterWriter: boolPtr(true)}
@@ -719,8 +725,8 @@ func TestComputeRDSDBClusterStatusAndIssues(t *testing.T) {
 	cases := []struct {
 		name        string
 		cluster     rdstypes.DBCluster
-		wantStatus  string
-		wantIssues  []string
+		wantPhrase  string   // expected Fields["status"] display phrase
+		wantFindings []string // expected Findings phrases in order
 	}{
 		{
 			name: "healthy_available_writer",
@@ -732,8 +738,8 @@ func TestComputeRDSDBClusterStatusAndIssues(t *testing.T) {
 				StorageEncrypted:      boolPtr(true),
 				BackupRetentionPeriod: int32Ptr(7),
 			},
-			wantStatus: "",
-			wantIssues: nil,
+			wantPhrase:  "",
+			wantFindings: nil,
 		},
 		{
 			name: "available_zero_writers",
@@ -745,8 +751,8 @@ func TestComputeRDSDBClusterStatusAndIssues(t *testing.T) {
 				StorageEncrypted:      boolPtr(true),
 				BackupRetentionPeriod: int32Ptr(7),
 			},
-			wantStatus: "no writer: reads only",
-			wantIssues: []string{"no writer: reads only"},
+			wantPhrase:  "no writer: reads only",
+			wantFindings: []string{"no writer: reads only"},
 		},
 		{
 			name: "available_deletion_protection_false",
@@ -758,8 +764,8 @@ func TestComputeRDSDBClusterStatusAndIssues(t *testing.T) {
 				StorageEncrypted:      boolPtr(true),
 				BackupRetentionPeriod: int32Ptr(7),
 			},
-			wantStatus: "delete-protection off",
-			wantIssues: []string{"delete-protection off"},
+			wantPhrase:  "delete-protection off",
+			wantFindings: []string{"delete-protection off"},
 		},
 		{
 			name: "available_storage_not_encrypted",
@@ -771,8 +777,8 @@ func TestComputeRDSDBClusterStatusAndIssues(t *testing.T) {
 				StorageEncrypted:      boolPtr(false),
 				BackupRetentionPeriod: int32Ptr(7),
 			},
-			wantStatus: "not encrypted at rest",
-			wantIssues: []string{"not encrypted at rest"},
+			wantPhrase:  "not encrypted at rest",
+			wantFindings: []string{"not encrypted at rest"},
 		},
 		{
 			name: "available_backup_retention_zero",
@@ -784,8 +790,8 @@ func TestComputeRDSDBClusterStatusAndIssues(t *testing.T) {
 				StorageEncrypted:      boolPtr(true),
 				BackupRetentionPeriod: int32Ptr(0),
 			},
-			wantStatus: "no automated backups",
-			wantIssues: []string{"no automated backups"},
+			wantPhrase:  "no automated backups",
+			wantFindings: []string{"no automated backups"},
 		},
 		{
 			name: "available_all_three_warnings",
@@ -797,8 +803,8 @@ func TestComputeRDSDBClusterStatusAndIssues(t *testing.T) {
 				StorageEncrypted:      boolPtr(false),
 				BackupRetentionPeriod: int32Ptr(0),
 			},
-			wantStatus: "delete-protection off (+2)",
-			wantIssues: []string{"delete-protection off", "not encrypted at rest", "no automated backups"},
+			wantPhrase:  "delete-protection off (+2)",
+			wantFindings: []string{"delete-protection off", "not encrypted at rest", "no automated backups"},
 		},
 		{
 			name: "failed_status",
@@ -807,8 +813,8 @@ func TestComputeRDSDBClusterStatusAndIssues(t *testing.T) {
 				Status:              aws.String("failed"),
 				DBClusterMembers:    []rdstypes.DBClusterMember{writer},
 			},
-			wantStatus: "failed: cluster operation",
-			wantIssues: []string{"failed: cluster operation"},
+			wantPhrase:  "failed: cluster operation",
+			wantFindings: []string{"failed: cluster operation"},
 		},
 		{
 			name: "inaccessible_encryption_credentials",
@@ -817,8 +823,8 @@ func TestComputeRDSDBClusterStatusAndIssues(t *testing.T) {
 				Status:              aws.String("inaccessible-encryption-credentials"),
 				DBClusterMembers:    []rdstypes.DBClusterMember{writer},
 			},
-			wantStatus: "encryption key unreachable",
-			wantIssues: []string{"encryption key unreachable"},
+			wantPhrase:  "encryption key unreachable",
+			wantFindings: []string{"encryption key unreachable"},
 		},
 		{
 			name: "incompatible_parameters",
@@ -827,8 +833,8 @@ func TestComputeRDSDBClusterStatusAndIssues(t *testing.T) {
 				Status:              aws.String("incompatible-parameters"),
 				DBClusterMembers:    []rdstypes.DBClusterMember{writer},
 			},
-			wantStatus: "parameter group incompatible",
-			wantIssues: []string{"parameter group incompatible"},
+			wantPhrase:  "parameter group incompatible",
+			wantFindings: []string{"parameter group incompatible"},
 		},
 		{
 			name: "modifying_transitional",
@@ -837,8 +843,8 @@ func TestComputeRDSDBClusterStatusAndIssues(t *testing.T) {
 				Status:              aws.String("modifying"),
 				DBClusterMembers:    []rdstypes.DBClusterMember{writer},
 			},
-			wantStatus: "modifying: in progress",
-			wantIssues: []string{"modifying: in progress"},
+			wantPhrase:  "modifying: in progress",
+			wantFindings: []string{"modifying: in progress"},
 		},
 		{
 			name: "unknown_status_passthrough",
@@ -847,8 +853,8 @@ func TestComputeRDSDBClusterStatusAndIssues(t *testing.T) {
 				Status:              aws.String("cross-region-copying"),
 				DBClusterMembers:    []rdstypes.DBClusterMember{writer},
 			},
-			wantStatus: "cross-region-copying",
-			wantIssues: []string{"cross-region-copying"},
+			wantPhrase:  "cross-region-copying",
+			wantFindings: []string{"cross-region-copying"},
 		},
 	}
 
@@ -862,17 +868,27 @@ func TestComputeRDSDBClusterStatusAndIssues(t *testing.T) {
 				t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 			}
 			r := result.Resources[0]
-			if r.Status != tc.wantStatus {
-				t.Errorf("Status = %q, want %q", r.Status, tc.wantStatus)
+			// PR-03e: Status must always be "".
+			if r.Status != "" {
+				t.Errorf("Status = %q, want %q (PR-03e: fetcher must not write Status)", r.Status, "")
 			}
-			if len(r.Issues) != len(tc.wantIssues) {
-				t.Errorf("Issues = %v, want %v", r.Issues, tc.wantIssues)
-			} else {
-				for i, want := range tc.wantIssues {
-					if r.Issues[i] != want {
-						t.Errorf("Issues[%d] = %q, want %q", i, r.Issues[i], want)
-					}
-				}
+			if r.Fields["status"] != tc.wantPhrase {
+				t.Errorf("Fields[status] = %q, want %q", r.Fields["status"], tc.wantPhrase)
+			}
+			// Compare finding phrases.
+			gotPhrases := make([]string, len(r.Findings))
+			for i, f := range r.Findings {
+				gotPhrases[i] = f.Phrase
+			}
+			wantFindings := tc.wantFindings
+			if len(wantFindings) == 0 {
+				wantFindings = nil
+			}
+			if len(gotPhrases) == 0 {
+				gotPhrases = nil
+			}
+			if !reflect.DeepEqual(gotPhrases, wantFindings) {
+				t.Errorf("Findings phrases = %v, want %v", gotPhrases, wantFindings)
 			}
 		})
 	}

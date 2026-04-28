@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -111,10 +112,8 @@ func init() {
 	})
 }
 
-// ComputeDBCSnapStatusAndIssues computes the §4 status phrase and ordered
-// issues slice for a DocDB / Aurora cluster snapshot. Returns ("", nil) for a
-// healthy (available) snapshot. The top phrase becomes Resource.Status; the
-// full slice becomes Resource.Issues.
+// computeDBCSnapFindings computes the ordered Wave-1 findings for a
+// DocDB / Aurora cluster snapshot. Returns nil for a healthy (available) snapshot.
 //
 // §0.1 / §3.1 precedence ladder (Broken > Warning, table order within severity):
 //  1. Broken: Status == "failed" → phrase "failed"
@@ -126,39 +125,52 @@ func init() {
 //     Gate: SnapshotType == "manual" AND SnapshotCreateTime != nil AND age > 365.
 //
 // Cross-ref signals (orphan, past-retention) are added by the Wave-1 issue
-// enricher (ComputeDBCSnapStatusAndIssues) via FieldUpdates, never here.
-func ComputeDBCSnapStatusAndIssues(snap docdbtypes.DBClusterSnapshot) (string, []string) {
+// enricher via FieldUpdates, never here.
+func computeDBCSnapFindings(snap docdbtypes.DBClusterSnapshot) []domain.Finding {
 	rawStatus := ""
 	if snap.Status != nil {
 		rawStatus = *snap.Status
 	}
 
-	var issues []string
-
 	// Broken checks first (severity wins).
 	if rawStatus == "failed" {
-		issues = append(issues, "failed")
-		return buildStatusFromIssues(issues), issues
+		return []domain.Finding{{Code: CodeDBCSnapFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
 	}
 	if strings.HasPrefix(rawStatus, "incompatible-") {
-		issues = append(issues, rawStatus)
-		return buildStatusFromIssues(issues), issues
+		return []domain.Finding{{Code: CodeDBCSnapIncompatible, Phrase: rawStatus, Severity: domain.SevBroken, Source: "wave1"}}
 	}
+
+	var findings []domain.Finding
 
 	// Warning: creating (transitional). DBClusterSnapshot has no PercentProgress.
 	if rawStatus == "creating" {
-		issues = append(issues, "creating")
+		findings = append(findings, domain.Finding{Code: CodeDBCSnapCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"})
 	}
 
 	// Warning: manual snapshot unused for > 365 days.
 	if snap.SnapshotType != nil && *snap.SnapshotType == "manual" && snap.SnapshotCreateTime != nil {
 		ageD := int(time.Since(*snap.SnapshotCreateTime).Hours() / 24)
 		if ageD > 365 {
-			issues = append(issues, fmt.Sprintf("manual, unused %dd", ageD))
+			findings = append(findings, domain.Finding{Code: CodeDBCSnapManualUnused, Phrase: fmt.Sprintf("manual, unused %dd", ageD), Severity: domain.SevWarn, Source: "wave1"})
 		}
 	}
 
-	return buildStatusFromIssues(issues), issues
+	return findings
+}
+
+// ComputeDBCSnapStatusAndIssues is the exported compatibility wrapper around
+// computeDBCSnapFindings. Returns (statusPhrase, issuesPhrases) matching the
+// legacy (string, []string) contract expected by external callers and tests.
+func ComputeDBCSnapStatusAndIssues(snap docdbtypes.DBClusterSnapshot) (string, []string) {
+	findings := computeDBCSnapFindings(snap)
+	if len(findings) == 0 {
+		return "", nil
+	}
+	phrases := make([]string, len(findings))
+	for i, f := range findings {
+		phrases[i] = f.Phrase
+	}
+	return phrases[0], phrases
 }
 
 // FetchDocDBClusterSnapshots calls the DocumentDB DescribeDBClusterSnapshots API and converts the
@@ -211,11 +223,16 @@ func FetchDocDBClusterSnapshotsPage(ctx context.Context, api DocDBDescribeDBClus
 
 		// Per spec §4 (docs/resources/dbc-snap.md), Status is the §4 phrase, not
 		// raw AWS state. Healthy snapshots render BLANK. Wave-1 fetcher-local
-		// signals (failed, incompatible-*, creating, manual-unused) are computed
-		// by ComputeDBCSnapStatusAndIssues and stored in Issues. Cross-ref signals
-		// (orphan, past-retention) come from enrichDBCSnapCrossRef and overwrite
-		// via FieldUpdates / merge with computeMergedStatus.
-		computedStatus, allIssues := ComputeDBCSnapStatusAndIssues(snapshot)
+		// signals (failed, incompatible-*, creating, manual-unused) are emitted
+		// as Findings by computeDBCSnapFindings.
+		findings := computeDBCSnapFindings(snapshot)
+		statusPhrase := ""
+		if len(findings) > 0 {
+			statusPhrase = findings[0].Phrase
+			if len(findings) > 1 {
+				statusPhrase = fmt.Sprintf("%s (+%d)", statusPhrase, len(findings)-1)
+			}
+		}
 
 		engine := ""
 		if snapshot.Engine != nil {
@@ -243,20 +260,19 @@ func FetchDocDBClusterSnapshotsPage(ctx context.Context, api DocDBDescribeDBClus
 		}
 
 		r := resource.Resource{
-			ID:     snapshotID,
-			Name:   snapshotID,
-			Status: computedStatus,
-			Issues: allIssues,
+			ID:   snapshotID,
+			Name: snapshotID,
 			Fields: map[string]string{
 				"snapshot_id":          snapshotID,
 				"cluster_id":           clusterID,
-				"status":               computedStatus,
+				"status":               statusPhrase,
 				"engine":               engine,
 				"snapshot_type":        snapshotType,
 				"snapshot_create_time": snapshotCreateTime,
 				"storage_type":         storageType,
 				"storage_encrypted":    storageEncrypted,
 			},
+			Findings:  findings,
 			RawStruct: snapshot,
 		}
 
