@@ -171,3 +171,47 @@ func glyphFromDomainSeverity(s domain.Severity) string {
 	}
 }
 
+// stripWave2 returns a copy of findings with wave2 entries removed.
+// Wave 1 entries (Source = "wave1") are preserved in order.
+// Returns the original slice unchanged when it contains no wave2 entries
+// (avoids allocation on the common happy-path: no stale wave2).
+func stripWave2(findings []domain.Finding) []domain.Finding {
+	if len(findings) == 0 {
+		return findings
+	}
+	out := findings[:0:0] // empty slice, no capacity reuse to avoid alias pollution
+	for _, f := range findings {
+		if !strings.HasPrefix(f.Source, "wave2:") {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// clearAllWave2 strips wave2 findings from every row in every session-scoped
+// cache. Used by main-menu Ctrl+R to ensure the next list-open doesn't
+// rehydrate stale wave2 attention state via findingsFromRows.
+func clearAllWave2(m *Model) {
+	for _, entry := range m.ResourceCache {
+		if entry == nil {
+			continue
+		}
+		for i := range entry.Resources {
+			entry.Resources[i].Findings = stripWave2(entry.Resources[i].Findings)
+			entry.Resources[i].AttentionDetails = nil
+		}
+	}
+	for _, rows := range m.LazyResourceCache {
+		for i := range rows {
+			rows[i].Findings = stripWave2(rows[i].Findings)
+			rows[i].AttentionDetails = nil
+		}
+	}
+	for _, rows := range m.ProbeResources {
+		for i := range rows {
+			rows[i].Findings = stripWave2(rows[i].Findings)
+			rows[i].AttentionDetails = nil
+		}
+	}
+}
+

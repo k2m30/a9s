@@ -354,6 +354,10 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		m.EnrichmentRan = make(map[string]bool)
 		m.EnrichmentTypeGen = make(map[string]int)
 		m.EnrichmentTruncatedIDs = make(map[string]map[string]bool)
+		// Clear stale Wave 2 from all cached rows before resetting ProbeResources.
+		// Without this, opening a cached list before the new enrichment completes
+		// would show the previous run's attention state (PR #310 CodeRabbit finding B).
+		clearAllWave2(&m)
 		m.ProbeResources = make(map[string][]resource.Resource)
 		m.ProbeTruncated = make(map[string]bool)
 		// Reset the menu's view-side state (availability, issue counts) in
@@ -412,6 +416,19 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	rt := rl.ResourceType()
+
+	// Pre-fetch cleanup: strip stale Wave 2 findings from all cached rows of this
+	// type BEFORE deleting the cache entry. applyEnrichment walks ResourceCache[rt]
+	// to find rows; because the active ResourceListModel's allResources slice shares
+	// the same backing array as entry.Resources, the mutation clears both the cache
+	// copy and the view's rows in one pass. Deleting the cache entry afterwards is
+	// still correct (forces a fresh fetch); the view rows are already cleared.
+	// This fixes the PR #310 CodeRabbit finding A: previously delete() ran first so
+	// applyEnrichment found no rows and the rl's slice retained stale wave2 state.
+	if rl.ParentContext() == nil && !rl.EscPops() {
+		(&m).applyEnrichment(rt, nil)
+	}
+
 	delete(m.ResourceCache, rt) // clear cache for refreshed type only
 	if rt == "ses" {
 		// Swap (see detail-view path above): protects against in-flight
@@ -435,9 +452,10 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 			// Clear per-resource truncation markers too: if the refresh errors
 			// out, stale "?" prefixes must not persist across the rerun.
 			delete(m.EnrichmentTruncatedIDs, rt)
-			// Strip wave2 from any rows still in ProbeResources/LazyResourceCache
-			// (ResourceCache[rt] was already deleted above on line 415). Rows are the
-			// authoritative source after PR-03a-fold; no parallel map to delete.
+			// Wave2 already stripped above (pre-fetch cleanup). Strip any rows
+			// that entered via ProbeResources/LazyResourceCache (those paths are
+			// NOT covered by the pre-fetch cleanup above, which only covers the
+			// ResourceCache entry before deletion).
 			(&m).applyEnrichment(rt, nil)
 			// Propagate the cleared state to the active ResourceListModel so
 			// row markers disappear immediately at Ctrl+R — otherwise stale markers
@@ -448,11 +466,8 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 			cmd := m.refreshResourceListWithEnrichmentRerun(*rl, tok)
 			return m, cmd
 		}
-		// Top-level list without an enricher: clear any stale wave2 findings from
-		// cached rows and propagate to the view so row markers don't persist across
-		// a Ctrl+R refresh. applyEnrichment with nil strips wave2 unconditionally
-		// (no-op when there are no wave2 entries — no guard needed after fold).
-		(&m).applyEnrichment(rt, nil)
+		// Top-level list without an enricher: propagate the cleared state.
+		// Wave2 was already stripped in the pre-fetch cleanup above.
 		rl.SetEnrichmentState(0, false, nil)
 	}
 	return m, m.refreshResourceList(*rl)
