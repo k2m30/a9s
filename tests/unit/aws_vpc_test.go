@@ -65,8 +65,8 @@ func TestFetchVPCs_ParsesMultipleVPCs(t *testing.T) {
 	if r0.Name != "main-vpc" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "main-vpc", r0.Name)
 	}
-	if r0.Status != "available" {
-		t.Errorf("resource[0].Status: expected %q, got %q", "available", r0.Status)
+	if r0.Status != "" {
+		t.Errorf("resource[0].Status: expected empty (PR-03d migration), got %q", r0.Status)
 	}
 
 	// Verify Fields
@@ -104,8 +104,11 @@ func TestFetchVPCs_ParsesMultipleVPCs(t *testing.T) {
 	if r1.Name != "" {
 		t.Errorf("resource[1].Name: expected empty string, got %q", r1.Name)
 	}
-	if r1.Status != "pending" {
-		t.Errorf("resource[1].Status: expected %q, got %q", "pending", r1.Status)
+	if r1.Status != "" {
+		t.Errorf("resource[1].Status: expected empty (PR-03d migration), got %q", r1.Status)
+	}
+	if r1.Fields["state"] != "pending" {
+		t.Errorf("resource[1].Fields[\"state\"]: expected %q, got %q", "pending", r1.Fields["state"])
 	}
 	if r1.Fields["is_default"] != "false" {
 		t.Errorf("resource[1].Fields[\"is_default\"]: expected %q, got %q", "false", r1.Fields["is_default"])
@@ -212,8 +215,8 @@ func TestFetchVPCs_RealAWSData(t *testing.T) {
 	if r0.Name != "dev-vpc" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "dev-vpc", r0.Name)
 	}
-	if r0.Status != "available" {
-		t.Errorf("resource[0].Status: expected %q, got %q", "available", r0.Status)
+	if r0.Status != "" {
+		t.Errorf("resource[0].Status: expected empty (PR-03d migration), got %q", r0.Status)
 	}
 	if r0.Fields["vpc_id"] != "vpc-0aaa1111bbb2222cc" {
 		t.Errorf("resource[0].Fields[\"vpc_id\"]: expected %q, got %q", "vpc-0aaa1111bbb2222cc", r0.Fields["vpc_id"])
@@ -251,8 +254,11 @@ func TestFetchVPCs_RealAWSData(t *testing.T) {
 	if r1.Name != "" {
 		t.Errorf("resource[1].Name: expected empty (no Name tag on default VPC), got %q", r1.Name)
 	}
-	if r1.Status != "available" {
-		t.Errorf("resource[1].Status: expected %q, got %q", "available", r1.Status)
+	if r1.Status != "" {
+		t.Errorf("resource[1].Status: expected empty (PR-03d migration), got %q", r1.Status)
+	}
+	if r1.Fields["state"] != "available" {
+		t.Errorf("resource[1].Fields[\"state\"]: expected %q, got %q", "available", r1.Fields["state"])
 	}
 	if r1.Fields["cidr_block"] != "172.31.0.0/16" {
 		t.Errorf("resource[1].Fields[\"cidr_block\"]: expected %q, got %q", "172.31.0.0/16", r1.Fields["cidr_block"])

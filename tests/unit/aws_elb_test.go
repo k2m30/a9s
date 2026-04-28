@@ -80,8 +80,8 @@ func TestFetchLoadBalancers_ParsesMultipleLoadBalancers(t *testing.T) {
 	if r0.Name != "prod-alb" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "prod-alb", r0.Name)
 	}
-	if r0.Status != "active" {
-		t.Errorf("resource[0].Status: expected %q, got %q", "active", r0.Status)
+	if r0.Status != "" {
+		t.Errorf("resource[0].Status: expected empty (PR-03d migration), got %q", r0.Status)
 	}
 	if r0.Fields["name"] != "prod-alb" {
 		t.Errorf("resource[0].Fields[\"name\"]: expected %q, got %q", "prod-alb", r0.Fields["name"])

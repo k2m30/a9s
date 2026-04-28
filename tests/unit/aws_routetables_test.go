@@ -67,9 +67,12 @@ func TestFetchRouteTables_ParsesMultipleRouteTables(t *testing.T) {
 	if r0.Name != "main-rtb" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "main-rtb", r0.Name)
 	}
-	// Status is "true" when Main association exists, "false" otherwise
-	if r0.Status != "true" {
-		t.Errorf("resource[0].Status: expected %q, got %q", "true", r0.Status)
+	// PR-03d: Status no longer set; is_main lives in Fields.
+	if r0.Status != "" {
+		t.Errorf("resource[0].Status: expected empty (PR-03d migration), got %q", r0.Status)
+	}
+	if r0.Fields["is_main"] != "true" {
+		t.Errorf("resource[0].Fields[\"is_main\"]: expected %q, got %q", "true", r0.Fields["is_main"])
 	}
 
 	// Verify Fields on all resources
@@ -107,8 +110,11 @@ func TestFetchRouteTables_ParsesMultipleRouteTables(t *testing.T) {
 	if r1.Name != "" {
 		t.Errorf("resource[1].Name: expected empty string, got %q", r1.Name)
 	}
-	if r1.Status != "false" {
-		t.Errorf("resource[1].Status: expected %q, got %q", "false", r1.Status)
+	if r1.Status != "" {
+		t.Errorf("resource[1].Status: expected empty (PR-03d migration), got %q", r1.Status)
+	}
+	if r1.Fields["is_main"] != "false" {
+		t.Errorf("resource[1].Fields[\"is_main\"]: expected %q, got %q", "false", r1.Fields["is_main"])
 	}
 	if r1.Fields["vpc_id"] != "vpc-bbb" {
 		t.Errorf("resource[1].Fields[\"vpc_id\"]: expected %q, got %q", "vpc-bbb", r1.Fields["vpc_id"])

@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -107,10 +108,19 @@ func FetchLoadBalancersPage(ctx context.Context, api ELBv2DescribeLoadBalancersA
 			lbArn = *lb.LoadBalancerArn
 		}
 
+		var findings []domain.Finding
+		switch state {
+		case "provisioning":
+			findings = []domain.Finding{{Code: CodeELBStateProvisioning, Phrase: "provisioning", Severity: domain.SevWarn, Source: "wave1"}}
+		case "active_impaired":
+			findings = []domain.Finding{{Code: CodeELBStateActiveImpaired, Phrase: "active impaired", Severity: domain.SevWarn, Source: "wave1"}}
+		case "failed":
+			findings = []domain.Finding{{Code: CodeELBStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+		}
+
 		r := resource.Resource{
-			ID:     lbName,
-			Name:   lbName,
-			Status: state,
+			ID:   lbName,
+			Name: lbName,
 			Fields: map[string]string{
 				"name":              lbName,
 				"dns_name":          dnsName,
@@ -120,6 +130,7 @@ func FetchLoadBalancersPage(ctx context.Context, api ELBv2DescribeLoadBalancersA
 				"vpc_id":            vpcID,
 				"load_balancer_arn": lbArn,
 			},
+			Findings:  findings,
 			RawStruct: lb,
 		}
 
