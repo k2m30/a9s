@@ -100,9 +100,8 @@ func FetchRouteTablesPage(ctx context.Context, api EC2DescribeRouteTablesAPI, co
 		}
 
 		r := resource.Resource{
-			ID:     rtbID,
-			Name:   name,
-			Status: isMain,
+			ID:   rtbID,
+			Name: name,
 			Fields: map[string]string{
 				"route_table_id":         rtbID,
 				"name":                   name,

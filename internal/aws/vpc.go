@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -90,10 +91,15 @@ func FetchVPCsPage(ctx context.Context, api EC2DescribeVpcsAPI, continuationToke
 			isDefault = "true"
 		}
 
+		var findings []domain.Finding
+		switch state {
+		case "pending":
+			findings = []domain.Finding{{Code: CodeVPCStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"}}
+		}
+
 		r := resource.Resource{
-			ID:     vpcID,
-			Name:   name,
-			Status: state,
+			ID:   vpcID,
+			Name: name,
 			Fields: map[string]string{
 				"vpc_id":     vpcID,
 				"name":       name,
@@ -101,6 +107,7 @@ func FetchVPCsPage(ctx context.Context, api EC2DescribeVpcsAPI, continuationToke
 				"state":      state,
 				"is_default": isDefault,
 			},
+			Findings:  findings,
 			RawStruct: vpc,
 		}
 

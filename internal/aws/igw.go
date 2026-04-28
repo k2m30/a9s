@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -92,10 +93,17 @@ func FetchInternetGatewaysPage(ctx context.Context, api EC2DescribeInternetGatew
 			state = string(igw.Attachments[0].State)
 		}
 
+		var findings []domain.Finding
+		switch state {
+		case "attaching":
+			findings = []domain.Finding{{Code: CodeIGWStateAttaching, Phrase: "attaching", Severity: domain.SevWarn, Source: "wave1"}}
+		case "detaching":
+			findings = []domain.Finding{{Code: CodeIGWStateDetaching, Phrase: "detaching", Severity: domain.SevWarn, Source: "wave1"}}
+		}
+
 		r := resource.Resource{
-			ID:     igwID,
-			Name:   name,
-			Status: state,
+			ID:   igwID,
+			Name: name,
 			Fields: map[string]string{
 				"igw_id":            igwID,
 				"name":              name,
@@ -103,6 +111,7 @@ func FetchInternetGatewaysPage(ctx context.Context, api EC2DescribeInternetGatew
 				"state":             state,
 				"attachments_count": fmt.Sprintf("%d", len(igw.Attachments)),
 			},
+			Findings:  findings,
 			RawStruct: igw,
 		}
 

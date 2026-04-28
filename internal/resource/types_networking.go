@@ -19,8 +19,11 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
 			},
 			Color: func(r Resource) Color {
+				if c, ok := ColorFromWave1(r); ok {
+					return c
+				}
 				switch r.Fields["state"] {
-				case "active":
+				case "active", "":
 					return ColorHealthy
 				case "provisioning", "active_impaired":
 					return ColorWarning
@@ -95,8 +98,11 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "is_default", Title: "Default", Width: 9, Sortable: true},
 			},
 			Color: func(r Resource) Color {
+				if c, ok := ColorFromWave1(r); ok {
+					return c
+				}
 				switch r.Fields["state"] {
-				case "available":
+				case "available", "":
 					return ColorHealthy
 				case "pending":
 					return ColorWarning
@@ -120,8 +126,11 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "available_ips", Title: "Available IPs", Width: 14, Sortable: true},
 			},
 			Color: func(r Resource) Color {
+				if c, ok := ColorFromWave1(r); ok {
+					return c
+				}
 				switch r.Fields["state"] {
-				case "available":
+				case "available", "":
 					return ColorHealthy
 				case "pending":
 					return ColorWarning
@@ -171,8 +180,11 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "public_ip", Title: "Public IP", Width: 16, Sortable: false},
 			},
 			Color: func(r Resource) Color {
+				if c, ok := ColorFromWave1(r); ok {
+					return c
+				}
 				switch r.Fields["state"] {
-				case "available":
+				case "available", "":
 					return ColorHealthy
 				case "pending", "deleting":
 					return ColorWarning
@@ -197,12 +209,15 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "state", Title: "State", Width: 12, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				attachments, _ := strconv.Atoi(r.Fields["attachments_count"])
-				if attachments == 0 {
-					return ColorWarning
+				if c, ok := ColorFromWave1(r); ok {
+					return c
 				}
 				switch r.Fields["state"] {
 				case "attaching", "detaching":
+					return ColorWarning
+				}
+				attachments, _ := strconv.Atoi(r.Fields["attachments_count"])
+				if attachments == 0 {
 					return ColorWarning
 				}
 				return ColorHealthy
@@ -225,13 +240,9 @@ func networkingResourceTypes() []ResourceTypeDef {
 			// Elastic IPs without an association are allocated-but-unused and
 			// continue to incur hourly charges. Surface those as warning.
 			Color: func(r Resource) Color {
-				// PR-03b: Findings-first for wave1 lifecycle entries.
-				for _, f := range r.Findings {
-					if f.Source == "wave1" {
-						return ColorFromSeverity(f.Severity)
-					}
+				if c, ok := ColorFromWave1(r); ok {
+					return c
 				}
-
 				if r.Fields["association_id"] == "" && r.Fields["instance_id"] == "" {
 					return ColorWarning
 				}
@@ -252,8 +263,11 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
 			},
 			Color: func(r Resource) Color {
+				if c, ok := ColorFromWave1(r); ok {
+					return c
+				}
 				switch r.Fields["state"] {
-				case "Available":
+				case "Available", "":
 					return ColorHealthy
 				case "PendingAcceptance", "Pending", "Deleting":
 					return ColorWarning
@@ -279,15 +293,18 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "description", Title: "Description", Width: 30, Sortable: false},
 			},
 			Color: func(r Resource) Color {
+				if c, ok := ColorFromWave1(r); ok {
+					return c
+				}
 				switch r.Fields["state"] {
-				case "available":
+				case "available", "":
 					return ColorHealthy
 				case "pending", "modifying", "deleting":
 					return ColorWarning
-				case "deleted":
-					return ColorDim
 				case "failed":
 					return ColorBroken
+				case "deleted":
+					return ColorDim
 				}
 				return ColorHealthy
 			},
@@ -307,13 +324,9 @@ func networkingResourceTypes() []ResourceTypeDef {
 				{Key: "private_ip", Title: "Private IP", Width: 16, Sortable: false},
 			},
 			Color: func(r Resource) Color {
-				// PR-03b: Findings-first for wave1 lifecycle entries.
-				for _, f := range r.Findings {
-					if f.Source == "wave1" {
-						return ColorFromSeverity(f.Severity)
-					}
+				if c, ok := ColorFromWave1(r); ok {
+					return c
 				}
-
 				switch r.Fields["status"] {
 				case "in-use":
 					return ColorHealthy
