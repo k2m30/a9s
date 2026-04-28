@@ -37,6 +37,7 @@ type DetailModel struct {
 	fieldList              []fieldpath.FieldItem       // structured field data; nil = not yet computed
 	fieldCursor            int                         // index into fieldList for navigable cursor
 	enrichmentFinding      *resource.EnrichmentFinding // nil when no finding; rendered at top of detail view when non-nil
+	plainMode              bool                        // true only during PlainContent(); causes Attention entries to render Key: Value (full text for clipboard/search)
 }
 
 // NewDetail creates a DetailModel for the given resource.

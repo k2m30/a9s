@@ -311,6 +311,9 @@ func (m ResourceListModel) renderDataRow(cols []listCol, r resource.Resource, ba
 				}
 			}
 		}
+		// Column width is already correct: widenLifecycleColumn pre-widened the
+		// lifecycle/status column before fitColumns ran, so c.width is the max
+		// across all rows. No per-row widening needed here.
 		padded := text.PadOrTrunc(val, c.width)
 		used += c.width
 		b.WriteString(base.Render(padded))
@@ -329,6 +332,21 @@ func (m ResourceListModel) extractCellValue(c listCol, r resource.Resource) stri
 	// Special key "@id" maps to the resource's canonical ID field.
 	if c.key == "@id" {
 		return r.ID
+	}
+	// PR-03a-views: status/lifecycle column reads Findings first, then
+	// Fields[LifecycleKey] as fallback — never r.Status or the raw key value.
+	// The status column is identified by c.key == "status" (conventional) or
+	// c.key == td.LifecycleKey when an explicit lifecycle key is set.
+	lifecycleKey := lifecycleColumnKey(m.typeDef)
+	isStatusCol := c.key == "status" || c.key == lifecycleKey
+	if isStatusCol {
+		if len(r.Findings) > 0 {
+			return r.Findings[0].Phrase
+		}
+		if v := r.Fields[lifecycleKey]; v != "" {
+			return v
+		}
+		// Fall through to normal extraction if neither Findings nor LifecycleKey value is set.
 	}
 	// Fields map (key-based columns) takes priority over raw struct fields.
 	// This ensures Wave-2 enriched values always win over struct literals,
@@ -374,4 +392,54 @@ func (m ResourceListModel) extractCellValue(c listCol, r resource.Resource) stri
 		return r.Name
 	}
 	return ""
+}
+
+func lifecycleColumnKey(td resource.ResourceTypeDef) string {
+	if td.LifecycleKey != "" {
+		return td.LifecycleKey
+	}
+	return "state"
+}
+
+// widenLifecycleColumn scans all rows and widens the lifecycle/status column
+// so its declared width covers the longest Findings phrase across every row.
+// Returns a new slice; the original is unmodified.
+//
+// This must run BEFORE fitColumns and renderHeaderRow so that the header and
+// all data rows use the same (widened) column width. Without this pre-pass,
+// renderDataRow would widen per-row in isolation, causing the header to show
+// the original (narrower) width while data rows overflow — a visible desync
+// between header labels and data cells.
+func (m ResourceListModel) widenLifecycleColumn(cols []listCol, rows []resource.Resource) []listCol {
+	if len(cols) == 0 || len(rows) == 0 {
+		return cols
+	}
+	lifecycleKey := lifecycleColumnKey(m.typeDef)
+	idx := -1
+	for i, c := range cols {
+		if c.key == "status" || c.key == lifecycleKey {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return cols
+	}
+	maxW := cols[idx].width
+	for _, r := range rows {
+		if len(r.Findings) == 0 {
+			continue
+		}
+		phrase := r.Findings[0].Phrase
+		if nat := lipgloss.Width(phrase); nat > maxW {
+			maxW = nat
+		}
+	}
+	if maxW == cols[idx].width {
+		return cols // no widening needed
+	}
+	out := make([]listCol, len(cols))
+	copy(out, cols)
+	out[idx].width = maxW
+	return out
 }
