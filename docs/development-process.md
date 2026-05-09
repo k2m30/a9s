@@ -120,8 +120,8 @@ Reviewers run **in parallel**. The PR cannot proceed until every applicable revi
 
 | Reviewer (Paperclip agent) | Always runs? | Trigger condition | Tools they invoke in-session |
 |---|---|---|---|
-| **CodeReviewer** | Yes | Any code change | `a9s-tui-reviewer` (TUI files), `a9s-consistency-checker`, `test-coverage-analyzer`, `a9s-docs-reviewer` (docs files), `tui-ux-auditor` (UX) |
-| **CodexReviewer** | Yes | Any code change | Codex pair-review pass — independent of CodeReviewer |
+| **CodeReviewer** | Yes | Any PR | `a9s-tui-reviewer` (TUI files), `a9s-consistency-checker`, `test-coverage-analyzer`, `a9s-docs-reviewer` (docs files), `tui-ux-auditor` (UX) |
+| **CodexReviewer** | Yes | Any PR | Codex pair-review pass — independent of CodeReviewer |
 | **Architect** | Yes for size ≥ `M` | Architecture checklist score; target ≥ 8.5 / 10 | `a9s-architect` (design re-read), `a9s-arch-review` skill |
 | **CTO** | Yes | Final sign-off; all above must be green first | `a9s-security-auditor` (when `internal/aws/` or deps changed) |
 | CodeRabbit (external) | Yes | One pass per push (batch fixes into one push) | n/a — external service, not a Paperclip agent |
