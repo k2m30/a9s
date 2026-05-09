@@ -81,6 +81,7 @@ func TestDemoColdCacheEC2_ListPopulates(t *testing.T) {
 //
 // Expected to FAIL initially because EC2Fake methods panic (T013 not yet done).
 func TestDemoColdCacheEC2_DetailRelatedPanels(t *testing.T) {
+	t.Parallel()
 	m := newDemoColdCacheApp(t)
 
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})
