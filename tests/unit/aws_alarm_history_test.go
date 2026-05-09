@@ -78,8 +78,8 @@ func TestFetchAlarmHistory_Basic(t *testing.T) {
 	})
 
 	t.Run("Status_is_string_HistoryItemType", func(t *testing.T) {
-		if r.Status != "StateUpdate" {
-			t.Errorf("Status: expected %q, got %q", "StateUpdate", r.Status)
+		if r.Fields["history_item_type"] != "StateUpdate" {
+			t.Errorf("Fields[history_item_type]: expected %q, got %q", "StateUpdate", r.Fields["history_item_type"])
 		}
 	})
 
@@ -502,8 +502,8 @@ func TestFetchAlarmHistory_Pagination(t *testing.T) {
 
 	t.Run("page1_all_have_status", func(t *testing.T) {
 		for i, r := range result1.Resources {
-			if r.Status == "" {
-				t.Errorf("page 1: resources[%d].Status should not be empty", i)
+			if r.Fields["history_item_type"] == "" {
+				t.Errorf("page 1: resources[%d].Fields[history_item_type] should not be empty", i)
 			}
 		}
 	})

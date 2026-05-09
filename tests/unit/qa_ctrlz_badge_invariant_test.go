@@ -67,10 +67,10 @@ func ctrlZModel(t *testing.T, shortName string, resources []resource.Resource) v
 // 2 ct-info (dim), 1 ct-attention (yellow), 1 ct-danger (red).
 func ctEvents4() []resource.Resource {
 	return []resource.Resource{
-		{ID: "evt-0001", Name: "read-1", Status: "ct-info"},
-		{ID: "evt-0002", Name: "write-1", Status: "ct-attention"},
-		{ID: "evt-0003", Name: "delete-1", Status: "ct-danger"},
-		{ID: "evt-0004", Name: "read-2", Status: "ct-info"},
+		{ID: "evt-0001", Name: "read-1", Fields: map[string]string{"status": "ct-info"}},
+		{ID: "evt-0002", Name: "write-1", Fields: map[string]string{"status": "ct-attention"}},
+		{ID: "evt-0003", Name: "delete-1", Fields: map[string]string{"status": "ct-danger"}},
+		{ID: "evt-0004", Name: "read-2", Fields: map[string]string{"status": "ct-info"}},
 	}
 }
 
