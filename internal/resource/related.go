@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
 )
 
@@ -289,9 +290,13 @@ func RegisterRelated(shortName string, defs []RelatedDef) {
 	relatedRegistry[shortName] = defs
 }
 
-// GetRelated returns the related definitions for the given resource short name,
-// or nil if none are registered.
+// GetRelated returns the related definitions for the given resource short name.
+// Catalog-backed: checks the catalog first; falls through to the legacy map.
+// Fallback removed in PR-04n.
 func GetRelated(shortName string) []RelatedDef {
+	if ct := catalog.Find(shortName); ct != nil && len(ct.Related) > 0 {
+		return ct.Related
+	}
 	return relatedRegistry[shortName]
 }
 
@@ -317,9 +322,10 @@ func RegisterFetchByIDs(shortName string, fn FetchByIDsFunc) {
 	fetchByIDsRegistry[shortName] = fn
 }
 
-// GetFetchByIDs returns the FetchByIDs helper for the target short name, or
-// nil if none is registered. Targets without a registered FetchByIDs skip
-// the lazy-add path — their checkers run the same way they always have.
+// GetFetchByIDs returns the FetchByIDs helper for the target short name.
+// Catalog-backed: falls through to the legacy map (catalog does not carry
+// FetchByIDs separately in PR-04a; per-category PRs wire this). Fallback
+// removed in PR-04n.
 func GetFetchByIDs(shortName string) FetchByIDsFunc {
 	return fetchByIDsRegistry[shortName]
 }
@@ -352,19 +358,28 @@ func RegisterNavigableFields(shortName string, fields []NavigableField) {
 
 // GetNavigableFields returns the navigable field definitions for the given
 // resource short name from the active registry. If the active registry has no
-// entry for shortName, it falls back to the default (init-time) registry.
-// Returns nil only when neither registry has an entry.
+// entry for shortName, it falls back to the default (init-time) registry,
+// then to the catalog. Returns nil only when no entry exists anywhere.
 //
-// This merged view ensures callers such as IsFieldNavigable and tests that
-// verify init-time registrations see the expected fields regardless of whether
-// BootstrapActiveNavFields has been called.
+// Catalog-backed: catalog is checked after the active and default registries;
+// per-category PRs (04b+) populate catalog entries. Fallback to legacy removed
+// in PR-04n.
 func GetNavigableFields(shortName string) []NavigableField {
 	navigableFieldMu.RLock()
-	defer navigableFieldMu.RUnlock()
 	if fields := navigableFieldRegistry[shortName]; len(fields) > 0 {
+		navigableFieldMu.RUnlock()
 		return fields
 	}
-	return defaultNavFieldRegistry[shortName]
+	if fields := defaultNavFieldRegistry[shortName]; len(fields) > 0 {
+		navigableFieldMu.RUnlock()
+		return fields
+	}
+	navigableFieldMu.RUnlock()
+	// Catalog fallback — active during 04b–04m for migrated types.
+	if ct := catalog.Find(shortName); ct != nil && len(ct.Navigable) > 0 {
+		return ct.Navigable
+	}
+	return nil
 }
 
 // GetActiveNavigableFields returns the navigable field definitions for the

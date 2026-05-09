@@ -3,6 +3,7 @@ package resource
 import (
 	"fmt"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
 )
 
@@ -28,13 +29,22 @@ func RegisterDetailEnricher(shortName string, f DetailEnricher) {
 	detailEnricherRegistry[shortName] = f
 }
 
-// GetDetailEnricher returns the detail enricher for the given resource short name, or nil.
+// GetDetailEnricher returns the detail enricher for the given resource short name.
+// Catalog-backed: checks the catalog first; falls through to the legacy map.
+// Fallback removed in PR-04n.
 func GetDetailEnricher(shortName string) DetailEnricher {
+	if ct := catalog.Find(shortName); ct != nil && ct.DetailEnrich != nil {
+		return ct.DetailEnrich
+	}
 	return detailEnricherRegistry[shortName]
 }
 
 // HasDetailEnricher returns true if a detail enricher is registered for the given short name.
+// Catalog-backed: checks the catalog first; falls through to the legacy map.
 func HasDetailEnricher(shortName string) bool {
+	if ct := catalog.Find(shortName); ct != nil && ct.DetailEnrich != nil {
+		return true
+	}
 	_, ok := detailEnricherRegistry[shortName]
 	return ok
 }

@@ -1,4 +1,4 @@
-.PHONY: build install test test-race lint gofix fmt run clean cover integration security coverage verify-readonly demo readme check-readme mdlint snapshot snapshot-update ready-to-push ready-to-release
+.PHONY: build install test test-race lint gofix fmt run clean cover integration security coverage verify-readonly demo readme check-readme mdlint snapshot snapshot-update ready-to-push ready-to-release generate
 
 BINARY   = a9s
 CMD      = ./cmd/a9s
@@ -8,6 +8,9 @@ COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
 DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 LDFLAGS  = -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
 GOFILES  = $(shell find . -type f -name '*.go' -not -path './vendor/*')
+
+generate:
+	go generate ./...
 
 build:
 	go build -trimpath -ldflags "$(LDFLAGS)" -o $(BINARY) $(CMD)
