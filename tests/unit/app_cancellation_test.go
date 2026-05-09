@@ -223,14 +223,17 @@ func (c *cancelObservingIAMClient) ListEntitiesForPolicy(
 }
 
 func TestIAMRelatedChecker_RespectsCancelledContext_PolicyRole(t *testing.T) {
+	t.Parallel()
 	testPolicyCheckerRespectsCancelledContext(t, "role")
 }
 
 func TestIAMRelatedChecker_RespectsCancelledContext_PolicyUser(t *testing.T) {
+	t.Parallel()
 	testPolicyCheckerRespectsCancelledContext(t, "iam-user")
 }
 
 func TestIAMRelatedChecker_RespectsCancelledContext_PolicyGroup(t *testing.T) {
+	t.Parallel()
 	testPolicyCheckerRespectsCancelledContext(t, "iam-group")
 }
 
