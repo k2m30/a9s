@@ -98,10 +98,18 @@ func pressTabDetail(d views.DetailModel) (views.DetailModel, tea.Cmd) {
 	return d.Update(tea.KeyPressMsg{Code: tea.KeyTab})
 }
 
-// registerEC2Defs registers one RelatedDef for "ec2" and returns a cleanup func.
+// registerEC2Defs registers one RelatedDef for "ec2" and returns a cleanup func
+// that restores the original defs so test order (shuffle) doesn't matter.
 func registerEC2Defs(defs []resource.RelatedDef) func() {
+	orig := resource.GetRelated("ec2")
 	resource.RegisterRelated("ec2", defs)
-	return func() { resource.UnregisterRelated("ec2") }
+	return func() {
+		if orig == nil {
+			resource.UnregisterRelated("ec2")
+		} else {
+			resource.RegisterRelated("ec2", orig)
+		}
+	}
 }
 
 // deliverResult delivers a RelatedCheckResultMsg to the DetailModel.
@@ -209,7 +217,7 @@ func TestDetail_FieldCursorIndependentFromScroll(t *testing.T) {
 	defer resource.UnregisterNavigableFields("ec2")
 
 	// Ensure no related defs so right column isn't shown (avoids Tab interactions).
-	resource.UnregisterRelated("ec2")
+	unregisterEC2Related(t)
 
 	// Width=80, height=5: not all 10 fields visible simultaneously.
 	d := makeDetailNarrow(t)
@@ -255,7 +263,7 @@ func TestDetail_FieldCursorClamps(t *testing.T) {
 	})
 	defer resource.UnregisterNavigableFields("ec2")
 
-	resource.UnregisterRelated("ec2")
+	unregisterEC2Related(t)
 
 	d := makeDetailNarrow(t)
 
@@ -302,7 +310,7 @@ func TestDetail_FieldCursorDown_TwoFieldsClamps(t *testing.T) {
 		{FieldPath: "VpcId", TargetType: "vpc"},
 	})
 	defer resource.UnregisterNavigableFields("ec2")
-	resource.UnregisterRelated("ec2")
+	unregisterEC2Related(t)
 
 	// 2-field config.
 	cfg := &config.ViewsConfig{
@@ -352,7 +360,7 @@ func TestDetail_FieldCursorUp_AtZeroStaysZero(t *testing.T) {
 		{FieldPath: "InstanceId", TargetType: "ec2"},
 	})
 	defer resource.UnregisterNavigableFields("ec2")
-	resource.UnregisterRelated("ec2")
+	unregisterEC2Related(t)
 
 	d := makeDetailNarrow(t)
 

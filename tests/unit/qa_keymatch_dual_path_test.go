@@ -334,10 +334,9 @@ func TestQA_DetailKeyMatch_YEmitsYAMLNavigate_BothPaths(t *testing.T) {
 func TestQA_DetailKeyMatch_RTogglesRightCol_BothPaths(t *testing.T) {
 	checkRToggle := func(t *testing.T, rMsg tea.Msg, path string) {
 		t.Helper()
-		resource.RegisterRelated("ec2", []resource.RelatedDef{
+		replaceEC2Related(t, []resource.RelatedDef{
 			{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 		})
-		defer resource.UnregisterRelated("ec2")
 
 		d := makeDetailDualPathWideEC2(t)
 
@@ -458,10 +457,9 @@ func TestQA_DetailKeyMatch_EscClearsSearch_BothPaths(t *testing.T) {
 func TestQA_DetailKeyMatch_TabFocusesRightCol_BothPaths(t *testing.T) {
 	checkTabFocus := func(t *testing.T, tabMsg tea.Msg, path string) {
 		t.Helper()
-		resource.RegisterRelated("ec2", []resource.RelatedDef{
+		replaceEC2Related(t, []resource.RelatedDef{
 			{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 		})
-		defer resource.UnregisterRelated("ec2")
 
 		d := makeDetailDualPathWideEC2(t)
 
@@ -537,10 +535,9 @@ func TestQA_DetailKeyMatch_WTogglesWrap_BothPaths(t *testing.T) {
 func TestQA_DetailKeyMatch_TabUnfocusesRightCol_BothPaths(t *testing.T) {
 	checkTabUnfocus := func(t *testing.T, tabMsg tea.Msg, path string) {
 		t.Helper()
-		resource.RegisterRelated("ec2", []resource.RelatedDef{
+		replaceEC2Related(t, []resource.RelatedDef{
 			{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 		})
-		defer resource.UnregisterRelated("ec2")
 
 		d := makeDetailDualPathWideEC2(t)
 
@@ -580,10 +577,9 @@ func TestQA_DetailKeyMatch_TabUnfocusesRightCol_BothPaths(t *testing.T) {
 func TestQA_DetailKeyMatch_EscUnfocusesRightCol_BothPaths(t *testing.T) {
 	checkEscUnfocus := func(t *testing.T, escMsg tea.Msg, path string) {
 		t.Helper()
-		resource.RegisterRelated("ec2", []resource.RelatedDef{
+		replaceEC2Related(t, []resource.RelatedDef{
 			{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 		})
-		defer resource.UnregisterRelated("ec2")
 
 		d := makeDetailDualPathWideEC2(t)
 
@@ -632,7 +628,7 @@ func TestQA_DetailKeyMatch_EscUnfocusesRightCol_BothPaths(t *testing.T) {
 func TestQA_DetailKeyMatch_RightColFocused_JMovesDown_BothPaths(t *testing.T) {
 	setupFocusedRightColTwoActionableRows := func(t *testing.T) views.DetailModel {
 		t.Helper()
-		resource.RegisterRelated("ec2", []resource.RelatedDef{
+		replaceEC2Related(t, []resource.RelatedDef{
 			{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 			{TargetType: "vpc", DisplayName: "VPCs", Checker: noopChecker},
 		})
@@ -662,11 +658,10 @@ func TestQA_DetailKeyMatch_RightColFocused_JMovesDown_BothPaths(t *testing.T) {
 	}
 
 	t.Run("KeyPressMsg", func(t *testing.T) {
-		resource.RegisterRelated("ec2", []resource.RelatedDef{
+		replaceEC2Related(t, []resource.RelatedDef{
 			{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 			{TargetType: "vpc", DisplayName: "VPCs", Checker: noopChecker},
 		})
-		defer resource.UnregisterRelated("ec2")
 
 		d := setupFocusedRightColTwoActionableRows(t)
 		viewBefore := d.View()
@@ -680,11 +675,10 @@ func TestQA_DetailKeyMatch_RightColFocused_JMovesDown_BothPaths(t *testing.T) {
 	})
 
 	t.Run("KeyReleaseMsg", func(t *testing.T) {
-		resource.RegisterRelated("ec2", []resource.RelatedDef{
+		replaceEC2Related(t, []resource.RelatedDef{
 			{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 			{TargetType: "vpc", DisplayName: "VPCs", Checker: noopChecker},
 		})
-		defer resource.UnregisterRelated("ec2")
 
 		d := setupFocusedRightColTwoActionableRows(t)
 		viewBefore := d.View()
@@ -707,7 +701,7 @@ func TestQA_DetailKeyMatch_RightColFocused_JMovesDown_BothPaths(t *testing.T) {
 func TestQA_DetailKeyMatch_RightColFocused_KMovesUp_BothPaths(t *testing.T) {
 	setupFocusedRightColAtSecondRow := func(t *testing.T) views.DetailModel {
 		t.Helper()
-		resource.RegisterRelated("ec2", []resource.RelatedDef{
+		replaceEC2Related(t, []resource.RelatedDef{
 			{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 			{TargetType: "vpc", DisplayName: "VPCs", Checker: noopChecker},
 		})
@@ -739,11 +733,10 @@ func TestQA_DetailKeyMatch_RightColFocused_KMovesUp_BothPaths(t *testing.T) {
 	}
 
 	t.Run("KeyPressMsg", func(t *testing.T) {
-		resource.RegisterRelated("ec2", []resource.RelatedDef{
+		replaceEC2Related(t, []resource.RelatedDef{
 			{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 			{TargetType: "vpc", DisplayName: "VPCs", Checker: noopChecker},
 		})
-		defer resource.UnregisterRelated("ec2")
 
 		d := setupFocusedRightColAtSecondRow(t)
 		viewAtSecond := d.View()
@@ -757,11 +750,10 @@ func TestQA_DetailKeyMatch_RightColFocused_KMovesUp_BothPaths(t *testing.T) {
 	})
 
 	t.Run("KeyReleaseMsg", func(t *testing.T) {
-		resource.RegisterRelated("ec2", []resource.RelatedDef{
+		replaceEC2Related(t, []resource.RelatedDef{
 			{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 			{TargetType: "vpc", DisplayName: "VPCs", Checker: noopChecker},
 		})
-		defer resource.UnregisterRelated("ec2")
 
 		d := setupFocusedRightColAtSecondRow(t)
 		viewAtSecond := d.View()
@@ -786,7 +778,7 @@ func TestQA_DetailKeyMatch_RightColFocused_KMovesUp_BothPaths(t *testing.T) {
 func TestQA_DetailKeyMatch_RightColFocused_SlashActivatesFilter_BothPaths(t *testing.T) {
 	setupFocusedRightColWithResults := func(t *testing.T) views.DetailModel {
 		t.Helper()
-		resource.RegisterRelated("ec2", []resource.RelatedDef{
+		replaceEC2Related(t, []resource.RelatedDef{
 			{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 		})
 		d := makeDetailDualPathWideEC2(t)
@@ -826,18 +818,16 @@ func TestQA_DetailKeyMatch_RightColFocused_SlashActivatesFilter_BothPaths(t *tes
 	}
 
 	t.Run("KeyPressMsg", func(t *testing.T) {
-		resource.RegisterRelated("ec2", []resource.RelatedDef{
+		replaceEC2Related(t, []resource.RelatedDef{
 			{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 		})
-		defer resource.UnregisterRelated("ec2")
 		checkSlashFilter(t, tea.KeyPressMsg{Code: -1, Text: "/"}, "KeyPressMsg")
 	})
 
 	t.Run("KeyReleaseMsg", func(t *testing.T) {
-		resource.RegisterRelated("ec2", []resource.RelatedDef{
+		replaceEC2Related(t, []resource.RelatedDef{
 			{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 		})
-		defer resource.UnregisterRelated("ec2")
 		checkSlashFilter(t, pressKeyRelease("/"), "KeyReleaseMsg")
 	})
 }
@@ -851,7 +841,7 @@ func TestQA_DetailKeyMatch_RightColFocused_SlashActivatesFilter_BothPaths(t *tes
 func TestQA_DetailKeyMatch_RightColFocused_EnterEmitsNavigate_BothPaths(t *testing.T) {
 	setupFocusedRightColActionable := func(t *testing.T) views.DetailModel {
 		t.Helper()
-		resource.RegisterRelated("ec2", []resource.RelatedDef{
+		replaceEC2Related(t, []resource.RelatedDef{
 			{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 		})
 		d := makeDetailDualPathWideEC2(t)
@@ -894,18 +884,16 @@ func TestQA_DetailKeyMatch_RightColFocused_EnterEmitsNavigate_BothPaths(t *testi
 	}
 
 	t.Run("KeyPressMsg", func(t *testing.T) {
-		resource.RegisterRelated("ec2", []resource.RelatedDef{
+		replaceEC2Related(t, []resource.RelatedDef{
 			{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 		})
-		defer resource.UnregisterRelated("ec2")
 		assertEnterOnRightCol(t, tea.KeyPressMsg{Code: tea.KeyEnter}, "KeyPressMsg")
 	})
 
 	t.Run("KeyReleaseMsg", func(t *testing.T) {
-		resource.RegisterRelated("ec2", []resource.RelatedDef{
+		replaceEC2Related(t, []resource.RelatedDef{
 			{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 		})
-		defer resource.UnregisterRelated("ec2")
 		assertEnterOnRightCol(t, pressSpecialKeyRelease(tea.KeyEnter), "KeyReleaseMsg")
 	})
 }
@@ -919,11 +907,10 @@ func TestQA_DetailKeyMatch_RightColFocused_EnterEmitsNavigate_BothPaths(t *testi
 // TestQA_RightCol_UpdateKeyMsg_JMovesDown verifies j via KeyReleaseMsg moves
 // the right column cursor when focused.
 func TestQA_RightCol_UpdateKeyMsg_JMovesDown(t *testing.T) {
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "aaa", DisplayName: "AAA Resources", Checker: noopChecker},
 		{TargetType: "bbb", DisplayName: "BBB Resources", Checker: noopChecker},
 	})
-	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailDualPathWideEC2(t)
 	if !strings.Contains(d.View(), "RELATED") {
@@ -962,11 +949,10 @@ func TestQA_RightCol_UpdateKeyMsg_JMovesDown(t *testing.T) {
 
 // TestQA_RightCol_UpdateKeyMsg_KMovesUp verifies k via KeyReleaseMsg in the right column.
 func TestQA_RightCol_UpdateKeyMsg_KMovesUp(t *testing.T) {
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "aaa", DisplayName: "AAA Resources", Checker: noopChecker},
 		{TargetType: "bbb", DisplayName: "BBB Resources", Checker: noopChecker},
 	})
-	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailDualPathWideEC2(t)
 	if !strings.Contains(d.View(), "RELATED") {
@@ -1007,10 +993,9 @@ func TestQA_RightCol_UpdateKeyMsg_KMovesUp(t *testing.T) {
 // TestQA_RightCol_UpdateKeyMsg_SlashActivatesFilter verifies / via KeyReleaseMsg
 // activates the filter in the right column.
 func TestQA_RightCol_UpdateKeyMsg_SlashActivatesFilter(t *testing.T) {
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "aaa", DisplayName: "AAA Resources", Checker: noopChecker},
 	})
-	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailDualPathWideEC2(t)
 	if !strings.Contains(d.View(), "RELATED") {
