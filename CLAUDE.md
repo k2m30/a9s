@@ -4,7 +4,7 @@ Your work will be review by Codex.
 
 ## Process — single source of truth
 
-**Read [`docs/development-process.md`](docs/development-process.md) first.** It defines the 7-stage lifecycle, Definition of Ready, Definition of Done, agent ownership per stage, and the canonical pre-push and pre-release gates. If a rule below conflicts with that document, the document wins until updated.
+**Read [`docs/development-process.md`](docs/development-process.md) first.** It defines the 8-stage lifecycle (Stages 1–8, with Stage 6.5 as an optional post-merge real-AWS gate), Definition of Ready, Definition of Done, agent ownership per stage, and the canonical pre-push and pre-release gates. If a rule below conflicts with that document, the document wins until updated.
 
 Quick reference:
 
