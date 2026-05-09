@@ -80,8 +80,8 @@ func TestFetchCloudFrontDistributions_ParsesMultiple(t *testing.T) {
 	if r0.Name != "E1ABC2DEF3GHIJ" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "E1ABC2DEF3GHIJ", r0.Name)
 	}
-	if r0.Status != "Deployed" {
-		t.Errorf("resource[0].Status: expected %q, got %q", "Deployed", r0.Status)
+	if r0.Fields["status"] != "Deployed" {
+		t.Errorf("resource[0].Fields[\"status\"]: expected %q, got %q", "Deployed", r0.Fields["status"])
 	}
 
 	// Verify required fields
@@ -109,10 +109,10 @@ func TestFetchCloudFrontDistributions_ParsesMultiple(t *testing.T) {
 	}
 
 	// Verify second distribution (disabled, no aliases).
-	// CloudFront fetcher synthesizes "Disabled" status when Enabled=false for row coloring (#61).
+	// The fetcher stores raw AWS status in Fields["status"]; disabled state is visible via Fields["enabled"].
 	r1 := resources[1]
-	if r1.Status != "Disabled" {
-		t.Errorf("resource[1].Status: expected %q, got %q", "Disabled", r1.Status)
+	if r1.Fields["status"] != "InProgress" {
+		t.Errorf("resource[1].Fields[\"status\"]: expected %q, got %q", "InProgress", r1.Fields["status"])
 	}
 	if r1.Fields["enabled"] != "false" {
 		t.Errorf("resource[1].Fields[\"enabled\"]: expected %q, got %q", "false", r1.Fields["enabled"])
