@@ -2,6 +2,16 @@
 
 Your work will be review by Codex.
 
+## Process — single source of truth
+
+**Read [`docs/development-process.md`](docs/development-process.md) first.** It defines the 7-stage lifecycle, Definition of Ready, Definition of Done, agent ownership per stage, and the canonical pre-push and pre-release gates. If a rule below conflicts with that document, the document wins until updated.
+
+Quick reference:
+
+- Pre-push gate (Stage 6): `make ready-to-push`
+- Pre-release gate (Stage 7): `make ready-to-release`
+- New work must be assigned by the CEO (or CTO on CEO's behalf). Never browse the backlog and self-assign.
+
 ## GitHub
 
 - Repository: `k2m30/a9s` — always use this owner/repo for GitHub API calls, issues, and PRs
@@ -150,18 +160,11 @@ When a single task would require reading 5+ files totaling >500 lines, OR when y
 - Do not make any changes until you have 95%+ confidence in what you need to build. Ask me follow up questions until you reach that confidence
 - TDD is non-negotiable: architect scopes both QA and coder tasks; QA writes tests, coder writes implementation. For rigid patterns (resource types, child views) they run in parallel. For novel features, QA goes first.
 - ALWAYS test ALL resource types (S3, EC2, RDS, Redis, DocumentDB, EKS, Secrets Manager, VPC, SG, Node Groups, etc), not just one
-- ALWAYS run `make test`, `make lint`, `make security`, and `make gofix` locally BEFORE pushing. Run `make test-race` for pre-push race detection. CI is not a debugging tool.
 - NEVER delete code, tests, or helpers just to make a linter happy. Understand WHY the code exists first. If it's genuinely dead, remove it. If it serves a purpose (scaffolding, crash-verification tests), use a targeted `//nolint` with a reason comment. If a linter rule produces widespread false positives, fix the rule in `.golangci.yml`.
 - NEVER make multiple push-and-check cycles. Get it right locally, push once.
-- BEFORE any push, run the `a9s-consistency-checker` agent to verify code/docs/website alignment
-- BEFORE any push, run the `test-coverage-analyzer` agent to check for coverage gaps
-- BEFORE any push, run the `a9s-architect` agent to verify architecture against `docs/go-codebase-checklist.md` (target: 8.5+/10)
-- BEFORE any push, run the full validation integration test against a REAL AWS profile (ask user for the profile name): `A9S_CT_PROFILE=<profile> go test -tags integration ./tests/integration/ -run TestFullRelatedViewValidation -count=1 -v -timeout 600s`. If region is not set, the profile's default region is used. No push without this passing.
-- BEFORE any release, run `make integration` — full demo-mode integration suite (no AWS profile needed when `A9S_CT_PROFILE` is unset). Catches cross-cutting regressions (cache seeding, badge aggregator, checker sentinels, enter-child fast path) that per-package unit tests miss.
-- BEFORE any release, update `CHANGELOG.md` with a new version entry (follow [Keep a Changelog](https://keepachangelog.com/) format) and create a matching `releases/vX.Y.Z.md` file with user-facing release notes. Every tagged version MUST have both a changelog entry and a release notes file.
-- BEFORE any release, align `docs/architecture.md` with the current codebase. Verify: layer boundaries, message types, view stack, caching layers, key handling, message-driven invariants, and any newly added subsystems accurately reflect reality. Outdated architecture docs mislead future contributors — treat divergence from the codebase as a release blocker.
-- BEFORE any release, audit every test added or modified in the release for busywork. Reject and delete tests that: round-trip a struct literal back to itself (tautology); assert a fake against input the test itself passed (mock-its-own-assertion); verify struct shape instead of behavior; assert on stub output without exercising production dispatch; duplicate another test in the release; construct unused variables or dead setup; or exist solely to tick a coverage counter. Regression pins for real invariants, compile-time invariant tests, and focused bug repros are NOT busywork. Delete busywork rather than keep it — coverage earned by busywork is a liability.
-- **Exception**: Docs-only changes (*.md, docs/, website/, specs/, .claude/, LICENSE) do NOT require the pre-push checklist.
+- BEFORE any push, the canonical gate is **`make ready-to-push`** — see [`docs/development-process.md`](docs/development-process.md) §"Stage 6 — Pre-push Validation" for the gate contents and the `internal/aws/` live-integration sub-rule. Stage 5 reviewer agents (`a9s-consistency-checker`, `test-coverage-analyzer`, `a9s-architect` ≥ M, `a9s-tui-reviewer`, `a9s-security-auditor`, `a9s-docs-reviewer`) must sign off before this gate runs.
+- BEFORE any release, the canonical gate is **`make ready-to-release`** — see [`docs/development-process.md`](docs/development-process.md) §"Stage 7 — Merge & Release" for the manual checklist (`CHANGELOG.md`, `releases/vX.Y.Z.md`, `docs/architecture.md` alignment, busywork audit on tests added/modified in the release).
+- **Exception**: Docs-only changes (`*.md`, `docs/`, `website/`, `specs/`, `.claude/`, `LICENSE`) skip `ready-to-push`; `make mdlint` is required.
 
 ## Docs Sync Rule
 
