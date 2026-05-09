@@ -98,9 +98,8 @@ func FetchCodePipelinesPage(ctx context.Context, api CodePipelineListPipelinesAP
 		}
 
 		r := resource.Resource{
-			ID:     name,
-			Name:   name,
-			Status: "",
+			ID:    name,
+			Name:  name,
 			Fields: map[string]string{
 				"name":          name,
 				"pipeline_type": pipelineType,

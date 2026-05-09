@@ -57,8 +57,8 @@ func TestFetchEventBridgeRules_ParsesMultiple(t *testing.T) {
 	if r0.Name != "daily-backup" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "daily-backup", r0.Name)
 	}
-	if r0.Status != "ENABLED" {
-		t.Errorf("resource[0].Status: expected %q, got %q", "ENABLED", r0.Status)
+	if r0.Fields["state"] != "ENABLED" {
+		t.Errorf("resource[0].Fields[\"state\"]: expected %q, got %q", "ENABLED", r0.Fields["state"])
 	}
 
 	// Verify required fields
@@ -80,8 +80,8 @@ func TestFetchEventBridgeRules_ParsesMultiple(t *testing.T) {
 
 	// Verify second rule (disabled, event pattern instead of schedule)
 	r1 := resources[1]
-	if r1.Status != "DISABLED" {
-		t.Errorf("resource[1].Status: expected %q, got %q", "DISABLED", r1.Status)
+	if r1.Fields["state"] != "DISABLED" {
+		t.Errorf("resource[1].Fields[\"state\"]: expected %q, got %q", "DISABLED", r1.Fields["state"])
 	}
 	if r1.Fields["schedule"] != "" {
 		t.Errorf("resource[1].Fields[\"schedule\"]: expected empty, got %q", r1.Fields["schedule"])

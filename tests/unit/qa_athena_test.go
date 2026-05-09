@@ -57,8 +57,8 @@ func TestFetchAthenaWorkgroups_ParsesMultipleWorkgroups(t *testing.T) {
 	if r.ID != "primary" {
 		t.Errorf("expected ID 'primary', got %q", r.ID)
 	}
-	if r.Status != "ENABLED" {
-		t.Errorf("expected Status 'ENABLED', got %q", r.Status)
+	if r.Fields["state"] != "ENABLED" {
+		t.Errorf("expected Fields[state] 'ENABLED', got %q", r.Fields["state"])
 	}
 	if r.Fields["workgroup_name"] != "primary" {
 		t.Errorf("expected Fields[workgroup_name] 'primary', got %q", r.Fields["workgroup_name"])
@@ -79,8 +79,8 @@ func TestFetchAthenaWorkgroups_ParsesMultipleWorkgroups(t *testing.T) {
 
 	// Second workgroup
 	r2 := resources[1]
-	if r2.Status != "DISABLED" {
-		t.Errorf("expected Status 'DISABLED', got %q", r2.Status)
+	if r2.Fields["state"] != "DISABLED" {
+		t.Errorf("expected Fields[state] 'DISABLED', got %q", r2.Fields["state"])
 	}
 }
 

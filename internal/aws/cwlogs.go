@@ -99,9 +99,8 @@ func FetchCloudWatchLogGroupsPage(ctx context.Context, api CWLogsDescribeLogGrou
 		}
 
 		r := resource.Resource{
-			ID:     logGroupName,
-			Name:   logGroupName,
-			Status: "",
+			ID:    logGroupName,
+			Name:  logGroupName,
 			Fields: map[string]string{
 				"log_group_name": logGroupName,
 				"stored_bytes":   storedBytes,

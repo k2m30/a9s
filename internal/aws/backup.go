@@ -91,9 +91,8 @@ func FetchBackupPlansPage(ctx context.Context, api BackupListBackupPlansAPI, con
 		resourcesCSV, notResourcesCSV := enumerateBackupPlanResources(ctx, selectionAPI, getSelectionAPI, planID)
 
 		r := resource.Resource{
-			ID:     planID,
-			Name:   planName,
-			Status: "",
+			ID:    planID,
+			Name:  planName,
 			Fields: map[string]string{
 				"plan_name":      planName,
 				"plan_id":        planID,

@@ -48,7 +48,7 @@ func buildSeverityCTEvent(
 }
 
 // fetchOneStatus is a test helper that calls FetchCloudTrailEventsPage with a
-// single synthetic event and returns the Resource.Status of the first result.
+// single synthetic event and returns the Fields["status"] of the first result.
 func fetchOneStatus(t *testing.T, event cloudtrailtypes.Event) string {
 	t.Helper()
 	result, err := awsclient.FetchCloudTrailEventsPage(
@@ -60,7 +60,7 @@ func fetchOneStatus(t *testing.T, event cloudtrailtypes.Event) string {
 	if len(result.Resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
-	return result.Resources[0].Status
+	return result.Resources[0].Fields["status"]
 }
 
 // ===========================================================================

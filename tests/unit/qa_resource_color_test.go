@@ -338,18 +338,18 @@ func TestColorRefactor_CtEvents_ExcludeFromIssueBadge(t *testing.T) {
 			r := resource.Resource{
 				ID:     "evt-0001",
 				Name:   "PutObject",
-				Status: tc.status,
+				Fields: map[string]string{"status": tc.status},
 			}
 			got := td.Color(r)
 			if got != tc.want {
-				t.Errorf("ct-events.Color({Status=%q}) = %v, want %v", tc.status, got, tc.want)
+				t.Errorf("ct-events.Color({Fields[status]=%q}) = %v, want %v", tc.status, got, tc.want)
 			}
 		})
 	}
 
 	// Specifically: ct-danger → ColorBroken contributes to ctrl+z visibility
 	// (IsIssue == true) but ExcludeFromIssueBadge keeps it out of the badge.
-	dangerR := resource.Resource{ID: "evt-0002", Name: "DeleteBucket", Status: "ct-danger"}
+	dangerR := resource.Resource{ID: "evt-0002", Name: "DeleteBucket", Fields: map[string]string{"status": "ct-danger"}}
 	dangerColor := td.Color(dangerR)
 	if !dangerColor.IsIssue() {
 		t.Errorf("ct-events ct-danger row: Color.IsIssue() must be true (visible after ctrl+z); got Color=%v", dangerColor)

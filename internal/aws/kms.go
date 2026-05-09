@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	kmstypes "github.com/aws/aws-sdk-go-v2/service/kms/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -136,9 +137,9 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 		alias := aliasMap[keyID]
 
 		resources = append(resources, resource.Resource{
-			ID:     keyID,
-			Name:   alias,
-			Status: status,
+			ID:       keyID,
+			Name:     alias,
+			Findings: kmsStateFindings(meta.KeyState, status),
 			Fields: map[string]string{
 				"key_id":      keyID,
 				"alias":       alias,
@@ -241,9 +242,9 @@ func FetchKMSKeysByIDs(ctx context.Context, c *ServiceClients, ids []string) ([]
 		status := string(meta.KeyState)
 		alias := aliasMap[keyID]
 		resources = append(resources, resource.Resource{
-			ID:     keyID,
-			Name:   alias,
-			Status: status,
+			ID:       keyID,
+			Name:     alias,
+			Findings: kmsStateFindings(meta.KeyState, status),
 			Fields: map[string]string{
 				"key_id":      keyID,
 				"alias":       alias,
@@ -356,9 +357,9 @@ func FetchKMSKeys(
 		alias := aliasMap[keyID]
 
 		r := resource.Resource{
-			ID:     keyID,
-			Name:   alias,
-			Status: status,
+			ID:       keyID,
+			Name:     alias,
+			Findings: kmsStateFindings(meta.KeyState, status),
 			Fields: map[string]string{
 				"key_id":      keyID,
 				"alias":       alias,
@@ -372,4 +373,21 @@ func FetchKMSKeys(
 	}
 
 	return resources, nil
+}
+
+// kmsStateFindings maps a KMS key state to the canonical Finding slice.
+// Enabled keys produce no findings (healthy state). All other states produce
+// a single finding so callers can drive row coloring and attention aggregation
+// without re-parsing the raw status string.
+func kmsStateFindings(state kmstypes.KeyState, stateStr string) []domain.Finding {
+	switch state {
+	case kmstypes.KeyStateEnabled:
+		return nil
+	case kmstypes.KeyStatePendingDeletion:
+		return []domain.Finding{{Code: CodeKMSStatePendingDeletion, Phrase: "pending deletion", Severity: domain.SevBroken, Source: "wave1"}}
+	case kmstypes.KeyStateDisabled:
+		return []domain.Finding{{Code: CodeKMSStateDisabled, Phrase: "disabled", Severity: domain.SevWarn, Source: "wave1"}}
+	default:
+		return []domain.Finding{{Code: CodeKMSStateUnavailable, Phrase: stateStr, Severity: domain.SevWarn, Source: "wave1"}}
+	}
 }

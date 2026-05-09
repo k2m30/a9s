@@ -92,9 +92,8 @@ func FetchStepFunctionsPage(ctx context.Context, api SFNListStateMachinesAPI, co
 		}
 
 		r := resource.Resource{
-			ID:     name,
-			Name:   name,
-			Status: "",
+			ID:    name,
+			Name:  name,
 			Fields: map[string]string{
 				"name":          name,
 				"arn":           arn,

@@ -129,7 +129,7 @@ func monitoringResourceTypes() []ResourceTypeDef {
 				{Key: "read_only", Title: "Read Only", Width: 10, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				switch r.Status {
+				switch r.Fields["status"] {
 				case "ct-danger":
 					return ColorBroken
 				case "ct-attention":

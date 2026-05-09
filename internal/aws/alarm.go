@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -106,9 +107,9 @@ func FetchCloudWatchAlarmsPage(ctx context.Context, api CloudWatchDescribeAlarms
 		actionsCount := len(alarm.AlarmActions)
 
 		r := resource.Resource{
-			ID:     alarmName,
-			Name:   alarmName,
-			Status: stateValue,
+			ID:       alarmName,
+			Name:     alarmName,
+			Findings: alarmStateFindings(stateValue, actionsCount),
 			Fields: map[string]string{
 				"alarm_name":    alarmName,
 				"state":         stateValue,
@@ -145,4 +146,18 @@ func FetchCloudWatchAlarmsPage(ctx context.Context, api CloudWatchDescribeAlarms
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+func alarmStateFindings(state string, actionsCount int) []domain.Finding {
+	switch state {
+	case "ALARM":
+		return []domain.Finding{{Code: CodeAlarmStateAlarm, Phrase: "ALARM", Severity: domain.SevBroken, Source: "wave1"}}
+	case "INSUFFICIENT_DATA":
+		return []domain.Finding{{Code: CodeAlarmStateInsufficient, Phrase: "insufficient data", Severity: domain.SevWarn, Source: "wave1"}}
+	case "OK":
+		if actionsCount == 0 {
+			return []domain.Finding{{Code: CodeAlarmNoActions, Phrase: "no actions", Severity: domain.SevWarn, Source: "wave1"}}
+		}
+	}
+	return nil
 }

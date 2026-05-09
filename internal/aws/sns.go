@@ -72,9 +72,8 @@ func FetchSNSTopicsPage(ctx context.Context, api SNSListTopicsAPI, continuationT
 		}
 
 		r := resource.Resource{
-			ID:     topicArn,
-			Name:   displayName,
-			Status: "",
+			ID:    topicArn,
+			Name:  displayName,
 			Fields: map[string]string{
 				"topic_arn":    topicArn,
 				"display_name": displayName,

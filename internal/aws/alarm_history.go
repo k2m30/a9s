@@ -101,9 +101,8 @@ func convertAlarmHistoryItem(item cwtypes.AlarmHistoryItem) resource.Resource {
 	}
 
 	return resource.Resource{
-		ID:     id,
-		Name:   id,
-		Status: historyItemType,
+		ID:    id,
+		Name:  id,
 		Fields: map[string]string{
 			"timestamp":         timestamp,
 			"history_item_type": historyItemType,

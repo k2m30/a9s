@@ -97,9 +97,9 @@ func TestFetchCloudTrailEvents_ParsesMultipleEvents(t *testing.T) {
 	if r0.Name != "RunInstances" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "RunInstances", r0.Name)
 	}
-	// RunInstances has "Run" prefix → write verb W → Status must be "ct-attention".
-	if r0.Status != "ct-attention" {
-		t.Errorf("resource[0].Status: expected %q (RunInstances is W verb → ct-attention per §1.2), got %q", "ct-attention", r0.Status)
+	// RunInstances has "Run" prefix → write verb W → Fields["status"] must be "ct-attention".
+	if r0.Fields["status"] != "ct-attention" {
+		t.Errorf("resource[0].Fields[status]: expected %q (RunInstances is W verb → ct-attention per §1.2), got %q", "ct-attention", r0.Fields["status"])
 	}
 
 	// Verify second event (read-only, empty Resources)
@@ -110,9 +110,9 @@ func TestFetchCloudTrailEvents_ParsesMultipleEvents(t *testing.T) {
 	if r1.Name != "GetObject" {
 		t.Errorf("resource[1].Name: expected %q, got %q", "GetObject", r1.Name)
 	}
-	// GetObject has "Get" prefix → read verb R, plain, same-account → Status must be "ct-info".
-	if r1.Status != "ct-info" {
-		t.Errorf("resource[1].Status: expected %q (GetObject is plain R verb → ct-info per §1.2), got %q", "ct-info", r1.Status)
+	// GetObject has "Get" prefix → read verb R, plain, same-account → Fields["status"] must be "ct-info".
+	if r1.Fields["status"] != "ct-info" {
+		t.Errorf("resource[1].Fields[status]: expected %q (GetObject is plain R verb → ct-info per §1.2), got %q", "ct-info", r1.Fields["status"])
 	}
 }
 
@@ -350,9 +350,9 @@ func TestFetchCloudTrailEvents_ReadOnlyIsString(t *testing.T) {
 	if r.Fields["read_only"] != "true" {
 		t.Errorf("Fields[\"read_only\"]: expected %q, got %q", "true", r.Fields["read_only"])
 	}
-	// DescribeInstances has "Describe" prefix → read verb R, plain → Status must be "ct-info".
-	if r.Status != "ct-info" {
-		t.Errorf("Status: expected %q (DescribeInstances is plain R verb → ct-info per §1.2), got %q", "ct-info", r.Status)
+	// DescribeInstances has "Describe" prefix → read verb R, plain → Fields["status"] must be "ct-info".
+	if r.Fields["status"] != "ct-info" {
+		t.Errorf("Fields[status]: expected %q (DescribeInstances is plain R verb → ct-info per §1.2), got %q", "ct-info", r.Fields["status"])
 	}
 	// _ct.outcome is always a non-empty string ("OK" or an error code).
 	if r.Fields["_ct.outcome"] == "" {

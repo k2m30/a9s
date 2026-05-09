@@ -113,9 +113,8 @@ func FetchCodeBuildProjectsPage(
 		}
 
 		r := resource.Resource{
-			ID:     name,
-			Name:   name,
-			Status: "",
+			ID:    name,
+			Name:  name,
 			Fields: map[string]string{
 				"name":          name,
 				"source_type":   sourceType,

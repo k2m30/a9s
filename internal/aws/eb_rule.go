@@ -86,9 +86,8 @@ func FetchEventBridgeRulesPage(ctx context.Context, api EventBridgeListRulesAPI,
 		}
 
 		r := resource.Resource{
-			ID:     name,
-			Name:   name,
-			Status: state,
+			ID:    name,
+			Name:  name,
 			Fields: map[string]string{
 				"name":          name,
 				"state":         state,

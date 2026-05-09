@@ -94,9 +94,8 @@ func FetchHostedZonesPage(ctx context.Context, api Route53ListHostedZonesAPI, co
 		}
 
 		r := resource.Resource{
-			ID:     zoneID,
-			Name:   name,
-			Status: "",
+			ID:    zoneID,
+			Name:  name,
 			Fields: map[string]string{
 				"zone_id":               zoneID,
 				"name":                  name,
