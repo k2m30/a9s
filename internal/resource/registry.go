@@ -4,6 +4,7 @@ import (
 	"maps"
 	"strings"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
 )
 
@@ -221,9 +222,13 @@ func RegisterPaginated(shortName string, f PaginatedFetcher) {
 	paginatedRegistry[shortName] = f
 }
 
-// GetPaginatedFetcher returns the paginated fetcher for the given resource short name,
-// or nil if no paginated fetcher is registered.
+// GetPaginatedFetcher returns the paginated fetcher for the given resource short name.
+// Catalog-backed: checks the catalog first; falls through to the legacy map.
+// Fallback removed in PR-04n.
 func GetPaginatedFetcher(shortName string) PaginatedFetcher {
+	if ct := catalog.Find(shortName); ct != nil && ct.Fetcher != nil {
+		return ct.Fetcher
+	}
 	return paginatedRegistry[shortName]
 }
 
@@ -238,9 +243,13 @@ func RegisterPaginatedChild(shortName string, f PaginatedChildFetcher) {
 	paginatedChildRegistry[shortName] = f
 }
 
-// GetPaginatedChildFetcher returns the paginated child fetcher for the given short name,
-// or nil if no paginated child fetcher is registered.
+// GetPaginatedChildFetcher returns the paginated child fetcher for the given short name.
+// Catalog-backed: checks the catalog first via the parent type's Children defs;
+// falls through to the legacy map. Fallback removed in PR-04n.
 func GetPaginatedChildFetcher(shortName string) PaginatedChildFetcher {
+	// Child fetchers are keyed by the child type's ShortName. The catalog stores
+	// them in the parent's Children []ChildViewDef; a separate per-child catalog
+	// lookup path is wired in per-category PRs (04b+). For now: legacy fallback.
 	return paginatedChildRegistry[shortName]
 }
 
@@ -261,9 +270,12 @@ func RegisterFilteredPaginated(shortName string, f FilteredPaginatedFetcher) {
 	filteredPaginatedRegistry[shortName] = f
 }
 
-// GetFilteredPaginatedFetcher returns the filtered paginated fetcher for the given short name,
-// or nil if none is registered.
+// GetFilteredPaginatedFetcher returns the filtered paginated fetcher for the given short name.
+// Catalog-backed: catalog does not yet carry filtered fetchers (added in per-category PRs);
+// falls through to the legacy map. Fallback removed in PR-04n.
 func GetFilteredPaginatedFetcher(shortName string) FilteredPaginatedFetcher {
+	// Filtered fetchers are not yet represented in catalog.ResourceTypeDef (04a).
+	// Per-category PRs (04b+) add a FilteredFetcher field to the catalog struct.
 	return filteredPaginatedRegistry[shortName]
 }
 
@@ -286,9 +298,13 @@ func RegisterRevealFetcher(shortName string, f RevealFetcher) {
 	revealRegistry[shortName] = f
 }
 
-// GetRevealFetcher returns the reveal fetcher for the given resource short name,
-// or nil if no reveal fetcher is registered.
+// GetRevealFetcher returns the reveal fetcher for the given resource short name.
+// Catalog-backed: checks the catalog first; falls through to the legacy map.
+// Fallback removed in PR-04n.
 func GetRevealFetcher(shortName string) RevealFetcher {
+	if ct := catalog.Find(shortName); ct != nil && ct.Reveal != nil {
+		return ct.Reveal
+	}
 	return revealRegistry[shortName]
 }
 
@@ -298,7 +314,11 @@ func UnregisterRevealFetcher(shortName string) {
 }
 
 // HasRevealFetcher returns true if a reveal fetcher is registered for the given short name.
+// Catalog-backed: checks the catalog first; falls through to the legacy map.
 func HasRevealFetcher(shortName string) bool {
+	if ct := catalog.Find(shortName); ct != nil && ct.Reveal != nil {
+		return true
+	}
 	_, ok := revealRegistry[shortName]
 	return ok
 }

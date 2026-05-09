@@ -3,6 +3,7 @@ package resource
 import (
 	"strings"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
 )
 
@@ -175,24 +176,54 @@ func buildResourceTypes() []ResourceTypeDef {
 }
 
 // AllResourceTypes returns the definitions for all supported resource types.
+// Catalog-backed: types declared in internal/catalog take precedence; types
+// not yet migrated fall through to the legacy resourceTypes slice.
+// Fallback is removed in PR-04n once all categories are migrated.
 func AllResourceTypes() []ResourceTypeDef {
+	catalogTypes := catalog.All()
+	if len(catalogTypes) > 0 {
+		// Return catalog types followed by any legacy types not yet in the catalog.
+		result := make([]ResourceTypeDef, 0, len(catalogTypes)+len(resourceTypes))
+		for _, ct := range catalogTypes {
+			result = append(result, adaptFromCatalog(ct))
+		}
+		catalogSet := make(map[string]struct{}, len(catalogTypes))
+		for _, ct := range catalogTypes {
+			catalogSet[ct.ShortName] = struct{}{}
+		}
+		for _, lt := range resourceTypes {
+			if _, inCatalog := catalogSet[lt.ShortName]; !inCatalog {
+				result = append(result, lt)
+			}
+		}
+		return result
+	}
+	// Legacy fallback (only meaningful during PR-04a through PR-04m).
 	result := make([]ResourceTypeDef, len(resourceTypes))
 	copy(result, resourceTypes)
 	return result
 }
 
 // AllShortNames returns the ShortName of every registered resource type.
+// Catalog-backed: delegates to AllResourceTypes so catalog types are included.
 func AllShortNames() []string {
-	names := make([]string, len(resourceTypes))
-	for i, rt := range resourceTypes {
+	all := AllResourceTypes()
+	names := make([]string, len(all))
+	for i, rt := range all {
 		names[i] = rt.ShortName
 	}
 	return names
 }
 
 // FindResourceType looks up a resource type by its ShortName or any of its Aliases.
-// Returns nil if no match is found.
+// Catalog-backed: checks the catalog first; falls through to the legacy slice
+// for types not yet migrated. Fallback removed in PR-04n.
 func FindResourceType(name string) *ResourceTypeDef {
+	if ct := catalog.Find(name); ct != nil {
+		def := adaptFromCatalog(*ct)
+		return &def
+	}
+	// Legacy fallback (only meaningful during PR-04a through PR-04m).
 	for i := range resourceTypes {
 		if strings.EqualFold(resourceTypes[i].ShortName, name) {
 			return &resourceTypes[i]
@@ -204,4 +235,34 @@ func FindResourceType(name string) *ResourceTypeDef {
 		}
 	}
 	return nil
+}
+
+// adaptFromCatalog converts a catalog.ResourceTypeDef into the legacy
+// ResourceTypeDef shape. This is a migration-window shim; deleted in PR-04n
+// when the legacy type is removed and consumers read catalog.ResourceTypeDef directly.
+//
+// Fields that require concrete internal/aws types (Wave2, Reveal, DetailEnrich)
+// are mapped from any to the correct type alias.
+func adaptFromCatalog(ct catalog.ResourceTypeDef) ResourceTypeDef {
+	return ResourceTypeDef{
+		Name:                  ct.Name,
+		ShortName:             ct.ShortName,
+		ListTitle:             ct.ListTitle,
+		Aliases:               ct.Aliases,
+		Category:              ct.Category,
+		Columns:               ct.Columns,
+		Children:              ct.Children,
+		CopyField:             ct.CopyField,
+		StubCreator:           ct.StubCreator,
+		RelatedContextFromIDs: ct.RelatedContextFromIDs,
+		CloudTrailKey:         ct.CloudTrailKey,
+		IdentityKey:           ct.IdentityKey,
+		LifecycleKey:          ct.LifecycleKey,
+		ExcludeFromIssueBadge: ct.ExcludeFromIssueBadge,
+		CellDecorators:        ct.CellDecorators,
+		Project:               ct.Project,
+		// Color: derived from severity; catalog types use SeverityStyle —
+		// per-category PRs (04b+) set this via a severity-based adapter.
+		// For now (catalog empty in 04a) this field is nil; fallbackColor is used.
+	}
 }
