@@ -21,6 +21,7 @@ jobs:
     outputs:
       go: ${{ steps.filter.outputs.go }}
       md: ${{ steps.filter.outputs.md }}
+      not_docs: ${{ steps.filter.outputs.not_docs }}
     steps:
       - uses: actions/checkout@v6
       - id: filter
@@ -36,6 +37,14 @@ jobs:
               - '.github/workflows/ci.yml'
             md:
               - '**/*.md'
+            not_docs:
+              - '**'
+              - '!**/*.md'
+              - '!docs/**'
+              - '!website/**'
+              - '!specs/**'
+              - '!.claude/**'
+              - '!LICENSE'
 
   lint:
     name: Lint
@@ -132,7 +141,7 @@ jobs:
 
   markdown-lint:
     name: Markdown lint
-    if: github.event_name == 'pull_request' && needs.changes.outputs.md == 'true'
+    if: github.event_name == 'pull_request' && (needs.changes.outputs.not_docs != 'true' || needs.changes.outputs.md == 'true')
     needs: changes
     runs-on: ubuntu-latest
     steps:
