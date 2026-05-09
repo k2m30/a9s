@@ -79,8 +79,8 @@ func TestFetchCloudWatchAlarms_ParsesMultipleAlarms(t *testing.T) {
 	if r0.Name != "high-cpu-alarm" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "high-cpu-alarm", r0.Name)
 	}
-	if r0.Status != "ALARM" {
-		t.Errorf("resource[0].Status: expected %q, got %q", "ALARM", r0.Status)
+	if len(r0.Findings) == 0 || string(r0.Findings[0].Code) != "alarm.state.alarm" {
+		t.Errorf("resource[0].Findings: expected alarm.state.alarm finding, got %v", r0.Findings)
 	}
 	if r0.Fields["alarm_name"] != "high-cpu-alarm" {
 		t.Errorf("resource[0].Fields[\"alarm_name\"]: expected %q, got %q", "high-cpu-alarm", r0.Fields["alarm_name"])
@@ -103,8 +103,12 @@ func TestFetchCloudWatchAlarms_ParsesMultipleAlarms(t *testing.T) {
 	if r1.ID != "low-disk-alarm" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "low-disk-alarm", r1.ID)
 	}
-	if r1.Status != "OK" {
-		t.Errorf("resource[1].Status: expected %q, got %q", "OK", r1.Status)
+	if r1.Fields["state"] != "OK" {
+		t.Errorf("resource[1].Fields[state]: expected %q, got %q", "OK", r1.Fields["state"])
+	}
+	// OK alarm with no AlarmActions → no_actions finding.
+	if len(r1.Findings) == 0 || string(r1.Findings[0].Code) != "alarm.no_actions" {
+		t.Errorf("resource[1].Findings: expected alarm.no_actions finding, got %v", r1.Findings)
 	}
 	if r1.Fields["threshold"] != "100.00" {
 		t.Errorf("resource[1].Fields[\"threshold\"]: expected %q, got %q", "100.00", r1.Fields["threshold"])
