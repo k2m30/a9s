@@ -131,9 +131,8 @@ func FetchIAMPoliciesPage(ctx context.Context, api IAMListPoliciesAPI, continuat
 		}
 
 		r := resource.Resource{
-			ID:     policyName,
-			Name:   policyName,
-			Status: "",
+			ID:   policyName,
+			Name: policyName,
 			Fields: map[string]string{
 				"policy_name":      policyName,
 				"policy_type":      "managed",
@@ -355,9 +354,8 @@ func buildAllManagedPolicies(ctx context.Context, api IAMListPoliciesAPI, store 
 				policyType = "aws-managed"
 			}
 			r := resource.Resource{
-				ID:     policyName,
-				Name:   policyName,
-				Status: "",
+				ID:   policyName,
+				Name: policyName,
 				Fields: map[string]string{
 					"policy_name":      policyName,
 					"policy_type":      policyType,

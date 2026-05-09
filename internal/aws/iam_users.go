@@ -94,9 +94,8 @@ func FetchIAMUsersPage(ctx context.Context, api IAMListUsersAPI, continuationTok
 		}
 
 		r := resource.Resource{
-			ID:     userName,
-			Name:   userName,
-			Status: "",
+			ID:   userName,
+			Name: userName,
 			Fields: map[string]string{
 				"user_name":          userName,
 				"user_id":            userID,

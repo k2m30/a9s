@@ -92,9 +92,8 @@ func FetchIAMGroupsPage(ctx context.Context, api IAMListGroupsAPI, continuationT
 		}
 
 		r := resource.Resource{
-			ID:     groupName,
-			Name:   groupName,
-			Status: "",
+			ID:   groupName,
+			Name: groupName,
 			Fields: map[string]string{
 				"group_name":  groupName,
 				"group_id":    groupID,
