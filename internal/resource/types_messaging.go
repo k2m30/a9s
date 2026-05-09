@@ -183,19 +183,7 @@ func messagingResourceTypes() []ResourceTypeDef {
 				{Key: "status", Title: "Status", Width: 36, Sortable: true},
 			},
 			Color: func(r Resource) Color {
-				// Color is driven by the enriched phrase for this identity.
-				// Wave-1: Status is set by the fetcher for non-Healthy identities
-				// (e.g. "verification failed", "pending verification").
-				// Wave-2: ApplyFieldUpdates writes account-level phrases into
-				// Fields["status"] (not r.Status), so for Healthy identities whose
-				// r.Status is empty, fall back to Fields["status"].
-				// Strip the `(+N)` suffix before matching so "account SHUTDOWN (+1)"
-				// maps to Broken just like "account SHUTDOWN".
-				statusSource := r.Status
-				if statusSource == "" {
-					statusSource = r.Fields["status"]
-				}
-				phrase := StripFindingSuffix(statusSource)
+				phrase := StripFindingSuffix(r.Fields["status"])
 				switch phrase {
 				case "verification failed", "verify: temp failure", "verification not started",
 					"account SHUTDOWN", "account PROBATION":
@@ -203,19 +191,6 @@ func messagingResourceTypes() []ResourceTypeDef {
 				case "pending verification", "sending disabled":
 					return ColorWarning
 				}
-				// Fallback: check verification_status field for backward-compatibility
-				// with resources that carry the raw AWS enum value in Fields but have
-				// not yet had their Status recomputed by the fetcher.
-				switch r.Fields["verification_status"] {
-				case "FAILED", "Failed", "TemporaryFailure", "TEMPORARY_FAILURE", "NOT_STARTED":
-					return ColorBroken
-				case "PENDING", "Pending":
-					return ColorWarning
-				}
-				if r.Fields["sending_enabled"] == "false" {
-					return ColorWarning
-				}
-				// Healthy or informational (quota 80%+ used): green row.
 				return ColorHealthy
 			},
 		},

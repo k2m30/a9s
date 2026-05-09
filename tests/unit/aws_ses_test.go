@@ -63,9 +63,12 @@ func TestFetchSESIdentitiesPage_DomainIdentityFieldMapping(t *testing.T) {
 	if r.Name != "acme-corp.com" {
 		t.Errorf("Name = %q, want %q", r.Name, "acme-corp.com")
 	}
-	// Healthy identity (SUCCESS + sending enabled): Status = ""
-	if r.Status != "" {
-		t.Errorf("Status = %q, want %q (healthy identity)", r.Status, "")
+	// Healthy identity (SUCCESS + sending enabled): no findings, empty status field
+	if len(r.Findings) != 0 {
+		t.Errorf("Findings = %v, want empty for healthy identity", r.Findings)
+	}
+	if r.Fields["status"] != "" {
+		t.Errorf("Fields[status] = %q, want empty for healthy identity", r.Fields["status"])
 	}
 	if r.Fields["identity_name"] != "acme-corp.com" {
 		t.Errorf("Fields[identity_name] = %q, want %q", r.Fields["identity_name"], "acme-corp.com")
@@ -120,9 +123,9 @@ func TestFetchSESIdentitiesPage_EmailAddressIdentityFieldMapping(t *testing.T) {
 	if r.Fields["sending_enabled"] != "false" {
 		t.Errorf("Fields[sending_enabled] = %q, want %q", r.Fields["sending_enabled"], "false")
 	}
-	// PENDING + sending disabled → multiple issues; status phrase is the top phrase.
-	if r.Status == "" {
-		t.Error("Status = empty, want non-empty (PENDING + sending disabled identity)")
+	// PENDING + sending disabled → multiple findings; status field is the top phrase.
+	if r.Fields["status"] == "" {
+		t.Error("Fields[status] = empty, want non-empty (PENDING + sending disabled identity)")
 	}
 	// Fields["verification_status"] is the raw SDK enum.
 	if r.Fields["verification_status"] != "PENDING" {
@@ -184,8 +187,8 @@ func TestFetchSESIdentitiesPage_StatusPhraseMapping(t *testing.T) {
 			if len(result.Resources) != 1 {
 				t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 			}
-			if result.Resources[0].Status != tc.wantStatus {
-				t.Errorf("Status = %q, want %q", result.Resources[0].Status, tc.wantStatus)
+			if result.Resources[0].Fields["status"] != tc.wantStatus {
+				t.Errorf("Fields[status] = %q, want %q", result.Resources[0].Fields["status"], tc.wantStatus)
 			}
 		})
 	}
@@ -218,12 +221,12 @@ func TestFetchSESIdentitiesPage_MultipleIssuesSuffixBumped(t *testing.T) {
 	r := result.Resources[0]
 	// FAILED + sending-disabled → top phrase is "verification failed (+1)"
 	expected := "verification failed (+1)"
-	if r.Status != expected {
-		t.Errorf("Status = %q, want %q (multi-issue suffix)", r.Status, expected)
+	if r.Fields["status"] != expected {
+		t.Errorf("Fields[status] = %q, want %q (multi-finding suffix)", r.Fields["status"], expected)
 	}
-	// Issues slice contains both phrases.
-	if len(r.Issues) != 2 {
-		t.Errorf("Issues = %v, want 2 entries", r.Issues)
+	// Findings slice contains both.
+	if len(r.Findings) != 2 {
+		t.Errorf("Findings = %v, want 2 entries", r.Findings)
 	}
 }
 
@@ -253,8 +256,8 @@ func TestFetchSESIdentitiesPage_HealthyIdentityHasNilIssues(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	r := result.Resources[0]
-	if len(r.Issues) != 0 {
-		t.Errorf("Issues = %v, want empty for healthy identity", r.Issues)
+	if len(r.Findings) != 0 {
+		t.Errorf("Findings = %v, want empty for healthy identity", r.Findings)
 	}
 }
 
@@ -454,9 +457,12 @@ func TestFetchSESIdentitiesPage_FixtureGraphRootIsHealthy(t *testing.T) {
 			continue
 		}
 		found = true
-		// Graph-root is SUCCESS + sending enabled → Status = ""
-		if r.Status != "" {
-			t.Errorf("graph-root Status = %q, want empty string (healthy)", r.Status)
+		// Graph-root is SUCCESS + sending enabled → no findings, empty status field
+		if len(r.Findings) != 0 {
+			t.Errorf("graph-root Findings = %v, want empty (healthy)", r.Findings)
+		}
+		if r.Fields["status"] != "" {
+			t.Errorf("graph-root Fields[status] = %q, want empty (healthy)", r.Fields["status"])
 		}
 		if r.Fields["identity_type"] != "DOMAIN" {
 			t.Errorf("graph-root Fields[identity_type] = %q, want %q", r.Fields["identity_type"], "DOMAIN")
@@ -474,10 +480,10 @@ func TestFetchSESIdentitiesPage_FixtureGraphRootIsHealthy(t *testing.T) {
 	}
 }
 
-// TestFetchSESIdentitiesPage_FixtureBrokenIdentitiesHaveNonEmptyStatus verifies
-// that the fixture contains identities with non-empty Status phrases, covering
+// TestFetchSESIdentitiesPage_FixtureBrokenIdentitiesHaveFindings verifies
+// that the fixture contains identities with non-empty Findings, covering
 // the broken/warning categories.
-func TestFetchSESIdentitiesPage_FixtureBrokenIdentitiesHaveNonEmptyStatus(t *testing.T) {
+func TestFetchSESIdentitiesPage_FixtureBrokenIdentitiesHaveFindings(t *testing.T) {
 	f := fixtures.NewSESFixtures()
 	mock := &mockSESv2Client{
 		output: &sesv2.ListEmailIdentitiesOutput{
@@ -490,15 +496,15 @@ func TestFetchSESIdentitiesPage_FixtureBrokenIdentitiesHaveNonEmptyStatus(t *tes
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Count resources with non-empty Status.
+	// Count resources with non-empty Findings.
 	var nonEmpty int
 	for _, r := range result.Resources {
-		if r.Status != "" {
+		if len(r.Findings) > 0 {
 			nonEmpty++
 		}
 	}
 	if nonEmpty == 0 {
-		t.Error("expected at least one resource with non-empty Status in fixture set")
+		t.Error("expected at least one resource with non-empty Findings in fixture set")
 	}
 }
 
@@ -520,11 +526,11 @@ func TestFetchSESIdentitiesPage_FixtureMultiIssueIdentityHasSuffix(t *testing.T)
 	for _, r := range result.Resources {
 		if r.ID == "broken.acme-corp.com" {
 			expected := "verification failed (+1)"
-			if r.Status != expected {
-				t.Errorf("broken.acme-corp.com Status = %q, want %q", r.Status, expected)
+			if r.Fields["status"] != expected {
+				t.Errorf("broken.acme-corp.com Fields[status] = %q, want %q", r.Fields["status"], expected)
 			}
-			if len(r.Issues) != 2 {
-				t.Errorf("broken.acme-corp.com Issues = %v, want 2", r.Issues)
+			if len(r.Findings) != 2 {
+				t.Errorf("broken.acme-corp.com Findings = %v, want 2", r.Findings)
 			}
 			return
 		}

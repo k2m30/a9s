@@ -1023,6 +1023,9 @@ func TestCR273_Item18_TrivialColor_MustClassify(t *testing.T) {
 		"parameter group incompatible", "no writer: reads only",
 		"modifying: in progress", "delete-protection off",
 		"not encrypted at rest", "no automated backups",
+		// ses phrase-based statuses (Color reads Fields["status"] derived phrase).
+		"verification failed", "verify: temp failure", "verification not started",
+		"pending verification", "sending disabled",
 	}
 
 	fieldKeys := []string{
