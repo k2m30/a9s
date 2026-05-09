@@ -35,6 +35,40 @@ func replaceEC2Related(t *testing.T, defs []resource.RelatedDef) {
 	t.Cleanup(func() { resource.RegisterRelated("ec2", orig) })
 }
 
+// replaceEC2NavigableFields registers navigable fields for "ec2" and restores
+// the prior ACTIVE registry state on cleanup. Snapshots the ACTIVE registry
+// (not the merged one) so an empty active stays empty after the test —
+// otherwise we'd promote production DEFAULT fields into ACTIVE and poison
+// later tests that check active-only navigability.
+func replaceEC2NavigableFields(t *testing.T, fields []resource.NavigableField) {
+	t.Helper()
+	orig := resource.GetActiveNavigableFields("ec2")
+	resource.RegisterNavigableFields("ec2", fields)
+	t.Cleanup(func() {
+		if orig == nil {
+			resource.UnregisterNavigableFields("ec2")
+		} else {
+			resource.RegisterNavigableFields("ec2", orig)
+		}
+	})
+}
+
+// unregisterEC2NavigableFields strips ec2 navigable fields from the ACTIVE
+// registry for the duration of t and restores them on cleanup. Used by tests
+// that need a clean "no active navigable fields" state for ec2.
+func unregisterEC2NavigableFields(t *testing.T) {
+	t.Helper()
+	orig := resource.GetActiveNavigableFields("ec2")
+	resource.UnregisterNavigableFields("ec2")
+	t.Cleanup(func() {
+		if orig == nil {
+			resource.UnregisterNavigableFields("ec2")
+		} else {
+			resource.RegisterNavigableFields("ec2", orig)
+		}
+	})
+}
+
 // newDemoColdCacheApp constructs a tui.Model exactly as cmd/a9s/main.go will
 // after feature 014-demo-transport-mock is fully wired (T036d). It uses
 // demo.NewServiceClients() to supply fake clients and passes them via

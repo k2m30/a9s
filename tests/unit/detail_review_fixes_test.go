@@ -211,10 +211,9 @@ func TestDetail_TabOnAutoShownPanel_ThenTabUnfocuses(t *testing.T) {
 // TargetType from the field at index 3 (SubnetId → "subnet"), NOT from index 0.
 func TestDetail_FieldCursorIndependentFromScroll(t *testing.T) {
 	// Register NavigableField for "SubnetId" → "subnet" (path index 2 in 0-based).
-	resource.RegisterNavigableFields("ec2", []resource.NavigableField{
+	replaceEC2NavigableFields(t, []resource.NavigableField{
 		{FieldPath: "SubnetId", TargetType: "subnet"},
 	})
-	defer resource.UnregisterNavigableFields("ec2")
 
 	// Ensure no related defs so right column isn't shown (avoids Tab interactions).
 	unregisterEC2Related(t)
@@ -258,10 +257,9 @@ func TestDetail_FieldCursorIndependentFromScroll(t *testing.T) {
 // Enter should always reference a valid field (no panic, no index out of range).
 func TestDetail_FieldCursorClamps(t *testing.T) {
 	// Register a navigable field so Enter has something to fire on.
-	resource.RegisterNavigableFields("ec2", []resource.NavigableField{
+	replaceEC2NavigableFields(t, []resource.NavigableField{
 		{FieldPath: "InstanceId", TargetType: "ec2"},
 	})
-	defer resource.UnregisterNavigableFields("ec2")
 
 	unregisterEC2Related(t)
 
@@ -305,11 +303,10 @@ func TestDetail_FieldCursorClamps(t *testing.T) {
 // TestDetail_FieldCursorDown_TwoFieldsClamps verifies the two-field boundary.
 // With only 2 fields, pressing j once lands at index 1, pressing again stays at 1.
 func TestDetail_FieldCursorDown_TwoFieldsClamps(t *testing.T) {
-	resource.RegisterNavigableFields("ec2", []resource.NavigableField{
+	replaceEC2NavigableFields(t, []resource.NavigableField{
 		{FieldPath: "InstanceId", TargetType: "ec2"},
 		{FieldPath: "VpcId", TargetType: "vpc"},
 	})
-	defer resource.UnregisterNavigableFields("ec2")
 	unregisterEC2Related(t)
 
 	// 2-field config.
@@ -356,10 +353,9 @@ func TestDetail_FieldCursorDown_TwoFieldsClamps(t *testing.T) {
 // TestDetail_FieldCursorUp_AtZeroStaysZero verifies pressing k at index 0 keeps
 // the cursor at 0 and Enter still fires on the first field.
 func TestDetail_FieldCursorUp_AtZeroStaysZero(t *testing.T) {
-	resource.RegisterNavigableFields("ec2", []resource.NavigableField{
+	replaceEC2NavigableFields(t, []resource.NavigableField{
 		{FieldPath: "InstanceId", TargetType: "ec2"},
 	})
-	defer resource.UnregisterNavigableFields("ec2")
 	unregisterEC2Related(t)
 
 	d := makeDetailNarrow(t)

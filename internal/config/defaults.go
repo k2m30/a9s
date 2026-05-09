@@ -28,9 +28,7 @@ func mergeDefaultViews() map[string]ViewDef {
 
 // sharedReadOnlyDefault is the lazily-built, never-mutated default config
 // instance shared across all callers that need read-only access.
-var sharedReadOnlyDefault = sync.OnceValue(func() *ViewsConfig {
-	return buildDefaultConfig()
-})
+var sharedReadOnlyDefault = sync.OnceValue(buildDefaultConfig)
 
 func buildDefaultConfig() *ViewsConfig {
 	cp := ViewsConfig{
