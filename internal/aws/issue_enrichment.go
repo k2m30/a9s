@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -89,6 +90,20 @@ func registerIssueEnricher(shortName string, fn IssueEnricherFunc, priority int)
 		panic(fmt.Sprintf("registerIssueEnricher: priority must be positive, got %d for short name %q", priority, shortName))
 	}
 	IssueEnricherRegistry[shortName] = IssueEnricher{Fn: fn, Priority: priority}
+}
+
+// GetIssueEnricher returns the Wave 2 issue enricher for the given resource
+// short name. Catalog-backed: checks catalog.ResourceTypes[shortName].Wave2
+// first (cast from any to IssueEnricher); falls through to IssueEnricherRegistry
+// for types not yet migrated to the catalog. Fallback removed in PR-04n.
+func GetIssueEnricher(shortName string) (IssueEnricher, bool) {
+	if ct := catalog.Find(shortName); ct != nil && ct.Wave2 != nil {
+		if e, ok := ct.Wave2.(IssueEnricher); ok {
+			return e, true
+		}
+	}
+	e, ok := IssueEnricherRegistry[shortName]
+	return e, ok
 }
 
 // IssueEnricherResult is the typed return value of a Wave 2 issue enricher.
