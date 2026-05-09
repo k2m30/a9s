@@ -1,4 +1,4 @@
-.PHONY: build install test test-race lint gofix fmt run clean cover integration security coverage verify-readonly demo readme check-readme mdlint snapshot snapshot-update
+.PHONY: build install test test-race lint gofix fmt run clean cover integration security coverage verify-readonly demo readme check-readme mdlint snapshot snapshot-update ready-to-push ready-to-release
 
 BINARY   = a9s
 CMD      = ./cmd/a9s
@@ -102,3 +102,18 @@ snapshot:
 snapshot-update:
 	UPDATE_GOLDEN=1 go test ./tests/unit/ -run 'Golden|Scenario' -count=1
 	UPDATE_GOLDEN=1 go test -tags integration ./tests/integration/ -run 'Visual|Scenario' -count=1
+
+# Stage 6 — Pre-push gate. The single command every PR must pass before push.
+# See docs/development-process.md.
+ready-to-push: test-race lint security gofix verify-readonly check-readme snapshot mdlint
+	@echo "PASS: ready-to-push gate green"
+
+# Stage 7 — Pre-release gate. Run before tagging a release. Subsumes ready-to-push
+# plus the full demo-mode integration suite. See docs/development-process.md.
+ready-to-release: ready-to-push integration
+	@echo "Manual checklist (not automatable, must be confirmed by release owner):"
+	@echo "  [ ] CHANGELOG.md updated for this version"
+	@echo "  [ ] releases/vX.Y.Z.md written"
+	@echo "  [ ] docs/architecture.md aligned with current codebase"
+	@echo "  [ ] Busywork audit on tests added/modified in this release complete"
+	@echo "PASS: ready-to-release automated gates green"
