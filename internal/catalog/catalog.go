@@ -4,7 +4,7 @@ package catalog
 // It is static — no init(), no Register* calls. Per-category PRs (04b–04m)
 // populate this slice. Until then it is empty and all lookups fall through
 // to the legacy registry in internal/resource.
-var ResourceTypes []ResourceTypeDef //nolint:gochecknoglobals // static catalog: intentional package-level var
+var ResourceTypes = computeTypes //nolint:gochecknoglobals // static catalog: intentional package-level var
 
 // Find returns the ResourceTypeDef for the given name (ShortName or Alias),
 // or nil if the catalog does not have an entry for it yet.
