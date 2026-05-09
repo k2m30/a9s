@@ -160,7 +160,6 @@ var resourceTypes = buildResourceTypes()
 
 func buildResourceTypes() []ResourceTypeDef {
 	var all []ResourceTypeDef
-	all = append(all, computeResourceTypes()...)
 	all = append(all, containersResourceTypes()...)
 	all = append(all, networkingResourceTypes()...)
 	all = append(all, databasesResourceTypes()...)
@@ -237,6 +236,16 @@ func FindResourceType(name string) *ResourceTypeDef {
 	return nil
 }
 
+// colorRegistry holds per-type Color functions for catalog-backed types.
+// Populated by per-category color_*.go init() calls during the migration
+// window (PR-04b through PR-04n). Deleted in PR-04n when adaptFromCatalog is removed.
+var colorRegistry = map[string]func(Resource) Color{} //nolint:gochecknoglobals // migration-window shim: intentional package-level var
+
+// augmentRegistry holds per-type Augment hooks for catalog-backed types.
+// Populated by per-category color_*.go init() calls during the migration
+// window (PR-04b through PR-04n). Deleted in PR-04n when adaptFromCatalog is removed.
+var augmentRegistry = map[string]domain.Augmenter{} //nolint:gochecknoglobals // migration-window shim: intentional package-level var
+
 // adaptFromCatalog converts a catalog.ResourceTypeDef into the legacy
 // ResourceTypeDef shape. This is a migration-window shim; deleted in PR-04n
 // when the legacy type is removed and consumers read catalog.ResourceTypeDef directly.
@@ -261,8 +270,11 @@ func adaptFromCatalog(ct catalog.ResourceTypeDef) ResourceTypeDef {
 		ExcludeFromIssueBadge: ct.ExcludeFromIssueBadge,
 		CellDecorators:        ct.CellDecorators,
 		Project:               ct.Project,
-		// Color: derived from severity; catalog types use SeverityStyle —
-		// per-category PRs (04b+) set this via a severity-based adapter.
-		// For now (catalog empty in 04a) this field is nil; fallbackColor is used.
+		// Color: populated from colorRegistry (per-category color_*.go init calls)
+		// during the migration window. When not registered, fallbackColor is used.
+		Color: colorRegistry[ct.ShortName],
+		// Augment: populated from augmentRegistry (per-category color_*.go init calls)
+		// during the migration window. When not registered, nil (no augmentation).
+		Augment: augmentRegistry[ct.ShortName],
 	}
 }
