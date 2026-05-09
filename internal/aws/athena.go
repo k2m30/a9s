@@ -107,9 +107,8 @@ func FetchAthenaWorkgroupsPage(ctx context.Context, api AthenaListWorkGroupsAPI,
 		}
 
 		r := resource.Resource{
-			ID:     wgName,
-			Name:   wgName,
-			Status: state,
+			ID:    wgName,
+			Name:  wgName,
 			Fields: map[string]string{
 				"workgroup_name":         wgName,
 				"state":                  state,
