@@ -29,6 +29,7 @@ import (
 // TestDemoColdCacheCtEvents_ListPopulates verifies that ct-events list view
 // populates from the demo transport on a cold cache.
 func TestDemoColdCacheCtEvents_ListPopulates(t *testing.T) {
+	t.Parallel()
 	m := newDemoColdCacheApp(t)
 
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -77,6 +78,7 @@ func TestDemoColdCacheCtEvents_ListPopulates(t *testing.T) {
 // opening CT event detail dispatches the real checker path (not a demo shortcut)
 // and that at least one checker returns a non-error result (Count >= 0).
 func TestDemoColdCacheCtEvents_DetailRelatedChecksRunLivePath(t *testing.T) {
+	t.Parallel()
 	m := newDemoColdCacheApp(t)
 
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -254,6 +256,7 @@ func TestDemoColdCacheCtEvents_DetailRelatedChecksRunLivePath(t *testing.T) {
 // RelatedCheckResultMsg values (not nil messages or panics), which only holds
 // if the live checker path is active.
 func TestDemoColdCacheCtEvents_NoDemoShortcut(t *testing.T) {
+	t.Parallel()
 	m := newDemoColdCacheApp(t)
 
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -317,6 +320,7 @@ func TestDemoColdCacheCtEvents_NoDemoShortcut(t *testing.T) {
 // This test is intentionally a no-op placeholder so the T012b requirement is
 // visible in the test suite.
 func TestDemoColdCacheACM_HasLiveFetcher(t *testing.T) {
+	t.Parallel()
 	// T012b: ACM has a live fetcher (FetchACMCertificates in internal/aws/acm.go).
 	// Typed-fake implementation tracked in T028. No skip needed.
 	t.Log("T012b: ACM live fetcher confirmed — migration to typed fake tracked under T028")

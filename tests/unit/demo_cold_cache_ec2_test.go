@@ -19,6 +19,7 @@ import (
 // that method is still a stub ("not yet implemented"). The coder's task (T013) is
 // to implement the fake and provide fixture data — at that point this test passes.
 func TestDemoColdCacheEC2_ListPopulates(t *testing.T) {
+	t.Parallel()
 	m := newDemoColdCacheApp(t)
 
 	// Size the model so View() renders.
@@ -80,6 +81,7 @@ func TestDemoColdCacheEC2_ListPopulates(t *testing.T) {
 //
 // Expected to FAIL initially because EC2Fake methods panic (T013 not yet done).
 func TestDemoColdCacheEC2_DetailRelatedPanels(t *testing.T) {
+	t.Parallel()
 	m := newDemoColdCacheApp(t)
 
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})
