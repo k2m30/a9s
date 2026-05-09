@@ -17,6 +17,7 @@ Quick reference:
 - Repository: `k2m30/a9s` — always use this owner/repo for GitHub API calls, issues, and PRs
 
 ## Active Technologies
+
 - Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2 (autoscaling, codeartifact, codebuild, codepipeline, dynamodb, ec2, ecr, ecs, efs, elasticbeanstalk, elbv2, events, iam, kms, lambda, rds, secretsmanager, ses, sesv2, sfn, sns, ssm, eventbridge, backup), yaml.v3, clipboard (020-architecture-refactor)
 - YAML config on disk (`~/.a9s/config.yaml`, `~/.a9s/themes/*.yaml`, `~/.a9s/views/`); YAML cache on disk (`~/.a9s/cache/<profile>--<region>.yaml`); session-scoped in-memory state owned by `internal/session.Session` after Phase 02 (020-architecture-refactor)
 
@@ -97,6 +98,10 @@ specs/           # feature specifications
 - **Message-driven** — views communicate via typed messages, never import each other
 - **Single source of truth** — key bindings in `keys/keys.go`, types in `types.go`, styles in `styles/`, **related-panel contract in `docs/related-resources.md`**
 
+## Skills and Subagents — in-session tooling, **not** Paperclip assignees
+
+> **The two tables below describe Claude Code skills and subagents.** They are tools invoked from within an agent's Claude Code session. **They are not Paperclip company agents.** They have no heartbeats, cannot be assigned issues, and cannot sign off on PRs. The Paperclip roster (CEO, CTO, Architect, Coder, QA, E2ETester, DevOps, CodexReviewer, CodeReviewer) is the only set of names that can own a stage or sign off on a PR — see [`docs/development-process.md`](docs/development-process.md) §"Agents". When this file refers to an "agent" by an `a9s-*` / `tui-*` / `test-coverage-analyzer` id, it means a tool a Paperclip agent invokes — never an issue assignee.
+
 ## Skills
 
 | Skill | Scope | Usage |
@@ -162,7 +167,7 @@ When a single task would require reading 5+ files totaling >500 lines, OR when y
 - ALWAYS test ALL resource types (S3, EC2, RDS, Redis, DocumentDB, EKS, Secrets Manager, VPC, SG, Node Groups, etc), not just one
 - NEVER delete code, tests, or helpers just to make a linter happy. Understand WHY the code exists first. If it's genuinely dead, remove it. If it serves a purpose (scaffolding, crash-verification tests), use a targeted `//nolint` with a reason comment. If a linter rule produces widespread false positives, fix the rule in `.golangci.yml`.
 - NEVER make multiple push-and-check cycles. Get it right locally, push once.
-- BEFORE any push, the canonical gate is **`make ready-to-push`** — see [`docs/development-process.md`](docs/development-process.md) §"Stage 6 — Pre-push Validation" for the gate contents and the `internal/aws/` live-integration sub-rule. Stage 5 reviewer agents (`a9s-consistency-checker`, `test-coverage-analyzer`, `a9s-architect` ≥ M, `a9s-tui-reviewer`, `a9s-security-auditor`, `a9s-docs-reviewer`) must sign off before this gate runs.
+- BEFORE any push, the canonical gate is **`make ready-to-push`** — see [`docs/development-process.md`](docs/development-process.md) §"Stage 6 — Pre-push Validation" for the gate contents and the `internal/aws/` live-integration sub-rule. Stage 5 reviewers (Paperclip agents: **CodeReviewer**, **CodexReviewer**, **Architect** for size ≥ M, **CTO** as final) must sign off before this gate runs. Those reviewers invoke the subagent tools (`a9s-consistency-checker`, `test-coverage-analyzer`, `a9s-tui-reviewer`, `a9s-security-auditor`, `a9s-docs-reviewer`, `tui-ux-auditor`) in-session — see the §"Skills and Subagents" banner below.
 - BEFORE any release, the canonical gate is **`make ready-to-release`** — see [`docs/development-process.md`](docs/development-process.md) §"Stage 7 — Merge & Release" for the manual checklist (`CHANGELOG.md`, `releases/vX.Y.Z.md`, `docs/architecture.md` alignment, busywork audit on tests added/modified in the release).
 - **Exception**: Docs-only changes (`*.md`, `docs/`, `website/`, `specs/`, `.claude/`, `LICENSE`) skip `ready-to-push`; `make mdlint` is required.
 
@@ -183,4 +188,5 @@ When code changes affect any of the following, update the shared source and rege
 - Go version bumped → `docs/shared/install.md`, CONTRIBUTING.md
 
 ## Recent Changes
+
 - 020-architecture-refactor: Added Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2 (autoscaling, codeartifact, codebuild, codepipeline, dynamodb, ec2, ecr, ecs, efs, elasticbeanstalk, elbv2, events, iam, kms, lambda, rds, secretsmanager, ses, sesv2, sfn, sns, ssm, eventbridge, backup), yaml.v3, clipboard
