@@ -13,6 +13,7 @@ func allTypes() []ResourceTypeDef {
 	all = append(all, computeTypes...)
 	all = append(all, containersTypes...)
 	all = append(all, networkingTypes...)
+	all = append(all, databasesTypes...)
 	return all
 }
 
