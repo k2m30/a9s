@@ -1,6 +1,7 @@
 package fixtures
 
 import (
+	"sync"
 	"fmt"
 	"time"
 
@@ -95,10 +96,14 @@ const (
 // Every fixture in docs/resources/redshift-impl-plan.md §2 is present.
 // Adversarial fixtures (nil-pointer Cluster, malformed Tags) are excluded —
 // those live inline in QA test files per the a9s-create-demo-fixture skill rule.
-func NewRedshiftFixtures() *RedshiftFixtures {
+var sharedRedshiftFixtures = sync.OnceValue(func() *RedshiftFixtures {
 	return &RedshiftFixtures{
 		Clusters: buildRedshiftClusters(),
 	}
+})
+
+func NewRedshiftFixtures() *RedshiftFixtures {
+	return sharedRedshiftFixtures()
 }
 
 // redshiftBaselineHealthy returns a fully-configured Redshift cluster with all

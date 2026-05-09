@@ -177,7 +177,8 @@ func New(profile, region string, opts ...Option) Model {
 	// Load view config synchronously (fast local file read).
 	cfg, cfgErr := config.Load()
 	if cfg == nil {
-		cfg = config.DefaultConfig()
+		// Use the shared read-only default — tui.Model never mutates viewConfig.
+		cfg = config.SharedDefaultConfig()
 	}
 
 	// Create the app-wide context first so it can be passed to AWS client

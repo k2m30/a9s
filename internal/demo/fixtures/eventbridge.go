@@ -1,6 +1,7 @@
 package fixtures
 
 import (
+	"sync"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 )
@@ -15,7 +16,7 @@ type EventBridgeFixtures struct {
 const prodEBRoleARN = "arn:aws:iam::123456789012:role/prod-ci-deploy-role"
 
 // NewEventBridgeFixtures constructs EventBridgeFixtures from the canonical demo data.
-func NewEventBridgeFixtures() *EventBridgeFixtures {
+var sharedEventBridgeFixtures = sync.OnceValue(func() *EventBridgeFixtures {
 	rules := []eventbridgetypes.Rule{
 		{
 			Name:               aws.String("nightly-db-backup"),
@@ -117,4 +118,8 @@ func NewEventBridgeFixtures() *EventBridgeFixtures {
 		Rules:         rules,
 		TargetsByRule: targetsByRule,
 	}
+})
+
+func NewEventBridgeFixtures() *EventBridgeFixtures {
+	return sharedEventBridgeFixtures()
 }

@@ -1,6 +1,7 @@
 package fixtures
 
 import (
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -117,12 +118,16 @@ func mustParseEFSTime(s string) time.Time {
 }
 
 // NewEFSFixtures constructs EFSFixtures from the canonical demo data.
-func NewEFSFixtures() *EFSFixtures {
+var sharedEFSFixtures = sync.OnceValue(func() *EFSFixtures {
 	return &EFSFixtures{
 		FileSystems:  buildEFSFileSystems(),
 		MountTargets: buildEFSMountTargets(),
 		AccessPoints: buildEFSAccessPoints(),
 	}
+})
+
+func NewEFSFixtures() *EFSFixtures {
+	return sharedEFSFixtures()
 }
 
 func buildEFSFileSystems() []efstypes.FileSystemDescription {

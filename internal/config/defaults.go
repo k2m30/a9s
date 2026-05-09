@@ -1,6 +1,9 @@
 package config
 
-import "maps"
+import (
+	"maps"
+	"sync"
+)
 
 // defaultViews holds the built-in view definitions for all supported resource types.
 // Paths use Go field names from AWS SDK v2 structs. ExtractValue matches case-insensitively.
@@ -23,8 +26,13 @@ func mergeDefaultViews() map[string]ViewDef {
 	return m
 }
 
-// DefaultConfig returns a copy of the built-in default configuration.
-func DefaultConfig() *ViewsConfig {
+// sharedReadOnlyDefault is the lazily-built, never-mutated default config
+// instance shared across all callers that need read-only access.
+var sharedReadOnlyDefault = sync.OnceValue(func() *ViewsConfig {
+	return buildDefaultConfig()
+})
+
+func buildDefaultConfig() *ViewsConfig {
 	cp := ViewsConfig{
 		Views: make(map[string]ViewDef, len(defaultViews.Views)),
 	}
@@ -36,6 +44,19 @@ func DefaultConfig() *ViewsConfig {
 		cp.Views[k] = ViewDef{List: cols, Detail: detail}
 	}
 	return &cp
+}
+
+// DefaultConfig returns a copy of the built-in default configuration.
+// Each call returns a new, independently-mutable copy.
+func DefaultConfig() *ViewsConfig {
+	return buildDefaultConfig()
+}
+
+// SharedDefaultConfig returns the shared read-only default configuration.
+// The caller MUST NOT mutate the returned value or any of its nested slices/maps.
+// Use DefaultConfig when a mutable copy is required.
+func SharedDefaultConfig() *ViewsConfig {
+	return sharedReadOnlyDefault()
 }
 
 // DefaultViewDef returns the built-in default ViewDef for the given resource

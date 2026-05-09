@@ -2,6 +2,7 @@
 package fixtures
 
 import (
+	"sync"
 	"fmt"
 	"strings"
 	"time"
@@ -57,7 +58,7 @@ const (
 // NewEC2Fixtures builds and returns a fully-populated EC2Fixtures struct
 // with deterministic demo data that matches the data served by the old demo code paths.
 // This is the single source of truth for all EC2 fake responses.
-func NewEC2Fixtures() *EC2Fixtures {
+var sharedEC2Fixtures = sync.OnceValue(func() *EC2Fixtures {
 	f := &EC2Fixtures{}
 	f.Reservations = buildReservations()
 	f.InstanceStatuses = buildInstanceStatuses(f.Reservations)
@@ -76,6 +77,10 @@ func NewEC2Fixtures() *EC2Fixtures {
 	f.Snapshots = buildSnapshots()
 	f.Images = buildImages()
 	return f
+})
+
+func NewEC2Fixtures() *EC2Fixtures {
+	return sharedEC2Fixtures()
 }
 
 // ---------------------------------------------------------------------------

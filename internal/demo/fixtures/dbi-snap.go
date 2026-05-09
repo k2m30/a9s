@@ -2,6 +2,7 @@
 package fixtures
 
 import (
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -81,10 +82,14 @@ const (
 // Every fixture in the impl-plan §2 is represented here; adversarial fixtures
 // (nil DBSnapshotIdentifier, nil Status, malformed ARN, nil SnapshotCreateTime)
 // stay inline in tests/unit/aws_rds_snap_test.go.
-func NewDBISnapFixtures() *DBISnapFixtures {
+var sharedDBISnapFixtures = sync.OnceValue(func() *DBISnapFixtures {
 	return &DBISnapFixtures{
 		Instances: buildDBISnapInstances(),
 	}
+})
+
+func NewDBISnapFixtures() *DBISnapFixtures {
+	return sharedDBISnapFixtures()
 }
 
 func buildDBISnapInstances() []rdstypes.DBSnapshot {
