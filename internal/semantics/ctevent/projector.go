@@ -73,7 +73,7 @@ func projectSDKEvent(sdkEv cloudtrailtypes.Event, r domain.Resource) []domain.Se
 		if err != nil {
 			return errorSection(err)
 		}
-		ev.Status = r.Status
+		ev.Status = ctEventStatus(r)
 		// Rich ct-events sections (ACTOR, ACTION, TARGET, CONTEXT, etc.)
 		sections = append(sections, convertSections(BuildSections(ev))...)
 	}
@@ -254,7 +254,7 @@ func jsonToYAMLLines(s string) []string {
 func parseResourceWithErr(r domain.Resource) (*Event, error) {
 	if r.RawStruct != nil {
 		if ev, ok := r.RawStruct.(*Event); ok {
-			ev.Status = r.Status
+			ev.Status = ctEventStatus(r)
 			return ev, nil
 		}
 		// AWS SDK type from live fetcher or test fixtures.
@@ -264,7 +264,7 @@ func parseResourceWithErr(r domain.Resource) (*Event, error) {
 				if err != nil {
 					return nil, err
 				}
-				ev.Status = r.Status
+				ev.Status = ctEventStatus(r)
 				return ev, nil
 			}
 		}
@@ -277,7 +277,7 @@ func parseResourceWithErr(r domain.Resource) (*Event, error) {
 	if err != nil {
 		return nil, err
 	}
-	ev.Status = r.Status
+	ev.Status = ctEventStatus(r)
 	return ev, nil
 }
 
@@ -312,6 +312,16 @@ func convertRow(r Row) domain.Item {
 		TargetType: r.TargetType,
 		NavID:      r.NavID,
 	}
+}
+
+// ctEventStatus returns the ct-events status tier from a Resource.
+// After PR-03h the fetcher stores it in Fields["status"]; r.Status is the
+// legacy fallback for hand-constructed test resources.
+func ctEventStatus(r domain.Resource) string {
+	if s := r.Fields["status"]; s != "" {
+		return s
+	}
+	return r.Status
 }
 
 // tierToSeverity maps the ctevent tier string to a domain.Severity value.

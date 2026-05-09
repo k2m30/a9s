@@ -82,10 +82,10 @@ func buildCTEventsResource(id, eventName, status, rawJSON string) resource.Resou
 	return resource.Resource{
 		ID:        id,
 		Name:      eventName,
-		Status:    status,
 		RawStruct: ct,
 		Fields: map[string]string{
 			"event_name": eventName,
+			"status":     status,
 		},
 	}
 }
@@ -838,7 +838,7 @@ func TestDetailViewCTEvents_Regression_ColorTierInvariant(t *testing.T) {
 
 			// The exact ANSI-styled event value as ColorStyle(ctEventsTd.Color(r)) would produce it.
 			ctEventsTd := resource.FindResourceType("ct-events")
-			tierRes := resource.Resource{ID: id, Status: tier}
+			tierRes := resource.Resource{ID: id, Fields: map[string]string{"status": tier}}
 			wantStyled := styles.ColorStyle(ctEventsTd.Color(tierRes)).Render(expectedEventValue)
 
 			// 1. The styled string must appear in the view (ColorTier was applied to Event row).

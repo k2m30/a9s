@@ -114,9 +114,8 @@ func FetchGlueJobsPage(ctx context.Context, api GlueGetJobsAPI, continuationToke
 		}
 
 		r := resource.Resource{
-			ID:     jobName,
-			Name:   jobName,
-			Status: "",
+			ID:    jobName,
+			Name:  jobName,
 			Fields: map[string]string{
 				"job_name":      jobName,
 				"role":          role,

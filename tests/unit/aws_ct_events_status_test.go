@@ -31,7 +31,7 @@ func buildCTEventWithStatus(t *testing.T, id, eventName, eventSource, username s
 		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 	r := result.Resources[0]
-	return r.Status, r.Fields["_ct.verb"]
+	return r.Fields["status"], r.Fields["_ct.verb"]
 }
 
 // plainAccountJSON returns JSON for a regular AssumedRole event with no errorCode.
@@ -277,9 +277,9 @@ func TestCTStatus_ExhaustiveGuard_ThreeValuesOnly(t *testing.T) {
 	}
 	valid := map[string]bool{"ct-info": true, "ct-attention": true, "ct-danger": true}
 	for _, r := range result.Resources {
-		if !valid[r.Status] {
-			t.Errorf("Resource %q (Status=%q): must be exactly ct-info / ct-attention / ct-danger per §1.1",
-				r.ID, r.Status)
+		if !valid[r.Fields["status"]] {
+			t.Errorf("Resource %q (Fields[status]=%q): must be exactly ct-info / ct-attention / ct-danger per §1.1",
+				r.ID, r.Fields["status"])
 		}
 	}
 }

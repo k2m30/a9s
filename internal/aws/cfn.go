@@ -3,9 +3,11 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -92,9 +94,9 @@ func FetchCloudFormationStacksPage(ctx context.Context, api CFNDescribeStacksAPI
 		}
 
 		r := resource.Resource{
-			ID:     stackName,
-			Name:   stackName,
-			Status: status,
+			ID:       stackName,
+			Name:     stackName,
+			Findings: cfnStackFindings(status),
 			Fields: map[string]string{
 				"stack_name":    stackName,
 				"status":        status,
@@ -129,4 +131,20 @@ func FetchCloudFormationStacksPage(ctx context.Context, api CFNDescribeStacksAPI
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+func cfnStackFindings(status string) []domain.Finding {
+	switch status {
+	case "ROLLBACK_COMPLETE", "ROLLBACK_FAILED",
+		"UPDATE_ROLLBACK_COMPLETE", "UPDATE_ROLLBACK_FAILED",
+		"IMPORT_ROLLBACK_COMPLETE", "IMPORT_ROLLBACK_FAILED":
+		return []domain.Finding{{Code: CodeCFNStackRollback, Phrase: strings.ToLower(status), Severity: domain.SevBroken, Source: "wave1"}}
+	}
+	if strings.HasSuffix(status, "_FAILED") {
+		return []domain.Finding{{Code: CodeCFNStackFailed, Phrase: strings.ToLower(status), Severity: domain.SevBroken, Source: "wave1"}}
+	}
+	if strings.HasSuffix(status, "_IN_PROGRESS") {
+		return []domain.Finding{{Code: CodeCFNStackInProgress, Phrase: strings.ToLower(status), Severity: domain.SevWarn, Source: "wave1"}}
+	}
+	return nil
 }

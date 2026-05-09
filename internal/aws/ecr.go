@@ -97,9 +97,8 @@ func FetchECRRepositoriesPage(ctx context.Context, api ECRDescribeRepositoriesAP
 		}
 
 		r := resource.Resource{
-			ID:     repoName,
-			Name:   repoName,
-			Status: "",
+			ID:    repoName,
+			Name:  repoName,
 			Fields: map[string]string{
 				"repository_name": repoName,
 				"uri":             uri,

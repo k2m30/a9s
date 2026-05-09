@@ -108,10 +108,9 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 		}
 
 		r := resource.Resource{
-			ID:     roleName,
-			Name:   roleName,
-			Type:   "role",
-			Status: "",
+			ID:   roleName,
+			Name: roleName,
+			Type: "role",
 			Fields: map[string]string{
 				"role_name":                   roleName,
 				"role_id":                     roleID,

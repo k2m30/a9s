@@ -451,8 +451,8 @@ func TestCTFlatten_StatusCTAttention_ForVerbW(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Resources[0].Status != "ct-attention" {
-		t.Errorf("Resource.Status = %q, want ct-attention for verb W (CreateBucket) per §1.2", result.Resources[0].Status)
+	if result.Resources[0].Fields["status"] != "ct-attention" {
+		t.Errorf("Fields[status] = %q, want ct-attention for verb W (CreateBucket) per §1.2", result.Resources[0].Fields["status"])
 	}
 }
 
@@ -466,8 +466,8 @@ func TestCTFlatten_StatusCTDanger_ForVerbD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Resources[0].Status != "ct-danger" {
-		t.Errorf("Resource.Status = %q, want ct-danger for verb D (DeleteTable) per §1.2", result.Resources[0].Status)
+	if result.Resources[0].Fields["status"] != "ct-danger" {
+		t.Errorf("Fields[status] = %q, want ct-danger for verb D (DeleteTable) per §1.2", result.Resources[0].Fields["status"])
 	}
 }
 
@@ -482,8 +482,8 @@ func TestCTFlatten_StatusCTInfo_ForVerbR(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Resources[0].Status != "ct-info" {
-		t.Errorf("Resource.Status = %q, want ct-info for plain verb R (GetObject) per §1.2", result.Resources[0].Status)
+	if result.Resources[0].Fields["status"] != "ct-info" {
+		t.Errorf("Fields[status] = %q, want ct-info for plain verb R (GetObject) per §1.2", result.Resources[0].Fields["status"])
 	}
 }
 
@@ -498,8 +498,8 @@ func TestCTFlatten_StatusCTInfo_ForVerbS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Resources[0].Status != "ct-info" {
-		t.Errorf("Resource.Status = %q, want ct-info for verb S (AwsServiceEvent) per §1.2", result.Resources[0].Status)
+	if result.Resources[0].Fields["status"] != "ct-info" {
+		t.Errorf("Fields[status] = %q, want ct-info for verb S (AwsServiceEvent) per §1.2", result.Resources[0].Fields["status"])
 	}
 }
 
@@ -513,8 +513,8 @@ func TestCTFlatten_StatusCTInfo_ForVerbI(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Resources[0].Status != "ct-info" {
-		t.Errorf("Resource.Status = %q, want ct-info for verb I (Insight category) per §1.2", result.Resources[0].Status)
+	if result.Resources[0].Fields["status"] != "ct-info" {
+		t.Errorf("Fields[status] = %q, want ct-info for verb I (Insight category) per §1.2", result.Resources[0].Fields["status"])
 	}
 }
 
@@ -528,8 +528,8 @@ func TestCTFlatten_StatusCTInfo_ForVerbN(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Resources[0].Status != "ct-info" {
-		t.Errorf("Resource.Status = %q, want ct-info for verb N (NetworkActivity category) per §1.2", result.Resources[0].Status)
+	if result.Resources[0].Fields["status"] != "ct-info" {
+		t.Errorf("Fields[status] = %q, want ct-info for verb N (NetworkActivity category) per §1.2", result.Resources[0].Fields["status"])
 	}
 }
 
@@ -544,8 +544,8 @@ func TestCTFlatten_StatusCTInfo_ForVerbQuestionMark(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Resources[0].Status != "ct-info" {
-		t.Errorf("Resource.Status = %q, want ct-info for verb ? (unknown event) per §1.2", result.Resources[0].Status)
+	if result.Resources[0].Fields["status"] != "ct-info" {
+		t.Errorf("Fields[status] = %q, want ct-info for verb ? (unknown event) per §1.2", result.Resources[0].Fields["status"])
 	}
 }
 

@@ -98,9 +98,8 @@ func FetchCodeArtifactReposPage(ctx context.Context, api CodeArtifactListReposit
 		}
 
 		r := resource.Resource{
-			ID:     repoName,
-			Name:   repoName,
-			Status: "",
+			ID:    repoName,
+			Name:  repoName,
 			Fields: map[string]string{
 				"repo_name":     repoName,
 				"domain_name":   domainName,

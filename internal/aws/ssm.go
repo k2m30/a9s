@@ -97,9 +97,8 @@ func FetchSSMParametersPage(ctx context.Context, api SSMDescribeParametersAPI, c
 		}
 
 		r := resource.Resource{
-			ID:     paramName,
-			Name:   paramName,
-			Status: "",
+			ID:    paramName,
+			Name:  paramName,
 			Fields: map[string]string{
 				"name":          paramName,
 				"type":          paramType,
