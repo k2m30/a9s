@@ -79,8 +79,8 @@ func TestFetchCloudFormationStacks_ParsesMultipleStacks(t *testing.T) {
 	if r0.Name != "prod-infra-stack" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "prod-infra-stack", r0.Name)
 	}
-	if r0.Status != "CREATE_COMPLETE" {
-		t.Errorf("resource[0].Status: expected %q, got %q", "CREATE_COMPLETE", r0.Status)
+	if r0.Fields["status"] != "CREATE_COMPLETE" {
+		t.Errorf("resource[0].Fields[\"status\"]: expected %q, got %q", "CREATE_COMPLETE", r0.Fields["status"])
 	}
 	if r0.Fields["stack_name"] != "prod-infra-stack" {
 		t.Errorf("resource[0].Fields[\"stack_name\"]: expected %q, got %q", "prod-infra-stack", r0.Fields["stack_name"])
@@ -103,8 +103,8 @@ func TestFetchCloudFormationStacks_ParsesMultipleStacks(t *testing.T) {
 	if r1.ID != "staging-app-stack" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "staging-app-stack", r1.ID)
 	}
-	if r1.Status != "UPDATE_COMPLETE" {
-		t.Errorf("resource[1].Status: expected %q, got %q", "UPDATE_COMPLETE", r1.Status)
+	if r1.Fields["status"] != "UPDATE_COMPLETE" {
+		t.Errorf("resource[1].Fields[\"status\"]: expected %q, got %q", "UPDATE_COMPLETE", r1.Fields["status"])
 	}
 	if r1.Fields["stack_name"] != "staging-app-stack" {
 		t.Errorf("resource[1].Fields[\"stack_name\"]: expected %q, got %q", "staging-app-stack", r1.Fields["stack_name"])

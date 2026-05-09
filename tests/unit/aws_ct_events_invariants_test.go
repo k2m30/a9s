@@ -172,7 +172,7 @@ func buildUnknownServiceEvent(id, eventName, eventSource string) cloudtrailtypes
 }
 
 // fetchUnknownServiceStatus runs buildUnknownServiceEvent through
-// FetchCloudTrailEventsPage and returns the resulting Resource.Status.
+// FetchCloudTrailEventsPage and returns the resulting Fields["status"].
 func fetchUnknownServiceStatus(t *testing.T, eventSource, eventName string) string {
 	t.Helper()
 	event := buildUnknownServiceEvent("unk-"+eventName, eventName, eventSource)
@@ -185,7 +185,7 @@ func fetchUnknownServiceStatus(t *testing.T, eventSource, eventName string) stri
 	if len(result.Resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
-	return result.Resources[0].Status
+	return result.Resources[0].Fields["status"]
 }
 
 // TestSensitiveReads_RejectsUnknownService verifies that isSensitiveRead's

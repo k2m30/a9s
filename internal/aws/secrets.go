@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -101,9 +102,9 @@ func FetchSecretsPage(ctx context.Context, api SecretsManagerListSecretsAPI, con
 		}
 
 		r := resource.Resource{
-			ID:     secretName,
-			Name:   secretName,
-			Status: "",
+			ID:       secretName,
+			Name:     secretName,
+			Findings: secretStateFindings(secretStatus),
 			Fields: map[string]string{
 				"secret_name":      secretName,
 				"description":      description,
@@ -141,6 +142,18 @@ func FetchSecretsPage(ctx context.Context, api SecretsManagerListSecretsAPI, con
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+func secretStateFindings(status string) []domain.Finding {
+	switch status {
+	case "DELETED":
+		return []domain.Finding{{Code: CodeSecretStateDeleted, Phrase: "deleted", Severity: domain.SevBroken, Source: "wave1"}}
+	case "OVERDUE":
+		return []domain.Finding{{Code: CodeSecretStateRotationOverdue, Phrase: "rotation overdue", Severity: domain.SevWarn, Source: "wave1"}}
+	case "DORMANT":
+		return []domain.Finding{{Code: CodeSecretStateDormant, Phrase: "dormant", Severity: domain.SevWarn, Source: "wave1"}}
+	}
+	return nil
 }
 
 // RevealSecret calls the SecretsManager GetSecretValue API and returns the

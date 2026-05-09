@@ -11,12 +11,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
 )
 
 func init() {
-	resource.RegisterFieldKeys("ct-events", []string{"event_name", "time", "event_time", "event_time_raw", "user", "source", "resource_type", "resource_name", "read_only", "role_name", "_ct.verb", "_ct.actor", "_ct.origin", "_ct.target", "_ct.target_raw", "_ct.outcome"})
+	resource.RegisterFieldKeys("ct-events", []string{"event_name", "time", "event_time", "event_time_raw", "user", "source", "resource_type", "resource_name", "read_only", "role_name", "status", "_ct.verb", "_ct.actor", "_ct.origin", "_ct.target", "_ct.target_raw", "_ct.outcome"})
 
 	// Paginated fetcher for resource list browsing (M key load-more).
 	resource.RegisterPaginated("ct-events", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
@@ -280,12 +281,13 @@ func buildCTResource(event cloudtrailtypes.Event) resource.Resource {
 	status := computeCTStatus(verb, eventName, source, errorCode, uiType, accountID, recipientAccount)
 
 	r := resource.Resource{
-		ID:     eventID,
-		Name:   eventName,
-		Status: status,
+		ID:       eventID,
+		Name:     eventName,
+		Findings: ctEventFindings(status),
 		Fields: map[string]string{
 			// Existing keys (kept for backwards compat with related-checkers and tests).
 			"event_name":     eventName,
+			"status":         status,
 			"time":           eventTimeDisplay,
 			"event_time":     eventTimeRaw,
 			"event_time_raw": eventTimeRaw,
@@ -599,6 +601,16 @@ func extractInsightRatio(parsed map[string]any) string {
 	formatted := fmt.Sprintf("%.1f", ratio)
 	formatted = strings.TrimSuffix(formatted, ".0")
 	return formatted
+}
+
+func ctEventFindings(status string) []domain.Finding {
+	switch status {
+	case "ct-danger":
+		return []domain.Finding{{Code: CodeCTEventDanger, Phrase: "danger", Severity: domain.SevBroken, Source: "wave1"}}
+	case "ct-attention":
+		return []domain.Finding{{Code: CodeCTEventAttention, Phrase: "attention", Severity: domain.SevWarn, Source: "wave1"}}
+	}
+	return nil
 }
 
 // computeCTStatus implements the §1.2 severity ladder.

@@ -104,9 +104,8 @@ func FetchSQSQueuesPage(ctx context.Context, listAPI SQSListQueuesAPI, attrAPI S
 		queueArn := attrs["QueueArn"]
 
 		r := resource.Resource{
-			ID:     queueName,
-			Name:   queueName,
-			Status: "",
+			ID:    queueName,
+			Name:  queueName,
 			Fields: map[string]string{
 				"queue_name":         queueName,
 				"queue_url":          queueURL,
