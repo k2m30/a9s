@@ -176,8 +176,8 @@ func generateResourceDoc(repoRoot string, rt catalog.ResourceTypeDef) error {
 			if rel.NeedsTargetCache {
 				approx = "yes"
 			}
-			relatedContent.WriteString(fmt.Sprintf("| %s | %s | %s |\n",
-				rel.TargetType, rel.DisplayName, approx))
+			fmt.Fprintf(&relatedContent, "| %s | %s | %s |\n",
+				rel.TargetType, rel.DisplayName, approx)
 		}
 	}
 
@@ -235,14 +235,14 @@ func updateGeneratedSection(path, section, content string) error {
 	if beginIdx == -1 || endIdx == -1 {
 		// Markers absent — append the block.
 		appended := existing + "\n" + begin + "\n" + content + end + "\n"
-		return os.WriteFile(path, []byte(appended), 0o600)
+		return os.WriteFile(path, []byte(appended), 0o600) //nolint:gosec // path is derived from repoRoot+catalog short names, not user input
 	}
 
 	// Replace content between markers (exclusive).
 	before := existing[:beginIdx+len(begin)]
 	after := existing[endIdx:]
 	updated := before + "\n" + content + after
-	return os.WriteFile(path, []byte(updated), 0o600)
+	return os.WriteFile(path, []byte(updated), 0o600) //nolint:gosec // path is derived from repoRoot+catalog short names, not user input
 }
 
 // findRepoRoot walks up from the current working directory to find the repo
