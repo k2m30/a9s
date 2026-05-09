@@ -117,8 +117,8 @@ func generateAttentionSignals(repoRoot string, types []catalog.ResourceTypeDef) 
 	rows.WriteString("| --- | --- | --- | --- | --- |\n")
 	for _, rt := range types {
 		for _, f := range rt.Findings {
-			rows.WriteString(fmt.Sprintf("| %s | %s | %s | %s | %s |\n",
-				rt.ShortName, string(f.Code), f.Phrase, severityLabel(f.Severity), f.Source))
+			fmt.Fprintf(&rows, "| %s | %s | %s | %s | %s |\n",
+				rt.ShortName, string(f.Code), f.Phrase, severityLabel(f.Severity), f.Source)
 		}
 	}
 
@@ -138,8 +138,8 @@ func generateRelatedResources(repoRoot string, types []catalog.ResourceTypeDef) 
 			if rel.NeedsTargetCache {
 				needsCache = "yes"
 			}
-			rows.WriteString(fmt.Sprintf("| %s | %s | %s | %s |\n",
-				rt.ShortName, rel.TargetType, rel.DisplayName, needsCache))
+			fmt.Fprintf(&rows, "| %s | %s | %s | %s |\n",
+				rt.ShortName, rel.TargetType, rel.DisplayName, needsCache)
 		}
 	}
 
@@ -161,8 +161,8 @@ func generateResourceDoc(repoRoot string, rt catalog.ResourceTypeDef) error {
 		findingsContent.WriteString("| Code | Phrase | Severity | Source |\n")
 		findingsContent.WriteString("| --- | --- | --- | --- |\n")
 		for _, f := range rt.Findings {
-			findingsContent.WriteString(fmt.Sprintf("| %s | %s | %s | %s |\n",
-				string(f.Code), f.Phrase, severityLabel(f.Severity), f.Source))
+			fmt.Fprintf(&findingsContent, "| %s | %s | %s | %s |\n",
+				string(f.Code), f.Phrase, severityLabel(f.Severity), f.Source)
 		}
 	}
 
@@ -184,7 +184,7 @@ func generateResourceDoc(repoRoot string, rt catalog.ResourceTypeDef) error {
 	// If the file does not exist, create a stub.
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		stub := buildStub(rt, header, findingsContent.String(), relatedContent.String())
-		return os.WriteFile(path, []byte(stub), 0o644)
+		return os.WriteFile(path, []byte(stub), 0o600)
 	}
 
 	// File exists — update each generated section in place.
@@ -222,7 +222,7 @@ func updateGeneratedSection(path, section, content string) error {
 		if os.IsNotExist(err) {
 			// Create file with just this section.
 			body := fmt.Sprintf("%s\n%s%s\n", begin, content, end)
-			return os.WriteFile(path, []byte(body), 0o644)
+			return os.WriteFile(path, []byte(body), 0o600)
 		}
 		return err
 	}
@@ -235,14 +235,14 @@ func updateGeneratedSection(path, section, content string) error {
 	if beginIdx == -1 || endIdx == -1 {
 		// Markers absent — append the block.
 		appended := existing + "\n" + begin + "\n" + content + end + "\n"
-		return os.WriteFile(path, []byte(appended), 0o644)
+		return os.WriteFile(path, []byte(appended), 0o600)
 	}
 
 	// Replace content between markers (exclusive).
 	before := existing[:beginIdx+len(begin)]
 	after := existing[endIdx:]
 	updated := before + "\n" + content + after
-	return os.WriteFile(path, []byte(updated), 0o644)
+	return os.WriteFile(path, []byte(updated), 0o600)
 }
 
 // findRepoRoot walks up from the current working directory to find the repo
