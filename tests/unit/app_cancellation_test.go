@@ -39,6 +39,7 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestModel_HasAppContext(t *testing.T) {
+	t.Parallel()
 	m := tui.New("", "")
 	ctx := m.AppContext()
 	if ctx == nil {
@@ -59,6 +60,7 @@ func TestModel_HasAppContext(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestModel_QuitCancelsAppContext(t *testing.T) {
+	t.Parallel()
 	m := tui.New("", "")
 
 	// Capture AppContext before the Update so we can observe the same context object.
@@ -100,6 +102,7 @@ func TestModel_QuitCancelsAppContext(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestFetchersUseContextNotBackground(t *testing.T) {
+	t.Parallel()
 	// Files that MUST NOT contain context.Background() after the refactor.
 	// These are the sites identified in CONCERNS #2/#20.
 	files := []string{
@@ -220,14 +223,17 @@ func (c *cancelObservingIAMClient) ListEntitiesForPolicy(
 }
 
 func TestIAMRelatedChecker_RespectsCancelledContext_PolicyRole(t *testing.T) {
+	t.Parallel()
 	testPolicyCheckerRespectsCancelledContext(t, "role")
 }
 
 func TestIAMRelatedChecker_RespectsCancelledContext_PolicyUser(t *testing.T) {
+	t.Parallel()
 	testPolicyCheckerRespectsCancelledContext(t, "iam-user")
 }
 
 func TestIAMRelatedChecker_RespectsCancelledContext_PolicyGroup(t *testing.T) {
+	t.Parallel()
 	testPolicyCheckerRespectsCancelledContext(t, "iam-group")
 }
 
@@ -289,6 +295,7 @@ func testPolicyCheckerRespectsCancelledContext(t *testing.T, targetType string) 
 // ---------------------------------------------------------------------------
 
 func TestIAMRelatedChecker_RespectsCancelledContext_RolePolicy(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
@@ -309,6 +316,7 @@ func TestIAMRelatedChecker_RespectsCancelledContext_RolePolicy(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestIAMRelatedChecker_RespectsCancelledContext_UserGroup(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
@@ -321,6 +329,7 @@ func TestIAMRelatedChecker_RespectsCancelledContext_UserGroup(t *testing.T) {
 }
 
 func TestIAMRelatedChecker_RespectsCancelledContext_UserPolicy(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
@@ -337,6 +346,7 @@ func TestIAMRelatedChecker_RespectsCancelledContext_UserPolicy(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestIAMRelatedChecker_RespectsCancelledContext_GroupUser(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
@@ -349,6 +359,7 @@ func TestIAMRelatedChecker_RespectsCancelledContext_GroupUser(t *testing.T) {
 }
 
 func TestIAMRelatedChecker_RespectsCancelledContext_GroupPolicy(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
@@ -368,6 +379,7 @@ func TestIAMRelatedChecker_RespectsCancelledContext_GroupPolicy(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestModel_Cancel_ZeroValue_DoesNotPanic(t *testing.T) {
+	t.Parallel()
 	defer func() {
 		if r := recover(); r != nil {
 			t.Fatalf("Cancel() on zero-value Model panicked: %v", r)
@@ -385,6 +397,7 @@ func TestModel_Cancel_ZeroValue_DoesNotPanic(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestModel_Cancel_CancelsAppContext(t *testing.T) {
+	t.Parallel()
 	m := tui.New("", "")
 
 	ctx := m.AppContext()
