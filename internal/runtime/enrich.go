@@ -27,22 +27,39 @@ type EnrichDetailEvent struct {
 	Resource     resource.Resource
 }
 
+// EnrichDetailPayload is the typed TaskPayload variant for
+// KindEnrichDetail. It carries the structured fields the adapter needs
+// to execute the dispatch — the resource type (which selects the
+// registered detail enricher) and the resource itself (the enricher's
+// input). Adapters type-switch on TaskRequest.Payload to recover both
+// without parsing TaskKey.Scope or accepting side-channel arguments.
+type EnrichDetailPayload struct {
+	ResourceType string
+	Resource     resource.Resource
+}
+
+// isTaskPayload satisfies the TaskPayload marker interface.
+func (EnrichDetailPayload) isTaskPayload() {}
+
 // HandleEnrichDetail decides whether to dispatch detail enrichment for
 // the given event. Today's contract: only resource types with a
 // registered detail enricher trigger a TaskRequest; everything else is
 // a no-op. No UIIntent is emitted at dispatch time — the adapter posts
 // the result back as a normal event.
 //
+// The runtime is the single source of truth for the dispatch decision:
+// when a TaskRequest is returned, the adapter is invariant-guaranteed
+// that an enricher is registered for Payload.ResourceType. The adapter
+// does not re-check, ensuring SSOT for the policy gate.
+//
 // Receiver migrated from *Model to *Core per docs/refactor/05-boundary.md.
-// The previous m.EnrichGen / m.PolicyDocCache accesses are adapter-owned
-// state that the adapter reads directly from c.Session() when building
-// the platform-specific async closure.
+// EnrichGen / PolicyDocCache reads stay adapter-side (read from
+// c.Session()) until those fields migrate in the orchestrator/state-
+// promotion PR.
 //
 // Sibling per-handler PRs expose their own entry points in the same
 // pattern. Once enough handlers have migrated, Core.HandleEvent will
-// aggregate them into a single type-switch; until then each handler
-// entry point keeps its migration step localized and independently
-// reviewable.
+// aggregate them into a single type-switch.
 func (c *Core) HandleEnrichDetail(ev EnrichDetailEvent) ([]UIIntent, []TaskRequest) {
 	if resource.GetDetailEnricher(ev.ResourceType) == nil {
 		return nil, nil
@@ -50,5 +67,9 @@ func (c *Core) HandleEnrichDetail(ev EnrichDetailEvent) ([]UIIntent, []TaskReque
 	return nil, []TaskRequest{{
 		Key:   TaskKey{Kind: KindEnrichDetail, Scope: ev.ResourceType + "/" + ev.Resource.ID},
 		Cache: CacheNone,
+		Payload: EnrichDetailPayload{
+			ResourceType: ev.ResourceType,
+			Resource:     ev.Resource,
+		},
 	}}
 }

@@ -14,11 +14,13 @@
 //     PRs can add cases without touching app.go.
 //
 //  3. runtimeTasksToCmd / enrichDetailCmd — the TaskRequest-to-tea.Cmd
-//     translator. The closure builder stays in the adapter because it
-//     returns tea.Cmd and reads adapter-owned state (m.appCtx, m.clients,
-//     the embedded session's EnrichGen and PolicyDocCache) that has not
-//     yet migrated to the runtime core. Per-handler PRs add cases here
-//     as they migrate handlers.
+//     translator. Tasks carry typed Payload values (runtime.TaskPayload
+//     variants); the adapter type-switches on Payload to recover all
+//     fields without parsing TaskKey.Scope or accepting side-channel
+//     arguments. The closure builder stays in the adapter because it
+//     returns tea.Cmd and reads adapter-owned state (m.appCtx,
+//     m.clients, the embedded session's EnrichGen and PolicyDocCache)
+//     that has not yet migrated to the runtime core.
 package tui
 
 import (
@@ -49,7 +51,7 @@ func (m Model) handleEnrichDetail(msg messages.EnrichDetailMsg) (tea.Model, tea.
 	for _, in := range intents {
 		m.applyIntent(in)
 	}
-	return m, m.runtimeTasksToCmd(tasks, msg.Resource)
+	return m, m.runtimeTasksToCmd(tasks)
 }
 
 // applyIntent walks the view stack applying a runtime UIIntent.
@@ -61,19 +63,23 @@ func (m *Model) applyIntent(_ runtime.UIIntent) {
 }
 
 // runtimeTasksToCmd translates a slice of runtime.TaskRequest values
-// into a single Bubble Tea command. Unknown TaskKind values are dropped
-// (forward-compat with newer runtime builds). res is the resource
-// payload from the originating message, captured into the closure so
-// the adapter doesn't need to round-trip back through the session cache.
-func (m Model) runtimeTasksToCmd(tasks []runtime.TaskRequest, res resource.Resource) tea.Cmd {
+// into a single Bubble Tea command. Each task carries a typed Payload
+// (a runtime.TaskPayload variant) whose concrete type tells the adapter
+// which closure builder to use. Unknown payload types are dropped for
+// forward-compat with newer runtime builds.
+//
+// Per-handler PRs (probes, related, fetchers, …) add their own
+// type-switch cases here as they migrate. The signature accepts only
+// the runtime's own TaskRequest slice — no side-channel parameters.
+func (m Model) runtimeTasksToCmd(tasks []runtime.TaskRequest) tea.Cmd {
 	if len(tasks) == 0 {
 		return nil
 	}
 	var cmds []tea.Cmd
 	for _, t := range tasks {
-		switch t.Key.Kind {
-		case runtime.KindEnrichDetail:
-			cmds = append(cmds, m.enrichDetailCmd(t.Key.Scope, res))
+		switch p := t.Payload.(type) {
+		case runtime.EnrichDetailPayload:
+			cmds = append(cmds, m.enrichDetailCmd(p))
 		}
 	}
 	switch len(cmds) {
@@ -87,28 +93,23 @@ func (m Model) runtimeTasksToCmd(tasks []runtime.TaskRequest, res resource.Resou
 }
 
 // enrichDetailCmd builds the Bubble Tea command that runs the on-demand
-// detail enricher and emits an EnrichDetailResultMsg. scope is the
-// TaskKey.Scope emitted by runtime.HandleEnrichDetail — "<resourceType>/
-// <resourceID>"; only the resource-type prefix is used (resource ID is
-// read off res directly).
+// detail enricher and emits an EnrichDetailResultMsg. It reads the
+// resource type and resource directly from the typed payload — no
+// Scope parsing, no side-channel resource argument.
+//
+// The runtime guarantees that an enricher is registered for
+// p.ResourceType (it would not have emitted this TaskRequest otherwise).
+// The adapter does not re-check this invariant. If somehow violated, the
+// nil-deref panic on enricher(...) is the correct surfacing — silent
+// no-op would mask a runtime/registry bug.
 //
 // EnrichGen is captured from the embedded Session at dispatch time to
 // preserve stale-result-rejection semantics: the result handler in
 // app.go compares msg.Generation against m.EnrichGen on receipt.
 // PolicyDocCache and clients are adapter-owned state that has not yet
 // migrated to the runtime core.
-func (m Model) enrichDetailCmd(scope string, res resource.Resource) tea.Cmd {
-	resourceType := scope
-	for i := 0; i < len(scope); i++ {
-		if scope[i] == '/' {
-			resourceType = scope[:i]
-			break
-		}
-	}
-	enricher := resource.GetDetailEnricher(resourceType)
-	if enricher == nil {
-		return nil
-	}
+func (m Model) enrichDetailCmd(p runtime.EnrichDetailPayload) tea.Cmd {
+	enricher := resource.GetDetailEnricher(p.ResourceType)
 	gen := m.EnrichGen             // session-owned, promoted via embedded *Session
 	policyDocs := m.PolicyDocCache // session-owned, promoted via embedded *Session
 	clients := m.clients
@@ -117,6 +118,8 @@ func (m Model) enrichDetailCmd(scope string, res resource.Resource) tea.Cmd {
 		Clients:    clients,
 		PolicyDocs: policyDocs,
 	}
+	resourceType := p.ResourceType
+	res := p.Resource
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(appCtx, 10*time.Second)
 		defer cancel()
