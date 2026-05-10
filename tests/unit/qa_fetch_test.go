@@ -718,6 +718,7 @@ func TestQA_FetchResources_NilClients(t *testing.T) {
 
 	for _, rt := range resource.AllShortNames() {
 		t.Run(rt, func(t *testing.T) {
+			t.Parallel()
 			_, cmd := rootApplyMsg(m, messages.NavigateMsg{
 				Target:       messages.TargetResourceList,
 				ResourceType: rt,

@@ -19,6 +19,7 @@ import (
 // that method is still a stub ("not yet implemented"). The coder's task (T013) is
 // to implement the fake and provide fixture data — at that point this test passes.
 func TestDemoColdCacheEC2_ListPopulates(t *testing.T) {
+	t.Parallel()
 	m := newDemoColdCacheApp(t)
 
 	// Size the model so View() renders.
