@@ -104,7 +104,7 @@ Every unit of work goes through these stages. Stages 1, 2, 4, 6, 6.5 may be **sk
 - **Trigger**: CEO/board files an issue, *or* a `todo, unassigned` issue exists in the active project (under CAE-1, the CTO auto-pulls these every heartbeat).
 - **Action**: Triage type (bug · feature · refactor · ops · docs), set priority, set size, name the owning Paperclip agent, draft acceptance criteria. Dispatch immediately; no waiting for explicit per-issue CEO approval on in-scope work.
 - **Exit**: Issue meets DoR and is dispatched to the owning agent (or to Architect when size ≥ M).
-- **Anti-pattern (post-CAE-1)**: CTO auto-pulls `todo, unassigned` issues in active projects every heartbeat, runs Stage 1 (size, AC, owner), and dispatches. CEO retains net-new strategic direction; CTO owns in-scope execution. Self-assigning *outside* the active project remains an anti-pattern. Other agents (Architect, QA, Coder, etc.) still act only on explicit dispatch from CTO or Architect — they do not browse the backlog.
+- **Anti-pattern (post-CAE-1)**: Self-assigning `todo, unassigned` issues *outside* the active project — CTO auto-pull is in-scope only. Other agents (Architect, QA, Coder, etc.) browsing the backlog or picking up undispatched work — they still act only on explicit dispatch from CTO or Architect. Waiting on CEO/board approval before dispatching in-scope ready work.
 
 ### Stage 2 — Spec & Design
 
@@ -270,7 +270,7 @@ Every "Primary" cell holds a **Paperclip agent name**. The "Tools" column lists 
 | Stage | Primary (Paperclip) | Helpers (Paperclip) | Reviewers (Paperclip) | Tools invoked in-session |
 |---|---|---|---|---|
 | 1 Intake | CTO | — | — | — |
-| 2 Spec | Architect | DevOps (consultative, optional) | CTO | `a9s-resource-spec`, `a9s-architect` |
+| 2 Spec | Architect | DevOps (consultative, optional) | — *(post-hoc only under CAE-1; CTO/board may comment but Stage 2 has no exit gate)* | `a9s-resource-spec`, `a9s-architect` |
 | 3 Tests | QA | — | Architect | `a9s-qa-stories`, `a9s-qa`, `a9s-related-qa` |
 | 4 Impl | Coder | — | — | `a9s-coder`, `a9s-integrator`, `a9s-fixtures` |
 | 5 Review | (parallel reviewers below) | — | CodeReviewer, CodexReviewer, Architect (≥M), CTO (final), CodeRabbit (external) | `a9s-tui-reviewer`, `a9s-consistency-checker`, `test-coverage-analyzer`, `a9s-security-auditor`, `a9s-docs-reviewer`, `tui-ux-auditor`, `a9s-arch-review` |

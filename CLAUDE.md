@@ -10,7 +10,7 @@ Quick reference:
 
 - Pre-push gate (Stage 6): `make ready-to-push`
 - Pre-release gate (Stage 7): `make ready-to-release`
-- New work must be assigned by the CEO (or CTO on CEO's behalf). Never browse the backlog and self-assign.
+- Under CAE-1, CTO auto-pulls `todo, unassigned` issues in the active project every heartbeat (see [`docs/development-process.md`](docs/development-process.md) §"Continuous Autonomous Execution"). Other agents (Architect, QA, Coder, DevOps, etc.) act only on explicit dispatch from CTO or Architect — they never browse the backlog or pick up undispatched work.
 
 ## GitHub
 
