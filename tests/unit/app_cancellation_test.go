@@ -106,7 +106,8 @@ func TestFetchersUseContextNotBackground(t *testing.T) {
 	// Files that MUST NOT contain context.Background() after the refactor.
 	// These are the sites identified in CONCERNS #2/#20.
 	files := []string{
-		"internal/tui/app_fetchers.go",
+		"internal/runtime/fetchers.go",
+		"internal/tui/fetch_adapter.go",
 		"internal/tui/app_related.go",
 		"internal/aws/iam_policies_related.go",
 		"internal/aws/iam_roles_related.go",

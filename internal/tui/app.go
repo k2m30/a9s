@@ -11,8 +11,10 @@ import (
 	"charm.land/lipgloss/v2"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/session"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
@@ -111,6 +113,8 @@ type Model struct {
 
 	noCache bool
 	isDemo  bool // true when running in --demo mode (synthetic clients); controls Wave 2 skip
+
+	core *runtime.Core // platform-agnostic orchestrator; owns fetch execution (PR-05a-h6)
 }
 
 
@@ -185,8 +189,10 @@ func New(profile, region string, opts ...Option) Model {
 	// construction and threaded through all fetchers.
 	ctx, cancel := context.WithCancel(context.Background())
 
+	sess := session.New()
 	m := Model{
-		Session:     session.New(),
+		Session:     sess,
+		core:        runtime.New(sess, catalog.ResourceTypes),
 		profile:     profile,
 		region:      region,
 		keys:        k,
