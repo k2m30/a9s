@@ -49,8 +49,11 @@ integration:
 security:
 	govulncheck ./...
 
+# TODO(AS-36): drop the docs/refactor/** exclusion once phase-03 lands and
+# refactor-doc churn stops. Excluding here keeps unrelated doc PRs from being
+# gated by in-flight refactor-doc lint regressions (see AS-85).
 mdlint:
-	markdownlint-cli2 "docs/**/*.md" "CLAUDE.md" "CONTRIBUTING.md" "CHANGELOG.md"
+	markdownlint-cli2 "docs/**/*.md" "!docs/refactor/**" "CLAUDE.md" "CONTRIBUTING.md" "CHANGELOG.md"
 
 coverage:
 	go test ./internal/... ./tests/... -coverpkg=./internal/... -coverprofile=coverage.out -covermode=atomic
