@@ -102,12 +102,19 @@ func TestDetailLayout_SectionHeadersAlignedWithScalars(t *testing.T) {
 			Code: new(int32(16)),
 		},
 	}
-	cfg, err := config.LoadFromDirs([]string{filepath.Join("..", "..", ".a9s", "views")})
-	if err != nil {
-		t.Fatalf("views dir not loadable: %v", err)
-	}
-	if cfg == nil {
-		t.Fatalf(".a9s/views/ directory not found or returned nil config")
+	// Build a minimal view config that maps "InstanceId" as a scalar and
+	// "State" (the whole nested struct) as a section, producing both a scalar
+	// line and a section-header line. Using the real EC2 view config would map
+	// State to the scalar State.Name and produce no section header.
+	cfg := &config.ViewsConfig{
+		Views: map[string]config.ViewDef{
+			"ec2": {
+				Detail: []config.DetailField{
+					{Path: "InstanceId"},
+					{Path: "State"},
+				},
+			},
+		},
 	}
 	res := resource.Resource{
 		ID:        "i-test123",
@@ -132,6 +139,13 @@ func TestDetailLayout_SectionHeadersAlignedWithScalars(t *testing.T) {
 	foundSubField := false
 
 	for line := range strings.SplitSeq(plain, "\n") {
+		// The detail view renders a two-column layout: left panel │ right panel.
+		// Trim everything from the │ separator onward so we inspect only the
+		// left (field) column's indentation and content.
+		if idx := strings.Index(line, "│"); idx >= 0 {
+			line = line[:idx]
+		}
+		line = strings.TrimRight(line, " ")
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
