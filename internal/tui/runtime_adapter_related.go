@@ -113,6 +113,10 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 		if result.TargetID != "" {
 			// Exact AMI navigation should fetch by image ID instead of falling
 			// back to the owned-AMI list, which misses public and third-party images.
+			// PR-05b: when m.clients moves into the runtime Core, the runtime will
+			// emit a typed FetchAMIDetail TaskRequest and this branch collapses
+			// into runtimeTasksToCmd; the adapter override stays for now because
+			// client selection is adapter-owned state.
 			if msg.TargetType == "ami" && m.clients != nil {
 				cmd := m.fetchAMIDetail(result.TargetID)
 				return m, cmd
@@ -211,6 +215,12 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 				return m, nil
 			}
 			// ResourceCache miss: check LazyResourceCache before triggering a fetch.
+			// PR-05b: this branch builds a fully-cached view when all RelatedIDs are
+			// in the lazy cache. runtime.relatedFetchTasks already returns nil tasks
+			// for full-coverage cases, so dropping `tasks` here is consistent with
+			// the runtime decision rather than a divergence. PR-05b will route the
+			// lazy-row slice through TaskRequest payload so the adapter no longer
+			// re-walks the cache.
 			if lazyRows, hasLazy := m.LazyResourceCache[msg.TargetType]; hasLazy {
 				idSet := make(map[string]bool, len(result.RelatedIDs))
 				for _, id := range result.RelatedIDs {
@@ -398,6 +408,11 @@ func relatedNavigateTasksToCmd(m Model, targetType string, result runtime.Naviga
 		case runtime.KindFetchFiltered:
 			cmds = append(cmds, m.fetchResourcesFiltered(targetType, result.FetchFilter))
 		case runtime.KindFetchMore:
+			// PR-05b: KindFetchMore TaskRequest does not carry the continuation
+			// token yet; the adapter re-derives it from the session cache here.
+			// When PR-05b lands the typed cmd/event split, the token rides on a
+			// structured TaskRequest payload (e.g. FetchMoreRequest) and this
+			// branch becomes a direct param pass-through.
 			if entry, ok := m.ResourceCache[targetType]; ok && entry.Pagination != nil {
 				cmds = append(cmds, m.fetchMoreResources(messages.LoadMoreMsg{
 					ResourceType:      targetType,
