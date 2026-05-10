@@ -42,14 +42,14 @@ Closing this boundary before any larger phase adds to it means later phases neve
 - **(b) Move fields to `internal/session/Session` but keep them unexported, accessing via methods.** Every `m.resourceCache[k] = v` becomes `m.Session().ResourceCacheSet(k, v)`. Order of magnitude more churn than capitalization, with worse readability. Rejected.
 - **(c) Keep `sessionRuntime` in `internal/tui/` indefinitely.** Defeats the phase. Rejected.
 
-**Files added**
+#### Files added
 
 - `internal/session/session.go` — `Session` struct with exported fields (capitalized from `sessionRuntime`'s former unexported fields). `New()`, `Rotate()` constructors and methods.
 - `internal/session/policy_store.go` — `PolicyStore` interface + thread-safe map-backed implementation.
 - `internal/session/identity_store.go` — `IdentityStore` interface + impl.
 - `internal/session/rule_set_store.go` — `RuleSetStore` interface + impl.
 
-**Files modified**
+#### Files modified
 
 - `internal/tui/session_runtime.go` — type body deleted; the file may itself be removed entirely, with `tui.Model` updated in `internal/tui/app.go` to embed `*session.Session` directly. The embed pattern preserves promoted-selector access (now to capitalized field names).
 - `internal/tui/app.go`, `internal/tui/app_handlers*.go`, `internal/tui/app_fetchers.go`, `internal/tui/app_probes.go`, `internal/tui/app_related.go`, and any other file in `internal/tui/` that reads or writes promoted fields — mechanical capitalization. Sample concrete renames:
@@ -69,7 +69,7 @@ Closing this boundary before any larger phase adds to it means later phases neve
 
 - `tests/unit/*.go` — any test that constructs `tui.Model{...}` literals with formerly-lowercase field initializers updates to capitalized.
 
-**Exit criteria**
+#### Exit criteria
 
 ```bash
 ls internal/session/
@@ -100,18 +100,18 @@ The capability interfaces are unused at this point. Subsequent PRs in this phase
 
 **Goal.** Delete `internal/aws/iam_policies.go`'s `allPoliciesMu` + cache. The IAM-policies-listing code path takes a `PolicyStore` capability instead.
 
-**Files modified**
+#### Files modified
 
 - `internal/aws/iam_policies.go` — function signatures change from `func ListAllIAMPolicies(ctx, clients)` to `func ListAllIAMPolicies(ctx, clients, store PolicyStore)`. The cached lookup logic moves into `PolicyStore` impl; `ListAllIAMPolicies` becomes a pure transport function.
 - All call sites of `ListAllIAMPolicies` and any sibling functions that read the cache — pass `Session.iamPolicies` (or a runtime-scoped wrapper) at the call site.
 - `internal/tui/session_runtime.go:128` — delete the `awsclient.ResetIAMPoliciesCache()` call. `Session.Rotate()` clears `iamPolicies` directly.
 
-**Files deleted (symbols)**
+#### Files deleted (symbols)
 
 - `var allPoliciesMu sync.Mutex` and the underlying map in `iam_policies.go`
 - `func ResetIAMPoliciesCache()` — exported helper no longer needed
 
-**Exit criteria**
+#### Exit criteria
 
 ```bash
 rg 'allPoliciesMu|ResetIAMPoliciesCache' internal/
@@ -132,17 +132,17 @@ Behavior verification:
 
 **Goal.** Same shape as 02b, applied to `internal/aws/identity_cache.go`.
 
-**Files modified**
+#### Files modified
 
 - `internal/aws/identity_cache.go` — convert `func GetCallerIdentity(ctx, clients)` to take an `IdentityStore` capability. The `//nolint:gochecknoglobals` comment is what we're earning the right to delete.
 - All call sites — pass `Session.identity`.
 
-**Files deleted (symbols)**
+#### Files deleted (symbols)
 
 - `var identityCacheMu sync.Mutex` and the cached identity value
 - The associated `//nolint:gochecknoglobals` comment
 
-**Exit criteria**
+#### Exit criteria
 
 ```bash
 rg 'identityCacheMu' internal/
@@ -158,17 +158,17 @@ rg 'gochecknoglobals' internal/aws/
 
 **Goal.** Delete `sesRuleSetCacheMu`, `sesRuleSetCaches`, `InvalidateSESRuleSetCache(*ServiceClients)`, `ClearAllSESRuleSetCaches()`. SES related-checkers take a `RuleSetStore` capability.
 
-**Files modified**
+#### Files modified
 
 - `internal/aws/ses_related.go` — checker functions take `RuleSetStore`. The pattern `cache, ok := sesRuleSetCaches[c]` (lines 141–147) is replaced with `store.Get(...)`.
 - `internal/tui/app_handlers.go:243` — delete the inline `awsclient.ClearAllSESRuleSetCaches()` call. `Session.Rotate()` clears `sesRuleSets` directly.
 
-**Files deleted (symbols)**
+#### Files deleted (symbols)
 
 - `var sesRuleSetCacheMu`, `var sesRuleSetCaches`, `type sesReceiptRuleSetCache` (or move it into `internal/session/rule_set_store.go` as the impl)
 - `func InvalidateSESRuleSetCache(*ServiceClients)`, `func ClearAllSESRuleSetCaches()`
 
-**Exit criteria**
+#### Exit criteria
 
 ```bash
 rg 'sesRuleSetCache|ClearAllSESRuleSetCaches|InvalidateSESRuleSetCache' internal/
@@ -186,17 +186,17 @@ rg 'sesRuleSetCacheMu|sesReceiptRuleSetCache' internal/aws/
 
 Note: PR-02a already moved `sessionRuntime`'s body to `internal/session/Session` and capitalized every promoted-selector access site. PR-02e does NOT re-do that work; it finishes the cache-reset story and finalizes any obsolete test-only helpers that were targeting the deleted `Reset*Cache` symbols.
 
-**Files modified**
+#### Files modified
 
 - `internal/tui/app_handlers.go` — any remaining inline cache resets are replaced with `m.Session.Rotate()`.
 - `internal/aws/ses_cache_test_accessor_test.go` and `internal/aws/ses_clear_cache_test.go` — these tests existed solely to verify `ClearAllSESRuleSetCaches`, deleted in PR-02d. **Migrate them**: re-target the same invariants ("rotate clears all entries"; "rotate on empty store is a no-op") at the new `RuleSetStore` capability, OR delete them if equivalent coverage exists in the new `internal/session/rule_set_store_test.go`. Do not leave them dangling.
 
-**Files deleted**
+#### Files deleted
 
 - Whatever `Reset*Cache` / `Clear*Cache` / `Invalidate*Cache` exported symbols remain in `internal/aws/`.
 - `internal/aws/ses_cache_test_accessor_test.go` and `internal/aws/ses_clear_cache_test.go` (assuming the migration above lands their replacements in `internal/session/`).
 
-**Exit criteria**
+#### Exit criteria
 
 ```bash
 rg 'func (Reset|Clear|Invalidate)\w*Cache' internal/aws/

@@ -203,7 +203,7 @@ This preserves today's stack-walking semantics — every matching view in the st
 
 **Goal.** Move all message handlers, fetcher dispatch, and session ownership out of `internal/tui/` into a new platform-agnostic `internal/runtime/` core package. `tui.Model` stops embedding `sessionRuntime` (now `internal/session.Session` after Phase 02). The Bubble Tea `Update` loop in the UI shell becomes a thin adapter that translates `tea.Msg` values into app-core events, forwards them to the core, applies returned UI intents, and turns task requests into `tea.Cmd`s.
 
-**Files added**
+#### Files added
 
 - `internal/runtime/orchestrator.go` — owns `*session.Session`, app-core dispatch entry point, fetcher invocation. Replaces the bulk of `internal/tui/app.go`. **No Bubble Tea imports.**
 - `internal/runtime/screens.go` — screen-descriptor definitions used to register stackable workflows without growing central shell switches.
@@ -216,18 +216,18 @@ This preserves today's stack-walking semantics — every matching view in the st
 - `internal/runtime/state.go` — `RuntimeState` struct: the view-ready state the UI shell renders. Snapshot of caches, current findings, queue progress, task state, etc.
 - `internal/tui/screens.go` — Bubble Tea screen builders (`runtime.ScreenID -> tea.Model`) used by the TUI adapter only.
 
-**Files modified**
+#### Files modified
 
 - `internal/tui/app.go` (currently ~880 lines / ~28 KB) — shrinks substantially. Realistic target: **300–400 lines**. The shell still owns view stack management, key resolver wiring, Bubble Tea message translation, screen-builder lookup, the `RuntimeState` field, the intent-application code, and `View()` rendering. The earlier draft's "under 200 lines" target was unrealistic given those responsibilities; calibrate to 300–400 instead and verify post-PR.
 - `internal/tui/app_input.go` — stays in tui (input mode is UI concern).
 - `internal/tui/app_handlers*.go` — content moved to `internal/runtime/`; files deleted from `internal/tui/`.
 - `cmd/a9s/main.go` — wires `runtime.New(session.New(), catalog.ResourceTypes)` and passes the core plus TUI adapter wiring to `tui.New()`.
 
-**Files deleted**
+#### Files deleted
 
 - `internal/tui/session_runtime.go` (or its remaining stub from Phase 02). `Session` lives in `internal/session/`; the embed in `tui.Model` is gone.
 
-**Exit criteria**
+#### Exit criteria
 
 ```bash
 # tui no longer owns Session:
@@ -276,11 +276,11 @@ Behavior verification:
 
 This PR also captures any final UI-shell shrinkage: dead helpers in `internal/tui/` that became unreferenced after PR-05a-extract.
 
-**Files added**
+#### Files added
 
 - `internal/domain/gen.go` — `Gen uint64` type, methods (`Bump()`, `Stamp() Gen`, etc.), thread-safety contract.
 
-**Files modified**
+#### Files modified
 
 - `internal/session/session.go` — generation counter fields (`availabilityGen`, `enrichmentGen`, `relatedGen`, `enrichGen`) all become `domain.Gen`. `Session.Rotate()` calls `.Bump()` on each.
 - Every message type that carries a `Gen` or `TypeGen` field — switch to `domain.Gen`.
@@ -288,7 +288,7 @@ This PR also captures any final UI-shell shrinkage: dead helpers in `internal/tu
 - `internal/runtime/orchestrator.go` — gen-stamping uniform.
 - `internal/tui/views/*.go` — any view that holds gen state (e.g. `ResourceListModel.gen`) switches to `domain.Gen`.
 
-**Exit criteria**
+#### Exit criteria
 
 ```bash
 # Only one gen type:
@@ -333,21 +333,21 @@ type Flash             struct { ... }
 
 Generation stamping moves into an `Event` base (or a generated wrapper) so handlers can no longer forget to gen-check. These types are plain app-core contracts; renderer adapters translate to and from Bubble Tea, Electron IPC, or any future transport at the boundary.
 
-**Files added**
+#### Files added
 
 - `internal/runtime/cmd/types.go` — command types (UI → runtime).
 - `internal/runtime/event/types.go` — event types (runtime → UI).
 
-**Files modified**
+#### Files modified
 
 - Every message-emitting site — emits `cmd.LoadResources` or `event.ResourcesLoaded` instead of bare `messages.LoadResourcesMsg`.
 - Every handler — receives typed cmd or event.
 
-**Files deleted**
+#### Files deleted
 
 - `internal/tui/messages/messages.go` — replaced by the cmd/event split.
 
-**Exit criteria**
+#### Exit criteria
 
 ```bash
 # Split is clean:

@@ -84,6 +84,7 @@ type FindingDef struct {
 var ResourceTypes = []ResourceTypeDef{
     // ... populated per-category in PR-04b onward
 }
+
 ```
 
 Boundary rule: if behavior is intrinsic to a resource type's list/detail/reveal/related/navigation metadata, it belongs in `ResourceTypeDef`. If it is a cross-cutting capability with its own screens, queries, or task model (logs, CloudTrail investigation, cost analysis, future actions), it gets its own module keyed by resource type, not another optional behavior field on the catalog struct. The one catalog-side hook is `Capabilities []domain.CapabilityID`: declarative support metadata only. Runtime uses that opt-in list when dispatching to capability modules in Phase 05.
@@ -96,7 +97,7 @@ Boundary rule: if behavior is intrinsic to a resource type's list/detail/reveal/
 
 **Goal.** Create `internal/catalog/`, redirect legacy accessors to wrap `catalog`, and ship `cmd/catalogen` as a markdown-only generator. This PR introduces the machinery; the catalog is empty (no type entries yet) and the legacy accessors fall back to legacy registries for every short name.
 
-**Files added**
+#### Files added
 
 - `internal/catalog/types.go` — `ResourceTypeDef`, `FindingDef`, helper types.
 - `internal/catalog/catalog.go` — `var ResourceTypes []ResourceTypeDef` (initially empty), accessor functions (`Find(shortName) *ResourceTypeDef`, `All() []ResourceTypeDef`, `AllShortNames() []string`, `ByCategory(cat) []ResourceTypeDef`).
@@ -135,6 +136,7 @@ The wrapper set must close every consumer the per-category PRs (04b–m) will st
 
 ```bash
 rg '^func\s+(Get|Find|All|Apply|Has)\w+\(' internal/resource/ internal/aws/issue_enrichment.go
+
 ```
 
 Every public `Get*` / `Find*` / `All*` / `Apply*` / `Has*` accessor in those files must have a corresponding wrapper. The grep above is the audit gate; do not skip it.
@@ -153,23 +155,27 @@ func GetPaginatedFetcher(short string) PaginatedFetcher {
     return legacyPaginatedFetchers[short]
 }
 // ... etc., one per wrapper above
+
 ```
 
 After PR-04m, the fallback branch in every wrapper is unreachable; PR-04n deletes the fallbacks along with the legacy registry maps.
 
-**Files modified**
+#### Files modified
 
 - `internal/resource/registry.go` (or new `internal/catalog/wrappers.go`) — adds every wrapper above.
 - **Consumer migration in this PR**: `internal/tui/app_fetchers.go`, `internal/tui/app_probes.go`, `internal/tui/app_related.go`, `internal/tui/views/detail_fields.go`, `internal/resource/navigation.go`, plus any other site found by:
+
   ```bash
   rg 'resource\.(GetPaginatedFetcher|FindResourceType|GetRelated|GetNavigableFields|AllShortNames|GetTypeByShortName|AllResourceTypes|GetIssueEnricher)\b' internal/
+
   ```
+
   Every match either keeps using `resource.<API>` (which is now a wrapper) — acceptable, since the wrapper handles routing — or switches to `catalog.<API>` if the wrappers live in `internal/catalog/`. Pick one location and stick with it; do not split wrappers across two packages.
 - **Import-cycle audit**: `internal/catalog` imports `internal/domain` for the type aliases. `internal/resource` imports `internal/catalog` for wrappers. `internal/catalog` MUST NOT import `internal/resource` — verify with `go list -f '{{.Imports}}' github.com/k2m30/a9s/v3/internal/catalog | grep internal/resource` (expected: zero hits).
 - `Makefile` — `make generate` runs `go generate ./...` invoking `cmd/catalogen`; CI runs `make generate` then `git diff --exit-code`.
 - `internal/catalog/doc.go` — `//go:generate go run ../../cmd/catalogen` directive (catalog drives the generator, since catalog is the input).
 
-**Exit criteria**
+#### Exit criteria
 
 ```bash
 ls internal/catalog/types.go internal/catalog/catalog.go
@@ -192,6 +198,7 @@ go build ./...
 
 make test
 # expected: passes — catalog is empty, accessors fall back to legacy registries, behavior unchanged
+
 ```
 
 **Stabilization checkpoint**: PR-04n. PR-04a installs the catalog skeleton and the wrapper layer that downstream per-category PRs (04b–m) depend on. Once any per-category PR has landed, reverting PR-04a alone breaks every migrated category; the unit of revert is the phase. Per `00-overview.md` "Migration discipline", do not preserve dual-iteration paths (legacy `resourceTypes` slice AND `catalog.ResourceTypes`) beyond what the migration window strictly needs — the wrappers are one-way compat for the duration of the phase, and PR-04n removes them.
@@ -260,6 +267,7 @@ rg '<one-of-x-types>' docs/attention-signals.md
 # go build still works (this is the build-break guard):
 go build ./...
 # expected: clean
+
 ```
 
 Behavior verification:
@@ -308,6 +316,7 @@ The contract: every per-resource markdown file is annotated with section markers
 | --- | --- | --- |
 | ...
 <!-- END GENERATED: related -->
+
 ```
 
 **Generator algorithm.** For each `<short>.md`:
@@ -325,13 +334,13 @@ The contract: every per-resource markdown file is annotated with section markers
 
 **Goal.** Cut the rope. Legacy `Register*` API is deleted. The legacy `resourceTypes` slice is deleted. Consumers read directly from `catalog.ResourceTypes`. The catalog accessor wrappers' fallback branch is deleted (it was only meaningful during 04b–04m).
 
-**Files modified**
+#### Files modified
 
 - `internal/resource/registry.go` (or wherever the wrappers live after 04a) — delete the legacy fallback branch. `FindResourceType` etc. are pure passthroughs to `catalog.Find` etc.
 - Every direct consumer of `resource.FindResourceType`, `resource.AllResourceTypes`, `resource.AllShortNames` — optionally switch to calling `catalog.*` directly. (Keeping the resource-package wrappers as aliases is fine for one more PR cycle if it reduces churn; the wrappers are now zero-cost.)
 - `tests/unit/architecture_conformance_test.go` — iterate `catalog.ResourceTypes` directly. Drop any markdown-parsing scaffolding.
 
-**Files deleted**
+#### Files deleted
 
 - `internal/resource/registry.go` `Register*` exported functions — entire surface
 - `internal/resource/types.go` `var resourceTypes = buildResourceTypes()`, `buildResourceTypes()`, the per-category builder slice — all gone (or `buildResourceTypes()` becomes `return nil` and is then deleted in a follow-up if linter complains)
@@ -339,7 +348,7 @@ The contract: every per-resource markdown file is annotated with section markers
 - All `NoOpIssueEnricher` registrations (most already deleted in 04b–04m; this is the final sweep)
 - Any `*_issue_enrichment.go` file whose only remaining content was `init()` registration code
 
-**Exit criteria**
+#### Exit criteria
 
 ```bash
 # Zero init() functions in feature wiring:
@@ -370,6 +379,7 @@ go run ./cmd/catalogen -verify
 # Conformance tests iterate catalog directly:
 rg 'parseMarkdownTable|attention-signals\.md' tests/unit/
 # expected: zero hits — tests read the catalog, not parsed markdown
+
 ```
 
 Mechanical-resource-implementation acceptance test passes (overview's program-wide criterion):
