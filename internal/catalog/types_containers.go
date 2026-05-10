@@ -1,6 +1,61 @@
 package catalog
 
-import "github.com/k2m30/a9s/v3/internal/domain"
+import (
+	"strconv"
+
+	"github.com/k2m30/a9s/v3/internal/domain"
+)
+
+func colorEKSCluster(r domain.Resource) domain.Color {
+	if c, ok := colorFromWave1(r); ok {
+		return c
+	}
+	if r.Fields["status"] == "FAILED" {
+		return domain.ColorBroken
+	}
+	hasIssues := false
+	if n, err := strconv.Atoi(r.Fields["health_issues_count"]); err == nil && n > 0 {
+		hasIssues = true
+	}
+	switch r.Fields["status"] {
+	case "ACTIVE":
+		if hasIssues {
+			return domain.ColorWarning
+		}
+		return domain.ColorHealthy
+	case "CREATING", "UPDATING", "DELETING":
+		return domain.ColorWarning
+	}
+	if hasIssues {
+		return domain.ColorWarning
+	}
+	return domain.ColorHealthy
+}
+
+func colorEKSNodeGroup(r domain.Resource) domain.Color {
+	if c, ok := colorFromWave1(r); ok {
+		return c
+	}
+	hasIssues := false
+	if n, err := strconv.Atoi(r.Fields["health_issues_count"]); err == nil && n > 0 {
+		hasIssues = true
+	}
+	switch r.Fields["status"] {
+	case "ACTIVE":
+		if hasIssues {
+			return domain.ColorWarning
+		}
+		return domain.ColorHealthy
+	case "CREATING", "UPDATING", "DELETING":
+		return domain.ColorWarning
+	case "CREATE_FAILED", "DELETE_FAILED", "DEGRADED":
+		return domain.ColorBroken
+	}
+	if hasIssues {
+		return domain.ColorWarning
+	}
+	return domain.ColorHealthy
+}
 
 var containersTypes = []ResourceTypeDef{
 	{
@@ -16,9 +71,7 @@ var containersTypes = []ResourceTypeDef{
 			{Key: "endpoint", Title: "Endpoint", Width: 48, Sortable: false},
 			{Key: "platform_version", Title: "Platform Version", Width: 18, Sortable: true},
 		},
-		// Fetcher/Wave2/Related/Navigable: intentionally nil — import cycle prevents
-		// internal/catalog from referencing internal/aws. These are wired in
-		// internal/aws via the legacy init() registries until PR-04n.
+		Color: colorEKSCluster,
 	},
 	{
 		Name:          "EKS Node Groups",
@@ -33,6 +86,6 @@ var containersTypes = []ResourceTypeDef{
 			{Key: "instance_types", Title: "Instance Types", Width: 20, Sortable: false},
 			{Key: "desired_size", Title: "Desired", Width: 9, Sortable: true},
 		},
-		// Fetcher/Wave2/Related/Navigable: intentionally nil — see eks note above.
+		Color: colorEKSNodeGroup,
 	},
 }

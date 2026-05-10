@@ -2,7 +2,13 @@ package catalog
 
 import "github.com/k2m30/a9s/v3/internal/domain"
 
-var cicdTypes = []ResourceTypeDef{
+func colorCFN(r domain.Resource) domain.Color      { return cfnStackColor(r.Fields["status"]) }
+func colorPipeline(_ domain.Resource) domain.Color { return domain.ColorHealthy }
+func colorCB(_ domain.Resource) domain.Color       { return domain.ColorHealthy }
+func colorECR(_ domain.Resource) domain.Color      { return domain.ColorHealthy }
+func colorCodeArtifact(_ domain.Resource) domain.Color { return domain.ColorHealthy }
+
+var cicdTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
 		Name:          "CloudFormation Stacks",
 		ShortName:     "cfn",
@@ -20,6 +26,7 @@ var cicdTypes = []ResourceTypeDef{
 			{ChildType: "cfn_events", Key: "enter", ContextKeys: map[string]string{"stack_name": "ID"}, DisplayNameKey: "Name"},
 			{ChildType: "cfn_resources", Key: "R", ContextKeys: map[string]string{"stack_name": "ID"}, DisplayNameKey: "Name"},
 		},
+		Color: colorCFN,
 	},
 	{
 		Name:          "CodePipelines",
@@ -40,6 +47,7 @@ var cicdTypes = []ResourceTypeDef{
 			ContextKeys:    map[string]string{"pipeline_name": "ID"},
 			DisplayNameKey: "Name",
 		}},
+		Color: colorPipeline,
 	},
 	{
 		Name:          "CodeBuild Projects",
@@ -59,6 +67,7 @@ var cicdTypes = []ResourceTypeDef{
 			ContextKeys:    map[string]string{"project_name": "ID"},
 			DisplayNameKey: "project_name",
 		}},
+		Color: colorCB,
 	},
 	{
 		Name:          "ECR Repositories",
@@ -79,6 +88,7 @@ var cicdTypes = []ResourceTypeDef{
 			ContextKeys:    map[string]string{"repository_name": "ID", "repository_uri": "uri"},
 			DisplayNameKey: "repository_name",
 		}},
+		Color: colorECR,
 	},
 	{
 		Name:          "CodeArtifact Repos",
@@ -92,5 +102,6 @@ var cicdTypes = []ResourceTypeDef{
 			{Key: "description", Title: "Description", Width: 30, Sortable: false},
 			{Key: "domain_owner", Title: "Owner", Width: 14, Sortable: true},
 		},
+		Color: colorCodeArtifact,
 	},
 }

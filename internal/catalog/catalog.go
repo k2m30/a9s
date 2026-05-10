@@ -1,5 +1,7 @@
 package catalog
 
+import "github.com/k2m30/a9s/v3/internal/domain"
+
 // ResourceTypes is the declarative registry of all a9s resource types.
 // It is static — no init(), no Register* calls. Per-category PRs (04b–04m)
 // populate this slice. Until then it is empty and all lookups fall through
@@ -69,6 +71,33 @@ func ByCategory(cat string) []ResourceTypeDef {
 		}
 	}
 	return result
+}
+
+// RegisterProject sets the Project (DetailProjector) for the catalog entry with
+// the given shortName. Called from init() in packages whose projector cannot be
+// imported from internal/catalog without creating an import cycle. No-op when
+// the shortName is not in the catalog.
+func RegisterProject(shortName string, p domain.DetailProjector) {
+	nameLower := toLower(shortName)
+	for i := range ResourceTypes {
+		if toLower(ResourceTypes[i].ShortName) == nameLower {
+			ResourceTypes[i].Project = p
+			return
+		}
+	}
+}
+
+// RegisterAugment sets the Augment hook for the catalog entry with the given
+// shortName. Same cycle-breaking pattern as RegisterProject. No-op when the
+// shortName is not in the catalog.
+func RegisterAugment(shortName string, aug domain.Augmenter) {
+	nameLower := toLower(shortName)
+	for i := range ResourceTypes {
+		if toLower(ResourceTypes[i].ShortName) == nameLower {
+			ResourceTypes[i].Augment = aug
+			return
+		}
+	}
 }
 
 // toLower is a minimal ASCII lower-case helper that avoids importing strings
