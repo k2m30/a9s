@@ -153,6 +153,7 @@ func enterChildExpectError(t *testing.T, m *tui.Model, childType string, parentC
 // TestDemoColdCacheNestedChildren_LogsChain verifies the three-level chain
 // logs → log_streams → log_events from a cold cache.
 func TestDemoColdCacheNestedChildren_LogsChain(t *testing.T) {
+	t.Parallel()
 	m := setupDemoApp(t)
 
 	// Level 0: load log groups.
@@ -195,6 +196,7 @@ func TestDemoColdCacheNestedChildren_LogsChain(t *testing.T) {
 // rule 4 for the log_streams child: an unknown log group name must surface an
 // error (ResourceNotFoundException), not an empty list.
 func TestDemoColdCacheNestedChildren_LogsChain_UnknownParent(t *testing.T) {
+	t.Parallel()
 	m := setupDemoApp(t)
 
 	// Ensure clients are wired but no real list navigation needed.
@@ -211,6 +213,7 @@ func TestDemoColdCacheNestedChildren_LogsChain_UnknownParent(t *testing.T) {
 // TestDemoColdCacheNestedChildren_LambdaChain verifies the three-level chain
 // lambda → lambda_invocations → lambda_invocation_logs from a cold cache.
 func TestDemoColdCacheNestedChildren_LambdaChain(t *testing.T) {
+	t.Parallel()
 	m := setupDemoApp(t)
 
 	// Level 0: load lambda functions.
@@ -262,6 +265,7 @@ func TestDemoColdCacheNestedChildren_LambdaChain(t *testing.T) {
 // rule 4 for lambda_invocations: an unknown function name must produce an SDK
 // error (or empty with error — not silent empty).
 func TestDemoColdCacheNestedChildren_LambdaChain_UnknownParent(t *testing.T) {
+	t.Parallel()
 	m := setupDemoApp(t)
 
 	enterChildExpectError(t, m, "lambda_invocations",
@@ -280,6 +284,7 @@ func TestDemoColdCacheNestedChildren_LambdaChain_UnknownParent(t *testing.T) {
 // TestDemoColdCacheNestedChildren_SFNChain verifies the three-level chain
 // sfn → sfn_executions → sfn_execution_history from a cold cache.
 func TestDemoColdCacheNestedChildren_SFNChain(t *testing.T) {
+	t.Parallel()
 	m := setupDemoApp(t)
 
 	// Level 0: load state machines.
@@ -332,6 +337,7 @@ func TestDemoColdCacheNestedChildren_SFNChain(t *testing.T) {
 // TestDemoColdCacheNestedChildren_SFNChain_UnknownParent verifies contract
 // rule 4 for sfn_executions: an unknown state machine ARN must surface an error.
 func TestDemoColdCacheNestedChildren_SFNChain_UnknownParent(t *testing.T) {
+	t.Parallel()
 	m := setupDemoApp(t)
 
 	enterChildExpectError(t, m, "sfn_executions",
@@ -350,6 +356,7 @@ func TestDemoColdCacheNestedChildren_SFNChain_UnknownParent(t *testing.T) {
 // TestDemoColdCacheNestedChildren_CBChain verifies the three-level chain
 // cb → cb_builds → cb_build_logs from a cold cache.
 func TestDemoColdCacheNestedChildren_CBChain(t *testing.T) {
+	t.Parallel()
 	m := setupDemoApp(t)
 
 	// Level 0: load CodeBuild projects.
@@ -397,6 +404,7 @@ func TestDemoColdCacheNestedChildren_CBChain(t *testing.T) {
 // TestDemoColdCacheNestedChildren_CBChain_UnknownParent verifies contract
 // rule 4 for cb_builds: an unknown project name must surface an error.
 func TestDemoColdCacheNestedChildren_CBChain_UnknownParent(t *testing.T) {
+	t.Parallel()
 	m := setupDemoApp(t)
 
 	enterChildExpectError(t, m, "cb_builds",
@@ -412,6 +420,7 @@ func TestDemoColdCacheNestedChildren_CBChain_UnknownParent(t *testing.T) {
 // TestDemoColdCacheNestedChildren_ELBChain verifies the three-level chain
 // elb → elb_listeners → elb_listener_rules from a cold cache.
 func TestDemoColdCacheNestedChildren_ELBChain(t *testing.T) {
+	t.Parallel()
 	m := setupDemoApp(t)
 
 	// Level 0: load load balancers.
@@ -454,6 +463,7 @@ func TestDemoColdCacheNestedChildren_ELBChain(t *testing.T) {
 // TestDemoColdCacheNestedChildren_ELBChain_UnknownParent verifies contract
 // rule 4 for elb_listeners: an unknown LB ARN must surface an error.
 func TestDemoColdCacheNestedChildren_ELBChain_UnknownParent(t *testing.T) {
+	t.Parallel()
 	m := setupDemoApp(t)
 
 	enterChildExpectError(t, m, "elb_listeners",

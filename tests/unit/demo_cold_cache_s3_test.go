@@ -23,6 +23,7 @@ import (
 // TestDemoColdCacheS3_ListPopulates verifies that navigating to the S3 resource
 // list with a cold cache produces at least one bucket from the demo transport.
 func TestDemoColdCacheS3_ListPopulates(t *testing.T) {
+	t.Parallel()
 	m := newDemoColdCacheApp(t)
 
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -75,6 +76,7 @@ func TestDemoColdCacheS3_ListPopulates(t *testing.T) {
 // injection requires a live program loop. The message mirrors what ResourceList
 // emits when Enter is pressed on a bucket row.
 func TestDemoColdCacheS3_ObjectsChildView(t *testing.T) {
+	t.Parallel()
 	m := newDemoColdCacheApp(t)
 
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -153,6 +155,7 @@ func TestDemoColdCacheS3_ObjectsChildView(t *testing.T) {
 // fetching s3_objects for a bucket that does not exist in the fixture must
 // produce an error, not an empty list.
 func TestDemoColdCacheS3_UnknownBucketReturnsError(t *testing.T) {
+	t.Parallel()
 	m := newDemoColdCacheApp(t)
 
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})
