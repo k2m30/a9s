@@ -1,16 +1,19 @@
 package unit
 
-// related_navigate_partial_cache_test.go — Tests for the partial cache / truncated
-// pagination bug in handleRelatedNavigate's multi-RelatedIDs branch.
+// related_navigate_partial_cache_test.go — Tests for the partial-cache /
+// pagination contract in handleRelatedNavigate's multi-RelatedIDs branch
+// (internal/tui/runtime_adapter_related.go, NavigationKindFilteredList +
+// RelatedIDs path).
 //
-// Bug (app_related.go:144-168): when RelatedIDs has >1 entries, the code filters
-// the resourceCache. If some IDs are missing AND the cache has IsTruncated==true,
-// those IDs may be on a later page — but the code silently shows the incomplete
-// filtered list without initiating a fetch.
+// The runtime is the sole decision-maker for fetch tasks
+// (internal/runtime/handlers_related.go relatedFetchTasks). The adapter must
+// translate the emitted []TaskRequest into tea.Cmd values and never silently
+// drop them, regardless of how much the cache already covers.
 //
-// TestRelatedNavigate_PartialCache_Truncated_FetchesMissing  — FAILS with current code.
-// TestRelatedNavigate_AllRelatedIDs_InCache_NoFetch           — PASSES (correct behavior).
-// TestRelatedNavigate_PartialCache_NotTruncated_ShowsFiltered — PASSES (correct behavior).
+// TestRelatedNavigate_PartialCache_Truncated_FetchesMissing       — partial + truncated → fetch (KindFetchMore translation).
+// TestRelatedNavigate_AllRelatedIDs_InCache_NoFetch                — full coverage → nil cmd.
+// TestRelatedNavigate_PartialCache_NotTruncated_FetchesFullList    — partial + not truncated → fetch (KindFetchResources translation).
+//   AS-216 / AS-245 (PR #345 R2) regression guard.
 
 import (
 	"context"
@@ -171,22 +174,33 @@ func TestRelatedNavigate_AllRelatedIDs_InCache_NoFetch(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// TestRelatedNavigate_PartialCache_NotTruncated_ShowsFiltered
+// TestRelatedNavigate_PartialCache_NotTruncated_FetchesFullList
 //
-// Given: resourceCache["ec2"] has only ec2[0..1], IsTruncated=false.
+// Given: resourceCache["ec2"] holds the loaded EC2 list, IsTruncated=false.
 // When:  RelatedNavigateMsg{RelatedIDs: [ec2[0].ID, "ec2-nonexistent-id"]} is sent.
-//        One ID is in the cache; the other does not exist anywhere.
-// Then:  The returned cmd is nil (cache is complete — missing IDs just don't exist,
-//        no fetch is needed, filtered partial result is acceptable).
+//        One ID is in the cache; the other is not — coverage is partial.
+// Then:  The returned cmd is non-nil (a full re-fetch is issued).
 //
-// This PASSES with current code (correct behavior).
+// Contract: per internal/runtime/handlers_related.go relatedFetchTasks() and
+// the pinning runtime test
+// TestRelatedFetchTasks_PartialCoverage_NotTruncated_FetchAll, when any
+// RelatedID is missing from cache and the cache cannot page further
+// (Pagination == nil OR IsTruncated == false), the runtime emits a
+// KindFetchResources task. The adapter must honor that task — a missing ID may
+// genuinely not exist OR may simply not have been observed yet, and the
+// runtime is the sole decision-maker. Returning nil here would silently strand
+// the user on an incomplete list and divergence the adapter from the runtime
+// SSOT. The pre-populated cached row stays visible while the fetch is in
+// flight (the view is built before the fetch cmd is returned).
+//
+// This is the AS-216 / AS-245 (PR #345 R2) regression guard for
+// internal/tui/runtime_adapter_related.go's RelatedIDs branch.
 // ---------------------------------------------------------------------------
 
-func TestRelatedNavigate_PartialCache_NotTruncated_ShowsFiltered(t *testing.T) {
+func TestRelatedNavigate_PartialCache_NotTruncated_FetchesFullList(t *testing.T) {
 	m, ec2Res := setupEC2ListWithCompleteCache(t)
 
-	// Request ec2[0] (in cache) + a nonexistent ID.
-	// Since the cache is NOT truncated, the nonexistent ID genuinely doesn't exist.
+	// Request ec2[0] (in cache) + a nonexistent ID — partial coverage.
 	navMsg := messages.RelatedNavigateMsg{
 		TargetType: "ec2",
 		RelatedIDs: []string{ec2Res[0].ID, "ec2-nonexistent-xxxxxxxxxxx"},
@@ -199,10 +213,13 @@ func TestRelatedNavigate_PartialCache_NotTruncated_ShowsFiltered(t *testing.T) {
 
 	_, cmd := rootApplyMsg(m, navMsg)
 
-	// Non-truncated cache + missing ID = ID simply doesn't exist.
-	// Showing the filtered partial result is correct; no fetch needed.
-	if cmd != nil {
-		t.Fatal("non-truncated cache with a genuinely missing ID should return nil cmd " +
-			"(filtered partial result is acceptable — the ID does not exist)")
+	// Partial coverage + non-truncated cache → runtime emits
+	// KindFetchResources and the adapter must propagate it, even though the
+	// cached row is already pre-populated in the view.
+	if !cmdIsNonNilFetch(cmd) {
+		t.Fatal("BUG: RelatedNavigateMsg with partial coverage on a non-truncated cache " +
+			"must initiate a full re-fetch (cmd should be non-nil) — runtime is the SSOT " +
+			"for the fetch decision and emits KindFetchResources here " +
+			"(see internal/runtime/handlers_related.go relatedFetchTasks)")
 	}
 }

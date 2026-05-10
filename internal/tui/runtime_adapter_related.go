@@ -1,14 +1,25 @@
-// app_handlers_related_navigate.go — RelatedNavigateMsg dispatch.
+// runtime_adapter_related.go — Bubble Tea adapter glue for the runtime
+// HandleRelatedNavigate entry point (Phase 05 PR-05a-h4).
 //
-// Split from app_related.go (which now holds RelatedCheckStartedMsg dispatch
-// and the cache-snapshot helpers) to keep both files under the 500-line
-// file-size budget.
+// handleRelatedNavigate replaces the deleted entry point from
+// internal/tui/app_handlers_related_navigate.go. It constructs a transient
+// runtime.Core, calls core.HandleRelatedNavigate, then applies the navigation
+// decision to the view stack and translates TaskRequests into tea.Cmd values.
+// The existing app.go dispatch line (return m.handleRelatedNavigate(msg)) is
+// unchanged.
 //
-//   handleRelatedNavigate       — main switch over NavigationResult.Kind
-//                                 (KindFlash / KindEnterChildView / KindFilteredList
-//                                  / KindDetail / KindResourceList).
-//   handleRelatedNavigateChild  — KindEnterChildView fan-out: resolves the
-//                                 ChildViewDef and emits EnterChildViewMsg.
+// handleRelatedNavigateChild stays here as a TUI-only helper because it
+// dispatches a messages.EnterChildViewMsg — a Bubble Tea message type.
+//
+// Decision-locus follow-up (PR-05b): a few branches in this adapter still walk
+// the session cache directly to drive view construction (AMI exact-ID drill,
+// lazy-cache full-coverage shortcut, RelatedIDs partial-coverage pre-populated
+// list). The runtime emits the same task decisions in HandleRelatedNavigate /
+// relatedFetchTasks; when PR-05b lands the typed cmd/event split it will carry
+// enough payload (continuation tokens, lazy-cache slices, client selection)
+// for the adapter to be purely mechanical. Until then the adapter mirrors the
+// runtime's policy and trusts the emitted []TaskRequest rather than overriding
+// it.
 package tui
 
 import (
@@ -17,20 +28,34 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/session"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
-// handleRelatedNavigate pushes a resource list view for the related target type,
-// or a detail view if a single related ID is found in the cache.
-// Cache hits skip the fetch and render filtered results immediately.
-// Cache misses dispatch a fetch command alongside the list view init.
+// handleRelatedNavigate replaces the entry point previously in
+// internal/tui/app_handlers_related_navigate.go. The signature is identical
+// so the existing app.go dispatch line is unchanged.
+//
+// It constructs a transient runtime.Core to invoke the migrated policy
+// (HandleRelatedNavigate), then builds the view and starts any required fetch
+// based on the returned NavigationResult and TaskRequests.
 func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model, tea.Cmd) {
-	result := ResolveRelatedNavigate(msg, m.snapshotCache())
+	core := runtime.New(m.Session, resource.AllResourceTypes())
+	ev := runtime.RelatedNavigateEvent{
+		TargetType:     msg.TargetType,
+		SourceResource: msg.SourceResource,
+		SourceType:     msg.SourceType,
+		TargetID:       msg.TargetID,
+		RelatedIDs:     msg.RelatedIDs,
+		FetchFilter:    msg.FetchFilter,
+		Checker:        msg.Checker,
+	}
+	result, tasks := core.HandleRelatedNavigate(ev)
 
 	switch result.Kind {
-	case KindFlash:
+	case runtime.NavigationKindFlash:
 		return m, func() tea.Msg {
 			return messages.FlashMsg{
 				Text:    result.FlashMessage,
@@ -38,17 +63,13 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 			}
 		}
 
-	case KindEnterChildView:
+	case runtime.NavigationKindEnterChildView:
 		return m.handleRelatedNavigateChild(msg)
 
-	case KindFilteredList:
+	case runtime.NavigationKindFilteredList:
 		rt := resource.FindResourceType(msg.TargetType)
 		if rt == nil {
-			// Fetcher-only type (registered paginated fetcher but no ResourceTypeDef —
-			// e.g. a dynamically-registered test type). When the lazy cache has partial
-			// coverage, fall through to a full fetch so the missing IDs are retrieved.
-			// This preserves the never-use-fast-path-for-partial-coverage invariant even
-			// when the type has no visual definition.
+			// Fetcher-only type (registered paginated fetcher but no ResourceTypeDef).
 			if len(result.RelatedIDs) > 0 {
 				if lazyRows, hasLazy := m.LazyResourceCache[msg.TargetType]; hasLazy {
 					idSet := make(map[string]bool, len(result.RelatedIDs))
@@ -62,7 +83,6 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 						}
 					}
 					// Partial coverage: fall through to fetch so missing IDs are retrieved.
-					// Full coverage: no need to fetch — but we have no view to render, so flash.
 					if len(filtered) < len(result.RelatedIDs) {
 						fetchCmd := m.fetchResources(msg.TargetType)
 						return m, fetchCmd
@@ -91,8 +111,12 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 
 		// TargetID-based filtered list (cache miss).
 		if result.TargetID != "" {
-			// Exact AMI navigation should fetch by image ID instead of
-			// falling back to the owned-AMI list, which misses public and third-party images.
+			// Exact AMI navigation should fetch by image ID instead of falling
+			// back to the owned-AMI list, which misses public and third-party images.
+			// PR-05b: when m.clients moves into the runtime Core, the runtime will
+			// emit a typed FetchAMIDetail TaskRequest and this branch collapses
+			// into runtimeTasksToCmd; the adapter override stays for now because
+			// client selection is adapter-owned state.
 			if msg.TargetType == "ami" && m.clients != nil {
 				cmd := m.fetchAMIDetail(result.TargetID)
 				return m, cmd
@@ -108,7 +132,8 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 				autoOpenSingleDetail: true,
 				reapplyChecker:       msg.Checker,
 			})
-			return m, tea.Batch(initCmd, m.fetchResources(msg.TargetType))
+			fetchCmd := relatedNavigateTasksToCmd(m, msg.TargetType, result, tasks)
+			return m, tea.Batch(initCmd, fetchCmd)
 		}
 
 		// RelatedIDs-based filtered list (multi or single cache miss).
@@ -124,10 +149,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 						filtered = append(filtered, r)
 					}
 				}
-				// Augment with lazy-cached resources for this type. These are
-				// out-of-scope entries (AWS-managed KMS keys, public AMIs, shared
-				// snapshots) that the top-level fetcher filtered out. Prefer
-				// ResourceCache on ID collision (already covered above).
+				// Augment with lazy-cached resources. Prefer ResourceCache on ID collision.
 				if lazyRows, hasLazy := m.LazyResourceCache[msg.TargetType]; hasLazy {
 					found := make(map[string]struct{}, len(filtered))
 					for _, r := range filtered {
@@ -143,8 +165,8 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 					}
 				}
 				// If some IDs are missing and cache may have more pages, fetch the rest.
-				// Pre-populate the list with already-cached filtered rows so they remain
-				// visible when subsequent pages arrive via Append:true ResourcesLoadedMsg.
+				// Pre-populate with already-cached filtered rows so they remain visible when
+				// subsequent pages arrive via Append:true ResourcesLoadedMsg.
 				if len(filtered) < len(result.RelatedIDs) && entry.Pagination != nil && entry.Pagination.IsTruncated {
 					rl := views.NewResourceListFromCache(
 						*rt, m.viewConfig, m.keys,
@@ -162,19 +184,20 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 					rl.SetEscPops(true)
 					rl.SetSize(m.innerSize())
 					m.pushView(&rl)
-					fetchCmd := m.fetchMoreResources(messages.LoadMoreMsg{
-						ResourceType:      msg.TargetType,
-						ContinuationToken: entry.Pagination.NextToken,
-					})
+					fetchCmd := relatedNavigateTasksToCmd(m, msg.TargetType, result, tasks)
 					return m, fetchCmd
 				}
-				// All RelatedIDs matched — no more pages can contribute to this
-				// filter, so strip IsTruncated on the pagination we hand to the
-				// view. Otherwise the list inherits the upstream cache's
-				// truncation flag and renders a misleading "m: load more"
-				// footer for a fully-resolved exact-ID filter.
+				// Coverage check: distinguish "all RelatedIDs matched" (true cache
+				// hit, drop pagination footer + return nil) from "partial coverage,
+				// not truncated" (cache exhausted but some IDs still missing —
+				// runtime emits KindFetchResources, adapter must honor it). The
+				// view is pre-populated with the cached rows in either case so
+				// they remain visible while any fetch is in flight.
+				fullyCovered := len(filtered) == len(result.RelatedIDs)
 				paginationForView := entry.Pagination
-				if paginationForView != nil && paginationForView.IsTruncated {
+				if fullyCovered && paginationForView != nil && paginationForView.IsTruncated {
+					// Fully resolved exact-ID filter — strip IsTruncated so the
+					// view doesn't show a misleading "load more" footer.
 					clone := *paginationForView
 					clone.IsTruncated = false
 					clone.NextToken = ""
@@ -183,7 +206,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 				rl := views.NewResourceListFromCache(
 					*rt, m.viewConfig, m.keys,
 					filtered, paginationForView,
-					"", // no text filter needed, already filtered by ID
+					"",
 					entry.SortColIdx, entry.SortAsc,
 					0, 0,
 					false,
@@ -196,11 +219,24 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 				rl.SetEscPops(true)
 				rl.SetSize(m.innerSize())
 				m.pushView(&rl)
-				return m, nil
+				if fullyCovered {
+					return m, nil
+				}
+				// Partial coverage + not truncated: the runtime emitted a
+				// KindFetchResources task (see relatedFetchTasks in
+				// internal/runtime/handlers_related.go and its test
+				// TestRelatedFetchTasks_PartialCoverage_NotTruncated_FetchAll).
+				// Honor it so missing IDs the existing fetcher hasn't seen yet
+				// are retrieved instead of silently surfacing an incomplete list.
+				return m, relatedNavigateTasksToCmd(m, msg.TargetType, result, tasks)
 			}
 			// ResourceCache miss: check LazyResourceCache before triggering a fetch.
-			// This handles the case where all requested IDs were pulled via FetchByIDs
-			// (e.g. AWS-managed KMS key drill — never in ResourceCache).
+			// PR-05b: this branch builds a fully-cached view when all RelatedIDs are
+			// in the lazy cache. runtime.relatedFetchTasks already returns nil tasks
+			// for full-coverage cases, so dropping `tasks` here is consistent with
+			// the runtime decision rather than a divergence. PR-05b will route the
+			// lazy-row slice through TaskRequest payload so the adapter no longer
+			// re-walks the cache.
 			if lazyRows, hasLazy := m.LazyResourceCache[msg.TargetType]; hasLazy {
 				idSet := make(map[string]bool, len(result.RelatedIDs))
 				for _, id := range result.RelatedIDs {
@@ -213,9 +249,6 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 					}
 				}
 				if len(filtered) > 0 && len(filtered) == len(result.RelatedIDs) {
-					// All requested IDs are covered by the lazy cache — render immediately.
-					// Partial coverage (some IDs missing) falls through to the full-fetch
-					// path below so those IDs are retrieved from AWS.
 					rl := views.NewResourceListFromCache(
 						*rt, m.viewConfig, m.keys,
 						filtered, nil,
@@ -248,10 +281,11 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 				opts = relatedListOpts{relatedIDs: result.RelatedIDs, reapplyChecker: msg.Checker}
 			}
 			initCmd := m.newRelatedList(*rt, msg.SourceResource, opts)
-			return m, tea.Batch(initCmd, m.fetchResources(msg.TargetType))
+			fetchCmd := relatedNavigateTasksToCmd(m, msg.TargetType, result, tasks)
+			return m, tea.Batch(initCmd, fetchCmd)
 		}
 
-	case KindDetail:
+	case runtime.NavigationKindDetail:
 		rt := resource.FindResourceType(msg.TargetType)
 		if rt == nil {
 			return m, func() tea.Msg {
@@ -262,15 +296,10 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 			}
 		}
 
-		// Find resource in cache. Search both resourceCache (primary, scope-filtered
-		// top-level entries) and lazyResourceCache (out-of-scope entries pulled via
-		// FetchByIDs, e.g. AWS-managed KMS keys, public AMIs).
 		targetID := result.TargetID
 		if targetID == "" && len(result.RelatedIDs) == 1 {
 			targetID = result.RelatedIDs[0]
 		}
-		// resolveDetailResource searches a slice for targetID and returns the
-		// resource if found.
 		resolveDetailResource := func(rows []resource.Resource) (resource.Resource, bool) {
 			for _, r := range rows {
 				if r.ID == targetID {
@@ -291,14 +320,6 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 		}
 		if detailFound {
 			r := detailRes
-			// Mirror manual Enter on this row: if the target type
-			// registers a child under Key="enter" and its DrillCondition
-			// (if any) admits the row, jump straight into the child
-			// view. Otherwise push the generic detail. This keeps
-			// single-result auto-drill consistent with what Enter does
-			// in the target list — a pivot that narrows to one row
-			// must not strand the operator on bucket metadata when
-			// Enter would have opened bucket contents.
 			if enterChild := enterChildForResource(rt, r); enterChild != nil {
 				ctx := buildChildContextForResource(*enterChild, r)
 				displayName := ctx[enterChild.DisplayNameKey]
@@ -332,7 +353,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 			return m, nil
 		}
 
-	case KindResourceList:
+	case runtime.NavigationKindResourceList:
 		rt := resource.FindResourceType(msg.TargetType)
 		if rt == nil {
 			return m, func() tea.Msg {
@@ -342,13 +363,11 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 				}
 			}
 		}
-		// Approximate-zero (0+) path: zero known IDs but the reverse-scan
-		// cache was truncated. Navigate with the checker so each loaded page
-		// re-applies the predicate and matches accumulate.
 		initCmd := m.newRelatedList(*rt, msg.SourceResource, relatedListOpts{
 			reapplyChecker: msg.Checker,
 		})
-		return m, tea.Batch(initCmd, m.fetchResources(msg.TargetType))
+		fetchCmd := relatedNavigateTasksToCmd(m, msg.TargetType, result, tasks)
+		return m, tea.Batch(initCmd, fetchCmd)
 	}
 
 	return m, nil
@@ -368,7 +387,6 @@ func (m Model) handleRelatedNavigateChild(msg messages.RelatedNavigateMsg) (tea.
 		}
 	}
 
-	// Extract parent context from related IDs using the child type's extractor.
 	var parentCtx map[string]string
 	if childDef.RelatedContextFromIDs != nil {
 		parentCtx = childDef.RelatedContextFromIDs(msg.RelatedIDs)
@@ -388,5 +406,43 @@ func (m Model) handleRelatedNavigateChild(msg messages.RelatedNavigateMsg) (tea.
 			ParentContext: parentCtx,
 			DisplayName:   displayName,
 		}
+	}
+}
+
+// relatedNavigateTasksToCmd translates TaskRequests from HandleRelatedNavigate
+// into Bubble Tea commands. Unknown TaskKind values are dropped for
+// forward-compatibility.
+func relatedNavigateTasksToCmd(m Model, targetType string, result runtime.NavigationResult, tasks []runtime.TaskRequest) tea.Cmd {
+	if len(tasks) == 0 {
+		return nil
+	}
+	var cmds []tea.Cmd
+	for _, t := range tasks {
+		switch t.Key.Kind {
+		case runtime.KindFetchResources:
+			cmds = append(cmds, m.fetchResources(targetType))
+		case runtime.KindFetchFiltered:
+			cmds = append(cmds, m.fetchResourcesFiltered(targetType, result.FetchFilter))
+		case runtime.KindFetchMore:
+			// PR-05b: KindFetchMore TaskRequest does not carry the continuation
+			// token yet; the adapter re-derives it from the session cache here.
+			// When PR-05b lands the typed cmd/event split, the token rides on a
+			// structured TaskRequest payload (e.g. FetchMoreRequest) and this
+			// branch becomes a direct param pass-through.
+			if entry, ok := m.ResourceCache[targetType]; ok && entry.Pagination != nil {
+				cmds = append(cmds, m.fetchMoreResources(messages.LoadMoreMsg{
+					ResourceType:      targetType,
+					ContinuationToken: entry.Pagination.NextToken,
+				}))
+			}
+		}
+	}
+	switch len(cmds) {
+	case 0:
+		return nil
+	case 1:
+		return cmds[0]
+	default:
+		return tea.Batch(cmds...)
 	}
 }

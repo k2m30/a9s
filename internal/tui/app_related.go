@@ -208,35 +208,6 @@ func missingFromCache(cache resource.ResourceCache, targetType string, ids []str
 	return missing
 }
 
-// snapshotCache returns a flat map[string][]resource.Resource snapshot of the
-// current resource cache and lazyResourceCache combined, suitable for passing
-// to pure resolver functions. On ID collision, resourceCache wins.
-func (m *Model) snapshotCache() map[string][]resource.Resource {
-	snap := make(map[string][]resource.Resource, len(m.ResourceCache)+len(m.LazyResourceCache))
-	// Seed from lazy entries first; ResourceCache entries overwrite on collision.
-	maps.Copy(snap, m.LazyResourceCache)
-	for shortName, entry := range m.ResourceCache {
-		if existing, ok := snap[shortName]; ok {
-			// Merge: ResourceCache rows take precedence; append lazy-only IDs.
-			known := make(map[string]struct{}, len(entry.Resources))
-			for _, r := range entry.Resources {
-				known[r.ID] = struct{}{}
-			}
-			merged := append([]resource.Resource(nil), entry.Resources...)
-			for _, r := range existing {
-				if _, dup := known[r.ID]; !dup {
-					merged = append(merged, r)
-				}
-			}
-			snap[shortName] = merged
-		} else {
-			snap[shortName] = entry.Resources
-		}
-	}
-	return snap
-}
-
-
 // relatedListOpts configures a related-navigation resource list.
 type relatedListOpts struct {
 	pendingFilter        string
