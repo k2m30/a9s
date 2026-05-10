@@ -31,8 +31,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime"
 )
 
 // ---------------------------------------------------------------------------
@@ -433,13 +432,13 @@ func TestCtEventsDemoRightColumnCheckers(t *testing.T) {
 				// G2 (Bug C): Count=-1 + non-empty FetchFilter must route to
 				// KindFilteredList or KindEnterChildView.
 				if result.Count == -1 && len(result.FetchFilter) > 0 {
-					navMsg := messages.RelatedNavigateMsg{
+					navMsg := runtime.RelatedNavigateEvent{
 						TargetType:  result.TargetType,
 						FetchFilter: result.FetchFilter,
 					}
-					navResult := tui.ResolveRelatedNavigate(navMsg, resolveCache)
+					navResult := runtime.ResolveRelatedNavigate(navMsg, resolveCache)
 					switch navResult.Kind {
-					case tui.KindFilteredList, tui.KindEnterChildView:
+					case runtime.NavigationKindFilteredList, runtime.NavigationKindEnterChildView:
 						// G2 OK
 					default:
 						t.Errorf("G2 (Bug C) FAIL: Count=-1+FetchFilter routed to %v, want KindFilteredList or KindEnterChildView — %s",
