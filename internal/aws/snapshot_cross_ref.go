@@ -196,10 +196,12 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 			}
 
 			// FieldUpdates carries the merged §4 status phrase. Idempotent:
-			// reads res.Status (fetcher-emitted), never a previously-merged
-			// value, so re-runs converge.
+			// reads the fetcher-emitted Wave-1 phrases (post-PR-03e via
+			// res.Findings; pre-PR-03e via res.Status / res.Issues), never a
+			// previously-merged value, so re-runs converge.
+			existingStatus, existingIssues := wave1StatusAndIssues(res)
 			result.FieldUpdates[res.ID] = map[string]string{
-				"status": computeMergedStatus(res.Status, res.Issues, newPhrases),
+				"status": computeMergedStatus(existingStatus, existingIssues, newPhrases),
 			}
 
 			// Findings emits the entries for the detail-view Attention section.
@@ -261,4 +263,27 @@ func computeMergedStatus(existingStatus string, existingIssues []string, newPhra
 		status = resource.BumpFindingSuffix(status)
 	}
 	return status
+}
+
+// wave1StatusAndIssues extracts the §4 top phrase + per-phrase slice from a
+// Resource, supporting both the post-PR-03e canonical form (Findings emitted
+// by the fetcher with Source=="wave1", display phrase in Fields["status"])
+// and the legacy form (Status + Issues populated by the fetcher). Returns
+// ("", nil) when neither carries any Wave-1 signal.
+func wave1StatusAndIssues(res resource.Resource) (string, []string) {
+	// Post-migration path: prefer Findings + Fields["status"].
+	if len(res.Findings) > 0 {
+		issues := make([]string, 0, len(res.Findings))
+		for _, f := range res.Findings {
+			if f.Source != "wave1" {
+				continue
+			}
+			issues = append(issues, f.Phrase)
+		}
+		if len(issues) > 0 {
+			return res.Fields["status"], issues
+		}
+	}
+	// Legacy fall-through for unmigrated fetchers.
+	return res.Status, res.Issues
 }

@@ -71,8 +71,12 @@ func TestFetchMSKClusters_ParsesMultipleClusters(t *testing.T) {
 	if r0.Name != "events-cluster" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "events-cluster", r0.Name)
 	}
-	if r0.Status != "ACTIVE" {
-		t.Errorf("resource[0].Status: expected %q, got %q", "ACTIVE", r0.Status)
+	// Healthy cluster: Status=="" (fetcher does not write Status), raw state in Fields["state"].
+	if r0.Status != "" {
+		t.Errorf("resource[0].Status: expected %q (healthy silence), got %q", "", r0.Status)
+	}
+	if r0.Fields["state"] != "ACTIVE" {
+		t.Errorf("resource[0].Fields[\"state\"]: expected %q, got %q", "ACTIVE", r0.Fields["state"])
 	}
 	if r0.Fields["cluster_type"] != "PROVISIONED" {
 		t.Errorf("resource[0].Fields[\"cluster_type\"]: expected %q, got %q", "PROVISIONED", r0.Fields["cluster_type"])
@@ -81,10 +85,13 @@ func TestFetchMSKClusters_ParsesMultipleClusters(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"version\"]: expected %q, got %q", "2.8.1", r0.Fields["version"])
 	}
 
-	// Verify second cluster
+	// Verify second cluster: Status=="" (fetcher does not write Status), phrase in Fields["status"].
 	r1 := resources[1]
-	if r1.Status != "CREATING" {
-		t.Errorf("resource[1].Status: expected %q, got %q", "CREATING", r1.Status)
+	if r1.Status != "" {
+		t.Errorf("resource[1].Status: expected %q (fetcher does not write Status), got %q", "", r1.Status)
+	}
+	if r1.Fields["status"] != "creating" {
+		t.Errorf("resource[1].Fields[\"status\"]: expected %q for CREATING cluster, got %q", "creating", r1.Fields["status"])
 	}
 	if r1.Fields["cluster_type"] != "SERVERLESS" {
 		t.Errorf("resource[1].Fields[\"cluster_type\"]: expected %q, got %q", "SERVERLESS", r1.Fields["cluster_type"])

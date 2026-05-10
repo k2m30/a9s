@@ -10,17 +10,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
-
-// brokenRDSDBCStatusPhrase maps Aurora / Multi-AZ cluster statuses that represent
-// hard failures to their display phrases per spec §4.
-// Mirrors brokenDBCStatusPhrase for the RDS-side cluster type.
-var brokenRDSDBCStatusPhrase = map[string]string{
-	"failed":                              "failed: cluster operation",
-	"inaccessible-encryption-credentials": "encryption key unreachable",
-	"incompatible-parameters":             "parameter group incompatible",
-}
 
 // transitionalRDSDBCStatusSet contains Aurora / Multi-AZ cluster statuses that
 // indicate a transitional (Warning) state.
@@ -43,54 +35,54 @@ func countRDSWriters(members []rdstypes.DBClusterMember) int {
 	return n
 }
 
-// computeRDSDBClusterStatusAndIssues returns the §4 phrase and the full ordered
-// list of every active issue phrase for an RDS-side (Aurora / Multi-AZ) DB cluster.
-// Algorithm mirrors computeDBCStatusAndIssues.
-func computeRDSDBClusterStatusAndIssues(cluster rdstypes.DBCluster) (string, []string) {
+// computeRDSDBClusterFindings returns []domain.Finding for an RDS-side (Aurora / Multi-AZ) DB cluster.
+// Algorithm mirrors computeDBCFindings.
+func computeRDSDBClusterFindings(cluster rdstypes.DBCluster) []domain.Finding {
 	status := aws.ToString(cluster.Status)
 
 	// Broken statuses — first match wins; no warning stacking.
-	if phrase, ok := brokenRDSDBCStatusPhrase[status]; ok {
-		return phrase, []string{phrase}
+	brokenCode := map[string]domain.FindingCode{
+		"failed":                              CodeDBCFailed,
+		"inaccessible-encryption-credentials": CodeDBCEncryptionKeyUnreachable,
+		"incompatible-parameters":             CodeDBCIncompatibleParameters,
+	}
+	brokenPhrase := map[string]string{
+		"failed":                              "failed: cluster operation",
+		"inaccessible-encryption-credentials": "encryption key unreachable",
+		"incompatible-parameters":             "parameter group incompatible",
+	}
+	if code, ok := brokenCode[status]; ok {
+		return []domain.Finding{{Code: code, Phrase: brokenPhrase[status], Severity: domain.SevBroken, Source: "wave1"}}
 	}
 
 	// No writer on an available cluster — reads only (Broken; beats warnings).
 	if status == "available" && countRDSWriters(cluster.DBClusterMembers) == 0 {
-		const phrase = "no writer: reads only"
-		return phrase, []string{phrase}
+		return []domain.Finding{{Code: CodeDBCNoWriter, Phrase: "no writer: reads only", Severity: domain.SevBroken, Source: "wave1"}}
 	}
 
 	// Transitional statuses.
 	if _, ok := transitionalRDSDBCStatusSet[status]; ok {
 		phrase := status + ": in progress"
-		return phrase, []string{phrase}
+		return []domain.Finding{{Code: CodeDBCTransitional, Phrase: phrase, Severity: domain.SevWarn, Source: "wave1"}}
 	}
 
 	// Healthy available — collect Wave-1 warnings in spec §4 table order.
 	if status == "available" {
-		var warnings []string
-		// §4 order: delete-protection off, not encrypted at rest, no automated backups.
+		var findings []domain.Finding
 		if cluster.DeletionProtection != nil && !*cluster.DeletionProtection {
-			warnings = append(warnings, "delete-protection off")
+			findings = append(findings, domain.Finding{Code: CodeDBCDeletionProtectionOff, Phrase: "delete-protection off", Severity: domain.SevWarn, Source: "wave1"})
 		}
 		if cluster.StorageEncrypted != nil && !*cluster.StorageEncrypted {
-			warnings = append(warnings, "not encrypted at rest")
+			findings = append(findings, domain.Finding{Code: CodeDBCNotEncryptedAtRest, Phrase: "not encrypted at rest", Severity: domain.SevWarn, Source: "wave1"})
 		}
 		if cluster.BackupRetentionPeriod != nil && *cluster.BackupRetentionPeriod == 0 {
-			warnings = append(warnings, "no automated backups")
+			findings = append(findings, domain.Finding{Code: CodeDBCNoAutomatedBackups, Phrase: "no automated backups", Severity: domain.SevWarn, Source: "wave1"})
 		}
-		switch len(warnings) {
-		case 0:
-			return "", nil
-		case 1:
-			return warnings[0], warnings
-		default:
-			return fmt.Sprintf("%s (+%d)", warnings[0], len(warnings)-1), warnings
-		}
+		return findings
 	}
 
 	// Unknown status — bare keyword passthrough (future-proof for new AWS statuses).
-	return status, []string{status}
+	return []domain.Finding{{Code: CodeDBCTransitional, Phrase: status, Severity: domain.SevWarn, Source: "wave1"}}
 }
 
 // FetchRDSDBClustersPage fetches a single page of Aurora + Multi-AZ DB clusters
@@ -171,17 +163,17 @@ func FetchRDSDBClustersPage(ctx context.Context, api RDSDescribeDBClustersAPI, c
 			backupRetentionPeriod = fmt.Sprintf("%d", *cluster.BackupRetentionPeriod)
 		}
 
-		computedStatus, computedIssues := computeRDSDBClusterStatusAndIssues(cluster)
+		findings := computeRDSDBClusterFindings(cluster)
+		statusPhrase := phraseFromFindings(findings)
 
 		r := resource.Resource{
-			ID:     clusterID,
-			Name:   clusterID,
-			Status: computedStatus,
-			Issues: computedIssues,
+			ID:       clusterID,
+			Name:     clusterID,
+			Findings: findings,
 			Fields: map[string]string{
 				"cluster_id":              clusterID,
 				"engine_version":          engineVersion,
-				"status":                  computedStatus,
+				"status":                  statusPhrase,
 				"instances":               instances,
 				"endpoint":                endpoint,
 				"arn":                     aws.ToString(cluster.DBClusterArn),

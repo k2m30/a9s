@@ -25,6 +25,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -398,6 +399,64 @@ func TestDBI_Enrich_Wave1PlusWave2_BumpsSuffix(t *testing.T) {
 	// "~" severity must not bump the S1 badge.
 	if result.IssueCount != 0 {
 		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
+	}
+}
+
+// TestDBI_Enrich_Wave1PlusWave2_PostPR03eShape pins the AS-132 regression: the
+// post-PR-03e fetcher emits Wave-1 phrases via Findings + Fields["status"] —
+// it intentionally stops populating Resource.Status. The enricher's
+// suffix-bump branch must read Fields["status"], NOT r.Status, otherwise it
+// silently downgrades to a bare "maintenance scheduled" overwrite that
+// erases the Wave-1 phrase from the S4 column. Sibling regression to AS-126;
+// surfaced by warn-dbi-public-maint visual scenarios where the row used to
+// render "publicly accessible (+1)" pre-migration but rendered just
+// "maintenance scheduled" post-migration until this fix.
+func TestDBI_Enrich_Wave1PlusWave2_PostPR03eShape(t *testing.T) {
+	const resourceID = fixtures.WarnDbiPublicMaintID
+	const arn = fixtures.WarnDbiPublicMaintARN
+
+	fake := &dbiMaintenanceFake{
+		pages: [][]rdstypes.ResourcePendingMaintenanceActions{
+			{
+				{
+					ResourceIdentifier: aws.String(arn),
+					PendingMaintenanceActionDetails: []rdstypes.PendingMaintenanceAction{
+						{Action: aws.String("os-upgrade"), Description: aws.String("Kernel security patch")},
+					},
+				},
+			},
+		},
+	}
+	clients := &awsclient.ServiceClients{RDS: fake}
+
+	// Post-PR-03e fetcher shape: Findings populated, Status empty, Fields["status"]
+	// carrying the merged §4 phrase. The enricher MUST find the wave-1 phrase
+	// here (not in r.Status) to bump the suffix correctly.
+	resources := []resource.Resource{
+		{
+			ID:   resourceID,
+			Name: resourceID,
+			Findings: []domain.Finding{
+				{Code: awsclient.CodeDBIPubliclyAccessible, Phrase: "publicly accessible", Severity: domain.SevWarn, Source: "wave1"},
+			},
+			Fields: map[string]string{"status": "publicly accessible"},
+			// Status: "" — intentionally unset; mirrors the fetcher's post-PR-03e contract.
+		},
+	}
+
+	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources, nil)
+	if err != nil {
+		t.Fatalf("EnrichDBIMaintenance error: %v", err)
+	}
+
+	updates, ok := result.FieldUpdates[resourceID]
+	if !ok {
+		t.Fatalf("FieldUpdates missing entry for %q", resourceID)
+	}
+	const want = "publicly accessible (+1)"
+	if updates["status"] != want {
+		t.Errorf("FieldUpdates[%q][status] = %q, want %q (AS-132 regression: enricher must read Fields[status], not the now-empty r.Status, to preserve wave-1 phrase + suffix bump)",
+			resourceID, updates["status"], want)
 	}
 }
 
