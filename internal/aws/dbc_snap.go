@@ -74,8 +74,19 @@ func init() {
 				},
 			}, fmt.Errorf("dbc-snap: RDS-side cluster snapshot fetch failed: %w", rdsErr)
 		}
-		// Combined success: DocDB page + RDS page concatenated. Page size may exceed DefaultPageSize when both SDKs return full pages on the same fetch tick — this is a deliberate trade so the operator sees a unified list rather than waiting for a second tick. Pagination tokens stay correct (docdb: vs rds: prefix tracks side authoritatively).
-		docResult.Resources = append(docResult.Resources, rdsResult.Resources...)
+		// Combined success: DocDB page + RDS page concatenated, then deduped by
+		// Resource.ID with first-occurrence wins. Both SDKs empirically return
+		// overlapping rows for the same snapshot — verified live on dev-readonly
+		// (AS-145): the RDS DescribeDBClusterSnapshots endpoint and the DocDB
+		// equivalent return the same snapshot rows for clusters that exist in
+		// both engine families' result sets, so raw concat doubles every row.
+		// DocDB-side rows are appended first, so dedup keeps the docdb-side row
+		// (engine-correct RawStruct used by detail enrichment / related-panel
+		// pivots). Page size may exceed DefaultPageSize when both SDKs return
+		// full pages on the same fetch tick — deliberate trade so the operator
+		// sees a unified list rather than waiting for a second tick. Pagination
+		// tokens stay correct (docdb: vs rds: prefix tracks side authoritatively).
+		docResult.Resources = dedupResourcesByID(append(docResult.Resources, rdsResult.Resources...))
 		if rdsResult.Pagination != nil && rdsResult.Pagination.IsTruncated {
 			return resource.FetchResult{
 				Resources: docResult.Resources,

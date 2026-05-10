@@ -26,14 +26,18 @@ package unit
 //	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/docdb"
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
+	"github.com/aws/aws-sdk-go-v2/service/rds"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // TestComputeDBCSnapStatusAndIssues pins the §4 phrase output and Issues slice
@@ -315,4 +319,251 @@ func TestComputeRDSDBClusterSnapshotStatusAndIssues(t *testing.T) {
 			}
 		})
 	}
+}
+
+// ---------------------------------------------------------------------------
+// AS-145: dbc-snap dual-SDK dedup-by-ID — DocDB-side wins.
+// ---------------------------------------------------------------------------
+
+// dbcSnapDocDBMock embeds fullDocDBMock (defined in aws_dbc_test.go, same
+// package) so it inherits all DocDBAPI methods, then overrides
+// DescribeDBClusterSnapshots to return scripted snapshot pages. Used to drive
+// the dbc-snap paginated fetcher through the dual-SDK overlap path.
+type dbcSnapDocDBMock struct {
+	fullDocDBMock
+	dbClusterSnapshotsPages []docdb.DescribeDBClusterSnapshotsOutput
+	dbClusterSnapshotsCall  int
+}
+
+func (m *dbcSnapDocDBMock) DescribeDBClusterSnapshots(
+	_ context.Context,
+	_ *docdb.DescribeDBClusterSnapshotsInput,
+	_ ...func(*docdb.Options),
+) (*docdb.DescribeDBClusterSnapshotsOutput, error) {
+	if m.dbClusterSnapshotsCall >= len(m.dbClusterSnapshotsPages) {
+		return &docdb.DescribeDBClusterSnapshotsOutput{}, nil
+	}
+	out := m.dbClusterSnapshotsPages[m.dbClusterSnapshotsCall]
+	m.dbClusterSnapshotsCall++
+	return &out, nil
+}
+
+// dbcSnapRDSMock embeds fullRDSMock and overrides DescribeDBClusterSnapshots
+// for the RDS side of the dual-SDK dedup test.
+type dbcSnapRDSMock struct {
+	fullRDSMock
+	dbClusterSnapshotsPages []rds.DescribeDBClusterSnapshotsOutput
+	dbClusterSnapshotsCall  int
+}
+
+func (m *dbcSnapRDSMock) DescribeDBClusterSnapshots(
+	_ context.Context,
+	_ *rds.DescribeDBClusterSnapshotsInput,
+	_ ...func(*rds.Options),
+) (*rds.DescribeDBClusterSnapshotsOutput, error) {
+	if m.dbClusterSnapshotsCall >= len(m.dbClusterSnapshotsPages) {
+		return &rds.DescribeDBClusterSnapshotsOutput{}, nil
+	}
+	out := m.dbClusterSnapshotsPages[m.dbClusterSnapshotsCall]
+	m.dbClusterSnapshotsCall++
+	return &out, nil
+}
+
+// TestDBCSnapFetcher_DedupesAcrossDualAPIByID pins the AS-145 production fix
+// for cluster snapshots: when DocDB and RDS DescribeDBClusterSnapshots both
+// return the same DBClusterSnapshotIdentifier on the same fetch tick, the
+// dbc-snap fetcher must dedup by Resource.ID with first-occurrence wins.
+// DocDB-side rows are appended first, so the docdb-side row must be preserved
+// (engine-correct RawStruct used by detail enrichment / related-panel pivots).
+func TestDBCSnapFetcher_DedupesAcrossDualAPIByID(t *testing.T) {
+	fetcher := resource.GetPaginatedFetcher("dbc-snap")
+	if fetcher == nil {
+		t.Fatal("no paginated fetcher registered for dbc-snap — init() not invoked")
+	}
+
+	now := time.Now().UTC()
+	age10d := now.Add(-10 * 24 * time.Hour)
+
+	// Sub-test 1: same snapshot identifier on both DocDB and RDS pages — 1 row,
+	// docdb-side RawStruct preserved.
+	t.Run("overlap_keeps_docdb_side", func(t *testing.T) {
+		const sharedID = "shared-snap-01"
+		docdbMock := &dbcSnapDocDBMock{
+			dbClusterSnapshotsPages: []docdb.DescribeDBClusterSnapshotsOutput{
+				{
+					DBClusterSnapshots: []docdbtypes.DBClusterSnapshot{
+						{
+							DBClusterSnapshotIdentifier: aws.String(sharedID),
+							DBClusterIdentifier:         aws.String("shared-cluster"),
+							Engine:                      aws.String("docdb"),
+							Status:                      aws.String("available"),
+							SnapshotType:                aws.String("automated"),
+							SnapshotCreateTime:          &age10d,
+						},
+					},
+				},
+			},
+		}
+		rdsMock := &dbcSnapRDSMock{
+			dbClusterSnapshotsPages: []rds.DescribeDBClusterSnapshotsOutput{
+				{
+					DBClusterSnapshots: []rdstypes.DBClusterSnapshot{
+						{
+							DBClusterSnapshotIdentifier: aws.String(sharedID),
+							DBClusterIdentifier:         aws.String("shared-cluster"),
+							Engine:                      aws.String("aurora-postgresql"),
+							Status:                      aws.String("available"),
+							SnapshotType:                aws.String("automated"),
+							SnapshotCreateTime:          &age10d,
+						},
+					},
+				},
+			},
+		}
+		clients := &awsclient.ServiceClients{DocDB: docdbMock, RDS: rdsMock}
+
+		result, err := fetcher(context.Background(), clients, "")
+		if err != nil {
+			t.Fatalf("fetcher error: %v", err)
+		}
+		if len(result.Resources) != 1 {
+			t.Fatalf("len(Resources) = %d, want 1 (overlap deduped)", len(result.Resources))
+		}
+		r := result.Resources[0]
+		if r.ID != sharedID {
+			t.Errorf("Resources[0].ID = %q, want %q", r.ID, sharedID)
+		}
+		if _, ok := r.RawStruct.(docdbtypes.DBClusterSnapshot); !ok {
+			t.Errorf("Resources[0].RawStruct type = %T, want docdbtypes.DBClusterSnapshot (DocDB-side appended first must win)", r.RawStruct)
+		}
+	})
+
+	// Sub-test 2: distinct snapshot identifiers on each side — both rows preserved.
+	t.Run("no_overlap_keeps_both", func(t *testing.T) {
+		docdbMock := &dbcSnapDocDBMock{
+			dbClusterSnapshotsPages: []docdb.DescribeDBClusterSnapshotsOutput{
+				{
+					DBClusterSnapshots: []docdbtypes.DBClusterSnapshot{
+						{
+							DBClusterSnapshotIdentifier: aws.String("docdb-only-snap-01"),
+							DBClusterIdentifier:         aws.String("docdb-cluster-01"),
+							Engine:                      aws.String("docdb"),
+							Status:                      aws.String("available"),
+							SnapshotType:                aws.String("automated"),
+							SnapshotCreateTime:          &age10d,
+						},
+					},
+				},
+			},
+		}
+		rdsMock := &dbcSnapRDSMock{
+			dbClusterSnapshotsPages: []rds.DescribeDBClusterSnapshotsOutput{
+				{
+					DBClusterSnapshots: []rdstypes.DBClusterSnapshot{
+						{
+							DBClusterSnapshotIdentifier: aws.String("rds-only-snap-01"),
+							DBClusterIdentifier:         aws.String("aurora-cluster-01"),
+							Engine:                      aws.String("aurora-mysql"),
+							Status:                      aws.String("available"),
+							SnapshotType:                aws.String("automated"),
+							SnapshotCreateTime:          &age10d,
+						},
+					},
+				},
+			},
+		}
+		clients := &awsclient.ServiceClients{DocDB: docdbMock, RDS: rdsMock}
+
+		result, err := fetcher(context.Background(), clients, "")
+		if err != nil {
+			t.Fatalf("fetcher error: %v", err)
+		}
+		if len(result.Resources) != 2 {
+			t.Fatalf("len(Resources) = %d, want 2 (no overlap)", len(result.Resources))
+		}
+		ids := map[string]bool{}
+		for _, r := range result.Resources {
+			ids[r.ID] = true
+		}
+		for _, want := range []string{"docdb-only-snap-01", "rds-only-snap-01"} {
+			if !ids[want] {
+				t.Errorf("expected resource %q in result, got %v", want, ids)
+			}
+		}
+	})
+
+	// Sub-test 3: shared snapshot id + RDS-only unique on the same tick —
+	// deduped pair plus the unique RDS row both survive.
+	t.Run("overlap_plus_rds_only_keeps_two", func(t *testing.T) {
+		const sharedID = "shared-snap-02"
+		docdbMock := &dbcSnapDocDBMock{
+			dbClusterSnapshotsPages: []docdb.DescribeDBClusterSnapshotsOutput{
+				{
+					DBClusterSnapshots: []docdbtypes.DBClusterSnapshot{
+						{
+							DBClusterSnapshotIdentifier: aws.String(sharedID),
+							DBClusterIdentifier:         aws.String("shared-cluster-02"),
+							Engine:                      aws.String("docdb"),
+							Status:                      aws.String("available"),
+							SnapshotType:                aws.String("automated"),
+							SnapshotCreateTime:          &age10d,
+						},
+					},
+				},
+			},
+		}
+		rdsMock := &dbcSnapRDSMock{
+			dbClusterSnapshotsPages: []rds.DescribeDBClusterSnapshotsOutput{
+				{
+					DBClusterSnapshots: []rdstypes.DBClusterSnapshot{
+						{
+							DBClusterSnapshotIdentifier: aws.String(sharedID),
+							DBClusterIdentifier:         aws.String("shared-cluster-02"),
+							Engine:                      aws.String("aurora-postgresql"),
+							Status:                      aws.String("available"),
+							SnapshotType:                aws.String("automated"),
+							SnapshotCreateTime:          &age10d,
+						},
+						{
+							DBClusterSnapshotIdentifier: aws.String("rds-only-snap-02"),
+							DBClusterIdentifier:         aws.String("aurora-cluster-02"),
+							Engine:                      aws.String("aurora-mysql"),
+							Status:                      aws.String("available"),
+							SnapshotType:                aws.String("automated"),
+							SnapshotCreateTime:          &age10d,
+						},
+					},
+				},
+			},
+		}
+		clients := &awsclient.ServiceClients{DocDB: docdbMock, RDS: rdsMock}
+
+		result, err := fetcher(context.Background(), clients, "")
+		if err != nil {
+			t.Fatalf("fetcher error: %v", err)
+		}
+		if len(result.Resources) != 2 {
+			t.Fatalf("len(Resources) = %d, want 2 (deduped overlap + unique rds snap)", len(result.Resources))
+		}
+		var sharedRow *resource.Resource
+		ids := map[string]bool{}
+		for i := range result.Resources {
+			r := &result.Resources[i]
+			ids[r.ID] = true
+			if r.ID == sharedID {
+				sharedRow = r
+			}
+		}
+		for _, want := range []string{sharedID, "rds-only-snap-02"} {
+			if !ids[want] {
+				t.Errorf("expected resource %q in result, got %v", want, ids)
+			}
+		}
+		if sharedRow == nil {
+			t.Fatal("shared snapshot row missing from result")
+		}
+		if _, ok := sharedRow.RawStruct.(docdbtypes.DBClusterSnapshot); !ok {
+			t.Errorf("shared row RawStruct type = %T, want docdbtypes.DBClusterSnapshot (DocDB-side appended first must win)", sharedRow.RawStruct)
+		}
+	})
 }
