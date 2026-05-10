@@ -239,8 +239,23 @@ func NoopChecker(_ context.Context, _ any, _ Resource, _ ResourceCache) RelatedC
 	return RelatedCheckResult{}
 }
 
+// relatedRegistryMu guards relatedRegistry and relatedRegistryPrevious. All
+// reads and writes to those two maps must hold this mutex.
+var relatedRegistryMu sync.RWMutex
+
 // relatedRegistry maps resource short names to their related resource definitions.
 var relatedRegistry = map[string][]RelatedDef{}
+
+// relatedRegistryPrevious is a stack (per short name) of registration snapshots
+// saved before each RegisterRelated / AppendRelated call. UnregisterRelated pops
+// the top entry to restore the previous state. Using a stack (instead of a single
+// slot) prevents nested Register calls — typical when production init() registers
+// once and a test then re-registers — from losing the original production
+// registration past the second Unregister.
+//
+// A nil entry on the stack means "no previous registration existed" and Unregister
+// should delete the active entry rather than restore.
+var relatedRegistryPrevious = map[string][][]RelatedDef{}
 
 // navigableFieldMu guards navigableFieldRegistry and navigableFieldPrevious.
 // All reads and writes to those two maps must hold this mutex.
@@ -277,7 +292,13 @@ var defaultNavFieldRegistry = map[string][]NavigableField{}
 // RegisterRelated stores related definitions for the given resource short
 // name. Panics at init-time if any RelatedDef has a nil Checker or empty
 // TargetType — a nil Checker is a structural bug, not a supported stub state.
-// Replaces any existing entry.
+//
+// The current value for shortName (which may be nil) is pushed onto a per-key
+// stack in relatedRegistryPrevious so that subsequent UnregisterRelated calls
+// restore the previous registration instead of destroying it. This is critical
+// for tests: production init() registers production defs once, and tests that
+// override-then-cleanup must not nuke the production registration for the rest
+// of the test process (AS-67).
 func RegisterRelated(shortName string, defs []RelatedDef) {
 	for _, d := range defs {
 		if d.Checker == nil {
@@ -287,6 +308,10 @@ func RegisterRelated(shortName string, defs []RelatedDef) {
 			panic(fmt.Sprintf("RegisterRelated(%q): empty TargetType — every RelatedDef must name a target", shortName))
 		}
 	}
+	relatedRegistryMu.Lock()
+	defer relatedRegistryMu.Unlock()
+	existing := relatedRegistry[shortName] // nil when not yet set
+	relatedRegistryPrevious[shortName] = append(relatedRegistryPrevious[shortName], existing)
 	relatedRegistry[shortName] = defs
 }
 
@@ -297,13 +322,37 @@ func GetRelated(shortName string) []RelatedDef {
 	if ct := catalog.Find(shortName); ct != nil && len(ct.Related) > 0 {
 		return ct.Related
 	}
+	relatedRegistryMu.RLock()
+	defer relatedRegistryMu.RUnlock()
 	return relatedRegistry[shortName]
 }
 
-// UnregisterRelated removes related definitions for the given short name.
-// Used only in tests for cleanup.
+// UnregisterRelated restores the previous registration for the given short name
+// (or deletes the entry entirely if no previous registration existed). Used only
+// in tests for cleanup.
+//
+// Pops the most recently pushed snapshot from the per-key stack in
+// relatedRegistryPrevious. If the popped snapshot is nil (the key had no entry
+// before the most recent Register/Append call), the active-registry entry is
+// deleted entirely. If the stack is empty (Unregister called without a matching
+// Register/Append), the entry is deleted as a safe fallback — preserving the
+// historical destructive semantics for test-only types like `test_append`,
+// `srcType`, and `resizeTestType` that were never registered before the test.
 func UnregisterRelated(shortName string) {
-	delete(relatedRegistry, shortName)
+	relatedRegistryMu.Lock()
+	defer relatedRegistryMu.Unlock()
+	stack := relatedRegistryPrevious[shortName]
+	if len(stack) == 0 {
+		delete(relatedRegistry, shortName)
+		return
+	}
+	prev := stack[len(stack)-1]
+	relatedRegistryPrevious[shortName] = stack[:len(stack)-1]
+	if prev == nil {
+		delete(relatedRegistry, shortName)
+	} else {
+		relatedRegistry[shortName] = prev
+	}
 }
 
 // FetchByIDsFunc fetches specific resource instances by ID, bypassing any
@@ -493,6 +542,11 @@ func BootstrapActiveNavFields() {
 // If no registration exists yet, it creates a new one. Panics at init-time if
 // def.Checker is nil or def.TargetType is empty — a nil Checker is a
 // structural bug, not a supported stub state.
+//
+// Like RegisterRelated, the pre-append value is pushed onto the per-key
+// snapshot stack so that a subsequent UnregisterRelated restores the previous
+// state (or deletes the entry, if no prior value existed). A duplicate-target
+// no-op does NOT push a snapshot — Unregister has nothing to undo.
 func AppendRelated(shortName string, def RelatedDef) {
 	if def.Checker == nil {
 		panic(fmt.Sprintf("AppendRelated(%q): nil Checker for target %q — every RelatedDef must have a real checker", shortName, def.TargetType))
@@ -500,12 +554,15 @@ func AppendRelated(shortName string, def RelatedDef) {
 	if def.TargetType == "" {
 		panic(fmt.Sprintf("AppendRelated(%q): empty TargetType — every RelatedDef must name a target", shortName))
 	}
+	relatedRegistryMu.Lock()
+	defer relatedRegistryMu.Unlock()
 	existing := relatedRegistry[shortName]
 	for _, d := range existing {
 		if d.TargetType == def.TargetType {
 			return // already registered, skip duplicate
 		}
 	}
+	relatedRegistryPrevious[shortName] = append(relatedRegistryPrevious[shortName], existing)
 	relatedRegistry[shortName] = append(existing, def)
 }
 

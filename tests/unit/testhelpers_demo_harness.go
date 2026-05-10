@@ -16,13 +16,14 @@ var noopChecker resource.RelatedChecker = func(_ context.Context, _ any, _ resou
 	return resource.RelatedCheckResult{Count: 0}
 }
 
-// unregisterEC2Related removes ec2 related defs for the duration of t and
-// restores them on cleanup so test order (shuffle) doesn't poison later tests.
+// unregisterEC2Related masks ec2 related defs with an empty slice for the
+// duration of t and restores the prior state on cleanup. Uses RegisterRelated
+// to push a new snapshot frame rather than popping the stack — UnregisterRelated
+// would restore the previous production registration rather than clearing defs.
 func unregisterEC2Related(t *testing.T) {
 	t.Helper()
-	orig := resource.GetRelated("ec2")
-	resource.UnregisterRelated("ec2")
-	t.Cleanup(func() { resource.RegisterRelated("ec2", orig) })
+	resource.RegisterRelated("ec2", []resource.RelatedDef{})
+	t.Cleanup(func() { resource.UnregisterRelated("ec2") })
 }
 
 // replaceEC2Related registers defs for "ec2" and restores the originals on
@@ -30,9 +31,8 @@ func unregisterEC2Related(t *testing.T) {
 // registry poisoned for subsequent tests running in shuffled order.
 func replaceEC2Related(t *testing.T, defs []resource.RelatedDef) {
 	t.Helper()
-	orig := resource.GetRelated("ec2")
 	resource.RegisterRelated("ec2", defs)
-	t.Cleanup(func() { resource.RegisterRelated("ec2", orig) })
+	t.Cleanup(func() { resource.UnregisterRelated("ec2") })
 }
 
 // newDemoColdCacheApp constructs a tui.Model exactly as cmd/a9s/main.go will
