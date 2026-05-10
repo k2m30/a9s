@@ -25,6 +25,26 @@ Throughout this document, every stage owner and every reviewer is a **Paperclip 
 
 Concretely: "the Coder agent invokes the `a9s-coder` subagent during Stage 4." Never "`a9s-coder` owns Stage 4."
 
+## Continuous Autonomous Execution (CAE-1)
+
+Effective immediately, the development process is **self-driving**. The board sets direction and reviews outcomes. The board does not gate execution. Agents make tradeoff calls, document them, and continue.
+
+The five rules of CAE-1:
+
+1. **No plan-approval `request_confirmation` gates.** Architect spec is published → QA writes failing tests → Coder ships. Reviewers (CodeReviewer + CodexReviewer + Architect-for-size≥M) catch issues at Stage 5. Board can override post-hoc by commenting on issue or PR.
+
+2. **CTO auto-pulls `todo, unassigned` work in active projects.** Every CTO heartbeat scans the active project (currently `refactoring`) for unassigned ready work, runs Stage 1 (size, AC, owner), and dispatches. The earlier anti-pattern "CTO does not browse the backlog" is removed for in-scope work. CEO still owns *net-new strategic direction*.
+
+3. **No "routed to CEO" parking.** When an agent faces a technical tradeoff, the agent makes the call, documents the reason in a comment, and continues. The board reviews outcomes, not pre-decisions. The CTO is the highest in-process technical authority.
+
+4. **Idle is forbidden when ready work exists.** When all of an agent's `in_progress` is parked on a real wait (PR review, blocker, monitor), the agent picks up its next assigned `todo` or any unblocked `blocked` work and starts. No heartbeat ends with idle status when ready assigned work remains.
+
+5. **Manual intervention survives only for**: net-new role hiring, destructive AWS/git actions, real-money spend, and Paperclip-platform changes outside this repo.
+
+**Board override clause.** The board (CEO / user) can override any in-process decision post-hoc by commenting on the issue or PR. Agents must respect that override the moment they observe it but **must never wait for it** before acting. Idle-pending-board is a process violation under CAE-1; the only valid waits are technical (PR review, CI, real blocker) — never governance.
+
+**Why this is safe.** The Stage 5 reviewer matrix (CodeReviewer + CodexReviewer always; Architect ≥ M; CTO final sign-off) and the Stage 6 / 6.5 / 7 gates are unchanged. CAE-1 removes *gates that wait on the board*, not gates that wait on technical correctness. The board retains full visibility (every comment, every PR) and full override (a comment instantly redirects).
+
 ## Agents — the 9 hired Paperclip roster
 
 This is the ground-truth list. If a stage names anyone else as an owner or reviewer, the doc is wrong.
@@ -81,10 +101,10 @@ Every unit of work goes through these stages. Stages 1, 2, 4, 6, 6.5 may be **sk
 ### Stage 1 — Intake
 
 - **Owner**: **CTO**.
-- **Trigger**: CEO/board files an issue, or a regression is observed.
-- **Action**: Triage type (bug · feature · refactor · ops · docs), set priority, set size, name the owning Paperclip agent, draft acceptance criteria.
-- **Exit**: Issue meets DoR.
-- **Anti-pattern**: Self-assigning unassigned work. CTO does not browse the backlog; only acts on what the CEO assigns. Other agents do not pick up backlog without explicit delegation.
+- **Trigger**: CEO/board files an issue, *or* a `todo, unassigned` issue exists in the active project (under CAE-1, the CTO auto-pulls these every heartbeat).
+- **Action**: Triage type (bug · feature · refactor · ops · docs), set priority, set size, name the owning Paperclip agent, draft acceptance criteria. Dispatch immediately; no waiting for explicit per-issue CEO approval on in-scope work.
+- **Exit**: Issue meets DoR and is dispatched to the owning agent (or to Architect when size ≥ M).
+- **Anti-pattern (post-CAE-1)**: CTO auto-pulls `todo, unassigned` issues in active projects every heartbeat, runs Stage 1 (size, AC, owner), and dispatches. CEO retains net-new strategic direction; CTO owns in-scope execution. Self-assigning *outside* the active project remains an anti-pattern. Other agents (Architect, QA, Coder, etc.) still act only on explicit dispatch from CTO or Architect — they do not browse the backlog.
 
 ### Stage 2 — Spec & Design
 
@@ -93,26 +113,29 @@ Every unit of work goes through these stages. Stages 1, 2, 4, 6, 6.5 may be **sk
 - **Optional consult**: **DevOps** for AWS-practitioner priority sanity ("which 10 resources next?", "is CWL more important than Lambda?").
 - **Trigger**: DoR met and size ≥ `M`. Skipped for `XS`/`S` bug fixes.
 - **Action**: Produce a spec doc. Resources use `a9s-resource-spec`. Refactor PRs reference the per-PR spec in `docs/refactor/`. Features write to `specs/<n>-<feature>.md`.
-- **Exit**: Spec doc + CTO sign-off comment on the issue. The spec is the contract; existing implementation is disposable.
+- **Exit (CAE-1)**: Spec doc committed to the feature branch with a `[spec-published]` comment on the issue and a scoped dispatch to **QA** for Stage 3 in the same heartbeat. **No `request_confirmation` plan-approval gate.** The spec is the contract; existing implementation is disposable. Stage 5 reviewers (CodeReviewer + CodexReviewer + Architect-for-size≥M + CTO final) catch spec-vs-diff mismatches; the board can override post-hoc by commenting on the issue or PR.
 - **Anti-pattern**: Skipping the spec for "obvious" features. If it is so obvious, the spec is one paragraph — write it anyway.
+- **Anti-pattern (post-CAE-1)**: Posting the spec and then waiting for CEO/CTO/board approval before dispatching QA. Spec is published → QA picks up. Approval is *not* an entry condition for Stage 3.
 
 ### Stage 3 — Tests
 
 - **Owner**: **QA**.
 - **Tools the QA agent invokes**: `a9s-qa-stories` (given/when/then with zero source-code knowledge), `a9s-qa` (failing Go tests), `a9s-related-qa` (related-view scope).
-- **Trigger**: Stage 2 sign-off (or Stage 1 sign-off for `XS`/`S`).
+- **Trigger**: Spec-published comment from Architect (size ≥ M) or scoped dispatch from CTO (`XS`/`S`). **No plan-approval `request_confirmation` gate** under CAE-1; QA proceeds on the published spec.
 - **Action**: Translate spec to stories, then to failing Go tests. Tests land on the feature branch and **fail as expected**. Architect provides exact file scope; QA rejects tasks without scope.
-- **Exit**: Failing tests committed. The Coder's job is to make them pass.
+- **Exit (CAE-1)**: Failing tests committed and a scoped dispatch to **Coder** for Stage 4 in the same heartbeat. The Coder's job is to make them pass.
 - **Anti-pattern**: "Test along with implementation." That is not TDD. Tests precede implementation in time and in commit history.
+- **Anti-pattern (post-CAE-1)**: Pre-circulating a test plan for board/CTO sign-off before writing the failing tests. The test code itself is the test plan; missing coverage is caught at Stage 5 by CodeReviewer/`test-coverage-analyzer`.
 
 ### Stage 4 — Implementation
 
 - **Owner**: **Coder**.
 - **Tools the Coder invokes**: `a9s-coder` (Go production code), `a9s-integrator` (cross-package wiring, `internal/tui/app.go`, message flow), `a9s-fixtures` (demo/test fixtures via `a9s-create-demo-fixture` skill).
-- **Trigger**: Stage 3 tests landed and red.
+- **Trigger**: Stage 3 tests landed and red. **No implementation-approach `request_confirmation` gate** under CAE-1; Coder proceeds on the scoped dispatch.
 - **Action**: Make the failing tests pass. Touch only files in the Architect's scope. Rebuild the binary (`make build`) after every change.
 - **Exit**: Tests pass; `make build && make test && make lint && make gofix && make security` green locally.
 - **Anti-pattern**: Coder writes new tests instead of routing back to QA. Coder edits files outside the Architect's scope. Coder skips `make gofix`.
+- **Anti-pattern (post-CAE-1)**: Posting an implementation plan and waiting for approval before writing code. The diff itself is the plan; design issues are caught at Stage 5 by Architect-for-size≥M.
 
 ### Stage 5 — Review
 
@@ -316,7 +339,10 @@ These are not for vanity. They are the input to the weekly retro: any value that
 
 - **Naming a subagent as a stage owner or reviewer.** Subagents are tools. Owners and reviewers are Paperclip agents from the roster above.
 - **Routing implementation work to DevOps.** DevOps is consultative only. PRs, branches, fixtures, tests, doc edits → Coder (or QA / Architect / CTO per stage).
-- **Reflexive backlog browsing.** Agents act only on explicit assignments.
+- **Reflexive backlog browsing *outside the active project*.** Under CAE-1, the **CTO auto-pulls** in-scope `todo, unassigned` issues every heartbeat (Stage 1) and dispatches. Other agents (Architect, QA, Coder, etc.) still act only on explicit dispatch from CTO or Architect — they do not browse the backlog.
+- **Plan-approval gates.** No `request_confirmation` for spec / test plan / implementation plan. Reviewers catch issues at Stage 5; the board overrides post-hoc by commenting. Manual intervention survives only for: net-new role hiring, destructive AWS/git actions, real-money spend, and Paperclip-platform changes outside this repo.
+- **"Routed to CEO" parking.** When an agent faces a technical tradeoff, the agent makes the call, documents the reason in a comment, and continues. The CTO is the highest in-process technical authority.
+- **Idle on ready work.** No heartbeat ends with `idle` status when ready assigned `todo` (or unblocked `blocked`) work remains.
 - **"Test along with the code."** Tests precede implementation in commit order.
 - **Push-fix-push cycles.** `make ready-to-push` runs locally before any push.
 - **Skipped gates.** A gate skipped is a gate deleted; either run it or remove it from the gate list.
