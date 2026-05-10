@@ -90,8 +90,8 @@ func TestRedis_Fetch_HealthyAvailable(t *testing.T) {
 	if r.Fields["status"] != "" {
 		t.Errorf("Fields[\"status\"] = %q, want %q (Healthy silence)", r.Fields["status"], "")
 	}
-	if len(r.Issues) != 0 {
-		t.Errorf("Issues = %v, want empty (Healthy)", r.Issues)
+	if len(r.Findings) != 0 {
+		t.Errorf("Findings = %v, want empty (Healthy)", r.Findings)
 	}
 }
 
@@ -118,8 +118,8 @@ func TestRedis_Fetch_StatusCreating(t *testing.T) {
 	if r.Fields["status"] != wantPhrase {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
 	}
-	if len(r.Issues) != 1 || r.Issues[0] != wantPhrase {
-		t.Errorf("Issues = %v, want [%q]", r.Issues, wantPhrase)
+	if len(r.Findings) != 1 || r.Findings[0].Phrase != wantPhrase {
+		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, wantPhrase)
 	}
 }
 
@@ -146,8 +146,8 @@ func TestRedis_Fetch_StatusModifying(t *testing.T) {
 	if r.Fields["status"] != wantPhrase {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
 	}
-	if len(r.Issues) != 1 || r.Issues[0] != wantPhrase {
-		t.Errorf("Issues = %v, want [%q]", r.Issues, wantPhrase)
+	if len(r.Findings) != 1 || r.Findings[0].Phrase != wantPhrase {
+		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, wantPhrase)
 	}
 }
 
@@ -174,8 +174,8 @@ func TestRedis_Fetch_StatusSnapshotting(t *testing.T) {
 	if r.Fields["status"] != wantPhrase {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
 	}
-	if len(r.Issues) != 1 || r.Issues[0] != wantPhrase {
-		t.Errorf("Issues = %v, want [%q]", r.Issues, wantPhrase)
+	if len(r.Findings) != 1 || r.Findings[0].Phrase != wantPhrase {
+		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, wantPhrase)
 	}
 }
 
@@ -202,8 +202,8 @@ func TestRedis_Fetch_StatusDeleting(t *testing.T) {
 	if r.Fields["status"] != wantPhrase {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
 	}
-	if len(r.Issues) != 1 || r.Issues[0] != wantPhrase {
-		t.Errorf("Issues = %v, want [%q]", r.Issues, wantPhrase)
+	if len(r.Findings) != 1 || r.Findings[0].Phrase != wantPhrase {
+		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, wantPhrase)
 	}
 }
 
@@ -230,8 +230,8 @@ func TestRedis_Fetch_StatusCreateFailed(t *testing.T) {
 	if r.Fields["status"] != wantPhrase {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
 	}
-	if len(r.Issues) != 1 || r.Issues[0] != wantPhrase {
-		t.Errorf("Issues = %v, want [%q]", r.Issues, wantPhrase)
+	if len(r.Findings) != 1 || r.Findings[0].Phrase != wantPhrase {
+		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, wantPhrase)
 	}
 }
 
@@ -258,8 +258,8 @@ func TestRedis_Fetch_MultiAZWithoutFailover(t *testing.T) {
 	if r.Fields["status"] != wantPhrase {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
 	}
-	if len(r.Issues) != 1 || r.Issues[0] != wantPhrase {
-		t.Errorf("Issues = %v, want [%q]", r.Issues, wantPhrase)
+	if len(r.Findings) != 1 || r.Findings[0].Phrase != wantPhrase {
+		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, wantPhrase)
 	}
 }
 
@@ -285,8 +285,8 @@ func TestRedis_Fetch_MultiAZDisabled_NoFinding(t *testing.T) {
 	if r.Fields["status"] != "" {
 		t.Errorf("Fields[\"status\"] = %q, want %q (single-AZ groups do not trigger the signal)", r.Fields["status"], "")
 	}
-	if len(r.Issues) != 0 {
-		t.Errorf("Issues = %v, want empty (no signal for single-AZ)", r.Issues)
+	if len(r.Findings) != 0 {
+		t.Errorf("Findings = %v, want empty (no signal for single-AZ)", r.Findings)
 	}
 }
 
@@ -313,16 +313,16 @@ func TestRedis_Fetch_MultiW1_ModifyingPlusNoFailover(t *testing.T) {
 	if r.Fields["status"] != wantStatus {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantStatus)
 	}
-	if len(r.Issues) != 2 {
-		t.Fatalf("Issues len = %d, want 2; Issues = %v", len(r.Issues), r.Issues)
+	if len(r.Findings) != 2 {
+		t.Fatalf("Findings len = %d, want 2; Findings = %v", len(r.Findings), r.Findings)
 	}
-	// Issues must be in §4 precedence order: alphabetical among warnings.
+	// Findings must be in §4 precedence order: alphabetical among warnings.
 	// "modifying — config change" < "multi-AZ without auto-failover" alphabetically.
-	if r.Issues[0] != "modifying \u2014 config change" {
-		t.Errorf("Issues[0] = %q, want %q", r.Issues[0], "modifying \u2014 config change")
+	if r.Findings[0].Phrase != "modifying \u2014 config change" {
+		t.Errorf("Findings[0].Phrase = %q, want %q", r.Findings[0].Phrase, "modifying \u2014 config change")
 	}
-	if r.Issues[1] != "multi-AZ without auto-failover" {
-		t.Errorf("Issues[1] = %q, want %q", r.Issues[1], "multi-AZ without auto-failover")
+	if r.Findings[1].Phrase != "multi-AZ without auto-failover" {
+		t.Errorf("Findings[1].Phrase = %q, want %q", r.Findings[1].Phrase, "multi-AZ without auto-failover")
 	}
 }
 
@@ -550,8 +550,8 @@ func TestRedis_Fetch_SingleShardModifying_UsesRGPhrase(t *testing.T) {
 	if r.Fields["status"] != wantPhrase {
 		t.Errorf("Fields[\"status\"] = %q, want %q (single-shard preserves RG phrase)", r.Fields["status"], wantPhrase)
 	}
-	if len(r.Issues) != 1 || r.Issues[0] != wantPhrase {
-		t.Errorf("Issues = %v, want [%q]", r.Issues, wantPhrase)
+	if len(r.Findings) != 1 || r.Findings[0].Phrase != wantPhrase {
+		t.Errorf("Findings = %v, want [%q]", r.Findings, wantPhrase)
 	}
 }
 
@@ -582,8 +582,8 @@ func TestRedis_Fetch_MultiShard_OneShardModifying(t *testing.T) {
 	if r.Fields["status"] != wantPhrase {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
 	}
-	if len(r.Issues) != 1 || r.Issues[0] != wantPhrase {
-		t.Errorf("Issues = %v, want [%q]", r.Issues, wantPhrase)
+	if len(r.Findings) != 1 || r.Findings[0].Phrase != wantPhrase {
+		t.Errorf("Findings = %v, want [%q]", r.Findings, wantPhrase)
 	}
 }
 
@@ -616,15 +616,15 @@ func TestRedis_Fetch_MultiShard_TwoShardsTransitioning(t *testing.T) {
 	if r.Fields["status"] != wantStatus {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantStatus)
 	}
-	if len(r.Issues) != 2 {
-		t.Fatalf("Issues len = %d, want 2; Issues = %v", len(r.Issues), r.Issues)
+	if len(r.Findings) != 2 {
+		t.Fatalf("Findings len = %d, want 2; Findings = %v", len(r.Findings), r.Findings)
 	}
 	// Alphabetical by phrase: "shard 0001: modifying" < "shard 0002: snapshotting".
-	if r.Issues[0] != "shard 0001: modifying" {
-		t.Errorf("Issues[0] = %q, want %q", r.Issues[0], "shard 0001: modifying")
+	if r.Findings[0].Phrase != "shard 0001: modifying" {
+		t.Errorf("Findings[0].Phrase = %q, want %q", r.Findings[0].Phrase, "shard 0001: modifying")
 	}
-	if r.Issues[1] != "shard 0002: snapshotting" {
-		t.Errorf("Issues[1] = %q, want %q", r.Issues[1], "shard 0002: snapshotting")
+	if r.Findings[1].Phrase != "shard 0002: snapshotting" {
+		t.Errorf("Findings[1].Phrase = %q, want %q", r.Findings[1].Phrase, "shard 0002: snapshotting")
 	}
 }
 
@@ -657,8 +657,8 @@ func TestRedis_Fetch_MultiShard_AllShardAvailableButRGModifying(t *testing.T) {
 	if r.Fields["status"] != wantPhrase {
 		t.Errorf("Fields[\"status\"] = %q, want %q (fallback to RG phrase when no shard is transitioning)", r.Fields["status"], wantPhrase)
 	}
-	if len(r.Issues) != 1 || r.Issues[0] != wantPhrase {
-		t.Errorf("Issues = %v, want [%q]", r.Issues, wantPhrase)
+	if len(r.Findings) != 1 || r.Findings[0].Phrase != wantPhrase {
+		t.Errorf("Findings = %v, want [%q]", r.Findings, wantPhrase)
 	}
 }
 
@@ -693,13 +693,13 @@ func TestRedis_Fetch_MultiShard_ShardPlusMultiAZNoFailover(t *testing.T) {
 	if r.Fields["status"] != wantStatus {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantStatus)
 	}
-	if len(r.Issues) != 2 {
-		t.Fatalf("Issues len = %d, want 2; Issues = %v", len(r.Issues), r.Issues)
+	if len(r.Findings) != 2 {
+		t.Fatalf("Findings len = %d, want 2; Findings = %v", len(r.Findings), r.Findings)
 	}
-	if r.Issues[0] != "multi-AZ without auto-failover" {
-		t.Errorf("Issues[0] = %q, want %q", r.Issues[0], "multi-AZ without auto-failover")
+	if r.Findings[0].Phrase != "multi-AZ without auto-failover" {
+		t.Errorf("Findings[0].Phrase = %q, want %q", r.Findings[0].Phrase, "multi-AZ without auto-failover")
 	}
-	if r.Issues[1] != "shard 0001: modifying" {
-		t.Errorf("Issues[1] = %q, want %q", r.Issues[1], "shard 0001: modifying")
+	if r.Findings[1].Phrase != "shard 0001: modifying" {
+		t.Errorf("Findings[1].Phrase = %q, want %q", r.Findings[1].Phrase, "shard 0001: modifying")
 	}
 }
