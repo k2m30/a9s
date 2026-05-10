@@ -188,7 +188,7 @@ This target is the canonical gate. It MUST pass locally with zero edits before a
 
 Parallelization and shared-fixture techniques are tracked under AS-26 and AS-27; the profile baseline lives in AS-24.
 
-Enforcement is manual until measurement infrastructure exists — there is no CI gate failing the build at the 5-minute mark yet. Until that gate lands, the author is responsible for catching budget regressions during Stage 6.
+Enforced by the `test-budget` CI job (`scripts/test-budget-gate.sh`, `.github/workflows/ci.yml`). The job fails the build when `make test` (non-race) exceeds 5 minutes wall on `ubuntu-latest`; macOS and Windows are observed via the `test` matrix but not gated. The race-detector wall is not gated here — race timing is non-deterministic across runners and is exercised in the nightly matrix per [AS-25](/AS/issues/AS-25).
 
 For changes that touch `internal/aws/` real-account behavior, additionally run the live integration test against a real AWS profile (this is also the entry to Stage 6.5):
 
