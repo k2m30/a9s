@@ -130,8 +130,22 @@ Notes:
 
 - A subagent id appearing in the "Tools" column is a tool the human-side Paperclip reviewer invokes. It does **not** sign off on its own. Sign-off is the Paperclip agent's act.
 - Docs-only PRs still run CodeReviewer (with `a9s-docs-reviewer` and `a9s-consistency-checker`) and CodexReviewer; Architect is skipped if size < `M`; CTO final sign-off still required.
-- **Exit**: All applicable Paperclip reviewers thumbs-up; CodeRabbit either resolved or `@coderabbitai ignore`d with reason.
+- **Verdict cross-post (CodeReviewer + CodexReviewer, mandatory).** Both reviewers MUST cross-post their final verdict (APPROVED / NEEDS CHANGES / REJECTED) as a `gh pr comment` on the GitHub PR thread, in addition to whatever they post on the Paperclip review-issue thread. The Stage 5 audit rule presumes a human-side reviewer can read verdicts on the PR itself; a verdict that lives only inside Paperclip violates that contract. The PR-thread comment must repeat the verdict label, the gate findings (with `file:line` citations), and the next owner — i.e. it is the same content as the Paperclip-thread post, not a "see Paperclip" pointer. CodeRabbit comments still do not count as Stage 5. Example invocation:
+
+  ```bash
+  gh pr comment <n> --repo k2m30/a9s --body "$(cat <<'EOF'
+  CodexReviewer Stage 5 verdict: NEEDS CHANGES
+  - [GATE] path/to/file.go:42 — finding + required fix
+  - Ruling: rule cited
+  Next owner: Coder
+  EOF
+  )"
+  ```
+
+  The cross-post is part of the Stage 5 deliverable; the PR-Gate audit treats the absence of a cross-post the same as the absence of a verdict — a missing cross-post means the PR stays `stage5-pending` for that reviewer regardless of what the Paperclip thread says.
+- **Exit**: All applicable Paperclip reviewers thumbs-up (Paperclip-thread verdict **and** GitHub PR cross-post present for CodeReviewer + CodexReviewer); CodeRabbit either resolved or `@coderabbitai ignore`d with reason.
 - **Anti-pattern**: Multiple push-fix-push cycles to chase reviewers. Get it right locally; push once.
+- **Anti-pattern**: Posting a Stage 5 verdict only on the Paperclip thread. The PR is the human-readable record of who signed off on what; an audit reading only the GitHub PR cannot reconstruct Stage 5 unless the cross-post is present.
 
 #### Recovery agents — no parent status transitions
 
@@ -270,6 +284,12 @@ Skill triggers (invoked in-session by the owning Paperclip agent above):
 - **P3 (low)**: nice-to-have. Backlog only; never auto-promoted.
 
 A bug fix follows the same lifecycle. The cheap path for `XS` bug fixes is Stages 1 → 3 → 4 → 5 → 6 → 7 (skip 2 and 6.5 if the change does not touch real-AWS surface). Even cheaper paths are not allowed; "I just changed one line" is how regressions hide.
+
+## Operations runbook (platform-layer incidents)
+
+Software incidents go through Stage 6.5 / "Incident & Rollback" below. **Platform-layer incidents** — agents stuck in `error`, recovery primitives, bearer-scoped operations — live in `docs/runbook.md`. Read that file first when something is wrong with an agent's lifecycle (not its code).
+
+The runbook is the single home for the CEO-bearer `error → idle` recovery primitive (`PATCH /api/agents/{id}` with `{"status":"idle"}`) and the constraints around it. Future on-call decisions should consult `docs/runbook.md`, not the originating incident issue body.
 
 ## Incident & Rollback
 
