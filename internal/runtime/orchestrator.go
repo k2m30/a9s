@@ -1,0 +1,50 @@
+package runtime
+
+import (
+	"github.com/k2m30/a9s/v3/internal/catalog"
+	"github.com/k2m30/a9s/v3/internal/session"
+)
+
+// Event is the marker interface for inputs the runtime accepts from an
+// adapter. Phase 05 PR-05a-scaffold defines it as an empty interface so
+// the Core skeleton compiles without depending on yet-to-be-created
+// concrete event types; PR-05b introduces the typed cmd/event split and
+// will replace this declaration with the typed event interface.
+type Event any
+
+// Core is the platform-agnostic app-core orchestrator. It owns session
+// state and the catalog of resource types, dispatches inbound events to
+// the appropriate handler, and returns a list of UI intents plus task
+// requests that adapters apply to their renderer-specific state.
+//
+// The handlers are not yet wired in PR-05a-scaffold — that work lands in
+// per-handler PRs AS-72-h1..h8. This struct exists so dependent PRs can
+// reference the entry-point type while the handler moves are sequenced.
+type Core struct {
+	session *session.Session
+	types   []catalog.ResourceTypeDef
+}
+
+// New constructs a Core bound to the given session and catalog snapshot.
+// The catalog slice is borrowed, not copied — callers must treat
+// catalog.ResourceTypes as immutable for the lifetime of the Core, which
+// matches the existing static-catalog contract.
+func New(s *session.Session, types []catalog.ResourceTypeDef) *Core {
+	return &Core{session: s, types: types}
+}
+
+// Session returns the runtime-owned session handle. Adapters need this
+// during the migration to read state the per-handler PRs have not yet
+// migrated; the field becomes private-only once handler moves complete.
+func (c *Core) Session() *session.Session { return c.session }
+
+// Types returns the catalog snapshot the Core was constructed with.
+func (c *Core) Types() []catalog.ResourceTypeDef { return c.types }
+
+// HandleEvent is the single entry point adapters call to deliver an
+// inbound event. It returns the UI intents to apply and the background
+// tasks to start. The skeleton returns nil, nil — handler wiring lands
+// in AS-72-h1..h8.
+func (c *Core) HandleEvent(_ Event) ([]UIIntent, []TaskRequest) {
+	return nil, nil
+}
