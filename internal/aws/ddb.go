@@ -12,29 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// ddbTableStatusPhrase maps a DynamoDB TableStatus enum to the §4 list phrase.
-// Returns "" for ACTIVE (Healthy silence) and a lowercase phrase for all other states.
-func ddbTableStatusPhrase(ts ddbtypes.TableStatus) string {
-	switch ts {
-	case ddbtypes.TableStatusActive:
-		return ""
-	case ddbtypes.TableStatusCreating:
-		return "creating"
-	case ddbtypes.TableStatusUpdating:
-		return "updating"
-	case ddbtypes.TableStatusDeleting:
-		return "deleting"
-	case ddbtypes.TableStatusArchiving:
-		return "archiving"
-	case ddbtypes.TableStatusInaccessibleEncryptionCredentials:
-		return "kms key inaccessible"
-	case ddbtypes.TableStatusArchived:
-		return "archived: kms key lost"
-	default:
-		return ""
-	}
-}
-
 // computeDDBFindings returns a []domain.Finding for the given DynamoDB table status.
 func computeDDBFindings(status ddbtypes.TableStatus) []domain.Finding {
 	switch status {
