@@ -15,6 +15,7 @@ const (
 	CodeDBIIncompatibleRestore      domain.FindingCode = "dbi.broken.incompatible_restore"
 	CodeDBIRestoreError             domain.FindingCode = "dbi.broken.restore_error"
 	CodeDBIEncryptionKeyUnavailable domain.FindingCode = "dbi.broken.encryption_key_unavailable"
+	CodeDBIStopped                  domain.FindingCode = "dbi.broken.stopped"
 
 	CodeDBITransitional          domain.FindingCode = "dbi.warn.transitional"
 	CodeDBINoAutomatedBackups    domain.FindingCode = "dbi.warn.no_automated_backups"

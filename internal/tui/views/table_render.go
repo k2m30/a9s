@@ -333,20 +333,31 @@ func (m ResourceListModel) extractCellValue(c listCol, r resource.Resource) stri
 	if c.key == "@id" {
 		return r.ID
 	}
-	// PR-03a-views: status/lifecycle column reads Findings first, then
-	// Fields[LifecycleKey] as fallback — never r.Status or the raw key value.
+	// Status/lifecycle column priority (PR-03a-views, refined for PR-03e):
+	//   1. Fields["status"] / Fields[lifecycleKey] when present — these carry
+	//      the merged §4 phrase including the (+N) suffix and any Wave-2
+	//      enricher overlay (e.g. snapshot_cross_ref FieldUpdates["status"],
+	//      dbi_issue_enrichment "maintenance scheduled" overlay).
+	//   2. Findings[0].Phrase as the fallback for unmigrated fetchers that
+	//      stamp Findings without populating Fields["status"].
+	// Reading Fields first preserves the AS-71 boundary that Wave-2 enricher
+	// migrations are out of scope; defer the Findings-only architecture to a
+	// follow-up PR.
 	// The status column is identified by c.key == "status" (conventional) or
 	// c.key == td.LifecycleKey when an explicit lifecycle key is set.
 	lifecycleKey := lifecycleColumnKey(m.typeDef)
 	isStatusCol := c.key == "status" || c.key == lifecycleKey
 	if isStatusCol {
+		if v := r.Fields["status"]; v != "" {
+			return v
+		}
 		if len(r.Findings) > 0 {
 			return r.Findings[0].Phrase
 		}
 		if v := r.Fields[lifecycleKey]; v != "" {
 			return v
 		}
-		// Fall through to normal extraction if neither Findings nor LifecycleKey value is set.
+		// Fall through to normal extraction if none of the above is set.
 	}
 	// Fields map (key-based columns) takes priority over raw struct fields.
 	// This ensures Wave-2 enriched values always win over struct literals,
@@ -427,10 +438,20 @@ func (m ResourceListModel) widenLifecycleColumn(cols []listCol, rows []resource.
 	}
 	maxW := cols[idx].width
 	for _, r := range rows {
-		if len(r.Findings) == 0 {
+		// Mirror extractCellValue's priority: Fields["status"] (the merged §4
+		// phrase including (+N) suffix and Wave-2 overlays) first, then
+		// Findings[0].Phrase, then Fields[lifecycleKey], so column widening
+		// matches the actual displayed content.
+		phrase := r.Fields["status"]
+		if phrase == "" && len(r.Findings) > 0 {
+			phrase = r.Findings[0].Phrase
+		}
+		if phrase == "" {
+			phrase = r.Fields[lifecycleKey]
+		}
+		if phrase == "" {
 			continue
 		}
-		phrase := r.Findings[0].Phrase
 		if nat := lipgloss.Width(phrase); nat > maxW {
 			maxW = nat
 		}

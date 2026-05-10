@@ -132,6 +132,62 @@ func TestPR03e_DBIFetcher_BrokenEmitsBrokenFinding(t *testing.T) {
 	}
 }
 
+// TestPR03e_DBIFetcher_StoppedEmitsBrokenFinding pins the AS-126 regression
+// fix: a "stopped" RDS instance must emit a SevBroken Finding (CodeDBIStopped)
+// so colorDBI's wave1-first prelude returns ColorBroken — matching the legacy
+// catalog colorDBI classification ("stopped" listed alongside "failed",
+// "storage-full", etc.). Pre-fix the fetcher's default branch downgraded
+// "stopped" to a SevWarn CodeDBITransitional finding, regressing the row from
+// Broken to Warning under the wave1-first color path.
+func TestPR03e_DBIFetcher_StoppedEmitsBrokenFinding(t *testing.T) {
+	mock := &pr03eRDSMock{
+		instances: []rdstypes.DBInstance{
+			{
+				DBInstanceIdentifier:  aws.String("staging-dbi-stopped"),
+				DBInstanceArn:         aws.String("arn:aws:rds:us-east-1:000000000000:db:staging-dbi-stopped"),
+				DBInstanceStatus:      aws.String("stopped"),
+				BackupRetentionPeriod: aws.Int32(7),
+				PubliclyAccessible:    aws.Bool(false),
+				StorageEncrypted:      aws.Bool(true),
+				DeletionProtection:    aws.Bool(true),
+			},
+		},
+	}
+
+	result, err := awsclient.FetchRDSInstancesPage(context.Background(), mock, "")
+	if err != nil {
+		t.Fatalf("FetchRDSInstancesPage: unexpected error: %v", err)
+	}
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+	r := result.Resources[0]
+
+	if len(r.Findings) != 1 {
+		t.Fatalf("Findings: got %d, want 1 for stopped DBI", len(r.Findings))
+	}
+	f := r.Findings[0]
+	if f.Code != awsclient.CodeDBIStopped {
+		t.Errorf("Findings[0].Code: got %q, want %q (AS-126 regression: stopped must be Broken-class, not Transitional)", f.Code, awsclient.CodeDBIStopped)
+	}
+	if f.Severity != domain.SevBroken {
+		t.Errorf("Findings[0].Severity: got %v, want domain.SevBroken (AS-126 regression: stopped must keep Broken severity)", f.Severity)
+	}
+	if f.Phrase != "stopped" {
+		t.Errorf("Findings[0].Phrase: got %q, want %q", f.Phrase, "stopped")
+	}
+
+	// And the catalog colorDBI must classify the row as ColorBroken via the
+	// wave1-first prelude — closing the regression loop end-to-end.
+	td := resource.FindResourceType("dbi")
+	if td == nil {
+		t.Fatal("dbi type def not found in registry")
+	}
+	if got := td.Color(r); got != resource.ColorBroken {
+		t.Errorf("colorDBI for stopped DBI: got %v, want ColorBroken (AS-126 regression)", got)
+	}
+}
+
 // TestPR03e_DBIColor_ReadsWave1First pins that the dbi Color func evaluates
 // Findings before the legacy Fields["status"] switch.
 //

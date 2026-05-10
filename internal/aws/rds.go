@@ -144,6 +144,16 @@ func FetchRDSInstancesPage(ctx context.Context, api RDSDescribeDBInstancesAPI, c
 
 		findings := computeDBIFindings(db)
 		statusPhrase := phraseFromFindings(findings)
+		if statusPhrase == "" {
+			// Unknown / undocumented RDS status: keep the raw value visible in
+			// the table so colorDBI's legacy classifier (which inspects
+			// Fields["status"] and the public/encrypted/deletion-protection
+			// overlays) keeps working. "available" with zero warnings legitimately
+			// returns "" and is intentionally skipped.
+			if raw := aws.ToString(db.DBInstanceStatus); raw != "" && raw != "available" {
+				statusPhrase = raw
+			}
+		}
 
 		r := resource.Resource{
 			ID:       dbIdentifier,
@@ -221,7 +231,9 @@ var transitionalStatusSet = map[string]struct{}{
 func computeDBIFindings(db rdstypes.DBInstance) []domain.Finding {
 	status := aws.ToString(db.DBInstanceStatus)
 
-	// Broken statuses
+	// Broken statuses. `stopped` belongs here per the catalog colorDBI legacy
+	// classification (an instance you must restart before it can serve traffic
+	// is operationally broken, not transitional).
 	brokenMap := map[string]domain.FindingCode{
 		"failed":                              CodeDBIFailed,
 		"storage-full":                        CodeDBIStorageFull,
@@ -231,6 +243,7 @@ func computeDBIFindings(db rdstypes.DBInstance) []domain.Finding {
 		"incompatible-restore":                CodeDBIIncompatibleRestore,
 		"restore-error":                       CodeDBIRestoreError,
 		"inaccessible-encryption-credentials": CodeDBIEncryptionKeyUnavailable,
+		"stopped":                             CodeDBIStopped,
 	}
 	brokenPhraseMap := map[string]string{
 		"failed":                              "failed",
@@ -241,6 +254,7 @@ func computeDBIFindings(db rdstypes.DBInstance) []domain.Finding {
 		"incompatible-restore":                "incompatible-restore",
 		"restore-error":                       "restore-error",
 		"inaccessible-encryption-credentials": "encryption key unavailable",
+		"stopped":                             "stopped",
 	}
 	if code, ok := brokenMap[status]; ok {
 		return []domain.Finding{{Code: code, Phrase: brokenPhraseMap[status], Severity: domain.SevBroken, Source: "wave1"}}
@@ -269,8 +283,12 @@ func computeDBIFindings(db rdstypes.DBInstance) []domain.Finding {
 		}
 		return findings
 	}
-	// unknown status
-	return []domain.Finding{{Code: CodeDBITransitional, Phrase: status, Severity: domain.SevWarn, Source: "wave1"}}
+	// Unknown status: do NOT emit a wave1 finding. The fetcher falls back to
+	// the raw RDS status string for Fields["status"], and colorDBI's legacy
+	// classifier handles severity (preserves the pre-PR-03e overlay semantics
+	// for new/unforeseen states such as `incompatible-*` / `inaccessible-*`
+	// variants the broken map does not enumerate).
+	return nil
 }
 
 // firstNonEmptyPendingModifiedValueKey inspects PendingModifiedValues fields in spec-defined order
