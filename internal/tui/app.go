@@ -449,13 +449,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case messages.IdentityErrorMsg:
 		return m.handleIdentityError(msg)
 	case messages.AvailabilityCacheLoadedMsg:
-		return m.handleAvailabilityCacheLoaded(msg)
+		return m.coreUpdate(msg)
 	case messages.AvailabilityPrefetchedMsg:
-		return m.handleAvailabilityPrefetched(msg)
+		return m.coreUpdate(msg)
 	case messages.AvailabilityCheckedMsg:
-		return m.handleAvailabilityChecked(msg)
+		return m.coreUpdate(msg)
 	case messages.EnrichmentCheckedMsg:
-		return m.handleEnrichmentChecked(msg)
+		return m.coreUpdate(msg)
 	case messages.EnrichDetailMsg:
 		return m.handleEnrichDetail(msg)
 	case messages.EnrichDetailResultMsg:
@@ -702,6 +702,123 @@ func (m Model) View() tea.View {
 	v := tea.NewView(header + "\n" + frame)
 	v.AltScreen = true
 	return v
+}
+
+// applyIntents walks the []runtime.UIIntent slice returned by m.core.HandleEvent
+// and applies each intent to the TUI view tree.  It returns any tea.Cmds that
+// the intents themselves require (e.g. flash auto-clear timers in the future).
+func (m *Model) applyIntents(intents []runtime.UIIntent) []tea.Cmd {
+	var cmds []tea.Cmd
+	for _, intent := range intents {
+		switch v := intent.(type) {
+		case runtime.PatchMenuAvailability:
+			if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
+				menu.SetAvailability(v.ResourceType, v.Count)
+				menu.SetTruncated(v.ResourceType, v.Truncated)
+			}
+		case runtime.PatchMenuIssueBatch:
+			if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
+				if len(v.Known) > 0 {
+					menu.SetIssuesFromCache(v.Counts, v.Truncated, v.Known)
+				}
+			}
+		case runtime.PatchMenuCheckProgress:
+			if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
+				menu.SetCheckProgress(v.Checked, v.Total)
+			}
+		case runtime.PatchMenuEnrichProgress:
+			if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
+				menu.SetEnrichProgress(v.Checked, v.Total)
+			}
+		case runtime.PatchMenu:
+			if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
+				menu.SetIssues(v.ResourceType, v.Issues, v.Truncated)
+			}
+		case runtime.PatchResourceList:
+			for _, sv := range m.stack {
+				rl, ok := sv.(*views.ResourceListModel)
+				if !ok || rl.ResourceType() != v.ResourceType {
+					continue
+				}
+				if v.Issues != nil && v.Enrichment != nil {
+					rl.SetEnrichmentState(v.Issues.Count, v.Issues.Truncated, v.Enrichment.Findings)
+					rl.SetTruncatedIDs(v.Enrichment.TruncatedIDs)
+				} else if v.Issues != nil {
+					rl.SetEnrichmentState(v.Issues.Count, v.Issues.Truncated, nil)
+				}
+				if v.Enrichment != nil && len(v.Enrichment.FieldUpdates) > 0 {
+					rl.ApplyFieldUpdates(v.Enrichment.FieldUpdates)
+				}
+			}
+		case runtime.PatchDetail:
+			for _, sv := range m.stack {
+				d, ok := sv.(*views.DetailModel)
+				if !ok || d.ResourceType() != v.ResourceType {
+					continue
+				}
+				if v.ResourceID != "" && d.ResourceID() != v.ResourceID {
+					continue
+				}
+				if v.EnrichmentFindings != nil {
+					if f, exists := v.EnrichmentFindings[d.ResourceID()]; exists {
+						d.SetEnrichmentFinding(&f)
+					} else {
+						d.SetEnrichmentFinding(nil)
+					}
+				}
+			}
+		case runtime.FlashIntent:
+			// Emit as messages.FlashMsg so it goes through the existing flash
+			// handler (which also records to errorHistory for the `!` log).
+			text, isErr := v.Text, v.IsError
+			cmds = append(cmds, func() tea.Msg {
+				return messages.FlashMsg{Text: text, IsError: isErr}
+			})
+		case runtime.ClearFlash:
+			m.flash.active = false
+		}
+	}
+	return cmds
+}
+
+// tasksToCmd converts a []runtime.TaskRequest returned by m.core.HandleEvent
+// into a single tea.Cmd (or nil when the slice is empty).
+func (m *Model) tasksToCmd(tasks []runtime.TaskRequest) tea.Cmd {
+	var cmds []tea.Cmd
+	for _, req := range tasks {
+		switch req.Key.Kind {
+		case runtime.TaskKindProbeAvailability:
+			cmd := m.probeResourceAvailability(req.Key.Scope, m.core.Session().AvailabilityGen)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		case runtime.TaskKindProbeEnrich:
+			cmd := m.probeEnrichment(req.Key.Scope, m.core.Session().EnrichmentGen)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		case runtime.TaskKindSaveCache:
+			cmd := m.saveAvailabilityCache()
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		}
+	}
+	if len(cmds) == 0 {
+		return nil
+	}
+	return tea.Batch(cmds...)
+}
+
+// coreUpdate dispatches a tea.Msg through m.core.HandleEvent, applies the
+// returned UIIntents to the view tree, and converts TaskRequests to tea.Cmds.
+func (m Model) coreUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
+	intents, tasks := m.core.HandleEvent(msg)
+	cmds := m.applyIntents(intents)
+	if tc := m.tasksToCmd(tasks); tc != nil {
+		cmds = append(cmds, tc)
+	}
+	return m, tea.Batch(cmds...)
 }
 
 // activeView returns the top of the view stack.
