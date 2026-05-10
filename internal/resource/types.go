@@ -159,17 +159,10 @@ type ResourceTypeDef struct {
 var resourceTypes = buildResourceTypes()
 
 func buildResourceTypes() []ResourceTypeDef {
-	var all []ResourceTypeDef
-	all = append(all, databasesResourceTypes()...)
-	all = append(all, monitoringResourceTypes()...)
-	all = append(all, messagingResourceTypes()...)
-	all = append(all, secretsResourceTypes()...)
-	all = append(all, dnsCdnResourceTypes()...)
-	all = append(all, securityResourceTypes()...)
-	all = append(all, cicdResourceTypes()...)
-	all = append(all, dataResourceTypes()...)
-	all = append(all, backupResourceTypes()...)
-	return all
+	// All categories migrated to internal/catalog. This func returns empty
+	// during the PR-04f–04n window; AllResourceTypes() sources from catalog.
+	// Deleted in PR-04n when the legacy resourceTypes var is removed.
+	return nil
 }
 
 // AllResourceTypes returns the definitions for all supported resource types.
@@ -244,6 +237,11 @@ var colorRegistry = map[string]func(Resource) Color{} //nolint:gochecknoglobals 
 // window (PR-04b through PR-04n). Deleted in PR-04n when adaptFromCatalog is removed.
 var augmentRegistry = map[string]domain.Augmenter{} //nolint:gochecknoglobals // migration-window shim: intentional package-level var
 
+// projectRegistry holds per-type DetailProjector funcs for catalog-backed types
+// that require a non-generic projector (e.g. ct-events). Populated by
+// per-category color_*.go init() calls. Deleted in PR-04n.
+var projectRegistry = map[string]domain.DetailProjector{} //nolint:gochecknoglobals // migration-window shim: intentional package-level var
+
 // adaptFromCatalog converts a catalog.ResourceTypeDef into the legacy
 // ResourceTypeDef shape. This is a migration-window shim; deleted in PR-04n
 // when the legacy type is removed and consumers read catalog.ResourceTypeDef directly.
@@ -267,7 +265,7 @@ func adaptFromCatalog(ct catalog.ResourceTypeDef) ResourceTypeDef {
 		LifecycleKey:          ct.LifecycleKey,
 		ExcludeFromIssueBadge: ct.ExcludeFromIssueBadge,
 		CellDecorators:        ct.CellDecorators,
-		Project:               ct.Project,
+		Project:               projectRegistry[ct.ShortName],
 		// Color: populated from colorRegistry (per-category color_*.go init calls)
 		// during the migration window. When not registered, fallbackColor is used.
 		Color: colorRegistry[ct.ShortName],
