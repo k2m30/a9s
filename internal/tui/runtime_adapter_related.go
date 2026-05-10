@@ -187,10 +187,17 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 					fetchCmd := relatedNavigateTasksToCmd(m, msg.TargetType, result, tasks)
 					return m, fetchCmd
 				}
-				// All RelatedIDs matched — strip IsTruncated so the view doesn't show
-				// a misleading "load more" footer for a fully-resolved exact-ID filter.
+				// Coverage check: distinguish "all RelatedIDs matched" (true cache
+				// hit, drop pagination footer + return nil) from "partial coverage,
+				// not truncated" (cache exhausted but some IDs still missing —
+				// runtime emits KindFetchResources, adapter must honor it). The
+				// view is pre-populated with the cached rows in either case so
+				// they remain visible while any fetch is in flight.
+				fullyCovered := len(filtered) == len(result.RelatedIDs)
 				paginationForView := entry.Pagination
-				if paginationForView != nil && paginationForView.IsTruncated {
+				if fullyCovered && paginationForView != nil && paginationForView.IsTruncated {
+					// Fully resolved exact-ID filter — strip IsTruncated so the
+					// view doesn't show a misleading "load more" footer.
 					clone := *paginationForView
 					clone.IsTruncated = false
 					clone.NextToken = ""
@@ -212,7 +219,16 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 				rl.SetEscPops(true)
 				rl.SetSize(m.innerSize())
 				m.pushView(&rl)
-				return m, nil
+				if fullyCovered {
+					return m, nil
+				}
+				// Partial coverage + not truncated: the runtime emitted a
+				// KindFetchResources task (see relatedFetchTasks in
+				// internal/runtime/handlers_related.go and its test
+				// TestRelatedFetchTasks_PartialCoverage_NotTruncated_FetchAll).
+				// Honor it so missing IDs the existing fetcher hasn't seen yet
+				// are retrieved instead of silently surfacing an incomplete list.
+				return m, relatedNavigateTasksToCmd(m, msg.TargetType, result, tasks)
 			}
 			// ResourceCache miss: check LazyResourceCache before triggering a fetch.
 			// PR-05b: this branch builds a fully-cached view when all RelatedIDs are
