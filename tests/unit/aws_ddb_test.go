@@ -71,7 +71,10 @@ func (s *ddbDescribeStub) DescribeTable(_ context.Context, in *dynamodb.Describe
 // ---------------------------------------------------------------------------
 
 // fetchDDBSingle wires a single TableDescription through FetchDynamoDBTablesPage
-// and returns the resulting Resource (status, issues, fields).
+// and returns (status, issues, fields) derived from the new Findings-based contract:
+//   - status  is r.Fields["status"]   (fetcher writes phrase here; r.Status is always "")
+//   - issues  is a []string of r.Findings[i].Phrase (same phrases, different carrier)
+//   - fields  is r.Fields
 func fetchDDBSingle(t *testing.T, table *ddbtypes.TableDescription) (status string, issues []string, fields map[string]string) {
 	t.Helper()
 	if table.TableName == nil {
@@ -89,7 +92,12 @@ func fetchDDBSingle(t *testing.T, table *ddbtypes.TableDescription) (status stri
 		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 	r := result.Resources[0]
-	return r.Status, r.Issues, r.Fields
+	// Derive issues from Findings so existing assertions stay intact.
+	phrases := make([]string, 0, len(r.Findings))
+	for _, f := range r.Findings {
+		phrases = append(phrases, f.Phrase)
+	}
+	return r.Fields["status"], phrases, r.Fields
 }
 
 // findDDBTable returns the TableDescription with the given name from the fixture.

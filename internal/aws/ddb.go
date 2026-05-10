@@ -8,29 +8,29 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// ddbTableStatusPhrase maps a DynamoDB TableStatus enum to the §4 list phrase.
-// Returns "" for ACTIVE (Healthy silence) and a lowercase phrase for all other states.
-func ddbTableStatusPhrase(ts ddbtypes.TableStatus) string {
-	switch ts {
+// computeDDBFindings returns a []domain.Finding for the given DynamoDB table status.
+func computeDDBFindings(status ddbtypes.TableStatus) []domain.Finding {
+	switch status {
 	case ddbtypes.TableStatusActive:
-		return ""
-	case ddbtypes.TableStatusCreating:
-		return "creating"
-	case ddbtypes.TableStatusUpdating:
-		return "updating"
-	case ddbtypes.TableStatusDeleting:
-		return "deleting"
-	case ddbtypes.TableStatusArchiving:
-		return "archiving"
+		return nil
 	case ddbtypes.TableStatusInaccessibleEncryptionCredentials:
-		return "kms key inaccessible"
+		return []domain.Finding{{Code: CodeDDBKMSKeyInaccessible, Phrase: "kms key inaccessible", Severity: domain.SevBroken, Source: "wave1"}}
 	case ddbtypes.TableStatusArchived:
-		return "archived: kms key lost"
+		return []domain.Finding{{Code: CodeDDBArchivedKMSLost, Phrase: "archived: kms key lost", Severity: domain.SevBroken, Source: "wave1"}}
+	case ddbtypes.TableStatusCreating:
+		return []domain.Finding{{Code: CodeDDBCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"}}
+	case ddbtypes.TableStatusUpdating:
+		return []domain.Finding{{Code: CodeDDBUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"}}
+	case ddbtypes.TableStatusDeleting:
+		return []domain.Finding{{Code: CodeDDBDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"}}
+	case ddbtypes.TableStatusArchiving:
+		return []domain.Finding{{Code: CodeDDBArchiving, Phrase: "archiving", Severity: domain.SevWarn, Source: "wave1"}}
 	default:
-		return ""
+		return nil
 	}
 }
 
@@ -123,7 +123,8 @@ func FetchDynamoDBTablesPage(ctx context.Context, listAPI DDBListTablesAPI, desc
 			name = *table.TableName
 		}
 
-		phrase := ddbTableStatusPhrase(table.TableStatus)
+		findings := computeDDBFindings(table.TableStatus)
+		statusPhrase := phraseFromFindings(findings)
 
 		itemCount := ""
 		if table.ItemCount != nil {
@@ -145,19 +146,13 @@ func FetchDynamoDBTablesPage(ctx context.Context, listAPI DDBListTablesAPI, desc
 			arn = *table.TableArn
 		}
 
-		var issues []string
-		if phrase != "" {
-			issues = []string{phrase}
-		}
-
 		r := resource.Resource{
-			ID:     name,
-			Name:   name,
-			Status: phrase,
-			Issues: issues,
+			ID:       name,
+			Name:     name,
+			Findings: findings,
 			Fields: map[string]string{
 				"table_name":   name,
-				"status":       phrase,
+				"status":       statusPhrase,
 				"item_count":   itemCount,
 				"size_bytes":   sizeBytes,
 				"billing_mode": billingMode,

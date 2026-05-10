@@ -86,11 +86,15 @@ func renderList(m views.ResourceListModel) string {
 // ---------------------------------------------------------------------------
 
 // TestViews_ListStatusColumn_ReadsFindingsPhrase verifies that when a resource
-// carries Findings[0].Phrase = "<canonical>" and Status = "<DECOY>", the list
-// view shows the canonical phrase, not the decoy.
+// carries Findings[0].Phrase = "<canonical>" and Fields["status"] is empty,
+// the list view shows the canonical phrase from Findings.
 //
-// Pre-fix: view reads Fields["status"] = DECOY → DECOY is visible.
-// Post-fix: view reads Findings[0].Phrase = canonical → canonical is visible.
+// Post-PR-03e priority (CTO-endorsed option (b) — preserves Wave-2 enricher
+// FieldUpdates["status"] overlays): Fields["status"] wins when set, otherwise
+// fall through to Findings[0].Phrase. Fetchers always write Fields["status"]
+// via phraseFromFindings, so the legacy "DECOY in Fields["status"]" scenario
+// is impossible in the migrated world; the test now only sets Findings, and
+// the view reads them via the empty-Fields["status"] fallback.
 func TestViews_ListStatusColumn_ReadsFindingsPhrase(t *testing.T) {
 	ensureNoColor(t)
 
@@ -98,15 +102,14 @@ func TestViews_ListStatusColumn_ReadsFindingsPhrase(t *testing.T) {
 		displayName string // human-readable case name
 		shortName   string // must NOT match any registered type to keep custom columns
 		canonical   string
-		decoy       string
 		resourceID  string
 	}{
-		{"ec2", "ec2-findings-test", "pending maintenance", "DECOY-ec2", "i-001"},
-		{"s3", "s3-findings-test", "public access enabled", "DECOY-s3", "my-bucket"},
-		{"sg", "sg-findings-test", "unrestricted ingress", "DECOY-sg", "sg-001"},
-		{"role", "role-findings-test", "admin policy attached", "DECOY-role", "MyRole"},
-		{"ng", "ng-findings-test", "node group degraded", "DECOY-ng", "ng-001"},
-		{"kms", "kms-findings-test", "key rotation disabled", "DECOY-kms", "key-001"},
+		{"ec2", "ec2-findings-test", "pending maintenance", "i-001"},
+		{"s3", "s3-findings-test", "public access enabled", "my-bucket"},
+		{"sg", "sg-findings-test", "unrestricted ingress", "sg-001"},
+		{"role", "role-findings-test", "admin policy attached", "MyRole"},
+		{"ng", "ng-findings-test", "node group degraded", "ng-001"},
+		{"kms", "kms-findings-test", "key rotation disabled", "key-001"},
 	}
 
 	for _, tc := range cases {
@@ -116,12 +119,9 @@ func TestViews_ListStatusColumn_ReadsFindingsPhrase(t *testing.T) {
 			r := resource.Resource{
 				ID:   tc.resourceID,
 				Name: tc.resourceID,
-				// Decoy goes into the status field — pre-fix view reads this.
-				Status: tc.decoy,
-				Fields: map[string]string{
-					"status": tc.decoy,
-				},
-				// Canonical phrase in Findings — post-fix view reads this.
+				// Fields["status"] intentionally empty — exercise the
+				// Findings[0].Phrase fallback path.
+				Fields: map[string]string{},
 				Findings: []domain.Finding{
 					{
 						Code:     domain.FindingCode(tc.displayName + ".test"),
@@ -138,10 +138,6 @@ func TestViews_ListStatusColumn_ReadsFindingsPhrase(t *testing.T) {
 			if !strings.Contains(out, tc.canonical) {
 				t.Errorf("[%s] rendered list does not contain canonical phrase %q; got:\n%s",
 					tc.displayName, tc.canonical, out)
-			}
-			if strings.Contains(out, tc.decoy) {
-				t.Errorf("[%s] rendered list contains DECOY phrase %q, which should not appear post-fix; got:\n%s",
-					tc.displayName, tc.decoy, out)
 			}
 		})
 	}

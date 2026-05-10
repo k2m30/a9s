@@ -6,7 +6,9 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kafka"
+	kafkatypes "github.com/aws/aws-sdk-go-v2/service/kafka/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -39,6 +41,28 @@ func FetchMSKClusters(ctx context.Context, api MSKListClustersV2API) ([]resource
 		token = result.Pagination.NextToken
 	}
 	return all, nil
+}
+
+// computeMSKFindings returns a []domain.Finding for the given MSK cluster state.
+func computeMSKFindings(state kafkatypes.ClusterState) []domain.Finding {
+	switch state {
+	case kafkatypes.ClusterStateFailed:
+		return []domain.Finding{{Code: CodeMSKFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+	case kafkatypes.ClusterStateCreating:
+		return []domain.Finding{{Code: CodeMSKCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"}}
+	case kafkatypes.ClusterStateUpdating:
+		return []domain.Finding{{Code: CodeMSKUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"}}
+	case kafkatypes.ClusterStateMaintenance:
+		return []domain.Finding{{Code: CodeMSKMaintenance, Phrase: "maintenance", Severity: domain.SevWarn, Source: "wave1"}}
+	case kafkatypes.ClusterStateRebootingBroker:
+		return []domain.Finding{{Code: CodeMSKRebootingBroker, Phrase: "rebooting broker", Severity: domain.SevWarn, Source: "wave1"}}
+	case kafkatypes.ClusterStateHealing:
+		return []domain.Finding{{Code: CodeMSKHealing, Phrase: "healing", Severity: domain.SevWarn, Source: "wave1"}}
+	case kafkatypes.ClusterStateDeleting:
+		return []domain.Finding{{Code: CodeMSKDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"}}
+	default:
+		return nil
+	}
 }
 
 // FetchMSKClustersPage fetches a single page of MSK clusters.
@@ -76,15 +100,19 @@ func FetchMSKClustersPage(ctx context.Context, api MSKListClustersV2API, continu
 			clusterARN = *cluster.ClusterArn
 		}
 
+		findings := computeMSKFindings(cluster.State)
+		statusPhrase := phraseFromFindings(findings)
+
 		r := resource.Resource{
-			ID:     clusterName,
-			Name:   clusterName,
-			Status: state,
+			ID:       clusterName,
+			Name:     clusterName,
+			Findings: findings,
 			Fields: map[string]string{
 				"cluster_name": clusterName,
 				"cluster_arn":  clusterARN,
 				"cluster_type": clusterType,
 				"state":        state,
+				"status":       statusPhrase,
 				"version":      version,
 			},
 			RawStruct: cluster,

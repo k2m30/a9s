@@ -21,6 +21,7 @@ import (
 	"time"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -514,6 +515,50 @@ func TestSnapshotCrossRef_Idempotent(t *testing.T) {
 
 		assertResultsIdentical(t, "snap-1", result1, result2)
 	})
+}
+
+// TestSnapshotCrossRef_FieldUpdatesStatusMerge_Wave1Findings pins the AS-132
+// regression: post-PR-03e the snapshot fetchers emit Wave-1 phrases via
+// Resource.Findings (Source=="wave1") + Fields["status"] — they no longer
+// populate Resource.Status / Resource.Issues. Reading the legacy fields here
+// would silently drop the Wave-1 phrase and collapse "unencrypted" + "orphan"
+// to a bare "orphan" overlay, hiding the encryption signal in the table. The
+// helper must read Findings + Fields["status"] and merge to "unencrypted (+1)"
+// just as it did against the legacy form. Sibling-of-AS-126 (closed PR #337
+// CR/CXR analysis on `493f0fa`); pre-fix the existing
+// FieldUpdatesStatusMerge tests passed only because they bypassed the fetcher
+// via `snapResWithStatus`.
+func TestSnapshotCrossRef_FieldUpdatesStatusMerge_Wave1Findings(t *testing.T) {
+	cfg := makeCrossRefCfg(true)
+	fn := awsclient.EnrichSnapshotCrossRef(cfg)
+
+	otherParent := testParent{ID: "p2", BackupRetentionPeriod: 7}
+	snap := testSnap{ID: "snap-1", ParentID: "p1"} // orphan — p1 not in cache
+
+	// Post-PR-03e shape: Findings populated by the fetcher, Fields["status"]
+	// carrying the merged §4 phrase. Status / Issues are intentionally empty.
+	res := resource.Resource{
+		ID: snap.ID,
+		Findings: []domain.Finding{
+			{Code: "dbi-snap.warn.unencrypted", Phrase: "unencrypted", Severity: domain.SevWarn, Source: "wave1"},
+		},
+		Fields:    map[string]string{"status": "unencrypted"},
+		RawStruct: snap,
+	}
+	cache := parentCache(false, otherParent)
+
+	result, err := fn(context.Background(), nil, []resource.Resource{res}, cache)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	updates, hasUpdates := result.FieldUpdates["snap-1"]
+	if !hasUpdates {
+		t.Fatal("expected FieldUpdates for snap-1, got none")
+	}
+	const wantStatus = "unencrypted (+1)"
+	if updates["status"] != wantStatus {
+		t.Errorf("post-PR-03e (Findings only, no Status/Issues): expected status=%q, got %q (AS-132 regression — cross-ref must read Wave-1 from Findings, not just Resource.Status)", wantStatus, updates["status"])
+	}
 }
 
 // ---------------------------------------------------------------------------
