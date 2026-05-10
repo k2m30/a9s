@@ -10,6 +10,16 @@
 //
 // handleRelatedNavigateChild stays here as a TUI-only helper because it
 // dispatches a messages.EnterChildViewMsg — a Bubble Tea message type.
+//
+// Decision-locus follow-up (PR-05b): a few branches in this adapter still walk
+// the session cache directly to drive view construction (AMI exact-ID drill,
+// lazy-cache full-coverage shortcut, RelatedIDs partial-coverage pre-populated
+// list). The runtime emits the same task decisions in HandleRelatedNavigate /
+// relatedFetchTasks; when PR-05b lands the typed cmd/event split it will carry
+// enough payload (continuation tokens, lazy-cache slices, client selection)
+// for the adapter to be purely mechanical. Until then the adapter mirrors the
+// runtime's policy and trusts the emitted []TaskRequest rather than overriding
+// it.
 package tui
 
 import (
