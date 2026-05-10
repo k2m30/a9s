@@ -360,12 +360,19 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) ([]UII
 			unified = msg.Issues
 		}
 
-		// OR in Wave-1 probe truncation: if the availability scan saw more
-		// resources than it reported, the badge must stay truncated even when
-		// Wave-2 itself is not truncated.
-		issueTruncated := msg.Truncated || c.session.ProbeTruncated[msg.ResourceType]
+		// Truncation precedence (behavior-preserving with the deleted
+		// app_handlers_availability.go:475-478 block):
+		//   1. start from Wave-2 truncated signal,
+		//   2. clear to false when no issues at all are observed,
+		//   3. force true when Wave-1 saw a truncated availability scan —
+		//      that lower-bound signal is authoritative even when the visible
+		//      subset shows zero issues, so the badge must remain truncated.
+		issueTruncated := msg.Truncated
 		if unified == 0 && len(msg.Findings) == 0 {
 			issueTruncated = false
+		}
+		if c.session.ProbeTruncated[msg.ResourceType] {
+			issueTruncated = true
 		}
 
 		// Emit menu issue badge update.
