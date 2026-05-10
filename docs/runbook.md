@@ -39,4 +39,4 @@ Every use of this primitive is logged at the platform layer. The originating CEO
 
 ### History
 
-Captured here from AS-115 (2026-05-10) so future on-call decisions do not require reading the issue body. Filed by [AS-117](https://github.com/k2m30/a9s/issues) per CEO direction. Any future addition to this constraint set lands as a single PR that updates this section in the same change.
+Captured here from AS-115 (2026-05-10, Paperclip-internal) so future on-call decisions do not require reading the issue body. Filed by AS-117 (Paperclip-internal) per CEO direction. Any future addition to this constraint set lands as a single PR that updates this section in the same change.
