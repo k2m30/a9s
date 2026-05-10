@@ -1,6 +1,7 @@
 package fixtures
 
 import (
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -14,7 +15,7 @@ type SFNFixtures struct {
 }
 
 // NewSFNFixtures constructs SFNFixtures from the canonical demo data.
-func NewSFNFixtures() *SFNFixtures {
+var sharedSFNFixtures = sync.OnceValue(func() *SFNFixtures {
 	const smARNOrderFulfillment = "arn:aws:states:us-east-1:123456789012:stateMachine:order-fulfillment-workflow"
 
 	redriveCount := int32(1)
@@ -123,4 +124,8 @@ func NewSFNFixtures() *SFNFixtures {
 			},
 		},
 	}
+})
+
+func NewSFNFixtures() *SFNFixtures {
+	return sharedSFNFixtures()
 }

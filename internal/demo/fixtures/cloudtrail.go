@@ -2,6 +2,7 @@
 package fixtures
 
 import (
+	"sync"
 	"fmt"
 	"time"
 
@@ -18,12 +19,16 @@ type CloudTrailFixtures struct {
 }
 
 // NewCloudTrailFixtures builds and returns a fully-populated CloudTrailFixtures struct.
-func NewCloudTrailFixtures() *CloudTrailFixtures {
+var sharedCloudTrailFixtures = sync.OnceValue(func() *CloudTrailFixtures {
 	return &CloudTrailFixtures{
 		Trails:      buildCTTrails(),
 		TrailStatus: buildCTTrailStatus(),
 		Events:      buildCTEvents(),
 	}
+})
+
+func NewCloudTrailFixtures() *CloudTrailFixtures {
+	return sharedCloudTrailFixtures()
 }
 
 // buildCTTrailStatus keys GetTrailStatus responses by trail ARN. One trail is

@@ -61,7 +61,8 @@ func ec2StoryDetail(t *testing.T, width, height int, withDefs bool) (views.Detai
 			"State":        "running",
 		},
 	}
-	cleanup := func() {}
+	origEC2Defs := resource.GetRelated("ec2")
+	restoreEC2 := func() { resource.RegisterRelated("ec2", origEC2Defs) }
 	if withDefs {
 		resource.RegisterRelated("ec2", []resource.RelatedDef{
 			{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
@@ -69,14 +70,13 @@ func ec2StoryDetail(t *testing.T, width, height int, withDefs bool) (views.Detai
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: noopChecker},
 			{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: noopChecker},
 		})
-		cleanup = func() { resource.UnregisterRelated("ec2") }
 	} else {
-		resource.UnregisterRelated("ec2")
+		resource.RegisterRelated("ec2", nil)
 	}
 	k := keys.Default()
 	d := views.NewDetail(res, "ec2", nil, k)
 	d.SetSize(width, height)
-	return d, cleanup
+	return d, restoreEC2
 }
 
 // ec2StoryDetailWithConfig builds a DetailModel with a ViewsConfig and nav fields.
@@ -101,20 +101,18 @@ func ec2StoryDetailWithConfig(t *testing.T, width, height int, withDefs bool) (v
 	resource.RegisterNavigableFields("ec2", []resource.NavigableField{
 		{FieldPath: "VpcId", TargetType: "vpc"},
 	})
-	cleanup := func() {
-		resource.UnregisterNavigableFields("ec2")
-	}
+	origEC2Defs2 := resource.GetRelated("ec2")
 	if withDefs {
 		resource.RegisterRelated("ec2", []resource.RelatedDef{
 			{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 			{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
 		})
-		cleanup = func() {
-			resource.UnregisterNavigableFields("ec2")
-			resource.UnregisterRelated("ec2")
-		}
 	} else {
-		resource.UnregisterRelated("ec2")
+		resource.RegisterRelated("ec2", nil)
+	}
+	cleanup := func() {
+		resource.UnregisterNavigableFields("ec2")
+		resource.RegisterRelated("ec2", origEC2Defs2)
 	}
 	k := keys.Default()
 	d := views.NewDetail(res, "ec2", cfg, k)
@@ -853,11 +851,10 @@ func TestEC2_051_CopyFromRightCol(t *testing.T) {
 // RelatedCheckStartedMsg to restart background checks.
 func TestEC2_052_CtrlR_Refresh(t *testing.T) {
 	// Ensure EC2 related defs are registered (prior tests may unregister them).
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
 	})
-	t.Cleanup(func() { resource.UnregisterRelated("ec2") })
 
 	m := tui.New("demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
@@ -1069,6 +1066,7 @@ func TestEC2_056_YAMLViewFullWidth(t *testing.T) {
 // in the detail view scrolls the viewport downward (or advances cursor by ~page).
 // We verify this by checking that View() content changes after PageDown.
 func TestEC2_057_PageDownMovesViewport(t *testing.T) {
+	unregisterEC2Related(t)
 	// Use a resource with many fields so there's content to scroll.
 	res := resource.Resource{
 		ID:   "i-0a1b2c3d4e5f60001",
@@ -1097,7 +1095,6 @@ func TestEC2_057_PageDownMovesViewport(t *testing.T) {
 		},
 	}
 
-	resource.UnregisterRelated("ec2")
 	k := keys.Default()
 	d := views.NewDetail(res, "ec2", nil, k)
 	// Height=8 ensures not all fields visible at once (20 fields > 8 rows).
@@ -1117,6 +1114,7 @@ func TestEC2_057_PageDownMovesViewport(t *testing.T) {
 // TestEC2_057_PageUpMovesViewport verifies that after scrolling down,
 // pressing Ctrl+U (PageUp) changes the viewport content.
 func TestEC2_057_PageUpMovesViewport(t *testing.T) {
+	unregisterEC2Related(t)
 	res := resource.Resource{
 		ID:   "i-0a1b2c3d4e5f60001",
 		Name: "web-prod-01",
@@ -1144,7 +1142,6 @@ func TestEC2_057_PageUpMovesViewport(t *testing.T) {
 		},
 	}
 
-	resource.UnregisterRelated("ec2")
 	k := keys.Default()
 	d := views.NewDetail(res, "ec2", nil, k)
 	d.SetSize(80, 8)

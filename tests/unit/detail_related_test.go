@@ -60,10 +60,9 @@ func pressToggleRelated(d views.DetailModel) (views.DetailModel, func() any) {
 // ---------------------------------------------------------------------------
 
 func TestDetail_ToggleRelated_FirstPressHidesAutoShown(t *testing.T) {
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
-	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailForToggleTest(t, 140)
 	before := d.View()
@@ -88,10 +87,9 @@ func TestDetail_ToggleRelated_FirstPressHidesAutoShown(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestDetail_ToggleRelated_SecondPressShows(t *testing.T) {
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
-	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailForToggleTest(t, 140)
 
@@ -125,10 +123,9 @@ func TestDetail_ToggleRelated_SecondPressShows(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestDetail_ToggleRelated_NarrowTerminal(t *testing.T) {
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
-	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailForToggleTest(t, 80)
 	_, rawCmd := pressToggleRelated(d)
@@ -149,10 +146,9 @@ func TestDetail_ToggleRelated_NarrowTerminal(t *testing.T) {
 func TestDetail_RelatedCheckResult_UpdatesRightCol(t *testing.T) {
 	ensureNoColor(t)
 
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
-	defer resource.UnregisterRelated("ec2")
 
 	// SetSize with width=140 and registered defs auto-shows the right column.
 	d := makeDetailForToggleTest(t, 140)
@@ -184,7 +180,7 @@ func TestDetail_RelatedCheckResult_UpdatesRightCol(t *testing.T) {
 
 func TestDetail_ToggleRelated_NoDefsRegistered(t *testing.T) {
 	// Guarantee no defs are registered for "ec2".
-	resource.UnregisterRelated("ec2")
+	unregisterEC2Related(t)
 
 	d := makeDetailForToggleTest(t, 140)
 	_, rawCmd := pressToggleRelated(d)

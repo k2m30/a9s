@@ -1,6 +1,7 @@
 package fixtures
 
 import (
+	"sync"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 )
@@ -14,7 +15,7 @@ type SNSFixtures struct {
 }
 
 // NewSNSFixtures constructs SNSFixtures from the canonical demo data.
-func NewSNSFixtures() *SNSFixtures {
+var sharedSNSFixtures = sync.OnceValue(func() *SNSFixtures {
 	topics := []snstypes.Topic{
 		{TopicArn: aws.String("arn:aws:sns:us-east-1:123456789012:alarm-notifications")},
 		{TopicArn: aws.String("arn:aws:sns:us-east-1:123456789012:order-events")},
@@ -89,6 +90,10 @@ func NewSNSFixtures() *SNSFixtures {
 		Subscriptions:        subscriptions,
 		SubscriptionsByTopic: subsByTopic,
 	}
+})
+
+func NewSNSFixtures() *SNSFixtures {
+	return sharedSNSFixtures()
 }
 
 // minimalSubscriptions returns a single canonical confirmed subscription so

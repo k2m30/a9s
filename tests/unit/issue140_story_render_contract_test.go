@@ -262,7 +262,7 @@ func TestIssue140_Story_EC2_029_FilteredAlarmListTitleAndScope(t *testing.T) {
 func withIssue140EC2RelatedDefs(t *testing.T) {
 	t.Helper()
 	oldDefs := append([]resource.RelatedDef(nil), resource.GetRelated("ec2")...)
-	oldNav := append([]resource.NavigableField(nil), resource.GetNavigableFields("ec2")...)
+	oldNav := append([]resource.NavigableField(nil), resource.GetActiveNavigableFields("ec2")...)
 	resource.RegisterRelated("ec2", []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
@@ -282,7 +282,11 @@ func withIssue140EC2RelatedDefs(t *testing.T) {
 	})
 	t.Cleanup(func() {
 		resource.RegisterRelated("ec2", oldDefs)
-		resource.RegisterNavigableFields("ec2", oldNav)
+		if len(oldNav) == 0 {
+			resource.UnregisterNavigableFields("ec2")
+		} else {
+			resource.RegisterNavigableFields("ec2", oldNav)
+		}
 	})
 }
 

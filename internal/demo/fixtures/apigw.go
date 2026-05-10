@@ -1,6 +1,7 @@
 package fixtures
 
 import (
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -13,7 +14,7 @@ type APIGWFixtures struct {
 }
 
 // NewAPIGWFixtures constructs APIGWFixtures from the canonical demo data.
-func NewAPIGWFixtures() *APIGWFixtures {
+var sharedAPIGWFixtures = sync.OnceValue(func() *APIGWFixtures {
 	return &APIGWFixtures{
 		APIs: []apigwtypes.Api{
 			{
@@ -48,4 +49,8 @@ func NewAPIGWFixtures() *APIGWFixtures {
 			},
 		},
 	}
+})
+
+func NewAPIGWFixtures() *APIGWFixtures {
+	return sharedAPIGWFixtures()
 }

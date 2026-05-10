@@ -1,6 +1,7 @@
 package fixtures
 
 import (
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -20,7 +21,7 @@ func mustParseAthenaTime(s string) time.Time {
 }
 
 // NewAthenaFixtures constructs AthenaFixtures from the canonical demo data.
-func NewAthenaFixtures() *AthenaFixtures {
+var sharedAthenaFixtures = sync.OnceValue(func() *AthenaFixtures {
 	return &AthenaFixtures{
 		WorkGroups: []athenatypes.WorkGroupSummary{
 			{
@@ -82,4 +83,8 @@ func NewAthenaFixtures() *AthenaFixtures {
 			},
 		},
 	}
+})
+
+func NewAthenaFixtures() *AthenaFixtures {
+	return sharedAthenaFixtures()
 }

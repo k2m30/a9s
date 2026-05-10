@@ -1,6 +1,7 @@
 package fixtures
 
 import (
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -20,7 +21,7 @@ type CloudWatchFixtures struct {
 const relatedAlarmSNSARN = "arn:aws:sns:us-east-1:123456789012:ops-alerts"
 
 // NewCloudWatchFixtures constructs CloudWatchFixtures from the canonical demo data.
-func NewCloudWatchFixtures() *CloudWatchFixtures {
+var sharedCloudWatchFixtures = sync.OnceValue(func() *CloudWatchFixtures {
 	return &CloudWatchFixtures{
 		Alarms: []cwtypes.MetricAlarm{
 			{
@@ -475,6 +476,10 @@ func NewCloudWatchFixtures() *CloudWatchFixtures {
 			"prod-efs-percent-io-high":     minimalAlarmHistory("prod-efs-percent-io-high"),
 		},
 	}
+})
+
+func NewCloudWatchFixtures() *CloudWatchFixtures {
+	return sharedCloudWatchFixtures()
 }
 
 // minimalAlarmHistory returns a canonical 3-item state sequence

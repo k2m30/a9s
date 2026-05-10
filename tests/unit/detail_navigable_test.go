@@ -84,10 +84,9 @@ func TestDetail_NavigableField_HighlightedInView(t *testing.T) {
 	styles.Reinit()
 	t.Cleanup(func() { styles.Reinit() })
 
-	resource.RegisterNavigableFields("ec2", []resource.NavigableField{
+	replaceEC2NavigableFields(t, []resource.NavigableField{
 		{FieldPath: "VpcId", TargetType: "vpc"},
 	})
-	defer resource.UnregisterNavigableFields("ec2")
 
 	d := makeNavDetail(140, 30)
 
@@ -126,10 +125,9 @@ func TestDetail_NavigableField_HighlightedInView(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestDetail_NavigableField_EnterEmitsNavigateMsg(t *testing.T) {
-	resource.RegisterNavigableFields("ec2", []resource.NavigableField{
+	replaceEC2NavigableFields(t, []resource.NavigableField{
 		{FieldPath: "VpcId", TargetType: "vpc"},
 	})
-	defer resource.UnregisterNavigableFields("ec2")
 
 	// Use a narrow-enough width that the right column is NOT auto-shown (< 100).
 	// That prevents rightColAutoShown, so the right column is not focused and
@@ -165,8 +163,11 @@ func TestDetail_NavigableField_EnterEmitsNavigateMsg(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestDetail_NonNavigableField_EnterIsNoop(t *testing.T) {
-	// Deliberately do NOT register navigable fields for "ec2".
-	// VpcId is present in the config but has no navigable registration.
+	// Deliberately strip ec2 navigable fields for this test — production
+	// init() registers some by default, so the assertion only holds when
+	// the registry is explicitly cleared (and restored on cleanup).
+	unregisterEC2NavigableFields(t)
+
 	d := makeNavDetail(80, 30)
 
 	_, cmd := d.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -185,11 +186,10 @@ func TestDetail_NonNavigableField_EnterIsNoop(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestIsFieldNavigable_MatchFound(t *testing.T) {
-	resource.RegisterNavigableFields("ec2", []resource.NavigableField{
+	replaceEC2NavigableFields(t, []resource.NavigableField{
 		{FieldPath: "VpcId", TargetType: "vpc"},
 		{FieldPath: "SubnetId", TargetType: "subnet"},
 	})
-	defer resource.UnregisterNavigableFields("ec2")
 
 	f := resource.IsFieldNavigable("ec2", "VpcId")
 	if f == nil {
@@ -201,10 +201,9 @@ func TestIsFieldNavigable_MatchFound(t *testing.T) {
 }
 
 func TestIsFieldNavigable_NoMatch(t *testing.T) {
-	resource.RegisterNavigableFields("ec2", []resource.NavigableField{
+	replaceEC2NavigableFields(t, []resource.NavigableField{
 		{FieldPath: "VpcId", TargetType: "vpc"},
 	})
-	defer resource.UnregisterNavigableFields("ec2")
 
 	f := resource.IsFieldNavigable("ec2", "SubnetId")
 	if f != nil {

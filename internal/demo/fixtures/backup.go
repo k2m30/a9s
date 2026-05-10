@@ -1,6 +1,7 @@
 package fixtures
 
 import (
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -488,7 +489,7 @@ func buildBackupSelections() map[string][]backuptypes.BackupSelection {
 // NewBackupFixtures constructs BackupFixtures from the canonical demo data.
 // Every plan in the impl-plan §2 is represented here; adversarial fixtures
 // (nil CreatedBy, nil CreationDate, API errors) stay inline in QA test files.
-func NewBackupFixtures() *BackupFixtures {
+var sharedBackupFixtures = sync.OnceValue(func() *BackupFixtures {
 	return &BackupFixtures{
 		RecoveryPoints:      buildBackupRecoveryPoints(),
 		Selections:          buildBackupSelections(),
@@ -595,4 +596,8 @@ func NewBackupFixtures() *BackupFixtures {
 			},
 		},
 	}
+})
+
+func NewBackupFixtures() *BackupFixtures {
+	return sharedBackupFixtures()
 }

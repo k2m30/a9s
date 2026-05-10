@@ -2,6 +2,7 @@
 package fixtures
 
 import (
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -87,13 +88,17 @@ const (
 )
 
 // NewDBCFixtures builds and returns a fully-populated DBCFixtures struct.
-func NewDBCFixtures() *DBCFixtures {
+var sharedDBCFixtures = sync.OnceValue(func() *DBCFixtures {
 	return &DBCFixtures{
 		DBClusters:                buildDBCClusters(),
 		DBClusterSnapshots:        buildDBCSnapshots(),
 		DBSubnetGroups:            buildDBCSubnetGroups(),
 		PendingMaintenanceActions: buildDBCPendingMaintenance(),
 	}
+})
+
+func NewDBCFixtures() *DBCFixtures {
+	return sharedDBCFixtures()
 }
 
 // dbcBaseline returns a healthy DocumentDB cluster with all fields set.

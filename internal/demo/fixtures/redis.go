@@ -4,6 +4,7 @@
 package fixtures
 
 import (
+	"sync"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
 )
@@ -119,13 +120,17 @@ type RedisFixtures struct {
 // Fixtures cover every §3.1 signal from docs/resources/redis.md plus the
 // multi-W1 case (U7a). The graph-root (prod-redis-sessions) carries matching
 // sibling entries for all 10 registered related-panel pivots.
-func NewRedisFixtures() *RedisFixtures {
+var sharedRedisFixtures = sync.OnceValue(func() *RedisFixtures {
 	return &RedisFixtures{
 		ReplicationGroups: buildRedisReplicationGroups(),
 		CacheClusters:     buildRedisCacheClusters(),
 		SubnetGroups:      buildRedisCacheSubnetGroups(),
 		TagLists:          buildRedisTagLists(),
 	}
+})
+
+func NewRedisFixtures() *RedisFixtures {
+	return sharedRedisFixtures()
 }
 
 // ---------------------------------------------------------------------------

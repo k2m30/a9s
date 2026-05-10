@@ -2,6 +2,7 @@
 package fixtures
 
 import (
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -31,7 +32,7 @@ type RDSFixtures struct {
 // DBInstances are sourced from DBIFixtures (single source of truth) plus the
 // legacy bulk-generated pool. Callers that only need DBInstances should use
 // NewDBIFixtures() directly.
-func NewRDSFixtures() *RDSFixtures {
+var sharedRDSFixtures = sync.OnceValue(func() *RDSFixtures {
 	dbi := NewDBIFixtures()
 	legacy := buildRDSInstances()
 	return &RDSFixtures{
@@ -42,6 +43,10 @@ func NewRDSFixtures() *RDSFixtures {
 		DBClusterSnapshots: buildRDSDBClusterSnapshots(),
 		DBSubnetGroups:     buildRDSDBSubnetGroups(),
 	}
+})
+
+func NewRDSFixtures() *RDSFixtures {
+	return sharedRDSFixtures()
 }
 
 const (

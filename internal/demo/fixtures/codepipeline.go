@@ -1,6 +1,7 @@
 package fixtures
 
 import (
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -18,7 +19,7 @@ func mustParseCPTime(s string) time.Time {
 }
 
 // NewCodePipelineFixtures constructs CodePipelineFixtures from the canonical demo data.
-func NewCodePipelineFixtures() *CodePipelineFixtures {
+var sharedCodePipelineFixtures = sync.OnceValue(func() *CodePipelineFixtures {
 	return &CodePipelineFixtures{
 		Pipelines: []cptypes.PipelineSummary{
 			{
@@ -45,4 +46,8 @@ func NewCodePipelineFixtures() *CodePipelineFixtures {
 			},
 		},
 	}
+})
+
+func NewCodePipelineFixtures() *CodePipelineFixtures {
+	return sharedCodePipelineFixtures()
 }

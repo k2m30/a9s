@@ -1,6 +1,7 @@
 package fixtures
 
 import (
+	"sync"
 	"fmt"
 	"time"
 
@@ -34,7 +35,7 @@ var secretDescPool = []string{
 }
 
 // NewSecretsFixtures constructs SecretsFixtures from the canonical demo data.
-func NewSecretsFixtures() *SecretsFixtures {
+var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 	secrets := []smtypes.SecretListEntry{
 		// RDS-managed secret for prod-dbi-1 — required for dbi→secrets related-panel pivot.
 		// ARN matches DBIFixtures.ProdDbiMasterSecretARN (MasterUserSecret.SecretArn on prod-dbi-1).
@@ -235,4 +236,8 @@ func NewSecretsFixtures() *SecretsFixtures {
 			"staging/database/mysql":     `{"host":"staging-mysql.c9xyz123.us-east-1.rds.amazonaws.com","port":"3306","username":"staginguser","password":"[REDACTED]"}`,
 		},
 	}
+})
+
+func NewSecretsFixtures() *SecretsFixtures {
+	return sharedSecretsFixtures()
 }

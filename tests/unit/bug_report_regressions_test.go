@@ -19,11 +19,10 @@ var defaultEC2RelatedDefs = append([]resource.RelatedDef(nil), resource.GetRelat
 func TestBug_RightColumnFilter_SlashFiltersAndEscapeClears(t *testing.T) {
 	ensureNoColor(t)
 
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: resource.NoopChecker},
 		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: resource.NoopChecker},
 	})
-	t.Cleanup(func() { resource.UnregisterRelated("ec2") })
 
 	d := makeDetailForFocusTest(t, 140)
 	d = makeExplicitlyVisible(d)
@@ -52,11 +51,10 @@ func TestBug_RightColumnFilter_SlashFiltersAndEscapeClears(t *testing.T) {
 func TestBug_AllZeroRelatedRows_DoNotAllowRightColumnFocus(t *testing.T) {
 	ensureNoColor(t)
 
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: resource.NoopChecker},
 		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: resource.NoopChecker},
 	})
-	t.Cleanup(func() { resource.UnregisterRelated("ec2") })
 
 	d := makeDetailForFocusTest(t, 140)
 	d = makeExplicitlyVisible(d)
@@ -87,10 +85,9 @@ func TestBug_AllZeroRelatedRows_DoNotAllowRightColumnFocus(t *testing.T) {
 func TestBug_FirstToggleRelated_HidesAutoShownColumn(t *testing.T) {
 	ensureNoColor(t)
 
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: resource.NoopChecker},
 	})
-	t.Cleanup(func() { resource.UnregisterRelated("ec2") })
 
 	d := makeDetailForFocusTest(t, 140)
 	if !strings.Contains(stripAnsi(d.View()), "RELATED") {

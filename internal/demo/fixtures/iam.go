@@ -2,6 +2,7 @@
 package fixtures
 
 import (
+	"sync"
 	"fmt"
 	"net/url"
 	"strings"
@@ -57,7 +58,7 @@ func IsCustomerManagedPolicyARN(policyARN string) bool {
 }
 
 // NewIAMFixtures builds and returns a fully-populated IAMFixtures struct.
-func NewIAMFixtures() *IAMFixtures {
+var sharedIAMFixtures = sync.OnceValue(func() *IAMFixtures {
 	f := &IAMFixtures{
 		AttachedRolePolicies:  make(map[string][]iamtypes.AttachedPolicy),
 		InlineRolePolicies:    make(map[string][]string),
@@ -79,6 +80,10 @@ func NewIAMFixtures() *IAMFixtures {
 	f.InlineGroupPolicies["developers"] = []string{"AllowAssumeRole", "AllowChangeOwnPassword"}
 	f.InlineGroupPolicies["readonly"] = []string{"DenyS3Delete"}
 	return f
+})
+
+func NewIAMFixtures() *IAMFixtures {
+	return sharedIAMFixtures()
 }
 
 func buildIAMRoles() []iamtypes.Role {

@@ -2,6 +2,7 @@
 package fixtures
 
 import (
+	"sync"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -21,7 +22,7 @@ type ECSFixtures struct {
 }
 
 // NewECSFixtures builds and returns a fully-populated ECSFixtures struct.
-func NewECSFixtures() *ECSFixtures {
+var sharedECSFixtures = sync.OnceValue(func() *ECSFixtures {
 	clusters := buildECSClusters()
 	services := buildECSServices()
 	tasks := buildECSTasks()
@@ -32,6 +33,10 @@ func NewECSFixtures() *ECSFixtures {
 		Tasks:           tasks,
 		TaskDefinitions: tdefs,
 	}
+})
+
+func NewECSFixtures() *ECSFixtures {
+	return sharedECSFixtures()
 }
 
 const (

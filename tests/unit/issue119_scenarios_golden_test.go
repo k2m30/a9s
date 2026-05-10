@@ -390,7 +390,7 @@ func sortedIssue119Names(m map[string]string) []string {
 func withIssue119EC2Defs(t *testing.T, fn func() string) string {
 	t.Helper()
 	oldDefs := append([]resource.RelatedDef(nil), resource.GetRelated("ec2")...)
-	oldNav := append([]resource.NavigableField(nil), resource.GetNavigableFields("ec2")...)
+	oldNav := append([]resource.NavigableField(nil), resource.GetActiveNavigableFields("ec2")...)
 	resource.RegisterRelated("ec2", []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
@@ -410,7 +410,11 @@ func withIssue119EC2Defs(t *testing.T, fn func() string) string {
 	})
 	defer func() {
 		resource.RegisterRelated("ec2", oldDefs)
-		resource.RegisterNavigableFields("ec2", oldNav)
+		if len(oldNav) == 0 {
+			resource.UnregisterNavigableFields("ec2")
+		} else {
+			resource.RegisterNavigableFields("ec2", oldNav)
+		}
 	}()
 	return fn()
 }

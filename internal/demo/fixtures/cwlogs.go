@@ -1,6 +1,7 @@
 package fixtures
 
 import (
+	"sync"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 )
@@ -15,7 +16,7 @@ type CWLogsFixtures struct {
 }
 
 // NewCWLogsFixtures constructs CWLogsFixtures from the canonical demo data.
-func NewCWLogsFixtures() *CWLogsFixtures {
+var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 	logGroups := []cwlogstypes.LogGroup{
 		{
 			LogGroupName:              aws.String("/aws/lambda/api-gateway-authorizer"),
@@ -360,6 +361,10 @@ func NewCWLogsFixtures() *CWLogsFixtures {
 		LogStreams: logStreams,
 		LogEvents:  logEvents,
 	}
+})
+
+func NewCWLogsFixtures() *CWLogsFixtures {
+	return sharedCWLogsFixtures()
 }
 
 // minimalLogStreams returns one canonical "2026/04/20/[$LATEST]<suffix>"

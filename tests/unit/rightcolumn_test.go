@@ -93,11 +93,10 @@ func sendRelatedResult(d views.DetailModel, msg messages.RelatedCheckResultMsg) 
 // ---------------------------------------------------------------------------
 
 func TestRightColumn_ToggleShowsRelatedHeader(t *testing.T) {
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
 	})
-	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailForRelatedTest(t, 140)
 	d = showRelatedPanel(d)
@@ -116,11 +115,10 @@ func TestRightColumn_ToggleShowsRelatedHeader(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestRightColumn_ShowsLoadingState(t *testing.T) {
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
 	})
-	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailForRelatedTest(t, 140)
 	d = showRelatedPanel(d)
@@ -142,11 +140,10 @@ func TestRightColumn_ShowsLoadingState(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestRightColumn_CountUpdatesOnResult(t *testing.T) {
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
 	})
-	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailForRelatedTest(t, 140)
 	d = showRelatedPanel(d)
@@ -174,10 +171,9 @@ func TestRightColumn_CountUpdatesOnResult(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestRightColumn_ZeroCountDim(t *testing.T) {
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
-	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailForRelatedTest(t, 140)
 	d = showRelatedPanel(d)
@@ -205,10 +201,9 @@ func TestRightColumn_ZeroCountDim(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestRightColumn_ErrorShowsDash(t *testing.T) {
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
-	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailForRelatedTest(t, 140)
 	d = showRelatedPanel(d)
@@ -237,11 +232,10 @@ func TestRightColumn_ErrorShowsDash(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestRightColumn_ToggleOffHidesPanel(t *testing.T) {
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
 	})
-	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailForRelatedTest(t, 140)
 	// Toggle ON
@@ -267,11 +261,10 @@ func TestRightColumn_ToggleOffHidesPanel(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestRightColumn_NarrowTerminalIgnoresToggle(t *testing.T) {
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
 	})
-	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailForRelatedTest(t, 59)
 	viewBefore := d.View()
@@ -292,7 +285,7 @@ func TestRightColumn_NarrowTerminalIgnoresToggle(t *testing.T) {
 
 func TestRightColumn_EmptyDefsShowsHint(t *testing.T) {
 	// Ensure "ec2" has no related defs registered (clean state)
-	resource.UnregisterRelated("ec2")
+	unregisterEC2Related(t)
 
 	d := makeDetailForRelatedTest(t, 140)
 	d = showRelatedPanel(d)
@@ -318,11 +311,10 @@ func TestRightColumn_EmptyDefsShowsHint(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestRightColumn_MultipleResults_EachUpdatesIndependently(t *testing.T) {
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
 	})
-	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailForRelatedTest(t, 140)
 	d = showRelatedPanel(d)
@@ -362,10 +354,9 @@ func TestRightColumn_MultipleResults_EachUpdatesIndependently(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestRightColumn_WrongResourceType_ResultIgnored(t *testing.T) {
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
-	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailForRelatedTest(t, 140)
 	d = sendToggleRelated(d)
@@ -394,10 +385,9 @@ func TestRightColumn_WrongResourceType_ResultIgnored(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestRightColumn_ToggleDefaultState_OnEntry(t *testing.T) {
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
-	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailForRelatedTest(t, 140)
 	view := d.View()
@@ -416,10 +406,9 @@ func TestRightColumn_ToggleDefaultState_OnEntry(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestRightColumn_View_WideTerminalShowsSideBySide(t *testing.T) {
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
-	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailForRelatedTest(t, 140)
 	d = showRelatedPanel(d)

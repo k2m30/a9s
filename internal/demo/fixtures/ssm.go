@@ -1,6 +1,7 @@
 package fixtures
 
 import (
+	"sync"
 	"fmt"
 	"time"
 
@@ -39,7 +40,7 @@ func mustParseSSMTime(s string) time.Time {
 }
 
 // NewSSMFixtures constructs SSMFixtures from the canonical demo data.
-func NewSSMFixtures() *SSMFixtures {
+var sharedSSMFixtures = sync.OnceValue(func() *SSMFixtures {
 	ssmTypeMap := map[string]ssmtypes.ParameterType{
 		"String":       ssmtypes.ParameterTypeString,
 		"SecureString": ssmtypes.ParameterTypeSecureString,
@@ -137,4 +138,8 @@ func NewSSMFixtures() *SSMFixtures {
 			"/acme/staging/ami-id":            "ami-0123456789abcdef0",
 		},
 	}
+})
+
+func NewSSMFixtures() *SSMFixtures {
+	return sharedSSMFixtures()
 }

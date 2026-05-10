@@ -84,10 +84,9 @@ func make007NavDetailWithColors(t *testing.T, width, height int) views.DetailMod
 // register007EC2Defs registers one RelatedDef for "ec2" and returns cleanup.
 func register007EC2Defs(t *testing.T) {
 	t.Helper()
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
-	t.Cleanup(func() { resource.UnregisterRelated("ec2") })
 }
 
 // ---------------------------------------------------------------------------
@@ -143,8 +142,7 @@ func TestDetail_007_SeparatorPresent_RightFocused(t *testing.T) {
 // Must continue to pass after fix.
 func TestDetail_007_SeparatorAbsent_NoRightCol(t *testing.T) {
 	// Explicitly ensure no related defs are registered for "ec2".
-	resource.UnregisterRelated("ec2")
-	t.Cleanup(func() { resource.UnregisterRelated("ec2") })
+	unregisterEC2Related(t)
 
 	d := make007EC2Detail(120, 30, nil)
 	view := d.View()
@@ -186,11 +184,8 @@ func TestDetail_007_SubField_RendersKeyAndValue(t *testing.T) {
 	styles.Reinit()
 	t.Cleanup(func() { styles.Reinit() })
 	resource.UnregisterNavigableFields("ec2")
-	resource.UnregisterRelated("ec2")
-	t.Cleanup(func() {
-		resource.UnregisterNavigableFields("ec2")
-		resource.UnregisterRelated("ec2")
-	})
+	defer resource.UnregisterNavigableFields("ec2")
+	unregisterEC2Related(t)
 
 	// Register a multi-line field: Tags as a YAML-like string with sub-entries.
 	// We inject Tags directly into Fields as a multi-line value so ExtractFieldList

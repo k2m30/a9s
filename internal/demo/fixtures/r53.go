@@ -1,6 +1,7 @@
 package fixtures
 
 import (
+	"sync"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	r53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 )
@@ -13,7 +14,7 @@ type R53Fixtures struct {
 }
 
 // NewR53Fixtures constructs R53Fixtures from the canonical demo data.
-func NewR53Fixtures() *R53Fixtures {
+var sharedR53Fixtures = sync.OnceValue(func() *R53Fixtures {
 	return &R53Fixtures{
 		HostedZones: []r53types.HostedZone{
 			{
@@ -202,4 +203,8 @@ func NewR53Fixtures() *R53Fixtures {
 			},
 		},
 	}
+})
+
+func NewR53Fixtures() *R53Fixtures {
+	return sharedR53Fixtures()
 }

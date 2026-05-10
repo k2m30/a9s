@@ -2,6 +2,7 @@
 package fixtures
 
 import (
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -101,11 +102,15 @@ const (
 // NewDBIFixtures builds and returns a fully-populated DBIFixtures struct.
 // The Instances slice contains all non-adversarial fixtures from the spec §2.
 // PendingMaintenanceActions contains the Wave 2 enrichment data for maint-dbi-scheduled.
-func NewDBIFixtures() *DBIFixtures {
+var sharedDBIFixtures = sync.OnceValue(func() *DBIFixtures {
 	return &DBIFixtures{
 		Instances:                 buildDBIInstances(),
 		PendingMaintenanceActions: buildDBIPendingMaintenance(),
 	}
+})
+
+func NewDBIFixtures() *DBIFixtures {
+	return sharedDBIFixtures()
 }
 
 // dbiBaselineHealthy builds a fully-configured healthy DBInstance.

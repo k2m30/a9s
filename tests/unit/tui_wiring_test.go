@@ -131,10 +131,9 @@ func TestWiring_CopyInDetailView_UsesActiveFieldValue(t *testing.T) {
 }
 
 func TestWiring_EscapeOnFocusedRightColumn_StaysInDetail(t *testing.T) {
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
-	t.Cleanup(func() { resource.UnregisterRelated("ec2") })
 
 	m := newRootSizedModel()
 	res := &resource.Resource{

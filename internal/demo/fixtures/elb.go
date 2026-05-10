@@ -2,6 +2,7 @@
 package fixtures
 
 import (
+	"sync"
 	"fmt"
 	"time"
 
@@ -37,7 +38,7 @@ const (
 )
 
 // NewELBFixtures builds and returns a fully-populated ELBFixtures struct.
-func NewELBFixtures() *ELBFixtures {
+var sharedELBFixtures = sync.OnceValue(func() *ELBFixtures {
 	f := &ELBFixtures{
 		Listeners:    make(map[string][]elbv2types.Listener),
 		TargetHealth: make(map[string][]elbv2types.TargetHealthDescription),
@@ -49,6 +50,10 @@ func NewELBFixtures() *ELBFixtures {
 	buildTargetHealth(f)
 	buildRules(f)
 	return f
+})
+
+func NewELBFixtures() *ELBFixtures {
+	return sharedELBFixtures()
 }
 
 func buildLoadBalancers() []elbv2types.LoadBalancer {

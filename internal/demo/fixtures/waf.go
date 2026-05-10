@@ -2,6 +2,7 @@
 package fixtures
 
 import (
+	"sync"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 )
@@ -14,7 +15,7 @@ type WAFFixtures struct {
 }
 
 // NewWAFFixtures constructs WAFFixtures from the canonical demo data.
-func NewWAFFixtures() *WAFFixtures {
+var sharedWAFFixtures = sync.OnceValue(func() *WAFFixtures {
 	return &WAFFixtures{
 		WebACLSummaries: []wafv2types.WebACLSummary{
 			{
@@ -51,4 +52,8 @@ func NewWAFFixtures() *WAFFixtures {
 			},
 		},
 	}
+})
+
+func NewWAFFixtures() *WAFFixtures {
+	return sharedWAFFixtures()
 }

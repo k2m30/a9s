@@ -2,6 +2,7 @@
 package fixtures
 
 import (
+	"sync"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 )
@@ -17,13 +18,17 @@ type EKSFixtures struct {
 }
 
 // NewEKSFixtures builds and returns a fully-populated EKSFixtures struct.
-func NewEKSFixtures() *EKSFixtures {
+var sharedEKSFixtures = sync.OnceValue(func() *EKSFixtures {
 	clusters := buildEKSClusters()
 	ngs := buildEKSNodegroups()
 	return &EKSFixtures{
 		Clusters:   clusters,
 		Nodegroups: ngs,
 	}
+})
+
+func NewEKSFixtures() *EKSFixtures {
+	return sharedEKSFixtures()
 }
 
 const (

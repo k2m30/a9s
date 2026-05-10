@@ -1,6 +1,7 @@
 package fixtures
 
 import (
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -91,7 +92,7 @@ type OpenSearchFixtures struct {
 // 1. healthy_baseline, 2. graph_root, 3. update_available_bang,
 // 4. encryption_off_tilde, 5. multi_background, 6. processing_warning,
 // 7. processing_plus_update, 8. isolated_broken, 9. deleting_dim.
-func NewOpenSearchFixtures() *OpenSearchFixtures {
+var sharedOpenSearchFixtures = sync.OnceValue(func() *OpenSearchFixtures {
 	return &OpenSearchFixtures{
 		Domains: []ostypes.DomainStatus{
 			osHealthyBaseline(),
@@ -105,6 +106,10 @@ func NewOpenSearchFixtures() *OpenSearchFixtures {
 			osDeletingDim(),
 		},
 	}
+})
+
+func NewOpenSearchFixtures() *OpenSearchFixtures {
+	return sharedOpenSearchFixtures()
 }
 
 // ---------------------------------------------------------------------------
