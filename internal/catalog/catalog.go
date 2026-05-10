@@ -4,7 +4,16 @@ package catalog
 // It is static — no init(), no Register* calls. Per-category PRs (04b–04m)
 // populate this slice. Until then it is empty and all lookups fall through
 // to the legacy registry in internal/resource.
-var ResourceTypes = computeTypes //nolint:gochecknoglobals // static catalog: intentional package-level var
+var ResourceTypes = allTypes() //nolint:gochecknoglobals // static catalog: intentional package-level var
+
+// allTypes concatenates per-category slices into the full catalog.
+// Per-category PRs (04b–04m) add their slice here; PR-04n removes this func.
+func allTypes() []ResourceTypeDef {
+	var all []ResourceTypeDef
+	all = append(all, computeTypes...)
+	all = append(all, containersTypes...)
+	return all
+}
 
 // Find returns the ResourceTypeDef for the given name (ShortName or Alias),
 // or nil if the catalog does not have an entry for it yet.

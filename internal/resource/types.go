@@ -160,7 +160,6 @@ var resourceTypes = buildResourceTypes()
 
 func buildResourceTypes() []ResourceTypeDef {
 	var all []ResourceTypeDef
-	all = append(all, containersResourceTypes()...)
 	all = append(all, networkingResourceTypes()...)
 	all = append(all, databasesResourceTypes()...)
 	all = append(all, monitoringResourceTypes()...)
