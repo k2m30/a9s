@@ -37,6 +37,10 @@ jobs:
               - '.golangci.yml'
               - 'Makefile'
               - '.github/workflows/ci.yml'
+              # AS-114 (Codex Stage 5): script-only edits to the budget gate
+              # must re-run the gate, otherwise an unvalidated change to the
+              # enforcement path can merge with the test-budget job skipped.
+              - 'scripts/test-budget-gate.sh'
             md:
               - '**/*.md'
             not_docs:
