@@ -75,8 +75,19 @@ func init() {
 				},
 			}, fmt.Errorf("dbc: RDS-side cluster fetch failed: %w", rdsErr)
 		}
-		// Combined success: DocDB page + RDS page concatenated. Page size may exceed DefaultPageSize when both SDKs return full pages on the same fetch tick — this is a deliberate trade so the operator sees a unified list rather than waiting for a second tick. Pagination tokens stay correct (docdb: vs rds: prefix tracks side authoritatively).
-		docResult.Resources = append(docResult.Resources, rdsResult.Resources...)
+		// Combined success: DocDB page + RDS page concatenated, then deduped by
+		// Resource.ID with first-occurrence wins. Both SDKs empirically return
+		// overlapping rows for the same cluster — verified live on dev-readonly
+		// (AS-145): the DocDB endpoint returns aurora-postgresql clusters too, so
+		// raw concat double-counts every cluster that exists in both engine
+		// families' result sets. DocDB-side rows are appended first, so dedup
+		// keeps the docdb-side row — this preserves the engine-correct RawStruct
+		// used by detail enrichment and related-panel pivots. Page size may
+		// exceed DefaultPageSize when both SDKs return full pages on the same
+		// fetch tick — deliberate trade so the operator sees a unified list
+		// rather than waiting for a second tick. Pagination tokens stay correct
+		// (docdb: vs rds: prefix tracks side authoritatively).
+		docResult.Resources = dedupResourcesByID(append(docResult.Resources, rdsResult.Resources...))
 		if rdsResult.Pagination != nil && rdsResult.Pagination.IsTruncated {
 			return resource.FetchResult{
 				Resources: docResult.Resources,
@@ -322,4 +333,30 @@ func computeDBCFindings(cluster docdbtypes.DBCluster) []domain.Finding {
 
 	// Unknown status — bare keyword passthrough (future-proof for new AWS statuses).
 	return []domain.Finding{{Code: CodeDBCTransitional, Phrase: status, Severity: domain.SevWarn, Source: "wave1"}}
+}
+
+// dedupResourcesByID returns rs with duplicate Resource.ID entries removed,
+// keeping the first occurrence. Used by the dbc and dbc-snap fetchers where
+// the DocDB and RDS SDKs both return overlapping rows for the same cluster /
+// snapshot (AS-145, verified live: the DocDB DescribeDBClusters endpoint
+// returns aurora-postgresql clusters too). DocDB-side rows are appended first
+// at the call sites, so first-occurrence wins keeps the docdb-side row.
+//
+// Engine-filter at source was considered and rejected: it goes silently stale
+// the moment AWS adds a new docdb engine variant or new aurora flavor, whereas
+// dedup-by-ID is symmetric across both fetchers and robust to SDK drift.
+func dedupResourcesByID(rs []resource.Resource) []resource.Resource {
+	if len(rs) < 2 {
+		return rs
+	}
+	seen := make(map[string]struct{}, len(rs))
+	out := make([]resource.Resource, 0, len(rs))
+	for _, r := range rs {
+		if _, dup := seen[r.ID]; dup {
+			continue
+		}
+		seen[r.ID] = struct{}{}
+		out = append(out, r)
+	}
+	return out
 }
