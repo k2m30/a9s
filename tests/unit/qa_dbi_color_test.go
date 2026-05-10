@@ -57,8 +57,8 @@ func TestDbiColor(t *testing.T) {
 			want:   resource.ColorBroken,
 		},
 		{
-			name:   "inaccessible_encryption_credentials",
-			fields: map[string]string{"status": "inaccessible-encryption-credentials"},
+			name:   "encryption_key_unavailable",
+			fields: map[string]string{"status": "encryption key unavailable"},
 			want:   resource.ColorBroken,
 		},
 		{

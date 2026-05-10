@@ -21,6 +21,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
+	"github.com/k2m30/a9s/v3/internal/domain"
 )
 
 // Shared helper efsMTFakeFromFixtures lives in helpers_efs_test.go.
@@ -144,9 +145,11 @@ func TestEnrichEFSMountTargets_W1WarningPlusW2Bumps(t *testing.T) {
 	clients := &awsclient.ServiceClients{EFS: fake}
 
 	// Resource represents the fetcher output for this W1-Warning fixture.
+	// enricher reads len(r.Findings) for the (+N) count.
 	res := efsResources(fsID)
-	res[0].Status = "updating"
-	res[0].Issues = []string{"updating"}
+	res[0].Findings = []domain.Finding{
+		{Code: awsclient.CodeEFSUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"},
+	}
 
 	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res, nil)
 	if err != nil {

@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -25,9 +26,9 @@ func init() {
 	})
 }
 
-// computeShardIssues returns one §4 phrase per non-available NodeGroup on a
+// computeShardIssues returns one phrase per non-available NodeGroup on a
 // multi-shard (cluster-mode-enabled) replication group, ordered alphabetically
-// by phrase so rule-7 precedence is stable. Returns nil when the RG has ≤1
+// by phrase so rule-7 precedence is stable. Returns nil when the RG has <=1
 // NodeGroup — single-shard RGs use the RG-level phrase instead.
 func computeShardIssues(nodeGroups []elasticachetypes.NodeGroup) []string {
 	if len(nodeGroups) <= 1 {
@@ -49,13 +50,13 @@ func computeShardIssues(nodeGroups []elasticachetypes.NodeGroup) []string {
 	return out
 }
 
-// rgTransientPhrase maps a transient RG-level status to its §4 list phrase.
+// rgTransientPhrase maps a transient RG-level status to its list phrase.
 func rgTransientPhrase(state string) string {
 	switch state {
 	case "modifying":
-		return "modifying \u2014 config change"
+		return "modifying — config change"
 	case "snapshotting":
-		return "snapshotting \u2014 backup running"
+		return "snapshotting — backup running"
 	}
 	return ""
 }
@@ -99,7 +100,7 @@ func FetchRedisPage(ctx context.Context, api ElastiCacheDescribeReplicationGroup
 	var resources []resource.Resource
 
 	for _, rg := range output.ReplicationGroups {
-		// Engine filter (spec §3.1, P2-1): skip any RG whose engine is not "redis".
+		// Engine filter: skip any RG whose engine is not "redis".
 		// DescribeReplicationGroups returns all ElastiCache engines (redis, valkey,
 		// memcached) through the same API; this fetcher is redis-only.
 		if rg.Engine == nil || !strings.EqualFold(aws.ToString(rg.Engine), "redis") {
@@ -135,8 +136,14 @@ func FetchRedisPage(ctx context.Context, api ElastiCacheDescribeReplicationGroup
 		multiAZ := rg.MultiAZ == elasticachetypes.MultiAZStatusEnabled
 		autoFailover := rg.AutomaticFailover == elasticachetypes.AutomaticFailoverStatusEnabled
 
-		issues := computeRedisIssues(status, multiAZ, autoFailover, rg.NodeGroups)
-		statusPhrase := redisStatusPhrase(issues)
+		findings := computeRedisFindings(status, multiAZ, autoFailover, rg.NodeGroups)
+		statusPhrase := ""
+		if len(findings) > 0 {
+			statusPhrase = findings[0].Phrase
+			if len(findings) > 1 {
+				statusPhrase = fmt.Sprintf("%s (+%d)", statusPhrase, len(findings)-1)
+			}
+		}
 
 		r := resource.Resource{
 			ID:   rgID,
@@ -149,7 +156,7 @@ func FetchRedisPage(ctx context.Context, api ElastiCacheDescribeReplicationGroup
 				"status":     statusPhrase,
 				"arn":        arn,
 			},
-			Issues:    issues,
+			Findings:  findings,
 			RawStruct: rg,
 		}
 
@@ -179,61 +186,48 @@ func FetchRedisPage(ctx context.Context, api ElastiCacheDescribeReplicationGroup
 	}, nil
 }
 
-// computeRedisIssues derives the ordered §4 issues slice for a ReplicationGroup.
-// Wave 1 signals only — spec §3.2 has no Wave 2 signals for redis.
-//
-// Precedence: Broken first, then Warnings alphabetically (per impl-plan §5).
-// The em-dash character (—) is used literally in all phrases.
+// computeRedisFindings derives the ordered Wave-1 findings slice for a ReplicationGroup.
+// Precedence: Broken first, then Warnings alphabetically.
 // For multi-shard RGs (len(nodeGroups) > 1) in modifying/snapshotting state,
-// per-shard phrases are emitted instead of the RG-level phrase.
-func computeRedisIssues(status string, multiAZ bool, autoFailover bool, nodeGroups []elasticachetypes.NodeGroup) []string {
-	var broken []string
-	var warnings []string
+// per-shard findings are emitted instead of the RG-level finding.
+func computeRedisFindings(status string, multiAZ bool, autoFailover bool, nodeGroups []elasticachetypes.NodeGroup) []domain.Finding {
+	var broken []domain.Finding
+	var warnings []domain.Finding
 
 	switch status {
 	case "available":
 		// Healthy — no state issue.
 	case "creating":
-		warnings = append(warnings, "creating \u2014 new group")
+		warnings = append(warnings, domain.Finding{Code: CodeRedisCreating, Phrase: "creating — new group", Severity: domain.SevWarn, Source: "wave1"})
 	case "deleting":
-		warnings = append(warnings, "deleting \u2014 teardown")
+		warnings = append(warnings, domain.Finding{Code: CodeRedisDeleting, Phrase: "deleting — teardown", Severity: domain.SevWarn, Source: "wave1"})
 	case "create-failed":
-		broken = append(broken, "create failed \u2014 see events")
+		broken = append(broken, domain.Finding{Code: CodeRedisCreateFailed, Phrase: "create failed — see events", Severity: domain.SevBroken, Source: "wave1"})
 	case "modifying", "snapshotting":
 		shardIssues := computeShardIssues(nodeGroups)
 		if len(shardIssues) > 0 {
-			// Multi-shard with at least one non-available shard: use shard-level phrases.
-			warnings = append(warnings, shardIssues...)
+			// Multi-shard with at least one non-available shard: use shard-level findings.
+			for _, p := range shardIssues {
+				warnings = append(warnings, domain.Finding{Code: CodeRedisShardIssue, Phrase: p, Severity: domain.SevWarn, Source: "wave1"})
+			}
 		} else {
-			// Single-shard OR all shards available (transient RG-level state):
-			// fall back to the RG-level phrase.
+			// Single-shard OR all shards available: fall back to the RG-level phrase.
 			if p := rgTransientPhrase(status); p != "" {
-				warnings = append(warnings, p)
+				code := CodeRedisModifying
+				if status == "snapshotting" {
+					code = CodeRedisSnapshotting
+				}
+				warnings = append(warnings, domain.Finding{Code: code, Phrase: p, Severity: domain.SevWarn, Source: "wave1"})
 			}
 		}
 	}
 
 	if multiAZ && !autoFailover {
-		warnings = append(warnings, "multi-AZ without auto-failover")
+		warnings = append(warnings, domain.Finding{Code: CodeRedisMultiAZWithoutAutoFailover, Phrase: "multi-AZ without auto-failover", Severity: domain.SevWarn, Source: "wave1"})
 	}
 
-	// Sort warnings alphabetically (per impl-plan §5 precedence).
-	sort.Strings(warnings)
+	// Sort warnings alphabetically (broken always first by construction).
+	sort.Slice(warnings, func(i, j int) bool { return warnings[i].Phrase < warnings[j].Phrase })
 
-	// Broken first, then sorted warnings.
 	return append(broken, warnings...)
-}
-
-// redisStatusPhrase converts an issues slice to the S4 status column string.
-// Empty slice → "" (Healthy silence per spec §4).
-// Single issue → the phrase verbatim.
-// Multiple issues → top phrase + " (+N)" suffix per universal rule 7.
-func redisStatusPhrase(issues []string) string {
-	if len(issues) == 0 {
-		return ""
-	}
-	if len(issues) == 1 {
-		return issues[0]
-	}
-	return fmt.Sprintf("%s (+%d)", issues[0], len(issues)-1)
 }
