@@ -276,8 +276,6 @@ Behavior verification:
 
 ### PR-03b through PR-03m — Per-category cutover
 
-**Realized pattern (Option A — relax mid-phase, gate at phase-end).** Per-category PRs migrate fetchers to emit canonical `Resource.Findings` directly, but they retain the legacy `EnrichmentFinding`-shaped enricher return contract and rely on the `applyEnrichment` shim in `internal/tui/app_enrich_fold.go` to bridge enricher output onto cached row state. Per-category PRs therefore do NOT change enricher signatures, do NOT delete `IssueEnricherResult`/`EnrichmentFinding`, and do NOT enforce a "no EnrichmentFinding return" exit criterion. That uniform migration is consolidated in **PR-03n** (see "Enricher signature migration is phase-end, not per-category" in the PR-03n section). This keeps each per-category PR mechanical and reviewable in isolation while preserving a single, atomic enricher-signature migration at phase end.
-
 12 PRs, one per service-category file in `internal/resource/types_*.go`:
 
 | PR | Category | Resource types affected |
@@ -298,7 +296,7 @@ Behavior verification:
 **Per-PR scope (template).** Each per-category PR:
 
 1. Updates every fetcher in `internal/aws/<category-services>.go` to populate `Resource.Findings` and `Resource.AttentionDetails` directly. Stops setting `Resource.Status` and `Resource.Issues`.
-2. Updates every Wave 2 issue enricher in `internal/aws/<svc>_issue_enrichment.go` to express its results in canonical terms — populating `Finding`/`AttentionDetail` data inside the existing `IssueEnricherResult`/`EnrichmentFinding` return shape. Stops calling `BumpFindingSuffix` on `Status`. **Per-category PRs (03b–03m) deliberately do NOT change enricher return signatures off `EnrichmentFinding`.** That uniform migration is consolidated in PR-03n (see "Enricher signature migration is phase-end, not per-category" below). The bridge for the duration of phase 03 is `applyEnrichment` in `internal/tui/app_enrich_fold.go`: it accepts `map[string]resource.EnrichmentFinding` from each enricher and folds the canonical content directly onto each cached row's `Findings` / `AttentionDetails`. Per-category PRs therefore keep the legacy enricher contract intact and rely on `applyEnrichment` for canonical row state.
+2. Updates every Wave 2 issue enricher in `internal/aws/<svc>_issue_enrichment.go` to append to `Findings` and write to `AttentionDetails[code]`. Stops calling `BumpFindingSuffix` on `Status`. Stops returning `EnrichmentFinding` — returns `[]Finding` + `map[FindingCode]AttentionDetail` updates.
 3. Updates every `Color` function in the corresponding `types_<category>.go` to read `Findings[0].Severity` first, falling back to `lifecycleSeverity(r.Fields[td.LifecycleKey])`. Drops any `r.Status` reads.
 4. Declares `FindingCode` constants in `internal/aws/<svc>_codes.go` (a sibling file in the same package as the fetcher). Per-service namespacing: `awsclient.CodeEC2Impaired = "ec2.impaired"`, `awsclient.CodeRDSMaintPending = "rds.maint.pending"`, etc. **The constants stay in `internal/aws/` for the entire program** — the speculative `internal/aws/` → `internal/transport/` rename is out of scope. If that rename ever happens, it's a single `gofmt`-style refactor across the package, post-program.
 5. The shim continues covering any unmigrated path. **Bypass for migrated types is input-driven, not state-driven.** A migrated fetcher stops writing `Status` and `Issues`, so when the shim runs over a migrated row the inputs (`r.Status`, `r.Issues`, parallel-map entry post-PR-03a-fold = none) are all empty. The shim's derivation contract is: *if all legacy inputs are empty, do not touch `Findings` or `AttentionDetails`* — preserving the directly-written values. This is **not** an early-return on `len(r.Findings) > 0` (which would skip Wave 2 re-merges and break the deterministic-re-derive guarantee from PR-03a-shim). The bypass happens because there is nothing to derive, not because findings are already populated.
@@ -338,25 +336,18 @@ Behavior verification:
 
 ### PR-03n — Cleanup; delete legacy
 
-**Goal.** Delete `Resource.Status`, `Resource.Issues`, the entire `(+N)` suffix algebra, the `applyEnrichment`-shim bridge, and the legacy `EnrichmentFinding` enricher contract. Migrate every Wave 2 enricher in `internal/aws/<svc>_issue_enrichment.go` off `EnrichmentFinding` onto canonical `[]Finding` + `map[FindingCode]AttentionDetail` returns in a single, uniform sweep.
-
-**Enricher signature migration is phase-end, not per-category.** Per-category PRs 03b–03m kept the legacy enricher contract by design (Option A — relax mid-phase, gate at phase-end). The bridge during phase 03 is `applyEnrichment` in `internal/tui/app_enrich_fold.go`, which folds `map[string]resource.EnrichmentFinding` into cached rows. PR-03n removes that bridge by changing every enricher's return type at once, then deleting the bridge along with the legacy type. Doing this uniformly avoids a long transitional window in which some enrichers return canonical types and others return `EnrichmentFinding` — every per-category PR would otherwise need to teach `applyEnrichment` two input shapes simultaneously.
+**Goal.** Delete `Resource.Status`, `Resource.Issues`, the entire `(+N)` suffix algebra, and the shim. Migrate any remaining `EnrichmentFinding` references off the legacy type into `Finding` + `AttentionDetail` directly.
 
 #### Files modified
 
 - `internal/domain/resource.go` — delete `Status`, `Issues` fields. (`internal/resource/resource.go` is still just the alias.)
-- `internal/resource/enrichment.go` — delete the legacy `EnrichmentFinding` type and any helper signatures it carried.
-- Every `internal/aws/<svc>_issue_enrichment.go` — change return type from `IssueEnricherResult` (which embeds `map[string]EnrichmentFinding`) to `[]Finding` + `map[FindingCode]AttentionDetail`. Update each registered enricher signature in lockstep.
-- `internal/tui/app_enrich_fold.go` — update `applyEnrichment` to accept the canonical `[]Finding` / `map[FindingCode]AttentionDetail` shape (or delete entirely if direct fetcher writes plus updated enricher writes make it redundant — decide in PR-03n's design).
-- Tests for every enricher: `tests/unit/<svc>_issue_enrichment_test.go` — assert on `Findings` / `AttentionDetails` directly. **Test migration is in scope for this PR.**
+- `internal/resource/enrichment.go` — either delete entirely (if all consumers now use `Finding` + `AttentionDetail`), or shrink to a deprecation alias if there's a transitional consumer not yet migrated.
 
 #### Files deleted
 
 - `internal/resource/finding_suffix.go` (the entire `(+N)` algebra)
 - `internal/semantics/attention/derive.go` (the shim)
-- The legacy `EnrichmentFinding` type and `IssueEnricherResult` carrier (or its `EnrichmentFinding`-keyed payload, depending on the realized struct shape)
 - Any helper functions on `EnrichmentFinding` that no longer have callers
-- The `applyEnrichment`-shim bridge if it becomes redundant under the new enricher contract
 
 #### Exit criteria
 
@@ -378,13 +369,6 @@ rg 'StripFindingSuffix|BumpFindingSuffix|SplitFindingSuffix' internal/
 # Shim deleted:
 ls internal/semantics/attention/derive.go 2>&1
 # expected: "No such file or directory"
-
-# Legacy EnrichmentFinding type and the applyEnrichment bridge are gone:
-rg '\bEnrichmentFinding\b' internal/
-# expected: zero hits — every Wave 2 enricher now returns canonical Finding/AttentionDetail.
-rg '\bapplyEnrichment\b' internal/
-# expected: zero hits if the bridge was deleted; otherwise the only remaining
-# call sites must operate over canonical types only — no EnrichmentFinding inputs.
 
 # No fetcher anywhere writes Status:
 rg 'resource\.Resource\{[^}]*Status:' internal/aws/
