@@ -1,4 +1,4 @@
-.PHONY: build install test test-race lint gofix fmt run clean cover integration security coverage verify-readonly demo readme check-readme mdlint snapshot snapshot-update ready-to-push ready-to-release generate
+.PHONY: build install test test-budget test-race lint gofix fmt run clean cover integration security coverage verify-readonly demo readme check-readme mdlint snapshot snapshot-update ready-to-push ready-to-release generate
 
 BINARY   = a9s
 CMD      = ./cmd/a9s
@@ -23,6 +23,12 @@ test:
 
 test-race:
 	go test ./tests/unit/ -count=1 -timeout 120s -race
+
+# AS-104: capture wall time of `make test` and write test-budget.json. The
+# CI `test-budget` job (.github/workflows/ci.yml) runs this, then invokes
+# `scripts/test-budget-gate.sh gate` to fail the build at the 5-minute mark.
+test-budget:
+	@scripts/test-budget-gate.sh capture
 
 lint:
 	golangci-lint run ./...
