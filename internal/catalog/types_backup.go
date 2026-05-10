@@ -2,7 +2,9 @@ package catalog
 
 import "github.com/k2m30/a9s/v3/internal/domain"
 
-var backupTypes = []ResourceTypeDef{
+func colorBackup(_ domain.Resource) domain.Color { return domain.ColorHealthy }
+
+var backupTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
 		Name:          "Backup Plans",
 		ShortName:     "backup",
@@ -17,5 +19,6 @@ var backupTypes = []ResourceTypeDef{
 		},
 		// Wave 2 enricher surfaces plans whose recent backup jobs have
 		// failed — Wave 1 list is declarative config.
+		Color: colorBackup,
 	},
 }
