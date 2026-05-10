@@ -266,3 +266,62 @@ func TestHandleRelatedNavigate_RelatedIDs_FullCoverage_NoTask(t *testing.T) {
 		t.Errorf("tasks = %v, want nil — full-coverage filtered list has no fetch", tasks)
 	}
 }
+
+// ─── AS-201 additions: edge cases not yet covered above ────────────────────
+
+// TestRelatedFetchTasks_MixedFullCoverage_Nil — coverage split across both
+// ResourceCache and LazyResourceCache, fully covered → no fetch. Pins that the
+// dedup-aware coverage calculation considers BOTH maps as a union before
+// emitting a fetch task.
+func TestRelatedFetchTasks_MixedFullCoverage_Nil(t *testing.T) {
+	s := newTestSession()
+	s.ResourceCache["ec2"] = &session.ResourceCacheEntry{
+		Resources: []resource.Resource{{ID: "i-1"}},
+	}
+	s.LazyResourceCache["ec2"] = []resource.Resource{{ID: "i-2"}}
+
+	got := relatedFetchTasks(s, "ec2", []string{"i-1", "i-2"})
+	if got != nil {
+		t.Errorf("got %+v, want nil — full mixed coverage should not request a fetch", got)
+	}
+}
+
+// TestRelatedFetchTasks_MissPaginationNil_FetchResources — miss with a
+// ResourceCache entry present but its Pagination is nil → KindFetchResources
+// (not KindFetchMore). Pins the precedence "no pagination info → start over"
+// vs. "pagination present and IsTruncated → continue".
+func TestRelatedFetchTasks_MissPaginationNil_FetchResources(t *testing.T) {
+	s := newTestSession()
+	s.ResourceCache["ec2"] = &session.ResourceCacheEntry{
+		Resources:  []resource.Resource{{ID: "i-1"}},
+		Pagination: nil,
+	}
+
+	got := relatedFetchTasks(s, "ec2", []string{"i-1", "i-missing"})
+	if len(got) != 1 {
+		t.Fatalf("len(tasks) = %d, want 1", len(got))
+	}
+	if got[0].Key.Kind != KindFetchResources {
+		t.Errorf("Kind = %q, want %q (Pagination==nil must fall back to full fetch)", got[0].Key.Kind, KindFetchResources)
+	}
+	if got[0].Key.Scope != "ec2" {
+		t.Errorf("Scope = %q, want %q", got[0].Key.Scope, "ec2")
+	}
+}
+
+// TestRelatedFetchTasks_MissNoResourceCache_LazyOnly_FetchResources — partial
+// miss where only LazyResourceCache has an entry (no ResourceCache entry at
+// all) → KindFetchResources. Pins that the lazy-only path correctly falls
+// through to a full-fetch request when coverage is incomplete.
+func TestRelatedFetchTasks_MissNoResourceCache_LazyOnly_FetchResources(t *testing.T) {
+	s := newTestSession()
+	s.LazyResourceCache["ec2"] = []resource.Resource{{ID: "i-1"}}
+
+	got := relatedFetchTasks(s, "ec2", []string{"i-1", "i-missing"})
+	if len(got) != 1 {
+		t.Fatalf("len(tasks) = %d, want 1", len(got))
+	}
+	if got[0].Key.Kind != KindFetchResources {
+		t.Errorf("Kind = %q, want %q", got[0].Key.Kind, KindFetchResources)
+	}
+}
