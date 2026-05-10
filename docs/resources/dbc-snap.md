@@ -21,15 +21,27 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 - **List API**: `DescribeDBClusterSnapshots`
 - **Describe API (if any)**: not used — all Wave 1 signals are carried on the list response.
 - **Coverage**: this resource type covers BOTH DocumentDB cluster snapshots
-  AND Aurora + Multi-AZ DB cluster snapshots. **The DocDB and RDS SDKs are
-  NOT interchangeable** — each scopes its DescribeDBClusterSnapshots response
-  to its own engine family per the AWS SDK Go v2 docstrings (docdb-side
-  returns DocDB only; rds-side explicitly returns Aurora + Multi-AZ). The
-  a9s fetcher therefore calls both `c.DocDB.DescribeDBClusterSnapshots` and
-  `c.RDS.DescribeDBClusterSnapshots` and merges results. Real AWS rejects
-  `CreateDBSnapshot` on Aurora cluster members; Aurora cluster-level
-  snapshots only exist as `DBClusterSnapshot`s on the RDS side, which is
-  why they live here and not in `dbi-snap`.
+  AND Aurora + Multi-AZ DB cluster snapshots. Both SDKs must be called to get
+  complete coverage; the a9s fetcher calls both `c.DocDB.DescribeDBClusterSnapshots`
+  and `c.RDS.DescribeDBClusterSnapshots` and merges results. Real AWS rejects
+  `CreateDBSnapshot` on Aurora cluster members; Aurora cluster-level snapshots
+  only exist as `DBClusterSnapshot`s on the RDS side, which is why they live
+  here and not in `dbi-snap`.
+  **The DocDB and RDS SDKs are NOT interchangeable, and they overlap.** The AWS
+  SDK Go v2 docstrings imply each scopes its `DescribeDBClusterSnapshots` response
+  to its own engine family, but **empirically (AS-145, verified live on dev-readonly
+  account `000000000000` eu-west-2), both endpoints return snapshot rows for both
+  engine families** — every snapshot for clusters that exist in both engines'
+  result sets is returned by both endpoints. Naïve concat would therefore double
+  every snapshot row.
+  **Dedup contract**: results are concatenated DocDB-side first, then deduped by
+  `Resource.ID` with first-occurrence-wins. The DocDB-side row is therefore preserved
+  on collisions, which is the engine-correct one for detail enrichment and the
+  `dbc-snap → dbc` related-panel pivot (`DBClusterSnapshot.DBClusterIdentifier` read
+  via the docdb-typed `RawStruct`). See `internal/aws/dbc_snap.go` (concat region)
+  and the package-private `dedupResourcesByID` helper in `internal/aws/dbc.go` for
+  the implementation; this dedup behavior is part of the fetcher contract — do not
+  remove it.
 
 ## 2. Related Resources Panel (detail view, right column)
 

@@ -21,14 +21,25 @@ Golden UX/UI doc for this resource, written from the operator's perspective. Des
 - **List API**: BOTH `c.DocDB.DescribeDBClusters` AND `c.RDS.DescribeDBClusters`, results merged via the `docdb:` / `rds:` continuation-token prefix scheme.
 - **Describe API (if any)**: `DescribePendingMaintenanceActions` (one account-wide call, shared with `dbi`)
 - **Coverage**: this resource type covers BOTH DocumentDB clusters AND Aurora + Multi-AZ DB clusters.
-  **The DocDB and RDS SDKs are NOT interchangeable** — the docdb-side SDK
+  Both SDKs must be called to get complete coverage; the a9s fetcher calls both and merges
+  results using the `docdb:` / `rds:` continuation-token prefix scheme.
+  **The DocDB and RDS SDKs are NOT interchangeable, and they overlap.** The docdb-side SDK
   (docdb@v1.48.12/api_op_DescribeDBClusters.go:14-19) instructs callers to use
   `filterName=engine,Values=docdb` for DocDB-only results; unfiltered behavior is
   documented as ambiguous, not engine-agnostic. The rds-side SDK
-  (rds@v1.116.3/api_op_DescribeDBClusters.go:19-28) returns Aurora + Multi-AZ clusters;
-  it may also return Neptune / DocumentDB rows per the official RDS docstring. Both SDKs
-  must be called to get complete coverage. The a9s fetcher calls both and merges results
-  using the `docdb:` / `rds:` continuation-token prefix scheme.
+  (rds@v1.116.3/api_op_DescribeDBClusters.go:19-28) returns Aurora + Multi-AZ clusters
+  and may also return Neptune / DocumentDB rows per the official RDS docstring.
+  **Empirically (AS-145, verified live on dev-readonly account `000000000000` eu-west-2),
+  both endpoints return rows for both engine families** — e.g. an `aurora-postgresql`
+  cluster surfaces from the DocDB endpoint as well as the RDS endpoint. Naïve concat would
+  therefore double-count every cluster that both endpoints return.
+  **Dedup contract**: results are concatenated DocDB-side first, then deduped by
+  `Resource.ID` with first-occurrence-wins. The DocDB-side row is therefore preserved on
+  collisions, which is the engine-correct one for detail enrichment and the
+  `dbc → dbc-snap` related-panel pivot (those branches type-assert on
+  `RawStruct` being a `docdbtypes.DBCluster`). See `internal/aws/dbc.go` (concat region)
+  and `dedupResourcesByID` for the implementation; this dedup behavior is part of the
+  fetcher contract — do not remove it.
 
 ## 2. Related Resources Panel (detail view, right column)
 
