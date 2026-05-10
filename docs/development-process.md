@@ -152,6 +152,18 @@ This target is the canonical gate. It MUST pass locally with zero edits before a
 7. `make snapshot` — golden-file render checks.
 8. `make mdlint` — markdown lint across `docs/`, `CLAUDE.md`, `CONTRIBUTING.md`, `CHANGELOG.md`.
 
+#### Test suite wall budget
+
+`make test` (non-race) MUST complete in ≤ **5 minutes** wall on standard CI hardware (the AS-6 baseline). If a change pushes the suite past that, the author must do one of:
+
+- (a) add `t.Parallel()` + row capture to the new tests;
+- (b) split the package into a sub-package (suggested boundary: any single package whose aggregate test wall exceeds 60 s, per the AS-24 finding);
+- (c) attach a `go test -json` profile + a written plan to the PR description and request CTO sign-off as part of Stage 5.
+
+Parallelization and shared-fixture techniques are tracked under AS-26 and AS-27; the profile baseline lives in AS-24.
+
+Enforcement is manual until measurement infrastructure exists — there is no CI gate failing the build at the 5-minute mark yet. Until that gate lands, the author is responsible for catching budget regressions during Stage 6.
+
 For changes that touch `internal/aws/` real-account behavior, additionally run the live integration test against a real AWS profile (this is also the entry to Stage 6.5):
 
 ```bash
