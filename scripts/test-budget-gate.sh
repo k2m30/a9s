@@ -20,7 +20,7 @@
 
 set -euo pipefail
 
-BUDGET_SECONDS=300
+BUDGET_SECONDS=1  # NEGATIVE-PATH DEMO — forced to 1s so the gate trips on any real run (DO NOT MERGE)
 ARTIFACT="${ARTIFACT:-test-budget.json}"
 
 usage() {
