@@ -1,8 +1,70 @@
 package catalog
 
-import "github.com/k2m30/a9s/v3/internal/domain"
+import (
+	"strconv"
+	"time"
 
-var monitoringTypes = []ResourceTypeDef{
+	"github.com/k2m30/a9s/v3/internal/domain"
+)
+
+func colorAlarm(r domain.Resource) domain.Color {
+	switch r.Fields["state"] {
+	case "ALARM":
+		return domain.ColorBroken
+	case "INSUFFICIENT_DATA":
+		return domain.ColorWarning
+	case "OK":
+		actionsCount, err := strconv.Atoi(r.Fields["actions_count"])
+		if err != nil || actionsCount == 0 {
+			return domain.ColorWarning
+		}
+		return domain.ColorHealthy
+	}
+	return domain.ColorHealthy
+}
+
+func colorLogs(r domain.Resource) domain.Color {
+	if r.Fields["retention_days"] == "" {
+		return domain.ColorWarning
+	}
+	if r.Fields["stored_bytes"] == "0 B" {
+		ct := r.Fields["creation_time"]
+		t, err := time.Parse("2006-01-02 15:04", ct)
+		if err == nil && time.Since(t) > 90*24*time.Hour {
+			return domain.ColorWarning
+		}
+	}
+	return domain.ColorHealthy
+}
+
+func colorTrail(r domain.Resource) domain.Color {
+	if r.Fields["is_logging"] == "false" {
+		return domain.ColorBroken
+	}
+	if r.Fields["latest_delivery_error"] != "" && r.Fields["latest_delivery_error"] != "-" {
+		return domain.ColorBroken
+	}
+	switch r.Fields["status"] {
+	case "failed", "FAILED", "error", "ERROR":
+		return domain.ColorBroken
+	}
+	if r.Fields["log_file_validation_enabled"] == "false" {
+		return domain.ColorWarning
+	}
+	return domain.ColorHealthy
+}
+
+func colorCTEvents(r domain.Resource) domain.Color {
+	switch r.Fields["status"] {
+	case "ct-danger":
+		return domain.ColorBroken
+	case "ct-attention":
+		return domain.ColorWarning
+	}
+	return domain.ColorDim
+}
+
+var monitoringTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
 		Name:          "CloudWatch Alarms",
 		ShortName:     "alarm",
@@ -23,6 +85,7 @@ var monitoringTypes = []ResourceTypeDef{
 			ContextKeys:    map[string]string{"alarm_name": "alarm_name"},
 			DisplayNameKey: "alarm_name",
 		}},
+		Color: colorAlarm,
 	},
 	{
 		Name:          "CloudWatch Log Groups",
@@ -42,6 +105,7 @@ var monitoringTypes = []ResourceTypeDef{
 			ContextKeys:    map[string]string{"log_group_name": "Name"},
 			DisplayNameKey: "log_group_name",
 		}},
+		Color: colorLogs,
 	},
 	{
 		Name:          "CloudTrail Trails",
@@ -55,6 +119,7 @@ var monitoringTypes = []ResourceTypeDef{
 			{Key: "home_region", Title: "Home Region", Width: 16, Sortable: true},
 			{Key: "multi_region", Title: "Multi-Region", Width: 14, Sortable: true},
 		},
+		Color: colorTrail,
 	},
 	{
 		Name:      "CloudTrail Events",
@@ -71,7 +136,8 @@ var monitoringTypes = []ResourceTypeDef{
 			{Key: "read_only", Title: "Read Only", Width: 10, Sortable: true},
 		},
 		ExcludeFromIssueBadge: true,
-		// Project: ctevent.Project — cannot import internal/semantics/ctevent from catalog.
-		// Registered via projectRegistry in internal/resource/color_monitoring.go init().
+		Color:                 colorCTEvents,
+		// Project (ctevent.Project) is injected by internal/resource/ct_events_init.go
+		// to avoid an import cycle: internal/catalog cannot import internal/semantics/ctevent.
 	},
 }
