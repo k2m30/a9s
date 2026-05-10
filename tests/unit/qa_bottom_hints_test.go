@@ -328,10 +328,9 @@ type testNavDetailEC2 struct {
 }
 
 func TestBottomHints_Detail_NavigableField(t *testing.T) {
-	resource.RegisterNavigableFields("ec2", []resource.NavigableField{
+	replaceEC2NavigableFields(t, []resource.NavigableField{
 		{FieldPath: "VpcId", TargetType: "vpc"},
 	})
-	t.Cleanup(func() { resource.UnregisterNavigableFields("ec2") })
 
 	vpcID := "vpc-test456"
 	res := resource.Resource{

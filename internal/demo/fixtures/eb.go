@@ -2,6 +2,7 @@
 package fixtures
 
 import (
+	"sync"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
 )
@@ -13,10 +14,14 @@ type EBFixtures struct {
 }
 
 // NewEBFixtures builds and returns a fully-populated EBFixtures struct.
-func NewEBFixtures() *EBFixtures {
+var sharedEBFixtures = sync.OnceValue(func() *EBFixtures {
 	return &EBFixtures{
 		Environments: buildEBEnvironments(),
 	}
+})
+
+func NewEBFixtures() *EBFixtures {
+	return sharedEBFixtures()
 }
 
 func buildEBEnvironments() []ebtypes.EnvironmentDescription {

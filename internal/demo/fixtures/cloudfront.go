@@ -1,6 +1,7 @@
 package fixtures
 
 import (
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -13,7 +14,7 @@ type CloudFrontFixtures struct {
 }
 
 // NewCloudFrontFixtures constructs CloudFrontFixtures from the canonical demo data.
-func NewCloudFrontFixtures() *CloudFrontFixtures {
+var sharedCloudFrontFixtures = sync.OnceValue(func() *CloudFrontFixtures {
 	return &CloudFrontFixtures{
 		Distributions: []cftypes.DistributionSummary{
 			{
@@ -212,4 +213,8 @@ func NewCloudFrontFixtures() *CloudFrontFixtures {
 			},
 		},
 	}
+})
+
+func NewCloudFrontFixtures() *CloudFrontFixtures {
+	return sharedCloudFrontFixtures()
 }

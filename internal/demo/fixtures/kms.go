@@ -1,6 +1,7 @@
 package fixtures
 
 import (
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -16,7 +17,7 @@ type KMSFixtures struct {
 }
 
 // NewKMSFixtures constructs KMSFixtures from the canonical demo data.
-func NewKMSFixtures() *KMSFixtures {
+var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 	keyMetadata := []*kmstypes.KeyMetadata{
 		{
 			KeyId:                aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
@@ -353,4 +354,8 @@ func NewKMSFixtures() *KMSFixtures {
 	}
 
 	return &KMSFixtures{Keys: keys, Aliases: aliases}
+})
+
+func NewKMSFixtures() *KMSFixtures {
+	return sharedKMSFixtures()
 }

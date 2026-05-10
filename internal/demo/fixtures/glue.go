@@ -1,6 +1,7 @@
 package fixtures
 
 import (
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -19,7 +20,7 @@ func mustParseGlueTime(s string) time.Time {
 }
 
 // NewGlueFixtures constructs GlueFixtures from the canonical demo data.
-func NewGlueFixtures() *GlueFixtures {
+var sharedGlueFixtures = sync.OnceValue(func() *GlueFixtures {
 	dpuSucceeded := 45000.0
 	dpuFailed := 12000.0
 	dpuTimeout := 72000.0
@@ -164,4 +165,8 @@ func NewGlueFixtures() *GlueFixtures {
 			},
 		},
 	}
+})
+
+func NewGlueFixtures() *GlueFixtures {
+	return sharedGlueFixtures()
 }

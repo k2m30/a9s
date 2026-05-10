@@ -73,16 +73,25 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            race: true
+          - os: macos-latest
+            race: false
+          - os: windows-latest
+            race: false
     steps:
       - uses: actions/checkout@v6
       - if: needs.changes.outputs.go == 'true'
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-      - if: needs.changes.outputs.go == 'true'
-        name: Run tests
-        run: go test ./tests/unit/ -count=1 -timeout 120s -race
+      - name: Run tests (with race detector)
+        if: needs.changes.outputs.go == 'true' && matrix.race
+        run: go test ./tests/unit/... -count=1 -timeout 600s -shuffle=on -race
+      - name: Run tests
+        if: needs.changes.outputs.go == 'true' && !matrix.race
+        run: go test ./tests/unit/... -count=1 -timeout 600s -shuffle=on
       - if: needs.changes.outputs.go != 'true'
         name: Docs-only PR — Test stub
         run: echo "No Go-affecting paths changed; Test stub passing per docs-only CI shim."
