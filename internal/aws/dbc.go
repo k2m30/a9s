@@ -341,6 +341,10 @@ func computeDBCFindings(cluster docdbtypes.DBCluster) []domain.Finding {
 // snapshot (AS-145, verified live: the DocDB DescribeDBClusters endpoint
 // returns aurora-postgresql clusters too). DocDB-side rows are appended first
 // at the call sites, so first-occurrence wins keeps the docdb-side row.
+//
+// Engine-filter at source was considered and rejected: it goes silently stale
+// the moment AWS adds a new docdb engine variant or new aurora flavor, whereas
+// dedup-by-ID is symmetric across both fetchers and robust to SDK drift.
 func dedupResourcesByID(rs []resource.Resource) []resource.Resource {
 	if len(rs) < 2 {
 		return rs
