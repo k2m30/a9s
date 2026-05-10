@@ -2,6 +2,8 @@ package unit
 
 import (
 	"context"
+	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -65,6 +67,11 @@ func TestRegisterRelated_ReplacesExisting(t *testing.T) {
 	defer resource.UnregisterRelated("test_reg")
 
 	resource.RegisterRelated("test_reg", second)
+	// AS-67: Each RegisterRelated pushes a snapshot. To leave the registry
+	// clean for the next test, every Register must be paired with an
+	// Unregister. Defers run LIFO, so this one pops `first` first, then the
+	// outer defer pops the original (nil) snapshot.
+	defer resource.UnregisterRelated("test_reg")
 
 	got := resource.GetRelated("test_reg")
 	if got == nil {
@@ -1734,6 +1741,148 @@ func TestAppendRelated_NilChecker_Panics(t *testing.T) {
 		t.Fatal("AppendRelated with zero-value Checker should panic, but did not")
 	}
 	resource.UnregisterRelated("unset_checker_test_append")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AS-67 — UnregisterRelated must restore production defs, not destroy them.
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Background: UnregisterRelated previously called delete(relatedRegistry, key),
+// which destroyed the production registration that aws/*.go init() established.
+// Tests using Register-then-defer-Unregister stomped production state for the
+// rest of the test process; this was order-dependent and only surfaced once
+// AS-26 / AS-41 introduced t.Parallel() to detail tests, deferring the parallel
+// batch until after the sequential batch had emptied the registry.
+//
+// The fix is a per-key snapshot stack: Register pushes the previous value and
+// Unregister pops it. A pop of nil (no prior registration) deletes the entry,
+// which preserves the historical destructive semantics for test-only types
+// that production never registered.
+
+// TestUnregisterRelated_RestoresPreviousValue is the AS-67 contract test: a
+// nested Register-then-Unregister pair must restore the previous registration
+// rather than delete it. A second Unregister (when the previous snapshot was
+// nil) deletes the entry. A third Unregister (popping the empty stack) is a
+// safe no-op.
+func TestUnregisterRelated_RestoresPreviousValue(t *testing.T) {
+	const shortName = "test_as67_restore_previous"
+
+	defsA := []resource.RelatedDef{
+		{TargetType: "as67-target-a", DisplayName: "Target A", Checker: noopChecker},
+	}
+	defsB := []resource.RelatedDef{
+		{TargetType: "as67-target-b", DisplayName: "Target B", Checker: noopChecker},
+	}
+
+	if got := resource.GetRelated(shortName); got != nil {
+		t.Fatalf("pre-condition: expected nil before any Register, got %v", got)
+	}
+
+	resource.RegisterRelated(shortName, defsA)
+	resource.RegisterRelated(shortName, defsB)
+
+	got := resource.GetRelated(shortName)
+	if len(got) != 1 || got[0].TargetType != "as67-target-b" {
+		t.Fatalf("after second Register, expected defsB active, got %v", got)
+	}
+
+	// First Unregister must restore defsA — NOT delete the entry. This is the
+	// regression guard for AS-67; the old destructive delete would return nil.
+	resource.UnregisterRelated(shortName)
+	got = resource.GetRelated(shortName)
+	if len(got) != 1 || got[0].TargetType != "as67-target-a" {
+		t.Fatalf("after first Unregister, expected defsA restored, got %v", got)
+	}
+
+	// Second Unregister pops the original "no previous registration" snapshot
+	// (a nil sentinel pushed by RegisterRelated when the key was empty), so
+	// the active entry is deleted entirely — preserving the historical
+	// destructive semantics for keys that production never registered.
+	resource.UnregisterRelated(shortName)
+	if got := resource.GetRelated(shortName); got != nil {
+		t.Fatalf("after second Unregister, expected nil (entry deleted), got %v", got)
+	}
+
+	// Third Unregister against an empty stack must be a safe no-op (no panic),
+	// since test-only short names like `test_append`, `srcType`, and
+	// `resizeTestType` may be Unregistered without a matching Register.
+	resource.UnregisterRelated(shortName)
+	if got := resource.GetRelated(shortName); got != nil {
+		t.Fatalf("after third Unregister (empty stack), expected nil, got %v", got)
+	}
+}
+
+// TestAppendRelated_UnregisterRestoresPreAppendState verifies that
+// AppendRelated participates in the same snapshot/restore contract as
+// RegisterRelated: appending a new RelatedDef pushes the pre-append state,
+// and a subsequent Unregister rolls back to that state.
+func TestAppendRelated_UnregisterRestoresPreAppendState(t *testing.T) {
+	const shortName = "test_as67_append_then_unregister"
+
+	base := []resource.RelatedDef{
+		{TargetType: "as67-base", DisplayName: "Base", Checker: noopChecker},
+	}
+	added := resource.RelatedDef{
+		TargetType: "as67-appended", DisplayName: "Appended", Checker: noopChecker,
+	}
+
+	resource.RegisterRelated(shortName, base)
+	resource.AppendRelated(shortName, added)
+
+	got := resource.GetRelated(shortName)
+	if len(got) != 2 {
+		t.Fatalf("after Append, expected 2 defs, got %d (%v)", len(got), got)
+	}
+
+	resource.UnregisterRelated(shortName)
+	got = resource.GetRelated(shortName)
+	if len(got) != 1 || got[0].TargetType != "as67-base" {
+		t.Fatalf("after Unregister of Append, expected base only, got %v", got)
+	}
+
+	resource.UnregisterRelated(shortName)
+	if got := resource.GetRelated(shortName); got != nil {
+		t.Fatalf("after final Unregister, expected nil, got %v", got)
+	}
+}
+
+// TestRegisterRelated_Concurrent exercises the registry's mutex under -race.
+// Each goroutine works on its own short name (per-key isolation), so the
+// logical interleaving is uninteresting — the point is that the data race
+// detector must not fire on shared map access.
+func TestRegisterRelated_Concurrent(t *testing.T) {
+	const goroutines = 32
+	const cycles = 50
+
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+	for g := 0; g < goroutines; g++ {
+		go func(id int) {
+			defer wg.Done()
+			shortName := fmt.Sprintf("test_as67_concurrent_%d", id)
+			defs := []resource.RelatedDef{
+				{
+					TargetType:  fmt.Sprintf("as67-tt-%d", id),
+					DisplayName: "concurrent",
+					Checker:     noopChecker,
+				},
+			}
+			extra := resource.RelatedDef{
+				TargetType:  fmt.Sprintf("as67-tt-%d-extra", id),
+				DisplayName: "extra",
+				Checker:     noopChecker,
+			}
+			for c := 0; c < cycles; c++ {
+				resource.RegisterRelated(shortName, defs)
+				_ = resource.GetRelated(shortName)
+				resource.AppendRelated(shortName, extra)
+				_ = resource.GetRelated(shortName)
+				resource.UnregisterRelated(shortName) // pops Append snapshot
+				resource.UnregisterRelated(shortName) // pops Register snapshot
+			}
+		}(g)
+	}
+	wg.Wait()
 }
 
 // ─── compile-time reference to context so the import is used ────────────────
