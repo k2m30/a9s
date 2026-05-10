@@ -2,6 +2,7 @@
 package fixtures
 
 import (
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -73,12 +74,16 @@ const (
 )
 
 // NewDDBFixtures returns a fully-populated DDBFixtures for demo and tests.
-func NewDDBFixtures() *DDBFixtures {
+var sharedDDBFixtures = sync.OnceValue(func() *DDBFixtures {
 	return &DDBFixtures{
 		Tables:              buildDDBTables(),
 		ContinuousBackups:   buildDDBContinuousBackups(),
 		KinesisDestinations: buildDDBKinesisDestinations(),
 	}
+})
+
+func NewDDBFixtures() *DDBFixtures {
+	return sharedDDBFixtures()
 }
 
 // pitrEnabled returns a ContinuousBackupsDescription with PITR enabled.

@@ -113,11 +113,10 @@ func TestDetail_TabSwitchesFocus(t *testing.T) {
 	noopChecker := func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 		return resource.RelatedCheckResult{Count: 0}
 	}
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 		{TargetType: "vpc", DisplayName: "VPCs", Checker: noopChecker},
 	})
-	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailForFocusTest(t, 140)
 
@@ -153,10 +152,9 @@ func TestDetail_TabTogglesFocusOff(t *testing.T) {
 	noopChecker := func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 		return resource.RelatedCheckResult{Count: 0}
 	}
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
-	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailForFocusTest(t, 140)
 
@@ -201,7 +199,7 @@ func TestDetail_TabTogglesFocusOff(t *testing.T) {
 
 func TestDetail_TabWithoutRightCol_IsNoop(t *testing.T) {
 	// No RelatedDefs needed — at width=80 right col is never shown regardless.
-	resource.UnregisterRelated("ec2")
+	unregisterEC2Related(t)
 
 	d := makeDetailForFocusTest(t, 80)
 	viewBefore := d.View()
@@ -220,7 +218,7 @@ func TestDetail_TabWithoutRightCol_IsNoop(t *testing.T) {
 // TestDetail_TabWithoutRightCol_NoPanicOnNarrowTerminal verifies no panic at
 // extreme narrow width (40 columns).
 func TestDetail_TabWithoutRightCol_NoPanicOnNarrowTerminal(t *testing.T) {
-	resource.UnregisterRelated("ec2")
+	unregisterEC2Related(t)
 
 	d := makeDetailForFocusTest(t, 40)
 
@@ -248,11 +246,10 @@ func TestDetail_RightColFocused_EnterEmitsNavigateMsg(t *testing.T) {
 	noopChecker := func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 		return resource.RelatedCheckResult{Count: 0}
 	}
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 		{TargetType: "vpc", DisplayName: "VPCs", Checker: noopChecker},
 	})
-	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailForFocusTest(t, 140)
 
@@ -308,10 +305,9 @@ func TestDetail_RightColFocused_EnterEmitsNavigateMsg_ExactTargetType(t *testing
 	noopChecker := func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 		return resource.RelatedCheckResult{Count: 0}
 	}
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
 	})
-	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailForFocusTest(t, 140)
 
@@ -364,10 +360,9 @@ func TestDetail_RightColFocused_EscUnfocuses(t *testing.T) {
 	noopChecker := func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 		return resource.RelatedCheckResult{Count: 0}
 	}
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
-	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailForFocusTest(t, 140)
 
@@ -403,10 +398,9 @@ func TestDetail_RightColFocused_EscDoesNotHidePanel(t *testing.T) {
 	noopChecker := func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 		return resource.RelatedCheckResult{Count: 0}
 	}
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
-	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailForFocusTest(t, 140)
 
@@ -433,7 +427,7 @@ func TestDetail_RightColFocused_EscDoesNotHidePanel(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestDetail_Tab_NoRelatedDefs_IsNoop(t *testing.T) {
-	resource.UnregisterRelated("ec2")
+	unregisterEC2Related(t)
 
 	d := makeDetailForFocusTest(t, 140)
 	viewBefore := d.View()
@@ -465,10 +459,9 @@ func TestDetail_FocusSequence_TabTabRestores(t *testing.T) {
 	noopChecker := func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 		return resource.RelatedCheckResult{Count: 0}
 	}
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
-	defer resource.UnregisterRelated("ec2")
 
 	d := makeDetailForFocusTest(t, 140)
 	if !strings.Contains(d.View(), "RELATED") {

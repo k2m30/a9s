@@ -2,6 +2,7 @@
 package fixtures
 
 import (
+	"sync"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -17,12 +18,16 @@ type LambdaFixtures struct {
 }
 
 // NewLambdaFixtures builds and returns a fully-populated LambdaFixtures struct.
-func NewLambdaFixtures() *LambdaFixtures {
+var sharedLambdaFixtures = sync.OnceValue(func() *LambdaFixtures {
 	fns := buildLambdaFunctions()
 	return &LambdaFixtures{
 		Functions:           fns,
 		EventSourceMappings: buildLambdaEventSourceMappings(fns),
 	}
+})
+
+func NewLambdaFixtures() *LambdaFixtures {
+	return sharedLambdaFixtures()
 }
 
 const (

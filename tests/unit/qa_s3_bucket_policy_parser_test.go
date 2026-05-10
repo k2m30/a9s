@@ -29,9 +29,13 @@ import (
 // s3FakeClientsWithPolicies returns a ServiceClients whose S3 fake has
 // BucketPolicies overridden with the per-test map. Enables exercising
 // the bucket-policy parser branches without mutating shared fixtures.
+//
+// Builds a fresh, minimal *S3Fixtures rather than reusing the shared
+// sync.OnceValue singleton — mutating that singleton (via the prior
+// `fix := NewS3Fixtures(); fix.BucketPolicies = policies` pattern)
+// poisoned later tests that rely on the production BucketPolicies map.
 func s3FakeClientsWithPolicies(policies map[string]string) *awsclient.ServiceClients {
-	fix := fixtures.NewS3Fixtures()
-	fix.BucketPolicies = policies
+	fix := &fixtures.S3Fixtures{BucketPolicies: policies}
 	return &awsclient.ServiceClients{S3: fakes.NewS3FromFixtures(fix)}
 }
 

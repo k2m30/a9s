@@ -1,6 +1,7 @@
 package fixtures
 
 import (
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -85,7 +86,7 @@ type SESFixtures struct {
 }
 
 // NewSESFixtures constructs SESFixtures from the canonical demo data.
-func NewSESFixtures() *SESFixtures {
+var sharedSESFixtures = sync.OnceValue(func() *SESFixtures {
 	return &SESFixtures{
 		Identities:                   buildSESIdentities(),
 		GetAccountDefault:            buildSESAccountHealthy(),
@@ -93,6 +94,10 @@ func NewSESFixtures() *SESFixtures {
 		EventDestinationsByConfigSet: buildSESEventDestinations(),
 		ActiveReceiptRuleSet:         buildSESActiveReceiptRuleSet(),
 	}
+})
+
+func NewSESFixtures() *SESFixtures {
+	return sharedSESFixtures()
 }
 
 // ---------------------------------------------------------------------------

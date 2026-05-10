@@ -16,6 +16,25 @@ var noopChecker resource.RelatedChecker = func(_ context.Context, _ any, _ resou
 	return resource.RelatedCheckResult{Count: 0}
 }
 
+// unregisterEC2Related removes ec2 related defs for the duration of t and
+// restores them on cleanup so test order (shuffle) doesn't poison later tests.
+func unregisterEC2Related(t *testing.T) {
+	t.Helper()
+	orig := resource.GetRelated("ec2")
+	resource.UnregisterRelated("ec2")
+	t.Cleanup(func() { resource.RegisterRelated("ec2", orig) })
+}
+
+// replaceEC2Related registers defs for "ec2" and restores the originals on
+// cleanup so tests that temporarily override related defs don't leave the
+// registry poisoned for subsequent tests running in shuffled order.
+func replaceEC2Related(t *testing.T, defs []resource.RelatedDef) {
+	t.Helper()
+	orig := resource.GetRelated("ec2")
+	resource.RegisterRelated("ec2", defs)
+	t.Cleanup(func() { resource.RegisterRelated("ec2", orig) })
+}
+
 // newDemoColdCacheApp constructs a tui.Model exactly as cmd/a9s/main.go will
 // after feature 014-demo-transport-mock is fully wired (T036d). It uses
 // demo.NewServiceClients() to supply fake clients and passes them via
