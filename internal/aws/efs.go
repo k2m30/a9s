@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/efs"
 	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -86,6 +87,33 @@ func efsW1Signals(lcs efstypes.LifeCycleState, numMT int32) []string {
 	return phrases
 }
 
+// efsW1Findings returns the active Wave-1 findings for this filesystem.
+func efsW1Findings(lcs efstypes.LifeCycleState, numMT int32) []domain.Finding {
+	var findings []domain.Finding
+
+	switch lcs {
+	case efstypes.LifeCycleStateError:
+		findings = append(findings, domain.Finding{Code: CodeEFSError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1"})
+	case efstypes.LifeCycleStateCreating:
+		findings = append(findings, domain.Finding{Code: CodeEFSCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"})
+	case efstypes.LifeCycleStateUpdating:
+		findings = append(findings, domain.Finding{Code: CodeEFSUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"})
+	case efstypes.LifeCycleStateDeleting:
+		findings = append(findings, domain.Finding{Code: CodeEFSDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"})
+	}
+
+	if numMT == 0 && lcs != efstypes.LifeCycleStateDeleted {
+		noMTFinding := domain.Finding{Code: CodeEFSNoMountTargets, Phrase: "no mount targets", Severity: domain.SevBroken, Source: "wave1"}
+		if len(findings) > 0 && findings[0].Code == CodeEFSError {
+			findings = append([]domain.Finding{findings[0], noMTFinding}, findings[1:]...)
+		} else {
+			findings = append([]domain.Finding{noMTFinding}, findings...)
+		}
+	}
+
+	return findings
+}
+
 // FetchEFSFileSystemsPage fetches a single page of EFS file systems.
 func FetchEFSFileSystemsPage(ctx context.Context, api EFSDescribeFileSystemsAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &efs.DescribeFileSystemsInput{
@@ -125,36 +153,18 @@ func FetchEFSFileSystemsPage(ctx context.Context, api EFSDescribeFileSystemsAPI,
 
 		mountTargets := fmt.Sprintf("%d", fs.NumberOfMountTargets)
 
-		// Compute Wave-1 signals in §4 precedence order.
-		signals := efsW1Signals(fs.LifeCycleState, fs.NumberOfMountTargets)
-
-		// Derive Status (S4) and Issues from active signals.
-		var status string
-		var issues []string
-
-		switch len(signals) {
-		case 0:
-			// Healthy — blank S4.
-			status = ""
-			issues = nil
-		case 1:
-			status = signals[0]
-			issues = signals
-		default:
-			// Multiple W1 signals: top phrase + "(+N-1)" suffix where N-1 = len-1.
-			status = fmt.Sprintf("%s (+%d)", signals[0], len(signals)-1)
-			issues = signals
-		}
+		// Compute Wave-1 findings.
+		findings := efsW1Findings(fs.LifeCycleState, fs.NumberOfMountTargets)
+		statusPhrase := phraseFromFindings(findings)
 
 		r := resource.Resource{
-			ID:     fsID,
-			Name:   name,
-			Status: status,
-			Issues: issues,
+			ID:       fsID,
+			Name:     name,
+			Findings: findings,
 			Fields: map[string]string{
 				"file_system_id":   fsID,
 				"name":             name,
-				"status":           status,
+				"status":           statusPhrase,
 				"performance_mode": performanceMode,
 				"throughput_mode":  throughputMode,
 				"encrypted":        encrypted,

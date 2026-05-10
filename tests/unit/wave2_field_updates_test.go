@@ -15,7 +15,6 @@ package unit
 import (
 	"context"
 	"net/url"
-	"reflect"
 	"regexp"
 	"strings"
 	"testing"
@@ -1098,17 +1097,31 @@ func TestFetchDBC_MultiWarningStatusPhrase(t *testing.T) {
 	// precedence order = delete-protection first, then not-encrypted, then
 	// no-automated-backups — so the top is "delete-protection off" with (+2).
 	const want = "delete-protection off (+2)"
-	if r.Status != want {
-		t.Errorf("Status = %q, want %q (spec §4 multi-warning top phrase)", r.Status, want)
+	// Per Phase-03 PR-03e: fetcher no longer writes Resource.Status; the
+	// display phrase lives in Fields["status"], findings carry severity.
+	if r.Status != "" {
+		t.Errorf("Status = %q, want \"\" (PR-03e: no Status writes)", r.Status)
 	}
 	if r.Fields["status"] != want {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], want)
 	}
 
-	// Issues slice enumerates every active warning (rule 7 — detail view renders each individually).
-	wantIssues := []string{"delete-protection off", "not encrypted at rest", "no automated backups"}
-	if !reflect.DeepEqual(r.Issues, wantIssues) {
-		t.Errorf("Issues = %v, want %v", r.Issues, wantIssues)
+	// Findings enumerate every active warning (rule 7 — detail view renders each individually).
+	wantFindings := []string{"delete-protection off", "not encrypted at rest", "no automated backups"}
+	if len(r.Findings) != len(wantFindings) {
+		t.Fatalf("Findings count = %d, want %d (%v)", len(r.Findings), len(wantFindings), r.Findings)
+	}
+	for i, phrase := range wantFindings {
+		if r.Findings[i].Phrase != phrase {
+			t.Errorf("Findings[%d].Phrase = %q, want %q", i, r.Findings[i].Phrase, phrase)
+		}
+		if r.Findings[i].Source != "wave1" {
+			t.Errorf("Findings[%d].Source = %q, want %q", i, r.Findings[i].Source, "wave1")
+		}
+	}
+	// Legacy r.Issues slice no longer populated (PR-03e migration).
+	if r.Issues != nil {
+		t.Errorf("Issues = %v, want nil (PR-03e: no Issues writes)", r.Issues)
 	}
 }
 

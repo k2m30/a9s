@@ -6,7 +6,9 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kinesis"
+	kinesistypes "github.com/aws/aws-sdk-go-v2/service/kinesis/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -42,6 +44,20 @@ func FetchKinesisStreams(ctx context.Context, api KinesisListStreamsAPI) ([]reso
 	return all, nil
 }
 
+// computeKinesisFindings returns a []domain.Finding for the given Kinesis stream state.
+func computeKinesisFindings(state kinesistypes.StreamStatus) []domain.Finding {
+	switch state {
+	case kinesistypes.StreamStatusCreating:
+		return []domain.Finding{{Code: CodeKinesisCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"}}
+	case kinesistypes.StreamStatusUpdating:
+		return []domain.Finding{{Code: CodeKinesisUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"}}
+	case kinesistypes.StreamStatusDeleting:
+		return []domain.Finding{{Code: CodeKinesisDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"}}
+	default:
+		return nil
+	}
+}
+
 // FetchKinesisStreamsPage fetches a single page of Kinesis streams.
 func FetchKinesisStreamsPage(ctx context.Context, api KinesisListStreamsAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &kinesis.ListStreamsInput{
@@ -69,7 +85,7 @@ func FetchKinesisStreamsPage(ctx context.Context, api KinesisListStreamsAPI, con
 			streamARN = *stream.StreamARN
 		}
 
-		status := string(stream.StreamStatus)
+		rawStatus := string(stream.StreamStatus)
 
 		creationTime := ""
 		if stream.StreamCreationTimestamp != nil {
@@ -81,13 +97,17 @@ func FetchKinesisStreamsPage(ctx context.Context, api KinesisListStreamsAPI, con
 			streamMode = string(stream.StreamModeDetails.StreamMode)
 		}
 
+		findings := computeKinesisFindings(stream.StreamStatus)
+		statusPhrase := phraseFromFindings(findings)
+
 		r := resource.Resource{
-			ID:     streamName,
-			Name:   streamName,
-			Status: status,
+			ID:       streamName,
+			Name:     streamName,
+			Findings: findings,
 			Fields: map[string]string{
 				"stream_name":   streamName,
-				"status":        status,
+				"status":        statusPhrase,
+				"stream_status": rawStatus,
 				"stream_arn":    streamARN,
 				"creation_time": creationTime,
 				"stream_mode":   streamMode,
