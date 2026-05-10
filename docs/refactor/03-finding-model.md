@@ -95,18 +95,18 @@ After PR-03a-shim, the only ways a resource can reach view state without `Findin
 
 **Goal.** Add the new types. No consumers, no shim, no view changes. Purely additive; the codebase compiles and behaves identically because nothing reads the new fields.
 
-**Files added**
+#### Files added
 
 - `internal/domain/finding.go` — `FindingCode`, `Finding`
 - `internal/semantics/attention/types.go` — `AttentionDetail`, `DetailRow`
 
-**Files modified**
+#### Files modified
 
 - `internal/domain/resource.go` — add `Findings []Finding` and `AttentionDetails map[FindingCode]AttentionDetail` fields. `Status` and `Issues` stay untouched. (Phase 01 moved the struct body here; `internal/resource/resource.go` is the alias and is not edited.)
 - `internal/resource/types.go` — add `LifecycleKey string` field to `ResourceTypeDef`.
 - All 12 `internal/resource/types_*.go` files — set `LifecycleKey` on every type def. Empty string defaults to `"state"`. Audit which types use a non-default key.
 
-**Exit criteria**
+#### Exit criteria
 
 ```bash
 # Fields exist on Resource:
@@ -132,11 +132,11 @@ make test
 
 **Goal.** Add the one-way derive shim and wire it into every entry point listed above. After this PR, every `Resource` reaching view state has `Findings` and `AttentionDetails` populated — derived from legacy `Status` + `Issues` + `EnrichmentFinding`. View code does not yet read the new fields; consumer migration is PR-03a-views.
 
-**Files added**
+#### Files added
 
 - `internal/semantics/attention/derive.go` — `func DeriveFindings(r *Resource, td ResourceTypeDef, enrichmentFindings map[string]EnrichmentFinding)`. Reads `r.Status`, `r.Issues`, and the supplied `enrichmentFindings` (keyed by resource ID; the caller passes the relevant slice of `m.enrichmentFindings`). Synthesizes a `FindingCode` from a per-type lookup table built before the per-category PR for that type begins. **Never writes back to `Status`/`Issues`. Deterministic: re-derives `r.Findings` and `r.AttentionDetails` from inputs each call — no early-return.** Re-derivation is safe because the inputs are the legacy fields and the parallel map; same inputs yield same outputs. The Wave 2 bridge depends on this: it calls `DeriveFindings` after `m.enrichmentFindings[type]` has been updated, and the shim must re-merge — an early-return on "Findings already populated" would skip the merge.
 
-**Files modified**
+#### Files modified
 
 - `internal/tui/app_fetchers.go` — wrap fetcher results: derive across `[]Resource` before publishing.
 - `internal/tui/app_handlers_availability.go` (around line 124) — derive across `msg.Resources` before `maps.Copy(m.probeResources, ...)`.
@@ -146,7 +146,7 @@ make test
 - `internal/tui/app_handlers_navigate.go` — child-view fetcher path: derive before passing resources to the child list.
 - `internal/tui/app_enrich.go` — `EnrichDetailResultMsg` path: derive before merging the enriched resource.
 
-**Exit criteria**
+#### Exit criteria
 
 ```bash
 # Every entry point calls DeriveFindings:
@@ -170,7 +170,7 @@ rg 'len\(r\.Findings\)\s*>\s*0' internal/semantics/attention/derive.go
 
 **Goal.** Convert every `r.Status` / `r.Issues` / direct `EnrichmentFinding` read in `internal/tui/` to use `Findings` and `AttentionDetails`. After this PR, no view code reads the legacy fields. Fetchers and enrichers still *write* `Status`/`Issues` (the per-category cutover migrates them); the shim from 03a-shim ensures `Findings` is populated by the time views read it.
 
-**Files modified**
+#### Files modified
 
 - `internal/tui/views/resourcelist.go`, `resourcelist_helpers.go`, `table_render.go` — list-view Status column and color logic read `Findings[0].Phrase` / `Findings[0].Severity`, falling back to `Fields[td.LifecycleKey]`.
 - `internal/tui/views/detail.go`, `detail_fields.go`, `detail_helpers.go`, `rightcolumn.go` — Attention section reads `r.AttentionDetails[code]` for each `r.Findings[i]`.
@@ -178,7 +178,7 @@ rg 'len\(r\.Findings\)\s*>\s*0' internal/semantics/attention/derive.go
 - `internal/tui/views/attention.go` — filter predicate reads `Findings`.
 - `tests/unit/` — update every test that asserts on `r.Status` content. Concrete files: `resourcelist_*_test.go`, `detail_*_test.go`, `mainmenu_*_test.go`, `attention_*_test.go`, `qa_*_test.go`. **Test migration is in scope for this PR.** Counted budget: ~30 test files, each touching 1–5 assertions. Estimated test diff: 200–400 lines.
 
-**Exit criteria**
+#### Exit criteria
 
 ```bash
 # View code does not read Resource.Status:
@@ -230,23 +230,23 @@ func (m *Model) applyEnrichment(
 )
 ```
 
-**Files added**
+#### Files added
 
 - `internal/tui/app_enrich_fold.go` (or extension to `app_handlers_availability.go`) — `applyEnrichment` defined as documented above.
 
-**Files modified**
+#### Files modified
 
 - `internal/tui/app_handlers_availability.go` — the `EnrichmentCheckedMsg` handler stops writing to `m.EnrichmentFindings` (now uppercase from PR-02a) and instead calls `m.applyEnrichment(...)`. The downstream `SetEnrichmentState` calls on `ResourceListModel` and `DetailModel` views read from updated cache rows; the `msg.Findings` argument is no longer plumbed through view APIs (or it stays for backward-compat, with views ignoring it — confirm during PR review).
 - `internal/tui/views/resourcelist.go` — `SetEnrichmentState`'s third argument (the `findings` map) becomes vestigial; either drop the argument here OR keep it accepted-but-ignored until PR-03n removes the API entirely. Pick one and stick with it for the per-category PRs that follow.
 - `internal/session/session.go` — delete the `EnrichmentFindings map[string]map[string]EnrichmentFinding` field from `Session`. Its purpose is gone.
 - `internal/semantics/attention/derive.go` — remove the `EnrichmentCheckedMsg` derivation branch added in PR-03a-shim. It is now dead code: cached rows already have post-enrichment `Findings` written directly. Other shim branches (Wave 1 fetcher path, probe path, etc.) stay until per-category PRs migrate them.
 
-**Files deleted (symbols)**
+#### Files deleted (symbols)
 
 - `Session.EnrichmentFindings` field.
 - Any helper that read or constructed the parallel map (e.g. `getEnrichmentFindingsFor(resourceType, resourceID)`).
 
-**Exit criteria**
+#### Exit criteria
 
 ```bash
 # Parallel map is gone:
@@ -276,6 +276,8 @@ Behavior verification:
 
 ### PR-03b through PR-03m — Per-category cutover
 
+**Realized pattern (Option A — relax mid-phase, gate at phase-end).** Per-category PRs migrate fetchers to emit canonical `Resource.Findings` directly, but they retain the legacy `EnrichmentFinding`-shaped enricher return contract and rely on the `applyEnrichment` shim in `internal/tui/app_enrich_fold.go` to bridge enricher output onto cached row state. Per-category PRs therefore do NOT change enricher signatures, do NOT delete `IssueEnricherResult`/`EnrichmentFinding`, and do NOT enforce a "no EnrichmentFinding return" exit criterion. That uniform migration is consolidated in **PR-03n** (see "Enricher signature migration is phase-end, not per-category" in the PR-03n section). This keeps each per-category PR mechanical and reviewable in isolation while preserving a single, atomic enricher-signature migration at phase end.
+
 12 PRs, one per service-category file in `internal/resource/types_*.go`:
 
 | PR | Category | Resource types affected |
@@ -296,7 +298,7 @@ Behavior verification:
 **Per-PR scope (template).** Each per-category PR:
 
 1. Updates every fetcher in `internal/aws/<category-services>.go` to populate `Resource.Findings` and `Resource.AttentionDetails` directly. Stops setting `Resource.Status` and `Resource.Issues`.
-2. Updates every Wave 2 issue enricher in `internal/aws/<svc>_issue_enrichment.go` to append to `Findings` and write to `AttentionDetails[code]`. Stops calling `BumpFindingSuffix` on `Status`. Stops returning `EnrichmentFinding` — returns `[]Finding` + `map[FindingCode]AttentionDetail` updates.
+2. Updates every Wave 2 issue enricher in `internal/aws/<svc>_issue_enrichment.go` to express its results in canonical terms — populating `Finding`/`AttentionDetail` data inside the existing `IssueEnricherResult`/`EnrichmentFinding` return shape. Stops calling `BumpFindingSuffix` on `Status`. **Per-category PRs (03b–03m) deliberately do NOT change enricher return signatures off `EnrichmentFinding`.** That uniform migration is consolidated in PR-03n (see "Enricher signature migration is phase-end, not per-category" below). The bridge for the duration of phase 03 is `applyEnrichment` in `internal/tui/app_enrich_fold.go`: it accepts `map[string]resource.EnrichmentFinding` from each enricher and folds the canonical content directly onto each cached row's `Findings` / `AttentionDetails`. Per-category PRs therefore keep the legacy enricher contract intact and rely on `applyEnrichment` for canonical row state.
 3. Updates every `Color` function in the corresponding `types_<category>.go` to read `Findings[0].Severity` first, falling back to `lifecycleSeverity(r.Fields[td.LifecycleKey])`. Drops any `r.Status` reads.
 4. Declares `FindingCode` constants in `internal/aws/<svc>_codes.go` (a sibling file in the same package as the fetcher). Per-service namespacing: `awsclient.CodeEC2Impaired = "ec2.impaired"`, `awsclient.CodeRDSMaintPending = "rds.maint.pending"`, etc. **The constants stay in `internal/aws/` for the entire program** — the speculative `internal/aws/` → `internal/transport/` rename is out of scope. If that rename ever happens, it's a single `gofmt`-style refactor across the package, post-program.
 5. The shim continues covering any unmigrated path. **Bypass for migrated types is input-driven, not state-driven.** A migrated fetcher stops writing `Status` and `Issues`, so when the shim runs over a migrated row the inputs (`r.Status`, `r.Issues`, parallel-map entry post-PR-03a-fold = none) are all empty. The shim's derivation contract is: *if all legacy inputs are empty, do not touch `Findings` or `AttentionDetails`* — preserving the directly-written values. This is **not** an early-return on `len(r.Findings) > 0` (which would skip Wave 2 re-merges and break the deterministic-re-derive guarantee from PR-03a-shim). The bypass happens because there is nothing to derive, not because findings are already populated.
@@ -336,20 +338,27 @@ Behavior verification:
 
 ### PR-03n — Cleanup; delete legacy
 
-**Goal.** Delete `Resource.Status`, `Resource.Issues`, the entire `(+N)` suffix algebra, and the shim. Migrate any remaining `EnrichmentFinding` references off the legacy type into `Finding` + `AttentionDetail` directly.
+**Goal.** Delete `Resource.Status`, `Resource.Issues`, the entire `(+N)` suffix algebra, the `applyEnrichment`-shim bridge, and the legacy `EnrichmentFinding` enricher contract. Migrate every Wave 2 enricher in `internal/aws/<svc>_issue_enrichment.go` off `EnrichmentFinding` onto canonical `[]Finding` + `map[FindingCode]AttentionDetail` returns in a single, uniform sweep.
 
-**Files modified**
+**Enricher signature migration is phase-end, not per-category.** Per-category PRs 03b–03m kept the legacy enricher contract by design (Option A — relax mid-phase, gate at phase-end). The bridge during phase 03 is `applyEnrichment` in `internal/tui/app_enrich_fold.go`, which folds `map[string]resource.EnrichmentFinding` into cached rows. PR-03n removes that bridge by changing every enricher's return type at once, then deleting the bridge along with the legacy type. Doing this uniformly avoids a long transitional window in which some enrichers return canonical types and others return `EnrichmentFinding` — every per-category PR would otherwise need to teach `applyEnrichment` two input shapes simultaneously.
+
+#### Files modified
 
 - `internal/domain/resource.go` — delete `Status`, `Issues` fields. (`internal/resource/resource.go` is still just the alias.)
-- `internal/resource/enrichment.go` — either delete entirely (if all consumers now use `Finding` + `AttentionDetail`), or shrink to a deprecation alias if there's a transitional consumer not yet migrated.
+- `internal/resource/enrichment.go` — delete the legacy `EnrichmentFinding` type and any helper signatures it carried.
+- Every `internal/aws/<svc>_issue_enrichment.go` — change return type from `IssueEnricherResult` (which embeds `map[string]EnrichmentFinding`) to `[]Finding` + `map[FindingCode]AttentionDetail`. Update each registered enricher signature in lockstep.
+- `internal/tui/app_enrich_fold.go` — update `applyEnrichment` to accept the canonical `[]Finding` / `map[FindingCode]AttentionDetail` shape (or delete entirely if direct fetcher writes plus updated enricher writes make it redundant — decide in PR-03n's design).
+- Tests for every enricher: `tests/unit/<svc>_issue_enrichment_test.go` — assert on `Findings` / `AttentionDetails` directly. **Test migration is in scope for this PR.**
 
-**Files deleted**
+#### Files deleted
 
 - `internal/resource/finding_suffix.go` (the entire `(+N)` algebra)
 - `internal/semantics/attention/derive.go` (the shim)
+- The legacy `EnrichmentFinding` type and `IssueEnricherResult` carrier (or its `EnrichmentFinding`-keyed payload, depending on the realized struct shape)
 - Any helper functions on `EnrichmentFinding` that no longer have callers
+- The `applyEnrichment`-shim bridge if it becomes redundant under the new enricher contract
 
-**Exit criteria**
+#### Exit criteria
 
 ```bash
 # Status field is gone:
@@ -369,6 +378,13 @@ rg 'StripFindingSuffix|BumpFindingSuffix|SplitFindingSuffix' internal/
 # Shim deleted:
 ls internal/semantics/attention/derive.go 2>&1
 # expected: "No such file or directory"
+
+# Legacy EnrichmentFinding type and the applyEnrichment bridge are gone:
+rg '\bEnrichmentFinding\b' internal/
+# expected: zero hits — every Wave 2 enricher now returns canonical Finding/AttentionDetail.
+rg '\bapplyEnrichment\b' internal/
+# expected: zero hits if the bridge was deleted; otherwise the only remaining
+# call sites must operate over canonical types only — no EnrichmentFinding inputs.
 
 # No fetcher anywhere writes Status:
 rg 'resource\.Resource\{[^}]*Status:' internal/aws/
