@@ -21,8 +21,8 @@ import (
 )
 
 // NavigationKind enumerates the possible outcomes of resolving a
-// RelatedNavigateEvent. Mirrors the contract in
-// internal/tui/navigation_resolve.go §"Related-navigation contract (#278)".
+// RelatedNavigateEvent. The pure contract is documented in
+// §"Related-navigation contract (#278)" on ResolveRelatedNavigate below.
 type NavigationKind int
 
 const (
@@ -34,7 +34,7 @@ const (
 	NavigationKindFlash                         // emit a FlashMsg (typically error path)
 )
 
-// NavigationResult is the pure-function output of resolveRelatedNavigate.
+// NavigationResult is the pure-function output of ResolveRelatedNavigate.
 // Fields are conditionally populated depending on Kind.
 type NavigationResult struct {
 	Kind         NavigationKind
@@ -74,6 +74,11 @@ const (
 	// KindFetchMore asks the adapter to fetch the next page of resources for
 	// the type named by TaskKey.Scope, using the continuation token it holds
 	// in the session cache.
+	//
+	// TODO(PR-05b): the continuation token is currently re-derived by the
+	// adapter from the session cache (see runtime_adapter_related.go). When
+	// PR-05b lands the typed cmd/event split it will travel as a structured
+	// payload on TaskRequest so the runtime is the single decision-maker.
 	KindFetchMore TaskKind = "fetch-more"
 )
 
@@ -88,7 +93,7 @@ const (
 // handler is platform-agnostic and testable without standing up Bubble Tea.
 func (c *Core) HandleRelatedNavigate(ev RelatedNavigateEvent) (NavigationResult, []TaskRequest) {
 	snap := relatedCacheSnapshot(c.session)
-	result := resolveRelatedNavigate(ev, snap)
+	result := ResolveRelatedNavigate(ev, snap)
 
 	switch result.Kind {
 	case NavigationKindFlash, NavigationKindEnterChildView, NavigationKindDetail:
@@ -197,9 +202,13 @@ func relatedCacheSnapshot(s *session.Session) map[string][]resource.Resource {
 	return snap
 }
 
-// resolveRelatedNavigate computes the navigation kind for a RelatedNavigateEvent.
-// This is the runtime-native version of the resolver; the pure contract mirrors
-// internal/tui/navigation_resolve.go §"Related-navigation contract (#278)".
+// ResolveRelatedNavigate computes the navigation kind for a RelatedNavigateEvent
+// against a flat resource-cache snapshot. After AS-150 it is the SSOT for
+// related-navigation resolution; the prior internal/tui resolver was deleted in
+// the same PR. Exported so tests/unit can drive it without reaching into
+// runtime internals.
+//
+// Related-navigation contract (#278):
 //
 //  1. Unknown target type          → NavigationKindFlash (error surfaced to the user).
 //  2. Child type                   → NavigationKindEnterChildView.
@@ -208,7 +217,7 @@ func relatedCacheSnapshot(s *session.Session) map[string][]resource.Resource {
 //  5. TargetID cache miss          → NavigationKindFilteredList (FilterText=TargetID).
 //  6. RelatedIDs (one or many)     → NavigationKindFilteredList (RelatedIDs preserved).
 //  7. Otherwise                    → NavigationKindResourceList.
-func resolveRelatedNavigate(ev RelatedNavigateEvent, cache map[string][]resource.Resource) NavigationResult {
+func ResolveRelatedNavigate(ev RelatedNavigateEvent, cache map[string][]resource.Resource) NavigationResult {
 	_, isChild, found := resource.ResolveNavigationTarget(ev.TargetType)
 	if !found {
 		return NavigationResult{
