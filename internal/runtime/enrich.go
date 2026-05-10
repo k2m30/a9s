@@ -65,11 +65,8 @@ func (c *Core) HandleEnrichDetail(ev EnrichDetailEvent) ([]UIIntent, []TaskReque
 		return nil, nil
 	}
 	return nil, []TaskRequest{{
-		Key:   TaskKey{Kind: KindEnrichDetail, Scope: ev.ResourceType + "/" + ev.Resource.ID},
-		Cache: CacheNone,
-		Payload: EnrichDetailPayload{
-			ResourceType: ev.ResourceType,
-			Resource:     ev.Resource,
-		},
+		Key:     TaskKey{Kind: KindEnrichDetail, Scope: ev.ResourceType + "/" + ev.Resource.ID},
+		Cache:   CacheNone,
+		Payload: EnrichDetailPayload(ev),
 	}}
 }
