@@ -116,7 +116,7 @@ func TestRelatedFetchTasks_MissNoResourceCache_LazyOnly_FetchResources(t *testin
 
 // ─── relatedCacheSnapshot — Cases a–d ──────────────────────────────────────
 
-// snapResource is a tiny accessor that returns the IDs visible in the snapshot
+// snapResourceIDs is a tiny accessor that returns the IDs visible in the snapshot
 // for the given shortName, preserving order.
 func snapResourceIDs(snap map[string][]resource.Resource, shortName string) []string {
 	rs := snap[shortName]
