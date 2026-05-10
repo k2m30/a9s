@@ -60,7 +60,7 @@ This phase ships as **one PR**. The work is tightly coupled (`Severity` must exi
 
 ### PR-01 — Domain bootstrap + introduce projection hook
 
-**Files added**
+#### Files added
 
 - `internal/domain/severity.go` — `Severity` enum + `IsIssue()` (~30 LOC)
 - `internal/domain/resource.go` — `Resource` struct moved from `internal/resource/resource.go` (~25 LOC)
@@ -71,7 +71,7 @@ This phase ships as **one PR**. The work is tightly coupled (`Severity` must exi
 - `internal/semantics/ctevent/` — entire `internal/aws/ctdetail/` directory, moved
 - `internal/semantics/ctevent/projector.go` — wraps existing `BuildSections` to return `[]domain.Section`
 
-**Files modified**
+#### Files modified
 
 - `internal/resource/resource.go` — replace struct definition with single line: `type Resource = domain.Resource` (alias). Every consumer of `resource.Resource` continues to compile.
 - `internal/resource/types.go` — add `Project domain.DetailProjector` field to `ResourceTypeDef`
@@ -80,13 +80,13 @@ This phase ships as **one PR**. The work is tightly coupled (`Severity` must exi
 - `internal/tui/views/detail_render.go` — consumes `[]domain.Section` (already does morally, just typed now)
 - Every `internal/tui/views/detail_*_test.go` that asserts on rendered detail content — verify still passing
 
-**Files deleted**
+#### Files deleted
 
 - The shortName branch in `detail_fields.go` lines 234–253 (ct-events special case)
 - `sectionsToFieldItems` shim at `detail_fields.go:470` (no longer needed; everyone returns `[]domain.Section` now)
 - `internal/aws/ctdetail/` directory (moved to `internal/semantics/ctevent/`, not deleted, but the old path goes away)
 
-**What this PR explicitly does NOT do**
+#### What this PR explicitly does NOT do
 
 - Does NOT touch `Resource.Status` / `Resource.Issues` / `(+N)` algebra. That's Phase 03.
 - Does NOT introduce `Finding`. Only `Severity`. `Item.Severity` is set by the projector from existing `Resource.Status` / `Fields["state"]` interpretation; no canonical finding model yet.
@@ -98,44 +98,56 @@ This phase ships as **one PR**. The work is tightly coupled (`Severity` must exi
 A PR is mergeable only when all of these are true. Verification commands run from repo root:
 
 1. **No shortName dispatch in detail rendering.**
+
    ```bash
    rg '== "ct-events"|"ct-events" ==' internal/tui/views/
    # expected: zero hits
    rg '\b(resType|resourceType|m\.resourceType)\s*==\s*"' internal/tui/views/detail_*.go
    # expected: zero hits
+
    ```
+
    (The previous draft used `resType == "` — the live code uses `m.resourceType ==`. Match both, plus the simpler "literal-against-shortname" pattern.)
 
 2. **`internal/aws/ctdetail/` is deleted.**
+
    ```bash
    ls internal/aws/ctdetail/ 2>&1
    # expected: "No such file or directory"
+
    ```
 
 3. **`internal/tui/views/` does not import `internal/semantics/ctevent`.**
+
    ```bash
    rg 'semantics/ctevent' internal/tui/
    # expected: zero hits — only the type def in internal/resource/ may reference ctevent.Project
+
    ```
 
 4. **`internal/domain` is presentation-free and imports nothing internal.**
+
    ```bash
    rg 'lipgloss|tcell|color\.' internal/domain/
    # expected: zero hits
 
    rg 'github\.com/k2m30/a9s' internal/domain/
    # expected: zero hits — domain is a leaf package
+
    ```
 
 5. **No import cycle from `internal/resource` to `internal/semantics/*`.**
+
    ```bash
    go list -f '{{.Imports}}' github.com/k2m30/a9s/v3/internal/semantics/ctevent | tr ' ' '\n' | grep 'internal/resource'
    # expected: zero hits
    go list -f '{{.Imports}}' github.com/k2m30/a9s/v3/internal/semantics/projection | tr ' ' '\n' | grep 'internal/resource'
    # expected: zero hits
+
    ```
 
 6. **`Resource` lives in `internal/domain`; `internal/resource` re-exports.**
+
    ```bash
    rg '^type Resource struct' internal/domain/resource.go
    # expected: present
@@ -143,9 +155,11 @@ A PR is mergeable only when all of these are true. Verification commands run fro
    # expected: present (single-line type alias)
    rg '^type Resource struct' internal/resource/resource.go
    # expected: zero hits
+
    ```
 
 7. **Generic projector covers every type — structural test, not a smoke list.**
+
    ```go
    // tests/unit/projection_coverage_test.go
    func TestProjectorCoverageAllTypes(t *testing.T) {
@@ -160,7 +174,9 @@ A PR is mergeable only when all of these are true. Verification commands run fro
            }
        }
    }
+
    ```
+
    This loop replaces the previous "verify ec2/s3/rds/..." smoke list. `make test` runs it; any regression in any of the 66 types fails the gate.
 
 8. **ct-events detail unchanged from user perspective.**
