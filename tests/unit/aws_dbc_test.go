@@ -709,6 +709,192 @@ func TestDbc_Pagination_MultiPage_Success(t *testing.T) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// AS-145: dual-SDK dedup-by-ID — DocDB-side wins.
+// ---------------------------------------------------------------------------
+
+// TestDBCFetcher_DedupesAcrossDualAPIByID pins the AS-145 production fix:
+// when DocDB and RDS DescribeDBClusters both return the same cluster ID on
+// the same fetch tick (verified live: the DocDB endpoint returns
+// aurora-postgresql clusters too), the dbc fetcher must dedup by Resource.ID
+// with first-occurrence wins. DocDB-side rows are appended first, so the
+// docdb-side row must be preserved (engine-correct RawStruct used by detail
+// enrichment and dbc-snap related-panel pivots).
+func TestDBCFetcher_DedupesAcrossDualAPIByID(t *testing.T) {
+	fetcher := resource.GetPaginatedFetcher("dbc")
+	if fetcher == nil {
+		t.Fatal("no paginated fetcher registered for dbc — init() not invoked")
+	}
+
+	// Sub-test 1: same cluster identifier returned by both DocDB and RDS on the
+	// same tick. Expect 1 row, with docdb-side RawStruct preserved.
+	t.Run("overlap_keeps_docdb_side", func(t *testing.T) {
+		const sharedID = "shared-cluster-01"
+		docdbMock := &fullDocDBMock{
+			dbClustersPages: []docdb.DescribeDBClustersOutput{
+				{
+					DBClusters: []docdbtypes.DBCluster{
+						{
+							DBClusterIdentifier: aws.String(sharedID),
+							Engine:              aws.String("docdb"),
+							Status:              aws.String("available"),
+							StorageEncrypted:    aws.Bool(true),
+							DeletionProtection:  aws.Bool(true),
+						},
+					},
+				},
+			},
+		}
+		rdsMock := &fullRDSMock{
+			dbClustersPages: []rds.DescribeDBClustersOutput{
+				{
+					DBClusters: []rdstypes.DBCluster{
+						{
+							DBClusterIdentifier: aws.String(sharedID),
+							Engine:              aws.String("aurora-postgresql"),
+							Status:              aws.String("available"),
+						},
+					},
+				},
+			},
+		}
+		clients := &awsclient.ServiceClients{DocDB: docdbMock, RDS: rdsMock}
+
+		result, err := fetcher(context.Background(), clients, "")
+		if err != nil {
+			t.Fatalf("fetcher error: %v", err)
+		}
+		if len(result.Resources) != 1 {
+			t.Fatalf("len(Resources) = %d, want 1 (overlap deduped)", len(result.Resources))
+		}
+		r := result.Resources[0]
+		if r.ID != sharedID {
+			t.Errorf("Resources[0].ID = %q, want %q", r.ID, sharedID)
+		}
+		if _, ok := r.RawStruct.(docdbtypes.DBCluster); !ok {
+			t.Errorf("Resources[0].RawStruct type = %T, want docdbtypes.DBCluster (DocDB-side appended first must win)", r.RawStruct)
+		}
+	})
+
+	// Sub-test 2: distinct identifiers on each side — both rows preserved.
+	t.Run("no_overlap_keeps_both", func(t *testing.T) {
+		docdbMock := &fullDocDBMock{
+			dbClustersPages: []docdb.DescribeDBClustersOutput{
+				{
+					DBClusters: []docdbtypes.DBCluster{
+						{
+							DBClusterIdentifier: aws.String("docdb-only-01"),
+							Engine:              aws.String("docdb"),
+							Status:              aws.String("available"),
+							StorageEncrypted:    aws.Bool(true),
+							DeletionProtection:  aws.Bool(true),
+						},
+					},
+				},
+			},
+		}
+		rdsMock := &fullRDSMock{
+			dbClustersPages: []rds.DescribeDBClustersOutput{
+				{
+					DBClusters: []rdstypes.DBCluster{
+						{
+							DBClusterIdentifier: aws.String("rds-only-01"),
+							Engine:              aws.String("aurora-mysql"),
+							Status:              aws.String("available"),
+						},
+					},
+				},
+			},
+		}
+		clients := &awsclient.ServiceClients{DocDB: docdbMock, RDS: rdsMock}
+
+		result, err := fetcher(context.Background(), clients, "")
+		if err != nil {
+			t.Fatalf("fetcher error: %v", err)
+		}
+		if len(result.Resources) != 2 {
+			t.Fatalf("len(Resources) = %d, want 2 (no overlap)", len(result.Resources))
+		}
+		ids := map[string]bool{}
+		for _, r := range result.Resources {
+			ids[r.ID] = true
+		}
+		for _, want := range []string{"docdb-only-01", "rds-only-01"} {
+			if !ids[want] {
+				t.Errorf("expected resource %q in result, got %v", want, ids)
+			}
+		}
+	})
+
+	// Sub-test 3: shared identifier + RDS-only unique on the same tick —
+	// deduped pair plus the unique RDS row both survive.
+	t.Run("overlap_plus_rds_only_keeps_two", func(t *testing.T) {
+		const sharedID = "shared-cluster-02"
+		docdbMock := &fullDocDBMock{
+			dbClustersPages: []docdb.DescribeDBClustersOutput{
+				{
+					DBClusters: []docdbtypes.DBCluster{
+						{
+							DBClusterIdentifier: aws.String(sharedID),
+							Engine:              aws.String("docdb"),
+							Status:              aws.String("available"),
+							StorageEncrypted:    aws.Bool(true),
+							DeletionProtection:  aws.Bool(true),
+						},
+					},
+				},
+			},
+		}
+		rdsMock := &fullRDSMock{
+			dbClustersPages: []rds.DescribeDBClustersOutput{
+				{
+					DBClusters: []rdstypes.DBCluster{
+						{
+							DBClusterIdentifier: aws.String(sharedID),
+							Engine:              aws.String("aurora-postgresql"),
+							Status:              aws.String("available"),
+						},
+						{
+							DBClusterIdentifier: aws.String("rds-only-02"),
+							Engine:              aws.String("aurora-mysql"),
+							Status:              aws.String("available"),
+						},
+					},
+				},
+			},
+		}
+		clients := &awsclient.ServiceClients{DocDB: docdbMock, RDS: rdsMock}
+
+		result, err := fetcher(context.Background(), clients, "")
+		if err != nil {
+			t.Fatalf("fetcher error: %v", err)
+		}
+		if len(result.Resources) != 2 {
+			t.Fatalf("len(Resources) = %d, want 2 (deduped overlap + unique rds row)", len(result.Resources))
+		}
+		var sharedRow *resource.Resource
+		ids := map[string]bool{}
+		for i := range result.Resources {
+			r := &result.Resources[i]
+			ids[r.ID] = true
+			if r.ID == sharedID {
+				sharedRow = r
+			}
+		}
+		for _, want := range []string{sharedID, "rds-only-02"} {
+			if !ids[want] {
+				t.Errorf("expected resource %q in result, got %v", want, ids)
+			}
+		}
+		if sharedRow == nil {
+			t.Fatal("shared cluster row missing from result")
+		}
+		if _, ok := sharedRow.RawStruct.(docdbtypes.DBCluster); !ok {
+			t.Errorf("shared row RawStruct type = %T, want docdbtypes.DBCluster (DocDB-side appended first must win)", sharedRow.RawStruct)
+		}
+	})
+}
+
 // TestComputeRDSDBClusterStatusAndFindings validates computeRDSDBClusterStatusAndIssues
 // (unexported) via FetchRDSDBClustersPage — 11 cases mirroring the docdb table.
 // assertions migrated from Status/Issues to Fields["status"]/Findings.
