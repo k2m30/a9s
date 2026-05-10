@@ -55,12 +55,19 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 	}
 
 	// Deterministic ARN-suffix matching via ordered probeIDs.
+	// statusByID carries the post-PR-03e canonical S4 phrase from
+	// Fields["status"] (the merged "<top> (+N)" the fetcher emits via
+	// phraseFromFindings) — NOT the legacy r.Status, which the wave-1
+	// fetcher migration intentionally stopped populating. Reading r.Status
+	// here would always see "" and silently downgrade the suffix-bump branch
+	// below to a bare "maintenance scheduled" overwrite, hiding the wave-1
+	// phrase entirely (AS-126 / AS-132 regression on warn-dbi-* rows).
 	probeIDs := make([]string, 0, len(resources))
 	statusByID := make(map[string]string, len(resources))
 	for _, r := range resources {
 		if r.ID != "" {
 			probeIDs = append(probeIDs, r.ID)
-			statusByID[r.ID] = r.Status
+			statusByID[r.ID] = r.Fields["status"]
 		}
 	}
 

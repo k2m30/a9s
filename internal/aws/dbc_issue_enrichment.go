@@ -41,12 +41,18 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 	}
 
 	// Deterministic ARN-suffix matching via ordered probeIDs.
+	// statusByID reads Fields["status"] (post-PR-03e canonical S4 phrase
+	// emitted by the dbc fetcher) rather than r.Status — the wave-1
+	// migration intentionally stopped populating r.Status, so reading it
+	// would silently downgrade the suffix-bump branch below to a bare
+	// "maintenance overdue" overwrite, hiding the wave-1 phrase entirely
+	// (AS-126 / AS-132 regression).
 	probeIDs := make([]string, 0, len(resources))
 	statusByID := make(map[string]string, len(resources))
 	for _, r := range resources {
 		if r.ID != "" {
 			probeIDs = append(probeIDs, r.ID)
-			statusByID[r.ID] = r.Status
+			statusByID[r.ID] = r.Fields["status"]
 		}
 	}
 

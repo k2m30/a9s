@@ -83,8 +83,8 @@ func TestFetchEFSFileSystems_ParsesMultiple(t *testing.T) {
 	if r0.Status != "" {
 		t.Errorf("resource[0].Status: expected blank (healthy), got %q", r0.Status)
 	}
-	if len(r0.Issues) != 0 {
-		t.Errorf("resource[0].Issues: expected empty for healthy FS, got %v", r0.Issues)
+	if len(r0.Findings) != 0 {
+		t.Errorf("resource[0].Findings: expected empty for healthy FS, got %v", r0.Findings)
 	}
 
 	// Verify required fields — derived `status` key replaced the AWS-raw `life_cycle_state` key.
@@ -111,21 +111,23 @@ func TestFetchEFSFileSystems_ParsesMultiple(t *testing.T) {
 	}
 
 	// Verify second file system (LifeCycleState=creating + NumberOfMountTargets=0):
-	// two coexisting §3.1 W1 signals. Broken ("no mount targets") wins precedence;
-	// Warning ("creating") is hidden. Expected Status = "no mount targets (+1)",
-	// Issues = ["no mount targets", "creating"] per spec rule 7.
+	// two coexisting W1 signals. Broken ("no mount targets") wins precedence.
+	// Expected Fields["status"] = "no mount targets (+1)", Findings has both findings.
 	r1 := resources[1]
-	if r1.Status != "no mount targets (+1)" {
-		t.Errorf("resource[1].Status: expected %q, got %q", "no mount targets (+1)", r1.Status)
+	if r1.Status != "" {
+		t.Errorf("resource[1].Status: expected %q (fetcher must not write Status), got %q", "", r1.Status)
 	}
-	wantIssues := []string{"no mount targets", "creating"}
-	if len(r1.Issues) != len(wantIssues) {
-		t.Fatalf("resource[1].Issues: expected %v, got %v", wantIssues, r1.Issues)
+	if r1.Fields["status"] != "no mount targets (+1)" {
+		t.Errorf("resource[1].Fields[\"status\"]: expected %q, got %q", "no mount targets (+1)", r1.Fields["status"])
 	}
-	for i, want := range wantIssues {
-		if r1.Issues[i] != want {
-			t.Errorf("resource[1].Issues[%d]: expected %q, got %q", i, want, r1.Issues[i])
-		}
+	if len(r1.Findings) != 2 {
+		t.Fatalf("resource[1].Findings: expected 2 findings, got %v", r1.Findings)
+	}
+	if r1.Findings[0].Code != awsclient.CodeEFSNoMountTargets {
+		t.Errorf("resource[1].Findings[0].Code: expected %q, got %q", awsclient.CodeEFSNoMountTargets, r1.Findings[0].Code)
+	}
+	if r1.Findings[1].Code != awsclient.CodeEFSCreating {
+		t.Errorf("resource[1].Findings[1].Code: expected %q, got %q", awsclient.CodeEFSCreating, r1.Findings[1].Code)
 	}
 	if r1.Name != "" {
 		t.Errorf("resource[1].Name: expected empty, got %q", r1.Name)

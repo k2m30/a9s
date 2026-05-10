@@ -79,8 +79,13 @@ func TestQA_DBCSnapshots_FetchSuccess(t *testing.T) {
 	}
 
 	r2 := resources[1]
-	if r2.Status != "creating" {
-		t.Errorf("expected Status 'creating', got %q", r2.Status)
+	// Per Phase-03 PR-03e: fetcher no longer writes Resource.Status; the
+	// display phrase lives in Fields["status"], findings carry severity.
+	if r2.Status != "" {
+		t.Errorf("expected Status '' (PR-03e: no Status writes), got %q", r2.Status)
+	}
+	if r2.Fields["status"] != "creating" {
+		t.Errorf("expected Fields[\"status\"] 'creating', got %q", r2.Fields["status"])
 	}
 	if r2.Fields["snapshot_type"] != "manual" {
 		t.Errorf("expected snapshot_type 'manual', got %q", r2.Fields["snapshot_type"])

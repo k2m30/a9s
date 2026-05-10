@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/redshift"
 	redshifttypes "github.com/aws/aws-sdk-go-v2/service/redshift/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -118,16 +119,16 @@ func FetchRedshiftClustersPage(ctx context.Context, api RedshiftDescribeClusters
 			clusterAvailabilityStatus = *cluster.ClusterAvailabilityStatus
 		}
 
-		derivedStatus, issues := computeRedshiftStatusAndIssues(cluster)
+		findings := computeRedshiftFindings(cluster)
+		statusPhrase := phraseFromFindings(findings)
 
 		r := resource.Resource{
-			ID:     clusterID,
-			Name:   clusterID,
-			Status: derivedStatus,
-			Issues: issues,
+			ID:       clusterID,
+			Name:     clusterID,
+			Findings: findings,
 			Fields: map[string]string{
 				"cluster_id":                  clusterID,
-				"status":                      derivedStatus,
+				"status":                      statusPhrase,
 				"cluster_status":              clusterStatus,
 				"node_type":                   nodeType,
 				"num_nodes":                   numNodes,
@@ -168,110 +169,77 @@ func FetchRedshiftClustersPage(ctx context.Context, api RedshiftDescribeClusters
 	}, nil
 }
 
-// computeRedshiftStatusAndIssues returns the top S4 phrase (with `(+N)` suffix
-// when multiple warnings stack) AND the full ordered list of every active issue
-// phrase. Mirrors computeDBIStatusAndIssues from rds.go but uses Redshift signals
-// per spec §3.1 and §4. Broken / transitional / healthy states each produce at
-// most one phrase; configuration-warning states stack per rule 7.
-func computeRedshiftStatusAndIssues(cluster redshifttypes.Cluster) (string, []string) {
-	clusterStatus := ""
-	if cluster.ClusterStatus != nil {
-		clusterStatus = *cluster.ClusterStatus
+// computeRedshiftFindings returns a []domain.Finding for the given Redshift cluster.
+func computeRedshiftFindings(cluster redshifttypes.Cluster) []domain.Finding {
+	clusterStatus := aws.ToString(cluster.ClusterStatus)
+	clusterAvailStatus := aws.ToString(cluster.ClusterAvailabilityStatus)
+
+	// Broken: ClusterStatus-driven
+	brokenByStatus := map[string]domain.FindingCode{
+		"incompatible-hsm":        CodeRedshiftIncompatibleHSM,
+		"incompatible-network":    CodeRedshiftIncompatibleNetwork,
+		"incompatible-parameters": CodeRedshiftIncompatibleParameters,
+		"incompatible-restore":    CodeRedshiftIncompatibleRestore,
+		"hardware-failure":        CodeRedshiftHardwareFailure,
+		"storage-full":            CodeRedshiftStorageFull,
+	}
+	brokenPhraseByStatus := map[string]string{
+		"incompatible-hsm":        "broken: incompatible-hsm",
+		"incompatible-network":    "broken: incompatible-network",
+		"incompatible-parameters": "broken: incompatible-parameters",
+		"incompatible-restore":    "broken: incompatible-restore",
+		"hardware-failure":        "broken: hardware-failure",
+		"storage-full":            "broken: storage-full",
+	}
+	if code, ok := brokenByStatus[clusterStatus]; ok {
+		return []domain.Finding{{Code: code, Phrase: brokenPhraseByStatus[clusterStatus], Severity: domain.SevBroken, Source: "wave1"}}
 	}
 
-	clusterAvailStatus := ""
-	if cluster.ClusterAvailabilityStatus != nil {
-		clusterAvailStatus = *cluster.ClusterAvailabilityStatus
-	}
-
-	// Step 1: Broken bucket — ClusterStatus-driven (highest severity, beats availability).
-	switch clusterStatus {
-	case "incompatible-hsm":
-		phrase := "broken: incompatible-hsm"
-		return phrase, []string{phrase}
-	case "incompatible-network":
-		phrase := "broken: incompatible-network"
-		return phrase, []string{phrase}
-	case "incompatible-parameters":
-		phrase := "broken: incompatible-parameters"
-		return phrase, []string{phrase}
-	case "incompatible-restore":
-		phrase := "broken: incompatible-restore"
-		return phrase, []string{phrase}
-	case "hardware-failure":
-		phrase := "broken: hardware-failure"
-		return phrase, []string{phrase}
-	case "storage-full":
-		phrase := "broken: storage-full"
-		return phrase, []string{phrase}
-	}
-
-	// Step 1b: Broken bucket — ClusterAvailabilityStatus-driven.
+	// Broken: ClusterAvailabilityStatus-driven
 	switch clusterAvailStatus {
 	case "Unavailable":
-		return "unavailable", []string{"unavailable"}
+		return []domain.Finding{{Code: CodeRedshiftUnavailable, Phrase: "unavailable", Severity: domain.SevBroken, Source: "wave1"}}
 	case "Failed":
-		return "failed", []string{"failed"}
+		return []domain.Finding{{Code: CodeRedshiftFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
 	}
 
-	// Step 2: Transitional bucket (Warning, ClusterStatus-driven) — return immediately.
-	switch clusterStatus {
-	case "creating":
-		return "creating", []string{"creating"}
-	case "modifying":
-		return "modifying", []string{"modifying"}
-	case "resizing":
-		return "resizing", []string{"resizing"}
-	case "rebooting":
-		return "rebooting", []string{"rebooting"}
-	case "renaming":
-		return "renaming", []string{"renaming"}
-	case "deleting":
-		return "deleting", []string{"deleting"}
+	// Transitional (Warning, ClusterStatus-driven)
+	transitionalByStatus := map[string]domain.FindingCode{
+		"creating":  CodeRedshiftCreating,
+		"modifying": CodeRedshiftModifying,
+		"resizing":  CodeRedshiftResizing,
+		"rebooting": CodeRedshiftRebooting,
+		"renaming":  CodeRedshiftRenaming,
+		"deleting":  CodeRedshiftDeleting,
+	}
+	if code, ok := transitionalByStatus[clusterStatus]; ok {
+		return []domain.Finding{{Code: code, Phrase: clusterStatus, Severity: domain.SevWarn, Source: "wave1"}}
 	}
 
-	// Steps 3–5: Warning bucket — collect all active warnings and stack them.
-	var warnings []string
+	// Warning bucket — stack all active warnings
+	var findings []domain.Finding
 
-	// Step 3: ClusterAvailabilityStatus warnings (first in precedence).
 	switch clusterAvailStatus {
 	case "Maintenance":
-		warnings = append(warnings, "maintenance")
+		findings = append(findings, domain.Finding{Code: CodeRedshiftMaintenance, Phrase: "maintenance", Severity: domain.SevWarn, Source: "wave1"})
 	case "Modifying":
-		warnings = append(warnings, "modifying")
+		findings = append(findings, domain.Finding{Code: CodeRedshiftAvailabilityModifying, Phrase: "modifying", Severity: domain.SevWarn, Source: "wave1"})
 	}
 
-	// Step 4: Configuration / maintenance warnings (in §4 precedence order).
-
-	// 4.1: PendingModifiedValues non-nil and at least one sub-field non-empty.
 	if hasPendingRedshiftModifiedValues(cluster.PendingModifiedValues) {
-		warnings = append(warnings, "pending change queued")
+		findings = append(findings, domain.Finding{Code: CodeRedshiftPendingChange, Phrase: "pending change queued", Severity: domain.SevWarn, Source: "wave1"})
 	}
-
-	// 4.2: DeferredMaintenanceWindows with active window (now ∈ [start, end]).
 	if hasActiveDeferredMaintenanceWindow(cluster.DeferredMaintenanceWindows, time.Now().UTC()) {
-		warnings = append(warnings, "maintenance deferred")
+		findings = append(findings, domain.Finding{Code: CodeRedshiftMaintenanceDeferred, Phrase: "maintenance deferred", Severity: domain.SevWarn, Source: "wave1"})
 	}
-
-	// 4.3: PubliclyAccessible == true.
 	if cluster.PubliclyAccessible != nil && *cluster.PubliclyAccessible {
-		warnings = append(warnings, "publicly accessible")
+		findings = append(findings, domain.Finding{Code: CodeRedshiftPubliclyAccessible, Phrase: "publicly accessible", Severity: domain.SevWarn, Source: "wave1"})
 	}
-
-	// 4.4: Encrypted == false.
 	if cluster.Encrypted != nil && !*cluster.Encrypted {
-		warnings = append(warnings, "unencrypted at rest")
+		findings = append(findings, domain.Finding{Code: CodeRedshiftUnencryptedAtRest, Phrase: "unencrypted at rest", Severity: domain.SevWarn, Source: "wave1"})
 	}
 
-	// Step 5: Combine.
-	switch len(warnings) {
-	case 0:
-		return "", nil
-	case 1:
-		return warnings[0], warnings
-	default:
-		return fmt.Sprintf("%s (+%d)", warnings[0], len(warnings)-1), warnings
-	}
+	return findings
 }
 
 // hasPendingRedshiftModifiedValues returns true when PendingModifiedValues is

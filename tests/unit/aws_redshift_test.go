@@ -1,20 +1,13 @@
 // aws_redshift_test.go — Unit tests for the Redshift fetcher.
-//
-// Tests assert on the contract surface of FetchRedshiftClustersPage:
-//   - Resource.Status  (§4 phrase, optionally suffixed with "(+N)")
-//   - Resource.Issues  (slice of §4 phrases in §4 precedence order)
-//   - Resource.Fields["status"]          (mirrors Resource.Status)
-//   - Resource.Fields["cluster_status"]  (raw ClusterStatus value — read by Color func)
-//
-// Wave 1 signals only (Wave 2 = None per spec).
+// // Tests assert on the contract surface of FetchRedshiftClustersPage:
+// - Resource.Status  always ""
+// - Resource.Findings (slice of domain.Finding in §4 precedence order, Source="wave1")
+// - Resource.Fields["status"]          (§4 display phrase — drives list-view color)
+// - Resource.Fields["cluster_status"]  (raw ClusterStatus value — read by Color func)
+// // Wave 1 signals only (Wave 2 = None per spec).
 // Anti-tests verify no CloudWatch-derived phrases surface (§3.3 out of scope).
 // Severity-precedence tests verify Broken beats Warning (U8).
-// Multi-finding tests verify rule-7 "(+N)" suffix and Issues ordering.
-//
-// Phase 6a fixture source: internal/demo/fixtures.NewRedshiftFixtures().
-// Phase 7 coder output is not yet complete; all signal tests are expected to
-// FAIL against the current redshift.go until phase 7 delivers the rewritten
-// fetcher. See "Expected failures" section in the task handoff notes.
+// Multi-finding tests verify rule-7 "(+N)" suffix and Findings ordering.
 package unit
 
 import (
@@ -29,6 +22,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -69,35 +63,60 @@ func fetchSingleCluster(t *testing.T, cluster redshifttypes.Cluster) resource.Re
 	return result.Resources[0]
 }
 
-// assertStatus asserts Resource.Status and Resource.Fields["status"].
-func assertStatus(t *testing.T, r resource.Resource, want string) {
+// assertStatus asserts Resource.Status is always empty () and
+// Resource.Fields["status"] carries the display phrase.
+func assertStatus(t *testing.T, r resource.Resource, wantPhrase string) {
 	t.Helper()
-	if r.Status != want {
-		t.Errorf("Resource.Status = %q, want %q", r.Status, want)
+	if r.Status != "" {
+		t.Errorf("Resource.Status = %q, want %q", r.Status, "")
 	}
-	if r.Fields["status"] != want {
-		t.Errorf("Resource.Fields[\"status\"] = %q, want %q", r.Fields["status"], want)
+	if r.Fields["status"] != wantPhrase {
+		t.Errorf("Resource.Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
 	}
 }
 
-// assertIssues asserts Resource.Issues deep-equals want (nil vs empty-slice
-// treated identically when want is nil).
-func assertIssues(t *testing.T, r resource.Resource, want []string) {
+// assertFindings asserts Resource.Findings matches the expected phrase list.
+// Each element of wantPhrases must match the corresponding Finding.Phrase in
+// Findings order. Nil/empty wantPhrases means healthy — no findings expected.
+func assertFindings(t *testing.T, r resource.Resource, wantPhrases []string) {
 	t.Helper()
-	if want == nil {
-		if len(r.Issues) != 0 {
-			t.Errorf("Resource.Issues = %v, want nil/empty", r.Issues)
+	if len(wantPhrases) == 0 {
+		if len(r.Findings) != 0 {
+			phrases := make([]string, len(r.Findings))
+			for i, f := range r.Findings {
+				phrases[i] = f.Phrase
+			}
+			t.Errorf("Resource.Findings = %v, want nil/empty (healthy)", phrases)
 		}
 		return
 	}
-	if len(r.Issues) != len(want) {
-		t.Errorf("Resource.Issues = %v (len=%d), want %v (len=%d)", r.Issues, len(r.Issues), want, len(want))
+	if len(r.Findings) != len(wantPhrases) {
+		phrases := make([]string, len(r.Findings))
+		for i, f := range r.Findings {
+			phrases[i] = f.Phrase
+		}
+		t.Errorf("Resource.Findings len=%d (%v), want len=%d (%v)", len(r.Findings), phrases, len(wantPhrases), wantPhrases)
 		return
 	}
-	for i, w := range want {
-		if r.Issues[i] != w {
-			t.Errorf("Resource.Issues[%d] = %q, want %q", i, r.Issues[i], w)
+	for i, want := range wantPhrases {
+		if r.Findings[i].Phrase != want {
+			t.Errorf("Resource.Findings[%d].Phrase = %q, want %q", i, r.Findings[i].Phrase, want)
 		}
+		if r.Findings[i].Source != "wave1" {
+			t.Errorf("Resource.Findings[%d].Source = %q, want %q", i, r.Findings[i].Source, "wave1")
+		}
+	}
+}
+
+// assertFindingCode asserts that Findings[i].Code matches the expected code.
+func assertFindingCode(t *testing.T, r resource.Resource, i int, want domain.FindingCode) {
+	t.Helper()
+	if i >= len(r.Findings) {
+		t.Errorf("Findings[%d] out of range (len=%d)", i, len(r.Findings))
+		return
+	}
+	if r.Findings[i].Code != want {
+		t.Errorf("Findings[%d].Code = %q, want %q", i, r.Findings[i].Code, want)
 	}
 }
 
@@ -125,7 +144,7 @@ func TestRedshift_Fetch_HealthyHasEmptyIssues(t *testing.T) {
 		t.Run(id, func(t *testing.T) {
 			r := fetchSingleCluster(t, redshiftFixtureByID(t, id))
 			assertStatus(t, r, "")
-			assertIssues(t, r, nil)
+			assertFindings(t, r, nil)
 			assertClusterStatusField(t, r, "available")
 		})
 	}
@@ -136,7 +155,7 @@ func TestRedshift_Fetch_HealthyHasEmptyIssues(t *testing.T) {
 func TestRedshift_Fetch_Healthy_Silent(t *testing.T) {
 	r := fetchSingleCluster(t, redshiftFixtureByID(t, fixtures.AcmeWarehouseID))
 	assertStatus(t, r, "")
-	assertIssues(t, r, nil)
+	assertFindings(t, r, nil)
 	assertClusterStatusField(t, r, "available")
 	// No jargon in status field
 	for _, bad := range []string{"OK", "ACTIVE", "available", "healthy", "-", "Available"} {
@@ -155,7 +174,7 @@ func TestRedshift_Fetch_Healthy_Silent(t *testing.T) {
 func TestRedshift_Fetch_Transitional_Resizing(t *testing.T) {
 	r := fetchSingleCluster(t, redshiftFixtureByID(t, fixtures.RedshiftResizingID))
 	assertStatus(t, r, "resizing")
-	assertIssues(t, r, []string{"resizing"})
+	assertFindings(t, r, []string{"resizing"})
 	assertClusterStatusField(t, r, "resizing")
 }
 
@@ -163,7 +182,7 @@ func TestRedshift_Fetch_Transitional_Resizing(t *testing.T) {
 func TestRedshift_Fetch_Transitional_Rebooting(t *testing.T) {
 	r := fetchSingleCluster(t, redshiftFixtureByID(t, fixtures.RedshiftRebootingID))
 	assertStatus(t, r, "rebooting")
-	assertIssues(t, r, []string{"rebooting"})
+	assertFindings(t, r, []string{"rebooting"})
 	assertClusterStatusField(t, r, "rebooting")
 }
 
@@ -175,7 +194,7 @@ func TestRedshift_Fetch_Transitional_Rebooting(t *testing.T) {
 func TestRedshift_Fetch_Broken_IncompatibleNetwork(t *testing.T) {
 	r := fetchSingleCluster(t, redshiftFixtureByID(t, fixtures.RedshiftIncompatibleNetworkID))
 	assertStatus(t, r, "broken: incompatible-network")
-	assertIssues(t, r, []string{"broken: incompatible-network"})
+	assertFindings(t, r, []string{"broken: incompatible-network"})
 	assertClusterStatusField(t, r, "incompatible-network")
 }
 
@@ -183,7 +202,7 @@ func TestRedshift_Fetch_Broken_IncompatibleNetwork(t *testing.T) {
 func TestRedshift_Fetch_Broken_HardwareFailure(t *testing.T) {
 	r := fetchSingleCluster(t, redshiftFixtureByID(t, fixtures.RedshiftHardwareFailureID))
 	assertStatus(t, r, "broken: hardware-failure")
-	assertIssues(t, r, []string{"broken: hardware-failure"})
+	assertFindings(t, r, []string{"broken: hardware-failure"})
 	assertClusterStatusField(t, r, "hardware-failure")
 }
 
@@ -191,7 +210,7 @@ func TestRedshift_Fetch_Broken_HardwareFailure(t *testing.T) {
 func TestRedshift_Fetch_Broken_StorageFull(t *testing.T) {
 	r := fetchSingleCluster(t, redshiftFixtureByID(t, fixtures.RedshiftStorageFullID))
 	assertStatus(t, r, "broken: storage-full")
-	assertIssues(t, r, []string{"broken: storage-full"})
+	assertFindings(t, r, []string{"broken: storage-full"})
 	assertClusterStatusField(t, r, "storage-full")
 }
 
@@ -203,7 +222,7 @@ func TestRedshift_Fetch_Broken_StorageFull(t *testing.T) {
 func TestRedshift_Fetch_Availability_Unavailable(t *testing.T) {
 	r := fetchSingleCluster(t, redshiftFixtureByID(t, fixtures.RedshiftAvailUnavailableID))
 	assertStatus(t, r, "unavailable")
-	assertIssues(t, r, []string{"unavailable"})
+	assertFindings(t, r, []string{"unavailable"})
 	assertClusterStatusField(t, r, "available")
 }
 
@@ -211,7 +230,7 @@ func TestRedshift_Fetch_Availability_Unavailable(t *testing.T) {
 func TestRedshift_Fetch_Availability_Failed(t *testing.T) {
 	r := fetchSingleCluster(t, redshiftFixtureByID(t, fixtures.RedshiftAvailFailedID))
 	assertStatus(t, r, "failed")
-	assertIssues(t, r, []string{"failed"})
+	assertFindings(t, r, []string{"failed"})
 	assertClusterStatusField(t, r, "available")
 }
 
@@ -223,7 +242,7 @@ func TestRedshift_Fetch_Availability_Failed(t *testing.T) {
 func TestRedshift_Fetch_Availability_Maintenance(t *testing.T) {
 	r := fetchSingleCluster(t, redshiftFixtureByID(t, fixtures.RedshiftAvailMaintenanceID))
 	assertStatus(t, r, "maintenance")
-	assertIssues(t, r, []string{"maintenance"})
+	assertFindings(t, r, []string{"maintenance"})
 	assertClusterStatusField(t, r, "available")
 }
 
@@ -231,7 +250,7 @@ func TestRedshift_Fetch_Availability_Maintenance(t *testing.T) {
 func TestRedshift_Fetch_Availability_Modifying(t *testing.T) {
 	r := fetchSingleCluster(t, redshiftFixtureByID(t, fixtures.RedshiftAvailModifyingID))
 	assertStatus(t, r, "modifying")
-	assertIssues(t, r, []string{"modifying"})
+	assertFindings(t, r, []string{"modifying"})
 	assertClusterStatusField(t, r, "available")
 }
 
@@ -243,7 +262,7 @@ func TestRedshift_Fetch_Availability_Modifying(t *testing.T) {
 func TestRedshift_Fetch_PendingChange(t *testing.T) {
 	r := fetchSingleCluster(t, redshiftFixtureByID(t, fixtures.RedshiftPendingChangeID))
 	assertStatus(t, r, "pending change queued")
-	assertIssues(t, r, []string{"pending change queued"})
+	assertFindings(t, r, []string{"pending change queued"})
 	assertClusterStatusField(t, r, "available")
 }
 
@@ -251,7 +270,7 @@ func TestRedshift_Fetch_PendingChange(t *testing.T) {
 func TestRedshift_Fetch_MaintenanceDeferred_Active(t *testing.T) {
 	r := fetchSingleCluster(t, redshiftFixtureByID(t, fixtures.RedshiftMaintenanceDeferredID))
 	assertStatus(t, r, "maintenance deferred")
-	assertIssues(t, r, []string{"maintenance deferred"})
+	assertFindings(t, r, []string{"maintenance deferred"})
 	assertClusterStatusField(t, r, "available")
 }
 
@@ -260,7 +279,7 @@ func TestRedshift_Fetch_MaintenanceDeferred_Active(t *testing.T) {
 func TestRedshift_Fetch_MaintenanceDeferred_Expired(t *testing.T) {
 	r := fetchSingleCluster(t, redshiftFixtureByID(t, fixtures.RedshiftMaintenanceDeferredExpiredID))
 	assertStatus(t, r, "")
-	assertIssues(t, r, nil)
+	assertFindings(t, r, nil)
 	assertClusterStatusField(t, r, "available")
 }
 
@@ -272,7 +291,7 @@ func TestRedshift_Fetch_MaintenanceDeferred_Expired(t *testing.T) {
 func TestRedshift_Fetch_PubliclyAccessible(t *testing.T) {
 	r := fetchSingleCluster(t, redshiftFixtureByID(t, fixtures.RedshiftPubliclyAccessibleID))
 	assertStatus(t, r, "publicly accessible")
-	assertIssues(t, r, []string{"publicly accessible"})
+	assertFindings(t, r, []string{"publicly accessible"})
 	assertClusterStatusField(t, r, "available")
 }
 
@@ -280,7 +299,7 @@ func TestRedshift_Fetch_PubliclyAccessible(t *testing.T) {
 func TestRedshift_Fetch_Unencrypted(t *testing.T) {
 	r := fetchSingleCluster(t, redshiftFixtureByID(t, fixtures.RedshiftUnencryptedID))
 	assertStatus(t, r, "unencrypted at rest")
-	assertIssues(t, r, []string{"unencrypted at rest"})
+	assertFindings(t, r, []string{"unencrypted at rest"})
 	assertClusterStatusField(t, r, "available")
 }
 
@@ -294,7 +313,7 @@ func TestRedshift_Fetch_Unencrypted(t *testing.T) {
 func TestRedshift_Fetch_MultiW1_PendingPlusPublicPlusUnencrypted(t *testing.T) {
 	r := fetchSingleCluster(t, redshiftFixtureByID(t, fixtures.WarnRedshiftMultiID))
 	assertStatus(t, r, "pending change queued (+2)")
-	assertIssues(t, r, []string{
+	assertFindings(t, r, []string{
 		"pending change queued",
 		"publicly accessible",
 		"unencrypted at rest",
@@ -306,7 +325,7 @@ func TestRedshift_Fetch_MultiW1_PendingPlusPublicPlusUnencrypted(t *testing.T) {
 func TestRedshift_Fetch_MultiW1_Two_Warnings_Suffix_Plus_1(t *testing.T) {
 	r := fetchSingleCluster(t, redshiftFixtureByID(t, fixtures.WarnRedshiftTwoID))
 	assertStatus(t, r, "publicly accessible (+1)")
-	assertIssues(t, r, []string{
+	assertFindings(t, r, []string{
 		"publicly accessible",
 		"unencrypted at rest",
 	})
@@ -322,12 +341,12 @@ func TestRedshift_Fetch_MultiW1_Two_Warnings_Suffix_Plus_1(t *testing.T) {
 func TestRedshift_Fetch_Broken_ClusterStatus_Beats_Availability_Modifying(t *testing.T) {
 	r := fetchSingleCluster(t, redshiftFixtureByID(t, fixtures.RedshiftBrokenWithWarningHiddenID))
 	assertStatus(t, r, "broken: storage-full")
-	assertIssues(t, r, []string{"broken: storage-full"})
+	assertFindings(t, r, []string{"broken: storage-full"})
 	assertClusterStatusField(t, r, "storage-full")
-	// The Issues slice must NOT contain any Warning phrases.
-	for _, issue := range r.Issues {
-		if strings.Contains(issue, "publicly") || strings.Contains(issue, "unencrypted") || strings.Contains(issue, "modifying") {
-			t.Errorf("Issues contains warning phrase %q when Broken should suppress all Warnings", issue)
+	// The Findings slice must NOT contain any Warning phrases.
+	for _, f := range r.Findings {
+		if strings.Contains(f.Phrase, "publicly") || strings.Contains(f.Phrase, "unencrypted") || strings.Contains(f.Phrase, "modifying") {
+			t.Errorf("Findings contains warning phrase %q when Broken should suppress all Warnings", f.Phrase)
 		}
 	}
 }
@@ -338,11 +357,11 @@ func TestRedshift_Fetch_Broken_ClusterStatus_Beats_Availability_Modifying(t *tes
 func TestRedshift_Fetch_Broken_Availability_Beats_Warning_PubliclyAccessible(t *testing.T) {
 	r := fetchSingleCluster(t, redshiftFixtureByID(t, fixtures.RedshiftAvailUnavailableWithWarningHiddenID))
 	assertStatus(t, r, "unavailable")
-	assertIssues(t, r, []string{"unavailable"})
-	// No Warning phrases in Issues.
-	for _, issue := range r.Issues {
-		if strings.Contains(issue, "publicly") || strings.Contains(issue, "unencrypted") {
-			t.Errorf("Issues contains warning phrase %q when Broken should suppress all Warnings", issue)
+	assertFindings(t, r, []string{"unavailable"})
+	// No Warning phrases in Findings.
+	for _, f := range r.Findings {
+		if strings.Contains(f.Phrase, "publicly") || strings.Contains(f.Phrase, "unencrypted") {
+			t.Errorf("Findings contains warning phrase %q when Broken should suppress all Warnings", f.Phrase)
 		}
 	}
 }
@@ -362,13 +381,13 @@ func TestRedshift_Fetch_IgnoresCloudWatchPercentageDiskSpaceUsed(t *testing.T) {
 			id = *cluster.ClusterIdentifier
 		}
 		forbidden := []string{"PercentageDiskSpaceUsed", "disk_space", "disk space", "percentage disk"}
-		for _, f := range forbidden {
-			if strings.Contains(strings.ToLower(r.Status), strings.ToLower(f)) {
-				t.Errorf("cluster %s: Status contains CloudWatch phrase %q (out of scope)", id, f)
+		for _, forbiddenPhrase := range forbidden {
+			if strings.Contains(strings.ToLower(r.Fields["status"]), strings.ToLower(forbiddenPhrase)) {
+				t.Errorf("cluster %s: Fields[status] contains CloudWatch phrase %q (out of scope)", id, forbiddenPhrase)
 			}
-			for _, issue := range r.Issues {
-				if strings.Contains(strings.ToLower(issue), strings.ToLower(f)) {
-					t.Errorf("cluster %s: Issues contains CloudWatch phrase %q (out of scope)", id, f)
+			for _, finding := range r.Findings {
+				if strings.Contains(strings.ToLower(finding.Phrase), strings.ToLower(forbiddenPhrase)) {
+					t.Errorf("cluster %s: Findings contains CloudWatch phrase %q (out of scope)", id, forbiddenPhrase)
 				}
 			}
 		}
@@ -387,12 +406,12 @@ func TestRedshift_Fetch_IgnoresCloudWatchHealthStatus(t *testing.T) {
 		// "health" as a substring would catch HealthStatus, HealthState, etc.
 		// Note: "unhealthy" is also out of scope; none of these come from CW.
 		for _, phrase := range []string{"HealthStatus", "health_status"} {
-			if strings.Contains(r.Status, phrase) {
-				t.Errorf("cluster %s: Status contains CloudWatch phrase %q (out of scope)", id, phrase)
+			if strings.Contains(r.Fields["status"], phrase) {
+				t.Errorf("cluster %s: Fields[status] contains CloudWatch phrase %q (out of scope)", id, phrase)
 			}
-			for _, issue := range r.Issues {
-				if strings.Contains(issue, phrase) {
-					t.Errorf("cluster %s: Issues contains CloudWatch phrase %q (out of scope)", id, phrase)
+			for _, finding := range r.Findings {
+				if strings.Contains(finding.Phrase, phrase) {
+					t.Errorf("cluster %s: Findings contains CloudWatch phrase %q (out of scope)", id, phrase)
 				}
 			}
 		}

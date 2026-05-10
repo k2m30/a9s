@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -161,6 +162,31 @@ func ComputeDBCSnapStatusAndIssues(snap docdbtypes.DBClusterSnapshot) (string, [
 	return buildStatusFromIssues(issues), issues
 }
 
+// computeDBCSnapFindings returns []domain.Finding for a DocDB cluster snapshot.
+func computeDBCSnapFindings(snap docdbtypes.DBClusterSnapshot) []domain.Finding {
+	rawStatus := aws.ToString(snap.Status)
+
+	if rawStatus == "failed" {
+		return []domain.Finding{{Code: CodeDBCSnapFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+	}
+	if strings.HasPrefix(rawStatus, "incompatible-") {
+		return []domain.Finding{{Code: CodeDBCSnapIncompatible, Phrase: rawStatus, Severity: domain.SevBroken, Source: "wave1"}}
+	}
+
+	var findings []domain.Finding
+	if rawStatus == "creating" {
+		findings = append(findings, domain.Finding{Code: CodeDBCSnapCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"})
+	}
+	if snap.SnapshotType != nil && *snap.SnapshotType == "manual" && snap.SnapshotCreateTime != nil {
+		ageD := int(time.Since(*snap.SnapshotCreateTime).Hours() / 24)
+		if ageD > 365 {
+			phrase := fmt.Sprintf("manual, unused %dd", ageD)
+			findings = append(findings, domain.Finding{Code: CodeDBCSnapManualUnused, Phrase: phrase, Severity: domain.SevWarn, Source: "wave1"})
+		}
+	}
+	return findings
+}
+
 // FetchDocDBClusterSnapshots calls the DocumentDB DescribeDBClusterSnapshots API and converts the
 // response into a slice of generic Resource structs. This covers DocumentDB cluster
 // snapshots only (docdb@v1.48.12/api_op_DescribeDBClusterSnapshots.go:14).
@@ -210,12 +236,9 @@ func FetchDocDBClusterSnapshotsPage(ctx context.Context, api DocDBDescribeDBClus
 		}
 
 		// Per spec §4 (docs/resources/dbc-snap.md), Status is the §4 phrase, not
-		// raw AWS state. Healthy snapshots render BLANK. Wave-1 fetcher-local
-		// signals (failed, incompatible-*, creating, manual-unused) are computed
-		// by ComputeDBCSnapStatusAndIssues and stored in Issues. Cross-ref signals
-		// (orphan, past-retention) come from enrichDBCSnapCrossRef and overwrite
-		// via FieldUpdates / merge with computeMergedStatus.
-		computedStatus, allIssues := ComputeDBCSnapStatusAndIssues(snapshot)
+		// raw AWS state. Healthy snapshots render BLANK.
+		findings := computeDBCSnapFindings(snapshot)
+		statusPhrase := phraseFromFindings(findings)
 
 		engine := ""
 		if snapshot.Engine != nil {
@@ -243,14 +266,13 @@ func FetchDocDBClusterSnapshotsPage(ctx context.Context, api DocDBDescribeDBClus
 		}
 
 		r := resource.Resource{
-			ID:     snapshotID,
-			Name:   snapshotID,
-			Status: computedStatus,
-			Issues: allIssues,
+			ID:       snapshotID,
+			Name:     snapshotID,
+			Findings: findings,
 			Fields: map[string]string{
 				"snapshot_id":          snapshotID,
 				"cluster_id":           clusterID,
-				"status":               computedStatus,
+				"status":               statusPhrase,
 				"engine":               engine,
 				"snapshot_type":        snapshotType,
 				"snapshot_create_time": snapshotCreateTime,

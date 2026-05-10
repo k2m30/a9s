@@ -8,6 +8,9 @@ import (
 )
 
 func colorDBI(r domain.Resource) domain.Color {
+	if c, ok := colorFromWave1(r); ok {
+		return c
+	}
 	status := r.Fields["status"]
 	stripped := stripFindingSuffix(status)
 	switch stripped {
@@ -66,6 +69,9 @@ func colorDBI(r domain.Resource) domain.Color {
 func colorS3(_ domain.Resource) domain.Color { return domain.ColorHealthy }
 
 func colorRedis(r domain.Resource) domain.Color {
+	if c, ok := colorFromWave1(r); ok {
+		return c
+	}
 	phrase := stripFindingSuffix(r.Fields["status"])
 	if phrase == "deleted" {
 		return domain.ColorDim
@@ -89,6 +95,9 @@ func colorRedis(r domain.Resource) domain.Color {
 }
 
 func colorDBC(r domain.Resource) domain.Color {
+	if c, ok := colorFromWave1(r); ok {
+		return c
+	}
 	phrase := stripFindingSuffix(r.Fields["status"])
 	switch phrase {
 	case "":
@@ -112,6 +121,9 @@ func colorDBC(r domain.Resource) domain.Color {
 }
 
 func colorDDB(r domain.Resource) domain.Color {
+	if c, ok := colorFromWave1(r); ok {
+		return c
+	}
 	phrase := stripFindingSuffix(r.Fields["status"])
 	switch phrase {
 	case "":
@@ -130,11 +142,10 @@ func colorOpenSearch(r domain.Resource) domain.Color {
 	if r.Fields["deleted"] == "true" {
 		return domain.ColorDim
 	}
-	status := r.Status
-	if status == "" {
-		status = r.Fields["status"]
+	if c, ok := colorFromWave1(r); ok {
+		return c
 	}
-	stripped := stripFindingSuffix(status)
+	stripped := stripFindingSuffix(r.Fields["status"])
 	if strings.HasPrefix(stripped, "isolated:") || r.Fields["domain_processing_status"] == "Isolated" {
 		return domain.ColorBroken
 	}
@@ -147,10 +158,10 @@ func colorOpenSearch(r domain.Resource) domain.Color {
 }
 
 func colorRedshift(r domain.Resource) domain.Color {
-	phrase := stripFindingSuffix(r.Fields["status"])
-	if phrase == "" {
-		phrase = stripFindingSuffix(r.Status)
+	if c, ok := colorFromWave1(r); ok {
+		return c
 	}
+	phrase := stripFindingSuffix(r.Fields["status"])
 	switch phrase {
 	case "unavailable", "failed":
 		return domain.ColorBroken
@@ -202,11 +213,10 @@ func colorRedshift(r domain.Resource) domain.Color {
 }
 
 func colorEFS(r domain.Resource) domain.Color {
-	status := r.Fields["status"]
-	if status == "" {
-		status = r.Status
+	if c, ok := colorFromWave1(r); ok {
+		return c
 	}
-	phrase := stripFindingSuffix(status)
+	phrase := stripFindingSuffix(r.Fields["status"])
 	switch phrase {
 	case "":
 		return domain.ColorHealthy
@@ -220,6 +230,9 @@ func colorEFS(r domain.Resource) domain.Color {
 }
 
 func colorDBISnap(r domain.Resource) domain.Color {
+	if c, ok := colorFromWave1(r); ok {
+		return c
+	}
 	phrase := stripFindingSuffix(r.Fields["status"])
 	if phrase == "failed" {
 		return domain.ColorBroken
@@ -237,6 +250,9 @@ func colorDBISnap(r domain.Resource) domain.Color {
 }
 
 func colorDBCSnap(r domain.Resource) domain.Color {
+	if c, ok := colorFromWave1(r); ok {
+		return c
+	}
 	phrase := stripFindingSuffix(r.Fields["status"])
 	if phrase == "failed" {
 		return domain.ColorBroken

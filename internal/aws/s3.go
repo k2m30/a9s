@@ -153,9 +153,8 @@ func FetchS3BucketsPageWithNotifications(
 		}
 
 		r := resource.Resource{
-			ID:     bucketName,
-			Name:   bucketName,
-			Status: "",
+			ID:   bucketName,
+			Name: bucketName,
 			Fields: map[string]string{
 				"name":                bucketName,
 				"bucket_name":         bucketName,

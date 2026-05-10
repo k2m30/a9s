@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -57,6 +58,31 @@ func ComputeRDSDBClusterSnapshotStatusAndIssues(snap rdstypes.DBClusterSnapshot)
 	return buildStatusFromIssues(issues), issues
 }
 
+// computeRDSDBClusterSnapshotFindings returns []domain.Finding for an RDS cluster snapshot.
+func computeRDSDBClusterSnapshotFindings(snap rdstypes.DBClusterSnapshot) []domain.Finding {
+	rawStatus := aws.ToString(snap.Status)
+
+	if rawStatus == "failed" {
+		return []domain.Finding{{Code: CodeDBCSnapFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+	}
+	if strings.HasPrefix(rawStatus, "incompatible-") {
+		return []domain.Finding{{Code: CodeDBCSnapIncompatible, Phrase: rawStatus, Severity: domain.SevBroken, Source: "wave1"}}
+	}
+
+	var findings []domain.Finding
+	if rawStatus == "creating" {
+		findings = append(findings, domain.Finding{Code: CodeDBCSnapCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"})
+	}
+	if snap.SnapshotType != nil && *snap.SnapshotType == "manual" && snap.SnapshotCreateTime != nil {
+		ageD := int(time.Since(*snap.SnapshotCreateTime).Hours() / 24)
+		if ageD > 365 {
+			phrase := fmt.Sprintf("manual, unused %dd", ageD)
+			findings = append(findings, domain.Finding{Code: CodeDBCSnapManualUnused, Phrase: phrase, Severity: domain.SevWarn, Source: "wave1"})
+		}
+	}
+	return findings
+}
+
 // FetchRDSDBClusterSnapshotsPage fetches a single page of Aurora + Multi-AZ DB
 // cluster snapshots via the RDS SDK.
 //
@@ -92,7 +118,8 @@ func FetchRDSDBClusterSnapshotsPage(ctx context.Context, api RDSDescribeDBCluste
 			clusterID = *snapshot.DBClusterIdentifier
 		}
 
-		computedStatus, allIssues := ComputeRDSDBClusterSnapshotStatusAndIssues(snapshot)
+		findings := computeRDSDBClusterSnapshotFindings(snapshot)
+		statusPhrase := phraseFromFindings(findings)
 
 		engine := ""
 		if snapshot.Engine != nil {
@@ -120,14 +147,13 @@ func FetchRDSDBClusterSnapshotsPage(ctx context.Context, api RDSDescribeDBCluste
 		}
 
 		r := resource.Resource{
-			ID:     snapshotID,
-			Name:   snapshotID,
-			Status: computedStatus,
-			Issues: allIssues,
+			ID:       snapshotID,
+			Name:     snapshotID,
+			Findings: findings,
 			Fields: map[string]string{
 				"snapshot_id":          snapshotID,
 				"cluster_id":           clusterID,
-				"status":               computedStatus,
+				"status":               statusPhrase,
 				"engine":               engine,
 				"snapshot_type":        snapshotType,
 				"snapshot_create_time": snapshotCreateTime,

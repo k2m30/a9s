@@ -32,6 +32,9 @@ func colorEBRule(r domain.Resource) domain.Color {
 }
 
 func colorKinesis(r domain.Resource) domain.Color {
+	if c, ok := colorFromWave1(r); ok {
+		return c
+	}
 	switch r.Fields["stream_status"] {
 	case "ACTIVE":
 		return domain.ColorHealthy
@@ -48,6 +51,9 @@ func colorKinesis(r domain.Resource) domain.Color {
 }
 
 func colorMSK(r domain.Resource) domain.Color {
+	if c, ok := colorFromWave1(r); ok {
+		return c
+	}
 	switch r.Fields["state"] {
 	case "ACTIVE":
 		return domain.ColorHealthy

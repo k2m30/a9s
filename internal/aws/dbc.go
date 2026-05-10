@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -206,17 +207,17 @@ func FetchDocDBClustersPage(ctx context.Context, api DocDBDescribeDBClustersAPI,
 			backupRetentionPeriod = fmt.Sprintf("%d", *cluster.BackupRetentionPeriod)
 		}
 
-		computedStatus, computedIssues := computeDBCStatusAndIssues(cluster)
+		findings := computeDBCFindings(cluster)
+		statusPhrase := phraseFromFindings(findings)
 
 		r := resource.Resource{
-			ID:     clusterID,
-			Name:   clusterID,
-			Status: computedStatus,
-			Issues: computedIssues,
+			ID:       clusterID,
+			Name:     clusterID,
+			Findings: findings,
 			Fields: map[string]string{
 				"cluster_id":              clusterID,
 				"engine_version":          engineVersion,
-				"status":                  computedStatus,
+				"status":                  statusPhrase,
 				"instances":               instances,
 				"endpoint":                endpoint,
 				"arn":                     aws.ToString(cluster.DBClusterArn),
@@ -255,14 +256,6 @@ func FetchDocDBClustersPage(ctx context.Context, api DocDBDescribeDBClustersAPI,
 	}, nil
 }
 
-// brokenDBCStatusPhrase maps DocumentDB cluster statuses that represent hard failures
-// to their display phrases per spec §4.
-var brokenDBCStatusPhrase = map[string]string{
-	"failed":                              "failed: cluster operation",
-	"inaccessible-encryption-credentials": "encryption key unreachable",
-	"incompatible-parameters":             "parameter group incompatible",
-}
-
 // transitionalDBCStatusSet contains DocumentDB cluster statuses that indicate a
 // transitional (Warning) state. These show a ": in progress" suffix.
 var transitionalDBCStatusSet = map[string]struct{}{
@@ -282,54 +275,51 @@ func countWriters(members []docdbtypes.DBClusterMember) int {
 	return n
 }
 
-// computeDBCStatusAndIssues returns the top S4 phrase (with `(+N)` suffix when
-// multiple warnings stack) AND the full ordered list of every active issue phrase.
-// The second return feeds Resource.Issues so the detail view can render all
-// active warnings individually (spec rule 7). Broken / transitional / healthy
-// states each produce at most one phrase.
-func computeDBCStatusAndIssues(cluster docdbtypes.DBCluster) (string, []string) {
+// computeDBCFindings returns []domain.Finding for a DocumentDB cluster.
+func computeDBCFindings(cluster docdbtypes.DBCluster) []domain.Finding {
 	status := aws.ToString(cluster.Status)
 
 	// Broken statuses — first match wins; no warning stacking.
-	if phrase, ok := brokenDBCStatusPhrase[status]; ok {
-		return phrase, []string{phrase}
+	brokenCode := map[string]domain.FindingCode{
+		"failed":                              CodeDBCFailed,
+		"inaccessible-encryption-credentials": CodeDBCEncryptionKeyUnreachable,
+		"incompatible-parameters":             CodeDBCIncompatibleParameters,
+	}
+	brokenPhrase := map[string]string{
+		"failed":                              "failed: cluster operation",
+		"inaccessible-encryption-credentials": "encryption key unreachable",
+		"incompatible-parameters":             "parameter group incompatible",
+	}
+	if code, ok := brokenCode[status]; ok {
+		return []domain.Finding{{Code: code, Phrase: brokenPhrase[status], Severity: domain.SevBroken, Source: "wave1"}}
 	}
 
 	// No writer on an available cluster — reads only (Broken; beats warnings).
 	if status == "available" && countWriters(cluster.DBClusterMembers) == 0 {
-		const phrase = "no writer: reads only"
-		return phrase, []string{phrase}
+		return []domain.Finding{{Code: CodeDBCNoWriter, Phrase: "no writer: reads only", Severity: domain.SevBroken, Source: "wave1"}}
 	}
 
 	// Transitional statuses.
 	if _, ok := transitionalDBCStatusSet[status]; ok {
 		phrase := status + ": in progress"
-		return phrase, []string{phrase}
+		return []domain.Finding{{Code: CodeDBCTransitional, Phrase: phrase, Severity: domain.SevWarn, Source: "wave1"}}
 	}
 
 	// Healthy available — collect Wave-1 warnings in spec §4 table order.
 	if status == "available" {
-		var warnings []string
-		// §4 order: delete-protection off, not encrypted at rest, no automated backups.
+		var findings []domain.Finding
 		if cluster.DeletionProtection != nil && !*cluster.DeletionProtection {
-			warnings = append(warnings, "delete-protection off")
+			findings = append(findings, domain.Finding{Code: CodeDBCDeletionProtectionOff, Phrase: "delete-protection off", Severity: domain.SevWarn, Source: "wave1"})
 		}
 		if cluster.StorageEncrypted != nil && !*cluster.StorageEncrypted {
-			warnings = append(warnings, "not encrypted at rest")
+			findings = append(findings, domain.Finding{Code: CodeDBCNotEncryptedAtRest, Phrase: "not encrypted at rest", Severity: domain.SevWarn, Source: "wave1"})
 		}
 		if cluster.BackupRetentionPeriod != nil && *cluster.BackupRetentionPeriod == 0 {
-			warnings = append(warnings, "no automated backups")
+			findings = append(findings, domain.Finding{Code: CodeDBCNoAutomatedBackups, Phrase: "no automated backups", Severity: domain.SevWarn, Source: "wave1"})
 		}
-		switch len(warnings) {
-		case 0:
-			return "", nil
-		case 1:
-			return warnings[0], warnings
-		default:
-			return fmt.Sprintf("%s (+%d)", warnings[0], len(warnings)-1), warnings
-		}
+		return findings
 	}
 
 	// Unknown status — bare keyword passthrough (future-proof for new AWS statuses).
-	return status, []string{status}
+	return []domain.Finding{{Code: CodeDBCTransitional, Phrase: status, Severity: domain.SevWarn, Source: "wave1"}}
 }
