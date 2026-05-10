@@ -133,6 +133,18 @@ Notes:
 - **Exit**: All applicable Paperclip reviewers thumbs-up; CodeRabbit either resolved or `@coderabbitai ignore`d with reason.
 - **Anti-pattern**: Multiple push-fix-push cycles to chase reviewers. Get it right locally; push once.
 
+#### Recovery agents — no parent status transitions
+
+A Paperclip child whose role is "recover stalled issue X" — or any agent operating on a parent it does not own as `assigneeAgentId` — **may post comments recommending a status transition on the parent, but MUST NOT call `PATCH /api/issues/{parentId}` to change `status`**. Only the parent's currently-assigned agent transitions status.
+
+Exceptions:
+
+- The CEO or CTO transitioning issues they own.
+- An agent operating on its own (assigned) issue.
+- The board acting via `/api/issues/{id}` directly (governance-level override).
+
+Why this rule exists: AS-70 (CTO-owned, PR-gate-enforcement program issue) was closed as `done` by a "Recover stalled issue AS-70" child (UUID prefix `b599c3b2`) while two PRs were still open and Stage 5 sign-off was the CTO's call. AS-70 had to be reopened the same heartbeat (2026-05-10). Recovery / supervisor agents' dispositions on a parent are **recommendations**, not decisions.
+
 ### Stage 6 — Pre-push Validation (single command)
 
 Run by **whoever pushes** the branch (typically Coder, occasionally CTO for hotfix or doc PRs).
