@@ -10,7 +10,7 @@ import (
 // the Core skeleton compiles without depending on yet-to-be-created
 // concrete event types; PR-05b introduces the typed cmd/event split and
 // will replace this declaration with the typed event interface.
-type Event interface{}
+type Event any
 
 // Core is the platform-agnostic app-core orchestrator. It owns session
 // state and the catalog of resource types, dispatches inbound events to
