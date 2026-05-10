@@ -759,12 +759,13 @@ func (m *Model) applyIntents(intents []runtime.UIIntent) []tea.Cmd {
 				if v.ResourceID != "" && d.ResourceID() != v.ResourceID {
 					continue
 				}
-				if v.EnrichmentFindings != nil {
-					if f, exists := v.EnrichmentFindings[d.ResourceID()]; exists {
-						d.SetEnrichmentFinding(&f)
-					} else {
-						d.SetEnrichmentFinding(nil)
-					}
+				// nil EnrichmentFindings = clear; non-nil = update from map.
+				if v.EnrichmentFindings == nil {
+					d.SetEnrichmentFinding(nil)
+				} else if f, exists := v.EnrichmentFindings[d.ResourceID()]; exists {
+					d.SetEnrichmentFinding(&f)
+				} else {
+					d.SetEnrichmentFinding(nil)
 				}
 			}
 		case runtime.FlashIntent:

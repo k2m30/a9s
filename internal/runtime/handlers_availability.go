@@ -360,7 +360,10 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) ([]UII
 			unified = msg.Issues
 		}
 
-		issueTruncated := msg.Truncated
+		// OR in Wave-1 probe truncation: if the availability scan saw more
+		// resources than it reported, the badge must stay truncated even when
+		// Wave-2 itself is not truncated.
+		issueTruncated := msg.Truncated || c.session.ProbeTruncated[msg.ResourceType]
 		if unified == 0 && len(msg.Findings) == 0 {
 			issueTruncated = false
 		}
