@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -275,32 +276,63 @@ func (m *Model) fetchRevealValue(resourceType, resourceID string) tea.Cmd {
 func (m *Model) connectAWS(profile, region string, gen int) tea.Cmd {
 	ctx := m.appCtx
 	return func() tea.Msg {
+		configPath := awsclient.DefaultConfigPath()
+		bestRegion := region
+
 		// First attempt: let SDK resolve region from env vars + config file.
 		cfg, err := awsclient.NewAWSSessionContext(ctx, profile, region)
+		// Read region from cfg even on error, then fall back to env vars — the SDK
+		// may not populate cfg.Region when profile loading fails.
+		if cfg.Region != "" {
+			bestRegion = cfg.Region
+		} else if r := os.Getenv("AWS_REGION"); r != "" {
+			bestRegion = r
+		} else if r := os.Getenv("AWS_DEFAULT_REGION"); r != "" {
+			bestRegion = r
+		}
 		if err != nil {
-			// If SDK fails due to missing region and we didn't provide one,
-			// fall back to config-file / us-east-1 (issue #82 safety net).
-			if region == "" && isMissingRegionError(err) {
-				configPath := awsclient.DefaultConfigPath()
-				fallbackRegion := awsclient.GetDefaultRegion(configPath, profile)
-				cfg, err = awsclient.NewAWSSessionContext(ctx, profile, fallbackRegion)
+			// If SDK failed due to missing region and env vars didn't help,
+			// retry with config-file / us-east-1 (issue #82 safety net).
+			if region == "" && bestRegion == "" && isMissingRegionError(err) {
+				fallback := awsclient.GetDefaultRegion(configPath, profile)
+				cfg2, err2 := awsclient.NewAWSSessionContext(ctx, profile, fallback)
+				if cfg2.Region != "" {
+					bestRegion = cfg2.Region
+				} else {
+					bestRegion = fallback
+				}
+				if err2 == nil {
+					clients := awsclient.CreateServiceClients(cfg2)
+					return messages.ClientsReadyMsg{Clients: clients, Region: bestRegion, Gen: gen}
+				}
+				err = err2
 			}
-			if err != nil {
-				return messages.ClientsReadyMsg{Err: err, Gen: gen}
+			// Last resort: ensure Region is non-empty for the error return.
+			if bestRegion == "" {
+				bestRegion = awsclient.GetDefaultRegion(configPath, profile)
 			}
+			return messages.ClientsReadyMsg{Err: err, Region: bestRegion, Gen: gen}
 		}
 		// SDK may succeed but leave Region empty (no env var, no config file).
 		// Retry with config-file / us-east-1 so API calls don't fail later.
 		if cfg.Region == "" && region == "" {
-			configPath := awsclient.DefaultConfigPath()
-			fallbackRegion := awsclient.GetDefaultRegion(configPath, profile)
-			cfg, err = awsclient.NewAWSSessionContext(ctx, profile, fallbackRegion)
-			if err != nil {
-				return messages.ClientsReadyMsg{Err: err, Gen: gen}
+			fallback := awsclient.GetDefaultRegion(configPath, profile)
+			cfg2, err2 := awsclient.NewAWSSessionContext(ctx, profile, fallback)
+			if err2 != nil {
+				if bestRegion == "" {
+					bestRegion = fallback
+				}
+				return messages.ClientsReadyMsg{Err: err2, Region: bestRegion, Gen: gen}
 			}
+			if cfg2.Region != "" {
+				bestRegion = cfg2.Region
+			} else {
+				bestRegion = fallback
+			}
+			cfg = cfg2
 		}
 		clients := awsclient.CreateServiceClients(cfg)
-		return messages.ClientsReadyMsg{Clients: clients, Region: cfg.Region, Gen: gen}
+		return messages.ClientsReadyMsg{Clients: clients, Region: bestRegion, Gen: gen}
 	}
 }
 
