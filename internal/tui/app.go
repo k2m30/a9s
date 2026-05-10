@@ -61,6 +61,7 @@ type errorEntry struct {
 // in-flight async results on switch.
 type Model struct {
 	*session.Session // embedded: session-scoped orchestration state
+	core             *runtime.Core // platform-agnostic app core (shares same *session.Session)
 
 	// --- UI shell state ---
 	width  int
