@@ -333,20 +333,30 @@ func (m ResourceListModel) extractCellValue(c listCol, r resource.Resource) stri
 	if c.key == "@id" {
 		return r.ID
 	}
-	// PR-03a-views: status/lifecycle column reads Findings first, then
-	// Fields[LifecycleKey] as fallback — never r.Status or the raw key value.
-	// The status column is identified by c.key == "status" (conventional) or
-	// c.key == td.LifecycleKey when an explicit lifecycle key is set.
+	// PR-03a-views: status/lifecycle column resolution:
+	//  1. Findings[0].Phrase + (+N) suffix — canonical phrase from migrated
+	//     fetchers. Findings take priority so Wave-2 enrichers that write
+	//     FieldUpdates["status"] do not shadow the fetcher-emitted phrase.
+	//  2. Fields[c.key] (Wave-2 enriched value written via FieldUpdates, or
+	//     legacy fetchers that still populate Fields["status"] directly).
+	//  3. Fields[LifecycleKey] — final structural fallback for legacy paths.
 	lifecycleKey := lifecycleColumnKey(m.typeDef)
 	isStatusCol := c.key == "status" || c.key == lifecycleKey
 	if isStatusCol {
 		if len(r.Findings) > 0 {
-			return r.Findings[0].Phrase
+			phrase := r.Findings[0].Phrase
+			if len(r.Findings) > 1 {
+				phrase = fmt.Sprintf("%s (+%d)", phrase, len(r.Findings)-1)
+			}
+			return phrase
+		}
+		if v, ok := r.Fields[c.key]; ok && v != "" {
+			return v
 		}
 		if v := r.Fields[lifecycleKey]; v != "" {
 			return v
 		}
-		// Fall through to normal extraction if neither Findings nor LifecycleKey value is set.
+		// Fall through to normal extraction if none of the above produced a value.
 	}
 	// Fields map (key-based columns) takes priority over raw struct fields.
 	// This ensures Wave-2 enriched values always win over struct literals,

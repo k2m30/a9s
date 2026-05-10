@@ -14,6 +14,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -97,10 +98,11 @@ func TestEnrichEFSMountTargets_Idempotent(t *testing.T) {
 	fake := efsMTFakeFromFixtures()
 	clients := &awsclient.ServiceClients{EFS: fake}
 
-	// Fetcher output: W1 Warning "updating", Issues carries the single phrase.
+	// Fetcher output: W1 Warning "updating" lives in Findings .
 	res := efsResources(fsID)
-	res[0].Status = "updating"
-	res[0].Issues = []string{"updating"}
+	res[0].Findings = []domain.Finding{
+		{Code: awsclient.CodeEFSUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"},
+	}
 
 	r1, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res, nil)
 	if err != nil {
@@ -113,9 +115,8 @@ func TestEnrichEFSMountTargets_Idempotent(t *testing.T) {
 	}
 
 	// Simulate merge of FieldUpdates into Fields (what the pipeline does),
-	// then re-run. Issues is fetcher-owned and stays = ["updating"].
+	// then re-run. Findings is fetcher-owned and stays unchanged.
 	res[0].Fields["status"] = r1.FieldUpdates[fsID]["status"]
-	res[0].Status = r1.FieldUpdates[fsID]["status"]
 
 	r2, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res, nil)
 	if err != nil {

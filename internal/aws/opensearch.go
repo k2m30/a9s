@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/opensearch"
 	opensearchtypes "github.com/aws/aws-sdk-go-v2/service/opensearch/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -36,86 +37,87 @@ func init() {
 	})
 }
 
-// computeOpenSearchStatusAndIssues classifies a DomainStatus against the 5 spec signals
-// and returns the top Status phrase (with optional (+N) suffix) and the Issues slice
-// (hard-state phrases only). now is injected so tests can use a fixed instant.
+// computeOpenSearchFindings classifies a DomainStatus against the 5 spec signals
+// and returns ordered Wave-1 findings. now is injected so tests can use a fixed instant.
 //
 // Signal precedence (top-first):
 //  1. Deleted → "deleting: removal in progress" (Dim / hard-state)
 //  2. DomainProcessingStatus=="Isolated" → "isolated: quarantined by AWS" (Broken / hard-state)
 //  3. Processing || UpgradeProcessing → "processing: config change in flight" (Warning / hard-state)
-//  4. UpdateAvailable && AutomatedUpdateDate in the past → "software update forced soon" (! background)
-//  5. EncryptionAtRestOptions.Enabled==false → "encryption at rest off" (~ background)
-//
-// Hard-state phrases go into Issues; background-check phrases do NOT.
-// topPhrase is "" when all signals are absent (Healthy silence — rule 1).
-func computeOpenSearchStatusAndIssues(domain opensearchtypes.DomainStatus, now time.Time) (topPhrase string, issues []string) {
-	const (
-		phraseDeleting   = "deleting: removal in progress"
-		phraseIsolated   = "isolated: quarantined by AWS"
-		phraseProcessing = "processing: config change in flight"
-		phraseUpdateSoon = "software update forced soon"
-		phraseEncOff     = "encryption at rest off"
-	)
-
+//  4. UpdateAvailable && AutomatedUpdateDate in the past → "software update forced soon" (Warning / background)
+//  5. EncryptionAtRestOptions.Enabled==false → "encryption at rest off" (Warning / background)
+func computeOpenSearchFindings(dom opensearchtypes.DomainStatus, now time.Time) []domain.Finding {
 	// Classify each signal.
-	isDeleted := domain.Deleted != nil && *domain.Deleted
-	isIsolated := domain.DomainProcessingStatus == opensearchtypes.DomainProcessingStatusTypeIsolated
-	isProcessing := (domain.Processing != nil && *domain.Processing) ||
-		(domain.UpgradeProcessing != nil && *domain.UpgradeProcessing)
+	isDeleted := dom.Deleted != nil && *dom.Deleted
+	isIsolated := dom.DomainProcessingStatus == opensearchtypes.DomainProcessingStatusTypeIsolated
+	isProcessing := (dom.Processing != nil && *dom.Processing) ||
+		(dom.UpgradeProcessing != nil && *dom.UpgradeProcessing)
 
-	isUpdateForcedSoon := domain.ServiceSoftwareOptions != nil &&
-		domain.ServiceSoftwareOptions.UpdateAvailable != nil &&
-		*domain.ServiceSoftwareOptions.UpdateAvailable &&
-		domain.ServiceSoftwareOptions.AutomatedUpdateDate != nil &&
-		domain.ServiceSoftwareOptions.AutomatedUpdateDate.Before(now)
+	isUpdateForcedSoon := dom.ServiceSoftwareOptions != nil &&
+		dom.ServiceSoftwareOptions.UpdateAvailable != nil &&
+		*dom.ServiceSoftwareOptions.UpdateAvailable &&
+		dom.ServiceSoftwareOptions.AutomatedUpdateDate != nil &&
+		dom.ServiceSoftwareOptions.AutomatedUpdateDate.Before(now)
 
-	isEncOff := domain.EncryptionAtRestOptions != nil &&
-		domain.EncryptionAtRestOptions.Enabled != nil &&
-		!*domain.EncryptionAtRestOptions.Enabled
+	isEncOff := dom.EncryptionAtRestOptions != nil &&
+		dom.EncryptionAtRestOptions.Enabled != nil &&
+		!*dom.EncryptionAtRestOptions.Enabled
 
-	// Build ordered phrase list (precedence order).
-	var phrases []string
-	var hardPhrases []string
+	var findings []domain.Finding
 
 	if isDeleted {
-		phrases = append(phrases, phraseDeleting)
-		hardPhrases = append(hardPhrases, phraseDeleting)
+		findings = append(findings, domain.Finding{Code: CodeOpenSearchDeleting, Phrase: "deleting: removal in progress", Severity: domain.SevDim, Source: "wave1"})
 	}
 	if isIsolated {
-		phrases = append(phrases, phraseIsolated)
-		hardPhrases = append(hardPhrases, phraseIsolated)
+		findings = append(findings, domain.Finding{Code: CodeOpenSearchIsolated, Phrase: "isolated: quarantined by AWS", Severity: domain.SevBroken, Source: "wave1"})
 	}
 	if isProcessing {
-		phrases = append(phrases, phraseProcessing)
-		hardPhrases = append(hardPhrases, phraseProcessing)
+		findings = append(findings, domain.Finding{Code: CodeOpenSearchProcessing, Phrase: "processing: config change in flight", Severity: domain.SevWarn, Source: "wave1"})
+	}
+	// Background-check signals (UpdateForcedSoon, EncOff) are owned by the
+	// EnrichOpenSearchDomains Wave 2 enricher — emitting them as wave1 here
+	// would double-render in the detail view and incorrectly drive Color.
+	// They appear in Fields["status"] as display phrases via the suffix below.
+	_ = isUpdateForcedSoon
+	_ = isEncOff
+
+	return findings
+}
+
+// computeOpenSearchDisplayPhrases mirrors computeOpenSearchFindings but returns
+// the full ordered phrase list including background-check signals (used to
+// build Fields["status"] with (+N) suffix).
+func computeOpenSearchDisplayPhrases(dom opensearchtypes.DomainStatus, now time.Time) []string {
+	isDeleted := dom.Deleted != nil && *dom.Deleted
+	isIsolated := dom.DomainProcessingStatus == opensearchtypes.DomainProcessingStatusTypeIsolated
+	isProcessing := (dom.Processing != nil && *dom.Processing) ||
+		(dom.UpgradeProcessing != nil && *dom.UpgradeProcessing)
+	isUpdateForcedSoon := dom.ServiceSoftwareOptions != nil &&
+		dom.ServiceSoftwareOptions.UpdateAvailable != nil &&
+		*dom.ServiceSoftwareOptions.UpdateAvailable &&
+		dom.ServiceSoftwareOptions.AutomatedUpdateDate != nil &&
+		dom.ServiceSoftwareOptions.AutomatedUpdateDate.Before(now)
+	isEncOff := dom.EncryptionAtRestOptions != nil &&
+		dom.EncryptionAtRestOptions.Enabled != nil &&
+		!*dom.EncryptionAtRestOptions.Enabled
+
+	var phrases []string
+	if isDeleted {
+		phrases = append(phrases, "deleting: removal in progress")
+	}
+	if isIsolated {
+		phrases = append(phrases, "isolated: quarantined by AWS")
+	}
+	if isProcessing {
+		phrases = append(phrases, "processing: config change in flight")
 	}
 	if isUpdateForcedSoon {
-		phrases = append(phrases, phraseUpdateSoon)
-		// background-check: NOT added to hardPhrases
+		phrases = append(phrases, "software update forced soon")
 	}
 	if isEncOff {
-		phrases = append(phrases, phraseEncOff)
-		// background-check: NOT added to hardPhrases
+		phrases = append(phrases, "encryption at rest off")
 	}
-
-	if len(phrases) == 0 {
-		return "", nil
-	}
-
-	top := phrases[0]
-	hidden := len(phrases) - 1
-	if hidden > 0 {
-		top = fmt.Sprintf("%s (+%d)", top, hidden)
-	}
-
-	// Issues carries only hard-state phrases (no suffix — raw phrase per signal).
-	var issueList []string
-	if len(hardPhrases) > 0 {
-		issueList = hardPhrases
-	}
-
-	return top, issueList
+	return phrases
 }
 
 // FetchOpenSearchDomains performs a two-step fetch:
@@ -167,52 +169,52 @@ func FetchOpenSearchDomainsAt(
 
 	var resources []resource.Resource
 
-	for _, domain := range descOutput.DomainStatusList {
+	for _, dom := range descOutput.DomainStatusList {
 		domainName := ""
-		if domain.DomainName != nil {
-			domainName = *domain.DomainName
+		if dom.DomainName != nil {
+			domainName = *dom.DomainName
 		}
 
 		engineVersion := ""
-		if domain.EngineVersion != nil {
-			engineVersion = *domain.EngineVersion
+		if dom.EngineVersion != nil {
+			engineVersion = *dom.EngineVersion
 		}
 
 		endpoint := ""
-		if domain.Endpoint != nil {
-			endpoint = *domain.Endpoint
+		if dom.Endpoint != nil {
+			endpoint = *dom.Endpoint
 		}
 
 		instanceType := ""
 		instanceCount := ""
-		if domain.ClusterConfig != nil {
-			instanceType = string(domain.ClusterConfig.InstanceType)
-			if domain.ClusterConfig.InstanceCount != nil {
-				instanceCount = fmt.Sprintf("%d", *domain.ClusterConfig.InstanceCount)
+		if dom.ClusterConfig != nil {
+			instanceType = string(dom.ClusterConfig.InstanceType)
+			if dom.ClusterConfig.InstanceCount != nil {
+				instanceCount = fmt.Sprintf("%d", *dom.ClusterConfig.InstanceCount)
 			}
 		}
 
 		// --- Signal flags ---
 		deleted := "false"
-		if domain.Deleted != nil && *domain.Deleted {
+		if dom.Deleted != nil && *dom.Deleted {
 			deleted = "true"
 		}
 
 		processing := "false"
-		if domain.Processing != nil && *domain.Processing {
+		if dom.Processing != nil && *dom.Processing {
 			processing = "true"
 		}
 
 		upgradeProcessing := "false"
-		if domain.UpgradeProcessing != nil && *domain.UpgradeProcessing {
+		if dom.UpgradeProcessing != nil && *dom.UpgradeProcessing {
 			upgradeProcessing = "true"
 		}
 
 		// DomainProcessingStatus: always emit at least "Active" so the Color func's
 		// Isolated branch is deterministic even when the AWS field is zero-value.
 		processingStatus := "Active"
-		if domain.DomainProcessingStatus != "" {
-			processingStatus = string(domain.DomainProcessingStatus)
+		if dom.DomainProcessingStatus != "" {
+			processingStatus = string(dom.DomainProcessingStatus)
 		}
 
 		// Software update forced soon: UpdateAvailable AND AutomatedUpdateDate in the past.
@@ -220,8 +222,8 @@ func FetchOpenSearchDomainsAt(
 		updateDate := ""
 		currentVersion := ""
 		newVersion := ""
-		if domain.ServiceSoftwareOptions != nil {
-			sso := domain.ServiceSoftwareOptions
+		if dom.ServiceSoftwareOptions != nil {
+			sso := dom.ServiceSoftwareOptions
 			if sso.UpdateAvailable != nil && *sso.UpdateAvailable &&
 				sso.AutomatedUpdateDate != nil &&
 				sso.AutomatedUpdateDate.Before(now) {
@@ -240,20 +242,28 @@ func FetchOpenSearchDomainsAt(
 
 		// Encryption at rest: non-nil pointer with value false.
 		encEnabled := "true"
-		if domain.EncryptionAtRestOptions != nil &&
-			domain.EncryptionAtRestOptions.Enabled != nil &&
-			!*domain.EncryptionAtRestOptions.Enabled {
+		if dom.EncryptionAtRestOptions != nil &&
+			dom.EncryptionAtRestOptions.Enabled != nil &&
+			!*dom.EncryptionAtRestOptions.Enabled {
 			encEnabled = "false"
 		}
 
-		// Classify status and issues using the shared classifier (injectable now).
-		statusPhrase, issues := computeOpenSearchStatusAndIssues(domain, now)
+		findings := computeOpenSearchFindings(dom, now)
+		// Display phrase covers background-check signals (UpdateForcedSoon,
+		// EncOff) that are deliberately not in Findings — those are Wave 2
+		// territory but still surface in the Status column for visibility.
+		displayPhrases := computeOpenSearchDisplayPhrases(dom, now)
+		statusPhrase := ""
+		if len(displayPhrases) > 0 {
+			statusPhrase = displayPhrases[0]
+			if len(displayPhrases) > 1 {
+				statusPhrase = fmt.Sprintf("%s (+%d)", statusPhrase, len(displayPhrases)-1)
+			}
+		}
 
 		r := resource.Resource{
-			ID:     domainName,
-			Name:   domainName,
-			Status: statusPhrase,
-			Issues: issues,
+			ID:   domainName,
+			Name: domainName,
 			Fields: map[string]string{
 				"domain_name":                       domainName,
 				"engine_version":                    engineVersion,
@@ -271,7 +281,8 @@ func FetchOpenSearchDomainsAt(
 				"current_version":                   currentVersion,
 				"new_version":                       newVersion,
 			},
-			RawStruct: domain,
+			Findings:  findings,
+			RawStruct: dom,
 		}
 
 		resources = append(resources, r)
