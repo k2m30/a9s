@@ -27,6 +27,9 @@ Thumbs.db
 coverage.out
 coverage.html
 
+# AS-104 — captured Stage 6 test-suite wall budget artifact
+test-budget.json
+
 !.claude
 .claude/worktrees/
 .claude/scheduled_tasks.lock

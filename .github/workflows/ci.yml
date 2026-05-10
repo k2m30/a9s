@@ -12,6 +12,8 @@ on:
 
 permissions:
   contents: read
+  # AS-104: test-budget job upserts a sticky PR comment with the wall/budget table.
+  pull-requests: write
 
 jobs:
   changes:
@@ -95,6 +97,101 @@ jobs:
       - if: needs.changes.outputs.go != 'true'
         name: Docs-only PR — Test stub
         run: echo "No Go-affecting paths changed; Test stub passing per docs-only CI shim."
+
+  test-budget:
+    # AS-104 — fail the build if `make test` (non-race) exceeds the
+    # 5-minute Stage 6 wall budget on ubuntu-latest. macOS/Windows are
+    # observed via the `test` matrix but not gated here. Race timing is
+    # non-deterministic across runners and is exercised by the nightly
+    # matrix per AS-25.
+    name: Test budget (5m wall)
+    if: github.event_name == 'pull_request'
+    needs: changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - if: needs.changes.outputs.go == 'true'
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - if: needs.changes.outputs.go == 'true'
+        name: Capture test-suite wall time
+        run: scripts/test-budget-gate.sh capture
+      - if: always() && needs.changes.outputs.go == 'true'
+        name: Upload test-budget artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-budget
+          path: test-budget.json
+          if-no-files-found: ignore
+      - if: needs.changes.outputs.go == 'true'
+        name: Gate against 5-minute budget
+        run: scripts/test-budget-gate.sh gate
+      - if: always() && needs.changes.outputs.go == 'true'
+        name: Upsert sticky PR comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const MARKER = '<!-- a9s-test-budget-gate -->';
+            let body;
+            try {
+              const raw = fs.readFileSync('test-budget.json', 'utf8');
+              const data = JSON.parse(raw);
+              const wall = data.wall_seconds;
+              const budget = data.budget_seconds;
+              const headroom = data.headroom_seconds;
+              const headroomPct = data.headroom_pct;
+              let status;
+              if (wall > budget) {
+                status = '❌ over budget';
+              } else if (headroom < 60) {
+                status = '⚠️ within 1m of budget';
+              } else {
+                status = '✅ under budget';
+              }
+              body = [
+                MARKER,
+                '### Test-suite wall budget',
+                '',
+                '| metric | value |',
+                '| --- | --- |',
+                `| wall | ${wall}s |`,
+                `| budget | ${budget}s |`,
+                `| headroom | ${headroom}s (${headroomPct}%) |`,
+                `| status | ${status} |`,
+                `| os | ${data.os} |`,
+                `| go | ${data.go_version} |`,
+                `| sha | ${data.git_sha} |`,
+                '',
+                'See `docs/development-process.md` §"Test suite wall budget".',
+              ].join('\n');
+            } catch (err) {
+              body = [
+                MARKER,
+                '### Test-suite wall budget',
+                '',
+                `Failed to read \`test-budget.json\`: ${err.message}`,
+              ].join('\n');
+            }
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number, per_page: 100,
+            });
+            const existing = comments.find((c) => c.body && c.body.startsWith(MARKER));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner, repo, comment_id: existing.id, body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number, body,
+              });
+            }
+      - if: needs.changes.outputs.go != 'true'
+        name: Docs-only PR — Test budget stub
+        run: echo "No Go-affecting paths changed; Test budget stub passing per docs-only CI shim."
 
   build:
     name: Build
