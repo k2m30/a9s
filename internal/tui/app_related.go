@@ -340,7 +340,7 @@ func (m *Model) buildResourceCacheSnapshot() resource.ResourceCache {
 // enterChildForResource returns the ChildViewDef registered under Key="enter"
 // for a resource type, or nil if none is registered or its DrillCondition
 // vetoes the given row. Mirror of (ResourceListModel).enterChildFor — used
-// when related-navigation takes the cache-hit fast path (KindDetail) and
+// when related-navigation takes the cache-hit fast path (NavigationKindDetail) and
 // must replicate manual-Enter behavior without instantiating a list view.
 func enterChildForResource(td *resource.ResourceTypeDef, r resource.Resource) *resource.ChildViewDef {
 	if td == nil {
@@ -361,7 +361,7 @@ func enterChildForResource(td *resource.ResourceTypeDef, r resource.Resource) *r
 
 // buildChildContextForResource resolves ContextKeys for a ChildViewDef given
 // the selected resource. Mirror of (ResourceListModel).buildChildContext for
-// the KindDetail fast path, without parent-context chaining ("@parent.*"
+// the NavigationKindDetail fast path, without parent-context chaining ("@parent.*"
 // sources collapse to empty because related-navigation starts from a fresh
 // detail drill, not a nested child stack).
 func buildChildContextForResource(child resource.ChildViewDef, r resource.Resource) map[string]string {
@@ -373,7 +373,7 @@ func buildChildContextForResource(child resource.ChildViewDef, r resource.Resour
 		case source == "Name":
 			ctx[param] = r.Name
 		case strings.HasPrefix(source, "@parent."):
-			// Unreachable from a related-navigation KindDetail entry — the
+			// Unreachable from a related-navigation NavigationKindDetail entry — the
 			// source resource is not a child view. Leave empty rather than
 			// reading uninitialised parent context.
 		default:
