@@ -2,7 +2,19 @@ package catalog
 
 import "github.com/k2m30/a9s/v3/internal/domain"
 
-var dataTypes = []ResourceTypeDef{
+func colorGlue(_ domain.Resource) domain.Color { return domain.ColorHealthy }
+
+func colorAthena(r domain.Resource) domain.Color {
+	switch r.Fields["state"] {
+	case "ENABLED":
+		return domain.ColorHealthy
+	case "DISABLED":
+		return domain.ColorWarning
+	}
+	return domain.ColorHealthy
+}
+
+var dataTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
 		Name:          "Glue Jobs",
 		ShortName:     "glue",
@@ -22,6 +34,7 @@ var dataTypes = []ResourceTypeDef{
 			ContextKeys:    map[string]string{"job_name": "ID"},
 			DisplayNameKey: "job_name",
 		}},
+		Color: colorGlue,
 	},
 	{
 		Name:          "Athena Workgroups",
@@ -35,5 +48,6 @@ var dataTypes = []ResourceTypeDef{
 			{Key: "description", Title: "Description", Width: 30, Sortable: false},
 			{Key: "engine_version", Title: "Engine", Width: 28, Sortable: true},
 		},
+		Color: colorAthena,
 	},
 }

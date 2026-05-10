@@ -1,8 +1,174 @@
 package catalog
 
-import "github.com/k2m30/a9s/v3/internal/domain"
+import (
+	"strconv"
 
-var networkingTypes = []ResourceTypeDef{
+	"github.com/k2m30/a9s/v3/internal/domain"
+)
+
+func colorELB(r domain.Resource) domain.Color {
+	if c, ok := colorFromWave1(r); ok {
+		return c
+	}
+	switch r.Fields["state"] {
+	case "active", "":
+		return domain.ColorHealthy
+	case "provisioning", "active_impaired":
+		return domain.ColorWarning
+	case "failed":
+		return domain.ColorBroken
+	}
+	return domain.ColorHealthy
+}
+
+func colorTG(_ domain.Resource) domain.Color { return domain.ColorHealthy }
+
+func colorSG(r domain.Resource) domain.Color {
+	if r.Fields["wide_open"] == "true" {
+		return domain.ColorBroken
+	}
+	count, _ := strconv.Atoi(r.Fields["dangerous_open_count"])
+	if count > 0 {
+		return domain.ColorBroken
+	}
+	return domain.ColorHealthy
+}
+
+func colorVPC(r domain.Resource) domain.Color {
+	if c, ok := colorFromWave1(r); ok {
+		return c
+	}
+	switch r.Fields["state"] {
+	case "available", "":
+		return domain.ColorHealthy
+	case "pending":
+		return domain.ColorWarning
+	}
+	return domain.ColorHealthy
+}
+
+func colorSubnet(r domain.Resource) domain.Color {
+	if c, ok := colorFromWave1(r); ok {
+		return c
+	}
+	switch r.Fields["state"] {
+	case "available", "":
+		return domain.ColorHealthy
+	case "pending":
+		return domain.ColorWarning
+	case "unavailable", "failed", "failed-insufficient-capacity":
+		return domain.ColorBroken
+	}
+	return domain.ColorHealthy
+}
+
+func colorRTB(r domain.Resource) domain.Color {
+	blackhole, _ := strconv.Atoi(r.Fields["blackhole_routes_count"])
+	if blackhole > 0 {
+		return domain.ColorBroken
+	}
+	assoc, _ := strconv.Atoi(r.Fields["associations_count"])
+	if assoc == 0 && r.Fields["is_main"] != "true" {
+		return domain.ColorWarning
+	}
+	return domain.ColorHealthy
+}
+
+func colorNAT(r domain.Resource) domain.Color {
+	if c, ok := colorFromWave1(r); ok {
+		return c
+	}
+	switch r.Fields["state"] {
+	case "available", "":
+		return domain.ColorHealthy
+	case "pending", "deleting":
+		return domain.ColorWarning
+	case "failed":
+		return domain.ColorBroken
+	case "deleted":
+		return domain.ColorDim
+	}
+	return domain.ColorHealthy
+}
+
+func colorIGW(r domain.Resource) domain.Color {
+	if c, ok := colorFromWave1(r); ok {
+		return c
+	}
+	switch r.Fields["state"] {
+	case "attaching", "detaching":
+		return domain.ColorWarning
+	}
+	attachments, _ := strconv.Atoi(r.Fields["attachments_count"])
+	if attachments == 0 {
+		return domain.ColorWarning
+	}
+	return domain.ColorHealthy
+}
+
+func colorEIP(r domain.Resource) domain.Color {
+	if c, ok := colorFromWave1(r); ok {
+		return c
+	}
+	if r.Fields["association_id"] == "" && r.Fields["instance_id"] == "" {
+		return domain.ColorWarning
+	}
+	return domain.ColorHealthy
+}
+
+func colorVPCE(r domain.Resource) domain.Color {
+	if c, ok := colorFromWave1(r); ok {
+		return c
+	}
+	switch r.Fields["state"] {
+	case "Available", "":
+		return domain.ColorHealthy
+	case "PendingAcceptance", "Pending", "Deleting":
+		return domain.ColorWarning
+	case "Failed", "Rejected", "Expired", "Partial":
+		return domain.ColorBroken
+	case "Deleted":
+		return domain.ColorDim
+	}
+	return domain.ColorHealthy
+}
+
+func colorTGW(r domain.Resource) domain.Color {
+	if c, ok := colorFromWave1(r); ok {
+		return c
+	}
+	switch r.Fields["state"] {
+	case "available", "":
+		return domain.ColorHealthy
+	case "pending", "modifying", "deleting":
+		return domain.ColorWarning
+	case "failed":
+		return domain.ColorBroken
+	case "deleted":
+		return domain.ColorDim
+	}
+	return domain.ColorHealthy
+}
+
+func colorENI(r domain.Resource) domain.Color {
+	if c, ok := colorFromWave1(r); ok {
+		return c
+	}
+	switch r.Fields["status"] {
+	case "in-use":
+		return domain.ColorHealthy
+	case "available":
+		if r.Fields["requester_managed"] == "true" {
+			return domain.ColorHealthy
+		}
+		return domain.ColorWarning
+	case "attaching", "detaching":
+		return domain.ColorWarning
+	}
+	return domain.ColorHealthy
+}
+
+var networkingTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
 		Name:          "Load Balancers",
 		ShortName:     "elb",
@@ -23,8 +189,7 @@ var networkingTypes = []ResourceTypeDef{
 			ContextKeys:    map[string]string{"load_balancer_arn": "load_balancer_arn", "lb_name": "Name"},
 			DisplayNameKey: "lb_name",
 		}},
-		// Fetcher/Wave2/Related/Navigable: intentionally nil — import cycle prevents
-		// internal/catalog from referencing internal/aws. Wired via legacy init() until PR-04n.
+		Color: colorELB,
 	},
 	{
 		Name:          "Target Groups",
@@ -46,6 +211,7 @@ var networkingTypes = []ResourceTypeDef{
 			ContextKeys:    map[string]string{"target_group_arn": "target_group_arn"},
 			DisplayNameKey: "Name",
 		}},
+		Color: colorTG,
 	},
 	{
 		Name:          "Security Groups",
@@ -59,6 +225,7 @@ var networkingTypes = []ResourceTypeDef{
 			{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
 			{Key: "description", Title: "Description", Width: 36, Sortable: false},
 		},
+		Color: colorSG,
 	},
 	{
 		Name:          "VPCs",
@@ -73,6 +240,7 @@ var networkingTypes = []ResourceTypeDef{
 			{Key: "state", Title: "State", Width: 12, Sortable: true},
 			{Key: "is_default", Title: "Default", Width: 9, Sortable: true},
 		},
+		Color: colorVPC,
 	},
 	{
 		Name:          "Subnets",
@@ -89,6 +257,7 @@ var networkingTypes = []ResourceTypeDef{
 			{Key: "state", Title: "State", Width: 12, Sortable: true},
 			{Key: "available_ips", Title: "Available IPs", Width: 14, Sortable: true},
 		},
+		Color: colorSubnet,
 	},
 	{
 		Name:          "Route Tables",
@@ -103,6 +272,7 @@ var networkingTypes = []ResourceTypeDef{
 			{Key: "routes_count", Title: "Routes", Width: 8, Sortable: true},
 			{Key: "associations_count", Title: "Assoc.", Width: 8, Sortable: true},
 		},
+		Color: colorRTB,
 	},
 	{
 		Name:          "NAT Gateways",
@@ -118,6 +288,7 @@ var networkingTypes = []ResourceTypeDef{
 			{Key: "state", Title: "State", Width: 12, Sortable: true},
 			{Key: "public_ip", Title: "Public IP", Width: 16, Sortable: false},
 		},
+		Color: colorNAT,
 	},
 	{
 		Name:          "Internet Gateways",
@@ -131,6 +302,7 @@ var networkingTypes = []ResourceTypeDef{
 			{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
 			{Key: "state", Title: "State", Width: 12, Sortable: true},
 		},
+		Color: colorIGW,
 	},
 	{
 		Name:          "Elastic IPs",
@@ -146,6 +318,7 @@ var networkingTypes = []ResourceTypeDef{
 			{Key: "instance_id", Title: "Instance", Width: 20, Sortable: true},
 			{Key: "domain", Title: "Domain", Width: 8, Sortable: true},
 		},
+		Color: colorEIP,
 	},
 	{
 		Name:          "VPC Endpoints",
@@ -160,6 +333,7 @@ var networkingTypes = []ResourceTypeDef{
 			{Key: "state", Title: "State", Width: 12, Sortable: true},
 			{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
 		},
+		Color: colorVPCE,
 	},
 	{
 		Name:          "Transit Gateways",
@@ -174,6 +348,7 @@ var networkingTypes = []ResourceTypeDef{
 			{Key: "owner_id", Title: "Owner", Width: 14, Sortable: true},
 			{Key: "description", Title: "Description", Width: 30, Sortable: false},
 		},
+		Color: colorTGW,
 	},
 	{
 		Name:          "Network Interfaces",
@@ -189,5 +364,6 @@ var networkingTypes = []ResourceTypeDef{
 			{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
 			{Key: "private_ip", Title: "Private IP", Width: 16, Sortable: false},
 		},
+		Color: colorENI,
 	},
 }

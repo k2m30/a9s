@@ -1,276 +1,45 @@
 package resource
 
 import (
-	"strings"
-
 	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
 )
 
 // Color classifies a resource's health for display, filtering, and badges.
-type Color uint8
+// Type alias of domain.Color — zero-churn backward compat for TUI consumers.
+type Color = domain.Color
 
 const (
-	ColorHealthy Color = iota // green  — nominal
-	ColorWarning              // yellow — transitioning / degrading
-	ColorBroken               // red    — stopped / failed / impaired
-	ColorDim                  // grey   — terminated / inactive
+	ColorHealthy = domain.ColorHealthy // green  — nominal
+	ColorWarning = domain.ColorWarning // yellow — transitioning / degrading
+	ColorBroken  = domain.ColorBroken  // red    — stopped / failed / impaired
+	ColorDim     = domain.ColorDim     // grey   — terminated / inactive
 )
 
-// IsIssue reports whether this color contributes to attention filtering and issue badges.
-func (c Color) IsIssue() bool { return c == ColorWarning || c == ColorBroken }
-
-// fallbackColor classifies a resource status string when no per-type Color func
-// is set. Covers the common AWS vocabulary so ad-hoc test ResourceTypeDef
-// instances (which omit Color) behave sensibly without requiring every test to
-// set up a full registered type.
-func fallbackColor(status string) Color {
-	switch status {
-	case "running", "available", "active", "ACTIVE", "AVAILABLE", "RUNNING",
-		"in-service", "healthy":
-		return ColorHealthy
-	case "stopped", "failed", "error", "impaired", "FAILED", "ERROR",
-		"STOPPED":
-		return ColorBroken
-	case "terminated", "TERMINATED", "shutting-down", "deleted", "DELETED",
-		"deregistered", "inactive", "INACTIVE":
-		// "inactive" is a steady-state (e.g. ASG scaled to 0, disabled rule);
-		// dim, not broken. Aligns with StandardLifecycleColor.
-		return ColorDim
-	}
-	// Suffix patterns for compound statuses (e.g. "create_failed", "update_in_progress").
-	lower := strings.ToLower(status)
-	switch {
-	case strings.HasSuffix(lower, "_failed") || strings.HasSuffix(lower, "-failed"):
-		return ColorBroken
-	case strings.HasSuffix(lower, "_in_progress") || strings.HasSuffix(lower, "_progress") ||
-		strings.HasSuffix(lower, "-in-progress") || status == "pending" ||
-		status == "creating" || status == "modifying" || status == "updating" ||
-		status == "initializing":
-		return ColorWarning
-	}
-	return ColorHealthy
-}
-
-// ResolveColor classifies r using d.Color, defaulting to a generic status-based
-// color when d.Color is nil. All registered types have non-nil Color (invariant #7);
-// the fallback exists only for ad-hoc ResourceTypeDef test doubles.
-func (d ResourceTypeDef) ResolveColor(r Resource) Color {
-	if d.Color == nil {
-		return fallbackColor(r.Status)
-	}
-	return d.Color(r)
-}
+// ResourceTypeDef defines a category of AWS resources the app can browse.
+// Type alias of catalog.ResourceTypeDef — zero-churn backward compat for TUI consumers.
+type ResourceTypeDef = catalog.ResourceTypeDef
 
 // Column defines a column in a resource table view.
-// Declaration lives in internal/domain/contracts.go; this alias keeps
-// existing consumers compiling. Deleted in PR-04n.
+// Type alias of domain.Column — zero-churn backward compat for TUI consumers.
 type Column = domain.Column
 
 // ChildViewDef describes a child view that can be drilled into from a parent
-// resource list. Declaration lives in internal/domain/contracts.go; this alias
-// keeps existing consumers compiling. Deleted in PR-04n.
+// resource list. Type alias of domain.ChildViewDef — zero-churn backward compat.
 type ChildViewDef = domain.ChildViewDef
 
-// ResourceTypeDef defines a category of AWS resources the app can browse.
-type ResourceTypeDef struct {
-	// Name is the display name (e.g., "EC2 Instances").
-	Name string
-	// ShortName is the colon-command alias (e.g., "ec2").
-	ShortName string
-	// ListTitle overrides ShortName for list view frame titles (e.g., "alarms" instead of "alarm").
-	// When empty, ShortName is used.
-	ListTitle string
-	// Aliases are alternative command names for this resource type.
-	Aliases []string
-	// Category groups resource types in the main menu (e.g., "COMPUTE", "NETWORKING").
-	Category string
-	// Columns are the table columns for list view.
-	Columns []Column
-	// Children defines child views that can be drilled into from this resource
-	// type's list view. Each entry maps a key press to a child type navigation.
-	Children []ChildViewDef
-	// CopyField overrides which field CopyContent copies. When non-empty,
-	// the resource list copies Fields[CopyField] instead of the default ID.
-	CopyField string
-	// StubCreator optionally creates a minimal stub Resource for the given ID when
-	// the target resource is not yet in the resource cache. Used by ResourceListModel
-	// to auto-navigate to a detail view when the filtered list is empty but a specific
-	// target ID is known (e.g., AMI navigation from EC2 detail before AMIs are loaded).
-	// When nil, no stub navigation occurs — the list just shows empty with a spinner.
-	StubCreator func(id string) Resource
-	// RelatedContextFromIDs extracts the ParentContext for a child-view navigation
-	// triggered from the related panel. Called when this type is the target of a
-	// RelatedNavigateMsg and the type is a registered child type (isChild=true).
-	// The first non-empty ID in relatedIDs is typically the encoded parent+child key.
-	// When nil, an empty parent context is used (bucket/prefix shown as empty).
-	RelatedContextFromIDs func(relatedIDs []string) map[string]string
-	// CloudTrailKey specifies how to build the CloudTrail LookupEvents filter.
-	// Format: "LookupAttr:ValueSource" where:
-	//   LookupAttr  = "ResourceName" or "Username"
-	//   ValueSource = "ID" (res.ID), "Name" (res.Name), or "Fields.xxx" (res.Fields["xxx"])
-	// Empty string means no CloudTrail support (t key suppressed).
-	CloudTrailKey string
-	// IdentityKey optionally names the column key used to position the
-	// enrichment-finding row marker. When empty, the row-marker resolver uses
-	// a cascade: match "name" key → path contains "Name"/"Identifier" →
-	// title equal to "Name" or the type Name → column index 0.
-	// Set this only when the cascade would pick the wrong column.
-	IdentityKey string
-	// LifecycleKey names the Resource.Fields key holding lifecycle state
-	// (e.g. "running", "stopped", "available", "deleted"). Used as the
-	// list-view Status column fallback when r.Findings is empty:
-	//
-	//   list view: r.Findings[0].Phrase if non-empty, else r.Fields[LifecycleKey]
-	//
-	// Empty string defaults to "state" at read time. Per-category PRs
-	// in Phase 03 set explicit non-default values where the structural
-	// Color func already reads a different key.
-	LifecycleKey string
-
-	// Color classifies the row's health. REQUIRED for all registered types.
-	// Reads the resource's structural fields directly.
-	Color func(Resource) Color
-
-	// ExcludeFromIssueBadge, when true, still colors rows and honors ctrl+z,
-	// but excludes the type from the main-menu badge count. Used for event-severity
-	// types (ct-events) where severity is event-level, not resource-health.
-	ExcludeFromIssueBadge bool
-
-	// CellDecorators optionally transforms cell values per column key before render.
-	// Key = column key; value = decorator func receiving the full resource and the
-	// already-extracted cell string, returning the replacement. nil map = no decorators.
-	CellDecorators map[string]func(r Resource, value string) string
-
-	// Project is an optional custom DetailProjector for this resource type.
-	// When nil, projection.Generic is used as the fallback projector.
-	// Set on types whose detail view requires specialised rendering that the
-	// generic field-path projector cannot produce (e.g. ct-events).
-	Project domain.DetailProjector
-
-	// Augment is an optional post-projector hook that injects additional sections
-	// after the main projector has run (e.g. EC2 status checks). When nil, no
-	// augmentation is applied. Pure function.
-	Augment domain.Augmenter
-}
-
-// resourceTypes holds all registered resource type definitions in menu display order.
-// Built once at package init from category-specific functions to preserve deterministic ordering.
-var resourceTypes = buildResourceTypes()
-
-func buildResourceTypes() []ResourceTypeDef {
-	// All categories migrated to internal/catalog. This func returns empty
-	// during the PR-04f–04n window; AllResourceTypes() sources from catalog.
-	// Deleted in PR-04n when the legacy resourceTypes var is removed.
-	return nil
-}
-
 // AllResourceTypes returns the definitions for all supported resource types.
-// Catalog-backed: types declared in internal/catalog take precedence; types
-// not yet migrated fall through to the legacy resourceTypes slice.
-// Fallback is removed in PR-04n once all categories are migrated.
+// Pure catalog passthrough.
 func AllResourceTypes() []ResourceTypeDef {
-	catalogTypes := catalog.All()
-	if len(catalogTypes) > 0 {
-		// Return catalog types followed by any legacy types not yet in the catalog.
-		result := make([]ResourceTypeDef, 0, len(catalogTypes)+len(resourceTypes))
-		for _, ct := range catalogTypes {
-			result = append(result, adaptFromCatalog(ct))
-		}
-		catalogSet := make(map[string]struct{}, len(catalogTypes))
-		for _, ct := range catalogTypes {
-			catalogSet[ct.ShortName] = struct{}{}
-		}
-		for _, lt := range resourceTypes {
-			if _, inCatalog := catalogSet[lt.ShortName]; !inCatalog {
-				result = append(result, lt)
-			}
-		}
-		return result
-	}
-	// Legacy fallback (only meaningful during PR-04a through PR-04m).
-	result := make([]ResourceTypeDef, len(resourceTypes))
-	copy(result, resourceTypes)
-	return result
+	return catalog.All()
 }
 
 // AllShortNames returns the ShortName of every registered resource type.
-// Catalog-backed: delegates to AllResourceTypes so catalog types are included.
 func AllShortNames() []string {
-	all := AllResourceTypes()
-	names := make([]string, len(all))
-	for i, rt := range all {
-		names[i] = rt.ShortName
-	}
-	return names
+	return catalog.AllShortNames()
 }
 
 // FindResourceType looks up a resource type by its ShortName or any of its Aliases.
-// Catalog-backed: checks the catalog first; falls through to the legacy slice
-// for types not yet migrated. Fallback removed in PR-04n.
 func FindResourceType(name string) *ResourceTypeDef {
-	if ct := catalog.Find(name); ct != nil {
-		def := adaptFromCatalog(*ct)
-		return &def
-	}
-	// Legacy fallback (only meaningful during PR-04a through PR-04m).
-	for i := range resourceTypes {
-		if strings.EqualFold(resourceTypes[i].ShortName, name) {
-			return &resourceTypes[i]
-		}
-		for _, alias := range resourceTypes[i].Aliases {
-			if strings.EqualFold(alias, name) {
-				return &resourceTypes[i]
-			}
-		}
-	}
-	return nil
-}
-
-// colorRegistry holds per-type Color functions for catalog-backed types.
-// Populated by per-category color_*.go init() calls during the migration
-// window (PR-04b through PR-04n). Deleted in PR-04n when adaptFromCatalog is removed.
-var colorRegistry = map[string]func(Resource) Color{} //nolint:gochecknoglobals // migration-window shim: intentional package-level var
-
-// augmentRegistry holds per-type Augment hooks for catalog-backed types.
-// Populated by per-category color_*.go init() calls during the migration
-// window (PR-04b through PR-04n). Deleted in PR-04n when adaptFromCatalog is removed.
-var augmentRegistry = map[string]domain.Augmenter{} //nolint:gochecknoglobals // migration-window shim: intentional package-level var
-
-// projectRegistry holds per-type DetailProjector funcs for catalog-backed types
-// that require a non-generic projector (e.g. ct-events). Populated by
-// per-category color_*.go init() calls. Deleted in PR-04n.
-var projectRegistry = map[string]domain.DetailProjector{} //nolint:gochecknoglobals // migration-window shim: intentional package-level var
-
-// adaptFromCatalog converts a catalog.ResourceTypeDef into the legacy
-// ResourceTypeDef shape. This is a migration-window shim; deleted in PR-04n
-// when the legacy type is removed and consumers read catalog.ResourceTypeDef directly.
-//
-// Fields that require concrete internal/aws types (Wave2, Reveal, DetailEnrich)
-// are mapped from any to the correct type alias.
-func adaptFromCatalog(ct catalog.ResourceTypeDef) ResourceTypeDef {
-	return ResourceTypeDef{
-		Name:                  ct.Name,
-		ShortName:             ct.ShortName,
-		ListTitle:             ct.ListTitle,
-		Aliases:               ct.Aliases,
-		Category:              ct.Category,
-		Columns:               ct.Columns,
-		Children:              ct.Children,
-		CopyField:             ct.CopyField,
-		StubCreator:           ct.StubCreator,
-		RelatedContextFromIDs: ct.RelatedContextFromIDs,
-		CloudTrailKey:         ct.CloudTrailKey,
-		IdentityKey:           ct.IdentityKey,
-		LifecycleKey:          ct.LifecycleKey,
-		ExcludeFromIssueBadge: ct.ExcludeFromIssueBadge,
-		CellDecorators:        ct.CellDecorators,
-		Project:               projectRegistry[ct.ShortName],
-		// Color: populated from colorRegistry (per-category color_*.go init calls)
-		// during the migration window. When not registered, fallbackColor is used.
-		Color: colorRegistry[ct.ShortName],
-		// Augment: populated from augmentRegistry (per-category color_*.go init calls)
-		// during the migration window. When not registered, nil (no augmentation).
-		Augment: augmentRegistry[ct.ShortName],
-	}
+	return catalog.Find(name)
 }

@@ -1,8 +1,47 @@
 package catalog
 
-import "github.com/k2m30/a9s/v3/internal/domain"
+import (
+	"strings"
+	"time"
 
-var securityTypes = []ResourceTypeDef{
+	"github.com/k2m30/a9s/v3/internal/domain"
+)
+
+func colorRole(r domain.Resource) domain.Color {
+	doc := r.Fields["assume_role_policy_document"]
+	if doc != "" &&
+		(strings.Contains(doc, `"Principal":"*"`) || strings.Contains(doc, `"Principal": "*"`)) {
+		return domain.ColorBroken
+	}
+	return domain.ColorHealthy
+}
+
+func colorPolicy(r domain.Resource) domain.Color {
+	if r.Fields["attachment_count"] == "0" && r.Fields["is_attachable"] == "true" {
+		return domain.ColorWarning
+	}
+	return domain.ColorHealthy
+}
+
+func colorIAMUser(r domain.Resource) domain.Color {
+	if r.Fields["has_console_password"] != "true" {
+		return domain.ColorHealthy
+	}
+	plu := r.Fields["password_last_used"]
+	t, err := time.Parse("2006-01-02 15:04", plu)
+	if err != nil {
+		return domain.ColorHealthy
+	}
+	if time.Since(t) > 90*24*time.Hour {
+		return domain.ColorWarning
+	}
+	return domain.ColorHealthy
+}
+
+func colorIAMGroup(_ domain.Resource) domain.Color { return domain.ColorHealthy }
+func colorWAF(_ domain.Resource) domain.Color      { return domain.ColorHealthy }
+
+var securityTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
 		Name:          "IAM Roles",
 		ShortName:     "role",
@@ -22,6 +61,7 @@ var securityTypes = []ResourceTypeDef{
 			ContextKeys:    map[string]string{"role_name": "ID"},
 			DisplayNameKey: "role_name",
 		}},
+		Color: colorRole,
 	},
 	{
 		Name:          "IAM Policies",
@@ -36,6 +76,7 @@ var securityTypes = []ResourceTypeDef{
 			{Key: "path", Title: "Path", Width: 20, Sortable: true},
 			{Key: "create_date", Title: "Created", Width: 22, Sortable: true},
 		},
+		Color: colorPolicy,
 	},
 	{
 		Name:          "IAM Users",
@@ -50,6 +91,7 @@ var securityTypes = []ResourceTypeDef{
 			{Key: "create_date", Title: "Created", Width: 22, Sortable: true},
 			{Key: "password_last_used", Title: "Password Last Used", Width: 22, Sortable: true},
 		},
+		Color: colorIAMUser,
 	},
 	{
 		Name:          "IAM Groups",
@@ -70,6 +112,7 @@ var securityTypes = []ResourceTypeDef{
 			ContextKeys:    map[string]string{"group_name": "ID"},
 			DisplayNameKey: "group_name",
 		}},
+		Color: colorIAMGroup,
 	},
 	{
 		Name:          "WAF Web ACLs",
@@ -82,5 +125,6 @@ var securityTypes = []ResourceTypeDef{
 			{Key: "id", Title: "ID", Width: 38, Sortable: true},
 			{Key: "description", Title: "Description", Width: 36, Sortable: false},
 		},
+		Color: colorWAF,
 	},
 }

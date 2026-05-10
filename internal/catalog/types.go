@@ -91,11 +91,32 @@ type ResourceTypeDef struct {
 	// navigation triggered from the related panel.
 	RelatedContextFromIDs func([]string) map[string]string
 
+	// ─── Color & Augmentation ──────────────────────────────────────────────
+
+	// Color classifies the row's health. REQUIRED for all registered types.
+	// Reads the resource's structural fields directly.
+	Color func(domain.Resource) domain.Color
+
+	// Augment is an optional post-projector hook that injects additional sections
+	// after the main projector has run (e.g. EC2 status checks). When nil, no
+	// augmentation is applied. Pure function.
+	Augment domain.Augmenter
+
 	// ─── Findings ──────────────────────────────────────────────────────────
 
 	// Findings is the declarative table of finding codes for this type.
 	// Graduated from Phase 03's per-enricher constants.
 	Findings []FindingDef
+}
+
+// ResolveColor classifies r using d.Color, defaulting to a generic
+// status-based color when d.Color is nil. All registered types have non-nil
+// Color (invariant #7); the fallback exists only for ad-hoc test doubles.
+func (d ResourceTypeDef) ResolveColor(r domain.Resource) domain.Color {
+	if d.Color == nil {
+		return colorFallback(r.Status)
+	}
+	return d.Color(r)
 }
 
 // FindingDef is a declarative entry in a resource type's findings table.

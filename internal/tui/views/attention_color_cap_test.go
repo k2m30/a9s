@@ -47,7 +47,6 @@ func TestCapTierToRowBucket(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			got := capTierToRowBucket(tc.tier, tc.bucket)
 			if got != tc.want {
@@ -89,7 +88,6 @@ func TestResolveRowColorBucket_DBCPhrases(t *testing.T) {
 		{"no writer: reads only", resource.ColorBroken},
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.phrase, func(t *testing.T) {
 			r := resource.Resource{
 				ID:     "dbc-test",
