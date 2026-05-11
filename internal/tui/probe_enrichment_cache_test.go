@@ -1,20 +1,20 @@
 package tui
 
 // probe_enrichment_cache_test.go — pin that probeEnrichment passes a cache
-// snapshot containing m.ProbeResources to the enricher closure, even when
-// m.ResourceCache is empty.
+// snapshot containing m.Session.ProbeResources to the enricher closure, even when
+// m.Session.ResourceCache is empty.
 //
 // Codex review (2026-04-25): the cross-ref enricher (e.g. dbi-snap orphan
 // detection) cannot fire on the initial enrichment pass if the cache snapshot
-// is built from m.ResourceCache alone, because that map is empty until the
+// is built from m.Session.ResourceCache alone, because that map is empty until the
 // user opens a list. ProbeResources holds the first-page rows retained by the
 // availability probe — it MUST be merged in. The fix is to call
 // m.buildResourceCacheSnapshot() (which merges all three sources) instead of
-// rolling an inline view of m.ResourceCache only.
+// rolling an inline view of m.Session.ResourceCache only.
 //
 // This test exercises the bug shape directly: register a capture-only enricher
-// for a sentinel resource type, populate m.ProbeResources["dbi"] with a sibling
-// row, leave m.ResourceCache empty, dispatch probeEnrichment, and assert the
+// for a sentinel resource type, populate m.Session.ProbeResources["dbi"] with a sibling
+// row, leave m.Session.ResourceCache empty, dispatch probeEnrichment, and assert the
 // enricher saw "dbi" in its cache argument.
 
 import (
@@ -30,9 +30,9 @@ import (
 )
 
 // TestProbeEnrichment_CacheSnapshotMergesProbeResources pins the contract
-// that probeEnrichment's cache snapshot includes m.ProbeResources, not just
-// m.ResourceCache. Pre-fix this test FAILS because the inline snapshot at
-// app_probes.go:344-353 builds only from m.ResourceCache.
+// that probeEnrichment's cache snapshot includes m.Session.ProbeResources, not just
+// m.Session.ResourceCache. Pre-fix this test FAILS because the inline snapshot at
+// app_probes.go:344-353 builds only from m.Session.ResourceCache.
 func TestProbeEnrichment_CacheSnapshotMergesProbeResources(t *testing.T) {
 	const sentinelType = "dbi-snap-probe-cache-pin"
 
@@ -75,7 +75,7 @@ func TestProbeEnrichment_CacheSnapshotMergesProbeResources(t *testing.T) {
 		core:    runtime.New(sess, catalog.ResourceTypes),
 		appCtx:  context.Background(),
 	}
-	m.ProbeResources = map[string][]resource.Resource{
+	m.Session.ProbeResources = map[string][]resource.Resource{
 		"dbi": {
 			{ID: "prod-dbi-1", Name: "prod-dbi-1"},
 		},
@@ -102,8 +102,8 @@ func TestProbeEnrichment_CacheSnapshotMergesProbeResources(t *testing.T) {
 	dbiEntry, ok := seenCache["dbi"]
 	if !ok {
 		t.Errorf("cache snapshot missing %q — enricher cannot run cross-ref signals against ProbeResources-only siblings.\n"+
-			"This is the Codex P1 regression: probeEnrichment must merge m.ProbeResources into the cache snapshot, "+
-			"not just m.ResourceCache (which is empty until the user opens a list).", "dbi")
+			"This is the Codex P1 regression: probeEnrichment must merge m.Session.ProbeResources into the cache snapshot, "+
+			"not just m.Session.ResourceCache (which is empty until the user opens a list).", "dbi")
 	}
 	if len(dbiEntry.Resources) != 1 || dbiEntry.Resources[0].ID != "prod-dbi-1" {
 		t.Errorf("cache[dbi].Resources = %v, want exactly the ProbeResources sibling row", dbiEntry.Resources)
