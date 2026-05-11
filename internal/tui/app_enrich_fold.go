@@ -9,10 +9,6 @@ package tui
 // resource type, so r.Findings and r.AttentionDetails are authoritative and
 // views need not consult a side map.
 //
-// clearEnrichmentFor re-derives wave1 only on cached rows of the given type,
-// effectively stripping any wave2 entries. Used by Ctrl+R and by the
-// clear-on-rerun-start logic in handleEnrichmentChecked.
-//
 // findingsFromRows rebuilds a per-resource EnrichmentFinding map from wave2
 // entries in the given resource slice. Used by cache-hit navigation paths to
 // populate views.ResourceListModel.findingsByID for row marker glyphs without
@@ -62,37 +58,6 @@ func (m *Model) applyEnrichment(resourceType string, findings map[string]resourc
 	}
 }
 
-// clearEnrichmentFor strips wave2 findings from every cached row of the given
-// resource type by re-deriving with nil enrichment. Wave1 findings (from
-// r.Status / r.Issues) are preserved. Used by clear-on-rerun-start logic so
-// stale wave2 markers disappear immediately without waiting for the rerun to
-// complete.
-func (m *Model) clearEnrichmentFor(resourceType string) {
-	canon := resourceType
-	var td resource.ResourceTypeDef
-	if t := resource.FindResourceType(resourceType); t != nil {
-		canon = t.ShortName
-		td = *t
-	} else {
-		td = resource.ResourceTypeDef{ShortName: canon}
-	}
-
-	clear := func(rows []resource.Resource) {
-		for i := range rows {
-			attention.DeriveFindings(&rows[i], td, nil)
-		}
-	}
-
-	if entry, ok := m.ResourceCache[canon]; ok {
-		clear(entry.Resources)
-	}
-	if rows, ok := m.LazyResourceCache[canon]; ok {
-		clear(rows)
-	}
-	if rows, ok := m.ProbeResources[canon]; ok {
-		clear(rows)
-	}
-}
 
 // findingFromResource extracts the first wave2 entry from r.Findings and
 // returns it as a *resource.EnrichmentFinding for wiring into detail views.

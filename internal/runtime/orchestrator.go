@@ -3,6 +3,7 @@ package runtime
 import (
 	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/session"
+	"github.com/k2m30/a9s/v3/internal/tui/messages"
 )
 
 // Event is the marker interface for inputs the runtime accepts from an
@@ -43,8 +44,20 @@ func (c *Core) Types() []catalog.ResourceTypeDef { return c.types }
 
 // HandleEvent is the single entry point adapters call to deliver an
 // inbound event. It returns the UI intents to apply and the background
-// tasks to start. The skeleton returns nil, nil — handler wiring lands
-// in AS-72-h1..h8.
-func (c *Core) HandleEvent(_ Event) ([]UIIntent, []TaskRequest) {
+// tasks to start.
+//
+// Handler wiring is added incrementally by the per-handler PRs (AS-72-h1..h8).
+// Unrecognised event types fall through to the nil, nil default.
+func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
+	switch msg := ev.(type) {
+	case messages.AvailabilityCacheLoadedMsg:
+		return c.handleAvailabilityCacheLoaded(msg)
+	case messages.AvailabilityPrefetchedMsg:
+		return c.handleAvailabilityPrefetched(msg)
+	case messages.AvailabilityCheckedMsg:
+		return c.handleAvailabilityChecked(msg)
+	case messages.EnrichmentCheckedMsg:
+		return c.handleEnrichmentChecked(msg)
+	}
 	return nil, nil
 }
