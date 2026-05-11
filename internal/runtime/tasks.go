@@ -10,6 +10,20 @@ import (
 // land alongside the per-handler PRs that own each task family.
 type TaskKind string
 
+const (
+	// TaskKindProbeAvailability asks the adapter to run a Wave-1 availability
+	// probe for the resource type named by TaskKey.Scope.
+	TaskKindProbeAvailability TaskKind = "probe-availability"
+
+	// TaskKindProbeEnrich asks the adapter to run a Wave-2 enrichment probe
+	// for the resource type named by TaskKey.Scope.
+	TaskKindProbeEnrich TaskKind = "probe-enrich"
+
+	// TaskKindSaveCache asks the adapter to persist the current availability
+	// state to disk. TaskKey.Scope is empty.
+	TaskKindSaveCache TaskKind = "save-cache"
+)
+
 // TaskKey uniquely identifies one background task. Scope is kind-specific
 // (resource-type, resource-id, query-id, …) and is opaque to the
 // scheduler — equality on TaskKey is the dedup key.

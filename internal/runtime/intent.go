@@ -29,7 +29,9 @@ type IssueBadgePatch struct {
 // ListEnrichmentPatch carries Wave 2 enrichment data for the rows of a
 // resource-list view. Findings is keyed by Resource.ID; nil means clear.
 type ListEnrichmentPatch struct {
-	Findings map[string]resource.EnrichmentFinding
+	Findings     map[string]resource.EnrichmentFinding
+	TruncatedIDs map[string]bool
+	FieldUpdates map[string]map[string]string
 }
 
 // PatchResourceList instructs the adapter to apply the contained patches
@@ -52,6 +54,10 @@ type PatchDetail struct {
 	Findings     []domain.Finding
 	Attention    map[domain.FindingCode]domain.AttentionDetail
 	FieldUpdates map[string]string
+	// EnrichmentFindings carries the Wave-2 per-resource finding map used by
+	// the adapter to look up the finding for a specific detail view's resource.
+	// Keyed by resource.Resource.ID; nil means clear enrichment.
+	EnrichmentFindings map[string]resource.EnrichmentFinding
 }
 
 func (PatchDetail) isIntent() {}
@@ -90,3 +96,54 @@ type ReplaceScreen struct {
 }
 
 func (ReplaceScreen) isIntent() {}
+
+// PatchMenuAvailability updates the resource-count display for one menu entry.
+// Combines SetAvailability + SetTruncated into a single intent.
+type PatchMenuAvailability struct {
+	ResourceType string
+	Count        int
+	Truncated    bool
+}
+
+func (PatchMenuAvailability) isIntent() {}
+
+// PatchMenuIssueBatch applies a batch of cached issue counts to the main menu.
+// Used on cache load to apply all stored issue counts atomically.
+type PatchMenuIssueBatch struct {
+	Counts    map[string]int
+	Truncated map[string]bool
+	Known     map[string]bool
+}
+
+func (PatchMenuIssueBatch) isIntent() {}
+
+// PatchMenuCheckProgress updates the Wave-1 availability-scan progress indicator.
+// Total=0 signals "scan complete" (clear the indicator).
+type PatchMenuCheckProgress struct {
+	Checked int
+	Total   int
+}
+
+func (PatchMenuCheckProgress) isIntent() {}
+
+// PatchMenuEnrichProgress updates the Wave-2 enrichment progress indicator.
+// Total=0 signals "enrichment complete" (clear the indicator).
+type PatchMenuEnrichProgress struct {
+	Checked int
+	Total   int
+}
+
+func (PatchMenuEnrichProgress) isIntent() {}
+
+// FlashIntent emits a transient notification to the adapter's status bar.
+type FlashIntent struct {
+	Text    string
+	IsError bool
+}
+
+func (FlashIntent) isIntent() {}
+
+// ClearFlash clears the active flash message from the adapter's status bar.
+type ClearFlash struct{}
+
+func (ClearFlash) isIntent() {}

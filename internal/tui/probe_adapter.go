@@ -155,12 +155,6 @@ func (m *Model) refreshResourceListWithEnrichmentRerun(
 	}
 }
 
-// buildEnrichQueue delegates to Core.buildEnrichQueue. Called by
-// app_handlers_availability.go during Wave-2 enrichment dispatch setup.
-func (m *Model) buildEnrichQueue() []string {
-	return m.core.BuildEnrichQueue()
-}
-
 // probeEnrichment returns a tea.Cmd that runs the registered Wave-2 enricher
 // for shortName and converts the result to EnrichmentCheckedMsg.
 func (m *Model) probeEnrichment(shortName string, gen int) tea.Cmd {
