@@ -28,21 +28,42 @@ import (
 // handleClientsReady defers to runtime.Core.HandleClientsReady for the
 // connect-lifecycle decision and translates the returned intents/tasks
 // back into Bubble Tea side effects. The flash gen bump is committed
-// only when Core actually returns a non-stale result — a stale Gen
-// causes Core to return (nil, nil), and bumping flash.gen anyway would
-// silently invalidate any ClearFlashMsg already in flight for the
-// current flash (CR/CXR Stage 5 finding).
+// only when Core actually emits flash work (FlashIntent or
+// FlashTickPayload) — non-flash result branches (stale gen → nil/nil;
+// success-no-pending-refresh → FetchIdentity+LoadAvailCache only) must
+// leave flash.gen alone so that any ClearFlashMsg already in flight for
+// the current flash still matches and clears on schedule (CXR/Architect
+// Stage 5 R3 finding on the prior `len(intents)>0||len(tasks)>0` gate).
 func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.Cmd) {
 	_, hasRL := m.activeView().(*views.ResourceListModel)
 	intents, tasks := m.core.HandleClientsReady(runtime.ClientsReadyEvent{
 		Clients: msg.Clients, Err: msg.Err, Region: msg.Region, Gen: msg.Gen,
 		StackDepth: len(m.stack), HasActiveRL: hasRL, NewGen: m.flash.gen + 1,
 	})
-	if len(intents) > 0 || len(tasks) > 0 {
+	if hasFlashWork(intents, tasks) {
 		m.flash.gen++
 	}
 	cmd := m.dispatchHandlerResult(intents, tasks)
 	return m, cmd
+}
+
+// hasFlashWork returns true when Core's result emits flash work — i.e.
+// a new flash (FlashIntent) is being set or an auto-clear tick
+// (FlashTickPayload) is being scheduled. Used by handleClientsReady to
+// gate the flash.gen bump so non-flash success paths do not invalidate
+// any in-flight ClearFlashMsg for the current flash.
+func hasFlashWork(intents []runtime.UIIntent, tasks []runtime.TaskRequest) bool {
+	for _, in := range intents {
+		if _, ok := in.(runtime.FlashIntent); ok {
+			return true
+		}
+	}
+	for _, t := range tasks {
+		if _, ok := t.Payload.(runtime.FlashTickPayload); ok {
+			return true
+		}
+	}
+	return false
 }
 
 // handleProfileSelected defers to runtime.Core.HandleProfileSelected for

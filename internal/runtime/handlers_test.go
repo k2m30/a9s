@@ -523,6 +523,55 @@ func TestHandleClientsReady_Success_InstallsClients(t *testing.T) {
 	}
 }
 
+// TestHandleClientsReady_Success_NoPendingRefresh_NoFlashWork pins the
+// Core contract the TUI adapter's `hasFlashWork` gate relies on: when
+// PendingRefresh=false, the success path emits NO FlashIntent in intents
+// and NO FlashTickPayload in tasks, so the adapter must not advance
+// m.flash.gen and must not invalidate any in-flight ClearFlashMsg for
+// the current flash. (CXR/Architect Stage 5 R3 regression.)
+func TestHandleClientsReady_Success_NoPendingRefresh_NoFlashWork(t *testing.T) {
+	c := newCore()
+	s := c.session
+	s.ConnectGen = 1
+	s.PendingRefresh = false
+
+	intents, tasks := c.HandleClientsReady(ClientsReadyEvent{
+		Gen: 1, NewGen: 2,
+		Clients:     &awsclient.ServiceClients{},
+		HasActiveRL: true, // even with an active list, no flash work when PendingRefresh=false
+	})
+
+	if _, ok := findFlashIntent(intents); ok {
+		t.Error("success-no-pending-refresh must not emit FlashIntent — bumping flash.gen on this path would silently invalidate any in-flight ClearFlashMsg for the current flash")
+	}
+	for _, ts := range tasks {
+		if _, ok := ts.Payload.(FlashTickPayload); ok {
+			t.Error("success-no-pending-refresh must not emit FlashTickPayload — bumping flash.gen on this path would silently invalidate any in-flight ClearFlashMsg for the current flash")
+		}
+	}
+}
+
+// TestHandleClientsReady_StaleGen_NoFlashWork pins the symmetric Core
+// contract for the stale path: stale Gen returns (nil, nil), so the
+// adapter's hasFlashWork gate correctly leaves m.flash.gen alone.
+func TestHandleClientsReady_StaleGen_NoFlashWork(t *testing.T) {
+	c := newCore()
+	c.session.ConnectGen = 5
+
+	intents, tasks := c.HandleClientsReady(ClientsReadyEvent{
+		Gen: 3, NewGen: 6, // ev.Gen != session.ConnectGen
+	})
+
+	if _, ok := findFlashIntent(intents); ok {
+		t.Error("stale gen must not emit FlashIntent")
+	}
+	for _, ts := range tasks {
+		if _, ok := ts.Payload.(FlashTickPayload); ok {
+			t.Error("stale gen must not emit FlashTickPayload")
+		}
+	}
+}
+
 // TestHandleClientsReady_Success_PendingRefreshWithActiveRL: PendingRefresh=true
 // AND HasActiveRL=true → RefreshActiveListIntent + "Connected. Refreshing..."
 // flash, PendingRefresh cleared.
