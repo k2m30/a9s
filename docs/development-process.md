@@ -47,7 +47,7 @@ The five rules of CAE-1:
 
 ## Issue-creation discipline (anti-proliferation, mandatory)
 
-Paperclip issues are the unit of *engineering work the user expects to see in their inbox*. They are **not** the audit log of every governance act, every heartbeat tick, every recovery action. Conflating those two roles is what turned the 40-PR refactor program into 432 issues. The following four rules are mandatory and apply to every agent.
+Paperclip issues are the unit of *engineering work the user expects to see in their inbox*. They are **not** the audit log of every governance act, every heartbeat tick, every recovery action. Conflating those two roles is what turned the 40-PR refactor program into 432 issues. The following five rules are mandatory and apply to every agent.
 
 1. **One review issue per PR (not one per reviewer).** Stage 5 creates exactly **one** Paperclip issue per PR — "Stage 5 review of PR #N". CodeReviewer, CodexReviewer, and (for size ≥ M) Architect post their verdicts as **comments on that single issue** plus the mandatory GitHub PR cross-post. The Architect's `make ready-to-push` and CTO final sign-off are comments on the same issue. **Never** spawn separate `Stage 5 — CodeReviewer / CodexReviewer / Architect` issues. A rework round (R2, R3, …) appends comments on the existing review issue — it does not create a new issue.
 
