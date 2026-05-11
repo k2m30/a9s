@@ -52,15 +52,17 @@ type errorEntry struct {
 // AWS clients, and routes all messages to the active child view.
 //
 // The Model pairs a UI shell (view stack, header, input mode, flash, theme)
-// with an embedded *session.Session that owns the in-memory orchestration
-// state tied to the active profile/region session. Field promotion means all
-// access sites like `m.ResourceCache` resolve transparently to the embedded
-// Session — see internal/session/session.go for the ownership contract.
-// handleProfileSelected / handleRegionSelected call m.Rotate() to invalidate
-// in-flight async results on switch.
+// with a named Session *session.Session field that owns the in-memory
+// orchestration state tied to the active profile/region session (un-embedded
+// in PR-05a-final to make session ownership explicit at every call site).
+// Access sites use m.Session.ResourceCache, m.Session.ProbeResources,
+// m.Session.RelatedGen, m.Session.Profile, m.Session.Clients, etc. —
+// see internal/session/session.go for the ownership contract.
+// handleProfileSelected / handleRegionSelected call m.Session.Rotate() to
+// invalidate in-flight async results on switch.
 type Model struct {
-	*session.Session               // embedded: session-scoped orchestration state (incl. Profile, Region, Clients, Identity, ConnectGen, etc. after PR-05a-h2)
-	core             *runtime.Core // platform-agnostic app core (shares same *session.Session)
+	Session *session.Session // session-scoped orchestration state (incl. Profile, Region, Clients, Identity, ConnectGen, etc. after PR-05a-h2; un-embedded in PR-05a-final)
+	core    *runtime.Core    // platform-agnostic app core (shares same *session.Session)
 
 	// --- UI shell state ---
 	width  int
@@ -105,13 +107,13 @@ type Option func(*Model)
 // WithProfile overrides the profile field on the session. Used in tests that need
 // a specific profile string without going through the live AWS bootstrap path.
 func WithProfile(profile string) Option {
-	return func(m *Model) { m.Profile = profile }
+	return func(m *Model) { m.Session.Profile = profile }
 }
 
 // WithRegion overrides the region field on the session. Used in tests that need
 // a specific region string without going through the live AWS bootstrap path.
 func WithRegion(region string) Option {
-	return func(m *Model) { m.Region = region }
+	return func(m *Model) { m.Session.Region = region }
 }
 
 // WithIsDemo marks the session as demo mode, which skips Wave 2 enrichment.
@@ -126,7 +128,7 @@ func WithIsDemo(demo bool) Option {
 // WithNoCache disables resource availability caching and background checks.
 func WithNoCache(disabled bool) Option {
 	return func(m *Model) {
-		m.NoCache = disabled
+		m.Session.NoCache = disabled
 	}
 }
 
@@ -134,7 +136,7 @@ func WithNoCache(disabled bool) Option {
 // synthetic ClientsReadyMsg instead of initiating a live AWS connection.
 func WithClients(clients *awsclient.ServiceClients) Option {
 	return func(m *Model) {
-		m.PreSuppliedClients = clients
+		m.Session.PreSuppliedClients = clients
 	}
 }
 
@@ -149,7 +151,7 @@ func WithActiveTheme(name string) Option {
 // directly on startup instead of the main menu. The caller is responsible for
 // resolving the input via resource.FindResourceType.
 func WithCommand(name string) Option {
-	return func(m *Model) { m.Command = name }
+	return func(m *Model) { m.Session.Command = name }
 }
 
 // New constructs the initial Model.
@@ -204,47 +206,13 @@ func (m Model) Cancel() {
 	}
 }
 
-// EnrichmentGen returns the current session-wide enrichment generation counter.
-// This accessor is used by tests to capture the pre-switch gen value and verify
-// that post-switch messages carrying the old gen are correctly discarded.
-//
-// Note: the method name shadows the promoted Session.EnrichmentGen field.
-// All write sites MUST use m.Session.EnrichmentGen explicitly.
-func (m Model) EnrichmentGen() int {
-	return m.Session.EnrichmentGen
-}
-
-// ActiveDetailResource is an exported test-only accessor for the top-of-stack
-// DetailModel resource — production code does not call it.
-// Lives outside _test.go because tests in tests/unit/ are package unit_test
-// and can't see same-package test helpers.
-// Returns ok=false when the active view is not a DetailModel.
-func (m Model) ActiveDetailResource() (resource.Resource, bool) {
-	if d, ok := m.activeView().(*views.DetailModel); ok {
-		return d.SourceResource(), true
-	}
-	return resource.Resource{}, false
-}
-
-// ActiveListResources is an exported test-only accessor for the top-of-stack
-// ResourceListModel's resource slice — production code does not call it.
-// Lives outside _test.go because tests in tests/unit/ are package unit_test
-// and can't see same-package test helpers.
-// Returns nil if the active view is not a ResourceListModel.
-func (m Model) ActiveListResources() []resource.Resource {
-	if rl, ok := m.activeView().(*views.ResourceListModel); ok {
-		return rl.AllResources()
-	}
-	return nil
-}
-
 // Init implements tea.Model. Fires a command to establish the AWS session.
 // When pre-supplied clients are present (demo mode or tests), emits a synthetic
 // ClientsReadyMsg immediately. Otherwise initiates the live AWS connection flow.
 func (m Model) Init() tea.Cmd {
-	if m.PreSuppliedClients != nil {
+	if m.Session.PreSuppliedClients != nil {
 		preCmd := func() tea.Msg {
-			return messages.ClientsReadyMsg{Clients: m.PreSuppliedClients}
+			return messages.ClientsReadyMsg{Clients: m.Session.PreSuppliedClients}
 		}
 		if m.configErr != nil {
 			return tea.Batch(preCmd, func() tea.Msg {
@@ -258,8 +226,8 @@ func (m Model) Init() tea.Cmd {
 	}
 	connectCmd := func() tea.Msg {
 		return messages.InitConnectMsg{
-			Profile: m.Profile,
-			Region:  m.Region,
+			Profile: m.Session.Profile,
+			Region:  m.Session.Region,
 		}
 	}
 	if m.configErr != nil {
@@ -318,7 +286,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case messages.ClearFlashMsg:
 		return m.handleClearFlash(msg)
 	case messages.InitConnectMsg:
-		cmd := m.connectAWS(msg.Profile, msg.Region, m.ConnectGen)
+		cmd := m.connectAWS(msg.Profile, msg.Region, m.Session.ConnectGen)
 		return m, cmd
 	case messages.ClientsReadyMsg:
 		return m.handleClientsReady(msg)
@@ -381,7 +349,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if rl.ParentContext() == nil && !rl.EscPops() {
 					rt := rl.ResourceType()
 					sortColIdx, sortAsc := rl.SortState()
-					updatedModel.ResourceCache[rt] = &session.ResourceCacheEntry{
+					updatedModel.Session.ResourceCache[rt] = &session.ResourceCacheEntry{
 						Resources:     rl.AllResources(),
 						Pagination:    rl.PaginationState(),
 						FilterText:    rl.FilterText(),
@@ -396,8 +364,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Active view is not a ResourceList for this type (e.g., detail or menu).
 				// Cache resources directly from the message so handleRelatedNavigate
 				// can find them when navigating to a related resource type.
-				if _, alreadyCached := updatedModel.ResourceCache[msg.ResourceType]; !alreadyCached {
-					updatedModel.ResourceCache[msg.ResourceType] = &session.ResourceCacheEntry{
+				if _, alreadyCached := updatedModel.Session.ResourceCache[msg.ResourceType]; !alreadyCached {
+					updatedModel.Session.ResourceCache[msg.ResourceType] = &session.ResourceCacheEntry{
 						Resources: msg.Resources,
 					}
 				}
@@ -412,15 +380,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// NOTE: This check runs regardless of which view is currently active —
 			// the user may have navigated away from the resource list before the
 			// fetch returned, but the rerun must still fire.
-			if msg.TypeGen != 0 && msg.TypeGen == updatedModel.EnrichmentTypeGen[msg.ResourceType] {
-				if updatedModel.ProbeResources == nil {
-					updatedModel.ProbeResources = make(map[string][]resource.Resource)
+			if msg.TypeGen != 0 && msg.TypeGen == updatedModel.Session.EnrichmentTypeGen[msg.ResourceType] {
+				if updatedModel.Session.ProbeResources == nil {
+					updatedModel.Session.ProbeResources = make(map[string][]resource.Resource)
 				}
-				updatedModel.ProbeResources[msg.ResourceType] = msg.Resources
-				if updatedModel.ProbeTruncated == nil {
-					updatedModel.ProbeTruncated = make(map[string]bool)
+				updatedModel.Session.ProbeResources[msg.ResourceType] = msg.Resources
+				if updatedModel.Session.ProbeTruncated == nil {
+					updatedModel.Session.ProbeTruncated = make(map[string]bool)
 				}
-				updatedModel.ProbeTruncated[msg.ResourceType] = msg.Pagination != nil && msg.Pagination.IsTruncated
+				updatedModel.Session.ProbeTruncated[msg.ResourceType] = msg.Pagination != nil && msg.Pagination.IsTruncated
 				cmd = tea.Batch(cmd, updatedModel.probeEnrichment(msg.ResourceType, updatedModel.Session.EnrichmentGen))
 			}
 			return updatedModel, cmd
@@ -442,7 +410,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleEnrichDetail(msg)
 	case messages.EnrichDetailResultMsg:
 		// Discard stale enrichment results (same convention as relatedGen).
-		if msg.Generation != 0 && msg.Generation != m.EnrichGen {
+		if msg.Generation != 0 && msg.Generation != m.Session.EnrichGen {
 			return m, nil
 		}
 		// Surface enrichment errors as a flash message.
@@ -465,7 +433,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// stamps Generation=0 onto results. Generation=0 is therefore the safe
 		// sentinel for test/manual injection (always accepted). Any non-zero
 		// generation that doesn't match the current relatedGen is stale and dropped.
-		if msg.Generation != 0 && msg.Generation != m.RelatedGen {
+		if msg.Generation != 0 && msg.Generation != m.Session.RelatedGen {
 			return m, nil
 		}
 		// Accumulate in relatedCache so re-entering the same detail skips re-dispatch.
@@ -479,8 +447,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if sourceID != "" {
 			ck := session.RelatedCacheKey(msg.ResourceType, sourceID)
-			existing, _ := m.RelatedCache.Get(ck)
-			m.RelatedCache.Set(ck, append(existing, session.RelatedCacheResult{
+			existing, _ := m.Session.RelatedCache.Get(ck)
+			m.Session.RelatedCache.Set(ck, append(existing, session.RelatedCacheResult{
 				DefDisplayName: msg.DefDisplayName,
 				Result:         msg.Result,
 			}))
@@ -500,10 +468,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if td := resource.FindResourceType(aliasName); td != nil {
 				shortName = td.ShortName
 			}
-			if _, exists := m.ResourceCache[shortName]; exists {
+			if _, exists := m.Session.ResourceCache[shortName]; exists {
 				continue
 			}
-			if _, lazyExists := m.LazyResourceCache[shortName]; lazyExists {
+			if _, lazyExists := m.Session.LazyResourceCache[shortName]; lazyExists {
 				continue
 			}
 			// Site 4: derive findings before storing in ResourceCache so cached
@@ -516,7 +484,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if pagination == nil && entry.IsTruncated {
 				pagination = &resource.PaginationMeta{IsTruncated: true}
 			}
-			m.ResourceCache[shortName] = &session.ResourceCacheEntry{
+			m.Session.ResourceCache[shortName] = &session.ResourceCacheEntry{
 				Resources:  entry.Resources,
 				Pagination: pagination,
 			}
@@ -541,7 +509,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Site 5: derive findings across the new slice before merging into
 			// LazyResourceCache (PR-03a-shim wire-up).
 			(&m).deriveFindingsForType(shortName, extra)
-			existing := m.LazyResourceCache[shortName]
+			existing := m.Session.LazyResourceCache[shortName]
 			known := make(map[string]struct{}, len(existing))
 			for _, r := range existing {
 				known[r.ID] = struct{}{}
@@ -553,7 +521,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				known[r.ID] = struct{}{}
 				existing = append(existing, r)
 			}
-			m.LazyResourceCache[shortName] = existing
+			m.Session.LazyResourceCache[shortName] = existing
 		}
 		// Surface FetchByIDs failures as a visible flash error. Partial results
 		// are already merged above; the flash informs the operator that some IDs
@@ -633,8 +601,8 @@ func (m Model) View() tea.View {
 
 	active := m.activeView()
 
-	headerProfile := m.Profile
-	headerRegion := m.Region
+	headerProfile := m.Session.Profile
+	headerRegion := m.Session.Region
 	if sel, ok := active.(*views.SelectorModel); ok {
 		if sel.Title() == "aws-regions" {
 			headerRegion = "..."
@@ -931,7 +899,7 @@ func (m *Model) cacheTopLevelResourceList(rl views.ResourceListModel) {
 	}
 	rt := rl.ResourceType()
 	sortColIdx, sortAsc := rl.SortState()
-	m.ResourceCache[rt] = &session.ResourceCacheEntry{
+	m.Session.ResourceCache[rt] = &session.ResourceCacheEntry{
 		Resources:     rl.AllResources(),
 		Pagination:    rl.PaginationState(),
 		FilterText:    rl.FilterText(),
@@ -995,35 +963,35 @@ func (m Model) headerRight() string {
 
 // accountBadge returns the account alias (preferred) or account ID for the header.
 func (m Model) accountBadge() string {
-	if m.Identity == nil {
+	if m.Session.Identity == nil {
 		return ""
 	}
-	if m.Identity.AccountAlias != "" {
-		return m.Identity.AccountAlias
+	if m.Session.Identity.AccountAlias != "" {
+		return m.Session.Identity.AccountAlias
 	}
-	return m.Identity.AccountID
+	return m.Session.Identity.AccountID
 }
 
 // identityRoleName returns the identity name (role or user) for the header.
 func (m Model) identityRoleName() string {
-	if m.Identity == nil {
+	if m.Session.Identity == nil {
 		return ""
 	}
-	return m.Identity.IdentityName
+	return m.Session.Identity.IdentityName
 }
 
 // identityToViewData converts the cached CallerIdentity to a view-layer IdentityData.
 func (m Model) identityToViewData() views.IdentityData {
-	if m.Identity == nil {
+	if m.Session.Identity == nil {
 		return views.IdentityData{}
 	}
 	return views.IdentityData{
-		AccountID:     m.Identity.AccountID,
-		AccountAlias:  m.Identity.AccountAlias,
-		ARN:           m.Identity.Arn,
-		RoleName:      m.Identity.RoleName,
-		UserName:      m.Identity.UserName,
-		SessionName:   m.Identity.SessionName,
-		IsAssumedRole: m.Identity.IsAssumedRole,
+		AccountID:     m.Session.Identity.AccountID,
+		AccountAlias:  m.Session.Identity.AccountAlias,
+		ARN:           m.Session.Identity.Arn,
+		RoleName:      m.Session.Identity.RoleName,
+		UserName:      m.Session.Identity.UserName,
+		SessionName:   m.Session.Identity.SessionName,
+		IsAssumedRole: m.Session.Identity.IsAssumedRole,
 	}
 }

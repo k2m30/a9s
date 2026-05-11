@@ -3,9 +3,9 @@
 // per-type caches, and the generation counters that invalidate stale async
 // results on profile/region switch or refresh.
 //
-// Session is embedded as *session.Session into tui.Model. Field promotion
-// means access sites like m.ResourceCache, m.ProbeResources, m.RelatedGen
-// resolve transparently to the embedded Session.
+// Session is held as Session *session.Session on tui.Model. Access sites use
+// m.Session.ResourceCache, m.Session.ProbeResources, m.Session.RelatedGen etc.
+// directly.
 //
 // Rules of ownership:
 //

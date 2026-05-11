@@ -1,6 +1,8 @@
 package runtime
 
 import (
+	"time"
+
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -147,3 +149,55 @@ func (FlashIntent) isIntent() {}
 type ClearFlash struct{}
 
 func (ClearFlash) isIntent() {}
+
+// SetErrorHintIntent toggles the persistent "errors visible — press ! to view"
+// hint shown after an error flash auto-clears (the adapter's showErrorHint
+// flag). HandleClearFlash emits this when the cleared flash carried an error.
+type SetErrorHintIntent struct {
+	Show bool
+}
+
+func (SetErrorHintIntent) isIntent() {}
+
+// AppendErrorHistoryIntent appends one entry to the adapter's per-session
+// error log used by the `!` overlay. HandleFlash / HandleAPIError /
+// HandleClientsReady emit this in error paths so the history matches the
+// flash text the user saw.
+type AppendErrorHistoryIntent struct {
+	Time    time.Time
+	Message string
+}
+
+func (AppendErrorHistoryIntent) isIntent() {}
+
+// ClearActiveListLoadingIntent tells the adapter to clear the loading
+// indicator on the currently-active resource-list view (if any). Emitted by
+// HandleAPIError so a failed AWS call removes the spinner immediately rather
+// than waiting for the next render.
+type ClearActiveListLoadingIntent struct{}
+
+func (ClearActiveListLoadingIntent) isIntent() {}
+
+// MenuClearAvailabilityIntent tells the adapter to reset the main-menu
+// availability counts before a profile/region switch reconnect. Emitted by
+// HandleProfileSelected / HandleRegionSelected so the menu shows the
+// "checking…" state until the new session reports back.
+type MenuClearAvailabilityIntent struct{}
+
+func (MenuClearAvailabilityIntent) isIntent() {}
+
+// PopSelectorIntent tells the adapter to pop the top view from its stack if
+// (and only if) that view is the profile/region/theme selector. Emitted by
+// the selector-confirm handlers so they do not need to inspect renderer
+// state to know whether the selector is on screen.
+type PopSelectorIntent struct{}
+
+func (PopSelectorIntent) isIntent() {}
+
+// RefreshActiveListIntent tells the adapter to re-fetch the currently-active
+// resource-list view, if there is one. Emitted by HandleClientsReady when
+// PendingRefresh is set so a successful post-switch connect refreshes the
+// list the user was viewing.
+type RefreshActiveListIntent struct{}
+
+func (RefreshActiveListIntent) isIntent() {}
