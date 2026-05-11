@@ -16,7 +16,7 @@
 // It asks runtime.Core whether any RelatedDefs are registered for the source
 // type, and if so fans out one checker goroutine per def via relatedCheckCmd
 // (capped by runtime.MaxConcurrentProbes). The actual probe loop stays here in
-// the adapter because it depends on m.clients, m.appCtx, and tea.Cmd —
+// the adapter because it depends on m.Clients, m.appCtx, and tea.Cmd —
 // platform glue that does not belong in internal/runtime.
 //
 // Decision-locus follow-up (PR-05b): a few branches in this adapter still walk
@@ -124,11 +124,11 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 		if result.TargetID != "" {
 			// Exact AMI navigation should fetch by image ID instead of falling
 			// back to the owned-AMI list, which misses public and third-party images.
-			// PR-05b: when m.clients moves into the runtime Core, the runtime will
+			// PR-05b: when m.Clients moves into the runtime Core, the runtime will
 			// emit a typed FetchAMIDetail TaskRequest and this branch collapses
 			// into runtimeTasksToCmd; the adapter override stays for now because
 			// client selection is adapter-owned state.
-			if msg.TargetType == "ami" && m.clients != nil {
+			if msg.TargetType == "ami" && m.Clients != nil {
 				cmd := m.fetchAMIDetail(result.TargetID)
 				return m, cmd
 			}
@@ -527,7 +527,7 @@ func (m Model) relatedCheckCmd(res resource.Resource) tea.Cmd {
 			if def.NeedsTargetCache {
 				if _, inMainCache := mainCacheKeys[def.TargetType]; !inMainCache {
 					if pf := resource.GetPaginatedFetcher(def.TargetType); pf != nil {
-						if fr, err := pf(ctx, m.clients, ""); err == nil {
+						if fr, err := pf(ctx, m.Clients, ""); err == nil {
 							isTrunc := fr.Pagination != nil && fr.Pagination.IsTruncated
 							if prev, hasPrev := localCache[def.TargetType]; hasPrev && prev.IsTruncated {
 								isTrunc = true
@@ -546,7 +546,7 @@ func (m Model) relatedCheckCmd(res resource.Resource) tea.Cmd {
 					}
 				}
 			}
-			result := def.Checker(ctx, m.clients, res, localCache)
+			result := def.Checker(ctx, m.Clients, res, localCache)
 			result.TargetType = def.TargetType
 			var lazyAdded map[string][]resource.Resource
 			var lazyAddError error
@@ -554,7 +554,7 @@ func (m Model) relatedCheckCmd(res resource.Resource) tea.Cmd {
 				if ff := resource.GetFetchByIDs(def.TargetType); ff != nil {
 					missing := runtime.MissingFromCache(localCache, def.TargetType, result.ResourceIDs)
 					if len(missing) > 0 {
-						extra, fetchErr := ff(ctx, m.clients, missing)
+						extra, fetchErr := ff(ctx, m.Clients, missing)
 						if fetchErr != nil {
 							lazyAddError = fetchErr
 						}

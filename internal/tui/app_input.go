@@ -59,15 +59,15 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if _, ok := m.activeView().(*views.IdentityModel); ok {
 			return m.updateActiveView(msg)
 		}
-		id := views.NewIdentity(m.profile, m.region, m.keys)
-		if m.identity != nil {
+		id := views.NewIdentity(m.Profile, m.Region, m.keys)
+		if m.Identity != nil {
 			data := m.identityToViewData()
 			id.SetIdentity(data)
 		}
 		id.SetSize(m.innerSize())
 		m.pushView(&id)
 		// Always re-fetch on i press
-		m.identityFetching = true
+		m.IdentityFetching = true
 		cmd := m.fetchIdentity()
 		return m, cmd
 	}
