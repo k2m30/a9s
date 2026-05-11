@@ -1009,5 +1009,79 @@ func TestHandleClientsReady_Failure_NilClients_NoBootstrapTasks(t *testing.T) {
 	}
 }
 
+// TestHandleClientsReady_Failure_RewiresPostRotateStores guards the Stage 5
+// P3 regression caught on PR #360: after Session.Rotate() installs fresh
+// per-session stores (PolicyStore / IdentityStore / RuleSetStore), the
+// failure path on the resulting ClientsReadyMsg must rewire the retained
+// transport with those post-rotate stores. Otherwise Pattern-C related
+// checkers (Glue tags, EBS Backup) and IAM lazy-add silently read the
+// pre-rotate (now-discarded) stores until the next successful reconnect.
+func TestHandleClientsReady_Failure_RewiresPostRotateStores(t *testing.T) {
+	c := newCore()
+	s := c.session
+
+	// Pre-rotate transport: holds the "old" per-session stores.
+	preRotateIAM := session.NewPolicyStore()
+	preRotateID := session.NewIdentityStore()
+	preRotateRS := session.NewRuleSetStore()
+	sc := &awsclient.ServiceClients{}
+	sc.SetIAMPolicies(preRotateIAM)
+	sc.SetIdentityStore(preRotateID)
+	sc.SetRuleSets(preRotateRS)
+	s.Clients = sc
+
+	// session.New() already installed fresh "post-rotate" stores on
+	// s.IAMPolicies / s.IdentityStore / s.RuleSets — capture them for
+	// comparison. They MUST be distinct from the pre-rotate stores wired
+	// onto sc above (otherwise this test cannot detect the regression).
+	postRotateIAM := s.IAMPolicies
+	postRotateID := s.IdentityStore
+	postRotateRS := s.RuleSets
+	if postRotateIAM == preRotateIAM || postRotateID == preRotateID || postRotateRS == preRotateRS {
+		t.Fatal("test setup error: pre- and post-rotate stores must be distinct references")
+	}
+
+	s.ConnectGen = 1
+	c.HandleClientsReady(ClientsReadyEvent{ //nolint:ineffassign,staticcheck // crash-verification
+		Gen: 1, NewGen: 2,
+		Err: errors.New("connect failed"),
+	})
+
+	if sc.IAMPolicies() != postRotateIAM {
+		t.Error("failure path must rewire retained Clients with post-rotate IAMPolicies (P3 invariant)")
+	}
+	if sc.IdentityStore() != postRotateID {
+		t.Error("failure path must rewire retained Clients with post-rotate IdentityStore (P3 invariant)")
+	}
+	if sc.RuleSets() != postRotateRS {
+		t.Error("failure path must rewire retained Clients with post-rotate RuleSets (P3 invariant)")
+	}
+}
+
+// TestHandleClientsReady_StaleGen_ReturnsEmpty guards the Stage 5 invariant
+// caught on PR #360: when the Core sees a stale ConnectGen on a
+// ClientsReadyMsg, it returns (nil, nil). The TUI adapter relies on this
+// to gate its flash.gen bump (it must not bump on stale dispatches —
+// doing so would invalidate ClearFlashMsg already in flight for the
+// current flash, leaving an active flash stuck on screen). This test
+// pins the Core side of that contract; the adapter side is the
+// `len(intents) > 0 || len(tasks) > 0` guard in app_session.go.
+func TestHandleClientsReady_StaleGen_ReturnsEmpty(t *testing.T) {
+	c := newCore()
+	c.session.ConnectGen = 5
+
+	intents, tasks := c.HandleClientsReady(ClientsReadyEvent{
+		Gen: 3, NewGen: 99, // stale Gen
+		Err: errors.New("ignored — stale"),
+	})
+
+	if len(intents) != 0 {
+		t.Errorf("stale Gen must return empty intents, got %d", len(intents))
+	}
+	if len(tasks) != 0 {
+		t.Errorf("stale Gen must return empty tasks, got %d", len(tasks))
+	}
+}
+
 // Sentinel to ensure the time import is used (AppendErrorHistoryIntent carries time.Time).
 var _ = time.Now
