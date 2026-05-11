@@ -47,9 +47,3 @@ func (m *Model) newRelatedList(rt resource.ResourceTypeDef, src resource.Resourc
 func (m *Model) buildResourceCacheSnapshot() resource.ResourceCache {
 	return runtime.New(m.Session, resource.AllResourceTypes()).BuildResourceCacheSnapshot()
 }
-
-// snapshotCache returns a flat map[string][]resource.Resource snapshot for
-// navigation resolvers (no pagination state needed).
-func (m *Model) snapshotCache() map[string][]resource.Resource {
-	return runtime.New(m.Session, resource.AllResourceTypes()).SnapshotCache()
-}
