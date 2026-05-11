@@ -11,7 +11,6 @@ import (
 	"charm.land/lipgloss/v2"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
@@ -191,7 +190,7 @@ func New(profile, region string, opts ...Option) Model {
 	sess := session.New()
 	m := Model{
 		Session:     sess,
-		core:        runtime.New(sess, catalog.ResourceTypes),
+		core:        runtime.New(sess, resource.AllResourceTypes()),
 		profile:     profile,
 		region:      region,
 		keys:        k,
