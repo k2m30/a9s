@@ -29,6 +29,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
@@ -90,7 +91,7 @@ func rerunEBSResources() []resource.Resource {
 //
 // sessionGen MUST be 0 for a freshly created model (enrichmentGen starts at 0).
 // typeGen MUST match the current per-type gen (0 initially, 1 after first Ctrl+R).
-func enrichmentCheckedWithFindings(sessionGen, typeGen int) messages.EnrichmentCheckedMsg {
+func enrichmentCheckedWithFindings(sessionGen, typeGen domain.Gen) messages.EnrichmentCheckedMsg {
 	return messages.EnrichmentCheckedMsg{
 		ResourceType: "ec2",
 		Issues:       1,

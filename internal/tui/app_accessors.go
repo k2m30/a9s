@@ -6,6 +6,7 @@
 package tui
 
 import (
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -16,7 +17,7 @@ import (
 //
 // Note: the method name shadows the promoted Session.EnrichmentGen field.
 // All write sites MUST use m.Session.EnrichmentGen explicitly.
-func (m Model) EnrichmentGen() int {
+func (m Model) EnrichmentGen() domain.Gen {
 	return m.Session.EnrichmentGen
 }
 
@@ -25,7 +26,7 @@ func (m Model) EnrichmentGen() int {
 // non-flash success paths and stale-gen paths must NOT advance this counter,
 // otherwise an in-flight ClearFlashMsg for the current flash gets silently
 // invalidated. (CXR/Architect Stage 5 R3+R4 finding regression coverage.)
-func (m Model) FlashGen() int {
+func (m Model) FlashGen() domain.Gen {
 	return m.flash.gen
 }
 
