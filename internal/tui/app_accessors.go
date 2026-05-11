@@ -20,6 +20,15 @@ func (m Model) EnrichmentGen() int {
 	return m.Session.EnrichmentGen
 }
 
+// FlashGen returns the current tui-adapter flash generation counter.
+// Test-only accessor for verifying handleClientsReady's `hasFlashWork` gate:
+// non-flash success paths and stale-gen paths must NOT advance this counter,
+// otherwise an in-flight ClearFlashMsg for the current flash gets silently
+// invalidated. (CXR/Architect Stage 5 R3+R4 finding regression coverage.)
+func (m Model) FlashGen() int {
+	return m.flash.gen
+}
+
 // ActiveDetailResource is an exported test-only accessor for the top-of-stack
 // DetailModel resource — production code does not call it.
 // Returns ok=false when the active view is not a DetailModel.
