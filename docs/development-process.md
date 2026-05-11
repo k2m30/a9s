@@ -45,6 +45,24 @@ The five rules of CAE-1:
 
 **Why this is safe.** The Stage 5 reviewer matrix (CodeReviewer + CodexReviewer always; Architect ≥ M; CTO final sign-off) and the Stage 6 / 6.5 / 7 gates are unchanged. CAE-1 removes *gates that wait on the board*, not gates that wait on technical correctness. The board retains full visibility (every comment, every PR) and full override (a comment instantly redirects).
 
+## Issue-creation discipline (anti-proliferation, mandatory)
+
+Paperclip issues are the unit of *engineering work the user expects to see in their inbox*. They are **not** the audit log of every governance act, every heartbeat tick, every recovery action. Conflating those two roles is what turned the 40-PR refactor program into 432 issues. The following four rules are mandatory and apply to every agent.
+
+1. **One review issue per PR (not one per reviewer).** Stage 5 creates exactly **one** Paperclip issue per PR — "Stage 5 review of PR #N". CodeReviewer, CodexReviewer, and (for size ≥ M) Architect post their verdicts as **comments on that single issue** plus the mandatory GitHub PR cross-post. The Architect's `make ready-to-push` and CTO final sign-off are comments on the same issue. **Never** spawn separate `Stage 5 — CodeReviewer / CodexReviewer / Architect` issues. A rework round (R2, R3, …) appends comments on the existing review issue — it does not create a new issue.
+
+2. **Heartbeat ticks do not create issues.** Routine cron firings are *agent wakes*, not persistent records. Each routine has at most one running umbrella issue ("CAE-1 heartbeat — current cycle"); successive ticks **append comments** to that single issue. New Paperclip issues are created only when a tick takes a concrete engineering action (e.g. dispatches a real Coder task) — and then the new issue tracks that action, not the tick.
+
+3. **Drift-detection cap: at most 1 new issue per heartbeat per agent.** When a sweep detects drift (orphan `in_review`, blocked-without-blocker, stale lock, projectId=null, etc.), record **every** finding as a comment on the existing affected issue. At most **one** new follow-up issue per heartbeat may be filed, and only when the drift requires bounded work that cannot be expressed as a status change on an existing issue. Multiple drift types in a single tick collapse into one summary comment on the heartbeat umbrella issue plus, at most, one new issue.
+
+4. **Recovery is a comment, not a child issue.** When an agent is found stalled or in `error`, post a comment on the **stalled issue itself** (and escalate to CTO/CEO if the platform-level recovery is needed). **Never** create a "Recover stalled issue AS-X" child. The stalled issue's `assigneeAgentId` is already correct; status transitions remain that assignee's call (recovery agents are advisory, see Stage 5 §"Recovery agents — no parent status transitions").
+
+5. **API probes are never issues.** Test API endpoints with throwaway curl / scripts. Issues whose title contains "probe", "test", "delete me", "_probe" etc. are a violation of this rule, full stop.
+
+**Why these rules.** AS-446 (2026-05-11) audit: 432 total issues, of which ~145 were legitimate engineering work and ~287 were process apparatus. The four levers that caused the proliferation map 1-to-1 to rules 1–4 above; rule 5 captures the residual probe-spam. Both the CEO and CTO audits converged on the same conclusion: process was followed; the process was the bug.
+
+**Enforcement.** This is part of the Definition of Done for every issue. A PR may carry a Stage-5-tagged label only if exactly one review issue exists for it. The CTO retro (Stage 8) MUST include a per-week count of issues created per PR shipped; a value > 1.5 trips a process-fix entry in the same retro.
+
 ## Agents — the 9 hired Paperclip roster
 
 This is the ground-truth list. If a stage names anyone else as an owner or reviewer, the doc is wrong.
@@ -139,7 +157,7 @@ Every unit of work goes through these stages. Stages 1, 2, 4, 6, 6.5 may be **sk
 
 ### Stage 5 — Review
 
-Reviewers run **in parallel**. The PR cannot proceed until every applicable reviewer signs off. Every reviewer in this matrix is a **Paperclip agent**; the "Tools they invoke" column lists the in-session subagents/skills they use during the review.
+Reviewers run **in parallel** against **a single review issue per PR** (see §"Issue-creation discipline" rule 1). The PR cannot proceed until every applicable reviewer signs off. Every reviewer in this matrix is a **Paperclip agent**; the "Tools they invoke" column lists the in-session subagents/skills they use during the review. **Each reviewer posts their verdict as a comment on the shared review issue plus the GitHub PR cross-post — they do not spawn a separate Paperclip issue for their own role.**
 
 | Reviewer (Paperclip agent) | Always runs? | Trigger condition | Tools they invoke in-session |
 |---|---|---|---|
@@ -169,8 +187,19 @@ Notes:
 - **Exit**: All applicable Paperclip reviewers thumbs-up (Paperclip-thread verdict **and** GitHub PR cross-post present for CodeReviewer + CodexReviewer); CodeRabbit either resolved or `@coderabbitai ignore`d with reason.
 - **Anti-pattern**: Multiple push-fix-push cycles to chase reviewers. Get it right locally; push once.
 - **Anti-pattern**: Posting a Stage 5 verdict only on the Paperclip thread. The PR is the human-readable record of who signed off on what; an audit reading only the GitHub PR cannot reconstruct Stage 5 unless the cross-post is present.
+- **Anti-pattern**: Filing one Paperclip issue per reviewer. Stage 5 is **one** review issue per PR; verdicts are comments on that issue. See §"Issue-creation discipline" rule 1.
 
-#### Recovery agents — no parent status transitions
+#### Recovery is a comment, not a child issue
+
+When an agent is detected stalled or in `error`, the response is:
+
+1. **Post a comment on the stalled issue itself.** Name the agent, the symptom (heartbeat stale, lock held, status frozen), and the recommended unblock action (resume agent, reassign, escalate).
+2. **Escalate to CTO/CEO** if a platform-level action (`PATCH /api/agents/{id}` status reset, force-release) is required — the platform agent that can act on that is the CEO (bearer-scope).
+3. **Do NOT create a "Recover stalled issue AS-X" child issue.** That pattern multiplies the work-tracker without adding signal; the stalled issue is the canonical record.
+
+When a comment-only recovery is genuinely insufficient (e.g. a bounded follow-up engineering task must be done by a different agent before the original can resume), the comment may say so and a single delegated follow-up issue may be filed under §"Issue-creation discipline" rule 3.
+
+##### Recovery agents — no parent status transitions
 
 A Paperclip child whose role is "recover stalled issue X" — or any agent operating on a parent it does not own as `assigneeAgentId` — **may post comments recommending a status transition on the parent, but MUST NOT call `PATCH /api/issues/{parentId}` to change `status`**. Only the parent's currently-assigned agent transitions status.
 
@@ -354,6 +383,11 @@ These are not for vanity. They are the input to the weekly retro: any value that
 - **Dual-authoring.** Two sources of truth for the same fact. Always wrong.
 - **Documentation drift.** Docs that contradict code are a release blocker, not a backlog item.
 - **Heroic merges.** A PR that requires the author to babysit CI is a PR that broke Stage 6.
+- **One issue per reviewer per PR.** Stage 5 is **one** review issue per PR; verdicts are comments on that issue (see §"Issue-creation discipline" rule 1). Spawning `Stage 5 — CodeReviewer / CodexReviewer / Architect` triplets is a process-cost multiplier with no signal gain.
+- **Heartbeat ticks persisted as issues.** Routine cron firings are wakes, not issues (rule 2). At most one running umbrella issue per routine; subsequent ticks are comments on it.
+- **Drift-detection issue spawning.** A sweep that finds N items of drift files **at most one** new issue; the other N-1 findings are comments on the affected issues (rule 3).
+- **"Recover stalled X" child issues.** Stalled-agent recovery is a comment on the stalled issue plus an escalation to CTO/CEO; never a new child (rule 4).
+- **Filing API probes as issues.** Probes/tests of the Paperclip API go through curl/scripts, not issue creation (rule 5).
 
 ## Updating this document
 
