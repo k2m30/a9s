@@ -33,6 +33,7 @@ import (
 	"time"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 )
 
 // Flash auto-clear durations. apiErrorFlashDuration is the longer 5 s window
@@ -50,7 +51,7 @@ const (
 type FlashEvent struct {
 	Text    string
 	IsError bool
-	NewGen  int
+	NewGen  domain.Gen
 }
 
 // ClearFlashEvent is the adapter-translated form of messages.ClearFlashMsg.
@@ -59,8 +60,8 @@ type FlashEvent struct {
 // IsError lets the handler emit SetErrorHintIntent when the cleared flash
 // was an error flash (mirrors the adapter's flashState.isError check).
 type ClearFlashEvent struct {
-	Gen        int
-	CurrentGen int
+	Gen        domain.Gen
+	CurrentGen domain.Gen
 	IsError    bool
 }
 
@@ -69,7 +70,7 @@ type ClearFlashEvent struct {
 // calling into the Core; the handler echoes it back via the FlashTickPayload.
 type APIErrorEvent struct {
 	Err    error
-	NewGen int
+	NewGen domain.Gen
 }
 
 // ClientsReadyEvent mirrors the fields of messages.ClientsReadyMsg the
@@ -86,10 +87,10 @@ type ClientsReadyEvent struct {
 	Clients     any
 	Err         error
 	Region      string
-	Gen         int
+	Gen         domain.Gen
 	StackDepth  int
 	HasActiveRL bool
-	NewGen      int
+	NewGen      domain.Gen
 }
 
 // ProfileSelectedEvent / RegionSelectedEvent mirror the corresponding
@@ -97,12 +98,12 @@ type ClientsReadyEvent struct {
 // already bumped to (used by the "Switching to …" flash tick).
 type ProfileSelectedEvent struct {
 	Profile string
-	NewGen  int
+	NewGen  domain.Gen
 }
 
 type RegionSelectedEvent struct {
 	Region string
-	NewGen int
+	NewGen domain.Gen
 }
 
 // HandleFlash bumps the flash generation, appends an error-history entry

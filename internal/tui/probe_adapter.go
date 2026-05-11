@@ -12,6 +12,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/cache"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -62,7 +63,7 @@ func (m *Model) loadAvailabilityCache() tea.Cmd {
 
 // probeResourceAvailability returns a tea.Cmd that runs a Wave-1 availability
 // probe for shortName and converts the result to AvailabilityCheckedMsg.
-func (m *Model) probeResourceAvailability(shortName string, gen int) tea.Cmd {
+func (m *Model) probeResourceAvailability(shortName string, gen domain.Gen) tea.Cmd {
 	ctx, clients := m.appCtx, m.Session.Clients
 	return func() tea.Msg {
 		r := m.core.ProbeResourceAvailability(ctx, clients, shortName)
@@ -142,7 +143,7 @@ func (m *Model) demoPrefetchCounts() tea.Cmd {
 // dispatch probeEnrichment. APIErrorMsg and any other message pass through
 // unchanged.
 func (m *Model) refreshResourceListWithEnrichmentRerun(
-	rl views.ResourceListModel, tok int,
+	rl views.ResourceListModel, tok domain.Gen,
 ) tea.Cmd {
 	inner := m.refreshResourceList(rl)
 	return func() tea.Msg {
@@ -157,7 +158,7 @@ func (m *Model) refreshResourceListWithEnrichmentRerun(
 
 // probeEnrichment returns a tea.Cmd that runs the registered Wave-2 enricher
 // for shortName and converts the result to EnrichmentCheckedMsg.
-func (m *Model) probeEnrichment(shortName string, gen int) tea.Cmd {
+func (m *Model) probeEnrichment(shortName string, gen domain.Gen) tea.Cmd {
 	ctx, clients := m.appCtx, m.Session.Clients
 	typeGen := m.Session.EnrichmentTypeGen[shortName]
 	if awsclient.IssueEnricherRegistry[shortName].Fn == nil {
