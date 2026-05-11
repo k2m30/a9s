@@ -294,7 +294,7 @@ func TestScenario_RelatedDrillThrough_All(t *testing.T) {
 //   2) Navigation integration. The direct-checker test verifies ID-format
 //      parity with the target fetcher, but does NOT exercise the actual
 //      TUI navigation — ResolveRelatedNavigate, handleRelatedNavigate,
-//      KindDetail fast path, EnterChildViewMsg dispatch, or the child-view
+//      NavigationKindDetail fast path, EnterChildViewMsg dispatch, or the child-view
 //      fetcher's ParentContext handling.
 //
 // To avoid the async race that made earlier TUI-driven tests flaky (related

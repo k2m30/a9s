@@ -325,7 +325,7 @@ func fullIntegrationEnterRelatedSingleDetail(t *testing.T, m *tui.Model, targetT
 		t.Fatalf("related %q navigation returned nil cmd; expected fetch+auto-open detail", displayName)
 	}
 
-	// Fast path: related-panel KindDetail (cache hit) pushes the detail view
+	// Fast path: related-panel NavigationKindDetail (cache hit) pushes the detail view
 	// directly and emits RelatedCheckStartedMsg without going through
 	// ResourcesLoadedMsg / NavigateMsg. Detect by scanning for that message
 	// in the returned cmd.

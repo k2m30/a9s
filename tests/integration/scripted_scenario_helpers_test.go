@@ -1015,7 +1015,7 @@ func (s *fullIntegrationScenario) DrillRelated(displayName string) []resource.Re
 	}
 
 	// Case 4: detail-view pushed without a NavigateMsg.
-	// handleRelatedNavigate's KindDetail + cache-hit branch pushes a detail view
+	// handleRelatedNavigate's NavigationKindDetail + cache-hit branch pushes a detail view
 	// and returns nil Cmd — no NavigateMsg is emitted, so currentResource stays
 	// pointed at the parent. Detect the push via the rendered frame title:
 	// "detail -- <id>" or "detail -- <id> (<name>)".

@@ -286,7 +286,7 @@ func TestFetchResourcesFiltered_NoFetcherWithDemoClients(t *testing.T) {
 
 	// Navigate to EC2 list, then send RelatedNavigateMsg with FetchFilter for
 	// a type with no filtered fetcher. Because this goes through handleRelatedNavigate
-	// which calls m.fetchResourcesFiltered directly for KindFilteredList results,
+	// which calls m.fetchResourcesFiltered directly for NavigationKindFilteredList results,
 	// we need to trigger that path. The easiest approach: register a typed resource
 	// and send a LoadMoreMsg with FetchFilter using demo clients.
 	// Use an arbitrary short name with no fetchers registered.

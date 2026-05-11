@@ -72,7 +72,7 @@ func BuildChildContextForResource(child resource.ChildViewDef, r resource.Resour
 		case source == "Name":
 			ctx[param] = r.Name
 		case strings.HasPrefix(source, "@parent."):
-			// no parent stack in related-navigation KindDetail entry
+			// no parent stack in related-navigation NavigationKindDetail entry
 		default:
 			ctx[param] = r.Fields[source]
 		}
