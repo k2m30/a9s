@@ -1,5 +1,6 @@
-// runtime_adapter_related.go — Bubble Tea adapter glue for the runtime
-// HandleRelatedNavigate entry point (Phase 05 PR-05a-h4).
+// runtime_adapter_related.go — Bubble Tea adapter glue for two runtime entry
+// points: HandleRelatedNavigate (Phase 05 PR-05a-h4, AS-150) and
+// HandleRelatedCheckStarted (Phase 05 PR-05a-h-related, AS-154).
 //
 // handleRelatedNavigate replaces the deleted entry point from
 // internal/tui/app_handlers_related_navigate.go. It constructs a transient
@@ -10,6 +11,13 @@
 //
 // handleRelatedNavigateChild stays here as a TUI-only helper because it
 // dispatches a messages.EnterChildViewMsg — a Bubble Tea message type.
+//
+// handleRelatedCheckStarted is the BT adapter for messages.RelatedCheckStartedMsg.
+// It asks runtime.Core whether any RelatedDefs are registered for the source
+// type, and if so fans out one checker goroutine per def via relatedCheckCmd
+// (capped by runtime.MaxConcurrentProbes). The actual probe loop stays here in
+// the adapter because it depends on m.clients, m.appCtx, and tea.Cmd —
+// platform glue that does not belong in internal/runtime.
 //
 // Decision-locus follow-up (PR-05b): a few branches in this adapter still walk
 // the session cache directly to drive view construction (AMI exact-ID drill,
@@ -23,7 +31,10 @@
 package tui
 
 import (
+	"context"
 	"fmt"
+	"maps"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -100,7 +111,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 		// FetchFilter path: use server-side filtered fetcher.
 		if len(result.FetchFilter) > 0 {
 			rl := views.NewResourceList(*rt, m.viewConfig, m.keys)
-			rl.SetTitleSuffix(relatedTitleSuffix(msg.SourceResource))
+			rl.SetTitleSuffix(runtime.RelatedTitleSuffix(msg.SourceResource))
 			rl.SetFetchFilter(result.FetchFilter)
 			rl.SetEscPops(true)
 			rl.SetSize(m.innerSize())
@@ -176,7 +187,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 						0, 0,
 						false,
 					)
-					rl.SetTitleSuffix(relatedTitleSuffix(msg.SourceResource))
+					rl.SetTitleSuffix(runtime.RelatedTitleSuffix(msg.SourceResource))
 					rl.SetRelatedIDFilter(result.RelatedIDs)
 					if msg.Checker != nil {
 						rl.SetReapplyChecker(msg.Checker, msg.SourceResource)
@@ -211,7 +222,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 					0, 0,
 					false,
 				)
-				rl.SetTitleSuffix(relatedTitleSuffix(msg.SourceResource))
+				rl.SetTitleSuffix(runtime.RelatedTitleSuffix(msg.SourceResource))
 				rl.SetRelatedIDFilter(result.RelatedIDs)
 				if msg.Checker != nil {
 					rl.SetReapplyChecker(msg.Checker, msg.SourceResource)
@@ -257,7 +268,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 						0, 0,
 						false,
 					)
-					rl.SetTitleSuffix(relatedTitleSuffix(msg.SourceResource))
+					rl.SetTitleSuffix(runtime.RelatedTitleSuffix(msg.SourceResource))
 					rl.SetRelatedIDFilter(result.RelatedIDs)
 					if msg.Checker != nil {
 						rl.SetReapplyChecker(msg.Checker, msg.SourceResource)
@@ -320,8 +331,8 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 		}
 		if detailFound {
 			r := detailRes
-			if enterChild := enterChildForResource(rt, r); enterChild != nil {
-				ctx := buildChildContextForResource(*enterChild, r)
+			if enterChild := runtime.EnterChildForResource(rt, r); enterChild != nil {
+				ctx := runtime.BuildChildContextForResource(*enterChild, r)
 				displayName := ctx[enterChild.DisplayNameKey]
 				childType := enterChild.ChildType
 				return m, func() tea.Msg {
@@ -445,4 +456,131 @@ func relatedNavigateTasksToCmd(m Model, targetType string, result runtime.Naviga
 	default:
 		return tea.Batch(cmds...)
 	}
+}
+
+// handleRelatedCheckStarted is the BT adapter entry point for
+// messages.RelatedCheckStartedMsg. Normalises src.Type from msg.ResourceType
+// when the detail view stores type separately from SourceResource.Type.
+func (m Model) handleRelatedCheckStarted(msg messages.RelatedCheckStartedMsg) (tea.Model, tea.Cmd) {
+	src := msg.SourceResource
+	if src.Type == "" {
+		src.Type = msg.ResourceType
+	}
+	core := runtime.New(m.Session, resource.AllResourceTypes())
+	_, tasks := core.HandleRelatedCheckStarted(runtime.RelatedCheckStartedEvent{
+		ResourceType:   msg.ResourceType,
+		SourceResource: src,
+	})
+	if len(tasks) == 0 {
+		return m, nil
+	}
+	return m, m.relatedCheckCmd(src)
+}
+
+// relatedCheckCmd fans out one goroutine per RelatedDef for res, capped by
+// runtime.MaxConcurrentProbes.
+func (m Model) relatedCheckCmd(res resource.Resource) tea.Cmd {
+	defs := resource.GetRelated(res.Type)
+	if len(defs) == 0 {
+		return nil
+	}
+
+	cache := m.buildResourceCacheSnapshot()
+	gen := m.RelatedGen
+
+	mainCacheKeys := make(map[string]struct{}, len(m.ResourceCache))
+	for k := range m.ResourceCache {
+		mainCacheKeys[k] = struct{}{}
+	}
+
+	sem := make(chan struct{}, runtime.MaxConcurrentProbes)
+	cmds := make([]tea.Cmd, 0, len(defs))
+
+	for _, def := range defs {
+		localCache := cache
+		cmds = append(cmds, func() (out tea.Msg) {
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			defer func() {
+				if r := recover(); r != nil {
+					out = messages.RelatedCheckResultMsg{
+						ResourceType:     res.Type,
+						SourceResourceID: res.ID,
+						DefDisplayName:   def.DisplayName,
+						Result:           resource.RelatedCheckResult{TargetType: def.TargetType, Count: -1},
+						Generation:       gen,
+					}
+				}
+			}()
+			if def.Checker == nil {
+				return messages.RelatedCheckResultMsg{
+					ResourceType:     res.Type,
+					SourceResourceID: res.ID,
+					DefDisplayName:   def.DisplayName,
+					Result:           resource.RelatedCheckResult{TargetType: def.TargetType, Count: -1},
+					Generation:       gen,
+				}
+			}
+			ctx, cancel := context.WithTimeout(m.appCtx, 10*time.Second)
+			defer cancel()
+			var cachedPages map[string]resource.ResourceCacheEntry
+			if def.NeedsTargetCache {
+				if _, inMainCache := mainCacheKeys[def.TargetType]; !inMainCache {
+					if pf := resource.GetPaginatedFetcher(def.TargetType); pf != nil {
+						if fr, err := pf(ctx, m.clients, ""); err == nil {
+							isTrunc := fr.Pagination != nil && fr.Pagination.IsTruncated
+							if prev, hasPrev := localCache[def.TargetType]; hasPrev && prev.IsTruncated {
+								isTrunc = true
+							}
+							entry := resource.ResourceCacheEntry{
+								Resources:   fr.Resources,
+								IsTruncated: isTrunc,
+								Pagination:  fr.Pagination,
+							}
+							enriched := make(resource.ResourceCache, len(localCache)+1)
+							maps.Copy(enriched, localCache)
+							enriched[def.TargetType] = entry
+							localCache = enriched
+							cachedPages = map[string]resource.ResourceCacheEntry{def.TargetType: entry}
+						}
+					}
+				}
+			}
+			result := def.Checker(ctx, m.clients, res, localCache)
+			result.TargetType = def.TargetType
+			var lazyAdded map[string][]resource.Resource
+			var lazyAddError error
+			if len(result.ResourceIDs) > 0 {
+				if ff := resource.GetFetchByIDs(def.TargetType); ff != nil {
+					missing := runtime.MissingFromCache(localCache, def.TargetType, result.ResourceIDs)
+					if len(missing) > 0 {
+						extra, fetchErr := ff(ctx, m.clients, missing)
+						if fetchErr != nil {
+							lazyAddError = fetchErr
+						}
+						if len(extra) > 0 {
+							entry := localCache[def.TargetType]
+							entry.Resources = append(append([]resource.Resource(nil), entry.Resources...), extra...)
+							enriched := make(resource.ResourceCache, len(localCache)+1)
+							maps.Copy(enriched, localCache)
+							enriched[def.TargetType] = entry
+							localCache = enriched
+							lazyAdded = map[string][]resource.Resource{def.TargetType: extra}
+						}
+					}
+				}
+			}
+			return messages.RelatedCheckResultMsg{
+				ResourceType:       res.Type,
+				SourceResourceID:   res.ID,
+				DefDisplayName:     def.DisplayName,
+				Result:             result,
+				Generation:         gen,
+				CachedPages:        cachedPages,
+				LazyAddedResources: lazyAdded,
+				LazyAddError:       lazyAddError,
+			}
+		})
+	}
+	return tea.Batch(cmds...)
 }
