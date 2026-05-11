@@ -3,6 +3,8 @@ package runtime
 import (
 	"context"
 	"time"
+
+	"github.com/k2m30/a9s/v3/internal/domain"
 )
 
 // TaskKind names a family of background tasks ("enrich", "related",
@@ -144,7 +146,7 @@ type TaskRequest struct {
 type ConnectPayload struct {
 	Profile string
 	Region  string
-	Gen     int
+	Gen     domain.Gen
 }
 
 func (ConnectPayload) isTaskPayload() {}
@@ -174,7 +176,7 @@ func (DemoPrefetchCountsPayload) isTaskPayload() {}
 // reference. The runtime owns the gen (computed at dispatch time) so the
 // stale-clear guard works the same as it did before extraction.
 type FlashTickPayload struct {
-	Gen      int
+	Gen      domain.Gen
 	Duration time.Duration
 }
 

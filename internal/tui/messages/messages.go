@@ -1,6 +1,7 @@
 package messages
 
 import (
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -44,7 +45,7 @@ type ResourcesLoadedMsg struct {
 	// applies the list update unconditionally, then — after its existing
 	// write-through block — checks this field; if it matches the current
 	// per-type gen, it seeds probeResources and dispatches probeEnrichment.
-	TypeGen int
+	TypeGen domain.Gen
 	// Err is non-nil when the paginated fetcher returned a partial-success
 	// composite error: SOME resources made it back AND something failed
 	// (e.g. one inline-group-policy enumeration call timed out). The handler
@@ -79,7 +80,7 @@ type FlashMsg struct {
 
 // ClearFlashMsg is sent after the flash auto-clear timer expires.
 type ClearFlashMsg struct {
-	Gen int // only clear if this matches current flash generation
+	Gen domain.Gen // only clear if this matches current flash generation
 }
 
 // ProfileSelectedMsg is sent when the user confirms a profile selection.
@@ -123,7 +124,7 @@ type ClientsReadyMsg struct {
 	Clients any
 	Err     error
 	Region  string // resolved region from AWS config (set on success)
-	Gen     int    // connect generation — ignore if != current connectGen
+	Gen     domain.Gen // connect generation — ignore if != current connectGen
 }
 
 // EnterChildViewMsg signals that the user has triggered a child view navigation.
@@ -160,7 +161,7 @@ type RelatedCheckResultMsg struct {
 	SourceResourceID string // ID of the source resource (for cache keying)
 	DefDisplayName   string // unique def.DisplayName — disambiguates multiple defs sharing a TargetType (e.g. ct-events self-pivots)
 	Result           resource.RelatedCheckResult
-	Generation       uint64 // dispatch generation — discard if != Model.RelatedGen
+	Generation       domain.Gen // dispatch generation — discard if != Model.RelatedGen
 	// CachedPages contains full top-level resource pages fetched from AWS on a
 	// cold cache miss, keyed by target resource short name. Non-nil only when
 	// the NeedsTargetCache prefetch executed a live fetch (i.e., target was
@@ -228,7 +229,7 @@ type AvailabilityPrefetchedMsg struct {
 	IssueTruncated map[string]bool                      // shortName -> true if issue count is lower bound
 	Resources      map[string][]resource.Resource       // shortName -> retained first-page resources for Wave 2
 	Pagination     map[string]*resource.PaginationMeta  // shortName -> full pagination meta (NextToken, etc.) for cache seeding
-	Gen            int                                  // availabilityGen captured at dispatch — stale if != current
+	Gen            domain.Gen                           // availabilityGen captured at dispatch — stale if != current
 	// PrefetchErr is the composite error aggregating per-type fetch failures
 	// during the synchronous availability prefetch. Non-nil when any paginated
 	// fetcher errored; the app handler surfaces it as a FlashMsg so operators
@@ -243,7 +244,7 @@ type AvailabilityCheckedMsg struct {
 	Count        int                 // number of resources found
 	Truncated    bool                // true if count is from a truncated first page
 	Err          error               // non-nil means "couldn't check" -- treat as unknown, don't grey out
-	Gen          int                 // generation counter -- ignore if != current availabilityGen
+	Gen          domain.Gen          // generation counter -- ignore if != current availabilityGen
 	Issues    int                 // count of IsIssueRowColor() resources (red/yellow only)
 	Resources []resource.Resource // Populated on success AND on partial-success (Err non-nil but partial results present)
 }
@@ -267,8 +268,8 @@ type EnrichmentCheckedMsg struct {
 	// enricher could not fully inspect them (per-resource API error or page cap).
 	TruncatedIDs map[string]bool
 	Err          error // enrichment error (nil on success)
-	Gen          int   // session-wide generation counter (stale probe protection; profile/region switch)
-	TypeGen      int   // per-type generation counter; bumped on every rerun for that type. Stale
+	Gen          domain.Gen // session-wide generation counter (stale probe protection; profile/region switch)
+	TypeGen      domain.Gen // per-type generation counter; bumped on every rerun for that type. Stale
 	// results whose TypeGen doesn't match the current per-type gen are discarded.
 }
 
@@ -300,5 +301,5 @@ type EnrichDetailResultMsg struct {
 	ResourceID   string
 	EnrichedRes  resource.Resource
 	Err          error
-	Generation   uint64
+	Generation   domain.Gen
 }

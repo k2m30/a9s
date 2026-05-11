@@ -12,6 +12,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/config"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/session"
@@ -39,7 +40,7 @@ type flashState struct {
 	text    string
 	isError bool
 	active  bool
-	gen     int // generation counter to avoid stale clears
+	gen     domain.Gen // generation counter to avoid stale clears
 }
 
 // errorEntry records a single error for the session error log.

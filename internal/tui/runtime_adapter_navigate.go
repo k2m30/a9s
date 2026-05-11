@@ -30,6 +30,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/config"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/session"
@@ -395,7 +396,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		m.Session.AvailabilityGen++
 		m.Session.EnrichmentGen++
 		m.Session.EnrichmentRan = make(map[string]bool)
-		m.Session.EnrichmentTypeGen = make(map[string]int)
+		m.Session.EnrichmentTypeGen = make(map[string]domain.Gen)
 		m.Session.EnrichmentTruncatedIDs = make(map[string]map[string]bool)
 		// Clear stale Wave 2 from all cached rows before resetting ProbeResources.
 		// Without this, opening a cached list before the new enrichment completes
