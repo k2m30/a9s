@@ -12,6 +12,155 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
+// handleKeyMsg processes all keyboard input: force-quit, input modes, global
+// keys, then falls through to the active view. Moved from app_handlers.go in
+// Phase-05 PR-05a-h1 (AS-147).
+func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Global keys handled before delegation
+	if key.Matches(msg, m.keys.ForceQuit) {
+		return m, tea.Quit
+	}
+
+	// Handle input modes — don't clear error hint during text input.
+	switch m.inputMode {
+	case modeFilter:
+		return m.updateFilterMode(msg)
+	case modeCommand:
+		return m.updateCommandMode(msg)
+	}
+
+	// Clear error hint on any navigation keypress (not during text input).
+	m.showErrorHint = false
+
+	// If the active view is in search input mode, delegate all keys to it.
+	// This prevents global keys (q, ?, i, etc.) from firing while typing a search query.
+	if s, ok := m.activeView().(views.Searchable); ok && s.IsSearchInputMode() {
+		return m.updateActiveView(msg)
+	}
+
+	// Global keys in normal mode
+	if key.Matches(msg, m.keys.Help) {
+		// If already on help, let the help view handle it (closes help)
+		if _, ok := m.activeView().(*views.HelpModel); ok {
+			return m.updateActiveView(msg)
+		}
+		ctx := m.helpContext()
+		activeShortName := ""
+		if rl, ok := m.activeView().(*views.ResourceListModel); ok {
+			activeShortName = rl.ShortName()
+		}
+		help := views.NewHelpWithResource(m.keys, ctx, activeShortName)
+		help.SetSize(m.innerSize())
+		m.pushView(&help)
+		return m, nil
+	}
+	if key.Matches(msg, m.keys.Identity) {
+		// If already on identity view, let it handle the key (dismisses)
+		if _, ok := m.activeView().(*views.IdentityModel); ok {
+			return m.updateActiveView(msg)
+		}
+		id := views.NewIdentity(m.profile, m.region, m.keys)
+		if m.identity != nil {
+			data := m.identityToViewData()
+			id.SetIdentity(data)
+		}
+		id.SetSize(m.innerSize())
+		m.pushView(&id)
+		// Always re-fetch on i press
+		m.identityFetching = true
+		cmd := m.fetchIdentity()
+		return m, cmd
+	}
+	if key.Matches(msg, m.keys.ErrorLog) {
+		// If already viewing the error log, let the view handle the key.
+		if ym, ok := m.activeView().(*views.YAMLModel); ok && ym.IsTextViewer() {
+			return m.updateActiveView(msg)
+		}
+		if len(m.errorHistory) == 0 {
+			return m.handleFlash(messages.FlashMsg{Text: "No errors this session"})
+		}
+		var sb strings.Builder
+		for i := len(m.errorHistory) - 1; i >= 0; i-- {
+			e := m.errorHistory[i]
+			fmt.Fprintf(&sb, "[%s] %s\n", e.time.Format("15:04:05"), e.message)
+		}
+		tv := views.NewTextViewer("errors", sb.String(), m.keys)
+		tv.SetSize(m.innerSize())
+		m.pushView(&tv)
+		return m, nil
+	}
+	if key.Matches(msg, m.keys.Quit) {
+		return m, tea.Quit
+	}
+	if key.Matches(msg, m.keys.Escape) {
+		if d, ok := m.activeView().(*views.DetailModel); ok && d.ConsumesEscapeLocally() {
+			return m.updateActiveView(msg)
+		}
+		// If active view has active search (confirmed highlights), delegate Esc to clear it.
+		if s, ok := m.activeView().(views.Searchable); ok && s.IsSearchActive() {
+			return m.updateActiveView(msg)
+		}
+		// Related-navigation resource lists should pop immediately on Esc.
+		if rl, ok := m.activeView().(*views.ResourceListModel); ok && rl.EscPops() {
+			m.popView()
+			return m, nil
+		}
+		// If active view has a confirmed filter, clear it first
+		if f, ok := m.activeView().(views.Filterable); ok && f.GetFilter() != "" {
+			f.SetFilter("")
+			if rl, ok := m.activeView().(*views.ResourceListModel); ok {
+				m.cacheTopLevelResourceList(*rl)
+			}
+			return m, nil
+		}
+		// Otherwise pop view; no-op on main menu (never quit from Esc)
+		m.popView()
+		return m, nil
+	}
+	if key.Matches(msg, m.keys.Colon) {
+		m.inputMode = modeCommand
+		m.cmdInput.Reset()
+		m.cmdInput.Focus()
+		return m, nil
+	}
+	if key.Matches(msg, m.keys.Filter) {
+		// Only activate filter mode on filterable views
+		if _, ok := m.activeView().(views.Filterable); ok {
+			m.inputMode = modeFilter
+			m.cmdInput.Reset()
+			m.cmdInput.Focus()
+			return m, nil
+		}
+		// On help views, delegate / to the view (which sends PopViewMsg to close).
+		if _, ok := m.activeView().(*views.HelpModel); ok {
+			return m.updateActiveView(msg)
+		}
+		// On searchable views (detail, YAML), delegate / for search activation.
+		if _, ok := m.activeView().(views.Searchable); ok {
+			return m.updateActiveView(msg)
+		}
+		// On other static views (reveal), consume / without action.
+		return m, nil
+	}
+
+	// Copy (c) — context-dependent clipboard copy
+	if key.Matches(msg, m.keys.Copy) {
+		return m.handleCopy()
+	}
+
+	// Refresh (ctrl+r) — re-fetch resources in resource list
+	if key.Matches(msg, m.keys.Refresh) {
+		return m.handleRefresh()
+	}
+
+	// Reveal (x) — fetch and display value via registered reveal fetcher
+	if key.Matches(msg, m.keys.Reveal) {
+		return m.handleReveal()
+	}
+
+	return m.updateActiveView(msg)
+}
+
 // updateFilterMode handles keys while in filter input mode.
 func (m Model) updateFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if key.Matches(msg, m.keys.Escape) {
