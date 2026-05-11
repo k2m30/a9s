@@ -5,7 +5,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
+	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 )
 
@@ -58,7 +58,7 @@ func TestHandleRelatedNavigateChild_UnknownChildType(t *testing.T) {
 
 	result := cmd()
 	// The root model routes unknown types through ResolveRelatedNavigate which
-	// returns KindFlash for unregistered types (neither child nor top-level).
+	// returns NavigationKindFlash for unregistered types (neither child nor top-level).
 	flashMsg, ok := result.(messages.FlashMsg)
 	if !ok {
 		t.Fatalf("cmd() returned %T, want messages.FlashMsg", result)
@@ -72,18 +72,18 @@ func TestHandleRelatedNavigateChild_UnknownChildType(t *testing.T) {
 }
 
 // TestResolveRelatedNavigate_ChildTypeReturnsKindEnterChildView verifies the
-// pure resolver returns KindEnterChildView for a registered child type,
+// pure resolver returns NavigationKindEnterChildView for a registered child type,
 // exercising the handleRelatedNavigateChild dispatch condition directly.
 func TestResolveRelatedNavigate_ChildTypeReturnsKindEnterChildView(t *testing.T) {
-	msg := messages.RelatedNavigateMsg{
+	ev := runtime.RelatedNavigateEvent{
 		TargetType: "ecr_images",
 	}
 	cache := map[string][]resource.Resource{}
 
-	result := tui.ResolveRelatedNavigate(msg, cache)
+	result := runtime.ResolveRelatedNavigate(ev, cache)
 
-	if result.Kind != tui.KindEnterChildView {
-		t.Errorf("Kind = %v, want KindEnterChildView (%v)", result.Kind, tui.KindEnterChildView)
+	if result.Kind != runtime.NavigationKindEnterChildView {
+		t.Errorf("Kind = %v, want NavigationKindEnterChildView (%v)", result.Kind, runtime.NavigationKindEnterChildView)
 	}
 	if result.TargetType != "ecr_images" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType, "ecr_images")
@@ -91,17 +91,17 @@ func TestResolveRelatedNavigate_ChildTypeReturnsKindEnterChildView(t *testing.T)
 }
 
 // TestResolveRelatedNavigate_UnknownTypeReturnsKindFlash verifies the pure
-// resolver returns KindFlash for an entirely unknown type.
+// resolver returns NavigationKindFlash for an entirely unknown type.
 func TestResolveRelatedNavigate_UnknownTypeReturnsKindFlash(t *testing.T) {
-	msg := messages.RelatedNavigateMsg{
+	ev := runtime.RelatedNavigateEvent{
 		TargetType: "nonexistent_xyz",
 	}
 	cache := map[string][]resource.Resource{}
 
-	result := tui.ResolveRelatedNavigate(msg, cache)
+	result := runtime.ResolveRelatedNavigate(ev, cache)
 
-	if result.Kind != tui.KindFlash {
-		t.Errorf("Kind = %v, want KindFlash (%v)", result.Kind, tui.KindFlash)
+	if result.Kind != runtime.NavigationKindFlash {
+		t.Errorf("Kind = %v, want NavigationKindFlash (%v)", result.Kind, runtime.NavigationKindFlash)
 	}
 	if !result.FlashIsError {
 		t.Error("FlashIsError = false, want true for unknown type")
