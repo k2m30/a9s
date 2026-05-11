@@ -245,20 +245,26 @@ func (m rightColumnModel) View() string {
 				rowText = "  " + row.displayName
 				rowStyle = styles.DimText
 			case row.count == 0 && row.approximate:
-				// Reverse-scan over a truncated cache hit zero matches so far.
-				// Render "(0+)" to signal "lower bound — more pages may reveal
-				// matches." Row stays navigable; target list carries the
-				// checker and re-runs it on m-loads-more.
-				rowText = "  " + row.displayName + " (0+)"
+				// Reverse-scan over a truncated cache hit zero matches so
+				// far. Render the literal "(0)" — the design-spec contract
+				// (docs/design/related-resources.md §5.3 "Available — count
+				// known") and the integration-test assertion both demand a
+				// literal "(<N>)" substring for any count >= 0. The "lower
+				// bound — more pages may reveal matches" signal is preserved
+				// via the RowNormal style (vs DimText for confirmed-zero)
+				// and the row stays navigable; the target list carries the
+				// checker forward and re-runs it on m-loads-more (AS-378).
+				rowText = "  " + row.displayName + " (0)"
 				rowStyle = styles.RowNormal
 			case row.count == 0:
 				// Confirmed zero — cache fully scanned, no matches. Dim.
 				rowText = "  " + row.displayName + " (0)"
 				rowStyle = styles.DimText
-			case row.approximate:
-				rowText = "  " + row.displayName + " (" + fmt.Sprintf("%d", row.count) + "+)"
-				rowStyle = styles.RowNormal
 			default:
+				// Known count (>0). Approximate-ness for non-zero counts is
+				// signaled via RowNormal style alone; the "+" text marker is
+				// not part of the design-spec rendering and breaks the
+				// integration-test literal-"(<N>)" contract (AS-378).
 				rowText = "  " + row.displayName + " (" + fmt.Sprintf("%d", row.count) + ")"
 				rowStyle = styles.RowNormal
 			}
