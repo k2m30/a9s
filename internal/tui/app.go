@@ -61,6 +61,7 @@ type errorEntry struct {
 // in-flight async results on switch.
 type Model struct {
 	*session.Session // embedded: session-scoped orchestration state
+	core             *runtime.Core // platform-agnostic app core (shares same *session.Session)
 
 	// --- UI shell state ---
 	width  int
@@ -113,8 +114,6 @@ type Model struct {
 
 	noCache bool
 	isDemo  bool // true when running in --demo mode (synthetic clients); controls Wave 2 skip
-
-	core *runtime.Core // platform-agnostic orchestrator; owns fetch execution (PR-05a-h6)
 }
 
 
