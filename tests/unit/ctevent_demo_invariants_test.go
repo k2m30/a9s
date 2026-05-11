@@ -16,7 +16,7 @@ package unit_test
 //
 //	TestCtEventsDemoRightColumnCheckers — G1/G2/G3: demo checker results are
 //	  consistent: IDs with Count>0 must be in demo fixtures; Count=-1+FetchFilter
-//	  must route to KindFilteredList or KindEnterChildView; Root events must
+//	  must route to NavigationKindFilteredList or NavigationKindEnterChildView; Root events must
 //	  return Count=0 for the role checker.
 
 import (
@@ -373,7 +373,7 @@ func isAWSServiceFixture(res resource.Resource) bool {
 //
 //	G1: Count>0 IDs must each exist in the fake resource cache for TargetType.
 //	G2 (Bug C): Count=-1 + non-empty FetchFilter must route via ResolveRelatedNavigate
-//	    to KindFilteredList or KindEnterChildView.
+//	    to NavigationKindFilteredList or NavigationKindEnterChildView.
 //	G3 (Bug A): Root-identity events must return Count=0 for the role checker.
 func TestCtEventsDemoRightColumnCheckers(t *testing.T) {
 	ensureNoColor(t)
@@ -430,7 +430,7 @@ func TestCtEventsDemoRightColumnCheckers(t *testing.T) {
 				}
 
 				// G2 (Bug C): Count=-1 + non-empty FetchFilter must route to
-				// KindFilteredList or KindEnterChildView.
+				// NavigationKindFilteredList or NavigationKindEnterChildView.
 				if result.Count == -1 && len(result.FetchFilter) > 0 {
 					navMsg := runtime.RelatedNavigateEvent{
 						TargetType:  result.TargetType,
@@ -441,7 +441,7 @@ func TestCtEventsDemoRightColumnCheckers(t *testing.T) {
 					case runtime.NavigationKindFilteredList, runtime.NavigationKindEnterChildView:
 						// G2 OK
 					default:
-						t.Errorf("G2 (Bug C) FAIL: Count=-1+FetchFilter routed to %v, want KindFilteredList or KindEnterChildView — %s",
+						t.Errorf("G2 (Bug C) FAIL: Count=-1+FetchFilter routed to %v, want NavigationKindFilteredList or NavigationKindEnterChildView — %s",
 							navResult.Kind, rowLabel)
 					}
 				}
