@@ -51,7 +51,7 @@ import (
 //
 // ct-events is the only type with a registered FilteredPaginatedFetcher.
 // RelatedNavigateMsg{TargetType:"ct-events", FetchFilter:{...}} routes through
-// handleRelatedNavigate → KindFilteredList + FetchFilter branch →
+// handleRelatedNavigate → NavigationKindFilteredList + FetchFilter branch →
 // m.fetchResourcesFiltered("ct-events", filter).
 func TestFetchResourcesFiltered_NilClients_ViaRelatedNavigate(t *testing.T) {
 	withTuiVersion(t, "test")

@@ -7,10 +7,10 @@ package unit
 // EXACTLY what pressing Enter would do in the target type's list view —
 // if the type registers Children[Key="enter"], drill INTO the child view;
 // otherwise open the generic detail view. The slow path (cache miss →
-// KindFilteredList + autoOpenSingleDetail) has been doing this since
+// NavigationKindFilteredList + autoOpenSingleDetail) has been doing this since
 // commit e6dfbc9 via (ResourceListModel).enterChildFor. The fast path
-// (cache hit → KindDetail in navigation_resolve.go + app_related.go) was
-// never updated and silently stranded the operator on the generic detail
+// (cache hit → NavigationKindDetail in internal/runtime/handlers_related.go)
+// was never updated and silently stranded the operator on the generic detail
 // when the target cache was already populated.
 //
 // This test pins the fast-path fix using s3 (Children[Key="enter"] →
@@ -33,7 +33,7 @@ import (
 
 // setupS3ListWithCache primes the root model's resourceCache["s3"] so a
 // subsequent RelatedNavigateMsg with a matching RelatedID will take the
-// KindDetail cache-hit branch.
+// NavigationKindDetail cache-hit branch.
 func setupS3ListWithCache(t *testing.T) (tui.Model, []resource.Resource) {
 	t.Helper()
 
@@ -139,8 +139,8 @@ func TestRelatedNavigate_CacheHit_SingleRelatedID_S3_EntersChildView(t *testing.
 
 // ---------------------------------------------------------------------------
 // Pin: RelatedNavigateMsg with TargetID on s3 (cache hit) also enters child.
-// Covers the TargetID path of the KindDetail branch (navigation_resolve.go
-// line 93) in addition to the single-RelatedID path (line 102).
+// Covers the TargetID path of the NavigationKindDetail branch
+// (internal/runtime/handlers_related.go) in addition to the single-RelatedID path.
 // ---------------------------------------------------------------------------
 
 func TestRelatedNavigate_CacheHit_TargetID_S3_EntersChildView(t *testing.T) {
