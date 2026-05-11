@@ -12,7 +12,7 @@
 // handleCopy, handleRefresh / refreshResourceList, handleReveal,
 // handleIdentityLoaded, and handleIdentityError stay here as TUI-only
 // helpers because every line of their bodies depends on adapter state
-// (view stack, view-typed methods, flashState, m.identity, tea.Cmd
+// (view stack, view-typed methods, flashState, m.Identity, tea.Cmd
 // returns). Their runtime-policy parts (cache-mutation gen bumps,
 // per-type enrichment-rerun bookkeeping) are reads/writes against the
 // embedded *Session — same data the runtime sees through c.session.
@@ -237,7 +237,7 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case runtime.NavigateKindFetchProfiles:
-		if m.preSuppliedClients != nil {
+		if m.PreSuppliedClients != nil {
 			return m, func() tea.Msg {
 				return messages.FlashMsg{
 					Text:    "context switching is disabled in demo mode",
@@ -248,7 +248,7 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		return m, navigateTasksToCmd(m, msg, result, tasks)
 
 	case runtime.NavigateKindPushRegion:
-		if m.preSuppliedClients != nil {
+		if m.PreSuppliedClients != nil {
 			return m, func() tea.Msg {
 				return messages.FlashMsg{
 					Text:    "region switching is disabled in demo mode",
@@ -261,7 +261,7 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		for i, r := range regions {
 			regionCodes[i] = r.Code
 		}
-		rg := views.NewRegion(regionCodes, m.region, m.keys)
+		rg := views.NewRegion(regionCodes, m.Region, m.keys)
 		rg.SetSize(m.innerSize())
 		m.pushView(&rg)
 		return m, nil
@@ -388,7 +388,7 @@ func (m Model) handleCopy() (tea.Model, tea.Cmd) {
 func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	// Main menu: restart availability checks (no-op in no-cache mode).
 	if _, ok := m.activeView().(*views.MainMenuModel); ok {
-		if m.noCache {
+		if m.NoCache {
 			return m, nil
 		}
 		// Increment gen to cancel any in-flight probes and enrichment.
@@ -432,8 +432,8 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		// replace the slot here.
 		if rt == "ses" {
 			m.RuleSets = session.NewRuleSetStore()
-			if m.clients != nil {
-				m.clients.SetRuleSets(m.RuleSets)
+			if m.Clients != nil {
+				m.Clients.SetRuleSets(m.RuleSets)
 			}
 		}
 		m.flash = flashState{text: "Refreshing...", isError: false, active: true}
@@ -480,8 +480,8 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		// Swap (see detail-view path above): protects against in-flight blocked
 		// DescribeActiveReceiptRuleSet fetchers re-poisoning the cache.
 		m.RuleSets = session.NewRuleSetStore()
-		if m.clients != nil {
-			m.clients.SetRuleSets(m.RuleSets)
+		if m.Clients != nil {
+			m.Clients.SetRuleSets(m.RuleSets)
 		}
 	}
 	m.flash = flashState{text: "Refreshing...", isError: false, active: true}
@@ -559,12 +559,12 @@ func (m Model) handleReveal() (tea.Model, tea.Cmd) {
 }
 
 // handleIdentityLoaded caches the identity and updates the identity view if
-// active. Adapter-side because m.identity / m.identityFetching live on the
+// active. Adapter-side because m.Identity / m.IdentityFetching live on the
 // TUI Model today.
 func (m Model) handleIdentityLoaded(msg messages.IdentityLoadedMsg) (tea.Model, tea.Cmd) {
-	m.identityFetching = false
+	m.IdentityFetching = false
 	if id, ok := msg.Identity.(*awsclient.CallerIdentity); ok {
-		m.identity = id
+		m.Identity = id
 	}
 	if idView, ok := m.activeView().(*views.IdentityModel); ok {
 		data := m.identityToViewData()
@@ -576,7 +576,7 @@ func (m Model) handleIdentityLoaded(msg messages.IdentityLoadedMsg) (tea.Model, 
 // handleIdentityError clears the fetching flag and updates the identity view
 // if active. Adapter-side for the same reason as handleIdentityLoaded.
 func (m Model) handleIdentityError(msg messages.IdentityErrorMsg) (tea.Model, tea.Cmd) {
-	m.identityFetching = false
+	m.IdentityFetching = false
 	if idView, ok := m.activeView().(*views.IdentityModel); ok {
 		idView.SetError(msg.Err)
 	}
