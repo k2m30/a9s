@@ -376,26 +376,38 @@ func TestIsActionableRow_HasActionableRows_DefiniteZero_BlocksFocus(t *testing.T
 // Render-level smoke tests
 // ---------------------------------------------------------------------------
 
-// TestIsActionableRow_ApproxZero_ViewShape verifies "(0+)" suffix rendering.
-//   - Part 1: approximate-zero row must show "(0+)" (PASSES NOW).
-//   - Part 2: after focus via loading state, "(0+)" must still appear in focused view.
+// TestIsActionableRow_ApproxZero_ViewShape verifies the "(0)" suffix
+// rendering for approximate-zero rows. Per AS-378, the renderer collapses
+// "(0+)" → "(0)" so the integration test (which asserts the literal
+// substring `"<Pivot> (<N>)"` for every count >= 0) is satisfied and the
+// design-spec table (`docs/design/related-resources.md §5.3`) stays the
+// SSOT. Approximate-ness is signaled via the RowNormal style (vs DimText
+// for confirmed-zero), and navigability is preserved by isActionableRow,
+// not by the text suffix.
+//   - Part 1: approximate-zero row renders as "Target Groups (0)" without
+//     the "+" marker.
+//   - Part 2: after focus transition via loading state, the same "(0)"
+//     suffix is present.
 func TestIsActionableRow_ApproxZero_ViewShape(t *testing.T) {
 	ensureNoColor(t)
 
-	// --- Part 1: (0+) present in unfocused view ---
+	// --- Part 1: (0) present in unfocused view, "(0+)" must be absent ---
 	d, cleanup := buildApproxDetail(t)
 	defer cleanup()
 
 	d = injectApproxResult(d, 0, true, nil, nil)
 	plain := stripAnsi(d.View())
-	if !strings.Contains(plain, "(0+)") {
-		t.Errorf("approximate-zero row must render as 'Target Groups (0+)' in View(); got:\n%s", plain)
+	if !strings.Contains(plain, "(0)") {
+		t.Errorf("approximate-zero row must render as 'Target Groups (0)' in View(); got:\n%s", plain)
+	}
+	if strings.Contains(plain, "(0+)") {
+		t.Errorf("approximate-zero row must NOT render the '+' marker after AS-378; got:\n%s", plain)
 	}
 	if !strings.Contains(plain, "Target Groups") {
 		t.Errorf("approximate-zero row display name 'Target Groups' missing from View(); got:\n%s", plain)
 	}
 
-	// --- Part 2: (0+) present after focus transition via loading state ---
+	// --- Part 2: (0) present after focus transition via loading state ---
 	d2, cleanup2 := buildApproxDetail(t)
 	defer cleanup2()
 
@@ -403,8 +415,11 @@ func TestIsActionableRow_ApproxZero_ViewShape(t *testing.T) {
 	d2 = injectApproxResult(d2, 0, true, nil, nil)
 
 	plain2 := stripAnsi(d2.View())
-	if !strings.Contains(plain2, "(0+)") {
-		t.Errorf("approximate-zero row must still show '(0+)' when right column is focused; got:\n%s", plain2)
+	if !strings.Contains(plain2, "(0)") {
+		t.Errorf("approximate-zero row must still show '(0)' when right column is focused; got:\n%s", plain2)
+	}
+	if strings.Contains(plain2, "(0+)") {
+		t.Errorf("approximate-zero row must NOT render '(0+)' when focused after AS-378; got:\n%s", plain2)
 	}
 }
 
