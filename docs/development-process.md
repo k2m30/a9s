@@ -230,11 +230,16 @@ For pure docs changes (`*.md`, `docs/`, `website/`, `specs/`, `.claude/`, `LICEN
 ### Stage 6.5 — Post-merge real-AWS validation
 
 - **Owner**: **E2ETester**.
-- **Trigger**: Any merge to `main` that touches `internal/aws/`, fetchers, child views, related-resource pivots, or fixtures. Skipped for pure-docs and pure-tooling changes.
-- **Action**: Run the integration suite against a real AWS profile (`A9S_CT_PROFILE=<profile>`), exercise the changed surface (golden-path: list → detail → child view → related view), and capture pass/fail per scenario. File a P1 incident issue (assignee CTO) if any real-AWS scenario regresses.
+- **Trigger** — fires when **any** of the following holds:
+  1. **Per-PR (surface trigger)**: a merge to `main` touches `internal/aws/`, fetchers, child views, related-resource pivots, or fixtures. Skipped for pure-docs and pure-tooling changes.
+  2. **Phase-boundary (batch trigger)**: at least **3 PRs** have merged in an in-flight refactor program (a `docs/refactor/<phase>.md` cluster, or any multi-PR program tracked by a parent issue) since the last Stage 6.5 sign-off on `main`, *regardless of whether they touch `internal/aws/`*. The CTO MUST dispatch a batch real-AWS pass before opening the next phase. Precedent: [AS-133](/AS/issues/AS-133) (Phase-03 batch, 2026-05-10) and [AS-79](/AS/issues/AS-79) (Phase-04 batch). The phase-boundary rule was codified in [AS-363](/AS/issues/AS-363) after CAE-1 4×'d merge throughput exposed that mocks cannot fully cover large refactor surfaces (runtime extraction, session ownership migrations) even when no individual PR touches `internal/aws/`.
+- **Action**: Run the integration suite against a real AWS profile (`A9S_CT_PROFILE=<profile>`), exercise the changed surface (golden-path: list → detail → child view → related view) across ≥ 4 distinct resource types when triggered by the phase-boundary rule, and capture pass/fail per scenario. File a P1 incident issue (assignee CTO) if any real-AWS scenario regresses.
 - **Tools the E2ETester invokes**: `a9s-bug-hunt-real-profile` skill, the integration test binaries under `tests/integration/`.
 - **Exit**: All real-AWS scenarios green, or an incident issue exists with the regression scoped and a follow-up Coder issue created.
-- **Anti-pattern**: Treating Stage 6 (`make ready-to-push`) as sufficient for changes that depend on real AWS API behavior.
+- **Anti-patterns**:
+  - Treating Stage 6 (`make ready-to-push`) as sufficient for changes that depend on real AWS API behavior.
+  - **Over-correcting to per-PR real-AWS** for refactor moves that do not touch `internal/aws/`. The phase-boundary rule is the batch trigger, not "every PR". Per-PR Stage 6.5 for pure-runtime-move PRs is wasteful and slows the loop.
+  - Letting `lastHeartbeatAt` for E2ETester drift > 48h while merges to `main` continue. The CAE-1 routine (routineId `4077ee95-6caa-402f-b156-34052fc19e5f`) carries a standing detection check for this gap; see [AS-363](/AS/issues/AS-363) AC3 and CTO `AGENTS.md` §"CAE-1 Heartbeat Scan".
 
 ### Stage 7 — Merge & Release
 
@@ -275,7 +280,7 @@ Every "Primary" cell holds a **Paperclip agent name**. The "Tools" column lists 
 | 4 Impl | Coder | — | — | `a9s-coder`, `a9s-integrator`, `a9s-fixtures` |
 | 5 Review | (parallel reviewers below) | — | CodeReviewer, CodexReviewer, Architect (≥M), CTO (final), CodeRabbit (external) | `a9s-tui-reviewer`, `a9s-consistency-checker`, `test-coverage-analyzer`, `a9s-security-auditor`, `a9s-docs-reviewer`, `tui-ux-auditor`, `a9s-arch-review` |
 | 6 Validate | (whoever pushes — usually Coder) | — | — | `make ready-to-push` |
-| 6.5 Post-merge AWS | E2ETester | — | CTO (incident triage) | `a9s-bug-hunt-real-profile`, `tests/integration/` |
+| 6.5 Post-merge AWS *(per-PR surface trigger OR phase-boundary batch — see §Stage 6.5)* | E2ETester | — | CTO (incident triage) | `a9s-bug-hunt-real-profile`, `tests/integration/` |
 | 7 Release | CTO | E2ETester (real-AWS sign-off) | CTO | `a9s-release-validator`, `release.md` skill |
 | 8 Retro | CTO | — | — | — |
 
