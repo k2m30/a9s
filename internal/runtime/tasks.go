@@ -3,6 +3,8 @@ package runtime
 import (
 	"context"
 	"time"
+
+	"github.com/k2m30/a9s/v3/internal/tui/messages"
 )
 
 // TaskKind names a family of background tasks ("enrich", "related",
@@ -22,6 +24,44 @@ const (
 	// TaskKindSaveCache asks the adapter to persist the current availability
 	// state to disk. TaskKey.Scope is empty.
 	TaskKindSaveCache TaskKind = "save-cache"
+
+	// TaskKindConnect asks the adapter to start an AWS connect attempt for the
+	// profile/region carried by ConnectPayload, tagged with the current
+	// session ConnectGen so a slow-arriving ClientsReadyMsg can be rejected
+	// when the user switches again before this one returns.
+	TaskKindConnect TaskKind = "connect"
+
+	// TaskKindFetchIdentity asks the adapter to fetch the caller-identity
+	// record for the current session and dispatch it back as an
+	// IdentityLoadedMsg.
+	TaskKindFetchIdentity TaskKind = "fetch-identity"
+
+	// TaskKindLoadAvailCache asks the adapter to load the on-disk availability
+	// cache for the current profile/region and dispatch the result back as
+	// AvailabilityCacheLoadedMsg.
+	TaskKindLoadAvailCache TaskKind = "load-avail-cache"
+
+	// TaskKindDemoPrefetchCounts asks the adapter to run the demo-mode
+	// synchronous prefetch that emits AvailabilityPrefetchedMsg. Used in
+	// --no-cache and --demo paths to avoid the async probe pipeline.
+	TaskKindDemoPrefetchCounts TaskKind = "demo-prefetch-counts"
+
+	// TaskKindFlashTick asks the adapter to schedule a ClearFlashMsg dispatch
+	// after FlashTickPayload.Duration. The payload's Gen is the flash gen the
+	// scheduled dispatch should reference so a stale tick is rejected.
+	TaskKindFlashTick TaskKind = "flash-tick"
+
+	// TaskKindEmitNavigate asks the adapter to dispatch a one-shot
+	// NavigateMsg derived from the -c CLI flag. Used by HandleClientsReady
+	// on first connect when Command is set and the user is still on the
+	// main menu.
+	TaskKindEmitNavigate TaskKind = "emit-navigate"
+
+	// TaskKindEmitAPIError asks the adapter to dispatch a messages.APIErrorMsg
+	// back through the input pipeline, used by HandleClientsReady's
+	// impossible "wrong concrete type on ClientsReadyMsg.Clients" branch to
+	// route the error through HandleAPIError's classification flow.
+	TaskKindEmitAPIError TaskKind = "emit-api-error"
 )
 
 // TaskKey uniquely identifies one background task. Scope is kind-specific
@@ -98,3 +138,66 @@ type TaskRequest struct {
 	Cache   CachePolicy
 	Payload TaskPayload
 }
+
+// ConnectPayload carries the profile/region/gen the adapter must use when
+// starting an AWS connect attempt. The gen is captured at dispatch time so
+// the resulting ClientsReadyMsg can be rejected by the gen guard if the
+// user switches again before the connect returns.
+type ConnectPayload struct {
+	Profile string
+	Region  string
+	Gen     int
+}
+
+func (ConnectPayload) isTaskPayload() {}
+
+// FetchIdentityPayload carries no fields — fetching the caller identity
+// reads directly from the live session.Session via the adapter. The empty
+// struct exists so the runtime can request the task via the typed
+// TaskRequest contract instead of an opaque TaskKey alone.
+type FetchIdentityPayload struct{}
+
+func (FetchIdentityPayload) isTaskPayload() {}
+
+// LoadAvailCachePayload carries no fields — the adapter resolves the
+// on-disk cache path from the live session profile/region.
+type LoadAvailCachePayload struct{}
+
+func (LoadAvailCachePayload) isTaskPayload() {}
+
+// DemoPrefetchCountsPayload carries no fields — the adapter runs the demo
+// fixture prefetch using its retained PreSuppliedClients reference.
+type DemoPrefetchCountsPayload struct{}
+
+func (DemoPrefetchCountsPayload) isTaskPayload() {}
+
+// FlashTickPayload carries the duration the adapter should sleep before
+// emitting a ClearFlashMsg, and the flash gen that ClearFlashMsg should
+// reference. The runtime owns the gen (computed at dispatch time) so the
+// stale-clear guard works the same as it did before extraction.
+type FlashTickPayload struct {
+	Gen      int
+	Duration time.Duration
+}
+
+func (FlashTickPayload) isTaskPayload() {}
+
+// EmitNavigatePayload carries the one-shot navigation the adapter must
+// dispatch as messages.NavigateMsg on first successful connect, derived
+// from the -c / Command field on the session. Target is the typed
+// ViewTarget the renderer uses for its dispatch.
+type EmitNavigatePayload struct {
+	Target       messages.ViewTarget
+	ResourceType string
+}
+
+func (EmitNavigatePayload) isTaskPayload() {}
+
+// EmitAPIErrorPayload carries the error the adapter must dispatch as
+// messages.APIErrorMsg. Used by HandleClientsReady's impossible
+// "wrong concrete type on Clients" branch.
+type EmitAPIErrorPayload struct {
+	Err error
+}
+
+func (EmitAPIErrorPayload) isTaskPayload() {}

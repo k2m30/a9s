@@ -13,7 +13,7 @@
 // ── Red-light expectations (before PR-03a-fold) ─────────────────────────────
 //
 //	Test 1/ProbeResources: fails because the handler's "all-enrichment-done"
-//	    cleanup (m.EnrichChecked >= m.EnrichTotal → m.ProbeResources = nil) runs
+//	    cleanup (m.Session.EnrichChecked >= m.Session.EnrichTotal → m.Session.ProbeResources = nil) runs
 //	    before the test can inspect the cache. After fold, applyEnrichment
 //	    must run BEFORE cleanup AND tests seed EnrichTotal=2 to keep ProbeResources
 //	    alive for inspection. Without EnrichTotal=2, this subtest ALWAYS fails.
@@ -132,7 +132,7 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 		t.Run(tc.name+"/ResourceCache", func(t *testing.T) {
 			m := newShimModel()
 
-			m.ResourceCache[tc.canonShort] = &session.ResourceCacheEntry{
+			m.Session.ResourceCache[tc.canonShort] = &session.ResourceCacheEntry{
 				Resources: []resource.Resource{
 					{ID: rid, Name: "test-" + tc.canonShort, Status: "running"},
 				},
@@ -145,7 +145,7 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 				TypeGen:      0,
 			})
 
-			entry, ok := m.ResourceCache[tc.canonShort]
+			entry, ok := m.Session.ResourceCache[tc.canonShort]
 			if !ok || len(entry.Resources) == 0 {
 				t.Fatalf("ResourceCache[%q] is empty after EnrichmentCheckedMsg", tc.canonShort)
 			}
@@ -185,7 +185,7 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 		t.Run(tc.name+"/LazyResourceCache", func(t *testing.T) {
 			m := newShimModel()
 
-			m.LazyResourceCache[tc.canonShort] = []resource.Resource{
+			m.Session.LazyResourceCache[tc.canonShort] = []resource.Resource{
 				{ID: rid, Name: "lazy-" + tc.canonShort, Status: "running"},
 			}
 
@@ -196,7 +196,7 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 				TypeGen:      0,
 			})
 
-			lazySlice, ok := m.LazyResourceCache[tc.canonShort]
+			lazySlice, ok := m.Session.LazyResourceCache[tc.canonShort]
 			if !ok || len(lazySlice) == 0 {
 				t.Fatalf("LazyResourceCache[%q] is empty after EnrichmentCheckedMsg", tc.canonShort)
 			}
@@ -215,19 +215,19 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 			m := newShimModel()
 
 			// Prevent the "all enrichment done" cleanup path (app_handlers_availability.go:
-			// if m.EnrichChecked >= m.EnrichTotal { m.ProbeResources = nil }).
+			// if m.Session.EnrichChecked >= m.Session.EnrichTotal { m.Session.ProbeResources = nil }).
 			// After EnrichChecked++ fires (0→1), we need 1 < EnrichTotal to avoid
 			// the cleanup so ProbeResources remains inspectable. Setting EnrichTotal=2
 			// simulates "one type still pending", keeping the cache alive.
-			m.EnrichTotal = 2
+			m.Session.EnrichTotal = 2
 
 			// ProbeResources is initialized via AvailabilityCheckedMsg in real usage,
 			// but for the fold test we set it directly — the fold must walk ProbeResources
 			// just as it walks the other two caches.
-			if m.ProbeResources == nil {
-				m.ProbeResources = make(map[string][]resource.Resource)
+			if m.Session.ProbeResources == nil {
+				m.Session.ProbeResources = make(map[string][]resource.Resource)
 			}
-			m.ProbeResources[tc.canonShort] = []resource.Resource{
+			m.Session.ProbeResources[tc.canonShort] = []resource.Resource{
 				{ID: rid, Name: "probe-" + tc.canonShort, Status: "running"},
 			}
 
@@ -238,7 +238,7 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 				TypeGen:      0,
 			})
 
-			probeSlice, ok := m.ProbeResources[tc.canonShort]
+			probeSlice, ok := m.Session.ProbeResources[tc.canonShort]
 			if !ok || len(probeSlice) == 0 {
 				t.Fatalf("ProbeResources[%q] is empty after EnrichmentCheckedMsg (fold path must update ProbeResources before cleanup)", tc.canonShort)
 			}
@@ -314,7 +314,7 @@ func TestFold_RepeatedEnrichmentReplacesWave2(t *testing.T) {
 			}
 
 			m := newShimModel()
-			m.ResourceCache[tc.canonShort] = &session.ResourceCacheEntry{
+			m.Session.ResourceCache[tc.canonShort] = &session.ResourceCacheEntry{
 				Resources: []resource.Resource{
 					{ID: rid, Name: "test-" + tc.canonShort, Status: "impaired"},
 				},
@@ -336,7 +336,7 @@ func TestFold_RepeatedEnrichmentReplacesWave2(t *testing.T) {
 				TypeGen:      0,
 			})
 
-			entry, ok := m.ResourceCache[tc.canonShort]
+			entry, ok := m.Session.ResourceCache[tc.canonShort]
 			if !ok || len(entry.Resources) == 0 {
 				t.Fatalf("ResourceCache[%q] is empty", tc.canonShort)
 			}
@@ -424,7 +424,7 @@ func TestFold_EmptyEnrichmentClearsWave2(t *testing.T) {
 			}
 
 			m := newShimModel()
-			m.ResourceCache[tc.canonShort] = &session.ResourceCacheEntry{
+			m.Session.ResourceCache[tc.canonShort] = &session.ResourceCacheEntry{
 				Resources: []resource.Resource{
 					{ID: rid, Name: "test-" + tc.canonShort, Status: "impaired"},
 				},
@@ -440,7 +440,7 @@ func TestFold_EmptyEnrichmentClearsWave2(t *testing.T) {
 
 			// Verify wave2 was set before clearing.
 			{
-				entry := m.ResourceCache[tc.canonShort]
+				entry := m.Session.ResourceCache[tc.canonShort]
 				if entry == nil || len(entry.Resources) == 0 {
 					t.Fatalf("ResourceCache[%q] empty after initial enrichment", tc.canonShort)
 				}
@@ -464,7 +464,7 @@ func TestFold_EmptyEnrichmentClearsWave2(t *testing.T) {
 				TypeGen:      0,
 			})
 
-			entry, ok := m.ResourceCache[tc.canonShort]
+			entry, ok := m.Session.ResourceCache[tc.canonShort]
 			if !ok || len(entry.Resources) == 0 {
 				t.Fatalf("ResourceCache[%q] is empty after empty EnrichmentCheckedMsg", tc.canonShort)
 			}
@@ -526,7 +526,7 @@ func TestFold_EnrichmentFindingsFieldDeleted(t *testing.T) {
 //
 // The pre-fix bug (PR #310 CodeRabbit finding A):
 //
-//	handleRefresh calls delete(m.ResourceCache[rt]) BEFORE applyEnrichment(rt, nil).
+//	handleRefresh calls delete(m.Session.ResourceCache[rt]) BEFORE applyEnrichment(rt, nil).
 //	applyEnrichment walks ResourceCache[rt] to find rows to clear — but the entry
 //	was just deleted, so it finds nothing. The ResourceListModel was constructed
 //	from entry.Resources when NavigateMsg was handled; the rl's internal slice
@@ -560,7 +560,7 @@ func TestFold_CtrlROnList_ClearsActiveRowFindings(t *testing.T) {
 
 	// Step 1: seed ResourceCache so NavigateMsg gets a cache hit and creates
 	// a ResourceListModel holding this slice.
-	m.ResourceCache["ec2"] = &session.ResourceCacheEntry{
+	m.Session.ResourceCache["ec2"] = &session.ResourceCacheEntry{
 		Resources: []resource.Resource{
 			{ID: rid, Name: "test-ec2", Status: "running"},
 		},
@@ -602,7 +602,7 @@ func TestFold_CtrlROnList_ClearsActiveRowFindings(t *testing.T) {
 
 	// Assertion: after Ctrl+R, no wave2 entry should remain on the rows
 	// visible in the active ResourceListModel. The fix requires applyEnrichment
-	// to run BEFORE delete(m.ResourceCache[rt]), so that rl's internal slice
+	// to run BEFORE delete(m.Session.ResourceCache[rt]), so that rl's internal slice
 	// has its wave2 findings cleared before the cache entry is removed.
 	postResources := m.ActiveListResources()
 	if len(postResources) == 0 {
@@ -614,7 +614,7 @@ func TestFold_CtrlROnList_ClearsActiveRowFindings(t *testing.T) {
 			if f.Source == wantSource {
 				t.Errorf(
 					"resource %q still has stale wave2 finding after Ctrl+R: Source=%q Phrase=%q; "+
-						"fix: call applyEnrichment(rt, nil) BEFORE delete(m.ResourceCache[rt]) in handleRefresh",
+						"fix: call applyEnrichment(rt, nil) BEFORE delete(m.Session.ResourceCache[rt]) in handleRefresh",
 					r.ID, f.Source, f.Phrase,
 				)
 			}
@@ -631,7 +631,7 @@ func TestFold_CtrlROnList_ClearsActiveRowFindings(t *testing.T) {
 // The pre-fix bug (PR #310 CodeRabbit finding B):
 //
 //	handleRefresh on the main-menu path resets side maps (ProbeResources,
-//	EnrichmentRan, etc.) but never touches m.ResourceCache. Rows in ResourceCache
+//	EnrichmentRan, etc.) but never touches m.Session.ResourceCache. Rows in ResourceCache
 //	retain stale r.Findings from the previous enrichment wave. When the user
 //	navigates back to a list, they see stale wave2 markers until a fresh
 //	EnrichmentCheckedMsg arrives and overwrites them.
@@ -664,12 +664,12 @@ func TestFold_MainMenuCtrlR_ClearsAllCachedWave2(t *testing.T) {
 	m = shimApplyMsg(m, messages.ClientsReadyMsg{Clients: nil})
 
 	// Step 1: seed ResourceCache for ec2 and s3 with running resources.
-	m.ResourceCache[ec2Short] = &session.ResourceCacheEntry{
+	m.Session.ResourceCache[ec2Short] = &session.ResourceCacheEntry{
 		Resources: []resource.Resource{
 			{ID: ec2ID, Name: "test-ec2", Status: "running"},
 		},
 	}
-	m.ResourceCache[s3Short] = &session.ResourceCacheEntry{
+	m.Session.ResourceCache[s3Short] = &session.ResourceCacheEntry{
 		Resources: []resource.Resource{
 			{ID: s3ID, Name: "test-bucket", Status: "running"},
 		},
@@ -698,7 +698,7 @@ func TestFold_MainMenuCtrlR_ClearsAllCachedWave2(t *testing.T) {
 		{ec2Short, ec2ID, "wave2:" + ec2Short},
 		{s3Short, s3ID, "wave2:" + s3Short},
 	} {
-		entry, ok := m.ResourceCache[tc.short]
+		entry, ok := m.Session.ResourceCache[tc.short]
 		if !ok || len(entry.Resources) == 0 {
 			t.Fatalf("pre-Ctrl+R: ResourceCache[%q] empty — enrichment not wired", tc.short)
 		}
@@ -728,7 +728,7 @@ func TestFold_MainMenuCtrlR_ClearsAllCachedWave2(t *testing.T) {
 		{ec2Short, "wave2:" + ec2Short},
 		{s3Short, "wave2:" + s3Short},
 	} {
-		entry, ok := m.ResourceCache[tc.short]
+		entry, ok := m.Session.ResourceCache[tc.short]
 		if !ok {
 			// Cache entry deleted on Ctrl+R is also acceptable — no stale wave2.
 			continue
@@ -824,7 +824,7 @@ func TestFold_AttentionDetailsCarryAcrossEntryPoints(t *testing.T) {
 
 			// Verify entry-point wave1 was set (shim site #4 must be wired for this to hold).
 			{
-				entry := m.ResourceCache[tc.canonShort]
+				entry := m.Session.ResourceCache[tc.canonShort]
 				if entry == nil || len(entry.Resources) == 0 {
 					t.Fatalf("ResourceCache[%q] empty after RelatedCheckResultMsg — site 4 shim not wired", tc.canonShort)
 				}
@@ -841,7 +841,7 @@ func TestFold_AttentionDetailsCarryAcrossEntryPoints(t *testing.T) {
 				TypeGen:      0,
 			})
 
-			entry, ok := m.ResourceCache[tc.canonShort]
+			entry, ok := m.Session.ResourceCache[tc.canonShort]
 			if !ok || len(entry.Resources) == 0 {
 				t.Fatalf("ResourceCache[%q] is empty after EnrichmentCheckedMsg", tc.canonShort)
 			}
