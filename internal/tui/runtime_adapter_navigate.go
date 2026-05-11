@@ -554,7 +554,8 @@ func (m Model) handleReveal() (tea.Model, tea.Cmd) {
 	if r == nil {
 		return m, nil
 	}
-	return m, m.fetchRevealValue(rt, r.ID)
+	cmd := m.fetchRevealValue(rt, r.ID)
+	return m, cmd
 }
 
 // handleIdentityLoaded caches the identity and updates the identity view if
