@@ -3,6 +3,7 @@ package session_test
 import (
 	"testing"
 
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/session"
 )
@@ -173,6 +174,99 @@ func TestSession_Rotate_ResetsQueueState(t *testing.T) {
 	}
 	if s.ProbeTruncated != nil {
 		t.Errorf("ProbeTruncated after Rotate() = %v, want nil", s.ProbeTruncated)
+	}
+}
+
+// TestSession_Rotate_ConnectGenAndIdentityLatches pins the PR-05a-h2 contract
+// for the lifecycle fields that Rotate() OWNS: ConnectGen must increment by
+// exactly 1, and Identity / IdentityFetching / PendingRefresh / HasPrevState /
+// PrevProfile / PrevRegion must all be zeroed.
+//
+// Without this test a future regression that forgets to bump ConnectGen would
+// allow a pre-switch ClientsReadyMsg to be accepted as fresh after a profile
+// switch, and a regression that fails to clear Identity / IdentityFetching
+// would leak the previous account's caller identity into the new session.
+func TestSession_Rotate_ConnectGenAndIdentityLatches(t *testing.T) {
+	t.Parallel()
+
+	s := session.New()
+
+	// Seed the latches with non-zero values from a fictional pre-switch state.
+	s.ConnectGen = 5
+	s.Identity = &awsclient.CallerIdentity{AccountID: "111122223333"}
+	s.IdentityFetching = true
+	s.PendingRefresh = true
+	s.HasPrevState = true
+	s.PrevProfile = "old-profile"
+	s.PrevRegion = "us-east-1"
+
+	s.Rotate()
+
+	if s.ConnectGen != 6 {
+		t.Errorf("ConnectGen after Rotate() = %d, want 6", s.ConnectGen)
+	}
+	if s.Identity != nil {
+		t.Errorf("Identity after Rotate() = %+v, want nil — pre-switch identity must not leak", s.Identity)
+	}
+	if s.IdentityFetching {
+		t.Error("IdentityFetching after Rotate() = true, want false — in-flight latch must be cleared")
+	}
+	if s.PendingRefresh {
+		t.Error("PendingRefresh after Rotate() = true, want false")
+	}
+	if s.HasPrevState {
+		t.Error("HasPrevState after Rotate() = true, want false — rollback latch must be cleared so the caller can re-seed it")
+	}
+	if s.PrevProfile != "" {
+		t.Errorf("PrevProfile after Rotate() = %q, want \"\"", s.PrevProfile)
+	}
+	if s.PrevRegion != "" {
+		t.Errorf("PrevRegion after Rotate() = %q, want \"\"", s.PrevRegion)
+	}
+}
+
+// TestSession_Rotate_PreservesProfileRegionClientsCommandNoCache pins the
+// PR-05a-h2 preserve-list contract. Rotate() MUST NOT touch Profile, Region,
+// Clients, PreSuppliedClients, Command, or NoCache — the caller
+// (handleProfileSelected / handleRegionSelected / cmd/a9s/main.go bootstrap)
+// owns those fields and writes the next target into Profile/Region
+// immediately after Rotate. Clearing them inside Rotate would either drop the
+// just-written target or silently undo bootstrap state (e.g. demo --clients).
+func TestSession_Rotate_PreservesProfileRegionClientsCommandNoCache(t *testing.T) {
+	t.Parallel()
+
+	s := session.New()
+
+	// Seed the preserve-list. Use distinguishable values so a regression that
+	// zeros them is obvious in the test output.
+	preClients := &awsclient.ServiceClients{}
+	preSupplied := &awsclient.ServiceClients{}
+	s.Profile = "dev-account"
+	s.Region = "eu-central-1"
+	s.Clients = preClients
+	s.PreSuppliedClients = preSupplied
+	s.Command = "ec2"
+	s.NoCache = true
+
+	s.Rotate()
+
+	if s.Profile != "dev-account" {
+		t.Errorf("Profile after Rotate() = %q, want %q (preserve-list)", s.Profile, "dev-account")
+	}
+	if s.Region != "eu-central-1" {
+		t.Errorf("Region after Rotate() = %q, want %q (preserve-list)", s.Region, "eu-central-1")
+	}
+	if s.Clients != preClients {
+		t.Errorf("Clients after Rotate() = %p, want %p (preserve-list — caller swaps after reconnect)", s.Clients, preClients)
+	}
+	if s.PreSuppliedClients != preSupplied {
+		t.Errorf("PreSuppliedClients after Rotate() = %p, want %p (preserve-list — demo/test bootstrap channel)", s.PreSuppliedClients, preSupplied)
+	}
+	if s.Command != "ec2" {
+		t.Errorf("Command after Rotate() = %q, want %q (preserve-list — one-shot CLI -c flag)", s.Command, "ec2")
+	}
+	if !s.NoCache {
+		t.Error("NoCache after Rotate() = false, want true (preserve-list — CLI --no-cache flag)")
 	}
 }
 

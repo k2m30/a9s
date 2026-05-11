@@ -69,11 +69,11 @@ func TestProbeEnrichment_CacheSnapshotMergesProbeResources(t *testing.T) {
 	// (m.core.ProbeEnrichment) sees the seeded ProbeResources without a nil
 	// receiver panic.
 	sess := session.New()
+	sess.Clients = &awsclient.ServiceClients{} // non-nil so closure passes the nil-check
 	m := &Model{
 		Session: sess,
 		core:    runtime.New(sess, catalog.ResourceTypes),
 		appCtx:  context.Background(),
-		clients: &awsclient.ServiceClients{}, // non-nil so closure passes the nil-check
 	}
 	m.ProbeResources = map[string][]resource.Resource{
 		"dbi": {

@@ -19,7 +19,7 @@
 //     fields without parsing TaskKey.Scope or accepting side-channel
 //     arguments. The closure builder stays in the adapter because it
 //     returns tea.Cmd and reads adapter-owned state (m.appCtx,
-//     m.clients, the embedded session's EnrichGen and PolicyDocCache)
+//     m.Clients, the embedded session's EnrichGen and PolicyDocCache)
 //     that has not yet migrated to the runtime core.
 package tui
 
@@ -112,7 +112,7 @@ func (m Model) enrichDetailCmd(p runtime.EnrichDetailPayload) tea.Cmd {
 	enricher := resource.GetDetailEnricher(p.ResourceType)
 	gen := m.EnrichGen             // session-owned, promoted via embedded *Session
 	policyDocs := m.PolicyDocCache // session-owned, promoted via embedded *Session
-	clients := m.clients
+	clients := m.Clients
 	appCtx := m.appCtx
 	dctx := &awsclient.DetailEnrichmentCtx{
 		Clients:    clients,
