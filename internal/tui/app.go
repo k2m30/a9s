@@ -59,16 +59,12 @@ type errorEntry struct {
 // handleProfileSelected / handleRegionSelected call m.Rotate() to invalidate
 // in-flight async results on switch.
 type Model struct {
-	*session.Session // embedded: session-scoped orchestration state
+	*session.Session               // embedded: session-scoped orchestration state (incl. Profile, Region, Clients, Identity, ConnectGen, etc. after PR-05a-h2)
 	core             *runtime.Core // platform-agnostic app core (shares same *session.Session)
 
 	// --- UI shell state ---
 	width  int
 	height int
-
-	profile string
-	region  string
-	clients *awsclient.ServiceClients
 
 	appCtx    context.Context
 	appCancel context.CancelFunc
@@ -90,45 +86,32 @@ type Model struct {
 	tabMatches []string
 	tabIndex   int
 
-	keys           keys.Map
-	viewConfig     *config.ViewsConfig
-	pendingRefresh bool   // set after profile/region switch to refresh on ClientsReadyMsg
-	connectGen     int    // incremented on profile/region switch; stale ClientsReadyMsg ignored
-	hasPrevState   bool   // true while prevProfile/prevRegion hold the rollback target
-	prevProfile    string // last stable profile before any in-flight switch, restored on failure
-	prevRegion     string // last stable region before any in-flight switch, restored on failure
-	configErr      error  // non-nil if views config was found but corrupt
-	activeTheme    string // current theme filename (for selector "(current)" indicator)
-	command        string // initial resource short name to navigate to on first ClientsReadyMsg (from -c flag)
-
-	identity         *awsclient.CallerIdentity
-	identityFetching bool
+	keys        keys.Map
+	viewConfig  *config.ViewsConfig
+	configErr   error  // non-nil if views config was found but corrupt
+	activeTheme string // current theme filename (for selector "(current)" indicator)
 
 	// headerCache avoids re-computing the header string every render when
 	// profile, region, version, and right-side content haven't changed.
 	headerCache    string
 	headerCacheKey string
 
-	preSuppliedClients *awsclient.ServiceClients
-
-	noCache bool
-	isDemo  bool // true when running in --demo mode (synthetic clients); controls Wave 2 skip
+	isDemo bool // true when running in --demo mode (synthetic clients); controls Wave 2 skip
 }
-
 
 // Option configures the root Model.
 type Option func(*Model)
 
-// WithProfile overrides the profile field on the model. Used in tests that need
+// WithProfile overrides the profile field on the session. Used in tests that need
 // a specific profile string without going through the live AWS bootstrap path.
 func WithProfile(profile string) Option {
-	return func(m *Model) { m.profile = profile }
+	return func(m *Model) { m.Profile = profile }
 }
 
-// WithRegion overrides the region field on the model. Used in tests that need
+// WithRegion overrides the region field on the session. Used in tests that need
 // a specific region string without going through the live AWS bootstrap path.
 func WithRegion(region string) Option {
-	return func(m *Model) { m.region = region }
+	return func(m *Model) { m.Region = region }
 }
 
 // WithIsDemo marks the session as demo mode, which skips Wave 2 enrichment.
@@ -143,7 +126,7 @@ func WithIsDemo(demo bool) Option {
 // WithNoCache disables resource availability caching and background checks.
 func WithNoCache(disabled bool) Option {
 	return func(m *Model) {
-		m.noCache = disabled
+		m.NoCache = disabled
 	}
 }
 
@@ -151,7 +134,7 @@ func WithNoCache(disabled bool) Option {
 // synthetic ClientsReadyMsg instead of initiating a live AWS connection.
 func WithClients(clients *awsclient.ServiceClients) Option {
 	return func(m *Model) {
-		m.preSuppliedClients = clients
+		m.PreSuppliedClients = clients
 	}
 }
 
@@ -166,7 +149,7 @@ func WithActiveTheme(name string) Option {
 // directly on startup instead of the main menu. The caller is responsible for
 // resolving the input via resource.FindResourceType.
 func WithCommand(name string) Option {
-	return func(m *Model) { m.command = name }
+	return func(m *Model) { m.Command = name }
 }
 
 // New constructs the initial Model.
@@ -188,11 +171,11 @@ func New(profile, region string, opts ...Option) Model {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	sess := session.New()
+	sess.Profile = profile
+	sess.Region = region
 	m := Model{
 		Session:     sess,
 		core:        runtime.New(sess, resource.AllResourceTypes()),
-		profile:     profile,
-		region:      region,
 		keys:        k,
 		stack:       []views.View{&menu},
 		cmdInput:    ti,
@@ -259,9 +242,9 @@ func (m Model) ActiveListResources() []resource.Resource {
 // When pre-supplied clients are present (demo mode or tests), emits a synthetic
 // ClientsReadyMsg immediately. Otherwise initiates the live AWS connection flow.
 func (m Model) Init() tea.Cmd {
-	if m.preSuppliedClients != nil {
+	if m.PreSuppliedClients != nil {
 		preCmd := func() tea.Msg {
-			return messages.ClientsReadyMsg{Clients: m.preSuppliedClients}
+			return messages.ClientsReadyMsg{Clients: m.PreSuppliedClients}
 		}
 		if m.configErr != nil {
 			return tea.Batch(preCmd, func() tea.Msg {
@@ -275,8 +258,8 @@ func (m Model) Init() tea.Cmd {
 	}
 	connectCmd := func() tea.Msg {
 		return messages.InitConnectMsg{
-			Profile: m.profile,
-			Region:  m.region,
+			Profile: m.Profile,
+			Region:  m.Region,
 		}
 	}
 	if m.configErr != nil {
@@ -335,7 +318,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case messages.ClearFlashMsg:
 		return m.handleClearFlash(msg)
 	case messages.InitConnectMsg:
-		cmd := m.connectAWS(msg.Profile, msg.Region, m.connectGen)
+		cmd := m.connectAWS(msg.Profile, msg.Region, m.ConnectGen)
 		return m, cmd
 	case messages.ClientsReadyMsg:
 		return m.handleClientsReady(msg)
@@ -650,8 +633,8 @@ func (m Model) View() tea.View {
 
 	active := m.activeView()
 
-	headerProfile := m.profile
-	headerRegion := m.region
+	headerProfile := m.Profile
+	headerRegion := m.Region
 	if sel, ok := active.(*views.SelectorModel); ok {
 		if sel.Title() == "aws-regions" {
 			headerRegion = "..."
@@ -1012,35 +995,35 @@ func (m Model) headerRight() string {
 
 // accountBadge returns the account alias (preferred) or account ID for the header.
 func (m Model) accountBadge() string {
-	if m.identity == nil {
+	if m.Identity == nil {
 		return ""
 	}
-	if m.identity.AccountAlias != "" {
-		return m.identity.AccountAlias
+	if m.Identity.AccountAlias != "" {
+		return m.Identity.AccountAlias
 	}
-	return m.identity.AccountID
+	return m.Identity.AccountID
 }
 
 // identityRoleName returns the identity name (role or user) for the header.
 func (m Model) identityRoleName() string {
-	if m.identity == nil {
+	if m.Identity == nil {
 		return ""
 	}
-	return m.identity.IdentityName
+	return m.Identity.IdentityName
 }
 
 // identityToViewData converts the cached CallerIdentity to a view-layer IdentityData.
 func (m Model) identityToViewData() views.IdentityData {
-	if m.identity == nil {
+	if m.Identity == nil {
 		return views.IdentityData{}
 	}
 	return views.IdentityData{
-		AccountID:     m.identity.AccountID,
-		AccountAlias:  m.identity.AccountAlias,
-		ARN:           m.identity.Arn,
-		RoleName:      m.identity.RoleName,
-		UserName:      m.identity.UserName,
-		SessionName:   m.identity.SessionName,
-		IsAssumedRole: m.identity.IsAssumedRole,
+		AccountID:     m.Identity.AccountID,
+		AccountAlias:  m.Identity.AccountAlias,
+		ARN:           m.Identity.Arn,
+		RoleName:      m.Identity.RoleName,
+		UserName:      m.Identity.UserName,
+		SessionName:   m.Identity.SessionName,
+		IsAssumedRole: m.Identity.IsAssumedRole,
 	}
 }

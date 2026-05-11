@@ -45,6 +45,58 @@ type ResourceCacheEntry struct {
 // Session owns the in-memory orchestration state for the active
 // profile/region session.
 type Session struct {
+	// Session identity — set by the caller (tui.New / handler) before/after Rotate.
+	Profile string
+	Region  string
+
+	// Session-scoped AWS transport. Set by handleClientsReady; cleared
+	// explicitly by handlers, not by Rotate (the caller decides whether to
+	// reuse the still-valid old clients on a rotation that may fail).
+	Clients *awsclient.ServiceClients
+
+	// PreSuppliedClients is the bootstrap-channel transport supplied by tests
+	// or demo mode via WithClients. Lives across Rotate because it represents
+	// a static input, not a live session.
+	PreSuppliedClients *awsclient.ServiceClients
+
+	// Identity is the resolved caller identity (account ID, ARN, role). Set
+	// by handleIdentityLoaded; cleared by Rotate so a stale identity from the
+	// pre-rotate session cannot leak into the next.
+	Identity *awsclient.CallerIdentity
+
+	// IdentityFetching latches that an identity fetch is in flight, so the
+	// header can show a spinner. Cleared by Rotate.
+	IdentityFetching bool
+
+	// ConnectGen is the staleness counter for AWS connect attempts. Bumped on
+	// every profile/region switch so a slow pre-switch ClientsReadyMsg arriving
+	// after the user has switched again is rejected by the gen guard.
+	// Rotate() bumps this; handlers MUST NOT bump it manually.
+	ConnectGen int
+
+	// PendingRefresh marks that a successful ClientsReady should re-fetch the
+	// active resource list (set by profile/region switch handlers). Cleared by
+	// Rotate; re-set to true after Rotate in the switch handlers.
+	PendingRefresh bool
+
+	// Rollback target for an in-flight profile/region switch. Captured BEFORE
+	// Rotate (via local vars) so the rapid A→B→C case keeps A as the rollback
+	// target. Cleared by Rotate; restored explicitly by the switch handler.
+	HasPrevState bool
+	PrevProfile  string
+	PrevRegion   string
+
+	// Command is the one-shot resource short name to navigate to on the first
+	// ClientsReadyMsg (from the -c CLI flag). Cleared by the handler after use;
+	// not cleared by Rotate (a profile switch should not lose the flag if the
+	// initial connect failed and rolled back).
+	Command string
+
+	// NoCache disables on-disk availability caching and background probes
+	// (set by the --no-cache / --demo CLI flags). Survives Rotate — it is a
+	// static policy, not session state.
+	NoCache bool
+
 	// Wave 1 availability scan.
 	AvailabilityGen int      // bumped on profile/region switch to cancel stale probes
 	AvailQueue      []string // resource short names remaining to probe
@@ -52,12 +104,12 @@ type Session struct {
 	AvailTotal      int      // total types to probe in current gen
 
 	// Wave 2 issue-enrichment dispatch.
-	ProbeResources  map[string][]resource.Resource // retained first-page resources from Wave 1
-	ProbeTruncated  map[string]bool                // per-type truncation signal from Wave 1 probe
-	EnrichQueue     []string                       // resource types pending Wave 2 enrichment
-	EnrichmentGen   int                            // session-wide gen counter for Wave 2
-	EnrichChecked   int                            // number of enrichment probes completed in current gen
-	EnrichTotal     int                            // total enrichment probes to run in current gen
+	ProbeResources map[string][]resource.Resource // retained first-page resources from Wave 1
+	ProbeTruncated map[string]bool                // per-type truncation signal from Wave 1 probe
+	EnrichQueue    []string                       // resource types pending Wave 2 enrichment
+	EnrichmentGen  int                            // session-wide gen counter for Wave 2
+	EnrichChecked  int                            // number of enrichment probes completed in current gen
+	EnrichTotal    int                            // total enrichment probes to run in current gen
 
 	// Per-type Wave 2 finding state (feature 018-enrichment-visibility).
 	// NOTE: EnrichmentFindings was moved to tui.Model in PR-03a-fold so that
@@ -91,13 +143,16 @@ type Session struct {
 	// every ClientsReadyMsg so FetchIAMPoliciesByIDsFull uses the session store.
 	IAMPolicies PolicyStore
 
-	// Identity is the per-session cache for the AWS caller's account ID.
-	// Replaces the package-level globals previously in
-	// internal/aws/identity_cache.go (identityCacheMu / cachedAccountID /
-	// cachedAccountErr). Wired into *ServiceClients.IdentityStore on every
-	// ClientsReadyMsg so Pattern-C related checkers (Glue tags, EBS Backup)
-	// see a per-profile/region scoped cache rather than a process-global one.
-	Identity IdentityStore
+	// IdentityStore is the per-session cache for the AWS caller's account ID
+	// used by Pattern-C related checkers. Replaces the package-level globals
+	// previously in internal/aws/identity_cache.go (identityCacheMu /
+	// cachedAccountID / cachedAccountErr). Wired into *ServiceClients.
+	// IdentityStore on every ClientsReadyMsg so Pattern-C related checkers
+	// (Glue tags, EBS Backup) see a per-profile/region scoped cache rather
+	// than a process-global one. Distinct from Session.Identity (the resolved
+	// *awsclient.CallerIdentity) which holds the human-readable identity
+	// metadata for the header / IdentityModel.
+	IdentityStore IdentityStore
 
 	// RuleSets is the per-session, single-slot cache for the SES v1
 	// DescribeActiveReceiptRuleSet response. Replaces the package-level
@@ -126,7 +181,7 @@ func New() *Session {
 		EnrichmentGen:          1,
 		PolicyDocCache:         &awsclient.PolicyDocumentCache{},
 		IAMPolicies:            NewPolicyStore(),
-		Identity:               NewIdentityStore(),
+		IdentityStore:          NewIdentityStore(),
 		RuleSets:               NewRuleSetStore(),
 	}
 }
@@ -146,6 +201,20 @@ func (s *Session) Rotate() {
 	s.EnrichGen++
 	s.AvailabilityGen++
 	s.EnrichmentGen++
+	s.ConnectGen++
+
+	// Session-identity / rollback-latch / fetch-latch fields. Profile/Region/
+	// Clients/PreSuppliedClients/Command/NoCache are deliberately NOT cleared
+	// — the caller (handleProfileSelected / handleRegionSelected) is responsible
+	// for setting Profile/Region to the new target, and for capturing rollback
+	// state via local vars BEFORE Rotate (so the rapid A→B→C case keeps A as
+	// the rollback target).
+	s.Identity = nil
+	s.IdentityFetching = false
+	s.PendingRefresh = false
+	s.HasPrevState = false
+	s.PrevProfile = ""
+	s.PrevRegion = ""
 
 	s.EnrichQueue = nil
 	s.ProbeResources = nil
@@ -169,9 +238,9 @@ func (s *Session) Rotate() {
 	// prior account/profile cannot leak into the next session.
 	s.IAMPolicies = NewPolicyStore()
 
-	// Identity: reset to a fresh store so the cached account ID + sticky
+	// IdentityStore: reset to a fresh store so the cached account ID + sticky
 	// failure (if any) from the prior session cannot leak into the next.
-	s.Identity = NewIdentityStore()
+	s.IdentityStore = NewIdentityStore()
 
 	// RuleSets: reset to a fresh store so the cached SES rule set from the
 	// prior session cannot leak into the next.
