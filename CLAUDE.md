@@ -11,6 +11,7 @@ Quick reference:
 - Pre-push gate (Stage 6): `make ready-to-push`
 - Pre-release gate (Stage 7): `make ready-to-release`
 - Under CAE-1, CTO auto-pulls `todo, unassigned` issues in the active project every heartbeat (see [`docs/development-process.md`](docs/development-process.md) §"Continuous Autonomous Execution"). Other agents (Architect, QA, Coder, DevOps, etc.) act only on explicit dispatch from CTO or Architect — they never browse the backlog or pick up undispatched work.
+- **Issue-creation discipline (mandatory, AS-446 retro).** Before creating any new Paperclip issue, check it against the five rules in [`docs/development-process.md`](docs/development-process.md) §"Issue-creation discipline": (1) one review issue per PR (not one per reviewer); (2) heartbeat ticks do not create issues; (3) drift-detection cap of ≤1 new issue per heartbeat; (4) recovery is a comment, not a child; (5) API probes are never issues. Violations are caught at retro and reverted.
 
 ## GitHub
 
