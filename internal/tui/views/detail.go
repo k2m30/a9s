@@ -12,7 +12,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // DetailModel renders the key-value describe view using bubbles/viewport for scroll.
@@ -113,14 +113,14 @@ func (m *DetailModel) TakePendingRelatedDispatch() bool {
 // Update delegates scroll to viewport; handles y (yaml), c (copy), esc (back).
 func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 	switch msg := msg.(type) {
-	case messages.RelatedCheckResultMsg:
+	case messages.RelatedCheckResult:
 		// Ignore results for a different resource type or source resource.
 		if msg.ResourceType != m.resourceType || (msg.SourceResourceID != "" && msg.SourceResourceID != m.res.ID) {
 			return m, nil
 		}
 		m.rightCol, _ = m.rightCol.Update(msg)
 		return m, nil
-	case messages.EnrichDetailResultMsg:
+	case messages.EnrichDetailResult:
 		// Guard: ignore results for a different resource type or resource ID.
 		if msg.ResourceType != m.resourceType || msg.ResourceID != m.res.ID {
 			return m, nil
@@ -215,7 +215,7 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 				name := m.rightCol.SelectedTypeName()
 				if name != "" {
 					return m, func() tea.Msg {
-						return messages.CopiedMsg{Content: name}
+						return messages.Copied{Content: name}
 					}
 				}
 				return m, nil
@@ -228,7 +228,7 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 					val = item.Key
 				}
 				return m, func() tea.Msg {
-					return messages.CopiedMsg{Content: val}
+					return messages.Copied{Content: val}
 				}
 			}
 			return m, nil
@@ -316,7 +316,7 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 				m.rightCol.SetSize(m.currentRightColWidth(), m.height)
 				m.recalcViewportWidth()
 				return m, func() tea.Msg {
-					return messages.RelatedCheckStartedMsg{
+					return messages.RelatedCheckStarted{
 						ResourceType:   m.resourceType,
 						SourceResource: m.res,
 					}
@@ -339,7 +339,7 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 						targetID = item.NavID
 					}
 					return m, func() tea.Msg {
-						return messages.RelatedNavigateMsg{
+						return messages.RelatedNavigate{
 							TargetType:     item.TargetType,
 							SourceResource: m.res,
 							SourceType:     m.resourceType,
@@ -351,7 +351,7 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 			return m, nil
 		case key.Matches(msg, m.keys.YAML):
 			return m, func() tea.Msg {
-				return messages.NavigateMsg{
+				return messages.Navigate{
 					Target:       messages.TargetYAML,
 					Resource:     &m.res,
 					ResourceType: m.resourceType,
@@ -359,7 +359,7 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 			}
 		case key.Matches(msg, m.keys.JSON):
 			return m, func() tea.Msg {
-				return messages.NavigateMsg{
+				return messages.Navigate{
 					Target:       messages.TargetJSON,
 					Resource:     &m.res,
 					ResourceType: m.resourceType,
@@ -375,7 +375,7 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 				res := m.res
 				rt := m.resourceType
 				return m, func() tea.Msg {
-					return messages.RelatedNavigateMsg{
+					return messages.RelatedNavigate{
 						TargetType:     "ct-events",
 						SourceResource: res,
 						SourceType:     rt,

@@ -26,7 +26,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // TestHandleRelatedNavigate_TruncatedCache_InitiatesFetch verifies that
@@ -47,7 +47,7 @@ func TestHandleRelatedNavigate_TruncatedCache_InitiatesFetch(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	// Navigate to EC2 list.
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -59,14 +59,14 @@ func TestHandleRelatedNavigate_TruncatedCache_InitiatesFetch(t *testing.T) {
 	}
 
 	// Load ONLY the first EC2 resource with truncated pagination.
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    ec2Res[0:1],
 		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-stored-001"},
 	})
 
 	// Request navigation with 2 IDs: ec2[0] (in cache) + ec2[1] (missing from page 1).
-	navMsg := messages.RelatedNavigateMsg{
+	navMsg := messages.RelatedNavigate{
 		TargetType: "ec2",
 		RelatedIDs: []string{ec2Res[0].ID, ec2Res[1].ID},
 		SourceResource: resource.Resource{
@@ -86,7 +86,7 @@ func TestHandleRelatedNavigate_TruncatedCache_InitiatesFetch(t *testing.T) {
 	// In unit test mode (nil clients), fetchMoreResources returns APIErrorMsg —
 	// we can still check the msg type to distinguish from a nil cmd.
 	msg := cmd()
-	if loaded, ok := msg.(messages.ResourcesLoadedMsg); ok {
+	if loaded, ok := msg.(messages.ResourcesLoaded); ok {
 		// If a ResourcesLoadedMsg was produced (demo mode with real demo clients),
 		// verify it uses Append=true (token resumption, not page 1 reset).
 		if !loaded.Append {
@@ -108,7 +108,7 @@ func TestHandleRelatedNavigate_CompleteCache_NoFetch(t *testing.T) {
 		tui.WithRegion(demo.DemoRegion))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -119,13 +119,13 @@ func TestHandleRelatedNavigate_CompleteCache_NoFetch(t *testing.T) {
 		t.Fatalf("demo ec2 fixtures need at least 2 resources (err=%v, len=%d)", err, len(ec2Res))
 	}
 	// Load ALL resources, non-truncated.
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    ec2Res,
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
 	})
 
-	navMsg := messages.RelatedNavigateMsg{
+	navMsg := messages.RelatedNavigate{
 		TargetType: "ec2",
 		RelatedIDs: []string{ec2Res[0].ID, ec2Res[1].ID},
 		SourceResource: resource.Resource{

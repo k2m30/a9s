@@ -8,7 +8,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // --- Resource list: c copies resource ID ---
@@ -17,8 +17,8 @@ func TestQA_Copy_ResourceList_CopiesID(t *testing.T) {
 	tui.Version = "test"
 	m := tui.New("test", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetResourceList, ResourceType: "ec2"})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "ec2", Resources: []resource.Resource{
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: []resource.Resource{
 		{ID: "i-0abc123", Name: "web-server", Status: "running", Fields: map[string]string{"instance_id": "i-0abc123"}},
 	}})
 
@@ -28,7 +28,7 @@ func TestQA_Copy_ResourceList_CopiesID(t *testing.T) {
 	}
 	// Execute the cmd to get the FlashMsg
 	msg := cmd()
-	flash, ok := msg.(messages.FlashMsg)
+	flash, ok := msg.(messages.Flash)
 	if !ok {
 		t.Fatalf("expected FlashMsg, got %T", msg)
 	}
@@ -46,7 +46,7 @@ func TestQA_Copy_Detail_CopiesFieldValue(t *testing.T) {
 	tui.Version = "test"
 	m := tui.New("test", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetResourceList, ResourceType: "ec2"})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	res := resource.Resource{
 		ID: "i-detail123", Name: "detail-server", Status: "running",
 		Fields: map[string]string{
@@ -54,7 +54,7 @@ func TestQA_Copy_Detail_CopiesFieldValue(t *testing.T) {
 			"state": "running", "type": "t3.micro", "private_ip": "10.0.1.5",
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "ec2", Resources: []resource.Resource{res}})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: []resource.Resource{res}})
 
 	// Navigate to detail
 	m, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'd'})
@@ -69,7 +69,7 @@ func TestQA_Copy_Detail_CopiesFieldValue(t *testing.T) {
 		t.Fatal("c on detail view should return a copy command")
 	}
 	msg := cmd()
-	flash, ok := msg.(messages.FlashMsg)
+	flash, ok := msg.(messages.Flash)
 	if !ok {
 		t.Fatalf("expected FlashMsg, got %T", msg)
 	}
@@ -87,12 +87,12 @@ func TestQA_Copy_YAML_CopiesFullYAML(t *testing.T) {
 	tui.Version = "test"
 	m := tui.New("test", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetResourceList, ResourceType: "ec2"})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	res := resource.Resource{
 		ID: "i-yaml123", Name: "yaml-server", Status: "running",
 		Fields: map[string]string{"instance_id": "i-yaml123", "state": "running"},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "ec2", Resources: []resource.Resource{res}})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: []resource.Resource{res}})
 
 	// Navigate to YAML via y key
 	m, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'y'})
@@ -106,7 +106,7 @@ func TestQA_Copy_YAML_CopiesFullYAML(t *testing.T) {
 		t.Fatal("c on YAML view should return a copy command")
 	}
 	msg := cmd()
-	flash, ok := msg.(messages.FlashMsg)
+	flash, ok := msg.(messages.Flash)
 	if !ok {
 		t.Fatalf("expected FlashMsg, got %T", msg)
 	}
@@ -146,8 +146,8 @@ func TestQA_Copy_AllResourceTypes(t *testing.T) {
 			tui.Version = "test"
 			m := tui.New("test", "us-east-1")
 			m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
-			m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetResourceList, ResourceType: tt.name})
-			m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+			m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: tt.name})
+			m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 				ResourceType: tt.name,
 				Resources:    []resource.Resource{{ID: tt.id, Name: tt.id, Fields: map[string]string{"name": tt.id}}},
 			})
@@ -157,7 +157,7 @@ func TestQA_Copy_AllResourceTypes(t *testing.T) {
 				return
 			}
 			msg := cmd()
-			if flash, ok := msg.(messages.FlashMsg); ok {
+			if flash, ok := msg.(messages.Flash); ok {
 				if strings.HasPrefix(flash.Text, "Copy failed:") {
 					t.Skip("clipboard not available in this environment")
 				}

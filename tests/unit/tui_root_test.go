@@ -11,7 +11,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // helper: create a model with a size set so View() actually renders
@@ -132,7 +132,7 @@ func TestRootHandleNavigate_ResourceList(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -152,7 +152,7 @@ func TestRootHandleNavigate_Detail(t *testing.T) {
 		ID:   "i-abc123",
 		Name: "my-instance",
 	}
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: res,
 	})
@@ -172,7 +172,7 @@ func TestRootHandleNavigate_YAML(t *testing.T) {
 		ID:   "i-abc123",
 		Name: "my-instance",
 	}
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetYAML,
 		Resource: res,
 	})
@@ -195,12 +195,12 @@ func TestRootHandleNavigate_JSON_QQuits(t *testing.T) {
 			"State": "running",
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		Resource:     res,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetJSON,
 		Resource:     res,
 		ResourceType: "ec2",
@@ -220,7 +220,7 @@ func TestRootHandleNavigate_Help(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target: messages.TargetHelp,
 	})
 
@@ -235,7 +235,7 @@ func TestRootHandleNavigate_Region(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target: messages.TargetRegion,
 	})
 
@@ -253,10 +253,10 @@ func TestRootPopView_ReturnsToMainMenu(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Push help
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetHelp})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 
 	// Pop it
-	m, _ = rootApplyMsg(m, messages.PopViewMsg{})
+	m, _ = rootApplyMsg(m, messages.PopView{})
 
 	plain := stripANSI(rootViewContent(m))
 
@@ -270,7 +270,7 @@ func TestRootPopView_CannotPopLastView(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Try to pop the only view — should not crash
-	m, _ = rootApplyMsg(m, messages.PopViewMsg{})
+	m, _ = rootApplyMsg(m, messages.PopView{})
 
 	plain := stripANSI(rootViewContent(m))
 
@@ -397,7 +397,7 @@ func TestRootHeaderRight_FlashMsg(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.FlashMsg{Text: "Copied!", IsError: false})
+	m, _ = rootApplyMsg(m, messages.Flash{Text: "Copied!", IsError: false})
 
 	plain := stripANSI(rootViewContent(m))
 
@@ -414,7 +414,7 @@ func TestRootFetchResources_NilClients(t *testing.T) {
 	// m.clients is nil (no AWS connection)
 
 	// Navigate to resource list — should not panic
-	_, cmd := rootApplyMsg(m, messages.NavigateMsg{
+	_, cmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -427,9 +427,9 @@ func TestRootFetchResources_NilClients(t *testing.T) {
 	// Execute the command — it should return an APIErrorMsg, not panic
 	msg := cmd()
 	switch msg.(type) {
-	case messages.APIErrorMsg:
+	case messages.APIError:
 		// expected
-	case messages.ResourcesLoadedMsg:
+	case messages.ResourcesLoaded:
 		t.Error("with nil clients, should not return ResourcesLoadedMsg")
 	default:
 		// Could be a batch cmd, that's also OK
@@ -443,26 +443,26 @@ func TestRootNavigateAndPopRoundTrip(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate: MainMenu -> ResourceList -> Detail -> pop -> pop
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "s3",
 	})
 
 	res := &resource.Resource{ID: "my-bucket", Name: "my-bucket"}
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: res,
 	})
 
 	// Pop back to resource list
-	m, _ = rootApplyMsg(m, messages.PopViewMsg{})
+	m, _ = rootApplyMsg(m, messages.PopView{})
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "s3") {
 		t.Errorf("after first pop, should be at s3 resource list, got: %s", plain)
 	}
 
 	// Pop back to main menu
-	m, _ = rootApplyMsg(m, messages.PopViewMsg{})
+	m, _ = rootApplyMsg(m, messages.PopView{})
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "resource-types") {
 		t.Errorf("after second pop, should be at main menu, got: %s", plain)
@@ -592,14 +592,14 @@ func TestRoot_MainMenu_SelectedRowSingleLine(t *testing.T) {
 func TestRoot_S3_EnterBucketShowsObjects(t *testing.T) {
 	m := newRootSizedModel()
 	// Navigate to S3
-	m, cmd := rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetResourceList, ResourceType: "s3"})
+	m, cmd := rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "s3"})
 	// Execute fetch cmd (ignored — we'll load manually)
 	_ = cmd
 	// Load buckets
 	buckets := []resource.Resource{
 		{ID: "my-bucket", Name: "my-bucket", Fields: map[string]string{"name": "my-bucket"}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "s3", Resources: buckets})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: buckets})
 	// Press Enter on the bucket — returns a cmd that produces EnterChildViewMsg
 	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	// Execute the cmd to get the EnterChildViewMsg and process it
@@ -625,11 +625,11 @@ func TestRoot_S3_EnterBucketShowsObjects(t *testing.T) {
 func TestRoot_S3_EscapeFromObjectsReturnsToBuckets(t *testing.T) {
 	m := newRootSizedModel()
 	// Navigate to S3 buckets
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetResourceList, ResourceType: "s3"})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "s3"})
 	buckets := []resource.Resource{
 		{ID: "my-bucket", Name: "my-bucket", Fields: map[string]string{"name": "my-bucket"}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "s3", Resources: buckets})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: buckets})
 	// Enter bucket — execute returned cmd
 	var cmd tea.Cmd
 	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -654,7 +654,7 @@ func TestRoot_EnterChildView_UnknownChildType(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Send EnterChildViewMsg with a child type that is not registered
-	_, cmd := rootApplyMsg(m, messages.EnterChildViewMsg{
+	_, cmd := rootApplyMsg(m, messages.EnterChildView{
 		ChildType:     "nonexistent_type",
 		ParentContext: map[string]string{"id": "test"},
 		DisplayName:   "test",
@@ -666,7 +666,7 @@ func TestRoot_EnterChildView_UnknownChildType(t *testing.T) {
 
 	// Execute the returned cmd — should produce a FlashMsg error
 	msg := cmd()
-	flashMsg, ok := msg.(messages.FlashMsg)
+	flashMsg, ok := msg.(messages.Flash)
 	if !ok {
 		t.Fatalf("expected FlashMsg, got %T", msg)
 	}
@@ -700,7 +700,7 @@ func TestRoot_EnterChildView_NilClients(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Send EnterChildViewMsg — handleEnterChildView will push a view and call fetchChildResources
-	_, cmd := rootApplyMsg(m, messages.EnterChildViewMsg{
+	_, cmd := rootApplyMsg(m, messages.EnterChildView{
 		ChildType:     testChildType,
 		ParentContext: map[string]string{"bucket": "test"},
 		DisplayName:   "test",
@@ -712,11 +712,11 @@ func TestRoot_EnterChildView_NilClients(t *testing.T) {
 
 	// Extract the APIErrorMsg from the batch — fetchChildResources should detect nil clients
 	msg := extractMsg(t, cmd, func(msg tea.Msg) bool {
-		_, ok := msg.(messages.APIErrorMsg)
+		_, ok := msg.(messages.APIError)
 		return ok
 	})
 
-	apiErr, ok := msg.(messages.APIErrorMsg)
+	apiErr, ok := msg.(messages.APIError)
 	if !ok {
 		t.Fatalf("expected APIErrorMsg from nil clients fetch, got %T", msg)
 	}
@@ -752,7 +752,7 @@ func TestRoot_EnterChildView_NilParentContext(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// Send EnterChildViewMsg with nil ParentContext — must not panic
-	m, cmd := rootApplyMsg(m, messages.EnterChildViewMsg{
+	m, cmd := rootApplyMsg(m, messages.EnterChildView{
 		ChildType:     testChildType,
 		ParentContext: nil,
 		DisplayName:   "test",
@@ -781,7 +781,7 @@ func TestRoot_View_LongErrorNoLineExceedsWidth(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Send a long API error that exceeds terminal width
-	m, _ = rootApplyMsg(m, messages.APIErrorMsg{
+	m, _ = rootApplyMsg(m, messages.APIError{
 		ResourceType: "kms",
 		Err:          fmt.Errorf("%s", longAWSError),
 	})
@@ -806,7 +806,7 @@ func TestRoot_View_LongErrorStillOneLine(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Send a long API error
-	m, _ = rootApplyMsg(m, messages.APIErrorMsg{
+	m, _ = rootApplyMsg(m, messages.APIError{
 		ResourceType: "kms",
 		Err:          fmt.Errorf("%s", longAWSError),
 	})
@@ -825,7 +825,7 @@ func TestRoot_View_ErrorTruncatedInHeader(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Send a long API error
-	m, _ = rootApplyMsg(m, messages.APIErrorMsg{
+	m, _ = rootApplyMsg(m, messages.APIError{
 		ResourceType: "kms",
 		Err:          fmt.Errorf("%s", longAWSError),
 	})

@@ -7,7 +7,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -50,7 +50,7 @@ func TestJSONView_PressD_EmitsNavigateToDetail(t *testing.T) {
 	_, cmd := m.Update(tea.KeyPressMsg{Code: -1, Text: "d"})
 	msg := execCmd(cmd)
 
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("pressing 'd' in JSON view: expected NavigateMsg, got %T (%v)", msg, msg)
 	}
@@ -76,7 +76,7 @@ func TestJSONView_PressY_EmitsNavigateToYAML(t *testing.T) {
 	_, cmd := m.Update(tea.KeyPressMsg{Code: -1, Text: "y"})
 	msg := execCmd(cmd)
 
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("pressing 'y' in JSON view: expected NavigateMsg, got %T (%v)", msg, msg)
 	}
@@ -118,7 +118,7 @@ func TestYAMLView_PressD_EmitsNavigateToDetail(t *testing.T) {
 	_, cmd := m.Update(tea.KeyPressMsg{Code: -1, Text: "d"})
 	msg := execCmd(cmd)
 
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("pressing 'd' in YAML view: expected NavigateMsg, got %T (%v)", msg, msg)
 	}
@@ -144,7 +144,7 @@ func TestYAMLView_PressJ_EmitsNavigateToJSON(t *testing.T) {
 	_, cmd := m.Update(tea.KeyPressMsg{Code: -1, Text: "J"})
 	msg := execCmd(cmd)
 
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("pressing 'J' in YAML view: expected NavigateMsg, got %T (%v)", msg, msg)
 	}

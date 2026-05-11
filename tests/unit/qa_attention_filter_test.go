@@ -6,7 +6,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -96,7 +96,7 @@ func TestAttentionFilter_IncludesResourcesWithFindings(t *testing.T) {
 	m := views.NewResourceList(*td, nil, k)
 	m.SetSize(120, 24)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    resources,
 	})

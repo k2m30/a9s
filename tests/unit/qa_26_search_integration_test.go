@@ -20,7 +20,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	tui "github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ---------------------------------------------------------------------------
@@ -40,13 +40,13 @@ func activateAndConfirmSearch(t *testing.T, m tui.Model, query string) tui.Model
 
 // navigateToDetail pushes a detail view for a resource into the root model.
 func navigateToDetail(m tui.Model, res *resource.Resource) tui.Model {
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetDetail, Resource: res})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetDetail, Resource: res})
 	return m
 }
 
 // navigateToYAML pushes a YAML view for a resource into the root model.
 func navigateToYAML(m tui.Model, res *resource.Resource) tui.Model {
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetYAML, Resource: res})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetYAML, Resource: res})
 	return m
 }
 
@@ -193,7 +193,7 @@ func TestSearch_G04_TwoEscapesExitView(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate: main menu → resource list → detail (to have something to pop back to).
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -813,9 +813,9 @@ func TestSearch_O04_CopyWorksWhileSearchActive(t *testing.T) {
 	// Execute the returned cmd.
 	msg := cmd()
 	switch msg.(type) {
-	case messages.FlashMsg:
+	case messages.Flash:
 		// OK — clipboard may succeed or fail in CI, but the copy path fired.
-	case messages.CopiedMsg:
+	case messages.Copied:
 		// OK — clipboard succeeded.
 	default:
 		t.Errorf("O04: expected FlashMsg or CopiedMsg from copy command, got %T", msg)
@@ -871,7 +871,7 @@ func TestSearch_O06_CtrlRDuringSearch_NoCrash(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to resource list first so Ctrl+r has a context.
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})

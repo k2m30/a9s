@@ -33,7 +33,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // TestBuildResourceCacheSnapshot_LazyOnlyTruncated verifies that when a resource
@@ -98,7 +98,7 @@ func TestBuildResourceCacheSnapshot_LazyOnlyTruncated(t *testing.T) {
 
 	// Navigate to src detail view so RelatedCheckStartedMsg is handled.
 	srcRes := resource.Resource{ID: "ge-src-001", Name: "ge-src-001"}
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		Resource:     &srcRes,
 		ResourceType: srcType,
@@ -108,7 +108,7 @@ func TestBuildResourceCacheSnapshot_LazyOnlyTruncated(t *testing.T) {
 	// LazyAddedResources populates lazyResourceCache[targetType].
 	// Since resourceCache[targetType] does NOT exist, this is a "lazy-only" entry.
 	lazyRes := resource.Resource{ID: "ge-lazy-001", Name: "ge-lazy-001"}
-	m, _ = rootApplyMsg(m, messages.RelatedCheckResultMsg{
+	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     srcType,
 		SourceResourceID: srcRes.ID,
 		DefDisplayName:   "GE Target",
@@ -125,7 +125,7 @@ func TestBuildResourceCacheSnapshot_LazyOnlyTruncated(t *testing.T) {
 
 	// Now dispatch RelatedCheckStartedMsg so the model calls buildResourceCacheSnapshot
 	// and passes it to the registered checker.
-	_, relCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	_, relCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   srcType,
 		SourceResource: srcRes,
 	})
@@ -156,7 +156,7 @@ func TestBuildResourceCacheSnapshot_LazyOnlyTruncated(t *testing.T) {
 	default:
 		// Checker may not have been called yet; drive RelatedCheckResultMsg delivery.
 		for _, msg := range allMsgs {
-			if rcr, ok := msg.(messages.RelatedCheckResultMsg); ok && rcr.ResourceType == srcType {
+			if rcr, ok := msg.(messages.RelatedCheckResult); ok && rcr.ResourceType == srcType {
 				m, _ = rootApplyMsg(m, rcr)
 			}
 		}
@@ -227,7 +227,7 @@ func TestBuildResourceCacheSnapshot_MergeCase_InheritsResourceCacheTruncated(t *
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	srcRes := resource.Resource{ID: "ge2-src-001", Name: "ge2-src-001"}
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		Resource:     &srcRes,
 		ResourceType: srcType,
@@ -235,11 +235,11 @@ func TestBuildResourceCacheSnapshot_MergeCase_InheritsResourceCacheTruncated(t *
 
 	// Seed the resourceCache[targetType] via a ResourcesLoadedMsg first.
 	// This sets resourceCache (not lazy). The fetched list is NOT truncated.
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: targetType,
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: targetType,
 		Resources: []resource.Resource{
 			{ID: "ge2-main-001", Name: "ge2-main-001"},
@@ -247,15 +247,15 @@ func TestBuildResourceCacheSnapshot_MergeCase_InheritsResourceCacheTruncated(t *
 		Pagination: &resource.PaginationMeta{IsTruncated: false},
 	})
 	// Navigate back to src detail.
-	m, _ = rootApplyMsg(m, messages.PopViewMsg{})
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.PopView{})
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		Resource:     &srcRes,
 		ResourceType: srcType,
 	})
 
 	// Also seed a lazy entry.
-	m, _ = rootApplyMsg(m, messages.RelatedCheckResultMsg{
+	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     srcType,
 		SourceResourceID: srcRes.ID,
 		DefDisplayName:   "GE2 Target",
@@ -270,7 +270,7 @@ func TestBuildResourceCacheSnapshot_MergeCase_InheritsResourceCacheTruncated(t *
 	})
 
 	// Dispatch RelatedCheckStartedMsg.
-	_, relCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	_, relCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   srcType,
 		SourceResource: srcRes,
 	})
@@ -279,7 +279,7 @@ func TestBuildResourceCacheSnapshot_MergeCase_InheritsResourceCacheTruncated(t *
 	}
 	allMsgs := drainAllMessages(relCmd)
 	for _, msg := range allMsgs {
-		if rcr, ok := msg.(messages.RelatedCheckResultMsg); ok {
+		if rcr, ok := msg.(messages.RelatedCheckResult); ok {
 			m, _ = rootApplyMsg(m, rcr)
 		}
 	}

@@ -3,7 +3,7 @@ package runtime
 import (
 	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/session"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // Event is the marker interface for inputs the runtime accepts from an
@@ -50,13 +50,13 @@ func (c *Core) Types() []catalog.ResourceTypeDef { return c.types }
 // Unrecognised event types fall through to the nil, nil default.
 func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 	switch msg := ev.(type) {
-	case messages.AvailabilityCacheLoadedMsg:
+	case messages.AvailabilityCacheLoaded:
 		return c.handleAvailabilityCacheLoaded(msg)
-	case messages.AvailabilityPrefetchedMsg:
+	case messages.AvailabilityPrefetched:
 		return c.handleAvailabilityPrefetched(msg)
-	case messages.AvailabilityCheckedMsg:
+	case messages.AvailabilityChecked:
 		return c.handleAvailabilityChecked(msg)
-	case messages.EnrichmentCheckedMsg:
+	case messages.EnrichmentChecked:
 		return c.handleEnrichmentChecked(msg)
 	}
 	return nil, nil

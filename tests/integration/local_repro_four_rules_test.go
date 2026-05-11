@@ -12,7 +12,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // liveProfile returns the AWS profile to use for live R1-R4 tests, or "" if
@@ -43,9 +43,9 @@ func newLiveR1R4Scenario(t *testing.T) *fullIntegrationScenario {
 	var connectCmd tea.Cmd
 	m, connectCmd = fullIntegrationApplyMsg(m, initMsg)
 	clientsReadyRaw := fullIntegrationRequireCmdMsg(t, connectCmd, "live R1-R4 AWS connect")
-	clientsReady, ok := clientsReadyRaw.(messages.ClientsReadyMsg)
+	clientsReady, ok := clientsReadyRaw.(messages.ClientsReady)
 	if !ok {
-		t.Fatalf("live R1-R4 AWS connect returned %T, expected messages.ClientsReadyMsg", clientsReadyRaw)
+		t.Fatalf("live R1-R4 AWS connect returned %T, expected messages.ClientsReady", clientsReadyRaw)
 	}
 	if clientsReady.Err != nil {
 		t.Fatalf("live R1-R4 AWS connect failed for profile=%q: %v", profile, clientsReady.Err)
@@ -54,7 +54,7 @@ func newLiveR1R4Scenario(t *testing.T) *fullIntegrationScenario {
 	var prefetchCmd tea.Cmd
 	m, prefetchCmd = fullIntegrationApplyMsg(m, clientsReady)
 	availMsg := fullIntegrationExtractMsg(t, prefetchCmd, func(msg tea.Msg) bool {
-		_, ok := msg.(messages.AvailabilityPrefetchedMsg)
+		_, ok := msg.(messages.AvailabilityPrefetched)
 		return ok
 	})
 	var wave2Cmd tea.Cmd
@@ -104,7 +104,7 @@ func drainWave2EnrichmentCollect(t *testing.T, m tui.Model, cmd tea.Cmd) (tui.Mo
 			if msg == nil {
 				continue
 			}
-			if em, ok := msg.(messages.EnrichmentCheckedMsg); ok {
+			if em, ok := msg.(messages.EnrichmentChecked); ok {
 				enrichmentMsgs++
 				if len(em.Findings) > 0 {
 					if collected[em.ResourceType] == nil {
@@ -358,14 +358,14 @@ func TestLiveR_DBIDetailShowsPendingMaintenance(t *testing.T) {
 	var connectCmd tea.Cmd
 	m, connectCmd = fullIntegrationApplyMsg(m, initMsg)
 	clientsReadyRaw := fullIntegrationRequireCmdMsg(t, connectCmd, "DBI detail AWS connect")
-	clientsReady := clientsReadyRaw.(messages.ClientsReadyMsg)
+	clientsReady := clientsReadyRaw.(messages.ClientsReady)
 	if clientsReady.Err != nil {
 		t.Fatalf("AWS connect failed for profile=%q: %v", profile, clientsReady.Err)
 	}
 	var prefetchCmd tea.Cmd
 	m, prefetchCmd = fullIntegrationApplyMsg(m, clientsReady)
 	availMsg := fullIntegrationExtractMsg(t, prefetchCmd, func(msg tea.Msg) bool {
-		_, ok := msg.(messages.AvailabilityPrefetchedMsg)
+		_, ok := msg.(messages.AvailabilityPrefetched)
 		return ok
 	})
 	var wave2Cmd tea.Cmd

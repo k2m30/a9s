@@ -49,7 +49,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -72,7 +72,7 @@ func newListModel(t *testing.T, shortName string, cfg *config.ViewsConfig, resou
 	m.SetSize(400, 50)
 
 	// Simulate resources loaded
-	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	m, _ = m.Update(messages.ResourcesLoaded{Resources: resources})
 
 	return stripAnsi(m.View())
 }

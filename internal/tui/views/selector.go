@@ -7,7 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
 
@@ -43,21 +43,21 @@ func NewSelector(items []string, activeItem, title string, onSelect func(string)
 // NewProfile returns a SelectorModel configured for AWS profile selection.
 func NewProfile(profiles []string, activeProfile string, k keys.Map) SelectorModel {
 	return NewSelector(profiles, activeProfile, "aws-profiles", func(s string) tea.Msg {
-		return messages.ProfileSelectedMsg{Profile: s}
+		return messages.ProfileSelected{Profile: s}
 	}, k)
 }
 
 // NewRegion returns a SelectorModel configured for AWS region selection.
 func NewRegion(regions []string, activeRegion string, k keys.Map) SelectorModel {
 	return NewSelector(regions, activeRegion, "aws-regions", func(s string) tea.Msg {
-		return messages.RegionSelectedMsg{Region: s}
+		return messages.RegionSelected{Region: s}
 	}, k)
 }
 
 // NewTheme returns a SelectorModel configured for theme selection.
 func NewTheme(themeFiles []string, activeTheme string, k keys.Map) SelectorModel {
 	return NewSelector(themeFiles, activeTheme, "themes", func(s string) tea.Msg {
-		return messages.ThemeSelectedMsg{Theme: s}
+		return messages.ThemeSelected{Theme: s}
 	}, k)
 }
 

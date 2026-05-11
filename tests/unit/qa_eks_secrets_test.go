@@ -7,7 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
 
@@ -22,14 +22,14 @@ func TestQA_EKS_ListColumns(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to EKS resource list
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "eks",
 	})
 
 	// Load EKS fixture data
 	clusters := fixtureEKSClusters()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "eks",
 		Resources:    clusters,
 	})
@@ -126,13 +126,13 @@ func TestQA_EKS_FrameTitle(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "eks",
 	})
 
 	clusters := fixtureEKSClusters()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "eks",
 		Resources:    clusters,
 	})
@@ -155,19 +155,19 @@ func TestQA_EKS_DetailView(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to EKS
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "eks",
 	})
 
 	clusters := fixtureEKSClusters()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "eks",
 		Resources:    clusters,
 	})
 
 	// Navigate to detail view via NavigateMsg
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: &clusters[0],
 	})
@@ -186,7 +186,7 @@ func TestQA_EKS_DetailViewFields(t *testing.T) {
 	m := newRootSizedModel()
 
 	clusters := fixtureEKSClusters()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: &clusters[0],
 	})
@@ -213,7 +213,7 @@ func TestQA_EKS_YAMLView(t *testing.T) {
 	m := newRootSizedModel()
 
 	clusters := fixtureEKSClusters()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetYAML,
 		Resource: &clusters[0],
 	})
@@ -235,7 +235,7 @@ func TestQA_EKS_YAMLViewContainsData(t *testing.T) {
 	m := newRootSizedModel()
 
 	clusters := fixtureEKSClusters()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetYAML,
 		Resource: &clusters[0],
 	})
@@ -262,14 +262,14 @@ func TestQA_Secrets_ListColumns(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to Secrets Manager resource list
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
 	})
 
 	// Load Secrets fixture data
 	secrets := fixtureSecrets()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "secrets",
 		Resources:    secrets,
 	})
@@ -338,13 +338,13 @@ func TestQA_Secrets_FrameTitle(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
 	})
 
 	secrets := fixtureSecrets()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "secrets",
 		Resources:    secrets,
 	})
@@ -367,13 +367,13 @@ func TestQA_Secrets_XKeyTriggersReveal(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to Secrets Manager
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
 	})
 
 	secrets := fixtureSecrets()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "secrets",
 		Resources:    secrets,
 	})
@@ -394,13 +394,13 @@ func TestQA_Secrets_XKeyDoesNothingOnEC2(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to EC2 resource list
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
 
 	instances := fixtureEC2Instances()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    instances,
 	})
@@ -426,13 +426,13 @@ func TestQA_Secrets_XKeyDoesNothingOnRDS(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbi",
 	})
 
 	instances := fixtureRDSInstances()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "dbi",
 		Resources:    instances,
 	})
@@ -450,13 +450,13 @@ func TestQA_Secrets_XKeyDoesNothingOnS3(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "s3",
 	})
 
 	buckets := fixtureS3Buckets()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    buckets,
 	})
@@ -474,13 +474,13 @@ func TestQA_Secrets_XKeyDoesNothingOnEKS(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "eks",
 	})
 
 	clusters := fixtureEKSClusters()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "eks",
 		Resources:    clusters,
 	})
@@ -498,13 +498,13 @@ func TestQA_Secrets_XKeyDoesNothingOnRedis(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "redis",
 	})
 
 	clusters := fixtureRedisClusters()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "redis",
 		Resources:    clusters,
 	})
@@ -522,13 +522,13 @@ func TestQA_Secrets_XKeyDoesNothingOnDocDB(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbc",
 	})
 
 	clusters := fixtureDocDBClusters()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "dbc",
 		Resources:    clusters,
 	})
@@ -551,19 +551,19 @@ func TestQA_Secrets_RevealViewShowsSecretValue(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to secrets list first
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
 	})
 
 	secrets := fixtureSecrets()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "secrets",
 		Resources:    secrets,
 	})
 
 	// Simulate receiving the secret value
-	m, _ = rootApplyMsg(m, messages.ValueRevealedMsg{
+	m, _ = rootApplyMsg(m, messages.ValueRevealed{
 		ResourceType: "secrets",
 		ResourceID:   "test/integration",
 		Value:        "super-secret-password-123",
@@ -589,19 +589,19 @@ func TestQA_Secrets_RevealHeaderWarning(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to secrets list
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
 	})
 
 	secrets := fixtureSecrets()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "secrets",
 		Resources:    secrets,
 	})
 
 	// Trigger reveal
-	m, _ = rootApplyMsg(m, messages.ValueRevealedMsg{
+	m, _ = rootApplyMsg(m, messages.ValueRevealed{
 		ResourceType: "secrets",
 		ResourceID:   "test/integration",
 		Value:        "my-secret-value",
@@ -630,19 +630,19 @@ func TestQA_Secrets_RevealCopyReturnsCmd(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to secrets list
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
 	})
 
 	secrets := fixtureSecrets()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "secrets",
 		Resources:    secrets,
 	})
 
 	// Open reveal view
-	m, _ = rootApplyMsg(m, messages.ValueRevealedMsg{
+	m, _ = rootApplyMsg(m, messages.ValueRevealed{
 		ResourceType: "secrets",
 		ResourceID:   "test/integration",
 		Value:        "copy-me-secret",
@@ -663,19 +663,19 @@ func TestQA_Secrets_EscapeFromRevealReturnsToList(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to secrets list
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
 	})
 
 	secrets := fixtureSecrets()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "secrets",
 		Resources:    secrets,
 	})
 
 	// Open reveal view
-	m, _ = rootApplyMsg(m, messages.ValueRevealedMsg{
+	m, _ = rootApplyMsg(m, messages.ValueRevealed{
 		ResourceType: "secrets",
 		ResourceID:   "test/integration",
 		Value:        "my-secret-value",
@@ -718,7 +718,7 @@ func TestQA_Secrets_DetailView(t *testing.T) {
 	m := newRootSizedModel()
 
 	secrets := fixtureSecrets()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: &secrets[0],
 	})
@@ -742,7 +742,7 @@ func TestQA_Secrets_YAMLView(t *testing.T) {
 	m := newRootSizedModel()
 
 	secrets := fixtureSecrets()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetYAML,
 		Resource: &secrets[0],
 	})
@@ -764,7 +764,7 @@ func TestQA_Secrets_YAMLViewContainsData(t *testing.T) {
 	m := newRootSizedModel()
 
 	secrets := fixtureSecrets()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetYAML,
 		Resource: &secrets[0],
 	})
@@ -811,19 +811,19 @@ func TestQA_EKS_EscapeFromDetailReturnsToList(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "eks",
 	})
 
 	clusters := fixtureEKSClusters()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "eks",
 		Resources:    clusters,
 	})
 
 	// Push detail view
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: &clusters[0],
 	})
@@ -844,19 +844,19 @@ func TestQA_EKS_EscapeFromYAMLReturnsToList(t *testing.T) {
 	withTuiVersion(t, "0.6.0")
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "eks",
 	})
 
 	clusters := fixtureEKSClusters()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "eks",
 		Resources:    clusters,
 	})
 
 	// Push YAML view
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetYAML,
 		Resource: &clusters[0],
 	})
@@ -883,13 +883,13 @@ func TestQA_SSM_XKeyTriggersReveal(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to SSM resource list.
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ssm",
 	})
 
 	params := fixtureSSMParameters()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ssm",
 		Resources:    params,
 	})
@@ -911,19 +911,19 @@ func TestQA_SSM_RevealViewShowsParameterValue(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to SSM parameter list first.
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ssm",
 	})
 
 	params := fixtureSSMParameters()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ssm",
 		Resources:    params,
 	})
 
 	// Simulate receiving the parameter value via the generalised message.
-	m, _ = rootApplyMsg(m, messages.ValueRevealedMsg{
+	m, _ = rootApplyMsg(m, messages.ValueRevealed{
 		ResourceType: "ssm",
 		ResourceID:   "/app/db/password",
 		Value:        "s3cr3t-db-pass!",

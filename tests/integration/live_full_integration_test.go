@@ -11,7 +11,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 var (
@@ -34,9 +34,9 @@ func TestLiveFullIntegration_AllResourcesBaseline(t *testing.T) {
 	var connectCmd tea.Cmd
 	m, connectCmd = fullIntegrationApplyMsg(m, initMsg)
 	clientsReadyRaw := fullIntegrationRequireCmdMsg(t, connectCmd, "live AWS connect")
-	clientsReady, ok := clientsReadyRaw.(messages.ClientsReadyMsg)
+	clientsReady, ok := clientsReadyRaw.(messages.ClientsReady)
 	if !ok {
-		t.Fatalf("live AWS connect returned %T, expected messages.ClientsReadyMsg", clientsReadyRaw)
+		t.Fatalf("live AWS connect returned %T, expected messages.ClientsReady", clientsReadyRaw)
 	}
 	if clientsReady.Err != nil {
 		t.Fatalf("live AWS connect failed for profile=%q region=%q: %v", profile, region, clientsReady.Err)
@@ -54,7 +54,7 @@ func TestLiveFullIntegration_AllResourcesBaseline(t *testing.T) {
 	var prefetchCmd tea.Cmd
 	m, prefetchCmd = fullIntegrationApplyMsg(m, clientsReady)
 	availMsg := fullIntegrationExtractMsg(t, prefetchCmd, func(msg tea.Msg) bool {
-		_, ok := msg.(messages.AvailabilityPrefetchedMsg)
+		_, ok := msg.(messages.AvailabilityPrefetched)
 		return ok
 	})
 	m, _ = fullIntegrationApplyMsg(m, availMsg)
@@ -80,9 +80,9 @@ func TestLiveFullIntegration_RelatedHopScenarios(t *testing.T) {
 	var connectCmd tea.Cmd
 	m, connectCmd = fullIntegrationApplyMsg(m, initMsg)
 	clientsReadyRaw := fullIntegrationRequireCmdMsg(t, connectCmd, "live AWS connect")
-	clientsReady, ok := clientsReadyRaw.(messages.ClientsReadyMsg)
+	clientsReady, ok := clientsReadyRaw.(messages.ClientsReady)
 	if !ok {
-		t.Fatalf("live AWS connect returned %T, expected messages.ClientsReadyMsg", clientsReadyRaw)
+		t.Fatalf("live AWS connect returned %T, expected messages.ClientsReady", clientsReadyRaw)
 	}
 	if clientsReady.Err != nil {
 		t.Fatalf("live AWS connect failed for profile=%q region=%q: %v", profile, region, clientsReady.Err)
@@ -100,7 +100,7 @@ func TestLiveFullIntegration_RelatedHopScenarios(t *testing.T) {
 	var prefetchCmd tea.Cmd
 	m, prefetchCmd = fullIntegrationApplyMsg(m, clientsReady)
 	availMsg := fullIntegrationExtractMsg(t, prefetchCmd, func(msg tea.Msg) bool {
-		_, ok := msg.(messages.AvailabilityPrefetchedMsg)
+		_, ok := msg.(messages.AvailabilityPrefetched)
 		return ok
 	})
 	m, _ = fullIntegrationApplyMsg(m, availMsg)

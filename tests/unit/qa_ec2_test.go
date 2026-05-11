@@ -8,7 +8,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -30,11 +30,11 @@ func newEC2ListModel(t *testing.T) tui.Model {
 	tui.Version = "0.6.0"
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 40})
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    fixtureEC2Instances(),
 	})
@@ -197,7 +197,7 @@ func TestQA_EC2_A4_StatusColoring_StoppedRowHasANSI(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 40})
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -212,7 +212,7 @@ func TestQA_EC2_A4_StatusColoring_StoppedRowHasANSI(t *testing.T) {
 			"type":  "t3.micro",
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{stoppedInstance},
 	})
@@ -640,7 +640,7 @@ func TestQA_EC2_A10_4_CopyCopiesInstanceID(t *testing.T) {
 		t.Fatal("A.10.4: pressing c should return a command for copy")
 	}
 	msg := cmd()
-	flash, ok := msg.(messages.FlashMsg)
+	flash, ok := msg.(messages.Flash)
 	if !ok {
 		t.Fatalf("A.10.4: expected FlashMsg, got %T", msg)
 	}
@@ -699,11 +699,11 @@ func TestQA_EC2_A12_1_EmptyInstanceList(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 40})
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{},
 	})
@@ -721,7 +721,7 @@ func TestQA_EC2_A13_1_LoadingState(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 40})
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -766,7 +766,7 @@ func newEC2DetailModel(t *testing.T, r resource.Resource) tui.Model {
 	tui.Version = "0.6.0"
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 40})
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: &r,
 	})
@@ -911,7 +911,7 @@ func newEC2YAMLModel(t *testing.T, r resource.Resource) tui.Model {
 	tui.Version = "0.6.0"
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 40})
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetYAML,
 		Resource: &r,
 	})
@@ -1109,11 +1109,11 @@ func TestQA_EC2_D1_FullNavigationStack(t *testing.T) {
 	}
 
 	// Navigate to EC2 list
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    fixtureEC2Instances(),
 	})
@@ -1359,7 +1359,7 @@ func TestQA_EC2_FilterResources_ByLaunchTime(t *testing.T) {
 func TestQA_EC2_FlashMsgAfterCopy(t *testing.T) {
 	m := newEC2ListModel(t)
 
-	m, _ = rootApplyMsg(m, messages.FlashMsg{Text: "Copied!", IsError: false})
+	m, _ = rootApplyMsg(m, messages.Flash{Text: "Copied!", IsError: false})
 
 	plain := stripANSI(rootViewContent(m))
 

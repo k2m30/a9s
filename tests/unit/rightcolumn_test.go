@@ -27,7 +27,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -80,7 +80,7 @@ func showRelatedPanel(d views.DetailModel) views.DetailModel {
 
 // sendRelatedResult delivers a RelatedCheckResultMsg to a DetailModel and
 // returns the updated model.
-func sendRelatedResult(d views.DetailModel, msg messages.RelatedCheckResultMsg) views.DetailModel {
+func sendRelatedResult(d views.DetailModel, msg messages.RelatedCheckResult) views.DetailModel {
 	updated, _ := d.Update(msg)
 	return updated
 }
@@ -147,7 +147,7 @@ func TestRightColumn_CountUpdatesOnResult(t *testing.T) {
 
 	d := makeDetailForRelatedTest(t, 140)
 	d = showRelatedPanel(d)
-	d = sendRelatedResult(d, messages.RelatedCheckResultMsg{
+	d = sendRelatedResult(d, messages.RelatedCheckResult{
 		ResourceType: "ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "tg",
@@ -177,7 +177,7 @@ func TestRightColumn_ZeroCountDim(t *testing.T) {
 
 	d := makeDetailForRelatedTest(t, 140)
 	d = showRelatedPanel(d)
-	d = sendRelatedResult(d, messages.RelatedCheckResultMsg{
+	d = sendRelatedResult(d, messages.RelatedCheckResult{
 		ResourceType: "ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "tg",
@@ -207,7 +207,7 @@ func TestRightColumn_ErrorShowsDash(t *testing.T) {
 
 	d := makeDetailForRelatedTest(t, 140)
 	d = showRelatedPanel(d)
-	d = sendRelatedResult(d, messages.RelatedCheckResultMsg{
+	d = sendRelatedResult(d, messages.RelatedCheckResult{
 		ResourceType: "ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "tg",
@@ -318,7 +318,7 @@ func TestRightColumn_MultipleResults_EachUpdatesIndependently(t *testing.T) {
 
 	d := makeDetailForRelatedTest(t, 140)
 	d = showRelatedPanel(d)
-	d = sendRelatedResult(d, messages.RelatedCheckResultMsg{
+	d = sendRelatedResult(d, messages.RelatedCheckResult{
 		ResourceType: "ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "tg",
@@ -327,7 +327,7 @@ func TestRightColumn_MultipleResults_EachUpdatesIndependently(t *testing.T) {
 			Err:         nil,
 		},
 	})
-	d = sendRelatedResult(d, messages.RelatedCheckResultMsg{
+	d = sendRelatedResult(d, messages.RelatedCheckResult{
 		ResourceType: "ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "asg",
@@ -361,7 +361,7 @@ func TestRightColumn_WrongResourceType_ResultIgnored(t *testing.T) {
 	d := makeDetailForRelatedTest(t, 140)
 	d = sendToggleRelated(d)
 	// Deliver a result for "rds" — should be ignored by the ec2 detail model
-	d = sendRelatedResult(d, messages.RelatedCheckResultMsg{
+	d = sendRelatedResult(d, messages.RelatedCheckResult{
 		ResourceType: "rds",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "tg",

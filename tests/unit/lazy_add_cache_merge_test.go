@@ -59,7 +59,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // efsCheckerByTarget returns the registered related checker for "efs" that
@@ -83,7 +83,7 @@ func efsCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 // the given targetType.
 func execRelatedCheckerResult(t *testing.T, m tui.Model, resourceType string, source resource.Resource, targetType string) (resource.RelatedCheckResult, bool) {
 	t.Helper()
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   resourceType,
 		SourceResource: source,
 	})
@@ -98,7 +98,7 @@ func execRelatedCheckerResult(t *testing.T, m tui.Model, resourceType string, so
 
 	batchMsg, ok := rawMsg.(tea.BatchMsg)
 	if !ok {
-		if r, ok2 := rawMsg.(messages.RelatedCheckResultMsg); ok2 && r.Result.TargetType == targetType {
+		if r, ok2 := rawMsg.(messages.RelatedCheckResult); ok2 && r.Result.TargetType == targetType {
 			return r.Result, true
 		}
 		return resource.RelatedCheckResult{Count: -1}, false
@@ -112,7 +112,7 @@ func execRelatedCheckerResult(t *testing.T, m tui.Model, resourceType string, so
 		if msg == nil {
 			continue
 		}
-		if r, ok2 := msg.(messages.RelatedCheckResultMsg); ok2 && r.Result.TargetType == targetType {
+		if r, ok2 := msg.(messages.RelatedCheckResult); ok2 && r.Result.TargetType == targetType {
 			return r.Result, true
 		}
 	}
@@ -140,11 +140,11 @@ func setupLiveModeEFSDetail(t *testing.T) (tui.Model, resource.Resource) {
 
 	// Navigate to an EFS list so the model is in a suitable state, then
 	// "enter" detail by loading resources and sending an Enter key.
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "efs",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "efs",
 		Resources:    []resource.Resource{efsRes},
 	})
@@ -182,7 +182,7 @@ func TestLazyAdd_MergesIntoExistingCacheEntry_DedupByID(t *testing.T) {
 		},
 	}
 
-	m, _ = rootApplyMsg(m, messages.RelatedCheckResultMsg{
+	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "efs",
 		SourceResourceID: efsSource.ID,
 		Result:           resource.RelatedCheckResult{TargetType: "ecs-task", Count: 2},
@@ -212,7 +212,7 @@ func TestLazyAdd_MergesIntoExistingCacheEntry_DedupByID(t *testing.T) {
 		},
 	}
 
-	m, _ = rootApplyMsg(m, messages.RelatedCheckResultMsg{
+	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "efs",
 		SourceResourceID: efsSource.ID,
 		Result:           resource.RelatedCheckResult{TargetType: "ecs-task", Count: 2},
@@ -294,7 +294,7 @@ func TestLazyAdd_NoEntry_CreatesTruncatedEntry(t *testing.T) {
 		},
 	}
 
-	m, _ = rootApplyMsg(m, messages.RelatedCheckResultMsg{
+	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "efs",
 		SourceResourceID: efsSource.ID,
 		Result:           resource.RelatedCheckResult{TargetType: "ecs-task", Count: 1},
@@ -332,7 +332,7 @@ func TestLazyAdd_NoEntry_CreatesTruncatedEntry(t *testing.T) {
 		ID:     "task-different-999",
 		Fields: map[string]string{"efs_file_system_ids": efsSource.ID},
 	}
-	m, _ = rootApplyMsg(m, messages.RelatedCheckResultMsg{
+	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "efs",
 		SourceResourceID: efsSource.ID,
 		Result:           resource.RelatedCheckResult{TargetType: "ecs-task", Count: 1},
@@ -377,7 +377,7 @@ func TestCachedPages_DoesNotOverwriteExistingEntry(t *testing.T) {
 		ID:   "tg-existing-001",
 		Name: "tg-existing-001",
 	}
-	m, _ = rootApplyMsg(m, messages.RelatedCheckResultMsg{
+	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "ec2",
 		SourceResourceID: firstInstance.ID,
 		Result:           resource.RelatedCheckResult{TargetType: "tg", Count: 0},
@@ -395,7 +395,7 @@ func TestCachedPages_DoesNotOverwriteExistingEntry(t *testing.T) {
 		ID:   "tg-fresh-001",
 		Name: "tg-fresh-001",
 	}
-	m, _ = rootApplyMsg(m, messages.RelatedCheckResultMsg{
+	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "ec2",
 		SourceResourceID: firstInstance.ID,
 		Result:           resource.RelatedCheckResult{TargetType: "tg", Count: 0},
@@ -438,7 +438,7 @@ func TestCachedPages_DoesNotOverwriteExistingEntry(t *testing.T) {
 	// but if we now dispatch CachedPages AGAIN with IsTruncated=true for "tg",
 	// it should still be a no-op (existing entry preserved → IsTruncated=false →
 	// checker returns Approximate=false).
-	m, _ = rootApplyMsg(m, messages.RelatedCheckResultMsg{
+	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "ec2",
 		SourceResourceID: firstInstance.ID,
 		Result:           resource.RelatedCheckResult{TargetType: "tg"},
@@ -475,7 +475,7 @@ func TestLazyAdd_EmptyResources_NoOp(t *testing.T) {
 	m, efsSource := setupLiveModeEFSDetail(t)
 
 	// Dispatch LazyAddedResources with an empty slice.
-	m, _ = rootApplyMsg(m, messages.RelatedCheckResultMsg{
+	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "efs",
 		SourceResourceID: efsSource.ID,
 		Result:           resource.RelatedCheckResult{TargetType: "ecs-task", Count: 0},
@@ -492,7 +492,7 @@ func TestLazyAdd_EmptyResources_NoOp(t *testing.T) {
 		Name:   "task-marker-001",
 		Fields: map[string]string{"efs_file_system_ids": efsSource.ID},
 	}
-	m, _ = rootApplyMsg(m, messages.RelatedCheckResultMsg{
+	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "efs",
 		SourceResourceID: efsSource.ID,
 		Result:           resource.RelatedCheckResult{TargetType: "ecs-task", Count: 1},

@@ -13,7 +13,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ── Clipboard copy tests ────────────────────────────────────────────────────
@@ -22,13 +22,13 @@ func TestWiring_CopyInResourceList_ReturnsFlashMsg(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to ec2 resource list
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
 
 	// Load some resources
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources: []resource.Resource{
 			{ID: "i-abc123", Name: "web-server", Status: "running", Fields: map[string]string{"instance_id": "i-abc123"}},
@@ -45,12 +45,12 @@ func TestWiring_CopyInResourceList_ReturnsFlashMsg(t *testing.T) {
 	// Execute the command — should return a FlashMsg or CopiedMsg
 	msg := cmd()
 	switch v := msg.(type) {
-	case messages.FlashMsg:
+	case messages.Flash:
 		if v.IsError {
 			// Clipboard may fail in CI, but should still produce a FlashMsg
 			t.Logf("clipboard copy returned error flash: %s (expected in headless env)", v.Text)
 		}
-	case messages.CopiedMsg:
+	case messages.Copied:
 		if v.Content != "i-abc123" {
 			t.Errorf("CopiedMsg.Content should be 'i-abc123', got %q", v.Content)
 		}
@@ -69,7 +69,7 @@ func TestWiring_CopyInDetailView_ReturnsFlashMsg(t *testing.T) {
 	}
 
 	// Navigate to detail
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: res,
 	})
@@ -83,9 +83,9 @@ func TestWiring_CopyInDetailView_ReturnsFlashMsg(t *testing.T) {
 
 	msg := cmd()
 	switch msg.(type) {
-	case messages.FlashMsg:
+	case messages.Flash:
 		// OK — clipboard may succeed or fail
-	case messages.CopiedMsg:
+	case messages.Copied:
 		// OK
 	default:
 		t.Errorf("expected FlashMsg or CopiedMsg, got %T", msg)
@@ -104,7 +104,7 @@ func TestWiring_CopyInDetailView_UsesActiveFieldValue(t *testing.T) {
 		},
 	}
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "ec2",
 		Resource:     res,
@@ -117,11 +117,11 @@ func TestWiring_CopyInDetailView_UsesActiveFieldValue(t *testing.T) {
 
 	msg := cmd()
 	switch v := msg.(type) {
-	case messages.CopiedMsg:
+	case messages.Copied:
 		if v.Content != "i-abc123" {
 			t.Errorf("CopiedMsg.Content should be the active field value, got %q", v.Content)
 		}
-	case messages.FlashMsg:
+	case messages.Flash:
 		if !strings.Contains(v.Text, "i-abc123") && !strings.HasPrefix(v.Text, "Copy failed:") {
 			t.Errorf("flash should mention copied field value, got %q", v.Text)
 		}
@@ -144,7 +144,7 @@ func TestWiring_EscapeOnFocusedRightColumn_StaysInDetail(t *testing.T) {
 		},
 	}
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "ec2",
 		Resource:     res,
@@ -175,7 +175,7 @@ func TestWiring_CopyInYAMLView_ReturnsFlashMsg(t *testing.T) {
 	}
 
 	// Navigate to YAML
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetYAML,
 		Resource: res,
 	})
@@ -189,9 +189,9 @@ func TestWiring_CopyInYAMLView_ReturnsFlashMsg(t *testing.T) {
 
 	msg := cmd()
 	switch msg.(type) {
-	case messages.FlashMsg:
+	case messages.Flash:
 		// OK
-	case messages.CopiedMsg:
+	case messages.Copied:
 		// OK
 	default:
 		t.Errorf("expected FlashMsg or CopiedMsg, got %T", msg)
@@ -202,7 +202,7 @@ func TestWiring_CopyInRevealView_ReturnsFlashMsg(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Push a reveal view via ValueRevealedMsg
-	m, _ = rootApplyMsg(m, messages.ValueRevealedMsg{
+	m, _ = rootApplyMsg(m, messages.ValueRevealed{
 		ResourceID: "my-secret",
 		Value:      "s3cr3t-value",
 	})
@@ -216,9 +216,9 @@ func TestWiring_CopyInRevealView_ReturnsFlashMsg(t *testing.T) {
 
 	msg := cmd()
 	switch msg.(type) {
-	case messages.FlashMsg:
+	case messages.Flash:
 		// OK
-	case messages.CopiedMsg:
+	case messages.Copied:
 		// OK
 	default:
 		t.Errorf("expected FlashMsg or CopiedMsg, got %T", msg)
@@ -231,7 +231,7 @@ func TestWiring_RefreshInResourceList_ReturnsFetchCmd(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to ec2 resource list
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -246,11 +246,11 @@ func TestWiring_RefreshInResourceList_ReturnsFetchCmd(t *testing.T) {
 	// Execute the cmd — should yield APIErrorMsg (nil clients) or ResourcesLoadedMsg
 	msg := cmd()
 	switch msg.(type) {
-	case messages.APIErrorMsg:
+	case messages.APIError:
 		// Expected: no clients initialized
-	case messages.ResourcesLoadedMsg:
+	case messages.ResourcesLoaded:
 		// Would happen if clients were set
-	case messages.FlashMsg:
+	case messages.Flash:
 		// Refreshing flash is also OK
 	default:
 		t.Errorf("expected APIErrorMsg or ResourcesLoadedMsg, got %T", msg)
@@ -297,7 +297,7 @@ func TestWiring_ClientsReady_DemoMode_TriggersAvailabilityProbes(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// Send ClientsReadyMsg — demo mode should still fire availability probes
-	_, cmd := rootApplyMsg(m, messages.ClientsReadyMsg{})
+	_, cmd := rootApplyMsg(m, messages.ClientsReady{})
 
 	if cmd == nil {
 		t.Fatal("ClientsReadyMsg in demo mode should return non-nil cmd (identity + availability probes)")
@@ -305,7 +305,7 @@ func TestWiring_ClientsReady_DemoMode_TriggersAvailabilityProbes(t *testing.T) {
 
 	// Execute the batch and look for an AvailabilityCacheLoadedMsg
 	found := extractMsg(t, cmd, func(msg tea.Msg) bool {
-		_, ok := msg.(messages.AvailabilityCacheLoadedMsg)
+		_, ok := msg.(messages.AvailabilityCacheLoaded)
 		return ok
 	})
 	if found == nil {
@@ -323,7 +323,7 @@ func TestWiring_ClientsReady_DemoMode_NoCache_SkipsAvailability(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// Send ClientsReadyMsg — with --no-cache, should only produce identity, NOT availability
-	_, cmd := rootApplyMsg(m, messages.ClientsReadyMsg{})
+	_, cmd := rootApplyMsg(m, messages.ClientsReady{})
 
 	if cmd == nil {
 		t.Fatal("ClientsReadyMsg in demo+no-cache should still return identity cmd")
@@ -337,13 +337,13 @@ func TestWiring_ClientsReady_DemoMode_NoCache_SkipsAvailability(t *testing.T) {
 				continue
 			}
 			subMsg := subCmd()
-			if _, isAvail := subMsg.(messages.AvailabilityCacheLoadedMsg); isAvail {
+			if _, isAvail := subMsg.(messages.AvailabilityCacheLoaded); isAvail {
 				t.Error("ClientsReadyMsg in demo+no-cache mode should NOT produce AvailabilityCacheLoadedMsg")
 			}
 		}
 	} else {
 		// Not a batch — check the single message
-		if _, isAvail := msg.(messages.AvailabilityCacheLoadedMsg); isAvail {
+		if _, isAvail := msg.(messages.AvailabilityCacheLoaded); isAvail {
 			t.Error("ClientsReadyMsg in demo+no-cache mode should NOT produce AvailabilityCacheLoadedMsg")
 		}
 	}
@@ -358,7 +358,7 @@ func TestWiring_AvailabilityComplete_ClearsFlash(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Set flash to simulate "Refreshing availability..." state
-	m, _ = rootApplyMsg(m, messages.FlashMsg{Text: "Refreshing availability...", IsError: false})
+	m, _ = rootApplyMsg(m, messages.Flash{Text: "Refreshing availability...", IsError: false})
 
 	// Verify flash is active
 	rendered := stripANSI(rootViewContent(m))
@@ -367,7 +367,7 @@ func TestWiring_AvailabilityComplete_ClearsFlash(t *testing.T) {
 	}
 
 	// Send AvailabilityCacheLoadedMsg to build the queue and fire first 3 probes
-	m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoaded{
 		Entries: make(map[string]int),
 		Expired: true,
 	})
@@ -379,7 +379,7 @@ func TestWiring_AvailabilityComplete_ClearsFlash(t *testing.T) {
 	allNames := resource.AllShortNames()
 	var lastCmd tea.Cmd
 	for _, name := range allNames {
-		m, lastCmd = rootApplyMsg(m, messages.AvailabilityCheckedMsg{
+		m, lastCmd = rootApplyMsg(m, messages.AvailabilityChecked{
 			ResourceType: name,
 			HasResources: true,
 			Count:        1,
@@ -413,7 +413,7 @@ func TestWiring_RefreshOnMainMenu_DemoMode_TriggersProbes(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// First send ClientsReadyMsg so probes can run
-	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{})
+	m, _ = rootApplyMsg(m, messages.ClientsReady{})
 
 	// Press ctrl+r on the main menu
 	_, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
@@ -449,12 +449,12 @@ func TestWiring_DemoMode_ProbeCount_MatchesPaginatedPageSize(t *testing.T) {
 		tui.WithProfile(demo.DemoProfile),
 		tui.WithRegion(demo.DemoRegion))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
-	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{Clients: demo.NewServiceClients()})
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: demo.NewServiceClients()})
 
 	// Step 3: Send AvailabilityCacheLoadedMsg to start the probe pipeline.
 	// In demo mode, loadAvailabilityCache returns Expired: true (no cache file),
 	// so we can send the message directly to start probes.
-	m, cmd := rootApplyMsg(m, messages.AvailabilityCacheLoadedMsg{
+	m, cmd := rootApplyMsg(m, messages.AvailabilityCacheLoaded{
 		Entries: make(map[string]int),
 		Expired: true,
 	})
@@ -467,7 +467,7 @@ func TestWiring_DemoMode_ProbeCount_MatchesPaginatedPageSize(t *testing.T) {
 	collected := make(map[string]probeResult)
 	for cmd != nil {
 		msg := cmd()
-		if acm, ok := msg.(messages.AvailabilityCheckedMsg); ok {
+		if acm, ok := msg.(messages.AvailabilityChecked); ok {
 			collected[acm.ResourceType] = probeResult{Count: acm.Count, Truncated: acm.Truncated}
 			m, cmd = rootApplyMsg(m, acm)
 			continue
@@ -478,7 +478,7 @@ func TestWiring_DemoMode_ProbeCount_MatchesPaginatedPageSize(t *testing.T) {
 					continue
 				}
 				subMsg := subCmd()
-				if acm, ok := subMsg.(messages.AvailabilityCheckedMsg); ok {
+				if acm, ok := subMsg.(messages.AvailabilityChecked); ok {
 					collected[acm.ResourceType] = probeResult{Count: acm.Count, Truncated: acm.Truncated}
 					m, cmd = rootApplyMsg(m, acm)
 				}
@@ -505,13 +505,13 @@ func TestWiring_RevealForSecrets_ReturnsFetchCmd(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to secrets resource list
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
 	})
 
 	// Load a secret
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "secrets",
 		Resources: []resource.Resource{
 			{ID: "my-secret", Name: "my-secret", Status: "active", Fields: map[string]string{"secret_name": "my-secret"}},
@@ -528,9 +528,9 @@ func TestWiring_RevealForSecrets_ReturnsFetchCmd(t *testing.T) {
 	// Execute the cmd — should yield FlashMsg (nil clients) or ValueRevealedMsg
 	msg := cmd()
 	switch msg.(type) {
-	case messages.FlashMsg:
+	case messages.Flash:
 		// Expected: no clients initialized
-	case messages.ValueRevealedMsg:
+	case messages.ValueRevealed:
 		// Would happen if clients were set
 	default:
 		t.Errorf("expected FlashMsg or ValueRevealedMsg, got %T", msg)
@@ -541,13 +541,13 @@ func TestWiring_RevealNotForNonSecrets(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to ec2 resource list
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
 
 	// Load a resource
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources: []resource.Resource{
 			{ID: "i-abc123", Name: "web-server", Status: "running", Fields: map[string]string{"instance_id": "i-abc123"}},
@@ -561,9 +561,9 @@ func TestWiring_RevealNotForNonSecrets(t *testing.T) {
 		// Execute to check it's not a reveal command
 		msg := cmd()
 		switch msg := msg.(type) {
-		case messages.ValueRevealedMsg:
+		case messages.ValueRevealed:
 			t.Error("pressing 'x' on non-secrets resource should not trigger reveal")
-		case messages.NavigateMsg:
+		case messages.Navigate:
 			if msg.Target == messages.TargetReveal {
 				t.Error("pressing 'x' on non-secrets resource should not navigate to reveal")
 			}
@@ -579,7 +579,7 @@ func TestWiring_EmptyProfileShowsDefaultInHeader(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// Simulate AWS connection completing
-	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{Clients: nil, Err: nil})
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Err: nil})
 
 	rendered := stripANSI(rootViewContent(m))
 	if !strings.Contains(rendered, "default") {
@@ -591,10 +591,10 @@ func TestWiring_ViewConfigLoadedOnClientsReady(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Send ClientsReadyMsg — viewConfig should be loaded
-	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{Clients: nil, Err: nil})
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Err: nil})
 
 	// Navigate to resource list — it should work (viewConfig used internally)
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -619,7 +619,7 @@ func TestWiring_ViewConfigLoadedAtInit(t *testing.T) {
 	}
 
 	// Navigate to resource list with viewConfig
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -637,7 +637,7 @@ func TestWiring_ValueRevealedMsg_PushesRevealView(t *testing.T) {
 	tui.Version = "1.0.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.ValueRevealedMsg{
+	m, _ = rootApplyMsg(m, messages.ValueRevealed{
 		ResourceID: "prod/db-password",
 		Value:      "hunter2",
 	})
@@ -656,7 +656,7 @@ func TestWiring_ValueRevealedMsg_Error(t *testing.T) {
 	tui.Version = "1.0.0"
 	m := newRootSizedModel()
 
-	m, cmd := rootApplyMsg(m, messages.ValueRevealedMsg{
+	m, cmd := rootApplyMsg(m, messages.ValueRevealed{
 		Err: errForTest("access denied"),
 	})
 	// The handler now returns a FlashMsg command; dispatch it.

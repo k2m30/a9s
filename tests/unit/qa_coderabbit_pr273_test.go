@@ -42,7 +42,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // =============================================================================
@@ -100,7 +100,7 @@ func TestCR273_Item18_MenuCtrlZ_NoFalsePositives_AllTypes(t *testing.T) {
 		issueKnown[td.ShortName] = true
 	}
 
-	m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoaded{
 		Entries:        entries,
 		Truncated:      truncated,
 		IssueCounts:    issueCounts,
@@ -111,7 +111,7 @@ func TestCR273_Item18_MenuCtrlZ_NoFalsePositives_AllTypes(t *testing.T) {
 
 	// Wave 2 clean for every enricher-backed type.
 	for shortName := range awsclient.IssueEnricherRegistry {
-		m, _ = rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+		m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: shortName,
 			Issues:       0,
 			Truncated:    false,
@@ -163,7 +163,7 @@ func TestCR273_Item18_MenuCtrlZ_Wave2AuthoritativeZero_AllEnricherTypes(t *testi
 		issueKnown[shortName] = true
 	}
 
-	m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoaded{
 		Entries:        entries,
 		Truncated:      map[string]bool{},
 		IssueCounts:    issueCounts,
@@ -174,7 +174,7 @@ func TestCR273_Item18_MenuCtrlZ_Wave2AuthoritativeZero_AllEnricherTypes(t *testi
 
 	// Wave 2: authoritative zero for every enricher-backed type.
 	for shortName := range awsclient.IssueEnricherRegistry {
-		m, _ = rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+		m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: shortName,
 			Issues:       0,
 			Truncated:    false,
@@ -233,7 +233,7 @@ func TestCR273_Item18_MenuCtrlZ_Wave2ErroredSubCall_AllEnricherTypes(t *testing.
 		issueKnown[shortName] = true
 	}
 
-	m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoaded{
 		Entries:        entries,
 		Truncated:      map[string]bool{},
 		IssueCounts:    issueCounts,
@@ -245,7 +245,7 @@ func TestCR273_Item18_MenuCtrlZ_Wave2ErroredSubCall_AllEnricherTypes(t *testing.
 	// Wave 2: for each enricher-backed type, a sub-call errored → Truncated=true,
 	// but Findings={} and Issues=0 (no actual issue seen).
 	for shortName := range awsclient.IssueEnricherRegistry {
-		m, _ = rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+		m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: shortName,
 			Issues:       0,
 			Truncated:    true,
@@ -297,7 +297,7 @@ func TestCR273_Item18_MenuCtrlZ_NoFalseNegatives_AllEnricherTypes(t *testing.T) 
 			continue
 		}
 		m := newRootSizedModel()
-		m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoadedMsg{
+		m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoaded{
 			Entries:        map[string]int{shortName: 3},
 			Truncated:      map[string]bool{},
 			IssueCounts:    map[string]int{shortName: 2},
@@ -331,7 +331,7 @@ func TestCR273_Item18_MenuCtrlZ_NoFalseNegatives_AllRegisteredTypes(t *testing.T
 			continue
 		}
 		m := newRootSizedModel()
-		m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoadedMsg{
+		m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoaded{
 			Entries:        map[string]int{td.ShortName: 3},
 			Truncated:      map[string]bool{},
 			IssueCounts:    map[string]int{td.ShortName: 2},
@@ -544,7 +544,7 @@ func TestCR273_Item6_Gen0_BypassesSessionGuard(t *testing.T) {
 
 	// Step 2: bump enrichmentGen by switching profile (→ enrichmentGen=1).
 	// We don't execute the returned cmd (AWS connect) — only the state update matters.
-	m, _ = rootApplyMsg(m, messages.ProfileSelectedMsg{Profile: "test-profile-switched"})
+	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "test-profile-switched"})
 
 	genAfterSwitch := m.EnrichmentGen()
 	if genAfterSwitch == 0 {
@@ -556,13 +556,13 @@ func TestCR273_Item6_Gen0_BypassesSessionGuard(t *testing.T) {
 
 	// Load resources so the list has items to mark.
 	resources := rerunEC2Resources()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    resources,
 	})
 
 	// Step 4: send Gen=0 injection message — must bypass session guard.
-	injected := messages.EnrichmentCheckedMsg{
+	injected := messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Issues:       1,
 		Truncated:    false,

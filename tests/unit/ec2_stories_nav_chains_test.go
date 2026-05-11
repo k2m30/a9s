@@ -27,7 +27,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ---------------------------------------------------------------------------
@@ -90,7 +90,7 @@ func ec2TestResource() resource.Resource {
 func chainNavigateToEC2Detail(t *testing.T, m tui.Model) tui.Model {
 	t.Helper()
 	ec2Res := ec2TestResource()
-	m, _ = chainApplyMsg(m, messages.NavigateMsg{
+	m, _ = chainApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "ec2",
 		Resource:     &ec2Res,
@@ -101,7 +101,7 @@ func chainNavigateToEC2Detail(t *testing.T, m tui.Model) tui.Model {
 // chainPreloadResources injects a ResourcesLoadedMsg to pre-populate the model's
 // resource cache for a given type before sending navigation messages.
 func chainPreloadResources(m tui.Model, resType string, resources []resource.Resource) tui.Model {
-	m, _ = chainApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = chainApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: resType,
 		Resources:    resources,
 	})
@@ -142,7 +142,7 @@ func TestEC2_027_ASG_Count1_OpensChildView(t *testing.T) {
 	}
 	m = chainPreloadResources(m, "asg", []resource.Resource{asgRes})
 
-	m, cmd := chainApplyMsg(m, messages.RelatedNavigateMsg{
+	m, cmd := chainApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "asg",
 		TargetID:   "web-prod-asg",
 	})
@@ -190,7 +190,7 @@ func TestEC2_028_EIP_Count1_OpensDetail(t *testing.T) {
 	}
 	m = chainPreloadResources(m, "eip", []resource.Resource{eipRes})
 
-	m, _ = chainApplyMsg(m, messages.RelatedNavigateMsg{
+	m, _ = chainApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "eip",
 		TargetID:   "eipalloc-0abc123def456789a",
 	})
@@ -226,13 +226,13 @@ func TestEC2_030_EnterOnAlarmInFilteredList(t *testing.T) {
 	m = chainPreloadResources(m, "alarm", alarms)
 
 	// Navigate to filtered alarm list (count=2 path)
-	m, _ = chainApplyMsg(m, messages.RelatedNavigateMsg{
+	m, _ = chainApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "alarm",
 		RelatedIDs: []string{"web-prod-cpu-high", "web-prod-status-check"},
 	})
 
 	// Now open alarm detail via NavigateMsg
-	m, _ = chainApplyMsg(m, messages.NavigateMsg{
+	m, _ = chainApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "alarm",
 		Resource:     &alarms[0],
@@ -261,13 +261,13 @@ func TestEC2_031_EscFromAlarmDetail_ReturnsToFilteredList(t *testing.T) {
 	m = chainPreloadResources(m, "alarm", alarms)
 
 	// Push filtered alarm list
-	m, _ = chainApplyMsg(m, messages.RelatedNavigateMsg{
+	m, _ = chainApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "alarm",
 		RelatedIDs: []string{"web-prod-cpu-high", "web-prod-status-check"},
 	})
 
 	// Push alarm detail
-	m, _ = chainApplyMsg(m, messages.NavigateMsg{
+	m, _ = chainApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "alarm",
 		Resource:     &alarms[0],
@@ -308,13 +308,13 @@ func TestEC2_032_EscFromFilteredList_ReturnsToEC2Detail(t *testing.T) {
 	m = chainPreloadResources(m, "alarm", alarms)
 
 	// Push filtered alarm list
-	m, _ = chainApplyMsg(m, messages.RelatedNavigateMsg{
+	m, _ = chainApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "alarm",
 		RelatedIDs: []string{"web-prod-cpu-high", "web-prod-status-check"},
 	})
 
 	// Push alarm detail
-	m, _ = chainApplyMsg(m, messages.NavigateMsg{
+	m, _ = chainApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "alarm",
 		Resource:     &alarms[0],
@@ -349,7 +349,7 @@ func TestEC2_034_EBSSnapshots_MultiHop(t *testing.T) {
 	}
 	m = chainPreloadResources(m, "ebs-snap", snaps)
 
-	m, _ = chainApplyMsg(m, messages.RelatedNavigateMsg{
+	m, _ = chainApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "ebs-snap",
 		RelatedIDs: []string{"snap-0aaa111111111111a", "snap-0bbb222222222222b"},
 	})
@@ -392,7 +392,7 @@ func TestEC2_035_ChainA_EC2ToVPCAndBack(t *testing.T) {
 	m = chainPreloadResources(m, "vpc", []resource.Resource{vpcRes})
 
 	// Navigate to VPC detail
-	m, _ = chainApplyMsg(m, messages.RelatedNavigateMsg{
+	m, _ = chainApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "vpc",
 		TargetID:   "vpc-0abc123def456789a",
 	})
@@ -433,7 +433,7 @@ func TestEC2_036_ChainB_EC2ToSubnetAndBack(t *testing.T) {
 	m = chainPreloadResources(m, "subnet", []resource.Resource{subnetRes})
 
 	// Navigate to Subnet detail
-	m, _ = chainApplyMsg(m, messages.RelatedNavigateMsg{
+	m, _ = chainApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "subnet",
 		TargetID:   "subnet-0aaa111111111111a",
 	})
@@ -474,7 +474,7 @@ func TestEC2_037_ChainC_EC2ToSGAndBack(t *testing.T) {
 	m = chainPreloadResources(m, "sg", []resource.Resource{sgRes})
 
 	// Navigate to SG detail
-	m, _ = chainApplyMsg(m, messages.RelatedNavigateMsg{
+	m, _ = chainApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "sg",
 		TargetID:   "sg-0aaa111111111111a",
 	})
@@ -517,7 +517,7 @@ func TestEC2_038_ChainD_EC2TabToTGAndBack(t *testing.T) {
 	m = chainPreloadResources(m, "tg", []resource.Resource{tgRes})
 
 	// Simulate right-column Enter on TG (count=1 path uses TargetID)
-	m, cmd := chainApplyMsg(m, messages.RelatedNavigateMsg{
+	m, cmd := chainApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "tg",
 		TargetID:   "tg-web-prod",
 	})
@@ -566,7 +566,7 @@ func TestEC2_039_ChainE_EC2ToAlarmListToDetailAndBackx2(t *testing.T) {
 	m = chainPreloadResources(m, "alarm", alarms)
 
 	// Step 1: Push filtered alarm list (2 of 3 alarms)
-	m, _ = chainApplyMsg(m, messages.RelatedNavigateMsg{
+	m, _ = chainApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "alarm",
 		RelatedIDs: []string{"alarm-ec2039-cpu", "alarm-ec2039-status"},
 	})
@@ -580,7 +580,7 @@ func TestEC2_039_ChainE_EC2ToAlarmListToDetailAndBackx2(t *testing.T) {
 	}
 
 	// Step 2: Push alarm detail
-	m, _ = chainApplyMsg(m, messages.NavigateMsg{
+	m, _ = chainApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "alarm",
 		Resource:     &alarms[0],
@@ -623,12 +623,12 @@ func TestEC2_040_ChainF_Depth6_EC2ToVPCToSubnetAndBack(t *testing.T) {
 	// stack: menu (1)
 
 	// Navigate to EC2 list then detail (stack: menu + ec2-list + ec2-detail = 3)
-	m, _ = chainApplyMsg(m, messages.NavigateMsg{
+	m, _ = chainApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
 	ec2Res := ec2TestResource()
-	m, _ = chainApplyMsg(m, messages.NavigateMsg{
+	m, _ = chainApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "ec2",
 		Resource:     &ec2Res,
@@ -649,7 +649,7 @@ func TestEC2_040_ChainF_Depth6_EC2ToVPCToSubnetAndBack(t *testing.T) {
 	m = chainPreloadResources(m, "subnet", subnets)
 
 	// Navigate to VPC detail (depth 4)
-	m, _ = chainApplyMsg(m, messages.RelatedNavigateMsg{
+	m, _ = chainApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "vpc",
 		TargetID:   "vpc-0abc123def456789a",
 	})
@@ -660,7 +660,7 @@ func TestEC2_040_ChainF_Depth6_EC2ToVPCToSubnetAndBack(t *testing.T) {
 	}
 
 	// Navigate to filtered Subnet list (depth 5)
-	m, _ = chainApplyMsg(m, messages.RelatedNavigateMsg{
+	m, _ = chainApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "subnet",
 		RelatedIDs: []string{"subnet-0aaa111111111111a", "subnet-0bbb222222222222b"},
 	})
@@ -671,7 +671,7 @@ func TestEC2_040_ChainF_Depth6_EC2ToVPCToSubnetAndBack(t *testing.T) {
 	}
 
 	// Navigate to Subnet detail (depth 6)
-	m, _ = chainApplyMsg(m, messages.NavigateMsg{
+	m, _ = chainApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "subnet",
 		Resource:     &subnets[0],
@@ -722,7 +722,7 @@ func TestEC2_041_ChainG_MixedLeftAndRight(t *testing.T) {
 	m = chainPreloadResources(m, "sg", []resource.Resource{sgRes})
 
 	// Step 1: Left-col Enter on GroupId → SG detail
-	m, _ = chainApplyMsg(m, messages.RelatedNavigateMsg{
+	m, _ = chainApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "sg",
 		TargetID:   "sg-0aaa111111111111a",
 	})
@@ -737,7 +737,7 @@ func TestEC2_041_ChainG_MixedLeftAndRight(t *testing.T) {
 	m = chainPreloadResources(m, "ec2", []resource.Resource{ec2Res})
 
 	// Step 2: Right-col Enter on "EC2 Instances" → filtered EC2 list
-	m, _ = chainApplyMsg(m, messages.RelatedNavigateMsg{
+	m, _ = chainApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "ec2",
 		RelatedIDs: []string{"i-0a1b2c3d4e5f60001"},
 	})
@@ -787,7 +787,7 @@ func TestEC2_042_NavToMissingResource_FlashMessage(t *testing.T) {
 
 	// Do NOT pre-load any resource in the "ami" type cache.
 	// Navigating to an AMI ID that doesn't exist should fail gracefully.
-	m, _ = chainApplyMsg(m, messages.RelatedNavigateMsg{
+	m, _ = chainApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "ami",
 		TargetID:   "ami-nonexistent-000000",
 	})
@@ -822,14 +822,14 @@ func TestEC2_046_DepthIndicator(t *testing.T) {
 	// Reach depth 6 by pushing five more views.
 
 	// depth 2: EC2 list
-	m, _ = chainApplyMsg(m, messages.NavigateMsg{
+	m, _ = chainApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
 
 	// depth 3: EC2 detail
 	ec2Res := ec2TestResource()
-	m, _ = chainApplyMsg(m, messages.NavigateMsg{
+	m, _ = chainApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "ec2",
 		Resource:     &ec2Res,
@@ -838,20 +838,20 @@ func TestEC2_046_DepthIndicator(t *testing.T) {
 	// depth 4: VPC detail
 	vpcRes := resource.Resource{ID: "vpc-depth4", Name: "vpc-depth4", Status: "available"}
 	m = chainPreloadResources(m, "vpc", []resource.Resource{vpcRes})
-	m, _ = chainApplyMsg(m, messages.RelatedNavigateMsg{TargetType: "vpc", TargetID: "vpc-depth4"})
+	m, _ = chainApplyMsg(m, messages.RelatedNavigate{TargetType: "vpc", TargetID: "vpc-depth4"})
 
 	// depth 5: Subnet list
 	subnets := []resource.Resource{
 		{ID: "subnet-depth5a", Name: "depth5-subnet", Status: "available"},
 	}
 	m = chainPreloadResources(m, "subnet", subnets)
-	m, _ = chainApplyMsg(m, messages.RelatedNavigateMsg{
+	m, _ = chainApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "subnet",
 		RelatedIDs: []string{"subnet-depth5a"},
 	})
 
 	// depth 6: Subnet detail
-	m, _ = chainApplyMsg(m, messages.NavigateMsg{
+	m, _ = chainApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "subnet",
 		Resource:     &subnets[0],
@@ -902,7 +902,7 @@ func TestEC2_058_CloudTrailPreFiltered(t *testing.T) {
 	}
 	m = chainPreloadResources(m, "cloudtrail", cloudtrailEvents)
 
-	m, _ = chainApplyMsg(m, messages.RelatedNavigateMsg{
+	m, _ = chainApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "cloudtrail",
 		RelatedIDs: []string{"event-001"},
 	})
@@ -931,7 +931,7 @@ func TestEC2_059_SessionCachePreventsRecheck(t *testing.T) {
 	m = chainNavigateToEC2Detail(t, m)
 
 	// Deliver related check results for this EC2 instance
-	checkResult := messages.RelatedCheckResultMsg{
+	checkResult := messages.RelatedCheckResult{
 		ResourceType: "ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "tg",
@@ -946,7 +946,7 @@ func TestEC2_059_SessionCachePreventsRecheck(t *testing.T) {
 
 	// Navigate back to the same EC2 detail
 	ec2Res := ec2TestResource()
-	m, _ = chainApplyMsg(m, messages.NavigateMsg{
+	m, _ = chainApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "ec2",
 		Resource:     &ec2Res,

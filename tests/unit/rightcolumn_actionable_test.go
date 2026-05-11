@@ -35,7 +35,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -79,7 +79,7 @@ func injectApproxResult(
 	fetchFilter map[string]string,
 	err error,
 ) views.DetailModel {
-	msg := messages.RelatedCheckResultMsg{
+	msg := messages.RelatedCheckResult{
 		ResourceType: "approx-test-ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "tg",
@@ -121,7 +121,7 @@ func isApproxNavMsg(msg tea.Msg) bool {
 	if msg == nil {
 		return false
 	}
-	_, ok := msg.(messages.RelatedNavigateMsg)
+	_, ok := msg.(messages.RelatedNavigate)
 	return ok
 }
 
@@ -241,7 +241,7 @@ func TestIsActionableRow_PositiveCount_NoFilter(t *testing.T) {
 
 	d = focusRightColWhileLoading(t, d)
 	// Inject count=5 with ResourceIDs (required when Count>0).
-	injectMsg := messages.RelatedCheckResultMsg{
+	injectMsg := messages.RelatedCheckResult{
 		ResourceType: "approx-test-ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "tg",
@@ -265,7 +265,7 @@ func TestIsActionableRow_ApproxN_NoFilter(t *testing.T) {
 	defer cleanup()
 
 	d = focusRightColWhileLoading(t, d)
-	injectMsg := messages.RelatedCheckResultMsg{
+	injectMsg := messages.RelatedCheckResult{
 		ResourceType: "approx-test-ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "tg",

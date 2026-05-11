@@ -7,7 +7,7 @@ import (
 	lipgloss "charm.land/lipgloss/v2"
 
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
 
@@ -64,20 +64,20 @@ func (m IdentityModel) Init() (IdentityModel, tea.Cmd) {
 // any KeyMsg sends PopViewMsg (dismisses the view).
 func (m IdentityModel) Update(msg tea.Msg) (IdentityModel, tea.Cmd) {
 	switch msg := msg.(type) {
-	case messages.IdentityLoadedMsg:
+	case messages.IdentityLoaded:
 		m.state = identityLoaded
 		if data, ok := msg.Identity.(IdentityData); ok {
 			m.data = data
 		}
 		return m, nil
-	case messages.IdentityErrorMsg:
+	case messages.IdentityError:
 		m.state = identityError
 		m.errorMsg = msg.Err
 		return m, nil
 	case tea.KeyMsg:
 		_ = msg
 		return m, func() tea.Msg {
-			return messages.PopViewMsg{}
+			return messages.PopView{}
 		}
 	}
 	return m, nil

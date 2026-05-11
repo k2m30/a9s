@@ -11,7 +11,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
 
@@ -39,7 +39,7 @@ func TestIssue140_Story_EC2_001_InitialDetailRenderContract(t *testing.T) {
 	m2, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 35})
 	m = m2.(tui.Model)
 	ec2 := mustDemoEC2(t)
-	m2, _ = m.Update(messages.NavigateMsg{Target: messages.TargetDetail, ResourceType: "ec2", Resource: &ec2[0]})
+	m2, _ = m.Update(messages.Navigate{Target: messages.TargetDetail, ResourceType: "ec2", Resource: &ec2[0]})
 	m = m2.(tui.Model)
 	frame := stripAnsi(m.View().Content)
 
@@ -183,7 +183,7 @@ func TestIssue140_Story_EC2_021_TabFocusMovesToFirstAvailableRightRow(t *testing
 		t.Fatalf("EC2-021: pressing Enter on right-focused column should emit RelatedNavigateMsg")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.RelatedNavigateMsg)
+	nav, ok := msg.(messages.RelatedNavigate)
 	if !ok {
 		t.Fatalf("EC2-021: expected RelatedNavigateMsg after Enter on right column, got %T", msg)
 	}
@@ -208,7 +208,7 @@ func TestIssue140_Story_EC2_033_DimRowsAreSkippedInRightColumn(t *testing.T) {
 		t.Fatalf("EC2-033: Enter on right column should navigate to first non-dim row")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.RelatedNavigateMsg)
+	nav, ok := msg.(messages.RelatedNavigate)
 	if !ok {
 		t.Fatalf("EC2-033: expected RelatedNavigateMsg, got %T", msg)
 	}
@@ -232,11 +232,11 @@ func TestIssue140_Story_EC2_029_FilteredAlarmListTitleAndScope(t *testing.T) {
 		{ID: "web-prod-status-check", Name: "web-prod-status-check", Status: "ok"},
 		{ID: "unrelated-alarm", Name: "unrelated-alarm", Status: "ok"},
 	}
-	m2, _ = m.Update(messages.ResourcesLoadedMsg{ResourceType: "alarm", Resources: alarms})
+	m2, _ = m.Update(messages.ResourcesLoaded{ResourceType: "alarm", Resources: alarms})
 	m = m2.(tui.Model)
 
 	source := resource.Resource{ID: "i-0a1b2c3d4e5f60001", Name: "web-prod-01"}
-	m2, _ = m.Update(messages.RelatedNavigateMsg{
+	m2, _ = m.Update(messages.RelatedNavigate{
 		TargetType:     "alarm",
 		SourceType:     "ec2",
 		SourceResource: source,

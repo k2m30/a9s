@@ -27,7 +27,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -48,7 +48,7 @@ func buildAllZeroDetail(t *testing.T, fixture resource.Resource) views.DetailMod
 	defs := resource.GetRelated("ct-events")
 	for _, def := range defs {
 		// Inject Count=0, no FetchFilter — non-actionable, resolved.
-		d, _ = d.Update(messages.RelatedCheckResultMsg{
+		d, _ = d.Update(messages.RelatedCheckResult{
 			ResourceType:   "ct-events",
 			DefDisplayName: def.DisplayName,
 			Result: resource.RelatedCheckResult{
@@ -78,7 +78,7 @@ func buildMixedNonActionableDetail(t *testing.T, fixture resource.Resource) view
 		} else {
 			count = -1 // odd indices: Count=-1, no FetchFilter
 		}
-		d, _ = d.Update(messages.RelatedCheckResultMsg{
+		d, _ = d.Update(messages.RelatedCheckResult{
 			ResourceType:   "ct-events",
 			DefDisplayName: def.DisplayName,
 			Result: resource.RelatedCheckResult{
@@ -207,7 +207,7 @@ func TestRightColumnNoActionableRowsBlocksFocus(t *testing.T) {
 			t.Skip("no defs")
 		}
 		firstDef := defs[0]
-		d, _ = d.Update(messages.RelatedCheckResultMsg{
+		d, _ = d.Update(messages.RelatedCheckResult{
 			ResourceType: "ct-events",
 			Result: resource.RelatedCheckResult{
 				TargetType:  firstDef.TargetType,

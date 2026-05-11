@@ -25,7 +25,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // priority10Types lists the short names that receive Priority=10 in
@@ -34,7 +34,7 @@ import (
 var priority10Types = []string{"dbi", "ebs", "cb", "tg", "pipeline", "sfn", "glue"}
 
 // enrichmentTypesFromMsgs extracts ResourceType strings in order for diagnostics.
-func enrichmentTypesFromMsgs(msgs []messages.EnrichmentCheckedMsg) []string {
+func enrichmentTypesFromMsgs(msgs []messages.EnrichmentChecked) []string {
 	out := make([]string, len(msgs))
 	for i, m := range msgs {
 		out[i] = m.ResourceType
@@ -52,7 +52,7 @@ func seedAllEnricherTypes(m tui.Model) (tui.Model, tea.Cmd) {
 			{ID: shortName + "-probe", Name: shortName + "-probe", Fields: map[string]string{}},
 		}
 	}
-	m, cmd := rootApplyMsg(m, messages.AvailabilityPrefetchedMsg{
+	m, cmd := rootApplyMsg(m, messages.AvailabilityPrefetched{
 		Entries:   make(map[string]int),
 		Resources: allResources,
 	})
@@ -68,7 +68,7 @@ func seedEnricherSubset(m tui.Model, names []string) (tui.Model, tea.Cmd) {
 			{ID: name + "-probe", Name: name + "-probe", Fields: map[string]string{}},
 		}
 	}
-	m, cmd := rootApplyMsg(m, messages.AvailabilityPrefetchedMsg{
+	m, cmd := rootApplyMsg(m, messages.AvailabilityPrefetched{
 		Entries:   make(map[string]int),
 		Resources: subset,
 	})

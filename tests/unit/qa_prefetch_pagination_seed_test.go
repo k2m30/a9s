@@ -27,7 +27,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // TestPrefetchPaginationSeed_PreservesNextToken — when the prefetched message
@@ -48,7 +48,7 @@ func TestPrefetchPaginationSeed_PreservesNextToken(t *testing.T) {
 		TotalHint:   -1,
 	}
 
-	m, _ = rootApplyMsg(m, messages.AvailabilityPrefetchedMsg{
+	m, _ = rootApplyMsg(m, messages.AvailabilityPrefetched{
 		Entries:        map[string]int{targetType: 2},
 		Truncated:      map[string]bool{targetType: true},
 		IssueCounts:    map[string]int{targetType: 0},
@@ -92,7 +92,7 @@ func TestPrefetchPaginationSeed_FallbackWhenPaginationOmitted(t *testing.T) {
 	const targetType = "rds"
 	r := resource.Resource{ID: "db-001", Name: "db-001"}
 
-	m, _ = rootApplyMsg(m, messages.AvailabilityPrefetchedMsg{
+	m, _ = rootApplyMsg(m, messages.AvailabilityPrefetched{
 		Entries:        map[string]int{targetType: 1},
 		Truncated:      map[string]bool{targetType: true},
 		IssueCounts:    map[string]int{targetType: 0},

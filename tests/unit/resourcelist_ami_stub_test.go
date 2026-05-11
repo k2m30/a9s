@@ -8,7 +8,7 @@ import (
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -46,7 +46,7 @@ func TestResourceListModel_StubCreator_NavigatesToDetail(t *testing.T) {
 	m.SetAutoOpenSingleDetail(true)
 
 	var got tea.Cmd
-	m, got = m.Update(messages.ResourcesLoadedMsg{
+	m, got = m.Update(messages.ResourcesLoaded{
 		ResourceType: "test-stub",
 		Resources:    []resource.Resource{}, // empty — no match
 	})
@@ -56,9 +56,9 @@ func TestResourceListModel_StubCreator_NavigatesToDetail(t *testing.T) {
 	}
 
 	rawMsg := got()
-	navMsg, ok := rawMsg.(messages.NavigateMsg)
+	navMsg, ok := rawMsg.(messages.Navigate)
 	if !ok {
-		t.Fatalf("T016: expected messages.NavigateMsg, got %T: %+v", rawMsg, rawMsg)
+		t.Fatalf("T016: expected messages.Navigate, got %T: %+v", rawMsg, rawMsg)
 	}
 	if navMsg.ResourceType != "test-stub" {
 		t.Errorf("T016: NavigateMsg.ResourceType = %q; want %q", navMsg.ResourceType, "test-stub")
@@ -102,7 +102,7 @@ func TestResourceListModel_NoStubCreator_NoNavigation(t *testing.T) {
 	m.SetAutoOpenSingleDetail(true)
 
 	var got tea.Cmd
-	m, got = m.Update(messages.ResourcesLoadedMsg{
+	m, got = m.Update(messages.ResourcesLoaded{
 		ResourceType: "test-stub",
 		Resources:    []resource.Resource{}, // empty — no match
 	})
@@ -113,7 +113,7 @@ func TestResourceListModel_NoStubCreator_NoNavigation(t *testing.T) {
 	}
 
 	rawMsg := got()
-	if _, ok := rawMsg.(messages.NavigateMsg); ok {
+	if _, ok := rawMsg.(messages.Navigate); ok {
 		t.Error("T017: NavigateMsg must NOT be emitted when StubCreator is nil")
 	}
 }
