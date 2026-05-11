@@ -14,7 +14,6 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/session"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
 )
 
 // ---- helpers ---------------------------------------------------------------
@@ -638,8 +637,8 @@ func TestHandleClientsReady_Success_Command_StackDepth1(t *testing.T) {
 	if !ok {
 		t.Fatal("expected TaskKindEmitNavigate task when Command set and StackDepth==1")
 	}
-	if nav.Target != messages.TargetResourceList {
-		t.Errorf("EmitNavigatePayload.Target = %v, want TargetResourceList", nav.Target)
+	if nav.Target != NavigateTargetResourceList {
+		t.Errorf("EmitNavigatePayload.Target = %v, want NavigateTargetResourceList", nav.Target)
 	}
 	if nav.ResourceType != "ec2" {
 		t.Errorf("EmitNavigatePayload.ResourceType = %q, want %q", nav.ResourceType, "ec2")
