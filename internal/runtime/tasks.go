@@ -3,8 +3,6 @@ package runtime
 import (
 	"context"
 	"time"
-
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
 )
 
 // TaskKind names a family of background tasks ("enrich", "related",
@@ -184,10 +182,10 @@ func (FlashTickPayload) isTaskPayload() {}
 
 // EmitNavigatePayload carries the one-shot navigation the adapter must
 // dispatch as messages.NavigateMsg on first successful connect, derived
-// from the -c / Command field on the session. Target is the typed
-// ViewTarget the renderer uses for its dispatch.
+// from the -c / Command field on the session. Target is the runtime-owned
+// NavigateTarget (translated to messages.ViewTarget by the adapter).
 type EmitNavigatePayload struct {
-	Target       messages.ViewTarget
+	Target       NavigateTarget
 	ResourceType string
 }
 
