@@ -107,55 +107,9 @@ func MissingFromCache(cache resource.ResourceCache, targetType string, ids []str
 	return missing
 }
 
-// BuildResourceCacheSnapshot returns a merged snapshot of session caches for
-// related checkers. ResourceCache wins on ID collision.
-func (c *Core) BuildResourceCacheSnapshot() resource.ResourceCache {
-	s := c.session
-	snap := make(resource.ResourceCache, len(s.ResourceCache)+len(s.LazyResourceCache)+len(s.ProbeResources))
-	for shortName, rows := range s.LazyResourceCache {
-		snap[shortName] = resource.ResourceCacheEntry{Resources: rows, IsTruncated: true}
-	}
-	for shortName, rows := range s.ProbeResources {
-		pt := s.ProbeTruncated[shortName]
-		if existing, ok := snap[shortName]; ok {
-			known := make(map[string]struct{}, len(existing.Resources))
-			for _, r := range existing.Resources {
-				known[r.ID] = struct{}{}
-			}
-			merged := append([]resource.Resource(nil), existing.Resources...)
-			for _, r := range rows {
-				if _, dup := known[r.ID]; !dup {
-					merged = append(merged, r)
-				}
-			}
-			snap[shortName] = resource.ResourceCacheEntry{Resources: merged, IsTruncated: existing.IsTruncated || pt}
-		} else {
-			snap[shortName] = resource.ResourceCacheEntry{Resources: rows, IsTruncated: pt}
-		}
-	}
-	for shortName, entry := range s.ResourceCache {
-		if entry == nil {
-			continue
-		}
-		cacheIsTrunc := (entry.Pagination != nil && entry.Pagination.IsTruncated) || s.ProbeTruncated[shortName]
-		if existing, ok := snap[shortName]; ok {
-			known := make(map[string]struct{}, len(entry.Resources))
-			for _, r := range entry.Resources {
-				known[r.ID] = struct{}{}
-			}
-			merged := append([]resource.Resource(nil), entry.Resources...)
-			for _, r := range existing.Resources {
-				if _, dup := known[r.ID]; !dup {
-					merged = append(merged, r)
-				}
-			}
-			snap[shortName] = resource.ResourceCacheEntry{Resources: merged, IsTruncated: cacheIsTrunc}
-		} else {
-			snap[shortName] = resource.ResourceCacheEntry{Resources: entry.Resources, IsTruncated: cacheIsTrunc}
-		}
-	}
-	return snap
-}
+// BuildResourceCacheSnapshot is defined in probes.go (AS-151). The
+// related-check fan-out in runtime_adapter_related.go calls Core.BuildResourceCacheSnapshot
+// directly, so no wrapper is needed here.
 
 // SnapshotCache returns a flat map snapshot combining ResourceCache and
 // LazyResourceCache. ResourceCache wins on ID collision.
