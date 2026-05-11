@@ -10,6 +10,7 @@ package tui
 import (
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/tui/messages"
 )
@@ -156,7 +157,7 @@ func (m *Model) fetchRevealValue(resourceType, resourceID string) tea.Cmd {
 // ClientsReadyMsg. gen is a monotonic counter incremented on each
 // profile/region switch; stale ClientsReadyMsg values carrying an old gen are
 // discarded by handleClientsReady.
-func (m *Model) connectAWS(profile, region string, gen int) tea.Cmd {
+func (m *Model) connectAWS(profile, region string, gen domain.Gen) tea.Cmd {
 	ctx := m.appCtx
 	return func() tea.Msg {
 		result, err := m.core.ConnectAWS(ctx, profile, region)

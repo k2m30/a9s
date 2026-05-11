@@ -25,6 +25,7 @@ package session
 
 import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -72,7 +73,7 @@ type Session struct {
 	// every profile/region switch so a slow pre-switch ClientsReadyMsg arriving
 	// after the user has switched again is rejected by the gen guard.
 	// Rotate() bumps this; handlers MUST NOT bump it manually.
-	ConnectGen int
+	ConnectGen domain.Gen
 
 	// PendingRefresh marks that a successful ClientsReady should re-fetch the
 	// active resource list (set by profile/region switch handlers). Cleared by
@@ -98,7 +99,7 @@ type Session struct {
 	NoCache bool
 
 	// Wave 1 availability scan.
-	AvailabilityGen int      // bumped on profile/region switch to cancel stale probes
+	AvailabilityGen domain.Gen // bumped on profile/region switch to cancel stale probes
 	AvailQueue      []string // resource short names remaining to probe
 	AvailChecked    int      // number probed so far in current gen
 	AvailTotal      int      // total types to probe in current gen
@@ -107,7 +108,7 @@ type Session struct {
 	ProbeResources map[string][]resource.Resource // retained first-page resources from Wave 1
 	ProbeTruncated map[string]bool                // per-type truncation signal from Wave 1 probe
 	EnrichQueue    []string                       // resource types pending Wave 2 enrichment
-	EnrichmentGen  int                            // session-wide gen counter for Wave 2
+	EnrichmentGen  domain.Gen                     // session-wide gen counter for Wave 2
 	EnrichChecked  int                            // number of enrichment probes completed in current gen
 	EnrichTotal    int                            // total enrichment probes to run in current gen
 
@@ -117,7 +118,7 @@ type Session struct {
 	// region switch handlers. The remaining maps stay here because they do not
 	// need to persist across a Rotate().
 	EnrichmentRan          map[string]bool
-	EnrichmentTypeGen      map[string]int
+	EnrichmentTypeGen      map[string]domain.Gen
 	EnrichmentTruncatedIDs map[string]map[string]bool
 
 	// Session-scoped caches + stale-result guards.
@@ -128,8 +129,8 @@ type Session struct {
 	// keys) do not pollute the scope-filtered main-menu list.
 	LazyResourceCache map[string][]resource.Resource
 	RelatedCache      *RelatedCacheLRU
-	RelatedGen        uint64 // bumped on refresh/profile/region switch
-	EnrichGen         uint64 // bumped on refresh/profile/region switch (detail-enrichment only)
+	RelatedGen        domain.Gen // bumped on refresh/profile/region switch
+	EnrichGen         domain.Gen // bumped on refresh/profile/region switch (detail-enrichment only)
 	EnrichResKey      string // "resourceType:resourceID" of last detail-enrichment dispatch
 
 	// Feature-specific session caches. These used to hang off *ServiceClients
@@ -171,7 +172,7 @@ func New() *Session {
 	return &Session{
 		ProbeResources:         nil, // initialized lazily on first probe retention
 		EnrichmentRan:          make(map[string]bool),
-		EnrichmentTypeGen:      make(map[string]int),
+		EnrichmentTypeGen:      make(map[string]domain.Gen),
 		EnrichmentTruncatedIDs: make(map[string]map[string]bool),
 		ResourceCache:          make(map[string]*ResourceCacheEntry),
 		LazyResourceCache:      make(map[string][]resource.Resource),
@@ -197,11 +198,11 @@ func New() *Session {
 // — this method touches only Session-owned fields.
 func (s *Session) Rotate() {
 	s.RelatedCache.Clear()
-	s.RelatedGen++
-	s.EnrichGen++
-	s.AvailabilityGen++
-	s.EnrichmentGen++
-	s.ConnectGen++
+	s.RelatedGen.Bump()
+	s.EnrichGen.Bump()
+	s.AvailabilityGen.Bump()
+	s.EnrichmentGen.Bump()
+	s.ConnectGen.Bump()
 
 	// Session-identity / rollback-latch / fetch-latch fields. Profile/Region/
 	// Clients/PreSuppliedClients/Command/NoCache are deliberately NOT cleared
@@ -227,7 +228,7 @@ func (s *Session) Rotate() {
 	s.ResourceCache = make(map[string]*ResourceCacheEntry)
 	s.LazyResourceCache = make(map[string][]resource.Resource)
 	s.EnrichmentRan = make(map[string]bool)
-	s.EnrichmentTypeGen = make(map[string]int)
+	s.EnrichmentTypeGen = make(map[string]domain.Gen)
 	s.EnrichmentTruncatedIDs = make(map[string]map[string]bool)
 
 	// Feature caches: swap the PolicyDocumentCache for a fresh instance so
