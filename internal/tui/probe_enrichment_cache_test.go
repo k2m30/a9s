@@ -23,7 +23,9 @@ import (
 	"testing"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/session"
 )
 
@@ -62,9 +64,14 @@ func TestProbeEnrichment_CacheSnapshotMergesProbeResources(t *testing.T) {
 	// Construct a Model where ProbeResources has a sibling list ("dbi") but
 	// ResourceCache is empty — this models the initial-menu-enrichment state.
 	// ResourceCache / ProbeResources / EnrichmentTypeGen live on the embedded
-	// *session.Session; session.New() initialises the required maps.
+	// *session.Session; session.New() initialises the required maps. The
+	// runtime.Core is bound to the same session so the probe_adapter delegate
+	// (m.core.ProbeEnrichment) sees the seeded ProbeResources without a nil
+	// receiver panic.
+	sess := session.New()
 	m := &Model{
-		Session: session.New(),
+		Session: sess,
+		core:    runtime.New(sess, catalog.ResourceTypes),
 		appCtx:  context.Background(),
 		clients: &awsclient.ServiceClients{}, // non-nil so closure passes the nil-check
 	}
