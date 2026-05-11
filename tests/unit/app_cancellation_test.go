@@ -108,7 +108,7 @@ func TestFetchersUseContextNotBackground(t *testing.T) {
 	files := []string{
 		"internal/runtime/fetchers.go",
 		"internal/tui/fetch_adapter.go",
-		"internal/tui/app_related.go",
+		"internal/tui/runtime_adapter_related.go",
 		"internal/aws/iam_policies_related.go",
 		"internal/aws/iam_roles_related.go",
 		"internal/aws/iam_users_related.go",
