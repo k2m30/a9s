@@ -170,6 +170,13 @@ func (m ResourceListModel) Init() (ResourceListModel, tea.Cmd) {
 func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.ResourcesLoaded:
+		// Drop loads for a different active resource type. A late EC2 fetch
+		// returning after the user has opened S3 must not mutate the S3
+		// list or its loading state — let the root model route the message
+		// to its write-through cache (which keys by msg.ResourceType).
+		if msg.ResourceType != m.typeDef.ShortName {
+			return m, nil
+		}
 		m.loading = false
 		m.loadingMore = false
 		if msg.Append {
