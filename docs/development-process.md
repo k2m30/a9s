@@ -112,11 +112,59 @@ If any of those is missing, the issue is parked in `todo` and the assignee asks 
 
 ## Lifecycle — 8 stages
 
-Every unit of work goes through these stages. Stages 1, 2, 4, 6, 6.5 may be **skipped** for trivial bug fixes (`XS`, single file, no behavior change visible to users). Stages 3, 5, 7 never skip.
+Every unit of work goes through these stages. Stages 1, 2, 4, 6, 6.5 may be **skipped** for trivial bug fixes (`XS`, single file, no behavior change visible to users). Stages 3, 5, 7 never skip — **except in the Trivial-docs fast-path below, which is the only lane that collapses Stages 2–5 into a single CTO authorship step.**
 
 ```text
 1. Intake → 2. Spec → 3. Tests → 4. Impl → 5. Review → 6. Validate → 6.5 Post-merge AWS → 7. Release → 8. Retro
 ```
+
+### Trivial-docs fast-path (`XS`-docs) — AS-595
+
+**Why this lane exists.** AS-592 (2026-05-12) was a `+2 / -0` one-file addition to this document. Filed as P0 with full feature-style acceptance criteria, it triggered Architect spec → QA dispatch → Coder impl → CodeReviewer + CodexReviewer + Architect Stage 5 reviews → PR #368 → AS-594 as a separate Stage 5 review tracker. For two lines of markdown. The board (AS-595) was furious; the chain was process-correct under the rules as written; the rules were wrong. This lane fixes that.
+
+**When the lane applies — all of the following must hold:**
+
+1. The change touches **only** `*.md`, `docs/`, `website/`, `specs/`, `.claude/`, `LICENSE`, or `CHANGELOG.md`. No Go source, no tests, no fixtures, no Makefile, no `.github/workflows/`, no `internal/`, no `cmd/`.
+2. Size is `XS`: ≤ 30 LOC added/changed across ≤ 2 files.
+3. The change is one of: typo fix, link fix, formatting/style fix, clarification, or **codifies a CEO/CTO policy decision already made on the issue thread** (the diff IS the decision).
+4. The change does **not** reverse an existing rule. Reversing a rule is a policy change and routes through normal Stage 1–5.
+
+**Lane procedure (single Paperclip agent, single heartbeat):**
+
+| Step | Owner | Action |
+|---|---|---|
+| 1 | CTO | Confirm the four conditions above hold. If any fails, route through normal Stages 1–5. |
+| 2 | CTO | Author the diff directly. **No** Architect spec, **no** QA dispatch, **no** Coder dispatch. |
+| 3 | CTO | Branch from `main`. Single commit. Conventional commit message (`docs(scope): ...`). `Co-Authored-By: Paperclip <noreply@paperclip.ing>`. |
+| 4 | CTO | Run `make mdlint` locally. This is the **only** gate. |
+| 5 | CTO | Open PR with `[trivial-docs]` prefix in the title. PR body is one sentence plus the rationale. |
+| 6 | CTO | Wait for CI to go green (Markdown lint, Detect changes, the skip-aware short path). |
+| 7 | CTO | Self-merge (squash) after CI green. **No** separate Paperclip Stage 5 review-issue, **no** Architect/QA/Coder dispatch, **no** CodeReviewer/CodexReviewer Stage 5 verdict required (they may still comment on the PR; their comments are advisory, not gating). |
+
+**CEO direct-authorship (narrow):** when the CEO is codifying a CEO policy decision they have just made on the issue thread, the CEO MAY author the trivial-docs PR themselves under this lane (CEO replaces CTO in steps 2–7 above). This is the exception to "CEO does not write doc edits"; it exists because routing a CEO-made policy decision through CTO authorship for a 2-line MD edit is exactly the over-process this lane fixes. The CEO's own `AGENTS.md` carries the matching authorization.
+
+**What the lane explicitly removes (vs. normal Stages 1–5):**
+
+- Stage 2 spec — no `[spec-published]` comment, no `docs/refactor/…` or `specs/…` doc.
+- Stage 3 tests — there is nothing to test; tests are not a hazing ritual.
+- Stage 4 implementation — collapses into the authorship step.
+- Stage 5 review-issue — **never** spawn a separate `Stage 5 review of PR #N — trivial-docs` Paperclip issue. The PR is its own record.
+- Stage 5 mandatory CR/CXR/Arch verdicts and PR cross-posts — not required. (They are required for **every other** PR; see Stage 5 below.)
+
+**What the lane preserves:**
+
+- Stage 6 docs-only exception still applies (`make ready-to-push` not required; `make mdlint` is).
+- Stage 6.5 not triggered (no `internal/aws/` touch by definition).
+- Stage 7 release flow unchanged for downstream releases; trivial-docs changes do not bump the release artifact unless `CHANGELOG.md` is involved.
+- Stage 8 retro: trivial-docs PRs count toward the per-week issues-per-PR audit at the favorable ratio (0 spawned issues per PR is the target).
+
+**Anti-patterns (this lane fails when):**
+
+- The CEO files a trivial-docs change with feature-style acceptance criteria (1–N), files-to-touch, done-when. That shape is the SDLC-routing signal; CTO will treat it as a feature. **Mark trivial-docs issues `[trivial-docs]` in the title and limit the body to one sentence plus the exact diff.**
+- The CTO dispatches Architect, QA, or Coder for a trivial-docs change. The CTO is the author.
+- A separate Stage 5 review-issue is spawned (`Stage 5 review of PR #N — trivial-docs (XS)`). The PR is the record; no Paperclip issue is needed for the review.
+- A CodeReviewer/CodexReviewer/Architect verdict is treated as gating on a trivial-docs PR. Their comments are advisory only on this lane.
+- The lane is stretched to cover policy reversals or non-docs files. If in doubt, route through normal Stage 1–5.
 
 ### Stage 1 — Intake
 
