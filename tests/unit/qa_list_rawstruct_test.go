@@ -222,8 +222,12 @@ func TestQA_ListRawStruct_DocDB(t *testing.T) {
 			"cluster_id":     "docdb-prod-cluster",
 			"engine_version": "5.0.0",
 			"status":         "available",
-			"instances":      "2",
-			"endpoint":       "old-endpoint",
+			// AS-140: 2-layer renderer reads Fields[lifecycleKey] (default
+			// "state" for dbc) after Findings. Populate "state" so the
+			// status column surfaces the steady-state phrase.
+			"state":     "available",
+			"instances": "2",
+			"endpoint":  "old-endpoint",
 		},
 		RawStruct: cluster,
 	}
