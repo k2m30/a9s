@@ -356,6 +356,7 @@ var networkingTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static cat
 		Aliases:       []string{"eni", "network-interfaces", "nis"},
 		Category:      "NETWORKING",
 		CloudTrailKey: "ResourceName:ID",
+		LifecycleKey:  "status",
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 24, Sortable: true},
 			{Key: "eni_id", Title: "ENI ID", Width: 26, Sortable: true},

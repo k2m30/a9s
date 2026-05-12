@@ -457,6 +457,7 @@ var computeTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static catalo
 		Aliases:       []string{"ecs-svc", "ecs-services"},
 		Category:      "COMPUTE",
 		CloudTrailKey: "ResourceName:ID",
+		LifecycleKey:  "status",
 		Columns: []domain.Column{
 			{Key: "service_name", Title: "Service Name", Width: 32, Sortable: true},
 			{Key: "cluster", Title: "Cluster", Width: 24, Sortable: true},
@@ -493,6 +494,7 @@ var computeTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static catalo
 		Aliases:       []string{"ecs", "ecs-clusters"},
 		Category:      "COMPUTE",
 		CloudTrailKey: "ResourceName:ID",
+		LifecycleKey:  "status",
 		Columns: []domain.Column{
 			{Key: "cluster_name", Title: "Cluster Name", Width: 32, Sortable: true},
 			{Key: "status", Title: "Status", Width: 12, Sortable: true},
@@ -508,6 +510,7 @@ var computeTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static catalo
 		Aliases:       []string{"ecs-task", "ecs-tasks", "tasks"},
 		Category:      "COMPUTE",
 		CloudTrailKey: "ResourceName:ID",
+		LifecycleKey:  "status",
 		Columns: []domain.Column{
 			{Key: "task_id", Title: "Task ID", Width: 38, Sortable: true},
 			{Key: "cluster", Title: "Cluster", Width: 24, Sortable: true},
@@ -549,6 +552,7 @@ var computeTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static catalo
 		Aliases:       []string{"asg", "autoscaling", "auto-scaling"},
 		Category:      "COMPUTE",
 		CloudTrailKey: "ResourceName:ID",
+		LifecycleKey:  "status",
 		Columns: []domain.Column{
 			{Key: "asg_name", Title: "ASG Name", Width: 36, Sortable: true},
 			{Key: "min_size", Title: "Min", Width: 6, Sortable: true},
@@ -568,6 +572,7 @@ var computeTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static catalo
 		Aliases:       []string{"eb", "beanstalk", "elastic-beanstalk"},
 		Category:      "COMPUTE",
 		CloudTrailKey: "ResourceName:ID",
+		LifecycleKey:  "status",
 		Columns: []domain.Column{
 			{Key: "environment_name", Title: "Environment", Width: 28, Sortable: true},
 			{Key: "application_name", Title: "Application", Width: 24, Sortable: true},
