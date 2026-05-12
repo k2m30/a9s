@@ -49,7 +49,7 @@ Important interaction rules:
 - `Update()` must not block; AWS/network work goes in `tea.Cmd`.
 - Old async results are dropped if the user refreshed or switched profile/region.
 - Cache lifetime follows the session; switching account or region must rotate session state.
-- On `main` today, behavior is wired through registries and `runtime.Core` (Phase-05 refactor, AS-237). Session state is exclusively owned by `core.Session()` — `tui.Model` never accesses session fields directly.
+- On `main` today, behavior is wired through registries; `runtime.Core` owns the active session. Phase-05a extraction is **in flight**: `runtime.Core` + `session.Session` exist, 6 handler bodies have moved (AS-315b / PR-05a-h3), but 4 handler families (`app_input.go`, `app_flash.go`, `app_session.go`, `app_screens.go`) still live in `internal/tui` pending PR-05a-h4 (screen-builder registry). `internal/tui` still imports `internal/session` and `internal/aws`; the package-boundary criterion in `docs/refactor/05-boundary.md` §"5a-extract" is not yet met.
 - In the target refactor architecture, those patterns are replaced by an explicit catalog, shared selectors and query contracts, capability modules, and runtime-owned screen/task contracts.
 
 ## What is a9s?
@@ -67,9 +67,9 @@ The current codebase has a real separation of concerns, but several of those bou
 ### Current Layer Boundaries On `main`
 
 - **`cmd/a9s`** — bootstrap only: parse flags, validate startup inputs, load config/theme, wire clients and options, start Bubble Tea.
-- **`internal/tui`** — UI shell and adapter: view stack, global key handling, message routing, sizing, and transient UI state. Holds a `*runtime.Core` (Phase-05, AS-237) and reaches session-scoped state via `m.core.Session()`; it does **not** own the session caches itself.
-- **`internal/runtime`** — platform-agnostic app core: `runtime.Core` owns the active `*session.Session` and the catalog snapshot, dispatches inbound events to handlers, and returns `UIIntent` / `TaskRequest` lists for adapters to apply. The handler moves out of `internal/tui` are landing incrementally under PR-05a..h.
-- **`internal/session`** — session-scoped state container: `session.Session` owns per-profile/region orchestration state — `ResourceCache`, `LazyResourceCache`, `RelatedCache`, the enrichment queues and per-type maps, and every generation counter. `Session.Rotate()` is the single point that invalidates all of it on profile/region switch.
+- **`internal/tui`** — UI shell and adapter: view stack, global key handling, message routing, sizing, and transient UI state. Holds a `*runtime.Core` (Phase-05a, AS-237 / AS-315a / AS-315b, **in flight**) and reaches session-scoped state via `m.core.Session()`; the field-level ownership of session caches has moved off `tui.Model`, but `internal/tui` still imports `internal/session` and `internal/aws` because four handler families (input / flash / session / screens) remain in `internal/tui` until PR-05a-h4 (screen-builder registry) lands.
+- **`internal/runtime`** — platform-agnostic app core: `runtime.Core` owns the active `*session.Session` and the catalog snapshot, dispatches a subset of inbound events to handlers, and returns `UIIntent` / `TaskRequest` lists for adapters to apply. Handler migration target: `docs/refactor/05-boundary.md` §"5a-extract". Today: 6 of 10 dispatchable handlers ported (`HandleFlash`, `HandleClearFlash`, `HandleAPIError`, `HandleClientsReady`, `HandleProfileSelected`, `HandleRegionSelected`). The remaining 4 (`handleProfilesLoaded`, `handleValueRevealed`, `handleEnterChildView`, `handleThemeSelected`) push view-stack frames and stay in `internal/tui` until the screen-builder registry exists.
+- **`internal/session`** — session-scoped state container (Phase 02 deliverable, **done**): `session.Session` owns per-profile/region orchestration state — `ResourceCache`, `LazyResourceCache`, `RelatedCache`, the enrichment queues and per-type maps, every generation counter (all typed `domain.Gen` after Phase 05a-gens), and the capability stores (`PolicyStore`, `IdentityStore`, `RuleSetStore`) that replaced the deleted `internal/aws/` package globals (`allPoliciesMu`, `identityCacheMu`, `sesRuleSetCacheMu`). `Session.Rotate()` is the single point that invalidates all of it on profile/region switch.
 - **`internal/resource`** — declarative registry: resource types, child-view metadata, related defs, navigable fields, and fetcher/enricher registration.
 - **`internal/aws`** — primarily the adapter layer: call AWS SDK APIs, transform responses into `resource.Resource`, and host a few non-UI helper subsystems that have not yet been split out. This layer should not know about Bubble Tea views.
 - **`internal/cache`** — persistence only: on-disk availability cache and TTL rules.
@@ -82,12 +82,15 @@ if it "works" — the gen guards, registry completeness checks, and related
 validators in `tests/unit/architecture_conformance_test.go` fail loudly when
 any of these drift.
 
-These are **current-state invariants**, not promises about the final architecture. In particular, the refactor plan under `docs/refactor/` intentionally replaces the old embedded-`sessionRuntime` model (removed in Phase-05, AS-237), package-`init()` registry wiring, the `Status`-centered resource model, and markdown-as-input contracts, and adds explicit capability modules, selector/query contracts, and runtime-owned screen/task boundaries.
+These are **current-state invariants**, not promises about the final architecture. In particular, the refactor plan under `docs/refactor/` intentionally replaces the old embedded-`sessionRuntime` model (removed in Phase-05a, AS-237 / AS-315a — embed elimination shipped, package-boundary closure pending PR-05a-h4), package-`init()` registry wiring (Phase 04, in flight — catalog scaffold landed, ~360 `Register*` calls + ~199 `init()` funcs still active in feature wiring), the `Status`-centered resource model (Phase 03, in flight — `Findings` model landed alongside `Status`/`Issues`; deletion is the PR-03n exit criterion), and markdown-as-input contracts, and adds explicit capability modules, selector/query contracts (`internal/semantics/selector/` not yet created), and runtime-owned screen/task boundaries.
 
 1. **One root application model owns session state and orchestration.**
-   `tui.Model` owns the UI shell; all session state lives in `runtime.Core`
-   (Phase-05, AS-237) and is accessed via `m.core.Session()`. The boundary is
-   explicit: no orchestration or session state leaks into view structs.
+   `tui.Model` owns the UI shell; the session state container lives in
+   `runtime.Core` (Phase-05a, AS-237 / AS-315a) and is accessed via
+   `m.core.Session()`. The field-level ownership boundary is established;
+   the package-import boundary (`internal/tui` not importing
+   `internal/session` or `internal/aws`) is the PR-05a-extract exit
+   criterion and is **not yet met** — see `docs/refactor/05-boundary.md`.
 2. **Views render state and emit typed messages.** Views never call AWS
    directly. `m.clients` is passed to tea.Cmds created by the root model,
    not consumed inside `View()`.
@@ -109,9 +112,13 @@ These are **current-state invariants**, not promises about the final architectur
 7. **Feature-specific caches do not hang off transport objects.**
    `*awsclient.ServiceClients` carries AWS clients only. Session-scoped
    caches live on `session.Session` (owned by `runtime.Core`) and reach
-   detail enrichers via `*awsclient.DetailEnrichmentCtx`; a few legacy
-   package-global caches still exist in `internal/aws` and are treated as
-   debt, not the desired pattern.
+   detail enrichers via `*awsclient.DetailEnrichmentCtx`. Phase 02
+   (`docs/refactor/02-session-owner.md`) deleted the legacy package-global
+   caches in `internal/aws/` — `allPoliciesMu` (IAM policies),
+   `identityCacheMu` (caller identity), and `sesRuleSetCacheMu` (SES rule
+   sets) — and replaced them with `PolicyStore` / `IdentityStore` /
+   `RuleSetStore` capabilities owned by `session.Session`. `internal/aws/`
+   is now globals-free.
 8. **Global keys are order-sensitive.** `Esc` is the back/dismiss key. `q`
    is the quit key in normal mode; it is not a navigation primitive.
    Input-mode and search-mode semantics take precedence over view-local
@@ -140,7 +147,7 @@ User Input → Update(msg) → (Model, Cmd) → View() → Terminal
 
 ### Messages
 
-Views communicate exclusively via typed messages (`internal/runtime/messages/`, split into `cmd.go` for UI→core commands and `event.go` for core→UI events). Views never import each other. The root `Model.Update()` routes messages to the appropriate handler.
+Views communicate exclusively via typed messages (`internal/runtime/messages/`, with `cmd.go` for UI→core commands and `event.go` for core→UI events). Views never import each other. The root `Model.Update()` routes messages to the appropriate handler.
 
 Key messages:
 
@@ -217,18 +224,19 @@ internal/
   aws/           # AWS service clients, resource fetchers, related checkers, enrichers
   buildinfo/     # version resolution (ldflags at build time)
   cache/         # on-disk availability cache with TTL (see Caching Layers)
-  catalog/       # resource type definitions and color helpers (Phase-05, AS-237)
+  catalog/       # canonical resource catalog (static `var ResourceTypes`, per-category `types_*.go`); destination of Phase 04 (`docs/refactor/04-catalog.md`). Coexists with `internal/resource/registry.go` until the PR-04n cutover deletes the legacy `Register*` API.
   config/        # YAML config loading, built-in defaults per service
   demo/          # synthetic fixture data for --demo mode
     fixtures/    #   per-service Go structs (ec2.go, iam.go, etc.)
     fakes/       #   per-service fake API implementations
-  domain/        # shared query-contract types: Resource, Color, Finding, Gen (Phase-05)
+  domain/        # leaf type-declaration package: Resource, Type, Severity, FindingCode, Finding, AttentionDetail, Color, Gen, plus query-contract types. Introduced in Phase 01 (`docs/refactor/01-projection-hook.md`); `Gen` added in Phase 05a-gens.
   fieldpath/     # struct field extraction via reflection (frozen — don't modify)
-  resource/      # generic resource model, type registry, fetcher registry
-  runtime/       # platform-agnostic app core: Core, orchestrator, handlers (Phase-05)
-    messages/    #   typed Cmd/Event message taxonomy (cmd.go, event.go)
-  session/       # session.Session — all session-scoped mutable state; Rotate() invalidates in-flight gens
-  tui/           # root Bubble Tea app model (tui.Model wraps runtime.Core)
+  resource/      # legacy resource model, type registry, fetcher registry (Phase 04 in-flight; backward-compat aliases — `resource.Resource`, `resource.ResourceTypeDef` — point at `internal/domain` / `internal/catalog`)
+  runtime/       # platform-agnostic app core: Core (orchestrator.go), handlers.go, screens.go, tasks.go, state.go, intent.go (Phase 05a-extract, in flight)
+    messages/    #   typed Cmd/Event message taxonomy (cmd.go, event.go, plus transitional messages.go); see Phase 05b deviation note in §Messages
+  session/       # session.Session — all session-scoped mutable state + capability stores (Phase 02, done); Rotate() invalidates in-flight gens
+  semantics/     # shared semantic helpers: attention (Findings derivation), projection (DetailProjector), ctevent (CloudTrail event summarization). `selector/` is a Phase 01 addition that is not yet created.
+  tui/           # Bubble Tea adapter shell (in-flight Phase-05a; still imports session/ and aws/ until PR-05a-h4 / screen-builder registry closes the boundary)
     keys/        #   key bindings (single Map struct, one file)
     layout/      #   frame rendering (borders, title, status line)
     styles/      #   Tokyo Night Dark palette, theming system
@@ -248,21 +256,30 @@ tests/
 This section describes the current resource model on `main`. It is intentionally conservative: it explains the struct the codebase uses today, not the canonical finding model planned in [`docs/refactor/03-finding-model.md`](refactor/03-finding-model.md).
 
 ```go
-// internal/resource/resource.go
+// internal/domain/resource.go   (Phase 01 moved the struct out of internal/resource;
+//                                internal/resource/resource.go is now a one-line
+//                                type alias `type Resource = domain.Resource` and is
+//                                deleted in PR-04n.)
 type Resource struct {
-    ID        string            // primary identifier
-    Name      string            // display name
-    Status    string            // lifecycle state (used for row coloring)
-    Issues    []string          // active Wave 1 issue phrases in precedence order
-    Fields    map[string]string // pre-extracted string values for table columns
-    RawStruct any               // original AWS SDK typed struct
+    ID               string                          // primary identifier (instance ID, ARN, name)
+    Name             string                          // display name (from Name tag or identifier)
+    Type             string                          // resource short name ("ec2", "rds", ...); empty = unknown
+    Status           string                          // legacy: top phrase (with optional "(+N)" suffix) for list display — Phase 03 migrating to Findings
+    Issues           []string                        // legacy: full ordered Wave-1 phrase set — Phase 03 migrating to Findings
+    Fields           map[string]string               // pre-extracted column values, snake_case keys ("instance_id", "vpc_id")
+    RawStruct        any                             // original AWS SDK typed struct (e.g., ec2types.Instance) for reflection-based detail rendering
+    Findings         []Finding                       // canonical Phase-03 finding list; populated by `attention.DeriveFindings` and by Wave 2 (`applyEnrichment`)
+    AttentionDetails map[FindingCode]AttentionDetail // structured detail rows keyed by stable `FindingCode`; consumed only by detail view's Attention section
 }
 ```
 
-- **Issues** — the full ordered set of active Wave 1 phrases for the row. Detail view uses this to render the leading Attention section instead of relying only on the top phrase in `Status`.
+- **Type** — short-name field added in Phase 01 (`docs/refactor/01-projection-hook.md`) so that downstream packages (semantics, projection) can route by type without re-deriving it.
+- **Status** / **Issues** — legacy lifecycle/issue surface still populated today; the shim in `internal/semantics/attention/` derives `Findings` from `Status` + `Issues` at each entry point listed in `docs/refactor/03-finding-model.md:78-89`. PR-03n's exit criterion deletes both fields and switches every view to read `Findings[0]` + `r.Fields[td.LifecycleKey]`.
+- **Findings** — canonical finding list (`domain.Finding{Code, Phrase, Severity, Source}`). Drives row coloring, list-view Status display, menu issue badges, and the ctrl+z attention filter. Wave 1 entries carry `Source = "wave1"`; Wave 2 entries carry `Source = "wave2:<short>"` and are written by `applyEnrichment` in `internal/tui/app_enrich_fold.go`.
+- **AttentionDetails** — supporting facts (rows shown in the detail-view Attention section) keyed by stable `FindingCode`. `FindingCode` is never displayed.
 - **Fields** — flat key-value pairs populated by each fetcher. Used for list table columns and simple detail rendering. Keys are snake_case (e.g., `"instance_id"`, `"vpc_id"`).
 - **RawStruct** — the actual AWS SDK struct (e.g., `ec2types.Instance`, `s3types.Bucket`). Used by detail/YAML/JSON views via reflection for deep field path traversal (e.g., `"State.Name"`, `"Placement.AvailabilityZone"`).
-- **Current limitation** — `Status` and `Issues` split one concept across two fields on `main`: `Status` carries the top phrase for row display, while `Issues` carries the full ordered set. That coupling is documented here because it exists today, not because it is the intended end state. The refactor plan moves issue semantics into canonical findings and lifecycle display into typed field selection.
+- **Current migration state** — Phase 03 (`docs/refactor/03-finding-model.md`) is **in flight**. `Status` + `Issues` (legacy) coexist with `Findings` + `AttentionDetails` (canonical) because PR-03a-types and PR-03a-shim landed; PR-03a-fold made cached `Resource.Findings` the authoritative read surface for Wave 2 (deleting the parallel `EnrichmentFindings` map). The remaining ~14 PRs in the phase cut every read site over to `Findings` and finally delete `Status` / `Issues` at PR-03n.
 
 ### Resource Type Registration
 
@@ -285,10 +302,14 @@ resource.RegisterFieldAliases("ec2", map[string]string{"id": "instance_id", "az"
 
 Package-`init()` registration is a property of the current implementation, not a pattern new architecture work should preserve indefinitely. While `main` still uses it, current changes must keep registry state coherent. The target direction is explicit catalog wiring with no hidden registration side effects.
 
+**Dual-source-of-truth period (Phase 04 in flight).** During Phase 04 (`docs/refactor/04-catalog.md`) the legacy `init()` + `Register*` mechanism above coexists with the new static catalog (`internal/catalog/catalog.go` exposes `var ResourceTypes = allTypes()`, populated from per-category `internal/catalog/types_*.go` files). Both surfaces ship the same resource-type list today — the legacy registry is still the authoritative dispatch source. PR-04n's exit criterion deletes the legacy `Register*` calls and `internal/resource/registry.go`. Until then, contributors adding a new resource type must update *both* surfaces; see the mechanical four-file acceptance test in `docs/refactor/00-overview.md:144-165` for the target end state.
+
 ### Resource Type Definitions
 
 ```go
-// internal/resource/types.go
+// internal/catalog/types.go    (canonical home; `internal/resource/types.go`
+//                               re-exports as `type ResourceTypeDef = catalog.ResourceTypeDef`
+//                               for backward compat until PR-04n.)
 type ResourceTypeDef struct {
     Name        string           // "EC2 Instances" — display name
     ShortName   string           // "ec2" — colon-command alias and registry key
@@ -302,7 +323,7 @@ type ResourceTypeDef struct {
     RelatedContextFromIDs func(relatedIDs []string) map[string]string // extracts parent context for related-panel navigation
     CloudTrailKey string         // "LookupAttr:ValueSource" for CloudTrail pivot; empty = no `t` key
     IdentityKey string           // column key for enrichment row-marker placement; empty = use 5-step cascade
-    Color func(Resource) Color   // REQUIRED: classifies row health; reads structural fields directly
+    Color func(domain.Resource) domain.Color   // REQUIRED: classifies row health; reads structural fields directly
     ExcludeFromIssueBadge bool   // rows still colored + ctrl+z visible, but excluded from menu badge (used by ct-events)
     CellDecorators map[string]func(r Resource, value string) string // transforms cell values per column before render
 }
@@ -937,7 +958,7 @@ The stack model maps naturally to drill-down navigation (list → detail → YAM
 
 ### Why generation counters?
 
-Async operations (related checks, enrichment) can outlive the view that triggered them. Generation counters (`relatedGen`, `enrichGen`, `availabilityGen`, `enrichmentTypeGen`) are incremented on context changes, causing stale in-flight results to be silently discarded. `enrichmentTypeGen` is a per-type counter for Wave 2: bumped on profile/region switch and on Ctrl+R when the active view is a top-level list with a registered enricher. The dual-generation guard (`Gen` on `EnrichmentCheckedMsg` for session-wide staleness, `TypeGen` for per-type rerun staleness) lets multiple types enrich concurrently while rerun invalidation only cancels the refreshed type.
+Async operations (related checks, enrichment) can outlive the view that triggered them. Generation counters (`AvailabilityGen`, `EnrichmentGen`, `RelatedGen`, `EnrichGen`, `EnrichmentTypeGen`) — all typed `domain.Gen` (`uint64`) after Phase 05a-gens — are incremented on context changes, causing stale in-flight results to be silently discarded. `EnrichmentTypeGen` is a per-type counter for Wave 2: bumped on profile/region switch and on Ctrl+R when the active view is a top-level list with a registered enricher. The dual-generation guard (`Gen` on `EnrichmentCheckedMsg` for session-wide staleness, `TypeGen` for per-type rerun staleness) lets multiple types enrich concurrently while rerun invalidation only cancels the refreshed type.
 
 ### Why a separate enricher pattern?
 
