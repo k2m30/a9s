@@ -86,18 +86,17 @@ func (c *Core) FetchChildResources(ctx context.Context, clients *awsclient.Servi
 // FetchMoreResources fetches the next page of resources using the given
 // params. It tries filtered fetch, then child fetch, then top-level paginated
 // fetch — matching the routing logic from the original app_fetchers.go.
-// The bool return indicates whether any fetcher was found (false = no fetcher
-// registered, error describes the missing type).
-func (c *Core) FetchMoreResources(ctx context.Context, clients *awsclient.ServiceClients, p FetchMoreParams) (resource.FetchResult, bool, error) {
+// When no fetcher is registered for the type, the returned error describes the
+// missing type.
+func (c *Core) FetchMoreResources(ctx context.Context, clients *awsclient.ServiceClients, p FetchMoreParams) (resource.FetchResult, error) {
 	if clients == nil {
-		return resource.FetchResult{}, false, fmt.Errorf("AWS clients not initialized")
+		return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
 	}
 
 	if len(p.FetchFilter) > 0 {
 		pf := resource.GetFilteredPaginatedFetcher(p.ResourceType)
 		if pf != nil {
-			res, err := pf(ctx, clients, p.FetchFilter, p.Token)
-			return res, true, err
+			return pf(ctx, clients, p.FetchFilter, p.Token)
 		}
 	}
 
@@ -105,18 +104,16 @@ func (c *Core) FetchMoreResources(ctx context.Context, clients *awsclient.Servic
 		pf := resource.GetPaginatedChildFetcher(p.ResourceType)
 		if pf != nil {
 			pc := resource.ParentContext(p.ParentCtx)
-			res, err := pf(ctx, clients, pc, p.Token)
-			return res, true, err
+			return pf(ctx, clients, pc, p.Token)
 		}
 	}
 
 	pf := resource.GetPaginatedFetcher(p.ResourceType)
 	if pf != nil {
-		res, err := pf(ctx, clients, p.Token)
-		return res, true, err
+		return pf(ctx, clients, p.Token)
 	}
 
-	return resource.FetchResult{}, false, fmt.Errorf("no paginated fetcher for: %s", p.ResourceType)
+	return resource.FetchResult{}, fmt.Errorf("no paginated fetcher for: %s", p.ResourceType)
 }
 
 // FetchIdentity calls STS GetCallerIdentity and IAM ListAccountAliases.
