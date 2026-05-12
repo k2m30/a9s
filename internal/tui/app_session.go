@@ -145,7 +145,7 @@ func (m Model) handleThemeSelected(msg messages.ThemeSelected) (tea.Model, tea.C
 
 // handleProfilesLoaded pushes the profile selector view onto the stack.
 func (m Model) handleProfilesLoaded(msg profilesLoadedMsg) (tea.Model, tea.Cmd) {
-	p := views.NewProfile(msg.profiles, m.Session.Profile, m.keys)
+	p := views.NewProfile(msg.profiles, m.core.Session().Profile, m.keys)
 	p.SetSize(m.innerSize())
 	m.pushView(&p)
 	return m, nil

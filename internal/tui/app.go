@@ -52,18 +52,12 @@ type errorEntry struct {
 // Model is the root Bubble Tea model. It owns the view stack, header state,
 // AWS clients, and routes all messages to the active child view.
 //
-// The Model pairs a UI shell (view stack, header, input mode, flash, theme)
-// with a named Session *session.Session field that owns the in-memory
-// orchestration state tied to the active profile/region session (un-embedded
-// in PR-05a-final to make session ownership explicit at every call site).
-// Access sites use m.Session.ResourceCache, m.Session.ProbeResources,
-// m.Session.RelatedGen, m.Session.Profile, m.Session.Clients, etc. —
-// see internal/session/session.go for the ownership contract.
-// handleProfileSelected / handleRegionSelected call m.Session.Rotate() to
-// invalidate in-flight async results on switch.
+// Session state is owned exclusively by core via core.Session(). Call
+// m.core.Session() at each use site. See internal/session/session.go for the
+// ownership contract. handleProfileSelected / handleRegionSelected call
+// m.core.Session().Rotate() to invalidate in-flight async results on switch.
 type Model struct {
-	Session *session.Session // session-scoped orchestration state (incl. Profile, Region, Clients, Identity, ConnectGen, etc. after PR-05a-h2; un-embedded in PR-05a-final)
-	core    *runtime.Core    // platform-agnostic app core (shares same *session.Session)
+	core    *runtime.Core    // platform-agnostic app core
 
 	// --- UI shell state ---
 	width  int
@@ -108,13 +102,13 @@ type Option func(*Model)
 // WithProfile overrides the profile field on the session. Used in tests that need
 // a specific profile string without going through the live AWS bootstrap path.
 func WithProfile(profile string) Option {
-	return func(m *Model) { m.Session.Profile = profile }
+	return func(m *Model) { m.core.Session().Profile = profile }
 }
 
 // WithRegion overrides the region field on the session. Used in tests that need
 // a specific region string without going through the live AWS bootstrap path.
 func WithRegion(region string) Option {
-	return func(m *Model) { m.Session.Region = region }
+	return func(m *Model) { m.core.Session().Region = region }
 }
 
 // WithIsDemo marks the session as demo mode, which skips Wave 2 enrichment.
@@ -129,7 +123,7 @@ func WithIsDemo(demo bool) Option {
 // WithNoCache disables resource availability caching and background checks.
 func WithNoCache(disabled bool) Option {
 	return func(m *Model) {
-		m.Session.NoCache = disabled
+		m.core.Session().NoCache = disabled
 	}
 }
 
@@ -137,7 +131,7 @@ func WithNoCache(disabled bool) Option {
 // synthetic ClientsReadyMsg instead of initiating a live AWS connection.
 func WithClients(clients *awsclient.ServiceClients) Option {
 	return func(m *Model) {
-		m.Session.PreSuppliedClients = clients
+		m.core.Session().PreSuppliedClients = clients
 	}
 }
 
@@ -152,7 +146,7 @@ func WithActiveTheme(name string) Option {
 // directly on startup instead of the main menu. The caller is responsible for
 // resolving the input via resource.FindResourceType.
 func WithCommand(name string) Option {
-	return func(m *Model) { m.Session.Command = name }
+	return func(m *Model) { m.core.Session().Command = name }
 }
 
 // New constructs the initial Model.
@@ -177,7 +171,6 @@ func New(profile, region string, opts ...Option) Model {
 	sess.Profile = profile
 	sess.Region = region
 	m := Model{
-		Session:     sess,
 		core:        runtime.New(sess, resource.AllResourceTypes()),
 		keys:        k,
 		stack:       []views.View{&menu},
@@ -211,9 +204,9 @@ func (m Model) Cancel() {
 // When pre-supplied clients are present (demo mode or tests), emits a synthetic
 // ClientsReadyMsg immediately. Otherwise initiates the live AWS connection flow.
 func (m Model) Init() tea.Cmd {
-	if m.Session.PreSuppliedClients != nil {
+	if m.core.Session().PreSuppliedClients != nil {
 		preCmd := func() tea.Msg {
-			return messages.ClientsReady{Clients: m.Session.PreSuppliedClients}
+			return messages.ClientsReady{Clients: m.core.Session().PreSuppliedClients}
 		}
 		if m.configErr != nil {
 			return tea.Batch(preCmd, func() tea.Msg {
@@ -227,8 +220,8 @@ func (m Model) Init() tea.Cmd {
 	}
 	connectCmd := func() tea.Msg {
 		return messages.InitConnect{
-			Profile: m.Session.Profile,
-			Region:  m.Session.Region,
+			Profile: m.core.Session().Profile,
+			Region:  m.core.Session().Region,
 		}
 	}
 	if m.configErr != nil {
@@ -287,7 +280,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case messages.ClearFlash:
 		return m.handleClearFlash(msg)
 	case messages.InitConnect:
-		cmd := m.connectAWS(msg.Profile, msg.Region, m.Session.ConnectGen)
+		cmd := m.connectAWS(msg.Profile, msg.Region, m.core.Session().ConnectGen)
 		return m, cmd
 	case messages.ClientsReady:
 		return m.handleClientsReady(msg)
@@ -350,7 +343,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if rl.ParentContext() == nil && !rl.EscPops() {
 					rt := rl.ResourceType()
 					sortColIdx, sortAsc := rl.SortState()
-					updatedModel.Session.ResourceCache[rt] = &session.ResourceCacheEntry{
+					updatedModel.core.Session().ResourceCache[rt] = &session.ResourceCacheEntry{
 						Resources:     rl.AllResources(),
 						Pagination:    rl.PaginationState(),
 						FilterText:    rl.FilterText(),
@@ -365,8 +358,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Active view is not a ResourceList for this type (e.g., detail or menu).
 				// Cache resources directly from the message so handleRelatedNavigate
 				// can find them when navigating to a related resource type.
-				if _, alreadyCached := updatedModel.Session.ResourceCache[msg.ResourceType]; !alreadyCached {
-					updatedModel.Session.ResourceCache[msg.ResourceType] = &session.ResourceCacheEntry{
+				if _, alreadyCached := updatedModel.core.Session().ResourceCache[msg.ResourceType]; !alreadyCached {
+					updatedModel.core.Session().ResourceCache[msg.ResourceType] = &session.ResourceCacheEntry{
 						Resources: msg.Resources,
 					}
 				}
@@ -381,16 +374,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// NOTE: This check runs regardless of which view is currently active —
 			// the user may have navigated away from the resource list before the
 			// fetch returned, but the rerun must still fire.
-			if msg.TypeGen != 0 && msg.TypeGen == updatedModel.Session.EnrichmentTypeGen[msg.ResourceType] {
-				if updatedModel.Session.ProbeResources == nil {
-					updatedModel.Session.ProbeResources = make(map[string][]resource.Resource)
+			if msg.TypeGen != 0 && msg.TypeGen == updatedModel.core.Session().EnrichmentTypeGen[msg.ResourceType] {
+				if updatedModel.core.Session().ProbeResources == nil {
+					updatedModel.core.Session().ProbeResources = make(map[string][]resource.Resource)
 				}
-				updatedModel.Session.ProbeResources[msg.ResourceType] = msg.Resources
-				if updatedModel.Session.ProbeTruncated == nil {
-					updatedModel.Session.ProbeTruncated = make(map[string]bool)
+				updatedModel.core.Session().ProbeResources[msg.ResourceType] = msg.Resources
+				if updatedModel.core.Session().ProbeTruncated == nil {
+					updatedModel.core.Session().ProbeTruncated = make(map[string]bool)
 				}
-				updatedModel.Session.ProbeTruncated[msg.ResourceType] = msg.Pagination != nil && msg.Pagination.IsTruncated
-				cmd = tea.Batch(cmd, updatedModel.probeEnrichment(msg.ResourceType, updatedModel.Session.EnrichmentGen))
+				updatedModel.core.Session().ProbeTruncated[msg.ResourceType] = msg.Pagination != nil && msg.Pagination.IsTruncated
+				cmd = tea.Batch(cmd, updatedModel.probeEnrichment(msg.ResourceType, updatedModel.core.Session().EnrichmentGen))
 			}
 			return updatedModel, cmd
 		}
@@ -410,7 +403,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case messages.EnrichDetail:
 		return m.handleEnrichDetail(msg)
 	case messages.EnrichDetailResult:
-		if messages.IsStale(msg, m.Session) {
+		if messages.IsStale(msg, m.core.Session()) {
 			return m, nil
 		}
 		// Surface enrichment errors as a flash message.
@@ -429,7 +422,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleRelatedCheckStarted(msg)
 	case messages.RelatedCheckResult:
 		// Discard results from a previous check generation (e.g., after Ctrl+R or
-		if messages.IsStale(msg, m.Session) {
+		if messages.IsStale(msg, m.core.Session()) {
 			return m, nil
 		}
 		// Accumulate in relatedCache so re-entering the same detail skips re-dispatch.
@@ -443,8 +436,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if sourceID != "" {
 			ck := session.RelatedCacheKey(msg.ResourceType, sourceID)
-			existing, _ := m.Session.RelatedCache.Get(ck)
-			m.Session.RelatedCache.Set(ck, append(existing, session.RelatedCacheResult{
+			existing, _ := m.core.Session().RelatedCache.Get(ck)
+			m.core.Session().RelatedCache.Set(ck, append(existing, session.RelatedCacheResult{
 				DefDisplayName: msg.DefDisplayName,
 				Result:         msg.Result,
 			}))
@@ -464,10 +457,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if td := resource.FindResourceType(aliasName); td != nil {
 				shortName = td.ShortName
 			}
-			if _, exists := m.Session.ResourceCache[shortName]; exists {
+			if _, exists := m.core.Session().ResourceCache[shortName]; exists {
 				continue
 			}
-			if _, lazyExists := m.Session.LazyResourceCache[shortName]; lazyExists {
+			if _, lazyExists := m.core.Session().LazyResourceCache[shortName]; lazyExists {
 				continue
 			}
 			// Site 4: derive findings before storing in ResourceCache so cached
@@ -480,7 +473,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if pagination == nil && entry.IsTruncated {
 				pagination = &resource.PaginationMeta{IsTruncated: true}
 			}
-			m.Session.ResourceCache[shortName] = &session.ResourceCacheEntry{
+			m.core.Session().ResourceCache[shortName] = &session.ResourceCacheEntry{
 				Resources:  entry.Resources,
 				Pagination: pagination,
 			}
@@ -505,7 +498,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Site 5: derive findings across the new slice before merging into
 			// LazyResourceCache (PR-03a-shim wire-up).
 			(&m).deriveFindingsForType(shortName, extra)
-			existing := m.Session.LazyResourceCache[shortName]
+			existing := m.core.Session().LazyResourceCache[shortName]
 			known := make(map[string]struct{}, len(existing))
 			for _, r := range existing {
 				known[r.ID] = struct{}{}
@@ -517,7 +510,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				known[r.ID] = struct{}{}
 				existing = append(existing, r)
 			}
-			m.Session.LazyResourceCache[shortName] = existing
+			m.core.Session().LazyResourceCache[shortName] = existing
 		}
 		// Surface FetchByIDs failures as a visible flash error. Partial results
 		// are already merged above; the flash informs the operator that some IDs
@@ -597,8 +590,8 @@ func (m Model) View() tea.View {
 
 	active := m.activeView()
 
-	headerProfile := m.Session.Profile
-	headerRegion := m.Session.Region
+	headerProfile := m.core.Session().Profile
+	headerRegion := m.core.Session().Region
 	if sel, ok := active.(*views.SelectorModel); ok {
 		if sel.Title() == "aws-regions" {
 			headerRegion = "..."
@@ -895,7 +888,7 @@ func (m *Model) cacheTopLevelResourceList(rl views.ResourceListModel) {
 	}
 	rt := rl.ResourceType()
 	sortColIdx, sortAsc := rl.SortState()
-	m.Session.ResourceCache[rt] = &session.ResourceCacheEntry{
+	m.core.Session().ResourceCache[rt] = &session.ResourceCacheEntry{
 		Resources:     rl.AllResources(),
 		Pagination:    rl.PaginationState(),
 		FilterText:    rl.FilterText(),
@@ -959,35 +952,35 @@ func (m Model) headerRight() string {
 
 // accountBadge returns the account alias (preferred) or account ID for the header.
 func (m Model) accountBadge() string {
-	if m.Session.Identity == nil {
+	if m.core.Session().Identity == nil {
 		return ""
 	}
-	if m.Session.Identity.AccountAlias != "" {
-		return m.Session.Identity.AccountAlias
+	if m.core.Session().Identity.AccountAlias != "" {
+		return m.core.Session().Identity.AccountAlias
 	}
-	return m.Session.Identity.AccountID
+	return m.core.Session().Identity.AccountID
 }
 
 // identityRoleName returns the identity name (role or user) for the header.
 func (m Model) identityRoleName() string {
-	if m.Session.Identity == nil {
+	if m.core.Session().Identity == nil {
 		return ""
 	}
-	return m.Session.Identity.IdentityName
+	return m.core.Session().Identity.IdentityName
 }
 
 // identityToViewData converts the cached CallerIdentity to a view-layer IdentityData.
 func (m Model) identityToViewData() views.IdentityData {
-	if m.Session.Identity == nil {
+	if m.core.Session().Identity == nil {
 		return views.IdentityData{}
 	}
 	return views.IdentityData{
-		AccountID:     m.Session.Identity.AccountID,
-		AccountAlias:  m.Session.Identity.AccountAlias,
-		ARN:           m.Session.Identity.Arn,
-		RoleName:      m.Session.Identity.RoleName,
-		UserName:      m.Session.Identity.UserName,
-		SessionName:   m.Session.Identity.SessionName,
-		IsAssumedRole: m.Session.Identity.IsAssumedRole,
+		AccountID:     m.core.Session().Identity.AccountID,
+		AccountAlias:  m.core.Session().Identity.AccountAlias,
+		ARN:           m.core.Session().Identity.Arn,
+		RoleName:      m.core.Session().Identity.RoleName,
+		UserName:      m.core.Session().Identity.UserName,
+		SessionName:   m.core.Session().Identity.SessionName,
+		IsAssumedRole: m.core.Session().Identity.IsAssumedRole,
 	}
 }

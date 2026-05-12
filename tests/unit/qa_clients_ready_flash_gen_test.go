@@ -48,7 +48,7 @@ func TestHandleClientsReady_SuccessNoPendingRefresh_FlashGenUnchanged(t *testing
 	m, _ = rootApplyMsg(m, messages.ClientsReady{
 		Clients: &awsclient.ServiceClients{},
 		Region:  "us-east-1",
-		Gen:     m.Session.ConnectGen, // matches session → non-stale
+		Gen:     m.Session().ConnectGen, // matches session → non-stale
 	})
 
 	if got := m.FlashGen(); got != genBefore {
@@ -76,7 +76,7 @@ func TestHandleClientsReady_StaleGen_FlashGenUnchanged(t *testing.T) {
 	m, _ = rootApplyMsg(m, messages.ClientsReady{
 		Clients: &awsclient.ServiceClients{},
 		Region:  "us-east-1",
-		Gen:     m.Session.ConnectGen + 5,
+		Gen:     m.Session().ConnectGen + 5,
 	})
 
 	if got := m.FlashGen(); got != genBefore {
