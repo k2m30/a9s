@@ -72,15 +72,21 @@ const (
 	KindFetchFiltered TaskKind = "fetch-filtered"
 
 	// KindFetchMore asks the adapter to fetch the next page of resources for
-	// the type named by TaskKey.Scope, using the continuation token it holds
-	// in the session cache.
-	//
-	// TODO(PR-05b): the continuation token is currently re-derived by the
-	// adapter from the session cache (see runtime_adapter_related.go). When
-	// PR-05b lands the typed cmd/event split it will travel as a structured
-	// payload on TaskRequest so the runtime is the single decision-maker.
+	// the type named by TaskKey.Scope. The continuation token rides on the
+	// TaskRequest as a FetchMorePayload so the runtime is the single decision-
+	// maker and the adapter is a pure mechanical translator (AS-270 / PR-05b).
 	KindFetchMore TaskKind = "fetch-more"
 )
+
+// FetchMorePayload carries the continuation token the adapter must use when
+// the runtime requests a KindFetchMore fetch. The runtime captures the token
+// from the session cache at dispatch time so the adapter no longer reaches
+// back into session state to re-derive it.
+type FetchMorePayload struct {
+	ContinuationToken string
+}
+
+func (FetchMorePayload) isTaskPayload() {}
 
 // HandleRelatedNavigate resolves the navigation kind using the session cache
 // and returns the decision plus any fetch tasks the adapter should start.
@@ -161,11 +167,14 @@ func relatedFetchTasks(s *session.Session, targetType string, relatedIDs []strin
 		return nil
 	}
 
-	// Some IDs are missing. If the cache has more pages, ask for more.
+	// Some IDs are missing. If the cache has more pages, ask for more and
+	// carry the continuation token as a structured payload (AS-270 / PR-05b)
+	// so the adapter is a pure pass-through.
 	if entry != nil && entry.Pagination != nil && entry.Pagination.IsTruncated {
 		return []TaskRequest{{
-			Key:   TaskKey{Kind: KindFetchMore, Scope: targetType},
-			Cache: CacheNone,
+			Key:     TaskKey{Kind: KindFetchMore, Scope: targetType},
+			Cache:   CacheNone,
+			Payload: FetchMorePayload{ContinuationToken: entry.Pagination.NextToken},
 		}}
 	}
 
