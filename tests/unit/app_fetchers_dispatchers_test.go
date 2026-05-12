@@ -38,7 +38,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -59,14 +59,14 @@ func TestFetchResourcesFiltered_NilClients_ViaRelatedNavigate(t *testing.T) {
 
 	// Navigate to a detail view first so RelatedNavigateMsg is handled.
 	res := &resource.Resource{ID: "i-0abc123", Name: "web-server"}
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		Resource:     res,
 		ResourceType: "ec2",
 	})
 
 	// Send RelatedNavigateMsg with FetchFilter for ct-events (has filtered fetcher).
-	_, cmd := rootApplyMsg(m, messages.RelatedNavigateMsg{
+	_, cmd := rootApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "ct-events",
 		FetchFilter: map[string]string{
 			"ResourceName": "i-0abc123",
@@ -81,7 +81,7 @@ func TestFetchResourcesFiltered_NilClients_ViaRelatedNavigate(t *testing.T) {
 	// Execute — with nil clients the fetchResourcesFiltered cmd returns APIErrorMsg.
 	msg := cmd()
 	switch v := msg.(type) {
-	case messages.APIErrorMsg:
+	case messages.APIError:
 		if !strings.Contains(v.Err.Error(), "not initialized") {
 			t.Errorf("APIErrorMsg.Err = %q, want 'not initialized'", v.Err.Error())
 		}
@@ -92,7 +92,7 @@ func TestFetchResourcesFiltered_NilClients_ViaRelatedNavigate(t *testing.T) {
 			if sub == nil {
 				continue
 			}
-			if ae, ok := sub().(messages.APIErrorMsg); ok {
+			if ae, ok := sub().(messages.APIError); ok {
 				if strings.Contains(ae.Err.Error(), "not initialized") {
 					found = true
 					break
@@ -118,7 +118,7 @@ func TestFetchResourcesFiltered_NoFetcher(t *testing.T) {
 	// which returns nil, so the filtered branch is skipped. The fallback
 	// paginated fetcher IS registered, so we use a type that has no fetcher at all.
 	const noSuchType = "test_ff_no_fetcher_xyz"
-	_, cmd := rootApplyMsg(m, messages.LoadMoreMsg{
+	_, cmd := rootApplyMsg(m, messages.LoadMore{
 		ResourceType: noSuchType,
 		FetchFilter:  map[string]string{"k": "v"},
 	})
@@ -127,7 +127,7 @@ func TestFetchResourcesFiltered_NoFetcher(t *testing.T) {
 	}
 	msg := cmd()
 	// With nil clients the nil-clients guard fires first regardless
-	apiErr, ok := msg.(messages.APIErrorMsg)
+	apiErr, ok := msg.(messages.APIError)
 	if !ok {
 		t.Fatalf("expected APIErrorMsg, got %T", msg)
 	}
@@ -162,7 +162,7 @@ func TestFetchChildResources_NilClients(t *testing.T) {
 		resource.UnregisterPaginatedChild(childType)
 	})
 
-	_, cmd := rootApplyMsg(m, messages.EnterChildViewMsg{
+	_, cmd := rootApplyMsg(m, messages.EnterChildView{
 		ChildType:     childType,
 		ParentContext: map[string]string{"bucket": "test-bucket"},
 		DisplayName:   "test-bucket",
@@ -172,10 +172,10 @@ func TestFetchChildResources_NilClients(t *testing.T) {
 	}
 	// The batch contains the child fetch cmd; extract it.
 	msg := extractMsg(t, cmd, func(m tea.Msg) bool {
-		_, ok := m.(messages.APIErrorMsg)
+		_, ok := m.(messages.APIError)
 		return ok
 	})
-	apiErr, ok := msg.(messages.APIErrorMsg)
+	apiErr, ok := msg.(messages.APIError)
 	if !ok {
 		t.Fatalf("expected APIErrorMsg from nil-clients child fetch, got %T", msg)
 	}
@@ -209,7 +209,7 @@ func TestFetchChildResources_UnknownChildType(t *testing.T) {
 		resource.UnregisterChildType(noFetcherChild)
 	})
 
-	_, cmd := rootApplyMsg(m, messages.EnterChildViewMsg{
+	_, cmd := rootApplyMsg(m, messages.EnterChildView{
 		ChildType:     noFetcherChild,
 		ParentContext: map[string]string{"id": "x"},
 		DisplayName:   "x",
@@ -218,10 +218,10 @@ func TestFetchChildResources_UnknownChildType(t *testing.T) {
 		t.Fatal("EnterChildViewMsg should return a cmd even with missing fetcher")
 	}
 	msg := extractMsg(t, cmd, func(m tea.Msg) bool {
-		_, ok := m.(messages.APIErrorMsg)
+		_, ok := m.(messages.APIError)
 		return ok
 	})
-	apiErr, ok := msg.(messages.APIErrorMsg)
+	apiErr, ok := msg.(messages.APIError)
 	if !ok {
 		// nil clients fires first and also produces APIErrorMsg — fine.
 		t.Logf("got %T; acceptable (nil-clients guard fired first)", msg)
@@ -258,7 +258,7 @@ func TestFetchMoreResources_ParentCtxBranch_NilClients(t *testing.T) {
 		resource.UnregisterPaginatedChild(childType)
 	})
 
-	_, cmd := rootApplyMsg(m, messages.LoadMoreMsg{
+	_, cmd := rootApplyMsg(m, messages.LoadMore{
 		ResourceType:      childType,
 		ContinuationToken: "next-page-token",
 		ParentContext:     map[string]string{"bucket": "my-bucket"},
@@ -267,7 +267,7 @@ func TestFetchMoreResources_ParentCtxBranch_NilClients(t *testing.T) {
 		t.Fatal("LoadMoreMsg with parentCtx should return a cmd")
 	}
 	msg := cmd()
-	apiErr, ok := msg.(messages.APIErrorMsg)
+	apiErr, ok := msg.(messages.APIError)
 	if !ok {
 		t.Fatalf("expected APIErrorMsg from nil-clients parentCtx branch, got %T", msg)
 	}
@@ -284,7 +284,7 @@ func TestFetchMoreResources_NoFetcherFallback(t *testing.T) {
 
 	// Use a type name with no registered fetchers at all.
 	const ghostType = "test_more_ghost_xyz"
-	_, cmd := rootApplyMsg(m, messages.LoadMoreMsg{
+	_, cmd := rootApplyMsg(m, messages.LoadMore{
 		ResourceType:      ghostType,
 		ContinuationToken: "tok",
 		// No FetchFilter, no ParentContext
@@ -294,7 +294,7 @@ func TestFetchMoreResources_NoFetcherFallback(t *testing.T) {
 	}
 	msg := cmd()
 	// nil-clients guard fires first
-	apiErr, ok := msg.(messages.APIErrorMsg)
+	apiErr, ok := msg.(messages.APIError)
 	if !ok {
 		t.Fatalf("expected APIErrorMsg, got %T", msg)
 	}
@@ -321,7 +321,7 @@ func TestFetchProfiles_ReturnsMsg(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to the profile selector to trigger fetchProfiles.
-	_, cmd := rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetProfile})
+	_, cmd := rootApplyMsg(m, messages.Navigate{Target: messages.TargetProfile})
 	if cmd == nil {
 		t.Fatal("navigating to profile selector should return a cmd (fetchProfiles)")
 	}
@@ -329,7 +329,7 @@ func TestFetchProfiles_ReturnsMsg(t *testing.T) {
 	// Acceptable: profilesLoadedMsg (internal type, not exported) or FlashMsg.
 	// We just verify it doesn't panic and is a known type.
 	switch msg.(type) {
-	case messages.FlashMsg:
+	case messages.Flash:
 		// No profiles found or error — acceptable in CI environments
 	case nil:
 		// Also acceptable if the cmd is batched
@@ -349,11 +349,11 @@ func TestFetchRevealValue_NilClients(t *testing.T) {
 
 	// Navigate to a resource list and load resources, then press 'x' to trigger
 	// reveal. We use "secrets" which has a reveal fetcher, so the lookup passes.
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "secrets",
 		Resources: []resource.Resource{
 			{ID: "my-secret-arn", Name: "my-secret"},
@@ -368,12 +368,12 @@ func TestFetchRevealValue_NilClients(t *testing.T) {
 	}
 	msg := cmd()
 	switch v := msg.(type) {
-	case messages.FlashMsg:
+	case messages.Flash:
 		// Expected: "AWS clients not initialized" or "no reveal support"
 		if !v.IsError {
 			t.Errorf("FlashMsg.IsError should be true for nil-clients reveal, got text=%q", v.Text)
 		}
-	case messages.ValueRevealedMsg:
+	case messages.ValueRevealed:
 		if v.Err == nil {
 			t.Error("ValueRevealedMsg.Err should be set for nil clients")
 		}
@@ -396,11 +396,11 @@ func TestFetchRevealValue_NoRevealFetcher(t *testing.T) {
 	}
 
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources: []resource.Resource{
 			{ID: "i-0abc111", Name: "web-server-1", Fields: map[string]string{"State": "running"}},
@@ -413,7 +413,7 @@ func TestFetchRevealValue_NoRevealFetcher(t *testing.T) {
 		return // bail-early path confirmed
 	}
 	msg := cmd()
-	if flash, ok := msg.(messages.FlashMsg); ok {
+	if flash, ok := msg.(messages.Flash); ok {
 		if !flash.IsError {
 			t.Errorf("FlashMsg.IsError should be true for type without reveal fetcher")
 		}
@@ -448,7 +448,7 @@ func TestProbeResourceAvailability_NilClients(t *testing.T) {
 	// Trigger probeResourceAvailability by sending AvailabilityCacheLoadedMsg{Expired: true}.
 	// The handler calls probeResourceAvailability for each resource type.
 	// We send it and execute the returned batch.
-	_, cmd := rootApplyMsg(m, messages.AvailabilityCacheLoadedMsg{
+	_, cmd := rootApplyMsg(m, messages.AvailabilityCacheLoaded{
 		Entries: make(map[string]int),
 		Expired: true,
 	})
@@ -459,7 +459,7 @@ func TestProbeResourceAvailability_NilClients(t *testing.T) {
 	// each type (nil clients guard).
 	msg := cmd()
 	switch v := msg.(type) {
-	case messages.AvailabilityCheckedMsg:
+	case messages.AvailabilityChecked:
 		if v.Err == nil {
 			t.Error("AvailabilityCheckedMsg.Err should be non-nil for nil clients")
 		}
@@ -470,7 +470,7 @@ func TestProbeResourceAvailability_NilClients(t *testing.T) {
 			if subCmd == nil {
 				continue
 			}
-			if sm, ok := subCmd().(messages.AvailabilityCheckedMsg); ok {
+			if sm, ok := subCmd().(messages.AvailabilityChecked); ok {
 				if sm.Err != nil {
 					found = true
 					break
@@ -507,7 +507,7 @@ func TestSaveAvailabilityCache_NoCacheMode(t *testing.T) {
 	// Deliver AvailabilityCheckedMsg that simulates the all-done state.
 	// This triggers the "all checks done" branch in handleAvailabilityChecked
 	// which calls saveAvailabilityCache. With noCache=true it's a no-op (nil cmd).
-	_, cmd := rootApplyMsg(m, messages.AvailabilityCheckedMsg{
+	_, cmd := rootApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: "ec2",
 		HasResources: true,
 		Count:        3,
@@ -542,7 +542,7 @@ func TestDemoPrefetchCounts_ViaClientReady(t *testing.T) {
 
 	// Send ClientsReadyMsg with the demo clients so handleClientsReady runs the
 	// noCache branch which calls demoPrefetchCounts().
-	_, cmd := rootApplyMsg(m, messages.ClientsReadyMsg{
+	_, cmd := rootApplyMsg(m, messages.ClientsReady{
 		Clients: clients,
 		Region:  demo.DemoRegion,
 		Gen:     0,
@@ -552,7 +552,7 @@ func TestDemoPrefetchCounts_ViaClientReady(t *testing.T) {
 	}
 	msg := cmd()
 	// demoPrefetchCounts returns AvailabilityPrefetchedMsg.
-	prefetched, ok := msg.(messages.AvailabilityPrefetchedMsg)
+	prefetched, ok := msg.(messages.AvailabilityPrefetched)
 	if !ok {
 		// May be a tea.BatchMsg wrapping it.
 		if batch, isBatch := msg.(tea.BatchMsg); isBatch {
@@ -560,7 +560,7 @@ func TestDemoPrefetchCounts_ViaClientReady(t *testing.T) {
 				if sub == nil {
 					continue
 				}
-				if pf, ok2 := sub().(messages.AvailabilityPrefetchedMsg); ok2 {
+				if pf, ok2 := sub().(messages.AvailabilityPrefetched); ok2 {
 					prefetched = pf
 					ok = true
 					break
@@ -583,7 +583,7 @@ func TestDemoPrefetchCounts_AvailabilityPrefetchedHandler(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Gen 0 matches initial availabilityGen.
-	_, cmd := rootApplyMsg(m, messages.AvailabilityPrefetchedMsg{
+	_, cmd := rootApplyMsg(m, messages.AvailabilityPrefetched{
 		Entries:     map[string]int{"ec2": 7, "s3": 3},
 		Truncated:   map[string]bool{},
 		IssueCounts: map[string]int{"ec2": 1},
@@ -623,12 +623,12 @@ func TestRefreshResourceListWithEnrichmentRerun_StampsTypeGen(t *testing.T) {
 	// ResourcesLoadedMsg. Either way the cmd closure should not panic.
 	msg := refreshCmd()
 	switch v := msg.(type) {
-	case messages.ResourcesLoadedMsg:
+	case messages.ResourcesLoaded:
 		// TypeGen must be non-zero — the wrapper stamps it.
 		if v.TypeGen == 0 {
 			t.Errorf("refreshResourceListWithEnrichmentRerun: TypeGen = 0, want > 0")
 		}
-	case messages.APIErrorMsg:
+	case messages.APIError:
 		// nil clients → API error, TypeGen never set — acceptable
 		t.Logf("Ctrl+R with nil clients returned APIErrorMsg (clients not initialized)")
 	default:
@@ -652,7 +652,7 @@ func TestRefreshResourceListWithEnrichmentRerun_PassthroughAPIError(t *testing.T
 	msg := refreshCmd()
 	// With nil clients, fetchResources returns APIErrorMsg.
 	// The wrapper must not swallow or modify it.
-	apiErr, ok := msg.(messages.APIErrorMsg)
+	apiErr, ok := msg.(messages.APIError)
 	if ok {
 		// Verify the ResourceType is correctly propagated.
 		if apiErr.ResourceType != "ec2" {
@@ -661,7 +661,7 @@ func TestRefreshResourceListWithEnrichmentRerun_PassthroughAPIError(t *testing.T
 		return
 	}
 	// ResourcesLoadedMsg is also acceptable if somehow the type has a nil-safe fetcher.
-	if _, ok := msg.(messages.ResourcesLoadedMsg); ok {
+	if _, ok := msg.(messages.ResourcesLoaded); ok {
 		return
 	}
 	// Any other type is also OK (batch, etc.)

@@ -22,7 +22,7 @@ import (
 
 // ProbeAvailabilityResult carries the outcome of a single Wave-1 resource
 // availability probe. Adapters convert this into a platform-specific message
-// (e.g. messages.AvailabilityCheckedMsg for the Bubble Tea adapter).
+// (e.g. messages.AvailabilityChecked for the Bubble Tea adapter).
 type ProbeAvailabilityResult struct {
 	ResourceType string
 	HasResources bool
@@ -35,7 +35,7 @@ type ProbeAvailabilityResult struct {
 
 // ProbeEnrichmentResult carries the outcome of a single Wave-2 issue
 // enrichment probe. Adapters convert this into a platform-specific message
-// (e.g. messages.EnrichmentCheckedMsg for the Bubble Tea adapter).
+// (e.g. messages.EnrichmentChecked for the Bubble Tea adapter).
 type ProbeEnrichmentResult struct {
 	ResourceType string
 	Issues       int
@@ -48,7 +48,7 @@ type ProbeEnrichmentResult struct {
 
 // DemoPrefetchResult carries the combined outcome of a synchronous demo
 // prefetch of all registered resource types. Adapters convert this into
-// a platform-specific message (e.g. messages.AvailabilityPrefetchedMsg for
+// a platform-specific message (e.g. messages.AvailabilityPrefetched for
 // the Bubble Tea adapter).
 type DemoPrefetchResult struct {
 	Entries        map[string]int

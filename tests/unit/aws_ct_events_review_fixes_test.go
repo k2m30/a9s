@@ -38,7 +38,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -100,7 +100,7 @@ func TestCTSort_RFC3339_AcrossMonthBoundary(t *testing.T) {
 	// ResourcesLoadedMsg triggers applySortAndFilter() with the default
 	// TIME column descending sort that NewResourceList sets when the view
 	// config declares one (ct-events always does).
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources:    resources,
 	})

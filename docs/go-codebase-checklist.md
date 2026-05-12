@@ -144,7 +144,7 @@ Tailored for a Go TUI application built with Bubble Tea v2, Lipgloss v2, and AWS
 ## Message Contracts
 
 - [ ] Messages are data-only structs — no methods, no behavior
-- [ ] Messages defined in `internal/tui/messages/` with zero upward imports
+- [ ] Messages defined in `internal/runtime/messages/` (`cmd.go` + `event.go`) with zero upward imports
 - [ ] `NavigateMsg` carries a `ViewTarget` enum + optional resource/type data
 - [ ] `PopViewMsg` is an empty struct — the root model handles stack manipulation
 - [ ] Flash messages use a generation counter to prevent stale clears

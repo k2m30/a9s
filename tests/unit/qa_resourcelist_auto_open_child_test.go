@@ -22,7 +22,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -56,7 +56,7 @@ func TestResourceList_AutoOpenSingle_PrefersEnterChildOverDetail(t *testing.T) {
 	matching := []resource.Resource{
 		{ID: targetBucket, Name: targetBucket, Fields: map[string]string{"name": targetBucket}},
 	}
-	_, got := m.Update(messages.ResourcesLoadedMsg{
+	_, got := m.Update(messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    matching,
 	})
@@ -68,7 +68,7 @@ func TestResourceList_AutoOpenSingle_PrefersEnterChildOverDetail(t *testing.T) {
 	// The auto-skip must land on the Enter-child view, not the generic
 	// detail — otherwise pivoting via the related panel strands the
 	// operator on bucket metadata when they were headed for bucket contents.
-	enterChild, ok := msg.(messages.EnterChildViewMsg)
+	enterChild, ok := msg.(messages.EnterChildView)
 	if !ok {
 		t.Fatalf("expected EnterChildViewMsg for a type with Children[Key=\"enter\"]; got %T: %+v",
 			msg, msg)
@@ -105,7 +105,7 @@ func TestResourceList_AutoOpenSingle_NoEnterChild_StillOpensDetail(t *testing.T)
 	matching := []resource.Resource{
 		{ID: "vol-123", Fields: map[string]string{"volume_id": "vol-123"}},
 	}
-	_, got := m.Update(messages.ResourcesLoadedMsg{
+	_, got := m.Update(messages.ResourcesLoaded{
 		ResourceType: "ebs",
 		Resources:    matching,
 	})
@@ -114,7 +114,7 @@ func TestResourceList_AutoOpenSingle_NoEnterChild_StillOpensDetail(t *testing.T)
 	}
 	msg := got()
 
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("expected NavigateMsg (no Enter-child registered); got %T: %+v", msg, msg)
 	}

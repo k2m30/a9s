@@ -17,7 +17,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -55,7 +55,7 @@ func hScrollRDSModel(t *testing.T, width int) views.ResourceListModel {
 	m := views.NewResourceList(*td, nil, k)
 	m.SetSize(width, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "dbi",
 		Resources:    fixtureRDSInstances(),
 	})

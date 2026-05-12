@@ -23,7 +23,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // drainCmds executes the cmd chain to completion (up to maxDepth) and returns
@@ -61,7 +61,7 @@ func setupEC2DetailWithResults(t *testing.T) tui.Model {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	// Navigate to EC2 list.
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -72,7 +72,7 @@ func setupEC2DetailWithResults(t *testing.T) tui.Model {
 		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err, len(ec2Res))
 	}
 
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    ec2Res,
 	})
@@ -87,7 +87,7 @@ func setupEC2DetailWithResults(t *testing.T) tui.Model {
 	// Verify RelatedCheckStartedMsg was produced somewhere in the chain.
 	foundRelatedCheck := false
 	for _, msg := range firstMsgs {
-		if _, ok := msg.(messages.RelatedCheckStartedMsg); ok {
+		if _, ok := msg.(messages.RelatedCheckStarted); ok {
 			foundRelatedCheck = true
 			break
 		}
@@ -102,7 +102,7 @@ func setupEC2DetailWithResults(t *testing.T) tui.Model {
 
 	// Feed results for all registered EC2 related types.
 	for _, def := range resource.GetRelated("ec2") {
-		m, _ = rootApplyMsg(m, messages.RelatedCheckResultMsg{
+		m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 			ResourceType: "ec2",
 			Result: resource.RelatedCheckResult{
 				TargetType:  def.TargetType,
@@ -137,7 +137,7 @@ func TestBug_RelatedCheckResults_NotCachedOnReentry(t *testing.T) {
 	// EXPECTED: no RelatedCheckStartedMsg on re-entry (results are cached).
 	// BUG: the root model always creates a fresh DetailModel, so it always re-emits.
 	for _, msg := range secondMsgs {
-		if _, ok := msg.(messages.RelatedCheckStartedMsg); ok {
+		if _, ok := msg.(messages.RelatedCheckStarted); ok {
 			t.Fatal("BUG: re-entering the same EC2 detail view should NOT re-dispatch " +
 				"RelatedCheckStartedMsg — related check results must be cached from the first visit")
 		}
@@ -192,7 +192,7 @@ func TestBug_RelatedCheckCache_DifferentResource_ShouldRecheck(t *testing.T) {
 
 	foundRelatedCheck := false
 	for _, msg := range secondMsgs {
-		if _, ok := msg.(messages.RelatedCheckStartedMsg); ok {
+		if _, ok := msg.(messages.RelatedCheckStarted); ok {
 			foundRelatedCheck = true
 			break
 		}
@@ -217,7 +217,7 @@ func TestBug_RelatedCheckCache_InvalidatedOnProfileSwitch(t *testing.T) {
 
 	// Simulate a profile switch. In demo mode, ProfileSelectedMsg is a no-op
 	// (returns immediately). But we feed it to exercise the cache invalidation path.
-	m, _ = rootApplyMsg(m, messages.ProfileSelectedMsg{Profile: "other-profile"})
+	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "other-profile"})
 
 	// Re-enter the first EC2 instance — drain cmd chain.
 	m, secondCmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
@@ -227,7 +227,7 @@ func TestBug_RelatedCheckCache_InvalidatedOnProfileSwitch(t *testing.T) {
 	// active and Enter works normally. Verify RelatedCheckStartedMsg is produced.
 	foundRelatedCheck := false
 	for _, msg := range secondMsgs {
-		if _, ok := msg.(messages.RelatedCheckStartedMsg); ok {
+		if _, ok := msg.(messages.RelatedCheckStarted); ok {
 			foundRelatedCheck = true
 			break
 		}

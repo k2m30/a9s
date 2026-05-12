@@ -18,7 +18,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 type fullIntegrationScenario struct {
@@ -31,10 +31,10 @@ type fullIntegrationScenario struct {
 
 	history []string
 
-	lastFlash           *messages.FlashMsg
-	lastAPIError        *messages.APIErrorMsg
-	lastResourcesLoaded *messages.ResourcesLoadedMsg
-	lastClientsReady    *messages.ClientsReadyMsg
+	lastFlash           *messages.Flash
+	lastAPIError        *messages.APIError
+	lastResourcesLoaded *messages.ResourcesLoaded
+	lastClientsReady    *messages.ClientsReady
 
 	// enrichmentErrors records every EnrichmentCheckedMsg.Err observed during
 	// the scenario. Populated as messages flow through observe(). Scenario
@@ -51,7 +51,7 @@ type fullIntegrationScenario struct {
 
 	currentResourceType string
 	currentResource     *resource.Resource
-	lastRelatedByName   map[string]messages.RelatedCheckResultMsg
+	lastRelatedByName   map[string]messages.RelatedCheckResult
 }
 
 type fullIntegrationFindResourceOptions struct {
@@ -69,7 +69,7 @@ func fullIntegrationNewDemoScenario(t *testing.T) *fullIntegrationScenario {
 		clients:           clients,
 		profile:           demo.DemoProfile,
 		region:            demo.DemoRegion,
-		lastRelatedByName: make(map[string]messages.RelatedCheckResultMsg),
+		lastRelatedByName: make(map[string]messages.RelatedCheckResult),
 	}
 }
 
@@ -83,9 +83,9 @@ func fullIntegrationNewLiveScenario(t *testing.T, profile, region string) *fullI
 	var connectCmd tea.Cmd
 	m, connectCmd = fullIntegrationApplyMsg(m, initMsg)
 	clientsReadyRaw := fullIntegrationRequireCmdMsg(t, connectCmd, "live scenario AWS connect")
-	clientsReady, ok := clientsReadyRaw.(messages.ClientsReadyMsg)
+	clientsReady, ok := clientsReadyRaw.(messages.ClientsReady)
 	if !ok {
-		t.Fatalf("live scenario AWS connect returned %T, expected messages.ClientsReadyMsg", clientsReadyRaw)
+		t.Fatalf("live scenario AWS connect returned %T, expected messages.ClientsReady", clientsReadyRaw)
 	}
 	if clientsReady.Err != nil {
 		t.Fatalf("live scenario AWS connect failed for profile=%q region=%q: %v", profile, region, clientsReady.Err)
@@ -124,7 +124,7 @@ func fullIntegrationNewLiveScenarioFromClients(t *testing.T, profile, region str
 // fullIntegrationNewReadyModelWithClients for the shared-clients path).
 func fullIntegrationScenarioFromClients(t *testing.T, profile, region string, clients *awsclient.ServiceClients, m tui.Model) *fullIntegrationScenario {
 	t.Helper()
-	ready := messages.ClientsReadyMsg{Clients: clients, Region: region}
+	ready := messages.ClientsReady{Clients: clients, Region: region}
 	return &fullIntegrationScenario{
 		t:                 t,
 		model:             m,
@@ -132,7 +132,7 @@ func fullIntegrationScenarioFromClients(t *testing.T, profile, region string, cl
 		profile:           profile,
 		region:            region,
 		lastClientsReady:  &ready,
-		lastRelatedByName: make(map[string]messages.RelatedCheckResultMsg),
+		lastRelatedByName: make(map[string]messages.RelatedCheckResult),
 	}
 }
 
@@ -216,7 +216,7 @@ func fullIntegrationMustFindResource(t *testing.T, clients *awsclient.ServiceCli
 func (s *fullIntegrationScenario) OpenList(resourceType string) {
 	s.t.Helper()
 	s.beginAction("open list %s", resourceType)
-	s.applyAndDrain(messages.NavigateMsg{
+	s.applyAndDrain(messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: resourceType,
 	})
@@ -235,7 +235,7 @@ func (s *fullIntegrationScenario) OpenDetailResource(resourceType string, res re
 	s.t.Helper()
 	s.beginAction("open detail %s %s", resourceType, res.ID)
 	copy := res
-	s.applyAndDrain(messages.NavigateMsg{
+	s.applyAndDrain(messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: resourceType,
 		Resource:     &copy,
@@ -279,25 +279,25 @@ func (s *fullIntegrationScenario) Command(cmd string) {
 		s.applyAndDrain(tea.QuitMsg{})
 		return
 	case "ctx", "profile":
-		s.applyAndDrain(messages.NavigateMsg{Target: messages.TargetProfile})
+		s.applyAndDrain(messages.Navigate{Target: messages.TargetProfile})
 		return
 	case "region":
-		s.applyAndDrain(messages.NavigateMsg{Target: messages.TargetRegion})
+		s.applyAndDrain(messages.Navigate{Target: messages.TargetRegion})
 		return
 	case "help":
-		s.applyAndDrain(messages.NavigateMsg{Target: messages.TargetHelp})
+		s.applyAndDrain(messages.Navigate{Target: messages.TargetHelp})
 		return
 	}
 
 	if rt := resource.FindResourceType(cmd); rt != nil {
-		s.applyAndDrain(messages.NavigateMsg{
+		s.applyAndDrain(messages.Navigate{
 			Target:       messages.TargetResourceList,
 			ResourceType: rt.ShortName,
 		})
 		return
 	}
 
-	s.applyAndDrain(messages.FlashMsg{
+	s.applyAndDrain(messages.Flash{
 		Text:    fmt.Sprintf("unknown command: %s", cmd),
 		IsError: true,
 	})
@@ -387,7 +387,7 @@ func (s *fullIntegrationScenario) ChooseRegion(region string) {
 	}
 
 	s.beginAction("choose region %s", region)
-	s.applyAndDrain(messages.RegionSelectedMsg{Region: region})
+	s.applyAndDrain(messages.RegionSelected{Region: region})
 	if s.lastClientsReady == nil {
 		s.failf("choose region %q did not reconnect clients", region)
 	}
@@ -401,7 +401,7 @@ func (s *fullIntegrationScenario) ChooseProfile(profile string) {
 	}
 
 	s.beginAction("choose profile %s", profile)
-	s.applyAndDrain(messages.ProfileSelectedMsg{Profile: profile})
+	s.applyAndDrain(messages.ProfileSelected{Profile: profile})
 	if s.lastClientsReady == nil {
 		s.failf("choose profile %q did not reconnect clients", profile)
 	}
@@ -700,34 +700,34 @@ func (s *fullIntegrationScenario) drainCmd(cmd tea.Cmd) {
 
 func (s *fullIntegrationScenario) shouldDrainFollowups(msg tea.Msg) bool {
 	switch msg.(type) {
-	case messages.NavigateMsg:
+	case messages.Navigate:
 		return true
-	case messages.ResourcesLoadedMsg:
+	case messages.ResourcesLoaded:
 		return true
-	case messages.LoadMoreMsg:
+	case messages.LoadMore:
 		return true
-	case messages.ClientsReadyMsg:
+	case messages.ClientsReady:
 		return true
-	case messages.RelatedCheckStartedMsg:
+	case messages.RelatedCheckStarted:
 		return true
-	case messages.RelatedNavigateMsg:
+	case messages.RelatedNavigate:
 		return true
-	case messages.EnterChildViewMsg:
+	case messages.EnterChildView:
 		return true
-	case messages.APIErrorMsg:
+	case messages.APIError:
 		return true
-	case messages.ValueRevealedMsg:
+	case messages.ValueRevealed:
 		return true
 	// Wave 1 + Wave 2 enrichment chain: availability → enrichment → field updates.
 	// Without these, demo-mode Wave 2 findings never reach the ResourceList,
 	// and the `~` glyph / `(+N)` suffix / "maintenance scheduled" invariants
 	// cannot be exercised end-to-end. Added 2026-04-22 after the dbi render
 	// gate surfaced the gap.
-	case messages.AvailabilityPrefetchedMsg:
+	case messages.AvailabilityPrefetched:
 		return true
-	case messages.AvailabilityCheckedMsg:
+	case messages.AvailabilityChecked:
 		return true
-	case messages.EnrichmentCheckedMsg:
+	case messages.EnrichmentChecked:
 		return true
 	default:
 		return false
@@ -736,39 +736,39 @@ func (s *fullIntegrationScenario) shouldDrainFollowups(msg tea.Msg) bool {
 
 func (s *fullIntegrationScenario) observe(msg tea.Msg) {
 	switch msg := msg.(type) {
-	case messages.FlashMsg:
+	case messages.Flash:
 		copy := msg
 		s.lastFlash = &copy
-	case messages.APIErrorMsg:
+	case messages.APIError:
 		copy := msg
 		s.lastAPIError = &copy
-	case messages.ResourcesLoadedMsg:
+	case messages.ResourcesLoaded:
 		copy := msg
 		s.lastResourcesLoaded = &copy
 		s.currentListType = msg.ResourceType
 		s.currentListResources = append([]resource.Resource(nil), msg.Resources...)
 		s.currentListPagination = msg.Pagination
-	case messages.NavigateMsg:
+	case messages.Navigate:
 		if msg.Target == messages.TargetDetail && msg.Resource != nil {
 			copy := *msg.Resource
 			s.currentResource = &copy
 			s.currentResourceType = msg.ResourceType
-			s.lastRelatedByName = make(map[string]messages.RelatedCheckResultMsg)
+			s.lastRelatedByName = make(map[string]messages.RelatedCheckResult)
 		}
 		if msg.Target == messages.TargetResourceList {
 			s.currentListType = msg.ResourceType
 		}
-	case messages.RelatedCheckStartedMsg:
+	case messages.RelatedCheckStarted:
 		s.currentResourceType = msg.ResourceType
 		copy := msg.SourceResource
 		s.currentResource = &copy
-		s.lastRelatedByName = make(map[string]messages.RelatedCheckResultMsg)
-	case messages.RelatedCheckResultMsg:
+		s.lastRelatedByName = make(map[string]messages.RelatedCheckResult)
+	case messages.RelatedCheckResult:
 		if s.lastRelatedByName == nil {
-			s.lastRelatedByName = make(map[string]messages.RelatedCheckResultMsg)
+			s.lastRelatedByName = make(map[string]messages.RelatedCheckResult)
 		}
 		s.lastRelatedByName[msg.DefDisplayName] = msg
-	case messages.ClientsReadyMsg:
+	case messages.ClientsReady:
 		copy := msg
 		s.lastClientsReady = &copy
 		if msg.Err == nil {
@@ -779,11 +779,11 @@ func (s *fullIntegrationScenario) observe(msg tea.Msg) {
 				s.region = msg.Region
 			}
 		}
-	case messages.ProfileSelectedMsg:
+	case messages.ProfileSelected:
 		s.profile = msg.Profile
-	case messages.RegionSelectedMsg:
+	case messages.RegionSelected:
 		s.region = msg.Region
-	case messages.EnrichmentCheckedMsg:
+	case messages.EnrichmentChecked:
 		if msg.Err != nil {
 			if s.enrichmentErrors == nil {
 				s.enrichmentErrors = make(map[string]error)
@@ -815,7 +815,7 @@ func (s *fullIntegrationScenario) AssertNoEnrichmentErrors() {
 	s.t.FailNow()
 }
 
-func (s *fullIntegrationScenario) relatedNavigateMsg(displayName string) messages.RelatedNavigateMsg {
+func (s *fullIntegrationScenario) relatedNavigateMsg(displayName string) messages.RelatedNavigate {
 	s.t.Helper()
 	if s.currentResource == nil {
 		s.failf("follow related %q requires an active detail resource", displayName)
@@ -836,7 +836,7 @@ func (s *fullIntegrationScenario) relatedNavigateMsg(displayName string) message
 		s.failf("resource type %q has no related definition %q", s.currentResourceType, displayName)
 	}
 
-	return messages.RelatedNavigateMsg{
+	return messages.RelatedNavigate{
 		TargetType:     targetType,
 		SourceResource: *s.currentResource,
 		SourceType:     s.currentResourceType,
@@ -1106,7 +1106,7 @@ func (s *fullIntegrationScenario) FollowNavigableField(fieldPath string) resourc
 	sourceType := s.currentResourceType
 
 	s.beginAction("follow navigable field %s → %s (targetID=%s)", fieldPath, nf.TargetType, targetID)
-	s.applyAndDrain(messages.RelatedNavigateMsg{
+	s.applyAndDrain(messages.RelatedNavigate{
 		TargetType:     nf.TargetType,
 		SourceResource: sourceRes,
 		SourceType:     sourceType,

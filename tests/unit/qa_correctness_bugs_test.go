@@ -20,7 +20,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -271,7 +271,7 @@ func TestBug192_AvailabilityProbes_NotDoneUntilAllReturn(t *testing.T) {
 	}
 
 	// Start probes
-	m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoaded{
 		Entries: make(map[string]int),
 		Expired: true,
 	})
@@ -280,7 +280,7 @@ func TestBug192_AvailabilityProbes_NotDoneUntilAllReturn(t *testing.T) {
 
 	// Send results for only the first half
 	for i := range half {
-		m, _ = rootApplyMsg(m, messages.AvailabilityCheckedMsg{
+		m, _ = rootApplyMsg(m, messages.AvailabilityChecked{
 			ResourceType: allNames[i],
 			HasResources: true,
 			Count:        1,
@@ -293,7 +293,7 @@ func TestBug192_AvailabilityProbes_NotDoneUntilAllReturn(t *testing.T) {
 	// fires. The only observable signal in tests: the LAST result in the
 	// "not done" state still produces a non-nil cmd (next probe or cache save).
 	// Verify the model still processes further messages without panicking.
-	m, cmd := rootApplyMsg(m, messages.AvailabilityCheckedMsg{
+	m, cmd := rootApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: allNames[half],
 		HasResources: false,
 		Count:        0,
@@ -330,7 +330,7 @@ func TestBug192_AvailabilityProbes_SaveCacheOnlyAfterAllDone(t *testing.T) {
 	}
 
 	// Start probes (gen stays at 0 after this)
-	m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoaded{
 		Entries: make(map[string]int),
 		Expired: true,
 	})
@@ -348,7 +348,7 @@ func TestBug192_AvailabilityProbes_SaveCacheOnlyAfterAllDone(t *testing.T) {
 
 	// Send all-but-last results (gen=0, no error, count=1)
 	for i := range total - 1 {
-		m, _ = rootApplyMsg(m, messages.AvailabilityCheckedMsg{
+		m, _ = rootApplyMsg(m, messages.AvailabilityChecked{
 			ResourceType: allNames[i],
 			HasResources: true,
 			Count:        1,
@@ -364,7 +364,7 @@ func TestBug192_AvailabilityProbes_SaveCacheOnlyAfterAllDone(t *testing.T) {
 	//
 	// After the FIX: the model waits for availChecked == availTotal.
 	// The last result triggers the "done" path and returns the saveCache cmd.
-	_, lastCmd := rootApplyMsg(m, messages.AvailabilityCheckedMsg{
+	_, lastCmd := rootApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: allNames[total-1],
 		HasResources: true,
 		Count:        1,
@@ -397,10 +397,10 @@ func TestBug193_ProfileSwitch_FailedConnect_RollsBackProfile(t *testing.T) {
 	}
 
 	// Switch profile
-	m, _ = rootApplyMsg(m, messages.ProfileSelectedMsg{Profile: "broken-profile"})
+	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "broken-profile"})
 
 	// Connection fails
-	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{
+	m, _ = rootApplyMsg(m, messages.ClientsReady{
 		Err: fmt.Errorf("connection failed: no such profile"),
 		Gen: 1, // matches connectGen after one ProfileSelectedMsg
 	})
@@ -429,10 +429,10 @@ func TestBug193_RegionSwitch_FailedConnect_RollsBackRegion(t *testing.T) {
 	}
 
 	// Switch region
-	m, _ = rootApplyMsg(m, messages.RegionSelectedMsg{Region: "ap-southeast-1"})
+	m, _ = rootApplyMsg(m, messages.RegionSelected{Region: "ap-southeast-1"})
 
 	// Connection fails
-	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{
+	m, _ = rootApplyMsg(m, messages.ClientsReady{
 		Err: fmt.Errorf("connection failed: invalid region"),
 		Gen: 1, // matches connectGen after one RegionSelectedMsg
 	})
@@ -455,10 +455,10 @@ func TestBug193_ProfileSwitch_SuccessfulConnect_CommitsProfile(t *testing.T) {
 	m := tui.New("original-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
-	m, _ = rootApplyMsg(m, messages.ProfileSelectedMsg{Profile: "new-profile"})
+	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "new-profile"})
 
 	// Successful connect (nil clients is acceptable for this test)
-	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{Clients: nil, Gen: 1})
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 1})
 
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "new-profile") {
@@ -473,10 +473,10 @@ func TestBug193_RegionSwitch_SuccessfulConnect_CommitsRegion(t *testing.T) {
 	m := tui.New("myprofile", "us-west-2")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
-	m, _ = rootApplyMsg(m, messages.RegionSelectedMsg{Region: "eu-west-1"})
+	m, _ = rootApplyMsg(m, messages.RegionSelected{Region: "eu-west-1"})
 
 	// Successful connect
-	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{Clients: nil, Gen: 1})
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 1})
 
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "eu-west-1") {
@@ -493,10 +493,10 @@ func TestBug193_EmptyProfile_FailedConnect_RollsBack(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// Attempt switch to a broken profile
-	m, _ = rootApplyMsg(m, messages.ProfileSelectedMsg{Profile: "broken-profile"})
+	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "broken-profile"})
 
 	// Connect fails
-	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{
+	m, _ = rootApplyMsg(m, messages.ClientsReady{
 		Err: fmt.Errorf("connection refused"),
 		Gen: 1, // matches connectGen after one ProfileSelectedMsg
 	})
@@ -519,9 +519,9 @@ func TestBug193_ProfileSwitch_FailedConnect_ShowsErrorFlash(t *testing.T) {
 	m := tui.New("original-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
-	m, _ = rootApplyMsg(m, messages.ProfileSelectedMsg{Profile: "broken-profile"})
+	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "broken-profile"})
 
-	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{
+	m, _ = rootApplyMsg(m, messages.ClientsReady{
 		Err: fmt.Errorf("NoCredentialProviders: no valid providers in chain"),
 		Gen: 1, // matches connectGen after one ProfileSelectedMsg
 	})
@@ -543,13 +543,13 @@ func TestBug193_RapidSwitch_StaleResponseIgnored(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// First switch: A → B (connectGen becomes 1)
-	m, _ = rootApplyMsg(m, messages.ProfileSelectedMsg{Profile: "profile-B"})
+	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "profile-B"})
 
 	// Second switch before B's response: B → C (connectGen becomes 2)
-	m, _ = rootApplyMsg(m, messages.ProfileSelectedMsg{Profile: "profile-C"})
+	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "profile-C"})
 
 	// Stale response from B's connect arrives (Gen: 1, current connectGen: 2)
-	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{Clients: nil, Gen: 1})
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 1})
 
 	plain := stripANSI(rootViewContent(m))
 	// Header should still show profile-C (the latest switch), not profile-B
@@ -558,7 +558,7 @@ func TestBug193_RapidSwitch_StaleResponseIgnored(t *testing.T) {
 	}
 
 	// Now C's response arrives successfully (Gen: 2)
-	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{Clients: nil, Gen: 2})
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 2})
 
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "profile-C") {
@@ -574,16 +574,16 @@ func TestBug193_RapidSwitch_FailedFinalConnect_RollsBackToOriginal(t *testing.T)
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// Rapid switches: A → B → C (connectGen becomes 2)
-	m, _ = rootApplyMsg(m, messages.ProfileSelectedMsg{Profile: "profile-B"})
-	m, _ = rootApplyMsg(m, messages.ProfileSelectedMsg{Profile: "profile-C"})
+	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "profile-B"})
+	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "profile-C"})
 
 	// Stale B response — ignored
-	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{
+	m, _ = rootApplyMsg(m, messages.ClientsReady{
 		Err: fmt.Errorf("B failed"), Gen: 1,
 	})
 
 	// C's response fails (Gen: 2, matches connectGen)
-	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{
+	m, _ = rootApplyMsg(m, messages.ClientsReady{
 		Err: fmt.Errorf("C failed"), Gen: 2,
 	})
 
@@ -607,8 +607,8 @@ func TestBug193_FailedSwitch_RestoresIdentityAndAvailability(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// Attempt switch and fail
-	m, _ = rootApplyMsg(m, messages.ProfileSelectedMsg{Profile: "broken"})
-	m, cmd := rootApplyMsg(m, messages.ClientsReadyMsg{
+	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "broken"})
+	m, cmd := rootApplyMsg(m, messages.ClientsReady{
 		Err: fmt.Errorf("access denied"), Gen: 1,
 	})
 
@@ -632,15 +632,15 @@ func TestBug193_FailedSwitch_RestoresIdentityAndAvailability(t *testing.T) {
 
 // executeConnectCmd fires an InitConnectMsg and executes the returned cmd,
 // returning the ClientsReadyMsg. Returns nil if the cmd doesn't produce one.
-func executeConnectCmd(t *testing.T, m tui.Model) *messages.ClientsReadyMsg {
+func executeConnectCmd(t *testing.T, m tui.Model) *messages.ClientsReady {
 	t.Helper()
-	_, cmd := rootApplyMsg(m, messages.InitConnectMsg{Profile: "", Region: ""})
+	_, cmd := rootApplyMsg(m, messages.InitConnect{Profile: "", Region: ""})
 	if cmd == nil {
 		t.Log("InitConnectMsg returned nil cmd")
 		return nil
 	}
 	msg := cmd()
-	if cr, ok := msg.(messages.ClientsReadyMsg); ok {
+	if cr, ok := msg.(messages.ClientsReady); ok {
 		return &cr
 	}
 	// cmd may return a BatchMsg; unwrap one level
@@ -650,7 +650,7 @@ func executeConnectCmd(t *testing.T, m tui.Model) *messages.ClientsReadyMsg {
 				continue
 			}
 			subMsg := sub()
-			if cr, ok := subMsg.(messages.ClientsReadyMsg); ok {
+			if cr, ok := subMsg.(messages.ClientsReady); ok {
 				return &cr
 			}
 		}

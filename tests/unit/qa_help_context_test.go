@@ -11,7 +11,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -85,7 +85,7 @@ func TestQA_HelpContext_ResourceList_ShowsRelevantKeys(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to ec2 resource list
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -122,7 +122,7 @@ func TestQA_HelpContext_ResourceList_ExcludesIrrelevantKeys(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -150,7 +150,7 @@ func TestQA_HelpContext_SecretsResourceList_IncludesReveal(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to secrets resource list
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
 	})
@@ -175,7 +175,7 @@ func TestQA_HelpContext_EC2ResourceList_ExcludesReveal(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to ec2 resource list
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -197,7 +197,7 @@ func TestQA_HelpContext_DetailView_ShowsRelevantKeys(t *testing.T) {
 	m := newRootSizedModel()
 
 	res := &resource.Resource{ID: "i-abc123", Name: "test-instance"}
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: res,
 	})
@@ -227,7 +227,7 @@ func TestQA_HelpContext_DetailView_ExcludesIrrelevantKeys(t *testing.T) {
 	m := newRootSizedModel()
 
 	res := &resource.Resource{ID: "i-abc123", Name: "test-instance"}
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: res,
 	})
@@ -259,7 +259,7 @@ func TestQA_HelpContext_YAMLView_ShowsRelevantKeys(t *testing.T) {
 	m := newRootSizedModel()
 
 	res := &resource.Resource{ID: "i-abc123", Name: "test-instance"}
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetYAML,
 		Resource: res,
 	})
@@ -288,7 +288,7 @@ func TestQA_HelpContext_YAMLView_ExcludesIrrelevantKeys(t *testing.T) {
 	m := newRootSizedModel()
 
 	res := &resource.Resource{ID: "i-abc123", Name: "test-instance"}
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetYAML,
 		Resource: res,
 	})
@@ -321,7 +321,7 @@ func TestQA_HelpContext_RegionSelector_ShowsRelevantKeys(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetRegion})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetRegion})
 
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))
 	plain := stripANSI(rootViewContent(m))
@@ -346,7 +346,7 @@ func TestQA_HelpContext_RegionSelector_ExcludesIrrelevantKeys(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetRegion})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetRegion})
 
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))
 	plain := stripANSI(rootViewContent(m))
@@ -378,7 +378,7 @@ func TestQA_HelpContext_RevealView_ShowsRelevantKeys(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Push reveal view via ValueRevealedMsg
-	m, _ = rootApplyMsg(m, messages.ValueRevealedMsg{
+	m, _ = rootApplyMsg(m, messages.ValueRevealed{
 		ResourceID: "my-secret",
 		Value:      "super-secret-value",
 	})
@@ -401,7 +401,7 @@ func TestQA_HelpContext_RevealView_ExcludesIrrelevantKeys(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.ValueRevealedMsg{
+	m, _ = rootApplyMsg(m, messages.ValueRevealed{
 		ResourceID: "my-secret",
 		Value:      "super-secret-value",
 	})
@@ -440,7 +440,7 @@ func TestQA_HelpContext_DetailView_CopySaysValue(t *testing.T) {
 	m := newRootSizedModel()
 
 	res := &resource.Resource{ID: "i-abc123", Name: "test-instance"}
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: res,
 	})
@@ -462,7 +462,7 @@ func TestQA_HelpContext_ResourceList_SortLabelsAccurate(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -599,7 +599,7 @@ func TestQA_HelpContext_PreservesViewContext(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to resource list
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -628,7 +628,7 @@ func TestQA_HelpContext_SecretsVsEC2_RevealKey(t *testing.T) {
 
 	// Test 1: Secrets should show reveal
 	m1 := newRootSizedModel()
-	m1, _ = rootApplyMsg(m1, messages.NavigateMsg{
+	m1, _ = rootApplyMsg(m1, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
 	})
@@ -641,7 +641,7 @@ func TestQA_HelpContext_SecretsVsEC2_RevealKey(t *testing.T) {
 
 	// Test 2: EC2 should NOT show reveal
 	m2 := newRootSizedModel()
-	m2, _ = rootApplyMsg(m2, messages.NavigateMsg{
+	m2, _ = rootApplyMsg(m2, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -666,7 +666,7 @@ func TestQA_HelpContext_AllResourceTypes_ShowResourceListKeys(t *testing.T) {
 		t.Run(rt, func(t *testing.T) {
 			tui.Version = "0.6.0"
 			m := newRootSizedModel()
-			m, _ = rootApplyMsg(m, messages.NavigateMsg{
+			m, _ = rootApplyMsg(m, messages.Navigate{
 				Target:       messages.TargetResourceList,
 				ResourceType: rt,
 			})
@@ -780,7 +780,7 @@ func TestQA_HelpContext_ResourceList_GetHelpContext_Paginated(t *testing.T) {
 		}
 	}
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    resources,
 		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "tok"},
@@ -828,7 +828,7 @@ func TestQA_HelpContext_ResourceList_GetHelpContext_NotPaginated(t *testing.T) {
 		}
 	}
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    resources,
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
@@ -870,7 +870,7 @@ func TestQA_HelpContext_SecretsList_GetHelpContext_Paginated(t *testing.T) {
 		}
 	}
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "secrets",
 		Resources:    resources,
 		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "tok"},

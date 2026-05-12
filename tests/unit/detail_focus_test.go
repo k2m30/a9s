@@ -26,7 +26,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -261,7 +261,7 @@ func TestDetail_RightColFocused_EnterEmitsNavigateMsg(t *testing.T) {
 	d = makeExplicitlyVisible(d)
 
 	// Deliver a result AFTER the column is rebuilt so ResourceIDs are preserved.
-	d, _ = d.Update(messages.RelatedCheckResultMsg{
+	d, _ = d.Update(messages.RelatedCheckResult{
 		ResourceType: "ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "tg",
@@ -282,9 +282,9 @@ func TestDetail_RightColFocused_EnterEmitsNavigateMsg(t *testing.T) {
 	}
 
 	msg := cmd()
-	nav, ok := msg.(messages.RelatedNavigateMsg)
+	nav, ok := msg.(messages.RelatedNavigate)
 	if !ok {
-		t.Fatalf("cmd() should produce messages.RelatedNavigateMsg, got %T", msg)
+		t.Fatalf("cmd() should produce messages.RelatedNavigate, got %T", msg)
 	}
 	if nav.TargetType != "tg" {
 		t.Errorf("RelatedNavigateMsg.TargetType: want \"tg\", got %q", nav.TargetType)
@@ -319,7 +319,7 @@ func TestDetail_RightColFocused_EnterEmitsNavigateMsg_ExactTargetType(t *testing
 	d = makeExplicitlyVisible(d)
 
 	// Deliver result AFTER column is rebuilt.
-	d, _ = d.Update(messages.RelatedCheckResultMsg{
+	d, _ = d.Update(messages.RelatedCheckResult{
 		ResourceType: "ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "asg",
@@ -337,9 +337,9 @@ func TestDetail_RightColFocused_EnterEmitsNavigateMsg_ExactTargetType(t *testing
 		t.Fatal("Enter on focused right column should return non-nil cmd")
 	}
 	result := cmd()
-	nav, ok := result.(messages.RelatedNavigateMsg)
+	nav, ok := result.(messages.RelatedNavigate)
 	if !ok {
-		t.Fatalf("cmd() should produce messages.RelatedNavigateMsg, got %T", result)
+		t.Fatalf("cmd() should produce messages.RelatedNavigate, got %T", result)
 	}
 	if nav.TargetType != "asg" {
 		t.Errorf("RelatedNavigateMsg.TargetType: want %q (exact), got %q", "asg", nav.TargetType)
@@ -386,7 +386,7 @@ func TestDetail_RightColFocused_EscUnfocuses(t *testing.T) {
 	// cmd must be nil or must not be PopViewMsg (Esc only unfocuses here).
 	if cmd != nil {
 		produced := cmd()
-		if _, isPopView := produced.(messages.PopViewMsg); isPopView {
+		if _, isPopView := produced.(messages.PopView); isPopView {
 			t.Errorf("Esc on focused right column should NOT emit PopViewMsg; got PopViewMsg")
 		}
 	}

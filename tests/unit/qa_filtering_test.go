@@ -8,7 +8,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -25,11 +25,11 @@ func typeFilter(m tui.Model, text string) tui.Model {
 
 // loadEC2Resources navigates to ec2 resource list and loads test resources.
 func loadEC2Resources(m tui.Model, resources []resource.Resource) tui.Model {
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    resources,
 	})
@@ -357,7 +357,7 @@ func TestQA_Filter_11_15_ProfileSelector_FilterWorks(t *testing.T) {
 	// Navigate to region selector (we can't easily test profile without AWS
 	// but we use region as a proxy -- however the story says profile)
 	// Push profile view by directly navigating
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetRegion})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetRegion})
 
 	// Verify we're on region view
 	plain := stripANSI(rootViewContent(m))
@@ -390,7 +390,7 @@ func TestQA_Filter_11_16_RegionSelector_FilterWorks(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to region selector
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetRegion})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetRegion})
 
 	m = typeFilter(m, "eu")
 	plain := stripANSI(rootViewContent(m))
@@ -417,7 +417,7 @@ func TestQA_Filter_11_17_DetailView_SlashActivatesSearch(t *testing.T) {
 
 	// Navigate to detail view
 	res := &resource.Resource{ID: "i-abc123", Name: "test-instance", Fields: map[string]string{"state": "running"}}
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: res,
 	})
@@ -460,7 +460,7 @@ func TestQA_Filter_11_18_YAMLView_SlashActivatesSearch(t *testing.T) {
 
 	// Navigate to YAML view
 	res := &resource.Resource{ID: "i-abc123", Name: "test-yaml", Fields: map[string]string{"key": "value"}}
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetYAML,
 		Resource: res,
 	})
@@ -498,7 +498,7 @@ func TestQA_Filter_11_19_HelpView_SlashClosesHelp(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Open help
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetHelp})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "help") {
 		t.Fatal("precondition: should be on help view")
@@ -530,7 +530,7 @@ func TestQA_Filter_11_20_RevealView_SlashIgnored(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to reveal view via ValueRevealedMsg
-	m, _ = rootApplyMsg(m, messages.ValueRevealedMsg{
+	m, _ = rootApplyMsg(m, messages.ValueRevealed{
 		ResourceID: "test-secret",
 		Value:      "s3cr3t-value",
 	})
@@ -768,11 +768,11 @@ func TestQA_Filter_11_27_FilterOnEmptyList(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to ec2 with empty resources
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{},
 	})

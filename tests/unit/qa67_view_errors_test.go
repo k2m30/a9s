@@ -19,17 +19,17 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // I.1 — FlashMsg with clipboard error shows error flash, application does not crash.
 func TestQa67_I1_ClipboardUnavailable_ShowsErrorFlash(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources: []resource.Resource{
 			{ID: "i-clip-test", Name: "clip-test", Status: "running", Fields: map[string]string{
@@ -46,7 +46,7 @@ func TestQa67_I1_ClipboardUnavailable_ShowsErrorFlash(t *testing.T) {
 	})
 
 	// Simulate clipboard unavailable via FlashMsg (as the TUI layer would do)
-	m, _ = rootApplyMsg(m, messages.FlashMsg{
+	m, _ = rootApplyMsg(m, messages.Flash{
 		Text:    "Error: clipboard not available",
 		IsError: true,
 	})
@@ -67,7 +67,7 @@ func TestQa67_I1_ClipboardUnavailable_ShowsErrorFlash(t *testing.T) {
 // (Simulates a deleted secret being revealed — API returns ResourceNotFoundException)
 func TestQa67_I2_RevealDeletedSecret_ShowsError(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
 	})
@@ -88,10 +88,10 @@ func TestQa67_I2_RevealDeletedSecret_ShowsError(t *testing.T) {
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "secrets", Resources: secrets})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "secrets", Resources: secrets})
 
 	// Simulate the reveal result: ResourceNotFoundException
-	m, _ = rootApplyMsg(m, messages.ValueRevealedMsg{
+	m, _ = rootApplyMsg(m, messages.ValueRevealed{
 		ResourceType: "secrets",
 		ResourceID:   "deleted-secret",
 		Err:          errResourceNotFound("deleted-secret"),
@@ -111,7 +111,7 @@ func errResourceNotFound(name string) error {
 // I.3 — Reveal for a secret with no current version shows error/empty indicator.
 func TestQa67_I3_RevealSecretNoCurrentVersion_ShowsError(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
 	})
@@ -132,10 +132,10 @@ func TestQa67_I3_RevealSecretNoCurrentVersion_ShowsError(t *testing.T) {
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "secrets", Resources: secrets})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "secrets", Resources: secrets})
 
 	// ValueRevealedMsg with error (no current version)
-	m, _ = rootApplyMsg(m, messages.ValueRevealedMsg{
+	m, _ = rootApplyMsg(m, messages.ValueRevealed{
 		ResourceType: "secrets",
 		ResourceID:   "no-value-secret",
 		Err:          errNoVersionFound("no-value-secret"),
@@ -158,7 +158,7 @@ func TestQa67_I5_XKeyOnNonSecretType_IsNoOp(t *testing.T) {
 	for _, rt := range nonSecretTypes {
 		t.Run(rt, func(t *testing.T) {
 			m := newRootSizedModel()
-			m, _ = rootApplyMsg(m, messages.NavigateMsg{
+			m, _ = rootApplyMsg(m, messages.Navigate{
 				Target:       messages.TargetResourceList,
 				ResourceType: rt,
 			})
@@ -182,7 +182,7 @@ func TestQa67_I5_XKeyOnNonSecretType_IsNoOp(t *testing.T) {
 			// cmd should be nil (no-op) or at most return a no-op FlashMsg
 			if cmd != nil {
 				msg := cmd()
-				if _, ok := msg.(messages.ValueRevealedMsg); ok {
+				if _, ok := msg.(messages.ValueRevealed); ok {
 					t.Errorf("I.5: pressing x on %s should not trigger a reveal", rt)
 				}
 			}
@@ -227,7 +227,7 @@ func TestQa67_I7_TabAutocomplete_NoMatch_DoesNothing(t *testing.T) {
 func TestQa67_I8_SortByStatus_ResourceTypeWithNoStatusColumn_NoCrash(t *testing.T) {
 	// Use SNS Topics which has minimal columns (no standard "status" column)
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "sns",
 	})
@@ -251,7 +251,7 @@ func TestQa67_I8_SortByStatus_ResourceTypeWithNoStatusColumn_NoCrash(t *testing.
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "sns", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "sns", Resources: resources})
 
 	// Press S to sort by status — should be no-op or graceful
 	m, _ = rootApplyMsg(m, rootKeyPress("S"))
@@ -271,7 +271,7 @@ func TestQa67_I8_SortByStatus_ResourceTypeWithNoStatusColumn_NoCrash(t *testing.
 // I.9 — Horizontal scroll on resource type with few columns is a no-op (no crash).
 func TestQa67_I9_HorizontalScroll_FewColumns_IsNoOp(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "sns",
 	})
@@ -285,7 +285,7 @@ func TestQa67_I9_HorizontalScroll_FewColumns_IsNoOp(t *testing.T) {
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "sns", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "sns", Resources: resources})
 
 	// Press l to scroll right — should stop at the last column (no crash)
 	for range 10 {
@@ -309,7 +309,7 @@ func TestQa67_I9_HorizontalScroll_FewColumns_IsNoOp(t *testing.T) {
 // I.4 — Reveal header warning shows "Secret visible" and does not auto-clear.
 func TestQa67_I4_RevealHeaderWarning_PersistsVisible(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
 	})
@@ -330,10 +330,10 @@ func TestQa67_I4_RevealHeaderWarning_PersistsVisible(t *testing.T) {
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "secrets", Resources: secrets})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "secrets", Resources: secrets})
 
 	// Navigate to reveal view via ValueRevealedMsg (success path)
-	m, _ = rootApplyMsg(m, messages.ValueRevealedMsg{
+	m, _ = rootApplyMsg(m, messages.ValueRevealed{
 		ResourceType: "secrets",
 		ResourceID:   "prod/api/key",
 		Value:        "hunter2-secret-value",

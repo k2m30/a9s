@@ -20,7 +20,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/runtime"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -34,7 +34,7 @@ import (
 // leave flash.gen alone so that any ClearFlashMsg already in flight for
 // the current flash still matches and clears on schedule (CXR/Architect
 // Stage 5 R3 finding on the prior `len(intents)>0||len(tasks)>0` gate).
-func (m Model) handleClientsReady(msg messages.ClientsReadyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleClientsReady(msg messages.ClientsReady) (tea.Model, tea.Cmd) {
 	_, hasRL := m.activeView().(*views.ResourceListModel)
 	intents, tasks := m.core.HandleClientsReady(runtime.ClientsReadyEvent{
 		Clients: msg.Clients, Err: msg.Err, Region: msg.Region, Gen: msg.Gen,
@@ -68,7 +68,7 @@ func hasFlashWork(intents []runtime.UIIntent, tasks []runtime.TaskRequest) bool 
 
 // handleProfileSelected defers to runtime.Core.HandleProfileSelected for
 // the Session.Rotate + rollback-latch + reconnect-request sequence.
-func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleProfileSelected(msg messages.ProfileSelected) (tea.Model, tea.Cmd) {
 	m.flash.gen++
 	intents, tasks := m.core.HandleProfileSelected(runtime.ProfileSelectedEvent{
 		Profile: msg.Profile, NewGen: m.flash.gen,
@@ -79,7 +79,7 @@ func (m Model) handleProfileSelected(msg messages.ProfileSelectedMsg) (tea.Model
 
 // handleRegionSelected defers to runtime.Core.HandleRegionSelected for
 // the Session.Rotate + rollback-latch + reconnect-request sequence.
-func (m Model) handleRegionSelected(msg messages.RegionSelectedMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleRegionSelected(msg messages.RegionSelected) (tea.Model, tea.Cmd) {
 	m.flash.gen++
 	intents, tasks := m.core.HandleRegionSelected(runtime.RegionSelectedEvent{
 		Region: msg.Region, NewGen: m.flash.gen,
@@ -92,30 +92,30 @@ func (m Model) handleRegionSelected(msg messages.RegionSelectedMsg) (tea.Model, 
 // pops the selector, and persists the choice to config.yaml. Stays in the
 // TUI adapter pending the screen-builder registry that successor PRs need
 // to push the selector view from a Core method.
-func (m Model) handleThemeSelected(msg messages.ThemeSelectedMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleThemeSelected(msg messages.ThemeSelected) (tea.Model, tea.Cmd) {
 	path, err := config.ThemePath(msg.Theme)
 	if err != nil {
 		return m, func() tea.Msg {
-			return messages.FlashMsg{Text: "Invalid theme: " + err.Error(), IsError: true}
+			return messages.Flash{Text: "Invalid theme: " + err.Error(), IsError: true}
 		}
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return m, func() tea.Msg {
-			return messages.FlashMsg{Text: "Cannot read theme: " + err.Error(), IsError: true}
+			return messages.Flash{Text: "Cannot read theme: " + err.Error(), IsError: true}
 		}
 	}
 	t, err := styles.ThemeFromYAML(data)
 	if err != nil {
 		return m, func() tea.Msg {
-			return messages.FlashMsg{Text: "Bad theme YAML: " + err.Error(), IsError: true}
+			return messages.Flash{Text: "Bad theme YAML: " + err.Error(), IsError: true}
 		}
 	}
 
 	// Persist BEFORE applying — if save fails, abort the change entirely.
 	if saveErr := config.SaveTheme(msg.Theme); saveErr != nil {
 		return m, func() tea.Msg {
-			return messages.FlashMsg{Text: "Cannot save theme config: " + saveErr.Error(), IsError: true}
+			return messages.Flash{Text: "Cannot save theme config: " + saveErr.Error(), IsError: true}
 		}
 	}
 
@@ -139,7 +139,7 @@ func (m Model) handleThemeSelected(msg messages.ThemeSelectedMsg) (tea.Model, te
 	}
 
 	return m, func() tea.Msg {
-		return messages.FlashMsg{Text: "Theme: " + msg.Theme}
+		return messages.Flash{Text: "Theme: " + msg.Theme}
 	}
 }
 

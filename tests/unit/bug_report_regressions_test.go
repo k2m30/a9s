@@ -11,7 +11,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 var defaultEC2RelatedDefs = append([]resource.RelatedDef(nil), resource.GetRelated("ec2")...)
@@ -58,11 +58,11 @@ func TestBug_AllZeroRelatedRows_DoNotAllowRightColumnFocus(t *testing.T) {
 
 	d := makeDetailForFocusTest(t, 140)
 	d = makeExplicitlyVisible(d)
-	d, _ = d.Update(messages.RelatedCheckResultMsg{
+	d, _ = d.Update(messages.RelatedCheckResult{
 		ResourceType: "ec2",
 		Result:       resource.RelatedCheckResult{TargetType: "alarm", Count: 0},
 	})
-	d, _ = d.Update(messages.RelatedCheckResultMsg{
+	d, _ = d.Update(messages.RelatedCheckResult{
 		ResourceType: "ec2",
 		Result:       resource.RelatedCheckResult{TargetType: "ct-events", Count: 0},
 	})
@@ -76,7 +76,7 @@ func TestBug_AllZeroRelatedRows_DoNotAllowRightColumnFocus(t *testing.T) {
 
 	_, cmd := d.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd != nil {
-		if _, ok := cmd().(messages.RelatedNavigateMsg); ok {
+		if _, ok := cmd().(messages.RelatedNavigate); ok {
 			t.Fatal("when every related row resolves to zero, Enter should not navigate from the right column")
 		}
 	}

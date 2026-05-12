@@ -47,7 +47,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo"
 	demofixtures "github.com/k2m30/a9s/v3/internal/demo/fixtures"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // drillThroughFixtures is the full set of (label, shortName, graphRoot) triples
@@ -282,31 +282,31 @@ func TestScenario_RelatedDrillThrough_All(t *testing.T) {
 // catches failures the direct-checker test (TestScenario_RelatedDrillThrough_All)
 // cannot see:
 //
-//   1) Child-view landings. When a target type registers Children[Key="enter"]
-//      (e.g. cfn → cfn_events, s3 → s3_objects, asg → asg_activities, tg →
-//      tg_health, cb → cb_builds, ecr → ecr_images, etc.), drilling into a
-//      Count=1 pivot must enter that child view and the child-view fetcher
-//      must return non-empty content. A fixture gap for the drilled entity
-//      (e.g. CFN events missing for a specific stack) makes the drill land
-//      on an empty view even though the checker correctly reported Count>=1
-//      with a matching ID.
+//  1. Child-view landings. When a target type registers Children[Key="enter"]
+//     (e.g. cfn → cfn_events, s3 → s3_objects, asg → asg_activities, tg →
+//     tg_health, cb → cb_builds, ecr → ecr_images, etc.), drilling into a
+//     Count=1 pivot must enter that child view and the child-view fetcher
+//     must return non-empty content. A fixture gap for the drilled entity
+//     (e.g. CFN events missing for a specific stack) makes the drill land
+//     on an empty view even though the checker correctly reported Count>=1
+//     with a matching ID.
 //
-//   2) Navigation integration. The direct-checker test verifies ID-format
-//      parity with the target fetcher, but does NOT exercise the actual
-//      TUI navigation — ResolveRelatedNavigate, handleRelatedNavigate,
-//      NavigationKindDetail fast path, EnterChildViewMsg dispatch, or the child-view
-//      fetcher's ParentContext handling.
+//  2. Navigation integration. The direct-checker test verifies ID-format
+//     parity with the target fetcher, but does NOT exercise the actual
+//     TUI navigation — ResolveRelatedNavigate, handleRelatedNavigate,
+//     NavigationKindDetail fast path, EnterChildViewMsg dispatch, or the child-view
+//     fetcher's ParentContext handling.
 //
 // To avoid the async race that made earlier TUI-driven tests flaky (related
 // checkers are goroutine-based; the scenario harness can't deterministically
 // wait for all results), this test:
 //
-//   a) Runs the checker synchronously against a prefetched cache to compute
-//      the expected ResourceIDs / FetchFilter.
-//   b) Opens the detail view for the graph-root.
-//   c) Dispatches a synthetic RelatedNavigateMsg carrying those IDs, bypassing
-//      the async check path entirely.
-//   d) Asserts the landing view is non-empty — detail, list, or child view.
+//	a) Runs the checker synchronously against a prefetched cache to compute
+//	   the expected ResourceIDs / FetchFilter.
+//	b) Opens the detail view for the graph-root.
+//	c) Dispatches a synthetic RelatedNavigateMsg carrying those IDs, bypassing
+//	   the async check path entirely.
+//	d) Asserts the landing view is non-empty — detail, list, or child view.
 //
 // A drilled pivot that lands on Count=0 in the target view, OR that lands on
 // a child view with an empty resource list, is a bug.
@@ -354,7 +354,7 @@ func TestScenario_RelatedDrillNavigationLands_All(t *testing.T) {
 
 						// 3. Dispatch synthetic RelatedNavigateMsg with the checker's
 						// output — bypasses the async check-result flow entirely.
-						navMsg := messages.RelatedNavigateMsg{
+						navMsg := messages.RelatedNavigate{
 							TargetType:     def.TargetType,
 							SourceResource: srcView,
 							SourceType:     group.shortName,

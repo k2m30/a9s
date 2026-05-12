@@ -18,7 +18,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -49,7 +49,7 @@ func newHintTestResourceList(n int) views.ResourceListModel {
 		}
 	}
 
-	rl, _ = rl.Update(messages.ResourcesLoadedMsg{
+	rl, _ = rl.Update(messages.ResourcesLoaded{
 		ResourceType: "hint-test",
 		Resources:    resources,
 		Pagination: &resource.PaginationMeta{

@@ -30,7 +30,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -61,7 +61,7 @@ func buildSuffixDetail(t *testing.T, displayName, targetType string) (views.Deta
 // injectSuffixResult delivers a RelatedCheckResultMsg for the named target
 // and waits for the model to apply it.
 func injectSuffixResult(d views.DetailModel, targetType string, count int, approximate bool, fetchFilter map[string]string) views.DetailModel {
-	msg := messages.RelatedCheckResultMsg{
+	msg := messages.RelatedCheckResult{
 		ResourceType: "suffix-test",
 		Result: resource.RelatedCheckResult{
 			TargetType:  targetType,

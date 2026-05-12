@@ -16,14 +16,14 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // F.3 — Resource deleted between list load and detail open: app renders without panic.
 // The detail view shows last-known data from the list (no second AWS call needed).
 func TestQa67_F3_ResourceDeletedBeforeDetailOpen_NoPanic(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -44,12 +44,12 @@ func TestQa67_F3_ResourceDeletedBeforeDetailOpen_NoPanic(t *testing.T) {
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "ec2", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
 
 	// Simulate: resource "deleted" in AWS, but user pressed d to view detail
 	// using the stale list data — this is the list-cached resource, no new API call.
 	res := &resources[0]
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: res,
 	})
@@ -73,7 +73,7 @@ func TestQa67_F3_ResourceDeletedBeforeDetailOpen_NoPanic(t *testing.T) {
 // F.4 — When APIErrorMsg arrives for a child view (resource deleted), error is shown and nav works.
 func TestQa67_F4_ResourceDeletedBeforeChildView_ShowsError(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "s3",
 	})
@@ -89,7 +89,7 @@ func TestQa67_F4_ResourceDeletedBeforeChildView_ShowsError(t *testing.T) {
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "s3", Resources: buckets})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: buckets})
 
 	// Navigate into the bucket (child view)
 	var cmd tea.Cmd
@@ -100,7 +100,7 @@ func TestQa67_F4_ResourceDeletedBeforeChildView_ShowsError(t *testing.T) {
 	}
 
 	// Simulate the APIErrorMsg from the child fetcher (bucket was deleted)
-	m, _ = rootApplyMsg(m, messages.APIErrorMsg{
+	m, _ = rootApplyMsg(m, messages.APIError{
 		ResourceType: "s3_objects",
 		Err:          errNoSuchBucket("deleted-bucket"),
 	})
@@ -126,7 +126,7 @@ func TestQa67_F6_RapidEscPresses_DoNotPanic(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Build up a view stack: menu -> list -> detail
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -147,8 +147,8 @@ func TestQa67_F6_RapidEscPresses_DoNotPanic(t *testing.T) {
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "ec2", Resources: resources})
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: &resources[0],
 	})
@@ -167,7 +167,7 @@ func TestQa67_F6_RapidEscPresses_DoNotPanic(t *testing.T) {
 // F.7 — Navigating away during loading state (before ResourcesLoadedMsg) does not corrupt view.
 func TestQa67_F7_EscDuringLoading_NavigatesBackCleanly(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -188,7 +188,7 @@ func TestQa67_F7_EscDuringLoading_NavigatesBackCleanly(t *testing.T) {
 	}
 
 	// Now if late ResourcesLoadedMsg arrives, it should be discarded or benign
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources: []resource.Resource{
 			{ID: "i-late", Name: "late-instance", Status: "running", Fields: map[string]string{
@@ -213,7 +213,7 @@ func TestQa67_F7_EscDuringLoading_NavigatesBackCleanly(t *testing.T) {
 // F.5 — Refresh after state change shows updated data.
 func TestQa67_F5_RefreshAfterStateChange_ShowsUpdatedData(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -236,7 +236,7 @@ func TestQa67_F5_RefreshAfterStateChange_ShowsUpdatedData(t *testing.T) {
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "ec2", Resources: initial})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: initial})
 
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "running") {
@@ -263,7 +263,7 @@ func TestQa67_F5_RefreshAfterStateChange_ShowsUpdatedData(t *testing.T) {
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "ec2", Resources: updated})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: updated})
 
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "stopped") {

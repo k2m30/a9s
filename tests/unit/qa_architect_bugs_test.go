@@ -9,7 +9,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // viewsDirs returns the standard views directory path for tests in tests/unit/.
@@ -20,11 +20,11 @@ var viewsDirs = []string{"../../.a9s/views"}
 func TestBug_S3_EnterOnFolder_NavigatesIntoPrefix(t *testing.T) {
 	m := newRootSizedModel()
 	// Navigate to S3 buckets
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetResourceList, ResourceType: "s3"})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "s3"})
 	buckets := []resource.Resource{
 		{ID: "my-bucket", Name: "my-bucket", Fields: map[string]string{"name": "my-bucket"}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "s3", Resources: buckets})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: buckets})
 	// Enter bucket
 	var cmd tea.Cmd
 	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -41,7 +41,7 @@ func TestBug_S3_EnterOnFolder_NavigatesIntoPrefix(t *testing.T) {
 			"key": "readme.txt", "size": "1024", "last_modified": "2025-01-01", "storage_class": "STANDARD",
 		}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "s3", Resources: objects})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: objects})
 	// Press Enter on the folder — should navigate into prefix, NOT show detail
 	_, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd == nil {
@@ -49,11 +49,11 @@ func TestBug_S3_EnterOnFolder_NavigatesIntoPrefix(t *testing.T) {
 	}
 	msg := cmd()
 	// Should be EnterChildViewMsg (data-driven child nav), not NavigateMsg{TargetDetail}
-	if childMsg, ok := msg.(messages.EnterChildViewMsg); ok {
+	if childMsg, ok := msg.(messages.EnterChildView); ok {
 		if childMsg.ChildType != "s3_objects" {
 			t.Errorf("EnterChildViewMsg.ChildType should be 's3_objects', got %q", childMsg.ChildType)
 		}
-	} else if nav, ok := msg.(messages.NavigateMsg); ok && nav.Target == messages.TargetDetail {
+	} else if nav, ok := msg.(messages.Navigate); ok && nav.Target == messages.TargetDetail {
 		t.Error("Enter on S3 folder must navigate into prefix, not show detail view")
 	} else {
 		t.Errorf("Enter on S3 folder should send EnterChildViewMsg, got %T", msg)
@@ -64,11 +64,11 @@ func TestBug_S3_EnterOnFolder_NavigatesIntoPrefix(t *testing.T) {
 
 func TestBug_S3_DKeyOnBucket_ShowsDetail(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetResourceList, ResourceType: "s3"})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "s3"})
 	buckets := []resource.Resource{
 		{ID: "my-bucket", Name: "my-bucket", Fields: map[string]string{"name": "my-bucket"}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "s3", Resources: buckets})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: buckets})
 	// Press d (describe) — should show detail, NOT enter bucket
 	_, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'd'})
 	if cmd == nil {
@@ -76,10 +76,10 @@ func TestBug_S3_DKeyOnBucket_ShowsDetail(t *testing.T) {
 	}
 	msg := cmd()
 	// Should be NavigateMsg{TargetDetail}, NOT EnterChildViewMsg
-	if _, ok := msg.(messages.EnterChildViewMsg); ok {
+	if _, ok := msg.(messages.EnterChildView); ok {
 		t.Error("d key on S3 bucket must show detail view, not drill into bucket")
 	}
-	if nav, ok := msg.(messages.NavigateMsg); ok {
+	if nav, ok := msg.(messages.Navigate); ok {
 		if nav.Target != messages.TargetDetail {
 			t.Errorf("d key should navigate to detail, got target %v", nav.Target)
 		}
@@ -133,8 +133,8 @@ func TestBug_Detail_UsesCorrectViewDefForResourceType(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	// Navigate to EC2, load resources, then open detail
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetResourceList, ResourceType: "ec2"})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "ec2", Resources: []resource.Resource{res}})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: []resource.Resource{res}})
 	// Open detail via d key
 	var cmd tea.Cmd
 	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: 'd'})

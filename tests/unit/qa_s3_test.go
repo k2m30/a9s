@@ -12,7 +12,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -43,11 +43,11 @@ func s3BucketTypeDef() resource.ResourceTypeDef {
 func s3LoadedBucketModel() tui.Model {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "s3",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    fixtureS3Buckets(),
 	})
@@ -65,7 +65,7 @@ func s3LoadedObjectModel() tui.Model {
 		m, _ = rootApplyMsg(m, msg)
 	}
 	// Load objects
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    fixtureS3Objects(),
 	})
@@ -79,7 +79,7 @@ func s3RLBucketModel() views.ResourceListModel {
 	m := views.NewResourceList(td, nil, k)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    fixtureS3Buckets(),
 	})
@@ -104,7 +104,7 @@ func s3RLObjectModel(bucket string) views.ResourceListModel {
 	m := views.NewChildResourceList(childDef, map[string]string{"bucket": bucket}, bucket, nil, k)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "s3_objects",
 		Resources:    fixtureS3Objects(),
 	})
@@ -183,7 +183,7 @@ func TestQA_S3_A2_1_BucketList_EmptyState(t *testing.T) {
 	m := views.NewResourceList(td, nil, k)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    []resource.Resource{},
 	})
@@ -465,7 +465,7 @@ func TestQA_S3_A8_1_EnterOnBucket_SendsEnterChildViewMsg(t *testing.T) {
 	}
 
 	msg := cmd()
-	childMsg, ok := msg.(messages.EnterChildViewMsg)
+	childMsg, ok := msg.(messages.EnterChildView)
 	if !ok {
 		t.Fatalf("Enter on S3 bucket should produce EnterChildViewMsg, got %T", msg)
 	}
@@ -488,13 +488,13 @@ func TestQA_S3_A8_2_EnterOnBucket_DoesNotSendTargetDetail(t *testing.T) {
 	}
 
 	msg := cmd()
-	if nav, ok := msg.(messages.NavigateMsg); ok {
+	if nav, ok := msg.(messages.Navigate); ok {
 		if nav.Target == messages.TargetDetail {
 			t.Error("Enter on S3 bucket must NOT send TargetDetail NavigateMsg (it should drill into objects)")
 		}
 	}
 	// Verify it's EnterChildViewMsg
-	if _, ok := msg.(messages.EnterChildViewMsg); !ok {
+	if _, ok := msg.(messages.EnterChildView); !ok {
 		t.Errorf("Enter on S3 bucket should produce EnterChildViewMsg, got %T", msg)
 	}
 }
@@ -548,7 +548,7 @@ func TestQA_S3_B2_1_ObjectList_EmptyBucket(t *testing.T) {
 	m := newS3ObjectsList("empty-bucket", nil, k)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    []resource.Resource{},
 	})
@@ -648,7 +648,7 @@ func TestQA_S3_B7_1_ObjectList_JKNavigation(t *testing.T) {
 	m := newS3ObjectsList("test-bucket", nil, k)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: multipleObjects})
+	m, _ = m.Update(messages.ResourcesLoaded{Resources: multipleObjects})
 
 	// Initially at first item
 	sel := m.SelectedResource()
@@ -707,7 +707,7 @@ func TestQA_S3_B9_1_ObjectList_FilterByKey(t *testing.T) {
 	m := newS3ObjectsList("test-bucket", nil, k)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: multipleObjects})
+	m, _ = m.Update(messages.ResourcesLoaded{Resources: multipleObjects})
 
 	m.SetFilter("config")
 	out := m.View()
@@ -741,7 +741,7 @@ func TestQA_S3_B10_1_ObjectList_SortByName(t *testing.T) {
 	m := newS3ObjectsList("test-bucket", nil, k)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: multipleObjects})
+	m, _ = m.Update(messages.ResourcesLoaded{Resources: multipleObjects})
 
 	// Before sort, first item is "zebra.txt" (insertion order)
 	sel := m.SelectedResource()
@@ -769,7 +769,7 @@ func TestQA_S3_B10_2_ObjectList_SortByAge(t *testing.T) {
 	m := newS3ObjectsList("test-bucket", nil, k)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: multipleObjects})
+	m, _ = m.Update(messages.ResourcesLoaded{Resources: multipleObjects})
 
 	// Press 3 to sort by age ascending (column 2 = last_modified, 1-indexed key "3")
 	m, _ = m.Update(s3KeyPress("3"))
@@ -798,7 +798,7 @@ func TestQA_S3_B10_3_ObjectList_SortBySize_UsesNumericByteOrder(t *testing.T) {
 	m := newS3ObjectsList("test-bucket", config.DefaultConfig(), k)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: multipleObjects})
+	m, _ = m.Update(messages.ResourcesLoaded{Resources: multipleObjects})
 
 	// Press 2 to sort by size ascending (column 1 = size, 1-indexed key "2").
 	m, _ = m.Update(s3KeyPress("2"))
@@ -893,7 +893,7 @@ func TestQA_S3_C1_BucketDetail_ViaDetailCommand(t *testing.T) {
 	}
 
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("d on S3 bucket should produce NavigateMsg for detail, got %T", msg)
 	}
@@ -914,7 +914,7 @@ func TestQA_S3_C2_ObjectDetail_EnterSendsDetail(t *testing.T) {
 	}
 
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("Enter on S3 object should produce NavigateMsg, got %T", msg)
 	}
@@ -989,11 +989,11 @@ func TestQA_S3_D2_1_FullFlowStack(t *testing.T) {
 	}
 
 	// 2. Navigate to S3 bucket list
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "s3",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    fixtureS3Buckets(),
 	})
@@ -1010,7 +1010,7 @@ func TestQA_S3_D2_1_FullFlowStack(t *testing.T) {
 		msg := cmd()
 		m, _ = rootApplyMsg(m, msg)
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    fixtureS3Objects(),
 	})
@@ -1068,7 +1068,7 @@ func TestQA_S3_MainMenu_ToS3Selection(t *testing.T) {
 	}
 
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("Enter on main menu should produce NavigateMsg, got %T", msg)
 	}
@@ -1163,7 +1163,7 @@ func TestQA_S3_YAML_FromObjectList(t *testing.T) {
 	}
 
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("y key should produce NavigateMsg, got %T", msg)
 	}
@@ -1247,7 +1247,7 @@ func TestQA_S3_ObjectList_HorizontalScroll(t *testing.T) {
 	m := newS3ObjectsList("test-bucket", nil, k)
 	m.SetSize(50, 20) // narrow width to trigger horizontal scroll
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    fixtureS3Objects(),
 	})
@@ -1337,7 +1337,7 @@ func TestQA_S3_EnterChildViewMsg_CreatesObjectListView(t *testing.T) {
 	m := s3LoadedBucketModel()
 
 	// Simulate EnterChildViewMsg for S3 objects
-	m, _ = rootApplyMsg(m, messages.EnterChildViewMsg{
+	m, _ = rootApplyMsg(m, messages.EnterChildView{
 		ChildType:     "s3_objects",
 		ParentContext: map[string]string{"bucket": "test-app-state"},
 		DisplayName:   "test-app-state",

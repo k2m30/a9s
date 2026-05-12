@@ -8,7 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -77,7 +77,7 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.updateActiveView(msg)
 		}
 		if len(m.errorHistory) == 0 {
-			return m.handleFlash(messages.FlashMsg{Text: "No errors this session"})
+			return m.handleFlash(messages.Flash{Text: "No errors this session"})
 		}
 		var sb strings.Builder
 		for i := len(m.errorHistory) - 1; i >= 0; i-- {
@@ -305,30 +305,30 @@ func (m Model) executeCommand(cmd string) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case "root", "main":
 		return m, func() tea.Msg {
-			return messages.NavigateMsg{Target: messages.TargetMainMenu}
+			return messages.Navigate{Target: messages.TargetMainMenu}
 		}
 	case "ctx", "profile":
 		return m, func() tea.Msg {
-			return messages.NavigateMsg{Target: messages.TargetProfile}
+			return messages.Navigate{Target: messages.TargetProfile}
 		}
 	case "region":
 		return m, func() tea.Msg {
-			return messages.NavigateMsg{Target: messages.TargetRegion}
+			return messages.Navigate{Target: messages.TargetRegion}
 		}
 	case "theme":
 		return m, func() tea.Msg {
-			return messages.NavigateMsg{Target: messages.TargetTheme}
+			return messages.Navigate{Target: messages.TargetTheme}
 		}
 	case "help":
 		return m, func() tea.Msg {
-			return messages.NavigateMsg{Target: messages.TargetHelp}
+			return messages.Navigate{Target: messages.TargetHelp}
 		}
 	}
 
 	rt := resource.FindResourceType(cmd)
 	if rt != nil {
 		return m, func() tea.Msg {
-			return messages.NavigateMsg{
+			return messages.Navigate{
 				Target:       messages.TargetResourceList,
 				ResourceType: rt.ShortName,
 			}
@@ -336,7 +336,7 @@ func (m Model) executeCommand(cmd string) (tea.Model, tea.Cmd) {
 	}
 
 	return m, func() tea.Msg {
-		return messages.FlashMsg{
+		return messages.Flash{
 			Text:    fmt.Sprintf("unknown command: %s", cmd),
 			IsError: true,
 		}

@@ -8,7 +8,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // TestQA_ClientsReady_CorrectType_Assigns verifies the happy path: when
@@ -18,7 +18,7 @@ func TestQA_ClientsReady_CorrectType_Assigns(t *testing.T) {
 	m := newRootSizedModel()
 
 	clients := &awsclient.ServiceClients{}
-	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{
+	m, _ = rootApplyMsg(m, messages.ClientsReady{
 		Clients: clients,
 		Region:  "us-east-1",
 	})
@@ -45,7 +45,7 @@ func TestQA_ClientsReady_NilClients_DemoFallback(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// Send ClientsReadyMsg with nil Clients — should trigger demo fallback.
-	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{
+	m, _ = rootApplyMsg(m, messages.ClientsReady{
 		Clients: nil,
 		Region:  "us-east-1",
 	})
@@ -63,7 +63,7 @@ func TestQA_ClientsReady_NilClients_DemoFallback(t *testing.T) {
 // TestQA_ClientsReady_WrongType_EmitsError is the critical regression test.
 // When ClientsReadyMsg.Clients is a non-nil value of the wrong concrete type,
 // the handler MUST surface an error — either via the returned tea.Cmd resolving
-// to a messages.APIErrorMsg, or via an error flash in the view.
+// to a messages.APIError, or via an error flash in the view.
 //
 // On current code (before the fix) this test FAILS because the silent fallback
 // to preSuppliedClients (or no-op) leaves the model in an indeterminate state
@@ -72,7 +72,7 @@ func TestQA_ClientsReady_WrongType_EmitsError(t *testing.T) {
 	m := newRootSizedModel()
 
 	// "definitely not a client" — a string, which is not *awsclient.ServiceClients.
-	m, cmd := rootApplyMsg(m, messages.ClientsReadyMsg{
+	m, cmd := rootApplyMsg(m, messages.ClientsReady{
 		Clients: "definitely not a client",
 		Region:  "us-east-1",
 	})
@@ -81,7 +81,7 @@ func TestQA_ClientsReady_WrongType_EmitsError(t *testing.T) {
 	// APIErrorMsg containing "unexpected" or "internal".
 	if cmd != nil {
 		result := cmd()
-		if errMsg, ok := result.(messages.APIErrorMsg); ok {
+		if errMsg, ok := result.(messages.APIError); ok {
 			errStr := ""
 			if errMsg.Err != nil {
 				errStr = errMsg.Err.Error()

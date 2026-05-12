@@ -8,7 +8,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // Reveals regression from real user journey:
@@ -25,7 +25,7 @@ func TestBugReveal_MainMenuToEC2Detail_MustShowRelatedColumn(t *testing.T) {
 				tui.WithRegion(demo.DemoRegion))
 			m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 170, Height: 50})
 			ec2 := mustDemoEC2(t)
-			m, _ = rootApplyMsg(m, messages.NavigateMsg{
+			m, _ = rootApplyMsg(m, messages.Navigate{
 				Target:       messages.TargetDetail,
 				ResourceType: "ec2",
 				Resource:     &ec2[0],

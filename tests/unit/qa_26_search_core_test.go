@@ -19,7 +19,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	tui "github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ---------------------------------------------------------------------------
@@ -66,13 +66,13 @@ func qa26SpecialCharsResource() *resource.Resource {
 
 // qa26NavigateDetail navigates the root model to the detail view for res.
 func qa26NavigateDetail(m tui.Model, res *resource.Resource) tui.Model {
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetDetail, Resource: res})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetDetail, Resource: res})
 	return m
 }
 
 // qa26NavigateYAML navigates the root model to the YAML view for res.
 func qa26NavigateYAML(m tui.Model, res *resource.Resource) tui.Model {
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetYAML, Resource: res})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetYAML, Resource: res})
 	return m
 }
 

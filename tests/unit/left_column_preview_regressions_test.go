@@ -15,7 +15,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -158,7 +158,7 @@ func TestPreviewLeft_DetailTitleIncludesDetailContextAndResourceID(t *testing.T)
 	m = m2.(tui.Model)
 
 	ec2 := mustDemoEC2(t)
-	m3, _ := m.Update(messages.NavigateMsg{
+	m3, _ := m.Update(messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "ec2",
 		Resource:     &ec2[0],
