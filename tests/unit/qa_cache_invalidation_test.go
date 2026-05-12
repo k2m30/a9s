@@ -17,7 +17,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ---------------------------------------------------------------------------
@@ -33,11 +33,11 @@ func TestQA_CacheInvalidation_ProfileSwitchClearsAll(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Step 1: navigate to ct-events and load data so the cache is populated.
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources:    ctEventsResources(50),
 		Pagination: &resource.PaginationMeta{
@@ -58,11 +58,11 @@ func TestQA_CacheInvalidation_ProfileSwitchClearsAll(t *testing.T) {
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
 	// Step 3: switch profile — this must clear the cache.
-	m, _ = rootApplyMsg(m, messages.ProfileSelectedMsg{Profile: "other-profile"})
+	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "other-profile"})
 
 	// Step 4: navigate to ct-events again.
 	// KEY ASSERTION: a fresh fetch must be issued because the cache was cleared.
-	_, cmd := rootApplyMsg(m, messages.NavigateMsg{
+	_, cmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
@@ -85,11 +85,11 @@ func TestQA_CacheInvalidation_RegionSwitchClearsAll(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Step 1: navigate to ct-events and load data.
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources:    ctEventsResources(50),
 		Pagination: &resource.PaginationMeta{
@@ -110,11 +110,11 @@ func TestQA_CacheInvalidation_RegionSwitchClearsAll(t *testing.T) {
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
 	// Step 3: switch region — this must clear the cache.
-	m, _ = rootApplyMsg(m, messages.RegionSelectedMsg{Region: "eu-west-1"})
+	m, _ = rootApplyMsg(m, messages.RegionSelected{Region: "eu-west-1"})
 
 	// Step 4: navigate to ct-events again.
 	// KEY ASSERTION: a fresh fetch must be issued because the cache was cleared.
-	_, cmd := rootApplyMsg(m, messages.NavigateMsg{
+	_, cmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
@@ -137,11 +137,11 @@ func TestQA_CacheInvalidation_RefreshClearsCurrentTypeOnly(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Step 1: Load ct-events (50 items), press Esc.
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources:    ctEventsResources(50),
 		Pagination: &resource.PaginationMeta{
@@ -154,11 +154,11 @@ func TestQA_CacheInvalidation_RefreshClearsCurrentTypeOnly(t *testing.T) {
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
 	// Step 2: Load ec2 (30 items), press Esc.
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    ec2TestResources(30),
 		Pagination: &resource.PaginationMeta{
@@ -171,7 +171,7 @@ func TestQA_CacheInvalidation_RefreshClearsCurrentTypeOnly(t *testing.T) {
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
 	// Step 3: Re-enter ct-events — must be a cache hit (cmd == nil).
-	m, ctCmd := rootApplyMsg(m, messages.NavigateMsg{
+	m, ctCmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
@@ -188,7 +188,7 @@ func TestQA_CacheInvalidation_RefreshClearsCurrentTypeOnly(t *testing.T) {
 
 	// Step 5: Press Esc back to main menu, then re-enter ec2.
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
-	_, ec2Cmd := rootApplyMsg(m, messages.NavigateMsg{
+	_, ec2Cmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -212,11 +212,11 @@ func TestQA_CacheInvalidation_CacheUpdatesOnAdditionalPage(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Step 1: Navigate to ct-events, load page 1 (50 items, truncated).
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources:    ctEventsResources(50),
 		Pagination: &resource.PaginationMeta{
@@ -238,7 +238,7 @@ func TestQA_CacheInvalidation_CacheUpdatesOnAdditionalPage(t *testing.T) {
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
 	// Step 3: Re-enter ct-events — must be a cache hit (cmd == nil) with 50 items.
-	m, ctCmd1 := rootApplyMsg(m, messages.NavigateMsg{
+	m, ctCmd1 := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
@@ -252,7 +252,7 @@ func TestQA_CacheInvalidation_CacheUpdatesOnAdditionalPage(t *testing.T) {
 
 	// Step 4: Press M to load more, then deliver page 2 (50 more items, final).
 	m, _ = rootApplyMsg(m, rootKeyPress("M"))
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources:    ctEventsResources2(50, 50),
 		Pagination: &resource.PaginationMeta{
@@ -274,7 +274,7 @@ func TestQA_CacheInvalidation_CacheUpdatesOnAdditionalPage(t *testing.T) {
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
 	// Step 6: Re-enter ct-events — cache hit must show 100 items.
-	m, ctCmd2 := rootApplyMsg(m, messages.NavigateMsg{
+	m, ctCmd2 := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})

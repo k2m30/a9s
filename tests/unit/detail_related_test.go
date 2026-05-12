@@ -21,7 +21,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -106,7 +106,7 @@ func TestDetail_ToggleRelated_SecondPressShows(t *testing.T) {
 	}
 
 	result := secondCmd()
-	startMsg, ok := result.(messages.RelatedCheckStartedMsg)
+	startMsg, ok := result.(messages.RelatedCheckStarted)
 	if !ok {
 		t.Fatalf("cmd() should produce RelatedCheckStartedMsg; got %T", result)
 	}
@@ -154,7 +154,7 @@ func TestDetail_RelatedCheckResult_UpdatesRightCol(t *testing.T) {
 	d := makeDetailForToggleTest(t, 140)
 
 	// Deliver the async check result.
-	d, _ = d.Update(messages.RelatedCheckResultMsg{
+	d, _ = d.Update(messages.RelatedCheckResult{
 		ResourceType: "ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "tg",
@@ -192,7 +192,7 @@ func TestDetail_ToggleRelated_NoDefsRegistered(t *testing.T) {
 	}
 
 	result := rawCmd()
-	startMsg, ok := result.(messages.RelatedCheckStartedMsg)
+	startMsg, ok := result.(messages.RelatedCheckStarted)
 	if !ok {
 		t.Fatalf("cmd() should produce RelatedCheckStartedMsg even with no defs; got %T", result)
 	}

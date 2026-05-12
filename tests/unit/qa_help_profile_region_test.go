@@ -10,7 +10,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -38,7 +38,7 @@ func TestQA_Help_OpenFromResourceList(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to ec2 resource list
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -58,7 +58,7 @@ func TestQA_Help_OpenFromDetailView(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target: messages.TargetHelp,
 	})
 
@@ -74,7 +74,7 @@ func TestQA_Help_FourColumnLayout(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetHelp})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 
 	plain := stripANSI(rootViewContent(m))
 
@@ -92,7 +92,7 @@ func TestQA_Help_KeyBindingsListed(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetHelp})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 
 	plain := stripANSI(rootViewContent(m))
 	plainLower := strings.ToLower(plain)
@@ -123,7 +123,7 @@ func TestQA_Help_AnyKeyCloses(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Push help
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetHelp})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 
 	// Verify we're on help
 	plain := stripANSI(rootViewContent(m))
@@ -152,7 +152,7 @@ func TestQA_Help_EscapeCloses(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetHelp})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 
 	// Press Escape to close help
 	m, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
@@ -173,7 +173,7 @@ func TestQA_Help_FrameTitle(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetHelp})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 
 	plain := stripANSI(rootViewContent(m))
 
@@ -187,7 +187,7 @@ func TestQA_Help_CloseHint(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetHelp})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 
 	plain := stripANSI(rootViewContent(m))
 
@@ -202,7 +202,7 @@ func TestQA_Help_PreservesReturnContext(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to resource list first
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -255,7 +255,7 @@ func TestQA_Profile_CtxCommandNavigates(t *testing.T) {
 	}
 
 	msg := cmd()
-	navMsg, ok := msg.(messages.NavigateMsg)
+	navMsg, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf(":ctx should produce NavigateMsg, got %T", msg)
 	}
@@ -285,7 +285,7 @@ func TestQA_Profile_ProfileCommandNavigates(t *testing.T) {
 	}
 
 	msg := cmd()
-	navMsg, ok := msg.(messages.NavigateMsg)
+	navMsg, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf(":profile should produce NavigateMsg, got %T", msg)
 	}
@@ -307,7 +307,7 @@ func TestQA_Profile_FrameTitle(t *testing.T) {
 	// We need to simulate this through the public API. Let's use the internal message route.
 
 	// Navigate to profile - the handleNavigate creates a fetchProfiles cmd
-	_, cmd := rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetProfile})
+	_, cmd := rootApplyMsg(m, messages.Navigate{Target: messages.TargetProfile})
 
 	if cmd == nil {
 		t.Fatal("NavigateMsg for profile should return a fetchProfiles cmd")
@@ -340,7 +340,7 @@ func TestQA_Profile_ListShowsProfiles(t *testing.T) {
 		t.Fatal(":ctx should produce a cmd")
 	}
 	msg := cmd()
-	if navMsg, ok := msg.(messages.NavigateMsg); ok {
+	if navMsg, ok := msg.(messages.Navigate); ok {
 		if navMsg.Target != messages.TargetProfile {
 			t.Errorf("expected TargetProfile, got %d", navMsg.Target)
 		}
@@ -355,7 +355,7 @@ func TestQA_Profile_EnterSelectsProfile(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Simulate receiving ProfileSelectedMsg (which is what the profile view emits on Enter)
-	m, cmd := rootApplyMsg(m, messages.ProfileSelectedMsg{Profile: "staging"})
+	m, cmd := rootApplyMsg(m, messages.ProfileSelected{Profile: "staging"})
 
 	// After profile selection: view should pop, and a connectAWS cmd should be returned
 	plain := stripANSI(rootViewContent(m))
@@ -374,7 +374,7 @@ func TestQA_Profile_EscapeCancels(t *testing.T) {
 
 	// Navigate to region first (to have a view to push), then to profile view via NavigateMsg
 	// Since profile requires I/O, we'll test with region which has the same architecture
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetRegion})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetRegion})
 
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "aws-regions") {
@@ -396,7 +396,7 @@ func TestQA_Profile_HeaderUpdatesAfterSelection(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Select a new profile
-	m, _ = rootApplyMsg(m, messages.ProfileSelectedMsg{Profile: "staging"})
+	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "staging"})
 
 	plain := stripANSI(rootViewContent(m))
 
@@ -432,7 +432,7 @@ func TestQA_Region_CommandOpensRegionList(t *testing.T) {
 
 	// Execute cmd to get NavigateMsg
 	msg := cmd()
-	navMsg, ok := msg.(messages.NavigateMsg)
+	navMsg, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf(":region should produce NavigateMsg, got %T", msg)
 	}
@@ -454,7 +454,7 @@ func TestQA_Region_ListContainsStandardRegions(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetRegion})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetRegion})
 
 	plain := stripANSI(rootViewContent(m))
 
@@ -470,7 +470,7 @@ func TestQA_Region_FrameTitleWithCount(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetRegion})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetRegion})
 
 	plain := stripANSI(rootViewContent(m))
 
@@ -487,7 +487,7 @@ func TestQA_Region_NavigateWithJK(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetRegion})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetRegion})
 
 	// Press j to move down
 	m, _ = rootApplyMsg(m, rootKeyPress("j"))
@@ -513,7 +513,7 @@ func TestQA_Region_EnterSelectsRegion(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetRegion})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetRegion})
 
 	// Move down one row — the region selector is alphabetical by code, so the
 	// second row is AllRegions()[1] regardless of which regions are present.
@@ -535,7 +535,7 @@ func TestQA_Region_EnterSelectsRegion(t *testing.T) {
 
 	// Execute the cmd to get RegionSelectedMsg
 	msg := cmd()
-	regionMsg, ok := msg.(messages.RegionSelectedMsg)
+	regionMsg, ok := msg.(messages.RegionSelected)
 	if !ok {
 		t.Fatalf("Enter on region should produce RegionSelectedMsg, got %T", msg)
 	}
@@ -561,7 +561,7 @@ func TestQA_Region_EscapeCancels(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetRegion})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetRegion})
 
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "aws-regions") {
@@ -588,13 +588,13 @@ func TestQA_Region_FromResourceListPreservesNav(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to ec2 resource list
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
 
 	// Open region selector
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetRegion})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetRegion})
 
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "aws-regions") {
@@ -617,7 +617,7 @@ func TestQA_Region_HeaderUpdatesAfterSelection(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Directly process RegionSelectedMsg
-	m, _ = rootApplyMsg(m, messages.RegionSelectedMsg{Region: "eu-west-1"})
+	m, _ = rootApplyMsg(m, messages.RegionSelected{Region: "eu-west-1"})
 
 	plain := stripANSI(rootViewContent(m))
 
@@ -636,7 +636,7 @@ func TestQA_Help_FlashMessageAppearsAndAutoClears(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Send a flash message
-	m, cmd := rootApplyMsg(m, messages.FlashMsg{Text: "Copied!", IsError: false})
+	m, cmd := rootApplyMsg(m, messages.Flash{Text: "Copied!", IsError: false})
 
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "Copied!") {
@@ -655,10 +655,10 @@ func TestQA_Help_FlashMessageReplaces(t *testing.T) {
 	m := newRootSizedModel()
 
 	// First flash
-	m, _ = rootApplyMsg(m, messages.FlashMsg{Text: "First!", IsError: false})
+	m, _ = rootApplyMsg(m, messages.Flash{Text: "First!", IsError: false})
 
 	// Second flash replaces
-	m, _ = rootApplyMsg(m, messages.FlashMsg{Text: "Second!", IsError: false})
+	m, _ = rootApplyMsg(m, messages.Flash{Text: "Second!", IsError: false})
 
 	plain := stripANSI(rootViewContent(m))
 	if strings.Contains(plain, "First!") {
@@ -674,7 +674,7 @@ func TestQA_Help_ErrorFlashMessage(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.FlashMsg{Text: "Error: no credentials", IsError: true})
+	m, _ = rootApplyMsg(m, messages.Flash{Text: "Error: no credentials", IsError: true})
 
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "Error: no credentials") {
@@ -694,10 +694,10 @@ func TestQA_Help_FlashClearsToHelpHint(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Set flash with gen=1
-	m, _ = rootApplyMsg(m, messages.FlashMsg{Text: "Copied!", IsError: false})
+	m, _ = rootApplyMsg(m, messages.Flash{Text: "Copied!", IsError: false})
 
 	// Clear it with matching gen
-	m, _ = rootApplyMsg(m, messages.ClearFlashMsg{Gen: 1})
+	m, _ = rootApplyMsg(m, messages.ClearFlash{Gen: 1})
 
 	plain := stripANSI(rootViewContent(m))
 	if strings.Contains(plain, "Copied!") {
@@ -714,10 +714,10 @@ func TestQA_Help_StaleClearFlashIgnored(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Set flash
-	m, _ = rootApplyMsg(m, messages.FlashMsg{Text: "Active!", IsError: false})
+	m, _ = rootApplyMsg(m, messages.Flash{Text: "Active!", IsError: false})
 
 	// Try to clear with wrong gen (0 instead of 1)
-	m, _ = rootApplyMsg(m, messages.ClearFlashMsg{Gen: 0})
+	m, _ = rootApplyMsg(m, messages.ClearFlash{Gen: 0})
 
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "Active!") {
@@ -752,7 +752,7 @@ func TestQA_Help_ResizeDuringHelp(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetHelp})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 
 	// Resize
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 100, Height: 30})
@@ -771,7 +771,7 @@ func TestQA_Region_ResizeDuringRegion(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetRegion})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetRegion})
 
 	// Resize
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 100, Height: 30})
@@ -842,7 +842,7 @@ func TestQA_Help_OpenFromYAMLView(t *testing.T) {
 
 	// Navigate to YAML view
 	res := &resource.Resource{ID: "test-123", Name: "test-resource"}
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetYAML,
 		Resource: res,
 	})
@@ -862,7 +862,7 @@ func TestQA_Help_ReturnFromHelpOnHelp(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Open help
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetHelp})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 
 	// Any key on help should produce PopViewMsg, not open another help
 	m, cmd := rootApplyMsg(m, rootKeyPress("a"))

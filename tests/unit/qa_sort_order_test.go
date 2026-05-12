@@ -7,7 +7,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -92,7 +92,7 @@ func sortLoadedModel(t *testing.T) views.ResourceListModel {
 	m := views.NewResourceList(td, nil, k)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    sortTestResources(),
 	})
@@ -489,7 +489,7 @@ func TestQA_SortOrder_LogStreams_AgeSortWorks(t *testing.T) {
 	m := views.NewResourceList(td, nil, k)
 	m.SetSize(200, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "log_streams",
 		Resources:    logStreamSortResources(),
 	})
@@ -600,7 +600,7 @@ func TestQA_SortOrder_AgeDeterministic_MultipleTimeFields(t *testing.T) {
 	m := views.NewResourceList(td, nil, k)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "multi_time",
 		Resources:    multiTimeFieldResources(),
 	})
@@ -678,7 +678,7 @@ func TestQA_SortOrder_AgeUsesFirstColumnMatch(t *testing.T) {
 	m := views.NewResourceList(td, nil, k)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "started_first",
 		Resources:    resources,
 	})
@@ -730,7 +730,7 @@ func TestQA_ListTitle_UsedInFrameTitle(t *testing.T) {
 	m := views.NewResourceList(td, nil, k)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "alarm",
 		Resources: []resource.Resource{
 			{
@@ -779,7 +779,7 @@ func TestQA_ListTitle_FallsBackToShortName(t *testing.T) {
 	m := views.NewResourceList(td, nil, k)
 	m.SetSize(120, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources: []resource.Resource{
 			{

@@ -12,7 +12,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/runtime"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // profilesLoadedMsg is a TUI-private message carrying AWS profile names
@@ -32,9 +32,9 @@ func (m *Model) fetchResources(resourceType string) tea.Cmd {
 		// surface the error AND keep the partial Resources; hard failures
 		// (no resources at all) route through APIErrorMsg.
 		if err != nil && len(res.Resources) == 0 {
-			return messages.APIErrorMsg{ResourceType: resourceType, Err: err}
+			return messages.APIError{ResourceType: resourceType, Err: err}
 		}
-		return messages.ResourcesLoadedMsg{
+		return messages.ResourcesLoaded{
 			ResourceType: resourceType,
 			Resources:    res.Resources,
 			Pagination:   res.Pagination,
@@ -49,9 +49,9 @@ func (m *Model) fetchResourcesFiltered(resourceType string, filter map[string]st
 	return func() tea.Msg {
 		res, err := m.core.FetchResourcesFiltered(ctx, clients, resourceType, filter)
 		if err != nil && len(res.Resources) == 0 {
-			return messages.APIErrorMsg{ResourceType: resourceType, Err: err}
+			return messages.APIError{ResourceType: resourceType, Err: err}
 		}
-		return messages.ResourcesLoadedMsg{
+		return messages.ResourcesLoaded{
 			ResourceType: resourceType,
 			Resources:    res.Resources,
 			Pagination:   res.Pagination,
@@ -67,9 +67,9 @@ func (m *Model) fetchAMIDetail(imageID string) tea.Cmd {
 	return func() tea.Msg {
 		res, err := m.core.FetchAMIDetail(ctx, clients, imageID)
 		if err != nil {
-			return messages.FlashMsg{Text: err.Error(), IsError: true}
+			return messages.Flash{Text: err.Error(), IsError: true}
 		}
-		return messages.NavigateMsg{
+		return messages.Navigate{
 			Target:       messages.TargetDetail,
 			ResourceType: "ami",
 			Resource:     &res,
@@ -83,9 +83,9 @@ func (m *Model) fetchChildResources(childType string, parentCtx map[string]strin
 	return func() tea.Msg {
 		res, err := m.core.FetchChildResources(ctx, clients, childType, parentCtx)
 		if err != nil {
-			return messages.APIErrorMsg{ResourceType: childType, Err: err}
+			return messages.APIError{ResourceType: childType, Err: err}
 		}
-		return messages.ResourcesLoadedMsg{
+		return messages.ResourcesLoaded{
 			ResourceType: childType,
 			Resources:    res.Resources,
 			Pagination:   res.Pagination,
@@ -95,7 +95,7 @@ func (m *Model) fetchChildResources(childType string, parentCtx map[string]strin
 
 // fetchMoreResources returns a tea.Cmd that fetches the next page of a
 // paginated resource list using the continuation token from LoadMoreMsg.
-func (m *Model) fetchMoreResources(msg messages.LoadMoreMsg) tea.Cmd {
+func (m *Model) fetchMoreResources(msg messages.LoadMore) tea.Cmd {
 	ctx, clients := m.appCtx, m.Session.Clients
 	p := runtime.FetchMoreParams{
 		ResourceType: msg.ResourceType,
@@ -106,9 +106,9 @@ func (m *Model) fetchMoreResources(msg messages.LoadMoreMsg) tea.Cmd {
 	return func() tea.Msg {
 		res, _, err := m.core.FetchMoreResources(ctx, clients, p)
 		if err != nil && len(res.Resources) == 0 {
-			return messages.APIErrorMsg{ResourceType: msg.ResourceType, Err: err}
+			return messages.APIError{ResourceType: msg.ResourceType, Err: err}
 		}
-		return messages.ResourcesLoadedMsg{
+		return messages.ResourcesLoaded{
 			ResourceType: msg.ResourceType,
 			Resources:    res.Resources,
 			Pagination:   res.Pagination,
@@ -124,9 +124,9 @@ func (m *Model) fetchIdentity() tea.Cmd {
 	return func() tea.Msg {
 		identity, err := m.core.FetchIdentity(ctx, clients)
 		if err != nil {
-			return messages.IdentityErrorMsg{Err: err.Error()}
+			return messages.IdentityError{Err: err.Error()}
 		}
-		return messages.IdentityLoadedMsg{Identity: identity}
+		return messages.IdentityLoaded{Identity: identity}
 	}
 }
 
@@ -135,7 +135,7 @@ func (m *Model) fetchProfiles() tea.Cmd {
 	return func() tea.Msg {
 		profiles, err := m.core.FetchProfiles()
 		if err != nil {
-			return messages.FlashMsg{Text: err.Error(), IsError: true}
+			return messages.Flash{Text: err.Error(), IsError: true}
 		}
 		return profilesLoadedMsg{profiles: profiles}
 	}
@@ -147,9 +147,9 @@ func (m *Model) fetchRevealValue(resourceType, resourceID string) tea.Cmd {
 	return func() tea.Msg {
 		value, err := m.core.FetchRevealValue(ctx, clients, resourceType, resourceID)
 		if err != nil {
-			return messages.ValueRevealedMsg{ResourceType: resourceType, ResourceID: resourceID, Err: err}
+			return messages.ValueRevealed{ResourceType: resourceType, ResourceID: resourceID, Err: err}
 		}
-		return messages.ValueRevealedMsg{ResourceType: resourceType, ResourceID: resourceID, Value: value}
+		return messages.ValueRevealed{ResourceType: resourceType, ResourceID: resourceID, Value: value}
 	}
 }
 
@@ -161,7 +161,7 @@ func (m *Model) connectAWS(profile, region string, gen domain.Gen) tea.Cmd {
 	ctx := m.appCtx
 	return func() tea.Msg {
 		result, err := m.core.ConnectAWS(ctx, profile, region)
-		return messages.ClientsReadyMsg{
+		return messages.ClientsReady{
 			Clients: result.Clients,
 			Region:  result.Region,
 			Gen:     gen,

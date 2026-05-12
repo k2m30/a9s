@@ -23,12 +23,12 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // navigateToDBIList navigates the root model to the DBI resource list.
 func navigateToDBIList(m tui.Model) tui.Model {
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbi",
 	})
@@ -57,7 +57,7 @@ func setupEnrichmentDispatch(t *testing.T, resources []resource.Resource) (tui.M
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
 
 	// Deliver ResourcesLoadedMsg{TypeGen=1} → tail branch fires probeEnrichment.
-	m, probeCmd := rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, probeCmd := rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "dbi",
 		Resources:    resources,
 		TypeGen:      1,
@@ -78,7 +78,7 @@ func TestProbeEnrichment_NilClients_ReturnsErrorMsg(t *testing.T) {
 	_, execProbe := setupEnrichmentDispatch(t, rerunDBIResources())
 	msg := execProbe()
 
-	checked, ok := msg.(messages.EnrichmentCheckedMsg)
+	checked, ok := msg.(messages.EnrichmentChecked)
 	if !ok {
 		// Batch is also acceptable — dig one level.
 		t.Logf("probeEnrichment returned %T (not directly EnrichmentCheckedMsg) — acceptable if batch", msg)
@@ -126,7 +126,7 @@ func TestProbeEnrichment_EnricherError_ReturnsErrorMsg(t *testing.T) {
 	_, execProbe := setupEnrichmentDispatch(t, rerunDBIResources())
 	msg := execProbe()
 
-	checked, ok := msg.(messages.EnrichmentCheckedMsg)
+	checked, ok := msg.(messages.EnrichmentChecked)
 	if !ok {
 		t.Logf("probeEnrichment returned %T — skipping (batch acceptable)", msg)
 		return
@@ -145,7 +145,7 @@ func TestProbeEnrichment_TypeGenForwarded(t *testing.T) {
 	_, execProbe := setupEnrichmentDispatch(t, rerunDBIResources())
 	msg := execProbe()
 
-	checked, ok := msg.(messages.EnrichmentCheckedMsg)
+	checked, ok := msg.(messages.EnrichmentChecked)
 	if !ok {
 		t.Logf("probeEnrichment returned %T — skipping TypeGen check (batch acceptable)", msg)
 		return
@@ -179,7 +179,7 @@ func TestProbeEnrichment_NoEnricher_NoCmdDispatched(t *testing.T) {
 	m := newRootSizedModel()
 	m = navigateToDBIList(m)
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
-	_, probeCmd := rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	_, probeCmd := rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "dbi",
 		Resources:    rerunDBIResources(),
 		TypeGen:      1,
@@ -188,7 +188,7 @@ func TestProbeEnrichment_NoEnricher_NoCmdDispatched(t *testing.T) {
 	// With no enricher, probeEnrichment returns nil — buildEnrichQueue skips it.
 	if probeCmd != nil {
 		msg := probeCmd()
-		if _, ok := msg.(messages.EnrichmentCheckedMsg); ok {
+		if _, ok := msg.(messages.EnrichmentChecked); ok {
 			t.Errorf("type with no enricher should not dispatch EnrichmentCheckedMsg, got %T", msg)
 		}
 	}
@@ -204,7 +204,7 @@ func TestProbeEnrichment_EmptyResources_StillDispatches(t *testing.T) {
 	m = navigateToDBIList(m)
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
 	// Deliver empty resource list with TypeGen=1.
-	_, probeCmd := rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	_, probeCmd := rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "dbi",
 		Resources:    []resource.Resource{}, // empty
 		TypeGen:      1,

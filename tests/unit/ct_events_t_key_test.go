@@ -8,7 +8,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -40,7 +40,7 @@ func ctEventsLoadedEC2List(t *testing.T) views.ResourceListModel {
 	m := views.NewResourceList(*td, nil, k)
 	m.SetSize(80, 24)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{ctEventsEC2Resource()},
 	})
@@ -59,7 +59,7 @@ func TestResourceList_TKey_EmitsRelatedNavigateMsg(t *testing.T) {
 	}
 
 	msg := cmd()
-	nav, ok := msg.(messages.RelatedNavigateMsg)
+	nav, ok := msg.(messages.RelatedNavigate)
 	if !ok {
 		t.Fatalf("pressing 't' must emit RelatedNavigateMsg; got %T", msg)
 	}
@@ -102,7 +102,7 @@ func TestResourceList_TKey_IAMUser_UsesUsername(t *testing.T) {
 	m := views.NewResourceList(*td, nil, k)
 	m.SetSize(80, 24)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "iam-user",
 		Resources: []resource.Resource{
 			{
@@ -122,7 +122,7 @@ func TestResourceList_TKey_IAMUser_UsesUsername(t *testing.T) {
 	}
 
 	msg := cmd()
-	nav, ok := msg.(messages.RelatedNavigateMsg)
+	nav, ok := msg.(messages.RelatedNavigate)
 	if !ok {
 		t.Fatalf("pressing 't' on IAM user must emit RelatedNavigateMsg; got %T", msg)
 	}
@@ -144,7 +144,7 @@ func TestDetail_TKey_EmitsRelatedNavigateMsg(t *testing.T) {
 	}
 
 	msg := cmd()
-	nav, ok := msg.(messages.RelatedNavigateMsg)
+	nav, ok := msg.(messages.RelatedNavigate)
 	if !ok {
 		t.Fatalf("pressing 't' in DetailModel must emit RelatedNavigateMsg; got %T", msg)
 	}
@@ -171,7 +171,7 @@ func TestYAML_TKey_EmitsRelatedNavigateMsg(t *testing.T) {
 	}
 
 	msg := cmd()
-	nav, ok := msg.(messages.RelatedNavigateMsg)
+	nav, ok := msg.(messages.RelatedNavigate)
 	if !ok {
 		t.Fatalf("pressing 't' in YAMLModel must emit RelatedNavigateMsg; got %T", msg)
 	}
@@ -211,7 +211,7 @@ func TestResourceList_TKey_NoopOnCtEventsList(t *testing.T) {
 	rl := views.NewResourceList(*td, nil, keys.Default())
 	rl.SetSize(120, 40)
 	// Load one event
-	rl, _ = rl.Update(messages.ResourcesLoadedMsg{
+	rl, _ = rl.Update(messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources: []resource.Resource{{
 			ID:     "evt-001",
@@ -245,7 +245,7 @@ func TestTKey_WorksFromAllViews(t *testing.T) {
 		}
 		rl := views.NewResourceList(*td, nil, k)
 		rl.SetSize(120, 40)
-		rl, _ = rl.Update(messages.ResourcesLoadedMsg{
+		rl, _ = rl.Update(messages.ResourcesLoaded{
 			ResourceType: "ec2",
 			Resources:    []resource.Resource{res},
 		})
@@ -254,7 +254,7 @@ func TestTKey_WorksFromAllViews(t *testing.T) {
 			t.Fatal("ResourceList: t key returned nil cmd")
 		}
 		msg := cmd()
-		nav, ok := msg.(messages.RelatedNavigateMsg)
+		nav, ok := msg.(messages.RelatedNavigate)
 		if !ok {
 			t.Fatalf("ResourceList: expected RelatedNavigateMsg, got %T", msg)
 		}
@@ -271,7 +271,7 @@ func TestTKey_WorksFromAllViews(t *testing.T) {
 			t.Fatal("Detail (left col): t key returned nil cmd")
 		}
 		msg := cmd()
-		nav, ok := msg.(messages.RelatedNavigateMsg)
+		nav, ok := msg.(messages.RelatedNavigate)
 		if !ok {
 			t.Fatalf("Detail (left col): expected RelatedNavigateMsg, got %T", msg)
 		}
@@ -295,7 +295,7 @@ func TestTKey_WorksFromAllViews(t *testing.T) {
 			t.Fatal("Detail (right col focused): t key returned nil cmd")
 		}
 		msg := cmd()
-		nav, ok := msg.(messages.RelatedNavigateMsg)
+		nav, ok := msg.(messages.RelatedNavigate)
 		if !ok {
 			t.Fatalf("Detail (right col focused): expected RelatedNavigateMsg, got %T", msg)
 		}
@@ -312,7 +312,7 @@ func TestTKey_WorksFromAllViews(t *testing.T) {
 			t.Fatal("YAML: t key returned nil cmd")
 		}
 		msg := cmd()
-		nav, ok := msg.(messages.RelatedNavigateMsg)
+		nav, ok := msg.(messages.RelatedNavigate)
 		if !ok {
 			t.Fatalf("YAML: expected RelatedNavigateMsg, got %T", msg)
 		}
@@ -340,7 +340,7 @@ func TestResourceList_TKey_SuppressedOnChildList(t *testing.T) {
 
 	// Key should be no-op
 	rl.SetSize(120, 40)
-	rl, _ = rl.Update(messages.ResourcesLoadedMsg{
+	rl, _ = rl.Update(messages.ResourcesLoaded{
 		ResourceType: "s3_objects",
 		Resources: []resource.Resource{{
 			ID: "file.txt", Name: "file.txt", Fields: map[string]string{},

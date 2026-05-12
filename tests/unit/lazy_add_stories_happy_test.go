@@ -17,7 +17,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ---------------------------------------------------------------------------
@@ -72,7 +72,7 @@ func Test_LA_001_KMSDrillAWSManagedKey(t *testing.T) {
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   srcType,
 		SourceResource: resource.Resource{ID: "src-la001-rds"},
 	})
@@ -155,7 +155,7 @@ func Test_LA_002_AMIDrillPublicAMI(t *testing.T) {
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   srcType,
 		SourceResource: resource.Resource{ID: "src-la002-ec2"},
 	})
@@ -236,7 +236,7 @@ func Test_LA_003_EBSSnapDrillSharedSnapshot(t *testing.T) {
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   srcType,
 		SourceResource: resource.Resource{ID: "src-la003-ebs"},
 	})
@@ -316,7 +316,7 @@ func Test_LA_004_IAMPolicyDrillAWSManaged(t *testing.T) {
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   srcType,
 		SourceResource: resource.Resource{ID: "src-la004-role"},
 	})
@@ -414,7 +414,7 @@ func Test_LA_081_ColdCacheDrillTriggersPrefetch(t *testing.T) {
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   srcType,
 		SourceResource: resource.Resource{ID: "src-la081"},
 	})
@@ -512,7 +512,7 @@ func Test_LA_082_WarmCacheDrillReusesCache(t *testing.T) {
 
 	// Pre-seed the cache with the warm entry, simulating "user previously
 	// opened the main-menu KMS list".
-	m, _ = rootApplyMsg(m, messages.RelatedCheckResultMsg{
+	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     srcType,
 		SourceResourceID: "seed-la082",
 		Result:           resource.RelatedCheckResult{TargetType: targetType, Count: 1},
@@ -528,7 +528,7 @@ func Test_LA_082_WarmCacheDrillReusesCache(t *testing.T) {
 	// during the actual drill below, not the seed step).
 	atomic.StoreInt32(&paginatedCalls, 0)
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   srcType,
 		SourceResource: resource.Resource{ID: "src-la082"},
 	})

@@ -24,7 +24,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // setupDemoApp is a test helper that creates a sized, client-wired cold-cache
@@ -34,7 +34,7 @@ func setupDemoApp(t *testing.T) *tui.Model {
 	m := newDemoColdCacheApp(t)
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	clients := demo.NewServiceClients()
-	*m, _ = rootApplyMsg(*m, messages.ClientsReadyMsg{Clients: clients, Gen: 0})
+	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 0})
 	return m
 }
 
@@ -44,7 +44,7 @@ func setupDemoApp(t *testing.T) *tui.Model {
 func loadResourceList(t *testing.T, m *tui.Model, resourceType string) []resource.Resource {
 	t.Helper()
 	var navCmd tea.Cmd
-	*m, navCmd = rootApplyMsg(*m, messages.NavigateMsg{
+	*m, navCmd = rootApplyMsg(*m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: resourceType,
 	})
@@ -52,10 +52,10 @@ func loadResourceList(t *testing.T, m *tui.Model, resourceType string) []resourc
 		t.Fatalf("expected cmd after NavigateMsg{%s}, got nil", resourceType)
 	}
 	raw := extractMsg(t, navCmd, func(msg tea.Msg) bool {
-		_, ok := msg.(messages.ResourcesLoadedMsg)
+		_, ok := msg.(messages.ResourcesLoaded)
 		return ok
 	})
-	loaded := raw.(messages.ResourcesLoadedMsg)
+	loaded := raw.(messages.ResourcesLoaded)
 	*m, _ = rootApplyMsg(*m, loaded)
 	return loaded.Resources
 }
@@ -64,10 +64,10 @@ func loadResourceList(t *testing.T, m *tui.Model, resourceType string) []resourc
 // fetch cmd. Returns the ResourcesLoadedMsg for the child type or fails the test
 // if the child type registration is missing, the fetch cmd is nil, or the cmd
 // returns an API error.
-func enterChildAndFetch(t *testing.T, m *tui.Model, childType string, parentCtx map[string]string, displayName string) messages.ResourcesLoadedMsg {
+func enterChildAndFetch(t *testing.T, m *tui.Model, childType string, parentCtx map[string]string, displayName string) messages.ResourcesLoaded {
 	t.Helper()
 	var fetchCmd tea.Cmd
-	*m, fetchCmd = rootApplyMsg(*m, messages.EnterChildViewMsg{
+	*m, fetchCmd = rootApplyMsg(*m, messages.EnterChildView{
 		ChildType:     childType,
 		ParentContext: parentCtx,
 		DisplayName:   displayName,
@@ -78,22 +78,22 @@ func enterChildAndFetch(t *testing.T, m *tui.Model, childType string, parentCtx 
 	}
 	raw := extractMsg(t, fetchCmd, func(msg tea.Msg) bool {
 		switch v := msg.(type) {
-		case messages.ResourcesLoadedMsg:
+		case messages.ResourcesLoaded:
 			return v.ResourceType == childType
-		case messages.APIErrorMsg:
+		case messages.APIError:
 			return true
 		}
 		return false
 	})
 	switch v := raw.(type) {
-	case messages.APIErrorMsg:
+	case messages.APIError:
 		t.Fatalf("child fetch for %q returned API error: %v", childType, v.Err)
-	case messages.ResourcesLoadedMsg:
+	case messages.ResourcesLoaded:
 		*m, _ = rootApplyMsg(*m, v)
 		return v
 	}
 	t.Fatalf("unexpected message type %T from %q fetch", raw, childType)
-	return messages.ResourcesLoadedMsg{}
+	return messages.ResourcesLoaded{}
 }
 
 // enterChildExpectError dispatches EnterChildViewMsg with a known-unknown parent
@@ -102,7 +102,7 @@ func enterChildAndFetch(t *testing.T, m *tui.Model, childType string, parentCtx 
 func enterChildExpectError(t *testing.T, m *tui.Model, childType string, parentCtx map[string]string, displayName string) {
 	t.Helper()
 	var fetchCmd tea.Cmd
-	*m, fetchCmd = rootApplyMsg(*m, messages.EnterChildViewMsg{
+	*m, fetchCmd = rootApplyMsg(*m, messages.EnterChildView{
 		ChildType:     childType,
 		ParentContext: parentCtx,
 		DisplayName:   displayName,
@@ -122,12 +122,12 @@ func enterChildExpectError(t *testing.T, m *tui.Model, childType string, parentC
 		}
 	}
 	switch v := msg.(type) {
-	case messages.APIErrorMsg:
+	case messages.APIError:
 		if v.Err == nil {
 			t.Errorf("contract rule 4: APIErrorMsg.Err must not be nil for unknown parent %q", childType)
 		}
 		// Correct: unknown parent surfaced as an error.
-	case messages.ResourcesLoadedMsg:
+	case messages.ResourcesLoaded:
 		if len(v.Resources) == 0 {
 			t.Errorf("contract rule 4 violation: %q fetch for unknown parent returned "+
 				"empty ResourcesLoadedMsg instead of an error — "+
@@ -136,7 +136,7 @@ func enterChildExpectError(t *testing.T, m *tui.Model, childType string, parentC
 			t.Errorf("contract rule 4 violation: %q fake returned %d resources for unknown parent — "+
 				"should have returned an SDK error", childType, len(v.Resources))
 		}
-	case messages.FlashMsg:
+	case messages.Flash:
 		if !v.IsError {
 			t.Errorf("FlashMsg for unknown parent %q must have IsError=true; got false. Text=%q", childType, v.Text)
 		}

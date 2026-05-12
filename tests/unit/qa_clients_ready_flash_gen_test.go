@@ -19,7 +19,7 @@ import (
 	"testing"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // TestHandleClientsReady_SuccessNoPendingRefresh_FlashGenUnchanged
@@ -36,7 +36,7 @@ func TestHandleClientsReady_SuccessNoPendingRefresh_FlashGenUnchanged(t *testing
 	m := newRootSizedModel()
 
 	// Establish a non-zero baseline flash.gen via a normal FlashMsg.
-	m, _ = rootApplyMsg(m, messages.FlashMsg{Text: "first flash"})
+	m, _ = rootApplyMsg(m, messages.Flash{Text: "first flash"})
 	genBefore := m.FlashGen()
 	if genBefore == 0 {
 		t.Fatalf("baseline flash.gen should be >0 after FlashMsg, got %d", genBefore)
@@ -45,7 +45,7 @@ func TestHandleClientsReady_SuccessNoPendingRefresh_FlashGenUnchanged(t *testing
 	// Dispatch a non-stale success ClientsReadyMsg. PendingRefresh stays
 	// false (the session default), so Core returns only FetchIdentity +
 	// LoadAvailCache tasks with no FlashIntent / FlashTickPayload.
-	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{
+	m, _ = rootApplyMsg(m, messages.ClientsReady{
 		Clients: &awsclient.ServiceClients{},
 		Region:  "us-east-1",
 		Gen:     m.Session.ConnectGen, // matches session → non-stale
@@ -66,14 +66,14 @@ func TestHandleClientsReady_SuccessNoPendingRefresh_FlashGenUnchanged(t *testing
 func TestHandleClientsReady_StaleGen_FlashGenUnchanged(t *testing.T) {
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.FlashMsg{Text: "first flash"})
+	m, _ = rootApplyMsg(m, messages.Flash{Text: "first flash"})
 	genBefore := m.FlashGen()
 	if genBefore == 0 {
 		t.Fatalf("baseline flash.gen should be >0 after FlashMsg, got %d", genBefore)
 	}
 
 	// Dispatch with Gen far ahead of ConnectGen so the stale guard fires.
-	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{
+	m, _ = rootApplyMsg(m, messages.ClientsReady{
 		Clients: &awsclient.ServiceClients{},
 		Region:  "us-east-1",
 		Gen:     m.Session.ConnectGen + 5,

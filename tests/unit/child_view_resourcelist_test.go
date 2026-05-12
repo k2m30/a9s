@@ -7,7 +7,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -115,7 +115,7 @@ func TestHandleChildKey_EnterOnS3Bucket_ProducesEnterChildViewMsg(t *testing.T) 
 	m, _ = m.Init()
 
 	// Load buckets
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources: []resource.Resource{
 			{ID: "my-bucket", Name: "my-bucket", Status: "", Fields: map[string]string{"name": "my-bucket", "creation_date": "2025-01-01"}},
@@ -129,7 +129,7 @@ func TestHandleChildKey_EnterOnS3Bucket_ProducesEnterChildViewMsg(t *testing.T) 
 	}
 
 	msg := cmd()
-	childMsg, ok := msg.(messages.EnterChildViewMsg)
+	childMsg, ok := msg.(messages.EnterChildView)
 	if !ok {
 		t.Fatalf("Expected EnterChildViewMsg, got %T", msg)
 	}
@@ -164,7 +164,7 @@ func TestHandleChildKey_EnterOnR53Zone_ProducesEnterChildViewMsg(t *testing.T) {
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "r53",
 		Resources: []resource.Resource{
 			{ID: "/hostedzone/ZTEST", Name: "example.com.", Status: "", Fields: map[string]string{"zone_id": "/hostedzone/ZTEST", "name": "example.com."}},
@@ -177,7 +177,7 @@ func TestHandleChildKey_EnterOnR53Zone_ProducesEnterChildViewMsg(t *testing.T) {
 	}
 
 	msg := cmd()
-	childMsg, ok := msg.(messages.EnterChildViewMsg)
+	childMsg, ok := msg.(messages.EnterChildView)
 	if !ok {
 		t.Fatalf("Expected EnterChildViewMsg, got %T", msg)
 	}
@@ -215,7 +215,7 @@ func TestHandleChildKey_DrillConditionFalse_FallsThrough(t *testing.T) {
 	m, _ = m.Init()
 
 	// Load a file (not a folder)
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "s3_objects",
 		Resources: []resource.Resource{
 			{ID: "data/file.txt", Name: "data/file.txt", Status: "file", Fields: map[string]string{"key": "data/file.txt"}},
@@ -229,7 +229,7 @@ func TestHandleChildKey_DrillConditionFalse_FallsThrough(t *testing.T) {
 	}
 
 	msg := cmd()
-	navMsg, ok := msg.(messages.NavigateMsg)
+	navMsg, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("Expected NavigateMsg for file (drill condition false), got %T", msg)
 	}
@@ -257,7 +257,7 @@ func TestHandleChildKey_DrillConditionTrue_ProducesChildMsg(t *testing.T) {
 	m, _ = m.Init()
 
 	// Load a folder
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "s3_objects",
 		Resources: []resource.Resource{
 			{ID: "data/", Name: "data/", Status: "folder", Fields: map[string]string{"key": "data/"}},
@@ -271,7 +271,7 @@ func TestHandleChildKey_DrillConditionTrue_ProducesChildMsg(t *testing.T) {
 	}
 
 	msg := cmd()
-	childMsg, ok := msg.(messages.EnterChildViewMsg)
+	childMsg, ok := msg.(messages.EnterChildView)
 	if !ok {
 		t.Fatalf("Expected EnterChildViewMsg for folder, got %T", msg)
 	}
@@ -300,7 +300,7 @@ func TestHandleChildKey_NoChildren_DefaultsToDetail(t *testing.T) {
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources: []resource.Resource{
 			{ID: "i-123", Name: "web-1", Status: "running", Fields: map[string]string{"instance_id": "i-123"}},
@@ -313,7 +313,7 @@ func TestHandleChildKey_NoChildren_DefaultsToDetail(t *testing.T) {
 	}
 
 	msg := cmd()
-	navMsg, ok := msg.(messages.NavigateMsg)
+	navMsg, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("Expected NavigateMsg for EC2, got %T", msg)
 	}
@@ -342,7 +342,7 @@ func TestBuildChildContext_ID(t *testing.T) {
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources: []resource.Resource{
 			{ID: "test-bucket", Name: "test-bucket", Fields: map[string]string{}},
@@ -352,7 +352,7 @@ func TestBuildChildContext_ID(t *testing.T) {
 	// Press Enter, verify context
 	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	msg := cmd()
-	childMsg := msg.(messages.EnterChildViewMsg)
+	childMsg := msg.(messages.EnterChildView)
 
 	if childMsg.ParentContext["bucket"] != "test-bucket" {
 		t.Errorf("Context for 'ID' source should resolve to resource ID, got %q", childMsg.ParentContext["bucket"])
@@ -375,7 +375,7 @@ func TestBuildChildContext_Name(t *testing.T) {
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "r53",
 		Resources: []resource.Resource{
 			{ID: "/hostedzone/Z1", Name: "test.com.", Fields: map[string]string{}},
@@ -384,7 +384,7 @@ func TestBuildChildContext_Name(t *testing.T) {
 
 	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	msg := cmd()
-	childMsg := msg.(messages.EnterChildViewMsg)
+	childMsg := msg.(messages.EnterChildView)
 
 	if childMsg.ParentContext["zone_name"] != "test.com." {
 		t.Errorf("Context for 'Name' source should resolve to resource Name, got %q", childMsg.ParentContext["zone_name"])
@@ -409,7 +409,7 @@ func TestBuildChildContext_AtParent(t *testing.T) {
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "s3_objects",
 		Resources: []resource.Resource{
 			{ID: "folder1/", Name: "folder1/", Status: "folder", Fields: map[string]string{"key": "folder1/"}},
@@ -418,7 +418,7 @@ func TestBuildChildContext_AtParent(t *testing.T) {
 
 	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	msg := cmd()
-	childMsg := msg.(messages.EnterChildViewMsg)
+	childMsg := msg.(messages.EnterChildView)
 
 	if childMsg.ParentContext["bucket"] != "my-bucket" {
 		t.Errorf("@parent.bucket should resolve to parent context value, got %q", childMsg.ParentContext["bucket"])
@@ -445,7 +445,7 @@ func TestBuildChildContext_FieldsKey(t *testing.T) {
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "test",
 		Resources: []resource.Resource{
 			{ID: "1", Name: "one", Fields: map[string]string{"custom_field": "custom-value"}},
@@ -454,7 +454,7 @@ func TestBuildChildContext_FieldsKey(t *testing.T) {
 
 	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	msg := cmd()
-	childMsg := msg.(messages.EnterChildViewMsg)
+	childMsg := msg.(messages.EnterChildView)
 
 	if childMsg.ParentContext["custom"] != "custom-value" {
 		t.Errorf("Fields key should resolve to resource Fields value, got %q", childMsg.ParentContext["custom"])
@@ -494,7 +494,7 @@ func TestChildResourceList_FrameTitle_WithCount(t *testing.T) {
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "s3_objects",
 		Resources: []resource.Resource{
 			{ID: "file1.txt", Name: "file1.txt", Status: "file", Fields: map[string]string{"key": "file1.txt"}},
@@ -573,7 +573,7 @@ func TestHandleChildKey_NonEnterKey_EventsKey(t *testing.T) {
 	m, _ = m.Init()
 
 	// Load a resource
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "test_parent_events",
 		Resources: []resource.Resource{
 			{ID: "res-123", Name: "my-resource", Status: "active", Fields: map[string]string{"id": "res-123", "name": "my-resource"}},
@@ -587,7 +587,7 @@ func TestHandleChildKey_NonEnterKey_EventsKey(t *testing.T) {
 	}
 
 	msg := cmd()
-	childMsg, ok := msg.(messages.EnterChildViewMsg)
+	childMsg, ok := msg.(messages.EnterChildView)
 	if !ok {
 		t.Fatalf("expected EnterChildViewMsg from 'e' key, got %T", msg)
 	}
@@ -617,7 +617,7 @@ func TestHandleChildKey_NonEnterKey_NoChildDefined(t *testing.T) {
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "ec2_no_events",
 		Resources: []resource.Resource{
 			{ID: "i-123", Name: "web-1", Status: "running", Fields: map[string]string{"instance_id": "i-123"}},

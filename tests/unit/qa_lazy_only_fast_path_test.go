@@ -30,7 +30,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -100,7 +100,7 @@ func TestNeedsTargetCache_PrefetchFires_WhenLazyOnlyEntry(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	srcRes := resource.Resource{ID: "gf-src-001", Name: "gf-src-001"}
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		Resource:     &srcRes,
 		ResourceType: srcType,
@@ -108,7 +108,7 @@ func TestNeedsTargetCache_PrefetchFires_WhenLazyOnlyEntry(t *testing.T) {
 
 	// Seed a lazy-only entry for targetType (NOT in resourceCache).
 	lazyRes := resource.Resource{ID: "gf-lazy-001", Name: "gf-lazy-001"}
-	m, _ = rootApplyMsg(m, messages.RelatedCheckResultMsg{
+	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     srcType,
 		SourceResourceID: srcRes.ID,
 		DefDisplayName:   "GF Target",
@@ -126,7 +126,7 @@ func TestNeedsTargetCache_PrefetchFires_WhenLazyOnlyEntry(t *testing.T) {
 	// Dispatch RelatedCheckStartedMsg — this triggers the checker goroutine.
 	// In the goroutine, NeedsTargetCache=true checks mainCacheKeys (resourceCache
 	// keys, NOT snapshot keys). Since targetType is lazy-only, it must trigger prefetch.
-	_, relCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	_, relCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   srcType,
 		SourceResource: srcRes,
 	})
@@ -152,7 +152,7 @@ func TestNeedsTargetCache_PrefetchFires_WhenLazyOnlyEntry(t *testing.T) {
 	default:
 		// Drive RelatedCheckResultMsg delivery if checker was synchronous.
 		for _, msg := range allMsgs {
-			if rcr, ok := msg.(messages.RelatedCheckResultMsg); ok && rcr.ResourceType == srcType {
+			if rcr, ok := msg.(messages.RelatedCheckResult); ok && rcr.ResourceType == srcType {
 				m, _ = rootApplyMsg(m, rcr)
 			}
 		}
@@ -238,7 +238,7 @@ func TestLazyFastPath_RequiresAllIDs(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	srcRes := resource.Resource{ID: "gg-src-001", Name: "gg-src-001"}
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		Resource:     &srcRes,
 		ResourceType: srcType,
@@ -247,7 +247,7 @@ func TestLazyFastPath_RequiresAllIDs(t *testing.T) {
 	// Seed lazy cache with ONLY k1 (k2 is missing).
 	// This is the partial-coverage scenario that must NOT use the fast path.
 	k1Res := resource.Resource{ID: "gg-k1", Name: "gg-k1"}
-	m, _ = rootApplyMsg(m, messages.RelatedCheckResultMsg{
+	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     srcType,
 		SourceResourceID: srcRes.ID,
 		DefDisplayName:   "GG Target",
@@ -265,7 +265,7 @@ func TestLazyFastPath_RequiresAllIDs(t *testing.T) {
 	// Navigate to the related list — this triggers handleRelatedNavigate.
 	// With full coverage (both IDs in lazy), fast path fires → no fetch.
 	// With partial coverage (k2 missing), fast path must NOT fire → fetchResources called.
-	_, drillCmd := rootApplyMsg(m, messages.RelatedNavigateMsg{
+	_, drillCmd := rootApplyMsg(m, messages.RelatedNavigate{
 		TargetType:     targetType,
 		SourceType:     srcType,
 		SourceResource: srcRes,

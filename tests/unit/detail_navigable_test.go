@@ -6,7 +6,7 @@ package unit_test
 // Navigable fields are registered via resource.RegisterNavigableFields.
 // When a field is navigable the detail view renders it with an underline style
 // and pressing Enter while the cursor is on that field emits a
-// messages.RelatedNavigateMsg.
+// messages.RelatedNavigate.
 
 import (
 	"os"
@@ -18,7 +18,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -143,7 +143,7 @@ func TestDetail_NavigableField_EnterEmitsNavigateMsg(t *testing.T) {
 	}
 
 	msg := cmd()
-	nav, ok := msg.(messages.RelatedNavigateMsg)
+	nav, ok := msg.(messages.RelatedNavigate)
 	if !ok {
 		t.Fatalf("cmd() should produce RelatedNavigateMsg, got %T", msg)
 	}

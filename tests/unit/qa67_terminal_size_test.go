@@ -22,7 +22,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // H.1 — Terminal exactly 60 columns wide: renders normally (no "too narrow").
@@ -140,7 +140,7 @@ func TestQa67_H7_ResizeDuringDetailView_NoCrash(t *testing.T) {
 			"lifecycle":   "normal",
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: res,
 	})
@@ -168,7 +168,7 @@ func TestQa67_H8_ResizeDuringYAMLView_NoCrash(t *testing.T) {
 		Status: "running",
 		Fields: map[string]string{},
 	}
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetYAML,
 		Resource: res,
 	})
@@ -187,7 +187,7 @@ func TestQa67_H8_ResizeDuringYAMLView_NoCrash(t *testing.T) {
 // H.9 — Resize during help screen re-renders without crash.
 func TestQa67_H9_ResizeDuringHelpScreen_NoCrash(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target: messages.TargetHelp,
 	})
 
@@ -209,7 +209,7 @@ func TestQa67_H9_ResizeDuringHelpScreen_NoCrash(t *testing.T) {
 // H.10 — Resize during child view re-renders without crash.
 func TestQa67_H10_ResizeDuringChildView_NoCrash(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "s3",
 	})
@@ -225,7 +225,7 @@ func TestQa67_H10_ResizeDuringChildView_NoCrash(t *testing.T) {
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "s3", Resources: buckets})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: buckets})
 
 	// Navigate into the bucket (child view) — execute the returned cmd to actually push the child view
 	var cmd tea.Cmd
@@ -242,7 +242,7 @@ func TestQa67_H10_ResizeDuringChildView_NoCrash(t *testing.T) {
 			"key": "file.txt", "size": "1024", "last_modified": "2025-01-01", "storage_class": "STANDARD",
 		}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "s3_objects", Resources: objects})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3_objects", Resources: objects})
 
 	// Resize multiple times
 	for _, width := range []int{80, 120, 60, 200} {
@@ -307,7 +307,7 @@ func TestQa67_H11_H12_ExtremeSizes_WithResourceList_NoCrash(t *testing.T) {
 			tui.Version = "test"
 			m := tui.New("testprofile", "us-east-1")
 			m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: sz.width, Height: sz.height})
-			m, _ = rootApplyMsg(m, messages.NavigateMsg{
+			m, _ = rootApplyMsg(m, messages.Navigate{
 				Target:       messages.TargetResourceList,
 				ResourceType: "ec2",
 			})
@@ -323,7 +323,7 @@ func TestQa67_H11_H12_ExtremeSizes_WithResourceList_NoCrash(t *testing.T) {
 					"lifecycle":   "",
 				}},
 			}
-			m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "ec2", Resources: resources})
+			m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
 			// Must not panic; View() must be non-empty
 			out := rootViewContent(m)
 			if out == "" {

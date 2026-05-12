@@ -16,10 +16,10 @@ can run in parallel (pattern is rigid).
 per-resource related views can be added:
 
 - `internal/resource/related.go` -- types, registries (`RelatedDef`, `NavigableField`), helper constructors
-- `RelatedCheckResultMsg` and `RelatedNavigateMsg` in `internal/tui/messages/messages.go`
+- `RelatedCheckResult` (event) and `RelatedNavigate` (cmd) in `internal/runtime/messages/{event,cmd}.go`
 - `ToggleRelated` binding in `internal/tui/keys/keys.go`
 - Two-column detail view in `internal/tui/views/detail.go` (field-list model with embedded rightColumnModel)
-- Handler code in `internal/tui/app.go` (main Update switch) and `internal/tui/app_related.go` for `RelatedCheckResultMsg` and `RelatedNavigateMsg`
+- Handler code in `internal/tui/app.go` (main Update switch) and `internal/tui/app_related.go` for `RelatedCheckResult` and `RelatedNavigate`
 
 If these don't exist, STOP. The infrastructure must land first.
 See `docs/design/related-views-architecture.md` Phases 1-8.

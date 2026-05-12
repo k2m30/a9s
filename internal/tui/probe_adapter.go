@@ -13,7 +13,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/cache"
 	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -25,7 +25,7 @@ func (m *Model) loadAvailabilityCache() tea.Cmd {
 	return func() tea.Msg {
 		cf, err := m.core.LoadAvailabilityCache(profile, region)
 		if err != nil || cf == nil {
-			return messages.AvailabilityCacheLoadedMsg{
+			return messages.AvailabilityCacheLoaded{
 				Entries: make(map[string]int),
 				Expired: true,
 			}
@@ -50,7 +50,7 @@ func (m *Model) loadAvailabilityCache() tea.Cmd {
 				}
 			}
 		}
-		return messages.AvailabilityCacheLoadedMsg{
+		return messages.AvailabilityCacheLoaded{
 			Entries:        entries,
 			Truncated:      truncated,
 			Expired:        cf.IsExpired(cache.DefaultTTL),
@@ -67,7 +67,7 @@ func (m *Model) probeResourceAvailability(shortName string, gen domain.Gen) tea.
 	ctx, clients := m.appCtx, m.Session.Clients
 	return func() tea.Msg {
 		r := m.core.ProbeResourceAvailability(ctx, clients, shortName)
-		return messages.AvailabilityCheckedMsg{
+		return messages.AvailabilityChecked{
 			ResourceType: shortName,
 			HasResources: r.HasResources,
 			Count:        r.Count,
@@ -122,7 +122,7 @@ func (m *Model) demoPrefetchCounts() tea.Cmd {
 	gen := m.Session.AvailabilityGen
 	return func() tea.Msg {
 		r := m.core.DemoPrefetchCounts(ctx, clients)
-		return messages.AvailabilityPrefetchedMsg{
+		return messages.AvailabilityPrefetched{
 			Entries:        r.Entries,
 			Truncated:      r.Truncated,
 			IssueCounts:    r.IssueCounts,
@@ -148,7 +148,7 @@ func (m *Model) refreshResourceListWithEnrichmentRerun(
 	inner := m.refreshResourceList(rl)
 	return func() tea.Msg {
 		msg := inner()
-		if loaded, ok := msg.(messages.ResourcesLoadedMsg); ok {
+		if loaded, ok := msg.(messages.ResourcesLoaded); ok {
 			loaded.TypeGen = tok
 			return loaded
 		}
@@ -166,7 +166,7 @@ func (m *Model) probeEnrichment(shortName string, gen domain.Gen) tea.Cmd {
 	}
 	return func() tea.Msg {
 		r := m.core.ProbeEnrichment(ctx, clients, shortName)
-		return messages.EnrichmentCheckedMsg{
+		return messages.EnrichmentChecked{
 			ResourceType: shortName,
 			Issues:       r.Issues,
 			Truncated:    r.Truncated,

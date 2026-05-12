@@ -7,18 +7,18 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // findNavigateMsg walks a tea.Cmd (including nested BatchMsg) and returns the
-// first messages.NavigateMsg found, or nil if none is found.
+// first messages.Navigate found, or nil if none is found.
 // Handles nil cmd and non-batch cases gracefully.
-func findNavigateMsg(cmd tea.Cmd) *messages.NavigateMsg {
+func findNavigateMsg(cmd tea.Cmd) *messages.Navigate {
 	if cmd == nil {
 		return nil
 	}
 	msg := cmd()
-	if nav, ok := msg.(messages.NavigateMsg); ok {
+	if nav, ok := msg.(messages.Navigate); ok {
 		return &nav
 	}
 	batch, ok := msg.(tea.BatchMsg)
@@ -30,7 +30,7 @@ func findNavigateMsg(cmd tea.Cmd) *messages.NavigateMsg {
 			continue
 		}
 		subMsg := subCmd()
-		if nav, ok := subMsg.(messages.NavigateMsg); ok {
+		if nav, ok := subMsg.(messages.Navigate); ok {
 			return &nav
 		}
 		if subBatch, ok := subMsg.(tea.BatchMsg); ok {
@@ -39,7 +39,7 @@ func findNavigateMsg(cmd tea.Cmd) *messages.NavigateMsg {
 					continue
 				}
 				innerMsg := innerCmd()
-				if nav, ok := innerMsg.(messages.NavigateMsg); ok {
+				if nav, ok := innerMsg.(messages.Navigate); ok {
 					return &nav
 				}
 			}
@@ -64,19 +64,19 @@ func TestQA_CLICommand_ClientsReady_EmitsNavigateMsg(t *testing.T) {
 	)
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
-	_, cmd := rootApplyMsg(m, messages.ClientsReadyMsg{
+	_, cmd := rootApplyMsg(m, messages.ClientsReady{
 		Clients: demo.NewServiceClients(),
 		Region:  "us-east-1",
 	})
 
 	nav := extractMsg(t, cmd, func(msg tea.Msg) bool {
-		_, ok := msg.(messages.NavigateMsg)
+		_, ok := msg.(messages.Navigate)
 		return ok
 	})
 
-	navMsg, ok := nav.(messages.NavigateMsg)
+	navMsg, ok := nav.(messages.Navigate)
 	if !ok {
-		t.Fatalf("expected messages.NavigateMsg, got %T", nav)
+		t.Fatalf("expected messages.Navigate, got %T", nav)
 	}
 	if navMsg.Target != messages.TargetResourceList {
 		t.Errorf("NavigateMsg.Target should be TargetResourceList, got %v", navMsg.Target)
@@ -98,7 +98,7 @@ func TestQA_CLICommand_ClientsReady_NoNavigateMsg_WhenUnset(t *testing.T) {
 	)
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
-	_, cmd := rootApplyMsg(m, messages.ClientsReadyMsg{
+	_, cmd := rootApplyMsg(m, messages.ClientsReady{
 		Clients: demo.NewServiceClients(),
 		Region:  "us-east-1",
 	})
@@ -123,7 +123,7 @@ func TestQA_CLICommand_ClientsReady_ClearedAfterFirstUse(t *testing.T) {
 	)
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
-	crm := messages.ClientsReadyMsg{
+	crm := messages.ClientsReady{
 		Clients: demo.NewServiceClients(),
 		Region:  "us-east-1",
 	}
@@ -133,7 +133,7 @@ func TestQA_CLICommand_ClientsReady_ClearedAfterFirstUse(t *testing.T) {
 	m, firstCmd = rootApplyMsg(m, crm)
 
 	_ = extractMsg(t, firstCmd, func(msg tea.Msg) bool {
-		_, ok := msg.(messages.NavigateMsg)
+		_, ok := msg.(messages.Navigate)
 		return ok
 	})
 
@@ -159,19 +159,19 @@ func TestQA_CLICommand_DemoMode_EmitsNavigateMsg(t *testing.T) {
 	)
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
-	_, cmd := rootApplyMsg(m, messages.ClientsReadyMsg{
+	_, cmd := rootApplyMsg(m, messages.ClientsReady{
 		Clients: demo.NewServiceClients(),
 		Region:  "us-east-1",
 	})
 
 	nav := extractMsg(t, cmd, func(msg tea.Msg) bool {
-		_, ok := msg.(messages.NavigateMsg)
+		_, ok := msg.(messages.Navigate)
 		return ok
 	})
 
-	navMsg, ok := nav.(messages.NavigateMsg)
+	navMsg, ok := nav.(messages.Navigate)
 	if !ok {
-		t.Fatalf("expected messages.NavigateMsg, got %T", nav)
+		t.Fatalf("expected messages.Navigate, got %T", nav)
 	}
 	if navMsg.Target != messages.TargetResourceList {
 		t.Errorf("NavigateMsg.Target should be TargetResourceList, got %v", navMsg.Target)
@@ -196,10 +196,10 @@ func TestQA_CLICommand_SkippedWhenUserNavigatedAway(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// Simulate user navigating to help before ClientsReadyMsg arrives.
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetHelp})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 
 	// Now ClientsReadyMsg arrives — stack depth is 2 (menu + help).
-	_, cmd := rootApplyMsg(m, messages.ClientsReadyMsg{
+	_, cmd := rootApplyMsg(m, messages.ClientsReady{
 		Clients: demo.NewServiceClients(),
 		Region:  "us-east-1",
 	})

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -167,7 +167,7 @@ func TestPaginationMeta_UnknownTotalHint(t *testing.T) {
 }
 
 func TestLoadMoreMsg_WithNilParentContext(t *testing.T) {
-	msg := messages.LoadMoreMsg{
+	msg := messages.LoadMore{
 		ResourceType:      "s3",
 		ContinuationToken: "tok-123",
 		ParentContext:     nil,
@@ -185,7 +185,7 @@ func TestLoadMoreMsg_WithNilParentContext(t *testing.T) {
 }
 
 func TestLoadMoreMsg_WithParentContext(t *testing.T) {
-	msg := messages.LoadMoreMsg{
+	msg := messages.LoadMore{
 		ResourceType:      "s3_objects",
 		ContinuationToken: "tok-456",
 		ParentContext:     map[string]string{"bucket": "my-bucket", "prefix": "data/"},
@@ -209,7 +209,7 @@ func TestLoadMoreMsg_WithParentContext(t *testing.T) {
 }
 
 func TestResourcesLoadedMsg_PaginationFields(t *testing.T) {
-	msg := messages.ResourcesLoadedMsg{
+	msg := messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    []resource.Resource{{ID: "r1"}},
 		Pagination: &resource.PaginationMeta{
@@ -242,7 +242,7 @@ func TestResourcesLoadedMsg_PaginationFields(t *testing.T) {
 }
 
 func TestResourcesLoadedMsg_LegacyNilPagination(t *testing.T) {
-	msg := messages.ResourcesLoadedMsg{
+	msg := messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{{ID: "i-123"}},
 		Pagination:   nil,

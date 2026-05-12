@@ -12,7 +12,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -91,7 +91,7 @@ func rlLoadedModel(t *testing.T) views.ResourceListModel {
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    rlTestResources(),
 	})
@@ -247,7 +247,7 @@ func TestResourceListView_HorizontalScroll(t *testing.T) {
 	m.SetSize(50, 20) // very narrow
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    rlTestResources(),
 	})
@@ -274,7 +274,7 @@ func TestResourceListView_HorizontalScroll_ClampsAtLastColumn(t *testing.T) {
 	m.SetSize(50, 20) // narrow enough that not all columns fit
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    rlTestResources(),
 	})
@@ -307,7 +307,7 @@ func TestResourceListView_HorizontalScroll_CannotScrollPastEnd(t *testing.T) {
 	m.SetSize(200, 20) // wide enough to see ALL columns
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    rlTestResources(),
 	})
@@ -337,7 +337,7 @@ func TestResourceListView_EmptyList(t *testing.T) {
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{},
 	})
@@ -374,7 +374,7 @@ func TestResourceListView_ConfigDrivenColumns(t *testing.T) {
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    rlTestResources(),
 	})
@@ -403,7 +403,7 @@ func TestResourceListView_VerticalScrollLimitsRows(t *testing.T) {
 	m.SetSize(120, 4)
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    rlTestResources(),
 	})
@@ -435,7 +435,7 @@ func TestResourceListView_SortIndicator(t *testing.T) {
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    rlTestResources(),
 	})
@@ -554,7 +554,7 @@ func TestResourceList_DownPastEnd_ManyItems(t *testing.T) {
 	}
 
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "log_streams",
 		Resources:    resources,
 	})
@@ -614,7 +614,7 @@ func TestResourceList_NarrowScreen_ShowsAllColumns(t *testing.T) {
 	m.SetSize(80, 20) // narrow terminal — 80 cols can't fit 22+120
 
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "log_events",
 		Resources: []resource.Resource{
 			{
@@ -654,7 +654,7 @@ func TestResourceListView_SetDisplayName(t *testing.T) {
 	m := views.NewResourceList(rlTestTypeDef(), nil, k)
 	m.SetSize(80, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    rlTestResources(),
 	})
@@ -682,7 +682,7 @@ func TestResourceListView_SetDisplayName_EmptyRestoresDefault(t *testing.T) {
 	m := views.NewResourceList(rlTestTypeDef(), nil, k)
 	m.SetSize(80, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    rlTestResources(),
 	})
@@ -726,7 +726,7 @@ func TestResourceListView_ExactRelatedTargetID_SingleID_TriggersLoadMore(t *test
 		{ID: "vol-other-2", Fields: map[string]string{"volume_id": "vol-other-2"}},
 	}
 	var got tea.Cmd
-	m, got = m.Update(messages.ResourcesLoadedMsg{
+	m, got = m.Update(messages.ResourcesLoaded{
 		ResourceType: "ebs",
 		Resources:    nonMatching,
 		Pagination: &resource.PaginationMeta{
@@ -739,7 +739,7 @@ func TestResourceListView_ExactRelatedTargetID_SingleID_TriggersLoadMore(t *test
 		t.Fatal("exactRelatedTargetID with single non-empty ID + truncated page should emit LoadMoreMsg cmd")
 	}
 	msg := got()
-	loadMore, ok := msg.(messages.LoadMoreMsg)
+	loadMore, ok := msg.(messages.LoadMore)
 	if !ok {
 		t.Fatalf("expected LoadMoreMsg, got %T: %+v", msg, msg)
 	}
@@ -772,7 +772,7 @@ func TestResourceListView_ExactRelatedTargetID_MultipleIDs_NoLoadMore(t *testing
 		{ID: "vol-other-x", Fields: map[string]string{"volume_id": "vol-other-x"}},
 	}
 	var got tea.Cmd
-	m, got = m.Update(messages.ResourcesLoadedMsg{
+	m, got = m.Update(messages.ResourcesLoaded{
 		ResourceType: "ebs",
 		Resources:    nonMatching,
 		Pagination: &resource.PaginationMeta{
@@ -783,7 +783,7 @@ func TestResourceListView_ExactRelatedTargetID_MultipleIDs_NoLoadMore(t *testing
 
 	if got != nil {
 		msg := got()
-		if _, isLoadMore := msg.(messages.LoadMoreMsg); isLoadMore {
+		if _, isLoadMore := msg.(messages.LoadMore); isLoadMore {
 			t.Error("exactRelatedTargetID with 2 IDs should NOT emit LoadMoreMsg (ambiguous target)")
 		}
 	}
@@ -815,7 +815,7 @@ func TestResourceListView_ExactRelatedTargetID_EmptyID_NoLoadMore(t *testing.T) 
 		{ID: "vol-other-y", Fields: map[string]string{"volume_id": "vol-other-y"}},
 	}
 	var got tea.Cmd
-	m, got = m.Update(messages.ResourcesLoadedMsg{
+	m, got = m.Update(messages.ResourcesLoaded{
 		ResourceType: "ebs",
 		Resources:    nonMatching,
 		Pagination: &resource.PaginationMeta{
@@ -826,7 +826,7 @@ func TestResourceListView_ExactRelatedTargetID_EmptyID_NoLoadMore(t *testing.T) 
 
 	if got != nil {
 		msg := got()
-		if _, isLoadMore := msg.(messages.LoadMoreMsg); isLoadMore {
+		if _, isLoadMore := msg.(messages.LoadMore); isLoadMore {
 			t.Error("empty-string relatedID should NOT trigger LoadMoreMsg")
 		}
 	}
@@ -878,7 +878,7 @@ func TestResourceListView_Wave2FieldUpdate_OverridesWave1FindingsPhrase(t *testi
 			"status":        "publicly accessible",
 		},
 	}
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "dbi",
 		Resources:    []resource.Resource{r},
 	})

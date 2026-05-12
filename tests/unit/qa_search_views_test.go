@@ -12,7 +12,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	tui "github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -373,7 +373,7 @@ func TestSearch_DetailView_RootLevel_NextPrevMatch(t *testing.T) {
 			"name":        "test-search-nav",
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetDetail, Resource: res})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetDetail, Resource: res})
 
 	// Activate search with /.
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: '/', Text: "/"})
@@ -455,7 +455,7 @@ func TestSearch_YAMLView_RootLevel_NextPrevMatch(t *testing.T) {
 			"name":        "test-yaml-search-nav",
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetYAML, Resource: res})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetYAML, Resource: res})
 
 	// Activate search with /.
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: '/', Text: "/"})

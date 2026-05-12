@@ -25,7 +25,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // setupEC2ListWithCache navigates to the EC2 list, loads all EC2 resources, and
@@ -41,7 +41,7 @@ func setupEC2ListWithCache(t *testing.T) (tui.Model, []resource.Resource) {
 		tui.WithRegion(demo.DemoRegion))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -52,7 +52,7 @@ func setupEC2ListWithCache(t *testing.T) (tui.Model, []resource.Resource) {
 		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err, len(ec2Res))
 	}
 
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    ec2Res,
 	})
@@ -64,7 +64,7 @@ func setupEC2ListWithCache(t *testing.T) (tui.Model, []resource.Resource) {
 // RelatedCheckStartedMsg.
 func containsRelatedCheckStartedMsg(msgs []tea.Msg) bool {
 	for _, msg := range msgs {
-		if _, ok := msg.(messages.RelatedCheckStartedMsg); ok {
+		if _, ok := msg.(messages.RelatedCheckStarted); ok {
 			return true
 		}
 	}
@@ -90,7 +90,7 @@ func TestRelatedNavigate_CachedTargetID_DispatchesRelatedCheck(t *testing.T) {
 	m, ec2Res := setupEC2ListWithCache(t)
 
 	// Send a RelatedNavigateMsg using TargetID — the cache-hit branch fires.
-	navMsg := messages.RelatedNavigateMsg{
+	navMsg := messages.RelatedNavigate{
 		TargetType: "ec2",
 		TargetID:   ec2Res[0].ID,
 		SourceResource: resource.Resource{
@@ -152,7 +152,7 @@ func TestRelatedNavigate_CachedTargetID_UsesCachedResults(t *testing.T) {
 	}
 
 	// Navigate again to the same resource via RelatedNavigateMsg (cache-hit branch).
-	navMsg := messages.RelatedNavigateMsg{
+	navMsg := messages.RelatedNavigate{
 		TargetType: "ec2",
 		TargetID:   ec2Res[0].ID,
 		SourceResource: resource.Resource{
@@ -194,7 +194,7 @@ func TestRelatedNavigate_SingleRelatedID_CacheHit_DispatchesRelatedCheck(t *test
 	m, ec2Res := setupEC2ListWithCache(t)
 
 	// Single RelatedID — uses the len==1 branch in handleRelatedNavigate.
-	navMsg := messages.RelatedNavigateMsg{
+	navMsg := messages.RelatedNavigate{
 		TargetType: "ec2",
 		RelatedIDs: []string{ec2Res[0].ID},
 		SourceResource: resource.Resource{

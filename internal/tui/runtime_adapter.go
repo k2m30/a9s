@@ -36,7 +36,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -47,7 +47,7 @@ import (
 // It constructs a transient runtime.Core to invoke the migrated policy
 // (HandleEnrichDetail), applies any returned UIIntents to the view stack,
 // then converts the returned TaskRequests into Bubble Tea commands.
-func (m Model) handleEnrichDetail(msg messages.EnrichDetailMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleEnrichDetail(msg messages.EnrichDetail) (tea.Model, tea.Cmd) {
 	core := runtime.New(m.Session, resource.AllResourceTypes())
 	intents, tasks := core.HandleEnrichDetail(runtime.EnrichDetailEvent{
 		ResourceType: msg.ResourceType,
@@ -77,7 +77,7 @@ func (m Model) handleEnrichDetail(msg messages.EnrichDetailMsg) (tea.Model, tea.
 // work (e.g. RefreshActiveListIntent), nil otherwise.
 //
 // FlashIntent is applied DIRECTLY here (set flashState text/isError/active)
-// rather than being dispatched back as messages.FlashMsg the way app.go's
+// rather than being dispatched back as messages.Flash the way app.go's
 // multi-intent applyIntents path does. The per-handler adapters in
 // app_flash.go / app_session.go pre-bump m.flash.gen before invoking the
 // Core, so by the time we get here the gen is already in sync with the
@@ -186,7 +186,7 @@ func (m Model) enrichDetailCmd(p runtime.EnrichDetailPayload) tea.Cmd {
 		ctx, cancel := context.WithTimeout(appCtx, 10*time.Second)
 		defer cancel()
 		enriched, err := enricher(ctx, dctx, res)
-		return messages.EnrichDetailResultMsg{
+		return messages.EnrichDetailResult{
 			ResourceType: resourceType,
 			ResourceID:   res.ID,
 			EnrichedRes:  enriched,
@@ -204,7 +204,7 @@ func (m Model) enrichDetailCmd(p runtime.EnrichDetailPayload) tea.Cmd {
 func flashTickCmd(p runtime.FlashTickPayload) tea.Cmd {
 	gen, dur := p.Gen, p.Duration
 	return tea.Tick(dur, func(_ time.Time) tea.Msg {
-		return messages.ClearFlashMsg{Gen: gen}
+		return messages.ClearFlash{Gen: gen}
 	})
 }
 
@@ -222,7 +222,7 @@ func emitNavigateCmd(p runtime.EmitNavigatePayload) tea.Cmd {
 	}
 	rt := p.ResourceType
 	return func() tea.Msg {
-		return messages.NavigateMsg{Target: target, ResourceType: rt}
+		return messages.Navigate{Target: target, ResourceType: rt}
 	}
 }
 
@@ -232,7 +232,7 @@ func emitNavigateCmd(p runtime.EmitNavigatePayload) tea.Cmd {
 func emitAPIErrorCmd(p runtime.EmitAPIErrorPayload) tea.Cmd {
 	err := p.Err
 	return func() tea.Msg {
-		return messages.APIErrorMsg{Err: err}
+		return messages.APIError{Err: err}
 	}
 }
 

@@ -8,7 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/demo"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // countSuffixRE matches count suffixes rendered by the main menu for a known
@@ -32,7 +32,7 @@ func TestDemoMainMenu_ShowsResourceCounts(t *testing.T) {
 	// Gen=0 matches connectGen zero-value so the stale-result guard passes.
 	clients := demo.NewServiceClients()
 	var initCmd tea.Cmd
-	*m, initCmd = rootApplyMsg(*m, messages.ClientsReadyMsg{Clients: clients, Gen: 0})
+	*m, initCmd = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 0})
 
 	// Drain any commands returned by handleClientsReady (identity probe, avail
 	// cache load). In demo mode with noCache=true these are expected to be nil
@@ -82,7 +82,7 @@ func TestDemoMainMenu_EC2CountNonZero(t *testing.T) {
 
 	clients := demo.NewServiceClients()
 	var initCmd tea.Cmd
-	*m, initCmd = rootApplyMsg(*m, messages.ClientsReadyMsg{Clients: clients, Gen: 0})
+	*m, initCmd = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 0})
 
 	if initCmd != nil {
 		msg := initCmd()

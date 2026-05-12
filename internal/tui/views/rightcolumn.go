@@ -13,20 +13,20 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
 
 type rightColumnRow struct {
 	targetType  string
 	displayName string
-	count       int                      // -1 = loading, 0+ = resolved
-	resourceIDs []string                 // IDs from checker result (for navigation in US3)
-	fetchFilter map[string]string        // server-side filter for filtered paginated fetcher
+	count       int               // -1 = loading, 0+ = resolved
+	resourceIDs []string          // IDs from checker result (for navigation in US3)
+	fetchFilter map[string]string // server-side filter for filtered paginated fetcher
 	loading     bool
 	err         error
-	approximate bool                     // true when count was derived from a truncated cache; UI renders "N+"
-	checker     resource.RelatedChecker  // originating RelatedDef.Checker — carried forward for re-apply on load-more
+	approximate bool                    // true when count was derived from a truncated cache; UI renders "N+"
+	checker     resource.RelatedChecker // originating RelatedDef.Checker — carried forward for re-apply on load-more
 }
 
 type rightColumnModel struct {
@@ -76,7 +76,7 @@ func (m rightColumnModel) Update(msg tea.Msg) (rightColumnModel, tea.Cmd) {
 	case tea.KeyMsg:
 		return m.updateKeyMsg(msg)
 
-	case messages.RelatedCheckResultMsg:
+	case messages.RelatedCheckResult:
 		// Match rows by DefDisplayName: it is unique per RelatedDef and handles
 		// the ct-events self-pivot case where 4 rows all share
 		// TargetType="ct-events" but carry distinct DisplayNames ("CT events by
@@ -186,7 +186,7 @@ func (m rightColumnModel) updateKeyMsg(msg tea.KeyMsg) (rightColumnModel, tea.Cm
 	case key.Matches(msg, m.keys.Enter):
 		if row := m.SelectedRow(); row != nil && isActionableRow(*row) {
 			return m, func() tea.Msg {
-				return messages.RelatedNavigateMsg{
+				return messages.RelatedNavigate{
 					TargetType:     row.targetType,
 					SourceResource: m.parentRes,
 					RelatedIDs:     row.resourceIDs,

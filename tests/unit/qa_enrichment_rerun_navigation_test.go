@@ -28,7 +28,7 @@ import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -69,7 +69,7 @@ func TestListCtrlR_RerunDispatchedEvenAfterNavigatingAway(t *testing.T) {
 
 	// Step 3: Navigate back to the main menu BEFORE the fetch returns.
 	// This simulates the user pressing Esc (or any key that pops the EBS list).
-	m, _ = rootApplyMsg(m, messages.PopViewMsg{})
+	m, _ = rootApplyMsg(m, messages.PopView{})
 
 	// Confirm we're back at the main menu (sanity check).
 	plain := stripANSI(rootViewContent(m))
@@ -82,7 +82,7 @@ func TestListCtrlR_RerunDispatchedEvenAfterNavigatingAway(t *testing.T) {
 	// We simulate this by delivering the message directly rather than executing the
 	// cmd (which would fail due to nil clients). We use TypeGen=1 matching the gen
 	// that was bumped at Ctrl+R time.
-	loadedMsg := messages.ResourcesLoadedMsg{
+	loadedMsg := messages.ResourcesLoaded{
 		ResourceType: "ebs",
 		Resources:    rerunEBSResources(),
 		TypeGen:      1, // matches enrichmentTypeGen["ebs"]=1 set during Ctrl+R
@@ -114,7 +114,7 @@ func TestListCtrlR_RerunDispatchedEvenAfterNavigatingAway(t *testing.T) {
 	if probeCmd != nil {
 		msg := probeCmd()
 		switch msg.(type) {
-		case messages.EnrichmentCheckedMsg:
+		case messages.EnrichmentChecked:
 			// Expected: probe fired, returned EnrichmentCheckedMsg (likely with Err != nil
 			// due to nil clients, but the dispatch itself occurred).
 		default:

@@ -43,7 +43,7 @@ const (
 	apiErrorFlashDuration = 5 * time.Second
 )
 
-// FlashEvent is the adapter-translated form of messages.FlashMsg used by
+// FlashEvent is the adapter-translated form of messages.Flash used by
 // HandleFlash. NewGen is the flash generation the adapter has already
 // bumped to on its flashState before calling into the Core; the handler
 // echoes it back via FlashTickPayload.Gen so the scheduled ClearFlashMsg
@@ -54,7 +54,7 @@ type FlashEvent struct {
 	NewGen  domain.Gen
 }
 
-// ClearFlashEvent is the adapter-translated form of messages.ClearFlashMsg.
+// ClearFlashEvent is the adapter-translated form of messages.ClearFlash.
 // Gen is the gen the original tea.Tick carried; CurrentGen is the gen the
 // adapter has now. The handler treats them as stale when they disagree.
 // IsError lets the handler emit SetErrorHintIntent when the cleared flash
@@ -65,7 +65,7 @@ type ClearFlashEvent struct {
 	IsError    bool
 }
 
-// APIErrorEvent is the adapter-translated form of messages.APIErrorMsg.
+// APIErrorEvent is the adapter-translated form of messages.APIError.
 // NewGen is the flash generation the adapter has already bumped to before
 // calling into the Core; the handler echoes it back via the FlashTickPayload.
 type APIErrorEvent struct {
@@ -73,7 +73,7 @@ type APIErrorEvent struct {
 	NewGen domain.Gen
 }
 
-// ClientsReadyEvent mirrors the fields of messages.ClientsReadyMsg the
+// ClientsReadyEvent mirrors the fields of messages.ClientsReady the
 // runtime needs to make its dispatch decision. The concrete *ServiceClients
 // is kept as any so this file stays free of any tui-only dependency on the
 // message type.

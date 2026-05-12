@@ -32,7 +32,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ---------------------------------------------------------------------------
@@ -94,7 +94,7 @@ func TestIssue237_ColdMissWriteBack_PreservesNextToken(t *testing.T) {
 	srcRes := resource.Resource{ID: "src-237-instance"}
 
 	// Dispatch: returns a batch of checker cmds.
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   srcType,
 		SourceResource: srcRes,
 	})
@@ -105,10 +105,10 @@ func TestIssue237_ColdMissWriteBack_PreservesNextToken(t *testing.T) {
 	// Execute the batch. With a single def, Bubble Tea may return the result
 	// directly rather than wrapping it in tea.BatchMsg — handle both cases.
 	rawMsg := batchCmd()
-	var resultMsg messages.RelatedCheckResultMsg
+	var resultMsg messages.RelatedCheckResult
 	found := false
 	switch v := rawMsg.(type) {
-	case messages.RelatedCheckResultMsg:
+	case messages.RelatedCheckResult:
 		resultMsg = v
 		found = true
 	case tea.BatchMsg:
@@ -116,7 +116,7 @@ func TestIssue237_ColdMissWriteBack_PreservesNextToken(t *testing.T) {
 			if cmd == nil {
 				continue
 			}
-			if r, ok2 := cmd().(messages.RelatedCheckResultMsg); ok2 {
+			if r, ok2 := cmd().(messages.RelatedCheckResult); ok2 {
 				resultMsg = r
 				found = true
 			}
@@ -185,7 +185,7 @@ func TestIssue239_StaleGenerationResult_IsDiscarded(t *testing.T) {
 
 	// Inject a result with gen=1 (the initial batch's generation, now stale since
 	// relatedGen=2). This simulates a late arrival from the previous batch.
-	m, _ = rootApplyMsg(m, messages.RelatedCheckResultMsg{
+	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "ec2",
 		SourceResourceID: viewedResourceID,
 		Generation:       1, // initial batch generation — stale after Ctrl+R (relatedGen=2)
@@ -216,7 +216,7 @@ func TestIssue239_CurrentGenerationResult_IsAccepted(t *testing.T) {
 	m, _ = rootApplyMsg(m, ctrlR()) // relatedGen: 1 → 2
 
 	// gen=2 matches relatedGen=2 → accepted.
-	m, _ = rootApplyMsg(m, messages.RelatedCheckResultMsg{
+	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "ec2",
 		SourceResourceID: viewedResourceID,
 		Generation:       2, // current generation after one Ctrl+R
@@ -284,7 +284,7 @@ func TestIssue240_FieldOnlyChecker_NoPrefetch(t *testing.T) {
 		Fields: map[string]string{"has_target": "true"},
 	}
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   srcType,
 		SourceResource: srcRes,
 	})
@@ -293,17 +293,17 @@ func TestIssue240_FieldOnlyChecker_NoPrefetch(t *testing.T) {
 	}
 
 	// Collect all RelatedCheckResultMsg values (handle single-def and multi-def batches).
-	var results []messages.RelatedCheckResultMsg
+	var results []messages.RelatedCheckResult
 	rawMsg := batchCmd()
 	switch v := rawMsg.(type) {
-	case messages.RelatedCheckResultMsg:
+	case messages.RelatedCheckResult:
 		results = append(results, v)
 	case tea.BatchMsg:
 		for _, cmd := range v {
 			if cmd == nil {
 				continue
 			}
-			if r, ok2 := cmd().(messages.RelatedCheckResultMsg); ok2 {
+			if r, ok2 := cmd().(messages.RelatedCheckResult); ok2 {
 				results = append(results, r)
 			}
 		}
@@ -369,7 +369,7 @@ func TestIssue240_CacheDependentChecker_DoesPrefetch(t *testing.T) {
 
 	srcRes := resource.Resource{ID: "src-240-cache"}
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   srcType,
 		SourceResource: srcRes,
 	})
@@ -377,17 +377,17 @@ func TestIssue240_CacheDependentChecker_DoesPrefetch(t *testing.T) {
 		t.Fatal("handleRelatedCheckStarted returned nil")
 	}
 
-	var resultMsg messages.RelatedCheckResultMsg
+	var resultMsg messages.RelatedCheckResult
 	rawMsg240 := batchCmd()
 	switch v := rawMsg240.(type) {
-	case messages.RelatedCheckResultMsg:
+	case messages.RelatedCheckResult:
 		resultMsg = v
 	case tea.BatchMsg:
 		for _, cmd := range v {
 			if cmd == nil {
 				continue
 			}
-			if r, ok2 := cmd().(messages.RelatedCheckResultMsg); ok2 {
+			if r, ok2 := cmd().(messages.RelatedCheckResult); ok2 {
 				resultMsg = r
 			}
 		}
@@ -480,7 +480,7 @@ func TestIssue241_ConcurrentProbesCappedAt4(t *testing.T) {
 
 	srcRes := resource.Resource{ID: "src-241"}
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   srcType,
 		SourceResource: srcRes,
 	})

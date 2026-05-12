@@ -18,7 +18,7 @@ import (
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -67,7 +67,7 @@ func TestDetail_RelatedCheckResult_IgnoresWrongSourceID(t *testing.T) {
 
 	// Deliver a result for the WRONG source resource ID.
 	// Count=5 is distinct — if this leaks into the view, it will be obvious.
-	wrongIDMsg := messages.RelatedCheckResultMsg{
+	wrongIDMsg := messages.RelatedCheckResult{
 		ResourceType:     "ec2",
 		SourceResourceID: "i-WRONG",
 		Result: resource.RelatedCheckResult{
@@ -110,7 +110,7 @@ func TestDetail_RelatedCheckResult_AcceptsCorrectSourceID(t *testing.T) {
 	}
 
 	// Deliver a result with the CORRECT source resource ID.
-	correctIDMsg := messages.RelatedCheckResultMsg{
+	correctIDMsg := messages.RelatedCheckResult{
 		ResourceType:     "ec2",
 		SourceResourceID: "i-111",
 		Result: resource.RelatedCheckResult{

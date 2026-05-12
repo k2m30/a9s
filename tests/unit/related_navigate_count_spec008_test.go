@@ -23,7 +23,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ---------------------------------------------------------------------------
@@ -57,7 +57,7 @@ func newRelatedDemoModel(t *testing.T) tui.Model {
 // navigateToEC2DetailRelated navigates the given model to the EC2 detail view.
 func navigateToEC2DetailRelated(t *testing.T, m tui.Model, res resource.Resource) tui.Model {
 	t.Helper()
-	m, _ = relatedApplyMsg(m, messages.NavigateMsg{
+	m, _ = relatedApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "ec2",
 		Resource:     &res,
@@ -67,7 +67,7 @@ func navigateToEC2DetailRelated(t *testing.T, m tui.Model, res resource.Resource
 
 // applyRelatedResourcesLoaded delivers a ResourcesLoadedMsg for the given type.
 func applyRelatedResourcesLoaded(m tui.Model, resourceType string, resources []resource.Resource) tui.Model {
-	m, _ = relatedApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = relatedApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: resourceType,
 		Resources:    resources,
 	})
@@ -104,7 +104,7 @@ func TestApp_008_RelatedNavigate_SingleID_OpensDrillTarget(t *testing.T) {
 	m = applyRelatedResourcesLoaded(m, "tg", []resource.Resource{tgRes})
 
 	// Deliver RelatedNavigateMsg with TargetID set (single resource navigation).
-	m, cmd := relatedApplyMsg(m, messages.RelatedNavigateMsg{
+	m, cmd := relatedApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "tg",
 		TargetID:   "tg-spec008-single",
 	})
@@ -143,14 +143,14 @@ func TestApp_008_RelatedNavigate_SingleID_CacheMiss_AutoOpensDetail(t *testing.T
 	m = navigateToEC2DetailRelated(t, m, ec2Res)
 
 	// No preloaded ami cache: this exercises the fetch/list fallback path.
-	m, _ = relatedApplyMsg(m, messages.RelatedNavigateMsg{
+	m, _ = relatedApplyMsg(m, messages.RelatedNavigate{
 		TargetType:     "ami",
 		SourceResource: ec2Res,
 		TargetID:       "ami-single-1",
 	})
 
 	// Fetch result contains multiple AMIs; related ID filter leaves one.
-	m2, cmd := relatedApplyMsg(m, messages.ResourcesLoadedMsg{
+	m2, cmd := relatedApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ami",
 		Resources: []resource.Resource{
 			{ID: "ami-single-1", Name: "ami-single", Status: "available"},
@@ -190,13 +190,13 @@ func TestApp_008_RelatedNavigate_SingleRelatedIDs_CacheMiss_AutoOpensDrillTarget
 	m = navigateToEC2DetailRelated(t, m, ec2Res)
 
 	// No preloaded asg cache: this exercises the right-column cache-miss flow.
-	m, _ = relatedApplyMsg(m, messages.RelatedNavigateMsg{
+	m, _ = relatedApplyMsg(m, messages.RelatedNavigate{
 		TargetType:     "asg",
 		SourceResource: ec2Res,
 		RelatedIDs:     []string{"asg-single-1"},
 	})
 
-	m2, cmd := relatedApplyMsg(m, messages.ResourcesLoadedMsg{
+	m2, cmd := relatedApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "asg",
 		Resources: []resource.Resource{
 			{ID: "asg-single-1", Name: "asg-single", Status: "InService"},
@@ -235,13 +235,13 @@ func TestApp_008_RelatedNavigate_SingleID_CacheMiss_LoadsMoreUntilTargetFound(t 
 	}
 	m = navigateToEC2DetailRelated(t, m, ec2Res)
 
-	m, _ = relatedApplyMsg(m, messages.RelatedNavigateMsg{
+	m, _ = relatedApplyMsg(m, messages.RelatedNavigate{
 		TargetType:     "alarm",
 		SourceResource: ec2Res,
 		TargetID:       "alarm-page2-target",
 	})
 
-	m2, cmd := relatedApplyMsg(m, messages.ResourcesLoadedMsg{
+	m2, cmd := relatedApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "alarm",
 		Resources: []resource.Resource{
 			{ID: "alarm-page1-other", Name: "page1-other", Status: "ok"},
@@ -257,7 +257,7 @@ func TestApp_008_RelatedNavigate_SingleID_CacheMiss_LoadsMoreUntilTargetFound(t 
 	if cmd == nil {
 		t.Fatal("first page without the exact target should request LoadMore")
 	}
-	loadMore, ok := cmd().(messages.LoadMoreMsg)
+	loadMore, ok := cmd().(messages.LoadMore)
 	if !ok {
 		t.Fatalf("expected LoadMoreMsg after page-1 miss, got %T", cmd())
 	}
@@ -265,7 +265,7 @@ func TestApp_008_RelatedNavigate_SingleID_CacheMiss_LoadsMoreUntilTargetFound(t 
 		t.Fatalf("LoadMoreMsg continuation token = %q, want %q", loadMore.ContinuationToken, "page-2")
 	}
 
-	m2, cmd = relatedApplyMsg(m, messages.ResourcesLoadedMsg{
+	m2, cmd = relatedApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "alarm",
 		Resources: []resource.Resource{
 			{ID: "alarm-page2-target", Name: "page2-target", Status: "alarm"},
@@ -314,7 +314,7 @@ func TestApp_008_RelatedNavigate_MultipleIDs_ShowsOnlyThoseResources(t *testing.
 	}
 	m = applyRelatedResourcesLoaded(m, "alarm", alarmResources)
 
-	m, _ = relatedApplyMsg(m, messages.RelatedNavigateMsg{
+	m, _ = relatedApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "alarm",
 		RelatedIDs: []string{"alarm-spec008-1", "alarm-spec008-2"},
 	})
@@ -347,7 +347,7 @@ func TestApp_008_RelatedNavigate_MultipleIDs_FrameTitleHasCount(t *testing.T) {
 	}
 	m = applyRelatedResourcesLoaded(m, "alarm", alarmResources)
 
-	m, _ = relatedApplyMsg(m, messages.RelatedNavigateMsg{
+	m, _ = relatedApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "alarm",
 		RelatedIDs: []string{"alarm-count-1", "alarm-count-2"},
 	})
@@ -367,7 +367,7 @@ func TestApp_008_RelatedNavigate_MultipleIDs_LoadMoreStaysConstrained(t *testing
 	m := newRelatedDemoModel(t)
 
 	// Prime cache via a real alarm list load so pagination metadata is retained.
-	m, _ = relatedApplyMsg(m, messages.NavigateMsg{
+	m, _ = relatedApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "alarm",
 	})
@@ -375,7 +375,7 @@ func TestApp_008_RelatedNavigate_MultipleIDs_LoadMoreStaysConstrained(t *testing
 		{ID: "alarm-related-1", Name: "related-one", Status: "alarm"},
 		{ID: "alarm-unrelated-1", Name: "unrelated-one", Status: "ok"},
 	})
-	m, _ = relatedApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = relatedApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "alarm",
 		Resources: []resource.Resource{
 			{ID: "alarm-related-1", Name: "related-one", Status: "alarm"},
@@ -397,13 +397,13 @@ func TestApp_008_RelatedNavigate_MultipleIDs_LoadMoreStaysConstrained(t *testing
 	}
 	m = navigateToEC2DetailRelated(t, m, ec2Res)
 
-	m, _ = relatedApplyMsg(m, messages.RelatedNavigateMsg{
+	m, _ = relatedApplyMsg(m, messages.RelatedNavigate{
 		TargetType:     "alarm",
 		SourceResource: ec2Res,
 		RelatedIDs:     []string{"alarm-related-1", "alarm-related-2"},
 	})
 
-	m2, _ := relatedApplyMsg(m, messages.ResourcesLoadedMsg{
+	m2, _ := relatedApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "alarm",
 		Resources: []resource.Resource{
 			{ID: "alarm-related-2", Name: "related-two", Status: "alarm"},
@@ -438,7 +438,7 @@ func TestApp_008_RelatedNavigate_MultipleIDs_LoadMoreStaysConstrained(t *testing
 func TestApp_008_RelatedCheckResult_Count0_NoNavigation(t *testing.T) {
 	m := newRelatedDemoModel(t)
 
-	checkMsg := messages.RelatedCheckResultMsg{
+	checkMsg := messages.RelatedCheckResult{
 		ResourceType: "ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "tg",
@@ -450,7 +450,7 @@ func TestApp_008_RelatedCheckResult_Count0_NoNavigation(t *testing.T) {
 
 	if cmd != nil {
 		resultMsg := cmd()
-		if _, isNav := resultMsg.(messages.RelatedNavigateMsg); isNav {
+		if _, isNav := resultMsg.(messages.RelatedNavigate); isNav {
 			t.Error("RelatedCheckResultMsg with Count=0 must not produce RelatedNavigateMsg")
 		}
 	}

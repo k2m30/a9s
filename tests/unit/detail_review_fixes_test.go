@@ -20,7 +20,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -113,7 +113,7 @@ func registerEC2Defs(defs []resource.RelatedDef) func() {
 }
 
 // deliverResult delivers a RelatedCheckResultMsg to the DetailModel.
-func deliverResult(d views.DetailModel, msg messages.RelatedCheckResultMsg) views.DetailModel {
+func deliverResult(d views.DetailModel, msg messages.RelatedCheckResult) views.DetailModel {
 	updated, _ := d.Update(msg)
 	return updated
 }
@@ -238,9 +238,9 @@ func TestDetail_FieldCursorIndependentFromScroll(t *testing.T) {
 	}
 
 	msg := cmd()
-	nav, ok := msg.(messages.RelatedNavigateMsg)
+	nav, ok := msg.(messages.RelatedNavigate)
 	if !ok {
-		t.Fatalf("cmd() should produce messages.RelatedNavigateMsg, got %T", msg)
+		t.Fatalf("cmd() should produce messages.RelatedNavigate, got %T", msg)
 	}
 	if nav.TargetType != "subnet" {
 		t.Errorf("RelatedNavigateMsg.TargetType: want %q (field at cursor index 2 = SubnetId), got %q", "subnet", nav.TargetType)
@@ -291,7 +291,7 @@ func TestDetail_FieldCursorClamps(t *testing.T) {
 	}
 
 	msg := cmd()
-	nav, ok := msg.(messages.RelatedNavigateMsg)
+	nav, ok := msg.(messages.RelatedNavigate)
 	if !ok {
 		t.Fatalf("cmd() should produce RelatedNavigateMsg after clamped cursor, got %T", msg)
 	}
@@ -341,7 +341,7 @@ func TestDetail_FieldCursorDown_TwoFieldsClamps(t *testing.T) {
 		t.Fatal("Enter on VpcId (cursor at index 1) should return non-nil cmd")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.RelatedNavigateMsg)
+	nav, ok := msg.(messages.RelatedNavigate)
 	if !ok {
 		t.Fatalf("cmd() should produce RelatedNavigateMsg, got %T", msg)
 	}
@@ -372,7 +372,7 @@ func TestDetail_FieldCursorUp_AtZeroStaysZero(t *testing.T) {
 		t.Fatal("Enter at clamped index 0 should return non-nil cmd")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.RelatedNavigateMsg)
+	nav, ok := msg.(messages.RelatedNavigate)
 	if !ok {
 		t.Fatalf("cmd() should produce RelatedNavigateMsg, got %T", msg)
 	}
@@ -411,7 +411,7 @@ func TestRightColumn_EnterBlockedOnLoadingRow(t *testing.T) {
 
 	if cmd != nil {
 		msg := cmd()
-		if _, ok := msg.(messages.RelatedNavigateMsg); ok {
+		if _, ok := msg.(messages.RelatedNavigate); ok {
 			t.Errorf("Enter on loading row should NOT emit RelatedNavigateMsg; got RelatedNavigateMsg with msg=%+v", msg)
 		}
 	}
@@ -435,7 +435,7 @@ func TestRightColumn_EnterBlockedOnZeroCountRow(t *testing.T) {
 	d = makeExplicitlyVisible(d)
 
 	// Deliver result with Count == 0 (no related resources found).
-	d = deliverResult(d, messages.RelatedCheckResultMsg{
+	d = deliverResult(d, messages.RelatedCheckResult{
 		ResourceType: "ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "tg",
@@ -453,7 +453,7 @@ func TestRightColumn_EnterBlockedOnZeroCountRow(t *testing.T) {
 
 	if cmd != nil {
 		msg := cmd()
-		if _, ok := msg.(messages.RelatedNavigateMsg); ok {
+		if _, ok := msg.(messages.RelatedNavigate); ok {
 			t.Errorf("Enter on zero-count row should NOT emit RelatedNavigateMsg; got RelatedNavigateMsg with msg=%+v", msg)
 		}
 	}
@@ -477,7 +477,7 @@ func TestRightColumn_EnterAllowedOnPositiveCountRow(t *testing.T) {
 	d = makeExplicitlyVisible(d)
 
 	// Deliver result with Count == 2 (positive — navigation allowed).
-	d = deliverResult(d, messages.RelatedCheckResultMsg{
+	d = deliverResult(d, messages.RelatedCheckResult{
 		ResourceType: "ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "tg",
@@ -497,9 +497,9 @@ func TestRightColumn_EnterAllowedOnPositiveCountRow(t *testing.T) {
 		t.Fatal("Enter on positive-count row should return non-nil cmd")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.RelatedNavigateMsg)
+	nav, ok := msg.(messages.RelatedNavigate)
 	if !ok {
-		t.Fatalf("cmd() should produce messages.RelatedNavigateMsg, got %T", msg)
+		t.Fatalf("cmd() should produce messages.RelatedNavigate, got %T", msg)
 	}
 	if nav.TargetType != "tg" {
 		t.Errorf("RelatedNavigateMsg.TargetType: want %q, got %q", "tg", nav.TargetType)
@@ -534,7 +534,7 @@ func TestRightColumn_EnterBlockedOnLoadingRow_AutoShown(t *testing.T) {
 
 	if cmd != nil {
 		msg := cmd()
-		if _, ok := msg.(messages.RelatedNavigateMsg); ok {
+		if _, ok := msg.(messages.RelatedNavigate); ok {
 			t.Errorf("Enter on auto-shown loading row should NOT emit RelatedNavigateMsg; got %+v", msg)
 		}
 	}
@@ -560,7 +560,7 @@ func TestRightColumn_NegativeOneCountRendersWithoutNumber(t *testing.T) {
 	}
 
 	// Deliver Count == -1 (not a simple "no results" — unknown/not-applicable).
-	d = deliverResult(d, messages.RelatedCheckResultMsg{
+	d = deliverResult(d, messages.RelatedCheckResult{
 		ResourceType: "ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "tg",
@@ -599,7 +599,7 @@ func TestRightColumn_NegativeOneCountRendersWithoutNumber_AfterAutoShow(t *testi
 	}
 
 	// Deliver -1 for "tg", positive for "asg".
-	d = deliverResult(d, messages.RelatedCheckResultMsg{
+	d = deliverResult(d, messages.RelatedCheckResult{
 		ResourceType: "ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "tg",
@@ -608,7 +608,7 @@ func TestRightColumn_NegativeOneCountRendersWithoutNumber_AfterAutoShow(t *testi
 			Err:         nil,
 		},
 	})
-	d = deliverResult(d, messages.RelatedCheckResultMsg{
+	d = deliverResult(d, messages.RelatedCheckResult{
 		ResourceType: "ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "asg",
@@ -655,7 +655,7 @@ func TestRightColumn_NegativeOneCount_NotZeroCount(t *testing.T) {
 	}
 
 	// tg: count -1, asg: count 0.
-	d = deliverResult(d, messages.RelatedCheckResultMsg{
+	d = deliverResult(d, messages.RelatedCheckResult{
 		ResourceType: "ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "tg",
@@ -664,7 +664,7 @@ func TestRightColumn_NegativeOneCount_NotZeroCount(t *testing.T) {
 			Err:         nil,
 		},
 	})
-	d = deliverResult(d, messages.RelatedCheckResultMsg{
+	d = deliverResult(d, messages.RelatedCheckResult{
 		ResourceType: "ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "asg",

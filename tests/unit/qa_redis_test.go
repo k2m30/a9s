@@ -13,7 +13,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -40,7 +40,7 @@ func loadedRedisModel(t *testing.T) views.ResourceListModel {
 	m := views.NewResourceList(td, nil, k)
 	m.SetSize(140, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "redis",
 		Resources:    fixtureRedisClusters(),
 	})
@@ -170,7 +170,7 @@ func TestQA_Redis_StatusColoring(t *testing.T) {
 	m := views.NewResourceList(td, nil, k)
 	m.SetSize(140, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "redis",
 		Resources:    multiStatusRedisFixtures(),
 	})
@@ -204,7 +204,7 @@ func TestQA_Redis_CursorNavigation(t *testing.T) {
 	m := views.NewResourceList(td, nil, k)
 	m.SetSize(140, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "redis",
 		Resources:    multiStatusRedisFixtures(),
 	})
@@ -257,7 +257,7 @@ func TestQA_Redis_ListFilter(t *testing.T) {
 	m := views.NewResourceList(td, nil, k)
 	m.SetSize(140, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "redis",
 		Resources:    multiStatusRedisFixtures(),
 	})
@@ -299,7 +299,7 @@ func TestQA_Redis_ListSort(t *testing.T) {
 	m := views.NewResourceList(td, nil, k)
 	m.SetSize(140, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "redis",
 		Resources:    multiStatusRedisFixtures(),
 	})
@@ -341,7 +341,7 @@ func TestQA_Redis_EmptyList(t *testing.T) {
 	m := views.NewResourceList(td, nil, k)
 	m.SetSize(140, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "redis",
 		Resources:    []resource.Resource{},
 	})
@@ -544,7 +544,7 @@ func TestQA_Redis_NavigateFromMainMenu(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to Redis list
-	m, cmd := rootApplyMsg(m, messages.NavigateMsg{
+	m, cmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "redis",
 	})
@@ -563,13 +563,13 @@ func TestQA_Redis_LoadAndDisplayList(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to Redis
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "redis",
 	})
 
 	// Load fixtures
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "redis",
 		Resources:    fixtures,
 	})
@@ -595,18 +595,18 @@ func TestQA_Redis_NavigateToDetail(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to Redis and load data
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "redis",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "redis",
 		Resources:    fixtures,
 	})
 
 	// Navigate to detail
 	res := fixtures[0]
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: &res,
 	})
@@ -628,18 +628,18 @@ func TestQA_Redis_NavigateToYAML(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to Redis and load data
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "redis",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "redis",
 		Resources:    fixtures,
 	})
 
 	// Navigate to YAML
 	res := fixtures[0]
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetYAML,
 		Resource: &res,
 	})
@@ -657,24 +657,24 @@ func TestQA_Redis_DetailBackNavigation(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to Redis list
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "redis",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "redis",
 		Resources:    fixtures,
 	})
 
 	// Navigate to detail
 	res := fixtures[0]
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: &res,
 	})
 
 	// Pop back
-	m, _ = rootApplyMsg(m, messages.PopViewMsg{})
+	m, _ = rootApplyMsg(m, messages.PopView{})
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "redis") {
 		t.Errorf("after pop from Redis detail, should return to Redis list, got: %s", plain)
@@ -720,7 +720,7 @@ func TestQA_Redis_HorizontalScroll(t *testing.T) {
 	m := views.NewResourceList(td, nil, k)
 	m.SetSize(50, 20) // very narrow to force scrolling
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "redis",
 		Resources:    fixtures,
 	})
@@ -799,16 +799,16 @@ func TestQA_Redis_YAMLBackNavigation(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate: Redis list -> YAML -> pop
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "redis",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "redis",
 		Resources:    fixtures,
 	})
 	res := fixtures[0]
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetYAML,
 		Resource: &res,
 	})
@@ -820,7 +820,7 @@ func TestQA_Redis_YAMLBackNavigation(t *testing.T) {
 	}
 
 	// Pop back to list
-	m, _ = rootApplyMsg(m, messages.PopViewMsg{})
+	m, _ = rootApplyMsg(m, messages.PopView{})
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "redis") {
 		t.Errorf("after pop from Redis YAML, should return to Redis list, got: %s", plain)
@@ -838,44 +838,44 @@ func TestQA_Redis_FullNavigationRoundTrip(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Main menu -> Redis list
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "redis",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "redis",
 		Resources:    fixtures,
 	})
 
 	// Redis list -> detail
 	res := fixtures[0]
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: &res,
 	})
 
 	// Detail -> YAML
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetYAML,
 		Resource: &res,
 	})
 
 	// Pop YAML -> detail
-	m, _ = rootApplyMsg(m, messages.PopViewMsg{})
+	m, _ = rootApplyMsg(m, messages.PopView{})
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, res.Name) && !strings.Contains(plain, res.ID) {
 		t.Errorf("pop from YAML should return to detail, got: %s", plain)
 	}
 
 	// Pop detail -> list
-	m, _ = rootApplyMsg(m, messages.PopViewMsg{})
+	m, _ = rootApplyMsg(m, messages.PopView{})
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "redis") {
 		t.Errorf("pop from detail should return to Redis list, got: %s", plain)
 	}
 
 	// Pop list -> main menu
-	m, _ = rootApplyMsg(m, messages.PopViewMsg{})
+	m, _ = rootApplyMsg(m, messages.PopView{})
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "resource-types") {
 		t.Errorf("pop from Redis list should return to main menu, got: %s", plain)
@@ -891,11 +891,11 @@ func TestQA_Redis_FilterHeaderDisplay(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to Redis
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "redis",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "redis",
 		Resources:    multiStatusRedisFixtures(),
 	})
@@ -920,13 +920,13 @@ func TestQA_Redis_HelpOverlay(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "redis",
 	})
 
 	// Open help
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetHelp})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "help") {

@@ -57,8 +57,8 @@ The visual spec is the architectural truth. You resolve ambiguities and update t
 ### 2. Component Interfaces (`internal/tui/`)
 You own public types, methods, view stack pattern, SetSize contract, FrameTitle contract.
 
-### 3. Message Contracts (`internal/tui/messages/`)
-You approve new message types. Messages carry data, not behavior. Zero upward imports.
+### 3. Message Contracts (`internal/runtime/messages/`)
+You approve new message types. Cmd types (UI → core) implement `isCmd()`; Event types (core → UI) implement `isEvent()`. Events that carry a dispatch generation also implement `GenStamped`. Messages carry data, not behavior. Zero upward imports.
 
 ### 4. Dependency Boundaries
 
@@ -66,17 +66,17 @@ You approve new message types. Messages carry data, not behavior. Zero upward im
 ALLOWED IMPORTS (directed, no cycles):
 
 cmd/a9s/main.go → internal/tui
-internal/tui/app.go → tui/keys, tui/messages, tui/styles, tui/layout, tui/views, aws, config
-internal/tui/views/* → tui/keys, tui/messages, tui/styles, fieldpath, config, resource
+internal/tui/app.go → tui/keys, runtime/messages, tui/styles, tui/layout, tui/views, aws, config
+internal/tui/views/* → tui/keys, runtime/messages, tui/styles, fieldpath, config, resource
 internal/tui/layout/* → tui/styles
 internal/tui/styles/* → (stdlib only + lipgloss)
-internal/tui/messages/* → resource (only)
+internal/runtime/messages/* → domain, resource (only)
 internal/tui/keys/* → (bubbles/key only)
 
 FORBIDDEN:
 views → layout (views return content, root composes frame)
 views → app (communicate via messages only)
-messages → anything in tui/
+runtime/messages → anything in tui/ (messages are platform-agnostic)
 ```
 
 ### 5. Task for QA and Coder

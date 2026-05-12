@@ -10,7 +10,7 @@ import (
 	"container/list"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // RelatedCacheKey builds the map key for RelatedCache lookups.
@@ -22,10 +22,10 @@ func RelatedCacheKey(resourceType, resourceID string) string {
 // RelatedCheckResultMsg form the detail view expects, preserving both the
 // resourceType and the per-row DefDisplayName so rightcolumn replay can
 // match the correct row on detail re-entry.
-func RelatedCacheReplay(resourceType string, cached []RelatedCacheResult) []messages.RelatedCheckResultMsg {
-	out := make([]messages.RelatedCheckResultMsg, len(cached))
+func RelatedCacheReplay(resourceType string, cached []RelatedCacheResult) []messages.RelatedCheckResult {
+	out := make([]messages.RelatedCheckResult, len(cached))
 	for i, c := range cached {
-		out[i] = messages.RelatedCheckResultMsg{
+		out[i] = messages.RelatedCheckResult{
 			ResourceType:   resourceType,
 			DefDisplayName: c.DefDisplayName,
 			Result:         c.Result,

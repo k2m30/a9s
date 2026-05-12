@@ -7,7 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/demo"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // TestDemoColdCacheEC2_ListPopulates drives the real message flow starting from
@@ -29,12 +29,12 @@ func TestDemoColdCacheEC2_ListPopulates(t *testing.T) {
 	// m.clients is set before any fetch commands run. connectGen is 0 (zero value)
 	// so Gen=0 passes the stale-result guard in handleClientsReady.
 	clients := demo.NewServiceClients()
-	*m, _ = rootApplyMsg(*m, messages.ClientsReadyMsg{Clients: clients, Gen: 0})
+	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 0})
 
 	// Navigate to the EC2 resource list. handleNavigate pushes the list and
 	// returns a batch cmd containing the resource list's Init + fetchResources("ec2").
 	var navCmd tea.Cmd
-	*m, navCmd = rootApplyMsg(*m, messages.NavigateMsg{
+	*m, navCmd = rootApplyMsg(*m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -47,11 +47,11 @@ func TestDemoColdCacheEC2_ListPopulates(t *testing.T) {
 	// EC2Fake.DescribeInstances call — which panics with "not yet implemented".
 	// That panic is the expected initial failure (the test correctly fails before T013).
 	raw := extractMsg(t, navCmd, func(msg tea.Msg) bool {
-		_, ok := msg.(messages.ResourcesLoadedMsg)
+		_, ok := msg.(messages.ResourcesLoaded)
 		return ok
 	})
 
-	result := raw.(messages.ResourcesLoadedMsg)
+	result := raw.(messages.ResourcesLoaded)
 
 	if len(result.Resources) == 0 {
 		t.Fatal("expected at least one EC2 instance in fixture data, got zero")
@@ -86,11 +86,11 @@ func TestDemoColdCacheEC2_DetailRelatedPanels(t *testing.T) {
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	clients := demo.NewServiceClients()
-	*m, _ = rootApplyMsg(*m, messages.ClientsReadyMsg{Clients: clients, Gen: 0})
+	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 0})
 
 	// Navigate to EC2 list and extract the ResourcesLoadedMsg from the batch.
 	var navCmd tea.Cmd
-	*m, navCmd = rootApplyMsg(*m, messages.NavigateMsg{
+	*m, navCmd = rootApplyMsg(*m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -99,10 +99,10 @@ func TestDemoColdCacheEC2_DetailRelatedPanels(t *testing.T) {
 	}
 
 	raw := extractMsg(t, navCmd, func(msg tea.Msg) bool {
-		_, ok := msg.(messages.ResourcesLoadedMsg)
+		_, ok := msg.(messages.ResourcesLoaded)
 		return ok
 	})
-	loaded := raw.(messages.ResourcesLoadedMsg)
+	loaded := raw.(messages.ResourcesLoaded)
 
 	if len(loaded.Resources) == 0 {
 		t.Fatal("fixture data has zero EC2 instances; cannot open detail")
@@ -115,7 +115,7 @@ func TestDemoColdCacheEC2_DetailRelatedPanels(t *testing.T) {
 	// RelatedCheckStartedMsg command when related defs are registered for ec2.
 	firstInstance := loaded.Resources[0]
 	var relatedCmd tea.Cmd
-	*m, relatedCmd = rootApplyMsg(*m, messages.NavigateMsg{
+	*m, relatedCmd = rootApplyMsg(*m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		Resource:     &firstInstance,
 		ResourceType: "ec2",
@@ -128,7 +128,7 @@ func TestDemoColdCacheEC2_DetailRelatedPanels(t *testing.T) {
 
 	// Execute to get RelatedCheckStartedMsg.
 	relatedMsg := relatedCmd()
-	started, ok := relatedMsg.(messages.RelatedCheckStartedMsg)
+	started, ok := relatedMsg.(messages.RelatedCheckStarted)
 	if !ok {
 		t.Fatalf("expected RelatedCheckStartedMsg from detail init, got %T", relatedMsg)
 	}
@@ -153,10 +153,10 @@ func TestDemoColdCacheEC2_DetailRelatedPanels(t *testing.T) {
 		return c()
 	}
 	rawCheck := runChecker(checkCmds)
-	var checkResult messages.RelatedCheckResultMsg
+	var checkResult messages.RelatedCheckResult
 	var found bool
 	switch v := rawCheck.(type) {
-	case messages.RelatedCheckResultMsg:
+	case messages.RelatedCheckResult:
 		checkResult = v
 		found = true
 	case tea.BatchMsg:
@@ -165,7 +165,7 @@ func TestDemoColdCacheEC2_DetailRelatedPanels(t *testing.T) {
 				continue
 			}
 			sub := runChecker(subCmd)
-			if r, ok2 := sub.(messages.RelatedCheckResultMsg); ok2 && r.Result.Count >= 0 {
+			if r, ok2 := sub.(messages.RelatedCheckResult); ok2 && r.Result.Count >= 0 {
 				checkResult = r
 				found = true
 				break

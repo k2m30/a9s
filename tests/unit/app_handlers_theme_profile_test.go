@@ -24,7 +24,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -38,12 +38,12 @@ func TestHandleThemeSelected_InvalidThemeName(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Absolute path is rejected by config.ThemePath with "absolute paths not allowed".
-	_, cmd := rootApplyMsg(m, messages.ThemeSelectedMsg{Theme: "/etc/passwd"})
+	_, cmd := rootApplyMsg(m, messages.ThemeSelected{Theme: "/etc/passwd"})
 	if cmd == nil {
 		t.Fatal("handleThemeSelected with invalid theme name should return a cmd")
 	}
 	msg := cmd()
-	flash, ok := msg.(messages.FlashMsg)
+	flash, ok := msg.(messages.Flash)
 	if !ok {
 		t.Fatalf("expected FlashMsg, got %T", msg)
 	}
@@ -65,12 +65,12 @@ func TestHandleThemeSelected_ThemeFileNotFound(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Valid filename format but the file does not exist on disk.
-	_, cmd := rootApplyMsg(m, messages.ThemeSelectedMsg{Theme: "nonexistent-theme-xyz.yaml"})
+	_, cmd := rootApplyMsg(m, messages.ThemeSelected{Theme: "nonexistent-theme-xyz.yaml"})
 	if cmd == nil {
 		t.Fatal("handleThemeSelected with missing theme file should return a cmd")
 	}
 	msg := cmd()
-	flash, ok := msg.(messages.FlashMsg)
+	flash, ok := msg.(messages.Flash)
 	if !ok {
 		t.Fatalf("expected FlashMsg, got %T", msg)
 	}
@@ -88,12 +88,12 @@ func TestHandleThemeSelected_EmptyThemeName(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
-	_, cmd := rootApplyMsg(m, messages.ThemeSelectedMsg{Theme: ""})
+	_, cmd := rootApplyMsg(m, messages.ThemeSelected{Theme: ""})
 	if cmd == nil {
 		t.Fatal("handleThemeSelected with empty theme name should return a cmd")
 	}
 	msg := cmd()
-	flash, ok := msg.(messages.FlashMsg)
+	flash, ok := msg.(messages.Flash)
 	if !ok {
 		t.Fatalf("expected FlashMsg, got %T", msg)
 	}
@@ -108,12 +108,12 @@ func TestHandleThemeSelected_TraversalRejected(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
-	_, cmd := rootApplyMsg(m, messages.ThemeSelectedMsg{Theme: "../evil.yaml"})
+	_, cmd := rootApplyMsg(m, messages.ThemeSelected{Theme: "../evil.yaml"})
 	if cmd == nil {
 		t.Fatal("handleThemeSelected with traversal theme name should return a cmd")
 	}
 	msg := cmd()
-	flash, ok := msg.(messages.FlashMsg)
+	flash, ok := msg.(messages.Flash)
 	if !ok {
 		t.Fatalf("expected FlashMsg, got %T", msg)
 	}
@@ -165,7 +165,7 @@ func TestHandleProfilesLoaded_PushesProfileSelectorView(t *testing.T) {
 
 	// Trigger fetchProfiles() — NavigateMsg{Target: TargetProfile} dispatches to
 	// handleNavigate which calls m.fetchProfiles() and returns its cmd.
-	_, fetchCmd := rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetProfile})
+	_, fetchCmd := rootApplyMsg(m, messages.Navigate{Target: messages.TargetProfile})
 	if fetchCmd == nil {
 		t.Fatal("NavigateMsg{TargetProfile} should return a cmd (fetchProfiles)")
 	}
@@ -173,7 +173,7 @@ func TestHandleProfilesLoaded_PushesProfileSelectorView(t *testing.T) {
 	// Execute the cmd — should return profilesLoadedMsg (opaque tea.Msg).
 	loadedMsg := fetchCmd()
 	// If the config read failed for some reason, loadedMsg might be FlashMsg.
-	if _, isFlash := loadedMsg.(messages.FlashMsg); isFlash {
+	if _, isFlash := loadedMsg.(messages.Flash); isFlash {
 		t.Fatalf("fetchProfiles returned FlashMsg — config file may be malformed: %v", loadedMsg)
 	}
 

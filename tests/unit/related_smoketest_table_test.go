@@ -32,7 +32,7 @@ import (
 	internalaws "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -41,7 +41,7 @@ import (
 // ---------------------------------------------------------------------------
 
 func deliverSmokeRelatedResult(d views.DetailModel, resourceType, targetType string, count int, ids ...string) views.DetailModel {
-	msg := messages.RelatedCheckResultMsg{
+	msg := messages.RelatedCheckResult{
 		ResourceType: resourceType,
 		Result: resource.RelatedCheckResult{
 			TargetType:  targetType,
@@ -1104,7 +1104,7 @@ func Test_RelatedSmoke(t *testing.T) {
 					t.Fatalf("%s-S04: Enter on count>0 row must emit a cmd; got nil", tc.shortName)
 				}
 				msg := cmd()
-				nav, ok := msg.(messages.RelatedNavigateMsg)
+				nav, ok := msg.(messages.RelatedNavigate)
 				if !ok {
 					t.Fatalf("%s-S04: Enter must produce RelatedNavigateMsg, got %T", tc.shortName, msg)
 				}
@@ -1125,7 +1125,7 @@ func Test_RelatedSmoke(t *testing.T) {
 				_, cmd := d.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 				if cmd != nil {
 					msg := cmd()
-					if _, isNav := msg.(messages.RelatedNavigateMsg); isNav {
+					if _, isNav := msg.(messages.RelatedNavigate); isNav {
 						t.Errorf("%s-S05: Enter on all-count=0 right column must not produce RelatedNavigateMsg", tc.shortName)
 					}
 				}

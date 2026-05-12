@@ -12,7 +12,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
 
@@ -169,7 +169,7 @@ func (m ResourceListModel) Init() (ResourceListModel, tea.Cmd) {
 // Update handles messages: ResourcesLoadedMsg, spinner ticks, key events.
 func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 	switch msg := msg.(type) {
-	case messages.ResourcesLoadedMsg:
+	case messages.ResourcesLoaded:
 		m.loading = false
 		m.loadingMore = false
 		if msg.Append {
@@ -199,7 +199,7 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 				displayName := ctx[enterChild.DisplayNameKey]
 				childType := enterChild.ChildType
 				return m, func() tea.Msg {
-					return messages.EnterChildViewMsg{
+					return messages.EnterChildView{
 						ChildType:     childType,
 						ParentContext: ctx,
 						DisplayName:   displayName,
@@ -207,7 +207,7 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 				}
 			}
 			return m, func() tea.Msg {
-				return messages.NavigateMsg{
+				return messages.Navigate{
 					Target:         messages.TargetDetail,
 					ResourceType:   m.typeDef.ShortName,
 					Resource:       &r,
@@ -222,7 +222,7 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 				token := m.pagination.NextToken
 				pc := m.parentContext
 				return m, func() tea.Msg {
-					return messages.LoadMoreMsg{
+					return messages.LoadMore{
 						ResourceType:      rt,
 						ContinuationToken: token,
 						ParentContext:     pc,
@@ -235,7 +235,7 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 				m.autoOpenSingleDetail = false
 				stub := m.typeDef.StubCreator(targetID)
 				return m, func() tea.Msg {
-					return messages.NavigateMsg{
+					return messages.Navigate{
 						Target:         messages.TargetDetail,
 						ResourceType:   m.typeDef.ShortName,
 						Resource:       &stub,
@@ -301,7 +301,7 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 				}
 				// No child matched — default to detail view
 				return m, func() tea.Msg {
-					return messages.NavigateMsg{
+					return messages.Navigate{
 						Target:   messages.TargetDetail,
 						Resource: r,
 					}
@@ -311,7 +311,7 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 			// d key always opens detail view (never drills into S3)
 			if r := m.SelectedResource(); r != nil {
 				return m, func() tea.Msg {
-					return messages.NavigateMsg{
+					return messages.Navigate{
 						Target:   messages.TargetDetail,
 						Resource: r,
 					}
@@ -320,7 +320,7 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 		case key.Matches(msg, m.keys.YAML):
 			if r := m.SelectedResource(); r != nil {
 				return m, func() tea.Msg {
-					return messages.NavigateMsg{
+					return messages.Navigate{
 						Target:   messages.TargetYAML,
 						Resource: r,
 					}
@@ -329,7 +329,7 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 		case key.Matches(msg, m.keys.JSON):
 			if r := m.SelectedResource(); r != nil {
 				return m, func() tea.Msg {
-					return messages.NavigateMsg{
+					return messages.Navigate{
 						Target:   messages.TargetJSON,
 						Resource: r,
 					}
@@ -373,7 +373,7 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 				filter := resource.BuildCloudTrailFilter(*r, m.typeDef.ShortName)
 				if filter != nil {
 					return m, func() tea.Msg {
-						return messages.RelatedNavigateMsg{
+						return messages.RelatedNavigate{
 							TargetType:     "ct-events",
 							SourceResource: *r,
 							SourceType:     m.typeDef.ShortName,
@@ -390,7 +390,7 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 				pc := m.parentContext
 				ff := m.fetchFilter
 				return m, func() tea.Msg {
-					return messages.LoadMoreMsg{
+					return messages.LoadMore{
 						ResourceType:      rt,
 						ContinuationToken: token,
 						ParentContext:     pc,

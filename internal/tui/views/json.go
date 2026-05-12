@@ -16,7 +16,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
 
@@ -50,7 +50,7 @@ func (m JSONModel) Init() (JSONModel, tea.Cmd) {
 // Update delegates scroll to viewport; handles c (copy), esc (back).
 func (m JSONModel) Update(msg tea.Msg) (JSONModel, tea.Cmd) {
 	switch msg := msg.(type) {
-	case messages.EnrichDetailResultMsg:
+	case messages.EnrichDetailResult:
 		// Accept enriched resource when type and ID match.
 		if msg.ResourceType != m.resourceType || msg.ResourceID != m.res.ID {
 			return m, nil
@@ -111,7 +111,7 @@ func (m JSONModel) Update(msg tea.Msg) (JSONModel, tea.Cmd) {
 			if ff := resource.BuildCloudTrailFilter(m.res, m.resourceType); ff != nil {
 				res := m.res
 				return m, func() tea.Msg {
-					return messages.RelatedNavigateMsg{
+					return messages.RelatedNavigate{
 						TargetType:     "ct-events",
 						SourceResource: res,
 						SourceType:     m.resourceType,
@@ -123,7 +123,7 @@ func (m JSONModel) Update(msg tea.Msg) (JSONModel, tea.Cmd) {
 		case key.Matches(msg, m.keys.Describe):
 			res := m.res
 			return m, func() tea.Msg {
-				return messages.NavigateMsg{
+				return messages.Navigate{
 					Target:         messages.TargetDetail,
 					Resource:       &res,
 					ResourceType:   m.resourceType,
@@ -133,7 +133,7 @@ func (m JSONModel) Update(msg tea.Msg) (JSONModel, tea.Cmd) {
 		case key.Matches(msg, m.keys.YAML):
 			res := m.res
 			return m, func() tea.Msg {
-				return messages.NavigateMsg{
+				return messages.Navigate{
 					Target:         messages.TargetYAML,
 					Resource:       &res,
 					ResourceType:   m.resourceType,

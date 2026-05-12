@@ -25,7 +25,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -87,7 +87,7 @@ func Test_LA_020_PartialResolution_ChecksStillDelivered(t *testing.T) {
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   srcType,
 		SourceResource: resource.Resource{ID: "src-la020-001"},
 	})
@@ -208,7 +208,7 @@ func Test_LA_024_GetPolicyDenied_PartialMetadataOK(t *testing.T) {
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   srcType,
 		SourceResource: resource.Resource{ID: "src-la024-role-001"},
 	})
@@ -329,7 +329,7 @@ func Test_LA_060_PivotCountEqualsRowCount(t *testing.T) {
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   srcType,
 		SourceResource: resource.Resource{ID: "src-la060-001"},
 	})
@@ -388,14 +388,14 @@ func Test_LA_061_FooterSuppressed_WhenAllRelatedIDsResolved(t *testing.T) {
 	}
 
 	// Load resources into cache with IsTruncated=true (upstream has more pages).
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: targetType,
 		Resources:    resources,
 		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "some-token"},
 	})
 
 	// Navigate using exactly the 3 IDs — all are present in cache.
-	m, _ = rootApplyMsg(m, messages.RelatedNavigateMsg{
+	m, _ = rootApplyMsg(m, messages.RelatedNavigate{
 		TargetType: targetType,
 		RelatedIDs: ids,
 		SourceResource: resource.Resource{
@@ -441,14 +441,14 @@ func Test_LA_062_FooterSuppressed_UpstreamTruncatedDrillResolved(t *testing.T) {
 	}
 
 	// Load with IsTruncated=true — simulates an account with >1000 KMS keys.
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: targetType,
 		Resources:    resources,
 		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "truncated-token"},
 	})
 
 	// Both IDs are in the cache; filter is fully resolved.
-	m, _ = rootApplyMsg(m, messages.RelatedNavigateMsg{
+	m, _ = rootApplyMsg(m, messages.RelatedNavigate{
 		TargetType: targetType,
 		RelatedIDs: ids,
 		SourceResource: resource.Resource{

@@ -37,7 +37,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -387,7 +387,7 @@ func TestCtrlZ_EC2_ImpairedRowsVisibleAfterPromotion(t *testing.T) {
 	}
 
 	// Load the resources into the active ResourceListModel.
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    promotedResources,
 	})
@@ -440,7 +440,7 @@ func TestMenuBadge_EC2_CountsImpairedRows(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to EC2 list and set showIssueBadge=true (top-level list from main menu).
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -454,7 +454,7 @@ func TestMenuBadge_EC2_CountsImpairedRows(t *testing.T) {
 		{ID: "i-stopped-001", Name: "stopped-server", Fields: map[string]string{"state": "stopped", "name": "stopped-server"}},
 	}
 
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    mixedResources,
 	})

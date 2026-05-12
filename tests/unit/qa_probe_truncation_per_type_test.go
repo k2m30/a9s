@@ -33,7 +33,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // TestBuildResourceCacheSnapshot_ProbeAuthoritative_SinglePageComplete verifies
@@ -88,7 +88,7 @@ func TestBuildResourceCacheSnapshot_ProbeAuthoritative_SinglePageComplete(t *tes
 	// Deliver AvailabilityPrefetchedMsg — this is the real probe handler path.
 	// Truncated[targetType] = false means the probe fetched ALL rows in one page.
 	probeResource := resource.Resource{ID: "pt1-target-001", Name: "pt1-target-001"}
-	m, _ = rootApplyMsg(m, messages.AvailabilityPrefetchedMsg{
+	m, _ = rootApplyMsg(m, messages.AvailabilityPrefetched{
 		Entries:        map[string]int{targetType: 1},
 		Truncated:      map[string]bool{targetType: false}, // NOT truncated: complete single page
 		IssueCounts:    map[string]int{targetType: 0},
@@ -99,7 +99,7 @@ func TestBuildResourceCacheSnapshot_ProbeAuthoritative_SinglePageComplete(t *tes
 
 	// Navigate to src detail view so RelatedCheckStartedMsg is handled.
 	srcRes := resource.Resource{ID: "pt1-src-001", Name: "pt1-src-001"}
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		Resource:     &srcRes,
 		ResourceType: srcType,
@@ -107,7 +107,7 @@ func TestBuildResourceCacheSnapshot_ProbeAuthoritative_SinglePageComplete(t *tes
 
 	// Dispatch RelatedCheckStartedMsg — triggers buildResourceCacheSnapshot and
 	// passes the snapshot to all registered checkers for srcType.
-	_, relCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	_, relCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   srcType,
 		SourceResource: srcRes,
 	})
@@ -190,7 +190,7 @@ func TestBuildResourceCacheSnapshot_ProbeTruncated_StampsTrue(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	probeResource := resource.Resource{ID: "pt2-target-001", Name: "pt2-target-001"}
-	m, _ = rootApplyMsg(m, messages.AvailabilityPrefetchedMsg{
+	m, _ = rootApplyMsg(m, messages.AvailabilityPrefetched{
 		Entries:        map[string]int{targetType: 1},
 		Truncated:      map[string]bool{targetType: true}, // TRUNCATED: more pages exist
 		IssueCounts:    map[string]int{targetType: 0},
@@ -200,13 +200,13 @@ func TestBuildResourceCacheSnapshot_ProbeTruncated_StampsTrue(t *testing.T) {
 	})
 
 	srcRes := resource.Resource{ID: "pt2-src-001", Name: "pt2-src-001"}
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		Resource:     &srcRes,
 		ResourceType: srcType,
 	})
 
-	_, relCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	_, relCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   srcType,
 		SourceResource: srcRes,
 	})

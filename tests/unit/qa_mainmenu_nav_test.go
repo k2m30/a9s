@@ -9,7 +9,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ---------------------------------------------------------------------------
@@ -154,7 +154,7 @@ func TestQA_MainMenu_CommandNavigateEC2(t *testing.T) {
 		t.Fatal(":ec2 should return a command")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
@@ -177,7 +177,7 @@ func TestQA_MainMenu_CommandNavigateS3(t *testing.T) {
 		t.Fatal(":s3 should return a command")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
@@ -200,7 +200,7 @@ func TestQA_MainMenu_CommandNavigateRDS(t *testing.T) {
 		t.Fatal(":dbi should return a command")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
@@ -223,7 +223,7 @@ func TestQA_MainMenu_CommandNavigateRedis(t *testing.T) {
 		t.Fatal(":redis should return a command")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
@@ -246,7 +246,7 @@ func TestQA_MainMenu_CommandNavigateDocDB(t *testing.T) {
 		t.Fatal(":dbc should return a command")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
@@ -269,7 +269,7 @@ func TestQA_MainMenu_CommandNavigateEKS(t *testing.T) {
 		t.Fatal(":eks should return a command")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
@@ -299,7 +299,7 @@ func TestQA_MainMenu_CommandTabAutocompleteCompletesUniquePrefix(t *testing.T) {
 		t.Fatal("after autocomplete, enter should return a NavigateMsg command")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("expected NavigateMsg after autocomplete enter, got %T", msg)
 	}
@@ -356,7 +356,7 @@ func TestQA_MainMenu_CommandNavigateSecrets(t *testing.T) {
 		t.Fatal(":secrets should return a command")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
@@ -407,7 +407,7 @@ func TestQA_MainMenu_CommandCtx(t *testing.T) {
 		t.Fatal(":ctx should return a command")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
@@ -430,7 +430,7 @@ func TestQA_MainMenu_CommandRegion(t *testing.T) {
 		t.Fatal(":region should return a command")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
@@ -453,7 +453,7 @@ func TestQA_MainMenu_UnknownCommandShowsError(t *testing.T) {
 		t.Fatal("unknown command should return a FlashMsg command")
 	}
 	msg := cmd()
-	flash, ok := msg.(messages.FlashMsg)
+	flash, ok := msg.(messages.Flash)
 	if !ok {
 		t.Fatalf("expected FlashMsg, got %T", msg)
 	}
@@ -776,7 +776,7 @@ func TestQA_MainMenu_HeaderShowsFlashOnError(t *testing.T) {
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.FlashMsg{Text: "Error: unknown command", IsError: true})
+	m, _ = rootApplyMsg(m, messages.Flash{Text: "Error: unknown command", IsError: true})
 
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "Error: unknown command") {
@@ -788,7 +788,7 @@ func TestQA_MainMenu_HeaderShowsFlashOnSuccess(t *testing.T) {
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.FlashMsg{Text: "Copied!", IsError: false})
+	m, _ = rootApplyMsg(m, messages.Flash{Text: "Copied!", IsError: false})
 
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "Copied!") {
@@ -1079,7 +1079,7 @@ func TestQA_MainMenu_SelectionPersistsAcrossGAndShiftG(t *testing.T) {
 		t.Fatal("Enter should produce a command")
 	}
 	msg := cmd()
-	nav := msg.(messages.NavigateMsg)
+	nav := msg.(messages.Navigate)
 	if nav.ResourceType != "backup" {
 		t.Errorf("after G, g, G, should be on backup, got %q", nav.ResourceType)
 	}
@@ -1090,7 +1090,7 @@ func TestQA_MainMenu_FlashClearsAfterClearMsg(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Send flash
-	m, cmd := rootApplyMsg(m, messages.FlashMsg{Text: "test flash", IsError: false})
+	m, cmd := rootApplyMsg(m, messages.Flash{Text: "test flash", IsError: false})
 
 	// Flash should be visible
 	plain := stripANSI(rootViewContent(m))
@@ -1104,7 +1104,7 @@ func TestQA_MainMenu_FlashClearsAfterClearMsg(t *testing.T) {
 	}
 	// Apply ClearFlashMsg directly — timer duration is not under test.
 	// Gen=1: fresh model starts at gen=0; FlashMsg increments it once.
-	m, _ = rootApplyMsg(m, messages.ClearFlashMsg{Gen: 1})
+	m, _ = rootApplyMsg(m, messages.ClearFlash{Gen: 1})
 
 	// Flash should be cleared
 	plain = stripANSI(rootViewContent(m))
@@ -1140,7 +1140,7 @@ func TestQA_MainMenu_WindowResizeMaintainsState(t *testing.T) {
 		t.Fatal("Enter should produce a command after resize")
 	}
 	msg := cmd()
-	nav := msg.(messages.NavigateMsg)
+	nav := msg.(messages.Navigate)
 	if nav.ResourceType != "ecs" {
 		t.Errorf("cursor should remain at ecs after resize, got %q", nav.ResourceType)
 	}

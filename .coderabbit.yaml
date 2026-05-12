@@ -57,7 +57,7 @@ reviews:
       instructions: |
         This is a Bubble Tea v2 TUI application. Key rules:
         - No blocking I/O in Update() — all I/O must be in tea.Cmd closures
-        - Views communicate via typed messages only (internal/tui/messages/messages.go)
+        - Views communicate via typed messages only (internal/runtime/messages/{cmd,event}.go)
         - Views must never import each other
         - Async results (related checks, enrichment) must include a Generation field
           and be validated against relatedGen/enrichGen to discard stale results

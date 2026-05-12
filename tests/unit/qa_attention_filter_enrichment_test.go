@@ -25,7 +25,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -48,7 +48,7 @@ func TestAttentionFilter_SetEnrichmentState_ReappliesFilter(t *testing.T) {
 		{ID: "b-1", Name: "bucket-beta", Fields: map[string]string{"name": "bucket-beta", "region": "us-east-1"}},
 		{ID: "b-2", Name: "bucket-gamma", Fields: map[string]string{"name": "bucket-gamma", "region": "us-east-1"}},
 	}
-	m, _ = m.Update(messages.ResourcesLoadedMsg{ResourceType: "s3", Resources: resources})
+	m, _ = m.Update(messages.ResourcesLoaded{ResourceType: "s3", Resources: resources})
 
 	// Enable attention filter BEFORE Wave 2 lands — mimics the user pressing
 	// ctrl+z while enrichment is still in flight.

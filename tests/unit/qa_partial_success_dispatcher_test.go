@@ -27,7 +27,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // drainAllMessages recursively walks a tea.Cmd's emitted message tree and
@@ -71,7 +71,7 @@ func TestDispatcher_PartialSuccess_HandlerEmitsFlashMsg(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	partialErr := errors.New("partial: 1 of 3 IDs failed: throttled")
-	_, cmd := rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	_, cmd := rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "test-handler-route",
 		Resources: []resource.Resource{
 			{ID: "managed-001", Name: "managed-001"},
@@ -84,9 +84,9 @@ func TestDispatcher_PartialSuccess_HandlerEmitsFlashMsg(t *testing.T) {
 		t.Fatal("handler must emit a Cmd that yields the FlashMsg for the partial-success error")
 	}
 	msgs := drainAllMessages(cmd)
-	var flash *messages.FlashMsg
+	var flash *messages.Flash
 	for i := range msgs {
-		if fm, ok := msgs[i].(messages.FlashMsg); ok {
+		if fm, ok := msgs[i].(messages.Flash); ok {
 			flash = &fm
 			break
 		}
@@ -110,7 +110,7 @@ func TestDispatcher_PartialSuccess_HandlerEmitsFlashMsg(t *testing.T) {
 // forcing the dispatcher back to "either resources OR error". This test
 // fails to compile if the field is removed.
 func TestResourcesLoadedMsg_HasErrField(t *testing.T) {
-	msg := messages.ResourcesLoadedMsg{
+	msg := messages.ResourcesLoaded{
 		ResourceType: "x",
 		Err:          errors.New("compile-time pin"),
 	}

@@ -5,13 +5,13 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
 // makeResourcesLoadedMsg creates a ResourcesLoadedMsg for testing view updates.
-func makeResourcesLoadedMsg(resourceType string, resources []resource.Resource) messages.ResourcesLoadedMsg {
-	return messages.ResourcesLoadedMsg{
+func makeResourcesLoadedMsg(resourceType string, resources []resource.Resource) messages.ResourcesLoaded {
+	return messages.ResourcesLoaded{
 		ResourceType: resourceType,
 		Resources:    resources,
 	}

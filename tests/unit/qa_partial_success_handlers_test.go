@@ -29,7 +29,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -58,7 +58,7 @@ func TestHandleAvailabilityChecked_PartialErrAppliesState(t *testing.T) {
 
 	// Dispatch the partial-success AvailabilityCheckedMsg.
 	// Gen=0 matches initial availabilityGen=0.
-	m, cmd := rootApplyMsg(m, messages.AvailabilityCheckedMsg{
+	m, cmd := rootApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: "ec2", // registered type so menu can track it
 		Err:          partialErr,
 		HasResources: true,
@@ -74,9 +74,9 @@ func TestHandleAvailabilityChecked_PartialErrAppliesState(t *testing.T) {
 		t.Fatal("handleAvailabilityChecked partial-err: must emit a cmd (at least a FlashMsg for the error)")
 	}
 	allMsgs := drainAllMessages(cmd)
-	var flash *messages.FlashMsg
+	var flash *messages.Flash
 	for i := range allMsgs {
-		if fm, ok := allMsgs[i].(messages.FlashMsg); ok {
+		if fm, ok := allMsgs[i].(messages.Flash); ok {
 			flash = &fm
 			break
 		}
@@ -97,7 +97,7 @@ func TestHandleAvailabilityChecked_PartialErrAppliesState(t *testing.T) {
 	// the probe cycle (triggers startEnrichment), then check the returned cmd tree
 	// for an EnrichmentCheckedMsg targeting "ec2". If probeResources["ec2"] was
 	// retained, buildEnrichQueue includes "ec2" → enrichment is dispatched.
-	_, enrichCmd := rootApplyMsg(m, messages.AvailabilityCheckedMsg{
+	_, enrichCmd := rootApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: "dummy-for-finalize",
 		Gen:          0,
 		Count:        0,
@@ -132,7 +132,7 @@ func TestHandleAvailabilityChecked_HardErr_NoStateApplied(t *testing.T) {
 	m := newRootSizedModel()
 	hardErr := errors.New("hard: endpoint unreachable")
 
-	m, cmd := rootApplyMsg(m, messages.AvailabilityCheckedMsg{
+	m, cmd := rootApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: "lambda",
 		Err:          hardErr,
 		HasResources: false,
@@ -142,7 +142,7 @@ func TestHandleAvailabilityChecked_HardErr_NoStateApplied(t *testing.T) {
 	})
 
 	// Hard failure: wave 2 must NOT be dispatched for lambda (no probe resources).
-	_, enrichCmd := rootApplyMsg(m, messages.AvailabilityCheckedMsg{
+	_, enrichCmd := rootApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: "dummy-finalize",
 		Gen:          0,
 	})
@@ -185,7 +185,7 @@ func TestHandleEnrichmentChecked_PartialErrAppliesState(t *testing.T) {
 	}
 
 	// Seed probeResources["ec2"] so the handler can merge FieldUpdates.
-	m, _ = rootApplyMsg(m, messages.AvailabilityCheckedMsg{
+	m, _ = rootApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: "ec2",
 		Gen:          0,
 		Count:        1,
@@ -198,7 +198,7 @@ func TestHandleEnrichmentChecked_PartialErrAppliesState(t *testing.T) {
 
 	// Deliver a partial-success EnrichmentCheckedMsg.
 	// Gen=0 and TypeGen=0 are the documented test-injection bypasses (always accepted).
-	m, cmd := rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+	m, cmd := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Err:          partialErr,
 		Issues:       1,
@@ -215,9 +215,9 @@ func TestHandleEnrichmentChecked_PartialErrAppliesState(t *testing.T) {
 		t.Fatal("handleEnrichmentChecked partial-err: must emit a cmd (FlashMsg for the error)")
 	}
 	allMsgs := drainAllMessages(cmd)
-	var flash *messages.FlashMsg
+	var flash *messages.Flash
 	for i := range allMsgs {
-		if fm, ok := allMsgs[i].(messages.FlashMsg); ok {
+		if fm, ok := allMsgs[i].(messages.Flash); ok {
 			flash = &fm
 			break
 		}
@@ -246,11 +246,11 @@ func TestHandleEnrichmentChecked_PartialErrAppliesState(t *testing.T) {
 	// and checking the resource has the updated field.
 	// We drive NavigateMsg+ResourcesLoadedMsg to get into the list view, then
 	// verify the resource has the wave-2 field applied.
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources: []resource.Resource{
 			{ID: "i-partial-001", Name: "web-server", Status: "stopped",
@@ -260,7 +260,7 @@ func TestHandleEnrichmentChecked_PartialErrAppliesState(t *testing.T) {
 
 	// Deliver another EnrichmentCheckedMsg with the partial result to apply
 	// FieldUpdates into the now-visible ResourceListModel.
-	m, cmd2 := rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+	m, cmd2 := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Err:          partialErr,
 		Issues:       1,
@@ -278,7 +278,7 @@ func TestHandleEnrichmentChecked_PartialErrAppliesState(t *testing.T) {
 		msgs2 := drainAllMessages(cmd2)
 		hasFlash2 := false
 		for _, msg := range msgs2 {
-			if _, ok := msg.(messages.FlashMsg); ok {
+			if _, ok := msg.(messages.Flash); ok {
 				hasFlash2 = true
 				break
 			}
@@ -299,7 +299,7 @@ func TestHandleEnrichmentChecked_PartialErrEmptyFindings_OnlyFlash(t *testing.T)
 	hardErr := errors.New("enricher: network timeout, no data returned")
 
 	// Deliver EnrichmentCheckedMsg with Err set and empty Findings.
-	_, cmd := rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+	_, cmd := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "rds",
 		Err:          hardErr,
 		Issues:       0,
@@ -315,9 +315,9 @@ func TestHandleEnrichmentChecked_PartialErrEmptyFindings_OnlyFlash(t *testing.T)
 	allMsgs := drainAllMessages(cmd)
 	// The cmd may be a batch that includes enrichment for other queued types.
 	// Find the FlashMsg that specifically mentions "rds" (our injected type).
-	var flash *messages.FlashMsg
+	var flash *messages.Flash
 	for i := range allMsgs {
-		if fm, ok := allMsgs[i].(messages.FlashMsg); ok && strings.Contains(fm.Text, "rds") {
+		if fm, ok := allMsgs[i].(messages.Flash); ok && strings.Contains(fm.Text, "rds") {
 			fm := fm
 			flash = &fm
 			break

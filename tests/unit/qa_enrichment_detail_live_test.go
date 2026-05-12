@@ -18,7 +18,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ---------------------------------------------------------------------------
@@ -51,21 +51,21 @@ func navigateToDetailWithRDS(t *testing.T, res resource.Resource) tui.Model {
 	m, _ = m2.(tui.Model)
 
 	// Navigate to RDS resource list.
-	m2, _ = m.Update(messages.NavigateMsg{
+	m2, _ = m.Update(messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "rds",
 	})
 	m, _ = m2.(tui.Model)
 
 	// Load resources into the list.
-	m2, _ = m.Update(messages.ResourcesLoadedMsg{
+	m2, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "rds",
 		Resources:    []resource.Resource{res},
 	})
 	m, _ = m2.(tui.Model)
 
 	// Navigate to detail for the resource.
-	m2, _ = m.Update(messages.NavigateMsg{
+	m2, _ = m.Update(messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "rds",
 		Resource:     &res,
@@ -96,7 +96,7 @@ func TestHandleEnrichmentChecked_UpdatesActiveDetailWhenFindingPresent(t *testin
 	m := navigateToDetailWithRDS(t, res)
 
 	// Send a valid EnrichmentCheckedMsg (Gen=0, TypeGen=0 match a fresh model).
-	findingMsg := messages.EnrichmentCheckedMsg{
+	findingMsg := messages.EnrichmentChecked{
 		ResourceType: "rds",
 		Issues:       1,
 		Truncated:    false,
@@ -135,7 +135,7 @@ func TestHandleEnrichmentChecked_ClearsDetailFindingOnRecovery(t *testing.T) {
 	m := navigateToDetailWithRDS(t, res)
 
 	// Step 1: Set a finding via the first EnrichmentCheckedMsg.
-	setFindingMsg := messages.EnrichmentCheckedMsg{
+	setFindingMsg := messages.EnrichmentChecked{
 		ResourceType: "rds",
 		Issues:       1,
 		Findings: map[string]resource.EnrichmentFinding{
@@ -157,7 +157,7 @@ func TestHandleEnrichmentChecked_ClearsDetailFindingOnRecovery(t *testing.T) {
 	// to a value that still matches. The first message set TypeGen=0 for a fresh
 	// model. After that message was processed, enrichmentTypeGen["rds"] is still 0
 	// (it's only bumped on rerun start, not on receipt). So TypeGen=0 still matches.
-	clearFindingMsg := messages.EnrichmentCheckedMsg{
+	clearFindingMsg := messages.EnrichmentChecked{
 		ResourceType: "rds",
 		Issues:       0,
 		Findings:     map[string]resource.EnrichmentFinding{}, // empty — "db-live-002" recovered
@@ -186,7 +186,7 @@ func TestHandleEnrichmentChecked_StaleTypeGenDoesNotUpdateDetail(t *testing.T) {
 	res := rdsLiveResource("db-live-003")
 	m := navigateToDetailWithRDS(t, res)
 
-	staleMsg := messages.EnrichmentCheckedMsg{
+	staleMsg := messages.EnrichmentChecked{
 		ResourceType: "rds",
 		Issues:       1,
 		Findings: map[string]resource.EnrichmentFinding{
@@ -219,14 +219,14 @@ func TestHandleEnrichmentChecked_FindingNotAppliedWhenDetailInactive(t *testing.
 	m, _ = m2.(tui.Model)
 
 	// Navigate to RDS list (NOT detail).
-	m2, _ = m.Update(messages.NavigateMsg{
+	m2, _ = m.Update(messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "rds",
 	})
 	m, _ = m2.(tui.Model)
 
 	// Send valid EnrichmentCheckedMsg while a list (not detail) is active.
-	findingMsg := messages.EnrichmentCheckedMsg{
+	findingMsg := messages.EnrichmentChecked{
 		ResourceType: "rds",
 		Issues:       1,
 		Findings: map[string]resource.EnrichmentFinding{

@@ -8,7 +8,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ---------------------------------------------------------------------------
@@ -172,7 +172,7 @@ func TestQA_MainMenu_MoveDownWithJ(t *testing.T) {
 		t.Fatal("Enter should produce a navigate command")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
@@ -192,7 +192,7 @@ func TestQA_MainMenu_MoveDownWithDownArrow(t *testing.T) {
 		t.Fatal("Enter should produce a navigate command")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
@@ -214,7 +214,7 @@ func TestQA_MainMenu_MoveUpWithK(t *testing.T) {
 		t.Fatal("Enter should produce a navigate command")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
@@ -235,7 +235,7 @@ func TestQA_MainMenu_MoveUpWithUpArrow(t *testing.T) {
 		t.Fatal("Enter should produce a navigate command")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
@@ -257,7 +257,7 @@ func TestQA_MainMenu_CursorStopsAtBottom(t *testing.T) {
 		t.Fatal("Enter should produce a navigate command")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
@@ -283,7 +283,7 @@ func TestQA_MainMenu_PageDownMovesMultipleItems(t *testing.T) {
 		t.Fatal("Enter should produce a command")
 	}
 	msg := cmd()
-	nav := msg.(messages.NavigateMsg)
+	nav := msg.(messages.Navigate)
 	// Cursor should NOT still be on ec2 (index 0)
 	if nav.ResourceType == "ec2" {
 		t.Error("after PageDown, cursor should have moved past ec2")
@@ -304,7 +304,7 @@ func TestQA_MainMenu_PageUpMovesMultipleItems(t *testing.T) {
 		t.Fatal("Enter should produce a command")
 	}
 	msg := cmd()
-	nav := msg.(messages.NavigateMsg)
+	nav := msg.(messages.Navigate)
 	if nav.ResourceType == "backup" {
 		t.Error("after PageUp from bottom, cursor should have moved up from backup")
 	}
@@ -325,7 +325,7 @@ func TestQA_MainMenu_PageDownClampsAtBottom(t *testing.T) {
 		t.Fatal("Enter should produce a command")
 	}
 	msg := cmd()
-	nav := msg.(messages.NavigateMsg)
+	nav := msg.(messages.Navigate)
 	if nav.ResourceType != "backup" {
 		t.Errorf("repeated PageDown should end on backup, got %q", nav.ResourceType)
 	}
@@ -349,7 +349,7 @@ func TestQA_MainMenu_PageUpClampsAtTop(t *testing.T) {
 		t.Fatal("Enter should produce a command")
 	}
 	msg := cmd()
-	nav := msg.(messages.NavigateMsg)
+	nav := msg.(messages.Navigate)
 	if nav.ResourceType != "ec2" {
 		t.Errorf("repeated PageUp should end on ec2, got %q", nav.ResourceType)
 	}
@@ -368,7 +368,7 @@ func TestQA_MainMenu_CtrlD_PageDown(t *testing.T) {
 		t.Fatal("Enter should produce a command")
 	}
 	msg := cmd()
-	nav := msg.(messages.NavigateMsg)
+	nav := msg.(messages.Navigate)
 	if nav.ResourceType == "ec2" {
 		t.Error("after Ctrl+D, cursor should have moved past ec2")
 	}
@@ -388,7 +388,7 @@ func TestQA_MainMenu_CtrlU_PageUp(t *testing.T) {
 		t.Fatal("Enter should produce a command")
 	}
 	msg := cmd()
-	nav := msg.(messages.NavigateMsg)
+	nav := msg.(messages.Navigate)
 	if nav.ResourceType == "ses" {
 		t.Error("after Ctrl+U from bottom, cursor should have moved up from ses")
 	}
@@ -406,7 +406,7 @@ func TestQA_MainMenu_CursorStopsAtTop(t *testing.T) {
 		t.Fatal("Enter should produce a navigate command")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
@@ -430,7 +430,7 @@ func TestQA_MainMenu_JumpToTopWithG(t *testing.T) {
 		t.Fatal("Enter should produce a navigate command")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
@@ -450,7 +450,7 @@ func TestQA_MainMenu_JumpToBottomWithShiftG(t *testing.T) {
 		t.Fatal("Enter should produce a navigate command")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
@@ -471,7 +471,7 @@ func TestQA_MainMenu_GOnFirstRowIsNoop(t *testing.T) {
 		t.Fatal("Enter should produce a navigate command")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
@@ -492,7 +492,7 @@ func TestQA_MainMenu_ShiftGOnLastRowIsNoop(t *testing.T) {
 		t.Fatal("Enter should produce a navigate command")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
@@ -532,7 +532,7 @@ func TestQA_MainMenu_EnterOnEachResourceType(t *testing.T) {
 				t.Fatal("Enter should produce a navigate command")
 			}
 			msg := cmd()
-			nav, ok := msg.(messages.NavigateMsg)
+			nav, ok := msg.(messages.Navigate)
 			if !ok {
 				t.Fatalf("expected NavigateMsg, got %T", msg)
 			}
@@ -560,7 +560,7 @@ func TestQA_MainMenu_RapidJPresses(t *testing.T) {
 		t.Fatal("Enter should produce a navigate command")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
@@ -583,7 +583,7 @@ func TestQA_MainMenu_MultipleJThenGReturnsToTop(t *testing.T) {
 		t.Fatal("Enter should produce a navigate command")
 	}
 	msg := cmd()
-	nav := msg.(messages.NavigateMsg)
+	nav := msg.(messages.Navigate)
 	if nav.ResourceType != "ec2" {
 		t.Errorf("after j*4 then g, should be at ec2, got %q", nav.ResourceType)
 	}
@@ -655,7 +655,7 @@ func TestMainMenu_Viewport_ScrolledDown_EnterSelectsCorrectItem(t *testing.T) {
 		t.Fatal("Enter on last item should produce a command")
 	}
 	msg := cmd()
-	nav := msg.(messages.NavigateMsg)
+	nav := msg.(messages.Navigate)
 	allTypes := resource.AllResourceTypes()
 	expected := allTypes[len(allTypes)-1].ShortName
 	if nav.ResourceType != expected {
@@ -732,7 +732,7 @@ func TestQA_MainMenu_CategoryHeadersNotSelectable(t *testing.T) {
 		t.Fatal("Enter should produce a navigate command")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}

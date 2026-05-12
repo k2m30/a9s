@@ -8,7 +8,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // --- Bug: Profile switch doesn't refresh data ---
@@ -16,11 +16,11 @@ import (
 func TestBug_ProfileSwitch_RefreshesResourceList(t *testing.T) {
 	m := newRootSizedModel()
 	// Navigate to EC2 and load resources
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetResourceList, ResourceType: "ec2"})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	oldResources := []resource.Resource{
 		{ID: "i-old", Name: "old-server", Status: "running", Fields: map[string]string{"instance_id": "i-old", "name": "old-server", "state": "running"}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "ec2", Resources: oldResources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: oldResources})
 
 	// Verify old data is visible
 	content := rootViewContent(m)
@@ -29,7 +29,7 @@ func TestBug_ProfileSwitch_RefreshesResourceList(t *testing.T) {
 	}
 
 	// Simulate profile switch: ProfileSelectedMsg
-	m, cmd := rootApplyMsg(m, messages.ProfileSelectedMsg{Profile: "new-profile"})
+	m, cmd := rootApplyMsg(m, messages.ProfileSelected{Profile: "new-profile"})
 
 	// After profile selected, a connectAWS cmd should be returned
 	if cmd == nil {
@@ -37,7 +37,7 @@ func TestBug_ProfileSwitch_RefreshesResourceList(t *testing.T) {
 	}
 
 	// Simulate ClientsReadyMsg (successful reconnect)
-	m, cmd = rootApplyMsg(m, messages.ClientsReadyMsg{Clients: nil, Gen: 1}) // nil clients for test
+	m, cmd = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 1}) // nil clients for test
 
 	// After reconnect, should trigger a refresh (return a fetch command)
 	// The active view should still be the resource list
@@ -62,8 +62,8 @@ func TestBug_ProfileSwitch_UpdatesHeaderProfile(t *testing.T) {
 	}
 
 	// Switch profile
-	m, _ = rootApplyMsg(m, messages.ProfileSelectedMsg{Profile: "new-profile"})
-	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{Clients: nil, Gen: 1})
+	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "new-profile"})
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 1})
 
 	content = rootViewContent(m)
 	if !strings.Contains(content, "new-profile") {
@@ -76,20 +76,20 @@ func TestBug_ProfileSwitch_UpdatesHeaderProfile(t *testing.T) {
 
 func TestBug_RegionSwitch_RefreshesResourceList(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetResourceList, ResourceType: "ec2"})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	resources := []resource.Resource{
 		{ID: "i-123", Name: "server", Status: "running", Fields: map[string]string{"instance_id": "i-123"}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "ec2", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
 
 	// Switch region
-	m, cmd := rootApplyMsg(m, messages.RegionSelectedMsg{Region: "eu-west-1"})
+	m, cmd := rootApplyMsg(m, messages.RegionSelected{Region: "eu-west-1"})
 	if cmd == nil {
 		t.Fatal("RegionSelectedMsg should return a reconnect command")
 	}
 
 	// Simulate successful reconnect
-	_, cmd = rootApplyMsg(m, messages.ClientsReadyMsg{Clients: nil, Gen: 1})
+	_, cmd = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 1})
 	if cmd == nil {
 		t.Error("After ClientsReadyMsg following region switch, should return a fetch command to refresh")
 	}
@@ -157,7 +157,7 @@ func TestBug_RegionShownInHeader_AfterConnect(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 24})
 
 	// After ClientsReadyMsg, region should be populated in header
-	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{Clients: nil})
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil})
 
 	content := rootViewContent(m)
 	plain := stripANSI(content)
@@ -172,7 +172,7 @@ func TestBug_RegionShownInHeader_AfterConnect(t *testing.T) {
 func TestBug_ProfileSwitch_FlashHasTimer(t *testing.T) {
 	m := newRootSizedModel()
 	// Switch profile — returns batch cmd (flash + connectAWS)
-	m, cmd := rootApplyMsg(m, messages.ProfileSelectedMsg{Profile: "test-prod"})
+	m, cmd := rootApplyMsg(m, messages.ProfileSelected{Profile: "test-prod"})
 	if cmd == nil {
 		t.Fatal("ProfileSelectedMsg should return a command")
 	}
@@ -184,7 +184,7 @@ func TestBug_ProfileSwitch_FlashHasTimer(t *testing.T) {
 			if subCmd != nil {
 				subMsg := subCmd()
 				// Only process FlashMsg, skip connectAWS (would need real AWS)
-				if _, isFlash := subMsg.(messages.FlashMsg); isFlash {
+				if _, isFlash := subMsg.(messages.Flash); isFlash {
 					m, _ = rootApplyMsg(m, subMsg)
 				}
 			}
@@ -200,21 +200,21 @@ func TestBug_ProfileSwitch_FlashHasTimer(t *testing.T) {
 
 func TestBug_ProfileSwitch_FlashClears(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetResourceList, ResourceType: "ec2"})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	resources := []resource.Resource{
 		{ID: "i-123", Name: "srv", Status: "running", Fields: map[string]string{"instance_id": "i-123"}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "ec2", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
 
 	// Switch profile — process the FlashMsg from the batch
-	m, cmd := rootApplyMsg(m, messages.ProfileSelectedMsg{Profile: "test-prod"})
+	m, cmd := rootApplyMsg(m, messages.ProfileSelected{Profile: "test-prod"})
 	if cmd != nil {
 		msg := cmd()
 		if batch, ok := msg.(tea.BatchMsg); ok {
 			for _, subCmd := range batch {
 				if subCmd != nil {
 					subMsg := subCmd()
-					if _, isFlash := subMsg.(messages.FlashMsg); isFlash {
+					if _, isFlash := subMsg.(messages.Flash); isFlash {
 						m, _ = rootApplyMsg(m, subMsg)
 					}
 				}
@@ -228,7 +228,7 @@ func TestBug_ProfileSwitch_FlashClears(t *testing.T) {
 	}
 
 	// ClientsReadyMsg arrives — "Connected. Refreshing..." replaces the switching flash
-	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{Clients: nil, Gen: 1})
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 1})
 	content = rootViewContent(m)
 	if strings.Contains(content, "Switching to test-prod") {
 		t.Error("'Switching to...' flash should be replaced after ClientsReadyMsg")
@@ -248,12 +248,12 @@ func TestBug_ProfileSwitch_ClearsRegion(t *testing.T) {
 	}
 
 	// Switch to a different profile
-	m, _ = rootApplyMsg(m, messages.ProfileSelectedMsg{Profile: "prod-profile"})
+	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "prod-profile"})
 
 	// After ClientsReadyMsg, region should be resolved from the NEW profile's config
 	// (not the old "us-west-2"). Since we can't control ~/.aws/config in tests,
 	// we verify that m.region was cleared by checking it gets re-resolved.
-	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{Clients: nil, Gen: 1})
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 1})
 
 	content = rootViewContent(m)
 	// The old region should NOT persist after profile switch
@@ -267,15 +267,15 @@ func TestBug_ProfileSwitch_ClearsRegion(t *testing.T) {
 func TestBug_RefreshFlashClears_AfterResourcesLoaded(t *testing.T) {
 	m := newRootSizedModel()
 	// Navigate to resource list
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetResourceList, ResourceType: "ec2"})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{{ID: "i-1", Fields: map[string]string{"instance_id": "i-1"}}},
 	})
 
 	// Simulate profile switch flow that sets "Connected. Refreshing..." flash
-	m, _ = rootApplyMsg(m, messages.ProfileSelectedMsg{Profile: "other"})
-	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{Clients: nil, Gen: 1})
+	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "other"})
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 1})
 
 	// At this point, flash should show "Connected. Refreshing..."
 	content := rootViewContent(m)
@@ -285,7 +285,7 @@ func TestBug_RefreshFlashClears_AfterResourcesLoaded(t *testing.T) {
 	}
 
 	// Now resources arrive — flash should be cleared
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{{ID: "i-2", Fields: map[string]string{"instance_id": "i-2"}}},
 	})
@@ -299,8 +299,8 @@ func TestBug_RefreshFlashClears_AfterResourcesLoaded(t *testing.T) {
 
 func TestBug_RefreshFlashClears_AfterCtrlR(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetResourceList, ResourceType: "ec2"})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{{ID: "i-1", Fields: map[string]string{"instance_id": "i-1"}}},
 	})
@@ -315,7 +315,7 @@ func TestBug_RefreshFlashClears_AfterCtrlR(t *testing.T) {
 	}
 
 	// Resources arrive — flash should clear
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{{ID: "i-2", Fields: map[string]string{"instance_id": "i-2"}}},
 	})
@@ -330,8 +330,8 @@ func TestBug_RefreshFlashClears_AfterCtrlR(t *testing.T) {
 func TestBug_ProfileSwitch_FromMainMenu_NoRefresh(t *testing.T) {
 	m := newRootSizedModel()
 	// Switch profile from main menu (no resource list active)
-	m, _ = rootApplyMsg(m, messages.ProfileSelectedMsg{Profile: "other-profile"})
-	m, cmd := rootApplyMsg(m, messages.ClientsReadyMsg{Clients: nil, Gen: 1})
+	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "other-profile"})
+	m, cmd := rootApplyMsg(m, messages.ClientsReady{Clients: nil, Gen: 1})
 
 	// From main menu, no resource list to refresh — cmd should be nil
 	if cmd != nil {

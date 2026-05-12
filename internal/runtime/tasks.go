@@ -57,7 +57,7 @@ const (
 	// main menu.
 	TaskKindEmitNavigate TaskKind = "emit-navigate"
 
-	// TaskKindEmitAPIError asks the adapter to dispatch a messages.APIErrorMsg
+	// TaskKindEmitAPIError asks the adapter to dispatch a messages.APIError
 	// back through the input pipeline, used by HandleClientsReady's
 	// impossible "wrong concrete type on ClientsReadyMsg.Clients" branch to
 	// route the error through HandleAPIError's classification flow.
@@ -183,7 +183,7 @@ type FlashTickPayload struct {
 func (FlashTickPayload) isTaskPayload() {}
 
 // EmitNavigatePayload carries the one-shot navigation the adapter must
-// dispatch as messages.NavigateMsg on first successful connect, derived
+// dispatch as messages.Navigate on first successful connect, derived
 // from the -c / Command field on the session. Target is the runtime-owned
 // NavigateTarget (translated to messages.ViewTarget by the adapter).
 type EmitNavigatePayload struct {
@@ -194,7 +194,7 @@ type EmitNavigatePayload struct {
 func (EmitNavigatePayload) isTaskPayload() {}
 
 // EmitAPIErrorPayload carries the error the adapter must dispatch as
-// messages.APIErrorMsg. Used by HandleClientsReady's impossible
+// messages.APIError. Used by HandleClientsReady's impossible
 // "wrong concrete type on Clients" branch.
 type EmitAPIErrorPayload struct {
 	Err error

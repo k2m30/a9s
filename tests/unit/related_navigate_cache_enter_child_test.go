@@ -28,7 +28,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // setupS3ListWithCache primes the root model's resourceCache["s3"] so a
@@ -45,7 +45,7 @@ func setupS3ListWithCache(t *testing.T) (tui.Model, []resource.Resource) {
 		tui.WithRegion(demo.DemoRegion))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "s3",
 	})
@@ -56,7 +56,7 @@ func setupS3ListWithCache(t *testing.T) (tui.Model, []resource.Resource) {
 		t.Fatalf("demo s3 fixtures missing (err=%v, len=%d)", err, len(s3Res))
 	}
 
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    s3Res,
 	})
@@ -66,13 +66,13 @@ func setupS3ListWithCache(t *testing.T) (tui.Model, []resource.Resource) {
 
 // containsEnterChildViewMsg returns true when any message in msgs is an
 // EnterChildViewMsg for the given child type.
-func containsEnterChildViewMsg(msgs []tea.Msg, childType string) (messages.EnterChildViewMsg, bool) {
+func containsEnterChildViewMsg(msgs []tea.Msg, childType string) (messages.EnterChildView, bool) {
 	for _, msg := range msgs {
-		if m, ok := msg.(messages.EnterChildViewMsg); ok && m.ChildType == childType {
+		if m, ok := msg.(messages.EnterChildView); ok && m.ChildType == childType {
 			return m, true
 		}
 	}
-	return messages.EnterChildViewMsg{}, false
+	return messages.EnterChildView{}, false
 }
 
 // containsNavigateMsgTargetDetail reports whether any message in msgs is a
@@ -81,7 +81,7 @@ func containsEnterChildViewMsg(msgs []tea.Msg, childType string) (messages.Enter
 // path must NOT emit a plain detail navigation.
 func containsNavigateMsgTargetDetail(msgs []tea.Msg, resourceType string) bool {
 	for _, msg := range msgs {
-		if m, ok := msg.(messages.NavigateMsg); ok &&
+		if m, ok := msg.(messages.Navigate); ok &&
 			m.Target == messages.TargetDetail &&
 			m.ResourceType == resourceType {
 			return true
@@ -103,7 +103,7 @@ func TestRelatedNavigate_CacheHit_SingleRelatedID_S3_EntersChildView(t *testing.
 	}
 	bucket := s3Res[0]
 
-	navMsg := messages.RelatedNavigateMsg{
+	navMsg := messages.RelatedNavigate{
 		TargetType: "s3",
 		RelatedIDs: []string{bucket.ID},
 		SourceResource: resource.Resource{
@@ -147,7 +147,7 @@ func TestRelatedNavigate_CacheHit_TargetID_S3_EntersChildView(t *testing.T) {
 	m, s3Res := setupS3ListWithCache(t)
 	bucket := s3Res[0]
 
-	navMsg := messages.RelatedNavigateMsg{
+	navMsg := messages.RelatedNavigate{
 		TargetType: "s3",
 		TargetID:   bucket.ID,
 		SourceResource: resource.Resource{

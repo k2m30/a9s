@@ -12,7 +12,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -41,7 +41,7 @@ func rdsLoadedModel(t *testing.T) views.ResourceListModel {
 	m := views.NewResourceList(td, nil, k)
 	m.SetSize(160, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "dbi",
 		Resources:    fixtureRDSInstances(),
 	})
@@ -59,7 +59,7 @@ func rdsLoadedModelWide(t *testing.T) views.ResourceListModel {
 	m := views.NewResourceList(td, nil, k)
 	m.SetSize(200, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "dbi",
 		Resources:    fixtureRDSInstances(),
 	})
@@ -127,7 +127,7 @@ func rdsExtendedModel(t *testing.T) views.ResourceListModel {
 	m := views.NewResourceList(td, nil, k)
 	m.SetSize(200, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "dbi",
 		Resources:    fixtureRDSInstancesExtended(),
 	})
@@ -560,7 +560,7 @@ func TestQA_RDS_EdgeCase_EmptyList(t *testing.T) {
 	m := views.NewResourceList(td, nil, k)
 	m.SetSize(160, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "dbi",
 		Resources:    []resource.Resource{},
 	})
@@ -846,7 +846,7 @@ func TestQA_RDS_Navigation_EnterOpensChildView(t *testing.T) {
 	}
 
 	msg := cmd()
-	child, ok := msg.(messages.EnterChildViewMsg)
+	child, ok := msg.(messages.EnterChildView)
 	if !ok {
 		t.Fatalf("Enter should produce EnterChildViewMsg, got %T", msg)
 	}
@@ -873,7 +873,7 @@ func TestQA_RDS_Navigation_DOpensDetail(t *testing.T) {
 	}
 
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("'d' should produce NavigateMsg, got %T", msg)
 	}
@@ -891,7 +891,7 @@ func TestQA_RDS_Navigation_YOpensYAML(t *testing.T) {
 	}
 
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("'y' should produce NavigateMsg, got %T", msg)
 	}
@@ -1100,7 +1100,7 @@ func TestQA_RDS_Detail_SwitchToYAML(t *testing.T) {
 	}
 
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("'y' should produce NavigateMsg, got %T", msg)
 	}
@@ -1292,13 +1292,13 @@ func TestQA_RDS_CrossView_ListToDetailAndBack(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to RDS list.
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbi",
 	})
 
 	// Load RDS data.
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "dbi",
 		Resources:    fixtureRDSInstances(),
 	})
@@ -1333,11 +1333,11 @@ func TestQA_RDS_CrossView_ListToYAMLAndBack(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to RDS list.
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbi",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "dbi",
 		Resources:    fixtureRDSInstances(),
 	})
@@ -1383,11 +1383,11 @@ func TestQA_RDS_CrossView_FilterHeaderDisplay(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to RDS list.
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbi",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "dbi",
 		Resources:    fixtureRDSInstances(),
 	})
@@ -1409,7 +1409,7 @@ func TestQA_RDS_CrossView_EscFromListReturnsToMainMenu(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to RDS.
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbi",
 	})
@@ -1436,7 +1436,7 @@ func TestQA_RDS_HorizontalScroll(t *testing.T) {
 	m := views.NewResourceList(td, nil, k)
 	m.SetSize(60, 20) // Narrow to force some columns off-screen.
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "dbi",
 		Resources:    fixtureRDSInstances(),
 	})
@@ -1467,7 +1467,7 @@ func TestQA_RDS_ConfigDrivenColumns(t *testing.T) {
 	m := views.NewResourceList(td, cfg, k)
 	m.SetSize(200, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "dbi",
 		Resources:    fixtureRDSInstances(),
 	})
@@ -1481,4 +1481,3 @@ func TestQA_RDS_ConfigDrivenColumns(t *testing.T) {
 		}
 	}
 }
-

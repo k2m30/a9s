@@ -34,7 +34,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -302,7 +302,7 @@ func TestQA_DetailKeyMatch_YEmitsYAMLNavigate_BothPaths(t *testing.T) {
 			return
 		}
 		msg := cmd()
-		nav, ok := msg.(messages.NavigateMsg)
+		nav, ok := msg.(messages.Navigate)
 		if !ok {
 			t.Errorf("%s y: cmd() must return NavigateMsg, got %T", path, msg)
 			return
@@ -387,7 +387,7 @@ func TestQA_DetailKeyMatch_EnterOnNavigable_BothPaths(t *testing.T) {
 			return
 		}
 		msg := cmd()
-		nav, ok := msg.(messages.RelatedNavigateMsg)
+		nav, ok := msg.(messages.RelatedNavigate)
 		if !ok {
 			t.Errorf("%s Enter: cmd() must return RelatedNavigateMsg, got %T", path, msg)
 			return
@@ -433,7 +433,7 @@ func TestQA_DetailKeyMatch_EscClearsSearch_BothPaths(t *testing.T) {
 		// Must NOT emit PopViewMsg.
 		if cmd != nil {
 			produced := cmd()
-			if _, isPopView := produced.(messages.PopViewMsg); isPopView {
+			if _, isPopView := produced.(messages.PopView); isPopView {
 				t.Errorf("%s Esc: must NOT emit PopViewMsg; got PopViewMsg", path)
 			}
 		}
@@ -604,7 +604,7 @@ func TestQA_DetailKeyMatch_EscUnfocusesRightCol_BothPaths(t *testing.T) {
 		// Must NOT emit PopViewMsg.
 		if cmd != nil {
 			produced := cmd()
-			if _, isPopView := produced.(messages.PopViewMsg); isPopView {
+			if _, isPopView := produced.(messages.PopView); isPopView {
 				t.Errorf("%s Esc (unfocus): must NOT emit PopViewMsg; got PopViewMsg", path)
 			}
 		}
@@ -637,7 +637,7 @@ func TestQA_DetailKeyMatch_RightColFocused_JMovesDown_BothPaths(t *testing.T) {
 			t.Skip("right column not auto-shown; skipping right-col j test")
 		}
 		d = makeExplicitlyVisibleDualPath(d)
-		d, _ = d.Update(messages.RelatedCheckResultMsg{
+		d, _ = d.Update(messages.RelatedCheckResult{
 			ResourceType: "ec2",
 			Result: resource.RelatedCheckResult{
 				TargetType:  "tg",
@@ -645,7 +645,7 @@ func TestQA_DetailKeyMatch_RightColFocused_JMovesDown_BothPaths(t *testing.T) {
 				ResourceIDs: []string{"tg-aaa"},
 			},
 		})
-		d, _ = d.Update(messages.RelatedCheckResultMsg{
+		d, _ = d.Update(messages.RelatedCheckResult{
 			ResourceType: "ec2",
 			Result: resource.RelatedCheckResult{
 				TargetType:  "vpc",
@@ -710,7 +710,7 @@ func TestQA_DetailKeyMatch_RightColFocused_KMovesUp_BothPaths(t *testing.T) {
 			t.Skip("right column not auto-shown; skipping right-col k test")
 		}
 		d = makeExplicitlyVisibleDualPath(d)
-		d, _ = d.Update(messages.RelatedCheckResultMsg{
+		d, _ = d.Update(messages.RelatedCheckResult{
 			ResourceType: "ec2",
 			Result: resource.RelatedCheckResult{
 				TargetType:  "tg",
@@ -718,7 +718,7 @@ func TestQA_DetailKeyMatch_RightColFocused_KMovesUp_BothPaths(t *testing.T) {
 				ResourceIDs: []string{"tg-aaa"},
 			},
 		})
-		d, _ = d.Update(messages.RelatedCheckResultMsg{
+		d, _ = d.Update(messages.RelatedCheckResult{
 			ResourceType: "ec2",
 			Result: resource.RelatedCheckResult{
 				TargetType:  "vpc",
@@ -786,7 +786,7 @@ func TestQA_DetailKeyMatch_RightColFocused_SlashActivatesFilter_BothPaths(t *tes
 			t.Skip("right column not auto-shown; skipping right-col / filter test")
 		}
 		d = makeExplicitlyVisibleDualPath(d)
-		d, _ = d.Update(messages.RelatedCheckResultMsg{
+		d, _ = d.Update(messages.RelatedCheckResult{
 			ResourceType: "ec2",
 			Result: resource.RelatedCheckResult{
 				TargetType:  "tg",
@@ -849,7 +849,7 @@ func TestQA_DetailKeyMatch_RightColFocused_EnterEmitsNavigate_BothPaths(t *testi
 			t.Skip("right column not auto-shown; skipping right-col Enter test")
 		}
 		d = makeExplicitlyVisibleDualPath(d)
-		d, _ = d.Update(messages.RelatedCheckResultMsg{
+		d, _ = d.Update(messages.RelatedCheckResult{
 			ResourceType: "ec2",
 			Result: resource.RelatedCheckResult{
 				TargetType:  "tg",
@@ -872,7 +872,7 @@ func TestQA_DetailKeyMatch_RightColFocused_EnterEmitsNavigate_BothPaths(t *testi
 			return
 		}
 		msg := cmd()
-		nav, ok := msg.(messages.RelatedNavigateMsg)
+		nav, ok := msg.(messages.RelatedNavigate)
 		if !ok {
 			t.Errorf("%s Enter (right col focused): cmd() must return RelatedNavigateMsg, got %T", path, msg)
 			return
@@ -917,7 +917,7 @@ func TestQA_RightCol_UpdateKeyMsg_JMovesDown(t *testing.T) {
 		t.Skip("right column not auto-shown; skipping rightcol updateKeyMsg j test")
 	}
 	d = makeExplicitlyVisibleDualPath(d)
-	d, _ = d.Update(messages.RelatedCheckResultMsg{
+	d, _ = d.Update(messages.RelatedCheckResult{
 		ResourceType: "ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "aaa",
@@ -925,7 +925,7 @@ func TestQA_RightCol_UpdateKeyMsg_JMovesDown(t *testing.T) {
 			ResourceIDs: []string{"aaa-001"},
 		},
 	})
-	d, _ = d.Update(messages.RelatedCheckResultMsg{
+	d, _ = d.Update(messages.RelatedCheckResult{
 		ResourceType: "ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "bbb",
@@ -959,7 +959,7 @@ func TestQA_RightCol_UpdateKeyMsg_KMovesUp(t *testing.T) {
 		t.Skip("right column not auto-shown; skipping rightcol updateKeyMsg k test")
 	}
 	d = makeExplicitlyVisibleDualPath(d)
-	d, _ = d.Update(messages.RelatedCheckResultMsg{
+	d, _ = d.Update(messages.RelatedCheckResult{
 		ResourceType: "ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "aaa",
@@ -967,7 +967,7 @@ func TestQA_RightCol_UpdateKeyMsg_KMovesUp(t *testing.T) {
 			ResourceIDs: []string{"aaa-001"},
 		},
 	})
-	d, _ = d.Update(messages.RelatedCheckResultMsg{
+	d, _ = d.Update(messages.RelatedCheckResult{
 		ResourceType: "ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "bbb",
@@ -1002,7 +1002,7 @@ func TestQA_RightCol_UpdateKeyMsg_SlashActivatesFilter(t *testing.T) {
 		t.Skip("right column not auto-shown; skipping rightcol updateKeyMsg / test")
 	}
 	d = makeExplicitlyVisibleDualPath(d)
-	d, _ = d.Update(messages.RelatedCheckResultMsg{
+	d, _ = d.Update(messages.RelatedCheckResult{
 		ResourceType: "ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType:  "aaa",

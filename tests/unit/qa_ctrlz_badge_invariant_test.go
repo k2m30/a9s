@@ -27,7 +27,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -56,7 +56,7 @@ func ctrlZModel(t *testing.T, shortName string, resources []resource.Resource) v
 	m.SetSize(200, 30)
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: shortName,
 		Resources:    resources,
 	})
@@ -526,7 +526,7 @@ func TestCtrlZ_PersistsAcrossCacheRoundTrip(t *testing.T) {
 	m.SetSize(200, 20)
 	m, _ = m.Init()
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources:    ctEvents4(),
 	})

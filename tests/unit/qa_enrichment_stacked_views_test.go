@@ -33,7 +33,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -56,7 +56,7 @@ func TestEnrichment_UpdatesStackedResourceListWhenDetailActive(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Step 1: Navigate to RDS list.
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "rds",
 	})
@@ -66,14 +66,14 @@ func TestEnrichment_UpdatesStackedResourceListWhenDetailActive(t *testing.T) {
 		{ID: "db-stacked-a-001", Name: "db-stacked-a-001", Status: "available", Fields: map[string]string{"db_instance_id": "db-stacked-a-001", "status": "available"}},
 		{ID: "db-stacked-b-001", Name: "db-stacked-b-001", Status: "available", Fields: map[string]string{"db_instance_id": "db-stacked-b-001", "status": "available"}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "rds",
 		Resources:    rdsResources,
 	})
 
 	// Step 3: Navigate to detail view for the first instance.
 	// DetailModel is now active; ResourceListModel is below it in m.stack.
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "rds",
 		Resource:     &rdsResources[0],
@@ -88,7 +88,7 @@ func TestEnrichment_UpdatesStackedResourceListWhenDetailActive(t *testing.T) {
 	// Step 4: Wave 2 enrichment completes while detail is active.
 	// Findings: db-stacked-a-001 has a finding (the same instance we're viewing).
 	// We use TypeGen=0 (startup probe, not a rerun).
-	enrichMsg := messages.EnrichmentCheckedMsg{
+	enrichMsg := messages.EnrichmentChecked{
 		ResourceType: "rds",
 		Issues:       1,
 		Truncated:    false,
@@ -101,7 +101,7 @@ func TestEnrichment_UpdatesStackedResourceListWhenDetailActive(t *testing.T) {
 	m, _ = rootApplyMsg(m, enrichMsg)
 
 	// Step 5: Pop back to the ResourceListModel.
-	m, _ = rootApplyMsg(m, messages.PopViewMsg{})
+	m, _ = rootApplyMsg(m, messages.PopView{})
 
 	// Verify we're back at the RDS list.
 	plainList := stripANSI(rootViewContent(m))
@@ -143,7 +143,7 @@ func TestEnrichment_UpdatesStackedDetailWhenAnotherDetailActive(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Step 1: Navigate to RDS list.
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "rds",
 	})
@@ -157,14 +157,14 @@ func TestEnrichment_UpdatesStackedDetailWhenAnotherDetailActive(t *testing.T) {
 		ID: "db-stacked-b-001", Name: "db-stacked-b-001", Status: "available",
 		Fields: map[string]string{"db_instance_id": "db-stacked-b-001", "status": "available"},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "rds",
 		Resources:    []resource.Resource{resourceA, resourceB},
 	})
 
 	// Step 3: Navigate to detail view for instance A.
 	// Stack: [MainMenu, ResourceList, DetailA]
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "rds",
 		Resource:     &resourceA,
@@ -178,7 +178,7 @@ func TestEnrichment_UpdatesStackedDetailWhenAnotherDetailActive(t *testing.T) {
 	// Step 4: Navigate to detail view for instance B.
 	// Stack: [MainMenu, ResourceList, DetailA, DetailB]
 	// DetailB is now active; DetailA is stacked below it.
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "rds",
 		Resource:     &resourceB,
@@ -190,7 +190,7 @@ func TestEnrichment_UpdatesStackedDetailWhenAnotherDetailActive(t *testing.T) {
 	}
 
 	// Step 5: Wave 2 enrichment completes with findings for BOTH A and B.
-	enrichMsg := messages.EnrichmentCheckedMsg{
+	enrichMsg := messages.EnrichmentChecked{
 		ResourceType: "rds",
 		Issues:       2,
 		Truncated:    false,
@@ -212,7 +212,7 @@ func TestEnrichment_UpdatesStackedDetailWhenAnotherDetailActive(t *testing.T) {
 
 	// Step 6: Pop back to detail-A.
 	// Stack: [MainMenu, ResourceList, DetailA]
-	m, _ = rootApplyMsg(m, messages.PopViewMsg{})
+	m, _ = rootApplyMsg(m, messages.PopView{})
 
 	plainA2 := stripANSI(rootViewContent(m))
 

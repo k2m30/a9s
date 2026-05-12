@@ -10,7 +10,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // Reveals bug: detail opened when terminal is narrow, then widened.
@@ -38,7 +38,7 @@ func TestBugReveal_EC2Detail_AutoShowsRelatedAfterResizeToWide(t *testing.T) {
 	if err != nil || len(ec2) == 0 {
 		t.Fatalf("demo ec2 fixtures missing: err=%v len=%d", err, len(ec2))
 	}
-	m2, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m2, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "ec2",
 		Resource:     &ec2[0],
@@ -83,7 +83,7 @@ func TestBugReveal_EC2Detail_ResizeDoesNotOverrideExplicitHide(t *testing.T) {
 	if err != nil || len(ec2b) == 0 {
 		t.Fatalf("demo ec2 fixtures missing: err=%v len=%d", err, len(ec2b))
 	}
-	m2, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m2, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "ec2",
 		Resource:     &ec2b[0],

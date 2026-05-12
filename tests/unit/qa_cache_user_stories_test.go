@@ -7,7 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 func TestQA_CacheStories_WarmReentryRestoresListState(t *testing.T) {
@@ -17,11 +17,11 @@ func TestQA_CacheStories_WarmReentryRestoresListState(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    ec2TestResources(30),
 		Pagination: &resource.PaginationMeta{
@@ -41,7 +41,7 @@ func TestQA_CacheStories_WarmReentryRestoresListState(t *testing.T) {
 
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
-	m, cmd := rootApplyMsg(m, messages.NavigateMsg{
+	m, cmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -67,11 +67,11 @@ func TestQA_CacheStories_LoadMoreUpdatesWarmCache(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources:    ctEventsResources(50),
 		Pagination: &resource.PaginationMeta{
@@ -83,7 +83,7 @@ func TestQA_CacheStories_LoadMoreUpdatesWarmCache(t *testing.T) {
 	})
 
 	m, _ = rootApplyMsg(m, rootKeyPress("M"))
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources:    ctEventsResources2(50, 50),
 		Pagination: &resource.PaginationMeta{
@@ -96,7 +96,7 @@ func TestQA_CacheStories_LoadMoreUpdatesWarmCache(t *testing.T) {
 	})
 
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
-	m, cmd := rootApplyMsg(m, messages.NavigateMsg{
+	m, cmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
@@ -146,18 +146,18 @@ func TestQA_CacheStories_RelatedNavigationUsesTargetDataCachedFromBackgroundLoad
 		Fields: map[string]string{"target_group_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/backend-tg/def456"},
 	}
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "ec2",
 		Resource:     &src,
 	})
 
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "tg",
 		Resources:    []resource.Resource{tg1, tg2},
 	})
 
-	m, cmd := rootApplyMsg(m, messages.RelatedNavigateMsg{
+	m, cmd := rootApplyMsg(m, messages.RelatedNavigate{
 		TargetType:     "tg",
 		SourceResource: src,
 		TargetID:       tg1.ID,
@@ -199,12 +199,12 @@ func TestQA_CacheStories_RelatedMultiIDUsesWarmCacheSubset(t *testing.T) {
 	alarm2 := resource.Resource{ID: "alarm-cache-2", Name: "status-check", Status: "ok"}
 	alarm3 := resource.Resource{ID: "alarm-cache-3", Name: "unrelated", Status: "ok"}
 
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "alarm",
 		Resources:    []resource.Resource{alarm1, alarm2, alarm3},
 	})
 
-	m, cmd := rootApplyMsg(m, messages.RelatedNavigateMsg{
+	m, cmd := rootApplyMsg(m, messages.RelatedNavigate{
 		TargetType:     "alarm",
 		SourceResource: src,
 		RelatedIDs:     []string{alarm1.ID, alarm2.ID},
@@ -240,17 +240,17 @@ func TestQA_CacheStories_ChildViewLoadsDoNotCreateTopLevelWarmCache(t *testing.T
 		{ID: "evt-2", Name: "Stack create done", Status: "CREATE_COMPLETE"},
 	}
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "cfn",
 		Resource:     &stack,
 	})
-	m, _ = rootApplyMsg(m, messages.EnterChildViewMsg{
+	m, _ = rootApplyMsg(m, messages.EnterChildView{
 		ChildType:     "cfn_events",
 		ParentContext: map[string]string{"stack_name": stack.ID, "Name": stack.Name},
 		DisplayName:   stack.Name,
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "cfn_events",
 		Resources:    childResources,
 	})
@@ -258,7 +258,7 @@ func TestQA_CacheStories_ChildViewLoadsDoNotCreateTopLevelWarmCache(t *testing.T
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
-	_, cmd := rootApplyMsg(m, messages.NavigateMsg{
+	_, cmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "cfn_events",
 	})
@@ -294,11 +294,11 @@ func TestQA_CacheStories_RefreshingChildViewDoesNotEvictTopLevelCache(t *testing
 		{ID: "evt-child-1", Name: "child event 1", Status: "CREATE_IN_PROGRESS"},
 	}
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources:    topLevelEvents,
 		Pagination: &resource.PaginationMeta{
@@ -309,17 +309,17 @@ func TestQA_CacheStories_RefreshingChildViewDoesNotEvictTopLevelCache(t *testing
 	})
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "cfn",
 		Resource:     &stack,
 	})
-	m, _ = rootApplyMsg(m, messages.EnterChildViewMsg{
+	m, _ = rootApplyMsg(m, messages.EnterChildView{
 		ChildType:     "cfn_events",
 		ParentContext: map[string]string{"stack_name": stack.ID, "Name": stack.Name},
 		DisplayName:   stack.Name,
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "cfn_events",
 		Resources:    childResources,
 	})
@@ -332,7 +332,7 @@ func TestQA_CacheStories_RefreshingChildViewDoesNotEvictTopLevelCache(t *testing
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
-	m, cmd := rootApplyMsg(m, messages.NavigateMsg{
+	m, cmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})

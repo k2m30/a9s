@@ -24,7 +24,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // K.1 — No panic on any common input in all view states.
@@ -79,11 +79,11 @@ func TestQa67_K1_NoPanic_InputSequences(t *testing.T) {
 	// Test in resource list state (loaded)
 	t.Run("resource_list_loaded", func(t *testing.T) {
 		m := newRootSizedModel()
-		m, _ = rootApplyMsg(m, messages.NavigateMsg{
+		m, _ = rootApplyMsg(m, messages.Navigate{
 			Target:       messages.TargetResourceList,
 			ResourceType: "ec2",
 		})
-		m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+		m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 			ResourceType: "ec2",
 			Resources: []resource.Resource{
 				{ID: "i-fuzz", Name: "fuzz-instance", Status: "running", Fields: map[string]string{
@@ -113,7 +113,7 @@ func TestQa67_K2_ViewStackIntegrity_AfterError(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate: main menu -> EC2 list -> detail
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -129,15 +129,15 @@ func TestQa67_K2_ViewStackIntegrity_AfterError(t *testing.T) {
 			"lifecycle":   "",
 		}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "ec2", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: &resources[0],
 	})
 
 	// Send an API error (simulating a detail refresh failing)
-	m, _ = rootApplyMsg(m, messages.APIErrorMsg{
+	m, _ = rootApplyMsg(m, messages.APIError{
 		ResourceType: "ec2",
 		Err:          errAccessDenied("ec2:DescribeInstances"),
 	})
@@ -163,7 +163,7 @@ func errAccessDenied(action string) error {
 // K.3 — Error in one child view does not affect sibling child views.
 func TestQa67_K3_ErrorInChildView_DoesNotAffectSiblings(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ecs-svc",
 	})
@@ -179,7 +179,7 @@ func TestQa67_K3_ErrorInChildView_DoesNotAffectSiblings(t *testing.T) {
 			"launch_type":   "FARGATE",
 		}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "ecs-svc", Resources: services})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ecs-svc", Resources: services})
 
 	// Open Events child view (key 'e') — execute the returned cmd to actually push the child view
 	var cmd tea.Cmd
@@ -189,7 +189,7 @@ func TestQa67_K3_ErrorInChildView_DoesNotAffectSiblings(t *testing.T) {
 			m, _ = rootApplyMsg(m, msg)
 		}
 	}
-	m, _ = rootApplyMsg(m, messages.APIErrorMsg{
+	m, _ = rootApplyMsg(m, messages.APIError{
 		ResourceType: "ecs_svc_events",
 		Err:          errAccessDenied("ecs:DescribeServices"),
 	})
@@ -212,7 +212,7 @@ func TestQa67_K3_ErrorInChildView_DoesNotAffectSiblings(t *testing.T) {
 // K.4 — Rapid ctrl+r does not cause data corruption or crash.
 func TestQa67_K4_RapidCtrlR_NoCrashOrCorruption(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -228,7 +228,7 @@ func TestQa67_K4_RapidCtrlR_NoCrashOrCorruption(t *testing.T) {
 			"lifecycle":   "",
 		}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "ec2", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
 
 	// Press ctrl+r three times rapidly
 	m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
@@ -242,7 +242,7 @@ func TestQa67_K4_RapidCtrlR_NoCrashOrCorruption(t *testing.T) {
 	}
 
 	// Deliver resources for the last refresh — should not corrupt state
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "ec2", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
 	out = rootViewContent(m)
 	plain := stripANSI(out)
 	if !strings.Contains(plain, "rapid-refresh") {
@@ -253,11 +253,11 @@ func TestQa67_K4_RapidCtrlR_NoCrashOrCorruption(t *testing.T) {
 // K.6 — Error flash does not overlap with filter mode.
 func TestQa67_K6_ErrorFlash_DoesNotOverlapFilter(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources: []resource.Resource{
 			{ID: "i-filter", Name: "filter-test", Status: "running", Fields: map[string]string{
@@ -274,7 +274,7 @@ func TestQa67_K6_ErrorFlash_DoesNotOverlapFilter(t *testing.T) {
 	})
 
 	// Trigger an error flash
-	m, _ = rootApplyMsg(m, messages.FlashMsg{
+	m, _ = rootApplyMsg(m, messages.Flash{
 		Text:    "Error: rate limit exceeded",
 		IsError: true,
 	})
@@ -292,13 +292,13 @@ func TestQa67_K6_ErrorFlash_DoesNotOverlapFilter(t *testing.T) {
 // K.7 — Frame title shows correct count after error then refresh.
 func TestQa67_K7_FrameTitleCount_AfterErrorThenRefresh(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
 
 	// Send an error — resource list is empty
-	m, _ = rootApplyMsg(m, messages.APIErrorMsg{
+	m, _ = rootApplyMsg(m, messages.APIError{
 		ResourceType: "ec2",
 		Err:          errAccessDenied("ec2:DescribeInstances"),
 	})
@@ -331,7 +331,7 @@ func TestQa67_K7_FrameTitleCount_AfterErrorThenRefresh(t *testing.T) {
 		}
 	}
 
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "ec2", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
 
 	out = rootViewContent(m)
 	plain = stripANSI(out)
@@ -347,7 +347,7 @@ func TestQa67_K7_FrameTitleCount_AfterErrorThenRefresh(t *testing.T) {
 // K.8 — Empty filter result followed by clear shows all resources.
 func TestQa67_K8_EmptyFilterClear_ShowsAllResources(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -373,7 +373,7 @@ func TestQa67_K8_EmptyFilterClear_ShowsAllResources(t *testing.T) {
 			"lifecycle":   "",
 		}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "ec2", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
 
 	// Enter filter mode and type something that matches nothing
 	m, _ = rootApplyMsg(m, rootKeyPress("/"))
@@ -404,12 +404,12 @@ func TestQa67_K8_EmptyFilterClear_ShowsAllResources(t *testing.T) {
 // K.9 — Copy from empty resource list does not crash.
 func TestQa67_K9_CopyFromEmptyList_NoCrash(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
 	// Load empty resources
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{},
 	})
@@ -425,11 +425,11 @@ func TestQa67_K9_CopyFromEmptyList_NoCrash(t *testing.T) {
 // K.10 — Sort on empty resource list is a no-op, no crash.
 func TestQa67_K10_SortOnEmptyList_NoCrash(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{},
 	})
@@ -447,11 +447,11 @@ func TestQa67_K10_SortOnEmptyList_NoCrash(t *testing.T) {
 // K.11 — Filter on empty resource list does not crash.
 func TestQa67_K11_FilterOnEmptyList_NoCrash(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{},
 	})
@@ -471,11 +471,11 @@ func TestQa67_K11_FilterOnEmptyList_NoCrash(t *testing.T) {
 // K.12 — Detail view on empty resource list is a no-op, no crash.
 func TestQa67_K12_DetailOnEmptyList_IsNoOp(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{},
 	})
@@ -497,11 +497,11 @@ func TestQa67_K12_DetailOnEmptyList_IsNoOp(t *testing.T) {
 // K.13 — YAML view on empty resource list is a no-op, no crash.
 func TestQa67_K13_YAMLOnEmptyList_IsNoOp(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{},
 	})
@@ -534,11 +534,11 @@ func TestQa67_K9_K13_EmptyListOps_AllResourceTypes(t *testing.T) {
 		for _, op := range ops {
 			t.Run(rt+"/"+op.name, func(t *testing.T) {
 				m := newRootSizedModel()
-				m, _ = rootApplyMsg(m, messages.NavigateMsg{
+				m, _ = rootApplyMsg(m, messages.Navigate{
 					Target:       messages.TargetResourceList,
 					ResourceType: rt,
 				})
-				m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+				m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 					ResourceType: rt,
 					Resources:    []resource.Resource{},
 				})

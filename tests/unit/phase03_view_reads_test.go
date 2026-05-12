@@ -15,7 +15,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -72,7 +72,7 @@ func loadList(td resource.ResourceTypeDef, rs []resource.Resource) views.Resourc
 	k := keys.Default()
 	m := views.NewResourceList(td, nil, k)
 	m.SetSize(120, 30)
-	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: rs, ResourceType: td.ShortName})
+	m, _ = m.Update(messages.ResourcesLoaded{Resources: rs, ResourceType: td.ShortName})
 	return m
 }
 
@@ -421,9 +421,10 @@ func TestViews_DetailAttention_PrefersFindingsPhraseOverIssues(t *testing.T) {
 // whose legacy Status/Color is broken.
 //
 // Setup: 3 resources, all with Fields["status"]="running" (Color = Healthy).
-//   A: Findings[0].Severity = SevBroken → should count
-//   B: Findings[0].Severity = SevWarn   → should count
-//   C: Findings = nil                   → should NOT count
+//
+//	A: Findings[0].Severity = SevBroken → should count
+//	B: Findings[0].Severity = SevWarn   → should count
+//	C: Findings = nil                   → should NOT count
 //
 // Pre-fix: IssueCount reads td.ResolveColor(r).IsIssue() → all Healthy → count=0.
 // Post-fix: IssueCount reads r.Findings → A+B are issues → count=2.
@@ -479,8 +480,9 @@ func TestViews_IssueCount_ReadsFindingsBySeverity(t *testing.T) {
 // with IsIssue() severity, regardless of their legacy Status / Color.
 //
 // Setup: 2 resources, both with Fields["status"]="running" (Healthy color):
-//   A: Findings[0].Severity = SevBroken → must be visible after enabling filter
-//   B: Findings = nil                   → must be hidden after enabling filter
+//
+//	A: Findings[0].Severity = SevBroken → must be visible after enabling filter
+//	B: Findings = nil                   → must be hidden after enabling filter
 //
 // Pre-fix: applyFilter reads td.ResolveColor(r).IsIssue() → both Healthy → both hidden.
 // Post-fix: applyFilter reads r.Findings → A visible, B hidden.
@@ -757,13 +759,15 @@ func TestViews_IssueCount_RespectsTypeColorOverride(t *testing.T) {
 //     issue-severity entry visible.
 //
 // Pre-fix: hasIssueFinding returns len>0 && Findings[0].IsIssue().
-//   Row A has Findings[0].Severity=SevOK → false → not counted.
-//   Only row B (SevWarn at index 0) is counted → IssueCount()=1.
+//
+//	Row A has Findings[0].Severity=SevOK → false → not counted.
+//	Only row B (SevWarn at index 0) is counted → IssueCount()=1.
 //
 // Post-fix: hasIssueFinding scans all entries.
-//   Row A has Findings[1].Severity=SevBroken → true → counted.
-//   Row B has Findings[0].Severity=SevWarn → true → counted.
-//   IssueCount()=2.
+//
+//	Row A has Findings[1].Severity=SevBroken → true → counted.
+//	Row B has Findings[0].Severity=SevWarn → true → counted.
+//	IssueCount()=2.
 //
 // Forward-compat note: production paths post-fix filter lifecycle findings
 // before populating r.Findings, so a real resource will not carry [SevOK,
@@ -779,8 +783,8 @@ func TestViews_HasIssueFinding_ScansAllFindings(t *testing.T) {
 	// Pre-fix: hasIssueFinding checks only Findings[0].Severity == SevOK → not an issue.
 	// Post-fix: scan all; Findings[1].Severity == SevBroken → is an issue.
 	resA := resource.Resource{
-		ID:   "i-mixed-1",
-		Name: "mixed-findings-1",
+		ID:     "i-mixed-1",
+		Name:   "mixed-findings-1",
 		Fields: map[string]string{"state": "running"},
 		Findings: []domain.Finding{
 			{Code: "ec2.lifecycle", Phrase: "running", Severity: domain.SevOK, Source: "wave1"},
@@ -789,8 +793,8 @@ func TestViews_HasIssueFinding_ScansAllFindings(t *testing.T) {
 	}
 	// Row B — only Findings[0]; SevWarn — both pre-fix and post-fix count this.
 	resB := resource.Resource{
-		ID:   "i-mixed-2",
-		Name: "mixed-findings-2",
+		ID:     "i-mixed-2",
+		Name:   "mixed-findings-2",
 		Fields: map[string]string{"state": "running"},
 		Findings: []domain.Finding{
 			{Code: "ec2.warn", Phrase: "node group degraded", Severity: domain.SevWarn, Source: "wave2:ec2"},
@@ -798,8 +802,8 @@ func TestViews_HasIssueFinding_ScansAllFindings(t *testing.T) {
 	}
 	// Row C — no findings; must not be counted.
 	resC := resource.Resource{
-		ID:   "i-mixed-3",
-		Name: "mixed-findings-3",
+		ID:     "i-mixed-3",
+		Name:   "mixed-findings-3",
 		Fields: map[string]string{"state": "running"},
 	}
 

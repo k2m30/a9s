@@ -10,7 +10,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // TestEC2Detail_Render_MatchesApprovedDesignContract validates the current EC2
@@ -51,7 +51,7 @@ func TestEC2Detail_Render_MatchesApprovedDesignContract(t *testing.T) {
 		},
 	}
 
-	m2, _ = m.Update(messages.NavigateMsg{
+	m2, _ = m.Update(messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "ec2",
 		Resource:     &ec2Res,

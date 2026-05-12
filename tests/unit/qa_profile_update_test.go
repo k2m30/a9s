@@ -7,7 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -63,7 +63,7 @@ func TestQA_ProfileUpdate_JMovesDown(t *testing.T) {
 		t.Fatal("Enter should produce a command")
 	}
 	msg := cmd()
-	psm, ok := msg.(messages.ProfileSelectedMsg)
+	psm, ok := msg.(messages.ProfileSelected)
 	if !ok {
 		t.Fatalf("expected ProfileSelectedMsg, got %T", msg)
 	}
@@ -84,7 +84,7 @@ func TestQA_ProfileUpdate_DownArrowMovesDown(t *testing.T) {
 		t.Fatal("Enter should produce a command")
 	}
 	msg := cmd()
-	psm, ok := msg.(messages.ProfileSelectedMsg)
+	psm, ok := msg.(messages.ProfileSelected)
 	if !ok {
 		t.Fatalf("expected ProfileSelectedMsg, got %T", msg)
 	}
@@ -109,7 +109,7 @@ func TestQA_ProfileUpdate_KMovesUp(t *testing.T) {
 		t.Fatal("Enter should produce a command")
 	}
 	msg := cmd()
-	psm, ok := msg.(messages.ProfileSelectedMsg)
+	psm, ok := msg.(messages.ProfileSelected)
 	if !ok {
 		t.Fatalf("expected ProfileSelectedMsg, got %T", msg)
 	}
@@ -131,7 +131,7 @@ func TestQA_ProfileUpdate_UpArrowMovesUp(t *testing.T) {
 		t.Fatal("Enter should produce a command")
 	}
 	msg := cmd()
-	psm := msg.(messages.ProfileSelectedMsg)
+	psm := msg.(messages.ProfileSelected)
 	if psm.Profile != "profile-2" {
 		t.Errorf("after down down up Enter, expected profile-2, got %s", psm.Profile)
 	}
@@ -151,7 +151,7 @@ func TestQA_ProfileUpdate_CursorStopsAtTop(t *testing.T) {
 		t.Fatal("Enter should produce a command")
 	}
 	msg := cmd()
-	psm := msg.(messages.ProfileSelectedMsg)
+	psm := msg.(messages.ProfileSelected)
 	if psm.Profile != "profile-1" {
 		t.Errorf("cursor should stop at top; expected profile-1, got %s", psm.Profile)
 	}
@@ -173,7 +173,7 @@ func TestQA_ProfileUpdate_CursorStopsAtBottom(t *testing.T) {
 		t.Fatal("Enter should produce a command")
 	}
 	msg := cmd()
-	psm := msg.(messages.ProfileSelectedMsg)
+	psm := msg.(messages.ProfileSelected)
 	if psm.Profile != "profile-3" {
 		t.Errorf("cursor should stop at bottom; expected profile-3, got %s", psm.Profile)
 	}
@@ -188,7 +188,7 @@ func TestQA_ProfileUpdate_EnterAtPosition0(t *testing.T) {
 		t.Fatal("Enter should produce a command")
 	}
 	msg := cmd()
-	psm, ok := msg.(messages.ProfileSelectedMsg)
+	psm, ok := msg.(messages.ProfileSelected)
 	if !ok {
 		t.Fatalf("expected ProfileSelectedMsg, got %T", msg)
 	}
@@ -208,7 +208,7 @@ func TestQA_ProfileUpdate_EnterAtPosition1(t *testing.T) {
 		t.Fatal("Enter should produce a command")
 	}
 	msg := cmd()
-	psm := msg.(messages.ProfileSelectedMsg)
+	psm := msg.(messages.ProfileSelected)
 	if psm.Profile != "profile-2" {
 		t.Errorf("Enter at position 1 should select profile-2, got %s", psm.Profile)
 	}
@@ -226,7 +226,7 @@ func TestQA_ProfileUpdate_EnterAtPosition2(t *testing.T) {
 		t.Fatal("Enter should produce a command")
 	}
 	msg := cmd()
-	psm := msg.(messages.ProfileSelectedMsg)
+	psm := msg.(messages.ProfileSelected)
 	if psm.Profile != "profile-3" {
 		t.Errorf("Enter at position 2 should select profile-3, got %s", psm.Profile)
 	}
@@ -251,7 +251,7 @@ func TestQA_ProfileUpdate_GGoesToTop(t *testing.T) {
 		t.Fatal("Enter should produce a command")
 	}
 	msg := enterCmd()
-	psm := msg.(messages.ProfileSelectedMsg)
+	psm := msg.(messages.ProfileSelected)
 	if psm.Profile != "profile-1" {
 		t.Errorf("g should go to top; expected profile-1, got %s", psm.Profile)
 	}
@@ -273,7 +273,7 @@ func TestQA_ProfileUpdate_ShiftGGoesToBottom(t *testing.T) {
 		t.Fatal("Enter should produce a command")
 	}
 	msg := enterCmd()
-	psm := msg.(messages.ProfileSelectedMsg)
+	psm := msg.(messages.ProfileSelected)
 	if psm.Profile != "profile-3" {
 		t.Errorf("G should go to bottom; expected profile-3, got %s", psm.Profile)
 	}

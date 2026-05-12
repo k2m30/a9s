@@ -20,7 +20,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -436,9 +436,9 @@ func TestDetailViewCTEvents_NavigatePrincipalRow(t *testing.T) {
 
 	// Execute the cmd to get the message.
 	msg := cmd()
-	navMsg, ok := msg.(messages.RelatedNavigateMsg)
+	navMsg, ok := msg.(messages.RelatedNavigate)
 	if !ok {
-		t.Fatalf("TestDetailViewCTEvents_NavigatePrincipalRow: Enter returned %T, want messages.RelatedNavigateMsg", msg)
+		t.Fatalf("TestDetailViewCTEvents_NavigatePrincipalRow: Enter returned %T, want messages.RelatedNavigate", msg)
 	}
 
 	if navMsg.TargetType != "role" {
@@ -544,9 +544,9 @@ func TestDetailViewCTEvents_Regression_S3TargetNavigability(t *testing.T) {
 		t.Fatal("TestDetailViewCTEvents_Regression_S3TargetNavigability: Enter on Bucket row returned nil cmd — Bucket row is not navigable")
 	}
 	bucketMsg := bucketCmd()
-	bucketNav, ok := bucketMsg.(messages.RelatedNavigateMsg)
+	bucketNav, ok := bucketMsg.(messages.RelatedNavigate)
 	if !ok {
-		t.Fatalf("TestDetailViewCTEvents_Regression_S3TargetNavigability: Bucket Enter returned %T, want messages.RelatedNavigateMsg", bucketMsg)
+		t.Fatalf("TestDetailViewCTEvents_Regression_S3TargetNavigability: Bucket Enter returned %T, want messages.RelatedNavigate", bucketMsg)
 	}
 	if bucketNav.TargetType != "s3" {
 		t.Errorf("TestDetailViewCTEvents_Regression_S3TargetNavigability: Bucket row TargetType = %q, want \"s3\"", bucketNav.TargetType)
@@ -562,9 +562,9 @@ func TestDetailViewCTEvents_Regression_S3TargetNavigability(t *testing.T) {
 		t.Fatal("TestDetailViewCTEvents_Regression_S3TargetNavigability: Enter on Object row returned nil cmd — Object row is not navigable")
 	}
 	objectMsg := objectCmd()
-	objectNav, ok := objectMsg.(messages.RelatedNavigateMsg)
+	objectNav, ok := objectMsg.(messages.RelatedNavigate)
 	if !ok {
-		t.Fatalf("TestDetailViewCTEvents_Regression_S3TargetNavigability: Object Enter returned %T, want messages.RelatedNavigateMsg", objectMsg)
+		t.Fatalf("TestDetailViewCTEvents_Regression_S3TargetNavigability: Object Enter returned %T, want messages.RelatedNavigate", objectMsg)
 	}
 	if objectNav.TargetType != "s3" {
 		t.Errorf("TestDetailViewCTEvents_Regression_S3TargetNavigability: Object row TargetType = %q, want \"s3\"", objectNav.TargetType)
@@ -759,9 +759,9 @@ func TestDetailViewCTEvents_Regression_EC2InstanceNavigability_FallbackPath(t *t
 	}
 
 	msg := cmd()
-	navMsg, ok := msg.(messages.RelatedNavigateMsg)
+	navMsg, ok := msg.(messages.RelatedNavigate)
 	if !ok {
-		t.Fatalf("TestDetailViewCTEvents_Regression_EC2InstanceNavigability_FallbackPath: Enter returned %T, want messages.RelatedNavigateMsg", msg)
+		t.Fatalf("TestDetailViewCTEvents_Regression_EC2InstanceNavigability_FallbackPath: Enter returned %T, want messages.RelatedNavigate", msg)
 	}
 
 	if navMsg.TargetType != "ec2" {

@@ -6,7 +6,7 @@ import (
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -20,7 +20,7 @@ func TestHandleRelatedNavigateChild_ValidChildType(t *testing.T) {
 	m := newRootSizedModel()
 
 	// "ecr_images" is a registered child type (ecr_images.go init).
-	msg := messages.RelatedNavigateMsg{
+	msg := messages.RelatedNavigate{
 		TargetType: "ecr_images",
 	}
 
@@ -30,9 +30,9 @@ func TestHandleRelatedNavigateChild_ValidChildType(t *testing.T) {
 	}
 
 	result := cmd()
-	enterMsg, ok := result.(messages.EnterChildViewMsg)
+	enterMsg, ok := result.(messages.EnterChildView)
 	if !ok {
-		t.Fatalf("cmd() returned %T, want messages.EnterChildViewMsg", result)
+		t.Fatalf("cmd() returned %T, want messages.EnterChildView", result)
 	}
 	if enterMsg.ChildType != "ecr_images" {
 		t.Errorf("EnterChildViewMsg.ChildType = %q, want %q", enterMsg.ChildType, "ecr_images")
@@ -47,7 +47,7 @@ func TestHandleRelatedNavigateChild_ValidChildType(t *testing.T) {
 func TestHandleRelatedNavigateChild_UnknownChildType(t *testing.T) {
 	m := newRootSizedModel()
 
-	msg := messages.RelatedNavigateMsg{
+	msg := messages.RelatedNavigate{
 		TargetType: "nonexistent_child_xyz",
 	}
 
@@ -59,9 +59,9 @@ func TestHandleRelatedNavigateChild_UnknownChildType(t *testing.T) {
 	result := cmd()
 	// The root model routes unknown types through ResolveRelatedNavigate which
 	// returns NavigationKindFlash for unregistered types (neither child nor top-level).
-	flashMsg, ok := result.(messages.FlashMsg)
+	flashMsg, ok := result.(messages.Flash)
 	if !ok {
-		t.Fatalf("cmd() returned %T, want messages.FlashMsg", result)
+		t.Fatalf("cmd() returned %T, want messages.Flash", result)
 	}
 	if !flashMsg.IsError {
 		t.Errorf("FlashMsg.IsError = false, want true for unknown child type")

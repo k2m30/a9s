@@ -12,7 +12,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -166,7 +166,7 @@ func TestDetailView_EnrichResult_IgnoresMismatchedResourceID(t *testing.T) {
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/my-policy", "my-policy", "Managed")
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "role_policies",
 		Resource:     &res,
@@ -177,7 +177,7 @@ func TestDetailView_EnrichResult_IgnoresMismatchedResourceID(t *testing.T) {
 
 	// Send enrichment result with WRONG resource ID — should be silently ignored
 	wrongRes := withDocument(res, map[string]any{"Version": "2012-10-17"})
-	m, _ = rootApplyMsg(m, messages.EnrichDetailResultMsg{
+	m, _ = rootApplyMsg(m, messages.EnrichDetailResult{
 		ResourceType: "role_policies",
 		ResourceID:   "wrong-id-that-does-not-match",
 		EnrichedRes:  wrongRes,
@@ -207,7 +207,7 @@ func TestApp_NavigateToRolePoliciesDetail_DispatchesEnrichment(t *testing.T) {
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/test", "test", "Managed")
 
-	_, cmd := rootApplyMsg(m, messages.NavigateMsg{
+	_, cmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "role_policies",
 		Resource:     &res,
@@ -257,7 +257,7 @@ func TestDetailView_EnrichResult_AcceptsMatchingID(t *testing.T) {
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/my-policy", "my-policy", "Managed")
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "role_policies",
 		Resource:     &res,
@@ -265,7 +265,7 @@ func TestDetailView_EnrichResult_AcceptsMatchingID(t *testing.T) {
 
 	enrichedRes := withDocument(res, map[string]any{"Version": "2012-10-17"})
 	// Should not panic, update should be accepted
-	m, _ = rootApplyMsg(m, messages.EnrichDetailResultMsg{
+	m, _ = rootApplyMsg(m, messages.EnrichDetailResult{
 		ResourceType: "role_policies",
 		ResourceID:   res.ID, // matching ID
 		EnrichedRes:  enrichedRes,
@@ -292,7 +292,7 @@ func TestEnrichResult_WrongResourceType_IsIgnored(t *testing.T) {
 	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/rt-test", "rt-test", "Managed")
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "role_policies",
 		Resource:     &res,
@@ -300,7 +300,7 @@ func TestEnrichResult_WrongResourceType_IsIgnored(t *testing.T) {
 
 	// Send enrichment result with WRONG resource type but matching ID
 	enrichedRes := withDocument(res, map[string]any{"Version": "2012-10-17"})
-	m, _ = rootApplyMsg(m, messages.EnrichDetailResultMsg{
+	m, _ = rootApplyMsg(m, messages.EnrichDetailResult{
 		ResourceType: "wrong-type",
 		ResourceID:   res.ID,
 		EnrichedRes:  enrichedRes,
@@ -322,14 +322,14 @@ func TestEnrichResult_ErrorShowsFlashMessage(t *testing.T) {
 	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/err-test", "err-test", "Managed")
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "role_policies",
 		Resource:     &res,
 	})
 
 	// Send enrichment result with an error
-	_, cmd := rootApplyMsg(m, messages.EnrichDetailResultMsg{
+	_, cmd := rootApplyMsg(m, messages.EnrichDetailResult{
 		ResourceType: "role_policies",
 		ResourceID:   res.ID,
 		Err:          fmt.Errorf("GetPolicy: access denied"),
@@ -340,7 +340,7 @@ func TestEnrichResult_ErrorShowsFlashMessage(t *testing.T) {
 		t.Fatal("expected a flash command on enrichment error")
 	}
 	msg := cmd()
-	flash, ok := msg.(messages.FlashMsg)
+	flash, ok := msg.(messages.Flash)
 	if !ok {
 		t.Fatalf("expected FlashMsg, got %T", msg)
 	}
@@ -362,7 +362,7 @@ func TestEnrichResult_StaleGeneration_IsDiscarded(t *testing.T) {
 	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/gen-test", "gen-test", "Managed")
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "role_policies",
 		Resource:     &res,
@@ -370,7 +370,7 @@ func TestEnrichResult_StaleGeneration_IsDiscarded(t *testing.T) {
 
 	// Send enrichment result with a stale generation (999 != current enrichGen)
 	enrichedRes := withDocument(res, map[string]any{"Version": "2012-10-17"})
-	m, _ = rootApplyMsg(m, messages.EnrichDetailResultMsg{
+	m, _ = rootApplyMsg(m, messages.EnrichDetailResult{
 		ResourceType: "role_policies",
 		ResourceID:   res.ID,
 		EnrichedRes:  enrichedRes,
@@ -395,7 +395,7 @@ func TestYAMLView_DirectFromList_EnrichmentUpdatesContent(t *testing.T) {
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/yaml-direct", "yaml-direct", "Managed")
 
 	// Open YAML view directly (as if pressing y from resource list)
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetYAML,
 		ResourceType: "role_policies",
 		Resource:     &res,
@@ -408,7 +408,7 @@ func TestYAMLView_DirectFromList_EnrichmentUpdatesContent(t *testing.T) {
 			map[string]any{"Effect": "Allow", "Action": "s3:*", "Resource": "*"},
 		},
 	})
-	m, _ = rootApplyMsg(m, messages.EnrichDetailResultMsg{
+	m, _ = rootApplyMsg(m, messages.EnrichDetailResult{
 		ResourceType: "role_policies",
 		ResourceID:   res.ID,
 		EnrichedRes:  enrichedRes,
@@ -435,7 +435,7 @@ func TestJSONView_DirectFromList_EnrichmentUpdatesContent(t *testing.T) {
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/json-direct", "json-direct", "Managed")
 
 	// Open JSON view directly
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetJSON,
 		ResourceType: "role_policies",
 		Resource:     &res,
@@ -448,7 +448,7 @@ func TestJSONView_DirectFromList_EnrichmentUpdatesContent(t *testing.T) {
 			map[string]any{"Effect": "Deny", "Action": "*", "Resource": "*"},
 		},
 	})
-	m, _ = rootApplyMsg(m, messages.EnrichDetailResultMsg{
+	m, _ = rootApplyMsg(m, messages.EnrichDetailResult{
 		ResourceType: "role_policies",
 		ResourceID:   res.ID,
 		EnrichedRes:  enrichedRes,
@@ -474,7 +474,7 @@ func TestYAMLView_WrongResourceType_EnrichmentIgnored(t *testing.T) {
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/yaml-guard", "yaml-guard", "Managed")
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetYAML,
 		ResourceType: "role_policies",
 		Resource:     &res,
@@ -482,7 +482,7 @@ func TestYAMLView_WrongResourceType_EnrichmentIgnored(t *testing.T) {
 
 	// Send enrichment with wrong resource type
 	enrichedRes := withDocument(res, map[string]any{"Version": "2012-10-17"})
-	m, _ = rootApplyMsg(m, messages.EnrichDetailResultMsg{
+	m, _ = rootApplyMsg(m, messages.EnrichDetailResult{
 		ResourceType: "wrong-type",
 		ResourceID:   res.ID,
 		EnrichedRes:  enrichedRes,
@@ -567,7 +567,7 @@ func TestRefresh_OnDetailView_DispatchesEnrichment(t *testing.T) {
 	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/refresh-test", "refresh-test", "Managed")
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "role_policies",
 		Resource:     &res,
@@ -612,7 +612,7 @@ func TestHandleEnrichDetail_NoEnricher_ReturnsNilCmd(t *testing.T) {
 	}
 
 	// Dispatch EnrichDetailMsg directly — exercises handleEnrichDetail.
-	_, cmd := rootApplyMsg(m, messages.EnrichDetailMsg{
+	_, cmd := rootApplyMsg(m, messages.EnrichDetail{
 		ResourceType: "ec2",
 		Resource:     ec2Res,
 	})
@@ -646,7 +646,7 @@ func TestHandleEnrichDetail_WithEnricher_ReturnsEnrichDetailResultMsg(t *testing
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/enrich-direct", "enrich-direct", "Managed")
 
 	// Dispatch EnrichDetailMsg directly to exercise handleEnrichDetail.
-	_, cmd := rootApplyMsg(m, messages.EnrichDetailMsg{
+	_, cmd := rootApplyMsg(m, messages.EnrichDetail{
 		ResourceType: "role_policies",
 		Resource:     res,
 	})
@@ -657,7 +657,7 @@ func TestHandleEnrichDetail_WithEnricher_ReturnsEnrichDetailResultMsg(t *testing
 
 	// Execute the cmd — it calls the enricher and returns EnrichDetailResultMsg.
 	result := cmd()
-	resultMsg, ok := result.(messages.EnrichDetailResultMsg)
+	resultMsg, ok := result.(messages.EnrichDetailResult)
 	if !ok {
 		t.Fatalf("cmd() should return EnrichDetailResultMsg, got %T", result)
 	}

@@ -30,7 +30,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -67,7 +67,7 @@ func newCTEventsDetail(res resource.Resource) views.DetailModel {
 // injectCTResult delivers a single RelatedCheckResultMsg into a ct-events
 // DetailModel and returns the updated model.
 func injectCTResult(d views.DetailModel, result resource.RelatedCheckResult) views.DetailModel {
-	updated, _ := d.Update(messages.RelatedCheckResultMsg{
+	updated, _ := d.Update(messages.RelatedCheckResult{
 		ResourceType: "ct-events",
 		Result:       result,
 	})
@@ -191,7 +191,7 @@ func TestCtEventsRightColumnDispatch(t *testing.T) {
 							}
 							_, cmd := d.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 							msg := ctExecuteCmd(cmd)
-							if navMsg, ok2 := msg.(messages.RelatedNavigateMsg); ok2 {
+							if navMsg, ok2 := msg.(messages.RelatedNavigate); ok2 {
 								if navMsg.TargetType == def.TargetType {
 									t.Errorf("D2 FAIL: Count=0 row dispatched RelatedNavigateMsg — %s"+
 										" | dispatched TargetType=%q RelatedIDs=%v FetchFilter=%v",
@@ -221,7 +221,7 @@ func TestCtEventsRightColumnDispatch(t *testing.T) {
 							return
 						}
 						msg := ctExecuteCmd(cmd)
-						navMsg, navOK := msg.(messages.RelatedNavigateMsg)
+						navMsg, navOK := msg.(messages.RelatedNavigate)
 						if !navOK {
 							t.Errorf("D1 FAIL: Count=%d typed row dispatched %T, want RelatedNavigateMsg — %s",
 								result.Count, msg, label)
@@ -255,7 +255,7 @@ func TestCtEventsRightColumnDispatch(t *testing.T) {
 							return
 						}
 						msg := ctExecuteCmd(cmd)
-						navMsg, navOK := msg.(messages.RelatedNavigateMsg)
+						navMsg, navOK := msg.(messages.RelatedNavigate)
 						if !navOK {
 							t.Errorf("D3 FAIL: pivot row dispatched %T, want RelatedNavigateMsg — %s"+
 								" | FetchFilter=%v",
@@ -316,7 +316,7 @@ func TestCtEventsRightColumnDispatch_LoadingRowNotActionable(t *testing.T) {
 		}
 		_, cmd := current.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 		msg := ctExecuteCmd(cmd)
-		if _, ok2 := msg.(messages.RelatedNavigateMsg); ok2 {
+		if _, ok2 := msg.(messages.RelatedNavigate); ok2 {
 			t.Errorf("loading row at position %d dispatched RelatedNavigateMsg — loading rows must not be navigable (event=%s)",
 				i, fixture.ID)
 		}

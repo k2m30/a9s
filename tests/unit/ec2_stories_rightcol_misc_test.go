@@ -36,7 +36,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -133,7 +133,7 @@ func ec2StoryViewContent(m tui.Model) string {
 
 // deliverRelatedResult delivers a RelatedCheckResultMsg to a DetailModel.
 func deliverRelatedResult(d views.DetailModel, targetType string, count int) views.DetailModel {
-	msg := messages.RelatedCheckResultMsg{
+	msg := messages.RelatedCheckResult{
 		ResourceType: "ec2",
 		Result: resource.RelatedCheckResult{
 			TargetType: targetType,
@@ -527,7 +527,7 @@ func TestEC2_043_AllCount0_NoCursorInRightCol(t *testing.T) {
 
 	if cmd != nil {
 		msg := cmd()
-		if _, isNav := msg.(messages.RelatedNavigateMsg); isNav {
+		if _, isNav := msg.(messages.RelatedNavigate); isNav {
 			t.Errorf("EC2-043: Enter on all-count=0 right column must not produce RelatedNavigateMsg; got %T", msg)
 		}
 	}
@@ -661,7 +661,7 @@ func TestEC2_047_EscFromDetailReturnsToList(t *testing.T) {
 	m, _ = ec2StoryApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 30})
 
 	// Navigate to EC2 list.
-	m, _ = ec2StoryApplyMsg(m, messages.NavigateMsg{
+	m, _ = ec2StoryApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -673,13 +673,13 @@ func TestEC2_047_EscFromDetailReturnsToList(t *testing.T) {
 		Status: "running",
 		Fields: map[string]string{"InstanceId": "i-0a1b2c3d4e5f60001"},
 	}
-	m, _ = ec2StoryApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = ec2StoryApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{ec2Res},
 	})
 
 	// Navigate to EC2 detail.
-	m, _ = ec2StoryApplyMsg(m, messages.NavigateMsg{
+	m, _ = ec2StoryApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "ec2",
 		Resource:     &ec2Res,
@@ -740,7 +740,7 @@ func TestEC2_049_NavigableFieldsWorkWithRightColHidden(t *testing.T) {
 	}
 
 	msg := cmd()
-	nav, ok := msg.(messages.RelatedNavigateMsg)
+	nav, ok := msg.(messages.RelatedNavigate)
 	if !ok {
 		t.Fatalf("EC2-049: cmd() must produce RelatedNavigateMsg, got %T", msg)
 	}
@@ -785,7 +785,7 @@ func TestEC2_050_CopyFieldValue(t *testing.T) {
 
 	// If a cmd is returned, it must produce a CopiedMsg with the field value.
 	msg := cmd()
-	copiedMsg, ok := msg.(messages.CopiedMsg)
+	copiedMsg, ok := msg.(messages.Copied)
 	if !ok {
 		t.Errorf("EC2-050: cmd() must produce CopiedMsg with field value; got %T", msg)
 		return
@@ -828,7 +828,7 @@ func TestEC2_051_CopyFromRightCol(t *testing.T) {
 	}
 
 	msg := cmd()
-	copiedMsg, ok := msg.(messages.CopiedMsg)
+	copiedMsg, ok := msg.(messages.Copied)
 	if !ok {
 		t.Errorf("EC2-051: cmd() from right-column c must produce CopiedMsg; got %T", msg)
 		return
@@ -872,7 +872,7 @@ func TestEC2_052_CtrlR_Refresh(t *testing.T) {
 	}
 
 	// Navigate to EC2 detail.
-	m, _ = ec2StoryApplyMsg(m, messages.NavigateMsg{
+	m, _ = ec2StoryApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "ec2",
 		Resource:     &ec2Res,
@@ -894,7 +894,7 @@ func TestEC2_052_CtrlR_Refresh(t *testing.T) {
 		t.Errorf("EC2-052: Ctrl+R cmd() must return a non-nil message")
 		return
 	}
-	if _, isRelated := msg.(messages.RelatedCheckStartedMsg); !isRelated {
+	if _, isRelated := msg.(messages.RelatedCheckStarted); !isRelated {
 		t.Errorf("EC2-052: Ctrl+R in detail view must trigger RelatedCheckStartedMsg; got %T", msg)
 	}
 }
@@ -922,7 +922,7 @@ func TestEC2_055_HelpScreenShown(t *testing.T) {
 	}
 
 	// Navigate to EC2 detail.
-	m, _ = ec2StoryApplyMsg(m, messages.NavigateMsg{
+	m, _ = ec2StoryApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "ec2",
 		Resource:     &ec2Res,
@@ -957,7 +957,7 @@ func TestEC2_055_HelpScreenClosesOnAnyKey(t *testing.T) {
 	}
 
 	// Navigate to EC2 detail.
-	m, _ = ec2StoryApplyMsg(m, messages.NavigateMsg{
+	m, _ = ec2StoryApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "ec2",
 		Resource:     &ec2Res,
@@ -1005,7 +1005,7 @@ func TestEC2_056_YAMLViewHidesRightCol(t *testing.T) {
 	}
 
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("EC2-056: pressing y must emit NavigateMsg; got %T", msg)
 	}
@@ -1033,7 +1033,7 @@ func TestEC2_056_YAMLViewFullWidth(t *testing.T) {
 	}
 
 	// Navigate to EC2 detail.
-	m, _ = ec2StoryApplyMsg(m, messages.NavigateMsg{
+	m, _ = ec2StoryApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "ec2",
 		Resource:     &ec2Res,

@@ -56,7 +56,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ---------------------------------------------------------------------------
@@ -443,7 +443,7 @@ func buildModelWithMockClients(t *testing.T) tui.Model {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	clients := buildMockClients(t)
-	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{Clients: clients})
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: clients})
 	return m
 }
 
@@ -471,18 +471,18 @@ func executeBatchCmd(cmd tea.Cmd) []tea.Msg {
 }
 
 // findMsgOfType returns the first message of a specific type from a slice.
-func findResourcesLoadedMsg(msgs []tea.Msg) *messages.ResourcesLoadedMsg {
+func findResourcesLoadedMsg(msgs []tea.Msg) *messages.ResourcesLoaded {
 	for _, msg := range msgs {
-		if rl, ok := msg.(messages.ResourcesLoadedMsg); ok {
+		if rl, ok := msg.(messages.ResourcesLoaded); ok {
 			return &rl
 		}
 	}
 	return nil
 }
 
-func findAPIErrorMsg(msgs []tea.Msg) *messages.APIErrorMsg {
+func findAPIErrorMsg(msgs []tea.Msg) *messages.APIError {
 	for _, msg := range msgs {
-		if ae, ok := msg.(messages.APIErrorMsg); ok {
+		if ae, ok := msg.(messages.APIError); ok {
 			return &ae
 		}
 	}
@@ -496,7 +496,7 @@ func findAPIErrorMsg(msgs []tea.Msg) *messages.APIErrorMsg {
 func TestQA_FetchResources_S3Buckets(t *testing.T) {
 	m := buildModelWithMockClients(t)
 
-	_, cmd := rootApplyMsg(m, messages.NavigateMsg{
+	_, cmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "s3",
 	})
@@ -526,7 +526,7 @@ func TestQA_FetchResources_S3Objects(t *testing.T) {
 	m := buildModelWithMockClients(t)
 
 	// S3 objects are fetched via EnterChildViewMsg
-	_, cmd := rootApplyMsg(m, messages.EnterChildViewMsg{
+	_, cmd := rootApplyMsg(m, messages.EnterChildView{
 		ChildType:     "s3_objects",
 		ParentContext: map[string]string{"bucket": "test-bucket"},
 		DisplayName:   "test-bucket",
@@ -553,7 +553,7 @@ func TestQA_FetchResources_S3Objects(t *testing.T) {
 func TestQA_FetchResources_EC2(t *testing.T) {
 	m := buildModelWithMockClients(t)
 
-	_, cmd := rootApplyMsg(m, messages.NavigateMsg{
+	_, cmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -579,7 +579,7 @@ func TestQA_FetchResources_EC2(t *testing.T) {
 func TestQA_FetchResources_RDS(t *testing.T) {
 	m := buildModelWithMockClients(t)
 
-	_, cmd := rootApplyMsg(m, messages.NavigateMsg{
+	_, cmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbi",
 	})
@@ -605,7 +605,7 @@ func TestQA_FetchResources_RDS(t *testing.T) {
 func TestQA_FetchResources_Redis(t *testing.T) {
 	m := buildModelWithMockClients(t)
 
-	_, cmd := rootApplyMsg(m, messages.NavigateMsg{
+	_, cmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "redis",
 	})
@@ -631,7 +631,7 @@ func TestQA_FetchResources_Redis(t *testing.T) {
 func TestQA_FetchResources_DocDB(t *testing.T) {
 	m := buildModelWithMockClients(t)
 
-	_, cmd := rootApplyMsg(m, messages.NavigateMsg{
+	_, cmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbc",
 	})
@@ -657,7 +657,7 @@ func TestQA_FetchResources_DocDB(t *testing.T) {
 func TestQA_FetchResources_EKS(t *testing.T) {
 	m := buildModelWithMockClients(t)
 
-	_, cmd := rootApplyMsg(m, messages.NavigateMsg{
+	_, cmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "eks",
 	})
@@ -683,7 +683,7 @@ func TestQA_FetchResources_EKS(t *testing.T) {
 func TestQA_FetchResources_Secrets(t *testing.T) {
 	m := buildModelWithMockClients(t)
 
-	_, cmd := rootApplyMsg(m, messages.NavigateMsg{
+	_, cmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
 	})
@@ -719,7 +719,7 @@ func TestQA_FetchResources_NilClients(t *testing.T) {
 	for _, rt := range resource.AllShortNames() {
 		t.Run(rt, func(t *testing.T) {
 			t.Parallel()
-			_, cmd := rootApplyMsg(m, messages.NavigateMsg{
+			_, cmd := rootApplyMsg(m, messages.Navigate{
 				Target:       messages.TargetResourceList,
 				ResourceType: rt,
 			})
@@ -747,7 +747,7 @@ func TestQA_FetchResources_UnsupportedResourceType(t *testing.T) {
 	m := buildModelWithMockClients(t)
 
 	// Send a LoadResourcesMsg with an unknown type (bypasses NavigateMsg validation)
-	_, cmd := rootApplyMsg(m, messages.LoadResourcesMsg{
+	_, cmd := rootApplyMsg(m, messages.LoadResources{
 		ResourceType: "bogus",
 	})
 	if cmd == nil {
@@ -755,7 +755,7 @@ func TestQA_FetchResources_UnsupportedResourceType(t *testing.T) {
 	}
 
 	msg := cmd()
-	ae, ok := msg.(messages.APIErrorMsg)
+	ae, ok := msg.(messages.APIError)
 	if !ok {
 		t.Fatalf("expected APIErrorMsg, got %T", msg)
 	}
@@ -774,7 +774,7 @@ func TestQA_FetchResources_UnsupportedResourceType(t *testing.T) {
 func TestQA_FetchResources_S3NavigatePrefix(t *testing.T) {
 	m := buildModelWithMockClients(t)
 
-	_, cmd := rootApplyMsg(m, messages.EnterChildViewMsg{
+	_, cmd := rootApplyMsg(m, messages.EnterChildView{
 		ChildType:     "s3_objects",
 		ParentContext: map[string]string{"bucket": "test-bucket", "prefix": "some/prefix/"},
 		DisplayName:   "test-bucket",
@@ -813,7 +813,7 @@ func TestQA_FetchResources_ViaLoadResourcesMsg(t *testing.T) {
 
 	for _, rt := range resource.AllShortNames() {
 		t.Run(rt, func(t *testing.T) {
-			_, cmd := rootApplyMsg(m, messages.LoadResourcesMsg{
+			_, cmd := rootApplyMsg(m, messages.LoadResources{
 				ResourceType: rt,
 			})
 			if cmd == nil {
@@ -822,11 +822,11 @@ func TestQA_FetchResources_ViaLoadResourcesMsg(t *testing.T) {
 
 			msg := cmd()
 			switch msg := msg.(type) {
-			case messages.ResourcesLoadedMsg:
+			case messages.ResourcesLoaded:
 				if msg.ResourceType != rt {
 					t.Errorf("expected ResourceType %q, got %q", rt, msg.ResourceType)
 				}
-			case messages.APIErrorMsg:
+			case messages.APIError:
 				if cborResources[rt] {
 					t.Skipf("skipping %s: uses CBOR protocol not supported by mock HTTP server", rt)
 				} else {

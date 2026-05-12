@@ -10,7 +10,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
 
@@ -396,7 +396,7 @@ func (m DetailModel) NeedsRelatedCheck() bool {
 // "by Username" / "by EventName" / "by SharedEventId") — resolve to the
 // correct row on replay instead of leaving all four stuck in the loading
 // state.
-func (m *DetailModel) ApplyRelatedResults(msgs []messages.RelatedCheckResultMsg) {
+func (m *DetailModel) ApplyRelatedResults(msgs []messages.RelatedCheckResult) {
 	for _, msg := range msgs {
 		m.rightCol, _ = m.rightCol.Update(msg)
 	}

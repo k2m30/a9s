@@ -21,7 +21,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // TestIssue235_EachCheckerGetsIsolatedCacheSnapshot verifies that when three
@@ -123,7 +123,7 @@ func TestIssue235_EachCheckerGetsIsolatedCacheSnapshot(t *testing.T) {
 	srcRes := resource.Resource{ID: "src-235-instance"}
 
 	// Send RelatedCheckStartedMsg — root returns a tea.Batch of 3 checker cmds.
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   srcType,
 		SourceResource: srcRes,
 	})
@@ -143,7 +143,7 @@ func TestIssue235_EachCheckerGetsIsolatedCacheSnapshot(t *testing.T) {
 	}
 
 	// Execute each sub-command and collect RelatedCheckResultMsg by target type.
-	results := make(map[string]messages.RelatedCheckResultMsg)
+	results := make(map[string]messages.RelatedCheckResult)
 	for _, cmd := range batchMsg {
 		if cmd == nil {
 			continue
@@ -152,7 +152,7 @@ func TestIssue235_EachCheckerGetsIsolatedCacheSnapshot(t *testing.T) {
 		if msg == nil {
 			continue
 		}
-		if r, ok2 := msg.(messages.RelatedCheckResultMsg); ok2 {
+		if r, ok2 := msg.(messages.RelatedCheckResult); ok2 {
 			results[r.Result.TargetType] = r
 		}
 	}

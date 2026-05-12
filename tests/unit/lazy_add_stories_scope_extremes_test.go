@@ -19,7 +19,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ---------------------------------------------------------------------------
@@ -37,7 +37,7 @@ func Test_LA_010_MixedInScopeAndOutOfScope(t *testing.T) {
 		targetType = "test-la010-target"
 	)
 
-	inScopeID  := "customer-kms-la010"
+	inScopeID := "customer-kms-la010"
 	outScopeID := "aws-managed-kms-la010"
 
 	resource.RegisterRelated(srcType, []resource.RelatedDef{
@@ -75,7 +75,7 @@ func Test_LA_010_MixedInScopeAndOutOfScope(t *testing.T) {
 
 	// Pre-seed the target cache with the in-scope resource via CachedPages.
 	inScopeRes := resource.Resource{ID: inScopeID, Name: inScopeID}
-	m, _ = rootApplyMsg(m, messages.RelatedCheckResultMsg{
+	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     srcType,
 		SourceResourceID: "src-la010-seed",
 		Result:           resource.RelatedCheckResult{TargetType: targetType, Count: 1},
@@ -88,7 +88,7 @@ func Test_LA_010_MixedInScopeAndOutOfScope(t *testing.T) {
 	})
 
 	srcRes := resource.Resource{ID: "src-la010-001"}
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   srcType,
 		SourceResource: srcRes,
 	})
@@ -181,7 +181,7 @@ func Test_LA_011_AllOutOfScopePopulatesDrill(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	srcRes := resource.Resource{ID: "src-la011-001"}
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   srcType,
 		SourceResource: srcRes,
 	})
@@ -246,7 +246,7 @@ func Test_LA_012_AllInScopeNoLazyAdd(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	// Pre-seed cache with both resources so they are "in-scope" / already loaded.
-	m, _ = rootApplyMsg(m, messages.RelatedCheckResultMsg{
+	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     srcType,
 		SourceResourceID: "src-la012-seed",
 		Result:           resource.RelatedCheckResult{TargetType: targetType, Count: 2},
@@ -259,7 +259,7 @@ func Test_LA_012_AllInScopeNoLazyAdd(t *testing.T) {
 	})
 
 	srcRes := resource.Resource{ID: "src-la012-001"}
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   srcType,
 		SourceResource: srcRes,
 	})
@@ -318,7 +318,7 @@ func Test_LA_015_ARNvsBareNameTolerance(t *testing.T) {
 	)
 
 	fullARN := "arn:aws:iam::aws:policy/AdministratorAccess-la015"
-	bareID  := "AdministratorAccess-la015"
+	bareID := "AdministratorAccess-la015"
 
 	resource.RegisterRelated(srcType, []resource.RelatedDef{
 		{
@@ -349,7 +349,7 @@ func Test_LA_015_ARNvsBareNameTolerance(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	srcRes := resource.Resource{ID: "src-la015-001"}
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   srcType,
 		SourceResource: srcRes,
 	})
@@ -394,7 +394,7 @@ func Test_LA_016_UUIDvsAliasDisplay(t *testing.T) {
 	)
 
 	keyUUID := "a1b2c3d4-e5f6-7890-abcd-ef0123456789"
-	alias   := "alias/my-cmk-la016"
+	alias := "alias/my-cmk-la016"
 
 	resource.RegisterRelated(srcType, []resource.RelatedDef{
 		{
@@ -432,7 +432,7 @@ func Test_LA_016_UUIDvsAliasDisplay(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	srcRes := resource.Resource{ID: "src-la016-001"}
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   srcType,
 		SourceResource: srcRes,
 	})
@@ -521,9 +521,9 @@ func Test_LA_070_100IDsDrillWithoutTimeout(t *testing.T) {
 
 	srcRes := resource.Resource{ID: "src-la070-001"}
 
-	done := make(chan messages.RelatedCheckResultMsg, 1)
+	done := make(chan messages.RelatedCheckResult, 1)
 	go func() {
-		_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+		_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
 			ResourceType:   srcType,
 			SourceResource: srcRes,
 		})
@@ -628,7 +628,7 @@ func Test_LA_071_MalformedIDsFiltered(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	srcRes := resource.Resource{ID: "src-la071-001"}
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   srcType,
 		SourceResource: srcRes,
 	})
@@ -715,7 +715,7 @@ func Test_LA_072_IDSetGrowsAcrossRedrill(t *testing.T) {
 
 	// --- First drill: checker emits id1, id2 ---
 	var batchCmd tea.Cmd
-	m, batchCmd = rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	m, batchCmd = rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   srcType,
 		SourceResource: srcRes,
 	})
@@ -741,7 +741,7 @@ func Test_LA_072_IDSetGrowsAcrossRedrill(t *testing.T) {
 	// --- Second drill: checker now emits id1, id2, id3 (superset) ---
 	checkerIDs = []string{id1, id2, id3}
 
-	_, batchCmd = rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	_, batchCmd = rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   srcType,
 		SourceResource: srcRes,
 	})

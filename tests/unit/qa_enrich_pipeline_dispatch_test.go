@@ -25,7 +25,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // pipelineProbeResources returns a minimal slice of fake CodePipeline resources
@@ -47,13 +47,13 @@ func pipelineProbeResources() []resource.Resource {
 // collectEnrichmentMsgs executes a cmd (possibly a BatchMsg) and returns all
 // EnrichmentCheckedMsg values found, up to two levels of nesting.
 // Unlike extractMsg, this helper does NOT call t.Fatal — it just returns what it finds.
-func collectEnrichmentMsgs(cmd tea.Cmd) []messages.EnrichmentCheckedMsg {
+func collectEnrichmentMsgs(cmd tea.Cmd) []messages.EnrichmentChecked {
 	if cmd == nil {
 		return nil
 	}
-	var found []messages.EnrichmentCheckedMsg
+	var found []messages.EnrichmentChecked
 	visit := func(msg tea.Msg) {
-		if m, ok := msg.(messages.EnrichmentCheckedMsg); ok {
+		if m, ok := msg.(messages.EnrichmentChecked); ok {
 			found = append(found, m)
 		}
 	}
@@ -97,7 +97,7 @@ func TestBuildEnrichQueue_DispatchesCodePipeline(t *testing.T) {
 	// Deliver AvailabilityCheckedMsg to seed probeResources["pipeline"] and
 	// trigger the availability-probe finalization path that calls startEnrichment.
 	// availTotal starts at 0; after incrementing availChecked to 1, 1 >= 0 → finalize.
-	_, cmd := rootApplyMsg(m, messages.AvailabilityCheckedMsg{
+	_, cmd := rootApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: "pipeline",
 		Count:        1,
 		Truncated:    false,

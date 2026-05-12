@@ -11,7 +11,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -167,7 +167,7 @@ func TestIdentityView_AnyKeyDismisses(t *testing.T) {
 	}
 
 	msg := cmd()
-	if _, ok := msg.(messages.PopViewMsg); !ok {
+	if _, ok := msg.(messages.PopView); !ok {
 		t.Errorf("Update(KeyMsg) should return PopViewMsg, got %T", msg)
 	}
 }
@@ -183,7 +183,7 @@ func TestIdentityView_Update_IdentityLoadedMsg(t *testing.T) {
 		AccountAlias: "acme-prod",
 		ARN:          "arn:aws:sts::123456789012:assumed-role/admin/s",
 	}
-	m, _ = m.Update(messages.IdentityLoadedMsg{Identity: data})
+	m, _ = m.Update(messages.IdentityLoaded{Identity: data})
 
 	plain := stripANSI(m.View())
 	if !strings.Contains(plain, "123456789012") {
@@ -200,7 +200,7 @@ func TestIdentityView_Update_IdentityErrorMsg(t *testing.T) {
 	m := views.NewIdentity("testprofile", "us-east-1", keys.Default())
 	m.SetSize(80, 24)
 
-	m, _ = m.Update(messages.IdentityErrorMsg{Err: "ExpiredToken: the security token has expired"})
+	m, _ = m.Update(messages.IdentityError{Err: "ExpiredToken: the security token has expired"})
 
 	plain := stripANSI(m.View())
 	if !strings.Contains(plain, "ExpiredToken") {
@@ -285,7 +285,7 @@ func TestRoot_IdentityLoaded_UpdatesHeader(t *testing.T) {
 		IsAssumedRole: true,
 		IdentityName:  "admin-role",
 	}
-	m, _ = rootApplyMsg(m, messages.IdentityLoadedMsg{Identity: identity})
+	m, _ = rootApplyMsg(m, messages.IdentityLoaded{Identity: identity})
 
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "acme-prod") {
@@ -397,7 +397,7 @@ func TestQA_Help_ShowsIdentityBinding(t *testing.T) {
 			name: "resource_list",
 			setup: func() tui.Model {
 				m := newRootSizedModel()
-				m, _ = rootApplyMsg(m, messages.NavigateMsg{
+				m, _ = rootApplyMsg(m, messages.Navigate{
 					Target:       messages.TargetResourceList,
 					ResourceType: "ec2",
 				})
@@ -408,11 +408,11 @@ func TestQA_Help_ShowsIdentityBinding(t *testing.T) {
 			name: "detail_view",
 			setup: func() tui.Model {
 				m := newRootSizedModel()
-				m, _ = rootApplyMsg(m, messages.NavigateMsg{
+				m, _ = rootApplyMsg(m, messages.Navigate{
 					Target:       messages.TargetResourceList,
 					ResourceType: "ec2",
 				})
-				m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+				m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 					ResourceType: "ec2",
 					Resources: []resource.Resource{
 						{
@@ -423,7 +423,7 @@ func TestQA_Help_ShowsIdentityBinding(t *testing.T) {
 						},
 					},
 				})
-				m, _ = rootApplyMsg(m, messages.NavigateMsg{
+				m, _ = rootApplyMsg(m, messages.Navigate{
 					Target: messages.TargetDetail,
 				})
 				return m

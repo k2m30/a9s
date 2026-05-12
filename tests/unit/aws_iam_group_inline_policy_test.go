@@ -30,24 +30,24 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // runIAMGroupRelatedCheck drives the cold-cache app to the detail view for the
 // given IAM group name and returns the RelatedCheckResultMsg for TargetType "policy".
 // Fails the test if the group is not found or no policy check result is produced.
-func runIAMGroupRelatedCheck(t *testing.T, groupName string) messages.RelatedCheckResultMsg {
+func runIAMGroupRelatedCheck(t *testing.T, groupName string) messages.RelatedCheckResult {
 	t.Helper()
 
 	m := newDemoColdCacheApp(t)
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	clients := demo.NewServiceClients()
-	*m, _ = rootApplyMsg(*m, messages.ClientsReadyMsg{Clients: clients, Gen: 0})
+	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 0})
 
 	// Navigate to IAM groups list.
 	var navCmd tea.Cmd
-	*m, navCmd = rootApplyMsg(*m, messages.NavigateMsg{
+	*m, navCmd = rootApplyMsg(*m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "iam-group",
 	})
@@ -56,10 +56,10 @@ func runIAMGroupRelatedCheck(t *testing.T, groupName string) messages.RelatedChe
 	}
 
 	raw := extractMsg(t, navCmd, func(msg tea.Msg) bool {
-		_, ok := msg.(messages.ResourcesLoadedMsg)
+		_, ok := msg.(messages.ResourcesLoaded)
 		return ok
 	})
-	loaded := raw.(messages.ResourcesLoadedMsg)
+	loaded := raw.(messages.ResourcesLoaded)
 
 	if len(loaded.Resources) == 0 {
 		t.Fatal("IAM groups fixture returned zero groups")
@@ -86,7 +86,7 @@ func runIAMGroupRelatedCheck(t *testing.T, groupName string) messages.RelatedChe
 
 	// Open detail — triggers related-check commands.
 	var relatedCmd tea.Cmd
-	*m, relatedCmd = rootApplyMsg(*m, messages.NavigateMsg{
+	*m, relatedCmd = rootApplyMsg(*m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		Resource:     &targetGroup,
 		ResourceType: "iam-group",
@@ -98,7 +98,7 @@ func runIAMGroupRelatedCheck(t *testing.T, groupName string) messages.RelatedChe
 
 	// Execute to get RelatedCheckStartedMsg.
 	relatedMsg := relatedCmd()
-	started, ok := relatedMsg.(messages.RelatedCheckStartedMsg)
+	started, ok := relatedMsg.(messages.RelatedCheckStarted)
 	if !ok {
 		t.Fatalf("expected RelatedCheckStartedMsg after detail nav, got %T", relatedMsg)
 	}
@@ -122,7 +122,7 @@ func runIAMGroupRelatedCheck(t *testing.T, groupName string) messages.RelatedChe
 
 	rawCheck := runChecker(checkCmds)
 	switch v := rawCheck.(type) {
-	case messages.RelatedCheckResultMsg:
+	case messages.RelatedCheckResult:
 		if v.Result.TargetType == "policy" {
 			return v
 		}
@@ -132,7 +132,7 @@ func runIAMGroupRelatedCheck(t *testing.T, groupName string) messages.RelatedChe
 				continue
 			}
 			sub := runChecker(subCmd)
-			if r, ok2 := sub.(messages.RelatedCheckResultMsg); ok2 && r.Result.TargetType == "policy" {
+			if r, ok2 := sub.(messages.RelatedCheckResult); ok2 && r.Result.TargetType == "policy" {
 				return r
 			}
 		}
@@ -140,7 +140,7 @@ func runIAMGroupRelatedCheck(t *testing.T, groupName string) messages.RelatedChe
 
 	t.Fatalf("no 'policy' RelatedCheckResultMsg found for group %q; "+
 		"is checkGroupPolicy registered as a RelatedDef for iam-group?", groupName)
-	return messages.RelatedCheckResultMsg{}
+	return messages.RelatedCheckResult{}
 }
 
 // TestIAMGroup_ManagedPolicies_RelatedCount verifies that a group with attached
@@ -201,11 +201,11 @@ func TestIAMPolicyList_IncludesInlinePolicies(t *testing.T) {
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	clients := demo.NewServiceClients()
-	*m, _ = rootApplyMsg(*m, messages.ClientsReadyMsg{Clients: clients, Gen: 0})
+	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 0})
 
 	// Navigate to the policy resource list.
 	var navCmd tea.Cmd
-	*m, navCmd = rootApplyMsg(*m, messages.NavigateMsg{
+	*m, navCmd = rootApplyMsg(*m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "policy",
 	})
@@ -215,10 +215,10 @@ func TestIAMPolicyList_IncludesInlinePolicies(t *testing.T) {
 
 	// Drain the fetch command to get ResourcesLoadedMsg.
 	raw := extractMsg(t, navCmd, func(msg tea.Msg) bool {
-		_, ok := msg.(messages.ResourcesLoadedMsg)
+		_, ok := msg.(messages.ResourcesLoaded)
 		return ok
 	})
-	loaded := raw.(messages.ResourcesLoadedMsg)
+	loaded := raw.(messages.ResourcesLoaded)
 
 	// Collect inline policy names from the returned resources.
 	var inlineNames []string
@@ -497,11 +497,11 @@ func TestInlinePolicy_DetailShowsParentGroup(t *testing.T) {
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	clients := demo.NewServiceClients()
-	*m, _ = rootApplyMsg(*m, messages.ClientsReadyMsg{Clients: clients, Gen: 0})
+	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 0})
 
 	// Fetch the policy list.
 	var navCmd tea.Cmd
-	*m, navCmd = rootApplyMsg(*m, messages.NavigateMsg{
+	*m, navCmd = rootApplyMsg(*m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "policy",
 	})
@@ -510,10 +510,10 @@ func TestInlinePolicy_DetailShowsParentGroup(t *testing.T) {
 	}
 
 	raw := extractMsg(t, navCmd, func(msg tea.Msg) bool {
-		_, ok := msg.(messages.ResourcesLoadedMsg)
+		_, ok := msg.(messages.ResourcesLoaded)
 		return ok
 	})
-	loaded := raw.(messages.ResourcesLoadedMsg)
+	loaded := raw.(messages.ResourcesLoaded)
 	*m, _ = rootApplyMsg(*m, loaded)
 
 	// Find an inline policy with a known parent group.
@@ -541,7 +541,7 @@ func TestInlinePolicy_DetailShowsParentGroup(t *testing.T) {
 
 	// Open detail for the inline policy — triggers related-check + enrichment commands.
 	var batchCmd tea.Cmd
-	*m, batchCmd = rootApplyMsg(*m, messages.NavigateMsg{
+	*m, batchCmd = rootApplyMsg(*m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		Resource:     &inlinePolicy,
 		ResourceType: "policy",
@@ -554,9 +554,9 @@ func TestInlinePolicy_DetailShowsParentGroup(t *testing.T) {
 	// The returned cmd may be a batch (enrichment + related check).
 	// Drain it to find the RelatedCheckStartedMsg.
 	batchMsg := batchCmd()
-	var started messages.RelatedCheckStartedMsg
+	var started messages.RelatedCheckStarted
 	switch msg := batchMsg.(type) {
-	case messages.RelatedCheckStartedMsg:
+	case messages.RelatedCheckStarted:
 		started = msg
 	case tea.BatchMsg:
 		found := false
@@ -565,7 +565,7 @@ func TestInlinePolicy_DetailShowsParentGroup(t *testing.T) {
 				continue
 			}
 			subMsg := sub()
-			if s, ok := subMsg.(messages.RelatedCheckStartedMsg); ok {
+			if s, ok := subMsg.(messages.RelatedCheckStarted); ok {
 				started = s
 				found = true
 				break
@@ -593,12 +593,12 @@ func TestInlinePolicy_DetailShowsParentGroup(t *testing.T) {
 		return c()
 	}
 
-	var groupResult messages.RelatedCheckResultMsg
+	var groupResult messages.RelatedCheckResult
 	var found bool
 
 	rawCheck := runChecker(checkCmds)
 	switch v := rawCheck.(type) {
-	case messages.RelatedCheckResultMsg:
+	case messages.RelatedCheckResult:
 		if v.Result.TargetType == "iam-group" {
 			groupResult = v
 			found = true
@@ -609,7 +609,7 @@ func TestInlinePolicy_DetailShowsParentGroup(t *testing.T) {
 				continue
 			}
 			sub := runChecker(subCmd)
-			if r, ok2 := sub.(messages.RelatedCheckResultMsg); ok2 && r.Result.TargetType == "iam-group" {
+			if r, ok2 := sub.(messages.RelatedCheckResult); ok2 && r.Result.TargetType == "iam-group" {
 				groupResult = r
 				found = true
 				break

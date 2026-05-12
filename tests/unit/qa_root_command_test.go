@@ -8,7 +8,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -32,7 +32,7 @@ func TestQA_RootCommand_EmitsNavigateToMainMenu(t *testing.T) {
 		t.Fatal(":root + Enter should return a command")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf(":root should emit NavigateMsg, got %T", msg)
 	}
@@ -57,7 +57,7 @@ func TestQA_MainCommand_EmitsNavigateToMainMenu(t *testing.T) {
 		t.Fatal(":main + Enter should return a command")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf(":main should emit NavigateMsg, got %T", msg)
 	}
@@ -115,11 +115,11 @@ func TestQA_RootCommand_PopsToMainMenu_FromResourceList(t *testing.T) {
 	withTuiVersion(t, "1.0.0")
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetMainMenu})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetMainMenu})
 
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "resource-types") {
@@ -134,16 +134,16 @@ func TestQA_RootCommand_PopsToMainMenu_FromDeepStack(t *testing.T) {
 	withTuiVersion(t, "1.0.0")
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "s3",
 	})
 	res := &resource.Resource{ID: "my-bucket", Name: "my-bucket"}
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: res,
 	})
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetMainMenu})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetMainMenu})
 
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "resource-types") {
@@ -158,7 +158,7 @@ func TestQA_RootCommand_NoopAtMainMenu(t *testing.T) {
 	withTuiVersion(t, "1.0.0")
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetMainMenu})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetMainMenu})
 
 	plain := stripANSI(rootViewContent(m))
 	if plain == "" {
@@ -210,7 +210,7 @@ func TestQA_HelpContext_ResourceList_ShowsCommandsSection(t *testing.T) {
 	withTuiVersion(t, "1.0.0")
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})

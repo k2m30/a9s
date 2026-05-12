@@ -30,16 +30,16 @@ import (
 	"sync/atomic"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ses"
 	sestypes "github.com/aws/aws-sdk-go-v2/service/ses/types"
-	tea "charm.land/bubbletea/v2"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/session"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // TestInvalidateSESRuleSetCache verifies that after a successful
@@ -48,11 +48,11 @@ import (
 // retry the API call.
 //
 // Behaviour pinned:
-//   1. First checker call: API called (counter = 1), valid rule set returned.
-//   2. Second checker call: cache hit, no new API call (counter still 1).
-//   3. Call InvalidateSESRuleSetCache(clients).
-//   4. Third checker call: cache miss, API called again (counter = 2).
-//   5. Returns same rule-set output (fake always returns the same fixture).
+//  1. First checker call: API called (counter = 1), valid rule set returned.
+//  2. Second checker call: cache hit, no new API call (counter still 1).
+//  3. Call InvalidateSESRuleSetCache(clients).
+//  4. Third checker call: cache miss, API called again (counter = 2).
+//  5. Returns same rule-set output (fake always returns the same fixture).
 func TestInvalidateSESRuleSetCache(t *testing.T) {
 	// Build a simple rule set with one global LambdaAction so the checker walk
 	// succeeds and returns Count=1 each time.
@@ -226,10 +226,10 @@ func TestHandleRefresh_SESDetailViewInvalidatesRuleSetCache(t *testing.T) {
 
 	// Wire the pre-supplied clients into m.clients by sending the ClientsReadyMsg
 	// that Init() would normally emit as a command (but we don't run the event loop).
-	m = applyMsg(m, messages.ClientsReadyMsg{Clients: clients})
+	m = applyMsg(m, messages.ClientsReady{Clients: clients})
 
 	// Push an SES detail view onto the stack.
-	m = applyMsg(m, messages.NavigateMsg{
+	m = applyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "ses",
 		Resource:     &sesRes,

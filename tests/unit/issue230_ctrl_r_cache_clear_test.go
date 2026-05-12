@@ -87,7 +87,7 @@ func TestContract_CtrlR_ClearsRelatedCache_ThenRechecks(t *testing.T) {
 		}
 		// Use fmt.Sprintf for type check without importing messages package.
 		typeName := fmt.Sprintf("%T", msg)
-		if typeName == "messages.RelatedCheckStartedMsg" {
+		if typeName == "messages.RelatedCheckStarted" {
 			found = true
 			break
 		}
@@ -101,7 +101,7 @@ func TestContract_CtrlR_ClearsRelatedCache_ThenRechecks(t *testing.T) {
 		m3, refreshCmd3 := rootApplyMsg(m3, ctrlR())
 		_, chainMsgs := drainCmds(t, m3, refreshCmd3, 10)
 		for _, msg := range chainMsgs {
-			if fmt.Sprintf("%T", msg) == "messages.RelatedCheckStartedMsg" {
+			if fmt.Sprintf("%T", msg) == "messages.RelatedCheckStarted" {
 				found = true
 				break
 			}
@@ -133,7 +133,7 @@ func TestContract_CtrlR_FromDetail_ProducesRelatedCheckStarted(t *testing.T) {
 	for _, msg := range chainMsgs {
 		typeName := fmt.Sprintf("%T", msg)
 		msgTypes = append(msgTypes, typeName)
-		if typeName == "messages.RelatedCheckStartedMsg" {
+		if typeName == "messages.RelatedCheckStarted" {
 			found = true
 			break
 		}

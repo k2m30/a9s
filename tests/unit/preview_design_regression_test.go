@@ -11,7 +11,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -89,7 +89,7 @@ func TestPreview_RightColumnTabFocus_SkipsDimRowsOnEnter(t *testing.T) {
 	defer cleanup()
 
 	// tg=0 (dim), asg=2 (available), others dim.
-	for _, msg := range []messages.RelatedCheckResultMsg{
+	for _, msg := range []messages.RelatedCheckResult{
 		{ResourceType: "ec2", Result: resource.RelatedCheckResult{TargetType: "tg", Count: 0}},
 		{ResourceType: "ec2", Result: resource.RelatedCheckResult{TargetType: "asg", Count: 2, ResourceIDs: []string{"asg-1", "asg-2"}}},
 		{ResourceType: "ec2", Result: resource.RelatedCheckResult{TargetType: "alarm", Count: 0}},
@@ -105,7 +105,7 @@ func TestPreview_RightColumnTabFocus_SkipsDimRowsOnEnter(t *testing.T) {
 		t.Fatal("enter on focused right column should emit RelatedNavigateMsg for first non-dim row")
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.RelatedNavigateMsg)
+	nav, ok := msg.(messages.RelatedNavigate)
 	if !ok {
 		t.Fatalf("expected RelatedNavigateMsg, got %T", msg)
 	}
@@ -131,7 +131,7 @@ func TestPreview_RightColumnScroll_KeepsDeepCursorRowVisible(t *testing.T) {
 
 	m := newPreviewDemoModel(t, 120, 8)
 	ec2Res := previewEC2Resource()
-	m, _ = previewApplyMsg(m, messages.NavigateMsg{
+	m, _ = previewApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "ec2",
 		Resource:     &ec2Res,
@@ -152,7 +152,7 @@ func TestPreview_RightColumnScroll_KeepsDeepCursorRowVisible(t *testing.T) {
 func TestPreview_DetailHelp_IncludesRelatedFilterAndCopyValue(t *testing.T) {
 	m := newPreviewDemoModel(t, 120, 30)
 	ec2Res := previewEC2Resource()
-	m, _ = previewApplyMsg(m, messages.NavigateMsg{
+	m, _ = previewApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "ec2",
 		Resource:     &ec2Res,

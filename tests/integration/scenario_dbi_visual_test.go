@@ -20,7 +20,7 @@ import (
 
 	demofixtures "github.com/k2m30/a9s/v3/internal/demo/fixtures"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 func TestScenario_DBIVisual(t *testing.T) {
@@ -333,9 +333,9 @@ func runDemoStartup(t *testing.T, s *fullIntegrationScenario) {
 	for _, msg := range fullIntegrationCollectCmdMessages(initCmd) {
 		// Skip the ClientsReadyMsg we've already synthesized via the scenario
 		// constructor — re-applying it would reset state. Only process the
-		// messages.AvailabilityPrefetchedMsg family when it arrives naturally
+		// messages.AvailabilityPrefetched family when it arrives naturally
 		// from the demoPrefetchCounts command chain.
-		if _, ok := msg.(messages.ClientsReadyMsg); ok {
+		if _, ok := msg.(messages.ClientsReady); ok {
 			s.applyAndDrain(msg)
 			continue
 		}

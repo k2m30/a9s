@@ -9,7 +9,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // resolveRowColor returns the resource.Color for row styling.
@@ -342,7 +342,6 @@ func (m ResourceListModel) IssueCount() int {
 	return m.issueCount
 }
 
-
 // SetShowIssueBadge enables the "issues:N" badge in FrameTitle.
 // Set by main menu navigation for top-level resource lists.
 func (m *ResourceListModel) SetShowIssueBadge(v bool) {
@@ -380,7 +379,7 @@ func (m ResourceListModel) handleChildKey(keyName string, r *resource.Resource) 
 			if child.DrillBlockMessage != "" {
 				msg := child.DrillBlockMessage
 				return m, func() tea.Msg {
-					return messages.FlashMsg{Text: msg, IsError: true}
+					return messages.Flash{Text: msg, IsError: true}
 				}
 			}
 			continue
@@ -391,7 +390,7 @@ func (m ResourceListModel) handleChildKey(keyName string, r *resource.Resource) 
 		childType := child.ChildType
 
 		return m, func() tea.Msg {
-			return messages.EnterChildViewMsg{
+			return messages.EnterChildView{
 				ChildType:     childType,
 				ParentContext: ctx,
 				DisplayName:   displayName,

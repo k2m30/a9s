@@ -21,12 +21,12 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/session"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // handleAvailabilityCacheLoaded applies cached entries to the main menu and
 // starts background availability checks.
-func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoadedMsg) ([]UIIntent, []TaskRequest) {
+func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoaded) ([]UIIntent, []TaskRequest) {
 	canonKey := func(k string) string {
 		if td := resource.FindResourceType(k); td != nil {
 			return td.ShortName
@@ -95,13 +95,7 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 // handleAvailabilityPrefetched applies synchronously-prefetched counts to the
 // main menu.  Used in no-cache + pre-supplied-clients mode so counts appear
 // immediately without background probes.
-func (c *Core) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetchedMsg) ([]UIIntent, []TaskRequest) {
-	// Gen guard: drop stale results produced before a profile/region switch.
-	// Gen=0 is the zero value (pre-guard dispatch) — accepted unconditionally.
-	if msg.Gen != 0 && msg.Gen != c.session.AvailabilityGen {
-		return nil, nil
-	}
-
+func (c *Core) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetched) ([]UIIntent, []TaskRequest) {
 	var intents []UIIntent
 
 	for shortName, count := range msg.Entries {
@@ -169,12 +163,7 @@ func (c *Core) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetchedM
 }
 
 // handleAvailabilityChecked processes a single resource type's probe result.
-func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityCheckedMsg) ([]UIIntent, []TaskRequest) {
-	// Ignore stale results from a previous generation (profile/region switch).
-	if msg.Gen != c.session.AvailabilityGen {
-		return nil, nil
-	}
-
+func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UIIntent, []TaskRequest) {
 	c.session.AvailChecked++
 
 	var intents []UIIntent
@@ -280,16 +269,12 @@ func (c *Core) startEnrichment() ([]UIIntent, []TaskRequest) {
 }
 
 // handleEnrichmentChecked processes a single Wave-2 enrichment result.
-func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentCheckedMsg) ([]UIIntent, []TaskRequest) {
+func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIIntent, []TaskRequest) {
 	originalType := msg.ResourceType
 	if td := resource.FindResourceType(msg.ResourceType); td != nil {
 		msg.ResourceType = td.ShortName
 	}
 
-	// Session-wide generation guard.
-	if msg.Gen != 0 && msg.Gen != c.session.EnrichmentGen {
-		return nil, nil
-	}
 	// Per-type generation guard.
 	if msg.TypeGen != 0 && msg.TypeGen != c.session.EnrichmentTypeGen[msg.ResourceType] {
 		return nil, nil

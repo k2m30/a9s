@@ -110,7 +110,7 @@ else
 fi
 
 # messages must not import tui/
-msgs_tui=$(grep -rn '".*tui/' internal/tui/messages/ 2>/dev/null | grep -v '_test.go' || true)
+msgs_tui=$(grep -rn '".*tui/' internal/runtime/messages/ 2>/dev/null | grep -v '_test.go' || true)
 if [ -z "$msgs_tui" ]; then
   pass "messages/ does not import tui/"
 else

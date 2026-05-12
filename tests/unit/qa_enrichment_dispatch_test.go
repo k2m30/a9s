@@ -18,7 +18,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // originalIssue196Enrichers lists the foundational enrichers from issue #196.
@@ -90,7 +90,7 @@ func newTestModel() tui.Model {
 func TestEnrichmentCheckedMsg_StaleSessionGenDropped(t *testing.T) {
 	m := newTestModel()
 
-	staleMsg := messages.EnrichmentCheckedMsg{
+	staleMsg := messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Issues:       42,
 		Truncated:    false,
@@ -115,7 +115,7 @@ func TestEnrichmentCheckedMsg_StaleSessionGenDropped(t *testing.T) {
 func TestEnrichmentCheckedMsg_StaleTypeGenDropped(t *testing.T) {
 	m := newTestModel()
 
-	staleMsg := messages.EnrichmentCheckedMsg{
+	staleMsg := messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Issues:       5,
 		Truncated:    false,
@@ -135,7 +135,7 @@ func TestEnrichmentCheckedMsg_StaleTypeGenDropped(t *testing.T) {
 func TestEnrichmentCheckedMsg_ErrorDoesNotCrash(t *testing.T) {
 	m := newTestModel()
 
-	errMsg := messages.EnrichmentCheckedMsg{
+	errMsg := messages.EnrichmentChecked{
 		ResourceType: "ddb",
 		Err:          errors.New("access denied"),
 		Gen:          0, // matches fresh model
@@ -153,7 +153,7 @@ func TestEnrichmentCheckedMsg_ErrorDoesNotCrash(t *testing.T) {
 func TestEnrichmentCheckedMsg_NilFindingsOnError(t *testing.T) {
 	m := newTestModel()
 
-	errMsg := messages.EnrichmentCheckedMsg{
+	errMsg := messages.EnrichmentChecked{
 		ResourceType: "sfn",
 		Findings:     nil, // explicitly nil — enricher errored out
 		Err:          errors.New("throttled"),
@@ -171,7 +171,7 @@ func TestEnrichmentCheckedMsg_NilFindingsOnError(t *testing.T) {
 func TestEnrichmentCheckedMsg_ValidSuccessDoesNotCrash(t *testing.T) {
 	m := newTestModel()
 
-	successMsg := messages.EnrichmentCheckedMsg{
+	successMsg := messages.EnrichmentChecked{
 		ResourceType: "glue",
 		Issues:       1,
 		Truncated:    false,

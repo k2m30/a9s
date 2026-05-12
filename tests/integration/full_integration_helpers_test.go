@@ -17,7 +17,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 type fullIntegrationCountExpectation struct {
@@ -190,7 +190,7 @@ func fullIntegrationNewReadyModelWithClients(t *testing.T, profile, region strin
 	t.Helper()
 	m := tui.New(profile, region, tui.WithClients(clients), tui.WithNoCache(true))
 	m, _ = fullIntegrationApplyMsg(m, tea.WindowSizeMsg{Width: 240, Height: 220})
-	m, _ = fullIntegrationApplyMsg(m, messages.ClientsReadyMsg{Clients: clients, Region: region})
+	m, _ = fullIntegrationApplyMsg(m, messages.ClientsReady{Clients: clients, Region: region})
 	return m
 }
 
@@ -269,23 +269,23 @@ func fullIntegrationExpectedRelatedCounts(t *testing.T, clients *awsclient.Servi
 	return expected
 }
 
-func fullIntegrationOpenResourceList(t *testing.T, m *tui.Model, resourceType string) messages.ResourcesLoadedMsg {
+func fullIntegrationOpenResourceList(t *testing.T, m *tui.Model, resourceType string) messages.ResourcesLoaded {
 	t.Helper()
 	var cmd tea.Cmd
-	*m, cmd = fullIntegrationApplyMsg(*m, messages.NavigateMsg{
+	*m, cmd = fullIntegrationApplyMsg(*m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: resourceType,
 	})
 	raw := fullIntegrationExtractMsg(t, cmd, func(msg tea.Msg) bool {
-		_, ok := msg.(messages.ResourcesLoadedMsg)
+		_, ok := msg.(messages.ResourcesLoaded)
 		return ok
 	})
-	loaded := raw.(messages.ResourcesLoadedMsg)
+	loaded := raw.(messages.ResourcesLoaded)
 	*m, _ = fullIntegrationApplyMsg(*m, loaded)
 	return loaded
 }
 
-func fullIntegrationDescribeSelectedResource(t *testing.T, m *tui.Model, resourceType string) (resource.Resource, []messages.RelatedCheckResultMsg) {
+func fullIntegrationDescribeSelectedResource(t *testing.T, m *tui.Model, resourceType string) (resource.Resource, []messages.RelatedCheckResult) {
 	t.Helper()
 	res, results, ok := fullIntegrationDescribeSelectedResourceMaybeRelated(t, m, resourceType)
 	if !ok {
@@ -294,14 +294,14 @@ func fullIntegrationDescribeSelectedResource(t *testing.T, m *tui.Model, resourc
 	return res, results
 }
 
-func fullIntegrationDescribeSelectedResourceMaybeRelated(t *testing.T, m *tui.Model, resourceType string) (resource.Resource, []messages.RelatedCheckResultMsg, bool) {
+func fullIntegrationDescribeSelectedResourceMaybeRelated(t *testing.T, m *tui.Model, resourceType string) (resource.Resource, []messages.RelatedCheckResult, bool) {
 	t.Helper()
 	var cmd tea.Cmd
 	*m, cmd = fullIntegrationApplyMsg(*m, fullIntegrationKeyPress("d"))
 	raw := fullIntegrationRequireCmdMsg(t, cmd, "describe selected "+resourceType)
-	nav, ok := raw.(messages.NavigateMsg)
+	nav, ok := raw.(messages.Navigate)
 	if !ok {
-		t.Fatalf("describe selected %s returned %T, expected messages.NavigateMsg", resourceType, raw)
+		t.Fatalf("describe selected %s returned %T, expected messages.Navigate", resourceType, raw)
 	}
 	if nav.Resource == nil {
 		t.Fatalf("describe selected %s returned NavigateMsg with nil resource", resourceType)
@@ -316,7 +316,7 @@ func fullIntegrationDescribeSelectedResourceMaybeRelated(t *testing.T, m *tui.Mo
 	return res, fullIntegrationRunRelatedChecksFromStartCmd(t, m, relatedCmd, resourceType), true
 }
 
-func fullIntegrationEnterRelatedSingleDetail(t *testing.T, m *tui.Model, targetType, displayName string) (resource.Resource, []messages.RelatedCheckResultMsg) {
+func fullIntegrationEnterRelatedSingleDetail(t *testing.T, m *tui.Model, targetType, displayName string) (resource.Resource, []messages.RelatedCheckResult) {
 	t.Helper()
 	rel := fullIntegrationEnterFocusedRelated(t, m, targetType, displayName)
 	var cmd tea.Cmd
@@ -330,7 +330,7 @@ func fullIntegrationEnterRelatedSingleDetail(t *testing.T, m *tui.Model, targetT
 	// ResourcesLoadedMsg / NavigateMsg. Detect by scanning for that message
 	// in the returned cmd.
 	for _, inner := range fullIntegrationCollectCmdMessages(cmd) {
-		started, ok := inner.(messages.RelatedCheckStartedMsg)
+		started, ok := inner.(messages.RelatedCheckStarted)
 		if !ok {
 			continue
 		}
@@ -340,16 +340,16 @@ func fullIntegrationEnterRelatedSingleDetail(t *testing.T, m *tui.Model, targetT
 	}
 
 	raw := fullIntegrationExtractMsg(t, cmd, func(msg tea.Msg) bool {
-		_, ok := msg.(messages.ResourcesLoadedMsg)
+		_, ok := msg.(messages.ResourcesLoaded)
 		return ok
 	})
-	loaded := raw.(messages.ResourcesLoadedMsg)
+	loaded := raw.(messages.ResourcesLoaded)
 	var autoOpenCmd tea.Cmd
 	*m, autoOpenCmd = fullIntegrationApplyMsg(*m, loaded)
 	navRaw := fullIntegrationRequireCmdMsg(t, autoOpenCmd, "auto-open related "+displayName)
-	nav, ok := navRaw.(messages.NavigateMsg)
+	nav, ok := navRaw.(messages.Navigate)
 	if !ok {
-		t.Fatalf("auto-open related %q returned %T, expected messages.NavigateMsg", displayName, navRaw)
+		t.Fatalf("auto-open related %q returned %T, expected messages.Navigate", displayName, navRaw)
 	}
 	if nav.Resource == nil {
 		t.Fatalf("auto-open related %q returned nil resource", displayName)
@@ -370,21 +370,21 @@ func fullIntegrationEnterRelatedList(t *testing.T, m *tui.Model, targetType, dis
 		return
 	}
 	raw := fullIntegrationExtractMsg(t, cmd, func(msg tea.Msg) bool {
-		_, ok := msg.(messages.ResourcesLoadedMsg)
+		_, ok := msg.(messages.ResourcesLoaded)
 		return ok
 	})
 	*m, _ = fullIntegrationApplyMsg(*m, raw)
 }
 
-func fullIntegrationEnterFocusedRelated(t *testing.T, m *tui.Model, targetType, displayName string) messages.RelatedNavigateMsg {
+func fullIntegrationEnterFocusedRelated(t *testing.T, m *tui.Model, targetType, displayName string) messages.RelatedNavigate {
 	t.Helper()
 	*m, _ = fullIntegrationApplyMsg(*m, fullIntegrationKeyPress("l"))
 	var cmd tea.Cmd
 	*m, cmd = fullIntegrationApplyMsg(*m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	raw := fullIntegrationRequireCmdMsg(t, cmd, "enter focused related "+displayName)
-	rel, ok := raw.(messages.RelatedNavigateMsg)
+	rel, ok := raw.(messages.RelatedNavigate)
 	if !ok {
-		t.Fatalf("enter focused related %q returned %T, expected messages.RelatedNavigateMsg", displayName, raw)
+		t.Fatalf("enter focused related %q returned %T, expected messages.RelatedNavigate", displayName, raw)
 	}
 	if rel.TargetType != targetType {
 		t.Fatalf("focused related row target = %q, expected %q (%s)", rel.TargetType, targetType, displayName)
@@ -392,23 +392,23 @@ func fullIntegrationEnterFocusedRelated(t *testing.T, m *tui.Model, targetType, 
 	return rel
 }
 
-func fullIntegrationRunRelatedChecksFromStartCmd(t *testing.T, m *tui.Model, startCmd tea.Cmd, resourceType string) []messages.RelatedCheckResultMsg {
+func fullIntegrationRunRelatedChecksFromStartCmd(t *testing.T, m *tui.Model, startCmd tea.Cmd, resourceType string) []messages.RelatedCheckResult {
 	t.Helper()
 	// startCmd may be a tea.BatchMsg carrying other detail-load messages
 	// (e.g. EnrichDetailMsg) alongside RelatedCheckStartedMsg — find the
 	// related-check message regardless of where it sits in the batch.
 	raw := fullIntegrationExtractMsg(t, startCmd, func(msg tea.Msg) bool {
-		_, ok := msg.(messages.RelatedCheckStartedMsg)
+		_, ok := msg.(messages.RelatedCheckStarted)
 		return ok
 	})
-	started, ok := raw.(messages.RelatedCheckStartedMsg)
+	started, ok := raw.(messages.RelatedCheckStarted)
 	if !ok {
-		t.Fatalf("related check start for %s returned %T, expected messages.RelatedCheckStartedMsg", resourceType, raw)
+		t.Fatalf("related check start for %s returned %T, expected messages.RelatedCheckStarted", resourceType, raw)
 	}
 	return fullIntegrationApplyStartedAndCollectResults(t, m, started, resourceType)
 }
 
-func fullIntegrationApplyStartedAndCollectResults(t *testing.T, m *tui.Model, started messages.RelatedCheckStartedMsg, resourceType string) []messages.RelatedCheckResultMsg {
+func fullIntegrationApplyStartedAndCollectResults(t *testing.T, m *tui.Model, started messages.RelatedCheckStarted, resourceType string) []messages.RelatedCheckResult {
 	t.Helper()
 	var cmd tea.Cmd
 	*m, cmd = fullIntegrationApplyMsg(*m, started)
@@ -422,10 +422,10 @@ func fullIntegrationApplyStartedAndCollectResults(t *testing.T, m *tui.Model, st
 	return results
 }
 
-func fullIntegrationCollectRelatedCheckResults(cmd tea.Cmd) []messages.RelatedCheckResultMsg {
-	var results []messages.RelatedCheckResultMsg
+func fullIntegrationCollectRelatedCheckResults(cmd tea.Cmd) []messages.RelatedCheckResult {
+	var results []messages.RelatedCheckResult
 	for _, msg := range fullIntegrationCollectCmdMessages(cmd) {
-		if result, ok := msg.(messages.RelatedCheckResultMsg); ok {
+		if result, ok := msg.(messages.RelatedCheckResult); ok {
 			results = append(results, result)
 		}
 	}
@@ -454,7 +454,7 @@ func fullIntegrationCollectMessages(msg tea.Msg) []tea.Msg {
 	}
 }
 
-func fullIntegrationAssertRelatedResults(t *testing.T, expected map[string]int, got []messages.RelatedCheckResultMsg, context string) {
+func fullIntegrationAssertRelatedResults(t *testing.T, expected map[string]int, got []messages.RelatedCheckResult, context string) {
 	t.Helper()
 	gotByName := make(map[string]int, len(got))
 	for _, result := range got {

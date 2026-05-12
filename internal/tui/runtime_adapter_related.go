@@ -10,9 +10,9 @@
 // unchanged.
 //
 // handleRelatedNavigateChild stays here as a TUI-only helper because it
-// dispatches a messages.EnterChildViewMsg — a Bubble Tea message type.
+// dispatches a messages.EnterChildView — a Bubble Tea message type.
 //
-// handleRelatedCheckStarted is the BT adapter for messages.RelatedCheckStartedMsg.
+// handleRelatedCheckStarted is the BT adapter for messages.RelatedCheckStarted.
 // It asks runtime.Core whether any RelatedDefs are registered for the source
 // type, and if so fans out one checker goroutine per def via relatedCheckCmd
 // (capped by runtime.MaxConcurrentProbes). The actual probe loop stays here in
@@ -41,7 +41,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/session"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -52,7 +52,7 @@ import (
 // It constructs a transient runtime.Core to invoke the migrated policy
 // (HandleRelatedNavigate), then builds the view and starts any required fetch
 // based on the returned NavigationResult and TaskRequests.
-func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, tea.Cmd) {
 	core := runtime.New(m.Session, resource.AllResourceTypes())
 	ev := runtime.RelatedNavigateEvent{
 		TargetType:     msg.TargetType,
@@ -68,7 +68,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 	switch result.Kind {
 	case runtime.NavigationKindFlash:
 		return m, func() tea.Msg {
-			return messages.FlashMsg{
+			return messages.Flash{
 				Text:    result.FlashMessage,
 				IsError: result.FlashIsError,
 			}
@@ -101,7 +101,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 				}
 			}
 			return m, func() tea.Msg {
-				return messages.FlashMsg{
+				return messages.Flash{
 					Text:    fmt.Sprintf("unknown resource type: %s", msg.TargetType),
 					IsError: true,
 				}
@@ -300,7 +300,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 		rt := resource.FindResourceType(msg.TargetType)
 		if rt == nil {
 			return m, func() tea.Msg {
-				return messages.FlashMsg{
+				return messages.Flash{
 					Text:    fmt.Sprintf("unknown resource type: %s", msg.TargetType),
 					IsError: true,
 				}
@@ -336,7 +336,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 				displayName := ctx[enterChild.DisplayNameKey]
 				childType := enterChild.ChildType
 				return m, func() tea.Msg {
-					return messages.EnterChildViewMsg{
+					return messages.EnterChildView{
 						ChildType:     childType,
 						ParentContext: ctx,
 						DisplayName:   displayName,
@@ -355,7 +355,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 				}
 				srcRes := r
 				return m, func() tea.Msg {
-					return messages.RelatedCheckStartedMsg{
+					return messages.RelatedCheckStarted{
 						ResourceType:   msg.TargetType,
 						SourceResource: srcRes,
 					}
@@ -368,7 +368,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 		rt := resource.FindResourceType(msg.TargetType)
 		if rt == nil {
 			return m, func() tea.Msg {
-				return messages.FlashMsg{
+				return messages.Flash{
 					Text:    fmt.Sprintf("unknown resource type: %s", msg.TargetType),
 					IsError: true,
 				}
@@ -387,11 +387,11 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigateMsg) (tea.Model
 // handleRelatedNavigateChild handles navigation to a child resource type from
 // the related panel. It dispatches an EnterChildViewMsg so that the existing
 // child-view machinery handles the push and fetch.
-func (m Model) handleRelatedNavigateChild(msg messages.RelatedNavigateMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleRelatedNavigateChild(msg messages.RelatedNavigate) (tea.Model, tea.Cmd) {
 	childDef := resource.GetChildType(msg.TargetType)
 	if childDef == nil {
 		return m, func() tea.Msg {
-			return messages.FlashMsg{
+			return messages.Flash{
 				Text:    fmt.Sprintf("unknown child type: %s", msg.TargetType),
 				IsError: true,
 			}
@@ -412,7 +412,7 @@ func (m Model) handleRelatedNavigateChild(msg messages.RelatedNavigateMsg) (tea.
 	}
 
 	return m, func() tea.Msg {
-		return messages.EnterChildViewMsg{
+		return messages.EnterChildView{
 			ChildType:     msg.TargetType,
 			ParentContext: parentCtx,
 			DisplayName:   displayName,
@@ -441,7 +441,7 @@ func relatedNavigateTasksToCmd(m Model, targetType string, result runtime.Naviga
 			// structured TaskRequest payload (e.g. FetchMoreRequest) and this
 			// branch becomes a direct param pass-through.
 			if entry, ok := m.Session.ResourceCache[targetType]; ok && entry.Pagination != nil {
-				cmds = append(cmds, m.fetchMoreResources(messages.LoadMoreMsg{
+				cmds = append(cmds, m.fetchMoreResources(messages.LoadMore{
 					ResourceType:      targetType,
 					ContinuationToken: entry.Pagination.NextToken,
 				}))
@@ -459,9 +459,9 @@ func relatedNavigateTasksToCmd(m Model, targetType string, result runtime.Naviga
 }
 
 // handleRelatedCheckStarted is the BT adapter entry point for
-// messages.RelatedCheckStartedMsg. Normalises src.Type from msg.ResourceType
+// messages.RelatedCheckStarted. Normalises src.Type from msg.ResourceType
 // when the detail view stores type separately from SourceResource.Type.
-func (m Model) handleRelatedCheckStarted(msg messages.RelatedCheckStartedMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleRelatedCheckStarted(msg messages.RelatedCheckStarted) (tea.Model, tea.Cmd) {
 	src := msg.SourceResource
 	if src.Type == "" {
 		src.Type = msg.ResourceType
@@ -503,7 +503,7 @@ func (m Model) relatedCheckCmd(res resource.Resource) tea.Cmd {
 			defer func() { <-sem }()
 			defer func() {
 				if r := recover(); r != nil {
-					out = messages.RelatedCheckResultMsg{
+					out = messages.RelatedCheckResult{
 						ResourceType:     res.Type,
 						SourceResourceID: res.ID,
 						DefDisplayName:   def.DisplayName,
@@ -513,7 +513,7 @@ func (m Model) relatedCheckCmd(res resource.Resource) tea.Cmd {
 				}
 			}()
 			if def.Checker == nil {
-				return messages.RelatedCheckResultMsg{
+				return messages.RelatedCheckResult{
 					ResourceType:     res.Type,
 					SourceResourceID: res.ID,
 					DefDisplayName:   def.DisplayName,
@@ -570,7 +570,7 @@ func (m Model) relatedCheckCmd(res resource.Resource) tea.Cmd {
 					}
 				}
 			}
-			return messages.RelatedCheckResultMsg{
+			return messages.RelatedCheckResult{
 				ResourceType:       res.Type,
 				SourceResourceID:   res.ID,
 				DefDisplayName:     def.DisplayName,

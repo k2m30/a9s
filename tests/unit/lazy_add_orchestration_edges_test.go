@@ -19,31 +19,31 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // collectRelatedResult runs batchCmd() and collects the first
 // RelatedCheckResultMsg found — handles both single-cmd and tea.BatchMsg.
-func collectRelatedResult(t *testing.T, batchCmd tea.Cmd) (messages.RelatedCheckResultMsg, bool) {
+func collectRelatedResult(t *testing.T, batchCmd tea.Cmd) (messages.RelatedCheckResult, bool) {
 	t.Helper()
 	if batchCmd == nil {
 		t.Fatal("batchCmd is nil — handleRelatedCheckStarted returned no command")
 	}
 	rawMsg := batchCmd()
 	switch v := rawMsg.(type) {
-	case messages.RelatedCheckResultMsg:
+	case messages.RelatedCheckResult:
 		return v, true
 	case tea.BatchMsg:
 		for _, cmd := range v {
 			if cmd == nil {
 				continue
 			}
-			if r, ok := cmd().(messages.RelatedCheckResultMsg); ok {
+			if r, ok := cmd().(messages.RelatedCheckResult); ok {
 				return r, true
 			}
 		}
 	}
-	return messages.RelatedCheckResultMsg{}, false
+	return messages.RelatedCheckResult{}, false
 }
 
 // ---------------------------------------------------------------------------
@@ -105,7 +105,7 @@ func TestLazyAdd_MissingFromCache_DedupsRepeatedIDsInChecker(t *testing.T) {
 
 	srcRes := resource.Resource{ID: "src-dedup-001"}
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   srcType,
 		SourceResource: srcRes,
 	})
@@ -183,7 +183,7 @@ func TestLazyAdd_FetchByIDsErrorSwallowed_ChecksResultStillDelivered(t *testing.
 
 	srcRes := resource.Resource{ID: "src-error-001"}
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   srcType,
 		SourceResource: srcRes,
 	})

@@ -20,7 +20,7 @@ import (
 
 // ConnectResult carries the resolved AWS clients and effective region returned
 // by ConnectAWS. Adapters translate this into a platform-specific "clients
-// ready" signal (e.g. messages.ClientsReadyMsg for the Bubble Tea adapter).
+// ready" signal (e.g. messages.ClientsReady for the Bubble Tea adapter).
 type ConnectResult struct {
 	Clients *awsclient.ServiceClients
 	Region  string

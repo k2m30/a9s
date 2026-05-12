@@ -7,12 +7,12 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // demoClientsReadyMsg creates a ClientsReadyMsg backed by all typed fakes.
-func demoClientsReadyMsg() messages.ClientsReadyMsg {
-	return messages.ClientsReadyMsg{Clients: demo.NewServiceClients()}
+func demoClientsReadyMsg() messages.ClientsReady {
+	return messages.ClientsReady{Clients: demo.NewServiceClients()}
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -36,9 +36,9 @@ func TestDemoMode_Init_NoAWSConnection(t *testing.T) {
 		t.Fatal("Init() returned nil cmd; expected a cmd that produces ClientsReadyMsg")
 	}
 	msg := cmd()
-	crm, ok := msg.(messages.ClientsReadyMsg)
+	crm, ok := msg.(messages.ClientsReady)
 	if !ok {
-		t.Fatalf("Init() cmd produced %T; expected messages.ClientsReadyMsg", msg)
+		t.Fatalf("Init() cmd produced %T; expected messages.ClientsReady", msg)
 	}
 	if crm.Clients == nil {
 		t.Error("ClientsReadyMsg.Clients should be non-nil in demo mode (backed by demo transport)")
@@ -66,7 +66,7 @@ func TestDemoMode_FetchResources_EC2(t *testing.T) {
 	m, _ = m.Update(demoClientsReadyMsg())
 
 	// Navigate to EC2 resource list
-	_, cmd := m.Update(messages.NavigateMsg{
+	_, cmd := m.Update(messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -77,10 +77,10 @@ func TestDemoMode_FetchResources_EC2(t *testing.T) {
 	// The cmd may be a tea.BatchMsg (from Init + fetchResources). We need to find
 	// the ResourcesLoadedMsg by executing all returned cmds.
 	msg := extractMsg(t, cmd, func(msg tea.Msg) bool {
-		_, ok := msg.(messages.ResourcesLoadedMsg)
+		_, ok := msg.(messages.ResourcesLoaded)
 		return ok
 	})
-	rlm, ok := msg.(messages.ResourcesLoadedMsg)
+	rlm, ok := msg.(messages.ResourcesLoaded)
 	if !ok {
 		t.Fatalf("expected ResourcesLoadedMsg; got %T", msg)
 	}
@@ -107,7 +107,7 @@ func TestDemoMode_FetchResources_Unknown(t *testing.T) {
 	m, _ = m.Update(demoClientsReadyMsg())
 
 	// Navigate to a non-demo resource type (nonexistent-type)
-	_, cmd := m.Update(messages.NavigateMsg{
+	_, cmd := m.Update(messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "nonexistent-type",
 	})
@@ -121,17 +121,17 @@ func TestDemoMode_FetchResources_Unknown(t *testing.T) {
 	// Both are acceptable non-error behaviors.
 	msg := extractMsg(t, cmd, func(msg tea.Msg) bool {
 		switch msg.(type) {
-		case messages.ResourcesLoadedMsg, messages.FlashMsg:
+		case messages.ResourcesLoaded, messages.Flash:
 			return true
 		}
 		return false
 	})
 	switch m := msg.(type) {
-	case messages.ResourcesLoadedMsg:
+	case messages.ResourcesLoaded:
 		if len(m.Resources) != 0 {
 			t.Errorf("expected 0 resources for non-demo type; got %d", len(m.Resources))
 		}
-	case messages.FlashMsg:
+	case messages.Flash:
 		// FlashMsg for unknown type is acceptable
 	default:
 		t.Fatalf("expected ResourcesLoadedMsg or FlashMsg; got %T", msg)
@@ -155,12 +155,12 @@ func TestDemoMode_BlockedCommand_Ctx(t *testing.T) {
 	m, _ = m.Update(demoClientsReadyMsg())
 
 	// Execute :ctx command via NavigateMsg (same path as executeCommand)
-	_, cmd := m.Update(messages.NavigateMsg{Target: messages.TargetProfile})
+	_, cmd := m.Update(messages.Navigate{Target: messages.TargetProfile})
 	if cmd == nil {
 		t.Fatal("NavigateMsg for TargetProfile returned nil cmd; expected flash message")
 	}
 	msg := cmd()
-	flash, ok := msg.(messages.FlashMsg)
+	flash, ok := msg.(messages.Flash)
 	if !ok {
 		t.Fatalf("expected FlashMsg; got %T", msg)
 	}
@@ -189,12 +189,12 @@ func TestDemoMode_BlockedCommand_Region(t *testing.T) {
 	m, _ = m.Update(demoClientsReadyMsg())
 
 	// Execute :region command via NavigateMsg
-	_, cmd := m.Update(messages.NavigateMsg{Target: messages.TargetRegion})
+	_, cmd := m.Update(messages.Navigate{Target: messages.TargetRegion})
 	if cmd == nil {
 		t.Fatal("NavigateMsg for TargetRegion returned nil cmd; expected flash message")
 	}
 	msg := cmd()
-	flash, ok := msg.(messages.FlashMsg)
+	flash, ok := msg.(messages.Flash)
 	if !ok {
 		t.Fatalf("expected FlashMsg; got %T", msg)
 	}
@@ -223,7 +223,7 @@ func TestDemoMode_RevealWorks(t *testing.T) {
 	m, _ = m.Update(demoClientsReadyMsg())
 
 	// Navigate to secrets resource list
-	m, cmd := m.Update(messages.NavigateMsg{
+	m, cmd := m.Update(messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
 	})
@@ -231,7 +231,7 @@ func TestDemoMode_RevealWorks(t *testing.T) {
 	// Execute only the ResourcesLoadedMsg from fetch (skip timer cmds)
 	if cmd != nil {
 		msg := extractMsg(t, cmd, func(msg tea.Msg) bool {
-			_, ok := msg.(messages.ResourcesLoadedMsg)
+			_, ok := msg.(messages.ResourcesLoaded)
 			return ok
 		})
 		m, _ = m.Update(msg)
@@ -251,10 +251,10 @@ func TestDemoMode_RevealWorks(t *testing.T) {
 
 	// The result must be ValueRevealedMsg (either Err==nil or Err!=nil).
 	// A FlashMsg would mean the reveal was blocked — which is no longer expected.
-	revealed, ok := revealMsg.(messages.ValueRevealedMsg)
+	revealed, ok := revealMsg.(messages.ValueRevealed)
 	if !ok {
 		// If it is a FlashMsg, surface the text to make failures self-explanatory.
-		if flash, isFlash := revealMsg.(messages.FlashMsg); isFlash {
+		if flash, isFlash := revealMsg.(messages.Flash); isFlash {
 			t.Fatalf("reveal pathway was blocked; got FlashMsg{Text:%q, IsError:%v} — expected ValueRevealedMsg", flash.Text, flash.IsError)
 		}
 		t.Fatalf("expected ValueRevealedMsg from reveal pathway; got %T", revealMsg)
@@ -286,7 +286,7 @@ func TestDemoMode_SSMRevealWorks(t *testing.T) {
 	m, _ = m.Update(demoClientsReadyMsg())
 
 	// Navigate to SSM parameter list
-	m, cmd := m.Update(messages.NavigateMsg{
+	m, cmd := m.Update(messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ssm",
 	})
@@ -294,7 +294,7 @@ func TestDemoMode_SSMRevealWorks(t *testing.T) {
 	// Execute only the ResourcesLoadedMsg from fetch (skip timer cmds)
 	if cmd != nil {
 		msg := extractMsg(t, cmd, func(msg tea.Msg) bool {
-			_, ok := msg.(messages.ResourcesLoadedMsg)
+			_, ok := msg.(messages.ResourcesLoaded)
 			return ok
 		})
 		m, _ = m.Update(msg)
@@ -312,9 +312,9 @@ func TestDemoMode_SSMRevealWorks(t *testing.T) {
 
 	// The result must be ValueRevealedMsg (either Err==nil or Err!=nil).
 	// A FlashMsg would mean the reveal was blocked — which is not expected.
-	revealed, ok := revealMsg.(messages.ValueRevealedMsg)
+	revealed, ok := revealMsg.(messages.ValueRevealed)
 	if !ok {
-		if flash, isFlash := revealMsg.(messages.FlashMsg); isFlash {
+		if flash, isFlash := revealMsg.(messages.Flash); isFlash {
 			t.Fatalf("SSM reveal pathway was blocked; got FlashMsg{Text:%q, IsError:%v} — expected ValueRevealedMsg", flash.Text, flash.IsError)
 		}
 		t.Fatalf("expected ValueRevealedMsg from SSM reveal pathway; got %T", revealMsg)
@@ -346,30 +346,30 @@ func TestDemoMode_RefreshReturnsSameData(t *testing.T) {
 	m, _ = m.Update(demoClientsReadyMsg())
 
 	// Navigate to EC2
-	m, cmd := m.Update(messages.NavigateMsg{
+	m, cmd := m.Update(messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
 
 	// Execute first fetch
 	msg := extractMsg(t, cmd, func(msg tea.Msg) bool {
-		_, ok := msg.(messages.ResourcesLoadedMsg)
+		_, ok := msg.(messages.ResourcesLoaded)
 		return ok
 	})
-	rlm1 := msg.(messages.ResourcesLoadedMsg)
+	rlm1 := msg.(messages.ResourcesLoaded)
 	firstCount := len(rlm1.Resources)
 
 	// Deliver the resources to the model
 	m, _ = m.Update(rlm1)
 
 	// Now trigger a LoadResourcesMsg (refresh path)
-	_, cmd = m.Update(messages.LoadResourcesMsg{ResourceType: "ec2"})
+	_, cmd = m.Update(messages.LoadResources{ResourceType: "ec2"})
 	if cmd == nil {
 		t.Fatal("LoadResourcesMsg returned nil cmd; expected fetch command")
 	}
 
 	msg2 := cmd()
-	rlm2, ok := msg2.(messages.ResourcesLoadedMsg)
+	rlm2, ok := msg2.(messages.ResourcesLoaded)
 	if !ok {
 		t.Fatalf("expected ResourcesLoadedMsg on refresh; got %T", msg2)
 	}
@@ -390,9 +390,9 @@ func TestNonDemoMode_Unchanged(t *testing.T) {
 		t.Fatal("Init() returned nil cmd; expected InitConnectMsg")
 	}
 	msg := cmd()
-	_, ok := msg.(messages.InitConnectMsg)
+	_, ok := msg.(messages.InitConnect)
 	if !ok {
-		t.Fatalf("Init() produced %T; expected messages.InitConnectMsg", msg)
+		t.Fatalf("Init() produced %T; expected messages.InitConnect", msg)
 	}
 }
 

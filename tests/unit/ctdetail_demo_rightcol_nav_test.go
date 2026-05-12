@@ -4,7 +4,7 @@ package unit_test
 //
 // For each of the 9 demo ct-events fixtures (Cases A–I), this file tests that:
 //   - pressing Tab focuses the right column (when actionable rows exist)
-//   - pressing Enter on the correct row dispatches messages.RelatedNavigateMsg
+//   - pressing Enter on the correct row dispatches messages.RelatedNavigate
 //   - the RelatedNavigateMsg.TargetType matches the expected group
 //   - each RelatedID in the message resolves to a real demo fixture
 //

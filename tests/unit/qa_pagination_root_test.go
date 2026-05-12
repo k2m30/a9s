@@ -41,7 +41,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -153,14 +153,14 @@ func TestQA_PaginationRoot_InitialLoadShowsTruncated(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to ct-events (push the resource list view onto the stack)
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
 
 	// Simulate the first page arriving with IsTruncated=true.
 	// We bypass the actual fetch command and inject the message directly.
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources:    ctEventsResources(50),
 		Pagination: &resource.PaginationMeta{
@@ -197,13 +197,13 @@ func TestQA_PaginationRoot_LoadMoreAppendsAndShowsUpdatedCount(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to ct-events
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
 
 	// Load page 1: truncated
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources:    ctEventsResources(50),
 		Pagination: &resource.PaginationMeta{
@@ -225,7 +225,7 @@ func TestQA_PaginationRoot_LoadMoreAppendsAndShowsUpdatedCount(t *testing.T) {
 	}
 
 	// Load page 2: final page, not truncated
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources:    ctEventsResources2(50, 50),
 		Pagination: &resource.PaginationMeta{
@@ -268,13 +268,13 @@ func TestQA_PaginationRoot_EscAndReenter_PreservesCachedResources(t *testing.T) 
 	m := newRootSizedModel()
 
 	// Step 1: Navigate to ct-events
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
 
 	// Step 2: Load page 1 (truncated)
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources:    ctEventsResources(50),
 		Pagination: &resource.PaginationMeta{
@@ -290,7 +290,7 @@ func TestQA_PaginationRoot_EscAndReenter_PreservesCachedResources(t *testing.T) 
 	m, _ = rootApplyMsg(m, rootKeyPress("M"))
 
 	// Step 4: Load page 2 (final)
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources:    ctEventsResources2(50, 50),
 		Pagination: &resource.PaginationMeta{
@@ -311,7 +311,7 @@ func TestQA_PaginationRoot_EscAndReenter_PreservesCachedResources(t *testing.T) 
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
 	// Step 6: Re-navigate to ct-events
-	m, cmd := rootApplyMsg(m, messages.NavigateMsg{
+	m, cmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
@@ -352,11 +352,11 @@ func TestQA_PaginationRoot_EscAndReenter_MKeyContinuesFromLastToken(t *testing.T
 	m := newRootSizedModel()
 
 	// Step 1: Navigate to ct-events, load one page, leave it truncated
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources:    ctEventsResources(50),
 		Pagination: &resource.PaginationMeta{
@@ -372,7 +372,7 @@ func TestQA_PaginationRoot_EscAndReenter_MKeyContinuesFromLastToken(t *testing.T
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
 	// Step 3: Re-enter ct-events (should use cache — no fetch)
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
@@ -386,7 +386,7 @@ func TestQA_PaginationRoot_EscAndReenter_MKeyContinuesFromLastToken(t *testing.T
 
 	// Execute the command and verify it carries the correct continuation token
 	msg := cmd()
-	loadMore, ok := msg.(messages.LoadMoreMsg)
+	loadMore, ok := msg.(messages.LoadMore)
 	if !ok {
 		t.Fatalf("expected LoadMoreMsg from M key on cached truncated list, got %T", msg)
 	}
@@ -412,11 +412,11 @@ func TestQA_PaginationRoot_CachePerResourceType(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Step 1: Navigate to ct-events, load 50 resources, Esc back
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources:    ctEventsResources(50),
 		Pagination: &resource.PaginationMeta{
@@ -429,11 +429,11 @@ func TestQA_PaginationRoot_CachePerResourceType(t *testing.T) {
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
 	// Step 2: Navigate to ec2, load 30 resources, Esc back
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    ec2TestResources(30),
 		Pagination: &resource.PaginationMeta{
@@ -446,7 +446,7 @@ func TestQA_PaginationRoot_CachePerResourceType(t *testing.T) {
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
 	// Step 3: Re-enter ct-events — must show 50 (not 30 or 0)
-	m, ctCmd := rootApplyMsg(m, messages.NavigateMsg{
+	m, ctCmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
@@ -462,7 +462,7 @@ func TestQA_PaginationRoot_CachePerResourceType(t *testing.T) {
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
 	// Step 4: Re-enter ec2 — must show 30 (not 50 or 0)
-	m, ec2Cmd := rootApplyMsg(m, messages.NavigateMsg{
+	m, ec2Cmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -590,13 +590,13 @@ func TestPagination_ErrorClearsLoadingMore(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to ct-events.
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
 
 	// Load page 1 — truncated.
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources:    ctEventsResources(50),
 		Pagination: &resource.PaginationMeta{
@@ -621,7 +621,7 @@ func TestPagination_ErrorClearsLoadingMore(t *testing.T) {
 	}
 
 	// Deliver an APIErrorMsg for ct-events (simulating a network failure on page 2).
-	m, _ = rootApplyMsg(m, messages.APIErrorMsg{
+	m, _ = rootApplyMsg(m, messages.APIError{
 		ResourceType: "ct-events",
 		Err:          fmt.Errorf("RequestTimeout: connection timed out"),
 	})
@@ -652,13 +652,13 @@ func TestPagination_DoubleLoadIgnored(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to ct-events.
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
 
 	// Load page 1 — truncated.
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources:    ctEventsResources(50),
 		Pagination: &resource.PaginationMeta{
@@ -706,13 +706,13 @@ func TestPagination_PopViewClearsLoadingMore(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to ct-events.
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
 
 	// Load page 1 — truncated.
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources:    ctEventsResources(50),
 		Pagination: &resource.PaginationMeta{
@@ -737,7 +737,7 @@ func TestPagination_PopViewClearsLoadingMore(t *testing.T) {
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 
 	// Re-push ct-events (simulate the user pressing Enter on it again in the menu).
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})

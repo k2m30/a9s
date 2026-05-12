@@ -12,7 +12,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 func applyRootAndCmd(t *testing.T, m tui.Model, msg tea.Msg) tui.Model {
@@ -36,7 +36,7 @@ func TestFirstScreen_EC2EnterToDetail_ShowsRelatedColumn(t *testing.T) {
 		tui.WithProfile(demo.DemoProfile),
 		tui.WithRegion(demo.DemoRegion))
 	m = applyRootAndCmd(t, m, tea.WindowSizeMsg{Width: 120, Height: 36})
-	m = applyRootAndCmd(t, m, messages.NavigateMsg{
+	m = applyRootAndCmd(t, m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -46,7 +46,7 @@ func TestFirstScreen_EC2EnterToDetail_ShowsRelatedColumn(t *testing.T) {
 	if err != nil || len(ec2) == 0 {
 		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err, len(ec2))
 	}
-	m = applyRootAndCmd(t, m, messages.ResourcesLoadedMsg{
+	m = applyRootAndCmd(t, m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    ec2,
 	})
@@ -82,7 +82,7 @@ func TestFirstScreen_DetailEnterRelatedList_EscReturnsToDetail(t *testing.T) {
 		t.Fatalf("demo ami fixtures missing (err=%v, len=%d)", err3, len(amis))
 	}
 
-	m = applyRootAndCmd(t, m, messages.NavigateMsg{
+	m = applyRootAndCmd(t, m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "ec2",
 		Resource:     &ec2[0],
@@ -95,7 +95,7 @@ func TestFirstScreen_DetailEnterRelatedList_EscReturnsToDetail(t *testing.T) {
 	m = applyRootAndCmd(t, m, rootSpecialKey(tea.KeyEnter))
 
 	// Simulate loaded target resources so single-match related navigation can resolve.
-	m = applyRootAndCmd(t, m, messages.ResourcesLoadedMsg{
+	m = applyRootAndCmd(t, m, messages.ResourcesLoaded{
 		ResourceType: "ami",
 		Resources:    amis,
 	})
@@ -129,7 +129,7 @@ func TestFirstScreen_DetailMissingType_StillShowsRelatedForEC2Shape(t *testing.T
 		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err4, len(ec2))
 	}
 	ec2Res := ec2[0]
-	m = applyRootAndCmd(t, m, messages.NavigateMsg{
+	m = applyRootAndCmd(t, m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "",
 		Resource:     &ec2Res,
@@ -175,7 +175,7 @@ func TestFirstScreen_DetailEnterExternalImageID_DoesNotEndInEmptyAMIList(t *test
 		},
 	}
 
-	m = applyRootAndCmd(t, m, messages.NavigateMsg{
+	m = applyRootAndCmd(t, m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "ec2",
 		Resource:     &ec2Res,
@@ -188,7 +188,7 @@ func TestFirstScreen_DetailEnterExternalImageID_DoesNotEndInEmptyAMIList(t *test
 
 	// Simulate the current live failure mode: the generic ami list fetch returns
 	// no rows for a referenced external image ID.
-	m = applyRootAndCmd(t, m, messages.ResourcesLoadedMsg{
+	m = applyRootAndCmd(t, m, messages.ResourcesLoaded{
 		ResourceType: "ami",
 		Resources:    nil,
 	})

@@ -36,7 +36,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -721,7 +721,7 @@ func TestStoryG3_SwitchingResourceType_ResetsPagination(t *testing.T) {
 	}
 
 	// After loading its own data, it's independent
-	m2, _ = m2.Update(messages.ResourcesLoadedMsg{
+	m2, _ = m2.Update(messages.ResourcesLoaded{
 		ResourceType: "dbi",
 		Resources:    pgTestResources(50),
 		Pagination:   nil,
@@ -790,7 +790,7 @@ func TestStoryH1_DemoMode_PaginationForLargeTypes(t *testing.T) {
 			m, _ = m.Init()
 
 			// Demo mode now sends ResourcesLoadedMsg WITH pagination metadata
-			m, _ = m.Update(messages.ResourcesLoadedMsg{
+			m, _ = m.Update(messages.ResourcesLoaded{
 				ResourceType: rt.ShortName,
 				Resources:    result.Resources,
 				Pagination:   result.Pagination,
@@ -896,7 +896,7 @@ func TestStoryH1_DemoMode_ChildViews_Pagination(t *testing.T) {
 			m, _ = m.Init()
 
 			// Demo mode now sends paginated data for child views too.
-			m, _ = m.Update(messages.ResourcesLoadedMsg{
+			m, _ = m.Update(messages.ResourcesLoaded{
 				ResourceType: tc.childType,
 				Resources:    result.Resources,
 				Pagination:   result.Pagination,
@@ -1304,7 +1304,7 @@ func TestStoryE4_AllResourceTypes(t *testing.T) {
 				}
 			}
 
-			m, _ = m.Update(messages.ResourcesLoadedMsg{
+			m, _ = m.Update(messages.ResourcesLoaded{
 				ResourceType: rt.ShortName,
 				Resources:    resources,
 				Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "tok"},
@@ -1401,7 +1401,7 @@ func TestStoryJ1_ResizeDuringLoadMore_PreservesData(t *testing.T) {
 				}
 			}
 
-			m, _ = m.Update(messages.ResourcesLoadedMsg{
+			m, _ = m.Update(messages.ResourcesLoaded{
 				ResourceType: rt.ShortName,
 				Resources:    resources,
 				Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "tok"},
@@ -1432,7 +1432,7 @@ func TestStoryJ1_ResizeDuringLoadMore_PreservesData(t *testing.T) {
 			}
 
 			// Now complete the load-more
-			m, _ = m.Update(messages.ResourcesLoadedMsg{
+			m, _ = m.Update(messages.ResourcesLoaded{
 				ResourceType: rt.ShortName,
 				Resources:    resources[:50],
 				Pagination:   &resource.PaginationMeta{IsTruncated: false},
@@ -1481,7 +1481,7 @@ func TestStoryJ2_MinimumTerminalSize_PreservesData(t *testing.T) {
 				}
 			}
 
-			m, _ = m.Update(messages.ResourcesLoadedMsg{
+			m, _ = m.Update(messages.ResourcesLoaded{
 				ResourceType: rt.ShortName,
 				Resources:    resources,
 				Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "tok"},
@@ -1489,7 +1489,7 @@ func TestStoryJ2_MinimumTerminalSize_PreservesData(t *testing.T) {
 
 			// Append 200 more
 			m, _ = m.Update(pgKeyPress("M"))
-			m, _ = m.Update(messages.ResourcesLoadedMsg{
+			m, _ = m.Update(messages.ResourcesLoaded{
 				ResourceType: rt.ShortName,
 				Resources:    resources,
 				Pagination:   &resource.PaginationMeta{IsTruncated: false},
@@ -1686,7 +1686,7 @@ func TestStoryL2_ErrorFlashDuringLoadMore_PreservesPagination(t *testing.T) {
 				}
 			}
 
-			m, _ = m.Update(messages.ResourcesLoadedMsg{
+			m, _ = m.Update(messages.ResourcesLoaded{
 				ResourceType: rt.ShortName,
 				Resources:    resources,
 				Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "tok"},
@@ -1759,7 +1759,7 @@ func TestStoryN1_CopyID_OnAppendedItems(t *testing.T) {
 				}
 			}
 
-			m, _ = m.Update(messages.ResourcesLoadedMsg{
+			m, _ = m.Update(messages.ResourcesLoaded{
 				ResourceType: rt.ShortName,
 				Resources:    page1,
 				Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "tok"},
@@ -1779,7 +1779,7 @@ func TestStoryN1_CopyID_OnAppendedItems(t *testing.T) {
 				}
 			}
 
-			m, _ = m.Update(messages.ResourcesLoadedMsg{
+			m, _ = m.Update(messages.ResourcesLoaded{
 				ResourceType: rt.ShortName,
 				Resources:    page2,
 				Pagination:   &resource.PaginationMeta{IsTruncated: false},
@@ -2017,7 +2017,7 @@ func TestStoryN_AllResourceTypes_AppendedItemsAccessible(t *testing.T) {
 				}
 			}
 
-			m, _ = m.Update(messages.ResourcesLoadedMsg{
+			m, _ = m.Update(messages.ResourcesLoaded{
 				ResourceType: rt.ShortName,
 				Resources:    page1,
 				Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "tok"},
@@ -2037,7 +2037,7 @@ func TestStoryN_AllResourceTypes_AppendedItemsAccessible(t *testing.T) {
 				}
 			}
 
-			m, _ = m.Update(messages.ResourcesLoadedMsg{
+			m, _ = m.Update(messages.ResourcesLoaded{
 				ResourceType: rt.ShortName,
 				Resources:    page2,
 				Pagination:   &resource.PaginationMeta{IsTruncated: false},
@@ -2220,7 +2220,7 @@ func TestStory_LoadMoreIndicator_AllResourceTypes(t *testing.T) {
 			}
 
 			// Load truncated page
-			m, _ = m.Update(messages.ResourcesLoadedMsg{
+			m, _ = m.Update(messages.ResourcesLoaded{
 				ResourceType: rt.ShortName,
 				Resources:    resources,
 				Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "tok"},
@@ -2234,7 +2234,7 @@ func TestStory_LoadMoreIndicator_AllResourceTypes(t *testing.T) {
 
 			// Load final page (complete)
 			m, _ = m.Update(pgKeyPress("M"))
-			m, _ = m.Update(messages.ResourcesLoadedMsg{
+			m, _ = m.Update(messages.ResourcesLoaded{
 				ResourceType: rt.ShortName,
 				Resources:    resources[:2],
 				Pagination:   &resource.PaginationMeta{IsTruncated: false},
@@ -2284,7 +2284,7 @@ func TestStoryDFGI_AllResourceTypes_PaginationViewConsistency(t *testing.T) {
 				}
 			}
 
-			m, _ = m.Update(messages.ResourcesLoadedMsg{
+			m, _ = m.Update(messages.ResourcesLoaded{
 				ResourceType: rt.ShortName,
 				Resources:    resources,
 				Pagination: &resource.PaginationMeta{
@@ -2303,7 +2303,7 @@ func TestStoryDFGI_AllResourceTypes_PaginationViewConsistency(t *testing.T) {
 			}
 
 			// 4. Append page 2 (final)
-			m, _ = m.Update(messages.ResourcesLoadedMsg{
+			m, _ = m.Update(messages.ResourcesLoaded{
 				ResourceType: rt.ShortName,
 				Resources:    resources,
 				Pagination:   &resource.PaginationMeta{IsTruncated: false},
@@ -2320,7 +2320,7 @@ func TestStoryDFGI_AllResourceTypes_PaginationViewConsistency(t *testing.T) {
 			}
 
 			// 6. Replace (simulate refresh) resets
-			m, _ = m.Update(messages.ResourcesLoadedMsg{
+			m, _ = m.Update(messages.ResourcesLoaded{
 				ResourceType: rt.ShortName,
 				Resources:    resources[:50],
 				Pagination:   nil,

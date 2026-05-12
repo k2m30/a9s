@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -26,7 +26,7 @@ func TestHandleIdentityError_ViewShowsError(t *testing.T) {
 	}
 
 	// Send the identity error message.
-	m, cmd := rootApplyMsg(m, messages.IdentityErrorMsg{Err: "access denied: missing sts:GetCallerIdentity"})
+	m, cmd := rootApplyMsg(m, messages.IdentityError{Err: "access denied: missing sts:GetCallerIdentity"})
 
 	// handleIdentityError returns nil cmd — no async work needed.
 	if cmd != nil {
@@ -46,7 +46,7 @@ func TestHandleIdentityError_NoIdentityView(t *testing.T) {
 	m := newRootSizedModel()
 	// Identity view is NOT pushed — active view is the main menu.
 
-	_, cmd := rootApplyMsg(m, messages.IdentityErrorMsg{Err: "some error"})
+	_, cmd := rootApplyMsg(m, messages.IdentityError{Err: "some error"})
 
 	if cmd != nil {
 		t.Errorf("handleIdentityError with no identity view should return nil cmd, got non-nil")

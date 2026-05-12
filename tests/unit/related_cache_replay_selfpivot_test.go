@@ -22,7 +22,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -64,7 +64,7 @@ func TestRelatedCacheReplay_CtEventsSelfPivots_AllRowsResolve(t *testing.T) {
 	// Inject one Count=5 result per self-pivot def, each with distinct
 	// DefDisplayName — the shape the production cache-replay path now uses.
 	for _, def := range ctSelfPivots {
-		d, _ = d.Update(messages.RelatedCheckResultMsg{
+		d, _ = d.Update(messages.RelatedCheckResult{
 			ResourceType:   "ct-events",
 			DefDisplayName: def.DisplayName,
 			Result: resource.RelatedCheckResult{

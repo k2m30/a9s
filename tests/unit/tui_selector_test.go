@@ -7,7 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -44,7 +44,7 @@ func TestSelector_NewProfileEnterReturnsProfileSelectedMsg(t *testing.T) {
 		t.Fatal("Enter should produce a command")
 	}
 	msg := cmd()
-	psm, ok := msg.(messages.ProfileSelectedMsg)
+	psm, ok := msg.(messages.ProfileSelected)
 	if !ok {
 		t.Fatalf("expected ProfileSelectedMsg, got %T", msg)
 	}
@@ -73,7 +73,7 @@ func TestSelector_NewRegionEnterReturnsRegionSelectedMsg(t *testing.T) {
 		t.Fatal("Enter should produce a command")
 	}
 	msg := cmd()
-	rsm, ok := msg.(messages.RegionSelectedMsg)
+	rsm, ok := msg.(messages.RegionSelected)
 	if !ok {
 		t.Fatalf("expected RegionSelectedMsg, got %T", msg)
 	}
@@ -102,7 +102,7 @@ func TestSelector_DownMovesSelection(t *testing.T) {
 	var selected string
 	m := views.NewSelector(items, "item-1", "test", func(s string) tea.Msg {
 		selected = s
-		return messages.ProfileSelectedMsg{Profile: s}
+		return messages.ProfileSelected{Profile: s}
 	}, k)
 	m.SetSize(80, 20)
 
@@ -124,7 +124,7 @@ func TestSelector_UpMovesSelection(t *testing.T) {
 	var selected string
 	m := views.NewSelector(items, "item-1", "test", func(s string) tea.Msg {
 		selected = s
-		return messages.ProfileSelectedMsg{Profile: s}
+		return messages.ProfileSelected{Profile: s}
 	}, k)
 	m.SetSize(80, 20)
 
@@ -150,7 +150,7 @@ func TestSelector_GGoesToTop(t *testing.T) {
 	var selected string
 	m := views.NewSelector(items, "item-1", "test", func(s string) tea.Msg {
 		selected = s
-		return messages.ProfileSelectedMsg{Profile: s}
+		return messages.ProfileSelected{Profile: s}
 	}, k)
 	m.SetSize(80, 20)
 
@@ -175,7 +175,7 @@ func TestSelector_ShiftGGoesToBottom(t *testing.T) {
 	var selected string
 	m := views.NewSelector(items, "item-1", "test", func(s string) tea.Msg {
 		selected = s
-		return messages.ProfileSelectedMsg{Profile: s}
+		return messages.ProfileSelected{Profile: s}
 	}, k)
 	m.SetSize(80, 20)
 
@@ -202,7 +202,7 @@ func TestSelector_PageDownMovesCursor(t *testing.T) {
 	var selected string
 	m := views.NewSelector(items, "", "test", func(s string) tea.Msg {
 		selected = s
-		return messages.ProfileSelectedMsg{Profile: s}
+		return messages.ProfileSelected{Profile: s}
 	}, k)
 	m.SetSize(80, 10) // small height
 
@@ -227,7 +227,7 @@ func TestSelector_PageUpMovesCursor(t *testing.T) {
 	var selected string
 	m := views.NewSelector(items, "", "test", func(s string) tea.Msg {
 		selected = s
-		return messages.ProfileSelectedMsg{Profile: s}
+		return messages.ProfileSelected{Profile: s}
 	}, k)
 	m.SetSize(80, 10)
 
@@ -253,7 +253,7 @@ func TestSelector_CursorStopsAtTop(t *testing.T) {
 	var selected string
 	m := views.NewSelector(items, "", "test", func(s string) tea.Msg {
 		selected = s
-		return messages.ProfileSelectedMsg{Profile: s}
+		return messages.ProfileSelected{Profile: s}
 	}, k)
 	m.SetSize(80, 20)
 
@@ -275,7 +275,7 @@ func TestSelector_CursorStopsAtBottom(t *testing.T) {
 	var selected string
 	m := views.NewSelector(items, "", "test", func(s string) tea.Msg {
 		selected = s
-		return messages.ProfileSelectedMsg{Profile: s}
+		return messages.ProfileSelected{Profile: s}
 	}, k)
 	m.SetSize(80, 20)
 
@@ -395,7 +395,7 @@ func TestSelector_SetFilterResetsCursor(t *testing.T) {
 	var selected string
 	m := views.NewSelector(items, "", "test", func(s string) tea.Msg {
 		selected = s
-		return messages.ProfileSelectedMsg{Profile: s}
+		return messages.ProfileSelected{Profile: s}
 	}, k)
 	m.SetSize(80, 20)
 

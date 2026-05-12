@@ -19,7 +19,7 @@ import (
 	demofixtures "github.com/k2m30/a9s/v3/internal/demo/fixtures"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 func TestRealDemo_DBIDetailShowsIssues(t *testing.T) {
@@ -37,7 +37,7 @@ func TestRealDemo_DBIDetailShowsIssues(t *testing.T) {
 	m = drainAll(t, m, cmd)
 
 	// Navigate to the dbi list via the same NavigateMsg a user keypress would produce.
-	m, cmd = fullIntegrationApplyMsg(m, messages.NavigateMsg{
+	m, cmd = fullIntegrationApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbi",
 	})
@@ -46,9 +46,9 @@ func TestRealDemo_DBIDetailShowsIssues(t *testing.T) {
 	// Fetch a concrete dbi resource from the clients (production path — same as
 	// the app's own lookups).
 	targets := []struct {
-		id           string
-		mustContain  []string
-		mustBeAfter  string
+		id          string
+		mustContain []string
+		mustBeAfter string
 	}{
 		// Attention entries capitalize the first letter for presentation.
 		{
@@ -72,7 +72,7 @@ func TestRealDemo_DBIDetailShowsIssues(t *testing.T) {
 		tc := tc
 		t.Run(tc.id, func(t *testing.T) {
 			res := fullIntegrationMustFindResourceByID(t, clients, "dbi", tc.id)
-			m2, cmd := fullIntegrationApplyMsg(m, messages.NavigateMsg{
+			m2, cmd := fullIntegrationApplyMsg(m, messages.Navigate{
 				Target:       messages.TargetDetail,
 				ResourceType: "dbi",
 				Resource:     &res,

@@ -27,6 +27,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ResourceCacheEntry stores the state of a previously-viewed resource list.
@@ -185,6 +186,25 @@ func New() *Session {
 		IdentityStore:          NewIdentityStore(),
 		RuleSets:               NewRuleSetStore(),
 	}
+}
+
+// CurrentGenFor implements messages.GenSource. It maps an Aspect to the
+// corresponding session generation counter so the central guard in
+// Core.HandleEvent can check staleness without importing session.
+func (s *Session) CurrentGenFor(a messages.Aspect) domain.Gen {
+	switch a {
+	case messages.AspectAvailability:
+		return s.AvailabilityGen
+	case messages.AspectEnrichment:
+		return s.EnrichmentGen
+	case messages.AspectRelated:
+		return s.RelatedGen
+	case messages.AspectEnrichDetail:
+		return s.EnrichGen
+	case messages.AspectConnect:
+		return s.ConnectGen
+	}
+	return 0
 }
 
 // Rotate rotates the session when the user switches profile or region. Every

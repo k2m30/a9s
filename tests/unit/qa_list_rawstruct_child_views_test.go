@@ -21,7 +21,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -62,7 +62,7 @@ func TestQA_ListRawStruct_LogStreams(t *testing.T) {
 		},
 	}
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	m, _ = m.Update(messages.ResourcesLoaded{Resources: resources})
 	view := stripAnsi(m.View())
 
 	if !strings.Contains(view, "abcdef1234567890") {
@@ -107,7 +107,7 @@ func TestQA_ListRawStruct_LogEvents(t *testing.T) {
 		},
 	}
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	m, _ = m.Update(messages.ResourcesLoaded{Resources: resources})
 	view := stripAnsi(m.View())
 
 	if !strings.Contains(view, "Failed to connect") {
@@ -163,7 +163,7 @@ func TestQA_ListRawStruct_TargetHealth(t *testing.T) {
 		},
 	}
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	m, _ = m.Update(messages.ResourcesLoaded{Resources: resources})
 	view := stripAnsi(m.View())
 
 	if !strings.Contains(view, "i-0abc1234def56789a") {
@@ -212,7 +212,7 @@ func TestLambdaInvocationsListRawStruct(t *testing.T) {
 		},
 	}
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	m, _ = m.Update(messages.ResourcesLoaded{Resources: resources})
 	view := stripAnsi(m.View())
 
 	if !strings.Contains(view, "12345678") {
@@ -257,7 +257,7 @@ func TestLambdaInvocationLogsListRawStruct(t *testing.T) {
 		},
 	}
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	m, _ = m.Update(messages.ResourcesLoaded{Resources: resources})
 	view := stripAnsi(m.View())
 
 	if !strings.Contains(view, "Processing request") {
@@ -302,7 +302,7 @@ func TestQA_ListRawStruct_EcsSvcEvents(t *testing.T) {
 		},
 	}
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	m, _ = m.Update(messages.ResourcesLoaded{Resources: resources})
 	view := stripAnsi(m.View())
 
 	if !strings.Contains(view, "steady state") {
@@ -354,7 +354,7 @@ func TestQA_ListRawStruct_EcsSvcTasks(t *testing.T) {
 		},
 	}
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	m, _ = m.Update(messages.ResourcesLoaded{Resources: resources})
 	view := stripAnsi(m.View())
 
 	if !strings.Contains(view, "abc123def456") {
@@ -401,7 +401,7 @@ func TestQA_ListRawStruct_EcsSvcLogs(t *testing.T) {
 		},
 	}
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	m, _ = m.Update(messages.ResourcesLoaded{Resources: resources})
 	view := stripAnsi(m.View())
 
 	if !strings.Contains(view, "Starting application") {
@@ -454,7 +454,7 @@ func TestQA_ListRawStruct_CfnEvents(t *testing.T) {
 		},
 	}
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	m, _ = m.Update(messages.ResourcesLoaded{Resources: resources})
 	view := stripAnsi(m.View())
 
 	if !strings.Contains(view, "MyBucket") {
@@ -508,7 +508,7 @@ func TestQA_ListRawStruct_CfnResources(t *testing.T) {
 		},
 	}
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	m, _ = m.Update(messages.ResourcesLoaded{Resources: resources})
 	view := stripAnsi(m.View())
 
 	if !strings.Contains(view, "MyBucket") {
@@ -558,7 +558,7 @@ func TestQA_ListRawStruct_AsgActivities(t *testing.T) {
 		},
 	}
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	m, _ = m.Update(messages.ResourcesLoaded{Resources: resources})
 	view := stripAnsi(m.View())
 
 	if !strings.Contains(view, "Successful") {
@@ -606,7 +606,7 @@ func TestQA_ListRawStruct_AlarmHistory(t *testing.T) {
 		},
 	}
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	m, _ = m.Update(messages.ResourcesLoaded{Resources: resources})
 	view := stripAnsi(m.View())
 
 	if !strings.Contains(view, "StateUpdate") {
@@ -662,7 +662,7 @@ func TestQA_ListRawStruct_ELBListeners(t *testing.T) {
 		},
 	}
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	m, _ = m.Update(messages.ResourcesLoaded{Resources: resources})
 	view := stripAnsi(m.View())
 
 	if !strings.Contains(view, "443") {
@@ -728,7 +728,7 @@ func TestQA_ListRawStruct_CBBuilds(t *testing.T) {
 		},
 	}
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	m, _ = m.Update(messages.ResourcesLoaded{Resources: resources})
 	view := stripAnsi(m.View())
 
 	if !strings.Contains(view, "SUCCEEDED") {
@@ -777,7 +777,7 @@ func TestQA_ListRawStruct_CBBuildLogs(t *testing.T) {
 		},
 	}
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	m, _ = m.Update(messages.ResourcesLoaded{Resources: resources})
 	view := stripAnsi(m.View())
 
 	if !strings.Contains(view, "Running command") {
@@ -836,7 +836,7 @@ func TestQA_ListRawStruct_ECRImages(t *testing.T) {
 		},
 	}
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	m, _ = m.Update(messages.ResourcesLoaded{Resources: resources})
 	view := stripAnsi(m.View())
 
 	if !strings.Contains(view, "latest") {
@@ -889,7 +889,7 @@ func TestQA_ListRawStruct_PipelineStages(t *testing.T) {
 		},
 	}
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	m, _ = m.Update(messages.ResourcesLoaded{Resources: resources})
 	view := stripAnsi(m.View())
 
 	if !strings.Contains(view, "Source") {
@@ -940,7 +940,7 @@ func TestQA_ListRawStruct_RolePolicies(t *testing.T) {
 		},
 	}
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	m, _ = m.Update(messages.ResourcesLoaded{Resources: resources})
 	view := stripAnsi(m.View())
 
 	if !strings.Contains(view, "ReadOnlyAccess") {
@@ -988,7 +988,7 @@ func TestQA_ListRawStruct_ELBListenerRules(t *testing.T) {
 		},
 	}
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	m, _ = m.Update(messages.ResourcesLoaded{Resources: resources})
 	view := stripAnsi(m.View())
 
 	if !strings.Contains(view, "100") {
@@ -1042,7 +1042,7 @@ func TestQA_ListRawStruct_DbiEvents(t *testing.T) {
 		},
 	}
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	m, _ = m.Update(messages.ResourcesLoaded{Resources: resources})
 	view := stripAnsi(m.View())
 
 	if !strings.Contains(view, "maintenance") {
@@ -1091,7 +1091,7 @@ func TestQA_ListRawStruct_EbRuleTargets(t *testing.T) {
 		},
 	}
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	m, _ = m.Update(messages.ResourcesLoaded{Resources: resources})
 	view := stripAnsi(m.View())
 
 	if !strings.Contains(view, "lambda-target-1") {
@@ -1150,7 +1150,7 @@ func TestQA_ListRawStruct_GlueRuns(t *testing.T) {
 		},
 	}
 
-	m, _ = m.Update(messages.ResourcesLoadedMsg{Resources: resources})
+	m, _ = m.Update(messages.ResourcesLoaded{Resources: resources})
 	view := stripAnsi(m.View())
 
 	if !strings.Contains(view, "jr_abc12") {

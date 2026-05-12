@@ -26,7 +26,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // TestCachePoison_RelatedNavigate_DoesNotOverwriteTopLevelCache verifies that
@@ -66,11 +66,11 @@ func TestCachePoison_RelatedNavigate_DoesNotOverwriteTopLevelCache(t *testing.T)
 	}
 	fullCount := len(ec2Res)
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    ec2Res,
 	})
@@ -87,7 +87,7 @@ func TestCachePoison_RelatedNavigate_DoesNotOverwriteTopLevelCache(t *testing.T)
 	// This simulates a user pressing a related-navigation key (e.g., from the
 	// right column) without a specific target ID.
 
-	navMsg := messages.RelatedNavigateMsg{
+	navMsg := messages.RelatedNavigate{
 		TargetType: "ec2",
 		SourceResource: resource.Resource{
 			ID:   "vpc-demo-001",
@@ -104,7 +104,7 @@ func TestCachePoison_RelatedNavigate_DoesNotOverwriteTopLevelCache(t *testing.T)
 	// With the bug, line 246 sees ParentContext()==nil and overwrites cache["ec2"].
 
 	partialList := ec2Res[0:1] // only the first EC2 instance
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    partialList,
 	})
@@ -125,7 +125,7 @@ func TestCachePoison_RelatedNavigate_DoesNotOverwriteTopLevelCache(t *testing.T)
 
 	// ── Step 8: Navigate back to EC2 list → restores from cache ─────────────
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})

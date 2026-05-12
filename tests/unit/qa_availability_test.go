@@ -9,7 +9,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -704,7 +704,7 @@ func TestQA_Availability_EnterBlockedOnEmpty(t *testing.T) {
 
 	if cmd != nil {
 		msg := cmd()
-		if _, ok := msg.(messages.NavigateMsg); ok {
+		if _, ok := msg.(messages.Navigate); ok {
 			t.Error("Enter on empty type should NOT produce a NavigateMsg")
 		}
 	}

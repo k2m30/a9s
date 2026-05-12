@@ -10,7 +10,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 func openFocusedRelatedDetailForRootFilterTest(t *testing.T) tui.Model {
@@ -43,7 +43,7 @@ func openFocusedRelatedDetailForRootFilterTest(t *testing.T) tui.Model {
 		},
 	}
 
-	m = applyRootAndCmd(t, m, messages.NavigateMsg{
+	m = applyRootAndCmd(t, m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "ec2",
 		Resource:     &res,

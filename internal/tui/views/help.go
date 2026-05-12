@@ -7,7 +7,7 @@ import (
 	lipgloss "charm.land/lipgloss/v2"
 
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/text"
 )
@@ -65,7 +65,7 @@ func (m HelpModel) Update(msg tea.Msg) (HelpModel, tea.Cmd) {
 	switch msg.(type) {
 	case tea.KeyMsg:
 		return m, func() tea.Msg {
-			return messages.PopViewMsg{}
+			return messages.PopView{}
 		}
 	}
 	return m, nil

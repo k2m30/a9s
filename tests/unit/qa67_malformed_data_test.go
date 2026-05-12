@@ -18,13 +18,13 @@ import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // C.1 — Nil optional fields in resource do not cause panic in list render.
 func TestQa67_C1_NilOptionalFields_ListRenderDoesNotPanic(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -49,7 +49,7 @@ func TestQa67_C1_NilOptionalFields_ListRenderDoesNotPanic(t *testing.T) {
 		},
 	}
 	// Must not panic
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "ec2", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
 	out := rootViewContent(m)
 	plain := stripANSI(out)
 	if plain == "" {
@@ -67,7 +67,7 @@ func TestQa67_C1_NilFields_AllResourceTypes(t *testing.T) {
 	for _, rt := range []string{"ec2", "s3", "secrets", "dbi"} {
 		t.Run(rt, func(t *testing.T) {
 			m := newRootSizedModel()
-			m, _ = rootApplyMsg(m, messages.NavigateMsg{
+			m, _ = rootApplyMsg(m, messages.Navigate{
 				Target:       messages.TargetResourceList,
 				ResourceType: rt,
 			})
@@ -79,7 +79,7 @@ func TestQa67_C1_NilFields_AllResourceTypes(t *testing.T) {
 				Fields: map[string]string{},
 			}
 			// Must not panic
-			m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+			m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 				ResourceType: rt,
 				Resources:    []resource.Resource{empty},
 			})
@@ -94,7 +94,7 @@ func TestQa67_C1_NilFields_AllResourceTypes(t *testing.T) {
 // C.2 — Empty string ID renders a selectable row (not skipped or panicking).
 func TestQa67_C2_EmptyID_RowStillRendersAndSelectable(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -130,7 +130,7 @@ func TestQa67_C2_EmptyID_RowStillRendersAndSelectable(t *testing.T) {
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "ec2", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
 	// Must not crash
 	out := rootViewContent(m)
 	plain := stripANSI(out)
@@ -143,7 +143,7 @@ func TestQa67_C2_EmptyID_RowStillRendersAndSelectable(t *testing.T) {
 // C.3 — Unknown enum value in status field renders as plain text, no crash.
 func TestQa67_C3_UnknownEnum_RendersAsPlainText(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -164,7 +164,7 @@ func TestQa67_C3_UnknownEnum_RendersAsPlainText(t *testing.T) {
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "ec2", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
 	out := rootViewContent(m)
 	plain := stripANSI(out)
 	// The row must render without crashing and display the resource
@@ -176,7 +176,7 @@ func TestQa67_C3_UnknownEnum_RendersAsPlainText(t *testing.T) {
 // C.4 — Malformed ARN renders as-is in the list without crash or truncation of other fields.
 func TestQa67_C4_MalformedARN_RendersWithoutPanic(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
 	})
@@ -198,7 +198,7 @@ func TestQa67_C4_MalformedARN_RendersWithoutPanic(t *testing.T) {
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "secrets", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "secrets", Resources: resources})
 	out := rootViewContent(m)
 	plain := stripANSI(out)
 	if !strings.Contains(plain, "malformed-arn-secret") {
@@ -209,7 +209,7 @@ func TestQa67_C4_MalformedARN_RendersWithoutPanic(t *testing.T) {
 // C.5 — Unicode and emoji characters in resource names do not corrupt layout or panic.
 func TestQa67_C5_UnicodeNames_DoNotCorruptLayout(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -239,7 +239,7 @@ func TestQa67_C5_UnicodeNames_DoNotCorruptLayout(t *testing.T) {
 			},
 		})
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "ec2", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
 	// Must not panic; output must be non-empty
 	out := rootViewContent(m)
 	if out == "" {
@@ -250,7 +250,7 @@ func TestQa67_C5_UnicodeNames_DoNotCorruptLayout(t *testing.T) {
 // C.6 — Zero-value timestamp (Go zero time) does not panic during rendering.
 func TestQa67_C6_ZeroTimestamp_DoesNotPanic(t *testing.T) {
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -271,7 +271,7 @@ func TestQa67_C6_ZeroTimestamp_DoesNotPanic(t *testing.T) {
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "ec2", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
 	out := rootViewContent(m)
 	if out == "" {
 		t.Error("C.6: View() returned empty after loading resource with zero timestamp")
@@ -289,7 +289,7 @@ func TestQa67_C7_AllNilOptionalFields_DetailViewNoPanic(t *testing.T) {
 		Fields:    map[string]string{},
 		RawStruct: nil,
 	}
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: res,
 	})
@@ -304,7 +304,7 @@ func TestQa67_C7_AllNilOptionalFields_DetailViewNoPanic(t *testing.T) {
 func TestQa67_C8_LongTagValue_DoesNotBreakListLayout(t *testing.T) {
 	longTag := strings.Repeat("x", 256)
 	m := newRootSizedModel()
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -326,7 +326,7 @@ func TestQa67_C8_LongTagValue_DoesNotBreakListLayout(t *testing.T) {
 			},
 		},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{ResourceType: "ec2", Resources: resources})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
 	out := rootViewContent(m)
 	plain := stripANSI(out)
 	// The resource row should still appear
@@ -353,7 +353,7 @@ func TestQa67_C9_AllNilFields_DetailViewRendersAvailableFields(t *testing.T) {
 		},
 		RawStruct: nil,
 	}
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: res,
 	})
@@ -373,7 +373,7 @@ func TestQa67_C9_AllNilFields_YAMLViewNoPanic(t *testing.T) {
 		Fields:    map[string]string{},
 		RawStruct: nil,
 	}
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetYAML,
 		Resource: res,
 	})

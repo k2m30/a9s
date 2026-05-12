@@ -24,7 +24,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -104,7 +104,7 @@ func TestLoadAvailabilityCache_PopulatedCacheReturnsEntries(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// Trigger handleClientsReady which calls loadAvailabilityCache.
-	_, cmd := rootApplyMsg(m, messages.ClientsReadyMsg{
+	_, cmd := rootApplyMsg(m, messages.ClientsReady{
 		Clients: clients,
 		Region:  region,
 		Gen:     0,
@@ -114,7 +114,7 @@ func TestLoadAvailabilityCache_PopulatedCacheReturnsEntries(t *testing.T) {
 	}
 
 	// Walk the batch to find AvailabilityCacheLoadedMsg.
-	var cacheMsg *messages.AvailabilityCacheLoadedMsg
+	var cacheMsg *messages.AvailabilityCacheLoaded
 	collectFromCmd(t, cmd, &cacheMsg)
 
 	if cacheMsg == nil {
@@ -167,7 +167,7 @@ func TestLoadAvailabilityCache_IssueFieldsMapped(t *testing.T) {
 	)
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
-	_, cmd := rootApplyMsg(m, messages.ClientsReadyMsg{
+	_, cmd := rootApplyMsg(m, messages.ClientsReady{
 		Clients: clients,
 		Region:  region,
 		Gen:     0,
@@ -176,7 +176,7 @@ func TestLoadAvailabilityCache_IssueFieldsMapped(t *testing.T) {
 		t.Fatal("ClientsReadyMsg should return a cmd batch")
 	}
 
-	var cacheMsg *messages.AvailabilityCacheLoadedMsg
+	var cacheMsg *messages.AvailabilityCacheLoaded
 	collectFromCmd(t, cmd, &cacheMsg)
 	if cacheMsg == nil {
 		t.Fatal("AvailabilityCacheLoadedMsg not found in batch")
@@ -195,14 +195,14 @@ func TestLoadAvailabilityCache_IssueFieldsMapped(t *testing.T) {
 
 // collectFromCmd recursively walks a tea.BatchMsg / tea.Cmd to find the first
 // AvailabilityCacheLoadedMsg, storing it in target if found.
-func collectFromCmd(t *testing.T, cmd tea.Cmd, target **messages.AvailabilityCacheLoadedMsg) {
+func collectFromCmd(t *testing.T, cmd tea.Cmd, target **messages.AvailabilityCacheLoaded) {
 	t.Helper()
 	if cmd == nil {
 		return
 	}
 	msg := cmd()
 	switch v := msg.(type) {
-	case messages.AvailabilityCacheLoadedMsg:
+	case messages.AvailabilityCacheLoaded:
 		*target = &v
 	case tea.BatchMsg:
 		for _, sub := range v {
@@ -240,7 +240,7 @@ func TestFetchMoreResources_FilteredFetcherErrorPropagated(t *testing.T) {
 	)
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
-	_, cmd := rootApplyMsg(m, messages.LoadMoreMsg{
+	_, cmd := rootApplyMsg(m, messages.LoadMore{
 		ResourceType:      errFilteredType,
 		ContinuationToken: "page-2-token",
 		FetchFilter:       map[string]string{"key": "value"},
@@ -249,7 +249,7 @@ func TestFetchMoreResources_FilteredFetcherErrorPropagated(t *testing.T) {
 		t.Fatal("LoadMoreMsg with failing filtered fetcher should return a cmd")
 	}
 	msg := cmd()
-	apiErr, ok := msg.(messages.APIErrorMsg)
+	apiErr, ok := msg.(messages.APIError)
 	if !ok {
 		t.Fatalf("expected APIErrorMsg from filtered fetcher error, got %T", msg)
 	}
@@ -292,7 +292,7 @@ func TestFetchResourcesFiltered_NoFetcherWithDemoClients(t *testing.T) {
 	// Use an arbitrary short name with no fetchers registered.
 	const noFFType = "test_no_ff_demo_clients"
 
-	_, cmd := rootApplyMsg(m, messages.LoadMoreMsg{
+	_, cmd := rootApplyMsg(m, messages.LoadMore{
 		ResourceType: noFFType,
 		FetchFilter:  map[string]string{"k": "v"},
 	})
@@ -303,7 +303,7 @@ func TestFetchResourcesFiltered_NoFetcherWithDemoClients(t *testing.T) {
 	// With demo clients (non-nil) and no FilteredPaginatedFetcher,
 	// fetchMoreResources skips to the paginated fetcher path. Since noFFType
 	// also has no paginated fetcher, it falls through to "no paginated fetcher for".
-	apiErr, ok := msg.(messages.APIErrorMsg)
+	apiErr, ok := msg.(messages.APIError)
 	if !ok {
 		t.Fatalf("expected APIErrorMsg, got %T", msg)
 	}

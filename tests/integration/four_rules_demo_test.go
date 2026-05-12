@@ -11,7 +11,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // fullIntegrationNewDemoScenarioWithWave1 builds a demo scenario that has
@@ -27,7 +27,7 @@ func fullIntegrationNewDemoScenarioWithWave1(t *testing.T) *fullIntegrationScena
 	var cmd tea.Cmd
 	m, cmd = fullIntegrationApplyMsg(m, initMsg)
 	availMsg := fullIntegrationExtractMsg(t, cmd, func(msg tea.Msg) bool {
-		_, ok := msg.(messages.AvailabilityPrefetchedMsg)
+		_, ok := msg.(messages.AvailabilityPrefetched)
 		return ok
 	})
 	m, _ = fullIntegrationApplyMsg(m, availMsg)
@@ -37,7 +37,7 @@ func fullIntegrationNewDemoScenarioWithWave1(t *testing.T) *fullIntegrationScena
 		clients:           clients,
 		profile:           demo.DemoProfile,
 		region:            demo.DemoRegion,
-		lastRelatedByName: make(map[string]messages.RelatedCheckResultMsg),
+		lastRelatedByName: make(map[string]messages.RelatedCheckResult),
 	}
 }
 

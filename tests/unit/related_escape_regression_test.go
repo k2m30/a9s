@@ -11,7 +11,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // Regression guard for related navigation UX:
@@ -36,7 +36,7 @@ func TestRelatedNavigate_FilteredList_EscReturnsToDetail(t *testing.T) {
 	}
 
 	// Source detail view.
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "ec2",
 		Resource:     &ec2[0],
@@ -44,7 +44,7 @@ func TestRelatedNavigate_FilteredList_EscReturnsToDetail(t *testing.T) {
 
 	// Open related target list using exact target ID (produces filtered title like ami(1/4)).
 	imageID := amis[0].ID
-	m, _ = rootApplyMsg(m, messages.RelatedNavigateMsg{
+	m, _ = rootApplyMsg(m, messages.RelatedNavigate{
 		TargetType:     "ami",
 		SourceType:     "ec2",
 		SourceResource: ec2[0],
@@ -52,7 +52,7 @@ func TestRelatedNavigate_FilteredList_EscReturnsToDetail(t *testing.T) {
 	})
 
 	// Simulate loaded target list.
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ami",
 		Resources:    amis,
 	})

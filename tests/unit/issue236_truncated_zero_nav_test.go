@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ---------------------------------------------------------------------------
@@ -70,9 +70,9 @@ func TestIssue236_EnterNavigatesOnTruncatedZeroRow(t *testing.T) {
 	}
 
 	msg := cmd()
-	nav, ok := msg.(messages.NavigateMsg)
+	nav, ok := msg.(messages.Navigate)
 	if !ok {
-		t.Fatalf("Enter on truncated-zero row must produce a messages.NavigateMsg, got %T", msg)
+		t.Fatalf("Enter on truncated-zero row must produce a messages.Navigate, got %T", msg)
 	}
 	if nav.ResourceType != allTypes[0].ShortName {
 		t.Errorf("NavigateMsg.ResourceType = %q, want %q", nav.ResourceType, allTypes[0].ShortName)

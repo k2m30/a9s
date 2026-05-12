@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // TestIssue119_StackedWidth_ToggleRelated verifies that at 80-99 columns
@@ -52,7 +52,7 @@ func TestIssue140_RelatedListTitle_ContainsSourceContext(t *testing.T) {
 	}
 	m = applyRelatedResourcesLoaded(m, "alarm", alarmResources)
 
-	m, _ = relatedApplyMsg(m, messages.RelatedNavigateMsg{
+	m, _ = relatedApplyMsg(m, messages.RelatedNavigate{
 		TargetType:     "alarm",
 		SourceType:     "ec2",
 		SourceResource: ec2Res,
