@@ -1,14 +1,20 @@
 // aws_efs_issue_enrichment_test.go — Wave-2 enricher behavioral tests for EFS.
 //
 // Tests the CONTRACT from docs/resources/efs-impl-plan.md §1 Wave-2,
-// U7b, U7c, U7e (detail content), U11. Phase 7 coder will make these pass.
+// U7b, U7c, U7e (detail content), U11.
+//
+// AS-140 (Wave-2 enricher migration): FieldUpdates["status"] is no longer
+// written by EnrichEFSMountTargets. The merged §4 status phrase is computed
+// at render time by phraseFromFindings(r.Findings) in extractCellValue —
+// wave-1 findings reach r.Findings via the fetcher, wave-2 findings via
+// applyEnrichment.
 //
 // Covered invariants:
 //   - TestEnrichEFSMountTargets_HealthyRowWithDown — healthy FS + MT-B creating:
-//     Summary="mount target down", FieldUpdates[id]["status"]="mount target down",
+//     Summary="mount target down", FieldUpdates is empty (AS-140),
 //     Rows include {MountTarget,AZ,State,Degraded}, U11 (Summary ≠ Row values).
 //   - TestEnrichEFSMountTargets_W1WarningPlusW2Bumps — W1 "updating" + W2 "mount target down":
-//     FieldUpdates[id]["status"]="mount target down (+1)".
+//     Finding emitted, FieldUpdates empty (AS-140 — bump now at render time).
 //   - TestEnrichEFSMountTargets_AllHealthyMounts_NoFinding — graph-root 3 MTs all available:
 //     no finding produced for ProdEFSID.
 //   - TestEnrichEFSMountTargets_SummaryDoesNotContainRowValues — U11 pin.
@@ -33,7 +39,8 @@ import (
 //   - Enricher produces ONE finding for fs-0healthymtdown001.
 //   - Severity = "!"
 //   - Summary = "mount target down" (exact §4 phrase; ≤ 40 chars)
-//   - FieldUpdates[id]["status"] = "mount target down" (no suffix — single finding)
+//   - FieldUpdates is empty (AS-140: status overlay removed; phrase reaches
+//     S4 via phraseFromFindings(r.Findings) at render time)
 //   - Rows contain: {Mount Target, AZ, State, Degraded}
 //   - U11: Summary must NOT contain any Row Value as substring.
 // ---------------------------------------------------------------------------
@@ -76,13 +83,10 @@ func TestEnrichEFSMountTargets_HealthyRowWithDown(t *testing.T) {
 		t.Errorf("Summary length %d > 40 chars: %q", len(finding.Summary), finding.Summary)
 	}
 
-	// FieldUpdates must write status = "mount target down" (no suffix — single W2 finding).
-	updates, hasUpdates := result.FieldUpdates[fsID]
-	if !hasUpdates {
-		t.Fatalf("FieldUpdates missing entry for %q", fsID)
-	}
-	if updates["status"] != "mount target down" {
-		t.Errorf("FieldUpdates[%q][\"status\"] = %q, want %q", fsID, updates["status"], "mount target down")
+	// AS-140: FieldUpdates must be empty — the merged display phrase is
+	// computed by phraseFromFindings(r.Findings) at render time.
+	if updates, hasUpdates := result.FieldUpdates[fsID]; hasUpdates && len(updates) != 0 {
+		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", fsID, updates)
 	}
 
 	// Rows must contain the four expected labels.
@@ -132,8 +136,9 @@ func TestEnrichEFSMountTargets_HealthyRowWithDown(t *testing.T) {
 // THEN:
 //   - Fetcher sets Status="updating", Issues=["updating"].
 //   - Enricher: W2 Broken > W1 Warning in severity.
-//   - FieldUpdates[id]["status"] = "mount target down (+1)"
-//     (+1 hidden = the W1 "updating" phrase).
+//   - Finding emitted for fsID with Summary="mount target down".
+//   - FieldUpdates is empty (AS-140: the "(+1)" suffix is computed at render
+//     time by phraseFromFindings(r.Findings) over the stacked W1+W2 findings).
 //   - Resource.Issues (Wave-1 only) stays = ["updating"].
 // ---------------------------------------------------------------------------
 
@@ -158,16 +163,11 @@ func TestEnrichEFSMountTargets_W1WarningPlusW2Bumps(t *testing.T) {
 		t.Fatalf("expected finding for %q, got none", fsID)
 	}
 
-	// FieldUpdates[id]["status"] must be "mount target down (+1)":
-	//   - W2 Broken phrase wins over W1 Warning.
-	//   - "+1" counts the hidden W1 Warning ("updating").
-	updates, hasUpdates := result.FieldUpdates[fsID]
-	if !hasUpdates {
-		t.Fatalf("FieldUpdates missing entry for %q", fsID)
-	}
-	wantStatus := "mount target down (+1)"
-	if updates["status"] != wantStatus {
-		t.Errorf("FieldUpdates[%q][\"status\"] = %q, want %q", fsID, updates["status"], wantStatus)
+	// AS-140: FieldUpdates must be empty. The W1+W2 stack merge to
+	// "mount target down (+1)" now happens at render time via
+	// phraseFromFindings(r.Findings) on the unified findings slice.
+	if updates, hasUpdates := result.FieldUpdates[fsID]; hasUpdates && len(updates) != 0 {
+		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", fsID, updates)
 	}
 
 	// The finding's Summary is still "mount target down" (the bare W2 phrase).
@@ -310,13 +310,14 @@ func TestEnrichEFSMountTargets_FindingRowsStructure(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// TEST: TestEnrichEFSMountTargets_FieldUpdates_NotNil
+// TEST: TestEnrichEFSMountTargets_FieldUpdates_EmptyAS140
 //
-// Verifies that FieldUpdates is never nil in the result (contract: MUST NOT be
-// nil if the enricher writes any updates).
+// AS-140: EnrichEFSMountTargets no longer writes FieldUpdates entries — the
+// merged display phrase is computed at render time. The result.FieldUpdates
+// map may legitimately be nil or non-nil but length 0 after this migration.
 // ---------------------------------------------------------------------------
 
-func TestEnrichEFSMountTargets_FieldUpdates_NotNil(t *testing.T) {
+func TestEnrichEFSMountTargets_FieldUpdates_EmptyAS140(t *testing.T) {
 	fake := efsMTFakeFromFixtures()
 	clients := &awsclient.ServiceClients{EFS: fake}
 
@@ -328,8 +329,9 @@ func TestEnrichEFSMountTargets_FieldUpdates_NotNil(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if result.FieldUpdates == nil {
-		t.Error("FieldUpdates must not be nil when enricher produces findings")
+	// FieldUpdates must carry zero entries for the finding-producing FS.
+	if updates, ok := result.FieldUpdates["fs-0healthymtdown001"]; ok && len(updates) != 0 {
+		t.Errorf("AS-140: expected empty FieldUpdates for finding-producing FS; got %v", updates)
 	}
 }
 
