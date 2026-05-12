@@ -10,7 +10,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo"
 	demofixtures "github.com/k2m30/a9s/v3/internal/demo/fixtures"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 func TestDemoFullIntegration_AllResourcesBaseline(t *testing.T) {
@@ -30,7 +30,7 @@ func TestDemoFullIntegration_AllResourcesBaseline(t *testing.T) {
 	var cmd tea.Cmd
 	m, cmd = fullIntegrationApplyMsg(m, initMsg)
 	availMsg := fullIntegrationExtractMsg(t, cmd, func(msg tea.Msg) bool {
-		_, ok := msg.(messages.AvailabilityPrefetchedMsg)
+		_, ok := msg.(messages.AvailabilityPrefetched)
 		return ok
 	})
 	m, _ = fullIntegrationApplyMsg(m, availMsg)

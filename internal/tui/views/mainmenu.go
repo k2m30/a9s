@@ -10,7 +10,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/text"
 )
@@ -108,7 +108,7 @@ func (m MainMenuModel) Update(msg tea.Msg) (MainMenuModel, tea.Cmd) {
 					}
 				}
 				return m, func() tea.Msg {
-					return messages.NavigateMsg{
+					return messages.Navigate{
 						Target:       messages.TargetResourceList,
 						ResourceType: selected.ShortName,
 					}

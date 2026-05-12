@@ -49,7 +49,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/session"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // slugForTest mirrors the unexported slug() function in internal/semantics/attention/derive.go.
@@ -138,7 +138,7 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 				},
 			}
 
-			m = shimApplyMsg(m, messages.EnrichmentCheckedMsg{
+			m = shimApplyMsg(m, messages.EnrichmentChecked{
 				ResourceType: msgType,
 				Findings:     map[string]resource.EnrichmentFinding{rid: ef},
 				Gen:          0,
@@ -189,7 +189,7 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 				{ID: rid, Name: "lazy-" + tc.canonShort, Status: "running"},
 			}
 
-			m = shimApplyMsg(m, messages.EnrichmentCheckedMsg{
+			m = shimApplyMsg(m, messages.EnrichmentChecked{
 				ResourceType: msgType,
 				Findings:     map[string]resource.EnrichmentFinding{rid: ef},
 				Gen:          0,
@@ -231,7 +231,7 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 				{ID: rid, Name: "probe-" + tc.canonShort, Status: "running"},
 			}
 
-			m = shimApplyMsg(m, messages.EnrichmentCheckedMsg{
+			m = shimApplyMsg(m, messages.EnrichmentChecked{
 				ResourceType: msgType,
 				Findings:     map[string]resource.EnrichmentFinding{rid: ef},
 				Gen:          0,
@@ -321,7 +321,7 @@ func TestFold_RepeatedEnrichmentReplacesWave2(t *testing.T) {
 			}
 
 			// First enrichment: wave2 = summaryA
-			m = shimApplyMsg(m, messages.EnrichmentCheckedMsg{
+			m = shimApplyMsg(m, messages.EnrichmentChecked{
 				ResourceType: msgType,
 				Findings:     map[string]resource.EnrichmentFinding{rid: efFirst},
 				Gen:          0,
@@ -329,7 +329,7 @@ func TestFold_RepeatedEnrichmentReplacesWave2(t *testing.T) {
 			})
 
 			// Second enrichment: wave2 = summaryB
-			m = shimApplyMsg(m, messages.EnrichmentCheckedMsg{
+			m = shimApplyMsg(m, messages.EnrichmentChecked{
 				ResourceType: msgType,
 				Findings:     map[string]resource.EnrichmentFinding{rid: efSecond},
 				Gen:          0,
@@ -431,7 +431,7 @@ func TestFold_EmptyEnrichmentClearsWave2(t *testing.T) {
 			}
 
 			// Seed wave2 finding.
-			m = shimApplyMsg(m, messages.EnrichmentCheckedMsg{
+			m = shimApplyMsg(m, messages.EnrichmentChecked{
 				ResourceType: msgType,
 				Findings:     map[string]resource.EnrichmentFinding{rid: efInitial},
 				Gen:          0,
@@ -457,7 +457,7 @@ func TestFold_EmptyEnrichmentClearsWave2(t *testing.T) {
 			}
 
 			// Send empty Findings — must clear wave2.
-			m = shimApplyMsg(m, messages.EnrichmentCheckedMsg{
+			m = shimApplyMsg(m, messages.EnrichmentChecked{
 				ResourceType: msgType,
 				Findings:     nil,
 				Gen:          0,
@@ -567,7 +567,7 @@ func TestFold_CtrlROnList_ClearsActiveRowFindings(t *testing.T) {
 	}
 
 	// Step 2: stamp wave2 findings into the cached row via EnrichmentCheckedMsg.
-	m = shimApplyMsg(m, messages.EnrichmentCheckedMsg{
+	m = shimApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Findings:     map[string]resource.EnrichmentFinding{rid: ef},
 		Gen:          0,
@@ -576,7 +576,7 @@ func TestFold_CtrlROnList_ClearsActiveRowFindings(t *testing.T) {
 
 	// Step 3: navigate to the ec2 list view — cache hit path creates a
 	// ResourceListModel from entry.Resources (the slice with wave2 findings).
-	m = shimApplyMsg(m, messages.NavigateMsg{
+	m = shimApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -661,7 +661,7 @@ func TestFold_MainMenuCtrlR_ClearsAllCachedWave2(t *testing.T) {
 	// ClientsReadyMsg with nil clients is enough to advance past init state.
 	m := tui.New("test-profile", "us-east-1")
 	m = shimApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
-	m = shimApplyMsg(m, messages.ClientsReadyMsg{Clients: nil})
+	m = shimApplyMsg(m, messages.ClientsReady{Clients: nil})
 
 	// Step 1: seed ResourceCache for ec2 and s3 with running resources.
 	m.Session.ResourceCache[ec2Short] = &session.ResourceCacheEntry{
@@ -676,13 +676,13 @@ func TestFold_MainMenuCtrlR_ClearsAllCachedWave2(t *testing.T) {
 	}
 
 	// Step 2: stamp wave2 findings via EnrichmentCheckedMsg for both types.
-	m = shimApplyMsg(m, messages.EnrichmentCheckedMsg{
+	m = shimApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: ec2Short,
 		Findings:     map[string]resource.EnrichmentFinding{ec2ID: efEC2},
 		Gen:          0,
 		TypeGen:      0,
 	})
-	m = shimApplyMsg(m, messages.EnrichmentCheckedMsg{
+	m = shimApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: s3Short,
 		Findings:     map[string]resource.EnrichmentFinding{s3ID: efS3},
 		Gen:          0,
@@ -807,7 +807,7 @@ func TestFold_AttentionDetailsCarryAcrossEntryPoints(t *testing.T) {
 			m := newShimModel()
 
 			// Step 1: resource enters via Site 4 (CachedPages).
-			m = shimApplyMsg(m, messages.RelatedCheckResultMsg{
+			m = shimApplyMsg(m, messages.RelatedCheckResult{
 				ResourceType:     tc.canonShort,
 				SourceResourceID: "src-1",
 				DefDisplayName:   tc.canonShort + " Resources",
@@ -834,7 +834,7 @@ func TestFold_AttentionDetailsCarryAcrossEntryPoints(t *testing.T) {
 			}
 
 			// Step 2: Wave 2 enrichment arrives.
-			m = shimApplyMsg(m, messages.EnrichmentCheckedMsg{
+			m = shimApplyMsg(m, messages.EnrichmentChecked{
 				ResourceType: msgType,
 				Findings:     map[string]resource.EnrichmentFinding{rid: ef},
 				Gen:          0,

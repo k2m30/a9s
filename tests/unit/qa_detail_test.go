@@ -21,7 +21,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -844,7 +844,7 @@ func TestQA_Detail_YAMLSwitch(t *testing.T) {
 	}
 
 	msg := cmd()
-	navMsg, ok := msg.(messages.NavigateMsg)
+	navMsg, ok := msg.(messages.Navigate)
 	if !ok {
 		t.Fatalf("expected NavigateMsg, got %T", msg)
 	}
@@ -884,7 +884,7 @@ func TestQA_Detail_YAMLSwitch_AllTypes(t *testing.T) {
 				t.Fatalf("%s: pressing 'y' should return a command", tc.name)
 			}
 			msg := cmd()
-			navMsg, ok := msg.(messages.NavigateMsg)
+			navMsg, ok := msg.(messages.Navigate)
 			if !ok {
 				t.Fatalf("%s: expected NavigateMsg, got %T", tc.name, msg)
 			}

@@ -23,7 +23,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -93,7 +93,7 @@ func TestEC2_008_NavChain_FieldCursorGetterExists(t *testing.T) {
 	m := newNavDemoModel(t)
 
 	ec2Res := firstEC2Resource(t)
-	m, _ = navApplyMsg(m, messages.NavigateMsg{
+	m, _ = navApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "ec2",
 		Resource:     &ec2Res,
@@ -162,7 +162,7 @@ func TestEC2_008_NavChain_RightCol_Count1_OpensDrillTarget(t *testing.T) {
 	m := newNavDemoModel(t)
 
 	ec2Res := firstEC2Resource(t)
-	m, _ = navApplyMsg(m, messages.NavigateMsg{
+	m, _ = navApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "ec2",
 		Resource:     &ec2Res,
@@ -175,13 +175,13 @@ func TestEC2_008_NavChain_RightCol_Count1_OpensDrillTarget(t *testing.T) {
 		Status: "active",
 		Fields: map[string]string{"target_group_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/prod-api-tg/abc123"},
 	}
-	m, _ = navApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = navApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "tg",
 		Resources:    []resource.Resource{tgRes},
 	})
 
 	// Deliver RelatedNavigateMsg with TargetID (count=1 path)
-	m, cmd := navApplyMsg(m, messages.RelatedNavigateMsg{
+	m, cmd := navApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "tg",
 		TargetID:   "tg-ec2chain-001",
 	})
@@ -217,7 +217,7 @@ func TestEC2_008_NavChain_RightCol_CountN_ShowsFilteredList(t *testing.T) {
 	m := newNavDemoModel(t)
 
 	ec2Res := firstEC2Resource(t)
-	m, _ = navApplyMsg(m, messages.NavigateMsg{
+	m, _ = navApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "ec2",
 		Resource:     &ec2Res,
@@ -229,13 +229,13 @@ func TestEC2_008_NavChain_RightCol_CountN_ShowsFilteredList(t *testing.T) {
 		{ID: "alarm-chain-2", Name: "status-check", Status: "ok"},
 		{ID: "alarm-chain-3", Name: "irrelevant-alarm", Status: "ok"},
 	}
-	m, _ = navApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = navApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "alarm",
 		Resources:    alarmResources,
 	})
 
 	// Deliver RelatedNavigateMsg with RelatedIDs (count>1 path)
-	m, _ = navApplyMsg(m, messages.RelatedNavigateMsg{
+	m, _ = navApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "alarm",
 		RelatedIDs: []string{"alarm-chain-1", "alarm-chain-2"},
 	})
@@ -266,20 +266,20 @@ func TestEC2_008_NavChain_EscReturnsToEC2Detail(t *testing.T) {
 	m := newNavDemoModel(t)
 
 	ec2Res := firstEC2Resource(t)
-	m, _ = navApplyMsg(m, messages.NavigateMsg{
+	m, _ = navApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "ec2",
 		Resource:     &ec2Res,
 	})
 
 	vpcRes := resource.Resource{ID: "vpc-0abc123def456789a", Name: "prod-vpc", Status: "available"}
-	m, _ = navApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = navApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "vpc",
 		Resources:    []resource.Resource{vpcRes},
 	})
 
 	// Navigate to VPC detail via RelatedNavigateMsg
-	m, _ = navApplyMsg(m, messages.RelatedNavigateMsg{
+	m, _ = navApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "vpc",
 		TargetID:   "vpc-0abc123def456789a",
 	})

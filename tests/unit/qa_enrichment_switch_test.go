@@ -25,7 +25,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // seedEnrichmentFindings delivers EnrichmentCheckedMsg for multiple resource
@@ -39,7 +39,7 @@ func seedEnrichmentFindings(m tui.Model) tui.Model {
 	// TODO: expose tui.Model.EnrichmentGen() accessor to read the actual pre-switch gen
 	// dynamically instead of hardcoding 0. Currently requires invasive refactor; 0 is
 	// the correct value for a freshly constructed model.
-	m, _ = rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+	m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Issues:       2,
 		Truncated:    false,
@@ -50,7 +50,7 @@ func seedEnrichmentFindings(m tui.Model) tui.Model {
 		TypeGen: 0,
 	})
 	// rds: same gens
-	m, _ = rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+	m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "rds",
 		Issues:       0,
 		Truncated:    false,
@@ -88,14 +88,14 @@ func TestProfileSwitch_ClearsEnrichmentState(t *testing.T) {
 
 	// Step 2: switch profile — handleProfileSelected bumps enrichmentGen,
 	// resets enrichmentTypeGen, enrichmentFindings, enrichmentRan.
-	m, switchCmd := rootApplyMsg(m, messages.ProfileSelectedMsg{Profile: "staging"})
+	m, switchCmd := rootApplyMsg(m, messages.ProfileSelected{Profile: "staging"})
 
 	// switchCmd will contain a connect command and flash — we don't need to
 	// execute it; we only care about the enrichment state reset.
 	_ = switchCmd
 
 	// Step 3: stale ec2 message (old Gen=0) must be dropped.
-	_, dropEC2Cmd := rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+	_, dropEC2Cmd := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Issues:       2,
 		Findings: map[string]resource.EnrichmentFinding{
@@ -109,7 +109,7 @@ func TestProfileSwitch_ClearsEnrichmentState(t *testing.T) {
 	}
 
 	// Step 4: stale rds message (old Gen=0) must also be dropped.
-	_, dropRDSCmd := rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+	_, dropRDSCmd := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "rds",
 		Issues:       0,
 		Findings: map[string]resource.EnrichmentFinding{
@@ -142,7 +142,7 @@ func TestProfileSwitch_ClearsEnrichmentState(t *testing.T) {
 		// but the stale-gen check runs before any map write, so a nil map would
 		// only panic if the maps are nil. Since we expect non-nil maps, a stale
 		// check should return early safely.
-		m2, _ := m.Update(messages.EnrichmentCheckedMsg{
+		m2, _ := m.Update(messages.EnrichmentChecked{
 			ResourceType: "ec2",
 			Issues:       1,
 			Findings:     map[string]resource.EnrichmentFinding{},
@@ -162,12 +162,12 @@ func TestProfileSwitch_BothEnrichmentMapsCleared(t *testing.T) {
 	m = seedEnrichmentFindings(m)
 
 	// Switch profile.
-	m, _ = rootApplyMsg(m, messages.ProfileSelectedMsg{Profile: "dev"})
+	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "dev"})
 
 	// Both types' stale messages must be dropped — neither should have surviving
 	// state that could be "reactivated" by a matching gen.
 	for _, rt := range []string{"ec2", "rds", "ebs", "ddb"} {
-		_, cmd := rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+		_, cmd := rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: rt,
 			Findings:     map[string]resource.EnrichmentFinding{},
 			Gen:          0, // old session gen (stale after profile switch)
@@ -195,11 +195,11 @@ func TestRegionSwitch_ClearsEnrichmentState(t *testing.T) {
 
 	// Step 2: switch region — handleRegionSelected bumps enrichmentGen,
 	// resets enrichmentTypeGen, enrichmentFindings, enrichmentRan.
-	m, switchCmd := rootApplyMsg(m, messages.RegionSelectedMsg{Region: "eu-west-1"})
+	m, switchCmd := rootApplyMsg(m, messages.RegionSelected{Region: "eu-west-1"})
 	_ = switchCmd
 
 	// Step 3: stale ec2 message (old Gen=0) must be dropped.
-	_, dropEC2Cmd := rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+	_, dropEC2Cmd := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Issues:       2,
 		Findings: map[string]resource.EnrichmentFinding{
@@ -213,7 +213,7 @@ func TestRegionSwitch_ClearsEnrichmentState(t *testing.T) {
 	}
 
 	// Step 4: stale rds message must also be dropped.
-	_, dropRDSCmd := rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+	_, dropRDSCmd := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "rds",
 		Issues:       0,
 		Findings: map[string]resource.EnrichmentFinding{
@@ -233,7 +233,7 @@ func TestRegionSwitch_ClearsEnrichmentState(t *testing.T) {
 				t.Errorf("after region switch, enrichment map write must not panic: %v", r)
 			}
 		}()
-		m2, _ := m.Update(messages.EnrichmentCheckedMsg{
+		m2, _ := m.Update(messages.EnrichmentChecked{
 			ResourceType: "ec2",
 			Findings:     map[string]resource.EnrichmentFinding{},
 			Gen:          0,
@@ -251,11 +251,11 @@ func TestRegionSwitch_BothEnrichmentMapsCleared(t *testing.T) {
 	m = seedEnrichmentFindings(m)
 
 	// Switch region.
-	m, _ = rootApplyMsg(m, messages.RegionSelectedMsg{Region: "ap-southeast-1"})
+	m, _ = rootApplyMsg(m, messages.RegionSelected{Region: "ap-southeast-1"})
 
 	// All types' old-gen messages must be dropped.
 	for _, rt := range []string{"ec2", "rds", "ebs", "ddb"} {
-		_, cmd := rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+		_, cmd := rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: rt,
 			Findings:     map[string]resource.EnrichmentFinding{},
 			Gen:          0, // old session gen (stale after region switch)
@@ -281,10 +281,10 @@ func TestProfileSwitch_TypeGenResetAllowsNewEnrichment(t *testing.T) {
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg()) // enrichmentTypeGen["ec2"] → 1
 
 	// Pop back to main menu.
-	m, _ = rootApplyMsg(m, messages.PopViewMsg{})
+	m, _ = rootApplyMsg(m, messages.PopView{})
 
 	// Switch profile — resets enrichmentTypeGen to empty map.
-	m, _ = rootApplyMsg(m, messages.ProfileSelectedMsg{Profile: "prod"})
+	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "prod"})
 
 	// Re-navigate to ec2 and Ctrl+R — must not panic (map is empty, not nil).
 	func() {
@@ -310,10 +310,10 @@ func TestRegionSwitch_TypeGenResetAllowsNewEnrichment(t *testing.T) {
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg()) // enrichmentTypeGen["ec2"] → 1
 
 	// Pop back to main menu.
-	m, _ = rootApplyMsg(m, messages.PopViewMsg{})
+	m, _ = rootApplyMsg(m, messages.PopView{})
 
 	// Switch region — resets enrichmentTypeGen to empty map.
-	m, _ = rootApplyMsg(m, messages.RegionSelectedMsg{Region: "us-west-2"})
+	m, _ = rootApplyMsg(m, messages.RegionSelected{Region: "us-west-2"})
 
 	// Re-navigate to ec2 and Ctrl+R — must not panic.
 	func() {

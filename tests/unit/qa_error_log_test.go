@@ -23,7 +23,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -40,9 +40,9 @@ func TestErrorHistoryAccumulation_ErrorFlashesAddToHistory(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Send three error flashes — each should be appended to history.
-	m, _ = rootApplyMsg(m, messages.FlashMsg{Text: "first error", IsError: true})
-	m, _ = rootApplyMsg(m, messages.FlashMsg{Text: "second error", IsError: true})
-	m, _ = rootApplyMsg(m, messages.FlashMsg{Text: "third error", IsError: true})
+	m, _ = rootApplyMsg(m, messages.Flash{Text: "first error", IsError: true})
+	m, _ = rootApplyMsg(m, messages.Flash{Text: "second error", IsError: true})
+	m, _ = rootApplyMsg(m, messages.Flash{Text: "third error", IsError: true})
 
 	// Press "!" to open the error log. If history has entries, a viewer is pushed
 	// and the view output contains the log entries. If history is empty, a flash
@@ -73,8 +73,8 @@ func TestErrorHistoryAccumulation_NonErrorFlashesNotAdded(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Send non-error flashes only.
-	m, _ = rootApplyMsg(m, messages.FlashMsg{Text: "copied to clipboard", IsError: false})
-	m, _ = rootApplyMsg(m, messages.FlashMsg{Text: "theme applied", IsError: false})
+	m, _ = rootApplyMsg(m, messages.Flash{Text: "copied to clipboard", IsError: false})
+	m, _ = rootApplyMsg(m, messages.Flash{Text: "theme applied", IsError: false})
 
 	// Press "!" — with no errors in history, must flash "No errors this session".
 	// Do NOT execute the returned cmd: it is a tea.Tick (auto-clear timer), and
@@ -110,7 +110,7 @@ func TestErrorFlashFullWidth_LongMessageNotTruncatedAt80(t *testing.T) {
 	//   new: 120-4 = 116           → 100-char message fits without truncation
 	longMsg := strings.Repeat("x", 100) // exactly 100 chars
 
-	m, _ = rootApplyMsg(m, messages.FlashMsg{Text: longMsg, IsError: true})
+	m, _ = rootApplyMsg(m, messages.Flash{Text: longMsg, IsError: true})
 
 	plain := stripANSI(rootViewContent(m))
 
@@ -132,7 +132,7 @@ func TestErrorFlashFullWidth_ExceedsWidthMinus4IsTruncated(t *testing.T) {
 	// 200-char message — vastly exceeds width-6=76, must be truncated.
 	veryLongMsg := strings.Repeat("z", 200)
 
-	m, _ = rootApplyMsg(m, messages.FlashMsg{Text: veryLongMsg, IsError: true})
+	m, _ = rootApplyMsg(m, messages.Flash{Text: veryLongMsg, IsError: true})
 
 	plain := stripANSI(rootViewContent(m))
 	firstL := firstLine(plain)
@@ -158,10 +158,10 @@ func TestErrorHintAfterClear_HintShownAfterErrorFlashClears(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Send an error flash. handleFlash increments gen to 1.
-	m, _ = rootApplyMsg(m, messages.FlashMsg{Text: "something failed", IsError: true})
+	m, _ = rootApplyMsg(m, messages.Flash{Text: "something failed", IsError: true})
 
 	// Clear the flash (gen=1 matches).
-	m, _ = rootApplyMsg(m, messages.ClearFlashMsg{Gen: 1})
+	m, _ = rootApplyMsg(m, messages.ClearFlash{Gen: 1})
 
 	plain := stripANSI(rootViewContent(m))
 
@@ -177,8 +177,8 @@ func TestErrorHintAfterClear_KeypressDismissesHint(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Set up the hint.
-	m, _ = rootApplyMsg(m, messages.FlashMsg{Text: "error occurred", IsError: true})
-	m, _ = rootApplyMsg(m, messages.ClearFlashMsg{Gen: 1})
+	m, _ = rootApplyMsg(m, messages.Flash{Text: "error occurred", IsError: true})
+	m, _ = rootApplyMsg(m, messages.ClearFlash{Gen: 1})
 
 	// Verify hint is present before keypress.
 	plain := stripANSI(rootViewContent(m))
@@ -208,10 +208,10 @@ func TestErrorHintNotShownForNonErrors(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Send a non-error flash (gen increments to 1).
-	m, _ = rootApplyMsg(m, messages.FlashMsg{Text: "Copied!", IsError: false})
+	m, _ = rootApplyMsg(m, messages.Flash{Text: "Copied!", IsError: false})
 
 	// Clear the flash.
-	m, _ = rootApplyMsg(m, messages.ClearFlashMsg{Gen: 1})
+	m, _ = rootApplyMsg(m, messages.ClearFlash{Gen: 1})
 
 	plain := stripANSI(rootViewContent(m))
 
@@ -232,7 +232,7 @@ func TestErrorLogKeyOpensViewer(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Add an error to history.
-	m, _ = rootApplyMsg(m, messages.FlashMsg{Text: "access denied", IsError: true})
+	m, _ = rootApplyMsg(m, messages.Flash{Text: "access denied", IsError: true})
 
 	// Press "!" to open the error log.
 	m, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: '!'})
@@ -265,8 +265,8 @@ func TestErrorLogKeyOpensViewer_NewestFirst(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.FlashMsg{Text: "first-error-aaa", IsError: true})
-	m, _ = rootApplyMsg(m, messages.FlashMsg{Text: "second-error-bbb", IsError: true})
+	m, _ = rootApplyMsg(m, messages.Flash{Text: "first-error-aaa", IsError: true})
+	m, _ = rootApplyMsg(m, messages.Flash{Text: "second-error-bbb", IsError: true})
 
 	m, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: '!'})
 	if cmd != nil {
@@ -416,7 +416,7 @@ func TestErrorHistoryFromAPIError(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.APIErrorMsg{
+	m, _ = rootApplyMsg(m, messages.APIError{
 		ResourceType: "ec2-instances",
 		Err:          fmt.Errorf("AccessDenied: User is not authorized"),
 	})
@@ -447,7 +447,7 @@ func TestErrorHistoryFromClientsReady(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Gen 0 matches the model's initial connectGen (zero value).
-	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{
+	m, _ = rootApplyMsg(m, messages.ClientsReady{
 		Err: errors.New("could not resolve credentials"),
 		Gen: 0,
 	})
@@ -476,7 +476,7 @@ func TestErrorLogTimestampFormat(t *testing.T) {
 	tui.Version = "test"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.FlashMsg{Text: "timestamp test error", IsError: true})
+	m, _ = rootApplyMsg(m, messages.Flash{Text: "timestamp test error", IsError: true})
 
 	m, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: '!'})
 	if cmd != nil {

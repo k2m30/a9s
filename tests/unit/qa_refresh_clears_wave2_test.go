@@ -14,7 +14,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // TestMainMenuCtrlR_ClearsEnrichmentFindings verifies that Ctrl+R on the main menu
@@ -31,7 +31,7 @@ func TestMainMenuCtrlR_ClearsEnrichmentFindings(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Step 1: seed findings for ec2 and ddb at Gen=0.
-	m, _ = rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+	m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Issues:       3,
 		Findings: map[string]resource.EnrichmentFinding{
@@ -40,7 +40,7 @@ func TestMainMenuCtrlR_ClearsEnrichmentFindings(t *testing.T) {
 		Gen:     0,
 		TypeGen: 0,
 	})
-	m, _ = rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+	m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ddb",
 		Issues:       1,
 		Findings: map[string]resource.EnrichmentFinding{
@@ -55,7 +55,7 @@ func TestMainMenuCtrlR_ClearsEnrichmentFindings(t *testing.T) {
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
 
 	// Step 4: re-deliver old-gen messages — must be dropped after enrichmentGen bump.
-	_, cmd1 := rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+	_, cmd1 := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Issues:       3,
 		Findings: map[string]resource.EnrichmentFinding{
@@ -68,7 +68,7 @@ func TestMainMenuCtrlR_ClearsEnrichmentFindings(t *testing.T) {
 		t.Error("after main-menu Ctrl+R: ec2 EnrichmentCheckedMsg{Gen=0} must be dropped — enrichmentGen was not bumped")
 	}
 
-	_, cmd2 := rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+	_, cmd2 := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ddb",
 		Issues:       1,
 		Findings: map[string]resource.EnrichmentFinding{
@@ -91,7 +91,7 @@ func TestMainMenuCtrlR_EnrichmentGenIncremented(t *testing.T) {
 
 	// Seed findings for several types.
 	for _, rt := range []string{"ec2", "ebs", "ddb", "tg"} {
-		m, _ = rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+		m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: rt,
 			Issues:       1,
 			Findings:     map[string]resource.EnrichmentFinding{},
@@ -105,7 +105,7 @@ func TestMainMenuCtrlR_EnrichmentGenIncremented(t *testing.T) {
 
 	// All types' old-gen messages must be dropped.
 	for _, rt := range []string{"ec2", "ebs", "ddb", "tg"} {
-		_, cmd := rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+		_, cmd := rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: rt,
 			Findings:     map[string]resource.EnrichmentFinding{},
 			Gen:          0, // stale after Ctrl+R bumped enrichmentGen
@@ -136,7 +136,7 @@ func TestMainMenuCtrlR_MapsSafeAfterReset(t *testing.T) {
 				t.Errorf("after main-menu Ctrl+R, enrichment maps must be non-nil (no panic): %v", r)
 			}
 		}()
-		m2, _ := m.Update(messages.EnrichmentCheckedMsg{
+		m2, _ := m.Update(messages.EnrichmentChecked{
 			ResourceType: "ec2",
 			Findings:     map[string]resource.EnrichmentFinding{},
 			Gen:          0,

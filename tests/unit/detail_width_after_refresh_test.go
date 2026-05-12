@@ -37,7 +37,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 const narrowTerminalWidth = 80
@@ -55,7 +55,7 @@ func setupEC2DetailWithResultsNarrow(t *testing.T) tui.Model {
 		tui.WithRegion(demo.DemoRegion))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: narrowTerminalWidth, Height: 36})
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -66,7 +66,7 @@ func setupEC2DetailWithResultsNarrow(t *testing.T) tui.Model {
 		t.Fatalf("demo ec2 fixtures missing: err=%v len=%d", err, len(ec2Res))
 	}
 
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    ec2Res,
 	})
@@ -77,7 +77,7 @@ func setupEC2DetailWithResultsNarrow(t *testing.T) tui.Model {
 
 	// Feed results for every EC2 related type so right column is visible.
 	for _, def := range resource.GetRelated("ec2") {
-		m, _ = rootApplyMsg(m, messages.RelatedCheckResultMsg{
+		m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 			ResourceType: "ec2",
 			Result: resource.RelatedCheckResult{
 				TargetType:  def.TargetType,
@@ -94,7 +94,7 @@ func setupEC2DetailWithResultsNarrow(t *testing.T) tui.Model {
 func feedEC2Results(t *testing.T, m tui.Model) tui.Model {
 	t.Helper()
 	for _, def := range resource.GetRelated("ec2") {
-		m, _ = rootApplyMsg(m, messages.RelatedCheckResultMsg{
+		m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 			ResourceType: "ec2",
 			Result: resource.RelatedCheckResult{
 				TargetType:  def.TargetType,

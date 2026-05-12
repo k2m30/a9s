@@ -9,8 +9,8 @@ package unit
 //
 // Phase 0+1 prerequisites (must be merged before these compile):
 //   - resource.PaginationMeta  (IsTruncated, NextToken)
-//   - messages.ResourcesLoadedMsg gains Pagination, Append fields
-//   - messages.LoadMoreMsg type
+//   - messages.ResourcesLoaded gains Pagination, Append fields
+//   - messages.LoadMore type
 //   - keys.Map gains LoadMore binding (M key)
 
 import (
@@ -24,7 +24,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -91,7 +91,7 @@ func pgLoadResources(
 	pagination *resource.PaginationMeta,
 	appendMode bool,
 ) views.ResourceListModel {
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    resources,
 		Pagination:   pagination,
@@ -375,7 +375,7 @@ func TestResourceList_LoadMore_WhenTruncated_SendsMsg(t *testing.T) {
 
 	// Execute the command to verify it produces a LoadMoreMsg
 	msg := cmd()
-	if _, ok := msg.(messages.LoadMoreMsg); !ok {
+	if _, ok := msg.(messages.LoadMore); !ok {
 		t.Errorf("expected cmd to produce LoadMoreMsg, got %T", msg)
 	}
 }
@@ -461,7 +461,7 @@ func TestResourceList_FrameTitle_Pagination_AllResourceTypes(t *testing.T) {
 			}
 
 			// Non-truncated
-			m, _ = m.Update(messages.ResourcesLoadedMsg{
+			m, _ = m.Update(messages.ResourcesLoaded{
 				ResourceType: rt.ShortName,
 				Resources:    resources,
 				Pagination:   nil,
@@ -474,7 +474,7 @@ func TestResourceList_FrameTitle_Pagination_AllResourceTypes(t *testing.T) {
 			}
 
 			// Truncated
-			m, _ = m.Update(messages.ResourcesLoadedMsg{
+			m, _ = m.Update(messages.ResourcesLoaded{
 				ResourceType: rt.ShortName,
 				Resources:    resources,
 				Pagination: &resource.PaginationMeta{

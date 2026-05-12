@@ -18,7 +18,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/session"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // findPatchMenu returns the first PatchMenu intent in xs whose ResourceType
@@ -67,7 +67,7 @@ func TestHandleEnrichmentChecked_TruncationPrecedence_Wave1Wins(t *testing.T) {
 
 	c := New(sess, catalog.ResourceTypes)
 
-	intents, _ := c.handleEnrichmentChecked(messages.EnrichmentCheckedMsg{
+	intents, _ := c.handleEnrichmentChecked(messages.EnrichmentChecked{
 		ResourceType: rt,
 		Issues:       0,
 		Truncated:    false,
@@ -92,7 +92,7 @@ func TestHandleEnrichmentChecked_TruncationPrecedence_NoWave1NoIssues_ClearsToFa
 	sess := session.New()
 	c := New(sess, catalog.ResourceTypes)
 
-	intents, _ := c.handleEnrichmentChecked(messages.EnrichmentCheckedMsg{
+	intents, _ := c.handleEnrichmentChecked(messages.EnrichmentChecked{
 		ResourceType: rt,
 		Issues:       0,
 		Truncated:    true, // Wave-2 thinks it's truncated, but no issues observed
@@ -117,7 +117,7 @@ func TestHandleEnrichmentChecked_TruncationPrecedence_Wave2WithFindings_StaysTru
 	sess := session.New()
 	c := New(sess, catalog.ResourceTypes)
 
-	intents, _ := c.handleEnrichmentChecked(messages.EnrichmentCheckedMsg{
+	intents, _ := c.handleEnrichmentChecked(messages.EnrichmentChecked{
 		ResourceType: rt,
 		Issues:       3,
 		Truncated:    true,
@@ -145,7 +145,7 @@ func TestHandleEnrichmentChecked_PatchDetail_NilFindings_ClearsContract(t *testi
 	sess := session.New()
 	c := New(sess, catalog.ResourceTypes)
 
-	intents, _ := c.handleEnrichmentChecked(messages.EnrichmentCheckedMsg{
+	intents, _ := c.handleEnrichmentChecked(messages.EnrichmentChecked{
 		ResourceType: rt,
 		Findings:     nil,
 	})
@@ -172,7 +172,7 @@ func TestHandleEnrichmentChecked_PatchDetail_NonNilFindings_PassesThrough(t *tes
 		"id-1": {Severity: "!", Summary: "broken"},
 		"id-2": {Severity: "~", Summary: "warn"},
 	}
-	intents, _ := c.handleEnrichmentChecked(messages.EnrichmentCheckedMsg{
+	intents, _ := c.handleEnrichmentChecked(messages.EnrichmentChecked{
 		ResourceType: rt,
 		Findings:     findings,
 	})

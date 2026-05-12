@@ -43,7 +43,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -125,12 +125,12 @@ func navigateToIndex(d views.DetailModel, n int) views.DetailModel {
 
 // extractRelatedNavigateMsg calls cmd() and type-asserts to RelatedNavigateMsg.
 // Returns (msg, true) on success, (zero, false) if cmd is nil or wrong type.
-func extractRelatedNavigateMsg(cmd tea.Cmd) (messages.RelatedNavigateMsg, bool) {
+func extractRelatedNavigateMsg(cmd tea.Cmd) (messages.RelatedNavigate, bool) {
 	if cmd == nil {
-		return messages.RelatedNavigateMsg{}, false
+		return messages.RelatedNavigate{}, false
 	}
 	msg := cmd()
-	nav, ok := msg.(messages.RelatedNavigateMsg)
+	nav, ok := msg.(messages.RelatedNavigate)
 	return nav, ok
 }
 
@@ -866,7 +866,7 @@ func TestEC2_016_IamInstanceProfileArn_NotNavigable(t *testing.T) {
 			continue
 		}
 		msg := cmd()
-		nav, ok := msg.(messages.RelatedNavigateMsg)
+		nav, ok := msg.(messages.RelatedNavigate)
 		if !ok {
 			continue
 		}
@@ -887,7 +887,7 @@ func TestEC2_016_IamInstanceProfileArn_NotNavigable(t *testing.T) {
 		_, cmd := pressEnterEC2(d2)
 		if cmd != nil {
 			msg := cmd()
-			if nav, ok := msg.(messages.RelatedNavigateMsg); ok && nav.TargetType != "vpc" {
+			if nav, ok := msg.(messages.RelatedNavigate); ok && nav.TargetType != "vpc" {
 				t.Errorf("EC2-016: Arn sub-field at index 2 must NOT be navigable, "+
 					"but got RelatedNavigateMsg{TargetType:%q, TargetID:%q}",
 					nav.TargetType, nav.TargetID)

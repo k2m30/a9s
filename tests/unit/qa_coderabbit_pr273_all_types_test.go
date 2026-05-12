@@ -51,7 +51,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 type typeContract struct {
@@ -252,7 +252,7 @@ func TestCR273_AllTypes_MenuCtrlZ_NoFalseNegatives(t *testing.T) {
 			}
 
 			m := newRootSizedModel()
-			m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoadedMsg{
+			m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoaded{
 				Entries:        map[string]int{c.shortName: 3},
 				Truncated:      map[string]bool{},
 				IssueCounts:    map[string]int{c.shortName: 2},
@@ -291,7 +291,7 @@ func TestCR273_AllTypes_MenuCtrlZ_NoFalsePositives(t *testing.T) {
 			}
 
 			m := newRootSizedModel()
-			m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoadedMsg{
+			m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoaded{
 				Entries:        map[string]int{c.shortName: 3},
 				Truncated:      map[string]bool{},
 				IssueCounts:    map[string]int{c.shortName: 0},
@@ -302,7 +302,7 @@ func TestCR273_AllTypes_MenuCtrlZ_NoFalsePositives(t *testing.T) {
 			// Wave 2 clean, if applicable.
 			if c.hasEnricher {
 				if _, ok := awsclient.IssueEnricherRegistry[c.shortName]; ok {
-					m, _ = rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+					m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 						ResourceType: c.shortName,
 						Issues:       0,
 						Truncated:    false,
@@ -346,7 +346,7 @@ func TestCR273_AllTypes_MenuCtrlZ_Wave2ErroredSubCall_NoFalsePositives(t *testin
 			}
 
 			m := newRootSizedModel()
-			m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoadedMsg{
+			m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoaded{
 				Entries:        map[string]int{c.shortName: 3},
 				Truncated:      map[string]bool{},
 				IssueCounts:    map[string]int{c.shortName: 0},
@@ -355,7 +355,7 @@ func TestCR273_AllTypes_MenuCtrlZ_Wave2ErroredSubCall_NoFalsePositives(t *testin
 				Expired:        false,
 			})
 			// Wave 2: one sub-call errored → Truncated=true, but Issues=0 and Findings={}.
-			m, _ = rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+			m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 				ResourceType: c.shortName,
 				Issues:       0,
 				Truncated:    true,
