@@ -2,13 +2,17 @@ package unit
 
 // aws_dbc_issue_enrichment_test.go — Wave 2 enricher tests for dbc.
 //
+// AS-140 (Wave-2 enricher migration): FieldUpdates["status"] is no longer
+// written by EnrichDBCMaintenance. The merged §4 status phrase is computed
+// at render time by phraseFromFindings(r.Findings) in extractCellValue.
+//
 // Tests drive aws.EnrichDBCMaintenance (the dbc-specific enricher) and assert:
 //   - Findings keyed by Resource.ID (ARN suffix-matched, "cluster" segment only).
 //   - Severity "!" (S1-badge-bumping — different from dbi's "~").
 //   - IssueCount increments for each overdue finding.
 //   - Summary is "maintenance overdue" (short phrase; rows carry concrete detail).
-//   - FieldUpdates["status"] == "maintenance overdue" for healthy resources.
-//   - Wave-1 non-healthy rows: suffix is bumped (+N), NOT overwritten.
+//   - FieldUpdates is nil or empty in every case (AS-140: no status overlay,
+//     no "(+N)" suffix arithmetic on the enricher side).
 //   - Future-dated actions (not yet overdue) are NOT emitted.
 //   - nil DocDB client returns empty result gracefully.
 //   - Instance ARNs ("db:" prefix) are filtered out — only "cluster:" matches.
@@ -171,12 +175,10 @@ func TestDBC_Enrich_MaintenanceOverdue_HealthyRow(t *testing.T) {
 		t.Errorf("IssueCount = %d, want ≥1 (! severity bumps badge)", result.IssueCount)
 	}
 
-	// FieldUpdates: healthy resource gets "maintenance overdue" status.
-	updates, ok := result.FieldUpdates[fixtures.MaintDbcOverdueID]
-	if !ok {
-		t.Errorf("FieldUpdates missing entry for %q", fixtures.MaintDbcOverdueID)
-	} else if updates["status"] != "maintenance overdue" {
-		t.Errorf("FieldUpdates[%q][status] = %q, want %q", fixtures.MaintDbcOverdueID, updates["status"], "maintenance overdue")
+	// AS-140: FieldUpdates must be nil/empty — the merged display phrase is
+	// computed by phraseFromFindings(r.Findings) at render time.
+	if updates, ok := result.FieldUpdates[fixtures.MaintDbcOverdueID]; ok && len(updates) != 0 {
+		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", fixtures.MaintDbcOverdueID, updates)
 	}
 }
 
@@ -279,10 +281,12 @@ func TestDBC_Enrich_NilDocDBClient(t *testing.T) {
 	}
 }
 
-// TestDBC_Enrich_Wave1PlusWave2_BumpsSuffix verifies that when the fetcher
-// already populated Status (Wave 1 warning), adding a Wave-2 maintenance
-// finding bumps the (+N) suffix rather than overwriting with "maintenance overdue".
-func TestDBC_Enrich_Wave1PlusWave2_BumpsSuffix(t *testing.T) {
+// TestDBC_Enrich_Wave1PlusWave2_NoFieldUpdates verifies AS-140: when the
+// fetcher already populated Status (Wave 1 warning), the Wave-2 maintenance
+// Finding is still emitted with severity "!" but FieldUpdates is left empty.
+// The merged "no automated backups (+1)" display is computed at render time
+// by phraseFromFindings(r.Findings).
+func TestDBC_Enrich_Wave1PlusWave2_NoFieldUpdates(t *testing.T) {
 	const clusterID = fixtures.WarnDbcNoBkpMaintID
 	const arn = fixtures.WarnDbcNoBkpMaintARN
 
@@ -323,14 +327,9 @@ func TestDBC_Enrich_Wave1PlusWave2_BumpsSuffix(t *testing.T) {
 		t.Errorf("Severity = %q, want %q", finding.Severity, "!")
 	}
 
-	// FieldUpdates must bump the Wave-1 phrase, not overwrite.
-	updates, ok := result.FieldUpdates[clusterID]
-	if !ok {
-		t.Fatalf("FieldUpdates missing entry for %q", clusterID)
-	}
-	want := "no automated backups (+1)"
-	if updates["status"] != want {
-		t.Errorf("FieldUpdates[%q][status] = %q, want %q (must bump suffix)", clusterID, updates["status"], want)
+	// AS-140: FieldUpdates must be empty.
+	if updates, ok := result.FieldUpdates[clusterID]; ok && len(updates) != 0 {
+		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", clusterID, updates)
 	}
 }
 
