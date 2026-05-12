@@ -60,7 +60,7 @@ CEO directive on AS-630 — overrides any later contradicting text in this doc.
 4. **Replacement table for every prior use of `in_review`:**
    - PR open, awaiting Stage 5 reviewers → issue stays `in_progress`; PR labels (`stage5-pending` / `stage5-complete` / `stage5-changes-requested`) + GitHub PR review state ARE the gating signal.
    - Awaiting a governance `request_confirmation` (hiring, spend, destructive op) → `blocked` with the interaction id in the blocker text.
-   - Awaiting E2ETester real-AWS sign-off → `in_progress` with a comment naming the wait.
+   - Awaiting E2ETester integration sign-off (demo fixtures by default, live profile when operator provides one — AS-640) → `in_progress` with a comment naming the wait.
    - Awaiting a child issue to complete → `blocked` with `blockedByIssueIds` set.
    - Reviewer (CodeReviewer / CodexReviewer / Architect-for-≥M) Stage 5 issue → `in_progress` while reviewing; **`done` once the verdict is posted on both Paperclip and the PR**.
 
@@ -95,7 +95,7 @@ This is the ground-truth list. If a stage names anyone else as an owner or revie
 | **Architect** | Spec & design | Owns Stage 2. Reviewer at Stage 5 for size ≥ `M`. |
 | **Coder** | Implementation | Owns Stage 4. Writes production code, wires packages, builds fixtures. |
 | **QA** | Test plans & tests | Owns Stage 3. Translates spec to stories, then to failing tests. |
-| **E2ETester** | Real-AWS scenario validation | Owns Stage 6.5 (post-merge real-AWS smoke) and the Stage 7 integration sign-off against a real profile. |
+| **E2ETester** | End-to-end scenario validation | Owns Stage 6.5 (post-merge integration smoke — demo fixtures by default, optional live AWS profile) and Stage 7 release integration sign-off. |
 | **CodeReviewer** | Diff-level code review | Reviewer at Stage 5 (always runs). Local-commit and PR-diff review. |
 | **CodexReviewer** | Independent pair-review | Reviewer at Stage 5 (always runs). Second-opinion review using Codex. |
 | **DevOps** | Consultative only | Provides operational priority input, AWS-practitioner advice, incident-response guidance. **Does not** write code, push branches, or own deploys. Never an implementation owner. |
@@ -134,7 +134,7 @@ If any of those is missing, the issue is parked in `todo` and the assignee asks 
 Every unit of work goes through these stages. Stages 1, 2, 4, 6, 6.5 may be **skipped** for trivial bug fixes (`XS`, single file, no behavior change visible to users). Stages 3, 5, 7 never skip — **except in the Trivial-docs fast-path below, which is the only lane that collapses Stages 2–5 into a single CTO authorship step.**
 
 ```text
-1. Intake → 2. Spec → 3. Tests → 4. Impl → 5. Review → 6. Validate → 6.5 Post-merge AWS → 7. Release → 8. Retro
+1. Intake → 2. Spec → 3. Tests → 4. Impl → 5. Review → 6. Validate → 6.5 Post-merge integration → 7. Release → 8. Retro
 ```
 
 ### Trivial-docs fast-path (`XS`-docs) — AS-595
@@ -311,7 +311,7 @@ Parallelization and shared-fixture techniques are tracked under AS-26 and AS-27;
 
 Enforced by the `test-budget` CI job (`scripts/test-budget-gate.sh`, `.github/workflows/ci.yml`). The job fails the build when `make test` (non-race) exceeds 5 minutes wall on `ubuntu-latest`; macOS and Windows are observed via the `test` matrix but not gated. The race-detector wall is not gated here — race timing is non-deterministic across runners and is exercised in the nightly matrix per [AS-25](/AS/issues/AS-25).
 
-For changes that touch `internal/aws/` real-account behavior, additionally run the live integration test against a real AWS profile (this is also the entry to Stage 6.5):
+For changes that touch `internal/aws/` real-account behavior, optionally run the integration test against a real AWS profile when one is available (under AS-640 the demo-fixture suite is the default Stage 6.5 surface; this command is the live supplemental lane):
 
 ```bash
 A9S_CT_PROFILE=<profile> go test -tags integration ./tests/integration/ \
@@ -325,18 +325,20 @@ A9S_CT_PROFILE=<profile> go test -tags integration ./tests/integration/ \
 
 For pure docs changes (`*.md`, `docs/`, `website/`, `specs/`, `.claude/`, `LICENSE`), `make ready-to-push` is **not** required. `make mdlint` is.
 
-### Stage 6.5 — Post-merge real-AWS validation
+### Stage 6.5 — Post-merge integration validation
 
 - **Owner**: **E2ETester**.
+- **Validation surface (AS-640, 2026-05-12)**: the **demo-fixture integration suite** is the default Stage 6.5 surface — `tests/integration/` driven against `internal/demo/fixtures/`, no AWS credentials required. A **live AWS profile** run (`A9S_CT_PROFILE=<profile>`) is **optional and operator-provided**: when an operator supplies a profile, E2ETester also runs the live pass against the changed surface, but a Stage 6.5 sign-off based solely on a green demo-fixture run at the merge SHA is fully valid. The board ruling on AS-639 / AS-640 made the demo-fixture suite the documented ground truth; live AWS is the optional supplemental lane.
 - **Trigger** — fires when **any** of the following holds:
   1. **Per-PR (surface trigger)**: a merge to `main` touches `internal/aws/`, fetchers, child views, related-resource pivots, or fixtures. Skipped for pure-docs and pure-tooling changes.
-  2. **Phase-boundary (batch trigger)**: at least **3 PRs** have merged in an in-flight refactor program (a `docs/refactor/<phase>.md` cluster, or any multi-PR program tracked by a parent issue) since the last Stage 6.5 sign-off on `main`, *regardless of whether they touch `internal/aws/`*. The CTO MUST dispatch a batch real-AWS pass before opening the next phase. Precedent: [AS-133](/AS/issues/AS-133) (Phase-03 batch, 2026-05-10) and [AS-79](/AS/issues/AS-79) (Phase-04 batch). The phase-boundary rule was codified in [AS-363](/AS/issues/AS-363) after CAE-1 4×'d merge throughput exposed that mocks cannot fully cover large refactor surfaces (runtime extraction, session ownership migrations) even when no individual PR touches `internal/aws/`.
-- **Action**: Run the integration suite against a real AWS profile (`A9S_CT_PROFILE=<profile>`), exercise the changed surface (golden-path: list → detail → child view → related view) across ≥ 4 distinct resource types when triggered by the phase-boundary rule, and capture pass/fail per scenario. File a P1 incident issue (assignee CTO) if any real-AWS scenario regresses.
-- **Tools the E2ETester invokes**: `a9s-bug-hunt-real-profile` skill, the integration test binaries under `tests/integration/`.
-- **Exit**: All real-AWS scenarios green, or an incident issue exists with the regression scoped and a follow-up Coder issue created.
+  2. **Phase-boundary (batch trigger)**: at least **3 PRs** have merged in an in-flight refactor program (a `docs/refactor/<phase>.md` cluster, or any multi-PR program tracked by a parent issue) since the last Stage 6.5 sign-off on `main`, *regardless of whether they touch `internal/aws/`*. The CTO MUST dispatch a batch integration pass before opening the next phase. Precedent: [AS-133](/AS/issues/AS-133) (Phase-03 batch, 2026-05-10) and [AS-79](/AS/issues/AS-79) (Phase-04 batch). The phase-boundary rule was codified in [AS-363](/AS/issues/AS-363) after CAE-1 4×'d merge throughput exposed that mocks cannot fully cover large refactor surfaces (runtime extraction, session ownership migrations) even when no individual PR touches `internal/aws/`.
+- **Action**: Run the integration suite (demo fixtures by default, live profile when operator provides one), exercise the changed surface (golden-path: list → detail → child view → related view) across ≥ 4 distinct resource types when triggered by the phase-boundary rule, and capture pass/fail per scenario. File a P1 incident issue (assignee CTO) if any scenario regresses.
+- **Tools the E2ETester invokes**: the integration test binaries under `tests/integration/` (always — demo or live); `a9s-bug-hunt-real-profile` skill (only when a live profile is provided).
+- **Exit**: All scenarios green on the chosen surface (demo by default, live when operator provides a profile), or an incident issue exists with the regression scoped and a follow-up Coder issue created. A demo-fixture-only sign-off comment at the merge SHA is unambiguously valid.
 - **Anti-patterns**:
-  - Treating Stage 6 (`make ready-to-push`) as sufficient for changes that depend on real AWS API behavior.
+  - Treating Stage 6 (`make ready-to-push`) as sufficient for changes that touch AWS-shaped behavior — Stage 6.5 still runs the broader integration suite (demo or live).
   - **Over-correcting to per-PR real-AWS** for refactor moves that do not touch `internal/aws/`. The phase-boundary rule is the batch trigger, not "every PR". Per-PR Stage 6.5 for pure-runtime-move PRs is wasteful and slows the loop.
+  - **Rejecting a Stage 6.5 task at the SCOPE GATE because it lacks a live AWS profile env-var.** Under AS-640, the demo-fixture suite is the default surface; live profile is operator-provided. Demo-mode tasks pass the SCOPE GATE without a profile.
   - Letting `lastHeartbeatAt` for E2ETester drift > 48h while merges to `main` continue. The CAE-1 routine (routineId `4077ee95-6caa-402f-b156-34052fc19e5f`) carries a standing detection check for this gap; see [AS-363](/AS/issues/AS-363) AC3 and CTO `AGENTS.md` §"CAE-1 Heartbeat Scan".
 
 ### Stage 7 — Merge & Release
@@ -345,14 +347,14 @@ For pure docs changes (`*.md`, `docs/`, `website/`, `specs/`, `.claude/`, `LICEN
 - **Release path** (when cutting a tagged version):
   - **Owner**: **CTO**.
   - **Tools the CTO invokes**: `a9s-release-validator` subagent (pre-tag checklist — GoReleaser config, multi-arch builds, changelog, CI), `release.md` skill.
-  - **E2ETester** runs the full real-AWS pass before the tag is pushed and signs off.
+  - **E2ETester** runs the full integration pass at the release SHA (demo fixtures by default; live profile when operator provides one) and signs off. A demo-fixture-only sign-off comment on the release commit is unambiguously valid (AS-640, 2026-05-12).
   - Steps:
     1. CTO runs `make ready-to-release` (Stage 6 gates + integration). All green.
     2. `a9s-release-validator` reports the pre-tag checklist; CTO resolves any flag.
     3. `CHANGELOG.md` updated with a Keep-a-Changelog entry; `releases/vX.Y.Z.md` written.
     4. `docs/architecture.md` aligned with the codebase. Outdated architecture docs are a release blocker.
     5. **Busywork audit**: every test added or modified in the release is reviewed and deleted if it is a tautology, a mock asserting its own input, a struct-shape pin instead of a behavior pin, or duplicate coverage. Coverage earned by busywork is a liability.
-    6. E2ETester signs off after a real-AWS pass on the release commit.
+    6. E2ETester signs off after running the integration suite (demo fixtures by default, live profile when operator provides one) on the release commit.
     7. Tag pushed; GoReleaser publishes; release notes go live.
 - **Exit**: Tag exists, artifacts published, `releases/vX.Y.Z.md` committed.
 
@@ -378,8 +380,8 @@ Every "Primary" cell holds a **Paperclip agent name**. The "Tools" column lists 
 | 4 Impl | Coder | — | — | `a9s-coder`, `a9s-integrator`, `a9s-fixtures` |
 | 5 Review | (parallel reviewers below) | — | CodeReviewer, CodexReviewer, Architect (≥M), CTO (final), CodeRabbit (external) | `a9s-tui-reviewer`, `a9s-consistency-checker`, `test-coverage-analyzer`, `a9s-security-auditor`, `a9s-docs-reviewer`, `tui-ux-auditor`, `a9s-arch-review` |
 | 6 Validate | (whoever pushes — usually Coder) | — | — | `make ready-to-push` |
-| 6.5 Post-merge AWS *(per-PR surface trigger OR phase-boundary batch — see §Stage 6.5)* | E2ETester | — | CTO (incident triage) | `a9s-bug-hunt-real-profile`, `tests/integration/` |
-| 7 Release | CTO | E2ETester (real-AWS sign-off) | CTO | `a9s-release-validator`, `release.md` skill |
+| 6.5 Post-merge integration *(per-PR surface trigger OR phase-boundary batch — see §Stage 6.5; demo-fixture suite by default, live profile optional, AS-640)* | E2ETester | — | CTO (incident triage) | `tests/integration/` (always), `a9s-bug-hunt-real-profile` (live profile only) |
+| 7 Release | CTO | E2ETester (integration sign-off — demo by default, live optional) | CTO | `a9s-release-validator`, `release.md` skill |
 | 8 Retro | CTO | — | — | — |
 
 Skill triggers (invoked in-session by the owning Paperclip agent above):

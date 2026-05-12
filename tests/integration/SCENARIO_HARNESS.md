@@ -55,9 +55,52 @@ scenario := fullIntegrationNewLiveScenario(t, "profile-name", "")
 
 If the region argument is empty, the app resolves it from the profile.
 
-## Live Profile Workflow
+## Demo-Mode Workflow (default, AS-640)
 
-When a bug can only be reproduced against a real AWS profile, use this workflow:
+The demo-fixture suite is the **default** integration surface for Stage 6.5 and Stage 7 (AS-640, 2026-05-12). It needs no AWS credentials, no operator-supplied profile, and no environment variables. Ground truth is the typed-fake fixture file at `internal/demo/fixtures/<shortName>.go` — the same file `./a9s --demo` consumes, so the test asserts what an operator running demo mode would actually see.
+
+When to use:
+
+- Any Stage 6.5 / Stage 7 run where the operator has not provided a live AWS profile (the common case).
+- Authoring a new committed regression test for a bug that can be reproduced against fixture state.
+- CI-style sweeps where reproducibility outweighs realness.
+
+Workflow:
+
+1. Add the scenario under `tests/integration/scenario_*_test.go`.
+2. Construct with `fullIntegrationNewDemoScenario(t)` — no env vars, no skip guard.
+3. Discover the fixture resource with `fullIntegrationMustFindAnyResource` / `fullIntegrationMustFindResourceByID` / `fullIntegrationMustFindResourceByNameContains` against `scenario.clients`.
+4. Drive the scenario with the harness actions (`OpenList`, `OpenDetailResource`, `FollowRelated`, …) and assert against fixture-derived ground truth.
+5. Run unconditionally:
+
+```sh
+unset AWS_PROFILE AWS_REGION AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
+go test -tags integration ./tests/integration/ -count=1 -v -timeout 600s
+```
+
+Example pattern:
+
+```go
+func TestDemoScenario_IAMUserToCloudTrail(t *testing.T) {
+	scenario := fullIntegrationNewDemoScenario(t)
+	user := fullIntegrationMustFindAnyResource(t, scenario.clients, "iam-user")
+
+	scenario.OpenDetailResource("iam-user", user)
+	scenario.ExpectCurrentResourceType("iam-user")
+	scenario.ExpectCurrentResourceID(user.ID)
+	scenario.ExpectRelatedRow("CloudTrail Events")
+
+	scenario.FollowRelated("CloudTrail Events")
+	scenario.ExpectNoAPIError()
+	scenario.ExpectCurrentListType("ct-events")
+}
+```
+
+Because the fixture is synthetic by construction, demo-mode tests are always commitable — there is no sensitive-value risk and no env-var precondition.
+
+## Live Profile Workflow (opt-in supplemental)
+
+Live profile runs are the **opt-in supplemental lane**: use them when an operator provides a real AWS profile to validate a bug that depends on real-AWS API behavior (pagination tokens, region-specific quirks, throttling) that fixtures cannot model. Under AS-640 this lane is not required for Stage 6.5 or Stage 7 sign-off.
 
 1. Add a focused local-only integration test under `tests/integration/` with a name like `local_repro_*_test.go`.
 2. Read the real profile, user/resource identifier, and region from environment variables.
