@@ -104,7 +104,7 @@ func (m *Model) fetchMoreResources(msg messages.LoadMore) tea.Cmd {
 		FetchFilter:  msg.FetchFilter,
 	}
 	return func() tea.Msg {
-		res, _, err := m.core.FetchMoreResources(ctx, clients, p)
+		res, err := m.core.FetchMoreResources(ctx, clients, p)
 		if err != nil && len(res.Resources) == 0 {
 			return messages.APIError{ResourceType: msg.ResourceType, Err: err}
 		}
