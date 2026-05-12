@@ -37,7 +37,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // setupLiveModeEC2Detail creates a NON-demo root model (so the real checker path runs),
@@ -60,11 +60,11 @@ func setupLiveModeEC2Detail(t *testing.T) (tui.Model, []resource.Resource) {
 		t.Fatalf("demo ec2 fixtures missing (err=%v, len=%d)", err, len(ec2Res))
 	}
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    ec2Res,
 	})
@@ -94,7 +94,7 @@ func setupLiveModeEC2Detail(t *testing.T) (tui.Model, []resource.Resource) {
 func execRelatedCheckAndCollectTGResult(t *testing.T, m tui.Model, sourceResource resource.Resource) (result resource.RelatedCheckResult, found bool) {
 	t.Helper()
 
-	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStartedMsg{
+	_, batchCmd := rootApplyMsg(m, messages.RelatedCheckStarted{
 		ResourceType:   "ec2",
 		SourceResource: sourceResource,
 	})
@@ -111,7 +111,7 @@ func execRelatedCheckAndCollectTGResult(t *testing.T, m tui.Model, sourceResourc
 	batchMsg, ok := rawMsg.(tea.BatchMsg)
 	if !ok {
 		// Single cmd, not a batch — handle it.
-		if r, ok2 := rawMsg.(messages.RelatedCheckResultMsg); ok2 && r.Result.TargetType == "tg" {
+		if r, ok2 := rawMsg.(messages.RelatedCheckResult); ok2 && r.Result.TargetType == "tg" {
 			return r.Result, true
 		}
 		return resource.RelatedCheckResult{Count: -1}, false
@@ -125,7 +125,7 @@ func execRelatedCheckAndCollectTGResult(t *testing.T, m tui.Model, sourceResourc
 		if msg == nil {
 			continue
 		}
-		if r, ok2 := msg.(messages.RelatedCheckResultMsg); ok2 && r.Result.TargetType == "tg" {
+		if r, ok2 := msg.(messages.RelatedCheckResult); ok2 && r.Result.TargetType == "tg" {
 			return r.Result, true
 		}
 	}
@@ -157,7 +157,7 @@ func TestContract_EmptyTruncatedPage_PreservesIsTruncated(t *testing.T) {
 	// Step 1: Write-back. Feed RelatedCheckResultMsg with empty-but-truncated CachedPages.
 	// This simulates what app_related.go:67-79 produces on a cold-miss first page
 	// where the paginated fetcher returned an empty page with more pages behind it.
-	m, _ = rootApplyMsg(m, messages.RelatedCheckResultMsg{
+	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "ec2",
 		SourceResourceID: firstInstance.ID,
 		Result: resource.RelatedCheckResult{
@@ -212,7 +212,7 @@ func TestContract_NonEmptyTruncatedPage_PreservesIsTruncated(t *testing.T) {
 	// Write-back: 1 resource + IsTruncated=true.
 	// The TG has no relationship to firstInstance. Without truncation → Count=0.
 	// With IsTruncated=true → {Count:0, Approximate:true} (honest lower bound).
-	m, _ = rootApplyMsg(m, messages.RelatedCheckResultMsg{
+	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "ec2",
 		SourceResourceID: firstInstance.ID,
 		Result: resource.RelatedCheckResult{
@@ -251,7 +251,7 @@ func TestContract_EmptyCompletePage_IsTruncatedFalse(t *testing.T) {
 	firstInstance := ec2Res[0]
 
 	// Write-back: empty + complete. Definitive zero — no TGs exist anywhere.
-	m, _ = rootApplyMsg(m, messages.RelatedCheckResultMsg{
+	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "ec2",
 		SourceResourceID: firstInstance.ID,
 		Result: resource.RelatedCheckResult{

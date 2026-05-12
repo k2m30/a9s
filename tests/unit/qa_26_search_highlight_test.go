@@ -12,7 +12,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	tui "github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -32,7 +32,7 @@ func searchActivateAndConfirm(s *views.SearchModel, plain, query string) {
 
 // rootNavigateToDetail navigates the root model to a detail view for the given resource.
 func rootNavigateToDetail(m tui.Model, res *resource.Resource) (tui.Model, tea.Cmd) {
-	return rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetDetail, Resource: res})
+	return rootApplyMsg(m, messages.Navigate{Target: messages.TargetDetail, Resource: res})
 }
 
 // rootActivateSearch sends "/" then types the query then presses Enter through the root model.

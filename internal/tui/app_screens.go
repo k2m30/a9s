@@ -14,16 +14,16 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
 // handleValueRevealed pushes the reveal view or flashes an error.
-func (m Model) handleValueRevealed(msg messages.ValueRevealedMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleValueRevealed(msg messages.ValueRevealed) (tea.Model, tea.Cmd) {
 	if msg.Err != nil {
 		errText := "reveal failed: " + msg.Err.Error()
 		return m, func() tea.Msg {
-			return messages.FlashMsg{Text: errText, IsError: true}
+			return messages.Flash{Text: errText, IsError: true}
 		}
 	}
 	rv := views.NewReveal(msg.ResourceID, msg.Value, m.keys)
@@ -34,11 +34,11 @@ func (m Model) handleValueRevealed(msg messages.ValueRevealedMsg) (tea.Model, te
 
 // handleEnterChildView creates a child resource list view and kicks off a fetch
 // using the child type registry. This is the generic handler for all child views.
-func (m Model) handleEnterChildView(msg messages.EnterChildViewMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleEnterChildView(msg messages.EnterChildView) (tea.Model, tea.Cmd) {
 	childTypeDef := resource.GetChildType(msg.ChildType)
 	if childTypeDef == nil {
 		return m, func() tea.Msg {
-			return messages.FlashMsg{Text: fmt.Sprintf("unknown child type: %s", msg.ChildType), IsError: true}
+			return messages.Flash{Text: fmt.Sprintf("unknown child type: %s", msg.ChildType), IsError: true}
 		}
 	}
 	rl := views.NewChildResourceList(*childTypeDef, msg.ParentContext, msg.DisplayName, m.viewConfig, m.keys)

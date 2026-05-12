@@ -34,7 +34,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/session"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -46,7 +46,7 @@ import (
 // constructs the requested view (when applicable) and translates any
 // TaskRequests into tea.Cmd values. View construction and tea.Cmd wrapping
 // stay here so the runtime is renderer-agnostic.
-func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 	ev := runtime.NavigateEvent{
 		Target:         translateNavigateTarget(msg.Target),
 		ResourceType:   msg.ResourceType,
@@ -85,7 +85,7 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		flashText := result.FlashMessage
 		flashErr := result.FlashIsError
 		return m, func() tea.Msg {
-			return messages.FlashMsg{Text: flashText, IsError: flashErr}
+			return messages.Flash{Text: flashText, IsError: flashErr}
 		}
 
 	case runtime.NavigateKindPopAll:
@@ -101,7 +101,7 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 			// Should be impossible — runtime canonicalised against the same
 			// registry — but fail loud if it ever happens.
 			return m, func() tea.Msg {
-				return messages.FlashMsg{
+				return messages.Flash{
 					Text:    fmt.Sprintf("internal: unknown resource type after cache hit: %s", canon),
 					IsError: true,
 				}
@@ -134,7 +134,7 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		rt := resource.FindResourceType(canon)
 		if rt == nil {
 			return m, func() tea.Msg {
-				return messages.FlashMsg{
+				return messages.Flash{
 					Text:    fmt.Sprintf("internal: unknown resource type: %s", canon),
 					IsError: true,
 				}
@@ -174,7 +174,7 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 			res := *result.Resource
 			rt := result.ResolvedType
 			cmds = append(cmds, func() tea.Msg {
-				return messages.EnrichDetailMsg{ResourceType: rt, Resource: res}
+				return messages.EnrichDetail{ResourceType: rt, Resource: res}
 			})
 		}
 		if result.DispatchRelated && d.NeedsRelatedCheck() {
@@ -185,7 +185,7 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 				res := *result.Resource
 				rt := result.ResolvedType
 				cmds = append(cmds, func() tea.Msg {
-					return messages.RelatedCheckStartedMsg{ResourceType: rt, SourceResource: res}
+					return messages.RelatedCheckStarted{ResourceType: rt, SourceResource: res}
 				})
 			}
 		}
@@ -205,7 +205,7 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 			res := *result.Resource
 			rt := result.ResolvedType
 			return m, func() tea.Msg {
-				return messages.EnrichDetailMsg{ResourceType: rt, Resource: res}
+				return messages.EnrichDetail{ResourceType: rt, Resource: res}
 			}
 		}
 		return m, nil
@@ -221,7 +221,7 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 			res := *result.Resource
 			rt := result.ResolvedType
 			return m, func() tea.Msg {
-				return messages.EnrichDetailMsg{ResourceType: rt, Resource: res}
+				return messages.EnrichDetail{ResourceType: rt, Resource: res}
 			}
 		}
 		return m, nil
@@ -240,7 +240,7 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 	case runtime.NavigateKindFetchProfiles:
 		if m.Session.PreSuppliedClients != nil {
 			return m, func() tea.Msg {
-				return messages.FlashMsg{
+				return messages.Flash{
 					Text:    "context switching is disabled in demo mode",
 					IsError: true,
 				}
@@ -251,7 +251,7 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 	case runtime.NavigateKindPushRegion:
 		if m.Session.PreSuppliedClients != nil {
 			return m, func() tea.Msg {
-				return messages.FlashMsg{
+				return messages.Flash{
 					Text:    "region switching is disabled in demo mode",
 					IsError: true,
 				}
@@ -271,14 +271,14 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		cfgDir := config.ConfigDir()
 		if cfgDir == "" {
 			return m, func() tea.Msg {
-				return messages.FlashMsg{Text: "Config directory not available", IsError: true}
+				return messages.Flash{Text: "Config directory not available", IsError: true}
 			}
 		}
 		themesDir := filepath.Join(cfgDir, "themes")
 		entries, err := os.ReadDir(themesDir)
 		if err != nil {
 			return m, func() tea.Msg {
-				return messages.FlashMsg{Text: "Cannot read themes directory: " + err.Error(), IsError: true}
+				return messages.Flash{Text: "Cannot read themes directory: " + err.Error(), IsError: true}
 			}
 		}
 		var themeFiles []string
@@ -289,7 +289,7 @@ func (m Model) handleNavigate(msg messages.NavigateMsg) (tea.Model, tea.Cmd) {
 		}
 		if len(themeFiles) == 0 {
 			return m, func() tea.Msg {
-				return messages.FlashMsg{Text: "No theme files found in " + themesDir, IsError: true}
+				return messages.Flash{Text: "No theme files found in " + themesDir, IsError: true}
 			}
 		}
 		th := views.NewTheme(themeFiles, m.activeTheme, m.keys)
@@ -336,7 +336,7 @@ func translateNavigateTarget(t messages.ViewTarget) runtime.NavigateTarget {
 // navigateTasksToCmd translates TaskRequests from HandleNavigate into a
 // Bubble Tea command. Unknown TaskKind values are dropped for forward-
 // compatibility with newer runtime builds.
-func navigateTasksToCmd(m Model, msg messages.NavigateMsg, result runtime.NavigateResult, tasks []runtime.TaskRequest) tea.Cmd {
+func navigateTasksToCmd(m Model, msg messages.Navigate, result runtime.NavigateResult, tasks []runtime.TaskRequest) tea.Cmd {
 	if len(tasks) == 0 {
 		return nil
 	}
@@ -441,14 +441,14 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 
 		var cmds []tea.Cmd
 		cmds = append(cmds, func() tea.Msg {
-			return messages.RelatedCheckStartedMsg{
+			return messages.RelatedCheckStarted{
 				ResourceType:   rt,
 				SourceResource: srcRes,
 			}
 		})
 		if resource.HasDetailEnricher(rt) {
 			cmds = append(cmds, func() tea.Msg {
-				return messages.EnrichDetailMsg{
+				return messages.EnrichDetail{
 					ResourceType: rt,
 					Resource:     srcRes,
 				}
@@ -562,7 +562,7 @@ func (m Model) handleReveal() (tea.Model, tea.Cmd) {
 // handleIdentityLoaded caches the identity and updates the identity view if
 // active. Adapter-side because m.Session.Identity / m.Session.IdentityFetching live on the
 // TUI Model today.
-func (m Model) handleIdentityLoaded(msg messages.IdentityLoadedMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleIdentityLoaded(msg messages.IdentityLoaded) (tea.Model, tea.Cmd) {
 	m.Session.IdentityFetching = false
 	if id, ok := msg.Identity.(*awsclient.CallerIdentity); ok {
 		m.Session.Identity = id
@@ -576,7 +576,7 @@ func (m Model) handleIdentityLoaded(msg messages.IdentityLoadedMsg) (tea.Model, 
 
 // handleIdentityError clears the fetching flag and updates the identity view
 // if active. Adapter-side for the same reason as handleIdentityLoaded.
-func (m Model) handleIdentityError(msg messages.IdentityErrorMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleIdentityError(msg messages.IdentityError) (tea.Model, tea.Cmd) {
 	m.Session.IdentityFetching = false
 	if idView, ok := m.activeView().(*views.IdentityModel); ok {
 		idView.SetError(msg.Err)
@@ -590,8 +590,8 @@ func copyToClipboard(content, successLabel string) tea.Cmd {
 	return func() tea.Msg {
 		err := clipboard.WriteAll(content)
 		if err != nil {
-			return messages.FlashMsg{Text: fmt.Sprintf("Copy failed: %v", err), IsError: true}
+			return messages.Flash{Text: fmt.Sprintf("Copy failed: %v", err), IsError: true}
 		}
-		return messages.FlashMsg{Text: successLabel, IsError: false}
+		return messages.Flash{Text: successLabel, IsError: false}
 	}
 }

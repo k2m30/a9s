@@ -18,7 +18,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/session"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -213,11 +213,11 @@ func (m Model) Cancel() {
 func (m Model) Init() tea.Cmd {
 	if m.Session.PreSuppliedClients != nil {
 		preCmd := func() tea.Msg {
-			return messages.ClientsReadyMsg{Clients: m.Session.PreSuppliedClients}
+			return messages.ClientsReady{Clients: m.Session.PreSuppliedClients}
 		}
 		if m.configErr != nil {
 			return tea.Batch(preCmd, func() tea.Msg {
-				return messages.FlashMsg{
+				return messages.Flash{
 					Text:    fmt.Sprintf("Config error: %v (using defaults)", m.configErr),
 					IsError: true,
 				}
@@ -226,14 +226,14 @@ func (m Model) Init() tea.Cmd {
 		return preCmd
 	}
 	connectCmd := func() tea.Msg {
-		return messages.InitConnectMsg{
+		return messages.InitConnect{
 			Profile: m.Session.Profile,
 			Region:  m.Session.Region,
 		}
 	}
 	if m.configErr != nil {
 		return tea.Batch(connectCmd, func() tea.Msg {
-			return messages.FlashMsg{
+			return messages.Flash{
 				Text:    fmt.Sprintf("Config error: %v (using defaults)", m.configErr),
 				IsError: true,
 			}
@@ -258,7 +258,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			src := d.SourceResource()
 			rtype := d.ResourceType()
 			return m, func() tea.Msg {
-				return messages.RelatedCheckStartedMsg{
+				return messages.RelatedCheckStarted{
 					ResourceType:   rtype,
 					SourceResource: src,
 				}
@@ -277,33 +277,33 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 		return m.updateActiveView(msg)
-	case messages.NavigateMsg:
+	case messages.Navigate:
 		return m.handleNavigate(msg)
-	case messages.PopViewMsg:
+	case messages.PopView:
 		m.popView()
 		return m, nil
-	case messages.FlashMsg:
+	case messages.Flash:
 		return m.handleFlash(msg)
-	case messages.ClearFlashMsg:
+	case messages.ClearFlash:
 		return m.handleClearFlash(msg)
-	case messages.InitConnectMsg:
+	case messages.InitConnect:
 		cmd := m.connectAWS(msg.Profile, msg.Region, m.Session.ConnectGen)
 		return m, cmd
-	case messages.ClientsReadyMsg:
+	case messages.ClientsReady:
 		return m.handleClientsReady(msg)
-	case messages.ProfileSelectedMsg:
+	case messages.ProfileSelected:
 		return m.handleProfileSelected(msg)
-	case messages.RegionSelectedMsg:
+	case messages.RegionSelected:
 		return m.handleRegionSelected(msg)
-	case messages.ThemeSelectedMsg:
+	case messages.ThemeSelected:
 		return m.handleThemeSelected(msg)
 	case profilesLoadedMsg:
 		return m.handleProfilesLoaded(msg)
-	case messages.ValueRevealedMsg:
+	case messages.ValueRevealed:
 		return m.handleValueRevealed(msg)
-	case messages.EnterChildViewMsg:
+	case messages.EnterChildView:
 		return m.handleEnterChildView(msg)
-	case messages.LoadResourcesMsg:
+	case messages.LoadResources:
 		var cmd tea.Cmd
 		if len(msg.ParentContext) > 0 {
 			cmd = m.fetchChildResources(msg.ResourceType, msg.ParentContext)
@@ -311,12 +311,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmd = m.fetchResources(msg.ResourceType)
 		}
 		return m, cmd
-	case messages.LoadMoreMsg:
+	case messages.LoadMore:
 		cmd := m.fetchMoreResources(msg)
 		return m, cmd
-	case messages.APIErrorMsg:
+	case messages.APIError:
 		return m.handleAPIError(msg)
-	case messages.ResourcesLoadedMsg:
+	case messages.ResourcesLoaded:
 		m.flash.active = false
 		// Site 1: derive findings across fetcher results before the view and
 		// write-through cache process them (PR-03a-shim wire-up).
@@ -330,7 +330,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Err != nil {
 			errText := "fetch " + msg.ResourceType + ": " + msg.Err.Error()
 			cmd = tea.Batch(cmd, func() tea.Msg {
-				return messages.FlashMsg{Text: errText, IsError: true}
+				return messages.Flash{Text: errText, IsError: true}
 			})
 		}
 		// Re-apply any carried related-checker against the newly loaded page.
@@ -395,29 +395,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return updatedModel, cmd
 		}
 		return updated, cmd
-	case messages.IdentityLoadedMsg:
+	case messages.IdentityLoaded:
 		return m.handleIdentityLoaded(msg)
-	case messages.IdentityErrorMsg:
+	case messages.IdentityError:
 		return m.handleIdentityError(msg)
-	case messages.AvailabilityCacheLoadedMsg:
+	case messages.AvailabilityCacheLoaded:
 		return m.coreUpdate(msg)
-	case messages.AvailabilityPrefetchedMsg:
+	case messages.AvailabilityPrefetched:
 		return m.coreUpdate(msg)
-	case messages.AvailabilityCheckedMsg:
+	case messages.AvailabilityChecked:
 		return m.coreUpdate(msg)
-	case messages.EnrichmentCheckedMsg:
+	case messages.EnrichmentChecked:
 		return m.coreUpdate(msg)
-	case messages.EnrichDetailMsg:
+	case messages.EnrichDetail:
 		return m.handleEnrichDetail(msg)
-	case messages.EnrichDetailResultMsg:
-		// Discard stale enrichment results (same convention as relatedGen).
-		if msg.Generation != 0 && msg.Generation != m.Session.EnrichGen {
+	case messages.EnrichDetailResult:
+		if messages.IsStale(msg, m.Session) {
 			return m, nil
 		}
 		// Surface enrichment errors as a flash message.
 		if msg.Err != nil {
 			return m, func() tea.Msg {
-				return messages.FlashMsg{Text: "enrich failed: " + msg.Err.Error(), IsError: true}
+				return messages.Flash{Text: "enrich failed: " + msg.Err.Error(), IsError: true}
 			}
 		}
 		// Site 7: derive findings on the enriched detail resource before the
@@ -426,15 +425,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Findings populated even when it doesn't write back to ResourceCache.
 		(&m).deriveFindingsForResource(msg.ResourceType, &msg.EnrichedRes)
 		return m.updateActiveView(msg)
-	case messages.RelatedCheckStartedMsg:
+	case messages.RelatedCheckStarted:
 		return m.handleRelatedCheckStarted(msg)
-	case messages.RelatedCheckResultMsg:
+	case messages.RelatedCheckResult:
 		// Discard results from a previous check generation (e.g., after Ctrl+R or
-		// profile/region switch). relatedGen starts at 1 so the live path never
-		// stamps Generation=0 onto results. Generation=0 is therefore the safe
-		// sentinel for test/manual injection (always accepted). Any non-zero
-		// generation that doesn't match the current relatedGen is stale and dropped.
-		if msg.Generation != 0 && msg.Generation != m.Session.RelatedGen {
+		if messages.IsStale(msg, m.Session) {
 			return m, nil
 		}
 		// Accumulate in relatedCache so re-entering the same detail skips re-dispatch.
@@ -531,7 +526,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m2, viewCmd := m.updateActiveView(msg)
 			m = m2.(Model)
 			flashCmd := func() tea.Msg {
-				return messages.FlashMsg{
+				return messages.Flash{
 					Text:    fmt.Sprintf("related-fetch: %v", msg.LazyAddError),
 					IsError: true,
 				}
@@ -541,7 +536,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				checkerErr := msg.Result.Err
 				targetType := msg.Result.TargetType
 				checkerFlashCmd := func() tea.Msg {
-					return messages.FlashMsg{
+					return messages.Flash{
 						Text:    fmt.Sprintf("related %s: %v", targetType, checkerErr),
 						IsError: true,
 					}
@@ -558,7 +553,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			checkerErr := msg.Result.Err
 			targetType := msg.Result.TargetType
 			flashCmd := func() tea.Msg {
-				return messages.FlashMsg{
+				return messages.Flash{
 					Text:    fmt.Sprintf("related %s: %v", targetType, checkerErr),
 					IsError: true,
 				}
@@ -566,7 +561,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(viewCmd, flashCmd)
 		}
 		return m.updateActiveView(msg)
-	case messages.RelatedNavigateMsg:
+	case messages.RelatedNavigate:
 		return m.handleRelatedNavigate(msg)
 	}
 	// Route unmatched messages to cmdInput when in filter/command mode.
@@ -720,11 +715,11 @@ func (m *Model) applyIntents(intents []runtime.UIIntent) []tea.Cmd {
 				}
 			}
 		case runtime.FlashIntent:
-			// Emit as messages.FlashMsg so it goes through the existing flash
+			// Emit as messages.Flash so it goes through the existing flash
 			// handler (which also records to errorHistory for the `!` log).
 			text, isErr := v.Text, v.IsError
 			cmds = append(cmds, func() tea.Msg {
-				return messages.FlashMsg{Text: text, IsError: isErr}
+				return messages.Flash{Text: text, IsError: isErr}
 			})
 		case runtime.ClearFlash:
 			m.flash.active = false

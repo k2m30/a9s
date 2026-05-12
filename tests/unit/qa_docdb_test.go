@@ -13,7 +13,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -40,7 +40,7 @@ func loadedDocDBModel(t *testing.T) views.ResourceListModel {
 	m := views.NewResourceList(td, nil, k)
 	m.SetSize(140, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "dbc",
 		Resources:    fixtureDocDBClusters(),
 	})
@@ -187,7 +187,7 @@ func TestQA_DocDB_StatusColoring(t *testing.T) {
 	m := views.NewResourceList(td, nil, k)
 	m.SetSize(140, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "dbc",
 		Resources:    multiStatusDocDBFixtures(),
 	})
@@ -218,7 +218,7 @@ func TestQA_DocDB_CursorNavigation(t *testing.T) {
 	m := views.NewResourceList(td, nil, k)
 	m.SetSize(140, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "dbc",
 		Resources:    multiStatusDocDBFixtures(),
 	})
@@ -271,7 +271,7 @@ func TestQA_DocDB_ListFilter(t *testing.T) {
 	m := views.NewResourceList(td, nil, k)
 	m.SetSize(140, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "dbc",
 		Resources:    multiStatusDocDBFixtures(),
 	})
@@ -311,7 +311,7 @@ func TestQA_DocDB_ListSort(t *testing.T) {
 	m := views.NewResourceList(td, nil, k)
 	m.SetSize(140, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "dbc",
 		Resources:    multiStatusDocDBFixtures(),
 	})
@@ -351,7 +351,7 @@ func TestQA_DocDB_EmptyList(t *testing.T) {
 	m := views.NewResourceList(td, nil, k)
 	m.SetSize(140, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "dbc",
 		Resources:    []resource.Resource{},
 	})
@@ -539,7 +539,7 @@ func TestQA_DocDB_NavigateFromMainMenu(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	m, cmd := rootApplyMsg(m, messages.NavigateMsg{
+	m, cmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbc",
 	})
@@ -557,11 +557,11 @@ func TestQA_DocDB_LoadAndDisplayList(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbc",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "dbc",
 		Resources:    fixtures,
 	})
@@ -582,17 +582,17 @@ func TestQA_DocDB_NavigateToDetail(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbc",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "dbc",
 		Resources:    fixtures,
 	})
 
 	res := fixtures[0]
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: &res,
 	})
@@ -613,17 +613,17 @@ func TestQA_DocDB_NavigateToYAML(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbc",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "dbc",
 		Resources:    fixtures,
 	})
 
 	res := fixtures[0]
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetYAML,
 		Resource: &res,
 	})
@@ -640,23 +640,23 @@ func TestQA_DocDB_DetailBackNavigation(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbc",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "dbc",
 		Resources:    fixtures,
 	})
 
 	res := fixtures[0]
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: &res,
 	})
 
 	// Pop back
-	m, _ = rootApplyMsg(m, messages.PopViewMsg{})
+	m, _ = rootApplyMsg(m, messages.PopView{})
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "dbc") {
 		t.Errorf("after pop from DocumentDB detail, should return to DocumentDB list, got: %s", plain)
@@ -702,7 +702,7 @@ func TestQA_DocDB_HorizontalScroll(t *testing.T) {
 	m := views.NewResourceList(td, nil, k)
 	m.SetSize(50, 20) // very narrow
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "dbc",
 		Resources:    fixtures,
 	})
@@ -751,7 +751,7 @@ func TestQA_CrossCommand_SwitchRedisToDocDB(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to Redis
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "redis",
 	})
@@ -785,7 +785,7 @@ func TestQA_CrossCommand_SwitchDocDBToRedis(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to DocumentDB
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbc",
 	})
@@ -832,7 +832,7 @@ func TestQA_DocDB_ZeroInstancesCount(t *testing.T) {
 			},
 		},
 	}
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "dbc",
 		Resources:    fixtures,
 	})
@@ -881,16 +881,16 @@ func TestQA_DocDB_YAMLBackNavigation(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate: DocDB list -> YAML -> pop
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbc",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "dbc",
 		Resources:    fixtures,
 	})
 	res := fixtures[0]
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetYAML,
 		Resource: &res,
 	})
@@ -900,7 +900,7 @@ func TestQA_DocDB_YAMLBackNavigation(t *testing.T) {
 		t.Fatalf("should be on YAML view, got: %s", plain)
 	}
 
-	m, _ = rootApplyMsg(m, messages.PopViewMsg{})
+	m, _ = rootApplyMsg(m, messages.PopView{})
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "dbc") {
 		t.Errorf("after pop from DocumentDB YAML, should return to DocumentDB list, got: %s", plain)
@@ -918,44 +918,44 @@ func TestQA_DocDB_FullNavigationRoundTrip(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Main menu -> DocumentDB list
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbc",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "dbc",
 		Resources:    fixtures,
 	})
 
 	// DocumentDB list -> detail
 	res := fixtures[0]
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetDetail,
 		Resource: &res,
 	})
 
 	// Detail -> YAML
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetYAML,
 		Resource: &res,
 	})
 
 	// Pop YAML -> detail
-	m, _ = rootApplyMsg(m, messages.PopViewMsg{})
+	m, _ = rootApplyMsg(m, messages.PopView{})
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, res.Name) && !strings.Contains(plain, res.ID) {
 		t.Errorf("pop from YAML should return to detail, got: %s", plain)
 	}
 
 	// Pop detail -> list
-	m, _ = rootApplyMsg(m, messages.PopViewMsg{})
+	m, _ = rootApplyMsg(m, messages.PopView{})
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "dbc") {
 		t.Errorf("pop from detail should return to DocumentDB list, got: %s", plain)
 	}
 
 	// Pop list -> main menu
-	m, _ = rootApplyMsg(m, messages.PopViewMsg{})
+	m, _ = rootApplyMsg(m, messages.PopView{})
 	plain = stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "resource-types") {
 		t.Errorf("pop from DocumentDB list should return to main menu, got: %s", plain)
@@ -971,11 +971,11 @@ func TestQA_DocDB_FilterHeaderDisplay(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Navigate to DocumentDB
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbc",
 	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "dbc",
 		Resources:    multiStatusDocDBFixtures(),
 	})
@@ -1000,13 +1000,13 @@ func TestQA_DocDB_HelpOverlay(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "dbc",
 	})
 
 	// Open help
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetHelp})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 
 	plain := stripANSI(rootViewContent(m))
 	if !strings.Contains(plain, "help") {

@@ -23,7 +23,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/demo"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // TestDemoColdCacheCtEvents_ListPopulates verifies that ct-events list view
@@ -35,10 +35,10 @@ func TestDemoColdCacheCtEvents_ListPopulates(t *testing.T) {
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	clients := demo.NewServiceClients()
-	*m, _ = rootApplyMsg(*m, messages.ClientsReadyMsg{Clients: clients, Gen: 0})
+	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 0})
 
 	var navCmd tea.Cmd
-	*m, navCmd = rootApplyMsg(*m, messages.NavigateMsg{
+	*m, navCmd = rootApplyMsg(*m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
@@ -48,11 +48,11 @@ func TestDemoColdCacheCtEvents_ListPopulates(t *testing.T) {
 	}
 
 	raw := extractMsg(t, navCmd, func(msg tea.Msg) bool {
-		_, ok := msg.(messages.ResourcesLoadedMsg)
+		_, ok := msg.(messages.ResourcesLoaded)
 		return ok
 	})
 
-	result := raw.(messages.ResourcesLoadedMsg)
+	result := raw.(messages.ResourcesLoaded)
 
 	if len(result.Resources) == 0 {
 		t.Fatal("expected at least one CloudTrail event in fixture data, got zero")
@@ -84,11 +84,11 @@ func TestDemoColdCacheCtEvents_DetailRelatedChecksRunLivePath(t *testing.T) {
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	clients := demo.NewServiceClients()
-	*m, _ = rootApplyMsg(*m, messages.ClientsReadyMsg{Clients: clients, Gen: 0})
+	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 0})
 
 	// Load ct-events list.
 	var navCmd tea.Cmd
-	*m, navCmd = rootApplyMsg(*m, messages.NavigateMsg{
+	*m, navCmd = rootApplyMsg(*m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
@@ -97,10 +97,10 @@ func TestDemoColdCacheCtEvents_DetailRelatedChecksRunLivePath(t *testing.T) {
 	}
 
 	raw := extractMsg(t, navCmd, func(msg tea.Msg) bool {
-		_, ok := msg.(messages.ResourcesLoadedMsg)
+		_, ok := msg.(messages.ResourcesLoaded)
 		return ok
 	})
-	loaded := raw.(messages.ResourcesLoadedMsg)
+	loaded := raw.(messages.ResourcesLoaded)
 
 	if len(loaded.Resources) == 0 {
 		t.Fatal("fixture data has zero ct-events; cannot open detail")
@@ -111,7 +111,7 @@ func TestDemoColdCacheCtEvents_DetailRelatedChecksRunLivePath(t *testing.T) {
 	// Open detail for the first event.
 	firstEvent := loaded.Resources[0]
 	var relatedCmd tea.Cmd
-	*m, relatedCmd = rootApplyMsg(*m, messages.NavigateMsg{
+	*m, relatedCmd = rootApplyMsg(*m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		Resource:     &firstEvent,
 		ResourceType: "ct-events",
@@ -124,7 +124,7 @@ func TestDemoColdCacheCtEvents_DetailRelatedChecksRunLivePath(t *testing.T) {
 
 	// Execute to get RelatedCheckStartedMsg.
 	relatedMsg := relatedCmd()
-	started, ok := relatedMsg.(messages.RelatedCheckStartedMsg)
+	started, ok := relatedMsg.(messages.RelatedCheckStarted)
 	if !ok {
 		t.Fatalf("expected RelatedCheckStartedMsg from ct-events detail init, got %T", relatedMsg)
 	}
@@ -147,11 +147,11 @@ func TestDemoColdCacheCtEvents_DetailRelatedChecksRunLivePath(t *testing.T) {
 	}
 
 	// Collect all RelatedCheckResultMsg values from the batch.
-	var results []messages.RelatedCheckResultMsg
+	var results []messages.RelatedCheckResult
 
 	collectFromMsg := func(batchResult tea.Msg) {
 		switch v := batchResult.(type) {
-		case messages.RelatedCheckResultMsg:
+		case messages.RelatedCheckResult:
 			results = append(results, v)
 		case tea.BatchMsg:
 			for _, subCmd := range v {
@@ -159,7 +159,7 @@ func TestDemoColdCacheCtEvents_DetailRelatedChecksRunLivePath(t *testing.T) {
 					continue
 				}
 				sub := runChecker(subCmd)
-				if r, ok2 := sub.(messages.RelatedCheckResultMsg); ok2 {
+				if r, ok2 := sub.(messages.RelatedCheckResult); ok2 {
 					results = append(results, r)
 				}
 			}
@@ -193,7 +193,7 @@ func TestDemoColdCacheCtEvents_DetailRelatedChecksRunLivePath(t *testing.T) {
 	}
 
 	// Build a map from DefDisplayName to full result for FetchFilter checking.
-	resultByName := make(map[string]messages.RelatedCheckResultMsg, len(results))
+	resultByName := make(map[string]messages.RelatedCheckResult, len(results))
 	for _, r := range results {
 		resultByName[r.DefDisplayName] = r
 	}
@@ -262,10 +262,10 @@ func TestDemoColdCacheCtEvents_NoDemoShortcut(t *testing.T) {
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	clients := demo.NewServiceClients()
-	*m, _ = rootApplyMsg(*m, messages.ClientsReadyMsg{Clients: clients, Gen: 0})
+	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 0})
 
 	var navCmd tea.Cmd
-	*m, navCmd = rootApplyMsg(*m, messages.NavigateMsg{
+	*m, navCmd = rootApplyMsg(*m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
@@ -274,10 +274,10 @@ func TestDemoColdCacheCtEvents_NoDemoShortcut(t *testing.T) {
 	}
 
 	raw := extractMsg(t, navCmd, func(msg tea.Msg) bool {
-		_, ok := msg.(messages.ResourcesLoadedMsg)
+		_, ok := msg.(messages.ResourcesLoaded)
 		return ok
 	})
-	loaded := raw.(messages.ResourcesLoadedMsg)
+	loaded := raw.(messages.ResourcesLoaded)
 
 	if len(loaded.Resources) == 0 {
 		t.Fatal("fixture data has zero ct-events")
@@ -286,7 +286,7 @@ func TestDemoColdCacheCtEvents_NoDemoShortcut(t *testing.T) {
 
 	firstEvent := loaded.Resources[0]
 	var relatedCmd tea.Cmd
-	*m, relatedCmd = rootApplyMsg(*m, messages.NavigateMsg{
+	*m, relatedCmd = rootApplyMsg(*m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		Resource:     &firstEvent,
 		ResourceType: "ct-events",
@@ -296,7 +296,7 @@ func TestDemoColdCacheCtEvents_NoDemoShortcut(t *testing.T) {
 	}
 
 	relatedMsg := relatedCmd()
-	started, ok := relatedMsg.(messages.RelatedCheckStartedMsg)
+	started, ok := relatedMsg.(messages.RelatedCheckStarted)
 	if !ok {
 		t.Fatalf("expected RelatedCheckStartedMsg; got %T", relatedMsg)
 	}

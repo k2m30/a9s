@@ -75,7 +75,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/session"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // shimApplyMsg applies a message to the TUI model and returns the updated model.
@@ -95,7 +95,7 @@ func newShimModel() tui.Model {
 	m = shimApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	// ClientsReadyMsg with nil clients advances m.clients; no AWS calls are made
 	// because WithNoCache(true) suppresses background availability probes.
-	m = shimApplyMsg(m, messages.ClientsReadyMsg{Clients: nil})
+	m = shimApplyMsg(m, messages.ClientsReady{Clients: nil})
 	return m
 }
 
@@ -141,7 +141,7 @@ func TestShim_ProbeResourcesPopulatesFindings(t *testing.T) {
 				Status: tc.status,
 			}
 
-			m = shimApplyMsg(m, messages.AvailabilityCheckedMsg{
+			m = shimApplyMsg(m, messages.AvailabilityChecked{
 				ResourceType: effective,
 				HasResources: true,
 				Count:        1,
@@ -227,7 +227,7 @@ func TestShim_EnrichmentCheckedBridgesWave2Findings(t *testing.T) {
 			}
 
 			// Send EnrichmentCheckedMsg using the alias (or canon) as ResourceType.
-			m = shimApplyMsg(m, messages.EnrichmentCheckedMsg{
+			m = shimApplyMsg(m, messages.EnrichmentChecked{
 				ResourceType: effective,
 				Issues:       0,
 				Truncated:    false,
@@ -308,7 +308,7 @@ func TestShim_CachedPagesPopulatesFindings(t *testing.T) {
 				Status: tc.status,
 			}
 
-			m = shimApplyMsg(m, messages.RelatedCheckResultMsg{
+			m = shimApplyMsg(m, messages.RelatedCheckResult{
 				ResourceType:     effective,
 				SourceResourceID: "",
 				DefDisplayName:   tc.name,
@@ -395,7 +395,7 @@ func TestShim_LazyAddedPopulatesFindings(t *testing.T) {
 				Status: tc.status,
 			}
 
-			m = shimApplyMsg(m, messages.RelatedCheckResultMsg{
+			m = shimApplyMsg(m, messages.RelatedCheckResult{
 				ResourceType:     effective,
 				SourceResourceID: "",
 				DefDisplayName:   tc.name,
@@ -472,7 +472,7 @@ func TestShim_DeriveHelpersResolveAlias(t *testing.T) {
 
 	// Step 1: send AvailabilityCheckedMsg with alias "rds" → ProbeResources["dbi"]
 	// is populated with wave1 findings (deriveFindingsForType called by handler).
-	m = shimApplyMsg(m, messages.AvailabilityCheckedMsg{
+	m = shimApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: "rds", // alias — handler normalizes to canonical "dbi"
 		HasResources: true,
 		Count:        1,
@@ -490,7 +490,7 @@ func TestShim_DeriveHelpersResolveAlias(t *testing.T) {
 	// does not fire after processing this single message, which would nil out ProbeResources
 	// before we can inspect it.
 	m.Session.EnrichTotal = 2
-	m = shimApplyMsg(m, messages.EnrichmentCheckedMsg{
+	m = shimApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "dbi",
 		Findings: map[string]resource.EnrichmentFinding{
 			rid: wave2Finding,
@@ -571,7 +571,7 @@ func TestShim_DeriveHelpersResolveAlias_SingleResource(t *testing.T) {
 	}
 
 	// Step 1: AvailabilityCheckedMsg with alias "rds" → ProbeResources["dbi"] with wave1.
-	m = shimApplyMsg(m, messages.AvailabilityCheckedMsg{
+	m = shimApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: "rds", // alias — handler normalizes to canonical "dbi"
 		HasResources: true,
 		Count:        1,
@@ -590,7 +590,7 @@ func TestShim_DeriveHelpersResolveAlias_SingleResource(t *testing.T) {
 	// does not fire after processing this single message, which would nil out ProbeResources
 	// before we can inspect it.
 	m.Session.EnrichTotal = 2
-	m = shimApplyMsg(m, messages.EnrichmentCheckedMsg{
+	m = shimApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "rds", // alias — exercises alias normalization in handleEnrichmentChecked
 		Findings: map[string]resource.EnrichmentFinding{
 			rid: wave2Finding,
@@ -707,7 +707,7 @@ func TestShim_NavigateAliasHitsCanonicalCache(t *testing.T) {
 
 	// Navigate using the alias "rds". The handler must resolve to "dbi" and
 	// find the cache entry, then call deriveFindingsForType on it.
-	m = shimApplyMsg(m, messages.NavigateMsg{
+	m = shimApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "rds", // alias for "dbi"
 	})
@@ -721,8 +721,8 @@ func TestShim_NavigateAliasHitsCanonicalCache(t *testing.T) {
 	got := entry.Resources[0]
 	if len(got.Findings) == 0 {
 		t.Errorf(
-			"ResourceCache[\"dbi\"].Resources[0].Findings: got empty — "+
-				"handleNavigate not resolving alias \"rds\" to canonical \"dbi\" for cache hit path; "+
+			"ResourceCache[\"dbi\"].Resources[0].Findings: got empty — " +
+				"handleNavigate not resolving alias \"rds\" to canonical \"dbi\" for cache hit path; " +
 				"deriveFindingsForType not called on cached resources",
 		)
 		return
@@ -784,7 +784,7 @@ func TestShim_ResourcesLoadedPopulatesFindings(t *testing.T) {
 				Status: tc.status,
 			}
 
-			m = shimApplyMsg(m, messages.ResourcesLoadedMsg{
+			m = shimApplyMsg(m, messages.ResourcesLoaded{
 				ResourceType: effective,
 				Resources:    []resource.Resource{res},
 			})
@@ -869,7 +869,7 @@ func TestShim_EnrichDetailResultPopulatesFindings(t *testing.T) {
 		Name:   "enrich-test-instance",
 		Status: resStatus,
 	}
-	m = shimApplyMsg(m, messages.NavigateMsg{
+	m = shimApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		Resource:     &res,
 		ResourceType: resType,
@@ -885,7 +885,7 @@ func TestShim_EnrichDetailResultPopulatesFindings(t *testing.T) {
 
 	// Send EnrichDetailResultMsg with Generation=0 (always accepted by the
 	// stale-check guard at app.go:432-434).
-	m = shimApplyMsg(m, messages.EnrichDetailResultMsg{
+	m = shimApplyMsg(m, messages.EnrichDetailResult{
 		ResourceType: resType,
 		ResourceID:   resID,
 		EnrichedRes:  enriched,

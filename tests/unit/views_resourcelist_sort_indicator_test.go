@@ -23,7 +23,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -71,7 +71,7 @@ func buildSortModel(
 
 	// Load a minimal synthetic resource so View() renders the header.
 	res := syntheticResourceForType(shortName)
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: shortName,
 		Resources:    []resource.Resource{res},
 	})
@@ -340,7 +340,7 @@ func TestSortIndicator_NoGlyphWhenUnsorted(t *testing.T) {
 			m.SetSize(200, 20)
 			m, _ = m.Init()
 			res := syntheticResourceForType(shortName)
-			m, _ = m.Update(messages.ResourcesLoadedMsg{
+			m, _ = m.Update(messages.ResourcesLoaded{
 				ResourceType: shortName,
 				Resources:    []resource.Resource{res},
 			})

@@ -18,7 +18,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -59,7 +59,7 @@ func TestRowMarker_HiddenWhenIdentityColumnScrolledOff(t *testing.T) {
 	resources := []resource.Resource{
 		{ID: "r-1", Name: "alpha-instance-with-distinctive-name", Status: "available", Fields: map[string]string{"name": "alpha-instance-with-distinctive-name", "state": "available", "type": "m5", "region": "us-east-1"}},
 	}
-	m, _ = m.Update(messages.ResourcesLoadedMsg{ResourceType: "test", Resources: resources})
+	m, _ = m.Update(messages.ResourcesLoaded{ResourceType: "test", Resources: resources})
 
 	findings := map[string]resource.EnrichmentFinding{
 		"r-1": {Severity: "!", Summary: "broken"},
@@ -115,7 +115,7 @@ func TestCtrlR_ClearsActiveListFindingsImmediately(t *testing.T) {
 
 	// Load real EC2 resources into the list so there's something to mark.
 	resources := rerunEC2Resources()
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    resources,
 	})

@@ -35,7 +35,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -166,7 +166,7 @@ func TestProbeEnrichment_PartialSuccess(t *testing.T) {
 	// Pre-supply clients so probeEnrichment's nil-clients guard passes.
 	// noCache=true means handleClientsReady skips fetchIdentity and goes through
 	// demoPrefetchCounts instead. We discard that cmd (no real AWS data needed).
-	m, _ = rootApplyMsg(m, messages.ClientsReadyMsg{Clients: &awsclient.ServiceClients{}, Gen: 0})
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: &awsclient.ServiceClients{}, Gen: 0})
 
 	probeRes := []resource.Resource{
 		{ID: "res-pe-001", Name: "res-pe-001", Status: "running"},
@@ -175,7 +175,7 @@ func TestProbeEnrichment_PartialSuccess(t *testing.T) {
 	// Deliver AvailabilityCheckedMsg to seed probeResources[shortName].
 	// availabilityGen=0 and Gen=0 → guard passes.
 	// availTotal=0 → availChecked(1) >= 0 → finalize → startEnrichment.
-	_, enrichCmd := rootApplyMsg(m, messages.AvailabilityCheckedMsg{
+	_, enrichCmd := rootApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: shortName,
 		Gen:          0,
 		Count:        len(probeRes),
@@ -189,9 +189,9 @@ func TestProbeEnrichment_PartialSuccess(t *testing.T) {
 
 	// Walk the cmd tree for EnrichmentCheckedMsg for shortName.
 	allMsgs := drainAllMessages(enrichCmd)
-	var gotMsg *messages.EnrichmentCheckedMsg
+	var gotMsg *messages.EnrichmentChecked
 	for _, msg := range allMsgs {
-		if ec, ok := msg.(messages.EnrichmentCheckedMsg); ok && ec.ResourceType == shortName {
+		if ec, ok := msg.(messages.EnrichmentChecked); ok && ec.ResourceType == shortName {
 			ec := ec
 			gotMsg = &ec
 			break

@@ -13,7 +13,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -209,13 +209,13 @@ func scenario119MainMenuCommandEC2(t *testing.T) string {
 
 func scenario119MainMenuHelp(t *testing.T) string {
 	m := issue119RootModel(120, 30, true)
-	m = issue119ApplyMsg(m, messages.NavigateMsg{Target: messages.TargetHelp})
+	m = issue119ApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 	return m.View().Content
 }
 
 func scenario119EC2ListLoading(t *testing.T) string {
 	m := issue119RootModel(140, 30, true)
-	m = issue119ApplyMsg(m, messages.NavigateMsg{
+	m = issue119ApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -242,31 +242,31 @@ func scenario119EC2ListFilterWeb(t *testing.T) string {
 func scenario119EC2ListHelp(t *testing.T) string {
 	m := issue119RootModel(140, 30, true)
 	m = issue119LoadEC2List(t, m)
-	m = issue119ApplyMsg(m, messages.NavigateMsg{Target: messages.TargetHelp})
+	m = issue119ApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 	return m.View().Content
 }
 
 func scenario119EC2ListSuccessFlash(t *testing.T) string {
 	m := issue119RootModel(140, 30, true)
 	m = issue119LoadEC2List(t, m)
-	m = issue119ApplyMsg(m, messages.FlashMsg{Text: "Copied ec2 id", IsError: false})
+	m = issue119ApplyMsg(m, messages.Flash{Text: "Copied ec2 id", IsError: false})
 	return m.View().Content
 }
 
 func scenario119EC2ListErrorFlash(t *testing.T) string {
 	m := issue119RootModel(140, 30, true)
 	m = issue119LoadEC2List(t, m)
-	m = issue119ApplyMsg(m, messages.FlashMsg{Text: "Error: load failed", IsError: true})
+	m = issue119ApplyMsg(m, messages.Flash{Text: "Error: load failed", IsError: true})
 	return m.View().Content
 }
 
 func scenario119EC2ListEmpty(t *testing.T) string {
 	m := issue119RootModel(140, 30, true)
-	m = issue119ApplyMsg(m, messages.NavigateMsg{
+	m = issue119ApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m = issue119ApplyMsg(m, messages.ResourcesLoadedMsg{
+	m = issue119ApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    nil,
 	})
@@ -276,7 +276,7 @@ func scenario119EC2ListEmpty(t *testing.T) string {
 func scenario119EC2YAMLView(t *testing.T) string {
 	m := issue119RootModel(120, 30, true)
 	ec2 := mustDemoEC2(t)
-	m = issue119ApplyMsg(m, messages.NavigateMsg{
+	m = issue119ApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetYAML,
 		Resource: &ec2[0],
 	})
@@ -285,7 +285,7 @@ func scenario119EC2YAMLView(t *testing.T) string {
 
 func scenario119RegionSelector(t *testing.T) string {
 	m := issue119RootModel(120, 30, false)
-	m = issue119ApplyMsg(m, messages.NavigateMsg{Target: messages.TargetRegion})
+	m = issue119ApplyMsg(m, messages.Navigate{Target: messages.TargetRegion})
 	return m.View().Content
 }
 
@@ -342,7 +342,7 @@ func issue119ModelToEC2Detail(t *testing.T, w, h int) tui.Model {
 	t.Helper()
 	m := issue119RootModel(w, h, true)
 	ec2 := mustDemoEC2(t)
-	m = issue119ApplyMsg(m, messages.NavigateMsg{Target: messages.TargetDetail, ResourceType: "ec2", Resource: &ec2[0]})
+	m = issue119ApplyMsg(m, messages.Navigate{Target: messages.TargetDetail, ResourceType: "ec2", Resource: &ec2[0]})
 	return m
 }
 
@@ -367,11 +367,11 @@ func issue119ApplyMsg(m tui.Model, msg tea.Msg) tui.Model {
 
 func issue119LoadEC2List(t *testing.T, m tui.Model) tui.Model {
 	t.Helper()
-	m = issue119ApplyMsg(m, messages.NavigateMsg{
+	m = issue119ApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	m = issue119ApplyMsg(m, messages.ResourcesLoadedMsg{
+	m = issue119ApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    mustDemoEC2(t),
 	})

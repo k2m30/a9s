@@ -16,7 +16,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -31,7 +31,7 @@ func buildEC2List(t *testing.T, width, height int) views.ResourceListModel {
 	m := views.NewResourceList(*td, config.DefaultConfig(), k)
 	m.SetSize(width, height)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources: []resource.Resource{
 			{
@@ -121,7 +121,7 @@ func TestInvalidateStyleCache_EmptyList(t *testing.T) {
 	m := views.NewResourceList(*td, config.DefaultConfig(), k)
 	m.SetSize(80, 24)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{},
 	})

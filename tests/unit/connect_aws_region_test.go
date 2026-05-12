@@ -9,7 +9,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // TestBug82_NewAWSSession_EmptyRegionProducesEmptyConfig demonstrates the root
@@ -97,13 +97,13 @@ func TestBug82_ConnectAWS_NoMissingRegionError(t *testing.T) {
 	m := tui.New("default", "")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
-	_, cmd := rootApplyMsg(m, messages.InitConnectMsg{Profile: "default", Region: ""})
+	_, cmd := rootApplyMsg(m, messages.InitConnect{Profile: "default", Region: ""})
 	if cmd == nil {
 		t.Fatal("InitConnectMsg should return a command")
 	}
 
 	msg := cmd()
-	clientsReady, ok := msg.(messages.ClientsReadyMsg)
+	clientsReady, ok := msg.(messages.ClientsReady)
 	if !ok {
 		t.Fatalf("expected ClientsReadyMsg, got %T", msg)
 	}
@@ -124,9 +124,9 @@ func TestBug82_ProfileSwitch_NoMissingRegionError(t *testing.T) {
 	tui.Version = "test"
 	m := tui.New("dev", "us-west-2")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetResourceList, ResourceType: "ec2"})
+	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 
-	_, cmd := rootApplyMsg(m, messages.ProfileSelectedMsg{Profile: "some-profile"})
+	_, cmd := rootApplyMsg(m, messages.ProfileSelected{Profile: "some-profile"})
 	if cmd == nil {
 		t.Fatal("ProfileSelectedMsg should return a batch command")
 	}
@@ -142,7 +142,7 @@ func TestBug82_ProfileSwitch_NoMissingRegionError(t *testing.T) {
 			continue
 		}
 		subMsg := subCmd()
-		if clientsReady, ok := subMsg.(messages.ClientsReadyMsg); ok {
+		if clientsReady, ok := subMsg.(messages.ClientsReady); ok {
 			if clientsReady.Err != nil {
 				errStr := strings.ToLower(clientsReady.Err.Error())
 				if strings.Contains(errStr, "missing region") || strings.Contains(errStr, "could not find region") {
@@ -162,7 +162,7 @@ func TestBug82_RegionSwitch_PassesExplicitRegion(t *testing.T) {
 	m := tui.New("dev", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
-	_, cmd := rootApplyMsg(m, messages.RegionSelectedMsg{Region: "eu-west-1"})
+	_, cmd := rootApplyMsg(m, messages.RegionSelected{Region: "eu-west-1"})
 	if cmd == nil {
 		t.Fatal("RegionSelectedMsg should return a batch command")
 	}
@@ -178,7 +178,7 @@ func TestBug82_RegionSwitch_PassesExplicitRegion(t *testing.T) {
 			continue
 		}
 		subMsg := subCmd()
-		if clientsReady, ok := subMsg.(messages.ClientsReadyMsg); ok {
+		if clientsReady, ok := subMsg.(messages.ClientsReady); ok {
 			if clientsReady.Err != nil {
 				errStr := strings.ToLower(clientsReady.Err.Error())
 				if strings.Contains(errStr, "missing region") {

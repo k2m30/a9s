@@ -32,7 +32,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // ctrlRKeyMsg returns a KeyPressMsg that matches the Refresh key binding.
@@ -47,7 +47,7 @@ func ctrlRKeyMsg() tea.KeyPressMsg {
 // the updated model. The navigation pushes a ResourceListModel onto the stack
 // without pre-loading resources (fresh list, no cache).
 func navigateToEC2List(m tui.Model) tui.Model {
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -68,7 +68,7 @@ func rerunEC2Resources() []resource.Resource {
 // EBS is used for tests that require probeEnrichment to fire: it is registered
 // in both EnricherRegistry and buildEnrichQueue's order list.
 func navigateToEBSList(m tui.Model) tui.Model {
-	m, _ = rootApplyMsg(m, messages.NavigateMsg{
+	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ebs",
 	})
@@ -91,8 +91,8 @@ func rerunEBSResources() []resource.Resource {
 //
 // sessionGen MUST be 0 for a freshly created model (enrichmentGen starts at 0).
 // typeGen MUST match the current per-type gen (0 initially, 1 after first Ctrl+R).
-func enrichmentCheckedWithFindings(sessionGen, typeGen domain.Gen) messages.EnrichmentCheckedMsg {
-	return messages.EnrichmentCheckedMsg{
+func enrichmentCheckedWithFindings(sessionGen, typeGen domain.Gen) messages.EnrichmentChecked {
+	return messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Issues:       1,
 		Truncated:    false,
@@ -139,10 +139,10 @@ func TestListCtrlR_HappyPath_RerunsEnrichment(t *testing.T) {
 	// produces an APIErrorMsg; the wrapper passes it through unchanged.
 	msg := refreshCmd()
 	switch msg.(type) {
-	case messages.APIErrorMsg:
+	case messages.APIError:
 		// Expected: nil clients → fetch error, wrapped cmd passes it through.
 		m, _ = rootApplyMsg(m, msg)
-	case messages.ResourcesLoadedMsg:
+	case messages.ResourcesLoaded:
 		// Would only happen with real clients (not in unit tests).
 		m, _ = rootApplyMsg(m, msg)
 	default:
@@ -180,7 +180,7 @@ func TestListCtrlR_HappyPath_WrappedCmdStampsTypeGen(t *testing.T) {
 
 	// Simulate the wrapped fetch cmd returning ResourcesLoadedMsg{TypeGen:1}.
 	// This is what the wrapped cmd would produce on a successful fetch.
-	loadedMsg := messages.ResourcesLoadedMsg{
+	loadedMsg := messages.ResourcesLoaded{
 		ResourceType: "ebs",
 		Resources:    rerunEBSResources(),
 		TypeGen:      1, // matches enrichmentTypeGen["ebs"]=1 after Ctrl+R
@@ -197,7 +197,7 @@ func TestListCtrlR_HappyPath_WrappedCmdStampsTypeGen(t *testing.T) {
 	if probeCmd != nil {
 		probeMsg := probeCmd()
 		switch probeMsg.(type) {
-		case messages.EnrichmentCheckedMsg:
+		case messages.EnrichmentChecked:
 			// Expected: probe fired, clients nil → enrichment error msg.
 		default:
 			// Batch cmds are acceptable — probeEnrichment may be batched.
@@ -218,7 +218,7 @@ func TestListCtrlR_HappyPath_ResourcesLoadedUpdatesView(t *testing.T) {
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
 
 	resources := rerunEC2Resources()
-	loadedMsg := messages.ResourcesLoadedMsg{
+	loadedMsg := messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    resources,
 		TypeGen:      1,
@@ -266,7 +266,7 @@ func TestListCtrlR_Overlap_StaleRerunSkipped_ListStillUpdates(t *testing.T) {
 	firstResources := []resource.Resource{
 		{ID: "vol-first111111111a", Name: "vol-first111111111a", Status: "available", Fields: map[string]string{"volume_id": "vol-first111111111a", "state": "available"}},
 	}
-	m, firstCmd := rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, firstCmd := rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ebs",
 		Resources:    firstResources,
 		TypeGen:      1, // stale (current=2)
@@ -290,7 +290,7 @@ func TestListCtrlR_Overlap_StaleRerunSkipped_ListStillUpdates(t *testing.T) {
 		// verify it does NOT yield an EnrichmentCheckedMsg (which would mean a
 		// probeEnrichment was dispatched from the stale tail branch).
 		firstMsg := firstCmd()
-		if _, isEnrich := firstMsg.(messages.EnrichmentCheckedMsg); isEnrich {
+		if _, isEnrich := firstMsg.(messages.EnrichmentChecked); isEnrich {
 			t.Error("stale TypeGen=1 tail branch must not dispatch probeEnrichment; " +
 				"got EnrichmentCheckedMsg from firstCmd — stale rerun fired incorrectly")
 		}
@@ -303,7 +303,7 @@ func TestListCtrlR_Overlap_StaleRerunSkipped_ListStillUpdates(t *testing.T) {
 		{ID: "vol-second11111111a", Name: "vol-second11111111a", Status: "available", Fields: map[string]string{"volume_id": "vol-second11111111a", "state": "available"}},
 		{ID: "vol-second22222222b", Name: "vol-second22222222b", Status: "in-use", Fields: map[string]string{"volume_id": "vol-second22222222b", "state": "in-use"}},
 	}
-	m, secondCmd := rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, secondCmd := rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ebs",
 		Resources:    secondResources,
 		TypeGen:      2, // matches current per-type gen=2
@@ -344,7 +344,7 @@ func TestListCtrlR_FetchError_NoLatentState(t *testing.T) {
 
 	// First: seed findings via a valid EnrichmentCheckedMsg to confirm they exist.
 	// enrichmentTypeGen["ebs"]=0 on fresh model; Gen=0 is the fresh session gen.
-	ebsFinding := messages.EnrichmentCheckedMsg{
+	ebsFinding := messages.EnrichmentChecked{
 		ResourceType: "ebs",
 		Issues:       1,
 		Findings: map[string]resource.EnrichmentFinding{
@@ -359,7 +359,7 @@ func TestListCtrlR_FetchError_NoLatentState(t *testing.T) {
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
 
 	// Findings are now cleared. Verify: TypeGen=0 is stale → dropped.
-	_, dropCmd := rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+	_, dropCmd := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ebs",
 		Issues:       1,
 		Findings: map[string]resource.EnrichmentFinding{
@@ -375,14 +375,14 @@ func TestListCtrlR_FetchError_NoLatentState(t *testing.T) {
 	// Simulate the wrapped fetch returning APIErrorMsg (nil clients → error path).
 	// Deliver the APIErrorMsg to the model — existing error handler runs.
 	// No stamped ResourcesLoadedMsg should arrive → findings stay cleared.
-	m, _ = rootApplyMsg(m, messages.APIErrorMsg{
+	m, _ = rootApplyMsg(m, messages.APIError{
 		ResourceType: "ebs",
 		Err:          errFetchFailed,
 	})
 
 	// enrichmentFindings must still be cleared (no latent state from failed attempt).
 	// Verify: TypeGen=1 EnrichmentCheckedMsg must STILL be accepted (gen not corrupted).
-	m, _ = rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+	m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ebs",
 		Issues:       1,
 		Findings: map[string]resource.EnrichmentFinding{
@@ -396,7 +396,7 @@ func TestListCtrlR_FetchError_NoLatentState(t *testing.T) {
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
 
 	// Deliver successful ResourcesLoadedMsg{TypeGen:2} — simulates wrapped fetch success.
-	m, probeCmd := rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, probeCmd := rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ebs",
 		Resources:    rerunEBSResources(),
 		TypeGen:      2,
@@ -444,7 +444,7 @@ func TestHandleEnrichmentChecked_DropsStaleTypeGen(t *testing.T) {
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
 
 	// Simulate stale startup probe: TypeGen=0 (captured before Ctrl+R bumped gen).
-	staleProbeMsg := messages.EnrichmentCheckedMsg{
+	staleProbeMsg := messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Issues:       3,
 		Truncated:    false,
@@ -481,7 +481,7 @@ func TestListCtrlR_NormalFetch_TypeGenZeroNeverTriggersRerun(t *testing.T) {
 	m = navigateToEC2List(m)
 
 	// Normal fetch (TypeGen=0) — as if navigate triggered the initial load.
-	m, cmd := rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, cmd := rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    rerunEC2Resources(),
 		TypeGen:      0, // normal fetch, no rerun intent
@@ -492,7 +492,7 @@ func TestListCtrlR_NormalFetch_TypeGenZeroNeverTriggersRerun(t *testing.T) {
 	// its result must NOT be an EnrichmentCheckedMsg directly.
 	if cmd != nil {
 		msg := cmd()
-		if _, isEnrich := msg.(messages.EnrichmentCheckedMsg); isEnrich {
+		if _, isEnrich := msg.(messages.EnrichmentChecked); isEnrich {
 			t.Error("normal fetch TypeGen=0 must not dispatch probeEnrichment; " +
 				"got EnrichmentCheckedMsg — tail branch incorrectly fired on TypeGen=0")
 		}

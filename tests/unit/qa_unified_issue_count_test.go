@@ -31,7 +31,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/messages"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -187,7 +187,7 @@ func buildUnifiedModel(t *testing.T, resources []resource.Resource, enrichIC int
 	m := views.NewResourceList(td, nil, keys.Default())
 	m.SetSize(120, 20)
 	m, _ = m.Init()
-	m, _ = m.Update(messages.ResourcesLoadedMsg{
+	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    resources,
 	})
@@ -286,14 +286,14 @@ func TestMenuCount_MatchesListCount_AfterWave2(t *testing.T) {
 		{ID: "i-0abc2222bbb222222", Name: "web-server-2",
 			Fields: map[string]string{"state": "running"}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoadedMsg{
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    resources,
 	})
 
 	// Deliver Wave-2 enrichment: 1 finding for the first instance.
 	// Gen=0 and TypeGen=0 match a fresh model's initial generation counters.
-	m, _ = rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+	m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Issues:       1,
 		Truncated:    false,
@@ -369,7 +369,7 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 		// to seed probeResources["ec2"] so unifiedIssueCount has wave1Resources.
 		// All three resources are running → Wave-1 contributes 0 to issue IDs.
 		resources := tildeSeverityEC2Instances()
-		m, _ = rootApplyMsg(m, messages.AvailabilityCheckedMsg{
+		m, _ = rootApplyMsg(m, messages.AvailabilityChecked{
 			ResourceType: "ec2",
 			Count:        3,
 			Resources:    resources,
@@ -382,7 +382,7 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 		// EnrichmentCheckedMsg: unifiedIssueCount re-derives from Findings.
 		// Bug (before fix): all 3 findings counted → issues:3.
 		// Correct (after fix): only "!" findings → issues:1.
-		m, _ = rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+		m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: "ec2",
 			Issues:       1,
 			Truncated:    false,
@@ -396,7 +396,7 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 		})
 
 		// Pop back to the menu so m.View() renders the main menu.
-		m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetMainMenu})
+		m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetMainMenu})
 		menuContent := stripANSI(m.View().Content)
 
 		// The menu badge format is " issues:N". Bug produces " issues:3".
@@ -413,7 +413,7 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 		m := newRootSizedModel()
 
 		resources := tildeSeverityEC2Instances()
-		m, _ = rootApplyMsg(m, messages.AvailabilityCheckedMsg{
+		m, _ = rootApplyMsg(m, messages.AvailabilityChecked{
 			ResourceType: "ec2",
 			Count:        3,
 			Resources:    resources,
@@ -426,7 +426,7 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 		// All three findings are "~" (informational). unifiedIssueCount must return 0.
 		// Bug (before fix): counts all 3 → issues:3.
 		// Correct (after fix): no "!" findings → no badge.
-		m, _ = rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+		m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: "ec2",
 			Issues:       0,
 			Truncated:    false,
@@ -439,7 +439,7 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 			TypeGen: 0,
 		})
 
-		m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetMainMenu})
+		m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetMainMenu})
 		menuContent := stripANSI(m.View().Content)
 
 		// No issue badge: " issues:" must not appear at all for ec2.
@@ -460,7 +460,7 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 			Status: "stopped",
 			Fields: map[string]string{"name": "stopped-server", "state": "stopped"},
 		}
-		m, _ = rootApplyMsg(m, messages.AvailabilityCheckedMsg{
+		m, _ = rootApplyMsg(m, messages.AvailabilityChecked{
 			ResourceType: "ec2",
 			Count:        1,
 			Resources:    []resource.Resource{brokenResource},
@@ -474,7 +474,7 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 		// unifiedIssueCount must return 1 (dedup + no ~ bump).
 		// Bug (before fix): "~" is counted, dedup collapses to 1 anyway — this subtest
 		// catches the case where a DIFFERENT id has a "~" finding that inflates count.
-		m, _ = rootApplyMsg(m, messages.EnrichmentCheckedMsg{
+		m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: "ec2",
 			Issues:       0, // enricher excludes ~ from IssueCount
 			Truncated:    false,
@@ -485,7 +485,7 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 			TypeGen: 0,
 		})
 
-		m, _ = rootApplyMsg(m, messages.NavigateMsg{Target: messages.TargetMainMenu})
+		m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetMainMenu})
 		menuContent := stripANSI(m.View().Content)
 
 		// Wave-1 broken resource contributes issues:1. ~ on same ID must not bump to 2.
