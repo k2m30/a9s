@@ -27,8 +27,7 @@ type ResourcesLoaded struct {
 	Err error
 }
 
-func (ResourcesLoaded) isEvent()              {}
-func (m ResourcesLoaded) GenStamp() domain.Gen { return m.TypeGen }
+func (ResourcesLoaded) isEvent() {}
 
 // APIError is sent when an AWS API call fails.
 type APIError struct {
@@ -51,8 +50,7 @@ type ClearFlash struct {
 	Gen domain.Gen // only clear if this matches current flash generation
 }
 
-func (ClearFlash) isEvent()              {}
-func (m ClearFlash) GenStamp() domain.Gen { return m.Gen }
+func (ClearFlash) isEvent() {}
 
 // ValueRevealed is sent when a resource value has been fetched via reveal (x key).
 type ValueRevealed struct {
@@ -83,6 +81,8 @@ type ClientsReady struct {
 
 func (ClientsReady) isEvent()              {}
 func (m ClientsReady) GenStamp() domain.Gen { return m.Gen }
+func (ClientsReady) GenAspect() Aspect      { return AspectConnect }
+func (ClientsReady) AcceptZeroGen() bool    { return true }
 
 // RelatedCheckResult delivers one checker's async result back to the detail view.
 // The adapter delegates this to the active view (detail model's rightColumnModel).
@@ -118,6 +118,8 @@ type RelatedCheckResult struct {
 
 func (RelatedCheckResult) isEvent()              {}
 func (m RelatedCheckResult) GenStamp() domain.Gen { return m.Generation }
+func (RelatedCheckResult) GenAspect() Aspect      { return AspectRelated }
+func (RelatedCheckResult) AcceptZeroGen() bool    { return true }
 
 // AvailabilityCacheLoaded delivers cached availability data loaded from disk.
 // Entries maps resource short names to resource counts.
@@ -154,6 +156,8 @@ type AvailabilityPrefetched struct {
 
 func (AvailabilityPrefetched) isEvent()              {}
 func (m AvailabilityPrefetched) GenStamp() domain.Gen { return m.Gen }
+func (AvailabilityPrefetched) GenAspect() Aspect      { return AspectAvailability }
+func (AvailabilityPrefetched) AcceptZeroGen() bool    { return true }
 
 // AvailabilityChecked reports one resource type's background probe result.
 type AvailabilityChecked struct {
@@ -169,6 +173,8 @@ type AvailabilityChecked struct {
 
 func (AvailabilityChecked) isEvent()              {}
 func (m AvailabilityChecked) GenStamp() domain.Gen { return m.Gen }
+func (AvailabilityChecked) GenAspect() Aspect      { return AspectAvailability }
+func (AvailabilityChecked) AcceptZeroGen() bool    { return false } // session counter starts at 0; zero stamp is always stale
 
 // EnrichmentChecked reports one resource type's Wave 2 enrichment result.
 type EnrichmentChecked struct {
@@ -196,6 +202,8 @@ type EnrichmentChecked struct {
 
 func (EnrichmentChecked) isEvent()              {}
 func (m EnrichmentChecked) GenStamp() domain.Gen { return m.Gen }
+func (EnrichmentChecked) GenAspect() Aspect      { return AspectEnrichment }
+func (EnrichmentChecked) AcceptZeroGen() bool    { return true }
 
 // IdentityLoaded is sent when the caller identity has been fetched.
 // Identity is typed as any to avoid importing aws/ from the messages package.
@@ -227,3 +235,5 @@ type EnrichDetailResult struct {
 
 func (EnrichDetailResult) isEvent()              {}
 func (m EnrichDetailResult) GenStamp() domain.Gen { return m.Generation }
+func (EnrichDetailResult) GenAspect() Aspect      { return AspectEnrichDetail }
+func (EnrichDetailResult) AcceptZeroGen() bool    { return true }

@@ -137,7 +137,7 @@ User Input → Update(msg) → (Model, Cmd) → View() → Terminal
 
 ### Messages
 
-Views communicate exclusively via typed messages (`internal/tui/messages/messages.go`). Views never import each other. The root `Model.Update()` routes messages to the appropriate handler.
+Views communicate exclusively via typed messages (`internal/runtime/messages/`, split into `cmd.go` for UI→core commands and `event.go` for core→UI events). Views never import each other. The root `Model.Update()` routes messages to the appropriate handler.
 
 Key messages:
 

@@ -96,12 +96,6 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 // main menu.  Used in no-cache + pre-supplied-clients mode so counts appear
 // immediately without background probes.
 func (c *Core) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetched) ([]UIIntent, []TaskRequest) {
-	// Gen guard: drop stale results produced before a profile/region switch.
-	// Gen=0 is the zero value (pre-guard dispatch) — accepted unconditionally.
-	if msg.Gen != 0 && msg.Gen != c.session.AvailabilityGen {
-		return nil, nil
-	}
-
 	var intents []UIIntent
 
 	for shortName, count := range msg.Entries {
@@ -170,11 +164,6 @@ func (c *Core) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetched)
 
 // handleAvailabilityChecked processes a single resource type's probe result.
 func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UIIntent, []TaskRequest) {
-	// Ignore stale results from a previous generation (profile/region switch).
-	if msg.Gen != c.session.AvailabilityGen {
-		return nil, nil
-	}
-
 	c.session.AvailChecked++
 
 	var intents []UIIntent
@@ -286,10 +275,6 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		msg.ResourceType = td.ShortName
 	}
 
-	// Session-wide generation guard.
-	if msg.Gen != 0 && msg.Gen != c.session.EnrichmentGen {
-		return nil, nil
-	}
 	// Per-type generation guard.
 	if msg.TypeGen != 0 && msg.TypeGen != c.session.EnrichmentTypeGen[msg.ResourceType] {
 		return nil, nil

@@ -410,8 +410,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case messages.EnrichDetail:
 		return m.handleEnrichDetail(msg)
 	case messages.EnrichDetailResult:
-		// Discard stale enrichment results (same convention as relatedGen).
-		if msg.Generation != 0 && msg.Generation != m.Session.EnrichGen {
+		if messages.IsStale(msg, m.Session) {
 			return m, nil
 		}
 		// Surface enrichment errors as a flash message.
@@ -430,11 +429,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleRelatedCheckStarted(msg)
 	case messages.RelatedCheckResult:
 		// Discard results from a previous check generation (e.g., after Ctrl+R or
-		// profile/region switch). relatedGen starts at 1 so the live path never
-		// stamps Generation=0 onto results. Generation=0 is therefore the safe
-		// sentinel for test/manual injection (always accepted). Any non-zero
-		// generation that doesn't match the current relatedGen is stale and dropped.
-		if msg.Generation != 0 && msg.Generation != m.Session.RelatedGen {
+		if messages.IsStale(msg, m.Session) {
 			return m, nil
 		}
 		// Accumulate in relatedCache so re-entering the same detail skips re-dispatch.

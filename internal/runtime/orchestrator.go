@@ -49,6 +49,9 @@ func (c *Core) Types() []catalog.ResourceTypeDef { return c.types }
 // Handler wiring is added incrementally by the per-handler PRs (AS-72-h1..h8).
 // Unrecognised event types fall through to the nil, nil default.
 func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
+	if g, ok := ev.(messages.GenStamped); ok && messages.IsStale(g, c.session) {
+		return nil, nil
+	}
 	switch msg := ev.(type) {
 	case messages.AvailabilityCacheLoaded:
 		return c.handleAvailabilityCacheLoaded(msg)
