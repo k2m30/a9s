@@ -83,15 +83,13 @@ func TestEnrichDBCSnapCrossRef_FailedPlusOrphan(t *testing.T) {
 			finding.Summary, "orphan: source cluster deleted")
 	}
 
-	// The merged status must be "failed (+1)" — Broken phrase stays at top,
-	// orphan stacked as +1. This is the B1 regression pin.
-	if result.FieldUpdates == nil || result.FieldUpdates["snap-failed"] == nil {
-		t.Fatal("FieldUpdates[\"snap-failed\"] is nil; want merged status phrase")
-	}
-	gotStatus := result.FieldUpdates["snap-failed"]["status"]
-	if gotStatus != "failed (+1)" {
-		t.Errorf("FieldUpdates[\"snap-failed\"][\"status\"] = %q, want %q",
-			gotStatus, "failed (+1)")
+	// AS-140: FieldUpdates must be empty — the merged "failed (+1)" stack is
+	// computed at render time by phraseFromFindings(r.Findings) (Wave-1
+	// "failed" finding + this enricher's Wave-2 orphan finding). The B1
+	// regression is now structurally impossible because the enricher no
+	// longer writes the merged phrase.
+	if updates, ok := result.FieldUpdates["snap-failed"]; ok && len(updates) != 0 {
+		t.Errorf("AS-140: expected empty FieldUpdates for snap-failed (status overlay removed); got %v", updates)
 	}
 }
 
@@ -183,9 +181,10 @@ func TestEnrichDBCSnapCrossRef_RDSShape_OrphanAndPastRetention(t *testing.T) {
 		if finding.Summary != "orphan: source cluster deleted" {
 			t.Errorf("Summary = %q, want %q", finding.Summary, "orphan: source cluster deleted")
 		}
-		if fu := result.FieldUpdates["aurora-orphan"]; fu == nil || fu["status"] != "orphan: source cluster deleted" {
-			t.Errorf("FieldUpdates status = %q, want %q",
-				result.FieldUpdates["aurora-orphan"]["status"], "orphan: source cluster deleted")
+		// AS-140: FieldUpdates must be empty — merged phrase is computed at
+		// render time by phraseFromFindings(r.Findings).
+		if updates, ok := result.FieldUpdates["aurora-orphan"]; ok && len(updates) != 0 {
+			t.Errorf("AS-140: expected empty FieldUpdates for aurora-orphan (status overlay removed); got %v", updates)
 		}
 	})
 

@@ -7,11 +7,32 @@ import (
 	lipgloss "charm.land/lipgloss/v2"
 
 	"github.com/k2m30/a9s/v3/internal/config"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/text"
 )
+
+// phraseFromFindings returns the merged S4 status phrase for a resource's
+// findings: the first finding's Phrase alone when only one is present, or
+// "<top> (+N)" when N additional findings are stacked. Returns "" when
+// findings is empty.
+//
+// AS-140 collapsed the 3-layer status priority in extractCellValue to two
+// layers by computing the merged phrase here at render time instead of
+// during Wave-2 enrichment. Both Wave-1 (fetcher-emitted) and Wave-2
+// (applyEnrichment-derived) findings live on r.Findings by the time a row
+// reaches the renderer.
+func phraseFromFindings(findings []domain.Finding) string {
+	if len(findings) == 0 {
+		return ""
+	}
+	if len(findings) == 1 {
+		return findings[0].Phrase
+	}
+	return fmt.Sprintf("%s (+%d)", findings[0].Phrase, len(findings)-1)
+}
 
 // lookupDecorator resolves a CellDecorator for column c by trying key, path,
 // lowercased title, and path's final segment. Returns nil if no match.
@@ -333,26 +354,22 @@ func (m ResourceListModel) extractCellValue(c listCol, r resource.Resource) stri
 	if c.key == "@id" {
 		return r.ID
 	}
-	// Status/lifecycle column priority (PR-03a-views, refined for PR-03e):
-	//   1. Fields["status"] / Fields[lifecycleKey] when present — these carry
-	//      the merged §4 phrase including the (+N) suffix and any Wave-2
-	//      enricher overlay (e.g. snapshot_cross_ref FieldUpdates["status"],
-	//      dbi_issue_enrichment "maintenance scheduled" overlay).
-	//   2. Findings[0].Phrase as the fallback for unmigrated fetchers that
-	//      stamp Findings without populating Fields["status"].
-	// Reading Fields first preserves the AS-71 boundary that Wave-2 enricher
-	// migrations are out of scope; defer the Findings-only architecture to a
-	// follow-up PR.
+	// Status/lifecycle column priority (AS-140, two-layer):
+	//   1. phraseFromFindings(r.Findings) — aggregates ALL findings (Wave-1
+	//      from the fetcher, Wave-2 from applyEnrichment) into a single
+	//      "<top> (+N)" phrase. Returns "" for a healthy resource.
+	//   2. Fields[lifecycleKey] — lifecycle steady-state ("running",
+	//      "available", etc.) when no findings are active.
+	// The intermediate r.Fields["status"] read was removed by AS-140 because
+	// Wave-2 enrichers no longer overlay it; DeriveFindings ensures
+	// r.Findings is populated before every render so layer 1 is authoritative.
 	// The status column is identified by c.key == "status" (conventional) or
 	// c.key == td.LifecycleKey when an explicit lifecycle key is set.
 	lifecycleKey := lifecycleColumnKey(m.typeDef)
 	isStatusCol := c.key == "status" || c.key == lifecycleKey
 	if isStatusCol {
-		if v := r.Fields["status"]; v != "" {
-			return v
-		}
-		if len(r.Findings) > 0 {
-			return r.Findings[0].Phrase
+		if phrase := phraseFromFindings(r.Findings); phrase != "" {
+			return phrase
 		}
 		if v := r.Fields[lifecycleKey]; v != "" {
 			return v

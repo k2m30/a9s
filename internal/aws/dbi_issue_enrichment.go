@@ -17,19 +17,16 @@ func init() {
 
 // EnrichDBIMaintenance calls DescribePendingMaintenanceActions (account-wide, paginated)
 // and emits one Finding per dbi instance with pending maintenance. Severity "~" —
-// IssueCount is always 0 (Wave 2 ~ does not bump the S1 menu badge). When the
-// resource is Healthy (fetcher Status == ""), the enricher sets
-// FieldUpdates[id]["status"] = "maintenance scheduled" so the S4 column shows
-// the short cause. When Wave 1 already populated Status, the enricher bumps the
-// (+N) suffix on the existing phrase (universal rule 7) so the operator sees
-// there is more to open for.
+// IssueCount is always 0 (Wave 2 ~ does not bump the S1 menu badge). The merged
+// S4 status phrase (e.g. "maintenance scheduled" alone, or "stopped (+1)" stacked
+// over a Wave-1 finding) is computed at render time from r.Findings via
+// phraseFromFindings; this enricher only emits Findings.
 func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
-	fieldUpdates := make(map[string]map[string]string)
 
 	if clients == nil || clients.RDS == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, FieldUpdates: fieldUpdates}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, FieldUpdates: make(map[string]map[string]string)}, nil
 	}
 
 	// Paginate with a cap.
@@ -45,7 +42,7 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 		out, err := clients.RDS.DescribePendingMaintenanceActions(ctx, &rds.DescribePendingMaintenanceActionsInput{Marker: marker})
 		pages++
 		if err != nil {
-			return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, FieldUpdates: fieldUpdates}, err
+			return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, FieldUpdates: make(map[string]map[string]string)}, err
 		}
 		allActions = append(allActions, out.PendingMaintenanceActions...)
 		if out.Marker == nil || *out.Marker == "" {
@@ -54,20 +51,14 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 		marker = out.Marker
 	}
 
-	// Deterministic ARN-suffix matching via ordered probeIDs.
-	// statusByID carries the post-PR-03e canonical S4 phrase from
-	// Fields["status"] (the merged "<top> (+N)" the fetcher emits via
-	// phraseFromFindings) — NOT the legacy r.Status, which the wave-1
-	// fetcher migration intentionally stopped populating. Reading r.Status
-	// here would always see "" and silently downgrade the suffix-bump branch
-	// below to a bare "maintenance scheduled" overwrite, hiding the wave-1
-	// phrase entirely (AS-126 / AS-132 regression on warn-dbi-* rows).
+	// Deterministic ARN-suffix matching via ordered probeIDs. AS-140 removed
+	// the parallel statusByID map: the merged S4 phrase (single-finding or
+	// Wave-1+Wave-2 stacked) is computed at render time from r.Findings, so
+	// the enricher no longer needs to read the fetcher's status overlay here.
 	probeIDs := make([]string, 0, len(resources))
-	statusByID := make(map[string]string, len(resources))
 	for _, r := range resources {
 		if r.ID != "" {
 			probeIDs = append(probeIDs, r.ID)
-			statusByID[r.ID] = r.Fields["status"]
 		}
 	}
 
@@ -117,19 +108,6 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 			Summary:  "pending maintenance",
 			Rows:     rows,
 		}
-
-		// Emit S4 FieldUpdate: if Healthy, set "maintenance scheduled"; if Wave 1 already
-		// populated Status, bump the (+N) suffix so the operator sees there's more to open for.
-		existing := statusByID[key]
-		var newStatus string
-		if existing == "" {
-			// Healthy + Wave 2 → sole finding, no suffix
-			newStatus = "maintenance scheduled"
-		} else {
-			// Wave 1 + Wave 2 stack → bump (+N) suffix on existing phrase
-			newStatus = resource.BumpFindingSuffix(existing)
-		}
-		fieldUpdates[key] = map[string]string{"status": newStatus}
 	}
 
 	return IssueEnricherResult{
@@ -137,7 +115,7 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 		Truncated:    truncated,
 		TruncatedIDs: truncatedIDs,
 		Findings:     findings,
-		FieldUpdates: fieldUpdates,
+		FieldUpdates: make(map[string]map[string]string),
 	}, nil
 }
 

@@ -9,7 +9,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/config"
-	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -833,66 +832,22 @@ func TestResourceListView_ExactRelatedTargetID_EmptyID_NoLoadMore(t *testing.T) 
 }
 
 // ===========================================================================
-// AS-132 / Sibling B regression: Wave-2 FieldUpdates["status"] must NOT be
-// shadowed by Findings[0].Phrase when the resource also carries a Wave-1
-// finding. Pre-fix the table renderer evaluated Findings first, dropping
-// every Wave-2 enricher overlay (snapshot_cross_ref orphan/past-retention,
-// dbi_issue_enrichment "maintenance scheduled" + (+N) bumps,
-// dbc_issue_enrichment ratchets) on rows that already had Wave-1 findings.
+// AS-140 — TestResourceListView_Wave2FieldUpdate_OverridesWave1FindingsPhrase
+// DELETED.
 //
-// Drives the post-Wave-2 path of the pipeline: a row arrives with
-// Findings[wave1] + Fields["status"] (the merged §4 phrase the fetcher
-// emitted), then ApplyFieldUpdates merges the enricher's overlay into
-// Fields["status"]. The renderer must show the overlay, not the original
-// Wave-1 phrase.
+// This test pinned the inverted priority where ApplyFieldUpdates overlaying
+// Fields["status"] WINS over Findings[0].Phrase. AS-140 reverses that: the
+// status column now reads phraseFromFindings(r.Findings) first (which
+// aggregates Wave-1 + Wave-2 findings into a "<top> (+N)" phrase), then
+// falls back to Fields[lifecycleKey]. Wave-2 enrichers no longer write
+// Fields["status"] at all — both findings travel via r.Findings, and the
+// renderer composes the stacked display.
+//
+// The new contract is covered by:
+//   - tests/unit/aws_efs_issue_enrichment_test.go (Wave-1 + Wave-2 stacked
+//     mount-target case — Findings populated, FieldUpdates empty).
+//   - tests/unit/enrichment_rds_findings_test.go
+//     (TestEnrichDBI_Wave1StoppedPlusWave2_StackedFindings_AS140).
+//   - tests/unit/phase03_view_reads_test.go (extractCellValue reads Findings
+//     for the list status column).
 // ===========================================================================
-
-func TestResourceListView_Wave2FieldUpdate_OverridesWave1FindingsPhrase(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
-
-	td := resource.ResourceTypeDef{
-		Name:      "DB Instances",
-		ShortName: "dbi",
-		Aliases:   []string{"dbi"},
-		Columns: []resource.Column{
-			{Key: "db_identifier", Title: "DB Identifier", Width: 24},
-			{Key: "status", Title: "Status", Width: 32},
-		},
-	}
-	k := keys.Default()
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(120, 20)
-	m, _ = m.Init()
-
-	// Wave-1 fetcher emitted a publicly-accessible warning. Fields["status"]
-	// is the merged §4 phrase from phraseFromFindings — bare phrase, no suffix.
-	r := resource.Resource{
-		ID:   "prod-dbi-01",
-		Type: "dbi",
-		Findings: []domain.Finding{
-			{Code: "dbi.warn.publicly_accessible", Phrase: "publicly accessible", Severity: domain.SevWarn, Source: "wave1"},
-		},
-		Fields: map[string]string{
-			"db_identifier": "prod-dbi-01",
-			"status":        "publicly accessible",
-		},
-	}
-	m, _ = m.Update(messages.ResourcesLoaded{
-		ResourceType: "dbi",
-		Resources:    []resource.Resource{r},
-	})
-
-	// Wave-2 enricher (e.g. dbi_issue_enrichment "maintenance scheduled" path,
-	// or snapshot_cross_ref "orphan" overlay) bumps the merged phrase. The
-	// model's ApplyFieldUpdates merges this into Fields["status"].
-	m.ApplyFieldUpdates(map[string]map[string]string{
-		"prod-dbi-01": {"status": "publicly accessible (+1)"},
-	})
-
-	out := m.View()
-	if !strings.Contains(out, "publicly accessible (+1)") {
-		t.Errorf("expected View to render Wave-2 overlay %q (Fields[status] after ApplyFieldUpdates), got:\n%s",
-			"publicly accessible (+1)", out)
-	}
-}

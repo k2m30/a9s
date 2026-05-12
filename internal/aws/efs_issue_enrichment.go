@@ -24,12 +24,12 @@ func init() {
 //   - Summary  = "mount target down"  (exact §4 phrase; ≤ 40 chars; no Row values embedded)
 //   - Rows     = [{Mount Target, <mtID>, "!"}, {AZ, <az>}, {State, <state>, "!"}, {Degraded, "N/M"}]
 //   - Severity = "!"
-//   - FieldUpdates[fsID]["status"]:
-//     — existing status == "" → "mount target down"
-//     — otherwise             → "mount target down (+N)" where N = hidden+1 from existing suffix
+//
+// AS-140: the enricher no longer writes FieldUpdates["status"]. The merged
+// S4 phrase ("mount target down" alone, or stacked with Wave-1 findings) is
+// computed at render time from r.Findings via phraseFromFindings.
 func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
-	fieldUpdates := make(map[string]map[string]string)
 	truncatedIDs := make(map[string]bool)
 	if clients.EFS == nil {
 		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
@@ -124,26 +124,12 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 			},
 		}
 		findings[fsID] = finding
-
-		// FieldUpdates: the Wave-2 phrase becomes the top, the Wave-1 phrases
-		// carried in r.Issues become the hidden count N. Deriving N from
-		// len(r.Issues) keeps the enricher idempotent — re-running against
-		// already-merged FieldUpdates["status"] never double-bumps the suffix,
-		// because Issues is fetcher-owned and stable across enrichment runs.
-		var newStatus string
-		if len(r.Issues) == 0 {
-			newStatus = "mount target down"
-		} else {
-			newStatus = fmt.Sprintf("mount target down (+%d)", len(r.Issues))
-		}
-		fu := map[string]string{"status": newStatus}
-		fieldUpdates[fsID] = fu
 	}
 	return IssueEnricherResult{
 		IssueCount:   len(findings),
 		Truncated:    truncated,
 		TruncatedIDs: truncatedIDs,
 		Findings:     findings,
-		FieldUpdates: fieldUpdates,
+		FieldUpdates: make(map[string]map[string]string),
 	}, AggregateFailures("efs-enrich: DescribeMountTargets", failures, total)
 }

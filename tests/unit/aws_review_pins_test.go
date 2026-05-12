@@ -82,51 +82,20 @@ func TestEFS_FixtureENIGroupNamesMatchSecurityGroups(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// #11 PIN — EnrichEFSMountTargets must be idempotent: running it twice against
-// the same fetcher output must produce the same FieldUpdates[id]["status"].
+// #11 PIN — DELETED by AS-140.
 //
-// Previously the enricher SplitFindingSuffix'd the existing Fields["status"]
-// and bumped hidden+1. If the caller merged FieldUpdates back into Fields
-// between runs (cache refresh without re-fetch), the second run saw
-// "mount target down (+1)" and computed (+2), then (+3), etc. — unbounded.
+// The original test pinned the EnrichEFSMountTargets suffix-bump idempotency
+// invariant against the FieldUpdates["status"] write path. AS-140 removed
+// that write entirely (the merged "mount target down (+N)" phrase is now
+// computed at render time by phraseFromFindings(r.Findings) in
+// internal/tui/views/table_render.go), making the bug structurally
+// impossible: the enricher no longer computes or stores the merged phrase.
+// This is parallel to the QA deletion of snapshot_cross_ref_internal_test.go
+// (which pinned the now-deleted computeMergedStatus helper).
+//
+// The new structural invariant ("FieldUpdates is empty after enrichment") is
+// pinned by the AS-140 assertions in tests/unit/aws_efs_issue_enrichment_test.go.
 // ---------------------------------------------------------------------------
-
-func TestEnrichEFSMountTargets_Idempotent(t *testing.T) {
-	const fsID = "fs-0warnupdmtdown001"
-
-	fake := efsMTFakeFromFixtures()
-	clients := &awsclient.ServiceClients{EFS: fake}
-
-	// Fetcher output: W1 Warning "updating", Issues carries the single phrase.
-	res := efsResources(fsID)
-	res[0].Status = "updating"
-	res[0].Issues = []string{"updating"}
-
-	r1, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res, nil)
-	if err != nil {
-		t.Fatalf("first run: %v", err)
-	}
-
-	want := "mount target down (+1)"
-	if r1.FieldUpdates[fsID]["status"] != want {
-		t.Fatalf("first run: FieldUpdates[%q][\"status\"] = %q, want %q", fsID, r1.FieldUpdates[fsID]["status"], want)
-	}
-
-	// Simulate merge of FieldUpdates into Fields (what the pipeline does),
-	// then re-run. Issues is fetcher-owned and stays = ["updating"].
-	res[0].Fields["status"] = r1.FieldUpdates[fsID]["status"]
-	res[0].Status = r1.FieldUpdates[fsID]["status"]
-
-	r2, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res, nil)
-	if err != nil {
-		t.Fatalf("second run: %v", err)
-	}
-
-	if r2.FieldUpdates[fsID]["status"] != want {
-		t.Errorf("second run (after merging first run's FieldUpdates into Fields): FieldUpdates[%q][\"status\"] = %q, want %q — enricher must be idempotent",
-			fsID, r2.FieldUpdates[fsID]["status"], want)
-	}
-}
 
 // ---------------------------------------------------------------------------
 // P2 PIN — Redshift Color func must classify derived-phrase inputs correctly

@@ -27,32 +27,25 @@ var nowFunc = time.Now
 //   - AutoAppliedAfterDate is non-nil AND in the past, OR
 //   - ForcedApplyDate is non-nil AND in the past.
 //
-// When the resource is Healthy (Status == ""), the enricher sets
-// FieldUpdates[id]["status"] = "maintenance overdue". When Wave 1 already
-// populated Status, the enricher bumps the (+N) suffix on the existing phrase
-// (universal rule 7) so the operator sees there is more to open for.
+// The merged S4 status phrase (e.g. "maintenance overdue" alone, or
+// "stopped (+1)" stacked over a Wave-1 finding) is computed at render time
+// from r.Findings via phraseFromFindings; this enricher only emits Findings.
 func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	findings := make(map[string]resource.EnrichmentFinding)
 	truncatedIDs := make(map[string]bool)
-	fieldUpdates := make(map[string]map[string]string)
 
 	if clients == nil || clients.DocDB == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, FieldUpdates: fieldUpdates}, nil
+		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, FieldUpdates: make(map[string]map[string]string)}, nil
 	}
 
-	// Deterministic ARN-suffix matching via ordered probeIDs.
-	// statusByID reads Fields["status"] (post-PR-03e canonical S4 phrase
-	// emitted by the dbc fetcher) rather than r.Status — the wave-1
-	// migration intentionally stopped populating r.Status, so reading it
-	// would silently downgrade the suffix-bump branch below to a bare
-	// "maintenance overdue" overwrite, hiding the wave-1 phrase entirely
-	// (AS-126 / AS-132 regression).
+	// Deterministic ARN-suffix matching via ordered probeIDs. AS-140 removed
+	// the parallel statusByID map: the merged S4 phrase (single-finding or
+	// Wave-1+Wave-2 stacked) is computed at render time from r.Findings, so
+	// the enricher no longer needs to read the fetcher's status overlay here.
 	probeIDs := make([]string, 0, len(resources))
-	statusByID := make(map[string]string, len(resources))
 	for _, r := range resources {
 		if r.ID != "" {
 			probeIDs = append(probeIDs, r.ID)
-			statusByID[r.ID] = r.Fields["status"]
 		}
 	}
 
@@ -141,20 +134,6 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 				Rows:     rows,
 			}
 			issueCount++
-
-			// Emit S4 FieldUpdate: if Healthy, set "maintenance overdue"; if Wave 1
-			// already populated Status, bump the (+N) suffix so the operator sees
-			// there's more to open for.
-			existing := statusByID[key]
-			var newStatus string
-			if existing == "" {
-				// Healthy + Wave 2 → sole finding, no suffix
-				newStatus = "maintenance overdue"
-			} else {
-				// Wave 1 + Wave 2 stack → bump (+N) suffix on existing phrase
-				newStatus = resource.BumpFindingSuffix(existing)
-			}
-			fieldUpdates[key] = map[string]string{"status": newStatus}
 		}
 
 		if out.Marker == nil || *out.Marker == "" {
@@ -168,7 +147,7 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 		Truncated:    truncated,
 		TruncatedIDs: truncatedIDs,
 		Findings:     findings,
-		FieldUpdates: fieldUpdates,
+		FieldUpdates: make(map[string]map[string]string),
 	}, AggregateFailures("dbc-enrich: DescribePendingMaintenanceActions", failures, pages)
 }
 
