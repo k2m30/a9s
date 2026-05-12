@@ -16,12 +16,10 @@
 //
 // Wave classification stays Wave 1 (zero SDK calls) — the helper scans the
 // in-memory ResourceCache only. Both signals route through
-// `IssueEnricherResult.Findings` (which surfaces in S5 Attention) plus
-// `FieldUpdates["status"]` (which merges into S4 via computeMergedStatus).
-// Re-runs are idempotent: Findings and FieldUpdates are map-keyed so a second
-// pass overwrites the first; computeMergedStatus reads the FETCHER's
-// `Resource.Status`, never a previously-merged value, so suffixes never
-// accumulate.
+// `IssueEnricherResult.Findings` (which surfaces in S5 Attention and, via
+// `applyEnrichment` → `DeriveFindings`, in the S4 status column via
+// `phraseFromFindings(r.Findings)` at render time). Re-runs are idempotent:
+// Findings is map-keyed so a second pass overwrites the first.
 //
 // Retention-rule-disabled mode: when a future consumer's parent type has no
 // retention concept (e.g. ebs-snap on ec2.Volume), set
@@ -97,9 +95,8 @@ type SnapshotCrossRefConfig struct {
 // orphan + past-retention pattern parameterized by cfg. The returned closure
 // is registered via registerIssueEnricher in the per-resource enricher file.
 //
-// Contract: zero API calls, idempotent on repeated runs (Findings and
-// FieldUpdates both overwrite per resource ID; reads res.Status which is the
-// fetcher-emitted value, never a previously-merged one).
+// Contract: zero API calls, idempotent on repeated runs (Findings overwrites
+// per resource ID).
 func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 	return func(_ context.Context, _ *ServiceClients, resources []resource.Resource, cache resource.ResourceCache) (IssueEnricherResult, error) {
 		// Default severity to "!" (operator-actionable) when callers omit the field.
@@ -111,7 +108,6 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 		result := IssueEnricherResult{
 			Findings:     make(map[string]resource.EnrichmentFinding),
 			TruncatedIDs: make(map[string]bool),
-			FieldUpdates: make(map[string]map[string]string),
 		}
 
 		// Skip rule per spec §3.1: the cross-ref enricher requires the parent
@@ -195,16 +191,9 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 				continue
 			}
 
-			// FieldUpdates carries the merged §4 status phrase. Idempotent:
-			// reads the fetcher-emitted Wave-1 phrases (post-PR-03e via
-			// res.Findings; pre-PR-03e via res.Status / res.Issues), never a
-			// previously-merged value, so re-runs converge.
-			existingStatus, existingIssues := wave1StatusAndIssues(res)
-			result.FieldUpdates[res.ID] = map[string]string{
-				"status": computeMergedStatus(existingStatus, existingIssues, newPhrases),
-			}
-
-			// Findings emits the entries for the detail-view Attention section.
+			// Findings emits the entries for the detail-view Attention section
+			// AND drives the S4 status column at render time via
+			// phraseFromFindings(r.Findings) (per AS-140).
 			result.Findings[res.ID] = resource.EnrichmentFinding{
 				Severity: severity,
 				Summary:  newPhrases[0],
@@ -216,74 +205,3 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 	}
 }
 
-// computeMergedStatus builds the §4 status phrase when the cross-ref enricher
-// adds phrases to an existing fetcher-emitted set of Wave-1 phrases.
-//
-//   - existingStatus is the FETCHER's Resource.Status (the §4 top phrase plus
-//     any (+N) suffix the fetcher already emitted). Reading from this — not
-//     from a previously-merged value — keeps the function idempotent: the
-//     enricher can run repeatedly and the suffix never accumulates.
-//   - existingIssues is the fetcher's Resource.Issues slice (count of fetcher
-//     phrases). Used only for total-count math.
-//   - newPhrases are the phrases this enricher contributes.
-//
-// Returned status = top phrase + " (+N-1)" where N is the total count, or the
-// bare top phrase when N == 1.
-//
-// Single-issue rule: when totalIssues == 1, reading existingStatus when
-// non-empty preserves the fetcher's §4 phrase. The fetcher contract (U7f)
-// requires Issues to be populated for every active Wave-1 phrase, so an
-// existingStatus with empty Issues should not occur — if it does, that's a
-// fetcher bug, not a helper concern.
-func computeMergedStatus(existingStatus string, existingIssues []string, newPhrases []string) string {
-	totalIssues := len(existingIssues) + len(newPhrases)
-
-	if totalIssues == 0 {
-		return ""
-	}
-	if totalIssues == 1 {
-		if existingStatus != "" {
-			return existingStatus
-		}
-		return newPhrases[0]
-	}
-	// N ≥ 2: pick the top phrase (fetcher's, if present; else the first new
-	// phrase) and apply BumpFindingSuffix once per *additional* phrase beyond
-	// it, so the suffix matches (totalIssues - 1).
-	top := existingStatus
-	startBumps := len(newPhrases)
-	if top == "" {
-		top = newPhrases[0]
-		startBumps = len(newPhrases) - 1
-	}
-	// existingIssues beyond index 0 already contributed to the fetcher's
-	// suffix encoded in existingStatus, so we only bump once per *new* phrase.
-	status := top
-	for i := 0; i < startBumps; i++ {
-		status = resource.BumpFindingSuffix(status)
-	}
-	return status
-}
-
-// wave1StatusAndIssues extracts the §4 top phrase + per-phrase slice from a
-// Resource, supporting both the post-PR-03e canonical form (Findings emitted
-// by the fetcher with Source=="wave1", display phrase in Fields["status"])
-// and the legacy form (Status + Issues populated by the fetcher). Returns
-// ("", nil) when neither carries any Wave-1 signal.
-func wave1StatusAndIssues(res resource.Resource) (string, []string) {
-	// Post-migration path: prefer Findings + Fields["status"].
-	if len(res.Findings) > 0 {
-		issues := make([]string, 0, len(res.Findings))
-		for _, f := range res.Findings {
-			if f.Source != "wave1" {
-				continue
-			}
-			issues = append(issues, f.Phrase)
-		}
-		if len(issues) > 0 {
-			return res.Fields["status"], issues
-		}
-	}
-	// Legacy fall-through for unmigrated fetchers.
-	return res.Status, res.Issues
-}
