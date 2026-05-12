@@ -157,12 +157,10 @@ func TestDBISnap_Enricher_Orphan_DbiMissingFromCache(t *testing.T) {
 	if finding.Summary != "orphan: source DB deleted" {
 		t.Errorf("Findings[%q].Summary = %q, want %q", snapID, finding.Summary, "orphan: source DB deleted")
 	}
-	if result.FieldUpdates == nil || result.FieldUpdates[snapID] == nil {
-		t.Fatalf("FieldUpdates[%q] is nil, want status phrase set", snapID)
-	}
-	statusPhrase := result.FieldUpdates[snapID]["status"]
-	if !strings.Contains(statusPhrase, "orphan") {
-		t.Errorf("FieldUpdates[%q][status] = %q, want to contain \"orphan\"", snapID, statusPhrase)
+	// AS-140: FieldUpdates must be empty — the merged display phrase is
+	// computed at render time by phraseFromFindings(r.Findings).
+	if updates, ok := result.FieldUpdates[snapID]; ok && len(updates) != 0 {
+		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", snapID, updates)
 	}
 }
 
@@ -213,9 +211,10 @@ func TestDBISnap_Enricher_AutomatedPastRetention_BasicCase(t *testing.T) {
 	if strings.Contains(finding.Summary, "past retention") && !strings.Contains(finding.Summary, "23d") {
 		t.Errorf("past-retention Summary %q should say 23d (30-7=23), got different days", finding.Summary)
 	}
-	// FieldUpdates must be set.
-	if result.FieldUpdates == nil || result.FieldUpdates[snapID] == nil {
-		t.Fatalf("FieldUpdates[%q] is nil, want status phrase set", snapID)
+	// AS-140: FieldUpdates must be empty — the merged display phrase is
+	// computed at render time by phraseFromFindings(r.Findings).
+	if updates, ok := result.FieldUpdates[snapID]; ok && len(updates) != 0 {
+		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", snapID, updates)
 	}
 }
 
@@ -334,13 +333,12 @@ func TestDBISnap_Enricher_MultiW1_UnencryptedPlusOrphan_Suffix(t *testing.T) {
 	if finding.Summary != "orphan: source DB deleted" {
 		t.Errorf("Findings[%q].Summary = %q, want \"orphan: source DB deleted\"", snapID, finding.Summary)
 	}
-	// FieldUpdates["status"] must be "unencrypted (+1)" — BumpFindingSuffix applied.
-	fu := result.FieldUpdates[snapID]
-	if fu == nil {
-		t.Fatalf("FieldUpdates[%q] is nil", snapID)
-	}
-	if fu["status"] != "unencrypted (+1)" {
-		t.Errorf("FieldUpdates[%q][status] = %q, want %q", snapID, fu["status"], "unencrypted (+1)")
+	// AS-140: FieldUpdates must be empty — the merged "unencrypted (+1)"
+	// stack is computed at render time by phraseFromFindings(r.Findings),
+	// which aggregates the Wave-1 "unencrypted" finding and this enricher's
+	// Wave-2 orphan finding.
+	if updates, ok := result.FieldUpdates[snapID]; ok && len(updates) != 0 {
+		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", snapID, updates)
 	}
 }
 
@@ -375,15 +373,17 @@ func TestDBISnap_Enricher_NoOp_WhenNoCrossRefSignalsApply(t *testing.T) {
 	if _, has := result.Findings[snapID]; has {
 		t.Errorf("Findings[%q] present, want absent (no cross-ref signals)", snapID)
 	}
-	if fu := result.FieldUpdates[snapID]; fu != nil && fu["status"] != "" {
-		t.Errorf("FieldUpdates[%q][status] = %q, want empty (no findings)", snapID, fu["status"])
+	// AS-140: FieldUpdates is no longer written by the cross-ref enricher;
+	// the merged display phrase is computed at render time. Either nil or
+	// empty for this key is correct.
+	if updates, ok := result.FieldUpdates[snapID]; ok && len(updates) != 0 {
+		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", snapID, updates)
 	}
-	// Maps must be non-nil (contract: "MUST NOT be nil on success").
+	// Findings and TruncatedIDs must still be non-nil on success (still-active
+	// contract for these channels). FieldUpdates is no longer in the contract
+	// after AS-140.
 	if result.Findings == nil {
 		t.Error("Findings is nil, want non-nil empty map on success")
-	}
-	if result.FieldUpdates == nil {
-		t.Error("FieldUpdates is nil, want non-nil empty map on success")
 	}
 	if result.TruncatedIDs == nil {
 		t.Error("TruncatedIDs is nil, want non-nil empty map on success")

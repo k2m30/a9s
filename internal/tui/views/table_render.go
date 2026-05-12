@@ -7,11 +7,32 @@ import (
 	lipgloss "charm.land/lipgloss/v2"
 
 	"github.com/k2m30/a9s/v3/internal/config"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/text"
 )
+
+// phraseFromFindings returns the merged S4 status phrase for a resource's
+// findings: the first finding's Phrase alone when only one is present, or
+// "<top> (+N)" when N additional findings are stacked. Returns "" when
+// findings is empty.
+//
+// AS-140 collapsed the 3-layer status priority in extractCellValue to two
+// layers by computing the merged phrase here at render time instead of
+// during Wave-2 enrichment. Both Wave-1 (fetcher-emitted) and Wave-2
+// (applyEnrichment-derived) findings live on r.Findings by the time a row
+// reaches the renderer.
+func phraseFromFindings(findings []domain.Finding) string {
+	if len(findings) == 0 {
+		return ""
+	}
+	if len(findings) == 1 {
+		return findings[0].Phrase
+	}
+	return fmt.Sprintf("%s (+%d)", findings[0].Phrase, len(findings)-1)
+}
 
 // lookupDecorator resolves a CellDecorator for column c by trying key, path,
 // lowercased title, and path's final segment. Returns nil if no match.
@@ -333,31 +354,32 @@ func (m ResourceListModel) extractCellValue(c listCol, r resource.Resource) stri
 	if c.key == "@id" {
 		return r.ID
 	}
-	// Status/lifecycle column priority (PR-03a-views, refined for PR-03e):
-	//   1. Fields["status"] / Fields[lifecycleKey] when present — these carry
-	//      the merged §4 phrase including the (+N) suffix and any Wave-2
-	//      enricher overlay (e.g. snapshot_cross_ref FieldUpdates["status"],
-	//      dbi_issue_enrichment "maintenance scheduled" overlay).
-	//   2. Findings[0].Phrase as the fallback for unmigrated fetchers that
-	//      stamp Findings without populating Fields["status"].
-	// Reading Fields first preserves the AS-71 boundary that Wave-2 enricher
-	// migrations are out of scope; defer the Findings-only architecture to a
-	// follow-up PR.
+	// Status/lifecycle column priority (AS-140, two-layer):
+	//   1. phraseFromFindings(r.Findings) — aggregates ALL findings (Wave-1
+	//      from the fetcher, Wave-2 from applyEnrichment) into a single
+	//      "<top> (+N)" phrase. Returns "" for a healthy resource.
+	//   2. Fields[lifecycleKey] — lifecycle steady-state ("running",
+	//      "available", etc.) when no findings are active.
+	// The intermediate r.Fields["status"] read was removed by AS-140 because
+	// Wave-2 enrichers no longer overlay it; DeriveFindings ensures
+	// r.Findings is populated before every render so layer 1 is authoritative.
 	// The status column is identified by c.key == "status" (conventional) or
 	// c.key == td.LifecycleKey when an explicit lifecycle key is set.
 	lifecycleKey := lifecycleColumnKey(m.typeDef)
 	isStatusCol := c.key == "status" || c.key == lifecycleKey
 	if isStatusCol {
-		if v := r.Fields["status"]; v != "" {
-			return v
+		// The 2-layer priority is exhaustive for status columns. Returning ""
+		// rather than falling through is required by AS-140: any fall-through
+		// path below (the generic Fields[c.key] read at the next branch, its
+		// empty-accept second pass, and the title-match loop) would re-read
+		// Fields["status"] / Fields[lifecycleKey] from a stale write source
+		// and undo the spec's removal of the 3-layer priority. Sibling helper
+		// widenLifecycleColumn uses the same 2-layer chain — keeping them
+		// aligned ensures the column width and the rendered value agree.
+		if phrase := phraseFromFindings(r.Findings); phrase != "" {
+			return phrase
 		}
-		if len(r.Findings) > 0 {
-			return r.Findings[0].Phrase
-		}
-		if v := r.Fields[lifecycleKey]; v != "" {
-			return v
-		}
-		// Fall through to normal extraction if none of the above is set.
+		return r.Fields[lifecycleKey]
 	}
 	// Fields map (key-based columns) takes priority over raw struct fields.
 	// This ensures Wave-2 enriched values always win over struct literals,
@@ -438,14 +460,13 @@ func (m ResourceListModel) widenLifecycleColumn(cols []listCol, rows []resource.
 	}
 	maxW := cols[idx].width
 	for _, r := range rows {
-		// Mirror extractCellValue's priority: Fields["status"] (the merged §4
-		// phrase including (+N) suffix and Wave-2 overlays) first, then
-		// Findings[0].Phrase, then Fields[lifecycleKey], so column widening
-		// matches the actual displayed content.
-		phrase := r.Fields["status"]
-		if phrase == "" && len(r.Findings) > 0 {
-			phrase = r.Findings[0].Phrase
-		}
+		// Mirror extractCellValue's AS-140 two-layer priority:
+		// phraseFromFindings(r.Findings) — which composes "<top> (+N)" for
+		// stacked findings — first, then Fields[lifecycleKey]. Sizing on
+		// Findings[0].Phrase alone would under-size the column whenever a
+		// row stacks wave-1+wave-2 (e.g. "stopped (+1)" rendered into a
+		// "stopped"-width slot, then truncated).
+		phrase := phraseFromFindings(r.Findings)
 		if phrase == "" {
 			phrase = r.Fields[lifecycleKey]
 		}
