@@ -193,9 +193,6 @@ func fixtureEC2Instances() []resource.Resource {
 // fixtureRDSInstances returns sanitized RDS instance data for testing.
 // Source: sanitized from real AWS data (2 instances).
 func fixtureRDSInstances() []resource.Resource {
-	// AS-140: dbi's typeDef leaves LifecycleKey empty so lifecycleKey defaults
-	// to "state"; populate both "status" and "state" so the 2-layer renderer
-	// surfaces the steady-state phrase. See fixtureDocDBClusters comment.
 	return []resource.Resource{
 		{
 			ID:     "test-docdb-1",
@@ -206,7 +203,6 @@ func fixtureRDSInstances() []resource.Resource {
 				"engine":         "dbc",
 				"engine_version": "5.0.0",
 				"status":         "available",
-				"state":          "available",
 				"class":          "db.r5.large",
 				"endpoint":       "test-docdb-1.cluster-abc123def.us-east-1.docdb.amazonaws.com",
 				"multi_az":       "No",
@@ -221,7 +217,6 @@ func fixtureRDSInstances() []resource.Resource {
 				"engine":         "aurora-postgresql",
 				"engine_version": "16.8",
 				"status":         "available",
-				"state":          "available",
 				"class":          "db.t3.medium",
 				"endpoint":       "test-rds-1.cluster-abc123def.us-east-1.rds.amazonaws.com",
 				"multi_az":       "No",
@@ -267,11 +262,6 @@ func fixtureRedisClusters() []resource.Resource {
 // fixtureDocDBClusters returns sanitized DocumentDB cluster data for testing.
 // Source: sanitized from real AWS data (2 clusters).
 func fixtureDocDBClusters() []resource.Resource {
-	// AS-140: the renderer's 2-layer status priority reads Fields[lifecycleKey]
-	// after Findings. dbc's typeDef leaves LifecycleKey empty so lifecycleKey
-	// defaults to "state"; populate both "status" (legacy key the fetcher
-	// still writes) AND "state" (the canonical 2-layer source) so the list
-	// view renders the steady-state phrase under the new contract.
 	return []resource.Resource{
 		{
 			ID:     "test-docdb-cluster",
@@ -281,7 +271,6 @@ func fixtureDocDBClusters() []resource.Resource {
 				"cluster_id":     "test-docdb-cluster",
 				"engine_version": "5.0.0",
 				"status":         "available",
-				"state":          "available",
 				"instances":      "1",
 				"endpoint":       "test-docdb-cluster.cluster-abc123def.us-east-1.docdb.amazonaws.com",
 			},
@@ -303,7 +292,6 @@ func fixtureDocDBClusters() []resource.Resource {
 				"cluster_id":     "test-rds-cluster",
 				"engine_version": "16.8",
 				"status":         "available",
-				"state":          "available",
 				"instances":      "1",
 				"endpoint":       "test-rds-cluster.cluster-abc123def.us-east-1.rds.amazonaws.com",
 			},

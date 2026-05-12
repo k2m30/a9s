@@ -102,6 +102,7 @@ var secretsTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static catalo
 		Aliases:       []string{"kms", "keys"},
 		Category:      "SECRETS & CONFIG",
 		CloudTrailKey: "ResourceName:ID",
+		LifecycleKey:  "status",
 		Columns: []domain.Column{
 			{Key: "alias", Title: "Alias", Width: 32, Sortable: true},
 			{Key: "key_id", Title: "Key ID", Width: 38, Sortable: true},

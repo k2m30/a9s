@@ -15,6 +15,7 @@ var cicdTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: 
 		Aliases:       []string{"cfn", "cloudformation", "stacks"},
 		Category:      "CI/CD",
 		CloudTrailKey: "ResourceName:ID",
+		LifecycleKey:  "status",
 		Columns: []domain.Column{
 			{Key: "stack_name", Title: "Stack Name", Width: 36, Sortable: true},
 			{Key: "status", Title: "Status", Width: 24, Sortable: true},
