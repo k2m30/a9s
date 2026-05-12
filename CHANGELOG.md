@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.45.0] - 2026-05-12
+
 ### Changed (BREAKING — resource type renames, no aliases)
 
 - **`rds-snap` → `dbi-snap`** — the RDS DBSnapshot resource type was
@@ -112,6 +114,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `docs/resources/dbc-snap.md` §3.1 + §4 now list the `incompatible-*`
   Broken signal (defensive parity with the documented `DBSnapshot`
   status family).
+
+### Internal (Phase-05 architecture refactor)
+
+- **`internal/runtime` package** — platform-agnostic app core (`Core`,
+  handlers, probes, fetchers, orchestrator) extracted from `internal/tui`.
+  `tui.Model` shrunk from ~1200 LOC to ~420 LOC; all behavior preserved.
+- **`session.Session` owns all session-scoped mutable state** — resource
+  cache, related cache, enrichment findings, generation counters, identity.
+  Accessed via `m.core.Session()`; `Rotate()` invalidates in-flight gens
+  on profile/region switch. Replaces the former `sessionRuntime` embed.
+- **`domain.Gen` unified generation counters** — `AvailabilityGen`,
+  `EnrichmentGen`, `ConnectGen` are now typed `domain.Gen` values with
+  shared `IsStale` / `Stamp` helpers (AS-73).
+- **Typed Cmd/Event message taxonomy** — `runtime/messages/cmd.go` (user
+  intent) and `event.go` (async results) with `GenStamped` embed for
+  compile-time gen-guard guarantees (AS-74).
+- **`KindFetchMore` carries token via `FetchMorePayload`** — pagination
+  token bundled with type + gen to eliminate token-mismatch races (AS-270).
+- **Wave-2 enrichers migrated to Findings API** — database enrichers no
+  longer write `FieldUpdates["status"]`; they emit `Findings` with
+  `Source="wave2"`. The status column applies a two-layer priority rule:
+  Wave-1 issue phrases first, Wave-2 findings appended only when no Wave-1
+  issue is present (AS-140).
+- **Glyphs only on `ColorHealthy` rows** — `"! "` and `"~ "` decorators
+  are applied only when `ResolveColor(r) == ColorHealthy`; non-Healthy
+  rows are colored instead.
+- **S3 cross-region related-defs soft-truncate to 0+** — out-of-region
+  buckets show empty count instead of error flash (AS-489).
+- **Related-panel literal `(N)` count suffix** — avoids ANSI-width
+  miscalculation when Lipgloss measures badge glyphs (AS-378).
+- **`verify-readonly` Makefile grep widened** to cover `internal/runtime/`
+  (AS-236).
+- **DBC/DBC-snap dual-API dedup** — rows appearing in both standard and
+  Aurora-specific API responses are deduplicated (AS-145).
 
 ## [3.44.0] - 2026-04-25
 
