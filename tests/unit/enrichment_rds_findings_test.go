@@ -1,6 +1,7 @@
 package unit
 
-// enrichment_rds_findings_test.go — Behavioral tests for EnrichRDSDocDBMaintenance.
+// enrichment_rds_findings_test.go — Behavioral tests for EnrichRDSDocDBMaintenance
+// plus the AS-140 stacked wave-1+wave-2 case for EnrichDBIMaintenance.
 //
 // Contract assertions (enricher-contract.md):
 //   - Returns EnricherResult.Findings keyed by Resource.ID (ARN-suffix match).
@@ -21,6 +22,7 @@ import (
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -233,5 +235,123 @@ func TestEnrichRDSDocDBMaintenance_NilRDSClientReturnsEmptyFindings(t *testing.T
 	}
 	if result.IssueCount != 0 {
 		t.Errorf("IssueCount = %d, want 0", result.IssueCount)
+	}
+}
+
+// dbiStackedFake satisfies awsclient.RDSAPI for the AS-140 stacked-finding test.
+type dbiStackedFake struct {
+	awsclient.RDSAPI
+	actions []rdstypes.ResourcePendingMaintenanceActions
+}
+
+func (f *dbiStackedFake) DescribePendingMaintenanceActions(
+	_ context.Context,
+	_ *rds.DescribePendingMaintenanceActionsInput,
+	_ ...func(*rds.Options),
+) (*rds.DescribePendingMaintenanceActionsOutput, error) {
+	return &rds.DescribePendingMaintenanceActionsOutput{
+		PendingMaintenanceActions: f.actions,
+	}, nil
+}
+
+// TestEnrichDBI_Wave1StoppedPlusWave2_StackedFindings_AS140 pins AS-140 for the
+// stacked wave-1+wave-2 case: a resource that already carries a wave-1 finding
+// "stopped" (from the fetcher) plus a wave-2 maintenance finding emitted by
+// EnrichDBIMaintenance.
+//
+// After both layers have contributed, the operator should see TWO findings on
+// the resource:
+//   - The wave-1 "stopped" finding stays in input resource.Findings (untouched
+//     by the enricher).
+//   - The wave-2 "pending maintenance" finding lands in result.Findings[id]
+//     and is grafted onto resource.Findings later by applyEnrichment.
+//
+// AS-140 contract for THIS enricher run:
+//   - result.Findings[id] is populated with the wave-2 Finding (1 entry).
+//   - result.FieldUpdates is empty (or its [id] sub-map is empty/missing) —
+//     no status overlay, no "(+1)" suffix arithmetic from the enricher side.
+//   - The wave-1 Finding on input resource.Findings remains in place; combined
+//     with the new wave-2 Finding, the unified r.Findings carries 2 entries
+//     once applyEnrichment runs upstream. The render-layer phraseFromFindings
+//     consumes both to produce "stopped (+1)".
+func TestEnrichDBI_Wave1StoppedPlusWave2_StackedFindings_AS140(t *testing.T) {
+	const resourceID = "stacked-stopped-plus-maint"
+	const arn = "arn:aws:rds:us-east-1:123456789012:db:" + resourceID
+
+	fake := &dbiStackedFake{
+		actions: []rdstypes.ResourcePendingMaintenanceActions{
+			{
+				ResourceIdentifier: aws.String(arn),
+				PendingMaintenanceActionDetails: []rdstypes.PendingMaintenanceAction{
+					{Action: aws.String("system-update"), Description: aws.String("Engine patch")},
+				},
+			},
+		},
+	}
+	clients := &awsclient.ServiceClients{RDS: fake}
+
+	// Input resource already carries a wave-1 "stopped" finding from the fetcher.
+	// Post-PR-03e fetcher contract: Findings populated, Fields["status"] carries
+	// the §4 phrase, Resource.Status intentionally empty.
+	wave1Finding := domain.Finding{
+		Code:     "dbi.broken.stopped",
+		Phrase:   "stopped",
+		Severity: domain.SevBroken,
+		Source:   "wave1",
+	}
+	resources := []resource.Resource{
+		{
+			ID:       resourceID,
+			Name:     resourceID,
+			Findings: []domain.Finding{wave1Finding},
+			Fields:   map[string]string{"status": "stopped"},
+		},
+	}
+
+	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources, nil)
+	if err != nil {
+		t.Fatalf("EnrichDBIMaintenance error: %v", err)
+	}
+
+	// The enricher must emit exactly one Finding for this resource (the wave-2
+	// maintenance signal). The wave-1 "stopped" finding belongs on the input
+	// resource and stays out of result.Findings.
+	wave2, ok := result.Findings[resourceID]
+	if !ok {
+		t.Fatalf("expected wave-2 Finding for %q; result.Findings keys = %v", resourceID, findingKeys(result.Findings))
+	}
+	if wave2.Summary != "pending maintenance" {
+		t.Errorf("wave-2 Summary = %q, want %q", wave2.Summary, "pending maintenance")
+	}
+	if wave2.Severity != "~" {
+		t.Errorf("wave-2 Severity = %q, want %q", wave2.Severity, "~")
+	}
+
+	// AS-140: result.FieldUpdates must be empty — the merged "stopped (+1)"
+	// display is computed at render time by phraseFromFindings(r.Findings).
+	if updates, hasUpdates := result.FieldUpdates[resourceID]; hasUpdates && len(updates) != 0 {
+		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", resourceID, updates)
+	}
+
+	// The wave-1 finding stays untouched on the input resource so the unified
+	// r.Findings (after applyEnrichment) carries 2 entries — one wave-1, one
+	// wave-2. We verify the input resource's wave-1 finding survived to
+	// confirm the enricher did not mutate the input.
+	if len(resources[0].Findings) != 1 || resources[0].Findings[0].Phrase != "stopped" {
+		t.Errorf("input wave-1 Finding must remain intact (count=1, phrase=%q); got Findings=%+v",
+			"stopped", resources[0].Findings)
+	}
+
+	// Combined understanding: 1 wave-1 on resource.Findings + 1 wave-2 in
+	// result.Findings[id] = 2 entries the unified r.Findings will carry after
+	// applyEnrichment. Pin that count explicitly so a future regression that
+	// drops the wave-2 emit is caught here.
+	gotWave2Count := 0
+	if _, ok := result.Findings[resourceID]; ok {
+		gotWave2Count = 1
+	}
+	totalEntries := len(resources[0].Findings) + gotWave2Count
+	if totalEntries != 2 {
+		t.Errorf("wave-1 + wave-2 stacked Findings count = %d, want 2 (wave-1 on input + wave-2 in result)", totalEntries)
 	}
 }

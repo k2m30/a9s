@@ -2,14 +2,20 @@ package unit
 
 // aws_dbi_issue_enrichment_test.go — Wave 2 enricher tests for dbi.
 //
+// AS-140 (Wave-2 enricher migration): FieldUpdates["status"] is no longer
+// written by EnrichDBIMaintenance. The merged §4 status phrase is computed
+// at render time by phraseFromFindings(r.Findings) in extractCellValue —
+// wave-1 findings reach r.Findings via the fetcher, wave-2 findings via
+// applyEnrichment.
+//
 // Tests drive aws.EnrichDBIMaintenance (the dbi-specific enricher) and assert:
 //   - Findings keyed by Resource.ID (ARN suffix-matched).
 //   - Severity "~" (informational, no S1 badge bump).
 //   - Summary is the short S5 phrase "pending maintenance" — Action and
 //     Description never appear in Summary (they belong in Rows per the
 //     resource.EnrichmentFinding contract).
-//   - FieldUpdates["status"] == "maintenance scheduled" only on Healthy rows.
-//   - Non-healthy rows get the finding but NOT the status field update.
+//   - FieldUpdates is nil or empty in every case (AS-140: no status overlay,
+//     no "(+N)" suffix arithmetic on the enricher side).
 //   - nil RDS client returns empty result gracefully.
 //   - Multi-page response: all actions from both pages processed.
 
@@ -138,10 +144,10 @@ func TestDBI_Enrich_MaintenancePending_HealthyRow(t *testing.T) {
 		}
 	}
 
-	if updates, ok := result.FieldUpdates[fixtures.MaintDbiScheduledID]; !ok {
-		t.Errorf("FieldUpdates missing entry for %q", fixtures.MaintDbiScheduledID)
-	} else if updates["status"] != "maintenance scheduled" {
-		t.Errorf("FieldUpdates[%q][status] = %q, want %q", fixtures.MaintDbiScheduledID, updates["status"], "maintenance scheduled")
+	// AS-140: FieldUpdates must be nil/empty — the merged display phrase is
+	// computed by phraseFromFindings(r.Findings) at render time.
+	if updates, ok := result.FieldUpdates[fixtures.MaintDbiScheduledID]; ok && len(updates) != 0 {
+		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", fixtures.MaintDbiScheduledID, updates)
 	}
 
 	if result.IssueCount != 0 {
@@ -196,12 +202,12 @@ func TestDBI_Enrich_MaintenancePending_NilDescription(t *testing.T) {
 	}
 }
 
-// TestDBI_Enrich_NonHealthyStatus_BumpsSuffix verifies that when the fetcher
-// already set a non-empty Status (e.g. "publicly accessible"), the enricher
-// adds a finding (for S5 visibility) AND bumps the FieldUpdates["status"] to
-// "publicly accessible (+1)" — per spec §4 universal rule 7, Wave-2 findings
-// bump the (+N) suffix so the operator sees there is more to open for.
-func TestDBI_Enrich_NonHealthyStatus_BumpsSuffix(t *testing.T) {
+// TestDBI_Enrich_NonHealthyStatus_NoFieldUpdates verifies AS-140: when the
+// fetcher already set a non-empty Status (e.g. "publicly accessible"), the
+// enricher still emits a Finding (for S5 visibility) but MUST NOT write
+// FieldUpdates["status"]. The merged "publicly accessible (+1)" display is
+// computed at render time by phraseFromFindings(r.Findings).
+func TestDBI_Enrich_NonHealthyStatus_NoFieldUpdates(t *testing.T) {
 	const resourceID = "inline-already-warning"
 	const arn = "arn:aws:rds:us-east-1:123456789012:db:" + resourceID
 
@@ -233,20 +239,16 @@ func TestDBI_Enrich_NonHealthyStatus_BumpsSuffix(t *testing.T) {
 		t.Fatalf("EnrichDBIMaintenance error: %v", err)
 	}
 
-	// Finding must be present (S5 visibility).
+	// Finding must be present (S5 visibility) — wave-1 stacking must NOT
+	// suppress the wave-2 maintenance finding.
 	if _, ok := result.Findings[resourceID]; !ok {
 		t.Errorf("expected finding for %q on non-healthy row (S5 still needed)", resourceID)
 	}
 
-	// FieldUpdates must bump the Wave-1 phrase with (+1) — NOT overwrite it with
-	// "maintenance scheduled" and NOT leave it empty (universal rule 7).
-	updates, ok := result.FieldUpdates[resourceID]
-	if !ok {
-		t.Fatalf("FieldUpdates missing entry for %q — Wave-2 must bump the suffix", resourceID)
-	}
-	want := "publicly accessible (+1)"
-	if updates["status"] != want {
-		t.Errorf("FieldUpdates[%q][status] = %q, want %q", resourceID, updates["status"], want)
+	// AS-140: FieldUpdates must be empty — no status overlay, no "(+1)" suffix
+	// arithmetic on the enricher side.
+	if updates, ok := result.FieldUpdates[resourceID]; ok && len(updates) != 0 {
+		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", resourceID, updates)
 	}
 }
 
@@ -340,11 +342,12 @@ func TestDBI_Enrich_Pagination(t *testing.T) {
 // Wave 1 + Wave 2 stacking — (+N) suffix (spec §4 universal rule 7)
 // ---------------------------------------------------------------------------
 
-// TestDBI_Enrich_Wave1PlusWave2_BumpsSuffix verifies that when a resource already
-// has a Wave-1 warning status ("publicly accessible"), adding a Wave-2 maintenance
-// finding bumps the status to "publicly accessible (+1)" — the operator sees there
-// is more to open for in the S5 findings panel.
-func TestDBI_Enrich_Wave1PlusWave2_BumpsSuffix(t *testing.T) {
+// TestDBI_Enrich_Wave1PlusWave2_NoFieldUpdates verifies AS-140: when a
+// resource already has a Wave-1 warning status ("publicly accessible") and a
+// Wave-2 maintenance finding stacks on top, the Finding is still emitted but
+// FieldUpdates is left empty — the merged "publicly accessible (+1)" display
+// is computed at render time by phraseFromFindings(r.Findings).
+func TestDBI_Enrich_Wave1PlusWave2_NoFieldUpdates(t *testing.T) {
 	const resourceID = fixtures.WarnDbiPublicMaintID
 	const arn = fixtures.WarnDbiPublicMaintARN
 
@@ -385,15 +388,9 @@ func TestDBI_Enrich_Wave1PlusWave2_BumpsSuffix(t *testing.T) {
 		t.Errorf("Severity = %q, want %q", finding.Severity, "~")
 	}
 
-	// FieldUpdates must bump the existing Wave-1 phrase with (+1), NOT overwrite
-	// with "maintenance scheduled" (Wave 1 phrase wins severity precedence).
-	updates, ok := result.FieldUpdates[resourceID]
-	if !ok {
-		t.Fatalf("FieldUpdates missing entry for %q", resourceID)
-	}
-	want := "publicly accessible (+1)"
-	if updates["status"] != want {
-		t.Errorf("FieldUpdates[%q][status] = %q, want %q", resourceID, updates["status"], want)
+	// AS-140: FieldUpdates must be empty.
+	if updates, ok := result.FieldUpdates[resourceID]; ok && len(updates) != 0 {
+		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", resourceID, updates)
 	}
 
 	// "~" severity must not bump the S1 badge.
@@ -402,16 +399,17 @@ func TestDBI_Enrich_Wave1PlusWave2_BumpsSuffix(t *testing.T) {
 	}
 }
 
-// TestDBI_Enrich_Wave1PlusWave2_PostPR03eShape pins the AS-132 regression: the
-// post-PR-03e fetcher emits Wave-1 phrases via Findings + Fields["status"] —
-// it intentionally stops populating Resource.Status. The enricher's
-// suffix-bump branch must read Fields["status"], NOT r.Status, otherwise it
-// silently downgrades to a bare "maintenance scheduled" overwrite that
-// erases the Wave-1 phrase from the S4 column. Sibling regression to AS-126;
-// surfaced by warn-dbi-public-maint visual scenarios where the row used to
-// render "publicly accessible (+1)" pre-migration but rendered just
-// "maintenance scheduled" post-migration until this fix.
-func TestDBI_Enrich_Wave1PlusWave2_PostPR03eShape(t *testing.T) {
+// TestDBI_Enrich_Wave1PlusWave2_PostPR03eShape_NoFieldUpdates verifies AS-140
+// on the post-PR-03e fetcher shape (Findings populated, Status empty,
+// Fields["status"] carrying the merged §4 phrase). The Wave-2 maintenance
+// finding is emitted to result.Findings, but FieldUpdates is empty — the
+// render-layer phraseFromFindings(r.Findings) computes the merged
+// "publicly accessible (+1)" display from the stacked findings.
+//
+// Pre-AS-140 this test pinned the suffix bump on FieldUpdates as an AS-132
+// regression check; that concern is now fully delegated to the
+// applyEnrichment / phraseFromFindings path.
+func TestDBI_Enrich_Wave1PlusWave2_PostPR03eShape_NoFieldUpdates(t *testing.T) {
 	const resourceID = fixtures.WarnDbiPublicMaintID
 	const arn = fixtures.WarnDbiPublicMaintARN
 
@@ -430,8 +428,7 @@ func TestDBI_Enrich_Wave1PlusWave2_PostPR03eShape(t *testing.T) {
 	clients := &awsclient.ServiceClients{RDS: fake}
 
 	// Post-PR-03e fetcher shape: Findings populated, Status empty, Fields["status"]
-	// carrying the merged §4 phrase. The enricher MUST find the wave-1 phrase
-	// here (not in r.Status) to bump the suffix correctly.
+	// carrying the merged §4 phrase.
 	resources := []resource.Resource{
 		{
 			ID:   resourceID,
@@ -449,22 +446,22 @@ func TestDBI_Enrich_Wave1PlusWave2_PostPR03eShape(t *testing.T) {
 		t.Fatalf("EnrichDBIMaintenance error: %v", err)
 	}
 
-	updates, ok := result.FieldUpdates[resourceID]
-	if !ok {
-		t.Fatalf("FieldUpdates missing entry for %q", resourceID)
+	// The wave-2 maintenance Finding must still be emitted.
+	if _, ok := result.Findings[resourceID]; !ok {
+		t.Errorf("expected finding for %q on post-PR-03e wave-1 shape", resourceID)
 	}
-	const want = "publicly accessible (+1)"
-	if updates["status"] != want {
-		t.Errorf("FieldUpdates[%q][status] = %q, want %q (AS-132 regression: enricher must read Fields[status], not the now-empty r.Status, to preserve wave-1 phrase + suffix bump)",
-			resourceID, updates["status"], want)
+
+	// AS-140: FieldUpdates must be empty.
+	if updates, ok := result.FieldUpdates[resourceID]; ok && len(updates) != 0 {
+		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", resourceID, updates)
 	}
 }
 
-// TestDBI_Enrich_Wave1MultiPlusWave2_BumpsExistingSuffix verifies that when a
-// resource already carries a Wave-1 multi-warning status of "no automated backups (+2)"
-// (3 stacked warnings), adding a Wave-2 maintenance finding increments the counter
-// to "(+3)" — NOT producing "(+2) (+1)" or any double-suffix.
-func TestDBI_Enrich_Wave1MultiPlusWave2_BumpsExistingSuffix(t *testing.T) {
+// TestDBI_Enrich_Wave1MultiPlusWave2_NoFieldUpdates verifies AS-140: when a
+// resource already carries a Wave-1 multi-warning status, the enricher still
+// emits its wave-2 Finding but does NOT touch FieldUpdates. The merged
+// "(+N+1)" display is computed at render time from r.Findings.
+func TestDBI_Enrich_Wave1MultiPlusWave2_NoFieldUpdates(t *testing.T) {
 	const resourceID = "inline-3warn-plus-maint"
 	const arn = "arn:aws:rds:us-east-1:123456789012:db:" + resourceID
 
@@ -496,20 +493,19 @@ func TestDBI_Enrich_Wave1MultiPlusWave2_BumpsExistingSuffix(t *testing.T) {
 		t.Fatalf("EnrichDBIMaintenance error: %v", err)
 	}
 
-	updates, ok := result.FieldUpdates[resourceID]
-	if !ok {
-		t.Fatalf("FieldUpdates missing entry for %q", resourceID)
+	if _, ok := result.Findings[resourceID]; !ok {
+		t.Errorf("expected finding for %q (wave-2 must emit even when wave-1 has +N)", resourceID)
 	}
-	want := "no automated backups (+3)"
-	if updates["status"] != want {
-		t.Errorf("FieldUpdates[%q][status] = %q, want %q (must increment counter, not double-suffix)", resourceID, updates["status"], want)
+	if updates, ok := result.FieldUpdates[resourceID]; ok && len(updates) != 0 {
+		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", resourceID, updates)
 	}
 }
 
-// TestDBI_Enrich_HealthyPlusWave2_NoSuffix_Regression is a regression pin: a
-// healthy resource (empty Status) that gets a Wave-2 maintenance finding must
-// receive "maintenance scheduled" — no suffix, since it is the sole finding.
-func TestDBI_Enrich_HealthyPlusWave2_NoSuffix_Regression(t *testing.T) {
+// TestDBI_Enrich_HealthyPlusWave2_NoFieldUpdates_Regression verifies AS-140 for
+// the healthy-resource case: a wave-2 finding is emitted (severity "~",
+// Summary "pending maintenance") but FieldUpdates is empty. Pre-AS-140 the
+// enricher would have written "maintenance scheduled" here.
+func TestDBI_Enrich_HealthyPlusWave2_NoFieldUpdates_Regression(t *testing.T) {
 	fix := fixtures.NewDBIFixtures()
 	resources := buildDbiResources(t)
 
@@ -523,46 +519,29 @@ func TestDBI_Enrich_HealthyPlusWave2_NoSuffix_Regression(t *testing.T) {
 		t.Fatalf("EnrichDBIMaintenance error: %v", err)
 	}
 
-	updates, ok := result.FieldUpdates[fixtures.MaintDbiScheduledID]
-	if !ok {
-		t.Fatalf("FieldUpdates missing entry for %q", fixtures.MaintDbiScheduledID)
+	if _, ok := result.Findings[fixtures.MaintDbiScheduledID]; !ok {
+		t.Errorf("expected finding for %q", fixtures.MaintDbiScheduledID)
 	}
-	want := "maintenance scheduled"
-	if updates["status"] != want {
-		t.Errorf("FieldUpdates[%q][status] = %q, want %q (sole Wave-2 finding must not add suffix)", fixtures.MaintDbiScheduledID, updates["status"], want)
+	if updates, ok := result.FieldUpdates[fixtures.MaintDbiScheduledID]; ok && len(updates) != 0 {
+		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", fixtures.MaintDbiScheduledID, updates)
 	}
 }
 
-// TestDBI_Enrich_BumpFindingSuffix_EdgeCases drives edge cases of the
-// bumpFindingSuffix logic via EnrichDBIMaintenance (which calls bumpFindingSuffix
-// internally when existing status is non-empty). This tests the helper indirectly
-// to remain robust against helper-naming changes.
-func TestDBI_Enrich_BumpFindingSuffix_EdgeCases(t *testing.T) {
+// TestDBI_Enrich_VariousExistingStatuses_NoFieldUpdates verifies AS-140 for a
+// matrix of pre-existing Wave-1 statuses: the enricher emits its Finding but
+// never writes FieldUpdates regardless of the prior status value. Previously
+// this test verified bump arithmetic on FieldUpdates; that responsibility
+// moved to phraseFromFindings at render time.
+func TestDBI_Enrich_VariousExistingStatuses_NoFieldUpdates(t *testing.T) {
 	cases := []struct {
 		name           string
 		existingStatus string // Wave-1 status already on the resource
-		wantStatus     string // expected FieldUpdates["status"] after Wave-2 enrichment
 	}{
-		{
-			name:           "no_existing_suffix",
-			existingStatus: "publicly accessible",
-			wantStatus:     "publicly accessible (+1)",
-		},
-		{
-			name:           "existing_suffix_1",
-			existingStatus: "publicly accessible (+1)",
-			wantStatus:     "publicly accessible (+2)",
-		},
-		{
-			name:           "existing_suffix_9_becomes_10",
-			existingStatus: "publicly accessible (+9)",
-			wantStatus:     "publicly accessible (+10)",
-		},
-		{
-			name:           "unparsable_suffix_appends_fresh",
-			existingStatus: "foo (+bar)",
-			wantStatus:     "foo (+bar) (+1)",
-		},
+		{name: "no_existing_suffix", existingStatus: "publicly accessible"},
+		{name: "existing_suffix_1", existingStatus: "publicly accessible (+1)"},
+		{name: "existing_suffix_9", existingStatus: "publicly accessible (+9)"},
+		{name: "unparsable_suffix", existingStatus: "foo (+bar)"},
+		{name: "healthy_empty_status", existingStatus: ""},
 	}
 
 	for _, tc := range cases {
@@ -598,12 +577,14 @@ func TestDBI_Enrich_BumpFindingSuffix_EdgeCases(t *testing.T) {
 				t.Fatalf("EnrichDBIMaintenance error: %v", err)
 			}
 
-			updates, ok := result.FieldUpdates[id]
-			if !ok {
-				t.Fatalf("FieldUpdates missing entry for %q", id)
+			// Finding must still be emitted regardless of pre-existing status.
+			if _, ok := result.Findings[id]; !ok {
+				t.Errorf("expected finding for %q", id)
 			}
-			if updates["status"] != tc.wantStatus {
-				t.Errorf("FieldUpdates[%q][status] = %q, want %q", id, updates["status"], tc.wantStatus)
+
+			// AS-140: FieldUpdates always empty — no status overlay.
+			if updates, ok := result.FieldUpdates[id]; ok && len(updates) != 0 {
+				t.Errorf("AS-140: expected empty FieldUpdates for %q (existingStatus=%q); got %v", id, tc.existingStatus, updates)
 			}
 		})
 	}
