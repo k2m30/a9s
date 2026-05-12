@@ -455,14 +455,13 @@ func (m ResourceListModel) widenLifecycleColumn(cols []listCol, rows []resource.
 	}
 	maxW := cols[idx].width
 	for _, r := range rows {
-		// Mirror extractCellValue's priority: Fields["status"] (the merged §4
-		// phrase including (+N) suffix and Wave-2 overlays) first, then
-		// Findings[0].Phrase, then Fields[lifecycleKey], so column widening
-		// matches the actual displayed content.
-		phrase := r.Fields["status"]
-		if phrase == "" && len(r.Findings) > 0 {
-			phrase = r.Findings[0].Phrase
-		}
+		// Mirror extractCellValue's AS-140 two-layer priority:
+		// phraseFromFindings(r.Findings) — which composes "<top> (+N)" for
+		// stacked findings — first, then Fields[lifecycleKey]. Sizing on
+		// Findings[0].Phrase alone would under-size the column whenever a
+		// row stacks wave-1+wave-2 (e.g. "stopped (+1)" rendered into a
+		// "stopped"-width slot, then truncated).
+		phrase := phraseFromFindings(r.Findings)
 		if phrase == "" {
 			phrase = r.Fields[lifecycleKey]
 		}
