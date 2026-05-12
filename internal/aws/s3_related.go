@@ -101,6 +101,11 @@ func checkS3CFN(ctx context.Context, clients any, res resource.Resource, cache r
 		if strings.Contains(err.Error(), "NoSuchTagSet") {
 			return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 		}
+		// Cross-region buckets (PermanentRedirect / IllegalLocationConstraintException):
+		// soft-truncate to "0+" rather than surface a hard unknown. See s3_cross_region.go.
+		if isS3CrossRegionErr(err) {
+			return resource.ApproximateZero("cfn")
+		}
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1, Err: err}
 	}
 	stackName := ""
@@ -161,6 +166,11 @@ func checkS3KMS(ctx context.Context, clients any, res resource.Resource, _ resou
 		if strings.Contains(err.Error(), "ServerSideEncryptionConfigurationNotFoundError") {
 			return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 		}
+		// Cross-region buckets (PermanentRedirect / IllegalLocationConstraintException):
+		// soft-truncate to "0+" rather than surface a hard unknown. See s3_cross_region.go.
+		if isS3CrossRegionErr(err) {
+			return resource.ApproximateZero("kms")
+		}
 		return resource.RelatedCheckResult{TargetType: "kms", Count: -1, Err: err}
 	}
 	if out.ServerSideEncryptionConfiguration == nil {
@@ -210,6 +220,11 @@ func checkS3Logs(ctx context.Context, clients any, res resource.Resource, _ reso
 		return logAPI.GetBucketLogging(ctx, &s3.GetBucketLoggingInput{Bucket: aws.String(bucket)})
 	})
 	if err != nil {
+		// Cross-region buckets (PermanentRedirect / IllegalLocationConstraintException):
+		// soft-truncate to "0+" rather than surface a hard unknown. See s3_cross_region.go.
+		if isS3CrossRegionErr(err) {
+			return resource.ApproximateZero("s3")
+		}
 		return resource.RelatedCheckResult{TargetType: "s3", Count: -1, Err: err}
 	}
 	if out.LoggingEnabled == nil || out.LoggingEnabled.TargetBucket == nil || *out.LoggingEnabled.TargetBucket == "" {
@@ -414,6 +429,11 @@ func checkS3Role(ctx context.Context, clients any, res resource.Resource, cache 
 		// response — honest 0, not error.
 		if strings.Contains(err.Error(), "NoSuchBucketPolicy") {
 			return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+		}
+		// Cross-region buckets (PermanentRedirect / IllegalLocationConstraintException):
+		// soft-truncate to "0+" rather than surface a hard unknown. See s3_cross_region.go.
+		if isS3CrossRegionErr(err) {
+			return resource.ApproximateZero("role")
 		}
 		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: err}
 	}
