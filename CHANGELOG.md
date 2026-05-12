@@ -445,7 +445,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Pre-existing lint warning in `cmd/preview/main.go` (if-else chain → switch)
 
-[Unreleased]: https://github.com/k2m30/a9s/compare/v3.39.0...HEAD
+[Unreleased]: https://github.com/k2m30/a9s/compare/v3.45.0...HEAD
+[3.45.0]: https://github.com/k2m30/a9s/compare/v3.44.0...v3.45.0
+[3.44.0]: https://github.com/k2m30/a9s/compare/v3.43.0...v3.44.0
+[3.43.0]: https://github.com/k2m30/a9s/compare/v3.42.0...v3.43.0
+[3.42.0]: https://github.com/k2m30/a9s/compare/v3.41.0...v3.42.0
+[3.41.0]: https://github.com/k2m30/a9s/compare/v3.40.0...v3.41.0
+[3.40.0]: https://github.com/k2m30/a9s/compare/v3.39.0...v3.40.0
 [3.39.0]: https://github.com/k2m30/a9s/compare/v3.38.0...v3.39.0
 [3.38.0]: https://github.com/k2m30/a9s/compare/v3.37.0...v3.38.0
 [3.37.0]: https://github.com/k2m30/a9s/compare/v3.36.1...v3.37.0
