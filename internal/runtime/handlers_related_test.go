@@ -110,6 +110,63 @@ func TestRelatedFetchTasks_PartialCoverage_TruncatedCache_FetchMore(t *testing.T
 	if tasks[0].Key.Scope != "ec2" {
 		t.Errorf("Scope = %q, want %q", tasks[0].Key.Scope, "ec2")
 	}
+	// AS-270: continuation token must travel on the TaskRequest as a typed
+	// FetchMorePayload so the adapter is a pure pass-through.
+	payload, ok := tasks[0].Payload.(FetchMorePayload)
+	if !ok {
+		t.Fatalf("Payload = %T, want FetchMorePayload", tasks[0].Payload)
+	}
+	if payload.ContinuationToken != "tok-2" {
+		t.Errorf("ContinuationToken = %q, want %q", payload.ContinuationToken, "tok-2")
+	}
+}
+
+// TestRelatedFetchTasks_FetchMore_EmptyToken — pins that an empty NextToken
+// on a truncated cache entry still travels as a FetchMorePayload (with
+// ContinuationToken=""), rather than being silently dropped. The runtime is
+// the single decision-maker; payload absence would force the adapter to
+// re-derive state.
+func TestRelatedFetchTasks_FetchMore_EmptyToken(t *testing.T) {
+	s := newTestSession()
+	s.ResourceCache = map[string]*session.ResourceCacheEntry{
+		"ec2": {
+			Resources:  []resource.Resource{{ID: "i-1"}},
+			Pagination: &resource.PaginationMeta{IsTruncated: true, NextToken: ""},
+		},
+	}
+
+	tasks := relatedFetchTasks(s, "ec2", []string{"i-1", "i-missing"})
+	if len(tasks) != 1 || tasks[0].Key.Kind != KindFetchMore {
+		t.Fatalf("tasks = %+v, want one KindFetchMore task", tasks)
+	}
+	payload, ok := tasks[0].Payload.(FetchMorePayload)
+	if !ok {
+		t.Fatalf("Payload = %T, want FetchMorePayload", tasks[0].Payload)
+	}
+	if payload.ContinuationToken != "" {
+		t.Errorf("ContinuationToken = %q, want empty string", payload.ContinuationToken)
+	}
+}
+
+// TestRelatedFetchTasks_FetchResources_NoPayload — KindFetchResources tasks
+// do not carry a FetchMorePayload; assert Payload is nil so the adapter
+// branch for fetch-resources is never accidentally fed a continuation token.
+func TestRelatedFetchTasks_FetchResources_NoPayload(t *testing.T) {
+	s := newTestSession()
+	s.ResourceCache = map[string]*session.ResourceCacheEntry{
+		"ec2": {
+			Resources:  []resource.Resource{{ID: "i-1"}},
+			Pagination: &resource.PaginationMeta{IsTruncated: false},
+		},
+	}
+
+	tasks := relatedFetchTasks(s, "ec2", []string{"i-1", "i-missing"})
+	if len(tasks) != 1 || tasks[0].Key.Kind != KindFetchResources {
+		t.Fatalf("tasks = %+v, want one KindFetchResources task", tasks)
+	}
+	if tasks[0].Payload != nil {
+		t.Errorf("Payload = %+v, want nil — KindFetchResources must not carry FetchMorePayload", tasks[0].Payload)
+	}
 }
 
 func TestRelatedFetchTasks_FullMiss_FetchAll(t *testing.T) {

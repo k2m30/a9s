@@ -214,12 +214,13 @@ func TestHandleRelatedNavigate_MultipleRelatedIDs_CacheMiss_FetchResources(t *te
 }
 
 // Case H — multiple RelatedIDs, partial coverage + truncated cache →
-// FilteredList with a single KindFetchMore task (continuation).
+// FilteredList with a single KindFetchMore task (continuation). AS-270:
+// the continuation token rides on the TaskRequest as a FetchMorePayload.
 func TestHandleRelatedNavigate_MultipleRelatedIDs_PartialCoverage_Truncated_FetchMore(t *testing.T) {
 	c, s := newRuntimeCore(t)
 	s.ResourceCache["ec2"] = &session.ResourceCacheEntry{
 		Resources:  []resource.Resource{{ID: "i-1"}},
-		Pagination: &domain.PaginationMeta{IsTruncated: true},
+		Pagination: &domain.PaginationMeta{IsTruncated: true, NextToken: "next-tok-xyz"},
 	}
 
 	result, tasks := c.HandleRelatedNavigate(runtime.RelatedNavigateEvent{
@@ -231,8 +232,9 @@ func TestHandleRelatedNavigate_MultipleRelatedIDs_PartialCoverage_Truncated_Fetc
 		t.Errorf("Kind = %v, want NavigationKindFilteredList", result.Kind)
 	}
 	wantTasks := []runtime.TaskRequest{{
-		Key:   runtime.TaskKey{Kind: runtime.KindFetchMore, Scope: "ec2"},
-		Cache: runtime.CacheNone,
+		Key:     runtime.TaskKey{Kind: runtime.KindFetchMore, Scope: "ec2"},
+		Cache:   runtime.CacheNone,
+		Payload: runtime.FetchMorePayload{ContinuationToken: "next-tok-xyz"},
 	}}
 	if !reflect.DeepEqual(tasks, wantTasks) {
 		t.Errorf("tasks = %+v, want %+v", tasks, wantTasks)
