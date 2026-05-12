@@ -67,7 +67,9 @@ The current codebase has a real separation of concerns, but several of those bou
 ### Current Layer Boundaries On `main`
 
 - **`cmd/a9s`** — bootstrap only: parse flags, validate startup inputs, load config/theme, wire clients and options, start Bubble Tea.
-- **`internal/tui`** — UI shell and orchestration: view stack, global key handling, message routing, sizing, transient UI state, and session-scoped cache ownership.
+- **`internal/tui`** — UI shell and adapter: view stack, global key handling, message routing, sizing, and transient UI state. Holds a `*runtime.Core` (Phase-05, AS-237) and reaches session-scoped state via `m.core.Session()`; it does **not** own the session caches itself.
+- **`internal/runtime`** — platform-agnostic app core: `runtime.Core` owns the active `*session.Session` and the catalog snapshot, dispatches inbound events to handlers, and returns `UIIntent` / `TaskRequest` lists for adapters to apply. The handler moves out of `internal/tui` are landing incrementally under PR-05a..h.
+- **`internal/session`** — session-scoped state container: `session.Session` owns per-profile/region orchestration state — `ResourceCache`, `LazyResourceCache`, `RelatedCache`, the enrichment queues and per-type maps, and every generation counter. `Session.Rotate()` is the single point that invalidates all of it on profile/region switch.
 - **`internal/resource`** — declarative registry: resource types, child-view metadata, related defs, navigable fields, and fetcher/enricher registration.
 - **`internal/aws`** — primarily the adapter layer: call AWS SDK APIs, transform responses into `resource.Resource`, and host a few non-UI helper subsystems that have not yet been split out. This layer should not know about Bubble Tea views.
 - **`internal/cache`** — persistence only: on-disk availability cache and TTL rules.
@@ -401,11 +403,14 @@ After Wave 2 issue enrichment runs, findings are surfaced in list and detail vie
 **Current-state ownership (Phase-05, AS-237)**: Session-scoped state lives exclusively in `session.Session`, owned by `runtime.Core` and accessed from `tui.Model` via `m.core.Session()`. The `tui.Model` struct holds only pure UI-shell state (view stack, input mode, flash, tab completion). Profile/region switches call `m.core.Session().Rotate()` which bumps every generation counter and rebuilds the maps — in-flight async messages tagged with the pre-switch gens are then rejected by the handlers' gen guards.
 
 Representative fields on `session.Session` (`internal/session/session.go`):
-- `EnrichmentFindings map[string]map[string]resource.EnrichmentFinding` — per-type per-resource findings; cleared per-type on rerun start, cleared entirely on `Rotate()`.
 - `EnrichmentRan map[string]bool` — banner visibility signal; `true` only after Wave 2 completed for that type.
-- `EnrichmentGen`, `AvailabilityGen`, `ConnectGen` — per-purpose generation counters; guard stale in-flight async results.
+- `EnrichmentTypeGen map[string]domain.Gen` — per-type Wave 2 generation counter; bumped on Ctrl+R rerun to invalidate stale in-flight results.
+- `EnrichmentTruncatedIDs map[string]map[string]bool` — per-type set of resource IDs the enricher had to skip due to API truncation.
+- `EnrichmentGen`, `AvailabilityGen`, `RelatedGen`, `EnrichGen` — per-purpose session-wide generation counters; guard stale in-flight async results.
 - `ResourceCache`, `RelatedCache`, `LazyResourceCache` — session-scoped resource and related-check caches.
 - `LazyResourceCache map[string][]resource.Resource` — sparse per-type cache populated by the related-panel lazy-add path when a checker emits IDs outside the top-level fetcher's scope filter (e.g. AWS-managed KMS key, public AMI, IAM `AdministratorAccess`). Consulted by `handleRelatedNavigate` (union-read with `ResourceCache`, `ResourceCache` wins on ID collision) but NEVER by the main-menu top-level list. Cleared on `Rotate()`.
+
+**Wave 2 findings (where they live):** PR-03a-fold deleted the parallel `EnrichmentFindings map[string]map[string]resource.EnrichmentFinding` map from `session.Session`. Wave 2 findings are now written directly onto each cached `resource.Resource.Findings` slice (with `Source` prefix `wave2:`) and `r.AttentionDetails`, via `applyEnrichment` in `internal/tui/app_enrich_fold.go`. Reads use `findingFromResource` / `findingsFromRows` against the cached rows. The runtime's view-ready snapshot surface (`runtime.RuntimeState.EnrichmentFindings`, `internal/runtime/state.go`) and the `PatchDetail.EnrichmentFindings` intent payload (`internal/runtime/intent.go`) carry per-resource findings out to adapters, but neither replaces the cached-row authority — they are derived from it.
 
 ---
 
