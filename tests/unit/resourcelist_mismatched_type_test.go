@@ -1,6 +1,7 @@
 package unit
 
 import (
+	"strings"
 	"testing"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
@@ -17,37 +18,60 @@ import (
 // list.
 func TestResourceListModel_ResourcesLoaded_DropsMismatchedType(t *testing.T) {
 	k := keys.Default()
-	td := resource.ResourceTypeDef{
-		Name:      "S3 Buckets",
-		ShortName: "s3",
-		Columns: []resource.Column{
-			{Key: "id", Title: "Name", Width: 20},
-		},
+
+	cases := []struct {
+		name          string // name of the active list
+		listShortName string // ShortName of the active list model
+		staleType     string // ResourceType on the stale message (alias or canonical)
+	}{
+		{"S3 list rejects EC2 rows", "s3", "ec2"},
+		{"EC2 list rejects S3 rows", "ec2", "s3"},
+		// "rds" is a registered alias for canonical ShortName "dbi".
+		// The fetcher stamps the alias on the wire; the guard must still drop it
+		// when the active list is for a different type.
+		{"S3 list rejects RDS alias rows", "s3", "rds"},
+		{"S3 list rejects RDS canonical rows", "s3", "dbi"},
+		{"Lambda list rejects EC2 rows", "lambda", "ec2"},
 	}
 
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(80, 24)
-	m, _ = m.Init()
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			td := resource.ResourceTypeDef{
+				Name:      tc.listShortName,
+				ShortName: tc.listShortName,
+				Columns: []resource.Column{
+					{Key: "id", Title: "ID", Width: 20},
+				},
+			}
 
-	// Late, mismatched fetch result for ec2 arrives while this list is s3.
-	stale := messages.ResourcesLoaded{
-		ResourceType: "ec2",
-		Resources: []resource.Resource{
-			{ID: "i-0123", Name: "i-0123", Fields: map[string]string{"id": "i-0123"}},
-			{ID: "i-0456", Name: "i-0456", Fields: map[string]string{"id": "i-0456"}},
-		},
-	}
+			m := views.NewResourceList(td, nil, k)
+			m.SetSize(80, 24)
+			m, _ = m.Init()
 
-	m, cmd := m.Update(stale)
+			stale := messages.ResourcesLoaded{
+				ResourceType: tc.staleType,
+				Resources: []resource.Resource{
+					{ID: "x-0001", Name: "x-0001", Fields: map[string]string{"id": "x-0001"}},
+				},
+			}
 
-	if got := len(m.AllResources()); got != 0 {
-		t.Errorf("mismatched ResourcesLoaded must not mutate allResources: got %d rows, want 0", got)
-	}
-	if got := len(m.VisibleResources()); got != 0 {
-		t.Errorf("mismatched ResourcesLoaded must not populate visibleResources: got %d rows, want 0", got)
-	}
-	if cmd != nil {
-		t.Errorf("mismatched ResourcesLoaded must return nil cmd, got %T", cmd())
+			m, cmd := m.Update(stale)
+
+			if got := len(m.AllResources()); got != 0 {
+				t.Errorf("mismatched ResourcesLoaded must not mutate allResources: got %d rows, want 0", got)
+			}
+			if got := len(m.VisibleResources()); got != 0 {
+				t.Errorf("mismatched ResourcesLoaded must not populate visibleResources: got %d rows, want 0", got)
+			}
+			if cmd != nil {
+				t.Errorf("mismatched ResourcesLoaded must return nil cmd, got %T", cmd())
+			}
+			// Behavioral proxy: the stale resource ID must not appear in the
+			// rendered view (loading spinner is still shown instead of rows).
+			if view := m.View(); strings.Contains(view, "x-0001") {
+				t.Errorf("stale resource ID must not appear in View() after mismatched drop")
+			}
+		})
 	}
 }
 
@@ -56,29 +80,46 @@ func TestResourceListModel_ResourcesLoaded_DropsMismatchedType(t *testing.T) {
 // over-fire and silently drop legitimate loads.
 func TestResourceListModel_ResourcesLoaded_AppliesMatchingType(t *testing.T) {
 	k := keys.Default()
-	td := resource.ResourceTypeDef{
-		Name:      "S3 Buckets",
-		ShortName: "s3",
-		Columns: []resource.Column{
-			{Key: "id", Title: "Name", Width: 20},
-		},
+
+	cases := []struct {
+		name          string
+		listShortName string
+		msgType       string // may be an alias
+	}{
+		{"S3 exact match", "s3", "s3"},
+		{"EC2 exact match", "ec2", "ec2"},
+		// The fetcher stamps "rds" (alias) on the wire while the list holds
+		// canonical ShortName "dbi" — the alias-aware guard must not drop it.
+		{"RDS alias match (rds→dbi)", "dbi", "rds"},
 	}
 
-	m := views.NewResourceList(td, nil, k)
-	m.SetSize(80, 24)
-	m, _ = m.Init()
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			td := resource.ResourceTypeDef{
+				Name:      tc.listShortName,
+				ShortName: tc.listShortName,
+				Columns: []resource.Column{
+					{Key: "id", Title: "ID", Width: 20},
+				},
+			}
 
-	fresh := messages.ResourcesLoaded{
-		ResourceType: "s3",
-		Resources: []resource.Resource{
-			{ID: "bucket-a", Name: "bucket-a", Fields: map[string]string{"id": "bucket-a"}},
-			{ID: "bucket-b", Name: "bucket-b", Fields: map[string]string{"id": "bucket-b"}},
-		},
-	}
+			m := views.NewResourceList(td, nil, k)
+			m.SetSize(80, 24)
+			m, _ = m.Init()
 
-	m, _ = m.Update(fresh)
+			fresh := messages.ResourcesLoaded{
+				ResourceType: tc.msgType,
+				Resources: []resource.Resource{
+					{ID: "res-a", Name: "res-a", Fields: map[string]string{"id": "res-a"}},
+					{ID: "res-b", Name: "res-b", Fields: map[string]string{"id": "res-b"}},
+				},
+			}
 
-	if got := len(m.AllResources()); got != 2 {
-		t.Errorf("matching-type ResourcesLoaded did not populate allResources: got %d rows, want 2", got)
+			m, _ = m.Update(fresh)
+
+			if got := len(m.AllResources()); got != 2 {
+				t.Errorf("matching-type ResourcesLoaded did not populate allResources: got %d rows, want 2", got)
+			}
+		})
 	}
 }
