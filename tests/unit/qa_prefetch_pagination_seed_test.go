@@ -58,7 +58,7 @@ func TestPrefetchPaginationSeed_PreservesNextToken(t *testing.T) {
 		Gen:            0,
 	})
 
-	entry, ok := m.Session.ResourceCache[targetType]
+	entry, ok := m.Session().ResourceCache[targetType]
 	if !ok {
 		t.Fatalf("expected ResourceCache entry for %q after prefetch seed; got nil", targetType)
 	}
@@ -102,7 +102,7 @@ func TestPrefetchPaginationSeed_FallbackWhenPaginationOmitted(t *testing.T) {
 		Gen: 0,
 	})
 
-	entry, ok := m.Session.ResourceCache[targetType]
+	entry, ok := m.Session().ResourceCache[targetType]
 	if !ok {
 		t.Fatalf("expected ResourceCache entry for %q after fallback prefetch seed; got nil", targetType)
 	}

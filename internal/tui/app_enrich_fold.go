@@ -47,13 +47,13 @@ func (m *Model) applyEnrichment(resourceType string, findings map[string]resourc
 		}
 	}
 
-	if entry, ok := m.Session.ResourceCache[canon]; ok {
+	if entry, ok := m.core.Session().ResourceCache[canon]; ok {
 		apply(entry.Resources)
 	}
-	if rows, ok := m.Session.LazyResourceCache[canon]; ok {
+	if rows, ok := m.core.Session().LazyResourceCache[canon]; ok {
 		apply(rows)
 	}
-	if rows, ok := m.Session.ProbeResources[canon]; ok {
+	if rows, ok := m.core.Session().ProbeResources[canon]; ok {
 		apply(rows)
 	}
 }
@@ -157,7 +157,7 @@ func stripWave2(findings []domain.Finding) []domain.Finding {
 // cache. Used by main-menu Ctrl+R to ensure the next list-open doesn't
 // rehydrate stale wave2 attention state via findingsFromRows.
 func clearAllWave2(m *Model) {
-	for _, entry := range m.Session.ResourceCache {
+	for _, entry := range m.core.Session().ResourceCache {
 		if entry == nil {
 			continue
 		}
@@ -166,13 +166,13 @@ func clearAllWave2(m *Model) {
 			entry.Resources[i].AttentionDetails = nil
 		}
 	}
-	for _, rows := range m.Session.LazyResourceCache {
+	for _, rows := range m.core.Session().LazyResourceCache {
 		for i := range rows {
 			rows[i].Findings = stripWave2(rows[i].Findings)
 			rows[i].AttentionDetails = nil
 		}
 	}
-	for _, rows := range m.Session.ProbeResources {
+	for _, rows := range m.core.Session().ProbeResources {
 		for i := range rows {
 			rows[i].Findings = stripWave2(rows[i].Findings)
 			rows[i].AttentionDetails = nil

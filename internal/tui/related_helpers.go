@@ -45,5 +45,5 @@ func (m *Model) newRelatedList(rt resource.ResourceTypeDef, src resource.Resourc
 // buildResourceCacheSnapshot delegates to runtime.Core for the canonical
 // multi-cache merge (ResourceCache + LazyResourceCache + ProbeResources).
 func (m *Model) buildResourceCacheSnapshot() resource.ResourceCache {
-	return runtime.New(m.Session, resource.AllResourceTypes()).BuildResourceCacheSnapshot()
+	return runtime.New(m.core.Session(), resource.AllResourceTypes()).BuildResourceCacheSnapshot()
 }

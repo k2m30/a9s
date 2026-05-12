@@ -3,7 +3,7 @@
 //
 //  1. handleEnrichDetail — a Model-receiver wrapper that replaces the
 //     deleted internal/tui/app_enrich.go entry point. It constructs a
-//     transient runtime.Core bound to the Model's embedded Session,
+//     transient runtime.Core bound to the Model's session owned by core,
 //     calls core.HandleEnrichDetail, and translates the returned
 //     TaskRequests into tea.Cmd values. The existing app.go dispatch
 //     line (return m.handleEnrichDetail(msg)) is unchanged.
@@ -23,7 +23,7 @@
 //     fields without parsing TaskKey.Scope or accepting side-channel
 //     arguments. The closure builder stays in the adapter because it
 //     returns tea.Cmd and reads adapter-owned state (m.appCtx,
-//     m.Session.Clients, the embedded session's EnrichGen and PolicyDocCache)
+//     m.core.Session().Clients, the session owned by core's EnrichGen and PolicyDocCache)
 //     that has not yet migrated to the runtime core.
 package tui
 
@@ -48,7 +48,7 @@ import (
 // (HandleEnrichDetail), applies any returned UIIntents to the view stack,
 // then converts the returned TaskRequests into Bubble Tea commands.
 func (m Model) handleEnrichDetail(msg messages.EnrichDetail) (tea.Model, tea.Cmd) {
-	core := runtime.New(m.Session, resource.AllResourceTypes())
+	core := runtime.New(m.core.Session(), resource.AllResourceTypes())
 	intents, tasks := core.HandleEnrichDetail(runtime.EnrichDetailEvent{
 		ResourceType: msg.ResourceType,
 		Resource:     msg.Resource,
@@ -164,17 +164,17 @@ func (m Model) runtimeTasksToCmd(tasks []runtime.TaskRequest) tea.Cmd {
 // resource type and resource directly from the typed payload — no
 // Scope parsing, no side-channel resource argument.
 //
-// EnrichGen is captured from the embedded Session at dispatch time to
+// EnrichGen is captured from the session owned by core at dispatch time to
 // preserve stale-result-rejection semantics: the result handler in
-// app.go compares msg.Generation against m.Session.EnrichGen on receipt.
+// app.go compares msg.Generation against m.core.Session().EnrichGen on receipt.
 // PolicyDocCache and clients are adapter-owned state that has not yet
 // migrated to the runtime core.
 func (m Model) enrichDetailCmd(p runtime.EnrichDetailPayload) tea.Cmd {
 	enricher := resource.GetDetailEnricher(p.ResourceType)
 
-	gen := m.Session.EnrichGen             // session-owned, promoted via embedded *Session
-	policyDocs := m.Session.PolicyDocCache // session-owned, promoted via embedded *Session
-	clients := m.Session.Clients
+	gen := m.core.Session().EnrichGen             // session-owned, promoted via session owned by core
+	policyDocs := m.core.Session().PolicyDocCache // session-owned, promoted via session owned by core
+	clients := m.core.Session().Clients
 	appCtx := m.appCtx
 	dctx := &awsclient.DetailEnrichmentCtx{
 		Clients:    clients,
