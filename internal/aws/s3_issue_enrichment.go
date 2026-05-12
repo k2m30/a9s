@@ -97,14 +97,12 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 			// when the configured client region differs from the bucket's region.
 			// This is a legitimate environmental condition (multi-region account),
 			// not a bug — mark data incomplete (TruncatedIDs → "?" row marker)
-			// but do NOT spam the failure log.
-			if errors.As(err, &apiErr) {
-				code := apiErr.ErrorCode()
-				if code == "PermanentRedirect" || code == "IllegalLocationConstraintException" {
-					truncated = true
-					truncatedIDs[r.ID] = true
-					continue
-				}
+			// but do NOT spam the failure log. Classification shared with the
+			// related-def checkers in s3_related.go via isS3CrossRegionErr.
+			if isS3CrossRegionErr(err) {
+				truncated = true
+				truncatedIDs[r.ID] = true
+				continue
 			}
 			// Other errors: data incomplete — do not emit a finding.
 			truncated = true
