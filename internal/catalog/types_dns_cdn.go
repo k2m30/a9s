@@ -45,6 +45,7 @@ var dnsCdnTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static catalog
 		Aliases:       []string{"cf", "cloudfront", "cdn"},
 		Category:      "DNS & CDN",
 		CloudTrailKey: "ResourceName:ID",
+		LifecycleKey:  "status",
 		Columns: []domain.Column{
 			{Key: "domain_name", Title: "Domain Name", Width: 40, Sortable: true},
 			{Key: "distribution_id", Title: "Distribution ID", Width: 16, Sortable: true},
@@ -61,6 +62,7 @@ var dnsCdnTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static catalog
 		Aliases:       []string{"acm", "certificates", "certs"},
 		Category:      "DNS & CDN",
 		CloudTrailKey: "ResourceName:ID",
+		LifecycleKey:  "status",
 		Columns: []domain.Column{
 			{Key: "domain_name", Title: "Domain Name", Width: 40, Sortable: true},
 			{Key: "status", Title: "Status", Width: 14, Sortable: true},

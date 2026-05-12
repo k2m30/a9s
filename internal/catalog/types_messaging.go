@@ -152,6 +152,7 @@ var messagingTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static cata
 		Aliases:       []string{"kinesis", "streams"},
 		Category:      "MESSAGING",
 		CloudTrailKey: "ResourceName:ID",
+		LifecycleKey:  "status",
 		Columns: []domain.Column{
 			{Key: "stream_name", Title: "Stream Name", Width: 36, Sortable: true},
 			{Key: "status", Title: "Status", Width: 12, Sortable: true},
@@ -204,6 +205,7 @@ var messagingTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static cata
 		Aliases:       []string{"ses", "email", "ses-identities"},
 		Category:      "MESSAGING",
 		CloudTrailKey: "ResourceName:ID",
+		LifecycleKey:  "status",
 		Columns: []domain.Column{
 			{Key: "identity_name", Title: "Identity", Width: 36, Sortable: true},
 			{Key: "identity_type", Title: "Type", Width: 16, Sortable: true},
