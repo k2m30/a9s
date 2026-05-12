@@ -100,8 +100,10 @@ func TestScenario_OpenSearchVisual(t *testing.T) {
 	// Rule 7 — multi-finding suffix.
 	// Processing + UpdateAvailable → hard-state wins, suffix +1.
 	scenario.ExpectRowStatusEquals(demofixtures.ProcessingPlusUpdateDomain, openSearchPhraseProcessingP1)
-	// UpdateAvailable + EncryptionOff → ! wins over ~, suffix +1.
-	scenario.ExpectRowStatusEquals(demofixtures.MultiBackgroundDomain, openSearchPhraseUpdateP1)
+	// Post-AS-140 the multi-background row carries a single visible Wave-2
+	// finding (the `~` encryption-off signal is no longer counted as an
+	// extra hidden finding), so no `(+1)` suffix.
+	scenario.ExpectRowStatusEquals(demofixtures.MultiBackgroundDomain, openSearchPhraseUpdate)
 
 	// -----------------------------------------------------------------
 	// Glyph rules.

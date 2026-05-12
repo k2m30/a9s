@@ -1,6 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
+
 - `cmd/` contains entrypoints and helper binaries: `cmd/a9s` (main app), `cmd/refgen`, and preview tools.
 - `internal/` holds production code:
   - `internal/aws/` read-only AWS fetchers and service clients.
@@ -12,6 +13,7 @@
 - `docs/`, `website/`, and `releases/` hold product docs and release notes.
 
 ## Build, Test, and Development Commands
+
 - `make build` builds `./a9s` with version metadata.
 - `make run` builds then starts the binary locally.
 - `make test` runs race-enabled unit tests (`./tests/unit/`).
@@ -22,6 +24,7 @@
 - `make coverage` generates `coverage.out` and prints function coverage.
 
 ## Coding Style & Naming Conventions
+
 - Go version: `1.26.x` (see `go.mod`).
 - Formatting is enforced with `gofmt` (`make fmt`); do not hand-format.
 - `.editorconfig`: tabs for `*.go`, 2-space indentation for YAML/Markdown/JSON.
@@ -31,12 +34,14 @@
 - Follow read-only architecture: no mutating AWS operations in runtime code.
 
 ## Testing Guidelines
+
 - Add/update tests with every behavior change; prefer TDD (failing test first).
 - Run at minimum: `make test lint verify-readonly` before opening a PR.
 - For cross-package confidence, run `make coverage`.
 - Integration tests are opt-in and should be run when touching end-to-end behavior.
 
 ## Commit & Pull Request Guidelines
+
 - Use Conventional Commits (`feat:`, `fix:`, `test:`, `docs:`), matching recent history.
 - Keep commits focused and atomic; include tests in the same PR when applicable.
 - PRs should follow `.github/pull_request_template.md`:
