@@ -8,24 +8,24 @@ package tui
 import (
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/session"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
+// Session returns the underlying *session.Session owned by core.
+// Test-only accessor — production code uses m.core.Session() directly.
+func (m Model) Session() *session.Session {
+	return m.core.Session()
+}
+
 // EnrichmentGen returns the current session-wide enrichment generation counter.
-// This accessor is used by tests to capture the pre-switch gen value and verify
-// that post-switch messages carrying the old gen are correctly discarded.
-//
-// Note: the method name shadows the promoted Session.EnrichmentGen field.
-// All write sites MUST use m.Session.EnrichmentGen explicitly.
+// Test-only accessor.
 func (m Model) EnrichmentGen() domain.Gen {
-	return m.Session.EnrichmentGen
+	return m.core.Session().EnrichmentGen
 }
 
 // FlashGen returns the current tui-adapter flash generation counter.
-// Test-only accessor for verifying handleClientsReady's `hasFlashWork` gate:
-// non-flash success paths and stale-gen paths must NOT advance this counter,
-// otherwise an in-flight ClearFlashMsg for the current flash gets silently
-// invalidated. (CXR/Architect Stage 5 R3+R4 finding regression coverage.)
+// Test-only accessor.
 func (m Model) FlashGen() domain.Gen {
 	return m.flash.gen
 }

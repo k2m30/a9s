@@ -24,7 +24,7 @@ type profilesLoadedMsg struct {
 // fetchResources returns a tea.Cmd that calls Core.FetchResources and
 // converts the result to ResourcesLoadedMsg or APIErrorMsg.
 func (m *Model) fetchResources(resourceType string) tea.Cmd {
-	ctx, clients := m.appCtx, m.Session.Clients
+	ctx, clients := m.appCtx, m.core.Session().Clients
 	return func() tea.Msg {
 		res, err := m.core.FetchResources(ctx, clients, resourceType)
 		// Partial-success contract: fetchers may return BOTH a non-empty
@@ -45,7 +45,7 @@ func (m *Model) fetchResources(resourceType string) tea.Cmd {
 
 // fetchResourcesFiltered returns a tea.Cmd for a server-side filtered fetch.
 func (m *Model) fetchResourcesFiltered(resourceType string, filter map[string]string) tea.Cmd {
-	ctx, clients := m.appCtx, m.Session.Clients
+	ctx, clients := m.appCtx, m.core.Session().Clients
 	return func() tea.Msg {
 		res, err := m.core.FetchResourcesFiltered(ctx, clients, resourceType, filter)
 		if err != nil && len(res.Resources) == 0 {
@@ -63,7 +63,7 @@ func (m *Model) fetchResourcesFiltered(resourceType string, filter map[string]st
 // fetchAMIDetail returns a tea.Cmd that fetches a single AMI by ID and
 // navigates to its detail view.
 func (m *Model) fetchAMIDetail(imageID string) tea.Cmd {
-	ctx, clients := m.appCtx, m.Session.Clients
+	ctx, clients := m.appCtx, m.core.Session().Clients
 	return func() tea.Msg {
 		res, err := m.core.FetchAMIDetail(ctx, clients, imageID)
 		if err != nil {
@@ -79,7 +79,7 @@ func (m *Model) fetchAMIDetail(imageID string) tea.Cmd {
 
 // fetchChildResources returns a tea.Cmd for paginated child resource loading.
 func (m *Model) fetchChildResources(childType string, parentCtx map[string]string) tea.Cmd {
-	ctx, clients := m.appCtx, m.Session.Clients
+	ctx, clients := m.appCtx, m.core.Session().Clients
 	return func() tea.Msg {
 		res, err := m.core.FetchChildResources(ctx, clients, childType, parentCtx)
 		if err != nil {
@@ -96,7 +96,7 @@ func (m *Model) fetchChildResources(childType string, parentCtx map[string]strin
 // fetchMoreResources returns a tea.Cmd that fetches the next page of a
 // paginated resource list using the continuation token from LoadMoreMsg.
 func (m *Model) fetchMoreResources(msg messages.LoadMore) tea.Cmd {
-	ctx, clients := m.appCtx, m.Session.Clients
+	ctx, clients := m.appCtx, m.core.Session().Clients
 	p := runtime.FetchMoreParams{
 		ResourceType: msg.ResourceType,
 		Token:        msg.ContinuationToken,
@@ -120,7 +120,7 @@ func (m *Model) fetchMoreResources(msg messages.LoadMore) tea.Cmd {
 
 // fetchIdentity returns a tea.Cmd that fetches the AWS caller identity.
 func (m *Model) fetchIdentity() tea.Cmd {
-	ctx, clients := m.appCtx, m.Session.Clients
+	ctx, clients := m.appCtx, m.core.Session().Clients
 	return func() tea.Msg {
 		identity, err := m.core.FetchIdentity(ctx, clients)
 		if err != nil {
@@ -143,7 +143,7 @@ func (m *Model) fetchProfiles() tea.Cmd {
 
 // fetchRevealValue returns a tea.Cmd that calls the registered reveal fetcher.
 func (m *Model) fetchRevealValue(resourceType, resourceID string) tea.Cmd {
-	ctx, clients := m.appCtx, m.Session.Clients
+	ctx, clients := m.appCtx, m.core.Session().Clients
 	return func() tea.Msg {
 		value, err := m.core.FetchRevealValue(ctx, clients, resourceType, resourceID)
 		if err != nil {
