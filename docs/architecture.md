@@ -49,7 +49,7 @@ Important interaction rules:
 - `Update()` must not block; AWS/network work goes in `tea.Cmd`.
 - Old async results are dropped if the user refreshed or switched profile/region.
 - Cache lifetime follows the session; switching account or region must rotate session state.
-- On `main` today, a lot of behavior is still wired through registries and `sessionRuntime`.
+- On `main` today, behavior is wired through registries and `runtime.Core` (Phase-05 refactor, AS-237). Session state is exclusively owned by `core.Session()` — `tui.Model` never accesses session fields directly.
 - In the target refactor architecture, those patterns are replaced by an explicit catalog, shared selectors and query contracts, capability modules, and runtime-owned screen/task contracts.
 
 ## What is a9s?
@@ -80,12 +80,12 @@ if it "works" — the gen guards, registry completeness checks, and related
 validators in `tests/unit/architecture_conformance_test.go` fail loudly when
 any of these drift.
 
-These are **current-state invariants**, not promises about the final architecture. In particular, the refactor plan under `docs/refactor/` intentionally replaces the embedded `sessionRuntime` model, package-`init()` registry wiring, the `Status`-centered resource model, and markdown-as-input contracts, and adds explicit capability modules, selector/query contracts, and runtime-owned screen/task boundaries.
+These are **current-state invariants**, not promises about the final architecture. In particular, the refactor plan under `docs/refactor/` intentionally replaces the old embedded-`sessionRuntime` model (removed in Phase-05, AS-237), package-`init()` registry wiring, the `Status`-centered resource model, and markdown-as-input contracts, and adds explicit capability modules, selector/query contracts, and runtime-owned screen/task boundaries.
 
 1. **One root application model owns session state and orchestration.**
-   UI shell concerns and session-runtime state both live on `tui.Model`
-   (the latter via the embedded `sessionRuntime`), but the boundary between
-   them is explicit. No orchestration state leaks into view structs.
+   `tui.Model` owns the UI shell; all session state lives in `runtime.Core`
+   (Phase-05, AS-237) and is accessed via `m.core.Session()`. The boundary is
+   explicit: no orchestration or session state leaks into view structs.
 2. **Views render state and emit typed messages.** Views never call AWS
    directly. `m.clients` is passed to tea.Cmds created by the root model,
    not consumed inside `View()`.
@@ -102,13 +102,14 @@ These are **current-state invariants**, not promises about the final architectur
    time. Handlers MUST drop messages whose generation does not match the
    current session-wide / per-type counter.
 6. **Cache invalidation is explicit.** Refresh, profile switch, and region
-   switch paths all rotate the session runtime via `resetForSessionSwitch`:
-   every gen counter is bumped and every map/queue is rebuilt in one place.
+   switch paths all call `m.core.Session().Rotate()`: every gen counter is
+   bumped and every map/queue is rebuilt in one place.
 7. **Feature-specific caches do not hang off transport objects.**
-   `*awsclient.ServiceClients` carries AWS clients only. Most session-scoped
-   caches live on `sessionRuntime` and reach detail enrichers via
-   `*awsclient.DetailEnrichmentCtx`; a few legacy package-global caches still
-   exist in `internal/aws` and are treated as debt, not the desired pattern.
+   `*awsclient.ServiceClients` carries AWS clients only. Session-scoped
+   caches live on `session.Session` (owned by `runtime.Core`) and reach
+   detail enrichers via `*awsclient.DetailEnrichmentCtx`; a few legacy
+   package-global caches still exist in `internal/aws` and are treated as
+   debt, not the desired pattern.
 8. **Global keys are order-sensitive.** `Esc` is the back/dismiss key. `q`
    is the quit key in normal mode; it is not a navigation primitive.
    Input-mode and search-mode semantics take precedence over view-local
@@ -214,16 +215,20 @@ internal/
   aws/           # AWS service clients, resource fetchers, related checkers, enrichers
   buildinfo/     # version resolution (ldflags at build time)
   cache/         # on-disk availability cache with TTL (see Caching Layers)
+  catalog/       # resource type definitions and color helpers (Phase-05, AS-237)
   config/        # YAML config loading, built-in defaults per service
   demo/          # synthetic fixture data for --demo mode
     fixtures/    #   per-service Go structs (ec2.go, iam.go, etc.)
     fakes/       #   per-service fake API implementations
+  domain/        # shared query-contract types: Resource, Color, Finding, Gen (Phase-05)
   fieldpath/     # struct field extraction via reflection (frozen — don't modify)
   resource/      # generic resource model, type registry, fetcher registry
-  tui/           # root Bubble Tea app model
+  runtime/       # platform-agnostic app core: Core, orchestrator, handlers (Phase-05)
+    messages/    #   typed Cmd/Event message taxonomy (cmd.go, event.go)
+  session/       # session.Session — all session-scoped mutable state; Rotate() invalidates in-flight gens
+  tui/           # root Bubble Tea app model (tui.Model wraps runtime.Core)
     keys/        #   key bindings (single Map struct, one file)
     layout/      #   frame rendering (borders, title, status line)
-    messages/    #   inter-view message types
     styles/      #   Tokyo Night Dark palette, theming system
     text/        #   text utilities (PadOrTrunc for column rendering)
     views/       #   all view models (see View Types below)
@@ -393,14 +398,14 @@ After Wave 2 issue enrichment runs, findings are surfaced in list and detail vie
 **Stacked-view live-update pattern:**
 - `handleEnrichmentChecked` iterates the full view stack, not just the active view. This allows enrichment messages to update non-active `ResourceListModel` and `DetailModel` instances for the affected type. A user can navigate away to a detail view while Wave 2 runs and both the list (behind) and the detail receive the findings without requiring a re-open.
 
-**Current-state ownership**: session-scoped state lives on the embedded `sessionRuntime` struct (`internal/tui/session_runtime.go`), not on the UI shell portion of `Model`. The split makes ownership explicit within today's architecture: caches, Wave 1/Wave 2 queues, findings, and generation counters are all owned by `sessionRuntime`. Field promotion keeps the access syntax (`m.resourceCache`, `m.probeResources`, `m.enrichmentFindings`) unchanged. Profile/region switches call `m.resetForSessionSwitch()` which bumps every generation counter and rebuilds the maps — in-flight async messages tagged with the pre-switch gens are then rejected by the handlers' gen guards. This is current implementation, not the target steady-state ownership model.
+**Current-state ownership (Phase-05, AS-237)**: Session-scoped state lives exclusively in `session.Session`, owned by `runtime.Core` and accessed from `tui.Model` via `m.core.Session()`. The `tui.Model` struct holds only pure UI-shell state (view stack, input mode, flash, tab completion). Profile/region switches call `m.core.Session().Rotate()` which bumps every generation counter and rebuilds the maps — in-flight async messages tagged with the pre-switch gens are then rejected by the handlers' gen guards.
 
-Representative fields owned by `sessionRuntime`:
-- `enrichmentFindings map[string]map[string]resource.EnrichmentFinding` — per-type per-resource findings; cleared per-type on rerun start, cleared entirely on profile/region switch.
-- `enrichmentRan map[string]bool` — banner visibility signal; `true` only after Wave 2 completed for that type.
-- `enrichmentTypeGen map[string]int` — per-type generation counter; guards against stale in-flight rerun results.
-- `resourceCache`, `relatedCache`, `probeResources`, `availQueue`, `enrichQueue` — session-scoped caches and dispatch queues.
-- `lazyResourceCache map[string][]resource.Resource` — sparse per-type cache populated by the related-panel lazy-add path when a checker emits IDs outside the top-level fetcher's scope filter (e.g. AWS-managed KMS key, public AMI, IAM `AdministratorAccess`). Consulted by `handleRelatedNavigate` (union-read with `resourceCache`, `resourceCache` wins on ID collision) but NEVER by the main-menu top-level list — so drill-through lands on real entries without polluting the scope-filtered list view. Cleared on profile/region switch.
+Representative fields on `session.Session` (`internal/session/session.go`):
+- `EnrichmentFindings map[string]map[string]resource.EnrichmentFinding` — per-type per-resource findings; cleared per-type on rerun start, cleared entirely on `Rotate()`.
+- `EnrichmentRan map[string]bool` — banner visibility signal; `true` only after Wave 2 completed for that type.
+- `EnrichmentGen`, `AvailabilityGen`, `ConnectGen` — per-purpose generation counters; guard stale in-flight async results.
+- `ResourceCache`, `RelatedCache`, `LazyResourceCache` — session-scoped resource and related-check caches.
+- `LazyResourceCache map[string][]resource.Resource` — sparse per-type cache populated by the related-panel lazy-add path when a checker emits IDs outside the top-level fetcher's scope filter (e.g. AWS-managed KMS key, public AMI, IAM `AdministratorAccess`). Consulted by `handleRelatedNavigate` (union-read with `ResourceCache`, `ResourceCache` wins on ID collision) but NEVER by the main-menu top-level list. Cleared on `Rotate()`.
 
 ---
 
@@ -621,10 +626,10 @@ View opens (detail, YAML, or JSON)
 
 **Caching policy**:
 - **Default**: no cache. Re-fetch on each enrichable view open when the data is cheap enough or may change during a session.
-- **If caching is justified**: use a session-scoped, feature-specific cache owned by `sessionRuntime` (passed to detail enrichers via `*awsclient.DetailEnrichmentCtx`). This is appropriate when the enrichment is relatively expensive and the data is unlikely to change within a session.
+- **If caching is justified**: use a session-scoped, feature-specific cache owned by `session.Session` and passed to detail enrichers via `*awsclient.DetailEnrichmentCtx`. This is appropriate when the enrichment is relatively expensive and the data is unlikely to change within a session.
 - **Never**: use package-global cache state for enrichers.
 
-**Current example**: IAM policy document enrichment uses a session-scoped `PolicyDocumentCache` owned by `sessionRuntime.policyDocCache` and passed to enrichers via `*awsclient.DetailEnrichmentCtx`. Cache keys are explicitly namespaced: `managed:<policyArn>` for managed policies, `inline:<roleName>/<policyName>` for inline. `resetForSessionSwitch` replaces the cache with a fresh instance on profile/region rotation so entries from a previous account cannot leak into the next.
+**Current example**: IAM policy document enrichment uses a session-scoped `PolicyDocumentCache` owned by `session.Session.PolicyDocCache` and passed to enrichers via `*awsclient.DetailEnrichmentCtx`. Cache keys are explicitly namespaced: `managed:<policyArn>` for managed policies, `inline:<roleName>/<policyName>` for inline. `session.Session.Rotate()` replaces the cache with a fresh instance on profile/region rotation so entries from a previous account cannot leak into the next.
 
 ---
 
@@ -663,10 +668,10 @@ This table describes the caches that exist on `main` today. The refactor plan's 
 | Cache | Location | Scope | Invalidation |
 |-------|----------|-------|-------------|
 | **Disk availability cache** | `internal/cache/` | Persisted at `~/.a9s/cache/<profile>--<region>.yaml` | TTL of 1 hour; file replaced atomically |
-| **Resource cache** | `sessionRuntime.resourceCache` | In-memory `map[string]*resourceCacheEntry` | Cleared on profile/region switch via `resetForSessionSwitch` |
-| **Related cache** | `sessionRuntime.relatedCache` | In-memory LRU with fixed capacity | Cleared on profile/region switch; entry deleted on Ctrl+R |
-| **Detail-enricher caches** | Feature-specific cache owned by `sessionRuntime` and delivered to enrichers via `*awsclient.DetailEnrichmentCtx` (current example: `PolicyDocumentCache`) | In-memory, session-scoped | Rotated by `resetForSessionSwitch` on profile/region switch |
-| **Enrichment visibility state** | `enrichmentFindings`, `enrichmentRan`, `enrichmentTypeGen` on `sessionRuntime` | In-memory, session-scoped | Cleared per-type on Ctrl+R rerun start; cleared entirely on profile/region switch |
+| **Resource cache** | `session.Session.ResourceCache` (owned by `runtime.Core`) | In-memory `map[string]*session.ResourceCacheEntry` | Cleared on profile/region switch via `session.Rotate()` |
+| **Related cache** | `session.Session.RelatedCache` | In-memory LRU with fixed capacity | Cleared on `Rotate()`; entry deleted on Ctrl+R |
+| **Detail-enricher caches** | Feature-specific cache on `session.Session`, delivered to enrichers via `*awsclient.DetailEnrichmentCtx` (current example: `PolicyDocumentCache`) | In-memory, session-scoped | Rotated by `session.Rotate()` on profile/region switch |
+| **Enrichment visibility state** | `EnrichmentFindings`, `EnrichmentRan`, `EnrichmentGen` on `session.Session` | In-memory, session-scoped | Cleared per-type on Ctrl+R rerun start; cleared entirely on `Rotate()` |
 
 **Disk availability cache** (`internal/cache/cache.go`): Tracks which resource types have resources, their counts, and issue counts. Loaded on startup to instantly grey-out empty types and show issue badges in the main menu. Structure: `File{Profile, Region, CheckedAt, Resources map[string]Entry}` where `Entry{HasResources, Count, Truncated, Issues, IssuesTruncated, IssuesKnown}`. The `IssuesKnown` bool distinguishes "probed and found zero issues" from "not yet probed" (both unmarshal as int 0 without this flag). When caching is enabled (not `--no-cache`), the cache is saved after Wave 1 probes complete and again after Wave 2 enrichment completes, so enriched issue counts persist across restarts. When `--no-cache` is active, `saveAvailabilityCache()` is a no-op.
 
@@ -674,7 +679,7 @@ This table describes the caches that exist on `main` today. The refactor plan's 
 
 **Related cache**: LRU mapping `"resourceType:resourceID"` → related check results. Avoids re-running related checks when re-entering a detail view for the same resource.
 
-**Enricher caches**: Caching is optional, not automatic. The default is no cache. When an enricher does cache, it should use a session-scoped, feature-specific cache owned by `sessionRuntime` and reach the enricher through `*awsclient.DetailEnrichmentCtx`, so cache lifetime matches session lifetime and is rotated by `resetForSessionSwitch`. The current example is the policy document enricher, which caches decoded documents by `managed:<policyArn>` or `inline:<roleName>/<policyName>`.
+**Enricher caches**: Caching is optional, not automatic. The default is no cache. When an enricher does cache, it should use a session-scoped, feature-specific cache on `session.Session` and reach the enricher through `*awsclient.DetailEnrichmentCtx`, so cache lifetime matches session lifetime and is rotated by `session.Rotate()`. The current example is the policy document enricher, which caches decoded documents by `managed:<policyArn>` or `inline:<roleName>/<policyName>`.
 
 ---
 

@@ -57,12 +57,15 @@ func TestDemoScenarioHarness_ListFilterAndSort(t *testing.T) {
 		t.Fatalf("demo iam-user list needs at least 2 resources to verify sort behavior")
 	}
 
-	scenario.SortByID()
+	// For iam-user, Resource.ID is the UserName (col 1), not the AWS UserId
+	// column (col 4 since AS-140 inserted "MFA" and "Risk" between Name and
+	// User ID). Sort by the Name column so the cursor row tracks ids[].
+	scenario.SortByName()
 	scenario.OpenSelectedDetail()
 	scenario.ExpectCurrentResourceID(ids[0])
 
 	scenario.Back()
-	scenario.SortByID()
+	scenario.SortByName()
 	scenario.OpenSelectedDetail()
 	scenario.ExpectCurrentResourceID(ids[len(ids)-1])
 }

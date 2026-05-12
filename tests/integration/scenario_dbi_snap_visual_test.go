@@ -85,9 +85,11 @@ func TestScenario_DBISnapVisual(t *testing.T) {
 	// -----------------------------------------------------------------
 	// Glyph rules.
 	// -----------------------------------------------------------------
-	// dbi-snap has no Wave-2 signals, so no fixture should ever carry a
-	// `!` or `~` glyph regardless of color. Spot-check non-green rows AND
-	// healthy rows — both should render glyph-free.
+	// After AS-140 the Wave-2 enricher emits Findings only (no
+	// FieldUpdates), so the orphan-snapshot fixture keeps its underlying
+	// status="available" → ColorHealthy and renders a `!` glyph for the
+	// `!`-severity orphan finding. The remaining rows are either truly
+	// healthy (no finding) or non-green (glyph suppressed by U5).
 	for _, id := range []string{
 		demofixtures.ProdDBISnapID,
 		demofixtures.BackupCoveredDBISnapID,
@@ -96,12 +98,15 @@ func TestScenario_DBISnapVisual(t *testing.T) {
 		demofixtures.BrokenDBISnapIncompatibleID,
 		demofixtures.SeverityBrokenWarnDBISnapID,
 		demofixtures.WarnDBISnapUnencryptedID,
-		demofixtures.WarnDBISnapOrphanID,
-		demofixtures.WarnDBISnapPastRetentionID,
 		demofixtures.MultiW1DBISnapID,
 	} {
 		scenario.ExpectRowNoGlyphPrefix(id)
 	}
+	// Healthy+! rows — `!`-severity Wave-2 finding on rows whose underlying
+	// status stayed ColorHealthy post-AS-140 (orphan and past-retention both
+	// have status="available" + encrypted=true → ColorHealthy).
+	scenario.ExpectRowNamePrefix(demofixtures.WarnDBISnapOrphanID, "! ")
+	scenario.ExpectRowNamePrefix(demofixtures.WarnDBISnapPastRetentionID, "! ")
 
 	// -----------------------------------------------------------------
 	// Related panel — graph-root = ProdDBISnapID. Per impl-plan §9.3

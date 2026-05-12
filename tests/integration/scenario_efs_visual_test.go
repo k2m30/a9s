@@ -98,12 +98,12 @@ func TestScenario_EFSVisual(t *testing.T) {
 	scenario.ExpectRowStatusEquals(efsWarnMulti, "no mount targets (+1)")
 
 	// ---------------------------------------------------------------
-	// U7b — W1 Warning + W2 Broken stack. W2 Broken displaces the top
-	// phrase (severity precedence) and the hidden W1 bumps the suffix.
-	// warn-efs-updating-mt-down: "updating" (Warning W1) + MT-B creating
-	// (Broken W2) → "mount target down (+1)".
+	// U7b — W1 Warning + W2 Broken stack. Post-AS-140 priority rule:
+	// the Wave-1 non-healthy Status wins over the Wave-2 finding.
+	// warn-efs-updating-mt-down: "updating" (Warning W1) tops, the
+	// hidden Wave-2 "mount target down" bumps the suffix → "updating (+1)".
 	// ---------------------------------------------------------------
-	scenario.ExpectRowStatusEquals(efsWarnUpdatingMTDown, "mount target down (+1)")
+	scenario.ExpectRowStatusEquals(efsWarnUpdatingMTDown, "updating (+1)")
 
 	// ---------------------------------------------------------------
 	// Wave-2 on Healthy escalates to Broken (no suffix, single finding).
