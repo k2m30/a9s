@@ -233,6 +233,21 @@ func (s *fullIntegrationScenario) OpenList(resourceType string) {
 
 func (s *fullIntegrationScenario) OpenDetailResource(resourceType string, res resource.Resource) {
 	s.t.Helper()
+	// Real demo navigation passes the cached enriched row (the one the list
+	// view holds, which has already been mutated by applyEnrichment on
+	// EnrichmentChecked). Test helpers like selectDBIByID return a fresh
+	// fetch via the paginated fetcher — that copy never picked up Wave-2
+	// Findings or AttentionDetails, so the detail-view Attention section
+	// would render only Wave-1 entries. Swap in the cached row when one
+	// exists so detail rendering matches what `./a9s --demo` shows on screen.
+	if entry, ok := s.model.Session().ResourceCache[resourceType]; ok && entry != nil {
+		for i := range entry.Resources {
+			if entry.Resources[i].ID == res.ID {
+				res = entry.Resources[i]
+				break
+			}
+		}
+	}
 	s.beginAction("open detail %s %s", resourceType, res.ID)
 	copy := res
 	s.applyAndDrain(messages.Navigate{
