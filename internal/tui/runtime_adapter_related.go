@@ -23,11 +23,11 @@
 // the session cache directly to drive view construction (AMI exact-ID drill,
 // lazy-cache full-coverage shortcut, RelatedIDs partial-coverage pre-populated
 // list). The runtime emits the same task decisions in HandleRelatedNavigate /
-// relatedFetchTasks; when PR-05b lands the typed cmd/event split it will carry
-// enough payload (continuation tokens, lazy-cache slices, client selection)
-// for the adapter to be purely mechanical. Until then the adapter mirrors the
-// runtime's policy and trusts the emitted []TaskRequest rather than overriding
-// it.
+// relatedFetchTasks; the typed payload split lands these incrementally. AS-270
+// handed continuation tokens off via FetchMorePayload so KindFetchMore is a
+// pure pass-through; the remaining lazy-cache slices and client selection
+// branches will follow. Until then the adapter mirrors the runtime's policy
+// and trusts the emitted []TaskRequest rather than overriding it.
 package tui
 
 import (
@@ -435,17 +435,20 @@ func relatedNavigateTasksToCmd(m Model, targetType string, result runtime.Naviga
 		case runtime.KindFetchFiltered:
 			cmds = append(cmds, m.fetchResourcesFiltered(targetType, result.FetchFilter))
 		case runtime.KindFetchMore:
-			// PR-05b: KindFetchMore TaskRequest does not carry the continuation
-			// token yet; the adapter re-derives it from the session cache here.
-			// When PR-05b lands the typed cmd/event split, the token rides on a
-			// structured TaskRequest payload (e.g. FetchMoreRequest) and this
-			// branch becomes a direct param pass-through.
-			if entry, ok := m.Session.ResourceCache[targetType]; ok && entry.Pagination != nil {
-				cmds = append(cmds, m.fetchMoreResources(messages.LoadMore{
-					ResourceType:      targetType,
-					ContinuationToken: entry.Pagination.NextToken,
-				}))
+			// Continuation token is runtime-owned and arrives as a structured
+			// payload (AS-270 / PR-05b). The adapter is a pure pass-through
+			// and no longer reads m.Session.ResourceCache here. A missing or
+			// wrong-typed payload is a runtime bug, not an adapter-recoverable
+			// state — drop the task to surface the regression instead of
+			// silently re-deriving.
+			payload, ok := t.Payload.(runtime.FetchMorePayload)
+			if !ok {
+				continue
 			}
+			cmds = append(cmds, m.fetchMoreResources(messages.LoadMore{
+				ResourceType:      targetType,
+				ContinuationToken: payload.ContinuationToken,
+			}))
 		}
 	}
 	switch len(cmds) {
