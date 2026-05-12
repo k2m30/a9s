@@ -283,6 +283,7 @@ var databasesTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static cata
 		Aliases:       []string{"dbi", "rds", "databases", "db-instances"},
 		Category:      "DATABASES & STORAGE",
 		CloudTrailKey: "ResourceName:Fields.arn",
+		LifecycleKey:  "status",
 		Columns: []domain.Column{
 			{Key: "db_identifier", Title: "DB Identifier", Width: 28, Sortable: true},
 			{Key: "engine", Title: "Engine", Width: 12, Sortable: true},
@@ -324,6 +325,7 @@ var databasesTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static cata
 		Aliases:       []string{"redis", "elasticache"},
 		Category:      "DATABASES & STORAGE",
 		CloudTrailKey: "ResourceName:ID",
+		LifecycleKey:  "status",
 		Columns: []domain.Column{
 			{Key: "cluster_id", Title: "Cluster ID", Width: 28, Sortable: true},
 			{Key: "node_type", Title: "Node Type", Width: 18, Sortable: true},
@@ -339,6 +341,7 @@ var databasesTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static cata
 		Aliases:       []string{"dbc", "docdb", "clusters", "db-clusters"},
 		Category:      "DATABASES & STORAGE",
 		CloudTrailKey: "ResourceName:Fields.arn",
+		LifecycleKey:  "status",
 		Columns: []domain.Column{
 			{Key: "cluster_id", Title: "Cluster ID", Width: 28, Sortable: true},
 			{Key: "engine_version", Title: "Version", Width: 10, Sortable: true},
@@ -354,6 +357,7 @@ var databasesTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static cata
 		Aliases:       []string{"ddb", "dynamodb", "dynamo"},
 		Category:      "DATABASES & STORAGE",
 		CloudTrailKey: "ResourceName:ID",
+		LifecycleKey:  "status",
 		Columns: []domain.Column{
 			{Key: "table_name", Title: "Table Name", Width: 36, Sortable: true},
 			{Key: "status", Title: "Status", Width: 12, Sortable: true},
@@ -384,6 +388,7 @@ var databasesTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static cata
 		Aliases:       []string{"redshift", "redshift-clusters"},
 		Category:      "DATABASES & STORAGE",
 		CloudTrailKey: "ResourceName:ID",
+		LifecycleKey:  "status",
 		Columns: []domain.Column{
 			{Key: "cluster_id", Title: "Cluster ID", Width: 36, Sortable: true},
 			{Key: "status", Title: "Status", Width: 34, Sortable: true},
@@ -400,6 +405,7 @@ var databasesTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static cata
 		Aliases:       []string{"efs", "file-systems"},
 		Category:      "DATABASES & STORAGE",
 		CloudTrailKey: "ResourceName:ID",
+		LifecycleKey:  "status",
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 28, Sortable: true},
 			{Key: "file_system_id", Title: "File System ID", Width: 22, Sortable: true},
@@ -416,6 +422,7 @@ var databasesTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static cata
 		Aliases:       []string{"dbi-snap", "rds-snapshots", "db-snapshots"},
 		Category:      "DATABASES & STORAGE",
 		CloudTrailKey: "ResourceName:ID",
+		LifecycleKey:  "status",
 		Columns: []domain.Column{
 			{Key: "snapshot_id", Title: "Snapshot ID", Width: 36, Sortable: true},
 			{Key: "db_instance", Title: "DB Instance", Width: 28, Sortable: true},
@@ -432,6 +439,7 @@ var databasesTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static cata
 		Aliases:       []string{"dbc-snap", "docdb-snapshots", "cluster-snapshots"},
 		Category:      "DATABASES & STORAGE",
 		CloudTrailKey: "ResourceName:ID",
+		LifecycleKey:  "status",
 		Columns: []domain.Column{
 			{Key: "snapshot_id", Title: "Snapshot ID", Width: 36, Sortable: true},
 			{Key: "cluster_id", Title: "Cluster ID", Width: 28, Sortable: true},
