@@ -293,6 +293,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case profilesLoadedMsg:
 		return m.handleProfilesLoaded(msg)
 	case messages.ValueRevealed:
+		if messages.IsStale(msg, m.core.Session()) {
+			return m, nil
+		}
 		return m.handleValueRevealed(msg)
 	case messages.EnterChildView:
 		return m.handleEnterChildView(msg)
@@ -301,15 +304,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(msg.ParentContext) > 0 {
 			cmd = m.fetchChildResources(msg.ResourceType, msg.ParentContext)
 		} else {
-			cmd = m.fetchResources(msg.ResourceType)
+			cmd = m.fetchResources(msg.ResourceType, m.core.Session().AvailabilityGen)
 		}
 		return m, cmd
 	case messages.LoadMore:
 		cmd := m.fetchMoreResources(msg)
 		return m, cmd
 	case messages.APIError:
+		if messages.IsStale(msg, m.core.Session()) {
+			return m, nil
+		}
 		return m.handleAPIError(msg)
 	case messages.ResourcesLoaded:
+		if messages.IsStale(msg, m.core.Session()) {
+			return m, nil
+		}
 		m.flash.active = false
 		// Site 1: derive findings across fetcher results before the view and
 		// write-through cache process them (PR-03a-shim wire-up).
@@ -389,8 +398,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return updated, cmd
 	case messages.IdentityLoaded:
+		if messages.IsStale(msg, m.core.Session()) {
+			return m, nil
+		}
 		return m.handleIdentityLoaded(msg)
 	case messages.IdentityError:
+		if messages.IsStale(msg, m.core.Session()) {
+			return m, nil
+		}
 		return m.handleIdentityError(msg)
 	case messages.AvailabilityCacheLoaded:
 		return m.coreUpdate(msg)

@@ -181,6 +181,7 @@ func New() *Session {
 		RelatedGen:             1,
 		EnrichGen:              1,
 		EnrichmentGen:          1,
+		AvailabilityGen:        1,
 		PolicyDocCache:         &awsclient.PolicyDocumentCache{},
 		IAMPolicies:            NewPolicyStore(),
 		IdentityStore:          NewIdentityStore(),

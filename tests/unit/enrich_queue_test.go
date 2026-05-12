@@ -55,6 +55,9 @@ func seedAllEnricherTypes(m tui.Model) (tui.Model, tea.Cmd) {
 	m, cmd := rootApplyMsg(m, messages.AvailabilityPrefetched{
 		Entries:   make(map[string]int),
 		Resources: allResources,
+		// Stamp the live AvailabilityGen so the AS-657/AS-659 staleness guard
+		// accepts the message (AcceptZeroGen=false after AS-659).
+		Gen: m.Session().AvailabilityGen,
 	})
 	return m, cmd
 }
@@ -71,6 +74,9 @@ func seedEnricherSubset(m tui.Model, names []string) (tui.Model, tea.Cmd) {
 	m, cmd := rootApplyMsg(m, messages.AvailabilityPrefetched{
 		Entries:   make(map[string]int),
 		Resources: subset,
+		// Stamp the live AvailabilityGen so the AS-657/AS-659 staleness guard
+		// accepts the message (AcceptZeroGen=false after AS-659).
+		Gen: m.Session().AvailabilityGen,
 	})
 	return m, cmd
 }

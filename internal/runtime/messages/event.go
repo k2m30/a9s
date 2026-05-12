@@ -19,6 +19,12 @@ type ResourcesLoaded struct {
 	// — checks this field; if it matches the current per-type gen, it seeds
 	// probeResources and dispatches probeEnrichment.
 	TypeGen domain.Gen
+	// Gen is the session AvailabilityGen captured at dispatch time. A
+	// ResourcesLoaded whose Gen no longer matches the current session gen is
+	// silently discarded (profile/region switch happened between dispatch and
+	// delivery). Zero is never treated as stale (AcceptZeroGen=true) so that
+	// test/demo callers that do not set Gen always pass the guard.
+	Gen domain.Gen
 	// Err is non-nil when the paginated fetcher returned a partial-success
 	// composite error: SOME resources made it back AND something failed
 	// (e.g. one inline-group-policy enumeration call timed out). The handler
@@ -27,15 +33,25 @@ type ResourcesLoaded struct {
 	Err error
 }
 
-func (ResourcesLoaded) isEvent() {}
+func (ResourcesLoaded) isEvent()              {}
+func (m ResourcesLoaded) GenStamp() domain.Gen { return m.Gen }
+func (ResourcesLoaded) GenAspect() Aspect      { return AspectAvailability }
+func (ResourcesLoaded) AcceptZeroGen() bool    { return true }
 
 // APIError is sent when an AWS API call fails.
 type APIError struct {
 	ResourceType string
 	Err          error
+	// Gen is the session AvailabilityGen captured at dispatch time. A stale
+	// APIError (from a prior profile/region) is silently discarded. Zero is
+	// never stale (AcceptZeroGen=true).
+	Gen domain.Gen
 }
 
-func (APIError) isEvent() {}
+func (APIError) isEvent()              {}
+func (m APIError) GenStamp() domain.Gen { return m.Gen }
+func (APIError) GenAspect() Aspect      { return AspectAvailability }
+func (APIError) AcceptZeroGen() bool    { return true }
 
 // Flash sets a transient message in the header right side.
 type Flash struct {
@@ -58,9 +74,16 @@ type ValueRevealed struct {
 	ResourceID   string // secret name or parameter name
 	Value        string
 	Err          error
+	// Gen is the session ConnectGen captured at dispatch time. A stale
+	// ValueRevealed (secret from a prior profile) is silently discarded to
+	// prevent cross-account secret display. Zero is never stale (AcceptZeroGen=true).
+	Gen domain.Gen
 }
 
-func (ValueRevealed) isEvent() {}
+func (ValueRevealed) isEvent()              {}
+func (m ValueRevealed) GenStamp() domain.Gen { return m.Gen }
+func (ValueRevealed) GenAspect() Aspect      { return AspectConnect }
+func (ValueRevealed) AcceptZeroGen() bool    { return true }
 
 // Copied is sent after a successful clipboard copy.
 type Copied struct {
@@ -157,7 +180,15 @@ type AvailabilityPrefetched struct {
 func (AvailabilityPrefetched) isEvent()              {}
 func (m AvailabilityPrefetched) GenStamp() domain.Gen { return m.Gen }
 func (AvailabilityPrefetched) GenAspect() Aspect      { return AspectAvailability }
-func (AvailabilityPrefetched) AcceptZeroGen() bool    { return true }
+
+// AcceptZeroGen returns false so an in-flight AvailabilityPrefetched stamped
+// with the pre-rotation session counter (e.g. captured before AvailabilityGen
+// was bumped) cannot bypass the staleness guard once Rotate() has advanced
+// AvailabilityGen past it. Session.New() seeds AvailabilityGen=1 so the
+// legitimate first prefetch on a fresh session is still applied; the
+// AS-648-h4 hazard is a zero-stamped message arriving after Rotate(), which
+// the AS-657 stale-drop guard must reject. Mirrors AvailabilityChecked.
+func (AvailabilityPrefetched) AcceptZeroGen() bool { return false }
 
 // AvailabilityChecked reports one resource type's background probe result.
 type AvailabilityChecked struct {
@@ -210,16 +241,32 @@ func (EnrichmentChecked) AcceptZeroGen() bool    { return true }
 // The adapter type-asserts it to *awsclient.CallerIdentity.
 type IdentityLoaded struct {
 	Identity any
+	// Gen is the session ConnectGen captured at dispatch time. A stale
+	// IdentityLoaded (account ID from a prior profile) is silently discarded
+	// to prevent stale identity from appearing in the header after a switch.
+	// Zero is never stale (AcceptZeroGen=true).
+	Gen domain.Gen
 }
 
-func (IdentityLoaded) isEvent() {}
+func (IdentityLoaded) isEvent()              {}
+func (m IdentityLoaded) GenStamp() domain.Gen { return m.Gen }
+func (IdentityLoaded) GenAspect() Aspect      { return AspectConnect }
+func (IdentityLoaded) AcceptZeroGen() bool    { return true }
 
 // IdentityError is sent when the caller identity fetch fails.
 type IdentityError struct {
 	Err string
+	// Gen is the session ConnectGen captured at dispatch time. A stale
+	// IdentityError (from a prior profile's fetch) is silently discarded to
+	// avoid clearing IdentityFetching for the new session's in-flight fetch.
+	// Zero is never stale (AcceptZeroGen=true).
+	Gen domain.Gen
 }
 
-func (IdentityError) isEvent() {}
+func (IdentityError) isEvent()              {}
+func (m IdentityError) GenStamp() domain.Gen { return m.Gen }
+func (IdentityError) GenAspect() Aspect      { return AspectConnect }
+func (IdentityError) AcceptZeroGen() bool    { return true }
 
 // EnrichDetailResult delivers an enriched resource back to the detail view.
 // On success, the detail view replaces its resource and rebuilds the field list.
