@@ -507,11 +507,13 @@ func TestSaveAvailabilityCache_NoCacheMode(t *testing.T) {
 	// Deliver AvailabilityCheckedMsg that simulates the all-done state.
 	// This triggers the "all checks done" branch in handleAvailabilityChecked
 	// which calls saveAvailabilityCache. With noCache=true it's a no-op (nil cmd).
+	// Stamp the live AvailabilityGen so the AS-657/AS-659 stale guard accepts
+	// the message (AcceptZeroGen=false; session.New seeds AvailabilityGen=1).
 	_, cmd := rootApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: "ec2",
 		HasResources: true,
 		Count:        3,
-		Gen:          0,
+		Gen:          m.Session().AvailabilityGen,
 	})
 	// With noCache=true, saveAvailabilityCache returns nil.
 	// No panic is the key assertion.
@@ -582,12 +584,14 @@ func TestDemoPrefetchCounts_AvailabilityPrefetchedHandler(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
-	// Gen 0 matches initial availabilityGen.
+	// Stamp the live AvailabilityGen so the AS-657/AS-659 staleness guard
+	// accepts the message (AcceptZeroGen=false after AS-659; session.New seeds
+	// AvailabilityGen=1).
 	_, cmd := rootApplyMsg(m, messages.AvailabilityPrefetched{
 		Entries:     map[string]int{"ec2": 7, "s3": 3},
 		Truncated:   map[string]bool{},
 		IssueCounts: map[string]int{"ec2": 1},
-		Gen:         0,
+		Gen:         m.Session().AvailabilityGen,
 		Resources:   map[string][]resource.Resource{},
 	})
 	// Handler should not crash.

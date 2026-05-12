@@ -435,6 +435,88 @@ func TestIdentityError_Fresh_DoesProcess(t *testing.T) {
 	}
 }
 
+// ── AC #6 (AS-659) — stale AvailabilityPrefetched is dropped ────────────────
+
+// TestAvailabilityPrefetched_Stale_Dropped pins the AS-648-h4 / AS-659 contract:
+// an AvailabilityPrefetched whose Gen no longer matches the live
+// Session.AvailabilityGen (because Rotate() has bumped the counter past it) must
+// be discarded. Without the guard, the demoPrefetchCounts dispatch path
+// captures Session.AvailabilityGen at dispatch time and a slow pre-switch
+// prefetch can repopulate menu counts and ResourceCache for the new
+// profile/region.
+//
+// Reverting AvailabilityPrefetched.AcceptZeroGen() back to true OR removing
+// the AvailabilityGen=1 seed in session.New() resurrects the bug: a
+// zero-stamped prefetch would silently bypass the guard once AvailabilityGen
+// is non-zero, contaminating the post-rotate session.
+//
+// Mirrors TestResourcesLoaded_Stale_Dropped — same pre-rotate / post-rotate
+// staleGen capture pattern.
+func TestAvailabilityPrefetched_Stale_Dropped(t *testing.T) {
+	m := newRootSizedModel()
+
+	// AvailabilityGen seeded at 1 by session.New(); rotate once so staleGen > 1.
+	m.Session().Rotate()
+
+	// Capture stale gen (non-zero) BEFORE the second Rotate.
+	staleGen := m.Session().AvailabilityGen
+	if staleGen == 0 {
+		t.Fatal("precondition failed: staleGen must be non-zero to test IsStale guard (AcceptZeroGen=false rejects zero unconditionally)")
+	}
+
+	// Second Rotate bumps AvailabilityGen past staleGen and clears caches.
+	m.Session().Rotate()
+	if m.Session().AvailabilityGen == staleGen {
+		t.Fatalf("precondition failed: Rotate() must advance AvailabilityGen past staleGen=%d", staleGen)
+	}
+
+	// Dispatch a stale AvailabilityPrefetched from the pre-rotate session.
+	const targetType = "ec2"
+	staleResource := resource.Resource{ID: "i-stale-prefetch", Name: "stale-prefetch-target"}
+	staleMsg := messages.AvailabilityPrefetched{
+		Entries:        map[string]int{targetType: 1},
+		Truncated:      map[string]bool{},
+		IssueCounts:    map[string]int{},
+		IssueTruncated: map[string]bool{},
+		Resources:      map[string][]resource.Resource{targetType: {staleResource}},
+		Pagination:     map[string]*resource.PaginationMeta{},
+		Gen:            staleGen,
+	}
+	m, _ = rootApplyMsg(m, staleMsg)
+
+	// ResourceCache must NOT have been seeded — the stale prefetch was dropped.
+	if entry, ok := m.Session().ResourceCache[targetType]; ok {
+		t.Errorf("stale AvailabilityPrefetched was NOT dropped: ResourceCache[%q]=%+v — post-rotate session contaminated by pre-rotate prefetch (AS-648-h4 regression)", targetType, entry)
+	}
+}
+
+// TestAvailabilityPrefetched_ZeroGen_Dropped pins the symmetric guard: a
+// zero-stamped AvailabilityPrefetched is also stale (AcceptZeroGen=false) and
+// must be dropped even if no Rotate() has happened yet. Without the
+// AvailabilityGen=1 seed in session.New(), a legitimate first prefetch
+// captured Gen=0 and matched the live AvailabilityGen=0, so this test could
+// not even be written.
+func TestAvailabilityPrefetched_ZeroGen_Dropped(t *testing.T) {
+	m := newRootSizedModel()
+
+	// Fresh session: AvailabilityGen is seeded at 1 (AS-648-h4 / AS-659).
+	if got := m.Session().AvailabilityGen; got != 1 {
+		t.Fatalf("precondition failed: fresh AvailabilityGen = %d, want 1 (session.New seed)", got)
+	}
+
+	const targetType = "ec2"
+	zeroMsg := messages.AvailabilityPrefetched{
+		Entries:   map[string]int{targetType: 1},
+		Resources: map[string][]resource.Resource{targetType: {{ID: "i-zero", Name: "zero-stamped"}}},
+		Gen:       0,
+	}
+	m, _ = rootApplyMsg(m, zeroMsg)
+
+	if entry, ok := m.Session().ResourceCache[targetType]; ok {
+		t.Errorf("zero-stamped AvailabilityPrefetched was NOT dropped: ResourceCache[%q]=%+v — guard regression: AcceptZeroGen() must remain false", targetType, entry)
+	}
+}
+
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 // errString is a minimal error implementation for test stubs.
