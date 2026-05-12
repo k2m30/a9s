@@ -368,13 +368,18 @@ func (m ResourceListModel) extractCellValue(c listCol, r resource.Resource) stri
 	lifecycleKey := lifecycleColumnKey(m.typeDef)
 	isStatusCol := c.key == "status" || c.key == lifecycleKey
 	if isStatusCol {
+		// The 2-layer priority is exhaustive for status columns. Returning ""
+		// rather than falling through is required by AS-140: any fall-through
+		// path below (the generic Fields[c.key] read at the next branch, its
+		// empty-accept second pass, and the title-match loop) would re-read
+		// Fields["status"] / Fields[lifecycleKey] from a stale write source
+		// and undo the spec's removal of the 3-layer priority. Sibling helper
+		// widenLifecycleColumn uses the same 2-layer chain — keeping them
+		// aligned ensures the column width and the rendered value agree.
 		if phrase := phraseFromFindings(r.Findings); phrase != "" {
 			return phrase
 		}
-		if v := r.Fields[lifecycleKey]; v != "" {
-			return v
-		}
-		// Fall through to normal extraction if none of the above is set.
+		return r.Fields[lifecycleKey]
 	}
 	// Fields map (key-based columns) takes priority over raw struct fields.
 	// This ensures Wave-2 enriched values always win over struct literals,
