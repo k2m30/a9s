@@ -156,8 +156,9 @@ type IssueEnricherResult struct {
 // (internal/resource/enricher.go) which enriches a single resource for detail views.
 //
 // Cache invariant — read-only shallow snapshot:
-// The dispatcher (internal/tui/app_probes.go probeEnrichment) builds the cache
-// once at dispatch time via m.buildResourceCacheSnapshot() and passes the
+// The TUI dispatcher (internal/tui/probe_adapter.go probeEnrichment tea.Cmd wrapper)
+// invokes (*Core).ProbeEnrichment, which builds the cache once at dispatch time via
+// (*Core).BuildResourceCacheSnapshot in internal/runtime/probes.go and passes the
 // resulting map by value. The map and its ResourceCacheEntry structs are
 // freshly allocated, but the .Resources slice header is COPIED — its backing
 // array is shared with the live m.resourceCache / m.probeResources / m.lazyResourceCache
