@@ -299,3 +299,93 @@ func TestSession_Rotate_SwapsPolicyDocCache(t *testing.T) {
 		t.Error("PolicyDocCache pointer is identical after Rotate(): old cache may leak across accounts")
 	}
 }
+
+// TestSession_Rotate_ResetsCapabilityStores is a regression pin verifying that
+// Rotate() replaces all three capability stores with fresh non-nil instances.
+// A leaked store pointer means credentials or policy data from a prior account
+// can surface in the next session.
+func TestSession_Rotate_ResetsCapabilityStores(t *testing.T) {
+	t.Parallel()
+	s := session.New()
+	beforeIAM := s.IAMPolicies
+	beforeID := s.IdentityStore
+	beforeRS := s.RuleSets
+	s.Rotate()
+	if s.IAMPolicies == beforeIAM {
+		t.Error("IAMPolicies pointer identical after Rotate(): old store may leak across accounts")
+	}
+	if s.IdentityStore == beforeID {
+		t.Error("IdentityStore pointer identical after Rotate(): old store may leak across accounts")
+	}
+	if s.RuleSets == beforeRS {
+		t.Error("RuleSets pointer identical after Rotate(): old store may leak across accounts")
+	}
+	if s.IAMPolicies == nil || s.IdentityStore == nil || s.RuleSets == nil {
+		t.Error("Rotate() must not nil out capability stores — fresh instances are required")
+	}
+}
+
+// TestSession_Rotate_RaceWithIAMPoliciesReader verifies that concurrent Rotate
+// calls do not race with IAMPolicies.Lookup reads. This test must be run with
+// -race to catch the data race that occurs when Rotate assigns s.IAMPolicies
+// without a mutex while a goroutine is reading it.
+func TestSession_Rotate_RaceWithIAMPoliciesReader(t *testing.T) {
+	s := session.New()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 100; i++ {
+			s.Rotate()
+		}
+	}()
+	for {
+		select {
+		case <-done:
+			return
+		default:
+			s.IAMPolicies.Lookup("x") //nolint:errcheck
+		}
+	}
+}
+
+// TestSession_Rotate_RaceWithIdentityStoreReader verifies that concurrent Rotate
+// calls do not race with IdentityStore.AccountID reads.
+func TestSession_Rotate_RaceWithIdentityStoreReader(t *testing.T) {
+	s := session.New()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 100; i++ {
+			s.Rotate()
+		}
+	}()
+	for {
+		select {
+		case <-done:
+			return
+		default:
+			_ = s.IdentityStore.AccountID()
+		}
+	}
+}
+
+// TestSession_Rotate_RaceWithRuleSetsReader verifies that concurrent Rotate
+// calls do not race with RuleSets.Get reads.
+func TestSession_Rotate_RaceWithRuleSetsReader(t *testing.T) {
+	s := session.New()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 100; i++ {
+			s.Rotate()
+		}
+	}()
+	for {
+		select {
+		case <-done:
+			return
+		default:
+			s.RuleSets.Get() //nolint:errcheck
+		}
+	}
+}
