@@ -208,17 +208,9 @@ func (c *Core) handleClientsReadyFailure(ev ClientsReadyEvent) ([]UIIntent, []Ta
 	}}
 
 	if s.Clients != nil {
-		// P3 invariant: Session.Rotate() (run earlier on the switch attempt
-		// that just failed) installed fresh IAMPolicies / IdentityStore /
-		// RuleSets on the session. The retained transport still points at
-		// the pre-rotate (now-discarded) stores, so Pattern-C related
-		// checks (Glue tags, EBS Backup) and IAM lazy-add would read
-		// sticky state until the next successful reconnect. Rewire on
-		// rollback so the retained transport sees the post-rotate stores.
-		s.Clients.SetIAMPolicies(s.IAMPolicies)
-		s.Clients.SetIdentityStore(s.IdentityStore)
-		s.Clients.SetRuleSets(s.RuleSets)
-
+		// Post-AS-660: the retained transport no longer carries the per-session
+		// capability stores. The fresh stores live on Session directly and the
+		// next NewScope() reads them — no rewire required.
 		s.IdentityFetching = true
 		tasks = append(tasks, TaskRequest{
 			Key:     TaskKey{Kind: TaskKindFetchIdentity},
@@ -247,18 +239,14 @@ func (c *Core) handleClientsReadyFailure(ev ClientsReadyEvent) ([]UIIntent, []Ta
 func (c *Core) handleClientsReadySuccess(ev ClientsReadyEvent) ([]UIIntent, []TaskRequest) {
 	s := c.session
 
-	// Install the new transport.
+	// Install the new transport. Post-AS-660 the transport carries no
+	// session-scoped stores; the stores live on Session and the dispatcher
+	// constructs a fresh aws.Scope per dispatch.
 	if ev.Clients == nil {
 		if s.Clients == nil && s.PreSuppliedClients != nil {
-			s.PreSuppliedClients.SetIAMPolicies(s.IAMPolicies)
-			s.PreSuppliedClients.SetIdentityStore(s.IdentityStore)
-			s.PreSuppliedClients.SetRuleSets(s.RuleSets)
 			s.Clients = s.PreSuppliedClients
 		}
 	} else if clients, ok := ev.Clients.(*awsclient.ServiceClients); ok {
-		clients.SetIAMPolicies(s.IAMPolicies)
-		clients.SetIdentityStore(s.IdentityStore)
-		clients.SetRuleSets(s.RuleSets)
 		s.Clients = clients
 	} else {
 		// Wrong concrete type — surface as APIErrorMsg via the adapter so

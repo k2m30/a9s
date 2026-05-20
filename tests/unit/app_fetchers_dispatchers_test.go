@@ -507,11 +507,13 @@ func TestSaveAvailabilityCache_NoCacheMode(t *testing.T) {
 	// Deliver AvailabilityCheckedMsg that simulates the all-done state.
 	// This triggers the "all checks done" branch in handleAvailabilityChecked
 	// which calls saveAvailabilityCache. With noCache=true it's a no-op (nil cmd).
+	// Stamp the live AvailabilityGen so the AS-657/AS-659 stale guard accepts
+	// the message (AcceptZeroGen=false; session.New seeds AvailabilityGen=1).
 	_, cmd := rootApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: "ec2",
 		HasResources: true,
 		Count:        3,
-		Gen:          0,
+		Gen:          m.Session().AvailabilityGen,
 	})
 	// With noCache=true, saveAvailabilityCache returns nil.
 	// No panic is the key assertion.
@@ -582,12 +584,14 @@ func TestDemoPrefetchCounts_AvailabilityPrefetchedHandler(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
-	// Gen 0 matches initial availabilityGen.
+	// Stamp the live AvailabilityGen so the AS-657/AS-659 staleness guard
+	// accepts the message (AcceptZeroGen=false after AS-659; session.New seeds
+	// AvailabilityGen=1).
 	_, cmd := rootApplyMsg(m, messages.AvailabilityPrefetched{
 		Entries:     map[string]int{"ec2": 7, "s3": 3},
 		Truncated:   map[string]bool{},
 		IssueCounts: map[string]int{"ec2": 1},
-		Gen:         0,
+		Gen:         m.Session().AvailabilityGen,
 		Resources:   map[string][]resource.Resource{},
 	})
 	// Handler should not crash.
@@ -666,4 +670,113 @@ func TestRefreshResourceListWithEnrichmentRerun_PassthroughAPIError(t *testing.T
 	}
 	// Any other type is also OK (batch, etc.)
 	t.Logf("wrapper passthrough returned %T — acceptable", msg)
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// TestFetchAdapter_CapturesGenAtDispatchTime
+// ────────────────────────────────────────────────────────────────────────────
+
+// TestFetchAdapter_CapturesGenAtDispatchTime verifies that fetchResources,
+// fetchIdentity, and fetchRevealValue capture the generation counter
+// SYNCHRONOUSLY at the call site — not lazily inside the goroutine closure.
+//
+// This is the critical correctness property: if gen is captured inside the
+// closure, a concurrent Rotate() that bumps the counter before the goroutine
+// runs would cause the message to carry the POST-rotate gen, bypassing the
+// stale guard entirely (the guard would see stamp==current and pass it).
+//
+// Test shape (mirrors connectAWS precedent at fetch_adapter.go:160-171):
+//  1. Capture the generation at dispatch time into dispatchGen.
+//  2. Build the tea.Cmd via the test-accessor (which internally calls the
+//     unexported fetch function with a fixed gen parameter).
+//  3. Rotate the session so the current gen no longer equals dispatchGen.
+//  4. Execute the cmd closure (synchronously — returns immediately with
+//     nil-clients error or ResourcesLoaded{Gen: dispatchGen}).
+//  5. Assert that the returned message carries Gen == dispatchGen, not the
+//     post-rotate gen.
+//
+// These tests FAIL TO COMPILE until Coder adds three exported test accessors
+// to internal/tui/app_accessors.go:
+//   - FetchResourcesCmdForTest(resourceType string, gen domain.Gen) tea.Cmd
+//   - FetchIdentityCmdForTest(gen domain.Gen) tea.Cmd
+//   - FetchRevealValueCmdForTest(resourceType, resourceID string, gen domain.Gen) tea.Cmd
+func TestFetchAdapter_CapturesGenAtDispatchTime(t *testing.T) {
+	withTuiVersion(t, "test")
+
+	t.Run("fetchResources", func(t *testing.T) {
+		m := newRootSizedModel()
+		dispatchGen := m.Session().AvailabilityGen
+
+		// Build the cmd at dispatch time with the captured gen.
+		cmd := m.FetchResourcesCmdForTest("ec2", dispatchGen)
+
+		// Rotate AFTER dispatch: the closure must carry dispatchGen, not the new gen.
+		m.Session().Rotate()
+		if m.Session().AvailabilityGen == dispatchGen {
+			t.Fatal("Rotate() did not bump AvailabilityGen — test precondition broken")
+		}
+
+		// Execute the closure synchronously (nil clients → APIError or ResourcesLoaded).
+		msg := cmd()
+		switch v := msg.(type) {
+		case messages.ResourcesLoaded:
+			if v.Gen != dispatchGen {
+				t.Errorf("fetchResources: Gen in ResourcesLoaded = %d, want dispatchGen %d — gen captured inside closure, not at dispatch site", v.Gen, dispatchGen)
+			}
+		case messages.APIError:
+			if v.Gen != dispatchGen {
+				t.Errorf("fetchResources: Gen in APIError = %d, want dispatchGen %d — gen captured inside closure, not at dispatch site", v.Gen, dispatchGen)
+			}
+		default:
+			t.Logf("fetchResources returned %T — checking not possible for this type; nil-clients guard may have fired before gen stamp", msg)
+		}
+	})
+
+	t.Run("fetchIdentity", func(t *testing.T) {
+		m := newRootSizedModel()
+		dispatchGen := m.Session().ConnectGen
+
+		cmd := m.FetchIdentityCmdForTest(dispatchGen)
+
+		m.Session().Rotate()
+		if m.Session().ConnectGen == dispatchGen {
+			t.Fatal("Rotate() did not bump ConnectGen — test precondition broken")
+		}
+
+		msg := cmd()
+		switch v := msg.(type) {
+		case messages.IdentityLoaded:
+			if v.Gen != dispatchGen {
+				t.Errorf("fetchIdentity: Gen in IdentityLoaded = %d, want dispatchGen %d — gen captured inside closure", v.Gen, dispatchGen)
+			}
+		case messages.IdentityError:
+			if v.Gen != dispatchGen {
+				t.Errorf("fetchIdentity: Gen in IdentityError = %d, want dispatchGen %d — gen captured inside closure", v.Gen, dispatchGen)
+			}
+		default:
+			t.Logf("fetchIdentity returned %T — cannot assert Gen on this type", msg)
+		}
+	})
+
+	t.Run("fetchRevealValue", func(t *testing.T) {
+		m := newRootSizedModel()
+		dispatchGen := m.Session().ConnectGen
+
+		cmd := m.FetchRevealValueCmdForTest("secrets", "prod/api/key", dispatchGen)
+
+		m.Session().Rotate()
+		if m.Session().ConnectGen == dispatchGen {
+			t.Fatal("Rotate() did not bump ConnectGen — test precondition broken")
+		}
+
+		msg := cmd()
+		switch v := msg.(type) {
+		case messages.ValueRevealed:
+			if v.Gen != dispatchGen {
+				t.Errorf("fetchRevealValue: Gen in ValueRevealed = %d, want dispatchGen %d — gen captured inside closure", v.Gen, dispatchGen)
+			}
+		default:
+			t.Logf("fetchRevealValue returned %T — cannot assert Gen on this type", msg)
+		}
+	})
 }

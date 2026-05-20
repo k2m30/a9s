@@ -68,12 +68,22 @@ func sesFixtureSrcIdentity(identityName string) resource.Resource {
 	}
 }
 
-// sesFixtureClients returns a *ServiceClients whose SESv2 fake is wired with the
-// canonical fixture event destinations for the graph-root identity.
-func sesFixtureClients() *awsclient.ServiceClients {
+// sesFixtureClients returns a *awsclient.Scope whose Clients.SESv2 fake is wired
+// with the canonical fixture event destinations for the graph-root identity,
+// and whose RuleSets store is a fresh empty per-Session store.
+//
+// Post-AS-660 the SES checkers (checkSESLambda, checkSESS3, …) type-assert
+// *Scope, so test helpers that drive them must hand them a Scope (not a bare
+// *ServiceClients). c.SES is intentionally left nil — every fixture identity
+// exercises the "pure outbound account, no rule set" path which returns
+// Count=0 for lambda/s3 checkers.
+func sesFixtureClients() *awsclient.Scope {
 	f := fixtures.NewSESFixtures()
-	return &awsclient.ServiceClients{
-		SESv2: newFakeSESv2FromFixture(f),
+	return &awsclient.Scope{
+		Clients: &awsclient.ServiceClients{
+			SESv2: newFakeSESv2FromFixture(f),
+		},
+		RuleSets: session.NewRuleSetStore(),
 	}
 }
 
@@ -502,15 +512,16 @@ func (f *fakeSESV1) DescribeActiveReceiptRuleSet(
 // Compile-time check: fakeSESV1 satisfies SESV1API.
 var _ awsclient.SESV1API = (*fakeSESV1)(nil)
 
-// sesV1Clients returns a *awsclient.ServiceClients with the given SESV1API
-// wired plus a fresh per-test session.RuleSetStore. Post-PR-02d the SES
-// rule-set cache lives on c.RuleSets() (per-Session) rather than a process-wide
-// map keyed by *ServiceClients pointer, so each test gets an isolated store
-// without needing fresh pointers.
-func sesV1Clients(v1 awsclient.SESV1API) *awsclient.ServiceClients {
-	c := &awsclient.ServiceClients{SES: v1}
-	c.SetRuleSets(session.NewRuleSetStore())
-	return c
+// sesV1Clients returns a *awsclient.Scope with the given SESV1API wired plus a
+// fresh per-test session.RuleSetStore. Post-AS-660 the SES rule-set cache lives
+// on scope.RuleSets (per-Session) rather than a process-wide map keyed by
+// *ServiceClients pointer, so each test gets an isolated store without needing
+// fresh pointers.
+func sesV1Clients(v1 awsclient.SESV1API) *awsclient.Scope {
+	return &awsclient.Scope{
+		Clients:  &awsclient.ServiceClients{SES: v1},
+		RuleSets: session.NewRuleSetStore(),
+	}
 }
 
 // sesLambdaARN returns a plausible Lambda ARN string for test data.

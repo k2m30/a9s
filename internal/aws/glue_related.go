@@ -119,12 +119,13 @@ func checkGlueCFN(ctx context.Context, clients any, res resource.Resource, cache
 	if jobName == "" {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: 0}
 	}
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil || c.Glue == nil {
+	s, ok := clients.(*Scope)
+	if !ok || s == nil || s.Clients == nil || s.Clients.Glue == nil {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
 	}
+	c := s.Clients
 	region := regionFromEnv()
-	account := accountIDFromClients(ctx, c, c.IdentityStore())
+	account := accountIDFromClients(ctx, c, s.IdentityStore)
 	if region == "" || account == "" {
 		return resource.RelatedCheckResult{TargetType: "cfn", Count: -1}
 	}
@@ -195,8 +196,8 @@ func checkGlueKMS(ctx context.Context, clients any, res resource.Resource, _ res
 	if job.SecurityConfiguration == nil || *job.SecurityConfiguration == "" {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil || c.Glue == nil {
+	c := serviceClientsFromAny(clients)
+	if c == nil || c.Glue == nil {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
 	}
 	secCfgAPI, ok := c.Glue.(GlueGetSecurityConfigurationAPI)
@@ -307,7 +308,9 @@ func checkGlueSecrets(_ context.Context, _ any, res resource.Resource, _ resourc
 func glueRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
 	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
+		// Glue source closures may receive either *Scope or *ServiceClients —
+		// mask the error only when no transport is reachable.
+		if serviceClientsFromAny(clients) == nil {
 			return nil, false, nil
 		}
 	}

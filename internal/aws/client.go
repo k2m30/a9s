@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -55,26 +54,11 @@ import (
 
 // ServiceClients holds AWS service clients for all supported services.
 //
-// Per-Session capability stores (IAMPolicies, IdentityStore, RuleSets) are
-// stored as unexported fields guarded by sync.RWMutex and accessed via
-// thread-safe getter/setter methods. Direct field access would race under
-// `-race` because:
-//
-//   - Writes happen on the Bubble Tea Update goroutine (handleClientsReady,
-//     handleRefresh swap on Ctrl+R).
-//   - Reads happen on fetcher goroutines spawned via tea.Cmd
-//     (FetchIAMPoliciesByIDsFull, accountIDFromClients,
-//     sesActiveReceiptRuleSet).
-//
-// Interface fields are 2-word values; concurrent unsynchronized read/write
-// is undefined behavior per the Go memory model. Methods serialize the
-// access.
+// Post-AS-660 it carries transport only. Per-Session capability stores
+// (IAMPolicies, IdentityStore, RuleSets) live on session.Session and reach
+// the four reader closures via the per-dispatch aws.Scope carrier — see
+// internal/aws/scope.go and internal/runtime/scope.go.
 type ServiceClients struct {
-	storesMu       sync.RWMutex
-	iamPolicies    iamPolicyStore
-	identityStore  identityStore
-	ruleSets       ruleSetStore
-
 	EC2              EC2API
 	S3               S3API
 	RDS              RDSAPI
@@ -190,88 +174,3 @@ func CreateServiceClients(cfg aws.Config) *ServiceClients {
 	}
 }
 
-// ─── Per-Session capability store accessors ───────────────────────────────
-//
-// Each accessor pair (getter / setter) serializes access via storesMu so the
-// Bubble Tea Update goroutine (which swaps stores on profile/region switch
-// or Ctrl+R refresh) and fetcher goroutines (which read the stores during
-// resource fetch / related-checker dispatch) don't race on the underlying
-// interface field.
-//
-// Read paths use a read-lock; write paths use a write-lock. The lock guards
-// only the field itself — methods on the returned store are independently
-// thread-safe per session.{PolicyStore,IdentityStore,RuleSetStore} contracts.
-
-// IAMPolicies returns the session-scoped IAM policy store, or nil if not
-// yet wired. Concurrency-safe.
-func (c *ServiceClients) IAMPolicies() iamPolicyStore {
-	if c == nil {
-		return nil
-	}
-	c.storesMu.RLock()
-	defer c.storesMu.RUnlock()
-	return c.iamPolicies
-}
-
-// SetIAMPolicies replaces the session-scoped IAM policy store. Concurrency-
-// safe. Callers passing the new store from the TUI Update loop must also
-// keep `Session.IAMPolicies` consistent so a subsequent ClientsReadyMsg or
-// Rotate sees the same store reference.
-func (c *ServiceClients) SetIAMPolicies(s iamPolicyStore) {
-	if c == nil {
-		return
-	}
-	c.storesMu.Lock()
-	defer c.storesMu.Unlock()
-	c.iamPolicies = s
-}
-
-// IdentityStore returns the session-scoped caller-identity store, or nil if
-// not yet wired. Concurrency-safe.
-func (c *ServiceClients) IdentityStore() identityStore {
-	if c == nil {
-		return nil
-	}
-	c.storesMu.RLock()
-	defer c.storesMu.RUnlock()
-	return c.identityStore
-}
-
-// SetIdentityStore replaces the session-scoped caller-identity store.
-// Concurrency-safe.
-func (c *ServiceClients) SetIdentityStore(s identityStore) {
-	if c == nil {
-		return
-	}
-	c.storesMu.Lock()
-	defer c.storesMu.Unlock()
-	c.identityStore = s
-}
-
-// RuleSets returns the session-scoped SES rule set store, or nil if not yet
-// wired. Concurrency-safe. Callers should capture the returned reference at
-// the start of a fetch operation so a concurrent SetRuleSets (e.g. Ctrl+R
-// refresh) can't repoison the new active store with a late writer — the
-// captured reference will be the now-orphaned old store. See
-// `sesActiveReceiptRuleSet` for the canonical capture pattern.
-func (c *ServiceClients) RuleSets() ruleSetStore {
-	if c == nil {
-		return nil
-	}
-	c.storesMu.RLock()
-	defer c.storesMu.RUnlock()
-	return c.ruleSets
-}
-
-// SetRuleSets replaces the session-scoped SES rule set store. The previous
-// store is NOT cleared — any in-flight fetcher that captured a reference
-// before this swap continues to write to the orphaned old store, and its
-// late writes do not affect the new active store.
-func (c *ServiceClients) SetRuleSets(s ruleSetStore) {
-	if c == nil {
-		return
-	}
-	c.storesMu.Lock()
-	defer c.storesMu.Unlock()
-	c.ruleSets = s
-}

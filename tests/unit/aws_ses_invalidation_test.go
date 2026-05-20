@@ -16,11 +16,11 @@
 // to internal/aws/ses_related.go (or a new ses_related_export_test.go file):
 //
 //	// SESActiveReceiptRuleSetForTest is a test-only export of sesActiveReceiptRuleSet.
-//	func SESActiveReceiptRuleSetForTest(ctx context.Context, c *ServiceClients) (*ses.DescribeActiveReceiptRuleSetOutput, error) {
-//	    return sesActiveReceiptRuleSet(ctx, c)
+//	func SESActiveReceiptRuleSetForTest(ctx context.Context, scope *Scope) (*ses.DescribeActiveReceiptRuleSetOutput, error) {
+//	    return sesActiveReceiptRuleSet(ctx, scope)
 //	}
 //
-// The test will fail to compile until this export exists.
+// The test will fail to compile until this export exists (post-AS-660: takes *Scope, not *ServiceClients).
 package unit_test
 
 import (
@@ -77,12 +77,11 @@ func TestInvalidateSESRuleSetCache(t *testing.T) {
 		},
 	}
 
-	// Wire a per-test RuleSets store so the cache works (post-PR-02d the
-	// rule set cache lives on c.RuleSets() rather than a process-global map
-	// keyed by *ServiceClients pointer). Use SetRuleSets because the field
-	// is unexported (CR-flagged race fix).
-	clients := &awsclient.ServiceClients{SES: v1Mock}
-	clients.SetRuleSets(session.NewRuleSetStore())
+	// Wire a per-test RuleSets store so the cache works (post-AS-660 the
+	// rule set cache lives on scope.RuleSets rather than a process-global map
+	// keyed by *ServiceClients pointer).
+	innerClients := &awsclient.ServiceClients{SES: v1Mock}
+	scope := &awsclient.Scope{Clients: innerClients, RuleSets: session.NewRuleSetStore()}
 
 	src := resource.Resource{
 		ID:     "any@example.com",
@@ -92,7 +91,7 @@ func TestInvalidateSESRuleSetCache(t *testing.T) {
 	checker := sesCheckerByTarget(t, "lambda")
 
 	// ---- Call 1: first call; must hit the API. ----
-	result1 := checker(context.Background(), clients, src, resource.ResourceCache{})
+	result1 := checker(context.Background(), scope, src, resource.ResourceCache{})
 	if result1.Err != nil {
 		t.Fatalf("call 1: unexpected error: %v", result1.Err)
 	}
@@ -104,7 +103,7 @@ func TestInvalidateSESRuleSetCache(t *testing.T) {
 	}
 
 	// ---- Call 2: cache hit; must NOT call the API again. ----
-	result2 := checker(context.Background(), clients, src, resource.ResourceCache{})
+	result2 := checker(context.Background(), scope, src, resource.ResourceCache{})
 	if result2.Err != nil {
 		t.Fatalf("call 2: unexpected error: %v", result2.Err)
 	}
@@ -119,10 +118,10 @@ func TestInvalidateSESRuleSetCache(t *testing.T) {
 	// Post-PR-02d (P2 fix): swap rather than Clear() so in-flight blocked
 	// fetchers can't re-poison the active store. Production code does this
 	// on Ctrl+R for SES detail/list views; the test mirrors that pattern.
-	clients.SetRuleSets(session.NewRuleSetStore())
+	scope.RuleSets = session.NewRuleSetStore()
 
 	// ---- Call 3: cache miss after invalidation; API must be called again. ----
-	result3 := checker(context.Background(), clients, src, resource.ResourceCache{})
+	result3 := checker(context.Background(), scope, src, resource.ResourceCache{})
 	if result3.Err != nil {
 		t.Fatalf("call 3: unexpected error: %v", result3.Err)
 	}
@@ -174,11 +173,12 @@ func TestHandleRefresh_SESDetailViewInvalidatesRuleSetCache(t *testing.T) {
 		},
 	}
 
-	// Wire a per-test RuleSets store so the cache works (post-PR-02d the
-	// rule set cache lives on c.RuleSets()). Reuse one *ServiceClients pointer
+	// Wire a per-test RuleSets store so the cache works (post-AS-660 the
+	// rule set cache lives on scope.RuleSets). Reuse one *ServiceClients pointer
 	// so that the TUI model and the checker share the same store reference.
-	clients := &awsclient.ServiceClients{SES: v1Mock}
-	clients.SetRuleSets(session.NewRuleSetStore())
+	// TODO(AS-660 Stage 4): TUI Ctrl+R must invalidate scope.RuleSets via m.Session wiring
+	innerClients := &awsclient.ServiceClients{SES: v1Mock}
+	scope := &awsclient.Scope{Clients: innerClients, RuleSets: session.NewRuleSetStore()}
 
 	src := resource.Resource{
 		ID:     "any@example.com",
@@ -188,7 +188,7 @@ func TestHandleRefresh_SESDetailViewInvalidatesRuleSetCache(t *testing.T) {
 	checker := sesCheckerByTarget(t, "lambda")
 
 	// ---- Call 1: seed the cache. ----
-	r1 := checker(context.Background(), clients, src, resource.ResourceCache{})
+	r1 := checker(context.Background(), scope, src, resource.ResourceCache{})
 	if r1.Count != 1 {
 		t.Errorf("call 1: Count = %d, want 1", r1.Count)
 	}
@@ -197,7 +197,7 @@ func TestHandleRefresh_SESDetailViewInvalidatesRuleSetCache(t *testing.T) {
 	}
 
 	// ---- Call 2: cache hit. ----
-	r2 := checker(context.Background(), clients, src, resource.ResourceCache{})
+	r2 := checker(context.Background(), scope, src, resource.ResourceCache{})
 	if r2.Count != 1 {
 		t.Errorf("call 2: Count = %d, want 1 (cached)", r2.Count)
 	}
@@ -219,14 +219,21 @@ func TestHandleRefresh_SESDetailViewInvalidatesRuleSetCache(t *testing.T) {
 	}
 
 	m := tui.New("demo", "us-east-1",
-		tui.WithClients(clients),
+		tui.WithClients(innerClients),
 		tui.WithNoCache(true),
 	)
 	m = applyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	// Wire the pre-supplied clients into m.clients by sending the ClientsReadyMsg
 	// that Init() would normally emit as a command (but we don't run the event loop).
-	m = applyMsg(m, messages.ClientsReady{Clients: clients})
+	m = applyMsg(m, messages.ClientsReady{Clients: innerClients})
+
+	// Post-AS-660: the production dispatcher constructs a fresh *aws.Scope per
+	// dispatch via runtime.NewScope(m.Session()), so it always reads the
+	// session-owned RuleSets store. Mirror that here: replace the test's local
+	// scope.RuleSets with the session's store so call 3 (after Ctrl+R) reads
+	// the post-swap store the same way production does.
+	scope.RuleSets = m.Session().RuleSets
 
 	// Push an SES detail view onto the stack.
 	m = applyMsg(m, messages.Navigate{
@@ -237,10 +244,14 @@ func TestHandleRefresh_SESDetailViewInvalidatesRuleSetCache(t *testing.T) {
 
 	// Press Ctrl+R while on the ses detail view — must call InvalidateSESRuleSetCache.
 	m = applyMsg(m, tea.KeyPressMsg{Code: -1, Text: "\x12"})
-	_ = m // model state after refresh is not inspected
+
+	// Re-sync the test scope with the post-Ctrl+R store so call 3 sees the
+	// fresh slot — matches production where every dispatcher invocation rebuilds
+	// the scope from m.Session().
+	scope.RuleSets = m.Session().RuleSets
 
 	// ---- Call 3: cache must be invalidated. ----
-	r3 := checker(context.Background(), clients, src, resource.ResourceCache{})
+	r3 := checker(context.Background(), scope, src, resource.ResourceCache{})
 	if r3.Count != 1 {
 		t.Errorf("call 3: Count = %d, want 1 (fresh fetch)", r3.Count)
 	}
@@ -310,8 +321,8 @@ func TestSESRuleSetSwap_LateWriterDoesNotPoisonNewStore(t *testing.T) {
 		output:    staleOutput,
 	}
 
-	clients := &awsclient.ServiceClients{SES: v1Mock}
-	clients.SetRuleSets(session.NewRuleSetStore())
+	innerClients := &awsclient.ServiceClients{SES: v1Mock}
+	scope := &awsclient.Scope{Clients: innerClients, RuleSets: session.NewRuleSetStore()}
 
 	src := resource.Resource{
 		ID:     "any@example.com",
@@ -323,7 +334,7 @@ func TestSESRuleSetSwap_LateWriterDoesNotPoisonNewStore(t *testing.T) {
 	checkerDone := make(chan struct{})
 	go func() {
 		defer close(checkerDone)
-		_ = checker(context.Background(), clients, src, resource.ResourceCache{})
+		_ = checker(context.Background(), scope, src, resource.ResourceCache{})
 	}()
 
 	// Wait for the blocked call to enter the SES API stub.
@@ -331,18 +342,18 @@ func TestSESRuleSetSwap_LateWriterDoesNotPoisonNewStore(t *testing.T) {
 
 	// Capture the OLD store reference so we can verify the late writer
 	// targeted it (not the new one).
-	oldStore := clients.RuleSets()
+	oldStore := scope.RuleSets
 
 	// Refresh: swap to a fresh store (production Ctrl+R pattern).
-	clients.SetRuleSets(session.NewRuleSetStore())
+	scope.RuleSets = session.NewRuleSetStore()
 
 	// Release the blocked call. Goroutine A returns and writes its result.
 	close(v1Mock.releaseCh)
 	<-checkerDone
 
-	// Pin: the new active store is empty. The late writer pollute the
+	// Pin: the new active store is empty. The late writer pollutes the
 	// orphaned old store, not the new one.
-	if _, ok := clients.RuleSets().Get(); ok {
+	if _, ok := scope.RuleSets.Get(); ok {
 		t.Errorf("new RuleSets store has cached entry — late writer poisoned the active slot")
 	}
 	// Confirm the orphaned store DID receive the write (so we know the
@@ -428,8 +439,8 @@ func TestSESActiveReceiptRuleSet_Singleflight_CoalescesConcurrentMisses(t *testi
 		output:     ruleSetOutput,
 	}
 
-	clients := &awsclient.ServiceClients{SES: mock}
-	clients.SetRuleSets(session.NewRuleSetStore())
+	innerClients := &awsclient.ServiceClients{SES: mock}
+	scope := &awsclient.Scope{Clients: innerClients, RuleSets: session.NewRuleSetStore()}
 
 	type result struct {
 		out *ses.DescribeActiveReceiptRuleSetOutput
@@ -449,7 +460,7 @@ func TestSESActiveReceiptRuleSet_Singleflight_CoalescesConcurrentMisses(t *testi
 		go func(idx int) {
 			defer wg.Done()
 			started <- struct{}{} // signal: "I'm about to call"
-			out, err := awsclient.SESActiveReceiptRuleSetForTest(context.Background(), clients)
+			out, err := awsclient.SESActiveReceiptRuleSetForTest(context.Background(), scope)
 			results[idx] = result{out: out, err: err}
 		}(i)
 	}
@@ -576,8 +587,8 @@ func TestSESActiveReceiptRuleSet_Singleflight_LeaderCancelDoesNotPoisonFollower(
 		output:     ruleSetOutput,
 	}
 
-	clients := &awsclient.ServiceClients{SES: mock}
-	clients.SetRuleSets(session.NewRuleSetStore())
+	innerClients := &awsclient.ServiceClients{SES: mock}
+	scope := &awsclient.Scope{Clients: innerClients, RuleSets: session.NewRuleSetStore()}
 
 	type result struct {
 		out *ses.DescribeActiveReceiptRuleSetOutput
@@ -593,7 +604,7 @@ func TestSESActiveReceiptRuleSet_Singleflight_LeaderCancelDoesNotPoisonFollower(
 	ctxA, cancelA := context.WithCancel(context.Background())
 	go func() {
 		defer wg.Done()
-		out, err := awsclient.SESActiveReceiptRuleSetForTest(ctxA, clients)
+		out, err := awsclient.SESActiveReceiptRuleSetForTest(ctxA, scope)
 		resA = result{out: out, err: err}
 	}()
 
@@ -612,7 +623,7 @@ func TestSESActiveReceiptRuleSet_Singleflight_LeaderCancelDoesNotPoisonFollower(
 	go func() {
 		defer wg.Done()
 		close(bStarted)
-		out, err := awsclient.SESActiveReceiptRuleSetForTest(context.Background(), clients)
+		out, err := awsclient.SESActiveReceiptRuleSetForTest(context.Background(), scope)
 		resB = result{out: out, err: err}
 	}()
 
@@ -713,13 +724,13 @@ var _ awsclient.SESV1API = (*nilReturnSESV1)(nil)
 func TestSESActiveReceiptRuleSet_NilResultIsNotCached(t *testing.T) {
 	mock := &nilReturnSESV1{}
 
-	clients := &awsclient.ServiceClients{SES: mock}
-	clients.SetRuleSets(session.NewRuleSetStore())
+	innerClients := &awsclient.ServiceClients{SES: mock}
+	scope := &awsclient.Scope{Clients: innerClients, RuleSets: session.NewRuleSetStore()}
 
 	ctx := context.Background()
 
 	// ---- Call 1: fetcher returns (nil, nil). ----
-	out1, err1 := awsclient.SESActiveReceiptRuleSetForTest(ctx, clients)
+	out1, err1 := awsclient.SESActiveReceiptRuleSetForTest(ctx, scope)
 	if err1 != nil {
 		t.Fatalf("call 1: unexpected error: %v", err1)
 	}
@@ -731,7 +742,7 @@ func TestSESActiveReceiptRuleSet_NilResultIsNotCached(t *testing.T) {
 	}
 
 	// ---- Call 2: nil must NOT have been cached — fetcher must be called again. ----
-	out2, err2 := awsclient.SESActiveReceiptRuleSetForTest(ctx, clients)
+	out2, err2 := awsclient.SESActiveReceiptRuleSetForTest(ctx, scope)
 	if err2 != nil {
 		t.Fatalf("call 2: unexpected error: %v", err2)
 	}

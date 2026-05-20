@@ -95,7 +95,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 					}
 					// Partial coverage: fall through to fetch so missing IDs are retrieved.
 					if len(filtered) < len(result.RelatedIDs) {
-						fetchCmd := m.fetchResources(msg.TargetType)
+						fetchCmd := m.fetchResources(msg.TargetType, m.core.Session().AvailabilityGen)
 						return m, fetchCmd
 					}
 				}
@@ -117,7 +117,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 			rl.SetSize(m.innerSize())
 			rl, initCmd := rl.Init()
 			m.pushView(&rl)
-			return m, tea.Batch(initCmd, m.fetchResourcesFiltered(msg.TargetType, result.FetchFilter))
+			return m, tea.Batch(initCmd, m.fetchResourcesFiltered(msg.TargetType, result.FetchFilter, m.core.Session().AvailabilityGen))
 		}
 
 		// TargetID-based filtered list (cache miss).
@@ -431,9 +431,9 @@ func relatedNavigateTasksToCmd(m Model, targetType string, result runtime.Naviga
 	for _, t := range tasks {
 		switch t.Key.Kind {
 		case runtime.KindFetchResources:
-			cmds = append(cmds, m.fetchResources(targetType))
+			cmds = append(cmds, m.fetchResources(targetType, m.core.Session().AvailabilityGen))
 		case runtime.KindFetchFiltered:
-			cmds = append(cmds, m.fetchResourcesFiltered(targetType, result.FetchFilter))
+			cmds = append(cmds, m.fetchResourcesFiltered(targetType, result.FetchFilter, m.core.Session().AvailabilityGen))
 		case runtime.KindFetchMore:
 			// Continuation token is runtime-owned and arrives as a structured
 			// payload (AS-270 / PR-05b). The adapter is a pure pass-through
@@ -549,7 +549,14 @@ func (m Model) relatedCheckCmd(res resource.Resource) tea.Cmd {
 					}
 				}
 			}
-			result := def.Checker(ctx, m.core.Session().Clients, res, localCache)
+			// Per AS-660: the four reader closures (policy FetchByIDs +
+			// checkSESLambda / checkSESS3 / checkGlueCFN / checkEBSBackup)
+			// require *aws.Scope so they can consume session-scoped stores.
+			// All other fetchers continue to receive *ServiceClients
+			// untouched. The dispatcher selects per-source-type for the
+			// checker and per-target-type for FetchByIDs.
+			checkerClients := relatedCheckerClients(m.core.Session(), res.Type)
+			result := def.Checker(ctx, checkerClients, res, localCache)
 			result.TargetType = def.TargetType
 			var lazyAdded map[string][]resource.Resource
 			var lazyAddError error
@@ -557,7 +564,7 @@ func (m Model) relatedCheckCmd(res resource.Resource) tea.Cmd {
 				if ff := resource.GetFetchByIDs(def.TargetType); ff != nil {
 					missing := runtime.MissingFromCache(localCache, def.TargetType, result.ResourceIDs)
 					if len(missing) > 0 {
-						extra, fetchErr := ff(ctx, m.core.Session().Clients, missing)
+						extra, fetchErr := ff(ctx, fetchByIDsClients(m.core.Session(), def.TargetType), missing)
 						if fetchErr != nil {
 							lazyAddError = fetchErr
 						}

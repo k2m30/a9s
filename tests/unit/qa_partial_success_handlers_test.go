@@ -57,7 +57,8 @@ func TestHandleAvailabilityChecked_PartialErrAppliesState(t *testing.T) {
 	}
 
 	// Dispatch the partial-success AvailabilityCheckedMsg.
-	// Gen=0 matches initial availabilityGen=0.
+	// session.New seeds AvailabilityGen=1 (AS-659) — stamp the live value so
+	// the AvailabilityChecked stale guard (AcceptZeroGen=false) accepts it.
 	m, cmd := rootApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: "ec2", // registered type so menu can track it
 		Err:          partialErr,
@@ -66,7 +67,7 @@ func TestHandleAvailabilityChecked_PartialErrAppliesState(t *testing.T) {
 		Resources:    partialResources,
 		Issues:       0,
 		Truncated:    false,
-		Gen:          0,
+		Gen:          m.Session().AvailabilityGen,
 	})
 
 	// CONTRACT 1: A FlashMsg with IsError=true must be emitted.
@@ -99,7 +100,7 @@ func TestHandleAvailabilityChecked_PartialErrAppliesState(t *testing.T) {
 	// retained, buildEnrichQueue includes "ec2" → enrichment is dispatched.
 	_, enrichCmd := rootApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: "dummy-for-finalize",
-		Gen:          0,
+		Gen:          m.Session().AvailabilityGen,
 		Count:        0,
 		HasResources: false,
 	})
@@ -138,13 +139,13 @@ func TestHandleAvailabilityChecked_HardErr_NoStateApplied(t *testing.T) {
 		HasResources: false,
 		Count:        0,
 		Resources:    nil,
-		Gen:          0,
+		Gen:          m.Session().AvailabilityGen,
 	})
 
 	// Hard failure: wave 2 must NOT be dispatched for lambda (no probe resources).
 	_, enrichCmd := rootApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: "dummy-finalize",
-		Gen:          0,
+		Gen:          m.Session().AvailabilityGen,
 	})
 	if enrichCmd != nil {
 		enrichMsgs := collectEnrichmentMsgs(enrichCmd)
@@ -187,7 +188,7 @@ func TestHandleEnrichmentChecked_PartialErrAppliesState(t *testing.T) {
 	// Seed probeResources["ec2"] so the handler can merge FieldUpdates.
 	m, _ = rootApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: "ec2",
-		Gen:          0,
+		Gen:          m.Session().AvailabilityGen,
 		Count:        1,
 		HasResources: true,
 		Resources: []resource.Resource{

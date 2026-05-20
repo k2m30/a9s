@@ -43,12 +43,35 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	demofixtures "github.com/k2m30/a9s/v3/internal/demo/fixtures"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/session"
 )
+
+// checkerClientsFor returns the carrier to hand a related-checker for the
+// given source resource type. Mirrors the production dispatcher
+// (internal/tui/scope_dispatch.go) — sources whose checkers consume
+// session-scoped stores (ses, glue, vol) receive a *aws.Scope wrapping the
+// transport plus fresh per-session stores; all others receive bare
+// *ServiceClients.
+//
+// Post-AS-660: the drill-through test runs checkers DIRECTLY (no TUI loop),
+// so it must replicate the dispatch wrapping rather than rely on the adapter.
+func checkerClientsFor(clients *awsclient.ServiceClients, sourceType string) any {
+	switch sourceType {
+	case "ses", "glue", "vol":
+		return &awsclient.Scope{
+			Clients:       clients,
+			IAMPolicies:   session.NewPolicyStore(),
+			IdentityStore: session.NewIdentityStore(),
+			RuleSets:      session.NewRuleSetStore(),
+		}
+	}
+	return clients
+}
 
 // drillThroughFixtures is the full set of (label, shortName, graphRoot) triples
 // that every drill-through subtest runs against. Multiple rows per shortName are
@@ -218,7 +241,7 @@ func TestScenario_RelatedDrillThrough_All(t *testing.T) {
 					if def.TargetType == "ct-events" {
 						continue
 					}
-					result := def.Checker(ctx, clients, src, cache)
+					result := def.Checker(ctx, checkerClientsFor(clients, group.shortName), src, cache)
 					obs := rootPivotObservation{
 						count:             result.Count,
 						resourceIDs:       append([]string(nil), result.ResourceIDs...),
@@ -335,7 +358,7 @@ func TestScenario_RelatedDrillNavigationLands_All(t *testing.T) {
 					t.Run(root.label+"/"+def.DisplayName, func(t *testing.T) {
 						// 1. Compute checker result synchronously.
 						src := fullIntegrationMustFindResourceByID(t, clients, group.shortName, root.id)
-						result := def.Checker(ctx, clients, src, cache)
+						result := def.Checker(ctx, checkerClientsFor(clients, group.shortName), src, cache)
 						if result.Count < 1 && len(result.ResourceIDs) == 0 && len(result.FetchFilter) == 0 {
 							// Already caught by the direct-checker test as U9 violation — skip
 							// drilling here. This subtest is purely about drill-lands-non-empty.

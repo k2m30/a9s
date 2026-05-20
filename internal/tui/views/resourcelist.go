@@ -182,7 +182,12 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 		// empty type only appears in unit-test fixtures that synthesise a
 		// ResourcesLoaded without a ResourceType. AS-648-h2 will tighten
 		// this further by carrying a session generation alongside the type.
-		if msg.ResourceType != "" {
+		//
+		// Child views (parentContext != nil) bypass the guard: their parent
+		// ResourceType differs from the child ShortName by design (e.g. S3
+		// object lists receive ResourceType "s3" from tests that address the
+		// parent bucket type rather than the canonical child type "s3_objects").
+		if msg.ResourceType != "" && m.parentContext == nil {
 			canon := msg.ResourceType
 			if td := resource.FindResourceType(msg.ResourceType); td != nil {
 				canon = td.ShortName

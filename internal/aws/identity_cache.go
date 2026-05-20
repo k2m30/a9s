@@ -24,23 +24,17 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
-// identityStore is the unexported shape internal/aws expects from a
-// per-Session identity cache. session.IdentityStore() satisfies this via
-// duck-typing — internal/aws cannot import internal/session without a cycle,
-// so the local interface mirrors the methods needed here.
-type identityStore interface {
-	AccountID() string
-	Err() error
-	Set(id string, err error)
-}
+// The per-Session identity cache shape consumed by accountIDFromClients is
+// declared as IdentityAccess in scope.go — session.IdentityStore satisfies
+// it via Go's structural typing.
 
 // accountIDFromClients returns the caller's AWS account ID, fetched and
 // cached via STS GetCallerIdentity on first call. Returns "" on any failure
 // so callers emit Count: -1.
 //
-// The store argument carries per-session state; pass c.IdentityStore() at the
-// call site so each profile/region session uses an isolated cache.
-func accountIDFromClients(ctx context.Context, c *ServiceClients, store identityStore) string {
+// The store argument carries per-session state; pass scope.IdentityStore at
+// the call site so each profile/region session uses an isolated cache.
+func accountIDFromClients(ctx context.Context, c *ServiceClients, store IdentityAccess) string {
 	if store == nil {
 		// Defensive: store must always be wired by handleClientsReady. Fall
 		// back to a fresh STS call so the related-checker still works (slow

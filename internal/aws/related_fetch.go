@@ -32,6 +32,13 @@ func FetchRelatedTarget(ctx context.Context, clients any, cache resource.Resourc
 	if pf == nil {
 		return nil, false, nil
 	}
+	// Unwrap *Scope to *ServiceClients so the paginated fetcher (which still
+	// type-asserts *ServiceClients per spec §3.4 — transport-only fetchers stay
+	// untouched) works uniformly whether the dispatcher passed a bare
+	// transport carrier or a Scope-wrapped one.
+	if c := serviceClientsFromAny(clients); c != nil {
+		clients = c
+	}
 	result, err := pf(ctx, clients, "")
 	if err != nil {
 		return nil, false, err

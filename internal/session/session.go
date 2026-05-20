@@ -140,28 +140,25 @@ type Session struct {
 	PolicyDocCache *awsclient.PolicyDocumentCache
 
 	// IAMPolicies is the per-session cache for IAM policy resources, keyed by
-	// both PolicyName and ARN. Replaces the package-level globals previously in
-	// internal/aws/iam_policies.go. Wired into *ServiceClients.IAMPolicies on
-	// every ClientsReadyMsg so FetchIAMPoliciesByIDsFull uses the session store.
+	// both PolicyName and ARN. Post-AS-660 the store lives only here: the
+	// dispatcher in internal/tui/scope_dispatch.go reads it into a fresh
+	// *aws.Scope on each "policy" FetchByIDs dispatch, so the transport
+	// (*ServiceClients) no longer carries a parallel copy.
 	IAMPolicies PolicyStore
 
 	// IdentityStore is the per-session cache for the AWS caller's account ID
-	// used by Pattern-C related checkers. Replaces the package-level globals
-	// previously in internal/aws/identity_cache.go (identityCacheMu /
-	// cachedAccountID / cachedAccountErr). Wired into *ServiceClients.
-	// IdentityStore on every ClientsReadyMsg so Pattern-C related checkers
-	// (Glue tags, EBS Backup) see a per-profile/region scoped cache rather
-	// than a process-global one. Distinct from Session.Identity (the resolved
-	// *awsclient.CallerIdentity) which holds the human-readable identity
-	// metadata for the header / IdentityModel.
+	// used by Pattern-C related checkers (Glue tags, EBS Backup). Post-AS-660
+	// it lives only here and reaches the readers via *aws.Scope. Distinct
+	// from Session.Identity (the resolved *awsclient.CallerIdentity) which
+	// holds the human-readable identity metadata for the header /
+	// IdentityModel.
 	IdentityStore IdentityStore
 
 	// RuleSets is the per-session, single-slot cache for the SES v1
-	// DescribeActiveReceiptRuleSet response. Replaces the package-level
-	// globals previously in internal/aws/ses_related.go (sesRuleSetCacheMu
-	// + sesRuleSetCaches map keyed by *ServiceClients pointer). Wired into
-	// *ServiceClients.RuleSets on every ClientsReadyMsg so checkSESLambda /
-	// checkSESS3 see a session-scoped cache rather than a process-global map.
+	// DescribeActiveReceiptRuleSet response. Post-AS-660 it lives only here
+	// and reaches checkSESLambda / checkSESS3 via *aws.Scope (the transport
+	// no longer carries the store). Swap (not Clear) is required on Ctrl+R so
+	// in-flight blocked fetchers land on the orphaned old store.
 	RuleSets RuleSetStore
 }
 
@@ -181,6 +178,7 @@ func New() *Session {
 		RelatedGen:             1,
 		EnrichGen:              1,
 		EnrichmentGen:          1,
+		AvailabilityGen:        1,
 		PolicyDocCache:         &awsclient.PolicyDocumentCache{},
 		IAMPolicies:            NewPolicyStore(),
 		IdentityStore:          NewIdentityStore(),

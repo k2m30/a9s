@@ -11,18 +11,9 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// iamPolicyStore is the subset of session.PolicyStore consumed by this file.
-// Defined locally to avoid an import cycle (internal/session imports internal/aws).
-// session.PolicyStore satisfies this interface via Go's structural typing.
-type iamPolicyStore interface {
-	Lookup(key string) (resource.Resource, bool)
-	Set(key string, r resource.Resource)
-	ManagedBuilt() bool
-	MarkManagedBuilt()
-	InlineBuilt() bool
-	MarkInlineBuilt()
-	Clear()
-}
+// The subset of session.PolicyStore consumed by this file is declared as
+// IAMPolicyAccess in scope.go — session.PolicyStore satisfies it via Go's
+// structural typing.
 
 func init() {
 	resource.RegisterFieldKeys("policy", []string{"policy_name", "policy_type", "attachment_count", "is_attachable", "path", "create_date"})
@@ -50,14 +41,14 @@ func init() {
 	})
 
 	resource.RegisterFetchByIDs("policy", func(ctx context.Context, clients any, ids []string) ([]resource.Resource, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
+		s, ok := clients.(*Scope)
+		if !ok || s == nil || s.Clients == nil {
+			return nil, fmt.Errorf("AWS clients not initialized: policy FetchByIDs requires *aws.Scope")
 		}
-		if c.IAMPolicies() == nil {
-			return nil, fmt.Errorf("IAMPolicies store not initialized on ServiceClients")
+		if s.IAMPolicies == nil {
+			return nil, fmt.Errorf("IAMPolicies store not initialized on aws.Scope")
 		}
-		return FetchIAMPoliciesByIDsFull(ctx, c.IAM, ids, c.IAMPolicies())
+		return FetchIAMPoliciesByIDsFull(ctx, s.Clients.IAM, ids, s.IAMPolicies)
 	})
 
 	resource.RegisterRelated("policy", []resource.RelatedDef{
@@ -199,9 +190,37 @@ func FetchIAMPoliciesPage(ctx context.Context, api IAMListPoliciesAPI, continuat
 // (c) introducing a sync.Once or
 // build-in-progress flag would re-couple the transport layer to a session
 // concern that PR-02b explicitly removed. Same applies to InlineBuilt.
-func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string, store iamPolicyStore) ([]resource.Resource, error) {
+func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string, store IAMPolicyAccess) ([]resource.Resource, error) {
 	if len(ids) == 0 {
 		return nil, nil
+	}
+	if store == nil {
+		return nil, fmt.Errorf("policy FetchByIDs: IAMPolicies store not initialized")
+	}
+
+	if api == nil {
+		// Defensive: no IAM API surface (test / pre-init). Skip both builds and
+		// fall through to a store-only lookup so callers with a pre-populated
+		// cache still resolve, and callers without one observe failures via
+		// AggregateFailures rather than a nil deref.
+		var failures []string
+		resources := make([]resource.Resource, 0, len(ids))
+		seen := make(map[string]struct{}, len(ids))
+		for _, id := range ids {
+			if id == "" {
+				continue
+			}
+			if _, dup := seen[id]; dup {
+				continue
+			}
+			seen[id] = struct{}{}
+			if r, hit := store.Lookup(id); hit {
+				resources = append(resources, r)
+			} else {
+				failures = append(failures, fmt.Sprintf("%s: not found", id))
+			}
+		}
+		return resources, AggregateFailures("policy FetchByIDs", failures, len(ids))
 	}
 
 	if !store.ManagedBuilt() {
@@ -276,7 +295,7 @@ func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string, st
 //
 // Per-ID failures (IDs not present in the all-policies map) are collected into
 // a composite error returned alongside the partial success list.
-func FetchIAMPoliciesByIDs(ctx context.Context, api IAMListPoliciesAPI, ids []string, store iamPolicyStore) ([]resource.Resource, error) {
+func FetchIAMPoliciesByIDs(ctx context.Context, api IAMListPoliciesAPI, ids []string, store IAMPolicyAccess) ([]resource.Resource, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
@@ -312,7 +331,7 @@ func FetchIAMPoliciesByIDs(ctx context.Context, api IAMListPoliciesAPI, ids []st
 // the store with every managed policy (customer + AWS). Each paginated
 // ListPolicies call is wrapped in RetryOnThrottle so throttling during
 // large accounts is handled gracefully.
-func buildAllManagedPolicies(ctx context.Context, api IAMListPoliciesAPI, store iamPolicyStore) error {
+func buildAllManagedPolicies(ctx context.Context, api IAMListPoliciesAPI, store IAMPolicyAccess) error {
 	var marker *string
 	for {
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*iam.ListPoliciesOutput, error) {

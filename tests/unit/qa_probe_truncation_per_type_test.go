@@ -94,7 +94,9 @@ func TestBuildResourceCacheSnapshot_ProbeAuthoritative_SinglePageComplete(t *tes
 		IssueCounts:    map[string]int{targetType: 0},
 		IssueTruncated: map[string]bool{targetType: false},
 		Resources:      map[string][]resource.Resource{targetType: {probeResource}},
-		Gen:            0, // Gen=0 is accepted unconditionally (test injection sentinel)
+		// Stamp the live AvailabilityGen so the AS-657/AS-659 staleness guard
+		// accepts the message (AcceptZeroGen=false after AS-659).
+		Gen: m.Session().AvailabilityGen,
 	})
 
 	// Navigate to src detail view so RelatedCheckStartedMsg is handled.
@@ -196,7 +198,9 @@ func TestBuildResourceCacheSnapshot_ProbeTruncated_StampsTrue(t *testing.T) {
 		IssueCounts:    map[string]int{targetType: 0},
 		IssueTruncated: map[string]bool{targetType: true},
 		Resources:      map[string][]resource.Resource{targetType: {probeResource}},
-		Gen:            0,
+		// Stamp the live AvailabilityGen so the AS-657/AS-659 staleness guard
+		// accepts the message (AcceptZeroGen=false after AS-659).
+		Gen: m.Session().AvailabilityGen,
 	})
 
 	srcRes := resource.Resource{ID: "pt2-src-001", Name: "pt2-src-001"}
