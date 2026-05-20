@@ -228,6 +228,13 @@ func TestHandleRefresh_SESDetailViewInvalidatesRuleSetCache(t *testing.T) {
 	// that Init() would normally emit as a command (but we don't run the event loop).
 	m = applyMsg(m, messages.ClientsReady{Clients: innerClients})
 
+	// Post-AS-660: the production dispatcher constructs a fresh *aws.Scope per
+	// dispatch via runtime.NewScope(m.Session()), so it always reads the
+	// session-owned RuleSets store. Mirror that here: replace the test's local
+	// scope.RuleSets with the session's store so call 3 (after Ctrl+R) reads
+	// the post-swap store the same way production does.
+	scope.RuleSets = m.Session().RuleSets
+
 	// Push an SES detail view onto the stack.
 	m = applyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
@@ -237,7 +244,11 @@ func TestHandleRefresh_SESDetailViewInvalidatesRuleSetCache(t *testing.T) {
 
 	// Press Ctrl+R while on the ses detail view — must call InvalidateSESRuleSetCache.
 	m = applyMsg(m, tea.KeyPressMsg{Code: -1, Text: "\x12"})
-	_ = m // model state after refresh is not inspected
+
+	// Re-sync the test scope with the post-Ctrl+R store so call 3 sees the
+	// fresh slot — matches production where every dispatcher invocation rebuilds
+	// the scope from m.Session().
+	scope.RuleSets = m.Session().RuleSets
 
 	// ---- Call 3: cache must be invalidated. ----
 	r3 := checker(context.Background(), scope, src, resource.ResourceCache{})

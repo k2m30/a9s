@@ -442,10 +442,11 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		// sesActiveReceiptRuleSet captures its store reference at entry; we
 		// replace the slot here.
 		if rt == "ses" {
+			// Swap (not Clear) the per-session store so in-flight blocked
+			// DescribeActiveReceiptRuleSet fetchers land on the orphaned old
+			// store, never the new one. Post-AS-660: stores live solely on
+			// Session — there is no transport-side rewire to perform.
 			m.core.Session().RuleSets = session.NewRuleSetStore()
-			if m.core.Session().Clients != nil {
-				m.core.Session().Clients.SetRuleSets(m.core.Session().RuleSets)
-			}
 		}
 		m.flash = flashState{text: "Refreshing...", isError: false, active: true}
 
@@ -490,10 +491,8 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	if rt == "ses" {
 		// Swap (see detail-view path above): protects against in-flight blocked
 		// DescribeActiveReceiptRuleSet fetchers re-poisoning the cache.
+		// Post-AS-660: no transport-side rewire — stores live solely on Session.
 		m.core.Session().RuleSets = session.NewRuleSetStore()
-		if m.core.Session().Clients != nil {
-			m.core.Session().Clients.SetRuleSets(m.core.Session().RuleSets)
-		}
 	}
 	m.flash = flashState{text: "Refreshing...", isError: false, active: true}
 

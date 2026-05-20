@@ -12,16 +12,9 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// ruleSetStore is the unexported shape internal/aws expects from a
-// per-Session SES rule set cache. session.RuleSetStore satisfies this via
-// duck-typing — internal/aws cannot import internal/session without a cycle,
-// so the local interface mirrors the methods needed here.
-type ruleSetStore interface {
-	Get() (any, bool)
-	Set(any)
-	Clear()
-	GetOrFetch(context.Context, func(context.Context) (any, error)) (any, error)
-}
+// The per-Session SES rule set cache shape consumed by sesActiveReceiptRuleSet
+// is declared as RuleSetAccess in scope.go — session.RuleSetStore satisfies
+// it via Go's structural typing.
 
 // checkSESR53 searches the R53 cache for hosted zones whose domain matches the
 // SES identity domain. Pattern N — naming convention.
@@ -81,7 +74,9 @@ func sesIdentityDomain(res resource.Resource) string {
 func sesRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
 	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
+		// SES source closures may receive either *Scope or *ServiceClients —
+		// mask the error only when no transport is reachable.
+		if serviceClientsFromAny(clients) == nil {
 			return nil, false, nil
 		}
 	}
@@ -126,11 +121,14 @@ func sesEventDestinations(ctx context.Context, c *ServiceClients, configSetName 
 // session. The store is per-session; singleflight coalesces concurrent misses
 // into one upstream call. Swap (not Clear) is required on Ctrl+R refresh so
 // late-completing fetches land on the orphaned old store, never the new one.
-func sesActiveReceiptRuleSet(ctx context.Context, c *ServiceClients) (*ses.DescribeActiveReceiptRuleSetOutput, error) {
+//
+// Post-AS-660: store is passed explicitly by the caller (the SES checker
+// type-asserts *Scope and forwards scope.RuleSets here) rather than being
+// pulled off *ServiceClients.
+func sesActiveReceiptRuleSet(ctx context.Context, c *ServiceClients, store RuleSetAccess) (*ses.DescribeActiveReceiptRuleSetOutput, error) {
 	if c == nil || c.SES == nil {
 		return nil, nil //nolint:nilnil // no SES v1 client; caller treats nil as "no rule set"
 	}
-	store := c.RuleSets()
 	if store == nil {
 		// No store wired (test path or pre-init); fall back to direct fetch
 		// without caching or coalescing.
@@ -162,8 +160,8 @@ func checkSESEbRule(ctx context.Context, clients any, res resource.Resource, cac
 	if identityName == "" {
 		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
 	}
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil {
+	c := serviceClientsFromAny(clients)
+	if c == nil {
 		// Without a client we cannot query SESv2 to discover EventBridge bus names.
 		// Return Count=0 (early exit — no-client path cannot produce results).
 		return resource.RelatedCheckResult{TargetType: "eb-rule", Count: 0}
@@ -320,11 +318,11 @@ func sesRuleAppliesToIdentity(rule sestypes.ReceiptRule, identityName, identityT
 // accounts with no active receipt rule set (pure outbound SES) — operator-honest
 // absence.
 func checkSESLambda(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil {
+	s, ok := clients.(*Scope)
+	if !ok || s == nil || s.Clients == nil || s.RuleSets == nil {
 		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1}
 	}
-	out, err := sesActiveReceiptRuleSet(ctx, c)
+	out, err := sesActiveReceiptRuleSet(ctx, s.Clients, s.RuleSets)
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "lambda", Count: -1, Err: err}
 	}
@@ -348,11 +346,11 @@ func checkSESLambda(ctx context.Context, clients any, res resource.Resource, _ r
 // Rules[].Actions[].S3Action.BucketName. Returns Count: 0 for accounts with no
 // active receipt rule set — operator-honest absence.
 func checkSESS3(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil {
+	s, ok := clients.(*Scope)
+	if !ok || s == nil || s.Clients == nil || s.RuleSets == nil {
 		return resource.RelatedCheckResult{TargetType: "s3", Count: -1}
 	}
-	out, err := sesActiveReceiptRuleSet(ctx, c)
+	out, err := sesActiveReceiptRuleSet(ctx, s.Clients, s.RuleSets)
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "s3", Count: -1, Err: err}
 	}
@@ -446,8 +444,8 @@ func checkSESSns(ctx context.Context, clients any, res resource.Resource, _ reso
 	if identityName == "" {
 		return resource.RelatedCheckResult{TargetType: "sns", Count: 0}
 	}
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil {
+	c := serviceClientsFromAny(clients)
+	if c == nil {
 		return resource.RelatedCheckResult{TargetType: "sns", Count: -1}
 	}
 	configSetName := sesConfigSetName(ctx, c, identityName)

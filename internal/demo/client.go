@@ -3,7 +3,6 @@ package demo
 import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
-	"github.com/k2m30/a9s/v3/internal/session"
 )
 
 // DemoRegion is the synthetic region displayed in demo mode.
@@ -62,8 +61,7 @@ func NewServiceClients() *awsclient.ServiceClients {
 	clients.KMS = fakes.NewKMS()
 	clients.MSK = fakes.NewMSK()
 	clients.Backup = fakes.NewBackup()
-	clients.SetIAMPolicies(session.NewPolicyStore())
-	clients.SetIdentityStore(session.NewIdentityStore())
-	clients.SetRuleSets(session.NewRuleSetStore())
+	// Per-Session capability stores are populated by session.New() (post-AS-660);
+	// the transport no longer carries session-scoped state.
 	return clients
 }

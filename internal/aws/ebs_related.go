@@ -154,12 +154,13 @@ func checkEBSBackup(ctx context.Context, clients any, res resource.Resource, _ r
 	if volID == "" {
 		return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
 	}
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil || c.Backup == nil {
+	s, ok := clients.(*Scope)
+	if !ok || s == nil || s.Clients == nil || s.Clients.Backup == nil {
 		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
 	}
+	c := s.Clients
 	region := regionFromEnv()
-	account := accountIDFromClients(ctx, c, c.IdentityStore())
+	account := accountIDFromClients(ctx, c, s.IdentityStore)
 	if region == "" || account == "" {
 		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
 	}
@@ -193,7 +194,9 @@ func checkEBSBackup(ctx context.Context, clients any, res resource.Resource, _ r
 func ebsRelatedResources(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
 	resources, isTruncated, err := FetchRelatedTarget(ctx, clients, cache, target)
 	if err != nil {
-		if _, ok := clients.(*ServiceClients); !ok {
+		// EBS source closures may receive either *Scope or *ServiceClients —
+		// mask the error only when no transport is reachable.
+		if serviceClientsFromAny(clients) == nil {
 			return nil, false, nil
 		}
 	}

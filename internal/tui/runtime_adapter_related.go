@@ -549,7 +549,14 @@ func (m Model) relatedCheckCmd(res resource.Resource) tea.Cmd {
 					}
 				}
 			}
-			result := def.Checker(ctx, m.core.Session().Clients, res, localCache)
+			// Per AS-660: the four reader closures (policy FetchByIDs +
+			// checkSESLambda / checkSESS3 / checkGlueCFN / checkEBSBackup)
+			// require *aws.Scope so they can consume session-scoped stores.
+			// All other fetchers continue to receive *ServiceClients
+			// untouched. The dispatcher selects per-source-type for the
+			// checker and per-target-type for FetchByIDs.
+			checkerClients := relatedCheckerClients(m.core.Session(), res.Type)
+			result := def.Checker(ctx, checkerClients, res, localCache)
 			result.TargetType = def.TargetType
 			var lazyAdded map[string][]resource.Resource
 			var lazyAddError error
@@ -557,7 +564,7 @@ func (m Model) relatedCheckCmd(res resource.Resource) tea.Cmd {
 				if ff := resource.GetFetchByIDs(def.TargetType); ff != nil {
 					missing := runtime.MissingFromCache(localCache, def.TargetType, result.ResourceIDs)
 					if len(missing) > 0 {
-						extra, fetchErr := ff(ctx, m.core.Session().Clients, missing)
+						extra, fetchErr := ff(ctx, fetchByIDsClients(m.core.Session(), def.TargetType), missing)
 						if fetchErr != nil {
 							lazyAddError = fetchErr
 						}

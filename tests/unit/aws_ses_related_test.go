@@ -68,12 +68,22 @@ func sesFixtureSrcIdentity(identityName string) resource.Resource {
 	}
 }
 
-// sesFixtureClients returns a *ServiceClients whose SESv2 fake is wired with the
-// canonical fixture event destinations for the graph-root identity.
-func sesFixtureClients() *awsclient.ServiceClients {
+// sesFixtureClients returns a *awsclient.Scope whose Clients.SESv2 fake is wired
+// with the canonical fixture event destinations for the graph-root identity,
+// and whose RuleSets store is a fresh empty per-Session store.
+//
+// Post-AS-660 the SES checkers (checkSESLambda, checkSESS3, …) type-assert
+// *Scope, so test helpers that drive them must hand them a Scope (not a bare
+// *ServiceClients). c.SES is intentionally left nil — every fixture identity
+// exercises the "pure outbound account, no rule set" path which returns
+// Count=0 for lambda/s3 checkers.
+func sesFixtureClients() *awsclient.Scope {
 	f := fixtures.NewSESFixtures()
-	return &awsclient.ServiceClients{
-		SESv2: newFakeSESv2FromFixture(f),
+	return &awsclient.Scope{
+		Clients: &awsclient.ServiceClients{
+			SESv2: newFakeSESv2FromFixture(f),
+		},
+		RuleSets: session.NewRuleSetStore(),
 	}
 }
 
