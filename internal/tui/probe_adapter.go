@@ -158,7 +158,16 @@ func (m *Model) refreshResourceListWithEnrichmentRerun(
 
 // probeEnrichment returns a tea.Cmd that runs the registered Wave-2 enricher
 // for shortName and converts the result to EnrichmentCheckedMsg.
+//
+// In demo mode (`WithIsDemo(true)`) the contract is to skip Wave-2 enrichment
+// entirely — registered enrichers are AWS-keyed and would issue real API calls
+// against synthetic fakes / missing credentials. The early return here matches
+// the documented WithIsDemo behavior; the registry is not consulted so AWS-only
+// enricher contracts are not exercised in demo sessions (AS-658 / AS-648-h3).
 func (m *Model) probeEnrichment(shortName string, gen domain.Gen) tea.Cmd {
+	if m.isDemo {
+		return nil
+	}
 	ctx, clients := m.appCtx, m.core.Session().Clients
 	typeGen := m.core.Session().EnrichmentTypeGen[shortName]
 	if awsclient.IssueEnricherRegistry[shortName].Fn == nil {
