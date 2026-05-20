@@ -250,64 +250,91 @@ func TestHappyPath_MatchingGen_ValueRevealed(t *testing.T) {
 	}
 }
 
-// TestHappyPath_ZeroGen_AcceptedByAllThree verifies that Gen==0 is never treated
-// as stale for ResourcesLoaded, IdentityLoaded, or ValueRevealed (AcceptZeroGen=true).
-// This covers the --demo / --no-cache bootstrap where Rotate() has not been called
-// and AvailabilityGen/ConnectGen start at zero.
+// TestHappyPath_ZeroGen_AcceptedByAllThree pins AcceptZeroGen=true for
+// ResourcesLoaded, IdentityLoaded, and ValueRevealed. The contract: a Gen=0
+// stamp must be accepted regardless of the live counter, because legacy/demo
+// /--no-cache/test callers dispatch these messages without a Gen field set.
+//
+// Each subtest forces the relevant live counter to a non-zero value before
+// dispatching a Gen=0 message, so the assertion exercises the IsStale
+// "stamp == 0 && AcceptZeroGen()" branch (messages/messages.go:71) rather
+// than the trivial "stamp == currentGen" path.
+//
+// Note: the prior version of this test gated on `m.Session().AvailabilityGen
+// == 0` on a fresh session. The AS-659 seed `AvailabilityGen=1` in
+// `session.New()` (this same PR) makes that precondition unsatisfiable, which
+// would silently skip the entire test post-merge.
 func TestHappyPath_ZeroGen_AcceptedByAllThree(t *testing.T) {
-	m := newRootSizedModel()
-
-	// AvailabilityGen and ConnectGen start at 0 on a fresh session.
-	if got := m.Session().AvailabilityGen; got != 0 {
-		t.Skipf("test requires initial AvailabilityGen==0, got %d (Rotate already called)", got)
-	}
-
-	// ResourcesLoaded with Gen=0 must be applied.
-	m, _ = rootApplyMsg(m, messages.Navigate{
-		Target:       messages.TargetResourceList,
-		ResourceType: "ec2",
-	})
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
-		ResourceType: "ec2",
-		Resources:    []resource.Resource{{ID: "i-zero-gen", Name: "zero-gen-server"}},
-		Gen:          domain.Gen(0),
-	})
-	got := m.ActiveListResources()
-	found := false
-	for _, r := range got {
-		if r.ID == "i-zero-gen" {
-			found = true
-			break
+	t.Run("ResourcesLoaded", func(t *testing.T) {
+		m := newRootSizedModel()
+		// Force AvailabilityGen non-zero so a Gen=0 dispatch can only succeed
+		// via the AcceptZeroGen=true branch in IsStale.
+		m.Session().Rotate()
+		if got := m.Session().AvailabilityGen; got == 0 {
+			t.Fatalf("precondition: AvailabilityGen must be non-zero, got 0")
 		}
-	}
-	if !found {
-		t.Error("ResourcesLoaded with Gen=0 was dropped on fresh session — AcceptZeroGen=true regression")
-	}
 
-	// IdentityLoaded with Gen=0 must be applied.
-	m2 := newRootSizedModel()
-	freshID := &awsclient.CallerIdentity{AccountID: "zero-gen-account"}
-	m2, _ = rootApplyMsg(m2, messages.IdentityLoaded{
-		Identity: freshID,
-		Gen:      domain.Gen(0),
+		m, _ = rootApplyMsg(m, messages.Navigate{
+			Target:       messages.TargetResourceList,
+			ResourceType: "ec2",
+		})
+		m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
+			ResourceType: "ec2",
+			Resources:    []resource.Resource{{ID: "i-zero-gen", Name: "zero-gen-server"}},
+			Gen:          domain.Gen(0),
+		})
+		got := m.ActiveListResources()
+		found := false
+		for _, r := range got {
+			if r.ID == "i-zero-gen" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("ResourcesLoaded with Gen=0 was dropped while AvailabilityGen!=0 — AcceptZeroGen=true regression")
+		}
 	})
-	if m2.Session().Identity == nil {
-		t.Error("IdentityLoaded with Gen=0 was dropped on fresh session — AcceptZeroGen=true regression")
-	}
 
-	// ValueRevealed with Gen=0 must be applied (reveal view pushed).
-	m3 := newRootSizedModel()
-	const zeroGenSecret = "ZERO_GEN_SECRET_demo_mode_xyz"
-	m3, _ = rootApplyMsg(m3, messages.ValueRevealed{
-		ResourceType: "secrets",
-		ResourceID:   "demo/key",
-		Value:        zeroGenSecret,
-		Gen:          domain.Gen(0),
+	t.Run("IdentityLoaded", func(t *testing.T) {
+		m := newRootSizedModel()
+		// Force ConnectGen non-zero so the AcceptZeroGen branch is the only
+		// path that admits a Gen=0 IdentityLoaded.
+		m.Session().Rotate()
+		if got := m.Session().ConnectGen; got == 0 {
+			t.Fatalf("precondition: ConnectGen must be non-zero, got 0")
+		}
+
+		freshID := &awsclient.CallerIdentity{AccountID: "zero-gen-account"}
+		m, _ = rootApplyMsg(m, messages.IdentityLoaded{
+			Identity: freshID,
+			Gen:      domain.Gen(0),
+		})
+		if m.Session().Identity == nil {
+			t.Error("IdentityLoaded with Gen=0 was dropped while ConnectGen!=0 — AcceptZeroGen=true regression")
+		}
 	})
-	plain3 := stripANSI(rootViewContent(m3))
-	if !strings.Contains(plain3, zeroGenSecret) {
-		t.Errorf("ValueRevealed with Gen=0 was dropped on fresh session — AcceptZeroGen=true regression; rendered: %q", plain3)
-	}
+
+	t.Run("ValueRevealed", func(t *testing.T) {
+		m := newRootSizedModel()
+		// Force ConnectGen non-zero (ValueRevealed uses AspectConnect).
+		m.Session().Rotate()
+		if got := m.Session().ConnectGen; got == 0 {
+			t.Fatalf("precondition: ConnectGen must be non-zero, got 0")
+		}
+
+		const zeroGenSecret = "ZERO_GEN_SECRET_demo_mode_xyz"
+		m, _ = rootApplyMsg(m, messages.ValueRevealed{
+			ResourceType: "secrets",
+			ResourceID:   "demo/key",
+			Value:        zeroGenSecret,
+			Gen:          domain.Gen(0),
+		})
+		plain := stripANSI(rootViewContent(m))
+		if !strings.Contains(plain, zeroGenSecret) {
+			t.Errorf("ValueRevealed with Gen=0 was dropped while ConnectGen!=0 — AcceptZeroGen=true regression; rendered: %q", plain)
+		}
+	})
 }
 
 // ── AC #5 — stale APIError / IdentityError do not flash ─────────────────────
