@@ -41,16 +41,19 @@ var originalIssue196Enrichers = []string{
 }
 
 // TestIssueEnricherRegistry_OriginalSetStillRegistered pins the original 8
-// enrichers from issue #196.
+// enrichers from issue #196. Post-AS-726 PR-04i, "sfn" lives on the catalog
+// row's Wave2 field rather than IssueEnricherRegistry. Use aws.GetIssueEnricher
+// which consults catalog Wave2 first then falls back to the legacy map, so
+// either registration path satisfies the test.
 func TestIssueEnricherRegistry_OriginalSetStillRegistered(t *testing.T) {
 	for _, shortName := range originalIssue196Enrichers {
-		fn, ok := awsclient.IssueEnricherRegistry[shortName]
+		fn, ok := awsclient.GetIssueEnricher(shortName)
 		if !ok {
-			t.Errorf("IssueEnricherRegistry missing entry for %q", shortName)
+			t.Errorf("Wave 2 enricher for %q missing (neither catalog Wave2 nor IssueEnricherRegistry has it)", shortName)
 			continue
 		}
 		if fn.Fn == nil {
-			t.Errorf("IssueEnricherRegistry[%q].Fn is nil — must be a non-nil IssueEnricherFunc", shortName)
+			t.Errorf("Wave 2 enricher for %q has nil Fn — must be a non-nil IssueEnricherFunc", shortName)
 		}
 	}
 }
