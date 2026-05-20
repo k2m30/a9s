@@ -41,7 +41,8 @@ func TestBug_S3_EnterOnFolder_NavigatesIntoPrefix(t *testing.T) {
 			"key": "readme.txt", "size": "1024", "last_modified": "2025-01-01", "storage_class": "STANDARD",
 		}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: objects})
+	// After Enter on a bucket, the active view is the s3_objects child list.
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3_objects", Resources: objects})
 	// Press Enter on the folder — should navigate into prefix, NOT show detail
 	_, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd == nil {
