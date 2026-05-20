@@ -214,7 +214,7 @@ This preserves today's stack-walking semantics — every matching view in the st
 - `internal/runtime/handlers_related.go` — moved from `internal/tui/app_handlers_related_navigate.go`.
 - `internal/runtime/probes.go`, `enrich.go`, `related.go`, `fetchers.go` — moved from corresponding `app_*.go` files.
 - `internal/runtime/state.go` — `RuntimeState` struct: the view-ready state the UI shell renders. Snapshot of caches, current findings, queue progress, task state, etc.
-- `internal/tui/screens.go` — Bubble Tea screen builders (`runtime.ScreenID -> tea.Model`) used by the TUI adapter only.
+- `internal/tui/screens.go` — Bubble Tea screen builders (`runtime.ScreenID -> tea.Model`) used by the TUI adapter only. The concrete registry plus its first four ScreenIDs (profile selector, reveal, child list, theme apply) lands in PR-05a-h4-a; see [`05-pr-05a-h4.md`](./05-pr-05a-h4.md).
 
 #### Files modified
 
@@ -262,6 +262,8 @@ rg 'tea\\.|bubbletea' internal/runtime/ internal/domain/ internal/session/ inter
 wc -l internal/tui/app.go
 # expected: 300–400 lines (was ~880)
 ```
+
+> **Status note (post AS-646 audit, 2026-05-20)**: the exit criteria above did not land with PR-05a-h2/h3 — `internal/tui` still imports `internal/session` and `internal/aws`, and `app.go` grew to ~986 LOC during the migration. The follow-on spec [`05-pr-05a-h4.md`](./05-pr-05a-h4.md) (AS-650) breaks the residual work into three child PRs (h4-a screen-builder + four handler ports; h4-b `Update()`-switch extraction; h4-c final import scrub) and is the first to pass the bash gates above when it ships.
 
 Behavior verification:
 - `make test` and `make test-race` pass.
