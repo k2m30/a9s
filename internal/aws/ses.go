@@ -9,14 +9,15 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 	sesv2types "github.com/aws/aws-sdk-go-v2/service/sesv2/types"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func init() {
-	resource.RegisterFieldKeys("ses", []string{"identity_name", "identity_type", "verification_status", "sending_enabled", "status"})
+	catalog.RegisterFieldKeys("ses", []string{"identity_name", "identity_type", "verification_status", "sending_enabled", "status"})
 
-	resource.RegisterPaginated("ses", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+	catalog.RegisterFetcher("ses", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
@@ -24,7 +25,7 @@ func init() {
 		return FetchSESIdentitiesPage(ctx, c.SESv2, continuationToken)
 	})
 
-	resource.RegisterRelated("ses", []resource.RelatedDef{
+	catalog.RegisterRelated("ses", []domain.RelatedDef{
 		{TargetType: "r53", DisplayName: "Route 53 (DNS)", Checker: checkSESR53, NeedsTargetCache: true},
 		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkSESEbRule, NeedsTargetCache: true},
 		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkSESLambda, NeedsTargetCache: false},

@@ -8,12 +8,13 @@ import (
 	snssvc "github.com/aws/aws-sdk-go-v2/service/sns"
 	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func init() {
-	registerIssueEnricher("sns", EnrichSNSSubscriptions, 100)
-	resource.RegisterIssueEnricherFieldKeys("sns", []string{"subs_count"})
+	catalog.RegisterWave2("sns", IssueEnricher{Fn: EnrichSNSSubscriptions, Priority: 100})
+	catalog.RegisterIssueEnricherFieldKeys("sns", []string{"subs_count"})
 }
 
 // EnrichSNSSubscriptions calls ListSubscriptionsByTopic per topic (cap EnrichmentCap)

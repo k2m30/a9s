@@ -10,12 +10,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
 	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func init() {
-	registerIssueEnricher("sfn", EnrichStepFunctionsStatus, 10)
-	resource.RegisterIssueEnricherFieldKeys("sfn", []string{"last_run"})
+	catalog.RegisterWave2("sfn", IssueEnricher{Fn: EnrichStepFunctionsStatus, Priority: 10})
+	catalog.RegisterIssueEnricherFieldKeys("sfn", []string{"last_run"})
 }
 
 // EnrichStepFunctionsStatus calls ListExecutions(max:1) for each state machine (1 per SFN, cap ~50).

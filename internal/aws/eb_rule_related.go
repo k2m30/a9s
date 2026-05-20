@@ -8,11 +8,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func init() {
-	resource.RegisterRelated("eb-rule", []resource.RelatedDef{
+	catalog.RegisterRelated("eb-rule", []domain.RelatedDef{
 		{TargetType: "role", DisplayName: "IAM Role", Checker: checkEbRuleRole, NeedsTargetCache: false},
 		{TargetType: "kinesis", DisplayName: "Kinesis (targets)", Checker: checkEbRuleKinesis},
 		{TargetType: "lambda", DisplayName: "Lambda (targets)", Checker: checkEbRuleLambda},
@@ -23,7 +25,7 @@ func init() {
 	})
 
 	// eventbridgetypes.Rule: RoleArn (execution role for the rule target)
-	resource.RegisterDefaultNavFields("eb-rule", []resource.NavigableField{
+	catalog.RegisterNavigable("eb-rule", []domain.NavigableField{
 		{FieldPath: "RoleArn", TargetType: "role"},
 	})
 }

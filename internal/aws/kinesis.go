@@ -8,14 +8,15 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/kinesis"
 	kinesistypes "github.com/aws/aws-sdk-go-v2/service/kinesis/types"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func init() {
-	resource.RegisterFieldKeys("kinesis", []string{"stream_name", "status", "stream_mode", "creation_time"})
+	catalog.RegisterFieldKeys("kinesis", []string{"stream_name", "status", "stream_mode", "creation_time"})
 
-	resource.RegisterPaginated("kinesis", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+	catalog.RegisterFetcher("kinesis", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")

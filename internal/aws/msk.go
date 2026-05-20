@@ -8,14 +8,15 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/kafka"
 	kafkatypes "github.com/aws/aws-sdk-go-v2/service/kafka/types"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func init() {
-	resource.RegisterFieldKeys("msk", []string{"cluster_name", "cluster_type", "state", "version"})
+	catalog.RegisterFieldKeys("msk", []string{"cluster_name", "cluster_type", "state", "version"})
 
-	resource.RegisterPaginated("msk", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+	catalog.RegisterFetcher("msk", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")

@@ -34,7 +34,12 @@ func RegisterFieldKeys(shortName string, keys []string) {
 
 // GetFieldKeys returns the registered Fields keys for the given resource type,
 // or nil if none are registered.
+// Catalog-backed: consults catalog.Find(shortName).FieldKeys first; falls
+// through to the legacy map for un-migrated types. Fallback removed in PR-04n.
 func GetFieldKeys(shortName string) []string {
+	if ct := catalog.Find(shortName); ct != nil && len(ct.FieldKeys) > 0 {
+		return ct.FieldKeys
+	}
 	return fieldKeyRegistry[shortName]
 }
 
@@ -71,7 +76,13 @@ func RegisterIssueEnricherFieldKeys(shortName string, keys []string) {
 
 // GetIssueEnricherFieldKeys returns the accumulated Wave 2 issue-enricher
 // field keys for the given resource short name, or nil if none are registered.
+// Catalog-backed: consults catalog.Find(shortName).IssueEnricherFieldKeys
+// first; falls through to the legacy map for un-migrated types. Fallback
+// removed in PR-04n.
 func GetIssueEnricherFieldKeys(shortName string) []string {
+	if ct := catalog.Find(shortName); ct != nil && len(ct.IssueEnricherFieldKeys) > 0 {
+		return ct.IssueEnricherFieldKeys
+	}
 	return issueEnricherFieldKeysRegistry[shortName]
 }
 
@@ -172,7 +183,12 @@ func RegisterChildType(def ResourceTypeDef) {
 
 // GetChildType returns the child type definition for the given short name,
 // or nil if no child type is registered.
+// Catalog-backed: consults catalog.FindChild(shortName) first; falls through
+// to the legacy map for un-migrated child types. Fallback removed in PR-04n.
 func GetChildType(shortName string) *ResourceTypeDef {
+	if c := catalog.FindChild(shortName); c != nil {
+		return c
+	}
 	return childTypes[shortName]
 }
 
@@ -244,12 +260,13 @@ func RegisterPaginatedChild(shortName string, f PaginatedChildFetcher) {
 }
 
 // GetPaginatedChildFetcher returns the paginated child fetcher for the given short name.
-// Catalog-backed: checks the catalog first via the parent type's Children defs;
-// falls through to the legacy map. Fallback removed in PR-04n.
+// Catalog-backed: checks catalog.FindChild(shortName).ChildFetcher first;
+// falls through to the legacy map for un-migrated child types. Fallback
+// removed in PR-04n.
 func GetPaginatedChildFetcher(shortName string) PaginatedChildFetcher {
-	// Child fetchers are keyed by the child type's ShortName. The catalog stores
-	// them in the parent's Children []ChildViewDef; a separate per-child catalog
-	// lookup path is wired in per-category PRs (04b+). For now: legacy fallback.
+	if c := catalog.FindChild(shortName); c != nil && c.ChildFetcher != nil {
+		return c.ChildFetcher
+	}
 	return paginatedChildRegistry[shortName]
 }
 
