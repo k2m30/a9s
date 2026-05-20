@@ -355,8 +355,9 @@ This section documents the current Wave 2 implementation on `main`. The refactor
 **Architecture:**
 - `internal/aws/issue_enrichment.go` — Wave 2 infrastructure: `IssueEnricherRegistry` map, unexported `registerIssueEnricher` helper (panics on empty name, nil fn, duplicate short name), `NoOpIssueEnricher`, `IssueEnricher` struct, `IssueEnricherFunc` / `IssueEnricherResult` types, shared helpers, `EnrichmentCap` / `PerParentPageCap`.
 - `internal/aws/*_issue_enrichment.go` — per-type enricher registrations, including real enrichers and `NoOpIssueEnricher` placeholders for types whose Wave 2 column is currently "None". Each file's `init()` calls `registerIssueEnricher(<shortname>, <fn>, <priority>)` and — if the enricher writes `FieldUpdates` — `resource.RegisterIssueEnricherFieldKeys(<shortname>, [...])`.
-- `internal/tui/app_probes.go` — `buildEnrichQueue()`, `probeEnrichment()`
-- `internal/tui/app_handlers_availability.go` — `startEnrichment()`, `handleEnrichmentChecked()` with only-increase guard
+- `internal/runtime/probes.go` — `(*Core).BuildEnrichQueue()` (queue construction lives on `runtime.Core`).
+- `internal/tui/probe_adapter.go` — `(*Model).probeEnrichment()` — the TUI-side `tea.Cmd` wrapper that dispatches enrichers and emits `EnrichmentChecked` messages.
+- `internal/runtime/handlers_availability.go` — `(*Core).startEnrichment()` (builds the queue, returns probe tasks) and `(*Core).handleEnrichmentChecked()` (applies one Wave-2 result with the only-increase guard).
 
 **Flow:**
 
@@ -372,7 +373,7 @@ Wave 1 probes complete
 
 **Registry**: On `main`, Wave 2 capability is expressed through `IssueEnricherRegistry` entries, including `NoOpIssueEnricher` placeholders that make "no Wave 2 signal" explicit and testable. Some types with `NoOpIssueEnricher` still perform in-fetcher Wave 2 work — their fetchers already make per-resource Describe calls and populate health fields at fetch time (e.g., EKS `health_issues_count`, CloudTrail `is_logging`, OpenSearch `cluster_health`).
 
-**Priority order** (`buildEnrichQueue`): Batchable enrichers that make account-wide calls are dispatched first (e.g., RDS/DocDB maintenance, EC2 instance status). Per-resource enrichers (e.g., DynamoDB PITR, KMS rotation, S3 PAB) iterate over resource IDs/ARNs, capped at `EnrichmentCap` (50). The registry key for each enricher must match the `ShortName` Wave 1 uses to store probe resources — a mismatch silently skips the enricher.
+**Priority order** (`(*Core).BuildEnrichQueue`): Batchable enrichers that make account-wide calls are dispatched first (e.g., RDS/DocDB maintenance, EC2 instance status). Per-resource enrichers (e.g., DynamoDB PITR, KMS rotation, S3 PAB) iterate over resource IDs/ARNs, capped at `EnrichmentCap` (50). The registry key for each enricher must match the `ShortName` Wave 1 uses to store probe resources — a mismatch silently skips the enricher.
 
 **Resource identity**: Enrichers receive retained first-page resources from Wave 1 probes (`probeResources map[string][]resource.Resource`). Account-wide enrichers make a single API call covering all resources. Per-resource enrichers fan out to individual resources, capped at `EnrichmentCap` (50).
 
@@ -528,7 +529,7 @@ Key highlights:
 
 ### Global vs View-Local Key Resolution
 
-The root model's `handleKeyMsg` (`app_handlers.go`) resolves keys in a specific order. Input modes take priority over global keys, which means `q`, `?`, etc. are swallowed during typing:
+The root model's `handleKeyMsg` (`internal/tui/app_input.go`) resolves keys in a specific order. Input modes take priority over global keys, which means `q`, `?`, etc. are swallowed during typing:
 
 1. **`Ctrl+C`** — force quit (always global, never delegated)
 2. **Input modes** — if filter, command, or search input is active, **all keys route to that input handler** (including `q`, `/`, `?`). This is why `q` doesn't quit while typing a filter.
