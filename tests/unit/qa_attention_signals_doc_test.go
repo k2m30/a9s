@@ -176,10 +176,13 @@ func TestAttentionSignalsDoc(t *testing.T) {
 				}
 			}
 
-			// Assertion 3: Wave 2 non-empty → registered enricher.
+			// Assertion 3: Wave 2 non-empty → registered enricher (catalog
+			// Wave2 or legacy IssueEnricherRegistry, per aws.GetIssueEnricher).
+			// Post-AS-726 PR-04i, messaging Wave 2 enrichers live on the
+			// catalog row; un-migrated categories still use the legacy map.
 			if !isNoneCell(row.Wave2) {
-				if _, ok := awsclient.IssueEnricherRegistry[row.ShortName]; !ok {
-					t.Errorf("docs Wave 2 signal for %q but no entry in awsclient.IssueEnricherRegistry", row.ShortName)
+				if _, ok := awsclient.GetIssueEnricher(row.ShortName); !ok {
+					t.Errorf("docs Wave 2 signal for %q but no Wave 2 enricher registered (neither catalog Wave2 nor IssueEnricherRegistry)", row.ShortName)
 				}
 			}
 		})

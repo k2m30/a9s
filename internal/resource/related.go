@@ -316,11 +316,32 @@ func RegisterRelated(shortName string, defs []RelatedDef) {
 }
 
 // GetRelated returns the related definitions for the given resource short name.
-// Catalog-backed: checks the catalog first; falls through to the legacy map.
-// Fallback removed in PR-04n.
+// Catalog-backed: for migrated types (catalog.Find returns a row with non-empty
+// Related), unions the catalog's static defs with any AppendRelated additions
+// in the legacy map (e.g. the global ct-events append). For un-migrated types
+// the legacy map is the sole source. Fallback removed in PR-04n.
 func GetRelated(shortName string) []RelatedDef {
 	if ct := catalog.Find(shortName); ct != nil && len(ct.Related) > 0 {
-		return ct.Related
+		relatedRegistryMu.RLock()
+		extra := relatedRegistry[shortName]
+		relatedRegistryMu.RUnlock()
+		if len(extra) == 0 {
+			return ct.Related
+		}
+		seen := make(map[string]bool, len(ct.Related)+len(extra))
+		out := make([]RelatedDef, 0, len(ct.Related)+len(extra))
+		for _, d := range ct.Related {
+			seen[d.TargetType] = true
+			out = append(out, d)
+		}
+		for _, d := range extra {
+			if seen[d.TargetType] {
+				continue
+			}
+			seen[d.TargetType] = true
+			out = append(out, d)
+		}
+		return out
 	}
 	relatedRegistryMu.RLock()
 	defer relatedRegistryMu.RUnlock()

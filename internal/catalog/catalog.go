@@ -117,6 +117,14 @@ func findIndex(name string) int {
 	return -1
 }
 
+// FindIndex returns the index of the catalog row with ShortName matching name
+// (case-insensitive), or -1 when no row matches. Used by callers that need to
+// mutate ResourceTypes[i] in place (e.g. resource.AppendRelated extending a
+// migrated row's Related slice).
+func FindIndex(name string) int {
+	return findIndex(name)
+}
+
 // RegisterFetcher sets the Wave 1 paginated fetcher on the named catalog row.
 // Panics if the row already has a non-nil Fetcher (duplicate registration).
 // No-op when the row is missing — the legacy registry fallback continues to

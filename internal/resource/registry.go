@@ -34,11 +34,15 @@ func RegisterFieldKeys(shortName string, keys []string) {
 
 // GetFieldKeys returns the registered Fields keys for the given resource type,
 // or nil if none are registered.
-// Catalog-backed: consults catalog.Find(shortName).FieldKeys first; falls
-// through to the legacy map for un-migrated types. Fallback removed in PR-04n.
+// Catalog-backed: consults the catalog top-level row first, then the catalog
+// child registry (PR-04i child views); falls through to the legacy map for
+// un-migrated types. Fallback removed in PR-04n.
 func GetFieldKeys(shortName string) []string {
 	if ct := catalog.Find(shortName); ct != nil && len(ct.FieldKeys) > 0 {
 		return ct.FieldKeys
+	}
+	if c := catalog.FindChild(shortName); c != nil && len(c.FieldKeys) > 0 {
+		return c.FieldKeys
 	}
 	return fieldKeyRegistry[shortName]
 }
