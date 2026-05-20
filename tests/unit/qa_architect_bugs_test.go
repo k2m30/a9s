@@ -32,7 +32,7 @@ func TestBug_S3_EnterOnFolder_NavigatesIntoPrefix(t *testing.T) {
 		msg := cmd()
 		m, _ = rootApplyMsg(m, msg)
 	}
-	// Load objects including a folder
+	// Load objects including a folder (child list type is s3_objects)
 	objects := []resource.Resource{
 		{ID: "enterprise/", Name: "enterprise/", Status: "folder", Fields: map[string]string{
 			"key": "enterprise/", "size": "", "last_modified": "", "storage_class": "",
@@ -41,7 +41,7 @@ func TestBug_S3_EnterOnFolder_NavigatesIntoPrefix(t *testing.T) {
 			"key": "readme.txt", "size": "1024", "last_modified": "2025-01-01", "storage_class": "STANDARD",
 		}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: objects})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3_objects", Resources: objects})
 	// Press Enter on the folder — should navigate into prefix, NOT show detail
 	_, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd == nil {
