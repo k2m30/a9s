@@ -194,6 +194,9 @@ func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string, st
 	if len(ids) == 0 {
 		return nil, nil
 	}
+	if store == nil {
+		return nil, fmt.Errorf("policy FetchByIDs: IAMPolicies store not initialized")
+	}
 
 	if api == nil {
 		// Defensive: no IAM API surface (test / pre-init). Skip both builds and
