@@ -1,5 +1,5 @@
 // handlers.go — shell-level handler bodies ported from internal/tui in
-// Phase-05 PR-05a-h3 (AS-315b / AS-324).
+// Phase-05 PR-05a-h3 (AS-315b / AS-324) and PR-05a-h4-a (AS-650 / AS-769).
 //
 // Each ported handler is a (c *Core) Handle* method that consumes a typed
 // runtime event, applies session-scoped state changes, and returns
@@ -10,7 +10,7 @@
 // translates the returned intents and tasks back into adapter-visible side
 // effects.
 //
-// What lives here (this PR):
+// What lives here (post h3 + h4-a):
 //
 //	HandleFlash          — flash gen bump + history; schedules ClearFlash tick.
 //	HandleClearFlash     — flash auto-clear honouring the session-owned gen.
@@ -18,14 +18,18 @@
 //	HandleClientsReady   — clients/identity wiring + post-connect refresh / boot.
 //	HandleProfileSelected— rotate, rollback latch, request reconnect.
 //	HandleRegionSelected — mirror of HandleProfileSelected for region.
+//	HandleProfilesLoaded — emits PushScreen{ScreenProfileSelector,...} (h4-a).
+//	HandleValueRevealed  — emits PushScreen{ScreenReveal,...} or FlashIntent (h4-a).
+//	HandleEnterChildView — emits PushScreen{ScreenChildList,...} + fetch task (h4-a).
+//	HandleThemeSelected  — emits TaskKindReadThemeFile (h4-a).
+//	HandleThemeFileRead  — emits Apply/Pop/Flash + Save task on success (h4-a).
 //
 // What stays in the TUI adapter (out of scope):
 //
 //   - handleKeyMsg (keyboard dispatch) — owns key.Matches semantics on
 //     adapter-owned tea types.
-//   - handleProfilesLoaded / handleValueRevealed / handleEnterChildView /
-//     handleThemeSelected — push concrete views onto the adapter view stack,
-//     which requires the screen-builder registry that lands in a successor PR.
+//   - The Update()-switch session-mutation extraction (ResourcesLoaded,
+//     RelatedCheckResult, IdentityLoaded, EnrichDetailResult) — PR-05a-h4-b.
 package runtime
 
 import (
@@ -33,7 +37,9 @@ import (
 	"time"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // Flash auto-clear durations. apiErrorFlashDuration is the longer 5 s window
@@ -387,6 +393,170 @@ func (c *Core) HandleProfileSelected(ev ProfileSelectedEvent) ([]UIIntent, []Tas
 			Payload: FlashTickPayload{Gen: ev.NewGen, Duration: flashDuration},
 		},
 	}
+	return intents, tasks
+}
+
+// ProfilesLoadedEvent / ValueRevealedEvent / EnterChildViewEvent /
+// ThemeSelectedEvent / ThemeFileReadEvent — adapter-translated forms of
+// the corresponding messages.* (and TUI-private profilesLoadedMsg) for
+// the four h3-deferred view-stack handlers ported in PR-05a-h4-a.
+
+// ProfilesLoadedEvent carries the list of AWS profiles the adapter loaded
+// from disk. HandleProfilesLoaded emits a PushScreen{ScreenProfileSelector}
+// whose payload pairs the list with the session's current profile.
+type ProfilesLoadedEvent struct {
+	Profiles []string
+}
+
+// ValueRevealedEvent carries the result of a reveal fetch (`x` key over a
+// secret-bearing resource). On Err the handler emits a flash error; on
+// success it emits a PushScreen{ScreenReveal} carrying the value.
+type ValueRevealedEvent struct {
+	ResourceID string
+	Value      string
+	Err        error
+}
+
+// EnterChildViewEvent carries the child-type short name, the parent
+// context map used by the fetcher, and the display name rendered as the
+// child view's frame title. Unknown ChildType yields a flash error.
+type EnterChildViewEvent struct {
+	ChildType     string
+	ParentContext map[string]string
+	DisplayName   string
+}
+
+// ThemeSelectedEvent carries the theme filename the user confirmed.
+// HandleThemeSelected resolves the path via config.ThemePath; the disk
+// read itself runs in a TaskKindReadThemeFile dispatch whose result the
+// adapter routes back as messages.ThemeFileRead → HandleThemeFileRead.
+type ThemeSelectedEvent struct {
+	Theme string
+}
+
+// ThemeFileReadEvent carries the bytes read from disk in response to
+// the read task, together with any I/O error. HandleThemeFileRead
+// branches on Err: read failure emits a flash error; read success emits
+// ApplyThemeIntent (Option B carries Bytes + Name, adapter re-parses
+// via styles.ThemeFromYAML before applying), PopSelectorIntent, a
+// success FlashIntent ("Theme: <name>"), and a TaskKindSaveThemeConfig
+// task. See docs/refactor/05-pr-05a-h4.md §"Theme-selected split".
+type ThemeFileReadEvent struct {
+	Theme string
+	Bytes []byte
+	Err   error
+}
+
+// HandleProfilesLoaded emits a PushScreen{ScreenProfileSelector} carrying
+// the profile list paired with the session's currently-active profile so
+// the selector can render the "(current)" indicator. No tasks fire — the
+// adapter's builder closure constructs the SelectorModel synchronously.
+func (c *Core) HandleProfilesLoaded(ev ProfilesLoadedEvent) ([]UIIntent, []TaskRequest) {
+	intents := []UIIntent{PushScreen{
+		ID: ScreenProfileSelector,
+		Payload: ProfileSelectorPayload{
+			Profiles: ev.Profiles,
+			Current:  c.session.Profile,
+		},
+	}}
+	return intents, nil
+}
+
+// HandleValueRevealed branches on Err. On error the handler emits a
+// "reveal failed: <err>" flash so the user sees why the reveal aborted;
+// on success it emits a PushScreen{ScreenReveal} whose payload carries
+// the resource ID and decrypted value the adapter renders.
+func (c *Core) HandleValueRevealed(ev ValueRevealedEvent) ([]UIIntent, []TaskRequest) {
+	if ev.Err != nil {
+		return []UIIntent{FlashIntent{
+			Text:    "reveal failed: " + ev.Err.Error(),
+			IsError: true,
+		}}, nil
+	}
+	intents := []UIIntent{PushScreen{
+		ID: ScreenReveal,
+		Payload: RevealPayload{
+			ResourceID: ev.ResourceID,
+			Value:      ev.Value,
+		},
+	}}
+	return intents, nil
+}
+
+// HandleEnterChildView validates ChildType via resource.GetChildType and
+// either flashes an "unknown child type" error or emits a
+// PushScreen{ScreenChildList} paired with a TaskKindFetchChildResources
+// task. The adapter's screen builder constructs the ChildResourceList view
+// and runs its Init() command; the fetch task kicks off paginated loading.
+func (c *Core) HandleEnterChildView(ev EnterChildViewEvent) ([]UIIntent, []TaskRequest) {
+	if resource.GetChildType(ev.ChildType) == nil {
+		return []UIIntent{FlashIntent{
+			Text:    fmt.Sprintf("unknown child type: %s", ev.ChildType),
+			IsError: true,
+		}}, nil
+	}
+	intents := []UIIntent{PushScreen{
+		ID:      ScreenChildList,
+		Payload: ChildListPayload(ev),
+	}}
+	tasks := []TaskRequest{{
+		Key: TaskKey{Kind: TaskKindFetchChildResources, Scope: ev.ChildType},
+		Payload: FetchChildResourcesPayload{
+			ChildType:     ev.ChildType,
+			ParentContext: ev.ParentContext,
+		},
+	}}
+	return intents, tasks
+}
+
+// HandleThemeSelected validates the theme path via config.ThemePath (a
+// non-renderer-coupled package) and either flashes an "Invalid theme:
+// <err>" error or emits a TaskKindReadThemeFile task. The adapter's task
+// closure performs the os.ReadFile and dispatches messages.ThemeFileRead
+// → HandleThemeFileRead, which owns the apply/pop/flash/save sequence.
+func (c *Core) HandleThemeSelected(ev ThemeSelectedEvent) ([]UIIntent, []TaskRequest) {
+	if _, err := config.ThemePath(ev.Theme); err != nil {
+		return []UIIntent{FlashIntent{
+			Text:    "Invalid theme: " + err.Error(),
+			IsError: true,
+		}}, nil
+	}
+	tasks := []TaskRequest{{
+		Key:     TaskKey{Kind: TaskKindReadThemeFile, Scope: ev.Theme},
+		Payload: ReadThemePayload(ev),
+	}}
+	return nil, tasks
+}
+
+// HandleThemeFileRead is the second half of the theme-selected flow.
+// Read failure emits a single "Cannot read theme: <err>" flash; read
+// success emits four results in this order: ApplyThemeIntent (carries
+// the YAML Bytes; adapter re-parses via styles.ThemeFromYAML and on
+// parse failure emits its own flash), PopSelectorIntent (closes the
+// theme selector), success FlashIntent ("Theme: <name>"), and a
+// TaskKindSaveThemeConfig task that persists the choice to config.yaml.
+//
+// PR-05a-h4-a Option B chose ordering "apply-then-persist" over the
+// pre-h4 "persist-then-apply" because the runtime/renderer split forces
+// the persist task to fire asynchronously; the save-fail UX delta
+// (theme stays applied for this session even if config save failed) is
+// documented in docs/refactor/05-pr-05a-h4.md §"Theme-selected split".
+func (c *Core) HandleThemeFileRead(ev ThemeFileReadEvent) ([]UIIntent, []TaskRequest) {
+	if ev.Err != nil {
+		return []UIIntent{FlashIntent{
+			Text:    "Cannot read theme: " + ev.Err.Error(),
+			IsError: true,
+		}}, nil
+	}
+	intents := []UIIntent{
+		ApplyThemeIntent{Bytes: ev.Bytes, Name: ev.Theme},
+		PopSelectorIntent{},
+		FlashIntent{Text: "Theme: " + ev.Theme},
+	}
+	tasks := []TaskRequest{{
+		Key:     TaskKey{Kind: TaskKindSaveThemeConfig, Scope: ev.Theme},
+		Payload: SaveThemeConfigPayload{Theme: ev.Theme},
+	}}
 	return intents, tasks
 }
 

@@ -94,6 +94,14 @@ type Model struct {
 	headerCacheKey string
 
 	isDemo bool // true when running in --demo mode (synthetic clients); controls Wave 2 skip
+
+	// screens is the renderer-side parallel of runtime.ScreenRegistry: it
+	// resolves runtime.ScreenID -> builder closure for the four ported
+	// view-stack handlers (HandleProfilesLoaded, HandleValueRevealed,
+	// HandleEnterChildView, HandleThemeSelected). Populated once in New()
+	// via defaultBuilders(&m); tests may shadow entries by assigning to
+	// individual map keys.
+	screens builders
 }
 
 // Option configures the root Model.
@@ -181,6 +189,7 @@ func New(profile, region string, opts ...Option) Model {
 		appCtx:      ctx,
 		appCancel:   cancel,
 	}
+	m.screens = defaultBuilders()
 	for _, opt := range opts {
 		opt(&m)
 	}
@@ -290,6 +299,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleRegionSelected(msg)
 	case messages.ThemeSelected:
 		return m.handleThemeSelected(msg)
+	case messages.ThemeFileRead:
+		return m.handleThemeFileRead(msg)
 	case profilesLoadedMsg:
 		return m.handleProfilesLoaded(msg)
 	case messages.ValueRevealed:
@@ -716,9 +727,74 @@ func (m *Model) applyIntents(intents []runtime.UIIntent) []tea.Cmd {
 			})
 		case runtime.ClearFlash:
 			m.flash.active = false
+		case runtime.PushScreen:
+			if c := m.pushScreen(v); c != nil {
+				cmds = append(cmds, c)
+			}
+		case runtime.PopScreen:
+			m.popView()
+		case runtime.ApplyThemeIntent:
+			if c := m.applyTheme(v); c != nil {
+				cmds = append(cmds, c)
+			}
+		case runtime.PopSelectorIntent:
+			if _, ok := m.activeView().(*views.SelectorModel); ok {
+				m.popView()
+			}
 		}
 	}
 	return cmds
+}
+
+// pushScreen resolves the runtime-emitted PushScreen via the screens
+// builder map and pushes the resulting view onto the stack. The live
+// *Model is passed to the builder at invocation so it observes the
+// current keymap / viewConfig / innerSize() rather than a stale
+// snapshot captured at tui.New time. A missing builder (unknown
+// ScreenID) surfaces as a flash so the operator sees the misconfig;
+// a builder that returns a nil view is silently dropped (the builder
+// itself owns the "I refuse to render this payload" decision).
+func (m *Model) pushScreen(v runtime.PushScreen) tea.Cmd {
+	builder, ok := m.screens[v.ID]
+	if !ok {
+		id := string(v.ID)
+		return func() tea.Msg {
+			return messages.Flash{Text: "no screen builder: " + id, IsError: true}
+		}
+	}
+	view, cmd := builder(m, v.Payload)
+	if view != nil {
+		m.pushView(view)
+	}
+	return cmd
+}
+
+// applyTheme parses the YAML bytes carried by ApplyThemeIntent and, on
+// success, swaps the active theme, invalidates the header cache, walks
+// the view stack invalidating ResourceListModel style caches, and sets
+// m.activeTheme so the next theme selector renders the "(current)"
+// indicator correctly. On parse failure the adapter emits a flash and
+// skips the apply; the persist task (queued separately) still fires
+// because the runtime already committed to the new theme name —
+// matching the documented Option B trade-off in
+// docs/refactor/05-pr-05a-h4.md §"Theme-selected split".
+func (m *Model) applyTheme(v runtime.ApplyThemeIntent) tea.Cmd {
+	t, err := styles.ThemeFromYAML(v.Bytes)
+	if err != nil {
+		text := "Bad theme YAML: " + err.Error()
+		return func() tea.Msg {
+			return messages.Flash{Text: text, IsError: true}
+		}
+	}
+	styles.ApplyTheme(t)
+	m.activeTheme = v.Name
+	m.headerCacheKey = ""
+	for _, sv := range m.stack {
+		if rl, ok := sv.(*views.ResourceListModel); ok {
+			rl.InvalidateStyleCache()
+		}
+	}
+	return nil
 }
 
 // tasksToCmd converts a []runtime.TaskRequest returned by m.core.HandleEvent
@@ -741,6 +817,20 @@ func (m *Model) tasksToCmd(tasks []runtime.TaskRequest) tea.Cmd {
 			cmd := m.saveAvailabilityCache()
 			if cmd != nil {
 				cmds = append(cmds, cmd)
+			}
+		case runtime.TaskKindFetchChildResources:
+			if p, ok := req.Payload.(runtime.FetchChildResourcesPayload); ok {
+				if cmd := m.fetchChildResources(p.ChildType, p.ParentContext); cmd != nil {
+					cmds = append(cmds, cmd)
+				}
+			}
+		case runtime.TaskKindReadThemeFile:
+			if p, ok := req.Payload.(runtime.ReadThemePayload); ok {
+				cmds = append(cmds, readThemeFileCmd(p))
+			}
+		case runtime.TaskKindSaveThemeConfig:
+			if p, ok := req.Payload.(runtime.SaveThemeConfigPayload); ok {
+				cmds = append(cmds, saveThemeConfigCmd(p))
 			}
 		}
 	}
