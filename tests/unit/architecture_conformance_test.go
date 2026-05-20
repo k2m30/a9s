@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -38,20 +39,39 @@ func TestConformance_EveryResourceTypeHasPaginatedFetcher(t *testing.T) {
 }
 
 // TestConformance_EveryResourceTypeHasWave2Registration pins the Wave 2
-// allowlist contract: every registered top-level resource type must have an
-// entry in IssueEnricherRegistry, either a real issue enricher or
-// NoOpIssueEnricher. An unregistered type is a silent skip — it would never
-// participate in Wave 2 even when docs/attention-signals.md claims it should.
+// allowlist contract: every registered top-level resource type must have a
+// catalog row whose Wave 2 status is EXPLICIT.
+//
+// "Explicit" means one of:
+//   - catalog.Find(sn).Wave2 != nil — a real Wave 2 enricher is registered on the catalog row, OR
+//   - awsclient.IssueEnricherRegistry[sn] exists — legacy registration (real or NoOpIssueEnricher), OR
+//   - catalog.Find(sn) != nil AND its row is intentionally marked "no Wave 2" (Wave2 nil, no legacy entry).
+//
+// AS-726 PR-04i deletes the NoOp-only files for sns-sub and kinesis and routes
+// their "no Wave 2" signal through catalog Wave2 == nil. Pre-AS-726 the only
+// explicit signal was the IssueEnricherRegistry map. Post-AS-726 catalog
+// presence is the new explicit signal — silent skips happen only when neither
+// path knows about the shortName.
 func TestConformance_EveryResourceTypeHasWave2Registration(t *testing.T) {
 	for _, td := range resource.AllResourceTypes() {
-		if _, ok := awsclient.IssueEnricherRegistry[td.ShortName]; !ok {
-			t.Errorf(
-				"resource type %q is not in awsclient.IssueEnricherRegistry — "+
-					"register either a real IssueEnricherFunc or NoOpIssueEnricher "+
-					"so the Wave 2 contract is explicit (docs/attention-signals.md)",
-				td.ShortName,
-			)
+		_, legacyOK := awsclient.IssueEnricherRegistry[td.ShortName]
+		catalogRow := catalog.Find(td.ShortName)
+		if legacyOK {
+			continue
 		}
+		if catalogRow != nil {
+			// Catalog-authoritative — Wave2 may be nil (explicit "no Wave 2")
+			// or non-nil (Wave 2 registered via catalog.RegisterWave2). Either
+			// way the type is known to the Wave 2 layer.
+			continue
+		}
+		t.Errorf(
+			"resource type %q has no explicit Wave 2 signal — "+
+				"either register via catalog.RegisterWave2 (catalog-authoritative; nil is the "+
+				"explicit \"no Wave 2\" signal) or add an IssueEnricherRegistry entry "+
+				"(legacy path). Currently neither path knows about this type.",
+			td.ShortName,
+		)
 	}
 }
 
@@ -152,4 +172,91 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// ---------------------------------------------------------------------------
+// AS-726 PR-04i — messaging catalog cutover (Phase 04)
+// ---------------------------------------------------------------------------
+
+// TestMessagingCatalogIsAuthoritative pins the AS-726 PR-04i acceptance: every
+// messaging top-level type has its Wave 1 fetcher, FieldKeys, and Related defs
+// living on the catalog row — not in the legacy resource/IssueEnricher registries.
+//
+// Snapshot counts come from the spec §1 file inventory (verified against the
+// legacy RegisterRelated() blocks in internal/aws/*_related.go BEFORE the cutover).
+// If a related def is added or removed, this test must change too — that's the
+// contract: docs/related-resources.md is the source of truth, and the catalog
+// row must mirror it.
+//
+// IssueEnricherFieldKeys are checked for the 5 messaging types that legacy
+// registered them (sqs, sns, eb-rule, sfn, ses). msk, sns-sub, and kinesis
+// have no Wave 2 field keys (msk's enricher writes no extra keys; sns-sub
+// and kinesis are the NoOp deletions covered by TestNoOpWave2ReturnsAbsent).
+//
+// Navigable is checked for the 4 types whose legacy init() called
+// RegisterDefaultNavFields: sns-sub, eb-rule, msk, sfn.
+func TestMessagingCatalogIsAuthoritative(t *testing.T) {
+	cases := []struct {
+		shortName              string
+		expectedRelated        int
+		expectedNavigable      int
+		expectedIssueFieldKeys []string // exact, in order
+		expectsWave2           bool
+	}{
+		{"sqs", 7, 0, []string{"dlq"}, true},
+		{"sns", 4, 0, []string{"subs_count"}, true},
+		{"sns-sub", 3, 1, nil, false}, // Wave 2 file deleted — see TestNoOpWave2ReturnsAbsent
+		{"eb-rule", 7, 1, []string{"target_count"}, true},
+		{"kinesis", 5, 0, nil, false}, // Wave 2 file deleted — see TestNoOpWave2ReturnsAbsent
+		{"msk", 10, 1, nil, true},
+		{"sfn", 6, 1, []string{"last_run"}, true},
+		{"ses", 5, 0, []string{"status"}, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.shortName, func(t *testing.T) {
+			ct := catalog.Find(tc.shortName)
+			if ct == nil {
+				t.Fatalf("catalog.Find(%q) returned nil — messaging row missing from catalog", tc.shortName)
+			}
+			if ct.Fetcher == nil {
+				t.Errorf("%s: Fetcher missing on catalog row — legacy registration still authoritative", tc.shortName)
+			}
+			if len(ct.FieldKeys) == 0 {
+				t.Errorf("%s: FieldKeys empty on catalog row — legacy registration still authoritative", tc.shortName)
+			}
+			if got := len(ct.Related); got != tc.expectedRelated {
+				t.Errorf("%s: catalog Related has %d entries, want %d (per spec §1 inventory)",
+					tc.shortName, got, tc.expectedRelated)
+			}
+			if got := len(ct.Navigable); got != tc.expectedNavigable {
+				t.Errorf("%s: catalog Navigable has %d entries, want %d",
+					tc.shortName, got, tc.expectedNavigable)
+			}
+			if tc.expectsWave2 {
+				if ct.Wave2 == nil {
+					t.Errorf("%s: catalog Wave2 nil, want non-nil (legacy registered a Wave 2 enricher)", tc.shortName)
+				}
+			} else {
+				if ct.Wave2 != nil {
+					t.Errorf("%s: catalog Wave2 non-nil, want nil (NoOp file deleted per spec §4)", tc.shortName)
+				}
+			}
+			if got := ct.IssueEnricherFieldKeys; !stringSliceEqual(got, tc.expectedIssueFieldKeys) {
+				t.Errorf("%s: catalog IssueEnricherFieldKeys = %v, want %v",
+					tc.shortName, got, tc.expectedIssueFieldKeys)
+			}
+		})
+	}
+}
+
+func stringSliceEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
