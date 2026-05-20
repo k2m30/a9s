@@ -174,8 +174,24 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 		// returning after the user has opened S3 must not mutate the S3
 		// list or its loading state — let the root model route the message
 		// to its write-through cache (which keys by msg.ResourceType).
-		if msg.ResourceType != m.typeDef.ShortName {
-			return m, nil
+		//
+		// Three branches:
+		//   1. Empty ResourceType — legacy load (pre-AS-652 callers and
+		//      ~30 existing tests omit the field). Admit unconditionally.
+		//   2. Non-empty and present in the catalog — alias-canonicalize
+		//      so callers passing an alias (e.g. "elb" for "elbv2") still
+		//      match the active type.
+		//   3. Non-empty and absent from the catalog (ad-hoc test types
+		//      and child-view sub-types not registered in the global
+		//      catalog) — fall back to literal string equality.
+		if msg.ResourceType != "" {
+			if canonical := resource.FindResourceType(msg.ResourceType); canonical != nil {
+				if canonical.ShortName != m.typeDef.ShortName {
+					return m, nil
+				}
+			} else if msg.ResourceType != m.typeDef.ShortName {
+				return m, nil
+			}
 		}
 		m.loading = false
 		m.loadingMore = false

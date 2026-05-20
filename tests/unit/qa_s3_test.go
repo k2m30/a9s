@@ -64,9 +64,9 @@ func s3LoadedObjectModel() tui.Model {
 		msg := cmd()
 		m, _ = rootApplyMsg(m, msg)
 	}
-	// Load objects
+	// Load objects (active view after Enter is the s3_objects child list)
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
-		ResourceType: "s3",
+		ResourceType: "s3_objects",
 		Resources:    fixtureS3Objects(),
 	})
 	return m
@@ -549,7 +549,7 @@ func TestQA_S3_B2_1_ObjectList_EmptyBucket(t *testing.T) {
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 	m, _ = m.Update(messages.ResourcesLoaded{
-		ResourceType: "s3",
+		ResourceType: "s3_objects",
 		Resources:    []resource.Resource{},
 	})
 
@@ -1011,7 +1011,7 @@ func TestQA_S3_D2_1_FullFlowStack(t *testing.T) {
 		m, _ = rootApplyMsg(m, msg)
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
-		ResourceType: "s3",
+		ResourceType: "s3_objects",
 		Resources:    fixtureS3Objects(),
 	})
 
@@ -1248,7 +1248,7 @@ func TestQA_S3_ObjectList_HorizontalScroll(t *testing.T) {
 	m.SetSize(50, 20) // narrow width to trigger horizontal scroll
 	m, _ = m.Init()
 	m, _ = m.Update(messages.ResourcesLoaded{
-		ResourceType: "s3",
+		ResourceType: "s3_objects",
 		Resources:    fixtureS3Objects(),
 	})
 
