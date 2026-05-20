@@ -22,7 +22,9 @@
 //	HandleValueRevealed  — emits PushScreen{ScreenReveal,...} or FlashIntent (h4-a).
 //	HandleEnterChildView — emits PushScreen{ScreenChildList,...} + fetch task (h4-a).
 //	HandleThemeSelected  — emits TaskKindReadThemeFile (h4-a).
-//	HandleThemeFileRead  — emits Apply/Pop/Flash + Save task on success (h4-a).
+//	HandleThemeFileRead  — parses YAML; on parse OK emits Apply/Pop/Flash +
+//	                       Save task; on parse fail emits error flash only
+//	                       (Save is gated on parse success — AS-784).
 //
 // What stays in the TUI adapter (out of scope):
 //
@@ -40,6 +42,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
 
 // Flash auto-clear durations. apiErrorFlashDuration is the longer 5 s window
@@ -528,23 +531,41 @@ func (c *Core) HandleThemeSelected(ev ThemeSelectedEvent) ([]UIIntent, []TaskReq
 	return nil, tasks
 }
 
-// HandleThemeFileRead is the second half of the theme-selected flow.
-// Read failure emits a single "Cannot read theme: <err>" flash; read
-// success emits four results in this order: ApplyThemeIntent (carries
-// the YAML Bytes; adapter re-parses via styles.ThemeFromYAML and on
-// parse failure emits its own flash), PopSelectorIntent (closes the
-// theme selector), success FlashIntent ("Theme: <name>"), and a
-// TaskKindSaveThemeConfig task that persists the choice to config.yaml.
+// HandleThemeFileRead is the second half of the theme-selected flow and
+// branches on three outcomes:
 //
-// PR-05a-h4-a Option B chose ordering "apply-then-persist" over the
-// pre-h4 "persist-then-apply" because the runtime/renderer split forces
-// the persist task to fire asynchronously; the save-fail UX delta
-// (theme stays applied for this session even if config save failed) is
-// documented in docs/refactor/05-pr-05a-h4.md §"Theme-selected split".
+//  1. Read failure → single "Cannot read theme: <err>" error flash, no apply,
+//     no pop, no save.
+//  2. Read OK, parse failure → single "Bad theme YAML: <err>" error flash,
+//     no apply, no pop, no save. The selector stays open so the user can
+//     retry. Validation is performed via styles.ThemeFromYAML; the returned
+//     Theme is discarded because Option B-bytes-carry hands the bytes to the
+//     adapter, which re-derives the Theme for renderer state.
+//  3. Read OK, parse OK → four results in order: ApplyThemeIntent (carries
+//     the YAML Bytes; the adapter re-parses via styles.ThemeFromYAML),
+//     PopSelectorIntent, success FlashIntent ("Theme: <name>"), and a
+//     TaskKindSaveThemeConfig task that persists the choice to config.yaml.
+//
+// The parse-then-emit ordering is the AS-784 fix for the AS-769 invariant
+// violation: the pre-fix handler emitted Save unconditionally on read
+// success, so a malformed-YAML theme would be persisted to disk even though
+// the adapter rejected the apply.
+//
+// PR-05a-h4-a Option B-bytes-carry keeps ApplyThemeIntent's payload as raw
+// bytes (the adapter does the second parse for the renderer state); the
+// save-fail UX delta (theme stays applied for the session even if config
+// save fails) is documented in docs/refactor/05-pr-05a-h4.md §"Theme-
+// selected split".
 func (c *Core) HandleThemeFileRead(ev ThemeFileReadEvent) ([]UIIntent, []TaskRequest) {
 	if ev.Err != nil {
 		return []UIIntent{FlashIntent{
 			Text:    "Cannot read theme: " + ev.Err.Error(),
+			IsError: true,
+		}}, nil
+	}
+	if _, err := styles.ThemeFromYAML(ev.Bytes); err != nil {
+		return []UIIntent{FlashIntent{
+			Text:    "Bad theme YAML: " + err.Error(),
 			IsError: true,
 		}}, nil
 	}

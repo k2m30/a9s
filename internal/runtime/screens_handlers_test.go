@@ -368,6 +368,84 @@ func TestCore_HandleThemeFileRead_ReadErrorEmitsFlashOnly(t *testing.T) {
 	}
 }
 
+// TestCore_HandleThemeFileRead_ParseErrorEmitsFlashOnly pins the AS-784
+// invariant: when read succeeds but the YAML cannot be parsed by
+// styles.ThemeFromYAML, the handler must emit exactly one error flash and
+// MUST NOT emit ApplyThemeIntent, PopSelectorIntent, or any
+// TaskKindSaveThemeConfig task. Pre-AS-784 the handler emitted Save
+// unconditionally on read success, persisting an invalid theme choice to
+// disk even though the adapter rejected the apply.
+func TestCore_HandleThemeFileRead_ParseErrorEmitsFlashOnly(t *testing.T) {
+	c := newCore()
+
+	// Malformed YAML — the leading `:` token is not a valid YAML node.
+	// styles.ThemeFromYAML returns "theme YAML parse error: …".
+	badBytes := []byte(":\n  not yaml at all\n: : :\n")
+
+	intents, tasks := c.HandleThemeFileRead(ThemeFileReadEvent{
+		Theme: "broken.yaml",
+		Bytes: badBytes,
+	})
+
+	if len(tasks) != 0 {
+		t.Errorf("expected zero tasks on parse error, got %d (%v)", len(tasks), taskKinds(tasks))
+	}
+	if hasTaskKind(tasks, TaskKindSaveThemeConfig) {
+		t.Errorf("expected NO TaskKindSaveThemeConfig on parse error; invalid theme must not be persisted")
+	}
+	if _, ok := findApplyTheme(intents); ok {
+		t.Errorf("expected no ApplyThemeIntent on parse error")
+	}
+	if findPopSelector(intents) {
+		t.Errorf("expected no PopSelectorIntent on parse error — selector stays open so user can retry")
+	}
+	fi, ok := findFlashIntent(intents)
+	if !ok {
+		t.Fatalf("expected FlashIntent, got intents=%#v", intents)
+	}
+	if !fi.IsError {
+		t.Errorf("expected IsError=true on parse error, got IsError=false")
+	}
+	const prefix = "Bad theme YAML: "
+	if len(fi.Text) < len(prefix) || fi.Text[:len(prefix)] != prefix {
+		t.Errorf("Text=%q want prefix %q", fi.Text, prefix)
+	}
+}
+
+// TestCore_HandleThemeFileRead_InvalidHexColorEmitsFlashOnly exercises the
+// second parse-fail branch styles.ThemeFromYAML guards: YAML that parses as
+// a themeYAML struct but contains an invalid hex colour string. Same
+// invariants as the malformed-YAML test above — Save must NOT fire.
+func TestCore_HandleThemeFileRead_InvalidHexColorEmitsFlashOnly(t *testing.T) {
+	c := newCore()
+
+	// Valid YAML shape, invalid hex colour value (`notahex` fails
+	// hexColorRe in styles/theme.go).
+	badBytes := []byte("name: Custom\ncolors:\n  accent: \"notahex\"\n")
+
+	intents, tasks := c.HandleThemeFileRead(ThemeFileReadEvent{
+		Theme: "bad-hex.yaml",
+		Bytes: badBytes,
+	})
+
+	if hasTaskKind(tasks, TaskKindSaveThemeConfig) {
+		t.Errorf("expected NO TaskKindSaveThemeConfig on invalid hex colour")
+	}
+	if _, ok := findApplyTheme(intents); ok {
+		t.Errorf("expected no ApplyThemeIntent on invalid hex colour")
+	}
+	if findPopSelector(intents) {
+		t.Errorf("expected no PopSelectorIntent on invalid hex colour")
+	}
+	fi, ok := findFlashIntent(intents)
+	if !ok {
+		t.Fatalf("expected FlashIntent, got intents=%#v", intents)
+	}
+	if !fi.IsError {
+		t.Errorf("expected IsError=true on invalid hex colour")
+	}
+}
+
 // ---- shared helper ---------------------------------------------------------
 
 // taskKinds extracts the TaskKind slice from tasks for diagnostic prints.

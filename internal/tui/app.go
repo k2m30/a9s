@@ -773,10 +773,17 @@ func (m *Model) pushScreen(v runtime.PushScreen) tea.Cmd {
 // success, swaps the active theme, invalidates the header cache, walks
 // the view stack invalidating ResourceListModel style caches, and sets
 // m.activeTheme so the next theme selector renders the "(current)"
-// indicator correctly. On parse failure the adapter emits a flash and
-// skips the apply; the persist task (queued separately) still fires
-// because the runtime already committed to the new theme name —
-// matching the documented Option B trade-off in
+// indicator correctly.
+//
+// Post-AS-784: Core's HandleThemeFileRead pre-validates the YAML via
+// styles.ThemeFromYAML before emitting ApplyThemeIntent + Save task. The
+// adapter parse-error branch below is therefore defensive — under normal
+// flow the bytes are guaranteed to parse. The branch is retained so any
+// future caller that constructs ApplyThemeIntent without the Core
+// validation gate (e.g. a test harness or a different entrypoint) still
+// surfaces a flash instead of silently swapping in a partially-decoded
+// theme. The Save task is no longer queued on parse failure because
+// HandleThemeFileRead gates it on parse success — see
 // docs/refactor/05-pr-05a-h4.md §"Theme-selected split".
 func (m *Model) applyTheme(v runtime.ApplyThemeIntent) tea.Cmd {
 	t, err := styles.ThemeFromYAML(v.Bytes)
