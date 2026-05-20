@@ -7,28 +7,26 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func init() {
 	// Child view: SNS Topic Subscriptions
-	resource.RegisterFieldKeys("sns_subscriptions", []string{
-		"protocol", "endpoint", "confirmation_status", "owner", "subscription_arn", "topic_arn",
-	})
-
-	resource.RegisterPaginatedChild("sns_subscriptions", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchSNSTopicSubscriptions(ctx, c.SNS, parentCtx["topic_arn"], continuationToken)
-	})
-
-	resource.RegisterChildType(resource.ResourceTypeDef{
+	catalog.RegisterChildView(catalog.ResourceTypeDef{
 		Name:      "SNS Subscriptions",
 		ShortName: "sns_subscriptions",
 		Columns:   resource.SnsSubscriptionColumns(),
 		CopyField: "endpoint",
+		FieldKeys: []string{"protocol", "endpoint", "confirmation_status", "owner", "subscription_arn", "topic_arn"},
+		ChildFetcher: func(ctx context.Context, clients any, parentCtx domain.ParentContext, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchSNSTopicSubscriptions(ctx, c.SNS, parentCtx["topic_arn"], continuationToken)
+		},
 	})
 }
 

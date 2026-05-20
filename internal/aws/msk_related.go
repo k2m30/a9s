@@ -12,11 +12,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/kafka"
 	kafkatypes "github.com/aws/aws-sdk-go-v2/service/kafka/types"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func init() {
-	resource.RegisterRelated("msk", []resource.RelatedDef{
+	catalog.RegisterRelated("msk", []domain.RelatedDef{
 		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkMSKAlarms, NeedsTargetCache: true},
 		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkMSKSG, NeedsTargetCache: false},
 		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkMSKKMS},
@@ -30,7 +32,7 @@ func init() {
 	})
 
 	// kafkatypes.Cluster: Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId → kms
-	resource.RegisterDefaultNavFields("msk", []resource.NavigableField{
+	catalog.RegisterNavigable("msk", []domain.NavigableField{
 		{FieldPath: "Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId", TargetType: "kms"},
 	})
 }

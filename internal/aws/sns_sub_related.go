@@ -5,17 +5,19 @@ import (
 	"context"
 	"strings"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func init() {
-	resource.RegisterRelated("sns-sub", []resource.RelatedDef{
+	catalog.RegisterRelated("sns-sub", []domain.RelatedDef{
 		{TargetType: "sns", DisplayName: "SNS Topic", Checker: checkSNSSubTopic, NeedsTargetCache: true},
 		{TargetType: "lambda", DisplayName: "Lambda Function", Checker: checkSNSSubLambda, NeedsTargetCache: true},
 		{TargetType: "sqs", DisplayName: "SQS Queue", Checker: checkSNSSubSQS, NeedsTargetCache: true},
 	})
 
-	resource.RegisterDefaultNavFields("sns-sub", []resource.NavigableField{
+	catalog.RegisterNavigable("sns-sub", []domain.NavigableField{
 		{FieldPath: "TopicArn", TargetType: "sns"},
 	})
 }

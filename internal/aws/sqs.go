@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -21,9 +22,9 @@ type SQSQueueAttributesRow struct {
 }
 
 func init() {
-	resource.RegisterFieldKeys("sqs", []string{"queue_name", "queue_url", "arn", "approx_messages", "approx_not_visible", "delay_seconds"})
+	catalog.RegisterFieldKeys("sqs", []string{"queue_name", "queue_url", "arn", "approx_messages", "approx_not_visible", "delay_seconds"})
 
-	resource.RegisterPaginated("sqs", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+	catalog.RegisterFetcher("sqs", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")

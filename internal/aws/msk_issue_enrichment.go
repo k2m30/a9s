@@ -10,11 +10,12 @@ import (
 	kafkasvc "github.com/aws/aws-sdk-go-v2/service/kafka"
 	kafkatypes "github.com/aws/aws-sdk-go-v2/service/kafka/types"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func init() {
-	registerIssueEnricher("msk", EnrichMSKCluster, 100)
+	catalog.RegisterWave2("msk", IssueEnricher{Fn: EnrichMSKCluster, Priority: 100})
 }
 
 // EnrichMSKCluster calls DescribeClusterV2 per provisioned MSK cluster (cap EnrichmentCap)

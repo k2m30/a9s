@@ -219,10 +219,16 @@ func TestIssueEnricherRegistry_AllExpectedKeys(t *testing.T) {
 	// The original 8 enrichers from issue #196. These must still be
 	// registered (real, not noop) — they're the foundational Wave 2
 	// implementations.
+	//
+	// Post-AS-726 PR-04i, "sfn" lives on the catalog row's Wave2 field
+	// rather than IssueEnricherRegistry. Use aws.GetIssueEnricher, which
+	// consults catalog Wave2 first then falls back to the legacy map, so
+	// either registration path satisfies the test.
 	expected := []string{"rds", "dbi", "ebs", "cb", "tg", "pipeline", "sfn", "glue"}
 	for _, key := range expected {
-		if e, ok := awsclient.IssueEnricherRegistry[key]; !ok || e.Fn == nil {
-			t.Errorf("IssueEnricherRegistry[%q].Fn is nil or missing", key)
+		e, ok := awsclient.GetIssueEnricher(key)
+		if !ok || e.Fn == nil {
+			t.Errorf("Wave 2 enricher for %q missing (neither catalog Wave2 nor IssueEnricherRegistry has it)", key)
 		}
 	}
 }

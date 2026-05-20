@@ -7,13 +7,14 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func init() {
-	resource.RegisterFieldKeys("sns-sub", []string{"topic_arn", "protocol", "endpoint", "subscription_arn"})
+	catalog.RegisterFieldKeys("sns-sub", []string{"topic_arn", "protocol", "endpoint", "subscription_arn"})
 
-	resource.RegisterPaginated("sns-sub", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+	catalog.RegisterFetcher("sns-sub", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
