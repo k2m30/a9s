@@ -9,12 +9,13 @@ import (
 	sqssvc "github.com/aws/aws-sdk-go-v2/service/sqs"
 	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func init() {
-	registerIssueEnricher("sqs", EnrichSQSAttributes, 100)
-	resource.RegisterIssueEnricherFieldKeys("sqs", []string{"dlq"})
+	catalog.RegisterWave2("sqs", IssueEnricher{Fn: EnrichSQSAttributes, Priority: 100})
+	catalog.RegisterIssueEnricherFieldKeys("sqs", []string{"dlq"})
 }
 
 // EnrichSQSAttributes calls GetQueueAttributes per queue (cap EnrichmentCap)

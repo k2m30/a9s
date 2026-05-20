@@ -7,12 +7,13 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func init() {
-	registerIssueEnricher("ses", EnrichSESAccount, 100)
-	resource.RegisterIssueEnricherFieldKeys("ses", []string{"status"})
+	catalog.RegisterWave2("ses", IssueEnricher{Fn: EnrichSESAccount, Priority: 100})
+	catalog.RegisterIssueEnricherFieldKeys("ses", []string{"status"})
 }
 
 // EnrichSESAccount calls sesv2:GetAccount once (account-wide) and replicates

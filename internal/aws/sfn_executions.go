@@ -8,36 +8,36 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
 	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func init() {
-	resource.RegisterFieldKeys("sfn_executions", []string{
-		"execution_arn", "name", "status", "start_date", "stop_date",
-		"duration", "state_machine_arn", "state_machine_alias_arn",
-		"state_machine_version_arn", "map_run_arn", "item_count",
-		"redrive_count", "redrive_date",
-	})
-
-	resource.RegisterPaginatedChild("sfn_executions", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchSFNExecutions(ctx, c.SFN, parentCtx, continuationToken)
-	})
-
-	resource.RegisterChildType(resource.ResourceTypeDef{
+	catalog.RegisterChildView(catalog.ResourceTypeDef{
 		Name:      "SFN Executions",
 		ShortName: "sfn_executions",
 		Columns:   resource.SFNExecutionColumns(),
 		CopyField: "execution_arn",
-		Children: []resource.ChildViewDef{{
+		FieldKeys: []string{
+			"execution_arn", "name", "status", "start_date", "stop_date",
+			"duration", "state_machine_arn", "state_machine_alias_arn",
+			"state_machine_version_arn", "map_run_arn", "item_count",
+			"redrive_count", "redrive_date",
+		},
+		Children: []domain.ChildViewDef{{
 			ChildType:      "sfn_execution_history",
 			Key:            "enter",
 			ContextKeys:    map[string]string{"execution_arn": "execution_arn", "execution_name": "Name"},
 			DisplayNameKey: "execution_name",
 		}},
+		ChildFetcher: func(ctx context.Context, clients any, parentCtx domain.ParentContext, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchSFNExecutions(ctx, c.SFN, parentCtx, continuationToken)
+		},
 	})
 }
 

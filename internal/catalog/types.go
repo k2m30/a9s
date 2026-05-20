@@ -107,6 +107,28 @@ type ResourceTypeDef struct {
 	// Findings is the declarative table of finding codes for this type.
 	// Graduated from Phase 03's per-enricher constants.
 	Findings []FindingDef
+
+	// ─── Field-key inventories (catalog-authoritative from PR-04i forward) ──
+
+	// FieldKeys lists the Resource.Fields keys produced by the fetcher for
+	// this resource type. Used by detail-field rendering and column-key
+	// assertions. Migrated from internal/resource fieldKeyRegistry.
+	FieldKeys []string
+
+	// IssueEnricherFieldKeys lists additional Resource.Fields keys produced
+	// by the Wave 2 enricher via IssueEnricherResult.FieldUpdates. Unioned
+	// with FieldKeys by GetAllFieldKeys consumers. Migrated from
+	// internal/resource issueEnricherFieldKeysRegistry. Catalog mutator
+	// RegisterIssueEnricherFieldKeys is idempotent and dedups entries.
+	IssueEnricherFieldKeys []string
+
+	// ─── Child-view-only fields ────────────────────────────────────────────
+
+	// ChildFetcher is the paginated fetcher for child-view rows. Populated
+	// only for entries registered via RegisterChildView (i.e. living in the
+	// catalog's child registry, not the top-level ResourceTypes slice).
+	// Top-level entries use Fetcher; child entries use ChildFetcher.
+	ChildFetcher domain.PaginatedChildFetcher
 }
 
 // ResolveColor classifies r using d.Color, defaulting to a generic

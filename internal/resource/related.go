@@ -523,6 +523,20 @@ func BootstrapActiveNavFields() {
 	maps.Copy(snapshot, defaultNavFieldRegistry)
 	defaultNavFieldMu.RUnlock()
 
+	// Catalog-authoritative entries (PR-04i+) live on the catalog row's
+	// Navigable slice rather than defaultNavFieldRegistry. Include them in
+	// the snapshot so DetailModel — which reads GetActiveNavigableFields —
+	// still resolves navigability for migrated types.
+	for _, rt := range catalog.All() {
+		if len(rt.Navigable) == 0 {
+			continue
+		}
+		if _, exists := snapshot[rt.ShortName]; exists {
+			continue
+		}
+		snapshot[rt.ShortName] = rt.Navigable
+	}
+
 	navigableFieldMu.Lock()
 	defer navigableFieldMu.Unlock()
 	for k, v := range snapshot {

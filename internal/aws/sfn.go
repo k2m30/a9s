@@ -6,13 +6,15 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func init() {
-	resource.RegisterFieldKeys("sfn", []string{"name", "type", "arn", "creation_date"})
+	catalog.RegisterFieldKeys("sfn", []string{"name", "type", "arn", "creation_date"})
 
-	resource.RegisterPaginated("sfn", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+	catalog.RegisterFetcher("sfn", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		c, ok := clients.(*ServiceClients)
 		if !ok || c == nil {
 			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
@@ -20,7 +22,7 @@ func init() {
 		return FetchStepFunctionsPage(ctx, c.SFN, continuationToken)
 	})
 
-	resource.RegisterRelated("sfn", []resource.RelatedDef{
+	catalog.RegisterRelated("sfn", []domain.RelatedDef{
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkSFNAlarm, NeedsTargetCache: false},
 		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkSFNLogs, NeedsTargetCache: true},
 		{TargetType: "role", DisplayName: "IAM Role", Checker: checkSFNRole, NeedsTargetCache: false},
@@ -33,7 +35,7 @@ func init() {
 	// list RawStruct) lacks it — the navigable-field registration is an intent
 	// contract: "if the raw struct exposes RoleArn, treat it as a role navigation".
 	// It resolves only when enriched detail (DescribeStateMachine) is present.
-	resource.RegisterDefaultNavFields("sfn", []resource.NavigableField{
+	catalog.RegisterNavigable("sfn", []domain.NavigableField{
 		{FieldPath: "RoleArn", TargetType: "role"},
 	})
 }

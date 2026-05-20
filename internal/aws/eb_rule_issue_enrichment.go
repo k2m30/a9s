@@ -10,12 +10,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func init() {
-	registerIssueEnricher("eb-rule", EnrichEventBridgeRuleTargets, 100)
-	resource.RegisterIssueEnricherFieldKeys("eb-rule", []string{"target_count"})
+	catalog.RegisterWave2("eb-rule", IssueEnricher{Fn: EnrichEventBridgeRuleTargets, Priority: 100})
+	catalog.RegisterIssueEnricherFieldKeys("eb-rule", []string{"target_count"})
 }
 
 // EnrichEventBridgeRuleTargets is a Wave 2 enricher for EventBridge rules.

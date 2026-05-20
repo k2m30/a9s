@@ -8,27 +8,25 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func init() {
-	resource.RegisterFieldKeys("eb_rule_targets", []string{
-		"target_id", "target_arn", "role_arn", "resource_type_name", "input_summary",
-	})
-
-	resource.RegisterPaginatedChild("eb_rule_targets", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchEventBridgeRuleTargets(ctx, c.EventBridge, parentCtx, continuationToken)
-	})
-
-	resource.RegisterChildType(resource.ResourceTypeDef{
+	catalog.RegisterChildView(catalog.ResourceTypeDef{
 		Name:      "EB Rule Targets",
 		ShortName: "eb_rule_targets",
 		Columns:   resource.EbRuleTargetColumns(),
 		CopyField: "target_arn",
+		FieldKeys: []string{"target_id", "target_arn", "role_arn", "resource_type_name", "input_summary"},
+		ChildFetcher: func(ctx context.Context, clients any, parentCtx domain.ParentContext, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchEventBridgeRuleTargets(ctx, c.EventBridge, parentCtx, continuationToken)
+		},
 	})
 }
 

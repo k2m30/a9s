@@ -9,30 +9,30 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
 	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 var camelSplitter = regexp.MustCompile("([a-z])([A-Z])")
 
 func init() {
-	resource.RegisterFieldKeys("sfn_execution_history", []string{
-		"timestamp", "event_type", "event_type_short",
-		"state_name", "event_detail", "event_id", "previous_event_id",
-	})
-
-	resource.RegisterPaginatedChild("sfn_execution_history", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchSFNExecutionHistory(ctx, c.SFN, parentCtx, continuationToken)
-	})
-
-	resource.RegisterChildType(resource.ResourceTypeDef{
+	catalog.RegisterChildView(catalog.ResourceTypeDef{
 		Name:      "SFN Execution History",
 		ShortName: "sfn_execution_history",
 		Columns:   resource.SFNExecutionHistoryColumns(),
 		CopyField: "event_detail",
+		FieldKeys: []string{
+			"timestamp", "event_type", "event_type_short",
+			"state_name", "event_detail", "event_id", "previous_event_id",
+		},
+		ChildFetcher: func(ctx context.Context, clients any, parentCtx domain.ParentContext, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchSFNExecutionHistory(ctx, c.SFN, parentCtx, continuationToken)
+		},
 	})
 }
 
