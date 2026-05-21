@@ -12,25 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("secrets", []string{"secret_name", "description", "last_accessed", "last_changed", "rotation_enabled", "arn", "status"})
-	resource.RegisterRevealFetcher("secrets", func(ctx context.Context, clients any, resourceID string) (string, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return "", fmt.Errorf("AWS clients not initialized")
-		}
-		return RevealSecret(ctx, c.SecretsManager, resourceID)
-	})
-
-	resource.RegisterPaginated("secrets", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchSecretsPage(ctx, c.SecretsManager, continuationToken)
-	})
-}
-
 // FetchSecrets calls the SecretsManager ListSecrets API and returns all pages
 // of secrets. Used by tests; the production path uses the per-page fetcher for pagination.
 func FetchSecrets(ctx context.Context, api SecretsManagerListSecretsAPI) ([]resource.Resource, error) {

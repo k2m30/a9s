@@ -13,29 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterRelated("secrets", []resource.RelatedDef{
-		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkSecretsKMS, NeedsTargetCache: true},
-		{TargetType: "lambda", DisplayName: "Lambda (rotation)", Checker: checkSecretsLambda, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkSecretsCFN, NeedsTargetCache: true},
-		{TargetType: "dbi", DisplayName: "RDS Instances", Checker: checkSecretsDBI, NeedsTargetCache: true},
-		{TargetType: "cb", DisplayName: "CodeBuild Projects", Checker: checkSecretsCB, NeedsTargetCache: true},
-		{TargetType: "codeartifact", DisplayName: "CodeArtifact Domains", Checker: checkSecretsCodeArtifact},
-		{TargetType: "eb", DisplayName: "Elastic Beanstalk", Checker: checkSecretsEB, NeedsTargetCache: true},
-		{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkSecretsECSTask, NeedsTargetCache: true},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkSecretsLogs},
-		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkSecretsRole},
-		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkSecretsSNS},
-	})
-
-	// smtypes.SecretListEntry: KmsKeyId (full ARN — UI resolves UUID suffix to kms cache),
-	// RotationLambdaARN (full ARN — UI resolves function name suffix to lambda cache)
-	resource.RegisterDefaultNavFields("secrets", []resource.NavigableField{
-		{FieldPath: "KmsKeyId", TargetType: "kms"},
-		{FieldPath: "RotationLambdaARN", TargetType: "lambda"},
-	})
-}
-
 // checkSecretsKMS returns the KMS key used to encrypt this secret (Pattern F).
 // KmsKeyId is a full ARN (arn:aws:kms:region:account:key/{uuid}); we extract the
 // UUID after the last "/" and search the kms cache for a matching resource ID.
