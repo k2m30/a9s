@@ -223,13 +223,16 @@ func RegisterPaginated(shortName string, f PaginatedFetcher) {
 }
 
 // GetPaginatedFetcher returns the paginated fetcher for the given resource short name.
-// Catalog-backed: checks the catalog first; falls through to the legacy map.
-// Fallback removed in PR-04n.
+// Legacy-first: the runtime map wins so RegisterPaginated test overrides take
+// effect. Catalog is the read-only fallback during the AS-795b–m transition.
 func GetPaginatedFetcher(shortName string) PaginatedFetcher {
+	if fn, ok := paginatedRegistry[shortName]; ok {
+		return fn
+	}
 	if ct := catalog.Find(shortName); ct != nil && ct.Fetcher != nil {
 		return ct.Fetcher
 	}
-	return paginatedRegistry[shortName]
+	return nil
 }
 
 // UnregisterPaginated removes a paginated fetcher. Used only in tests for cleanup.
@@ -299,13 +302,16 @@ func RegisterRevealFetcher(shortName string, f RevealFetcher) {
 }
 
 // GetRevealFetcher returns the reveal fetcher for the given resource short name.
-// Catalog-backed: checks the catalog first; falls through to the legacy map.
-// Fallback removed in PR-04n.
+// Legacy-first: runtime map wins so test overrides via RegisterRevealFetcher
+// take effect. Catalog is the read-only fallback during AS-795b–m.
 func GetRevealFetcher(shortName string) RevealFetcher {
+	if fn, ok := revealRegistry[shortName]; ok {
+		return fn
+	}
 	if ct := catalog.Find(shortName); ct != nil && ct.Reveal != nil {
 		return ct.Reveal
 	}
-	return revealRegistry[shortName]
+	return nil
 }
 
 // UnregisterRevealFetcher removes a reveal fetcher. Used only in tests for cleanup.
@@ -314,11 +320,14 @@ func UnregisterRevealFetcher(shortName string) {
 }
 
 // HasRevealFetcher returns true if a reveal fetcher is registered for the given short name.
-// Catalog-backed: checks the catalog first; falls through to the legacy map.
+// Legacy-first: runtime map wins so test overrides via RegisterRevealFetcher
+// are honored. Catalog is the read-only fallback during AS-795b–m.
 func HasRevealFetcher(shortName string) bool {
+	if _, ok := revealRegistry[shortName]; ok {
+		return true
+	}
 	if ct := catalog.Find(shortName); ct != nil && ct.Reveal != nil {
 		return true
 	}
-	_, ok := revealRegistry[shortName]
-	return ok
+	return false
 }

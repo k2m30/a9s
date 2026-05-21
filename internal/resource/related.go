@@ -316,15 +316,24 @@ func RegisterRelated(shortName string, defs []RelatedDef) {
 }
 
 // GetRelated returns the related definitions for the given resource short name.
-// Catalog-backed: checks the catalog first; falls through to the legacy map.
-// Fallback removed in PR-04n.
+// Legacy-first: reads the mutable runtime map so RegisterRelated / AppendRelated
+// overrides (test helpers, zzz_ct_events_all_related.go) take precedence over
+// the catalog source slice. The catalog acts as the read-only fallback for the
+// AS-795b–m transition window when a type's init() body is gone but the
+// runtime map was not populated by either a sibling init() or aws.Install's
+// bridgeCatalogToLegacy pass. AS-731 deletes both the legacy map and this
+// fallback once every consumer reads catalog directly.
 func GetRelated(shortName string) []RelatedDef {
+	relatedRegistryMu.RLock()
+	if defs, ok := relatedRegistry[shortName]; ok {
+		relatedRegistryMu.RUnlock()
+		return defs
+	}
+	relatedRegistryMu.RUnlock()
 	if ct := catalog.Find(shortName); ct != nil && len(ct.Related) > 0 {
 		return ct.Related
 	}
-	relatedRegistryMu.RLock()
-	defer relatedRegistryMu.RUnlock()
-	return relatedRegistry[shortName]
+	return nil
 }
 
 // UnregisterRelated restores the previous registration for the given short name

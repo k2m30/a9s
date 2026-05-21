@@ -133,57 +133,35 @@ func TestCatalogInstall_GoldenParity(t *testing.T) {
 	}
 }
 
-// Test 6 — AS-795a invariant: every top-level entry must have zero-value
-// Fetcher, Related, Navigable, and Wave2 in the scaffold PR.
-// Per-category migration (AS-795b–m) will populate these fields.
-func TestCatalogInstall_AS795a_ZeroRuntimeWiring(t *testing.T) {
+// Test 6 — AS-795 progressive-migration invariant: every entry with a non-nil
+// Fetcher must also carry FieldKeys + (Related OR Navigable) so partial
+// scaffolds don't slip into main. Inverse holds too: when Fetcher is nil the
+// other wiring fields stay zero. AS-795b–m flip types one category at a time;
+// this test grows with each migration but the shape stays identical.
+//
+// Replaces the AS-795a-era "zero wiring" guards, which were valid only while
+// no category had been migrated (PR #392). AS-807 migrates the first batch
+// (compute + ng).
+func TestCatalogInstall_AS795_MigrationShape(t *testing.T) {
 	all := catalog.All()
 	if len(all) == 0 {
 		t.Fatal("catalog.All() returned empty slice; aws.Install() may not have been called")
 	}
 	for _, rt := range all {
-		if rt.Fetcher != nil {
-			t.Errorf("type %q: Fetcher is non-nil in AS-795a scaffold; migration belongs in AS-795b–m", rt.ShortName)
+		if rt.Fetcher == nil {
+			if len(rt.FieldKeys) != 0 {
+				t.Errorf("type %q: FieldKeys populated without Fetcher — partial migration?", rt.ShortName)
+			}
+			if rt.Wave2 != nil {
+				t.Errorf("type %q: Wave2 populated without Fetcher — partial migration?", rt.ShortName)
+			}
+			continue
 		}
-		if len(rt.Related) != 0 {
-			t.Errorf("type %q: Related is non-empty in AS-795a scaffold; migration belongs in AS-795b–m", rt.ShortName)
+		if len(rt.FieldKeys) == 0 {
+			t.Errorf("type %q: Fetcher set but FieldKeys empty — migration must populate both", rt.ShortName)
 		}
-		if len(rt.Navigable) != 0 {
-			t.Errorf("type %q: Navigable is non-empty in AS-795a scaffold; migration belongs in AS-795b–m", rt.ShortName)
-		}
-		if rt.Wave2 != nil {
-			t.Errorf("type %q: Wave2 is non-nil in AS-795a scaffold; migration belongs in AS-795b–m", rt.ShortName)
-		}
-	}
-}
-
-// Test 6b — AS-795a invariant: new ResourceTypeDef fields introduced by the
-// scaffold (FieldKeys, FieldAliases, FetchByIDs, FilteredFetcher,
-// IssueEnricherFieldKeys, ChildFetcher) must be zero-valued for every
-// top-level entry. Per-category PRs (AS-795b–m) populate them.
-func TestCatalogInstall_AS795a_NewFieldsZeroValued(t *testing.T) {
-	all := catalog.All()
-	if len(all) == 0 {
-		t.Fatal("catalog.All() returned empty slice; aws.Install() may not have been called")
-	}
-	for _, rt := range all {
-		if len(rt.FieldKeys) != 0 {
-			t.Errorf("type %q: FieldKeys non-empty in AS-795a scaffold", rt.ShortName)
-		}
-		if len(rt.FieldAliases) != 0 {
-			t.Errorf("type %q: FieldAliases non-empty in AS-795a scaffold", rt.ShortName)
-		}
-		if rt.FetchByIDs != nil {
-			t.Errorf("type %q: FetchByIDs non-nil in AS-795a scaffold", rt.ShortName)
-		}
-		if rt.FilteredFetcher != nil {
-			t.Errorf("type %q: FilteredFetcher non-nil in AS-795a scaffold", rt.ShortName)
-		}
-		if len(rt.IssueEnricherFieldKeys) != 0 {
-			t.Errorf("type %q: IssueEnricherFieldKeys non-empty in AS-795a scaffold", rt.ShortName)
-		}
-		if rt.ChildFetcher != nil {
-			t.Errorf("type %q: ChildFetcher non-nil in AS-795a scaffold", rt.ShortName)
+		if len(rt.Related) == 0 && len(rt.Navigable) == 0 {
+			t.Errorf("type %q: Fetcher set but no Related or Navigable wiring", rt.ShortName)
 		}
 	}
 }

@@ -12,18 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("ecs-svc", []string{"service_name", "cluster", "status", "desired_count", "running_count", "launch_type", "task_definition"})
-
-	resource.RegisterPaginated("ecs-svc", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchECSServicesPage(ctx, c.ECS, c.ECS, c.ECS, continuationToken)
-	})
-}
-
 // FetchECSServicesPage fetches one page of ECS clusters using the continuationToken,
 // then for each cluster in that page fetches all services via ListServices+DescribeServices.
 // IsTruncated reflects whether ListClusters has more pages beyond this one.

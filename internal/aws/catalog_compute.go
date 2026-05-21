@@ -1,12 +1,15 @@
 package aws
 
 import (
+	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // deprecatedLambdaRuntimes is the set of Lambda runtime identifiers that AWS
@@ -451,6 +454,66 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		},
 		Color:   colorEC2,
 		Augment: augmentEC2StatusChecks,
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchEC2InstancesPage(ctx, c.EC2, continuationToken)
+		},
+		Wave2: IssueEnricher{Fn: EnrichEC2InstanceStatus, Priority: 100},
+		FieldKeys: []string{
+			"instance_id", "name", "state", "type", "private_ip", "public_ip",
+			"launch_time", "lifecycle", "image_id", "vpc_id",
+			"system_status", "instance_status", "state_reason_code",
+		},
+		FieldAliases: map[string]string{
+			"instance_id":  "InstanceId",
+			"type":         "InstanceType",
+			"state":        "State",
+			"lifecycle":    "InstanceLifecycle",
+			"image_id":     "ImageId",
+			"key_name":     "KeyName",
+			"vpc_id":       "VpcId",
+			"subnet_id":    "SubnetId",
+			"private_ip":   "PrivateIpAddress",
+			"private_dns":  "PrivateDnsName",
+			"public_ip":    "PublicIpAddress",
+			"iam_profile":  "IamInstanceProfile",
+			"architecture": "Architecture",
+			"platform":     "Platform",
+			"launch_time":  "LaunchTime",
+		},
+		Related: []domain.RelatedDef{
+			{TargetType: "tg", DisplayName: "Target Groups", Checker: checkEC2TargetGroups, NeedsTargetCache: true},
+			{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkEC2ASG, NeedsTargetCache: true},
+			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkEC2Alarms, NeedsTargetCache: true},
+			{TargetType: "ng", DisplayName: "EKS Node Groups", Checker: checkEC2NodeGroups, NeedsTargetCache: true},
+			{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkEC2CFN, NeedsTargetCache: true},
+			{TargetType: "eip", DisplayName: "Elastic IPs", Checker: checkEC2EIP, NeedsTargetCache: true},
+			{TargetType: "ebs", DisplayName: "EBS Volumes", Checker: checkEC2EBS},
+			{TargetType: "ebs-snap", DisplayName: "EBS Snapshots", Checker: checkEC2EBSSnap, NeedsTargetCache: true},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkEC2CloudTrailEvents, NeedsTargetCache: false},
+			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkEC2SG},
+			{TargetType: "vpc", DisplayName: "VPC", Checker: checkEC2VPC},
+			{TargetType: "role", DisplayName: "IAM Role", Checker: checkEC2Role},
+			{TargetType: "ami", DisplayName: "AMI", Checker: checkEC2AMI},
+			{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkEC2ENI},
+			{TargetType: "subnet", DisplayName: "Subnet", Checker: checkEC2Subnet},
+			{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkEC2KMS, NeedsTargetCache: true},
+			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkEC2Logs, NeedsTargetCache: true},
+			{TargetType: "ssm", DisplayName: "SSM Parameters", Checker: checkEC2SSM},
+			{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkEC2Backup, NeedsTargetCache: true},
+		},
+		Navigable: []domain.NavigableField{
+			{FieldPath: "VpcId", TargetType: "vpc"},
+			{FieldPath: "SubnetId", TargetType: "subnet"},
+			{FieldPath: "ImageId", TargetType: "ami"},
+			{FieldPath: "BlockDeviceMappings.Ebs.VolumeId", TargetType: "ebs"},
+			{FieldPath: "SecurityGroups.GroupId", TargetType: "sg"},
+			{FieldPath: "NetworkInterfaces.NetworkInterfaceId", TargetType: "eni"},
+			{FieldPath: "IamInstanceProfile.Arn", TargetType: "role"},
+		},
 	},
 	{
 		Name:          "ECS Services",
@@ -488,6 +551,43 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			},
 		},
 		Color: colorECSSvc,
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchECSServicesPage(ctx, c.ECS, c.ECS, c.ECS, continuationToken)
+		},
+		Wave2: IssueEnricher{Fn: EnrichECSServices, Priority: 100},
+		FieldKeys: []string{
+			"service_name", "cluster", "status", "desired_count",
+			"running_count", "launch_type", "task_definition",
+		},
+		Related: []domain.RelatedDef{
+			{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkECSSvcCluster},
+			{TargetType: "tg", DisplayName: "Target Groups", Checker: checkECSSvcTargetGroups},
+			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkECSSvcAlarms, NeedsTargetCache: true},
+			{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkECSSvcELB, NeedsTargetCache: true},
+			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkECSSvcLogs, NeedsTargetCache: true},
+			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkECSSvcSG},
+			{TargetType: "role", DisplayName: "IAM Role", Checker: checkECSSvcRole},
+			{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkECSSvcCFN, NeedsTargetCache: true},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkECSSvcCTEvents, NeedsTargetCache: true},
+			{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkECSSvcEbRule, NeedsTargetCache: true},
+			{TargetType: "ecr", DisplayName: "ECR Repositories", Checker: checkECSSvcECR},
+			{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkECSSvcTasks, NeedsTargetCache: true},
+			{TargetType: "secrets", DisplayName: "Secrets", Checker: checkECSSvcSecrets},
+			{TargetType: "sfn", DisplayName: "Step Functions", Checker: checkECSSvcSFN, NeedsTargetCache: true},
+			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkECSSvcSubnet},
+			{TargetType: "vpc", DisplayName: "VPC", Checker: checkECSSvcVPC, NeedsTargetCache: true},
+		},
+		Navigable: []domain.NavigableField{
+			{FieldPath: "ClusterArn", TargetType: "ecs"},
+			{FieldPath: "RoleArn", TargetType: "role"},
+			{FieldPath: "NetworkConfiguration.AwsvpcConfiguration.Subnets", TargetType: "subnet"},
+			{FieldPath: "NetworkConfiguration.AwsvpcConfiguration.SecurityGroups", TargetType: "sg"},
+			{FieldPath: "LoadBalancers.TargetGroupArn", TargetType: "tg"},
+		},
 	},
 	{
 		Name:          "ECS Clusters",
@@ -504,6 +604,29 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "services_count", Title: "Services", Width: 10, Sortable: true},
 		},
 		Color: colorECSCluster,
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchECSClustersPage(ctx, c.ECS, c.ECS, continuationToken)
+		},
+		Wave2:     IssueEnricher{Fn: EnrichECSClusters, Priority: 100},
+		FieldKeys: []string{"cluster_name", "status", "running_tasks", "pending_tasks", "services_count"},
+		Related: []domain.RelatedDef{
+			{TargetType: "ecs-svc", DisplayName: "ECS Services", Checker: checkECSServices, NeedsTargetCache: true},
+			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkECSAlarms, NeedsTargetCache: true},
+			{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkECSCFN, NeedsTargetCache: true},
+			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkECSKMS},
+			{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkECSASG, NeedsTargetCache: true},
+			{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkECSEC2, NeedsTargetCache: true},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkECSCTEvents, NeedsTargetCache: true},
+			{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkECSTasks, NeedsTargetCache: true},
+			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkECSLogs, NeedsTargetCache: true},
+		},
+		Navigable: []domain.NavigableField{
+			{FieldPath: "Configuration.ExecuteCommandConfiguration.KmsKeyId", TargetType: "kms"},
+		},
 	},
 	{
 		Name:          "ECS Tasks",
@@ -546,6 +669,52 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			},
 		},
 		Color: colorLambda,
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchLambdaFunctionsPage(ctx, c.Lambda, continuationToken)
+		},
+		FieldKeys: []string{
+			"function_name", "runtime", "state", "memory", "timeout", "handler",
+			"last_modified", "code_size", "log_group", "package_type",
+			"event_source_arn", "arn",
+		},
+		Related: []domain.RelatedDef{
+			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkLambdaRole, NeedsTargetCache: true},
+			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkLambdaAlarms, NeedsTargetCache: true},
+			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkLambdaLogs, NeedsTargetCache: true},
+			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkLambdaSG},
+			{TargetType: "vpc", DisplayName: "VPC", Checker: checkLambdaVPC},
+			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkLambdaKMS},
+			{TargetType: "sqs", DisplayName: "SQS Queues", Checker: checkLambdaSQS},
+			{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkLambdaCFN, NeedsTargetCache: false},
+			{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkLambdaEBRule, NeedsTargetCache: false},
+			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkLambdaSubnet},
+			{TargetType: "efs", DisplayName: "EFS File Systems", Checker: checkLambdaEFS},
+			{TargetType: "apigw", DisplayName: "API Gateways", Checker: checkLambdaAPIGW, NeedsTargetCache: true},
+			{TargetType: "cf", DisplayName: "CloudFront", Checker: checkLambdaCF, NeedsTargetCache: true},
+			{TargetType: "ddb", DisplayName: "DynamoDB Tables", Checker: checkLambdaDDB},
+			{TargetType: "kinesis", DisplayName: "Kinesis Streams", Checker: checkLambdaKinesis},
+			{TargetType: "msk", DisplayName: "MSK Clusters", Checker: checkLambdaMSK},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkLambdaCTEvents, NeedsTargetCache: true},
+			{TargetType: "tg", DisplayName: "Target Groups", Checker: checkLambdaTG, NeedsTargetCache: true},
+			{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkLambdaSNS, NeedsTargetCache: true},
+			{TargetType: "sns-sub", DisplayName: "SNS Subscriptions", Checker: checkLambdaSNSSub, NeedsTargetCache: true},
+			{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkLambdaS3, NeedsTargetCache: true},
+			{TargetType: "ecr", DisplayName: "ECR Repositories", Checker: checkLambdaECR},
+			{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkLambdaENI, NeedsTargetCache: true},
+			{TargetType: "secrets", DisplayName: "Secrets", Checker: checkLambdaSecrets, NeedsTargetCache: true},
+			{TargetType: "ssm", DisplayName: "SSM Parameters", Checker: checkLambdaSSM, NeedsTargetCache: true},
+		},
+		Navigable: []domain.NavigableField{
+			{FieldPath: "Role", TargetType: "role"},
+			{FieldPath: "KMSKeyArn", TargetType: "kms"},
+			{FieldPath: "VpcConfig.VpcId", TargetType: "vpc"},
+			{FieldPath: "VpcConfig.SubnetIds", TargetType: "subnet"},
+			{FieldPath: "VpcConfig.SecurityGroupIds", TargetType: "sg"},
+		},
 	},
 	{
 		Name:          "Auto Scaling Groups",
@@ -566,6 +735,36 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{ChildType: "asg_activities", Key: "enter", ContextKeys: map[string]string{"asg_name": "asg_name"}, DisplayNameKey: "asg_name"},
 		},
 		Color: colorASG,
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchAutoScalingGroupsPage(ctx, c.AutoScaling, continuationToken)
+		},
+		Wave2: IssueEnricher{Fn: EnrichASGScalingActivities, Priority: 100},
+		FieldKeys: []string{
+			"asg_name", "min_size", "max_size", "desired", "instances", "status",
+			"instances_unhealthy_count", "in_service_count", "suspended_processes",
+		},
+		Related: []domain.RelatedDef{
+			{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkASGEC2},
+			{TargetType: "tg", DisplayName: "Target Groups", Checker: checkASGTG},
+			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkASGSubnets},
+			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkASGAlarm, NeedsTargetCache: true},
+			{TargetType: "ng", DisplayName: "EKS Node Groups", Checker: checkASGNG, NeedsTargetCache: true},
+			{TargetType: "ami", DisplayName: "AMI", Checker: checkASGAMI, NeedsTargetCache: false},
+			{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkASGELB, NeedsTargetCache: false},
+			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkASGRole, NeedsTargetCache: false},
+			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkASGSG, NeedsTargetCache: false},
+			{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkASGSNS, NeedsTargetCache: false},
+			{TargetType: "vpc", DisplayName: "VPCs", Checker: checkASGVPC, NeedsTargetCache: false},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("asg")},
+		},
+		Navigable: []domain.NavigableField{
+			{FieldPath: "TargetGroupARNs", TargetType: "tg"},
+			{FieldPath: "VPCZoneIdentifier", TargetType: "subnet"},
+		},
 	},
 	{
 		Name:          "Elastic Beanstalk",
@@ -652,5 +851,35 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			}
 		},
 		Color: colorAMI,
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchAMIsPage(ctx, c.EC2, continuationToken)
+		},
+		FetchByIDs: func(ctx context.Context, clients any, ids []string) ([]resource.Resource, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return nil, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchAMIsByIDs(ctx, c.EC2, ids)
+		},
+		FieldKeys: []string{
+			"image_id", "name", "state", "architecture", "platform",
+			"root_device_type", "creation_date", "public", "deprecated",
+		},
+		Related: []domain.RelatedDef{
+			{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkAMIEC2, NeedsTargetCache: true},
+			{TargetType: "ebs-snap", DisplayName: "EBS Snapshots", Checker: checkAMIEBSSnaps, NeedsTargetCache: false},
+			{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkAMIASG, NeedsTargetCache: true},
+			{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkAMICFN, NeedsTargetCache: true},
+			{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkAMIKMS},
+			{TargetType: "ng", DisplayName: "EKS Node Groups", Checker: checkAMING, NeedsTargetCache: true},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("ami")},
+		},
+		Navigable: []domain.NavigableField{
+			{FieldPath: "BlockDeviceMappings.Ebs.SnapshotId", TargetType: "ebs-snap"},
+		},
 	},
 }

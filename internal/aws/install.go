@@ -1,6 +1,33 @@
 package aws
 
-import "github.com/k2m30/a9s/v3/internal/catalog"
+import (
+	"context"
+
+	"github.com/k2m30/a9s/v3/internal/catalog"
+	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// ctEventsCheckerFor returns the RelatedChecker used for the CloudTrail Events
+// pivot on every top-level resource type. Migrated types embed this in their
+// catalog struct literal; zzz_ct_events_all_related.go falls back to
+// AppendRelated for non-migrated types. The returned closure captures the
+// owning resource type's short name so BuildCloudTrailFilter routes the
+// LookupEvents call against the right ResourceName/Fields key.
+func ctEventsCheckerFor(shortName string) domain.RelatedChecker {
+	sn := shortName
+	return func(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+		filter := resource.BuildCloudTrailFilter(res, sn)
+		if filter == nil {
+			return resource.RelatedCheckResult{TargetType: "ct-events", Count: 0}
+		}
+		return resource.RelatedCheckResult{
+			TargetType:  "ct-events",
+			Count:       -1,
+			FetchFilter: filter,
+		}
+	}
+}
 
 // Install loads the AWS resource catalog into internal/catalog. MUST be called
 // exactly once at program start (main() / TestMain) before any
@@ -27,6 +54,45 @@ import "github.com/k2m30/a9s/v3/internal/catalog"
 func Install() {
 	catalog.SetTypes(allTopLevelTypes())
 	catalog.SetChildTypes(allChildTypes())
+	bridgeCatalogToLegacy()
+}
+
+// bridgeCatalogToLegacy populates the internal/resource legacy maps from the
+// catalog struct fields. Required during the AS-795b–m transition because
+// several consumers still read internal/resource maps directly (not through
+// the catalog-aware accessors). Each Register* call only fires when the
+// catalog has data for that field, so non-migrated types' init() registrations
+// are not clobbered with zero values.
+//
+// AS-795n deletes both this bridge and the matching internal/resource maps
+// once consumers migrate to catalog.Find / catalog.AllByWave2().
+func bridgeCatalogToLegacy() {
+	for _, rt := range catalog.All() {
+		if rt.Fetcher != nil {
+			resource.RegisterPaginated(rt.ShortName, rt.Fetcher)
+		}
+		if len(rt.FieldKeys) > 0 {
+			resource.RegisterFieldKeys(rt.ShortName, rt.FieldKeys)
+		}
+		if len(rt.FieldAliases) > 0 {
+			resource.RegisterFieldAliases(rt.ShortName, rt.FieldAliases)
+		}
+		if len(rt.Related) > 0 {
+			resource.RegisterRelated(rt.ShortName, rt.Related)
+		}
+		if len(rt.Navigable) > 0 {
+			resource.RegisterDefaultNavFields(rt.ShortName, rt.Navigable)
+		}
+		if rt.FetchByIDs != nil {
+			resource.RegisterFetchByIDs(rt.ShortName, rt.FetchByIDs)
+		}
+		if rt.FilteredFetcher != nil {
+			resource.RegisterFilteredPaginated(rt.ShortName, rt.FilteredFetcher)
+		}
+		if rt.Reveal != nil {
+			resource.RegisterRevealFetcher(rt.ShortName, rt.Reveal)
+		}
+	}
 }
 
 // allTopLevelTypes concatenates the per-category top-level catalog slices into
