@@ -11,18 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("tgw", []string{"tgw_id", "name", "state", "owner_id", "description"})
-
-	resource.RegisterPaginated("tgw", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchTransitGatewaysPage(ctx, c.EC2, continuationToken)
-	})
-}
-
 // FetchTransitGateways calls the EC2 DescribeTransitGateways API and converts the
 // response into a slice of generic Resource structs.
 func FetchTransitGateways(ctx context.Context, api EC2DescribeTransitGatewaysAPI) ([]resource.Resource, error) {

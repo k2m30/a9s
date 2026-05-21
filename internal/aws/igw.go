@@ -11,27 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("igw", []string{"igw_id", "name", "vpc_id", "state", "attachments_count"})
-
-	resource.RegisterDefaultNavFields("igw", []resource.NavigableField{
-		{FieldPath: "Attachments.VpcId", TargetType: "vpc"},
-	})
-
-	resource.RegisterRelated("igw", []resource.RelatedDef{
-		{TargetType: "vpc", DisplayName: "VPCs", Checker: checkIGWVPC, NeedsTargetCache: true},
-		{TargetType: "rtb", DisplayName: "Route Tables", Checker: checkIGWRTB, NeedsTargetCache: true},
-	})
-
-	resource.RegisterPaginated("igw", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchInternetGatewaysPage(ctx, c.EC2, continuationToken)
-	})
-}
-
 // FetchInternetGateways calls the EC2 DescribeInternetGateways API and converts the
 // response into a slice of generic Resource structs.
 func FetchInternetGateways(ctx context.Context, api EC2DescribeInternetGatewaysAPI) ([]resource.Resource, error) {
