@@ -1,36 +1,44 @@
 package unit_test
 
 import (
+	"sync"
 	"testing"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// relatedDefsSnapshot captures all related defs at package init time, before
-// any test can mutate the registry via RegisterRelated. This is necessary
-// because many tests in this package temporarily overwrite registry entries
-// (e.g. "ec2") without always restoring them, which would make golden checks
-// fail non-deterministically depending on test execution order.
-var relatedDefsSnapshot map[string][]resource.RelatedDef
+// relatedDefsSnapshot captures all related defs on first access, before any
+// test has had a chance to mutate the registry via RegisterRelated. We can't
+// take this snapshot in init() because init() runs before TestMain, and
+// catalog.Find / catalog.All panic until SetTypes has been called by
+// aws.Install in TestMain.
+var (
+	relatedDefsSnapshot     map[string][]resource.RelatedDef
+	relatedDefsSnapshotOnce sync.Once
+)
 
-func init() {
-	relatedDefsSnapshot = make(map[string][]resource.RelatedDef)
-	for _, rt := range resource.AllResourceTypes() {
-		defs := resource.GetRelated(rt.ShortName)
-		if len(defs) > 0 {
-			copied := make([]resource.RelatedDef, len(defs))
-			copy(copied, defs)
-			relatedDefsSnapshot[rt.ShortName] = copied
+func snapshotRelatedDefs() map[string][]resource.RelatedDef {
+	relatedDefsSnapshotOnce.Do(func() {
+		snap := make(map[string][]resource.RelatedDef)
+		for _, rt := range resource.AllResourceTypes() {
+			defs := resource.GetRelated(rt.ShortName)
+			if len(defs) > 0 {
+				copied := make([]resource.RelatedDef, len(defs))
+				copy(copied, defs)
+				snap[rt.ShortName] = copied
+			}
 		}
-	}
+		relatedDefsSnapshot = snap
+	})
+	return relatedDefsSnapshot
 }
 
 // TestRelatedDefs_AllDisplayNamesNonEmpty verifies that every registered
 // RelatedDef (as of package init) has a non-empty DisplayName.
 // An empty DisplayName produces a blank row label in the right column.
 func TestRelatedDefs_AllDisplayNamesNonEmpty(t *testing.T) {
-	for shortName, defs := range relatedDefsSnapshot {
+	for shortName, defs := range snapshotRelatedDefs() {
 		for i, def := range defs {
 			if def.DisplayName == "" {
 				t.Errorf("%s: related def[%d] (TargetType=%q) has empty DisplayName",
@@ -394,7 +402,7 @@ func TestRelatedDefs_GoldenDisplayNames(t *testing.T) {
 	}
 
 	for k, wantName := range golden {
-		defs, ok := relatedDefsSnapshot[k.shortName]
+		defs, ok := snapshotRelatedDefs()[k.shortName]
 		if !ok {
 			t.Errorf("%s: no related defs in snapshot (resource type not registered or has no related defs)",
 				k.shortName)

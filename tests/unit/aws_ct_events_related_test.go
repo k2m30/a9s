@@ -3,6 +3,7 @@ package unit_test
 import (
 	"context"
 	"slices"
+	"sync"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -387,24 +388,29 @@ func TestRelated_CtEvents_IAMUser_FetchFilterSet_Match_Truncated(t *testing.T) {
 // FetchFilter propagation: checkEC2CloudTrailEvents (ec2 → ct-events)
 // ---------------------------------------------------------------------------
 
-// ec2CtEventsRelatedChecker captures the ec2→ct-events checker at package init time,
-// before any test can mutate the ec2 related registry.
-var ec2CtEventsRelatedChecker resource.RelatedChecker
-
-func init() {
-	for _, def := range resource.GetRelated("ec2") {
-		if def.TargetType == "ct-events" {
-			ec2CtEventsRelatedChecker = def.Checker
-			break
-		}
-	}
-}
+// ec2CtEventsRelatedChecker captures the ec2→ct-events checker on first use,
+// before any test mutates the ec2 related registry. Snapshot timing matters:
+// taking it on first call (inside TestMain-scope) means catalog.Find has been
+// installed via aws.Install. We can't snapshot at package init() because that
+// runs before TestMain (and catalog.Find panics until SetTypes is called).
+var (
+	ec2CtEventsRelatedChecker     resource.RelatedChecker
+	ec2CtEventsRelatedCheckerOnce sync.Once
+)
 
 // ec2CtEventsCheckerByTarget returns the RelatedChecker for "ct-events" registered
 // under "ec2". Defined here (unit_test pkg) to avoid conflict with ec2CheckerByTarget
 // in aws_ec2_related_test.go (unit pkg).
 func ec2CtEventsCheckerByTarget(t *testing.T) resource.RelatedChecker {
 	t.Helper()
+	ec2CtEventsRelatedCheckerOnce.Do(func() {
+		for _, def := range resource.GetRelated("ec2") {
+			if def.TargetType == "ct-events" {
+				ec2CtEventsRelatedChecker = def.Checker
+				break
+			}
+		}
+	})
 	if ec2CtEventsRelatedChecker == nil {
 		t.Fatal("ec2 ct-events checker not captured at init — verify ec2 RegisterRelated includes ct-events")
 	}

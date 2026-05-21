@@ -2,6 +2,7 @@ package unit_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -18,32 +19,44 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// checkerCache captures related checkers at init time, before any test can
-// overwrite the global registry. This makes field-extraction tests immune
-// to test-order pollution from tests that call RegisterRelated("ec2", ...).
-var checkerCache = func() map[string]map[string]resource.RelatedChecker {
-	cache := make(map[string]map[string]resource.RelatedChecker)
-	for _, td := range resource.AllResourceTypes() {
-		sn := td.ShortName
-		defs := resource.GetRelated(sn)
-		if len(defs) == 0 {
-			continue
-		}
-		m := make(map[string]resource.RelatedChecker, len(defs))
-		for _, def := range defs {
-			if def.Checker != nil {
-				m[def.TargetType] = def.Checker
-			}
-		}
-		cache[sn] = m
-	}
-	return cache
-}()
+// checkerCache holds related checkers captured the first time
+// fieldExtractionChecker is called. Snapshot timing matters: tests that call
+// RegisterRelated mutate the global registry, so we want a snapshot taken
+// before any test runs. We can't use a package-level var initializer here
+// because catalog.All (transitively reached via resource.AllResourceTypes)
+// panics until aws.Install is called in TestMain — and package-level var
+// initialization runs before TestMain.
+var (
+	checkerCache     map[string]map[string]resource.RelatedChecker
+	checkerCacheOnce sync.Once
+)
 
 // fieldExtractionChecker retrieves the RelatedChecker for the given source type
-// and target type from the init-time cache. Immune to test pollution.
+// and target type from a one-shot snapshot of the production registry. The
+// snapshot is taken the first time this helper is called — after TestMain has
+// installed the catalog and before any test has had a chance to overwrite the
+// related registry.
 func fieldExtractionChecker(t *testing.T, shortName, targetType string) resource.RelatedChecker {
 	t.Helper()
+	checkerCacheOnce.Do(func() {
+		cache := make(map[string]map[string]resource.RelatedChecker)
+		for _, td := range resource.AllResourceTypes() {
+			sn := td.ShortName
+			defs := resource.GetRelated(sn)
+			if len(defs) == 0 {
+				continue
+			}
+			m := make(map[string]resource.RelatedChecker, len(defs))
+			for _, def := range defs {
+				if def.Checker != nil {
+					m[def.TargetType] = def.Checker
+				}
+			}
+			cache[sn] = m
+		}
+		checkerCache = cache
+	})
+
 	m, ok := checkerCache[shortName]
 	if !ok {
 		t.Fatalf("%s: no related checkers cached at init time", shortName)

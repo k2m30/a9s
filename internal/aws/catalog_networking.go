@@ -1,8 +1,9 @@
-package catalog
+package aws
 
 import (
 	"strconv"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
 )
 
@@ -168,7 +169,7 @@ func colorENI(r domain.Resource) domain.Color {
 	return domain.ColorHealthy
 }
 
-var networkingTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
+var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
 		Name:          "Load Balancers",
 		ShortName:     "elb",

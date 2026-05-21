@@ -1,8 +1,9 @@
-package catalog
+package aws
 
 import (
 	"strings"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
 )
 
@@ -77,7 +78,7 @@ func colorSES(r domain.Resource) domain.Color {
 	return domain.ColorHealthy
 }
 
-var messagingTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
+var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
 		Name:          "SQS Queues",
 		ShortName:     "sqs",
