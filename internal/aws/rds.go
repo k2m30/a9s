@@ -12,42 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("dbi", []string{"db_identifier", "engine", "engine_version", "status", "class", "endpoint", "multi_az", "arn", "publicly_accessible", "storage_encrypted", "deletion_protection", "backup_retention_period"})
-
-	resource.RegisterRelated("dbi", []resource.RelatedDef{
-		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkDbiSG},
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkDbiKMS},
-		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkDbiSubnets},
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkDbiAlarm, NeedsTargetCache: true},
-		{TargetType: "dbi-snap", DisplayName: "DB Instance Snapshots", Checker: checkDbiDBISnap, NeedsTargetCache: true},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkDBILogs, NeedsTargetCache: true},
-		{TargetType: "vpc", DisplayName: "VPC", Checker: checkDbiVPC},
-		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkDbiSecrets, NeedsTargetCache: true},
-		{TargetType: "dbc", DisplayName: "RDS Clusters", Checker: checkDbiDBC, NeedsTargetCache: true},
-		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkDbiRole},
-		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkDbiENI},
-		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkDbiCTEvents, NeedsTargetCache: true},
-	})
-
-	// rdstypes.DBInstance: VpcSecurityGroups[].VpcSecurityGroupId, DBSubnetGroup.VpcId,
-	// DBSubnetGroup.Subnets[].SubnetIdentifier, KmsKeyId
-	resource.RegisterDefaultNavFields("dbi", []resource.NavigableField{
-		{FieldPath: "VpcSecurityGroups.VpcSecurityGroupId", TargetType: "sg"},
-		{FieldPath: "DBSubnetGroup.VpcId", TargetType: "vpc"},
-		{FieldPath: "DBSubnetGroup.Subnets.SubnetIdentifier", TargetType: "subnet"},
-		{FieldPath: "KmsKeyId", TargetType: "kms"},
-	})
-
-	resource.RegisterPaginated("dbi", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchRDSInstancesPage(ctx, c.RDS, continuationToken)
-	})
-}
-
 // FetchRDSInstances calls the RDS DescribeDBInstances API and converts the
 // response into a slice of generic Resource structs.
 //

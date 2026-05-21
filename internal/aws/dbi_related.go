@@ -191,7 +191,10 @@ func dbiRelatedResources(ctx context.Context, clients any, cache resource.Resour
 func checkDbiSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
+		// Parent isn't a DBInstance — cannot read MasterUserSecret.
+		// Returning -1 here drops the honest lower bound; 0 is correct because
+		// without a recognizable parent shape there are no DBInstance-secret links to find.
+		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
 	}
 	if db.MasterUserSecret == nil || db.MasterUserSecret.SecretArn == nil || *db.MasterUserSecret.SecretArn == "" {
 		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
@@ -237,7 +240,10 @@ func checkDbiVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 func checkDbiDBC(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok {
-		return resource.RelatedCheckResult{TargetType: "dbc", Count: -1}
+		// Parent isn't a DBInstance — cannot read DBClusterIdentifier.
+		// Returning -1 drops the honest lower bound; 0 is correct because
+		// without DBClusterIdentifier there are no cluster memberships to find.
+		return resource.RelatedCheckResult{TargetType: "dbc", Count: 0}
 	}
 	if db.DBClusterIdentifier == nil || *db.DBClusterIdentifier == "" {
 		return resource.RelatedCheckResult{TargetType: "dbc", Count: 0}
@@ -376,10 +382,15 @@ func checkDbiCTEvents(ctx context.Context, clients any, res resource.Resource, c
 			ids = append(ids, eventRes.ID)
 		}
 	}
-	if truncated {
-		return resource.RelatedCheckResult{TargetType: "ct-events", Count: -1, FetchFilter: fetchFilter}
+	if len(ids) == 0 && truncated {
+		r := resource.ApproximateZero("ct-events")
+		r.FetchFilter = fetchFilter
+		return r
 	}
 	result := relatedResult("ct-events", ids)
+	if truncated {
+		result.Approximate = true
+	}
 	result.FetchFilter = fetchFilter
 	return result
 }

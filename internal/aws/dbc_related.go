@@ -393,12 +393,9 @@ func dbcDocDBSubnetGroup(ctx context.Context, clients any, res resource.Resource
 func checkDbcSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	secretARN := dbcClusterMasterSecretARN(res.RawStruct)
 	if secretARN == "" {
-		// Check whether the raw struct was even a valid cluster shape.
-		if _, ok1 := assertStruct[docdb_types.DBCluster](res.RawStruct); !ok1 {
-			if _, ok2 := assertStruct[rdstypes.DBCluster](res.RawStruct); !ok2 {
-				return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
-			}
-		}
+		// Parent has no MasterUserSecret — true regardless of whether the
+		// RawStruct shape was a recognised cluster. Returning Count=0 is
+		// definitive: there is no cluster-managed master secret to associate.
 		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
 	}
 

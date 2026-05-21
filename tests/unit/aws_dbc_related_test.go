@@ -492,8 +492,11 @@ func TestRelated_DBC_Secrets_NoMasterUserSecret(t *testing.T) {
 	}
 }
 
-// TestRelated_DBC_Secrets_WrongRawStruct verifies Count=-1 when RawStruct is
-// not a DBCluster (assertStruct fails).
+// TestRelated_DBC_Secrets_WrongRawStruct verifies Count=0 when RawStruct is
+// not a DBCluster shape. dbcClusterMasterSecretARN returns "" for any
+// unrecognised parent, so there is no MasterUserSecret link to find.
+// Returning -1 would drop the honest lower bound — see
+// TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsApproximate.
 func TestRelated_DBC_Secrets_WrongRawStruct(t *testing.T) {
 	src := resource.Resource{
 		ID:        "acme-docdb-prod",
@@ -503,8 +506,8 @@ func TestRelated_DBC_Secrets_WrongRawStruct(t *testing.T) {
 	checker := dbcCheckerByTarget(t, "secrets")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (no MasterUserSecret on unrecognised parent shape)", result.Count)
 	}
 }
 
