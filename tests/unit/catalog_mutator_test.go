@@ -292,6 +292,7 @@ func TestRegisterIssueEnricherFieldKeys(t *testing.T) {
 func TestRegisterChildView(t *testing.T) {
 	t.Run("happy_path_register_then_find", func(t *testing.T) {
 		sn := "_qa_test_childview_happy"
+		defer catalog.RemoveForTest(sn)
 
 		catalog.RegisterChildView(catalog.ResourceTypeDef{
 			Name:         "QA Child Happy",
@@ -321,6 +322,7 @@ func TestRegisterChildView(t *testing.T) {
 
 	t.Run("panic_on_duplicate", func(t *testing.T) {
 		sn := "_qa_test_childview_dup"
+		defer catalog.RemoveForTest(sn)
 		catalog.RegisterChildView(catalog.ResourceTypeDef{ShortName: sn, ChildFetcher: noopChildFetcher})
 		expectPanic(t, "RegisterChildView second call with same shortName", func() {
 			catalog.RegisterChildView(catalog.ResourceTypeDef{ShortName: sn, ChildFetcher: noopChildFetcher})
