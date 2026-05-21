@@ -11,18 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("backup", []string{"plan_name", "plan_id", "creation_date", "last_execution", "resources", "not_resources"})
-
-	resource.RegisterPaginated("backup", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchBackupPlansPage(ctx, c.Backup, continuationToken)
-	})
-}
-
 // FetchBackupPlans calls the Backup ListBackupPlans API and returns a slice of
 // generic Resource structs.
 func FetchBackupPlans(ctx context.Context, api BackupListBackupPlansAPI) ([]resource.Resource, error) {
