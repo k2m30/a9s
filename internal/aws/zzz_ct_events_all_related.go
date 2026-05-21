@@ -11,7 +11,13 @@ import (
 )
 
 func init() {
-	for _, shortName := range resource.AllShortNames() {
+	// Iterate the package-local catalog data slices (initialized by Go before
+	// init() runs). We cannot use resource.AllShortNames here because that
+	// would call catalog.AllShortNames, which panics until aws.Install runs in
+	// main() / TestMain — and main() runs after init(). The catalog data
+	// already lives in this package post-AS-795a, so iterate it directly.
+	for _, rt := range allTopLevelTypes() {
+		shortName := rt.ShortName
 		if shortName == "ct-events" {
 			continue // don't add self-reference
 		}

@@ -1,10 +1,12 @@
-package catalog
+package aws
 
 import (
 	"strconv"
 	"time"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
 )
 
 func colorAlarm(r domain.Resource) domain.Color {
@@ -64,7 +66,7 @@ func colorCTEvents(r domain.Resource) domain.Color {
 	return domain.ColorDim
 }
 
-var monitoringTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
+var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
 		Name:          "CloudWatch Alarms",
 		ShortName:     "alarm",
@@ -137,7 +139,6 @@ var monitoringTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static cat
 		},
 		ExcludeFromIssueBadge: true,
 		Color:                 colorCTEvents,
-		// Project (ctevent.Project) is injected by internal/resource/ct_events_init.go
-		// to avoid an import cycle: internal/catalog cannot import internal/semantics/ctevent.
+		Project:               ctevent.Project,
 	},
 }

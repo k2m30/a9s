@@ -1,4 +1,4 @@
-// catalogen is a go:generate–driven binary that reads catalog.ResourceTypes
+// catalogen is a go:generate–driven binary that reads the installed catalog
 // and emits markdown documentation. It does NOT generate any Go code.
 //
 // Usage (via go generate):
@@ -31,11 +31,15 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
 )
 
 func main() {
+	// Install the catalog before any catalog.All / catalog.Find call.
+	aws.Install()
+
 	verify := flag.Bool("verify", false, "verify every catalog entry has a matching docs/resources/<short>.md")
 	flag.Parse()
 
@@ -51,7 +55,7 @@ func main() {
 	}
 }
 
-// run generates all markdown outputs from catalog.ResourceTypes.
+// run generates all markdown outputs from the installed catalog.
 // When the catalog is empty it is a no-op.
 func run() error {
 	types := catalog.All()

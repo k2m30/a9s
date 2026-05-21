@@ -4,7 +4,7 @@
 //
 // Cases A–K mirror the Stage 2 scope on AS-201. The runtime seam is exactly
 // what AS-150 exposed — these tests stand up *runtime.Core directly through
-// runtime.New(session.New(), catalog.ResourceTypes) and assert the
+// runtime.New(session.New(), catalog.All()) and assert the
 // NavigationResult + []TaskRequest pair returned for each branch.
 //
 // HARD CONSTRAINT (per AS-203 acceptance): this file MUST NOT import
@@ -31,7 +31,7 @@ import (
 func newRuntimeCore(t *testing.T) (*runtime.Core, *session.Session) {
 	t.Helper()
 	s := session.New()
-	c := runtime.New(s, catalog.ResourceTypes)
+	c := runtime.New(s, catalog.All())
 	return c, s
 }
 
