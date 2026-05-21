@@ -14,18 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("redshift", []string{"cluster_id", "status", "cluster_status", "node_type", "num_nodes", "db_name", "endpoint", "publicly_accessible", "encrypted", "cluster_availability_status"})
-
-	resource.RegisterPaginated("redshift", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchRedshiftClustersPage(ctx, c.Redshift, continuationToken)
-	})
-}
-
 // FetchRedshiftClusters calls the Redshift DescribeClusters API and converts the
 // response into a slice of generic Resource structs.
 func FetchRedshiftClusters(ctx context.Context, api RedshiftDescribeClustersAPI) ([]resource.Resource, error) {

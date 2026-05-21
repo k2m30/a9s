@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
@@ -13,124 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
-
-func init() {
-	resource.RegisterFieldKeys("dbc", []string{"cluster_id", "engine_version", "status", "instances", "endpoint", "arn", "has_writer", "writer_count", "deletion_protection", "storage_encrypted", "backup_retention_period"})
-
-	// dbc fetcher merges results from two separate SDK calls:
-	//   c.DocDB.DescribeDBClusters — DocumentDB clusters. The docdb SDK docstring
-	//     (docdb@v1.48.12/api_op_DescribeDBClusters.go:14-19) instructs callers to
-	//     use filterName=engine,Values=docdb for DocDB-only results — unfiltered
-	//     behavior is documented as ambiguous, not engine-agnostic.
-	//   c.RDS.DescribeDBClusters   — Aurora + Multi-AZ clusters
-	//     (rds@v1.116.3/api_op_DescribeDBClusters.go:19-28). May also return Neptune
-	//     / DocumentDB rows — both SDKs must be called to get complete coverage.
-	// Token format: "" or "docdb:<tok>" for DocDB pages, then "rds:" (sentinel) or
-	// "rds:<tok>" for RDS pages.
-	resource.RegisterPaginated("dbc", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-
-		// RDS phase: continuation already transitioned to RDS side.
-		// Partial DocDB rows were already returned in the prior page; this is a
-		// single-side fetch with no prior-state append — an RDS error here returns
-		// an empty result with the error so the operator can retry by re-opening the list.
-		if rdsTok, ok2 := strings.CutPrefix(continuationToken, "rds:"); ok2 {
-			result, err := FetchRDSDBClustersPage(ctx, c.RDS, rdsTok)
-			if err != nil {
-				return resource.FetchResult{}, err
-			}
-			if result.Pagination != nil && result.Pagination.IsTruncated {
-				result.Pagination.NextToken = "rds:" + result.Pagination.NextToken
-			}
-			return result, nil
-		}
-
-		// DocDB phase (continuationToken == "" or "docdb:<tok>").
-		docdbTok, _ := strings.CutPrefix(continuationToken, "docdb:")
-		docResult, err := FetchDocDBClustersPage(ctx, c.DocDB, docdbTok)
-		if err != nil {
-			return resource.FetchResult{}, err
-		}
-		if docResult.Pagination != nil && docResult.Pagination.IsTruncated {
-			// DocDB still has more pages — return with docdb: prefix.
-			docResult.Pagination.NextToken = "docdb:" + docResult.Pagination.NextToken
-			return docResult, nil
-		}
-
-		// Rule E5: preserve partial DocDB rows on RDS failure — return what we have
-		// with IsTruncated=true so the operator sees the DocDB rows and a composite
-		// error rather than an empty result with a silent discard.
-		rdsResult, rdsErr := FetchRDSDBClustersPage(ctx, c.RDS, "")
-		if rdsErr != nil {
-			return resource.FetchResult{
-				Resources: docResult.Resources,
-				Pagination: &resource.PaginationMeta{
-					IsTruncated: true,
-					NextToken:   "rds:",
-					PageSize:    len(docResult.Resources),
-					TotalHint:   -1,
-				},
-			}, fmt.Errorf("dbc: RDS-side cluster fetch failed: %w", rdsErr)
-		}
-		// Combined success: DocDB page + RDS page concatenated, then deduped by
-		// Resource.ID with first-occurrence wins. Both SDKs empirically return
-		// overlapping rows for the same cluster — verified live on dev-readonly
-		// (AS-145): the DocDB endpoint returns aurora-postgresql clusters too, so
-		// raw concat double-counts every cluster that exists in both engine
-		// families' result sets. DocDB-side rows are appended first, so dedup
-		// keeps the docdb-side row — this preserves the engine-correct RawStruct
-		// used by detail enrichment and related-panel pivots. Page size may
-		// exceed DefaultPageSize when both SDKs return full pages on the same
-		// fetch tick — deliberate trade so the operator sees a unified list
-		// rather than waiting for a second tick. Pagination tokens stay correct
-		// (docdb: vs rds: prefix tracks side authoritatively).
-		docResult.Resources = dedupResourcesByID(append(docResult.Resources, rdsResult.Resources...))
-		if rdsResult.Pagination != nil && rdsResult.Pagination.IsTruncated {
-			return resource.FetchResult{
-				Resources: docResult.Resources,
-				Pagination: &resource.PaginationMeta{
-					IsTruncated: true,
-					NextToken:   "rds:" + rdsResult.Pagination.NextToken,
-					PageSize:    len(docResult.Resources),
-					TotalHint:   -1,
-				},
-			}, nil
-		}
-		return resource.FetchResult{
-			Resources: docResult.Resources,
-			Pagination: &resource.PaginationMeta{
-				IsTruncated: false,
-				PageSize:    len(docResult.Resources),
-				TotalHint:   len(docResult.Resources),
-			},
-		}, nil
-	})
-
-	resource.RegisterRelated("dbc", []resource.RelatedDef{
-		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkDbcSG},
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkDbcAlarm, NeedsTargetCache: true},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkDbcLogs, NeedsTargetCache: true},
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkDbcKMS},
-		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkDbcSecrets, NeedsTargetCache: true},
-		{TargetType: "dbi", DisplayName: "RDS Instances", Checker: checkDbcDBI, NeedsTargetCache: true},
-		{TargetType: "dbc-snap", DisplayName: "DB Cluster Snapshots", Checker: checkDbcDbcSnap, NeedsTargetCache: true},
-		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkDbcSubnet},
-		{TargetType: "vpc", DisplayName: "VPC", Checker: checkDbcVPC},
-		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkDbcCTEvents},
-	})
-
-	// docdb_types.DBCluster: VpcSecurityGroups[].VpcSecurityGroupId (list),
-	// KmsKeyId (scalar). DBSubnetGroup on DocDB is just a *string name, not
-	// a struct — VPC/Subnet navigation is surfaced via checkDbcVPC /
-	// checkDbcSubnet in the related-panel, not via navigable fields.
-	resource.RegisterDefaultNavFields("dbc", []resource.NavigableField{
-		{FieldPath: "VpcSecurityGroups.VpcSecurityGroupId", TargetType: "sg"},
-		{FieldPath: "KmsKeyId", TargetType: "kms"},
-	})
-}
 
 // FetchDocDBClusters calls the DocumentDB DescribeDBClusters API and converts the
 // response into a slice of generic Resource structs. This covers DocumentDB

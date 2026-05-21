@@ -13,38 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("dbi-snap", []string{"snapshot_id", "db_instance", "status", "engine", "snapshot_type", "created", "arn"})
-
-	// dbc pivot is intentionally NOT registered here: real AWS rejects
-	// CreateDBSnapshot on Aurora cluster members, so an dbi-snap (DBSnapshot)
-	// is structurally never associated with a DBCluster. Aurora cluster
-	// snapshots live in dbc-snap (DBClusterSnapshot). A registered pivot that
-	// always resolves Count=0 is dead UX — drop it.
-	resource.RegisterRelated("dbi-snap", []resource.RelatedDef{
-		{TargetType: "dbi", DisplayName: "DB Instances", Checker: checkDBISnapDBI, NeedsTargetCache: true},
-		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkDBISnapKMS, NeedsTargetCache: true},
-		{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkDBISnapBackup},
-		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkDBISnapCTEvents, NeedsTargetCache: true},
-	})
-
-	// rdstypes.DBSnapshot does not expose a VpcId field — only DBInstanceIdentifier
-	// and KmsKeyId resolve directly. The vpc pivot (when needed) is reachable via
-	// the dbi cross-ref.
-	resource.RegisterDefaultNavFields("dbi-snap", []resource.NavigableField{
-		{FieldPath: "DBInstanceIdentifier", TargetType: "dbi"},
-		{FieldPath: "KmsKeyId", TargetType: "kms"},
-	})
-
-	resource.RegisterPaginated("dbi-snap", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchDBISnapshotsPage(ctx, c.RDS, continuationToken)
-	})
-}
-
 // ComputeDBISnapStatusAndIssues computes findings for an RDS snapshot.
 // Returns nil for a healthy (available + encrypted) snapshot.
 //

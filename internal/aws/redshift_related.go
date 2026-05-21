@@ -13,26 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterRelated("redshift", []resource.RelatedDef{
-		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkRedshiftAlarms, NeedsTargetCache: true},
-		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkRedshiftSG},
-		{TargetType: "vpc", DisplayName: "VPC", Checker: checkRedshiftVPC},
-		{TargetType: "role", DisplayName: "IAM Role", Checker: checkRedshiftRole},
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkRedshiftKMS},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkRedshiftCFN, NeedsTargetCache: true},
-		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkRedshiftSecrets, NeedsTargetCache: true},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkRedshiftLogs},
-		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkRedshiftS3},
-		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkRedshiftSubnet},
-	})
-
-	// redshifttypes.Cluster: VpcId
-	resource.RegisterDefaultNavFields("redshift", []resource.NavigableField{
-		{FieldPath: "VpcId", TargetType: "vpc"},
-	})
-}
-
 // checkRedshiftAlarms checks the cache for CloudWatch alarms with ClusterIdentifier dimension matching this cluster.
 func checkRedshiftAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterID := res.ID

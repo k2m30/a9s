@@ -15,28 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterRelated("opensearch", []resource.RelatedDef{
-		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkOpenSearchAlarms, NeedsTargetCache: true},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkOpenSearchLogs, NeedsTargetCache: false},
-		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkOpenSearchSG},
-		{TargetType: "vpc", DisplayName: "VPC", Checker: checkOpenSearchVPC},
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkOpenSearchKMS},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkOpenSearchCFN},
-		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkOpenSearchSubnet},
-		{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkOpenSearchACM, NeedsTargetCache: true},
-	})
-
-	// opensearchtypes.DomainStatus: EncryptionAtRestOptions.KmsKeyId
-	// VPCOptions: VPCId, SubnetIds, SecurityGroupIds
-	resource.RegisterDefaultNavFields("opensearch", []resource.NavigableField{
-		{FieldPath: "EncryptionAtRestOptions.KmsKeyId", TargetType: "kms"},
-		{FieldPath: "VPCOptions.VPCId", TargetType: "vpc"},
-		{FieldPath: "VPCOptions.SubnetIds", TargetType: "subnet"},
-		{FieldPath: "VPCOptions.SecurityGroupIds", TargetType: "sg"},
-	})
-}
-
 // checkOpenSearchAlarms checks the cache for CloudWatch alarms with DomainName dimension matching this domain.
 func checkOpenSearchAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	domainName := res.ID
