@@ -8,6 +8,9 @@
 // render multi-screen workflows (logs, CloudTrail, cost views, …) without
 // growing central shell switches. Phase 05 PR-05a-scaffold creates the
 // types only; per-handler PRs (AS-72-h1..h8) wire them to live behavior.
+// PR-05a-h4-a (AS-769) adds the typed ScreenPayload contract and the
+// concrete selector/reveal/child-list payloads used by the four ported
+// view-stack-pushing handlers.
 package runtime
 
 import "github.com/k2m30/a9s/v3/internal/domain"
@@ -16,6 +19,15 @@ import "github.com/k2m30/a9s/v3/internal/domain"
 // it to look up the renderer-specific builder; the shared core never
 // constructs renderer types itself.
 type ScreenID string
+
+// Screen IDs emitted by PR-05a-h4-a handlers. Capability screens
+// (logs, ct.scan, cost) reuse the existing ScreenContext-only PushScreen
+// path and are not enumerated here.
+const (
+	ScreenProfileSelector ScreenID = "profile-selector"
+	ScreenReveal          ScreenID = "reveal"
+	ScreenChildList       ScreenID = "child-list"
+)
 
 // ScreenContext is the input handed to an adapter when the runtime asks
 // it to push, replace, or otherwise materialize a screen. Renderer-free.
@@ -26,6 +38,43 @@ type ScreenContext struct {
 	// Query is the zero value when the screen is not query-driven.
 	Query domain.QuerySpec
 }
+
+// ScreenPayload is the marker interface for typed per-Screen payload
+// structs. PushScreen.Payload carries one of these; adapters type-switch
+// on the concrete type to recover the payload fields. nil Payload is
+// permitted when ScreenContext.Capability alone suffices for routing.
+type ScreenPayload interface {
+	isScreenPayload()
+}
+
+// ProfileSelectorPayload carries the profile list + the currently-active
+// profile name for the profile selector screen.
+type ProfileSelectorPayload struct {
+	Profiles []string
+	Current  string
+}
+
+func (ProfileSelectorPayload) isScreenPayload() {}
+
+// RevealPayload carries the resource ID and decrypted value for the
+// reveal screen (`x` key over a secret-bearing resource).
+type RevealPayload struct {
+	ResourceID string
+	Value      string
+}
+
+func (RevealPayload) isScreenPayload() {}
+
+// ChildListPayload carries the child-type short name, the parent context
+// map used by the child fetcher, and the human-readable display name
+// rendered as the child view's frame title.
+type ChildListPayload struct {
+	ChildType     string
+	ParentContext map[string]string
+	DisplayName   string
+}
+
+func (ChildListPayload) isScreenPayload() {}
 
 // ScreenDescriptor declaratively describes one registrable screen. Used by
 // the adapter to wire its builder map and by the runtime to validate that

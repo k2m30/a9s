@@ -9,19 +9,18 @@ package tui
 // the messages.* into the runtime.*Event, call the Core method, apply
 // returned intents, and translate returned tasks into tea.Cmds.
 //
-// handleThemeSelected and handleProfilesLoaded stay in the TUI adapter
-// for now — they push concrete view structs onto the adapter view stack,
-// which requires the screen-builder registry that lands in a successor PR.
+// PR-05a-h4-a (AS-769) ports the remaining four view-stack handlers
+// (handleProfilesLoaded, handleValueRevealed, handleEnterChildView,
+// handleThemeSelected) to (c *Core) Handle* methods backed by the
+// screen-builder registry in screens.go. handleThemeFileRead is a new
+// thin adapter introduced by h4-a to complete the two-step theme flow
+// (read task → HandleThemeFileRead → Apply/Pop/Flash + Save task).
 
 import (
-	"os"
-
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -88,65 +87,35 @@ func (m Model) handleRegionSelected(msg messages.RegionSelected) (tea.Model, tea
 	return m, cmd
 }
 
-// handleThemeSelected applies the selected theme, invalidates style caches,
-// pops the selector, and persists the choice to config.yaml. Stays in the
-// TUI adapter pending the screen-builder registry that successor PRs need
-// to push the selector view from a Core method.
+// handleThemeSelected delegates to runtime.Core.HandleThemeSelected, which
+// resolves the path via config.ThemePath and emits a TaskKindReadThemeFile.
+// The adapter task closure performs the os.ReadFile and dispatches
+// messages.ThemeFileRead → handleThemeFileRead for the apply/pop/save flow.
 func (m Model) handleThemeSelected(msg messages.ThemeSelected) (tea.Model, tea.Cmd) {
-	path, err := config.ThemePath(msg.Theme)
-	if err != nil {
-		return m, func() tea.Msg {
-			return messages.Flash{Text: "Invalid theme: " + err.Error(), IsError: true}
-		}
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return m, func() tea.Msg {
-			return messages.Flash{Text: "Cannot read theme: " + err.Error(), IsError: true}
-		}
-	}
-	t, err := styles.ThemeFromYAML(data)
-	if err != nil {
-		return m, func() tea.Msg {
-			return messages.Flash{Text: "Bad theme YAML: " + err.Error(), IsError: true}
-		}
-	}
-
-	// Persist BEFORE applying — if save fails, abort the change entirely.
-	if saveErr := config.SaveTheme(msg.Theme); saveErr != nil {
-		return m, func() tea.Msg {
-			return messages.Flash{Text: "Cannot save theme config: " + saveErr.Error(), IsError: true}
-		}
-	}
-
-	// Save succeeded — now apply the theme.
-	styles.ApplyTheme(t)
-	m.activeTheme = msg.Theme
-
-	// Invalidate header cache.
-	m.headerCacheKey = ""
-
-	// Invalidate styledRowCache on all ResourceListModel views in the stack.
-	for _, v := range m.stack {
-		if rl, ok := v.(*views.ResourceListModel); ok {
-			rl.InvalidateStyleCache()
-		}
-	}
-
-	// Pop the selector view.
-	if _, ok := m.activeView().(*views.SelectorModel); ok {
-		m.popView()
-	}
-
-	return m, func() tea.Msg {
-		return messages.Flash{Text: "Theme: " + msg.Theme}
-	}
+	intents, tasks := m.core.HandleThemeSelected(runtime.ThemeSelectedEvent{Theme: msg.Theme})
+	cmd := m.dispatchCoreScreenResult(intents, tasks)
+	return m, cmd
 }
 
-// handleProfilesLoaded pushes the profile selector view onto the stack.
+// handleThemeFileRead delegates to runtime.Core.HandleThemeFileRead, which
+// branches on read error → flash or success → ApplyThemeIntent (bytes) +
+// PopSelectorIntent + success Flash + TaskKindSaveThemeConfig.
+func (m Model) handleThemeFileRead(msg messages.ThemeFileRead) (tea.Model, tea.Cmd) {
+	intents, tasks := m.core.HandleThemeFileRead(runtime.ThemeFileReadEvent{
+		Theme: msg.Theme, Bytes: msg.Bytes, Err: msg.Err,
+	})
+	cmd := m.dispatchCoreScreenResult(intents, tasks)
+	return m, cmd
+}
+
+// handleProfilesLoaded delegates to runtime.Core.HandleProfilesLoaded,
+// which emits PushScreen{ScreenProfileSelector, ProfileSelectorPayload{...}}.
+// The screens.go builder constructs the SelectorModel and pushes it.
 func (m Model) handleProfilesLoaded(msg profilesLoadedMsg) (tea.Model, tea.Cmd) {
-	p := views.NewProfile(msg.profiles, m.core.Session().Profile, m.keys)
-	p.SetSize(m.innerSize())
-	m.pushView(&p)
-	return m, nil
+	intents, tasks := m.core.HandleProfilesLoaded(runtime.ProfilesLoadedEvent{
+		Profiles: msg.profiles,
+	})
+	cmd := m.dispatchCoreScreenResult(intents, tasks)
+	return m, cmd
 }
+

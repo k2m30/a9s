@@ -115,6 +115,12 @@ func (m *Model) applyIntent(intent runtime.UIIntent) tea.Cmd {
 		if rl, ok := m.activeView().(*views.ResourceListModel); ok {
 			return m.refreshResourceList(*rl)
 		}
+	case runtime.PushScreen:
+		return m.pushScreen(v)
+	case runtime.PopScreen:
+		m.popView()
+	case runtime.ApplyThemeIntent:
+		return m.applyTheme(v)
 	}
 	return nil
 }
@@ -147,6 +153,14 @@ func (m Model) runtimeTasksToCmd(tasks []runtime.TaskRequest) tea.Cmd {
 			cmds = append(cmds, emitNavigateCmd(p))
 		case runtime.EmitAPIErrorPayload:
 			cmds = append(cmds, emitAPIErrorCmd(p))
+		case runtime.FetchChildResourcesPayload:
+			if cmd := m.fetchChildResources(p.ChildType, p.ParentContext); cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		case runtime.ReadThemePayload:
+			cmds = append(cmds, readThemeFileCmd(p))
+		case runtime.SaveThemeConfigPayload:
+			cmds = append(cmds, saveThemeConfigCmd(p))
 		}
 	}
 	switch len(cmds) {
