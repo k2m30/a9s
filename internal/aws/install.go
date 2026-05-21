@@ -2,6 +2,7 @@ package aws
 
 import (
 	"context"
+	"sync"
 
 	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
@@ -54,18 +55,16 @@ func ctEventsCheckerFor(shortName string) domain.RelatedChecker {
 func Install() {
 	catalog.SetTypes(allTopLevelTypes())
 	catalog.SetChildTypes(allChildTypes())
-	if installed {
-		return
-	}
-	bridgeCatalogToLegacy()
-	installed = true
+	bridgeOnce.Do(bridgeCatalogToLegacy)
 }
 
-// installed tracks whether bridgeCatalogToLegacy has run. The legacy
-// internal/resource maps include at least one panic-on-duplicate registrar
-// (RegisterDetailEnricher) so the bridge must run exactly once even though
-// the catalog itself accepts idempotent SetTypes calls.
-var installed bool //nolint:gochecknoglobals // process-scope install gate
+// bridgeOnce gates bridgeCatalogToLegacy to a single execution per process.
+// The legacy internal/resource maps include at least one panic-on-duplicate
+// registrar (RegisterDetailEnricher) so the bridge must run exactly once even
+// though catalog.SetTypes accepts idempotent calls. sync.Once is preferred
+// over a plain bool to guard against the race between concurrent Install()
+// callers landing both into bridgeCatalogToLegacy (per CodeRabbit on PR #397).
+var bridgeOnce sync.Once //nolint:gochecknoglobals // process-scope install gate
 
 // bridgeCatalogToLegacy populates the internal/resource legacy maps from the
 // catalog struct fields. Required during the AS-795b–m transition because

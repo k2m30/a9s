@@ -114,6 +114,14 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			if err != nil {
 				return result, err
 			}
+			// Inline group policies are not paginated by AWS — fetch once on the
+			// first page only. Appending on every continuation token would
+			// duplicate the same inline rows across pages (CodeRabbit finding
+			// on PR #397). The original init() in iam_policies.go had the same
+			// bug; the catalog migration site is the natural place to land the fix.
+			if continuationToken != "" {
+				return result, nil
+			}
 			inlines, inlineErr := fetchInlineGroupPolicies(ctx, c.IAM)
 			// Partial failure: inline group policy enumeration failed for some
 			// groups. Preserve the inline results we did get, then propagate the
