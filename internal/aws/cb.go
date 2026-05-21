@@ -9,42 +9,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("cb", []string{"name", "source_type", "description", "last_modified"})
-
-	resource.RegisterPaginated("cb", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchCodeBuildProjectsPage(ctx, c.CodeBuild, c.CodeBuild, continuationToken)
-	})
-
-	resource.RegisterRelated("cb", []resource.RelatedDef{
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkCbLogs, NeedsTargetCache: true},
-		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkCbRole, NeedsTargetCache: true},
-		{TargetType: "pipeline", DisplayName: "CodePipelines", Checker: checkCbPipeline, NeedsTargetCache: true},
-		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkCbSG},
-		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkCbSubnet, NeedsTargetCache: false},
-		{TargetType: "vpc", DisplayName: "VPC", Checker: checkCbVPC},
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkCbKMS},
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkCbAlarm, NeedsTargetCache: true},
-		{TargetType: "ecr", DisplayName: "ECR Repositories", Checker: checkCbECR, NeedsTargetCache: true},
-		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkCbS3, NeedsTargetCache: true},
-		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkCbSecrets, NeedsTargetCache: false},
-		{TargetType: "ssm", DisplayName: "SSM Parameters", Checker: checkCbSSM, NeedsTargetCache: false},
-	})
-
-	// cbtypes.Project: ServiceRole, EncryptionKey (KMS), VpcConfig.{VpcId,Subnets,SecurityGroupIds}
-	resource.RegisterDefaultNavFields("cb", []resource.NavigableField{
-		{FieldPath: "ServiceRole", TargetType: "role"},
-		{FieldPath: "EncryptionKey", TargetType: "kms"},
-		{FieldPath: "VpcConfig.VpcId", TargetType: "vpc"},
-		{FieldPath: "VpcConfig.Subnets", TargetType: "subnet"},
-		{FieldPath: "VpcConfig.SecurityGroupIds", TargetType: "sg"},
-	})
-}
-
 // FetchCodeBuildProjectsPage fetches one page of project names from ListProjects
 // using the continuationToken, then calls BatchGetProjects for that page's names.
 // IsTruncated reflects whether ListProjects has more pages beyond this one.
