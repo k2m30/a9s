@@ -14,7 +14,13 @@ import (
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
-var defaultEC2RelatedDefs = append([]resource.RelatedDef(nil), resource.GetRelated("ec2")...)
+// defaultEC2RelatedDefs returns a snapshot of the production ec2 RelatedDefs
+// at call time. Implemented as a function (not a package-level var) so the
+// catalog.Find lookup it triggers happens after TestMain has called
+// aws.Install — package-level var initializers run before TestMain.
+func defaultEC2RelatedDefs() []resource.RelatedDef {
+	return append([]resource.RelatedDef(nil), resource.GetRelated("ec2")...)
+}
 
 func TestBug_RightColumnFilter_SlashFiltersAndEscapeClears(t *testing.T) {
 	ensureNoColor(t)
@@ -134,7 +140,7 @@ func TestBug_EC2DefaultDetail_ShowsAttachedEBSVolumeIDs(t *testing.T) {
 }
 
 func TestBug_EC2DefaultRelatedDefinitions_IncludeEBSVolumes(t *testing.T) {
-	for _, def := range defaultEC2RelatedDefs {
+	for _, def := range defaultEC2RelatedDefs() {
 		if def.TargetType == "ebs" {
 			return
 		}

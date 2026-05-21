@@ -1,6 +1,9 @@
-package catalog
+package aws
 
-import "github.com/k2m30/a9s/v3/internal/domain"
+import (
+	"github.com/k2m30/a9s/v3/internal/catalog"
+	"github.com/k2m30/a9s/v3/internal/domain"
+)
 
 func colorCF(r domain.Resource) domain.Color {
 	if r.Fields["enabled"] == "false" {
@@ -17,7 +20,7 @@ func colorCF(r domain.Resource) domain.Color {
 
 func colorAPIGW(_ domain.Resource) domain.Color { return domain.ColorHealthy }
 
-var dnsCdnTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
+var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
 		Name:          "Route 53 Hosted Zones",
 		ShortName:     "r53",

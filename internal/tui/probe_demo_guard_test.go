@@ -45,7 +45,7 @@ func TestProbeEnrichment_DemoMode_ReturnsNilAndSkipsRegistry(t *testing.T) {
 	sess := session.New()
 	sess.Clients = &awsclient.ServiceClients{}
 	m := &Model{
-		core:   runtime.New(sess, catalog.ResourceTypes),
+		core:   runtime.New(sess, catalog.All()),
 		appCtx: context.Background(),
 		isDemo: true,
 	}
@@ -84,7 +84,7 @@ func TestProbeEnrichment_NonDemoMode_ReturnsCmd(t *testing.T) {
 	sess := session.New()
 	sess.Clients = &awsclient.ServiceClients{}
 	m := &Model{
-		core:   runtime.New(sess, catalog.ResourceTypes),
+		core:   runtime.New(sess, catalog.All()),
 		appCtx: context.Background(),
 		isDemo: false,
 	}

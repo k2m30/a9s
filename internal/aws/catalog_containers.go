@@ -1,8 +1,9 @@
-package catalog
+package aws
 
 import (
 	"strconv"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
 )
 
@@ -57,7 +58,7 @@ func colorEKSNodeGroup(r domain.Resource) domain.Color {
 	return domain.ColorHealthy
 }
 
-var containersTypes = []ResourceTypeDef{
+var containersTypes = []catalog.ResourceTypeDef{
 	{
 		Name:          "EKS Clusters",
 		ShortName:     "eks",

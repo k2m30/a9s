@@ -71,6 +71,26 @@ type ResourceTypeDef struct {
 	// DetailEnrich is an optional on-demand detail enricher (e.g. policy fetch).
 	// nil means no detail enrichment beyond the base fetcher.
 	DetailEnrich domain.DetailEnricher
+	// FieldKeys lists the valid Resource.Fields keys produced by the Wave 1
+	// fetcher. Populated by aws.Install(); zero value if no Wave 1 surface.
+	FieldKeys []string
+	// FieldAliases maps source field keys to alias keys copied into the
+	// resource's Fields by ApplyFieldAliases. Populated by aws.Install().
+	FieldAliases map[string]string
+	// FetchByIDs fetches a specific set of resource instances by ID, bypassing
+	// any pagination. Populated by aws.Install(); zero value if no Wave 1 surface.
+	FetchByIDs domain.FetchByIDsFunc
+	// FilteredFetcher returns a single page of resources filtered server-side.
+	// Populated by aws.Install(); zero value if no server-side filter is supported.
+	FilteredFetcher domain.FilteredPaginatedFetcher
+	// IssueEnricherFieldKeys lists the Resource.Fields keys that the Wave 2
+	// issue enricher writes via IssueEnricherResult.FieldUpdates. Populated by
+	// aws.Install(); zero value if no Wave 2 surface.
+	IssueEnricherFieldKeys []string
+	// ChildFetcher is the paginated child-resource fetcher for child types.
+	// Only meaningful on child-type entries (set via catalog.SetChildTypes).
+	// Populated by aws.Install(); zero value on top-level type entries.
+	ChildFetcher domain.PaginatedChildFetcher
 
 	// ─── Cross-cutting ─────────────────────────────────────────────────────
 

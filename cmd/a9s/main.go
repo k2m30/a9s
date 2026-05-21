@@ -10,7 +10,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	_ "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/buildinfo"
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/demo"
@@ -41,6 +41,12 @@ var renameHints = map[string]string{
 }
 
 func main() {
+	// Install the AWS catalog into internal/catalog before any code path can
+	// hit catalog.Find / catalog.All. Must run before resource.FindResourceType
+	// below and before any tui.New construction — both transitively call
+	// catalog accessors that panic when SetTypes has not yet been invoked.
+	aws.Install()
+
 	var (
 		profile     string
 		region      string

@@ -47,10 +47,10 @@ func findPatchDetail(xs []UIIntent, rt string) *PatchDetail {
 // catalog, so the tests don't hard-code a value that could be removed later.
 func pickKnownShortName(t *testing.T) string {
 	t.Helper()
-	if len(catalog.ResourceTypes) == 0 {
-		t.Fatal("catalog.ResourceTypes is empty — cannot run handler test")
+	if len(catalog.All()) == 0 {
+		t.Fatal("catalog.All() is empty — cannot run handler test")
 	}
-	return catalog.ResourceTypes[0].ShortName
+	return catalog.All()[0].ShortName
 }
 
 // TestHandleEnrichmentChecked_TruncationPrecedence_Wave1Wins covers the
@@ -65,7 +65,7 @@ func TestHandleEnrichmentChecked_TruncationPrecedence_Wave1Wins(t *testing.T) {
 	sess := session.New()
 	sess.ProbeTruncated = map[string]bool{rt: true}
 
-	c := New(sess, catalog.ResourceTypes)
+	c := New(sess, catalog.All())
 
 	intents, _ := c.handleEnrichmentChecked(messages.EnrichmentChecked{
 		ResourceType: rt,
@@ -90,7 +90,7 @@ func TestHandleEnrichmentChecked_TruncationPrecedence_NoWave1NoIssues_ClearsToFa
 	rt := pickKnownShortName(t)
 
 	sess := session.New()
-	c := New(sess, catalog.ResourceTypes)
+	c := New(sess, catalog.All())
 
 	intents, _ := c.handleEnrichmentChecked(messages.EnrichmentChecked{
 		ResourceType: rt,
@@ -115,7 +115,7 @@ func TestHandleEnrichmentChecked_TruncationPrecedence_Wave2WithFindings_StaysTru
 	rt := pickKnownShortName(t)
 
 	sess := session.New()
-	c := New(sess, catalog.ResourceTypes)
+	c := New(sess, catalog.All())
 
 	intents, _ := c.handleEnrichmentChecked(messages.EnrichmentChecked{
 		ResourceType: rt,
@@ -143,7 +143,7 @@ func TestHandleEnrichmentChecked_PatchDetail_NilFindings_ClearsContract(t *testi
 	rt := pickKnownShortName(t)
 
 	sess := session.New()
-	c := New(sess, catalog.ResourceTypes)
+	c := New(sess, catalog.All())
 
 	intents, _ := c.handleEnrichmentChecked(messages.EnrichmentChecked{
 		ResourceType: rt,
@@ -166,7 +166,7 @@ func TestHandleEnrichmentChecked_PatchDetail_NonNilFindings_PassesThrough(t *tes
 	rt := pickKnownShortName(t)
 
 	sess := session.New()
-	c := New(sess, catalog.ResourceTypes)
+	c := New(sess, catalog.All())
 
 	findings := map[string]resource.EnrichmentFinding{
 		"id-1": {Severity: "!", Summary: "broken"},

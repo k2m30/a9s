@@ -7,6 +7,6 @@
 // Boundary rule: internal/catalog imports ONLY internal/domain — never
 // internal/resource, internal/aws, or internal/tui.
 //
-// cmd/catalogen reads catalog.ResourceTypes and emits markdown documentation
+// cmd/catalogen reads the installed catalog and emits markdown documentation
 // only (no generated Go code). Run "make generate" to regenerate.
 package catalog

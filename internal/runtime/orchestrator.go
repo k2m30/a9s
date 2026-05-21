@@ -28,7 +28,7 @@ type Core struct {
 
 // New constructs a Core bound to the given session and catalog snapshot.
 // The catalog slice is borrowed, not copied — callers must treat
-// catalog.ResourceTypes as immutable for the lifetime of the Core, which
+// the installed catalog as immutable for the lifetime of the Core, which
 // matches the existing static-catalog contract.
 func New(s *session.Session, types []catalog.ResourceTypeDef) *Core {
 	return &Core{session: s, types: types}

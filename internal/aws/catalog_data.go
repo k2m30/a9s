@@ -1,6 +1,9 @@
-package catalog
+package aws
 
-import "github.com/k2m30/a9s/v3/internal/domain"
+import (
+	"github.com/k2m30/a9s/v3/internal/catalog"
+	"github.com/k2m30/a9s/v3/internal/domain"
+)
 
 func colorGlue(_ domain.Resource) domain.Color { return domain.ColorHealthy }
 
@@ -14,7 +17,7 @@ func colorAthena(r domain.Resource) domain.Color {
 	return domain.ColorHealthy
 }
 
-var dataTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
+var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
 		Name:          "Glue Jobs",
 		ShortName:     "glue",

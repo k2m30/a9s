@@ -9,12 +9,18 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/k2m30/a9s/v3/internal/aws"
 )
 
 // testBinary is the path to the compiled a9s binary for CLI tests.
 var testBinary string
 
 func TestMain(m *testing.M) {
+	// Install the AWS catalog before any in-process integration test calls
+	// into catalog.Find / catalog.All (transitively via tui.New, etc.).
+	aws.Install()
+
 	// Build the binary once for all CLI tests.
 	tmpDir := os.TempDir()
 	testBinary = filepath.Join(tmpDir, "a9s-test")

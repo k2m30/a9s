@@ -202,7 +202,7 @@ func TestRelatedFetchTasks_PartialCoverage_NotTruncated_FetchAll(t *testing.T) {
 }
 
 func TestHandleRelatedNavigate_UnknownType_FlashOnly_NoTask(t *testing.T) {
-	c := New(newTestSession(), catalog.ResourceTypes)
+	c := New(newTestSession(), catalog.All())
 
 	result, tasks := c.HandleRelatedNavigate(RelatedNavigateEvent{TargetType: "nonexistent_xyz"})
 
@@ -218,7 +218,7 @@ func TestHandleRelatedNavigate_UnknownType_FlashOnly_NoTask(t *testing.T) {
 }
 
 func TestHandleRelatedNavigate_ChildType_NoTask(t *testing.T) {
-	c := New(newTestSession(), catalog.ResourceTypes)
+	c := New(newTestSession(), catalog.All())
 
 	result, tasks := c.HandleRelatedNavigate(RelatedNavigateEvent{
 		TargetType: "ecr_images",
@@ -238,7 +238,7 @@ func TestHandleRelatedNavigate_DetailCacheHit_NoTask(t *testing.T) {
 	s.ResourceCache = map[string]*session.ResourceCacheEntry{
 		"s3": {Resources: []resource.Resource{{ID: "prod-logs"}}},
 	}
-	c := New(s, catalog.ResourceTypes)
+	c := New(s, catalog.All())
 
 	result, tasks := c.HandleRelatedNavigate(RelatedNavigateEvent{
 		TargetType: "s3",
@@ -254,7 +254,7 @@ func TestHandleRelatedNavigate_DetailCacheHit_NoTask(t *testing.T) {
 }
 
 func TestHandleRelatedNavigate_FilteredList_FetchFilter_EmitsFiltered(t *testing.T) {
-	c := New(newTestSession(), catalog.ResourceTypes)
+	c := New(newTestSession(), catalog.All())
 
 	result, tasks := c.HandleRelatedNavigate(RelatedNavigateEvent{
 		TargetType:  "ct-events",
@@ -270,7 +270,7 @@ func TestHandleRelatedNavigate_FilteredList_FetchFilter_EmitsFiltered(t *testing
 }
 
 func TestHandleRelatedNavigate_FilteredList_TargetIDMiss_EmitsFetchResources(t *testing.T) {
-	c := New(newTestSession(), catalog.ResourceTypes)
+	c := New(newTestSession(), catalog.All())
 
 	result, tasks := c.HandleRelatedNavigate(RelatedNavigateEvent{
 		TargetType: "s3",
@@ -289,7 +289,7 @@ func TestHandleRelatedNavigate_FilteredList_TargetIDMiss_EmitsFetchResources(t *
 }
 
 func TestHandleRelatedNavigate_ResourceList_EmitsFetchResources(t *testing.T) {
-	c := New(newTestSession(), catalog.ResourceTypes)
+	c := New(newTestSession(), catalog.All())
 
 	result, tasks := c.HandleRelatedNavigate(RelatedNavigateEvent{TargetType: "ec2"})
 
@@ -309,7 +309,7 @@ func TestHandleRelatedNavigate_RelatedIDs_FullCoverage_NoTask(t *testing.T) {
 	s.ResourceCache = map[string]*session.ResourceCacheEntry{
 		"ec2": {Resources: []resource.Resource{{ID: "i-1"}, {ID: "i-2"}, {ID: "i-3"}}},
 	}
-	c := New(s, catalog.ResourceTypes)
+	c := New(s, catalog.All())
 
 	result, tasks := c.HandleRelatedNavigate(RelatedNavigateEvent{
 		TargetType: "ec2",

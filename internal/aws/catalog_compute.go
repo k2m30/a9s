@@ -1,10 +1,11 @@
-package catalog
+package aws
 
 import (
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
 )
 
@@ -415,7 +416,7 @@ func ec2StatusCheckTier(status string) string {
 }
 
 // computeTypes is the declarative catalog for all COMPUTE category resource types.
-var computeTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
+var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
 		Name:          "EC2 Instances",
 		ShortName:     "ec2",
