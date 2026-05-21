@@ -14,18 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("eks", []string{"cluster_name", "version", "status", "endpoint", "platform_version", "arn", "health_issues_count", "health_issues"})
-
-	resource.RegisterPaginated("eks", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchEKSClustersPage(ctx, c, continuationToken)
-	})
-}
-
 // FetchEKSClustersPage fetches a single page of EKS clusters using the registered
 // paginated fetcher pattern. For each cluster name returned by ListClusters,
 // DescribeCluster is called. Per-item describe failures are aggregated into a

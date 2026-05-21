@@ -80,6 +80,39 @@ var containersTypes = []catalog.ResourceTypeDef{
 			{Key: "platform_version", Title: "Platform Version", Width: 18, Sortable: true},
 		},
 		Color: colorEKSCluster,
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchEKSClustersPage(ctx, c, continuationToken)
+		},
+		FieldKeys: []string{
+			"cluster_name", "version", "status", "endpoint", "platform_version",
+			"arn", "health_issues_count", "health_issues",
+		},
+		Related: []domain.RelatedDef{
+			{TargetType: "ng", DisplayName: "Node Groups", Checker: checkEKSNodeGroups, NeedsTargetCache: true},
+			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkEKSAlarms, NeedsTargetCache: true},
+			{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkEKSCFN, NeedsTargetCache: true},
+			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkEKSLogs, NeedsTargetCache: true},
+			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkEKSSG},
+			{TargetType: "vpc", DisplayName: "VPC", Checker: checkEKSVPC},
+			{TargetType: "role", DisplayName: "IAM Role", Checker: checkEKSRole},
+			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkEKSKMS},
+			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkEKSSubnet},
+			{TargetType: "ami", DisplayName: "AMI", Checker: checkEKSAMI},
+			{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkEKSASG, NeedsTargetCache: true},
+			{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkEKSEC2},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkEKSCTEvents, NeedsTargetCache: true},
+		},
+		Navigable: []domain.NavigableField{
+			{FieldPath: "ResourcesVpcConfig.VpcId", TargetType: "vpc"},
+			{FieldPath: "ResourcesVpcConfig.ClusterSecurityGroupId", TargetType: "sg"},
+			{FieldPath: "ResourcesVpcConfig.SubnetIds", TargetType: "subnet"},
+			{FieldPath: "ResourcesVpcConfig.SecurityGroupIds", TargetType: "sg"},
+			{FieldPath: "RoleArn", TargetType: "role"},
+		},
 	},
 	{
 		Name:          "EKS Node Groups",
