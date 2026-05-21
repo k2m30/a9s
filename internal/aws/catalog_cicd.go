@@ -119,6 +119,32 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			DisplayNameKey: "repository_name",
 		}},
 		Color: colorECR,
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchECRRepositoriesPage(ctx, c.ECR, continuationToken)
+		},
+		Wave2: IssueEnricher{Fn: EnrichECRRepository, Priority: 100},
+		FieldKeys: []string{
+			"repository_name", "uri", "tag_mutability", "scan_on_push", "created_at",
+		},
+		IssueEnricherFieldKeys: []string{"critical_vulns", "high_vulns", "images_scanned"},
+		Related: []domain.RelatedDef{
+			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkECRLambda, NeedsTargetCache: true},
+			{TargetType: "cb", DisplayName: "CodeBuild Projects", Checker: checkECRCodeBuild, NeedsTargetCache: true},
+			{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkECRCFN, NeedsTargetCache: true},
+			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkECRKMS},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkECRCTEvents, NeedsTargetCache: true},
+			{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkECREbRule},
+			{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkECRECSTask, NeedsTargetCache: true},
+			{TargetType: "pipeline", DisplayName: "CodePipelines", Checker: checkECRPipeline},
+			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkECRRole},
+		},
+		Navigable: []domain.NavigableField{
+			{FieldPath: "EncryptionConfiguration.KmsKey", TargetType: "kms"},
+		},
 	},
 	{
 		Name:          "CodeArtifact Repos",
