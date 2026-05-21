@@ -11,34 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("ecs", []string{"cluster_name", "status", "running_tasks", "pending_tasks", "services_count"})
-
-	resource.RegisterPaginated("ecs", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchECSClustersPage(ctx, c.ECS, c.ECS, continuationToken)
-	})
-
-	resource.RegisterRelated("ecs", []resource.RelatedDef{
-		{TargetType: "ecs-svc", DisplayName: "ECS Services", Checker: checkECSServices, NeedsTargetCache: true},
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkECSAlarms, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkECSCFN, NeedsTargetCache: true},
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkECSKMS},
-		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkECSASG, NeedsTargetCache: true},
-		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkECSEC2, NeedsTargetCache: true},
-		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkECSCTEvents, NeedsTargetCache: true},
-		{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkECSTasks, NeedsTargetCache: true},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkECSLogs, NeedsTargetCache: true},
-	})
-
-	resource.RegisterDefaultNavFields("ecs", []resource.NavigableField{
-		{FieldPath: "Configuration.ExecuteCommandConfiguration.KmsKeyId", TargetType: "kms"},
-	})
-}
-
 // FetchECSClusters performs a two-step fetch: ListClusters to get ARNs,
 // then DescribeClusters for full details.
 func FetchECSClusters(ctx context.Context, listAPI ECSListClustersAPI, describeAPI ECSDescribeClustersAPI) ([]resource.Resource, error) {

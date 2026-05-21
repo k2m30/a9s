@@ -12,68 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("ec2", []string{"instance_id", "name", "state", "type", "private_ip", "public_ip", "launch_time", "lifecycle", "image_id", "vpc_id", "system_status", "instance_status", "state_reason_code"})
-
-	resource.RegisterFieldAliases("ec2", map[string]string{
-		"instance_id":  "InstanceId",
-		"type":         "InstanceType",
-		"state":        "State",
-		"lifecycle":    "InstanceLifecycle",
-		"image_id":     "ImageId",
-		"key_name":     "KeyName",
-		"vpc_id":       "VpcId",
-		"subnet_id":    "SubnetId",
-		"private_ip":   "PrivateIpAddress",
-		"private_dns":  "PrivateDnsName",
-		"public_ip":    "PublicIpAddress",
-		"iam_profile":  "IamInstanceProfile",
-		"architecture": "Architecture",
-		"platform":     "Platform",
-		"launch_time":  "LaunchTime",
-	})
-
-	resource.RegisterPaginated("ec2", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchEC2InstancesPage(ctx, c.EC2, continuationToken)
-	})
-
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: checkEC2TargetGroups, NeedsTargetCache: true},
-		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkEC2ASG, NeedsTargetCache: true},
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkEC2Alarms, NeedsTargetCache: true},
-		{TargetType: "ng", DisplayName: "EKS Node Groups", Checker: checkEC2NodeGroups, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkEC2CFN, NeedsTargetCache: true},
-		{TargetType: "eip", DisplayName: "Elastic IPs", Checker: checkEC2EIP, NeedsTargetCache: true},
-		{TargetType: "ebs", DisplayName: "EBS Volumes", Checker: checkEC2EBS},
-		{TargetType: "ebs-snap", DisplayName: "EBS Snapshots", Checker: checkEC2EBSSnap, NeedsTargetCache: true},
-		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkEC2CloudTrailEvents, NeedsTargetCache: false},
-		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkEC2SG},
-		{TargetType: "vpc", DisplayName: "VPC", Checker: checkEC2VPC},
-		{TargetType: "role", DisplayName: "IAM Role", Checker: checkEC2Role},
-		{TargetType: "ami", DisplayName: "AMI", Checker: checkEC2AMI},
-		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkEC2ENI},
-		{TargetType: "subnet", DisplayName: "Subnet", Checker: checkEC2Subnet},
-		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkEC2KMS, NeedsTargetCache: true},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkEC2Logs, NeedsTargetCache: true},
-		{TargetType: "ssm", DisplayName: "SSM Parameters", Checker: checkEC2SSM},
-		{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkEC2Backup, NeedsTargetCache: true},
-	})
-
-	resource.RegisterDefaultNavFields("ec2", []resource.NavigableField{
-		{FieldPath: "VpcId", TargetType: "vpc"},
-		{FieldPath: "SubnetId", TargetType: "subnet"},
-		{FieldPath: "ImageId", TargetType: "ami"},
-		{FieldPath: "BlockDeviceMappings.Ebs.VolumeId", TargetType: "ebs"},
-		{FieldPath: "SecurityGroups.GroupId", TargetType: "sg"},
-		{FieldPath: "NetworkInterfaces.NetworkInterfaceId", TargetType: "eni"},
-		{FieldPath: "IamInstanceProfile.Arn", TargetType: "role"},
-	})
-}
-
 // FetchEC2Instances calls the EC2 DescribeInstances API and returns all pages
 // of instances. Used by tests; the production path uses the per-page fetcher for pagination.
 func FetchEC2Instances(ctx context.Context, api EC2FetchInstancesAPI) ([]resource.Resource, error) {

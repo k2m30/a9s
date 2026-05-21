@@ -13,41 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("asg", []string{
-		"asg_name", "min_size", "max_size", "desired", "instances", "status",
-		"instances_unhealthy_count", "in_service_count", "suspended_processes",
-	})
-
-	resource.RegisterPaginated("asg", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchAutoScalingGroupsPage(ctx, c.AutoScaling, continuationToken)
-	})
-
-	resource.RegisterRelated("asg", []resource.RelatedDef{
-		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkASGEC2},
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: checkASGTG},
-		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkASGSubnets},
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkASGAlarm, NeedsTargetCache: true},
-		{TargetType: "ng", DisplayName: "EKS Node Groups", Checker: checkASGNG, NeedsTargetCache: true},
-		{TargetType: "ami", DisplayName: "AMI", Checker: checkASGAMI, NeedsTargetCache: false},
-		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkASGELB, NeedsTargetCache: false},
-		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkASGRole, NeedsTargetCache: false},
-		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkASGSG, NeedsTargetCache: false},
-		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkASGSNS, NeedsTargetCache: false},
-		{TargetType: "vpc", DisplayName: "VPCs", Checker: checkASGVPC, NeedsTargetCache: false},
-	})
-
-	// autoscalingtypes.Group: TargetGroupARNs[] — list of TG ARNs; VPCZoneIdentifier — CSV subnet IDs
-	resource.RegisterDefaultNavFields("asg", []resource.NavigableField{
-		{FieldPath: "TargetGroupARNs", TargetType: "tg"},
-		{FieldPath: "VPCZoneIdentifier", TargetType: "subnet"},
-	})
-}
-
 // FetchAutoScalingGroups calls the AutoScaling DescribeAutoScalingGroups API and converts the
 // response into a slice of generic Resource structs.
 func FetchAutoScalingGroups(ctx context.Context, api ASGDescribeAutoScalingGroupsAPI) ([]resource.Resource, error) {
