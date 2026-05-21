@@ -76,12 +76,46 @@ func (PatchMenu) isIntent() {}
 
 // PushScreen asks the adapter to materialize and push the named screen
 // onto its view stack with the given context.
+//
+// Payload carries per-screen typed data (selectors, reveal results,
+// child-list parameters). It is nil for capability screens whose
+// adapter-side builder resolves everything from ScreenContext alone.
+// PR-05a-h4-a introduced Payload alongside the four ported view-stack
+// handlers; pre-h4-a callers that emit PushScreen with Context only
+// continue to work because the builder closures type-switch on Payload
+// and tolerate the zero value when their ScreenID does not require it.
 type PushScreen struct {
 	ID      ScreenID
 	Context ScreenContext
+	Payload ScreenPayload
 }
 
 func (PushScreen) isIntent() {}
+
+// ApplyThemeIntent asks the adapter to swap the active theme and
+// invalidate any caches that materialised colour-dependent state
+// (header text, per-row styled caches in ResourceListModel views, …).
+//
+// PR-05a-h4-a chose Option B from docs/refactor/05-pr-05a-h4.md
+// §"Theme-selected split": the runtime carries the parsed YAML *bytes*
+// and the theme filename, and the adapter re-parses via
+// styles.ThemeFromYAML before applying. This keeps the runtime free of
+// any lipgloss / Bubble Tea coupling that hosting a *styles.Theme
+// would force. Option A (extracting a domain.Theme value type) was
+// considered cleaner but is a larger refactor properly scoped to a
+// follow-on PR; B preserves the boundary invariant today.
+//
+// On parse failure the adapter MUST emit a flash describing the
+// failure and skip the apply; the persist task that this intent ships
+// with continues to fire because the runtime already committed to the
+// new theme name. (Save-fail surfaces a separate adapter-side flash
+// from the SaveThemeConfig task.)
+type ApplyThemeIntent struct {
+	Bytes []byte
+	Name  string
+}
+
+func (ApplyThemeIntent) isIntent() {}
 
 // PopScreen asks the adapter to pop the topmost screen off its view
 // stack. The runtime owns no view stack itself; this is purely a

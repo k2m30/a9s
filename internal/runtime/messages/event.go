@@ -237,3 +237,20 @@ func (EnrichDetailResult) isEvent()              {}
 func (m EnrichDetailResult) GenStamp() domain.Gen { return m.Generation }
 func (EnrichDetailResult) GenAspect() Aspect      { return AspectEnrichDetail }
 func (EnrichDetailResult) AcceptZeroGen() bool    { return true }
+
+// ThemeFileRead delivers the bytes of a theme YAML file read from disk
+// in response to a TaskKindReadThemeFile dispatch. Theme is the theme
+// filename the user selected; Bytes is the raw YAML payload (nil on
+// read error); Err is non-nil when the read failed. PR-05a-h4-a
+// (AS-769) introduced this event so the runtime can split the
+// theme-selected flow into a Core-side handler (HandleThemeSelected,
+// emits the read task) and a second Core-side handler
+// (HandleThemeFileRead, emits Apply/Pop/Flash + Save task) without
+// performing file I/O inside Core.
+type ThemeFileRead struct {
+	Theme string
+	Bytes []byte
+	Err   error
+}
+
+func (ThemeFileRead) isEvent() {}

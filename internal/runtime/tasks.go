@@ -62,6 +62,25 @@ const (
 	// impossible "wrong concrete type on ClientsReadyMsg.Clients" branch to
 	// route the error through HandleAPIError's classification flow.
 	TaskKindEmitAPIError TaskKind = "emit-api-error"
+
+	// TaskKindFetchChildResources asks the adapter to run the paginated
+	// child-resource fetcher for the (childType, parentContext) carried by
+	// FetchChildResourcesPayload and dispatch the result as
+	// messages.ResourcesLoaded. Emitted by HandleEnterChildView.
+	TaskKindFetchChildResources TaskKind = "fetch-child-resources"
+
+	// TaskKindReadThemeFile asks the adapter to resolve the theme file path
+	// via config.ThemePath and read the YAML bytes from disk, then dispatch
+	// the bytes back as messages.ThemeFileRead so HandleThemeFileRead can
+	// emit the apply/pop/flash/save sequence. Emitted by HandleThemeSelected.
+	TaskKindReadThemeFile TaskKind = "read-theme-file"
+
+	// TaskKindSaveThemeConfig asks the adapter to persist the theme choice
+	// to config.yaml via config.SaveTheme. Emitted by HandleThemeFileRead on
+	// the success branch alongside the ApplyThemeIntent + PopSelectorIntent
+	// + success FlashIntent. Save failures surface adapter-side as a
+	// messages.Flash error; the in-memory theme remains applied.
+	TaskKindSaveThemeConfig TaskKind = "save-theme-config"
 )
 
 // TaskKey uniquely identifies one background task. Scope is kind-specific
@@ -201,3 +220,37 @@ type EmitAPIErrorPayload struct {
 }
 
 func (EmitAPIErrorPayload) isTaskPayload() {}
+
+// FetchChildResourcesPayload carries the child-type short name and the
+// parent context map used by the adapter's paginated child fetcher.
+// Emitted by HandleEnterChildView so the adapter's tasksToCmd can build
+// the existing fetchChildResources closure without parsing TaskKey.Scope.
+type FetchChildResourcesPayload struct {
+	ChildType     string
+	ParentContext map[string]string
+}
+
+func (FetchChildResourcesPayload) isTaskPayload() {}
+
+// ReadThemePayload carries the theme filename whose YAML the adapter
+// must read from disk. The adapter resolves the absolute path via
+// config.ThemePath and reads via os.ReadFile, dispatching the result
+// (or read error) back as messages.ThemeFileRead.
+type ReadThemePayload struct {
+	Theme string
+}
+
+func (ReadThemePayload) isTaskPayload() {}
+
+// SaveThemeConfigPayload carries the theme filename the adapter must
+// persist to config.yaml via config.SaveTheme. Emitted by
+// HandleThemeFileRead's success branch after the apply/pop/flash
+// intents. A save failure surfaces as a Flash; the in-memory theme
+// remains applied (intentional ordering change vs the pre-h4-a
+// persist-before-apply behaviour, documented in
+// docs/refactor/05-pr-05a-h4.md §"Theme-selected split").
+type SaveThemeConfigPayload struct {
+	Theme string
+}
+
+func (SaveThemeConfigPayload) isTaskPayload() {}
