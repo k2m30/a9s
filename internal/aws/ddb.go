@@ -34,33 +34,6 @@ func computeDDBFindings(status ddbtypes.TableStatus) []domain.Finding {
 	}
 }
 
-func init() {
-	resource.RegisterFieldKeys("ddb", []string{"table_name", "status", "item_count", "size_bytes", "billing_mode"})
-
-	resource.RegisterPaginated("ddb", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchDynamoDBTablesPage(ctx, c.DynamoDB, c.DynamoDB, continuationToken)
-	})
-
-	resource.RegisterRelated("ddb", []resource.RelatedDef{
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkDdbKMS},
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkDdbAlarm, NeedsTargetCache: true},
-		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkDdbLambda},
-		{TargetType: "kinesis", DisplayName: "Kinesis Streams", Checker: checkDdbKinesis},
-		{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkDdbBackup},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkDdbLogs, NeedsTargetCache: true},
-		{TargetType: "vpce", DisplayName: "VPC Endpoints", Checker: checkDdbVPCE, NeedsTargetCache: true},
-	})
-
-	// ddbtypes.TableDescription: SSEDescription.KMSMasterKeyArn
-	resource.RegisterDefaultNavFields("ddb", []resource.NavigableField{
-		{FieldPath: "SSEDescription.KMSMasterKeyArn", TargetType: "kms"},
-	})
-}
-
 // FetchDynamoDBTables calls the DynamoDB ListTables/DescribeTable APIs and
 // returns all pages of tables. Used by tests; the production path uses the per-page fetcher for pagination.
 func FetchDynamoDBTables(ctx context.Context, listAPI DDBListTablesAPI, describeAPI DDBDescribeTableAPI) ([]resource.Resource, error) {
