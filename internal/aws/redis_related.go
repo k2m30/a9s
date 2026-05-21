@@ -19,30 +19,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterRelated("redis", []resource.RelatedDef{
-		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkRedisAlarms, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkRedisCFN, NeedsTargetCache: true},
-		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkRedisCtEvents, NeedsTargetCache: true},
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkRedisKMS, NeedsTargetCache: false},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkRedisLogs, NeedsTargetCache: true},
-		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkRedisSecrets, NeedsTargetCache: true},
-		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkRedisSG, NeedsTargetCache: true},
-		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkRedisSNS, NeedsTargetCache: true},
-		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkRedisSubnet, NeedsTargetCache: true},
-		{TargetType: "vpc", DisplayName: "VPC", Checker: checkRedisVPC, NeedsTargetCache: false},
-	})
-
-	// ReplicationGroup.KmsKeyId is a scalar — the only navigable path that
-	// resolves against this RawStruct. Security Groups live on MemberCluster
-	// objects returned by DescribeCacheClusters, not on ReplicationGroup, so
-	// SG navigation is surfaced via the checkRedisSG related-panel checker,
-	// not via a navigable field.
-	resource.RegisterDefaultNavFields("redis", []resource.NavigableField{
-		{FieldPath: "KmsKeyId", TargetType: "kms"},
-	})
-}
-
 // checkRedisAlarms checks the alarm cache for CloudWatch alarms with a
 // CacheClusterId dimension matching any member cluster of this replication group.
 func checkRedisAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {

@@ -1,11 +1,14 @@
 package aws
 
 import (
+	"context"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func colorDBI(r domain.Resource) domain.Color {
@@ -301,6 +304,39 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			DisplayNameKey: "db_identifier",
 		}},
 		Color: colorDBI,
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchRDSInstancesPage(ctx, c.RDS, continuationToken)
+		},
+		Wave2: IssueEnricher{Fn: EnrichDBIMaintenance, Priority: 10},
+		FieldKeys: []string{
+			"db_identifier", "engine", "engine_version", "status", "class", "endpoint",
+			"multi_az", "arn", "publicly_accessible", "storage_encrypted",
+			"deletion_protection", "backup_retention_period",
+		},
+		Related: []domain.RelatedDef{
+			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkDbiSG},
+			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkDbiKMS},
+			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkDbiSubnets},
+			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkDbiAlarm, NeedsTargetCache: true},
+			{TargetType: "dbi-snap", DisplayName: "DB Instance Snapshots", Checker: checkDbiDBISnap, NeedsTargetCache: true},
+			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkDBILogs, NeedsTargetCache: true},
+			{TargetType: "vpc", DisplayName: "VPC", Checker: checkDbiVPC},
+			{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkDbiSecrets, NeedsTargetCache: true},
+			{TargetType: "dbc", DisplayName: "RDS Clusters", Checker: checkDbiDBC, NeedsTargetCache: true},
+			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkDbiRole},
+			{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkDbiENI},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkDbiCTEvents, NeedsTargetCache: true},
+		},
+		Navigable: []domain.NavigableField{
+			{FieldPath: "VpcSecurityGroups.VpcSecurityGroupId", TargetType: "sg"},
+			{FieldPath: "DBSubnetGroup.VpcId", TargetType: "vpc"},
+			{FieldPath: "DBSubnetGroup.Subnets.SubnetIdentifier", TargetType: "subnet"},
+			{FieldPath: "KmsKeyId", TargetType: "kms"},
+		},
 	},
 	{
 		Name:          "S3 Buckets",
@@ -335,6 +371,29 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "endpoint", Title: "Endpoint", Width: 40, Sortable: false},
 		},
 		Color: colorRedis,
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchRedisPage(ctx, c.ElastiCache, continuationToken)
+		},
+		FieldKeys: []string{"cluster_id", "node_type", "status", "nodes", "endpoint", "arn"},
+		Related: []domain.RelatedDef{
+			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkRedisAlarms, NeedsTargetCache: true},
+			{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkRedisCFN, NeedsTargetCache: true},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkRedisCtEvents, NeedsTargetCache: true},
+			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkRedisKMS, NeedsTargetCache: false},
+			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkRedisLogs, NeedsTargetCache: true},
+			{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkRedisSecrets, NeedsTargetCache: true},
+			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkRedisSG, NeedsTargetCache: true},
+			{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkRedisSNS, NeedsTargetCache: true},
+			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkRedisSubnet, NeedsTargetCache: true},
+			{TargetType: "vpc", DisplayName: "VPC", Checker: checkRedisVPC, NeedsTargetCache: false},
+		},
+		Navigable: []domain.NavigableField{
+			{FieldPath: "KmsKeyId", TargetType: "kms"},
+		},
 	},
 	{
 		Name:          "DB Clusters",
@@ -351,6 +410,85 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "endpoint", Title: "Endpoint", Width: 48, Sortable: false},
 		},
 		Color: colorDBC,
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			if rdsTok, ok2 := strings.CutPrefix(continuationToken, "rds:"); ok2 {
+				result, err := FetchRDSDBClustersPage(ctx, c.RDS, rdsTok)
+				if err != nil {
+					return resource.FetchResult{}, err
+				}
+				if result.Pagination != nil && result.Pagination.IsTruncated {
+					result.Pagination.NextToken = "rds:" + result.Pagination.NextToken
+				}
+				return result, nil
+			}
+			docdbTok, _ := strings.CutPrefix(continuationToken, "docdb:")
+			docResult, err := FetchDocDBClustersPage(ctx, c.DocDB, docdbTok)
+			if err != nil {
+				return resource.FetchResult{}, err
+			}
+			if docResult.Pagination != nil && docResult.Pagination.IsTruncated {
+				docResult.Pagination.NextToken = "docdb:" + docResult.Pagination.NextToken
+				return docResult, nil
+			}
+			rdsResult, rdsErr := FetchRDSDBClustersPage(ctx, c.RDS, "")
+			if rdsErr != nil {
+				return resource.FetchResult{
+					Resources: docResult.Resources,
+					Pagination: &resource.PaginationMeta{
+						IsTruncated: true,
+						NextToken:   "rds:",
+						PageSize:    len(docResult.Resources),
+						TotalHint:   -1,
+					},
+				}, fmt.Errorf("dbc: RDS-side cluster fetch failed: %w", rdsErr)
+			}
+			docResult.Resources = dedupResourcesByID(append(docResult.Resources, rdsResult.Resources...))
+			if rdsResult.Pagination != nil && rdsResult.Pagination.IsTruncated {
+				return resource.FetchResult{
+					Resources: docResult.Resources,
+					Pagination: &resource.PaginationMeta{
+						IsTruncated: true,
+						NextToken:   "rds:" + rdsResult.Pagination.NextToken,
+						PageSize:    len(docResult.Resources),
+						TotalHint:   -1,
+					},
+				}, nil
+			}
+			return resource.FetchResult{
+				Resources: docResult.Resources,
+				Pagination: &resource.PaginationMeta{
+					IsTruncated: false,
+					PageSize:    len(docResult.Resources),
+					TotalHint:   len(docResult.Resources),
+				},
+			}, nil
+		},
+		Wave2: IssueEnricher{Fn: EnrichDBCMaintenance, Priority: 100},
+		FieldKeys: []string{
+			"cluster_id", "engine_version", "status", "instances", "endpoint", "arn",
+			"has_writer", "writer_count", "deletion_protection", "storage_encrypted",
+			"backup_retention_period",
+		},
+		Related: []domain.RelatedDef{
+			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkDbcSG},
+			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkDbcAlarm, NeedsTargetCache: true},
+			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkDbcLogs, NeedsTargetCache: true},
+			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkDbcKMS},
+			{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkDbcSecrets, NeedsTargetCache: true},
+			{TargetType: "dbi", DisplayName: "RDS Instances", Checker: checkDbcDBI, NeedsTargetCache: true},
+			{TargetType: "dbc-snap", DisplayName: "DB Cluster Snapshots", Checker: checkDbcDbcSnap, NeedsTargetCache: true},
+			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkDbcSubnet},
+			{TargetType: "vpc", DisplayName: "VPC", Checker: checkDbcVPC},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkDbcCTEvents},
+		},
+		Navigable: []domain.NavigableField{
+			{FieldPath: "VpcSecurityGroups.VpcSecurityGroupId", TargetType: "sg"},
+			{FieldPath: "KmsKeyId", TargetType: "kms"},
+		},
 	},
 	{
 		Name:          "DynamoDB Tables",
@@ -367,6 +505,28 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "billing_mode", Title: "Billing", Width: 16, Sortable: true},
 		},
 		Color: colorDDB,
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchDynamoDBTablesPage(ctx, c.DynamoDB, c.DynamoDB, continuationToken)
+		},
+		Wave2:     IssueEnricher{Fn: EnrichDynamoDBPITR, Priority: 100},
+		FieldKeys: []string{"table_name", "status", "item_count", "size_bytes", "billing_mode"},
+		Related: []domain.RelatedDef{
+			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkDdbKMS},
+			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkDdbAlarm, NeedsTargetCache: true},
+			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkDdbLambda},
+			{TargetType: "kinesis", DisplayName: "Kinesis Streams", Checker: checkDdbKinesis},
+			{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkDdbBackup},
+			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkDdbLogs, NeedsTargetCache: true},
+			{TargetType: "vpce", DisplayName: "VPC Endpoints", Checker: checkDdbVPCE, NeedsTargetCache: true},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("ddb")},
+		},
+		Navigable: []domain.NavigableField{
+			{FieldPath: "SSEDescription.KMSMasterKeyArn", TargetType: "kms"},
+		},
 	},
 	{
 		Name:          "OpenSearch Domains",
@@ -382,6 +542,45 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "endpoint", Title: "Endpoint", Width: 48, Sortable: false},
 		},
 		Color: colorOpenSearch,
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			resources, err := FetchOpenSearchDomains(ctx, c.OpenSearch, c.OpenSearch)
+			if err != nil {
+				return resource.FetchResult{}, err
+			}
+			return resource.FetchResult{
+				Resources:  resources,
+				Pagination: &resource.PaginationMeta{IsTruncated: false, TotalHint: len(resources), PageSize: len(resources)},
+			}, nil
+		},
+		Wave2: IssueEnricher{Fn: EnrichOpenSearchDomains, Priority: 100},
+		FieldKeys: []string{
+			"domain_name", "engine_version", "instance_type", "instance_count", "endpoint",
+			"status", "domain_processing_status",
+			"deleted", "processing", "upgrade_processing",
+			"service_software_update_available", "encryption_at_rest_enabled",
+			"automated_update_date", "current_version", "new_version",
+		},
+		Related: []domain.RelatedDef{
+			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkOpenSearchAlarms, NeedsTargetCache: true},
+			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkOpenSearchLogs, NeedsTargetCache: false},
+			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkOpenSearchSG},
+			{TargetType: "vpc", DisplayName: "VPC", Checker: checkOpenSearchVPC},
+			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkOpenSearchKMS},
+			{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkOpenSearchCFN},
+			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkOpenSearchSubnet},
+			{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkOpenSearchACM, NeedsTargetCache: true},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("opensearch")},
+		},
+		Navigable: []domain.NavigableField{
+			{FieldPath: "EncryptionAtRestOptions.KmsKeyId", TargetType: "kms"},
+			{FieldPath: "VPCOptions.VPCId", TargetType: "vpc"},
+			{FieldPath: "VPCOptions.SubnetIds", TargetType: "subnet"},
+			{FieldPath: "VPCOptions.SecurityGroupIds", TargetType: "sg"},
+		},
 	},
 	{
 		Name:          "Redshift Clusters",
@@ -399,6 +598,34 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "endpoint", Title: "Endpoint", Width: 44, Sortable: false},
 		},
 		Color: colorRedshift,
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchRedshiftClustersPage(ctx, c.Redshift, continuationToken)
+		},
+		FieldKeys: []string{
+			"cluster_id", "status", "cluster_status", "node_type", "num_nodes",
+			"db_name", "endpoint", "publicly_accessible", "encrypted",
+			"cluster_availability_status",
+		},
+		Related: []domain.RelatedDef{
+			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkRedshiftAlarms, NeedsTargetCache: true},
+			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkRedshiftSG},
+			{TargetType: "vpc", DisplayName: "VPC", Checker: checkRedshiftVPC},
+			{TargetType: "role", DisplayName: "IAM Role", Checker: checkRedshiftRole},
+			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkRedshiftKMS},
+			{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkRedshiftCFN, NeedsTargetCache: true},
+			{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkRedshiftSecrets, NeedsTargetCache: true},
+			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkRedshiftLogs},
+			{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkRedshiftS3},
+			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkRedshiftSubnet},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("redshift")},
+		},
+		Navigable: []domain.NavigableField{
+			{FieldPath: "VpcId", TargetType: "vpc"},
+		},
 	},
 	{
 		Name:          "EFS File Systems",
@@ -433,6 +660,25 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "created", Title: "Created", Width: 22, Sortable: true},
 		},
 		Color: colorDBISnap,
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchDBISnapshotsPage(ctx, c.RDS, continuationToken)
+		},
+		Wave2:     IssueEnricher{Fn: enrichDBISnapCrossRef, Priority: 100},
+		FieldKeys: []string{"snapshot_id", "db_instance", "status", "engine", "snapshot_type", "created", "arn"},
+		Related: []domain.RelatedDef{
+			{TargetType: "dbi", DisplayName: "DB Instances", Checker: checkDBISnapDBI, NeedsTargetCache: true},
+			{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkDBISnapKMS, NeedsTargetCache: true},
+			{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkDBISnapBackup},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkDBISnapCTEvents, NeedsTargetCache: true},
+		},
+		Navigable: []domain.NavigableField{
+			{FieldPath: "DBInstanceIdentifier", TargetType: "dbi"},
+			{FieldPath: "KmsKeyId", TargetType: "kms"},
+		},
 	},
 	{
 		Name:          "DB Cluster Snapshots",
@@ -451,5 +697,78 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "storage_type", Title: "Storage", Width: 10, Sortable: true},
 		},
 		Color: colorDBCSnap,
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			if rdsTok, ok2 := strings.CutPrefix(continuationToken, "rds:"); ok2 {
+				result, err := FetchRDSDBClusterSnapshotsPage(ctx, c.RDS, rdsTok)
+				if err != nil {
+					return resource.FetchResult{}, err
+				}
+				if result.Pagination != nil && result.Pagination.IsTruncated {
+					result.Pagination.NextToken = "rds:" + result.Pagination.NextToken
+				}
+				return result, nil
+			}
+			docdbTok, _ := strings.CutPrefix(continuationToken, "docdb:")
+			docResult, err := FetchDocDBClusterSnapshotsPage(ctx, c.DocDB, docdbTok)
+			if err != nil {
+				return resource.FetchResult{}, err
+			}
+			if docResult.Pagination != nil && docResult.Pagination.IsTruncated {
+				docResult.Pagination.NextToken = "docdb:" + docResult.Pagination.NextToken
+				return docResult, nil
+			}
+			rdsResult, rdsErr := FetchRDSDBClusterSnapshotsPage(ctx, c.RDS, "")
+			if rdsErr != nil {
+				return resource.FetchResult{
+					Resources: docResult.Resources,
+					Pagination: &resource.PaginationMeta{
+						IsTruncated: true,
+						NextToken:   "rds:",
+						PageSize:    len(docResult.Resources),
+						TotalHint:   -1,
+					},
+				}, fmt.Errorf("dbc-snap: RDS-side cluster snapshot fetch failed: %w", rdsErr)
+			}
+			docResult.Resources = dedupResourcesByID(append(docResult.Resources, rdsResult.Resources...))
+			if rdsResult.Pagination != nil && rdsResult.Pagination.IsTruncated {
+				return resource.FetchResult{
+					Resources: docResult.Resources,
+					Pagination: &resource.PaginationMeta{
+						IsTruncated: true,
+						NextToken:   "rds:" + rdsResult.Pagination.NextToken,
+						PageSize:    len(docResult.Resources),
+						TotalHint:   -1,
+					},
+				}, nil
+			}
+			return resource.FetchResult{
+				Resources: docResult.Resources,
+				Pagination: &resource.PaginationMeta{
+					IsTruncated: false,
+					PageSize:    len(docResult.Resources),
+					TotalHint:   len(docResult.Resources),
+				},
+			}, nil
+		},
+		Wave2: IssueEnricher{Fn: enrichDBCSnapCrossRef, Priority: 100},
+		FieldKeys: []string{
+			"snapshot_id", "cluster_id", "status", "engine", "snapshot_type",
+			"snapshot_create_time", "storage_type", "storage_encrypted",
+		},
+		Related: []domain.RelatedDef{
+			{TargetType: "dbc", DisplayName: "DocumentDB Cluster", Checker: checkDbcSnapDBC, NeedsTargetCache: true},
+			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkDbcSnapKMS},
+			{TargetType: "vpc", DisplayName: "VPC", Checker: checkDbcSnapVPC},
+			{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkDbcSnapBackup},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkDbcSnapCTEvents},
+		},
+		Navigable: []domain.NavigableField{
+			{FieldPath: "VpcId", TargetType: "vpc"},
+			{FieldPath: "KmsKeyId", TargetType: "kms"},
+		},
 	},
 }

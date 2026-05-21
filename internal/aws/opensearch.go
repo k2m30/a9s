@@ -12,31 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("opensearch", []string{
-		"domain_name", "engine_version", "instance_type", "instance_count", "endpoint",
-		"status", "domain_processing_status",
-		"deleted", "processing", "upgrade_processing",
-		"service_software_update_available", "encryption_at_rest_enabled",
-		"automated_update_date", "current_version", "new_version",
-	})
-
-	resource.RegisterPaginated("opensearch", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		resources, err := FetchOpenSearchDomains(ctx, c.OpenSearch, c.OpenSearch)
-		if err != nil {
-			return resource.FetchResult{}, err
-		}
-		return resource.FetchResult{
-			Resources:  resources,
-			Pagination: &resource.PaginationMeta{IsTruncated: false, TotalHint: len(resources), PageSize: len(resources)},
-		}, nil
-	})
-}
-
 // openSearchSignals classifies a DomainStatus against the 5 spec signals.
 // Returns hard-state findings (for Resource.Findings) and the total signal count
 // (for computing the Fields["status"] display phrase with suffix).

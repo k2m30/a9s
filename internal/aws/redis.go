@@ -14,18 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("redis", []string{"cluster_id", "node_type", "status", "nodes", "endpoint", "arn"})
-
-	resource.RegisterPaginated("redis", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchRedisPage(ctx, c.ElastiCache, continuationToken)
-	})
-}
-
 // computeShardIssues returns one phrase per non-available NodeGroup on a
 // multi-shard (cluster-mode-enabled) replication group, ordered alphabetically
 // by phrase so rule-7 precedence is stable. Returns nil when the RG has ≤1
