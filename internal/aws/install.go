@@ -93,6 +93,21 @@ func bridgeCatalogToLegacy() {
 			resource.RegisterRevealFetcher(rt.ShortName, rt.Reveal)
 		}
 	}
+	// Child types: replay catalog child-type entries onto the legacy
+	// resource.childTypes + paginatedChildRegistry maps so consumers calling
+	// resource.GetChildType / resource.GetPaginatedChildFetcher continue to
+	// resolve migrated entries. AS-808 / PR #395 round-2 introduces the first
+	// migrated child (ecr_images); sibling category PRs append their own
+	// `<cat>ChildTypes` slices to allChildTypes() above.
+	for _, ct := range allChildTypes() {
+		resource.RegisterChildType(ct)
+		if ct.ChildFetcher != nil {
+			resource.RegisterPaginatedChild(ct.ShortName, ct.ChildFetcher)
+		}
+		if len(ct.FieldKeys) > 0 {
+			resource.RegisterFieldKeys(ct.ShortName, ct.FieldKeys)
+		}
+	}
 }
 
 // allTopLevelTypes concatenates the per-category top-level catalog slices into
@@ -119,11 +134,16 @@ func allTopLevelTypes() []catalog.ResourceTypeDef {
 	return all
 }
 
-// allChildTypes returns the child-type catalog slice. Empty in AS-795a — the
-// per-category PRs populate this as they migrate child fetchers off the
-// internal/resource.childTypes map. Returning an empty slice now keeps the
-// install contract uniform with allTopLevelTypes and lets catalog.FindChild
-// panic loudly when called without an install.
+// allChildTypes concatenates the per-category child-type catalog slices into
+// one flat slice. The order mirrors allTopLevelTypes for consistency. Sibling
+// category PRs (AS-795b/d–m) extend this by appending their own
+// `<cat>ChildTypes` slice — using append-of-slices keeps the per-PR diff
+// localized to one new `all = append(all, <cat>ChildTypes...)` line.
+//
+// First populated in AS-808 / PR #395 round-2 with containersChildTypes
+// (ecr_images).
 func allChildTypes() []catalog.ResourceTypeDef {
-	return nil
+	var all []catalog.ResourceTypeDef
+	all = append(all, containersChildTypes...)
+	return all
 }

@@ -246,3 +246,32 @@ func fetchNodeGroupsPage(ctx context.Context, clients any, continuationToken str
 		},
 	}, AggregateFailures("ng: DescribeNodegroup", failures, totalAttempted)
 }
+
+// containersChildTypes is the declarative child-type catalog for the CONTAINERS
+// category. First per-category child-type slice in the AS-795 migration —
+// sibling category PRs (AS-795b/d–m) append their own `<cat>ChildTypes` slice
+// to allChildTypes() in install.go without merge conflicts.
+//
+// AS-808 / PR #395 (round 2): ecr_images migrates here from ecr_images.go's
+// init() body per AS-795 §3 spec scope (eks, ecr, ecr-images) and CTO
+// arbitration on the round-1 review (2026-05-21T06:45Z).
+var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
+	{
+		Name:      "ECR Images",
+		ShortName: "ecr_images",
+		Columns:   resource.ECRImageColumns(),
+		CopyField: "image_uri",
+		FieldKeys: []string{
+			"image_tags", "digest_short", "pushed_at", "image_size",
+			"scan_status", "finding_counts", "image_uri", "image_digest",
+			"repository_name",
+		},
+		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchECRImages(ctx, c.ECR, parentCtx, continuationToken)
+		},
+	},
+}

@@ -12,29 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("ecr_images", []string{
-		"image_tags", "digest_short", "pushed_at", "image_size",
-		"scan_status", "finding_counts", "image_uri", "image_digest",
-		"repository_name",
-	})
-
-	resource.RegisterPaginatedChild("ecr_images", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchECRImages(ctx, c.ECR, parentCtx, continuationToken)
-	})
-
-	resource.RegisterChildType(resource.ResourceTypeDef{
-		Name:      "ECR Images",
-		ShortName: "ecr_images",
-		Columns:   resource.ECRImageColumns(),
-		CopyField: "image_uri",
-	})
-}
-
 // FetchECRImages calls the ECR DescribeImages API and converts the response into
 // a FetchResult with pagination support. A single API call is made per invocation;
 // images are sorted by push time (newest first) before being returned. IsTruncated
