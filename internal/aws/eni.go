@@ -12,18 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("eni", []string{"eni_id", "name", "status", "type", "vpc_id", "private_ip", "requester_managed"})
-
-	resource.RegisterPaginated("eni", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchNetworkInterfacesPage(ctx, c.EC2, continuationToken)
-	})
-}
-
 // FetchNetworkInterfaces calls the EC2 DescribeNetworkInterfaces API and converts the
 // response into a slice of generic Resource structs.
 func FetchNetworkInterfaces(ctx context.Context, api EC2DescribeNetworkInterfacesAPI) ([]resource.Resource, error) {
