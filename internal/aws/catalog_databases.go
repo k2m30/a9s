@@ -1,9 +1,10 @@
-package catalog
+package aws
 
 import (
 	"strings"
 	"time"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
 )
 
@@ -276,7 +277,7 @@ func colorDBCSnap(r domain.Resource) domain.Color {
 	return domain.ColorHealthy
 }
 
-var databasesTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
+var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
 		Name:          "DB Instances",
 		ShortName:     "dbi",

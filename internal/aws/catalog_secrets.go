@@ -1,9 +1,10 @@
-package catalog
+package aws
 
 import (
 	"strings"
 	"time"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
 )
 
@@ -65,7 +66,7 @@ func colorKMS(r domain.Resource) domain.Color {
 	return domain.ColorHealthy
 }
 
-var secretsTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
+var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
 		Name:          "Secrets Manager",
 		ShortName:     "secrets",

@@ -1,6 +1,9 @@
-package catalog
+package aws
 
-import "github.com/k2m30/a9s/v3/internal/domain"
+import (
+	"github.com/k2m30/a9s/v3/internal/catalog"
+	"github.com/k2m30/a9s/v3/internal/domain"
+)
 
 func colorCFN(r domain.Resource) domain.Color      { return cfnStackColor(r.Fields["status"]) }
 func colorPipeline(_ domain.Resource) domain.Color { return domain.ColorHealthy }
@@ -8,7 +11,7 @@ func colorCB(_ domain.Resource) domain.Color       { return domain.ColorHealthy 
 func colorECR(_ domain.Resource) domain.Color      { return domain.ColorHealthy }
 func colorCodeArtifact(_ domain.Resource) domain.Color { return domain.ColorHealthy }
 
-var cicdTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
+var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
 		Name:          "CloudFormation Stacks",
 		ShortName:     "cfn",

@@ -1,9 +1,10 @@
-package catalog
+package aws
 
 import (
 	"strings"
 	"time"
 
+	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
 )
 
@@ -41,7 +42,7 @@ func colorIAMUser(r domain.Resource) domain.Color {
 func colorIAMGroup(_ domain.Resource) domain.Color { return domain.ColorHealthy }
 func colorWAF(_ domain.Resource) domain.Color      { return domain.ColorHealthy }
 
-var securityTypes = []ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
+var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
 		Name:          "IAM Roles",
 		ShortName:     "role",

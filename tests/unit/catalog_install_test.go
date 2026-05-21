@@ -15,6 +15,7 @@ package unit
 //       FilteredFetcher/IssueEnricherFieldKeys/ChildFetcher are zero for all types
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"strings"
@@ -71,7 +72,7 @@ func TestCatalogFind_PanicsBeforeSetTypes(t *testing.T) {
 		os.Exit(0) // unreachable when panic fires correctly
 	}
 
-	cmd := exec.Command(os.Args[0], "-test.run=^TestCatalogFind_PanicsBeforeSetTypes$")
+	cmd := exec.CommandContext(context.Background(), os.Args[0], "-test.run=^TestCatalogFind_PanicsBeforeSetTypes$")
 	cmd.Env = append(os.Environ(),
 		"TEST_CATALOG_PANIC=1",
 		"TEST_SKIP_INSTALL=1",
