@@ -11,28 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterDefaultNavFields("eni", []resource.NavigableField{
-		{FieldPath: "VpcId", TargetType: "vpc"},
-		{FieldPath: "SubnetId", TargetType: "subnet"},
-		{FieldPath: "Groups.GroupId", TargetType: "sg"},
-		{FieldPath: "Attachment.InstanceId", TargetType: "ec2"},
-		{FieldPath: "Association.AllocationId", TargetType: "eip"},
-	})
-
-	resource.RegisterRelated("eni", []resource.RelatedDef{
-		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkENIEC2, NeedsTargetCache: true},
-		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkENISG, NeedsTargetCache: true},
-		{TargetType: "eip", DisplayName: "Elastic IPs", Checker: checkENIEIP, NeedsTargetCache: true},
-		{TargetType: "vpc", DisplayName: "VPC", Checker: checkENIVPC},
-		{TargetType: "subnet", DisplayName: "Subnet", Checker: checkENISubnet},
-		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkENIELB},
-		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkENILambda},
-		{TargetType: "nat", DisplayName: "NAT Gateways", Checker: checkENINAT, NeedsTargetCache: true},
-		{TargetType: "vpce", DisplayName: "VPC Endpoints", Checker: checkENIVPCE, NeedsTargetCache: true},
-	})
-}
-
 // checkENIEC2 extracts Attachment.InstanceId from the ENI RawStruct and searches
 // the ec2 cache for a matching instance.
 func checkENIEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {

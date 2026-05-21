@@ -12,32 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterDefaultNavFields("vpce", []resource.NavigableField{
-		{FieldPath: "VpcId", TargetType: "vpc"},
-		{FieldPath: "SubnetIds", TargetType: "subnet"},
-		{FieldPath: "NetworkInterfaceIds", TargetType: "eni"},
-		{FieldPath: "Groups.GroupId", TargetType: "sg"},
-		{FieldPath: "RouteTableIds", TargetType: "rtb"},
-	})
-
-	resource.RegisterRelated("vpce", []resource.RelatedDef{
-		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkVPCESubnet, NeedsTargetCache: false},
-		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkVPCESG, NeedsTargetCache: false},
-		{TargetType: "rtb", DisplayName: "Route Tables", Checker: checkVPCERTB, NeedsTargetCache: false},
-		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkVPCEENI, NeedsTargetCache: false},
-		{TargetType: "vpc", DisplayName: "VPC", Checker: checkVPCEVPC},
-		{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkVPCEACM},
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkVPCEAlarm},
-		{TargetType: "cf", DisplayName: "CloudFront", Checker: checkVPCECF},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkVPCELogs},
-		{TargetType: "r53", DisplayName: "Route 53 Zones", Checker: checkVPCER53},
-		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkVPCES3},
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: checkVPCETG},
-		{TargetType: "waf", DisplayName: "WAF Web ACLs", Checker: checkVPCEWAF},
-	})
-}
-
 // checkVPCESubnet reads SubnetIds from the VpcEndpoint RawStruct directly.
 // Pattern F: all data is in RawStruct, no cache lookup needed.
 func checkVPCESubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {

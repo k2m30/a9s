@@ -12,22 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterRelated("sg", []resource.RelatedDef{
-		{TargetType: "vpc", DisplayName: "VPC", Checker: checkSGVPC, NeedsTargetCache: false},
-		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkSGEC2, NeedsTargetCache: true},
-		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkSGENI, NeedsTargetCache: true},
-		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkSGELB, NeedsTargetCache: true},
-		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkSGLambda, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkSGCFN, NeedsTargetCache: false},
-		{TargetType: "sg", DisplayName: "Referencing SGs", Checker: checkSGSG, NeedsTargetCache: true},
-	})
-
-	resource.RegisterDefaultNavFields("sg", []resource.NavigableField{
-		{FieldPath: "VpcId", TargetType: "vpc"},
-	})
-}
-
 // checkSGVPC reads the vpc_id field directly from the SG resource.
 // No cache access needed — the field is populated by the SG fetcher.
 func checkSGVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {

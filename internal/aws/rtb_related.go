@@ -12,29 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterDefaultNavFields("rtb", []resource.NavigableField{
-		{FieldPath: "VpcId", TargetType: "vpc"},
-		{FieldPath: "Associations.SubnetId", TargetType: "subnet"},
-		{FieldPath: "Routes.NatGatewayId", TargetType: "nat"},
-		{FieldPath: "Routes.GatewayId", TargetType: "igw"},
-		{FieldPath: "Routes.NetworkInterfaceId", TargetType: "eni"},
-		{FieldPath: "Routes.TransitGatewayId", TargetType: "tgw"},
-		{FieldPath: "Routes.VpcPeeringConnectionId", TargetType: "vpc"},
-	})
-
-	resource.RegisterRelated("rtb", []resource.RelatedDef{
-		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkRTBSubnet, NeedsTargetCache: true},
-		{TargetType: "nat", DisplayName: "NAT Gateways", Checker: checkRTBNAT, NeedsTargetCache: true},
-		{TargetType: "igw", DisplayName: "Internet Gateways", Checker: checkRTBIGW, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkRTBCFN, NeedsTargetCache: true},
-		{TargetType: "vpc", DisplayName: "VPC", Checker: checkRTBVPC},
-		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkRTBENI, NeedsTargetCache: true},
-		{TargetType: "tgw", DisplayName: "Transit Gateways", Checker: checkRTBTGW, NeedsTargetCache: true},
-		{TargetType: "vpce", DisplayName: "VPC Endpoints", Checker: checkRTBVPCE, NeedsTargetCache: true},
-	})
-}
-
 // checkRTBSubnet searches the subnet cache for subnets associated with this route table.
 // It extracts SubnetIds from ec2types.RouteTable.Associations[] (Pattern C — cache lookup).
 func checkRTBSubnet(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {

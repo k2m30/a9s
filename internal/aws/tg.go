@@ -10,18 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("tg", []string{"target_group_name", "port", "protocol", "vpc_id", "target_type", "health_check_path"})
-
-	resource.RegisterPaginated("tg", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchTargetGroupsPage(ctx, c.ELBv2, continuationToken)
-	})
-}
-
 // FetchTargetGroups calls the ELBv2 DescribeTargetGroups API and converts the
 // response into a slice of generic Resource structs.
 func FetchTargetGroups(ctx context.Context, api ELBv2DescribeTargetGroupsAPI) ([]resource.Resource, error) {

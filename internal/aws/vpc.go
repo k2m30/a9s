@@ -11,18 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("vpc", []string{"vpc_id", "name", "cidr_block", "state", "is_default"})
-
-	resource.RegisterPaginated("vpc", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchVPCsPage(ctx, c.EC2, continuationToken)
-	})
-}
-
 // FetchVPCs calls the EC2 DescribeVpcs API and converts the
 // response into a slice of generic Resource structs.
 func FetchVPCs(ctx context.Context, api EC2DescribeVpcsAPI) ([]resource.Resource, error) {

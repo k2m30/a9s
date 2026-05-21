@@ -10,26 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterDefaultNavFields("eip", []resource.NavigableField{
-		{FieldPath: "InstanceId", TargetType: "ec2"},
-		{FieldPath: "NetworkInterfaceId", TargetType: "eni"},
-	})
-
-	resource.RegisterRelated("eip", []resource.RelatedDef{
-		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkEIPEC2},
-		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkEIPENI},
-		{TargetType: "nat", DisplayName: "NAT Gateways", Checker: checkEIPNAT, NeedsTargetCache: true},
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkEIPAlarm},
-		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkEIPASG},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkEIPCFN},
-		{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkEIPECS},
-		{TargetType: "ecs-svc", DisplayName: "ECS Services", Checker: checkEIPECSSvc},
-		{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkEIPECSTask},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkEIPLogs},
-	})
-}
-
 // checkEIPEC2 returns the EC2 instance associated with this Elastic IP (Pattern F).
 func checkEIPEC2(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.Address](res.RawStruct)

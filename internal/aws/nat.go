@@ -11,33 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("nat", []string{"nat_gateway_id", "name", "vpc_id", "subnet_id", "state", "public_ip"})
-
-	resource.RegisterPaginated("nat", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchNatGatewaysPage(ctx, c.EC2, continuationToken)
-	})
-
-	resource.RegisterDefaultNavFields("nat", []resource.NavigableField{
-		{FieldPath: "VpcId", TargetType: "vpc"},
-		{FieldPath: "SubnetId", TargetType: "subnet"},
-		{FieldPath: "NatGatewayAddresses.AllocationId", TargetType: "eip"},
-	})
-
-	resource.RegisterRelated("nat", []resource.RelatedDef{
-		{TargetType: "vpc", DisplayName: "VPCs", Checker: checkNATVPC, NeedsTargetCache: true},
-		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkNATSubnet, NeedsTargetCache: true},
-		{TargetType: "rtb", DisplayName: "Route Tables", Checker: checkNATRTB, NeedsTargetCache: true},
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkNATAlarm, NeedsTargetCache: true},
-		{TargetType: "eip", DisplayName: "Elastic IPs", Checker: checkNATEIP, NeedsTargetCache: true},
-		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkNATENI, NeedsTargetCache: true},
-	})
-}
-
 // FetchNatGateways calls the EC2 DescribeNatGateways API and converts the
 // response into a slice of generic Resource structs.
 func FetchNatGateways(ctx context.Context, api EC2DescribeNatGatewaysAPI) ([]resource.Resource, error) {

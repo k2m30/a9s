@@ -15,31 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterRelated("tg", []resource.RelatedDef{
-		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkTGELB, NeedsTargetCache: false},
-		{TargetType: "ecs-svc", DisplayName: "ECS Services", Checker: checkTGECSSvc, NeedsTargetCache: true},
-		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkTGASG, NeedsTargetCache: true},
-		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkTGAlarm, NeedsTargetCache: true},
-		{TargetType: "vpc", DisplayName: "VPC", Checker: checkTGVPC},
-		{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkTGBackup},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkTGCFN},
-		{TargetType: "dbc", DisplayName: "DocumentDB Clusters", Checker: checkTGDBC},
-		{TargetType: "dbi", DisplayName: "RDS Instances", Checker: checkTGDBI},
-		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkTGEC2},
-		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkTGLambda},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkTGLogs},
-		{TargetType: "dbi-snap", DisplayName: "DB Instance Snapshots", Checker: checkTGDBISnap},
-		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkTGSG},
-		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkTGSubnet},
-	})
-
-	resource.RegisterDefaultNavFields("tg", []resource.NavigableField{
-		{FieldPath: "VpcId", TargetType: "vpc"},
-		{FieldPath: "LoadBalancerArns", TargetType: "elb"},
-	})
-}
-
 // tgARN returns the Target Group ARN from Fields or RawStruct.
 func tgARN(res resource.Resource) string {
 	if arn := res.Fields["target_group_arn"]; arn != "" {
