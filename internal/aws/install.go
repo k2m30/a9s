@@ -54,8 +54,18 @@ func ctEventsCheckerFor(shortName string) domain.RelatedChecker {
 func Install() {
 	catalog.SetTypes(allTopLevelTypes())
 	catalog.SetChildTypes(allChildTypes())
+	if installed {
+		return
+	}
 	bridgeCatalogToLegacy()
+	installed = true
 }
+
+// installed tracks whether bridgeCatalogToLegacy has run. The legacy
+// internal/resource maps include at least one panic-on-duplicate registrar
+// (RegisterDetailEnricher) so the bridge must run exactly once even though
+// the catalog itself accepts idempotent SetTypes calls.
+var installed bool //nolint:gochecknoglobals // process-scope install gate
 
 // bridgeCatalogToLegacy populates the internal/resource legacy maps from the
 // catalog struct fields. Required during the AS-795b–m transition because
@@ -92,13 +102,16 @@ func bridgeCatalogToLegacy() {
 		if rt.Reveal != nil {
 			resource.RegisterRevealFetcher(rt.ShortName, rt.Reveal)
 		}
+		if rt.DetailEnrich != nil {
+			resource.RegisterDetailEnricher(rt.ShortName, rt.DetailEnrich)
+		}
 	}
 	// Child types: replay catalog child-type entries onto the legacy
 	// resource.childTypes + paginatedChildRegistry maps so consumers calling
 	// resource.GetChildType / resource.GetPaginatedChildFetcher continue to
-	// resolve migrated entries. AS-808 / PR #395 round-2 introduces the first
-	// migrated child (ecr_images); sibling category PRs append their own
-	// `<cat>ChildTypes` slices to allChildTypes() above.
+	// resolve migrated entries. Child loop introduced by AS-808 / PR #395
+	// (containers, ecr_images); AS-815 / PR #397 adds DetailEnrich support
+	// here so the role_policies detail enricher resolves through the bridge.
 	for _, ct := range allChildTypes() {
 		resource.RegisterChildType(ct)
 		if ct.ChildFetcher != nil {
@@ -106,6 +119,9 @@ func bridgeCatalogToLegacy() {
 		}
 		if len(ct.FieldKeys) > 0 {
 			resource.RegisterFieldKeys(ct.ShortName, ct.FieldKeys)
+		}
+		if ct.DetailEnrich != nil {
+			resource.RegisterDetailEnricher(ct.ShortName, ct.DetailEnrich)
 		}
 	}
 }
@@ -141,9 +157,11 @@ func allTopLevelTypes() []catalog.ResourceTypeDef {
 // localized to one new `all = append(all, <cat>ChildTypes...)` line.
 //
 // First populated in AS-808 / PR #395 round-2 with containersChildTypes
-// (ecr_images).
+// (ecr_images); AS-815 / PR #397 adds securityChildTypes
+// (iam_group_members, role_policies).
 func allChildTypes() []catalog.ResourceTypeDef {
 	var all []catalog.ResourceTypeDef
 	all = append(all, containersChildTypes...)
+	all = append(all, securityChildTypes...)
 	return all
 }
