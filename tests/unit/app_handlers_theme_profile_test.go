@@ -55,8 +55,15 @@ func TestHandleThemeSelected_InvalidThemeName(t *testing.T) {
 	}
 }
 
-// TestHandleThemeSelected_ThemeFileNotFound verifies that sending a ThemeSelectedMsg
-// with a syntactically valid but non-existent filename returns FlashMsg{IsError: true}.
+// TestHandleThemeSelected_ThemeFileNotFound verifies that selecting a theme
+// whose filename is syntactically valid but missing on disk surfaces a
+// "Cannot read theme: …" FlashMsg to the user.
+//
+// PR-05a-h4-a (AS-769) split the theme-selected flow into two round trips:
+// ThemeSelected → TaskKindReadThemeFile dispatch → messages.ThemeFileRead →
+// HandleThemeFileRead → FlashIntent (error). The test drives both steps:
+// the first cmd produces messages.ThemeFileRead{Err: ...}; feeding that
+// back through the root model produces the user-visible FlashMsg.
 func TestHandleThemeSelected_ThemeFileNotFound(t *testing.T) {
 	withTuiVersion(t, "test")
 	tmp := t.TempDir()
@@ -64,15 +71,31 @@ func TestHandleThemeSelected_ThemeFileNotFound(t *testing.T) {
 
 	m := newRootSizedModel()
 
-	// Valid filename format but the file does not exist on disk.
+	// Step 1: ThemeSelected → ReadThemeFile task → ThemeFileRead{Err}.
 	_, cmd := rootApplyMsg(m, messages.ThemeSelected{Theme: "nonexistent-theme-xyz.yaml"})
 	if cmd == nil {
-		t.Fatal("handleThemeSelected with missing theme file should return a cmd")
+		t.Fatal("handleThemeSelected with missing theme file should return a cmd (read task)")
 	}
-	msg := cmd()
+	readResult := cmd()
+	tfr, ok := readResult.(messages.ThemeFileRead)
+	if !ok {
+		t.Fatalf("expected messages.ThemeFileRead from read task, got %T", readResult)
+	}
+	if tfr.Err == nil {
+		t.Fatalf("expected ThemeFileRead.Err to be set for missing file, got nil")
+	}
+
+	// Step 2: feed ThemeFileRead back through the root model.
+	// HandleThemeFileRead branches on Err and emits a FlashIntent which the
+	// h4-a plural-dispatch path re-emits as messages.Flash.
+	_, flashCmd := rootApplyMsg(m, tfr)
+	if flashCmd == nil {
+		t.Fatal("handleThemeFileRead on read error should return a cmd (flash re-emit)")
+	}
+	msg := flashCmd()
 	flash, ok := msg.(messages.Flash)
 	if !ok {
-		t.Fatalf("expected FlashMsg, got %T", msg)
+		t.Fatalf("expected messages.Flash from HandleThemeFileRead error branch, got %T", msg)
 	}
 	if !flash.IsError {
 		t.Errorf("FlashMsg.IsError = false, want true (file not found)")
