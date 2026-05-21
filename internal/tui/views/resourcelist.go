@@ -183,11 +183,12 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 		// ResourcesLoaded without a ResourceType. AS-648-h2 will tighten
 		// this further by carrying a session generation alongside the type.
 		//
-		// Child views (parentContext != nil) bypass the guard: their parent
-		// ResourceType differs from the child ShortName by design (e.g. S3
-		// object lists receive ResourceType "s3" from tests that address the
-		// parent bucket type rather than the canonical child type "s3_objects").
-		if msg.ResourceType != "" && m.parentContext == nil {
+		// Child views (parentContext != nil) must still be guarded: production
+		// child fetches stamp ResourceType = childType (canonical, e.g.
+		// "s3_objects") at internal/tui/fetch_adapter.go:103, so the same
+		// canonicalised comparison rejects a late ResourcesLoaded from a
+		// different child whose Gen guard happens to still match.
+		if msg.ResourceType != "" {
 			canon := msg.ResourceType
 			if td := resource.FindResourceType(msg.ResourceType); td != nil {
 				canon = td.ShortName
