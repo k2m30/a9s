@@ -10,33 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("logs", []string{"log_group_name", "stored_bytes", "retention_days", "creation_time", "kms_key_id"})
-
-	resource.RegisterPaginated("logs", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchCloudWatchLogGroupsPage(ctx, c.CloudWatchLogs, continuationToken)
-	})
-
-	resource.RegisterRelated("logs", []resource.RelatedDef{
-		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkLogsLambda, NeedsTargetCache: true},
-		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkLogsAlarms, NeedsTargetCache: true},
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkLogsKMS},
-		{TargetType: "apigw", DisplayName: "API Gateway", Checker: checkLogsAPIGW, NeedsTargetCache: true},
-		{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkLogsECSTask, NeedsTargetCache: true},
-		{TargetType: "kinesis", DisplayName: "Kinesis Streams", Checker: checkLogsKinesis},
-		{TargetType: "s3", DisplayName: "S3 (exports)", Checker: checkLogsS3},
-	})
-
-	// cloudwatchlogstypes.LogGroup: KmsKeyId
-	resource.RegisterDefaultNavFields("logs", []resource.NavigableField{
-		{FieldPath: "KmsKeyId", TargetType: "kms"},
-	})
-}
-
 // FetchCloudWatchLogGroups calls the CloudWatchLogs DescribeLogGroups API and
 // returns all pages of log groups. Used by tests; the production path uses the per-page fetcher for pagination.
 func FetchCloudWatchLogGroups(ctx context.Context, api CWLogsDescribeLogGroupsAPI) ([]resource.Resource, error) {
