@@ -147,7 +147,7 @@ User Input → Update(msg) → (Model, Cmd) → View() → Terminal
 
 ### Messages
 
-Views communicate exclusively via typed messages (`internal/runtime/messages/`, with `cmd.go` for UI→core commands and `event.go` for core→UI events). Views never import each other. The root `Model.Update()` routes messages to the appropriate handler.
+Views communicate exclusively via typed messages (`internal/runtime/messages/`, with `cmd.go` for UI→core commands, `event.go` for core→UI events, and `messages.go` carrying the `Cmd` / `Event` / `GenStamped` marker interfaces). Views never import each other. The root `Model.Update()` routes messages to the appropriate handler.
 
 Key messages:
 
@@ -233,7 +233,7 @@ internal/
   fieldpath/     # struct field extraction via reflection (frozen — don't modify)
   resource/      # legacy resource model, type registry, fetcher registry (Phase 04 in-flight; backward-compat aliases — `resource.Resource`, `resource.ResourceTypeDef` — point at `internal/domain` / `internal/catalog`)
   runtime/       # platform-agnostic app core: Core (orchestrator.go), handlers.go, screens.go, tasks.go, state.go, intent.go (Phase 05a-extract, in flight)
-    messages/    #   typed Cmd/Event message taxonomy (cmd.go, event.go, plus transitional messages.go); see Phase 05b deviation note in §Messages
+    messages/    #   typed Cmd/Event message taxonomy (cmd.go, event.go, messages.go marker interfaces)
   session/       # session.Session — all session-scoped mutable state + capability stores (Phase 02, done); Rotate() invalidates in-flight gens
   semantics/     # shared semantic helpers: attention (Findings derivation), projection (DetailProjector), ctevent (CloudTrail event summarization). `selector/` is a Phase 01 addition that is not yet created.
   tui/           # Bubble Tea adapter shell (in-flight Phase-05a; still imports session/ and aws/ until PR-05a-h4 / screen-builder registry closes the boundary)
