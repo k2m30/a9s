@@ -11,18 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("waf", []string{"name", "id", "description"})
-
-	resource.RegisterPaginated("waf", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchWAFWebACLsPage(ctx, c.WAFv2, continuationToken)
-	})
-}
-
 // FetchWAFWebACLs calls the WAFv2 ListWebACLs API with Scope=REGIONAL and converts
 // the response into a slice of generic Resource structs.
 func FetchWAFWebACLs(ctx context.Context, api WAFv2ListWebACLsAPI) ([]resource.Resource, error) {

@@ -1,11 +1,14 @@
 package aws
 
 import (
+	"context"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func colorRole(r domain.Resource) domain.Color {
@@ -127,5 +130,24 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			{Key: "description", Title: "Description", Width: 36, Sortable: false},
 		},
 		Color: colorWAF,
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchWAFWebACLsPage(ctx, c.WAFv2, continuationToken)
+		},
+		Wave2:     IssueEnricher{Fn: EnrichWAFLogging, Priority: 100},
+		FieldKeys: []string{"name", "id", "description"},
+		Related: []domain.RelatedDef{
+			{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkWAFELB, NeedsTargetCache: false},
+			{TargetType: "apigw", DisplayName: "API Gateways", Checker: checkWAFAPIGW, NeedsTargetCache: false},
+			{TargetType: "cf", DisplayName: "CloudFront", Checker: checkWAFCF, NeedsTargetCache: false},
+			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkWAFAlarm},
+			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkWAFLogs},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("waf")},
+		},
+		// wafv2types.WebACLSummary: no cross-ref fields — Name, Id, ARN, Description, LockToken only.
+		// Associations (ELB/APIGW/CF) are resolved via checkWAF* related checkers at runtime.
 	},
 }
