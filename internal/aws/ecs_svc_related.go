@@ -13,36 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterRelated("ecs-svc", []resource.RelatedDef{
-		{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkECSSvcCluster},
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: checkECSSvcTargetGroups},
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkECSSvcAlarms, NeedsTargetCache: true},
-		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkECSSvcELB, NeedsTargetCache: true},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkECSSvcLogs, NeedsTargetCache: true},
-		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkECSSvcSG},
-		{TargetType: "role", DisplayName: "IAM Role", Checker: checkECSSvcRole},
-		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkECSSvcCFN, NeedsTargetCache: true},
-		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkECSSvcCTEvents, NeedsTargetCache: true},
-		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkECSSvcEbRule, NeedsTargetCache: true},
-		{TargetType: "ecr", DisplayName: "ECR Repositories", Checker: checkECSSvcECR},
-		{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkECSSvcTasks, NeedsTargetCache: true},
-		{TargetType: "secrets", DisplayName: "Secrets", Checker: checkECSSvcSecrets},
-		{TargetType: "sfn", DisplayName: "Step Functions", Checker: checkECSSvcSFN, NeedsTargetCache: true},
-		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkECSSvcSubnet},
-		{TargetType: "vpc", DisplayName: "VPC", Checker: checkECSSvcVPC, NeedsTargetCache: true},
-	})
-
-	// ecstypes.Service: ClusterArn, RoleArn, NetworkConfiguration subnets/SGs, LoadBalancer TG ARNs
-	resource.RegisterDefaultNavFields("ecs-svc", []resource.NavigableField{
-		{FieldPath: "ClusterArn", TargetType: "ecs"},
-		{FieldPath: "RoleArn", TargetType: "role"},
-		{FieldPath: "NetworkConfiguration.AwsvpcConfiguration.Subnets", TargetType: "subnet"},
-		{FieldPath: "NetworkConfiguration.AwsvpcConfiguration.SecurityGroups", TargetType: "sg"},
-		{FieldPath: "LoadBalancers.TargetGroupArn", TargetType: "tg"},
-	})
-}
-
 // checkECSSvcCluster returns the ECS cluster this service belongs to (Pattern F).
 // Extracts the cluster name from the Fields["cluster"] key populated by the fetcher.
 func checkECSSvcCluster(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {

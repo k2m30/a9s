@@ -13,40 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("ami", []string{"image_id", "name", "state", "architecture", "platform", "root_device_type", "creation_date", "public", "deprecated"})
-
-	resource.RegisterPaginated("ami", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchAMIsPage(ctx, c.EC2, continuationToken)
-	})
-
-	resource.RegisterFetchByIDs("ami", func(ctx context.Context, clients any, ids []string) ([]resource.Resource, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchAMIsByIDs(ctx, c.EC2, ids)
-	})
-
-	resource.RegisterRelated("ami", []resource.RelatedDef{
-		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkAMIEC2, NeedsTargetCache: true},
-		{TargetType: "ebs-snap", DisplayName: "EBS Snapshots", Checker: checkAMIEBSSnaps, NeedsTargetCache: false},
-		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkAMIASG, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkAMICFN, NeedsTargetCache: true},
-		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkAMIKMS},
-		{TargetType: "ng", DisplayName: "EKS Node Groups", Checker: checkAMING, NeedsTargetCache: true},
-	})
-
-	// ec2types.Image: BlockDeviceMappings[].Ebs.SnapshotId
-	resource.RegisterDefaultNavFields("ami", []resource.NavigableField{
-		{FieldPath: "BlockDeviceMappings.Ebs.SnapshotId", TargetType: "ebs-snap"},
-	})
-}
-
 // FetchAMIs calls the EC2 DescribeImages API and returns all pages of AMIs.
 // Used by tests; the production path uses the per-page fetcher for pagination.
 func FetchAMIs(ctx context.Context, api EC2DescribeImagesAPI) ([]resource.Resource, error) {
