@@ -163,3 +163,21 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `!` severity for the three Wave 2 Broken signals — a9s-devops (2026-04-20): possible=yes, worth=yes. A stopped trail, a failing S3 delivery, or a silent delivery are all cases where the audit record is actively being lost — this is a compliance/security break and must bump the menu `issues:N` count; `~` would under-sell the risk. S3 is suppressed per the HOW rule because the row is already red.
 - Out-of-scope rationale for `LatestDigestDeliveryError`, `LatestNotificationError`, `LatestCloudWatchLogsDeliveryError` — a9s-devops (2026-04-20): possible=yes, worth=no. The golden-doc signals already cover the actively-losing-data cases; these extra fields surface niche sub-failures whose fix path is the existing `kms` / `logs` / `role` pivots.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
+
+<!-- BEGIN GENERATED: header -->
+trail — MONITORING. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| s3 | S3 Bucket | yes |
+| logs | Log Groups | yes |
+| sns | SNS Topic | yes |
+| kms | KMS Key | yes |
+| role | IAM Role | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

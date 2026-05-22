@@ -279,3 +279,34 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — Count shown is `yes` for every target — a9s-devops (2026-04-20): possible=yes, worth=yes. Every pivot above returns a concrete matched set; rendering the count is standard a9s behavior.
 - a9s-devops consultation — Status column wording for `stopped: Server.*` surfaces the raw AWS code — a9s-devops (2026-04-20): possible=yes, worth=yes. `Server.SpotInstanceShutdown`, `Server.InsufficientInstanceCapacity` etc. are already short and industry-known to operators; translating them would lose precision.
 - a9s-devops consultation — long-stopped wording shows age (`stopped 42d ago`) rather than just `stopped` — a9s-devops (2026-04-20): possible=yes, worth=yes. Age is the whole reason the row is flagged; without it the row violates the "no bare state keyword" rule.
+
+<!-- BEGIN GENERATED: header -->
+ec2 — COMPUTE. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| tg | Target Groups | yes |
+| asg | Auto Scaling Groups | yes |
+| alarm | CloudWatch Alarms | yes |
+| ng | EKS Node Groups | yes |
+| cfn | CloudFormation Stacks | yes |
+| eip | Elastic IPs | yes |
+| ebs | EBS Volumes | no |
+| ebs-snap | EBS Snapshots | yes |
+| ct-events | CloudTrail Events | no |
+| sg | Security Groups | no |
+| vpc | VPC | no |
+| role | IAM Role | no |
+| ami | AMI | no |
+| eni | Network Interfaces | no |
+| subnet | Subnet | no |
+| kms | KMS Keys | yes |
+| logs | Log Groups | yes |
+| ssm | SSM Parameters | no |
+| backup | Backup Plans | yes |
+<!-- END GENERATED: related -->

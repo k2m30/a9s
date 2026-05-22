@@ -163,3 +163,23 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - IPv6 `::/0` gap — `a9s-devops (2026-04-20): possible=yes, worth=yes. AWS SDK exposes IpPermission.Ipv6Ranges[].CidrIpv6; the current attention-signals.md rule mentions only 0.0.0.0/0 and misses an equally dangerous exposure path. Noted in §4.1 as a UX gap rather than amending the golden doc unilaterally.`
 - Egress-wide-open omission — `a9s-devops (2026-04-20): possible=yes, worth=no. Default VPC SG permits all egress; flagging egress 0.0.0.0/0 would paint half the list yellow with no actionable value. Recorded in §5 Out of Scope.`
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
+
+<!-- BEGIN GENERATED: header -->
+sg — NETWORKING. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| vpc | VPC | no |
+| ec2 | EC2 Instances | yes |
+| eni | Network Interfaces | yes |
+| elb | Load Balancers | yes |
+| lambda | Lambda Functions | yes |
+| cfn | CloudFormation | no |
+| sg | Referencing SGs | yes |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

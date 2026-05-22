@@ -135,3 +135,18 @@ At 3am, glancing at the list, the operator can distinguish the four Warning mode
 - `rtb` discovery via reverse-scan of the already-loaded list — `a9s-devops (2026-04-20): possible=yes, worth=yes. The route target lives on the Route object as GatewayId; scanning the already-loaded rtb list avoids any extra AWS call.`
 - `vpc` discovery via `Attachments[0].VpcId` — `a9s-devops (2026-04-20): possible=yes, worth=yes. IGW-to-VPC is a 1:1 relationship carried directly on the list response, no cross-scan needed.`
 - CloudWatch metrics per IGW not available — `a9s-devops (2026-04-20): possible=no, worth=no. AWS does not publish an AWS/EC2 or AWS/VPC namespace for internet gateways; flow logs on the VPC are the closest substitute and are VPC-scoped, not gateway-scoped.`
+
+<!-- BEGIN GENERATED: header -->
+igw — NETWORKING. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| vpc | VPCs | yes |
+| rtb | Route Tables | yes |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

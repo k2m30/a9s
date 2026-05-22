@@ -227,3 +227,25 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - AWS API Reference (fallback) — DocumentDB `DescribeDBClusters` — <https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DescribeDBClusters.html>.
 - AWS API Reference (fallback) — DocumentDB `DescribeDBSubnetGroups` (used to resolve subnets + VPC behind `DBSubnetGroup`) — <https://docs.aws.amazon.com/documentdb/latest/developerguide/API_DescribeDBSubnetGroups.html>.
 - amendment — the Source URL and display name for `dbc` in `docs/attention-signals.md` were corrected from RDS (`API_DescribeDBClusters` under `AmazonRDS`) to DocumentDB (`API_DescribeDBClusters` under `documentdb`), and the Wave 3 CloudWatch metric `AuroraReplicaLag` was replaced with `DBInstanceReplicaLag` to match the DocumentDB namespace. Rationale: `docs/related-resources.md` anchors `dbc` at `documentdb/latest/developerguide/API_DBCluster.html` and the user specification is `dbc (DocumentDB Cluster)`. Field names listed in the Wave 1 cell (`Status`, `DBClusterMembers`, `IsClusterWriter`, `DeletionProtection`, `StorageEncrypted`, `BackupRetentionPeriod`) match `service/docdb/types.DBCluster` verbatim, so no field edits were needed.
+
+<!-- BEGIN GENERATED: header -->
+dbc — DATABASES & STORAGE. Lifecycle key: `status`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| sg | Security Groups | no |
+| alarm | CloudWatch Alarms | yes |
+| logs | Log Groups | yes |
+| kms | KMS Key | no |
+| secrets | Secrets Manager | yes |
+| dbi | RDS Instances | yes |
+| dbc-snap | DB Cluster Snapshots | yes |
+| subnet | Subnets | no |
+| vpc | VPC | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

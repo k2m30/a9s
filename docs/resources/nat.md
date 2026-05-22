@@ -166,3 +166,22 @@ At 3am, glancing at the list, the operator sees a red row for a failed NAT and i
 - `Count shown: unknown` for every related target — `docs/related-resources.md` is silent on per-target counts. a9s-devops persona (2026-04-20): possible=no to cite from golden docs, worth=no to guess. Remaining gap is documented, not invented.
 - `State==deleted` treated as Dim but not surfaced — `a9s-devops persona (2026-04-20): possible=yes (SDK enum), worth=no for daily-driver use. Recorded in §5 Out of Scope rather than §4 to avoid inventing behavior outside attention-signals.md`.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
+
+<!-- BEGIN GENERATED: header -->
+nat — NETWORKING. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| vpc | VPCs | yes |
+| subnet | Subnets | yes |
+| rtb | Route Tables | yes |
+| alarm | CloudWatch Alarms | yes |
+| eip | Elastic IPs | yes |
+| eni | Network Interfaces | yes |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

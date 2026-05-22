@@ -140,3 +140,20 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - §4 orphan-topic S4/S5 wording — a9s-devops (2026-04-20): possible=yes, worth=yes. `no subscribers` on the row lets an operator triage without drilling in; S5 spells out the consequence (messages discarded) for the detail view.
 - §5 missing-KMS deferral — a9s-devops (2026-04-20): possible=yes-via-tags-or-regex, worth=no as a universal default. Without an explicit "sensitive" trigger the rule fires on every unencrypted topic, producing noise. Defer until `attention-signals.md` defines the trigger.
 - §5 read-only invariant — `docs/architecture.md` § "What is a9s?" (line 15).
+
+<!-- BEGIN GENERATED: header -->
+sns — MESSAGING. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| alarm | CloudWatch Alarms | no |
+| sns-sub | Subscriptions | yes |
+| kms | KMS Key | no |
+| role | IAM Role | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

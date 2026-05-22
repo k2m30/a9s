@@ -122,3 +122,17 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Rephrasing `Tier==Advanced unused >90d` → `Tier==Advanced AND LastModifiedDate >90d` — `a9s-devops (2026-04-20): possible=no for "unused" at Wave 1, possible=yes for "aged". Rationale: DescribeParameters response (ParameterMetadata) exposes LastModifiedDate but not last-access timestamp; true access tracking lives in GetParameterHistory which is Wave 3. The Wave 1 signal as originally worded could not be implemented from the list response. Rephrasing to LastModifiedDate-age preserves the cost-hygiene intent and is achievable at Wave 1.` Amendment recorded in `docs/attention-signals.md` with an HTML comment on the same row.
 - `kms` discovery mechanism (cross-reference already-loaded `kms` list by `KeyId` / alias) — `a9s-devops (2026-04-20): possible=yes, worth=yes. Rationale: ParameterMetadata.KeyId is populated only for SecureString; the default key alias alias/aws/ssm is well-known, and customer-managed aliases are resolvable against the kms list when loaded. Operators rotating a customer-managed key need the inverse lookup (which parameters depend on this key) which the related panel delivers.`
 - Policies scope-out — `a9s-devops (2026-04-20): possible=yes (ParameterMetadata.Policies[] is present on the list response), worth=no for the default list view. Rationale: parameter policies (expiration, notification, no-change) are a niche power-user feature; alerting on policy expiry is better served by EventBridge or a dedicated advanced-policies view than by occupying S3/S4 real estate that all SSM rows would otherwise lose to a rarely-used signal.`
+
+<!-- BEGIN GENERATED: header -->
+ssm — SECRETS & CONFIG. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| kms | KMS Key | yes |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

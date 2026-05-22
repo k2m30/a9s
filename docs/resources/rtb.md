@@ -162,3 +162,24 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `vpce` discovered via `Routes[].GatewayId` with `vpce-` prefix (gateway endpoints, not interface endpoints) — a9s-devops (2026-04-20): possible=yes, worth=yes. S3 and DynamoDB gateway endpoints install themselves as a route whose target is the `vpce-*` gateway ID; interface endpoints attach via ENI/DNS rather than a route and pivot from elsewhere.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 - Count-shown values left `unknown` — `docs/related-resources.md` and `docs/enrichment-visibility.md` do not specify per-target count visibility for `rtb`; HOW decision deferred to a per-resource UX review rather than invented here.
+
+<!-- BEGIN GENERATED: header -->
+rtb — NETWORKING. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| subnet | Subnets | yes |
+| nat | NAT Gateways | yes |
+| igw | Internet Gateways | yes |
+| cfn | CloudFormation | yes |
+| vpc | VPC | no |
+| eni | Network Interfaces | yes |
+| tgw | Transit Gateways | yes |
+| vpce | VPC Endpoints | yes |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

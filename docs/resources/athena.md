@@ -159,3 +159,21 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — glue discovery via region-local Glue Jobs list (no per-workgroup field) — `a9s-devops (2026-04-20): possible=yes, worth=yes. Athena↔Glue binding is namespace-level; Glue Data Catalog is account/region-scoped. Operator workflow: failed query → pivot to Glue Jobs that populate the referenced tables.`
 - a9s-devops consultation — role pivot is partial (Spark/IAM IC only) via `Configuration.ExecutionRole` — `a9s-devops (2026-04-20): possible=yes (partial), worth=yes. Spark workgroups have ExecutionRole; SQL-only workgroups fall back to ct-events for audit. Matches related-resources.md 1/6-audit borderline note.`
 - a9s-devops consultation — count shown = yes for kms/logs/role/s3 (singular fields when set); glue = yes (region count); ct-events = unknown (windowed CloudTrail queries) — `a9s-devops (2026-04-20): possible=yes, worth=yes. Per-target singular or account-wide; consistent with acm/s3/ec2 specs in docs/resources/.`
+
+<!-- BEGIN GENERATED: header -->
+athena — DATA & ANALYTICS. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| s3 | S3 Buckets (results) | no |
+| kms | KMS Keys | no |
+| glue | Glue Data Catalog | no |
+| logs | Log Groups | no |
+| role | IAM Roles | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

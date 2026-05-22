@@ -128,3 +128,19 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `ct-events` discovery via `SubscriptionArn` lookup — `a9s-devops (2026-04-20): possible=yes (LookupEvents filtered on ARN), worth=yes. Audit trail answers "when was this sub created/confirmed/modified and by whom" — a real incident question.`
 - Count hidden for `sns`, `lambda`, `sqs` pivots — `a9s-devops (2026-04-20): possible=yes (cardinality is statically known to be 1), worth=no. Singular pivots with a forced count of "1" add visual noise; operators read the pivot name and already know the cardinality. Hide the count.`
 - Count shown for `ct-events` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Event volume is itself diagnostic (no recent events on a changed subscription is a clue), so the number matters here.`
+
+<!-- BEGIN GENERATED: header -->
+sns-sub — MESSAGING. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| sns | SNS Topic | yes |
+| lambda | Lambda Function | yes |
+| sqs | SQS Queue | yes |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->
