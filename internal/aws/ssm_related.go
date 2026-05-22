@@ -9,17 +9,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterRelated("ssm", []resource.RelatedDef{
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkSSMKMS, NeedsTargetCache: true},
-	})
-
-	// ssmtypes.ParameterMetadata: KeyId (present for SecureString parameters)
-	resource.RegisterDefaultNavFields("ssm", []resource.NavigableField{
-		{FieldPath: "KeyId", TargetType: "kms"},
-	})
-}
-
 // checkSSMKMS checks the KMS cache for the key used to encrypt this SecureString parameter.
 // Pattern C: extracts KeyId from RawStruct, then scans the kms cache for a match.
 func checkSSMKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
