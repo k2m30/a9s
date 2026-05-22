@@ -11,27 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("cfn_events", []string{
-		"timestamp", "logical_resource_id", "resource_type",
-		"resource_status", "resource_status_reason",
-	})
-
-	resource.RegisterPaginatedChild("cfn_events", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchCfnEvents(ctx, c.CloudFormation, parentCtx["stack_name"], continuationToken)
-	})
-
-	resource.RegisterChildType(resource.ResourceTypeDef{
-		Name:      "Stack Events",
-		ShortName: "cfn_events",
-		Columns:   resource.CfnEventColumns(),
-	})
-}
-
 // FetchCfnEvents calls the CloudFormation DescribeStackEvents API and converts
 // the response into a FetchResult with pagination support. A single API call is
 // made per invocation; IsTruncated and NextToken are forwarded as pagination

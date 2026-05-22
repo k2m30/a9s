@@ -284,4 +284,74 @@ var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 			return FetchECRImages(ctx, c.ECR, parentCtx, continuationToken)
 		},
 	},
+	{
+		Name:      "Service Tasks",
+		ShortName: "ecs_tasks",
+		Columns:   resource.EcsSvcTaskColumns(),
+		FieldKeys: []string{
+			"task_id_short", "status", "health", "task_def_short",
+			"started_at", "stopped_reason", "stop_code",
+		},
+		Color: func(r domain.Resource) domain.Color {
+			// Structural broken overrides (precedence over wave1).
+			if r.Fields["health"] == "UNHEALTHY" {
+				return domain.ColorBroken
+			}
+			if r.Fields["status"] == "STOPPED" {
+				sc := r.Fields["stop_code"]
+				if sc != "" && sc != "UserInitiated" {
+					return domain.ColorBroken
+				}
+			}
+			// Wave1 Findings.
+			for _, f := range r.Findings {
+				if f.Source == "wave1" {
+					return resource.ColorFromSeverity(f.Severity)
+				}
+			}
+			// Structural lifecycle fallback.
+			switch r.Fields["status"] {
+			case "RUNNING":
+				return domain.ColorHealthy
+			case "STOPPED":
+				return domain.ColorDim
+			case "PROVISIONING", "PENDING", "ACTIVATING", "DEACTIVATING", "STOPPING", "DEPROVISIONING":
+				return domain.ColorWarning
+			}
+			return domain.ColorHealthy
+		},
+		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchEcsSvcTasks(ctx, c.ECS, c.ECS, parentCtx["cluster"], parentCtx["service_name"], continuationToken)
+		},
+	},
+	{
+		Name:      "Service Events",
+		ShortName: "ecs_svc_events",
+		Columns:   resource.EcsSvcEventColumns(),
+		FieldKeys: []string{"timestamp", "message"},
+		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchEcsSvcEvents(ctx, c.ECS, parentCtx["cluster"], parentCtx["service_name"], continuationToken)
+		},
+	},
+	{
+		Name:      "Service Logs",
+		ShortName: "ecs_svc_logs",
+		Columns:   resource.EcsSvcLogColumns(),
+		FieldKeys: []string{"timestamp", "stream_short", "message"},
+		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchEcsSvcLogs(ctx, c.ECS, c.CloudWatchLogs, parentCtx["cluster"], parentCtx["service_name"], parentCtx["task_definition"], continuationToken)
+		},
+	},
 }

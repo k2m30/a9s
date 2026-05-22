@@ -10,23 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("log_events", []string{"timestamp", "message", "ingestion_time", "event_id"})
-
-	resource.RegisterPaginatedChild("log_events", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchLogEvents(ctx, c.CloudWatchLogs, parentCtx["log_group_name"], parentCtx["log_stream_name"], continuationToken)
-	})
-	resource.RegisterChildType(resource.ResourceTypeDef{
-		Name:      "Log Events",
-		ShortName: "log_events",
-		Columns:   resource.LogEventColumns(),
-	})
-}
-
 // FetchLogEvents calls the CloudWatchLogs GetLogEvents API for a given
 // log group and stream, converting the response into a FetchResult.
 // This is a single-call API, but uses FetchResult for consistency.

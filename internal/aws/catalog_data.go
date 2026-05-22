@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
@@ -96,6 +97,71 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkAthenaLogs},
 			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkAthenaRole},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("athena")},
+		},
+	},
+}
+
+var dataChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
+	{
+		Name:      "Job Runs",
+		ShortName: "glue_runs",
+		Columns:   resource.GlueRunColumns(),
+		CopyField: "error_message",
+		FieldKeys: []string{
+			"run_id_short", "job_run_state", "started_on",
+			"execution_time_human", "error_message", "dpu_hours",
+			"run_id", "job_name",
+		},
+		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchGlueJobRuns(ctx, c.Glue, parentCtx["job_name"], continuationToken)
+		},
+	},
+	{
+		Name:      "S3 Objects",
+		ShortName: "s3_objects",
+		Columns:   resource.S3ObjectColumns(),
+		FieldKeys: []string{"key", "size", "last_modified", "storage_class"},
+		Children: []domain.ChildViewDef{{
+			ChildType:      "s3_objects",
+			Key:            "enter",
+			ContextKeys:    map[string]string{"bucket": "@parent.bucket", "prefix": "ID"},
+			DisplayNameKey: "bucket",
+			DrillCondition: func(r domain.Resource) bool { return r.Status == "folder" },
+		}},
+		// RelatedContextFromIDs extracts the bucket name from related IDs encoded as
+		// "bucket|key". Used when navigating to s3_objects from the related panel
+		// (e.g., from a CloudTrail event detail view).
+		RelatedContextFromIDs: func(relatedIDs []string) map[string]string {
+			for _, id := range relatedIDs {
+				parts := strings.SplitN(id, "|", 2)
+				if len(parts) != 2 || parts[0] == "" {
+					continue
+				}
+				bucket := parts[0]
+				key := parts[1]
+				// Derive the prefix (folder path) from the key so the child view
+				// lands on the folder containing the object, not the bucket root.
+				// Example: key="prod/config.json" → prefix="prod/"
+				// Example: key="landing/2026/04/07/x.parquet" → prefix="landing/2026/04/07/"
+				// Example: key="build-4821.tar.gz" → prefix=""
+				prefix := ""
+				if idx := strings.LastIndex(key, "/"); idx >= 0 {
+					prefix = key[:idx+1]
+				}
+				return map[string]string{"bucket": bucket, "prefix": prefix}
+			}
+			return map[string]string{"bucket": "", "prefix": ""}
+		},
+		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchS3Objects(ctx, c.S3, parentCtx["bucket"], parentCtx["prefix"], continuationToken)
 		},
 	},
 }

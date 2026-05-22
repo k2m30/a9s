@@ -11,26 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("acm", []string{"domain_name", "status", "type", "not_after", "in_use", "days_left"})
-
-	resource.RegisterPaginated("acm", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchACMCertificatesPage(ctx, c.ACM, continuationToken)
-	})
-
-	resource.RegisterRelated("acm", []resource.RelatedDef{
-		{TargetType: "cf", DisplayName: "CloudFront Distros", Checker: checkACMCF, NeedsTargetCache: true},
-		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkACMELB},
-		{TargetType: "apigw", DisplayName: "API Gateways", Checker: checkACMAPIGW},
-		{TargetType: "r53", DisplayName: "Route 53 Zones", Checker: checkACMR53},
-	})
-	// No NavigableFields — CertificateSummary has no forward refs to other resource types
-}
-
 // FetchACMCertificates calls the ACM ListCertificates API and converts the
 // response into a slice of generic Resource structs.
 func FetchACMCertificates(ctx context.Context, api ACMListCertificatesAPI) ([]resource.Resource, error) {

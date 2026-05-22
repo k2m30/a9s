@@ -266,3 +266,51 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 	},
 }
+
+var monitoringChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
+	{
+		Name:      "Log Streams",
+		ShortName: "log_streams",
+		Columns:   resource.LogStreamColumns(),
+		FieldKeys: []string{"stream_name", "last_event", "first_event"},
+		Children: []domain.ChildViewDef{{
+			ChildType:      "log_events",
+			Key:            "enter",
+			ContextKeys:    map[string]string{"log_group_name": "@parent.log_group_name", "log_stream_name": "Name"},
+			DisplayNameKey: "log_stream_name",
+		}},
+		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchLogStreams(ctx, c.CloudWatchLogs, parentCtx["log_group_name"], continuationToken)
+		},
+	},
+	{
+		Name:      "Log Events",
+		ShortName: "log_events",
+		Columns:   resource.LogEventColumns(),
+		FieldKeys: []string{"timestamp", "message", "ingestion_time", "event_id"},
+		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchLogEvents(ctx, c.CloudWatchLogs, parentCtx["log_group_name"], parentCtx["log_stream_name"], continuationToken)
+		},
+	},
+	{
+		Name:      "Alarm History",
+		ShortName: "alarm_history",
+		Columns:   resource.AlarmHistoryColumns(),
+		FieldKeys: []string{"timestamp", "history_item_type", "history_summary"},
+		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchAlarmHistory(ctx, c.CloudWatch, parentCtx, continuationToken)
+		},
+	},
+}

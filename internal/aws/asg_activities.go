@@ -11,26 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("asg_activities", []string{
-		"start_time", "status_code", "description", "cause",
-	})
-
-	resource.RegisterPaginatedChild("asg_activities", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchAsgActivities(ctx, c.AutoScaling, parentCtx, continuationToken)
-	})
-
-	resource.RegisterChildType(resource.ResourceTypeDef{
-		Name:      "Scaling Activities",
-		ShortName: "asg_activities",
-		Columns:   resource.AsgActivityColumns(),
-	})
-}
-
 // FetchAsgActivities calls the AutoScaling DescribeScalingActivities API and
 // converts the response into a FetchResult with pagination support. A single
 // API call is made per invocation; IsTruncated and NextToken are forwarded as

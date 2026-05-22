@@ -44,41 +44,44 @@ type sdkRegionDescriptor struct {
 	Description string `json:"description"`
 }
 
+// Package-level region catalogue, parsed once at package load from the embedded
+// partitions.json. The multi-return loader replaces the AS-947-pruned init()
+// so the file no longer trips the `rg ^func init\(\)` gate.
+//
+//nolint:gochecknoglobals // process-scope region catalogue: parsed once at package load
 var (
-	// allRegionsCache is the memoised AllRegions result.
-	allRegionsCache []AWSRegion
-
-	// awsPartitionRegionRegex is the regex that validates commercial-partition
-	// region codes. Exposed as a variable so tests can assert that every
-	// region we expose satisfies it.
-	awsPartitionRegionRegex *regexp.Regexp
-
-	// commercialDisplayNames maps commercial-partition region codes to their
-	// human-readable names. Populated from partitions.json at init.
-	commercialDisplayNames map[string]string
+	allRegionsCache, awsPartitionRegionRegex = loadCommercialPartition()
 )
 
-func init() {
+// loadCommercialPartition parses the embedded partitions.json and returns the
+// commercial-partition region slice (sorted by code, with each AWSRegion's
+// DisplayName already populated from the SDK description) and the region-code
+// regex. Panics on malformed input — the embedded JSON is vendored at build
+// time so any parse failure is a build-time bug.
+//
+// AllRegions() copies the returned slice on every call (caller-mutable). Gov-cloud
+// (`aws-us-gov`) and China (`aws-cn`) partitions are skipped intentionally —
+// `TestAllRegions_NoGovOrChinaLeaks` pins the behavior.
+func loadCommercialPartition() ([]AWSRegion, *regexp.Regexp) {
 	var parsed sdkPartitions
 	if err := json.Unmarshal(partitionsJSON, &parsed); err != nil {
 		panic(fmt.Sprintf("aws regions: parse embedded partitions.json: %v", err))
 	}
 
-	commercialDisplayNames = map[string]string{}
+	var regions []AWSRegion
+	var regex *regexp.Regexp
+
 	for _, p := range parsed.Partitions {
 		if p.ID != "aws" {
-			// Skip gov-cloud (aws-us-gov) and China (aws-cn). a9s targets the
-			// commercial partition; TestAllRegions_NoGovOrChinaLeaks pins that
-			// nothing from those partitions leaks into AllRegions().
 			continue
 		}
 		re, err := regexp.Compile(p.RegionRegex)
 		if err != nil {
 			panic(fmt.Sprintf("aws regions: compile region regex %q: %v", p.RegionRegex, err))
 		}
-		awsPartitionRegionRegex = re
+		regex = re
 
-		regions := make([]AWSRegion, 0, len(p.Regions))
+		regions = make([]AWSRegion, 0, len(p.Regions))
 		for code, desc := range p.Regions {
 			// Filter out pseudo-regions that the SDK emits for global
 			// services (e.g. "aws-global", "aws-cn-global"). They are not
@@ -91,17 +94,16 @@ func init() {
 			if display == "" {
 				display = code
 			}
-			commercialDisplayNames[code] = display
 			regions = append(regions, AWSRegion{Code: code, DisplayName: display})
 		}
 		// Stable alphabetical order on code — the selector UI expects a
 		// deterministic ordering independent of map iteration.
 		sort.Slice(regions, func(i, j int) bool { return regions[i].Code < regions[j].Code })
-		allRegionsCache = regions
 	}
-	if awsPartitionRegionRegex == nil {
+	if regex == nil {
 		panic("aws regions: embedded partitions.json has no 'aws' partition")
 	}
+	return regions, regex
 }
 
 // AllRegions returns the list of commercial-partition AWS regions in a stable

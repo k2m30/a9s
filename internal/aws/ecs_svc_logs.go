@@ -12,24 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("ecs_svc_logs", []string{"timestamp", "stream_short", "message"})
-
-	resource.RegisterPaginatedChild("ecs_svc_logs", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchEcsSvcLogs(ctx, c.ECS, c.CloudWatchLogs, parentCtx["cluster"], parentCtx["service_name"], parentCtx["task_definition"], continuationToken)
-	})
-
-	resource.RegisterChildType(resource.ResourceTypeDef{
-		Name:      "Service Logs",
-		ShortName: "ecs_svc_logs",
-		Columns:   resource.EcsSvcLogColumns(),
-	})
-}
-
 // maxLogEvents caps the total number of log events fetched per service.
 const maxLogEvents = 200
 

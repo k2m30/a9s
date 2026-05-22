@@ -676,3 +676,57 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 	},
 }
+
+var networkingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
+	{
+		Name:      "ELB Listeners",
+		ShortName: "elb_listeners",
+		Columns:   resource.ELBListenerColumns(),
+		FieldKeys: []string{
+			"port", "protocol", "default_action_type", "default_action_target",
+			"ssl_policy", "certificate_short", "listener_display",
+		},
+		Children: []domain.ChildViewDef{{
+			ChildType:      "elb_listener_rules",
+			Key:            "enter",
+			ContextKeys:    map[string]string{"listener_arn": "ID"},
+			DisplayNameKey: "listener_display",
+		}},
+		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchELBListeners(ctx, c.ELBv2, parentCtx, continuationToken)
+		},
+	},
+	{
+		Name:      "Listener Rules",
+		ShortName: "elb_listener_rules",
+		Columns:   resource.ELBListenerRuleColumns(),
+		CopyField: "conditions_summary",
+		FieldKeys: []string{
+			"priority", "conditions_summary", "action_type", "action_target", "is_default",
+		},
+		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchELBListenerRules(ctx, c.ELBv2, parentCtx, continuationToken)
+		},
+	},
+	{
+		Name:      "Target Health",
+		ShortName: "tg_health",
+		Columns:   resource.TargetHealthColumns(),
+		FieldKeys: []string{"target_id", "port", "az", "health", "reason", "description"},
+		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchTargetHealth(ctx, c.ELBv2, parentCtx["target_group_arn"], continuationToken)
+		},
+	},
+}

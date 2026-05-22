@@ -12,29 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("log_streams", []string{"stream_name", "last_event", "first_event"})
-
-	resource.RegisterPaginatedChild("log_streams", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchLogStreams(ctx, c.CloudWatchLogs, parentCtx["log_group_name"], continuationToken)
-	})
-	resource.RegisterChildType(resource.ResourceTypeDef{
-		Name:      "Log Streams",
-		ShortName: "log_streams",
-		Columns:   resource.LogStreamColumns(),
-		Children: []resource.ChildViewDef{{
-			ChildType:      "log_events",
-			Key:            "enter",
-			ContextKeys:    map[string]string{"log_group_name": "@parent.log_group_name", "log_stream_name": "Name"},
-			DisplayNameKey: "log_stream_name",
-		}},
-	})
-}
-
 // FetchLogStreams calls the CloudWatchLogs DescribeLogStreams API for a given
 // log group and converts the response into a FetchResult with pagination
 // support. A single API call is made per invocation; IsTruncated and NextToken

@@ -12,18 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("efs", []string{"file_system_id", "name", "status", "performance_mode", "throughput_mode", "encrypted", "mount_targets"})
-
-	resource.RegisterPaginated("efs", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchEFSFileSystemsPage(ctx, c.EFS, continuationToken)
-	})
-}
-
 // FetchEFSFileSystems calls the EFS DescribeFileSystems API and converts
 // the response into a slice of generic Resource structs.
 func FetchEFSFileSystems(ctx context.Context, api EFSDescribeFileSystemsAPI) ([]resource.Resource, error) {

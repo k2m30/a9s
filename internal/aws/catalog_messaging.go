@@ -34,6 +34,64 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 			return FetchEventBridgeRuleTargets(ctx, c.EventBridge, parentCtx, continuationToken)
 		},
 	},
+	{
+		Name:      "SFN Executions",
+		ShortName: "sfn_executions",
+		Columns:   resource.SFNExecutionColumns(),
+		CopyField: "execution_arn",
+		FieldKeys: []string{
+			"execution_arn", "name", "status", "start_date", "stop_date",
+			"duration", "state_machine_arn", "state_machine_alias_arn",
+			"state_machine_version_arn", "map_run_arn", "item_count",
+			"redrive_count", "redrive_date",
+		},
+		Children: []domain.ChildViewDef{{
+			ChildType:      "sfn_execution_history",
+			Key:            "enter",
+			ContextKeys:    map[string]string{"execution_arn": "execution_arn", "execution_name": "Name"},
+			DisplayNameKey: "execution_name",
+		}},
+		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchSFNExecutions(ctx, c.SFN, parentCtx, continuationToken)
+		},
+	},
+	{
+		Name:      "SFN Execution History",
+		ShortName: "sfn_execution_history",
+		Columns:   resource.SFNExecutionHistoryColumns(),
+		CopyField: "event_detail",
+		FieldKeys: []string{
+			"timestamp", "event_type", "event_type_short",
+			"state_name", "event_detail", "event_id", "previous_event_id",
+		},
+		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchSFNExecutionHistory(ctx, c.SFN, parentCtx, continuationToken)
+		},
+	},
+	{
+		Name:      "SNS Subscriptions",
+		ShortName: "sns_subscriptions",
+		Columns:   resource.SnsSubscriptionColumns(),
+		CopyField: "endpoint",
+		FieldKeys: []string{
+			"protocol", "endpoint", "confirmation_status", "owner", "subscription_arn", "topic_arn",
+		},
+		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchSNSTopicSubscriptions(ctx, c.SNS, parentCtx["topic_arn"], continuationToken)
+		},
+	},
 }
 
 func colorSQS(_ domain.Resource) domain.Color { return domain.ColorHealthy }

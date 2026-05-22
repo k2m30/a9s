@@ -11,18 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("r53", []string{"zone_id", "name", "record_count", "private_zone", "comment", "alias_targets", "s3website_alias_names"})
-
-	resource.RegisterPaginated("r53", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchHostedZonesPage(ctx, c.Route53, continuationToken)
-	})
-}
-
 // FetchHostedZones calls the Route53 ListHostedZones API and converts
 // the response into a slice of generic Resource structs.
 func FetchHostedZones(ctx context.Context, api Route53ListHostedZonesAPI) ([]resource.Resource, error) {

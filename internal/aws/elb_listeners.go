@@ -11,35 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("elb_listeners", []string{
-		"port", "protocol", "default_action_type", "default_action_target",
-		"ssl_policy", "certificate_short", "listener_display",
-	})
-
-	resource.RegisterPaginatedChild("elb_listeners", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchELBListeners(ctx, c.ELBv2, parentCtx, continuationToken)
-	})
-
-	resource.RegisterChildType(resource.ResourceTypeDef{
-		Name:      "ELB Listeners",
-		ShortName: "elb_listeners",
-		Columns:   resource.ELBListenerColumns(),
-		Children: []resource.ChildViewDef{
-			{
-				ChildType:      "elb_listener_rules",
-				Key:            "enter",
-				ContextKeys:    map[string]string{"listener_arn": "ID"},
-				DisplayNameKey: "listener_display",
-			},
-		},
-	})
-}
-
 // FetchELBListeners calls the ELBv2 DescribeListeners API and converts the
 // response into a FetchResult with pagination support. A single API call is
 // made per invocation; IsTruncated and NextToken (Marker) are forwarded as

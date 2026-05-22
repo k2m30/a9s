@@ -10,29 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterRelated("ecs-task", []resource.RelatedDef{
-		{TargetType: "ecs-svc", DisplayName: "ECS Services", Checker: checkECSTaskService},
-		{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkECSTaskCluster},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkECSTaskLogs, NeedsTargetCache: true},
-		{TargetType: "role", DisplayName: "IAM Role", Checker: checkECSTaskRole},
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkECSTaskAlarm, NeedsTargetCache: true},
-		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkECSTaskCTEvents, NeedsTargetCache: true},
-		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkECSTaskEC2},
-		{TargetType: "ecr", DisplayName: "ECR Repositories", Checker: checkECSTaskECR},
-		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkECSTaskENI},
-		{TargetType: "secrets", DisplayName: "Secrets", Checker: checkECSTaskSecrets},
-		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkECSTaskSG},
-		{TargetType: "ssm", DisplayName: "SSM Parameters", Checker: checkECSTaskSSM},
-		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkECSTaskSubnet},
-	})
-
-	// ecstypes.Task: ClusterArn (parent cluster for this task execution)
-	resource.RegisterDefaultNavFields("ecs-task", []resource.NavigableField{
-		{FieldPath: "ClusterArn", TargetType: "ecs"},
-	})
-}
-
 // checkECSTaskService returns the ECS service this task belongs to (Pattern F).
 // For service-managed tasks, the Group field has the format "service:{service-name}".
 func checkECSTaskService(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {

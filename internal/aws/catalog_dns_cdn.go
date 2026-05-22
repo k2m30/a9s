@@ -45,7 +45,25 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			DisplayNameKey: "zone_name",
 		}},
 		Color: r53Color,
-		Wave2: IssueEnricher{Fn: EnrichRoute53Zone, Priority: 100},
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchHostedZonesPage(ctx, c.Route53, continuationToken)
+		},
+		Wave2:     IssueEnricher{Fn: EnrichRoute53Zone, Priority: 100},
+		FieldKeys: []string{"zone_id", "name", "record_count", "private_zone", "comment", "alias_targets", "s3website_alias_names"},
+		Related: []domain.RelatedDef{
+			{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkR53ELB, NeedsTargetCache: true},
+			{TargetType: "cf", DisplayName: "CloudFront", Checker: checkR53CF, NeedsTargetCache: true},
+			{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkR53ACM},
+			{TargetType: "apigw", DisplayName: "API Gateways", Checker: checkR53APIGW, NeedsTargetCache: true},
+			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkR53Logs},
+			{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkR53S3, NeedsTargetCache: true},
+			{TargetType: "vpc", DisplayName: "VPCs", Checker: checkR53VPC},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("r53")},
+		},
 	},
 	{
 		Name:          "CloudFront Distributions",
@@ -102,7 +120,23 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			{Key: "in_use", Title: "In Use", Width: 8, Sortable: true},
 		},
 		Color: acmColor,
-		Wave2: IssueEnricher{Fn: EnrichACMCertificate, Priority: 100},
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchACMCertificatesPage(ctx, c.ACM, continuationToken)
+		},
+		Wave2:     IssueEnricher{Fn: EnrichACMCertificate, Priority: 100},
+		FieldKeys: []string{"domain_name", "status", "type", "not_after", "in_use", "days_left"},
+		Related: []domain.RelatedDef{
+			{TargetType: "cf", DisplayName: "CloudFront Distros", Checker: checkACMCF, NeedsTargetCache: true},
+			{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkACMELB},
+			{TargetType: "apigw", DisplayName: "API Gateways", Checker: checkACMAPIGW},
+			{TargetType: "r53", DisplayName: "Route 53 Zones", Checker: checkACMR53},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("acm")},
+		},
+		// No NavigableFields — CertificateSummary has no forward refs to other resource types
 	},
 	{
 		Name:          "API Gateways",
@@ -145,6 +179,22 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkApigwSNS},
 			{TargetType: "vpce", DisplayName: "VPC Endpoints", Checker: checkApigwVPCE},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("apigw")},
+		},
+	},
+}
+
+var dnsCdnChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
+	{
+		Name:      "R53 Records",
+		ShortName: "r53_records",
+		Columns:   resource.R53RecordColumns(),
+		FieldKeys: []string{"name", "type", "ttl", "values"},
+		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchR53Records(ctx, c.Route53, parentCtx["zone_id"], continuationToken)
 		},
 	},
 }

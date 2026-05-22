@@ -684,7 +684,37 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "mount_targets", Title: "Mounts", Width: 8, Sortable: true},
 		},
 		Color: colorEFS,
-		Wave2: IssueEnricher{Fn: EnrichEFSMountTargets, Priority: 100},
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchEFSFileSystemsPage(ctx, c.EFS, continuationToken)
+		},
+		Wave2:     IssueEnricher{Fn: EnrichEFSMountTargets, Priority: 100},
+		FieldKeys: []string{"file_system_id", "name", "status", "performance_mode", "throughput_mode", "encrypted", "mount_targets"},
+		Related: []domain.RelatedDef{
+			{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkEFSKMS},
+			{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkEFSCFN, NeedsTargetCache: true},
+			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkEFSSG, NeedsTargetCache: false},
+			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkEFSSubnet, NeedsTargetCache: false},
+			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkEFSLambda, NeedsTargetCache: false},
+			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkEFSAlarm, NeedsTargetCache: true},
+			{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkEFSBackup, NeedsTargetCache: true},
+			// EC2 pivot intentionally removed: EC2→EFS mounting happens at the
+			// guest OS level via DNS lookup of mt ENIs. AWS exposes no API edge
+			// linking instance → filesystem — mount-target ENIs are
+			// RequesterManaged with no Attachment.InstanceId, so a checker can
+			// only return zero or heuristic noise. Honest drop beats a registered
+			// pivot that always returns Count=0 (U9 violation).
+			{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkEFSECSTask, NeedsTargetCache: true},
+			{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkEFSENI, NeedsTargetCache: true},
+			{TargetType: "vpc", DisplayName: "VPC", Checker: checkEFSVPC, NeedsTargetCache: true},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("efs")},
+		},
+		Navigable: []domain.NavigableField{
+			{FieldPath: "KmsKeyId", TargetType: "kms"},
+		},
 	},
 	{
 		Name:          "DB Instance Snapshots",
@@ -811,6 +841,26 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Navigable: []domain.NavigableField{
 			{FieldPath: "VpcId", TargetType: "vpc"},
 			{FieldPath: "KmsKeyId", TargetType: "kms"},
+		},
+	},
+}
+
+var databasesChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
+	{
+		Name:      "RDS Events",
+		ShortName: "dbi_events",
+		Columns:   resource.DbiEventColumns(),
+		CopyField: "message",
+		FieldKeys: []string{
+			"timestamp", "event_categories", "message",
+			"source_identifier", "source_type", "source_arn",
+		},
+		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchRDSEvents(ctx, c.RDS, parentCtx["db_identifier"], continuationToken)
 		},
 	},
 }
