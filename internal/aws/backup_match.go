@@ -1,33 +1,11 @@
-// backup_match.go — AWS Backup selection ARN matching with wildcard + NotResources support.
+// backup_match.go — AWS Backup plan coverage logic.
 package aws
 
 import (
-	"regexp"
 	"strings"
-)
 
-// ARNMatches reports whether pattern matches arn. pattern may contain '*'
-// which matches any sequence of characters (matching AWS Backup
-// BackupSelection.Resources wildcard semantics per
-// https://docs.aws.amazon.com/aws-backup/latest/devguide/API_BackupSelection.html).
-// Other regex metacharacters in pattern are treated as literal.
-// Empty pattern or empty arn returns false.
-func ARNMatches(pattern, arn string) bool {
-	if pattern == "" || arn == "" {
-		return false
-	}
-	if !strings.Contains(pattern, "*") {
-		return pattern == arn
-	}
-	// QuoteMeta escapes regex metacharacters; then restore wildcards as .*
-	re := regexp.QuoteMeta(pattern)
-	re = strings.ReplaceAll(re, `\*`, `.*`)
-	compiled, err := regexp.Compile("^" + re + "$")
-	if err != nil {
-		return false
-	}
-	return compiled.MatchString(arn)
-}
+	"github.com/k2m30/a9s/v3/internal/semantics/selector"
+)
 
 // BackupPlanCoversARN reports whether a backup plan with the given
 // comma-joined Resources and NotResources ARN lists covers targetARN.
@@ -44,7 +22,7 @@ func BackupPlanCoversARN(resourcesCSV, notResourcesCSV, targetARN string) bool {
 		if p == "" {
 			continue
 		}
-		if ARNMatches(p, targetARN) {
+		if selector.MatchARN(p, targetARN) {
 			return false
 		}
 	}
@@ -53,7 +31,7 @@ func BackupPlanCoversARN(resourcesCSV, notResourcesCSV, targetARN string) bool {
 		if p == "" {
 			continue
 		}
-		if ARNMatches(p, targetARN) {
+		if selector.MatchARN(p, targetARN) {
 			return true
 		}
 	}
