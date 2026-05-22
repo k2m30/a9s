@@ -801,6 +801,28 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "created", Title: "Created", Width: 18, Sortable: true},
 		},
 		Color: colorEBS,
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchEBSVolumesPage(ctx, c.EC2, continuationToken)
+		},
+		Wave2:     IssueEnricher{Fn: EnrichEBSVolumeStatus, Priority: 10},
+		FieldKeys: []string{"volume_id", "name", "state", "size", "type", "iops", "encrypted", "attached_to", "az", "created"},
+		Related: []domain.RelatedDef{
+			{TargetType: "ec2", DisplayName: "EC2 Instance", Checker: checkEBSEC2, NeedsTargetCache: false},
+			{TargetType: "ebs-snap", DisplayName: "EBS Snapshots", Checker: checkEBSSnap, NeedsTargetCache: true},
+			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkEBSKMS, NeedsTargetCache: false},
+			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkEBSAlarm, NeedsTargetCache: true},
+			{TargetType: "backup", DisplayName: "Backup", Checker: checkEBSBackup},
+			{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkEBSCFN, NeedsTargetCache: true},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("ebs")},
+		},
+		Navigable: []domain.NavigableField{
+			{FieldPath: "Attachments.InstanceId", TargetType: "ec2"},
+			{FieldPath: "KmsKeyId", TargetType: "kms"},
+		},
 	},
 	{
 		Name:          "EBS Snapshots",
@@ -820,6 +842,33 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "progress", Title: "Progress", Width: 10, Sortable: false},
 		},
 		Color: colorEBSSnap,
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchEBSSnapshotsPage(ctx, c.EC2, continuationToken)
+		},
+		FieldKeys: []string{"snapshot_id", "name", "state", "volume_id", "size", "encrypted", "description", "started", "progress"},
+		FetchByIDs: func(ctx context.Context, clients any, ids []string) ([]resource.Resource, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return nil, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchEBSSnapshotsByIDs(ctx, c.EC2, ids)
+		},
+		Related: []domain.RelatedDef{
+			{TargetType: "ami", DisplayName: "AMIs", Checker: checkEBSSnapAMI, NeedsTargetCache: true},
+			{TargetType: "ebs", DisplayName: "EBS Volume", Checker: checkEBSSnapEBS, NeedsTargetCache: false},
+			{TargetType: "ec2", DisplayName: "EC2 Instance", Checker: checkEBSSnapEC2, NeedsTargetCache: false},
+			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkEBSSnapKMS, NeedsTargetCache: false},
+			{TargetType: "backup", DisplayName: "Backup", Checker: checkEBSSnapBackup},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("ebs-snap")},
+		},
+		Navigable: []domain.NavigableField{
+			{FieldPath: "VolumeId", TargetType: "ebs"},
+			{FieldPath: "KmsKeyId", TargetType: "kms"},
+		},
 	},
 	{
 		Name:          "AMIs",

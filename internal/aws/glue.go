@@ -11,33 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("glue", []string{"job_name", "glue_version", "worker_type", "num_workers", "last_modified"})
-
-	resource.RegisterPaginated("glue", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchGlueJobsPage(ctx, c.Glue, continuationToken)
-	})
-
-	resource.RegisterDefaultNavFields("glue", []resource.NavigableField{
-		{FieldPath: "Role", TargetType: "role"},
-	})
-
-	resource.RegisterRelated("glue", []resource.RelatedDef{
-		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkGlueRole, NeedsTargetCache: true},
-		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkGlueAlarms, NeedsTargetCache: true},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkGlueLogs, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkGlueCFN},
-		{TargetType: "s3", DisplayName: "S3 (script bucket)", Checker: checkGlueS3},
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkGlueKMS},
-		{TargetType: "athena", DisplayName: "Athena WorkGroups", Checker: checkGlueAthena},
-		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkGlueSecrets},
-	})
-}
-
 // FetchGlueJobs calls the Glue GetJobs API and converts the response
 // into a slice of generic Resource structs.
 func FetchGlueJobs(ctx context.Context, api GlueGetJobsAPI) ([]resource.Resource, error) {
