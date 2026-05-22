@@ -27,29 +27,6 @@ type PipelineStageRow struct {
 	RevisionSummary  string
 }
 
-func init() {
-	resource.RegisterFieldKeys("pipeline_stages", []string{
-		"stage_name", "stage_status", "action_name", "action_status",
-		"last_change_time", "external_url", "action_token",
-		"action_error_details", "revision_id", "revision_summary",
-	})
-
-	resource.RegisterPaginatedChild("pipeline_stages", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchPipelineStages(ctx, c.CodePipeline, parentCtx, continuationToken)
-	})
-
-	resource.RegisterChildType(resource.ResourceTypeDef{
-		Name:      "Pipeline Stages",
-		ShortName: "pipeline_stages",
-		Columns:   resource.PipelineStageColumns(),
-		CopyField: "external_url",
-	})
-}
-
 // FetchPipelineStages calls GetPipelineState and flattens the hierarchical
 // stages→actions response into a flat list of stage-action pair Resources.
 // A stage with N actions produces N rows. The stage_name field is set only

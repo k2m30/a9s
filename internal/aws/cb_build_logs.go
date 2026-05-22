@@ -12,25 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("cb_build_logs", []string{"timestamp", "message", "ingestion_time", "event_id"})
-
-	resource.RegisterPaginatedChild("cb_build_logs", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchCBBuildLogs(ctx, c.CloudWatchLogs, parentCtx["log_group_name"], parentCtx["log_stream_name"], continuationToken)
-	})
-
-	resource.RegisterChildType(resource.ResourceTypeDef{
-		Name:      "Build Logs",
-		ShortName: "cb_build_logs",
-		Columns:   resource.CBBuildLogColumns(),
-		CopyField: "message",
-	})
-}
-
 // FetchCBBuildLogs calls the CloudWatch Logs GetLogEvents API for a given
 // log group and stream (from a CodeBuild build), converting the response
 // into a FetchResult. This is a single-call API, but uses FetchResult for consistency.

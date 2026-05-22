@@ -10,22 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("codeartifact", []string{"repo_name", "domain_name", "description", "domain_owner"})
-
-	resource.RegisterPaginated("codeartifact", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchCodeArtifactReposPage(ctx, c.CodeArtifact, continuationToken)
-	})
-
-	resource.RegisterRelated("codeartifact", []resource.RelatedDef{
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkCodeartifactKMS, NeedsTargetCache: false},
-	})
-}
-
 // FetchCodeArtifactRepos calls the CodeArtifact ListRepositories API and converts the
 // response into a slice of generic Resource structs.
 func FetchCodeArtifactRepos(ctx context.Context, api CodeArtifactListRepositoriesAPI) ([]resource.Resource, error) {
