@@ -614,21 +614,3 @@ func s3RelatedResources(ctx context.Context, clients any, cache resource.Resourc
 	return resources, isTruncated, err
 }
 
-func init() {
-	resource.RegisterRelated("s3", []resource.RelatedDef{
-		{TargetType: "trail", DisplayName: "CloudTrail Trails", Checker: checkS3Trail, NeedsTargetCache: true},
-		{TargetType: "cf", DisplayName: "CloudFront", Checker: checkS3CF, NeedsTargetCache: true},
-		{TargetType: "lambda", DisplayName: "Lambda (notifications)", Checker: checkS3Lambda},
-		{TargetType: "sns", DisplayName: "SNS (notifications)", Checker: checkS3SNS},
-		{TargetType: "sqs", DisplayName: "SQS (notifications)", Checker: checkS3SQS},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkS3CFN},
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkS3KMS},
-		{TargetType: "s3", DisplayName: "Access Log Bucket", Checker: checkS3Logs},
-		{TargetType: "athena", DisplayName: "Athena WorkGroups", Checker: checkS3Athena},
-		{TargetType: "glue", DisplayName: "Glue Jobs", Checker: checkS3Glue},
-		{TargetType: "backup", DisplayName: "Backup", Checker: checkS3Backup},
-		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkS3EBRule},
-		{TargetType: "r53", DisplayName: "Route 53", Checker: checkS3R53},
-		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkS3Role},
-	})
-}
