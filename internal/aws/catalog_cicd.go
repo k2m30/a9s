@@ -1,8 +1,12 @@
 package aws
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func colorCFN(r domain.Resource) domain.Color      { return cfnStackColor(r.Fields["status"]) }
@@ -31,6 +35,28 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{ChildType: "cfn_resources", Key: "R", ContextKeys: map[string]string{"stack_name": "ID"}, DisplayNameKey: "Name"},
 		},
 		Color: colorCFN,
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchCloudFormationStacksPage(ctx, c.CloudFormation, continuationToken)
+		},
+		Wave2:     IssueEnricher{Fn: EnrichCFNCombined, Priority: 100},
+		FieldKeys: []string{"stack_name", "status", "creation_time", "last_updated", "description"},
+		Related: []domain.RelatedDef{
+			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkCfnRole, NeedsTargetCache: true},
+			{TargetType: "cfn", DisplayName: "Related Stacks", Checker: checkCFNCFN, NeedsTargetCache: true},
+			{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkCfnSNS},
+			{TargetType: "s3", DisplayName: "S3 (stack resources)", Checker: checkCfnS3},
+			{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkCfnEBRule},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("cfn")},
+		},
+		Navigable: []domain.NavigableField{
+			{FieldPath: "RoleARN", TargetType: "role"},
+			{FieldPath: "NotificationARNs", TargetType: "sns"},
+		},
+		IssueEnricherFieldKeys: []string{"drift_status"},
 	},
 	{
 		Name:          "CodePipelines",
