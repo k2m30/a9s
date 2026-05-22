@@ -24,49 +24,6 @@ type iamPolicyStore interface {
 	Clear()
 }
 
-func init() {
-	resource.RegisterFieldKeys("policy", []string{"policy_name", "policy_type", "attachment_count", "is_attachable", "path", "create_date"})
-
-	resource.RegisterPaginated("policy", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		result, err := FetchIAMPoliciesPage(ctx, c.IAM, continuationToken)
-		if err != nil {
-			return result, err
-		}
-		inlines, inlineErr := fetchInlineGroupPolicies(ctx, c.IAM)
-		// Partial failure: inline group policy enumeration failed for some
-		// groups. Preserve the inline results we did get, then propagate the
-		// composite error so app.go's ResourcesLoadedMsg handler surfaces it
-		// via FlashMsg → `!` log (per E1–E6). Managed policies above are
-		// still returned in result.Resources regardless.
-		result.Resources = append(result.Resources, inlines...)
-		if result.Pagination != nil {
-			result.Pagination.PageSize = len(result.Resources)
-		}
-		return result, inlineErr
-	})
-
-	resource.RegisterFetchByIDs("policy", func(ctx context.Context, clients any, ids []string) ([]resource.Resource, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
-		}
-		if c.IAMPolicies() == nil {
-			return nil, fmt.Errorf("IAMPolicies store not initialized on ServiceClients")
-		}
-		return FetchIAMPoliciesByIDsFull(ctx, c.IAM, ids, c.IAMPolicies())
-	})
-
-	resource.RegisterRelated("policy", []resource.RelatedDef{
-		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkPolicyRole, NeedsTargetCache: false},
-		{TargetType: "iam-user", DisplayName: "IAM Users", Checker: checkPolicyUser, NeedsTargetCache: false},
-		{TargetType: "iam-group", DisplayName: "IAM Groups", Checker: checkPolicyGroup, NeedsTargetCache: false},
-	})
-}
-
 // FetchIAMPolicies calls the IAM ListPolicies API and returns all pages of
 // customer-managed policies. Used by tests; the production path uses the per-page fetcher for pagination.
 func FetchIAMPolicies(ctx context.Context, api IAMListPoliciesAPI) ([]resource.Resource, error) {

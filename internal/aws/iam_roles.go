@@ -13,18 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("role", []string{"role_name", "role_id", "path", "create_date", "description", "assume_role_policy_document", "trust_wildcard", "trust_summary", "policy_resources"})
-
-	resource.RegisterPaginated("role", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchIAMRolesPage(ctx, c.IAM, continuationToken)
-	})
-}
-
 // FetchIAMRoles calls the IAM ListRoles API and returns all pages of roles.
 // Used by tests; the production path uses the per-page fetcher for pagination.
 func FetchIAMRoles(ctx context.Context, api IAMListRolesAPI) ([]resource.Resource, error) {

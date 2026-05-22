@@ -10,25 +10,8 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("iam-group", []string{"group_name", "group_id", "path", "create_date", "arn"})
-
-	resource.RegisterPaginated("iam-group", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchIAMGroupsPage(ctx, c.IAM, continuationToken)
-	})
-
-	resource.RegisterRelated("iam-group", []resource.RelatedDef{
-		{TargetType: "iam-user", DisplayName: "IAM Users", Checker: checkGroupUser, NeedsTargetCache: false},
-		{TargetType: "policy", DisplayName: "IAM Policies", Checker: checkGroupPolicy, NeedsTargetCache: false},
-	})
-
-	// iamtypes.Group: no navigable cross-ref fields — the Group struct carries only
-	// GroupName, GroupId, Arn, Path, CreateDate. Members and policies are runtime API relationships.
-}
+// iamtypes.Group: no navigable cross-ref fields — the Group struct carries only
+// GroupName, GroupId, Arn, Path, CreateDate. Members and policies are runtime API relationships.
 
 // FetchIAMGroups calls the IAM ListGroups API and returns all pages of groups.
 // Used by tests; the production path uses the per-page fetcher for pagination.

@@ -10,27 +10,9 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("iam-user", []string{"user_name", "user_id", "path", "create_date", "password_last_used", "has_console_password"})
-
-	resource.RegisterPaginated("iam-user", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchIAMUsersPage(ctx, c.IAM, continuationToken)
-	})
-
-	resource.RegisterRelated("iam-user", []resource.RelatedDef{
-		{TargetType: "iam-group", DisplayName: "IAM Groups", Checker: checkUserGroup, NeedsTargetCache: false},
-		{TargetType: "policy", DisplayName: "IAM Policies", Checker: checkUserPolicy, NeedsTargetCache: false},
-		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkIAMUserCtEvents, NeedsTargetCache: false},
-	})
-
-	// iamtypes.User: no navigable cross-ref fields in the rendered detail view.
-	// Groups membership is a runtime API relationship (checkUserGroup), not a field on the User struct.
-	// PermissionsBoundary.PermissionsBoundaryArn exists but policy ARNs don't match a9s policy IDs.
-}
+// iamtypes.User: no navigable cross-ref fields in the rendered detail view.
+// Groups membership is a runtime API relationship (checkUserGroup), not a field on the User struct.
+// PermissionsBoundary.PermissionsBoundaryArn exists but policy ARNs don't match a9s policy IDs.
 
 // FetchIAMUsers calls the IAM ListUsers API and returns all pages of users.
 // Used by tests; the production path uses the per-page fetcher for pagination.
