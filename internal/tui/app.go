@@ -46,10 +46,13 @@ type errorEntry struct {
 // Model is the root Bubble Tea model. It owns the view stack, header state,
 // AWS clients, and routes all messages to the active child view.
 //
-// Session state is owned exclusively by core via core.Session(). Call
-// m.core.Session() at each use site. See the internal/session package for
-// the ownership contract. handleProfileSelected / handleRegionSelected call
-// m.core.Session().Rotate() to invalidate in-flight async results on switch.
+// Session state is owned exclusively by core via *runtime.Core. The renderer
+// reads and mutates session-scoped state through the typed accessors in
+// internal/runtime/accessors.go (m.core.Profile(), m.core.ResourceCache(rt),
+// m.core.BumpRelatedGen(), etc.) — internal/session's struct shape is no
+// longer visible to the tui package. handleProfileSelected /
+// handleRegionSelected call runtime.Core.Rotate (via the orchestrator) to
+// invalidate in-flight async results on profile/region switch.
 type Model struct {
 	core    *runtime.Core    // platform-agnostic app core
 
@@ -154,9 +157,9 @@ func (m Model) Cancel() {
 // When pre-supplied clients are present (demo mode or tests), emits a synthetic
 // ClientsReadyMsg immediately. Otherwise initiates the live AWS connection flow.
 func (m Model) Init() tea.Cmd {
-	if m.core.Session().PreSuppliedClients != nil {
+	if m.core.PreSuppliedClients() != nil {
 		preCmd := func() tea.Msg {
-			return messages.ClientsReady{Clients: m.core.Session().PreSuppliedClients}
+			return messages.ClientsReady{Clients: m.core.PreSuppliedClients()}
 		}
 		if m.configErr != nil {
 			return tea.Batch(preCmd, func() tea.Msg {
@@ -170,8 +173,8 @@ func (m Model) Init() tea.Cmd {
 	}
 	connectCmd := func() tea.Msg {
 		return messages.InitConnect{
-			Profile: m.core.Session().Profile,
-			Region:  m.core.Session().Region,
+			Profile: m.core.Profile(),
+			Region:  m.core.Region(),
 		}
 	}
 	if m.configErr != nil {
@@ -230,7 +233,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case messages.ClearFlash:
 		return m.handleClearFlash(msg)
 	case messages.InitConnect:
-		cmd := m.connectAWS(msg.Profile, msg.Region, m.core.Session().ConnectGen)
+		cmd := m.connectAWS(msg.Profile, msg.Region, m.core.ConnectGen())
 		return m, cmd
 	case messages.ClientsReady:
 		return m.handleClientsReady(msg)
@@ -245,7 +248,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case profilesLoadedMsg:
 		return m.handleProfilesLoaded(msg)
 	case messages.ValueRevealed:
-		if messages.IsStale(msg, m.core.Session()) {
+		if messages.IsStale(msg, m.core) {
 			return m, nil
 		}
 		return m.handleValueRevealed(msg)
@@ -256,14 +259,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(msg.ParentContext) > 0 {
 			cmd = m.fetchChildResources(msg.ResourceType, msg.ParentContext)
 		} else {
-			cmd = m.fetchResources(msg.ResourceType, m.core.Session().AvailabilityGen)
+			cmd = m.fetchResources(msg.ResourceType, m.core.AvailabilityGen())
 		}
 		return m, cmd
 	case messages.LoadMore:
 		cmd := m.fetchMoreResources(msg)
 		return m, cmd
 	case messages.APIError:
-		if messages.IsStale(msg, m.core.Session()) {
+		if messages.IsStale(msg, m.core) {
 			return m, nil
 		}
 		return m.handleAPIError(msg)

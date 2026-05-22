@@ -16,7 +16,7 @@
 // It asks runtime.Core whether any RelatedDefs are registered for the source
 // type, and if so fans out one checker goroutine per def via relatedCheckCmd
 // (capped by runtime.MaxConcurrentProbes). The actual probe loop stays here in
-// the adapter because it depends on m.core.Session().Clients, m.appCtx, and tea.Cmd —
+// the adapter because it depends on m.core.Clients(), m.appCtx, and tea.Cmd —
 // platform glue that does not belong in internal/runtime.
 //
 // Decision-locus follow-up (PR-05b): a few branches in this adapter still walk
@@ -52,7 +52,6 @@ import (
 // (HandleRelatedNavigate), then builds the view and starts any required fetch
 // based on the returned NavigationResult and TaskRequests.
 func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, tea.Cmd) {
-	core := runtime.New(m.core.Session(), resource.AllResourceTypes())
 	ev := runtime.RelatedNavigateEvent{
 		TargetType:     msg.TargetType,
 		SourceResource: msg.SourceResource,
@@ -62,7 +61,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 		FetchFilter:    msg.FetchFilter,
 		Checker:        msg.Checker,
 	}
-	result, tasks := core.HandleRelatedNavigate(ev)
+	result, tasks := m.core.HandleRelatedNavigate(ev)
 
 	switch result.Kind {
 	case runtime.NavigationKindFlash:
@@ -81,7 +80,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 		if rt == nil {
 			// Fetcher-only type (registered paginated fetcher but no ResourceTypeDef).
 			if len(result.RelatedIDs) > 0 {
-				if lazyRows, hasLazy := m.core.Session().LazyResourceCache[msg.TargetType]; hasLazy {
+				if lazyRows, hasLazy := m.core.LazyResourceCache(msg.TargetType); hasLazy {
 					idSet := make(map[string]bool, len(result.RelatedIDs))
 					for _, id := range result.RelatedIDs {
 						idSet[id] = true
@@ -94,7 +93,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 					}
 					// Partial coverage: fall through to fetch so missing IDs are retrieved.
 					if len(filtered) < len(result.RelatedIDs) {
-						fetchCmd := m.fetchResources(msg.TargetType, m.core.Session().AvailabilityGen)
+						fetchCmd := m.fetchResources(msg.TargetType, m.core.AvailabilityGen())
 						return m, fetchCmd
 					}
 				}
@@ -116,18 +115,18 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 			rl.SetSize(m.innerSize())
 			rl, initCmd := rl.Init()
 			m.pushView(&rl)
-			return m, tea.Batch(initCmd, m.fetchResourcesFiltered(msg.TargetType, result.FetchFilter, m.core.Session().AvailabilityGen))
+			return m, tea.Batch(initCmd, m.fetchResourcesFiltered(msg.TargetType, result.FetchFilter, m.core.AvailabilityGen()))
 		}
 
 		// TargetID-based filtered list (cache miss).
 		if result.TargetID != "" {
 			// Exact AMI navigation should fetch by image ID instead of falling
 			// back to the owned-AMI list, which misses public and third-party images.
-			// PR-05b: when m.core.Session().Clients moves into the runtime Core, the runtime will
+			// PR-05b: when m.core.Clients() moves into the runtime Core, the runtime will
 			// emit a typed FetchAMIDetail TaskRequest and this branch collapses
 			// into runtimeTasksToCmd; the adapter override stays for now because
 			// client selection is adapter-owned state.
-			if msg.TargetType == "ami" && m.core.Session().Clients != nil {
+			if msg.TargetType == "ami" && m.core.Clients() != nil {
 				cmd := m.fetchAMIDetail(result.TargetID)
 				return m, cmd
 			}
@@ -148,7 +147,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 
 		// RelatedIDs-based filtered list (multi or single cache miss).
 		if len(result.RelatedIDs) > 0 {
-			if entry, ok := m.core.Session().ResourceCache[msg.TargetType]; ok {
+			if entry, ok := m.core.ResourceCache(msg.TargetType); ok && entry != nil {
 				idSet := make(map[string]bool, len(result.RelatedIDs))
 				for _, id := range result.RelatedIDs {
 					idSet[id] = true
@@ -160,7 +159,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 					}
 				}
 				// Augment with lazy-cached resources. Prefer ResourceCache on ID collision.
-				if lazyRows, hasLazy := m.core.Session().LazyResourceCache[msg.TargetType]; hasLazy {
+				if lazyRows, hasLazy := m.core.LazyResourceCache(msg.TargetType); hasLazy {
 					found := make(map[string]struct{}, len(filtered))
 					for _, r := range filtered {
 						found[r.ID] = struct{}{}
@@ -247,7 +246,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 			// the runtime decision rather than a divergence. PR-05b will route the
 			// lazy-row slice through TaskRequest payload so the adapter no longer
 			// re-walks the cache.
-			if lazyRows, hasLazy := m.core.Session().LazyResourceCache[msg.TargetType]; hasLazy {
+			if lazyRows, hasLazy := m.core.LazyResourceCache(msg.TargetType); hasLazy {
 				idSet := make(map[string]bool, len(result.RelatedIDs))
 				for _, id := range result.RelatedIDs {
 					idSet[id] = true
@@ -320,11 +319,11 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 		}
 		var detailRes resource.Resource
 		var detailFound bool
-		if entry, ok := m.core.Session().ResourceCache[msg.TargetType]; ok {
+		if entry, ok := m.core.ResourceCache(msg.TargetType); ok && entry != nil {
 			detailRes, detailFound = resolveDetailResource(entry.Resources)
 		}
 		if !detailFound {
-			if lazyRows, ok := m.core.Session().LazyResourceCache[msg.TargetType]; ok {
+			if lazyRows, ok := m.core.LazyResourceCache(msg.TargetType); ok {
 				detailRes, detailFound = resolveDetailResource(lazyRows)
 			}
 		}
@@ -348,7 +347,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 			m.pushView(&detail)
 			if detail.NeedsRelatedCheck() {
 				ck := runtime.RelatedCacheKey(msg.TargetType, r.ID)
-				if cached, ok := m.core.Session().RelatedCache.Get(ck); ok && len(cached) > 0 {
+				if cached, ok := m.core.RelatedCacheGet(ck); ok && len(cached) > 0 {
 					detail.ApplyRelatedResults(runtime.RelatedCacheReplay(msg.TargetType, cached))
 					return m, nil
 				}
@@ -430,9 +429,9 @@ func relatedNavigateTasksToCmd(m Model, targetType string, result runtime.Naviga
 	for _, t := range tasks {
 		switch t.Key.Kind {
 		case runtime.KindFetchResources:
-			cmds = append(cmds, m.fetchResources(targetType, m.core.Session().AvailabilityGen))
+			cmds = append(cmds, m.fetchResources(targetType, m.core.AvailabilityGen()))
 		case runtime.KindFetchFiltered:
-			cmds = append(cmds, m.fetchResourcesFiltered(targetType, result.FetchFilter, m.core.Session().AvailabilityGen))
+			cmds = append(cmds, m.fetchResourcesFiltered(targetType, result.FetchFilter, m.core.AvailabilityGen()))
 		case runtime.KindFetchMore:
 			// Continuation token is runtime-owned and arrives as a structured
 			// payload (AS-270 / PR-05b). The adapter is a pure pass-through
@@ -468,8 +467,7 @@ func (m Model) handleRelatedCheckStarted(msg messages.RelatedCheckStarted) (tea.
 	if src.Type == "" {
 		src.Type = msg.ResourceType
 	}
-	core := runtime.New(m.core.Session(), resource.AllResourceTypes())
-	_, tasks := core.HandleRelatedCheckStarted(runtime.RelatedCheckStartedEvent{
+	_, tasks := m.core.HandleRelatedCheckStarted(runtime.RelatedCheckStartedEvent{
 		ResourceType:   msg.ResourceType,
 		SourceResource: src,
 	})
@@ -488,13 +486,15 @@ func (m Model) relatedCheckCmd(res resource.Resource) tea.Cmd {
 	}
 
 	cache := m.buildResourceCacheSnapshot()
-	gen := m.core.Session().RelatedGen
+	gen := m.core.RelatedGen()
 
-	mainCacheKeys := make(map[string]struct{}, len(m.core.Session().ResourceCache))
-	for k := range m.core.Session().ResourceCache {
+	keys := m.core.ResourceCacheKeys()
+	mainCacheKeys := make(map[string]struct{}, len(keys))
+	for _, k := range keys {
 		mainCacheKeys[k] = struct{}{}
 	}
 
+	clients := m.core.Clients()
 	sem := make(chan struct{}, runtime.MaxConcurrentProbes)
 	cmds := make([]tea.Cmd, 0, len(defs))
 
@@ -529,7 +529,7 @@ func (m Model) relatedCheckCmd(res resource.Resource) tea.Cmd {
 			if def.NeedsTargetCache {
 				if _, inMainCache := mainCacheKeys[def.TargetType]; !inMainCache {
 					if pf := resource.GetPaginatedFetcher(def.TargetType); pf != nil {
-						if fr, err := pf(ctx, m.core.Session().Clients, ""); err == nil {
+						if fr, err := pf(ctx, clients, ""); err == nil {
 							isTrunc := fr.Pagination != nil && fr.Pagination.IsTruncated
 							if prev, hasPrev := localCache[def.TargetType]; hasPrev && prev.IsTruncated {
 								isTrunc = true
@@ -548,7 +548,7 @@ func (m Model) relatedCheckCmd(res resource.Resource) tea.Cmd {
 					}
 				}
 			}
-			result := def.Checker(ctx, m.core.Session().Clients, res, localCache)
+			result := def.Checker(ctx, clients, res, localCache)
 			result.TargetType = def.TargetType
 			var lazyAdded map[string][]resource.Resource
 			var lazyAddError error
@@ -556,7 +556,7 @@ func (m Model) relatedCheckCmd(res resource.Resource) tea.Cmd {
 				if ff := resource.GetFetchByIDs(def.TargetType); ff != nil {
 					missing := runtime.MissingFromCache(localCache, def.TargetType, result.ResourceIDs)
 					if len(missing) > 0 {
-						extra, fetchErr := ff(ctx, m.core.Session().Clients, missing)
+						extra, fetchErr := ff(ctx, clients, missing)
 						if fetchErr != nil {
 							lazyAddError = fetchErr
 						}

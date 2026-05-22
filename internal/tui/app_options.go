@@ -18,14 +18,14 @@ import "github.com/k2m30/a9s/v3/internal/runtime"
 // tests that need a specific profile string without going through the live
 // AWS bootstrap path.
 func WithProfile(profile string) Option {
-	return func(m *Model) { m.core.Session().Profile = profile }
+	return func(m *Model) { m.core.SetProfile(profile) }
 }
 
 // WithRegion overrides the region field on the active session — used in
 // tests that need a specific region string without going through the live
 // AWS bootstrap path.
 func WithRegion(region string) Option {
-	return func(m *Model) { m.core.Session().Region = region }
+	return func(m *Model) { m.core.SetRegion(region) }
 }
 
 // WithIsDemo marks the session as demo mode, which skips Wave 2 enrichment.
@@ -40,7 +40,7 @@ func WithIsDemo(demo bool) Option {
 // WithNoCache disables resource availability caching and background checks.
 func WithNoCache(disabled bool) Option {
 	return func(m *Model) {
-		m.core.Session().NoCache = disabled
+		m.core.SetNoCache(disabled)
 	}
 }
 
@@ -51,7 +51,7 @@ func WithNoCache(disabled bool) Option {
 // AWS-client package directly.
 func WithClients(clients *runtime.ServiceClients) Option {
 	return func(m *Model) {
-		m.core.Session().PreSuppliedClients = clients
+		m.core.SetPreSuppliedClients(clients)
 	}
 }
 
@@ -66,5 +66,5 @@ func WithActiveTheme(name string) Option {
 // directly on startup instead of the main menu. The caller is responsible for
 // resolving the input via resource.FindResourceType.
 func WithCommand(name string) Option {
-	return func(m *Model) { m.core.Session().Command = name }
+	return func(m *Model) { m.core.SetCommand(name) }
 }

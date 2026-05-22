@@ -23,7 +23,7 @@
 //     fields without parsing TaskKey.Scope or accepting side-channel
 //     arguments. The closure builder stays in the adapter because it
 //     returns tea.Cmd and reads adapter-owned state (m.appCtx,
-//     m.core.Session().Clients, the session owned by core's EnrichGen and PolicyDocCache)
+//     m.core.Clients(), the session owned by core's EnrichGen and PolicyDocCache)
 //     that has not yet migrated to the runtime core.
 package tui
 
@@ -142,7 +142,7 @@ func (m Model) runtimeTasksToCmd(tasks []runtime.TaskRequest) tea.Cmd {
 		case runtime.ConnectPayload:
 			cmds = append(cmds, m.connectAWS(p.Profile, p.Region, p.Gen))
 		case runtime.FetchIdentityPayload:
-			cmds = append(cmds, m.fetchIdentity(m.core.Session().ConnectGen))
+			cmds = append(cmds, m.fetchIdentity(m.core.ConnectGen()))
 		case runtime.LoadAvailCachePayload:
 			cmds = append(cmds, m.loadAvailabilityCache())
 		case runtime.DemoPrefetchCountsPayload:

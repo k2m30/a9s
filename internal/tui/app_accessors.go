@@ -32,7 +32,7 @@ func (m Model) Core() *runtime.Core {
 // EnrichmentGen returns the current session-wide enrichment generation counter.
 // Test-only accessor.
 func (m Model) EnrichmentGen() domain.Gen {
-	return m.core.Session().EnrichmentGen
+	return m.core.EnrichmentGen()
 }
 
 // FlashGen returns the current tui-adapter flash generation counter.

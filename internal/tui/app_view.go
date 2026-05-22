@@ -42,8 +42,8 @@ func (m Model) View() tea.View {
 
 	active := m.activeView()
 
-	headerProfile := m.core.Session().Profile
-	headerRegion := m.core.Session().Region
+	headerProfile := m.core.Profile()
+	headerRegion := m.core.Region()
 	if sel, ok := active.(*views.SelectorModel); ok {
 		if sel.Title() == "aws-regions" {
 			headerRegion = "..."
@@ -142,41 +142,45 @@ func (m Model) headerRight() string {
 
 // accountBadge returns the account alias (preferred) or account ID for the header.
 func (m Model) accountBadge() string {
-	if m.core.Session().Identity == nil {
+	id := m.core.Identity()
+	if id == nil {
 		return ""
 	}
-	if m.core.Session().Identity.AccountAlias != "" {
-		return m.core.Session().Identity.AccountAlias
+	if id.AccountAlias != "" {
+		return id.AccountAlias
 	}
-	return m.core.Session().Identity.AccountID
+	return id.AccountID
 }
 
 // identityRoleName returns the identity name (role or user) for the header.
 func (m Model) identityRoleName() string {
-	if m.core.Session().Identity == nil {
+	id := m.core.Identity()
+	if id == nil {
 		return ""
 	}
-	return m.core.Session().Identity.IdentityName
+	return id.IdentityName
 }
 
-// identityToViewData converts the session-cached caller identity (the AWS
-// SDK form) to a view-layer IdentityData. Used at IdentityModel
-// construction time (the `i` key press) to seed the view from current
-// session state before the in-flight identity fetch returns. The post-h4-b
-// SetIdentityIntent updates the IdentityModel via applyIntents using
-// the *domain.CallerIdentity mirror — this helper covers the construction
-// path that runs before any intent fires.
+// identityToViewData converts the session-cached caller identity (mirrored
+// to the renderer-shaped *domain.CallerIdentity by m.core.Identity()) to a
+// view-layer IdentityData. Used at IdentityModel construction time (the
+// `i` key press) to seed the view from current session state before the
+// in-flight identity fetch returns. The post-h4-b SetIdentityIntent
+// updates the IdentityModel via applyIntents using the same domain mirror —
+// this helper covers the construction path that runs before any intent
+// fires.
 func (m Model) identityToViewData() views.IdentityData {
-	if m.core.Session().Identity == nil {
+	id := m.core.Identity()
+	if id == nil {
 		return views.IdentityData{}
 	}
 	return views.IdentityData{
-		AccountID:     m.core.Session().Identity.AccountID,
-		AccountAlias:  m.core.Session().Identity.AccountAlias,
-		ARN:           m.core.Session().Identity.Arn,
-		RoleName:      m.core.Session().Identity.RoleName,
-		UserName:      m.core.Session().Identity.UserName,
-		SessionName:   m.core.Session().Identity.SessionName,
-		IsAssumedRole: m.core.Session().Identity.IsAssumedRole,
+		AccountID:     id.AccountID,
+		AccountAlias:  id.AccountAlias,
+		ARN:           id.Arn,
+		RoleName:      id.RoleName,
+		UserName:      id.UserName,
+		SessionName:   id.SessionName,
+		IsAssumedRole: id.IsAssumedRole,
 	}
 }

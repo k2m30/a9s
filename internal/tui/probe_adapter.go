@@ -19,8 +19,8 @@ import (
 // loadAvailabilityCache returns a tea.Cmd that reads the availability cache
 // from disk and converts the result to AvailabilityCacheLoadedMsg.
 func (m *Model) loadAvailabilityCache() tea.Cmd {
-	profile := m.core.Session().Profile
-	region := m.core.Session().Region
+	profile := m.core.Profile()
+	region := m.core.Region()
 	return func() tea.Msg {
 		cf, err := m.core.LoadAvailabilityCache(profile, region)
 		if err != nil || cf == nil {
@@ -63,7 +63,7 @@ func (m *Model) loadAvailabilityCache() tea.Cmd {
 // probeResourceAvailability returns a tea.Cmd that runs a Wave-1 availability
 // probe for shortName and converts the result to AvailabilityCheckedMsg.
 func (m *Model) probeResourceAvailability(shortName string, gen domain.Gen) tea.Cmd {
-	ctx, clients := m.appCtx, m.core.Session().Clients
+	ctx, clients := m.appCtx, m.core.Clients()
 	return func() tea.Msg {
 		r := m.core.ProbeResourceAvailability(ctx, clients, shortName)
 		return messages.AvailabilityChecked{
@@ -82,11 +82,11 @@ func (m *Model) probeResourceAvailability(shortName string, gen domain.Gen) tea.
 // saveAvailabilityCache returns a tea.Cmd that persists the current
 // availability state to disk. No-op when caching is disabled (noCache=true).
 func (m *Model) saveAvailabilityCache() tea.Cmd {
-	if m.core.Session().NoCache {
+	if m.core.NoCache() {
 		return nil
 	}
-	profile := m.core.Session().Profile
-	region := m.core.Session().Region
+	profile := m.core.Profile()
+	region := m.core.Region()
 
 	// Collect availability, truncation, and issue counts from main menu.
 	var entries map[string]int
@@ -117,8 +117,8 @@ func (m *Model) saveAvailabilityCache() tea.Cmd {
 // Used when pre-supplied clients are present and no-cache is active so the
 // main menu shows counts immediately without the async probe pipeline.
 func (m *Model) demoPrefetchCounts() tea.Cmd {
-	ctx, clients := m.appCtx, m.core.Session().Clients
-	gen := m.core.Session().AvailabilityGen
+	ctx, clients := m.appCtx, m.core.Clients()
+	gen := m.core.AvailabilityGen()
 	return func() tea.Msg {
 		r := m.core.DemoPrefetchCounts(ctx, clients)
 		return messages.AvailabilityPrefetched{
@@ -167,8 +167,8 @@ func (m *Model) probeEnrichment(shortName string, gen domain.Gen) tea.Cmd {
 	if m.isDemo {
 		return nil
 	}
-	ctx, clients := m.appCtx, m.core.Session().Clients
-	typeGen := m.core.Session().EnrichmentTypeGen[shortName]
+	ctx, clients := m.appCtx, m.core.Clients()
+	typeGen := m.core.EnrichmentTypeGen(shortName)
 	if !m.core.HasIssueEnricher(shortName) {
 		return nil
 	}

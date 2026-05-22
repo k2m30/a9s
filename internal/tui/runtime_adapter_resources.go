@@ -50,7 +50,7 @@ func (m Model) handleResourcesLoaded(msg messages.ResourcesLoaded) (tea.Model, t
 	// invoked directly (not via HandleEvent's central GenStamped gate) and the
 	// pre-Core view-side derive + updateActiveView would otherwise mutate state
 	// from a previous profile/region rotation.
-	if messages.IsStale(msg, m.core.Session()) {
+	if messages.IsStale(msg, m.core) {
 		return m, nil
 	}
 	(&m).deriveFindingsForType(msg.ResourceType, msg.Resources)
@@ -83,7 +83,7 @@ func (m Model) handleResourcesLoaded(msg messages.ResourcesLoaded) (tea.Model, t
 // source-resource ID (the original case-body fallback). Core receives
 // the resolved value as authoritative.
 func (m Model) handleRelatedCheckResult(msg messages.RelatedCheckResult) (tea.Model, tea.Cmd) {
-	if messages.IsStale(msg, m.core.Session()) {
+	if messages.IsStale(msg, m.core) {
 		return m, nil
 	}
 	sourceID := msg.SourceResourceID
@@ -138,7 +138,7 @@ func (m Model) handleRelatedCheckResult(msg messages.RelatedCheckResult) (tea.Mo
 // updateActiveView never sees a half-populated EnrichedRes — matches the
 // original case-body's early-return on err.
 func (m Model) handleEnrichDetailResult(msg messages.EnrichDetailResult) (tea.Model, tea.Cmd) {
-	if messages.IsStale(msg, m.core.Session()) {
+	if messages.IsStale(msg, m.core) {
 		return m, nil
 	}
 	intents, tasks := m.core.HandleEnrichDetailResult(runtime.EnrichDetailResultEvent{

@@ -153,7 +153,7 @@ func (m *Model) cacheTopLevelResourceList(rl views.ResourceListModel) {
 	}
 	rt := rl.ResourceType()
 	sortColIdx, sortAsc := rl.SortState()
-	m.core.Session().ResourceCache[rt] = &domain.ListViewCacheEntry{
+	m.core.SetResourceCache(rt, &domain.ListViewCacheEntry{
 		Resources:     rl.AllResources(),
 		Pagination:    rl.PaginationState(),
 		FilterText:    rl.FilterText(),
@@ -162,7 +162,7 @@ func (m *Model) cacheTopLevelResourceList(rl views.ResourceListModel) {
 		SortAsc:       sortAsc,
 		CursorPos:     rl.CursorPosition(),
 		HScrollOffset: rl.HScrollOffset(),
-	}
+	})
 }
 
 // helpContext determines the HelpContext from the current active view.
