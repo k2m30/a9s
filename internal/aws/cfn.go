@@ -11,32 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("cfn", []string{"stack_name", "status", "creation_time", "last_updated", "description"})
-
-	resource.RegisterPaginated("cfn", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchCloudFormationStacksPage(ctx, c.CloudFormation, continuationToken)
-	})
-
-	resource.RegisterRelated("cfn", []resource.RelatedDef{
-		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkCfnRole, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "Related Stacks", Checker: checkCFNCFN, NeedsTargetCache: true},
-		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkCfnSNS},
-		{TargetType: "s3", DisplayName: "S3 (stack resources)", Checker: checkCfnS3},
-		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkCfnEBRule},
-	})
-
-	// cfntypes.Stack: RoleARN (execution role), NotificationARNs (SNS topics for stack events)
-	resource.RegisterDefaultNavFields("cfn", []resource.NavigableField{
-		{FieldPath: "RoleARN", TargetType: "role"},
-		{FieldPath: "NotificationARNs", TargetType: "sns"},
-	})
-}
-
 // FetchCloudFormationStacks calls the CloudFormation DescribeStacks API and converts the
 // response into a slice of generic Resource structs.
 func FetchCloudFormationStacks(ctx context.Context, api CFNDescribeStacksAPI) ([]resource.Resource, error) {

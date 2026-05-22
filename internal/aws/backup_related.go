@@ -13,14 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterRelated("backup", []resource.RelatedDef{
-		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkBackupRole},
-		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkBackupKMS},
-		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkBackupSNS},
-	})
-}
-
 // checkBackupRole resolves the IAM roles used by this plan's selections via
 // a single backup:ListBackupSelections call (Pattern C). Each
 // BackupSelectionsListMember exposes IamRoleArn directly — the role the
