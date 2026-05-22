@@ -14,36 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("lambda_invocations", []string{
-		"request_id", "timestamp", "status", "duration_ms",
-		"billed_duration_ms", "memory_size_mb", "memory_used_mb",
-		"memory_used", "init_duration_ms", "cold_start", "xray_trace_id",
-	})
-
-	resource.RegisterPaginatedChild("lambda_invocations", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchLambdaInvocations(ctx, c.CloudWatchLogs, parentCtx["function_name"], parentCtx["log_group"], continuationToken)
-	})
-
-	resource.RegisterChildType(resource.ResourceTypeDef{
-		Name:      "Lambda Invocations",
-		ShortName: "lambda_invocations",
-		Columns:   resource.LambdaInvocationColumns(),
-		Children: []resource.ChildViewDef{
-			{
-				ChildType:      "lambda_invocation_logs",
-				Key:            "enter",
-				ContextKeys:    map[string]string{"log_group": "@parent.log_group", "request_id": "request_id"},
-				DisplayNameKey: "request_id",
-			},
-		},
-	})
-}
-
 // maxInvocations caps the result set to keep load times fast.
 const maxInvocations = 50
 

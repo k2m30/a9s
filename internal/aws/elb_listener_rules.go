@@ -11,27 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("elb_listener_rules", []string{
-		"priority", "conditions_summary", "action_type", "action_target", "is_default",
-	})
-
-	resource.RegisterPaginatedChild("elb_listener_rules", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchELBListenerRules(ctx, c.ELBv2, parentCtx, continuationToken)
-	})
-
-	resource.RegisterChildType(resource.ResourceTypeDef{
-		Name:      "Listener Rules",
-		ShortName: "elb_listener_rules",
-		Columns:   resource.ELBListenerRuleColumns(),
-		CopyField: "conditions_summary",
-	})
-}
-
 // FetchELBListenerRules calls the ELBv2 DescribeRules API and converts the
 // response into a FetchResult. This is a single-call API (no pagination from AWS),
 // but uses FetchResult for consistency with the paginated child fetcher interface.

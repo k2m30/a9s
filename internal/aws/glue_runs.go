@@ -12,29 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("glue_runs", []string{
-		"run_id_short", "job_run_state", "started_on",
-		"execution_time_human", "error_message", "dpu_hours",
-		"run_id", "job_name",
-	})
-
-	resource.RegisterPaginatedChild("glue_runs", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchGlueJobRuns(ctx, c.Glue, parentCtx["job_name"], continuationToken)
-	})
-
-	resource.RegisterChildType(resource.ResourceTypeDef{
-		Name:      "Job Runs",
-		ShortName: "glue_runs",
-		Columns:   resource.GlueRunColumns(),
-		CopyField: "error_message",
-	})
-}
-
 // FetchGlueJobRuns calls the Glue GetJobRuns API and converts the response
 // into a FetchResult with pagination support. A single API call is made per
 // invocation; IsTruncated and NextToken are forwarded as pagination metadata

@@ -10,28 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	// Child view: SNS Topic Subscriptions
-	resource.RegisterFieldKeys("sns_subscriptions", []string{
-		"protocol", "endpoint", "confirmation_status", "owner", "subscription_arn", "topic_arn",
-	})
-
-	resource.RegisterPaginatedChild("sns_subscriptions", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchSNSTopicSubscriptions(ctx, c.SNS, parentCtx["topic_arn"], continuationToken)
-	})
-
-	resource.RegisterChildType(resource.ResourceTypeDef{
-		Name:      "SNS Subscriptions",
-		ShortName: "sns_subscriptions",
-		Columns:   resource.SnsSubscriptionColumns(),
-		CopyField: "endpoint",
-	})
-}
-
 // FetchSNSTopicSubscriptions calls the SNS ListSubscriptionsByTopic API and
 // converts the response into a FetchResult with pagination support. A single
 // API call is made per invocation; IsTruncated and NextToken are forwarded as

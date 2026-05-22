@@ -130,6 +130,23 @@ func FindChild(name string) *ResourceTypeDef {
 	return nil
 }
 
+// AllChildren returns the installed child-type catalog as a slice. The order
+// is not stable — child types are stored in a map for ShortName lookup. Use
+// only for replay walks (e.g. the AS-795 legacy-bridge) where iteration order
+// is irrelevant.
+//
+// Panics if SetChildTypes has not been called.
+func AllChildren() []ResourceTypeDef {
+	if !childInstalled {
+		panic("catalog.SetChildTypes not called — programmer must invoke aws.Install() before any child-catalog accessor")
+	}
+	out := make([]ResourceTypeDef, 0, len(childRegistry))
+	for _, c := range childRegistry {
+		out = append(out, c)
+	}
+	return out
+}
+
 // requireInstalled panics with a clear message if SetTypes has not yet been
 // called. The message names the install hook so the failing test author knows
 // where to look.
