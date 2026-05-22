@@ -10,26 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("athena", []string{"workgroup_name", "state", "description", "engine_version", "result_output_location"})
-
-	resource.RegisterPaginated("athena", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchAthenaWorkgroupsPage(ctx, c.Athena, continuationToken)
-	})
-
-	resource.RegisterRelated("athena", []resource.RelatedDef{
-		{TargetType: "s3", DisplayName: "S3 Buckets (results)", Checker: checkAthenaS3},
-		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkAthenaKMS},
-		{TargetType: "glue", DisplayName: "Glue Data Catalog", Checker: checkAthenaGlue},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkAthenaLogs},
-		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkAthenaRole},
-	})
-}
-
 // FetchAthenaWorkgroups calls the Athena ListWorkGroups API and converts the
 // response into a slice of generic Resource structs.
 func FetchAthenaWorkgroups(ctx context.Context, api AthenaListWorkGroupsAPI) ([]resource.Resource, error) {

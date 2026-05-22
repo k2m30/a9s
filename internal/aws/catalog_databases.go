@@ -355,6 +355,47 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			DisplayNameKey: "bucket",
 		}},
 		Color: colorS3,
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			// Related-panel contract (docs/resources/s3.md §2): lambda/sns/sqs
+			// pivots must resolve non-zero when this bucket has a matching
+			// notification target. Those checkers read Fields["notification_*"],
+			// which can only be populated by GetBucketNotificationConfiguration
+			// — so the list path must run it per-bucket. Accepts N+1 per page
+			// (cheap API, typically ≤50 buckets per AWS account) in exchange
+			// for having the notification pivots actually work.
+			return FetchS3BucketsPageWithNotifications(ctx, c.S3, c.S3, continuationToken)
+		},
+		Wave2: IssueEnricher{Fn: EnrichS3PublicAccessBlock, Priority: 100},
+		FieldKeys: []string{
+			"name",
+			"bucket_name",
+			"creation_date",
+			"notification_lambda",
+			"notification_sqs",
+			"notification_sns",
+		},
+		Related: []domain.RelatedDef{
+			{TargetType: "trail", DisplayName: "CloudTrail Trails", Checker: checkS3Trail, NeedsTargetCache: true},
+			{TargetType: "cf", DisplayName: "CloudFront", Checker: checkS3CF, NeedsTargetCache: true},
+			{TargetType: "lambda", DisplayName: "Lambda (notifications)", Checker: checkS3Lambda},
+			{TargetType: "sns", DisplayName: "SNS (notifications)", Checker: checkS3SNS},
+			{TargetType: "sqs", DisplayName: "SQS (notifications)", Checker: checkS3SQS},
+			{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkS3CFN},
+			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkS3KMS},
+			{TargetType: "s3", DisplayName: "Access Log Bucket", Checker: checkS3Logs},
+			{TargetType: "athena", DisplayName: "Athena WorkGroups", Checker: checkS3Athena},
+			{TargetType: "glue", DisplayName: "Glue Jobs", Checker: checkS3Glue},
+			{TargetType: "backup", DisplayName: "Backup", Checker: checkS3Backup},
+			{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkS3EBRule},
+			{TargetType: "r53", DisplayName: "Route 53", Checker: checkS3R53},
+			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkS3Role},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("s3")},
+		},
+		IssueEnricherFieldKeys: []string{"status"},
 	},
 	{
 		Name:          "ElastiCache Redis",

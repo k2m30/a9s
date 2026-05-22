@@ -13,59 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("ebs", []string{"volume_id", "name", "state", "size", "type", "iops", "encrypted", "attached_to", "az", "created"})
-	resource.RegisterPaginated("ebs", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchEBSVolumesPage(ctx, c.EC2, continuationToken)
-	})
-
-	resource.RegisterFieldKeys("ebs-snap", []string{"snapshot_id", "name", "state", "volume_id", "size", "encrypted", "description", "started", "progress"})
-	resource.RegisterPaginated("ebs-snap", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchEBSSnapshotsPage(ctx, c.EC2, continuationToken)
-	})
-
-	resource.RegisterFetchByIDs("ebs-snap", func(ctx context.Context, clients any, ids []string) ([]resource.Resource, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchEBSSnapshotsByIDs(ctx, c.EC2, ids)
-	})
-
-	resource.RegisterRelated("ebs", []resource.RelatedDef{
-		{TargetType: "ec2", DisplayName: "EC2 Instance", Checker: checkEBSEC2, NeedsTargetCache: false},
-		{TargetType: "ebs-snap", DisplayName: "EBS Snapshots", Checker: checkEBSSnap, NeedsTargetCache: true},
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkEBSKMS, NeedsTargetCache: false},
-		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkEBSAlarm, NeedsTargetCache: true},
-		{TargetType: "backup", DisplayName: "Backup", Checker: checkEBSBackup},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkEBSCFN, NeedsTargetCache: true},
-	})
-	resource.RegisterDefaultNavFields("ebs", []resource.NavigableField{
-		{FieldPath: "Attachments.InstanceId", TargetType: "ec2"},
-		{FieldPath: "KmsKeyId", TargetType: "kms"},
-	})
-
-	resource.RegisterRelated("ebs-snap", []resource.RelatedDef{
-		{TargetType: "ami", DisplayName: "AMIs", Checker: checkEBSSnapAMI, NeedsTargetCache: true},
-		{TargetType: "ebs", DisplayName: "EBS Volume", Checker: checkEBSSnapEBS, NeedsTargetCache: false},
-		{TargetType: "ec2", DisplayName: "EC2 Instance", Checker: checkEBSSnapEC2, NeedsTargetCache: false},
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkEBSSnapKMS, NeedsTargetCache: false},
-		{TargetType: "backup", DisplayName: "Backup", Checker: checkEBSSnapBackup},
-	})
-	resource.RegisterDefaultNavFields("ebs-snap", []resource.NavigableField{
-		{FieldPath: "VolumeId", TargetType: "ebs"},
-		{FieldPath: "KmsKeyId", TargetType: "kms"},
-	})
-}
-
 // FetchEBSVolumes calls the EC2 DescribeVolumes API and returns all pages
 // of volumes. Used by tests; the production path uses the per-page fetcher for pagination.
 func FetchEBSVolumes(ctx context.Context, api EC2DescribeVolumesAPI) ([]resource.Resource, error) {
