@@ -1,4 +1,4 @@
-.PHONY: build install test test-budget test-race lint gofix fmt run clean cover integration security coverage verify-readonly demo readme check-readme mdlint snapshot snapshot-update ready-to-push ready-to-release generate
+.PHONY: build install test test-budget test-race lint gofix fmt run clean cover integration security coverage verify-readonly verify-zero-init demo readme check-readme mdlint snapshot snapshot-update ready-to-push ready-to-release generate
 
 BINARY   = a9s
 CMD      = ./cmd/a9s
@@ -91,6 +91,19 @@ verify-readonly:
 		echo "PASS: All API calls are read-only"; \
 	fi
 
+# AS-820: lock in AS-795 invariant. init() bodies must not return to
+# internal/aws/ or internal/catalog/ after the AS-795b..p migration.
+# internal/resource/projection_init.go is excluded — AS-731 removes that
+# package wholesale.
+verify-zero-init:
+	@echo "Checking for init() bodies in internal/aws/ and internal/catalog/..."
+	@if grep -rln '^func init()' internal/aws/ internal/catalog/ 2>/dev/null; then \
+		echo "FAIL: init() bodies found in internal/aws/ or internal/catalog/ — AS-795 invariant is migrated catalog literals, not package init()"; \
+		exit 1; \
+	else \
+		echo "PASS: no init() bodies in internal/aws/ or internal/catalog/"; \
+	fi
+
 demo:
 	vhs docs/demos/demo.tape
 
@@ -119,7 +132,7 @@ snapshot-update:
 
 # Stage 6 — Pre-push gate. The single command every PR must pass before push.
 # See docs/development-process.md.
-ready-to-push: test-race lint security gofix verify-readonly check-readme snapshot mdlint
+ready-to-push: test-race lint security gofix verify-readonly verify-zero-init check-readme snapshot mdlint
 	@echo "PASS: ready-to-push gate green"
 
 # Stage 7 — Pre-release gate. Run before tagging a release. Subsumes ready-to-push
