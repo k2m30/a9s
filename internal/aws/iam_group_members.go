@@ -9,27 +9,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("iam_group_members", []string{
-		"user_name", "user_id", "arn", "path", "create_date", "password_last_used",
-	})
-
-	resource.RegisterPaginatedChild("iam_group_members", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchIAMGroupMembers(ctx, c.IAM, parentCtx, continuationToken)
-	})
-
-	resource.RegisterChildType(resource.ResourceTypeDef{
-		Name:      "Group Members",
-		ShortName: "iam_group_members",
-		Columns:   resource.IAMGroupMemberColumns(),
-		CopyField: "user_name",
-	})
-}
-
 // FetchIAMGroupMembers calls the IAM GetGroup API and converts the response
 // into a FetchResult of generic Resource structs representing group members.
 // A single API call is made per invocation; IsTruncated and NextToken (Marker)
