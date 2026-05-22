@@ -33,7 +33,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -44,12 +43,13 @@ import (
 // internal/tui/app_enrich.go. The signature is identical — (tea.Model,
 // tea.Cmd) — so the existing app.go dispatch line is unchanged.
 //
-// It constructs a transient runtime.Core to invoke the migrated policy
-// (HandleEnrichDetail), applies any returned UIIntents to the view stack,
-// then converts the returned TaskRequests into Bubble Tea commands.
+// It invokes m.core.HandleEnrichDetail (Core constructs the payload's
+// DetailCtx + Generation from session state post-PR-05a-h4-b), applies
+// any returned UIIntents to the view stack, then converts the returned
+// TaskRequests into Bubble Tea commands. The pre-h4-b transient-Core
+// shim is gone — the live Core has access to the same session pointer.
 func (m Model) handleEnrichDetail(msg messages.EnrichDetail) (tea.Model, tea.Cmd) {
-	core := runtime.New(m.core.Session(), resource.AllResourceTypes())
-	intents, tasks := core.HandleEnrichDetail(runtime.EnrichDetailEvent{
+	intents, tasks := m.core.HandleEnrichDetail(runtime.EnrichDetailEvent{
 		ResourceType: msg.ResourceType,
 		Resource:     msg.Resource,
 	})
@@ -174,28 +174,21 @@ func (m Model) runtimeTasksToCmd(tasks []runtime.TaskRequest) tea.Cmd {
 }
 
 // enrichDetailCmd builds the Bubble Tea command that runs the on-demand
-// detail enricher and emits an EnrichDetailResultMsg. It reads the
-// resource type and resource directly from the typed payload — no
-// Scope parsing, no side-channel resource argument.
-//
-// EnrichGen is captured from the session owned by core at dispatch time to
-// preserve stale-result-rejection semantics: the result handler in
-// app.go compares msg.Generation against m.core.Session().EnrichGen on receipt.
-// PolicyDocCache and clients are adapter-owned state that has not yet
-// migrated to the runtime core.
+// detail enricher and emits an EnrichDetailResultMsg. It reads every
+// runtime-side input (DetailCtx, Generation) from the typed payload —
+// PR-05a-h4-b (AS-962) moved DetailEnrichmentCtx construction onto Core
+// so the adapter no longer touches awsclient.DetailEnrichmentCtx
+// directly here. The remaining adapter-owned input is m.appCtx (the
+// app-wide cancellation context); ctx still wraps a 10 s per-call
+// timeout the runtime cannot express because tea.Cmd composition
+// happens here.
 func (m Model) enrichDetailCmd(p runtime.EnrichDetailPayload) tea.Cmd {
 	enricher := resource.GetDetailEnricher(p.ResourceType)
-
-	gen := m.core.Session().EnrichGen             // session-owned, promoted via session owned by core
-	policyDocs := m.core.Session().PolicyDocCache // session-owned, promoted via session owned by core
-	clients := m.core.Session().Clients
 	appCtx := m.appCtx
-	dctx := &awsclient.DetailEnrichmentCtx{
-		Clients:    clients,
-		PolicyDocs: policyDocs,
-	}
-	resourceType := p.ResourceType
+	dctx := p.DetailCtx
+	gen := p.Generation
 	res := p.Resource
+	resourceType := p.ResourceType
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(appCtx, 10*time.Second)
 		defer cancel()
