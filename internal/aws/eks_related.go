@@ -12,34 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	// Cluster.ResourcesVpcConfig: VpcId, ClusterSecurityGroupId, SubnetIds, SecurityGroupIds
-	// Cluster: RoleArn (IAM role for cluster operations)
-	resource.RegisterDefaultNavFields("eks", []resource.NavigableField{
-		{FieldPath: "ResourcesVpcConfig.VpcId", TargetType: "vpc"},
-		{FieldPath: "ResourcesVpcConfig.ClusterSecurityGroupId", TargetType: "sg"},
-		{FieldPath: "ResourcesVpcConfig.SubnetIds", TargetType: "subnet"},
-		{FieldPath: "ResourcesVpcConfig.SecurityGroupIds", TargetType: "sg"},
-		{FieldPath: "RoleArn", TargetType: "role"},
-	})
-
-	resource.RegisterRelated("eks", []resource.RelatedDef{
-		{TargetType: "ng", DisplayName: "Node Groups", Checker: checkEKSNodeGroups, NeedsTargetCache: true},
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkEKSAlarms, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkEKSCFN, NeedsTargetCache: true},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkEKSLogs, NeedsTargetCache: true},
-		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkEKSSG},
-		{TargetType: "vpc", DisplayName: "VPC", Checker: checkEKSVPC},
-		{TargetType: "role", DisplayName: "IAM Role", Checker: checkEKSRole},
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkEKSKMS},
-		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkEKSSubnet},
-		{TargetType: "ami", DisplayName: "AMI", Checker: checkEKSAMI},
-		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkEKSASG, NeedsTargetCache: true},
-		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkEKSEC2},
-		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkEKSCTEvents, NeedsTargetCache: true},
-	})
-}
-
 // checkEKSNodeGroups checks the cache for node groups belonging to this EKS cluster.
 func checkEKSNodeGroups(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.ID

@@ -7,10 +7,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterDetailEnricher("role_policies", enrichRolePolicy)
-}
-
 // enrichRolePolicy fetches the policy document for a role_policies resource
 // and returns an enriched copy with Document set on RawStruct.
 // Uses the session-scoped PolicyDocs cache provided on DetailEnrichmentCtx.

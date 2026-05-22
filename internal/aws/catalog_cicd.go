@@ -1,8 +1,12 @@
 package aws
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func colorCFN(r domain.Resource) domain.Color      { return cfnStackColor(r.Fields["status"]) }
@@ -31,6 +35,28 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{ChildType: "cfn_resources", Key: "R", ContextKeys: map[string]string{"stack_name": "ID"}, DisplayNameKey: "Name"},
 		},
 		Color: colorCFN,
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchCloudFormationStacksPage(ctx, c.CloudFormation, continuationToken)
+		},
+		Wave2:     IssueEnricher{Fn: EnrichCFNCombined, Priority: 100},
+		FieldKeys: []string{"stack_name", "status", "creation_time", "last_updated", "description"},
+		Related: []domain.RelatedDef{
+			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkCfnRole, NeedsTargetCache: true},
+			{TargetType: "cfn", DisplayName: "Related Stacks", Checker: checkCFNCFN, NeedsTargetCache: true},
+			{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkCfnSNS},
+			{TargetType: "s3", DisplayName: "S3 (stack resources)", Checker: checkCfnS3},
+			{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkCfnEBRule},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("cfn")},
+		},
+		Navigable: []domain.NavigableField{
+			{FieldPath: "RoleARN", TargetType: "role"},
+			{FieldPath: "NotificationARNs", TargetType: "sns"},
+		},
+		IssueEnricherFieldKeys: []string{"drift_status"},
 	},
 	{
 		Name:          "CodePipelines",
@@ -93,6 +119,32 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			DisplayNameKey: "repository_name",
 		}},
 		Color: colorECR,
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchECRRepositoriesPage(ctx, c.ECR, continuationToken)
+		},
+		Wave2: IssueEnricher{Fn: EnrichECRRepository, Priority: 100},
+		FieldKeys: []string{
+			"repository_name", "uri", "tag_mutability", "scan_on_push", "created_at",
+		},
+		IssueEnricherFieldKeys: []string{"critical_vulns", "high_vulns", "images_scanned"},
+		Related: []domain.RelatedDef{
+			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkECRLambda, NeedsTargetCache: true},
+			{TargetType: "cb", DisplayName: "CodeBuild Projects", Checker: checkECRCodeBuild, NeedsTargetCache: true},
+			{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkECRCFN, NeedsTargetCache: true},
+			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkECRKMS},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkECRCTEvents, NeedsTargetCache: true},
+			{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkECREbRule},
+			{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkECRECSTask, NeedsTargetCache: true},
+			{TargetType: "pipeline", DisplayName: "CodePipelines", Checker: checkECRPipeline},
+			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkECRRole},
+		},
+		Navigable: []domain.NavigableField{
+			{FieldPath: "EncryptionConfiguration.KmsKey", TargetType: "kms"},
+		},
 	},
 	{
 		Name:          "CodeArtifact Repos",

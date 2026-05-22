@@ -136,18 +136,6 @@ func computeSGRiskFields(perms []ec2types.IpPermission) (string, string, string)
 	return strconv.Itoa(dangerousCount), wideOpenStr, riskSummary
 }
 
-func init() {
-	resource.RegisterFieldKeys("sg", []string{"group_id", "group_name", "vpc_id", "description", "dangerous_open_count", "wide_open", "risk_summary"})
-
-	resource.RegisterPaginated("sg", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchSecurityGroupsPage(ctx, c.EC2, continuationToken)
-	})
-}
-
 // FetchSecurityGroups calls the EC2 DescribeSecurityGroups API and returns all
 // pages of security groups. Used by tests; the production path uses the per-page fetcher for pagination.
 func FetchSecurityGroups(ctx context.Context, api EC2DescribeSecurityGroupsAPI) ([]resource.Resource, error) {

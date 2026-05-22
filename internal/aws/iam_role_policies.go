@@ -18,26 +18,6 @@ type RolePolicyRow struct {
 	Document   any `json:"Document,omitempty" yaml:"Document,omitempty"`
 }
 
-func init() {
-	resource.RegisterFieldKeys("role_policies", []string{
-		"policy_name", "policy_arn", "policy_type",
-	})
-
-	resource.RegisterPaginatedChild("role_policies", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchRolePolicies(ctx, c.IAM, c.IAM, parentCtx, continuationToken)
-	})
-
-	resource.RegisterChildType(resource.ResourceTypeDef{
-		Name:      "Role Policies",
-		ShortName: "role_policies",
-		Columns:   resource.RolePolicyColumns(),
-	})
-}
-
 // FetchRolePolicies calls ListAttachedRolePolicies and ListRolePolicies to
 // retrieve both managed and inline policies attached to the given IAM role.
 // A single API call is made for each list per invocation. Managed policies

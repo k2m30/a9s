@@ -15,35 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterRelated("tgw", []resource.RelatedDef{
-		{
-			TargetType:       "vpc",
-			DisplayName:      "VPCs",
-			Checker:          checkTGWVPC,
-			NeedsTargetCache: false,
-		},
-		{
-			TargetType:       "rtb",
-			DisplayName:      "Route Tables",
-			Checker:          checkTGWRTB,
-			NeedsTargetCache: true,
-		},
-		{
-			TargetType:       "role",
-			DisplayName:      "IAM Role",
-			Checker:          checkTGWRole,
-			NeedsTargetCache: false,
-		},
-		{
-			TargetType:       "subnet",
-			DisplayName:      "Subnets",
-			Checker:          checkTGWSubnet,
-			NeedsTargetCache: false,
-		},
-	})
-}
-
 // checkTGWVPC calls ec2:DescribeTransitGatewayVpcAttachments filtered by the
 // TGW id and collects the VpcId of each returned attachment (Pattern A —
 // direct API call). DevOps consensus (5/5 reviewers) agrees this is the
