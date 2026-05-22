@@ -23,10 +23,13 @@ func TestMain(m *testing.M) {
 	aws.Install()
 	resource.WireProjection()
 
-	// Build the binary once for all CLI tests.
+	// Build the binary once for all CLI tests. Stamp main.version via
+	// ldflags so TestQA_012_VersionFlag's X.Y.Z assertion holds — without
+	// ldflags, buildinfo.ResolveVersion falls back to "dev" and `--version`
+	// prints "a9s dev" with no "." in it (AS-768).
 	tmpDir := os.TempDir()
 	testBinary = filepath.Join(tmpDir, "a9s-test")
-	cmd := exec.Command("go", "build", "-o", testBinary, "./cmd/a9s/")
+	cmd := exec.Command("go", "build", "-ldflags", "-X main.version=test-0.0.0", "-o", testBinary, "./cmd/a9s/")
 	cmd.Dir = findProjectRoot()
 	if out, err := cmd.CombinedOutput(); err != nil {
 		panic("failed to build test binary: " + string(out) + ": " + err.Error())
