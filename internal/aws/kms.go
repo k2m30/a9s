@@ -12,34 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("kms", []string{"alias", "key_id", "status", "description"})
-
-	resource.RegisterPaginated("kms", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchKMSKeysPage(ctx, c, continuationToken)
-	})
-
-	resource.RegisterFetchByIDs("kms", func(ctx context.Context, clients any, ids []string) ([]resource.Resource, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return nil, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchKMSKeysByIDs(ctx, c, ids)
-	})
-
-	resource.RegisterRelated("kms", []resource.RelatedDef{
-		{TargetType: "ebs", DisplayName: "EBS Volumes", Checker: checkKMSEBS, NeedsTargetCache: true},
-		{TargetType: "dbi", DisplayName: "RDS Instances", Checker: checkKMSRDS, NeedsTargetCache: true},
-		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkKMSSecrets, NeedsTargetCache: true},
-		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkKMSS3, NeedsTargetCache: false},
-		{TargetType: "role", DisplayName: "IAM Roles (grants)", Checker: checkKMSRole, NeedsTargetCache: false},
-	})
-}
-
 // FetchKMSKeysPage fetches a single page of KMS keys using the registered
 // paginated fetcher pattern.
 //
