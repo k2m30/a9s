@@ -32,7 +32,7 @@
 //	   scaffolding. Covered by grep-audit.
 //
 //	#7 app_enrich.go — EnrichDetailResultMsg updates only the active DetailModel's
-//	   internal m.res field, not m.Session().ResourceCache. That field is unexported and
+//	   internal m.res field, not m.Core().Session().ResourceCache. That field is unexported and
 //	   inaccessible from this external test package. The wire-up will be verified
 //	   by the coder's grep-audit (exactly 7 sites).
 //
@@ -55,7 +55,7 @@
 //	   are missed. Pre-fix: only wave1 finding returned. Post-fix: 2 findings.
 //
 //	TestShim_NavigateAliasHitsCanonicalCache:
-//	   handleNavigate does m.Session().ResourceCache[msg.ResourceType] — alias misses canonical
+//	   handleNavigate does m.Core().Session().ResourceCache[msg.ResourceType] — alias misses canonical
 //	   cache key, bypasses deriveFindingsForType, leaving Findings empty. Pre-fix:
 //	   empty. Post-fix: Findings populated.
 //
@@ -100,11 +100,11 @@ func newShimModel() tui.Model {
 }
 
 // TestShim_ProbeResourcesPopulatesFindings verifies that when
-// AvailabilityCheckedMsg is handled the retained resources in m.Session().ProbeResources
+// AvailabilityCheckedMsg is handled the retained resources in m.Core().Session().ProbeResources
 // have their Findings field populated by DeriveFindings.
 //
 // Wire-up site: app_handlers_availability.go (~line 215), the
-// m.Session().ProbeResources[msg.ResourceType] = msg.Resources assignment.
+// m.Core().Session().ProbeResources[msg.ResourceType] = msg.Resources assignment.
 //
 // Table-driven: every row exercises a distinct resource type to ensure no
 // type is special-cased and aliases are handled correctly.
@@ -148,13 +148,13 @@ func TestShim_ProbeResourcesPopulatesFindings(t *testing.T) {
 				Truncated:    false,
 				// session.New seeds AvailabilityGen=1 (AS-659) — stamp the live
 				// value so the AvailabilityChecked stale guard accepts it.
-				Gen:       m.Session().AvailabilityGen,
+				Gen:       m.Core().Session().AvailabilityGen,
 				Issues:    1,
 				Resources: []resource.Resource{res},
 			})
 
 			// The cache lookup must use the canonical short name, NOT the alias.
-			probeSlice, ok := m.Session().ProbeResources[tc.canonShort]
+			probeSlice, ok := m.Core().Session().ProbeResources[tc.canonShort]
 			if !ok || len(probeSlice) == 0 {
 				t.Fatalf("ProbeResources[%q] is empty — handler did not retain resources (alias=%q)", tc.canonShort, effective)
 			}
@@ -185,7 +185,7 @@ func TestShim_ProbeResourcesPopulatesFindings(t *testing.T) {
 
 // TestShim_EnrichmentCheckedBridgesWave2Findings is the critical Wave-2 bridge test.
 //
-// The test pre-seeds m.Session().ResourceCache[tc.canonShort] with a resource that has
+// The test pre-seeds m.Core().Session().ResourceCache[tc.canonShort] with a resource that has
 // tc.status, sends EnrichmentCheckedMsg (using alias if present), and asserts
 // the first finding is populated correctly.
 //
@@ -224,7 +224,7 @@ func TestShim_EnrichmentCheckedBridgesWave2Findings(t *testing.T) {
 			}
 
 			// Seed the cache under the canonical short name.
-			m.Session().ResourceCache[tc.canonShort] = &session.ResourceCacheEntry{
+			m.Core().Session().ResourceCache[tc.canonShort] = &session.ResourceCacheEntry{
 				Resources: []resource.Resource{res},
 			}
 
@@ -238,7 +238,7 @@ func TestShim_EnrichmentCheckedBridgesWave2Findings(t *testing.T) {
 				TypeGen:      0,
 			})
 
-			entry, ok := m.Session().ResourceCache[tc.canonShort]
+			entry, ok := m.Core().Session().ResourceCache[tc.canonShort]
 			if !ok || len(entry.Resources) == 0 {
 				t.Fatalf("ResourceCache[%q] is empty after EnrichmentCheckedMsg", tc.canonShort)
 			}
@@ -268,10 +268,10 @@ func TestShim_EnrichmentCheckedBridgesWave2Findings(t *testing.T) {
 }
 
 // TestShim_CachedPagesPopulatesFindings verifies that when RelatedCheckResultMsg
-// carries a CachedPages entry, the resources written to m.Session().ResourceCache have
+// carries a CachedPages entry, the resources written to m.Core().Session().ResourceCache have
 // their Findings field populated by DeriveFindings.
 //
-// Wire-up site: app.go (~line 489), the m.Session().ResourceCache[shortName] = ... assignment
+// Wire-up site: app.go (~line 489), the m.Core().Session().ResourceCache[shortName] = ... assignment
 // inside the CachedPages loop.
 //
 // Table-driven: aliased rows (rds-aliased, redis-aliased) are expected to fail
@@ -325,7 +325,7 @@ func TestShim_CachedPagesPopulatesFindings(t *testing.T) {
 			})
 
 			// After handling, the cache must be stored under the canonical key.
-			entry, ok := m.Session().ResourceCache[tc.canonShort]
+			entry, ok := m.Core().Session().ResourceCache[tc.canonShort]
 			if !ok || len(entry.Resources) == 0 {
 				t.Fatalf("ResourceCache[%q] is empty — CachedPages was not written (alias=%q)", tc.canonShort, effective)
 			}
@@ -355,10 +355,10 @@ func TestShim_CachedPagesPopulatesFindings(t *testing.T) {
 }
 
 // TestShim_LazyAddedPopulatesFindings verifies that when RelatedCheckResultMsg
-// carries a LazyAddedResources entry, the resources merged into m.Session().LazyResourceCache
+// carries a LazyAddedResources entry, the resources merged into m.Core().Session().LazyResourceCache
 // have their Findings field populated by DeriveFindings.
 //
-// Wire-up site: app.go (~line 517), the m.Session().LazyResourceCache[shortName] = existing
+// Wire-up site: app.go (~line 517), the m.Core().Session().LazyResourceCache[shortName] = existing
 // assignment inside the LazyAddedResources loop.
 //
 // Table-driven: aliased rows (rds-aliased, redis-aliased) are expected to fail
@@ -409,7 +409,7 @@ func TestShim_LazyAddedPopulatesFindings(t *testing.T) {
 			})
 
 			// The lazy cache must be stored under the canonical short name.
-			lazySlice, ok := m.Session().LazyResourceCache[tc.canonShort]
+			lazySlice, ok := m.Core().Session().LazyResourceCache[tc.canonShort]
 			if !ok || len(lazySlice) == 0 {
 				t.Fatalf("LazyResourceCache[%q] is empty — LazyAddedResources was not written (alias=%q)", tc.canonShort, effective)
 			}
@@ -481,7 +481,7 @@ func TestShim_DeriveHelpersResolveAlias(t *testing.T) {
 		Truncated:    false,
 		// session.New seeds AvailabilityGen=1 (AS-659) — stamp the live
 		// value so the AvailabilityChecked stale guard accepts it.
-		Gen:       m.Session().AvailabilityGen,
+		Gen:       m.Core().Session().AvailabilityGen,
 		Issues:    1,
 		Resources: []resource.Resource{res},
 	})
@@ -493,7 +493,7 @@ func TestShim_DeriveHelpersResolveAlias(t *testing.T) {
 	// Set EnrichTotal > 1 so the "all enrichment done" branch (EnrichChecked >= EnrichTotal)
 	// does not fire after processing this single message, which would nil out ProbeResources
 	// before we can inspect it.
-	m.Session().EnrichTotal = 2
+	m.Core().Session().EnrichTotal = 2
 	m = shimApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "dbi",
 		Findings: map[string]resource.EnrichmentFinding{
@@ -503,7 +503,7 @@ func TestShim_DeriveHelpersResolveAlias(t *testing.T) {
 		TypeGen: 0,
 	})
 
-	probeSlice, ok := m.Session().ProbeResources["dbi"]
+	probeSlice, ok := m.Core().Session().ProbeResources["dbi"]
 	if !ok || len(probeSlice) == 0 {
 		t.Fatal("ProbeResources[\"dbi\"] is empty after AvailabilityCheckedMsg with alias \"rds\"")
 	}
@@ -582,7 +582,7 @@ func TestShim_DeriveHelpersResolveAlias_SingleResource(t *testing.T) {
 		Truncated:    false,
 		// session.New seeds AvailabilityGen=1 (AS-659) — stamp the live
 		// value so the AvailabilityChecked stale guard accepts it.
-		Gen:       m.Session().AvailabilityGen,
+		Gen:       m.Core().Session().AvailabilityGen,
 		Issues:    1,
 		Resources: []resource.Resource{res},
 	})
@@ -595,7 +595,7 @@ func TestShim_DeriveHelpersResolveAlias_SingleResource(t *testing.T) {
 	// Set EnrichTotal > 1 so the "all enrichment done" branch (EnrichChecked >= EnrichTotal)
 	// does not fire after processing this single message, which would nil out ProbeResources
 	// before we can inspect it.
-	m.Session().EnrichTotal = 2
+	m.Core().Session().EnrichTotal = 2
 	m = shimApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "rds", // alias — exercises alias normalization in handleEnrichmentChecked
 		Findings: map[string]resource.EnrichmentFinding{
@@ -605,7 +605,7 @@ func TestShim_DeriveHelpersResolveAlias_SingleResource(t *testing.T) {
 		TypeGen: 0,
 	})
 
-	probeSlice, ok := m.Session().ProbeResources["dbi"]
+	probeSlice, ok := m.Core().Session().ProbeResources["dbi"]
 	if !ok || len(probeSlice) == 0 {
 		t.Fatal("ProbeResources[\"dbi\"] is empty after AvailabilityCheckedMsg with alias \"rds\"")
 	}
@@ -685,16 +685,16 @@ func TestShim_DeriveHelpersResolveAlias_SingleResource(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────────
 
 // TestShim_NavigateAliasHitsCanonicalCache verifies that handleNavigate resolves
-// an alias to the canonical ShortName before looking up m.Session().ResourceCache.
+// an alias to the canonical ShortName before looking up m.Core().Session().ResourceCache.
 //
-// Bug: app_handlers_navigate.go:49 does m.Session().ResourceCache[msg.ResourceType] —
+// Bug: app_handlers_navigate.go:49 does m.Core().Session().ResourceCache[msg.ResourceType] —
 // when msg.ResourceType is "rds" (alias) but the cache is keyed under "dbi"
 // (canonical), the lookup misses. deriveFindingsForType is never called on the
 // cached resources, so Findings remain empty.
 //
-// Setup: seed m.Session().ResourceCache["dbi"] with one resource (Status="impaired").
+// Setup: seed m.Core().Session().ResourceCache["dbi"] with one resource (Status="impaired").
 // Drive NavigateMsg{Target: TargetResourceList, ResourceType: "rds"}.
-// Post-fix: m.Session().ResourceCache["dbi"].Resources[0].Findings is populated.
+// Post-fix: m.Core().Session().ResourceCache["dbi"].Resources[0].Findings is populated.
 // Pre-fix: Findings is empty (cache entry found only after canonical lookup is wired).
 func TestShim_NavigateAliasHitsCanonicalCache(t *testing.T) {
 	m := newShimModel()
@@ -707,7 +707,7 @@ func TestShim_NavigateAliasHitsCanonicalCache(t *testing.T) {
 	}
 
 	// Seed the cache under the canonical key "dbi".
-	m.Session().ResourceCache["dbi"] = &session.ResourceCacheEntry{
+	m.Core().Session().ResourceCache["dbi"] = &session.ResourceCacheEntry{
 		Resources: []resource.Resource{res},
 	}
 
@@ -719,7 +719,7 @@ func TestShim_NavigateAliasHitsCanonicalCache(t *testing.T) {
 	})
 
 	// The cache under "dbi" must now have Findings populated.
-	entry, ok := m.Session().ResourceCache["dbi"]
+	entry, ok := m.Core().Session().ResourceCache["dbi"]
 	if !ok || len(entry.Resources) == 0 {
 		t.Fatal("ResourceCache[\"dbi\"] is empty after NavigateMsg — unexpected state")
 	}
@@ -799,10 +799,10 @@ func TestShim_ResourcesLoadedPopulatesFindings(t *testing.T) {
 			// an alias). The canonical test: check both canonical and alias keys to
 			// find where the entry landed, then assert Findings.
 			var entry *session.ResourceCacheEntry
-			if e, ok := m.Session().ResourceCache[tc.canonShort]; ok {
+			if e, ok := m.Core().Session().ResourceCache[tc.canonShort]; ok {
 				entry = e
 			} else if tc.alias != "" {
-				if e, ok := m.Session().ResourceCache[effective]; ok {
+				if e, ok := m.Core().Session().ResourceCache[effective]; ok {
 					entry = e
 				}
 			}

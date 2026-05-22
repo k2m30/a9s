@@ -59,16 +59,16 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if _, ok := m.activeView().(*views.IdentityModel); ok {
 			return m.updateActiveView(msg)
 		}
-		id := views.NewIdentity(m.core.Session().Profile, m.core.Session().Region, m.keys)
-		if m.core.Session().Identity != nil {
+		id := views.NewIdentity(m.core.Profile(), m.core.Region(), m.keys)
+		if m.core.Identity() != nil {
 			data := m.identityToViewData()
 			id.SetIdentity(data)
 		}
 		id.SetSize(m.innerSize())
 		m.pushView(&id)
 		// Always re-fetch on i press
-		m.core.Session().IdentityFetching = true
-		cmd := m.fetchIdentity(m.core.Session().ConnectGen)
+		m.core.SetIdentityFetching(true)
+		cmd := m.fetchIdentity(m.core.ConnectGen())
 		return m, cmd
 	}
 	if key.Matches(msg, m.keys.ErrorLog) {
