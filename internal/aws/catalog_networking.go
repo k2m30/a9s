@@ -216,6 +216,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkELBS3},
 			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkELBSubnet},
 			{TargetType: "waf", DisplayName: "WAF Web ACLs", Checker: checkELBWAF},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("elb")},
 		},
 		Navigable: []domain.NavigableField{
 			{FieldPath: "VpcId", TargetType: "vpc"},
@@ -270,6 +271,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "dbi-snap", DisplayName: "DB Instance Snapshots", Checker: checkTGDBISnap},
 			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkTGSG},
 			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkTGSubnet},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("tg")},
 		},
 		Navigable: []domain.NavigableField{
 			{FieldPath: "VpcId", TargetType: "vpc"},
@@ -305,6 +307,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkSGLambda, NeedsTargetCache: true},
 			{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkSGCFN, NeedsTargetCache: false},
 			{TargetType: "sg", DisplayName: "Referencing SGs", Checker: checkSGSG, NeedsTargetCache: true},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("sg")},
 		},
 		Navigable: []domain.NavigableField{
 			{FieldPath: "VpcId", TargetType: "vpc"},
@@ -346,6 +349,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkVPCCFN, NeedsTargetCache: false},
 			{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkVPCENI, NeedsTargetCache: true},
 			{TargetType: "tgw", DisplayName: "Transit Gateways", Checker: checkVPCTGW, NeedsTargetCache: false},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("vpc")},
 		},
 	},
 	{
@@ -384,6 +388,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "efs", DisplayName: "EFS File Systems", Checker: checkSubnetEFS},
 			{TargetType: "eks", DisplayName: "EKS Clusters", Checker: checkSubnetEKS, NeedsTargetCache: true},
 			{TargetType: "vpce", DisplayName: "VPC Endpoints", Checker: checkSubnetVPCE, NeedsTargetCache: true},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("subnet")},
 		},
 		Navigable: []domain.NavigableField{
 			{FieldPath: "VpcId", TargetType: "vpc"},
@@ -420,6 +425,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkRTBENI, NeedsTargetCache: true},
 			{TargetType: "tgw", DisplayName: "Transit Gateways", Checker: checkRTBTGW, NeedsTargetCache: true},
 			{TargetType: "vpce", DisplayName: "VPC Endpoints", Checker: checkRTBVPCE, NeedsTargetCache: true},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("rtb")},
 		},
 		Navigable: []domain.NavigableField{
 			{FieldPath: "VpcId", TargetType: "vpc"},
@@ -461,6 +467,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkNATAlarm, NeedsTargetCache: true},
 			{TargetType: "eip", DisplayName: "Elastic IPs", Checker: checkNATEIP, NeedsTargetCache: true},
 			{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkNATENI, NeedsTargetCache: true},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("nat")},
 		},
 		Navigable: []domain.NavigableField{
 			{FieldPath: "VpcId", TargetType: "vpc"},
@@ -492,6 +499,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Related: []domain.RelatedDef{
 			{TargetType: "vpc", DisplayName: "VPCs", Checker: checkIGWVPC, NeedsTargetCache: true},
 			{TargetType: "rtb", DisplayName: "Route Tables", Checker: checkIGWRTB, NeedsTargetCache: true},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("igw")},
 		},
 		Navigable: []domain.NavigableField{
 			{FieldPath: "Attachments.VpcId", TargetType: "vpc"},
@@ -538,6 +546,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "ecs-svc", DisplayName: "ECS Services", Checker: checkEIPECSSvc},
 			{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkEIPECSTask},
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkEIPLogs},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("eip")},
 		},
 		Navigable: []domain.NavigableField{
 			{FieldPath: "InstanceId", TargetType: "ec2"},
@@ -580,6 +589,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkVPCES3},
 			{TargetType: "tg", DisplayName: "Target Groups", Checker: checkVPCETG},
 			{TargetType: "waf", DisplayName: "WAF Web ACLs", Checker: checkVPCEWAF},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("vpce")},
 		},
 		Navigable: []domain.NavigableField{
 			{FieldPath: "VpcId", TargetType: "vpc"},
@@ -618,6 +628,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "rtb", DisplayName: "Route Tables", Checker: checkTGWRTB, NeedsTargetCache: true},
 			{TargetType: "role", DisplayName: "IAM Role", Checker: checkTGWRole, NeedsTargetCache: false},
 			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkTGWSubnet, NeedsTargetCache: false},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("tgw")},
 		},
 	},
 	{
@@ -654,6 +665,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkENILambda},
 			{TargetType: "nat", DisplayName: "NAT Gateways", Checker: checkENINAT, NeedsTargetCache: true},
 			{TargetType: "vpce", DisplayName: "VPC Endpoints", Checker: checkENIVPCE, NeedsTargetCache: true},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("eni")},
 		},
 		Navigable: []domain.NavigableField{
 			{FieldPath: "VpcId", TargetType: "vpc"},
