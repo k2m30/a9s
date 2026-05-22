@@ -109,7 +109,7 @@ var noNavFieldsAllowList = map[string]string{
 // listed in noNavFieldsAllowList with a documented reason.
 //
 // Failure here means a new resource type was added without wiring navigable fields.
-// Fix: either call resource.RegisterNavigableFields in the type's aws/*.go init(),
+// Fix: either call resource.SetNavigableFieldsForTest in the type's aws/*.go init(),
 // or add it to noNavFieldsAllowList with a rationale comment.
 func TestResourceTypeDef_AllHaveNavigableFields(t *testing.T) {
 	types := resource.AllResourceTypes()
@@ -127,7 +127,7 @@ func TestResourceTypeDef_AllHaveNavigableFields(t *testing.T) {
 			continue
 		}
 		t.Errorf("resource type %q has 0 NavigableFields and is not in the allow-list — "+
-			"add RegisterNavigableFields in internal/aws/<type>.go init() or document "+
+			"add SetNavigableFieldsForTest in internal/aws/<type>.go init() or document "+
 			"why this type needs no navigable fields in noNavFieldsAllowList", td.ShortName)
 	}
 }

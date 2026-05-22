@@ -171,3 +171,23 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Wave 3 metric-filter-count check (OUT OF SCOPE) — `docs/attention-signals.md` § Monitoring row `logs`.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 - `~` severity choice for `lastEventTimestamp` staleness — user decision deferred; defaulted to `~` (informational background check on a green row) because a stale log stream is a lagging signal, not an active break. a9s-devops (2026-04-20): stale-log-group does not itself cause user-facing impact — it flags a silent emitter; worth surfacing but not worth bumping the menu `issues:N` count.
+
+<!-- BEGIN GENERATED: header -->
+logs — MONITORING. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| lambda | Lambda Functions | yes |
+| alarm | CW Alarms | yes |
+| kms | KMS Key | no |
+| apigw | API Gateway | yes |
+| ecs-task | ECS Tasks | yes |
+| kinesis | Kinesis Streams | no |
+| s3 | S3 (exports) | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

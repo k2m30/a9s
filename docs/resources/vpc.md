@@ -190,3 +190,27 @@ At 3am, glancing at the list, a yellow row with `pending: VPC being created` or 
 - Default-VPC detection out-of-scope rationale — `a9s-devops (2026-04-20): possible=yes (Vpc.IsDefault is on the list response), worth=no. Not a daily-driver signal; belongs in Security Hub / Config, not in the attention column.`
 - `BlockPublicAccessStates` surfacing out-of-scope — `a9s-devops (2026-04-20): possible=yes, worth=no. Account-posture control, not per-row operational attention.`
 - No per-VPC CloudWatch namespace — `a9s-devops (2026-04-20): possible=no, worth=no. AWS publishes flow logs (presence covered in Wave 2) but no per-VPC metric namespace.`
+
+<!-- BEGIN GENERATED: header -->
+vpc — NETWORKING. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| subnet | Subnets | yes |
+| sg | Security Groups | yes |
+| ec2 | EC2 Instances | yes |
+| elb | Load Balancers | yes |
+| nat | NAT Gateways | yes |
+| igw | Internet Gateways | yes |
+| rtb | Route Tables | yes |
+| vpce | VPC Endpoints | yes |
+| cfn | CloudFormation | no |
+| eni | Network Interfaces | yes |
+| tgw | Transit Gateways | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

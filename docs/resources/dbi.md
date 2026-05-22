@@ -238,3 +238,27 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Wave 3 exclusions — a9s-devops (2026-04-20): possible=yes, worth=no as list-row signals. CloudWatch per-resource metrics scale per-datapoint per-minute; they belong in a metrics view, not on the resource list.
 - user decision (2026-04-21): transitional S4 shape is `<status>: <first non-empty PendingModifiedValues key>` when available, else bare status. Pins the §4.1 recommendation into §4 so the coder has no latitude.
 - user decision (2026-04-21): each Broken failure status renders its own S5 remedy sentence (per the table in §4), rather than a single generic "in a failed state" sentence.
+
+<!-- BEGIN GENERATED: header -->
+dbi — DATABASES & STORAGE. Lifecycle key: `status`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| sg | Security Groups | no |
+| kms | KMS Key | no |
+| subnet | Subnets | no |
+| alarm | CloudWatch Alarms | yes |
+| dbi-snap | DB Instance Snapshots | yes |
+| logs | Log Groups | yes |
+| vpc | VPC | no |
+| secrets | Secrets Manager | yes |
+| dbc | RDS Clusters | yes |
+| role | IAM Roles | no |
+| eni | Network Interfaces | no |
+| ct-events | CloudTrail Events | yes |
+<!-- END GENERATED: related -->

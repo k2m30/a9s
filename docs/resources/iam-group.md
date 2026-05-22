@@ -120,3 +120,18 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Inline group policies deferred — a9s-devops persona (2026-04-20): possible=yes, worth=no. The `policy` shortName is managed-policy-only, and inline policies are not independently navigable a9s resources.
 - `~` severity for orphan-group finding — a9s-devops persona (2026-04-20): empty groups are a cost/hygiene signal, not operational breakage; `~` matches the "worth knowing, no action needed" slot. No S1 bump.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?" (read-only by design).
+
+<!-- BEGIN GENERATED: header -->
+iam-group — SECURITY & IAM. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| iam-user | IAM Users | no |
+| policy | IAM Policies | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

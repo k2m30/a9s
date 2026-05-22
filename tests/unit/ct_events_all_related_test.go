@@ -20,10 +20,10 @@ import (
 // TestAppendRelated_AddsToExisting verifies that AppendRelated appends a new
 // entry to an existing RelatedDef slice without replacing it.
 func TestAppendRelated_AddsToExisting(t *testing.T) {
-	resource.RegisterRelated("test_append", []resource.RelatedDef{
+	resource.SetRelatedForTest("test_append", []resource.RelatedDef{
 		{TargetType: "vpc", DisplayName: "VPCs", Checker: resource.NoopChecker},
 	})
-	t.Cleanup(func() { resource.UnregisterRelated("test_append") })
+	t.Cleanup(func() { resource.CleanupRelatedForTest("test_append") })
 
 	resource.AppendRelated("test_append", resource.RelatedDef{
 		TargetType:  "ct-events",
@@ -43,7 +43,7 @@ func TestAppendRelated_AddsToExisting(t *testing.T) {
 // TestAppendRelated_CreatesNew verifies that AppendRelated creates a new entry
 // when no prior registration exists for the short name.
 func TestAppendRelated_CreatesNew(t *testing.T) {
-	t.Cleanup(func() { resource.UnregisterRelated("test_append_new") })
+	t.Cleanup(func() { resource.CleanupRelatedForTest("test_append_new") })
 
 	resource.AppendRelated("test_append_new", resource.RelatedDef{
 		TargetType:  "ct-events",
@@ -63,10 +63,10 @@ func TestAppendRelated_CreatesNew(t *testing.T) {
 // TestAppendRelated_NoDuplicate verifies that calling AppendRelated twice with
 // the same TargetType does not create a duplicate entry.
 func TestAppendRelated_NoDuplicate(t *testing.T) {
-	resource.RegisterRelated("test_append_dedup", []resource.RelatedDef{
+	resource.SetRelatedForTest("test_append_dedup", []resource.RelatedDef{
 		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: resource.NoopChecker},
 	})
-	t.Cleanup(func() { resource.UnregisterRelated("test_append_dedup") })
+	t.Cleanup(func() { resource.CleanupRelatedForTest("test_append_dedup") })
 
 	resource.AppendRelated("test_append_dedup", resource.RelatedDef{
 		TargetType:  "ct-events",

@@ -9,11 +9,11 @@ import (
 // TestQA_FieldAlias_RegisterAndApply verifies that registered aliases are applied:
 // original keys remain, alias keys are added, and unaliased keys are untouched.
 func TestQA_FieldAlias_RegisterAndApply(t *testing.T) {
-	resource.RegisterFieldAliases("ec2", map[string]string{
+	resource.SetFieldAliasesForTest("ec2", map[string]string{
 		"instance_id": "InstanceId",
 		"state":       "State",
 	})
-	t.Cleanup(func() { resource.UnregisterFieldAliases("ec2") })
+	t.Cleanup(func() { resource.CleanupFieldAliasesForTest("ec2") })
 
 	fields := map[string]string{
 		"instance_id": "i-123",
@@ -44,10 +44,10 @@ func TestQA_FieldAlias_RegisterAndApply(t *testing.T) {
 
 // TestQA_FieldAlias_NoOverwrite verifies that aliases never overwrite keys that already exist.
 func TestQA_FieldAlias_NoOverwrite(t *testing.T) {
-	resource.RegisterFieldAliases("ec2", map[string]string{
+	resource.SetFieldAliasesForTest("ec2", map[string]string{
 		"state": "State",
 	})
-	t.Cleanup(func() { resource.UnregisterFieldAliases("ec2") })
+	t.Cleanup(func() { resource.CleanupFieldAliasesForTest("ec2") })
 
 	fields := map[string]string{
 		"state": "running",
@@ -63,10 +63,10 @@ func TestQA_FieldAlias_NoOverwrite(t *testing.T) {
 
 // TestQA_FieldAlias_EmptyFields verifies that nil input returns nil (no panic, no allocation).
 func TestQA_FieldAlias_EmptyFields(t *testing.T) {
-	resource.RegisterFieldAliases("ec2", map[string]string{
+	resource.SetFieldAliasesForTest("ec2", map[string]string{
 		"instance_id": "InstanceId",
 	})
-	t.Cleanup(func() { resource.UnregisterFieldAliases("ec2") })
+	t.Cleanup(func() { resource.CleanupFieldAliasesForTest("ec2") })
 
 	result := resource.ApplyFieldAliases("ec2", nil)
 
@@ -95,10 +95,10 @@ func TestQA_FieldAlias_NoAliasRegistered(t *testing.T) {
 
 // TestQA_FieldAlias_EmptyValueSkipped verifies that whitespace-only source values are not aliased.
 func TestQA_FieldAlias_EmptyValueSkipped(t *testing.T) {
-	resource.RegisterFieldAliases("ec2", map[string]string{
+	resource.SetFieldAliasesForTest("ec2", map[string]string{
 		"instance_id": "InstanceId",
 	})
-	t.Cleanup(func() { resource.UnregisterFieldAliases("ec2") })
+	t.Cleanup(func() { resource.CleanupFieldAliasesForTest("ec2") })
 
 	fields := map[string]string{
 		"instance_id": "  ",
@@ -114,10 +114,10 @@ func TestQA_FieldAlias_EmptyValueSkipped(t *testing.T) {
 // TestQA_FieldAlias_NoCopyWhenAllPresent verifies that when all alias targets already exist
 // the function returns the same map (no copy performed).
 func TestQA_FieldAlias_NoCopyWhenAllPresent(t *testing.T) {
-	resource.RegisterFieldAliases("ec2", map[string]string{
+	resource.SetFieldAliasesForTest("ec2", map[string]string{
 		"state": "State",
 	})
-	t.Cleanup(func() { resource.UnregisterFieldAliases("ec2") })
+	t.Cleanup(func() { resource.CleanupFieldAliasesForTest("ec2") })
 
 	fields := map[string]string{
 		"state": "running",

@@ -187,3 +187,19 @@ One bullet per claim in §§2–4.1. Citation sources, in order of authority:
 - a9s-devops persona (2026-04-20) — `creating` status paired with `PercentProgress` for S4 text — possible=yes, worth=yes. Rationale: `DBSnapshot.PercentProgress` is on the list response; attaching the percentage converts a bare transitional keyword into an informative progress reading at zero cost.
 - a9s-devops persona (2026-04-20) — public-snapshot / shared-account detection (`DescribeDBSnapshotAttributes`) kept out of scope as a Wave 2 list-row signal — possible=yes, worth=no at list-row cost shape. Rationale: per-snapshot fan-out is expensive for a security-audit concern that belongs in a posture view, not on every list refresh; Wave 3 placement matches the golden doc.
 - Count-shown values for the related panel — a9s-devops persona (2026-04-20): possible=yes (for cached-sibling lookups), worth=yes. For `dbi`, `kms`, `dbc`, `backup` the counts come from already-loaded siblings and are exact and cheap; `ct-events` is windowed and a count would be misleading, hence `unknown`.
+
+<!-- BEGIN GENERATED: header -->
+dbi-snap — DATABASES & STORAGE. Lifecycle key: `status`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| dbi | DB Instances | yes |
+| kms | KMS Keys | yes |
+| backup | Backup Plans | no |
+| ct-events | CloudTrail Events | yes |
+<!-- END GENERATED: related -->

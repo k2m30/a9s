@@ -1,7 +1,7 @@
 package unit
 
 // golden_research_related_test.go — Golden test: all P0 relationships from
-// research docs must have a matching RegisterRelated entry.
+// research docs must have a matching SetRelatedForTest entry.
 //
 // Reads every docs/design/related-resources/{shortname}.md file, extracts
 // table rows marked "| P0 |", parses the target shortname from the first
@@ -115,7 +115,7 @@ func TestGolden_ResearchP0RelationshipsRegistered(t *testing.T) {
 			}
 
 			if !registered[target] {
-				t.Errorf("%s: P0 relationship %q from research doc not registered in RegisterRelated",
+				t.Errorf("%s: P0 relationship %q from research doc not registered in SetRelatedForTest",
 					sourceShortname, target)
 				failures++
 			}
@@ -123,7 +123,7 @@ func TestGolden_ResearchP0RelationshipsRegistered(t *testing.T) {
 	}
 
 	if failures > 0 {
-		t.Logf("%d P0 relationship gap(s) found — add RegisterRelated entries for each", failures)
+		t.Logf("%d P0 relationship gap(s) found — add SetRelatedForTest entries for each", failures)
 	}
 }
 

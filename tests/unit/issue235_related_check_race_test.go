@@ -62,14 +62,14 @@ func TestIssue235_EachCheckerGetsIsolatedCacheSnapshot(t *testing.T) {
 		}, nil
 	})
 
-	resource.RegisterPaginated(typeX, fetcherX)
-	resource.RegisterPaginated(typeY, fetcherY)
-	resource.RegisterPaginated(typeZ, fetcherZ)
+	resource.SetPaginatedForTest(typeX, fetcherX)
+	resource.SetPaginatedForTest(typeY, fetcherY)
+	resource.SetPaginatedForTest(typeZ, fetcherZ)
 
 	// Register related defs: each checker receives the cache snapshot and counts
 	// only its own type's resource. If cache isolation is broken, a checker may
 	// incorrectly see another type's resource under its own key.
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:       typeX,
 			DisplayName:      "Type X",
@@ -109,10 +109,10 @@ func TestIssue235_EachCheckerGetsIsolatedCacheSnapshot(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterPaginated(typeX)
-		resource.UnregisterPaginated(typeY)
-		resource.UnregisterPaginated(typeZ)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupPaginatedForTest(typeX)
+		resource.CleanupPaginatedForTest(typeY)
+		resource.CleanupPaginatedForTest(typeZ)
 	})
 
 	// Non-demo model so handleRelatedCheckStarted hits the live-mode path

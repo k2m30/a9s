@@ -149,7 +149,7 @@ func TestBuildEnrichQueue_StableAlphabeticalWithinPriority(t *testing.T) {
 	}
 	for _, name := range priority10Types {
 		awsclient.SetWave2EnricherForTest(t, name, awsclient.IssueEnricher{
-			Fn:       awsclient.NoOpIssueEnricher,
+			Fn:       awsclient.InFetcherWave2Sentinel,
 			Priority: 10,
 		})
 	}
@@ -252,7 +252,7 @@ func TestBuildEnrichQueue_SkipsTypesWithoutProbe(t *testing.T) {
 	// map. SetWave2EnricherForTest accepts sentinel short names (not in the
 	// catalog) and restores state automatically via t.Cleanup.
 	awsclient.SetWave2EnricherForTest(t, probeSkipType, awsclient.IssueEnricher{
-		Fn:       awsclient.NoOpIssueEnricher,
+		Fn:       awsclient.InFetcherWave2Sentinel,
 		Priority: 100,
 	})
 
@@ -288,7 +288,7 @@ func TestBuildEnrichQueue_NewEnricherAutoParticipates(t *testing.T) {
 	// priority to prove the Wave 2 entry alone is sufficient to participate in
 	// dispatch ordering. SetWave2EnricherForTest restores state automatically.
 	awsclient.SetWave2EnricherForTest(t, novelType, awsclient.IssueEnricher{
-		Fn:       awsclient.NoOpIssueEnricher,
+		Fn:       awsclient.InFetcherWave2Sentinel,
 		Priority: 10, // batchable tier
 	})
 

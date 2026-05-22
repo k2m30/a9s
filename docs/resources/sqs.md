@@ -189,3 +189,23 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - §5 backlog-threshold deferral — a9s-devops (2026-04-21): possible=yes-via-heuristic, worth=yes-but-decision-deferred. No universal absolute number works across interactive vs batch workloads; recommend deferring to an explicit decision in `attention-signals.md` (fixed default, per-queue tag override, or relative heuristic).
 - §5 rising-unbounded deferral — a9s-devops (2026-04-21): possible=yes, worth=yes-but-needs-sampling-contract. Needs sample-cadence + delta-threshold specification and possibly cache-format change; defer until `attention-signals.md` specifies.
 - §5 read-only invariant — `docs/architecture.md` § "What is a9s?".
+
+<!-- BEGIN GENERATED: header -->
+sqs — MESSAGING. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| alarm | CloudWatch Alarms | yes |
+| lambda | Lambda Functions | no |
+| sqs | Dead Letter Queues | yes |
+| sns-sub | SNS Subscriptions | yes |
+| sns | SNS Topics | yes |
+| eb-rule | EventBridge Rules | yes |
+| kms | KMS Key | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

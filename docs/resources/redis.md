@@ -215,3 +215,25 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `create-failed` cause text unavailable on `ReplicationGroup` — a9s-devops (2026-04-20): possible=no, worth=yes. AWS does not expose a `FailureMessage`/`FailureCode` field on the replication-group response; the cause is only in CloudTrail events; S4 directs the operator there.
 - Encryption / AUTH posture out of scope at list level — a9s-devops (2026-04-20): possible=yes, worth=no. Audit-scope not incident-scope; surfacing as Warning would noisy-up legacy groups without driving action.
 - Shard-level status out of scope at list level — a9s-devops (2026-04-20): possible=yes, worth=no at list level. `NodeGroup.Status` exists but belongs in a per-replication-group shard panel, not on the list row.
+
+<!-- BEGIN GENERATED: header -->
+redis — DATABASES & STORAGE. Lifecycle key: `status`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| alarm | CW Alarms | yes |
+| cfn | CloudFormation | yes |
+| ct-events | CloudTrail Events | yes |
+| kms | KMS Key | no |
+| logs | Log Groups | yes |
+| secrets | Secrets Manager | yes |
+| sg | Security Groups | yes |
+| sns | SNS Topics | yes |
+| subnet | Subnets | yes |
+| vpc | VPC | no |
+<!-- END GENERATED: related -->

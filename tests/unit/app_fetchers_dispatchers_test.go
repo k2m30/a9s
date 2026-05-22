@@ -149,17 +149,17 @@ func TestFetchChildResources_NilClients(t *testing.T) {
 	// Register a temporary child type so the "unsupported child type" guard is
 	// not hit — we want the nil-clients guard.
 	const childType = "test_child_nil_clients"
-	resource.RegisterChildType(resource.ResourceTypeDef{
+	resource.SetChildTypeForTest(resource.ResourceTypeDef{
 		Name:      "Test Child Nil Clients",
 		ShortName: childType,
 		Columns:   []resource.Column{{Key: "id", Title: "ID", Width: 20}},
 	})
-	resource.RegisterPaginatedChild(childType, func(_ context.Context, _ any, _ resource.ParentContext, _ string) (resource.FetchResult, error) {
+	resource.SetPaginatedChildForTest(childType, func(_ context.Context, _ any, _ resource.ParentContext, _ string) (resource.FetchResult, error) {
 		return resource.FetchResult{}, nil
 	})
 	t.Cleanup(func() {
-		resource.UnregisterChildType(childType)
-		resource.UnregisterPaginatedChild(childType)
+		resource.CleanupChildTypeForTest(childType)
+		resource.CleanupPaginatedChildForTest(childType)
 	})
 
 	_, cmd := rootApplyMsg(m, messages.EnterChildView{
@@ -199,14 +199,14 @@ func TestFetchChildResources_UnknownChildType(t *testing.T) {
 	// The FlashMsg path already covers the case where the child type def is absent
 	// entirely; this covers the internal fetcher-absent path.
 	const noFetcherChild = "test_child_no_fetcher"
-	resource.RegisterChildType(resource.ResourceTypeDef{
+	resource.SetChildTypeForTest(resource.ResourceTypeDef{
 		Name:      "Test Child No Fetcher",
 		ShortName: noFetcherChild,
 		Columns:   []resource.Column{{Key: "id", Title: "ID", Width: 20}},
 	})
 	// Do NOT register a paginated child fetcher — leave it absent.
 	t.Cleanup(func() {
-		resource.UnregisterChildType(noFetcherChild)
+		resource.CleanupChildTypeForTest(noFetcherChild)
 	})
 
 	_, cmd := rootApplyMsg(m, messages.EnterChildView{
@@ -245,17 +245,17 @@ func TestFetchMoreResources_ParentCtxBranch_NilClients(t *testing.T) {
 
 	// Register a child fetcher so the lookup succeeds.
 	const childType = "test_more_child"
-	resource.RegisterChildType(resource.ResourceTypeDef{
+	resource.SetChildTypeForTest(resource.ResourceTypeDef{
 		Name:      "Test More Child",
 		ShortName: childType,
 		Columns:   []resource.Column{{Key: "id", Title: "ID", Width: 20}},
 	})
-	resource.RegisterPaginatedChild(childType, func(_ context.Context, _ any, _ resource.ParentContext, _ string) (resource.FetchResult, error) {
+	resource.SetPaginatedChildForTest(childType, func(_ context.Context, _ any, _ resource.ParentContext, _ string) (resource.FetchResult, error) {
 		return resource.FetchResult{}, nil
 	})
 	t.Cleanup(func() {
-		resource.UnregisterChildType(childType)
-		resource.UnregisterPaginatedChild(childType)
+		resource.CleanupChildTypeForTest(childType)
+		resource.CleanupPaginatedChildForTest(childType)
 	})
 
 	_, cmd := rootApplyMsg(m, messages.LoadMore{

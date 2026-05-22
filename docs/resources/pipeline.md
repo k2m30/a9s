@@ -216,3 +216,27 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `s3` discovery via `ArtifactStore.Location` plus `Provider==S3` source/deploy actions — `a9s-devops (2026-04-20): possible=yes, worth=yes. ArtifactStore.Location is the bucket name directly.`
 - `sns` discovery limited to manual-approval `Configuration["NotificationArn"]`; developer-tools notifications are a separate API and out of scope for this target — `a9s-devops (2026-04-20): possible=yes (approval only), worth=yes. The related-resources contract says "Approval SNS topic", so scope is bounded.`
 - Superseded HOW ignored — row middle-dot `·` marker, `⚠ Background Check` detail header, and derived list-level banner in `docs/enrichment-visibility.md` are not cited or reproduced per the skill's S1–S5 rules.
+
+<!-- BEGIN GENERATED: header -->
+pipeline — CI/CD. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| cb | CodeBuild Projects | no |
+| role | IAM Roles | no |
+| cfn | CloudFormation | no |
+| codeartifact | CodeArtifact | no |
+| eb-rule | EventBridge Rules | no |
+| ecr | ECR Repositories | no |
+| ecs-svc | ECS Services | no |
+| kms | KMS Key | no |
+| lambda | Lambda Functions | no |
+| s3 | S3 Buckets (artifacts) | no |
+| sns | SNS Topics | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

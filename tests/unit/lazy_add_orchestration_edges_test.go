@@ -66,7 +66,7 @@ func TestLazyAdd_MissingFromCache_DedupsRepeatedIDsInChecker(t *testing.T) {
 	var capturedIDs []string
 	var capturedOnce atomic.Bool
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:       targetType,
 			DisplayName:      "Dedup Test Target",
@@ -81,7 +81,7 @@ func TestLazyAdd_MissingFromCache_DedupsRepeatedIDsInChecker(t *testing.T) {
 		},
 	})
 
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
 		if capturedOnce.CompareAndSwap(false, true) {
 			cp := make([]string, len(ids))
 			copy(cp, ids)
@@ -96,8 +96,8 @@ func TestLazyAdd_MissingFromCache_DedupsRepeatedIDsInChecker(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
 	m := tui.New("testprofile", "us-east-1")
@@ -154,7 +154,7 @@ func TestLazyAdd_FetchByIDsErrorSwallowed_ChecksResultStillDelivered(t *testing.
 		targetType = "test-lazy-error-target"
 	)
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:       targetType,
 			DisplayName:      "Error Swallow Test Target",
@@ -169,13 +169,13 @@ func TestLazyAdd_FetchByIDsErrorSwallowed_ChecksResultStillDelivered(t *testing.
 		},
 	})
 
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, _ []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, _ []string) ([]resource.Resource, error) {
 		return nil, errors.New("simulated aws failure")
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
 	m := tui.New("testprofile", "us-east-1")

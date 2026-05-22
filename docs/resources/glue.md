@@ -169,3 +169,24 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — `secrets` pivot via Connection `SECRET_ID` property — `a9s-devops persona (2026-04-20): possible=yes, worth=yes. Glue Connections that wrap Secrets Manager expose the secret ID under this property; this is the only on-resource path.`
 - a9s-devops consultation — inner-script data paths are not discoverable — `a9s-devops persona (2026-04-20): possible=no, not available in AWS surface. Glue exposes no "datasets this script reads" API; static code analysis is out of scope.`
 - a9s-devops consultation — sibling Glue object types (crawlers, triggers, workflows) deliberately excluded for now — `a9s-devops persona (2026-04-20): possible=yes, worth=no. Would warrant their own shortNames in a future iteration; current glue shortName scopes to Jobs per related-resources.md.`
+
+<!-- BEGIN GENERATED: header -->
+glue — DATA & ANALYTICS. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| role | IAM Roles | yes |
+| alarm | CW Alarms | yes |
+| logs | Log Groups | yes |
+| cfn | CloudFormation Stacks | no |
+| s3 | S3 (script bucket) | no |
+| kms | KMS Key | no |
+| athena | Athena WorkGroups | no |
+| secrets | Secrets Manager | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

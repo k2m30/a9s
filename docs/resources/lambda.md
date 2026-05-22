@@ -327,3 +327,40 @@ One bullet per claim in §§2–4.1. Citation sources, in order of authority:
 - Wave 3 OUT OF SCOPE items — `docs/attention-signals.md` § Compute row `lambda` Wave 3 cell.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?" (a9s makes no AWS write calls).
 - S4 list-text wording (`creating`, `idle: not invoked recently`, `failed: <StateReasonCode>`, `update failed: <LastUpdateStatusReasonCode>`, `runtime deprecated: <Runtime>`, `no DLQ — async failures dropped`) — a9s-devops (2026-04-20): possible=yes, worth=yes. Paired state+cause wording per the skill's §4 rules; `StateReasonCode` / `LastUpdateStatusReasonCode` are AWS-provided short codes suitable for a 40-char status cell (AWS SDK Go v2 — lambda/types.StateReasonCode, lambda/types.LastUpdateStatusReasonCode).
+
+<!-- BEGIN GENERATED: header -->
+lambda — COMPUTE. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| role | IAM Roles | yes |
+| alarm | CW Alarms | yes |
+| logs | Log Groups | yes |
+| sg | Security Groups | no |
+| vpc | VPC | no |
+| kms | KMS Key | no |
+| sqs | SQS Queues | no |
+| cfn | CloudFormation | no |
+| eb-rule | EventBridge Rules | no |
+| subnet | Subnets | no |
+| efs | EFS File Systems | no |
+| apigw | API Gateways | yes |
+| cf | CloudFront | yes |
+| ddb | DynamoDB Tables | no |
+| kinesis | Kinesis Streams | no |
+| msk | MSK Clusters | no |
+| ct-events | CloudTrail Events | yes |
+| tg | Target Groups | yes |
+| sns | SNS Topics | yes |
+| sns-sub | SNS Subscriptions | yes |
+| s3 | S3 Buckets | yes |
+| ecr | ECR Repositories | no |
+| eni | Network Interfaces | yes |
+| secrets | Secrets | yes |
+| ssm | SSM Parameters | yes |
+<!-- END GENERATED: related -->

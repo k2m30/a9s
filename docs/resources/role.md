@@ -161,3 +161,24 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 - S1–S5 surface definitions and Wave→surface mapping — `.claude/skills/a9s-resource-spec/SKILL.md` § "Allowed visualization surfaces (exactly five)".
 - `~` severity choice for dormant-role finding — a9s-devops (2026-04-20): possible=yes, worth=no (for bumping S1). Dormancy is informational; deletion requires human review of trust and attached-policy blast radius, so chasing it via the menu issues count would be noise. `~` (no S1 bump) is the correct surface.
+
+<!-- BEGIN GENERATED: header -->
+role — SECURITY & IAM. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| lambda | Lambda Functions | yes |
+| glue | Glue Jobs | yes |
+| ng | Node Groups | yes |
+| policy | IAM Policies | no |
+| ec2 | EC2 Instances | yes |
+| eks | EKS Clusters | yes |
+| iam-group | IAM Groups (trust) | no |
+| iam-user | IAM Users (trust) | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

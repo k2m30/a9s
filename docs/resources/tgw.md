@@ -143,3 +143,20 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `ct-events` universal pivot — `docs/related-resources.md` § Policy (universal ct-events entry applies to every registered type).
 - S1–S5 surface mechanics and Wave→surface mapping — a9s-resource-spec skill SKILL.md § "Allowed visualization surfaces (exactly five)" and § "Mapping rules".
 - Read-only invariant (Out of Scope write operations) — `docs/architecture.md` § "What is a9s?".
+
+<!-- BEGIN GENERATED: header -->
+tgw — NETWORKING. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| vpc | VPCs | no |
+| rtb | Route Tables | yes |
+| role | IAM Role | no |
+| subnet | Subnets | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

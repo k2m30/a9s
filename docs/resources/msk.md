@@ -218,3 +218,26 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `ct-events` is the universal pivot applied to every registered type — `docs/related-resources.md` § Policy.
 - a9s is read-only — `docs/architecture.md` § "What is a9s?".
 - Superseded HOW ignored — row middle-dot `·` marker, `⚠ Background Check` detail header, and derived list-level banner in `docs/enrichment-visibility.md` are not cited or reproduced per the skill's S1–S5 rules.
+
+<!-- BEGIN GENERATED: header -->
+msk — MESSAGING. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| alarm | CW Alarms | yes |
+| sg | Security Groups | no |
+| kms | KMS Key | no |
+| lambda | Lambda Functions | yes |
+| cfn | CloudFormation | yes |
+| subnet | Subnets | no |
+| vpc | VPC | yes |
+| logs | Log Groups | no |
+| s3 | S3 (broker logs) | no |
+| secrets | Secrets Manager | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

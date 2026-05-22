@@ -219,3 +219,27 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `efs` count caveat (mount-target data is not on the top-level `efs` list response — it requires `DescribeMountTargets` per FS) — `AWS SDK Go v2 — efs/types.FileSystemDescription` (no subnet field on `FileSystemDescription`; subnet data only on `MountTargetDescription`).
 - `cfn` tag-based discovery is conventional (no direct field on `Subnet`) — a9s-devops (2026-04-20): possible=yes, worth=yes. Real-world subnets that are CFN-managed carry `aws:cloudformation:stack-name`; operator commonly pivots from a subnet to its stack during drift or change investigations. No AWS surface carries a direct Stack reference on `Subnet` itself, so tags are the only read-only discovery path.
 - `efs` pivot worth surfacing despite indirect discovery — a9s-devops (2026-04-20): possible=yes, worth=yes. Subnet IP exhaustion or AZ failure directly breaks EFS mount-target reachability in that AZ; operator routinely asks "which FS mounts through this subnet?" during AZ incident triage. Surfaced as count-when-loaded, accepting that the count is present only when mount-target data has been fetched by the `efs` resource's own Wave 2.
+
+<!-- BEGIN GENERATED: header -->
+subnet — NETWORKING. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| ec2 | EC2 Instances | yes |
+| eni | Network Interfaces | yes |
+| nat | NAT Gateways | yes |
+| elb | Load Balancers | yes |
+| rtb | Route Tables | yes |
+| cfn | CloudFormation | no |
+| vpc | VPC | no |
+| asg | Auto Scaling Groups | yes |
+| efs | EFS File Systems | no |
+| eks | EKS Clusters | yes |
+| vpce | VPC Endpoints | yes |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

@@ -684,17 +684,17 @@ func TestRoot_EnterChildView_NilClients(t *testing.T) {
 	tui.Version = "0.6.0"
 	// Register a temporary child type so handleEnterChildView passes the lookup
 	testChildType := "test_nil_clients_child"
-	resource.RegisterChildType(resource.ResourceTypeDef{
+	resource.SetChildTypeForTest(resource.ResourceTypeDef{
 		Name:      "Test Nil Clients Child",
 		ShortName: testChildType,
 		Columns:   []resource.Column{{Key: "id", Title: "ID", Width: 20}},
 	})
-	resource.RegisterPaginatedChild(testChildType, func(_ context.Context, clients any, _ resource.ParentContext, _ string) (resource.FetchResult, error) {
+	resource.SetPaginatedChildForTest(testChildType, func(_ context.Context, clients any, _ resource.ParentContext, _ string) (resource.FetchResult, error) {
 		// This should not be reached if clients are nil — the model checks first
 		return resource.FetchResult{}, nil
 	})
-	defer resource.UnregisterChildType(testChildType)
-	defer resource.UnregisterPaginatedChild(testChildType)
+	defer resource.CleanupChildTypeForTest(testChildType)
+	defer resource.CleanupPaginatedChildForTest(testChildType)
 
 	// Create model WITHOUT demo mode and WITHOUT clients (clients == nil)
 	m := newRootSizedModel()
@@ -731,16 +731,16 @@ func TestRoot_EnterChildView_NilParentContext(t *testing.T) {
 	tui.Version = "0.6.0"
 	// Register a temporary child type
 	testChildType := "test_nil_ctx"
-	resource.RegisterChildType(resource.ResourceTypeDef{
+	resource.SetChildTypeForTest(resource.ResourceTypeDef{
 		Name:      "Test Nil Ctx",
 		ShortName: testChildType,
 		Columns:   []resource.Column{{Key: "id", Title: "ID", Width: 20}},
 	})
-	resource.RegisterPaginatedChild(testChildType, func(_ context.Context, _ any, _ resource.ParentContext, _ string) (resource.FetchResult, error) {
+	resource.SetPaginatedChildForTest(testChildType, func(_ context.Context, _ any, _ resource.ParentContext, _ string) (resource.FetchResult, error) {
 		return resource.FetchResult{}, nil
 	})
-	defer resource.UnregisterChildType(testChildType)
-	defer resource.UnregisterPaginatedChild(testChildType)
+	defer resource.CleanupChildTypeForTest(testChildType)
+	defer resource.CleanupPaginatedChildForTest(testChildType)
 
 	// Create model in demo mode so we don't need real AWS clients
 	m := tui.New("demo", "us-east-1",

@@ -175,3 +175,25 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - AWS SDK Go v2 — `NetworkInterface.RequesterManaged` (zombie detection precondition) — `AWS SDK Go v2 — service/ec2/types.NetworkInterface § RequesterManaged`.
 - a9s-devops consultation — pivot from `eni` to `elb`/`lambda`/`nat`/`vpce` via `InterfaceType` + `Description` parsing — `a9s-devops (2026-04-20): possible=yes, worth=yes. The ENI shape exposes no direct owning-resource ID for managed variants; AWS encodes the owner into InterfaceType plus a stable Description prefix, which is the standard cross-link used by operators and the in-console Network Interface detail view.`
 - a9s-devops consultation — zombie detection (`RequesterManaged` + cross-reference to already-loaded sibling lists) — `a9s-devops (2026-04-20): possible=yes, worth=yes. Requester-managed ENIs whose owner is gone are a real cleanup item (common after Lambda VPC churn and failed vpce teardown). Sibling-list cross-reference is zero-cost during normal browsing and matches the golden-doc's Wave 1 phrasing.`
+
+<!-- BEGIN GENERATED: header -->
+eni — NETWORKING. Lifecycle key: `status`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| ec2 | EC2 Instances | yes |
+| sg | Security Groups | yes |
+| eip | Elastic IPs | yes |
+| vpc | VPC | no |
+| subnet | Subnet | no |
+| elb | Load Balancers | no |
+| lambda | Lambda Functions | no |
+| nat | NAT Gateways | yes |
+| vpce | VPC Endpoints | yes |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

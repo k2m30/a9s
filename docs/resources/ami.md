@@ -161,3 +161,22 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `DeprecationTime` S4 wording (`deprecated <Nd> ago`) and `StateReason.Message` S4 wording (`failed: <reason>`) — a9s-devops (2026-04-20): operator-readable phrasing; mirrors the ACM `expires in Nd` pattern already used elsewhere in a9s, pairs a state keyword with its cause so the S4 rule (no bare state keywords) is satisfied.
 - Backing-snapshot-missing S4 wording (`backing snapshot missing`) — a9s-devops (2026-04-20): plain-language restatement of the cross-ref failure; tells the on-call engineer the AMI is unusable without naming the snapshot ID on the list row.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
+
+<!-- BEGIN GENERATED: header -->
+ami — COMPUTE. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| ec2 | EC2 Instances | yes |
+| ebs-snap | EBS Snapshots | no |
+| asg | Auto Scaling Groups | yes |
+| cfn | CloudFormation Stacks | yes |
+| kms | KMS Keys | no |
+| ng | EKS Node Groups | yes |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

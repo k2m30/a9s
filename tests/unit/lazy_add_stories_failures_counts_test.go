@@ -47,7 +47,7 @@ func Test_LA_020_PartialResolution_ChecksStillDelivered(t *testing.T) {
 		targetType = "test-la020-target"
 	)
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:       targetType,
 			DisplayName:      "LA-020 Partial Test Target",
@@ -64,7 +64,7 @@ func Test_LA_020_PartialResolution_ChecksStillDelivered(t *testing.T) {
 	})
 
 	// FetchByIDs returns only 3 of the 5 requested IDs (simulates partial resolve).
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
 		// Return at most 3 resources regardless of how many were requested.
 		resolvable := []string{"id-001", "id-002", "id-003"}
 		var out []resource.Resource
@@ -80,8 +80,8 @@ func Test_LA_020_PartialResolution_ChecksStillDelivered(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
 	m := tui.New("testprofile", "us-east-1")
@@ -165,7 +165,7 @@ func Test_LA_024_GetPolicyDenied_PartialMetadataOK(t *testing.T) {
 		policyARN  = "arn:aws:iam::aws:policy/AdministratorAccess"
 	)
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:       targetType,
 			DisplayName:      "LA-024 Policy Test Target",
@@ -182,7 +182,7 @@ func Test_LA_024_GetPolicyDenied_PartialMetadataOK(t *testing.T) {
 
 	// FetchByIDs simulates GetPolicy denied: returns the row with policy_name
 	// populated (parseable from ARN) but empty attachment_count and create_date.
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
 		var out []resource.Resource
 		for _, id := range ids {
 			if id == policyARN {
@@ -201,8 +201,8 @@ func Test_LA_024_GetPolicyDenied_PartialMetadataOK(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
 	m := tui.New("testprofile", "us-east-1")
@@ -298,7 +298,7 @@ func Test_LA_060_PivotCountEqualsRowCount(t *testing.T) {
 
 	ids := []string{"kms-001", "kms-002", "kms-003", "kms-004", "kms-005", "kms-006", "kms-007"}
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:       targetType,
 			DisplayName:      "LA-060 Count Equality Target",
@@ -313,7 +313,7 @@ func Test_LA_060_PivotCountEqualsRowCount(t *testing.T) {
 		},
 	})
 
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, fetchIDs []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, fetchIDs []string) ([]resource.Resource, error) {
 		var out []resource.Resource
 		for _, id := range fetchIDs {
 			out = append(out, resource.Resource{ID: id, Name: "key-" + id})
@@ -322,8 +322,8 @@ func Test_LA_060_PivotCountEqualsRowCount(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
 	m := tui.New("testprofile", "us-east-1")

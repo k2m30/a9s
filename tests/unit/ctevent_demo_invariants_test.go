@@ -294,7 +294,7 @@ func TestCtEventsDemoRegistryNavigableFields(t *testing.T) {
 
 	navFields := resource.GetNavigableFields("ct-events")
 	if len(navFields) == 0 {
-		t.Fatal("resource.GetNavigableFields(\"ct-events\") returned no fields — RegisterNavigableFields not called?")
+		t.Fatal("resource.GetNavigableFields(\"ct-events\") returned no fields — SetNavigableFieldsForTest not called?")
 	}
 
 	fixtures := loadAllCTFixtures(t)

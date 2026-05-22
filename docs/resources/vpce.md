@@ -255,3 +255,29 @@ At 3am, glancing at the list, a red vpce row with `interface: no ENIs — unreac
 - DNS-probe out-of-scope — `a9s-devops (2026-04-20): possible=no, worth=n/a. a9s does not dial into the VPC.`
 - Wave 1 `State` bucket mapping, `LastError`, `NetworkInterfaceIds==[]`, `RouteTableIds==[]` rules — `docs/attention-signals.md` § Networking row for `vpce` (line 57).
 - Wave 3 endpoint-policy analysis out-of-scope — `docs/attention-signals.md` § Networking row for `vpce` Wave 3 cell (line 57).
+
+<!-- BEGIN GENERATED: header -->
+vpce — NETWORKING. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| subnet | Subnets | no |
+| sg | Security Groups | no |
+| rtb | Route Tables | no |
+| eni | Network Interfaces | no |
+| vpc | VPC | no |
+| acm | ACM Certificates | no |
+| alarm | CloudWatch Alarms | no |
+| cf | CloudFront | no |
+| logs | Log Groups | no |
+| r53 | Route 53 Zones | no |
+| s3 | S3 Buckets | no |
+| tg | Target Groups | no |
+| waf | WAF Web ACLs | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

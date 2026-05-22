@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func TestMain(m *testing.M) {
@@ -12,6 +13,7 @@ func TestMain(m *testing.M) {
 	// panic-before-SetTypes path without triggering a bootstrap here.
 	if os.Getenv("TEST_SKIP_INSTALL") != "1" {
 		awsclient.Install()
+		resource.WireProjection()
 	}
 	os.Exit(m.Run())
 }

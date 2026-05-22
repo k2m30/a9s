@@ -6,7 +6,7 @@ package unit
 //
 // These tests are DISTINCT from aws_nodegroups_image_id_test.go, which only exercises
 // the standalone FetchNodeGroups helper. This file targets the closure registered in
-// internal/aws/ng.go via resource.RegisterPaginated("ng", ...).
+// internal/aws/ng.go via resource.SetPaginatedForTest("ng", ...).
 
 import (
 	"context"
@@ -24,7 +24,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 
 	// Side-effect import: triggers init() in internal/aws which calls
-	// resource.RegisterPaginated("ng", ...) — required so GetPaginatedFetcher("ng") is non-nil.
+	// resource.SetPaginatedForTest("ng", ...) — required so GetPaginatedFetcher("ng") is non-nil.
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 )
 

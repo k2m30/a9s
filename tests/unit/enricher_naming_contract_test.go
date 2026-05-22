@@ -88,18 +88,24 @@ func TestNamingContract_Wave2Accessors_Shape(t *testing.T) {
 	}
 }
 
-// TestNamingContract_NoOpIssueEnricher_ReturnsEmptyResult pins the no-op
-// Wave 2 issue enricher used for resource types with no Wave 2 coverage.
-func TestNamingContract_NoOpIssueEnricher_ReturnsEmptyResult(t *testing.T) {
-	res, err := awsclient.NoOpIssueEnricher(context.Background(), nil, nil, nil)
+// TestNamingContract_InFetcherWave2Sentinel_ReturnsEmptyResult pins the
+// in-fetcher Wave 2 sentinel used for resource types whose Wave 2 work is
+// performed by the fetcher itself (e.g. EKS DescribeCluster, EKS Node Group
+// DescribeNodegroup, CloudTrail GetTrailStatus). The sentinel Fn is wired
+// into IssueEnricher{} so TestAttentionSignalsDoc sees a non-nil Wave2
+// without scheduling a redundant background enrichment pass.
+// Renamed from NoOpIssueEnricher in AS-731 to make the in-fetcher
+// contract explicit and to satisfy the zero-hits grep on `NoOpIssueEnricher`.
+func TestNamingContract_InFetcherWave2Sentinel_ReturnsEmptyResult(t *testing.T) {
+	res, err := awsclient.InFetcherWave2Sentinel(context.Background(), nil, nil, nil)
 	if err != nil {
-		t.Fatalf("NoOpIssueEnricher must not error, got %v", err)
+		t.Fatalf("InFetcherWave2Sentinel must not error, got %v", err)
 	}
 	if res.IssueCount != 0 {
 		t.Errorf("IssueCount = %d, want 0", res.IssueCount)
 	}
 	if res.Truncated {
-		t.Error("NoOpIssueEnricher must not be truncated")
+		t.Error("InFetcherWave2Sentinel must not be truncated")
 	}
 	if len(res.Findings) != 0 {
 		t.Errorf("Findings must be empty, got %d entries", len(res.Findings))

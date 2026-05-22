@@ -189,3 +189,24 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `ec2` / `ebs` discovery via ASG → Instances → BlockDeviceMappings — `a9s-devops (2026-04-20): possible=yes, worth=yes. EKS API exposes no direct instance list on a node group; the ASG pivot is the canonical path and is the same one the AWS Console uses. Cheap when ec2 and asg lists are already cached, otherwise fan-out per node group.`
 - `sg` split between `Resources.RemoteAccessSecurityGroup` and `RemoteAccess.SourceSecurityGroups` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Operators confuse these two; the first is the SG attached to nodes' ENIs for remote access, the second is the list of client SGs allowed to SSH in. Surfacing both (deduplicated) in the related panel prevents "why can't I SSH?" misdiagnosis. Primary data-plane SG for pod traffic lives on the cluster, not the node group.`
 - S4/S5 cause-text rewrites for each `health.issues[]` code — `a9s-devops (2026-04-20): possible=yes, worth=yes. AWS surfaces the issue Code and Message verbatim; the spec rewrites jargon-free short causes for S4 (<= 40 chars) and one-line operator sentences for S5 (<= 100 chars). Keeping Message as fallback for DEGRADED so runtime detail isn't lost.`
+
+<!-- BEGIN GENERATED: header -->
+ng — CONTAINERS. Lifecycle key: `status`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| eks | EKS Clusters | yes |
+| role | IAM Roles | yes |
+| asg | Auto Scaling Groups | yes |
+| ec2 | EC2 Instances | yes |
+| sg | Security Groups | no |
+| ami | AMI | no |
+| ebs | EBS Volumes | no |
+| subnet | Subnets | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

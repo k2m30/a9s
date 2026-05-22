@@ -102,12 +102,12 @@ func pressTabDetail(d views.DetailModel) (views.DetailModel, tea.Cmd) {
 // that restores the original defs so test order (shuffle) doesn't matter.
 func registerEC2Defs(defs []resource.RelatedDef) func() {
 	orig := resource.GetRelated("ec2")
-	resource.RegisterRelated("ec2", defs)
+	resource.SetRelatedForTest("ec2", defs)
 	return func() {
 		if orig == nil {
-			resource.UnregisterRelated("ec2")
+			resource.CleanupRelatedForTest("ec2")
 		} else {
-			resource.RegisterRelated("ec2", orig)
+			resource.SetRelatedForTest("ec2", orig)
 		}
 	}
 }

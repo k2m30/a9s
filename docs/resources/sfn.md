@@ -161,3 +161,22 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `Out-of-scope: ASL parse beyond lambda` — `a9s-devops (2026-04-20): possible=yes, worth=no. related-resources.md contract restricts ASL-derived targets to lambda; widening violates the contract and risks combinatorial panel growth.`
 - `Out-of-scope: per-execution drill-down` — `a9s-devops (2026-04-20): possible=yes, worth=no for v1. Belongs in a future execution-browser child view; CloudTrail + Console cover incident workflow today.`
 - `Read-only invariant` — `docs/architecture.md` § "What is a9s?".
+
+<!-- BEGIN GENERATED: header -->
+sfn — MESSAGING. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| alarm | CloudWatch Alarms | no |
+| logs | Log Groups | yes |
+| role | IAM Role | no |
+| eb-rule | EventBridge Rules | yes |
+| kms | KMS Key | no |
+| lambda | Lambda Functions | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

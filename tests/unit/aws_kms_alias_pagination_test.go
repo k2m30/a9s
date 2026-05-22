@@ -14,7 +14,7 @@ package unit
 //
 // After FetchKMSKeysPage is added, the init() registration should call it:
 //
-//   resource.RegisterPaginated("kms", func(ctx context.Context, clients any, tok string) (resource.FetchResult, error) {
+//   resource.SetPaginatedForTest("kms", func(ctx context.Context, clients any, tok string) (resource.FetchResult, error) {
 //       c, _ := clients.(*ServiceClients)
 //       return FetchKMSKeysPage(ctx, c, tok)
 //   })

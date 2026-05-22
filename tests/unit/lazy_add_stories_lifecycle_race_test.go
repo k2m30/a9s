@@ -49,7 +49,7 @@ func Test_LA_030_ProfileSwitch_ClearsLazyAddedTargets(t *testing.T) {
 	)
 	lazyRes := resource.Resource{ID: "la030-stale-id", Name: "la030-stale"}
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:  targetType,
 			DisplayName: "LA-030 Target",
@@ -62,7 +62,7 @@ func Test_LA_030_ProfileSwitch_ClearsLazyAddedTargets(t *testing.T) {
 			},
 		},
 	})
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
 		var out []resource.Resource
 		for _, id := range ids {
 			out = append(out, resource.Resource{ID: id, Name: id})
@@ -71,8 +71,8 @@ func Test_LA_030_ProfileSwitch_ClearsLazyAddedTargets(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
 	// Phase 1: seed cache on a pre-switch model.
@@ -134,7 +134,7 @@ func Test_LA_031_RegionSwitch_ClearsLazyAddedTargets(t *testing.T) {
 	)
 	lazyRes := resource.Resource{ID: "la031-stale-id", Name: "la031-stale"}
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:  targetType,
 			DisplayName: "LA-031 Target",
@@ -147,7 +147,7 @@ func Test_LA_031_RegionSwitch_ClearsLazyAddedTargets(t *testing.T) {
 			},
 		},
 	})
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
 		var out []resource.Resource
 		for _, id := range ids {
 			out = append(out, resource.Resource{ID: id, Name: id})
@@ -156,8 +156,8 @@ func Test_LA_031_RegionSwitch_ClearsLazyAddedTargets(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
 	// Phase 1: seed cache on pre-switch model.
@@ -224,7 +224,7 @@ func Test_LA_033_SourceDetailRefresh_RerunsChecker(t *testing.T) {
 	const idB = "la033-id-B"
 
 	// Checker always returns idB — simulates "after refresh, checker sees updated IDs".
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:  targetType,
 			DisplayName: "LA-033 Target",
@@ -237,7 +237,7 @@ func Test_LA_033_SourceDetailRefresh_RerunsChecker(t *testing.T) {
 			},
 		},
 	})
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
 		var out []resource.Resource
 		for _, id := range ids {
 			out = append(out, resource.Resource{ID: id, Name: id})
@@ -246,8 +246,8 @@ func Test_LA_033_SourceDetailRefresh_RerunsChecker(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
 	m := tui.New("test-profile", "us-east-1")
@@ -316,7 +316,7 @@ func Test_LA_034_MainMenuRoundtrip_LazyAddEntryMarkedTruncated(t *testing.T) {
 
 	var paginatedCalls atomic.Int64
 
-	resource.RegisterPaginated(targetType, func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
+	resource.SetPaginatedForTest(targetType, func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
 		paginatedCalls.Add(1)
 		return resource.FetchResult{
 			Resources: []resource.Resource{
@@ -326,7 +326,7 @@ func Test_LA_034_MainMenuRoundtrip_LazyAddEntryMarkedTruncated(t *testing.T) {
 	})
 
 	lazyRes := resource.Resource{ID: "la034-lazy-id", Name: "la034-lazy"}
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:  targetType,
 			DisplayName: "LA-034 Target",
@@ -339,7 +339,7 @@ func Test_LA_034_MainMenuRoundtrip_LazyAddEntryMarkedTruncated(t *testing.T) {
 			},
 		},
 	})
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
 		var out []resource.Resource
 		for _, id := range ids {
 			out = append(out, resource.Resource{ID: id, Name: id})
@@ -348,9 +348,9 @@ func Test_LA_034_MainMenuRoundtrip_LazyAddEntryMarkedTruncated(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
-		resource.UnregisterPaginated(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
+		resource.CleanupPaginatedForTest(targetType)
 	})
 
 	m := tui.New("test-profile", "us-east-1")
@@ -422,7 +422,7 @@ func Test_LA_040_RepeatDrill_Idempotent(t *testing.T) {
 		idY = "la040-id-Y"
 	)
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:  targetType,
 			DisplayName: "LA-040 Target",
@@ -435,7 +435,7 @@ func Test_LA_040_RepeatDrill_Idempotent(t *testing.T) {
 			},
 		},
 	})
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
 		var out []resource.Resource
 		for _, id := range ids {
 			out = append(out, resource.Resource{ID: id, Name: id})
@@ -444,8 +444,8 @@ func Test_LA_040_RepeatDrill_Idempotent(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
 	m := tui.New("test-profile", "us-east-1")
@@ -517,9 +517,9 @@ func Test_LA_041_RepeatDrill_DifferentSource_SameTarget_SingleEntry(t *testing.T
 		},
 	}
 
-	resource.RegisterRelated(srcTypeAlpha, []resource.RelatedDef{sharedDef})
-	resource.RegisterRelated(srcTypeBeta, []resource.RelatedDef{sharedDef})
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
+	resource.SetRelatedForTest(srcTypeAlpha, []resource.RelatedDef{sharedDef})
+	resource.SetRelatedForTest(srcTypeBeta, []resource.RelatedDef{sharedDef})
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
 		var out []resource.Resource
 		for _, id := range ids {
 			out = append(out, resource.Resource{ID: id, Name: id})
@@ -528,9 +528,9 @@ func Test_LA_041_RepeatDrill_DifferentSource_SameTarget_SingleEntry(t *testing.T
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcTypeAlpha)
-		resource.UnregisterRelated(srcTypeBeta)
-		resource.UnregisterFetchByIDs(targetType)
+		resource.CleanupRelatedForTest(srcTypeAlpha)
+		resource.CleanupRelatedForTest(srcTypeBeta)
+		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
 	m := tui.New("test-profile", "us-east-1")
@@ -591,7 +591,7 @@ func Test_LA_042_EscUnrelatedNav_ReDrill_Stable(t *testing.T) {
 		idForY  = "la042-y-id"
 	)
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:  targetX,
 			DisplayName: "LA-042 Target X",
@@ -615,14 +615,14 @@ func Test_LA_042_EscUnrelatedNav_ReDrill_Stable(t *testing.T) {
 			},
 		},
 	})
-	resource.RegisterFetchByIDs(targetX, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetX, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
 		var out []resource.Resource
 		for _, id := range ids {
 			out = append(out, resource.Resource{ID: id, Name: id})
 		}
 		return out, nil
 	})
-	resource.RegisterFetchByIDs(targetY, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetY, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
 		var out []resource.Resource
 		for _, id := range ids {
 			out = append(out, resource.Resource{ID: id, Name: id})
@@ -631,9 +631,9 @@ func Test_LA_042_EscUnrelatedNav_ReDrill_Stable(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetX)
-		resource.UnregisterFetchByIDs(targetY)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetX)
+		resource.CleanupFetchByIDsForTest(targetY)
 	})
 
 	m := tui.New("test-profile", "us-east-1")
@@ -729,7 +729,7 @@ func Test_LA_043_SourceDetailReEntry_UsesCachedResult(t *testing.T) {
 
 	var checkerCalls atomic.Int64
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:  targetType,
 			DisplayName: "LA-043 Target",
@@ -743,7 +743,7 @@ func Test_LA_043_SourceDetailReEntry_UsesCachedResult(t *testing.T) {
 			},
 		},
 	})
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
 		var out []resource.Resource
 		for _, id := range ids {
 			out = append(out, resource.Resource{ID: id, Name: id})
@@ -752,8 +752,8 @@ func Test_LA_043_SourceDetailReEntry_UsesCachedResult(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
 	m := tui.New("test-profile", "us-east-1")
@@ -835,7 +835,7 @@ func Test_LA_050_DrillDuringEnrichment_ResultLandsWithoutDrop(t *testing.T) {
 		targetType = "test-la050-target"
 	)
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:  targetType,
 			DisplayName: "LA-050 Slow Target",
@@ -849,7 +849,7 @@ func Test_LA_050_DrillDuringEnrichment_ResultLandsWithoutDrop(t *testing.T) {
 			},
 		},
 	})
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
 		var out []resource.Resource
 		for _, id := range ids {
 			out = append(out, resource.Resource{ID: id, Name: id})
@@ -858,8 +858,8 @@ func Test_LA_050_DrillDuringEnrichment_ResultLandsWithoutDrop(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
 	m := tui.New("test-profile", "us-east-1")
@@ -912,7 +912,7 @@ func Test_LA_051_EscDuringResolution_StaleResultDropped(t *testing.T) {
 		targetType = "test-la051-target"
 	)
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:  targetType,
 			DisplayName: "LA-051 Target",
@@ -925,7 +925,7 @@ func Test_LA_051_EscDuringResolution_StaleResultDropped(t *testing.T) {
 			},
 		},
 	})
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
 		var out []resource.Resource
 		for _, id := range ids {
 			out = append(out, resource.Resource{ID: id, Name: id})
@@ -934,8 +934,8 @@ func Test_LA_051_EscDuringResolution_StaleResultDropped(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
 	m := tui.New("test-profile", "us-east-1")
@@ -992,7 +992,7 @@ func Test_LA_052_RapidConsecutiveDispatches_CheckerRunsEachTime(t *testing.T) {
 
 	var checkerCalls atomic.Int64
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:  targetType,
 			DisplayName: "LA-052 Target",
@@ -1006,7 +1006,7 @@ func Test_LA_052_RapidConsecutiveDispatches_CheckerRunsEachTime(t *testing.T) {
 			},
 		},
 	})
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
 		var out []resource.Resource
 		for _, id := range ids {
 			out = append(out, resource.Resource{ID: id, Name: id})
@@ -1015,8 +1015,8 @@ func Test_LA_052_RapidConsecutiveDispatches_CheckerRunsEachTime(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
 	m := tui.New("test-profile", "us-east-1")
@@ -1065,7 +1065,7 @@ func Test_LA_053_ProfileSwitchMidResolution_StaleResultDiscarded(t *testing.T) {
 		targetType = "test-la053-target"
 	)
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:  targetType,
 			DisplayName: "LA-053 Target",
@@ -1078,7 +1078,7 @@ func Test_LA_053_ProfileSwitchMidResolution_StaleResultDiscarded(t *testing.T) {
 			},
 		},
 	})
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
 		var out []resource.Resource
 		for _, id := range ids {
 			out = append(out, resource.Resource{ID: id, Name: id})
@@ -1087,8 +1087,8 @@ func Test_LA_053_ProfileSwitchMidResolution_StaleResultDiscarded(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
 	m := tui.New("profile-A", "us-east-1")
@@ -1146,7 +1146,7 @@ func Test_LA_054_RegionSwitchMidResolution_StaleResultDiscarded(t *testing.T) {
 		targetType = "test-la054-target"
 	)
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:  targetType,
 			DisplayName: "LA-054 Target",
@@ -1159,7 +1159,7 @@ func Test_LA_054_RegionSwitchMidResolution_StaleResultDiscarded(t *testing.T) {
 			},
 		},
 	})
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
 		var out []resource.Resource
 		for _, id := range ids {
 			out = append(out, resource.Resource{ID: id, Name: id})
@@ -1168,8 +1168,8 @@ func Test_LA_054_RegionSwitchMidResolution_StaleResultDiscarded(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
 	m := tui.New("test-profile", "us-east-1")

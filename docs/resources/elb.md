@@ -194,3 +194,28 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — `waf` discovery via `wafv2:ListResourcesForWebACL(ResourceType=APPLICATION_LOAD_BALANCER)` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Documented reverse pivot; matches waf contract row listing elb.`
 - a9s-devops consultation — `s3` (access-log bucket) discovery deferred — `a9s-devops (2026-04-20): possible=yes via DescribeLoadBalancerAttributes, worth=no at list time. Would require N+1 fan-out attention-signals.md explicitly defers to Wave 3.`
 - a9s-devops consultation — Classic (ELBv1) default Healthy bucket when no State field — implicit from attention-signals.md note "Classic (ELBv1) has no State field"; no state signal available, so the row defaults to Healthy and target-health signalling moves to `tg`. No separate devops dispatch.
+
+<!-- BEGIN GENERATED: header -->
+elb — NETWORKING. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| tg | Target Groups | yes |
+| alarm | CW Alarms | yes |
+| sg | Security Groups | no |
+| vpc | VPC | no |
+| cfn | CloudFormation | no |
+| r53 | Route 53 Records | no |
+| acm | ACM Certificates | no |
+| cf | CloudFront | no |
+| eni | Network Interfaces | yes |
+| s3 | S3 Buckets | no |
+| subnet | Subnets | no |
+| waf | WAF Web ACLs | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

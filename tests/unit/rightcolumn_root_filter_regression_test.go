@@ -17,11 +17,11 @@ func openFocusedRelatedDetailForRootFilterTest(t *testing.T) tui.Model {
 	t.Helper()
 
 	oldDefs := append([]resource.RelatedDef(nil), resource.GetRelated("ec2")...)
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	resource.SetRelatedForTest("ec2", []resource.RelatedDef{
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: resource.NoopChecker},
 		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: resource.NoopChecker},
 	})
-	t.Cleanup(func() { resource.RegisterRelated("ec2", oldDefs) })
+	t.Cleanup(func() { resource.SetRelatedForTest("ec2", oldDefs) })
 
 	m := tui.New("demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),

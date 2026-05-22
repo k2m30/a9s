@@ -5,11 +5,11 @@ package unit
 //
 // This file is NOT a PR #273 regression pin. It surfaced accidentally
 // during PR #273 review as a fundamental gap in the detail view's
-// navigable-field coverage: RegisterNavigableFields entries had drifted
+// navigable-field coverage: SetNavigableFieldsForTest entries had drifted
 // away from the AWS API cross-references that should drive them.
 //
 // The detail view (DetailModel) underlines fields that are registered via
-// resource.RegisterNavigableFields so the user can press Enter and jump to
+// resource.SetNavigableFieldsForTest so the user can press Enter and jump to
 // a filtered list of the target resource type. Any cross-reference that
 // AWS exposes on the list/describe response and that a9s already knows how
 // to browse as its own resource type MUST be navigable — otherwise the
@@ -32,7 +32,7 @@ package unit
 //   (A) TestNavigableFields_AllExpectedFieldsRegistered — every
 //       navigableContracts row's FieldPath must appear in
 //       resource.GetNavigableFields(shortName) with the same TargetType.
-//       Failures reveal missing RegisterNavigableFields entries.
+//       Failures reveal missing SetNavigableFieldsForTest entries.
 //
 //   (B) TestNavigableFields_TargetTypesAreRegistered — every navigable
 //       TargetType must be a registered resource type. Otherwise pressing
@@ -305,7 +305,7 @@ func buildContractIndex() map[string]map[string]string {
 }
 
 // TestNavigableFields_AllExpectedFieldsRegistered asserts every navigableContracts
-// row with a non-empty fieldPath is backed by resource.RegisterNavigableFields
+// row with a non-empty fieldPath is backed by resource.SetNavigableFieldsForTest
 // for the same shortName with the same TargetType.
 func TestNavigableFields_AllExpectedFieldsRegistered(t *testing.T) {
 	idx := buildContractIndex()
@@ -319,7 +319,7 @@ func TestNavigableFields_AllExpectedFieldsRegistered(t *testing.T) {
 				got, ok := registered[path]
 				if !ok {
 					c := findContract(shortName, path)
-					t.Errorf("%s.%s missing RegisterNavigableFields registration (expected TargetType=%q)\n  AWS API: %s\n  Reasoning: %s",
+					t.Errorf("%s.%s missing SetNavigableFieldsForTest registration (expected TargetType=%q)\n  AWS API: %s\n  Reasoning: %s",
 						shortName, path, want, c.apiDoc, c.reasoning)
 					continue
 				}
@@ -352,7 +352,7 @@ func TestNavigableFields_TargetTypesAreRegistered(t *testing.T) {
 
 // TestNavigableFields_NoOrphans asserts every currently-registered
 // NavigableField has a corresponding row in navigableContracts. A source
-// RegisterNavigableFields call without a contract row indicates the
+// SetNavigableFieldsForTest call without a contract row indicates the
 // contract table is out of date.
 func TestNavigableFields_NoOrphans(t *testing.T) {
 	idx := buildContractIndex()

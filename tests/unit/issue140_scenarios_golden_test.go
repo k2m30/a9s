@@ -322,7 +322,7 @@ func withScenarioEC2Defs(t *testing.T, fn func() string) string {
 	t.Helper()
 	oldDefs := append([]resource.RelatedDef(nil), resource.GetRelated("ec2")...)
 	oldNav := append([]resource.NavigableField(nil), resource.GetActiveNavigableFields("ec2")...)
-	resource.RegisterRelated("ec2", []resource.RelatedDef{
+	resource.SetRelatedForTest("ec2", []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
 		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: noopChecker},
@@ -333,18 +333,18 @@ func withScenarioEC2Defs(t *testing.T, fn func() string) string {
 		{TargetType: "ebs-snap", DisplayName: "EBS Snapshots", Checker: noopChecker},
 		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: noopChecker},
 	})
-	resource.RegisterNavigableFields("ec2", []resource.NavigableField{
+	resource.SetNavigableFieldsForTest("ec2", []resource.NavigableField{
 		{FieldPath: "VpcId", TargetType: "vpc"},
 		{FieldPath: "SubnetId", TargetType: "subnet"},
 		{FieldPath: "ImageId", TargetType: "ami"},
 		{FieldPath: "SecurityGroups.GroupId", TargetType: "sg"},
 	})
 	defer func() {
-		resource.RegisterRelated("ec2", oldDefs)
+		resource.SetRelatedForTest("ec2", oldDefs)
 		if len(oldNav) == 0 {
-			resource.UnregisterNavigableFields("ec2")
+			resource.CleanupNavigableFieldsForTest("ec2")
 		} else {
-			resource.RegisterNavigableFields("ec2", oldNav)
+			resource.SetNavigableFieldsForTest("ec2", oldNav)
 		}
 	}()
 	return fn()

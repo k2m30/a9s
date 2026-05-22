@@ -151,3 +151,19 @@ At 3am, glancing at the list, the operator sees `! plan-daily-prod 2 jobs failed
 - Discovery mechanism for `role` from a BackupPlan — `a9s-devops (2026-04-20): possible=yes, worth=yes. ListBackupSelections(BackupPlanId).BackupSelectionsList[].IamRoleArn gives the ARN directly; a plan with multiple selections may have multiple roles. Justified because IAM permissions failures are the second top cause of backup failure.`
 - Discovery mechanism for `sns` from a BackupPlan — `a9s-devops (2026-04-20): possible=yes, worth=yes. SNS is per-vault; resolve distinct vault names from Rules[].TargetBackupVaultName, then GetBackupVaultNotifications per vault. Justified because absence-of-SNS on a backup vault is itself a silent-risk signal worth surfacing.`
 - Severity choice: `FAILED/EXPIRED/ABORTED` = `!` (Broken) and `PARTIAL` = `~` (Warning) — `docs/attention-signals.md` § "Backup & Email" Wave 2 cell ("any job State in FAILED/EXPIRED/ABORTED → Broken; PARTIAL → Warning") maps directly to the S1-bumping `!` glyph for Broken and the non-bumping `~` glyph for Warning per the skill's Wave-to-surface rules.
+
+<!-- BEGIN GENERATED: header -->
+backup — BACKUP. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| role | IAM Roles | no |
+| kms | KMS Keys | no |
+| sns | SNS Topics | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

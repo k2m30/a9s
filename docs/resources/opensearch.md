@@ -185,3 +185,24 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — Wave 2 batching with `DescribeDomains` (up to 5 domain names per call) — `a9s-devops (2026-04-20, persona): possible=yes, worth=yes. DescribeDomains is the only API that returns full DomainStatus; batching caps fan-out at N/5 calls, well within Wave 2 bounds.`
 - user decision — severity for `ServiceSoftwareOptions.UpdateAvailable` past `AutomatedUpdateDate` — `user (2026-04-20): decide →`!`. Rationale: AWS will auto-apply any day, causing a rolling restart; operator wants this flagged so the window can be planned. Consistent with ACM`!`for imminent cert expiry.`
 - user decision — severity for `EncryptionAtRestOptions.Enabled==false` — `user (2026-04-20): decide →`~`. Rationale: posture/compliance finding, not an outage risk. Consistent with RDS`StorageEncrypted==false`and S3 encryption defaults treated as background annotations.`
+
+<!-- BEGIN GENERATED: header -->
+opensearch — DATABASES & STORAGE. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| alarm | CW Alarms | yes |
+| logs | Log Groups | no |
+| sg | Security Groups | no |
+| vpc | VPC | no |
+| kms | KMS Key | no |
+| cfn | CloudFormation | no |
+| subnet | Subnets | no |
+| acm | ACM Certificates | yes |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

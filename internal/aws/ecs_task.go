@@ -19,7 +19,7 @@ import (
 // then for each cluster in that page fetches all tasks via ListTasks+DescribeTasks.
 // IsTruncated reflects whether ListClusters has more pages beyond this one.
 // Fields["efs_file_system_ids"] is always "" (no task-definition join).
-// Use the RegisterPaginated path for the full join via DescribeTaskDefinition.
+// Use the SetPaginatedForTest path for the full join via DescribeTaskDefinition.
 func FetchECSTasksPage(
 	ctx context.Context,
 	listClustersAPI ECSListClustersAPI,
@@ -30,7 +30,7 @@ func FetchECSTasksPage(
 	return fetchECSTasksPageWithJoin(ctx, listClustersAPI, listTasksAPI, describeTasksAPI, nil, continuationToken)
 }
 
-// fetchECSTasksPageWithJoin is the full implementation used by the RegisterPaginated
+// fetchECSTasksPageWithJoin is the full implementation used by the SetPaginatedForTest
 // closure in init(). describeTaskDefAPI may be nil; in that case the EFS volume
 // join is skipped and Fields["efs_file_system_ids"] is always "".
 func fetchECSTasksPageWithJoin(
@@ -252,7 +252,7 @@ func ecsJoinEFSVolumes(
 // 3. DescribeTasks per cluster to get full details
 //
 // Fields["efs_file_system_ids"] is always "" (no task-definition join).
-// Use the RegisterPaginated path (init) for the full join via DescribeTaskDefinition.
+// Use the SetPaginatedForTest path (init) for the full join via DescribeTaskDefinition.
 func FetchECSTasks(
 	ctx context.Context,
 	listClustersAPI ECSListClustersAPI,

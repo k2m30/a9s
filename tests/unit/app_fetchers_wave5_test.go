@@ -224,13 +224,13 @@ func TestFetchMoreResources_FilteredFetcherErrorPropagated(t *testing.T) {
 	withTuiVersion(t, "test")
 
 	const errFilteredType = "test_filtered_err_wave5"
-	resource.RegisterFilteredPaginated(errFilteredType, func(
+	resource.SetFilteredPaginatedForTest(errFilteredType, func(
 		_ context.Context, _ any, _ map[string]string, _ string,
 	) (resource.FetchResult, error) {
 		return resource.FetchResult{}, fmt.Errorf("simulated fetcher error")
 	})
 	t.Cleanup(func() {
-		resource.UnregisterFilteredPaginated(errFilteredType)
+		resource.CleanupFilteredPaginatedForTest(errFilteredType)
 	})
 
 	clients := demo.NewServiceClients()

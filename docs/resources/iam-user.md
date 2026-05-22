@@ -141,3 +141,18 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Severity assignment `!` vs `~` for Wave 2 findings — persona decision: MFA-missing is a security incident (Broken + `!` drives S1 count); stale/never-used keys are hygiene (`~` annotation, no S1 bump). Grounded in skill surface rules (§S1, §S3) and CIS IAM benchmarks' treatment of MFA as mandatory.
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 - `iam-user` NOT-related pairs (`kms`, `role`) — `docs/related-resources.md` §"Known NOT-related pairs" lines 1101–1102.
+
+<!-- BEGIN GENERATED: header -->
+iam-user — SECURITY & IAM. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| iam-group | IAM Groups | no |
+| policy | IAM Policies | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

@@ -165,3 +165,21 @@ One bullet per claim in §§2–4.1.
 - a9s-devops consultation — `kms` discovery requires Wave-2 `DescribeStreamSummary` to read `KeyId` — `a9s-devops (2026-04-20): possible=yes, worth=yes. KeyId is absent from StreamSummary; the describe call is justified because CMK audit is a standard security review step operators repeat.`
 - a9s-devops consultation — `lambda` discovery via reverse scan of ESM by `EventSourceArn` — `a9s-devops (2026-04-20): possible=yes, worth=yes. ESM is the canonical consumer link; scanning an already-loaded ESM set is zero-cost and answers "who is reading this stream?" the first question operators ask about a lagging stream.`
 - a9s-devops consultation — `ddb` reverse pivot omitted — `a9s-devops (2026-04-20): possible=yes, worth=no. DescribeKinesisStreamingDestination would be required per DDB table in the loaded list; operators pivot DDB→Kinesis in practice, not the reverse, so the N-table cost is unjustified for a rare workflow. Recorded in §5 Out of Scope.`
+
+<!-- BEGIN GENERATED: header -->
+kinesis — MESSAGING. Lifecycle key: `status`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| alarm | CW Alarms | yes |
+| lambda | Lambda Functions | yes |
+| cfn | CloudFormation | no |
+| ddb | DynamoDB Streams | yes |
+| kms | KMS Key | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

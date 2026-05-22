@@ -267,3 +267,31 @@ One bullet per claim in §§2–4.1. Citation sources, in order of authority:
 - AWS SDK Go v2 — `ListServicesOutput.ServiceArns` returns ARNs only (no status fields) — `AWS SDK Go v2 — service/ecs.ListServicesOutput § ServiceArns`. Justifies the §1 note that `DescribeServices` is the effective list API.
 - Read-only invariant — `docs/architecture.md` § `What is a9s?`.
 - Wave classification and ECS signal set — `docs/attention-signals.md` § `Containers / Compute` row `ecs-svc`.
+
+<!-- BEGIN GENERATED: header -->
+ecs-svc — COMPUTE. Lifecycle key: `status`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| ecs | ECS Clusters | no |
+| tg | Target Groups | no |
+| alarm | CloudWatch Alarms | yes |
+| elb | Load Balancers | yes |
+| logs | Log Groups | yes |
+| sg | Security Groups | no |
+| role | IAM Role | no |
+| cfn | CloudFormation Stacks | yes |
+| ct-events | CloudTrail Events | yes |
+| eb-rule | EventBridge Rules | yes |
+| ecr | ECR Repositories | no |
+| ecs-task | ECS Tasks | yes |
+| secrets | Secrets | no |
+| sfn | Step Functions | yes |
+| subnet | Subnets | no |
+| vpc | VPC | yes |
+<!-- END GENERATED: related -->

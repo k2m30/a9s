@@ -60,7 +60,7 @@ func TestBuildResourceCacheSnapshot_ProbeAuthoritative_SinglePageComplete(t *tes
 	var capturedCache resource.ResourceCache
 	var checkerCalls int32
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:  targetType,
 			DisplayName: "PT1 Target",
@@ -71,16 +71,16 @@ func TestBuildResourceCacheSnapshot_ProbeAuthoritative_SinglePageComplete(t *tes
 			},
 		},
 	})
-	t.Cleanup(func() { resource.UnregisterRelated(srcType) })
+	t.Cleanup(func() { resource.CleanupRelatedForTest(srcType) })
 
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
 		out := make([]resource.Resource, len(ids))
 		for i, id := range ids {
 			out[i] = resource.Resource{ID: id, Name: id}
 		}
 		return out, nil
 	})
-	t.Cleanup(func() { resource.UnregisterFetchByIDs(targetType) })
+	t.Cleanup(func() { resource.CleanupFetchByIDsForTest(targetType) })
 
 	m := newRootSizedModel()
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
@@ -164,7 +164,7 @@ func TestBuildResourceCacheSnapshot_ProbeTruncated_StampsTrue(t *testing.T) {
 	var capturedCache resource.ResourceCache
 	var checkerCalls int32
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:  targetType,
 			DisplayName: "PT2 Target",
@@ -175,16 +175,16 @@ func TestBuildResourceCacheSnapshot_ProbeTruncated_StampsTrue(t *testing.T) {
 			},
 		},
 	})
-	t.Cleanup(func() { resource.UnregisterRelated(srcType) })
+	t.Cleanup(func() { resource.CleanupRelatedForTest(srcType) })
 
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
 		out := make([]resource.Resource, len(ids))
 		for i, id := range ids {
 			out[i] = resource.Resource{ID: id, Name: id}
 		}
 		return out, nil
 	})
-	t.Cleanup(func() { resource.UnregisterFetchByIDs(targetType) })
+	t.Cleanup(func() { resource.CleanupFetchByIDsForTest(targetType) })
 
 	m := newRootSizedModel()
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})

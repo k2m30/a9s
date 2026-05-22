@@ -66,7 +66,7 @@ func TestLazyAddError_EmitsFlashMsg(t *testing.T) {
 		targetType = "test-flash-error-target"
 	)
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:       targetType,
 			DisplayName:      "Flash Error Test Target",
@@ -81,13 +81,13 @@ func TestLazyAddError_EmitsFlashMsg(t *testing.T) {
 		},
 	})
 
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, _ []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, _ []string) ([]resource.Resource, error) {
 		return nil, errors.New("simulated boom")
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
 	m := tui.New("testprofile", "us-east-1")
@@ -145,7 +145,7 @@ func TestLazyAddError_PartialSuccess_StillEmitsFlashMsg(t *testing.T) {
 		targetType = "test-flash-partial-target"
 	)
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:       targetType,
 			DisplayName:      "Flash Partial Test Target",
@@ -160,15 +160,15 @@ func TestLazyAddError_PartialSuccess_StillEmitsFlashMsg(t *testing.T) {
 		},
 	})
 
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, _ []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, _ []string) ([]resource.Resource, error) {
 		// Partial success: 1 resolved, 1 missing.
 		partial := []resource.Resource{{ID: "id-ok", Name: "ok-resource"}}
 		return partial, errors.New("id-bad: denied")
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
 	m := tui.New("testprofile", "us-east-1")

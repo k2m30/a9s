@@ -15,13 +15,13 @@ var noopChecker resource.RelatedChecker = func(_ context.Context, _ any, _ resou
 }
 
 // unregisterEC2Related masks ec2 related defs with an empty slice for the
-// duration of t and restores the prior state on cleanup. Uses RegisterRelated
-// to push a new snapshot frame rather than popping the stack — UnregisterRelated
+// duration of t and restores the prior state on cleanup. Uses SetRelatedForTest
+// to push a new snapshot frame rather than popping the stack — CleanupRelatedForTest
 // would restore the previous production registration rather than clearing defs.
 func unregisterEC2Related(t *testing.T) {
 	t.Helper()
-	resource.RegisterRelated("ec2", []resource.RelatedDef{})
-	t.Cleanup(func() { resource.UnregisterRelated("ec2") })
+	resource.SetRelatedForTest("ec2", []resource.RelatedDef{})
+	t.Cleanup(func() { resource.CleanupRelatedForTest("ec2") })
 }
 
 // replaceEC2Related registers defs for "ec2" and restores the originals on
@@ -29,8 +29,8 @@ func unregisterEC2Related(t *testing.T) {
 // registry poisoned for subsequent tests running in shuffled order.
 func replaceEC2Related(t *testing.T, defs []resource.RelatedDef) {
 	t.Helper()
-	resource.RegisterRelated("ec2", defs)
-	t.Cleanup(func() { resource.UnregisterRelated("ec2") })
+	resource.SetRelatedForTest("ec2", defs)
+	t.Cleanup(func() { resource.CleanupRelatedForTest("ec2") })
 }
 
 // replaceEC2NavigableFields registers navigable fields for "ec2" and restores
@@ -41,12 +41,12 @@ func replaceEC2Related(t *testing.T, defs []resource.RelatedDef) {
 func replaceEC2NavigableFields(t *testing.T, fields []resource.NavigableField) {
 	t.Helper()
 	orig := resource.GetActiveNavigableFields("ec2")
-	resource.RegisterNavigableFields("ec2", fields)
+	resource.SetNavigableFieldsForTest("ec2", fields)
 	t.Cleanup(func() {
 		if orig == nil {
-			resource.UnregisterNavigableFields("ec2")
+			resource.CleanupNavigableFieldsForTest("ec2")
 		} else {
-			resource.RegisterNavigableFields("ec2", orig)
+			resource.SetNavigableFieldsForTest("ec2", orig)
 		}
 	})
 }
@@ -57,12 +57,12 @@ func replaceEC2NavigableFields(t *testing.T, fields []resource.NavigableField) {
 func unregisterEC2NavigableFields(t *testing.T) {
 	t.Helper()
 	orig := resource.GetActiveNavigableFields("ec2")
-	resource.UnregisterNavigableFields("ec2")
+	resource.CleanupNavigableFieldsForTest("ec2")
 	t.Cleanup(func() {
 		if orig == nil {
-			resource.UnregisterNavigableFields("ec2")
+			resource.CleanupNavigableFieldsForTest("ec2")
 		} else {
-			resource.RegisterNavigableFields("ec2", orig)
+			resource.SetNavigableFieldsForTest("ec2", orig)
 		}
 	})
 }

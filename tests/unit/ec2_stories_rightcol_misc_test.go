@@ -62,16 +62,16 @@ func ec2StoryDetail(t *testing.T, width, height int, withDefs bool) (views.Detai
 		},
 	}
 	origEC2Defs := resource.GetRelated("ec2")
-	restoreEC2 := func() { resource.RegisterRelated("ec2", origEC2Defs) }
+	restoreEC2 := func() { resource.SetRelatedForTest("ec2", origEC2Defs) }
 	if withDefs {
-		resource.RegisterRelated("ec2", []resource.RelatedDef{
+		resource.SetRelatedForTest("ec2", []resource.RelatedDef{
 			{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 			{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: noopChecker},
 			{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: noopChecker},
 		})
 	} else {
-		resource.RegisterRelated("ec2", nil)
+		resource.SetRelatedForTest("ec2", nil)
 	}
 	k := keys.Default()
 	d := views.NewDetail(res, "ec2", nil, k)
@@ -98,21 +98,21 @@ func ec2StoryDetailWithConfig(t *testing.T, width, height int, withDefs bool) (v
 			},
 		},
 	}
-	resource.RegisterNavigableFields("ec2", []resource.NavigableField{
+	resource.SetNavigableFieldsForTest("ec2", []resource.NavigableField{
 		{FieldPath: "VpcId", TargetType: "vpc"},
 	})
 	origEC2Defs2 := resource.GetRelated("ec2")
 	if withDefs {
-		resource.RegisterRelated("ec2", []resource.RelatedDef{
+		resource.SetRelatedForTest("ec2", []resource.RelatedDef{
 			{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 			{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: noopChecker},
 		})
 	} else {
-		resource.RegisterRelated("ec2", nil)
+		resource.SetRelatedForTest("ec2", nil)
 	}
 	cleanup := func() {
-		resource.UnregisterNavigableFields("ec2")
-		resource.RegisterRelated("ec2", origEC2Defs2)
+		resource.CleanupNavigableFieldsForTest("ec2")
+		resource.SetRelatedForTest("ec2", origEC2Defs2)
 	}
 	k := keys.Default()
 	d := views.NewDetail(res, "ec2", cfg, k)

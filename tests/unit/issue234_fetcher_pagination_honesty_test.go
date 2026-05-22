@@ -1,6 +1,6 @@
 // issue234_fetcher_pagination_honesty_test.go — Tests for issue #234.
 //
-// Business rule: A fetcher registered via RegisterPaginated must stop after one
+// Business rule: A fetcher registered via SetPaginatedForTest must stop after one
 // API page and honestly report IsTruncated. Fetchers that internally loop ALL
 // pages before returning violate this contract — they do unbounded work on cold
 // start and cause related-view checkers to get dishonest IsTruncated=false.

@@ -1150,3 +1150,613 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 - `lambda` → `r53` — no native linkage; custom domains go via API Gateway / CloudFront.
 - `sns-sub` → `ecs` — SNS subscriptions don't target ECS clusters/services directly.
 - `tg` → `role` — no IAM role attribute on target groups.
+
+<!-- BEGIN GENERATED: related-table -->
+| Source Type | Target Type | Display Name | Needs Target Cache |
+| --- | --- | --- | --- |
+| ec2 | tg | Target Groups | yes |
+| ec2 | asg | Auto Scaling Groups | yes |
+| ec2 | alarm | CloudWatch Alarms | yes |
+| ec2 | ng | EKS Node Groups | yes |
+| ec2 | cfn | CloudFormation Stacks | yes |
+| ec2 | eip | Elastic IPs | yes |
+| ec2 | ebs | EBS Volumes | no |
+| ec2 | ebs-snap | EBS Snapshots | yes |
+| ec2 | ct-events | CloudTrail Events | no |
+| ec2 | sg | Security Groups | no |
+| ec2 | vpc | VPC | no |
+| ec2 | role | IAM Role | no |
+| ec2 | ami | AMI | no |
+| ec2 | eni | Network Interfaces | no |
+| ec2 | subnet | Subnet | no |
+| ec2 | kms | KMS Keys | yes |
+| ec2 | logs | Log Groups | yes |
+| ec2 | ssm | SSM Parameters | no |
+| ec2 | backup | Backup Plans | yes |
+| ecs-svc | ecs | ECS Clusters | no |
+| ecs-svc | tg | Target Groups | no |
+| ecs-svc | alarm | CloudWatch Alarms | yes |
+| ecs-svc | elb | Load Balancers | yes |
+| ecs-svc | logs | Log Groups | yes |
+| ecs-svc | sg | Security Groups | no |
+| ecs-svc | role | IAM Role | no |
+| ecs-svc | cfn | CloudFormation Stacks | yes |
+| ecs-svc | ct-events | CloudTrail Events | yes |
+| ecs-svc | eb-rule | EventBridge Rules | yes |
+| ecs-svc | ecr | ECR Repositories | no |
+| ecs-svc | ecs-task | ECS Tasks | yes |
+| ecs-svc | secrets | Secrets | no |
+| ecs-svc | sfn | Step Functions | yes |
+| ecs-svc | subnet | Subnets | no |
+| ecs-svc | vpc | VPC | yes |
+| ecs | ecs-svc | ECS Services | yes |
+| ecs | alarm | CloudWatch Alarms | yes |
+| ecs | cfn | CloudFormation Stacks | yes |
+| ecs | kms | KMS Key | no |
+| ecs | asg | Auto Scaling Groups | yes |
+| ecs | ec2 | EC2 Instances | yes |
+| ecs | ct-events | CloudTrail Events | yes |
+| ecs | ecs-task | ECS Tasks | yes |
+| ecs | logs | Log Groups | yes |
+| ecs-task | ecs-svc | ECS Services | no |
+| ecs-task | ecs | ECS Clusters | no |
+| ecs-task | logs | Log Groups | yes |
+| ecs-task | role | IAM Role | no |
+| ecs-task | alarm | CloudWatch Alarms | yes |
+| ecs-task | ct-events | CloudTrail Events | yes |
+| ecs-task | ec2 | EC2 Instances | no |
+| ecs-task | ecr | ECR Repositories | no |
+| ecs-task | eni | Network Interfaces | no |
+| ecs-task | secrets | Secrets | no |
+| ecs-task | sg | Security Groups | no |
+| ecs-task | ssm | SSM Parameters | no |
+| ecs-task | subnet | Subnets | no |
+| lambda | role | IAM Roles | yes |
+| lambda | alarm | CW Alarms | yes |
+| lambda | logs | Log Groups | yes |
+| lambda | sg | Security Groups | no |
+| lambda | vpc | VPC | no |
+| lambda | kms | KMS Key | no |
+| lambda | sqs | SQS Queues | no |
+| lambda | cfn | CloudFormation | no |
+| lambda | eb-rule | EventBridge Rules | no |
+| lambda | subnet | Subnets | no |
+| lambda | efs | EFS File Systems | no |
+| lambda | apigw | API Gateways | yes |
+| lambda | cf | CloudFront | yes |
+| lambda | ddb | DynamoDB Tables | no |
+| lambda | kinesis | Kinesis Streams | no |
+| lambda | msk | MSK Clusters | no |
+| lambda | ct-events | CloudTrail Events | yes |
+| lambda | tg | Target Groups | yes |
+| lambda | sns | SNS Topics | yes |
+| lambda | sns-sub | SNS Subscriptions | yes |
+| lambda | s3 | S3 Buckets | yes |
+| lambda | ecr | ECR Repositories | no |
+| lambda | eni | Network Interfaces | yes |
+| lambda | secrets | Secrets | yes |
+| lambda | ssm | SSM Parameters | yes |
+| asg | ec2 | EC2 Instances | no |
+| asg | tg | Target Groups | no |
+| asg | subnet | Subnets | no |
+| asg | alarm | CloudWatch Alarms | yes |
+| asg | ng | EKS Node Groups | yes |
+| asg | ami | AMI | no |
+| asg | elb | Load Balancers | no |
+| asg | role | IAM Roles | no |
+| asg | sg | Security Groups | no |
+| asg | sns | SNS Topics | no |
+| asg | vpc | VPCs | no |
+| asg | ct-events | CloudTrail Events | no |
+| ebs | ec2 | EC2 Instance | no |
+| ebs | ebs-snap | EBS Snapshots | yes |
+| ebs | kms | KMS Key | no |
+| ebs | alarm | CW Alarms | yes |
+| ebs | backup | Backup | no |
+| ebs | cfn | CloudFormation | yes |
+| ebs | ct-events | CloudTrail Events | no |
+| ebs-snap | ami | AMIs | yes |
+| ebs-snap | ebs | EBS Volume | no |
+| ebs-snap | ec2 | EC2 Instance | no |
+| ebs-snap | kms | KMS Key | no |
+| ebs-snap | backup | Backup | no |
+| ebs-snap | ct-events | CloudTrail Events | no |
+| ami | ec2 | EC2 Instances | yes |
+| ami | ebs-snap | EBS Snapshots | no |
+| ami | asg | Auto Scaling Groups | yes |
+| ami | cfn | CloudFormation Stacks | yes |
+| ami | kms | KMS Keys | no |
+| ami | ng | EKS Node Groups | yes |
+| ami | ct-events | CloudTrail Events | no |
+| eks | ng | Node Groups | yes |
+| eks | alarm | CloudWatch Alarms | yes |
+| eks | cfn | CloudFormation Stacks | yes |
+| eks | logs | Log Groups | yes |
+| eks | sg | Security Groups | no |
+| eks | vpc | VPC | no |
+| eks | role | IAM Role | no |
+| eks | kms | KMS Key | no |
+| eks | subnet | Subnets | no |
+| eks | ami | AMI | no |
+| eks | asg | Auto Scaling Groups | yes |
+| eks | ec2 | EC2 Instances | no |
+| eks | ct-events | CloudTrail Events | yes |
+| ng | eks | EKS Clusters | yes |
+| ng | role | IAM Roles | yes |
+| ng | asg | Auto Scaling Groups | yes |
+| ng | ec2 | EC2 Instances | yes |
+| ng | sg | Security Groups | no |
+| ng | ami | AMI | no |
+| ng | ebs | EBS Volumes | no |
+| ng | subnet | Subnets | no |
+| ng | ct-events | CloudTrail Events | no |
+| elb | tg | Target Groups | yes |
+| elb | alarm | CW Alarms | yes |
+| elb | sg | Security Groups | no |
+| elb | vpc | VPC | no |
+| elb | cfn | CloudFormation | no |
+| elb | r53 | Route 53 Records | no |
+| elb | acm | ACM Certificates | no |
+| elb | cf | CloudFront | no |
+| elb | eni | Network Interfaces | yes |
+| elb | s3 | S3 Buckets | no |
+| elb | subnet | Subnets | no |
+| elb | waf | WAF Web ACLs | no |
+| elb | ct-events | CloudTrail Events | no |
+| tg | elb | Load Balancers | no |
+| tg | ecs-svc | ECS Services | yes |
+| tg | asg | Auto Scaling Groups | yes |
+| tg | alarm | CW Alarms | yes |
+| tg | vpc | VPC | no |
+| tg | backup | Backup Plans | no |
+| tg | cfn | CloudFormation | no |
+| tg | dbc | DocumentDB Clusters | no |
+| tg | dbi | RDS Instances | no |
+| tg | ec2 | EC2 Instances | no |
+| tg | lambda | Lambda Functions | no |
+| tg | logs | Log Groups | no |
+| tg | dbi-snap | DB Instance Snapshots | no |
+| tg | sg | Security Groups | no |
+| tg | subnet | Subnets | no |
+| tg | ct-events | CloudTrail Events | no |
+| sg | vpc | VPC | no |
+| sg | ec2 | EC2 Instances | yes |
+| sg | eni | Network Interfaces | yes |
+| sg | elb | Load Balancers | yes |
+| sg | lambda | Lambda Functions | yes |
+| sg | cfn | CloudFormation | no |
+| sg | sg | Referencing SGs | yes |
+| sg | ct-events | CloudTrail Events | no |
+| vpc | subnet | Subnets | yes |
+| vpc | sg | Security Groups | yes |
+| vpc | ec2 | EC2 Instances | yes |
+| vpc | elb | Load Balancers | yes |
+| vpc | nat | NAT Gateways | yes |
+| vpc | igw | Internet Gateways | yes |
+| vpc | rtb | Route Tables | yes |
+| vpc | vpce | VPC Endpoints | yes |
+| vpc | cfn | CloudFormation | no |
+| vpc | eni | Network Interfaces | yes |
+| vpc | tgw | Transit Gateways | no |
+| vpc | ct-events | CloudTrail Events | no |
+| subnet | ec2 | EC2 Instances | yes |
+| subnet | eni | Network Interfaces | yes |
+| subnet | nat | NAT Gateways | yes |
+| subnet | elb | Load Balancers | yes |
+| subnet | rtb | Route Tables | yes |
+| subnet | cfn | CloudFormation | no |
+| subnet | vpc | VPC | no |
+| subnet | asg | Auto Scaling Groups | yes |
+| subnet | efs | EFS File Systems | no |
+| subnet | eks | EKS Clusters | yes |
+| subnet | vpce | VPC Endpoints | yes |
+| subnet | ct-events | CloudTrail Events | no |
+| rtb | subnet | Subnets | yes |
+| rtb | nat | NAT Gateways | yes |
+| rtb | igw | Internet Gateways | yes |
+| rtb | cfn | CloudFormation | yes |
+| rtb | vpc | VPC | no |
+| rtb | eni | Network Interfaces | yes |
+| rtb | tgw | Transit Gateways | yes |
+| rtb | vpce | VPC Endpoints | yes |
+| rtb | ct-events | CloudTrail Events | no |
+| nat | vpc | VPCs | yes |
+| nat | subnet | Subnets | yes |
+| nat | rtb | Route Tables | yes |
+| nat | alarm | CloudWatch Alarms | yes |
+| nat | eip | Elastic IPs | yes |
+| nat | eni | Network Interfaces | yes |
+| nat | ct-events | CloudTrail Events | no |
+| igw | vpc | VPCs | yes |
+| igw | rtb | Route Tables | yes |
+| igw | ct-events | CloudTrail Events | no |
+| eip | ec2 | EC2 Instances | no |
+| eip | eni | Network Interfaces | no |
+| eip | nat | NAT Gateways | yes |
+| eip | alarm | CloudWatch Alarms | no |
+| eip | asg | Auto Scaling Groups | no |
+| eip | cfn | CloudFormation | no |
+| eip | ecs | ECS Clusters | no |
+| eip | ecs-svc | ECS Services | no |
+| eip | ecs-task | ECS Tasks | no |
+| eip | logs | Log Groups | no |
+| eip | ct-events | CloudTrail Events | no |
+| vpce | subnet | Subnets | no |
+| vpce | sg | Security Groups | no |
+| vpce | rtb | Route Tables | no |
+| vpce | eni | Network Interfaces | no |
+| vpce | vpc | VPC | no |
+| vpce | acm | ACM Certificates | no |
+| vpce | alarm | CloudWatch Alarms | no |
+| vpce | cf | CloudFront | no |
+| vpce | logs | Log Groups | no |
+| vpce | r53 | Route 53 Zones | no |
+| vpce | s3 | S3 Buckets | no |
+| vpce | tg | Target Groups | no |
+| vpce | waf | WAF Web ACLs | no |
+| vpce | ct-events | CloudTrail Events | no |
+| tgw | vpc | VPCs | no |
+| tgw | rtb | Route Tables | yes |
+| tgw | role | IAM Role | no |
+| tgw | subnet | Subnets | no |
+| tgw | ct-events | CloudTrail Events | no |
+| eni | ec2 | EC2 Instances | yes |
+| eni | sg | Security Groups | yes |
+| eni | eip | Elastic IPs | yes |
+| eni | vpc | VPC | no |
+| eni | subnet | Subnet | no |
+| eni | elb | Load Balancers | no |
+| eni | lambda | Lambda Functions | no |
+| eni | nat | NAT Gateways | yes |
+| eni | vpce | VPC Endpoints | yes |
+| eni | ct-events | CloudTrail Events | no |
+| dbi | sg | Security Groups | no |
+| dbi | kms | KMS Key | no |
+| dbi | subnet | Subnets | no |
+| dbi | alarm | CloudWatch Alarms | yes |
+| dbi | dbi-snap | DB Instance Snapshots | yes |
+| dbi | logs | Log Groups | yes |
+| dbi | vpc | VPC | no |
+| dbi | secrets | Secrets Manager | yes |
+| dbi | dbc | RDS Clusters | yes |
+| dbi | role | IAM Roles | no |
+| dbi | eni | Network Interfaces | no |
+| dbi | ct-events | CloudTrail Events | yes |
+| s3 | trail | CloudTrail Trails | yes |
+| s3 | cf | CloudFront | yes |
+| s3 | lambda | Lambda (notifications) | no |
+| s3 | sns | SNS (notifications) | no |
+| s3 | sqs | SQS (notifications) | no |
+| s3 | cfn | CloudFormation | no |
+| s3 | kms | KMS Key | no |
+| s3 | s3 | Access Log Bucket | no |
+| s3 | athena | Athena WorkGroups | no |
+| s3 | glue | Glue Jobs | no |
+| s3 | backup | Backup | no |
+| s3 | eb-rule | EventBridge Rules | no |
+| s3 | r53 | Route 53 | no |
+| s3 | role | IAM Roles | no |
+| s3 | ct-events | CloudTrail Events | no |
+| redis | alarm | CW Alarms | yes |
+| redis | cfn | CloudFormation | yes |
+| redis | ct-events | CloudTrail Events | yes |
+| redis | kms | KMS Key | no |
+| redis | logs | Log Groups | yes |
+| redis | secrets | Secrets Manager | yes |
+| redis | sg | Security Groups | yes |
+| redis | sns | SNS Topics | yes |
+| redis | subnet | Subnets | yes |
+| redis | vpc | VPC | no |
+| dbc | sg | Security Groups | no |
+| dbc | alarm | CloudWatch Alarms | yes |
+| dbc | logs | Log Groups | yes |
+| dbc | kms | KMS Key | no |
+| dbc | secrets | Secrets Manager | yes |
+| dbc | dbi | RDS Instances | yes |
+| dbc | dbc-snap | DB Cluster Snapshots | yes |
+| dbc | subnet | Subnets | no |
+| dbc | vpc | VPC | no |
+| dbc | ct-events | CloudTrail Events | no |
+| ddb | kms | KMS Key | no |
+| ddb | alarm | CloudWatch Alarms | yes |
+| ddb | lambda | Lambda Functions | no |
+| ddb | kinesis | Kinesis Streams | no |
+| ddb | backup | Backup Plans | no |
+| ddb | logs | Log Groups | yes |
+| ddb | vpce | VPC Endpoints | yes |
+| ddb | ct-events | CloudTrail Events | no |
+| opensearch | alarm | CW Alarms | yes |
+| opensearch | logs | Log Groups | no |
+| opensearch | sg | Security Groups | no |
+| opensearch | vpc | VPC | no |
+| opensearch | kms | KMS Key | no |
+| opensearch | cfn | CloudFormation | no |
+| opensearch | subnet | Subnets | no |
+| opensearch | acm | ACM Certificates | yes |
+| opensearch | ct-events | CloudTrail Events | no |
+| redshift | alarm | CW Alarms | yes |
+| redshift | sg | Security Groups | no |
+| redshift | vpc | VPC | no |
+| redshift | role | IAM Role | no |
+| redshift | kms | KMS Key | no |
+| redshift | cfn | CloudFormation | yes |
+| redshift | secrets | Secrets Manager | yes |
+| redshift | logs | Log Groups | no |
+| redshift | s3 | S3 Buckets | no |
+| redshift | subnet | Subnets | no |
+| redshift | ct-events | CloudTrail Events | no |
+| efs | kms | KMS Keys | no |
+| efs | cfn | CloudFormation Stacks | yes |
+| efs | sg | Security Groups | no |
+| efs | subnet | Subnets | no |
+| efs | lambda | Lambda Functions | no |
+| efs | alarm | CloudWatch Alarms | yes |
+| efs | backup | Backup Plans | yes |
+| efs | ecs-task | ECS Tasks | yes |
+| efs | eni | Network Interfaces | yes |
+| efs | vpc | VPC | yes |
+| efs | ct-events | CloudTrail Events | no |
+| dbi-snap | dbi | DB Instances | yes |
+| dbi-snap | kms | KMS Keys | yes |
+| dbi-snap | backup | Backup Plans | no |
+| dbi-snap | ct-events | CloudTrail Events | yes |
+| dbc-snap | dbc | DocumentDB Cluster | yes |
+| dbc-snap | kms | KMS Key | no |
+| dbc-snap | vpc | VPC | no |
+| dbc-snap | backup | Backup Plans | no |
+| dbc-snap | ct-events | CloudTrail Events | no |
+| alarm | sns | SNS Topics | no |
+| alarm | asg | Auto Scaling Groups | yes |
+| alarm | apigw | API Gateways | no |
+| alarm | cb | CodeBuild Projects | no |
+| alarm | dbi | RDS Instances | no |
+| alarm | ec2 | EC2 Instances | no |
+| alarm | ecs | ECS Clusters | no |
+| alarm | eks | EKS Clusters | no |
+| alarm | kms | KMS Keys | no |
+| alarm | lambda | Lambda Functions | no |
+| alarm | logs | Log Groups | no |
+| alarm | s3 | S3 Buckets | no |
+| alarm | sfn | Step Functions | no |
+| alarm | waf | WAF Web ACLs | no |
+| alarm | ct-events | CloudTrail Events | yes |
+| logs | lambda | Lambda Functions | yes |
+| logs | alarm | CW Alarms | yes |
+| logs | kms | KMS Key | no |
+| logs | apigw | API Gateway | yes |
+| logs | ecs-task | ECS Tasks | yes |
+| logs | kinesis | Kinesis Streams | no |
+| logs | s3 | S3 (exports) | no |
+| logs | ct-events | CloudTrail Events | no |
+| trail | s3 | S3 Bucket | yes |
+| trail | logs | Log Groups | yes |
+| trail | sns | SNS Topic | yes |
+| trail | kms | KMS Key | yes |
+| trail | role | IAM Role | no |
+| trail | ct-events | CloudTrail Events | no |
+| ct-events | role | IAM Roles | yes |
+| ct-events | iam-user | IAM Users | yes |
+| ct-events | ec2 | EC2 Instances | yes |
+| ct-events | s3 | S3 Buckets | yes |
+| ct-events | lambda | Lambda Functions | yes |
+| ct-events | dbi | RDS Instances | yes |
+| ct-events | kms | KMS Keys | yes |
+| ct-events | secrets | Secrets | yes |
+| ct-events | vpce | VPC Endpoints | yes |
+| ct-events | sg | Security Groups | yes |
+| ct-events | ddb | DynamoDB Tables | yes |
+| ct-events | cfn | CloudFormation Stacks | yes |
+| ct-events | trail | CloudTrail Trails | yes |
+| ct-events | ct-events | CT events by AccessKeyId | no |
+| ct-events | ct-events | CT events by Username | no |
+| ct-events | ct-events | CT events by EventName | no |
+| ct-events | ct-events | CT events by SharedEventId | no |
+| sqs | alarm | CloudWatch Alarms | yes |
+| sqs | lambda | Lambda Functions | no |
+| sqs | sqs | Dead Letter Queues | yes |
+| sqs | sns-sub | SNS Subscriptions | yes |
+| sqs | sns | SNS Topics | yes |
+| sqs | eb-rule | EventBridge Rules | yes |
+| sqs | kms | KMS Key | no |
+| sqs | ct-events | CloudTrail Events | no |
+| sns | alarm | CloudWatch Alarms | no |
+| sns | sns-sub | Subscriptions | yes |
+| sns | kms | KMS Key | no |
+| sns | role | IAM Role | no |
+| sns | ct-events | CloudTrail Events | no |
+| sns-sub | sns | SNS Topic | yes |
+| sns-sub | lambda | Lambda Function | yes |
+| sns-sub | sqs | SQS Queue | yes |
+| sns-sub | ct-events | CloudTrail Events | no |
+| eb | cfn | CloudFormation Stack | yes |
+| eb | logs | Log Groups | yes |
+| eb | asg | Auto Scaling Groups | yes |
+| eb | ec2 | EC2 Instances | yes |
+| eb | alarm | CloudWatch Alarms | yes |
+| eb | elb | Load Balancers | no |
+| eb | tg | Target Groups | no |
+| eb | sg | Security Groups | no |
+| eb | role | IAM Role | no |
+| eb | s3 | S3 Buckets | no |
+| eb | ct-events | CloudTrail Events | no |
+| eb-rule | role | IAM Role | no |
+| eb-rule | kinesis | Kinesis (targets) | no |
+| eb-rule | lambda | Lambda (targets) | no |
+| eb-rule | logs | Log Groups (targets) | no |
+| eb-rule | sfn | Step Functions (targets) | no |
+| eb-rule | sns | SNS (targets) | no |
+| eb-rule | sqs | SQS (targets) | no |
+| eb-rule | ct-events | CloudTrail Events | no |
+| kinesis | alarm | CW Alarms | yes |
+| kinesis | lambda | Lambda Functions | yes |
+| kinesis | cfn | CloudFormation | no |
+| kinesis | ddb | DynamoDB Streams | yes |
+| kinesis | kms | KMS Key | no |
+| kinesis | ct-events | CloudTrail Events | no |
+| msk | alarm | CW Alarms | yes |
+| msk | sg | Security Groups | no |
+| msk | kms | KMS Key | no |
+| msk | lambda | Lambda Functions | yes |
+| msk | cfn | CloudFormation | yes |
+| msk | subnet | Subnets | no |
+| msk | vpc | VPC | yes |
+| msk | logs | Log Groups | no |
+| msk | s3 | S3 (broker logs) | no |
+| msk | secrets | Secrets Manager | no |
+| msk | ct-events | CloudTrail Events | no |
+| sfn | alarm | CloudWatch Alarms | no |
+| sfn | logs | Log Groups | yes |
+| sfn | role | IAM Role | no |
+| sfn | eb-rule | EventBridge Rules | yes |
+| sfn | kms | KMS Key | no |
+| sfn | lambda | Lambda Functions | no |
+| sfn | ct-events | CloudTrail Events | no |
+| ses | r53 | Route 53 (DNS) | yes |
+| ses | eb-rule | EventBridge Rules | yes |
+| ses | lambda | Lambda Functions | no |
+| ses | s3 | S3 Buckets | no |
+| ses | sns | SNS Topics | no |
+| ses | ct-events | CloudTrail Events | no |
+| secrets | kms | KMS Keys | yes |
+| secrets | lambda | Lambda (rotation) | yes |
+| secrets | cfn | CloudFormation | yes |
+| secrets | dbi | RDS Instances | yes |
+| secrets | cb | CodeBuild Projects | yes |
+| secrets | codeartifact | CodeArtifact Domains | no |
+| secrets | eb | Elastic Beanstalk | yes |
+| secrets | ecs-task | ECS Tasks | yes |
+| secrets | logs | Log Groups | no |
+| secrets | role | IAM Roles | no |
+| secrets | sns | SNS Topics | no |
+| secrets | ct-events | CloudTrail Events | no |
+| ssm | kms | KMS Key | yes |
+| ssm | ct-events | CloudTrail Events | no |
+| kms | ebs | EBS Volumes | yes |
+| kms | dbi | RDS Instances | yes |
+| kms | secrets | Secrets Manager | yes |
+| kms | s3 | S3 Buckets | no |
+| kms | role | IAM Roles (grants) | no |
+| kms | ct-events | CloudTrail Events | no |
+| r53 | elb | Load Balancers | yes |
+| r53 | cf | CloudFront | yes |
+| r53 | acm | ACM Certificates | no |
+| r53 | apigw | API Gateways | yes |
+| r53 | logs | Log Groups | no |
+| r53 | s3 | S3 Buckets | yes |
+| r53 | vpc | VPCs | no |
+| r53 | ct-events | CloudTrail Events | no |
+| cf | s3 | S3 Buckets (origin) | yes |
+| cf | elb | Load Balancers (origin) | yes |
+| cf | waf | WAF Web ACLs | yes |
+| cf | acm | ACM Certificates | yes |
+| cf | r53 | Route 53 Zones | no |
+| cf | alarm | CloudWatch Alarms | yes |
+| cf | lambda | Lambda@Edge | no |
+| cf | logs | Log Groups | no |
+| cf | ct-events | CloudTrail Events | no |
+| acm | cf | CloudFront Distros | yes |
+| acm | elb | Load Balancers | no |
+| acm | apigw | API Gateways | no |
+| acm | r53 | Route 53 Zones | no |
+| acm | ct-events | CloudTrail Events | no |
+| apigw | logs | Log Groups | yes |
+| apigw | lambda | Lambda Functions | no |
+| apigw | waf | WAF Web ACLs | no |
+| apigw | acm | ACM Certificates | no |
+| apigw | alarm | CloudWatch Alarms | yes |
+| apigw | cf | CloudFront | no |
+| apigw | elb | Load Balancers | no |
+| apigw | kms | KMS Keys | no |
+| apigw | r53 | Route 53 Zones | no |
+| apigw | role | IAM Role | no |
+| apigw | sfn | Step Functions | no |
+| apigw | sns | SNS Topics | no |
+| apigw | vpce | VPC Endpoints | no |
+| apigw | ct-events | CloudTrail Events | no |
+| role | lambda | Lambda Functions | yes |
+| role | glue | Glue Jobs | yes |
+| role | ng | Node Groups | yes |
+| role | policy | IAM Policies | no |
+| role | ec2 | EC2 Instances | yes |
+| role | eks | EKS Clusters | yes |
+| role | iam-group | IAM Groups (trust) | no |
+| role | iam-user | IAM Users (trust) | no |
+| role | ct-events | CloudTrail Events | no |
+| policy | role | IAM Roles | no |
+| policy | iam-user | IAM Users | no |
+| policy | iam-group | IAM Groups | no |
+| policy | ct-events | CloudTrail Events | no |
+| iam-user | iam-group | IAM Groups | no |
+| iam-user | policy | IAM Policies | no |
+| iam-user | ct-events | CloudTrail Events | no |
+| iam-group | iam-user | IAM Users | no |
+| iam-group | policy | IAM Policies | no |
+| iam-group | ct-events | CloudTrail Events | no |
+| waf | elb | Load Balancers | no |
+| waf | apigw | API Gateways | no |
+| waf | cf | CloudFront | no |
+| waf | alarm | CloudWatch Alarms | no |
+| waf | logs | Log Groups | no |
+| waf | ct-events | CloudTrail Events | no |
+| cfn | role | IAM Roles | yes |
+| cfn | cfn | Related Stacks | yes |
+| cfn | sns | SNS Topics | no |
+| cfn | s3 | S3 (stack resources) | no |
+| cfn | eb-rule | EventBridge Rules | no |
+| cfn | ct-events | CloudTrail Events | no |
+| pipeline | cb | CodeBuild Projects | no |
+| pipeline | role | IAM Roles | no |
+| pipeline | cfn | CloudFormation | no |
+| pipeline | codeartifact | CodeArtifact | no |
+| pipeline | eb-rule | EventBridge Rules | no |
+| pipeline | ecr | ECR Repositories | no |
+| pipeline | ecs-svc | ECS Services | no |
+| pipeline | kms | KMS Key | no |
+| pipeline | lambda | Lambda Functions | no |
+| pipeline | s3 | S3 Buckets (artifacts) | no |
+| pipeline | sns | SNS Topics | no |
+| pipeline | ct-events | CloudTrail Events | no |
+| cb | logs | Log Groups | yes |
+| cb | role | IAM Roles | yes |
+| cb | pipeline | CodePipelines | yes |
+| cb | sg | Security Groups | no |
+| cb | subnet | Subnets | no |
+| cb | vpc | VPC | no |
+| cb | kms | KMS Key | no |
+| cb | alarm | CloudWatch Alarms | yes |
+| cb | ecr | ECR Repositories | yes |
+| cb | s3 | S3 Buckets | yes |
+| cb | secrets | Secrets Manager | no |
+| cb | ssm | SSM Parameters | no |
+| cb | ct-events | CloudTrail Events | no |
+| ecr | lambda | Lambda Functions | yes |
+| ecr | cb | CodeBuild Projects | yes |
+| ecr | cfn | CloudFormation Stacks | yes |
+| ecr | kms | KMS Key | no |
+| ecr | ct-events | CloudTrail Events | yes |
+| ecr | eb-rule | EventBridge Rules | no |
+| ecr | ecs-task | ECS Tasks | yes |
+| ecr | pipeline | CodePipelines | no |
+| ecr | role | IAM Roles | no |
+| codeartifact | kms | KMS Key | no |
+| codeartifact | ct-events | CloudTrail Events | no |
+| glue | role | IAM Roles | yes |
+| glue | alarm | CW Alarms | yes |
+| glue | logs | Log Groups | yes |
+| glue | cfn | CloudFormation Stacks | no |
+| glue | s3 | S3 (script bucket) | no |
+| glue | kms | KMS Key | no |
+| glue | athena | Athena WorkGroups | no |
+| glue | secrets | Secrets Manager | no |
+| glue | ct-events | CloudTrail Events | no |
+| athena | s3 | S3 Buckets (results) | no |
+| athena | kms | KMS Keys | no |
+| athena | glue | Glue Data Catalog | no |
+| athena | logs | Log Groups | no |
+| athena | role | IAM Roles | no |
+| athena | ct-events | CloudTrail Events | no |
+| backup | role | IAM Roles | no |
+| backup | kms | KMS Keys | no |
+| backup | sns | SNS Topics | no |
+| backup | ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related-table -->

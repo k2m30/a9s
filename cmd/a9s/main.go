@@ -46,6 +46,11 @@ func main() {
 	// below and before any tui.New construction — both transitively call
 	// catalog accessors that panic when SetTypes has not yet been invoked.
 	aws.Install()
+	// Wire resource-registry callbacks into the projection layer. Replaces
+	// the legacy internal/resource init() per AS-731 exit criterion (zero
+	// init() in internal/resource/). Must run after aws.Install so callbacks
+	// resolve catalog-backed defaults.
+	resource.WireProjection()
 
 	var (
 		profile     string
@@ -201,7 +206,7 @@ func main() {
 
 	// Populate the ACTIVE nav field registry from the DEFAULT registry so that
 	// DetailModel navigability works in production. This runs after all init()
-	// functions have populated the DEFAULT registry via RegisterDefaultNavFields.
+	// functions have populated the DEFAULT registry via SetDefaultNavFieldsForTest.
 	resource.BootstrapActiveNavFields()
 
 	if err := runProgram(profile, region, extraOpts, activeTheme); err != nil {

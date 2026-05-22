@@ -189,3 +189,22 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation (persona fallback, 2026-04-20) — `cfn` discovery: `Volume.Tags[]` lookup for `aws:cloudformation:stack-name` / `aws:cloudformation:stack-id` — CFN propagates these automatically. possible=yes, worth=yes. Rationale: IaC-ownership pivot is a standard ops question and requires no extra API.
 - UX decision — `Encrypted==false` on in-use volumes uses `!` severity — governed by `docs/attention-signals.md` Wave 1 entry (Warning), rendered as `!` on Healthy rows per this skill's §4 mapping rule "Wave 2 background finding on a Healthy row, important". Treated as important (`!`) because CIS EC2.7 is a hard security-audit finding, not an informational note.
 - UX decision — `Events[] non-empty` uses `~` severity — informational scheduled/AWS-notification event; does not require immediate action, so does not bump S1 menu count.
+
+<!-- BEGIN GENERATED: header -->
+ebs — COMPUTE. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| ec2 | EC2 Instance | no |
+| ebs-snap | EBS Snapshots | yes |
+| kms | KMS Key | no |
+| alarm | CW Alarms | yes |
+| backup | Backup | no |
+| cfn | CloudFormation | yes |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

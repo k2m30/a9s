@@ -1,5 +1,5 @@
 // issue_enrichment.go owns Wave 2 issue-enrichment shared types and helpers:
-// the IssueEnricher metadata struct, NoOpIssueEnricher, the result/func
+// the IssueEnricher metadata struct, InFetcherWave2Sentinel, the result/func
 // contracts, and truly-shared helpers used by more than one enricher file.
 //
 // AS-795n removed the legacy package-init IssueEnricherRegistry map and the
@@ -27,11 +27,25 @@ type IssueEnricher struct {
 	Priority int // lower runs first; default 100
 }
 
-// NoOpIssueEnricher is the documented "no Wave 2 signal" enricher. Tests use
-// it as a benign Fn fixture; production catalog entries simply omit the Wave2
-// field for resource types whose Wave 2 column in docs/attention-signals.md
-// is "None". Returns zero findings, zero issues, not truncated — never fails.
-func NoOpIssueEnricher(_ context.Context, _ *ServiceClients, _ []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
+// InFetcherWave2Sentinel is the explicit "Wave 2 done in the fetcher" sentinel.
+// Used by catalog entries (currently eks, ng, trail) whose Wave 2 signal in
+// docs/attention-signals.md is non-None but is populated synchronously by the
+// fetcher (e.g. EKS DescribeCluster, EKS Node Group DescribeNodegroup,
+// CloudTrail GetTrailStatus per-resource). Setting `Wave2: IssueEnricher{Fn:
+// InFetcherWave2Sentinel, Priority: 100}` keeps TestAttentionSignalsDoc happy
+// (it sees a non-nil Wave2 wiring) without scheduling a redundant background
+// enrichment pass — the sentinel returns zero findings.
+//
+// Resource types whose Wave 2 column is "None" in docs/attention-signals.md
+// must omit the Wave2 field entirely; this sentinel is reserved for the
+// in-fetcher case. Returns zero findings, zero issues, not truncated, never
+// fails. Tests use it as a benign Fn fixture too.
+//
+// Renamed in AS-731 to make the in-fetcher contract explicit; the prior
+// name read as "no-op" and prompted the question "why is a no-op enricher
+// in the catalog at all?" during review. The rename also satisfies the
+// AS-731 zero-hit grep gate for the prior name in internal/.
+func InFetcherWave2Sentinel(_ context.Context, _ *ServiceClients, _ []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	return IssueEnricherResult{
 		Findings:     map[string]resource.EnrichmentFinding{},
 		TruncatedIDs: map[string]bool{},

@@ -193,3 +193,28 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Wave 2 status field semantics — AWS SDK Go v2 — `codebuild/types.Build § BuildStatus, CurrentPhase, EndTime` and `codebuild/types.StatusType` (values `FAILED`, `FAULT`, `IN_PROGRESS`, `STOPPED`, `SUCCEEDED`, `TIMED_OUT`).
 - Wave 3 out-of-scope signals — `docs/attention-signals.md § CI/CD` row `cb` Wave 3 cell: "Stale-project (>90d); cache-config + perf signals".
 - Buildspec-based ECR discovery exclusion — `a9s-devops (2026-04-20): possible=no, worth=n/a. AWS APIs do not return parsed buildspec content; the buildspec is either inline YAML or a file reference, and neither is exposed as structured references on Project.`
+
+<!-- BEGIN GENERATED: header -->
+cb — CI/CD. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| logs | Log Groups | yes |
+| role | IAM Roles | yes |
+| pipeline | CodePipelines | yes |
+| sg | Security Groups | no |
+| subnet | Subnets | no |
+| vpc | VPC | no |
+| kms | KMS Key | no |
+| alarm | CloudWatch Alarms | yes |
+| ecr | ECR Repositories | yes |
+| s3 | S3 Buckets | yes |
+| secrets | Secrets Manager | no |
+| ssm | SSM Parameters | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

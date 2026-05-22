@@ -205,3 +205,26 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `Causes[]` populated only under enhanced health — a9s-devops (2026-04-20): possible=yes, worth=yes. Basic health does not populate `Causes`; implementation must tolerate the empty slice without emitting an S5 line. Persona call because the golden docs are silent on the basic-vs-enhanced distinction but the API contract is explicit.
 - Wave 3 items explicitly listed as out of scope — `docs/attention-signals.md` § Compute (row `eb`, Wave 3 cell).
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
+
+<!-- BEGIN GENERATED: header -->
+eb — MESSAGING. Lifecycle key: `status`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| cfn | CloudFormation Stack | yes |
+| logs | Log Groups | yes |
+| asg | Auto Scaling Groups | yes |
+| ec2 | EC2 Instances | yes |
+| alarm | CloudWatch Alarms | yes |
+| elb | Load Balancers | no |
+| tg | Target Groups | no |
+| sg | Security Groups | no |
+| role | IAM Role | no |
+| s3 | S3 Buckets | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

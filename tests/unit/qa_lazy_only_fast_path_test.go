@@ -60,7 +60,7 @@ func TestNeedsTargetCache_PrefetchFires_WhenLazyOnlyEntry(t *testing.T) {
 
 	var paginatedFetchCallCount int32
 
-	resource.RegisterPaginated(targetType, func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
+	resource.SetPaginatedForTest(targetType, func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
 		atomic.AddInt32(&paginatedFetchCallCount, 1)
 		return resource.FetchResult{
 			Resources: []resource.Resource{
@@ -68,19 +68,19 @@ func TestNeedsTargetCache_PrefetchFires_WhenLazyOnlyEntry(t *testing.T) {
 			},
 		}, nil
 	})
-	t.Cleanup(func() { resource.UnregisterPaginated(targetType) })
+	t.Cleanup(func() { resource.CleanupPaginatedForTest(targetType) })
 
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
 		out := make([]resource.Resource, len(ids))
 		for i, id := range ids {
 			out[i] = resource.Resource{ID: id, Name: id}
 		}
 		return out, nil
 	})
-	t.Cleanup(func() { resource.UnregisterFetchByIDs(targetType) })
+	t.Cleanup(func() { resource.CleanupFetchByIDsForTest(targetType) })
 
 	var checkerCallCount int32
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:       targetType,
 			DisplayName:      "GF Target",
@@ -94,7 +94,7 @@ func TestNeedsTargetCache_PrefetchFires_WhenLazyOnlyEntry(t *testing.T) {
 			},
 		},
 	})
-	t.Cleanup(func() { resource.UnregisterRelated(srcType) })
+	t.Cleanup(func() { resource.CleanupRelatedForTest(srcType) })
 
 	m := newRootSizedModel()
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
@@ -196,7 +196,7 @@ func TestLazyFastPath_RequiresAllIDs(t *testing.T) {
 	)
 
 	var fetchCallCount int32
-	resource.RegisterPaginated(targetType, func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
+	resource.SetPaginatedForTest(targetType, func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
 		atomic.AddInt32(&fetchCallCount, 1)
 		return resource.FetchResult{
 			Resources: []resource.Resource{
@@ -205,18 +205,18 @@ func TestLazyFastPath_RequiresAllIDs(t *testing.T) {
 			},
 		}, nil
 	})
-	t.Cleanup(func() { resource.UnregisterPaginated(targetType) })
+	t.Cleanup(func() { resource.CleanupPaginatedForTest(targetType) })
 
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
 		out := make([]resource.Resource, len(ids))
 		for i, id := range ids {
 			out[i] = resource.Resource{ID: id, Name: id}
 		}
 		return out, nil
 	})
-	t.Cleanup(func() { resource.UnregisterFetchByIDs(targetType) })
+	t.Cleanup(func() { resource.CleanupFetchByIDsForTest(targetType) })
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:  targetType,
 			DisplayName: "GG Target",
@@ -229,7 +229,7 @@ func TestLazyFastPath_RequiresAllIDs(t *testing.T) {
 			},
 		},
 	})
-	t.Cleanup(func() { resource.UnregisterRelated(srcType) })
+	t.Cleanup(func() { resource.CleanupRelatedForTest(srcType) })
 
 	// Pass non-nil clients so fetchResources doesn't short-circuit on the
 	// nil-clients guard. The registered paginated fetcher above ignores the

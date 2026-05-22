@@ -213,3 +213,26 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Read-only invariant (Out of Scope bullet) — `docs/architecture.md` § "What is a9s?" (line 15: "Read-only by design — a9s never makes write calls to AWS").
 - §4 banned-word avoidance (`Wave`, `finding`, `bucket`, `severity` absent from all list/detail text) — per skill rules.
 - `ct-events` as universal pivot — `docs/related-resources.md` § Policy.
+
+<!-- BEGIN GENERATED: header -->
+redshift — DATABASES & STORAGE. Lifecycle key: `status`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| alarm | CW Alarms | yes |
+| sg | Security Groups | no |
+| vpc | VPC | no |
+| role | IAM Role | no |
+| kms | KMS Key | no |
+| cfn | CloudFormation | yes |
+| secrets | Secrets Manager | yes |
+| logs | Log Groups | no |
+| s3 | S3 Buckets | no |
+| subnet | Subnets | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

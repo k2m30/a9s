@@ -16,9 +16,9 @@ import (
 //
 // AS-812 PR #402 round 2 (CTO arbitration 2026-05-22T01:46Z): eb_rule_targets
 // migrates here from eb_rule_targets.go's init() body. Identity / Columns /
-// CopyField preserved from the removed RegisterChildType call; FieldKeys and
-// ChildFetcher carried over from the removed RegisterFieldKeys /
-// RegisterPaginatedChild calls.
+// CopyField preserved from the removed SetChildTypeForTest call; FieldKeys and
+// ChildFetcher carried over from the removed SetFieldKeysForTest /
+// SetPaginatedChildForTest calls.
 var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
 		Name:      "EB Rule Targets",

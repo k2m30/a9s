@@ -128,3 +128,17 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Severity choice `~` for unused-repo finding (informational, not urgent) — a9s-devops (2026-04-20): possible=yes, worth=yes; an empty registry is a housekeeping concern discovered during quarterly clean-up, not incident-time breakage. `~` keeps it out of `issues:N` while still glyphing it on the list row. Aligns with analogous informational-background-check findings (e.g. RDS maintenance scheduled, EBS snapshot aging) in other specs.
 - List text (S4) wording `empty, created 47d ago` — a9s-devops (2026-04-20): possible=yes, worth=yes; pairs the condition (`empty`) with the cause (`47d ago`) per the "state keywords are not explanations" rule; ≤40 chars. The `47d` digits are illustrative — production implementation computes the actual age from `CreatedTime`.
 - Detail text (S5) wording `No packages published since repository was created 47 days ago — consider removing if unused.` — a9s-devops (2026-04-20): possible=yes, worth=yes; plain-English operator sentence with a next-step hint; ≤100 chars (exactly 99 with illustrative `47`). Avoids all banned jargon (no `Wave`, no `enrichment`, no `finding`, no `bucket`).
+
+<!-- BEGIN GENERATED: header -->
+codeartifact — CI/CD. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| kms | KMS Key | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

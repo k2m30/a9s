@@ -102,11 +102,11 @@ func TestBottomHints_ResourceList_NoEnterChild(t *testing.T) {
 }
 
 func TestBottomHints_ResourceList_WithEnterChild(t *testing.T) {
-	resource.RegisterChildType(resource.ResourceTypeDef{
+	resource.SetChildTypeForTest(resource.ResourceTypeDef{
 		Name:      "S3 Objects",
 		ShortName: "s3_objects_hints_test",
 	})
-	t.Cleanup(func() { resource.UnregisterChildType("s3_objects_hints_test") })
+	t.Cleanup(func() { resource.CleanupChildTypeForTest("s3_objects_hints_test") })
 
 	td := resource.ResourceTypeDef{
 		Name:      "S3 Buckets",
@@ -136,10 +136,10 @@ func TestBottomHints_ResourceList_WithEnterChild(t *testing.T) {
 }
 
 func TestBottomHints_ResourceList_WithReveal(t *testing.T) {
-	resource.RegisterRevealFetcher("secrets_test_hints", func(_ context.Context, _ any, _ string) (string, error) {
+	resource.SetRevealFetcherForTest("secrets_test_hints", func(_ context.Context, _ any, _ string) (string, error) {
 		return "", nil
 	})
-	t.Cleanup(func() { resource.UnregisterRevealFetcher("secrets_test_hints") })
+	t.Cleanup(func() { resource.CleanupRevealFetcherForTest("secrets_test_hints") })
 
 	td := resource.ResourceTypeDef{
 		Name:      "Secrets",
@@ -185,13 +185,13 @@ func TestBottomHints_ResourceList_EscPops(t *testing.T) {
 }
 
 func TestBottomHints_ResourceList_MultipleChildKeys(t *testing.T) {
-	resource.RegisterChildType(resource.ResourceTypeDef{Name: "ECS Tasks", ShortName: "ecs_tasks_hints_test"})
-	resource.RegisterChildType(resource.ResourceTypeDef{Name: "ECS Events", ShortName: "ecs_events_hints_test"})
-	resource.RegisterChildType(resource.ResourceTypeDef{Name: "ECS Logs", ShortName: "ecs_logs_hints_test"})
+	resource.SetChildTypeForTest(resource.ResourceTypeDef{Name: "ECS Tasks", ShortName: "ecs_tasks_hints_test"})
+	resource.SetChildTypeForTest(resource.ResourceTypeDef{Name: "ECS Events", ShortName: "ecs_events_hints_test"})
+	resource.SetChildTypeForTest(resource.ResourceTypeDef{Name: "ECS Logs", ShortName: "ecs_logs_hints_test"})
 	t.Cleanup(func() {
-		resource.UnregisterChildType("ecs_tasks_hints_test")
-		resource.UnregisterChildType("ecs_events_hints_test")
-		resource.UnregisterChildType("ecs_logs_hints_test")
+		resource.CleanupChildTypeForTest("ecs_tasks_hints_test")
+		resource.CleanupChildTypeForTest("ecs_events_hints_test")
+		resource.CleanupChildTypeForTest("ecs_logs_hints_test")
 	})
 
 	td := resource.ResourceTypeDef{
@@ -290,7 +290,7 @@ func TestBottomHints_Detail_PlainField_NoRelated(t *testing.T) {
 }
 
 func TestBottomHints_Detail_PlainField_WithRelated(t *testing.T) {
-	resource.RegisterRelated("hints_test_with_related", []resource.RelatedDef{
+	resource.SetRelatedForTest("hints_test_with_related", []resource.RelatedDef{
 		{
 			TargetType:  "vpc",
 			DisplayName: "VPC",
@@ -299,7 +299,7 @@ func TestBottomHints_Detail_PlainField_WithRelated(t *testing.T) {
 			},
 		},
 	})
-	t.Cleanup(func() { resource.UnregisterRelated("hints_test_with_related") })
+	t.Cleanup(func() { resource.CleanupRelatedForTest("hints_test_with_related") })
 
 	res := resource.Resource{
 		ID:   "test-id",
@@ -379,7 +379,7 @@ func TestBottomHints_Detail_NavigableField(t *testing.T) {
 // We skip the auto-show path and use a narrow terminal to avoid auto-show,
 // then check that without explicit toggle there is no "tab" hint.
 func TestBottomHints_Detail_RightColVisible_NoTabWhenAutoShow(t *testing.T) {
-	resource.RegisterRelated("hints_test_right_col", []resource.RelatedDef{
+	resource.SetRelatedForTest("hints_test_right_col", []resource.RelatedDef{
 		{
 			TargetType:  "vpc",
 			DisplayName: "VPC",
@@ -388,7 +388,7 @@ func TestBottomHints_Detail_RightColVisible_NoTabWhenAutoShow(t *testing.T) {
 			},
 		},
 	})
-	t.Cleanup(func() { resource.UnregisterRelated("hints_test_right_col") })
+	t.Cleanup(func() { resource.CleanupRelatedForTest("hints_test_right_col") })
 
 	res := resource.Resource{
 		ID:   "test-id",

@@ -166,3 +166,21 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `ct-events` is the universal pivot — `docs/related-resources.md` § Policy (universal cross-reference via `resources[].ARN`).
 - Read-only invariant — `docs/architecture.md` § opening paragraph ("a9s is a read-only terminal UI for AWS").
 - S1–S5 surface rules and glyph constraints — `a9s-resource-spec` skill § "Allowed visualization surfaces (exactly five)".
+
+<!-- BEGIN GENERATED: header -->
+kms — SECRETS & CONFIG. Lifecycle key: `status`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| ebs | EBS Volumes | yes |
+| dbi | RDS Instances | yes |
+| secrets | Secrets Manager | yes |
+| s3 | S3 Buckets | no |
+| role | IAM Roles (grants) | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

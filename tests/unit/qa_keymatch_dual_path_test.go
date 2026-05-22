@@ -92,10 +92,10 @@ func makeDetailDualPathWideEC2(t *testing.T) views.DetailModel {
 // makeDetailWithNavFieldDual creates a detail model with VpcId registered as navigable.
 func makeDetailWithNavFieldDual(t *testing.T) views.DetailModel {
 	t.Helper()
-	resource.RegisterNavigableFields("ec2", []resource.NavigableField{
+	resource.SetNavigableFieldsForTest("ec2", []resource.NavigableField{
 		{FieldPath: "VpcId", TargetType: "vpc"},
 	})
-	t.Cleanup(func() { resource.UnregisterNavigableFields("ec2") })
+	t.Cleanup(func() { resource.CleanupNavigableFieldsForTest("ec2") })
 
 	res := resource.Resource{
 		ID:   "i-navfield-dual",

@@ -22,7 +22,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 
-	// Side-effect import: triggers init() which calls resource.RegisterPaginated("lambda", …)
+	// Side-effect import: triggers init() which calls resource.SetPaginatedForTest("lambda", …)
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 )
 

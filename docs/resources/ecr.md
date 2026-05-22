@@ -185,3 +185,24 @@ One bullet per claim in §§2–4.1.
 - Non-matches (`ecr → ecs`, `ecr → eks`) — `docs/related-resources.md` §Non-matches (lines 1092–1093).
 - Read-only invariant — `docs/architecture.md` §"What is a9s?".
 - Removed stale `ecs` bullet from detailed `ecr` section — `a9s-resource-spec amendment (2026-04-20): contradicted per-type contract and Non-matches section; reason in HTML comment inline.`
+
+<!-- BEGIN GENERATED: header -->
+ecr — CI/CD. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| lambda | Lambda Functions | yes |
+| cb | CodeBuild Projects | yes |
+| cfn | CloudFormation Stacks | yes |
+| kms | KMS Key | no |
+| ct-events | CloudTrail Events | yes |
+| eb-rule | EventBridge Rules | no |
+| ecs-task | ECS Tasks | yes |
+| pipeline | CodePipelines | no |
+| role | IAM Roles | no |
+<!-- END GENERATED: related -->

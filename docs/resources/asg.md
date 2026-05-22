@@ -189,3 +189,27 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — `sns` discovery (two extra ASG-scoped calls) — `a9s-devops (2026-04-20): possible=yes, worth=yes. DescribeNotificationConfigurations + DescribeLifecycleHooks are the only APIs that expose scale-event paging topology; two calls per ASG is acceptable because this info is invisible anywhere else in the detail view.`.
 - a9s-devops consultation — `role` discovery (service-linked + instance-profile) — `a9s-devops (2026-04-20): possible=yes, worth=yes. ServiceLinkedRoleARN is on the list response; the instance-profile role requires one GetInstanceProfile round-trip but is central to permission troubleshooting when health checks or scaling fail.`.
 - a9s-devops consultation — severity call for Wave 2 launch-failure on Healthy row — `a9s-devops (2026-04-20): possible=yes, worth=yes. Failed latest activity on an otherwise-green ASG is operator-actionable (new instances won't come up) — severity !, not ~. When the same condition coincides with InService < MinSize the row is already red and S3 is suppressed per S1–S5 rules.`.
+
+<!-- BEGIN GENERATED: header -->
+asg — COMPUTE. Lifecycle key: `status`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| ec2 | EC2 Instances | no |
+| tg | Target Groups | no |
+| subnet | Subnets | no |
+| alarm | CloudWatch Alarms | yes |
+| ng | EKS Node Groups | yes |
+| ami | AMI | no |
+| elb | Load Balancers | no |
+| role | IAM Roles | no |
+| sg | Security Groups | no |
+| sns | SNS Topics | no |
+| vpc | VPCs | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->
