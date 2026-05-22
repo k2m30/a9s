@@ -219,3 +219,31 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — `sg` not a TG-level pivot — `a9s-devops (2026-04-20): possible=no, worth=no. TargetGroup has no SecurityGroups field; SG pivot belongs to the parent ALB or the registered instances.`
 - a9s-devops consultation — `subnet` not a TG-level pivot — `a9s-devops (2026-04-20): possible=no, worth=no. TargetGroup has no subnet field; subnet pivot lives on the parent ELB AvailabilityZones.SubnetId.`
 - a9s-devops consultation — Wave 2 severity mapping ("any unhealthy" = Warning, "all unhealthy" = Broken) matches attention-signals.md verbatim — `a9s-devops (2026-04-20): possible=yes, worth=yes. "All targets unhealthy" is the user-facing-outage case and justifies the Broken bucket.`
+
+<!-- BEGIN GENERATED: header -->
+tg — NETWORKING. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| elb | Load Balancers | no |
+| ecs-svc | ECS Services | yes |
+| asg | Auto Scaling Groups | yes |
+| alarm | CW Alarms | yes |
+| vpc | VPC | no |
+| backup | Backup Plans | no |
+| cfn | CloudFormation | no |
+| dbc | DocumentDB Clusters | no |
+| dbi | RDS Instances | no |
+| ec2 | EC2 Instances | no |
+| lambda | Lambda Functions | no |
+| logs | Log Groups | no |
+| dbi-snap | DB Instance Snapshots | no |
+| sg | Security Groups | no |
+| subnet | Subnets | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

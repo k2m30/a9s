@@ -2,8 +2,8 @@ package unit
 
 // reveal_registry_test.go tests the reveal registry functions that will be
 // added to internal/resource/registry.go as part of issue #104.
-// These tests will FAIL until the coder adds RegisterRevealFetcher,
-// GetRevealFetcher, UnregisterRevealFetcher, HasRevealFetcher to registry.go
+// These tests will FAIL until the coder adds SetRevealFetcherForTest,
+// GetRevealFetcher, CleanupRevealFetcherForTest, HasRevealFetcher to registry.go
 // and updates secrets.go and ssm.go to register reveal fetchers in init().
 
 import (
@@ -27,12 +27,12 @@ func TestRevealRegistry_RegisterAndGet(t *testing.T) {
 		return "value", nil
 	}
 
-	resource.RegisterRevealFetcher(shortName, fetcher)
-	t.Cleanup(func() { resource.UnregisterRevealFetcher(shortName) })
+	resource.SetRevealFetcherForTest(shortName, fetcher)
+	t.Cleanup(func() { resource.CleanupRevealFetcherForTest(shortName) })
 
 	got := resource.GetRevealFetcher(shortName)
 	if got == nil {
-		t.Fatal("GetRevealFetcher returned nil after RegisterRevealFetcher")
+		t.Fatal("GetRevealFetcher returned nil after SetRevealFetcherForTest")
 	}
 
 	// Verify the returned function is callable and returns the expected value.
@@ -75,8 +75,8 @@ func TestRevealRegistry_HasRevealFetcher(t *testing.T) {
 		t.Fatal("HasRevealFetcher returned true before registration")
 	}
 
-	resource.RegisterRevealFetcher(shortName, fetcher)
-	t.Cleanup(func() { resource.UnregisterRevealFetcher(shortName) })
+	resource.SetRevealFetcherForTest(shortName, fetcher)
+	t.Cleanup(func() { resource.CleanupRevealFetcherForTest(shortName) })
 
 	// After registration, should be true.
 	if !resource.HasRevealFetcher(shortName) {
@@ -88,7 +88,7 @@ func TestRevealRegistry_HasRevealFetcher(t *testing.T) {
 // TestRevealRegistry_Unregister
 // ---------------------------------------------------------------------------
 
-// TestRevealRegistry_Unregister verifies that UnregisterRevealFetcher removes
+// TestRevealRegistry_Unregister verifies that CleanupRevealFetcherForTest removes
 // a previously registered fetcher.
 func TestRevealRegistry_Unregister(t *testing.T) {
 	const shortName = "test_unregister_reveal"
@@ -96,21 +96,21 @@ func TestRevealRegistry_Unregister(t *testing.T) {
 		return "", nil
 	}
 
-	resource.RegisterRevealFetcher(shortName, fetcher)
+	resource.SetRevealFetcherForTest(shortName, fetcher)
 
 	// Verify it was registered.
 	if resource.GetRevealFetcher(shortName) == nil {
 		t.Fatal("expected fetcher to be registered before unregister")
 	}
 
-	resource.UnregisterRevealFetcher(shortName)
+	resource.CleanupRevealFetcherForTest(shortName)
 
 	// After unregister, should be nil.
 	if resource.GetRevealFetcher(shortName) != nil {
-		t.Fatal("GetRevealFetcher should return nil after UnregisterRevealFetcher")
+		t.Fatal("GetRevealFetcher should return nil after CleanupRevealFetcherForTest")
 	}
 	if resource.HasRevealFetcher(shortName) {
-		t.Fatal("HasRevealFetcher should return false after UnregisterRevealFetcher")
+		t.Fatal("HasRevealFetcher should return false after CleanupRevealFetcherForTest")
 	}
 }
 

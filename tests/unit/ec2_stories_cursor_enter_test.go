@@ -138,25 +138,25 @@ func extractRelatedNavigateMsg(cmd tea.Cmd) (messages.RelatedNavigate, bool) {
 // and returns a cleanup function.
 func registerEC2NavFields(t *testing.T) {
 	t.Helper()
-	resource.RegisterNavigableFields("ec2", []resource.NavigableField{
+	resource.SetNavigableFieldsForTest("ec2", []resource.NavigableField{
 		{FieldPath: "VpcId", TargetType: "vpc"},
 		{FieldPath: "SubnetId", TargetType: "subnet"},
 		{FieldPath: "ImageId", TargetType: "ami"},
 	})
-	t.Cleanup(func() { resource.UnregisterNavigableFields("ec2") })
+	t.Cleanup(func() { resource.CleanupNavigableFieldsForTest("ec2") })
 }
 
 // registerEC2NavFieldsWithSG registers VpcId, SubnetId, ImageId, and also
 // SecurityGroups.GroupId as navigable for "ec2".
 func registerEC2NavFieldsWithSG(t *testing.T) {
 	t.Helper()
-	resource.RegisterNavigableFields("ec2", []resource.NavigableField{
+	resource.SetNavigableFieldsForTest("ec2", []resource.NavigableField{
 		{FieldPath: "VpcId", TargetType: "vpc"},
 		{FieldPath: "SubnetId", TargetType: "subnet"},
 		{FieldPath: "ImageId", TargetType: "ami"},
 		{FieldPath: "SecurityGroups.GroupId", TargetType: "sg"},
 	})
-	t.Cleanup(func() { resource.UnregisterNavigableFields("ec2") })
+	t.Cleanup(func() { resource.CleanupNavigableFieldsForTest("ec2") })
 }
 
 // ---------------------------------------------------------------------------

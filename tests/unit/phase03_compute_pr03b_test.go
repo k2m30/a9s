@@ -1207,7 +1207,7 @@ func TestPR03b_LambdaFetcher_InactiveEmitsNoFinding(t *testing.T) {
 // =============================================================================
 
 // TestPR03b_EC2Fields_StateReasonCodeRegistered asserts that "state_reason_code"
-// is declared in the EC2 RegisterFieldKeys call. The EC2 fetcher writes this key
+// is declared in the EC2 SetFieldKeysForTest call. The EC2 fetcher writes this key
 // (used by Color's Server.* branch), so it must be registered to appear in view
 // column projections and pass the TestColumnKeysHaveProducers check.
 func TestPR03b_EC2Fields_StateReasonCodeRegistered(t *testing.T) {
@@ -1217,7 +1217,7 @@ func TestPR03b_EC2Fields_StateReasonCodeRegistered(t *testing.T) {
 			return
 		}
 	}
-	t.Errorf("ec2 RegisterFieldKeys must include \"state_reason_code\" (written by FetchEC2Instances per PR-03b); registered keys: %v", keys)
+	t.Errorf("ec2 SetFieldKeysForTest must include \"state_reason_code\" (written by FetchEC2Instances per PR-03b); registered keys: %v", keys)
 }
 
 // =============================================================================
@@ -1225,7 +1225,7 @@ func TestPR03b_EC2Fields_StateReasonCodeRegistered(t *testing.T) {
 // =============================================================================
 
 // TestPR03b_LambdaFields_StateRegistered asserts that "state" is declared in the
-// Lambda RegisterFieldKeys call. The Lambda fetcher writes Fields["state"] for
+// Lambda SetFieldKeysForTest call. The Lambda fetcher writes Fields["state"] for
 // every function (used by Color's lifecycle-class branch); the key must be
 // registered to flow through column projections correctly.
 func TestPR03b_LambdaFields_StateRegistered(t *testing.T) {
@@ -1235,5 +1235,5 @@ func TestPR03b_LambdaFields_StateRegistered(t *testing.T) {
 			return
 		}
 	}
-	t.Errorf("lambda RegisterFieldKeys must include \"state\" (written by FetchLambdaFunctions per PR-03b); registered keys: %v", keys)
+	t.Errorf("lambda SetFieldKeysForTest must include \"state\" (written by FetchLambdaFunctions per PR-03b); registered keys: %v", keys)
 }

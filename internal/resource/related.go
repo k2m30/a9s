@@ -230,9 +230,9 @@ func UnknownRelated(targetType string) RelatedCheckResult {
 }
 
 // NoopChecker is a stub RelatedChecker suitable for tests that exercise
-// registry wiring (RegisterRelated / AppendRelated / GetRelated) without
+// registry wiring (SetRelatedForTest / AppendRelated / GetRelated) without
 // exercising real related-resource logic. Production code MUST NOT use it:
-// RegisterRelated panics if any RelatedDef is registered with a nil Checker,
+// SetRelatedForTest panics if any RelatedDef is registered with a nil Checker,
 // but production tests using this explicit stub satisfy the guard while
 // remaining free of test-specific behavior.
 func NoopChecker(_ context.Context, _ any, _ Resource, _ ResourceCache) RelatedCheckResult {
@@ -247,7 +247,7 @@ var relatedRegistryMu sync.RWMutex
 var relatedRegistry = map[string][]RelatedDef{}
 
 // relatedRegistryPrevious is a stack (per short name) of registration snapshots
-// saved before each RegisterRelated / AppendRelated call. UnregisterRelated pops
+// saved before each SetRelatedForTest / AppendRelated call. CleanupRelatedForTest pops
 // the top entry to restore the previous state. Using a stack (instead of a single
 // slot) prevents nested Register calls — typical when production init() registers
 // once and a test then re-registers — from losing the original production
@@ -263,13 +263,13 @@ var navigableFieldMu sync.RWMutex
 
 // navigableFieldRegistry maps resource short names to their active navigable
 // field definitions. This is the mutable "session" registry: it starts empty
-// and is populated only by explicit RegisterNavigableFields calls (from tests
+// and is populated only by explicit SetNavigableFieldsForTest calls (from tests
 // or from BootstrapActiveNavFields at app startup). This keeps unit tests that
-// do not call RegisterNavigableFields isolated from production init-time defaults.
+// do not call SetNavigableFieldsForTest isolated from production init-time defaults.
 var navigableFieldRegistry = map[string][]NavigableField{}
 
 // navigableFieldPrevious is a stack (per short name) of registration snapshots
-// saved before each RegisterNavigableFields call. UnregisterNavigableFields pops
+// saved before each SetNavigableFieldsForTest call. CleanupNavigableFieldsForTest pops
 // the top entry to restore the previous state. Using a stack (instead of a single
 // slot) prevents nested Register calls from losing the original default-registered
 // state past the second Unregister.
@@ -278,34 +278,34 @@ var navigableFieldPrevious = map[string][][]NavigableField{}
 // defaultNavFieldMu guards defaultNavFieldRegistry. Writes happen only during
 // package init; reads can happen from any goroutine after startup. The mutex
 // provides defense-in-depth for test binaries that may call
-// RegisterDefaultNavFields from multiple goroutines in parallel.
+// SetDefaultNavFieldsForTest from multiple goroutines in parallel.
 var defaultNavFieldMu sync.RWMutex
 
 // defaultNavFieldRegistry is an immutable-by-convention registry populated at
-// init time by aws/*.go packages via RegisterDefaultNavFields. It is never
+// init time by aws/*.go packages via SetDefaultNavFieldsForTest. It is never
 // modified after package initialisation. NavFieldsProvider (used by
 // projection.Generic) reads from this registry. DetailModel reads from the
 // mutable navigableFieldRegistry so that tests can construct models without
 // any nav field registrations.
 var defaultNavFieldRegistry = map[string][]NavigableField{}
 
-// RegisterRelated stores related definitions for the given resource short
+// SetRelatedForTest stores related definitions for the given resource short
 // name. Panics at init-time if any RelatedDef has a nil Checker or empty
 // TargetType — a nil Checker is a structural bug, not a supported stub state.
 //
 // The current value for shortName (which may be nil) is pushed onto a per-key
-// stack in relatedRegistryPrevious so that subsequent UnregisterRelated calls
+// stack in relatedRegistryPrevious so that subsequent CleanupRelatedForTest calls
 // restore the previous registration instead of destroying it. This is critical
 // for tests: production init() registers production defs once, and tests that
 // override-then-cleanup must not nuke the production registration for the rest
 // of the test process (AS-67).
-func RegisterRelated(shortName string, defs []RelatedDef) {
+func SetRelatedForTest(shortName string, defs []RelatedDef) {
 	for _, d := range defs {
 		if d.Checker == nil {
-			panic(fmt.Sprintf("RegisterRelated(%q): nil Checker for target %q — every RelatedDef must have a real checker", shortName, d.TargetType))
+			panic(fmt.Sprintf("SetRelatedForTest(%q): nil Checker for target %q — every RelatedDef must have a real checker", shortName, d.TargetType))
 		}
 		if d.TargetType == "" {
-			panic(fmt.Sprintf("RegisterRelated(%q): empty TargetType — every RelatedDef must name a target", shortName))
+			panic(fmt.Sprintf("SetRelatedForTest(%q): empty TargetType — every RelatedDef must name a target", shortName))
 		}
 	}
 	relatedRegistryMu.Lock()
@@ -316,7 +316,7 @@ func RegisterRelated(shortName string, defs []RelatedDef) {
 }
 
 // GetRelated returns the related definitions for the given resource short name.
-// Legacy-first: reads the mutable runtime map so RegisterRelated / AppendRelated
+// Legacy-first: reads the mutable runtime map so SetRelatedForTest / AppendRelated
 // overrides (test helpers, zzz_ct_events_all_related.go) take precedence over
 // the catalog source slice. The catalog acts as the read-only fallback for the
 // AS-795b–m transition window when a type's init() body is gone but the
@@ -336,7 +336,7 @@ func GetRelated(shortName string) []RelatedDef {
 	return nil
 }
 
-// UnregisterRelated restores the previous registration for the given short name
+// CleanupRelatedForTest restores the previous registration for the given short name
 // (or deletes the entry entirely if no previous registration existed). Used only
 // in tests for cleanup.
 //
@@ -347,7 +347,7 @@ func GetRelated(shortName string) []RelatedDef {
 // Register/Append), the entry is deleted as a safe fallback — preserving the
 // historical destructive semantics for test-only types like `test_append`,
 // `srcType`, and `resizeTestType` that were never registered before the test.
-func UnregisterRelated(shortName string) {
+func CleanupRelatedForTest(shortName string) {
 	relatedRegistryMu.Lock()
 	defer relatedRegistryMu.Unlock()
 	stack := relatedRegistryPrevious[shortName]
@@ -373,40 +373,47 @@ type FetchByIDsFunc = domain.FetchByIDsFunc
 // fetchByIDsRegistry maps target resource short name to its FetchByIDs helper.
 var fetchByIDsRegistry = map[string]FetchByIDsFunc{}
 
-// RegisterFetchByIDs stores the FetchByIDs helper for the given target short
+// SetFetchByIDsForTest stores the FetchByIDs helper for the given target short
 // name. Replaces any existing entry. Safe to call from an init() alongside
-// RegisterPaginated.
-func RegisterFetchByIDs(shortName string, fn FetchByIDsFunc) {
+// SetPaginatedForTest.
+func SetFetchByIDsForTest(shortName string, fn FetchByIDsFunc) {
 	fetchByIDsRegistry[shortName] = fn
 }
 
 // GetFetchByIDs returns the FetchByIDs helper for the target short name.
 // Catalog-backed: falls through to the legacy map (catalog does not carry
-// FetchByIDs separately in PR-04a; per-category PRs wire this). Fallback
-// removed in PR-04n.
+// FetchByIDs separately in PR-04a; per-category PRs wire this). Legacy-first:
+// test overrides via SetFetchByIDsForTest take effect; otherwise reads the
+// catalog FetchByIDs field.
 func GetFetchByIDs(shortName string) FetchByIDsFunc {
-	return fetchByIDsRegistry[shortName]
+	if fn, ok := fetchByIDsRegistry[shortName]; ok {
+		return fn
+	}
+	if ct := catalog.Find(shortName); ct != nil && ct.FetchByIDs != nil {
+		return ct.FetchByIDs
+	}
+	return nil
 }
 
-// UnregisterFetchByIDs removes the FetchByIDs helper for the given short
-// name. Parity with UnregisterRelated — used only in tests for cleanup,
+// CleanupFetchByIDsForTest removes the FetchByIDs helper for the given short
+// name. Parity with CleanupRelatedForTest — used only in tests for cleanup,
 // never from production code.
-func UnregisterFetchByIDs(shortName string) {
+func CleanupFetchByIDsForTest(shortName string) {
 	delete(fetchByIDsRegistry, shortName)
 }
 
-// RegisterNavigableFields stores navigable field definitions for the given
+// SetNavigableFieldsForTest stores navigable field definitions for the given
 // resource short name. Replaces any existing entry.
 //
 // The current value for shortName (which may be nil) is pushed onto a per-key
 // stack in navigableFieldPrevious so that nested Register calls can all be
-// rolled back in order by successive UnregisterNavigableFields calls.
+// rolled back in order by successive CleanupNavigableFieldsForTest calls.
 //
 // Contract: every Register MUST be paired with an Unregister, otherwise the
 // per-key snapshot stack grows unbounded for the lifetime of the process. In
 // practice every test that registers also unregisters via t.Cleanup; production
 // callers register once at init and never unregister.
-func RegisterNavigableFields(shortName string, fields []NavigableField) {
+func SetNavigableFieldsForTest(shortName string, fields []NavigableField) {
 	navigableFieldMu.Lock()
 	defer navigableFieldMu.Unlock()
 	existing := navigableFieldRegistry[shortName] // nil when not yet set
@@ -443,7 +450,7 @@ func GetNavigableFields(shortName string) []NavigableField {
 // GetActiveNavigableFields returns the navigable field definitions for the
 // given resource short name from the active registry ONLY. Unlike
 // GetNavigableFields, this function does NOT fall back to the default registry.
-// Returns nil when no explicit RegisterNavigableFields call has been made for
+// Returns nil when no explicit SetNavigableFieldsForTest call has been made for
 // shortName.
 //
 // Used by DetailModel.buildFieldList so that navigable affordances in the
@@ -466,7 +473,7 @@ func IsFieldNavigable(shortName, fieldPath string) *NavigableField {
 	return nil
 }
 
-// UnregisterNavigableFields removes the navigable field registration for the
+// CleanupNavigableFieldsForTest removes the navigable field registration for the
 // given short name. Used only in tests for cleanup.
 //
 // Pops the most recently pushed snapshot from the per-key stack in
@@ -474,7 +481,7 @@ func IsFieldNavigable(shortName, fieldPath string) *NavigableField {
 // before the most recent Register call), the active-registry entry is deleted
 // entirely. If the stack is empty (Unregister called without a matching
 // Register), the entry is deleted as a safe fallback.
-func UnregisterNavigableFields(shortName string) {
+func CleanupNavigableFieldsForTest(shortName string) {
 	navigableFieldMu.Lock()
 	defer navigableFieldMu.Unlock()
 	stack := navigableFieldPrevious[shortName]
@@ -491,14 +498,14 @@ func UnregisterNavigableFields(shortName string) {
 	}
 }
 
-// RegisterDefaultNavFields stores the canonical (production) navigable field
+// SetDefaultNavFieldsForTest stores the canonical (production) navigable field
 // definitions for a resource type into the immutable-by-convention default
 // registry. Called from aws/*.go init() functions instead of
-// RegisterNavigableFields so that the mutable active registry (read by
+// SetNavigableFieldsForTest so that the mutable active registry (read by
 // DetailModel) stays empty until BootstrapActiveNavFields is invoked at app
 // startup. Tests that construct DetailModels directly never see init-time nav
-// fields unless they explicitly call RegisterNavigableFields.
-func RegisterDefaultNavFields(shortName string, fields []NavigableField) {
+// fields unless they explicitly call SetNavigableFieldsForTest.
+func SetDefaultNavFieldsForTest(shortName string, fields []NavigableField) {
 	defaultNavFieldMu.Lock()
 	defer defaultNavFieldMu.Unlock()
 	defaultNavFieldRegistry[shortName] = fields
@@ -510,8 +517,15 @@ func RegisterDefaultNavFields(shortName string, fields []NavigableField) {
 // nav fields regardless of the active-registry state.
 func GetDefaultNavFields(shortName string) []NavigableField {
 	defaultNavFieldMu.RLock()
-	defer defaultNavFieldMu.RUnlock()
-	return defaultNavFieldRegistry[shortName]
+	if fields, ok := defaultNavFieldRegistry[shortName]; ok && len(fields) > 0 {
+		defaultNavFieldMu.RUnlock()
+		return fields
+	}
+	defaultNavFieldMu.RUnlock()
+	if ct := catalog.Find(shortName); ct != nil && len(ct.Navigable) > 0 {
+		return ct.Navigable
+	}
+	return nil
 }
 
 // BootstrapActiveNavFields copies all entries from the default nav field
@@ -520,10 +534,10 @@ func GetDefaultNavFields(shortName string) []NavigableField {
 // Must be called after all init() functions have run (i.e. inside main()).
 // Noop in test binaries that never call this function.
 //
-// Concurrency: NOT safe to call concurrently with RegisterDefaultNavFields.
+// Concurrency: NOT safe to call concurrently with SetDefaultNavFieldsForTest.
 // Bootstrap snapshots the default registry under one lock, releases it, and
 // then takes the active registry's lock — there is a small window where a
-// concurrent RegisterDefaultNavFields would not be reflected in the snapshot.
+// concurrent SetDefaultNavFieldsForTest would not be reflected in the snapshot.
 // In production this is fine because Bootstrap runs after init() in the
 // single-threaded main goroutine, before any concurrent activity begins.
 func BootstrapActiveNavFields() {
@@ -536,7 +550,7 @@ func BootstrapActiveNavFields() {
 	defer navigableFieldMu.Unlock()
 	for k, v := range snapshot {
 		// Only populate entries that have not already been explicitly set via
-		// RegisterNavigableFields. This preserves test-supplied overrides when
+		// SetNavigableFieldsForTest. This preserves test-supplied overrides when
 		// BootstrapActiveNavFields is called inside tui.New (e.g. by golden
 		// scenario helpers that register custom nav fields before constructing
 		// the TUI model).
@@ -552,8 +566,8 @@ func BootstrapActiveNavFields() {
 // def.Checker is nil or def.TargetType is empty — a nil Checker is a
 // structural bug, not a supported stub state.
 //
-// Like RegisterRelated, the pre-append value is pushed onto the per-key
-// snapshot stack so that a subsequent UnregisterRelated restores the previous
+// Like SetRelatedForTest, the pre-append value is pushed onto the per-key
+// snapshot stack so that a subsequent CleanupRelatedForTest restores the previous
 // state (or deletes the entry, if no prior value existed). A duplicate-target
 // no-op does NOT push a snapshot — Unregister has nothing to undo.
 func AppendRelated(shortName string, def RelatedDef) {

@@ -219,3 +219,28 @@ One bullet per claim in §§2–4.1.
 - a9s-devops persona (2026-04-20) — `ecr`, `logs`, `role`, `secrets`, `ssm` pivots require a `DescribeTaskDefinition` call: possible=yes, worth=yes. Rationale: these five pivots are the common "why did the task fail to start?" answers (image pull, log-group permission, IAM, secret rotation, parameter drift); one `DescribeTaskDefinition` per unique revision is a bounded cost and matches the Wave 2 budget already authorized for the `essential=true + ExitCode!=0` signal.
 - a9s-devops persona (2026-04-20) — `sg` pivot is indirect via the ENI: possible=yes, worth=yes. Rationale: awsvpc tasks carry security groups on the ENI, not on the Task; once the ENI is loaded for the `eni` pivot, `sg` is a pure cross-reference with no additional call.
 - a9s-devops persona (2026-04-20) — severity on Wave 2 `essential+ExitCode!=0` is `!` (counted) because the finding identifies a concrete container-level failure an on-call must address. Rationale: matches the existing `enrichment-visibility.md` example for ECS Tasks (`"task stopped: EssentialContainerExited"` with `!`).
+
+<!-- BEGIN GENERATED: header -->
+ecs-task — COMPUTE. Lifecycle key: `status`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| ecs-svc | ECS Services | no |
+| ecs | ECS Clusters | no |
+| logs | Log Groups | yes |
+| role | IAM Role | no |
+| alarm | CloudWatch Alarms | yes |
+| ct-events | CloudTrail Events | yes |
+| ec2 | EC2 Instances | no |
+| ecr | ECR Repositories | no |
+| eni | Network Interfaces | no |
+| secrets | Secrets | no |
+| sg | Security Groups | no |
+| ssm | SSM Parameters | no |
+| subnet | Subnets | no |
+<!-- END GENERATED: related -->

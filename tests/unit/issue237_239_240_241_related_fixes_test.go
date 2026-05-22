@@ -56,7 +56,7 @@ func TestIssue237_ColdMissWriteBack_PreservesNextToken(t *testing.T) {
 	)
 
 	// Register a paginated fetcher that returns a truncated first page with a token.
-	resource.RegisterPaginated(targetType, func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
+	resource.SetPaginatedForTest(targetType, func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
 		return resource.FetchResult{
 			Resources: []resource.Resource{{ID: "r1"}},
 			Pagination: &resource.PaginationMeta{
@@ -68,7 +68,7 @@ func TestIssue237_ColdMissWriteBack_PreservesNextToken(t *testing.T) {
 
 	// Register a related def that reads the target from cache (NeedsTargetCache=true),
 	// ensuring the cold-miss prefetch path is exercised.
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:       targetType,
 			DisplayName:      "Test Target",
@@ -84,8 +84,8 @@ func TestIssue237_ColdMissWriteBack_PreservesNextToken(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterPaginated(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupPaginatedForTest(targetType)
 	})
 
 	m := tui.New("testprofile", "us-east-1")
@@ -251,12 +251,12 @@ func TestIssue240_FieldOnlyChecker_NoPrefetch(t *testing.T) {
 
 	fetchCalled := atomic.Bool{}
 
-	resource.RegisterPaginated(targetType, func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
+	resource.SetPaginatedForTest(targetType, func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
 		fetchCalled.Store(true) // must NOT be called for field-only checker
 		return resource.FetchResult{Resources: []resource.Resource{{ID: "should-not-fetch"}}}, nil
 	})
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:       targetType,
 			DisplayName:      "Field-Only Checker",
@@ -272,8 +272,8 @@ func TestIssue240_FieldOnlyChecker_NoPrefetch(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterPaginated(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupPaginatedForTest(targetType)
 	})
 
 	m := tui.New("testprofile", "us-east-1")
@@ -336,7 +336,7 @@ func TestIssue240_CacheDependentChecker_DoesPrefetch(t *testing.T) {
 
 	fetchCalled := atomic.Bool{}
 
-	resource.RegisterPaginated(targetType, func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
+	resource.SetPaginatedForTest(targetType, func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
 		fetchCalled.Store(true)
 		return resource.FetchResult{
 			Resources:  []resource.Resource{{ID: "t1"}},
@@ -344,7 +344,7 @@ func TestIssue240_CacheDependentChecker_DoesPrefetch(t *testing.T) {
 		}, nil
 	})
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:       targetType,
 			DisplayName:      "Cache-Dependent Checker",
@@ -360,8 +360,8 @@ func TestIssue240_CacheDependentChecker_DoesPrefetch(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterPaginated(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupPaginatedForTest(targetType)
 	})
 
 	m := tui.New("testprofile", "us-east-1")
@@ -427,13 +427,13 @@ func TestIssue241_ConcurrentProbesCappedAt4(t *testing.T) {
 	for i := range numCheckers {
 		targetType := "_t241_target_" + string(rune('a'+i))
 		idx := i
-		resource.RegisterPaginated(targetType, func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
+		resource.SetPaginatedForTest(targetType, func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
 			return resource.FetchResult{
 				Resources:  []resource.Resource{{ID: "r" + string(rune('a'+idx))}},
 				Pagination: &resource.PaginationMeta{IsTruncated: false},
 			}, nil
 		})
-		t.Cleanup(func() { resource.UnregisterPaginated(targetType) })
+		t.Cleanup(func() { resource.CleanupPaginatedForTest(targetType) })
 	}
 
 	var (
@@ -472,8 +472,8 @@ func TestIssue241_ConcurrentProbesCappedAt4(t *testing.T) {
 		}
 	}
 
-	resource.RegisterRelated(srcType, defs)
-	t.Cleanup(func() { resource.UnregisterRelated(srcType) })
+	resource.SetRelatedForTest(srcType, defs)
+	t.Cleanup(func() { resource.CleanupRelatedForTest(srcType) })
 
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})

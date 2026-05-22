@@ -624,7 +624,7 @@ func TestDetailViewCTEvents_Regression_FrameBorder(t *testing.T) {
 // The fix removes the bypass so View() always uses the standard path.
 // This test catches that regression.
 //
-// Precondition: RegisterRelated("ct-events", ...) must be called in
+// Precondition: SetRelatedForTest("ct-events", ...) must be called in
 // internal/aws/ct_events.go init — verified by the GetRelated sanity check.
 func TestDetailViewCTEvents_Regression_RelatedRightColumn(t *testing.T) {
 	ensureNoColor(t)
@@ -634,7 +634,7 @@ func TestDetailViewCTEvents_Regression_RelatedRightColumn(t *testing.T) {
 	// and the right column will never auto-show regardless of terminal width.
 	defs := resource.GetRelated("ct-events")
 	if len(defs) == 0 {
-		t.Fatal("resource.GetRelated(\"ct-events\") returned no defs — RegisterRelated not called in production init")
+		t.Fatal("resource.GetRelated(\"ct-events\") returned no defs — SetRelatedForTest not called in production init")
 	}
 
 	res := buildCTEventsResource(

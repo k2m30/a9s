@@ -36,7 +36,7 @@ func Test_LA_001_KMSDrillAWSManagedKey(t *testing.T) {
 	const keyID = "aws-managed-rds-uuid-la001"
 	const alias = "aws/rds"
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:       targetType,
 			DisplayName:      "KMS Keys",
@@ -52,7 +52,7 @@ func Test_LA_001_KMSDrillAWSManagedKey(t *testing.T) {
 	})
 
 	var fetchByIDsCalled int32
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, _ []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, _ []string) ([]resource.Resource, error) {
 		atomic.AddInt32(&fetchByIDsCalled, 1)
 		return []resource.Resource{{
 			ID:   keyID,
@@ -65,8 +65,8 @@ func Test_LA_001_KMSDrillAWSManagedKey(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
 	m := tui.New("testprofile", "us-east-1")
@@ -120,7 +120,7 @@ func Test_LA_002_AMIDrillPublicAMI(t *testing.T) {
 	const ownerID = "amazon"
 	const amiName = "amzn2-ami-hvm"
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:       targetType,
 			DisplayName:      "AMIs",
@@ -135,7 +135,7 @@ func Test_LA_002_AMIDrillPublicAMI(t *testing.T) {
 		},
 	})
 
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, _ []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, _ []string) ([]resource.Resource, error) {
 		return []resource.Resource{{
 			ID:   imageID,
 			Name: amiName,
@@ -148,8 +148,8 @@ func Test_LA_002_AMIDrillPublicAMI(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
 	m := tui.New("testprofile", "us-east-1")
@@ -202,7 +202,7 @@ func Test_LA_003_EBSSnapDrillSharedSnapshot(t *testing.T) {
 	const snapID = "snap-0def5678-la003"
 	const ownerID = "999999999999"
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:       targetType,
 			DisplayName:      "EBS Snapshots",
@@ -217,7 +217,7 @@ func Test_LA_003_EBSSnapDrillSharedSnapshot(t *testing.T) {
 		},
 	})
 
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, _ []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, _ []string) ([]resource.Resource, error) {
 		return []resource.Resource{{
 			ID:   snapID,
 			Name: snapID,
@@ -229,8 +229,8 @@ func Test_LA_003_EBSSnapDrillSharedSnapshot(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
 	m := tui.New("testprofile", "us-east-1")
@@ -282,7 +282,7 @@ func Test_LA_004_IAMPolicyDrillAWSManaged(t *testing.T) {
 	const policyName = "AdministratorAccess-la004"
 	const policyType = "aws-managed"
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:       targetType,
 			DisplayName:      "IAM Policies",
@@ -297,7 +297,7 @@ func Test_LA_004_IAMPolicyDrillAWSManaged(t *testing.T) {
 		},
 	})
 
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, _ []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, _ []string) ([]resource.Resource, error) {
 		return []resource.Resource{{
 			ID:   policyARN,
 			Name: policyName,
@@ -309,8 +309,8 @@ func Test_LA_004_IAMPolicyDrillAWSManaged(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
 	m := tui.New("testprofile", "us-east-1")
@@ -372,7 +372,7 @@ func Test_LA_081_ColdCacheDrillTriggersPrefetch(t *testing.T) {
 
 	var paginatedCalls int32
 
-	resource.RegisterPaginated(targetType, func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
+	resource.SetPaginatedForTest(targetType, func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
 		atomic.AddInt32(&paginatedCalls, 1)
 		return resource.FetchResult{
 			Resources: []resource.Resource{
@@ -382,7 +382,7 @@ func Test_LA_081_ColdCacheDrillTriggersPrefetch(t *testing.T) {
 		}, nil
 	})
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:       targetType,
 			DisplayName:      "KMS Keys (cold)",
@@ -397,7 +397,7 @@ func Test_LA_081_ColdCacheDrillTriggersPrefetch(t *testing.T) {
 		},
 	})
 
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
 		var out []resource.Resource
 		for _, id := range ids {
 			out = append(out, resource.Resource{ID: id, Name: id})
@@ -406,9 +406,9 @@ func Test_LA_081_ColdCacheDrillTriggersPrefetch(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
-		resource.UnregisterPaginated(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
+		resource.CleanupPaginatedForTest(targetType)
 	})
 
 	m := tui.New("testprofile", "us-east-1")
@@ -468,7 +468,7 @@ func Test_LA_082_WarmCacheDrillReusesCache(t *testing.T) {
 
 	var paginatedCalls int32
 
-	resource.RegisterPaginated(targetType, func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
+	resource.SetPaginatedForTest(targetType, func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
 		atomic.AddInt32(&paginatedCalls, 1)
 		return resource.FetchResult{
 			Resources: []resource.Resource{
@@ -477,7 +477,7 @@ func Test_LA_082_WarmCacheDrillReusesCache(t *testing.T) {
 		}, nil
 	})
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:       targetType,
 			DisplayName:      "KMS Keys (warm)",
@@ -493,7 +493,7 @@ func Test_LA_082_WarmCacheDrillReusesCache(t *testing.T) {
 		},
 	})
 
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
 		var out []resource.Resource
 		for _, id := range ids {
 			out = append(out, resource.Resource{ID: id, Name: id})
@@ -502,9 +502,9 @@ func Test_LA_082_WarmCacheDrillReusesCache(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
-		resource.UnregisterPaginated(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
+		resource.CleanupPaginatedForTest(targetType)
 	})
 
 	m := tui.New("testprofile", "us-east-1")

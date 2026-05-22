@@ -185,3 +185,23 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — `vpce` discovery via `ServiceName == com.amazonaws.<region>.dynamodb` — a9s-devops persona (2026-04-20): possible=yes, worth=yes. DDB gateway-endpoint service name is region-scoped and canonical; per-table endpoint binding does not exist on the AWS surface.
 - a9s-devops consultation — global-table `Replicas[].ReplicaStatus` deferred — a9s-devops persona (2026-04-20): possible=yes, worth=yes but not in today's attention contract; recorded in §5 Out of Scope so it isn't lost.
 - a9s golden doc — a9s is read-only — `docs/architecture.md` § "a9s is a read-only terminal UI for AWS".
+
+<!-- BEGIN GENERATED: header -->
+ddb — DATABASES & STORAGE. Lifecycle key: `status`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| kms | KMS Key | no |
+| alarm | CloudWatch Alarms | yes |
+| lambda | Lambda Functions | no |
+| kinesis | Kinesis Streams | no |
+| backup | Backup Plans | no |
+| logs | Log Groups | yes |
+| vpce | VPC Endpoints | yes |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

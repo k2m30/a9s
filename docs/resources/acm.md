@@ -187,3 +187,20 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `ct-events` is the universal pivot applied to every registered type — `docs/related-resources.md` § Policy, rule 4.
 - a9s is read-only — `docs/architecture.md` § "What is a9s?".
 - Superseded HOW ignored — row middle-dot `·` marker, `⚠ Background Check` detail header, and derived list-level banner in `docs/enrichment-visibility.md` are not cited or reproduced per the skill's S1–S5 rules.
+
+<!-- BEGIN GENERATED: header -->
+acm — DNS & CDN. Lifecycle key: `status`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| cf | CloudFront Distros | yes |
+| elb | Load Balancers | no |
+| apigw | API Gateways | no |
+| r53 | Route 53 Zones | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

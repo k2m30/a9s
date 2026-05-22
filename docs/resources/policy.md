@@ -134,3 +134,19 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Counts shown for `iam-group`, `iam-user`, `role` pivots — `a9s-devops (2026-04-20): possible=yes, worth=yes. "How many users/groups/roles does this policy touch?" is the first question during a least-privilege review; the ListEntitiesForPolicy response already contains the lists so deriving counts is free.`
 - Inline policies excluded from `policy` resource type (§5) — `a9s-devops (2026-04-20): possible=no as a standalone row (no standalone ARN, no account-wide list), worth=no at top level (blast radius already constrained to single parent entity). Surface on parent entity detail only.`
 - Managed policies have no trust-policy wildcard check (§5) — `a9s-devops (2026-04-20): possible=no — managed policies do not have trust policies; AssumeRole-wildcard checks live on role resource type, not here.`
+
+<!-- BEGIN GENERATED: header -->
+policy — SECURITY & IAM. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| role | IAM Roles | no |
+| iam-user | IAM Users | no |
+| iam-group | IAM Groups | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

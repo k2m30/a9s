@@ -14,7 +14,7 @@ func TestColumnKeys_MatchFetcherFieldKeys(t *testing.T) {
 	for _, rt := range resource.AllResourceTypes() {
 		validKeys := resource.GetFieldKeys(rt.ShortName)
 		if validKeys == nil {
-			t.Errorf("no field keys registered for resource type %q — add RegisterFieldKeys in fetcher init()", rt.ShortName)
+			t.Errorf("no field keys registered for resource type %q — add SetFieldKeysForTest in fetcher init()", rt.ShortName)
 			continue
 		}
 

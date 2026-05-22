@@ -170,3 +170,21 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `SendingEnabled==false` on a verified identity is a yellow (Warning) row with `sending disabled`, not green + `~` glyph — `a9s-devops (2026-04-20): possible=yes, worth=yes. The ~ annotation is reserved for background checks on fully-healthy rows (e.g. maintenance scheduled). A paused identity cannot send, so it fails the "fully healthy right now" test; bucketing Warning/yellow matches operator intuition that something is operationally off.`
 - Read-only invariant (no write operations) — `docs/architecture.md` § "What is a9s?".
 - `user decision (2026-04-23)`: wire a dedicated SES v1 SDK client (`github.com/aws/aws-sdk-go-v2/service/ses`) to back the `lambda` and `s3` pivots via `ses:DescribeActiveReceiptRuleSet`. SES v1 receipt rules are a minority workflow (inbound email) but when present the pivot is genuinely load-bearing (3am debugging of `support@`/`invoices@`-style routers). Returning a silent 0 when the relationship does exist is worse than the one-call cost.
+
+<!-- BEGIN GENERATED: header -->
+ses — MESSAGING. Lifecycle key: `status`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| r53 | Route 53 (DNS) | yes |
+| eb-rule | EventBridge Rules | yes |
+| lambda | Lambda Functions | no |
+| s3 | S3 Buckets | no |
+| sns | SNS Topics | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

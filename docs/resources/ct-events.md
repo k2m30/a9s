@@ -208,3 +208,32 @@ At 3am, glancing at a ct-events list filtered by an anxious operator, can they t
 - a9s-devops consultation — Wave 1 Broken does not reach S5 in this spec — `a9s-devops persona (2026-04-20): possible=yes, worth=no. The storm signal is aggregation over a page, not a property of one event row; a per-row detail sentence would either repeat the list text or claim an aggregate truth on the wrong scope. The aggregate belongs in S4 or in a dedicated "storms" view, both of which are covered by S2+S4 here.`
 - a9s-devops consultation — no Wave 2 even though CloudTrail has richer APIs — `a9s-devops persona (2026-04-20): possible=yes (GetEventSelectors, GetInsightSelectors exist), worth=no for the ct-events row itself. Those APIs describe *trails*, not events, and their signals are already owned by the trail spec. Adding them here would duplicate work and conflate two mental models.`
 - a9s-devops consultation — `ct-events` self-pivot is exposed as four distinct menu items rather than one generic "filter" — `a9s-devops persona (2026-04-20): possible=yes, worth=yes. Four facets = four common forensics questions ("what else did this key do?", "every ConsoleLogin this week?", etc.) each worth a one-keystroke pivot; collapsing into a single generic filter would add a form prompt and cost time during an incident.`
+
+<!-- BEGIN GENERATED: header -->
+ct-events — MONITORING. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| role | IAM Roles | yes |
+| iam-user | IAM Users | yes |
+| ec2 | EC2 Instances | yes |
+| s3 | S3 Buckets | yes |
+| lambda | Lambda Functions | yes |
+| dbi | RDS Instances | yes |
+| kms | KMS Keys | yes |
+| secrets | Secrets | yes |
+| vpce | VPC Endpoints | yes |
+| sg | Security Groups | yes |
+| ddb | DynamoDB Tables | yes |
+| cfn | CloudFormation Stacks | yes |
+| trail | CloudTrail Trails | yes |
+| ct-events | CT events by AccessKeyId | no |
+| ct-events | CT events by Username | no |
+| ct-events | CT events by EventName | no |
+| ct-events | CT events by SharedEventId | no |
+<!-- END GENERATED: related -->

@@ -149,3 +149,8 @@ State-value buckets: **Healthy**, **Warning**, **Broken**, **Dim**
 | shortName | Name | Wave 1 | Wave 2 | Wave 3 | Source |
 |---|---|---|---|---|---|
 | `backup` | Backup Plans | None — `ListBackupPlans` is config-only | `ListBackupJobs(ByCreatedAfter=now-24h)` (account-wide, bucketed by `BackupPlanId`): any job `State` in `FAILED`/`EXPIRED`/`ABORTED` → Broken; `PARTIAL` → Warning (some resources backed up, others failed) | "Newest completed older than rule cadence × 2" (requires `GetBackupPlan` per plan for rule cadence) | [ListBackupJobs](https://docs.aws.amazon.com/aws-backup/latest/devguide/API_ListBackupJobs.html) |
+
+<!-- BEGIN GENERATED: findings-table -->
+| Type | Code | Phrase | Severity | Source |
+| --- | --- | --- | --- | --- |
+<!-- END GENERATED: findings-table -->

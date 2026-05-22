@@ -31,7 +31,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 
-	// Side-effect import: triggers init() which calls resource.RegisterPaginated("s3", …)
+	// Side-effect import: triggers init() which calls resource.SetPaginatedForTest("s3", …)
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 )
 

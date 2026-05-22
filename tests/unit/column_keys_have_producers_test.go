@@ -39,7 +39,7 @@ var columnKeyProducerAllowlist = map[string]map[string]string{
 // TestColumnKeysHaveProducers verifies that every List-column Key defined in
 // the built-in default views (internal/config/defaults_*.go, merged via
 // config.DefaultConfig()) is present in GetAllFieldKeys — the union of the
-// fetcher (RegisterFieldKeys) and enricher (RegisterEnricherFieldKeys)
+// fetcher (SetFieldKeysForTest) and enricher (RegisterEnricherFieldKeys)
 // registries for that resource type.
 //
 // The built-in defaults are the ACTUAL columns shipped to end users; the
@@ -105,7 +105,7 @@ func TestColumnKeysHaveProducers(t *testing.T) {
 				if !producerSet[col.Key] {
 					t.Errorf(
 						"column %q on type %q has no producer (fetcher or enricher) — "+
-							"add RegisterFieldKeys or RegisterEnricherFieldKeys for this key, "+
+							"add SetFieldKeysForTest or RegisterEnricherFieldKeys for this key, "+
 							"or add it to columnKeyProducerAllowlist with a justification",
 						col.Key, shortName,
 					)
@@ -119,7 +119,7 @@ func TestColumnKeysHaveProducers(t *testing.T) {
 // globs internal/aws/catalog_*.go and counts IssueEnricherFieldKeys: literals
 // on per-resource catalog struct literals. Post-AS-795n the Wave 2 field-key
 // registrations live in the catalog (the bridge in install.go replays them
-// into the legacy resource.RegisterIssueEnricherFieldKeys map). Requiring at
+// into the legacy resource.SetIssueEnricherFieldKeysForTest map). Requiring at
 // least 10 occurrences proves the catalog actually wires Wave 2 field keys
 // rather than declaring the catalog field and leaving it empty everywhere.
 func TestEnricherFieldKeys_RegisterCallsAreInInitBlock(t *testing.T) {

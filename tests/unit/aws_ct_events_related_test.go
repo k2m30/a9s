@@ -412,7 +412,7 @@ func ec2CtEventsCheckerByTarget(t *testing.T) resource.RelatedChecker {
 		}
 	})
 	if ec2CtEventsRelatedChecker == nil {
-		t.Fatal("ec2 ct-events checker not captured at init — verify ec2 RegisterRelated includes ct-events")
+		t.Fatal("ec2 ct-events checker not captured at init — verify ec2 SetRelatedForTest includes ct-events")
 	}
 	return ec2CtEventsRelatedChecker
 }

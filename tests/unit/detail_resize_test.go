@@ -56,10 +56,10 @@ func makeResizeDetailModel() views.DetailModel {
 // ---------------------------------------------------------------------------
 
 func TestDetailModel_NarrowToWideResize_DispatchesRelatedCheck(t *testing.T) {
-	resource.RegisterRelated(resizeTestType, []resource.RelatedDef{
+	resource.SetRelatedForTest(resizeTestType, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
-	defer resource.UnregisterRelated(resizeTestType)
+	defer resource.CleanupRelatedForTest(resizeTestType)
 
 	d := makeResizeDetailModel()
 
@@ -95,10 +95,10 @@ func TestDetailModel_NarrowToWideResize_DispatchesRelatedCheck(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestDetailModel_FirstPaint_NoDoubleDispatch(t *testing.T) {
-	resource.RegisterRelated(resizeTestType, []resource.RelatedDef{
+	resource.SetRelatedForTest(resizeTestType, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
-	defer resource.UnregisterRelated(resizeTestType)
+	defer resource.CleanupRelatedForTest(resizeTestType)
 
 	d := makeResizeDetailModel()
 

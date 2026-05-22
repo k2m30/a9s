@@ -177,3 +177,26 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops persona — `ecs` / `ecs-svc` / `ecs-task` via `NetworkInterfaceId` match on `attachments[].details[]` — persona (2026-04-20): possible=yes, worth=yes-narrow. Pattern is rare (ALB/Fargate auto-IP is more common) but valid for legacy task-per-EIP setups; skip when no ENI association.
 - a9s-devops persona — `logs` via VPC-flow-log group-name convention keyed off the attached ENI's VPC — persona (2026-04-20): possible=partial, worth=yes-narrow. No direct AWS reference API; returns 0 when flow logs target S3 or Kinesis.
 - a9s-devops persona — `alarm` non-ENI/NAT dimensions, `logs` beyond best-effort, ECS without ENI recorded in §5 — persona (2026-04-20): possible=no / partial, worth=no. AWS surface does not expose a direct cross-reference and the operator benefit is below the Wave 1 cost budget.
+
+<!-- BEGIN GENERATED: header -->
+eip — NETWORKING. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| ec2 | EC2 Instances | no |
+| eni | Network Interfaces | no |
+| nat | NAT Gateways | yes |
+| alarm | CloudWatch Alarms | no |
+| asg | Auto Scaling Groups | no |
+| cfn | CloudFormation | no |
+| ecs | ECS Clusters | no |
+| ecs-svc | ECS Services | no |
+| ecs-task | ECS Tasks | no |
+| logs | Log Groups | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

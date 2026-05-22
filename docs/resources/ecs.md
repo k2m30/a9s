@@ -184,3 +184,24 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - AWS API Reference (fallback) — container-instance EC2 linkage via `DescribeContainerInstances.Ec2InstanceId` — `AWS API Reference: DescribeContainerInstances` (<https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_DescribeContainerInstances.html>).
 - AWS API Reference (fallback) — CloudFormation stack tag `aws:cloudformation:stack-name` is injected on resources created by a stack — `AWS API Reference: AWS resource and property types reference` (<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-resource-tags.html>).
 - AWS API Reference (fallback) — CloudWatch Alarm `Dimensions` shape — `AWS API Reference: Dimension` (<https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_Dimension.html>).
+
+<!-- BEGIN GENERATED: header -->
+ecs — COMPUTE. Lifecycle key: `status`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| ecs-svc | ECS Services | yes |
+| alarm | CloudWatch Alarms | yes |
+| cfn | CloudFormation Stacks | yes |
+| kms | KMS Key | no |
+| asg | Auto Scaling Groups | yes |
+| ec2 | EC2 Instances | yes |
+| ct-events | CloudTrail Events | yes |
+| ecs-task | ECS Tasks | yes |
+| logs | Log Groups | yes |
+<!-- END GENERATED: related -->

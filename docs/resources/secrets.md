@@ -203,3 +203,27 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Read-only invariant (no write APIs) — `docs/architecture.md` §"What is a9s?".
 - ScheduleExpression gap (Wave 1 "rotation failing" rule misses cron/rate schedules) — a9s-devops (2026-04-20): possible=yes, worth=yes. Rationale: `RotationRules.ScheduleExpression` is set instead of `AutomaticallyAfterDays` for cron/rate-based rotations (confirmed in `AWS SDK Go v2 — service/secretsmanager/types.RotationRulesType § ScheduleExpression`). Daily operators using cron schedules would see silent false-negatives; the fix is a `NextRotationDate`-based fallback, and it belongs as a §4.1 UX gap rather than a change to the golden doc.
 - `DeletedDate set` classified as Warning rather than Dim — `docs/attention-signals.md` § Secrets & Config, `Wave 1` cell for `secrets`. The golden doc explicitly writes `Warning`; this spec honors the classification.
+
+<!-- BEGIN GENERATED: header -->
+secrets — SECRETS & CONFIG. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| kms | KMS Keys | yes |
+| lambda | Lambda (rotation) | yes |
+| cfn | CloudFormation | yes |
+| dbi | RDS Instances | yes |
+| cb | CodeBuild Projects | yes |
+| codeartifact | CodeArtifact Domains | no |
+| eb | Elastic Beanstalk | yes |
+| ecs-task | ECS Tasks | yes |
+| logs | Log Groups | no |
+| role | IAM Roles | no |
+| sns | SNS Topics | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

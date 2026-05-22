@@ -136,3 +136,21 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `logs` discovery via `GetLoggingConfiguration` per ACL, filtering `LogDestinationConfigs[]` ARNs that begin with `arn:aws:logs:` — a9s-devops (2026-04-20): possible=yes, worth=yes. WAF logging also supports Kinesis Firehose and S3 sinks; only CW Logs destinations bind to the `logs` panel target.
 - `~` severity for `Rules==[]` (empty ACL is a config hygiene concern but no active security regression — the ACL simply does nothing) and `!` severity for `DefaultAction==Allow` + zero rules (allow-all default with no rules is a real protection gap that warrants the menu count bump) — a9s-devops (2026-04-20): possible=yes, worth=yes. Severity split matches the attention-signals.md row (Warning vs Broken) and the S1-S5 mapping rules for Wave 2 background findings on a Healthy row.
 - List text and detail text wording for both Wave 2 signals — generated per the output-template §4 rules (≤40 char S4, ≤100 char S5, no jargon, state + cause).
+
+<!-- BEGIN GENERATED: header -->
+waf — SECURITY & IAM. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| elb | Load Balancers | no |
+| apigw | API Gateways | no |
+| cf | CloudFront | no |
+| alarm | CloudWatch Alarms | no |
+| logs | Log Groups | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->
