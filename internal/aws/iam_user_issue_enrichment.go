@@ -15,11 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("iam-user", EnrichIAMUserMFA, 100)
-	resource.RegisterIssueEnricherFieldKeys("iam-user", []string{"mfa", "risk"})
-}
-
 // EnrichIAMUserMFA calls GetLoginProfile + ListMFADevices + ListAccessKeys per user
 // (capped at EnrichmentCap) to surface console users without MFA and stale access keys.
 //

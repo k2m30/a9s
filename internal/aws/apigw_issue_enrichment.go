@@ -12,11 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("apigw", EnrichAPIGatewayStage, 100)
-	resource.RegisterIssueEnricherFieldKeys("apigw", []string{"stages_count"})
-}
-
 // EnrichAPIGatewayStage calls GetStages per API (cap EnrichmentCap)
 // and returns a Finding for any API with stage-level throttling or access-log issues.
 //

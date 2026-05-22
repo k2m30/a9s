@@ -93,7 +93,8 @@ type SnapshotCrossRefConfig struct {
 
 // EnrichSnapshotCrossRef returns an IssueEnricherFunc that applies the
 // orphan + past-retention pattern parameterized by cfg. The returned closure
-// is registered via registerIssueEnricher in the per-resource enricher file.
+// is wired into the catalog.ResourceTypeDef.Wave2 field of the snapshot type
+// (catalog_databases.go entries for dbi-snap, dbc-snap, etc.).
 //
 // Contract: zero API calls, idempotent on repeated runs (Findings overwrites
 // per resource ID).

@@ -139,6 +139,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			"policy_name", "policy_type", "attachment_count", "is_attachable",
 			"path", "create_date",
 		},
+		IssueEnricherFieldKeys: []string{"risk"},
 		FetchByIDs: func(ctx context.Context, clients any, ids []string) ([]resource.Resource, error) {
 			c, ok := clients.(*ServiceClients)
 			if !ok || c == nil {
@@ -183,6 +184,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			"user_name", "user_id", "path", "create_date", "password_last_used",
 			"has_console_password",
 		},
+		IssueEnricherFieldKeys: []string{"mfa", "risk"},
 		Related: []domain.RelatedDef{
 			{TargetType: "iam-group", DisplayName: "IAM Groups", Checker: checkUserGroup, NeedsTargetCache: false},
 			{TargetType: "policy", DisplayName: "IAM Policies", Checker: checkUserPolicy, NeedsTargetCache: false},
@@ -216,8 +218,9 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			}
 			return FetchIAMGroupsPage(ctx, c.IAM, continuationToken)
 		},
-		Wave2:     IssueEnricher{Fn: EnrichIAMGroup, Priority: 100},
-		FieldKeys: []string{"group_name", "group_id", "path", "create_date", "arn"},
+		Wave2:                  IssueEnricher{Fn: EnrichIAMGroup, Priority: 100},
+		FieldKeys:              []string{"group_name", "group_id", "path", "create_date", "arn"},
+		IssueEnricherFieldKeys: []string{"member_count"},
 		Related: []domain.RelatedDef{
 			{TargetType: "iam-user", DisplayName: "IAM Users", Checker: checkGroupUser, NeedsTargetCache: false},
 			{TargetType: "policy", DisplayName: "IAM Policies", Checker: checkGroupPolicy, NeedsTargetCache: false},
@@ -243,8 +246,9 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			}
 			return FetchWAFWebACLsPage(ctx, c.WAFv2, continuationToken)
 		},
-		Wave2:     IssueEnricher{Fn: EnrichWAFLogging, Priority: 100},
-		FieldKeys: []string{"name", "id", "description"},
+		Wave2:                  IssueEnricher{Fn: EnrichWAFLogging, Priority: 100},
+		FieldKeys:              []string{"name", "id", "description"},
+		IssueEnricherFieldKeys: []string{"rules_summary"},
 		Related: []domain.RelatedDef{
 			{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkWAFELB, NeedsTargetCache: false},
 			{TargetType: "apigw", DisplayName: "API Gateways", Checker: checkWAFAPIGW, NeedsTargetCache: false},

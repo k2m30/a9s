@@ -3,11 +3,12 @@ package unit
 // enrich_queue_test.go — Regression tests for declarative Wave 2 issue-enricher
 // priority metadata.
 //
-// IssueEnricherRegistry is map[string]IssueEnricher{Fn IssueEnricherFunc;
-// Priority int}. The seven "batchable" types (dbi, ebs, cb, tg, pipeline, sfn,
-// glue) get Priority=10; all remaining types get Priority=100.
-// buildEnrichQueue sorts by Priority (asc) then alphabetically within each
-// tier.
+// Wave 2 enricher metadata is now declared on each catalog.ResourceTypeDef
+// literal's Wave2 field (post-AS-795n); reads go through
+// awsclient.AllWave2 / Wave2EnricherFor / SetWave2EnricherForTest. The seven
+// "batchable" types (dbi, ebs, cb, tg, pipeline, sfn, glue) get Priority=10;
+// all remaining types get Priority=100. buildEnrichQueue sorts by Priority
+// (asc) then alphabetically within each tier.
 //
 // These tests verify resulting ordering behaviour against the registry.
 //
@@ -17,20 +18,19 @@ package unit
 // cause if used to seed many types one at a time.
 
 import (
-	"maps"
 	"sort"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// priority10Types lists the short names that receive Priority=10 in
-// IssueEnricherRegistry. These are the "batchable" Wave 2 issue enrichers
-// scheduled first in the dispatch queue.
+// priority10Types lists the short names that receive Priority=10 in the
+// Wave 2 catalog. These are the "batchable" Wave 2 issue enrichers scheduled
+// first in the dispatch queue.
 var priority10Types = []string{"dbi", "ebs", "cb", "tg", "pipeline", "sfn", "glue"}
 
 // enrichmentTypesFromMsgs extracts ResourceType strings in order for diagnostics.
@@ -43,13 +43,14 @@ func enrichmentTypesFromMsgs(msgs []messages.EnrichmentChecked) []string {
 }
 
 // seedAllEnricherTypes builds an AvailabilityPrefetchedMsg.Resources map
-// containing one fake resource for every key in IssueEnricherRegistry, then
+// containing one fake resource for every Wave 2 entry in the catalog, then
 // delivers it to the model. Returns the cmd that triggers startEnrichment.
 func seedAllEnricherTypes(m tui.Model) (tui.Model, tea.Cmd) {
-	allResources := make(map[string][]resource.Resource, len(awsclient.IssueEnricherRegistry))
-	for shortName := range awsclient.IssueEnricherRegistry {
-		allResources[shortName] = []resource.Resource{
-			{ID: shortName + "-probe", Name: shortName + "-probe", Fields: map[string]string{}},
+	entries := awsclient.AllWave2()
+	allResources := make(map[string][]resource.Resource, len(entries))
+	for _, e := range entries {
+		allResources[e.ShortName] = []resource.Resource{
+			{ID: e.ShortName + "-probe", Name: e.ShortName + "-probe", Fields: map[string]string{}},
 		}
 	}
 	m, cmd := rootApplyMsg(m, messages.AvailabilityPrefetched{
@@ -139,25 +140,18 @@ func TestBuildEnrichQueue_OrdersByMetadataPriority(t *testing.T) {
 func TestBuildEnrichQueue_StableAlphabeticalWithinPriority(t *testing.T) {
 	tui.Version = "test"
 
-	// Snapshot and restore the full registry around this test.
-	snapshot := make(map[string]awsclient.IssueEnricher, len(awsclient.IssueEnricherRegistry))
-	maps.Copy(snapshot, awsclient.IssueEnricherRegistry)
-	t.Cleanup(func() {
-		for k := range awsclient.IssueEnricherRegistry {
-			delete(awsclient.IssueEnricherRegistry, k)
-		}
-		maps.Copy(awsclient.IssueEnricherRegistry, snapshot)
-	})
-
-	// Replace registry with only the seven priority-10 types.
-	for k := range awsclient.IssueEnricherRegistry {
-		delete(awsclient.IssueEnricherRegistry, k)
+	// Mask every catalog Wave 2 entry with an Fn=nil override so AllWave2
+	// excludes them, then inject fresh Priority=10 NoOp overrides for the
+	// seven batchable types. SetWave2EnricherForTest/DeleteWave2EnricherForTest
+	// restore the previous state automatically via t.Cleanup.
+	for _, ent := range awsclient.AllWave2() {
+		awsclient.DeleteWave2EnricherForTest(t, ent.ShortName)
 	}
 	for _, name := range priority10Types {
-		awsclient.IssueEnricherRegistry[name] = awsclient.IssueEnricher{
+		awsclient.SetWave2EnricherForTest(t, name, awsclient.IssueEnricher{
 			Fn:       awsclient.NoOpIssueEnricher,
 			Priority: 10,
-		}
+		})
 	}
 
 	m := newRootSizedModel()
@@ -231,10 +225,10 @@ func TestBuildEnrichQueue_IncludesAllRegisteredEnrichers(t *testing.T) {
 		dispatched[msg.ResourceType] = true
 	}
 
-	for shortName := range awsclient.IssueEnricherRegistry {
-		if !dispatched[shortName] {
+	for _, ent := range awsclient.AllWave2() {
+		if !dispatched[ent.ShortName] {
 			t.Errorf("enricher %q is registered with a probeResources entry but was NOT dispatched; "+
-				"check buildEnrichQueue handles all EnricherRegistry keys", shortName)
+				"check buildEnrichQueue handles every catalog.AllByWave2 entry", ent.ShortName)
 		}
 	}
 }
@@ -254,14 +248,13 @@ func TestBuildEnrichQueue_SkipsTypesWithoutProbe(t *testing.T) {
 
 	const probeSkipType = "test-no-probe-skip"
 
-	// Register a no-op Enricher for the test type.
-	// This assignment uses the new Enricher struct — TDD-red until ARCH-04 completes
-	// the registry type migration from map[string]EnricherFunc to map[string]Enricher.
-	awsclient.IssueEnricherRegistry[probeSkipType] = awsclient.IssueEnricher{
+	// Register a no-op Wave 2 enricher for the test type via the test-override
+	// map. SetWave2EnricherForTest accepts sentinel short names (not in the
+	// catalog) and restores state automatically via t.Cleanup.
+	awsclient.SetWave2EnricherForTest(t, probeSkipType, awsclient.IssueEnricher{
 		Fn:       awsclient.NoOpIssueEnricher,
 		Priority: 100,
-	}
-	t.Cleanup(func() { delete(awsclient.IssueEnricherRegistry, probeSkipType) })
+	})
 
 	m := newRootSizedModel()
 
@@ -282,7 +275,7 @@ func TestBuildEnrichQueue_SkipsTypesWithoutProbe(t *testing.T) {
 
 // TestBuildEnrichQueue_NewEnricherAutoParticipates proves the scheduling
 // contract for #277: a brand-new issue enricher added at runtime (as any real
-// new enricher would be added in production code via the IssueEnricherRegistry
+// new enricher would be added in production code via the catalog Wave2 field
 // init block) participates in the dispatch queue WITHOUT any change to
 // internal/tui/app_fetchers.go. Priority metadata on the registry entry is the
 // single source of scheduling truth.
@@ -291,13 +284,13 @@ func TestBuildEnrichQueue_NewEnricherAutoParticipates(t *testing.T) {
 
 	const novelType = "arch277-novel-enricher"
 
-	// Register a novel enricher with a distinct priority to prove the registry
-	// entry alone is sufficient to participate in dispatch ordering.
-	awsclient.IssueEnricherRegistry[novelType] = awsclient.IssueEnricher{
+	// Register a novel enricher (sentinel name not in catalog) with a distinct
+	// priority to prove the Wave 2 entry alone is sufficient to participate in
+	// dispatch ordering. SetWave2EnricherForTest restores state automatically.
+	awsclient.SetWave2EnricherForTest(t, novelType, awsclient.IssueEnricher{
 		Fn:       awsclient.NoOpIssueEnricher,
 		Priority: 10, // batchable tier
-	}
-	t.Cleanup(func() { delete(awsclient.IssueEnricherRegistry, novelType) })
+	})
 
 	m := newRootSizedModel()
 	_, enrichCmd := seedAllEnricherTypes(m)
@@ -317,7 +310,7 @@ func TestBuildEnrichQueue_NewEnricherAutoParticipates(t *testing.T) {
 	}
 	if novelPos == -1 {
 		t.Fatalf("novel enricher %q did not participate in dispatch queue; "+
-			"buildEnrichQueue must read IssueEnricherRegistry directly so new registrations "+
+			"buildEnrichQueue must read catalog.AllByWave2 directly so new registrations "+
 			"require no TUI runtime changes. Dispatched: %v",
 			novelType, enrichmentTypesFromMsgs(found))
 	}
@@ -333,7 +326,7 @@ func TestBuildEnrichQueue_NewEnricherAutoParticipates(t *testing.T) {
 	for i := 0; i < novelPos; i++ {
 		if !p10Set[found[i].ResourceType] {
 			t.Errorf("novel Priority=10 enricher %q was preceded by Priority=100 type %q at index %d; "+
-				"priority metadata on IssueEnricherRegistry entry is not authoritative",
+				"priority metadata on catalog Wave2 entry is not authoritative",
 				novelType, found[i].ResourceType, i)
 		}
 	}

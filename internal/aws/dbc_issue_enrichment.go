@@ -12,10 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("dbc", EnrichDBCMaintenance, 100)
-}
-
 // nowFunc is the time source for overdue-date checks. Tests override it to a
 // fixed past/future anchor via package-level replacement.
 var nowFunc = time.Now

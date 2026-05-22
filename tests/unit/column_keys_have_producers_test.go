@@ -116,10 +116,12 @@ func TestColumnKeysHaveProducers(t *testing.T) {
 }
 
 // TestEnricherFieldKeys_RegisterCallsAreInInitBlock is a stringy smoke test that
-// globs internal/aws/*_issue_enrichment.go and counts RegisterIssueEnricherFieldKeys(
-// calls across all per-resource files. Requiring at least 10 calls proves the
-// coder actually wired up registrations in the owning resource init() blocks
-// rather than declaring the helper and never calling it.
+// globs internal/aws/catalog_*.go and counts IssueEnricherFieldKeys: literals
+// on per-resource catalog struct literals. Post-AS-795n the Wave 2 field-key
+// registrations live in the catalog (the bridge in install.go replays them
+// into the legacy resource.RegisterIssueEnricherFieldKeys map). Requiring at
+// least 10 occurrences proves the catalog actually wires Wave 2 field keys
+// rather than declaring the catalog field and leaving it empty everywhere.
 func TestEnricherFieldKeys_RegisterCallsAreInInitBlock(t *testing.T) {
 	// Locate the repo root via the test file's own path.
 	_, filename, _, ok := runtime.Caller(0)
@@ -129,15 +131,15 @@ func TestEnricherFieldKeys_RegisterCallsAreInInitBlock(t *testing.T) {
 	// tests/unit/ -> two levels up -> repo root
 	repoRoot := filepath.Join(filepath.Dir(filename), "..", "..")
 
-	matches, err := filepath.Glob(filepath.Join(repoRoot, "internal", "aws", "*_issue_enrichment.go"))
+	matches, err := filepath.Glob(filepath.Join(repoRoot, "internal", "aws", "catalog_*.go"))
 	if err != nil {
 		t.Fatalf("filepath.Glob failed: %v", err)
 	}
 	if len(matches) == 0 {
-		t.Fatal("filepath.Glob returned zero matches for internal/aws/*_issue_enrichment.go — check repo layout")
+		t.Fatal("filepath.Glob returned zero matches for internal/aws/catalog_*.go — check repo layout")
 	}
 
-	const needle = "RegisterIssueEnricherFieldKeys("
+	const needle = "IssueEnricherFieldKeys:"
 	total := 0
 	for _, path := range matches {
 		if strings.HasSuffix(path, "_test.go") {
@@ -153,8 +155,9 @@ func TestEnricherFieldKeys_RegisterCallsAreInInitBlock(t *testing.T) {
 	const minExpected = 10
 	if total < minExpected {
 		t.Errorf(
-			"found only %d call(s) to %s across internal/aws/*_issue_enrichment.go, expected at least %d — "+
-				"the coder must put RegisterIssueEnricherFieldKeys(...) in the owning resource's _issue_enrichment.go init() block",
+			"found only %d occurrence(s) of %q across internal/aws/catalog_*.go, expected at least %d — "+
+				"each Wave 2 issue enricher that writes Resource.Fields keys must declare them on the "+
+				"owning catalog.ResourceTypeDef literal's IssueEnricherFieldKeys field",
 			total, needle, minExpected,
 		)
 	}

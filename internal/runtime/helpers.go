@@ -3,7 +3,7 @@ package runtime
 // helpers.go — session-state helpers on Core used by the per-handler PRs.
 //
 // These methods operate only on c.session fields and platform-agnostic packages
-// (resource, semantics/attention, aws/IssueEnricherRegistry).  They are the
+// (resource, semantics/attention, aws/wave2.AllWave2).  They are the
 // runtime equivalents of the same-named methods that still exist on tui.Model
 // for non-migrated callers; both sets operate on the same *session.Session so
 // mutations are visible to both.

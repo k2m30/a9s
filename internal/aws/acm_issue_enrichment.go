@@ -13,10 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("acm", EnrichACMCertificate, 100)
-}
-
 // EnrichACMCertificate calls DescribeCertificate per ACM certificate (cap EnrichmentCap)
 // and raises findings for:
 //   - NotAfter within 30 days → "!" finding "expires in <N> days" (or "expired" if past)

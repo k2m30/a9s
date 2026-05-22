@@ -12,7 +12,6 @@ package runtime
 import (
 	"context"
 	"fmt"
-	"sort"
 	"time"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
@@ -246,31 +245,18 @@ func (c *Core) DemoPrefetchCounts(ctx context.Context, clients *awsclient.Servic
 	}
 }
 
-// buildEnrichQueue returns resource types that have registered Wave-2 issue
-// enrichers AND have retained probe resources, sorted by declarative priority
-// from IssueEnricherRegistry[name].Priority (lower values first), then
-// alphabetically within the same priority tier.
+// buildEnrichQueue returns resource types that have a registered Wave-2 issue
+// enricher AND retained probe resources, in dispatch order. Dispatch order
+// (priority ascending, then alphabetical) is owned by awsclient.AllWave2 so
+// this function only filters by ProbeResources membership.
 func (c *Core) BuildEnrichQueue() []string {
-	type pair struct {
-		name     string
-		priority int
-	}
-	var ps []pair
-	for name, e := range awsclient.IssueEnricherRegistry {
-		if _, ok := c.session.ProbeResources[name]; !ok {
+	all := awsclient.AllWave2()
+	queue := make([]string, 0, len(all))
+	for _, e := range all {
+		if _, ok := c.session.ProbeResources[e.ShortName]; !ok {
 			continue
 		}
-		ps = append(ps, pair{name: name, priority: e.Priority})
-	}
-	sort.Slice(ps, func(i, j int) bool {
-		if ps[i].priority != ps[j].priority {
-			return ps[i].priority < ps[j].priority
-		}
-		return ps[i].name < ps[j].name
-	})
-	queue := make([]string, len(ps))
-	for i, p := range ps {
-		queue[i] = p.name
+		queue = append(queue, e.ShortName)
 	}
 	return queue
 }
@@ -294,8 +280,8 @@ func (c *Core) ProbeEnrichment(ctx context.Context, clients *awsclient.ServiceCl
 			Err:          fmt.Errorf("AWS clients not initialized"),
 		}
 	}
-	enricherFn := awsclient.IssueEnricherRegistry[shortName].Fn
-	if enricherFn == nil {
+	e, ok := awsclient.Wave2EnricherFor(shortName)
+	if !ok {
 		return ProbeEnrichmentResult{ResourceType: shortName}
 	}
 	resources := c.session.ProbeResources[shortName]
@@ -305,7 +291,7 @@ func (c *Core) ProbeEnrichment(ctx context.Context, clients *awsclient.ServiceCl
 	defer cancel()
 
 	result, err := awsclient.RetryOnThrottle(probeCtx, awsclient.DefaultRetryConfig(), func() (awsclient.IssueEnricherResult, error) {
-		return enricherFn(probeCtx, clients, resources, cacheSnap)
+		return e.Fn(probeCtx, clients, resources, cacheSnap)
 	})
 	// Always populate fields from result regardless of err. RetryOnThrottle
 	// preserves partial result on non-retryable errors (partial-success

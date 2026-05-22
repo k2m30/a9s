@@ -1,14 +1,18 @@
-// issue_enrichment.go owns Wave 2 issue-enrichment infrastructure: the
-// IssueEnricher registry, the registerIssueEnricher helper, NoOpIssueEnricher,
-// shared caps, and truly-shared helpers used by more than one enricher file.
+// issue_enrichment.go owns Wave 2 issue-enrichment shared types and helpers:
+// the IssueEnricher metadata struct, NoOpIssueEnricher, the result/func
+// contracts, and truly-shared helpers used by more than one enricher file.
+//
+// AS-795n removed the legacy package-init IssueEnricherRegistry map and the
+// registerIssueEnricher helper. Wave 2 enricher registrations now live as
+// the Wave2 field on each catalog.ResourceTypeDef literal in the
+// catalog_<category>.go files. Read access goes through
+// awsclient.Wave2EnricherFor / awsclient.AllWave2 in wave2.go.
 package aws
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
-	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -23,23 +27,10 @@ type IssueEnricher struct {
 	Priority int // lower runs first; default 100
 }
 
-// IssueEnricherRegistry maps resource short names to their Wave 2 Enricher metadata.
-// Each entry carries the enricher function (Fn) and its dispatch priority
-// (Priority: lower runs first; 10 = batchable/cheap, 100 = default).
-//
-// Priority is the single source of truth for enrichment ordering.
-// buildEnrichQueue in internal/tui/app_fetchers.go sorts by Priority then
-// alphabetically within each tier — no hardcoded ordering list needed.
-//
-// Every registered resource type per docs/attention-signals.md either:
-//   - has a real Wave 2 enricher registered here (Wave 2 column non-empty), or
-//   - is registered with NoOpIssueEnricher (Wave 2 column is "None" in the doc).
-var IssueEnricherRegistry = map[string]IssueEnricher{}
-
-// NoOpIssueEnricher is registered for resource types whose Wave 2 column in
-// docs/attention-signals.md is "None". It makes the "no Wave 2 signal"
-// classification explicit in the registry rather than implicit-by-absence.
-// Returns zero findings, zero issues, not truncated — never fails.
+// NoOpIssueEnricher is the documented "no Wave 2 signal" enricher. Tests use
+// it as a benign Fn fixture; production catalog entries simply omit the Wave2
+// field for resource types whose Wave 2 column in docs/attention-signals.md
+// is "None". Returns zero findings, zero issues, not truncated — never fails.
 func NoOpIssueEnricher(_ context.Context, _ *ServiceClients, _ []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	return IssueEnricherResult{
 		Findings:     map[string]resource.EnrichmentFinding{},
@@ -71,39 +62,6 @@ func formatDate(t interface{ Format(string) string }) string {
 		return ""
 	}
 	return t.Format("2006-01-02")
-}
-
-// registerIssueEnricher registers a Wave 2 enricher function for the given short name
-// with the given priority. Panics on: empty shortName, nil fn, duplicate registration,
-// or non-positive priority.
-func registerIssueEnricher(shortName string, fn IssueEnricherFunc, priority int) {
-	if shortName == "" {
-		panic("registerIssueEnricher: short name must not be empty")
-	}
-	if fn == nil {
-		panic(fmt.Sprintf("registerIssueEnricher: nil fn for short name %q", shortName))
-	}
-	if _, exists := IssueEnricherRegistry[shortName]; exists {
-		panic(fmt.Sprintf("registerIssueEnricher: duplicate registration for short name %q", shortName))
-	}
-	if priority <= 0 {
-		panic(fmt.Sprintf("registerIssueEnricher: priority must be positive, got %d for short name %q", priority, shortName))
-	}
-	IssueEnricherRegistry[shortName] = IssueEnricher{Fn: fn, Priority: priority}
-}
-
-// GetIssueEnricher returns the Wave 2 issue enricher for the given resource
-// short name. Catalog-backed: checks catalog.Find(shortName).Wave2 first (cast
-// from any to IssueEnricher); falls through to IssueEnricherRegistry for types
-// not yet migrated to the catalog. Fallback removed in PR-04n.
-func GetIssueEnricher(shortName string) (IssueEnricher, bool) {
-	if ct := catalog.Find(shortName); ct != nil && ct.Wave2 != nil {
-		if e, ok := ct.Wave2.(IssueEnricher); ok {
-			return e, true
-		}
-	}
-	e, ok := IssueEnricherRegistry[shortName]
-	return e, ok
 }
 
 // IssueEnricherResult is the typed return value of a Wave 2 issue enricher.

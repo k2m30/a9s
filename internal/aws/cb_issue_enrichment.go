@@ -13,11 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("cb", EnrichCodeBuildStatus, 10)
-	resource.RegisterIssueEnricherFieldKeys("cb", []string{"last_build"})
-}
-
 // EnrichCodeBuildStatus calls BatchGetBuilds for the latest build of each project
 // and returns a Finding for every project whose latest build is not SUCCEEDED.
 // Severity is "!" (broken/degraded). Summary: "latest build FAILED (<date>)".

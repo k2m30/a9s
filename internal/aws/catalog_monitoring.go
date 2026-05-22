@@ -143,8 +143,9 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			}
 			return FetchCloudWatchLogGroupsPage(ctx, c.CloudWatchLogs, continuationToken)
 		},
-		Wave2:     IssueEnricher{Fn: EnrichLogsMetricFilters, Priority: 100},
-		FieldKeys: []string{"log_group_name", "stored_bytes", "retention_days", "creation_time", "kms_key_id"},
+		Wave2:                  IssueEnricher{Fn: EnrichLogsMetricFilters, Priority: 100},
+		FieldKeys:              []string{"log_group_name", "stored_bytes", "retention_days", "creation_time", "kms_key_id"},
+		IssueEnricherFieldKeys: []string{"last_event_at"},
 		Related: []domain.RelatedDef{
 			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkLogsLambda, NeedsTargetCache: true},
 			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkLogsAlarms, NeedsTargetCache: true},
@@ -186,6 +187,11 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 				Pagination: &resource.PaginationMeta{IsTruncated: false, TotalHint: len(resources), PageSize: len(resources)},
 			}, nil
 		},
+		// In-fetcher Wave 2: the trail fetcher already issues GetTrailStatus
+		// per-trail and populates is_logging / latest_delivery_error /
+		// log_file_validation_enabled at fetch time. NoOpIssueEnricher makes
+		// the Wave 2 contract explicit for TestAttentionSignalsDoc.
+		Wave2:     IssueEnricher{Fn: NoOpIssueEnricher, Priority: 100},
 		FieldKeys: []string{"trail_name", "s3_bucket", "home_region", "multi_region", "is_logging", "latest_delivery_error", "log_file_validation_enabled"},
 		Related: []domain.RelatedDef{
 			{TargetType: "s3", DisplayName: "S3 Bucket", Checker: checkTrailS3, NeedsTargetCache: true},

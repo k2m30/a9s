@@ -13,10 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("msk", EnrichMSKCluster, 100)
-}
-
 // EnrichMSKCluster calls DescribeClusterV2 per provisioned MSK cluster (cap EnrichmentCap)
 // and raises findings for:
 //   - Broker software version below 2.8 (major.minor) → "~" "broker software outdated"

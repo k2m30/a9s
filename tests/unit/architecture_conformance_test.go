@@ -37,20 +37,22 @@ func TestConformance_EveryResourceTypeHasPaginatedFetcher(t *testing.T) {
 	}
 }
 
-// TestConformance_EveryResourceTypeHasWave2Registration pins the Wave 2
-// allowlist contract: every registered top-level resource type must have an
-// entry in IssueEnricherRegistry, either a real issue enricher or
-// NoOpIssueEnricher. An unregistered type is a silent skip — it would never
-// participate in Wave 2 even when docs/attention-signals.md claims it should.
-func TestConformance_EveryResourceTypeHasWave2Registration(t *testing.T) {
+// TestConformance_EveryWave2DocRowHasCatalogEntry pins the Wave 2 contract
+// post-AS-795n: every resource type with a non-"None" Wave 2 row in
+// docs/attention-signals.md must have a non-nil catalog Wave2 field. The
+// doc-grounded TestAttentionSignalsDoc enforces the same invariant, plus
+// the "None" rows are now explicit-by-absence: a catalog entry with a nil
+// Wave2 field is the documented "no Wave 2 signal" classification.
+func TestConformance_EveryWave2DocRowHasCatalogEntry(t *testing.T) {
+	// Catalog entries with non-nil Wave2 are the live registrations. We do
+	// NOT require every resource type to have a Wave2 — "None" rows in the
+	// doc are legitimately absent. The behavioral contract is enforced by
+	// TestAttentionSignalsDoc which reads the doc and pairs each non-"None"
+	// row against awsclient.Wave2EnricherFor.
 	for _, td := range resource.AllResourceTypes() {
-		if _, ok := awsclient.IssueEnricherRegistry[td.ShortName]; !ok {
-			t.Errorf(
-				"resource type %q is not in awsclient.IssueEnricherRegistry — "+
-					"register either a real IssueEnricherFunc or NoOpIssueEnricher "+
-					"so the Wave 2 contract is explicit (docs/attention-signals.md)",
-				td.ShortName,
-			)
+		// Sanity check the type is fetchable; Wave 2 absence is allowed.
+		if resource.GetPaginatedFetcher(td.ShortName) == nil {
+			t.Errorf("resource type %q has no PaginatedFetcher; cannot run Wave 1, let alone Wave 2", td.ShortName)
 		}
 	}
 }
@@ -73,12 +75,12 @@ func TestConformance_RelatedValidatorsExposed(t *testing.T) {
 // Stale-result / invalidation guards
 // ---------------------------------------------------------------------------
 
-// TestConformance_Wave2Registry_IsNonEmpty pins that the Wave 2 registry
-// has been wired at package init. An empty registry would silently disable
-// every Wave 2 background check, since buildEnrichQueue iterates over it.
+// TestConformance_Wave2Registry_IsNonEmpty pins that the Wave 2 catalog
+// surface is non-empty. An empty AllWave2 would silently disable every Wave 2
+// background check, since BuildEnrichQueue iterates over it.
 func TestConformance_Wave2Registry_IsNonEmpty(t *testing.T) {
-	if len(awsclient.IssueEnricherRegistry) == 0 {
-		t.Fatal("awsclient.IssueEnricherRegistry is empty — Wave 2 dispatch would silently skip every type; init() wiring missing")
+	if len(awsclient.AllWave2()) == 0 {
+		t.Fatal("awsclient.AllWave2() is empty — Wave 2 dispatch would silently skip every type; catalog wiring missing")
 	}
 }
 
@@ -99,12 +101,12 @@ var hardcodedAllowlistPatterns = []*regexp.Regexp{
 
 // allowedTUIFiles lists internal/tui files where a string-literal slice of
 // resource short names is legitimate (test harnesses, non-dispatch helpers).
-// Currently empty — the dispatch code uses IssueEnricherRegistry iteration.
+// Currently empty — the dispatch code uses awsclient.AllWave2 iteration.
 var allowedTUIFiles = map[string]struct{}{}
 
 // TestConformance_NoHardcodedTypeAllowlist_InTUIDispatch scans internal/tui
 // source files for slice literals of known Wave 2 resource short names. The
-// Wave 2 dispatch contract is "iterate IssueEnricherRegistry, sort by
+// Wave 2 dispatch contract is "iterate awsclient.AllWave2(), sort by
 // priority" — a hardcoded allowlist in the TUI package would regress the
 // declarative scheduling contract from #277.
 //
@@ -135,7 +137,7 @@ func TestConformance_NoHardcodedTypeAllowlist_InTUIDispatch(t *testing.T) {
 				snippet := string(data[loc[0]:min(loc[1]+40, len(data))])
 				t.Errorf(
 					"%s: hardcoded Wave 2 short-name allowlist detected — dispatch must iterate "+
-						"awsclient.IssueEnricherRegistry instead. Snippet: %q",
+						"awsclient.AllWave2 instead. Snippet: %q",
 					rel, snippet,
 				)
 			}

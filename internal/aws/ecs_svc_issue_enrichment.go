@@ -14,10 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("ecs-svc", EnrichECSServices, 100)
-}
-
 // EnrichECSServices is a Wave 2 enricher for ECS services.
 // It groups services by cluster name, batches DescribeServices calls (up to 10 per
 // cluster per call — the ECS API maximum), and raises findings for:

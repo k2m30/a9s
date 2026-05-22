@@ -91,6 +91,11 @@ var containersTypes = []catalog.ResourceTypeDef{
 			"cluster_name", "version", "status", "endpoint", "platform_version",
 			"arn", "health_issues_count", "health_issues",
 		},
+		// In-fetcher Wave 2: the eks fetcher already issues per-cluster
+		// DescribeCluster calls and populates health_issues_count / health_issues
+		// at fetch time. NoOpIssueEnricher makes the contract explicit so
+		// TestAttentionSignalsDoc sees a Wave 2 wiring.
+		Wave2: IssueEnricher{Fn: NoOpIssueEnricher, Priority: 100},
 		Related: []domain.RelatedDef{
 			{TargetType: "ng", DisplayName: "Node Groups", Checker: checkEKSNodeGroups, NeedsTargetCache: true},
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkEKSAlarms, NeedsTargetCache: true},
@@ -130,6 +135,11 @@ var containersTypes = []catalog.ResourceTypeDef{
 		},
 		Color:   colorEKSNodeGroup,
 		Fetcher: fetchNodeGroupsPage,
+		// In-fetcher Wave 2: the ng fetcher already issues per-node-group
+		// DescribeNodegroup calls and populates health_issues_count /
+		// health_issues at fetch time. NoOpIssueEnricher records the contract
+		// explicitly so TestAttentionSignalsDoc sees a Wave 2 wiring.
+		Wave2: IssueEnricher{Fn: NoOpIssueEnricher, Priority: 100},
 		FieldKeys: []string{
 			"nodegroup_name", "cluster_name", "status", "instance_types",
 			"desired_size", "health_issues_count", "health_issues", "image_id",

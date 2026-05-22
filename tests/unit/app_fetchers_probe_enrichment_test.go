@@ -94,25 +94,19 @@ func TestProbeEnrichment_NilClients_ReturnsErrorMsg(t *testing.T) {
 
 // TestProbeEnrichment_EnricherError_ReturnsErrorMsg verifies that when the
 // registered enricher returns an error, probeEnrichment returns
-// EnrichmentCheckedMsg with Err set. We swap EnricherRegistry["dbi"] with a
-// fake that errors, then restore it.
+// EnrichmentCheckedMsg with Err set. We override the dbi enricher with a fake
+// that errors via SetWave2EnricherForTest; cleanup is automatic via t.Cleanup.
 func TestProbeEnrichment_EnricherError_ReturnsErrorMsg(t *testing.T) {
 	tui.Version = "test"
 
-	// Temporarily replace the dbi enricher with one that always errors.
-	original := awsclient.IssueEnricherRegistry["dbi"]
-	awsclient.IssueEnricherRegistry["dbi"] = awsclient.IssueEnricher{
+	// Temporarily replace the dbi enricher with one that always errors. The
+	// helper records the previous value and restores it on t.Cleanup.
+	prev, _ := awsclient.Wave2EnricherFor("dbi")
+	awsclient.SetWave2EnricherForTest(t, "dbi", awsclient.IssueEnricher{
 		Fn: func(_ context.Context, _ *awsclient.ServiceClients, _ []resource.Resource, _ resource.ResourceCache) (awsclient.IssueEnricherResult, error) {
 			return awsclient.IssueEnricherResult{}, fmt.Errorf("simulated enricher failure")
 		},
-		Priority: original.Priority,
-	}
-	t.Cleanup(func() {
-		if original.Fn != nil {
-			awsclient.IssueEnricherRegistry["dbi"] = original
-		} else {
-			delete(awsclient.IssueEnricherRegistry, "dbi")
-		}
+		Priority: prev.Priority,
 	})
 
 	// We need a model with non-nil clients so the nil-clients branch is NOT taken.
@@ -162,19 +156,14 @@ func TestProbeEnrichment_TypeGenForwarded(t *testing.T) {
 // TestProbeEnrichment_NoEnricher_NoCmdDispatched verifies that when no enricher
 // is registered for a type, probeEnrichment is not dispatched (returns nil cmd).
 //
-// We test this by temporarily removing dbi from EnricherRegistry. With no
-// enricher, buildEnrichQueue skips dbi → no probeEnrichment cmd returned.
+// We test this by temporarily shadowing dbi via DeleteWave2EnricherForTest
+// (injects an Fn=nil override). With no enricher, buildEnrichQueue skips
+// dbi → no probeEnrichment cmd returned. Cleanup is automatic.
 func TestProbeEnrichment_NoEnricher_NoCmdDispatched(t *testing.T) {
 	tui.Version = "test"
 
-	// Temporarily remove the dbi enricher.
-	original := awsclient.IssueEnricherRegistry["dbi"]
-	delete(awsclient.IssueEnricherRegistry, "dbi")
-	t.Cleanup(func() {
-		if original.Fn != nil {
-			awsclient.IssueEnricherRegistry["dbi"] = original
-		}
-	})
+	// Temporarily remove the dbi enricher via Fn=nil override.
+	awsclient.DeleteWave2EnricherForTest(t, "dbi")
 
 	m := newRootSizedModel()
 	m = navigateToDBIList(m)
