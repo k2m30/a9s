@@ -102,7 +102,7 @@ func TestBuildEnrichQueue_DispatchesCodePipeline(t *testing.T) {
 		ResourceType: "pipeline",
 		Count:        1,
 		Truncated:    false,
-		Gen:          m.Session().AvailabilityGen,
+		Gen:          m.Core().Session().AvailabilityGen,
 		Resources:    pipelineProbeResources(),
 	})
 

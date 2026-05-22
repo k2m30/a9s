@@ -48,7 +48,7 @@ func TestResourcesLoaded_Stale_Dropped(t *testing.T) {
 
 	// Rotate once so AvailabilityGen becomes non-zero (starts at 0).
 	// This ensures staleGen > 0, bypassing AcceptZeroGen=true.
-	m.Session().Rotate()
+	m.Core().Session().Rotate()
 
 	// Navigate to ec2 list and load sentinel resources with the current (non-zero) gen.
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -61,7 +61,7 @@ func TestResourcesLoaded_Stale_Dropped(t *testing.T) {
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    sentinel,
-		Gen:          m.Session().AvailabilityGen, // current non-zero gen — matches
+		Gen:          m.Core().Session().AvailabilityGen, // current non-zero gen — matches
 	})
 	// Verify baseline: sentinel resource is present.
 	if got := m.ActiveListResources(); len(got) == 0 || got[0].ID != "i-before-rotate" {
@@ -69,12 +69,12 @@ func TestResourcesLoaded_Stale_Dropped(t *testing.T) {
 	}
 
 	// Capture stale gen (non-zero) BEFORE the second Rotate.
-	staleGen := m.Session().AvailabilityGen
+	staleGen := m.Core().Session().AvailabilityGen
 	if staleGen == 0 {
 		t.Fatal("precondition failed: staleGen must be non-zero to test IsStale guard (AcceptZeroGen=true would pass zero)")
 	}
 	// Second Rotate bumps AvailabilityGen to staleGen+1.
-	m.Session().Rotate()
+	m.Core().Session().Rotate()
 
 	// Dispatch a stale ResourcesLoaded (Gen == staleGen, current is staleGen+1).
 	staleMsg := messages.ResourcesLoaded{
@@ -109,18 +109,18 @@ func TestIdentityLoaded_Stale_Dropped(t *testing.T) {
 	m := newRootSizedModel()
 
 	// First Rotate: ConnectGen becomes non-zero.
-	m.Session().Rotate()
+	m.Core().Session().Rotate()
 
 	// Capture stale ConnectGen (non-zero) BEFORE the second Rotate.
-	staleGen := m.Session().ConnectGen
+	staleGen := m.Core().Session().ConnectGen
 	if staleGen == 0 {
 		t.Fatal("precondition failed: staleGen must be non-zero to test IsStale guard")
 	}
 	// Second Rotate: ConnectGen becomes staleGen+1, Identity cleared.
-	m.Session().Rotate()
+	m.Core().Session().Rotate()
 
 	// Session.Identity is nil after Rotate() (per session.go:233).
-	if m.Session().Identity != nil {
+	if m.Core().Session().Identity != nil {
 		t.Fatal("precondition failed: Session.Identity should be nil after Rotate()")
 	}
 
@@ -133,8 +133,8 @@ func TestIdentityLoaded_Stale_Dropped(t *testing.T) {
 	m, _ = rootApplyMsg(m, staleMsg)
 
 	// Session.Identity must still be nil — the stale message was dropped.
-	if m.Session().Identity != nil {
-		t.Errorf("stale IdentityLoaded was NOT dropped: Session.Identity = %+v, expected nil — guard regression", m.Session().Identity)
+	if m.Core().Session().Identity != nil {
+		t.Errorf("stale IdentityLoaded was NOT dropped: Session.Identity = %+v, expected nil — guard regression", m.Core().Session().Identity)
 	}
 }
 
@@ -154,15 +154,15 @@ func TestValueRevealed_Stale_Dropped(t *testing.T) {
 	m := newRootSizedModel()
 
 	// First Rotate: ConnectGen becomes non-zero.
-	m.Session().Rotate()
+	m.Core().Session().Rotate()
 
 	// Capture stale ConnectGen (non-zero) BEFORE the second Rotate.
-	staleGen := m.Session().ConnectGen
+	staleGen := m.Core().Session().ConnectGen
 	if staleGen == 0 {
 		t.Fatal("precondition failed: staleGen must be non-zero to test IsStale guard")
 	}
 	// Second Rotate: ConnectGen becomes staleGen+1.
-	m.Session().Rotate()
+	m.Core().Session().Rotate()
 
 	// The secret value from a previous profile that must NOT appear.
 	const staleSecret = "PREV_ACCOUNT_SECRET_VALUE_xyzzy_42"
@@ -194,7 +194,7 @@ func TestHappyPath_MatchingGen_ResourcesLoaded(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	currentGen := m.Session().AvailabilityGen
+	currentGen := m.Core().Session().AvailabilityGen
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{{ID: "i-fresh", Name: "fresh-server"}},
@@ -217,17 +217,17 @@ func TestHappyPath_MatchingGen_ResourcesLoaded(t *testing.T) {
 // Gen == current ConnectGen sets Session.Identity.
 func TestHappyPath_MatchingGen_IdentityLoaded(t *testing.T) {
 	m := newRootSizedModel()
-	currentGen := m.Session().ConnectGen
+	currentGen := m.Core().Session().ConnectGen
 	freshIdentity := &awsclient.CallerIdentity{AccountID: "999988887777"}
 	m, _ = rootApplyMsg(m, messages.IdentityLoaded{
 		Identity: freshIdentity,
 		Gen:      currentGen,
 	})
-	if m.Session().Identity == nil {
+	if m.Core().Session().Identity == nil {
 		t.Fatal("happy-path IdentityLoaded with matching gen was not applied: Session.Identity is nil")
 	}
-	if m.Session().Identity.AccountID != "999988887777" {
-		t.Errorf("Session.Identity.AccountID = %q, want 999988887777", m.Session().Identity.AccountID)
+	if m.Core().Session().Identity.AccountID != "999988887777" {
+		t.Errorf("Session.Identity.AccountID = %q, want 999988887777", m.Core().Session().Identity.AccountID)
 	}
 }
 
@@ -235,7 +235,7 @@ func TestHappyPath_MatchingGen_IdentityLoaded(t *testing.T) {
 // Gen == current ConnectGen pushes the reveal view.
 func TestHappyPath_MatchingGen_ValueRevealed(t *testing.T) {
 	m := newRootSizedModel()
-	currentGen := m.Session().ConnectGen
+	currentGen := m.Core().Session().ConnectGen
 	const freshSecret = "FRESH_CURRENT_SESSION_SECRET_abc123"
 	m, _ = rootApplyMsg(m, messages.ValueRevealed{
 		ResourceType: "secrets",
@@ -260,7 +260,7 @@ func TestHappyPath_MatchingGen_ValueRevealed(t *testing.T) {
 // "stamp == 0 && AcceptZeroGen()" branch (messages/messages.go:71) rather
 // than the trivial "stamp == currentGen" path.
 //
-// Note: the prior version of this test gated on `m.Session().AvailabilityGen
+// Note: the prior version of this test gated on `m.Core().Session().AvailabilityGen
 // == 0` on a fresh session. The AS-659 seed `AvailabilityGen=1` in
 // `session.New()` (this same PR) makes that precondition unsatisfiable, which
 // would silently skip the entire test post-merge.
@@ -269,8 +269,8 @@ func TestHappyPath_ZeroGen_AcceptedByAllThree(t *testing.T) {
 		m := newRootSizedModel()
 		// Force AvailabilityGen non-zero so a Gen=0 dispatch can only succeed
 		// via the AcceptZeroGen=true branch in IsStale.
-		m.Session().Rotate()
-		if got := m.Session().AvailabilityGen; got == 0 {
+		m.Core().Session().Rotate()
+		if got := m.Core().Session().AvailabilityGen; got == 0 {
 			t.Fatalf("precondition: AvailabilityGen must be non-zero, got 0")
 		}
 
@@ -300,8 +300,8 @@ func TestHappyPath_ZeroGen_AcceptedByAllThree(t *testing.T) {
 		m := newRootSizedModel()
 		// Force ConnectGen non-zero so the AcceptZeroGen branch is the only
 		// path that admits a Gen=0 IdentityLoaded.
-		m.Session().Rotate()
-		if got := m.Session().ConnectGen; got == 0 {
+		m.Core().Session().Rotate()
+		if got := m.Core().Session().ConnectGen; got == 0 {
 			t.Fatalf("precondition: ConnectGen must be non-zero, got 0")
 		}
 
@@ -310,7 +310,7 @@ func TestHappyPath_ZeroGen_AcceptedByAllThree(t *testing.T) {
 			Identity: freshID,
 			Gen:      domain.Gen(0),
 		})
-		if m.Session().Identity == nil {
+		if m.Core().Session().Identity == nil {
 			t.Error("IdentityLoaded with Gen=0 was dropped while ConnectGen!=0 — AcceptZeroGen=true regression")
 		}
 	})
@@ -318,8 +318,8 @@ func TestHappyPath_ZeroGen_AcceptedByAllThree(t *testing.T) {
 	t.Run("ValueRevealed", func(t *testing.T) {
 		m := newRootSizedModel()
 		// Force ConnectGen non-zero (ValueRevealed uses AspectConnect).
-		m.Session().Rotate()
-		if got := m.Session().ConnectGen; got == 0 {
+		m.Core().Session().Rotate()
+		if got := m.Core().Session().ConnectGen; got == 0 {
 			t.Fatalf("precondition: ConnectGen must be non-zero, got 0")
 		}
 
@@ -352,7 +352,7 @@ func TestAPIError_Stale_NoFlash(t *testing.T) {
 	m := newRootSizedModel()
 
 	// First Rotate: AvailabilityGen becomes non-zero.
-	m.Session().Rotate()
+	m.Core().Session().Rotate()
 
 	// Establish baseline flash.gen (non-zero) via a legitimate flash.
 	m, _ = rootApplyMsg(m, messages.Flash{Text: "baseline flash"})
@@ -362,11 +362,11 @@ func TestAPIError_Stale_NoFlash(t *testing.T) {
 	}
 
 	// Capture stale gen (non-zero) and rotate a second time.
-	staleGen := m.Session().AvailabilityGen
+	staleGen := m.Core().Session().AvailabilityGen
 	if staleGen == 0 {
 		t.Fatal("precondition failed: staleGen must be non-zero to test IsStale guard")
 	}
-	m.Session().Rotate()
+	m.Core().Session().Rotate()
 
 	// Dispatch stale APIError.
 	staleErr := messages.APIError{
@@ -396,18 +396,18 @@ func TestIdentityError_Stale_DoesNotClearFetching(t *testing.T) {
 	m := newRootSizedModel()
 
 	// First Rotate: ConnectGen becomes non-zero.
-	m.Session().Rotate()
+	m.Core().Session().Rotate()
 
 	// Capture stale ConnectGen (non-zero) and rotate a second time so a new
 	// identity fetch could be in flight for the post-rotate session.
-	staleGen := m.Session().ConnectGen
+	staleGen := m.Core().Session().ConnectGen
 	if staleGen == 0 {
 		t.Fatal("precondition failed: staleGen must be non-zero to test IsStale guard")
 	}
-	m.Session().Rotate()
+	m.Core().Session().Rotate()
 
 	// Simulate: a new identity fetch is in flight for the post-rotate session.
-	m.Session().IdentityFetching = true
+	m.Core().Session().IdentityFetching = true
 
 	// Dispatch stale IdentityError from the pre-rotate session.
 	staleErr := messages.IdentityError{
@@ -417,7 +417,7 @@ func TestIdentityError_Stale_DoesNotClearFetching(t *testing.T) {
 	m, _ = rootApplyMsg(m, staleErr)
 
 	// IdentityFetching must still be true — the stale error must not clear it.
-	if !m.Session().IdentityFetching {
+	if !m.Core().Session().IdentityFetching {
 		t.Errorf("stale IdentityError cleared Session.IdentityFetching for the new session — guard regression: post-rotate spinner would disappear while real fetch still in flight")
 	}
 }
@@ -430,7 +430,7 @@ func TestAPIError_Fresh_DoesFlash(t *testing.T) {
 	m := newRootSizedModel()
 
 	genBefore := m.FlashGen()
-	currentGen := m.Session().AvailabilityGen
+	currentGen := m.Core().Session().AvailabilityGen
 
 	m, _ = rootApplyMsg(m, messages.APIError{
 		ResourceType: "ec2",
@@ -448,8 +448,8 @@ func TestAPIError_Fresh_DoesFlash(t *testing.T) {
 func TestIdentityError_Fresh_DoesProcess(t *testing.T) {
 	m := newRootSizedModel()
 
-	m.Session().IdentityFetching = true
-	currentGen := m.Session().ConnectGen
+	m.Core().Session().IdentityFetching = true
+	currentGen := m.Core().Session().ConnectGen
 
 	m, _ = rootApplyMsg(m, messages.IdentityError{
 		Err: "some identity error",
@@ -457,7 +457,7 @@ func TestIdentityError_Fresh_DoesProcess(t *testing.T) {
 	})
 
 	// handleIdentityError clears IdentityFetching.
-	if m.Session().IdentityFetching {
+	if m.Core().Session().IdentityFetching {
 		t.Error("fresh IdentityError was dropped or did not clear IdentityFetching — guard too broad")
 	}
 }
@@ -483,17 +483,17 @@ func TestAvailabilityPrefetched_Stale_Dropped(t *testing.T) {
 	m := newRootSizedModel()
 
 	// AvailabilityGen seeded at 1 by session.New(); rotate once so staleGen > 1.
-	m.Session().Rotate()
+	m.Core().Session().Rotate()
 
 	// Capture stale gen (non-zero) BEFORE the second Rotate.
-	staleGen := m.Session().AvailabilityGen
+	staleGen := m.Core().Session().AvailabilityGen
 	if staleGen == 0 {
 		t.Fatal("precondition failed: staleGen must be non-zero to test IsStale guard (AcceptZeroGen=false rejects zero unconditionally)")
 	}
 
 	// Second Rotate bumps AvailabilityGen past staleGen and clears caches.
-	m.Session().Rotate()
-	if m.Session().AvailabilityGen == staleGen {
+	m.Core().Session().Rotate()
+	if m.Core().Session().AvailabilityGen == staleGen {
 		t.Fatalf("precondition failed: Rotate() must advance AvailabilityGen past staleGen=%d", staleGen)
 	}
 
@@ -512,7 +512,7 @@ func TestAvailabilityPrefetched_Stale_Dropped(t *testing.T) {
 	m, _ = rootApplyMsg(m, staleMsg)
 
 	// ResourceCache must NOT have been seeded — the stale prefetch was dropped.
-	if entry, ok := m.Session().ResourceCache[targetType]; ok {
+	if entry, ok := m.Core().Session().ResourceCache[targetType]; ok {
 		t.Errorf("stale AvailabilityPrefetched was NOT dropped: ResourceCache[%q]=%+v — post-rotate session contaminated by pre-rotate prefetch (AS-648-h4 regression)", targetType, entry)
 	}
 }
@@ -527,7 +527,7 @@ func TestAvailabilityPrefetched_ZeroGen_Dropped(t *testing.T) {
 	m := newRootSizedModel()
 
 	// Fresh session: AvailabilityGen is seeded at 1 (AS-648-h4 / AS-659).
-	if got := m.Session().AvailabilityGen; got != 1 {
+	if got := m.Core().Session().AvailabilityGen; got != 1 {
 		t.Fatalf("precondition failed: fresh AvailabilityGen = %d, want 1 (session.New seed)", got)
 	}
 
@@ -539,7 +539,7 @@ func TestAvailabilityPrefetched_ZeroGen_Dropped(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, zeroMsg)
 
-	if entry, ok := m.Session().ResourceCache[targetType]; ok {
+	if entry, ok := m.Core().Session().ResourceCache[targetType]; ok {
 		t.Errorf("zero-stamped AvailabilityPrefetched was NOT dropped: ResourceCache[%q]=%+v — guard regression: AcceptZeroGen() must remain false", targetType, entry)
 	}
 }

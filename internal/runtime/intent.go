@@ -259,7 +259,7 @@ func (PatchResourceCache) isIntent() {}
 // PatchRelatedCache appends one resolved related-check result to the
 // session-owned RelatedCache. Emitted by HandleRelatedCheckResult after
 // resolving the source resource ID; the adapter applies by appending to
-// any existing slice under the session.RelatedCacheKey.
+// any existing slice under the runtime.RelatedCacheKey.
 type PatchRelatedCache struct {
 	ResourceType   string
 	SourceID       string

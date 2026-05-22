@@ -10,8 +10,8 @@
 // IdentityError / ValueRevealed now captures the dispatch-time generation counter
 // (gen domain.Gen) at the call site. The gen is stamped onto the returned message
 // so the app.go handler can discard stale results after a profile/region switch
-// (messages.IsStale guard). Callers pass m.core.Session().AvailabilityGen (for
-// resource fetches) or m.core.Session().ConnectGen (for identity/reveal fetches).
+// (messages.IsStale guard). Callers pass m.core.AvailabilityGen() (for
+// resource fetches) or m.core.ConnectGen() (for identity/reveal fetches).
 package tui
 
 import (
@@ -33,7 +33,7 @@ type profilesLoadedMsg struct {
 // gen is the AvailabilityGen captured at dispatch time; it is stamped onto the
 // returned message so the handler can discard stale results after a switch.
 func (m *Model) fetchResources(resourceType string, gen domain.Gen) tea.Cmd {
-	ctx, clients := m.appCtx, m.core.Session().Clients
+	ctx, clients := m.appCtx, m.core.Clients()
 	return func() tea.Msg {
 		res, err := m.core.FetchResources(ctx, clients, resourceType)
 		// Partial-success contract: fetchers may return BOTH a non-empty
@@ -56,7 +56,7 @@ func (m *Model) fetchResources(resourceType string, gen domain.Gen) tea.Cmd {
 // fetchResourcesFiltered returns a tea.Cmd for a server-side filtered fetch.
 // gen is the AvailabilityGen captured at dispatch time.
 func (m *Model) fetchResourcesFiltered(resourceType string, filter map[string]string, gen domain.Gen) tea.Cmd {
-	ctx, clients := m.appCtx, m.core.Session().Clients
+	ctx, clients := m.appCtx, m.core.Clients()
 	return func() tea.Msg {
 		res, err := m.core.FetchResourcesFiltered(ctx, clients, resourceType, filter)
 		if err != nil && len(res.Resources) == 0 {
@@ -75,7 +75,7 @@ func (m *Model) fetchResourcesFiltered(resourceType string, filter map[string]st
 // fetchAMIDetail returns a tea.Cmd that fetches a single AMI by ID and
 // navigates to its detail view.
 func (m *Model) fetchAMIDetail(imageID string) tea.Cmd {
-	ctx, clients := m.appCtx, m.core.Session().Clients
+	ctx, clients := m.appCtx, m.core.Clients()
 	return func() tea.Msg {
 		res, err := m.core.FetchAMIDetail(ctx, clients, imageID)
 		if err != nil {
@@ -93,8 +93,8 @@ func (m *Model) fetchAMIDetail(imageID string) tea.Cmd {
 // Child resource fetches use AvailabilityGen so stale results from prior
 // profile/region are discarded along with top-level fetches.
 func (m *Model) fetchChildResources(childType string, parentCtx map[string]string) tea.Cmd {
-	ctx, clients := m.appCtx, m.core.Session().Clients
-	gen := m.core.Session().AvailabilityGen
+	ctx, clients := m.appCtx, m.core.Clients()
+	gen := m.core.AvailabilityGen()
 	return func() tea.Msg {
 		res, err := m.core.FetchChildResources(ctx, clients, childType, parentCtx)
 		if err != nil {
@@ -113,8 +113,8 @@ func (m *Model) fetchChildResources(childType string, parentCtx map[string]strin
 // paginated resource list using the continuation token from LoadMoreMsg.
 // gen is the AvailabilityGen captured at dispatch time.
 func (m *Model) fetchMoreResources(msg messages.LoadMore) tea.Cmd {
-	ctx, clients := m.appCtx, m.core.Session().Clients
-	gen := m.core.Session().AvailabilityGen
+	ctx, clients := m.appCtx, m.core.Clients()
+	gen := m.core.AvailabilityGen()
 	p := runtime.FetchMoreParams{
 		ResourceType: msg.ResourceType,
 		Token:        msg.ContinuationToken,
@@ -141,7 +141,7 @@ func (m *Model) fetchMoreResources(msg messages.LoadMore) tea.Cmd {
 // gen is the ConnectGen captured at dispatch time; it is stamped onto the
 // returned message so the handler can discard stale results after a switch.
 func (m *Model) fetchIdentity(gen domain.Gen) tea.Cmd {
-	ctx, clients := m.appCtx, m.core.Session().Clients
+	ctx, clients := m.appCtx, m.core.Clients()
 	return func() tea.Msg {
 		identity, err := m.core.FetchIdentity(ctx, clients)
 		if err != nil {
@@ -166,7 +166,7 @@ func (m *Model) fetchProfiles() tea.Cmd {
 // gen is the ConnectGen captured at dispatch time; it is stamped onto the
 // returned message so the handler can discard stale results after a switch.
 func (m *Model) fetchRevealValue(resourceType, resourceID string, gen domain.Gen) tea.Cmd {
-	ctx, clients := m.appCtx, m.core.Session().Clients
+	ctx, clients := m.appCtx, m.core.Clients()
 	return func() tea.Msg {
 		value, err := m.core.FetchRevealValue(ctx, clients, resourceType, resourceID)
 		if err != nil {

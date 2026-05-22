@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/session"
 )
 
@@ -93,7 +94,7 @@ func TestRelatedCacheLRU_Clear(t *testing.T) {
 // for the shared TargetType="ct-events".
 func TestRelatedCacheReplay_PreservesDefDisplayName(t *testing.T) {
 	c := session.NewRelatedCacheLRU(10)
-	key := session.RelatedCacheKey("ct-events", "src-evt-0001")
+	key := runtime.RelatedCacheKey("ct-events", "src-evt-0001")
 
 	in := []session.RelatedCacheResult{
 		{DefDisplayName: "CT events by AccessKeyId", Result: resource.RelatedCheckResult{TargetType: "ct-events", Count: 3, ResourceIDs: []string{"e1"}}},
@@ -111,9 +112,9 @@ func TestRelatedCacheReplay_PreservesDefDisplayName(t *testing.T) {
 		t.Fatalf("len(cached) = %d, want %d", len(got), len(in))
 	}
 
-	// session.RelatedCacheReplay must project cached entries back into messages
+	// runtime.RelatedCacheReplay must project cached entries back into messages
 	// carrying the original DefDisplayName so every row resolves.
-	msgs := session.RelatedCacheReplay("ct-events", got)
+	msgs := runtime.RelatedCacheReplay("ct-events", got)
 	if len(msgs) != len(in) {
 		t.Fatalf("len(replay) = %d, want %d", len(msgs), len(in))
 	}

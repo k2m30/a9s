@@ -58,7 +58,7 @@ func seedAllEnricherTypes(m tui.Model) (tui.Model, tea.Cmd) {
 		Resources: allResources,
 		// Stamp the live AvailabilityGen so the AS-657/AS-659 staleness guard
 		// accepts the message (AcceptZeroGen=false after AS-659).
-		Gen: m.Session().AvailabilityGen,
+		Gen: m.Core().Session().AvailabilityGen,
 	})
 	return m, cmd
 }
@@ -77,7 +77,7 @@ func seedEnricherSubset(m tui.Model, names []string) (tui.Model, tea.Cmd) {
 		Resources: subset,
 		// Stamp the live AvailabilityGen so the AS-657/AS-659 staleness guard
 		// accepts the message (AcceptZeroGen=false after AS-659).
-		Gen: m.Session().AvailabilityGen,
+		Gen: m.Core().Session().AvailabilityGen,
 	})
 	return m, cmd
 }

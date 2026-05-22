@@ -57,10 +57,10 @@ func TestPrefetchPaginationSeed_PreservesNextToken(t *testing.T) {
 		Pagination:     map[string]*resource.PaginationMeta{targetType: wantMeta},
 		// Stamp the live AvailabilityGen so the AS-657/AS-659 staleness guard
 		// accepts the message (AcceptZeroGen=false after AS-659).
-		Gen: m.Session().AvailabilityGen,
+		Gen: m.Core().Session().AvailabilityGen,
 	})
 
-	entry, ok := m.Session().ResourceCache[targetType]
+	entry, ok := m.Core().Session().ResourceCache[targetType]
 	if !ok {
 		t.Fatalf("expected ResourceCache entry for %q after prefetch seed; got nil", targetType)
 	}
@@ -103,10 +103,10 @@ func TestPrefetchPaginationSeed_FallbackWhenPaginationOmitted(t *testing.T) {
 		// Pagination intentionally nil — pre-fix shape.
 		// Stamp the live AvailabilityGen so the AS-657/AS-659 staleness guard
 		// accepts the message (AcceptZeroGen=false after AS-659).
-		Gen: m.Session().AvailabilityGen,
+		Gen: m.Core().Session().AvailabilityGen,
 	})
 
-	entry, ok := m.Session().ResourceCache[targetType]
+	entry, ok := m.Core().Session().ResourceCache[targetType]
 	if !ok {
 		t.Fatalf("expected ResourceCache entry for %q after fallback prefetch seed; got nil", targetType)
 	}

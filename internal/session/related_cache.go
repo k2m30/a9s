@@ -1,7 +1,13 @@
-// related_cache.go — LRU cache and replay helpers for related-resource check
-// results, keyed by `<resourceType>:<resourceID>`. Hits replay each row's
-// RelatedCheckResultMsg into the rightcolumn view on detail re-entry so the
-// pivot table re-paints without re-issuing AWS describe calls.
+// related_cache.go — LRU cache for related-resource check results.
+//
+// The bounded LRU and the per-row payload type live here because
+// session.Session owns the cache instance (RelatedCacheLRU field). The
+// `RelatedCacheKey` / `RelatedCacheReplay` free helpers used to live here
+// too; PR-05a-h4-c (AS-963) moved them to internal/runtime so renderer
+// adapters can resolve cache keys without importing internal/session.
+// Tests and runtime code reach the helpers via runtime.RelatedCacheKey /
+// runtime.RelatedCacheReplay; there is no session-side re-export to keep
+// drift between two copies impossible.
 //
 // Moved from internal/tui/related_cache.go as part of Phase 02 session owner migration.
 package session
@@ -10,29 +16,7 @@ import (
 	"container/list"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
-
-// RelatedCacheKey builds the map key for RelatedCache lookups.
-func RelatedCacheKey(resourceType, resourceID string) string {
-	return resourceType + ":" + resourceID
-}
-
-// RelatedCacheReplay converts cached related-check results into the
-// RelatedCheckResultMsg form the detail view expects, preserving both the
-// resourceType and the per-row DefDisplayName so rightcolumn replay can
-// match the correct row on detail re-entry.
-func RelatedCacheReplay(resourceType string, cached []RelatedCacheResult) []messages.RelatedCheckResult {
-	out := make([]messages.RelatedCheckResult, len(cached))
-	for i, c := range cached {
-		out[i] = messages.RelatedCheckResult{
-			ResourceType:   resourceType,
-			DefDisplayName: c.DefDisplayName,
-			Result:         c.Result,
-		}
-	}
-	return out
-}
 
 // RelatedCacheLRU is a simple LRU cache for related-resource check results.
 // It caps at MaxRelatedCacheEntries entries; the least-recently-used entry

@@ -15,7 +15,7 @@
 // stack, view-typed methods, flashState, tea.Cmd returns). Their
 // runtime-policy parts (cache-mutation gen bumps, per-type
 // enrichment-rerun bookkeeping) are reads/writes against the session
-// owned by core — same data the runtime sees through c.session.
+// owned by core — same data the runtime sees through its session field.
 //
 // PR-05a-h4-b (AS-962) removed the inline handleIdentityLoaded /
 // handleIdentityError helpers in favour of HandleEvent-routed dispatch
@@ -34,12 +34,9 @@ import (
 
 	"github.com/atotto/clipboard"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/config"
-	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
-	"github.com/k2m30/a9s/v3/internal/session"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -131,7 +128,7 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 			issueTrunc = menu.GetIssueTruncated()[canon]
 		}
 		rl.SetEnrichmentState(issueCount, issueTrunc, findingsFromRows(entry.Resources))
-		rl.SetTruncatedIDs(m.core.Session().EnrichmentTruncatedIDs[canon])
+		rl.SetTruncatedIDs(m.core.EnrichmentTruncatedIDs(canon))
 		m.pushView(&rl)
 		return m, nil
 
@@ -158,7 +155,7 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 			issueTrunc = menu.GetIssueTruncated()[canon]
 		}
 		rl.SetEnrichmentState(issueCount, issueTrunc, nil)
-		rl.SetTruncatedIDs(m.core.Session().EnrichmentTruncatedIDs[canon])
+		rl.SetTruncatedIDs(m.core.EnrichmentTruncatedIDs(canon))
 		rl, initCmd := rl.Init()
 		m.pushView(&rl)
 		fetchCmd := navigateTasksToCmd(m, msg, result, tasks)
@@ -184,9 +181,9 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 			})
 		}
 		if result.DispatchRelated && d.NeedsRelatedCheck() {
-			ck := session.RelatedCacheKey(result.ResolvedType, result.Resource.ID)
-			if cached, ok := m.core.Session().RelatedCache.Get(ck); ok && len(cached) > 0 {
-				d.ApplyRelatedResults(session.RelatedCacheReplay(result.ResolvedType, cached))
+			ck := runtime.RelatedCacheKey(result.ResolvedType, result.Resource.ID)
+			if cached, ok := m.core.RelatedCacheGet(ck); ok && len(cached) > 0 {
+				d.ApplyRelatedResults(runtime.RelatedCacheReplay(result.ResolvedType, cached))
 			} else {
 				res := *result.Resource
 				rt := result.ResolvedType
@@ -244,7 +241,7 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case runtime.NavigateKindFetchProfiles:
-		if m.core.Session().PreSuppliedClients != nil {
+		if m.core.PreSuppliedClients() != nil {
 			return m, func() tea.Msg {
 				return messages.Flash{
 					Text:    "context switching is disabled in demo mode",
@@ -255,7 +252,7 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		return m, navigateTasksToCmd(m, msg, result, tasks)
 
 	case runtime.NavigateKindPushRegion:
-		if m.core.Session().PreSuppliedClients != nil {
+		if m.core.PreSuppliedClients() != nil {
 			return m, func() tea.Msg {
 				return messages.Flash{
 					Text:    "region switching is disabled in demo mode",
@@ -268,7 +265,7 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		for i, r := range regions {
 			regionCodes[i] = r.Code
 		}
-		rg := views.NewRegion(regionCodes, m.core.Session().Region, m.keys)
+		rg := views.NewRegion(regionCodes, m.core.Region(), m.keys)
 		rg.SetSize(m.innerSize())
 		m.pushView(&rg)
 		return m, nil
@@ -360,12 +357,12 @@ func navigateTasksToCmd(m Model, msg messages.Navigate, result runtime.NavigateR
 			if fetchRT == "" {
 				fetchRT = msg.ResourceType
 			}
-			cmds = append(cmds, m.fetchResources(fetchRT, m.core.Session().AvailabilityGen))
+			cmds = append(cmds, m.fetchResources(fetchRT, m.core.AvailabilityGen()))
 		case runtime.KindFetchProfiles:
 			cmds = append(cmds, m.fetchProfiles())
 		case runtime.KindFetchReveal:
 			if p, ok := t.Payload.(runtime.FetchRevealPayload); ok {
-				cmds = append(cmds, m.fetchRevealValue(p.ResourceType, p.ResourceID, m.core.Session().ConnectGen))
+				cmds = append(cmds, m.fetchRevealValue(p.ResourceType, p.ResourceID, m.core.ConnectGen()))
 			}
 		}
 	}
@@ -405,22 +402,19 @@ func (m Model) handleCopy() (tea.Model, tea.Cmd) {
 func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	// Main menu: restart availability checks (no-op in no-cache mode).
 	if _, ok := m.activeView().(*views.MainMenuModel); ok {
-		if m.core.Session().NoCache {
+		if m.core.NoCache() {
 			return m, nil
 		}
 		// Increment gen to cancel any in-flight probes and enrichment.
-		m.core.Session().AvailabilityGen++
-		m.core.Session().EnrichmentGen++
-		m.core.Session().EnrichmentRan = make(map[string]bool)
-		m.core.Session().EnrichmentTypeGen = make(map[string]domain.Gen)
-		m.core.Session().EnrichmentTruncatedIDs = make(map[string]map[string]bool)
+		m.core.BumpAvailabilityGen()
+		m.core.BumpEnrichmentGen()
+		m.core.ResetEnrichmentMaps()
 		// Clear stale Wave 2 from all cached rows before resetting ProbeResources.
 		// Without this, opening a cached list before the new enrichment completes
 		// would show the previous run's attention state (PR #310 CodeRabbit
 		// finding B).
 		clearAllWave2(&m)
-		m.core.Session().ProbeResources = make(map[string][]resource.Resource)
-		m.core.Session().ProbeTruncated = make(map[string]bool)
+		m.core.ResetProbeMaps()
 		// Reset the menu's view-side state (availability, issue counts) in
 		// lockstep with the model-side maps above.
 		if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
@@ -436,10 +430,10 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		d.ResetRightColumn()
 		rt := d.ResourceType()
 		srcRes := d.SourceResource()
-		m.core.Session().RelatedCache.Delete(session.RelatedCacheKey(rt, srcRes.ID))
-		m.core.Session().RelatedGen++      // cancel in-flight results from previous batch
-		m.core.Session().EnrichGen++       // cancel in-flight enrichment from previous batch
-		m.core.Session().EnrichResKey = "" // force gen bump on next enrichment dispatch
+		m.core.RelatedCacheDelete(runtime.RelatedCacheKey(rt, srcRes.ID))
+		m.core.BumpRelatedGen() // cancel in-flight results from previous batch
+		m.core.BumpEnrichGen()  // cancel in-flight enrichment from previous batch
+		m.core.ClearEnrichResKey() // force gen bump on next enrichment dispatch
 		// Invalidate the SES v1 receipt rule set cache so Ctrl+R on a detail
 		// view picks up receipt-rule changes without requiring a profile/region
 		// switch. Swap (not Clear) so that any in-flight blocked
@@ -489,7 +483,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		(&m).applyEnrichment(rt, nil)
 	}
 
-	delete(m.core.Session().ResourceCache, rt) // clear cache for refreshed type only
+	m.core.DeleteResourceCache(rt) // clear cache for refreshed type only
 	if rt == "ses" {
 		// Swap (see detail-view path above): protects against in-flight blocked
 		// DescribeActiveReceiptRuleSet fetchers re-poisoning the cache.
@@ -502,13 +496,12 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	// outgoing ResourcesLoadedMsg so the tail branch in app.go can seed
 	// probeResources and dispatch probeEnrichment on success.
 	if rl.ParentContext() == nil && !rl.EscPops() {
-		if _, hasEnricher := awsclient.Wave2EnricherFor(rt); hasEnricher {
-			m.core.Session().EnrichmentTypeGen[rt]++
-			tok := m.core.Session().EnrichmentTypeGen[rt]
-			delete(m.core.Session().EnrichmentRan, rt)
+		if m.core.HasIssueEnricher(rt) {
+			tok := m.core.BumpEnrichmentTypeGen(rt)
+			m.core.DeleteEnrichmentRan(rt)
 			// Clear per-resource truncation markers too: if the refresh errors
 			// out, stale "?" prefixes must not persist across the rerun.
-			delete(m.core.Session().EnrichmentTruncatedIDs, rt)
+			m.core.DeleteEnrichmentTruncatedIDs(rt)
 			// Wave2 already stripped above (pre-fetch cleanup). Strip any rows
 			// that entered via ProbeResources/LazyResourceCache (those paths
 			// are NOT covered by the pre-fetch cleanup above, which only
@@ -535,7 +528,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 // and by other callers in the TUI.
 func (m Model) refreshResourceList(rl views.ResourceListModel) tea.Cmd {
 	rt := rl.ResourceType()
-	gen := m.core.Session().AvailabilityGen
+	gen := m.core.AvailabilityGen()
 
 	// Filtered lists must refresh through the same filtered fetcher so their
 	// pagination token remains valid for subsequent load-more requests.
@@ -566,7 +559,7 @@ func (m Model) handleReveal() (tea.Model, tea.Cmd) {
 	if r == nil {
 		return m, nil
 	}
-	cmd := m.fetchRevealValue(rt, r.ID, m.core.Session().ConnectGen)
+	cmd := m.fetchRevealValue(rt, r.ID, m.core.ConnectGen())
 	return m, cmd
 }
 
@@ -580,7 +573,7 @@ func (m Model) handleReveal() (tea.Model, tea.Cmd) {
 // the stale-gen check up-front so the view-side SetError() does not
 // fire on a stale error from a prior profile/region.
 func (m Model) handleIdentityError(msg messages.IdentityError) (tea.Model, tea.Cmd) {
-	if messages.IsStale(msg, m.core.Session()) {
+	if messages.IsStale(msg, m.core) {
 		return m, nil
 	}
 	updated, cmd := m.coreUpdate(msg)

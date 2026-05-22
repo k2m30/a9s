@@ -37,16 +37,13 @@ import (
 // ResourceCacheEntry stores the state of a previously-viewed resource list.
 // Used to restore the list when the user re-enters the same resource type
 // from the main menu, avoiding redundant API calls.
-type ResourceCacheEntry struct {
-	Resources     []resource.Resource
-	Pagination    *resource.PaginationMeta
-	FilterText    string
-	AttentionOnly bool // §7.3: ctrl+z toggle persisted across view re-entry
-	SortColIdx    int
-	SortAsc       bool
-	CursorPos     int
-	HScrollOffset int
-}
+//
+// Defined as an alias to domain.ListViewCacheEntry in PR-05a-h4-c (AS-963)
+// so renderer adapters can construct entries without importing
+// internal/session. The existing `session.ResourceCacheEntry` name stays
+// available for callers (tests, runtime handlers) that already reference
+// it. Field set is unchanged.
+type ResourceCacheEntry = domain.ListViewCacheEntry
 
 // Session owns the in-memory orchestration state for the active
 // profile/region session.

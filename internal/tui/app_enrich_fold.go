@@ -47,13 +47,13 @@ func (m *Model) applyEnrichment(resourceType string, findings map[string]resourc
 		}
 	}
 
-	if entry, ok := m.core.Session().ResourceCache[canon]; ok {
+	if entry, ok := m.core.ResourceCache(canon); ok && entry != nil {
 		apply(entry.Resources)
 	}
-	if rows, ok := m.core.Session().LazyResourceCache[canon]; ok {
+	if rows, ok := m.core.LazyResourceCache(canon); ok {
 		apply(rows)
 	}
-	if rows, ok := m.core.Session().ProbeResources[canon]; ok {
+	if rows, ok := m.core.ProbeResources(canon); ok {
 		apply(rows)
 	}
 }
@@ -157,26 +157,23 @@ func stripWave2(findings []domain.Finding) []domain.Finding {
 // cache. Used by main-menu Ctrl+R to ensure the next list-open doesn't
 // rehydrate stale wave2 attention state via findingsFromRows.
 func clearAllWave2(m *Model) {
-	for _, entry := range m.core.Session().ResourceCache {
-		if entry == nil {
-			continue
-		}
+	m.core.ForEachResourceCache(func(_ string, entry *domain.ListViewCacheEntry) {
 		for i := range entry.Resources {
 			entry.Resources[i].Findings = stripWave2(entry.Resources[i].Findings)
 			entry.Resources[i].AttentionDetails = nil
 		}
-	}
-	for _, rows := range m.core.Session().LazyResourceCache {
+	})
+	m.core.ForEachLazyResourceCache(func(_ string, rows []resource.Resource) {
 		for i := range rows {
 			rows[i].Findings = stripWave2(rows[i].Findings)
 			rows[i].AttentionDetails = nil
 		}
-	}
-	for _, rows := range m.core.Session().ProbeResources {
+	})
+	m.core.ForEachProbeResources(func(_ string, rows []resource.Resource) {
 		for i := range rows {
 			rows[i].Findings = stripWave2(rows[i].Findings)
 			rows[i].AttentionDetails = nil
 		}
-	}
+	})
 }
 
