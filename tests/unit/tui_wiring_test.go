@@ -380,7 +380,7 @@ func TestWiring_AvailabilityComplete_ClearsFlash(t *testing.T) {
 	var lastCmd tea.Cmd
 	// session.New seeds AvailabilityGen=1 (AS-659) — capture and reuse so the
 	// AvailabilityChecked stale guard (AcceptZeroGen=false) accepts each msg.
-	gen := m.Session().AvailabilityGen
+	gen := m.Core().Session().AvailabilityGen
 	for _, name := range allNames {
 		m, lastCmd = rootApplyMsg(m, messages.AvailabilityChecked{
 			ResourceType: name,

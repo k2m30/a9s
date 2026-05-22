@@ -10,7 +10,6 @@ package tui
 import (
 	tea "charm.land/bubbletea/v2"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/cache"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -170,7 +169,7 @@ func (m *Model) probeEnrichment(shortName string, gen domain.Gen) tea.Cmd {
 	}
 	ctx, clients := m.appCtx, m.core.Session().Clients
 	typeGen := m.core.Session().EnrichmentTypeGen[shortName]
-	if _, ok := awsclient.Wave2EnricherFor(shortName); !ok {
+	if !m.core.HasIssueEnricher(shortName) {
 		return nil
 	}
 	return func() tea.Msg {

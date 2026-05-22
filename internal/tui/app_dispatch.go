@@ -9,9 +9,12 @@
 // The five new h4-b intents — PatchResourceCache, PatchRelatedCache,
 // PatchLazyResourceCache, SetIdentityIntent, HeaderInvalidateIntent —
 // each land as a case in applyIntents below. They cross-write
-// session-state owned by Core via the *session.Session pointer that
-// runtime.Core and tui.Model both reference (no separate sync needed —
-// the session is the same instance, not a copy).
+// session-state owned by Core via the handle returned by
+// m.core.Session() (no separate sync needed — the session is the same
+// instance, not a copy). PR-05a-h4-c (AS-963) routed the related-cache
+// key + result type through the internal/runtime package so the
+// renderer-side dispatcher no longer imports the internal/session
+// package.
 package tui
 
 import (
@@ -21,7 +24,6 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/session"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -127,9 +129,9 @@ func (m *Model) applyIntents(intents []runtime.UIIntent) []tea.Cmd {
 			// production but keeps the intent set complete for tests
 			// and future emitters that may surface this branch).
 			if v.SourceID != "" {
-				key := session.RelatedCacheKey(v.ResourceType, v.SourceID)
+				key := runtime.RelatedCacheKey(v.ResourceType, v.SourceID)
 				existing, _ := m.core.Session().RelatedCache.Get(key)
-				m.core.Session().RelatedCache.Set(key, append(existing, session.RelatedCacheResult{
+				m.core.Session().RelatedCache.Set(key, append(existing, runtime.RelatedCacheResult{
 					DefDisplayName: v.DefDisplayName,
 					Result:         v.Result,
 				}))

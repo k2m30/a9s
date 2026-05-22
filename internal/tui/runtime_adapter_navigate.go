@@ -15,7 +15,7 @@
 // stack, view-typed methods, flashState, tea.Cmd returns). Their
 // runtime-policy parts (cache-mutation gen bumps, per-type
 // enrichment-rerun bookkeeping) are reads/writes against the session
-// owned by core — same data the runtime sees through c.session.
+// owned by core — same data the runtime sees through its session field.
 //
 // PR-05a-h4-b (AS-962) removed the inline handleIdentityLoaded /
 // handleIdentityError helpers in favour of HandleEvent-routed dispatch
@@ -34,12 +34,10 @@ import (
 
 	"github.com/atotto/clipboard"
 
-	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
-	"github.com/k2m30/a9s/v3/internal/session"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -184,9 +182,9 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 			})
 		}
 		if result.DispatchRelated && d.NeedsRelatedCheck() {
-			ck := session.RelatedCacheKey(result.ResolvedType, result.Resource.ID)
+			ck := runtime.RelatedCacheKey(result.ResolvedType, result.Resource.ID)
 			if cached, ok := m.core.Session().RelatedCache.Get(ck); ok && len(cached) > 0 {
-				d.ApplyRelatedResults(session.RelatedCacheReplay(result.ResolvedType, cached))
+				d.ApplyRelatedResults(runtime.RelatedCacheReplay(result.ResolvedType, cached))
 			} else {
 				res := *result.Resource
 				rt := result.ResolvedType
@@ -436,7 +434,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		d.ResetRightColumn()
 		rt := d.ResourceType()
 		srcRes := d.SourceResource()
-		m.core.Session().RelatedCache.Delete(session.RelatedCacheKey(rt, srcRes.ID))
+		m.core.Session().RelatedCache.Delete(runtime.RelatedCacheKey(rt, srcRes.ID))
 		m.core.Session().RelatedGen++      // cancel in-flight results from previous batch
 		m.core.Session().EnrichGen++       // cancel in-flight enrichment from previous batch
 		m.core.Session().EnrichResKey = "" // force gen bump on next enrichment dispatch
@@ -502,7 +500,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	// outgoing ResourcesLoadedMsg so the tail branch in app.go can seed
 	// probeResources and dispatch probeEnrichment on success.
 	if rl.ParentContext() == nil && !rl.EscPops() {
-		if _, hasEnricher := awsclient.Wave2EnricherFor(rt); hasEnricher {
+		if m.core.HasIssueEnricher(rt) {
 			m.core.Session().EnrichmentTypeGen[rt]++
 			tok := m.core.Session().EnrichmentTypeGen[rt]
 			delete(m.core.Session().EnrichmentRan, rt)

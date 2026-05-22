@@ -40,7 +40,6 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
-	"github.com/k2m30/a9s/v3/internal/session"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -348,9 +347,9 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 			detail.SetSize(m.innerSize())
 			m.pushView(&detail)
 			if detail.NeedsRelatedCheck() {
-				ck := session.RelatedCacheKey(msg.TargetType, r.ID)
+				ck := runtime.RelatedCacheKey(msg.TargetType, r.ID)
 				if cached, ok := m.core.Session().RelatedCache.Get(ck); ok && len(cached) > 0 {
-					detail.ApplyRelatedResults(session.RelatedCacheReplay(msg.TargetType, cached))
+					detail.ApplyRelatedResults(runtime.RelatedCacheReplay(msg.TargetType, cached))
 					return m, nil
 				}
 				srcRes := r

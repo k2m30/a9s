@@ -179,7 +179,7 @@ func TestProbeEnrichment_PartialSuccess(t *testing.T) {
 	// availTotal=0 → availChecked(1) >= 0 → finalize → startEnrichment.
 	_, enrichCmd := rootApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: shortName,
-		Gen:          m.Session().AvailabilityGen,
+		Gen:          m.Core().Session().AvailabilityGen,
 		Count:        len(probeRes),
 		HasResources: true,
 		Resources:    probeRes,

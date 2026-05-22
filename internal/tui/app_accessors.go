@@ -3,6 +3,13 @@
 // These methods live outside _test.go so that tests in tests/unit/ (package
 // unit_test) can reach them without being in the same package. Production code
 // does not call them.
+//
+// PR-05a-h4-c (AS-963) deleted the Session() accessor (its return type
+// was the last production-side leak of the session package into the tui
+// package). Callers in tests must go through m.Core().Session() instead.
+// Core() returns the platform-agnostic *runtime.Core so the boundary
+// check (`go list .Imports` against internal/tui) no longer reports the
+// session package.
 package tui
 
 import (
@@ -10,14 +17,16 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/session"
+	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
-// Session returns the underlying *session.Session owned by core.
-// Test-only accessor — production code uses m.core.Session() directly.
-func (m Model) Session() *session.Session {
-	return m.core.Session()
+// Core returns the runtime-owned *runtime.Core handle. Test-only accessor
+// — production code uses m.core directly. Replaces the prior Session()
+// accessor whose session-typed return value forced the tui package to
+// import the internal/session package.
+func (m Model) Core() *runtime.Core {
+	return m.core
 }
 
 // EnrichmentGen returns the current session-wide enrichment generation counter.
