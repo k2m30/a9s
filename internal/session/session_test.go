@@ -54,6 +54,13 @@ func TestSession_New_InitializesMaps(t *testing.T) {
 	if s.EnrichmentGen != 1 {
 		t.Errorf("EnrichmentGen = %d, want 1", s.EnrichmentGen)
 	}
+	// AvailabilityGen seeded at 1 so the prefetch path captures a non-zero gen
+	// (AS-648-h4 / AS-659): AvailabilityPrefetched.AcceptZeroGen() returns
+	// false, so a zero stamp would otherwise be dropped after Rotate() bumps
+	// the counter, contaminating a freshly rotated session's menu counts.
+	if s.AvailabilityGen != 1 {
+		t.Errorf("AvailabilityGen = %d, want 1", s.AvailabilityGen)
+	}
 }
 
 // TestSession_Rotate_BumpsGenerations verifies that Rotate() increments every

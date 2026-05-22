@@ -245,11 +245,13 @@ func TestBug191_LoadFromDirs_ThreeLayerMerge(t *testing.T) {
 // Bug #192: Availability probes must not declare "done" while probes in-flight
 // ════════════════════════════════════════════════════════════════════════════
 
-// The initial availability probe generation is 0 (set in tui.New before any
-// profile/region switch). AvailabilityCacheLoadedMsg does NOT increment the
-// generation — only profile/region switches do. So all probe results must
-// use Gen=0 to match the model's availabilityGen.
-const bug192InitialGen = 0
+// The initial availability probe generation is 1 (seeded in session.New per
+// AS-648-h4 / AS-659 so AvailabilityPrefetched/Checked cannot smuggle a
+// zero-stamped pre-rotation result past the staleness guard).
+// AvailabilityCacheLoadedMsg does NOT increment the generation — only
+// profile/region switches do. So all probe results must use Gen=1 to match
+// the fresh model's availabilityGen.
+const bug192InitialGen = 1
 
 // bug192Model creates a model ready for availability probe testing.
 func bug192Model(t *testing.T) tui.Model {

@@ -142,7 +142,7 @@ func (m Model) runtimeTasksToCmd(tasks []runtime.TaskRequest) tea.Cmd {
 		case runtime.ConnectPayload:
 			cmds = append(cmds, m.connectAWS(p.Profile, p.Region, p.Gen))
 		case runtime.FetchIdentityPayload:
-			cmds = append(cmds, m.fetchIdentity())
+			cmds = append(cmds, m.fetchIdentity(m.core.Session().ConnectGen))
 		case runtime.LoadAvailCachePayload:
 			cmds = append(cmds, m.loadAvailabilityCache())
 		case runtime.DemoPrefetchCountsPayload:

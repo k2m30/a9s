@@ -92,16 +92,17 @@ func TestBuildEnrichQueue_DispatchesCodePipeline(t *testing.T) {
 
 	m := newRootSizedModel()
 	// isDemo must be false (default) so startEnrichment is not skipped.
-	// availabilityGen is 0 (initial). Gen: 0 in the message matches → not dropped.
 
 	// Deliver AvailabilityCheckedMsg to seed probeResources["pipeline"] and
 	// trigger the availability-probe finalization path that calls startEnrichment.
 	// availTotal starts at 0; after incrementing availChecked to 1, 1 >= 0 → finalize.
+	// session.New seeds AvailabilityGen=1 (AS-659) — stamp the live value so
+	// the AvailabilityChecked stale guard (AcceptZeroGen=false) accepts it.
 	_, cmd := rootApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: "pipeline",
 		Count:        1,
 		Truncated:    false,
-		Gen:          0, // matches initial availabilityGen == 0
+		Gen:          m.Session().AvailabilityGen,
 		Resources:    pipelineProbeResources(),
 	})
 

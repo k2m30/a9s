@@ -344,12 +344,22 @@ func navigateTasksToCmd(m Model, msg messages.Navigate, result runtime.NavigateR
 	for _, t := range tasks {
 		switch t.Key.Kind {
 		case runtime.KindFetchResources:
-			cmds = append(cmds, m.fetchResources(msg.ResourceType))
+			// Use the canonical ShortName (result.ResolvedType) rather than the
+			// user-supplied ResourceType so that aliases (e.g. "rds" → "dbi") are
+			// resolved before the type is stamped on the ResourcesLoaded message.
+			// This ensures the ResourceListModel's type-guard comparison
+			// (msg.ResourceType vs m.typeDef.ShortName) uses the same canonical
+			// value the runtime resolved when it pushed the list view.
+			fetchRT := result.ResolvedType
+			if fetchRT == "" {
+				fetchRT = msg.ResourceType
+			}
+			cmds = append(cmds, m.fetchResources(fetchRT, m.core.Session().AvailabilityGen))
 		case runtime.KindFetchProfiles:
 			cmds = append(cmds, m.fetchProfiles())
 		case runtime.KindFetchReveal:
 			if p, ok := t.Payload.(runtime.FetchRevealPayload); ok {
-				cmds = append(cmds, m.fetchRevealValue(p.ResourceType, p.ResourceID))
+				cmds = append(cmds, m.fetchRevealValue(p.ResourceType, p.ResourceID, m.core.Session().ConnectGen))
 			}
 		}
 	}
@@ -525,11 +535,12 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 // and by other callers in the TUI.
 func (m Model) refreshResourceList(rl views.ResourceListModel) tea.Cmd {
 	rt := rl.ResourceType()
+	gen := m.core.Session().AvailabilityGen
 
 	// Filtered lists must refresh through the same filtered fetcher so their
 	// pagination token remains valid for subsequent load-more requests.
 	if ff := rl.FetchFilter(); len(ff) > 0 {
-		return m.fetchResourcesFiltered(rt, ff)
+		return m.fetchResourcesFiltered(rt, ff, gen)
 	}
 
 	// Child lists refresh through the child fetcher using their parent context.
@@ -537,7 +548,7 @@ func (m Model) refreshResourceList(rl views.ResourceListModel) tea.Cmd {
 		return m.fetchChildResources(rt, pc)
 	}
 
-	return m.fetchResources(rt)
+	return m.fetchResources(rt, gen)
 }
 
 // handleReveal fetches a revealed value using the resource type's registered
@@ -555,7 +566,7 @@ func (m Model) handleReveal() (tea.Model, tea.Cmd) {
 	if r == nil {
 		return m, nil
 	}
-	cmd := m.fetchRevealValue(rt, r.ID)
+	cmd := m.fetchRevealValue(rt, r.ID, m.core.Session().ConnectGen)
 	return m, cmd
 }
 

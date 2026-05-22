@@ -146,9 +146,11 @@ func TestShim_ProbeResourcesPopulatesFindings(t *testing.T) {
 				HasResources: true,
 				Count:        1,
 				Truncated:    false,
-				Gen:          0,
-				Issues:       1,
-				Resources:    []resource.Resource{res},
+				// session.New seeds AvailabilityGen=1 (AS-659) — stamp the live
+				// value so the AvailabilityChecked stale guard accepts it.
+				Gen:       m.Session().AvailabilityGen,
+				Issues:    1,
+				Resources: []resource.Resource{res},
 			})
 
 			// The cache lookup must use the canonical short name, NOT the alias.
@@ -477,9 +479,11 @@ func TestShim_DeriveHelpersResolveAlias(t *testing.T) {
 		HasResources: true,
 		Count:        1,
 		Truncated:    false,
-		Gen:          0,
-		Issues:       1,
-		Resources:    []resource.Resource{res},
+		// session.New seeds AvailabilityGen=1 (AS-659) — stamp the live
+		// value so the AvailabilityChecked stale guard accepts it.
+		Gen:       m.Session().AvailabilityGen,
+		Issues:    1,
+		Resources: []resource.Resource{res},
 	})
 
 	// Step 2: send EnrichmentCheckedMsg with canonical "dbi" carrying wave2 finding.
@@ -576,9 +580,11 @@ func TestShim_DeriveHelpersResolveAlias_SingleResource(t *testing.T) {
 		HasResources: true,
 		Count:        1,
 		Truncated:    false,
-		Gen:          0,
-		Issues:       1,
-		Resources:    []resource.Resource{res},
+		// session.New seeds AvailabilityGen=1 (AS-659) — stamp the live
+		// value so the AvailabilityChecked stale guard accepts it.
+		Gen:       m.Session().AvailabilityGen,
+		Issues:    1,
+		Resources: []resource.Resource{res},
 	})
 
 	// Step 2: EnrichmentCheckedMsg with alias "rds" (mirrors real production path

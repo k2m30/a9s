@@ -68,7 +68,7 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.pushView(&id)
 		// Always re-fetch on i press
 		m.core.Session().IdentityFetching = true
-		cmd := m.fetchIdentity()
+		cmd := m.fetchIdentity(m.core.Session().ConnectGen)
 		return m, cmd
 	}
 	if key.Matches(msg, m.keys.ErrorLog) {
