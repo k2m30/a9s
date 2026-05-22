@@ -5,6 +5,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/session"
 )
 
 // UIIntent is the contract by which the runtime tells an adapter to
@@ -235,3 +236,68 @@ func (PopSelectorIntent) isIntent() {}
 type RefreshActiveListIntent struct{}
 
 func (RefreshActiveListIntent) isIntent() {}
+
+// PatchResourceCache writes a single ResourceCacheEntry into the
+// session-owned ResourceCache. Emitted by HandleResourcesLoaded when the
+// loaded slice should be cached without the view-side write-through path
+// (i.e. the active view is not the ResourceListModel for this type, so
+// cacheTopLevelResourceList will not fire). Entry may be nil to signal a
+// clear (no current emitter exercises that branch — kept for symmetry).
+//
+// The Entry type remains *session.ResourceCacheEntry under h4-b because
+// h4-c moves the type definition into internal/domain. Adapters that
+// already import internal/session apply the intent with a direct map
+// assignment; once h4-c lands the field will retype to *domain.ResourceCacheEntry
+// with no call-site changes beyond import sweeps.
+type PatchResourceCache struct {
+	ResourceType string
+	Entry        *session.ResourceCacheEntry
+}
+
+func (PatchResourceCache) isIntent() {}
+
+// PatchRelatedCache appends one resolved related-check result to the
+// session-owned RelatedCache. Emitted by HandleRelatedCheckResult after
+// resolving the source resource ID; the adapter applies by appending to
+// any existing slice under the session.RelatedCacheKey.
+type PatchRelatedCache struct {
+	ResourceType   string
+	SourceID       string
+	DefDisplayName string
+	Result         resource.RelatedCheckResult
+}
+
+func (PatchRelatedCache) isIntent() {}
+
+// PatchLazyResourceCache merges sparse lazy-added resources into the
+// session-owned LazyResourceCache. Keys in Adds may be aliases — Core
+// canonicalises before emitting, so adapters store the canonical
+// ShortName verbatim. De-dup by Resource.ID is performed by Core; the
+// adapter overwrites the slice for each key.
+type PatchLazyResourceCache struct {
+	Adds map[string][]resource.Resource
+}
+
+func (PatchLazyResourceCache) isIntent() {}
+
+// SetIdentityIntent carries the resolved caller-identity mirror to the
+// adapter. The runtime writes session.Identity (still typed as
+// *awsclient.CallerIdentity until h4-c retypes it) before emitting; this
+// intent gives the renderer a renderer-shaped value to apply to active
+// views (today: IdentityModel.SetIdentity) without importing internal/aws.
+// nil Identity is permitted and signals a no-op render-side update
+// (the session field is already cleared by Core in that path).
+type SetIdentityIntent struct {
+	Identity *domain.CallerIdentity
+}
+
+func (SetIdentityIntent) isIntent() {}
+
+// HeaderInvalidateIntent asks the adapter to bust the cached header so
+// the next View() pass recomputes the badge / role / right-side string.
+// Emitted alongside SetIdentityIntent on successful identity resolution
+// because account alias + identity name are inputs to the header cache
+// key — clearing the cache key forces a re-render with the fresh data.
+type HeaderInvalidateIntent struct{}
+
+func (HeaderInvalidateIntent) isIntent() {}
