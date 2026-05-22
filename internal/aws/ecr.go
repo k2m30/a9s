@@ -10,34 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("ecr", []string{"repository_name", "uri", "tag_mutability", "scan_on_push", "created_at"})
-
-	resource.RegisterPaginated("ecr", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchECRRepositoriesPage(ctx, c.ECR, continuationToken)
-	})
-
-	resource.RegisterRelated("ecr", []resource.RelatedDef{
-		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkECRLambda, NeedsTargetCache: true},
-		{TargetType: "cb", DisplayName: "CodeBuild Projects", Checker: checkECRCodeBuild, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkECRCFN, NeedsTargetCache: true},
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkECRKMS},
-		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkECRCTEvents, NeedsTargetCache: true},
-		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkECREbRule},
-		{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkECRECSTask, NeedsTargetCache: true},
-		{TargetType: "pipeline", DisplayName: "CodePipelines", Checker: checkECRPipeline},
-		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkECRRole},
-	})
-
-	resource.RegisterDefaultNavFields("ecr", []resource.NavigableField{
-		{FieldPath: "EncryptionConfiguration.KmsKey", TargetType: "kms"},
-	})
-}
-
 // FetchECRRepositories calls the ECR DescribeRepositories API and converts
 // the response into a slice of generic Resource structs.
 func FetchECRRepositories(ctx context.Context, api ECRDescribeRepositoriesAPI) ([]resource.Resource, error) {

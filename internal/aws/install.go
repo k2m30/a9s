@@ -2,6 +2,7 @@ package aws
 
 import (
 	"context"
+	"sync"
 
 	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
@@ -54,8 +55,16 @@ func ctEventsCheckerFor(shortName string) domain.RelatedChecker {
 func Install() {
 	catalog.SetTypes(allTopLevelTypes())
 	catalog.SetChildTypes(allChildTypes())
-	bridgeCatalogToLegacy()
+	bridgeOnce.Do(bridgeCatalogToLegacy)
 }
+
+// bridgeOnce gates bridgeCatalogToLegacy to a single execution per process.
+// The legacy internal/resource maps include at least one panic-on-duplicate
+// registrar (RegisterDetailEnricher) so the bridge must run exactly once even
+// though catalog.SetTypes accepts idempotent calls. sync.Once is preferred
+// over a plain bool to guard against the race between concurrent Install()
+// callers landing both into bridgeCatalogToLegacy (per CodeRabbit on PR #397).
+var bridgeOnce sync.Once //nolint:gochecknoglobals // process-scope install gate
 
 // bridgeCatalogToLegacy populates the internal/resource legacy maps from the
 // catalog struct fields. Required during the AS-795b–m transition because
@@ -92,6 +101,27 @@ func bridgeCatalogToLegacy() {
 		if rt.Reveal != nil {
 			resource.RegisterRevealFetcher(rt.ShortName, rt.Reveal)
 		}
+		if rt.DetailEnrich != nil {
+			resource.RegisterDetailEnricher(rt.ShortName, rt.DetailEnrich)
+		}
+	}
+	// Child types: replay catalog child-type entries onto the legacy
+	// resource.childTypes + paginatedChildRegistry maps so consumers calling
+	// resource.GetChildType / resource.GetPaginatedChildFetcher continue to
+	// resolve migrated entries. Child loop introduced by AS-808 / PR #395
+	// (containers, ecr_images); AS-815 / PR #397 adds DetailEnrich support
+	// here so the role_policies detail enricher resolves through the bridge.
+	for _, ct := range allChildTypes() {
+		resource.RegisterChildType(ct)
+		if ct.ChildFetcher != nil {
+			resource.RegisterPaginatedChild(ct.ShortName, ct.ChildFetcher)
+		}
+		if len(ct.FieldKeys) > 0 {
+			resource.RegisterFieldKeys(ct.ShortName, ct.FieldKeys)
+		}
+		if ct.DetailEnrich != nil {
+			resource.RegisterDetailEnricher(ct.ShortName, ct.DetailEnrich)
+		}
 	}
 }
 
@@ -119,11 +149,18 @@ func allTopLevelTypes() []catalog.ResourceTypeDef {
 	return all
 }
 
-// allChildTypes returns the child-type catalog slice. Empty in AS-795a — the
-// per-category PRs populate this as they migrate child fetchers off the
-// internal/resource.childTypes map. Returning an empty slice now keeps the
-// install contract uniform with allTopLevelTypes and lets catalog.FindChild
-// panic loudly when called without an install.
+// allChildTypes concatenates the per-category child-type catalog slices into
+// one flat slice. The order mirrors allTopLevelTypes for consistency. Sibling
+// category PRs (AS-795b/d–m) extend this by appending their own
+// `<cat>ChildTypes` slice — using append-of-slices keeps the per-PR diff
+// localized to one new `all = append(all, <cat>ChildTypes...)` line.
+//
+// First populated in AS-808 / PR #395 round-2 with containersChildTypes
+// (ecr_images); AS-815 / PR #397 adds securityChildTypes
+// (iam_group_members, role_policies).
 func allChildTypes() []catalog.ResourceTypeDef {
-	return nil
+	var all []catalog.ResourceTypeDef
+	all = append(all, containersChildTypes...)
+	all = append(all, securityChildTypes...)
+	return all
 }

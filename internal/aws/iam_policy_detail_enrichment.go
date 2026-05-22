@@ -17,10 +17,6 @@ type PolicyEnriched struct {
 	Document any `json:"Document,omitempty" yaml:"Document,omitempty"`
 }
 
-func init() {
-	resource.RegisterDetailEnricher("policy", enrichPolicy)
-}
-
 // enrichPolicy fetches the policy document for a top-level IAM policy.
 // All top-level policies are managed (Scope=Local), so only the managed
 // document path is needed.

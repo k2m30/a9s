@@ -11,39 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("elb", []string{"name", "dns_name", "type", "scheme", "state", "vpc_id", "load_balancer_arn"})
-
-	resource.RegisterPaginated("elb", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchLoadBalancersPage(ctx, c.ELBv2, continuationToken)
-	})
-
-	resource.RegisterDefaultNavFields("elb", []resource.NavigableField{
-		{FieldPath: "VpcId", TargetType: "vpc"},
-		{FieldPath: "SecurityGroups", TargetType: "sg"},
-		{FieldPath: "AvailabilityZones.SubnetId", TargetType: "subnet"},
-	})
-
-	resource.RegisterRelated("elb", []resource.RelatedDef{
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: checkELBTargetGroups, NeedsTargetCache: true},
-		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkELBAlarms, NeedsTargetCache: true},
-		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkELBSG},
-		{TargetType: "vpc", DisplayName: "VPC", Checker: checkELBVPC},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkELBCFN},
-		{TargetType: "r53", DisplayName: "Route 53 Records", Checker: checkELBR53},
-		{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkELBACM},
-		{TargetType: "cf", DisplayName: "CloudFront", Checker: checkELBCF},
-		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkELBENI, NeedsTargetCache: true},
-		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkELBS3},
-		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkELBSubnet},
-		{TargetType: "waf", DisplayName: "WAF Web ACLs", Checker: checkELBWAF},
-	})
-}
-
 // FetchLoadBalancers calls the ELBv2 DescribeLoadBalancers API and converts the
 // response into a slice of generic Resource structs.
 func FetchLoadBalancers(ctx context.Context, api ELBv2DescribeLoadBalancersAPI) ([]resource.Resource, error) {

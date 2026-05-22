@@ -12,25 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("ssm", []string{"name", "type", "version", "last_modified", "description", "risk"})
-	resource.RegisterRevealFetcher("ssm", func(ctx context.Context, clients any, resourceID string) (string, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return "", fmt.Errorf("AWS clients not initialized")
-		}
-		return RevealSSMParameter(ctx, c.SSM, resourceID)
-	})
-
-	resource.RegisterPaginated("ssm", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchSSMParametersPage(ctx, c.SSM, continuationToken)
-	})
-}
-
 // FetchSSMParameters calls the SSM DescribeParameters API and returns all pages
 // of parameters. Used by tests; the production path uses the per-page fetcher for pagination.
 func FetchSSMParameters(ctx context.Context, api SSMDescribeParametersAPI) ([]resource.Resource, error) {

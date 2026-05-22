@@ -11,18 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("subnet", []string{"subnet_id", "name", "vpc_id", "cidr_block", "availability_zone", "state", "available_ips"})
-
-	resource.RegisterPaginated("subnet", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchSubnetsPage(ctx, c.EC2, continuationToken)
-	})
-}
-
 // FetchSubnets calls the EC2 DescribeSubnets API and converts the
 // response into a slice of generic Resource structs.
 func FetchSubnets(ctx context.Context, api EC2DescribeSubnetsAPI) ([]resource.Resource, error) {

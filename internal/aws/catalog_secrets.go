@@ -1,11 +1,14 @@
 package aws
 
 import (
+	"context"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 func colorSecrets(r domain.Resource) domain.Color {
@@ -81,6 +84,39 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "rotation_enabled", Title: "Rotation", Width: 10, Sortable: true},
 		},
 		Color: colorSecrets,
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchSecretsPage(ctx, c.SecretsManager, continuationToken)
+		},
+		Reveal: func(ctx context.Context, clients any, resourceID string) (string, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return "", fmt.Errorf("AWS clients not initialized")
+			}
+			return RevealSecret(ctx, c.SecretsManager, resourceID)
+		},
+		FieldKeys: []string{"secret_name", "description", "last_accessed", "last_changed", "rotation_enabled", "arn", "status"},
+		Related: []domain.RelatedDef{
+			{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkSecretsKMS, NeedsTargetCache: true},
+			{TargetType: "lambda", DisplayName: "Lambda (rotation)", Checker: checkSecretsLambda, NeedsTargetCache: true},
+			{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkSecretsCFN, NeedsTargetCache: true},
+			{TargetType: "dbi", DisplayName: "RDS Instances", Checker: checkSecretsDBI, NeedsTargetCache: true},
+			{TargetType: "cb", DisplayName: "CodeBuild Projects", Checker: checkSecretsCB, NeedsTargetCache: true},
+			{TargetType: "codeartifact", DisplayName: "CodeArtifact Domains", Checker: checkSecretsCodeArtifact},
+			{TargetType: "eb", DisplayName: "Elastic Beanstalk", Checker: checkSecretsEB, NeedsTargetCache: true},
+			{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkSecretsECSTask, NeedsTargetCache: true},
+			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkSecretsLogs},
+			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkSecretsRole},
+			{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkSecretsSNS},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("secrets")},
+		},
+		Navigable: []domain.NavigableField{
+			{FieldPath: "KmsKeyId", TargetType: "kms"},
+			{FieldPath: "RotationLambdaARN", TargetType: "lambda"},
+		},
 	},
 	{
 		Name:          "SSM Parameters",
@@ -96,6 +132,28 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "description", Title: "Description", Width: 30, Sortable: false},
 		},
 		Color: colorSSM,
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchSSMParametersPage(ctx, c.SSM, continuationToken)
+		},
+		Reveal: func(ctx context.Context, clients any, resourceID string) (string, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return "", fmt.Errorf("AWS clients not initialized")
+			}
+			return RevealSSMParameter(ctx, c.SSM, resourceID)
+		},
+		FieldKeys: []string{"name", "type", "version", "last_modified", "description", "risk"},
+		Related: []domain.RelatedDef{
+			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkSSMKMS, NeedsTargetCache: true},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("ssm")},
+		},
+		Navigable: []domain.NavigableField{
+			{FieldPath: "KeyId", TargetType: "kms"},
+		},
 	},
 	{
 		Name:          "KMS Keys",
@@ -111,5 +169,30 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "description", Title: "Description", Width: 36, Sortable: false},
 		},
 		Color: colorKMS,
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchKMSKeysPage(ctx, c, continuationToken)
+		},
+		Wave2: IssueEnricher{Fn: EnrichKMSRotation, Priority: 100},
+		FetchByIDs: func(ctx context.Context, clients any, ids []string) ([]resource.Resource, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return nil, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchKMSKeysByIDs(ctx, c, ids)
+		},
+		FieldKeys:              []string{"alias", "key_id", "status", "description"},
+		IssueEnricherFieldKeys: []string{"rotation_enabled"},
+		Related: []domain.RelatedDef{
+			{TargetType: "ebs", DisplayName: "EBS Volumes", Checker: checkKMSEBS, NeedsTargetCache: true},
+			{TargetType: "dbi", DisplayName: "RDS Instances", Checker: checkKMSRDS, NeedsTargetCache: true},
+			{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkKMSSecrets, NeedsTargetCache: true},
+			{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkKMSS3, NeedsTargetCache: false},
+			{TargetType: "role", DisplayName: "IAM Roles (grants)", Checker: checkKMSRole, NeedsTargetCache: false},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("kms")},
+		},
 	},
 }

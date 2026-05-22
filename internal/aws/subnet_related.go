@@ -12,26 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterDefaultNavFields("subnet", []resource.NavigableField{
-		{FieldPath: "VpcId", TargetType: "vpc"},
-	})
-
-	resource.RegisterRelated("subnet", []resource.RelatedDef{
-		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkSubnetEC2, NeedsTargetCache: true},
-		{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkSubnetENI, NeedsTargetCache: true},
-		{TargetType: "nat", DisplayName: "NAT Gateways", Checker: checkSubnetNAT, NeedsTargetCache: true},
-		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkSubnetELB, NeedsTargetCache: true},
-		{TargetType: "rtb", DisplayName: "Route Tables", Checker: checkSubnetRTB, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkSubnetCFN, NeedsTargetCache: false},
-		{TargetType: "vpc", DisplayName: "VPC", Checker: checkSubnetVPC},
-		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkSubnetASG, NeedsTargetCache: true},
-		{TargetType: "efs", DisplayName: "EFS File Systems", Checker: checkSubnetEFS},
-		{TargetType: "eks", DisplayName: "EKS Clusters", Checker: checkSubnetEKS, NeedsTargetCache: true},
-		{TargetType: "vpce", DisplayName: "VPC Endpoints", Checker: checkSubnetVPCE, NeedsTargetCache: true},
-	})
-}
-
 // checkSubnetEC2 searches the ec2 cache for instances whose SubnetId matches
 // the subnet's ID. Uses assertStruct since subnet_id is not in EC2 Fields map.
 func checkSubnetEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
