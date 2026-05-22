@@ -15,6 +15,8 @@
 package tui
 
 import (
+	"maps"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/runtime"
@@ -133,9 +135,7 @@ func (m *Model) applyIntents(intents []runtime.UIIntent) []tea.Cmd {
 				}))
 			}
 		case runtime.PatchLazyResourceCache:
-			for shortName, rows := range v.Adds {
-				m.core.Session().LazyResourceCache[shortName] = rows
-			}
+			maps.Copy(m.core.Session().LazyResourceCache, v.Adds)
 		case runtime.SetIdentityIntent:
 			if v.Identity == nil {
 				continue
