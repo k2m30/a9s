@@ -85,7 +85,9 @@ func TestAvailabilityPrefetchedMsg_PrefetchErrEmitsFlash(t *testing.T) {
 		IssueCounts:    map[string]int{},
 		IssueTruncated: map[string]bool{},
 		Resources:      map[string][]resource.Resource{},
-		// Gen=0 accepted unconditionally — see handleAvailabilityPrefetched gen guard.
+		// Stamp the live AvailabilityGen — AS-657/AS-659 staleness guard
+		// drops zero-stamped prefetches (AcceptZeroGen=false).
+		Gen:         m.Session().AvailabilityGen,
 		PrefetchErr: errors.New("eks: access denied, ng: throttled"),
 	}
 
@@ -114,6 +116,9 @@ func TestAvailabilityPrefetchedMsg_NilPrefetchErrNoFlash(t *testing.T) {
 		IssueCounts:    map[string]int{},
 		IssueTruncated: map[string]bool{},
 		Resources:      map[string][]resource.Resource{},
+		// Stamp the live AvailabilityGen — AS-657/AS-659 staleness guard
+		// drops zero-stamped prefetches (AcceptZeroGen=false).
+		Gen: m.Session().AvailabilityGen,
 		// PrefetchErr left nil — happy path.
 	}
 

@@ -365,8 +365,9 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 	t.Run("one ! finding + two ~ findings → count=1 (only ! counts)", func(t *testing.T) {
 		m := newRootSizedModel()
 
-		// Use AvailabilityCheckedMsg (Gen=0 matches fresh model's availabilityGen=0)
-		// to seed probeResources["ec2"] so unifiedIssueCount has wave1Resources.
+		// Use AvailabilityCheckedMsg stamped with the live AvailabilityGen
+		// (session.New seeds it to 1 after AS-659) to seed probeResources["ec2"]
+		// so unifiedIssueCount has wave1Resources.
 		// All three resources are running → Wave-1 contributes 0 to issue IDs.
 		resources := tildeSeverityEC2Instances()
 		m, _ = rootApplyMsg(m, messages.AvailabilityChecked{
@@ -374,7 +375,7 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 			Count:        3,
 			Resources:    resources,
 			Issues:       0,
-			Gen:          0,
+			Gen:          m.Session().AvailabilityGen,
 		})
 
 		m = navigateToEC2List(m)
@@ -418,7 +419,7 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 			Count:        3,
 			Resources:    resources,
 			Issues:       0,
-			Gen:          0,
+			Gen:          m.Session().AvailabilityGen,
 		})
 
 		m = navigateToEC2List(m)
@@ -465,7 +466,7 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 			Count:        1,
 			Resources:    []resource.Resource{brokenResource},
 			Issues:       1, // Wave-1 issue
-			Gen:          0,
+			Gen:          m.Session().AvailabilityGen,
 		})
 
 		m = navigateToEC2List(m)
