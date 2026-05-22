@@ -156,12 +156,14 @@ func allTopLevelTypes() []catalog.ResourceTypeDef {
 // localized to one new `all = append(all, <cat>ChildTypes...)` line.
 //
 // First populated in AS-808 / PR #395 round-2 with containersChildTypes
-// (ecr_images); AS-815 / PR #397 adds securityChildTypes
+// (ecr_images); AS-812 / PR #402 adds messagingChildTypes
+// (eb_rule_targets); AS-815 / PR #397 adds securityChildTypes
 // (iam_group_members, role_policies); AS-816 / PR #400 adds cicdChildTypes
 // (cb_builds, cb_build_logs, pipeline_stages).
 func allChildTypes() []catalog.ResourceTypeDef {
 	var all []catalog.ResourceTypeDef
 	all = append(all, containersChildTypes...)
+	all = append(all, messagingChildTypes...)
 	all = append(all, securityChildTypes...)
 	all = append(all, cicdChildTypes...)
 	return all

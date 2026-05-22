@@ -15,19 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterRelated("kinesis", []resource.RelatedDef{
-		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkKinesisAlarms, NeedsTargetCache: true},
-		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkKinesisLambda, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkKinesisCFN},
-		{TargetType: "ddb", DisplayName: "DynamoDB Streams", Checker: checkKinesisDDB, NeedsTargetCache: true},
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkKinesisKMS},
-	})
-
-	// kinesisstypes.StreamSummary (list response): no navigable fields — KeyId/EncryptionType
-	// are on DescribeStream's StreamDescriptionSummary, not the list summary used as RawStruct.
-}
-
 // checkKinesisAlarms checks the cache for CloudWatch alarms with StreamName dimension matching this stream.
 func checkKinesisAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	streamName := res.ID

@@ -12,18 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("kinesis", []string{"stream_name", "status", "stream_mode", "creation_time"})
-
-	resource.RegisterPaginated("kinesis", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchKinesisStreamsPage(ctx, c.Kinesis, continuationToken)
-	})
-}
-
 // FetchKinesisStreams calls the Kinesis ListStreams API and converts the
 // response into a slice of generic Resource structs.
 // Uses the StreamSummaries field (not the legacy StreamNames).

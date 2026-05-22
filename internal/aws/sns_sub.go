@@ -10,22 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("sns-sub", []string{"topic_arn", "protocol", "endpoint", "subscription_arn"})
-
-	resource.RegisterPaginated("sns-sub", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		subsAPI, ok := c.SNS.(SNSListSubscriptionsAPI)
-		if !ok {
-			return resource.FetchResult{}, fmt.Errorf("SNS client does not support ListSubscriptions")
-		}
-		return FetchSNSSubscriptionsPage(ctx, subsAPI, continuationToken)
-	})
-}
-
 // FetchSNSSubscriptions calls the SNS ListSubscriptions API and converts the
 // response into a slice of generic Resource structs.
 func FetchSNSSubscriptions(ctx context.Context, api SNSListSubscriptionsAPI) ([]resource.Resource, error) {

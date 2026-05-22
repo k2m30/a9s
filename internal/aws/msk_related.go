@@ -15,26 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterRelated("msk", []resource.RelatedDef{
-		{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkMSKAlarms, NeedsTargetCache: true},
-		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkMSKSG, NeedsTargetCache: false},
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkMSKKMS},
-		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkMSKLambda, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkMSKCFN, NeedsTargetCache: true},
-		{TargetType: "subnet", DisplayName: "Subnets", Checker: checkMSKSubnet},
-		{TargetType: "vpc", DisplayName: "VPC", Checker: checkMSKVPC, NeedsTargetCache: true},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkMSKLogs},
-		{TargetType: "s3", DisplayName: "S3 (broker logs)", Checker: checkMSKS3},
-		{TargetType: "secrets", DisplayName: "Secrets Manager", Checker: checkMSKSecrets},
-	})
-
-	// kafkatypes.Cluster: Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId → kms
-	resource.RegisterDefaultNavFields("msk", []resource.NavigableField{
-		{FieldPath: "Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId", TargetType: "kms"},
-	})
-}
-
 // checkMSKAlarms checks the cache for CloudWatch alarms with "Cluster Name" dimension matching this cluster.
 func checkMSKAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterName := res.ID

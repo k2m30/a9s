@@ -10,18 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("eb", []string{"environment_name", "application_name", "status", "health", "version_label"})
-
-	resource.RegisterPaginated("eb", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchEBEnvironmentsPage(ctx, c.ElasticBeanstalk, continuationToken)
-	})
-}
-
 // FetchEBEnvironments calls the Elastic Beanstalk DescribeEnvironments API and converts
 // the response into a slice of generic Resource structs.
 func FetchEBEnvironments(ctx context.Context, api EBDescribeEnvironmentsAPI) ([]resource.Resource, error) {
