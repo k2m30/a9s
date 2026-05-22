@@ -95,7 +95,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 					}
 					// Partial coverage: fall through to fetch so missing IDs are retrieved.
 					if len(filtered) < len(result.RelatedIDs) {
-						fetchCmd := m.fetchResources(msg.TargetType)
+						fetchCmd := m.fetchResources(msg.TargetType, m.core.Session().AvailabilityGen)
 						return m, fetchCmd
 					}
 				}
@@ -117,7 +117,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 			rl.SetSize(m.innerSize())
 			rl, initCmd := rl.Init()
 			m.pushView(&rl)
-			return m, tea.Batch(initCmd, m.fetchResourcesFiltered(msg.TargetType, result.FetchFilter))
+			return m, tea.Batch(initCmd, m.fetchResourcesFiltered(msg.TargetType, result.FetchFilter, m.core.Session().AvailabilityGen))
 		}
 
 		// TargetID-based filtered list (cache miss).
@@ -431,9 +431,9 @@ func relatedNavigateTasksToCmd(m Model, targetType string, result runtime.Naviga
 	for _, t := range tasks {
 		switch t.Key.Kind {
 		case runtime.KindFetchResources:
-			cmds = append(cmds, m.fetchResources(targetType))
+			cmds = append(cmds, m.fetchResources(targetType, m.core.Session().AvailabilityGen))
 		case runtime.KindFetchFiltered:
-			cmds = append(cmds, m.fetchResourcesFiltered(targetType, result.FetchFilter))
+			cmds = append(cmds, m.fetchResourcesFiltered(targetType, result.FetchFilter, m.core.Session().AvailabilityGen))
 		case runtime.KindFetchMore:
 			// Continuation token is runtime-owned and arrives as a structured
 			// payload (AS-270 / PR-05b). The adapter is a pure pass-through

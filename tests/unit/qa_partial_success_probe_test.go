@@ -174,11 +174,12 @@ func TestProbeEnrichment_PartialSuccess(t *testing.T) {
 		{ID: "res-pe-002", Name: "res-pe-002", Status: "running"},
 	}
 	// Deliver AvailabilityCheckedMsg to seed probeResources[shortName].
-	// availabilityGen=0 and Gen=0 → guard passes.
+	// session.New seeds AvailabilityGen=1 (AS-659) — stamp the live value so
+	// the AvailabilityChecked stale guard (AcceptZeroGen=false) accepts it.
 	// availTotal=0 → availChecked(1) >= 0 → finalize → startEnrichment.
 	_, enrichCmd := rootApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: shortName,
-		Gen:          0,
+		Gen:          m.Session().AvailabilityGen,
 		Count:        len(probeRes),
 		HasResources: true,
 		Resources:    probeRes,

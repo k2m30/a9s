@@ -6,6 +6,8 @@
 package tui
 
 import (
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/session"
@@ -48,4 +50,26 @@ func (m Model) ActiveListResources() []resource.Resource {
 		return rl.AllResources()
 	}
 	return nil
+}
+
+// FetchResourcesCmdForTest returns a tea.Cmd produced by fetchResources for
+// the given resourceType and gen. Test-only: lets tests execute the cmd
+// synchronously and assert that the Gen field was captured at dispatch time.
+func (m Model) FetchResourcesCmdForTest(resourceType string, gen domain.Gen) tea.Cmd {
+	return m.fetchResources(resourceType, gen)
+}
+
+// FetchIdentityCmdForTest returns a tea.Cmd produced by fetchIdentity for
+// the given gen. Test-only: lets tests execute the cmd synchronously and
+// assert that the Gen field was captured at dispatch time.
+func (m Model) FetchIdentityCmdForTest(gen domain.Gen) tea.Cmd {
+	return m.fetchIdentity(gen)
+}
+
+// FetchRevealValueCmdForTest returns a tea.Cmd produced by fetchRevealValue
+// for the given resourceType, resourceID, and gen. Test-only: lets tests
+// execute the cmd synchronously and assert that the Gen field was captured at
+// dispatch time.
+func (m Model) FetchRevealValueCmdForTest(resourceType, resourceID string, gen domain.Gen) tea.Cmd {
+	return m.fetchRevealValue(resourceType, resourceID, gen)
 }
