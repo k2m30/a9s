@@ -12,27 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("dbi_events", []string{
-		"timestamp", "event_categories", "message",
-		"source_identifier", "source_type", "source_arn",
-	})
-
-	resource.RegisterPaginatedChild("dbi_events", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchRDSEvents(ctx, c.RDS, parentCtx["db_identifier"], continuationToken)
-	})
-
-	resource.RegisterChildType(resource.ResourceTypeDef{
-		Name:      "RDS Events",
-		ShortName: "dbi_events",
-		Columns:   resource.DbiEventColumns(),
-		CopyField: "message",
-	})
-}
 
 // FetchRDSEvents calls the RDS DescribeEvents API for a specific DB instance
 // and converts the response into a FetchResult with pagination support. A single

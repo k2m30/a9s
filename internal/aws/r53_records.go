@@ -12,24 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("r53_records", []string{"name", "type", "ttl", "values"})
-
-	// Register R53 records as a child type with its own fetcher.
-	resource.RegisterPaginatedChild("r53_records", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchR53Records(ctx, c.Route53, parentCtx["zone_id"], continuationToken)
-	})
-	resource.RegisterChildType(resource.ResourceTypeDef{
-		Name:      "R53 Records",
-		ShortName: "r53_records",
-		Columns:   resource.R53RecordColumns(),
-	})
-}
-
 // r53ContinuationToken encodes the three Route53 pagination cursors into a single
 // JSON string for use as a continuation token.
 type r53ContinuationToken struct {

@@ -15,18 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterRelated("r53", []resource.RelatedDef{
-		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkR53ELB, NeedsTargetCache: true},
-		{TargetType: "cf", DisplayName: "CloudFront", Checker: checkR53CF, NeedsTargetCache: true},
-		{TargetType: "acm", DisplayName: "ACM Certificates", Checker: checkR53ACM},
-		{TargetType: "apigw", DisplayName: "API Gateways", Checker: checkR53APIGW, NeedsTargetCache: true},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkR53Logs},
-		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkR53S3, NeedsTargetCache: true},
-		{TargetType: "vpc", DisplayName: "VPCs", Checker: checkR53VPC},
-	})
-}
-
 // errClientMissing is a sentinel returned by related-resource checkers when
 // the service client required for the check is not initialized. Callers
 // should treat it as "unknown" (Count:-1) rather than a real API error.

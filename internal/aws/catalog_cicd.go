@@ -238,8 +238,8 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 // appended into allChildTypes() in install.go without merge conflicts.
 //
 // Each entry carries Name/ShortName/Columns/CopyField (verbatim from the deleted
-// resource.RegisterChildType calls) plus FieldKeys and a ChildFetcher closure
-// (verbatim from the deleted resource.RegisterPaginatedChild closures).
+// child-type registrations) plus FieldKeys and a ChildFetcher closure (verbatim
+// from the deleted paginated-child registrations).
 var cicdChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
 		Name:      "CodeBuild Builds",

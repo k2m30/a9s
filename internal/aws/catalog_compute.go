@@ -645,7 +645,34 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "memory", Title: "Memory", Width: 8, Sortable: true},
 		},
 		Color: colorECSTask,
-		Wave2: IssueEnricher{Fn: EnrichECSTasks, Priority: 100},
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return fetchECSTasksPageWithJoin(ctx, c.ECS, c.ECS, c.ECS, c.ECS, continuationToken)
+		},
+		Wave2:     IssueEnricher{Fn: EnrichECSTasks, Priority: 100},
+		FieldKeys: []string{"task_id", "cluster", "last_status", "stop_code", "health_status", "task_definition", "launch_type", "cpu", "memory", "status", "efs_file_system_ids"},
+		Related: []domain.RelatedDef{
+			{TargetType: "ecs-svc", DisplayName: "ECS Services", Checker: checkECSTaskService},
+			{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkECSTaskCluster},
+			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkECSTaskLogs, NeedsTargetCache: true},
+			{TargetType: "role", DisplayName: "IAM Role", Checker: checkECSTaskRole},
+			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkECSTaskAlarm, NeedsTargetCache: true},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkECSTaskCTEvents, NeedsTargetCache: true},
+			{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkECSTaskEC2},
+			{TargetType: "ecr", DisplayName: "ECR Repositories", Checker: checkECSTaskECR},
+			{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkECSTaskENI},
+			{TargetType: "secrets", DisplayName: "Secrets", Checker: checkECSTaskSecrets},
+			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkECSTaskSG},
+			{TargetType: "ssm", DisplayName: "SSM Parameters", Checker: checkECSTaskSSM},
+			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkECSTaskSubnet},
+		},
+		// ecstypes.Task: ClusterArn (parent cluster for this task execution)
+		Navigable: []domain.NavigableField{
+			{FieldPath: "ClusterArn", TargetType: "ecs"},
+		},
 	},
 	{
 		Name:          "Lambda Functions",
@@ -914,6 +941,58 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		},
 		Navigable: []domain.NavigableField{
 			{FieldPath: "BlockDeviceMappings.Ebs.SnapshotId", TargetType: "ebs-snap"},
+		},
+	},
+}
+
+var computeChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
+	{
+		Name:      "Lambda Invocations",
+		ShortName: "lambda_invocations",
+		Columns:   resource.LambdaInvocationColumns(),
+		FieldKeys: []string{
+			"request_id", "timestamp", "status", "duration_ms",
+			"billed_duration_ms", "memory_size_mb", "memory_used_mb",
+			"memory_used", "init_duration_ms", "cold_start", "xray_trace_id",
+		},
+		Children: []domain.ChildViewDef{{
+			ChildType:      "lambda_invocation_logs",
+			Key:            "enter",
+			ContextKeys:    map[string]string{"log_group": "@parent.log_group", "request_id": "request_id"},
+			DisplayNameKey: "request_id",
+		}},
+		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchLambdaInvocations(ctx, c.CloudWatchLogs, parentCtx["function_name"], parentCtx["log_group"], continuationToken)
+		},
+	},
+	{
+		Name:      "Lambda Invocation Logs",
+		ShortName: "lambda_invocation_logs",
+		Columns:   resource.LambdaInvocationLogColumns(),
+		FieldKeys: []string{"timestamp", "message"},
+		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchLambdaInvocationLogs(ctx, c.CloudWatchLogs, parentCtx["log_group"], parentCtx["request_id"], continuationToken)
+		},
+	},
+	{
+		Name:      "Scaling Activities",
+		ShortName: "asg_activities",
+		Columns:   resource.AsgActivityColumns(),
+		FieldKeys: []string{"start_time", "status_code", "description", "cause"},
+		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchAsgActivities(ctx, c.AutoScaling, parentCtx, continuationToken)
 		},
 	},
 }

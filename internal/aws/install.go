@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"sync"
 
 	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
@@ -55,77 +54,11 @@ func ctEventsCheckerFor(shortName string) domain.RelatedChecker {
 func Install() {
 	catalog.SetTypes(allTopLevelTypes())
 	catalog.SetChildTypes(allChildTypes())
-	bridgeOnce.Do(bridgeCatalogToLegacy)
-}
-
-// bridgeOnce gates bridgeCatalogToLegacy to a single execution per process.
-// The legacy internal/resource maps include at least one panic-on-duplicate
-// registrar (RegisterDetailEnricher) so the bridge must run exactly once even
-// though catalog.SetTypes accepts idempotent calls. sync.Once is preferred
-// over a plain bool to guard against the race between concurrent Install()
-// callers landing both into bridgeCatalogToLegacy (per CodeRabbit on PR #397).
-var bridgeOnce sync.Once //nolint:gochecknoglobals // process-scope install gate
-
-// bridgeCatalogToLegacy populates the internal/resource legacy maps from the
-// catalog struct fields. Required during the AS-795b–m transition because
-// several consumers still read internal/resource maps directly (not through
-// the catalog-aware accessors). Each Register* call only fires when the
-// catalog has data for that field, so non-migrated types' init() registrations
-// are not clobbered with zero values.
-//
-// AS-795n deletes both this bridge and the matching internal/resource maps
-// once consumers migrate to catalog.Find / catalog.AllByWave2().
-func bridgeCatalogToLegacy() {
-	for _, rt := range catalog.All() {
-		if rt.Fetcher != nil {
-			resource.RegisterPaginated(rt.ShortName, rt.Fetcher)
-		}
-		if len(rt.FieldKeys) > 0 {
-			resource.RegisterFieldKeys(rt.ShortName, rt.FieldKeys)
-		}
-		if len(rt.FieldAliases) > 0 {
-			resource.RegisterFieldAliases(rt.ShortName, rt.FieldAliases)
-		}
-		if len(rt.Related) > 0 {
-			resource.RegisterRelated(rt.ShortName, rt.Related)
-		}
-		if len(rt.Navigable) > 0 {
-			resource.RegisterDefaultNavFields(rt.ShortName, rt.Navigable)
-		}
-		if rt.FetchByIDs != nil {
-			resource.RegisterFetchByIDs(rt.ShortName, rt.FetchByIDs)
-		}
-		if rt.FilteredFetcher != nil {
-			resource.RegisterFilteredPaginated(rt.ShortName, rt.FilteredFetcher)
-		}
-		if rt.Reveal != nil {
-			resource.RegisterRevealFetcher(rt.ShortName, rt.Reveal)
-		}
-		if rt.DetailEnrich != nil {
-			resource.RegisterDetailEnricher(rt.ShortName, rt.DetailEnrich)
-		}
-		if len(rt.IssueEnricherFieldKeys) > 0 {
-			resource.RegisterIssueEnricherFieldKeys(rt.ShortName, rt.IssueEnricherFieldKeys)
-		}
-	}
-	// Child types: replay catalog child-type entries onto the legacy
-	// resource.childTypes + paginatedChildRegistry maps so consumers calling
-	// resource.GetChildType / resource.GetPaginatedChildFetcher continue to
-	// resolve migrated entries. Child loop introduced by AS-808 / PR #395
-	// (containers, ecr_images); AS-815 / PR #397 adds DetailEnrich support
-	// here so the role_policies detail enricher resolves through the bridge.
-	for _, ct := range allChildTypes() {
-		resource.RegisterChildType(ct)
-		if ct.ChildFetcher != nil {
-			resource.RegisterPaginatedChild(ct.ShortName, ct.ChildFetcher)
-		}
-		if len(ct.FieldKeys) > 0 {
-			resource.RegisterFieldKeys(ct.ShortName, ct.FieldKeys)
-		}
-		if ct.DetailEnrich != nil {
-			resource.RegisterDetailEnricher(ct.ShortName, ct.DetailEnrich)
-		}
-	}
+	// Bridge catalog → legacy internal/resource maps. The bridge body itself
+	// lives in internal/resource (BridgeCatalogToLegacy) so internal/aws has
+	// no resource.Register* call sites — the AS-947 grep gate (Wave 2.5)
+	// enforces zero such calls outside the resource package.
+	resource.BridgeCatalogToLegacy()
 }
 
 // allTopLevelTypes concatenates the per-category top-level catalog slices into
@@ -162,12 +95,22 @@ func allTopLevelTypes() []catalog.ResourceTypeDef {
 // (ecr_images); AS-812 / PR #402 adds messagingChildTypes
 // (eb_rule_targets); AS-815 / PR #397 adds securityChildTypes
 // (iam_group_members, role_policies); AS-816 / PR #400 adds cicdChildTypes
-// (cb_builds, cb_build_logs, pipeline_stages).
+// (cb_builds, cb_build_logs, pipeline_stages). AS-947 / PR #TBD adds the
+// remaining per-category child slices (compute, containers, monitoring,
+// data, backup, databases, dns-cdn, networking, messaging) so the init()
+// bodies in internal/aws/*.go can be deleted in the same PR.
 func allChildTypes() []catalog.ResourceTypeDef {
 	var all []catalog.ResourceTypeDef
+	all = append(all, computeChildTypes...)
 	all = append(all, containersChildTypes...)
+	all = append(all, networkingChildTypes...)
+	all = append(all, databasesChildTypes...)
+	all = append(all, monitoringChildTypes...)
 	all = append(all, messagingChildTypes...)
 	all = append(all, securityChildTypes...)
+	all = append(all, dnsCdnChildTypes...)
 	all = append(all, cicdChildTypes...)
+	all = append(all, dataChildTypes...)
+	all = append(all, backupChildTypes...)
 	return all
 }
