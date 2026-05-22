@@ -23,7 +23,7 @@
 //     fields without parsing TaskKey.Scope or accepting side-channel
 //     arguments. The closure builder stays in the adapter because it
 //     returns tea.Cmd and reads adapter-owned state (m.appCtx,
-//     m.core.Session().Clients, the session owned by core's EnrichGen and PolicyDocCache)
+//     m.core.Clients(), the session owned by core's EnrichGen and PolicyDocCache)
 //     that has not yet migrated to the runtime core.
 package tui
 
@@ -142,7 +142,7 @@ func (m Model) runtimeTasksToCmd(tasks []runtime.TaskRequest) tea.Cmd {
 		case runtime.ConnectPayload:
 			cmds = append(cmds, m.connectAWS(p.Profile, p.Region, p.Gen))
 		case runtime.FetchIdentityPayload:
-			cmds = append(cmds, m.fetchIdentity(m.core.Session().ConnectGen))
+			cmds = append(cmds, m.fetchIdentity(m.core.ConnectGen()))
 		case runtime.LoadAvailCachePayload:
 			cmds = append(cmds, m.loadAvailabilityCache())
 		case runtime.DemoPrefetchCountsPayload:
@@ -177,7 +177,7 @@ func (m Model) runtimeTasksToCmd(tasks []runtime.TaskRequest) tea.Cmd {
 // detail enricher and emits an EnrichDetailResultMsg. It reads every
 // runtime-side input (DetailCtx, Generation) from the typed payload —
 // PR-05a-h4-b (AS-962) moved DetailEnrichmentCtx construction onto Core
-// so the adapter no longer touches awsclient.DetailEnrichmentCtx
+// so the adapter no longer touches the AWS-side DetailEnrichmentCtx
 // directly here. The remaining adapter-owned input is m.appCtx (the
 // app-wide cancellation context); ctx still wraps a 10 s per-call
 // timeout the runtime cannot express because tea.Cmd composition

@@ -513,7 +513,7 @@ func TestSaveAvailabilityCache_NoCacheMode(t *testing.T) {
 		ResourceType: "ec2",
 		HasResources: true,
 		Count:        3,
-		Gen:          m.Session().AvailabilityGen,
+		Gen:          m.Core().Session().AvailabilityGen,
 	})
 	// With noCache=true, saveAvailabilityCache returns nil.
 	// No panic is the key assertion.
@@ -591,7 +591,7 @@ func TestDemoPrefetchCounts_AvailabilityPrefetchedHandler(t *testing.T) {
 		Entries:     map[string]int{"ec2": 7, "s3": 3},
 		Truncated:   map[string]bool{},
 		IssueCounts: map[string]int{"ec2": 1},
-		Gen:         m.Session().AvailabilityGen,
+		Gen:         m.Core().Session().AvailabilityGen,
 		Resources:   map[string][]resource.Resource{},
 	})
 	// Handler should not crash.
@@ -705,14 +705,14 @@ func TestFetchAdapter_CapturesGenAtDispatchTime(t *testing.T) {
 
 	t.Run("fetchResources", func(t *testing.T) {
 		m := newRootSizedModel()
-		dispatchGen := m.Session().AvailabilityGen
+		dispatchGen := m.Core().Session().AvailabilityGen
 
 		// Build the cmd at dispatch time with the captured gen.
 		cmd := m.FetchResourcesCmdForTest("ec2", dispatchGen)
 
 		// Rotate AFTER dispatch: the closure must carry dispatchGen, not the new gen.
-		m.Session().Rotate()
-		if m.Session().AvailabilityGen == dispatchGen {
+		m.Core().Session().Rotate()
+		if m.Core().Session().AvailabilityGen == dispatchGen {
 			t.Fatal("Rotate() did not bump AvailabilityGen — test precondition broken")
 		}
 
@@ -734,12 +734,12 @@ func TestFetchAdapter_CapturesGenAtDispatchTime(t *testing.T) {
 
 	t.Run("fetchIdentity", func(t *testing.T) {
 		m := newRootSizedModel()
-		dispatchGen := m.Session().ConnectGen
+		dispatchGen := m.Core().Session().ConnectGen
 
 		cmd := m.FetchIdentityCmdForTest(dispatchGen)
 
-		m.Session().Rotate()
-		if m.Session().ConnectGen == dispatchGen {
+		m.Core().Session().Rotate()
+		if m.Core().Session().ConnectGen == dispatchGen {
 			t.Fatal("Rotate() did not bump ConnectGen — test precondition broken")
 		}
 
@@ -760,12 +760,12 @@ func TestFetchAdapter_CapturesGenAtDispatchTime(t *testing.T) {
 
 	t.Run("fetchRevealValue", func(t *testing.T) {
 		m := newRootSizedModel()
-		dispatchGen := m.Session().ConnectGen
+		dispatchGen := m.Core().Session().ConnectGen
 
 		cmd := m.FetchRevealValueCmdForTest("secrets", "prod/api/key", dispatchGen)
 
-		m.Session().Rotate()
-		if m.Session().ConnectGen == dispatchGen {
+		m.Core().Session().Rotate()
+		if m.Core().Session().ConnectGen == dispatchGen {
 			t.Fatal("Rotate() did not bump ConnectGen — test precondition broken")
 		}
 

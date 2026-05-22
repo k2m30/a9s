@@ -240,7 +240,7 @@ func (s *fullIntegrationScenario) OpenDetailResource(resourceType string, res re
 	// Findings or AttentionDetails, so the detail-view Attention section
 	// would render only Wave-1 entries. Swap in the cached row when one
 	// exists so detail rendering matches what `./a9s --demo` shows on screen.
-	if entry, ok := s.model.Session().ResourceCache[resourceType]; ok && entry != nil {
+	if entry, ok := s.model.Core().ResourceCache(resourceType); ok && entry != nil {
 		for i := range entry.Resources {
 			if entry.Resources[i].ID == res.ID {
 				res = entry.Resources[i]

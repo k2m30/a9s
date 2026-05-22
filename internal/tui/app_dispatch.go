@@ -9,19 +9,19 @@
 // The five new h4-b intents — PatchResourceCache, PatchRelatedCache,
 // PatchLazyResourceCache, SetIdentityIntent, HeaderInvalidateIntent —
 // each land as a case in applyIntents below. They cross-write
-// session-state owned by Core via the *session.Session pointer that
-// runtime.Core and tui.Model both reference (no separate sync needed —
-// the session is the same instance, not a copy).
+// session-state owned by Core via the typed accessors in
+// internal/runtime/accessors.go (SetResourceCache, RelatedCacheSet,
+// ExtendLazyResourceCache). PR-05a-h4-c (AS-963) routed the related-cache
+// key + result type through the internal/runtime package and migrated
+// every session-field access in the renderer onto those typed accessors,
+// so the dispatcher no longer reaches into the session struct shape.
 package tui
 
 import (
-	"maps"
-
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/session"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -31,6 +31,10 @@ import (
 // each intent to the TUI view tree + session state. Returns any
 // follow-up tea.Cmds the intents themselves require (flash re-emit,
 // screen-builder closures, theme-apply errors).
+//
+// Session-state mutations land through m.core's typed accessors
+// (SetResourceCache, RelatedCacheSet, ExtendLazyResourceCache) so the
+// dispatcher never reaches through Core into the session struct.
 func (m *Model) applyIntents(intents []runtime.UIIntent) []tea.Cmd {
 	var cmds []tea.Cmd
 	for _, intent := range intents {
@@ -118,7 +122,7 @@ func (m *Model) applyIntents(intents []runtime.UIIntent) []tea.Cmd {
 				m.popView()
 			}
 		case runtime.PatchResourceCache:
-			m.core.Session().ResourceCache[v.ResourceType] = v.Entry
+			m.core.SetResourceCache(v.ResourceType, v.Entry)
 		case runtime.PatchRelatedCache:
 			// PR-05a-h4-b: kept as an applyIntents case for forward-
 			// compatibility, even though Core today writes the
@@ -127,15 +131,15 @@ func (m *Model) applyIntents(intents []runtime.UIIntent) []tea.Cmd {
 			// production but keeps the intent set complete for tests
 			// and future emitters that may surface this branch).
 			if v.SourceID != "" {
-				key := session.RelatedCacheKey(v.ResourceType, v.SourceID)
-				existing, _ := m.core.Session().RelatedCache.Get(key)
-				m.core.Session().RelatedCache.Set(key, append(existing, session.RelatedCacheResult{
+				key := runtime.RelatedCacheKey(v.ResourceType, v.SourceID)
+				existing, _ := m.core.RelatedCacheGet(key)
+				m.core.RelatedCacheSet(key, append(existing, runtime.RelatedCacheResult{
 					DefDisplayName: v.DefDisplayName,
 					Result:         v.Result,
 				}))
 			}
 		case runtime.PatchLazyResourceCache:
-			maps.Copy(m.core.Session().LazyResourceCache, v.Adds)
+			m.core.ExtendLazyResourceCache(v.Adds)
 		case runtime.SetIdentityIntent:
 			if v.Identity == nil {
 				continue
@@ -221,12 +225,12 @@ func (m *Model) tasksToCmd(tasks []runtime.TaskRequest) tea.Cmd {
 	for _, req := range tasks {
 		switch req.Key.Kind {
 		case runtime.TaskKindProbeAvailability:
-			cmd := m.probeResourceAvailability(req.Key.Scope, m.core.Session().AvailabilityGen)
+			cmd := m.probeResourceAvailability(req.Key.Scope, m.core.AvailabilityGen())
 			if cmd != nil {
 				cmds = append(cmds, cmd)
 			}
 		case runtime.TaskKindProbeEnrich:
-			cmd := m.probeEnrichment(req.Key.Scope, m.core.Session().EnrichmentGen)
+			cmd := m.probeEnrichment(req.Key.Scope, m.core.EnrichmentGen())
 			if cmd != nil {
 				cmds = append(cmds, cmd)
 			}

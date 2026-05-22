@@ -375,7 +375,7 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 			Count:        3,
 			Resources:    resources,
 			Issues:       0,
-			Gen:          m.Session().AvailabilityGen,
+			Gen:          m.Core().Session().AvailabilityGen,
 		})
 
 		m = navigateToEC2List(m)
@@ -419,7 +419,7 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 			Count:        3,
 			Resources:    resources,
 			Issues:       0,
-			Gen:          m.Session().AvailabilityGen,
+			Gen:          m.Core().Session().AvailabilityGen,
 		})
 
 		m = navigateToEC2List(m)
@@ -466,7 +466,7 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 			Count:        1,
 			Resources:    []resource.Resource{brokenResource},
 			Issues:       1, // Wave-1 issue
-			Gen:          m.Session().AvailabilityGen,
+			Gen:          m.Core().Session().AvailabilityGen,
 		})
 
 		m = navigateToEC2List(m)
