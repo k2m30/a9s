@@ -15,9 +15,13 @@
 //     EnrichmentRan, EnrichmentTypeGen, EnrichmentTruncatedIDs) MUST be
 //     constructed by New(). ProbeResources and the availability/enrich queues
 //     stay nil until a probe retains its first batch — they are built in place.
-//   - EnrichmentFindings was removed in PR-03a-fold; it now lives directly on
-//     tui.Model so it is not subject to Session.Rotate() clearing. The Model
-//     owner (handleProfileSelected / handleRegionSelected) clears it explicitly.
+//   - EnrichmentFindings was removed in PR-03a-fold. There is no parallel
+//     EnrichmentFindings map on tui.Model or on Session; Wave 2 findings are
+//     written directly onto each cached `resource.Resource.Findings` slice
+//     (Source = "wave2:<short>") and r.AttentionDetails, via applyEnrichment
+//     in internal/tui/app_enrich_fold.go. The cached rows are the authority;
+//     runtime.RuntimeState.EnrichmentFindings and PatchDetail.EnrichmentFindings
+//     are derived adapter-payload surfaces, not a second source of truth.
 //   - Session rotation (profile/region switch) MUST bump every generation and
 //     replace/clear the caches, so in-flight messages tagged with old gens are
 //     discarded by the handlers' gen guards.
@@ -114,10 +118,11 @@ type Session struct {
 	EnrichTotal    int                            // total enrichment probes to run in current gen
 
 	// Per-type Wave 2 finding state (feature 018-enrichment-visibility).
-	// NOTE: EnrichmentFindings was moved to tui.Model in PR-03a-fold so that
-	// it survives Session.Rotate() and is cleared explicitly by the profile/
-	// region switch handlers. The remaining maps stay here because they do not
-	// need to persist across a Rotate().
+	// NOTE: PR-03a-fold deleted the parallel EnrichmentFindings map entirely;
+	// Wave 2 findings now live on each cached resource.Resource.Findings slice
+	// (see internal/tui/app_enrich_fold.go applyEnrichment). The Wave-2 progress
+	// / control maps below remain here because they are session-scoped and are
+	// cleared on Session.Rotate() — they are not the authority for finding data.
 	EnrichmentRan          map[string]bool
 	EnrichmentTypeGen      map[string]domain.Gen
 	EnrichmentTruncatedIDs map[string]map[string]bool
