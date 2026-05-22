@@ -11,27 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("eb_rule_targets", []string{
-		"target_id", "target_arn", "role_arn", "resource_type_name", "input_summary",
-	})
-
-	resource.RegisterPaginatedChild("eb_rule_targets", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchEventBridgeRuleTargets(ctx, c.EventBridge, parentCtx, continuationToken)
-	})
-
-	resource.RegisterChildType(resource.ResourceTypeDef{
-		Name:      "EB Rule Targets",
-		ShortName: "eb_rule_targets",
-		Columns:   resource.EbRuleTargetColumns(),
-		CopyField: "target_arn",
-	})
-}
-
 // FetchEventBridgeRuleTargets calls the EventBridge ListTargetsByRule API
 // and converts the response into a FetchResult. This is a single-call API,
 // but uses FetchResult for consistency with the paginated child fetcher interface.
