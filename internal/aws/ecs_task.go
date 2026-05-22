@@ -15,18 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("ecs-task", []string{"task_id", "cluster", "last_status", "stop_code", "health_status", "task_definition", "launch_type", "cpu", "memory", "status", "efs_file_system_ids"})
-
-	resource.RegisterPaginated("ecs-task", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return fetchECSTasksPageWithJoin(ctx, c.ECS, c.ECS, c.ECS, c.ECS, continuationToken)
-	})
-}
-
 // FetchECSTasksPage fetches one page of ECS clusters using the continuationToken,
 // then for each cluster in that page fetches all tasks via ListTasks+DescribeTasks.
 // IsTruncated reflects whether ListClusters has more pages beyond this one.

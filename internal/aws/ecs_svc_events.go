@@ -11,24 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("ecs_svc_events", []string{"timestamp", "message"})
-
-	resource.RegisterPaginatedChild("ecs_svc_events", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchEcsSvcEvents(ctx, c.ECS, parentCtx["cluster"], parentCtx["service_name"], continuationToken)
-	})
-
-	resource.RegisterChildType(resource.ResourceTypeDef{
-		Name:      "Service Events",
-		ShortName: "ecs_svc_events",
-		Columns:   resource.EcsSvcEventColumns(),
-	})
-}
-
 // FetchEcsSvcEvents calls the ECS DescribeServices API and extracts the
 // Events list from the service. At most 100 events are returned (the API
 // default maximum), so no pagination is needed. Uses FetchResult for consistency.

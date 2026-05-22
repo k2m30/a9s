@@ -11,23 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("lambda_invocation_logs", []string{"timestamp", "message"})
-
-	resource.RegisterPaginatedChild("lambda_invocation_logs", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchLambdaInvocationLogs(ctx, c.CloudWatchLogs, parentCtx["log_group"], parentCtx["request_id"], continuationToken)
-	})
-
-	resource.RegisterChildType(resource.ResourceTypeDef{
-		Name:      "Lambda Invocation Logs",
-		ShortName: "lambda_invocation_logs",
-		Columns:   resource.LambdaInvocationLogColumns(),
-	})
-}
 
 // maxInvocationLogLines caps the result set for a single invocation's logs.
 const maxInvocationLogLines = 500

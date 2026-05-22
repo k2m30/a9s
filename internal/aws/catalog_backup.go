@@ -45,3 +45,38 @@ var backupTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		IssueEnricherFieldKeys: []string{"status"},
 	},
 }
+
+var backupChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
+	{
+		Name:      "Stack Events",
+		ShortName: "cfn_events",
+		Columns:   resource.CfnEventColumns(),
+		FieldKeys: []string{
+			"timestamp", "logical_resource_id", "resource_type",
+			"resource_status", "resource_status_reason",
+		},
+		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchCfnEvents(ctx, c.CloudFormation, parentCtx["stack_name"], continuationToken)
+		},
+	},
+	{
+		Name:      "Stack Resources",
+		ShortName: "cfn_resources",
+		Columns:   resource.CfnResourceColumns(),
+		FieldKeys: []string{
+			"logical_resource_id", "physical_resource_id", "resource_type",
+			"resource_status", "drift_status", "last_updated",
+		},
+		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchCfnResources(ctx, c.CloudFormation, parentCtx["stack_name"], continuationToken)
+		},
+	},
+}
