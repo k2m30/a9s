@@ -8,7 +8,11 @@
 // platform-specific async work.
 package runtime
 
-import "github.com/k2m30/a9s/v3/internal/resource"
+import (
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/internal/resource"
+)
 
 // KindEnrichDetail is the TaskKind the runtime emits to ask the adapter
 // to run the on-demand detail enricher for a single resource. Adapters
@@ -29,13 +33,23 @@ type EnrichDetailEvent struct {
 
 // EnrichDetailPayload is the typed TaskPayload variant for
 // KindEnrichDetail. It carries the structured fields the adapter needs
-// to execute the dispatch — the resource type (which selects the
-// registered detail enricher) and the resource itself (the enricher's
-// input). Adapters type-switch on TaskRequest.Payload to recover both
-// without parsing TaskKey.Scope or accepting side-channel arguments.
+// to execute the dispatch — the resource type (selects the registered
+// detail enricher), the resource itself (the enricher's input), the
+// DetailEnrichmentCtx the runtime constructs from session-owned
+// Clients/PolicyDocCache, and the EnrichGen captured at dispatch so
+// the adapter can stamp the result for stale-rejection on receipt.
+//
+// PR-05a-h4-b (AS-962) moved DetailCtx construction off the adapter so
+// internal/tui no longer touches awsclient.DetailEnrichmentCtx directly;
+// the adapter reads the typed payload fields verbatim instead. The
+// DetailCtx pointer is nil only when session.Clients is unset (test
+// harnesses constructing a Core without a transport) — the adapter is
+// responsible for tolerating that branch.
 type EnrichDetailPayload struct {
 	ResourceType string
 	Resource     resource.Resource
+	DetailCtx    *awsclient.DetailEnrichmentCtx
+	Generation   domain.Gen
 }
 
 // isTaskPayload satisfies the TaskPayload marker interface.
@@ -64,9 +78,21 @@ func (c *Core) HandleEnrichDetail(ev EnrichDetailEvent) ([]UIIntent, []TaskReque
 	if resource.GetDetailEnricher(ev.ResourceType) == nil {
 		return nil, nil
 	}
+	var dctx *awsclient.DetailEnrichmentCtx
+	if c.session.Clients != nil || c.session.PolicyDocCache != nil {
+		dctx = &awsclient.DetailEnrichmentCtx{
+			Clients:    c.session.Clients,
+			PolicyDocs: c.session.PolicyDocCache,
+		}
+	}
 	return nil, []TaskRequest{{
-		Key:     TaskKey{Kind: KindEnrichDetail, Scope: ev.ResourceType + "/" + ev.Resource.ID},
-		Cache:   CacheNone,
-		Payload: EnrichDetailPayload(ev),
+		Key:   TaskKey{Kind: KindEnrichDetail, Scope: ev.ResourceType + "/" + ev.Resource.ID},
+		Cache: CacheNone,
+		Payload: EnrichDetailPayload{
+			ResourceType: ev.ResourceType,
+			Resource:     ev.Resource,
+			DetailCtx:    dctx,
+			Generation:   c.session.EnrichGen,
+		},
 	}}
 }
