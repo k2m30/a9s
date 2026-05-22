@@ -1,11 +1,14 @@
 package aws
 
 import (
+	"context"
+	"fmt"
 	"strconv"
 	"time"
 
 	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
 )
 
@@ -88,6 +91,31 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			DisplayNameKey: "alarm_name",
 		}},
 		Color: colorAlarm,
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchCloudWatchAlarmsPage(ctx, c.CloudWatch, continuationToken)
+		},
+		FieldKeys: []string{"alarm_name", "state", "metric_name", "namespace", "threshold", "actions_count"},
+		Related: []domain.RelatedDef{
+			{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkAlarmSNS, NeedsTargetCache: false},
+			{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkAlarmASG, NeedsTargetCache: true},
+			{TargetType: "apigw", DisplayName: "API Gateways", Checker: checkAlarmAPIGW},
+			{TargetType: "cb", DisplayName: "CodeBuild Projects", Checker: checkAlarmCB},
+			{TargetType: "dbi", DisplayName: "RDS Instances", Checker: checkAlarmDBI},
+			{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkAlarmEC2},
+			{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkAlarmECS},
+			{TargetType: "eks", DisplayName: "EKS Clusters", Checker: checkAlarmEKS},
+			{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkAlarmKMS},
+			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkAlarmLambda},
+			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkAlarmLogs},
+			{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkAlarmS3},
+			{TargetType: "sfn", DisplayName: "Step Functions", Checker: checkAlarmSFN},
+			{TargetType: "waf", DisplayName: "WAF Web ACLs", Checker: checkAlarmWAF},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkAlarmCTEvents, NeedsTargetCache: true},
+		},
 	},
 	{
 		Name:          "CloudWatch Log Groups",
@@ -108,6 +136,28 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			DisplayNameKey: "log_group_name",
 		}},
 		Color: colorLogs,
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchCloudWatchLogGroupsPage(ctx, c.CloudWatchLogs, continuationToken)
+		},
+		Wave2:     IssueEnricher{Fn: EnrichLogsMetricFilters, Priority: 100},
+		FieldKeys: []string{"log_group_name", "stored_bytes", "retention_days", "creation_time", "kms_key_id"},
+		Related: []domain.RelatedDef{
+			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkLogsLambda, NeedsTargetCache: true},
+			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkLogsAlarms, NeedsTargetCache: true},
+			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkLogsKMS},
+			{TargetType: "apigw", DisplayName: "API Gateway", Checker: checkLogsAPIGW, NeedsTargetCache: true},
+			{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkLogsECSTask, NeedsTargetCache: true},
+			{TargetType: "kinesis", DisplayName: "Kinesis Streams", Checker: checkLogsKinesis},
+			{TargetType: "s3", DisplayName: "S3 (exports)", Checker: checkLogsS3},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("logs")},
+		},
+		Navigable: []domain.NavigableField{
+			{FieldPath: "KmsKeyId", TargetType: "kms"},
+		},
 	},
 	{
 		Name:          "CloudTrail Trails",
@@ -122,6 +172,36 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "multi_region", Title: "Multi-Region", Width: 14, Sortable: true},
 		},
 		Color: colorTrail,
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			resources, err := FetchCloudTrailTrails(ctx, c.CloudTrail)
+			if err != nil {
+				return resource.FetchResult{}, err
+			}
+			return resource.FetchResult{
+				Resources:  resources,
+				Pagination: &resource.PaginationMeta{IsTruncated: false, TotalHint: len(resources), PageSize: len(resources)},
+			}, nil
+		},
+		FieldKeys: []string{"trail_name", "s3_bucket", "home_region", "multi_region", "is_logging", "latest_delivery_error", "log_file_validation_enabled"},
+		Related: []domain.RelatedDef{
+			{TargetType: "s3", DisplayName: "S3 Bucket", Checker: checkTrailS3, NeedsTargetCache: true},
+			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkTrailLogs, NeedsTargetCache: true},
+			{TargetType: "sns", DisplayName: "SNS Topic", Checker: checkTrailSNS, NeedsTargetCache: true},
+			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkTrailKMS, NeedsTargetCache: true},
+			{TargetType: "role", DisplayName: "IAM Role", Checker: checkTrailRole},
+			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("trail")},
+		},
+		Navigable: []domain.NavigableField{
+			{FieldPath: "S3BucketName", TargetType: "s3"},
+			{FieldPath: "KmsKeyId", TargetType: "kms"},
+			{FieldPath: "SnsTopicARN", TargetType: "sns"},
+			{FieldPath: "CloudWatchLogsLogGroupArn", TargetType: "logs"},
+			{FieldPath: "CloudWatchLogsRoleArn", TargetType: "role"},
+		},
 	},
 	{
 		Name:      "CloudTrail Events",
@@ -140,5 +220,43 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		ExcludeFromIssueBadge: true,
 		Color:                 colorCTEvents,
 		Project:               ctevent.Project,
+		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchCloudTrailEventsPage(ctx, c.CloudTrail, continuationToken)
+		},
+		FilteredFetcher: func(ctx context.Context, clients any, filter map[string]string, continuationToken string) (resource.FetchResult, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
+			}
+			return FetchCloudTrailEventsPageFiltered(ctx, c.CloudTrail, filter, continuationToken)
+		},
+		FieldKeys: []string{"event_name", "time", "event_time", "event_time_raw", "user", "source", "resource_type", "resource_name", "read_only", "role_name", "status", "_ct.verb", "_ct.actor", "_ct.origin", "_ct.target", "_ct.target_raw", "_ct.outcome"},
+		Related: []domain.RelatedDef{
+			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkCtEventsRole, NeedsTargetCache: true},
+			{TargetType: "iam-user", DisplayName: "IAM Users", Checker: checkCtEventsUser, NeedsTargetCache: true},
+			{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkCtEventsEC2, NeedsTargetCache: true},
+			{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkCtEventsS3, NeedsTargetCache: true},
+			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkCtEventsLambda, NeedsTargetCache: true},
+			{TargetType: "dbi", DisplayName: "RDS Instances", Checker: checkCtEventsRDS, NeedsTargetCache: true},
+			{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkCtEventsKMS, NeedsTargetCache: true},
+			{TargetType: "secrets", DisplayName: "Secrets", Checker: checkCtEventsSecrets, NeedsTargetCache: true},
+			{TargetType: "vpce", DisplayName: "VPC Endpoints", Checker: checkCtEventsVPCE, NeedsTargetCache: true},
+			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkCtEventsSG, NeedsTargetCache: true},
+			{TargetType: "ddb", DisplayName: "DynamoDB Tables", Checker: checkCtEventsDDB, NeedsTargetCache: true},
+			{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkCtEventsCFN, NeedsTargetCache: true},
+			{TargetType: "trail", DisplayName: "CloudTrail Trails", Checker: checkCtEventsTrail, NeedsTargetCache: true},
+			{TargetType: "ct-events", DisplayName: "CT events by AccessKeyId", Checker: checkCtEventsPivotByAccessKeyId, NeedsTargetCache: false},
+			{TargetType: "ct-events", DisplayName: "CT events by Username", Checker: checkCtEventsPivotByUsername, NeedsTargetCache: false},
+			{TargetType: "ct-events", DisplayName: "CT events by EventName", Checker: checkCtEventsPivotByEventName, NeedsTargetCache: false},
+			{TargetType: "ct-events", DisplayName: "CT events by SharedEventId", Checker: checkCtEventsPivotBySharedEventId, NeedsTargetCache: false},
+		},
+		Navigable: []domain.NavigableField{
+			{FieldPath: "user", TargetType: "iam-user"},
+			{FieldPath: "role_name", TargetType: "role"},
+		},
 	},
 }
