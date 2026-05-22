@@ -7,9 +7,9 @@ package unit
 // past-retention signals must fire for DBClusterSnapshot inputs whose
 // parent is missing or whose retention is exceeded.
 //
-// The enricher is registered in IssueEnricherRegistry["dbc-snap"]. Tests
-// drive it by retrieving the registered function, NOT by importing the
-// production file directly.
+// The enricher is wired into catalog_databases.go's dbc-snap Wave2 field.
+// Tests drive it by looking it up via awsclient.Wave2EnricherFor, NOT by
+// importing the production file directly.
 
 import (
 	"context"
@@ -26,15 +26,16 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// dbcSnapEnricher retrieves the registered dbc-snap IssueEnricherFunc.
+// dbcSnapEnricher retrieves the registered dbc-snap IssueEnricherFunc from
+// the catalog Wave2 field via awsclient.Wave2EnricherFor.
 func dbcSnapEnricher(t *testing.T) awsclient.IssueEnricherFunc {
 	t.Helper()
-	e, ok := awsclient.IssueEnricherRegistry["dbc-snap"]
+	e, ok := awsclient.Wave2EnricherFor("dbc-snap")
 	if !ok {
-		t.Fatal("IssueEnricherRegistry[\"dbc-snap\"] not registered")
+		t.Fatal("awsclient.Wave2EnricherFor(\"dbc-snap\") not registered (catalog Wave2 field missing)")
 	}
 	if e.Fn == nil {
-		t.Fatal("IssueEnricherRegistry[\"dbc-snap\"].Fn is nil")
+		t.Fatal("Wave2EnricherFor(\"dbc-snap\").Fn is nil")
 	}
 	return e.Fn
 }

@@ -10,10 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("ebs", EnrichEBSVolumeStatus, 10)
-}
-
 // EnrichEBSVolumeStatus calls DescribeVolumeStatus (account-wide, paginated) and returns
 // a Finding for every volume with non-ok status.
 // Severity is "!" (broken/degraded). Walks up to EnrichmentCap pages via NextToken.

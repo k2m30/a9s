@@ -12,11 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("backup", EnrichBackupJobs, 100)
-	resource.RegisterIssueEnricherFieldKeys("backup", []string{"status"})
-}
-
 // EnrichBackupJobs calls ListBackupJobs (account-wide, paginated) and returns a Finding
 // for each BackupPlanId that has a failed/aborted/expired/partial job in the last 24h.
 // Severity "!" for FAILED/ABORTED/EXPIRED, "~" for PARTIAL.

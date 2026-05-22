@@ -3,7 +3,7 @@ package unit
 // qa_enrichment_dispatch_test.go — Tests for enrichment dispatch and handler behavior.
 //
 // Tests verify:
-//   1. IssueEnricherRegistry completeness — all 8 resource short names are registered with non-nil functions.
+//   1. Wave 2 catalog completeness — all 8 foundational resource short names resolve via awsclient.Wave2EnricherFor.
 //   2. Session-wide gen guard — EnrichmentCheckedMsg with stale Gen is silently dropped (no panic, no cmd).
 //   3. Per-type gen guard — EnrichmentCheckedMsg with stale TypeGen is silently dropped.
 //   4. Valid EnrichmentCheckedMsg with Err != nil does not crash.
@@ -41,32 +41,33 @@ var originalIssue196Enrichers = []string{
 }
 
 // TestIssueEnricherRegistry_OriginalSetStillRegistered pins the original 8
-// enrichers from issue #196.
+// enrichers from issue #196 — they must remain discoverable via the
+// Wave 2 accessor regardless of which catalog category file owns them.
 func TestIssueEnricherRegistry_OriginalSetStillRegistered(t *testing.T) {
 	for _, shortName := range originalIssue196Enrichers {
-		fn, ok := awsclient.IssueEnricherRegistry[shortName]
+		e, ok := awsclient.Wave2EnricherFor(shortName)
 		if !ok {
-			t.Errorf("IssueEnricherRegistry missing entry for %q", shortName)
+			t.Errorf("awsclient.Wave2EnricherFor missing entry for %q", shortName)
 			continue
 		}
-		if fn.Fn == nil {
-			t.Errorf("IssueEnricherRegistry[%q].Fn is nil — must be a non-nil IssueEnricherFunc", shortName)
+		if e.Fn == nil {
+			t.Errorf("Wave2EnricherFor(%q).Fn is nil — must be a non-nil IssueEnricherFunc", shortName)
 		}
 	}
 }
 
-// TestIssueEnricherRegistry_NoEntriesForUnregisteredTypes verifies the registry
-// only contains entries for shortNames that are registered as ResourceTypeDefs.
-// Replaces the prior allowlist-based test — that was authoritative when only
-// 8 enrichers existed; now the doc-grounded contract (TestAttentionSignalsDoc)
-// is the source of truth.
+// TestIssueEnricherRegistry_NoEntriesForUnregisteredTypes verifies every
+// Wave 2 entry exposed by AllWave2 maps back to a registered ResourceTypeDef.
+// After AS-795n the catalog literal IS the registration, so this is trivially
+// true — but the test stays as a regression guard for stub test injections
+// that forget to clean up.
 //
 // TODO(no-middle-state): this test proves only registry shape. Keep behavioral
 // tests for any feature that is claimed as implemented.
 func TestIssueEnricherRegistry_NoEntriesForUnregisteredTypes(t *testing.T) {
-	for key := range awsclient.IssueEnricherRegistry {
-		if resource.FindResourceType(key) == nil {
-			t.Errorf("IssueEnricherRegistry[%q] has no matching ResourceTypeDef", key)
+	for _, entry := range awsclient.AllWave2() {
+		if resource.FindResourceType(entry.ShortName) == nil {
+			t.Errorf("AllWave2 entry %q has no matching ResourceTypeDef", entry.ShortName)
 		}
 	}
 }

@@ -11,10 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("elb", EnrichELBAttributes, 100)
-}
-
 // EnrichELBAttributes calls DescribeLoadBalancerAttributes for each load
 // balancer (1 per LB, cap 50) and returns an informational "~" finding for
 // each LB missing deletion protection or access logging.

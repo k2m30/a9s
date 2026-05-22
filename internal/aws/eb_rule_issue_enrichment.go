@@ -13,11 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("eb-rule", EnrichEventBridgeRuleTargets, 100)
-	resource.RegisterIssueEnricherFieldKeys("eb-rule", []string{"target_count"})
-}
-
 // EnrichEventBridgeRuleTargets is a Wave 2 enricher for EventBridge rules.
 // Per rule (cap 50) it calls ListTargetsByRule and raises findings for:
 //   - Rule state == ENABLED AND len(Targets) == 0 → "!" finding (rule matches but goes nowhere)

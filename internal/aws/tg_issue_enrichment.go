@@ -12,11 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("tg", EnrichTargetGroupHealth, 10)
-	resource.RegisterIssueEnricherFieldKeys("tg", []string{"health_summary"})
-}
-
 // EnrichTargetGroupHealth calls DescribeTargetHealth for each target group (1 per TG, cap ~50).
 // Returns a Finding for each TG with at least one unhealthy target.
 // Severity is "!" (broken/degraded). Summary: "unhealthy targets: X/Y".

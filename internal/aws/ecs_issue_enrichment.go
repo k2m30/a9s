@@ -12,10 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("ecs", EnrichECSClusters, 100)
-}
-
 // EnrichECSClusters is a Wave 2 enricher for ECS clusters.
 // It calls DescribeClusters with Include=STATISTICS and raises findings for:
 //   - pendingTasksCount > 0 → "~" finding (pending tasks indicate scheduling pressure)

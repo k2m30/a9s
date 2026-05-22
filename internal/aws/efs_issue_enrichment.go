@@ -12,10 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("efs", EnrichEFSMountTargets, 100)
-}
-
 // EnrichEFSMountTargets calls DescribeMountTargets per file system (cap EnrichmentCap, per-FS
 // pagination up to PerParentPageCap pages) and emits one EnrichmentFinding per file system
 // with any mount target whose LifeCycleState is not "available".

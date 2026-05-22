@@ -13,11 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("s3", EnrichS3PublicAccessBlock, 100)
-	resource.RegisterIssueEnricherFieldKeys("s3", []string{"status"})
-}
-
 // EnrichS3PublicAccessBlock calls GetPublicAccessBlock per bucket (cap EnrichmentCap)
 // and emits a finding when the bucket has no PAB configuration or when any of the
 // four PAB flags is false.

@@ -12,11 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("tgw", EnrichTGWAttachments, 100)
-	resource.RegisterIssueEnricherFieldKeys("tgw", []string{"att_status"})
-}
-
 // EnrichTGWAttachments calls DescribeTransitGatewayAttachments per TGW (cap EnrichmentCap,
 // per-TGW pagination up to PerParentPageCap pages) and returns a Finding for any TGW with
 // attachments in a failed or transitional state.

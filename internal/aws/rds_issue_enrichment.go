@@ -10,10 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("rds", EnrichRDSDocDBMaintenance, 100)
-}
-
 // EnrichRDSDocDBMaintenance calls DescribePendingMaintenanceActions (account-wide, paginated)
 // and returns a Finding for every resource with pending maintenance.
 // Severity is "~" (informational); IssueCount is always 0 (excluded from menu badge).

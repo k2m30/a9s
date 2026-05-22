@@ -85,8 +85,9 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			}
 			return FetchCodePipelinesPage(ctx, c.CodePipeline, continuationToken)
 		},
-		Wave2:     IssueEnricher{Fn: EnrichCodePipelineStatus, Priority: 10},
-		FieldKeys: []string{"name", "pipeline_type", "version", "created", "updated"},
+		Wave2:                  IssueEnricher{Fn: EnrichCodePipelineStatus, Priority: 10},
+		FieldKeys:              []string{"name", "pipeline_type", "version", "created", "updated"},
+		IssueEnricherFieldKeys: []string{"last_status"},
 		Related: []domain.RelatedDef{
 			{TargetType: "cb", DisplayName: "CodeBuild Projects", Checker: checkPipelineCB, NeedsTargetCache: false},
 			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkPipelineRole, NeedsTargetCache: false},
@@ -128,8 +129,9 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			}
 			return FetchCodeBuildProjectsPage(ctx, c.CodeBuild, c.CodeBuild, continuationToken)
 		},
-		Wave2:     IssueEnricher{Fn: EnrichCodeBuildStatus, Priority: 10},
-		FieldKeys: []string{"name", "source_type", "description", "last_modified"},
+		Wave2:                  IssueEnricher{Fn: EnrichCodeBuildStatus, Priority: 10},
+		FieldKeys:              []string{"name", "source_type", "description", "last_modified"},
+		IssueEnricherFieldKeys: []string{"last_build"},
 		Related: []domain.RelatedDef{
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkCbLogs, NeedsTargetCache: true},
 			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkCbRole, NeedsTargetCache: true},
@@ -220,8 +222,9 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			}
 			return FetchCodeArtifactReposPage(ctx, c.CodeArtifact, continuationToken)
 		},
-		Wave2:     IssueEnricher{Fn: EnrichCodeArtifactRepository, Priority: 100},
-		FieldKeys: []string{"repo_name", "domain_name", "description", "domain_owner"},
+		Wave2:                  IssueEnricher{Fn: EnrichCodeArtifactRepository, Priority: 100},
+		FieldKeys:              []string{"repo_name", "domain_name", "description", "domain_owner"},
+		IssueEnricherFieldKeys: []string{"package_count"},
 		Related: []domain.RelatedDef{
 			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkCodeartifactKMS, NeedsTargetCache: false},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("codeartifact"), NeedsTargetCache: false},

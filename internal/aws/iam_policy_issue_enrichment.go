@@ -10,11 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("policy", EnrichIAMPolicy, 100)
-	resource.RegisterIssueEnricherFieldKeys("policy", []string{"risk"})
-}
-
 // EnrichIAMPolicy calls GetPolicy + GetPolicyVersion per customer-managed policy
 // (capped at EnrichmentCap) to detect wildcard-admin policies.
 //
