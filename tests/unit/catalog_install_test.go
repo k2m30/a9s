@@ -130,6 +130,9 @@ func TestCatalogInstall_GoldenParity(t *testing.T) {
 			if got.Category != g.category {
 				t.Errorf("Category: got %q, want %q", got.Category, g.category)
 			}
+			if got.Fetcher == nil {
+				t.Errorf("Fetcher: got nil, want non-nil (AS-795 acceptance: every top-level catalog entry must have a populated Fetcher after the AS-795b..p init() cleanup)")
+			}
 		})
 	}
 }
