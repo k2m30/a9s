@@ -33,9 +33,20 @@ func RegisterFieldKeys(shortName string, keys []string) {
 }
 
 // GetFieldKeys returns the registered Fields keys for the given resource type,
-// or nil if none are registered.
+// or nil if none are registered. Legacy-first: runtime map wins so test
+// overrides via RegisterFieldKeys take effect; otherwise reads the catalog
+// FieldKeys field for the type (or its child type when the name is a child).
 func GetFieldKeys(shortName string) []string {
-	return fieldKeyRegistry[shortName]
+	if keys, ok := fieldKeyRegistry[shortName]; ok {
+		return keys
+	}
+	if ct := catalog.Find(shortName); ct != nil && len(ct.FieldKeys) > 0 {
+		return ct.FieldKeys
+	}
+	if ct := catalog.FindChild(shortName); ct != nil && len(ct.FieldKeys) > 0 {
+		return ct.FieldKeys
+	}
+	return nil
 }
 
 // issueEnricherFieldKeysRegistry stores field keys produced by Wave 2 issue
@@ -71,8 +82,16 @@ func RegisterIssueEnricherFieldKeys(shortName string, keys []string) {
 
 // GetIssueEnricherFieldKeys returns the accumulated Wave 2 issue-enricher
 // field keys for the given resource short name, or nil if none are registered.
+// Legacy-first: test overrides via RegisterIssueEnricherFieldKeys take effect;
+// otherwise reads the catalog IssueEnricherFieldKeys field.
 func GetIssueEnricherFieldKeys(shortName string) []string {
-	return issueEnricherFieldKeysRegistry[shortName]
+	if keys, ok := issueEnricherFieldKeysRegistry[shortName]; ok {
+		return keys
+	}
+	if ct := catalog.Find(shortName); ct != nil && len(ct.IssueEnricherFieldKeys) > 0 {
+		return ct.IssueEnricherFieldKeys
+	}
+	return nil
 }
 
 // GetAllFieldKeys returns the union of fetcher-registered field keys and
@@ -124,11 +143,17 @@ func RegisterFieldAliases(shortName string, aliases map[string]string) {
 // For each alias (from→to), if fields[from] has a non-empty value and fields[to]
 // does not exist, it's copied. Returns the original map unchanged when no copies
 // are needed. Returns nil if fields is nil.
-// Overrides (registered after init) take precedence over builtins.
+// Overrides (registered after init) take precedence over builtins; builtins
+// fall back to catalog FieldAliases when the legacy map is empty.
 func ApplyFieldAliases(shortName string, fields map[string]string) map[string]string {
 	aliases := fieldAliasOverrides[shortName]
 	if len(aliases) == 0 {
 		aliases = fieldAliasBuiltins[shortName]
+	}
+	if len(aliases) == 0 {
+		if ct := catalog.Find(shortName); ct != nil && len(ct.FieldAliases) > 0 {
+			aliases = ct.FieldAliases
+		}
 	}
 	if len(aliases) == 0 || len(fields) == 0 {
 		return fields
@@ -157,10 +182,16 @@ func ApplyFieldAliases(shortName string, fields map[string]string) map[string]st
 	return out
 }
 
-// UnregisterFieldAliases removes field alias overrides. Used only in tests for cleanup.
-// Builtin aliases registered by init() are never removed.
+// UnregisterFieldAliases removes field alias overrides AND test-registered
+// builtins for the given short name. Used only in tests for cleanup.
+// After AS-731 deleted the catalog→legacy bridge, fieldAliasBuiltins starts
+// empty for every shortName: any builtin entry was placed there by a test's
+// RegisterFieldAliases call (the "first call becomes builtin" branch) and
+// must be cleared on cleanup so subsequent reads fall through to the catalog
+// FieldAliases field in ApplyFieldAliases.
 func UnregisterFieldAliases(shortName string) {
 	delete(fieldAliasOverrides, shortName)
+	delete(fieldAliasBuiltins, shortName)
 }
 
 // RegisterChildType stores a child type definition in the child types registry.
@@ -171,25 +202,50 @@ func RegisterChildType(def ResourceTypeDef) {
 }
 
 // GetChildType returns the child type definition for the given short name,
-// or nil if no child type is registered.
+// or nil if no child type is registered. Legacy-first: test overrides via
+// RegisterChildType take effect; otherwise reads catalog.FindChild.
 func GetChildType(shortName string) *ResourceTypeDef {
-	return childTypes[shortName]
+	if def, ok := childTypes[shortName]; ok {
+		return def
+	}
+	if ct := catalog.FindChild(shortName); ct != nil {
+		return ct
+	}
+	return nil
 }
 
 // AllChildTypes returns all registered child type definitions.
 // The returned slice is in no guaranteed order.
+// Combines legacy registry entries with catalog child entries; legacy wins
+// on name collision so test overrides remain visible.
 func AllChildTypes() []ResourceTypeDef {
 	result := make([]ResourceTypeDef, 0, len(childTypes))
-	for _, def := range childTypes {
+	seen := make(map[string]struct{}, len(childTypes))
+	for name, def := range childTypes {
 		result = append(result, *def)
+		seen[name] = struct{}{}
+	}
+	for _, ct := range catalog.AllChildren() {
+		if _, ok := seen[ct.ShortName]; ok {
+			continue
+		}
+		result = append(result, ct)
 	}
 	return result
 }
 
 // AllChildShortNames returns the ShortName of every registered child type.
+// Includes both legacy registry entries and catalog child entries.
 func AllChildShortNames() []string {
-	names := make([]string, 0, len(childTypes))
+	seen := make(map[string]struct{}, len(childTypes))
 	for name := range childTypes {
+		seen[name] = struct{}{}
+	}
+	for _, ct := range catalog.AllChildren() {
+		seen[ct.ShortName] = struct{}{}
+	}
+	names := make([]string, 0, len(seen))
+	for name := range seen {
 		names = append(names, name)
 	}
 	return names
@@ -247,13 +303,16 @@ func RegisterPaginatedChild(shortName string, f PaginatedChildFetcher) {
 }
 
 // GetPaginatedChildFetcher returns the paginated child fetcher for the given short name.
-// Catalog-backed: checks the catalog first via the parent type's Children defs;
-// falls through to the legacy map. Fallback removed in PR-04n.
+// Legacy-first: test overrides via RegisterPaginatedChild take effect;
+// otherwise reads the catalog child-type ChildFetcher field.
 func GetPaginatedChildFetcher(shortName string) PaginatedChildFetcher {
-	// Child fetchers are keyed by the child type's ShortName. The catalog stores
-	// them in the parent's Children []ChildViewDef; a separate per-child catalog
-	// lookup path is wired in per-category PRs (04b+). For now: legacy fallback.
-	return paginatedChildRegistry[shortName]
+	if fn, ok := paginatedChildRegistry[shortName]; ok {
+		return fn
+	}
+	if ct := catalog.FindChild(shortName); ct != nil && ct.ChildFetcher != nil {
+		return ct.ChildFetcher
+	}
+	return nil
 }
 
 // UnregisterPaginatedChild removes a paginated child fetcher. Used only in tests for cleanup.
@@ -274,12 +333,16 @@ func RegisterFilteredPaginated(shortName string, f FilteredPaginatedFetcher) {
 }
 
 // GetFilteredPaginatedFetcher returns the filtered paginated fetcher for the given short name.
-// Catalog-backed: catalog does not yet carry filtered fetchers (added in per-category PRs);
-// falls through to the legacy map. Fallback removed in PR-04n.
+// Legacy-first: test overrides via RegisterFilteredPaginated take effect;
+// otherwise reads the catalog FilteredFetcher field.
 func GetFilteredPaginatedFetcher(shortName string) FilteredPaginatedFetcher {
-	// Filtered fetchers are not yet represented in catalog.ResourceTypeDef (04a).
-	// Per-category PRs (04b+) add a FilteredFetcher field to the catalog struct.
-	return filteredPaginatedRegistry[shortName]
+	if fn, ok := filteredPaginatedRegistry[shortName]; ok {
+		return fn
+	}
+	if ct := catalog.Find(shortName); ct != nil && ct.FilteredFetcher != nil {
+		return ct.FilteredFetcher
+	}
+	return nil
 }
 
 // UnregisterFilteredPaginated removes a filtered paginated fetcher. Used only in tests for cleanup.

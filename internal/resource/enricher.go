@@ -30,19 +30,27 @@ func RegisterDetailEnricher(shortName string, f DetailEnricher) {
 }
 
 // GetDetailEnricher returns the detail enricher for the given resource short name.
-// Catalog-backed: checks the catalog first; falls through to the legacy map.
-// Fallback removed in PR-04n.
+// Catalog-backed: checks the catalog (both top-level and child types) first;
+// falls through to the legacy map so test overrides via RegisterDetailEnricher
+// continue to work for synthetic short names.
 func GetDetailEnricher(shortName string) DetailEnricher {
 	if ct := catalog.Find(shortName); ct != nil && ct.DetailEnrich != nil {
+		return ct.DetailEnrich
+	}
+	if ct := catalog.FindChild(shortName); ct != nil && ct.DetailEnrich != nil {
 		return ct.DetailEnrich
 	}
 	return detailEnricherRegistry[shortName]
 }
 
 // HasDetailEnricher returns true if a detail enricher is registered for the given short name.
-// Catalog-backed: checks the catalog first; falls through to the legacy map.
+// Catalog-backed: checks the catalog (both top-level and child) first; falls
+// through to the legacy map.
 func HasDetailEnricher(shortName string) bool {
 	if ct := catalog.Find(shortName); ct != nil && ct.DetailEnrich != nil {
+		return true
+	}
+	if ct := catalog.FindChild(shortName); ct != nil && ct.DetailEnrich != nil {
 		return true
 	}
 	_, ok := detailEnricherRegistry[shortName]

@@ -382,10 +382,17 @@ func RegisterFetchByIDs(shortName string, fn FetchByIDsFunc) {
 
 // GetFetchByIDs returns the FetchByIDs helper for the target short name.
 // Catalog-backed: falls through to the legacy map (catalog does not carry
-// FetchByIDs separately in PR-04a; per-category PRs wire this). Fallback
-// removed in PR-04n.
+// FetchByIDs separately in PR-04a; per-category PRs wire this). Legacy-first:
+// test overrides via RegisterFetchByIDs take effect; otherwise reads the
+// catalog FetchByIDs field.
 func GetFetchByIDs(shortName string) FetchByIDsFunc {
-	return fetchByIDsRegistry[shortName]
+	if fn, ok := fetchByIDsRegistry[shortName]; ok {
+		return fn
+	}
+	if ct := catalog.Find(shortName); ct != nil && ct.FetchByIDs != nil {
+		return ct.FetchByIDs
+	}
+	return nil
 }
 
 // UnregisterFetchByIDs removes the FetchByIDs helper for the given short
@@ -510,8 +517,15 @@ func RegisterDefaultNavFields(shortName string, fields []NavigableField) {
 // nav fields regardless of the active-registry state.
 func GetDefaultNavFields(shortName string) []NavigableField {
 	defaultNavFieldMu.RLock()
-	defer defaultNavFieldMu.RUnlock()
-	return defaultNavFieldRegistry[shortName]
+	if fields, ok := defaultNavFieldRegistry[shortName]; ok && len(fields) > 0 {
+		defaultNavFieldMu.RUnlock()
+		return fields
+	}
+	defaultNavFieldMu.RUnlock()
+	if ct := catalog.Find(shortName); ct != nil && len(ct.Navigable) > 0 {
+		return ct.Navigable
+	}
+	return nil
 }
 
 // BootstrapActiveNavFields copies all entries from the default nav field
