@@ -11,40 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("cb_builds", []string{
-		"build_number", "build_status", "start_time", "end_time",
-		"duration", "source_version_short", "initiator", "build_id",
-		"build_arn", "current_phase", "source_version",
-		"resolved_source_version", "log_group_name", "log_stream_name",
-	})
-
-	resource.RegisterPaginatedChild("cb_builds", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchCBBuilds(ctx, c.CodeBuild, c.CodeBuild, parentCtx, continuationToken)
-	})
-
-	resource.RegisterChildType(resource.ResourceTypeDef{
-		Name:      "CodeBuild Builds",
-		ShortName: "cb_builds",
-		Columns:   resource.CBBuildColumns(),
-		CopyField: "build_id",
-		Children: []resource.ChildViewDef{{
-			ChildType:      "cb_build_logs",
-			Key:            "enter",
-			ContextKeys:    map[string]string{"log_group_name": "log_group_name", "log_stream_name": "log_stream_name", "build_number": "build_number"},
-			DisplayNameKey: "build_number",
-			DrillCondition: func(r resource.Resource) bool {
-				return r.Fields["log_group_name"] != ""
-			},
-			DrillBlockMessage: "Build logs not available in CloudWatch",
-		}},
-	})
-}
-
 // FetchCBBuilds performs a two-step fetch:
 // 1. ListBuildsForProject (single page) to collect build IDs
 // 2. BatchGetBuilds in chunks of 100 (API limit) to get full build details
