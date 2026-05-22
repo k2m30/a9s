@@ -50,19 +50,41 @@ func TestNamingContract_IssueEnricher_IsStructWithFnAndPriority(t *testing.T) {
 	}
 }
 
-// TestNamingContract_IssueEnricherRegistry_IsMap pins the Wave 2 registry name
-// and shape. The registry key is a resource short name and the value is an
-// IssueEnricher with Fn + Priority metadata.
-func TestNamingContract_IssueEnricherRegistry_IsMap(t *testing.T) {
-	rt := reflect.TypeOf(awsclient.IssueEnricherRegistry)
-	if rt.Kind() != reflect.Map {
-		t.Fatalf("awsclient.IssueEnricherRegistry must be a map, got %v", rt.Kind())
+// TestNamingContract_Wave2Accessors_Shape pins the post-AS-795n Wave 2
+// accessor API on awsclient. Wave2EnricherFor returns the enricher value
+// plus a found bool; AllWave2 returns ordered Wave2Entry pairs.
+func TestNamingContract_Wave2Accessors_Shape(t *testing.T) {
+	// Wave2EnricherFor must be (string) (IssueEnricher, bool).
+	lookupT := reflect.TypeOf(awsclient.Wave2EnricherFor)
+	if lookupT.Kind() != reflect.Func {
+		t.Fatalf("awsclient.Wave2EnricherFor must be a func, got %v", lookupT.Kind())
 	}
-	if rt.Key().Kind() != reflect.String {
-		t.Fatalf("IssueEnricherRegistry key must be string, got %v", rt.Key().Kind())
+	if lookupT.NumIn() != 1 || lookupT.In(0).Kind() != reflect.String {
+		t.Fatalf("Wave2EnricherFor must take a single string, got %v", lookupT)
 	}
-	if rt.Elem() != reflect.TypeOf(awsclient.IssueEnricher{}) {
-		t.Fatalf("IssueEnricherRegistry value must be awsclient.IssueEnricher, got %v", rt.Elem())
+	if lookupT.NumOut() != 2 ||
+		lookupT.Out(0) != reflect.TypeOf(awsclient.IssueEnricher{}) ||
+		lookupT.Out(1).Kind() != reflect.Bool {
+		t.Fatalf("Wave2EnricherFor must return (IssueEnricher, bool), got %v", lookupT)
+	}
+
+	// AllWave2 must be () []Wave2Entry; Wave2Entry must expose ShortName + Enricher.
+	allT := reflect.TypeOf(awsclient.AllWave2)
+	if allT.Kind() != reflect.Func || allT.NumIn() != 0 || allT.NumOut() != 1 {
+		t.Fatalf("awsclient.AllWave2 must be func() []Wave2Entry, got %v", allT)
+	}
+	if allT.Out(0).Kind() != reflect.Slice {
+		t.Fatalf("AllWave2 must return a slice, got %v", allT.Out(0))
+	}
+	entryT := allT.Out(0).Elem()
+	if entryT.Kind() != reflect.Struct {
+		t.Fatalf("Wave2Entry must be a struct, got %v", entryT.Kind())
+	}
+	if _, ok := entryT.FieldByName("ShortName"); !ok {
+		t.Error("Wave2Entry must expose a ShortName field")
+	}
+	if _, ok := entryT.FieldByName("Enricher"); !ok {
+		t.Error("Wave2Entry must expose an Enricher field")
 	}
 }
 

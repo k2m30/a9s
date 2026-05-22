@@ -110,9 +110,9 @@ func TestCR273_Item18_MenuCtrlZ_NoFalsePositives_AllTypes(t *testing.T) {
 	})
 
 	// Wave 2 clean for every enricher-backed type.
-	for shortName := range awsclient.IssueEnricherRegistry {
+	for _, ent := range awsclient.AllWave2() {
 		m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
-			ResourceType: shortName,
+			ResourceType: ent.ShortName,
 			Issues:       0,
 			Truncated:    false,
 			Findings:     map[string]resource.EnrichmentFinding{},
@@ -156,11 +156,11 @@ func TestCR273_Item18_MenuCtrlZ_Wave2AuthoritativeZero_AllEnricherTypes(t *testi
 	issueCounts := map[string]int{}
 	issueTruncated := map[string]bool{}
 	issueKnown := map[string]bool{}
-	for shortName := range awsclient.IssueEnricherRegistry {
-		entries[shortName] = 1
-		issueCounts[shortName] = 0
-		issueTruncated[shortName] = true // Wave 1 lower bound
-		issueKnown[shortName] = true
+	for _, ent := range awsclient.AllWave2() {
+		entries[ent.ShortName] = 1
+		issueCounts[ent.ShortName] = 0
+		issueTruncated[ent.ShortName] = true // Wave 1 lower bound
+		issueKnown[ent.ShortName] = true
 	}
 
 	m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoaded{
@@ -173,9 +173,9 @@ func TestCR273_Item18_MenuCtrlZ_Wave2AuthoritativeZero_AllEnricherTypes(t *testi
 	})
 
 	// Wave 2: authoritative zero for every enricher-backed type.
-	for shortName := range awsclient.IssueEnricherRegistry {
+	for _, ent := range awsclient.AllWave2() {
 		m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
-			ResourceType: shortName,
+			ResourceType: ent.ShortName,
 			Issues:       0,
 			Truncated:    false,
 			Findings:     map[string]resource.EnrichmentFinding{},
@@ -189,13 +189,13 @@ func TestCR273_Item18_MenuCtrlZ_Wave2AuthoritativeZero_AllEnricherTypes(t *testi
 	plain := stripANSI(rootViewContent(m))
 
 	var stuckVisible []string
-	for shortName := range awsclient.IssueEnricherRegistry {
-		td := resource.FindResourceType(shortName)
+	for _, ent := range awsclient.AllWave2() {
+		td := resource.FindResourceType(ent.ShortName)
 		if td == nil || td.ExcludeFromIssueBadge {
 			continue
 		}
 		if strings.Contains(plain, td.Name) {
-			stuckVisible = append(stuckVisible, shortName+" ("+td.Name+")")
+			stuckVisible = append(stuckVisible, ent.ShortName+" ("+td.Name+")")
 		}
 	}
 
@@ -217,7 +217,7 @@ func TestCR273_Item18_MenuCtrlZ_Wave2AuthoritativeZero_AllEnricherTypes(t *testi
 // NOT appear under ctrl+z.
 //
 // Affected enrichers (per-resource callers that promote error to truncated):
-// every entry in awsclient.IssueEnricherRegistry. This test iterates all of them.
+// every entry in awsclient.AllWave2(). This test iterates all of them.
 func TestCR273_Item18_MenuCtrlZ_Wave2ErroredSubCall_AllEnricherTypes(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
@@ -226,11 +226,11 @@ func TestCR273_Item18_MenuCtrlZ_Wave2ErroredSubCall_AllEnricherTypes(t *testing.
 	issueCounts := map[string]int{}
 	issueTruncated := map[string]bool{}
 	issueKnown := map[string]bool{}
-	for shortName := range awsclient.IssueEnricherRegistry {
-		entries[shortName] = 1
-		issueCounts[shortName] = 0
-		issueTruncated[shortName] = false
-		issueKnown[shortName] = true
+	for _, ent := range awsclient.AllWave2() {
+		entries[ent.ShortName] = 1
+		issueCounts[ent.ShortName] = 0
+		issueTruncated[ent.ShortName] = false
+		issueKnown[ent.ShortName] = true
 	}
 
 	m, _ = rootApplyMsg(m, messages.AvailabilityCacheLoaded{
@@ -244,9 +244,9 @@ func TestCR273_Item18_MenuCtrlZ_Wave2ErroredSubCall_AllEnricherTypes(t *testing.
 
 	// Wave 2: for each enricher-backed type, a sub-call errored → Truncated=true,
 	// but Findings={} and Issues=0 (no actual issue seen).
-	for shortName := range awsclient.IssueEnricherRegistry {
+	for _, ent := range awsclient.AllWave2() {
 		m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
-			ResourceType: shortName,
+			ResourceType: ent.ShortName,
 			Issues:       0,
 			Truncated:    true,
 			Findings:     map[string]resource.EnrichmentFinding{},
@@ -260,13 +260,13 @@ func TestCR273_Item18_MenuCtrlZ_Wave2ErroredSubCall_AllEnricherTypes(t *testing.
 	plain := stripANSI(rootViewContent(m))
 
 	var falsePositives []string
-	for shortName := range awsclient.IssueEnricherRegistry {
-		td := resource.FindResourceType(shortName)
+	for _, ent := range awsclient.AllWave2() {
+		td := resource.FindResourceType(ent.ShortName)
 		if td == nil || td.ExcludeFromIssueBadge {
 			continue
 		}
 		if strings.Contains(plain, td.Name) {
-			falsePositives = append(falsePositives, shortName+" ("+td.Name+")")
+			falsePositives = append(falsePositives, ent.ShortName+" ("+td.Name+")")
 		}
 	}
 
@@ -291,7 +291,8 @@ func TestCR273_Item18_MenuCtrlZ_Wave2ErroredSubCall_AllEnricherTypes(t *testing.
 func TestCR273_Item18_MenuCtrlZ_NoFalseNegatives_AllEnricherTypes(t *testing.T) {
 	tui.Version = "0.6.0"
 	var falseNegatives []string
-	for shortName := range awsclient.IssueEnricherRegistry {
+	for _, ent := range awsclient.AllWave2() {
+		shortName := ent.ShortName
 		td := resource.FindResourceType(shortName)
 		if td == nil || td.ExcludeFromIssueBadge {
 			continue

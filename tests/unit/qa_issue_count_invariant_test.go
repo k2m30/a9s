@@ -52,9 +52,9 @@ func TestAllEnrichers_IssueCountNeverExceedsResources(t *testing.T) {
 	}
 	nilClients := (*awsclient.ServiceClients)(nil)
 
-	for shortName, ent := range awsclient.IssueEnricherRegistry {
-		shortName := shortName
-		fn := ent.Fn
+	for _, w := range awsclient.AllWave2() {
+		shortName := w.ShortName
+		fn := w.Enricher.Fn
 
 		t.Run(shortName, func(t *testing.T) {
 			var result awsclient.IssueEnricherResult

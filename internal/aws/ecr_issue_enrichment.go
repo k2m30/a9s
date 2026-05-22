@@ -13,11 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("ecr", EnrichECRRepository, 100)
-	resource.RegisterIssueEnricherFieldKeys("ecr", []string{"critical_vulns", "high_vulns", "images_scanned"})
-}
-
 // ECRImagesPerRepo caps how many recent images are inspected per repository.
 // DescribeImages returns ImageScanFindingsSummary inline, so the enricher pays
 // exactly one AWS call per repo regardless of how many images it samples —

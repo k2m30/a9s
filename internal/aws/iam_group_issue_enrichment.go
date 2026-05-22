@@ -11,11 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("iam-group", EnrichIAMGroup, 100)
-	resource.RegisterIssueEnricherFieldKeys("iam-group", []string{"member_count"})
-}
-
 // EnrichIAMGroup calls GetGroup + ListAttachedGroupPolicies per group
 // (capped at EnrichmentCap) to surface orphan groups and no-op groups.
 //

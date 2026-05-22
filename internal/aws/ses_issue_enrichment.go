@@ -10,11 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("ses", EnrichSESAccount, 100)
-	resource.RegisterIssueEnricherFieldKeys("ses", []string{"status"})
-}
-
 // EnrichSESAccount calls sesv2:GetAccount once (account-wide) and replicates
 // the single account-level finding onto every identity row in the input slice.
 //

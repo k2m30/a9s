@@ -5,9 +5,10 @@ package unit
 // Spec: docs/resources/dbi-snap.md §3.1 (orphan + past-retention signals) +
 //       impl-plan §1.1 (enricher test cases) + §3.3 (enricher contract).
 //
-// The enricher is registered in IssueEnricherRegistry["dbi-snap"]. Tests drive
-// it by retrieving the registered function, NOT by importing the production file
-// directly. This ensures we are testing the wired function, not an unregistered one.
+// The enricher is wired into catalog_databases.go's dbi-snap Wave2 field.
+// Tests drive it by looking it up via awsclient.Wave2EnricherFor, NOT by
+// importing the production file directly. This ensures we are testing the
+// wired function, not an unregistered one.
 //
 // Enricher contract (§4.2 + §3.3):
 //   - Zero API calls — pure cross-ref against the dbi ResourceCache.
@@ -36,15 +37,16 @@ import (
 // Helpers
 // ---------------------------------------------------------------------------
 
-// dbiSnapEnricher retrieves the registered dbi-snap IssueEnricherFunc.
+// dbiSnapEnricher retrieves the registered dbi-snap IssueEnricherFunc from
+// the catalog Wave2 field via awsclient.Wave2EnricherFor.
 func dbiSnapEnricher(t *testing.T) awsclient.IssueEnricherFunc {
 	t.Helper()
-	e, ok := awsclient.IssueEnricherRegistry["dbi-snap"]
+	e, ok := awsclient.Wave2EnricherFor("dbi-snap")
 	if !ok {
-		t.Fatal("IssueEnricherRegistry[\"dbi-snap\"] not registered")
+		t.Fatal("awsclient.Wave2EnricherFor(\"dbi-snap\") not registered (catalog Wave2 field missing)")
 	}
 	if e.Fn == nil {
-		t.Fatal("IssueEnricherRegistry[\"dbi-snap\"].Fn is nil")
+		t.Fatal("Wave2EnricherFor(\"dbi-snap\").Fn is nil")
 	}
 	return e.Fn
 }

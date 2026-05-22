@@ -11,11 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("vpc", EnrichVPCFlowLogs, 100)
-	resource.RegisterIssueEnricherFieldKeys("vpc", []string{"flow_logs"})
-}
-
 // EnrichVPCFlowLogs calls DescribeFlowLogs per VPC (capped at EnrichmentCap) and
 // raises a finding when no ACTIVE flow log exists.
 //

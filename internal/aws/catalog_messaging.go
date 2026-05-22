@@ -133,8 +133,9 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			}
 			return FetchSQSQueuesPage(ctx, listAPI, c.SQS, continuationToken)
 		},
-		Wave2:     IssueEnricher{Fn: EnrichSQSAttributes, Priority: 100},
-		FieldKeys: []string{"queue_name", "queue_url", "arn", "approx_messages", "approx_not_visible", "delay_seconds"},
+		Wave2:                  IssueEnricher{Fn: EnrichSQSAttributes, Priority: 100},
+		FieldKeys:              []string{"queue_name", "queue_url", "arn", "approx_messages", "approx_not_visible", "delay_seconds"},
+		IssueEnricherFieldKeys: []string{"dlq"},
 		Related: []domain.RelatedDef{
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkSQSAlarm, NeedsTargetCache: true},
 			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkSQSLambda, NeedsTargetCache: false},
@@ -174,8 +175,9 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			}
 			return FetchSNSTopicsPage(ctx, topicsAPI, continuationToken)
 		},
-		Wave2:     IssueEnricher{Fn: EnrichSNSSubscriptions, Priority: 100},
-		FieldKeys: []string{"topic_arn", "display_name"},
+		Wave2:                  IssueEnricher{Fn: EnrichSNSSubscriptions, Priority: 100},
+		FieldKeys:              []string{"topic_arn", "display_name"},
+		IssueEnricherFieldKeys: []string{"subs_count"},
 		Related: []domain.RelatedDef{
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkSNSAlarm, NeedsTargetCache: false},
 			{TargetType: "sns-sub", DisplayName: "Subscriptions", Checker: checkSNSSub, NeedsTargetCache: true},
@@ -290,8 +292,9 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			}
 			return FetchEventBridgeRulesPage(ctx, c.EventBridge, continuationToken)
 		},
-		Wave2:     IssueEnricher{Fn: EnrichEventBridgeRuleTargets, Priority: 100},
-		FieldKeys: []string{"name", "state", "event_bus", "schedule", "description", "event_pattern"},
+		Wave2:                  IssueEnricher{Fn: EnrichEventBridgeRuleTargets, Priority: 100},
+		FieldKeys:              []string{"name", "state", "event_bus", "schedule", "description", "event_pattern"},
+		IssueEnricherFieldKeys: []string{"target_count"},
 		Related: []domain.RelatedDef{
 			{TargetType: "role", DisplayName: "IAM Role", Checker: checkEbRuleRole, NeedsTargetCache: false},
 			{TargetType: "kinesis", DisplayName: "Kinesis (targets)", Checker: checkEbRuleKinesis},
@@ -406,8 +409,9 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			}
 			return FetchStepFunctionsPage(ctx, c.SFN, continuationToken)
 		},
-		Wave2:     IssueEnricher{Fn: EnrichStepFunctionsStatus, Priority: 10},
-		FieldKeys: []string{"name", "type", "arn", "creation_date"},
+		Wave2:                  IssueEnricher{Fn: EnrichStepFunctionsStatus, Priority: 10},
+		FieldKeys:              []string{"name", "type", "arn", "creation_date"},
+		IssueEnricherFieldKeys: []string{"last_run"},
 		Related: []domain.RelatedDef{
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkSFNAlarm, NeedsTargetCache: false},
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkSFNLogs, NeedsTargetCache: true},

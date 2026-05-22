@@ -353,8 +353,9 @@ Some resource types hide problems behind extra API calls (e.g., EC2 with impaire
 This section documents the current Wave 2 implementation on `main`. The refactor plan in [`docs/refactor/03-finding-model.md`](refactor/03-finding-model.md) and [`docs/refactor/04-catalog.md`](refactor/04-catalog.md) replaces this registry-and-markdown-driven model with canonical findings and catalog-owned metadata.
 
 **Architecture:**
-- `internal/aws/issue_enrichment.go` — Wave 2 infrastructure: `IssueEnricherRegistry` map, unexported `registerIssueEnricher` helper (panics on empty name, nil fn, duplicate short name), `NoOpIssueEnricher`, `IssueEnricher` struct, `IssueEnricherFunc` / `IssueEnricherResult` types, shared helpers, `EnrichmentCap` / `PerParentPageCap`.
-- `internal/aws/*_issue_enrichment.go` — per-type enricher registrations, including real enrichers and `NoOpIssueEnricher` placeholders for types whose Wave 2 column is currently "None". Each file's `init()` calls `registerIssueEnricher(<shortname>, <fn>, <priority>)` and — if the enricher writes `FieldUpdates` — `resource.RegisterIssueEnricherFieldKeys(<shortname>, [...])`.
+- `internal/aws/issue_enrichment.go` — Wave 2 shared types and helpers: `NoOpIssueEnricher`, `IssueEnricher` struct, `IssueEnricherFunc` / `IssueEnricherResult` types, shared helpers, `EnrichmentCap` / `PerParentPageCap`. As of AS-795n, the package-init `IssueEnricherRegistry` map and `registerIssueEnricher` helper are gone — registrations now live on each `catalog.ResourceTypeDef` literal's `Wave2` field.
+- `internal/aws/wave2.go` — read API over the catalog: `Wave2EnricherFor(shortName) (IssueEnricher, bool)` and `AllWave2() []Wave2Entry`. Also exposes `SetWave2EnricherForTest` / `DeleteWave2EnricherForTest` for the test-override map used by `tests/unit/`.
+- `internal/aws/catalog_*.go` — per-category catalog literals. Each entry's `Wave2` field carries an `IssueEnricher{Fn:..., Priority:...}`, and `IssueEnricherFieldKeys` lists the `Fields` keys the enricher writes via `IssueEnricherResult.FieldUpdates`. Types with `NoOpIssueEnricher` are explicit placeholders for in-fetcher Wave 2 work.
 - `internal/runtime/probes.go` — `(*Core).BuildEnrichQueue()` (queue construction lives on `runtime.Core`).
 - `internal/tui/probe_adapter.go` — `(*Model).probeEnrichment()` — the TUI-side `tea.Cmd` wrapper that dispatches enrichers and emits `EnrichmentChecked` messages.
 - `internal/runtime/handlers_availability.go` — `(*Core).startEnrichment()` (builds the queue, returns probe tasks) and `(*Core).handleEnrichmentChecked()` (applies one Wave-2 result with the only-increase guard).
@@ -363,7 +364,7 @@ This section documents the current Wave 2 implementation on `main`. The refactor
 
 ```text
 Wave 1 probes complete
-  → startEnrichment() builds queue from IssueEnricherRegistry ∩ probeResources
+  → startEnrichment() builds queue from awsclient.AllWave2() ∩ probeResources
   → probeEnrichment() dispatches issue enrichers (4-at-a-time, same as Wave 1)
   → EnrichmentCheckedMsg arrives
     → only-increase guard: menu badge updated only if new count > current
@@ -371,13 +372,13 @@ Wave 1 probes complete
   → all done: clear probeResources, save cache with enriched counts (when caching enabled)
 ```
 
-**Registry**: On `main`, Wave 2 capability is expressed through `IssueEnricherRegistry` entries, including `NoOpIssueEnricher` placeholders that make "no Wave 2 signal" explicit and testable. Some types with `NoOpIssueEnricher` still perform in-fetcher Wave 2 work — their fetchers already make per-resource Describe calls and populate health fields at fetch time (e.g., EKS `health_issues_count`, CloudTrail `is_logging`, OpenSearch `cluster_health`).
+**Registry**: Wave 2 capability is declared on each `catalog.ResourceTypeDef` literal's `Wave2` field, including `NoOpIssueEnricher` placeholders that make "no Wave 2 signal" explicit and testable. Some types with `NoOpIssueEnricher` still perform in-fetcher Wave 2 work — their fetchers already make per-resource Describe calls and populate health fields at fetch time (e.g., EKS `health_issues_count`, CloudTrail `is_logging`, OpenSearch `cluster_health`).
 
 **Priority order** (`(*Core).BuildEnrichQueue`): Batchable enrichers that make account-wide calls are dispatched first (e.g., RDS/DocDB maintenance, EC2 instance status). Per-resource enrichers (e.g., DynamoDB PITR, KMS rotation, S3 PAB) iterate over resource IDs/ARNs, capped at `EnrichmentCap` (50). The registry key for each enricher must match the `ShortName` Wave 1 uses to store probe resources — a mismatch silently skips the enricher.
 
 **Resource identity**: Enrichers receive retained first-page resources from Wave 1 probes (`probeResources map[string][]resource.Resource`). Account-wide enrichers make a single API call covering all resources. Per-resource enrichers fan out to individual resources, capped at `EnrichmentCap` (50).
 
-**Current contract on `main`**: [`docs/attention-signals.md`](attention-signals.md) is the hand-maintained source of truth for Wave 1 (Color func) and Wave 2 (issue-enricher) assignments per resource type. `TestAttentionSignalsDoc` parses the markdown table and enforces: every type with Wave 1 != "None" has a non-nil `Color` func, and every type with Wave 2 != "None" has an `IssueEnricherRegistry` entry. The refactor plan replaces this with generated docs from catalog data.
+**Current contract on `main`**: [`docs/attention-signals.md`](attention-signals.md) is the hand-maintained source of truth for Wave 1 (Color func) and Wave 2 (issue-enricher) assignments per resource type. `TestAttentionSignalsDoc` parses the markdown table and enforces: every type with Wave 1 != "None" has a non-nil `Color` func, and every type with Wave 2 != "None" returns a non-nil entry from `awsclient.Wave2EnricherFor(shortName)`. The refactor plan replaces this with generated docs from catalog data.
 
 **Skip condition**: Wave 2 runs only when `isDemo=false`. Demo mode has no real AWS to query. `--no-cache` on live AWS still runs Wave 2 (it only disables disk persistence, not capabilities).
 
@@ -606,7 +607,7 @@ In the detail view, navigable fields are underlined. Pressing Enter on one emits
 a9s has two distinct enrichment pipelines with disjoint contracts:
 
 1. **Detail enrichment** (on-demand) — `resource.DetailEnricher` in `internal/resource/enricher.go`. Fetches additional data when a user opens a detail/YAML/JSON view (e.g., IAM policy documents). See below.
-2. **Wave 2 issue enrichment** (background) — `awsclient.IssueEnricherFunc` registered in `awsclient.IssueEnricherRegistry` (infrastructure in `internal/aws/issue_enrichment.go`; one `*_issue_enrichment.go` file per short name). Discovers hidden issues via additional API calls after Wave 1 probes complete. See "Wave 2 Issue Enrichment Pipeline" under Fetcher Patterns.
+2. **Wave 2 issue enrichment** (background) — `awsclient.IssueEnricherFunc` declared on each `catalog.ResourceTypeDef.Wave2` field and accessed via `awsclient.Wave2EnricherFor(shortName)` / `awsclient.AllWave2()` (shared types in `internal/aws/issue_enrichment.go`; read API in `internal/aws/wave2.go`; per-resource enricher bodies live in `*_issue_enrichment.go` files per short name). Discovers hidden issues via additional API calls after Wave 1 probes complete. See "Wave 2 Issue Enrichment Pipeline" under Fetcher Patterns.
 
 ### On-Demand Detail Enhancement
 

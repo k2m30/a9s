@@ -23,6 +23,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/catalog"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // Test 1 — Smoke: Install() makes catalog.Find("ec2") return a non-nil entry.
@@ -135,13 +136,20 @@ func TestCatalogInstall_GoldenParity(t *testing.T) {
 
 // Test 6 — AS-795 progressive-migration invariant: every entry with a non-nil
 // Fetcher must also carry FieldKeys + (Related OR Navigable) so partial
-// scaffolds don't slip into main. Inverse holds too: when Fetcher is nil the
-// other wiring fields stay zero. AS-795b–m flip types one category at a time;
+// scaffolds don't slip into main. AS-795b–m flip types one category at a time;
 // this test grows with each migration but the shape stays identical.
 //
+// AS-795n exception: Wave2 migration is global (one PR migrates every
+// remaining Wave 2 enricher into the catalog so the IssueEnricherRegistry map
+// can be deleted). Wave2 in catalog without Fetcher in catalog is therefore
+// expected for any type whose Fetcher hasn't been moved out of its
+// legacy init() yet (acm/efs/r53/ecs-task are the remaining stragglers as
+// of AS-795n). When the Wave2 field is non-nil but Fetcher is nil, we only
+// require that the type still has a fetcher reachable via the legacy
+// resource.GetPaginatedFetcher map (populated by the file's package init()).
+//
 // Replaces the AS-795a-era "zero wiring" guards, which were valid only while
-// no category had been migrated (PR #392). AS-807 migrates the first batch
-// (compute + ng).
+// no category had been migrated (PR #392).
 func TestCatalogInstall_AS795_MigrationShape(t *testing.T) {
 	all := catalog.All()
 	if len(all) == 0 {
@@ -153,7 +161,12 @@ func TestCatalogInstall_AS795_MigrationShape(t *testing.T) {
 				t.Errorf("type %q: FieldKeys populated without Fetcher — partial migration?", rt.ShortName)
 			}
 			if rt.Wave2 != nil {
-				t.Errorf("type %q: Wave2 populated without Fetcher — partial migration?", rt.ShortName)
+				// AS-795n: Wave2 may be in catalog while Fetcher is still in
+				// legacy init(). Require the legacy fetcher to be present so
+				// the type is still reachable in the running app.
+				if resource.GetPaginatedFetcher(rt.ShortName) == nil {
+					t.Errorf("type %q: Wave2 in catalog and no Fetcher anywhere (catalog or legacy) — type is unreachable", rt.ShortName)
+				}
 			}
 			continue
 		}

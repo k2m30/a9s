@@ -12,10 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("asg", EnrichASGScalingActivities, 100)
-}
-
 // EnrichASGScalingActivities calls DescribeScalingActivities(MaxRecords=1) for each ASG
 // (cap EnrichmentCap) and returns a Finding when the latest activity StatusCode == Failed.
 // Severity is "!" (broken/degraded). Summary: "latest scaling activity failed: <statusMessage>".

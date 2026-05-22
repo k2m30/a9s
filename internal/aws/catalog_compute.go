@@ -645,6 +645,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Key: "memory", Title: "Memory", Width: 8, Sortable: true},
 		},
 		Color: colorECSTask,
+		Wave2: IssueEnricher{Fn: EnrichECSTasks, Priority: 100},
 	},
 	{
 		Name:          "Lambda Functions",

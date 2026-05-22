@@ -13,11 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("codeartifact", EnrichCodeArtifactRepository, 100)
-	resource.RegisterIssueEnricherFieldKeys("codeartifact", []string{"package_count"})
-}
-
 // EnrichCodeArtifactRepository calls GetRepositoryPermissionsPolicy per repository (capped at
 // EnrichmentCap) to surface IAM policy findings.
 //

@@ -22,10 +22,6 @@ import (
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 )
 
-func init() {
-	registerIssueEnricher("dbi-snap", enrichDBISnapCrossRef, 100)
-}
-
 // enrichDBISnapCrossRef is the IssueEnricherFunc registered for dbi-snap.
 // It is the SnapshotCrossRef helper instantiated with rds.DBSnapshot /
 // rds.DBInstance extractors.

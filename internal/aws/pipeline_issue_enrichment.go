@@ -12,11 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("pipeline", EnrichCodePipelineStatus, 10)
-	resource.RegisterIssueEnricherFieldKeys("pipeline", []string{"last_status"})
-}
-
 // EnrichCodePipelineStatus calls GetPipelineState for each pipeline (1 per pipeline, cap ~50).
 // Returns a Finding for each pipeline with a failed stage.
 // Severity is "!" (broken/degraded). Summary: "stage <Name> failed".

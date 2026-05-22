@@ -104,6 +104,9 @@ func bridgeCatalogToLegacy() {
 		if rt.DetailEnrich != nil {
 			resource.RegisterDetailEnricher(rt.ShortName, rt.DetailEnrich)
 		}
+		if len(rt.IssueEnricherFieldKeys) > 0 {
+			resource.RegisterIssueEnricherFieldKeys(rt.ShortName, rt.IssueEnricherFieldKeys)
+		}
 	}
 	// Child types: replay catalog child-type entries onto the legacy
 	// resource.childTypes + paginatedChildRegistry maps so consumers calling

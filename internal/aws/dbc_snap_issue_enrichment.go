@@ -33,10 +33,6 @@ import (
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 )
 
-func init() {
-	registerIssueEnricher("dbc-snap", enrichDBCSnapCrossRef, 100)
-}
-
 // enrichDBCSnapCrossRef is the IssueEnricherFunc registered for dbc-snap.
 var enrichDBCSnapCrossRef = EnrichSnapshotCrossRef(SnapshotCrossRefConfig{
 	ParentShortName:    "dbc",

@@ -13,11 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("cfn", EnrichCFNCombined, 100)
-	resource.RegisterIssueEnricherFieldKeys("cfn", []string{"drift_status"})
-}
-
 // EnrichCFNStackEvents calls DescribeStackEvents for each stack (first page only,
 // up to EnrichmentCap stacks). It scans the most recent events client-side for any
 // resource with ResourceStatus ending in "_FAILED". A failed resource event produces

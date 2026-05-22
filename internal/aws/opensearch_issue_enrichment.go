@@ -8,10 +8,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("opensearch", EnrichOpenSearchDomains, 100)
-}
-
 // EnrichOpenSearchDomains emits EnrichmentFindings for background-check signals
 // read from resource Fields populated by FetchOpenSearchDomains:
 //

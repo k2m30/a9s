@@ -14,10 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("ec2", EnrichEC2InstanceStatus, 100)
-}
-
 // EnrichEC2InstanceStatus calls DescribeInstanceStatus(IncludeAllInstances=true) (account-wide,
 // paginated) and returns a Finding for every instance whose system or instance status is not "ok".
 // Scheduled events with NotBeforeDeadline within the next 7 days also produce a Finding.

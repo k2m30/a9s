@@ -13,11 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("sfn", EnrichStepFunctionsStatus, 10)
-	resource.RegisterIssueEnricherFieldKeys("sfn", []string{"last_run"})
-}
-
 // EnrichStepFunctionsStatus calls ListExecutions(max:1) for each state machine (1 per SFN, cap ~50).
 // Returns a Finding for each state machine whose latest execution is FAILED, TIMED_OUT, or ABORTED.
 // Severity is "!" (broken/degraded). Summary: "latest execution <STATUS>".

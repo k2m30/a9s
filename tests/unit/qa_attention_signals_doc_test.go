@@ -7,7 +7,7 @@ package unit
 //
 //  1. Resource type exists — resource.FindResourceType(shortName) must return non-nil.
 //  2. Wave 1 non-empty → Color func non-nil.
-//  3. Wave 2 non-empty → awsclient.IssueEnricherRegistry[shortName] must be non-nil.
+//  3. Wave 2 non-empty → awsclient.Wave2EnricherFor(shortName) must be ok.
 //
 // Plus one table-level guard:
 //
@@ -176,10 +176,10 @@ func TestAttentionSignalsDoc(t *testing.T) {
 				}
 			}
 
-			// Assertion 3: Wave 2 non-empty → registered enricher.
+			// Assertion 3: Wave 2 non-empty → catalog Wave 2 enricher wired.
 			if !isNoneCell(row.Wave2) {
-				if _, ok := awsclient.IssueEnricherRegistry[row.ShortName]; !ok {
-					t.Errorf("docs Wave 2 signal for %q but no entry in awsclient.IssueEnricherRegistry", row.ShortName)
+				if _, ok := awsclient.Wave2EnricherFor(row.ShortName); !ok {
+					t.Errorf("docs Wave 2 signal for %q but no awsclient.Wave2EnricherFor entry (catalog Wave2 field missing)", row.ShortName)
 				}
 			}
 		})

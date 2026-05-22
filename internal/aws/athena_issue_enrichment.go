@@ -11,10 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("athena", EnrichAthenaWorkGroup, 100)
-}
-
 // EnrichAthenaWorkGroup calls GetWorkGroup per workgroup (capped at EnrichmentCap) to
 // surface governance and security findings.
 //

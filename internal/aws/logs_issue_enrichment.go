@@ -13,11 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("logs", EnrichLogsMetricFilters, 100)
-	resource.RegisterIssueEnricherFieldKeys("logs", []string{"last_event_at"})
-}
-
 // EnrichLogsMetricFilters calls DescribeMetricFilters per CloudTrail log group
 // (capped at EnrichmentCap) to detect audit log groups without metric filters.
 // It also writes last_event_at for all log groups via DescribeLogStreams.

@@ -45,6 +45,7 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			DisplayNameKey: "zone_name",
 		}},
 		Color: r53Color,
+		Wave2: IssueEnricher{Fn: EnrichRoute53Zone, Priority: 100},
 	},
 	{
 		Name:          "CloudFront Distributions",
@@ -101,6 +102,7 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			{Key: "in_use", Title: "In Use", Width: 8, Sortable: true},
 		},
 		Color: acmColor,
+		Wave2: IssueEnricher{Fn: EnrichACMCertificate, Priority: 100},
 	},
 	{
 		Name:          "API Gateways",
@@ -123,8 +125,9 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			}
 			return FetchAPIGatewaysPageMerged(ctx, c, continuationToken)
 		},
-		Wave2:     IssueEnricher{Fn: EnrichAPIGatewayStage, Priority: 100},
-		FieldKeys: []string{"api_id", "name", "protocol", "endpoint", "description"},
+		Wave2:                  IssueEnricher{Fn: EnrichAPIGatewayStage, Priority: 100},
+		FieldKeys:              []string{"api_id", "name", "protocol", "endpoint", "description"},
+		IssueEnricherFieldKeys: []string{"stages_count"},
 		Related: []domain.RelatedDef{
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkApigwLogs, NeedsTargetCache: true},
 			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkApigwLambda},

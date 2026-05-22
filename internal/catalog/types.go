@@ -53,8 +53,10 @@ type ResourceTypeDef struct {
 	// Fetcher is the Wave 1 paginated fetcher for this resource type.
 	Fetcher domain.PaginatedFetcher
 	// Wave2 is the Wave 2 issue-enricher. nil means no Wave 2 signal.
-	// Concrete type is *aws.IssueEnricher; stored as any to avoid import cycle.
-	// Replaces NoOpIssueEnricher — nil is the explicit "no Wave 2" signal.
+	// Concrete type is aws.IssueEnricher (value type); stored as any to
+	// avoid import cycle. A zero IssueEnricher with Fn == nil behaves
+	// identically to a nil any — both bypass Wave 2 dispatch via the
+	// AllWave2 filter in internal/aws/wave2.go.
 	Wave2 any
 	// Project is an optional custom DetailProjector. When nil,
 	// projection.Generic is used as the fallback projector.

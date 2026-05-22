@@ -10,10 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("ddb", EnrichDynamoDBPITR, 100)
-}
-
 // EnrichDynamoDBPITR calls DescribeContinuousBackups for each table (cap EnrichmentCap)
 // and returns a Finding when PITR is not enabled.
 // Severity is "~" (informational); PITR-disabled findings do not bump the menu badge.

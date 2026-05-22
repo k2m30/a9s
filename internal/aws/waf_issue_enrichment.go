@@ -13,11 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("waf", EnrichWAFLogging, 100)
-	resource.RegisterIssueEnricherFieldKeys("waf", []string{"rules_summary"})
-}
-
 // EnrichWAFLogging calls GetLoggingConfiguration, ListResourcesForWebACL, and GetWebACL per WebACL
 // (cap EnrichmentCap) and raises findings for:
 //   - GetLoggingConfiguration returns WAFNonexistentItemException → "~" finding

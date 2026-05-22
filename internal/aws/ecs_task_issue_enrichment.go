@@ -13,10 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("ecs-task", EnrichECSTasks, 100)
-}
-
 // EnrichECSTasks is a Wave 2 enricher for ECS tasks.
 // It groups tasks by cluster ARN and calls DescribeTasks (up to 100 per call)
 // to surface failures that Wave 1 status coloring cannot detect.

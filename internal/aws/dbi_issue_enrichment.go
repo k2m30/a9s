@@ -11,10 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("dbi", EnrichDBIMaintenance, 10)
-}
-
 // EnrichDBIMaintenance calls DescribePendingMaintenanceActions (account-wide, paginated)
 // and emits one Finding per dbi instance with pending maintenance. Severity "~" —
 // IssueCount is always 0 (Wave 2 ~ does not bump the S1 menu badge). The merged

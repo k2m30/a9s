@@ -492,7 +492,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	// outgoing ResourcesLoadedMsg so the tail branch in app.go can seed
 	// probeResources and dispatch probeEnrichment on success.
 	if rl.ParentContext() == nil && !rl.EscPops() {
-		if _, hasEnricher := awsclient.IssueEnricherRegistry[rt]; hasEnricher {
+		if _, hasEnricher := awsclient.Wave2EnricherFor(rt); hasEnricher {
 			m.core.Session().EnrichmentTypeGen[rt]++
 			tok := m.core.Session().EnrichmentTypeGen[rt]
 			delete(m.core.Session().EnrichmentRan, rt)

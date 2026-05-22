@@ -12,11 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("sqs", EnrichSQSAttributes, 100)
-	resource.RegisterIssueEnricherFieldKeys("sqs", []string{"dlq"})
-}
-
 // EnrichSQSAttributes calls GetQueueAttributes per queue (cap EnrichmentCap)
 // to surface missing DLQ and missing KMS encryption as Wave 2 findings.
 // Per-queue errors set Truncated=true + TruncatedIDs[id]=true for the affected

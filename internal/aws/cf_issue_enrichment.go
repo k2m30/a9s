@@ -12,10 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("cf", EnrichCloudFrontDistribution, 100)
-}
-
 // EnrichCloudFrontDistribution calls GetDistributionConfig per distribution (cap EnrichmentCap)
 // and returns a Finding for any distribution with insecure viewer or origin protocol settings.
 //

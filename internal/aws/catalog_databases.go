@@ -684,6 +684,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Key: "mount_targets", Title: "Mounts", Width: 8, Sortable: true},
 		},
 		Color: colorEFS,
+		Wave2: IssueEnricher{Fn: EnrichEFSMountTargets, Priority: 100},
 	},
 	{
 		Name:          "DB Instance Snapshots",

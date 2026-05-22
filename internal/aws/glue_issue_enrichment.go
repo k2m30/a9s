@@ -12,11 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("glue", EnrichGlueJobStatus, 10)
-	resource.RegisterIssueEnricherFieldKeys("glue", []string{"last_run"})
-}
-
 // EnrichGlueJobStatus calls GetJobRuns(max:1) for each job (1 per job, cap ~50).
 // Returns a Finding for each job whose latest run is FAILED, ERROR, or TIMEOUT.
 // Severity is "!" (broken/degraded). Summary: "latest run <STATUS>".

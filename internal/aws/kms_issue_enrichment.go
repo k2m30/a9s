@@ -10,11 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("kms", EnrichKMSRotation, 100)
-	resource.RegisterIssueEnricherFieldKeys("kms", []string{"rotation_enabled"})
-}
-
 // EnrichKMSRotation calls GetKeyRotationStatus for each customer-managed key (cap EnrichmentCap)
 // and returns a Finding when key rotation is not enabled.
 // Severity is "~" (informational per CIS KMS.1); IssueCount counts rotation-disabled findings.
