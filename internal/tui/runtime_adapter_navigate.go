@@ -10,12 +10,18 @@
 // returned TaskRequests into tea.Cmd values.
 //
 // handleCopy, handleRefresh / refreshResourceList, handleReveal,
-// handleIdentityLoaded, and handleIdentityError stay here as TUI-only
-// helpers because every line of their bodies depends on adapter state
-// (view stack, view-typed methods, flashState, m.core.Session().Identity, tea.Cmd
-// returns). Their runtime-policy parts (cache-mutation gen bumps,
-// per-type enrichment-rerun bookkeeping) are reads/writes against the
-// session owned by core — same data the runtime sees through c.session.
+// and the identity-error view-update tail stay here as TUI-only helpers
+// because every line of their bodies depends on adapter state (view
+// stack, view-typed methods, flashState, tea.Cmd returns). Their
+// runtime-policy parts (cache-mutation gen bumps, per-type
+// enrichment-rerun bookkeeping) are reads/writes against the session
+// owned by core — same data the runtime sees through c.session.
+//
+// PR-05a-h4-b (AS-962) removed the inline handleIdentityLoaded /
+// handleIdentityError helpers in favour of HandleEvent-routed dispatch
+// + applyIntents (SetIdentityIntent, HeaderInvalidateIntent). The
+// IdentityError view-side note now flows through the runtime_adapter
+// SetIdentityError path; handleIdentityError-the-method is gone.
 package tui
 
 import (
@@ -257,7 +263,7 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
-		regions := awsclient.AllRegions()
+		regions := m.core.AllRegions()
 		regionCodes := make([]string, len(regions))
 		for i, r := range regions {
 			regionCodes[i] = r.Code
@@ -442,10 +448,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		// sesActiveReceiptRuleSet captures its store reference at entry; we
 		// replace the slot here.
 		if rt == "ses" {
-			m.core.Session().RuleSets = session.NewRuleSetStore()
-			if m.core.Session().Clients != nil {
-				m.core.Session().Clients.SetRuleSets(m.core.Session().RuleSets)
-			}
+			m.core.ResetRuleSets()
 		}
 		m.flash = flashState{text: "Refreshing...", isError: false, active: true}
 
@@ -490,10 +493,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	if rt == "ses" {
 		// Swap (see detail-view path above): protects against in-flight blocked
 		// DescribeActiveReceiptRuleSet fetchers re-poisoning the cache.
-		m.core.Session().RuleSets = session.NewRuleSetStore()
-		if m.core.Session().Clients != nil {
-			m.core.Session().Clients.SetRuleSets(m.core.Session().RuleSets)
-		}
+		m.core.ResetRuleSets()
 	}
 	m.flash = flashState{text: "Refreshing...", isError: false, active: true}
 
@@ -570,29 +570,27 @@ func (m Model) handleReveal() (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// handleIdentityLoaded caches the identity and updates the identity view if
-// active. Adapter-side because m.core.Session().Identity / m.core.Session().IdentityFetching live on the
-// TUI Model today.
-func (m Model) handleIdentityLoaded(msg messages.IdentityLoaded) (tea.Model, tea.Cmd) {
-	m.core.Session().IdentityFetching = false
-	if id, ok := msg.Identity.(*awsclient.CallerIdentity); ok {
-		m.core.Session().Identity = id
-	}
-	if idView, ok := m.activeView().(*views.IdentityModel); ok {
-		data := m.identityToViewData()
-		idView.SetIdentity(data)
-	}
-	return m, nil
-}
-
-// handleIdentityError clears the fetching flag and updates the identity view
-// if active. Adapter-side for the same reason as handleIdentityLoaded.
+// handleIdentityError clears the fetching flag (via Core through
+// HandleEvent → HandleIdentityError) and additionally updates the
+// IdentityModel view if active. The view-side note stays in the
+// adapter because IdentityModel.SetError requires inspecting the
+// renderer's view stack — out of scope for the platform-agnostic Core.
+//
+// AS-657 stamped IdentityError with AspectConnect; the shim performs
+// the stale-gen check up-front so the view-side SetError() does not
+// fire on a stale error from a prior profile/region.
 func (m Model) handleIdentityError(msg messages.IdentityError) (tea.Model, tea.Cmd) {
-	m.core.Session().IdentityFetching = false
+	if messages.IsStale(msg, m.core.Session()) {
+		return m, nil
+	}
+	updated, cmd := m.coreUpdate(msg)
+	if um, ok := updated.(Model); ok {
+		m = um
+	}
 	if idView, ok := m.activeView().(*views.IdentityModel); ok {
 		idView.SetError(msg.Err)
 	}
-	return m, nil
+	return m, cmd
 }
 
 // copyToClipboard returns a tea.Cmd that writes content to the system

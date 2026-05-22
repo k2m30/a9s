@@ -61,6 +61,10 @@ func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 		return c.handleAvailabilityChecked(msg)
 	case messages.EnrichmentChecked:
 		return c.handleEnrichmentChecked(msg)
+	case messages.IdentityLoaded:
+		return c.HandleIdentityLoaded(IdentityLoadedEvent{Identity: msg.Identity})
+	case messages.IdentityError:
+		return c.HandleIdentityError(IdentityErrorEvent{Err: msg.Err})
 	}
 	return nil, nil
 }
