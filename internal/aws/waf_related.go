@@ -1,4 +1,7 @@
-// waf_related.go registers related-resource definitions for WAF Web ACLs.
+// waf_related.go defines the related-resource checkers for WAF Web ACLs.
+// The Related slice for "waf" is registered via the catalog struct literal in
+// catalog_security.go (AS-814); this file now contains only the per-target
+// checker functions referenced from that catalog entry.
 package aws
 
 import (
@@ -13,19 +16,6 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
-
-func init() {
-	resource.RegisterRelated("waf", []resource.RelatedDef{
-		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkWAFELB, NeedsTargetCache: false},
-		{TargetType: "apigw", DisplayName: "API Gateways", Checker: checkWAFAPIGW, NeedsTargetCache: false},
-		{TargetType: "cf", DisplayName: "CloudFront", Checker: checkWAFCF, NeedsTargetCache: false},
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkWAFAlarm},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkWAFLogs},
-	})
-
-	// wafv2types.WebACLSummary: no cross-ref fields — Name, Id, ARN, Description, LockToken only.
-	// Associations (ELB/APIGW/CF) are resolved via checkWAF* related checkers at runtime.
-}
 
 // checkWAFELB calls wafv2:ListResourcesForWebACL with ALB resource type and
 // returns matching load balancer names (Pattern A — direct API call).
