@@ -18,12 +18,13 @@ package unit
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // navigateToDBIList navigates the root model to the DBI resource list.
@@ -96,38 +97,50 @@ func TestProbeEnrichment_NilClients_ReturnsErrorMsg(t *testing.T) {
 // registered enricher returns an error, probeEnrichment returns
 // EnrichmentCheckedMsg with Err set. We override the dbi enricher with a fake
 // that errors via SetWave2EnricherForTest; cleanup is automatic via t.Cleanup.
+//
+// To prove branch (c) (enricher-error) is reached and not branch (b)
+// (nil-clients), the test seeds the session with a non-nil empty
+// *awsclient.ServiceClients via the public ClientsReady message channel
+// and asserts the substring of the sentinel error returned by the fake.
 func TestProbeEnrichment_EnricherError_ReturnsErrorMsg(t *testing.T) {
 	tui.Version = "test"
 
 	// Temporarily replace the dbi enricher with one that always errors. The
 	// helper records the previous value and restores it on t.Cleanup.
 	prev, _ := awsclient.Wave2EnricherFor("dbi")
+	const sentinel = "simulated enricher failure"
 	awsclient.SetWave2EnricherForTest(t, "dbi", awsclient.IssueEnricher{
 		Fn: func(_ context.Context, _ *awsclient.ServiceClients, _ []resource.Resource, _ resource.ResourceCache) (awsclient.IssueEnricherResult, error) {
-			return awsclient.IssueEnricherResult{}, fmt.Errorf("simulated enricher failure")
+			return awsclient.IssueEnricherResult{}, fmt.Errorf("%s", sentinel)
 		},
 		Priority: prev.Priority,
 	})
 
-	// We need a model with non-nil clients so the nil-clients branch is NOT taken.
-	// Since we can't inject real clients, we'll accept that with nil clients the
-	// error path (b) fires — which also tests Err is set. The key thing this test
-	// adds is: the enricher func was registered and will be invoked.
-	//
-	// To truly reach the enricher-error branch (c) we need non-nil clients.
-	// In unit tests we can't construct real AWS clients, so we verify the
-	// command shape via the nil-clients path as a coverage proxy.
-	_, execProbe := setupEnrichmentDispatch(t, rerunDBIResources())
-	msg := execProbe()
-
+	// Seed non-nil empty clients via the public message channel so probeEnrichment's
+	// nil-clients early-return (branch b) is NOT taken. The fake enricher ignores
+	// the *ServiceClients argument so a zero value is safe.
+	m := newRootSizedModel()
+	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: &awsclient.ServiceClients{}})
+	m = navigateToDBIList(m)
+	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
+	_, probeCmd := rootApplyMsg(m, messages.ResourcesLoaded{
+		ResourceType: "dbi",
+		Resources:    rerunDBIResources(),
+		TypeGen:      1,
+	})
+	if probeCmd == nil {
+		t.Fatal("ResourcesLoadedMsg{TypeGen=1} should dispatch probeEnrichment (non-nil cmd)")
+	}
+	msg := probeCmd()
 	checked, ok := msg.(messages.EnrichmentChecked)
 	if !ok {
-		t.Logf("probeEnrichment returned %T — skipping (batch acceptable)", msg)
-		return
+		t.Fatalf("probeEnrichment returned %T; want messages.EnrichmentChecked", msg)
 	}
-	// Either nil-clients error (b) or enricher error (c) — both produce Err != nil.
 	if checked.Err == nil {
-		t.Error("error path: EnrichmentCheckedMsg.Err should be set")
+		t.Fatal("EnrichmentCheckedMsg.Err is nil — enricher-error branch (c) was not reached")
+	}
+	if !strings.Contains(checked.Err.Error(), sentinel) {
+		t.Errorf("EnrichmentCheckedMsg.Err = %q; want substring %q (nil-clients branch likely fired instead)", checked.Err.Error(), sentinel)
 	}
 }
 

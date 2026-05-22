@@ -39,20 +39,25 @@ func TestConformance_EveryResourceTypeHasPaginatedFetcher(t *testing.T) {
 
 // TestConformance_EveryWave2DocRowHasCatalogEntry pins the Wave 2 contract
 // post-AS-795n: every resource type with a non-"None" Wave 2 row in
-// docs/attention-signals.md must have a non-nil catalog Wave2 field. The
-// doc-grounded TestAttentionSignalsDoc enforces the same invariant, plus
-// the "None" rows are now explicit-by-absence: a catalog entry with a nil
-// Wave2 field is the documented "no Wave 2 signal" classification.
+// docs/attention-signals.md must have a non-nil catalog Wave2 field reachable
+// through awsclient.Wave2EnricherFor. The broader TestAttentionSignalsDoc
+// pairs Wave 1/Wave 2/Color in one sub-test pass; this conformance variant is
+// a fast scan that fails fast when the catalog → accessor chain drops a row.
 func TestConformance_EveryWave2DocRowHasCatalogEntry(t *testing.T) {
-	// Catalog entries with non-nil Wave2 are the live registrations. We do
-	// NOT require every resource type to have a Wave2 — "None" rows in the
-	// doc are legitimately absent. The behavioral contract is enforced by
-	// TestAttentionSignalsDoc which reads the doc and pairs each non-"None"
-	// row against awsclient.Wave2EnricherFor.
-	for _, td := range resource.AllResourceTypes() {
-		// Sanity check the type is fetchable; Wave 2 absence is allowed.
-		if resource.GetPaginatedFetcher(td.ShortName) == nil {
-			t.Errorf("resource type %q has no PaginatedFetcher; cannot run Wave 1, let alone Wave 2", td.ShortName)
+	docPath := attentionSignalsDocPath(t)
+	rows, err := parseAttentionSignalsDoc(docPath)
+	if err != nil {
+		t.Fatalf("failed to parse %s: %v", docPath, err)
+	}
+	if len(rows) == 0 {
+		t.Fatalf("0 rows parsed from %s — parse may be broken", docPath)
+	}
+	for _, row := range rows {
+		if isNoneCell(row.Wave2) {
+			continue
+		}
+		if _, ok := awsclient.Wave2EnricherFor(row.ShortName); !ok {
+			t.Errorf("docs Wave 2 signal for %q but awsclient.Wave2EnricherFor returns ok=false (catalog Wave2 missing or wrong type)", row.ShortName)
 		}
 	}
 }

@@ -299,19 +299,22 @@ func TestCR273_AllTypes_MenuCtrlZ_NoFalsePositives(t *testing.T) {
 				IssueKnown:     map[string]bool{c.shortName: true},
 				Expired:        false,
 			})
-			// Wave 2 clean, if applicable.
+			// Wave 2 clean, if applicable. A type declared hasEnricher=true
+			// whose catalog entry has silently lost its Wave 2 wiring would
+			// pass this test vacuously — fail hard instead.
 			if c.hasEnricher {
-				if _, ok := awsclient.Wave2EnricherFor(c.shortName); ok {
-					m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
-						ResourceType: c.shortName,
-						Issues:       0,
-						Truncated:    false,
-						Findings:     map[string]resource.EnrichmentFinding{},
-						Err:          nil,
-						Gen:          0,
-						TypeGen:      0,
-					})
+				if _, ok := awsclient.Wave2EnricherFor(c.shortName); !ok {
+					t.Fatalf("type %q declared hasEnricher=true but awsclient.Wave2EnricherFor returns ok=false (catalog Wave2 wiring dropped)", c.shortName)
 				}
+				m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
+					ResourceType: c.shortName,
+					Issues:       0,
+					Truncated:    false,
+					Findings:     map[string]resource.EnrichmentFinding{},
+					Err:          nil,
+					Gen:          0,
+					TypeGen:      0,
+				})
 			}
 			m, _ = rootApplyMsg(m, tea.KeyPressMsg{Code: 'z', Mod: tea.ModCtrl})
 			plain := stripANSI(rootViewContent(m))
@@ -342,7 +345,7 @@ func TestCR273_AllTypes_MenuCtrlZ_Wave2ErroredSubCall_NoFalsePositives(t *testin
 				t.Skipf("%s has no Wave 2 enricher — partial-error scenario N/A", c.shortName)
 			}
 			if _, ok := awsclient.Wave2EnricherFor(c.shortName); !ok {
-				t.Skipf("%s declared hasEnricher=true but has no Wave 2 enricher in the catalog", c.shortName)
+				t.Fatalf("%s declared hasEnricher=true but awsclient.Wave2EnricherFor returns ok=false (catalog Wave2 wiring dropped)", c.shortName)
 			}
 
 			m := newRootSizedModel()
