@@ -35,6 +35,7 @@ func NoOpIssueEnricher(_ context.Context, _ *ServiceClients, _ []resource.Resour
 	return IssueEnricherResult{
 		Findings:     map[string]resource.EnrichmentFinding{},
 		TruncatedIDs: map[string]bool{},
+		FieldUpdates: map[string]map[string]string{},
 		IssueCount:   0,
 		Truncated:    false,
 	}, nil
