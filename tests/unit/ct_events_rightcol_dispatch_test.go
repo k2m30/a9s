@@ -142,7 +142,7 @@ func TestCtEventsRightColumnDispatch(t *testing.T) {
 
 	defs := resource.GetRelated("ct-events")
 	if len(defs) == 0 {
-		t.Fatal("resource.GetRelated(\"ct-events\") returned no defs — RegisterRelated not called?")
+		t.Fatal("resource.GetRelated(\"ct-events\") returned no defs — SetRelatedForTest not called?")
 	}
 
 	// ct-events has no demo override: the real checkers are pure field-readers

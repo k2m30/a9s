@@ -170,3 +170,21 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `LastCheckTimestamp` for drift — `AWS SDK Go v2 — cloudformation/types.StackDriftInformation § LastCheckTimestamp`.
 - Stack event fields `ResourceStatus`, `ResourceStatusReason`, `LogicalResourceId` for S5 text — `AWS SDK Go v2 — cloudformation/types.StackEvent § ResourceStatus, ResourceStatusReason, LogicalResourceId`.
 - Read-only invariant (no write ops) — `docs/architecture.md` § "What is a9s?" ("a9s never makes write calls to AWS").
+
+<!-- BEGIN GENERATED: header -->
+cfn — CI/CD. Lifecycle key: `status`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| role | IAM Roles | yes |
+| cfn | Related Stacks | yes |
+| sns | SNS Topics | no |
+| s3 | S3 (stack resources) | no |
+| eb-rule | EventBridge Rules | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

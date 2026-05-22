@@ -212,3 +212,26 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — `lambda` discovery via `FunctionConfiguration.FileSystemConfigs[].Arn` — `a9s-devops (2026-04-20): possible=yes, worth=yes. FileSystemConfigs[].Arn is an access-point ARN that embeds the FS id; prefix-match so both forms resolve.`
 - a9s-devops consultation — `sg` discovery via `DescribeMountTargetSecurityGroups` or ENI `Groups` join — `a9s-devops (2026-04-20): possible=yes, worth=yes. Both paths return the same SG set; prefer ENI join when eni list is already loaded.`
 - a9s-devops consultation — `eni`/`subnet`/`vpc` discovery via `DescribeMountTargets` fields `NetworkInterfaceId`/`SubnetId`/`VpcId` — `a9s-devops (2026-04-20): possible=yes, worth=yes. All three are direct SDK fields on MountTargetDescription; one DescribeMountTargets call covers all three pivots.`
+
+<!-- BEGIN GENERATED: header -->
+efs — DATABASES & STORAGE. Lifecycle key: `status`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| kms | KMS Keys | no |
+| cfn | CloudFormation Stacks | yes |
+| sg | Security Groups | no |
+| subnet | Subnets | no |
+| lambda | Lambda Functions | no |
+| alarm | CloudWatch Alarms | yes |
+| backup | Backup Plans | yes |
+| ecs-task | ECS Tasks | yes |
+| eni | Network Interfaces | yes |
+| vpc | VPC | yes |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

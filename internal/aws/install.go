@@ -54,11 +54,11 @@ func ctEventsCheckerFor(shortName string) domain.RelatedChecker {
 func Install() {
 	catalog.SetTypes(allTopLevelTypes())
 	catalog.SetChildTypes(allChildTypes())
-	// Bridge catalog → legacy internal/resource maps. The bridge body itself
-	// lives in internal/resource (BridgeCatalogToLegacy) so internal/aws has
-	// no resource.Register* call sites — the AS-947 grep gate (Wave 2.5)
-	// enforces zero such calls outside the resource package.
-	resource.BridgeCatalogToLegacy()
+	// AS-731: catalog → legacy bridge deleted. Production consumers read the
+	// catalog directly via resource.Get* wrappers, which fall back to catalog
+	// fields when their legacy registry map is empty. Tests that override
+	// behavior continue to use resource.Register* on the legacy maps for
+	// scoped, undo-able injection.
 }
 
 // allTopLevelTypes concatenates the per-category top-level catalog slices into

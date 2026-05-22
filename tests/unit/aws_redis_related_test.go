@@ -950,7 +950,7 @@ func TestRelated_Redis_CtEvents_ElastiCacheSourceAloneDoesNotMatch(t *testing.T)
 // field-only checkers that do not scan any target type's resource cache).
 // All other entries must have NeedsTargetCache==true.
 // EXPECTED FAIL until coder sets NeedsTargetCache: false for kms and vpc in
-// redis_related.go's RegisterRelated call.
+// redis_related.go's SetRelatedForTest call.
 func TestRelated_Redis_Registration_KMSVPCNoTargetCache(t *testing.T) {
 	// Expected NeedsTargetCache per target type.
 	// kms and vpc are field-only: no cache scan required.

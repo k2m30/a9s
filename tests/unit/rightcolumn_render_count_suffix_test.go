@@ -41,10 +41,10 @@ import (
 // stomp the shared registry.
 func buildSuffixDetail(t *testing.T, displayName, targetType string) (views.DetailModel, func()) {
 	t.Helper()
-	resource.RegisterRelated("suffix-test", []resource.RelatedDef{
+	resource.SetRelatedForTest("suffix-test", []resource.RelatedDef{
 		{TargetType: targetType, DisplayName: displayName, Checker: noopChecker},
 	})
-	cleanup := func() { resource.UnregisterRelated("suffix-test") }
+	cleanup := func() { resource.CleanupRelatedForTest("suffix-test") }
 
 	res := resource.Resource{
 		ID:   "suffix-test-id",

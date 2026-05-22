@@ -186,3 +186,24 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — `r53` discovery via reverse scan of loaded record sets where `AliasTarget.DNSName` matches the distribution's `DomainName` — a9s-devops (2026-04-20): possible=yes, worth=yes. Case-fold the comparison and tolerate trailing dot.
 - a9s-devops consultation — `s3` discovery via `Origins[].DomainName` suffix match plus `LoggingConfig.Bucket` — a9s-devops (2026-04-20): possible=yes, worth=yes. Covers both the OAI/OAC origin case and the standard-log sink.
 - a9s-devops consultation — `logs` discovery left as TBD — a9s-devops (2026-04-20): possible=partial, worth=yes-in-principle. Standard logging goes to S3 not CW Logs; real-time log configs require `GetRealtimeLogConfig` per configuration, which exceeds the bounded Wave 2 budget.
+
+<!-- BEGIN GENERATED: header -->
+cf — DNS & CDN. Lifecycle key: `status`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| s3 | S3 Buckets (origin) | yes |
+| elb | Load Balancers (origin) | yes |
+| waf | WAF Web ACLs | yes |
+| acm | ACM Certificates | yes |
+| r53 | Route 53 Zones | no |
+| alarm | CloudWatch Alarms | yes |
+| lambda | Lambda@Edge | no |
+| logs | Log Groups | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

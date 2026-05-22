@@ -192,3 +192,20 @@ One bullet per claim in §§2–4.1. Citation sources, in order of authority:
 - a9s-devops persona (2026-04-20) — `backup` discovery via snapshot-identifier prefix `awsbackup:job-<uuid>` on `DBClusterSnapshotIdentifier` — possible=yes, worth=yes (narrow). Rationale: DocDB operators treat AWS Backup-created recovery points as a separate workflow from DocDB-native snapshots; the identifier prefix is free on the list response, so no per-row API cost.
 - a9s-devops persona (2026-04-20) — `vpc` pivot worth-assessment — possible=yes (field on SDK shape), worth=weak. Rationale: kept because the field is free on the list response and orients the operator at a glance; restore-time VPC selection is independent.
 - a9s-devops persona (2026-04-20) — no per-row cause text for `creating`/`failed` Status values — possible=no on the DocDB SDK shape. Rationale: the operator must pivot to `ct-events` to get the failure cause; this is an acceptable design limit given AWS's own surface is thin here.
+
+<!-- BEGIN GENERATED: header -->
+dbc-snap — DATABASES & STORAGE. Lifecycle key: `status`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| dbc | DocumentDB Cluster | yes |
+| kms | KMS Key | no |
+| vpc | VPC | no |
+| backup | Backup Plans | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

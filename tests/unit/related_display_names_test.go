@@ -9,7 +9,7 @@ import (
 )
 
 // relatedDefsSnapshot captures all related defs on first access, before any
-// test has had a chance to mutate the registry via RegisterRelated. We can't
+// test has had a chance to mutate the registry via SetRelatedForTest. We can't
 // take this snapshot in init() because init() runs before TestMain, and
 // catalog.Find / catalog.All panic until SetTypes has been called by
 // aws.Install in TestMain.

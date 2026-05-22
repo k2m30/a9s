@@ -32,7 +32,7 @@ func TestRegistry_MockFetcher_CanBeCalledAndReturnsResources(t *testing.T) {
 		{ID: "test-1", Name: "Test Resource 1"},
 		{ID: "test-2", Name: "Test Resource 2"},
 	}
-	resource.RegisterPaginated("_test_mock", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+	resource.SetPaginatedForTest("_test_mock", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		return resource.FetchResult{
 			Resources: testResources,
 			Pagination: &resource.PaginationMeta{
@@ -42,7 +42,7 @@ func TestRegistry_MockFetcher_CanBeCalledAndReturnsResources(t *testing.T) {
 			},
 		}, nil
 	})
-	defer resource.UnregisterPaginated("_test_mock") // clean up
+	defer resource.CleanupPaginatedForTest("_test_mock") // clean up
 
 	f := resource.GetPaginatedFetcher("_test_mock")
 	if f == nil {
@@ -62,10 +62,10 @@ func TestRegistry_MockFetcher_CanBeCalledAndReturnsResources(t *testing.T) {
 }
 
 func TestRegistry_MockFetcher_CanReturnError(t *testing.T) {
-	resource.RegisterPaginated("_test_err", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
+	resource.SetPaginatedForTest("_test_err", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
 		return resource.FetchResult{}, fmt.Errorf("simulated AWS error")
 	})
-	defer resource.UnregisterPaginated("_test_err")
+	defer resource.CleanupPaginatedForTest("_test_err")
 
 	f := resource.GetPaginatedFetcher("_test_err")
 	if f == nil {

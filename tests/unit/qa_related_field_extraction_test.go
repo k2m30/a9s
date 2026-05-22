@@ -21,7 +21,7 @@ import (
 
 // checkerCache holds related checkers captured the first time
 // fieldExtractionChecker is called. Snapshot timing matters: tests that call
-// RegisterRelated mutate the global registry, so we want a snapshot taken
+// SetRelatedForTest mutate the global registry, so we want a snapshot taken
 // before any test runs. We can't use a package-level var initializer here
 // because catalog.All (transitively reached via resource.AllResourceTypes)
 // panics until aws.Install is called in TestMain — and package-level var

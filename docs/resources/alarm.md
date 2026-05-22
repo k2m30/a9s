@@ -232,3 +232,30 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `ct-events` is the universal pivot applied to every registered type — `docs/related-resources.md` § Policy, rule 4.
 - a9s is read-only — `docs/architecture.md` § "What is a9s?".
 - Superseded HOW ignored — row middle-dot `·` marker, `⚠ Background Check` detail header, and derived list-level banner in `docs/enrichment-visibility.md` are not cited or reproduced per the skill's S1–S5 rules.
+
+<!-- BEGIN GENERATED: header -->
+alarm — MONITORING. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| sns | SNS Topics | no |
+| asg | Auto Scaling Groups | yes |
+| apigw | API Gateways | no |
+| cb | CodeBuild Projects | no |
+| dbi | RDS Instances | no |
+| ec2 | EC2 Instances | no |
+| ecs | ECS Clusters | no |
+| eks | EKS Clusters | no |
+| kms | KMS Keys | no |
+| lambda | Lambda Functions | no |
+| logs | Log Groups | no |
+| s3 | S3 Buckets | no |
+| sfn | Step Functions | no |
+| waf | WAF Web ACLs | no |
+| ct-events | CloudTrail Events | yes |
+<!-- END GENERATED: related -->

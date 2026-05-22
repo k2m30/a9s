@@ -205,3 +205,29 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Allowed surfaces S1–S5, Wave→surface mapping, banned-words list, list-text ≤40 chars / detail ≤100 chars — `.claude/skills/a9s-resource-spec/SKILL.md` § "Allowed visualization surfaces" and § "UX rules the spec must enforce" (skill governance, not golden docs).
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 - Severity choice `~` (not `!`) for "no deployed stage" — user decision deferred; current call is a9s-devops (2026-04-20): undeployed API is a cleanup/audit concern, not a page-the-on-call concern; promote to `!` only if governance escalation is adopted.
+
+<!-- BEGIN GENERATED: header -->
+apigw — DNS & CDN. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| logs | Log Groups | yes |
+| lambda | Lambda Functions | no |
+| waf | WAF Web ACLs | no |
+| acm | ACM Certificates | no |
+| alarm | CloudWatch Alarms | yes |
+| cf | CloudFront | no |
+| elb | Load Balancers | no |
+| kms | KMS Keys | no |
+| r53 | Route 53 Zones | no |
+| role | IAM Role | no |
+| sfn | Step Functions | no |
+| sns | SNS Topics | no |
+| vpce | VPC Endpoints | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

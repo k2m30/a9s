@@ -168,3 +168,21 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — discovery mechanism for `ec2` target — `a9s-devops (2026-04-20): possible=yes, worth=yes. Golden doc is silent; Snapshot has no direct EC2 field. Reverse path via ebs (Volume.SnapshotId → Volume.Attachments[].InstanceId) is preferred over ami → ec2 for the restore workflow — it is cheaper and more accurate.`
 - a9s-devops consultation — count-shown policy — `a9s-devops (2026-04-20): possible=yes, worth=no as a per-resource override. docs/related-resources.md does not specify per-target count semantics for ebs-snap; leaving as "unknown" until the WHAT doc adds a count column or a9s sets a project-wide rule. No value in guessing per-resource.`
 - UX rewrite — S4 `error: <StateMessage>` vs bare `error` — `user default (2026-04-20): pair the state keyword with StateMessage so a red row is triageable without opening detail; matches the skill's "state keywords are not explanations" rule.`
+
+<!-- BEGIN GENERATED: header -->
+ebs-snap — COMPUTE. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| ami | AMIs | yes |
+| ebs | EBS Volume | no |
+| ec2 | EC2 Instance | no |
+| kms | KMS Key | no |
+| backup | Backup | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

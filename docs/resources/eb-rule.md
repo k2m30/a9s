@@ -180,3 +180,23 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — severity mapping (`!` for no-targets and disabled-with-targets, `~` for missing DLQ) — `a9s-devops (2026-04-20): possible=yes, worth=yes. The first two are live broken states; DLQ-missing is latent risk that only manifests on another failure — textbook informational glyph.`
 - a9s-devops consultation — per-target typed discriminator not worth introducing — `a9s-devops (2026-04-20): possible=no (no AWS field), worth=no. ARN-prefix parsing is idiomatic.`
 - a9s-devops consultation — rule-per-bus coverage map not worth adding — `a9s-devops (2026-04-20): possible=yes, worth=no. EventBusName is already on the list row and per-target pivots already cover the drill-down workflow.`
+
+<!-- BEGIN GENERATED: header -->
+eb-rule — MESSAGING. Lifecycle key: `state`.
+<!-- END GENERATED: header -->
+
+<!-- BEGIN GENERATED: findings -->
+<!-- END GENERATED: findings -->
+
+<!-- BEGIN GENERATED: related -->
+| Target Type | Display Name | Approximate? |
+| --- | --- | --- |
+| role | IAM Role | no |
+| kinesis | Kinesis (targets) | no |
+| lambda | Lambda (targets) | no |
+| logs | Log Groups (targets) | no |
+| sfn | Step Functions (targets) | no |
+| sns | SNS (targets) | no |
+| sqs | SQS (targets) | no |
+| ct-events | CloudTrail Events | no |
+<!-- END GENERATED: related -->

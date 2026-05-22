@@ -19,7 +19,7 @@ import (
 // KmsKeyId may be either a full ARN (arn:aws:kms:...:key/{id}) or a bare key ID.
 //
 // The checker emits the key ID blindly; the related-check orchestrator's
-// lazy-add path (RegisterFetchByIDs for "kms") fetches the key metadata on
+// lazy-add path (SetFetchByIDsForTest for "kms") fetches the key metadata on
 // demand when the ID is not already in the customer-managed kms cache. That
 // keeps this checker simple AND lets AWS-managed keys (aws/elasticfilesystem,
 // etc.) drill into a real entry — both the count and the drill land on the
