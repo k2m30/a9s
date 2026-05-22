@@ -50,8 +50,8 @@ func TestRegisterChildType(t *testing.T) {
 		ShortName: "test_child",
 		Columns:   []resource.Column{{Key: "name", Title: "Name", Width: 30}},
 	}
-	resource.RegisterChildType(childDef)
-	defer resource.UnregisterChildType("test_child")
+	resource.SetChildTypeForTest(childDef)
+	defer resource.CleanupChildTypeForTest("test_child")
 
 	got := resource.GetChildType("test_child")
 	if got == nil {
@@ -73,15 +73,15 @@ func TestGetChildType_NotRegistered(t *testing.T) {
 }
 
 func TestUnregisterChildType(t *testing.T) {
-	resource.RegisterChildType(resource.ResourceTypeDef{
+	resource.SetChildTypeForTest(resource.ResourceTypeDef{
 		Name:      "Temp Child",
 		ShortName: "temp_child",
 	})
-	resource.UnregisterChildType("temp_child")
+	resource.CleanupChildTypeForTest("temp_child")
 
 	got := resource.GetChildType("temp_child")
 	if got != nil {
-		t.Error("GetChildType should return nil after UnregisterChildType")
+		t.Error("GetChildType should return nil after CleanupChildTypeForTest")
 	}
 }
 
@@ -91,7 +91,7 @@ func TestUnregisterChildType(t *testing.T) {
 
 func TestRegisterChildFetcher(t *testing.T) {
 	called := false
-	resource.RegisterPaginatedChild("test_child_fetch", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+	resource.SetPaginatedChildForTest("test_child_fetch", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		called = true
 		resources := []resource.Resource{{ID: "test-1", Name: "Test"}}
 		return resource.FetchResult{
@@ -103,7 +103,7 @@ func TestRegisterChildFetcher(t *testing.T) {
 			},
 		}, nil
 	})
-	defer resource.UnregisterPaginatedChild("test_child_fetch")
+	defer resource.CleanupPaginatedChildForTest("test_child_fetch")
 
 	fetcher := resource.GetPaginatedChildFetcher("test_child_fetch")
 	if fetcher == nil {
@@ -133,14 +133,14 @@ func TestGetChildFetcher_NotRegistered(t *testing.T) {
 }
 
 func TestUnregisterChildFetcher(t *testing.T) {
-	resource.RegisterPaginatedChild("temp_fetcher", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+	resource.SetPaginatedChildForTest("temp_fetcher", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		return resource.FetchResult{}, nil
 	})
-	resource.UnregisterPaginatedChild("temp_fetcher")
+	resource.CleanupPaginatedChildForTest("temp_fetcher")
 
 	got := resource.GetPaginatedChildFetcher("temp_fetcher")
 	if got != nil {
-		t.Error("GetPaginatedChildFetcher should return nil after UnregisterPaginatedChild")
+		t.Error("GetPaginatedChildFetcher should return nil after CleanupPaginatedChildForTest")
 	}
 }
 
@@ -174,11 +174,11 @@ func TestResourceTypeDef_MultipleChildren(t *testing.T) {
 
 func TestChildFetcher_ReceivesParentContext(t *testing.T) {
 	var receivedCtx resource.ParentContext
-	resource.RegisterPaginatedChild("ctx_test", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
+	resource.SetPaginatedChildForTest("ctx_test", func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 		receivedCtx = parentCtx
 		return resource.FetchResult{}, nil
 	})
-	defer resource.UnregisterPaginatedChild("ctx_test")
+	defer resource.CleanupPaginatedChildForTest("ctx_test")
 
 	fetcher := resource.GetPaginatedChildFetcher("ctx_test")
 	expectedCtx := resource.ParentContext{

@@ -40,7 +40,7 @@ func Test_LA_010_MixedInScopeAndOutOfScope(t *testing.T) {
 	inScopeID := "customer-kms-la010"
 	outScopeID := "aws-managed-kms-la010"
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:       targetType,
 			DisplayName:      "LA-010 Target",
@@ -56,7 +56,7 @@ func Test_LA_010_MixedInScopeAndOutOfScope(t *testing.T) {
 	})
 
 	var fetchByIDsCalled int32
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
 		atomic.AddInt32(&fetchByIDsCalled, 1)
 		var out []resource.Resource
 		for _, id := range ids {
@@ -66,8 +66,8 @@ func Test_LA_010_MixedInScopeAndOutOfScope(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
 	m := tui.New("testprofile", "us-east-1")
@@ -149,7 +149,7 @@ func Test_LA_011_AllOutOfScopePopulatesDrill(t *testing.T) {
 
 	ids := []string{"policy-aws-001-la011", "policy-aws-002-la011", "policy-aws-003-la011"}
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:       targetType,
 			DisplayName:      "LA-011 Target",
@@ -164,7 +164,7 @@ func Test_LA_011_AllOutOfScopePopulatesDrill(t *testing.T) {
 		},
 	})
 
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, fetchIDs []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, fetchIDs []string) ([]resource.Resource, error) {
 		var out []resource.Resource
 		for _, id := range fetchIDs {
 			out = append(out, resource.Resource{ID: id, Name: id})
@@ -173,8 +173,8 @@ func Test_LA_011_AllOutOfScopePopulatesDrill(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
 	m := tui.New("testprofile", "us-east-1")
@@ -216,7 +216,7 @@ func Test_LA_012_AllInScopeNoLazyAdd(t *testing.T) {
 	res1 := resource.Resource{ID: "policy-customer-001-la012", Name: "MyAppPolicy"}
 	res2 := resource.Resource{ID: "policy-customer-002-la012", Name: "BillingRead"}
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:       targetType,
 			DisplayName:      "LA-012 Target",
@@ -232,14 +232,14 @@ func Test_LA_012_AllInScopeNoLazyAdd(t *testing.T) {
 	})
 
 	var fetchByIDsCallCount int32
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, _ []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, _ []string) ([]resource.Resource, error) {
 		atomic.AddInt32(&fetchByIDsCallCount, 1)
 		return nil, nil
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
 	m := tui.New("testprofile", "us-east-1")
@@ -320,7 +320,7 @@ func Test_LA_015_ARNvsBareNameTolerance(t *testing.T) {
 	fullARN := "arn:aws:iam::aws:policy/AdministratorAccess-la015"
 	bareID := "AdministratorAccess-la015"
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:       targetType,
 			DisplayName:      "LA-015 Target",
@@ -335,14 +335,14 @@ func Test_LA_015_ARNvsBareNameTolerance(t *testing.T) {
 		},
 	})
 
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, _ []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, _ []string) ([]resource.Resource, error) {
 		// Returns resource with bare ID regardless of the ARN input.
 		return []resource.Resource{{ID: bareID, Name: bareID}}, nil
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
 	m := tui.New("testprofile", "us-east-1")
@@ -396,7 +396,7 @@ func Test_LA_016_UUIDvsAliasDisplay(t *testing.T) {
 	keyUUID := "a1b2c3d4-e5f6-7890-abcd-ef0123456789"
 	alias := "alias/my-cmk-la016"
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:       targetType,
 			DisplayName:      "LA-016 Target",
@@ -411,7 +411,7 @@ func Test_LA_016_UUIDvsAliasDisplay(t *testing.T) {
 		},
 	})
 
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, _ []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, _ []string) ([]resource.Resource, error) {
 		return []resource.Resource{
 			{
 				ID:   keyUUID,
@@ -424,8 +424,8 @@ func Test_LA_016_UUIDvsAliasDisplay(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
 	m := tui.New("testprofile", "us-east-1")
@@ -488,7 +488,7 @@ func Test_LA_070_100IDsDrillWithoutTimeout(t *testing.T) {
 		ids[i] = fmt.Sprintf("policy-arn-la070-%03d", i)
 	}
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:       targetType,
 			DisplayName:      "LA-070 Target",
@@ -503,7 +503,7 @@ func Test_LA_070_100IDsDrillWithoutTimeout(t *testing.T) {
 		},
 	})
 
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, fetchIDs []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, fetchIDs []string) ([]resource.Resource, error) {
 		out := make([]resource.Resource, len(fetchIDs))
 		for i, id := range fetchIDs {
 			out[i] = resource.Resource{ID: id, Name: id}
@@ -512,8 +512,8 @@ func Test_LA_070_100IDsDrillWithoutTimeout(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
 	m := tui.New("testprofile", "us-east-1")
@@ -586,7 +586,7 @@ func Test_LA_071_MalformedIDsFiltered(t *testing.T) {
 
 	emittedIDs := []string{"", "arn:aws:", "kms-valid-la071", "", "kms-valid-la071"}
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:       targetType,
 			DisplayName:      "LA-071 Target",
@@ -604,7 +604,7 @@ func Test_LA_071_MalformedIDsFiltered(t *testing.T) {
 	var capturedIDs []string
 	var capturedOnce atomic.Bool
 
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
 		if capturedOnce.CompareAndSwap(false, true) {
 			cp := make([]string, len(ids))
 			copy(cp, ids)
@@ -620,8 +620,8 @@ func Test_LA_071_MalformedIDsFiltered(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
 	m := tui.New("testprofile", "us-east-1")
@@ -679,7 +679,7 @@ func Test_LA_072_IDSetGrowsAcrossRedrill(t *testing.T) {
 	// checkerIDs is swapped between the two drill phases.
 	checkerIDs := []string{id1, id2}
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:       targetType,
 			DisplayName:      "LA-072 Target",
@@ -695,7 +695,7 @@ func Test_LA_072_IDSetGrowsAcrossRedrill(t *testing.T) {
 		},
 	})
 
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, fetchIDs []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, fetchIDs []string) ([]resource.Resource, error) {
 		out := make([]resource.Resource, len(fetchIDs))
 		for i, id := range fetchIDs {
 			out[i] = resource.Resource{ID: id, Name: id}
@@ -704,8 +704,8 @@ func Test_LA_072_IDSetGrowsAcrossRedrill(t *testing.T) {
 	})
 
 	t.Cleanup(func() {
-		resource.UnregisterRelated(srcType)
-		resource.UnregisterFetchByIDs(targetType)
+		resource.CleanupRelatedForTest(srcType)
+		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
 	m := tui.New("testprofile", "us-east-1")

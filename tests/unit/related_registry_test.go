@@ -24,11 +24,11 @@ var testNavigableFields = []resource.NavigableField{
 }
 
 // TestRegisterRelated_StoresAndRetrieves verifies that RelatedDef entries are
-// stored by RegisterRelated and returned by GetRelated, and that GetRelated
+// stored by SetRelatedForTest and returned by GetRelated, and that GetRelated
 // returns nil for an unknown short name.
 func TestRegisterRelated_StoresAndRetrieves(t *testing.T) {
-	resource.RegisterRelated("test_reg", testRelatedDefs)
-	defer resource.UnregisterRelated("test_reg")
+	resource.SetRelatedForTest("test_reg", testRelatedDefs)
+	defer resource.CleanupRelatedForTest("test_reg")
 
 	got := resource.GetRelated("test_reg")
 	if got == nil {
@@ -63,15 +63,15 @@ func TestRegisterRelated_ReplacesExisting(t *testing.T) {
 		{TargetType: "elb", DisplayName: "Load Balancers", Checker: noopChecker},
 	}
 
-	resource.RegisterRelated("test_reg", first)
-	defer resource.UnregisterRelated("test_reg")
+	resource.SetRelatedForTest("test_reg", first)
+	defer resource.CleanupRelatedForTest("test_reg")
 
-	resource.RegisterRelated("test_reg", second)
-	// AS-67: Each RegisterRelated pushes a snapshot. To leave the registry
+	resource.SetRelatedForTest("test_reg", second)
+	// AS-67: Each SetRelatedForTest pushes a snapshot. To leave the registry
 	// clean for the next test, every Register must be paired with an
 	// Unregister. Defers run LIFO, so this one pops `first` first, then the
 	// outer defer pops the original (nil) snapshot.
-	defer resource.UnregisterRelated("test_reg")
+	defer resource.CleanupRelatedForTest("test_reg")
 
 	got := resource.GetRelated("test_reg")
 	if got == nil {
@@ -88,11 +88,11 @@ func TestRegisterRelated_ReplacesExisting(t *testing.T) {
 	}
 }
 
-// TestUnregisterRelated_RemovesEntry verifies that UnregisterRelated causes
+// TestUnregisterRelated_RemovesEntry verifies that CleanupRelatedForTest causes
 // GetRelated to return nil for the removed short name.
 func TestUnregisterRelated_RemovesEntry(t *testing.T) {
-	resource.RegisterRelated("test_reg", testRelatedDefs)
-	resource.UnregisterRelated("test_reg")
+	resource.SetRelatedForTest("test_reg", testRelatedDefs)
+	resource.CleanupRelatedForTest("test_reg")
 
 	got := resource.GetRelated("test_reg")
 	if got != nil {
@@ -101,12 +101,12 @@ func TestUnregisterRelated_RemovesEntry(t *testing.T) {
 }
 
 // TestRegisterNavigableFields_StoresAndRetrieves verifies that NavigableField
-// entries are stored by RegisterNavigableFields and returned by
+// entries are stored by SetNavigableFieldsForTest and returned by
 // GetNavigableFields, and that GetNavigableFields returns nil for an unknown
 // short name.
 func TestRegisterNavigableFields_StoresAndRetrieves(t *testing.T) {
-	resource.RegisterNavigableFields("test_reg", testNavigableFields)
-	defer resource.UnregisterNavigableFields("test_reg")
+	resource.SetNavigableFieldsForTest("test_reg", testNavigableFields)
+	defer resource.CleanupNavigableFieldsForTest("test_reg")
 
 	got := resource.GetNavigableFields("test_reg")
 	if got == nil {
@@ -131,11 +131,11 @@ func TestRegisterNavigableFields_StoresAndRetrieves(t *testing.T) {
 }
 
 // TestUnregisterNavigableFields_RemovesEntry verifies that
-// UnregisterNavigableFields causes GetNavigableFields to return nil for the
+// CleanupNavigableFieldsForTest causes GetNavigableFields to return nil for the
 // removed short name.
 func TestUnregisterNavigableFields_RemovesEntry(t *testing.T) {
-	resource.RegisterNavigableFields("test_reg", testNavigableFields)
-	resource.UnregisterNavigableFields("test_reg")
+	resource.SetNavigableFieldsForTest("test_reg", testNavigableFields)
+	resource.CleanupNavigableFieldsForTest("test_reg")
 
 	got := resource.GetNavigableFields("test_reg")
 	if got != nil {
@@ -1694,7 +1694,7 @@ func TestRelated_WAF_Registered(t *testing.T) {
 	}
 }
 
-// TestRegisterRelated_NilChecker_Panics verifies that RegisterRelated panics
+// TestRegisterRelated_NilChecker_Panics verifies that SetRelatedForTest panics
 // when any RelatedDef has a zero-value (unset) Checker — the structural-bug
 // guard must fire at init-time so that stub registrations are caught early.
 func TestRegisterRelated_NilChecker_Panics(t *testing.T) {
@@ -1710,14 +1710,14 @@ func TestRegisterRelated_NilChecker_Panics(t *testing.T) {
 				panicked = true
 			}
 		}()
-		resource.RegisterRelated("unset_checker_test", []resource.RelatedDef{
+		resource.SetRelatedForTest("unset_checker_test", []resource.RelatedDef{
 			{TargetType: "tg", DisplayName: "Target Groups", Checker: unsetChecker},
 		})
 	}()
 	if !panicked {
-		t.Fatal("RegisterRelated with zero-value Checker should panic, but did not")
+		t.Fatal("SetRelatedForTest with zero-value Checker should panic, but did not")
 	}
-	resource.UnregisterRelated("unset_checker_test")
+	resource.CleanupRelatedForTest("unset_checker_test")
 }
 
 // TestAppendRelated_NilChecker_Panics verifies that AppendRelated panics when
@@ -1740,14 +1740,14 @@ func TestAppendRelated_NilChecker_Panics(t *testing.T) {
 	if !panicked {
 		t.Fatal("AppendRelated with zero-value Checker should panic, but did not")
 	}
-	resource.UnregisterRelated("unset_checker_test_append")
+	resource.CleanupRelatedForTest("unset_checker_test_append")
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// AS-67 — UnregisterRelated must restore production defs, not destroy them.
+// AS-67 — CleanupRelatedForTest must restore production defs, not destroy them.
 // ═══════════════════════════════════════════════════════════════════════════
 //
-// Background: UnregisterRelated previously called delete(relatedRegistry, key),
+// Background: CleanupRelatedForTest previously called delete(relatedRegistry, key),
 // which destroyed the production registration that aws/*.go init() established.
 // Tests using Register-then-defer-Unregister stomped production state for the
 // rest of the test process; this was order-dependent and only surfaced once
@@ -1778,8 +1778,8 @@ func TestUnregisterRelated_RestoresPreviousValue(t *testing.T) {
 		t.Fatalf("pre-condition: expected nil before any Register, got %v", got)
 	}
 
-	resource.RegisterRelated(shortName, defsA)
-	resource.RegisterRelated(shortName, defsB)
+	resource.SetRelatedForTest(shortName, defsA)
+	resource.SetRelatedForTest(shortName, defsB)
 
 	got := resource.GetRelated(shortName)
 	if len(got) != 1 || got[0].TargetType != "as67-target-b" {
@@ -1788,17 +1788,17 @@ func TestUnregisterRelated_RestoresPreviousValue(t *testing.T) {
 
 	// First Unregister must restore defsA — NOT delete the entry. This is the
 	// regression guard for AS-67; the old destructive delete would return nil.
-	resource.UnregisterRelated(shortName)
+	resource.CleanupRelatedForTest(shortName)
 	got = resource.GetRelated(shortName)
 	if len(got) != 1 || got[0].TargetType != "as67-target-a" {
 		t.Fatalf("after first Unregister, expected defsA restored, got %v", got)
 	}
 
 	// Second Unregister pops the original "no previous registration" snapshot
-	// (a nil sentinel pushed by RegisterRelated when the key was empty), so
+	// (a nil sentinel pushed by SetRelatedForTest when the key was empty), so
 	// the active entry is deleted entirely — preserving the historical
 	// destructive semantics for keys that production never registered.
-	resource.UnregisterRelated(shortName)
+	resource.CleanupRelatedForTest(shortName)
 	if got := resource.GetRelated(shortName); got != nil {
 		t.Fatalf("after second Unregister, expected nil (entry deleted), got %v", got)
 	}
@@ -1806,7 +1806,7 @@ func TestUnregisterRelated_RestoresPreviousValue(t *testing.T) {
 	// Third Unregister against an empty stack must be a safe no-op (no panic),
 	// since test-only short names like `test_append`, `srcType`, and
 	// `resizeTestType` may be Unregistered without a matching Register.
-	resource.UnregisterRelated(shortName)
+	resource.CleanupRelatedForTest(shortName)
 	if got := resource.GetRelated(shortName); got != nil {
 		t.Fatalf("after third Unregister (empty stack), expected nil, got %v", got)
 	}
@@ -1814,7 +1814,7 @@ func TestUnregisterRelated_RestoresPreviousValue(t *testing.T) {
 
 // TestAppendRelated_UnregisterRestoresPreAppendState verifies that
 // AppendRelated participates in the same snapshot/restore contract as
-// RegisterRelated: appending a new RelatedDef pushes the pre-append state,
+// SetRelatedForTest: appending a new RelatedDef pushes the pre-append state,
 // and a subsequent Unregister rolls back to that state.
 func TestAppendRelated_UnregisterRestoresPreAppendState(t *testing.T) {
 	const shortName = "test_as67_append_then_unregister"
@@ -1826,7 +1826,7 @@ func TestAppendRelated_UnregisterRestoresPreAppendState(t *testing.T) {
 		TargetType: "as67-appended", DisplayName: "Appended", Checker: noopChecker,
 	}
 
-	resource.RegisterRelated(shortName, base)
+	resource.SetRelatedForTest(shortName, base)
 	resource.AppendRelated(shortName, added)
 
 	got := resource.GetRelated(shortName)
@@ -1834,13 +1834,13 @@ func TestAppendRelated_UnregisterRestoresPreAppendState(t *testing.T) {
 		t.Fatalf("after Append, expected 2 defs, got %d (%v)", len(got), got)
 	}
 
-	resource.UnregisterRelated(shortName)
+	resource.CleanupRelatedForTest(shortName)
 	got = resource.GetRelated(shortName)
 	if len(got) != 1 || got[0].TargetType != "as67-base" {
 		t.Fatalf("after Unregister of Append, expected base only, got %v", got)
 	}
 
-	resource.UnregisterRelated(shortName)
+	resource.CleanupRelatedForTest(shortName)
 	if got := resource.GetRelated(shortName); got != nil {
 		t.Fatalf("after final Unregister, expected nil, got %v", got)
 	}
@@ -1873,12 +1873,12 @@ func TestRegisterRelated_Concurrent(t *testing.T) {
 				Checker:     noopChecker,
 			}
 			for c := 0; c < cycles; c++ {
-				resource.RegisterRelated(shortName, defs)
+				resource.SetRelatedForTest(shortName, defs)
 				_ = resource.GetRelated(shortName)
 				resource.AppendRelated(shortName, extra)
 				_ = resource.GetRelated(shortName)
-				resource.UnregisterRelated(shortName) // pops Append snapshot
-				resource.UnregisterRelated(shortName) // pops Register snapshot
+				resource.CleanupRelatedForTest(shortName) // pops Append snapshot
+				resource.CleanupRelatedForTest(shortName) // pops Register snapshot
 			}
 		}(g)
 	}

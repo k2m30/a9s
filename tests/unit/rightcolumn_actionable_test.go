@@ -51,10 +51,10 @@ const approxTestWidth = 140
 // The caller must defer the returned cleanup func.
 func buildApproxDetail(t *testing.T) (views.DetailModel, func()) {
 	t.Helper()
-	resource.RegisterRelated("approx-test-ec2", []resource.RelatedDef{
+	resource.SetRelatedForTest("approx-test-ec2", []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
 	})
-	cleanup := func() { resource.UnregisterRelated("approx-test-ec2") }
+	cleanup := func() { resource.CleanupRelatedForTest("approx-test-ec2") }
 
 	res := resource.Resource{
 		ID:   "i-approxtest001",

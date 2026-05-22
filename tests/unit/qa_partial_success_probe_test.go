@@ -64,10 +64,10 @@ func TestProbeAvailability_FetcherReturnsPartialResults(t *testing.T) {
 	partialErr := errors.New("partial: one ID failed to fetch")
 	expectedResources := partialProbeResources()
 
-	resource.RegisterPaginated(shortName, func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
+	resource.SetPaginatedForTest(shortName, func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
 		return resource.FetchResult{Resources: expectedResources}, partialErr
 	})
-	t.Cleanup(func() { resource.UnregisterPaginated(shortName) })
+	t.Cleanup(func() { resource.CleanupPaginatedForTest(shortName) })
 
 	pf := resource.GetPaginatedFetcher(shortName)
 	if pf == nil {
@@ -95,10 +95,10 @@ func TestProbeAvailability_HardFailure_FetcherReturnsNoResources(t *testing.T) {
 	const shortName = "test-pa-hardfail-fetcher"
 	hardErr := errors.New("hard: service unreachable")
 
-	resource.RegisterPaginated(shortName, func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
+	resource.SetPaginatedForTest(shortName, func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
 		return resource.FetchResult{}, hardErr
 	})
-	t.Cleanup(func() { resource.UnregisterPaginated(shortName) })
+	t.Cleanup(func() { resource.CleanupPaginatedForTest(shortName) })
 
 	pf := resource.GetPaginatedFetcher(shortName)
 	if pf == nil {

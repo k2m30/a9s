@@ -66,8 +66,8 @@ func TestDetail_SelectedRow_FillsViewportWidth(t *testing.T) {
 
 	// Disable related to keep single-column width deterministic.
 	oldDefs := resource.GetRelated("ec2")
-	resource.RegisterRelated("ec2", nil)
-	t.Cleanup(func() { resource.RegisterRelated("ec2", oldDefs) })
+	resource.SetRelatedForTest("ec2", nil)
+	t.Cleanup(func() { resource.SetRelatedForTest("ec2", oldDefs) })
 
 	d := makePreviewEC2Detail(t, 90, 30)
 	line := findSelectedLine(d.View())

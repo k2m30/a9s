@@ -8,9 +8,9 @@ import (
 )
 
 // TestRegistry_AllChildTypesHaveParents verifies that every ChildViewDef.ChildType
-// declared in AllResourceTypes() has a corresponding RegisterChildType registration.
+// declared in AllResourceTypes() has a corresponding SetChildTypeForTest registration.
 // Bug caught: a developer adds a ChildViewDef entry referencing a short name that
-// was never registered via RegisterChildType, causing a silent nil-type panic at
+// was never registered via SetChildTypeForTest, causing a silent nil-type panic at
 // runtime when the child view is opened.
 func TestRegistry_AllChildTypesHaveParents(t *testing.T) {
 	// Build the set of all child type short names declared in parent ChildViewDef
@@ -33,12 +33,12 @@ func TestRegistry_AllChildTypesHaveParents(t *testing.T) {
 	}
 
 	// For each declared child type, assert GetChildType returns a non-nil definition.
-	// A nil means RegisterChildType was never called for that short name.
+	// A nil means SetChildTypeForTest was never called for that short name.
 	for childShortName, parentShortName := range declared {
 		def := resource.GetChildType(childShortName)
 		if def == nil {
 			t.Errorf(
-				"child type %q declared in parent %q has no RegisterChildType registration — GetChildType returned nil",
+				"child type %q declared in parent %q has no SetChildTypeForTest registration — GetChildType returned nil",
 				childShortName, parentShortName,
 			)
 		}
@@ -69,7 +69,7 @@ func TestRegistry_AllChildTypesHaveParents(t *testing.T) {
 // TestRegistry_AllRegisteredTypesHaveFetcher verifies that every short name returned
 // by AllShortNames() has at least one registered fetcher (paginated or filtered-paginated).
 // Bug caught: a developer registers a new ResourceTypeDef but forgets to call
-// RegisterPaginated or RegisterFilteredPaginated in the aws/*.go init(), causing the
+// SetPaginatedForTest or SetFilteredPaginatedForTest in the aws/*.go init(), causing the
 // resource list to silently do nothing when opened.
 func TestRegistry_AllRegisteredTypesHaveFetcher(t *testing.T) {
 	missing := []string{}

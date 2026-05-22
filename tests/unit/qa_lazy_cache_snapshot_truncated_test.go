@@ -56,7 +56,7 @@ func TestBuildResourceCacheSnapshot_LazyOnlyTruncated(t *testing.T) {
 	var capturedCache resource.ResourceCache
 	var checkerCallCount int32
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:       targetType,
 			DisplayName:      "GE Target",
@@ -72,26 +72,26 @@ func TestBuildResourceCacheSnapshot_LazyOnlyTruncated(t *testing.T) {
 			},
 		},
 	})
-	t.Cleanup(func() { resource.UnregisterRelated(srcType) })
+	t.Cleanup(func() { resource.CleanupRelatedForTest(srcType) })
 
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
 		out := make([]resource.Resource, len(ids))
 		for i, id := range ids {
 			out[i] = resource.Resource{ID: id, Name: id}
 		}
 		return out, nil
 	})
-	t.Cleanup(func() { resource.UnregisterFetchByIDs(targetType) })
+	t.Cleanup(func() { resource.CleanupFetchByIDsForTest(targetType) })
 
 	// Register a paginated fetcher for targetType so prefetch can fire.
-	resource.RegisterPaginated(targetType, func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
+	resource.SetPaginatedForTest(targetType, func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
 		return resource.FetchResult{
 			Resources: []resource.Resource{
 				{ID: "ge-target-001", Name: "ge-target-001"},
 			},
 		}, nil
 	})
-	t.Cleanup(func() { resource.UnregisterPaginated(targetType) })
+	t.Cleanup(func() { resource.CleanupPaginatedForTest(targetType) })
 
 	m := newRootSizedModel()
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
@@ -197,7 +197,7 @@ func TestBuildResourceCacheSnapshot_MergeCase_InheritsResourceCacheTruncated(t *
 	var capturedCache resource.ResourceCache
 	var checkerCallCount int32
 
-	resource.RegisterRelated(srcType, []resource.RelatedDef{
+	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:       targetType,
 			DisplayName:      "GE2 Target",
@@ -212,16 +212,16 @@ func TestBuildResourceCacheSnapshot_MergeCase_InheritsResourceCacheTruncated(t *
 			},
 		},
 	})
-	t.Cleanup(func() { resource.UnregisterRelated(srcType) })
+	t.Cleanup(func() { resource.CleanupRelatedForTest(srcType) })
 
-	resource.RegisterFetchByIDs(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, ids []string) ([]resource.Resource, error) {
 		out := make([]resource.Resource, len(ids))
 		for i, id := range ids {
 			out[i] = resource.Resource{ID: id, Name: id}
 		}
 		return out, nil
 	})
-	t.Cleanup(func() { resource.UnregisterFetchByIDs(targetType) })
+	t.Cleanup(func() { resource.CleanupFetchByIDsForTest(targetType) })
 
 	m := newRootSizedModel()
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})

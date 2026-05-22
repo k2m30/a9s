@@ -14,24 +14,24 @@ type DetailEnricher = domain.DetailEnricher
 
 var detailEnricherRegistry = map[string]DetailEnricher{}
 
-// RegisterDetailEnricher adds a detail enricher for the given resource short name.
+// SetDetailEnricherForTest adds a detail enricher for the given resource short name.
 // Panics on empty short name, nil function, or duplicate registration.
-func RegisterDetailEnricher(shortName string, f DetailEnricher) {
+func SetDetailEnricherForTest(shortName string, f DetailEnricher) {
 	if shortName == "" {
-		panic("RegisterDetailEnricher: empty short name")
+		panic("SetDetailEnricherForTest: empty short name")
 	}
 	if f == nil {
-		panic(fmt.Sprintf("RegisterDetailEnricher: nil enricher func for short name %q", shortName))
+		panic(fmt.Sprintf("SetDetailEnricherForTest: nil enricher func for short name %q", shortName))
 	}
 	if _, exists := detailEnricherRegistry[shortName]; exists {
-		panic(fmt.Sprintf("RegisterDetailEnricher: duplicate registration for short name %q", shortName))
+		panic(fmt.Sprintf("SetDetailEnricherForTest: duplicate registration for short name %q", shortName))
 	}
 	detailEnricherRegistry[shortName] = f
 }
 
 // GetDetailEnricher returns the detail enricher for the given resource short name.
 // Catalog-backed: checks the catalog (both top-level and child types) first;
-// falls through to the legacy map so test overrides via RegisterDetailEnricher
+// falls through to the legacy map so test overrides via SetDetailEnricherForTest
 // continue to work for synthetic short names.
 func GetDetailEnricher(shortName string) DetailEnricher {
 	if ct := catalog.Find(shortName); ct != nil && ct.DetailEnrich != nil {
@@ -57,7 +57,7 @@ func HasDetailEnricher(shortName string) bool {
 	return ok
 }
 
-// UnregisterDetailEnricher removes a detail enricher. Used only in tests for cleanup.
-func UnregisterDetailEnricher(shortName string) {
+// CleanupDetailEnricherForTest removes a detail enricher. Used only in tests for cleanup.
+func CleanupDetailEnricherForTest(shortName string) {
 	delete(detailEnricherRegistry, shortName)
 }

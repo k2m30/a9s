@@ -120,12 +120,12 @@ func TestEC2RelatedColdCache_FirstPageOnly_TG(t *testing.T) {
 	})
 
 	original := resource.GetPaginatedFetcher("tg")
-	resource.RegisterPaginated("tg", mockFetcher)
+	resource.SetPaginatedForTest("tg", mockFetcher)
 	t.Cleanup(func() {
 		if original != nil {
-			resource.RegisterPaginated("tg", original)
+			resource.SetPaginatedForTest("tg", original)
 		} else {
-			resource.UnregisterPaginated("tg")
+			resource.CleanupPaginatedForTest("tg")
 		}
 	})
 
@@ -160,12 +160,12 @@ func TestEC2RelatedColdCache_FirstPageOnly_CFN(t *testing.T) {
 	})
 
 	original := resource.GetPaginatedFetcher("cfn")
-	resource.RegisterPaginated("cfn", mockFetcher)
+	resource.SetPaginatedForTest("cfn", mockFetcher)
 	t.Cleanup(func() {
 		if original != nil {
-			resource.RegisterPaginated("cfn", original)
+			resource.SetPaginatedForTest("cfn", original)
 		} else {
-			resource.UnregisterPaginated("cfn")
+			resource.CleanupPaginatedForTest("cfn")
 		}
 	})
 
@@ -208,12 +208,12 @@ func TestEC2RelatedColdCache_TruncatedZeroMatch_IsApproximate(t *testing.T) {
 	})
 
 	original := resource.GetPaginatedFetcher("tg")
-	resource.RegisterPaginated("tg", mockFetcher)
+	resource.SetPaginatedForTest("tg", mockFetcher)
 	t.Cleanup(func() {
 		if original != nil {
-			resource.RegisterPaginated("tg", original)
+			resource.SetPaginatedForTest("tg", original)
 		} else {
-			resource.UnregisterPaginated("tg")
+			resource.CleanupPaginatedForTest("tg")
 		}
 	})
 

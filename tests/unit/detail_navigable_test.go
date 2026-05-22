@@ -3,7 +3,7 @@ package unit_test
 // detail_navigable_test.go — tests for navigable field rendering and Enter-key
 // navigation in the detail view (T016).
 //
-// Navigable fields are registered via resource.RegisterNavigableFields.
+// Navigable fields are registered via resource.SetNavigableFieldsForTest.
 // When a field is navigable the detail view renders it with an underline style
 // and pressing Enter while the cursor is on that field emits a
 // messages.RelatedNavigate.

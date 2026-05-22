@@ -61,11 +61,11 @@ func TestHandleRelatedNavigate_UnknownType_Flash(t *testing.T) {
 // into tests/unit).
 func TestHandleRelatedNavigate_ChildType_EnterChildView(t *testing.T) {
 	const childShort = "test_child_type_handle_related_b"
-	resource.RegisterChildType(resource.ResourceTypeDef{
+	resource.SetChildTypeForTest(resource.ResourceTypeDef{
 		Name:      "Test Child",
 		ShortName: childShort,
 	})
-	t.Cleanup(func() { resource.UnregisterChildType(childShort) })
+	t.Cleanup(func() { resource.CleanupChildTypeForTest(childShort) })
 
 	c, _ := newRuntimeCore(t)
 
@@ -130,11 +130,11 @@ func TestHandleRelatedNavigate_TopLevelCacheHit_SingleRelatedID_Detail(t *testin
 // Registers a no-op filtered paginated fetcher for the test type. t.Cleanup
 // unregisters it so test order does not matter.
 func TestHandleRelatedNavigate_FetchFilter_RegisteredFetcher_FilteredList(t *testing.T) {
-	resource.RegisterFilteredPaginated("ec2",
+	resource.SetFilteredPaginatedForTest("ec2",
 		func(_ context.Context, _ any, _ map[string]string, _ string) (domain.FetchResult, error) {
 			return domain.FetchResult{}, nil
 		})
-	t.Cleanup(func() { resource.UnregisterFilteredPaginated("ec2") })
+	t.Cleanup(func() { resource.CleanupFilteredPaginatedForTest("ec2") })
 
 	c, _ := newRuntimeCore(t)
 

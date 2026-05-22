@@ -28,7 +28,7 @@ package unit
 //       registration is a failure, with the doc row cited in the error.
 //
 //   (B) TestRelatedPanel_RegistrationHasGoldenDocEntry
-//       For every TargetType currently registered via RegisterRelated,
+//       For every TargetType currently registered via SetRelatedForTest,
 //       either (a) it is listed in the golden table for that shortName,
 //       or (b) it is a documented self-reference pattern (type->same).
 //       Otherwise the registration has drifted and the doc must be
@@ -41,7 +41,7 @@ package unit
 //       same PR" rule.
 //
 //   (D) TestRelatedPanel_TargetTypesAreRegistered
-//       Every TargetType in the golden doc and in every RegisterRelated
+//       Every TargetType in the golden doc and in every SetRelatedForTest
 //       call must name a real registered shortName (typo guard).
 //
 // When a test here fails:
@@ -162,7 +162,7 @@ func parseGoldenTable(doc string) map[string]map[string]struct{} {
 	return out
 }
 
-// selfRefAllowed enumerates the shortName values whose RegisterRelated
+// selfRefAllowed enumerates the shortName values whose SetRelatedForTest
 // legitimately includes the same shortName as a target, because AWS
 // exposes a same-type relationship on the resource itself:
 //
@@ -194,7 +194,7 @@ func TestRelatedPanel_ContractMatchesGoldenDoc(t *testing.T) {
 			sort.Strings(missing)
 			if len(missing) > 0 {
 				t.Errorf(
-					"%s is missing RegisterRelated entries required by docs/related-resources.md: %v\n\n"+
+					"%s is missing SetRelatedForTest entries required by docs/related-resources.md: %v\n\n"+
 						"The golden doc is the SINGLE SOURCE OF TRUTH. Either add the registration (preferred) "+
 						"or open a PR that removes the row from the golden doc with an AWS-API-anchored rationale.",
 					sn, missing,
@@ -226,7 +226,7 @@ func TestRelatedPanel_RegistrationHasGoldenDocEntry(t *testing.T) {
 			sort.Strings(drift)
 			if len(drift) > 0 {
 				t.Errorf(
-					"%s has RegisterRelated entries NOT present in docs/related-resources.md: %v\n\n"+
+					"%s has SetRelatedForTest entries NOT present in docs/related-resources.md: %v\n\n"+
 						"Either (a) remove the registration if it is stale, or (b) add a row to the golden "+
 						"doc citing the AWS API field or DevOps workflow that justifies it, then re-run tests.",
 					sn, drift,
@@ -259,7 +259,7 @@ func TestRelatedPanel_EveryRegisteredTypeHasGoldenRow(t *testing.T) {
 }
 
 // TestRelatedPanel_TargetTypesAreRegistered asserts every TargetType
-// referenced by the golden doc OR by RegisterRelated calls is a real
+// referenced by the golden doc OR by SetRelatedForTest calls is a real
 // registered shortName (typo guard).
 func TestRelatedPanel_TargetTypesAreRegistered(t *testing.T) {
 	registered := make(map[string]bool, len(resource.AllResourceTypes()))
@@ -294,7 +294,7 @@ func TestRelatedPanel_TargetTypesAreRegistered(t *testing.T) {
 		}
 		sort.Strings(bad)
 		if len(bad) > 0 {
-			t.Errorf("RegisterRelated calls reference unregistered shortNames (typos): %v", bad)
+			t.Errorf("SetRelatedForTest calls reference unregistered shortNames (typos): %v", bad)
 		}
 	})
 }
@@ -344,7 +344,7 @@ func parseExcludedPairs(doc string) map[string]map[string]struct{} {
 //
 // It parses the "Explicitly excluded" section of docs/related-resources.md and
 // asserts that none of the 57 listed parent→target pairs appear in any
-// RegisterRelated call. Re-adding an excluded pair without removing it from the
+// SetRelatedForTest call. Re-adding an excluded pair without removing it from the
 // doc first will cause this test to fail with a clear message.
 //
 // The total count of excluded pairs is also asserted so that accidental

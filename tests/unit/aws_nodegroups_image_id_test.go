@@ -7,7 +7,7 @@ package unit
 //   1. FetchNodeGroups signature is extended to accept EC2DescribeLaunchTemplateVersionsAPI
 //   2. buildNodeGroupResource (or the fetcher loop) resolves and populates Fields["image_id"]
 //      when the nodegroup has a custom LaunchTemplate.
-//   3. resource.RegisterFieldKeys("ng", ...) includes "image_id".
+//   3. resource.SetFieldKeysForTest("ng", ...) includes "image_id".
 
 import (
 	"context"
@@ -301,13 +301,13 @@ func TestFetchNodeGroups_UsesDefaultVersionWhenVersionIsEmpty(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// T-NG-IMG05: RegisterFieldKeys("ng", ...) includes "image_id"
+// T-NG-IMG05: SetFieldKeysForTest("ng", ...) includes "image_id"
 // ---------------------------------------------------------------------------
 
 func TestFetchNodeGroups_RegistersImageIDField(t *testing.T) {
 	keys := resource.GetFieldKeys("ng")
 	if len(keys) == 0 {
-		t.Fatal("GetFieldKeys(\"ng\") returned nil/empty — RegisterFieldKeys(\"ng\", ...) was not called")
+		t.Fatal("GetFieldKeys(\"ng\") returned nil/empty — SetFieldKeysForTest(\"ng\", ...) was not called")
 	}
 
 	found := false
@@ -318,6 +318,6 @@ func TestFetchNodeGroups_RegistersImageIDField(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Errorf("RegisterFieldKeys(\"ng\", ...) does not include \"image_id\"; current keys: %v", keys)
+		t.Errorf("SetFieldKeysForTest(\"ng\", ...) does not include \"image_id\"; current keys: %v", keys)
 	}
 }

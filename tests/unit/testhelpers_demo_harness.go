@@ -17,13 +17,13 @@ var noopChecker resource.RelatedChecker = func(_ context.Context, _ any, _ resou
 }
 
 // unregisterEC2Related masks ec2 related defs with an empty slice for the
-// duration of t and restores the prior state on cleanup. Uses RegisterRelated
-// to push a new snapshot frame rather than popping the stack — UnregisterRelated
+// duration of t and restores the prior state on cleanup. Uses SetRelatedForTest
+// to push a new snapshot frame rather than popping the stack — CleanupRelatedForTest
 // would restore the previous production registration rather than clearing defs.
 func unregisterEC2Related(t *testing.T) {
 	t.Helper()
-	resource.RegisterRelated("ec2", []resource.RelatedDef{})
-	t.Cleanup(func() { resource.UnregisterRelated("ec2") })
+	resource.SetRelatedForTest("ec2", []resource.RelatedDef{})
+	t.Cleanup(func() { resource.CleanupRelatedForTest("ec2") })
 }
 
 // replaceEC2Related registers defs for "ec2" and restores the originals on
@@ -31,8 +31,8 @@ func unregisterEC2Related(t *testing.T) {
 // registry poisoned for subsequent tests running in shuffled order.
 func replaceEC2Related(t *testing.T, defs []resource.RelatedDef) {
 	t.Helper()
-	resource.RegisterRelated("ec2", defs)
-	t.Cleanup(func() { resource.UnregisterRelated("ec2") })
+	resource.SetRelatedForTest("ec2", defs)
+	t.Cleanup(func() { resource.CleanupRelatedForTest("ec2") })
 }
 
 // newDemoColdCacheApp constructs a tui.Model exactly as cmd/a9s/main.go will

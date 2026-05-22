@@ -13,7 +13,7 @@ func IsCustomerManagedIAMPolicyARN(policyARN string) bool {
 }
 
 // attachedPolicyNames returns every PolicyName in the slice, AWS-managed and
-// customer-managed alike. The related-panel lazy-add path (RegisterFetchByIDs
+// customer-managed alike. The related-panel lazy-add path (SetFetchByIDsForTest
 // for "policy") resolves AWS-managed names on demand so the drill lands on a
 // real entry even though the paginated policy fetcher filters Scope=Local.
 // Previously this helper pre-filtered by ARN to match the fetcher's Scope=Local

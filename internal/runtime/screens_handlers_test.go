@@ -77,13 +77,13 @@ func findSaveTheme(tasks []TaskRequest) (SaveThemeConfigPayload, bool) {
 // finds something. Cleans up via t.Cleanup.
 func withTempChildType(t *testing.T, shortName string) {
 	t.Helper()
-	resource.RegisterChildType(resource.ResourceTypeDef{
+	resource.SetChildTypeForTest(resource.ResourceTypeDef{
 		Name:      "Test " + shortName,
 		ShortName: shortName,
 		Columns:   []resource.Column{{Key: "id", Title: "ID", Width: 8}},
 	})
 	t.Cleanup(func() {
-		resource.UnregisterChildType(shortName)
+		resource.CleanupChildTypeForTest(shortName)
 	})
 }
 

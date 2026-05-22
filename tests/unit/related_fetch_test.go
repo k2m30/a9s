@@ -83,10 +83,10 @@ func TestFetchRelatedTarget_CacheMiss_NoFetcher(t *testing.T) {
 func TestFetchRelatedTarget_CacheMiss_FetcherError(t *testing.T) {
 	// Register a temporary fetcher that always fails.
 	fetchErr := errors.New("simulated fetch failure")
-	resource.RegisterPaginated("test-fetch-err", func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
+	resource.SetPaginatedForTest("test-fetch-err", func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
 		return resource.FetchResult{}, fetchErr
 	})
-	defer resource.UnregisterPaginated("test-fetch-err")
+	defer resource.CleanupPaginatedForTest("test-fetch-err")
 
 	cache := resource.ResourceCache{}
 

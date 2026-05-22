@@ -71,10 +71,10 @@ func TestBuildFieldList_ScalarNavigableField_AppliesNavIDFromValue(t *testing.T)
 	}
 
 	// Register "role" as navigable for lambda.
-	resource.RegisterNavigableFields("lambda", []resource.NavigableField{
+	resource.SetNavigableFieldsForTest("lambda", []resource.NavigableField{
 		{FieldPath: "Role", TargetType: "role"},
 	})
-	defer resource.UnregisterNavigableFields("lambda")
+	defer resource.CleanupNavigableFieldsForTest("lambda")
 
 	// Use a ViewsConfig that includes "Role" in detailPaths so the path-form
 	// branch is taken — this branch passes navMap to ExtractFieldList, enabling
@@ -134,10 +134,10 @@ func TestBuildFieldList_ScalarNavigableField_NoExtractor_NavIDEmpty(t *testing.T
 		},
 	}
 
-	resource.RegisterNavigableFields("ec2", []resource.NavigableField{
+	resource.SetNavigableFieldsForTest("ec2", []resource.NavigableField{
 		{FieldPath: "SubnetId", TargetType: "subnet"},
 	})
-	defer resource.UnregisterNavigableFields("ec2")
+	defer resource.CleanupNavigableFieldsForTest("ec2")
 
 	cfg := &config.ViewsConfig{
 		Views: map[string]config.ViewDef{

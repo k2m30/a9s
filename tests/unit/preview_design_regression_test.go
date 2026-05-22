@@ -116,7 +116,7 @@ func TestPreview_RightColumnTabFocus_SkipsDimRowsOnEnter(t *testing.T) {
 
 func TestPreview_RightColumnScroll_KeepsDeepCursorRowVisible(t *testing.T) {
 	oldDefs := append([]resource.RelatedDef(nil), resource.GetRelated("ec2")...)
-	t.Cleanup(func() { resource.RegisterRelated("ec2", oldDefs) })
+	t.Cleanup(func() { resource.SetRelatedForTest("ec2", oldDefs) })
 
 	defs := make([]resource.RelatedDef, 0, 20)
 	for i := 1; i <= 20; i++ {
@@ -127,7 +127,7 @@ func TestPreview_RightColumnScroll_KeepsDeepCursorRowVisible(t *testing.T) {
 			Checker:     resource.NoopChecker,
 		})
 	}
-	resource.RegisterRelated("ec2", defs)
+	resource.SetRelatedForTest("ec2", defs)
 
 	m := newPreviewDemoModel(t, 120, 8)
 	ec2Res := previewEC2Resource()

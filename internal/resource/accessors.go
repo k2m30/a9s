@@ -20,21 +20,21 @@ const DefaultPageSize = 50
 type ParentContext = domain.ParentContext
 
 // fieldKeyRegistry maps resource short names to their valid Fields keys.
-// Populated by RegisterFieldKeys calls in each aws/*.go init().
+// Populated by SetFieldKeysForTest calls in each aws/*.go init().
 var fieldKeyRegistry = map[string][]string{}
 
 // childTypes maps child type short names to their type definitions.
 var childTypes = map[string]*ResourceTypeDef{}
 
-// RegisterFieldKeys records the valid Fields keys for a resource type.
-// Called from init() in each aws/*.go file alongside RegisterPaginated.
-func RegisterFieldKeys(shortName string, keys []string) {
+// SetFieldKeysForTest records the valid Fields keys for a resource type.
+// Called from init() in each aws/*.go file alongside SetPaginatedForTest.
+func SetFieldKeysForTest(shortName string, keys []string) {
 	fieldKeyRegistry[shortName] = keys
 }
 
 // GetFieldKeys returns the registered Fields keys for the given resource type,
 // or nil if none are registered. Legacy-first: runtime map wins so test
-// overrides via RegisterFieldKeys take effect; otherwise reads the catalog
+// overrides via SetFieldKeysForTest take effect; otherwise reads the catalog
 // FieldKeys field for the type (or its child type when the name is a child).
 func GetFieldKeys(shortName string) []string {
 	if keys, ok := fieldKeyRegistry[shortName]; ok {
@@ -58,14 +58,14 @@ func GetFieldKeys(shortName string) []string {
 // documented allowlist for intentionally-blank columns.
 var issueEnricherFieldKeysRegistry = map[string][]string{}
 
-// RegisterIssueEnricherFieldKeys declares the set of Resource.Fields keys that
+// SetIssueEnricherFieldKeysForTest declares the set of Resource.Fields keys that
 // a Wave 2 issue enricher writes via IssueEnricherResult.FieldUpdates for the
 // given resource short name. Multiple enrichers may target the same type; keys
 // are unioned.
 //
 // Call from enrichment.go package init() or from each Enrich* function body
 // (idempotent — duplicates are deduplicated).
-func RegisterIssueEnricherFieldKeys(shortName string, keys []string) {
+func SetIssueEnricherFieldKeysForTest(shortName string, keys []string) {
 	existing := issueEnricherFieldKeysRegistry[shortName]
 	seen := make(map[string]bool, len(existing))
 	for _, k := range existing {
@@ -82,7 +82,7 @@ func RegisterIssueEnricherFieldKeys(shortName string, keys []string) {
 
 // GetIssueEnricherFieldKeys returns the accumulated Wave 2 issue-enricher
 // field keys for the given resource short name, or nil if none are registered.
-// Legacy-first: test overrides via RegisterIssueEnricherFieldKeys take effect;
+// Legacy-first: test overrides via SetIssueEnricherFieldKeysForTest take effect;
 // otherwise reads the catalog IssueEnricherFieldKeys field.
 func GetIssueEnricherFieldKeys(shortName string) []string {
 	if keys, ok := issueEnricherFieldKeysRegistry[shortName]; ok {
@@ -118,18 +118,18 @@ func GetAllFieldKeys(shortName string) []string {
 }
 
 // fieldAliasBuiltins holds aliases registered by init() functions in aws/*.go.
-// These are permanent and never removed by UnregisterFieldAliases.
+// These are permanent and never removed by CleanupFieldAliasesForTest.
 var fieldAliasBuiltins = map[string]map[string]string{}
 
 // fieldAliasOverrides holds aliases registered outside of init() (e.g., in tests).
-// UnregisterFieldAliases removes entries from this map only.
+// CleanupFieldAliasesForTest removes entries from this map only.
 var fieldAliasOverrides = map[string]map[string]string{}
 
-// RegisterFieldAliases records field name aliases for a resource type.
-// Called from init() in aws/*.go alongside RegisterFieldKeys; registers as builtins
+// SetFieldAliasesForTest records field name aliases for a resource type.
+// Called from init() in aws/*.go alongside SetFieldKeysForTest; registers as builtins
 // (permanent). When called outside of init() — e.g., in tests — entries are stored
-// as overrides that UnregisterFieldAliases can remove.
-func RegisterFieldAliases(shortName string, aliases map[string]string) {
+// as overrides that CleanupFieldAliasesForTest can remove.
+func SetFieldAliasesForTest(shortName string, aliases map[string]string) {
 	// Detect init-time registration: if init has not yet registered a builtin for this
 	// short name we treat the call as a builtin. Subsequent calls (from tests) override.
 	if _, hasBuiltin := fieldAliasBuiltins[shortName]; !hasBuiltin {
@@ -182,28 +182,28 @@ func ApplyFieldAliases(shortName string, fields map[string]string) map[string]st
 	return out
 }
 
-// UnregisterFieldAliases removes field alias overrides AND test-registered
+// CleanupFieldAliasesForTest removes field alias overrides AND test-registered
 // builtins for the given short name. Used only in tests for cleanup.
 // After AS-731 deleted the catalog→legacy bridge, fieldAliasBuiltins starts
 // empty for every shortName: any builtin entry was placed there by a test's
-// RegisterFieldAliases call (the "first call becomes builtin" branch) and
+// SetFieldAliasesForTest call (the "first call becomes builtin" branch) and
 // must be cleared on cleanup so subsequent reads fall through to the catalog
 // FieldAliases field in ApplyFieldAliases.
-func UnregisterFieldAliases(shortName string) {
+func CleanupFieldAliasesForTest(shortName string) {
 	delete(fieldAliasOverrides, shortName)
 	delete(fieldAliasBuiltins, shortName)
 }
 
-// RegisterChildType stores a child type definition in the child types registry.
+// SetChildTypeForTest stores a child type definition in the child types registry.
 // Called from init() in each aws/*.go file for sub-resource types.
-func RegisterChildType(def ResourceTypeDef) {
+func SetChildTypeForTest(def ResourceTypeDef) {
 	copy := def
 	childTypes[def.ShortName] = &copy
 }
 
 // GetChildType returns the child type definition for the given short name,
 // or nil if no child type is registered. Legacy-first: test overrides via
-// RegisterChildType take effect; otherwise reads catalog.FindChild.
+// SetChildTypeForTest take effect; otherwise reads catalog.FindChild.
 func GetChildType(shortName string) *ResourceTypeDef {
 	if def, ok := childTypes[shortName]; ok {
 		return def
@@ -251,8 +251,8 @@ func AllChildShortNames() []string {
 	return names
 }
 
-// UnregisterChildType removes a child type. Used only in tests for cleanup.
-func UnregisterChildType(shortName string) {
+// CleanupChildTypeForTest removes a child type. Used only in tests for cleanup.
+func CleanupChildTypeForTest(shortName string) {
 	delete(childTypes, shortName)
 }
 
@@ -272,14 +272,14 @@ var paginatedRegistry = map[string]PaginatedFetcher{}
 // paginatedChildRegistry maps child type short names to their paginated child fetcher functions.
 var paginatedChildRegistry = map[string]PaginatedChildFetcher{}
 
-// RegisterPaginated adds a paginated fetcher for the given resource short name.
+// SetPaginatedForTest adds a paginated fetcher for the given resource short name.
 // Called from init() in each aws/*.go file for resources that support pagination.
-func RegisterPaginated(shortName string, f PaginatedFetcher) {
+func SetPaginatedForTest(shortName string, f PaginatedFetcher) {
 	paginatedRegistry[shortName] = f
 }
 
 // GetPaginatedFetcher returns the paginated fetcher for the given resource short name.
-// Legacy-first: the runtime map wins so RegisterPaginated test overrides take
+// Legacy-first: the runtime map wins so SetPaginatedForTest test overrides take
 // effect. Catalog is the read-only fallback during the AS-795b–m transition.
 func GetPaginatedFetcher(shortName string) PaginatedFetcher {
 	if fn, ok := paginatedRegistry[shortName]; ok {
@@ -291,19 +291,19 @@ func GetPaginatedFetcher(shortName string) PaginatedFetcher {
 	return nil
 }
 
-// UnregisterPaginated removes a paginated fetcher. Used only in tests for cleanup.
-func UnregisterPaginated(shortName string) {
+// CleanupPaginatedForTest removes a paginated fetcher. Used only in tests for cleanup.
+func CleanupPaginatedForTest(shortName string) {
 	delete(paginatedRegistry, shortName)
 }
 
-// RegisterPaginatedChild adds a paginated child fetcher for the given short name.
+// SetPaginatedChildForTest adds a paginated child fetcher for the given short name.
 // Called from init() in each aws/*.go file for child resources that support pagination.
-func RegisterPaginatedChild(shortName string, f PaginatedChildFetcher) {
+func SetPaginatedChildForTest(shortName string, f PaginatedChildFetcher) {
 	paginatedChildRegistry[shortName] = f
 }
 
 // GetPaginatedChildFetcher returns the paginated child fetcher for the given short name.
-// Legacy-first: test overrides via RegisterPaginatedChild take effect;
+// Legacy-first: test overrides via SetPaginatedChildForTest take effect;
 // otherwise reads the catalog child-type ChildFetcher field.
 func GetPaginatedChildFetcher(shortName string) PaginatedChildFetcher {
 	if fn, ok := paginatedChildRegistry[shortName]; ok {
@@ -315,8 +315,8 @@ func GetPaginatedChildFetcher(shortName string) PaginatedChildFetcher {
 	return nil
 }
 
-// UnregisterPaginatedChild removes a paginated child fetcher. Used only in tests for cleanup.
-func UnregisterPaginatedChild(shortName string) {
+// CleanupPaginatedChildForTest removes a paginated child fetcher. Used only in tests for cleanup.
+func CleanupPaginatedChildForTest(shortName string) {
 	delete(paginatedChildRegistry, shortName)
 }
 
@@ -327,13 +327,13 @@ type FilteredPaginatedFetcher = domain.FilteredPaginatedFetcher
 
 var filteredPaginatedRegistry = map[string]FilteredPaginatedFetcher{}
 
-// RegisterFilteredPaginated adds a filtered paginated fetcher for the given resource short name.
-func RegisterFilteredPaginated(shortName string, f FilteredPaginatedFetcher) {
+// SetFilteredPaginatedForTest adds a filtered paginated fetcher for the given resource short name.
+func SetFilteredPaginatedForTest(shortName string, f FilteredPaginatedFetcher) {
 	filteredPaginatedRegistry[shortName] = f
 }
 
 // GetFilteredPaginatedFetcher returns the filtered paginated fetcher for the given short name.
-// Legacy-first: test overrides via RegisterFilteredPaginated take effect;
+// Legacy-first: test overrides via SetFilteredPaginatedForTest take effect;
 // otherwise reads the catalog FilteredFetcher field.
 func GetFilteredPaginatedFetcher(shortName string) FilteredPaginatedFetcher {
 	if fn, ok := filteredPaginatedRegistry[shortName]; ok {
@@ -345,8 +345,8 @@ func GetFilteredPaginatedFetcher(shortName string) FilteredPaginatedFetcher {
 	return nil
 }
 
-// UnregisterFilteredPaginated removes a filtered paginated fetcher. Used only in tests for cleanup.
-func UnregisterFilteredPaginated(shortName string) {
+// CleanupFilteredPaginatedForTest removes a filtered paginated fetcher. Used only in tests for cleanup.
+func CleanupFilteredPaginatedForTest(shortName string) {
 	delete(filteredPaginatedRegistry, shortName)
 }
 
@@ -358,14 +358,14 @@ type RevealFetcher = domain.RevealFetcher
 // revealRegistry maps resource short names to their reveal fetcher functions.
 var revealRegistry = map[string]RevealFetcher{}
 
-// RegisterRevealFetcher adds a reveal fetcher for the given resource short name.
+// SetRevealFetcherForTest adds a reveal fetcher for the given resource short name.
 // Called from init() in each aws/*.go file for resource types that support reveal.
-func RegisterRevealFetcher(shortName string, f RevealFetcher) {
+func SetRevealFetcherForTest(shortName string, f RevealFetcher) {
 	revealRegistry[shortName] = f
 }
 
 // GetRevealFetcher returns the reveal fetcher for the given resource short name.
-// Legacy-first: runtime map wins so test overrides via RegisterRevealFetcher
+// Legacy-first: runtime map wins so test overrides via SetRevealFetcherForTest
 // take effect. Catalog is the read-only fallback during AS-795b–m.
 func GetRevealFetcher(shortName string) RevealFetcher {
 	if fn, ok := revealRegistry[shortName]; ok {
@@ -377,13 +377,13 @@ func GetRevealFetcher(shortName string) RevealFetcher {
 	return nil
 }
 
-// UnregisterRevealFetcher removes a reveal fetcher. Used only in tests for cleanup.
-func UnregisterRevealFetcher(shortName string) {
+// CleanupRevealFetcherForTest removes a reveal fetcher. Used only in tests for cleanup.
+func CleanupRevealFetcherForTest(shortName string) {
 	delete(revealRegistry, shortName)
 }
 
 // HasRevealFetcher returns true if a reveal fetcher is registered for the given short name.
-// Legacy-first: runtime map wins so test overrides via RegisterRevealFetcher
+// Legacy-first: runtime map wins so test overrides via SetRevealFetcherForTest
 // are honored. Catalog is the read-only fallback during AS-795b–m.
 func HasRevealFetcher(shortName string) bool {
 	if _, ok := revealRegistry[shortName]; ok {

@@ -18,10 +18,10 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// #9 PIN — efs RegisterFieldKeys must include every key the fetcher writes.
+// #9 PIN — efs SetFieldKeysForTest must include every key the fetcher writes.
 //
 // The fetcher populates Fields["throughput_mode"] (efs.go:152) but the initial
-// RegisterFieldKeys list at efs.go:15 omitted it. This makes the key invisible
+// SetFieldKeysForTest list at efs.go:15 omitted it. This makes the key invisible
 // to tooling that enumerates the registered keys (viewsgen, YAML merging).
 // ---------------------------------------------------------------------------
 
@@ -32,7 +32,7 @@ func TestEFS_RegisterFieldKeys_IncludesThroughputMode(t *testing.T) {
 			return
 		}
 	}
-	t.Fatalf("RegisterFieldKeys(\"efs\") missing %q — fetcher writes Fields[%q] but it is not registered; keys=%v", "throughput_mode", "throughput_mode", keys)
+	t.Fatalf("SetFieldKeysForTest(\"efs\") missing %q — fetcher writes Fields[%q] but it is not registered; keys=%v", "throughput_mode", "throughput_mode", keys)
 }
 
 // ---------------------------------------------------------------------------

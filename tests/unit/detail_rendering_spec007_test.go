@@ -65,7 +65,7 @@ func twoFieldNavConfig() *config.ViewsConfig {
 
 // make007NavDetailWithColors creates a DetailModel with colors enabled, a
 // 2-field nav config, and "VpcId" registered as navigable → "vpc".
-// Caller must call defer resource.UnregisterNavigableFields("ec2") and
+// Caller must call defer resource.CleanupNavigableFieldsForTest("ec2") and
 // defer styles.Reinit().
 func make007NavDetailWithColors(t *testing.T, width, height int) views.DetailModel {
 	t.Helper()
@@ -73,10 +73,10 @@ func make007NavDetailWithColors(t *testing.T, width, height int) views.DetailMod
 	styles.Reinit()
 	t.Cleanup(func() { styles.Reinit() })
 
-	resource.RegisterNavigableFields("ec2", []resource.NavigableField{
+	resource.SetNavigableFieldsForTest("ec2", []resource.NavigableField{
 		{FieldPath: "VpcId", TargetType: "vpc"},
 	})
-	t.Cleanup(func() { resource.UnregisterNavigableFields("ec2") })
+	t.Cleanup(func() { resource.CleanupNavigableFieldsForTest("ec2") })
 
 	return make007EC2Detail(width, height, twoFieldNavConfig())
 }
@@ -183,8 +183,8 @@ func TestDetail_007_SubField_RendersKeyAndValue(t *testing.T) {
 	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
 	t.Cleanup(func() { styles.Reinit() })
-	resource.UnregisterNavigableFields("ec2")
-	defer resource.UnregisterNavigableFields("ec2")
+	resource.CleanupNavigableFieldsForTest("ec2")
+	defer resource.CleanupNavigableFieldsForTest("ec2")
 	unregisterEC2Related(t)
 
 	// Register a multi-line field: Tags as a YAML-like string with sub-entries.

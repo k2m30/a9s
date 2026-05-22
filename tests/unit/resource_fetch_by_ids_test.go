@@ -1,7 +1,7 @@
 package unit
 
 // resource_fetch_by_ids_test.go — registry tests for lazy-add
-// (RegisterFetchByIDs / GetFetchByIDs). Exercises the round-trip contract
+// (SetFetchByIDsForTest / GetFetchByIDs). Exercises the round-trip contract
 // without hitting any AWS fake: callers that register a fetcher can recover
 // it by short name, and unregistered types return nil.
 
@@ -15,7 +15,7 @@ import (
 
 func TestRegisterFetchByIDs_RoundTrip(t *testing.T) {
 	const shortName = "test-lazy-add-roundtrip"
-	t.Cleanup(func() { resource.UnregisterFetchByIDs(shortName) })
+	t.Cleanup(func() { resource.CleanupFetchByIDsForTest(shortName) })
 
 	want := []resource.Resource{
 		{ID: "id-a", Fields: map[string]string{"k": "v"}},
@@ -29,7 +29,7 @@ func TestRegisterFetchByIDs_RoundTrip(t *testing.T) {
 		return want, nil
 	}
 
-	resource.RegisterFetchByIDs(shortName, fn)
+	resource.SetFetchByIDsForTest(shortName, fn)
 
 	got := resource.GetFetchByIDs(shortName)
 	if got == nil {

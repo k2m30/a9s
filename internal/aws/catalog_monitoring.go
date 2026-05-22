@@ -189,9 +189,9 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 		// In-fetcher Wave 2: the trail fetcher already issues GetTrailStatus
 		// per-trail and populates is_logging / latest_delivery_error /
-		// log_file_validation_enabled at fetch time. NoOpIssueEnricher makes
+		// log_file_validation_enabled at fetch time. InFetcherWave2Sentinel makes
 		// the Wave 2 contract explicit for TestAttentionSignalsDoc.
-		Wave2:     IssueEnricher{Fn: NoOpIssueEnricher, Priority: 100},
+		Wave2:     IssueEnricher{Fn: InFetcherWave2Sentinel, Priority: 100},
 		FieldKeys: []string{"trail_name", "s3_bucket", "home_region", "multi_region", "is_logging", "latest_delivery_error", "log_file_validation_enabled"},
 		Related: []domain.RelatedDef{
 			{TargetType: "s3", DisplayName: "S3 Bucket", Checker: checkTrailS3, NeedsTargetCache: true},
