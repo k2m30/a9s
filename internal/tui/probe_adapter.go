@@ -170,7 +170,7 @@ func (m *Model) probeEnrichment(shortName string, gen domain.Gen) tea.Cmd {
 	}
 	ctx, clients := m.appCtx, m.core.Session().Clients
 	typeGen := m.core.Session().EnrichmentTypeGen[shortName]
-	if awsclient.IssueEnricherRegistry[shortName].Fn == nil {
+	if _, ok := awsclient.Wave2EnricherFor(shortName); !ok {
 		return nil
 	}
 	return func() tea.Msg {

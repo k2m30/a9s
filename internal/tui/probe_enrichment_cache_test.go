@@ -50,16 +50,7 @@ func TestProbeEnrichment_CacheSnapshotMergesProbeResources(t *testing.T) {
 		return awsclient.IssueEnricherResult{}, nil
 	}
 
-	// Stash and restore registry entry so the test doesn't pollute global state.
-	prev, hadPrev := awsclient.IssueEnricherRegistry[sentinelType]
-	awsclient.IssueEnricherRegistry[sentinelType] = awsclient.IssueEnricher{Fn: captureFn, Priority: 100}
-	t.Cleanup(func() {
-		if hadPrev {
-			awsclient.IssueEnricherRegistry[sentinelType] = prev
-		} else {
-			delete(awsclient.IssueEnricherRegistry, sentinelType)
-		}
-	})
+	awsclient.SetWave2EnricherForTest(t, sentinelType, awsclient.IssueEnricher{Fn: captureFn, Priority: 100})
 
 	// Construct a Model where ProbeResources has a sibling list ("dbi") but
 	// ResourceCache is empty — this models the initial-menu-enrichment state.

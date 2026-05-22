@@ -11,11 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("sns", EnrichSNSSubscriptions, 100)
-	resource.RegisterIssueEnricherFieldKeys("sns", []string{"subs_count"})
-}
-
 // EnrichSNSSubscriptions calls ListSubscriptionsByTopic per topic (cap EnrichmentCap)
 // to surface orphan topics and topics with all-pending-confirmation subscribers.
 // Per-topic errors are treated as truncated (skip silently).

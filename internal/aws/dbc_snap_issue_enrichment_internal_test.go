@@ -5,7 +5,7 @@ package aws
 //
 // Lives in internal/aws (not tests/unit) so it can call the unexported
 // enrichDBCSnapCrossRef package-level var directly, testing the exact
-// function wired into IssueEnricherRegistry["dbc-snap"].
+// function wired into catalog_databases.go's dbc-snap Wave2 field.
 //
 // Pins regression B1: a fetcher-emitted Broken phrase ("failed") MUST
 // survive cross-ref enrichment. When the enricher adds "orphan: source

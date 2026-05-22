@@ -212,33 +212,30 @@ func TestRealApplyFilter_NonzeroVisible_AllOthersZero(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// IssueEnricherRegistry completeness
+// Wave 2 catalog completeness
 // ---------------------------------------------------------------------------
 
 func TestIssueEnricherRegistry_AllExpectedKeys(t *testing.T) {
 	// The original 8 enrichers from issue #196. These must still be
-	// registered (real, not noop) — they're the foundational Wave 2
+	// discoverable via Wave2EnricherFor — they're the foundational Wave 2
 	// implementations.
 	expected := []string{"rds", "dbi", "ebs", "cb", "tg", "pipeline", "sfn", "glue"}
 	for _, key := range expected {
-		if e, ok := awsclient.IssueEnricherRegistry[key]; !ok || e.Fn == nil {
-			t.Errorf("IssueEnricherRegistry[%q].Fn is nil or missing", key)
+		if e, ok := awsclient.Wave2EnricherFor(key); !ok || e.Fn == nil {
+			t.Errorf("Wave2EnricherFor(%q) is missing or has nil Fn", key)
 		}
 	}
 }
 
 func TestIssueEnricherRegistry_NoUnexpectedKeys(t *testing.T) {
-	// Per docs/attention-signals.md, EVERY registered resource type has an
-	// IssueEnricherRegistry entry (real or NoOpIssueEnricher). The doc-grounded test
-	// TestAttentionSignalsDoc enforces the registration contract — this test only
-	// asserts there are no entries for shortNames that are not registered as
-	// resource types.
+	// AllWave2 returns one entry per catalog Wave2 field. Every entry must
+	// correspond to a registered ResourceTypeDef.
 	//
 	// TODO(no-middle-state): avoid calling this the "full contract". Registration
 	// is necessary, but it does not prove that the feature is fully implemented.
-	for key := range awsclient.IssueEnricherRegistry {
-		if resource.FindResourceType(key) == nil {
-			t.Errorf("IssueEnricherRegistry has entry for %q but no such ResourceTypeDef is registered", key)
+	for _, entry := range awsclient.AllWave2() {
+		if resource.FindResourceType(entry.ShortName) == nil {
+			t.Errorf("AllWave2 entry %q has no matching ResourceTypeDef", entry.ShortName)
 		}
 	}
 }

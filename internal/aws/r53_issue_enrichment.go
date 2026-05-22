@@ -11,10 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	registerIssueEnricher("r53", EnrichRoute53Zone, 100)
-}
-
 // EnrichRoute53Zone calls GetHostedZone per zone (cap EnrichmentCap) and raises a finding
 // for private zones that have no VPC associations (orphaned private zone).
 //

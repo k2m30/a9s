@@ -21,8 +21,8 @@ import (
 
 // TestProbeEnrichment_DemoMode_ReturnsNilAndSkipsRegistry verifies that when
 // `m.isDemo == true`, probeEnrichment short-circuits to nil BEFORE consulting
-// `awsclient.IssueEnricherRegistry`. A sentinel enricher counts invocations of
-// its registry hit + closure; both must remain zero in demo mode.
+// the Wave 2 enricher accessor. A sentinel enricher counts invocations of its
+// lookup hit + closure; both must remain zero in demo mode.
 func TestProbeEnrichment_DemoMode_ReturnsNilAndSkipsRegistry(t *testing.T) {
 	const sentinelType = "dbi-snap-probe-demo-guard-pin"
 
@@ -32,15 +32,7 @@ func TestProbeEnrichment_DemoMode_ReturnsNilAndSkipsRegistry(t *testing.T) {
 		return awsclient.IssueEnricherResult{}, nil
 	}
 
-	prev, hadPrev := awsclient.IssueEnricherRegistry[sentinelType]
-	awsclient.IssueEnricherRegistry[sentinelType] = awsclient.IssueEnricher{Fn: captureFn, Priority: 100}
-	t.Cleanup(func() {
-		if hadPrev {
-			awsclient.IssueEnricherRegistry[sentinelType] = prev
-		} else {
-			delete(awsclient.IssueEnricherRegistry, sentinelType)
-		}
-	})
+	awsclient.SetWave2EnricherForTest(t, sentinelType, awsclient.IssueEnricher{Fn: captureFn, Priority: 100})
 
 	sess := session.New()
 	sess.Clients = &awsclient.ServiceClients{}
@@ -71,15 +63,7 @@ func TestProbeEnrichment_NonDemoMode_ReturnsCmd(t *testing.T) {
 		return awsclient.IssueEnricherResult{}, nil
 	}
 
-	prev, hadPrev := awsclient.IssueEnricherRegistry[sentinelType]
-	awsclient.IssueEnricherRegistry[sentinelType] = awsclient.IssueEnricher{Fn: captureFn, Priority: 100}
-	t.Cleanup(func() {
-		if hadPrev {
-			awsclient.IssueEnricherRegistry[sentinelType] = prev
-		} else {
-			delete(awsclient.IssueEnricherRegistry, sentinelType)
-		}
-	})
+	awsclient.SetWave2EnricherForTest(t, sentinelType, awsclient.IssueEnricher{Fn: captureFn, Priority: 100})
 
 	sess := session.New()
 	sess.Clients = &awsclient.ServiceClients{}

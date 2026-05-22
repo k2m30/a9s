@@ -147,14 +147,15 @@ func TestProbeEnrichment_PartialSuccess(t *testing.T) {
 		},
 	}
 
-	// Register a synthetic enricher that returns a partial result AND an error.
-	awsclient.IssueEnricherRegistry[shortName] = awsclient.IssueEnricher{
+	// Register a synthetic enricher (sentinel name not in catalog) that returns
+	// a partial result AND an error. SetWave2EnricherForTest restores state
+	// automatically via t.Cleanup.
+	awsclient.SetWave2EnricherForTest(t, shortName, awsclient.IssueEnricher{
 		Priority: 100,
 		Fn: func(_ context.Context, _ *awsclient.ServiceClients, _ []resource.Resource, _ resource.ResourceCache) (awsclient.IssueEnricherResult, error) {
 			return partialResult, partialErr
 		},
-	}
-	t.Cleanup(func() { delete(awsclient.IssueEnricherRegistry, shortName) })
+	})
 
 	// Seed probeResources[shortName] so buildEnrichQueue includes it.
 	// Use WithNoCache(true) so that delivering ClientsReadyMsg sets m.clients without
