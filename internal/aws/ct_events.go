@@ -16,54 +16,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/semantics/ctevent"
 )
 
-func init() {
-	resource.RegisterFieldKeys("ct-events", []string{"event_name", "time", "event_time", "event_time_raw", "user", "source", "resource_type", "resource_name", "read_only", "role_name", "status", "_ct.verb", "_ct.actor", "_ct.origin", "_ct.target", "_ct.target_raw", "_ct.outcome"})
-
-	// Paginated fetcher for resource list browsing (M key load-more).
-	resource.RegisterPaginated("ct-events", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchCloudTrailEventsPage(ctx, c.CloudTrail, continuationToken)
-	})
-
-	// Filtered paginated fetcher for related navigation (e.g., IAM User → ct-events via Username).
-	resource.RegisterFilteredPaginated("ct-events", func(ctx context.Context, clients any, filter map[string]string, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchCloudTrailEventsPageFiltered(ctx, c.CloudTrail, filter, continuationToken)
-	})
-
-	resource.RegisterRelated("ct-events", []resource.RelatedDef{
-		{TargetType: "role", DisplayName: "IAM Roles", Checker: checkCtEventsRole, NeedsTargetCache: true},
-		{TargetType: "iam-user", DisplayName: "IAM Users", Checker: checkCtEventsUser, NeedsTargetCache: true},
-		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkCtEventsEC2, NeedsTargetCache: true},
-		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkCtEventsS3, NeedsTargetCache: true},
-		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkCtEventsLambda, NeedsTargetCache: true},
-		{TargetType: "dbi", DisplayName: "RDS Instances", Checker: checkCtEventsRDS, NeedsTargetCache: true},
-		{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkCtEventsKMS, NeedsTargetCache: true},
-		{TargetType: "secrets", DisplayName: "Secrets", Checker: checkCtEventsSecrets, NeedsTargetCache: true},
-		{TargetType: "vpce", DisplayName: "VPC Endpoints", Checker: checkCtEventsVPCE, NeedsTargetCache: true},
-		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkCtEventsSG, NeedsTargetCache: true},
-		{TargetType: "ddb", DisplayName: "DynamoDB Tables", Checker: checkCtEventsDDB, NeedsTargetCache: true},
-		{TargetType: "cfn", DisplayName: "CloudFormation Stacks", Checker: checkCtEventsCFN, NeedsTargetCache: true},
-		{TargetType: "trail", DisplayName: "CloudTrail Trails", Checker: checkCtEventsTrail, NeedsTargetCache: true},
-		// Self-pivot entries (ct-events → ct-events): navigate to events filtered by attribute.
-		{TargetType: "ct-events", DisplayName: "CT events by AccessKeyId", Checker: checkCtEventsPivotByAccessKeyId, NeedsTargetCache: false},
-		{TargetType: "ct-events", DisplayName: "CT events by Username", Checker: checkCtEventsPivotByUsername, NeedsTargetCache: false},
-		{TargetType: "ct-events", DisplayName: "CT events by EventName", Checker: checkCtEventsPivotByEventName, NeedsTargetCache: false},
-		{TargetType: "ct-events", DisplayName: "CT events by SharedEventId", Checker: checkCtEventsPivotBySharedEventId, NeedsTargetCache: false},
-	})
-
-	resource.RegisterDefaultNavFields("ct-events", []resource.NavigableField{
-		{FieldPath: "user", TargetType: "iam-user"},
-		{FieldPath: "role_name", TargetType: "role"},
-	})
-}
-
 // FetchCloudTrailEvents fetches all CloudTrail LookupEvents pages and returns
 // the combined resources. Used by related-resource cold-cache checks and tests.
 func FetchCloudTrailEvents(ctx context.Context, api CloudTrailLookupEventsAPI) ([]resource.Resource, error) {

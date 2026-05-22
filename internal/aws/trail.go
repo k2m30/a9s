@@ -9,25 +9,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("trail", []string{"trail_name", "s3_bucket", "home_region", "multi_region", "is_logging", "latest_delivery_error", "log_file_validation_enabled"})
-
-	resource.RegisterPaginated("trail", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		resources, err := FetchCloudTrailTrails(ctx, c.CloudTrail)
-		if err != nil {
-			return resource.FetchResult{}, err
-		}
-		return resource.FetchResult{
-			Resources:  resources,
-			Pagination: &resource.PaginationMeta{IsTruncated: false, TotalHint: len(resources), PageSize: len(resources)},
-		}, nil
-	})
-}
-
 // FetchCloudTrailTrails calls DescribeTrails and GetTrailStatus (per trail)
 // so the list row can classify `is_logging=false` / `latest_delivery_error` as
 // broken. GetTrailStatus is the authoritative source for logging health; the

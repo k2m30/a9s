@@ -10,24 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterRelated("trail", []resource.RelatedDef{
-		{TargetType: "s3", DisplayName: "S3 Bucket", Checker: checkTrailS3, NeedsTargetCache: true},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkTrailLogs, NeedsTargetCache: true},
-		{TargetType: "sns", DisplayName: "SNS Topic", Checker: checkTrailSNS, NeedsTargetCache: true},
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkTrailKMS, NeedsTargetCache: true},
-		{TargetType: "role", DisplayName: "IAM Role", Checker: checkTrailRole},
-	})
-
-	resource.RegisterDefaultNavFields("trail", []resource.NavigableField{
-		{FieldPath: "S3BucketName", TargetType: "s3"},
-		{FieldPath: "KmsKeyId", TargetType: "kms"},
-		{FieldPath: "SnsTopicARN", TargetType: "sns"},
-		{FieldPath: "CloudWatchLogsLogGroupArn", TargetType: "logs"},
-		{FieldPath: "CloudWatchLogsRoleArn", TargetType: "role"},
-	})
-}
-
 // checkTrailS3 searches the s3 cache for the bucket this trail writes logs to.
 // Pattern C — match S3BucketName from RawStruct against s3 cache IDs (bucket names).
 func checkTrailS3(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
