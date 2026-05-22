@@ -13,21 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterRelated("sqs", []resource.RelatedDef{
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkSQSAlarm, NeedsTargetCache: true},
-		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkSQSLambda, NeedsTargetCache: false},
-		{TargetType: "sqs", DisplayName: "Dead Letter Queues", Checker: checkSQSSQS, NeedsTargetCache: true},
-		{TargetType: "sns-sub", DisplayName: "SNS Subscriptions", Checker: checkSQSSNSSub, NeedsTargetCache: true},
-		{TargetType: "sns", DisplayName: "SNS Topics", Checker: checkSQSSNS, NeedsTargetCache: true},
-		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkSQSEbRule, NeedsTargetCache: true},
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkSQSKMS},
-	})
-
-	// SQS RawStruct is a Fields map (QueueUrl + Attributes string map) — KmsMasterKeyId and
-	// RedrivePolicy are embedded in the Attributes string map, not struct fields; no NavigableField path applies.
-}
-
 // checkSQSSNS resolves the SNS topics publishing to this queue by scanning the
 // sns-sub cache: any subscription with protocol=sqs and Endpoint matching this
 // queue's ARN maps back to its topic_arn. Pattern C — reverse two-hop.

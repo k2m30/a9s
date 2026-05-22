@@ -12,18 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("msk", []string{"cluster_name", "cluster_type", "state", "version"})
-
-	resource.RegisterPaginated("msk", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchMSKClustersPage(ctx, c.MSK, continuationToken)
-	})
-}
-
 // FetchMSKClusters calls the MSK ListClustersV2 API and returns a slice of
 // generic Resource structs.
 func FetchMSKClusters(ctx context.Context, api MSKListClustersV2API) ([]resource.Resource, error) {

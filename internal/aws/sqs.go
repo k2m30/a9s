@@ -20,22 +20,6 @@ type SQSQueueAttributesRow struct {
 	Attributes map[string]string
 }
 
-func init() {
-	resource.RegisterFieldKeys("sqs", []string{"queue_name", "queue_url", "arn", "approx_messages", "approx_not_visible", "delay_seconds"})
-
-	resource.RegisterPaginated("sqs", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		listAPI, ok := c.SQS.(SQSListQueuesAPI)
-		if !ok {
-			return resource.FetchResult{}, fmt.Errorf("SQS client does not support ListQueues")
-		}
-		return FetchSQSQueuesPage(ctx, listAPI, c.SQS, continuationToken)
-	})
-}
-
 // FetchSQSQueues calls the SQS ListQueues/GetQueueAttributes APIs and returns
 // all pages of queues. Used by tests; the production path uses the per-page fetcher for pagination.
 func FetchSQSQueues(ctx context.Context, listAPI SQSListQueuesAPI, attrAPI SQSGetQueueAttributesAPI) ([]resource.Resource, error) {

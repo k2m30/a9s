@@ -8,18 +8,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterRelated("sns-sub", []resource.RelatedDef{
-		{TargetType: "sns", DisplayName: "SNS Topic", Checker: checkSNSSubTopic, NeedsTargetCache: true},
-		{TargetType: "lambda", DisplayName: "Lambda Function", Checker: checkSNSSubLambda, NeedsTargetCache: true},
-		{TargetType: "sqs", DisplayName: "SQS Queue", Checker: checkSNSSubSQS, NeedsTargetCache: true},
-	})
-
-	resource.RegisterDefaultNavFields("sns-sub", []resource.NavigableField{
-		{FieldPath: "TopicArn", TargetType: "sns"},
-	})
-}
-
 // checkSNSSubTopic checks the sns cache for the topic this subscription belongs to.
 // Pattern C: matches res.Fields["topic_arn"] against sns cache IDs (topic ARNs).
 func checkSNSSubTopic(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {

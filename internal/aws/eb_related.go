@@ -12,21 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterRelated("eb", []resource.RelatedDef{
-		{TargetType: "cfn", DisplayName: "CloudFormation Stack", Checker: checkEbCFN, NeedsTargetCache: true},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkEbLogs, NeedsTargetCache: true},
-		{TargetType: "asg", DisplayName: "Auto Scaling Groups", Checker: checkEbASG, NeedsTargetCache: true},
-		{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkEbEC2, NeedsTargetCache: true},
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkEbAlarm, NeedsTargetCache: true},
-		{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkEbELB, NeedsTargetCache: false},
-		{TargetType: "tg", DisplayName: "Target Groups", Checker: checkEbTG, NeedsTargetCache: false},
-		{TargetType: "sg", DisplayName: "Security Groups", Checker: checkEbSG, NeedsTargetCache: false},
-		{TargetType: "role", DisplayName: "IAM Role", Checker: checkEbRole, NeedsTargetCache: false},
-		{TargetType: "s3", DisplayName: "S3 Buckets", Checker: checkEbS3, NeedsTargetCache: false},
-	})
-}
-
 // checkEbCFN checks the CFN cache for a stack associated with this EB environment.
 // Pattern C: match by stack name prefix "awseb-{envID}".
 func checkEbCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {

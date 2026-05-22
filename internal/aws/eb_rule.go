@@ -10,18 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("eb-rule", []string{"name", "state", "event_bus", "schedule", "description", "event_pattern"})
-
-	resource.RegisterPaginated("eb-rule", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchEventBridgeRulesPage(ctx, c.EventBridge, continuationToken)
-	})
-}
-
 // FetchEventBridgeRules calls the EventBridge ListRules API and converts
 // the response into a slice of generic Resource structs.
 func FetchEventBridgeRules(ctx context.Context, api EventBridgeListRulesAPI) ([]resource.Resource, error) {

@@ -11,23 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterRelated("eb-rule", []resource.RelatedDef{
-		{TargetType: "role", DisplayName: "IAM Role", Checker: checkEbRuleRole, NeedsTargetCache: false},
-		{TargetType: "kinesis", DisplayName: "Kinesis (targets)", Checker: checkEbRuleKinesis},
-		{TargetType: "lambda", DisplayName: "Lambda (targets)", Checker: checkEbRuleLambda},
-		{TargetType: "logs", DisplayName: "Log Groups (targets)", Checker: checkEbRuleLogs},
-		{TargetType: "sfn", DisplayName: "Step Functions (targets)", Checker: checkEbRuleSFN},
-		{TargetType: "sns", DisplayName: "SNS (targets)", Checker: checkEbRuleSNS},
-		{TargetType: "sqs", DisplayName: "SQS (targets)", Checker: checkEbRuleSQS},
-	})
-
-	// eventbridgetypes.Rule: RoleArn (execution role for the rule target)
-	resource.RegisterDefaultNavFields("eb-rule", []resource.NavigableField{
-		{FieldPath: "RoleArn", TargetType: "role"},
-	})
-}
-
 // checkEbRuleRole reads RoleArn from the Rule RawStruct and extracts the role name.
 // Pattern F — no cache needed.
 func checkEbRuleRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {

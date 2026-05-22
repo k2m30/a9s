@@ -32,18 +32,6 @@ func snsGetTopicAttrs(ctx context.Context, clients any, topicARN string) map[str
 	return out.Attributes
 }
 
-func init() {
-	resource.RegisterRelated("sns", []resource.RelatedDef{
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkSNSAlarm, NeedsTargetCache: false},
-		{TargetType: "sns-sub", DisplayName: "Subscriptions", Checker: checkSNSSub, NeedsTargetCache: true},
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkSNSKMS, NeedsTargetCache: false},
-		{TargetType: "role", DisplayName: "IAM Role", Checker: checkSNSRole, NeedsTargetCache: false},
-	})
-
-	// snstypes topic: detail view renders only TopicArn — no cross-ref fields (KmsMasterKeyId,
-	// subscriptions, delivery policies are GetTopicAttributes results, not in the list RawStruct).
-}
-
 // checkSNSAlarm searches the alarm cache for alarms whose AlarmActions, OKActions,
 // or InsufficientDataActions reference this SNS topic ARN.
 // Pattern C — reverse lookup in alarm cache.
