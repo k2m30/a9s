@@ -9,35 +9,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("sfn", []string{"name", "type", "arn", "creation_date"})
-
-	resource.RegisterPaginated("sfn", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		return FetchStepFunctionsPage(ctx, c.SFN, continuationToken)
-	})
-
-	resource.RegisterRelated("sfn", []resource.RelatedDef{
-		{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkSFNAlarm, NeedsTargetCache: false},
-		{TargetType: "logs", DisplayName: "Log Groups", Checker: checkSFNLogs, NeedsTargetCache: true},
-		{TargetType: "role", DisplayName: "IAM Role", Checker: checkSFNRole, NeedsTargetCache: false},
-		{TargetType: "eb-rule", DisplayName: "EventBridge Rules", Checker: checkSFNEbRule, NeedsTargetCache: true},
-		{TargetType: "kms", DisplayName: "KMS Key", Checker: checkSFNKMS, NeedsTargetCache: false},
-		{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkSFNLambda, NeedsTargetCache: false},
-	})
-
-	// RoleArn is declared navigable even though sfntypes.StateMachineListItem (the
-	// list RawStruct) lacks it — the navigable-field registration is an intent
-	// contract: "if the raw struct exposes RoleArn, treat it as a role navigation".
-	// It resolves only when enriched detail (DescribeStateMachine) is present.
-	resource.RegisterDefaultNavFields("sfn", []resource.NavigableField{
-		{FieldPath: "RoleArn", TargetType: "role"},
-	})
-}
-
 // FetchStepFunctions calls the SFN ListStateMachines API and converts
 // the response into a slice of generic Resource structs.
 func FetchStepFunctions(ctx context.Context, api SFNListStateMachinesAPI) ([]resource.Resource, error) {

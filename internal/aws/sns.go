@@ -10,22 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-func init() {
-	resource.RegisterFieldKeys("sns", []string{"topic_arn", "display_name"})
-
-	resource.RegisterPaginated("sns", func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
-		c, ok := clients.(*ServiceClients)
-		if !ok || c == nil {
-			return resource.FetchResult{}, fmt.Errorf("AWS clients not initialized")
-		}
-		topicsAPI, ok := c.SNS.(SNSListTopicsAPI)
-		if !ok {
-			return resource.FetchResult{}, fmt.Errorf("SNS client does not support ListTopics")
-		}
-		return FetchSNSTopicsPage(ctx, topicsAPI, continuationToken)
-	})
-}
-
 // FetchSNSTopics calls the SNS ListTopics API and returns all pages of topics.
 // Used by tests; the production path uses the per-page fetcher for pagination.
 func FetchSNSTopics(ctx context.Context, api SNSListTopicsAPI) ([]resource.Resource, error) {

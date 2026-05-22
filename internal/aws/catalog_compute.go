@@ -767,22 +767,6 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		},
 	},
 	{
-		Name:          "Elastic Beanstalk",
-		ShortName:     "eb",
-		Aliases:       []string{"eb", "beanstalk", "elastic-beanstalk"},
-		Category:      "COMPUTE",
-		CloudTrailKey: "ResourceName:ID",
-		LifecycleKey:  "status",
-		Columns: []domain.Column{
-			{Key: "environment_name", Title: "Environment", Width: 28, Sortable: true},
-			{Key: "application_name", Title: "Application", Width: 24, Sortable: true},
-			{Key: "status", Title: "Status", Width: 12, Sortable: true},
-			{Key: "health", Title: "Health", Width: 10, Sortable: true},
-			{Key: "version_label", Title: "Version", Width: 16, Sortable: true},
-		},
-		Color: colorEB,
-	},
-	{
 		Name:          "EBS Volumes",
 		ShortName:     "ebs",
 		Aliases:       []string{"ebs", "volumes", "ebs-vol"},
