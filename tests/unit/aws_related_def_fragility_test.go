@@ -27,6 +27,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
+	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 	smithy "github.com/aws/smithy-go"
@@ -290,6 +291,46 @@ func TestCheckELBWAF_CallsAPIForApplicationLB(t *testing.T) {
 
 	if result.Count != 1 {
 		t.Fatalf("Count = %d, want 1; ResourceIDs=%v Err=%v", result.Count, result.ResourceIDs, result.Err)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != wafID {
+		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, wafID)
+	}
+}
+
+// TestCheckELBWAF_EmptyTypeFallbackToRawStruct verifies the defense-in-depth
+// fallback: when Fields["type"] is empty (e.g. cache rehydration paths that
+// drop the field), the checker falls back to RawStruct.Type. If RawStruct
+// resolves to "application", the WAF API call still proceeds. This mirrors
+// the existing elbARN RawStruct fallback at lines 370-376 and prevents a
+// silent false-negative on a security-relevant pivot.
+func TestCheckELBWAF_EmptyTypeFallbackToRawStruct(t *testing.T) {
+	const albARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/prod-alb/abcdef1234567890"
+	const wafID = "waf-web-acl-id-fallback"
+	source := resource.Resource{
+		ID:     "prod-alb",
+		Name:   "prod-alb",
+		Fields: map[string]string{"load_balancer_arn": albARN}, // type missing
+		RawStruct: elbv2types.LoadBalancer{
+			LoadBalancerArn: aws.String(albARN),
+			Type:            elbv2types.LoadBalancerTypeEnumApplication,
+		},
+	}
+	clients := &awsclient.ServiceClients{
+		WAFv2: &fakeWAFv2ForResource{
+			output: &wafv2.GetWebACLForResourceOutput{
+				WebACL: &wafv2types.WebACL{
+					Id:   aws.String(wafID),
+					Name: aws.String("prod-alb-waf"),
+					ARN:  aws.String("arn:aws:wafv2:us-east-1:123456789012:regional/webacl/prod-alb-waf/" + wafID),
+				},
+			},
+		},
+	}
+	checker := elbCheckerByTarget(t, "waf")
+	result := checker(context.Background(), clients, source, resource.ResourceCache{})
+
+	if result.Count != 1 {
+		t.Fatalf("Count = %d, want 1 (RawStruct fallback should have surfaced ALB type); ResourceIDs=%v Err=%v", result.Count, result.ResourceIDs, result.Err)
 	}
 	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != wafID {
 		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, wafID)

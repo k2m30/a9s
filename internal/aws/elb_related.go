@@ -364,8 +364,11 @@ func checkELBSubnet(_ context.Context, _ any, res resource.Resource, _ resource.
 // AWS WAFv2 only supports CloudFront, ALB, API Gateway, AppSync, Cognito,
 // Verified Access, and App Runner — NLBs and GWLBs are unsupported and
 // calling GetWebACLForResource with a non-ALB ELB returns
-// WAFInvalidParameterException. Gate on the ELB type to keep the
-// related-panel result a definitive zero instead of a fetch failure.
+// WAFInvalidParameterException. Short-circuit when the ELB type is a known
+// unsupported value (network or gateway) to keep the related-panel result a
+// definitive zero instead of a fetch failure. Fall through to the API call
+// for "application" and unknown types so ALBs with missing Fields["type"]
+// (e.g. cache rehydration paths) still get checked via RawStruct fallback.
 func checkELBWAF(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	elbARN := res.Fields["load_balancer_arn"]
 	if elbARN == "" {
@@ -377,7 +380,13 @@ func checkELBWAF(ctx context.Context, clients any, res resource.Resource, _ reso
 	if elbARN == "" {
 		return resource.RelatedCheckResult{TargetType: "waf", Count: 0}
 	}
-	if res.Fields["type"] != "application" {
+	lbType := res.Fields["type"]
+	if lbType == "" {
+		if raw, ok := assertStruct[elbv2types.LoadBalancer](res.RawStruct); ok {
+			lbType = string(raw.Type)
+		}
+	}
+	if lbType == "network" || lbType == "gateway" {
 		return resource.RelatedCheckResult{TargetType: "waf", Count: 0}
 	}
 	c, ok := clients.(*ServiceClients)
