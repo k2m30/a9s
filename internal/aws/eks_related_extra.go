@@ -3,6 +3,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -13,6 +14,7 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
+	smithy "github.com/aws/smithy-go"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -172,6 +174,14 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 			})
 		})
 		if ltErr != nil {
+			// Soft-skip when the launch template has been deleted upstream:
+			// AWS returns InvalidLaunchTemplateId.NotFound, which is a true
+			// "no AMI to relate to" rather than a fetch failure.
+			var apiErr smithy.APIError
+			if errors.As(ltErr, &apiErr) && apiErr.ErrorCode() == "InvalidLaunchTemplateId.NotFound" {
+				failures = append(failures, fmt.Sprintf("%s: launch template deleted", ngName))
+				continue
+			}
 			failures = append(failures, fmt.Sprintf("%s/lt: %v", ngName, ltErr))
 			continue
 		}

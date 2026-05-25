@@ -584,7 +584,7 @@ func TestRelated_ELB_WAF_Found(t *testing.T) {
 	const wafID = "waf-web-acl-id-abc123"
 	source := resource.Resource{
 		ID:     "prod-alb",
-		Fields: map[string]string{"load_balancer_arn": elbARN},
+		Fields: map[string]string{"load_balancer_arn": elbARN, "type": "application"},
 	}
 	clients := &awsclient.ServiceClients{
 		WAFv2: &fakeWAFv2ForResource{
@@ -612,7 +612,7 @@ func TestRelated_ELB_WAF_NoWebACL(t *testing.T) {
 	const elbARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/prod-alb/abcdef1234567890"
 	source := resource.Resource{
 		ID:     "prod-alb",
-		Fields: map[string]string{"load_balancer_arn": elbARN},
+		Fields: map[string]string{"load_balancer_arn": elbARN, "type": "application"},
 	}
 	clients := &awsclient.ServiceClients{
 		WAFv2: &fakeWAFv2ForResource{
