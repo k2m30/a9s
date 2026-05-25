@@ -360,6 +360,12 @@ func checkELBSubnet(_ context.Context, _ any, res resource.Resource, _ resource.
 
 // checkELBWAF reports the WAF Web ACL attached to this ELB.
 // Pattern C: one wafv2:GetWebACLForResource call with the ELB ARN.
+//
+// AWS WAFv2 only supports CloudFront, ALB, API Gateway, AppSync, Cognito,
+// Verified Access, and App Runner — NLBs and GWLBs are unsupported and
+// calling GetWebACLForResource with a non-ALB ELB returns
+// WAFInvalidParameterException. Gate on the ELB type to keep the
+// related-panel result a definitive zero instead of a fetch failure.
 func checkELBWAF(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	elbARN := res.Fields["load_balancer_arn"]
 	if elbARN == "" {
@@ -369,6 +375,9 @@ func checkELBWAF(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 	}
 	if elbARN == "" {
+		return resource.RelatedCheckResult{TargetType: "waf", Count: 0}
+	}
+	if res.Fields["type"] != "application" {
 		return resource.RelatedCheckResult{TargetType: "waf", Count: 0}
 	}
 	c, ok := clients.(*ServiceClients)

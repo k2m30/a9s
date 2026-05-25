@@ -3,6 +3,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -10,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
+	smithy "github.com/aws/smithy-go"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -217,6 +219,12 @@ func checkNGAMI(ctx context.Context, clients any, res resource.Resource, _ resou
 		})
 	})
 	if err != nil {
+		// Launch template deleted upstream — that is a true zero, not a
+		// fetch failure: there is no AMI for this NG to relate to.
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) && apiErr.ErrorCode() == "InvalidLaunchTemplateId.NotFound" {
+			return resource.RelatedCheckResult{TargetType: "ami", Count: 0}
+		}
 		return resource.RelatedCheckResult{TargetType: "ami", Count: -1, Err: err}
 	}
 	for _, v := range ltOut.LaunchTemplateVersions {
