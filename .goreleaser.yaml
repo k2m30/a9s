@@ -34,17 +34,17 @@ archives:
         formats:
           - zip
 
-brews:
-  - repository:
+homebrew_casks:
+  - name: a9s
+    binaries:
+      - a9s
+    repository:
       owner: k2m30
       name: homebrew-a9s
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    directory: Formula
+    directory: Casks
     homepage: https://github.com/k2m30/a9s
     description: Terminal UI AWS Resource Manager
-    license: GPL-3.0-or-later
-    test: |
-      system "#{bin}/a9s", "--version"
 
 scoops:
   - repository:
