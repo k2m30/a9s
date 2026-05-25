@@ -41,6 +41,12 @@ jobs:
               # must re-run the gate, otherwise an unvalidated change to the
               # enforcement path can merge with the test-budget job skipped.
               - 'scripts/test-budget-gate.sh'
+              # AS-1246: .goreleaser.yaml is validated inside the Build job
+              # (`goreleaser check`). Without it in this filter, a goreleaser
+              # config regression can land via a docs-classified PR with the
+              # Build job stubbed — the exact gap that let AS-1243/PR #414 sit
+              # broken when goreleaser v2.16 escalated the brews deprecation.
+              - '.goreleaser.yaml'
             md:
               - '**/*.md'
             not_docs:
