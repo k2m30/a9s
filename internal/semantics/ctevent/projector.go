@@ -315,13 +315,9 @@ func convertRow(r Row) domain.Item {
 }
 
 // ctEventStatus returns the ct-events status tier from a Resource.
-// After PR-03h the fetcher stores it in Fields["status"]; r.Status is the
-// legacy fallback for hand-constructed test resources.
+// The fetcher stores it in Fields["status"].
 func ctEventStatus(r domain.Resource) string {
-	if s := r.Fields["status"]; s != "" {
-		return s
-	}
-	return r.Status
+	return r.Fields["status"]
 }
 
 // tierToSeverity maps the ctevent tier string to a domain.Severity value.

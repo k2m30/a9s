@@ -80,7 +80,10 @@ func TestEnrichProgressIndicator_CombinesWithCtrlZ(t *testing.T) {
 func gapResources(statuses ...string) []resource.Resource {
 	res := make([]resource.Resource, len(statuses))
 	for i, s := range statuses {
-		res[i] = resource.Resource{ID: fmt.Sprintf("gap-%d", i), Status: s}
+		res[i] = resource.Resource{
+			ID:     fmt.Sprintf("gap-%d", i),
+			Fields: map[string]string{"status": s},
+		}
 	}
 	return res
 }

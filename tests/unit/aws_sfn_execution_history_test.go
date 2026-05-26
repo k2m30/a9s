@@ -98,22 +98,22 @@ func TestFetchSFNExecutionHistory_Basic(t *testing.T) {
 
 	t.Run("first_event_Status_active", func(t *testing.T) {
 		// ExecutionStarted maps to "active"
-		if resources[0].Status != "active" {
-			t.Errorf("Status: expected %q, got %q", "active", resources[0].Status)
+		if resources[0].Fields["status"] != "active" {
+			t.Errorf("Fields[\"status\"]: expected %q, got %q", "active", resources[0].Fields["status"])
 		}
 	})
 
 	t.Run("second_event_Status_pending", func(t *testing.T) {
 		// TaskScheduled maps to "pending"
-		if resources[1].Status != "pending" {
-			t.Errorf("Status: expected %q, got %q", "pending", resources[1].Status)
+		if resources[1].Fields["status"] != "pending" {
+			t.Errorf("Fields[\"status\"]: expected %q, got %q", "pending", resources[1].Fields["status"])
 		}
 	})
 
 	t.Run("third_event_Status_succeeded", func(t *testing.T) {
 		// TaskSucceeded maps to "succeeded"
-		if resources[2].Status != "succeeded" {
-			t.Errorf("Status: expected %q, got %q", "succeeded", resources[2].Status)
+		if resources[2].Fields["status"] != "succeeded" {
+			t.Errorf("Fields[\"status\"]: expected %q, got %q", "succeeded", resources[2].Fields["status"])
 		}
 	})
 

@@ -342,9 +342,9 @@ func capTierToRowBucket(tier string, rowBucket resource.Color) string {
 // owns its broken-vocabulary — dbi knows about "storage-full", ec2 about
 // "stopped", etc. — so this dispatcher stays universal.
 //
-// The phrase is injected as both r.Status and r.Fields["status"] because
-// some Color funcs read one, some read the other. Trailing "(+N)" suffix is
-// stripped inside the Color funcs themselves (via resource.StripFindingSuffix).
+// The phrase is injected as r.Fields["status"] because each per-type Color
+// func reads it from there. Trailing "(+N)" suffix is stripped inside the
+// Color funcs themselves (via resource.StripFindingSuffix).
 //
 // Unknown resource types default to "~" (warning) — safe for info-only
 // rendering without false-positive "!" coloring.
@@ -354,7 +354,6 @@ func phraseTier(resourceType, phrase string) string {
 		return "~"
 	}
 	probe := resource.Resource{
-		Status: phrase,
 		Fields: map[string]string{"status": phrase},
 	}
 	if td.ResolveColor(probe) == resource.ColorBroken {
