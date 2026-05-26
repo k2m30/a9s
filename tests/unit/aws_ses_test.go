@@ -196,7 +196,8 @@ func TestFetchSESIdentitiesPage_StatusPhraseMapping(t *testing.T) {
 
 // TestFetchSESIdentitiesPage_MultipleIssuesSuffixBumped verifies that an identity
 // with FAILED verification AND sending disabled produces a Status phrase with the
-// "(+N)" suffix (BumpFindingSuffix behavior from computeSESStatusAndIssues).
+// "(+N)" suffix. The suffix is built by sesTopPhrase in the fetcher — not by
+// resource.BumpFindingSuffix (which W1.2 of AS-1390 removed from all enrichers).
 func TestFetchSESIdentitiesPage_MultipleIssuesSuffixBumped(t *testing.T) {
 	mock := &mockSESv2Client{
 		output: &sesv2.ListEmailIdentitiesOutput{

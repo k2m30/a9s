@@ -58,20 +58,10 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 		}
 		pitrEnabled := string(pitr.PointInTimeRecoveryStatus) == "ENABLED"
 		if !pitrEnabled {
-			// Compute the new status value: if the table already has a non-empty
-			// status phrase (e.g. "archived: kms key lost"), bump the suffix so the
-			// operator sees there is an additional finding. Otherwise the phrase is
-			// "PITR off" itself.
-			existingStatus := r.Fields["status"]
-			var newStatus string
-			if existingStatus != "" {
-				newStatus = resource.BumpFindingSuffix(existingStatus)
-			} else {
-				newStatus = "PITR off"
-			}
-			result.FieldUpdates[r.ID] = map[string]string{
-				"status": newStatus,
-			}
+			// AS-140 / AS-1394: emit only the Finding entry. The merged display
+			// phrase (e.g. "archived: kms key lost") is computed at render time
+			// by phraseFromFindings(r.Findings) — not by writing
+			// FieldUpdates["status"] here.
 			setWave2Finding(&result, r.ID, ddbCodePITROff, "PITR off", "~", "ddb", nil)
 		}
 	}
