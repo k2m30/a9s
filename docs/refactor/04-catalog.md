@@ -4,9 +4,9 @@
 
 ## Goal
 
-Replace the `Register*` API with a static, declarative `internal/catalog` package. After this phase:
+Replace the `Register*` API with a declarative `internal/catalog` package populated at startup. After this phase:
 
-- `var ResourceTypes = []ResourceTypeDef{...}` is the single source of truth for every resource type.
+- `aws.Install()` (called once at program start / `TestMain`) loads the per-category resource slices into `internal/catalog` via `catalog.SetTypes([]ResourceTypeDef)` and `catalog.SetChildTypes([]ResourceTypeDef)`. After install, `catalog.Find`, `catalog.All`, `catalog.AllShortNames`, `catalog.ByCategory`, `catalog.FindChild`, and `catalog.AllChildren` are the single source of truth for every resource type.
 - Each `ResourceTypeDef` literal carries direct function references for `Fetcher`, `Wave2`, `Project`, `Related`, `Navigable`, plus declarative tables for `Findings []FindingDef`, `Columns`, `Children`, `LifecycleKey`, `CloudTrail`, etc.
 - `internal/catalog` remains **resource-shaped metadata only**. Cross-cutting capabilities such as logs, investigation/search workflows, cost views, and any future action system do not accrete as behavior handlers on `ResourceTypeDef`; the only catalog-side hook is declarative support metadata (`Capabilities`), while implementations bind separately by resource type.
 - `cmd/catalogen` is a `go generate`–driven binary that emits **markdown only** — no generated Go code:
@@ -16,78 +16,106 @@ Replace the `Register*` API with a static, declarative `internal/catalog` packag
 
 After this phase, the **mechanical-resource-implementation acceptance test** from `00-overview.md` is satisfiable: a new resource is one catalog struct literal, one transport file, optional Wave 2 / related files, demo fixtures, tests. No `init()`. No `Register*`. No markdown edits.
 
-## Why one direction only — and no generated `init()`
+## Why one direction only — and no `init()` in feature wiring
 
 The previous draft of this phase had additive fields on `ResourceTypeDef` *alongside* the existing `Register*` registry, with each per-category PR migrating consumers. That's dual-authoring: a new resource added during the migration window has to be declared in two places. Two sources of truth are exactly the lazy compromise this refactor exists to remove.
 
 A second iteration proposed generating a `registry_generated.go` whose `init()` populated the legacy registry maps. That contradicts cross-phase invariant #5 ("compile-time codegen, not runtime `init()`") even if the generated file is checked in. Generated `init()` is still `init()`.
 
-**The correct shape:**
+**The landed shape (two-step install, no codegen, no `init()` in feature wiring):**
 
-- **From PR-04a onward, the catalog is authoritative.** Nothing is hand-edited in the legacy registry.
-- The legacy registry accessors (`resource.FindResourceType`, `resource.AllResourceTypes`, `resource.AllShortNames`) become **thin Go wrappers around `catalog`** in PR-04a. No generated init() ever. The wrappers iterate `catalog.ResourceTypes` directly. Hand-written, one-line each.
-- Per-category PRs (04b through 04m) move type definitions from `internal/resource/types_<category>.go` into `internal/catalog/types_<category>.go` AND remove the corresponding `categoryResourceTypes()` call from `buildResourceTypes()`. After PR-04m, `buildResourceTypes()` body is empty.
-- For Wave 1 fetcher, Wave 2 enricher, related-def, navigable-field registration: today these live in `init()` calls in `internal/aws/*.go`. Per-category PRs migrate these *into the catalog struct literals* directly, replacing the legacy `init()` calls. After each per-category PR, that category has zero `init()` in `internal/aws/`.
-- During 04a–04m, unmigrated categories' `init()` calls in `internal/aws/` continue to populate legacy registries. The catalog accessors fall back to legacy lookups for any short name not yet in `catalog.ResourceTypes`. After PR-04m, the fallback is unreachable and is deleted by 04n.
-- 04n cuts the rope: delete `internal/resource/registry.go`, delete the fallback shim, delete the empty `buildResourceTypes()`, delete the legacy `Register*` symbols. `cmd/catalogen` ships, but only emits markdown — no Go code generation.
+- The per-category resource data lives in `internal/aws/types_<category>.go` (one slice per category, e.g. `computeTypes`, `containersTypes`). See [`landed/AS-795-init-cycle-break.md`](landed/AS-795-init-cycle-break.md) for the rationale: locating the slices in `internal/aws` is what lets each `ResourceTypeDef` literal carry direct function references for its `Fetcher`, `Wave2`, `Project`, `Related`, etc. without forcing `internal/catalog` to import `internal/aws` (which would close a cycle).
+- `aws.Install()` is the install hook (`internal/aws/install.go`). It calls `catalog.SetTypes(allTopLevelTypes())` and `catalog.SetChildTypes(allChildTypes())` exactly once at program start (`main()`) or `TestMain`.
+- `catalog.SetTypes` / `catalog.SetChildTypes` accept a slice and assign the registry; calling twice with identical data is a no-op, calling twice with different data panics. Catalog accessors panic when called before `SetTypes` to catch test binaries that forget `aws.Install`.
+- Consumers read the catalog exclusively through `catalog.Find`, `catalog.All`, `catalog.AllShortNames`, `catalog.ByCategory`, `catalog.FindChild`, and `catalog.AllChildren`. The `internal/resource` package re-exports `ResourceTypeDef` as a type alias of `catalog.ResourceTypeDef` and keeps thin `Find*` / `All*` wrappers for legacy import-path compatibility — they delegate to `catalog` and add no behavior of their own.
+- `cmd/catalogen` ships as a markdown-only generator. It emits `docs/attention-signals.md`, `docs/related-resources.md`, and `docs/resources/<short>.md` between `BEGIN GENERATED` / `END GENERATED` markers. No Go code is generated. No `init()` is generated. Per AS-731 / PR-04n, the catalog → legacy bridge was deleted: production consumers read the catalog directly via `resource.Get*` wrappers, which fall back to catalog fields when their legacy registry map is empty. Tests that override behavior continue to use `resource.Register*` on the legacy maps for scoped, undo-able injection.
 
 ## Catalog shape
 
+The actual production struct lives in `internal/catalog/types.go`. The shape below is a structural summary; consult the source for the authoritative field set, godoc, and tags. `internal/catalog` only imports `internal/domain`, never `internal/aws` or `internal/resource`.
+
 ```go
-// internal/catalog/types.go
+// internal/catalog/types.go (summary — see source for the full set)
 package catalog
 
+import "github.com/k2m30/a9s/v3/internal/domain"
+
 type ResourceTypeDef struct {
-    // Identity
+    // ── Identity ──────────────────────────────────────────────────────────
     Name      string
     ShortName string
     Aliases   []string
     Category  string
     ListTitle string
 
-    // Display
-    Columns        []Column
-    LifecycleKey   string  // Phase 03 introduced; defaults "state"
+    // ── Display ───────────────────────────────────────────────────────────
+    Columns        []domain.Column
+    LifecycleKey   string // Phase 03 introduced; defaults "state"
     IdentityKey    string
     CellDecorators map[string]func(domain.Resource, string) string
     CopyField      string
 
-    // Behavior
-    Fetcher    PaginatedFetcher
-    Wave2      IssueEnricher  // nil = no Wave 2 signal — replaces NoOpIssueEnricher
-    Project    DetailProjector  // nil = generic projection
-    Related    []RelatedDef
-    Navigable  []NavigableField
-    Children   []ChildViewDef
-    Reveal     RevealFetcher
-    DetailEnrich DetailEnricher  // optional; e.g. policy-doc fetch
+    // ── Behavior ──────────────────────────────────────────────────────────
+    Fetcher                domain.PaginatedFetcher
+    Wave2                  any // see "Wave2 any cycle-break" below
+    Project                domain.DetailProjector
+    Related                []domain.RelatedDef
+    Navigable              []domain.NavigableField
+    Children               []domain.ChildViewDef
+    Reveal                 domain.RevealFetcher
+    DetailEnrich           domain.DetailEnricher
+    FieldKeys              []string
+    FieldAliases           map[string]string
+    FetchByIDs             domain.FetchByIDsFunc
+    FilteredFetcher        domain.FilteredPaginatedFetcher
+    IssueEnricherFieldKeys []string
+    ChildFetcher           domain.PaginatedChildFetcher
 
-    // Cross-cutting
-    Capabilities         []domain.CapabilityID  // opt-in to logs, ct-investigate, cost, actions; handlers live outside catalog
+    // ── Cross-cutting ─────────────────────────────────────────────────────
+    Capabilities          []domain.CapabilityID
     CloudTrailKey         string
     ExcludeFromIssueBadge bool
     StubCreator           func(string) domain.Resource
     RelatedContextFromIDs func([]string) map[string]string
 
-    // Findings declarative table — graduated from Phase 03's per-enricher constants.
+    // ── Color & Augmentation ──────────────────────────────────────────────
+    Color   func(domain.Resource) domain.Color // per-category hook; no standalone 5a-color PR
+    Augment domain.Augmenter
+
+    // ── Findings ──────────────────────────────────────────────────────────
     Findings []FindingDef
 }
 
 type FindingDef struct {
     Code     domain.FindingCode
-    Phrase   string             // §4 phrase
+    Phrase   string
     Severity domain.Severity
-    Source   string             // "wave1" | "wave2" — provenance class
+    Source   string // "wave1" | "wave2"
 }
-
-// Static. No init(). No Register*.
-var ResourceTypes = []ResourceTypeDef{
-    // ... populated per-category in PR-04b onward
-}
-
 ```
 
 Boundary rule: if behavior is intrinsic to a resource type's list/detail/reveal/related/navigation metadata, it belongs in `ResourceTypeDef`. If it is a cross-cutting capability with its own screens, queries, or task model (logs, CloudTrail investigation, cost analysis, future actions), it gets its own module keyed by resource type, not another optional behavior field on the catalog struct. The one catalog-side hook is `Capabilities []domain.CapabilityID`: declarative support metadata only. Runtime uses that opt-in list when dispatching to capability modules in Phase 05.
+
+### Accreted `ResourceTypeDef` fields
+
+The fields below accreted onto `ResourceTypeDef` during the per-category migration (PR-04b–m) and the AS-795 install-time-population reshape. Each one earned its place against the boundary rule; together they describe the contract `internal/aws` populates and `internal/catalog` exposes.
+
+- **`Color func(domain.Resource) domain.Color`** — per-category row-health classifier. The per-category migration replaced `td.Color(r)` call sites with `styles.SeverityStyle(...)` in the TUI adapter, but the field itself stayed on the catalog struct so each category can attach a typed classifier without re-introducing `if shortName == "x"` branching at the call site. Invariant: no standalone 5a-color PR exists; the migration is inline.
+- **`Augment domain.Augmenter`** — optional post-projector hook that injects additional sections after the main projector runs (e.g. EC2 status checks). When `nil`, no augmentation is applied. Pure function — no I/O, no caches.
+- **`FieldKeys []string`** — the set of valid `Resource.Fields` keys produced by the Wave 1 fetcher. Populated by `aws.Install()`; the zero value indicates no Wave 1 surface for this type. Detail view uses it to render fields in a stable order.
+- **`FieldAliases map[string]string`** — maps source field keys to alias keys copied into `Resource.Fields` by `ApplyFieldAliases`. Populated by `aws.Install()`. Used when the human-readable column key differs from the SDK field name.
+- **`FetchByIDs domain.FetchByIDsFunc`** — fetches a specific set of resource instances by ID, bypassing pagination. Populated by `aws.Install()`; zero value if no Wave 1 surface. Used by the related-resource panel when navigating to a small known set.
+- **`FilteredFetcher domain.FilteredPaginatedFetcher`** — returns a single page of resources filtered server-side. Populated by `aws.Install()`; zero value if the SDK does not support a server-side filter. Used by CloudTrail-style narrow queries.
+- **`IssueEnricherFieldKeys []string`** — the `Resource.Fields` keys that the Wave 2 issue enricher writes via `IssueEnricherResult.FieldUpdates`. Populated by `aws.Install()`; zero value if no Wave 2 surface. Used by the cache-invalidation path so list/detail rerenders pick up Wave 2 writes deterministically.
+- **`ChildFetcher domain.PaginatedChildFetcher`** — paginated child-resource fetcher. Only meaningful on child-type entries (set via `catalog.SetChildTypes`); zero value on top-level type entries. Drives the child-view drill-down.
+
+### `Wave2 any` — cycle-break
+
+`Wave2` is typed `any` (`internal/catalog/types.go:60`). The intuitive shape — `Wave2 IssueEnricher` with `IssueEnricher` declared in `internal/aws` — would close a cycle: `internal/catalog` cannot import `internal/aws` because `internal/aws/install.go` already imports `internal/catalog` to populate the registry. Lifting the concrete enricher type into `internal/domain` was rejected as overdeclarative for one field; the install hook is the natural place to keep the wire format.
+
+The contract: `Wave2` stores an `aws.IssueEnricher` value (a struct with `Fn` and `Priority` fields). A nil `any` and a zero `IssueEnricher` with `Fn == nil` both bypass Wave 2 dispatch via the `AllWave2` filter in `internal/aws/wave2.go`. `internal/aws` is responsible for the type assertion on read; `internal/catalog` is responsible only for storage. This is the only field on `ResourceTypeDef` typed `any` — every other behavior reference carries its declared type from `internal/domain`.
+
+Cross-reference: [`landed/AS-795-init-cycle-break.md`](landed/AS-795-init-cycle-break.md) is the authoritative landed spec for the catalog-population layout — including the per-category data files in `internal/aws/types_<category>.go`, the `aws.Install()` ordering, and the cycle constraints this section summarizes.
 
 ## PR breakdown
 
@@ -320,13 +348,13 @@ The contract: every per-resource markdown file is annotated with section markers
 ```
 
 **Generator algorithm.** For each `<short>.md`:
-1. If file does not exist: emit a stub from a template with all expected `BEGIN/END GENERATED` blocks; prose-only sections marked with `(TODO: write narrative)`.
-2. If file exists: read it; for each `BEGIN GENERATED: <section>` … `END GENERATED: <section>` pair, replace the block content. Outside blocks, byte-preserve.
-3. If file is missing a generated block the generator wants to write (e.g. a new `findings` section): append a new block at the end with a comment indicating it was auto-added.
+1. If the file does not exist: emit a stub from a template with all expected `BEGIN/END GENERATED` blocks; prose-only sections receive an explicit narrative-placeholder block whose content is owned by the per-category PR.
+2. If the file exists: read it; for each `BEGIN GENERATED: <section>` … `END GENERATED: <section>` pair, replace the block content. Outside blocks, byte-preserve.
+3. If the file is missing a generated block the generator wants to write (e.g. a new `findings` section): append a new block at the end with a comment indicating it was auto-added.
 
 **Human edits**: anywhere outside `BEGIN GENERATED` / `END GENERATED` markers. The generator never touches that prose.
 
-**No GENERATED blocks at all on a file**: the generator treats the file as fully hand-edited (legacy mode) and only verifies that the catalog's `ShortName` matches a file in `docs/resources/`. Migration of legacy files into marker form happens incrementally, one PR at a time, until every file uses the contract. Phase 04 does not require all 66 files to be marker-converted in one go — that's a separate cleanup that can run alongside the per-category PRs.
+**No GENERATED blocks at all on a file**: the generator treats the file as fully hand-edited (legacy mode) and only verifies that the catalog's `ShortName` matches a file in `docs/resources/`. Marker conversion is incremental: each per-category PR (04b–m) converts only the files for the resource types it migrates, and the legacy-mode acceptance check stays in place until the last hand-edited file in the category is converted. Phase 04 does not require all 66 files to be marker-converted in one go; the per-category PRs land the catalog migration first, then incrementally fold the matching `docs/resources/<short>.md` into marker form as the prose for each type is reviewed. Full marker coverage is the entry condition for retiring the legacy-mode branch entirely, not for closing Phase 04.
 
 ---
 
