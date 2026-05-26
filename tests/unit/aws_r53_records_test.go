@@ -79,9 +79,9 @@ func TestFetchR53Records_Basic(t *testing.T) {
 		}
 	})
 
-	t.Run("A_record_Status", func(t *testing.T) {
-		if resources[0].Status != "A" {
-			t.Errorf("Status: expected %q, got %q", "A", resources[0].Status)
+	t.Run("A_record_Type", func(t *testing.T) {
+		if got := resources[0].Fields["type"]; got != "A" {
+			t.Errorf("Fields[\"type\"]: expected %q, got %q", "A", got)
 		}
 	})
 
@@ -124,8 +124,8 @@ func TestFetchR53Records_Basic(t *testing.T) {
 		if r.Name != "www.example.com." {
 			t.Errorf("Name: expected %q, got %q", "www.example.com.", r.Name)
 		}
-		if r.Status != "CNAME" {
-			t.Errorf("Status: expected %q, got %q", "CNAME", r.Status)
+		if got := r.Fields["type"]; got != "CNAME" {
+			t.Errorf("Fields[\"type\"]: expected %q, got %q", "CNAME", got)
 		}
 		if r.Fields["ttl"] != "3600" {
 			t.Errorf("Fields[ttl]: expected %q, got %q", "3600", r.Fields["ttl"])
@@ -141,8 +141,8 @@ func TestFetchR53Records_Basic(t *testing.T) {
 		if r.ID != "example.com.|MX" {
 			t.Errorf("ID: expected %q, got %q", "example.com.|MX", r.ID)
 		}
-		if r.Status != "MX" {
-			t.Errorf("Status: expected %q, got %q", "MX", r.Status)
+		if got := r.Fields["type"]; got != "MX" {
+			t.Errorf("Fields[\"type\"]: expected %q, got %q", "MX", got)
 		}
 		if r.Fields["ttl"] != "600" {
 			t.Errorf("Fields[ttl]: expected %q, got %q", "600", r.Fields["ttl"])
@@ -227,9 +227,9 @@ func TestFetchR53Records_AliasRecord(t *testing.T) {
 		}
 	})
 
-	t.Run("alias_status", func(t *testing.T) {
-		if r.Status != "A" {
-			t.Errorf("Status: expected %q, got %q", "A", r.Status)
+	t.Run("alias_type", func(t *testing.T) {
+		if got := r.Fields["type"]; got != "A" {
+			t.Errorf("Fields[\"type\"]: expected %q, got %q", "A", got)
 		}
 	})
 
