@@ -24,8 +24,8 @@ const (
 // Severity "!" for FAILED/ABORTED/EXPIRED, "~" for PARTIAL.
 // IssueCount counts only "!" findings.
 //
-// Rule-7 suffix machinery (BumpFindingSuffix) is N/A for backup — spec §3.1 has zero
-// Wave-1 signals so there are no coexisting Wave-1 warnings to apply the (+N) arithmetic.
+// Rule-7 (+N) stacking is N/A for backup — spec §3.1 has zero Wave-1 signals so
+// there are no coexisting Wave-1 warnings to stack with the Wave-2 finding.
 func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string]domain.Finding),
