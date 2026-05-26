@@ -8,7 +8,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// iam-group canonical FindingCodes.
+const (
+	iamGroupCodeOrphanOrNoop domain.FindingCode = "iam-group.orphan-or-noop"
 )
 
 // EnrichIAMGroup calls GetGroup + ListAttachedGroupPolicies per group
@@ -20,17 +26,19 @@ import (
 //
 // Skip when clients.IAM == nil.
 func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	fieldUpdates := make(map[string]map[string]string)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+		FieldUpdates: make(map[string]map[string]string),
+	}
 	if clients.IAM == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	getGroupAPI, ok1 := clients.IAM.(IAMGetGroupAPI)
 	attachedPoliciesAPI, ok2 := clients.IAM.(IAMListAttachedGroupPoliciesAPI)
 	inlinePoliciesAPI, ok3 := clients.IAM.(IAMListGroupPoliciesAPI)
 	if !ok1 || !ok2 || !ok3 {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 
 	truncated := len(resources) > EnrichmentCap
@@ -55,7 +63,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		for {
 			if memberPages >= PerParentPageCap {
 				memberTruncated = true
-				truncatedIDs[r.ID] = true
+				result.TruncatedIDs[r.ID] = true
 				break
 			}
 			groupOut, err := getGroupAPI.GetGroup(ctx, &iam.GetGroupInput{
@@ -64,7 +72,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 			})
 			if err != nil {
 				truncated = true
-				truncatedIDs[r.ID] = true
+				result.TruncatedIDs[r.ID] = true
 				if memberPages == 0 {
 					memberFirstCallErrd = true
 				} else {
@@ -90,7 +98,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		for {
 			if attachedPages >= PerParentPageCap {
 				attachedTruncated = true
-				truncatedIDs[r.ID] = true
+				result.TruncatedIDs[r.ID] = true
 				break
 			}
 			attachedOut, err := attachedPoliciesAPI.ListAttachedGroupPolicies(ctx, &iam.ListAttachedGroupPoliciesInput{
@@ -99,7 +107,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 			})
 			if err != nil {
 				truncated = true
-				truncatedIDs[r.ID] = true
+				result.TruncatedIDs[r.ID] = true
 				if attachedPages == 0 {
 					attachedFirstCallErrd = true
 				} else {
@@ -125,7 +133,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		for {
 			if inlinePages >= PerParentPageCap {
 				inlineTruncated = true
-				truncatedIDs[r.ID] = true
+				result.TruncatedIDs[r.ID] = true
 				break
 			}
 			inlineOut, err := inlinePoliciesAPI.ListGroupPolicies(ctx, &iam.ListGroupPoliciesInput{
@@ -134,7 +142,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 			})
 			if err != nil {
 				truncated = true
-				truncatedIDs[r.ID] = true
+				result.TruncatedIDs[r.ID] = true
 				if inlinePages == 0 {
 					inlineFirstCallErrd = true
 				} else {
@@ -161,14 +169,14 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		if memberTruncated {
 			memberCountStr = resource.FormatApproximate(memberCount)
 		}
-		fieldUpdates[r.ID] = map[string]string{
+		result.FieldUpdates[r.ID] = map[string]string{
 			"member_count": memberCountStr,
 		}
 
-		var rows []resource.FindingRow
+		var rows []domain.DetailRow
 
 		if memberCount == 0 && !memberTruncated {
-			rows = append(rows, resource.FindingRow{
+			rows = append(rows, domain.DetailRow{
 				Label: "Members",
 				Value: "group has no members (orphan)",
 				Tier:  "~",
@@ -176,7 +184,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		}
 
 		if len(allAttached) == 0 && len(allInline) == 0 && !attachedTruncated && !inlineTruncated {
-			rows = append(rows, resource.FindingRow{
+			rows = append(rows, domain.DetailRow{
 				Label: "Policies",
 				Value: "group has no policies (no-op group)",
 				Tier:  "~",
@@ -186,12 +194,10 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		if len(rows) == 0 {
 			continue
 		}
-		findings[r.ID] = resource.EnrichmentFinding{
-			Severity: "~",
-			Summary:  rows[0].Value,
-			Rows:     rows,
-		}
+		setWave2Finding(&result, r.ID, iamGroupCodeOrphanOrNoop, rows[0].Value, "~", "iam-group", rows)
 	}
 	// Group findings are severity "~" (informational); IssueCount stays 0.
-	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	result.IssueCount = 0
+	result.Truncated = truncated
+	return result, nil
 }

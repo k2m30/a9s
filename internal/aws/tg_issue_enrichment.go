@@ -9,7 +9,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	elbtypes "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// tg canonical FindingCodes.
+const (
+	tgCodeUnhealthyTargets domain.FindingCode = "tg.unhealthy-targets"
 )
 
 // EnrichTargetGroupHealth calls DescribeTargetHealth for each target group (1 per TG, cap ~50).
@@ -17,11 +23,13 @@ import (
 // Severity is "!" (broken/degraded). Summary: "unhealthy targets: X/Y".
 // Per-TG errors are aggregated and returned as a composite error alongside partial findings (E3, E4, E5).
 func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	fieldUpdates := make(map[string]map[string]string)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+		FieldUpdates: make(map[string]map[string]string),
+	}
 	if clients.ELBv2 == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	var failures []string
@@ -50,7 +58,7 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
-			truncatedIDs[r.ID] = true
+			result.TruncatedIDs[r.ID] = true
 			continue
 		}
 		targetCount := len(out.TargetHealthDescriptions)
@@ -71,23 +79,21 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 		} else {
 			healthSummary = fmt.Sprintf("%d/%d healthy", healthy, targetCount)
 		}
-		fieldUpdates[r.ID] = map[string]string{
+		result.FieldUpdates[r.ID] = map[string]string{
 			"health_summary": healthSummary,
 		}
 		if unhealthy > 0 {
-			rows := []resource.FindingRow{
+			rows := []domain.DetailRow{
 				{Label: "Unhealthy Targets", Value: fmt.Sprintf("%d/%d", unhealthy, targetCount), Tier: "!"},
 			}
 			if firstReason != "" {
-				rows = append(rows, resource.FindingRow{Label: "Reason", Value: firstReason, Tier: "~"})
+				rows = append(rows, domain.DetailRow{Label: "Reason", Value: firstReason, Tier: "~"})
 			}
-			findings[r.ID] = resource.EnrichmentFinding{
-				Severity: "!",
-				Summary:  fmt.Sprintf("unhealthy targets: %d/%d", unhealthy, targetCount),
-				Rows:     rows,
-			}
+			setWave2Finding(&result, r.ID, tgCodeUnhealthyTargets, fmt.Sprintf("unhealthy targets: %d/%d", unhealthy, targetCount), "!", "tg", rows)
 		}
 	}
-	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates},
+	result.IssueCount = len(result.Findings)
+	result.Truncated = truncated
+	return result,
 		AggregateFailures("tg-enrich: DescribeTargetHealth", failures, total)
 }

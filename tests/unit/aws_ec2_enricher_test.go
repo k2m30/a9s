@@ -22,6 +22,7 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -81,8 +82,8 @@ func TestEnrichEC2InstanceStatus_InstanceStatusImpairedProducesFindingSevBang(t 
 	if !ok {
 		t.Fatalf("expected finding keyed by instance ID %q", "i-0aaaa1111bbbbb222")
 	}
-	if f.Severity != "!" {
-		t.Errorf("severity = %q, want %q", f.Severity, "!")
+	if f.Severity != domain.SevBroken {
+		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
 	if result.IssueCount != 1 {
 		t.Errorf("IssueCount = %d, want 1", result.IssueCount)
@@ -117,8 +118,8 @@ func TestEnrichEC2InstanceStatus_SystemStatusImpairedProducesFindingSevBang(t *t
 	if !ok {
 		t.Fatalf("expected finding keyed by instance ID %q for impaired system status", "i-0bbbb2222ccccc333")
 	}
-	if f.Severity != "!" {
-		t.Errorf("severity = %q, want %q", f.Severity, "!")
+	if f.Severity != domain.SevBroken {
+		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
 }
 
@@ -157,8 +158,8 @@ func TestEnrichEC2InstanceStatus_ScheduledEventSoonProducesFindingSevTilde(t *te
 	if !ok {
 		t.Fatalf("expected finding keyed by instance ID %q for imminent scheduled event", "i-0cccc3333ddddd444")
 	}
-	if f.Severity != "~" {
-		t.Errorf("severity = %q, want %q", f.Severity, "~")
+	if f.Severity != domain.SevWarn {
+		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
 }
 

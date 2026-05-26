@@ -10,7 +10,14 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/codeartifact"
 	codeartifacttypes "github.com/aws/aws-sdk-go-v2/service/codeartifact/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// codeartifact canonical FindingCodes.
+const (
+	codeartifactCodePublicAccessPolicy domain.FindingCode = "codeartifact.public-access-policy"
+	codeartifactCodeNoPermissionsPolicy domain.FindingCode = "codeartifact.no-permissions-policy"
 )
 
 // EnrichCodeArtifactRepository calls GetRepositoryPermissionsPolicy per repository (capped at
@@ -23,11 +30,13 @@ import (
 // Per-repo errors other than ResourceNotFoundException mark Truncated=true and are skipped.
 // Skip when clients.CodeArtifact == nil.
 func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	fieldUpdates := make(map[string]map[string]string)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+		FieldUpdates: make(map[string]map[string]string),
+	}
 	if clients.CodeArtifact == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	issueCount := 0
@@ -82,7 +91,7 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 				nextToken = pkgOut.NextToken
 			}
 			if total >= 0 {
-				fieldUpdates[key] = map[string]string{"package_count": resource.FormatExact(total)}
+				result.FieldUpdates[key] = map[string]string{"package_count": resource.FormatExact(total)}
 			}
 		}
 		input := &codeartifact.GetRepositoryPermissionsPolicyInput{
@@ -96,16 +105,13 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 		if err != nil {
 			if _, ok := errors.AsType[*codeartifacttypes.ResourceNotFoundException](err); ok {
 				// No policy set — default open within the domain.
-				findings[key] = resource.EnrichmentFinding{
-					Severity: "~",
-					Summary:  "no permissions policy",
-				}
+				setWave2Finding(&result, key, codeartifactCodeNoPermissionsPolicy, "no permissions policy", "~", "codeartifact", nil)
 				// "~" does not contribute to IssueCount.
 				continue
 			}
 			// Any other error — skip this repo but flag truncation.
 			truncated = true
-			truncatedIDs[r.ID] = true
+			result.TruncatedIDs[r.ID] = true
 			continue
 		}
 		if out.Policy == nil || out.Policy.Document == nil {
@@ -113,15 +119,14 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 		}
 		doc := *out.Policy.Document
 		if strings.Contains(doc, `"Principal":"*"`) || strings.Contains(doc, `"Principal": "*"`) {
-			findings[key] = resource.EnrichmentFinding{
-				Severity: "!",
-				Summary:  "public access policy",
-				Rows: []resource.FindingRow{
+			setWave2Finding(&result, key, codeartifactCodePublicAccessPolicy, "public access policy", "!", "codeartifact",
+				[]domain.DetailRow{
 					{Label: "Principal", Value: "*", Tier: "!"},
-				},
-			}
+				})
 			issueCount++
 		}
 	}
-	return IssueEnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	result.IssueCount = issueCount
+	result.Truncated = truncated
+	return result, nil
 }

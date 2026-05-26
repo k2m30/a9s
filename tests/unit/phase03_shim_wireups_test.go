@@ -233,7 +233,7 @@ func TestShim_EnrichmentCheckedBridgesWave2Findings(t *testing.T) {
 				ResourceType: effective,
 				Issues:       0,
 				Truncated:    false,
-				Findings:     map[string]resource.EnrichmentFinding{},
+				Findings:     map[string]domain.Finding{},
 				Gen:          0,
 				TypeGen:      0,
 			})
@@ -457,10 +457,14 @@ func TestShim_DeriveHelpersResolveAlias(t *testing.T) {
 	m := newShimModel()
 
 	rid := "i-alias-wave2-001"
-	wave2Finding := resource.EnrichmentFinding{
-		Severity: "!",
-		Summary:  "pending maintenance",
-		Rows: []resource.FindingRow{
+	wave2Finding := domain.Finding{
+		Code:     "dbi.pending.maintenance",
+		Phrase:   "pending maintenance",
+		Severity: domain.SevBroken,
+		Source:   "wave2:dbi",
+	}
+	wave2Attention := domain.AttentionDetail{
+		Rows: []domain.DetailRow{
 			{Label: "Action", Value: "reboot"},
 		},
 	}
@@ -496,8 +500,11 @@ func TestShim_DeriveHelpersResolveAlias(t *testing.T) {
 	m.Core().Session().EnrichTotal = 2
 	m = shimApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "dbi",
-		Findings: map[string]resource.EnrichmentFinding{
+		Findings: map[string]domain.Finding{
 			rid: wave2Finding,
+		},
+		AttentionDetails: map[string]domain.AttentionDetail{
+			rid: wave2Attention,
 		},
 		Gen:     0,
 		TypeGen: 0,
@@ -559,10 +566,14 @@ func TestShim_DeriveHelpersResolveAlias_SingleResource(t *testing.T) {
 	m := newShimModel()
 
 	rid := "i-alias-single-001"
-	wave2Finding := resource.EnrichmentFinding{
-		Severity: "!",
-		Summary:  "pending maintenance",
-		Rows: []resource.FindingRow{
+	wave2Finding := domain.Finding{
+		Code:     "dbi.pending.maintenance",
+		Phrase:   "pending maintenance",
+		Severity: domain.SevBroken,
+		Source:   "wave2:dbi",
+	}
+	wave2Attention := domain.AttentionDetail{
+		Rows: []domain.DetailRow{
 			{Label: "Action", Value: "reboot"},
 		},
 	}
@@ -598,8 +609,11 @@ func TestShim_DeriveHelpersResolveAlias_SingleResource(t *testing.T) {
 	m.Core().Session().EnrichTotal = 2
 	m = shimApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "rds", // alias — exercises alias normalization in handleEnrichmentChecked
-		Findings: map[string]resource.EnrichmentFinding{
+		Findings: map[string]domain.Finding{
 			rid: wave2Finding,
+		},
+		AttentionDetails: map[string]domain.AttentionDetail{
+			rid: wave2Attention,
 		},
 		Gen:     0,
 		TypeGen: 0,

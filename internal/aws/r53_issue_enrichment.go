@@ -8,7 +8,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	r53svc "github.com/aws/aws-sdk-go-v2/service/route53"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// r53 canonical FindingCodes.
+const (
+	r53CodeOrphanPrivateZone domain.FindingCode = "r53.orphan-private-zone"
 )
 
 // EnrichRoute53Zone calls GetHostedZone per zone (cap EnrichmentCap) and raises a finding
@@ -20,10 +26,12 @@ import (
 //
 // Skip if clients.Route53 == nil. Per-zone errors → Truncated.
 func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+	}
 	if clients.Route53 == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	var failures []string
@@ -48,7 +56,7 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
-			truncatedIDs[r.ID] = true
+			result.TruncatedIDs[r.ID] = true
 			continue
 		}
 		if out.HostedZone == nil {
@@ -61,16 +69,14 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 		if len(out.VPCs) > 0 {
 			continue
 		}
-		findings[r.ID] = resource.EnrichmentFinding{
-			Severity: "~",
-			Summary:  "private zone with no VPC associations (orphan)",
-			Rows: []resource.FindingRow{
-				{Label: "Zone ID", Value: zoneID, Tier: "~"},
-				{Label: "Issue", Value: "private zone with no VPC associations (orphan)", Tier: "~"},
-			},
-		}
+		setWave2Finding(&result, r.ID, r53CodeOrphanPrivateZone, "private zone with no VPC associations (orphan)", "~", "r53", []domain.DetailRow{
+			{Label: "Zone ID", Value: zoneID, Tier: "~"},
+			{Label: "Issue", Value: "private zone with no VPC associations (orphan)", Tier: "~"},
+		})
 	}
 	// All Route53 findings are severity "~" (informational).
-	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings},
+	result.IssueCount = 0
+	result.Truncated = truncated
+	return result,
 		AggregateFailures("r53-enrich: GetHostedZone", failures, total)
 }

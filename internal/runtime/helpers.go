@@ -9,15 +9,29 @@ package runtime
 // mutations are visible to both.
 
 import (
+	"strings"
+
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/semantics/attention"
 )
 
 // applyEnrichment merges Wave-2 enrichment findings into every cached row of
-// the given resource type by calling DeriveFindings with the provided findings
-// map. Replaces prior wave-2 findings in place while preserving wave-1.  Walks
-// ResourceCache, LazyResourceCache, and ProbeResources.
-func (c *Core) applyEnrichment(resourceType string, findings map[string]resource.EnrichmentFinding) {
+// the given resource type. For each cached row it:
+//
+//  1. Re-derives Wave-1 findings via attention.DeriveFindings (Wave-1 only —
+//     post-AS-1395 the shim no longer accepts a Wave-2 input).
+//  2. Appends the Wave-2 Finding from findings[r.ID] (when present).
+//  3. Writes attentionDetails[r.ID] into r.AttentionDetails under the matching
+//     FindingCode (the fold-layer re-keying from Resource.ID to FindingCode).
+//
+// Walks ResourceCache, LazyResourceCache, and ProbeResources. Replaces prior
+// wave-2 findings in place while preserving wave-1.
+func (c *Core) applyEnrichment(
+	resourceType string,
+	findings map[string]domain.Finding,
+	attentionDetails map[string]domain.AttentionDetail,
+) {
 	canon := resourceType
 	var td resource.ResourceTypeDef
 	if t := resource.FindResourceType(resourceType); t != nil {
@@ -29,7 +43,7 @@ func (c *Core) applyEnrichment(resourceType string, findings map[string]resource
 
 	apply := func(rows []resource.Resource) {
 		for i := range rows {
-			attention.DeriveFindings(&rows[i], td, findings)
+			applyWave2ToRow(&rows[i], td, findings, attentionDetails)
 		}
 	}
 
@@ -45,8 +59,8 @@ func (c *Core) applyEnrichment(resourceType string, findings map[string]resource
 }
 
 // clearEnrichmentFor strips wave-2 findings from every cached row of the given
-// resource type by re-deriving with nil enrichment.  Wave-1 findings are
-// preserved.  Used by clear-on-rerun-start logic in handleEnrichmentChecked.
+// resource type by re-deriving Wave-1 only and discarding any prior wave-2
+// entries. Used by clear-on-rerun-start logic in handleEnrichmentChecked.
 func (c *Core) clearEnrichmentFor(resourceType string) {
 	canon := resourceType
 	var td resource.ResourceTypeDef
@@ -59,7 +73,7 @@ func (c *Core) clearEnrichmentFor(resourceType string) {
 
 	clear := func(rows []resource.Resource) {
 		for i := range rows {
-			attention.DeriveFindings(&rows[i], td, nil)
+			applyWave2ToRow(&rows[i], td, nil, nil)
 		}
 	}
 
@@ -91,3 +105,40 @@ func (c *Core) deriveFindingsForType(short string, rows []resource.Resource) {
 	}
 }
 
+// applyWave2ToRow re-derives Wave-1 findings on r, then appends the per-row
+// Wave-2 Finding (if present) and writes its AttentionDetail under the
+// Finding's Code. Nil findings/attentionDetails behaves as the clear path
+// (Wave-1 only, no Wave-2 appended).
+func applyWave2ToRow(
+	r *domain.Resource,
+	td resource.ResourceTypeDef,
+	findings map[string]domain.Finding,
+	attentionDetails map[string]domain.AttentionDetail,
+) {
+	if r == nil {
+		return
+	}
+	// Wave-1 derivation overwrites r.Findings + r.AttentionDetails entirely.
+	attention.DeriveFindings(r, td)
+	f, ok := findings[r.ID]
+	if !ok || f.Phrase == "" {
+		return
+	}
+	// AS-1395: enricher-emitted Findings already carry the canonical Code and
+	// Source. Source must be "wave2:<short>" for the existing app_enrich_fold
+	// readers (findingFromResource, findingsFromRows, stripWave2) to recognise
+	// the entry. Tolerate enrichers that forgot to set Source by stamping the
+	// canonical form here.
+	if f.Source == "" {
+		f.Source = "wave2:" + td.ShortName
+	} else if !strings.HasPrefix(f.Source, "wave2:") {
+		f.Source = "wave2:" + td.ShortName
+	}
+	r.Findings = append(r.Findings, f)
+	if ad, ok := attentionDetails[r.ID]; ok && len(ad.Rows) > 0 {
+		if r.AttentionDetails == nil {
+			r.AttentionDetails = make(map[domain.FindingCode]domain.AttentionDetail, 1)
+		}
+		r.AttentionDetails[f.Code] = ad
+	}
+}

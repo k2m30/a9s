@@ -10,7 +10,13 @@ import (
 	wafv2svc "github.com/aws/aws-sdk-go-v2/service/wafv2"
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// waf canonical FindingCodes.
+const (
+	wafCodeNoLogging domain.FindingCode = "waf.no-logging"
 )
 
 // EnrichWAFLogging calls GetLoggingConfiguration, ListResourcesForWebACL, and GetWebACL per WebACL
@@ -24,11 +30,13 @@ import (
 // Skip if clients.WAFv2 == nil. Per-WebACL errors (other than WAFNonexistentItemException) are
 // aggregated and returned as a composite error alongside partial findings (E3, E4, E5).
 func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	fieldUpdates := make(map[string]map[string]string)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+		FieldUpdates: make(map[string]map[string]string),
+	}
 	if clients.WAFv2 == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	var failures []string
@@ -45,7 +53,7 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 			continue
 		}
 		total++
-		var rows []resource.FindingRow
+		var rows []domain.DetailRow
 
 		// Check logging configuration.
 		_, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*wafv2svc.GetLoggingConfigurationOutput, error) {
@@ -55,7 +63,7 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 		})
 		if err != nil {
 			if _, ok := errors.AsType[*wafv2types.WAFNonexistentItemException](err); ok {
-				rows = append(rows, resource.FindingRow{
+				rows = append(rows, domain.DetailRow{
 					Label: "Logging",
 					Value: "no logging configuration",
 					Tier:  "~",
@@ -64,7 +72,7 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 				// Unexpected error — skip this ACL.
 				failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 				truncated = true
-				truncatedIDs[r.ID] = true
+				result.TruncatedIDs[r.ID] = true
 				continue
 			}
 		}
@@ -78,11 +86,11 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
-			truncatedIDs[r.ID] = true
+			result.TruncatedIDs[r.ID] = true
 			continue
 		}
 		if len(assocOut.ResourceArns) == 0 {
-			rows = append(rows, resource.FindingRow{
+			rows = append(rows, domain.DetailRow{
 				Label: "Associations",
 				Value: "WebACL not associated with any resources (orphan)",
 				Tier:  "~",
@@ -120,20 +128,18 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 				}
 			}
 		}
-		fieldUpdates[r.ID] = map[string]string{
+		result.FieldUpdates[r.ID] = map[string]string{
 			"rules_summary": rulesSummary,
 		}
 
 		if len(rows) == 0 {
 			continue
 		}
-		findings[r.ID] = resource.EnrichmentFinding{
-			Severity: "~",
-			Summary:  rows[0].Value,
-			Rows:     rows,
-		}
+		setWave2Finding(&result, r.ID, wafCodeNoLogging, rows[0].Value, "~", "waf", rows)
 	}
 	// All WAF logging findings are severity "~" (informational).
-	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates},
+	result.IssueCount = 0
+	result.Truncated = truncated
+	return result,
 		AggregateFailures("waf-enrich", failures, total)
 }

@@ -8,7 +8,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// elb canonical FindingCodes.
+const (
+	elbCodeMisconfigured domain.FindingCode = "elb.misconfigured"
 )
 
 // EnrichELBAttributes calls DescribeLoadBalancerAttributes for each load
@@ -22,10 +28,12 @@ import (
 // r.Fields["load_balancer_arn"] — the elb fetcher emits ID = bare LB name
 // and stores the ARN in Fields. Each call is wrapped in RetryOnThrottle.
 func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+	}
 	if clients.ELBv2 == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	var failures []string
@@ -53,10 +61,10 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
-			truncatedIDs[r.ID] = true
+			result.TruncatedIDs[r.ID] = true
 			continue
 		}
-		var rows []resource.FindingRow
+		var rows []domain.DetailRow
 		for _, attr := range out.Attributes {
 			if attr.Key == nil || attr.Value == nil {
 				continue
@@ -64,11 +72,11 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 			switch *attr.Key {
 			case "deletion_protection.enabled":
 				if *attr.Value == "false" {
-					rows = append(rows, resource.FindingRow{Label: "Deletion Protection", Value: "disabled", Tier: "~"})
+					rows = append(rows, domain.DetailRow{Label: "Deletion Protection", Value: "disabled", Tier: "~"})
 				}
 			case "access_logs.s3.enabled":
 				if *attr.Value == "false" {
-					rows = append(rows, resource.FindingRow{Label: "Access Logs", Value: "disabled", Tier: "~"})
+					rows = append(rows, domain.DetailRow{Label: "Access Logs", Value: "disabled", Tier: "~"})
 				}
 			}
 		}
@@ -81,18 +89,15 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 		if len(rows) >= 2 {
 			severity = "!"
 		}
-		findings[r.ID] = resource.EnrichmentFinding{
-			Severity: severity,
-			Summary:  rows[0].Label + ": " + rows[0].Value,
-			Rows:     rows,
-		}
+		setWave2Finding(&result, r.ID, elbCodeMisconfigured, rows[0].Label+": "+rows[0].Value, severity, "elb", rows)
 	}
 	issueCount := 0
-	for _, f := range findings {
-		if f.Severity == "!" {
+	for _, f := range result.Findings {
+		if f.Severity == domain.SevBroken {
 			issueCount++
 		}
 	}
-	return IssueEnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings},
-		AggregateFailures("elb-enrich: DescribeLoadBalancerAttributes", failures, total)
+	result.IssueCount = issueCount
+	result.Truncated = truncated
+	return result, AggregateFailures("elb-enrich: DescribeLoadBalancerAttributes", failures, total)
 }

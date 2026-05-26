@@ -18,6 +18,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 )
@@ -68,15 +69,17 @@ func TestDetail_SetEnrichmentFinding_PreservesCursorIdentity(t *testing.T) {
 	before := m.fieldList[m.fieldCursor]
 
 	// Wave 2 enrichment lands after the operator moved cursor.
-	finding := resource.EnrichmentFinding{
-		Severity: "!",
-		Summary:  "encryption key unavailable",
-		Rows: []resource.FindingRow{
-			{Label: "KMS Key", Value: "arn:aws:kms:…"},
-			{Label: "Reason", Value: "key is pending deletion"},
-		},
+	finding := domain.Finding{
+		Code:     "kms.key-unavailable",
+		Phrase:   "encryption key unavailable",
+		Severity: domain.SevBroken,
+		Source:   "wave2:dbi",
 	}
-	m.SetEnrichmentFinding(&finding)
+	ad := domain.AttentionDetail{Rows: []domain.DetailRow{
+		{Label: "KMS Key", Value: "arn:aws:kms:…"},
+		{Label: "Reason", Value: "key is pending deletion"},
+	}}
+	m.SetEnrichmentFinding(&finding, &ad)
 
 	// After injection, the cursor must still point at the SAME logical item.
 	if m.fieldCursor < 0 || m.fieldCursor >= len(m.fieldList) {
@@ -127,12 +130,14 @@ func TestDetail_SetEnrichmentFinding_RenderedSelectionFollowsCursor(t *testing.T
 	}
 
 	// Enrichment fires.
-	finding := resource.EnrichmentFinding{
-		Severity: "!",
-		Summary:  "encryption key unavailable",
-		Rows:     []resource.FindingRow{{Label: "KMS Key", Value: "arn:aws:kms:…"}},
+	finding := domain.Finding{
+		Code:     "kms.key-unavailable",
+		Phrase:   "encryption key unavailable",
+		Severity: domain.SevBroken,
+		Source:   "wave2:dbi",
 	}
-	m.SetEnrichmentFinding(&finding)
+	ad := domain.AttentionDetail{Rows: []domain.DetailRow{{Label: "KMS Key", Value: "arn:aws:kms:…"}}}
+	m.SetEnrichmentFinding(&finding, &ad)
 
 	// Rendered viewport content at the CURRENT fieldCursor index must carry
 	// the same Key as before. If renderContent ran before relocation, the
@@ -160,15 +165,17 @@ func TestDetail_ClearEnrichmentFinding_PreservesCursorIdentity(t *testing.T) {
 			"endpoint":       "prod-db-2.aws.com:5432",
 		},
 	}
-	finding := resource.EnrichmentFinding{
-		Severity: "!",
-		Summary:  "pending maintenance",
-		Rows:     []resource.FindingRow{{Label: "Action", Value: "os-upgrade"}},
+	finding := domain.Finding{
+		Code:     "dbi.pending-maintenance",
+		Phrase:   "pending maintenance",
+		Severity: domain.SevBroken,
+		Source:   "wave2:dbi",
 	}
+	ad := domain.AttentionDetail{Rows: []domain.DetailRow{{Label: "Action", Value: "os-upgrade"}}}
 
 	m := NewDetail(res, "dbi", nil, keys.Default())
 	m.SetSize(120, 40)
-	m.SetEnrichmentFinding(&finding)
+	m.SetEnrichmentFinding(&finding, &ad)
 	m.refreshViewportContent()
 
 	if len(m.fieldList) < 8 {
@@ -179,7 +186,7 @@ func TestDetail_ClearEnrichmentFinding_PreservesCursorIdentity(t *testing.T) {
 	before := m.fieldList[m.fieldCursor]
 
 	// Finding clears (e.g. next enrichment cycle reports healthy).
-	m.SetEnrichmentFinding(nil)
+	m.SetEnrichmentFinding(nil, nil)
 
 	if m.fieldCursor < 0 || m.fieldCursor >= len(m.fieldList) {
 		t.Fatalf("fieldCursor out of range after clear: %d / %d",

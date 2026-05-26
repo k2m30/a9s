@@ -175,15 +175,16 @@ func (m *Model) probeEnrichment(shortName string, gen domain.Gen) tea.Cmd {
 	return func() tea.Msg {
 		r := m.core.ProbeEnrichment(ctx, clients, shortName)
 		return messages.EnrichmentChecked{
-			ResourceType: shortName,
-			Issues:       r.Issues,
-			Truncated:    r.Truncated,
-			Findings:     r.Findings,
-			FieldUpdates: r.FieldUpdates,
-			TruncatedIDs: r.TruncatedIDs,
-			Gen:          gen,
-			TypeGen:      typeGen,
-			Err:          r.Err,
+			ResourceType:     shortName,
+			Issues:           r.Issues,
+			Truncated:        r.Truncated,
+			Findings:         r.Findings,
+			AttentionDetails: r.AttentionDetails,
+			FieldUpdates:     r.FieldUpdates,
+			TruncatedIDs:     r.TruncatedIDs,
+			Gen:              gen,
+			TypeGen:          typeGen,
+			Err:              r.Err,
 		}
 	}
 }

@@ -10,7 +10,14 @@ import (
 	acmsvc "github.com/aws/aws-sdk-go-v2/service/acm"
 	acmtypes "github.com/aws/aws-sdk-go-v2/service/acm/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// acm canonical FindingCodes.
+const (
+	acmCodeExpiresSoon domain.FindingCode = "acm.expires-soon"
+	acmCodeOrphan      domain.FindingCode = "acm.orphan"
 )
 
 // EnrichACMCertificate calls DescribeCertificate per ACM certificate (cap EnrichmentCap)
@@ -21,10 +28,12 @@ import (
 // IssueCount counts only "!" severity findings — "~" (informational) are excluded from the badge.
 // Skip if clients.ACM == nil. Per-cert errors → Truncated.
 func EnrichACMCertificate(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+	}
 	if clients.ACM == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	now := time.Now()
@@ -45,7 +54,7 @@ func EnrichACMCertificate(ctx context.Context, clients *ServiceClients, resource
 		})
 		if err != nil {
 			truncated = true
-			truncatedIDs[r.ID] = true
+			result.TruncatedIDs[r.ID] = true
 			continue
 		}
 		if out.Certificate == nil {
@@ -64,22 +73,18 @@ func EnrichACMCertificate(ctx context.Context, clients *ServiceClients, resource
 					days := int(remaining.Hours() / 24)
 					summary = fmt.Sprintf("expires in %d days", days)
 				}
-				findings[r.ID] = resource.EnrichmentFinding{
-					Severity: "!",
-					Summary:  summary,
-				}
+				setWave2Finding(&result, r.ID, acmCodeExpiresSoon, summary, "!", "acm", nil)
 				bangCount++
 				continue
 			}
 		}
 		// Orphan check — only for ISSUED certs not already flagged.
 		if cert.Status == acmtypes.CertificateStatusIssued && len(cert.InUseBy) == 0 {
-			findings[r.ID] = resource.EnrichmentFinding{
-				Severity: "~",
-				Summary:  "certificate not in use (orphan)",
-			}
+			setWave2Finding(&result, r.ID, acmCodeOrphan, "certificate not in use (orphan)", "~", "acm", nil)
 			// "~" is informational — not counted in IssueCount.
 		}
 	}
-	return IssueEnricherResult{IssueCount: bangCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	result.IssueCount = bangCount
+	result.Truncated = truncated
+	return result, nil
 }

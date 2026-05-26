@@ -49,6 +49,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -310,7 +311,7 @@ func TestCR273_AllTypes_MenuCtrlZ_NoFalsePositives(t *testing.T) {
 					ResourceType: c.shortName,
 					Issues:       0,
 					Truncated:    false,
-					Findings:     map[string]resource.EnrichmentFinding{},
+					Findings:     map[string]domain.Finding{},
 					Err:          nil,
 					Gen:          0,
 					TypeGen:      0,
@@ -362,7 +363,7 @@ func TestCR273_AllTypes_MenuCtrlZ_Wave2ErroredSubCall_NoFalsePositives(t *testin
 				ResourceType: c.shortName,
 				Issues:       0,
 				Truncated:    true,
-				Findings:     map[string]resource.EnrichmentFinding{},
+				Findings:     map[string]domain.Finding{},
 				Err:          nil,
 				Gen:          0,
 				TypeGen:      0,

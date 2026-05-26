@@ -9,7 +9,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
 	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// cf canonical FindingCodes.
+const (
+	cfCodeInsecureProtocol domain.FindingCode = "cf.insecure-protocol"
 )
 
 // EnrichCloudFrontDistribution calls GetDistributionConfig per distribution (cap EnrichmentCap)
@@ -21,10 +27,12 @@ import (
 //
 // Skip if clients.CloudFront == nil. Per-distribution errors → truncated.
 func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+	}
 	if clients.CloudFront == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -40,21 +48,21 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 		})
 		if err != nil {
 			truncated = true
-			truncatedIDs[r.ID] = true
+			result.TruncatedIDs[r.ID] = true
 			continue
 		}
 		if out.DistributionConfig == nil {
 			continue
 		}
 		cfg := out.DistributionConfig
-		var rows []resource.FindingRow
+		var rows []domain.DetailRow
 		var summaries []string
 
 		// Check viewer protocol policy on default cache behavior.
 		if cfg.DefaultCacheBehavior != nil &&
 			cfg.DefaultCacheBehavior.ViewerProtocolPolicy == cftypes.ViewerProtocolPolicyAllowAll {
 			summaries = append(summaries, "no HTTPS redirect (insecure)")
-			rows = append(rows, resource.FindingRow{
+			rows = append(rows, domain.DetailRow{
 				Label: "ViewerProtocolPolicy",
 				Value: "allow-all",
 				Tier:  "~",
@@ -71,12 +79,12 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 						originID = *origin.Id
 					}
 					summaries = append(summaries, "origin without TLS")
-					rows = append(rows, resource.FindingRow{
+					rows = append(rows, domain.DetailRow{
 						Label: "Origin",
 						Value: originID,
 						Tier:  "~",
 					})
-					rows = append(rows, resource.FindingRow{
+					rows = append(rows, domain.DetailRow{
 						Label: "OriginProtocolPolicy",
 						Value: "http-only",
 						Tier:  "~",
@@ -89,13 +97,11 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 			continue
 		}
 		summary := strings.Join(summaries, "; ")
-		findings[distID] = resource.EnrichmentFinding{
-			Severity: "~",
-			Summary:  summary,
-			Rows:     rows,
-		}
+		setWave2Finding(&result, distID, cfCodeInsecureProtocol, summary, "~", "cf", rows)
 	}
 	// All CloudFront findings are severity "~" (informational).
 	// IssueCount counts only "!" severity findings; "~" do not contribute.
-	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	result.IssueCount = 0
+	result.Truncated = truncated
+	return result, nil
 }

@@ -17,6 +17,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
@@ -134,7 +135,7 @@ func TestEnrichmentCheckedMsg_NilErrNoFlash(t *testing.T) {
 	m := newTestModel()
 	okMsg := messages.EnrichmentChecked{
 		ResourceType: "sfn",
-		Findings:     map[string]resource.EnrichmentFinding{},
+		Findings:     map[string]domain.Finding{},
 	}
 
 	_, cmd := m.Update(okMsg)

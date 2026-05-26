@@ -7,17 +7,25 @@ import (
 	ec2svc "github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// ebs canonical FindingCodes.
+const (
+	ebsCodeVolumeIODegraded domain.FindingCode = "ebs.volume-io-degraded"
 )
 
 // EnrichEBSVolumeStatus calls DescribeVolumeStatus (account-wide, paginated) and returns
 // a Finding for every volume with non-ok status.
 // Severity is "!" (broken/degraded). Walks up to EnrichmentCap pages via NextToken.
 func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+	}
 	if clients.EC2 == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	// Build a set of known resource IDs so we can detect unmatched API returns.
 	knownIDs := make(map[string]bool, len(resources))
@@ -40,7 +48,7 @@ func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resourc
 		})
 		pages++
 		if err != nil {
-			return IssueEnricherResult{TruncatedIDs: truncatedIDs}, err
+			return IssueEnricherResult{TruncatedIDs: result.TruncatedIDs}, err
 		}
 		allVolumeStatuses = append(allVolumeStatuses, out.VolumeStatuses...)
 		if out.NextToken == nil {
@@ -61,7 +69,7 @@ func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resourc
 			continue
 		}
 		ioState := string(v.VolumeStatus.Status)
-		rows := []resource.FindingRow{
+		rows := []domain.DetailRow{
 			{Label: "I/O State", Value: ioState, Tier: "!"},
 		}
 		// Most recent event (if any).
@@ -75,21 +83,19 @@ func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resourc
 				eventVal = *ev.Description
 			}
 			if eventVal != "" {
-				rows = append(rows, resource.FindingRow{Label: "Event", Value: eventVal, Tier: "~"})
+				rows = append(rows, domain.DetailRow{Label: "Event", Value: eventVal, Tier: "~"})
 			}
 		}
 		// Most recent action code (if any).
 		if len(v.Actions) > 0 {
 			ac := v.Actions[0]
 			if ac.Code != nil && *ac.Code != "" {
-				rows = append(rows, resource.FindingRow{Label: "Action Code", Value: *ac.Code})
+				rows = append(rows, domain.DetailRow{Label: "Action Code", Value: *ac.Code})
 			}
 		}
-		findings[volID] = resource.EnrichmentFinding{
-			Severity: "!",
-			Summary:  "volume I/O degraded",
-			Rows:     rows,
-		}
+		setWave2Finding(&result, volID, ebsCodeVolumeIODegraded, "volume I/O degraded", "!", "ebs", rows)
 	}
-	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	result.IssueCount = len(result.Findings)
+	result.Truncated = truncated
+	return result, nil
 }

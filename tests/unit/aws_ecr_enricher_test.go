@@ -20,6 +20,7 @@ import (
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -188,8 +189,8 @@ func TestEnrichECRRepository_CriticalFindingsProduceSevBang(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding keyed by %q", ecrRepo1)
 	}
-	if f.Severity != "!" {
-		t.Errorf("severity = %q, want %q", f.Severity, "!")
+	if f.Severity != domain.SevBroken {
+		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
 	if _, ok := result.Findings[ecrRepo2]; ok {
 		t.Error("repo-2 must NOT appear in Findings — no critical vulnerabilities")
@@ -227,8 +228,8 @@ func TestEnrichECRRepository_HighFindingsProduceSevTilde(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (high vulns)", ecrRepo1)
 	}
-	if f.Severity != "~" {
-		t.Errorf("severity = %q, want %q", f.Severity, "~")
+	if f.Severity != domain.SevWarn {
+		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
 	if _, ok := result.Findings[ecrRepo2]; ok {
 		t.Error("repo-2 must NOT appear in Findings — no vulnerabilities")

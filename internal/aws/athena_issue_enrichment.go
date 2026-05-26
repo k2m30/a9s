@@ -8,7 +8,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/athena"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// athena canonical FindingCodes.
+const (
+	athenaCodeGovernanceMisconfigured domain.FindingCode = "athena.governance-misconfigured"
 )
 
 // EnrichAthenaWorkGroup calls GetWorkGroup per workgroup (capped at EnrichmentCap) to
@@ -23,10 +29,12 @@ import (
 // Per-WG errors mark Truncated=true and are skipped.
 // Skip when clients.Athena == nil.
 func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+	}
 	if clients.Athena == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -45,7 +53,7 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 		})
 		if err != nil {
 			truncated = true
-			truncatedIDs[r.ID] = true
+			result.TruncatedIDs[r.ID] = true
 			continue
 		}
 		if out.WorkGroup == nil || out.WorkGroup.Configuration == nil {
@@ -56,10 +64,10 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 		if key == "" {
 			key = wgName
 		}
-		var rows []resource.FindingRow
+		var rows []domain.DetailRow
 		// EnforceWorkGroupConfiguration defaults to true; false means callers can bypass settings.
 		if cfg.EnforceWorkGroupConfiguration != nil && !*cfg.EnforceWorkGroupConfiguration {
-			rows = append(rows, resource.FindingRow{
+			rows = append(rows, domain.DetailRow{
 				Label: "EnforceWorkGroupConfiguration",
 				Value: "false",
 				Tier:  "~",
@@ -67,7 +75,7 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 		}
 		// Missing encryption on result configuration is a security concern.
 		if cfg.ResultConfiguration == nil || cfg.ResultConfiguration.EncryptionConfiguration == nil {
-			rows = append(rows, resource.FindingRow{
+			rows = append(rows, domain.DetailRow{
 				Label: "ResultConfiguration.EncryptionConfiguration",
 				Value: "nil",
 				Tier:  "~",
@@ -80,12 +88,10 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 		if len(rows) > 1 {
 			summary = fmt.Sprintf("%s (%d findings)", rows[0].Label, len(rows))
 		}
-		findings[key] = resource.EnrichmentFinding{
-			Severity: "~",
-			Summary:  summary,
-			Rows:     rows,
-		}
+		setWave2Finding(&result, key, athenaCodeGovernanceMisconfigured, summary, "~", "athena", rows)
 		// "~" severity does not contribute to IssueCount.
 	}
-	return IssueEnricherResult{Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	result.IssueCount = 0
+	result.Truncated = truncated
+	return result, nil
 }

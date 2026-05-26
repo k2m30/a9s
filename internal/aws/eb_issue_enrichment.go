@@ -9,7 +9,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk"
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// eb canonical FindingCodes.
+const (
+	ebCodeEnvironmentCauses domain.FindingCode = "eb.environment-causes"
 )
 
 // EnrichEBEnvironmentHealth calls DescribeEnvironmentHealth for each Elastic
@@ -18,10 +24,12 @@ import (
 // Summary: "EB causes: <first cause>". IssueCount is always 0 — causes are
 // informational signals, not broken-state indicators.
 func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+	}
 	if clients.ElasticBeanstalk == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -41,19 +49,19 @@ func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, res
 		})
 		if err != nil {
 			truncated = true
-			truncatedIDs[r.ID] = true
+			result.TruncatedIDs[r.ID] = true
 			continue
 		}
 		if len(out.Causes) == 0 {
 			continue
 		}
 		firstCause := out.Causes[0]
-		rows := []resource.FindingRow{
+		rows := []domain.DetailRow{
 			{Label: "Cause", Value: firstCause, Tier: "~"},
 		}
 		// Record additional causes as extra rows.
 		for _, cause := range out.Causes[1:] {
-			rows = append(rows, resource.FindingRow{Label: "Cause", Value: cause, Tier: "~"})
+			rows = append(rows, domain.DetailRow{Label: "Cause", Value: cause, Tier: "~"})
 		}
 		// Key on resource ID (environment ID) for registry consistency.
 		// Fall back to name if ID is not set.
@@ -61,11 +69,9 @@ func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, res
 		if key == "" {
 			key = name
 		}
-		findings[key] = resource.EnrichmentFinding{
-			Severity: "~",
-			Summary:  fmt.Sprintf("EB causes: %s", firstCause),
-			Rows:     rows,
-		}
+		setWave2Finding(&result, key, ebCodeEnvironmentCauses, fmt.Sprintf("EB causes: %s", firstCause), "~", "eb", rows)
 	}
-	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	result.IssueCount = 0
+	result.Truncated = truncated
+	return result, nil
 }

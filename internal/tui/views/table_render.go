@@ -324,9 +324,9 @@ func (m ResourceListModel) renderDataRow(cols []listCol, r resource.Resource, ba
 				// is itself the signal. No `?` glyph, no others.
 				if m.typeDef.ResolveColor(r) == resource.ColorHealthy {
 					switch finding.Severity {
-					case "!":
+					case domain.SevBroken:
 						val = "! " + val
-					case "~":
+					case domain.SevWarn:
 						val = "~ " + val
 					}
 				}

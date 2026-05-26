@@ -10,6 +10,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -86,14 +87,14 @@ func drainWave2Enrichment(t *testing.T, m tui.Model, cmd tea.Cmd) tui.Model {
 
 // drainWave2EnrichmentCollect is like drainWave2Enrichment but also returns
 // the per-type findings observed during the drain. The returned map is
-// shortName → finding-keyed map of resource IDs to EnrichmentFinding, so
+// shortName → finding-keyed map of resource IDs to domain.Finding, so
 // callers can drill into specific affected resources for end-to-end assertions.
-func drainWave2EnrichmentCollect(t *testing.T, m tui.Model, cmd tea.Cmd) (tui.Model, map[string]map[string]resource.EnrichmentFinding) {
+func drainWave2EnrichmentCollect(t *testing.T, m tui.Model, cmd tea.Cmd) (tui.Model, map[string]map[string]domain.Finding) {
 	t.Helper()
 	const maxIterations = 200 // 9 enrichers × worst-case 20 follow-ups; generous
 	queue := []tea.Cmd{cmd}
 	enrichmentMsgs := 0
-	collected := map[string]map[string]resource.EnrichmentFinding{}
+	collected := map[string]map[string]domain.Finding{}
 	for i := 0; i < maxIterations && len(queue) > 0; i++ {
 		next := queue[0]
 		queue = queue[1:]
@@ -108,7 +109,7 @@ func drainWave2EnrichmentCollect(t *testing.T, m tui.Model, cmd tea.Cmd) (tui.Mo
 				enrichmentMsgs++
 				if len(em.Findings) > 0 {
 					if collected[em.ResourceType] == nil {
-						collected[em.ResourceType] = map[string]resource.EnrichmentFinding{}
+						collected[em.ResourceType] = map[string]domain.Finding{}
 					}
 					for id, f := range em.Findings {
 						collected[em.ResourceType][id] = f

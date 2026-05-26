@@ -22,6 +22,7 @@ import (
 	kafkatypes "github.com/aws/aws-sdk-go-v2/service/kafka/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -168,8 +169,8 @@ func TestEnrichMSKCluster_OutdatedVersionProducesFindingSevTilde(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding keyed by bare cluster name %q", mskName1)
 	}
-	if f.Severity != "~" {
-		t.Errorf("severity = %q, want %q", f.Severity, "~")
+	if f.Severity != domain.SevWarn {
+		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
 	if _, ok := result.Findings[mskName2]; ok {
 		t.Error("cluster-2 must NOT appear in Findings — it uses modern Kafka version")
@@ -201,8 +202,8 @@ func TestEnrichMSKCluster_PlaintextEncryptionProducesFindingSevTilde(t *testing.
 	if !ok {
 		t.Fatalf("expected finding keyed by bare cluster name %q", mskName1)
 	}
-	if f.Severity != "~" {
-		t.Errorf("severity = %q, want %q", f.Severity, "~")
+	if f.Severity != domain.SevWarn {
+		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
 	if _, ok := result.Findings[mskName2]; ok {
 		t.Error("cluster-2 must NOT appear in Findings — it uses TLS")

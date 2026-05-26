@@ -23,7 +23,7 @@ package unit
 import (
 	"testing"
 
-	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
@@ -43,8 +43,8 @@ func seedEnrichmentFindings(m tui.Model) tui.Model {
 		ResourceType: "ec2",
 		Issues:       2,
 		Truncated:    false,
-		Findings: map[string]resource.EnrichmentFinding{
-			"i-0abc1111aaa111111": {Severity: "!", Summary: "system status impaired"},
+		Findings: map[string]domain.Finding{
+			"i-0abc1111aaa111111": {Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
 		},
 		Gen:     0,
 		TypeGen: 0,
@@ -54,8 +54,8 @@ func seedEnrichmentFindings(m tui.Model) tui.Model {
 		ResourceType: "rds",
 		Issues:       0,
 		Truncated:    false,
-		Findings: map[string]resource.EnrichmentFinding{
-			"arn:aws:rds:us-east-1:123456789012:db:prod-db": {Severity: "~", Summary: "pending maintenance: system-update"},
+		Findings: map[string]domain.Finding{
+			"arn:aws:rds:us-east-1:123456789012:db:prod-db": {Code: "rds.pending-maintenance", Phrase: "pending maintenance: system-update", Severity: domain.SevWarn, Source: "wave2:rds"},
 		},
 		Gen:     0,
 		TypeGen: 0,
@@ -98,8 +98,8 @@ func TestProfileSwitch_ClearsEnrichmentState(t *testing.T) {
 	_, dropEC2Cmd := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Issues:       2,
-		Findings: map[string]resource.EnrichmentFinding{
-			"i-0abc1111aaa111111": {Severity: "!", Summary: "system status impaired"},
+		Findings: map[string]domain.Finding{
+			"i-0abc1111aaa111111": {Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
 		},
 		Gen:     0, // stale — switch bumped enrichmentGen above 0
 		TypeGen: 0,
@@ -112,8 +112,8 @@ func TestProfileSwitch_ClearsEnrichmentState(t *testing.T) {
 	_, dropRDSCmd := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "rds",
 		Issues:       0,
-		Findings: map[string]resource.EnrichmentFinding{
-			"arn:aws:rds:us-east-1:123456789012:db:prod-db": {Severity: "~", Summary: "pending maintenance"},
+		Findings: map[string]domain.Finding{
+			"arn:aws:rds:us-east-1:123456789012:db:prod-db": {Code: "rds.pending-maintenance", Phrase: "pending maintenance", Severity: domain.SevWarn, Source: "wave2:rds"},
 		},
 		Gen:     0, // stale
 		TypeGen: 0,
@@ -145,7 +145,7 @@ func TestProfileSwitch_ClearsEnrichmentState(t *testing.T) {
 		m2, _ := m.Update(messages.EnrichmentChecked{
 			ResourceType: "ec2",
 			Issues:       1,
-			Findings:     map[string]resource.EnrichmentFinding{},
+			Findings:     map[string]domain.Finding{},
 			Gen:          0,  // stale
 			TypeGen:      99, // stale
 		})
@@ -169,7 +169,7 @@ func TestProfileSwitch_BothEnrichmentMapsCleared(t *testing.T) {
 	for _, rt := range []string{"ec2", "rds", "ebs", "ddb"} {
 		_, cmd := rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: rt,
-			Findings:     map[string]resource.EnrichmentFinding{},
+			Findings:     map[string]domain.Finding{},
 			Gen:          0, // old session gen (stale after profile switch)
 			TypeGen:      0,
 		})
@@ -202,8 +202,8 @@ func TestRegionSwitch_ClearsEnrichmentState(t *testing.T) {
 	_, dropEC2Cmd := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Issues:       2,
-		Findings: map[string]resource.EnrichmentFinding{
-			"i-0abc1111aaa111111": {Severity: "!", Summary: "system status impaired"},
+		Findings: map[string]domain.Finding{
+			"i-0abc1111aaa111111": {Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
 		},
 		Gen:     0, // stale — switch bumped enrichmentGen
 		TypeGen: 0,
@@ -216,8 +216,8 @@ func TestRegionSwitch_ClearsEnrichmentState(t *testing.T) {
 	_, dropRDSCmd := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "rds",
 		Issues:       0,
-		Findings: map[string]resource.EnrichmentFinding{
-			"arn:aws:rds:us-east-1:123456789012:db:prod-db": {Severity: "~", Summary: "pending maintenance"},
+		Findings: map[string]domain.Finding{
+			"arn:aws:rds:us-east-1:123456789012:db:prod-db": {Code: "rds.pending-maintenance", Phrase: "pending maintenance", Severity: domain.SevWarn, Source: "wave2:rds"},
 		},
 		Gen:     0, // stale
 		TypeGen: 0,
@@ -235,7 +235,7 @@ func TestRegionSwitch_ClearsEnrichmentState(t *testing.T) {
 		}()
 		m2, _ := m.Update(messages.EnrichmentChecked{
 			ResourceType: "ec2",
-			Findings:     map[string]resource.EnrichmentFinding{},
+			Findings:     map[string]domain.Finding{},
 			Gen:          0,
 			TypeGen:      99,
 		})
@@ -257,7 +257,7 @@ func TestRegionSwitch_BothEnrichmentMapsCleared(t *testing.T) {
 	for _, rt := range []string{"ec2", "rds", "ebs", "ddb"} {
 		_, cmd := rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: rt,
-			Findings:     map[string]resource.EnrichmentFinding{},
+			Findings:     map[string]domain.Finding{},
 			Gen:          0, // old session gen (stale after region switch)
 			TypeGen:      0,
 		})

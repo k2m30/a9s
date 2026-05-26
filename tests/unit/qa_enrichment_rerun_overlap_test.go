@@ -96,8 +96,8 @@ func enrichmentCheckedWithFindings(sessionGen, typeGen domain.Gen) messages.Enri
 		ResourceType: "ec2",
 		Issues:       1,
 		Truncated:    false,
-		Findings: map[string]resource.EnrichmentFinding{
-			"i-0abc1111aaa111111": {Severity: "!", Summary: "system status impaired"},
+		Findings: map[string]domain.Finding{
+			"i-0abc1111aaa111111": {Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
 		},
 		Gen:     sessionGen,
 		TypeGen: typeGen,
@@ -347,8 +347,8 @@ func TestListCtrlR_FetchError_NoLatentState(t *testing.T) {
 	ebsFinding := messages.EnrichmentChecked{
 		ResourceType: "ebs",
 		Issues:       1,
-		Findings: map[string]resource.EnrichmentFinding{
-			"vol-0abc1111aaa11111a": {Severity: "!", Summary: "volume degraded"},
+		Findings: map[string]domain.Finding{
+			"vol-0abc1111aaa11111a": {Code: "ebs.volume.degraded", Phrase: "volume degraded", Severity: domain.SevBroken, Source: "wave2:ebs"},
 		},
 		Gen:     0,
 		TypeGen: 0,
@@ -362,8 +362,8 @@ func TestListCtrlR_FetchError_NoLatentState(t *testing.T) {
 	_, dropCmd := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ebs",
 		Issues:       1,
-		Findings: map[string]resource.EnrichmentFinding{
-			"vol-0abc1111aaa11111a": {Severity: "!", Summary: "volume degraded"},
+		Findings: map[string]domain.Finding{
+			"vol-0abc1111aaa11111a": {Code: "ebs.volume.degraded", Phrase: "volume degraded", Severity: domain.SevBroken, Source: "wave2:ebs"},
 		},
 		Gen:     0,
 		TypeGen: 0,
@@ -385,8 +385,8 @@ func TestListCtrlR_FetchError_NoLatentState(t *testing.T) {
 	m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ebs",
 		Issues:       1,
-		Findings: map[string]resource.EnrichmentFinding{
-			"vol-0abc1111aaa11111a": {Severity: "!", Summary: "volume degraded"},
+		Findings: map[string]domain.Finding{
+			"vol-0abc1111aaa11111a": {Code: "ebs.volume.degraded", Phrase: "volume degraded", Severity: domain.SevBroken, Source: "wave2:ebs"},
 		},
 		Gen:     0,
 		TypeGen: 1,
@@ -448,9 +448,9 @@ func TestHandleEnrichmentChecked_DropsStaleTypeGen(t *testing.T) {
 		ResourceType: "ec2",
 		Issues:       3,
 		Truncated:    false,
-		Findings: map[string]resource.EnrichmentFinding{
-			"i-0abc1111aaa111111": {Severity: "!", Summary: "system status impaired"},
-			"i-0abc2222bbb222222": {Severity: "!", Summary: "instance status impaired"},
+		Findings: map[string]domain.Finding{
+			"i-0abc1111aaa111111": {Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
+			"i-0abc2222bbb222222": {Code: "ec2.instance.status.impaired", Phrase: "instance status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
 		},
 		Gen:     0, // matches session enrichmentGen=0
 		TypeGen: 0, // STALE — current enrichmentTypeGen["ec2"]=1

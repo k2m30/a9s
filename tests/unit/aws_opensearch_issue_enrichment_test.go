@@ -22,6 +22,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -79,13 +80,13 @@ func buildOSResource(domain ostypes.DomainStatus, statusOverride string) resourc
 	}
 }
 
-// u11SummaryRowCheck asserts the U11 contract: Summary must not contain any
+// u11SummaryRowCheck asserts the U11 contract: Phrase must not contain any
 // row value. Fails the test if violated.
-func u11SummaryRowCheck(t *testing.T, finding resource.EnrichmentFinding) {
+func u11SummaryRowCheck(t *testing.T, finding domain.Finding, rows []domain.DetailRow) {
 	t.Helper()
-	for _, row := range finding.Rows {
-		if strings.Contains(finding.Summary, row.Value) {
-			t.Errorf("U11 violation: Summary %q contains row.Value %q — facts must live in Rows only", finding.Summary, row.Value)
+	for _, row := range rows {
+		if strings.Contains(finding.Phrase, row.Value) {
+			t.Errorf("U11 violation: Phrase %q contains row.Value %q — facts must live in Rows only", finding.Phrase, row.Value)
 		}
 	}
 }
@@ -124,15 +125,16 @@ func TestOpenSearch_Enrich_UpdateAvailable_EmitsBangFinding(t *testing.T) {
 		t.Fatalf("no Finding for resource %q", id)
 	}
 
-	if finding.Severity != "!" {
-		t.Errorf("Severity = %q, want %q", finding.Severity, "!")
+	if finding.Severity != domain.SevBroken {
+		t.Errorf("Severity = %v, want SevBroken", finding.Severity)
 	}
-	if finding.Summary != "software update forced soon" {
-		t.Errorf("Summary = %q, want %q", finding.Summary, "software update forced soon")
+	if finding.Phrase != "software update forced soon" {
+		t.Errorf("Phrase = %q, want %q", finding.Phrase, "software update forced soon")
 	}
 
-	// U11 — Summary must not contain any row value.
-	u11SummaryRowCheck(t, finding)
+	rows := result.AttentionDetails[id].Rows
+	// U11 — Phrase must not contain any row value.
+	u11SummaryRowCheck(t, finding, rows)
 
 	if result.IssueCount != 1 {
 		t.Errorf("IssueCount = %d, want 1 (! bumps menu badge)", result.IssueCount)
@@ -141,7 +143,7 @@ func TestOpenSearch_Enrich_UpdateAvailable_EmitsBangFinding(t *testing.T) {
 	// Verify rows contain "Automated Update" and "Current Version".
 	hasAutomatedUpdate := false
 	hasCurrentVersion := false
-	for _, row := range finding.Rows {
+	for _, row := range rows {
 		if row.Label == "Automated Update" {
 			hasAutomatedUpdate = true
 		}
@@ -150,10 +152,10 @@ func TestOpenSearch_Enrich_UpdateAvailable_EmitsBangFinding(t *testing.T) {
 		}
 	}
 	if !hasAutomatedUpdate {
-		t.Errorf("Rows missing {Label:\"Automated Update\", ...}; got: %v", finding.Rows)
+		t.Errorf("Rows missing {Label:\"Automated Update\", ...}; got: %v", rows)
 	}
 	if !hasCurrentVersion {
-		t.Errorf("Rows missing {Label:\"Current Version\", ...}; got: %v", finding.Rows)
+		t.Errorf("Rows missing {Label:\"Current Version\", ...}; got: %v", rows)
 	}
 }
 
@@ -190,15 +192,15 @@ func TestOpenSearch_Enrich_EncryptionOff_EmitsTildeFinding(t *testing.T) {
 		t.Fatalf("no Finding for resource %q", id)
 	}
 
-	if finding.Severity != "~" {
-		t.Errorf("Severity = %q, want %q", finding.Severity, "~")
+	if finding.Severity != domain.SevWarn {
+		t.Errorf("Severity = %v, want SevWarn", finding.Severity)
 	}
-	if finding.Summary != "encryption at rest off" {
-		t.Errorf("Summary = %q, want %q", finding.Summary, "encryption at rest off")
+	if finding.Phrase != "encryption at rest off" {
+		t.Errorf("Phrase = %q, want %q", finding.Phrase, "encryption at rest off")
 	}
 
-	// U11 — Summary must not contain any row value.
-	u11SummaryRowCheck(t, finding)
+	// U11 — Phrase must not contain any row value.
+	u11SummaryRowCheck(t, finding, result.AttentionDetails[id].Rows)
 
 	if result.IssueCount != 0 {
 		t.Errorf("IssueCount = %d, want 0 (~ never bumps badge)", result.IssueCount)
@@ -240,26 +242,27 @@ func TestOpenSearch_Enrich_MultiBackground_TopWinsHiddenSurfacesAsRow(t *testing
 	}
 
 	// ! beats ~
-	if finding.Severity != "!" {
-		t.Errorf("Severity = %q, want %q (! beats ~)", finding.Severity, "!")
+	if finding.Severity != domain.SevBroken {
+		t.Errorf("Severity = %v, want SevBroken (! beats ~)", finding.Severity)
 	}
-	if finding.Summary != "software update forced soon" {
-		t.Errorf("Summary = %q, want %q", finding.Summary, "software update forced soon")
+	if finding.Phrase != "software update forced soon" {
+		t.Errorf("Phrase = %q, want %q", finding.Phrase, "software update forced soon")
 	}
 
+	rows3 := result.AttentionDetails[id].Rows
 	// Hidden ~ surfaces as Additional row.
 	hasAdditional := false
-	for _, row := range finding.Rows {
+	for _, row := range rows3 {
 		if row.Label == "Additional" && row.Value == "encryption at rest off" {
 			hasAdditional = true
 		}
 	}
 	if !hasAdditional {
-		t.Errorf("Rows missing {Label:\"Additional\", Value:\"encryption at rest off\"}; got: %v", finding.Rows)
+		t.Errorf("Rows missing {Label:\"Additional\", Value:\"encryption at rest off\"}; got: %v", rows3)
 	}
 
-	// U11 — Summary must not contain any row value.
-	u11SummaryRowCheck(t, finding)
+	// U11 — Phrase must not contain any row value.
+	u11SummaryRowCheck(t, finding, rows3)
 
 	if result.IssueCount != 1 {
 		t.Errorf("IssueCount = %d, want 1 (multi still counts as 1 instance)", result.IssueCount)
@@ -301,11 +304,11 @@ func TestOpenSearch_Enrich_HardStatePlusBackground_NoFieldUpdate(t *testing.T) {
 		t.Fatalf("no Finding for resource %q", id)
 	}
 
-	if finding.Severity != "!" {
-		t.Errorf("Severity = %q, want %q", finding.Severity, "!")
+	if finding.Severity != domain.SevBroken {
+		t.Errorf("Severity = %v, want SevBroken", finding.Severity)
 	}
-	if finding.Summary != "software update forced soon" {
-		t.Errorf("Summary = %q, want %q", finding.Summary, "software update forced soon")
+	if finding.Phrase != "software update forced soon" {
+		t.Errorf("Phrase = %q, want %q", finding.Phrase, "software update forced soon")
 	}
 
 	// Enricher must NOT overwrite Status (fetcher is authoritative for opensearch).

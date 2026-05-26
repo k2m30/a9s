@@ -279,8 +279,8 @@ func TestEnrichIAMGroup_PaginatesAttachedPolicies(t *testing.T) {
 
 	// Because total attached policies (90) > 0, no "no policies" finding
 	if f, ok := result.Findings[groupName]; ok {
-		if strings.Contains(f.Summary, "no policies") {
-			t.Errorf("must not emit 'no policies' finding when attached policies span 2 pages; got: %q", f.Summary)
+		if strings.Contains(f.Phrase, "no policies") {
+			t.Errorf("must not emit 'no policies' finding when attached policies span 2 pages; got: %q", f.Phrase)
 		}
 	}
 
@@ -338,8 +338,8 @@ func TestEnrichIAMGroup_PaginatesInlinePolicies(t *testing.T) {
 
 	// Because total inline policies (35) > 0, no "no policies" finding
 	if f, ok := result.Findings[groupName]; ok {
-		if strings.Contains(f.Summary, "no policies") {
-			t.Errorf("must not emit 'no policies' finding when inline policies span 2 pages; got: %q", f.Summary)
+		if strings.Contains(f.Phrase, "no policies") {
+			t.Errorf("must not emit 'no policies' finding when inline policies span 2 pages; got: %q", f.Phrase)
 		}
 	}
 
@@ -465,7 +465,7 @@ func TestEnrichIAMGroup_ZeroMembersAcrossPages(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding for %q (no members), but none was produced", groupName)
 	}
-	if !strings.Contains(f.Summary, "no members") {
-		t.Errorf("finding summary %q must contain \"no members\"", f.Summary)
+	if !strings.Contains(f.Phrase, "no members") {
+		t.Errorf("finding summary %q must contain \"no members\"", f.Phrase)
 	}
 }

@@ -10,7 +10,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// eb-rule canonical FindingCodes.
+const (
+	ebRuleCodeTargetIssue domain.FindingCode = "eb-rule.target-issue"
 )
 
 // EnrichEventBridgeRuleTargets is a Wave 2 enricher for EventBridge rules.
@@ -19,11 +25,13 @@ import (
 //   - Rule state == DISABLED AND len(Targets) > 0 → "~" finding (disabled rule still has targets — drift)
 //   - Any target without DeadLetterConfig → "~" finding (no DLQ on target)
 func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	fieldUpdates := make(map[string]map[string]string)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+		FieldUpdates: make(map[string]map[string]string),
+	}
 	if clients.EventBridge == nil || len(resources) == 0 {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 
 	truncated := len(resources) > EnrichmentCap
@@ -54,7 +62,7 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 			if targetPages >= PerParentPageCap {
 				targetsTruncated = true
 				truncated = true
-				truncatedIDs[r.ID] = true
+				result.TruncatedIDs[r.ID] = true
 				break
 			}
 			pageInput := &eventbridge.ListTargetsByRuleInput{
@@ -68,7 +76,7 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 			targetPages++
 			if err != nil {
 				truncated = true
-				truncatedIDs[r.ID] = true
+				result.TruncatedIDs[r.ID] = true
 				break
 			}
 			targets = append(targets, out.Targets...)
@@ -83,14 +91,14 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 		if targetsTruncated {
 			targetCountStr = resource.FormatApproximate(len(targets))
 		}
-		fieldUpdates[ruleName] = map[string]string{
+		result.FieldUpdates[ruleName] = map[string]string{
 			"target_count": targetCountStr,
 		}
-		var rows []resource.FindingRow
+		var rows []domain.DetailRow
 
 		// ENABLED rule with no targets → rule fires but goes nowhere.
 		if state == "ENABLED" && len(targets) == 0 && !targetsTruncated {
-			rows = append(rows, resource.FindingRow{
+			rows = append(rows, domain.DetailRow{
 				Label: "Targets",
 				Value: "enabled rule has no targets (rule matches but goes nowhere)",
 				Tier:  "!",
@@ -99,7 +107,7 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 
 		// DISABLED rule still has targets → probable drift/oversight.
 		if state == "DISABLED" && len(targets) > 0 {
-			rows = append(rows, resource.FindingRow{
+			rows = append(rows, domain.DetailRow{
 				Label: "Targets",
 				Value: fmt.Sprintf("disabled rule still has %d target(s) (drift)", len(targets)),
 				Tier:  "~",
@@ -113,7 +121,7 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 				if target.Id != nil {
 					targetID = *target.Id
 				}
-				rows = append(rows, resource.FindingRow{
+				rows = append(rows, domain.DetailRow{
 					Label: "Target",
 					Value: fmt.Sprintf("%s: no dead-letter config", targetID),
 					Tier:  "~",
@@ -134,19 +142,16 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 			}
 		}
 
-		findings[ruleName] = resource.EnrichmentFinding{
-			Severity: severity,
-			Summary:  rows[0].Value,
-			Rows:     rows,
-		}
+		setWave2Finding(&result, ruleName, ebRuleCodeTargetIssue, rows[0].Value, severity, "eb-rule", rows)
 	}
 
 	issueCount := 0
-	for _, f := range findings {
-		if f.Severity == "!" {
+	for _, f := range result.Findings {
+		if f.Severity == domain.SevBroken {
 			issueCount++
 		}
 	}
-
-	return IssueEnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	result.IssueCount = issueCount
+	result.Truncated = truncated
+	return result, nil
 }

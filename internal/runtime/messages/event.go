@@ -215,8 +215,13 @@ type EnrichmentChecked struct {
 	// Findings is the per-resource finding map for this type, keyed by
 	// resource.Resource.ID. Populated on success AND on partial-success (Err
 	// non-nil but partial results present). May include findings for resources
-	// off-page (account-wide enrichers).
-	Findings map[string]resource.EnrichmentFinding
+	// off-page (account-wide enrichers). At most one Finding per Resource.ID.
+	Findings map[string]domain.Finding
+	// AttentionDetails carries the supporting rows for each per-resource
+	// Finding. Keyed by Resource.ID at message-emission time; the fold layer
+	// (runtime.Core.applyEnrichment) flips it to FindingCode against the
+	// matching r.Findings entry when writing onto cached rows.
+	AttentionDetails map[string]domain.AttentionDetail
 	// FieldUpdates carries per-resource Fields[] mutations to merge into
 	// cached rows. Keyed by resource ID then by field key. Populated on success
 	// AND on partial-success (Err non-nil but partial results present).

@@ -2,7 +2,6 @@ package runtime
 
 import (
 	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/session"
 )
 
@@ -20,7 +19,11 @@ type RuntimeState struct {
 
 	// EnrichmentFindings carries the most-recent Wave 2 findings per
 	// resource type, keyed by ResourceType -> ResourceID -> finding.
-	EnrichmentFindings map[string]map[string]resource.EnrichmentFinding
+	EnrichmentFindings map[string]map[string]domain.Finding
+	// EnrichmentAttentionDetails carries the supporting AttentionDetail rows
+	// for each Wave 2 finding, keyed by ResourceType -> ResourceID -> detail.
+	// Paired with EnrichmentFindings (same key shape; same ResourceID).
+	EnrichmentAttentionDetails map[string]map[string]domain.AttentionDetail
 
 	// MenuBadges is the current per-resource-type issue badge state used
 	// to render the main menu.

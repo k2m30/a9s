@@ -10,14 +10,20 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	smithy "github.com/aws/smithy-go"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// s3 canonical FindingCodes.
+const (
+	s3CodePublicAccessBlockIncomplete domain.FindingCode = "s3.public-access-block-incomplete"
 )
 
 // EnrichS3PublicAccessBlock calls GetPublicAccessBlock per bucket (cap EnrichmentCap)
 // and emits a finding when the bucket has no PAB configuration or when any of the
 // four PAB flags is false.
 //
-// Contract (EnrichmentFinding):
+// Contract (Finding):
 //   - Severity is always "!" (important background concern on a Healthy row).
 //   - Summary is always "public access block incomplete" — stable across all instances.
 //   - Rows carry the per-case detail (never duplicated in Summary).
@@ -46,11 +52,13 @@ import (
 // the failure aggregates into the returned composite error.
 // IssueCount stays 0 (framework counts "!" findings directly).
 func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	fieldUpdates := make(map[string]map[string]string)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+		FieldUpdates: make(map[string]map[string]string),
+	}
 	if clients.S3 == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	var failures []string
@@ -75,15 +83,11 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 		if err != nil {
 			var apiErr smithy.APIError
 			if errors.As(err, &apiErr) && apiErr.ErrorCode() == "NoSuchPublicAccessBlockConfiguration" {
-				findings[name] = resource.EnrichmentFinding{
-					Severity: "!",
-					Summary:  "public access block incomplete",
-					Rows: []resource.FindingRow{
-						{Label: "Status", Value: "no public access block configuration"},
-						{Label: "Account-level PAB", Value: "may still apply"},
-					},
-				}
-				fieldUpdates[name] = map[string]string{"status": "public access block incomplete"}
+				setWave2Finding(&result, name, s3CodePublicAccessBlockIncomplete, "public access block incomplete", "!", "s3", []domain.DetailRow{
+					{Label: "Status", Value: "no public access block configuration"},
+					{Label: "Account-level PAB", Value: "may still apply"},
+				})
+				result.FieldUpdates[name] = map[string]string{"status": "public access block incomplete"}
 				continue
 			}
 			// Cross-region buckets: ListBuckets returns ALL buckets globally, but
@@ -96,25 +100,21 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 			// related-def checkers in s3_related.go via isS3CrossRegionErr.
 			if isS3CrossRegionErr(err) {
 				truncated = true
-				truncatedIDs[r.ID] = true
+				result.TruncatedIDs[r.ID] = true
 				continue
 			}
 			// Other errors: data incomplete — do not emit a finding.
 			truncated = true
-			truncatedIDs[r.ID] = true
+			result.TruncatedIDs[r.ID] = true
 			failures = append(failures, fmt.Sprintf("%s: %v", name, err))
 			continue
 		}
 		if out.PublicAccessBlockConfiguration == nil {
-			findings[name] = resource.EnrichmentFinding{
-				Severity: "!",
-				Summary:  "public access block incomplete",
-				Rows: []resource.FindingRow{
-					{Label: "Status", Value: "no public access block configuration"},
-					{Label: "Account-level PAB", Value: "may still apply"},
-				},
-			}
-			fieldUpdates[name] = map[string]string{"status": "public access block incomplete"}
+			setWave2Finding(&result, name, s3CodePublicAccessBlockIncomplete, "public access block incomplete", "!", "s3", []domain.DetailRow{
+				{Label: "Status", Value: "no public access block configuration"},
+				{Label: "Account-level PAB", Value: "may still apply"},
+			})
+			result.FieldUpdates[name] = map[string]string{"status": "public access block incomplete"}
 			continue
 		}
 		cfg := out.PublicAccessBlockConfiguration
@@ -128,24 +128,22 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 			{"BlockPublicPolicy", cfg.BlockPublicPolicy},
 			{"RestrictPublicBuckets", cfg.RestrictPublicBuckets},
 		}
-		var falseFlags []resource.FindingRow
+		var falseFlags []domain.DetailRow
 		for _, fc := range flags {
 			if fc.value == nil || !*fc.value {
-				falseFlags = append(falseFlags, resource.FindingRow{Label: fc.name, Value: "false"})
+				falseFlags = append(falseFlags, domain.DetailRow{Label: fc.name, Value: "false"})
 			}
 		}
 		if len(falseFlags) == 0 {
 			// All flags true — healthy bucket. No finding.
 			continue
 		}
-		falseFlags = append(falseFlags, resource.FindingRow{Label: "Account-level PAB", Value: "may still apply"})
-		findings[name] = resource.EnrichmentFinding{
-			Severity: "!",
-			Summary:  "public access block incomplete",
-			Rows:     falseFlags,
-		}
-		fieldUpdates[name] = map[string]string{"status": "public access block incomplete"}
+		falseFlags = append(falseFlags, domain.DetailRow{Label: "Account-level PAB", Value: "may still apply"})
+		setWave2Finding(&result, name, s3CodePublicAccessBlockIncomplete, "public access block incomplete", "!", "s3", falseFlags)
+		result.FieldUpdates[name] = map[string]string{"status": "public access block incomplete"}
 	}
-	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates},
+	result.IssueCount = 0
+	result.Truncated = truncated
+	return result,
 		AggregateFailures("s3-enrich: GetPublicAccessBlock", failures, total)
 }

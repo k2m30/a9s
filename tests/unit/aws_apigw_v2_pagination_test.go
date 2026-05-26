@@ -23,6 +23,8 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
+
+	"github.com/k2m30/a9s/v3/internal/domain"
 	apigwtypes "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
@@ -249,11 +251,11 @@ func TestEnrichAPIGatewayStage_ZeroStagesAcrossPages(t *testing.T) {
 	if !ok {
 		t.Errorf("expected 1 finding for 0 stages (no deployed stages), got 0")
 	} else {
-		if f.Severity != "~" {
-			t.Errorf("finding Severity = %q, want \"~\"", f.Severity)
+		if f.Severity != domain.SevWarn {
+			t.Errorf("finding Severity = %v, want SevWarn", f.Severity)
 		}
-		if !strings.Contains(strings.ToLower(f.Summary), "no deployed") {
-			t.Errorf("finding Summary = %q, must contain \"no deployed\"", f.Summary)
+		if !strings.Contains(strings.ToLower(f.Phrase), "no deployed") {
+			t.Errorf("finding Summary = %q, must contain \"no deployed\"", f.Phrase)
 		}
 	}
 }

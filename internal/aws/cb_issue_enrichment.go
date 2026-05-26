@@ -10,18 +10,26 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/codebuild"
 	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// cb canonical FindingCodes.
+const (
+	cbCodeLatestBuildFailed domain.FindingCode = "cb.latest-build-failed"
 )
 
 // EnrichCodeBuildStatus calls BatchGetBuilds for the latest build of each project
 // and returns a Finding for every project whose latest build is not SUCCEEDED.
 // Severity is "!" (broken/degraded). Summary: "latest build FAILED (<date>)".
 func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	fieldUpdates := make(map[string]map[string]string)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+		FieldUpdates: make(map[string]map[string]string),
+	}
 	if clients.CodeBuild == nil || len(resources) == 0 {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	names := make([]string, 0, len(resources))
 	for _, r := range resources {
@@ -30,7 +38,7 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		}
 	}
 	if len(names) == 0 {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	buildIDToProject := make(map[string]string, len(names))
 	var buildIDs []string
@@ -45,7 +53,7 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		})
 		if err != nil {
 			truncated = true
-			truncatedIDs[name] = true
+			result.TruncatedIDs[name] = true
 			continue
 		}
 		if len(out.Ids) > 0 {
@@ -55,13 +63,14 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		}
 	}
 	if len(buildIDs) == 0 {
-		return IssueEnricherResult{Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+		result.Truncated = truncated
+		return result, nil
 	}
 	builds, err := clients.CodeBuild.BatchGetBuilds(ctx, &codebuild.BatchGetBuildsInput{
 		Ids: buildIDs,
 	})
 	if err != nil {
-		return IssueEnricherResult{TruncatedIDs: truncatedIDs}, err
+		return IssueEnricherResult{TruncatedIDs: result.TruncatedIDs}, err
 	}
 	for _, b := range builds.Builds {
 		if b.Id == nil {
@@ -73,7 +82,7 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		}
 		switch b.BuildStatus {
 		case cbtypes.StatusTypeSucceeded, cbtypes.StatusTypeInProgress, cbtypes.StatusTypeStopped:
-			fieldUpdates[projectName] = map[string]string{"last_build": "OK"}
+			result.FieldUpdates[projectName] = map[string]string{"last_build": "OK"}
 			continue
 		}
 		statusVal := string(b.BuildStatus)
@@ -83,23 +92,23 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 			hours := int(elapsed.Hours())
 			lastBuildVal = fmt.Sprintf("%s %dh ago", statusVal, hours)
 		}
-		rows := []resource.FindingRow{
+		rows := []domain.DetailRow{
 			{Label: "Status", Value: statusVal, Tier: "!"},
 		}
 		if b.EndTime != nil {
-			rows = append(rows, resource.FindingRow{Label: "Ended", Value: b.EndTime.Format("2006-01-02")})
+			rows = append(rows, domain.DetailRow{Label: "Ended", Value: b.EndTime.Format("2006-01-02")})
 		}
 		// Append the latest failed phase if build is not complete.
 		if !b.BuildComplete {
 			if b.CurrentPhase != nil && *b.CurrentPhase != "" {
-				rows = append(rows, resource.FindingRow{Label: "Current Phase", Value: *b.CurrentPhase, Tier: "~"})
+				rows = append(rows, domain.DetailRow{Label: "Current Phase", Value: *b.CurrentPhase, Tier: "~"})
 			}
 		} else {
 			// Find the latest failed phase.
 			for i := len(b.Phases) - 1; i >= 0; i-- {
 				ph := b.Phases[i]
 				if ph.PhaseStatus == cbtypes.StatusTypeFailed {
-					rows = append(rows, resource.FindingRow{Label: "Phase", Value: string(ph.PhaseType), Tier: "!"})
+					rows = append(rows, domain.DetailRow{Label: "Phase", Value: string(ph.PhaseType), Tier: "!"})
 					break
 				}
 			}
@@ -108,12 +117,10 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		if b.EndTime != nil {
 			summary = fmt.Sprintf("latest build %s (%s)", statusVal, b.EndTime.Format("2006-01-02"))
 		}
-		findings[projectName] = resource.EnrichmentFinding{
-			Severity: "!",
-			Summary:  summary,
-			Rows:     rows,
-		}
-		fieldUpdates[projectName] = map[string]string{"last_build": lastBuildVal}
+		setWave2Finding(&result, projectName, cbCodeLatestBuildFailed, summary, "!", "cb", rows)
+		result.FieldUpdates[projectName] = map[string]string{"last_build": lastBuildVal}
 	}
-	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	result.IssueCount = len(result.Findings)
+	result.Truncated = truncated
+	return result, nil
 }

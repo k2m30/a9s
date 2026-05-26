@@ -211,7 +211,7 @@ func TestOpenSearch_Enrich_DeletedDomain_SkipsFinding(t *testing.T) {
 	if len(result2.Findings) != 1 {
 		t.Errorf("non-deleted control: Findings = %v, want exactly one (sanity check for the pin anchor)", result2.Findings)
 	}
-	if f, ok := result2.Findings[domainName]; !ok || !strings.Contains(f.Summary, "software update") {
-		t.Errorf("non-deleted control: finding summary = %q, want to contain %q", f.Summary, "software update")
+	if f, ok := result2.Findings[domainName]; !ok || !strings.Contains(f.Phrase, "software update") {
+		t.Errorf("non-deleted control: finding summary = %q, want to contain %q", f.Phrase, "software update")
 	}
 }

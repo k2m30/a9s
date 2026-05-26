@@ -17,6 +17,7 @@ import (
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -170,8 +171,8 @@ func TestEnrichIAMGroup_NoMembersProducesFindingSevTilde(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (empty group)", "dev-team")
 	}
-	if f.Severity != "~" {
-		t.Errorf("severity = %q, want %q", f.Severity, "~")
+	if f.Severity != domain.SevWarn {
+		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
 	if _, ok := result.Findings["ops-team"]; ok {
 		t.Error("ops-team must NOT appear in Findings — it has members")
@@ -209,8 +210,8 @@ func TestEnrichIAMGroup_NoPoliciesProducesFindingSevTilde(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (no policies)", "dev-team")
 	}
-	if f.Severity != "~" {
-		t.Errorf("severity = %q, want %q", f.Severity, "~")
+	if f.Severity != domain.SevWarn {
+		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
 	if _, ok := result.Findings["ops-team"]; ok {
 		t.Error("ops-team must NOT appear in Findings — it has a policy")

@@ -25,6 +25,7 @@ import (
 	smithy "github.com/aws/smithy-go"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -115,25 +116,25 @@ func pabResource(name string) resource.Resource {
 
 // assertFindingShape is a shared assertion helper for the stable finding contract.
 // It fails the test if the finding at key does not have the expected severity
-// and the verbatim stable Summary.
-func assertFindingShape(t *testing.T, findings map[string]resource.EnrichmentFinding, key string) resource.EnrichmentFinding {
+// and the verbatim stable Phrase.
+func assertFindingShape(t *testing.T, findings map[string]domain.Finding, key string) domain.Finding {
 	t.Helper()
 	f, ok := findings[key]
 	if !ok {
 		t.Fatalf("expected finding for %q; Findings keys = %v", key, findingKeys(findings))
 	}
-	if f.Severity != "!" {
-		t.Errorf("[%s] Severity = %q, want %q", key, f.Severity, "!")
+	if f.Severity != domain.SevBroken {
+		t.Errorf("[%s] Severity = %v, want SevBroken", key, f.Severity)
 	}
-	const wantSummary = "public access block incomplete"
-	if f.Summary != wantSummary {
-		t.Errorf("[%s] Summary = %q, want %q", key, f.Summary, wantSummary)
+	const wantPhrase = "public access block incomplete"
+	if f.Phrase != wantPhrase {
+		t.Errorf("[%s] Phrase = %q, want %q", key, f.Phrase, wantPhrase)
 	}
 	return f
 }
 
-// rowMap converts a FindingRow slice to a label→value map for easy assertion.
-func rowMap(rows []resource.FindingRow) map[string]string {
+// rowMap converts a DetailRow slice to a label→value map for easy assertion.
+func rowMap(rows []domain.DetailRow) map[string]string {
 	m := make(map[string]string, len(rows))
 	for _, r := range rows {
 		m[r.Label] = r.Value
@@ -199,13 +200,13 @@ func TestS3_Enrich_NoPAB_Configuration(t *testing.T) {
 
 	finding := assertFindingShape(t, result.Findings, "a9s-demo-nopab")
 
-	// U11: Summary must NOT embed the row-level detail string.
-	if strings.Contains(finding.Summary, "no public access block configuration") {
-		t.Errorf("Summary must not embed Row content; got %q", finding.Summary)
+	// U11: Phrase must NOT embed the row-level detail string.
+	if strings.Contains(finding.Phrase, "no public access block configuration") {
+		t.Errorf("Phrase must not embed Row content; got %q", finding.Phrase)
 	}
 
 	// Rows must carry the detail.
-	rows := rowMap(finding.Rows)
+	rows := rowMap(result.AttentionDetails["a9s-demo-nopab"].Rows)
 	if rows["Status"] != "no public access block configuration" {
 		t.Errorf("Rows[Status] = %q, want %q", rows["Status"], "no public access block configuration")
 	}
@@ -252,12 +253,12 @@ func TestS3_Enrich_PartialPAB_SingleFlagFalse(t *testing.T) {
 
 	finding := assertFindingShape(t, result.Findings, "a9s-demo-partial-pab")
 
-	// U11: Summary must not contain flag names or values.
-	if strings.Contains(finding.Summary, "BlockPublicAcls") || strings.Contains(finding.Summary, "false") {
-		t.Errorf("Summary must not embed Row content; got %q", finding.Summary)
+	// U11: Phrase must not contain flag names or values.
+	if strings.Contains(finding.Phrase, "BlockPublicAcls") || strings.Contains(finding.Phrase, "false") {
+		t.Errorf("Phrase must not embed Row content; got %q", finding.Phrase)
 	}
 
-	rows := rowMap(finding.Rows)
+	rows := rowMap(result.AttentionDetails["a9s-demo-partial-pab"].Rows)
 	if rows["BlockPublicAcls"] != "false" {
 		t.Errorf("Rows[BlockPublicAcls] = %q, want %q", rows["BlockPublicAcls"], "false")
 	}
@@ -300,17 +301,17 @@ func TestS3_Enrich_PartialPAB_MultipleFlagsFalse(t *testing.T) {
 
 	finding := assertFindingShape(t, result.Findings, "a9s-demo-multifail-pab")
 
-	// Summary must be stable — same phrase even when multiple flags are false.
-	const wantSummary = "public access block incomplete"
-	if finding.Summary != wantSummary {
-		t.Errorf("Summary = %q, want %q (must be stable across instances)", finding.Summary, wantSummary)
+	// Phrase must be stable — same phrase even when multiple flags are false.
+	const wantPhrase = "public access block incomplete"
+	if finding.Phrase != wantPhrase {
+		t.Errorf("Phrase = %q, want %q (must be stable across instances)", finding.Phrase, wantPhrase)
 	}
-	// Summary must not contain flag names.
-	if strings.Contains(finding.Summary, "BlockPublicAcls") || strings.Contains(finding.Summary, "BlockPublicPolicy") {
-		t.Errorf("Summary must not embed Row content; got %q", finding.Summary)
+	// Phrase must not contain flag names.
+	if strings.Contains(finding.Phrase, "BlockPublicAcls") || strings.Contains(finding.Phrase, "BlockPublicPolicy") {
+		t.Errorf("Phrase must not embed Row content; got %q", finding.Phrase)
 	}
 
-	rows := rowMap(finding.Rows)
+	rows := rowMap(result.AttentionDetails["a9s-demo-multifail-pab"].Rows)
 	if rows["BlockPublicAcls"] != "false" {
 		t.Errorf("Rows[BlockPublicAcls] = %q, want %q", rows["BlockPublicAcls"], "false")
 	}
@@ -343,9 +344,9 @@ func TestS3_Enrich_NilPABConfiguration_TreatedAsNoPAB(t *testing.T) {
 
 	finding := assertFindingShape(t, result.Findings, "a9s-demo-nilcfg")
 
-	// Must not embed row detail in Summary.
-	if strings.Contains(finding.Summary, "no public access block configuration") {
-		t.Errorf("Summary must not embed Row content; got %q", finding.Summary)
+	// Must not embed row detail in Phrase.
+	if strings.Contains(finding.Phrase, "no public access block configuration") {
+		t.Errorf("Phrase must not embed Row content; got %q", finding.Phrase)
 	}
 
 	updates, ok := result.FieldUpdates["a9s-demo-nilcfg"]
@@ -462,10 +463,10 @@ func TestS3_Enrich_IssueCount_FourBuckets(t *testing.T) {
 		t.Fatalf("EnrichS3PublicAccessBlock error: %v", err)
 	}
 
-	// Count "!" findings manually to decouple from IssueCount field name choices.
+	// Count SevBroken findings manually to decouple from IssueCount field name choices.
 	bangCount := 0
 	for _, f := range result.Findings {
-		if f.Severity == "!" {
+		if f.Severity == domain.SevBroken {
 			bangCount++
 		}
 	}
@@ -522,10 +523,10 @@ func TestS3_Enrich_U11_SummaryStable_NeverContainsRowValues(t *testing.T) {
 	}
 
 	for id, finding := range result.Findings {
-		for _, row := range finding.Rows {
-			if row.Value != "" && strings.Contains(finding.Summary, row.Value) {
-				t.Errorf("[%s] Summary %q must not contain Row value %q (U11 Summary≠Rows separation)",
-					id, finding.Summary, row.Value)
+		for _, row := range result.AttentionDetails[id].Rows {
+			if row.Value != "" && strings.Contains(finding.Phrase, row.Value) {
+				t.Errorf("[%s] Phrase %q must not contain Row value %q (U11 Phrase≠Rows separation)",
+					id, finding.Phrase, row.Value)
 			}
 		}
 	}

@@ -221,16 +221,16 @@ func TestSnapshotCrossRef_OrphanFinding(t *testing.T) {
 		t.Fatal("expected orphan finding for snap-1, got none")
 	}
 
-	if finding.Severity != "!" {
-		t.Errorf("expected Severity=%q, got %q", "!", finding.Severity)
+	if finding.Severity != domain.SevBroken {
+		t.Errorf("expected Severity=SevBroken, got %v", finding.Severity)
 	}
-	if finding.Summary != "orphan: source parent deleted" {
-		t.Errorf("expected Summary=%q, got %q", "orphan: source parent deleted", finding.Summary)
+	if finding.Phrase != "orphan: source parent deleted" {
+		t.Errorf("expected Phrase=%q, got %q", "orphan: source parent deleted", finding.Phrase)
 	}
 
 	// Must contain a row with Label="Source Parent" and Value containing "p1" and the hint.
 	found = false
-	for _, row := range finding.Rows {
+	for _, row := range result.AttentionDetails["snap-1"].Rows {
 		if row.Label == "Source Parent" {
 			found = true
 			if !crossRefContains(row.Value, "p1") {
@@ -242,7 +242,7 @@ func TestSnapshotCrossRef_OrphanFinding(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Errorf("expected a row with Label=%q, rows were: %+v", "Source Parent", finding.Rows)
+		t.Errorf("expected a row with Label=%q, rows were: %+v", "Source Parent", result.AttentionDetails["snap-1"].Rows)
 	}
 
 	// AS-140: FieldUpdates must be nil or empty — the enricher no longer overlays
@@ -277,22 +277,22 @@ func TestSnapshotCrossRef_PastRetention_Automated(t *testing.T) {
 	if !found {
 		t.Fatal("expected past-retention finding for snap-1, got none")
 	}
-	if finding.Severity != "!" {
-		t.Errorf("expected Severity=%q, got %q", "!", finding.Severity)
+	if finding.Severity != domain.SevBroken {
+		t.Errorf("expected Severity=SevBroken, got %v", finding.Severity)
 	}
 
-	// Summary should match "automated, <N>d past retention" where N ≈ ageDays - retentionDays.
+	// Phrase should match "automated, <N>d past retention" where N ≈ ageDays - retentionDays.
 	expectedDaysOver := ageDays - retentionDays
 	expectedPhrase := fmt.Sprintf("automated, %dd past retention", expectedDaysOver)
-	if finding.Summary != expectedPhrase {
-		t.Errorf("expected Summary=%q, got %q", expectedPhrase, finding.Summary)
+	if finding.Phrase != expectedPhrase {
+		t.Errorf("expected Phrase=%q, got %q", expectedPhrase, finding.Phrase)
 	}
 
 	// Rows must contain Source Parent, Retention, Created entries.
 	hasParentRow := false
 	hasRetentionRow := false
 	hasCreatedRow := false
-	for _, row := range finding.Rows {
+	for _, row := range result.AttentionDetails["snap-1"].Rows {
 		switch row.Label {
 		case "Source Parent":
 			hasParentRow = true
@@ -313,13 +313,13 @@ func TestSnapshotCrossRef_PastRetention_Automated(t *testing.T) {
 		}
 	}
 	if !hasParentRow {
-		t.Errorf("missing Source Parent row; rows: %+v", finding.Rows)
+		t.Errorf("missing Source Parent row; rows: %+v", result.AttentionDetails["snap-1"].Rows)
 	}
 	if !hasRetentionRow {
-		t.Errorf("missing Retention row; rows: %+v", finding.Rows)
+		t.Errorf("missing Retention row; rows: %+v", result.AttentionDetails["snap-1"].Rows)
 	}
 	if !hasCreatedRow {
-		t.Errorf("missing Created row; rows: %+v", finding.Rows)
+		t.Errorf("missing Created row; rows: %+v", result.AttentionDetails["snap-1"].Rows)
 	}
 
 	// AS-140: FieldUpdates must be nil or empty for snap-1 — the enricher no
@@ -607,13 +607,15 @@ func assertResultsIdentical(t *testing.T, id string, r1, r2 awsclient.IssueEnric
 	}
 	if ok1 {
 		if f1.Severity != f2.Severity {
-			t.Errorf("idempotency: Severity run1=%q run2=%q for %q", f1.Severity, f2.Severity, id)
+			t.Errorf("idempotency: Severity run1=%v run2=%v for %q", f1.Severity, f2.Severity, id)
 		}
-		if f1.Summary != f2.Summary {
-			t.Errorf("idempotency: Summary run1=%q run2=%q for %q", f1.Summary, f2.Summary, id)
+		if f1.Phrase != f2.Phrase {
+			t.Errorf("idempotency: Phrase run1=%q run2=%q for %q", f1.Phrase, f2.Phrase, id)
 		}
-		if len(f1.Rows) != len(f2.Rows) {
-			t.Errorf("idempotency: len(Rows) run1=%d run2=%d for %q", len(f1.Rows), len(f2.Rows), id)
+		rows1 := r1.AttentionDetails[id].Rows
+		rows2 := r2.AttentionDetails[id].Rows
+		if len(rows1) != len(rows2) {
+			t.Errorf("idempotency: len(Rows) run1=%d run2=%d for %q", len(rows1), len(rows2), id)
 		}
 	}
 

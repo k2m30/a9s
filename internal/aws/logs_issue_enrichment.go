@@ -10,7 +10,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cwlogssvc "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// logs canonical FindingCodes.
+const (
+	logsCodeMissingMetricFilters domain.FindingCode = "logs.missing-metric-filters"
 )
 
 // EnrichLogsMetricFilters calls DescribeMetricFilters per CloudTrail log group
@@ -24,15 +30,17 @@ import (
 // IssueCount stays 0 (severity "~" only).
 // Skip when clients.CloudWatchLogs == nil or does not implement CWLogsDescribeMetricFiltersAPI.
 func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	fieldUpdates := make(map[string]map[string]string)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+		FieldUpdates: make(map[string]map[string]string),
+	}
 	if clients.CloudWatchLogs == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	metricFiltersAPI, ok := clients.CloudWatchLogs.(CWLogsDescribeMetricFiltersAPI)
 	if !ok {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	// CWLogsAPI already embeds CWLogsDescribeLogStreamsAPI, so the type assertion
 	// always succeeds for valid clients. However, test fakes that embed the interface
@@ -76,10 +84,10 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 					default:
 						rel = t.Format("2006-01-02")
 					}
-					if fieldUpdates[r.ID] == nil {
-						fieldUpdates[r.ID] = make(map[string]string)
+					if result.FieldUpdates[r.ID] == nil {
+						result.FieldUpdates[r.ID] = make(map[string]string)
 					}
-					fieldUpdates[r.ID]["last_event_at"] = rel
+					result.FieldUpdates[r.ID]["last_event_at"] = rel
 				}
 			}
 		}
@@ -97,7 +105,7 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
-			truncatedIDs[r.ID] = true
+			result.TruncatedIDs[r.ID] = true
 			continue
 		}
 
@@ -105,17 +113,15 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 			continue
 		}
 
-		findings[r.ID] = resource.EnrichmentFinding{
-			Severity: "~",
-			Summary:  "audit log group missing metric filters",
-			Rows: []resource.FindingRow{
-				{Label: "Log Group", Value: logGroupName, Tier: "~"},
-				{Label: "Metric Filters", Value: "none", Tier: "~"},
-			},
-		}
+		setWave2Finding(&result, r.ID, logsCodeMissingMetricFilters, "audit log group missing metric filters", "~", "logs", []domain.DetailRow{
+			{Label: "Log Group", Value: logGroupName, Tier: "~"},
+			{Label: "Metric Filters", Value: "none", Tier: "~"},
+		})
 	}
 	// Metric filter findings are severity "~" (informational); IssueCount stays 0.
-	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates},
+	result.IssueCount = 0
+	result.Truncated = truncated
+	return result,
 		AggregateFailures("logs-enrich: DescribeMetricFilters", failures, total)
 }
 

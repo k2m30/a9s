@@ -8,7 +8,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// dbi canonical FindingCodes.
+const (
+	dbiCodePendingMaintenance domain.FindingCode = "dbi.pending-maintenance"
 )
 
 // EnrichDBIMaintenance calls DescribePendingMaintenanceActions (account-wide, paginated)
@@ -18,11 +24,14 @@ import (
 // over a Wave-1 finding) is computed at render time from r.Findings via
 // phraseFromFindings; this enricher only emits Findings.
 func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+		FieldUpdates: make(map[string]map[string]string),
+	}
 
 	if clients == nil || clients.RDS == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, FieldUpdates: make(map[string]map[string]string)}, nil
+		return result, nil
 	}
 
 	// Paginate with a cap.
@@ -38,7 +47,7 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 		out, err := clients.RDS.DescribePendingMaintenanceActions(ctx, &rds.DescribePendingMaintenanceActionsInput{Marker: marker})
 		pages++
 		if err != nil {
-			return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, FieldUpdates: make(map[string]map[string]string)}, err
+			return result, err
 		}
 		allActions = append(allActions, out.PendingMaintenanceActions...)
 		if out.Marker == nil || *out.Marker == "" {
@@ -79,39 +88,30 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 
 		// Summary is the short S5 phrase; every concrete fact (Action,
 		// Description, Earliest Target, Apply Method) lives only in Rows so
-		// the Attention section does not render duplicated content. See the
-		// contract on resource.EnrichmentFinding.
-		var rows []resource.FindingRow
+		// the Attention section does not render duplicated content.
+		var rows []domain.DetailRow
 		for _, pa := range action.PendingMaintenanceActionDetails {
 			if pa.Action != nil && *pa.Action != "" {
-				rows = append(rows, resource.FindingRow{Label: "Action", Value: *pa.Action, Tier: "~"})
+				rows = append(rows, domain.DetailRow{Label: "Action", Value: *pa.Action, Tier: "~"})
 			}
 			if pa.OptInStatus != nil && *pa.OptInStatus != "" {
-				rows = append(rows, resource.FindingRow{Label: "Apply Method", Value: *pa.OptInStatus})
+				rows = append(rows, domain.DetailRow{Label: "Apply Method", Value: *pa.OptInStatus})
 			}
 			if pa.AutoAppliedAfterDate != nil {
-				rows = append(rows, resource.FindingRow{Label: "Earliest Target", Value: formatDate(pa.AutoAppliedAfterDate), Tier: "~"})
+				rows = append(rows, domain.DetailRow{Label: "Earliest Target", Value: formatDate(pa.AutoAppliedAfterDate), Tier: "~"})
 			} else if pa.ForcedApplyDate != nil {
-				rows = append(rows, resource.FindingRow{Label: "Earliest Target", Value: formatDate(pa.ForcedApplyDate), Tier: "~"})
+				rows = append(rows, domain.DetailRow{Label: "Earliest Target", Value: formatDate(pa.ForcedApplyDate), Tier: "~"})
 			}
 			if pa.Description != nil && *pa.Description != "" {
-				rows = append(rows, resource.FindingRow{Label: "Description", Value: *pa.Description})
+				rows = append(rows, domain.DetailRow{Label: "Description", Value: *pa.Description})
 			}
 		}
 
-		findings[key] = resource.EnrichmentFinding{
-			Severity: "~",
-			Summary:  "pending maintenance",
-			Rows:     rows,
-		}
+		setWave2Finding(&result, key, dbiCodePendingMaintenance, "pending maintenance", "~", "dbi", rows)
 	}
 
-	return IssueEnricherResult{
-		IssueCount:   0, // "~" findings never bump the S1 badge
-		Truncated:    truncated,
-		TruncatedIDs: truncatedIDs,
-		Findings:     findings,
-		FieldUpdates: make(map[string]map[string]string),
-	}, nil
+	result.IssueCount = 0 // "~" findings never bump the S1 badge
+	result.Truncated = truncated
+	return result, nil
 }
 

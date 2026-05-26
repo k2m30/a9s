@@ -93,8 +93,8 @@ func TestEnrichEBSVolumeStatus_SummaryVolumeIODegraded(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	f := result.Findings["vol-sum"]
-	if f.Summary != "volume I/O degraded" {
-		t.Errorf("summary = %q, want %q", f.Summary, "volume I/O degraded")
+	if f.Phrase != "volume I/O degraded" {
+		t.Errorf("summary = %q, want %q", f.Phrase, "volume I/O degraded")
 	}
 }
 

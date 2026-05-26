@@ -10,7 +10,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// ecs-task canonical FindingCodes.
+const (
+	ecsTaskCodeTaskFailed domain.FindingCode = "ecs-task.task-failed"
 )
 
 // EnrichECSTasks is a Wave 2 enricher for ECS tasks.
@@ -22,10 +28,12 @@ import (
 //   - StopCode == EssentialContainerExited → essential container died
 //   - Any container with a non-zero ExitCode → container crash detected
 func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+	}
 	if clients.ECS == nil || len(resources) == 0 {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 
 	// Group task ARNs by cluster ARN.
@@ -79,18 +87,18 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 					continue
 				}
 
-				var rows []resource.FindingRow
+				var rows []domain.DetailRow
 
 				// Check stop code for known failure modes.
 				switch task.StopCode {
 				case ecstypes.TaskStopCodeTaskFailedToStart:
-					rows = append(rows, resource.FindingRow{
+					rows = append(rows, domain.DetailRow{
 						Label: "Stop Code",
 						Value: "TaskFailedToStart — task never launched",
 						Tier:  "!",
 					})
 				case ecstypes.TaskStopCodeEssentialContainerExited:
-					rows = append(rows, resource.FindingRow{
+					rows = append(rows, domain.DetailRow{
 						Label: "Stop Code",
 						Value: "EssentialContainerExited — essential container died",
 						Tier:  "!",
@@ -104,7 +112,7 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 						if container.Name != nil {
 							name = *container.Name
 						}
-						rows = append(rows, resource.FindingRow{
+						rows = append(rows, domain.DetailRow{
 							Label: "Container",
 							Value: fmt.Sprintf("%s exited with code %d", name, *container.ExitCode),
 							Tier:  "!",
@@ -118,14 +126,12 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 				}
 
 				summary := rows[0].Value
-				findings[taskID] = resource.EnrichmentFinding{
-					Severity: "!",
-					Summary:  summary,
-					Rows:     rows,
-				}
+				setWave2Finding(&result, taskID, ecsTaskCodeTaskFailed, summary, "!", "ecs-task", rows)
 			}
 		}
 	}
 
-	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	result.IssueCount = len(result.Findings)
+	result.Truncated = truncated
+	return result, nil
 }

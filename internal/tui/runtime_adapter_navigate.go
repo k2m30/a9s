@@ -168,8 +168,8 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		d := views.NewDetail(*result.Resource, result.ResolvedType, m.viewConfig, m.keys)
 		d.SetNavProvider(resource.GetNavigableFields)
 		d.SetSize(m.innerSize())
-		if ef := findingFromResource(*result.Resource); ef != nil {
-			d.SetEnrichmentFinding(ef)
+		if ef, ad := findingFromResource(*result.Resource); ef != nil {
+			d.SetEnrichmentFinding(ef, ad)
 		}
 		m.pushView(&d)
 		var cmds []tea.Cmd
@@ -480,7 +480,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	// CodeRabbit finding A: previously delete() ran first so applyEnrichment
 	// found no rows and the rl's slice retained stale wave2 state.
 	if rl.ParentContext() == nil && !rl.EscPops() {
-		(&m).applyEnrichment(rt, nil)
+		(&m).applyEnrichment(rt, nil, nil)
 	}
 
 	m.core.DeleteResourceCache(rt) // clear cache for refreshed type only
@@ -506,7 +506,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 			// that entered via ProbeResources/LazyResourceCache (those paths
 			// are NOT covered by the pre-fetch cleanup above, which only
 			// covers the ResourceCache entry before deletion).
-			(&m).applyEnrichment(rt, nil)
+			(&m).applyEnrichment(rt, nil, nil)
 			// Propagate the cleared state to the active ResourceListModel so
 			// row markers disappear immediately at Ctrl+R — otherwise stale
 			// markers would remain visible until the rerun completes (and

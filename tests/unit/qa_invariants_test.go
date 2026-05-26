@@ -429,8 +429,8 @@ func TestEnrichmentFinding_AllKeptEnrichersPopulateRows(t *testing.T) {
 			if len(result.Findings) == 0 {
 				t.Fatalf("enricher produced 0 findings — test setup must guarantee at least one issue")
 			}
-			for id, f := range result.Findings {
-				if len(f.Rows) == 0 {
+			for id := range result.Findings {
+				if len(result.AttentionDetails[id].Rows) == 0 {
 					t.Errorf("finding for resource %q has 0 Rows — enricher must populate at least one FindingRow", id)
 				}
 			}

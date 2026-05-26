@@ -8,11 +8,12 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/config"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // DetailModel renders the key-value describe view using bubbles/viewport for scroll.
@@ -36,7 +37,8 @@ type DetailModel struct {
 	pendingRelatedDispatch bool                        // true when a narrow→wide resize should dispatch RelatedCheckStartedMsg
 	fieldList              []fieldpath.FieldItem       // structured field data; nil = not yet computed
 	fieldCursor            int                         // index into fieldList for navigable cursor
-	enrichmentFinding      *resource.EnrichmentFinding // nil when no finding; rendered at top of detail view when non-nil
+	enrichmentFinding      *domain.Finding             // nil when no finding; rendered at top of detail view when non-nil
+	enrichmentDetail       *domain.AttentionDetail     // paired with enrichmentFinding; nil when finding has no supporting rows
 	plainMode              bool                        // true only during PlainContent(); causes Attention entries to render Key: Value (full text for clipboard/search)
 }
 

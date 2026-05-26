@@ -29,6 +29,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -127,7 +128,7 @@ func futureDate() *time.Time {
 }
 
 // dbcFindingKeys returns all keys in the findings map (for error reporting).
-func dbcFindingKeys(m map[string]resource.EnrichmentFinding) []string {
+func dbcFindingKeys(m map[string]domain.Finding) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)
@@ -160,14 +161,14 @@ func TestDBC_Enrich_MaintenanceOverdue_HealthyRow(t *testing.T) {
 		t.Fatalf("expected finding for %q; Findings keys = %v", fixtures.MaintDbcOverdueID, dbcFindingKeys(result.Findings))
 	}
 
-	// Severity "!" — DBC maintenance is S1-badge-bumping (unlike DBI's "~").
-	if finding.Severity != "!" {
-		t.Errorf("Severity = %q, want %q", finding.Severity, "!")
+	// Severity SevBroken — DBC maintenance is S1-badge-bumping (unlike DBI's "~").
+	if finding.Severity != domain.SevBroken {
+		t.Errorf("Severity = %v, want SevBroken", finding.Severity)
 	}
 
-	// Summary is the short S5 phrase.
-	if finding.Summary != "maintenance overdue" {
-		t.Errorf("Summary = %q, want %q", finding.Summary, "maintenance overdue")
+	// Phrase is the short S5 phrase.
+	if finding.Phrase != "maintenance overdue" {
+		t.Errorf("Phrase = %q, want %q", finding.Phrase, "maintenance overdue")
 	}
 
 	// "!" findings increment the issue count.
@@ -318,13 +319,13 @@ func TestDBC_Enrich_Wave1PlusWave2_NoFieldUpdates(t *testing.T) {
 		t.Fatalf("EnrichDBCMaintenance error: %v", err)
 	}
 
-	// Finding present with "!" severity.
+	// Finding present with SevBroken severity.
 	finding, ok := result.Findings[clusterID]
 	if !ok {
 		t.Fatalf("expected finding for %q; Findings = %v", clusterID, dbcFindingKeys(result.Findings))
 	}
-	if finding.Severity != "!" {
-		t.Errorf("Severity = %q, want %q", finding.Severity, "!")
+	if finding.Severity != domain.SevBroken {
+		t.Errorf("Severity = %v, want SevBroken", finding.Severity)
 	}
 
 	// AS-140: FieldUpdates must be empty.
@@ -442,13 +443,12 @@ func TestDBC_Enrich_FindingRows(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnrichDBCMaintenance error: %v", err)
 	}
-	finding, ok := result.Findings[clusterID]
-	if !ok {
+	if _, ok := result.Findings[clusterID]; !ok {
 		t.Fatalf("expected finding for %q", clusterID)
 	}
 
 	gotRows := map[string]string{}
-	for _, row := range finding.Rows {
+	for _, row := range result.AttentionDetails[clusterID].Rows {
 		gotRows[row.Label] = row.Value
 	}
 

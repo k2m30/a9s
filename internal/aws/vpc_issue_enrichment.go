@@ -8,7 +8,13 @@ import (
 	ec2svc "github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// vpc canonical FindingCodes.
+const (
+	vpcCodeNoFlowLogs domain.FindingCode = "vpc.no-flow-logs"
 )
 
 // EnrichVPCFlowLogs calls DescribeFlowLogs per VPC (capped at EnrichmentCap) and
@@ -20,11 +26,13 @@ import (
 // IssueCount stays 0 (severity "~" only).
 // Skip when clients.EC2 == nil.
 func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	fieldUpdates := make(map[string]map[string]string)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+		FieldUpdates: make(map[string]map[string]string),
+	}
 	if clients.EC2 == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -44,7 +52,7 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 			if flPages >= PerParentPageCap {
 				flTruncated = true
 				truncated = true
-				truncatedIDs[r.ID] = true
+				result.TruncatedIDs[r.ID] = true
 				break
 			}
 			out, err := clients.EC2.DescribeFlowLogs(ctx, &ec2svc.DescribeFlowLogsInput{
@@ -56,7 +64,7 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 			flPages++
 			if err != nil {
 				truncated = true
-				truncatedIDs[r.ID] = true
+				result.TruncatedIDs[r.ID] = true
 				flTruncated = true
 				break
 			}
@@ -80,14 +88,13 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 		flowLogsVal := "yes"
 		if !hasActive {
 			flowLogsVal = "no"
-			findings[vpcID] = resource.EnrichmentFinding{
-				Severity: "~",
-				Summary:  "no active VPC flow logs (CIS EC2.6)",
-			}
+			setWave2Finding(&result, vpcID, vpcCodeNoFlowLogs, "no active VPC flow logs (CIS EC2.6)", "~", "vpc", nil)
 		}
-		fieldUpdates[vpcID] = map[string]string{
+		result.FieldUpdates[vpcID] = map[string]string{
 			"flow_logs": flowLogsVal,
 		}
 	}
-	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	result.IssueCount = 0
+	result.Truncated = truncated
+	return result, nil
 }

@@ -10,7 +10,14 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// cfn canonical FindingCodes.
+const (
+	cfnCodeRecentResourceFailure domain.FindingCode = "cfn.recent-resource-failure"
+	cfnCodeStackDrifted          domain.FindingCode = "cfn.stack-drifted"
 )
 
 // EnrichCFNStackEvents calls DescribeStackEvents for each stack (first page only,
@@ -19,10 +26,12 @@ import (
 // a "!" finding: "recent resource failure: <ResourceType>/<LogicalResourceId>".
 // This surfaces hidden failures that are not reflected in the top-level StackStatus.
 func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+	}
 	if clients.CloudFormation == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	var failures []string
@@ -47,13 +56,13 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
-			truncatedIDs[r.ID] = true
+			result.TruncatedIDs[r.ID] = true
 			continue
 		}
 		// Scan events from the first page for any resource with a _FAILED status.
 		// The API returns events in reverse-chronological order; we inspect all
 		// events on the first page to catch recent failures.
-		var failedRows []resource.FindingRow
+		var failedRows []domain.DetailRow
 		for _, ev := range out.StackEvents {
 			status := string(ev.ResourceStatus)
 			if !strings.HasSuffix(status, "_FAILED") {
@@ -77,10 +86,10 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 			} else if logicalID != "" {
 				label = resourceType + "/" + logicalID
 			}
-			row := resource.FindingRow{Label: label, Value: status, Tier: "!"}
+			row := domain.DetailRow{Label: label, Value: status, Tier: "!"}
 			failedRows = append(failedRows, row)
 			if reason != "" {
-				failedRows = append(failedRows, resource.FindingRow{Label: "Reason", Value: reason, Tier: "~"})
+				failedRows = append(failedRows, domain.DetailRow{Label: "Reason", Value: reason, Tier: "~"})
 			}
 		}
 		if len(failedRows) == 0 {
@@ -90,14 +99,12 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 		if key == "" {
 			key = stackName
 		}
-		findings[key] = resource.EnrichmentFinding{
-			Severity: "!",
-			Summary:  fmt.Sprintf("recent resource failure: %s", failedRows[0].Label),
-			Rows:     failedRows,
-		}
+		setWave2Finding(&result, key, cfnCodeRecentResourceFailure,
+			fmt.Sprintf("recent resource failure: %s", failedRows[0].Label), "!", "cfn", failedRows)
 	}
-	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings},
-		AggregateFailures("cfn-enrich: DescribeStackEvents", failures, total)
+	result.IssueCount = len(result.Findings)
+	result.Truncated = truncated
+	return result, AggregateFailures("cfn-enrich: DescribeStackEvents", failures, total)
 }
 
 // EnrichCFNCombined merges findings from EnrichCFNStackEvents and EnrichCFNDrift.
@@ -121,7 +128,7 @@ func EnrichCFNCombined(ctx context.Context, clients *ServiceClients, resources [
 		combinedErr = driftErr
 	}
 
-	merged := make(map[string]resource.EnrichmentFinding, len(eventsResult.Findings)+len(driftResult.Findings))
+	merged := make(map[string]domain.Finding, len(eventsResult.Findings)+len(driftResult.Findings))
 	// Drift findings go in first; stack-events findings overwrite on conflict.
 	maps.Copy(merged, driftResult.Findings)
 	maps.Copy(merged, eventsResult.Findings)
@@ -156,11 +163,13 @@ func EnrichCFNCombined(ctx context.Context, clients *ServiceClients, resources [
 // "stack drifted from template". IN_SYNC and NOT_CHECKED stacks produce no finding.
 // Severity "~" findings do not contribute to IssueCount.
 func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	fieldUpdates := make(map[string]map[string]string)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+		FieldUpdates: make(map[string]map[string]string),
+	}
 	if clients.CloudFormation == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	var failures []string
@@ -185,7 +194,7 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
-			truncatedIDs[r.ID] = true
+			result.TruncatedIDs[r.ID] = true
 			continue
 		}
 		if len(out.Stacks) == 0 {
@@ -198,21 +207,19 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 		}
 		if stack.DriftInformation != nil {
 			driftStatus := string(stack.DriftInformation.StackDriftStatus)
-			fieldUpdates[key] = map[string]string{
+			result.FieldUpdates[key] = map[string]string{
 				"drift_status": driftStatus,
 			}
 			if driftStatus == "DRIFTED" {
-				findings[key] = resource.EnrichmentFinding{
-					Severity: "~",
-					Summary:  "stack drifted from template",
-					Rows: []resource.FindingRow{
+				setWave2Finding(&result, key, cfnCodeStackDrifted, "stack drifted from template", "~", "cfn",
+					[]domain.DetailRow{
 						{Label: "Drift Status", Value: driftStatus, Tier: "~"},
-					},
-				}
+					})
 			}
 		}
 	}
 	// "~" findings do not contribute to IssueCount per the IssueEnricherResult contract.
-	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates},
-		AggregateFailures("cfn-enrich: DescribeStacks", failures, total)
+	result.IssueCount = 0
+	result.Truncated = truncated
+	return result, AggregateFailures("cfn-enrich: DescribeStacks", failures, total)
 }

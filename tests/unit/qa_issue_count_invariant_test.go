@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -101,7 +102,7 @@ func TestAllEnrichers_IssueCountNeverExceedsResources(t *testing.T) {
 // so that FrameTitle() includes the issue count when enrichmentIssueCount > 0.
 // It reuses buildUnifiedModel from qa_unified_issue_count_test.go for loading,
 // then enables the badge on the returned model.
-func buildUnifiedModelWithBadge(t *testing.T, resources []resource.Resource, enrichIC int, findings map[string]resource.EnrichmentFinding) string {
+func buildUnifiedModelWithBadge(t *testing.T, resources []resource.Resource, enrichIC int, findings map[string]domain.Finding) string {
 	t.Helper()
 	td := resource.ResourceTypeDef{
 		ShortName: "ec2",
@@ -144,7 +145,7 @@ func extractIssueCount(title string) int {
 }
 
 // unionSize returns the number of distinct IDs across the resource slice and findings map.
-func unionSize(resources []resource.Resource, findings map[string]resource.EnrichmentFinding) int {
+func unionSize(resources []resource.Resource, findings map[string]domain.Finding) int {
 	seen := make(map[string]struct{}, len(resources)+len(findings))
 	for _, r := range resources {
 		seen[r.ID] = struct{}{}
@@ -171,9 +172,9 @@ func TestUnifiedIssueCount_NeverExceedsUnionSize(t *testing.T) {
 			{ID: "i-002", Name: "s2", Status: "stopped", Fields: map[string]string{"name": "s2", "state": "stopped"}},
 			{ID: "i-003", Name: "s3", Status: "stopped", Fields: map[string]string{"name": "s3", "state": "stopped"}},
 		}
-		findings := map[string]resource.EnrichmentFinding{
-			"vol-aaa": {Severity: "!", Summary: "impaired"},
-			"vol-bbb": {Severity: "!", Summary: "impaired"},
+		findings := map[string]domain.Finding{
+			"vol-aaa": {Code: "ebs.volume.degraded", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ebs"},
+			"vol-bbb": {Code: "ebs.volume.degraded", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ebs"},
 		}
 		// The union is {i-001,i-002,i-003,vol-aaa,vol-bbb} = 5 distinct IDs.
 		// enrichIC must equal the correct unified count (not the sum).
@@ -198,10 +199,10 @@ func TestUnifiedIssueCount_NeverExceedsUnionSize(t *testing.T) {
 			{ID: "i-bbb", Name: "server-b", Status: "stopped", Fields: map[string]string{"name": "server-b", "state": "stopped"}},
 			{ID: "i-ccc", Name: "server-c", Status: "stopped", Fields: map[string]string{"name": "server-c", "state": "stopped"}},
 		}
-		findings := map[string]resource.EnrichmentFinding{
-			"i-aaa": {Severity: "!", Summary: "status impaired"},
-			"i-bbb": {Severity: "!", Summary: "status impaired"},
-			"i-ccc": {Severity: "!", Summary: "status impaired"},
+		findings := map[string]domain.Finding{
+			"i-aaa": {Code: "ec2.system.status.impaired", Phrase: "status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
+			"i-bbb": {Code: "ec2.system.status.impaired", Phrase: "status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
+			"i-ccc": {Code: "ec2.system.status.impaired", Phrase: "status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
 		}
 		// Union is still 3 (not 6 — no double counting).
 		union := unionSize(resources, findings)
@@ -227,9 +228,9 @@ func TestUnifiedIssueCount_NeverExceedsUnionSize(t *testing.T) {
 			{ID: "i-r04", Name: "healthy-4", Status: "running", Fields: map[string]string{"name": "healthy-4", "state": "running"}},
 			{ID: "i-r05", Name: "healthy-5", Status: "running", Fields: map[string]string{"name": "healthy-5", "state": "running"}},
 		}
-		findings := map[string]resource.EnrichmentFinding{
-			"i-r01": {Severity: "!", Summary: "impaired"},
-			"i-r02": {Severity: "!", Summary: "impaired"},
+		findings := map[string]domain.Finding{
+			"i-r01": {Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
+			"i-r02": {Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
 		}
 		// enrichIC = 2 (two findings, both from known resource IDs)
 		title := buildUnifiedModelWithBadge(t, resources, 2, findings)
@@ -252,12 +253,12 @@ func TestUnifiedIssueCount_NeverExceedsUnionSize(t *testing.T) {
 			{ID: "i-p01", Name: "page-instance-1", Status: "running", Fields: map[string]string{"name": "page-instance-1", "state": "running"}},
 			{ID: "i-p02", Name: "page-instance-2", Status: "running", Fields: map[string]string{"name": "page-instance-2", "state": "running"}},
 		}
-		findings := map[string]resource.EnrichmentFinding{
-			"i-x01": {Severity: "!", Summary: "impaired"},
-			"i-x02": {Severity: "!", Summary: "impaired"},
-			"i-x03": {Severity: "!", Summary: "impaired"},
-			"i-x04": {Severity: "!", Summary: "impaired"},
-			"i-x05": {Severity: "!", Summary: "impaired"},
+		findings := map[string]domain.Finding{
+			"i-x01": {Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
+			"i-x02": {Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
+			"i-x03": {Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
+			"i-x04": {Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
+			"i-x05": {Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
 		}
 		union := unionSize(resources, findings) // = 7 (2 page resources + 5 finding-only IDs)
 		// Pass union as enrichIC: the production code computes this across the full account,

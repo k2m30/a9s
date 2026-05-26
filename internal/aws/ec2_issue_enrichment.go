@@ -11,7 +11,14 @@ import (
 	ec2svc "github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// ec2 canonical FindingCodes.
+const (
+	ec2CodeInstanceStatusImpaired domain.FindingCode = "ec2.instance-status-impaired"
+	// TODO(W1-future): split scheduled-event branch into a typed constant once ec2 enricher is further split.
 )
 
 // EnrichEC2InstanceStatus calls DescribeInstanceStatus(IncludeAllInstances=true) (account-wide,
@@ -20,10 +27,12 @@ import (
 // Severity "!" for status != ok; "~" for scheduled events. IssueCount counts "!" findings only.
 // Pagination uses NextToken; walks up to EnrichmentCap pages.
 func EnrichEC2InstanceStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+	}
 	if clients.EC2 == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	// Build a set of known resource IDs so we can detect unmatched API returns.
 	knownIDs := make(map[string]bool, len(resources))
@@ -47,7 +56,7 @@ func EnrichEC2InstanceStatus(ctx context.Context, clients *ServiceClients, resou
 		})
 		pages++
 		if err != nil {
-			return IssueEnricherResult{TruncatedIDs: truncatedIDs}, err
+			return IssueEnricherResult{TruncatedIDs: result.TruncatedIDs}, err
 		}
 		allInstanceStatuses = append(allInstanceStatuses, out.InstanceStatuses...)
 		if out.NextToken == nil {
@@ -70,20 +79,20 @@ func EnrichEC2InstanceStatus(ctx context.Context, clients *ServiceClients, resou
 		}
 
 		// Collect rows for this instance.
-		var rows []resource.FindingRow
+		var rows []domain.DetailRow
 		severity := "~" // start informational; upgrade to "!" on real impairment
 
 		// Check instance status.
 		if is.InstanceStatus != nil && is.InstanceStatus.Status != ec2types.SummaryStatusOk {
 			statusStr := string(is.InstanceStatus.Status)
-			rows = append(rows, resource.FindingRow{Label: "Instance Status", Value: statusStr, Tier: "!"})
+			rows = append(rows, domain.DetailRow{Label: "Instance Status", Value: statusStr, Tier: "!"})
 			severity = "!"
 		}
 
 		// Check system status.
 		if is.SystemStatus != nil && is.SystemStatus.Status != ec2types.SummaryStatusOk {
 			statusStr := string(is.SystemStatus.Status)
-			rows = append(rows, resource.FindingRow{Label: "System Status", Value: statusStr, Tier: "!"})
+			rows = append(rows, domain.DetailRow{Label: "System Status", Value: statusStr, Tier: "!"})
 			severity = "!"
 		}
 
@@ -102,7 +111,7 @@ func EnrichEC2InstanceStatus(ctx context.Context, clients *ServiceClients, resou
 			}
 			code := string(ev.Code)
 			dateStr := eventDate.Format("2006-01-02")
-			rows = append(rows, resource.FindingRow{
+			rows = append(rows, domain.DetailRow{
 				Label: "Scheduled Event",
 				Value: fmt.Sprintf("%s at %s", code, dateStr),
 				Tier:  "~",
@@ -125,18 +134,16 @@ func EnrichEC2InstanceStatus(ctx context.Context, clients *ServiceClients, resou
 			summary = fmt.Sprintf("scheduled event: %s", rows[0].Value)
 		}
 
-		findings[id] = resource.EnrichmentFinding{
-			Severity: severity,
-			Summary:  summary,
-			Rows:     rows,
-		}
+		setWave2Finding(&result, id, ec2CodeInstanceStatusImpaired, summary, severity, "ec2", rows)
 	}
 
 	issueCount := 0
-	for _, f := range findings {
-		if f.Severity == "!" {
+	for _, f := range result.Findings {
+		if f.Severity == domain.SevBroken {
 			issueCount++
 		}
 	}
-	return IssueEnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	result.IssueCount = issueCount
+	result.Truncated = truncated
+	return result, nil
 }

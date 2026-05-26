@@ -9,17 +9,25 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	asgtypes "github.com/aws/aws-sdk-go-v2/service/autoscaling/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// asg canonical FindingCodes.
+const (
+	asgCodeScalingActivityFailed domain.FindingCode = "asg.scaling-activity-failed"
 )
 
 // EnrichASGScalingActivities calls DescribeScalingActivities(MaxRecords=1) for each ASG
 // (cap EnrichmentCap) and returns a Finding when the latest activity StatusCode == Failed.
 // Severity is "!" (broken/degraded). Summary: "latest scaling activity failed: <statusMessage>".
 func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+	}
 	if clients.AutoScaling == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	var failures []string
@@ -42,7 +50,7 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
-			truncatedIDs[r.ID] = true
+			result.TruncatedIDs[r.ID] = true
 			continue
 		}
 		if len(out.Activities) == 0 {
@@ -60,24 +68,21 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 		if statusMsg != "" {
 			summary = fmt.Sprintf("latest scaling activity failed: %s", statusMsg)
 		}
-		rows := []resource.FindingRow{
+		rows := []domain.DetailRow{
 			{Label: "Status", Value: string(act.StatusCode), Tier: "!"},
 		}
 		if statusMsg != "" {
-			rows = append(rows, resource.FindingRow{Label: "Message", Value: statusMsg, Tier: "!"})
+			rows = append(rows, domain.DetailRow{Label: "Message", Value: statusMsg, Tier: "!"})
 		}
 		if act.Cause != nil && *act.Cause != "" {
-			rows = append(rows, resource.FindingRow{Label: "Cause", Value: *act.Cause})
+			rows = append(rows, domain.DetailRow{Label: "Cause", Value: *act.Cause})
 		}
 		if act.StartTime != nil {
-			rows = append(rows, resource.FindingRow{Label: "Started", Value: act.StartTime.Format("2006-01-02")})
+			rows = append(rows, domain.DetailRow{Label: "Started", Value: act.StartTime.Format("2006-01-02")})
 		}
-		findings[r.ID] = resource.EnrichmentFinding{
-			Severity: "!",
-			Summary:  summary,
-			Rows:     rows,
-		}
+		setWave2Finding(&result, r.ID, asgCodeScalingActivityFailed, summary, "!", "asg", rows)
 	}
-	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings},
-		AggregateFailures("asg-enrich: DescribeScalingActivities", failures, total)
+	result.IssueCount = len(result.Findings)
+	result.Truncated = truncated
+	return result, AggregateFailures("asg-enrich: DescribeScalingActivities", failures, total)
 }

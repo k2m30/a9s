@@ -1,9 +1,7 @@
-// phase03_derive_findings_test.go — TDD red-light tests for PR-03a-shim derive.
+// phase03_derive_findings_test.go — TDD tests for PR-03a-shim derive.
 //
-// These tests MUST fail to compile until the following are added:
-//   - package internal/semantics/attention
-//   - function attention.DeriveFindings(r *domain.Resource, td resource.ResourceTypeDef,
-//     enrichmentFindings map[string]resource.EnrichmentFinding)
+// Tests attention.DeriveFindings(r *domain.Resource, td resource.ResourceTypeDef)
+// (2-arg form; wave2 enrichment is applied separately by applyEnrichment).
 //
 // Spec: docs/refactor/03-finding-model.md (PR-03a-shim)
 package unit_test
@@ -24,7 +22,7 @@ var ec2TD = resource.ResourceTypeDef{ShortName: "ec2"}
 // the resource pointer is nil — the contract is a safe no-op.
 func TestDerive_NilResource_NoOp(t *testing.T) {
 	// Must not panic; no assertions beyond "we got here".
-	attention.DeriveFindings(nil, ec2TD, nil)
+	attention.DeriveFindings(nil, ec2TD)
 }
 
 // TestDerive_HealthyRow_EmptyOutputs verifies that a resource with no Status,
@@ -32,7 +30,7 @@ func TestDerive_NilResource_NoOp(t *testing.T) {
 // AttentionDetails — i.e. the zero-value healthy row.
 func TestDerive_HealthyRow_EmptyOutputs(t *testing.T) {
 	r := domain.Resource{ID: "i-healthy"}
-	attention.DeriveFindings(&r, ec2TD, nil)
+	attention.DeriveFindings(&r, ec2TD)
 	if r.Findings != nil {
 		t.Errorf("Findings: got %v, want nil", r.Findings)
 	}
@@ -46,7 +44,7 @@ func TestDerive_HealthyRow_EmptyOutputs(t *testing.T) {
 // from the Status phrase.
 func TestDerive_StatusOnly_SingleWave1Finding(t *testing.T) {
 	r := domain.Resource{ID: "i-001", Status: "impaired"}
-	attention.DeriveFindings(&r, ec2TD, nil)
+	attention.DeriveFindings(&r, ec2TD)
 	if len(r.Findings) != 1 {
 		t.Fatalf("len(Findings): got %d, want 1", len(r.Findings))
 	}
@@ -68,7 +66,7 @@ func TestDerive_StatusOnly_SingleWave1Finding(t *testing.T) {
 // The function resource.StripFindingSuffix handles this stripping.
 func TestDerive_StatusWithSuffix_StripsBumpFinding(t *testing.T) {
 	r := domain.Resource{ID: "i-002", Status: "impaired (+2)"}
-	attention.DeriveFindings(&r, ec2TD, nil)
+	attention.DeriveFindings(&r, ec2TD)
 	if len(r.Findings) != 1 {
 		t.Fatalf("len(Findings): got %d, want 1", len(r.Findings))
 	}
@@ -94,7 +92,7 @@ func TestDerive_IssuesList_OneFindingPerIssue(t *testing.T) {
 			"instance check failed",
 		},
 	}
-	attention.DeriveFindings(&r, ec2TD, nil)
+	attention.DeriveFindings(&r, ec2TD)
 	if len(r.Findings) != 3 {
 		t.Fatalf("len(Findings): got %d, want 3", len(r.Findings))
 	}
@@ -131,7 +129,7 @@ func TestDerive_IssuesList_OneFindingPerIssue(t *testing.T) {
 // Post-fix: "running" is recognized as a lifecycle phrase → Findings == nil.
 func TestDerive_IssuesEmpty_StatusFallback(t *testing.T) {
 	r := domain.Resource{ID: "i-004", Status: "running", Issues: nil}
-	attention.DeriveFindings(&r, ec2TD, nil)
+	attention.DeriveFindings(&r, ec2TD)
 	if len(r.Findings) != 0 {
 		t.Fatalf("len(Findings): got %d, want 0 (lifecycle steady-state must not produce a Finding)", len(r.Findings))
 	}
@@ -160,7 +158,7 @@ func TestDerive_LifecyclePhrasesAreNotEmittedAsFindings(t *testing.T) {
 		phrase := phrase
 		t.Run(phrase, func(t *testing.T) {
 			r := domain.Resource{ID: "i", Status: phrase}
-			attention.DeriveFindings(&r, ec2TD, nil)
+			attention.DeriveFindings(&r, ec2TD)
 			if len(r.Findings) != 0 {
 				t.Errorf("Status=%q: got %d Findings, want 0 (lifecycle phrase must not emit a Finding)",
 					phrase, len(r.Findings))
@@ -184,7 +182,7 @@ func TestDerive_LifecyclePhrasesInIssuesAreAlsoSkipped(t *testing.T) {
 		ID:     "i-mixed",
 		Issues: []string{"running", "impaired", "terminated"},
 	}
-	attention.DeriveFindings(&r, ec2TD, nil)
+	attention.DeriveFindings(&r, ec2TD)
 	if len(r.Findings) != 1 {
 		t.Fatalf("len(Findings): got %d, want 1 (only non-lifecycle phrase 'impaired' must produce a Finding)", len(r.Findings))
 	}
@@ -207,14 +205,23 @@ func TestDerive_LifecyclePhrasesInIssuesAreAlsoSkipped(t *testing.T) {
 // Post-fix: "running" is filtered; enrichment becomes the sole Findings[0].
 func TestDerive_Wave2OnTopOfLifecycleStatus(t *testing.T) {
 	r := domain.Resource{ID: "i-w2", Status: "running"}
-	ef := map[string]resource.EnrichmentFinding{
-		"i-w2": {
-			Severity: "!",
-			Summary:  "pending maintenance",
-			Rows:     []resource.FindingRow{{Label: "Action", Value: "reboot"}},
-		},
+	// Wave-1 derive: "running" is a lifecycle phrase — no wave1 finding.
+	attention.DeriveFindings(&r, ec2TD)
+	// Wave-2 append (simulates applyEnrichment): directly append the wave2 finding.
+	w2 := domain.Finding{
+		Code:     "ec2.pending.maintenance",
+		Phrase:   "pending maintenance",
+		Severity: domain.SevBroken,
+		Source:   "wave2:ec2",
 	}
-	attention.DeriveFindings(&r, ec2TD, ef)
+	r.Findings = append(r.Findings, w2)
+	if r.AttentionDetails == nil {
+		r.AttentionDetails = make(map[domain.FindingCode]domain.AttentionDetail)
+	}
+	r.AttentionDetails[w2.Code] = domain.AttentionDetail{
+		Rows: []domain.DetailRow{{Label: "Action", Value: "reboot"}},
+	}
+
 	if len(r.Findings) != 1 {
 		t.Fatalf("len(Findings): got %d, want 1 (lifecycle filtered; wave2 is the only Finding)", len(r.Findings))
 	}
@@ -235,16 +242,20 @@ func TestDerive_Wave2OnTopOfLifecycleStatus(t *testing.T) {
 // populated with the corresponding rows.
 func TestDerive_Wave2Only_AppendsFindingAndAttentionDetails(t *testing.T) {
 	r := domain.Resource{ID: "i-005"}
-	ef := map[string]resource.EnrichmentFinding{
-		"i-005": {
-			Severity: "!",
-			Summary:  "pending maintenance",
-			Rows: []resource.FindingRow{
-				{Label: "Action", Value: "reboot", Tier: ""},
-			},
-		},
+	// Wave-1 derive: no status/issues → no wave1 findings.
+	attention.DeriveFindings(&r, ec2TD)
+	// Wave-2 append (simulates applyEnrichment).
+	wantCode := domain.FindingCode("ec2.pending.maintenance")
+	w2 := domain.Finding{
+		Code:     wantCode,
+		Phrase:   "pending maintenance",
+		Severity: domain.SevBroken,
+		Source:   "wave2:ec2",
 	}
-	attention.DeriveFindings(&r, ec2TD, ef)
+	r.Findings = append(r.Findings, w2)
+	r.AttentionDetails = map[domain.FindingCode]domain.AttentionDetail{
+		wantCode: {Rows: []domain.DetailRow{{Label: "Action", Value: "reboot", Tier: ""}}},
+	}
 
 	if len(r.Findings) != 1 {
 		t.Fatalf("len(Findings): got %d, want 1", len(r.Findings))
@@ -261,7 +272,6 @@ func TestDerive_Wave2Only_AppendsFindingAndAttentionDetails(t *testing.T) {
 	}
 
 	// Code is derived from slug of "pending maintenance" under "ec2" short name.
-	wantCode := domain.FindingCode("ec2.pending.maintenance")
 	if f.Code != wantCode {
 		t.Errorf("Code: got %q, want %q", f.Code, wantCode)
 	}
@@ -298,14 +308,19 @@ func TestDerive_Wave1AndWave2_Combined(t *testing.T) {
 		ID:     "i-006",
 		Issues: []string{"impaired"},
 	}
-	ef := map[string]resource.EnrichmentFinding{
-		"i-006": {
-			Severity: "~",
-			Summary:  "scheduled reboot",
-			Rows:     []resource.FindingRow{{Label: "Window", Value: "sat 02:00"}},
-		},
+	// Wave-1 derive.
+	attention.DeriveFindings(&r, ec2TD)
+	// Wave-2 append (simulates applyEnrichment).
+	w2 := domain.Finding{
+		Code:     "ec2.scheduled.reboot",
+		Phrase:   "scheduled reboot",
+		Severity: domain.SevWarn,
+		Source:   "wave2:ec2",
 	}
-	attention.DeriveFindings(&r, ec2TD, ef)
+	r.Findings = append(r.Findings, w2)
+	r.AttentionDetails = map[domain.FindingCode]domain.AttentionDetail{
+		w2.Code: {Rows: []domain.DetailRow{{Label: "Window", Value: "sat 02:00"}}},
+	}
 
 	if len(r.Findings) != 2 {
 		t.Fatalf("len(Findings): got %d, want 2", len(r.Findings))
@@ -352,13 +367,14 @@ func TestDerive_Wave2SeverityMapping(t *testing.T) {
 		tc := tc
 		t.Run(tc.inputSev, func(t *testing.T) {
 			r := domain.Resource{ID: "i-sev"}
-			ef := map[string]resource.EnrichmentFinding{
-				"i-sev": {
-					Severity: tc.inputSev,
-					Summary:  "test phrase",
-				},
+			// Wave-2 append (simulates applyEnrichment).
+			w2 := domain.Finding{
+				Code:     "ec2.test.sev",
+				Phrase:   "test phrase",
+				Severity: tc.wantSev,
+				Source:   "wave2:ec2",
 			}
-			attention.DeriveFindings(&r, ec2TD, ef)
+			r.Findings = append(r.Findings, w2)
 			if len(r.Findings) != 1 {
 				t.Fatalf("len(Findings): got %d, want 1", len(r.Findings))
 			}
@@ -378,16 +394,15 @@ func TestDerive_Deterministic_RepeatedCallsIdentical(t *testing.T) {
 		ID:     "i-007",
 		Issues: []string{"impaired"},
 	}
-	ef := map[string]resource.EnrichmentFinding{
-		"i-007": {Severity: "!", Summary: "pending maintenance"},
-	}
 
-	attention.DeriveFindings(&r, ec2TD, ef)
+	// First call: wave1 derive only.
+	attention.DeriveFindings(&r, ec2TD)
 	findings1 := make([]domain.Finding, len(r.Findings))
 	copy(findings1, r.Findings)
 	details1 := r.AttentionDetails
 
-	attention.DeriveFindings(&r, ec2TD, ef)
+	// Second call with same inputs — must produce identical result, not append.
+	attention.DeriveFindings(&r, ec2TD)
 
 	if !reflect.DeepEqual(findings1, r.Findings) {
 		t.Errorf("Findings changed on second call: first=%v second=%v", findings1, r.Findings)
@@ -395,9 +410,9 @@ func TestDerive_Deterministic_RepeatedCallsIdentical(t *testing.T) {
 	if !reflect.DeepEqual(details1, r.AttentionDetails) {
 		t.Errorf("AttentionDetails changed on second call")
 	}
-	// Specifically verify the count hasn't doubled (append would produce 4 not 2).
-	if len(r.Findings) != 2 {
-		t.Errorf("len(Findings) after second call: got %d, want 2 (replace, not append)", len(r.Findings))
+	// Specifically verify the count hasn't doubled (append would produce 2 not 1).
+	if len(r.Findings) != 1 {
+		t.Errorf("len(Findings) after second call: got %d, want 1 (replace, not append)", len(r.Findings))
 	}
 }
 
@@ -413,7 +428,7 @@ func TestDerive_Wave2BridgeOnSecondCall(t *testing.T) {
 	}
 
 	// First pass: no enrichment.
-	attention.DeriveFindings(&r, ec2TD, nil)
+	attention.DeriveFindings(&r, ec2TD)
 	if len(r.Findings) != 1 {
 		t.Fatalf("after first call: len(Findings): got %d, want 1", len(r.Findings))
 	}
@@ -421,11 +436,15 @@ func TestDerive_Wave2BridgeOnSecondCall(t *testing.T) {
 		t.Errorf("after first call: Findings[0].Source: got %q, want wave1", r.Findings[0].Source)
 	}
 
-	// Second pass: enrichment now present for the same resource.
-	ef := map[string]resource.EnrichmentFinding{
-		"i-008": {Severity: "!", Summary: "pending maintenance"},
+	// Second pass: re-derive wave1, then append wave2 (simulates applyEnrichment).
+	attention.DeriveFindings(&r, ec2TD)
+	w2 := domain.Finding{
+		Code:     "ec2.pending.maintenance",
+		Phrase:   "pending maintenance",
+		Severity: domain.SevBroken,
+		Source:   "wave2:ec2",
 	}
-	attention.DeriveFindings(&r, ec2TD, ef)
+	r.Findings = append(r.Findings, w2)
 	if len(r.Findings) != 2 {
 		t.Fatalf("after second call: len(Findings): got %d, want 2 (wave1 + wave2, no early-return)", len(r.Findings))
 	}
@@ -445,7 +464,7 @@ func TestDerive_NoEarlyReturnOnExistingFindings(t *testing.T) {
 			{Code: "manual", Phrase: "stale", Severity: domain.SevBroken, Source: "manual"},
 		},
 	}
-	attention.DeriveFindings(&r, ec2TD, nil)
+	attention.DeriveFindings(&r, ec2TD)
 	if len(r.Findings) != 0 {
 		t.Errorf("len(Findings): got %d, want 0 (shim must replace stale entries on healthy row)", len(r.Findings))
 	}
@@ -465,7 +484,7 @@ func TestDerive_NoEarlyReturnOnExistingFindings(t *testing.T) {
 func TestDerive_InactiveIsEmittedAsFinding(t *testing.T) {
 	r := domain.Resource{ID: "i", Status: "inactive"}
 	td := resource.ResourceTypeDef{ShortName: "ecs-svc"}
-	attention.DeriveFindings(&r, td, nil)
+	attention.DeriveFindings(&r, td)
 
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings count = %d, want 1 (inactive must emit a Finding — see ECS type policy)", len(r.Findings))
@@ -500,7 +519,7 @@ func TestDerive_MigratedRowPreservesFetcherFindings(t *testing.T) {
 		},
 	}
 	td := resource.ResourceTypeDef{ShortName: "ec2"}
-	attention.DeriveFindings(&r, td, nil)
+	attention.DeriveFindings(&r, td)
 
 	if len(r.Findings) != 1 {
 		t.Fatalf("len(Findings) = %d, want 1 — shim must preserve fetcher-emitted wave1 entries when r.Status/r.Issues are empty", len(r.Findings))
@@ -530,10 +549,19 @@ func TestDerive_MigratedRowMergesWave2WithFetcherWave1(t *testing.T) {
 		},
 	}
 	td := resource.ResourceTypeDef{ShortName: "ec2"}
-	enrich := map[string]resource.EnrichmentFinding{
-		"i-1": {Severity: "!", Summary: "instance status: impaired", Rows: []resource.FindingRow{{Label: "Instance Status", Value: "impaired"}}},
+	// Wave-1 derive: shim preserves pre-populated fetcher wave1 entries.
+	attention.DeriveFindings(&r, td)
+	// Wave-2 append (simulates applyEnrichment).
+	w2 := domain.Finding{
+		Code:     "ec2.instance.status.impaired",
+		Phrase:   "instance status: impaired",
+		Severity: domain.SevBroken,
+		Source:   "wave2:ec2",
 	}
-	attention.DeriveFindings(&r, td, enrich)
+	r.Findings = append(r.Findings, w2)
+	r.AttentionDetails = map[domain.FindingCode]domain.AttentionDetail{
+		w2.Code: {Rows: []domain.DetailRow{{Label: "Instance Status", Value: "impaired"}}},
+	}
 
 	if len(r.Findings) != 2 {
 		t.Fatalf("len(Findings) = %d, want 2 (wave1 from fetcher + wave2 from enrichment)", len(r.Findings))

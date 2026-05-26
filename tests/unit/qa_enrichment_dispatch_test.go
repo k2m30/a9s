@@ -16,6 +16,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -95,8 +96,8 @@ func TestEnrichmentCheckedMsg_StaleSessionGenDropped(t *testing.T) {
 		ResourceType: "ec2",
 		Issues:       42,
 		Truncated:    false,
-		Findings: map[string]resource.EnrichmentFinding{
-			"i-abc": {Severity: "!", Summary: "system status impaired"},
+		Findings: map[string]domain.Finding{
+			"i-abc": {Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
 		},
 		Gen:     999, // stale — fresh model's enrichmentGen is 0
 		TypeGen: 0,
@@ -120,7 +121,7 @@ func TestEnrichmentCheckedMsg_StaleTypeGenDropped(t *testing.T) {
 		ResourceType: "ec2",
 		Issues:       5,
 		Truncated:    false,
-		Findings:     map[string]resource.EnrichmentFinding{},
+		Findings:     map[string]domain.Finding{},
 		Gen:          0,  // matches fresh model's enrichmentGen=0
 		TypeGen:      99, // stale — fresh model's enrichmentTypeGen["ec2"] is 0
 	}
@@ -176,8 +177,8 @@ func TestEnrichmentCheckedMsg_ValidSuccessDoesNotCrash(t *testing.T) {
 		ResourceType: "glue",
 		Issues:       1,
 		Truncated:    false,
-		Findings: map[string]resource.EnrichmentFinding{
-			"my-glue-job": {Severity: "!", Summary: "latest run FAILED"},
+		Findings: map[string]domain.Finding{
+			"my-glue-job": {Code: "glue.job.last.run.failed", Phrase: "latest run FAILED", Severity: domain.SevBroken, Source: "wave2:glue"},
 		},
 		Gen:     0,
 		TypeGen: 0,

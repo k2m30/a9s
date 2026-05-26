@@ -33,6 +33,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 )
 
 // ---------------------------------------------------------------------------
@@ -169,12 +170,12 @@ func TestBackup_Enricher_OneFailed_ShowsBrokenPhrase(t *testing.T) {
 	finding, ok := result.Findings[planID]
 	require.True(t, ok, "expected finding for plan %s; got keys %v", planID, findingKeys(result.Findings))
 
-	// Severity must be "!" (Broken).
-	require.Equal(t, "!", finding.Severity, "Severity mismatch — FAILED must map to '!'")
+	// Severity must be Broken.
+	require.Equal(t, domain.SevBroken, finding.Severity, "Severity mismatch — FAILED must map to '!'")
 
-	// Summary is the exact spec §4 S4 phrase.
-	require.Equal(t, "1 job failed in last 24h", finding.Summary,
-		"Summary mismatch — must match spec §4 S4 list text exactly")
+	// Phrase is the exact spec §4 S4 phrase.
+	require.Equal(t, "1 job failed in last 24h", finding.Phrase,
+		"Phrase mismatch — must match spec §4 S4 list text exactly")
 
 	// FieldUpdates must use key "status" (not "last_status").
 	updates, hasUpdates := result.FieldUpdates[planID]
@@ -188,30 +189,30 @@ func TestBackup_Enricher_OneFailed_ShowsBrokenPhrase(t *testing.T) {
 	require.GreaterOrEqual(t, result.IssueCount, 1,
 		"IssueCount must be >= 1 when a '!' finding exists")
 
-	// U11: Summary must not contain any Row.Value (skip pure-integer counts — they appear in
-	// both Summary phrases and count rows by design).
-	for _, row := range finding.Rows {
+	// U11: Phrase must not contain any Row.Value (skip pure-integer counts — they appear in
+	// both Phrase phrases and count rows by design).
+	for _, row := range result.AttentionDetails[planID].Rows {
 		if row.Value == "" {
 			continue
 		}
 		if _, isNum := strconv.Atoi(row.Value); isNum == nil {
-			continue // count values like "1", "3" appear in Summary phrases — not a U11 violation
+			continue // count values like "1", "3" appear in Phrase phrases — not a U11 violation
 		}
-		require.NotContains(t, finding.Summary, row.Value,
-			"U11 violation: Summary %q must not contain Row value %q", finding.Summary, row.Value)
+		require.NotContains(t, finding.Phrase, row.Value,
+			"U11 violation: Phrase %q must not contain Row value %q", finding.Phrase, row.Value)
 	}
 
 	// Rows must carry the state value for the failed job.
-	require.NotEmpty(t, finding.Rows, "Rows must not be empty — must carry job state detail")
+	require.NotEmpty(t, result.AttentionDetails[planID].Rows, "Rows must not be empty — must carry job state detail")
 	stateFound := false
-	for _, row := range finding.Rows {
+	for _, row := range result.AttentionDetails[planID].Rows {
 		if row.Value == "FAILED" {
 			stateFound = true
 			break
 		}
 	}
 	require.True(t, stateFound,
-		"Rows must contain a row with Value='FAILED' (job state detail); Rows: %v", finding.Rows)
+		"Rows must contain a row with Value='FAILED' (job state detail); Rows: %v", result.AttentionDetails[planID].Rows)
 }
 
 // ---------------------------------------------------------------------------
@@ -236,9 +237,9 @@ func TestBackup_Enricher_TwoFailed_CountsCorrectly(t *testing.T) {
 	finding, ok := result.Findings[planID]
 	require.True(t, ok, "expected finding for plan %s; got keys %v", planID, findingKeys(result.Findings))
 
-	require.Equal(t, "!", finding.Severity, "Severity mismatch — 2 failed jobs must map to '!'")
-	require.Equal(t, "2 jobs failed in last 24h", finding.Summary,
-		"Summary must be '2 jobs failed in last 24h' per spec §4 S4")
+	require.Equal(t, domain.SevBroken, finding.Severity, "Severity mismatch — 2 failed jobs must map to '!'")
+	require.Equal(t, "2 jobs failed in last 24h", finding.Phrase,
+		"Phrase must be '2 jobs failed in last 24h' per spec §4 S4")
 
 	updates, hasUpdates := result.FieldUpdates[planID]
 	require.True(t, hasUpdates, "FieldUpdates must contain an entry for plan %s", planID)
@@ -246,20 +247,20 @@ func TestBackup_Enricher_TwoFailed_CountsCorrectly(t *testing.T) {
 		"FieldUpdates[status] must equal the S4 phrase")
 
 	// U11: skip pure-integer count values — they naturally appear in count phrases.
-	for _, row := range finding.Rows {
+	for _, row := range result.AttentionDetails[planID].Rows {
 		if row.Value == "" {
 			continue
 		}
 		if _, isNum := strconv.Atoi(row.Value); isNum == nil {
 			continue
 		}
-		require.NotContains(t, finding.Summary, row.Value,
-			"U11: Summary %q must not contain Row value %q", finding.Summary, row.Value)
+		require.NotContains(t, finding.Phrase, row.Value,
+			"U11: Phrase %q must not contain Row value %q", finding.Phrase, row.Value)
 	}
 
 	// Both FAILED and EXPIRED states must appear in Rows.
 	rowVals := make(map[string]bool)
-	for _, row := range finding.Rows {
+	for _, row := range result.AttentionDetails[planID].Rows {
 		rowVals[row.Value] = true
 	}
 	require.True(t, rowVals["FAILED"], "Rows must carry FAILED state; rowValues: %v", rowVals)
@@ -286,21 +287,21 @@ func TestBackup_Enricher_OneAborted_IsAlsoBroken(t *testing.T) {
 	finding, ok := result.Findings[planID]
 	require.True(t, ok, "expected finding for plan %s; ABORTED must map to '!' bucket", planID)
 
-	require.Equal(t, "!", finding.Severity,
+	require.Equal(t, domain.SevBroken, finding.Severity,
 		"ABORTED must map to Severity '!' per spec §3.2")
-	require.Equal(t, "1 job failed in last 24h", finding.Summary,
+	require.Equal(t, "1 job failed in last 24h", finding.Phrase,
 		"ABORTED must use the same canonical phrase as FAILED per spec §4")
 
 	// U11: skip pure-integer count values.
-	for _, row := range finding.Rows {
+	for _, row := range result.AttentionDetails[planID].Rows {
 		if row.Value == "" {
 			continue
 		}
 		if _, isNum := strconv.Atoi(row.Value); isNum == nil {
 			continue
 		}
-		require.NotContains(t, finding.Summary, row.Value,
-			"U11: Summary %q must not contain Row value %q", finding.Summary, row.Value)
+		require.NotContains(t, finding.Phrase, row.Value,
+			"U11: Phrase %q must not contain Row value %q", finding.Phrase, row.Value)
 	}
 }
 
@@ -326,11 +327,11 @@ func TestBackup_Enricher_PartialOnly_IsWarning(t *testing.T) {
 	finding, ok := result.Findings[planID]
 	require.True(t, ok, "expected finding for plan %s; got keys %v", planID, findingKeys(result.Findings))
 
-	require.Equal(t, "~", finding.Severity,
+	require.Equal(t, domain.SevWarn, finding.Severity,
 		"PARTIAL-only must produce Severity '~' (Warning, not Broken)")
 	// Spec §4 S4: "partial: K of M resources skipped" where K=1 partial, M=3 total.
-	require.Equal(t, "partial: 1 of 3 resources skipped", finding.Summary,
-		"Summary must match spec §4 S4 phrase exactly")
+	require.Equal(t, "partial: 1 of 3 resources skipped", finding.Phrase,
+		"Phrase must match spec §4 S4 phrase exactly")
 
 	updates, hasUpdates := result.FieldUpdates[planID]
 	require.True(t, hasUpdates, "FieldUpdates must have entry for plan %s", planID)
@@ -341,28 +342,28 @@ func TestBackup_Enricher_PartialOnly_IsWarning(t *testing.T) {
 	// We check by counting only "!" findings in the result.
 	bangCount := 0
 	for _, f := range result.Findings {
-		if f.Severity == "!" {
+		if f.Severity == domain.SevBroken {
 			bangCount++
 		}
 	}
 	require.Equal(t, 0, bangCount,
 		"S1: ~ findings must not increment IssueCount; no '!' findings expected for PARTIAL-only")
 
-	// U11: Summary must not contain Row values (skip pure-integer counts).
-	for _, row := range finding.Rows {
+	// U11: Phrase must not contain Row values (skip pure-integer counts).
+	for _, row := range result.AttentionDetails[planID].Rows {
 		if row.Value == "" {
 			continue
 		}
 		if _, isNum := strconv.Atoi(row.Value); isNum == nil {
 			continue
 		}
-		require.NotContains(t, finding.Summary, row.Value,
-			"U11: Summary %q must not contain Row value %q", finding.Summary, row.Value)
+		require.NotContains(t, finding.Phrase, row.Value,
+			"U11: Phrase %q must not contain Row value %q", finding.Phrase, row.Value)
 	}
 
 	// Rows must carry "Partial jobs" and "Total jobs" (or functionally equivalent integer counts).
-	rowVals := make(map[string]string, len(finding.Rows))
-	for _, row := range finding.Rows {
+	rowVals := make(map[string]string, len(result.AttentionDetails[planID].Rows))
+	for _, row := range result.AttentionDetails[planID].Rows {
 		rowVals[row.Label] = row.Value
 	}
 
@@ -370,7 +371,7 @@ func TestBackup_Enricher_PartialOnly_IsWarning(t *testing.T) {
 	// "Partial jobs"/"Total jobs" labels or as any row carrying the integer values.
 	partialCountFound := false
 	totalCountFound := false
-	for _, row := range finding.Rows {
+	for _, row := range result.AttentionDetails[planID].Rows {
 		if row.Value == "1" {
 			partialCountFound = true
 		}
@@ -379,9 +380,9 @@ func TestBackup_Enricher_PartialOnly_IsWarning(t *testing.T) {
 		}
 	}
 	require.True(t, partialCountFound,
-		"Rows must carry the partial job count (value '1'); Rows: %v", finding.Rows)
+		"Rows must carry the partial job count (value '1'); Rows: %v", result.AttentionDetails[planID].Rows)
 	require.True(t, totalCountFound,
-		"Rows must carry the total job count (value '3'); Rows: %v", finding.Rows)
+		"Rows must carry the total job count (value '3'); Rows: %v", result.AttentionDetails[planID].Rows)
 }
 
 // ---------------------------------------------------------------------------
@@ -408,13 +409,13 @@ func TestBackup_Enricher_MixedFailedAndPartial_BrokenWins(t *testing.T) {
 	finding, ok := result.Findings[planID]
 	require.True(t, ok, "expected finding for plan %s; got keys %v", planID, findingKeys(result.Findings))
 
-	// U7d: "!" beats "~".
-	require.Equal(t, "!", finding.Severity,
+	// U7d: Broken beats Warning.
+	require.Equal(t, domain.SevBroken, finding.Severity,
 		"U7d: Broken must beat Warning when both FAILED and PARTIAL exist")
 
-	// One FAILED job drives the summary.
-	require.Equal(t, "1 job failed in last 24h", finding.Summary,
-		"U7d: Summary uses the failed-bucket phrase when any '!' job exists")
+	// One FAILED job drives the phrase.
+	require.Equal(t, "1 job failed in last 24h", finding.Phrase,
+		"U7d: Phrase uses the failed-bucket phrase when any '!' job exists")
 
 	updates, hasUpdates := result.FieldUpdates[planID]
 	require.True(t, hasUpdates, "FieldUpdates must have entry for plan %s", planID)
@@ -424,7 +425,7 @@ func TestBackup_Enricher_MixedFailedAndPartial_BrokenWins(t *testing.T) {
 	// S1: IssueCount bumps.
 	bangCount := 0
 	for _, f := range result.Findings {
-		if f.Severity == "!" {
+		if f.Severity == domain.SevBroken {
 			bangCount++
 		}
 	}
@@ -434,16 +435,16 @@ func TestBackup_Enricher_MixedFailedAndPartial_BrokenWins(t *testing.T) {
 	// Rows must include both the failed job State AND partial job count
 	// so nothing silently disappears.
 	rowVals := make(map[string]bool)
-	for _, row := range finding.Rows {
+	for _, row := range result.AttentionDetails[planID].Rows {
 		rowVals[row.Value] = true
 	}
 	require.True(t, rowVals["FAILED"],
-		"Rows must contain State=FAILED; rows: %v", finding.Rows)
+		"Rows must contain State=FAILED; rows: %v", result.AttentionDetails[planID].Rows)
 
 	// Partial evidence must be preserved alongside the FAILED evidence so the
 	// enricher cannot silently drop partial context when a failed job exists.
 	var sawPartial bool
-	for _, row := range finding.Rows {
+	for _, row := range result.AttentionDetails[planID].Rows {
 		if row.Label == "Partial jobs" || row.Tier == "~" {
 			sawPartial = true
 			break
@@ -452,15 +453,15 @@ func TestBackup_Enricher_MixedFailedAndPartial_BrokenWins(t *testing.T) {
 	require.True(t, sawPartial, "mixed FAILED+PARTIAL finding must surface partial evidence in Rows")
 
 	// U11: skip pure-integer count values.
-	for _, row := range finding.Rows {
+	for _, row := range result.AttentionDetails[planID].Rows {
 		if row.Value == "" {
 			continue
 		}
 		if _, isNum := strconv.Atoi(row.Value); isNum == nil {
 			continue
 		}
-		require.NotContains(t, finding.Summary, row.Value,
-			"U11: Summary %q must not contain Row value %q", finding.Summary, row.Value)
+		require.NotContains(t, finding.Phrase, row.Value,
+			"U11: Phrase %q must not contain Row value %q", finding.Phrase, row.Value)
 	}
 }
 
@@ -546,8 +547,8 @@ func TestBackup_Enricher_BannedWords_NeverAppear(t *testing.T) {
 	}
 
 	for _, word := range bannedWords {
-		require.NotContains(t, finding.Summary, word,
-			"Summary must not contain banned word %q; got Summary=%q", word, finding.Summary)
+		require.NotContains(t, finding.Phrase, word,
+			"Phrase must not contain banned word %q; got Phrase=%q", word, finding.Phrase)
 	}
 
 	if updates, ok := result.FieldUpdates[planID]; ok {
@@ -735,26 +736,26 @@ func TestBackup_Enricher_FailedBucket_AllStatesMapToBang(t *testing.T) {
 			require.True(t, ok,
 				"state %s must produce a finding; got keys %v", tc.state, findingKeys(result.Findings))
 
-			require.Equal(t, "!", finding.Severity,
+			require.Equal(t, domain.SevBroken, finding.Severity,
 				"state %s must map to Severity '!'", tc.state)
-			require.Equal(t, tc.wantMsg, finding.Summary,
-				"state %s Summary must be %q", tc.state, tc.wantMsg)
+			require.Equal(t, tc.wantMsg, finding.Phrase,
+				"state %s Phrase must be %q", tc.state, tc.wantMsg)
 
 			// U11 for every case. Skip pure-integer row values — counts are
-			// allowed to appear inside the Summary phrase (e.g. "2 jobs failed
+			// allowed to appear inside the Phrase (e.g. "2 jobs failed
 			// in last 24h" legitimately contains "2"), and U11 is meant to
-			// catch Summaries concatenated from descriptive Row values, not
+			// catch Phrase concatenated from descriptive Row values, not
 			// numeric match-ups.
-			for _, row := range finding.Rows {
+			for _, row := range result.AttentionDetails[tc.planID].Rows {
 				if row.Value == "" {
 					continue
 				}
 				if _, convErr := strconv.Atoi(row.Value); convErr == nil {
 					continue
 				}
-				require.NotContains(t, finding.Summary, row.Value,
-					"U11: [%s] Summary %q must not contain Row value %q",
-					tc.state, finding.Summary, row.Value)
+				require.NotContains(t, finding.Phrase, row.Value,
+					"U11: [%s] Phrase %q must not contain Row value %q",
+					tc.state, finding.Phrase, row.Value)
 			}
 		})
 	}
@@ -810,7 +811,7 @@ func TestBackup_Enricher_U11_SummaryNeverContainsRowValues(t *testing.T) {
 	require.NoError(t, err)
 
 	for planID, finding := range result.Findings {
-		for _, row := range finding.Rows {
+		for _, row := range result.AttentionDetails[planID].Rows {
 			if row.Value == "" {
 				continue
 			}
@@ -819,9 +820,9 @@ func TestBackup_Enricher_U11_SummaryNeverContainsRowValues(t *testing.T) {
 			if _, isNum := strconv.Atoi(row.Value); isNum == nil {
 				continue
 			}
-			require.NotContains(t, finding.Summary, row.Value,
-				"U11 violation for plan %s: Summary %q contains Row value %q — Summary and Rows must be disjoint",
-				planID, finding.Summary, row.Value)
+			require.NotContains(t, finding.Phrase, row.Value,
+				"U11 violation for plan %s: Phrase %q contains Row value %q — Phrase and Rows must be disjoint",
+				planID, finding.Phrase, row.Value)
 		}
 	}
 }

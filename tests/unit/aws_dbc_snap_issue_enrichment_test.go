@@ -23,6 +23,7 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -79,11 +80,11 @@ func TestDBCSnap_Orphan_DocDB(t *testing.T) {
 	if !ok {
 		t.Fatal("expected orphan finding, got none")
 	}
-	if finding.Severity != "!" {
-		t.Errorf("Severity = %q, want %q", finding.Severity, "!")
+	if finding.Severity != domain.SevBroken {
+		t.Errorf("Severity = %v, want SevBroken", finding.Severity)
 	}
-	if finding.Summary != "orphan: source cluster deleted" {
-		t.Errorf("Summary = %q, want %q", finding.Summary, "orphan: source cluster deleted")
+	if finding.Phrase != "orphan: source cluster deleted" {
+		t.Errorf("Phrase = %q, want %q", finding.Phrase, "orphan: source cluster deleted")
 	}
 	// AS-140: FieldUpdates must be empty — the merged display phrase is
 	// computed at render time by phraseFromFindings(r.Findings).
@@ -134,8 +135,8 @@ func TestDBCSnap_Orphan_Aurora(t *testing.T) {
 	}
 	if finding, ok := result.Findings["orphan-aurora-snap"]; !ok {
 		t.Fatal("expected orphan finding for Aurora snapshot (rdstypes.DBClusterSnapshot), got none")
-	} else if finding.Summary != "orphan: source cluster deleted" {
-		t.Errorf("Summary = %q, want %q", finding.Summary, "orphan: source cluster deleted")
+	} else if finding.Phrase != "orphan: source cluster deleted" {
+		t.Errorf("Phrase = %q, want %q", finding.Phrase, "orphan: source cluster deleted")
 	}
 	// AS-140: FieldUpdates must be empty — the merged display phrase is
 	// computed at render time by phraseFromFindings(r.Findings).
@@ -184,11 +185,11 @@ func TestDBCSnap_PastRetention_DocDB(t *testing.T) {
 	if !ok {
 		t.Fatal("expected past-retention finding, got none")
 	}
-	if !strings.Contains(finding.Summary, "automated") || !strings.Contains(finding.Summary, "past retention") {
-		t.Errorf("Summary = %q, want \"automated, Nd past retention\"", finding.Summary)
+	if !strings.Contains(finding.Phrase, "automated") || !strings.Contains(finding.Phrase, "past retention") {
+		t.Errorf("Phrase = %q, want \"automated, Nd past retention\"", finding.Phrase)
 	}
-	if !strings.Contains(finding.Summary, "23d") {
-		t.Errorf("Summary days-over should be 23 (30 - 7), got %q", finding.Summary)
+	if !strings.Contains(finding.Phrase, "23d") {
+		t.Errorf("Phrase days-over should be 23 (30 - 7), got %q", finding.Phrase)
 	}
 }
 

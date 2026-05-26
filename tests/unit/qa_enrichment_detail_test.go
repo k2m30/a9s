@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
@@ -94,11 +95,8 @@ func TestDetailView_NoBackgroundCheckSection_WhenNoFinding(t *testing.T) {
 func TestDetailView_ShowsBackgroundCheckSection_WhenFindingSet(t *testing.T) {
 	m := newRDSDetailModel(t)
 
-	finding := resource.EnrichmentFinding{
-		Severity: "!",
-		Summary:  "pending maintenance: system-update (New OS patch)",
-	}
-	m.SetEnrichmentFinding(&finding)
+	finding := domain.Finding{Code: "test.finding", Phrase: "pending maintenance: system-update (New OS patch)", Severity: domain.SevBroken, Source: "wave2:test"}
+	m.SetEnrichmentFinding(&finding, nil)
 
 	output := detailRenderOutput(m)
 
@@ -128,8 +126,8 @@ func TestDetailView_SetFindingInvalidatesFieldList(t *testing.T) {
 	}
 
 	// Set finding and render again.
-	finding := resource.EnrichmentFinding{Severity: "~", Summary: "pending maintenance: minor-version-upgrade"}
-	m.SetEnrichmentFinding(&finding)
+	finding := domain.Finding{Code: "test.finding", Phrase: "pending maintenance: minor-version-upgrade", Severity: domain.SevWarn, Source: "wave2:test"}
+	m.SetEnrichmentFinding(&finding, nil)
 
 	second := detailRenderOutput(m)
 	if !strings.Contains(second, "Attention") {
@@ -150,8 +148,8 @@ func TestDetailView_SetFindingInvalidatesFieldList(t *testing.T) {
 func TestDetailView_FindingSeverityBangRendersWithSummary(t *testing.T) {
 	m := newRDSDetailModel(t)
 
-	finding := resource.EnrichmentFinding{Severity: "!", Summary: "latest build FAILED (2026-04-13)"}
-	m.SetEnrichmentFinding(&finding)
+	finding := domain.Finding{Code: "test.finding", Phrase: "latest build FAILED (2026-04-13)", Severity: domain.SevBroken, Source: "wave2:test"}
+	m.SetEnrichmentFinding(&finding, nil)
 
 	// Must not panic.
 	output := detailRenderOutput(m)
@@ -173,8 +171,8 @@ func TestDetailView_FindingSeverityBangRendersWithSummary(t *testing.T) {
 func TestDetailView_FindingSeverityTildeRendersWithSummary(t *testing.T) {
 	m := newRDSDetailModel(t)
 
-	finding := resource.EnrichmentFinding{Severity: "~", Summary: "pending maintenance: os-upgrade"}
-	m.SetEnrichmentFinding(&finding)
+	finding := domain.Finding{Code: "test.finding", Phrase: "pending maintenance: os-upgrade", Severity: domain.SevWarn, Source: "wave2:test"}
+	m.SetEnrichmentFinding(&finding, nil)
 
 	// Must not panic.
 	output := detailRenderOutput(m)
@@ -189,14 +187,14 @@ func TestDetailView_FindingSeverityTildeRendersWithSummary(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestDetailView_SetFindingToNilRemovesSection asserts that after a finding is
-// set and then cleared via SetEnrichmentFinding(nil), the "Background Check"
+// set and then cleared via SetEnrichmentFinding(nil, nil), the "Background Check"
 // section disappears from the rendered output.
 func TestDetailView_SetFindingToNilRemovesSection(t *testing.T) {
 	m := newRDSDetailModel(t)
 
 	// Set finding.
-	finding := resource.EnrichmentFinding{Severity: "!", Summary: "system status impaired"}
-	m.SetEnrichmentFinding(&finding)
+	finding := domain.Finding{Code: "test.finding", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:test"}
+	m.SetEnrichmentFinding(&finding, nil)
 
 	withFinding := detailRenderOutput(m)
 	if !strings.Contains(withFinding, "Attention") {
@@ -204,11 +202,11 @@ func TestDetailView_SetFindingToNilRemovesSection(t *testing.T) {
 	}
 
 	// Clear finding.
-	m.SetEnrichmentFinding(nil)
+	m.SetEnrichmentFinding(nil, nil)
 
 	withoutFinding := detailRenderOutput(m)
 	if strings.Contains(withoutFinding, "Attention") {
-		t.Errorf("after SetEnrichmentFinding(nil), 'Pending Maintenance' must not appear, got:\n%s", withoutFinding)
+		t.Errorf("after SetEnrichmentFinding(nil, nil), 'Pending Maintenance' must not appear, got:\n%s", withoutFinding)
 	}
 }
 
@@ -222,8 +220,8 @@ func TestDetailView_SetFindingToNilRemovesSection(t *testing.T) {
 func TestDetailView_YAMLViewDoesNotShowFinding(t *testing.T) {
 	m := newRDSDetailModel(t)
 
-	finding := resource.EnrichmentFinding{Severity: "!", Summary: "instance status impaired"}
-	m.SetEnrichmentFinding(&finding)
+	finding := domain.Finding{Code: "test.finding", Phrase: "instance status impaired", Severity: domain.SevBroken, Source: "wave2:test"}
+	m.SetEnrichmentFinding(&finding, nil)
 
 	// RawYAML is the YAML serialization path used for the YAML view.
 	yamlOutput := m.RawYAML()
@@ -288,8 +286,8 @@ func TestDetailView_FindingRendersForMultipleResourceTypes(t *testing.T) {
 			m := views.NewDetail(tc.res, tc.resourceType, nil, k)
 			m.SetSize(120, 40)
 
-			finding := resource.EnrichmentFinding{Severity: "!", Summary: tc.summary}
-			m.SetEnrichmentFinding(&finding)
+			finding := domain.Finding{Code: "test.finding", Phrase: tc.summary, Severity: domain.SevBroken, Source: "wave2:test"}
+			m.SetEnrichmentFinding(&finding, nil)
 
 			output := m.PlainContent()
 

@@ -31,6 +31,14 @@ import (
 
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
+
+	"github.com/k2m30/a9s/v3/internal/domain"
+)
+
+// dbc-snap canonical FindingCodes emitted by the cross-ref enricher.
+const (
+	dbcSnapOrphanCode        domain.FindingCode = "dbc-snap.orphan"
+	dbcSnapPastRetentionCode domain.FindingCode = "dbc-snap.past-retention"
 )
 
 // enrichDBCSnapCrossRef is the IssueEnricherFunc registered for dbc-snap.
@@ -45,6 +53,9 @@ var enrichDBCSnapCrossRef = EnrichSnapshotCrossRef(SnapshotCrossRefConfig{
 	RetentionPhrase:    func(d int) string { return fmt.Sprintf("automated, %dd past retention", d) },
 	RetentionEnabled:   true,
 	Severity:           "!",
+	ShortName:          "dbc-snap",
+	OrphanCode:         dbcSnapOrphanCode,
+	PastRetentionCode:  dbcSnapPastRetentionCode,
 })
 
 // dbcSnapParentID extracts DBClusterIdentifier from either a

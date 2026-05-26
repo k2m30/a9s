@@ -8,6 +8,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -343,7 +344,7 @@ func (m DetailModel) SourceResource() resource.Resource {
 // back to cursor=0 rather than hunting for a gone row. Regression guards:
 // views.TestDetail_SetEnrichmentFinding_PreservesCursorIdentity and
 // views.TestDetail_SetEnrichmentFinding_RenderedSelectionFollowsCursor.
-func (m *DetailModel) SetEnrichmentFinding(f *resource.EnrichmentFinding) {
+func (m *DetailModel) SetEnrichmentFinding(f *domain.Finding, ad *domain.AttentionDetail) {
 	var beforeKey, beforePath string
 	haveSnapshot := false
 	if m.fieldList != nil && m.fieldCursor >= 0 && m.fieldCursor < len(m.fieldList) {
@@ -356,6 +357,7 @@ func (m *DetailModel) SetEnrichmentFinding(f *resource.EnrichmentFinding) {
 	}
 
 	m.enrichmentFinding = f
+	m.enrichmentDetail = ad
 	m.fieldList = nil
 	m.buildFieldList() // eager rebuild BEFORE render — see sequence in docstring
 

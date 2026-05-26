@@ -10,7 +10,14 @@ import (
 	kafkasvc "github.com/aws/aws-sdk-go-v2/service/kafka"
 	kafkatypes "github.com/aws/aws-sdk-go-v2/service/kafka/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// msk canonical FindingCodes.
+const (
+	mskCodeBrokerOutdated    domain.FindingCode = "msk.broker-outdated"
+	mskCodeEncryptionNotTLS  domain.FindingCode = "msk.encryption-not-tls"
 )
 
 // EnrichMSKCluster calls DescribeClusterV2 per provisioned MSK cluster (cap EnrichmentCap)
@@ -21,10 +28,12 @@ import (
 // Serverless clusters (Provisioned==nil) are skipped.
 // Skip if clients.MSK == nil. Per-cluster errors → Truncated.
 func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+	}
 	if clients.MSK == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	var failures []string
@@ -49,7 +58,7 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
-			truncatedIDs[r.ID] = true
+			result.TruncatedIDs[r.ID] = true
 			continue
 		}
 		if out.ClusterInfo == nil {
@@ -63,27 +72,23 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 		// Check broker software version.
 		if prov.CurrentBrokerSoftwareInfo != nil && prov.CurrentBrokerSoftwareInfo.KafkaVersion != nil {
 			if isMSKVersionOutdated(*prov.CurrentBrokerSoftwareInfo.KafkaVersion) {
-				findings[r.ID] = resource.EnrichmentFinding{
-					Severity: "~",
-					Summary:  "broker software outdated",
-				}
+				setWave2Finding(&result, r.ID, mskCodeBrokerOutdated, "broker software outdated", "~", "msk", nil)
 			}
 		}
 		// Check encryption in transit (only set finding if not already set).
-		if _, alreadyFound := findings[r.ID]; !alreadyFound {
+		if _, alreadyFound := result.Findings[r.ID]; !alreadyFound {
 			if prov.EncryptionInfo != nil &&
 				prov.EncryptionInfo.EncryptionInTransit != nil &&
 				prov.EncryptionInfo.EncryptionInTransit.ClientBroker != kafkatypes.ClientBrokerTls {
-				findings[r.ID] = resource.EnrichmentFinding{
-					Severity: "~",
-					Summary:  "encryption in transit not enforced",
-				}
+				setWave2Finding(&result, r.ID, mskCodeEncryptionNotTLS, "encryption in transit not enforced", "~", "msk", nil)
 			}
 		}
 	}
 	// All MSK findings are severity "~" (informational) and do not contribute to the
 	// attention menu badge. IssueCount is always 0 for this enricher.
-	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings},
+	result.IssueCount = 0
+	result.Truncated = truncated
+	return result,
 		AggregateFailures("msk-enrich: DescribeClusterV2", failures, total)
 }
 

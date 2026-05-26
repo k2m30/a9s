@@ -10,9 +10,10 @@ import (
 	lipgloss "charm.land/lipgloss/v2"
 
 	"github.com/k2m30/a9s/v3/internal/config"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
 
@@ -63,7 +64,7 @@ type ResourceListModel struct {
 	// enrichment state — populated by SetEnrichmentState.
 	enrichmentIssueCount int                                   // unified Wave-1 + Wave-2 distinct-instance count
 	enrichmentTruncated  bool                                  // true if enrichment count is a lower bound
-	findingsByID         map[string]resource.EnrichmentFinding // this type's per-resource findings
+	findingsByID         map[string]domain.Finding             // this type's per-resource Wave-2 findings (AS-1395 typed model)
 	// truncatedByID is populated by SetTruncatedIDs. Resources in this set
 	// had their enrichment truncated (per-resource API error or page cap) and
 	// are rendered with a "?" prefix in the identity column.
@@ -560,7 +561,7 @@ func (m *ResourceListModel) View() string {
 // re-runs applySortAndFilter so that the ctrl+z attention filter picks up newly
 // flagged rows immediately — otherwise enabling ctrl+z before Wave 2 completes
 // would leave the enriched rows hidden until the next filter edit.
-func (m *ResourceListModel) SetEnrichmentState(issueCount int, truncated bool, findings map[string]resource.EnrichmentFinding) {
+func (m *ResourceListModel) SetEnrichmentState(issueCount int, truncated bool, findings map[string]domain.Finding) {
 	m.enrichmentIssueCount = issueCount
 	m.enrichmentTruncated = truncated
 	m.findingsByID = findings

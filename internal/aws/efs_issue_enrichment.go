@@ -9,7 +9,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/efs"
 	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// efs canonical FindingCodes.
+const (
+	efsCodeMountTargetDown domain.FindingCode = "efs.mount-target-down"
 )
 
 // EnrichEFSMountTargets calls DescribeMountTargets per file system (cap EnrichmentCap, per-FS
@@ -25,10 +31,12 @@ import (
 // S4 phrase ("mount target down" alone, or stacked with Wave-1 findings) is
 // computed at render time from r.Findings via phraseFromFindings.
 func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+	}
 	if clients.EFS == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	var failures []string
@@ -52,7 +60,7 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 			if mtPages >= PerParentPageCap {
 				mtTruncated = true
 				truncated = true
-				truncatedIDs[r.ID] = true
+				result.TruncatedIDs[r.ID] = true
 				break
 			}
 			out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*efs.DescribeMountTargetsOutput, error) {
@@ -65,7 +73,7 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 			if err != nil {
 				failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 				truncated = true
-				truncatedIDs[r.ID] = true
+				result.TruncatedIDs[r.ID] = true
 				pageFailed = true
 				break
 			}
@@ -109,23 +117,15 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 		state := string(firstBad.LifeCycleState)
 
 		// Summary must NOT embed any Row value (U11 contract).
-		finding := resource.EnrichmentFinding{
-			Severity: "!",
-			Summary:  "mount target down",
-			Rows: []resource.FindingRow{
-				{Label: "Mount Target", Value: mtID, Tier: "!"},
-				{Label: "AZ", Value: az},
-				{Label: "State", Value: state, Tier: "!"},
-				{Label: "Degraded", Value: fmt.Sprintf("%d/%d", unavailableCount, totalMT)},
-			},
-		}
-		findings[fsID] = finding
+		setWave2Finding(&result, fsID, efsCodeMountTargetDown, "mount target down", "!", "efs", []domain.DetailRow{
+			{Label: "Mount Target", Value: mtID, Tier: "!"},
+			{Label: "AZ", Value: az},
+			{Label: "State", Value: state, Tier: "!"},
+			{Label: "Degraded", Value: fmt.Sprintf("%d/%d", unavailableCount, totalMT)},
+		})
 	}
-	return IssueEnricherResult{
-		IssueCount:   len(findings),
-		Truncated:    truncated,
-		TruncatedIDs: truncatedIDs,
-		Findings:     findings,
-		FieldUpdates: make(map[string]map[string]string),
-	}, AggregateFailures("efs-enrich: DescribeMountTargets", failures, total)
+	result.IssueCount = len(result.Findings)
+	result.Truncated = truncated
+	result.FieldUpdates = make(map[string]map[string]string)
+	return result, AggregateFailures("efs-enrich: DescribeMountTargets", failures, total)
 }

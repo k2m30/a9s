@@ -7,7 +7,15 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// ses canonical FindingCodes.
+const (
+	sesCodeShutdown  domain.FindingCode = "ses.account-shutdown"
+	sesCodeProbation domain.FindingCode = "ses.account-probation"
+	sesCodeQuota     domain.FindingCode = "ses.quota-high"
 )
 
 // EnrichSESAccount calls sesv2:GetAccount once (account-wide) and replicates
@@ -26,12 +34,14 @@ import (
 // account regardless of how many identity rows are in the list (spec §4
 // "S1 counts the account-level finding once, not N times").
 func EnrichSESAccount(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	truncatedIDs := make(map[string]bool)
-	fieldUpdates := make(map[string]map[string]string)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+		FieldUpdates: make(map[string]map[string]string),
+	}
 
 	if clients == nil || clients.SESv2 == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, FieldUpdates: fieldUpdates}, nil
+		return result, nil
 	}
 
 	out, err := clients.SESv2.GetAccount(ctx, &sesv2.GetAccountInput{})
@@ -40,63 +50,49 @@ func EnrichSESAccount(ctx context.Context, clients *ServiceClients, resources []
 		// initialized maps so a caller that writes into result.Findings or
 		// result.FieldUpdates cannot panic on a nil map. Range over nil is
 		// safe, but writes would not be.
-		return IssueEnricherResult{
-			Findings:     findings,
-			FieldUpdates: fieldUpdates,
-			TruncatedIDs: truncatedIDs,
-		}, err
+		return result, err
 	}
 
 	// Decide the single account-level finding using §4 precedence.
-	finding, hasFinding := sesAccountFinding(out)
+	code, phrase, severityGlyph, rows, hasFinding := sesAccountFinding(out)
 	if !hasFinding {
-		return IssueEnricherResult{
-			IssueCount:   0,
-			Truncated:    false,
-			TruncatedIDs: truncatedIDs,
-			Findings:     findings,
-			FieldUpdates: fieldUpdates,
-		}, nil
+		return result, nil
 	}
 
 	// Replicate the finding onto every identity row.
 	for _, res := range resources {
-		findings[res.ID] = finding
+		setWave2Finding(&result, res.ID, code, phrase, severityGlyph, "ses", rows)
 
 		// S4 FieldUpdate: Healthy row → set to summary; non-Healthy → bump suffix.
 		var newStatus string
 		if res.Status == "" {
-			newStatus = finding.Summary
+			newStatus = phrase
 		} else {
 			newStatus = resource.BumpFindingSuffix(res.Status)
 		}
-		fieldUpdates[res.ID] = map[string]string{"status": newStatus}
+		result.FieldUpdates[res.ID] = map[string]string{"status": newStatus}
 	}
 
 	// IssueCount: 1 if "!" severity (account counted once), else 0.
 	issueCount := 0
-	if finding.Severity == "!" {
+	if severityGlyph == "!" {
 		issueCount = 1
 	}
 
-	return IssueEnricherResult{
-		IssueCount:   issueCount,
-		Truncated:    false,
-		TruncatedIDs: truncatedIDs,
-		Findings:     findings,
-		FieldUpdates: fieldUpdates,
-	}, nil
+	result.IssueCount = issueCount
+	result.Truncated = false
+	return result, nil
 }
 
 // sesAccountFinding derives the single account-level finding from GetAccount output.
-// Returns (finding, true) when a finding exists, or (zero, false) when the account
-// is healthy and below the quota threshold.
+// Returns (code, phrase, severityGlyph, rows, hasFinding) when a finding exists,
+// or ("", "", "", nil, false) when the account is healthy and below the quota threshold.
 //
-// U11 contract: Summary is the short S4 phrase only; per-account context lives in
-// Rows (Enforcement Status / Sent Last 24h / Max 24h Send). strings.Contains(Summary, rowValue) == false.
-func sesAccountFinding(out *sesv2.GetAccountOutput) (resource.EnrichmentFinding, bool) {
+// U11 contract: phrase is the short S4 phrase only; per-account context lives in
+// rows (Enforcement Status / Sent Last 24h / Max 24h Send). strings.Contains(phrase, rowValue) == false.
+func sesAccountFinding(out *sesv2.GetAccountOutput) (domain.FindingCode, string, string, []domain.DetailRow, bool) {
 	if out == nil {
-		return resource.EnrichmentFinding{}, false
+		return "", "", "", nil, false
 	}
 
 	enforcementStatus := ""
@@ -106,20 +102,12 @@ func sesAccountFinding(out *sesv2.GetAccountOutput) (resource.EnrichmentFinding,
 
 	switch enforcementStatus {
 	case "SHUTDOWN":
-		return resource.EnrichmentFinding{
-			Severity: "!",
-			Summary:  "account SHUTDOWN",
-			Rows: []resource.FindingRow{
-				{Label: "Action", Value: "Open an AWS support case after fixing the underlying issue", Tier: "!"},
-			},
+		return sesCodeShutdown, "account SHUTDOWN", "!", []domain.DetailRow{
+			{Label: "Action", Value: "Open an AWS support case after fixing the underlying issue", Tier: "!"},
 		}, true
 	case "PROBATION":
-		return resource.EnrichmentFinding{
-			Severity: "!",
-			Summary:  "account PROBATION",
-			Rows: []resource.FindingRow{
-				{Label: "Action", Value: "Reduce bounce/complaint rate before AWS suspends sending", Tier: "!"},
-			},
+		return sesCodeProbation, "account PROBATION", "!", []domain.DetailRow{
+			{Label: "Action", Value: "Reduce bounce/complaint rate before AWS suspends sending", Tier: "!"},
 		}, true
 	}
 
@@ -130,16 +118,12 @@ func sesAccountFinding(out *sesv2.GetAccountOutput) (resource.EnrichmentFinding,
 		if sent > 0.8*max {
 			sentStr := strconv.FormatFloat(sent, 'f', -1, 64)
 			maxStr := strconv.FormatFloat(max, 'f', -1, 64)
-			return resource.EnrichmentFinding{
-				Severity: "~",
-				Summary:  "quota 80%+ used",
-				Rows: []resource.FindingRow{
-					{Label: "Sent Last 24h", Value: sentStr, Tier: "~"},
-					{Label: "Max 24h Send", Value: maxStr},
-				},
+			return sesCodeQuota, "quota 80%+ used", "~", []domain.DetailRow{
+				{Label: "Sent Last 24h", Value: sentStr, Tier: "~"},
+				{Label: "Max 24h Send", Value: maxStr},
 			}, true
 		}
 	}
 
-	return resource.EnrichmentFinding{}, false
+	return "", "", "", nil, false
 }

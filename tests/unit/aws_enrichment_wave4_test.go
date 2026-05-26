@@ -26,6 +26,7 @@ import (
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -767,18 +768,19 @@ func TestEnrichEBSVolumeStatus_WarningStatusProducesFinding(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding for volume with status 'warning'")
 	}
-	if f.Severity != "!" {
-		t.Errorf("severity = %q, want %q", f.Severity, "!")
+	if f.Severity != domain.SevBroken {
+		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
-	if f.Summary != "volume I/O degraded" {
-		t.Errorf("summary = %q, want %q", f.Summary, "volume I/O degraded")
+	if f.Phrase != "volume I/O degraded" {
+		t.Errorf("summary = %q, want %q", f.Phrase, "volume I/O degraded")
 	}
 	// The I/O State row must reflect the actual status string.
-	if len(f.Rows) == 0 {
+	volWarnRows := result.AttentionDetails["vol-warn"].Rows
+	if len(volWarnRows) == 0 {
 		t.Fatal("expected at least one finding row")
 	}
-	if f.Rows[0].Value != "warning" {
-		t.Errorf("I/O State row value = %q, want %q", f.Rows[0].Value, "warning")
+	if volWarnRows[0].Value != "warning" {
+		t.Errorf("I/O State row value = %q, want %q", volWarnRows[0].Value, "warning")
 	}
 }
 
@@ -810,14 +812,13 @@ func TestEnrichEBSVolumeStatus_EventAndActionRowsPopulated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings["vol-events"]
-	if !ok {
+	if _, ok := result.Findings["vol-events"]; !ok {
 		t.Fatalf("expected finding for impaired volume with events/actions")
 	}
 
 	hasEvent := false
 	hasAction := false
-	for _, row := range f.Rows {
+	for _, row := range result.AttentionDetails["vol-events"].Rows {
 		if row.Label == "Event" {
 			hasEvent = true
 			if !strings.Contains(row.Value, "degraded") {

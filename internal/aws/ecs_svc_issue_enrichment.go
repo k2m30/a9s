@@ -11,7 +11,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// ecs-svc canonical FindingCodes.
+const (
+	ecsSvcCodeDeploymentFailed domain.FindingCode = "ecs-svc.deployment-failed"
 )
 
 // EnrichECSServices is a Wave 2 enricher for ECS services.
@@ -22,10 +28,12 @@ import (
 //   - runningCount < desiredCount with no IN_PROGRESS deployment → "!" finding
 //   - Recent events (last 10m) containing "unable to place" or "ELB health checks failed" → "!" finding
 func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+	}
 	if clients.ECS == nil || len(resources) == 0 {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 
 	// Group service names by cluster name. Both fields are populated by FetchECSServicesPage.
@@ -69,7 +77,7 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 				for _, svcName := range batch {
 					failures = append(failures, fmt.Sprintf("%s/%s: %v", clusterName, svcName, err))
 					if r, ok := resourceByService[svcName]; ok {
-						truncatedIDs[r.ID] = true
+						result.TruncatedIDs[r.ID] = true
 					}
 				}
 				truncated = true
@@ -136,19 +144,19 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 					continue
 				}
 
-				var rows []resource.FindingRow
+				var rows []domain.DetailRow
 				for _, issue := range deploymentIssues {
-					rows = append(rows, resource.FindingRow{Label: "Deployment", Value: issue, Tier: "!"})
+					rows = append(rows, domain.DetailRow{Label: "Deployment", Value: issue, Tier: "!"})
 				}
 				if serviceStuck {
-					rows = append(rows, resource.FindingRow{
+					rows = append(rows, domain.DetailRow{
 						Label: "Tasks",
 						Value: fmt.Sprintf("running %d / desired %d (stuck)", svc.RunningCount, svc.DesiredCount),
 						Tier:  "!",
 					})
 				}
 				for _, issue := range eventIssues {
-					rows = append(rows, resource.FindingRow{Label: "Event", Value: issue, Tier: "!"})
+					rows = append(rows, domain.DetailRow{Label: "Event", Value: issue, Tier: "!"})
 				}
 
 				summary := "deployment failed"
@@ -158,15 +166,12 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 					summary = eventIssues[0]
 				}
 
-				findings[svcName] = resource.EnrichmentFinding{
-					Severity: "!",
-					Summary:  summary,
-					Rows:     rows,
-				}
+				setWave2Finding(&result, svcName, ecsSvcCodeDeploymentFailed, summary, "!", "ecs-svc", rows)
 			}
 		}
 	}
 
-	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings},
-		AggregateFailures("ecs-svc-enrich: DescribeServices", failures, total)
+	result.IssueCount = len(result.Findings)
+	result.Truncated = truncated
+	return result, AggregateFailures("ecs-svc-enrich: DescribeServices", failures, total)
 }

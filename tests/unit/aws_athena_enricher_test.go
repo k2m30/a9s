@@ -21,6 +21,7 @@ import (
 	athenatypes "github.com/aws/aws-sdk-go-v2/service/athena/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -158,11 +159,11 @@ func TestEnrichAthenaWorkGroup_NotEnforcedProducesFindingSevTilde(t *testing.T) 
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (not enforced)", athenaWG1)
 	}
-	if f.Severity != "~" {
-		t.Errorf("severity = %q, want %q", f.Severity, "~")
+	if f.Severity != domain.SevWarn {
+		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
-	if !strings.Contains(f.Summary, "Enforce") {
-		t.Errorf("summary %q must contain \"Enforce\"", f.Summary)
+	if !strings.Contains(f.Phrase, "Enforce") {
+		t.Errorf("summary %q must contain \"Enforce\"", f.Phrase)
 	}
 	if _, ok := result.Findings[athenaWG2]; ok {
 		t.Error("WG-2 must NOT appear in Findings — it is correctly configured")
@@ -195,11 +196,11 @@ func TestEnrichAthenaWorkGroup_NoEncryptionProducesFindingSevTilde(t *testing.T)
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (no encryption)", athenaWG1)
 	}
-	if f.Severity != "~" {
-		t.Errorf("severity = %q, want %q", f.Severity, "~")
+	if f.Severity != domain.SevWarn {
+		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
-	if !strings.Contains(strings.ToLower(f.Summary), "encryption") {
-		t.Errorf("summary %q must contain \"encryption\"", f.Summary)
+	if !strings.Contains(strings.ToLower(f.Phrase), "encryption") {
+		t.Errorf("summary %q must contain \"encryption\"", f.Phrase)
 	}
 	if _, ok := result.Findings[athenaWG2]; ok {
 		t.Error("WG-2 must NOT appear in Findings — it has encryption configured")

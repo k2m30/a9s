@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -26,7 +27,7 @@ func TestIssueEnricherFuncSignatureReturnsResult(t *testing.T) {
 		return awsclient.IssueEnricherResult{
 			IssueCount: 3,
 			Truncated:  true,
-			Findings:   make(map[string]resource.EnrichmentFinding),
+			Findings:   make(map[string]domain.Finding),
 		}, nil
 	})
 
@@ -57,7 +58,7 @@ func TestIssueEnricherFuncSignatureReturnsFalseWhenNotTruncated(t *testing.T) {
 		return awsclient.IssueEnricherResult{
 			IssueCount: 0,
 			Truncated:  false,
-			Findings:   make(map[string]resource.EnrichmentFinding),
+			Findings:   make(map[string]domain.Finding),
 		}, nil
 	})
 
@@ -94,7 +95,7 @@ func TestEnrichmentCapTruncation(t *testing.T) {
 		return awsclient.IssueEnricherResult{
 			IssueCount: 0,
 			Truncated:  len(resources) > awsclient.EnrichmentCap,
-			Findings:   make(map[string]resource.EnrichmentFinding),
+			Findings:   make(map[string]domain.Finding),
 		}, nil
 	})
 

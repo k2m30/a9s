@@ -27,6 +27,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -178,8 +179,8 @@ func TestHandleEnrichmentChecked_PartialErrAppliesState(t *testing.T) {
 	m := newRootSizedModel()
 	partialErr := errors.New("partial: enrichment timed out for 1 of 5 resources")
 
-	findings := map[string]resource.EnrichmentFinding{
-		"i-partial-001": {Severity: "!", Summary: "stopped instance"},
+	findings := map[string]domain.Finding{
+		"i-partial-001": {Code: "ec2.system.status.impaired", Phrase: "stopped instance", Severity: domain.SevBroken, Source: "wave2:ec2"},
 	}
 	fieldUpdates := map[string]map[string]string{
 		"i-partial-001": {"stop_reason": "user initiated"},

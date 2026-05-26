@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/config"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
@@ -107,9 +108,9 @@ func TestSpec_NoBanner_WhenFindingsOffViewport(t *testing.T) {
 	m.SetShowIssueBadge(true)
 	m.SetSize(120, 5) // tiny viewport — forces hidden findings
 	// Attach findings to rows that would be off-viewport after sort/filter.
-	findings := map[string]resource.EnrichmentFinding{
-		"i-001": {Severity: "!", Summary: "some finding"},
-		"i-002": {Severity: "!", Summary: "some finding"},
+	findings := map[string]domain.Finding{
+		"i-001": {Code: "ec2.system.status.impaired", Phrase: "some finding", Severity: domain.SevBroken, Source: "wave2:ec2"},
+		"i-002": {Code: "ec2.system.status.impaired", Phrase: "some finding", Severity: domain.SevBroken, Source: "wave2:ec2"},
 	}
 	m.SetEnrichmentState(2, false, findings)
 	view := stripANSISpec(m.View())
