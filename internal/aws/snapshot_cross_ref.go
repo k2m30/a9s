@@ -31,6 +31,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -85,10 +86,22 @@ type SnapshotCrossRefConfig struct {
 	RetentionEnabled bool
 
 	// Severity is the severity tier emitted on every FindingRow and on the
-	// EnrichmentFinding.Severity for this enricher's output. "!" for the
+	// domain.Finding.Severity for this enricher's output. "!" for the
 	// existing snapshot consumers (orphan + past-retention are operator-
 	// actionable). Future consumers may use "~" for informational signals.
+	// Internally mapped to domain.Severity via glyphToSeverity.
 	Severity string
+
+	// OrphanCode is the canonical FindingCode emitted when the orphan rule
+	// fires (e.g. "dbi-snap.orphan"). Required.
+	OrphanCode domain.FindingCode
+	// PastRetentionCode is the canonical FindingCode emitted when the past-
+	// retention rule fires (e.g. "dbi-snap.past-retention"). Required when
+	// RetentionEnabled is true.
+	PastRetentionCode domain.FindingCode
+	// ShortName is the resource short name used to stamp the Source field
+	// ("wave2:<short>") on every emitted Finding. Required.
+	ShortName string
 }
 
 // EnrichSnapshotCrossRef returns an IssueEnricherFunc that applies the
@@ -105,10 +118,13 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 		if severity == "" {
 			severity = "!"
 		}
+		sev := glyphToSeverity(severity)
+		source := "wave2:" + cfg.ShortName
 
 		result := IssueEnricherResult{
-			Findings:     make(map[string]resource.EnrichmentFinding),
-			TruncatedIDs: make(map[string]bool),
+			Findings:         make(map[string]domain.Finding),
+			AttentionDetails: make(map[string]domain.AttentionDetail),
+			TruncatedIDs:     make(map[string]bool),
 		}
 
 		// Skip rule per spec §3.1: the cross-ref enricher requires the parent
@@ -132,8 +148,9 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 
 			parentRaw, parentFound := parentByID[parentID]
 
-			var newPhrases []string
-			var rows []resource.FindingRow
+			var phrase string
+			var code domain.FindingCode
+			var rows []domain.DetailRow
 
 			switch {
 			case !parentFound:
@@ -143,8 +160,9 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 				if parentEntry.IsTruncated {
 					continue
 				}
-				newPhrases = append(newPhrases, cfg.OrphanPhrase)
-				rows = append(rows, resource.FindingRow{
+				phrase = cfg.OrphanPhrase
+				code = cfg.OrphanCode
+				rows = append(rows, domain.DetailRow{
 					Label: cfg.ParentRowLabel,
 					Value: parentID + " (not in loaded list)",
 					Tier:  severity,
@@ -167,18 +185,19 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 					continue
 				}
 				overD := ageD - retentionD
-				newPhrases = append(newPhrases, cfg.RetentionPhrase(overD))
-				rows = append(rows, resource.FindingRow{
+				phrase = cfg.RetentionPhrase(overD)
+				code = cfg.PastRetentionCode
+				rows = append(rows, domain.DetailRow{
 					Label: cfg.ParentRowLabel,
 					Value: parentID,
 					Tier:  severity,
 				})
-				rows = append(rows, resource.FindingRow{
+				rows = append(rows, domain.DetailRow{
 					Label: "Retention",
 					Value: fmt.Sprintf("%d days", retention),
 					Tier:  severity,
 				})
-				rows = append(rows, resource.FindingRow{
+				rows = append(rows, domain.DetailRow{
 					Label: "Created",
 					Value: createdAt.Format("2006-01-02"),
 					Tier:  severity,
@@ -188,21 +207,40 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 				continue
 			}
 
-			if len(newPhrases) == 0 {
+			if phrase == "" {
 				continue
 			}
 
-			// Findings emits the entries for the detail-view Attention section
+			// Findings emits the entry for the detail-view Attention section
 			// AND drives the S4 status column at render time via
 			// phraseFromFindings(r.Findings) (per AS-140).
-			result.Findings[res.ID] = resource.EnrichmentFinding{
-				Severity: severity,
-				Summary:  newPhrases[0],
-				Rows:     rows,
+			result.Findings[res.ID] = domain.Finding{
+				Code:     code,
+				Phrase:   phrase,
+				Severity: sev,
+				Source:   source,
+			}
+			if len(rows) > 0 {
+				result.AttentionDetails[res.ID] = domain.AttentionDetail{Rows: rows}
 			}
 		}
 
 		return result, nil
+	}
+}
+
+// glyphToSeverity maps a legacy "!" / "~" / "" severity glyph to the canonical
+// domain.Severity. Used by snapshot_cross_ref.go (and any other enricher
+// callsite that still parameterizes via glyph strings) until the per-enricher
+// migration replaces the glyph parameter with a typed domain.Severity.
+func glyphToSeverity(s string) domain.Severity {
+	switch s {
+	case "!":
+		return domain.SevBroken
+	case "~":
+		return domain.SevWarn
+	default:
+		return domain.SevDim
 	}
 }
 

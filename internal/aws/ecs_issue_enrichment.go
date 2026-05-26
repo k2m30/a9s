@@ -9,7 +9,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// ecs canonical FindingCodes.
+const (
+	ecsCodeClusterIssue domain.FindingCode = "ecs.cluster-issue"
 )
 
 // EnrichECSClusters is a Wave 2 enricher for ECS clusters.
@@ -22,10 +28,12 @@ import (
 // (informational) and do not contribute to the attention menu badge per the
 // IssueEnricherResult contract.
 func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+	}
 	if clients.ECS == nil || len(resources) == 0 {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 
 	clusterNames := make([]string, 0, len(resources))
@@ -71,11 +79,11 @@ func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources [
 			running := cluster.RunningTasksCount
 			registered := cluster.RegisteredContainerInstancesCount
 
-			var rows []resource.FindingRow
+			var rows []domain.DetailRow
 			var summaries []string
 
 			if pending > 0 {
-				rows = append(rows, resource.FindingRow{
+				rows = append(rows, domain.DetailRow{
 					Label: "Pending Tasks",
 					Value: fmt.Sprintf("%d tasks pending", pending),
 					Tier:  "~",
@@ -84,7 +92,7 @@ func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources [
 			}
 
 			if running == 0 && registered > 0 {
-				rows = append(rows, resource.FindingRow{
+				rows = append(rows, domain.DetailRow{
 					Label: "Tasks",
 					Value: fmt.Sprintf("no running tasks (%d container instances registered)", registered),
 					Tier:  "~",
@@ -97,15 +105,13 @@ func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources [
 			}
 
 			summary := strings.Join(summaries, "; ")
-			findings[name] = resource.EnrichmentFinding{
-				Severity: "~",
-				Summary:  summary,
-				Rows:     rows,
-			}
+			setWave2Finding(&result, name, ecsCodeClusterIssue, summary, "~", "ecs", rows)
 		}
 	}
 
 	// IssueCount is 0: all ECS cluster findings are "~" (informational) and
 	// do not contribute to the attention menu badge.
-	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	result.IssueCount = 0
+	result.Truncated = truncated
+	return result, nil
 }

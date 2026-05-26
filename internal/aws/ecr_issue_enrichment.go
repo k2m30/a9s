@@ -10,7 +10,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// ecr canonical FindingCodes.
+const (
+	ecrCodeVulnerabilities domain.FindingCode = "ecr.vulnerabilities"
 )
 
 // ECRImagesPerRepo caps how many recent images are inspected per repository.
@@ -41,15 +47,17 @@ const ECRImagesPerRepo = 10
 // Repositories without scan data (unscanned images) contribute zero counts
 // silently — AWS returns a nil ImageScanFindingsSummary for those.
 func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	fieldUpdates := make(map[string]map[string]string)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+		FieldUpdates: make(map[string]map[string]string),
+	}
 	if clients == nil || clients.ECR == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	describeAPI, ok := clients.ECR.(ECRDescribeImagesAPI)
 	if !ok {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 
 	truncated := len(resources) > EnrichmentCap
@@ -79,7 +87,7 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
-			truncatedIDs[r.ID] = true
+			result.TruncatedIDs[r.ID] = true
 			continue
 		}
 
@@ -102,7 +110,7 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 			}
 		}
 
-		fieldUpdates[r.ID] = map[string]string{
+		result.FieldUpdates[r.ID] = map[string]string{
 			"critical_vulns": strconv.FormatInt(int64(criticalTotal), 10),
 			"high_vulns":     strconv.FormatInt(int64(highTotal), 10),
 			"images_scanned": strconv.Itoa(scannedCount),
@@ -112,36 +120,33 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 			continue
 		}
 
-		var rows []resource.FindingRow
+		var rows []domain.DetailRow
 		tier := "~"
 		if criticalTotal > 0 {
 			tier = "!"
-			rows = append(rows, resource.FindingRow{
+			rows = append(rows, domain.DetailRow{
 				Label: "CRITICAL",
 				Value: fmt.Sprintf("%d CRITICAL findings across %d image(s)", criticalTotal, scannedCount),
 				Tier:  "!",
 			})
 		}
 		if highTotal > 0 {
-			rows = append(rows, resource.FindingRow{
+			rows = append(rows, domain.DetailRow{
 				Label: "HIGH",
 				Value: fmt.Sprintf("%d HIGH findings across %d image(s)", highTotal, scannedCount),
 				Tier:  "~",
 			})
 		}
-		findings[r.ID] = resource.EnrichmentFinding{
-			Severity: tier,
-			Summary:  rows[0].Value,
-			Rows:     rows,
-		}
+		setWave2Finding(&result, r.ID, ecrCodeVulnerabilities, rows[0].Value, tier, "ecr", rows)
 	}
 
 	issueCount := 0
-	for _, f := range findings {
-		if f.Severity == "!" {
+	for _, f := range result.Findings {
+		if f.Severity == domain.SevBroken {
 			issueCount++
 		}
 	}
-	return IssueEnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates},
-		AggregateFailures("ecr-enrich: DescribeImages", failures, total)
+	result.IssueCount = issueCount
+	result.Truncated = truncated
+	return result, AggregateFailures("ecr-enrich: DescribeImages", failures, total)
 }

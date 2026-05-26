@@ -78,9 +78,9 @@ func TestEnrichDBCSnapCrossRef_FailedPlusOrphan(t *testing.T) {
 	if !hasFinding {
 		t.Fatal("Findings[\"snap-failed\"] missing; want orphan finding from cross-ref enricher")
 	}
-	if finding.Summary != "orphan: source cluster deleted" {
+	if finding.Phrase != "orphan: source cluster deleted" {
 		t.Errorf("Findings[\"snap-failed\"].Summary = %q, want %q",
-			finding.Summary, "orphan: source cluster deleted")
+			finding.Phrase, "orphan: source cluster deleted")
 	}
 
 	// AS-140: FieldUpdates must be empty — the merged "failed (+1)" stack is
@@ -178,8 +178,8 @@ func TestEnrichDBCSnapCrossRef_RDSShape_OrphanAndPastRetention(t *testing.T) {
 		if !ok {
 			t.Fatal("expected orphan finding for rdstypes.DBClusterSnapshot, got none")
 		}
-		if finding.Summary != "orphan: source cluster deleted" {
-			t.Errorf("Summary = %q, want %q", finding.Summary, "orphan: source cluster deleted")
+		if finding.Phrase != "orphan: source cluster deleted" {
+			t.Errorf("Summary = %q, want %q", finding.Phrase, "orphan: source cluster deleted")
 		}
 		// AS-140: FieldUpdates must be empty — merged phrase is computed at
 		// render time by phraseFromFindings(r.Findings).
@@ -225,12 +225,12 @@ func TestEnrichDBCSnapCrossRef_RDSShape_OrphanAndPastRetention(t *testing.T) {
 		if !ok {
 			t.Fatal("expected past-retention finding for rdstypes automated snapshot")
 		}
-		if !strings.Contains(finding.Summary, "automated") || !strings.Contains(finding.Summary, "past retention") {
-			t.Errorf("Summary = %q; want automated + past retention", finding.Summary)
+		if !strings.Contains(finding.Phrase, "automated") || !strings.Contains(finding.Phrase, "past retention") {
+			t.Errorf("Summary = %q; want automated + past retention", finding.Phrase)
 		}
 		// 25 - 7 = 18 days over retention
-		if !strings.Contains(finding.Summary, "18d") {
-			t.Errorf("Summary days-over should be 18 (25 - 7), got %q", finding.Summary)
+		if !strings.Contains(finding.Phrase, "18d") {
+			t.Errorf("Summary days-over should be 18 (25 - 7), got %q", finding.Phrase)
 		}
 	})
 }

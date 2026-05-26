@@ -12,7 +12,14 @@ import (
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	smithy "github.com/aws/smithy-go"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// iam-user canonical FindingCodes.
+const (
+	iamUserCodeNoMFA   domain.FindingCode = "iam-user.no-mfa"
+	iamUserCodeOldKey  domain.FindingCode = "iam-user.old-key"
 )
 
 // EnrichIAMUserMFA calls GetLoginProfile + ListMFADevices + ListAccessKeys per user
@@ -24,17 +31,19 @@ import (
 //
 // Skip when clients.IAM == nil.
 func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	fieldUpdates := make(map[string]map[string]string)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+		FieldUpdates: make(map[string]map[string]string),
+	}
 	if clients.IAM == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	loginProfileAPI, ok1 := clients.IAM.(IAMGetLoginProfileAPI)
 	mfaAPI, ok2 := clients.IAM.(IAMListMFADevicesAPI)
 	accessKeyAPI, ok3 := clients.IAM.(IAMListAccessKeysAPI)
 	if !ok1 || !ok2 || !ok3 {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 
 	truncated := len(resources) > EnrichmentCap
@@ -64,7 +73,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			if !isNoSuchEntity {
 				// Unexpected error — skip this user but flag truncation.
 				truncated = true
-				truncatedIDs[r.ID] = true
+				result.TruncatedIDs[r.ID] = true
 				continue
 			}
 			// NoSuchEntityException means the user has no console password.
@@ -72,7 +81,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			hasConsolePassword = true
 		}
 
-		var rows []resource.FindingRow
+		var rows []domain.DetailRow
 		severity := "~"
 		hasMFA := false
 		riskLabel := ""
@@ -84,12 +93,12 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			})
 			if mfaErr != nil {
 				truncated = true
-				truncatedIDs[r.ID] = true
+				result.TruncatedIDs[r.ID] = true
 				continue
 			}
 			hasMFA = len(mfaOut.MFADevices) > 0
 			if !hasMFA {
-				rows = append(rows, resource.FindingRow{
+				rows = append(rows, domain.DetailRow{
 					Label: "MFA",
 					Value: "console user without MFA (CIS IAM.5)",
 					Tier:  "!",
@@ -106,7 +115,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 		})
 		if keysErr != nil {
 			truncated = true
-			truncatedIDs[r.ID] = true
+			result.TruncatedIDs[r.ID] = true
 			continue
 		}
 		hasOldKey := false
@@ -123,7 +132,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 				if key.AccessKeyId != nil {
 					keyID = *key.AccessKeyId
 				}
-				rows = append(rows, resource.FindingRow{
+				rows = append(rows, domain.DetailRow{
 					Label: "Access Key",
 					Value: fmt.Sprintf("key %s >90d (rotation)", keyID),
 					Tier:  "~",
@@ -140,7 +149,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 		if hasMFA || !hasConsolePassword {
 			mfaVal = "true"
 		}
-		fieldUpdates[r.ID] = map[string]string{
+		result.FieldUpdates[r.ID] = map[string]string{
 			"mfa":  mfaVal,
 			"risk": riskLabel,
 		}
@@ -148,11 +157,14 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 		if len(rows) == 0 {
 			continue
 		}
-		findings[r.ID] = resource.EnrichmentFinding{
-			Severity: severity,
-			Summary:  rows[0].Value,
-			Rows:     rows,
+		// Use the no-mfa code when severity is "!", otherwise old-key code.
+		code := iamUserCodeOldKey
+		if severity == "!" {
+			code = iamUserCodeNoMFA
 		}
+		setWave2Finding(&result, r.ID, code, rows[0].Value, severity, "iam-user", rows)
 	}
-	return IssueEnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	result.IssueCount = issueCount
+	result.Truncated = truncated
+	return result, nil
 }

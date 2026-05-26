@@ -23,6 +23,7 @@ import (
 	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -98,8 +99,8 @@ func TestEnrichCodeBuildStatus_FailedBuildFindingKeyedByProjectName(t *testing.T
 	if !ok {
 		t.Fatalf("expected finding keyed by project name %q", "my-project")
 	}
-	if f.Severity != "!" {
-		t.Errorf("severity = %q, want %q", f.Severity, "!")
+	if f.Severity != domain.SevBroken {
+		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
 }
 
@@ -124,7 +125,7 @@ func TestEnrichCodeBuildStatus_SummaryContainsDateAndStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	summary := result.Findings["proj-a"].Summary
+	summary := result.Findings["proj-a"].Phrase
 	// Must contain the status (FAILED) and the date in YYYY-MM-DD format.
 	if !strings.Contains(summary, "FAILED") {
 		t.Errorf("summary %q must contain %q", summary, "FAILED")

@@ -88,7 +88,7 @@ func TestEnrichStepFunctionsStatus_SummaryContainsFAILED(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	summary := result.Findings[smName].Summary
+	summary := result.Findings[smName].Phrase
 	if !strings.Contains(summary, "FAILED") {
 		t.Errorf("summary %q must contain %q", summary, "FAILED")
 	}
@@ -106,7 +106,7 @@ func TestEnrichStepFunctionsStatus_SummaryTimedOut(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	summary := result.Findings[smName].Summary
+	summary := result.Findings[smName].Phrase
 	// Status token from SDK is "TIMED_OUT" — just verify it contains the key distinguisher
 	if !strings.Contains(summary, "TIMED_OUT") {
 		t.Errorf("summary %q must contain %q", summary, "TIMED_OUT")
@@ -125,7 +125,7 @@ func TestEnrichStepFunctionsStatus_SummaryAborted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	summary := result.Findings[smName].Summary
+	summary := result.Findings[smName].Phrase
 	if !strings.Contains(summary, "ABORTED") {
 		t.Errorf("summary %q must contain %q", summary, "ABORTED")
 	}

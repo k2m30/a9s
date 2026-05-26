@@ -23,6 +23,7 @@ import (
 	kafkatypes "github.com/aws/aws-sdk-go-v2/service/kafka/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -295,8 +296,8 @@ func TestEnrichIAMPolicy_NoRawStructARNFallbackFromID(t *testing.T) {
 	if _, ok := result.Findings[iamPolicyARN1]; !ok {
 		t.Errorf("expected admin-star finding via ARN fallback from r.ID, got %d findings", len(result.Findings))
 	}
-	if result.Findings[iamPolicyARN1].Severity != "!" {
-		t.Errorf("severity = %q, want %q", result.Findings[iamPolicyARN1].Severity, "!")
+	if result.Findings[iamPolicyARN1].Severity != domain.SevBroken {
+		t.Errorf("severity = %v, want SevBroken", result.Findings[iamPolicyARN1].Severity)
 	}
 }
 
@@ -518,12 +519,12 @@ func TestEnrichASGScalingActivities_FailedWithStatusMessageSummarized(t *testing
 		t.Fatalf("expected finding for capacity-asg, got none")
 	}
 	// Summary must contain the status message.
-	if !strings.Contains(f.Summary, statusMsg) {
-		t.Errorf("summary %q must contain status message %q", f.Summary, statusMsg)
+	if !strings.Contains(f.Phrase, statusMsg) {
+		t.Errorf("summary %q must contain status message %q", f.Phrase, statusMsg)
 	}
 	// Rows must include a "Message" row.
 	var hasMessageRow, hasCauseRow, hasStartedRow bool
-	for _, row := range f.Rows {
+	for _, row := range result.AttentionDetails["capacity-asg"].Rows {
 		switch row.Label {
 		case "Message":
 			hasMessageRow = true
@@ -582,10 +583,10 @@ func TestEnrichASGScalingActivities_FailedWithoutStatusMessagePlainSummary(t *te
 	if !ok {
 		t.Fatalf("expected finding for silent-fail-asg")
 	}
-	if f.Summary != "latest scaling activity failed" {
-		t.Errorf("summary = %q, want %q", f.Summary, "latest scaling activity failed")
+	if f.Phrase != "latest scaling activity failed" {
+		t.Errorf("summary = %q, want %q", f.Phrase, "latest scaling activity failed")
 	}
-	for _, row := range f.Rows {
+	for _, row := range result.AttentionDetails["silent-fail-asg"].Rows {
 		if row.Label == "Message" {
 			t.Error("rows must NOT contain a Message label when StatusMessage is nil")
 		}
@@ -699,12 +700,11 @@ func TestEnrichCodePipelineStatus_ActionErrorDetailsAppended(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings["err-pipe-id"]
-	if !ok {
+	if _, ok := result.Findings["err-pipe-id"]; !ok {
 		t.Fatalf("expected finding for err-pipe-id, got none")
 	}
 	var hasErrorRow bool
-	for _, row := range f.Rows {
+	for _, row := range result.AttentionDetails["err-pipe-id"].Rows {
 		if row.Label == "Error" {
 			hasErrorRow = true
 			if row.Value != errMsg {
@@ -746,11 +746,10 @@ func TestEnrichCodePipelineStatus_ActionNilExecutionSkipped(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f, ok := result.Findings["nil-exec-pipe"]
-	if !ok {
+	if _, ok := result.Findings["nil-exec-pipe"]; !ok {
 		t.Fatalf("expected finding for nil-exec-pipe")
 	}
-	for _, row := range f.Rows {
+	for _, row := range result.AttentionDetails["nil-exec-pipe"].Rows {
 		if row.Label == "Error" {
 			t.Error("no Error row should be appended when action LatestExecution is nil")
 		}
@@ -819,19 +818,19 @@ func TestEnrichMSKCluster_VersionBoundaries(t *testing.T) {
 
 			// Findings are keyed by r.ID = bare cluster name, not the ARN.
 			f, hasFinding := result.Findings[mskNameForVersionTests]
-			isOutdatedFinding := hasFinding && f.Summary == "broker software outdated"
+			isOutdatedFinding := hasFinding && f.Phrase == "broker software outdated"
 
 			if tc.wantOutdated && !isOutdatedFinding {
 				summary := ""
 				if hasFinding {
-					summary = f.Summary
+					summary = f.Phrase
 				}
 				t.Errorf("version %q: expected 'broker software outdated' finding, got hasFinding=%v summary=%q",
 					tc.version, hasFinding, summary)
 			}
 			if !tc.wantOutdated && isOutdatedFinding {
 				t.Errorf("version %q: expected no outdated finding, got one with summary %q",
-					tc.version, f.Summary)
+					tc.version, f.Phrase)
 			}
 		})
 	}

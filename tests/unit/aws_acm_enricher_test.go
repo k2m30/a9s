@@ -23,6 +23,7 @@ import (
 	acmtypes "github.com/aws/aws-sdk-go-v2/service/acm/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -162,11 +163,11 @@ func TestEnrichACMCertificate_ExpiringSoonProducesFindingSevBang(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding keyed by bare domain %q", acmDomain1)
 	}
-	if f.Severity != "!" {
-		t.Errorf("severity = %q, want %q", f.Severity, "!")
+	if f.Severity != domain.SevBroken {
+		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
-	if !strings.Contains(strings.ToLower(f.Summary), "expires") {
-		t.Errorf("summary %q must contain \"expires\"", f.Summary)
+	if !strings.Contains(strings.ToLower(f.Phrase), "expires") {
+		t.Errorf("summary %q must contain \"expires\"", f.Phrase)
 	}
 	if _, ok := result.Findings[acmDomain2]; ok {
 		t.Error("cert-2 must NOT appear in Findings — it is not expiring soon")
@@ -201,8 +202,8 @@ func TestEnrichACMCertificate_ExpiredProducesFindingSevBang(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding keyed by bare domain %q", acmDomain1)
 	}
-	if f.Severity != "!" {
-		t.Errorf("severity = %q, want %q", f.Severity, "!")
+	if f.Severity != domain.SevBroken {
+		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
 	if _, ok := result.Findings[acmDomain2]; ok {
 		t.Error("cert-2 must NOT appear in Findings — it is valid")
@@ -237,8 +238,8 @@ func TestEnrichACMCertificate_OrphanIssuedProducesFindingSevTilde(t *testing.T) 
 	if !ok {
 		t.Fatalf("expected finding keyed by bare domain %q (orphan cert)", acmDomain1)
 	}
-	if f.Severity != "~" {
-		t.Errorf("severity = %q, want %q", f.Severity, "~")
+	if f.Severity != domain.SevWarn {
+		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
 	if _, ok := result.Findings[acmDomain2]; ok {
 		t.Error("cert-2 must NOT appear in Findings — it is in use")

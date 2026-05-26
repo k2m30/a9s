@@ -9,12 +9,18 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // nowFunc is the time source for overdue-date checks. Tests override it to a
 // fixed past/future anchor via package-level replacement.
 var nowFunc = time.Now
+
+// dbc canonical FindingCodes.
+const (
+	dbcCodeMaintenanceOverdue domain.FindingCode = "dbc.maintenance-overdue"
+)
 
 // EnrichDBCMaintenance calls DescribePendingMaintenanceActions (account-wide,
 // paginated) and emits one Finding per dbc cluster with overdue maintenance.
@@ -27,11 +33,14 @@ var nowFunc = time.Now
 // "stopped (+1)" stacked over a Wave-1 finding) is computed at render time
 // from r.Findings via phraseFromFindings; this enricher only emits Findings.
 func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+		FieldUpdates: make(map[string]map[string]string),
+	}
 
 	if clients == nil || clients.DocDB == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs, FieldUpdates: make(map[string]map[string]string)}, nil
+		return result, nil
 	}
 
 	// Deterministic ARN-suffix matching via ordered probeIDs. AS-140 removed
@@ -106,29 +115,25 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 			// Build rows. Summary is the short S5 phrase; every concrete fact
 			// (Action, Description, Earliest Target, Apply Method) lives only in
 			// Rows so the Attention section does not render duplicated content (U11).
-			var rows []resource.FindingRow
+			var rows []domain.DetailRow
 			for _, pa := range action.PendingMaintenanceActionDetails {
 				if pa.Action != nil && *pa.Action != "" {
-					rows = append(rows, resource.FindingRow{Label: "Action", Value: *pa.Action, Tier: "!"})
+					rows = append(rows, domain.DetailRow{Label: "Action", Value: *pa.Action, Tier: "!"})
 				}
 				if pa.OptInStatus != nil && *pa.OptInStatus != "" {
-					rows = append(rows, resource.FindingRow{Label: "Apply Method", Value: *pa.OptInStatus})
+					rows = append(rows, domain.DetailRow{Label: "Apply Method", Value: *pa.OptInStatus})
 				}
 				if pa.AutoAppliedAfterDate != nil {
-					rows = append(rows, resource.FindingRow{Label: "Earliest Target", Value: formatDate(pa.AutoAppliedAfterDate), Tier: "!"})
+					rows = append(rows, domain.DetailRow{Label: "Earliest Target", Value: formatDate(pa.AutoAppliedAfterDate), Tier: "!"})
 				} else if pa.ForcedApplyDate != nil {
-					rows = append(rows, resource.FindingRow{Label: "Earliest Target", Value: formatDate(pa.ForcedApplyDate), Tier: "!"})
+					rows = append(rows, domain.DetailRow{Label: "Earliest Target", Value: formatDate(pa.ForcedApplyDate), Tier: "!"})
 				}
 				if pa.Description != nil && *pa.Description != "" {
-					rows = append(rows, resource.FindingRow{Label: "Description", Value: *pa.Description})
+					rows = append(rows, domain.DetailRow{Label: "Description", Value: *pa.Description})
 				}
 			}
 
-			findings[key] = resource.EnrichmentFinding{
-				Severity: "!",
-				Summary:  "maintenance overdue",
-				Rows:     rows,
-			}
+			setWave2Finding(&result, key, dbcCodeMaintenanceOverdue, "maintenance overdue", "!", "dbc", rows)
 			issueCount++
 		}
 
@@ -138,13 +143,9 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 		marker = out.Marker
 	}
 
-	return IssueEnricherResult{
-		IssueCount:   issueCount, // "!" findings bump the S1 badge
-		Truncated:    truncated,
-		TruncatedIDs: truncatedIDs,
-		Findings:     findings,
-		FieldUpdates: make(map[string]map[string]string),
-	}, AggregateFailures("dbc-enrich: DescribePendingMaintenanceActions", failures, pages)
+	result.IssueCount = issueCount // "!" findings bump the S1 badge
+	result.Truncated = truncated
+	return result, AggregateFailures("dbc-enrich: DescribePendingMaintenanceActions", failures, pages)
 }
 
 // isClusterARN returns true when the ARN's resource-type segment is "cluster".

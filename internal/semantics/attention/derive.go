@@ -1,16 +1,17 @@
 // Package attention holds the Phase-03 canonical-finding derivation shim.
 //
-// DeriveFindings is a one-way bridge from the legacy Resource.Status +
-// Resource.Issues + Wave-2 EnrichmentFinding model to the new
-// Resource.Findings + Resource.AttentionDetails model. Until per-category
-// PRs (03b–m) migrate fetchers to write Findings directly, every entry
-// point that surfaces a Resource to view code calls DeriveFindings to
-// populate the new fields.
+// DeriveFindings is a Wave-1-only one-way bridge from the legacy
+// Resource.Status + Resource.Issues model to the new Resource.Findings model.
+// Wave-2 entries are appended downstream by runtime.Core.applyEnrichment using
+// the typed Finding + AttentionDetail emitted by each enricher (post-AS-1395
+// type swap). Until per-category PRs (03b–m) migrate fetchers to write
+// Findings directly, every entry point that surfaces a Resource to view code
+// calls DeriveFindings to populate the new fields.
 //
 // The function is deterministic — re-derives every call from inputs, never
 // early-returns on len(r.Findings) > 0. The Wave 2 bridge depends on this:
-// EnrichmentCheckedMsg arrives after the first derive call has already run,
-// and the second call must re-merge the just-populated parallel map.
+// applyEnrichment re-runs derive before each Wave-2 append so stale Wave-2
+// entries do not accumulate across reruns.
 package attention
 
 import (
@@ -22,21 +23,20 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// DeriveFindings populates r.Findings and r.AttentionDetails from r.Status,
-// r.Issues, and the supplied enrichmentFindings keyed by resource ID.
-// Caller passes m.EnrichmentFindings[resourceType] as the third arg.
+// DeriveFindings populates r.Findings from r.Status + r.Issues (Wave-1 only).
+// Replaces — never appends to — r.Findings and r.AttentionDetails so stale
+// entries from prior runs are discarded.
 //
 // Output contract:
-//   - r.Findings:        wave1 issue entries only (lifecycle steady-state
-//     phrases are filtered), then wave2 entry if
-//     enrichmentFindings[r.ID] exists.
-//   - r.AttentionDetails: keyed by FindingCode; only contains the wave2 entry
-//     when present.
-//   - Healthy row (no Status, no Issues, no enrichment): both fields nil.
-//   - Replacement, not append: stale prior entries are discarded.
+//   - r.Findings:         wave1 issue entries only (lifecycle steady-state
+//     phrases are filtered).
+//   - r.AttentionDetails: cleared (nil).  Wave-2 callers (applyEnrichment)
+//     are responsible for appending the wave2 Finding and writing the
+//     companion AttentionDetail keyed by FindingCode after this call.
+//   - Healthy row (no Status, no Issues): both fields nil.
 //
 // Safe on nil r (no-op).
-func DeriveFindings(r *domain.Resource, td resource.ResourceTypeDef, enrichmentFindings map[string]resource.EnrichmentFinding) {
+func DeriveFindings(r *domain.Resource, td resource.ResourceTypeDef) {
 	if r == nil {
 		return
 	}
@@ -78,33 +78,8 @@ func DeriveFindings(r *domain.Resource, td resource.ResourceTypeDef, enrichmentF
 		}
 	}
 
-	// Wave 2: at most one finding per resource per type.
-	var attn map[domain.FindingCode]domain.AttentionDetail
-	if ef, ok := enrichmentFindings[r.ID]; ok && ef.Summary != "" {
-		code := domain.FindingCode(td.ShortName + "." + slug(ef.Summary))
-		findings = append(findings, domain.Finding{
-			Code:     code,
-			Phrase:   ef.Summary,
-			Severity: severityFromMarker(ef.Severity),
-			Source:   "wave2:" + td.ShortName,
-		})
-		if len(ef.Rows) > 0 {
-			rows := make([]domain.DetailRow, 0, len(ef.Rows))
-			for _, row := range ef.Rows {
-				rows = append(rows, domain.DetailRow{
-					Label: row.Label,
-					Value: row.Value,
-					Tier:  row.Tier,
-				})
-			}
-			attn = map[domain.FindingCode]domain.AttentionDetail{
-				code: {Rows: rows},
-			}
-		}
-	}
-
 	r.Findings = findings
-	r.AttentionDetails = attn
+	r.AttentionDetails = nil
 }
 
 // DeriveWave1Only re-derives only the wave1 portion of r.Findings from r.Status
@@ -113,8 +88,8 @@ func DeriveFindings(r *domain.Resource, td resource.ResourceTypeDef, enrichmentF
 // wave2 findings written by applyEnrichment (PR-03a-fold) are not wiped when a
 // resource is re-derived at a later site (e.g. cache-hit navigation, lazy add).
 //
-// The EnrichmentChecked handler uses applyEnrichment which calls the full
-// DeriveFindings with the new wave2 inputs.
+// The EnrichmentChecked handler uses applyEnrichment which re-derives wave1
+// and then appends the new wave2 entry directly.
 //
 // Safe on nil r (no-op).
 func DeriveWave1Only(r *domain.Resource, td resource.ResourceTypeDef) {
@@ -137,8 +112,7 @@ func DeriveWave1Only(r *domain.Resource, td resource.ResourceTypeDef) {
 			}
 		}
 	}
-	// Re-derive wave1 only (nil enrichment = no wave2 emitted).
-	DeriveFindings(r, td, nil)
+	DeriveFindings(r, td)
 	// Re-append the saved wave2 entries.
 	r.Findings = append(r.Findings, wave2...)
 	if len(wave2Attn) > 0 {
@@ -147,22 +121,6 @@ func DeriveWave1Only(r *domain.Resource, td resource.ResourceTypeDef) {
 		} else {
 			maps.Copy(r.AttentionDetails, wave2Attn)
 		}
-	}
-}
-
-// severityFromMarker maps an EnrichmentFinding.Severity glyph to a domain.Severity.
-//
-//	"!" -> SevBroken (degraded/failed)
-//	"~" -> SevWarn   (scheduled/informational)
-//	any other (incl. "") -> SevDim (unknown)
-func severityFromMarker(s string) domain.Severity {
-	switch s {
-	case "!":
-		return domain.SevBroken
-	case "~":
-		return domain.SevWarn
-	default:
-		return domain.SevDim
 	}
 }
 

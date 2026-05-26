@@ -100,8 +100,8 @@ func TestEnrichRDSDocDBMaintenance_SeverityTilde(t *testing.T) {
 	if !ok {
 		t.Fatal("expected finding for my-db")
 	}
-	if f.Severity != "~" {
-		t.Errorf("severity = %q, want %q", f.Severity, "~")
+	if f.Severity != domain.SevWarn {
+		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
 }
 
@@ -126,11 +126,11 @@ func TestEnrichRDSDocDBMaintenance_SummaryFormat(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	f := result.Findings["my-db"]
-	if !strings.HasPrefix(f.Summary, "pending maintenance") {
-		t.Errorf("summary %q does not start with %q", f.Summary, "pending maintenance")
+	if !strings.HasPrefix(f.Phrase, "pending maintenance") {
+		t.Errorf("summary %q does not start with %q", f.Phrase, "pending maintenance")
 	}
-	if !strings.Contains(f.Summary, "system-update") {
-		t.Errorf("summary %q does not contain action name %q", f.Summary, "system-update")
+	if !strings.Contains(f.Phrase, "system-update") {
+		t.Errorf("summary %q does not contain action name %q", f.Phrase, "system-update")
 	}
 }
 
@@ -320,11 +320,11 @@ func TestEnrichDBI_Wave1StoppedPlusWave2_StackedFindings_AS140(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected wave-2 Finding for %q; result.Findings keys = %v", resourceID, findingKeys(result.Findings))
 	}
-	if wave2.Summary != "pending maintenance" {
-		t.Errorf("wave-2 Summary = %q, want %q", wave2.Summary, "pending maintenance")
+	if wave2.Phrase != "pending maintenance" {
+		t.Errorf("wave-2 Phrase = %q, want %q", wave2.Phrase, "pending maintenance")
 	}
-	if wave2.Severity != "~" {
-		t.Errorf("wave-2 Severity = %q, want %q", wave2.Severity, "~")
+	if wave2.Severity != domain.SevWarn {
+		t.Errorf("wave-2 Severity = %v, want SevWarn", wave2.Severity)
 	}
 
 	// AS-140: result.FieldUpdates must be empty — the merged "stopped (+1)"
