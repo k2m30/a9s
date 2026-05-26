@@ -154,10 +154,19 @@ func colorMSK(r domain.Resource) domain.Color {
 }
 
 func colorSES(r domain.Resource) domain.Color {
+	// AS-1397: Wave-2 SES findings (account SHUTDOWN/PROBATION/quota) live in
+	// r.Findings with Source="wave2:ses"; FieldUpdates["status"] is no longer
+	// written. Wave-1 (verification/sending) is in Fields["status"] from the
+	// SES fetcher's sesTopPhrase. Wave-2 wins when present — Severity drives
+	// the color directly.
+	for i := range r.Findings {
+		if r.Findings[i].Source == "wave2:ses" {
+			return colorFromSeverity(r.Findings[i].Severity)
+		}
+	}
 	phrase := stripFindingSuffix(r.Fields["status"])
 	switch phrase {
-	case "verification failed", "verify: temp failure", "verification not started",
-		"account SHUTDOWN", "account PROBATION":
+	case "verification failed", "verify: temp failure", "verification not started":
 		return domain.ColorBroken
 	case "pending verification", "sending disabled":
 		return domain.ColorWarning
