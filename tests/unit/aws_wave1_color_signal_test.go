@@ -164,6 +164,70 @@ func TestCfnResources_ColorSignal(t *testing.T) {
 	}
 }
 
+func fetchOneCfnEvent(t *testing.T, status cfntypes.ResourceStatus) resource.Resource {
+	t.Helper()
+	mock := &mockCFNDescribeStackEventsClient{
+		outputs: []*cloudformation.DescribeStackEventsOutput{{
+			StackEvents: []cfntypes.StackEvent{{
+				EventId:           aws.String("evt-1"),
+				LogicalResourceId: aws.String("MyResource"),
+				ResourceType:      aws.String("AWS::S3::Bucket"),
+				ResourceStatus:    status,
+				Timestamp:         aws.Time(time.Now()),
+			}},
+		}},
+	}
+	result, err := awsclient.FetchCfnEvents(context.Background(), mock, "my-stack", "")
+	if err != nil {
+		t.Fatalf("FetchCfnEvents: %v", err)
+	}
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(result.Resources))
+	}
+	return result.Resources[0]
+}
+
+func TestCfnEvents_ColorSignal(t *testing.T) {
+	td := resource.GetChildType("cfn_events")
+	if td == nil {
+		t.Fatal("cfn_events child type not registered")
+	}
+	cases := []struct {
+		status    cfntypes.ResourceStatus
+		wantColor resource.Color
+		wantCode  domain.FindingCode
+	}{
+		{cfntypes.ResourceStatusCreateFailed, resource.ColorBroken, awsclient.CodeCfnEventFailed},
+		{cfntypes.ResourceStatusUpdateFailed, resource.ColorBroken, awsclient.CodeCfnEventFailed},
+		{cfntypes.ResourceStatusDeleteFailed, resource.ColorBroken, awsclient.CodeCfnEventFailed},
+		{cfntypes.ResourceStatusCreateInProgress, resource.ColorWarning, awsclient.CodeCfnEventInProgress},
+		{cfntypes.ResourceStatusUpdateInProgress, resource.ColorWarning, awsclient.CodeCfnEventInProgress},
+		{cfntypes.ResourceStatusDeleteInProgress, resource.ColorWarning, awsclient.CodeCfnEventInProgress},
+		{cfntypes.ResourceStatusDeleteComplete, resource.ColorDim, awsclient.CodeCfnEventDeleted},
+		{cfntypes.ResourceStatusCreateComplete, resource.ColorHealthy, ""},
+		{cfntypes.ResourceStatusUpdateComplete, resource.ColorHealthy, ""},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(string(tc.status), func(t *testing.T) {
+			r := fetchOneCfnEvent(t, tc.status)
+			if got := td.ResolveColor(r); got != tc.wantColor {
+				t.Errorf("ResolveColor(%s) = %v, want %v", tc.status, got, tc.wantColor)
+			}
+			if tc.wantCode != "" {
+				if len(r.Findings) == 0 || r.Findings[0].Code != tc.wantCode {
+					t.Errorf("expected Findings[0].Code=%q, got %+v", tc.wantCode, r.Findings)
+				}
+				if len(r.Findings) > 0 && r.Findings[0].Source != "wave1" {
+					t.Errorf("Findings[0].Source = %q, want wave1", r.Findings[0].Source)
+				}
+			} else if len(r.Findings) != 0 {
+				t.Errorf("expected no findings for %s, got %+v", tc.status, r.Findings)
+			}
+		})
+	}
+}
+
 func fetchOneGlueRun(t *testing.T, state gluetypes.JobRunState) resource.Resource {
 	t.Helper()
 	mock := &mockGlueGetJobRunsClient{

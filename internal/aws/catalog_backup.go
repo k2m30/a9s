@@ -51,6 +51,7 @@ var backupChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // s
 		Name:      "Stack Events",
 		ShortName: "cfn_events",
 		Columns:   resource.CfnEventColumns(),
+		Color:     colorWave1OrHealthy,
 		FieldKeys: []string{
 			"timestamp", "logical_resource_id", "resource_type",
 			"resource_status", "resource_status_reason",
