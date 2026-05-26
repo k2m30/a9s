@@ -124,9 +124,8 @@ func convertR53Record(record r53types.ResourceRecordSet) resource.Resource {
 	}
 
 	return resource.Resource{
-		ID:     id,
-		Name:   name,
-		Status: recType,
+		ID:   id,
+		Name: name,
 		Fields: map[string]string{
 			"name":   name,
 			"type":   recType,

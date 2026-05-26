@@ -7,8 +7,22 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
+
+// logEventFindings returns wave1 findings derived from a classified log status
+// (see classifyLogEventStatus). ERROR → broken; WARN → warn; REPORT/META/""
+// emit no finding (healthy).
+func logEventFindings(status string) []domain.Finding {
+	switch status {
+	case "ERROR":
+		return []domain.Finding{{Code: CodeCWLogError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1"}}
+	case "WARN":
+		return []domain.Finding{{Code: CodeCWLogWarn, Phrase: "warning", Severity: domain.SevWarn, Source: "wave1"}}
+	}
+	return nil
+}
 
 // FetchLogEvents calls the CloudWatchLogs GetLogEvents API for a given
 // log group and stream, converting the response into a FetchResult.
@@ -58,14 +72,15 @@ func FetchLogEvents(ctx context.Context, api CWLogsGetLogEventsAPI, logGroupName
 		status := classifyLogEventStatus(message)
 
 		r := resource.Resource{
-			ID:     id,
-			Name:   name,
-			Status: status,
+			ID:       id,
+			Name:     name,
+			Findings: logEventFindings(status),
 			Fields: map[string]string{
 				"timestamp":      ts,
 				"message":        message,
 				"ingestion_time": ingestionTime,
 				"event_id":       id,
+				"status":         status,
 			},
 			RawStruct: event,
 		}

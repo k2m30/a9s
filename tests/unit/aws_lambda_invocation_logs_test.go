@@ -174,9 +174,10 @@ func TestFetchLambdaInvocationLogs_StatusClassification(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.description, func(t *testing.T) {
-			if resources[tc.idx].Status != tc.expectedStatus {
-				t.Errorf("resource[%d] Status: expected %q, got %q (message: %q)",
-					tc.idx, tc.expectedStatus, resources[tc.idx].Status,
+			got := resources[tc.idx].Fields["status"]
+			if got != tc.expectedStatus {
+				t.Errorf("resource[%d] Fields[\"status\"]: expected %q, got %q (message: %q)",
+					tc.idx, tc.expectedStatus, got,
 					resources[tc.idx].Fields["message"])
 			}
 		})
