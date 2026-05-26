@@ -93,9 +93,9 @@ func TestFetchCBBuilds_Basic(t *testing.T) {
 		}
 	})
 
-	t.Run("Status_is_build_status", func(t *testing.T) {
-		if r.Status != "SUCCEEDED" {
-			t.Errorf("Status: expected %q, got %q", "SUCCEEDED", r.Status)
+	t.Run("Fields_build_status", func(t *testing.T) {
+		if got := r.Fields["build_status"]; got != "SUCCEEDED" {
+			t.Errorf("Fields[\"build_status\"]: expected %q, got %q", "SUCCEEDED", got)
 		}
 	})
 

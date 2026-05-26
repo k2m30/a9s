@@ -72,6 +72,18 @@ func colorFromWave1(r domain.Resource) (domain.Color, bool) {
 	return domain.ColorHealthy, false
 }
 
+// colorWave1OrHealthy classifies r from its first wave1 Finding, defaulting to
+// healthy when none is present. Used by child-type catalog entries whose only
+// severity signal comes from fetcher-emitted wave1 Findings (AS-1393: replaces
+// the Resource.Status string fallback for cb_builds, cfn_resources, glue_runs,
+// log_events, lambda_invocation_logs, role_policies).
+func colorWave1OrHealthy(r domain.Resource) domain.Color {
+	if c, ok := colorFromWave1(r); ok {
+		return c
+	}
+	return domain.ColorHealthy
+}
+
 // findingSuffixRe strips the trailing " (+N)" suffix from a status phrase.
 var findingSuffixRe = regexp.MustCompile(` \(\+\d+\)$`)
 

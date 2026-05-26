@@ -94,9 +94,9 @@ func TestFetchCfnEvents_Basic(t *testing.T) {
 		}
 	})
 
-	t.Run("event_0_Status", func(t *testing.T) {
-		if resources[0].Status != "CREATE_COMPLETE" {
-			t.Errorf("Status: expected %q, got %q", "CREATE_COMPLETE", resources[0].Status)
+	t.Run("event_0_Fields_resource_status", func(t *testing.T) {
+		if got := resources[0].Fields["resource_status"]; got != "CREATE_COMPLETE" {
+			t.Errorf("Fields[\"resource_status\"]: expected %q, got %q", "CREATE_COMPLETE", got)
 		}
 	})
 

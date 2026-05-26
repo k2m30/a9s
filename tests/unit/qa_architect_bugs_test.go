@@ -35,10 +35,10 @@ func TestBug_S3_EnterOnFolder_NavigatesIntoPrefix(t *testing.T) {
 	// Load objects including a folder (child list type is s3_objects)
 	objects := []resource.Resource{
 		{ID: "enterprise/", Name: "enterprise/", Status: "folder", Fields: map[string]string{
-			"key": "enterprise/", "size": "", "last_modified": "", "storage_class": "",
+			"key": "enterprise/", "size": "", "last_modified": "", "storage_class": "", "kind": "folder",
 		}},
 		{ID: "readme.txt", Name: "readme.txt", Status: "", Fields: map[string]string{
-			"key": "readme.txt", "size": "1024", "last_modified": "2025-01-01", "storage_class": "STANDARD",
+			"key": "readme.txt", "size": "1024", "last_modified": "2025-01-01", "storage_class": "STANDARD", "kind": "file",
 		}},
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3_objects", Resources: objects})

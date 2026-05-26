@@ -246,6 +246,7 @@ var cicdChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		ShortName: "cb_builds",
 		Columns:   resource.CBBuildColumns(),
 		CopyField: "build_id",
+		Color:     colorWave1OrHealthy,
 		FieldKeys: []string{
 			"build_number", "build_status", "start_time", "end_time",
 			"duration", "source_version_short", "initiator", "build_id",

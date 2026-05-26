@@ -8,8 +8,31 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
+
+// cfnEventFindings returns wave1 findings derived from a stack-event
+// status. *_FAILED → broken; *_IN_PROGRESS → warn; DELETE_COMPLETE → dim.
+// Steady-state *_COMPLETE rows emit no finding (render healthy). Mirrors
+// cfnResourceFindings because StackEvent and StackResourceSummary share the
+// same ResourceStatus enum.
+func cfnEventFindings(status cfntypes.ResourceStatus) []domain.Finding {
+	s := string(status)
+	if s == "" {
+		return nil
+	}
+	if s == "DELETE_COMPLETE" {
+		return []domain.Finding{{Code: CodeCfnEventDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"}}
+	}
+	if strings.HasSuffix(s, "_FAILED") {
+		return []domain.Finding{{Code: CodeCfnEventFailed, Phrase: strings.ToLower(strings.ReplaceAll(s, "_", " ")), Severity: domain.SevBroken, Source: "wave1"}}
+	}
+	if strings.HasSuffix(s, "_IN_PROGRESS") {
+		return []domain.Finding{{Code: CodeCfnEventInProgress, Phrase: strings.ToLower(strings.ReplaceAll(s, "_", " ")), Severity: domain.SevWarn, Source: "wave1"}}
+	}
+	return nil
+}
 
 // FetchCfnEvents calls the CloudFormation DescribeStackEvents API and converts
 // the response into a FetchResult with pagination support. A single API call is
@@ -94,9 +117,9 @@ func convertCfnEvent(event cfntypes.StackEvent) resource.Resource {
 	}
 
 	return resource.Resource{
-		ID:     id,
-		Name:   name,
-		Status: resourceStatus,
+		ID:       id,
+		Name:     name,
+		Findings: cfnEventFindings(event.ResourceStatus),
 		Fields: map[string]string{
 			"timestamp":              timestamp,
 			"logical_resource_id":    logicalResourceID,

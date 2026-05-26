@@ -286,6 +286,7 @@ var securityChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals //
 		Name:      "Role Policies",
 		ShortName: "role_policies",
 		Columns:   resource.RolePolicyColumns(),
+		Color:     colorWave1OrHealthy,
 		FieldKeys: []string{"policy_name", "policy_arn", "policy_type"},
 		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			c, ok := clients.(*ServiceClients)

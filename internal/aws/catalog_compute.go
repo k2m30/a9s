@@ -973,6 +973,7 @@ var computeChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // 
 		Name:      "Lambda Invocation Logs",
 		ShortName: "lambda_invocation_logs",
 		Columns:   resource.LambdaInvocationLogColumns(),
+		Color:     colorWave1OrHealthy,
 		FieldKeys: []string{"timestamp", "message"},
 		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			c, ok := clients.(*ServiceClients)

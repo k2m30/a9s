@@ -8,8 +8,29 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/codebuild"
 	cbtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
+
+// cbBuildFindings returns wave1 findings derived from a CodeBuild build status.
+// FAILED/FAULT/TIMED_OUT classify as broken; IN_PROGRESS as warn; STOPPED as
+// dim (terminal lifecycle). SUCCEEDED and unknown statuses return nil so the
+// row renders healthy.
+func cbBuildFindings(status cbtypes.StatusType) []domain.Finding {
+	switch status {
+	case cbtypes.StatusTypeFailed:
+		return []domain.Finding{{Code: CodeCBBuildFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+	case cbtypes.StatusTypeFault:
+		return []domain.Finding{{Code: CodeCBBuildFault, Phrase: "fault", Severity: domain.SevBroken, Source: "wave1"}}
+	case cbtypes.StatusTypeTimedOut:
+		return []domain.Finding{{Code: CodeCBBuildTimedOut, Phrase: "timed out", Severity: domain.SevBroken, Source: "wave1"}}
+	case cbtypes.StatusTypeInProgress:
+		return []domain.Finding{{Code: CodeCBBuildInProgress, Phrase: "in progress", Severity: domain.SevWarn, Source: "wave1"}}
+	case cbtypes.StatusTypeStopped:
+		return []domain.Finding{{Code: CodeCBBuildStopped, Phrase: "stopped", Severity: domain.SevDim, Source: "wave1"}}
+	}
+	return nil
+}
 
 // FetchCBBuilds performs a two-step fetch:
 // 1. ListBuildsForProject (single page) to collect build IDs
@@ -168,9 +189,9 @@ func convertCBBuild(build cbtypes.Build) resource.Resource {
 	}
 
 	return resource.Resource{
-		ID:     buildID,
-		Name:   name,
-		Status: status,
+		ID:       buildID,
+		Name:     name,
+		Findings: cbBuildFindings(build.BuildStatus),
 		Fields: map[string]string{
 			"build_number":            buildNumber,
 			"build_status":            status,

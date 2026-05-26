@@ -71,9 +71,9 @@ func TestFetchGlueJobRuns_Basic(t *testing.T) {
 		}
 	})
 
-	t.Run("Status_is_job_run_state", func(t *testing.T) {
-		if r.Status != "SUCCEEDED" {
-			t.Errorf("Status: expected %q, got %q", "SUCCEEDED", r.Status)
+	t.Run("Fields_job_run_state", func(t *testing.T) {
+		if got := r.Fields["job_run_state"]; got != "SUCCEEDED" {
+			t.Errorf("Fields[\"job_run_state\"]: expected %q, got %q", "SUCCEEDED", got)
 		}
 	})
 
@@ -257,8 +257,8 @@ func TestFetchGlueJobRuns_NilOptionalFields(t *testing.T) {
 	})
 
 	t.Run("status_populated", func(t *testing.T) {
-		if result.Resources[0].Status != "RUNNING" {
-			t.Errorf("Status: expected %q, got %q", "RUNNING", result.Resources[0].Status)
+		if got := result.Resources[0].Fields["job_run_state"]; got != "RUNNING" {
+			t.Errorf("Fields[\"job_run_state\"]: expected %q, got %q", "RUNNING", got)
 		}
 	})
 }
@@ -584,8 +584,8 @@ func TestFetchGlueJobRuns_Pagination(t *testing.T) {
 
 	t.Run("page1_all_have_status", func(t *testing.T) {
 		for i, r := range result1.Resources {
-			if r.Status == "" {
-				t.Errorf("page 1: resources[%d].Status should not be empty", i)
+			if r.Fields["job_run_state"] == "" {
+				t.Errorf("page 1: resources[%d].Fields[\"job_run_state\"] should not be empty", i)
 			}
 		}
 	})
