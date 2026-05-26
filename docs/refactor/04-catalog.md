@@ -111,7 +111,7 @@ The fields below accreted onto `ResourceTypeDef` during the per-category migrati
 
 ### `Wave2 any` — cycle-break
 
-`Wave2` is typed `any` (`internal/catalog/types.go:60`). The intuitive shape — `Wave2 IssueEnricher` with `IssueEnricher` declared in `internal/aws` — would close a cycle: `internal/catalog` cannot import `internal/aws` because `internal/aws/install.go` already imports `internal/catalog` to populate the registry. Lifting the concrete enricher type into `internal/domain` was rejected as overdeclarative for one field; the install hook is the natural place to keep the wire format.
+`Wave2` is typed `any` (field `Wave2 any` in `internal/catalog/types.go`). The intuitive shape — `Wave2 IssueEnricher` with `IssueEnricher` declared in `internal/aws` — would close a cycle: `internal/catalog` cannot import `internal/aws` because `internal/aws/install.go` already imports `internal/catalog` to populate the registry. Lifting the concrete enricher type into `internal/domain` was rejected as overdeclarative for one field; the install hook is the natural place to keep the wire format.
 
 The contract: `Wave2` stores an `aws.IssueEnricher` value (a struct with `Fn` and `Priority` fields). A nil `any` and a zero `IssueEnricher` with `Fn == nil` both bypass Wave 2 dispatch via the `AllWave2` filter in `internal/aws/wave2.go`. `internal/aws` is responsible for the type assertion on read; `internal/catalog` is responsible only for storage. This is the only field on `ResourceTypeDef` typed `any` — every other behavior reference carries its declared type from `internal/domain`.
 
