@@ -12,13 +12,14 @@
 //   - nil resources slice → no findings (nothing to replicate onto).
 //   - Two resources passed → two entries in Findings map (one per row).
 //   - PROBATION beats quota: PROBATION takes precedence, quota not checked.
-//   - FieldUpdates: Healthy-row (Status=="") → new status = finding.Summary.
-//   - FieldUpdates: Non-Healthy row (Status!="") → bumped via BumpFindingSuffix.
+//   - AS-1397: the enricher does NOT write FieldUpdates["status"]; the Wave-2
+//     phrase reaches the list view via r.Findings[0].Phrase (phraseFromFindings)
+//     and row color via colorSES reading r.Findings.
 //   - nil clients.SESv2 → empty Findings map (non-nil), 0 IssueCount, no error.
 //   - API error → error propagated.
 //   - U11 invariant: Summary must NOT contain any row's Value string.
 //   - TruncatedIDs is non-nil on all return paths.
-//   - FieldUpdates is non-nil on all return paths.
+//   - FieldUpdates is non-nil on all return paths (symmetry; never written).
 //   - Fixture-based: NewSESFixtures().GetAccountDefault (HEALTHY, ~2.4% usage)
 //     → 0 findings, 0 IssueCount.
 package unit
@@ -369,50 +370,60 @@ func TestEnrichSESAccount_ProbationBeatsQuota(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// FieldUpdates — Healthy row and non-Healthy row
+// FieldUpdates — AS-1397: never written, always non-nil
 // ---------------------------------------------------------------------------
 
-// TestEnrichSESAccount_FieldUpdatesHealthyRowSetToSummary verifies that a row
-// with Status=="" gets FieldUpdates["status"] = finding.Summary.
-func TestEnrichSESAccount_FieldUpdatesHealthyRowSetToSummary(t *testing.T) {
-	fake := &sesEnrichmentFake{enforcementStatus: aws.String("SHUTDOWN")}
-	clients := &awsclient.ServiceClients{SESv2: fake}
-	rows := []resource.Resource{sesResourceRow("acme-corp.com", "")} // Status = ""
-
-	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+// TestEnrichSESAccount_FieldUpdatesNeverWritten pins AS-1397: the SES enricher
+// must not write to FieldUpdates on any path. The Wave-2 phrase reaches the
+// list view via r.Findings[0].Phrase (phraseFromFindings at render time) and
+// the row color via colorSES reading r.Findings.
+//
+// Covers all three §4 paths plus the Wave-1-preceded row (former
+// BumpFindingSuffix path) — none may write a status entry.
+func TestEnrichSESAccount_FieldUpdatesNeverWritten(t *testing.T) {
+	cases := []struct {
+		name string
+		fake *sesEnrichmentFake
+		rows []resource.Resource
+	}{
+		{
+			name: "SHUTDOWN, healthy row",
+			fake: &sesEnrichmentFake{enforcementStatus: aws.String("SHUTDOWN")},
+			rows: []resource.Resource{sesResourceRow("acme-corp.com", "")},
+		},
+		{
+			name: "SHUTDOWN, row preceded by Wave-1 status (former Bump path)",
+			fake: &sesEnrichmentFake{enforcementStatus: aws.String("SHUTDOWN")},
+			rows: []resource.Resource{sesResourceRow("broken.acme-corp.com", "verification failed")},
+		},
+		{
+			name: "PROBATION, healthy row",
+			fake: &sesEnrichmentFake{enforcementStatus: aws.String("PROBATION")},
+			rows: []resource.Resource{sesResourceRow("acme-corp.com", "")},
+		},
+		{
+			name: "quota >80%, healthy row",
+			fake: &sesEnrichmentFake{
+				sendQuota: &sesv2types.SendQuota{Max24HourSend: 10000.0, SentLast24Hours: 9000.0},
+			},
+			rows: []resource.Resource{sesResourceRow("acme-corp.com", "")},
+		},
 	}
-	if result.FieldUpdates == nil {
-		t.Fatal("FieldUpdates must not be nil")
-	}
-	updates, ok := result.FieldUpdates["acme-corp.com"]
-	if !ok {
-		t.Fatal("expected FieldUpdates entry for acme-corp.com")
-	}
-	if updates["status"] != "account SHUTDOWN" {
-		t.Errorf("FieldUpdates[status] = %q, want %q", updates["status"], "account SHUTDOWN")
-	}
-}
-
-// TestEnrichSESAccount_FieldUpdatesNonHealthyRowBumped verifies that a row
-// with an existing Wave-1 Status gets the suffix bumped via BumpFindingSuffix.
-func TestEnrichSESAccount_FieldUpdatesNonHealthyRowBumped(t *testing.T) {
-	fake := &sesEnrichmentFake{enforcementStatus: aws.String("SHUTDOWN")}
-	clients := &awsclient.ServiceClients{SESv2: fake}
-	// Row already has a Wave-1 status phrase.
-	rows := []resource.Resource{sesResourceRow("broken.acme-corp.com", "verification failed")}
-
-	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	updates := result.FieldUpdates["broken.acme-corp.com"]
-	newStatus := updates["status"]
-	// BumpFindingSuffix on "verification failed" → "verification failed (+1)"
-	expected := "verification failed (+1)"
-	if newStatus != expected {
-		t.Errorf("FieldUpdates[status] = %q, want %q (Wave-1 status must be bumped)", newStatus, expected)
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			clients := &awsclient.ServiceClients{SESv2: tc.fake}
+			result, err := awsclient.EnrichSESAccount(context.Background(), clients, tc.rows, nil)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result.FieldUpdates == nil {
+				t.Fatal("FieldUpdates must remain non-nil for symmetry")
+			}
+			if len(result.FieldUpdates) != 0 {
+				t.Errorf("AS-1397: FieldUpdates must be empty (the enricher must not write to it); got %d entries: %+v", len(result.FieldUpdates), result.FieldUpdates)
+			}
+		})
 	}
 }
 
@@ -632,20 +643,30 @@ func TestEnrichSESAccount_FixtureHealthyAccountProducesNoFindings(t *testing.T) 
 }
 
 // ---------------------------------------------------------------------------
-// Target #1 — SES Color func must fall back to Fields["status"] when Status=""
+// AS-1397 — colorSES must source Wave-2 SES findings from r.Findings
 // ---------------------------------------------------------------------------
 
-// TestSES_ColorReadsFieldsStatusFallback_AccountSHUTDOWN verifies that the SES
-// Color function returns ColorBroken when r.Status is empty but Fields["status"]
-// carries the Wave-2 phrase "account SHUTDOWN".
+// TestSES_ColorReadsWave2FindingsForAccountFindings pins AS-1397's rendering
+// invariant: the SES Color resolver returns the Wave-2 finding's severity color
+// when the account-level finding lives in r.Findings (Source="wave2:ses").
+// FieldUpdates["status"] is no longer written; the Wave-2 phrase reaches color
+// classification via r.Findings, not via Fields["status"].
 //
-// Regression pin: ApplyFieldUpdates writes to Fields["status"], not r.Status.
-// Before fix: Color checks r.Status only → stays green (ColorHealthy).
-// After fix:  Color falls back to Fields["status"] when r.Status is empty.
-func TestSES_ColorReadsFieldsStatusFallback_AccountSHUTDOWN(t *testing.T) {
+// Without this path, pure-Wave-2 rows would silently render ColorHealthy after
+// AS-1397 even though phraseFromFindings still surfaces "account SHUTDOWN" in
+// the Status column.
+func TestSES_ColorReadsWave2FindingsForAccountFindings(t *testing.T) {
 	td := resource.FindResourceType("ses")
 	if td == nil {
 		t.Fatal("ses resource type not registered")
+	}
+
+	wave2 := func(code domain.FindingCode, phrase string, sev domain.Severity) domain.Finding {
+		return domain.Finding{Code: code, Phrase: phrase, Severity: sev, Source: "wave2:ses"}
+	}
+	wave1Failed := domain.Finding{
+		Code: awsclient.CodeSESVerificationFailed, Phrase: "verification failed",
+		Severity: domain.SevBroken, Source: "wave1",
 	}
 
 	cases := []struct {
@@ -654,55 +675,87 @@ func TestSES_ColorReadsFieldsStatusFallback_AccountSHUTDOWN(t *testing.T) {
 		wantColor resource.Color
 	}{
 		{
-			name: "SHUTDOWN in Fields[status] with empty Status → ColorBroken",
+			name: "SHUTDOWN Wave-2 finding → ColorBroken",
 			r: resource.Resource{
-				ID:     "acme-corp.com",
-				Status: "",
+				ID: "acme-corp.com",
+				Findings: []domain.Finding{
+					wave2("ses.account-shutdown", "account SHUTDOWN", domain.SevBroken),
+				},
 				Fields: map[string]string{
 					"verification_status": "SUCCESS",
 					"sending_enabled":     "true",
-					"status":              "account SHUTDOWN",
 				},
 			},
 			wantColor: resource.ColorBroken,
 		},
 		{
-			name: "PROBATION in Fields[status] with empty Status → ColorBroken",
+			name: "PROBATION Wave-2 finding → ColorBroken",
 			r: resource.Resource{
-				ID:     "noreply@acme-corp.com",
-				Status: "",
+				ID: "noreply@acme-corp.com",
+				Findings: []domain.Finding{
+					wave2("ses.account-probation", "account PROBATION", domain.SevBroken),
+				},
 				Fields: map[string]string{
 					"verification_status": "SUCCESS",
 					"sending_enabled":     "true",
-					"status":              "account PROBATION",
 				},
 			},
 			wantColor: resource.ColorBroken,
 		},
 		{
-			name: "quota 80%+ used in Fields[status] → ColorHealthy (informational, stays green)",
+			// quota 80%+ reaches S3/S4/S5 only per docs/resources/ses.md §4
+			// (line 140): "Surfaces reached" is S3, S4, S5 — S2 (row color)
+			// is explicitly excluded. The row stays a Healthy (green) row
+			// with a "~" informational glyph; the Severity here is SevWarn
+			// but colorSES special-cases sesCodeQuota to ColorHealthy.
+			name: "quota 80%+ Wave-2 finding (SevWarn) → ColorHealthy (S2 excluded by spec)",
 			r: resource.Resource{
-				ID:     "acme-corp.com",
-				Status: "",
+				ID: "acme-corp.com",
+				Findings: []domain.Finding{
+					wave2("ses.quota-high", "quota 80%+ used", domain.SevWarn),
+				},
 				Fields: map[string]string{
 					"verification_status": "SUCCESS",
 					"sending_enabled":     "true",
-					"status":              "quota 80%+ used",
 				},
 			},
 			wantColor: resource.ColorHealthy,
 		},
 		{
-			// Wave-1 precedence guard: when Status is non-empty, Fields["status"]
-			// fallback must NOT override — Wave-1 status wins.
-			name: "non-empty Status with SHUTDOWN in Fields[status] → Wave-1 wins (ColorBroken from Status)",
+			// Wave-2 wins when stacked with Wave-1. To prove precedence, the
+			// Wave-1 fallback (Fields["status"]="sending disabled" → ColorWarning)
+			// would land on a different color than the Wave-2 SHUTDOWN finding
+			// (SevBroken → ColorBroken). wantColor=ColorBroken can only be
+			// satisfied by colorSES short-circuiting on the wave2:ses entry.
+			name: "Wave-1 sending disabled + Wave-2 SHUTDOWN → Wave-2 ColorBroken (precedence)",
 			r: resource.Resource{
-				ID:     "broken.acme-corp.com",
-				Status: "verification failed",
+				ID: "shutdown.acme-corp.com",
+				Findings: []domain.Finding{
+					{
+						Code: awsclient.CodeSESSendingDisabled, Phrase: "sending disabled",
+						Severity: domain.SevWarn, Source: "wave1",
+					},
+					wave2("ses.account-shutdown", "account SHUTDOWN", domain.SevBroken),
+				},
+				Fields: map[string]string{
+					"verification_status": "SUCCESS",
+					"sending_enabled":     "false",
+					"status":              "sending disabled",
+				},
+			},
+			wantColor: resource.ColorBroken,
+		},
+		{
+			// Wave-1 only (no Wave-2): color falls back to the SES fetcher's
+			// Fields["status"] phrase set by sesTopPhrase.
+			name: "Wave-1 verification failed only → Fields[status] path, ColorBroken",
+			r: resource.Resource{
+				ID:       "broken.acme-corp.com",
+				Findings: []domain.Finding{wave1Failed},
 				Fields: map[string]string{
 					"verification_status": "FAILED",
 					"sending_enabled":     "true",
-					"status":              "account SHUTDOWN",
+					"status":              "verification failed",
 				},
 			},
 			wantColor: resource.ColorBroken,
@@ -714,8 +767,8 @@ func TestSES_ColorReadsFieldsStatusFallback_AccountSHUTDOWN(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			got := td.ResolveColor(tc.r)
 			if got != tc.wantColor {
-				t.Errorf("ResolveColor(%q, Status=%q, Fields[status]=%q) = %v, want %v",
-					tc.r.ID, tc.r.Status, tc.r.Fields["status"], got, tc.wantColor)
+				t.Errorf("ResolveColor(%q, Findings=%+v, Fields[status]=%q) = %v, want %v",
+					tc.r.ID, tc.r.Findings, tc.r.Fields["status"], got, tc.wantColor)
 			}
 		})
 	}
