@@ -375,13 +375,13 @@ func TestFetchRolePolicies_AdminHighlight(t *testing.T) {
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
-	if resources[0].Status != "failed" {
-		t.Errorf("AdministratorAccess Status: expected %q, got %q", "failed", resources[0].Status)
+	if got := resources[0].Fields["status"]; got != "failed" {
+		t.Errorf("AdministratorAccess Fields[\"status\"]: expected %q, got %q", "failed", got)
 	}
 }
 
 // TestFetchRolePolicies_PowerUserHighlight verifies that PowerUserAccess
-// policy gets Status="failed" for status coloring.
+// policy gets Fields["status"]="failed" for status coloring.
 func TestFetchRolePolicies_PowerUserHighlight(t *testing.T) {
 	attachedMock := &mockIAMListAttachedRolePoliciesClient{
 		outputs: []*iam.ListAttachedRolePoliciesOutput{
@@ -411,13 +411,13 @@ func TestFetchRolePolicies_PowerUserHighlight(t *testing.T) {
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
-	if resources[0].Status != "failed" {
-		t.Errorf("PowerUserAccess Status: expected %q, got %q", "failed", resources[0].Status)
+	if got := resources[0].Fields["status"]; got != "failed" {
+		t.Errorf("PowerUserAccess Fields[\"status\"]: expected %q, got %q", "failed", got)
 	}
 }
 
 // TestFetchRolePolicies_InlineDim verifies that inline policies get
-// Status="terminated" for dimming.
+// Fields["status"]="terminated" for dimming.
 func TestFetchRolePolicies_InlineDim(t *testing.T) {
 	attachedMock := &mockIAMListAttachedRolePoliciesClient{
 		outputs: []*iam.ListAttachedRolePoliciesOutput{
@@ -439,8 +439,8 @@ func TestFetchRolePolicies_InlineDim(t *testing.T) {
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
-	if resources[0].Status != "terminated" {
-		t.Errorf("Inline policy Status: expected %q, got %q", "terminated", resources[0].Status)
+	if got := resources[0].Fields["status"]; got != "terminated" {
+		t.Errorf("Inline policy Fields[\"status\"]: expected %q, got %q", "terminated", got)
 	}
 }
 

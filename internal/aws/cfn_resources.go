@@ -90,9 +90,8 @@ func convertCfnResource(summary cfntypes.StackResourceSummary) resource.Resource
 	}
 
 	return resource.Resource{
-		ID:     logicalResourceID,
-		Name:   logicalResourceID,
-		Status: resourceStatus,
+		ID:   logicalResourceID,
+		Name: logicalResourceID,
 		Fields: map[string]string{
 			"logical_resource_id":  logicalResourceID,
 			"physical_resource_id": physicalResourceID,

@@ -130,7 +130,7 @@ var dataChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			Key:            "enter",
 			ContextKeys:    map[string]string{"bucket": "@parent.bucket", "prefix": "ID"},
 			DisplayNameKey: "bucket",
-			DrillCondition: func(r domain.Resource) bool { return r.Status == "folder" },
+			DrillCondition: func(r domain.Resource) bool { return r.Fields["kind"] == "folder" },
 		}},
 		// RelatedContextFromIDs extracts the bucket name from related IDs encoded as
 		// "bucket|key". Used when navigating to s3_objects from the related panel

@@ -94,9 +94,8 @@ func convertCfnEvent(event cfntypes.StackEvent) resource.Resource {
 	}
 
 	return resource.Resource{
-		ID:     id,
-		Name:   name,
-		Status: resourceStatus,
+		ID:   id,
+		Name: name,
 		Fields: map[string]string{
 			"timestamp":              timestamp,
 			"logical_resource_id":    logicalResourceID,

@@ -73,12 +73,12 @@ func FetchLambdaInvocationLogs(ctx context.Context, api CWLogsFilterLogEventsAPI
 			status := classifyLogEventStatus(message)
 
 			resources = append(resources, resource.Resource{
-				ID:     id,
-				Name:   name,
-				Status: status,
+				ID:   id,
+				Name: name,
 				Fields: map[string]string{
 					"timestamp": ts,
 					"message":   message,
+					"status":    status,
 				},
 				RawStruct: event,
 			})

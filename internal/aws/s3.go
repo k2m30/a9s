@@ -188,6 +188,7 @@ func FetchS3Objects(ctx context.Context, api S3ListObjectsV2API, bucket, prefix 
 				"size":          "",
 				"last_modified": "",
 				"storage_class": "",
+				"kind":          "folder",
 			},
 			RawStruct: cp,
 		}
@@ -222,6 +223,7 @@ func FetchS3Objects(ctx context.Context, api S3ListObjectsV2API, bucket, prefix 
 				"size":          size,
 				"last_modified": lastModified,
 				"storage_class": storageClass,
+				"kind":          "file",
 			},
 			RawStruct: obj,
 		}

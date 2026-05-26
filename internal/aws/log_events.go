@@ -58,14 +58,14 @@ func FetchLogEvents(ctx context.Context, api CWLogsGetLogEventsAPI, logGroupName
 		status := classifyLogEventStatus(message)
 
 		r := resource.Resource{
-			ID:     id,
-			Name:   name,
-			Status: status,
+			ID:   id,
+			Name: name,
 			Fields: map[string]string{
 				"timestamp":      ts,
 				"message":        message,
 				"ingestion_time": ingestionTime,
 				"event_id":       id,
+				"status":         status,
 			},
 			RawStruct: event,
 		}

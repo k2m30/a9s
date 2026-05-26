@@ -106,9 +106,8 @@ func convertGlueJobRun(run gluetypes.JobRun) resource.Resource {
 	}
 
 	return resource.Resource{
-		ID:     runID,
-		Name:   startedOn,
-		Status: jobRunState,
+		ID:   runID,
+		Name: startedOn,
 		Fields: map[string]string{
 			"run_id_short":         runIDShort,
 			"job_run_state":        jobRunState,

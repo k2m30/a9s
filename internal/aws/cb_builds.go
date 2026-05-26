@@ -168,9 +168,8 @@ func convertCBBuild(build cbtypes.Build) resource.Resource {
 	}
 
 	return resource.Resource{
-		ID:     buildID,
-		Name:   name,
-		Status: status,
+		ID:   buildID,
+		Name: name,
 		Fields: map[string]string{
 			"build_number":            buildNumber,
 			"build_status":            status,

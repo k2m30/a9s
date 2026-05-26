@@ -55,14 +55,14 @@ func FetchRolePolicies(
 		status := rolePolicyStatus(policyName)
 
 		managed = append(managed, resource.Resource{
-			ID:     policyArn,
-			Name:   policyName,
-			Status: status,
+			ID:   policyArn,
+			Name: policyName,
 			Fields: map[string]string{
 				"policy_name": policyName,
 				"policy_arn":  policyArn,
 				"policy_type": "Managed",
 				"role_name":   roleName,
+				"status":      status,
 			},
 			RawStruct: RolePolicyRow{
 				PolicyName: policyName,
@@ -83,14 +83,14 @@ func FetchRolePolicies(
 	var inline []resource.Resource
 	for _, name := range inlineOutput.PolicyNames {
 		inline = append(inline, resource.Resource{
-			ID:     name,
-			Name:   name,
-			Status: "terminated",
+			ID:   name,
+			Name: name,
 			Fields: map[string]string{
 				"policy_name": name,
 				"policy_arn":  "",
 				"policy_type": "Inline",
 				"role_name":   roleName,
+				"status":      "terminated",
 			},
 			RawStruct: RolePolicyRow{
 				PolicyName: name,
