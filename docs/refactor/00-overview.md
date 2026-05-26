@@ -22,8 +22,8 @@ Specifically, after this refactor:
 - Zero `Resource.Status` field initializers. Status display is derived from `Findings` and `Fields[LifecycleKey]`.
 - Zero hand-editable structured sections in markdown. `attention-signals.md`, `related-resources.md`, and the structured tables (Findings, Related, Columns) inside per-resource specs are generated between `BEGIN GENERATED` / `END GENERATED` markers; prose between markers is preserved verbatim.
 - Zero package-globals in `internal/aws/`. Caches are session-owned; transport receives narrow capability interfaces.
-- Zero `if shortName == "x"` branches in dispatch code. Per-type behavior is declarative.
-- Zero per-category `Color` functions. A single `styles.SeverityStyle(domain.Severity) lipgloss.Style` mapping is the only severity-to-presentation translator. (Migrated inline by Phase 04 per-category PRs; no standalone PR.)
+- Zero `if shortName == "x"` branches in dispatch code (per-type default UI state e.g. `resourcelist.go`'s ct-events default-sort is the only allowed shape).
+- Zero per-category `Color` functions. A single `styles.SeverityStyle(domain.Severity) lipgloss.Style` mapping is the only severity-to-presentation translator. `Color` is migrated inline by Phase 04 per-category PRs — per-category PRs replace `td.Color(r)` call sites with `styles.SeverityStyle(...)` in the same PR. The `Color` field remains on `ResourceTypeDef` as a per-category hook; the invariant is that no standalone 5a-color PR exists, not that the field disappears.
 - A future desktop renderer can be added as an adapter on top of the same app core; it does not require rewriting orchestration, selectors, queries, tasks, or session logic.
 
 ## Issue-driven target amendments
@@ -53,7 +53,7 @@ As of **2026-04-26**, the open issue set shows architectural pressure that goes 
 
 Total: **40 PRs, all mandatory.**
 
-Phase 1' is 17 PRs (was 14): the original PR-03a is split into 03a-types, 03a-shim, 03a-views, and 03a-fold (the Wave 2 row-mutation path that replaces `m.enrichmentFindings` — without this PR, post-enrichment findings disappear from list/detail rendering between 03a-views and 03b). See `03-finding-model.md`. Phase 5b is mandatory (was previously listed as optional); type-level gen-stamping prevents an entire bug class, and "optional structural correctness" is itself the kind of compromise this refactor exists to remove. The Color → severity collapse — invariant #4's structural completion — is handled inline by Phase 04 per-category PRs (the new catalog struct never has a `Color` field; per-category PRs replace `td.Color(r)` call sites with `styles.SeverityStyle(...)` in the same PR). No standalone 5a-color PR.
+Phase 1' is 17 PRs (was 14): the original PR-03a is split into 03a-types, 03a-shim, 03a-views, and 03a-fold (the Wave 2 row-mutation path that replaces `m.enrichmentFindings` — without this PR, post-enrichment findings disappear from list/detail rendering between 03a-views and 03b). See `03-finding-model.md`. Phase 5b is mandatory (was previously listed as optional); type-level gen-stamping prevents an entire bug class, and "optional structural correctness" is itself the kind of compromise this refactor exists to remove. The Color → severity collapse — invariant #4's structural completion — is handled inline by Phase 04 per-category PRs (per-category PRs replace `td.Color(r)` call sites with `styles.SeverityStyle(...)` in the same PR; the `Color` field stays on `ResourceTypeDef` as the per-category hook). No standalone 5a-color PR.
 
 Phase numbering reflects original priority labels (Phase 2 was the second item in the original priority order; Phase 1' is the redesign of Phase 1 around the lifecycle correction). Filename numbering reflects execution order.
 
@@ -83,7 +83,7 @@ Every phase ends with a checkpoint where the full gate suite (`make test`, `make
 
 | Checkpoint | What is verifiably true at this commit |
 |---|---|
-| End of Phase 01 (PR-01) | `internal/domain` is the leaf type-declaration package; `internal/semantics/{projection,ctevent,selector}/` exist with stub or real implementations; `ResourceTypeDef.Project` field wired; ct-events shortName branch deleted from `internal/tui/views/`; full test/render parity preserved. Phase 01 ships as a single PR per `01-projection-hook.md`, so this checkpoint coincides with PR-01 itself. |
+| End of Phase 01 (PR-01) | `internal/domain` is the leaf type-declaration package; `internal/semantics/{projection,ctevent,selector}/` exist with stub or real implementations; `ResourceTypeDef.Project` field wired; ct-events shortName branch deleted from `internal/tui/views/`; full test/render parity preserved. Phase 01 ships as a single PR per [`landed/01-projection-hook.md`](./landed/01-projection-hook.md), so this checkpoint coincides with PR-01 itself. |
 | End of Phase 02 (PR-02e) | `Session.Rotate()` is the single reset entry point; `internal/aws/` carries no mutable globals; live profile-switch test passes against a real AWS profile; `make test` green. |
 | End of Phase 03 (PR-03n) | Canonical `Findings` model is the only model; `Resource.Status`/`Resource.Issues` deleted; the on-disk cache YAML format break is migrated crash-free per the PR-03n risk-register decision; `make test-race` clean. |
 | End of Phase 04 (PR-04n) | Catalog is authoritative; zero `init()` and zero `Register*` in feature wiring; `make generate && git diff --exit-code` clean; mechanical-resource-implementation acceptance test passes. |
@@ -168,13 +168,13 @@ If at the end of the program this test fails — if adding a resource still requ
 
 | Phase | Status | Notes |
 |---|---|---|
-| 01-projection-hook | not started | includes `internal/domain` bootstrap (Resource + Section/Item/DetailProjector type decls) |
-| 02-session-owner | not started | |
-| 03-finding-model | not started | 17 PRs (03a split into 03a-types/shim/views/fold) |
-| 04-catalog | not started | |
-| 05a-extract | not started | |
-| 05a-gens | not started | |
-| 05b-msg-taxonomy | not started | |
+| 01-projection-hook | LANDED | `internal/domain` bootstrap + Section/Item/DetailProjector type decls landed |
+| 02-session-owner | LANDED | session-owned caches; `internal/aws/` package-globals removed |
+| 03-finding-model | in progress (PR-03n cleanup pending) | 17 PRs landed; PR-03n cleanup tracked under [AS-1390](../../specs/) umbrella + W1.* sibling issues |
+| 04-catalog | LANDED | `aws.Install()` + `catalog.SetTypes(...)` two-step model in production; see `04-catalog.md` |
+| 05a-extract | LANDED | `runtime.Core` extracted from `internal/tui/app.go` (PR-05a-h4 series) |
+| 05a-gens | LANDED | gen-counter unification merged into 05a sequence |
+| 05b-msg-taxonomy | LANDED | message taxonomy + type-level gen-stamping landed alongside 05a |
 
 Update this table as phases complete.
 
