@@ -9,7 +9,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// iam-role canonical FindingCodes.
+const (
+	iamRoleCodeDormant domain.FindingCode = "iam-role.dormant"
 )
 
 // EnrichIAMRoleLastUsed calls GetRole per role (capped at EnrichmentCap) to detect dormant roles.
@@ -20,14 +26,16 @@ import (
 // AWS service-linked roles (Path starts with "/aws-service-role/") are skipped.
 // Skip when clients.IAM == nil.
 func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+	}
 	if clients.IAM == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	getRoleAPI, ok := clients.IAM.(IAMGetRoleAPI)
 	if !ok {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -50,7 +58,7 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 		})
 		if err != nil {
 			truncated = true
-			truncatedIDs[r.ID] = true
+			result.TruncatedIDs[r.ID] = true
 			continue
 		}
 		if out.Role == nil {
@@ -63,12 +71,11 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 			isDormant = true
 		}
 		if isDormant {
-			findings[r.ID] = resource.EnrichmentFinding{
-				Severity: "~",
-				Summary:  "dormant role (>90d)",
-			}
+			setWave2Finding(&result, r.ID, iamRoleCodeDormant, "dormant role (>90d)", "~", "iam-role", nil)
 		}
 	}
 	// Dormant-role findings are severity "~" (informational); IssueCount stays 0.
-	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	result.IssueCount = 0
+	result.Truncated = truncated
+	return result, nil
 }

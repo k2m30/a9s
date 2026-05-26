@@ -4,15 +4,10 @@ package tui
 // m.EnrichmentFindings map approach with direct mutation of cached row
 // Findings/AttentionDetails.
 //
-// applyEnrichment is the canonical write path for Wave 2 results: it calls
-// DeriveFindings with the full findings map on every cached row of the given
-// resource type, so r.Findings and r.AttentionDetails are authoritative and
-// views need not consult a side map.
-//
-// findingsFromRows rebuilds a per-resource EnrichmentFinding map from wave2
-// entries in the given resource slice. Used by cache-hit navigation paths to
-// populate views.ResourceListModel.findingsByID for row marker glyphs without
-// the now-deleted m.EnrichmentFindings parallel map.
+// applyEnrichment is the canonical write path for Wave 2 results.
+// findingFromResource and findingsFromRows rebuild detail/list view input
+// from the authoritative r.Findings + r.AttentionDetails state on each cached
+// row, replacing the side maps that PR-03a-fold removed.
 
 import (
 	"strings"
@@ -23,15 +18,22 @@ import (
 )
 
 // applyEnrichment merges Wave 2 enrichment findings into every cached row of
-// the given resource type by calling DeriveFindings with the provided findings
-// map. Replaces prior wave2 findings in place while preserving wave1. Walks
-// ResourceCache, LazyResourceCache, and ProbeResources for the canonical short
-// name.
+// the given resource type. AS-1395 changed the contract: instead of calling
+// the pre-AS-1395 DeriveFindings(r, td, enrichmentFindings) shim, this helper
+// uses applyWave2ToRow (mirrors runtime/helpers.go) to:
 //
-// Replaces the prior re-derive loops that followed the
-// m.EnrichmentFindings[type] = msg.Findings write. Cached rows now hold their
-// own Findings/AttentionDetails directly; views read from r.Findings.
-func (m *Model) applyEnrichment(resourceType string, findings map[string]resource.EnrichmentFinding) {
+//  1. Re-derive Wave-1 findings via attention.DeriveFindings(r, td).
+//  2. Append the matching domain.Finding from findings[r.ID].
+//  3. Write attentionDetails[r.ID] into r.AttentionDetails under the
+//     Finding's Code (the fold-layer Resource.ID → FindingCode re-key).
+//
+// Walks ResourceCache, LazyResourceCache, and ProbeResources. Cached rows now
+// hold their own Findings/AttentionDetails directly; views read from r.Findings.
+func (m *Model) applyEnrichment(
+	resourceType string,
+	findings map[string]domain.Finding,
+	attentionDetails map[string]domain.AttentionDetail,
+) {
 	canon := resourceType
 	var td resource.ResourceTypeDef
 	if t := resource.FindResourceType(resourceType); t != nil {
@@ -43,7 +45,7 @@ func (m *Model) applyEnrichment(resourceType string, findings map[string]resourc
 
 	apply := func(rows []resource.Resource) {
 		for i := range rows {
-			attention.DeriveFindings(&rows[i], td, findings)
+			applyWave2ToRow(&rows[i], td, findings, attentionDetails)
 		}
 	}
 
@@ -58,60 +60,76 @@ func (m *Model) applyEnrichment(resourceType string, findings map[string]resourc
 	}
 }
 
-
-// findingFromResource extracts the first wave2 entry from r.Findings and
-// returns it as a *resource.EnrichmentFinding for wiring into detail views.
-// Returns nil when no wave2 finding is present (detail view shows no Attention
-// section). This replaces the m.EnrichmentFindings[resType][r.ID] lookup that
-// was deleted in PR-03a-fold; cached rows are now the authoritative source.
-func findingFromResource(r resource.Resource) *resource.EnrichmentFinding {
-	for _, f := range r.Findings {
-		if strings.HasPrefix(f.Source, "wave2:") {
-			ef := resource.EnrichmentFinding{
-				Severity: glyphFromDomainSeverity(f.Severity),
-				Summary:  f.Phrase,
-			}
-			// Preserve any Rows (AttentionDetail body) if the wave2 entry carried them.
-			// AttentionDetails is keyed by FindingCode; look up by f.Code.
-			if r.AttentionDetails != nil {
-				if ad, ok := r.AttentionDetails[f.Code]; ok {
-					ef.Rows = make([]resource.FindingRow, 0, len(ad.Rows))
-					for _, row := range ad.Rows {
-						ef.Rows = append(ef.Rows, resource.FindingRow{
-							Label: row.Label,
-							Value: row.Value,
-							Tier:  row.Tier,
-						})
-					}
-				}
-			}
-			return &ef
-		}
+// applyWave2ToRow mirrors internal/runtime/helpers.go applyWave2ToRow.  Kept as
+// a sibling in this file so tui.Model.applyEnrichment does not need to import
+// internal/runtime (which would create a cycle: runtime depends on internal/aws
+// which depends on internal/resource, and tui depends on runtime).
+func applyWave2ToRow(
+	r *domain.Resource,
+	td resource.ResourceTypeDef,
+	findings map[string]domain.Finding,
+	attentionDetails map[string]domain.AttentionDetail,
+) {
+	if r == nil {
+		return
 	}
-	return nil
+	attention.DeriveFindings(r, td)
+	f, ok := findings[r.ID]
+	if !ok || f.Phrase == "" {
+		return
+	}
+	if f.Source == "" || !strings.HasPrefix(f.Source, "wave2:") {
+		f.Source = "wave2:" + td.ShortName
+	}
+	r.Findings = append(r.Findings, f)
+	if ad, ok := attentionDetails[r.ID]; ok && len(ad.Rows) > 0 {
+		if r.AttentionDetails == nil {
+			r.AttentionDetails = make(map[domain.FindingCode]domain.AttentionDetail, 1)
+		}
+		r.AttentionDetails[f.Code] = ad
+	}
 }
 
-// findingsFromRows rebuilds a per-resource resource.EnrichmentFinding map from
-// wave2 entries in the supplied resource slice. This replaces the read of the
-// now-deleted m.EnrichmentFindings[canon] at cache-hit navigation sites so that
-// views.ResourceListModel.findingsByID (used for row marker glyphs) is correctly
-// populated from the authoritative r.Findings on each cached row.
+// findingFromResource extracts the first wave2 Finding (and its companion
+// AttentionDetail, if present) from r.Findings / r.AttentionDetails for
+// wiring into detail views. Both return values are nil when no wave2 finding
+// is present (detail view shows no Attention section).
+func findingFromResource(r resource.Resource) (*domain.Finding, *domain.AttentionDetail) {
+	for _, f := range r.Findings {
+		if strings.HasPrefix(f.Source, "wave2:") {
+			finding := f
+			var ad *domain.AttentionDetail
+			if r.AttentionDetails != nil {
+				if got, ok := r.AttentionDetails[f.Code]; ok && len(got.Rows) > 0 {
+					adVal := got
+					ad = &adVal
+				}
+			}
+			return &finding, ad
+		}
+	}
+	return nil, nil
+}
+
+// findingsFromRows rebuilds a per-resource domain.Finding map from wave2
+// entries in the supplied resource slice. AS-1395 retyped this to emit
+// domain.Finding (matching the runtime→adapter PatchResourceList contract).
+// Used by cache-hit navigation sites that populate
+// views.ResourceListModel.findingsByID (row marker glyphs) from the
+// authoritative r.Findings on each cached row.
 //
-// Only the first wave2 finding per resource is mapped (at most one wave2 entry
-// per resource per type is guaranteed by DeriveFindings).
-// Returns nil when no wave2 findings are present (avoids allocating an empty map).
-func findingsFromRows(rows []resource.Resource) map[string]resource.EnrichmentFinding {
-	var out map[string]resource.EnrichmentFinding
+// Only the first wave2 finding per resource is mapped (at most one wave2
+// entry per resource per type is guaranteed by applyEnrichment).
+// Returns nil when no wave2 findings are present.
+func findingsFromRows(rows []resource.Resource) map[string]domain.Finding {
+	var out map[string]domain.Finding
 	for _, r := range rows {
 		for _, f := range r.Findings {
 			if strings.HasPrefix(f.Source, "wave2:") {
 				if out == nil {
-					out = make(map[string]resource.EnrichmentFinding)
+					out = make(map[string]domain.Finding)
 				}
-				out[r.ID] = resource.EnrichmentFinding{
-					Severity: glyphFromDomainSeverity(f.Severity),
-					Summary:  f.Phrase,
-				}
+				out[r.ID] = f
 				break // at most one wave2 finding per resource
 			}
 		}
@@ -119,22 +137,6 @@ func findingsFromRows(rows []resource.Resource) map[string]resource.EnrichmentFi
 	return out
 }
 
-// glyphFromDomainSeverity converts a domain.Severity constant to the
-// resource.EnrichmentFinding.Severity glyph string used by row marker rendering.
-//
-//	SevBroken → "!"   (failed / degraded)
-//	SevWarn   → "~"   (scheduled maintenance / informational)
-//	other     → ""    (no glyph rendered)
-func glyphFromDomainSeverity(s domain.Severity) string {
-	switch s {
-	case domain.SevBroken:
-		return "!"
-	case domain.SevWarn:
-		return "~"
-	default:
-		return ""
-	}
-}
 
 // stripWave2 returns a copy of findings with wave2 entries removed.
 // Wave 1 entries (Source = "wave1") are preserved in order.

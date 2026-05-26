@@ -20,6 +20,14 @@ import (
 	"time"
 
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
+
+	"github.com/k2m30/a9s/v3/internal/domain"
+)
+
+// dbi-snap canonical FindingCodes emitted by the cross-ref enricher.
+const (
+	dbiSnapOrphanCode        domain.FindingCode = "dbi-snap.orphan"
+	dbiSnapPastRetentionCode domain.FindingCode = "dbi-snap.past-retention"
 )
 
 // enrichDBISnapCrossRef is the IssueEnricherFunc registered for dbi-snap.
@@ -55,9 +63,12 @@ var enrichDBISnapCrossRef = EnrichSnapshotCrossRef(SnapshotCrossRefConfig{
 		}
 		return *db.BackupRetentionPeriod, true
 	},
-	OrphanPhrase:     "orphan: source DB deleted",
-	ParentRowLabel:   "Source DB",
-	RetentionPhrase:  func(d int) string { return fmt.Sprintf("automated, %dd past retention", d) },
-	RetentionEnabled: true,
-	Severity:         "!",
+	OrphanPhrase:      "orphan: source DB deleted",
+	ParentRowLabel:    "Source DB",
+	RetentionPhrase:   func(d int) string { return fmt.Sprintf("automated, %dd past retention", d) },
+	RetentionEnabled:  true,
+	Severity:          "!",
+	ShortName:         "dbi-snap",
+	OrphanCode:        dbiSnapOrphanCode,
+	PastRetentionCode: dbiSnapPastRetentionCode,
 })

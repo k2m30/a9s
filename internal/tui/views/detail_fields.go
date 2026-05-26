@@ -199,14 +199,22 @@ func (m *DetailModel) injectAttentionSection() {
 		for _, phrase := range m.res.Issues {
 			entries = append(entries, entry{tier: phraseTier(m.resourceType, phrase), primary: phrase})
 		}
-		if m.enrichmentFinding != nil && m.enrichmentFinding.Summary != "" {
-			enrichRows := make([]domain.DetailRow, len(m.enrichmentFinding.Rows))
-			for i, r := range m.enrichmentFinding.Rows {
-				enrichRows[i] = domain.DetailRow{Label: r.Label, Value: r.Value, Tier: r.Tier}
+		if m.enrichmentFinding != nil && m.enrichmentFinding.Phrase != "" {
+			var enrichRows []domain.DetailRow
+			if m.enrichmentDetail != nil {
+				enrichRows = make([]domain.DetailRow, len(m.enrichmentDetail.Rows))
+				copy(enrichRows, m.enrichmentDetail.Rows)
+			}
+			var tier string
+			switch m.enrichmentFinding.Severity {
+			case domain.SevBroken:
+				tier = "!"
+			case domain.SevWarn:
+				tier = "~"
 			}
 			entries = append(entries, entry{
-				tier:    m.enrichmentFinding.Severity,
-				primary: m.enrichmentFinding.Summary,
+				tier:    tier,
+				primary: m.enrichmentFinding.Phrase,
 				rows:    enrichRows,
 			})
 		}

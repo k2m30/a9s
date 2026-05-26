@@ -22,6 +22,7 @@ import (
 	codeartifacttypes "github.com/aws/aws-sdk-go-v2/service/codeartifact/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -159,11 +160,11 @@ func TestEnrichCodeArtifactRepository_NoPolicyProducesFindingSevTilde(t *testing
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (no policy)", caRepo1)
 	}
-	if f.Severity != "~" {
-		t.Errorf("severity = %q, want %q", f.Severity, "~")
+	if f.Severity != domain.SevWarn {
+		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
-	if !strings.Contains(strings.ToLower(f.Summary), "no permissions policy") {
-		t.Errorf("summary %q must contain \"no permissions policy\"", f.Summary)
+	if !strings.Contains(strings.ToLower(f.Phrase), "no permissions policy") {
+		t.Errorf("summary %q must contain \"no permissions policy\"", f.Phrase)
 	}
 	if _, ok := result.Findings[caRepo2]; ok {
 		t.Error("repo-2 must NOT appear in Findings — it has a valid policy")
@@ -195,11 +196,11 @@ func TestEnrichCodeArtifactRepository_PublicPolicyProducesFindingSevBang(t *test
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (public access)", caRepo1)
 	}
-	if f.Severity != "!" {
-		t.Errorf("severity = %q, want %q", f.Severity, "!")
+	if f.Severity != domain.SevBroken {
+		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
-	if !strings.Contains(strings.ToLower(f.Summary), "public access") {
-		t.Errorf("summary %q must contain \"public access\"", f.Summary)
+	if !strings.Contains(strings.ToLower(f.Phrase), "public access") {
+		t.Errorf("summary %q must contain \"public access\"", f.Phrase)
 	}
 	if _, ok := result.Findings[caRepo2]; ok {
 		t.Error("repo-2 must NOT appear in Findings — it has a specific principal")

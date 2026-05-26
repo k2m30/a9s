@@ -27,6 +27,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -168,11 +169,11 @@ func TestDDB_Enrich_PITRDisabled_HealthyRow(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding for %q (PITR disabled); Findings keys = %v", fixtures.AuditPITROffID, findingKeysDDB(result.Findings))
 	}
-	if finding.Severity != "~" {
-		t.Errorf("Severity = %q, want %q", finding.Severity, "~")
+	if finding.Severity != domain.SevWarn {
+		t.Errorf("Severity = %v, want SevWarn", finding.Severity)
 	}
-	if finding.Summary != "PITR off" {
-		t.Errorf("Summary = %q, want %q", finding.Summary, "PITR off")
+	if finding.Phrase != "PITR off" {
+		t.Errorf("Phrase = %q, want %q", finding.Phrase, "PITR off")
 	}
 
 	updates, ok := result.FieldUpdates[fixtures.AuditPITROffID]
@@ -212,11 +213,11 @@ func TestDDB_Enrich_PITRDisabled_NonHealthyRow(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding for %q (ARCHIVED + PITR off); Findings keys = %v", fixtures.LegacyArchivedID, findingKeysDDB(result.Findings))
 	}
-	if finding.Severity != "~" {
-		t.Errorf("Severity = %q, want %q", finding.Severity, "~")
+	if finding.Severity != domain.SevWarn {
+		t.Errorf("Severity = %v, want SevWarn", finding.Severity)
 	}
-	if finding.Summary != "PITR off" {
-		t.Errorf("Summary = %q, want %q", finding.Summary, "PITR off")
+	if finding.Phrase != "PITR off" {
+		t.Errorf("Phrase = %q, want %q", finding.Phrase, "PITR off")
 	}
 
 	updates, ok := result.FieldUpdates[fixtures.LegacyArchivedID]
@@ -256,13 +257,13 @@ func TestDDB_Enrich_SummaryNotRows_Contract(t *testing.T) {
 		t.Fatalf("expected finding for %q", fixtures.AuditPITROffID)
 	}
 
-	if finding.Summary != "PITR off" {
-		t.Errorf("Summary = %q, want exactly %q", finding.Summary, "PITR off")
+	if finding.Phrase != "PITR off" {
+		t.Errorf("Phrase = %q, want exactly %q", finding.Phrase, "PITR off")
 	}
-	// U11: no Row value should appear in Summary.
-	for _, row := range finding.Rows {
-		if row.Value != "" && strings.Contains(finding.Summary, row.Value) {
-			t.Errorf("Summary %q embeds Row[%q].Value %q — Summary and Rows must be distinct channels (U11)", finding.Summary, row.Label, row.Value)
+	// U11: no Row value should appear in Phrase.
+	for _, row := range result.AttentionDetails[fixtures.AuditPITROffID].Rows {
+		if row.Value != "" && strings.Contains(finding.Phrase, row.Value) {
+			t.Errorf("Phrase %q embeds Row[%q].Value %q — Phrase and Rows must be distinct channels (U11)", finding.Phrase, row.Label, row.Value)
 		}
 	}
 }
@@ -351,7 +352,7 @@ func TestDDB_Enrich_NilDynamoDBClient(t *testing.T) {
 // internal helpers
 // ---------------------------------------------------------------------------
 
-func findingKeysDDB(m map[string]resource.EnrichmentFinding) []string {
+func findingKeysDDB(m map[string]domain.Finding) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)

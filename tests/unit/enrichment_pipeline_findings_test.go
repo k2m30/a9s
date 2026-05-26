@@ -22,6 +22,7 @@ import (
 	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -83,8 +84,8 @@ func TestEnrichCodePipelineStatus_FailedStageKeyedByResourceID(t *testing.T) {
 	if _, ok := result.Findings["my-pipeline"]; ok {
 		t.Error("finding must not be keyed by r.Name")
 	}
-	if got := result.Findings["pipe-id"].Severity; got != "!" {
-		t.Errorf("Findings[%q].Severity = %q, want %q", "pipe-id", got, "!")
+	if got := result.Findings["pipe-id"].Severity; got != domain.SevBroken {
+		t.Errorf("Findings[%q].Severity = %v, want SevBroken", "pipe-id", got)
 	}
 }
 
@@ -107,15 +108,15 @@ func TestEnrichCodePipelineStatus_SummaryContainsStageName(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	finding := result.Findings["summary-pipeline"]
-	summary := finding.Summary
+	summary := finding.Phrase
 	if !strings.Contains(summary, "Integration-Test") {
 		t.Errorf("summary %q must contain stage name %q", summary, "Integration-Test")
 	}
 	if !strings.Contains(summary, "failed") {
 		t.Errorf("summary %q must contain %q", summary, "failed")
 	}
-	if got := finding.Severity; got != "!" {
-		t.Errorf("Findings[%q].Severity = %q, want %q", "summary-pipeline", got, "!")
+	if got := finding.Severity; got != domain.SevBroken {
+		t.Errorf("Findings[%q].Severity = %v, want SevBroken", "summary-pipeline", got)
 	}
 }
 

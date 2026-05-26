@@ -19,9 +19,10 @@ import (
 	"fmt"
 	"maps"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/session"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/session"
 )
 
 // handleAvailabilityCacheLoaded applies cached entries to the main menu and
@@ -307,7 +308,7 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 
 		// Site 3 (Wave-2 bridge, PR-03a-fold): applyEnrichment directly mutates
 		// r.Findings and r.AttentionDetails on every cached row of this type.
-		c.applyEnrichment(msg.ResourceType, msg.Findings)
+		c.applyEnrichment(msg.ResourceType, msg.Findings, msg.AttentionDetails)
 
 		// Merge FieldUpdates into ProbeResources and ResourceCache.
 		if len(msg.FieldUpdates) > 0 {
@@ -373,8 +374,9 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 
 		// Emit resource-list enrichment patch (updates list badge + row markers).
 		enrichPatch := &ListEnrichmentPatch{
-			Findings:     msg.Findings,
-			TruncatedIDs: msg.TruncatedIDs,
+			Findings:         msg.Findings,
+			AttentionDetails: msg.AttentionDetails,
+			TruncatedIDs:     msg.TruncatedIDs,
 		}
 		if len(msg.FieldUpdates) > 0 {
 			enrichPatch.FieldUpdates = msg.FieldUpdates
@@ -389,8 +391,9 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		// ResourceID empty = all detail views of this type; the adapter looks up
 		// the finding for each view's specific resource ID from EnrichmentFindings.
 		intents = append(intents, PatchDetail{
-			ResourceType:       msg.ResourceType,
-			EnrichmentFindings: msg.Findings,
+			ResourceType:               msg.ResourceType,
+			EnrichmentFindings:         msg.Findings,
+			EnrichmentAttentionDetails: msg.AttentionDetails,
 		})
 	}
 
@@ -420,8 +423,9 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 
 // unifiedIssueCount returns the distinct count of resource IDs with ≥1 issue
 // across both Wave-1 (IsIssue() status color) and Wave-2 (enrichment findings).
-// Only "!"-severity findings contribute to the S1 badge.
-func unifiedIssueCount(wave1Resources []resource.Resource, td resource.ResourceTypeDef, findings map[string]resource.EnrichmentFinding) int {
+// Only SevBroken findings contribute to the S1 badge ("!"-glyph equivalent;
+// SevWarn / "~" informational findings are excluded).
+func unifiedIssueCount(wave1Resources []resource.Resource, td resource.ResourceTypeDef, findings map[string]domain.Finding) int {
 	if td.ExcludeFromIssueBadge {
 		return 0
 	}
@@ -436,7 +440,7 @@ func unifiedIssueCount(wave1Resources []resource.Resource, td resource.ResourceT
 		}
 	}
 	for id, finding := range findings {
-		if finding.Severity != "!" {
+		if finding.Severity != domain.SevBroken {
 			continue
 		}
 		if _, ok := knownIDs[id]; ok {

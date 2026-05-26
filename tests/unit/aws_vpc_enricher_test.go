@@ -20,6 +20,7 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -144,8 +145,8 @@ func TestEnrichVPCFlowLogs_NoLogsProducesFindingSevTilde(t *testing.T) {
 			t.Errorf("expected finding for %q", id)
 			continue
 		}
-		if f.Severity != "~" {
-			t.Errorf("%s: severity = %q, want %q", id, f.Severity, "~")
+		if f.Severity != domain.SevWarn {
+			t.Errorf("%s: severity = %v, want SevWarn", id, f.Severity)
 		}
 	}
 }
@@ -171,8 +172,8 @@ func TestEnrichVPCFlowLogs_InactiveOnlyProducesFindingForAffectedVPC(t *testing.
 	if !ok {
 		t.Fatalf("expected finding keyed by %q", "vpc-00000001")
 	}
-	if f.Severity != "~" {
-		t.Errorf("severity = %q, want %q", f.Severity, "~")
+	if f.Severity != domain.SevWarn {
+		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
 	if _, ok := result.Findings["vpc-00000002"]; ok {
 		t.Error("vpc-00000002 must NOT appear in Findings — it has an ACTIVE flow log")
@@ -232,7 +233,7 @@ func TestEnrichVPCFlowLogs_APIErrorSetsTruncatedFindsOtherVPC(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding for vpc-00000002 (no active flow logs)")
 	}
-	if f.Severity != "~" {
-		t.Errorf("vpc-00000002 severity = %q, want %q", f.Severity, "~")
+	if f.Severity != domain.SevWarn {
+		t.Errorf("vpc-00000002 severity = %v, want %v", f.Severity, "~")
 	}
 }
