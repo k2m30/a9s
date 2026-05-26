@@ -20,6 +20,7 @@ package tui
 import (
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
@@ -87,13 +88,21 @@ func (m *Model) applyIntents(intents []runtime.UIIntent) []tea.Cmd {
 				if v.ResourceID != "" && d.ResourceID() != v.ResourceID {
 					continue
 				}
-				// nil EnrichmentFindings = clear; non-nil = update from map.
+				// AS-1395: runtime ships domain.Finding + domain.AttentionDetail
+				// keyed by Resource.ID. nil EnrichmentFindings = clear; non-nil =
+				// update from map.
 				if v.EnrichmentFindings == nil {
-					d.SetEnrichmentFinding(nil)
+					d.SetEnrichmentFinding(nil, nil)
 				} else if f, exists := v.EnrichmentFindings[d.ResourceID()]; exists {
-					d.SetEnrichmentFinding(&f)
+					finding := f
+					var ad *domain.AttentionDetail
+					if got, hasAD := v.EnrichmentAttentionDetails[d.ResourceID()]; hasAD && len(got.Rows) > 0 {
+						adVal := got
+						ad = &adVal
+					}
+					d.SetEnrichmentFinding(&finding, ad)
 				} else {
-					d.SetEnrichmentFinding(nil)
+					d.SetEnrichmentFinding(nil, nil)
 				}
 			}
 		case runtime.FlashIntent:

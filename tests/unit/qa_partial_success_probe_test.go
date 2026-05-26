@@ -33,6 +33,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -139,8 +140,8 @@ func TestProbeEnrichment_PartialSuccess(t *testing.T) {
 		TruncatedIDs: map[string]bool{
 			"res-pe-002": true,
 		},
-		Findings: map[string]resource.EnrichmentFinding{
-			"res-pe-001": {Severity: "!", Summary: "maintenance window overdue"},
+		Findings: map[string]domain.Finding{
+			"res-pe-001": {Code: "rds.pending-maintenance", Phrase: "maintenance window overdue", Severity: domain.SevBroken, Source: "wave2:test-pe-partial"},
 		},
 		FieldUpdates: map[string]map[string]string{
 			"res-pe-001": {"maintenance_window": "overdue"},

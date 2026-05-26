@@ -16,6 +16,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -100,8 +101,8 @@ func TestHandleEnrichmentChecked_UpdatesActiveDetailWhenFindingPresent(t *testin
 		ResourceType: "rds",
 		Issues:       1,
 		Truncated:    false,
-		Findings: map[string]resource.EnrichmentFinding{
-			"db-live-001": {Severity: "!", Summary: "pending maintenance: system-update — live update test"},
+		Findings: map[string]domain.Finding{
+			"db-live-001": {Code: "rds.pending-maintenance", Phrase: "pending maintenance: system-update — live update test", Severity: domain.SevBroken, Source: "wave2:rds"},
 		},
 		Err:     nil,
 		Gen:     0, // matches fresh model's enrichmentGen=0
@@ -138,8 +139,8 @@ func TestHandleEnrichmentChecked_ClearsDetailFindingOnRecovery(t *testing.T) {
 	setFindingMsg := messages.EnrichmentChecked{
 		ResourceType: "rds",
 		Issues:       1,
-		Findings: map[string]resource.EnrichmentFinding{
-			"db-live-002": {Severity: "!", Summary: "pending maintenance: system-update — will recover"},
+		Findings: map[string]domain.Finding{
+			"db-live-002": {Code: "rds.pending-maintenance", Phrase: "pending maintenance: system-update — will recover", Severity: domain.SevBroken, Source: "wave2:rds"},
 		},
 		Gen:     0,
 		TypeGen: 0,
@@ -160,7 +161,7 @@ func TestHandleEnrichmentChecked_ClearsDetailFindingOnRecovery(t *testing.T) {
 	clearFindingMsg := messages.EnrichmentChecked{
 		ResourceType: "rds",
 		Issues:       0,
-		Findings:     map[string]resource.EnrichmentFinding{}, // empty — "db-live-002" recovered
+		Findings:     map[string]domain.Finding{}, // empty — "db-live-002" recovered
 		Gen:          0,
 		TypeGen:      0, // still matches (TypeGen only changes on rerun start)
 	}
@@ -189,8 +190,8 @@ func TestHandleEnrichmentChecked_StaleTypeGenDoesNotUpdateDetail(t *testing.T) {
 	staleMsg := messages.EnrichmentChecked{
 		ResourceType: "rds",
 		Issues:       1,
-		Findings: map[string]resource.EnrichmentFinding{
-			"db-live-003": {Severity: "!", Summary: "stale finding — should not appear"},
+		Findings: map[string]domain.Finding{
+			"db-live-003": {Code: "rds.pending-maintenance", Phrase: "stale finding — should not appear", Severity: domain.SevBroken, Source: "wave2:rds"},
 		},
 		Gen:     0,
 		TypeGen: 99, // stale — fresh model's enrichmentTypeGen["rds"] is 0
@@ -229,8 +230,8 @@ func TestHandleEnrichmentChecked_FindingNotAppliedWhenDetailInactive(t *testing.
 	findingMsg := messages.EnrichmentChecked{
 		ResourceType: "rds",
 		Issues:       1,
-		Findings: map[string]resource.EnrichmentFinding{
-			"db-not-in-detail": {Severity: "!", Summary: "finding for list-only scenario"},
+		Findings: map[string]domain.Finding{
+			"db-not-in-detail": {Code: "rds.pending-maintenance", Phrase: "finding for list-only scenario", Severity: domain.SevBroken, Source: "wave2:rds"},
 		},
 		Gen:     0,
 		TypeGen: 0,

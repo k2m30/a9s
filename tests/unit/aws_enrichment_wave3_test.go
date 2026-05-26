@@ -34,6 +34,7 @@ import (
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -146,14 +147,14 @@ func TestEnrichECSServices_StuckServiceEmitsBangFinding(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding for service %q; findings: %v", svcName, result.Findings)
 	}
-	if f.Severity != "!" {
-		t.Errorf("severity = %q, want %q", f.Severity, "!")
+	if f.Severity != domain.SevBroken {
+		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
-	if !strings.Contains(f.Summary, "running") {
-		t.Errorf("summary %q should contain %q", f.Summary, "running")
+	if !strings.Contains(f.Phrase, "running") {
+		t.Errorf("summary %q should contain %q", f.Phrase, "running")
 	}
-	if !strings.Contains(f.Summary, "desired") {
-		t.Errorf("summary %q should contain %q", f.Summary, "desired")
+	if !strings.Contains(f.Phrase, "desired") {
+		t.Errorf("summary %q should contain %q", f.Phrase, "desired")
 	}
 	if result.IssueCount != 1 {
 		t.Errorf("IssueCount = %d, want 1", result.IssueCount)
@@ -202,11 +203,11 @@ func TestEnrichECSServices_DeploymentRolloutFailedEmitsFinding(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding for service %q; findings: %v", svcName, result.Findings)
 	}
-	if f.Severity != "!" {
-		t.Errorf("severity = %q, want %q", f.Severity, "!")
+	if f.Severity != domain.SevBroken {
+		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
-	if !strings.Contains(f.Summary, "deployment") {
-		t.Errorf("summary %q should contain %q", f.Summary, "deployment")
+	if !strings.Contains(f.Phrase, "deployment") {
+		t.Errorf("summary %q should contain %q", f.Phrase, "deployment")
 	}
 }
 
@@ -365,11 +366,11 @@ func TestEnrichECSClusters_PendingTasksEmitsFinding(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding for cluster %q; findings: %v", clusterName, result.Findings)
 	}
-	if f.Severity != "~" {
-		t.Errorf("severity = %q, want %q", f.Severity, "~")
+	if f.Severity != domain.SevWarn {
+		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
-	if !strings.Contains(f.Summary, "pending") {
-		t.Errorf("summary %q should contain %q", f.Summary, "pending")
+	if !strings.Contains(f.Phrase, "pending") {
+		t.Errorf("summary %q should contain %q", f.Phrase, "pending")
 	}
 	// IssueCount must be 0 — all ECS cluster findings are informational.
 	if result.IssueCount != 0 {
@@ -513,11 +514,11 @@ func TestEnrichECSTasks_TaskFailedToStartEmitsFinding(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding for task %q; findings: %v", taskID, result.Findings)
 	}
-	if f.Severity != "!" {
-		t.Errorf("severity = %q, want %q", f.Severity, "!")
+	if f.Severity != domain.SevBroken {
+		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
-	if !strings.Contains(f.Summary, "TaskFailedToStart") {
-		t.Errorf("summary %q should contain %q", f.Summary, "TaskFailedToStart")
+	if !strings.Contains(f.Phrase, "TaskFailedToStart") {
+		t.Errorf("summary %q should contain %q", f.Phrase, "TaskFailedToStart")
 	}
 	if result.IssueCount != 1 {
 		t.Errorf("IssueCount = %d, want 1", result.IssueCount)
@@ -718,11 +719,11 @@ func TestEnrichCFNStackEvents_FailedEventEmitsBangFinding(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding for stack %q; findings: %v", stackID, result.Findings)
 	}
-	if f.Severity != "!" {
-		t.Errorf("severity = %q, want %q", f.Severity, "!")
+	if f.Severity != domain.SevBroken {
+		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
-	if !strings.Contains(f.Summary, "recent resource failure") {
-		t.Errorf("summary %q should contain %q", f.Summary, "recent resource failure")
+	if !strings.Contains(f.Phrase, "recent resource failure") {
+		t.Errorf("summary %q should contain %q", f.Phrase, "recent resource failure")
 	}
 	if result.IssueCount != 1 {
 		t.Errorf("IssueCount = %d, want 1", result.IssueCount)
@@ -857,8 +858,8 @@ func TestEnrichELBAttributes_BothMisconfigurations_BangFinding(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding for LB %q; findings: %v", lbName, result.Findings)
 	}
-	if f.Severity != "!" {
-		t.Errorf("severity = %q, want %q (both misconfigured → promotion)", f.Severity, "!")
+	if f.Severity != domain.SevBroken {
+		t.Errorf("severity = %v, want %q (both misconfigured → promotion)", f.Severity, "!")
 	}
 	if result.IssueCount != 1 {
 		t.Errorf("IssueCount = %d, want 1", result.IssueCount)
@@ -889,8 +890,8 @@ func TestEnrichELBAttributes_OnlyDeletionProtectionMissing_TildeFinding(t *testi
 	if !ok {
 		t.Fatalf("expected finding for LB %q; findings: %v", lbName, result.Findings)
 	}
-	if f.Severity != "~" {
-		t.Errorf("severity = %q, want %q (single misconfiguration → ~)", f.Severity, "~")
+	if f.Severity != domain.SevWarn {
+		t.Errorf("severity = %v, want %q (single misconfiguration → ~)", f.Severity, "~")
 	}
 	// Single "~" finding must NOT contribute to IssueCount.
 	if result.IssueCount != 0 {
@@ -1008,11 +1009,11 @@ func TestEnrichEBEnvironmentHealth_CausesEmitsTildeFinding(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding keyed by env ID %q; findings: %v", envID, result.Findings)
 	}
-	if f.Severity != "~" {
-		t.Errorf("severity = %q, want %q", f.Severity, "~")
+	if f.Severity != domain.SevWarn {
+		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
-	if !strings.Contains(f.Summary, "EB causes:") {
-		t.Errorf("summary %q should contain %q", f.Summary, "EB causes:")
+	if !strings.Contains(f.Phrase, "EB causes:") {
+		t.Errorf("summary %q should contain %q", f.Phrase, "EB causes:")
 	}
 	// IssueCount must be 0 — EB health findings are always informational.
 	if result.IssueCount != 0 {
@@ -1135,8 +1136,8 @@ func TestEnrichCFNCombined_EventsAndDriftMerged(t *testing.T) {
 	}
 	// Events win on ID conflict: the stackID finding must be "!".
 	if f, ok := result.Findings[stackID]; ok {
-		if f.Severity != "!" {
-			t.Errorf("expected events finding (severity !) to win over drift finding; got severity %q", f.Severity)
+		if f.Severity != domain.SevBroken {
+			t.Errorf("expected events finding (severity !) to win over drift finding; got severity %v", f.Severity)
 		}
 	}
 }

@@ -7,7 +7,13 @@ import (
 
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// iam-policy canonical FindingCodes.
+const (
+	iamPolicyCodeAdminStar domain.FindingCode = "iam-policy.admin-star"
 )
 
 // EnrichIAMPolicy calls GetPolicy + GetPolicyVersion per customer-managed policy
@@ -19,19 +25,21 @@ import (
 // AWS-managed policies (ARN starts with "arn:aws:iam::aws:policy/") are skipped.
 // Skip when clients.IAM == nil.
 func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+		FieldUpdates: make(map[string]map[string]string),
+	}
 	if clients.IAM == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	getPolicyAPI, ok1 := clients.IAM.(IAMGetPolicyAPI)
 	getPolicyVersionAPI, ok2 := clients.IAM.(IAMGetPolicyVersionAPI)
 	if !ok1 || !ok2 {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	issueCount := 0
-	fieldUpdates := make(map[string]map[string]string)
 	for i, r := range resources {
 		if i >= EnrichmentCap {
 			break
@@ -54,7 +62,7 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 		doc, err := FetchManagedPolicyDocument(ctx, getPolicyAPI, getPolicyVersionAPI, policyARN)
 		if err != nil {
 			truncated = true
-			truncatedIDs[r.ID] = true
+			result.TruncatedIDs[r.ID] = true
 			continue
 		}
 		riskVal := ""
@@ -65,21 +73,19 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 		}
 		if isAdminStarPolicy(doc) {
 			riskVal = "ADMIN_ALL"
-			findings[r.ID] = resource.EnrichmentFinding{
-				Severity: "!",
-				Summary:  "admin star (CIS IAM.16)",
-				Rows: []resource.FindingRow{
-					{Label: "Action", Value: "*", Tier: "!"},
-					{Label: "Resource", Value: "*", Tier: "!"},
-				},
-			}
+			setWave2Finding(&result, r.ID, iamPolicyCodeAdminStar, "admin star (CIS IAM.16)", "!", "iam-policy", []domain.DetailRow{
+				{Label: "Action", Value: "*", Tier: "!"},
+				{Label: "Resource", Value: "*", Tier: "!"},
+			})
 			issueCount++
 		}
-		fieldUpdates[r.ID] = map[string]string{
+		result.FieldUpdates[r.ID] = map[string]string{
 			"risk": riskVal,
 		}
 	}
-	return IssueEnricherResult{IssueCount: issueCount, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	result.IssueCount = issueCount
+	result.Truncated = truncated
+	return result, nil
 }
 
 // extractIAMPolicyARN extracts the ARN from a resource whose RawStruct is an iamtypes.Policy

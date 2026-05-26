@@ -10,7 +10,8 @@ This document is the first thing you should read when joining the project. It ex
 For the target "no legacy / no lazy compromise" architecture and the migration plan, read:
 
 - [`docs/refactor/00-overview.md`](refactor/00-overview.md) — program-level goals and invariants
-- [`docs/refactor/01-projection-hook.md`](refactor/01-projection-hook.md) through [`docs/refactor/05-boundary.md`](refactor/05-boundary.md) — phase-by-phase target architecture
+- [`docs/refactor/03-finding-model.md`](refactor/03-finding-model.md), [`docs/refactor/04-catalog.md`](refactor/04-catalog.md), [`docs/refactor/05-boundary.md`](refactor/05-boundary.md) — active phase specs
+- [`docs/refactor/landed/`](refactor/landed/) — archived per-PR specs for Phase 01 / 02 / 05a (preserved verbatim as landed)
 
 Latest target-architecture additions in the refactor docs:
 
@@ -113,7 +114,7 @@ These are **current-state invariants**, not promises about the final architectur
    `*awsclient.ServiceClients` carries AWS clients only. Session-scoped
    caches live on `session.Session` (owned by `runtime.Core`) and reach
    detail enrichers via `*awsclient.DetailEnrichmentCtx`. Phase 02
-   (`docs/refactor/02-session-owner.md`) deleted the legacy package-global
+   (`docs/refactor/landed/02-session-owner.md`) deleted the legacy package-global
    caches in `internal/aws/` — `allPoliciesMu` (IAM policies),
    `identityCacheMu` (caller identity), and `sesRuleSetCacheMu` (SES rule
    sets) — and replaced them with `PolicyStore` / `IdentityStore` /
@@ -229,7 +230,7 @@ internal/
   demo/          # synthetic fixture data for --demo mode
     fixtures/    #   per-service Go structs (ec2.go, iam.go, etc.)
     fakes/       #   per-service fake API implementations
-  domain/        # leaf type-declaration package: Resource, Type, Severity, FindingCode, Finding, AttentionDetail, Color, Gen, plus query-contract types. Introduced in Phase 01 (`docs/refactor/01-projection-hook.md`); `Gen` added in Phase 05a-gens.
+  domain/        # leaf type-declaration package: Resource, Type, Severity, FindingCode, Finding, AttentionDetail, Color, Gen, plus query-contract types. Introduced in Phase 01 (`docs/refactor/landed/01-projection-hook.md`); `Gen` added in Phase 05a-gens.
   fieldpath/     # struct field extraction via reflection (frozen — don't modify)
   resource/      # legacy resource model, type registry, fetcher registry (Phase 04 in-flight; backward-compat aliases — `resource.Resource`, `resource.ResourceTypeDef` — point at `internal/domain` / `internal/catalog`)
   runtime/       # platform-agnostic app core: Core (orchestrator.go), handlers.go, screens.go, tasks.go, state.go, intent.go (Phase 05a-extract, in flight)
@@ -273,7 +274,7 @@ type Resource struct {
 }
 ```
 
-- **Type** — short-name field added in Phase 01 (`docs/refactor/01-projection-hook.md`) so that downstream packages (semantics, projection) can route by type without re-deriving it.
+- **Type** — short-name field added in Phase 01 (`docs/refactor/landed/01-projection-hook.md`) so that downstream packages (semantics, projection) can route by type without re-deriving it.
 - **Status** / **Issues** — legacy lifecycle/issue surface still populated today; the shim in `internal/semantics/attention/` derives `Findings` from `Status` + `Issues` at each entry point listed in `docs/refactor/03-finding-model.md:78-89`. PR-03n's exit criterion deletes both fields and switches every view to read `Findings[0]` + `r.Fields[td.LifecycleKey]`.
 - **Findings** — canonical finding list (`domain.Finding{Code, Phrase, Severity, Source}`). Drives row coloring, list-view Status display, menu issue badges, and the ctrl+z attention filter. Wave 1 entries carry `Source = "wave1"`; Wave 2 entries carry `Source = "wave2:<short>"` and are written by `applyEnrichment` in `internal/tui/app_enrich_fold.go`.
 - **AttentionDetails** — supporting facts (rows shown in the detail-view Attention section) keyed by stable `FindingCode`. `FindingCode` is never displayed.

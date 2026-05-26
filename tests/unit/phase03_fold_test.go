@@ -81,7 +81,7 @@ func slugForTest(phrase string) string {
 // Specifically for each type:
 //   - Resource with Status "running" (a lifecycle phrase, filtered by wave1)
 //     should yield exactly one finding after enrichment — the wave2 entry.
-//   - That wave2 finding must have Phrase == ef.Summary and Source == "wave2:<canonShort>".
+//   - That wave2 finding must have Phrase == ef.Phrase and Source == "wave2:<canonShort>".
 //   - r.AttentionDetails[code].Rows must contain the EnrichmentFinding's Rows.
 //   - The same row mutation must occur for LazyResourceCache and ProbeResources.
 //
@@ -120,10 +120,14 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 		wantCode := domain.FindingCode(tc.canonShort + "." + slugForTest(tc.summary))
 		rid := "r-" + tc.canonShort
 
-		ef := resource.EnrichmentFinding{
-			Severity: "~",
-			Summary:  tc.summary,
-			Rows: []resource.FindingRow{
+		efFinding := domain.Finding{
+			Code:     wantCode,
+			Phrase:   tc.summary,
+			Severity: domain.SevWarn,
+			Source:   wantSource,
+		}
+		efAttention := domain.AttentionDetail{
+			Rows: []domain.DetailRow{
 				{Label: "Action", Value: "test-action"},
 				{Label: "Detail", Value: "test-detail"},
 			},
@@ -140,7 +144,8 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 
 			m = shimApplyMsg(m, messages.EnrichmentChecked{
 				ResourceType: msgType,
-				Findings:     map[string]resource.EnrichmentFinding{rid: ef},
+				Findings:     map[string]domain.Finding{rid: efFinding},
+				AttentionDetails: map[string]domain.AttentionDetail{rid: efAttention},
 				Gen:          0,
 				TypeGen:      0,
 			})
@@ -165,18 +170,18 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 				}
 			}
 
-			// AttentionDetails must carry the EnrichmentFinding's Rows.
+			// AttentionDetails must carry the rows from the enrichment input.
 			if len(r.AttentionDetails) == 0 {
 				t.Errorf("AttentionDetails: got empty, want entry for code %q", wantCode)
 			} else if detail, ok := r.AttentionDetails[wantCode]; !ok {
 				t.Errorf("AttentionDetails[%q]: not found; keys: %v", wantCode, r.AttentionDetails)
-			} else if len(detail.Rows) != len(ef.Rows) {
-				t.Errorf("AttentionDetails[%q].Rows: got len=%d, want %d", wantCode, len(detail.Rows), len(ef.Rows))
+			} else if len(detail.Rows) != len(efAttention.Rows) {
+				t.Errorf("AttentionDetails[%q].Rows: got len=%d, want %d", wantCode, len(detail.Rows), len(efAttention.Rows))
 			} else {
 				for i, row := range detail.Rows {
-					if row.Label != ef.Rows[i].Label || row.Value != ef.Rows[i].Value {
+					if row.Label != efAttention.Rows[i].Label || row.Value != efAttention.Rows[i].Value {
 						t.Errorf("AttentionDetails[%q].Rows[%d]: got {%q,%q}, want {%q,%q}",
-							wantCode, i, row.Label, row.Value, ef.Rows[i].Label, ef.Rows[i].Value)
+							wantCode, i, row.Label, row.Value, efAttention.Rows[i].Label, efAttention.Rows[i].Value)
 					}
 				}
 			}
@@ -190,10 +195,11 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 			}
 
 			m = shimApplyMsg(m, messages.EnrichmentChecked{
-				ResourceType: msgType,
-				Findings:     map[string]resource.EnrichmentFinding{rid: ef},
-				Gen:          0,
-				TypeGen:      0,
+				ResourceType:     msgType,
+				Findings:         map[string]domain.Finding{rid: efFinding},
+				AttentionDetails: map[string]domain.AttentionDetail{rid: efAttention},
+				Gen:              0,
+				TypeGen:          0,
 			})
 
 			lazySlice, ok := m.Core().Session().LazyResourceCache[tc.canonShort]
@@ -232,10 +238,11 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 			}
 
 			m = shimApplyMsg(m, messages.EnrichmentChecked{
-				ResourceType: msgType,
-				Findings:     map[string]resource.EnrichmentFinding{rid: ef},
-				Gen:          0,
-				TypeGen:      0,
+				ResourceType:     msgType,
+				Findings:         map[string]domain.Finding{rid: efFinding},
+				AttentionDetails: map[string]domain.AttentionDetail{rid: efAttention},
+				Gen:              0,
+				TypeGen:          0,
 			})
 
 			probeSlice, ok := m.Core().Session().ProbeResources[tc.canonShort]
@@ -304,13 +311,17 @@ func TestFold_RepeatedEnrichmentReplacesWave2(t *testing.T) {
 			wantSource := "wave2:" + tc.canonShort
 			rid := "r-repeat-" + tc.canonShort
 
-			efFirst := resource.EnrichmentFinding{
-				Severity: "~",
-				Summary:  tc.summaryA,
+			efFirst := domain.Finding{
+				Code:     domain.FindingCode(tc.canonShort + "." + slugForTest(tc.summaryA)),
+				Phrase:   tc.summaryA,
+				Severity: domain.SevWarn,
+				Source:   wantSource,
 			}
-			efSecond := resource.EnrichmentFinding{
-				Severity: "!",
-				Summary:  tc.summaryB,
+			efSecond := domain.Finding{
+				Code:     domain.FindingCode(tc.canonShort + "." + slugForTest(tc.summaryB)),
+				Phrase:   tc.summaryB,
+				Severity: domain.SevBroken,
+				Source:   wantSource,
 			}
 
 			m := newShimModel()
@@ -323,7 +334,7 @@ func TestFold_RepeatedEnrichmentReplacesWave2(t *testing.T) {
 			// First enrichment: wave2 = summaryA
 			m = shimApplyMsg(m, messages.EnrichmentChecked{
 				ResourceType: msgType,
-				Findings:     map[string]resource.EnrichmentFinding{rid: efFirst},
+				Findings:     map[string]domain.Finding{rid: efFirst},
 				Gen:          0,
 				TypeGen:      0,
 			})
@@ -331,7 +342,7 @@ func TestFold_RepeatedEnrichmentReplacesWave2(t *testing.T) {
 			// Second enrichment: wave2 = summaryB
 			m = shimApplyMsg(m, messages.EnrichmentChecked{
 				ResourceType: msgType,
-				Findings:     map[string]resource.EnrichmentFinding{rid: efSecond},
+				Findings:     map[string]domain.Finding{rid: efSecond},
 				Gen:          0,
 				TypeGen:      0,
 			})
@@ -361,8 +372,8 @@ func TestFold_RepeatedEnrichmentReplacesWave2(t *testing.T) {
 			if wave2.Source != wantSource {
 				t.Errorf("Findings[1].Source: got %q, want %q", wave2.Source, wantSource)
 			}
-			if wave2.Phrase != efSecond.Summary {
-				t.Errorf("Findings[1].Phrase: got %q, want %q (second wave2 only — must NOT stack)", wave2.Phrase, efSecond.Summary)
+			if wave2.Phrase != efSecond.Phrase {
+				t.Errorf("Findings[1].Phrase: got %q, want %q (second wave2 only — must NOT stack)", wave2.Phrase, efSecond.Phrase)
 			}
 		})
 	}
@@ -417,10 +428,15 @@ func TestFold_EmptyEnrichmentClearsWave2(t *testing.T) {
 			wantWave2Source := "wave2:" + tc.canonShort
 			rid := "r-empty-" + tc.canonShort
 
-			efInitial := resource.EnrichmentFinding{
-				Severity: "~",
-				Summary:  tc.summary,
-				Rows:     []resource.FindingRow{{Label: "Action", Value: "test-retirement"}},
+			efInitialCode := domain.FindingCode(tc.canonShort + "." + slugForTest(tc.summary))
+			efInitialFinding := domain.Finding{
+				Code:     efInitialCode,
+				Phrase:   tc.summary,
+				Severity: domain.SevWarn,
+				Source:   wantWave2Source,
+			}
+			efInitialAttention := domain.AttentionDetail{
+				Rows: []domain.DetailRow{{Label: "Action", Value: "test-retirement"}},
 			}
 
 			m := newShimModel()
@@ -432,10 +448,11 @@ func TestFold_EmptyEnrichmentClearsWave2(t *testing.T) {
 
 			// Seed wave2 finding.
 			m = shimApplyMsg(m, messages.EnrichmentChecked{
-				ResourceType: msgType,
-				Findings:     map[string]resource.EnrichmentFinding{rid: efInitial},
-				Gen:          0,
-				TypeGen:      0,
+				ResourceType:     msgType,
+				Findings:         map[string]domain.Finding{rid: efInitialFinding},
+				AttentionDetails: map[string]domain.AttentionDetail{rid: efInitialAttention},
+				Gen:              0,
+				TypeGen:          0,
 			})
 
 			// Verify wave2 was set before clearing.
@@ -548,10 +565,14 @@ func TestFold_CtrlROnList_ClearsActiveRowFindings(t *testing.T) {
 		wantSource = "wave2:ec2"
 	)
 
-	ef := resource.EnrichmentFinding{
-		Severity: "!",
-		Summary:  "pending maintenance",
-		Rows: []resource.FindingRow{
+	efFinding := domain.Finding{
+		Code:     "ec2.pending.maintenance",
+		Phrase:   "pending maintenance",
+		Severity: domain.SevBroken,
+		Source:   wantSource,
+	}
+	efAttention := domain.AttentionDetail{
+		Rows: []domain.DetailRow{
 			{Label: "Action", Value: "instance-retirement"},
 		},
 	}
@@ -568,10 +589,11 @@ func TestFold_CtrlROnList_ClearsActiveRowFindings(t *testing.T) {
 
 	// Step 2: stamp wave2 findings into the cached row via EnrichmentCheckedMsg.
 	m = shimApplyMsg(m, messages.EnrichmentChecked{
-		ResourceType: "ec2",
-		Findings:     map[string]resource.EnrichmentFinding{rid: ef},
-		Gen:          0,
-		TypeGen:      0,
+		ResourceType:     "ec2",
+		Findings:         map[string]domain.Finding{rid: efFinding},
+		AttentionDetails: map[string]domain.AttentionDetail{rid: efAttention},
+		Gen:              0,
+		TypeGen:          0,
 	})
 
 	// Step 3: navigate to the ec2 list view — cache hit path creates a
@@ -646,15 +668,23 @@ func TestFold_MainMenuCtrlR_ClearsAllCachedWave2(t *testing.T) {
 		s3Short  = "s3"
 	)
 
-	efEC2 := resource.EnrichmentFinding{
-		Severity: "!",
-		Summary:  "ec2 retirement",
-		Rows:     []resource.FindingRow{{Label: "Action", Value: "retirement"}},
+	efEC2Finding := domain.Finding{
+		Code:     "ec2.ec2.retirement",
+		Phrase:   "ec2 retirement",
+		Severity: domain.SevBroken,
+		Source:   "wave2:" + ec2Short,
 	}
-	efS3 := resource.EnrichmentFinding{
-		Severity: "~",
-		Summary:  "s3 public access",
-		Rows:     []resource.FindingRow{{Label: "Policy", Value: "public-read"}},
+	efEC2Attention := domain.AttentionDetail{
+		Rows: []domain.DetailRow{{Label: "Action", Value: "retirement"}},
+	}
+	efS3Finding := domain.Finding{
+		Code:     "s3.s3.public.access",
+		Phrase:   "s3 public access",
+		Severity: domain.SevWarn,
+		Source:   "wave2:" + s3Short,
+	}
+	efS3Attention := domain.AttentionDetail{
+		Rows: []domain.DetailRow{{Label: "Policy", Value: "public-read"}},
 	}
 
 	// Build a model WITHOUT WithNoCache so main-menu Ctrl+R is not a no-op.
@@ -677,16 +707,18 @@ func TestFold_MainMenuCtrlR_ClearsAllCachedWave2(t *testing.T) {
 
 	// Step 2: stamp wave2 findings via EnrichmentCheckedMsg for both types.
 	m = shimApplyMsg(m, messages.EnrichmentChecked{
-		ResourceType: ec2Short,
-		Findings:     map[string]resource.EnrichmentFinding{ec2ID: efEC2},
-		Gen:          0,
-		TypeGen:      0,
+		ResourceType:     ec2Short,
+		Findings:         map[string]domain.Finding{ec2ID: efEC2Finding},
+		AttentionDetails: map[string]domain.AttentionDetail{ec2ID: efEC2Attention},
+		Gen:              0,
+		TypeGen:          0,
 	})
 	m = shimApplyMsg(m, messages.EnrichmentChecked{
-		ResourceType: s3Short,
-		Findings:     map[string]resource.EnrichmentFinding{s3ID: efS3},
-		Gen:          0,
-		TypeGen:      0,
+		ResourceType:     s3Short,
+		Findings:         map[string]domain.Finding{s3ID: efS3Finding},
+		AttentionDetails: map[string]domain.AttentionDetail{s3ID: efS3Attention},
+		Gen:              0,
+		TypeGen:          0,
 	})
 
 	// Step 3: confirm wave2 entries are present before Ctrl+R.
@@ -798,10 +830,14 @@ func TestFold_AttentionDetailsCarryAcrossEntryPoints(t *testing.T) {
 			wantCode := domain.FindingCode(tc.canonShort + "." + slugForTest(tc.summary))
 			rid := "r-site4-" + tc.canonShort
 
-			ef := resource.EnrichmentFinding{
-				Severity: "~",
-				Summary:  tc.summary,
-				Rows:     []resource.FindingRow{{Label: "Action", Value: "test-retirement"}},
+			efFinding := domain.Finding{
+				Code:     wantCode,
+				Phrase:   tc.summary,
+				Severity: domain.SevWarn,
+				Source:   wantSource,
+			}
+			efAttention := domain.AttentionDetail{
+				Rows: []domain.DetailRow{{Label: "Action", Value: "test-retirement"}},
 			}
 
 			m := newShimModel()
@@ -835,10 +871,11 @@ func TestFold_AttentionDetailsCarryAcrossEntryPoints(t *testing.T) {
 
 			// Step 2: Wave 2 enrichment arrives.
 			m = shimApplyMsg(m, messages.EnrichmentChecked{
-				ResourceType: msgType,
-				Findings:     map[string]resource.EnrichmentFinding{rid: ef},
-				Gen:          0,
-				TypeGen:      0,
+				ResourceType:     msgType,
+				Findings:         map[string]domain.Finding{rid: efFinding},
+				AttentionDetails: map[string]domain.AttentionDetail{rid: efAttention},
+				Gen:              0,
+				TypeGen:          0,
 			})
 
 			entry, ok := m.Core().Session().ResourceCache[tc.canonShort]
@@ -875,8 +912,8 @@ func TestFold_AttentionDetailsCarryAcrossEntryPoints(t *testing.T) {
 				t.Errorf("AttentionDetails[%q]: not found", wantCode)
 			} else if len(detail.Rows) == 0 {
 				t.Errorf("AttentionDetails[%q].Rows: empty, want non-empty", wantCode)
-			} else if detail.Rows[0].Label != ef.Rows[0].Label {
-				t.Errorf("AttentionDetails[%q].Rows[0].Label: got %q, want %q", wantCode, detail.Rows[0].Label, ef.Rows[0].Label)
+			} else if detail.Rows[0].Label != efAttention.Rows[0].Label {
+				t.Errorf("AttentionDetails[%q].Rows[0].Label: got %q, want %q", wantCode, detail.Rows[0].Label, efAttention.Rows[0].Label)
 			}
 		})
 	}

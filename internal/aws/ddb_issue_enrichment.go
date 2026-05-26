@@ -7,18 +7,26 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// ddb canonical FindingCodes.
+const (
+	ddbCodePITROff domain.FindingCode = "ddb.pitr-off"
 )
 
 // EnrichDynamoDBPITR calls DescribeContinuousBackups for each table (cap EnrichmentCap)
 // and returns a Finding when PITR is not enabled.
 // Severity is "~" (informational); PITR-disabled findings do not bump the menu badge.
 func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	fieldUpdates := make(map[string]map[string]string)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+		FieldUpdates: make(map[string]map[string]string),
+	}
 	if clients.DynamoDB == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -38,7 +46,7 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 		if err != nil {
 			// sub-call error: skip this table, mark truncated to signal incomplete data
 			truncated = true
-			truncatedIDs[r.ID] = true
+			result.TruncatedIDs[r.ID] = true
 			continue
 		}
 		if out.ContinuousBackupsDescription == nil {
@@ -50,25 +58,14 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 		}
 		pitrEnabled := string(pitr.PointInTimeRecoveryStatus) == "ENABLED"
 		if !pitrEnabled {
-			// Compute the new status value: if the table already has a non-empty
-			// status phrase (e.g. "archived: kms key lost"), bump the suffix so the
-			// operator sees there is an additional finding. Otherwise the phrase is
-			// "PITR off" itself.
-			existingStatus := r.Fields["status"]
-			var newStatus string
-			if existingStatus != "" {
-				newStatus = resource.BumpFindingSuffix(existingStatus)
-			} else {
-				newStatus = "PITR off"
-			}
-			fieldUpdates[r.ID] = map[string]string{
-				"status": newStatus,
-			}
-			findings[r.ID] = resource.EnrichmentFinding{
-				Severity: "~",
-				Summary:  "PITR off",
-			}
+			// AS-140 / AS-1394: emit only the Finding entry. The merged display
+			// phrase (e.g. "archived: kms key lost") is computed at render time
+			// by phraseFromFindings(r.Findings) — not by writing
+			// FieldUpdates["status"] here.
+			setWave2Finding(&result, r.ID, ddbCodePITROff, "PITR off", "~", "ddb", nil)
 		}
 	}
-	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	result.IssueCount = 0
+	result.Truncated = truncated
+	return result, nil
 }

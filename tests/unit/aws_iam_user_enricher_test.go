@@ -20,6 +20,7 @@ import (
 	"github.com/aws/smithy-go"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -174,8 +175,8 @@ func TestEnrichIAMUserMFA_NoMFAProducesFindingSevBang(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (no MFA)", "alice")
 	}
-	if f.Severity != "!" {
-		t.Errorf("severity = %q, want %q", f.Severity, "!")
+	if f.Severity != domain.SevBroken {
+		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
 	if _, ok := result.Findings["bob"]; ok {
 		t.Error("bob must NOT appear in Findings — bob has MFA")
@@ -241,8 +242,8 @@ func TestEnrichIAMUserMFA_OldAccessKeyProducesFindingSevTilde(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (old access key)", "alice")
 	}
-	if f.Severity != "~" {
-		t.Errorf("severity = %q, want %q", f.Severity, "~")
+	if f.Severity != domain.SevWarn {
+		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
 	if _, ok := result.Findings["bob"]; ok {
 		t.Error("bob must NOT appear in Findings — bob has a recent key")

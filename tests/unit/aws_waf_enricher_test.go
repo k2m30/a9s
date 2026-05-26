@@ -21,6 +21,7 @@ import (
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -186,11 +187,11 @@ func TestEnrichWAFLogging_NoLoggingProducesFindingSevTilde(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (no logging)", wafACLARN1)
 	}
-	if f.Severity != "~" {
-		t.Errorf("severity = %q, want %q", f.Severity, "~")
+	if f.Severity != domain.SevWarn {
+		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
-	if !strings.Contains(strings.ToLower(f.Summary), "no logging") {
-		t.Errorf("summary %q must contain \"no logging\"", f.Summary)
+	if !strings.Contains(strings.ToLower(f.Phrase), "no logging") {
+		t.Errorf("summary %q must contain \"no logging\"", f.Phrase)
 	}
 	if _, ok := result.Findings[wafACLARN2]; ok {
 		t.Error("acl-2 must NOT appear in Findings — it has logging configured")
@@ -226,11 +227,11 @@ func TestEnrichWAFLogging_OrphanACLProducesFindingSevTilde(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (orphan ACL)", wafACLARN1)
 	}
-	if f.Severity != "~" {
-		t.Errorf("severity = %q, want %q", f.Severity, "~")
+	if f.Severity != domain.SevWarn {
+		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
-	if !strings.Contains(strings.ToLower(f.Summary), "not associated") {
-		t.Errorf("summary %q must contain \"not associated\"", f.Summary)
+	if !strings.Contains(strings.ToLower(f.Phrase), "not associated") {
+		t.Errorf("summary %q must contain \"not associated\"", f.Phrase)
 	}
 	if _, ok := result.Findings[wafACLARN2]; ok {
 		t.Error("acl-2 must NOT appear in Findings — it is associated with a resource")

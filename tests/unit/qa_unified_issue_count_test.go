@@ -28,6 +28,7 @@ import (
 	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
@@ -174,7 +175,7 @@ func TestAllEnrichers_IssueCountMatchesFindings(t *testing.T) {
 
 // buildUnifiedModel builds a ResourceListModel loaded with the given resources and
 // enrichment state, returning the FrameTitle for count inspection.
-func buildUnifiedModel(t *testing.T, resources []resource.Resource, enrichIC int, findings map[string]resource.EnrichmentFinding) string {
+func buildUnifiedModel(t *testing.T, resources []resource.Resource, enrichIC int, findings map[string]domain.Finding) string {
 	t.Helper()
 	td := resource.ResourceTypeDef{
 		ShortName: "ec2",
@@ -208,8 +209,8 @@ func TestUnifiedIssueCount_DedupesAcrossWaves(t *testing.T) {
 			{ID: "i-bbb", Name: "running-server", Status: "running",
 				Fields: map[string]string{"name": "running-server", "state": "running"}},
 		}
-		findings := map[string]resource.EnrichmentFinding{
-			"i-bbb": {Severity: "!", Summary: "status impaired"},
+		findings := map[string]domain.Finding{
+			"i-bbb": {Code: "ec2.system.status.impaired", Phrase: "status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
 		}
 		// enrichIC=1 reflects the correct distinct count from unifiedIssueCount on the production side.
 		title := buildUnifiedModel(t, resources, 1, findings)
@@ -223,8 +224,8 @@ func TestUnifiedIssueCount_DedupesAcrossWaves(t *testing.T) {
 			{ID: "i-aaa", Name: "stopped-server", Status: "stopped",
 				Fields: map[string]string{"name": "stopped-server", "state": "stopped"}},
 		}
-		findings := map[string]resource.EnrichmentFinding{
-			"i-aaa": {Severity: "!", Summary: "status impaired"},
+		findings := map[string]domain.Finding{
+			"i-aaa": {Code: "ec2.system.status.impaired", Phrase: "status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
 		}
 		// unifiedIssueCount({i-aaa(stopped)}, findings{i-aaa}) = 1, not 2.
 		title := buildUnifiedModel(t, resources, 1, findings)
@@ -243,10 +244,10 @@ func TestUnifiedIssueCount_DedupesAcrossWaves(t *testing.T) {
 			{ID: "i-bbb", Name: "s2", Status: "running", Fields: map[string]string{"name": "s2"}},
 			{ID: "i-ccc", Name: "s3", Status: "running", Fields: map[string]string{"name": "s3"}},
 		}
-		findings := map[string]resource.EnrichmentFinding{
-			"i-aaa": {Severity: "!", Summary: "impaired"},
-			"i-bbb": {Severity: "~", Summary: "maintenance"},
-			"i-ccc": {Severity: "!", Summary: "impaired"},
+		findings := map[string]domain.Finding{
+			"i-aaa": {Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
+			"i-bbb": {Code: "rds.pending-maintenance", Phrase: "maintenance", Severity: domain.SevWarn, Source: "wave2:ec2"},
+			"i-ccc": {Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
 		}
 		title := buildUnifiedModel(t, resources, 3, findings)
 		if !strings.Contains(title, "3") {
@@ -258,7 +259,7 @@ func TestUnifiedIssueCount_DedupesAcrossWaves(t *testing.T) {
 		resources := []resource.Resource{
 			{ID: "i-aaa", Name: "server", Status: "running", Fields: map[string]string{"name": "server"}},
 		}
-		title := buildUnifiedModel(t, resources, 0, map[string]resource.EnrichmentFinding{})
+		title := buildUnifiedModel(t, resources, 0, map[string]domain.Finding{})
 		if strings.Contains(title, "[!]") {
 			t.Errorf("FrameTitle() = %q; no issue badge expected when enrichIC=0 and no findings", title)
 		}
@@ -297,8 +298,8 @@ func TestMenuCount_MatchesListCount_AfterWave2(t *testing.T) {
 		ResourceType: "ec2",
 		Issues:       1,
 		Truncated:    false,
-		Findings: map[string]resource.EnrichmentFinding{
-			"i-0abc1111aaa111111": {Severity: "!", Summary: "system status impaired"},
+		Findings: map[string]domain.Finding{
+			"i-0abc1111aaa111111": {Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
 		},
 		Gen:     0,
 		TypeGen: 0,
@@ -387,10 +388,10 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 			ResourceType: "ec2",
 			Issues:       1,
 			Truncated:    false,
-			Findings: map[string]resource.EnrichmentFinding{
-				"i-aaa": {Severity: "!", Summary: "system status impaired"},
-				"i-bbb": {Severity: "~", Summary: "pending maintenance"},
-				"i-ccc": {Severity: "~", Summary: "quota 80%+ used"},
+			Findings: map[string]domain.Finding{
+				"i-aaa": {Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
+				"i-bbb": {Code: "rds.pending-maintenance", Phrase: "pending maintenance", Severity: domain.SevWarn, Source: "wave2:ec2"},
+				"i-ccc": {Code: "ec2.instance.quota", Phrase: "quota 80%+ used", Severity: domain.SevWarn, Source: "wave2:ec2"},
 			},
 			Gen:     0,
 			TypeGen: 0,
@@ -431,10 +432,10 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 			ResourceType: "ec2",
 			Issues:       0,
 			Truncated:    false,
-			Findings: map[string]resource.EnrichmentFinding{
-				"i-aaa": {Severity: "~", Summary: "pending maintenance"},
-				"i-bbb": {Severity: "~", Summary: "pending maintenance"},
-				"i-ccc": {Severity: "~", Summary: "quota 80%+ used"},
+			Findings: map[string]domain.Finding{
+				"i-aaa": {Code: "rds.pending-maintenance", Phrase: "pending maintenance", Severity: domain.SevWarn, Source: "wave2:ec2"},
+				"i-bbb": {Code: "rds.pending-maintenance", Phrase: "pending maintenance", Severity: domain.SevWarn, Source: "wave2:ec2"},
+				"i-ccc": {Code: "ec2.instance.quota", Phrase: "quota 80%+ used", Severity: domain.SevWarn, Source: "wave2:ec2"},
 			},
 			Gen:     0,
 			TypeGen: 0,
@@ -479,8 +480,8 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 			ResourceType: "ec2",
 			Issues:       0, // enricher excludes ~ from IssueCount
 			Truncated:    false,
-			Findings: map[string]resource.EnrichmentFinding{
-				"i-stopped": {Severity: "~", Summary: "pending maintenance"},
+			Findings: map[string]domain.Finding{
+				"i-stopped": {Code: "rds.pending-maintenance", Phrase: "pending maintenance", Severity: domain.SevWarn, Source: "wave2:ec2"},
 			},
 			Gen:     0,
 			TypeGen: 0,

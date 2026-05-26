@@ -31,10 +31,13 @@ type IssueBadgePatch struct {
 
 // ListEnrichmentPatch carries Wave 2 enrichment data for the rows of a
 // resource-list view. Findings is keyed by Resource.ID; nil means clear.
+// AttentionDetails is paired by Resource.ID (not FindingCode) — the adapter
+// re-keys when applying to per-row detail state.
 type ListEnrichmentPatch struct {
-	Findings     map[string]resource.EnrichmentFinding
-	TruncatedIDs map[string]bool
-	FieldUpdates map[string]map[string]string
+	Findings         map[string]domain.Finding
+	AttentionDetails map[string]domain.AttentionDetail
+	TruncatedIDs     map[string]bool
+	FieldUpdates     map[string]map[string]string
 }
 
 // PatchResourceList instructs the adapter to apply the contained patches
@@ -60,7 +63,11 @@ type PatchDetail struct {
 	// EnrichmentFindings carries the Wave-2 per-resource finding map used by
 	// the adapter to look up the finding for a specific detail view's resource.
 	// Keyed by resource.Resource.ID; nil means clear enrichment.
-	EnrichmentFindings map[string]resource.EnrichmentFinding
+	EnrichmentFindings map[string]domain.Finding
+	// EnrichmentAttentionDetails carries the supporting rows for each per-
+	// resource Wave-2 finding, keyed by Resource.ID at the message-emission
+	// boundary. Paired with EnrichmentFindings (same Resource.ID set).
+	EnrichmentAttentionDetails map[string]domain.AttentionDetail
 }
 
 func (PatchDetail) isIntent() {}

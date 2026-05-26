@@ -27,6 +27,7 @@ import (
 	ebtypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -287,21 +288,20 @@ func TestEnrichEventBridgeRule_DLQCheckAcrossAllPages(t *testing.T) {
 	}
 
 	// Findings must exist for the targets-without-DLQ from page 2
-	f, ok := result.Findings[ruleName]
-	if !ok {
+	if _, ok := result.Findings[ruleName]; !ok {
 		t.Fatalf("expected finding for %q (targets on page 2 lack DLQ), none produced", ruleName)
 	}
 
 	// Verify at least one row references the no-DLQ issue
 	foundNoDLQ := false
-	for _, row := range f.Rows {
+	for _, row := range result.AttentionDetails[ruleName].Rows {
 		if strings.Contains(row.Value, "no dead-letter config") {
 			foundNoDLQ = true
 			break
 		}
 	}
 	if !foundNoDLQ {
-		t.Errorf("no row with 'no dead-letter config' in finding rows: %v", f.Rows)
+		t.Errorf("no row with 'no dead-letter config' in finding rows: %v", result.AttentionDetails[ruleName].Rows)
 	}
 }
 
@@ -352,11 +352,11 @@ func TestEnrichEventBridgeRule_EnabledWithZeroTargetsAcrossPages(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding for %q (enabled rule with no targets), none produced", ruleName)
 	}
-	if f.Severity != "!" {
-		t.Errorf("finding severity = %q, want \"!\"", f.Severity)
+	if f.Severity != domain.SevBroken {
+		t.Errorf("finding severity = %v, want SevBroken", f.Severity)
 	}
-	if !strings.Contains(f.Summary, "no targets") {
-		t.Errorf("finding summary %q must contain \"no targets\"", f.Summary)
+	if !strings.Contains(f.Phrase, "no targets") {
+		t.Errorf("finding summary %q must contain \"no targets\"", f.Phrase)
 	}
 
 	// IssueCount must be 1

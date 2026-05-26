@@ -4,11 +4,12 @@ package unit
 //
 // Tests drive EnrichDynamoDBPITR and assert:
 //   - PITR enabled  → no finding, no FieldUpdates["status"].
-//   - PITR disabled on Healthy row → FieldUpdates[id]["status"] == "PITR off",
-//     Findings[id].Severity == "~", Findings[id].Summary == "PITR off".
+//   - PITR disabled on Healthy row → Findings[id].Severity == "~",
+//     Findings[id].Summary == "PITR off". AS-140 (W1.2 of AS-1390): no
+//     FieldUpdates["status"] is written — the merged display phrase is
+//     computed at render time by phraseFromFindings(r.Findings).
 //   - PITR disabled on non-Healthy row (e.g. "archived: kms key lost") →
-//     FieldUpdates[id]["status"] == resource.BumpFindingSuffix(existing),
-//     Finding still Severity "~", Summary "PITR off".
+//     same as above; no (+N) suffix is applied by this enricher.
 //   - Summary/Rows contract (U11): Summary is "PITR off"; Row values must
 //     NOT be substrings of Summary.
 //   - Error path: DescribeContinuousBackups errors → table skipped,
@@ -27,6 +28,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -148,7 +150,9 @@ func TestDDB_Enrich_PITREnabled_NoFinding(t *testing.T) {
 }
 
 // TestDDB_Enrich_PITRDisabled_HealthyRow verifies a Healthy ACTIVE table with
-// PITR disabled produces the correct finding and FieldUpdates["status"] == "PITR off".
+// PITR disabled produces the correct EnrichmentFinding. AS-140 (W1.2 of
+// AS-1390): no FieldUpdates["status"] is written — the display phrase is
+// computed at render time by phraseFromFindings(r.Findings).
 func TestDDB_Enrich_PITRDisabled_HealthyRow(t *testing.T) {
 	fake := &ddbContinuousBackupsFake{
 		responses: map[string]*dynamodb.DescribeContinuousBackupsOutput{
@@ -168,19 +172,17 @@ func TestDDB_Enrich_PITRDisabled_HealthyRow(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding for %q (PITR disabled); Findings keys = %v", fixtures.AuditPITROffID, findingKeysDDB(result.Findings))
 	}
-	if finding.Severity != "~" {
-		t.Errorf("Severity = %q, want %q", finding.Severity, "~")
+	if finding.Severity != domain.SevWarn {
+		t.Errorf("Severity = %v, want SevWarn", finding.Severity)
 	}
-	if finding.Summary != "PITR off" {
-		t.Errorf("Summary = %q, want %q", finding.Summary, "PITR off")
+	if finding.Phrase != "PITR off" {
+		t.Errorf("Phrase = %q, want %q", finding.Phrase, "PITR off")
 	}
 
-	updates, ok := result.FieldUpdates[fixtures.AuditPITROffID]
-	if !ok {
-		t.Fatalf("FieldUpdates missing entry for %q", fixtures.AuditPITROffID)
-	}
-	if updates["status"] != "PITR off" {
-		t.Errorf("FieldUpdates[%q][status] = %q, want %q", fixtures.AuditPITROffID, updates["status"], "PITR off")
+	// AS-140: FieldUpdates must be empty for this resource — the merged
+	// display phrase is now computed at render time by phraseFromFindings.
+	if updates, ok := result.FieldUpdates[fixtures.AuditPITROffID]; ok && len(updates) != 0 {
+		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", fixtures.AuditPITROffID, updates)
 	}
 
 	if result.IssueCount != 0 {
@@ -188,10 +190,12 @@ func TestDDB_Enrich_PITRDisabled_HealthyRow(t *testing.T) {
 	}
 }
 
-// TestDDB_Enrich_PITRDisabled_NonHealthyRow verifies that a table already carrying
-// "archived: kms key lost" (Wave-2 fetcher phrase) gets a bumped suffix
-// "archived: kms key lost (+1)" when PITR is also disabled.
-// Finding is still emitted with Severity "~" and Summary "PITR off".
+// TestDDB_Enrich_PITRDisabled_NonHealthyRow verifies that a table already
+// carrying "archived: kms key lost" (Wave-1 fetcher phrase) still gets the
+// Wave-2 EnrichmentFinding emitted when PITR is disabled. AS-140 (W1.2 of
+// AS-1390): no FieldUpdates["status"] is written and no (+N) suffix is
+// applied; the merged display phrase is computed at render time by
+// phraseFromFindings(r.Findings).
 func TestDDB_Enrich_PITRDisabled_NonHealthyRow(t *testing.T) {
 	// legacy-archived: fetcher sets Status="archived: kms key lost"
 	existingStatus := "archived: kms key lost"
@@ -212,20 +216,18 @@ func TestDDB_Enrich_PITRDisabled_NonHealthyRow(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding for %q (ARCHIVED + PITR off); Findings keys = %v", fixtures.LegacyArchivedID, findingKeysDDB(result.Findings))
 	}
-	if finding.Severity != "~" {
-		t.Errorf("Severity = %q, want %q", finding.Severity, "~")
+	if finding.Severity != domain.SevWarn {
+		t.Errorf("Severity = %v, want SevWarn", finding.Severity)
 	}
-	if finding.Summary != "PITR off" {
-		t.Errorf("Summary = %q, want %q", finding.Summary, "PITR off")
+	if finding.Phrase != "PITR off" {
+		t.Errorf("Phrase = %q, want %q", finding.Phrase, "PITR off")
 	}
 
-	updates, ok := result.FieldUpdates[fixtures.LegacyArchivedID]
-	if !ok {
-		t.Fatalf("FieldUpdates missing entry for %q", fixtures.LegacyArchivedID)
-	}
-	wantStatus := "archived: kms key lost (+1)"
-	if updates["status"] != wantStatus {
-		t.Errorf("FieldUpdates[%q][status] = %q, want %q (BumpFindingSuffix)", fixtures.LegacyArchivedID, updates["status"], wantStatus)
+	// AS-140: FieldUpdates must be empty for this resource — the merged
+	// Wave-1 + Wave-2 display phrase is computed at render time by
+	// phraseFromFindings(r.Findings).
+	if updates, ok := result.FieldUpdates[fixtures.LegacyArchivedID]; ok && len(updates) != 0 {
+		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", fixtures.LegacyArchivedID, updates)
 	}
 
 	if result.IssueCount != 0 {
@@ -256,13 +258,13 @@ func TestDDB_Enrich_SummaryNotRows_Contract(t *testing.T) {
 		t.Fatalf("expected finding for %q", fixtures.AuditPITROffID)
 	}
 
-	if finding.Summary != "PITR off" {
-		t.Errorf("Summary = %q, want exactly %q", finding.Summary, "PITR off")
+	if finding.Phrase != "PITR off" {
+		t.Errorf("Phrase = %q, want exactly %q", finding.Phrase, "PITR off")
 	}
-	// U11: no Row value should appear in Summary.
-	for _, row := range finding.Rows {
-		if row.Value != "" && strings.Contains(finding.Summary, row.Value) {
-			t.Errorf("Summary %q embeds Row[%q].Value %q — Summary and Rows must be distinct channels (U11)", finding.Summary, row.Label, row.Value)
+	// U11: no Row value should appear in Phrase.
+	for _, row := range result.AttentionDetails[fixtures.AuditPITROffID].Rows {
+		if row.Value != "" && strings.Contains(finding.Phrase, row.Value) {
+			t.Errorf("Phrase %q embeds Row[%q].Value %q — Phrase and Rows must be distinct channels (U11)", finding.Phrase, row.Label, row.Value)
 		}
 	}
 }
@@ -295,10 +297,14 @@ func TestDDB_Enrich_ErrorPath_TruncatedID(t *testing.T) {
 	}
 }
 
-// TestDDB_Enrich_BumpFindingSuffix_ExistingPlusSuffix verifies that when the
-// existing status already carries a suffix (e.g. "kms key inaccessible (+2)"),
-// the enricher increments it to "(+3)" — not producing double suffixes.
-func TestDDB_Enrich_BumpFindingSuffix_ExistingPlusSuffix(t *testing.T) {
+// TestDDB_Enrich_PITRDisabled_NoFieldUpdates_WithStackedWave1 verifies AS-140
+// (W1.2 of AS-1390): when the existing status already carries a stacked
+// Wave-1 phrase (e.g. "kms key inaccessible (+2)"), the enricher must NOT
+// write FieldUpdates["status"] — no suffix-bump arithmetic happens here.
+// The merged display phrase is computed at render time by
+// phraseFromFindings(r.Findings), which aggregates Wave-1 findings on the
+// resource with this enricher's Wave-2 "PITR off" finding.
+func TestDDB_Enrich_PITRDisabled_NoFieldUpdates_WithStackedWave1(t *testing.T) {
 	id := "inline-bump-ddb-test"
 	existingStatus := "kms key inaccessible (+2)"
 	fake := &ddbContinuousBackupsFake{
@@ -321,13 +327,13 @@ func TestDDB_Enrich_BumpFindingSuffix_ExistingPlusSuffix(t *testing.T) {
 		t.Fatalf("EnrichDynamoDBPITR error: %v", err)
 	}
 
-	updates, ok := result.FieldUpdates[id]
-	if !ok {
-		t.Fatalf("FieldUpdates missing entry for %q", id)
+	// The Wave-2 PITR finding must still be emitted.
+	if _, ok := result.Findings[id]; !ok {
+		t.Errorf("expected PITR-off Finding for %q even when row carries stacked Wave-1 phrase", id)
 	}
-	wantStatus := "kms key inaccessible (+3)"
-	if updates["status"] != wantStatus {
-		t.Errorf("FieldUpdates[%q][status] = %q, want %q (must increment counter, not double-suffix)", id, updates["status"], wantStatus)
+	// AS-140: no FieldUpdates write — no suffix-bump arithmetic from this enricher.
+	if updates, ok := result.FieldUpdates[id]; ok && len(updates) != 0 {
+		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", id, updates)
 	}
 }
 
@@ -351,7 +357,7 @@ func TestDDB_Enrich_NilDynamoDBClient(t *testing.T) {
 // internal helpers
 // ---------------------------------------------------------------------------
 
-func findingKeysDDB(m map[string]resource.EnrichmentFinding) []string {
+func findingKeysDDB(m map[string]domain.Finding) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)

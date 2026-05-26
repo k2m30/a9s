@@ -16,9 +16,9 @@ import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/catalog"
-	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/session"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/session"
 )
 
 // findPatchMenu returns the first PatchMenu intent in xs whose ResourceType
@@ -121,8 +121,8 @@ func TestHandleEnrichmentChecked_TruncationPrecedence_Wave2WithFindings_StaysTru
 		ResourceType: rt,
 		Issues:       3,
 		Truncated:    true,
-		Findings: map[string]resource.EnrichmentFinding{
-			"id-1": {Severity: "!", Summary: "broken"},
+		Findings: map[string]domain.Finding{
+			"id-1": {Code: "test.broken", Phrase: "broken", Severity: domain.SevBroken, Source: "wave2:" + rt},
 		},
 	})
 
@@ -168,9 +168,9 @@ func TestHandleEnrichmentChecked_PatchDetail_NonNilFindings_PassesThrough(t *tes
 	sess := session.New()
 	c := New(sess, catalog.All())
 
-	findings := map[string]resource.EnrichmentFinding{
-		"id-1": {Severity: "!", Summary: "broken"},
-		"id-2": {Severity: "~", Summary: "warn"},
+	findings := map[string]domain.Finding{
+		"id-1": {Code: "test.broken", Phrase: "broken", Severity: domain.SevBroken, Source: "wave2:" + rt},
+		"id-2": {Code: "test.warn", Phrase: "warn", Severity: domain.SevWarn, Source: "wave2:" + rt},
 	}
 	intents, _ := c.handleEnrichmentChecked(messages.EnrichmentChecked{
 		ResourceType: rt,
@@ -189,7 +189,7 @@ func TestHandleEnrichmentChecked_PatchDetail_NonNilFindings_PassesThrough(t *tes
 		if !ok {
 			t.Fatalf("missing finding for %q", k)
 		}
-		if got.Severity != v.Severity || got.Summary != v.Summary {
+		if got.Severity != v.Severity || got.Phrase != v.Phrase {
 			t.Fatalf("finding %q mismatch: want %+v, got %+v", k, v, got)
 		}
 	}

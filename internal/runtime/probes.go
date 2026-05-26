@@ -16,6 +16,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/cache"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -35,14 +36,19 @@ type ProbeAvailabilityResult struct {
 // ProbeEnrichmentResult carries the outcome of a single Wave-2 issue
 // enrichment probe. Adapters convert this into a platform-specific message
 // (e.g. messages.EnrichmentChecked for the Bubble Tea adapter).
+//
+// Findings and AttentionDetails are both keyed by Resource.ID. The fold layer
+// (runtime.Core.applyEnrichment) flips AttentionDetails to FindingCode against
+// the matching r.Findings entry when writing onto cached rows.
 type ProbeEnrichmentResult struct {
-	ResourceType string
-	Issues       int
-	Truncated    bool
-	Findings     map[string]resource.EnrichmentFinding
-	FieldUpdates map[string]map[string]string
-	TruncatedIDs map[string]bool
-	Err          error
+	ResourceType     string
+	Issues           int
+	Truncated        bool
+	Findings         map[string]domain.Finding
+	AttentionDetails map[string]domain.AttentionDetail
+	FieldUpdates     map[string]map[string]string
+	TruncatedIDs     map[string]bool
+	Err              error
 }
 
 // DemoPrefetchResult carries the combined outcome of a synchronous demo
@@ -297,13 +303,14 @@ func (c *Core) ProbeEnrichment(ctx context.Context, clients *awsclient.ServiceCl
 	// preserves partial result on non-retryable errors (partial-success
 	// contract: never-silent-skip).
 	return ProbeEnrichmentResult{
-		ResourceType: shortName,
-		Issues:       result.IssueCount,
-		Truncated:    result.Truncated,
-		Findings:     result.Findings,
-		FieldUpdates: result.FieldUpdates,
-		TruncatedIDs: result.TruncatedIDs,
-		Err:          err,
+		ResourceType:     shortName,
+		Issues:           result.IssueCount,
+		Truncated:        result.Truncated,
+		Findings:         result.Findings,
+		AttentionDetails: result.AttentionDetails,
+		FieldUpdates:     result.FieldUpdates,
+		TruncatedIDs:     result.TruncatedIDs,
+		Err:              err,
 	}
 }
 

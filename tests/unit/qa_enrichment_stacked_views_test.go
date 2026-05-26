@@ -31,6 +31,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -92,8 +93,8 @@ func TestEnrichment_UpdatesStackedResourceListWhenDetailActive(t *testing.T) {
 		ResourceType: "rds",
 		Issues:       1,
 		Truncated:    false,
-		Findings: map[string]resource.EnrichmentFinding{
-			"db-stacked-a-001": {Severity: "!", Summary: "pending maintenance: system-update"},
+		Findings: map[string]domain.Finding{
+			"db-stacked-a-001": {Code: "rds.pending-maintenance", Phrase: "pending maintenance: system-update", Severity: domain.SevBroken, Source: "wave2:rds"},
 		},
 		Gen:     0, // fresh model: enrichmentGen=0
 		TypeGen: 0, // startup probe: enrichmentTypeGen["rds"]=0
@@ -194,9 +195,9 @@ func TestEnrichment_UpdatesStackedDetailWhenAnotherDetailActive(t *testing.T) {
 		ResourceType: "rds",
 		Issues:       2,
 		Truncated:    false,
-		Findings: map[string]resource.EnrichmentFinding{
-			"db-stacked-a-001": {Severity: "!", Summary: "pending maintenance: system-update on A"},
-			"db-stacked-b-001": {Severity: "~", Summary: "pending maintenance: minor-version-upgrade on B"},
+		Findings: map[string]domain.Finding{
+			"db-stacked-a-001": {Code: "rds.pending-maintenance", Phrase: "pending maintenance: system-update on A", Severity: domain.SevBroken, Source: "wave2:rds"},
+			"db-stacked-b-001": {Code: "rds.pending-maintenance", Phrase: "pending maintenance: minor-version-upgrade on B", Severity: domain.SevWarn, Source: "wave2:rds"},
 		},
 		Gen:     0,
 		TypeGen: 0,

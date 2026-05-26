@@ -19,6 +19,7 @@ import (
 	efstypes "github.com/aws/aws-sdk-go-v2/service/efs/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 )
 
 // Shared helpers (efsMountTargetFake, efsResources, availableMT,
@@ -76,8 +77,8 @@ func TestEnrichEFSMountTargets_OneUnavailableMTProducesFindingSevBang(t *testing
 	if !ok {
 		t.Fatalf("expected finding keyed by %q", "fs-00000001")
 	}
-	if f.Severity != "!" {
-		t.Errorf("severity = %q, want %q", f.Severity, "!")
+	if f.Severity != domain.SevBroken {
+		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
 	if _, ok := result.Findings["fs-00000002"]; ok {
 		t.Error("fs-00000002 must NOT appear in Findings — all its MTs are available")

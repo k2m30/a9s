@@ -9,8 +9,24 @@ import (
 	ec2svc "github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
+
+// tgw canonical FindingCodes.
+const (
+	tgwCodeAttachmentFailed      domain.FindingCode = "tgw.attachment-failed"
+	tgwCodeAttachmentTransitional domain.FindingCode = "tgw.attachment-transitional"
+)
+
+// worstTGWFinding holds the temporary state for tracking the worst attachment finding
+// across all attachments for a single TGW during the enrichment loop.
+type worstTGWFinding struct {
+	code    domain.FindingCode
+	summary string
+	glyph   string
+	rows    []domain.DetailRow
+}
 
 // EnrichTGWAttachments calls DescribeTransitGatewayAttachments per TGW (cap EnrichmentCap,
 // per-TGW pagination up to PerParentPageCap pages) and returns a Finding for any TGW with
@@ -19,11 +35,13 @@ import (
 // When multiple issues exist on the same TGW, the worst severity ("!") takes precedence.
 // Per-TGW errors are aggregated and returned as a composite error alongside partial findings (E3, E4, E5).
 func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	fieldUpdates := make(map[string]map[string]string)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+		FieldUpdates: make(map[string]map[string]string),
+	}
 	if clients.EC2 == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	var failures []string
@@ -46,7 +64,7 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 			if attPages >= PerParentPageCap {
 				attTruncated = true
 				truncated = true
-				truncatedIDs[r.ID] = true
+				result.TruncatedIDs[r.ID] = true
 				break
 			}
 			out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2svc.DescribeTransitGatewayAttachmentsOutput, error) {
@@ -61,7 +79,7 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 			if err != nil {
 				failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 				truncated = true
-				truncatedIDs[r.ID] = true
+				result.TruncatedIDs[r.ID] = true
 				break
 			}
 			allAttachments = append(allAttachments, out.TransitGatewayAttachments...)
@@ -75,7 +93,7 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 		}
 		// Collect worst finding across all attachments for this TGW.
 		// "!" severity beats "~" severity.
-		var worst *resource.EnrichmentFinding
+		var worst *worstTGWFinding
 		issueCount := 0
 		for _, att := range allAttachments {
 			attID := ""
@@ -83,24 +101,26 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 				attID = *att.TransitGatewayAttachmentId
 			}
 			state := string(att.State)
-			var candidate *resource.EnrichmentFinding
+			var candidate *worstTGWFinding
 			switch state {
 			case "failed", "failing":
 				issueCount++
-				candidate = &resource.EnrichmentFinding{
-					Severity: "!",
-					Summary:  fmt.Sprintf("attachment %s failed", attID),
-					Rows: []resource.FindingRow{
+				candidate = &worstTGWFinding{
+					code:    tgwCodeAttachmentFailed,
+					summary: fmt.Sprintf("attachment %s failed", attID),
+					glyph:   "!",
+					rows: []domain.DetailRow{
 						{Label: "Attachment", Value: attID, Tier: "!"},
 						{Label: "State", Value: state, Tier: "!"},
 					},
 				}
 			case "modifying", "pendingAcceptance", "rollingBack":
 				issueCount++
-				candidate = &resource.EnrichmentFinding{
-					Severity: "~",
-					Summary:  fmt.Sprintf("attachment %s %s", attID, state),
-					Rows: []resource.FindingRow{
+				candidate = &worstTGWFinding{
+					code:    tgwCodeAttachmentTransitional,
+					summary: fmt.Sprintf("attachment %s %s", attID, state),
+					glyph:   "~",
+					rows: []domain.DetailRow{
 						{Label: "Attachment", Value: attID, Tier: "~"},
 						{Label: "State", Value: state, Tier: "~"},
 					},
@@ -109,7 +129,7 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 			if candidate == nil {
 				continue
 			}
-			if worst == nil || (worst.Severity != "!" && candidate.Severity == "!") {
+			if worst == nil || (worst.glyph != "!" && candidate.glyph == "!") {
 				worst = candidate
 			}
 		}
@@ -117,13 +137,15 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 		if issueCount > 0 {
 			attStatusVal = fmt.Sprintf("%d issues", issueCount)
 		}
-		fieldUpdates[tgwID] = map[string]string{
+		result.FieldUpdates[tgwID] = map[string]string{
 			"att_status": attStatusVal,
 		}
 		if worst != nil {
-			findings[tgwID] = *worst
+			setWave2Finding(&result, tgwID, worst.code, worst.summary, worst.glyph, "tgw", worst.rows)
 		}
 	}
-	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates},
+	result.IssueCount = len(result.Findings)
+	result.Truncated = truncated
+	return result,
 		AggregateFailures("tgw-enrich: DescribeTransitGatewayAttachments", failures, total)
 }

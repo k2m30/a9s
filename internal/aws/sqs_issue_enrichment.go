@@ -9,7 +9,13 @@ import (
 	sqssvc "github.com/aws/aws-sdk-go-v2/service/sqs"
 	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// sqs canonical FindingCodes.
+const (
+	sqsCodeMissingDLQ domain.FindingCode = "sqs.missing-dlq"
 )
 
 // EnrichSQSAttributes calls GetQueueAttributes per queue (cap EnrichmentCap)
@@ -19,11 +25,13 @@ import (
 // via AggregateFailures so the operator sees the failure in the error log (!).
 // Partial findings are returned alongside the composite error on partial fail.
 func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	fieldUpdates := make(map[string]map[string]string)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+		FieldUpdates: make(map[string]map[string]string),
+	}
 	if clients.SQS == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	var failures []string
@@ -50,7 +58,7 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
-			truncatedIDs[r.ID] = true
+			result.TruncatedIDs[r.ID] = true
 			continue
 		}
 		_, hasDLQ := out.Attributes["RedrivePolicy"]
@@ -58,19 +66,19 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 		if hasDLQ {
 			dlqVal = "yes"
 		}
-		fieldUpdates[r.ID] = map[string]string{
+		result.FieldUpdates[r.ID] = map[string]string{
 			"dlq": dlqVal,
 		}
-		var rows []resource.FindingRow
+		var rows []domain.DetailRow
 		if !hasDLQ {
-			rows = append(rows, resource.FindingRow{
+			rows = append(rows, domain.DetailRow{
 				Label: "DLQ",
 				Value: "no DLQ configured",
 				Tier:  "~",
 			})
 		}
 		if _, ok := out.Attributes["KmsMasterKeyId"]; !ok {
-			rows = append(rows, resource.FindingRow{
+			rows = append(rows, domain.DetailRow{
 				Label: "Encryption",
 				Value: "no KMS encryption configured",
 				Tier:  "~",
@@ -79,12 +87,10 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 		if len(rows) == 0 {
 			continue
 		}
-		findings[r.ID] = resource.EnrichmentFinding{
-			Severity: "~",
-			Summary:  rows[0].Value,
-			Rows:     rows,
-		}
+		setWave2Finding(&result, r.ID, sqsCodeMissingDLQ, rows[0].Value, "~", "sqs", rows)
 	}
-	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates},
+	result.IssueCount = 0
+	result.Truncated = truncated
+	return result,
 		AggregateFailures("sqs-enrich: GetQueueAttributes", failures, total)
 }

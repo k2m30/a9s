@@ -7,7 +7,13 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// rds canonical FindingCodes.
+const (
+	rdsCodePendingMaintenance domain.FindingCode = "rds.pending-maintenance"
 )
 
 // EnrichRDSDocDBMaintenance calls DescribePendingMaintenanceActions (account-wide, paginated)
@@ -16,10 +22,12 @@ import (
 // The API returns maintenance actions for all RDS/DocDB resources (clusters AND instances).
 // Pagination uses Marker; walks up to EnrichmentCap pages.
 func EnrichRDSDocDBMaintenance(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+	}
 	if clients.RDS == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	type maintenanceAction = rds.DescribePendingMaintenanceActionsOutput
 	var allPages []*maintenanceAction
@@ -36,7 +44,7 @@ func EnrichRDSDocDBMaintenance(ctx context.Context, clients *ServiceClients, res
 		})
 		pages++
 		if err != nil {
-			return IssueEnricherResult{TruncatedIDs: truncatedIDs}, err
+			return IssueEnricherResult{TruncatedIDs: result.TruncatedIDs}, err
 		}
 		allPages = append(allPages, out)
 		if out.Marker == nil {
@@ -66,7 +74,7 @@ func EnrichRDSDocDBMaintenance(ctx context.Context, clients *ServiceClients, res
 			}
 			// Collect action descriptions for the summary and rows.
 			var actions []string
-			var rows []resource.FindingRow
+			var rows []domain.DetailRow
 			for _, pa := range action.PendingMaintenanceActionDetails {
 				if pa.Action != nil {
 					actions = append(actions, *pa.Action)
@@ -87,16 +95,16 @@ func EnrichRDSDocDBMaintenance(ctx context.Context, clients *ServiceClients, res
 					earliestTarget = formatDate(pa.ForcedApplyDate)
 				}
 				if actionVal != "" {
-					rows = append(rows, resource.FindingRow{Label: "Action", Value: actionVal, Tier: "~"})
+					rows = append(rows, domain.DetailRow{Label: "Action", Value: actionVal, Tier: "~"})
 				}
 				if applyMethod != "" {
-					rows = append(rows, resource.FindingRow{Label: "Apply Method", Value: applyMethod})
+					rows = append(rows, domain.DetailRow{Label: "Apply Method", Value: applyMethod})
 				}
 				if earliestTarget != "" {
-					rows = append(rows, resource.FindingRow{Label: "Earliest Target", Value: earliestTarget, Tier: "~"})
+					rows = append(rows, domain.DetailRow{Label: "Earliest Target", Value: earliestTarget, Tier: "~"})
 				}
 				if pa.Description != nil && *pa.Description != "" {
-					rows = append(rows, resource.FindingRow{Label: "Description", Value: *pa.Description})
+					rows = append(rows, domain.DetailRow{Label: "Description", Value: *pa.Description})
 				}
 			}
 			summary := "pending maintenance"
@@ -119,12 +127,10 @@ func EnrichRDSDocDBMaintenance(ctx context.Context, clients *ServiceClients, res
 				// for an instance; or page truncation evicted it). Append to
 				continue
 			}
-			findings[key] = resource.EnrichmentFinding{
-				Severity: "~",
-				Summary:  summary,
-				Rows:     rows,
-			}
+			setWave2Finding(&result, key, rdsCodePendingMaintenance, summary, "~", "rds", rows)
 		}
 	}
-	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings}, nil
+	result.IssueCount = 0
+	result.Truncated = truncated
+	return result, nil
 }

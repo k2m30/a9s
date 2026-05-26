@@ -9,18 +9,26 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/codepipeline"
 	cptypes "github.com/aws/aws-sdk-go-v2/service/codepipeline/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// pipeline canonical FindingCodes.
+const (
+	pipelineCodeStageFailed domain.FindingCode = "pipeline.stage-failed"
 )
 
 // EnrichCodePipelineStatus calls GetPipelineState for each pipeline (1 per pipeline, cap ~50).
 // Returns a Finding for each pipeline with a failed stage.
 // Severity is "!" (broken/degraded). Summary: "stage <Name> failed".
 func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	fieldUpdates := make(map[string]map[string]string)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+		FieldUpdates: make(map[string]map[string]string),
+	}
 	if clients.CodePipeline == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	var failures []string
@@ -41,7 +49,7 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
-			truncatedIDs[r.ID] = true
+			result.TruncatedIDs[r.ID] = true
 			continue
 		}
 		key := r.ID
@@ -58,7 +66,7 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 				stageName = *stage.StageName
 			}
 			lastStatus = stageName
-			rows := []resource.FindingRow{
+			rows := []domain.DetailRow{
 				{Label: "Failed Stage", Value: stageName, Tier: "!"},
 				{Label: "Status", Value: string(stage.LatestExecution.Status)},
 			}
@@ -73,20 +81,18 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 				if action.LatestExecution.ErrorDetails != nil && action.LatestExecution.ErrorDetails.Message != nil {
 					msg := *action.LatestExecution.ErrorDetails.Message
 					if msg != "" {
-						rows = append(rows, resource.FindingRow{Label: "Error", Value: msg, Tier: "!"})
+						rows = append(rows, domain.DetailRow{Label: "Error", Value: msg, Tier: "!"})
 					}
 					break
 				}
 			}
-			findings[key] = resource.EnrichmentFinding{
-				Severity: "!",
-				Summary:  fmt.Sprintf("stage %s failed", stageName),
-				Rows:     rows,
-			}
+			setWave2Finding(&result, key, pipelineCodeStageFailed, fmt.Sprintf("stage %s failed", stageName), "!", "pipeline", rows)
 			break // first failed stage is sufficient
 		}
-		fieldUpdates[key] = map[string]string{"last_status": lastStatus}
+		result.FieldUpdates[key] = map[string]string{"last_status": lastStatus}
 	}
-	return IssueEnricherResult{IssueCount: len(findings), Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates},
+	result.IssueCount = len(result.Findings)
+	result.Truncated = truncated
+	return result,
 		AggregateFailures("pipeline-enrich: GetPipelineState", failures, total)
 }
