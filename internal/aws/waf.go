@@ -74,9 +74,8 @@ func FetchWAFWebACLsPage(ctx context.Context, api WAFv2ListWebACLsAPI, continuat
 		}
 
 		r := resource.Resource{
-			ID:     id,
-			Name:   name,
-			Status: "",
+			ID:   id,
+			Name: name,
 			Fields: map[string]string{
 				"name":        name,
 				"id":          id,

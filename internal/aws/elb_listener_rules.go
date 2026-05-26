@@ -108,9 +108,8 @@ func convertRule(rule elbtypes.Rule) resource.Resource {
 	}
 
 	return resource.Resource{
-		ID:     ruleArn,
-		Name:   priority,
-		Status: "",
+		ID:   ruleArn,
+		Name: priority,
 		Fields: map[string]string{
 			"priority":           priority,
 			"conditions_summary": conditionsSummary,

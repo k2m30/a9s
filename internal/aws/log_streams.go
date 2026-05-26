@@ -77,9 +77,8 @@ func convertLogStream(s cwlogstypes.LogStream) resource.Resource {
 	}
 
 	return resource.Resource{
-		ID:     name,
-		Name:   name,
-		Status: "",
+		ID:   name,
+		Name: name,
 		Fields: map[string]string{
 			"stream_name": name,
 			"last_event":  lastEvent,
