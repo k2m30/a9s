@@ -27,8 +27,9 @@ const (
 //   - quota > 80% → severity "~", Summary "quota 80%+ used"
 //   - otherwise → no finding
 //
-// FieldUpdates["status"]: if the row is Healthy (Status==""), set to finding.Summary;
-// if Wave-1 already set a Status, bump via resource.BumpFindingSuffix.
+// AS-1397: the enricher no longer writes FieldUpdates["status"]. The Wave-2
+// phrase is sourced at render time from r.Findings via phraseFromFindings;
+// row color is sourced from the Wave-2 finding's Severity via colorSES.
 //
 // IssueCount is 1 when severity is "!", else 0 — counted once for the whole
 // account regardless of how many identity rows are in the list (spec §4
@@ -62,15 +63,6 @@ func EnrichSESAccount(ctx context.Context, clients *ServiceClients, resources []
 	// Replicate the finding onto every identity row.
 	for _, res := range resources {
 		setWave2Finding(&result, res.ID, code, phrase, severityGlyph, "ses", rows)
-
-		// S4 FieldUpdate: Healthy row → set to summary; non-Healthy → bump suffix.
-		var newStatus string
-		if res.Status == "" {
-			newStatus = phrase
-		} else {
-			newStatus = resource.BumpFindingSuffix(res.Status)
-		}
-		result.FieldUpdates[res.ID] = map[string]string{"status": newStatus}
 	}
 
 	// IssueCount: 1 if "!" severity (account counted once), else 0.
