@@ -27,6 +27,7 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
+	"github.com/k2m30/a9s/v3/internal/domain"
 )
 
 // Shared helper efsMTFakeFromFixtures lives in helpers_efs_test.go.
@@ -68,19 +69,19 @@ func TestEnrichEFSMountTargets_HealthyRowWithDown(t *testing.T) {
 		t.Fatalf("expected finding for %q, got none; all findings: %v", fsID, result.Findings)
 	}
 
-	// Severity must be "!".
-	if finding.Severity != "!" {
-		t.Errorf("Severity = %q, want %q", finding.Severity, "!")
+	// Severity must be Broken.
+	if finding.Severity != domain.SevBroken {
+		t.Errorf("Severity = %v, want SevBroken", finding.Severity)
 	}
 
-	// Summary must be exactly "mount target down" (§4 "list text" phrase).
-	if finding.Summary != "mount target down" {
-		t.Errorf("Summary = %q, want %q", finding.Summary, "mount target down")
+	// Phrase must be exactly "mount target down" (§4 "list text" phrase).
+	if finding.Phrase != "mount target down" {
+		t.Errorf("Phrase = %q, want %q", finding.Phrase, "mount target down")
 	}
 
-	// Summary must be ≤ 40 chars.
-	if len(finding.Summary) > 40 {
-		t.Errorf("Summary length %d > 40 chars: %q", len(finding.Summary), finding.Summary)
+	// Phrase must be ≤ 40 chars.
+	if len(finding.Phrase) > 40 {
+		t.Errorf("Phrase length %d > 40 chars: %q", len(finding.Phrase), finding.Phrase)
 	}
 
 	// AS-140: FieldUpdates must be empty — the merged display phrase is
@@ -91,13 +92,13 @@ func TestEnrichEFSMountTargets_HealthyRowWithDown(t *testing.T) {
 
 	// Rows must contain the four expected labels.
 	wantLabels := []string{"Mount Target", "AZ", "State", "Degraded"}
-	rowLabels := make(map[string]string, len(finding.Rows))
-	for _, row := range finding.Rows {
+	rowLabels := make(map[string]string, len(result.AttentionDetails[fsID].Rows))
+	for _, row := range result.AttentionDetails[fsID].Rows {
 		rowLabels[row.Label] = row.Value
 	}
 	for _, label := range wantLabels {
 		if _, ok := rowLabels[label]; !ok {
-			t.Errorf("Rows missing label %q; got rows: %v", label, finding.Rows)
+			t.Errorf("Rows missing label %q; got rows: %v", label, result.AttentionDetails[fsID].Rows)
 		}
 	}
 
@@ -121,10 +122,10 @@ func TestEnrichEFSMountTargets_HealthyRowWithDown(t *testing.T) {
 		t.Errorf("Rows[Degraded] = %q, want %q", degVal, "1/2")
 	}
 
-	// U11: Summary must NOT contain any Row Value as substring.
-	for _, row := range finding.Rows {
-		if row.Value != "" && strings.Contains(finding.Summary, row.Value) {
-			t.Errorf("U11 violation: Summary %q contains Row Value %q (label=%q)", finding.Summary, row.Value, row.Label)
+	// U11: Phrase must NOT contain any Row Value as substring.
+	for _, row := range result.AttentionDetails[fsID].Rows {
+		if row.Value != "" && strings.Contains(finding.Phrase, row.Value) {
+			t.Errorf("U11 violation: Phrase %q contains Row Value %q (label=%q)", finding.Phrase, row.Value, row.Label)
 		}
 	}
 }
@@ -170,15 +171,15 @@ func TestEnrichEFSMountTargets_W1WarningPlusW2Bumps(t *testing.T) {
 		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", fsID, updates)
 	}
 
-	// The finding's Summary is still "mount target down" (the bare W2 phrase).
+	// The finding's Phrase is still "mount target down" (the bare W2 phrase).
 	finding := result.Findings[fsID]
-	if finding.Summary != "mount target down" {
-		t.Errorf("Summary = %q, want %q", finding.Summary, "mount target down")
+	if finding.Phrase != "mount target down" {
+		t.Errorf("Phrase = %q, want %q", finding.Phrase, "mount target down")
 	}
 
 	// The down MT-B must appear in Rows[Mount Target].
-	rowLabels := make(map[string]string, len(finding.Rows))
-	for _, row := range finding.Rows {
+	rowLabels := make(map[string]string, len(result.AttentionDetails[fsID].Rows))
+	for _, row := range result.AttentionDetails[fsID].Rows {
 		rowLabels[row.Label] = row.Value
 	}
 	if mtVal := rowLabels["Mount Target"]; !strings.Contains(mtVal, fixtures.UpdatingMTDownMountTargetBID) {
@@ -249,13 +250,13 @@ func TestEnrichEFSMountTargets_SummaryDoesNotContainRowValues(t *testing.T) {
 			t.Errorf("expected finding for %q, got none", fsID)
 			continue
 		}
-		for _, row := range finding.Rows {
+		for _, row := range result.AttentionDetails[fsID].Rows {
 			if row.Value == "" {
 				continue
 			}
-			if strings.Contains(finding.Summary, row.Value) {
-				t.Errorf("U11 violation for %q: Summary %q contains Row[%q].Value %q",
-					fsID, finding.Summary, row.Label, row.Value)
+			if strings.Contains(finding.Phrase, row.Value) {
+				t.Errorf("U11 violation for %q: Phrase %q contains Row[%q].Value %q",
+					fsID, finding.Phrase, row.Label, row.Value)
 			}
 		}
 	}
@@ -281,13 +282,12 @@ func TestEnrichEFSMountTargets_FindingRowsStructure(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	finding, ok := result.Findings[fsID]
-	if !ok {
+	if _, ok := result.Findings[fsID]; !ok {
 		t.Fatalf("expected finding for %q", fsID)
 	}
 
 	// Every row must have a non-empty Label.
-	for i, row := range finding.Rows {
+	for i, row := range result.AttentionDetails[fsID].Rows {
 		if row.Label == "" {
 			t.Errorf("Rows[%d].Label is empty", i)
 		}
@@ -297,7 +297,7 @@ func TestEnrichEFSMountTargets_FindingRowsStructure(t *testing.T) {
 	// "State" row must have Tier="!".
 	// Other rows (AZ, Degraded) may have Tier="" (neutral context).
 	tierMap := make(map[string]string)
-	for _, row := range finding.Rows {
+	for _, row := range result.AttentionDetails[fsID].Rows {
 		tierMap[row.Label] = row.Tier
 	}
 
@@ -414,13 +414,12 @@ func TestEnrichEFSMountTargets_DetailContent_U7c(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	finding, ok := result.Findings[fsID]
-	if !ok {
+	if _, ok := result.Findings[fsID]; !ok {
 		t.Fatalf("expected finding for %q", fsID)
 	}
 
-	rowMap := make(map[string]string, len(finding.Rows))
-	for _, row := range finding.Rows {
+	rowMap := make(map[string]string, len(result.AttentionDetails[fsID].Rows))
+	for _, row := range result.AttentionDetails[fsID].Rows {
 		rowMap[row.Label] = row.Value
 	}
 

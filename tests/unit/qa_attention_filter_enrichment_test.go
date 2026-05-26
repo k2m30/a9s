@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/config"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -58,8 +59,8 @@ func TestAttentionFilter_SetEnrichmentState_ReappliesFilter(t *testing.T) {
 	// SetEnrichmentState → applySortAndFilter re-run, the row must become
 	// visible immediately — without the user toggling ctrl+z or editing the
 	// filter text.
-	findings := map[string]resource.EnrichmentFinding{
-		"b-0": {Severity: "!", Summary: "public access enabled"},
+	findings := map[string]domain.Finding{
+		"b-0": {Code: "s3.public.access.enabled", Phrase: "public access enabled", Severity: domain.SevBroken, Source: "wave2:s3"},
 	}
 	m.SetEnrichmentState(1, false, findings)
 

@@ -21,6 +21,7 @@ import (
 	apigwtypes "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -158,11 +159,11 @@ func TestEnrichAPIGatewayStage_NoThrottlingProducesFindingSevTilde(t *testing.T)
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (no throttling)", apigwAPIID1)
 	}
-	if f.Severity != "~" {
-		t.Errorf("severity = %q, want %q", f.Severity, "~")
+	if f.Severity != domain.SevWarn {
+		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
-	if !strings.Contains(strings.ToLower(f.Summary), "throttling") {
-		t.Errorf("summary %q must contain \"throttling\"", f.Summary)
+	if !strings.Contains(strings.ToLower(f.Phrase), "throttling") {
+		t.Errorf("summary %q must contain \"throttling\"", f.Phrase)
 	}
 	if _, ok := result.Findings[apigwAPIID2]; ok {
 		t.Error("api-2 must NOT appear in Findings — it has throttling configured")
@@ -202,11 +203,11 @@ func TestEnrichAPIGatewayStage_NoAccessLogsProducesFindingSevTilde(t *testing.T)
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (no access logs)", apigwAPIID1)
 	}
-	if f.Severity != "~" {
-		t.Errorf("severity = %q, want %q", f.Severity, "~")
+	if f.Severity != domain.SevWarn {
+		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
-	if !strings.Contains(strings.ToLower(f.Summary), "access log") {
-		t.Errorf("summary %q must contain \"access log\"", f.Summary)
+	if !strings.Contains(strings.ToLower(f.Phrase), "access log") {
+		t.Errorf("summary %q must contain \"access log\"", f.Phrase)
 	}
 	if _, ok := result.Findings[apigwAPIID2]; ok {
 		t.Error("api-2 must NOT appear in Findings — it has access logs configured")
@@ -273,12 +274,12 @@ func TestEnrichAPIGatewayStage_ZeroStagesEmitsWarning(t *testing.T) {
 		)
 	}
 
-	if f.Severity != "~" {
-		t.Errorf("finding Severity = %q, want \"~\"", f.Severity)
+	if f.Severity != domain.SevWarn {
+		t.Errorf("finding Severity = %v, want SevWarn", f.Severity)
 	}
 
-	if !strings.Contains(strings.ToLower(f.Summary), "no deployed") {
-		t.Errorf("finding Summary = %q, must contain \"no deployed\"", f.Summary)
+	if !strings.Contains(strings.ToLower(f.Phrase), "no deployed") {
+		t.Errorf("finding Summary = %q, must contain \"no deployed\"", f.Phrase)
 	}
 }
 

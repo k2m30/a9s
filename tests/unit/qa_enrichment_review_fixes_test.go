@@ -15,6 +15,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
@@ -61,8 +62,8 @@ func TestRowMarker_HiddenWhenIdentityColumnScrolledOff(t *testing.T) {
 	}
 	m, _ = m.Update(messages.ResourcesLoaded{ResourceType: "test", Resources: resources})
 
-	findings := map[string]resource.EnrichmentFinding{
-		"r-1": {Severity: "!", Summary: "broken"},
+	findings := map[string]domain.Finding{
+		"r-1": {Code: "ec2.system.status.impaired", Phrase: "broken", Severity: domain.SevBroken, Source: "wave2:ec2"},
 	}
 	m.SetEnrichmentState(len(findings), false, findings)
 

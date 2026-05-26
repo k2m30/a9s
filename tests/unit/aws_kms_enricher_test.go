@@ -18,6 +18,7 @@ import (
 	"github.com/aws/smithy-go"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -100,8 +101,8 @@ func TestEnrichKMSRotation_DisabledProducesFindings(t *testing.T) {
 			t.Errorf("expected finding for key %q", id)
 			continue
 		}
-		if f.Severity != "~" {
-			t.Errorf("key %q severity = %q, want %q", id, f.Severity, "~")
+		if f.Severity != domain.SevWarn {
+			t.Errorf("key %q severity = %v, want SevWarn", id, f.Severity)
 		}
 	}
 }
@@ -207,8 +208,8 @@ func TestEnrichKMSRotation_MixedDisabledEnabledError(t *testing.T) {
 	f, ok := result.Findings["key-disabled"]
 	if !ok {
 		t.Error("expected finding for key-disabled")
-	} else if f.Severity != "~" {
-		t.Errorf("key-disabled severity = %q, want %q", f.Severity, "~")
+	} else if f.Severity != domain.SevWarn {
+		t.Errorf("key-disabled severity = %v, want %v", f.Severity, "~")
 	}
 	if _, ok := result.Findings["key-enabled"]; ok {
 		t.Error("unexpected finding for key-enabled")

@@ -8,18 +8,27 @@ import (
 	snssvc "github.com/aws/aws-sdk-go-v2/service/sns"
 	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// sns canonical FindingCodes.
+const (
+	snsCodeNoSubscribers    domain.FindingCode = "sns.no-subscribers"
+	snsCodeAllPending       domain.FindingCode = "sns.all-pending-confirmation"
 )
 
 // EnrichSNSSubscriptions calls ListSubscriptionsByTopic per topic (cap EnrichmentCap)
 // to surface orphan topics and topics with all-pending-confirmation subscribers.
 // Per-topic errors are treated as truncated (skip silently).
 func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	fieldUpdates := make(map[string]map[string]string)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+		FieldUpdates: make(map[string]map[string]string),
+	}
 	if clients.SNS == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
 	for i, r := range resources {
@@ -41,7 +50,7 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 			})
 			if err != nil {
 				truncated = true
-				truncatedIDs[r.ID] = true
+				result.TruncatedIDs[r.ID] = true
 				pagedErr = true
 				break
 			}
@@ -54,17 +63,13 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 		if pagedErr {
 			continue
 		}
-		fieldUpdates[r.ID] = map[string]string{
+		result.FieldUpdates[r.ID] = map[string]string{
 			"subs_count": resource.FormatExact(len(subs)),
 		}
 		if len(subs) == 0 {
-			findings[r.ID] = resource.EnrichmentFinding{
-				Severity: "~",
-				Summary:  "topic has no subscribers",
-				Rows: []resource.FindingRow{
-					{Label: "Subscribers", Value: "topic has no subscribers", Tier: "~"},
-				},
-			}
+			setWave2Finding(&result, r.ID, snsCodeNoSubscribers, "topic has no subscribers", "~", "sns", []domain.DetailRow{
+				{Label: "Subscribers", Value: "topic has no subscribers", Tier: "~"},
+			})
 			continue
 		}
 		allPending := true
@@ -79,14 +84,12 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 			}
 		}
 		if allPending {
-			findings[r.ID] = resource.EnrichmentFinding{
-				Severity: "~",
-				Summary:  "all pending confirmation",
-				Rows: []resource.FindingRow{
-					{Label: "Subscribers", Value: "all pending confirmation", Tier: "~"},
-				},
-			}
+			setWave2Finding(&result, r.ID, snsCodeAllPending, "all pending confirmation", "~", "sns", []domain.DetailRow{
+				{Label: "Subscribers", Value: "all pending confirmation", Tier: "~"},
+			})
 		}
 	}
-	return IssueEnricherResult{IssueCount: 0, Truncated: truncated, TruncatedIDs: truncatedIDs, Findings: findings, FieldUpdates: fieldUpdates}, nil
+	result.IssueCount = 0
+	result.Truncated = truncated
+	return result, nil
 }

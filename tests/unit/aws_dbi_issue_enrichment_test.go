@@ -116,26 +116,25 @@ func TestDBI_Enrich_MaintenancePending_HealthyRow(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding for %q; Findings keys = %v", fixtures.MaintDbiScheduledID, findingKeys(result.Findings))
 	}
-	if finding.Severity != "~" {
-		t.Errorf("Severity = %q, want %q", finding.Severity, "~")
+	if finding.Severity != domain.SevWarn {
+		t.Errorf("Severity = %v, want SevWarn", finding.Severity)
 	}
 
-	// Summary is the short S5 phrase — concrete details (Action, Description)
-	// must NOT appear here; they belong in Rows. See the contract on
-	// resource.EnrichmentFinding.
-	if finding.Summary != "pending maintenance" {
-		t.Errorf("Summary = %q, want %q", finding.Summary, "pending maintenance")
+	// Phrase is the short S5 phrase — concrete details (Action, Description)
+	// must NOT appear here; they belong in AttentionDetail rows.
+	if finding.Phrase != "pending maintenance" {
+		t.Errorf("Phrase = %q, want %q", finding.Phrase, "pending maintenance")
 	}
-	if strings.Contains(finding.Summary, "system-update") || strings.Contains(finding.Summary, "New minor engine patch") {
-		t.Errorf("Summary must not embed Row content; got %q", finding.Summary)
+	if strings.Contains(finding.Phrase, "system-update") || strings.Contains(finding.Phrase, "New minor engine patch") {
+		t.Errorf("Phrase must not embed Row content; got %q", finding.Phrase)
 	}
-	// The same facts must be present in Rows.
+	// The same facts must be present in AttentionDetail rows.
 	wantRows := map[string]string{
 		"Action":      "system-update",
 		"Description": "New minor engine patch 16.2.3",
 	}
 	gotRows := map[string]string{}
-	for _, r := range finding.Rows {
+	for _, r := range result.AttentionDetails[fixtures.MaintDbiScheduledID].Rows {
 		gotRows[r.Label] = r.Value
 	}
 	for label, val := range wantRows {
@@ -188,11 +187,11 @@ func TestDBI_Enrich_MaintenancePending_NilDescription(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding for %q", resourceID)
 	}
-	if finding.Summary != "pending maintenance" {
-		t.Errorf("Summary = %q, want %q", finding.Summary, "pending maintenance")
+	if finding.Phrase != "pending maintenance" {
+		t.Errorf("Phrase = %q, want %q", finding.Phrase, "pending maintenance")
 	}
 	var labels []string
-	for _, r := range finding.Rows {
+	for _, r := range result.AttentionDetails[resourceID].Rows {
 		labels = append(labels, r.Label)
 	}
 	for _, l := range labels {
@@ -379,13 +378,13 @@ func TestDBI_Enrich_Wave1PlusWave2_NoFieldUpdates(t *testing.T) {
 		t.Fatalf("EnrichDBIMaintenance error: %v", err)
 	}
 
-	// Finding must be present with severity "~".
+	// Finding must be present with SevWarn severity.
 	finding, ok := result.Findings[resourceID]
 	if !ok {
 		t.Fatalf("expected finding for %q; Findings keys = %v", resourceID, findingKeys(result.Findings))
 	}
-	if finding.Severity != "~" {
-		t.Errorf("Severity = %q, want %q", finding.Severity, "~")
+	if finding.Severity != domain.SevWarn {
+		t.Errorf("Severity = %v, want SevWarn", finding.Severity)
 	}
 
 	// AS-140: FieldUpdates must be empty.
@@ -594,7 +593,7 @@ func TestDBI_Enrich_VariousExistingStatuses_NoFieldUpdates(t *testing.T) {
 // internal helpers
 // ---------------------------------------------------------------------------
 
-func findingKeys(m map[string]resource.EnrichmentFinding) []string {
+func findingKeys(m map[string]domain.Finding) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)

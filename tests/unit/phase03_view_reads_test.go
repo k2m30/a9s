@@ -563,12 +563,14 @@ func TestViews_DetailEnrichmentLateUpdatePicksUpFindings(t *testing.T) {
 	_ = firstOut // only used to confirm we can render
 
 	// Simulate Wave-2 result arriving later.
-	ef := resource.EnrichmentFinding{
-		Severity: "!",
-		Summary:  "pending maintenance",
-		Rows:     []resource.FindingRow{{Label: "Action", Value: "reboot"}},
+	ef := domain.Finding{
+		Code:     "test.pending-maintenance",
+		Phrase:   "pending maintenance",
+		Severity: domain.SevBroken,
+		Source:   "wave2:test",
 	}
-	m.SetEnrichmentFinding(&ef)
+	ad := domain.AttentionDetail{Rows: []domain.DetailRow{{Label: "Action", Value: "reboot"}}}
+	m.SetEnrichmentFinding(&ef, &ad)
 
 	// Second render: enrichment finding must now appear.
 	secondOut := m.PlainContent()

@@ -20,6 +20,7 @@ import (
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -161,8 +162,8 @@ func TestEnrichIAMRoleLastUsed_DormantProducesFindingSevTilde(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (dormant role)", "role-1")
 	}
-	if f.Severity != "~" {
-		t.Errorf("severity = %q, want %q", f.Severity, "~")
+	if f.Severity != domain.SevWarn {
+		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
 	if _, ok := result.Findings["role-2"]; ok {
 		t.Error("role-2 must NOT appear in Findings — it was recently used")
@@ -198,8 +199,8 @@ func TestEnrichIAMRoleLastUsed_NeverUsedProducesFindingSevTilde(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding keyed by %q (never-used role)", "role-1")
 	}
-	if f.Severity != "~" {
-		t.Errorf("severity = %q, want %q", f.Severity, "~")
+	if f.Severity != domain.SevWarn {
+		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
 	if _, ok := result.Findings["role-2"]; ok {
 		t.Error("role-2 must NOT appear in Findings — it was recently used")

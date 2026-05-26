@@ -34,6 +34,7 @@ import (
 	sesv2types "github.com/aws/aws-sdk-go-v2/service/sesv2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -101,11 +102,11 @@ func TestEnrichSESAccount_ShutdownFindingPerRow(t *testing.T) {
 			t.Errorf("Findings missing key %q", id)
 			continue
 		}
-		if f.Severity != "!" {
-			t.Errorf("identity %q: Severity = %q, want %q", id, f.Severity, "!")
+		if f.Severity != domain.SevBroken {
+			t.Errorf("identity %q: Severity = %v, want SevBroken", id, f.Severity)
 		}
-		if f.Summary != "account SHUTDOWN" {
-			t.Errorf("identity %q: Summary = %q, want %q", id, f.Summary, "account SHUTDOWN")
+		if f.Phrase != "account SHUTDOWN" {
+			t.Errorf("identity %q: Summary = %q, want %q", id, f.Phrase, "account SHUTDOWN")
 		}
 	}
 }
@@ -168,10 +169,11 @@ func TestEnrichSESAccount_ShutdownFindingRowActionable(t *testing.T) {
 	if !ok {
 		t.Fatal("expected finding for identity acme-corp.com")
 	}
-	if len(f.Rows) == 0 {
+	ad := result.AttentionDetails["acme-corp.com"]
+	if len(ad.Rows) == 0 {
 		t.Fatal("expected at least one row in SHUTDOWN finding")
 	}
-	row := f.Rows[0]
+	row := ad.Rows[0]
 	if row.Label != "Action" {
 		t.Errorf("Row.Label = %q, want %q (operator-actionable context)", row.Label, "Action")
 	}
@@ -181,6 +183,7 @@ func TestEnrichSESAccount_ShutdownFindingRowActionable(t *testing.T) {
 	if row.Tier != "!" {
 		t.Errorf("Row.Tier = %q, want %q", row.Tier, "!")
 	}
+	_ = f
 }
 
 // ---------------------------------------------------------------------------
@@ -207,11 +210,11 @@ func TestEnrichSESAccount_ProbationFindingPerRow(t *testing.T) {
 	if !ok {
 		t.Fatal("expected finding keyed by identity ID")
 	}
-	if f.Severity != "!" {
-		t.Errorf("Severity = %q, want %q (PROBATION is severity !)", f.Severity, "!")
+	if f.Severity != domain.SevBroken {
+		t.Errorf("Severity = %v, want %q (PROBATION is severity !)", f.Severity, "!")
 	}
-	if f.Summary != "account PROBATION" {
-		t.Errorf("Summary = %q, want %q", f.Summary, "account PROBATION")
+	if f.Phrase != "account PROBATION" {
+		t.Errorf("Summary = %q, want %q", f.Phrase, "account PROBATION")
 	}
 }
 
@@ -242,11 +245,11 @@ func TestEnrichSESAccount_ProbationFindingRowActionable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	f := result.Findings["acme-corp.com"]
-	if len(f.Rows) == 0 {
+	ad := result.AttentionDetails["acme-corp.com"]
+	if len(ad.Rows) == 0 {
 		t.Fatal("expected at least one row in PROBATION finding")
 	}
-	row := f.Rows[0]
+	row := ad.Rows[0]
 	if row.Label != "Action" {
 		t.Errorf("Row.Label = %q, want %q (operator-actionable context)", row.Label, "Action")
 	}
@@ -284,11 +287,11 @@ func TestEnrichSESAccount_QuotaOver80PercentProducesTildeFindings(t *testing.T) 
 		t.Fatal("expected findings for 90% quota usage, got 0")
 	}
 	f := result.Findings["acme-corp.com"]
-	if f.Severity != "~" {
-		t.Errorf("Severity = %q, want %q for quota > 80%%", f.Severity, "~")
+	if f.Severity != domain.SevWarn {
+		t.Errorf("Severity = %v, want %q for quota > 80%%", f.Severity, "~")
 	}
-	if f.Summary != "quota 80%+ used" {
-		t.Errorf("Summary = %q, want %q", f.Summary, "quota 80%+ used")
+	if f.Phrase != "quota 80%+ used" {
+		t.Errorf("Summary = %q, want %q", f.Phrase, "quota 80%+ used")
 	}
 }
 
@@ -360,8 +363,8 @@ func TestEnrichSESAccount_ProbationBeatsQuota(t *testing.T) {
 	if !ok {
 		t.Fatal("expected finding for PROBATION+quota case")
 	}
-	if f.Summary != "account PROBATION" {
-		t.Errorf("Summary = %q, want %q (PROBATION must win over quota)", f.Summary, "account PROBATION")
+	if f.Phrase != "account PROBATION" {
+		t.Errorf("Summary = %q, want %q (PROBATION must win over quota)", f.Phrase, "account PROBATION")
 	}
 }
 
@@ -517,9 +520,9 @@ func TestEnrichSESAccount_ShutdownSummaryDoesNotContainRowValue(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	f := result.Findings["acme-corp.com"]
-	for _, row := range f.Rows {
-		if row.Value != "" && strings.Contains(f.Summary, row.Value) {
-			t.Errorf("U11 violation: Summary %q contains Row.Value %q", f.Summary, row.Value)
+	for _, row := range result.AttentionDetails["acme-corp.com"].Rows {
+		if row.Value != "" && strings.Contains(f.Phrase, row.Value) {
+			t.Errorf("U11 violation: Summary %q contains Row.Value %q", f.Phrase, row.Value)
 		}
 	}
 }
@@ -535,9 +538,9 @@ func TestEnrichSESAccount_ProbationSummaryDoesNotContainRowValue(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	f := result.Findings["acme-corp.com"]
-	for _, row := range f.Rows {
-		if row.Value != "" && strings.Contains(f.Summary, row.Value) {
-			t.Errorf("U11 violation: Summary %q contains Row.Value %q", f.Summary, row.Value)
+	for _, row := range result.AttentionDetails["acme-corp.com"].Rows {
+		if row.Value != "" && strings.Contains(f.Phrase, row.Value) {
+			t.Errorf("U11 violation: Summary %q contains Row.Value %q", f.Phrase, row.Value)
 		}
 	}
 }
@@ -562,9 +565,9 @@ func TestEnrichSESAccount_QuotaSummaryDoesNotContainSentOrMaxValues(t *testing.T
 	if !ok {
 		t.Fatal("expected quota finding for 90% usage")
 	}
-	for _, row := range f.Rows {
-		if row.Value != "" && strings.Contains(f.Summary, row.Value) {
-			t.Errorf("U11 violation: Summary %q contains Row.Value %q", f.Summary, row.Value)
+	for _, row := range result.AttentionDetails["acme-corp.com"].Rows {
+		if row.Value != "" && strings.Contains(f.Phrase, row.Value) {
+			t.Errorf("U11 violation: Summary %q contains Row.Value %q", f.Phrase, row.Value)
 		}
 	}
 }

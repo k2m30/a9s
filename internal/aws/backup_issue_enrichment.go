@@ -9,7 +9,14 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/backup"
 	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+)
+
+// backup canonical FindingCodes.
+const (
+	backupCodeJobFailed  domain.FindingCode = "backup.job-failed"
+	backupCodeJobPartial domain.FindingCode = "backup.job-partial"
 )
 
 // EnrichBackupJobs calls ListBackupJobs (account-wide, paginated) and returns a Finding
@@ -20,11 +27,13 @@ import (
 // Rule-7 suffix machinery (BumpFindingSuffix) is N/A for backup — spec §3.1 has zero
 // Wave-1 signals so there are no coexisting Wave-1 warnings to apply the (+N) arithmetic.
 func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
-	findings := make(map[string]resource.EnrichmentFinding)
-	fieldUpdates := make(map[string]map[string]string)
-	truncatedIDs := make(map[string]bool)
+	result := IssueEnricherResult{
+		Findings:     make(map[string]domain.Finding),
+		TruncatedIDs: make(map[string]bool),
+		FieldUpdates: make(map[string]map[string]string),
+	}
 	if clients.Backup == nil {
-		return IssueEnricherResult{Findings: findings, TruncatedIDs: truncatedIDs}, nil
+		return result, nil
 	}
 
 	var allJobs []backuptypes.BackupJob
@@ -109,9 +118,9 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource
 
 			// Cap displayed failed jobs at 5.
 			cap := min(failedCount, 5)
-			var rows []resource.FindingRow
+			var rows []domain.DetailRow
 			for _, job := range b.failedJobs[:cap] {
-				rows = append(rows, resource.FindingRow{
+				rows = append(rows, domain.DetailRow{
 					Label: "State",
 					Value: string(job.State),
 					Tier:  "!",
@@ -125,7 +134,7 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource
 				}
 			}
 			if mostRecent != nil {
-				rows = append(rows, resource.FindingRow{
+				rows = append(rows, domain.DetailRow{
 					Label: "Most recent",
 					Value: mostRecent.UTC().Format("2006-01-02 15:04 UTC"),
 					Tier:  "!",
@@ -133,50 +142,38 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, _ []resource
 			}
 			// If there are also partial jobs, append a partial row so nothing silently disappears.
 			if partialCount > 0 {
-				rows = append(rows, resource.FindingRow{
+				rows = append(rows, domain.DetailRow{
 					Label: "Partial jobs",
 					Value: fmt.Sprintf("%d", partialCount),
 					Tier:  "~",
 				})
 			}
 
-			findings[planID] = resource.EnrichmentFinding{
-				Severity: "!",
-				Summary:  summary,
-				Rows:     rows,
+			setWave2Finding(&result, planID, backupCodeJobFailed, summary, "!", "backup", rows)
+			if result.FieldUpdates[planID] == nil {
+				result.FieldUpdates[planID] = make(map[string]string)
 			}
-			if _, ok := fieldUpdates[planID]; !ok {
-				fieldUpdates[planID] = make(map[string]string)
-			}
-			fieldUpdates[planID]["status"] = summary
+			result.FieldUpdates[planID]["status"] = summary
 			issueCount++
 		} else if partialCount >= 1 {
 			summary := fmt.Sprintf("partial: %d of %d resources skipped", partialCount, totalCount)
-			rows := []resource.FindingRow{
+			rows := []domain.DetailRow{
 				{Label: "Partial jobs", Value: fmt.Sprintf("%d", partialCount), Tier: "~"},
 				{Label: "Total jobs", Value: fmt.Sprintf("%d", totalCount), Tier: "~"},
 			}
-			findings[planID] = resource.EnrichmentFinding{
-				Severity: "~",
-				Summary:  summary,
-				Rows:     rows,
+			setWave2Finding(&result, planID, backupCodeJobPartial, summary, "~", "backup", rows)
+			if result.FieldUpdates[planID] == nil {
+				result.FieldUpdates[planID] = make(map[string]string)
 			}
-			if _, ok := fieldUpdates[planID]; !ok {
-				fieldUpdates[planID] = make(map[string]string)
-			}
-			fieldUpdates[planID]["status"] = summary
+			result.FieldUpdates[planID]["status"] = summary
 			// "~" findings do not count toward issueCount.
 		}
 		// Else: only COMPLETED jobs — no finding, no FieldUpdate.
 	}
 
-	return IssueEnricherResult{
-		IssueCount:   issueCount,
-		Truncated:    truncated,
-		TruncatedIDs: truncatedIDs,
-		Findings:     findings,
-		FieldUpdates: fieldUpdates,
-	}, AggregateFailures("backup-enrich: ListBackupJobs", failures, pages)
+	result.IssueCount = issueCount
+	result.Truncated = truncated
+	return result, AggregateFailures("backup-enrich: ListBackupJobs", failures, pages)
 }
 
 // plural returns "s" when n != 1, "" otherwise.
