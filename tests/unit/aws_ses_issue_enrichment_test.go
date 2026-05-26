@@ -703,7 +703,12 @@ func TestSES_ColorReadsWave2FindingsForAccountFindings(t *testing.T) {
 			wantColor: resource.ColorBroken,
 		},
 		{
-			name: "quota 80%+ Wave-2 finding (SevWarn) → ColorWarning",
+			// quota 80%+ reaches S3/S4/S5 only per docs/resources/ses.md §4
+			// (line 140): "Surfaces reached" is S3, S4, S5 — S2 (row color)
+			// is explicitly excluded. The row stays a Healthy (green) row
+			// with a "~" informational glyph; the Severity here is SevWarn
+			// but colorSES special-cases sesCodeQuota to ColorHealthy.
+			name: "quota 80%+ Wave-2 finding (SevWarn) → ColorHealthy (S2 excluded by spec)",
 			r: resource.Resource{
 				ID: "acme-corp.com",
 				Findings: []domain.Finding{
@@ -714,20 +719,28 @@ func TestSES_ColorReadsWave2FindingsForAccountFindings(t *testing.T) {
 					"sending_enabled":     "true",
 				},
 			},
-			wantColor: resource.ColorWarning,
+			wantColor: resource.ColorHealthy,
 		},
 		{
-			// Wave-2 wins when stacked with Wave-1: account SHUTDOWN is the
-			// dominant signal even when a Wave-1 verification failure is also
-			// present. colorSES short-circuits on the first wave2:ses finding.
-			name: "Wave-1 verification failed + Wave-2 SHUTDOWN → Wave-2 ColorBroken",
+			// Wave-2 wins when stacked with Wave-1. To prove precedence, the
+			// Wave-1 fallback (Fields["status"]="sending disabled" → ColorWarning)
+			// would land on a different color than the Wave-2 SHUTDOWN finding
+			// (SevBroken → ColorBroken). wantColor=ColorBroken can only be
+			// satisfied by colorSES short-circuiting on the wave2:ses entry.
+			name: "Wave-1 sending disabled + Wave-2 SHUTDOWN → Wave-2 ColorBroken (precedence)",
 			r: resource.Resource{
-				ID:       "broken.acme-corp.com",
-				Findings: []domain.Finding{wave1Failed, wave2("ses.account-shutdown", "account SHUTDOWN", domain.SevBroken)},
+				ID: "shutdown.acme-corp.com",
+				Findings: []domain.Finding{
+					{
+						Code: awsclient.CodeSESSendingDisabled, Phrase: "sending disabled",
+						Severity: domain.SevWarn, Source: "wave1",
+					},
+					wave2("ses.account-shutdown", "account SHUTDOWN", domain.SevBroken),
+				},
 				Fields: map[string]string{
-					"verification_status": "FAILED",
-					"sending_enabled":     "true",
-					"status":              "verification failed",
+					"verification_status": "SUCCESS",
+					"sending_enabled":     "false",
+					"status":              "sending disabled",
 				},
 			},
 			wantColor: resource.ColorBroken,

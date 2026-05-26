@@ -158,9 +158,14 @@ func colorSES(r domain.Resource) domain.Color {
 	// r.Findings with Source="wave2:ses"; FieldUpdates["status"] is no longer
 	// written. Wave-1 (verification/sending) is in Fields["status"] from the
 	// SES fetcher's sesTopPhrase. Wave-2 wins when present — Severity drives
-	// the color directly.
+	// the color directly, except the quota signal whose spec surfaces are
+	// S3/S4/S5 only (docs/resources/ses.md §4) — quota stays green even at
+	// SevWarn so the row remains a Healthy row with an informational glyph.
 	for i := range r.Findings {
 		if r.Findings[i].Source == "wave2:ses" {
+			if r.Findings[i].Code == sesCodeQuota {
+				return domain.ColorHealthy
+			}
 			return colorFromSeverity(r.Findings[i].Severity)
 		}
 	}
