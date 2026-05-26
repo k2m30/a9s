@@ -67,6 +67,28 @@ func slugForTest(phrase string) string {
 	return s
 }
 
+// applyMsg applies a message to the TUI model and returns the updated model.
+// Relocated from the deleted phase03_shim_wireups_test.go (renamed from applyMsg).
+func applyMsg(m tui.Model, msg tea.Msg) tui.Model {
+	newM, _ := m.Update(msg)
+	return newM.(tui.Model)
+}
+
+// newRootModel builds a minimal root model suitable for the fold tests.
+// It applies a WindowSizeMsg and a ClientsReadyMsg with nil clients, which is
+// enough to advance the model past the initial state without triggering live AWS calls.
+// Relocated from the deleted phase03_shim_wireups_test.go (renamed from newRootModel).
+func newRootModel() tui.Model {
+	m := tui.New("test-profile", "us-east-1",
+		tui.WithNoCache(true),
+	)
+	m = applyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
+	// ClientsReadyMsg with nil clients advances m.clients; no AWS calls are made
+	// because WithNoCache(true) suppresses background availability probes.
+	m = applyMsg(m, messages.ClientsReady{Clients: nil})
+	return m
+}
+
 // ── Test 1: EnrichmentCheckedMsg mutates rows directly in all three caches ──
 
 // TestFold_EnrichmentCheckedMutatesRowsDirectly verifies that after the fold
@@ -134,7 +156,7 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 		}
 
 		t.Run(tc.name+"/ResourceCache", func(t *testing.T) {
-			m := newShimModel()
+			m := newRootModel()
 
 			m.Core().Session().ResourceCache[tc.canonShort] = &session.ResourceCacheEntry{
 				Resources: []resource.Resource{
@@ -142,7 +164,7 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 				},
 			}
 
-			m = shimApplyMsg(m, messages.EnrichmentChecked{
+			m = applyMsg(m, messages.EnrichmentChecked{
 				ResourceType: msgType,
 				Findings:     map[string]domain.Finding{rid: efFinding},
 				AttentionDetails: map[string]domain.AttentionDetail{rid: efAttention},
@@ -188,13 +210,13 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 		})
 
 		t.Run(tc.name+"/LazyResourceCache", func(t *testing.T) {
-			m := newShimModel()
+			m := newRootModel()
 
 			m.Core().Session().LazyResourceCache[tc.canonShort] = []resource.Resource{
 				{ID: rid, Name: "lazy-" + tc.canonShort, Status: "running"},
 			}
 
-			m = shimApplyMsg(m, messages.EnrichmentChecked{
+			m = applyMsg(m, messages.EnrichmentChecked{
 				ResourceType:     msgType,
 				Findings:         map[string]domain.Finding{rid: efFinding},
 				AttentionDetails: map[string]domain.AttentionDetail{rid: efAttention},
@@ -218,7 +240,7 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 		})
 
 		t.Run(tc.name+"/ProbeResources", func(t *testing.T) {
-			m := newShimModel()
+			m := newRootModel()
 
 			// Prevent the "all enrichment done" cleanup path (app_handlers_availability.go:
 			// if m.Core().Session().EnrichChecked >= m.Core().Session().EnrichTotal { m.Core().Session().ProbeResources = nil }).
@@ -237,7 +259,7 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 				{ID: rid, Name: "probe-" + tc.canonShort, Status: "running"},
 			}
 
-			m = shimApplyMsg(m, messages.EnrichmentChecked{
+			m = applyMsg(m, messages.EnrichmentChecked{
 				ResourceType:     msgType,
 				Findings:         map[string]domain.Finding{rid: efFinding},
 				AttentionDetails: map[string]domain.AttentionDetail{rid: efAttention},
@@ -324,15 +346,26 @@ func TestFold_RepeatedEnrichmentReplacesWave2(t *testing.T) {
 				Source:   wantSource,
 			}
 
-			m := newShimModel()
+			m := newRootModel()
 			m.Core().Session().ResourceCache[tc.canonShort] = &session.ResourceCacheEntry{
 				Resources: []resource.Resource{
-					{ID: rid, Name: "test-" + tc.canonShort, Status: "impaired"},
+					{
+						ID:   rid,
+						Name: "test-" + tc.canonShort,
+						// W1.4a: fetchers populate Findings directly; mirror what the
+						// removed derive shim produced from Status: "impaired".
+						Findings: []domain.Finding{{
+							Code:     domain.FindingCode(tc.canonShort + ".impaired"),
+							Phrase:   "impaired",
+							Severity: domain.SevBroken,
+							Source:   "wave1",
+						}},
+					},
 				},
 			}
 
 			// First enrichment: wave2 = summaryA
-			m = shimApplyMsg(m, messages.EnrichmentChecked{
+			m = applyMsg(m, messages.EnrichmentChecked{
 				ResourceType: msgType,
 				Findings:     map[string]domain.Finding{rid: efFirst},
 				Gen:          0,
@@ -340,7 +373,7 @@ func TestFold_RepeatedEnrichmentReplacesWave2(t *testing.T) {
 			})
 
 			// Second enrichment: wave2 = summaryB
-			m = shimApplyMsg(m, messages.EnrichmentChecked{
+			m = applyMsg(m, messages.EnrichmentChecked{
 				ResourceType: msgType,
 				Findings:     map[string]domain.Finding{rid: efSecond},
 				Gen:          0,
@@ -439,15 +472,26 @@ func TestFold_EmptyEnrichmentClearsWave2(t *testing.T) {
 				Rows: []domain.DetailRow{{Label: "Action", Value: "test-retirement"}},
 			}
 
-			m := newShimModel()
+			m := newRootModel()
 			m.Core().Session().ResourceCache[tc.canonShort] = &session.ResourceCacheEntry{
 				Resources: []resource.Resource{
-					{ID: rid, Name: "test-" + tc.canonShort, Status: "impaired"},
+					{
+						ID:   rid,
+						Name: "test-" + tc.canonShort,
+						// W1.4a: fetchers populate Findings directly; mirror what the
+						// removed derive shim produced from Status: "impaired".
+						Findings: []domain.Finding{{
+							Code:     domain.FindingCode(tc.canonShort + ".impaired"),
+							Phrase:   "impaired",
+							Severity: domain.SevBroken,
+							Source:   "wave1",
+						}},
+					},
 				},
 			}
 
 			// Seed wave2 finding.
-			m = shimApplyMsg(m, messages.EnrichmentChecked{
+			m = applyMsg(m, messages.EnrichmentChecked{
 				ResourceType:     msgType,
 				Findings:         map[string]domain.Finding{rid: efInitialFinding},
 				AttentionDetails: map[string]domain.AttentionDetail{rid: efInitialAttention},
@@ -474,7 +518,7 @@ func TestFold_EmptyEnrichmentClearsWave2(t *testing.T) {
 			}
 
 			// Send empty Findings — must clear wave2.
-			m = shimApplyMsg(m, messages.EnrichmentChecked{
+			m = applyMsg(m, messages.EnrichmentChecked{
 				ResourceType: msgType,
 				Findings:     nil,
 				Gen:          0,
@@ -577,7 +621,7 @@ func TestFold_CtrlROnList_ClearsActiveRowFindings(t *testing.T) {
 		},
 	}
 
-	m := newShimModel()
+	m := newRootModel()
 
 	// Step 1: seed ResourceCache so NavigateMsg gets a cache hit and creates
 	// a ResourceListModel holding this slice.
@@ -588,7 +632,7 @@ func TestFold_CtrlROnList_ClearsActiveRowFindings(t *testing.T) {
 	}
 
 	// Step 2: stamp wave2 findings into the cached row via EnrichmentCheckedMsg.
-	m = shimApplyMsg(m, messages.EnrichmentChecked{
+	m = applyMsg(m, messages.EnrichmentChecked{
 		ResourceType:     "ec2",
 		Findings:         map[string]domain.Finding{rid: efFinding},
 		AttentionDetails: map[string]domain.AttentionDetail{rid: efAttention},
@@ -598,7 +642,7 @@ func TestFold_CtrlROnList_ClearsActiveRowFindings(t *testing.T) {
 
 	// Step 3: navigate to the ec2 list view — cache hit path creates a
 	// ResourceListModel from entry.Resources (the slice with wave2 findings).
-	m = shimApplyMsg(m, messages.Navigate{
+	m = applyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
@@ -620,7 +664,7 @@ func TestFold_CtrlROnList_ClearsActiveRowFindings(t *testing.T) {
 	}
 
 	// Step 5: send Ctrl+R — this triggers handleRefresh on the resource list path.
-	m = shimApplyMsg(m, tea.KeyPressMsg{Code: -1, Text: "\x12"})
+	m = applyMsg(m, tea.KeyPressMsg{Code: -1, Text: "\x12"})
 
 	// Assertion: after Ctrl+R, no wave2 entry should remain on the rows
 	// visible in the active ResourceListModel. The fix requires applyEnrichment
@@ -690,8 +734,8 @@ func TestFold_MainMenuCtrlR_ClearsAllCachedWave2(t *testing.T) {
 	// Build a model WITHOUT WithNoCache so main-menu Ctrl+R is not a no-op.
 	// ClientsReadyMsg with nil clients is enough to advance past init state.
 	m := tui.New("test-profile", "us-east-1")
-	m = shimApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
-	m = shimApplyMsg(m, messages.ClientsReady{Clients: nil})
+	m = applyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = applyMsg(m, messages.ClientsReady{Clients: nil})
 
 	// Step 1: seed ResourceCache for ec2 and s3 with running resources.
 	m.Core().Session().ResourceCache[ec2Short] = &session.ResourceCacheEntry{
@@ -706,14 +750,14 @@ func TestFold_MainMenuCtrlR_ClearsAllCachedWave2(t *testing.T) {
 	}
 
 	// Step 2: stamp wave2 findings via EnrichmentCheckedMsg for both types.
-	m = shimApplyMsg(m, messages.EnrichmentChecked{
+	m = applyMsg(m, messages.EnrichmentChecked{
 		ResourceType:     ec2Short,
 		Findings:         map[string]domain.Finding{ec2ID: efEC2Finding},
 		AttentionDetails: map[string]domain.AttentionDetail{ec2ID: efEC2Attention},
 		Gen:              0,
 		TypeGen:          0,
 	})
-	m = shimApplyMsg(m, messages.EnrichmentChecked{
+	m = applyMsg(m, messages.EnrichmentChecked{
 		ResourceType:     s3Short,
 		Findings:         map[string]domain.Finding{s3ID: efS3Finding},
 		AttentionDetails: map[string]domain.AttentionDetail{s3ID: efS3Attention},
@@ -747,7 +791,7 @@ func TestFold_MainMenuCtrlR_ClearsAllCachedWave2(t *testing.T) {
 	}
 
 	// Step 4: send Ctrl+R while on the main menu.
-	m = shimApplyMsg(m, tea.KeyPressMsg{Code: -1, Text: "\x12"})
+	m = applyMsg(m, tea.KeyPressMsg{Code: -1, Text: "\x12"})
 
 	// Assertion: ResourceCache entries for both types must have NO wave2 findings.
 	// Pre-fix: ResourceCache is untouched by main-menu Ctrl+R, so wave2 persists.
@@ -840,10 +884,10 @@ func TestFold_AttentionDetailsCarryAcrossEntryPoints(t *testing.T) {
 				Rows: []domain.DetailRow{{Label: "Action", Value: "test-retirement"}},
 			}
 
-			m := newShimModel()
+			m := newRootModel()
 
 			// Step 1: resource enters via Site 4 (CachedPages).
-			m = shimApplyMsg(m, messages.RelatedCheckResult{
+			m = applyMsg(m, messages.RelatedCheckResult{
 				ResourceType:     tc.canonShort,
 				SourceResourceID: "src-1",
 				DefDisplayName:   tc.canonShort + " Resources",
@@ -852,7 +896,18 @@ func TestFold_AttentionDetailsCarryAcrossEntryPoints(t *testing.T) {
 				CachedPages: map[string]resource.ResourceCacheEntry{
 					tc.canonShort: {
 						Resources: []resource.Resource{
-							{ID: rid, Name: "site4-" + tc.canonShort, Status: "impaired"},
+							{
+								ID:   rid,
+								Name: "site4-" + tc.canonShort,
+								// W1.4a: fetchers populate Findings directly; mirror what the
+								// removed derive shim produced from Status: "impaired".
+								Findings: []domain.Finding{{
+									Code:     domain.FindingCode(tc.canonShort + ".impaired"),
+									Phrase:   "impaired",
+									Severity: domain.SevBroken,
+									Source:   "wave1",
+								}},
+							},
 						},
 					},
 				},
@@ -870,7 +925,7 @@ func TestFold_AttentionDetailsCarryAcrossEntryPoints(t *testing.T) {
 			}
 
 			// Step 2: Wave 2 enrichment arrives.
-			m = shimApplyMsg(m, messages.EnrichmentChecked{
+			m = applyMsg(m, messages.EnrichmentChecked{
 				ResourceType:     msgType,
 				Findings:         map[string]domain.Finding{rid: efFinding},
 				AttentionDetails: map[string]domain.AttentionDetail{rid: efAttention},

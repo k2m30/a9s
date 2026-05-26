@@ -3,24 +3,23 @@ package runtime
 // helpers.go — session-state helpers on Core used by the per-handler PRs.
 //
 // These methods operate only on c.session fields and platform-agnostic packages
-// (resource, semantics/attention, aws/wave2.AllWave2).  They are the
-// runtime equivalents of the same-named methods that still exist on tui.Model
-// for non-migrated callers; both sets operate on the same *session.Session so
-// mutations are visible to both.
+// (resource, aws/wave2.AllWave2).  They are the runtime equivalents of the
+// same-named methods that still exist on tui.Model for non-migrated callers;
+// both sets operate on the same *session.Session so mutations are visible to
+// both.
 
 import (
 	"strings"
 
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/semantics/attention"
 )
 
 // applyEnrichment merges Wave-2 enrichment findings into every cached row of
 // the given resource type. For each cached row it:
 //
-//  1. Re-derives Wave-1 findings via attention.DeriveFindings (Wave-1 only —
-//     post-AS-1395 the shim no longer accepts a Wave-2 input).
+//  1. Strips any existing Wave-2 entries from r.Findings (fetchers write
+//     Wave-1 Findings directly post-W1.1; nothing else needs re-derivation).
 //  2. Appends the Wave-2 Finding from findings[r.ID] (when present).
 //  3. Writes attentionDetails[r.ID] into r.AttentionDetails under the matching
 //     FindingCode (the fold-layer re-keying from Resource.ID to FindingCode).
@@ -59,8 +58,8 @@ func (c *Core) applyEnrichment(
 }
 
 // clearEnrichmentFor strips wave-2 findings from every cached row of the given
-// resource type by re-deriving Wave-1 only and discarding any prior wave-2
-// entries. Used by clear-on-rerun-start logic in handleEnrichmentChecked.
+// resource type, preserving Wave-1 entries already on r.Findings. Used by
+// clear-on-rerun-start logic in handleEnrichmentChecked.
 func (c *Core) clearEnrichmentFor(resourceType string) {
 	canon := resourceType
 	var td resource.ResourceTypeDef
@@ -88,27 +87,14 @@ func (c *Core) clearEnrichmentFor(resourceType string) {
 	}
 }
 
-// deriveFindingsForType re-derives wave-1 findings across rows in-place,
-// preserving any wave-2 entries already present.
 func (c *Core) deriveFindingsForType(short string, rows []resource.Resource) {
-	if len(rows) == 0 {
-		return
-	}
-	var td resource.ResourceTypeDef
-	if t := resource.FindResourceType(short); t != nil {
-		td = *t
-	} else {
-		td = resource.ResourceTypeDef{ShortName: short}
-	}
-	for i := range rows {
-		attention.DeriveWave1Only(&rows[i], td)
-	}
+	// W1.4a: fetchers write wave1 Findings directly; no derivation needed.
 }
 
-// applyWave2ToRow re-derives Wave-1 findings on r, then appends the per-row
-// Wave-2 Finding (if present) and writes its AttentionDetail under the
-// Finding's Code. Nil findings/attentionDetails behaves as the clear path
-// (Wave-1 only, no Wave-2 appended).
+// applyWave2ToRow strips any existing Wave-2 entries from r.Findings, then
+// appends the per-row Wave-2 Finding (if present) and writes its AttentionDetail
+// under the Finding's Code. Nil findings/attentionDetails behaves as the clear
+// path (strip only, no Wave-2 appended).
 func applyWave2ToRow(
 	r *domain.Resource,
 	td resource.ResourceTypeDef,
@@ -118,8 +104,16 @@ func applyWave2ToRow(
 	if r == nil {
 		return
 	}
-	// Wave-1 derivation overwrites r.Findings + r.AttentionDetails entirely.
-	attention.DeriveFindings(r, td)
+	// Strip any existing wave2 entries; fetchers write wave1 Findings directly (W1.1+).
+	n := 0
+	for _, f := range r.Findings {
+		if !strings.HasPrefix(f.Source, "wave2:") {
+			r.Findings[n] = f
+			n++
+		}
+	}
+	r.Findings = r.Findings[:n]
+	r.AttentionDetails = nil
 	f, ok := findings[r.ID]
 	if !ok || f.Phrase == "" {
 		return
