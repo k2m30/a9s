@@ -179,6 +179,11 @@ func FetchS3Objects(ctx context.Context, api S3ListObjectsV2API, bucket, prefix 
 			folderKey = *cp.Prefix
 		}
 
+		// AS-1393: Fields["kind"] is the new structural folder/file marker the
+		// production DrillCondition reads; Status is a transitional mirror until
+		// the next W1 sibling lane drops it. Do not delete the Status write here
+		// without flipping every synthetic ChildViewDef in tests/unit/ that
+		// still asserts r.Status == "folder".
 		r := resource.Resource{
 			ID:     folderKey,
 			Name:   folderKey,

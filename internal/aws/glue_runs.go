@@ -9,8 +9,36 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/glue"
 	gluetypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
+
+// glueRunFindings returns wave1 findings derived from a Glue job-run state.
+// FAILED/TIMEOUT/ERROR → broken; RUNNING/STARTING/STOPPING/WAITING → warn;
+// STOPPED → dim. SUCCEEDED and unknown states return nil (healthy).
+func glueRunFindings(state gluetypes.JobRunState) []domain.Finding {
+	switch state {
+	case gluetypes.JobRunStateFailed:
+		return []domain.Finding{{Code: CodeGlueRunFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"}}
+	case gluetypes.JobRunStateTimeout:
+		return []domain.Finding{{Code: CodeGlueRunTimeout, Phrase: "timeout", Severity: domain.SevBroken, Source: "wave1"}}
+	case gluetypes.JobRunStateError:
+		return []domain.Finding{{Code: CodeGlueRunError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1"}}
+	case gluetypes.JobRunStateExpired:
+		return []domain.Finding{{Code: CodeGlueRunExpired, Phrase: "expired", Severity: domain.SevBroken, Source: "wave1"}}
+	case gluetypes.JobRunStateRunning:
+		return []domain.Finding{{Code: CodeGlueRunRunning, Phrase: "running", Severity: domain.SevWarn, Source: "wave1"}}
+	case gluetypes.JobRunStateStarting:
+		return []domain.Finding{{Code: CodeGlueRunStarting, Phrase: "starting", Severity: domain.SevWarn, Source: "wave1"}}
+	case gluetypes.JobRunStateStopping:
+		return []domain.Finding{{Code: CodeGlueRunStopping, Phrase: "stopping", Severity: domain.SevWarn, Source: "wave1"}}
+	case gluetypes.JobRunStateWaiting:
+		return []domain.Finding{{Code: CodeGlueRunWaiting, Phrase: "waiting", Severity: domain.SevWarn, Source: "wave1"}}
+	case gluetypes.JobRunStateStopped:
+		return []domain.Finding{{Code: CodeGlueRunStopped, Phrase: "stopped", Severity: domain.SevDim, Source: "wave1"}}
+	}
+	return nil
+}
 
 // FetchGlueJobRuns calls the Glue GetJobRuns API and converts the response
 // into a FetchResult with pagination support. A single API call is made per
@@ -106,8 +134,9 @@ func convertGlueJobRun(run gluetypes.JobRun) resource.Resource {
 	}
 
 	return resource.Resource{
-		ID:   runID,
-		Name: startedOn,
+		ID:       runID,
+		Name:     startedOn,
+		Findings: glueRunFindings(run.JobRunState),
 		Fields: map[string]string{
 			"run_id_short":         runIDShort,
 			"job_run_state":        jobRunState,

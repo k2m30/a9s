@@ -6,8 +6,26 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
+
+// rolePolicyFindings returns wave1 findings derived from a managed-policy
+// name. AdministratorAccess and PowerUserAccess emit a broken finding so the
+// row renders red. Other managed-policy names emit no finding (healthy).
+func rolePolicyFindings(policyName string) []domain.Finding {
+	switch policyName {
+	case "AdministratorAccess", "PowerUserAccess":
+		return []domain.Finding{{Code: CodeRolePolicyOverPrivileged, Phrase: "over-privileged", Severity: domain.SevBroken, Source: "wave1"}}
+	}
+	return nil
+}
+
+// inlineRolePolicyFindings returns the wave1 finding for an inline role
+// policy — always dim to distinguish from managed-policy rows.
+func inlineRolePolicyFindings() []domain.Finding {
+	return []domain.Finding{{Code: CodeRolePolicyInline, Phrase: "inline", Severity: domain.SevDim, Source: "wave1"}}
+}
 
 // RolePolicyRow is the RawStruct for each role policy row.
 // It holds policy data for detail/YAML view rendering.
@@ -55,8 +73,9 @@ func FetchRolePolicies(
 		status := rolePolicyStatus(policyName)
 
 		managed = append(managed, resource.Resource{
-			ID:   policyArn,
-			Name: policyName,
+			ID:       policyArn,
+			Name:     policyName,
+			Findings: rolePolicyFindings(policyName),
 			Fields: map[string]string{
 				"policy_name": policyName,
 				"policy_arn":  policyArn,
@@ -83,8 +102,9 @@ func FetchRolePolicies(
 	var inline []resource.Resource
 	for _, name := range inlineOutput.PolicyNames {
 		inline = append(inline, resource.Resource{
-			ID:   name,
-			Name: name,
+			ID:       name,
+			Name:     name,
+			Findings: inlineRolePolicyFindings(),
 			Fields: map[string]string{
 				"policy_name": name,
 				"policy_arn":  "",

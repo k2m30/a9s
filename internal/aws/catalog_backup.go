@@ -67,6 +67,7 @@ var backupChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // s
 		Name:      "Stack Resources",
 		ShortName: "cfn_resources",
 		Columns:   resource.CfnResourceColumns(),
+		Color:     colorWave1OrHealthy,
 		FieldKeys: []string{
 			"logical_resource_id", "physical_resource_id", "resource_type",
 			"resource_status", "drift_status", "last_updated",

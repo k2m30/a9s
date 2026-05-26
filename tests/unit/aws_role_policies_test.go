@@ -345,7 +345,9 @@ func TestFetchRolePolicies_NilFields(t *testing.T) {
 }
 
 // TestFetchRolePolicies_AdminHighlight verifies that AdministratorAccess
-// policy gets Status="failed" for status coloring.
+// emits an over-privileged wave1 Finding so the row resolves as ColorBroken
+// (red). Pins both the storage migration (Fields["status"]="failed") and
+// the user-visible color contract that AS-1393 must preserve.
 func TestFetchRolePolicies_AdminHighlight(t *testing.T) {
 	attachedMock := &mockIAMListAttachedRolePoliciesClient{
 		outputs: []*iam.ListAttachedRolePoliciesOutput{
@@ -378,10 +380,18 @@ func TestFetchRolePolicies_AdminHighlight(t *testing.T) {
 	if got := resources[0].Fields["status"]; got != "failed" {
 		t.Errorf("AdministratorAccess Fields[\"status\"]: expected %q, got %q", "failed", got)
 	}
+	td := resource.GetChildType("role_policies")
+	if td == nil {
+		t.Fatal("role_policies child type not registered")
+	}
+	if got := td.ResolveColor(resources[0]); got != resource.ColorBroken {
+		t.Errorf("AdministratorAccess ResolveColor: expected ColorBroken, got %v (Findings=%+v)", got, resources[0].Findings)
+	}
 }
 
 // TestFetchRolePolicies_PowerUserHighlight verifies that PowerUserAccess
-// policy gets Fields["status"]="failed" for status coloring.
+// emits an over-privileged wave1 Finding so the row resolves as ColorBroken
+// (red). Pins both the Fields["status"] migration and the color contract.
 func TestFetchRolePolicies_PowerUserHighlight(t *testing.T) {
 	attachedMock := &mockIAMListAttachedRolePoliciesClient{
 		outputs: []*iam.ListAttachedRolePoliciesOutput{
@@ -414,10 +424,18 @@ func TestFetchRolePolicies_PowerUserHighlight(t *testing.T) {
 	if got := resources[0].Fields["status"]; got != "failed" {
 		t.Errorf("PowerUserAccess Fields[\"status\"]: expected %q, got %q", "failed", got)
 	}
+	td := resource.GetChildType("role_policies")
+	if td == nil {
+		t.Fatal("role_policies child type not registered")
+	}
+	if got := td.ResolveColor(resources[0]); got != resource.ColorBroken {
+		t.Errorf("PowerUserAccess ResolveColor: expected ColorBroken, got %v (Findings=%+v)", got, resources[0].Findings)
+	}
 }
 
-// TestFetchRolePolicies_InlineDim verifies that inline policies get
-// Fields["status"]="terminated" for dimming.
+// TestFetchRolePolicies_InlineDim verifies that inline policies emit an
+// inline wave1 Finding so the row resolves as ColorDim (grey), and that the
+// Fields["status"]="terminated" migration is preserved.
 func TestFetchRolePolicies_InlineDim(t *testing.T) {
 	attachedMock := &mockIAMListAttachedRolePoliciesClient{
 		outputs: []*iam.ListAttachedRolePoliciesOutput{
@@ -441,6 +459,13 @@ func TestFetchRolePolicies_InlineDim(t *testing.T) {
 	}
 	if got := resources[0].Fields["status"]; got != "terminated" {
 		t.Errorf("Inline policy Fields[\"status\"]: expected %q, got %q", "terminated", got)
+	}
+	td := resource.GetChildType("role_policies")
+	if td == nil {
+		t.Fatal("role_policies child type not registered")
+	}
+	if got := td.ResolveColor(resources[0]); got != resource.ColorDim {
+		t.Errorf("Inline policy ResolveColor: expected ColorDim, got %v (Findings=%+v)", got, resources[0].Findings)
 	}
 }
 
