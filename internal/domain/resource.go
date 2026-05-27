@@ -7,8 +7,11 @@ package domain
 // Moved from internal/resource/resource.go in Phase 01.
 // internal/resource re-exports this via a type alias.
 //
-// Phase 03 will migrate Status/Issues to Findings/AttentionDetails.
-// Those fields are intentionally kept here until that phase.
+// W1.4a deleted the legacy derive shim; the Status/Issues fields are
+// still consumed by a handful of read sites in internal/catalog,
+// internal/semantics/{ctevent,projection}, internal/aws/catalog_compute,
+// and internal/tui/views. W1.4b (AS-1428) will migrate those readers
+// and the remaining fetcher Status: writes, then delete the fields.
 type Resource struct {
 	// ID is the primary identifier (instance ID, ARN, name).
 	ID string

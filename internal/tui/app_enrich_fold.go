@@ -14,15 +14,13 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/semantics/attention"
 )
 
 // applyEnrichment merges Wave 2 enrichment findings into every cached row of
-// the given resource type. AS-1395 changed the contract: instead of calling
-// the pre-AS-1395 DeriveFindings(r, td, enrichmentFindings) shim, this helper
-// uses applyWave2ToRow (mirrors runtime/helpers.go) to:
+// the given resource type using applyWave2ToRow (mirrors runtime/helpers.go) to:
 //
-//  1. Re-derive Wave-1 findings via attention.DeriveFindings(r, td).
+//  1. Strip any existing Wave-2 entries from r.Findings (fetchers write
+//     Wave-1 Findings directly post-W1.1).
 //  2. Append the matching domain.Finding from findings[r.ID].
 //  3. Write attentionDetails[r.ID] into r.AttentionDetails under the
 //     Finding's Code (the fold-layer Resource.ID → FindingCode re-key).
@@ -73,7 +71,16 @@ func applyWave2ToRow(
 	if r == nil {
 		return
 	}
-	attention.DeriveFindings(r, td)
+	// Strip any existing wave2 entries; fetchers write wave1 Findings directly (W1.1+).
+	n := 0
+	for _, f := range r.Findings {
+		if !strings.HasPrefix(f.Source, "wave2:") {
+			r.Findings[n] = f
+			n++
+		}
+	}
+	r.Findings = r.Findings[:n]
+	r.AttentionDetails = nil
 	f, ok := findings[r.ID]
 	if !ok || f.Phrase == "" {
 		return
