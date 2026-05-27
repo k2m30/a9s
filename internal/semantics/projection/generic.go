@@ -171,22 +171,19 @@ func buildItems(r domain.Resource, cfg *config.ViewsConfig, navProvider func(str
 		fields = FieldAliasProvider(shortName, fields)
 	}
 
-	// Synthesise minimal Fields from ID/Name/Status when the resource is a
-	// bare stub (no Fields, no RawStruct).
-	if len(fields) == 0 && r.RawStruct == nil && (r.ID != "" || r.Name != "" || r.Status != "") {
+	// Synthesise minimal Fields from ID/Name when the resource is a bare
+	// stub (no Fields, no RawStruct).
+	if len(fields) == 0 && r.RawStruct == nil && (r.ID != "" || r.Name != "") {
 		var fieldKeys []string
 		if shortName != "" && FieldKeysProvider != nil {
 			fieldKeys = FieldKeysProvider(shortName)
 		}
-		synth := make(map[string]string, 3)
+		synth := make(map[string]string, 2)
 		if r.ID != "" && len(fieldKeys) > 0 {
 			synth[fieldKeys[0]] = r.ID
 		}
 		if r.Name != "" && len(fieldKeys) > 1 {
 			synth[fieldKeys[1]] = r.Name
-		}
-		if r.Status != "" && len(fieldKeys) > 2 {
-			synth[fieldKeys[2]] = r.Status
 		}
 		if len(synth) > 0 {
 			fields = synth

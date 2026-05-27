@@ -518,9 +518,9 @@ func TestFetchPipelineStages_StatusMapping(t *testing.T) {
 			if len(resources) != 1 {
 				t.Fatalf("expected 1 resource, got %d", len(resources))
 			}
-			if resources[0].Status != tc.wantStatus {
-				t.Errorf("Status for action %q: expected %q, got %q",
-					tc.actionStatus, tc.wantStatus, resources[0].Status)
+			if resources[0].Fields["status"] != tc.wantStatus {
+				t.Errorf("Fields[\"status\"] for action %q: expected %q, got %q",
+					tc.actionStatus, tc.wantStatus, resources[0].Fields["status"])
 			}
 		})
 	}

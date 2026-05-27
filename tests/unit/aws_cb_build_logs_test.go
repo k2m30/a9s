@@ -77,15 +77,15 @@ func TestFetchCBBuildLogs_Basic(t *testing.T) {
 
 	t.Run("first_event_Status_in_progress", func(t *testing.T) {
 		// "Running command" maps to IN_PROGRESS
-		if resources[0].Status != "IN_PROGRESS" {
-			t.Errorf("Status: expected %q, got %q", "IN_PROGRESS", resources[0].Status)
+		if resources[0].Fields["status"] != "IN_PROGRESS" {
+			t.Errorf("Fields[\"status\"]: expected %q, got %q", "IN_PROGRESS", resources[0].Fields["status"])
 		}
 	})
 
 	t.Run("second_event_Status_succeeded", func(t *testing.T) {
 		// "Phase complete" and "SUCCEEDED" maps to SUCCEEDED
-		if resources[1].Status != "SUCCEEDED" {
-			t.Errorf("Status: expected %q, got %q", "SUCCEEDED", resources[1].Status)
+		if resources[1].Fields["status"] != "SUCCEEDED" {
+			t.Errorf("Fields[\"status\"]: expected %q, got %q", "SUCCEEDED", resources[1].Fields["status"])
 		}
 	})
 
@@ -310,9 +310,9 @@ func TestFetchCBBuildLogs_StatusClassification(t *testing.T) {
 			if len(resources) != 1 {
 				t.Fatalf("expected 1 resource, got %d", len(resources))
 			}
-			if resources[0].Status != tc.wantStatus {
-				t.Errorf("Status for %q: expected %q, got %q",
-					tc.message, tc.wantStatus, resources[0].Status)
+			if resources[0].Fields["status"] != tc.wantStatus {
+				t.Errorf("Fields[\"status\"] for %q: expected %q, got %q",
+					tc.message, tc.wantStatus, resources[0].Fields["status"])
 			}
 		})
 	}

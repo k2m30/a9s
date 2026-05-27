@@ -86,9 +86,8 @@ func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, c
 		}
 
 		r := resource.Resource{
-			ID:     domainName,
-			Name:   domainName,
-			Status: status,
+			ID:   domainName,
+			Name: domainName,
 			Fields: map[string]string{
 				"domain_name":     domainName,
 				"certificate_arn": certARN,

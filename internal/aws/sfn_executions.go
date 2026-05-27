@@ -130,9 +130,8 @@ func convertSFNExecution(item sfntypes.ExecutionListItem) resource.Resource {
 	}
 
 	return resource.Resource{
-		ID:     name,
-		Name:   name,
-		Status: status,
+		ID:   name,
+		Name: name,
 		Fields: map[string]string{
 			"execution_arn":             executionArn,
 			"name":                      name,
