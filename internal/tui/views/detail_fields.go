@@ -167,7 +167,7 @@ func (m *DetailModel) injectAttentionSection() {
 		// SevOK / SevDim findings represent healthy / informational states
 		// that carry no actionable signal — including them would create a
 		// spurious "Attention (1)" block on every healthy resource whose
-		// Status was promoted to a Findings entry by DeriveFindings.
+		// fetcher emitted a SevOK / SevDim lifecycle finding.
 		if !f.Severity.IsIssue() {
 			continue
 		}

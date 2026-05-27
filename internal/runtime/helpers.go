@@ -87,10 +87,6 @@ func (c *Core) clearEnrichmentFor(resourceType string) {
 	}
 }
 
-func (c *Core) deriveFindingsForType(short string, rows []resource.Resource) {
-	// W1.4a: fetchers write wave1 Findings directly; no derivation needed.
-}
-
 // applyWave2ToRow strips any existing Wave-2 entries from r.Findings, then
 // appends the per-row Wave-2 Finding (if present) and writes its AttentionDetail
 // under the Finding's Code. Nil findings/attentionDetails behaves as the clear

@@ -650,8 +650,8 @@ func (m *ResourceListModel) applyFilter() {
 
 // FilterResources returns resources matching the query (case-insensitive).
 // PR-03a-views: searches r.ID, r.Name, r.Fields values, and r.Findings[i].Phrase.
-// Post-W1.4b.3 the wave-1 status phrase lives on r.Fields["status"] and,
-// when DeriveFindings has been called, on r.Findings[i].Phrase.
+// Post-W1.4b.3 the wave-1 status phrase lives on r.Fields["status"] and on
+// any r.Findings[i].Phrase the fetcher emitted directly.
 // Exported so tests can call it directly.
 func FilterResources(query string, resources []resource.Resource) []resource.Resource {
 	if query == "" {
