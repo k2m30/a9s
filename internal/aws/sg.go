@@ -201,9 +201,8 @@ func FetchSecurityGroupsPage(ctx context.Context, api EC2DescribeSecurityGroupsA
 		dangerousCount, wideOpen, riskSummary := computeSGRiskFields(sg.IpPermissions)
 
 		r := resource.Resource{
-			ID:     groupID,
-			Name:   groupName,
-			Status: "", // SGs have no status field
+			ID:   groupID,
+			Name: groupName,
 			Fields: map[string]string{
 				"group_id":             groupID,
 				"group_name":           groupName,

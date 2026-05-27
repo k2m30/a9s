@@ -79,9 +79,8 @@ func FetchCloudTrailTrails(ctx context.Context, api CloudTrailDescribeTrailsAPI)
 		}
 
 		r := resource.Resource{
-			ID:     trailName,
-			Name:   trailName,
-			Status: "",
+			ID:   trailName,
+			Name: trailName,
 			Fields: map[string]string{
 				"trail_name":                  trailName,
 				"trail_arn":                   trailARN,

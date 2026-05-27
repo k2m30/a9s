@@ -91,9 +91,8 @@ func convertSNSSubscription(sub snstypes.Subscription) resource.Resource {
 	}
 
 	return resource.Resource{
-		ID:     id,
-		Name:   endpoint,
-		Status: "",
+		ID:   id,
+		Name: endpoint,
 		Fields: map[string]string{
 			"protocol":            protocol,
 			"endpoint":            endpoint,

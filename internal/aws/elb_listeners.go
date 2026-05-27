@@ -113,9 +113,8 @@ func convertListener(listener elbtypes.Listener) resource.Resource {
 	}
 
 	return resource.Resource{
-		ID:     arn,
-		Name:   port,
-		Status: "",
+		ID:   arn,
+		Name: port,
 		Fields: map[string]string{
 			"port":                  port,
 			"protocol":              protocol,

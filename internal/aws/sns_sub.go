@@ -71,9 +71,8 @@ func FetchSNSSubscriptionsPage(ctx context.Context, api SNSListSubscriptionsAPI,
 		}
 
 		r := resource.Resource{
-			ID:     subscriptionArn,
-			Name:   topicName,
-			Status: "",
+			ID:   subscriptionArn,
+			Name: topicName,
 			Fields: map[string]string{
 				"topic_arn":        topicArn,
 				"protocol":         protocol,
