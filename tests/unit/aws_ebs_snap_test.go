@@ -69,9 +69,6 @@ func TestFetchEBSSnapshots_ParsesMultipleSnapshots(t *testing.T) {
 		t.Errorf("resource[0].Name: expected %q, got %q", "prod-snap-daily", r0.Name)
 	}
 	// Post-fold contract: completed state is healthy → no Status, no Finding.
-	if r0.Status != "" {
-		t.Errorf("resource[0].Status: expected %q (fetcher must not write Status), got %q", "", r0.Status)
-	}
 	if len(r0.Findings) != 0 {
 		t.Errorf("resource[0].Findings: expected 0 for completed snapshot, got %d", len(r0.Findings))
 	}
@@ -85,9 +82,6 @@ func TestFetchEBSSnapshots_ParsesMultipleSnapshots(t *testing.T) {
 		t.Errorf("resource[1].Name: expected empty string (no Name tag), got %q", r1.Name)
 	}
 	// Post-fold contract: pending state emits SevWarn Finding, not Status.
-	if r1.Status != "" {
-		t.Errorf("resource[1].Status: expected %q (fetcher must not write Status), got %q", "", r1.Status)
-	}
 	if len(r1.Findings) != 1 {
 		t.Fatalf("resource[1].Findings: expected 1 for pending snapshot, got %d", len(r1.Findings))
 	}

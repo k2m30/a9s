@@ -47,8 +47,6 @@ func TestEnrichDBCSnapCrossRef_FailedPlusOrphan(t *testing.T) {
 	res := resource.Resource{
 		ID:        "snap-failed",
 		Name:      "snap-failed",
-		Status:    "failed",
-		Issues:    []string{"failed"},
 		Fields:    map[string]string{},
 		RawStruct: snap,
 	}
@@ -107,7 +105,6 @@ func TestEnrichDBCSnapCrossRef_TruncatedDBC_OrphanSuppressed(t *testing.T) {
 	res := resource.Resource{
 		ID:        "snap-healthy",
 		Name:      "snap-healthy",
-		Status:    "",
 		Fields:    map[string]string{},
 		RawStruct: snap,
 	}
@@ -153,7 +150,6 @@ func TestEnrichDBCSnapCrossRef_RDSShape_OrphanAndPastRetention(t *testing.T) {
 		res := resource.Resource{
 			ID:        "aurora-orphan",
 			Name:      "aurora-orphan",
-			Status:    "",
 			Fields:    map[string]string{},
 			RawStruct: snap,
 		}
@@ -212,7 +208,6 @@ func TestEnrichDBCSnapCrossRef_RDSShape_OrphanAndPastRetention(t *testing.T) {
 		res := resource.Resource{
 			ID:        "aurora-stale",
 			Name:      "aurora-stale",
-			Status:    "",
 			Fields:    map[string]string{},
 			RawStruct: snap,
 		}

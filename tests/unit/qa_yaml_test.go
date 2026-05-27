@@ -709,7 +709,6 @@ func TestQA_YAML_FieldsOnly_NoRawStruct(t *testing.T) {
 	res := resource.Resource{
 		ID:     "test-fields-only",
 		Name:   "fields-only-resource",
-		Status: "active",
 		Fields: map[string]string{
 			"key1": "value1",
 			"key2": "value2",
@@ -746,7 +745,6 @@ func TestQA_YAML_EmptyResource(t *testing.T) {
 	res := resource.Resource{
 		ID:     "empty-resource",
 		Name:   "empty",
-		Status: "",
 		Fields: map[string]string{},
 		// RawStruct is nil, Fields is empty
 	}

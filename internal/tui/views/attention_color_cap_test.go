@@ -91,7 +91,6 @@ func TestResolveRowColorBucket_DBCPhrases(t *testing.T) {
 		t.Run(tc.phrase, func(t *testing.T) {
 			r := resource.Resource{
 				ID:     "dbc-test",
-				Status: tc.phrase,
 				Fields: map[string]string{"status": tc.phrase},
 			}
 			got := resolveRowColorBucket("dbc", r)

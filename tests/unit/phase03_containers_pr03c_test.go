@@ -113,9 +113,6 @@ func TestPR03c_NGFetcher_ActiveEmitsNoFinding(t *testing.T) {
 	}
 	r := resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for ACTIVE node group)", r.Status, "")
-	}
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 for ACTIVE node group", len(r.Findings))
 	}
@@ -149,9 +146,6 @@ func TestPR03c_NGFetcher_BrokenEmitsFinding(t *testing.T) {
 	}
 	r := resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for CREATE_FAILED node group", len(r.Findings))
 	}
@@ -198,9 +192,6 @@ func TestPR03c_NGFetcher_TransitionalEmitsWarn(t *testing.T) {
 	}
 	r := resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for CREATING node group", len(r.Findings))
 	}
@@ -305,9 +296,6 @@ func TestPR03c_ECSFetcher_ActiveEmitsNoFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for ACTIVE cluster)", r.Status, "")
-	}
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 for ACTIVE cluster", len(r.Findings))
 	}
@@ -337,9 +325,6 @@ func TestPR03c_ECSFetcher_BrokenEmitsFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for FAILED cluster", len(r.Findings))
 	}
@@ -379,9 +364,6 @@ func TestPR03c_ECSFetcher_TransitionalEmitsWarn(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for PROVISIONING cluster", len(r.Findings))
 	}
@@ -467,9 +449,6 @@ func TestPR03c_ECSSvcFetcher_ActiveEmitsNoFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for ACTIVE service)", r.Status, "")
-	}
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 for ACTIVE service", len(r.Findings))
 	}
@@ -508,9 +487,6 @@ func TestPR03c_ECSSvcFetcher_BrokenEmitsFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for INACTIVE service", len(r.Findings))
 	}
@@ -556,9 +532,6 @@ func TestPR03c_ECSSvcFetcher_TransitionalEmitsWarn(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for DRAINING service", len(r.Findings))
 	}
@@ -654,9 +627,6 @@ func TestPR03c_ECSTaskFetcher_RunningEmitsNoFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for RUNNING task)", r.Status, "")
-	}
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 for RUNNING task", len(r.Findings))
 	}
@@ -698,9 +668,6 @@ func TestPR03c_ECSTaskFetcher_StoppedEmitsNoFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for STOPPED task)", r.Status, "")
-	}
 	// STOPPED is lifecycle-terminal — no wave1 Finding (stop_code handled structurally).
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 for STOPPED task (lifecycle-terminal; stop_code is structural)", len(r.Findings))
@@ -739,9 +706,6 @@ func TestPR03c_ECSTaskFetcher_TransitionalEmitsWarn(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for PENDING task", len(r.Findings))
 	}

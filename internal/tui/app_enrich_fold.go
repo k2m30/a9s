@@ -72,14 +72,7 @@ func applyWave2ToRow(
 		return
 	}
 	// Strip any existing wave2 entries; fetchers write wave1 Findings directly (W1.1+).
-	n := 0
-	for _, f := range r.Findings {
-		if !strings.HasPrefix(f.Source, "wave2:") {
-			r.Findings[n] = f
-			n++
-		}
-	}
-	r.Findings = r.Findings[:n]
+	r.Findings = stripWave2(r.Findings)
 	r.AttentionDetails = nil
 	f, ok := findings[r.ID]
 	if !ok || f.Phrase == "" {

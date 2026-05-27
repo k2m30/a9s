@@ -37,7 +37,6 @@ func buildEC2List(t *testing.T, width, height int) views.ResourceListModel {
 			{
 				ID:     "i-0aaa111111111111a",
 				Name:   "test-instance",
-				Status: "running",
 				Fields: map[string]string{
 					"instance_id": "i-0aaa111111111111a",
 					"type":        "t3.medium",

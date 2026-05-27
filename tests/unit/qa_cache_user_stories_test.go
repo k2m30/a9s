@@ -126,7 +126,6 @@ func TestQA_CacheStories_RelatedNavigationUsesTargetDataCachedFromBackgroundLoad
 	src := resource.Resource{
 		ID:     "i-cache-001",
 		Name:   "cache-source",
-		Status: "running",
 		Fields: map[string]string{"instance_id": "i-cache-001"},
 	}
 	// tg registers Children[Key="enter"] → tg_health with ContextKeys
@@ -136,13 +135,11 @@ func TestQA_CacheStories_RelatedNavigationUsesTargetDataCachedFromBackgroundLoad
 	tg1 := resource.Resource{
 		ID:     "tg-cache-1",
 		Name:   "frontend-tg",
-		Status: "active",
 		Fields: map[string]string{"target_group_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/frontend-tg/abc123"},
 	}
 	tg2 := resource.Resource{
 		ID:     "tg-cache-2",
 		Name:   "backend-tg",
-		Status: "active",
 		Fields: map[string]string{"target_group_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/backend-tg/def456"},
 	}
 
@@ -192,12 +189,11 @@ func TestQA_CacheStories_RelatedMultiIDUsesWarmCacheSubset(t *testing.T) {
 	src := resource.Resource{
 		ID:     "i-cache-002",
 		Name:   "cache-source",
-		Status: "running",
 		Fields: map[string]string{"instance_id": "i-cache-002"},
 	}
-	alarm1 := resource.Resource{ID: "alarm-cache-1", Name: "cpu-high", Status: "alarm"}
-	alarm2 := resource.Resource{ID: "alarm-cache-2", Name: "status-check", Status: "ok"}
-	alarm3 := resource.Resource{ID: "alarm-cache-3", Name: "unrelated", Status: "ok"}
+	alarm1 := resource.Resource{ID: "alarm-cache-1", Name: "cpu-high"}
+	alarm2 := resource.Resource{ID: "alarm-cache-2", Name: "status-check"}
+	alarm3 := resource.Resource{ID: "alarm-cache-3", Name: "unrelated"}
 
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "alarm",
@@ -232,12 +228,11 @@ func TestQA_CacheStories_ChildViewLoadsDoNotCreateTopLevelWarmCache(t *testing.T
 	stack := resource.Resource{
 		ID:     "stack-001",
 		Name:   "payments-stack",
-		Status: "CREATE_COMPLETE",
 		Fields: map[string]string{"stack_name": "payments-stack"},
 	}
 	childResources := []resource.Resource{
-		{ID: "evt-1", Name: "Stack create started", Status: "CREATE_IN_PROGRESS"},
-		{ID: "evt-2", Name: "Stack create done", Status: "CREATE_COMPLETE"},
+		{ID: "evt-1", Name: "Stack create started"},
+		{ID: "evt-2", Name: "Stack create done"},
 	}
 
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -275,11 +270,11 @@ func TestQA_CacheStories_RefreshingChildViewDoesNotEvictTopLevelCache(t *testing
 	// Name so it renders in the ACTOR column and can be used as an assertion target
 	// (the Name is not rendered in any default column without a RawStruct).
 	topLevelEvents := []resource.Resource{
-		{ID: "evt-top-1", Name: "LookupEvents top-level", Status: "ct-info", Fields: map[string]string{
+		{ID: "evt-top-1", Name: "LookupEvents top-level", Fields: map[string]string{
 			"_ct.verb": "R", "_ct.actor": "LookupEvents top-level", "_ct.origin": "CLI",
 			"_ct.target": "(none)", "_ct.outcome": "OK", "event_time": "2026-03-28 14:30:15",
 		}},
-		{ID: "evt-top-2", Name: "AssumeRole top-level", Status: "ct-info", Fields: map[string]string{
+		{ID: "evt-top-2", Name: "AssumeRole top-level", Fields: map[string]string{
 			"_ct.verb": "R", "_ct.actor": "AssumeRole top-level", "_ct.origin": "CLI",
 			"_ct.target": "(none)", "_ct.outcome": "OK", "event_time": "2026-03-28 14:30:15",
 		}},
@@ -287,11 +282,10 @@ func TestQA_CacheStories_RefreshingChildViewDoesNotEvictTopLevelCache(t *testing
 	stack := resource.Resource{
 		ID:     "stack-002",
 		Name:   "edge-stack",
-		Status: "CREATE_COMPLETE",
 		Fields: map[string]string{"stack_name": "edge-stack"},
 	}
 	childResources := []resource.Resource{
-		{ID: "evt-child-1", Name: "child event 1", Status: "CREATE_IN_PROGRESS"},
+		{ID: "evt-child-1", Name: "child event 1"},
 	}
 
 	m, _ = rootApplyMsg(m, messages.Navigate{

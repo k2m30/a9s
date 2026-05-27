@@ -128,9 +128,9 @@ func TestCountIssueRowsForType_ExcludeFromIssueBadge(t *testing.T) {
 	}
 
 	resources := []resource.Resource{
-		{ID: "evt-0001", Status: "ct-danger"},
-		{ID: "evt-0002", Status: "ct-attention"},
-		{ID: "evt-0003", Status: "ct-info"},
+		{ID: "evt-0001"},
+		{ID: "evt-0002"},
+		{ID: "evt-0003"},
 	}
 
 	got := countIssueRowsForType(td, resources)
@@ -142,7 +142,7 @@ func TestCountIssueRowsForType_ExcludeFromIssueBadge(t *testing.T) {
 // TestCountIssueRowsForType_NilTypeDef guards against nil type def.
 func TestCountIssueRowsForType_NilTypeDef(t *testing.T) {
 	resources := []resource.Resource{
-		{ID: "r-001", Status: "stopped"},
+		{ID: "r-001"},
 	}
 	got := countIssueRowsForType(nil, resources)
 	if got != 0 {

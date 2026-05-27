@@ -41,7 +41,7 @@ func TestCopyContent_ResourceList_ReturnsSelectedID(t *testing.T) {
 	m.SetSize(120, 40)
 	// Simulate loading resources
 	m, _ = m.Update(makeResourcesLoadedMsg("ec2", []resource.Resource{
-		{ID: "i-0abc123", Name: "web-server", Status: "running", Fields: map[string]string{"instance_id": "i-0abc123"}},
+		{ID: "i-0abc123", Name: "web-server", Fields: map[string]string{"instance_id": "i-0abc123"}},
 	}))
 	var v views.View = &m
 	content, label := v.CopyContent()

@@ -109,7 +109,6 @@ func pabResource(name string) resource.Resource {
 	return resource.Resource{
 		ID:     name,
 		Name:   name,
-		Status: "",
 		Fields: map[string]string{"name": name},
 	}
 }

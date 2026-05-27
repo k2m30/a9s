@@ -160,7 +160,7 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 
 			m.Core().Session().ResourceCache[tc.canonShort] = &session.ResourceCacheEntry{
 				Resources: []resource.Resource{
-					{ID: rid, Name: "test-" + tc.canonShort, Status: "running"},
+					{ID: rid, Name: "test-" + tc.canonShort, Fields: map[string]string{"status": "running"}},
 				},
 			}
 
@@ -213,7 +213,7 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 			m := newRootModel()
 
 			m.Core().Session().LazyResourceCache[tc.canonShort] = []resource.Resource{
-				{ID: rid, Name: "lazy-" + tc.canonShort, Status: "running"},
+				{ID: rid, Name: "lazy-" + tc.canonShort, Fields: map[string]string{"status": "running"}},
 			}
 
 			m = applyMsg(m, messages.EnrichmentChecked{
@@ -256,7 +256,7 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 				m.Core().Session().ProbeResources = make(map[string][]resource.Resource)
 			}
 			m.Core().Session().ProbeResources[tc.canonShort] = []resource.Resource{
-				{ID: rid, Name: "probe-" + tc.canonShort, Status: "running"},
+				{ID: rid, Name: "probe-" + tc.canonShort, Fields: map[string]string{"status": "running"}},
 			}
 
 			m = applyMsg(m, messages.EnrichmentChecked{
@@ -627,7 +627,7 @@ func TestFold_CtrlROnList_ClearsActiveRowFindings(t *testing.T) {
 	// a ResourceListModel holding this slice.
 	m.Core().Session().ResourceCache["ec2"] = &session.ResourceCacheEntry{
 		Resources: []resource.Resource{
-			{ID: rid, Name: "test-ec2", Status: "running"},
+			{ID: rid, Name: "test-ec2", Fields: map[string]string{"status": "running"}},
 		},
 	}
 
@@ -740,12 +740,12 @@ func TestFold_MainMenuCtrlR_ClearsAllCachedWave2(t *testing.T) {
 	// Step 1: seed ResourceCache for ec2 and s3 with running resources.
 	m.Core().Session().ResourceCache[ec2Short] = &session.ResourceCacheEntry{
 		Resources: []resource.Resource{
-			{ID: ec2ID, Name: "test-ec2", Status: "running"},
+			{ID: ec2ID, Name: "test-ec2", Fields: map[string]string{"status": "running"}},
 		},
 	}
 	m.Core().Session().ResourceCache[s3Short] = &session.ResourceCacheEntry{
 		Resources: []resource.Resource{
-			{ID: s3ID, Name: "test-bucket", Status: "running"},
+			{ID: s3ID, Name: "test-bucket", Fields: map[string]string{"status": "running"}},
 		},
 	}
 

@@ -98,7 +98,7 @@ func s3RLObjectModel(bucket string) views.ResourceListModel {
 			Key:            "enter",
 			ContextKeys:    map[string]string{"bucket": "@parent.bucket", "prefix": "ID"},
 			DisplayNameKey: "bucket",
-			DrillCondition: func(r resource.Resource) bool { return r.Status == "folder" },
+			DrillCondition: func(r resource.Resource) bool { return r.Fields["status"] == "folder" },
 		}},
 	}
 	m := views.NewChildResourceList(childDef, map[string]string{"bucket": bucket}, bucket, nil, k)
@@ -128,7 +128,7 @@ func newS3ObjectsList(bucket string, viewConfig *config.ViewsConfig, k keys.Map)
 			Key:            "enter",
 			ContextKeys:    map[string]string{"bucket": "@parent.bucket", "prefix": "ID"},
 			DisplayNameKey: "bucket",
-			DrillCondition: func(r resource.Resource) bool { return r.Status == "folder" },
+			DrillCondition: func(r resource.Resource) bool { return r.Fields["status"] == "folder" },
 		}},
 	}
 	parentCtx := map[string]string{"bucket": bucket}
@@ -631,15 +631,15 @@ func TestQA_S3_B7_1_ObjectList_JKNavigation(t *testing.T) {
 	// Create fixture with multiple objects
 	multipleObjects := []resource.Resource{
 		{
-			ID: "file1.txt", Name: "file1.txt", Status: "file",
+			ID: "file1.txt", Name: "file1.txt",
 			Fields: map[string]string{"key": "file1.txt", "size": "1 KB", "last_modified": "2025-01-01"},
 		},
 		{
-			ID: "file2.txt", Name: "file2.txt", Status: "file",
+			ID: "file2.txt", Name: "file2.txt",
 			Fields: map[string]string{"key": "file2.txt", "size": "2 KB", "last_modified": "2025-01-02"},
 		},
 		{
-			ID: "file3.txt", Name: "file3.txt", Status: "file",
+			ID: "file3.txt", Name: "file3.txt",
 			Fields: map[string]string{"key": "file3.txt", "size": "3 KB", "last_modified": "2025-01-03"},
 		},
 	}
@@ -690,15 +690,15 @@ func TestQA_S3_B7_1_ObjectList_JKNavigation(t *testing.T) {
 func TestQA_S3_B9_1_ObjectList_FilterByKey(t *testing.T) {
 	multipleObjects := []resource.Resource{
 		{
-			ID: "config.yaml", Name: "config.yaml", Status: "file",
+			ID: "config.yaml", Name: "config.yaml",
 			Fields: map[string]string{"key": "config.yaml", "size": "1 KB", "last_modified": "2025-01-01"},
 		},
 		{
-			ID: "data.csv", Name: "data.csv", Status: "file",
+			ID: "data.csv", Name: "data.csv",
 			Fields: map[string]string{"key": "data.csv", "size": "2 KB", "last_modified": "2025-01-02"},
 		},
 		{
-			ID: "config.json", Name: "config.json", Status: "file",
+			ID: "config.json", Name: "config.json",
 			Fields: map[string]string{"key": "config.json", "size": "500 B", "last_modified": "2025-01-03"},
 		},
 	}

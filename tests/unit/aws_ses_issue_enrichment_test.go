@@ -71,7 +71,6 @@ func sesResourceRow(id, status string) resource.Resource {
 	return resource.Resource{
 		ID:     id,
 		Name:   id,
-		Status: status,
 		Fields: map[string]string{"identity_name": id},
 	}
 }

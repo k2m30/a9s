@@ -26,7 +26,6 @@ package tui
 import (
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
@@ -53,7 +52,6 @@ func (m Model) handleResourcesLoaded(msg messages.ResourcesLoaded) (tea.Model, t
 	if messages.IsStale(msg, m.core) {
 		return m, nil
 	}
-	(&m).deriveFindingsForType(msg.ResourceType, msg.Resources)
 	updated, viewCmd := m.updateActiveView(msg)
 	if updatedModel, ok := updated.(Model); ok {
 		if rl, ok := updatedModel.activeView().(*views.ResourceListModel); ok {
@@ -92,27 +90,8 @@ func (m Model) handleRelatedCheckResult(msg messages.RelatedCheckResult) (tea.Mo
 			sourceID = d.SourceResource().ID
 		}
 	}
-	// Derive wave-1 findings on slices BEFORE Core writes them to cache.
-	// Adapter owns this because deriveFindingsForType is the Model-side
-	// helper used at every adapter entry point; Core has its own
-	// equivalent that runs at related-navigate cache-hit time.
-	for aliasName, entry := range msg.CachedPages {
-		shortName := aliasName
-		if td := resource.FindResourceType(aliasName); td != nil {
-			shortName = td.ShortName
-		}
-		(&m).deriveFindingsForType(shortName, entry.Resources)
-	}
-	for aliasName, extra := range msg.LazyAddedResources {
-		if len(extra) == 0 {
-			continue
-		}
-		shortName := aliasName
-		if td := resource.FindResourceType(aliasName); td != nil {
-			shortName = td.ShortName
-		}
-		(&m).deriveFindingsForType(shortName, extra)
-	}
+	// W1.4b.3: fetcher-emitted rows already carry Findings; no re-derive needed
+	// on cached pages or lazy-added resources before Core writes them to cache.
 	intents, tasks := m.core.HandleRelatedCheckResult(runtime.RelatedCheckResultEvent{
 		ResourceType:       msg.ResourceType,
 		SourceResourceID:   sourceID,
@@ -149,7 +128,6 @@ func (m Model) handleEnrichDetailResult(msg messages.EnrichDetailResult) (tea.Mo
 	if msg.Err != nil {
 		return m, coreCmd
 	}
-	(&m).deriveFindingsForResource(msg.ResourceType, &msg.EnrichedRes)
 	updated, viewCmd := m.updateActiveView(msg)
 	if updatedModel, ok := updated.(Model); ok {
 		m = updatedModel

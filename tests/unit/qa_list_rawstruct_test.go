@@ -89,7 +89,6 @@ func TestQA_ListRawStruct_EC2(t *testing.T) {
 	res := resource.Resource{
 		ID:     "i-0abcdef1234567890",
 		Name:   "web-server-prod",
-		Status: "running",
 		Fields: map[string]string{
 			"instance_id": "i-0abcdef1234567890",
 			"name":        "web-server-prod",
@@ -137,7 +136,6 @@ func TestQA_ListRawStruct_RDS(t *testing.T) {
 	res := resource.Resource{
 		ID:     "prod-db-01",
 		Name:   "prod-db-01",
-		Status: "available",
 		Fields: map[string]string{
 			"db_identifier":  "prod-db-01",
 			"engine":         "mysql",
@@ -178,7 +176,6 @@ func TestQA_ListRawStruct_Redis(t *testing.T) {
 	res := resource.Resource{
 		ID:     "redis-prod-001",
 		Name:   "redis-prod-001",
-		Status: "available",
 		Fields: map[string]string{
 			"cluster_id": "redis-prod-001",
 			"node_type":  "cache.r6g.large",
@@ -217,7 +214,6 @@ func TestQA_ListRawStruct_DocDB(t *testing.T) {
 	res := resource.Resource{
 		ID:     "docdb-prod-cluster",
 		Name:   "docdb-prod-cluster",
-		Status: "available",
 		Fields: map[string]string{
 			"cluster_id":     "docdb-prod-cluster",
 			"engine_version": "5.0.0",
@@ -256,7 +252,6 @@ func TestQA_ListRawStruct_EKS(t *testing.T) {
 	res := resource.Resource{
 		ID:     "prod-cluster",
 		Name:   "prod-cluster",
-		Status: "ACTIVE",
 		Fields: map[string]string{
 			"cluster_name":     "prod-cluster",
 			"version":          "1.28",
@@ -295,7 +290,6 @@ func TestQA_ListRawStruct_Secrets(t *testing.T) {
 	res := resource.Resource{
 		ID:     "prod/database/password",
 		Name:   "prod/database/password",
-		Status: "",
 		Fields: map[string]string{
 			"secret_name":      "prod/database/password",
 			"description":      "old-desc",
@@ -334,7 +328,6 @@ func TestQA_ListRawStruct_S3(t *testing.T) {
 	res := resource.Resource{
 		ID:     "my-production-bucket",
 		Name:   "my-production-bucket",
-		Status: "",
 		Fields: map[string]string{
 			"name":          "my-production-bucket",
 			"bucket_name":   "my-production-bucket",
@@ -1280,7 +1273,6 @@ func TestQA_ListRawStruct_EBSVolume(t *testing.T) {
 	res := resource.Resource{
 		ID:     "vol-111aabbcc",
 		Name:   "prod-data-vol",
-		Status: "in-use",
 		Fields: map[string]string{
 			"volume_id":   "vol-111aabbcc",
 			"name":        "prod-data-vol",
@@ -1324,7 +1316,6 @@ func TestQA_ListRawStruct_EBSSnapshot(t *testing.T) {
 	res := resource.Resource{
 		ID:     "snap-0aabb11cc",
 		Name:   "prod-snap-daily",
-		Status: "completed",
 		Fields: map[string]string{
 			"snapshot_id": "snap-0aabb11cc",
 			"name":        "prod-snap-daily",
@@ -1367,7 +1358,6 @@ func TestQA_ListRawStruct_AMI(t *testing.T) {
 	res := resource.Resource{
 		ID:     "ami-0abc111222333444a",
 		Name:   "my-web-server-ami",
-		Status: "available",
 		Fields: map[string]string{
 			"image_id":         "ami-0abc111222333444a",
 			"name":             "my-web-server-ami",
@@ -1413,7 +1403,6 @@ func TestQA_ListRawStruct_CloudTrailEvent(t *testing.T) {
 	res := resource.Resource{
 		ID:     "evt-0001-abcd-1234-5678-abcdef012345",
 		Name:   "RunInstances",
-		Status: "ct-attention",
 		Fields: map[string]string{
 			"event_name":    "RunInstances",
 			"time":          "2025-03-15 12:00:00",

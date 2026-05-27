@@ -31,7 +31,6 @@ func TestQa67_F3_ResourceDeletedBeforeDetailOpen_NoPanic(t *testing.T) {
 		{
 			ID:     "i-deleted-later",
 			Name:   "soon-deleted",
-			Status: "running",
 			Fields: map[string]string{
 				"instance_id": "i-deleted-later",
 				"name":        "soon-deleted",
@@ -81,7 +80,6 @@ func TestQa67_F4_ResourceDeletedBeforeChildView_ShowsError(t *testing.T) {
 		{
 			ID:     "deleted-bucket",
 			Name:   "deleted-bucket",
-			Status: "available",
 			Fields: map[string]string{
 				"name":          "deleted-bucket",
 				"region":        "us-east-1",
@@ -134,7 +132,6 @@ func TestQa67_F6_RapidEscPresses_DoNotPanic(t *testing.T) {
 		{
 			ID:     "i-deep",
 			Name:   "deep-nav-instance",
-			Status: "running",
 			Fields: map[string]string{
 				"instance_id": "i-deep",
 				"name":        "deep-nav-instance",
@@ -191,7 +188,7 @@ func TestQa67_F7_EscDuringLoading_NavigatesBackCleanly(t *testing.T) {
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources: []resource.Resource{
-			{ID: "i-late", Name: "late-instance", Status: "running", Fields: map[string]string{
+			{ID: "i-late", Name: "late-instance", Fields: map[string]string{
 				"instance_id": "i-late",
 				"name":        "late-instance",
 				"state":       "running",
@@ -223,7 +220,6 @@ func TestQa67_F5_RefreshAfterStateChange_ShowsUpdatedData(t *testing.T) {
 		{
 			ID:     "i-state-change",
 			Name:   "changeable-instance",
-			Status: "running",
 			Fields: map[string]string{
 				"instance_id": "i-state-change",
 				"name":        "changeable-instance",
@@ -250,7 +246,6 @@ func TestQa67_F5_RefreshAfterStateChange_ShowsUpdatedData(t *testing.T) {
 		{
 			ID:     "i-state-change",
 			Name:   "changeable-instance",
-			Status: "stopped",
 			Fields: map[string]string{
 				"instance_id": "i-state-change",
 				"name":        "changeable-instance",

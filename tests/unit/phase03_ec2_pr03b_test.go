@@ -70,9 +70,6 @@ func TestEC2Fetcher_RunningStateEmitsNoFinding(t *testing.T) {
 	r := resources[0]
 
 	// Post-migration: fetcher no longer writes Status for lifecycle states.
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for running)", r.Status, "")
-	}
 
 	// No finding for the healthy steady-state.
 	if len(r.Findings) != 0 {
@@ -112,9 +109,6 @@ func TestEC2Fetcher_PendingStateEmitsWarnFinding(t *testing.T) {
 	}
 	r := resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for pending state", len(r.Findings))
@@ -167,9 +161,6 @@ func TestEC2Fetcher_StoppedServerEmitsBrokenFinding(t *testing.T) {
 	}
 	r := resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for stopped+Server.* state", len(r.Findings))
@@ -406,9 +397,6 @@ func TestEC2Fetcher_StoppingStateEmitsWarnFinding(t *testing.T) {
 	}
 	r := resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for stopping)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for stopping state", len(r.Findings))
 	}

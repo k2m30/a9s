@@ -48,9 +48,6 @@ func TestPR03d_VPCFetcher_PendingEmitsWarnFinding(t *testing.T) {
 	}
 	r := resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for pending VPC)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for pending VPC", len(r.Findings))
 	}
@@ -139,9 +136,6 @@ func TestPR03d_SubnetFetcher_PendingEmitsWarnFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for pending subnet)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for pending subnet", len(r.Findings))
 	}
@@ -183,9 +177,6 @@ func TestPR03d_SubnetFetcher_UnavailableEmitsBrokenFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for unavailable subnet", len(r.Findings))
 	}
@@ -273,9 +264,6 @@ func TestPR03d_ELBFetcher_ProvisioningEmitsWarnFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for provisioning ELB)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for provisioning ELB", len(r.Findings))
 	}
@@ -319,9 +307,6 @@ func TestPR03d_ELBFetcher_FailedEmitsBrokenFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for failed ELB", len(r.Findings))
 	}
@@ -407,9 +392,6 @@ func TestPR03d_IGWFetcher_AttachingEmitsWarnFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for attaching IGW)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for attaching IGW", len(r.Findings))
 	}
@@ -498,9 +480,6 @@ func TestPR03d_NATFetcher_PendingEmitsWarnFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for pending NAT)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for pending NAT", len(r.Findings))
 	}
@@ -539,9 +518,6 @@ func TestPR03d_NATFetcher_FailedEmitsBrokenFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for failed NAT", len(r.Findings))
 	}
@@ -624,9 +600,6 @@ func TestPR03d_VPCEFetcher_PendingEmitsWarnFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for pending VPCE)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for pending VPCE", len(r.Findings))
 	}
@@ -666,9 +639,6 @@ func TestPR03d_VPCEFetcher_FailedEmitsBrokenFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for failed VPCE", len(r.Findings))
 	}
@@ -753,9 +723,6 @@ func TestPR03d_TGWFetcher_PendingEmitsWarnFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for pending TGW)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for pending TGW", len(r.Findings))
 	}
@@ -796,9 +763,6 @@ func TestPR03d_TGWFetcher_FailedEmitsBrokenFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for failed TGW", len(r.Findings))
 	}
@@ -919,9 +883,6 @@ func TestPR03d_RTBFetcher_NeverEmitsFindingsOrStatus(t *testing.T) {
 			r := result.Resources[0]
 
 			// Status must be empty — "is_main" is NOT a lifecycle state.
-			if r.Status != "" {
-				t.Errorf("Status: got %q, want %q (is_main is structural metadata, not a lifecycle state — fetcher must not write Status)", r.Status, "")
-			}
 			// No Findings — rtb has no lifecycle states to emit.
 			if len(r.Findings) != 0 {
 				t.Errorf("Findings: got %d, want 0 (rtb emits no wave1 Findings)", len(r.Findings))

@@ -48,8 +48,8 @@ import (
 // probeResourceAvailability partial-success tests.
 func partialProbeResources() []resource.Resource {
 	return []resource.Resource{
-		{ID: "res-pa-001", Name: "res-pa-001", Status: "running"},
-		{ID: "res-pa-002", Name: "res-pa-002", Status: "running"},
+		{ID: "res-pa-001", Name: "res-pa-001"},
+		{ID: "res-pa-002", Name: "res-pa-002"},
 	}
 }
 
@@ -171,8 +171,8 @@ func TestProbeEnrichment_PartialSuccess(t *testing.T) {
 	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: &awsclient.ServiceClients{}, Gen: 0})
 
 	probeRes := []resource.Resource{
-		{ID: "res-pe-001", Name: "res-pe-001", Status: "running"},
-		{ID: "res-pe-002", Name: "res-pe-002", Status: "running"},
+		{ID: "res-pe-001", Name: "res-pe-001"},
+		{ID: "res-pe-002", Name: "res-pe-002"},
 	}
 	// Deliver AvailabilityCheckedMsg to seed probeResources[shortName].
 	// session.New seeds AvailabilityGen=1 (AS-659) — stamp the live value so

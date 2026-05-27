@@ -37,35 +37,35 @@ func rlTestTypeDef() resource.ResourceTypeDef {
 func rlTestResources() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID: "i-001", Name: "api-prod-01", Status: "running",
+			ID: "i-001", Name: "api-prod-01",
 			Fields: map[string]string{
 				"instance_id": "i-001", "name": "api-prod-01",
 				"state": "running", "type": "t3.medium",
 			},
 		},
 		{
-			ID: "i-002", Name: "api-prod-02", Status: "running",
+			ID: "i-002", Name: "api-prod-02",
 			Fields: map[string]string{
 				"instance_id": "i-002", "name": "api-prod-02",
 				"state": "running", "type": "t3.medium",
 			},
 		},
 		{
-			ID: "i-003", Name: "worker-01", Status: "stopped",
+			ID: "i-003", Name: "worker-01",
 			Fields: map[string]string{
 				"instance_id": "i-003", "name": "worker-01",
 				"state": "stopped", "type": "t3.large",
 			},
 		},
 		{
-			ID: "i-004", Name: "bastion", Status: "pending",
+			ID: "i-004", Name: "bastion",
 			Fields: map[string]string{
 				"instance_id": "i-004", "name": "bastion",
 				"state": "pending", "type": "t2.micro",
 			},
 		},
 		{
-			ID: "i-005", Name: "legacy-app", Status: "terminated",
+			ID: "i-005", Name: "legacy-app",
 			Fields: map[string]string{
 				"instance_id": "i-005", "name": "legacy-app",
 				"state": "terminated", "type": "t2.small",
