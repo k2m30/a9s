@@ -149,10 +149,10 @@ func convertECRImage(img ecrtypes.ImageDetail, repositoryURI, repositoryName str
 	status := computeImageStatus(img)
 
 	return resource.Resource{
-		ID:     digest,
-		Name:   name,
-		Status: status,
+		ID:   digest,
+		Name: name,
 		Fields: map[string]string{
+			"status":          status,
 			"image_tags":      imageTags,
 			"digest_short":    digestShort,
 			"pushed_at":       pushedAt,

@@ -81,10 +81,10 @@ func ConvertHistoryEvent(event sfntypes.HistoryEvent, lastStateName *string) res
 	stateName := resolveStateName(event, lastStateName)
 
 	return resource.Resource{
-		ID:     fmt.Sprintf("%d", event.Id),
-		Name:   HumanizeEventType(eventType),
-		Status: ClassifyEventStatus(eventType),
+		ID:   fmt.Sprintf("%d", event.Id),
+		Name: HumanizeEventType(eventType),
 		Fields: map[string]string{
+			"status":            ClassifyEventStatus(eventType),
 			"timestamp":         timestamp,
 			"event_type":        eventType,
 			"event_type_short":  HumanizeEventType(eventType),

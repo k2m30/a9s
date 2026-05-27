@@ -177,9 +177,8 @@ func convertReportEvent(event cwlogstypes.FilteredLogEvent) (resource.Resource, 
 	memoryUsed := memoryUsedMB + "/" + memorySizeMB + " MB"
 
 	return resource.Resource{
-		ID:     requestID,
-		Name:   name,
-		Status: status,
+		ID:   requestID,
+		Name: name,
 		Fields: map[string]string{
 			"request_id":             requestID,
 			"timestamp":              ts,
