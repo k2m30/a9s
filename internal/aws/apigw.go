@@ -40,9 +40,8 @@ func FetchAPIGatewaysPageMerged(ctx context.Context, c *ServiceClients, continua
 				name := aws.ToString(item.Name)
 				description := aws.ToString(item.Description)
 				r := resource.Resource{
-					ID:     apiID,
-					Name:   name,
-					Status: "",
+					ID:   apiID,
+					Name: name,
 					Fields: map[string]string{
 						"api_id":      apiID,
 						"name":        name,
@@ -133,9 +132,8 @@ func FetchAPIGatewaysPage(ctx context.Context, api APIGatewayV2GetApisAPI, conti
 		}
 
 		r := resource.Resource{
-			ID:     apiID,
-			Name:   name,
-			Status: "",
+			ID:   apiID,
+			Name: name,
 			Fields: map[string]string{
 				"api_id":      apiID,
 				"name":        name,
