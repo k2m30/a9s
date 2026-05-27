@@ -170,7 +170,7 @@ If at the end of the program this test fails — if adding a resource still requ
 |---|---|---|
 | 01-projection-hook | LANDED | `internal/domain` bootstrap + Section/Item/DetailProjector type decls landed |
 | 02-session-owner | LANDED | session-owned caches; `internal/aws/` package-globals removed |
-| 03-finding-model | in progress (PR-03n cleanup pending) | 17 PRs landed; PR-03n cleanup tracked under [AS-1390](../../specs/) umbrella + W1.* sibling issues |
+| 03-finding-model | LANDED | 17 PRs landed in 03a..03n; PR-03n cleanup completed via AS-1390 umbrella (W1+W5 children AS-1392..AS-1397) |
 | 04-catalog | LANDED | `aws.Install()` + `catalog.SetTypes(...)` two-step model in production; see `04-catalog.md` |
 | 05a-extract | LANDED | `runtime.Core` extracted from `internal/tui/app.go` (PR-05a-h4 series) |
 | 05a-gens | LANDED | gen-counter unification merged into 05a sequence |
