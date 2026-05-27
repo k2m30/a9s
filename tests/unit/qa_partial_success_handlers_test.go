@@ -53,8 +53,8 @@ func TestHandleAvailabilityChecked_PartialErrAppliesState(t *testing.T) {
 	m := newRootSizedModel()
 	partialErr := errors.New("partial: throttled on 1 of 3 IDs")
 	partialResources := []resource.Resource{
-		{ID: "res-b-001", Name: "res-b-001", Status: "running"},
-		{ID: "res-b-002", Name: "res-b-002", Status: "running"},
+		{ID: "res-b-001", Name: "res-b-001"},
+		{ID: "res-b-002", Name: "res-b-002"},
 	}
 
 	// Dispatch the partial-success AvailabilityCheckedMsg.
@@ -193,7 +193,7 @@ func TestHandleEnrichmentChecked_PartialErrAppliesState(t *testing.T) {
 		Count:        1,
 		HasResources: true,
 		Resources: []resource.Resource{
-			{ID: "i-partial-001", Name: "web-server", Status: "stopped",
+			{ID: "i-partial-001", Name: "web-server",
 				Fields: map[string]string{"instance_id": "i-partial-001"}},
 		},
 	})
@@ -255,7 +255,7 @@ func TestHandleEnrichmentChecked_PartialErrAppliesState(t *testing.T) {
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources: []resource.Resource{
-			{ID: "i-partial-001", Name: "web-server", Status: "stopped",
+			{ID: "i-partial-001", Name: "web-server",
 				Fields: map[string]string{"instance_id": "i-partial-001"}},
 		},
 	})

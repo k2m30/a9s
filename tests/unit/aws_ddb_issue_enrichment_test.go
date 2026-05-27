@@ -106,9 +106,8 @@ func buildDDBEnricherClients(fake awsclient.DynamoDBAPI) *awsclient.ServiceClien
 func makeDDBResource(id string, status string) resource.Resource {
 	arn := "arn:aws:dynamodb:us-east-1:123456789012:table/" + id
 	return resource.Resource{
-		ID:     id,
-		Name:   id,
-		Status: status,
+		ID:   id,
+		Name: id,
 		Fields: map[string]string{
 			"status": status,
 			"arn":    arn,
@@ -317,7 +316,6 @@ func TestDDB_Enrich_PITRDisabled_NoFieldUpdates_WithStackedWave1(t *testing.T) {
 		{
 			ID:     id,
 			Name:   id,
-			Status: existingStatus,
 			Fields: map[string]string{"status": existingStatus},
 		},
 	}

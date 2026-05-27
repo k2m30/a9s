@@ -66,9 +66,8 @@ func apigwResources(ids ...string) []resource.Resource {
 	res := make([]resource.Resource, 0, len(ids))
 	for _, id := range ids {
 		res = append(res, resource.Resource{
-			ID:     id,
-			Name:   "api-" + id,
-			Status: "ACTIVE",
+			ID:   id,
+			Name: "api-" + id,
 			Fields: map[string]string{
 				"api_id":       id,
 				"name":         "api-" + id,

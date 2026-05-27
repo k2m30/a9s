@@ -85,9 +85,6 @@ func TestFetchLambdaFunctions_ParsesMultipleFunctions(t *testing.T) {
 	}
 	// Post-fold contract: fetcher stops writing Status (runtime is in Fields["runtime"], not Status).
 	// Active/default state → no wave1 Finding.
-	if r0.Status != "" {
-		t.Errorf("resource[0].Status: expected %q (fetcher must not write Status), got %q", "", r0.Status)
-	}
 	if len(r0.Findings) != 0 {
 		t.Errorf("resource[0].Findings: expected 0 for Active function, got %d", len(r0.Findings))
 	}

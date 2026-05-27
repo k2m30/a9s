@@ -15,7 +15,6 @@ func fixtureS3Buckets() []resource.Resource {
 		{
 			ID:     "test-app-state",
 			Name:   "test-app-state",
-			Status: "",
 			Fields: map[string]string{
 				"name":          "test-app-state",
 				"bucket_name":   "test-app-state",
@@ -25,7 +24,6 @@ func fixtureS3Buckets() []resource.Resource {
 		{
 			ID:     "cdn-logs.example.com",
 			Name:   "cdn-logs.example.com",
-			Status: "",
 			Fields: map[string]string{
 				"name":          "cdn-logs.example.com",
 				"bucket_name":   "cdn-logs.example.com",
@@ -35,7 +33,6 @@ func fixtureS3Buckets() []resource.Resource {
 		{
 			ID:     "cdn-website.example.com",
 			Name:   "cdn-website.example.com",
-			Status: "",
 			Fields: map[string]string{
 				"name":          "cdn-website.example.com",
 				"bucket_name":   "cdn-website.example.com",
@@ -45,7 +42,6 @@ func fixtureS3Buckets() []resource.Resource {
 		{
 			ID:     "dev-fileshare",
 			Name:   "dev-fileshare",
-			Status: "",
 			Fields: map[string]string{
 				"name":          "dev-fileshare",
 				"bucket_name":   "dev-fileshare",
@@ -55,7 +51,6 @@ func fixtureS3Buckets() []resource.Resource {
 		{
 			ID:     "dev-loki-chunks",
 			Name:   "dev-loki-chunks",
-			Status: "",
 			Fields: map[string]string{
 				"name":          "dev-loki-chunks",
 				"bucket_name":   "dev-loki-chunks",
@@ -72,7 +67,6 @@ func fixtureS3Objects() []resource.Resource {
 		{
 			ID:     "dev/terraform.tfstate",
 			Name:   "dev/terraform.tfstate",
-			Status: "file",
 			Fields: map[string]string{
 				"key":           "dev/terraform.tfstate",
 				"size":          "61.9 KB",
@@ -90,7 +84,6 @@ func fixtureEC2Instances() []resource.Resource {
 		{
 			ID:     "i-0aaa111111111111a",
 			Name:   "",
-			Status: "running",
 			Fields: map[string]string{
 				"instance_id":     "i-0aaa111111111111a",
 				"name":            "",
@@ -107,7 +100,6 @@ func fixtureEC2Instances() []resource.Resource {
 		{
 			ID:     "i-0bbb222222222222b",
 			Name:   "VPN",
-			Status: "running",
 			Fields: map[string]string{
 				"instance_id":     "i-0bbb222222222222b",
 				"name":            "VPN",
@@ -124,7 +116,6 @@ func fixtureEC2Instances() []resource.Resource {
 		{
 			ID:     "i-0ccc333333333333c",
 			Name:   "kafka",
-			Status: "running",
 			Fields: map[string]string{
 				"instance_id":     "i-0ccc333333333333c",
 				"name":            "kafka",
@@ -142,7 +133,6 @@ func fixtureEC2Instances() []resource.Resource {
 			// No status check fields — represents API error fallback, no indicator expected.
 			ID:     "i-0ddd444444444444d",
 			Name:   "monitoring",
-			Status: "running",
 			Fields: map[string]string{
 				"instance_id": "i-0ddd444444444444d",
 				"name":        "monitoring",
@@ -157,7 +147,6 @@ func fixtureEC2Instances() []resource.Resource {
 		{
 			ID:     "i-0eee555555555555e",
 			Name:   "apps-on-demand",
-			Status: "running",
 			Fields: map[string]string{
 				"instance_id":     "i-0eee555555555555e",
 				"name":            "apps-on-demand",
@@ -175,7 +164,6 @@ func fixtureEC2Instances() []resource.Resource {
 			// No status check fields — non-running, no indicator expected.
 			ID:     "i-0fff666666666666f",
 			Name:   "apps",
-			Status: "terminated",
 			Fields: map[string]string{
 				"instance_id": "i-0fff666666666666f",
 				"name":        "apps",
@@ -197,7 +185,6 @@ func fixtureRDSInstances() []resource.Resource {
 		{
 			ID:     "test-docdb-1",
 			Name:   "test-docdb-1",
-			Status: "available",
 			Fields: map[string]string{
 				"db_identifier":  "test-docdb-1",
 				"engine":         "dbc",
@@ -211,7 +198,6 @@ func fixtureRDSInstances() []resource.Resource {
 		{
 			ID:     "test-rds-1",
 			Name:   "test-rds-1",
-			Status: "available",
 			Fields: map[string]string{
 				"db_identifier":  "test-rds-1",
 				"engine":         "aurora-postgresql",
@@ -233,7 +219,6 @@ func fixtureRedisClusters() []resource.Resource {
 		{
 			ID:     "test-redis-1",
 			Name:   "test-redis-1",
-			Status: "available",
 			Fields: map[string]string{
 				"cluster_id": "test-redis-1",
 				"node_type":  "cache.t2.micro",
@@ -266,7 +251,6 @@ func fixtureDocDBClusters() []resource.Resource {
 		{
 			ID:     "test-docdb-cluster",
 			Name:   "test-docdb-cluster",
-			Status: "available",
 			Fields: map[string]string{
 				"cluster_id":     "test-docdb-cluster",
 				"engine_version": "5.0.0",
@@ -287,7 +271,6 @@ func fixtureDocDBClusters() []resource.Resource {
 		{
 			ID:     "test-rds-cluster",
 			Name:   "test-rds-cluster",
-			Status: "available",
 			Fields: map[string]string{
 				"cluster_id":     "test-rds-cluster",
 				"engine_version": "16.8",
@@ -315,7 +298,6 @@ func fixtureEKSClusters() []resource.Resource {
 		{
 			ID:     "test-cluster-1",
 			Name:   "test-cluster-1",
-			Status: "ACTIVE",
 			Fields: map[string]string{
 				"cluster_name":     "test-cluster-1",
 				"version":          "1.31",
@@ -334,7 +316,6 @@ func fixtureSecrets() []resource.Resource {
 		{
 			ID:     "test/integration",
 			Name:   "test/integration",
-			Status: "",
 			Fields: map[string]string{
 				"secret_name":      "test/integration",
 				"description":      "",
@@ -346,7 +327,6 @@ func fixtureSecrets() []resource.Resource {
 		{
 			ID:     "test/github-app",
 			Name:   "test/github-app",
-			Status: "",
 			Fields: map[string]string{
 				"secret_name":      "test/github-app",
 				"description":      "",
@@ -358,7 +338,6 @@ func fixtureSecrets() []resource.Resource {
 		{
 			ID:     "test/docdb-credentials",
 			Name:   "test/docdb-credentials",
-			Status: "",
 			Fields: map[string]string{
 				"secret_name":      "test/docdb-credentials",
 				"description":      "",
@@ -370,7 +349,6 @@ func fixtureSecrets() []resource.Resource {
 		{
 			ID:     "test/redis-credentials",
 			Name:   "test/redis-credentials",
-			Status: "",
 			Fields: map[string]string{
 				"secret_name":      "test/redis-credentials",
 				"description":      "",
@@ -382,7 +360,6 @@ func fixtureSecrets() []resource.Resource {
 		{
 			ID:     "test/rds-credentials",
 			Name:   "test/rds-credentials",
-			Status: "",
 			Fields: map[string]string{
 				"secret_name":      "test/rds-credentials",
 				"description":      "",
@@ -401,7 +378,6 @@ func fixtureSSMParameters() []resource.Resource {
 		{
 			ID:     "/app/db/password",
 			Name:   "/app/db/password",
-			Status: "",
 			Fields: map[string]string{
 				"name":          "/app/db/password",
 				"type":          "SecureString",
@@ -413,7 +389,6 @@ func fixtureSSMParameters() []resource.Resource {
 		{
 			ID:     "/app/api-key",
 			Name:   "/app/api-key",
-			Status: "",
 			Fields: map[string]string{
 				"name":          "/app/api-key",
 				"type":          "SecureString",

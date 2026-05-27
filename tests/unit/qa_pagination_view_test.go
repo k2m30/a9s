@@ -54,7 +54,7 @@ func pgTestResources(n int) []resource.Resource {
 		id := fmt.Sprintf("i-%05d", i)
 		name := fmt.Sprintf("instance-%05d", i)
 		res[i] = resource.Resource{
-			ID: id, Name: name, Status: "running",
+			ID: id, Name: name,
 			Fields: map[string]string{
 				"instance_id": id,
 				"name":        name,
@@ -243,7 +243,7 @@ func TestResourceList_Update_AppendTrue_AppendsResources(t *testing.T) {
 		id := fmt.Sprintf("i-%05d", 200+i)
 		name := fmt.Sprintf("instance-%05d", 200+i)
 		page2[i] = resource.Resource{
-			ID: id, Name: name, Status: "running",
+			ID: id, Name: name,
 			Fields: map[string]string{
 				"instance_id": id,
 				"name":        name,
@@ -455,8 +455,7 @@ func TestResourceList_FrameTitle_Pagination_AllResourceTypes(t *testing.T) {
 					fields[col.Key] = fmt.Sprintf("%s-%d", col.Key, i)
 				}
 				resources[i] = resource.Resource{
-					ID: fmt.Sprintf("id-%d", i), Name: fmt.Sprintf("name-%d", i),
-					Status: "running", Fields: fields,
+					ID: fmt.Sprintf("id-%d", i), Name: fmt.Sprintf("name-%d", i), Fields: fields,
 				}
 			}
 

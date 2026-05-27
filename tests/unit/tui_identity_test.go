@@ -418,7 +418,6 @@ func TestQA_Help_ShowsIdentityBinding(t *testing.T) {
 						{
 							ID:     "i-1234567890abcdef0",
 							Name:   "test-instance",
-							Status: "running",
 							Fields: map[string]string{"Type": "t3.micro", "AZ": "us-east-1a"},
 						},
 					},

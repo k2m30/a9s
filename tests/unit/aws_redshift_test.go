@@ -67,9 +67,6 @@ func fetchSingleCluster(t *testing.T, cluster redshifttypes.Cluster) resource.Re
 // Resource.Fields["status"] carries the display phrase.
 func assertStatus(t *testing.T, r resource.Resource, wantPhrase string) {
 	t.Helper()
-	if r.Status != "" {
-		t.Errorf("Resource.Status = %q, want %q", r.Status, "")
-	}
 	if r.Fields["status"] != wantPhrase {
 		t.Errorf("Resource.Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
 	}
@@ -157,12 +154,6 @@ func TestRedshift_Fetch_Healthy_Silent(t *testing.T) {
 	assertStatus(t, r, "")
 	assertFindings(t, r, nil)
 	assertClusterStatusField(t, r, "available")
-	// No jargon in status field
-	for _, bad := range []string{"OK", "ACTIVE", "available", "healthy", "-", "Available"} {
-		if r.Status == bad {
-			t.Errorf("Resource.Status = %q, must be blank for healthy clusters (not %q)", r.Status, bad)
-		}
-	}
 }
 
 // ---------------------------------------------------------------------------

@@ -206,7 +206,7 @@ func buildUnifiedModel(t *testing.T, resources []resource.Resource, enrichIC int
 func TestUnifiedIssueCount_DedupesAcrossWaves(t *testing.T) {
 	t.Run("disjoint: Wave-2 only (enrichIC=1) on running resource → count=1", func(t *testing.T) {
 		resources := []resource.Resource{
-			{ID: "i-bbb", Name: "running-server", Status: "running",
+			{ID: "i-bbb", Name: "running-server",
 				Fields: map[string]string{"name": "running-server", "state": "running"}},
 		}
 		findings := map[string]domain.Finding{
@@ -221,7 +221,7 @@ func TestUnifiedIssueCount_DedupesAcrossWaves(t *testing.T) {
 
 	t.Run("fully overlapping: same resource in Wave-1 and Wave-2 → enrichIC=1 not 2", func(t *testing.T) {
 		resources := []resource.Resource{
-			{ID: "i-aaa", Name: "stopped-server", Status: "stopped",
+			{ID: "i-aaa", Name: "stopped-server",
 				Fields: map[string]string{"name": "stopped-server", "state": "stopped"}},
 		}
 		findings := map[string]domain.Finding{
@@ -240,9 +240,9 @@ func TestUnifiedIssueCount_DedupesAcrossWaves(t *testing.T) {
 
 	t.Run("multiple disjoint findings → enrichIC=3", func(t *testing.T) {
 		resources := []resource.Resource{
-			{ID: "i-aaa", Name: "s1", Status: "running", Fields: map[string]string{"name": "s1"}},
-			{ID: "i-bbb", Name: "s2", Status: "running", Fields: map[string]string{"name": "s2"}},
-			{ID: "i-ccc", Name: "s3", Status: "running", Fields: map[string]string{"name": "s3"}},
+			{ID: "i-aaa", Name: "s1", Fields: map[string]string{"name": "s1"}},
+			{ID: "i-bbb", Name: "s2", Fields: map[string]string{"name": "s2"}},
+			{ID: "i-ccc", Name: "s3", Fields: map[string]string{"name": "s3"}},
 		}
 		findings := map[string]domain.Finding{
 			"i-aaa": {Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
@@ -257,7 +257,7 @@ func TestUnifiedIssueCount_DedupesAcrossWaves(t *testing.T) {
 
 	t.Run("empty findings → enrichIC=0 → FrameTitle has no issue badge", func(t *testing.T) {
 		resources := []resource.Resource{
-			{ID: "i-aaa", Name: "server", Status: "running", Fields: map[string]string{"name": "server"}},
+			{ID: "i-aaa", Name: "server", Fields: map[string]string{"name": "server"}},
 		}
 		title := buildUnifiedModel(t, resources, 0, map[string]domain.Finding{})
 		if strings.Contains(title, "[!]") {
@@ -339,11 +339,11 @@ func TestMenuCount_MatchesListCount_AfterWave2(t *testing.T) {
 // so any badge count must come from Wave-2 findings only.
 func tildeSeverityEC2Instances() []resource.Resource {
 	return []resource.Resource{
-		{ID: "i-aaa", Name: "server-a", Status: "running",
+		{ID: "i-aaa", Name: "server-a",
 			Fields: map[string]string{"name": "server-a", "state": "running"}},
-		{ID: "i-bbb", Name: "server-b", Status: "running",
+		{ID: "i-bbb", Name: "server-b",
 			Fields: map[string]string{"name": "server-b", "state": "running"}},
-		{ID: "i-ccc", Name: "server-c", Status: "running",
+		{ID: "i-ccc", Name: "server-c",
 			Fields: map[string]string{"name": "server-c", "state": "running"}},
 	}
 }
@@ -459,7 +459,6 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 		brokenResource := resource.Resource{
 			ID:     "i-stopped",
 			Name:   "stopped-server",
-			Status: "stopped",
 			Fields: map[string]string{"name": "stopped-server", "state": "stopped"},
 		}
 		m, _ = rootApplyMsg(m, messages.AvailabilityChecked{

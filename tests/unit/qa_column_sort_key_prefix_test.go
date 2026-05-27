@@ -47,7 +47,6 @@ func buildResourceList(t *testing.T, shortName string, width int) views.Resource
 	res := resource.Resource{
 		ID:     "test-resource-001",
 		Name:   "test-resource",
-		Status: "available",
 		Fields: map[string]string{},
 	}
 	m, _ = m.Update(messages.ResourcesLoaded{

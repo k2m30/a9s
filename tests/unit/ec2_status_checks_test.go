@@ -237,7 +237,6 @@ func TestEC2StatusChecks_List_NonRunningImpairedFieldsNoIndicator(t *testing.T) 
 	stoppedWithBadChecks := resource.Resource{
 		ID:     "i-stopped-bad-checks",
 		Name:   "stopped-bad",
-		Status: "stopped",
 		Fields: map[string]string{
 			"instance_id":     "i-stopped-bad-checks",
 			"name":            "stopped-bad",
@@ -274,7 +273,6 @@ func TestEC2StatusChecks_Detail_UnhealthyShowsSection(t *testing.T) {
 	r := resource.Resource{
 		ID:     "i-0aaa111111111111a",
 		Name:   "",
-		Status: "running",
 		Fields: map[string]string{
 			"instance_id":     "i-0aaa111111111111a",
 			"state":           "running",
@@ -305,7 +303,6 @@ func TestEC2StatusChecks_Detail_UnhealthyShowsStatusValues(t *testing.T) {
 	r := resource.Resource{
 		ID:     "i-0aaa111111111111a",
 		Name:   "",
-		Status: "running",
 		Fields: map[string]string{
 			"instance_id":     "i-0aaa111111111111a",
 			"state":           "running",
@@ -332,7 +329,6 @@ func TestEC2StatusChecks_Detail_InitializingShowsSection(t *testing.T) {
 	r := resource.Resource{
 		ID:     "i-0bbb222222222222b",
 		Name:   "VPN",
-		Status: "running",
 		Fields: map[string]string{
 			"instance_id":     "i-0bbb222222222222b",
 			"name":            "VPN",
@@ -366,7 +362,6 @@ func TestEC2StatusChecks_Detail_HealthyOmitsSection(t *testing.T) {
 	r := resource.Resource{
 		ID:     "i-0ccc333333333333c",
 		Name:   "kafka",
-		Status: "running",
 		Fields: map[string]string{
 			"instance_id":     "i-0ccc333333333333c",
 			"name":            "kafka",
@@ -396,7 +391,6 @@ func TestEC2StatusChecks_Detail_NoFieldsOmitsSection(t *testing.T) {
 	r := resource.Resource{
 		ID:     "i-0ddd444444444444d",
 		Name:   "monitoring",
-		Status: "running",
 		Fields: map[string]string{
 			"instance_id": "i-0ddd444444444444d",
 			"name":        "monitoring",
@@ -423,7 +417,6 @@ func TestEC2StatusChecks_Detail_NonRunningOmitsSection(t *testing.T) {
 	r := resource.Resource{
 		ID:     "i-0fff666666666666f",
 		Name:   "apps",
-		Status: "terminated",
 		Fields: map[string]string{
 			"instance_id":     "i-0fff666666666666f",
 			"name":            "apps",
@@ -448,7 +441,6 @@ func TestEC2StatusChecks_Detail_StoppedOmitsSection(t *testing.T) {
 	r := resource.Resource{
 		ID:     "i-stopped-test",
 		Name:   "old-worker",
-		Status: "stopped",
 		Fields: map[string]string{
 			"instance_id": "i-stopped-test",
 			"name":        "old-worker",
@@ -476,7 +468,6 @@ func TestEC2StatusChecks_Detail_EmptySystemShowsDash(t *testing.T) {
 	r := resource.Resource{
 		ID:     "i-test-empty-sys",
 		Name:   "dash-sys",
-		Status: "running",
 		Fields: map[string]string{
 			"instance_id":     "i-test-empty-sys",
 			"name":            "dash-sys",
@@ -508,7 +499,6 @@ func TestEC2StatusChecks_Detail_EmptyInstanceShowsDash(t *testing.T) {
 	r := resource.Resource{
 		ID:     "i-test-empty-inst",
 		Name:   "dash-inst",
-		Status: "running",
 		Fields: map[string]string{
 			"instance_id":     "i-test-empty-inst",
 			"name":            "dash-inst",
@@ -544,7 +534,6 @@ func TestEC2StatusChecks_Detail_SectionAppendsAfterState(t *testing.T) {
 	r := resource.Resource{
 		ID:     "i-test-order",
 		Name:   "order-test",
-		Status: "running",
 		Fields: map[string]string{
 			"instance_id":     "i-test-order",
 			"state":           "running",
@@ -625,7 +614,6 @@ func TestEC2StatusChecks_Detail_StatusStyleColors(t *testing.T) {
 			r := resource.Resource{
 				ID:     "i-test-style",
 				Name:   "style-test",
-				Status: "running",
 				Fields: map[string]string{
 					"instance_id":     "i-test-style",
 					"state":           "running",

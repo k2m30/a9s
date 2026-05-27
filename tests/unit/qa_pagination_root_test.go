@@ -63,7 +63,6 @@ func ctEventsResources(n int) []resource.Resource {
 		resources[i] = resource.Resource{
 			ID:     id,
 			Name:   fmt.Sprintf("CreateBucket-%d", i),
-			Status: "ct-attention",
 			Fields: map[string]string{
 				"event_name":    fmt.Sprintf("CreateBucket-%d", i),
 				"time":          "2026-03-28 14:30:15",
@@ -97,7 +96,6 @@ func ctEventsResources2(n, offset int) []resource.Resource {
 		resources[i] = resource.Resource{
 			ID:     id,
 			Name:   fmt.Sprintf("DeleteObject-%d", idx),
-			Status: "ct-danger",
 			Fields: map[string]string{
 				"event_name":    fmt.Sprintf("DeleteObject-%d", idx),
 				"time":          "2026-03-28 14:30:15",
@@ -127,7 +125,6 @@ func ec2TestResources(n int) []resource.Resource {
 		resources[i] = resource.Resource{
 			ID:     id,
 			Name:   fmt.Sprintf("web-server-%d", i),
-			Status: "running",
 			Fields: map[string]string{
 				"instance_id":   id,
 				"instance_type": "t3.micro",

@@ -19,7 +19,7 @@ func TestQA_Copy_ResourceList_CopiesID(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: []resource.Resource{
-		{ID: "i-0abc123", Name: "web-server", Status: "running", Fields: map[string]string{"instance_id": "i-0abc123"}},
+		{ID: "i-0abc123", Name: "web-server", Fields: map[string]string{"instance_id": "i-0abc123"}},
 	}})
 
 	_, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'c'})
@@ -48,7 +48,7 @@ func TestQA_Copy_Detail_CopiesFieldValue(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	res := resource.Resource{
-		ID: "i-detail123", Name: "detail-server", Status: "running",
+		ID: "i-detail123", Name: "detail-server",
 		Fields: map[string]string{
 			"instance_id": "i-detail123", "name": "detail-server",
 			"state": "running", "type": "t3.micro", "private_ip": "10.0.1.5",
@@ -89,7 +89,7 @@ func TestQA_Copy_YAML_CopiesFullYAML(t *testing.T) {
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	res := resource.Resource{
-		ID: "i-yaml123", Name: "yaml-server", Status: "running",
+		ID: "i-yaml123", Name: "yaml-server",
 		Fields: map[string]string{"instance_id": "i-yaml123", "state": "running"},
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: []resource.Resource{res}})

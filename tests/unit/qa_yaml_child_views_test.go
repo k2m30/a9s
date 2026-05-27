@@ -21,7 +21,6 @@ func fixtureLogStreams() []resource.Resource {
 		{
 			ID:     "2024/03/22/[$LATEST]abcdef1234567890",
 			Name:   "2024/03/22/[$LATEST]abcdef1234567890",
-			Status: "",
 			Fields: map[string]string{
 				"stream_name": "2024/03/22/[$LATEST]abcdef1234567890",
 				"last_event":  "2024-03-23 00:00",
@@ -40,7 +39,6 @@ func fixtureLogEvents() []resource.Resource {
 		{
 			ID:     "evt-1711065600000-0",
 			Name:   "ERROR NullPointerException in com.example.App.main",
-			Status: "ERROR",
 			Fields: map[string]string{
 				"timestamp":      "2024-03-22 00:00",
 				"message":        "ERROR NullPointerException in com.example.App.main",
@@ -125,7 +123,6 @@ func fixtureTargetHealth() []resource.Resource {
 		{
 			ID:     "i-0abc1234def56789a",
 			Name:   "i-0abc1234def56789a",
-			Status: "unhealthy",
 			Fields: map[string]string{
 				"target_id":   "i-0abc1234def56789a",
 				"port":        "8080",
@@ -180,7 +177,6 @@ func fixtureLambdaInvocations() []resource.Resource {
 		{
 			ID:     "12345678-1234-1234-1234-123456789012",
 			Name:   "12345678-1234-1234-1234-123456789012",
-			Status: "OK",
 			Fields: map[string]string{
 				"request_id":  "12345678-1234-1234-1234-123456789012",
 				"timestamp":   "2024-03-22 00:00",
@@ -235,7 +231,6 @@ func fixtureLambdaInvocationLogs() []resource.Resource {
 		{
 			ID:     "log-001",
 			Name:   "INFO Processing request for user abc-123",
-			Status: "",
 			Fields: map[string]string{
 				"timestamp": "2024-03-22 00:00",
 				"message":   "INFO Processing request for user abc-123",
@@ -286,7 +281,6 @@ func fixtureEcsSvcEvents() []resource.Resource {
 		{
 			ID:     "evt-yaml-001",
 			Name:   "(service web-service) has reached a steady state.",
-			Status: "",
 			Fields: map[string]string{
 				"timestamp": "2024-03-22 10:00",
 				"message":   "(service web-service) has reached a steady state.",
@@ -337,7 +331,6 @@ func fixtureEcsSvcTasks() []resource.Resource {
 		{
 			ID:     "abc123def456",
 			Name:   "abc123def456",
-			Status: "RUNNING",
 			Fields: map[string]string{
 				"task_id_short":  "abc123def456",
 				"status":         "RUNNING",
@@ -392,7 +385,6 @@ func fixtureEcsSvcLogs() []resource.Resource {
 		{
 			ID:     "evt-svc-log-001",
 			Name:   "INFO Starting application server on port 8080",
-			Status: "",
 			Fields: map[string]string{
 				"timestamp":    "2024-03-21 16:00",
 				"stream_short": "web/abc123de",
@@ -444,7 +436,6 @@ func fixtureCfnEvents() []resource.Resource {
 		{
 			ID:     "evt-yaml-cfn-001",
 			Name:   "2024-03-22 10:00",
-			Status: "CREATE_COMPLETE",
 			Fields: map[string]string{
 				"timestamp":              "2024-03-22 10:00",
 				"logical_resource_id":    "MyBucket",
@@ -498,7 +489,6 @@ func fixtureCfnResources() []resource.Resource {
 		{
 			ID:     "MyBucket",
 			Name:   "MyBucket",
-			Status: "CREATE_COMPLETE",
 			Fields: map[string]string{
 				"logical_resource_id":  "MyBucket",
 				"physical_resource_id": "my-stack-mybucket-abc123",
@@ -553,7 +543,6 @@ func fixtureAsgActivities() []resource.Resource {
 		{
 			ID:     "act-yaml-001",
 			Name:   "2024-03-22 10:00",
-			Status: "Successful",
 			Fields: map[string]string{
 				"start_time":  "2024-03-22 10:00",
 				"status_code": "Successful",
@@ -564,7 +553,6 @@ func fixtureAsgActivities() []resource.Resource {
 		{
 			ID:     "act-yaml-002",
 			Name:   "2024-03-22 10:05",
-			Status: "Failed",
 			Fields: map[string]string{
 				"start_time":  "2024-03-22 10:05",
 				"status_code": "Failed",
@@ -617,7 +605,6 @@ func fixtureAlarmHistory() []resource.Resource {
 		{
 			ID:     "2024-03-22 10:00",
 			Name:   "2024-03-22 10:00",
-			Status: "StateUpdate",
 			Fields: map[string]string{
 				"timestamp":         "2024-03-22 10:00",
 				"history_item_type": "StateUpdate",
@@ -627,7 +614,6 @@ func fixtureAlarmHistory() []resource.Resource {
 		{
 			ID:     "2024-03-22 10:05",
 			Name:   "2024-03-22 10:05",
-			Status: "ConfigurationUpdate",
 			Fields: map[string]string{
 				"timestamp":         "2024-03-22 10:05",
 				"history_item_type": "ConfigurationUpdate",
@@ -679,7 +665,6 @@ func fixtureELBListeners() []resource.Resource {
 		{
 			ID:     "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/api-prod-alb/abc123/def456",
 			Name:   "443",
-			Status: "",
 			Fields: map[string]string{
 				"port":                  "443",
 				"protocol":              "HTTPS",
@@ -692,7 +677,6 @@ func fixtureELBListeners() []resource.Resource {
 		{
 			ID:     "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/api-prod-alb/abc123/ghi789",
 			Name:   "80",
-			Status: "",
 			Fields: map[string]string{
 				"port":                  "80",
 				"protocol":              "HTTP",
@@ -747,7 +731,6 @@ func fixtureCBBuilds() []resource.Resource {
 		{
 			ID:     "my-project:build-id-001",
 			Name:   "#142",
-			Status: "SUCCEEDED",
 			Fields: map[string]string{
 				"build_number":            "142",
 				"build_status":            "SUCCEEDED",
@@ -810,7 +793,6 @@ func fixtureCBBuildLogs() []resource.Resource {
 		{
 			ID:     "evt-1718445600000-0",
 			Name:   "[Container] Running command echo hello",
-			Status: "IN_PROGRESS",
 			Fields: map[string]string{
 				"timestamp":      "2024-06-15 10:00",
 				"message":        "[Container] Running command echo hello",
@@ -863,7 +845,6 @@ func fixtureECRImages() []resource.Resource {
 		{
 			ID:     "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
 			Name:   "latest, v1.0.0",
-			Status: "",
 			Fields: map[string]string{
 				"image_tags":     "latest, v1.0.0",
 				"digest_short":   "abcdef123456",
@@ -919,7 +900,6 @@ func fixturePipelineStages() []resource.Resource {
 		{
 			ID:     "Source/GitHub",
 			Name:   "GitHub",
-			Status: "running",
 			Fields: map[string]string{
 				"stage_name":           "Source",
 				"stage_status":         "Succeeded",
@@ -978,7 +958,6 @@ func fixtureRolePolicies() []resource.Resource {
 		{
 			ID:     "arn:aws:iam::aws:policy/ReadOnlyAccess",
 			Name:   "ReadOnlyAccess",
-			Status: "",
 			Fields: map[string]string{
 				"policy_name": "ReadOnlyAccess",
 				"policy_arn":  "arn:aws:iam::aws:policy/ReadOnlyAccess",
@@ -988,7 +967,6 @@ func fixtureRolePolicies() []resource.Resource {
 		{
 			ID:     "my-inline-policy",
 			Name:   "my-inline-policy",
-			Status: "terminated",
 			Fields: map[string]string{
 				"policy_name": "my-inline-policy",
 				"policy_arn":  "",
@@ -1040,7 +1018,6 @@ func fixtureIAMGroupMembers() []resource.Resource {
 		{
 			ID:     "alice",
 			Name:   "alice",
-			Status: "",
 			Fields: map[string]string{
 				"user_name":          "alice",
 				"user_id":            "AIDAEXAMPLE1111111111",
@@ -1093,7 +1070,6 @@ func fixtureELBListenerRules() []resource.Resource {
 		{
 			ID:     "arn:rule/1",
 			Name:   "100",
-			Status: "",
 			Fields: map[string]string{
 				"priority":           "100",
 				"conditions_summary": "path: /api/*",
@@ -1254,7 +1230,6 @@ func fixtureEbRuleTargets() []resource.Resource {
 		{
 			ID:     "lambda-target-1",
 			Name:   "lambda-target-1",
-			Status: "",
 			Fields: map[string]string{
 				"target_id":          "lambda-target-1",
 				"target_arn":         "arn:aws:lambda:us-east-1:123456789012:function:data-pipeline-daily",
@@ -1266,7 +1241,6 @@ func fixtureEbRuleTargets() []resource.Resource {
 		{
 			ID:     "sqs-target-2",
 			Name:   "sqs-target-2",
-			Status: "",
 			Fields: map[string]string{
 				"target_id":          "sqs-target-2",
 				"target_arn":         "arn:aws:sqs:us-east-1:123456789012:processing-queue",
@@ -1320,7 +1294,6 @@ func fixtureGlueRuns() []resource.Resource {
 		{
 			ID:     "jr_abc12345-6789-0abc-def0-123456789012",
 			Name:   "2024-08-10 14:30",
-			Status: "SUCCEEDED",
 			Fields: map[string]string{
 				"run_id_short":         "jr_abc12",
 				"job_run_state":        "SUCCEEDED",

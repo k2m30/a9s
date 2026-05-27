@@ -45,17 +45,15 @@ func (m *backupPlanListMock) ListBackupPlans(_ context.Context, _ *backup.ListBa
 // TestBackup_Fetcher_HealthyPlan_StatusIsEmpty verifies that every plan
 // returned by the fetcher has Status == "" and Issues == nil/empty.
 // Spec §3.1: "No Wave 1 signals" — the list API is config-only.
-func TestBackup_Fetcher_HealthyPlan_StatusIsEmpty(t *testing.T) {
+func TestBackup_Fetcher_HealthyPlan_NoWave1Findings(t *testing.T) {
 	fake := fakes.NewBackup()
 	resources, err := awsclient.FetchBackupPlans(context.Background(), fake)
 	require.NoError(t, err)
 	require.NotEmpty(t, resources)
 
 	for _, r := range resources {
-		require.Empty(t, r.Status,
-			"Resource.Status must be empty for plan %s — spec §3.1: no Wave-1 signals", r.ID)
-		require.Empty(t, r.Issues,
-			"Resource.Issues must be empty for plan %s — spec §3.1: no Wave-1 signals", r.ID)
+		require.Empty(t, r.Findings,
+			"Resource.Findings must be empty for plan %s — spec §3.1: no Wave-1 signals", r.ID)
 	}
 }
 
@@ -78,10 +76,8 @@ func TestBackup_Fetcher_NeverRanPlan_IsHealthy(t *testing.T) {
 			continue
 		}
 		found = true
-		require.Empty(t, r.Status,
-			"plan-never-ran must have empty Status (Healthy — spec §4)")
-		require.Empty(t, r.Issues,
-			"plan-never-ran must have empty Issues (spec §3.1 Wave-1 silent)")
+		require.Empty(t, r.Findings,
+			"plan-never-ran must have no Findings (Healthy — spec §4, no Wave-1 signals §3.1)")
 		require.Empty(t, r.Fields["last_execution"],
 			"plan-never-ran must have empty last_execution field (LastExecutionDate is nil)")
 	}
@@ -108,8 +104,7 @@ func TestBackup_Fetcher_MapsHealthyPlanFields(t *testing.T) {
 
 		require.Equal(t, fixtures.HealthyDailyPlanID, r.ID, "Resource.ID mismatch")
 		require.Equal(t, "acme-daily-backup", r.Name, "Resource.Name mismatch")
-		require.Empty(t, r.Status, "Resource.Status must be empty (fetcher silence §3.1)")
-		require.Empty(t, r.Issues, "Resource.Issues must be empty (no Wave-1 signals §3.1)")
+		require.Empty(t, r.Findings, "Resource.Findings must be empty (fetcher silence §3.1)")
 
 		require.Equal(t, "acme-daily-backup", r.Fields["plan_name"],
 			"Fields[plan_name] mismatch")
@@ -148,8 +143,8 @@ func TestBackup_Fetcher_ResourceIssuesEmptyForAllFixtures(t *testing.T) {
 		"expected 8 fixture plans (impl-plan §2); update this count if fixtures change")
 
 	for _, r := range resources {
-		require.Empty(t, r.Issues,
-			"Resource.Issues must be empty for plan %s (%s) — spec §3.1 declares no Wave-1 signals",
+		require.Empty(t, r.Findings,
+			"Resource.Findings must be empty for plan %s (%s) — spec §3.1 declares no Wave-1 signals",
 			r.ID, r.Name)
 	}
 }

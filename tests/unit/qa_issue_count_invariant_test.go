@@ -168,9 +168,9 @@ func unionSize(resources []resource.Resource, findings map[string]domain.Finding
 func TestUnifiedIssueCount_NeverExceedsUnionSize(t *testing.T) {
 	t.Run("disjoint Wave-1 and Wave-2 findings on different IDs — count never exceeds 5", func(t *testing.T) {
 		resources := []resource.Resource{
-			{ID: "i-001", Name: "s1", Status: "stopped", Fields: map[string]string{"name": "s1", "state": "stopped"}},
-			{ID: "i-002", Name: "s2", Status: "stopped", Fields: map[string]string{"name": "s2", "state": "stopped"}},
-			{ID: "i-003", Name: "s3", Status: "stopped", Fields: map[string]string{"name": "s3", "state": "stopped"}},
+			{ID: "i-001", Name: "s1", Fields: map[string]string{"name": "s1", "state": "stopped"}},
+			{ID: "i-002", Name: "s2", Fields: map[string]string{"name": "s2", "state": "stopped"}},
+			{ID: "i-003", Name: "s3", Fields: map[string]string{"name": "s3", "state": "stopped"}},
 		}
 		findings := map[string]domain.Finding{
 			"vol-aaa": {Code: "ebs.volume.degraded", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ebs"},
@@ -195,9 +195,9 @@ func TestUnifiedIssueCount_NeverExceedsUnionSize(t *testing.T) {
 
 	t.Run("fully overlapping — same 3 IDs in Wave-1 and Wave-2 → count must be 3 not 6", func(t *testing.T) {
 		resources := []resource.Resource{
-			{ID: "i-aaa", Name: "server-a", Status: "stopped", Fields: map[string]string{"name": "server-a", "state": "stopped"}},
-			{ID: "i-bbb", Name: "server-b", Status: "stopped", Fields: map[string]string{"name": "server-b", "state": "stopped"}},
-			{ID: "i-ccc", Name: "server-c", Status: "stopped", Fields: map[string]string{"name": "server-c", "state": "stopped"}},
+			{ID: "i-aaa", Name: "server-a", Fields: map[string]string{"name": "server-a", "state": "stopped"}},
+			{ID: "i-bbb", Name: "server-b", Fields: map[string]string{"name": "server-b", "state": "stopped"}},
+			{ID: "i-ccc", Name: "server-c", Fields: map[string]string{"name": "server-c", "state": "stopped"}},
 		}
 		findings := map[string]domain.Finding{
 			"i-aaa": {Code: "ec2.system.status.impaired", Phrase: "status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
@@ -222,11 +222,11 @@ func TestUnifiedIssueCount_NeverExceedsUnionSize(t *testing.T) {
 
 	t.Run("Wave-2 only — all resources healthy + 2 findings → count never exceeds 2", func(t *testing.T) {
 		resources := []resource.Resource{
-			{ID: "i-r01", Name: "healthy-1", Status: "running", Fields: map[string]string{"name": "healthy-1", "state": "running"}},
-			{ID: "i-r02", Name: "healthy-2", Status: "running", Fields: map[string]string{"name": "healthy-2", "state": "running"}},
-			{ID: "i-r03", Name: "healthy-3", Status: "running", Fields: map[string]string{"name": "healthy-3", "state": "running"}},
-			{ID: "i-r04", Name: "healthy-4", Status: "running", Fields: map[string]string{"name": "healthy-4", "state": "running"}},
-			{ID: "i-r05", Name: "healthy-5", Status: "running", Fields: map[string]string{"name": "healthy-5", "state": "running"}},
+			{ID: "i-r01", Name: "healthy-1", Fields: map[string]string{"name": "healthy-1", "state": "running"}},
+			{ID: "i-r02", Name: "healthy-2", Fields: map[string]string{"name": "healthy-2", "state": "running"}},
+			{ID: "i-r03", Name: "healthy-3", Fields: map[string]string{"name": "healthy-3", "state": "running"}},
+			{ID: "i-r04", Name: "healthy-4", Fields: map[string]string{"name": "healthy-4", "state": "running"}},
+			{ID: "i-r05", Name: "healthy-5", Fields: map[string]string{"name": "healthy-5", "state": "running"}},
 		}
 		findings := map[string]domain.Finding{
 			"i-r01": {Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
@@ -250,8 +250,8 @@ func TestUnifiedIssueCount_NeverExceedsUnionSize(t *testing.T) {
 		// 2 healthy resources visible in this page; 5 findings whose IDs are not in the list.
 		// The enrichIC passed by the production code is the true distinct union count.
 		resources := []resource.Resource{
-			{ID: "i-p01", Name: "page-instance-1", Status: "running", Fields: map[string]string{"name": "page-instance-1", "state": "running"}},
-			{ID: "i-p02", Name: "page-instance-2", Status: "running", Fields: map[string]string{"name": "page-instance-2", "state": "running"}},
+			{ID: "i-p01", Name: "page-instance-1", Fields: map[string]string{"name": "page-instance-1", "state": "running"}},
+			{ID: "i-p02", Name: "page-instance-2", Fields: map[string]string{"name": "page-instance-2", "state": "running"}},
 		}
 		findings := map[string]domain.Finding{
 			"i-x01": {Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},

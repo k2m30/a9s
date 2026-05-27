@@ -171,7 +171,6 @@ func TestColorRefactor_EC2Color_ImpairedPromotion(t *testing.T) {
 			r := resource.Resource{
 				ID:     "i-0abc1234567",
 				Name:   "test-instance",
-				Status: tc.fields["state"],
 				Fields: tc.fields,
 			}
 			got := td.Color(r)
@@ -260,7 +259,6 @@ func TestColorRefactor_EC2CellDecorator_StateParity(t *testing.T) {
 			r := resource.Resource{
 				ID:     "i-0abc1234567",
 				Name:   "test-instance",
-				Status: "running",
 				Fields: tc.fields,
 			}
 			got := dec(r, tc.value)

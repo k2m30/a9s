@@ -33,7 +33,6 @@ func TestQa67_C1_NilOptionalFields_ListRenderDoesNotPanic(t *testing.T) {
 		{
 			ID:     "i-niltest01",
 			Name:   "",
-			Status: "running",
 			Fields: map[string]string{
 				"instance_id": "i-niltest01",
 				"name":        "",
@@ -75,7 +74,6 @@ func TestQa67_C1_NilFields_AllResourceTypes(t *testing.T) {
 			empty := resource.Resource{
 				ID:     "empty-resource-id",
 				Name:   "",
-				Status: "",
 				Fields: map[string]string{},
 			}
 			// Must not panic
@@ -102,7 +100,6 @@ func TestQa67_C2_EmptyID_RowStillRendersAndSelectable(t *testing.T) {
 		{
 			ID:     "",
 			Name:   "",
-			Status: "running",
 			Fields: map[string]string{
 				"instance_id": "",
 				"name":        "",
@@ -117,7 +114,6 @@ func TestQa67_C2_EmptyID_RowStillRendersAndSelectable(t *testing.T) {
 		{
 			ID:     "i-normal",
 			Name:   "normal-instance",
-			Status: "running",
 			Fields: map[string]string{
 				"instance_id": "i-normal",
 				"name":        "normal-instance",
@@ -151,7 +147,6 @@ func TestQa67_C3_UnknownEnum_RendersAsPlainText(t *testing.T) {
 		{
 			ID:     "i-unknown-state",
 			Name:   "unusual-instance",
-			Status: "hibernating", // not a known EC2 state
 			Fields: map[string]string{
 				"instance_id": "i-unknown-state",
 				"name":        "unusual-instance",
@@ -185,7 +180,6 @@ func TestQa67_C4_MalformedARN_RendersWithoutPanic(t *testing.T) {
 		{
 			ID:     malformedARN,
 			Name:   "malformed-arn-secret",
-			Status: "active",
 			Fields: map[string]string{
 				"name":               "malformed-arn-secret",
 				"arn":                malformedARN,
@@ -226,7 +220,6 @@ func TestQa67_C5_UnicodeNames_DoNotCorruptLayout(t *testing.T) {
 		resources = append(resources, resource.Resource{
 			ID:     u.id,
 			Name:   u.name,
-			Status: "running",
 			Fields: map[string]string{
 				"instance_id": u.id,
 				"name":        u.name,
@@ -258,7 +251,6 @@ func TestQa67_C6_ZeroTimestamp_DoesNotPanic(t *testing.T) {
 		{
 			ID:     "i-zero-time",
 			Name:   "zero-time-instance",
-			Status: "running",
 			Fields: map[string]string{
 				"instance_id": "i-zero-time",
 				"name":        "zero-time-instance",
@@ -285,7 +277,6 @@ func TestQa67_C7_AllNilOptionalFields_DetailViewNoPanic(t *testing.T) {
 	res := &resource.Resource{
 		ID:        "i-all-nil",
 		Name:      "all-nil-instance",
-		Status:    "stopped",
 		Fields:    map[string]string{},
 		RawStruct: nil,
 	}
@@ -312,7 +303,6 @@ func TestQa67_C8_LongTagValue_DoesNotBreakListLayout(t *testing.T) {
 		{
 			ID:     "i-long-tag",
 			Name:   "long-tag-instance",
-			Status: "running",
 			Fields: map[string]string{
 				"instance_id": "i-long-tag",
 				"name":        "long-tag-instance",
@@ -341,7 +331,6 @@ func TestQa67_C9_AllNilFields_DetailViewRendersAvailableFields(t *testing.T) {
 	res := &resource.Resource{
 		ID:     "minimal-resource",
 		Name:   "minimal",
-		Status: "available",
 		Fields: map[string]string{
 			"db_identifier":  "minimal-resource",
 			"engine":         "mysql",
@@ -369,7 +358,6 @@ func TestQa67_C9_AllNilFields_YAMLViewNoPanic(t *testing.T) {
 	res := &resource.Resource{
 		ID:        "yaml-nil-resource",
 		Name:      "yaml-nil",
-		Status:    "available",
 		Fields:    map[string]string{},
 		RawStruct: nil,
 	}

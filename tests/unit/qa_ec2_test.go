@@ -205,7 +205,6 @@ func TestQA_EC2_A4_StatusColoring_StoppedRowHasANSI(t *testing.T) {
 	stoppedInstance := resource.Resource{
 		ID:     "i-stopped123",
 		Name:   "stopped-instance",
-		Status: "stopped",
 		Fields: map[string]string{
 			"name":  "stopped-instance",
 			"state": "stopped",
@@ -996,7 +995,6 @@ func TestQA_EC2_C3_SyntaxColoring_KeysVsValues(t *testing.T) {
 	r := resource.Resource{
 		ID:     "i-colortest",
 		Name:   "colortest",
-		Status: "running",
 		Fields: map[string]string{
 			"instance_id": "i-colortest",
 			"state":       "running",
@@ -1071,7 +1069,6 @@ func TestQA_EC2_YAML_FieldsMapRendersCorrectly(t *testing.T) {
 	r := resource.Resource{
 		ID:     "i-test123",
 		Name:   "test-instance",
-		Status: "running",
 		Fields: map[string]string{
 			"instance_id": "i-test123",
 			"state":       "running",
@@ -1303,7 +1300,7 @@ func TestQA_EC2_FilterResources_CaseInsensitive(t *testing.T) {
 	result := views.FilterResources("RUNNING", instances)
 	runningCount := 0
 	for _, inst := range instances {
-		if inst.Status == "running" {
+		if inst.Fields["state"] == "running" {
 			runningCount++
 		}
 	}

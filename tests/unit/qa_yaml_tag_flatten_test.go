@@ -282,7 +282,6 @@ func TestYAMLView_TagListFlattened(t *testing.T) {
 	res := resource.Resource{
 		ID:        "snapshot-2024-01-15",
 		Name:      "snapshot-2024-01-15",
-		Status:    "available",
 		Fields:    map[string]string{},
 		RawStruct: snap,
 	}

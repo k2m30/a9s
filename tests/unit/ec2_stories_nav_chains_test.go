@@ -69,13 +69,13 @@ func newChainDemoModel(t *testing.T) tui.Model {
 // forward navigations (VpcId, SubnetId, GroupId) resolve to existing fixtures.
 func ec2TestResource() resource.Resource {
 	return resource.Resource{
-		ID:     "i-0a1b2c3d4e5f60001",
-		Name:   "web-prod-01",
-		Status: "running",
+		ID:   "i-0a1b2c3d4e5f60001",
+		Name: "web-prod-01",
 		Fields: map[string]string{
 			"instance_id": "i-0a1b2c3d4e5f60001",
 			"name":        "web-prod-01",
 			"state":       "running",
+			"status":      "running",
 			"type":        "t3.large",
 			"private_ip":  "10.0.1.10",
 			"public_ip":   "54.210.33.112",
@@ -129,12 +129,12 @@ func TestEC2_027_ASG_Count1_OpensChildView(t *testing.T) {
 	m = chainNavigateToEC2Detail(t, m)
 
 	asgRes := resource.Resource{
-		ID:     "web-prod-asg",
-		Name:   "web-prod-asg",
-		Status: "InService",
+		ID:   "web-prod-asg",
+		Name: "web-prod-asg",
 		Fields: map[string]string{
 			"name":             "web-prod-asg",
 			"asg_name":         "web-prod-asg",
+			"status":           "InService",
 			"min_size":         "2",
 			"max_size":         "10",
 			"desired_capacity": "3",
@@ -179,13 +179,13 @@ func TestEC2_028_EIP_Count1_OpensDetail(t *testing.T) {
 	m = chainNavigateToEC2Detail(t, m)
 
 	eipRes := resource.Resource{
-		ID:     "eipalloc-0abc123def456789a",
-		Name:   "web-prod-eip",
-		Status: "associated",
+		ID:   "eipalloc-0abc123def456789a",
+		Name: "web-prod-eip",
 		Fields: map[string]string{
 			"allocation_id": "eipalloc-0abc123def456789a",
 			"public_ip":     "54.210.33.112",
 			"instance_id":   "i-0a1b2c3d4e5f60001",
+			"status":        "associated",
 		},
 	}
 	m = chainPreloadResources(m, "eip", []resource.Resource{eipRes})
@@ -220,8 +220,8 @@ func TestEC2_030_EnterOnAlarmInFilteredList(t *testing.T) {
 	m = chainNavigateToEC2Detail(t, m)
 
 	alarms := []resource.Resource{
-		{ID: "web-prod-cpu-high", Name: "web-prod-cpu-high", Status: "ALARM"},
-		{ID: "web-prod-status-check", Name: "web-prod-status-check", Status: "OK"},
+		{ID: "web-prod-cpu-high", Name: "web-prod-cpu-high", Fields: map[string]string{"status": "ALARM"}},
+		{ID: "web-prod-status-check", Name: "web-prod-status-check", Fields: map[string]string{"status": "OK"}},
 	}
 	m = chainPreloadResources(m, "alarm", alarms)
 
@@ -255,8 +255,8 @@ func TestEC2_031_EscFromAlarmDetail_ReturnsToFilteredList(t *testing.T) {
 	m = chainNavigateToEC2Detail(t, m)
 
 	alarms := []resource.Resource{
-		{ID: "web-prod-cpu-high", Name: "web-prod-cpu-high", Status: "ALARM"},
-		{ID: "web-prod-status-check", Name: "web-prod-status-check", Status: "OK"},
+		{ID: "web-prod-cpu-high", Name: "web-prod-cpu-high", Fields: map[string]string{"status": "ALARM"}},
+		{ID: "web-prod-status-check", Name: "web-prod-status-check", Fields: map[string]string{"status": "OK"}},
 	}
 	m = chainPreloadResources(m, "alarm", alarms)
 
@@ -302,8 +302,8 @@ func TestEC2_032_EscFromFilteredList_ReturnsToEC2Detail(t *testing.T) {
 	m = chainNavigateToEC2Detail(t, m)
 
 	alarms := []resource.Resource{
-		{ID: "web-prod-cpu-high", Name: "web-prod-cpu-high", Status: "ALARM"},
-		{ID: "web-prod-status-check", Name: "web-prod-status-check", Status: "OK"},
+		{ID: "web-prod-cpu-high", Name: "web-prod-cpu-high", Fields: map[string]string{"status": "ALARM"}},
+		{ID: "web-prod-status-check", Name: "web-prod-status-check", Fields: map[string]string{"status": "OK"}},
 	}
 	m = chainPreloadResources(m, "alarm", alarms)
 
@@ -343,9 +343,9 @@ func TestEC2_034_EBSSnapshots_MultiHop(t *testing.T) {
 	m = chainNavigateToEC2Detail(t, m)
 
 	snaps := []resource.Resource{
-		{ID: "snap-0aaa111111111111a", Name: "snap-web-prod-root", Status: "completed"},
-		{ID: "snap-0bbb222222222222b", Name: "snap-web-prod-data", Status: "completed"},
-		{ID: "snap-unrelated-zzz999", Name: "snap-other-server", Status: "completed"},
+		{ID: "snap-0aaa111111111111a", Name: "snap-web-prod-root", Fields: map[string]string{"status": "completed"}},
+		{ID: "snap-0bbb222222222222b", Name: "snap-web-prod-data", Fields: map[string]string{"status": "completed"}},
+		{ID: "snap-unrelated-zzz999", Name: "snap-other-server", Fields: map[string]string{"status": "completed"}},
 	}
 	m = chainPreloadResources(m, "ebs-snap", snaps)
 
@@ -380,13 +380,13 @@ func TestEC2_035_ChainA_EC2ToVPCAndBack(t *testing.T) {
 	m = chainNavigateToEC2Detail(t, m)
 
 	vpcRes := resource.Resource{
-		ID:     "vpc-0abc123def456789a",
-		Name:   "production-vpc",
-		Status: "available",
+		ID:   "vpc-0abc123def456789a",
+		Name: "production-vpc",
 		Fields: map[string]string{
 			"vpc_id":     "vpc-0abc123def456789a",
 			"cidr_block": "10.0.0.0/16",
 			"state":      "available",
+			"status":     "available",
 		},
 	}
 	m = chainPreloadResources(m, "vpc", []resource.Resource{vpcRes})
@@ -421,12 +421,12 @@ func TestEC2_036_ChainB_EC2ToSubnetAndBack(t *testing.T) {
 	m = chainNavigateToEC2Detail(t, m)
 
 	subnetRes := resource.Resource{
-		ID:     "subnet-0aaa111111111111a",
-		Name:   "public-a",
-		Status: "available",
+		ID:   "subnet-0aaa111111111111a",
+		Name: "public-a",
 		Fields: map[string]string{
 			"subnet_id": "subnet-0aaa111111111111a",
 			"vpc_id":    "vpc-0abc123def456789a",
+			"status":    "available",
 			"az":        "us-east-1a",
 		},
 	}
@@ -462,13 +462,13 @@ func TestEC2_037_ChainC_EC2ToSGAndBack(t *testing.T) {
 	m = chainNavigateToEC2Detail(t, m)
 
 	sgRes := resource.Resource{
-		ID:     "sg-0aaa111111111111a",
-		Name:   "acme-web-alb-sg",
-		Status: "active",
+		ID:   "sg-0aaa111111111111a",
+		Name: "acme-web-alb-sg",
 		Fields: map[string]string{
 			"group_id":   "sg-0aaa111111111111a",
 			"group_name": "acme-web-alb-sg",
 			"vpc_id":     "vpc-0abc123def456789a",
+			"status":     "active",
 		},
 	}
 	m = chainPreloadResources(m, "sg", []resource.Resource{sgRes})
@@ -504,14 +504,14 @@ func TestEC2_038_ChainD_EC2TabToTGAndBack(t *testing.T) {
 	m = chainNavigateToEC2Detail(t, m)
 
 	tgRes := resource.Resource{
-		ID:     "tg-web-prod",
-		Name:   "web-prod-tg",
-		Status: "active",
+		ID:   "tg-web-prod",
+		Name: "web-prod-tg",
 		Fields: map[string]string{
 			"name":             "web-prod-tg",
 			"target_group_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/web-prod-tg/abc123",
 			"port":             "80",
 			"protocol":         "HTTP",
+			"status":           "active",
 		},
 	}
 	m = chainPreloadResources(m, "tg", []resource.Resource{tgRes})
@@ -559,9 +559,9 @@ func TestEC2_039_ChainE_EC2ToAlarmListToDetailAndBackx2(t *testing.T) {
 	m = chainNavigateToEC2Detail(t, m)
 
 	alarms := []resource.Resource{
-		{ID: "alarm-ec2039-cpu", Name: "web-prod-cpu-high", Status: "ALARM"},
-		{ID: "alarm-ec2039-status", Name: "web-prod-status-check", Status: "OK"},
-		{ID: "alarm-ec2039-unrelated", Name: "other-server-alarm", Status: "OK"},
+		{ID: "alarm-ec2039-cpu", Name: "web-prod-cpu-high", Fields: map[string]string{"status": "ALARM"}},
+		{ID: "alarm-ec2039-status", Name: "web-prod-status-check", Fields: map[string]string{"status": "OK"}},
+		{ID: "alarm-ec2039-unrelated", Name: "other-server-alarm", Fields: map[string]string{"status": "OK"}},
 	}
 	m = chainPreloadResources(m, "alarm", alarms)
 
@@ -638,12 +638,11 @@ func TestEC2_040_ChainF_Depth6_EC2ToVPCToSubnetAndBack(t *testing.T) {
 	vpcRes := resource.Resource{
 		ID:     "vpc-0abc123def456789a",
 		Name:   "production-vpc",
-		Status: "available",
-		Fields: map[string]string{"vpc_id": "vpc-0abc123def456789a"},
+		Fields: map[string]string{"vpc_id": "vpc-0abc123def456789a", "status": "available"},
 	}
 	subnets := []resource.Resource{
-		{ID: "subnet-0aaa111111111111a", Name: "public-a", Status: "available"},
-		{ID: "subnet-0bbb222222222222b", Name: "public-b", Status: "available"},
+		{ID: "subnet-0aaa111111111111a", Name: "public-a", Fields: map[string]string{"status": "available"}},
+		{ID: "subnet-0bbb222222222222b", Name: "public-b", Fields: map[string]string{"status": "available"}},
 	}
 	m = chainPreloadResources(m, "vpc", []resource.Resource{vpcRes})
 	m = chainPreloadResources(m, "subnet", subnets)
@@ -716,8 +715,7 @@ func TestEC2_041_ChainG_MixedLeftAndRight(t *testing.T) {
 	sgRes := resource.Resource{
 		ID:     "sg-0aaa111111111111a",
 		Name:   "acme-web-alb-sg",
-		Status: "active",
-		Fields: map[string]string{"group_id": "sg-0aaa111111111111a"},
+		Fields: map[string]string{"group_id": "sg-0aaa111111111111a", "status": "active"},
 	}
 	m = chainPreloadResources(m, "sg", []resource.Resource{sgRes})
 
@@ -836,13 +834,13 @@ func TestEC2_046_DepthIndicator(t *testing.T) {
 	})
 
 	// depth 4: VPC detail
-	vpcRes := resource.Resource{ID: "vpc-depth4", Name: "vpc-depth4", Status: "available"}
+	vpcRes := resource.Resource{ID: "vpc-depth4", Name: "vpc-depth4", Fields: map[string]string{"status": "available"}}
 	m = chainPreloadResources(m, "vpc", []resource.Resource{vpcRes})
 	m, _ = chainApplyMsg(m, messages.RelatedNavigate{TargetType: "vpc", TargetID: "vpc-depth4"})
 
 	// depth 5: Subnet list
 	subnets := []resource.Resource{
-		{ID: "subnet-depth5a", Name: "depth5-subnet", Status: "available"},
+		{ID: "subnet-depth5a", Name: "depth5-subnet", Fields: map[string]string{"status": "available"}},
 	}
 	m = chainPreloadResources(m, "subnet", subnets)
 	m, _ = chainApplyMsg(m, messages.RelatedNavigate{
@@ -897,8 +895,8 @@ func TestEC2_058_CloudTrailPreFiltered(t *testing.T) {
 	// Since no CloudTrail resource type exists yet, this navigates to "cloudtrail"
 	// and the expectation is that the view contains the pre-filter query.
 	cloudtrailEvents := []resource.Resource{
-		{ID: "event-001", Name: "RunInstances", Status: "Success",
-			Fields: map[string]string{"resource_name": "i-0a1b2c3d4e5f60001"}},
+		{ID: "event-001", Name: "RunInstances",
+			Fields: map[string]string{"resource_name": "i-0a1b2c3d4e5f60001", "status": "Success"}},
 	}
 	m = chainPreloadResources(m, "cloudtrail", cloudtrailEvents)
 

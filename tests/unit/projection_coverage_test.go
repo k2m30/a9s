@@ -23,9 +23,8 @@ import (
 // an ID row.
 func minimalResource(shortName string) domain.Resource {
 	return domain.Resource{
-		ID:     shortName + "-fixture-id",
-		Name:   shortName + "-fixture-name",
-		Status: "active",
+		ID:   shortName + "-fixture-id",
+		Name: shortName + "-fixture-name",
 		Fields: map[string]string{
 			"id":     shortName + "-fixture-id",
 			"name":   shortName + "-fixture-name",
