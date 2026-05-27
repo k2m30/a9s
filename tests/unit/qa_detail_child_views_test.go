@@ -569,7 +569,6 @@ func TestCfnResourcesDetailViewContainsExpectedFields(t *testing.T) {
 		"logical_resource_id":  "MyBucket",
 		"physical_resource_id": "my-stack-mybucket-abc123",
 		"resource_type":        "AWS::S3::Bucket",
-		"resource_status":      "CREATE_COMPLETE",
 		"drift_status":         "IN_SYNC",
 		"last_updated":         "2024-03-22 10:00",
 	}
@@ -680,8 +679,8 @@ func TestAlarmHistoryDetailViewContainsExpectedFields(t *testing.T) {
 		Timestamp:       &ts,
 	}
 	res := buildResource("2024-03-22 10:00", "2024-03-22 10:00", item)
-	res.Status = "StateUpdate"
 	res.Fields = map[string]string{
+		"status":            "StateUpdate",
 		"timestamp":         "2024-03-22 10:00",
 		"history_item_type": "StateUpdate",
 		"history_summary":   "Alarm updated from OK to ALARM",
@@ -793,7 +792,6 @@ func TestQA_Detail_SFNExecutions_ViewContainsExpectedFields(t *testing.T) {
 		StateMachineVersionArn: new("arn:aws:states:us-east-1:123456789012:stateMachine:my-state-machine:1"),
 	}
 	res := buildResource("exec-001", "exec-001", item)
-	res.Status = "SUCCEEDED"
 	res.Fields = map[string]string{
 		"execution_arn":             "arn:aws:states:us-east-1:123456789012:execution:my-state-machine:exec-001",
 		"name":                      "exec-001",
@@ -858,8 +856,8 @@ func TestQA_Detail_SFNExecutionHistory_ViewContainsExpectedFields(t *testing.T) 
 		},
 	}
 	res := buildResource("1", "Task State Entered", event)
-	res.Status = "pending"
 	res.Fields = map[string]string{
+		"status":            "pending",
 		"timestamp":         "2024-06-15 10:00",
 		"event_type":        "TaskStateEntered",
 		"event_type_short":  "Task State Entered",
@@ -900,8 +898,8 @@ func TestQA_Detail_SFNExecutionHistory_FailedEvent(t *testing.T) {
 		},
 	}
 	res := buildResource("5", "Task Failed", event)
-	res.Status = "failed"
 	res.Fields = map[string]string{
+		"status":            "failed",
 		"timestamp":         "2024-06-15 10:00",
 		"event_type":        "TaskFailed",
 		"event_type_short":  "Task Failed",
@@ -965,7 +963,6 @@ func TestQA_Detail_CBBuilds_ViewContainsExpectedFields(t *testing.T) {
 		},
 	}
 	res := buildResource("my-project:build-id-001", "#142", build)
-	res.Status = "SUCCEEDED"
 	res.Fields = map[string]string{
 		"build_number":            "142",
 		"build_status":            "SUCCEEDED",
@@ -1026,8 +1023,8 @@ func TestQA_Detail_CBBuildLogs_ViewContainsExpectedFields(t *testing.T) {
 		"[Container] Running command echo hello",
 		ev,
 	)
-	res.Status = "IN_PROGRESS"
 	res.Fields = map[string]string{
+		"status":            "IN_PROGRESS",
 		"timestamp":      "2024-06-15 10:00",
 		"message":        "[Container] Running command echo hello",
 		"ingestion_time": "2024-06-15 10:00",
@@ -1084,7 +1081,6 @@ func TestQA_Detail_ECRImages_ViewContainsExpectedFields(t *testing.T) {
 		},
 	}
 	res := buildResource("sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890", "latest, v1.0.0", img)
-	res.Status = ""
 	res.Fields = map[string]string{
 		"image_tags":     "latest, v1.0.0",
 		"digest_short":   "abcdef123456",
@@ -1143,10 +1139,8 @@ func TestQA_Detail_PipelineStages_ViewContainsExpectedFields(t *testing.T) {
 		RevisionSummary:  "commit-sha-abc",
 	}
 	res := buildResource("Source/GitHub", "GitHub", row)
-	res.Status = "running"
 	res.Fields = map[string]string{
 		"stage_name":           "Source",
-		"stage_status":         "Succeeded",
 		"action_name":          "GitHub",
 		"action_status":        "Succeeded",
 		"last_change_time":     "2024-06-15 10:00",
@@ -1196,8 +1190,8 @@ func TestQA_Detail_RolePolicies_ViewContainsExpectedFields(t *testing.T) {
 		PolicyType: "Managed",
 	}
 	res := buildResource("arn:aws:iam::aws:policy/ReadOnlyAccess", "ReadOnlyAccess", row)
-	res.Status = ""
 	res.Fields = map[string]string{
+		"status":            "",
 		"policy_name": "ReadOnlyAccess",
 		"policy_arn":  "arn:aws:iam::aws:policy/ReadOnlyAccess",
 		"policy_type": "Managed",
@@ -1245,8 +1239,8 @@ func TestQA_Detail_IAMGroupMembers_ViewContainsExpectedFields(t *testing.T) {
 		CreateDate: &createDate,
 	}
 	res := buildResource("alice", "alice", user)
-	res.Status = ""
 	res.Fields = map[string]string{
+		"status":            "",
 		"user_name":          "alice",
 		"user_id":            "AIDAEXAMPLE1111111111",
 		"create_date":        "2024-03-15 09:30",
@@ -1305,8 +1299,8 @@ func TestQA_Detail_ELBListenerRules_ViewContainsExpectedFields(t *testing.T) {
 		IsDefault: new(false),
 	}
 	res := buildResource("arn:rule/1", "100", rule)
-	res.Status = ""
 	res.Fields = map[string]string{
+		"status":            "",
 		"priority":           "100",
 		"conditions_summary": "path: /api/*",
 		"action_type":        "forward",
@@ -1465,8 +1459,8 @@ func TestEbRuleTargetsDetailViewContainsExpectedFields(t *testing.T) {
 		Input:   new(`{"source":"eventbridge"}`),
 	}
 	res := buildResource("lambda-target-1", "lambda-target-1", target)
-	res.Status = ""
 	res.Fields = map[string]string{
+		"status":            "",
 		"target_id":          "lambda-target-1",
 		"target_arn":         "arn:aws:lambda:us-east-1:123456789012:function:data-pipeline-daily",
 		"role_arn":           "arn:aws:iam::123456789012:role/EventBridgeLambdaRole",
@@ -1520,8 +1514,8 @@ func TestGlueRunsDetailViewContainsExpectedFields(t *testing.T) {
 		DPUSeconds:    &dpuSec,
 	}
 	res := buildResource("jr_abc12345-6789-0abc-def0-123456789012", "2024-08-10 14:30", run)
-	res.Status = "SUCCEEDED"
 	res.Fields = map[string]string{
+		"status":            "SUCCEEDED",
 		"run_id_short":         "jr_abc12",
 		"job_run_state":        "SUCCEEDED",
 		"started_on":           "2024-08-10 14:30",

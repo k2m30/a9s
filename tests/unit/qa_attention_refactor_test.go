@@ -28,11 +28,11 @@ func attentionEC2TypeDef() resource.ResourceTypeDef {
 // attentionMixedResources returns a slice with running, stopped, and terminated resources.
 func attentionMixedResources() []resource.Resource {
 	return []resource.Resource{
-		{ID: "i-001", Name: "web-01", Status: "running"},
-		{ID: "i-002", Name: "web-02", Status: "stopped"},
-		{ID: "i-003", Name: "web-03", Status: "terminated"},
-		{ID: "i-004", Name: "api-01", Status: "running"},
-		{ID: "i-005", Name: "db-01", Status: "pending"},
+		{ID: "i-001", Name: "web-01"},
+		{ID: "i-002", Name: "web-02"},
+		{ID: "i-003", Name: "web-03"},
+		{ID: "i-004", Name: "api-01"},
+		{ID: "i-005", Name: "db-01"},
 	}
 }
 

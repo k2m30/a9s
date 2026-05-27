@@ -121,9 +121,8 @@ func (c *Core) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetched)
 		if c.session.ProbeResources == nil {
 			c.session.ProbeResources = make(map[string][]resource.Resource, len(msg.Resources))
 		}
-		for short, rows := range msg.Resources {
-			c.deriveFindingsForType(short, rows)
-		}
+		// Fetcher-emitted rows already carry Findings; no re-derive needed
+		// (W1.4b.3 dropped the legacy Status/Issues bridge).
 		maps.Copy(c.session.ProbeResources, msg.Resources)
 
 		if c.session.ProbeTruncated == nil {
@@ -192,7 +191,8 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 		if td := resource.FindResourceType(msg.ResourceType); td != nil {
 			canonType = td.ShortName
 		}
-		c.deriveFindingsForType(canonType, msg.Resources)
+		// Fetcher-emitted rows already carry Findings; no re-derive needed
+		// (W1.4b.3 dropped the legacy Status/Issues bridge).
 		c.session.ProbeResources[canonType] = msg.Resources
 		if c.session.ProbeTruncated == nil {
 			c.session.ProbeTruncated = make(map[string]bool)

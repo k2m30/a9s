@@ -64,13 +64,13 @@ func firstEC2Resource(t *testing.T) resource.Resource {
 	// The first demo EC2 instance is i-0a1b2c3d4e5f60001 / web-prod-01
 	// We construct it directly to avoid import cycle with demo package.
 	return resource.Resource{
-		ID:     "i-0a1b2c3d4e5f60001",
-		Name:   "web-prod-01",
-		Status: "running",
+		ID:   "i-0a1b2c3d4e5f60001",
+		Name: "web-prod-01",
 		Fields: map[string]string{
 			"instance_id": "i-0a1b2c3d4e5f60001",
 			"name":        "web-prod-01",
 			"state":       "running",
+			"status":      "running",
 			"type":        "t3.large",
 			"private_ip":  "10.0.1.10",
 			"public_ip":   "54.210.33.112",
@@ -170,10 +170,12 @@ func TestEC2_008_NavChain_RightCol_Count1_OpensDrillTarget(t *testing.T) {
 
 	// Pre-populate TG cache
 	tgRes := resource.Resource{
-		ID:     "tg-ec2chain-001",
-		Name:   "prod-api-tg",
-		Status: "active",
-		Fields: map[string]string{"target_group_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/prod-api-tg/abc123"},
+		ID:   "tg-ec2chain-001",
+		Name: "prod-api-tg",
+		Fields: map[string]string{
+			"target_group_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/prod-api-tg/abc123",
+			"status":           "active",
+		},
 	}
 	m, _ = navApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "tg",
@@ -225,9 +227,9 @@ func TestEC2_008_NavChain_RightCol_CountN_ShowsFilteredList(t *testing.T) {
 
 	// Pre-populate alarm cache with 3 alarms
 	alarmResources := []resource.Resource{
-		{ID: "alarm-chain-1", Name: "high-cpu", Status: "alarm"},
-		{ID: "alarm-chain-2", Name: "status-check", Status: "ok"},
-		{ID: "alarm-chain-3", Name: "irrelevant-alarm", Status: "ok"},
+		{ID: "alarm-chain-1", Name: "high-cpu", Fields: map[string]string{"status": "alarm"}},
+		{ID: "alarm-chain-2", Name: "status-check", Fields: map[string]string{"status": "ok"}},
+		{ID: "alarm-chain-3", Name: "irrelevant-alarm", Fields: map[string]string{"status": "ok"}},
 	}
 	m, _ = navApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "alarm",
@@ -272,7 +274,7 @@ func TestEC2_008_NavChain_EscReturnsToEC2Detail(t *testing.T) {
 		Resource:     &ec2Res,
 	})
 
-	vpcRes := resource.Resource{ID: "vpc-0abc123def456789a", Name: "prod-vpc", Status: "available"}
+	vpcRes := resource.Resource{ID: "vpc-0abc123def456789a", Name: "prod-vpc", Fields: map[string]string{"status": "available"}}
 	m, _ = navApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "vpc",
 		Resources:    []resource.Resource{vpcRes},

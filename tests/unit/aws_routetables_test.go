@@ -67,9 +67,6 @@ func TestFetchRouteTables_ParsesMultipleRouteTables(t *testing.T) {
 	if r0.Name != "main-rtb" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "main-rtb", r0.Name)
 	}
-	if r0.Status != "" {
-		t.Errorf("resource[0].Status: expected empty, got %q", r0.Status)
-	}
 	if len(r0.Findings) != 0 {
 		t.Errorf("resource[0].Findings: expected none for rtb (never emits), got %d", len(r0.Findings))
 	}
@@ -111,9 +108,6 @@ func TestFetchRouteTables_ParsesMultipleRouteTables(t *testing.T) {
 	}
 	if r1.Name != "" {
 		t.Errorf("resource[1].Name: expected empty string, got %q", r1.Name)
-	}
-	if r1.Status != "" {
-		t.Errorf("resource[1].Status: expected empty, got %q", r1.Status)
 	}
 	if r1.Fields["is_main"] != "false" {
 		t.Errorf("resource[1].Fields[\"is_main\"]: expected %q, got %q", "false", r1.Fields["is_main"])

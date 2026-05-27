@@ -55,8 +55,7 @@ func TestEnrichEFSMountTargets_HealthyRowWithDown(t *testing.T) {
 	// Simulate a healthy fetcher result (Status="", Issues=[]) for this FS.
 	// Only the Wave-2 enricher fires — the FS itself is available but MT-B is creating.
 	res := efsResources(fsID)
-	res[0].Status = ""
-	res[0].Issues = nil
+	res[0].Fields["status"] = ""
 
 	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res, nil)
 	if err != nil {
@@ -151,8 +150,7 @@ func TestEnrichEFSMountTargets_W1WarningPlusW2Bumps(t *testing.T) {
 
 	// Resource represents the fetcher output for this W1-Warning fixture.
 	res := efsResources(fsID)
-	res[0].Status = "updating"
-	res[0].Issues = []string{"updating"}
+	res[0].Fields["status"] = "updating"
 
 	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res, nil)
 	if err != nil {
@@ -204,8 +202,7 @@ func TestEnrichEFSMountTargets_AllHealthyMounts_NoFinding(t *testing.T) {
 	clients := &awsclient.ServiceClients{EFS: fake}
 
 	res := efsResources(fixtures.ProdEFSID)
-	res[0].Status = ""
-	res[0].Issues = nil
+	res[0].Fields["status"] = ""
 
 	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res, nil)
 	if err != nil {
@@ -355,8 +352,7 @@ func TestEnrichEFSMountTargets_IssueCount(t *testing.T) {
 	if len(res) < 2 {
 		t.Fatalf("efsResources returned %d resources, expected %d (one per ID)", len(res), len(findingFSIDs))
 	}
-	res[1].Status = "updating"
-	res[1].Issues = []string{"updating"}
+	res[1].Fields["status"] = "updating"
 
 	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res, nil)
 	if err != nil {
@@ -406,8 +402,7 @@ func TestEnrichEFSMountTargets_DetailContent_U7c(t *testing.T) {
 	clients := &awsclient.ServiceClients{EFS: fake}
 
 	res := efsResources(fsID)
-	res[0].Status = "updating"
-	res[0].Issues = []string{"updating"}
+	res[0].Fields["status"] = "updating"
 
 	result, err := awsclient.EnrichEFSMountTargets(context.Background(), clients, res, nil)
 	if err != nil {

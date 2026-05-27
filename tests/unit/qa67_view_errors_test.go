@@ -32,7 +32,7 @@ func TestQa67_I1_ClipboardUnavailable_ShowsErrorFlash(t *testing.T) {
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources: []resource.Resource{
-			{ID: "i-clip-test", Name: "clip-test", Status: "running", Fields: map[string]string{
+			{ID: "i-clip-test", Name: "clip-test", Fields: map[string]string{
 				"instance_id": "i-clip-test",
 				"name":        "clip-test",
 				"state":       "running",
@@ -75,7 +75,6 @@ func TestQa67_I2_RevealDeletedSecret_ShowsError(t *testing.T) {
 		{
 			ID:     "arn:aws:secretsmanager:us-east-1:123:secret:deleted-secret",
 			Name:   "deleted-secret",
-			Status: "active",
 			Fields: map[string]string{
 				"name":               "deleted-secret",
 				"arn":                "arn:aws:secretsmanager:us-east-1:123:secret:deleted-secret",
@@ -119,7 +118,6 @@ func TestQa67_I3_RevealSecretNoCurrentVersion_ShowsError(t *testing.T) {
 		{
 			ID:     "arn:aws:secretsmanager:us-east-1:123:secret:no-value-secret",
 			Name:   "no-value-secret",
-			Status: "active",
 			Fields: map[string]string{
 				"name":               "no-value-secret",
 				"arn":                "arn:aws:secretsmanager:us-east-1:123:secret:no-value-secret",
@@ -235,7 +233,6 @@ func TestQa67_I8_SortByStatus_ResourceTypeWithNoStatusColumn_NoCrash(t *testing.
 		{
 			ID:     "arn:aws:sns:us-east-1:123:topic-alpha",
 			Name:   "topic-alpha",
-			Status: "",
 			Fields: map[string]string{
 				"topic_name": "topic-alpha",
 				"topic_arn":  "arn:aws:sns:us-east-1:123:topic-alpha",
@@ -244,7 +241,6 @@ func TestQa67_I8_SortByStatus_ResourceTypeWithNoStatusColumn_NoCrash(t *testing.
 		{
 			ID:     "arn:aws:sns:us-east-1:123:topic-beta",
 			Name:   "topic-beta",
-			Status: "",
 			Fields: map[string]string{
 				"topic_name": "topic-beta",
 				"topic_arn":  "arn:aws:sns:us-east-1:123:topic-beta",
@@ -317,7 +313,6 @@ func TestQa67_I4_RevealHeaderWarning_PersistsVisible(t *testing.T) {
 		{
 			ID:     "arn:aws:secretsmanager:us-east-1:123:secret:prod/api/key",
 			Name:   "prod/api/key",
-			Status: "active",
 			Fields: map[string]string{
 				"name":               "prod/api/key",
 				"arn":                "arn:aws:secretsmanager:us-east-1:123:secret:prod/api/key",

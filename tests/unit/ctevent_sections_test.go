@@ -58,7 +58,6 @@ func minimalEvent() *ctevent.Event {
 		SourceIPAddress:    "10.0.0.1",
 		AccountID:          "111111111111",
 		RecipientAccountID: "111111111111",
-		Status:             "ct-info",
 		Verb:               "R",
 		UserIdentity: ctevent.UserIdentity{
 			Type: "AssumedRole",
@@ -274,7 +273,6 @@ func TestCTDetailBuildSections_NonNilReturn(t *testing.T) {
 		EventID:       "e-degenerate",
 		EventCategory: "Management",
 		EventType:     "AwsApiCall",
-		Status:        "ct-info",
 	}
 	sections := ctevent.BuildSections(event)
 	if sections == nil {
@@ -295,7 +293,6 @@ func TestCTDetailBuildSections_InsightOmitsActor(t *testing.T) {
 		AWSRegion:          "us-east-1",
 		AccountID:          "999999999999",
 		RecipientAccountID: "999999999999",
-		Status:             "ct-info",
 		Verb:               "R",
 		// No UserIdentity ARN → should produce no ACTOR
 		UserIdentity: ctevent.UserIdentity{},
@@ -337,7 +334,6 @@ func TestCTDetailBuildSections_AwsServiceEvent_ServiceRowInActor(t *testing.T) {
 		SourceIPAddress:    "AWS Internal",
 		AccountID:          "444444444444",
 		RecipientAccountID: "444444444444",
-		Status:             "ct-attention",
 		Verb:               "W",
 		UserIdentity: ctevent.UserIdentity{
 			Type:      "AWSService",
@@ -638,7 +634,6 @@ func TestCTDetailBuildSections_WireframeCases(t *testing.T) {
 				UserAgent:          "aws-sdk-go-v2/1.30.3",
 				AccountID:          "111111111111",
 				RecipientAccountID: "111111111111",
-				Status:             "ct-info",
 				Verb:               "R",
 				UserIdentity: ctevent.UserIdentity{
 					Type:        "AssumedRole",
@@ -672,7 +667,6 @@ func TestCTDetailBuildSections_WireframeCases(t *testing.T) {
 				UserAgent:          "Console (AWS Internal)",
 				AccountID:          "222222222222",
 				RecipientAccountID: "222222222222",
-				Status:             "ct-danger",
 				Verb:               "D",
 				UserIdentity: ctevent.UserIdentity{
 					Type:        "AssumedRole",
@@ -713,7 +707,6 @@ func TestCTDetailBuildSections_WireframeCases(t *testing.T) {
 				UserAgent:          "aws-cli/2.17.9 Python/3.12.4 Darwin/24.1.0",
 				AccountID:          "333333333333",
 				RecipientAccountID: "333333333333",
-				Status:             "ct-danger",
 				Verb:               "W",
 				ErrorCode:          "AccessDenied",
 				ErrorMessage:       "User: arn:aws:iam::333333333333:user/bob is not authorized to perform: s3:PutObject",
@@ -747,7 +740,6 @@ func TestCTDetailBuildSections_WireframeCases(t *testing.T) {
 				SourceIPAddress:    "AWS Internal",
 				AccountID:          "444444444444",
 				RecipientAccountID: "444444444444",
-				Status:             "ct-attention",
 				Verb:               "W",
 				UserIdentity: ctevent.UserIdentity{
 					Type:      "AWSService",
@@ -781,7 +773,6 @@ func TestCTDetailBuildSections_WireframeCases(t *testing.T) {
 				UserAgent:          "Console (Mozilla/5.0 Safari/605.1.15)",
 				AccountID:          "555555555555",
 				RecipientAccountID: "555555555555",
-				Status:             "ct-attention",
 				Verb:               "W",
 				UserIdentity: ctevent.UserIdentity{
 					Type: "Root",
@@ -814,7 +805,6 @@ func TestCTDetailBuildSections_WireframeCases(t *testing.T) {
 				UserAgent:          "aws-sdk-go-v2/1.30.3",
 				AccountID:          "666666666666",
 				RecipientAccountID: "666666666666",
-				Status:             "ct-info",
 				Verb:               "R",
 				UserIdentity: ctevent.UserIdentity{
 					Type: "WebIdentityUser",
@@ -852,7 +842,6 @@ func TestCTDetailBuildSections_WireframeCases(t *testing.T) {
 				UserAgent:          "aws-cli/2.17.9",
 				AccountID:          "888888888888",
 				RecipientAccountID: "777777777777",
-				Status:             "ct-attention",
 				Verb:               "W",
 				UserIdentity: ctevent.UserIdentity{
 					Type:        "AssumedRole",
@@ -884,7 +873,6 @@ func TestCTDetailBuildSections_WireframeCases(t *testing.T) {
 				AWSRegion:          "us-east-1",
 				AccountID:          "999999999999",
 				RecipientAccountID: "999999999999",
-				Status:             "ct-info",
 				Verb:               "R",
 				UserIdentity:       ctevent.UserIdentity{}, // empty
 				InsightDetails: &ctevent.InsightDetails{
@@ -917,7 +905,6 @@ func TestCTDetailBuildSections_WireframeCases(t *testing.T) {
 				SourceIPAddress:    "10.12.4.77",
 				AccountID:          "111111111111",
 				RecipientAccountID: "111111111111",
-				Status:             "ct-danger",
 				Verb:               "W",
 				ErrorCode:          "VpceAccessDenied",
 				ErrorMessage:       "The VPC endpoint policy denies the s3:PutObject action",

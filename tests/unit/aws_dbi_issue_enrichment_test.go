@@ -176,7 +176,7 @@ func TestDBI_Enrich_MaintenancePending_NilDescription(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{RDS: fake}
 	resources := []resource.Resource{
-		{ID: resourceID, Name: resourceID, Status: "", Fields: map[string]string{"status": ""}},
+		{ID: resourceID, Name: resourceID, Fields: map[string]string{"status": ""}},
 	}
 
 	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources, nil)
@@ -228,7 +228,6 @@ func TestDBI_Enrich_NonHealthyStatus_NoFieldUpdates(t *testing.T) {
 		{
 			ID:     resourceID,
 			Name:   resourceID,
-			Status: "publicly accessible",
 			Fields: map[string]string{"status": "publicly accessible"},
 		},
 	}
@@ -268,7 +267,7 @@ func TestDBI_Enrich_NoMatchNoFinding(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{RDS: fake}
 	resources := []resource.Resource{
-		{ID: "other-instance", Status: "", Fields: map[string]string{}},
+		{ID: "other-instance", Fields: map[string]string{}},
 	}
 
 	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources, nil)
@@ -321,8 +320,8 @@ func TestDBI_Enrich_Pagination(t *testing.T) {
 	fake := &dbiMaintenanceFake{pages: [][]rdstypes.ResourcePendingMaintenanceActions{page1, page2}}
 	clients := &awsclient.ServiceClients{RDS: fake}
 	resources := []resource.Resource{
-		{ID: "dbi-page1", Status: "", Fields: map[string]string{"status": ""}},
-		{ID: "dbi-page2", Status: "", Fields: map[string]string{"status": ""}},
+		{ID: "dbi-page1", Fields: map[string]string{"status": ""}},
+		{ID: "dbi-page2", Fields: map[string]string{"status": ""}},
 	}
 
 	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, resources, nil)
@@ -368,7 +367,6 @@ func TestDBI_Enrich_Wave1PlusWave2_NoFieldUpdates(t *testing.T) {
 		{
 			ID:     resourceID,
 			Name:   resourceID,
-			Status: "publicly accessible",
 			Fields: map[string]string{"status": "publicly accessible"},
 		},
 	}
@@ -482,7 +480,6 @@ func TestDBI_Enrich_Wave1MultiPlusWave2_NoFieldUpdates(t *testing.T) {
 		{
 			ID:     resourceID,
 			Name:   resourceID,
-			Status: "no automated backups (+2)",
 			Fields: map[string]string{"status": "no automated backups (+2)"},
 		},
 	}
@@ -566,7 +563,6 @@ func TestDBI_Enrich_VariousExistingStatuses_NoFieldUpdates(t *testing.T) {
 				{
 					ID:     id,
 					Name:   id,
-					Status: tc.existingStatus,
 					Fields: map[string]string{"status": tc.existingStatus},
 				},
 			}

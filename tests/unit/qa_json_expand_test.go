@@ -299,7 +299,6 @@ func TestQA_JSONExpand_CloudTrail_OutOfScope(t *testing.T) {
 	res := resource.Resource{
 		ID:        "event-ct-scope-test",
 		Name:      "PutObject",
-		Status:    "write",
 		RawStruct: event,
 	}
 	cfg := config.DefaultConfig()

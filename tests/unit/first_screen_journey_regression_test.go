@@ -158,7 +158,6 @@ func TestFirstScreen_DetailEnterExternalImageID_DoesNotEndInEmptyAMIList(t *test
 	ec2Res := resource.Resource{
 		ID:     "i-external-ami",
 		Name:   "vpn-like-host",
-		Status: "running",
 		Fields: map[string]string{
 			"InstanceId":         "i-external-ami",
 			"State":              "running",

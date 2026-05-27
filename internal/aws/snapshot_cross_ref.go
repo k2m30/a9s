@@ -17,7 +17,7 @@
 // Wave classification stays Wave 1 (zero SDK calls) — the helper scans the
 // in-memory ResourceCache only. Both signals route through
 // `IssueEnricherResult.Findings` (which surfaces in S5 Attention and, via
-// `applyEnrichment` → `DeriveFindings`, in the S4 status column via
+// `applyEnrichment` → `applyWave2ToRow`, in the S4 status column via
 // `phraseFromFindings(r.Findings)` at render time). Re-runs are idempotent:
 // Findings is map-keyed so a second pass overwrites the first.
 //

@@ -66,9 +66,6 @@ func TestFetchInternetGateways_ParsesMultipleIGWs(t *testing.T) {
 	if r0.Name != "main-igw" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "main-igw", r0.Name)
 	}
-	if r0.Status != "" {
-		t.Errorf("resource[0].Status: expected empty, got %q", r0.Status)
-	}
 	if len(r0.Findings) != 0 {
 		t.Errorf("resource[0].Findings: expected none for attached IGW, got %d", len(r0.Findings))
 	}
@@ -104,9 +101,6 @@ func TestFetchInternetGateways_ParsesMultipleIGWs(t *testing.T) {
 	}
 	if r1.Name != "" {
 		t.Errorf("resource[1].Name: expected empty string, got %q", r1.Name)
-	}
-	if r1.Status != "" {
-		t.Errorf("resource[1].Status: expected empty, got %q", r1.Status)
 	}
 	if r1.Fields["vpc_id"] != "vpc-bbb" {
 		t.Errorf("resource[1].Fields[\"vpc_id\"]: expected %q, got %q", "vpc-bbb", r1.Fields["vpc_id"])

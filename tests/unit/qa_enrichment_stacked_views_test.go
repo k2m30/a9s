@@ -64,8 +64,8 @@ func TestEnrichment_UpdatesStackedResourceListWhenDetailActive(t *testing.T) {
 
 	// Step 2: Load RDS resources.
 	rdsResources := []resource.Resource{
-		{ID: "db-stacked-a-001", Name: "db-stacked-a-001", Status: "available", Fields: map[string]string{"db_instance_id": "db-stacked-a-001", "status": "available"}},
-		{ID: "db-stacked-b-001", Name: "db-stacked-b-001", Status: "available", Fields: map[string]string{"db_instance_id": "db-stacked-b-001", "status": "available"}},
+		{ID: "db-stacked-a-001", Name: "db-stacked-a-001", Fields: map[string]string{"db_instance_id": "db-stacked-a-001", "status": "available"}},
+		{ID: "db-stacked-b-001", Name: "db-stacked-b-001", Fields: map[string]string{"db_instance_id": "db-stacked-b-001", "status": "available"}},
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "rds",
@@ -151,11 +151,11 @@ func TestEnrichment_UpdatesStackedDetailWhenAnotherDetailActive(t *testing.T) {
 
 	// Step 2: Load two RDS resources.
 	resourceA := resource.Resource{
-		ID: "db-stacked-a-001", Name: "db-stacked-a-001", Status: "available",
+		ID: "db-stacked-a-001", Name: "db-stacked-a-001",
 		Fields: map[string]string{"db_instance_id": "db-stacked-a-001", "status": "available"},
 	}
 	resourceB := resource.Resource{
-		ID: "db-stacked-b-001", Name: "db-stacked-b-001", Status: "available",
+		ID: "db-stacked-b-001", Name: "db-stacked-b-001",
 		Fields: map[string]string{"db_instance_id": "db-stacked-b-001", "status": "available"},
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{

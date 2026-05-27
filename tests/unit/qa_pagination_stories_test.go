@@ -627,7 +627,7 @@ func TestStoryG1_DetailAndBack_PreservesLoadedData(t *testing.T) {
 	for i := range 200 {
 		id := fmt.Sprintf("i-%05d", 200+i)
 		page2[i] = resource.Resource{
-			ID: id, Name: id, Status: "running",
+			ID: id, Name: id,
 			Fields: map[string]string{
 				"instance_id": id, "name": id, "state": "running",
 			},
@@ -644,7 +644,7 @@ func TestStoryG1_DetailAndBack_PreservesLoadedData(t *testing.T) {
 	for i := range 200 {
 		id := fmt.Sprintf("i-%05d", 400+i)
 		page3[i] = resource.Resource{
-			ID: id, Name: id, Status: "running",
+			ID: id, Name: id,
 			Fields: map[string]string{
 				"instance_id": id, "name": id, "state": "running",
 			},
@@ -947,7 +947,7 @@ func TestStoryI4_LoadMoreAfterSort_PreservesSortOrder(t *testing.T) {
 		name := fmt.Sprintf("z-instance-%05d", 199-i)
 		id := fmt.Sprintf("i-%05d", i)
 		resources[i] = resource.Resource{
-			ID: id, Name: name, Status: "running",
+			ID: id, Name: name,
 			Fields: map[string]string{
 				"instance_id": id, "name": name, "state": "running",
 			},
@@ -980,7 +980,7 @@ func TestStoryI4_LoadMoreAfterSort_PreservesSortOrder(t *testing.T) {
 		name := fmt.Sprintf("a-instance-%05d", i) // "a-" sorts before "z-"
 		id := fmt.Sprintf("i-%05d", 200+i)
 		page2[i] = resource.Resource{
-			ID: id, Name: name, Status: "running",
+			ID: id, Name: name,
 			Fields: map[string]string{
 				"instance_id": id, "name": name, "state": "running",
 			},
@@ -1037,7 +1037,7 @@ func TestStoryI5_LoadMoreAtBottom_CursorStays(t *testing.T) {
 	for i := range 100 {
 		id := fmt.Sprintf("i-%05d", 200+i)
 		page2[i] = resource.Resource{
-			ID: id, Name: fmt.Sprintf("instance-%05d", 200+i), Status: "running",
+			ID: id, Name: fmt.Sprintf("instance-%05d", 200+i),
 			Fields: map[string]string{
 				"instance_id": id,
 				"name":        fmt.Sprintf("instance-%05d", 200+i),
@@ -1299,8 +1299,7 @@ func TestStoryE4_AllResourceTypes(t *testing.T) {
 					fields[col.Key] = fmt.Sprintf("%s-%d", col.Key, i)
 				}
 				resources[i] = resource.Resource{
-					ID: fmt.Sprintf("id-%d", i), Name: fmt.Sprintf("name-%d", i),
-					Status: "running", Fields: fields,
+					ID: fmt.Sprintf("id-%d", i), Name: fmt.Sprintf("name-%d", i), Fields: fields,
 				}
 			}
 
@@ -1396,8 +1395,7 @@ func TestStoryJ1_ResizeDuringLoadMore_PreservesData(t *testing.T) {
 					fields[col.Key] = fmt.Sprintf("%s-%d", col.Key, i)
 				}
 				resources[i] = resource.Resource{
-					ID: fmt.Sprintf("id-%d", i), Name: fmt.Sprintf("name-%d", i),
-					Status: "running", Fields: fields,
+					ID: fmt.Sprintf("id-%d", i), Name: fmt.Sprintf("name-%d", i), Fields: fields,
 				}
 			}
 
@@ -1476,8 +1474,7 @@ func TestStoryJ2_MinimumTerminalSize_PreservesData(t *testing.T) {
 					fields[col.Key] = fmt.Sprintf("%s-%d", col.Key, i)
 				}
 				resources[i] = resource.Resource{
-					ID: fmt.Sprintf("id-%d", i), Name: fmt.Sprintf("name-%d", i),
-					Status: "running", Fields: fields,
+					ID: fmt.Sprintf("id-%d", i), Name: fmt.Sprintf("name-%d", i), Fields: fields,
 				}
 			}
 
@@ -1681,8 +1678,7 @@ func TestStoryL2_ErrorFlashDuringLoadMore_PreservesPagination(t *testing.T) {
 					fields[col.Key] = fmt.Sprintf("%s-%d", col.Key, i)
 				}
 				resources[i] = resource.Resource{
-					ID: fmt.Sprintf("id-%d", i), Name: fmt.Sprintf("name-%d", i),
-					Status: "running", Fields: fields,
+					ID: fmt.Sprintf("id-%d", i), Name: fmt.Sprintf("name-%d", i), Fields: fields,
 				}
 			}
 
@@ -1754,8 +1750,7 @@ func TestStoryN1_CopyID_OnAppendedItems(t *testing.T) {
 					fields[col.Key] = fmt.Sprintf("p1-%s-%d", col.Key, i)
 				}
 				page1[i] = resource.Resource{
-					ID: fmt.Sprintf("page1-id-%d", i), Name: fmt.Sprintf("page1-name-%d", i),
-					Status: "running", Fields: fields,
+					ID: fmt.Sprintf("page1-id-%d", i), Name: fmt.Sprintf("page1-name-%d", i), Fields: fields,
 				}
 			}
 
@@ -1774,8 +1769,7 @@ func TestStoryN1_CopyID_OnAppendedItems(t *testing.T) {
 					fields[col.Key] = fmt.Sprintf("p2-%s-%d", col.Key, i)
 				}
 				page2[i] = resource.Resource{
-					ID: fmt.Sprintf("page2-id-%d", i), Name: fmt.Sprintf("page2-name-%d", i),
-					Status: "running", Fields: fields,
+					ID: fmt.Sprintf("page2-id-%d", i), Name: fmt.Sprintf("page2-name-%d", i), Fields: fields,
 				}
 			}
 
@@ -1828,7 +1822,7 @@ func TestStoryN3_SortToggle_AfterLoadMore(t *testing.T) {
 		name := fmt.Sprintf("z-item-%05d", i)
 		id := fmt.Sprintf("i-%05d", i)
 		page1[i] = resource.Resource{
-			ID: id, Name: name, Status: "running",
+			ID: id, Name: name,
 			Fields: map[string]string{
 				"instance_id": id, "name": name, "state": "running",
 			},
@@ -1846,7 +1840,7 @@ func TestStoryN3_SortToggle_AfterLoadMore(t *testing.T) {
 		name := fmt.Sprintf("a-item-%05d", i)
 		id := fmt.Sprintf("i-%05d", 200+i)
 		page2[i] = resource.Resource{
-			ID: id, Name: name, Status: "running",
+			ID: id, Name: name,
 			Fields: map[string]string{
 				"instance_id": id, "name": name, "state": "running",
 			},
@@ -1916,7 +1910,7 @@ func TestStoryN5_PageUpDown_AcrossLoadMoreBoundary(t *testing.T) {
 		id := fmt.Sprintf("i-%05d", 200+i)
 		name := fmt.Sprintf("instance-%05d", 200+i)
 		page2[i] = resource.Resource{
-			ID: id, Name: name, Status: "running",
+			ID: id, Name: name,
 			Fields: map[string]string{
 				"instance_id": id, "name": name, "state": "running",
 			},
@@ -2012,8 +2006,7 @@ func TestStoryN_AllResourceTypes_AppendedItemsAccessible(t *testing.T) {
 					fields[col.Key] = fmt.Sprintf("p1-%s-%d", col.Key, i)
 				}
 				page1[i] = resource.Resource{
-					ID: fmt.Sprintf("p1-id-%d", i), Name: fmt.Sprintf("p1-name-%d", i),
-					Status: "running", Fields: fields,
+					ID: fmt.Sprintf("p1-id-%d", i), Name: fmt.Sprintf("p1-name-%d", i), Fields: fields,
 				}
 			}
 
@@ -2032,8 +2025,7 @@ func TestStoryN_AllResourceTypes_AppendedItemsAccessible(t *testing.T) {
 					fields[col.Key] = fmt.Sprintf("p2-%s-%d", col.Key, i)
 				}
 				page2[i] = resource.Resource{
-					ID: fmt.Sprintf("p2-id-%d", i), Name: fmt.Sprintf("p2-name-%d", i),
-					Status: "running", Fields: fields,
+					ID: fmt.Sprintf("p2-id-%d", i), Name: fmt.Sprintf("p2-name-%d", i), Fields: fields,
 				}
 			}
 
@@ -2214,8 +2206,7 @@ func TestStory_LoadMoreIndicator_AllResourceTypes(t *testing.T) {
 					fields[col.Key] = fmt.Sprintf("%s-%d", col.Key, i)
 				}
 				resources[i] = resource.Resource{
-					ID: fmt.Sprintf("id-%d", i), Name: fmt.Sprintf("name-%d", i),
-					Status: "running", Fields: fields,
+					ID: fmt.Sprintf("id-%d", i), Name: fmt.Sprintf("name-%d", i), Fields: fields,
 				}
 			}
 
@@ -2279,8 +2270,7 @@ func TestStoryDFGI_AllResourceTypes_PaginationViewConsistency(t *testing.T) {
 					fields[col.Key] = fmt.Sprintf("%s-%d", col.Key, i)
 				}
 				resources[i] = resource.Resource{
-					ID: fmt.Sprintf("id-%d", i), Name: fmt.Sprintf("name-%d", i),
-					Status: "running", Fields: fields,
+					ID: fmt.Sprintf("id-%d", i), Name: fmt.Sprintf("name-%d", i), Fields: fields,
 				}
 			}
 

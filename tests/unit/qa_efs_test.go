@@ -80,9 +80,6 @@ func TestFetchEFSFileSystems_ParsesMultiple(t *testing.T) {
 		t.Errorf("resource[0].Name: expected %q, got %q", "shared-data", r0.Name)
 	}
 	// Healthy FS (LifeCycleState=available, NumberOfMountTargets=3) — blank Status per spec §4.
-	if r0.Status != "" {
-		t.Errorf("resource[0].Status: expected blank (healthy), got %q", r0.Status)
-	}
 	if len(r0.Findings) != 0 {
 		t.Errorf("resource[0].Findings: expected empty for healthy FS, got %v", r0.Findings)
 	}
@@ -114,9 +111,6 @@ func TestFetchEFSFileSystems_ParsesMultiple(t *testing.T) {
 	// two coexisting W1 signals. Broken ("no mount targets") wins precedence.
 	// Expected Fields["status"] = "no mount targets (+1)", Findings has both findings.
 	r1 := resources[1]
-	if r1.Status != "" {
-		t.Errorf("resource[1].Status: expected %q (fetcher must not write Status), got %q", "", r1.Status)
-	}
 	if r1.Fields["status"] != "no mount targets (+1)" {
 		t.Errorf("resource[1].Fields[\"status\"]: expected %q, got %q", "no mount targets (+1)", r1.Fields["status"])
 	}

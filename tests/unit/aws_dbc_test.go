@@ -106,9 +106,6 @@ func TestFetchDocDBClusters_FieldMapping(t *testing.T) {
 		t.Errorf("Name = %q, want %q", r.Name, "prod-docdb-01")
 	}
 	// Status is always "" (phrases moved to Findings + Fields["status"]).
-	if r.Status != "" {
-		t.Errorf("Status = %q, want blank", r.Status)
-	}
 	if len(r.Findings) != 0 {
 		phrases := make([]string, len(r.Findings))
 		for i, f := range r.Findings {
@@ -1050,9 +1047,6 @@ func TestComputeRDSDBClusterStatusAndFindings(t *testing.T) {
 			}
 			r := result.Resources[0]
 			// Status must always be "".
-			if r.Status != "" {
-				t.Errorf("Status = %q, want %q", r.Status, "")
-			}
 			if r.Fields["status"] != tc.wantPhrase {
 				t.Errorf("Fields[status] = %q, want %q", r.Fields["status"], tc.wantPhrase)
 			}

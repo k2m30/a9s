@@ -129,9 +129,6 @@ func TestFetchEC2_PromotesStatusToImpairedWhenSystemStatusImpaired(t *testing.T)
 	r := resources[0]
 
 	// Post-cleanup: Resource.Status is never written by the fetcher.
-	if r.Status != "" {
-		t.Errorf("expected Resource.Status == %q (empty — no dual-write), got %q", "", r.Status)
-	}
 
 	// The wave2 enrichment field must carry the impaired signal.
 	if r.Fields["system_status"] != "impaired" {
@@ -184,9 +181,6 @@ func TestFetchEC2_PromotesStatusToImpairedWhenInstanceStatusImpaired(t *testing.
 	r := resources[0]
 
 	// Post-cleanup: Resource.Status is never written by the fetcher.
-	if r.Status != "" {
-		t.Errorf("expected Resource.Status == %q (empty — no dual-write), got %q", "", r.Status)
-	}
 
 	// The wave2 enrichment field must carry the impaired signal.
 	if r.Fields["instance_status"] != "impaired" {
@@ -236,9 +230,6 @@ func TestFetchEC2_PromotesStatusToInitializingWhenInstanceStatusInitializing(t *
 	r := resources[0]
 
 	// Post-cleanup: Resource.Status is never written by the fetcher.
-	if r.Status != "" {
-		t.Errorf("expected Resource.Status == %q (empty — no dual-write), got %q", "", r.Status)
-	}
 
 	// The wave2 enrichment field must carry the initializing signal.
 	if r.Fields["instance_status"] != "initializing" {
@@ -285,9 +276,6 @@ func TestFetchEC2_LeavesStatusAsRunningWhenBothOk(t *testing.T) {
 
 	r := resources[0]
 	// PR-03b: fetcher no longer writes Resource.Status; lifecycle is in Fields["state"].
-	if r.Status != "" {
-		t.Errorf("expected Resource.Status == %q (empty) for healthy running instance, got %q", "", r.Status)
-	}
 	if len(r.Findings) != 0 {
 		t.Errorf("expected 0 Findings for healthy running instance, got %d", len(r.Findings))
 	}
@@ -334,9 +322,6 @@ func TestFetchEC2_DoesNotPromoteStoppedInstance(t *testing.T) {
 
 	r := resources[0]
 	// PR-03b: fetcher no longer writes Resource.Status; state is surfaced via Findings.
-	if r.Status != "" {
-		t.Errorf("expected Resource.Status == %q (empty) for stopped instance, got %q", "", r.Status)
-	}
 	// Stopped instance with no Server.* state reason → CodeEC2StateStopped / SevWarn.
 	if len(r.Findings) != 1 {
 		t.Fatalf("expected 1 Finding for stopped instance, got %d", len(r.Findings))

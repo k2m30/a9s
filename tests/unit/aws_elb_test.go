@@ -80,9 +80,6 @@ func TestFetchLoadBalancers_ParsesMultipleLoadBalancers(t *testing.T) {
 	if r0.Name != "prod-alb" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "prod-alb", r0.Name)
 	}
-	if r0.Status != "" {
-		t.Errorf("resource[0].Status: expected empty, got %q", r0.Status)
-	}
 	if len(r0.Findings) != 0 {
 		t.Errorf("resource[0].Findings: expected none for active ELB, got %d", len(r0.Findings))
 	}

@@ -120,13 +120,13 @@ func ebRuleResources(rules ...struct {
 	res := make([]resource.Resource, 0, len(rules))
 	for _, r := range rules {
 		res = append(res, resource.Resource{
-			ID:     r.name,
-			Name:   r.name,
-			Status: r.state,
+			ID:   r.name,
+			Name: r.name,
 			Fields: map[string]string{
 				"name":      r.name,
 				"state":     r.state,
 				"event_bus": r.bus,
+				"status":    r.state,
 			},
 		})
 	}

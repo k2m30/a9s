@@ -85,9 +85,6 @@ func TestFetchSecurityGroups_ParsesMultipleGroups(t *testing.T) {
 	if r0.Name != "web-sg" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "web-sg", r0.Name)
 	}
-	if r0.Status != "" {
-		t.Errorf("resource[0].Status: expected empty string, got %q", r0.Status)
-	}
 
 	// Verify second security group
 	r1 := resources[1]
@@ -96,9 +93,6 @@ func TestFetchSecurityGroups_ParsesMultipleGroups(t *testing.T) {
 	}
 	if r1.Name != "db-sg" {
 		t.Errorf("resource[1].Name: expected %q, got %q", "db-sg", r1.Name)
-	}
-	if r1.Status != "" {
-		t.Errorf("resource[1].Status: expected empty string, got %q", r1.Status)
 	}
 
 	// Verify Fields contain the expected keys
@@ -368,13 +362,6 @@ func TestFetchSecurityGroups_RealAWSData(t *testing.T) {
 	}
 	if vpcCounts["vpc-0ddd3333eee4444ff"] != 2 {
 		t.Errorf("expected 2 SGs in default VPC, got %d", vpcCounts["vpc-0ddd3333eee4444ff"])
-	}
-
-	// --- Verify all SGs have Status="" (SGs don't have a status) ---
-	for i, r := range resources {
-		if r.Status != "" {
-			t.Errorf("resource[%d].Status should be empty for SGs, got %q", i, r.Status)
-		}
 	}
 
 	// --- Verify all SGs have RawStruct of type ec2types.SecurityGroup ---

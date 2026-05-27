@@ -607,8 +607,8 @@ func (m *ResourceListModel) applyFilter() {
 	if m.IsEnabled() {
 		kept := make([]resource.Resource, 0, len(result))
 		for _, r := range result {
-			// PR-03a-views: prefer Findings-based predicate; fall back to legacy color
-			// check (which reads r.Status / r.Fields) when Findings is empty.
+			// PR-03a-views: prefer Findings-based predicate; fall back to per-type
+			// color check (which reads r.Fields) when Findings is empty.
 			if hasIssueFinding(r) {
 				kept = append(kept, r)
 				continue
@@ -631,11 +631,11 @@ func (m *ResourceListModel) applyFilter() {
 
 	// Recompute issue count from allResources (not filtered — represents the full page).
 	// PR-03a-views: prefer Findings-based predicate; fall back to per-type
-	// td.ResolveColor(r) when Findings is empty. td.ResolveColor itself falls
-	// back to FallbackColor(r.Status) when no per-type Color func is set, so
-	// canonical lifecycle steady-states remain ColorDim. Using td.ResolveColor
-	// instead of FallbackColor ensures per-type Color logic (e.g. ECS INACTIVE →
-	// ColorBroken, EC2 Server.* stopped → ColorBroken) is respected.
+	// td.ResolveColor(r) when Findings is empty. td.ResolveColor reads from
+	// r.Fields (e.g. Fields["status"]) so canonical lifecycle steady-states
+	// remain ColorDim. Using td.ResolveColor instead of a bare fallback ensures
+	// per-type Color logic (e.g. ECS INACTIVE → ColorBroken, EC2 Server.*
+	// stopped → ColorBroken) is respected.
 	ic := 0
 	for _, r := range m.allResources {
 		if hasIssueFinding(r) {
@@ -650,8 +650,8 @@ func (m *ResourceListModel) applyFilter() {
 
 // FilterResources returns resources matching the query (case-insensitive).
 // PR-03a-views: searches r.ID, r.Name, r.Fields values, and r.Findings[i].Phrase.
-// r.Status is no longer searched directly; its value is present in r.Fields and,
-// after DeriveFindings, in r.Findings[i].Phrase.
+// Post-W1.4b.3 the wave-1 status phrase lives on r.Fields["status"] and on
+// any r.Findings[i].Phrase the fetcher emitted directly.
 // Exported so tests can call it directly.
 func FilterResources(query string, resources []resource.Resource) []resource.Resource {
 	if query == "" {

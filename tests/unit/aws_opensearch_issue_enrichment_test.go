@@ -74,7 +74,6 @@ func buildOSResource(domain ostypes.DomainStatus, statusOverride string) resourc
 	return resource.Resource{
 		ID:        name,
 		Name:      name,
-		Status:    statusOverride,
 		Fields:    fields,
 		RawStruct: domain,
 	}

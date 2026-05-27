@@ -44,15 +44,15 @@ func markerTypeDef() resource.ResourceTypeDef {
 func markerResources() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID: "i-1", Name: "web-server-01", Status: "running",
+			ID: "i-1", Name: "web-server-01",
 			Fields: map[string]string{"name": "web-server-01", "state": "running"},
 		},
 		{
-			ID: "i-2", Name: "api-gateway-02", Status: "running",
+			ID: "i-2", Name: "api-gateway-02",
 			Fields: map[string]string{"name": "api-gateway-02", "state": "running"},
 		},
 		{
-			ID: "i-3", Name: "worker-node-03", Status: "running",
+			ID: "i-3", Name: "worker-node-03",
 			Fields: map[string]string{"name": "worker-node-03", "state": "running"},
 		},
 	}
@@ -285,7 +285,7 @@ func TestRowMarker_AllResourceTypes(t *testing.T) {
 			m.SetSize(80, 24)
 			m, _ = m.Init()
 			res := []resource.Resource{
-				{ID: "test-id-1", Name: "test-resource", Status: "running",
+				{ID: "test-id-1", Name: "test-resource",
 					Fields: map[string]string{"name": "test-resource"}},
 			}
 			m, _ = m.Update(messages.ResourcesLoaded{

@@ -143,10 +143,8 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 		}
 		canon := rt.ShortName
 		if entry, ok := c.session.ResourceCache[canon]; ok {
-			// Site 6: re-derive findings on cached resources before display so
-			// child-view and related-navigation cache-hit paths are covered
-			// (PR-03a-shim wire-up). Idempotent: re-derive is safe.
-			c.deriveFindingsForType(canon, entry.Resources)
+			// Cached resources already carry fetcher-emitted Findings; no
+			// re-derive needed (W1.4b.3 dropped the legacy Status/Issues bridge).
 			return NavigateResult{
 				Kind:         NavigateKindPushResourceListCached,
 				ResolvedType: canon,

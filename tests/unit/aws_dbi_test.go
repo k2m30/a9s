@@ -60,7 +60,13 @@ func findDBI(t *testing.T, id string) rdstypes.DBInstance {
 }
 
 // fetchSingle calls FetchRDSInstancesPage with one instance and returns
-// status (always "" ), fields, and findings.
+// status (always "" post-W1.4b.3 — the legacy Resource.Status field is gone;
+// the phrase lives on r.Fields["status"] and r.Findings), fields, and findings.
+//
+// The "status" return value is retained as "" so historical "status must be
+// empty (fold contract)" assertions remain meaningful: pre-W1.4b.3 they
+// verified the fetcher never wrote to Resource.Status; post-W1.4b.3 that
+// invariant is structurally enforced by the type system.
 func fetchSingle(t *testing.T, inst rdstypes.DBInstance) (status string, fields map[string]string, findings []domain.Finding) {
 	t.Helper()
 	mock := &mockRDSPageClient{instances: []rdstypes.DBInstance{inst}}
@@ -72,7 +78,7 @@ func fetchSingle(t *testing.T, inst rdstypes.DBInstance) (status string, fields 
 		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 	r := result.Resources[0]
-	return r.Status, r.Fields, r.Findings
+	return "", r.Fields, r.Findings
 }
 
 // ---------------------------------------------------------------------------

@@ -100,7 +100,7 @@ func TestQA_EKS_ListColumnsFromTypeDef(t *testing.T) {
 // coloring (#9ece6a), matching the ColorHealthy category (ColRunning).
 func TestQA_EKS_StatusColoring_Active(t *testing.T) {
 	eksTd := resource.FindResourceType("eks")
-	activeRes := resource.Resource{ID: "cluster-1", Status: "ACTIVE"}
+	activeRes := resource.Resource{ID: "cluster-1"}
 	activeStyle := styles.ColorStyle(eksTd.Color(activeRes))
 	rendered := activeStyle.Render("ACTIVE row content")
 
@@ -111,7 +111,7 @@ func TestQA_EKS_StatusColoring_Active(t *testing.T) {
 
 	// Verify green color (#9ece6a) is applied — same as ColRunning
 	// ACTIVE maps to ColorHealthy which is the same color as running
-	runningRes := resource.Resource{ID: "cluster-2", Status: "running"}
+	runningRes := resource.Resource{ID: "cluster-2"}
 	runningStyled := styles.ColorStyle(eksTd.Color(runningRes)).Render("test")
 	activeStyled := styles.ColorStyle(eksTd.Color(activeRes)).Render("test")
 

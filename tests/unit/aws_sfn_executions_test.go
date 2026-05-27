@@ -84,7 +84,7 @@ func TestFetchSFNExecutions_Basic(t *testing.T) {
 
 	t.Run("Status_is_uppercase", func(t *testing.T) {
 		if r.Fields["status"] != "SUCCEEDED" {
-			t.Errorf("Fields[\"status\"]: expected %q, got %q", "SUCCEEDED", r.Fields["status"])
+			t.Errorf("Status: expected %q, got %q", "SUCCEEDED", r.Fields["status"])
 		}
 	})
 
@@ -349,7 +349,7 @@ func TestFetchSFNExecutions_NilFields(t *testing.T) {
 	t.Run("status_populated", func(t *testing.T) {
 		r := result.Resources[0]
 		if r.Fields["status"] != "RUNNING" {
-			t.Errorf("Fields[\"status\"]: expected %q, got %q", "RUNNING", r.Fields["status"])
+			t.Errorf("Status: expected %q, got %q", "RUNNING", r.Fields["status"])
 		}
 	})
 }

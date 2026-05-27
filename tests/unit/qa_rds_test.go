@@ -74,7 +74,6 @@ func fixtureRDSInstancesExtended() []resource.Resource {
 		resource.Resource{
 			ID:     "stopped-db",
 			Name:   "stopped-db",
-			Status: "stopped",
 			Fields: map[string]string{
 				"db_identifier":  "stopped-db",
 				"engine":         "mysql",
@@ -88,7 +87,6 @@ func fixtureRDSInstancesExtended() []resource.Resource {
 		resource.Resource{
 			ID:     "creating-db",
 			Name:   "creating-db",
-			Status: "creating",
 			Fields: map[string]string{
 				"db_identifier":  "creating-db",
 				"engine":         "postgres",
@@ -102,7 +100,6 @@ func fixtureRDSInstancesExtended() []resource.Resource {
 		resource.Resource{
 			ID:     "prod-postgres-primary",
 			Name:   "prod-postgres-primary",
-			Status: "available",
 			Fields: map[string]string{
 				"db_identifier":  "prod-postgres-primary",
 				"engine":         "postgres",
@@ -369,7 +366,6 @@ func TestQA_RDS_ListData_RowCount(t *testing.T) {
 func rdsColorResource(dbStatus string) resource.Resource {
 	return resource.Resource{
 		ID:     "db-test-001",
-		Status: dbStatus,
 		Fields: map[string]string{"status": dbStatus},
 	}
 }
@@ -1016,7 +1012,6 @@ func TestQA_RDS_Detail_WithRawStruct_AllDetailPaths(t *testing.T) {
 	res := resource.Resource{
 		ID:        "prod-db-01",
 		Name:      "prod-db-01",
-		Status:    "available",
 		RawStruct: &rawStruct,
 		Fields:    map[string]string{},
 	}
@@ -1068,7 +1063,6 @@ func TestQA_RDS_Detail_CreatingInstanceNoEndpoint(t *testing.T) {
 	res := resource.Resource{
 		ID:        "creating-db",
 		Name:      "creating-db",
-		Status:    "creating",
 		RawStruct: &rawStruct,
 		Fields:    map[string]string{},
 	}
@@ -1202,7 +1196,6 @@ func TestQA_RDS_YAML_WithRawStruct(t *testing.T) {
 	res := resource.Resource{
 		ID:        "test-yaml-db",
 		Name:      "test-yaml-db",
-		Status:    "available",
 		RawStruct: &rawStruct,
 		Fields:    map[string]string{},
 	}
@@ -1249,7 +1242,6 @@ func TestQA_RDS_YAML_CreatingInstanceNoEndpoint(t *testing.T) {
 	res := resource.Resource{
 		ID:        "yaml-creating-db",
 		Name:      "yaml-creating-db",
-		Status:    "creating",
 		RawStruct: &rawStruct,
 		Fields:    map[string]string{},
 	}

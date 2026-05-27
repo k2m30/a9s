@@ -361,8 +361,8 @@ func (m ResourceListModel) extractCellValue(c listCol, r resource.Resource) stri
 	//   2. Fields[lifecycleKey] — lifecycle steady-state ("running",
 	//      "available", etc.) when no findings are active.
 	// The intermediate r.Fields["status"] read was removed by AS-140 because
-	// Wave-2 enrichers no longer overlay it; DeriveFindings ensures
-	// r.Findings is populated before every render so layer 1 is authoritative.
+	// Wave-2 enrichers no longer overlay it; fetchers emit r.Findings directly
+	// (W1.4b.3 dropped the Status/Issues bridge) so layer 1 is authoritative.
 	// The status column is identified by c.key == "status" (conventional) or
 	// c.key == td.LifecycleKey when an explicit lifecycle key is set.
 	lifecycleKey := lifecycleColumnKey(m.typeDef)

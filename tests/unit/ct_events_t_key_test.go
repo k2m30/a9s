@@ -21,7 +21,6 @@ func ctEventsEC2Resource() resource.Resource {
 	return resource.Resource{
 		ID:     "i-test",
 		Name:   "test-instance",
-		Status: "running",
 		Fields: map[string]string{
 			"arn": "arn:aws:ec2:us-east-1:000000000000:instance/i-test",
 		},
@@ -108,7 +107,6 @@ func TestResourceList_TKey_IAMUser_UsesUsername(t *testing.T) {
 			{
 				ID:     "test-user",
 				Name:   "test-user",
-				Status: "active",
 				Fields: map[string]string{
 					"user_name": "test-user",
 				},

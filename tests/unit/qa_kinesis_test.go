@@ -55,9 +55,6 @@ func TestFetchKinesisStreams_ParsesMultipleStreams(t *testing.T) {
 		t.Errorf("expected ID 'my-stream-1', got %q", r.ID)
 	}
 	// Healthy streams: Status=="" and Fields["status"]=="" (healthy silence).
-	if r.Status != "" {
-		t.Errorf("expected Status %q (healthy silence), got %q", "", r.Status)
-	}
 	if r.Fields["stream_name"] != "my-stream-1" {
 		t.Errorf("expected Fields[stream_name] 'my-stream-1', got %q", r.Fields["stream_name"])
 	}
@@ -70,9 +67,6 @@ func TestFetchKinesisStreams_ParsesMultipleStreams(t *testing.T) {
 
 	// Verify second stream: Status=="" (fetcher does not write Status), phrase is in Fields["status"].
 	r2 := resources[1]
-	if r2.Status != "" {
-		t.Errorf("expected Status %q (fetcher does not write Status), got %q", "", r2.Status)
-	}
 	if r2.Fields["status"] != "creating" {
 		t.Errorf("expected Fields[status] %q for CREATING stream, got %q", "creating", r2.Fields["status"])
 	}

@@ -49,7 +49,7 @@ func snapOutput(snaps ...rdstypes.DBSnapshot) *rds.DescribeDBSnapshotsOutput {
 }
 
 // fetchSnap fetches a page from a single-page mock holding the provided snapshots.
-// resourceRow.status is populated from r.Fields["status"] (not r.Status).
+// resourceRow.status is populated from r.Fields["status"] (not r.Fields["status"]).
 func fetchSnap(t *testing.T, snaps ...rdstypes.DBSnapshot) []resourceRow {
 	t.Helper()
 	mock := &mockDescribeDBSnapshots{output: snapOutput(snaps...)}

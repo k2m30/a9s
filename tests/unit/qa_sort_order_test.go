@@ -38,35 +38,35 @@ func sortTestTypeDef() resource.ResourceTypeDef {
 func sortTestResources() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID: "i-001", Name: "echo", Status: "terminated",
+			ID: "i-001", Name: "echo",
 			Fields: map[string]string{
 				"instance_id": "i-001", "name": "echo", "state": "terminated",
 				"launch_time": "2026-01-05 00:00",
 			},
 		},
 		{
-			ID: "i-002", Name: "alpha", Status: "running",
+			ID: "i-002", Name: "alpha",
 			Fields: map[string]string{
 				"instance_id": "i-002", "name": "alpha", "state": "running",
 				"launch_time": "2026-01-01 00:00",
 			},
 		},
 		{
-			ID: "i-003", Name: "delta", Status: "stopped",
+			ID: "i-003", Name: "delta",
 			Fields: map[string]string{
 				"instance_id": "i-003", "name": "delta", "state": "stopped",
 				"launch_time": "2026-01-04 00:00",
 			},
 		},
 		{
-			ID: "i-004", Name: "bravo", Status: "pending",
+			ID: "i-004", Name: "bravo",
 			Fields: map[string]string{
 				"instance_id": "i-004", "name": "bravo", "state": "pending",
 				"launch_time": "2026-01-02 00:00",
 			},
 		},
 		{
-			ID: "i-005", Name: "charlie", Status: "running",
+			ID: "i-005", Name: "charlie",
 			Fields: map[string]string{
 				"instance_id": "i-005", "name": "charlie", "state": "running",
 				"launch_time": "2026-01-03 00:00",
@@ -453,21 +453,21 @@ func logStreamSortTypeDef() resource.ResourceTypeDef {
 func logStreamSortResources() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID: "stream-c", Name: "stream-c", Status: "",
+			ID: "stream-c", Name: "stream-c",
 			Fields: map[string]string{
 				"stream_name": "stream-c", "last_event": "2026-03-22 02:47",
 				"first_event": "2026-03-22 01:00",
 			},
 		},
 		{
-			ID: "stream-a", Name: "stream-a", Status: "",
+			ID: "stream-a", Name: "stream-a",
 			Fields: map[string]string{
 				"stream_name": "stream-a", "last_event": "2026-03-20 10:00",
 				"first_event": "2026-03-20 09:00",
 			},
 		},
 		{
-			ID: "stream-b", Name: "stream-b", Status: "",
+			ID: "stream-b", Name: "stream-b",
 			Fields: map[string]string{
 				"stream_name": "stream-b", "last_event": "2026-03-21 15:30",
 				"first_event": "2026-03-21 14:00",
@@ -550,7 +550,7 @@ func multiTimeFieldTypeDef() resource.ResourceTypeDef {
 func multiTimeFieldResources() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID: "r-001", Name: "alpha", Status: "",
+			ID: "r-001", Name: "alpha",
 			Fields: map[string]string{
 				"name":          "alpha",
 				"creation_date": "2026-01-01 00:00",
@@ -558,7 +558,7 @@ func multiTimeFieldResources() []resource.Resource {
 			},
 		},
 		{
-			ID: "r-002", Name: "bravo", Status: "",
+			ID: "r-002", Name: "bravo",
 			Fields: map[string]string{
 				"name":          "bravo",
 				"creation_date": "2026-01-03 00:00",
@@ -566,7 +566,7 @@ func multiTimeFieldResources() []resource.Resource {
 			},
 		},
 		{
-			ID: "r-003", Name: "charlie", Status: "",
+			ID: "r-003", Name: "charlie",
 			Fields: map[string]string{
 				"name":          "charlie",
 				"creation_date": "2026-01-02 00:00",
@@ -657,7 +657,7 @@ func TestQA_SortOrder_AgeUsesFirstColumnMatch(t *testing.T) {
 
 	resources := []resource.Resource{
 		{
-			ID: "s-001", Name: "foo", Status: "",
+			ID: "s-001", Name: "foo",
 			Fields: map[string]string{
 				"name":       "foo",
 				"started":    "2026-01-01 00:00",
@@ -665,7 +665,7 @@ func TestQA_SortOrder_AgeUsesFirstColumnMatch(t *testing.T) {
 			},
 		},
 		{
-			ID: "s-002", Name: "bar", Status: "",
+			ID: "s-002", Name: "bar",
 			Fields: map[string]string{
 				"name":       "bar",
 				"started":    "2026-01-02 00:00",
@@ -736,7 +736,6 @@ func TestQA_ListTitle_UsedInFrameTitle(t *testing.T) {
 			{
 				ID:     "a1",
 				Name:   "cpu-high",
-				Status: "OK",
 				Fields: map[string]string{"alarm_name": "cpu-high"},
 			},
 		},
@@ -785,7 +784,6 @@ func TestQA_ListTitle_FallsBackToShortName(t *testing.T) {
 			{
 				ID:     "i-abc123",
 				Name:   "my-server",
-				Status: "running",
 				Fields: map[string]string{"instance_id": "i-abc123"},
 			},
 		},

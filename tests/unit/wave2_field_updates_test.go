@@ -595,7 +595,7 @@ func TestEnrichCodePipelineStatus_WritesLastStatus(t *testing.T) {
 					{
 						StageName: aws.String("Build"),
 						LatestExecution: &cptypes.StageExecution{
-							Status: "Failed",
+							Status: cptypes.StageExecutionStatusFailed,
 						},
 					},
 				},
@@ -1099,9 +1099,6 @@ func TestFetchDBC_MultiWarningStatusPhrase(t *testing.T) {
 	const want = "delete-protection off (+2)"
 	// Per Phase-03 PR-03e: fetcher no longer writes Resource.Status; the
 	// display phrase lives in Fields["status"], findings carry severity.
-	if r.Status != "" {
-		t.Errorf("Status = %q, want \"\" (PR-03e: no Status writes)", r.Status)
-	}
 	if r.Fields["status"] != want {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], want)
 	}
@@ -1118,10 +1115,6 @@ func TestFetchDBC_MultiWarningStatusPhrase(t *testing.T) {
 		if r.Findings[i].Source != "wave1" {
 			t.Errorf("Findings[%d].Source = %q, want %q", i, r.Findings[i].Source, "wave1")
 		}
-	}
-	// Legacy r.Issues slice no longer populated (PR-03e migration).
-	if r.Issues != nil {
-		t.Errorf("Issues = %v, want nil (PR-03e: no Issues writes)", r.Issues)
 	}
 }
 

@@ -74,7 +74,7 @@ func TestSpec_NoBanner_WhenEnrichmentTruncated(t *testing.T) {
 		resource.ResourceTypeDef{ShortName: "ec2", Name: "EC2 Instances"},
 		nil, keys.Default(),
 		[]resource.Resource{
-			{ID: "i-001", Name: "web-01", Status: "running"},
+			{ID: "i-001", Name: "web-01"},
 		},
 		nil, "", views.SortColNone, true, 0, 0, false,
 	)
@@ -98,8 +98,8 @@ func TestSpec_NoBanner_WhenEnrichmentTruncated(t *testing.T) {
 
 func TestSpec_NoBanner_WhenFindingsOffViewport(t *testing.T) {
 	res := []resource.Resource{
-		{ID: "i-001", Name: "web-01", Status: "running"},
-		{ID: "i-002", Name: "web-02", Status: "running"},
+		{ID: "i-001", Name: "web-01"},
+		{ID: "i-002", Name: "web-02"},
 	}
 	m := views.NewResourceListFromCache(
 		resource.ResourceTypeDef{ShortName: "ec2", Name: "EC2 Instances"},
@@ -128,7 +128,7 @@ func TestSpec_NoBanner_WhenFindingsOffViewport(t *testing.T) {
 
 func TestSpec_S3_NoQuestionGlyph_OnTruncatedEnrichment(t *testing.T) {
 	res := []resource.Resource{
-		{ID: "i-001", Name: "web-01", Status: "running"},
+		{ID: "i-001", Name: "web-01"},
 	}
 	m := views.NewResourceListFromCache(
 		resource.ResourceTypeDef{ShortName: "ec2", Name: "EC2 Instances"},
@@ -168,7 +168,6 @@ func TestSpec_S4_S3HealthyStatus_BlankNotBucketName(t *testing.T) {
 	res := []resource.Resource{{
 		ID:        "authservice-prod-state",
 		Name:      "authservice-prod-state",
-		Status:    "",
 		Fields:    map[string]string{}, // no "status" key — healthy bucket, no enrichment yet
 		RawStruct: bucket,
 	}}
@@ -214,10 +213,10 @@ func TestSpec_S4_S3HealthyStatus_BlankNotBucketName(t *testing.T) {
 func TestSpec_ListTitle_NoIssueBadge_DuplicatedFromMenu(t *testing.T) {
 	// Four broken instances → issueCount = 4 after applySortAndFilter.
 	res := []resource.Resource{
-		{ID: "i-001", Name: "a", Status: "stopped"},
-		{ID: "i-002", Name: "b", Status: "stopped"},
-		{ID: "i-003", Name: "c", Status: "stopped"},
-		{ID: "i-004", Name: "d", Status: "stopped"},
+		{ID: "i-001", Name: "a"},
+		{ID: "i-002", Name: "b"},
+		{ID: "i-003", Name: "c"},
+		{ID: "i-004", Name: "d"},
 	}
 	m := views.NewResourceListFromCache(
 		resource.ResourceTypeDef{ShortName: "ec2", Name: "EC2 Instances"},

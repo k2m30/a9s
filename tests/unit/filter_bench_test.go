@@ -14,7 +14,6 @@ func generateResources(n int) []resource.Resource {
 		resources[i] = resource.Resource{
 			ID:     fmt.Sprintf("i-%010d", i),
 			Name:   fmt.Sprintf("instance-%d", i),
-			Status: "running",
 			Fields: map[string]string{
 				"instance_id": fmt.Sprintf("i-%010d", i),
 				"name":        fmt.Sprintf("instance-%d", i),
