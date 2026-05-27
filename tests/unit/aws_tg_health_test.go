@@ -106,8 +106,8 @@ func TestFetchTargetHealth_Basic(t *testing.T) {
 	})
 
 	t.Run("target_0_Status", func(t *testing.T) {
-		if resources[0].Status != "healthy" {
-			t.Errorf("Status: expected %q, got %q", "healthy", resources[0].Status)
+		if resources[0].Fields["status"] != "healthy" {
+			t.Errorf("Fields[\"status\"]: expected %q, got %q", "healthy", resources[0].Fields["status"])
 		}
 	})
 
@@ -149,8 +149,8 @@ func TestFetchTargetHealth_Basic(t *testing.T) {
 
 	t.Run("target_2_unhealthy", func(t *testing.T) {
 		r := resources[2]
-		if r.Status != "unhealthy" {
-			t.Errorf("Status: expected %q, got %q", "unhealthy", r.Status)
+		if r.Fields["status"] != "unhealthy" {
+			t.Errorf("Fields[\"status\"]: expected %q, got %q", "unhealthy", r.Fields["status"])
 		}
 		if r.Fields["reason"] != "Target.FailedHealthChecks" {
 			t.Errorf("Fields[reason]: expected %q, got %q", "Target.FailedHealthChecks", r.Fields["reason"])
@@ -162,8 +162,8 @@ func TestFetchTargetHealth_Basic(t *testing.T) {
 
 	t.Run("target_3_draining", func(t *testing.T) {
 		r := resources[3]
-		if r.Status != "draining" {
-			t.Errorf("Status: expected %q, got %q", "draining", r.Status)
+		if r.Fields["status"] != "draining" {
+			t.Errorf("Fields[\"status\"]: expected %q, got %q", "draining", r.Fields["status"])
 		}
 		if r.Fields["reason"] != "Target.DeregistrationInProgress" {
 			t.Errorf("Fields[reason]: expected %q, got %q", "Target.DeregistrationInProgress", r.Fields["reason"])
@@ -279,8 +279,8 @@ func TestFetchTargetHealth_AllStates(t *testing.T) {
 
 	for i, s := range states {
 		t.Run(s.expected, func(t *testing.T) {
-			if resources[i].Status != s.expected {
-				t.Errorf("Status: expected %q, got %q", s.expected, resources[i].Status)
+			if resources[i].Fields["status"] != s.expected {
+				t.Errorf("Fields[\"status\"]: expected %q, got %q", s.expected, resources[i].Fields["status"])
 			}
 			if resources[i].Fields["health"] != s.expected {
 				t.Errorf("Fields[health]: expected %q, got %q", s.expected, resources[i].Fields["health"])
@@ -362,8 +362,8 @@ func TestFetchTargetHealth_IPTargets(t *testing.T) {
 		if r.ID != "10.0.2.103" {
 			t.Errorf("ID: expected %q, got %q", "10.0.2.103", r.ID)
 		}
-		if r.Status != "unhealthy" {
-			t.Errorf("Status: expected %q, got %q", "unhealthy", r.Status)
+		if r.Fields["status"] != "unhealthy" {
+			t.Errorf("Fields[\"status\"]: expected %q, got %q", "unhealthy", r.Fields["status"])
 		}
 		if r.Fields["reason"] != "Target.Timeout" {
 			t.Errorf("Fields[reason]: expected %q, got %q", "Target.Timeout", r.Fields["reason"])

@@ -83,8 +83,8 @@ func TestFetchSFNExecutions_Basic(t *testing.T) {
 	})
 
 	t.Run("Status_is_uppercase", func(t *testing.T) {
-		if r.Status != "SUCCEEDED" {
-			t.Errorf("Status: expected %q, got %q", "SUCCEEDED", r.Status)
+		if r.Fields["status"] != "SUCCEEDED" {
+			t.Errorf("Fields[\"status\"]: expected %q, got %q", "SUCCEEDED", r.Fields["status"])
 		}
 	})
 
@@ -348,8 +348,8 @@ func TestFetchSFNExecutions_NilFields(t *testing.T) {
 
 	t.Run("status_populated", func(t *testing.T) {
 		r := result.Resources[0]
-		if r.Status != "RUNNING" {
-			t.Errorf("Status: expected %q, got %q", "RUNNING", r.Status)
+		if r.Fields["status"] != "RUNNING" {
+			t.Errorf("Fields[\"status\"]: expected %q, got %q", "RUNNING", r.Fields["status"])
 		}
 	})
 }
@@ -450,8 +450,8 @@ func TestFetchSFNExecutions_Pagination(t *testing.T) {
 
 	t.Run("page1_all_have_status", func(t *testing.T) {
 		for i, r := range result1.Resources {
-			if r.Status == "" {
-				t.Errorf("page 1: resources[%d].Status should not be empty", i)
+			if r.Fields["status"] == "" {
+				t.Errorf("page 1: resources[%d].Fields[\"status\"] should not be empty", i)
 			}
 		}
 	})
@@ -761,9 +761,6 @@ func TestFetchSFNExecutions_StatusPreserved(t *testing.T) {
 				t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 			}
 
-			if result.Resources[0].Status != tc.expected {
-				t.Errorf("Status: expected %q, got %q", tc.expected, result.Resources[0].Status)
-			}
 			if result.Resources[0].Fields["status"] != tc.expected {
 				t.Errorf("Fields[status]: expected %q, got %q", tc.expected, result.Resources[0].Fields["status"])
 			}

@@ -360,8 +360,7 @@ func TestCTEventProjectorTierMapping(t *testing.T) {
 
 			projRes := domain.Resource{
 				ID:        "test-event-id",
-				Status:    tc.tier,
-				Fields:    map[string]string{},
+				Fields:    map[string]string{"status": tc.tier},
 				RawStruct: event,
 			}
 

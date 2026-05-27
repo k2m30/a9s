@@ -68,8 +68,8 @@ func TestFetchLambdaInvocations_Basic(t *testing.T) {
 	})
 
 	t.Run("invocation_0_Status_OK", func(t *testing.T) {
-		if resources[0].Status != "OK" {
-			t.Errorf("Status: expected %q, got %q", "OK", resources[0].Status)
+		if resources[0].Fields["status"] != "OK" {
+			t.Errorf("Fields[\"status\"]: expected %q, got %q", "OK", resources[0].Fields["status"])
 		}
 	})
 
@@ -209,8 +209,8 @@ func TestFetchLambdaInvocations_ErrorStatus(t *testing.T) {
 	}
 
 	// A simple REPORT without error markers should be "OK"
-	if resources[0].Status != "OK" {
-		t.Errorf("Status: expected %q for normal REPORT, got %q", "OK", resources[0].Status)
+	if resources[0].Fields["status"] != "OK" {
+		t.Errorf("Fields[\"status\"]: expected %q for normal REPORT, got %q", "OK", resources[0].Fields["status"])
 	}
 }
 

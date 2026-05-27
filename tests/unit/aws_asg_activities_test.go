@@ -83,8 +83,8 @@ func TestFetchAsgActivities_Basic(t *testing.T) {
 	})
 
 	t.Run("Status_is_string_StatusCode", func(t *testing.T) {
-		if r.Status != "Successful" {
-			t.Errorf("Status: expected %q, got %q", "Successful", r.Status)
+		if r.Fields["status"] != "Successful" {
+			t.Errorf("Fields[\"status\"]: expected %q, got %q", "Successful", r.Fields["status"])
 		}
 	})
 
@@ -530,8 +530,8 @@ func TestFetchAsgActivities_Pagination(t *testing.T) {
 
 	t.Run("page1_all_have_status", func(t *testing.T) {
 		for i, r := range result1.Resources {
-			if r.Status == "" {
-				t.Errorf("page 1: resources[%d].Status should not be empty", i)
+			if r.Fields["status"] == "" {
+				t.Errorf("page 1: resources[%d].Fields[\"status\"] should not be empty", i)
 			}
 		}
 	})

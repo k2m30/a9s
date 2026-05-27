@@ -132,11 +132,12 @@ type ResourceTypeDef struct {
 }
 
 // ResolveColor classifies r using d.Color, defaulting to a generic
-// status-based color when d.Color is nil. All registered types have non-nil
-// Color (invariant #7); the fallback exists only for ad-hoc test doubles.
+// status-based color when d.Color is nil, reading Fields["status"]. All
+// registered types have non-nil Color (invariant #7); the fallback exists
+// only for ad-hoc test doubles.
 func (d ResourceTypeDef) ResolveColor(r domain.Resource) domain.Color {
 	if d.Color == nil {
-		return colorFallback(r.Status)
+		return colorFallback(r.Fields["status"])
 	}
 	return d.Color(r)
 }

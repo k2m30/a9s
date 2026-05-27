@@ -68,13 +68,13 @@ func convertTargetHealth(thd elbv2types.TargetHealthDescription) resource.Resour
 	}
 
 	return resource.Resource{
-		ID:     targetID,
-		Name:   targetID,
-		Status: health,
+		ID:   targetID,
+		Name: targetID,
 		Fields: map[string]string{
 			"target_id":   targetID,
 			"port":        port,
 			"az":          az,
+			"status":      health,
 			"health":      health,
 			"reason":      reason,
 			"description": description,

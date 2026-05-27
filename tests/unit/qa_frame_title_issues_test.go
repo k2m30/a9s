@@ -23,15 +23,17 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
-// makeResourcesWithStatuses creates a slice of resources with the given statuses.
-// Each resource gets a synthetic ID to avoid collisions.
+// makeResourcesWithStatuses creates a slice of resources with the given
+// statuses. Each resource gets a synthetic ID to avoid collisions. The status
+// is stored under Fields["status"] which the colorFallback reads when the
+// ResourceTypeDef has no per-type Color func (as in these title tests).
 func makeResourcesWithStatuses(statuses ...string) []resource.Resource {
 	res := make([]resource.Resource, len(statuses))
 	for i, s := range statuses {
 		res[i] = resource.Resource{
 			ID:     fmt.Sprintf("i-%04d", i),
 			Name:   fmt.Sprintf("resource-%d", i),
-			Status: s,
+			Fields: map[string]string{"status": s},
 		}
 	}
 	return res
@@ -137,7 +139,7 @@ func TestFrameTitleTextFilterActive(t *testing.T) {
 	for i := range resources {
 		resources[i] = resource.Resource{
 			ID:     fmt.Sprintf("i-%04d", i),
-			Status: "stopped", // all are issues, but filter badge should not appear
+			Fields: map[string]string{"status": "stopped"}, // all are issues, but filter badge should not appear
 		}
 		if i < 7 {
 			resources[i].Name = fmt.Sprintf("web-%d", i)
@@ -190,13 +192,13 @@ func TestFrameTitleCtrlZAndTextFilter(t *testing.T) {
 		switch {
 		case i < 10:
 			resources[i].Name = fmt.Sprintf("web-%d", i)
-			resources[i].Status = "running"
+			resources[i].Fields = map[string]string{"status": "running"}
 		case i < 20:
 			resources[i].Name = fmt.Sprintf("app-%d", i)
-			resources[i].Status = "running"
+			resources[i].Fields = map[string]string{"status": "running"}
 		default:
-			resources[i].Name = fmt.Sprintf("web-%d", i) // matches text filter
-			resources[i].Status = "terminated"           // dim — filtered by ctrl+z
+			resources[i].Name = fmt.Sprintf("web-%d", i)                    // matches text filter
+			resources[i].Fields = map[string]string{"status": "terminated"} // dim — filtered by ctrl+z
 		}
 	}
 	// With text="web-" and attentionOnly=true:

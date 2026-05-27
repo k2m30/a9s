@@ -145,10 +145,10 @@ func convertPipelineStageAction(stageName, stageStatus string, action cptypes.Ac
 	status := pipelineActionStatus(actionStatus)
 
 	return resource.Resource{
-		ID:     id,
-		Name:   actionName,
-		Status: status,
+		ID:   id,
+		Name: actionName,
 		Fields: map[string]string{
+			"status":               status,
 			"stage_name":           displayStageName,
 			"stage_status":         displayStageStatus,
 			"action_name":          actionName,

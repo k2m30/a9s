@@ -50,9 +50,6 @@ func colorEC2(r domain.Resource) domain.Color {
 		return domain.ColorWarning
 	}
 	state := r.Fields["state"]
-	if state == "" {
-		state = r.Status
-	}
 	switch state {
 	case "running", "":
 		return domain.ColorHealthy
@@ -140,9 +137,6 @@ func colorLambda(r domain.Resource) domain.Color {
 		return c
 	}
 	state := r.Fields["state"]
-	if state == "" {
-		state = r.Status
-	}
 	switch state {
 	case "Failed":
 		return domain.ColorBroken
@@ -900,9 +894,8 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		},
 		StubCreator: func(id string) domain.Resource {
 			return domain.Resource{
-				ID:     id,
-				Name:   id,
-				Status: "-",
+				ID:   id,
+				Name: id,
 				Fields: map[string]string{
 					"image_id": id,
 					"ImageId":  id,

@@ -53,20 +53,20 @@ func buildIssueCountList(t *testing.T, resources []resource.Resource) views.Reso
 func TestResourceListIssueCountOnlyRedYellow(t *testing.T) {
 	resources := []resource.Resource{
 		// Green — running (not an issue)
-		{ID: "i-001", Name: "web-01", Status: "running"},
-		{ID: "i-002", Name: "web-02", Status: "running"},
-		{ID: "i-003", Name: "web-03", Status: "running"},
-		{ID: "i-004", Name: "web-04", Status: "running"},
-		{ID: "i-005", Name: "web-05", Status: "running"},
+		{ID: "i-001", Name: "web-01", Fields: map[string]string{"status": "running"}},
+		{ID: "i-002", Name: "web-02", Fields: map[string]string{"status": "running"}},
+		{ID: "i-003", Name: "web-03", Fields: map[string]string{"status": "running"}},
+		{ID: "i-004", Name: "web-04", Fields: map[string]string{"status": "running"}},
+		{ID: "i-005", Name: "web-05", Fields: map[string]string{"status": "running"}},
 		// Red — stopped (issue)
-		{ID: "i-006", Name: "db-01", Status: "stopped"},
-		{ID: "i-007", Name: "db-02", Status: "stopped"},
-		{ID: "i-008", Name: "db-03", Status: "stopped"},
+		{ID: "i-006", Name: "db-01", Fields: map[string]string{"status": "stopped"}},
+		{ID: "i-007", Name: "db-02", Fields: map[string]string{"status": "stopped"}},
+		{ID: "i-008", Name: "db-03", Fields: map[string]string{"status": "stopped"}},
 		// Yellow — pending (issue)
-		{ID: "i-009", Name: "cache-01", Status: "pending"},
-		{ID: "i-010", Name: "cache-02", Status: "pending"},
+		{ID: "i-009", Name: "cache-01", Fields: map[string]string{"status": "pending"}},
+		{ID: "i-010", Name: "cache-02", Fields: map[string]string{"status": "pending"}},
 		// Dim — terminated (not an issue)
-		{ID: "i-011", Name: "old-01", Status: "terminated"},
+		{ID: "i-011", Name: "old-01", Fields: map[string]string{"status": "terminated"}},
 	}
 
 	m := buildIssueCountList(t, resources)
@@ -85,9 +85,9 @@ func TestResourceListIssueCountOnlyRedYellow(t *testing.T) {
 // returns 0 when all resources have a healthy (green) status.
 func TestResourceListIssueCountZeroWhenAllHealthy(t *testing.T) {
 	resources := []resource.Resource{
-		{ID: "i-001", Name: "web-01", Status: "running"},
-		{ID: "i-002", Name: "web-02", Status: "running"},
-		{ID: "i-003", Name: "web-03", Status: "running"},
+		{ID: "i-001", Name: "web-01", Fields: map[string]string{"status": "running"}},
+		{ID: "i-002", Name: "web-02", Fields: map[string]string{"status": "running"}},
+		{ID: "i-003", Name: "web-03", Fields: map[string]string{"status": "running"}},
 	}
 
 	m := buildIssueCountList(t, resources)
@@ -105,11 +105,11 @@ func TestResourceListIssueCountZeroWhenAllHealthy(t *testing.T) {
 // total resource count when all resources have red or yellow statuses.
 func TestResourceListIssueCountAllIssues(t *testing.T) {
 	resources := []resource.Resource{
-		{ID: "i-001", Name: "db-01", Status: "stopped"},
-		{ID: "i-002", Name: "db-02", Status: "failed"},
-		{ID: "i-003", Name: "db-03", Status: "error"},
-		{ID: "i-004", Name: "cache-01", Status: "pending"},
-		{ID: "i-005", Name: "cache-02", Status: "creating"},
+		{ID: "i-001", Name: "db-01", Fields: map[string]string{"status": "stopped"}},
+		{ID: "i-002", Name: "db-02", Fields: map[string]string{"status": "failed"}},
+		{ID: "i-003", Name: "db-03", Fields: map[string]string{"status": "error"}},
+		{ID: "i-004", Name: "cache-01", Fields: map[string]string{"status": "pending"}},
+		{ID: "i-005", Name: "cache-02", Fields: map[string]string{"status": "creating"}},
 	}
 
 	m := buildIssueCountList(t, resources)
