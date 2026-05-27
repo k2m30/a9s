@@ -56,7 +56,9 @@ type Event struct {
 	// internal/aws/ct_events_severity.go ClassifyCTVerb)
 	Verb string // "R" | "W" | "D" | "S" | "I" | "N" | "?"
 
-	// Status is the severity tier computed from the event (from resource.Resource.Status).
+	// Status is the severity tier computed from the event by
+	// internal/aws/ct_events.go#computeCTStatus and written to
+	// resource.Resource.Fields["status"].
 	// One of "ct-info" | "ct-attention" | "ct-danger".
 	Status string
 }

@@ -386,7 +386,7 @@ func buildRedshiftClusters() []redshifttypes.Cluster {
 	// -----------------------------------------------------------------------
 	// 20. redshift-broken-with-warning-hidden — Broken suppresses Warnings (U8)
 	// ClusterStatus=storage-full (Broken) + ClusterAvailabilityStatus=Modifying + PubliclyAccessible=true + Encrypted=false
-	// Expected: Resource.Status = "broken: storage-full", Issues = ["broken: storage-full"]
+	// Expected: Fields["status"] = "broken: storage-full", Findings (wave1) phrases = ["broken: storage-full"]
 	// -----------------------------------------------------------------------
 	brokenWithWarning := redshiftBaselineHealthy(RedshiftBrokenWithWarningHiddenID)
 	brokenWithWarning.ClusterStatus = aws.String("storage-full")
@@ -399,7 +399,7 @@ func buildRedshiftClusters() []redshifttypes.Cluster {
 	// -----------------------------------------------------------------------
 	// 21. redshift-avail-unavailable-with-warning-hidden — availability-driven Broken suppresses Warning (U8)
 	// ClusterStatus=available, ClusterAvailabilityStatus=Unavailable + PubliclyAccessible=true
-	// Expected: Resource.Status = "unavailable", Issues = ["unavailable"]
+	// Expected: Fields["status"] = "unavailable", Findings (wave1) phrases = ["unavailable"]
 	// -----------------------------------------------------------------------
 	availUnavailableWithWarning := redshiftBaselineHealthy(RedshiftAvailUnavailableWithWarningHiddenID)
 	availUnavailableWithWarning.ClusterAvailabilityStatus = aws.String("Unavailable")
