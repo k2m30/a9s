@@ -324,7 +324,7 @@ func buildRedisReplicationGroups() []elasticachetypes.ReplicationGroup {
 		// Multi-W1 fixture (U7a): Status=modifying + multi-AZ without auto-failover.
 		// Two coexisting §3.1 Warnings in the same row.
 		// Expected Fields["status"] == "modifying — config change (+1)".
-		// Expected Resource.Issues == ["modifying — config change", "multi-AZ without auto-failover"].
+		// Expected Findings (wave1) phrases == ["modifying — config change", "multi-AZ without auto-failover"].
 		{
 			ReplicationGroupId:   aws.String(WarnRedisMultiID),
 			Description:          aws.String("Legacy billing Redis (modifying + no failover)"),
@@ -454,7 +454,7 @@ func buildRedisReplicationGroups() []elasticachetypes.ReplicationGroup {
 
 		// Multi-shard one-modifying — shard 0001 modifying, 0002 + 0003 available.
 		// Expected Fields["status"] == "shard 0001: modifying".
-		// Expected Resource.Issues == ["shard 0001: modifying"].
+		// Expected Findings (wave1) phrases == ["shard 0001: modifying"].
 		{
 			ReplicationGroupId: aws.String(MultiShardOneModifyingID),
 			Description:        aws.String("Multi-shard cluster (shard 0001 modifying)"),
@@ -527,7 +527,7 @@ func buildRedisReplicationGroups() []elasticachetypes.ReplicationGroup {
 
 		// Multi-shard two-transitioning — shard 0001 modifying + 0002 snapshotting + 0003 available.
 		// Expected Fields["status"] == "shard 0001: modifying (+1)".
-		// Expected Resource.Issues == ["shard 0001: modifying", "shard 0002: snapshotting"] (alphabetical).
+		// Expected Findings (wave1) phrases == ["shard 0001: modifying", "shard 0002: snapshotting"] (alphabetical).
 		{
 			ReplicationGroupId: aws.String(MultiShardTwoTransitioningID),
 			Description:        aws.String("Multi-shard cluster (two shards transitioning)"),
