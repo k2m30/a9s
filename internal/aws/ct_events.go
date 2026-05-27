@@ -229,7 +229,8 @@ func buildCTResource(event cloudtrailtypes.Event) resource.Resource {
 	sourceIP := strFromMap(parsed, "sourceIPAddress")
 	region := strFromMap(parsed, "awsRegion")
 
-	// Set Resource.Status using §1.2 severity ladder.
+	// Compute the §1.2 severity tier ("ct-info" | "ct-attention" | "ct-danger").
+	// Written below to Fields["status"] and used to build wave1 Findings.
 	status := computeCTStatus(verb, eventName, source, errorCode, uiType, accountID, recipientAccount)
 
 	r := resource.Resource{

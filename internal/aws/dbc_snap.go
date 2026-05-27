@@ -17,8 +17,10 @@ import (
 
 // ComputeDBCSnapStatusAndIssues computes the §4 status phrase and ordered
 // issues slice for a DocDB / Aurora cluster snapshot. Returns ("", nil) for a
-// healthy (available) snapshot. The top phrase becomes Resource.Status; the
-// full slice becomes Resource.Issues.
+// healthy (available) snapshot. The returned values mirror the wave1 Findings
+// emitted by computeDBCSnapFindings: the top phrase is what
+// phraseFromFindings produces for Fields["status"], and the slice is the
+// ordered list of finding phrases.
 //
 // §0.1 / §3.1 precedence ladder (Broken > Warning, table order within severity):
 //  1. Broken: Status == "failed" → phrase "failed"
@@ -30,7 +32,7 @@ import (
 //     Gate: SnapshotType == "manual" AND SnapshotCreateTime != nil AND age > 365.
 //
 // Cross-ref signals (orphan, past-retention) are added by the Wave-1 issue
-// enricher (ComputeDBCSnapStatusAndIssues) via FieldUpdates, never here.
+// enricher via FieldUpdates, never here.
 func ComputeDBCSnapStatusAndIssues(snap docdbtypes.DBClusterSnapshot) (string, []string) {
 	rawStatus := ""
 	if snap.Status != nil {
