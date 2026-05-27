@@ -31,7 +31,7 @@ import (
 //     N = int(time.Since(SnapshotCreateTime).Hours()/24).
 //     Gate: SnapshotType == "manual" AND SnapshotCreateTime != nil AND age > 365.
 //
-// Cross-ref signals (orphan, past-retention) are added by the Wave-2 issue
+// Cross-ref signals (orphan, past-retention) are added by the Wave-1 issue
 // enricher via FieldUpdates, never here.
 func ComputeDBCSnapStatusAndIssues(snap docdbtypes.DBClusterSnapshot) (string, []string) {
 	rawStatus := ""
