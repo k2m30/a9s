@@ -77,9 +77,6 @@ func TestFetchELBListeners_Basic(t *testing.T) {
 	})
 
 	t.Run("Status_is_empty", func(t *testing.T) {
-		if r.Status != "" {
-			t.Errorf("Status: expected empty string, got %q", r.Status)
-		}
 	})
 
 	t.Run("Fields_port", func(t *testing.T) {

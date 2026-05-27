@@ -73,9 +73,8 @@ var _ awsclient.CFNAPI = (*cfnDescribeStacksDriftFake)(nil)
 // FetchCloudFormationStacksPage produces: ID = stack name.
 func cfnDriftStackResource(name, status string) resource.Resource {
 	return resource.Resource{
-		ID:     name,
-		Name:   name,
-		Status: status,
+		ID:   name,
+		Name: name,
 		Fields: map[string]string{
 			"stack_name":    name,
 			"status":        status,

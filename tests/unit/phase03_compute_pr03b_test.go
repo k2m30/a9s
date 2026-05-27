@@ -89,9 +89,6 @@ func TestPR03b_LambdaFetcher_ActiveEmitsNoFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for Active)", r.Status, "")
-	}
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 for Active state", len(r.Findings))
 	}
@@ -123,9 +120,6 @@ func TestPR03b_LambdaFetcher_FailedEmitsBrokenFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for Failed state", len(r.Findings))
 	}
@@ -193,9 +187,6 @@ func TestPR03b_EKSFetcher_ActiveEmitsNoFinding(t *testing.T) {
 	}
 	r := resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for ACTIVE)", r.Status, "")
-	}
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 for ACTIVE cluster", len(r.Findings))
 	}
@@ -224,9 +215,6 @@ func TestPR03b_EKSFetcher_FailedEmitsBrokenFinding(t *testing.T) {
 	}
 	r := resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for FAILED cluster", len(r.Findings))
 	}
@@ -309,9 +297,6 @@ func TestPR03b_ASGFetcher_HealthyEmitsNoFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for healthy ASG)", r.Status, "")
-	}
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 for healthy ASG", len(r.Findings))
 	}
@@ -346,9 +331,6 @@ func TestPR03b_ASGFetcher_DeletingEmitsWarnFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for deleting ASG", len(r.Findings))
 	}
@@ -409,9 +391,6 @@ func TestPR03b_EBFetcher_GreenEmitsNoFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for Green)", r.Status, "")
-	}
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 for Green environment", len(r.Findings))
 	}
@@ -469,9 +448,6 @@ func TestPR03b_EBSFetcher_InUseEmitsNoFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for in-use volume)", r.Status, "")
-	}
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 for in-use volume", len(r.Findings))
 	}
@@ -504,9 +480,6 @@ func TestPR03b_EBSFetcher_ErrorEmitsBrokenFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for error volume", len(r.Findings))
 	}
@@ -575,9 +548,6 @@ func TestPR03b_AMIFetcher_AvailableEmitsNoFinding(t *testing.T) {
 	}
 	r := resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for available AMI)", r.Status, "")
-	}
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 for available AMI", len(r.Findings))
 	}
@@ -611,9 +581,6 @@ func TestPR03b_AMIFetcher_FailedEmitsBrokenFinding(t *testing.T) {
 	}
 	r := resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for failed AMI", len(r.Findings))
 	}
@@ -687,9 +654,6 @@ func TestPR03b_EIPFetcher_AssociatedEmitsNoFinding(t *testing.T) {
 	}
 	r := resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status=domain)", r.Status, "")
-	}
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 for associated EIP", len(r.Findings))
 	}
@@ -722,9 +686,6 @@ func TestPR03b_EIPFetcher_UnassociatedEmitsWarnFinding(t *testing.T) {
 	}
 	r := resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status=domain)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for unassociated EIP", len(r.Findings))
 	}
@@ -797,9 +758,6 @@ func TestPR03b_ENIFetcher_InUseEmitsNoFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for in-use ENI)", r.Status, "")
-	}
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 for in-use ENI", len(r.Findings))
 	}
@@ -832,9 +790,6 @@ func TestPR03b_ENIFetcher_AttachingEmitsWarnFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for attaching ENI", len(r.Findings))
 	}
@@ -907,9 +862,6 @@ func TestPR03b_EBSSnapFetcher_CompletedEmitsNoFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for completed snapshot)", r.Status, "")
-	}
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 for completed snapshot", len(r.Findings))
 	}
@@ -943,9 +895,6 @@ func TestPR03b_EBSSnapFetcher_ErrorEmitsBrokenFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for error snapshot", len(r.Findings))
 	}
@@ -1145,9 +1094,6 @@ func TestPR03b_EBFetcher_DoesNotEmitHealthAsWave1Finding(t *testing.T) {
 				t.Errorf("health=%s: Findings: got %d, want 0 (health must not be emitted as wave1 Finding)", tc.name, len(r.Findings))
 			}
 			// Fetcher must not write Status.
-			if r.Status != "" {
-				t.Errorf("health=%s: Status: got %q, want %q (fetcher must not write Status)", tc.name, r.Status, "")
-			}
 			// Fields["health"] must carry the raw health value for structural Color classification.
 			if r.Fields["health"] != tc.name {
 				t.Errorf("health=%s: Fields[\"health\"]: got %q, want %q", tc.name, r.Fields["health"], tc.name)

@@ -353,7 +353,7 @@ func TestFetchECRImages_UntaggedImage(t *testing.T) {
 
 	t.Run("status_terminated", func(t *testing.T) {
 		if r.Fields["status"] != "terminated" {
-			t.Errorf("Fields[\"status\"]: expected %q for untagged image, got %q", "terminated", r.Fields["status"])
+			t.Errorf("Status: expected %q for untagged image, got %q", "terminated", r.Fields["status"])
 		}
 	})
 }
@@ -892,7 +892,7 @@ func TestFetchECRImages_StatusMapping(t *testing.T) {
 			}
 
 			if result.Resources[0].Fields["status"] != tc.expectedStatus {
-				t.Errorf("Fields[\"status\"]: expected %q, got %q", tc.expectedStatus, result.Resources[0].Fields["status"])
+				t.Errorf("Status: expected %q, got %q", tc.expectedStatus, result.Resources[0].Fields["status"])
 			}
 		})
 	}

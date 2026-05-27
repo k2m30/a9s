@@ -88,20 +88,31 @@ func makeCrossRefCfg(retentionEnabled bool) awsclient.SnapshotCrossRefConfig {
 func snapRes(snap testSnap) resource.Resource {
 	return resource.Resource{
 		ID:        snap.ID,
-		Status:    "",
 		RawStruct: snap,
 	}
 }
 
-// snapResWithStatus builds a resource.Resource with a pre-existing Status and
-// Issues slice (simulates a Wave-1 fetcher that emitted findings before Wave 2).
+// snapResWithStatus builds a resource.Resource with a pre-existing Wave-1
+// finding (simulates a fetcher that emitted findings before Wave 2).
+// Empty status / nil issues produces a resource with no Findings.
 func snapResWithStatus(snap testSnap, status string, issues []string) resource.Resource {
-	return resource.Resource{
+	r := resource.Resource{
 		ID:        snap.ID,
-		Status:    status,
-		Issues:    issues,
+		Fields:    map[string]string{},
 		RawStruct: snap,
 	}
+	if status != "" {
+		r.Fields["status"] = status
+	}
+	for _, phrase := range issues {
+		r.Findings = append(r.Findings, domain.Finding{
+			Code:     domain.FindingCode("wave1." + phrase),
+			Phrase:   phrase,
+			Severity: domain.SevBroken,
+			Source:   "wave1",
+		})
+	}
+	return r
 }
 
 // parentCache builds a ResourceCache with "test-parent" entries.

@@ -52,9 +52,6 @@ func TestQA_IAMGroups_FetchSuccess(t *testing.T) {
 	if r.Name != "admins" {
 		t.Errorf("expected Name 'admins', got %q", r.Name)
 	}
-	if r.Status != "" {
-		t.Errorf("expected empty status, got %q", r.Status)
-	}
 	if r.Fields["group_name"] != "admins" {
 		t.Errorf("expected group_name 'admins', got %q", r.Fields["group_name"])
 	}

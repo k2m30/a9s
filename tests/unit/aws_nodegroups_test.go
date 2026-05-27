@@ -122,9 +122,6 @@ func TestFetchNodeGroups_ParsesMultipleClustersAndGroups(t *testing.T) {
 	}
 	// Post-PR-03c: fetcher no longer writes Status for ACTIVE node groups.
 	// State lives in Fields["status"]; ACTIVE node groups emit no Finding.
-	if r0.Status != "" {
-		t.Errorf("resource[0].Status leaked: got %q, want %q (fetcher must stop writing Status)", r0.Status, "")
-	}
 	if len(r0.Findings) != 0 {
 		t.Errorf("resource[0].Findings: got %d, want 0 for ACTIVE node group", len(r0.Findings))
 	}
@@ -169,9 +166,6 @@ func TestFetchNodeGroups_ParsesMultipleClustersAndGroups(t *testing.T) {
 	}
 	// Post-PR-03c: CREATING is a transitional state — fetcher emits SevWarn Finding,
 	// stops writing Status. State lives in Fields["status"].
-	if r2.Status != "" {
-		t.Errorf("resource[2].Status leaked: got %q, want %q (fetcher must stop writing Status for CREATING)", r2.Status, "")
-	}
 	if r2.Fields["status"] != "CREATING" {
 		t.Errorf("resource[2].Fields[status]: expected %q, got %q", "CREATING", r2.Fields["status"])
 	}
@@ -459,9 +453,6 @@ func TestFetchNodeGroups_RealAWSData(t *testing.T) {
 	gpu := resources[gpuIdx]
 	// Post-PR-03c: CREATE_FAILED is a broken state — fetcher emits SevBroken Finding,
 	// stops writing Status. State lives in Fields["status"].
-	if gpu.Status != "" {
-		t.Errorf("gpu node group Status leaked: got %q, want %q (fetcher must stop writing Status)", gpu.Status, "")
-	}
 	if gpu.Fields["status"] != "CREATE_FAILED" {
 		t.Errorf("gpu node group Fields[status]: expected %q, got %q", "CREATE_FAILED", gpu.Fields["status"])
 	}
@@ -506,9 +497,6 @@ func TestFetchNodeGroups_RealAWSData(t *testing.T) {
 	}
 	kafka := resources[kafkaIdx]
 	// Post-PR-03c: fetcher no longer writes Status for ACTIVE node groups.
-	if kafka.Status != "" {
-		t.Errorf("kafka node group Status leaked: got %q, want %q (fetcher must stop writing Status)", kafka.Status, "")
-	}
 	if len(kafka.Findings) != 0 {
 		t.Errorf("kafka node group Findings: got %d, want 0 for ACTIVE", len(kafka.Findings))
 	}
@@ -545,9 +533,6 @@ func TestFetchNodeGroups_RealAWSData(t *testing.T) {
 	}
 	system := resources[systemIdx]
 	// Post-PR-03c: fetcher no longer writes Status for ACTIVE node groups.
-	if system.Status != "" {
-		t.Errorf("system node group Status leaked: got %q, want %q (fetcher must stop writing Status)", system.Status, "")
-	}
 	if len(system.Findings) != 0 {
 		t.Errorf("system node group Findings: got %d, want 0 for ACTIVE", len(system.Findings))
 	}

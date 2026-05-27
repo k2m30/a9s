@@ -55,9 +55,6 @@ func TestQA_IAMUsers_FetchSuccess(t *testing.T) {
 	if r.Name != "alice" {
 		t.Errorf("expected Name 'alice', got %q", r.Name)
 	}
-	if r.Status != "" {
-		t.Errorf("expected empty status, got %q", r.Status)
-	}
 	if r.Fields["user_name"] != "alice" {
 		t.Errorf("expected user_name 'alice', got %q", r.Fields["user_name"])
 	}

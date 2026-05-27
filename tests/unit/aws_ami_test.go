@@ -72,10 +72,7 @@ func TestFetchAMIs_ParsesMultipleImages(t *testing.T) {
 	if r0.Name != "my-web-server-ami" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "my-web-server-ami", r0.Name)
 	}
-	// Post-fold contract: fetcher stops writing Status; available state is healthy → no Finding.
-	if r0.Status != "" {
-		t.Errorf("resource[0].Status: expected %q (fetcher must not write Status), got %q", "", r0.Status)
-	}
+	// Post-fold contract: available state is healthy → no Finding.
 	if len(r0.Findings) != 0 {
 		t.Errorf("resource[0].Findings: expected 0 for available AMI, got %d", len(r0.Findings))
 	}
@@ -88,10 +85,7 @@ func TestFetchAMIs_ParsesMultipleImages(t *testing.T) {
 	if r1.Name != "my-arm64-ami" {
 		t.Errorf("resource[1].Name: expected %q, got %q", "my-arm64-ami", r1.Name)
 	}
-	// Post-fold contract: available state is healthy → no Status, no Finding.
-	if r1.Status != "" {
-		t.Errorf("resource[1].Status: expected %q (fetcher must not write Status), got %q", "", r1.Status)
-	}
+	// Post-fold contract: available state is healthy → no Finding.
 	if len(r1.Findings) != 0 {
 		t.Errorf("resource[1].Findings: expected 0 for available AMI, got %d", len(r1.Findings))
 	}

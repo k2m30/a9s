@@ -118,9 +118,6 @@ func TestFetchIAMGroupMembers_Basic(t *testing.T) {
 		}
 	})
 	t.Run("Status_is_empty", func(t *testing.T) {
-		if r0.Status != "" {
-			t.Errorf("Status: expected empty, got %q", r0.Status)
-		}
 	})
 
 	t.Run("required_fields_present_on_all_rows", func(t *testing.T) {

@@ -133,17 +133,16 @@ func domainItemToFieldItem(it domain.Item, sectionTitle string) fieldpath.FieldI
 }
 
 // injectAttentionSection prepends a unified "Attention" section to the field
-// list when the resource has one or more active signals — either a Wave 1
-// phrase in m.res.Issues or a Wave 2 m.enrichmentFinding. Spec §4 universal
-// rule 7: every finding must remain individually visible across S2–S5. The
-// list view's Status column shows only the top phrase (with optional `(+N)`
-// suffix for multi-finding rows); this section surfaces the full set so the
-// operator sees everything at a 3am glance without hunting through raw SDK
-// fields.
+// list when the resource has one or more active signals in m.res.Findings.
+// Spec §4 universal rule 7: every finding must remain individually visible
+// across S2–S5. The list view's Status column shows only the top phrase (with
+// optional `(+N)` suffix for multi-finding rows); this section surfaces the
+// full set so the operator sees everything at a 3am glance without hunting
+// through raw SDK fields.
 //
-// Entry order: "!" (broken) first, then "~" and others. Within a tier,
-// m.res.Issues retains §4 precedence order, with the Wave 2 finding appended
-// last at its own tier.
+// Per-entry rows come from m.res.AttentionDetails keyed by Finding.Code.
+//
+// Entry order: "!" (broken) first, then "~" and others.
 //
 // Section header: "Attention (N)" where N is the total entry count. Omitted
 // when N == 0 (truly healthy rows).
@@ -163,61 +162,34 @@ func (m *DetailModel) injectAttentionSection() {
 		splitKeyValue bool // when true: Key=primary (raw phrase), Value=glyph+capitalizedPhrase (display)
 	}
 	var entries []entry
-	// PR-03a-views: read r.Findings + r.AttentionDetails when Findings is populated.
-	// Fall back to legacy r.Issues + m.enrichmentFinding when Findings is empty.
-	if len(m.res.Findings) > 0 {
-		for _, f := range m.res.Findings {
-			// Only surface issue-severity findings in the Attention section.
-			// SevOK / SevDim findings represent healthy / informational states
-			// that carry no actionable signal — including them would create a
-			// spurious "Attention (1)" block on every healthy resource whose
-			// Status was promoted to a Findings entry by DeriveFindings.
-			if !f.Severity.IsIssue() {
-				continue
-			}
-			var tier string
-			switch f.Severity {
-			case domain.SevBroken:
-				tier = "!"
-			default:
-				tier = "~"
-			}
-			var rows []domain.DetailRow
-			if m.res.AttentionDetails != nil {
-				if det, ok := m.res.AttentionDetails[f.Code]; ok {
-					rows = det.Rows
-				}
-			}
-			// splitKeyValue=true: Key holds the raw phrase (for search and clipboard),
-			// Value holds the glyph+capitalized phrase (for TUI display). PlainContent
-			// renders "raw phrase: ! Capitalized phrase" so callers can match against
-			// the original lowercase text; the TUI viewport renders only the Value to
-			// keep the line short enough to fit the viewport.
-			entries = append(entries, entry{tier: tier, primary: f.Phrase, rows: rows, splitKeyValue: true})
+	for _, f := range m.res.Findings {
+		// Only surface issue-severity findings in the Attention section.
+		// SevOK / SevDim findings represent healthy / informational states
+		// that carry no actionable signal — including them would create a
+		// spurious "Attention (1)" block on every healthy resource whose
+		// fetcher emitted a SevOK / SevDim lifecycle finding.
+		if !f.Severity.IsIssue() {
+			continue
 		}
-	} else {
-		for _, phrase := range m.res.Issues {
-			entries = append(entries, entry{tier: phraseTier(m.resourceType, phrase), primary: phrase})
+		var tier string
+		switch f.Severity {
+		case domain.SevBroken:
+			tier = "!"
+		default:
+			tier = "~"
 		}
-		if m.enrichmentFinding != nil && m.enrichmentFinding.Phrase != "" {
-			var enrichRows []domain.DetailRow
-			if m.enrichmentDetail != nil {
-				enrichRows = make([]domain.DetailRow, len(m.enrichmentDetail.Rows))
-				copy(enrichRows, m.enrichmentDetail.Rows)
+		var rows []domain.DetailRow
+		if m.res.AttentionDetails != nil {
+			if det, ok := m.res.AttentionDetails[f.Code]; ok {
+				rows = det.Rows
 			}
-			var tier string
-			switch m.enrichmentFinding.Severity {
-			case domain.SevBroken:
-				tier = "!"
-			case domain.SevWarn:
-				tier = "~"
-			}
-			entries = append(entries, entry{
-				tier:    tier,
-				primary: m.enrichmentFinding.Phrase,
-				rows:    enrichRows,
-			})
 		}
+		// splitKeyValue=true: Key holds the raw phrase (for search and clipboard),
+		// Value holds the glyph+capitalized phrase (for TUI display). PlainContent
+		// renders "raw phrase: ! Capitalized phrase" so callers can match against
+		// the original lowercase text; the TUI viewport renders only the Value to
+		// keep the line short enough to fit the viewport.
+		entries = append(entries, entry{tier: tier, primary: f.Phrase, rows: rows, splitKeyValue: true})
 	}
 	if len(entries) == 0 {
 		return
@@ -291,9 +263,9 @@ func (m *DetailModel) injectAttentionSection() {
 }
 
 // capitalizeFirst returns s with its first rune uppercased. Used for
-// presentation in the Attention section — the underlying data (Resource.Issues
-// phrases, EnrichmentFinding.Summary) stays canonical lowercase to match §4
-// spec vocabulary; only the rendered entry is capitalized for readability.
+// presentation in the Attention section — the underlying Finding.Phrase stays
+// canonical lowercase to match §4 spec vocabulary; only the rendered entry is
+// capitalized for readability.
 func capitalizeFirst(s string) string {
 	if s == "" {
 		return s
@@ -335,31 +307,6 @@ func capTierToRowBucket(tier string, rowBucket resource.Color) string {
 		return "~"
 	}
 	return tier
-}
-
-// phraseTier classifies a Wave 1 S4 phrase into "!" (broken) or "~" (warning
-// or info) by delegating to the resource type's Color function. Each type
-// owns its broken-vocabulary — dbi knows about "storage-full", ec2 about
-// "stopped", etc. — so this dispatcher stays universal.
-//
-// The phrase is injected as r.Fields["status"] because each per-type Color
-// func reads it from there. Trailing "(+N)" suffix is stripped inside the
-// Color funcs themselves (via resource.StripFindingSuffix).
-//
-// Unknown resource types default to "~" (warning) — safe for info-only
-// rendering without false-positive "!" coloring.
-func phraseTier(resourceType, phrase string) string {
-	td := resource.FindResourceType(resourceType)
-	if td == nil {
-		return "~"
-	}
-	probe := resource.Resource{
-		Fields: map[string]string{"status": phrase},
-	}
-	if td.ResolveColor(probe) == resource.ColorBroken {
-		return "!"
-	}
-	return "~"
 }
 
 // subFieldIndent returns the left margin for a sub-field at the given indent level.

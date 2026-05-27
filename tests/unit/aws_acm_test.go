@@ -78,7 +78,7 @@ func TestFetchACMCertificates_ParsesMultipleCertificates(t *testing.T) {
 		t.Errorf("resource[0].Name: expected %q, got %q", "api.example.com", r0.Name)
 	}
 	if r0.Fields["status"] != "ISSUED" {
-		t.Errorf("resource[0].Fields[\"status\"]: expected %q, got %q", "ISSUED", r0.Fields["status"])
+		t.Errorf("resource[0].Status: expected %q, got %q", "ISSUED", r0.Fields["status"])
 	}
 	if r0.Fields["domain_name"] != "api.example.com" {
 		t.Errorf("resource[0].Fields[\"domain_name\"]: expected %q, got %q", "api.example.com", r0.Fields["domain_name"])
@@ -102,7 +102,7 @@ func TestFetchACMCertificates_ParsesMultipleCertificates(t *testing.T) {
 		t.Errorf("resource[1].ID: expected %q, got %q", "staging.example.com", r1.ID)
 	}
 	if r1.Fields["status"] != "PENDING_VALIDATION" {
-		t.Errorf("resource[1].Fields[\"status\"]: expected %q, got %q", "PENDING_VALIDATION", r1.Fields["status"])
+		t.Errorf("resource[1].Status: expected %q, got %q", "PENDING_VALIDATION", r1.Fields["status"])
 	}
 	if r1.Fields["type"] != "IMPORTED" {
 		t.Errorf("resource[1].Fields[\"type\"]: expected %q, got %q", "IMPORTED", r1.Fields["type"])

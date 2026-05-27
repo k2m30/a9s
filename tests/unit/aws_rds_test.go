@@ -60,9 +60,6 @@ func TestFetchRDSInstances_ParsesMultipleInstances(t *testing.T) {
 	if r0.ID != "prod-db-01" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "prod-db-01", r0.ID)
 	}
-	if r0.Status != "" {
-		t.Errorf("resource[0].Status: expected %q (healthy silence), got %q", "", r0.Status)
-	}
 
 	// Verify required fields exist and have correct values
 	requiredFields := []string{"db_identifier", "engine", "engine_version", "status", "class", "endpoint", "multi_az"}

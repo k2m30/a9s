@@ -18,7 +18,7 @@ func TestBug_ProfileSwitch_RefreshesResourceList(t *testing.T) {
 	// Navigate to EC2 and load resources
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	oldResources := []resource.Resource{
-		{ID: "i-old", Name: "old-server", Status: "running", Fields: map[string]string{"instance_id": "i-old", "name": "old-server", "state": "running"}},
+		{ID: "i-old", Name: "old-server", Fields: map[string]string{"instance_id": "i-old", "name": "old-server", "state": "running"}},
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: oldResources})
 
@@ -78,7 +78,7 @@ func TestBug_RegionSwitch_RefreshesResourceList(t *testing.T) {
 	m := newRootSizedModel()
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	resources := []resource.Resource{
-		{ID: "i-123", Name: "server", Status: "running", Fields: map[string]string{"instance_id": "i-123"}},
+		{ID: "i-123", Name: "server", Fields: map[string]string{"instance_id": "i-123"}},
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
 
@@ -202,7 +202,7 @@ func TestBug_ProfileSwitch_FlashClears(t *testing.T) {
 	m := newRootSizedModel()
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	resources := []resource.Resource{
-		{ID: "i-123", Name: "srv", Status: "running", Fields: map[string]string{"instance_id": "i-123"}},
+		{ID: "i-123", Name: "srv", Fields: map[string]string{"instance_id": "i-123"}},
 	}
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "ec2", Resources: resources})
 

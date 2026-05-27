@@ -58,7 +58,6 @@ func makeCFResource(id string, aliases []string) resource.Resource {
 	return resource.Resource{
 		ID:        id,
 		Name:      id,
-		Status:    "Deployed",
 		RawStruct: dist,
 	}
 }
@@ -69,8 +68,7 @@ func makeR53Resource(id, zoneName string) resource.Resource {
 	return resource.Resource{
 		ID:     id,
 		Name:   zoneName,
-		Status: "active",
-		Fields: map[string]string{"name": zoneName},
+		Fields: map[string]string{"name": zoneName, "status": "active"},
 	}
 }
 

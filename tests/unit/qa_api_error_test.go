@@ -301,7 +301,7 @@ func TestBug_S3Refresh_InsideBucket(t *testing.T) {
 
 	// Load objects
 	objects := []resource.Resource{
-		{ID: "file1.txt", Name: "file1.txt", Status: "", Fields: map[string]string{
+		{ID: "file1.txt", Name: "file1.txt", Fields: map[string]string{
 			"key": "file1.txt", "size": "1024", "last_modified": "2025-01-01", "storage_class": "STANDARD",
 		}},
 	}
@@ -375,7 +375,7 @@ func TestBug_S3Refresh_InsidePrefix(t *testing.T) {
 
 	// Load objects including a folder
 	objects := []resource.Resource{
-		{ID: "data/", Name: "data/", Status: "folder", Fields: map[string]string{
+		{ID: "data/", Name: "data/", Fields: map[string]string{
 			"key": "data/", "size": "", "last_modified": "", "storage_class": "",
 		}},
 	}
@@ -390,7 +390,7 @@ func TestBug_S3Refresh_InsidePrefix(t *testing.T) {
 
 	// Load objects inside the prefix
 	prefixObjects := []resource.Resource{
-		{ID: "data/file.csv", Name: "data/file.csv", Status: "", Fields: map[string]string{
+		{ID: "data/file.csv", Name: "data/file.csv", Fields: map[string]string{
 			"key": "data/file.csv", "size": "2048", "last_modified": "2025-02-01", "storage_class": "STANDARD",
 		}},
 	}

@@ -323,10 +323,17 @@ func (m DetailModel) SourceResource() resource.Resource {
 	return m.res
 }
 
-// SetEnrichmentFinding sets (or clears) the enrichment finding for this resource.
-// A nil value clears any existing finding (recovery case). Setting a new value
-// invalidates the field list and triggers a viewport re-render so the Attention
-// section appears or disappears immediately.
+// SetEnrichmentFinding sets (or clears) the wave-2 enrichment finding for this
+// resource. A nil value clears any prior wave-2 entry (recovery case). Setting
+// a new value invalidates the field list and triggers a viewport re-render so
+// the Attention section appears or disappears immediately.
+//
+// Phase 03 W1.4b.3: the wave-2 entry now lives directly on m.res.Findings
+// (tagged with Source="wave2:…") instead of a separate DetailModel field, so
+// the renderer reads a single source of truth (m.res.Findings + AttentionDetails).
+// Subsequent calls strip any existing wave-2 entry before appending the new
+// one, preserving the prior "replace, don't accumulate" semantics. Wave-1
+// entries on m.res.Findings are preserved.
 //
 // Cursor stability: the rebuild prepends / removes the Attention section
 // (detail_fields.go:injectAttentionSection), which would otherwise leave
@@ -356,8 +363,40 @@ func (m *DetailModel) SetEnrichmentFinding(f *domain.Finding, ad *domain.Attenti
 		}
 	}
 
-	m.enrichmentFinding = f
-	m.enrichmentDetail = ad
+	// Strip any prior wave-2 entries from m.res.Findings + their companion
+	// AttentionDetails so repeated SetEnrichmentFinding calls replace rather
+	// than accumulate. Wave-1 entries (Source != "wave2:…") are preserved.
+	if len(m.res.Findings) > 0 {
+		kept := m.res.Findings[:0:0]
+		for _, fi := range m.res.Findings {
+			if strings.HasPrefix(fi.Source, "wave2:") {
+				if m.res.AttentionDetails != nil {
+					delete(m.res.AttentionDetails, fi.Code)
+				}
+				continue
+			}
+			kept = append(kept, fi)
+		}
+		m.res.Findings = kept
+	}
+
+	// Append the new wave-2 finding (and AttentionDetail) when present.
+	// Source is stamped so subsequent strip cycles can recognise it, even if
+	// the caller passed an unstamped Finding (e.g. legacy test fixtures).
+	if f != nil && f.Phrase != "" {
+		finding := *f
+		if !strings.HasPrefix(finding.Source, "wave2:") {
+			finding.Source = "wave2:tui"
+		}
+		m.res.Findings = append(m.res.Findings, finding)
+		if ad != nil && len(ad.Rows) > 0 {
+			if m.res.AttentionDetails == nil {
+				m.res.AttentionDetails = make(map[domain.FindingCode]domain.AttentionDetail, 1)
+			}
+			m.res.AttentionDetails[finding.Code] = *ad
+		}
+	}
+
 	m.fieldList = nil
 	m.buildFieldList() // eager rebuild BEFORE render — see sequence in docstring
 

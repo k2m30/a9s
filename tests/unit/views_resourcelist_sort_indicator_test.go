@@ -135,7 +135,6 @@ func syntheticResourceForType(shortName string) resource.Resource {
 			ID:   "event-test-0001",
 			Name: "DescribeInstances",
 			// Use ct-info (dim) so the sort test is purely about header decoration.
-			Status: "ct-info",
 			Fields: map[string]string{
 				"time":        "Apr 07 17:00:00",
 				"event_time":  "2026-04-07T17:00:00Z",
@@ -150,7 +149,6 @@ func syntheticResourceForType(shortName string) resource.Resource {
 		return resource.Resource{
 			ID:     "i-0test001",
 			Name:   "test-instance",
-			Status: "running",
 			Fields: map[string]string{
 				"instance_id": "i-0test001",
 				"name":        "test-instance",
@@ -162,7 +160,6 @@ func syntheticResourceForType(shortName string) resource.Resource {
 		return resource.Resource{
 			ID:     "test-db-instance",
 			Name:   "test-db",
-			Status: "available",
 			Fields: map[string]string{
 				"db_instance_identifier": "test-db",
 				"status":                 "available",
@@ -174,7 +171,6 @@ func syntheticResourceForType(shortName string) resource.Resource {
 		return resource.Resource{
 			ID:     "test-resource-001",
 			Name:   "test-resource",
-			Status: "available",
 			Fields: map[string]string{},
 		}
 	}

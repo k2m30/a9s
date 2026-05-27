@@ -75,9 +75,6 @@ func TestQA_ECSTasks_FetchSuccess(t *testing.T) {
 	}
 	// Post-PR-03c: fetcher no longer writes Status for RUNNING tasks.
 	// State lives in Fields["status"]; RUNNING tasks emit no Finding.
-	if r.Status != "" {
-		t.Errorf("Status leaked: got %q, want %q (fetcher must stop writing Status for RUNNING task)", r.Status, "")
-	}
 	if r.Fields["status"] != "RUNNING" {
 		t.Errorf("Fields[status]: expected %q, got %q", "RUNNING", r.Fields["status"])
 	}
@@ -103,9 +100,6 @@ func TestQA_ECSTasks_FetchSuccess(t *testing.T) {
 	r2 := resources[1]
 	// Post-PR-03c: fetcher no longer writes Status for STOPPED tasks.
 	// STOPPED is lifecycle-terminal — no Finding emitted; stop_code carries actionable info.
-	if r2.Status != "" {
-		t.Errorf("r2 Status leaked: got %q, want %q (fetcher must stop writing Status for STOPPED task)", r2.Status, "")
-	}
 	if r2.Fields["status"] != "STOPPED" {
 		t.Errorf("r2 Fields[status]: expected %q, got %q", "STOPPED", r2.Fields["status"])
 	}

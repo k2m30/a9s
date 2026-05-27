@@ -90,7 +90,6 @@ func TestApp_008_RelatedNavigate_SingleID_OpensDrillTarget(t *testing.T) {
 	ec2Res := resource.Resource{
 		ID:     "i-0a1b2c3d4e5f60001",
 		Name:   "web-prod-01",
-		Status: "running",
 		Fields: map[string]string{"instance_id": "i-0a1b2c3d4e5f60001"},
 	}
 	m = navigateToEC2DetailRelated(t, m, ec2Res)
@@ -98,7 +97,6 @@ func TestApp_008_RelatedNavigate_SingleID_OpensDrillTarget(t *testing.T) {
 	tgRes := resource.Resource{
 		ID:     "tg-spec008-single",
 		Name:   "my-target-group",
-		Status: "active",
 		Fields: map[string]string{"target_group_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-target-group/abc123"},
 	}
 	m = applyRelatedResourcesLoaded(m, "tg", []resource.Resource{tgRes})
@@ -137,7 +135,6 @@ func TestApp_008_RelatedNavigate_SingleID_CacheMiss_AutoOpensDetail(t *testing.T
 	ec2Res := resource.Resource{
 		ID:     "i-0a1b2c3d4e5f60001",
 		Name:   "web-prod-01",
-		Status: "running",
 		Fields: map[string]string{"instance_id": "i-0a1b2c3d4e5f60001"},
 	}
 	m = navigateToEC2DetailRelated(t, m, ec2Res)
@@ -153,8 +150,8 @@ func TestApp_008_RelatedNavigate_SingleID_CacheMiss_AutoOpensDetail(t *testing.T
 	m2, cmd := relatedApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ami",
 		Resources: []resource.Resource{
-			{ID: "ami-single-1", Name: "ami-single", Status: "available"},
-			{ID: "ami-other-1", Name: "ami-other", Status: "available"},
+			{ID: "ami-single-1", Name: "ami-single", Fields: map[string]string{"status": "available"}},
+			{ID: "ami-other-1", Name: "ami-other", Fields: map[string]string{"status": "available"}},
 		},
 	})
 	m = m2
@@ -184,7 +181,6 @@ func TestApp_008_RelatedNavigate_SingleRelatedIDs_CacheMiss_AutoOpensDrillTarget
 	ec2Res := resource.Resource{
 		ID:     "i-0a1b2c3d4e5f60001",
 		Name:   "web-prod-01",
-		Status: "running",
 		Fields: map[string]string{"instance_id": "i-0a1b2c3d4e5f60001"},
 	}
 	m = navigateToEC2DetailRelated(t, m, ec2Res)
@@ -199,8 +195,8 @@ func TestApp_008_RelatedNavigate_SingleRelatedIDs_CacheMiss_AutoOpensDrillTarget
 	m2, cmd := relatedApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "asg",
 		Resources: []resource.Resource{
-			{ID: "asg-single-1", Name: "asg-single", Status: "InService"},
-			{ID: "asg-other-1", Name: "asg-other", Status: "InService"},
+			{ID: "asg-single-1", Name: "asg-single", Fields: map[string]string{"status": "InService"}},
+			{ID: "asg-other-1", Name: "asg-other", Fields: map[string]string{"status": "InService"}},
 		},
 	})
 	m = m2
@@ -230,7 +226,6 @@ func TestApp_008_RelatedNavigate_SingleID_CacheMiss_LoadsMoreUntilTargetFound(t 
 	ec2Res := resource.Resource{
 		ID:     "i-0a1b2c3d4e5f60001",
 		Name:   "web-prod-01",
-		Status: "running",
 		Fields: map[string]string{"instance_id": "i-0a1b2c3d4e5f60001"},
 	}
 	m = navigateToEC2DetailRelated(t, m, ec2Res)
@@ -244,7 +239,7 @@ func TestApp_008_RelatedNavigate_SingleID_CacheMiss_LoadsMoreUntilTargetFound(t 
 	m2, cmd := relatedApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "alarm",
 		Resources: []resource.Resource{
-			{ID: "alarm-page1-other", Name: "page1-other", Status: "ok"},
+			{ID: "alarm-page1-other", Name: "page1-other", Fields: map[string]string{"status": "ok"}},
 		},
 		Pagination: &resource.PaginationMeta{
 			IsTruncated: true,
@@ -268,8 +263,8 @@ func TestApp_008_RelatedNavigate_SingleID_CacheMiss_LoadsMoreUntilTargetFound(t 
 	m2, cmd = relatedApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "alarm",
 		Resources: []resource.Resource{
-			{ID: "alarm-page2-target", Name: "page2-target", Status: "alarm"},
-			{ID: "alarm-page2-other", Name: "page2-other", Status: "ok"},
+			{ID: "alarm-page2-target", Name: "page2-target", Fields: map[string]string{"status": "alarm"}},
+			{ID: "alarm-page2-other", Name: "page2-other", Fields: map[string]string{"status": "ok"}},
 		},
 		Pagination: &resource.PaginationMeta{
 			IsTruncated: false,
@@ -308,9 +303,9 @@ func TestApp_008_RelatedNavigate_MultipleIDs_ShowsOnlyThoseResources(t *testing.
 	m := newRelatedDemoModel(t)
 
 	alarmResources := []resource.Resource{
-		{ID: "alarm-spec008-1", Name: "high-cpu-alarm", Status: "alarm"},
-		{ID: "alarm-spec008-2", Name: "status-check-alarm", Status: "ok"},
-		{ID: "alarm-spec008-3", Name: "unrelated-alarm", Status: "ok"},
+		{ID: "alarm-spec008-1", Name: "high-cpu-alarm", Fields: map[string]string{"status": "alarm"}},
+		{ID: "alarm-spec008-2", Name: "status-check-alarm", Fields: map[string]string{"status": "ok"}},
+		{ID: "alarm-spec008-3", Name: "unrelated-alarm", Fields: map[string]string{"status": "ok"}},
 	}
 	m = applyRelatedResourcesLoaded(m, "alarm", alarmResources)
 
@@ -341,9 +336,9 @@ func TestApp_008_RelatedNavigate_MultipleIDs_FrameTitleHasCount(t *testing.T) {
 	m := newRelatedDemoModel(t)
 
 	alarmResources := []resource.Resource{
-		{ID: "alarm-count-1", Name: "cpu-alarm", Status: "alarm"},
-		{ID: "alarm-count-2", Name: "memory-alarm", Status: "alarm"},
-		{ID: "alarm-count-3", Name: "disk-alarm", Status: "ok"},
+		{ID: "alarm-count-1", Name: "cpu-alarm", Fields: map[string]string{"status": "alarm"}},
+		{ID: "alarm-count-2", Name: "memory-alarm", Fields: map[string]string{"status": "alarm"}},
+		{ID: "alarm-count-3", Name: "disk-alarm", Fields: map[string]string{"status": "ok"}},
 	}
 	m = applyRelatedResourcesLoaded(m, "alarm", alarmResources)
 
@@ -372,14 +367,14 @@ func TestApp_008_RelatedNavigate_MultipleIDs_LoadMoreStaysConstrained(t *testing
 		ResourceType: "alarm",
 	})
 	m = applyRelatedResourcesLoaded(m, "alarm", []resource.Resource{
-		{ID: "alarm-related-1", Name: "related-one", Status: "alarm"},
-		{ID: "alarm-unrelated-1", Name: "unrelated-one", Status: "ok"},
+		{ID: "alarm-related-1", Name: "related-one", Fields: map[string]string{"status": "alarm"}},
+		{ID: "alarm-unrelated-1", Name: "unrelated-one", Fields: map[string]string{"status": "ok"}},
 	})
 	m, _ = relatedApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "alarm",
 		Resources: []resource.Resource{
-			{ID: "alarm-related-1", Name: "related-one", Status: "alarm"},
-			{ID: "alarm-unrelated-1", Name: "unrelated-one", Status: "ok"},
+			{ID: "alarm-related-1", Name: "related-one", Fields: map[string]string{"status": "alarm"}},
+			{ID: "alarm-unrelated-1", Name: "unrelated-one", Fields: map[string]string{"status": "ok"}},
 		},
 		Pagination: &resource.PaginationMeta{
 			IsTruncated: true,
@@ -392,7 +387,6 @@ func TestApp_008_RelatedNavigate_MultipleIDs_LoadMoreStaysConstrained(t *testing
 	ec2Res := resource.Resource{
 		ID:     "i-0a1b2c3d4e5f60001",
 		Name:   "web-prod-01",
-		Status: "running",
 		Fields: map[string]string{"instance_id": "i-0a1b2c3d4e5f60001"},
 	}
 	m = navigateToEC2DetailRelated(t, m, ec2Res)
@@ -406,8 +400,8 @@ func TestApp_008_RelatedNavigate_MultipleIDs_LoadMoreStaysConstrained(t *testing
 	m2, _ := relatedApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "alarm",
 		Resources: []resource.Resource{
-			{ID: "alarm-related-2", Name: "related-two", Status: "alarm"},
-			{ID: "alarm-unrelated-2", Name: "unrelated-two", Status: "ok"},
+			{ID: "alarm-related-2", Name: "related-two", Fields: map[string]string{"status": "alarm"}},
+			{ID: "alarm-unrelated-2", Name: "unrelated-two", Fields: map[string]string{"status": "ok"}},
 		},
 		Pagination: &resource.PaginationMeta{
 			IsTruncated: false,

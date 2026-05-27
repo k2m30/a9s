@@ -109,14 +109,8 @@ func TestOpenSearch_Fetch_HealthyHappyPath(t *testing.T) {
 	}
 	r := resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status = %q, want %q (Healthy silence — rule 1)", r.Status, "")
-	}
 	if r.Fields["status"] != "" {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "")
-	}
-	if len(r.Issues) != 0 {
-		t.Errorf("Issues = %v, want nil (no Wave 1, no hard-state)", r.Issues)
 	}
 	if r.Fields["deleted"] != "false" {
 		t.Errorf("Fields[\"deleted\"] = %q, want %q", r.Fields["deleted"], "false")
@@ -165,9 +159,6 @@ func TestOpenSearch_Fetch_DeletedDim(t *testing.T) {
 
 	const wantPhrase = "deleting: removal in progress"
 	// Fetcher does not write Resource.Status — it is always "".
-	if r.Status != "" {
-		t.Errorf("Status = %q, want %q (fetcher must not write Status)", r.Status, "")
-	}
 	if r.Fields["status"] != wantPhrase {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
 	}
@@ -206,9 +197,6 @@ func TestOpenSearch_Fetch_IsolatedBroken(t *testing.T) {
 
 	const wantPhrase = "isolated: quarantined by AWS"
 	// Fetcher does not write Resource.Status — it is always "".
-	if r.Status != "" {
-		t.Errorf("Status = %q, want %q (fetcher must not write Status)", r.Status, "")
-	}
 	if r.Fields["status"] != wantPhrase {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
 	}
@@ -248,9 +236,6 @@ func TestOpenSearch_Fetch_ProcessingWarning(t *testing.T) {
 
 	const wantPhrase = "processing: config change in flight"
 	// Fetcher does not write Resource.Status — it is always "".
-	if r.Status != "" {
-		t.Errorf("Status = %q, want %q (fetcher must not write Status)", r.Status, "")
-	}
 	if r.Fields["status"] != wantPhrase {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
 	}
@@ -290,9 +275,6 @@ func TestOpenSearch_Fetch_UpgradeProcessingWarning(t *testing.T) {
 
 	const wantPhrase = "processing: config change in flight"
 	// Fetcher does not write Resource.Status — it is always "".
-	if r.Status != "" {
-		t.Errorf("Status = %q, want %q (fetcher must not write Status)", r.Status, "")
-	}
 	if r.Fields["status"] != wantPhrase {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
 	}
@@ -339,9 +321,6 @@ func TestOpenSearch_Fetch_UpdateAvailableHealthyBang(t *testing.T) {
 	r := resources[0]
 
 	// Fetcher does not write Resource.Status — it is always "".
-	if r.Status != "" {
-		t.Errorf("Status = %q, want %q (fetcher must not write Status)", r.Status, "")
-	}
 	if r.Fields["status"] != "software update forced soon" {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "software update forced soon")
 	}
@@ -386,9 +365,6 @@ func TestOpenSearch_Fetch_UpdateAvailableFutureDateSilent(t *testing.T) {
 	}
 	r := resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status = %q, want %q (not yet forced — silent)", r.Status, "")
-	}
 	if r.Fields["service_software_update_available"] != "false" {
 		t.Errorf("Fields[\"service_software_update_available\"] = %q, want %q", r.Fields["service_software_update_available"], "false")
 	}
@@ -422,9 +398,6 @@ func TestOpenSearch_Fetch_EncryptionOffHealthyTilde(t *testing.T) {
 	r := resources[0]
 
 	// Fetcher does not write Resource.Status — it is always "".
-	if r.Status != "" {
-		t.Errorf("Status = %q, want %q (fetcher must not write Status)", r.Status, "")
-	}
 	if r.Fields["status"] != "encryption at rest off" {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "encryption at rest off")
 	}
@@ -473,9 +446,6 @@ func TestOpenSearch_Fetch_MultiW2UpdatePlusEncryptionSuffix(t *testing.T) {
 	r := resources[0]
 
 	// Fetcher does not write Resource.Status — it is always "".
-	if r.Status != "" {
-		t.Errorf("Status = %q, want %q (fetcher must not write Status)", r.Status, "")
-	}
 	// Display column carries both background-check signals with (+N) suffix.
 	if r.Fields["status"] != "software update forced soon (+1)" {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "software update forced soon (+1)")
@@ -519,9 +489,6 @@ func TestOpenSearch_Fetch_HardStatePlusBackgroundSuffix(t *testing.T) {
 	r := resources[0]
 
 	// Fetcher does not write Resource.Status — it is always "".
-	if r.Status != "" {
-		t.Errorf("Status = %q, want %q (fetcher must not write Status)", r.Status, "")
-	}
 	// Display: processing (hard-state) + software update (background) → suffix (+1).
 	if r.Fields["status"] != "processing: config change in flight (+1)" {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "processing: config change in flight (+1)")
@@ -564,9 +531,6 @@ func TestOpenSearch_Fetch_IsolatedPlusEncryptionOff(t *testing.T) {
 	r := resources[0]
 
 	// Fetcher does not write Resource.Status — it is always "".
-	if r.Status != "" {
-		t.Errorf("Status = %q, want %q (fetcher must not write Status)", r.Status, "")
-	}
 	// Display: isolated (hard-state) + encryption-off (background) → suffix (+1).
 	if r.Fields["status"] != "isolated: quarantined by AWS (+1)" {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "isolated: quarantined by AWS (+1)")
@@ -616,9 +580,6 @@ func TestOpenSearch_Fetch_DeletedPlusBackgroundBackgroundSuppressed(t *testing.T
 	r := resources[0]
 
 	// Fetcher does not write Resource.Status — it is always "".
-	if r.Status != "" {
-		t.Errorf("Status = %q, want %q (fetcher must not write Status)", r.Status, "")
-	}
 	// Display: deleted (hard-state) + 2 background-checks → suffix (+2).
 	if r.Fields["status"] != "deleting: removal in progress (+2)" {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "deleting: removal in progress (+2)")

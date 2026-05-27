@@ -72,9 +72,6 @@ func TestFetchEBSVolumes_ParsesMultipleVolumes(t *testing.T) {
 		t.Errorf("resource[0].Name: expected %q, got %q", "prod-data-vol", r0.Name)
 	}
 	// Post-fold contract: in-use state is healthy → no Status, no Finding.
-	if r0.Status != "" {
-		t.Errorf("resource[0].Status: expected %q (fetcher must not write Status), got %q", "", r0.Status)
-	}
 	if len(r0.Findings) != 0 {
 		t.Errorf("resource[0].Findings: expected 0 for in-use volume, got %d", len(r0.Findings))
 	}
@@ -88,9 +85,6 @@ func TestFetchEBSVolumes_ParsesMultipleVolumes(t *testing.T) {
 		t.Errorf("resource[1].Name: expected empty string (no Name tag), got %q", r1.Name)
 	}
 	// Post-fold contract: available state is healthy for EBS volumes → no Status, no Finding.
-	if r1.Status != "" {
-		t.Errorf("resource[1].Status: expected %q (fetcher must not write Status), got %q", "", r1.Status)
-	}
 	if len(r1.Findings) != 0 {
 		t.Errorf("resource[1].Findings: expected 0 for available volume, got %d", len(r1.Findings))
 	}

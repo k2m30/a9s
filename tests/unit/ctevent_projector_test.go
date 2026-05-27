@@ -74,12 +74,11 @@ func buildProjectorResource(t *testing.T, r domain.Resource) (domain.Resource, b
 		t.Logf("fixture %q: ctevent.Parse failed: %v — skipping", r.ID, err)
 		return domain.Resource{}, false
 	}
-	parsed.Status = r.Status // propagate severity tier from the Resource
+	parsed.Status = r.Fields["status"] // propagate severity tier from the Resource
 
 	projectorResource := domain.Resource{
 		ID:        r.ID,
 		Name:      r.Name,
-		Status:    r.Status,
 		Fields:    r.Fields,
 		RawStruct: parsed, // *ctevent.Event — ctevent.Project fast path
 	}
@@ -173,7 +172,7 @@ func TestCTEventProjectorMatchesBuildSections(t *testing.T) {
 			if err != nil {
 				t.Skipf("ctevent.Parse failed: %v", err)
 			}
-			parsedEvent.Status = r.Status
+			parsedEvent.Status = r.Fields["status"]
 
 			// Reference path: BuildSections on the parsed event (called exactly once).
 			legacySections := ctevent.BuildSections(parsedEvent)
@@ -187,7 +186,6 @@ func TestCTEventProjectorMatchesBuildSections(t *testing.T) {
 			projRes := domain.Resource{
 				ID:        r.ID,
 				Name:      r.Name,
-				Status:    r.Status,
 				Fields:    r.Fields,
 				RawStruct: parsedEvent, // *ctevent.Event — ctevent.Project fast path
 			}
@@ -354,8 +352,7 @@ func TestCTEventProjectorTierMapping(t *testing.T) {
 			event := &ctevent.Event{
 				EventID:     "test-event-id",
 				EventSource: "s3.amazonaws.com",
-				EventName:   "PutObject",
-				Status:      tc.tier, // propagated to the ACTION section's Event row
+				EventName:   "PutObject", // propagated to the ACTION section's Event row
 			}
 
 			projRes := domain.Resource{

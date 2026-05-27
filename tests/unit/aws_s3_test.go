@@ -43,8 +43,8 @@ func TestS3_FetcherResourceIssues_AlwaysEmpty(t *testing.T) {
 		t.Fatal("expected at least one bucket from demo fake")
 	}
 	for _, r := range resources {
-		if len(r.Issues) != 0 {
-			t.Errorf("bucket %q: Issues = %v, want nil/empty (no Wave 1 signals in s3 spec)", r.ID, r.Issues)
+		if len(r.Findings) != 0 {
+			t.Errorf("bucket %q: Findings = %v, want nil/empty (no Wave 1 signals in s3 spec)", r.ID, r.Findings)
 		}
 	}
 }
@@ -95,23 +95,6 @@ func TestS3_FetcherIdentityFields_HealthyBucket(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("healthy-bucket fixture %q not found in fetcher output", fixtures.HealthyBucketName)
-	}
-}
-
-// TestS3_FetcherStatus_AlwaysEmpty verifies that no bucket receives a Status
-// value from the fetcher. S3 has no Wave 1 signals, so Status must always be
-// empty string — enrichment may later set FieldUpdates["status"] but the
-// fetcher must not pre-populate it.
-func TestS3_FetcherStatus_AlwaysEmpty(t *testing.T) {
-	fake := fakes.NewS3()
-	resources, err := awsclient.FetchS3Buckets(context.Background(), fake)
-	if err != nil {
-		t.Fatalf("FetchS3Buckets: %v", err)
-	}
-	for _, r := range resources {
-		if r.Status != "" {
-			t.Errorf("bucket %q: Status = %q, want \"\" (fetcher must not set status — Wave 2 only)", r.ID, r.Status)
-		}
 	}
 }
 

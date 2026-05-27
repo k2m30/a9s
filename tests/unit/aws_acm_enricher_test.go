@@ -70,9 +70,8 @@ func acmCertResources(arns ...string) []resource.Resource {
 	for _, arn := range arns {
 		domain := "example-" + arn[len(arn)-8:] + ".com"
 		res = append(res, resource.Resource{
-			ID:     domain,
-			Name:   domain,
-			Status: "ISSUED",
+			ID:   domain,
+			Name: domain,
 			Fields: map[string]string{
 				"certificate_arn": arn,
 				"domain_name":     domain,

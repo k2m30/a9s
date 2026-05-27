@@ -79,9 +79,9 @@ func navigateToEBSList(m tui.Model) tui.Model {
 // use as simulated fetch results in probeEnrichment-testing scenarios.
 func rerunEBSResources() []resource.Resource {
 	return []resource.Resource{
-		{ID: "vol-0abc1111aaa11111a", Name: "vol-0abc1111aaa11111a", Status: "available", Fields: map[string]string{"volume_id": "vol-0abc1111aaa11111a", "state": "available"}},
-		{ID: "vol-0abc2222bbb22222b", Name: "vol-0abc2222bbb22222b", Status: "available", Fields: map[string]string{"volume_id": "vol-0abc2222bbb22222b", "state": "available"}},
-		{ID: "vol-0abc3333ccc33333c", Name: "vol-0abc3333ccc33333c", Status: "in-use", Fields: map[string]string{"volume_id": "vol-0abc3333ccc33333c", "state": "in-use"}},
+		{ID: "vol-0abc1111aaa11111a", Name: "vol-0abc1111aaa11111a", Fields: map[string]string{"volume_id": "vol-0abc1111aaa11111a", "state": "available"}},
+		{ID: "vol-0abc2222bbb22222b", Name: "vol-0abc2222bbb22222b", Fields: map[string]string{"volume_id": "vol-0abc2222bbb22222b", "state": "available"}},
+		{ID: "vol-0abc3333ccc33333c", Name: "vol-0abc3333ccc33333c", Fields: map[string]string{"volume_id": "vol-0abc3333ccc33333c", "state": "in-use"}},
 	}
 }
 
@@ -264,7 +264,7 @@ func TestListCtrlR_Overlap_StaleRerunSkipped_ListStillUpdates(t *testing.T) {
 	// TypeGen=1 < current per-type gen=2.
 	// Per FR-017: list update must apply unconditionally; rerun must be skipped.
 	firstResources := []resource.Resource{
-		{ID: "vol-first111111111a", Name: "vol-first111111111a", Status: "available", Fields: map[string]string{"volume_id": "vol-first111111111a", "state": "available"}},
+		{ID: "vol-first111111111a", Name: "vol-first111111111a", Fields: map[string]string{"volume_id": "vol-first111111111a", "state": "available"}},
 	}
 	m, firstCmd := rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ebs",
@@ -300,8 +300,8 @@ func TestListCtrlR_Overlap_StaleRerunSkipped_ListStillUpdates(t *testing.T) {
 	// TypeGen=2 == current per-type gen=2.
 	// List update AND rerun must both fire.
 	secondResources := []resource.Resource{
-		{ID: "vol-second11111111a", Name: "vol-second11111111a", Status: "available", Fields: map[string]string{"volume_id": "vol-second11111111a", "state": "available"}},
-		{ID: "vol-second22222222b", Name: "vol-second22222222b", Status: "in-use", Fields: map[string]string{"volume_id": "vol-second22222222b", "state": "in-use"}},
+		{ID: "vol-second11111111a", Name: "vol-second11111111a", Fields: map[string]string{"volume_id": "vol-second11111111a", "state": "available"}},
+		{ID: "vol-second22222222b", Name: "vol-second22222222b", Fields: map[string]string{"volume_id": "vol-second22222222b", "state": "in-use"}},
 	}
 	m, secondCmd := rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ebs",

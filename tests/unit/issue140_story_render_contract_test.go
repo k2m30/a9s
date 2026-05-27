@@ -228,9 +228,9 @@ func TestIssue140_Story_EC2_029_FilteredAlarmListTitleAndScope(t *testing.T) {
 	m = m2.(tui.Model)
 
 	alarms := []resource.Resource{
-		{ID: "web-prod-cpu-high", Name: "web-prod-cpu-high", Status: "alarm"},
-		{ID: "web-prod-status-check", Name: "web-prod-status-check", Status: "ok"},
-		{ID: "unrelated-alarm", Name: "unrelated-alarm", Status: "ok"},
+		{ID: "web-prod-cpu-high", Name: "web-prod-cpu-high", Fields: map[string]string{"status": "alarm"}},
+		{ID: "web-prod-status-check", Name: "web-prod-status-check", Fields: map[string]string{"status": "ok"}},
+		{ID: "unrelated-alarm", Name: "unrelated-alarm", Fields: map[string]string{"status": "ok"}},
 	}
 	m2, _ = m.Update(messages.ResourcesLoaded{ResourceType: "alarm", Resources: alarms})
 	m = m2.(tui.Model)

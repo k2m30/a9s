@@ -72,7 +72,6 @@ func buildCTResource(eventName, eventSource, userType string) resource.Resource 
 	return resource.Resource{
 		ID:        "e-section-test-001",
 		Name:      eventName,
-		Status:    "ct-info",
 		RawStruct: ctEvent,
 		Fields: map[string]string{
 			"event_name": eventName,

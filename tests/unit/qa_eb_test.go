@@ -66,9 +66,6 @@ func TestFetchEBEnvironments_ParsesMultipleEnvironments(t *testing.T) {
 	// emit wave1 Findings for health. Health classification stays structural via
 	// the Color func reading Fields["health"]. This is the post-fix pin — the coder
 	// fix removes health-as-wave1-finding from the fetcher.
-	if r.Status != "" {
-		t.Errorf("expected Status %q (fetcher must not write Status), got %q", "", r.Status)
-	}
 	if len(r.Findings) != 0 {
 		t.Errorf("expected 0 Findings for Green environment (health is structural, not wave1), got %d", len(r.Findings))
 	}
@@ -92,9 +89,6 @@ func TestFetchEBEnvironments_ParsesMultipleEnvironments(t *testing.T) {
 	// Second env (Yellow health): post-fix contract — no Status, no wave1 Finding.
 	// Color func reads Fields["health"] == "Yellow" to derive ColorWarning structurally.
 	r2 := resources[1]
-	if r2.Status != "" {
-		t.Errorf("expected Status %q for Yellow env (fetcher must not write Status), got %q", "", r2.Status)
-	}
 	if len(r2.Findings) != 0 {
 		t.Errorf("expected 0 Findings for Yellow environment (health is structural, not wave1), got %d", len(r2.Findings))
 	}

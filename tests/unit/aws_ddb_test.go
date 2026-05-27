@@ -72,7 +72,7 @@ func (s *ddbDescribeStub) DescribeTable(_ context.Context, in *dynamodb.Describe
 
 // fetchDDBSingle wires a single TableDescription through FetchDynamoDBTablesPage
 // and returns (status, issues, fields) derived from the new Findings-based contract:
-//   - status  is r.Fields["status"]   (fetcher writes phrase here; r.Status is always "")
+//   - status  is r.Fields["status"]   (fetcher writes phrase here; r.Fields["status"] is always "")
 //   - issues  is a []string of r.Findings[i].Phrase (same phrases, different carrier)
 //   - fields  is r.Fields
 func fetchDDBSingle(t *testing.T, table *ddbtypes.TableDescription) (status string, issues []string, fields map[string]string) {

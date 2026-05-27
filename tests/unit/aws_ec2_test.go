@@ -93,9 +93,6 @@ func TestFetchEC2Instances_ParsesMultipleReservations(t *testing.T) {
 		t.Errorf("resource[0].Name: expected %q, got %q", "web-server-1", r0.Name)
 	}
 	// PR-03b: fetcher no longer writes Resource.Status; lifecycle is in Fields["state"].
-	if r0.Status != "" {
-		t.Errorf("resource[0].Status: expected %q (empty), got %q", "", r0.Status)
-	}
 	if len(r0.Findings) != 0 {
 		t.Errorf("resource[0].Findings: expected 0 findings for running instance, got %d", len(r0.Findings))
 	}
@@ -112,9 +109,6 @@ func TestFetchEC2Instances_ParsesMultipleReservations(t *testing.T) {
 		t.Errorf("resource[1].Name: expected %q, got %q", "web-server-2", r1.Name)
 	}
 	// PR-03b: fetcher no longer writes Resource.Status; stopped state → Finding emitted.
-	if r1.Status != "" {
-		t.Errorf("resource[1].Status: expected %q (empty), got %q", "", r1.Status)
-	}
 	if len(r1.Findings) != 1 {
 		t.Fatalf("resource[1].Findings: expected 1 finding for stopped instance, got %d", len(r1.Findings))
 	}
@@ -134,9 +128,6 @@ func TestFetchEC2Instances_ParsesMultipleReservations(t *testing.T) {
 		t.Errorf("resource[2].Name: expected %q, got %q", "api-server", r2.Name)
 	}
 	// PR-03b: fetcher no longer writes Resource.Status.
-	if r2.Status != "" {
-		t.Errorf("resource[2].Status: expected %q (empty), got %q", "", r2.Status)
-	}
 	if len(r2.Findings) != 0 {
 		t.Errorf("resource[2].Findings: expected 0 findings for running instance, got %d", len(r2.Findings))
 	}

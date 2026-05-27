@@ -134,7 +134,6 @@ func setupLiveModeEFSDetail(t *testing.T) (tui.Model, resource.Resource) {
 	efsRes := resource.Resource{
 		ID:     "fs-existing-001",
 		Name:   "fs-existing-001",
-		Status: "available",
 		Fields: map[string]string{},
 	}
 
@@ -168,7 +167,6 @@ func TestLazyAdd_MergesIntoExistingCacheEntry_DedupByID(t *testing.T) {
 	taskA := resource.Resource{
 		ID:     "task-existing-001",
 		Name:   "task-existing-001",
-		Status: "RUNNING",
 		Fields: map[string]string{
 			"efs_file_system_ids": efsSource.ID, // matches source
 		},
@@ -176,7 +174,6 @@ func TestLazyAdd_MergesIntoExistingCacheEntry_DedupByID(t *testing.T) {
 	taskB := resource.Resource{
 		ID:     "task-existing-002",
 		Name:   "task-existing-002",
-		Status: "RUNNING",
 		Fields: map[string]string{
 			"efs_file_system_ids": efsSource.ID, // also matches source
 		},
@@ -198,7 +195,6 @@ func TestLazyAdd_MergesIntoExistingCacheEntry_DedupByID(t *testing.T) {
 	taskNew := resource.Resource{
 		ID:     "task-lazy-003",
 		Name:   "task-lazy-003",
-		Status: "RUNNING",
 		Fields: map[string]string{
 			"efs_file_system_ids": efsSource.ID, // matches source
 		},
@@ -206,7 +202,6 @@ func TestLazyAdd_MergesIntoExistingCacheEntry_DedupByID(t *testing.T) {
 	taskDup := resource.Resource{
 		ID:     "task-existing-001", // duplicate of taskA
 		Name:   "task-existing-001",
-		Status: "RUNNING",
 		Fields: map[string]string{
 			"efs_file_system_ids": efsSource.ID,
 		},
@@ -288,7 +283,6 @@ func TestLazyAdd_NoEntry_CreatesTruncatedEntry(t *testing.T) {
 	lazyTask := resource.Resource{
 		ID:     "task-lazy-only-001",
 		Name:   "task-lazy-only-001",
-		Status: "RUNNING",
 		Fields: map[string]string{
 			"efs_file_system_ids": efsSource.ID,
 		},

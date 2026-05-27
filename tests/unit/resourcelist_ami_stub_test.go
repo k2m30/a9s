@@ -30,7 +30,6 @@ func TestResourceListModel_StubCreator_NavigatesToDetail(t *testing.T) {
 			return resource.Resource{
 				ID:     id,
 				Name:   id,
-				Status: "-",
 				Fields: map[string]string{
 					"id": id,
 				},

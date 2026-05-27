@@ -7,11 +7,7 @@ package domain
 // Moved from internal/resource/resource.go in Phase 01.
 // internal/resource re-exports this via a type alias.
 //
-// W1.4a deleted the legacy derive shim; the Status/Issues fields are
-// still consumed by a handful of read sites in internal/catalog,
-// internal/semantics/{ctevent,projection}, internal/aws/catalog_compute,
-// and internal/tui/views. W1.4b (AS-1428) will migrate those readers
-// and the remaining fetcher Status: writes, then delete the fields.
+// Phase 03 canonical model — see `docs/refactor/03-finding-model.md`.
 type Resource struct {
 	// ID is the primary identifier (instance ID, ARN, name).
 	ID string
@@ -23,13 +19,6 @@ type Resource struct {
 	// fields, and field aliases. Empty string = unknown type (falls back to
 	// Fields-only rendering with no navigability).
 	Type string
-	// Status is the current state/status of the resource. Carries the top
-	// phrase (with optional `(+N)` suffix) for the list view.
-	// Phase 03 migrates this to Findings.
-	Status string
-	// Issues carries every active Wave 1 issue phrase in precedence order.
-	// Empty for Healthy rows. Phase 03 migrates this to Findings.
-	Issues []string
 	// Fields holds all visible column values by key.
 	Fields map[string]string
 	// RawStruct holds the original AWS SDK typed struct for reflection-based

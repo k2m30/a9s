@@ -194,7 +194,6 @@ func (c *Core) HandleRelatedCheckResult(ev RelatedCheckResultEvent) ([]UIIntent,
 		if _, lazyExists := c.session.LazyResourceCache[shortName]; lazyExists {
 			continue
 		}
-		c.deriveFindingsForType(shortName, entry.Resources)
 		pagination := entry.Pagination
 		if pagination == nil && entry.IsTruncated {
 			pagination = &resource.PaginationMeta{IsTruncated: true}
@@ -218,7 +217,6 @@ func (c *Core) HandleRelatedCheckResult(ev RelatedCheckResultEvent) ([]UIIntent,
 			continue
 		}
 		shortName := canonShortName(aliasName)
-		c.deriveFindingsForType(shortName, extra)
 		existing := c.session.LazyResourceCache[shortName]
 		known := make(map[string]struct{}, len(existing))
 		for _, r := range existing {

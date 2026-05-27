@@ -86,7 +86,7 @@ func TestQa67_K1_NoPanic_InputSequences(t *testing.T) {
 		m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 			ResourceType: "ec2",
 			Resources: []resource.Resource{
-				{ID: "i-fuzz", Name: "fuzz-instance", Status: "running", Fields: map[string]string{
+				{ID: "i-fuzz", Name: "fuzz-instance", Fields: map[string]string{
 					"instance_id": "i-fuzz",
 					"name":        "fuzz-instance",
 					"state":       "running",
@@ -118,7 +118,7 @@ func TestQa67_K2_ViewStackIntegrity_AfterError(t *testing.T) {
 		ResourceType: "ec2",
 	})
 	resources := []resource.Resource{
-		{ID: "i-stack-test", Name: "stack-test", Status: "running", Fields: map[string]string{
+		{ID: "i-stack-test", Name: "stack-test", Fields: map[string]string{
 			"instance_id": "i-stack-test",
 			"name":        "stack-test",
 			"state":       "running",
@@ -168,7 +168,7 @@ func TestQa67_K3_ErrorInChildView_DoesNotAffectSiblings(t *testing.T) {
 		ResourceType: "ecs-svc",
 	})
 	services := []resource.Resource{
-		{ID: "my-cluster/my-service", Name: "my-service", Status: "ACTIVE", Fields: map[string]string{
+		{ID: "my-cluster/my-service", Name: "my-service", Fields: map[string]string{
 			"service_name":  "my-service",
 			"cluster":       "my-cluster",
 			"status":        "ACTIVE",
@@ -217,7 +217,7 @@ func TestQa67_K4_RapidCtrlR_NoCrashOrCorruption(t *testing.T) {
 		ResourceType: "ec2",
 	})
 	resources := []resource.Resource{
-		{ID: "i-rapid", Name: "rapid-refresh", Status: "running", Fields: map[string]string{
+		{ID: "i-rapid", Name: "rapid-refresh", Fields: map[string]string{
 			"instance_id": "i-rapid",
 			"name":        "rapid-refresh",
 			"state":       "running",
@@ -260,7 +260,7 @@ func TestQa67_K6_ErrorFlash_DoesNotOverlapFilter(t *testing.T) {
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources: []resource.Resource{
-			{ID: "i-filter", Name: "filter-test", Status: "running", Fields: map[string]string{
+			{ID: "i-filter", Name: "filter-test", Fields: map[string]string{
 				"instance_id": "i-filter",
 				"name":        "filter-test",
 				"state":       "running",
@@ -352,7 +352,7 @@ func TestQa67_K8_EmptyFilterClear_ShowsAllResources(t *testing.T) {
 		ResourceType: "ec2",
 	})
 	resources := []resource.Resource{
-		{ID: "i-alpha", Name: "alpha-server", Status: "running", Fields: map[string]string{
+		{ID: "i-alpha", Name: "alpha-server", Fields: map[string]string{
 			"instance_id": "i-alpha",
 			"name":        "alpha-server",
 			"state":       "running",
@@ -362,7 +362,7 @@ func TestQa67_K8_EmptyFilterClear_ShowsAllResources(t *testing.T) {
 			"launch_time": "2025-01-01",
 			"lifecycle":   "",
 		}},
-		{ID: "i-beta", Name: "beta-server", Status: "running", Fields: map[string]string{
+		{ID: "i-beta", Name: "beta-server", Fields: map[string]string{
 			"instance_id": "i-beta",
 			"name":        "beta-server",
 			"state":       "running",

@@ -51,7 +51,7 @@ func loadedDocDBModel(t *testing.T) views.ResourceListModel {
 func multiStatusDocDBFixtures() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID: "docdb-available", Name: "docdb-available", Status: "available",
+			ID: "docdb-available", Name: "docdb-available",
 			Fields: map[string]string{
 				"cluster_id": "docdb-available", "engine_version": "5.0.0",
 				"status": "available", "instances": "2",
@@ -69,7 +69,7 @@ func multiStatusDocDBFixtures() []resource.Resource {
 			},
 		},
 		{
-			ID: "docdb-creating", Name: "docdb-creating", Status: "creating",
+			ID: "docdb-creating", Name: "docdb-creating",
 			Fields: map[string]string{
 				"cluster_id": "docdb-creating", "engine_version": "5.0.0",
 				"status": "creating", "instances": "0",
@@ -82,7 +82,7 @@ func multiStatusDocDBFixtures() []resource.Resource {
 			},
 		},
 		{
-			ID: "docdb-deleting", Name: "docdb-deleting", Status: "deleting",
+			ID: "docdb-deleting", Name: "docdb-deleting",
 			Fields: map[string]string{
 				"cluster_id": "docdb-deleting", "engine_version": "5.0.0",
 				"status": "deleting", "instances": "1",
@@ -431,7 +431,6 @@ func TestQA_DocDB_DetailStatusColoring(t *testing.T) {
 	dbcRes := func(status string) resource.Resource {
 		return resource.Resource{
 			ID:     "cluster-001",
-			Status: status,
 			Fields: map[string]string{"status": status},
 		}
 	}
@@ -824,7 +823,7 @@ func TestQA_DocDB_ZeroInstancesCount(t *testing.T) {
 
 	fixtures := []resource.Resource{
 		{
-			ID: "docdb-empty", Name: "docdb-empty", Status: "creating",
+			ID: "docdb-empty", Name: "docdb-empty",
 			Fields: map[string]string{
 				"cluster_id": "docdb-empty", "engine_version": "5.0.0",
 				"status": "creating", "instances": "0",

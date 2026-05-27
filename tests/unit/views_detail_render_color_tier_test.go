@@ -100,7 +100,6 @@ func buildCTResourceForTier(eventName, eventSource, userType, statusHint string)
 	return resource.Resource{
 		ID:        "e-color-tier-test",
 		Name:      eventName,
-		Status:    statusHint,
 		RawStruct: ctEvent,
 		Fields: map[string]string{
 			"event_name": eventName,

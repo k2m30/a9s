@@ -66,9 +66,8 @@ func cfDistroResources(ids ...string) []resource.Resource {
 	res := make([]resource.Resource, 0, len(ids))
 	for _, id := range ids {
 		res = append(res, resource.Resource{
-			ID:     id,
-			Name:   id,
-			Status: "Deployed",
+			ID:   id,
+			Name: id,
 			Fields: map[string]string{
 				"distribution_id": id,
 				"domain_name":     id + ".cloudfront.net",

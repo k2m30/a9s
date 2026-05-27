@@ -16,7 +16,6 @@ func makeTestResources() []resource.Resource {
 		{
 			ID:     "i-001",
 			Name:   "prod-web-1",
-			Status: "running",
 			Fields: map[string]string{
 				"instance_id": "i-001",
 				"name":        "prod-web-1",
@@ -28,7 +27,6 @@ func makeTestResources() []resource.Resource {
 		{
 			ID:     "i-002",
 			Name:   "prod-api-1",
-			Status: "running",
 			Fields: map[string]string{
 				"instance_id": "i-002",
 				"name":        "prod-api-1",
@@ -40,7 +38,6 @@ func makeTestResources() []resource.Resource {
 		{
 			ID:     "i-003",
 			Name:   "staging-web-1",
-			Status: "stopped",
 			Fields: map[string]string{
 				"instance_id": "i-003",
 				"name":        "staging-web-1",
@@ -52,7 +49,6 @@ func makeTestResources() []resource.Resource {
 		{
 			ID:     "i-004",
 			Name:   "dev-worker-1",
-			Status: "running",
 			Fields: map[string]string{
 				"instance_id": "i-004",
 				"name":        "dev-worker-1",
@@ -64,7 +60,6 @@ func makeTestResources() []resource.Resource {
 		{
 			ID:     "i-005",
 			Name:   "test-batch",
-			Status: "running",
 			Fields: map[string]string{
 				"instance_id": "i-005",
 				"name":        "test-batch",

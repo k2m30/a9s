@@ -385,7 +385,6 @@ func TestCR273_Item1_NG_CREATING_ReturnsWarning(t *testing.T) {
 	r := resource.Resource{
 		ID:     "ng-test-1",
 		Name:   "acme-node-group-01",
-		Status: "CREATING",
 		Fields: map[string]string{"status": "CREATING"},
 	}
 	got := td.Color(r)
@@ -404,7 +403,6 @@ func TestCR273_Item1_NG_UPDATING_ReturnsWarning(t *testing.T) {
 	r := resource.Resource{
 		ID:     "ng-test-2",
 		Name:   "acme-node-group-02",
-		Status: "UPDATING",
 		Fields: map[string]string{"status": "UPDATING"},
 	}
 	got := td.Color(r)
@@ -423,7 +421,6 @@ func TestCR273_Item1_NG_DELETING_ReturnsWarning(t *testing.T) {
 	r := resource.Resource{
 		ID:     "ng-test-3",
 		Name:   "acme-node-group-03",
-		Status: "DELETING",
 		Fields: map[string]string{"status": "DELETING"},
 	}
 	got := td.Color(r)
@@ -442,7 +439,6 @@ func TestCR273_Item1_NG_CREATE_FAILED_ReturnsBroken(t *testing.T) {
 	r := resource.Resource{
 		ID:     "ng-test-4",
 		Name:   "acme-node-group-04",
-		Status: "CREATE_FAILED",
 		Fields: map[string]string{"status": "CREATE_FAILED"},
 	}
 	got := td.Color(r)
@@ -461,7 +457,6 @@ func TestCR273_Item1_NG_DEGRADED_ReturnsBroken(t *testing.T) {
 	r := resource.Resource{
 		ID:     "ng-test-5",
 		Name:   "acme-node-group-05",
-		Status: "DEGRADED",
 		Fields: map[string]string{"status": "DEGRADED"},
 	}
 	got := td.Color(r)
@@ -480,7 +475,6 @@ func TestCR273_Item1_NG_ACTIVE_ReturnsHealthy(t *testing.T) {
 	r := resource.Resource{
 		ID:     "ng-test-6",
 		Name:   "acme-node-group-06",
-		Status: "ACTIVE",
 		Fields: map[string]string{"status": "ACTIVE"},
 	}
 	got := td.Color(r)
@@ -758,7 +752,6 @@ func TestCR273_Item2_RDS_ColorReadsStatusKey(t *testing.T) {
 	r := resource.Resource{
 		ID:     "db-test-1",
 		Name:   "acme-prod-db",
-		Status: "failed",
 		Fields: map[string]string{"status": "failed"},
 	}
 	got := td.Color(r)
@@ -779,13 +772,12 @@ func TestCR273_Item2_DocDB_ColorReadsStatusKey(t *testing.T) {
 	r := resource.Resource{
 		ID:     "cluster-test-1",
 		Name:   "acme-docdb-cluster",
-		Status: "failed: cluster operation",
 		Fields: map[string]string{"status": "failed: cluster operation"},
 	}
 	got := td.Color(r)
 	if got != resource.ColorBroken {
 		t.Errorf("dbc Color(status=%q) = %v, want ColorBroken (%v): cluster-level failure state must not appear healthy in issue badges or ctrl+z filtering",
-			r.Status, got, resource.ColorBroken)
+			r.Fields["status"], got, resource.ColorBroken)
 	}
 }
 
@@ -800,13 +792,12 @@ func TestCR273_Item2_DDB_ColorReadsStatusKey(t *testing.T) {
 	r := resource.Resource{
 		ID:     "table-test-1",
 		Name:   "acme-events-table",
-		Status: "kms key inaccessible",
 		Fields: map[string]string{"status": "kms key inaccessible"},
 	}
 	got := td.Color(r)
 	if got != resource.ColorBroken {
 		t.Errorf("ddb Color(status=%q) = %v, want ColorBroken (%v): §4 phrase for INACCESSIBLE_ENCRYPTION_CREDENTIALS must classify as Broken",
-			r.Status, got, resource.ColorBroken)
+			r.Fields["status"], got, resource.ColorBroken)
 	}
 }
 
@@ -835,7 +826,6 @@ func TestCR273_Item3_CloudWatchAlarm_ALARM_ReturnsBroken(t *testing.T) {
 	r := resource.Resource{
 		ID:     "acme-cpu-high-alarm",
 		Name:   "acme-cpu-high-alarm",
-		Status: "ALARM",
 		Fields: map[string]string{
 			"alarm_name": "acme-cpu-high-alarm",
 			"state":      "ALARM",
@@ -860,7 +850,6 @@ func TestCR273_Item3_CloudWatchAlarm_INSUFFICIENT_DATA_ReturnsWarning(t *testing
 	r := resource.Resource{
 		ID:     "acme-disk-alarm",
 		Name:   "acme-disk-alarm",
-		Status: "INSUFFICIENT_DATA",
 		Fields: map[string]string{
 			"alarm_name": "acme-disk-alarm",
 			"state":      "INSUFFICIENT_DATA",
@@ -899,7 +888,6 @@ func TestCR273_Item5_CFN_IMPORT_ROLLBACK_COMPLETE_ReturnsBroken(t *testing.T) {
 	r := resource.Resource{
 		ID:     "acme-import-stack",
 		Name:   "acme-import-stack",
-		Status: "IMPORT_ROLLBACK_COMPLETE",
 		Fields: map[string]string{"status": "IMPORT_ROLLBACK_COMPLETE"},
 	}
 	got := td.Color(r)
@@ -1066,7 +1054,6 @@ func TestCR273_Item18_TrivialColor_MustClassify(t *testing.T) {
 				fields[k] = s
 			}
 			r := resource.Resource{
-				Status: s,
 				Fields: fields,
 			}
 			c := td.Color(r)

@@ -72,9 +72,6 @@ func TestFetchMSKClusters_ParsesMultipleClusters(t *testing.T) {
 		t.Errorf("resource[0].Name: expected %q, got %q", "events-cluster", r0.Name)
 	}
 	// Healthy cluster: Status=="" (fetcher does not write Status), raw state in Fields["state"].
-	if r0.Status != "" {
-		t.Errorf("resource[0].Status: expected %q (healthy silence), got %q", "", r0.Status)
-	}
 	if r0.Fields["state"] != "ACTIVE" {
 		t.Errorf("resource[0].Fields[\"state\"]: expected %q, got %q", "ACTIVE", r0.Fields["state"])
 	}
@@ -87,9 +84,6 @@ func TestFetchMSKClusters_ParsesMultipleClusters(t *testing.T) {
 
 	// Verify second cluster: Status=="" (fetcher does not write Status), phrase in Fields["status"].
 	r1 := resources[1]
-	if r1.Status != "" {
-		t.Errorf("resource[1].Status: expected %q (fetcher does not write Status), got %q", "", r1.Status)
-	}
 	if r1.Fields["status"] != "creating" {
 		t.Errorf("resource[1].Fields[\"status\"]: expected %q for CREATING cluster, got %q", "creating", r1.Fields["status"])
 	}

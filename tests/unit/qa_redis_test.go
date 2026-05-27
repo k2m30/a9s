@@ -56,7 +56,7 @@ func loadedRedisModel(t *testing.T) views.ResourceListModel {
 func multiStatusRedisFixtures() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID: "redis-available", Name: "redis-available", Status: "available",
+			ID: "redis-available", Name: "redis-available",
 			Fields: map[string]string{
 				"cluster_id": "redis-available",
 				"node_type":  "cache.t2.micro", "status": "",
@@ -70,7 +70,7 @@ func multiStatusRedisFixtures() []resource.Resource {
 			},
 		},
 		{
-			ID: "redis-creating", Name: "redis-creating", Status: "creating",
+			ID: "redis-creating", Name: "redis-creating",
 			Fields: map[string]string{
 				"cluster_id": "redis-creating",
 				"node_type":  "cache.t2.micro", "status": "creating — new group",
@@ -84,7 +84,7 @@ func multiStatusRedisFixtures() []resource.Resource {
 			},
 		},
 		{
-			ID: "redis-deleting", Name: "redis-deleting", Status: "deleting",
+			ID: "redis-deleting", Name: "redis-deleting",
 			Fields: map[string]string{
 				"cluster_id": "redis-deleting",
 				"node_type":  "cache.t2.micro", "status": "deleting — teardown",
@@ -435,7 +435,6 @@ func TestQA_Redis_DetailStatusColoring(t *testing.T) {
 	redisRes := func(status string) resource.Resource {
 		return resource.Resource{
 			ID:     "cache-001",
-			Status: status,
 			Fields: map[string]string{"status": status},
 		}
 	}

@@ -128,7 +128,6 @@ func TestQa67_H7_ResizeDuringDetailView_NoCrash(t *testing.T) {
 	res := &resource.Resource{
 		ID:     "i-detail-resize",
 		Name:   "resize-test-instance",
-		Status: "running",
 		Fields: map[string]string{
 			"instance_id": "i-detail-resize",
 			"name":        "resize-test-instance",
@@ -165,7 +164,6 @@ func TestQa67_H8_ResizeDuringYAMLView_NoCrash(t *testing.T) {
 	res := &resource.Resource{
 		ID:     "i-yaml-resize",
 		Name:   "yaml-resize-test",
-		Status: "running",
 		Fields: map[string]string{},
 	}
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -217,7 +215,6 @@ func TestQa67_H10_ResizeDuringChildView_NoCrash(t *testing.T) {
 		{
 			ID:     "resize-bucket",
 			Name:   "resize-bucket",
-			Status: "available",
 			Fields: map[string]string{
 				"name":          "resize-bucket",
 				"region":        "us-east-1",
@@ -238,7 +235,7 @@ func TestQa67_H10_ResizeDuringChildView_NoCrash(t *testing.T) {
 
 	// Load some objects
 	objects := []resource.Resource{
-		{ID: "file.txt", Name: "file.txt", Status: "", Fields: map[string]string{
+		{ID: "file.txt", Name: "file.txt", Fields: map[string]string{
 			"key": "file.txt", "size": "1024", "last_modified": "2025-01-01", "storage_class": "STANDARD",
 		}},
 	}
@@ -312,7 +309,7 @@ func TestQa67_H11_H12_ExtremeSizes_WithResourceList_NoCrash(t *testing.T) {
 				ResourceType: "ec2",
 			})
 			resources := []resource.Resource{
-				{ID: "i-size-test", Name: "size-test", Status: "running", Fields: map[string]string{
+				{ID: "i-size-test", Name: "size-test", Fields: map[string]string{
 					"instance_id": "i-size-test",
 					"name":        "size-test",
 					"state":       "running",

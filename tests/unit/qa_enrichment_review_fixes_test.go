@@ -58,7 +58,7 @@ func TestRowMarker_HiddenWhenIdentityColumnScrolledOff(t *testing.T) {
 	m, _ = m.Init()
 
 	resources := []resource.Resource{
-		{ID: "r-1", Name: "alpha-instance-with-distinctive-name", Status: "available", Fields: map[string]string{"name": "alpha-instance-with-distinctive-name", "state": "available", "type": "m5", "region": "us-east-1"}},
+		{ID: "r-1", Name: "alpha-instance-with-distinctive-name", Fields: map[string]string{"name": "alpha-instance-with-distinctive-name", "state": "available", "type": "m5", "region": "us-east-1"}},
 	}
 	m, _ = m.Update(messages.ResourcesLoaded{ResourceType: "test", Resources: resources})
 

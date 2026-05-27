@@ -51,9 +51,6 @@ func TestQA_TransitGateways_FetchSuccess(t *testing.T) {
 	if r.Name != "main-tgw" {
 		t.Errorf("expected Name 'main-tgw', got %q", r.Name)
 	}
-	if r.Status != "" {
-		t.Errorf("expected empty Status, got %q", r.Status)
-	}
 	if len(r.Findings) != 0 {
 		t.Errorf("expected no Findings for available TGW, got %d", len(r.Findings))
 	}

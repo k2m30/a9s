@@ -226,9 +226,6 @@ func TestFetchEcsSvcTasks_MixedStatus(t *testing.T) {
 	// State lives in Fields["status"].
 	t.Run("running_task_status", func(t *testing.T) {
 		r := result.Resources[0]
-		if r.Status != "" {
-			t.Errorf("Status leaked: got %q, want %q (fetcher must stop writing Status for RUNNING task)", r.Status, "")
-		}
 		if r.Fields["status"] != "RUNNING" {
 			t.Errorf("Fields[status]: expected %q, got %q", "RUNNING", r.Fields["status"])
 		}
@@ -239,9 +236,6 @@ func TestFetchEcsSvcTasks_MixedStatus(t *testing.T) {
 
 	t.Run("stopped_task_status", func(t *testing.T) {
 		r := result.Resources[1]
-		if r.Status != "" {
-			t.Errorf("Status leaked: got %q, want %q (fetcher must stop writing Status for STOPPED task)", r.Status, "")
-		}
 		if r.Fields["status"] != "STOPPED" {
 			t.Errorf("Fields[status]: expected %q, got %q", "STOPPED", r.Fields["status"])
 		}

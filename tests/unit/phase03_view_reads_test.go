@@ -82,7 +82,7 @@ func renderList(m views.ResourceListModel) string {
 }
 
 // ---------------------------------------------------------------------------
-// Test 1 — list Status column reads Findings[0].Phrase, not r.Status
+// Test 1 — list Status column reads Findings[0].Phrase, not r.Fields["status"]
 // ---------------------------------------------------------------------------
 
 // TestViews_ListStatusColumn_ReadsFindingsPhrase verifies that when a resource
@@ -220,14 +220,12 @@ func TestViews_ListColor_DelegatesToTypeColor(t *testing.T) {
 	padding := resource.Resource{
 		ID:     "i-cursor",
 		Name:   "cursor-holder",
-		Status: "running",
 		Fields: map[string]string{"status": "running"},
 	}
 	// healthyRow at position 1: Findings=nil, td.Color → ColorHealthy.
 	healthyRow := resource.Resource{
 		ID:       "i-healthy",
 		Name:     "healthy-row",
-		Status:   "running",
 		Fields:   map[string]string{"status": "running"},
 		Findings: nil,
 	}
@@ -238,7 +236,6 @@ func TestViews_ListColor_DelegatesToTypeColor(t *testing.T) {
 	findingsBrokenRow := resource.Resource{
 		ID:     "i-findings-broken",
 		Name:   "findings-broken-row",
-		Status: "running",
 		Fields: map[string]string{"status": "running"},
 		Findings: []domain.Finding{
 			{
@@ -370,12 +367,11 @@ func TestViews_DetailAttention_ReadsAttentionDetails(t *testing.T) {
 // Test 5 — detail Attention prefers Findings phrase over Issues
 // ---------------------------------------------------------------------------
 
-// TestViews_DetailAttention_PrefersFindingsPhraseOverIssues verifies that when
-// both r.Findings[0].Phrase and r.Issues are set, the detail view shows the
-// Findings phrase, not the Issues phrase.
-//
-// Pre-fix: injectAttentionSection reads m.res.Issues → shows "legacy decoy".
-// Post-fix: reads r.Findings[0].Phrase → shows "canonical phrase".
+// TestViews_DetailAttention_PrefersFindingsPhrase verifies that the detail
+// view's Attention section reads r.Findings[0].Phrase. Post-W1.4b.3 there is
+// no longer a legacy Issues fallback to compare against — this test now pins
+// the structural contract that Findings is the sole source of the rendered
+// phrase.
 func TestViews_DetailAttention_PrefersFindingsPhraseOverIssues(t *testing.T) {
 	ensureNoColor(t)
 
@@ -386,7 +382,6 @@ func TestViews_DetailAttention_PrefersFindingsPhraseOverIssues(t *testing.T) {
 			"status": "running",
 		},
 		// Legacy field — pre-fix detail view reads this.
-		Issues: []string{"legacy decoy"},
 		// New field — post-fix detail view reads this.
 		Findings: []domain.Finding{
 			{
@@ -436,9 +431,7 @@ func TestViews_IssueCount_ReadsFindingsBySeverity(t *testing.T) {
 	resA := resource.Resource{
 		ID:     "i-A",
 		Name:   "instance-A",
-		Status: "running",
 		Fields: map[string]string{"status": "running"},
-		Issues: nil,
 		Findings: []domain.Finding{
 			{Code: "ec2.A", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave1"},
 		},
@@ -446,9 +439,7 @@ func TestViews_IssueCount_ReadsFindingsBySeverity(t *testing.T) {
 	resB := resource.Resource{
 		ID:     "i-B",
 		Name:   "instance-B",
-		Status: "running",
 		Fields: map[string]string{"status": "running"},
-		Issues: nil,
 		Findings: []domain.Finding{
 			{Code: "ec2.B", Phrase: "degraded", Severity: domain.SevWarn, Source: "wave1"},
 		},
@@ -456,9 +447,7 @@ func TestViews_IssueCount_ReadsFindingsBySeverity(t *testing.T) {
 	resC := resource.Resource{
 		ID:       "i-C",
 		Name:     "instance-C",
-		Status:   "running",
 		Fields:   map[string]string{"status": "running"},
-		Issues:   nil,
 		Findings: nil,
 	}
 
@@ -494,7 +483,6 @@ func TestViews_AttentionFilter_ReadsFindings(t *testing.T) {
 	resA := resource.Resource{
 		ID:     "i-filter-A",
 		Name:   "filter-A",
-		Status: "running",
 		Fields: map[string]string{"status": "running"},
 		Findings: []domain.Finding{
 			{Code: "ec2.filter.A", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave1"},
@@ -503,7 +491,6 @@ func TestViews_AttentionFilter_ReadsFindings(t *testing.T) {
 	resB := resource.Resource{
 		ID:       "i-filter-B",
 		Name:     "filter-B",
-		Status:   "running",
 		Fields:   map[string]string{"status": "running"},
 		Findings: nil,
 	}
@@ -551,7 +538,6 @@ func TestViews_DetailEnrichmentLateUpdatePicksUpFindings(t *testing.T) {
 			"InstanceId": "i-late",
 		},
 		// "impaired" is a real issue phrase — wave1 Finding will be derived.
-		Status: "impaired",
 	}
 
 	k := keys.Default()
@@ -611,7 +597,6 @@ func TestViews_ListStatusColumn_Wave2OverridesLifecycle(t *testing.T) {
 		ID:   "i-w2-lc",
 		Name: "w2-lifecycle",
 		// Status is a lifecycle steady-state — must be filtered by DeriveFindings.
-		Status: "running",
 		Fields: map[string]string{
 			"name":  "w2-lifecycle",
 			"state": "running",
@@ -645,7 +630,7 @@ func TestViews_ListStatusColumn_Wave2OverridesLifecycle(t *testing.T) {
 // TestViews_ListStatusColumn_LifecycleKeyDefaultIsState verifies that when
 // Findings is nil and LifecycleKey is empty on the typeDef, the status column
 // still resolves to Fields["state"] because the extractCellValue default is
-// "state" (not the column key, not r.Status).
+// "state" (not the column key, not r.Fields["status"]).
 //
 // Tested across 6 representative type shorts to ensure the default applies
 // regardless of which type is used.
@@ -705,7 +690,7 @@ func TestViews_ListStatusColumn_LifecycleKeyDefaultIsState(t *testing.T) {
 //
 // This pins that per-type Color is authoritative for issue classification in
 // the empty-Findings fallback path: IssueCount must use td.ResolveColor(r),
-// NOT FallbackColor(r.Status).
+// NOT FallbackColor(r.Fields["status"]).
 //
 // Setup: td.Color maps Fields["state"]="terminated" to ColorBroken. A resource
 // with that state and Findings=nil is loaded. IssueCount must return 1.
@@ -731,7 +716,6 @@ func TestViews_IssueCount_RespectsTypeColorOverride(t *testing.T) {
 	r := resource.Resource{
 		ID:     "i-term-broken",
 		Name:   "terminated-broken",
-		Status: "terminated",
 		Fields: map[string]string{"state": "terminated"},
 		// Findings=nil forces the fallback path: IssueCount must use td.ResolveColor.
 		Findings: nil,
@@ -859,7 +843,6 @@ func TestViews_ListColor_ECSInactiveIsBroken(t *testing.T) {
 		ID:   "svc-inactive",
 		Name: "inactive-service",
 		// Status field intentionally matches the ECS status key.
-		Status: "INACTIVE",
 		Fields: map[string]string{
 			"service_name": "inactive-service",
 			"status":       "INACTIVE",
@@ -884,7 +867,7 @@ func TestViews_ListColor_ECSInactiveIsBroken(t *testing.T) {
 
 // TestViews_IssueCount_FallbackUsesTypeResolveColor pins that the empty-Findings
 // fallback in IssueCount uses td.ResolveColor(r) (which reads full Fields), not
-// the coarser FallbackColor(r.Status).
+// the coarser FallbackColor(r.Fields["status"]).
 //
 // Setup: EC2 type def; resource has Status="" (FallbackColor → ColorHealthy) but
 // Fields["state"]="stopped" and Fields["state_reason_code"]="Server.InternalError"
@@ -907,7 +890,6 @@ func TestViews_IssueCount_FallbackUsesTypeResolveColor(t *testing.T) {
 	brokenProbe := resource.Resource{
 		ID:     "i-probe",
 		Name:   "probe",
-		Status: "",
 		Fields: map[string]string{
 			"state":             "stopped",
 			"state_reason_code": "Server.InternalError",
@@ -923,7 +905,6 @@ func TestViews_IssueCount_FallbackUsesTypeResolveColor(t *testing.T) {
 		Name: "server-stopped-instance",
 		// Status is deliberately empty so FallbackColor("") → ColorHealthy.
 		// td.ResolveColor reads Fields["state"]="stopped" + Server.* reason → ColorBroken.
-		Status: "",
 		Fields: map[string]string{
 			"state":             "stopped",
 			"state_reason_code": "Server.InternalError",

@@ -57,21 +57,21 @@ func wideTypeDef() resource.ResourceTypeDef {
 func wideTestResources() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID: "w-001", Name: "item-a", Status: "active",
+			ID: "w-001", Name: "item-a",
 			Fields: map[string]string{
 				"col0": "a0", "col1": "b0", "col2": "c0",
 				"col3": "d0", "col4": "e0", "col5": "f0",
 			},
 		},
 		{
-			ID: "w-002", Name: "item-b", Status: "active",
+			ID: "w-002", Name: "item-b",
 			Fields: map[string]string{
 				"col0": "a1", "col1": "b1", "col2": "c1",
 				"col3": "d1", "col4": "e1", "col5": "f1",
 			},
 		},
 		{
-			ID: "w-003", Name: "item-c", Status: "active",
+			ID: "w-003", Name: "item-c",
 			Fields: map[string]string{
 				"col0": "a2", "col1": "b2", "col2": "c2",
 				"col3": "d2", "col4": "e2", "col5": "f2",

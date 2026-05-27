@@ -151,7 +151,6 @@ func TestOpenSearchColor(t *testing.T) {
 			r := resource.Resource{
 				ID:     "test-domain",
 				Name:   "test-domain",
-				Status: tc.status,
 				Fields: tc.fields,
 			}
 			got := td.ResolveColor(r)

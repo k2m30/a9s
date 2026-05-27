@@ -34,10 +34,10 @@ func TestBug_S3_EnterOnFolder_NavigatesIntoPrefix(t *testing.T) {
 	}
 	// Load objects including a folder (child list type is s3_objects)
 	objects := []resource.Resource{
-		{ID: "enterprise/", Name: "enterprise/", Status: "folder", Fields: map[string]string{
+		{ID: "enterprise/", Name: "enterprise/", Fields: map[string]string{
 			"key": "enterprise/", "size": "", "last_modified": "", "storage_class": "", "kind": "folder",
 		}},
-		{ID: "readme.txt", Name: "readme.txt", Status: "", Fields: map[string]string{
+		{ID: "readme.txt", Name: "readme.txt", Fields: map[string]string{
 			"key": "readme.txt", "size": "1024", "last_modified": "2025-01-01", "storage_class": "STANDARD", "kind": "file",
 		}},
 	}
@@ -123,7 +123,6 @@ func TestBug_Detail_UsesCorrectViewDefForResourceType(t *testing.T) {
 	res := resource.Resource{
 		ID:        instID,
 		Name:      "web-server",
-		Status:    "running",
 		RawStruct: raw,
 		Fields:    map[string]string{"instance_id": instID, "name": "web-server", "state": "running"},
 	}

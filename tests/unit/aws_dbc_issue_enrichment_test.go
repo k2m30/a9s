@@ -203,7 +203,7 @@ func TestDBC_Enrich_FutureDate_NoFinding(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{DocDB: fake}
 	resources := []resource.Resource{
-		{ID: clusterID, Status: "", Fields: map[string]string{"status": ""}},
+		{ID: clusterID, Fields: map[string]string{"status": ""}},
 	}
 
 	result, err := awsclient.EnrichDBCMaintenance(context.Background(), clients, resources, nil)
@@ -248,7 +248,7 @@ func TestDBC_Enrich_InstanceARN_Filtered(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{DocDB: fake}
 	resources := []resource.Resource{
-		{ID: clusterID, Status: "", Fields: map[string]string{"status": ""}},
+		{ID: clusterID, Fields: map[string]string{"status": ""}},
 		// The instance is NOT in the dbc resource list.
 	}
 
@@ -309,7 +309,6 @@ func TestDBC_Enrich_Wave1PlusWave2_NoFieldUpdates(t *testing.T) {
 		{
 			ID:     clusterID,
 			Name:   clusterID,
-			Status: "no automated backups",
 			Fields: map[string]string{"status": "no automated backups"},
 		},
 	}
@@ -351,7 +350,7 @@ func TestDBC_Enrich_NoMatchNoFinding(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{DocDB: fake}
 	resources := []resource.Resource{
-		{ID: "other-cluster", Status: "", Fields: map[string]string{}},
+		{ID: "other-cluster", Fields: map[string]string{}},
 	}
 
 	result, err := awsclient.EnrichDBCMaintenance(context.Background(), clients, resources, nil)
@@ -391,8 +390,8 @@ func TestDBC_Enrich_Pagination(t *testing.T) {
 	fake := &dbcMaintenanceFake{pages: [][]docdbtypes.ResourcePendingMaintenanceActions{page1, page2}}
 	clients := &awsclient.ServiceClients{DocDB: fake}
 	resources := []resource.Resource{
-		{ID: cluster1, Status: "", Fields: map[string]string{"status": ""}},
-		{ID: cluster2, Status: "", Fields: map[string]string{"status": ""}},
+		{ID: cluster1, Fields: map[string]string{"status": ""}},
+		{ID: cluster2, Fields: map[string]string{"status": ""}},
 	}
 
 	result, err := awsclient.EnrichDBCMaintenance(context.Background(), clients, resources, nil)
@@ -436,7 +435,7 @@ func TestDBC_Enrich_FindingRows(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{DocDB: fake}
 	resources := []resource.Resource{
-		{ID: clusterID, Status: "", Fields: map[string]string{"status": ""}},
+		{ID: clusterID, Fields: map[string]string{"status": ""}},
 	}
 
 	result, err := awsclient.EnrichDBCMaintenance(context.Background(), clients, resources, nil)
@@ -491,7 +490,7 @@ func TestDBC_Enrich_ForcedApplyDate_Overdue(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{DocDB: fake}
 	resources := []resource.Resource{
-		{ID: clusterID, Status: "", Fields: map[string]string{"status": ""}},
+		{ID: clusterID, Fields: map[string]string{"status": ""}},
 	}
 
 	result, err := awsclient.EnrichDBCMaintenance(context.Background(), clients, resources, nil)

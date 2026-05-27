@@ -40,15 +40,14 @@ func TestIssue140_RelatedListTitle_ContainsSourceContext(t *testing.T) {
 	ec2Res := resource.Resource{
 		ID:     "i-0a1b2c3d4e5f60001",
 		Name:   "web-prod-01",
-		Status: "running",
-		Fields: map[string]string{"instance_id": "i-0a1b2c3d4e5f60001"},
+		Fields: map[string]string{"instance_id": "i-0a1b2c3d4e5f60001", "status": "running"},
 	}
 	m = navigateToEC2DetailRelated(t, m, ec2Res)
 
 	alarmResources := []resource.Resource{
-		{ID: "alarm-title-1", Name: "high-cpu-alarm", Status: "alarm"},
-		{ID: "alarm-title-2", Name: "status-check-alarm", Status: "ok"},
-		{ID: "alarm-title-3", Name: "unrelated-alarm", Status: "ok"},
+		{ID: "alarm-title-1", Name: "high-cpu-alarm", Fields: map[string]string{"status": "alarm"}},
+		{ID: "alarm-title-2", Name: "status-check-alarm", Fields: map[string]string{"status": "ok"}},
+		{ID: "alarm-title-3", Name: "unrelated-alarm", Fields: map[string]string{"status": "ok"}},
 	}
 	m = applyRelatedResourcesLoaded(m, "alarm", alarmResources)
 

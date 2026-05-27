@@ -80,15 +80,15 @@ func TestAttentionFilter_IncludesResourcesWithFindings(t *testing.T) {
 
 	resources := []resource.Resource{
 		{
-			ID: "res-0", Name: "bucket-alpha", Status: "active",
+			ID: "res-0", Name: "bucket-alpha",
 			Fields: map[string]string{"name": "bucket-alpha"},
 		},
 		{
-			ID: "res-1", Name: "bucket-beta", Status: "active",
+			ID: "res-1", Name: "bucket-beta",
 			Fields: map[string]string{"name": "bucket-beta"},
 		},
 		{
-			ID: "res-2", Name: "bucket-gamma", Status: "active",
+			ID: "res-2", Name: "bucket-gamma",
 			Fields: map[string]string{"name": "bucket-gamma"},
 		},
 	}

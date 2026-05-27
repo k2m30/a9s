@@ -54,9 +54,6 @@ func TestQA_IAMPolicies_FetchSuccess(t *testing.T) {
 	if r.Name != "my-custom-policy" {
 		t.Errorf("expected Name 'my-custom-policy', got %q", r.Name)
 	}
-	if r.Status != "" {
-		t.Errorf("expected empty status, got %q", r.Status)
-	}
 	if r.Fields["policy_name"] != "my-custom-policy" {
 		t.Errorf("expected policy_name 'my-custom-policy', got %q", r.Fields["policy_name"])
 	}

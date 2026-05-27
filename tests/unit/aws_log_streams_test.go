@@ -70,12 +70,6 @@ func TestFetchLogStreams_Basic(t *testing.T) {
 		}
 	})
 
-	t.Run("stream_alpha_Status", func(t *testing.T) {
-		if resources[0].Status != "" {
-			t.Errorf("Status: expected empty string, got %q", resources[0].Status)
-		}
-	})
-
 	t.Run("stream_alpha_fields", func(t *testing.T) {
 		r := resources[0]
 		if r.Fields["stream_name"] != "stream-alpha" {

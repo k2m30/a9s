@@ -76,7 +76,6 @@ func TestContentDetail_ViewWithFields(t *testing.T) {
 	res := resource.Resource{
 		ID:     "i-abc123",
 		Name:   "test-instance",
-		Status: "running",
 		Fields: map[string]string{
 			"InstanceId":   "i-abc123",
 			"InstanceType": "t3.medium",
@@ -96,7 +95,6 @@ func TestContentDetail_ViewContainsFieldKeys(t *testing.T) {
 	res := resource.Resource{
 		ID:     "i-abc123",
 		Name:   "test-instance",
-		Status: "running",
 		Fields: map[string]string{
 			"InstanceId":   "i-abc123",
 			"InstanceType": "t3.medium",
@@ -118,7 +116,6 @@ func TestContentDetail_ViewContainsFieldValues(t *testing.T) {
 	res := resource.Resource{
 		ID:     "i-abc123",
 		Name:   "test-instance",
-		Status: "running",
 		Fields: map[string]string{
 			"InstanceId":   "i-abc123",
 			"InstanceType": "t3.medium",
@@ -156,7 +153,6 @@ func TestContentDetail_ViewWithRawStructAndConfig(t *testing.T) {
 	res := resource.Resource{
 		ID:        "i-struct123",
 		Name:      "struct-instance",
-		Status:    "running",
 		RawStruct: &rawStruct,
 		Fields:    map[string]string{},
 	}
@@ -178,7 +174,6 @@ func TestContentYAML_ViewWithFields(t *testing.T) {
 	res := resource.Resource{
 		ID:     "i-abc123",
 		Name:   "test-instance",
-		Status: "running",
 		Fields: map[string]string{
 			"InstanceId":   "i-abc123",
 			"InstanceType": "t3.medium",
@@ -197,7 +192,6 @@ func TestContentYAML_ViewContainsYAMLKeys(t *testing.T) {
 	res := resource.Resource{
 		ID:     "i-abc123",
 		Name:   "test-instance",
-		Status: "running",
 		Fields: map[string]string{
 			"InstanceId":   "i-abc123",
 			"InstanceType": "t3.medium",
@@ -219,7 +213,6 @@ func TestContentYAML_ViewContainsYAMLValues(t *testing.T) {
 	res := resource.Resource{
 		ID:     "i-abc123",
 		Name:   "test-instance",
-		Status: "running",
 		Fields: map[string]string{
 			"InstanceId":   "i-abc123",
 			"InstanceType": "t3.medium",
@@ -249,7 +242,6 @@ func TestContentYAML_ViewWithRawStruct(t *testing.T) {
 	res := resource.Resource{
 		ID:        "i-struct456",
 		Name:      "struct-instance",
-		Status:    "running",
 		RawStruct: &rawStruct,
 		Fields:    map[string]string{},
 	}

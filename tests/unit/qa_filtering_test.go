@@ -39,16 +39,16 @@ func loadEC2Resources(m tui.Model, resources []resource.Resource) tui.Model {
 // sampleEC2Resources returns a set of test EC2 resources.
 func sampleEC2Resources() []resource.Resource {
 	return []resource.Resource{
-		{ID: "i-abc001", Name: "api-prod-01", Status: "running", Fields: map[string]string{"instance_id": "i-abc001", "name": "api-prod-01", "state": "running", "type": "t3.medium"}},
-		{ID: "i-abc002", Name: "api-prod-02", Status: "running", Fields: map[string]string{"instance_id": "i-abc002", "name": "api-prod-02", "state": "running", "type": "t3.medium"}},
-		{ID: "i-abc003", Name: "worker-01", Status: "running", Fields: map[string]string{"instance_id": "i-abc003", "name": "worker-01", "state": "running", "type": "t3.large"}},
-		{ID: "i-abc004", Name: "worker-02", Status: "pending", Fields: map[string]string{"instance_id": "i-abc004", "name": "worker-02", "state": "pending", "type": "t3.large"}},
-		{ID: "i-abc005", Name: "bastion", Status: "running", Fields: map[string]string{"instance_id": "i-abc005", "name": "bastion", "state": "running", "type": "t2.micro"}},
-		{ID: "i-abc006", Name: "old-worker", Status: "stopped", Fields: map[string]string{"instance_id": "i-abc006", "name": "old-worker", "state": "stopped", "type": "t3.medium"}},
-		{ID: "i-abc007", Name: "legacy-app", Status: "terminated", Fields: map[string]string{"instance_id": "i-abc007", "name": "legacy-app", "state": "terminated", "type": "t2.small"}},
-		{ID: "i-abc008", Name: "db-server", Status: "running", Fields: map[string]string{"instance_id": "i-abc008", "name": "db-server", "state": "running", "type": "r5.xlarge"}},
-		{ID: "i-abc009", Name: "cache-node", Status: "running", Fields: map[string]string{"instance_id": "i-abc009", "name": "cache-node", "state": "running", "type": "r5.large"}},
-		{ID: "i-abc010", Name: "monitoring", Status: "running", Fields: map[string]string{"instance_id": "i-abc010", "name": "monitoring", "state": "running", "type": "t3.small"}},
+		{ID: "i-abc001", Name: "api-prod-01", Fields: map[string]string{"instance_id": "i-abc001", "name": "api-prod-01", "state": "running", "type": "t3.medium"}},
+		{ID: "i-abc002", Name: "api-prod-02", Fields: map[string]string{"instance_id": "i-abc002", "name": "api-prod-02", "state": "running", "type": "t3.medium"}},
+		{ID: "i-abc003", Name: "worker-01", Fields: map[string]string{"instance_id": "i-abc003", "name": "worker-01", "state": "running", "type": "t3.large"}},
+		{ID: "i-abc004", Name: "worker-02", Fields: map[string]string{"instance_id": "i-abc004", "name": "worker-02", "state": "pending", "type": "t3.large"}},
+		{ID: "i-abc005", Name: "bastion", Fields: map[string]string{"instance_id": "i-abc005", "name": "bastion", "state": "running", "type": "t2.micro"}},
+		{ID: "i-abc006", Name: "old-worker", Fields: map[string]string{"instance_id": "i-abc006", "name": "old-worker", "state": "stopped", "type": "t3.medium"}},
+		{ID: "i-abc007", Name: "legacy-app", Fields: map[string]string{"instance_id": "i-abc007", "name": "legacy-app", "state": "terminated", "type": "t2.small"}},
+		{ID: "i-abc008", Name: "db-server", Fields: map[string]string{"instance_id": "i-abc008", "name": "db-server", "state": "running", "type": "r5.xlarge"}},
+		{ID: "i-abc009", Name: "cache-node", Fields: map[string]string{"instance_id": "i-abc009", "name": "cache-node", "state": "running", "type": "r5.large"}},
+		{ID: "i-abc010", Name: "monitoring", Fields: map[string]string{"instance_id": "i-abc010", "name": "monitoring", "state": "running", "type": "t3.small"}},
 	}
 }
 
@@ -556,9 +556,9 @@ func TestQA_Filter_11_21_SpecialCharacters(t *testing.T) {
 	tui.Version = "0.6.0"
 	m := newRootSizedModel()
 	resources := []resource.Resource{
-		{ID: "i-001", Name: "api-prod-01", Status: "running", Fields: map[string]string{"name": "api-prod-01"}},
-		{ID: "i-002", Name: "app.service", Status: "running", Fields: map[string]string{"name": "app.service"}},
-		{ID: "i-003", Name: "my_bucket", Status: "running", Fields: map[string]string{"name": "my_bucket"}},
+		{ID: "i-001", Name: "api-prod-01", Fields: map[string]string{"name": "api-prod-01"}},
+		{ID: "i-002", Name: "app.service", Fields: map[string]string{"name": "app.service"}},
+		{ID: "i-003", Name: "my_bucket", Fields: map[string]string{"name": "my_bucket"}},
 	}
 	m = loadEC2Resources(m, resources)
 

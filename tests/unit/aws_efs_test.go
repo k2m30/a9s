@@ -72,9 +72,6 @@ func TestFetchEFSFileSystems_HealthyBaseline_Silence(t *testing.T) {
 		t.Fatalf("graph-root fixture %q not found in fetcher output", fixtures.ProdEFSID)
 	}
 
-	if r.Status != "" {
-		t.Errorf("Status = %q, want %q (healthy rows must have blank Status per spec §4)", r.Status, "")
-	}
 	if statusField := r.Fields["status"]; statusField != "" {
 		t.Errorf("Fields[\"status\"] = %q, want %q (healthy rows must have blank status field)", statusField, "")
 	}
@@ -244,9 +241,6 @@ func TestFetchEFSFileSystems_MultiW1_NomountsPlusDeleting(t *testing.T) {
 	}
 
 	wantStatus := "no mount targets (+1)"
-	if r.Status != "" {
-		t.Errorf("Status = %q, want %q (fetcher must not write Status)", r.Status, "")
-	}
 	if statusField := r.Fields["status"]; statusField != wantStatus {
 		t.Errorf("Fields[\"status\"] = %q, want %q (top phrase + (+N) suffix)", statusField, wantStatus)
 	}

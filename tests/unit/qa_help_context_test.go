@@ -771,7 +771,6 @@ func TestQA_HelpContext_ResourceList_GetHelpContext_Paginated(t *testing.T) {
 	for i := range 5 {
 		resources[i] = resource.Resource{
 			ID: fmt.Sprintf("i-%d", i), Name: fmt.Sprintf("inst-%d", i),
-			Status: "running",
 			Fields: map[string]string{
 				"instance_id": fmt.Sprintf("i-%d", i),
 				"name":        fmt.Sprintf("inst-%d", i),
@@ -819,7 +818,6 @@ func TestQA_HelpContext_ResourceList_GetHelpContext_NotPaginated(t *testing.T) {
 	for i := range 5 {
 		resources[i] = resource.Resource{
 			ID: fmt.Sprintf("i-%d", i), Name: fmt.Sprintf("inst-%d", i),
-			Status: "running",
 			Fields: map[string]string{
 				"instance_id": fmt.Sprintf("i-%d", i),
 				"name":        fmt.Sprintf("inst-%d", i),
@@ -865,8 +863,7 @@ func TestQA_HelpContext_SecretsList_GetHelpContext_Paginated(t *testing.T) {
 			fields[col.Key] = fmt.Sprintf("%s-%d", col.Key, i)
 		}
 		resources[i] = resource.Resource{
-			ID: fmt.Sprintf("secret-%d", i), Name: fmt.Sprintf("my-secret-%d", i),
-			Status: "active", Fields: fields,
+			ID: fmt.Sprintf("secret-%d", i), Name: fmt.Sprintf("my-secret-%d", i), Fields: fields,
 		}
 	}
 

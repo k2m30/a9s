@@ -217,7 +217,6 @@ func TestDetailViewCTEvents_NoRawJSON_RendersFlatFields(t *testing.T) {
 	res := resource.Resource{
 		ID:     "evt-fallback-000",
 		Name:   "FallbackEvent",
-		Status: "ct-info",
 		Fields: map[string]string{
 			"event_name": "FallbackEvent",
 		},

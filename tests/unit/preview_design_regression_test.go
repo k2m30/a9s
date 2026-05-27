@@ -38,14 +38,14 @@ func newPreviewDemoModel(t *testing.T, w, h int) tui.Model {
 
 func previewEC2Resource() resource.Resource {
 	return resource.Resource{
-		ID:     "i-0a1b2c3d4e5f60001",
-		Name:   "web-prod-01",
-		Status: "running",
+		ID:   "i-0a1b2c3d4e5f60001",
+		Name: "web-prod-01",
 		Fields: map[string]string{
 			"InstanceId": "i-0a1b2c3d4e5f60001",
 			"VpcId":      "vpc-0abc123def456789a",
 			"SubnetId":   "subnet-0aaa111111111111a",
 			"ImageId":    "ami-0abc123def456789a",
+			"status":     "running",
 		},
 	}
 }

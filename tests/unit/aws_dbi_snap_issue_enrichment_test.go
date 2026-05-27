@@ -59,27 +59,30 @@ func snapResource(snap rdstypes.DBSnapshot) resource.Resource {
 	if snap.DBSnapshotIdentifier != nil {
 		id = *snap.DBSnapshotIdentifier
 	}
-	status := ""
-	// Apply fetcher-level status computation: for the enricher tests we
-	// only need the status the fetcher would have set. We keep it simple here
-	// since the enricher operates on Resources produced by FetchDBISnapshotsPage.
+	// The enricher operates on Resources produced by FetchDBISnapshotsPage;
+	// it reads RawStruct + Findings (post-W1.4b.3), not the legacy Status field.
 	r := resource.Resource{
 		ID:        id,
 		Name:      id,
-		Status:    status,
 		Fields:    map[string]string{},
 		RawStruct: snap,
 	}
 	return r
 }
 
-// snapResourceWithStatus builds a resource.Resource with a pre-set Status
-// (simulating what the fetcher emits before enrichment).
+// snapResourceWithStatus builds a resource.Resource with a pre-set Wave-1
+// finding phrase (simulating what the fetcher emits before enrichment).
+// Empty preStatus produces a resource with no Findings.
 func snapResourceWithStatus(snap rdstypes.DBSnapshot, preStatus string) resource.Resource {
 	r := snapResource(snap)
-	r.Status = preStatus
 	if preStatus != "" {
-		r.Issues = []string{preStatus}
+		r.Fields["status"] = preStatus
+		r.Findings = []domain.Finding{{
+			Code:     domain.FindingCode("dbi-snap." + preStatus),
+			Phrase:   preStatus,
+			Severity: domain.SevBroken,
+			Source:   "wave1",
+		}}
 	}
 	return r
 }
@@ -492,7 +495,6 @@ func TestDBISnap_Enricher_FullFixtures_OrphanAndRetentionFound(t *testing.T) {
 		resources = append(resources, resource.Resource{
 			ID:        id,
 			Name:      id,
-			Status:    "",
 			Fields:    map[string]string{},
 			RawStruct: snap,
 		})

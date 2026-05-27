@@ -80,9 +80,6 @@ func TestFetchECSClusters_ParsesMultipleClusters(t *testing.T) {
 	}
 	// Post-PR-03c: fetcher no longer writes Status for ACTIVE clusters.
 	// State lives in Fields["status"]; ACTIVE clusters emit no Finding.
-	if r0.Status != "" {
-		t.Errorf("resource[0].Status leaked: got %q, want %q (fetcher must stop writing Status)", r0.Status, "")
-	}
 	if len(r0.Findings) != 0 {
 		t.Errorf("resource[0].Findings: got %d, want 0 for ACTIVE cluster", len(r0.Findings))
 	}

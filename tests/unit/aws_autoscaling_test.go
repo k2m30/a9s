@@ -120,9 +120,6 @@ func TestFetchAutoScalingGroups_ParsesMultipleGroups(t *testing.T) {
 		t.Errorf("resource[1].ID: expected %q, got %q", "staging-api-asg", r1.ID)
 	}
 	// Post-fold contract: fetcher stops writing Status; emits wave1 Finding instead.
-	if r1.Status != "" {
-		t.Errorf("resource[1].Status: expected %q (fetcher must not write Status), got %q", "", r1.Status)
-	}
 	if len(r1.Findings) != 1 {
 		t.Fatalf("resource[1].Findings: expected 1 for deleting ASG, got %d", len(r1.Findings))
 	}

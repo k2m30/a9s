@@ -67,9 +67,8 @@ func athenaWorkGroupResources(names ...string) []resource.Resource {
 	res := make([]resource.Resource, 0, len(names))
 	for _, name := range names {
 		res = append(res, resource.Resource{
-			ID:     name,
-			Name:   name,
-			Status: "ENABLED",
+			ID:   name,
+			Name: name,
 			Fields: map[string]string{
 				"name":        name,
 				"state":       "ENABLED",

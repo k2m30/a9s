@@ -670,8 +670,7 @@ func TestEC2_047_EscFromDetailReturnsToList(t *testing.T) {
 	ec2Res := resource.Resource{
 		ID:     "i-0a1b2c3d4e5f60001",
 		Name:   "web-prod-01",
-		Status: "running",
-		Fields: map[string]string{"InstanceId": "i-0a1b2c3d4e5f60001"},
+		Fields: map[string]string{"InstanceId": "i-0a1b2c3d4e5f60001", "status": "running"},
 	}
 	m, _ = ec2StoryApplyMsg(m, messages.ResourcesLoaded{
 		ResourceType: "ec2",
@@ -867,8 +866,7 @@ func TestEC2_052_CtrlR_Refresh(t *testing.T) {
 	ec2Res := resource.Resource{
 		ID:     "i-0a1b2c3d4e5f60001",
 		Name:   "web-prod-01",
-		Status: "running",
-		Fields: map[string]string{"InstanceId": "i-0a1b2c3d4e5f60001"},
+		Fields: map[string]string{"InstanceId": "i-0a1b2c3d4e5f60001", "status": "running"},
 	}
 
 	// Navigate to EC2 detail.
@@ -917,8 +915,7 @@ func TestEC2_055_HelpScreenShown(t *testing.T) {
 	ec2Res := resource.Resource{
 		ID:     "i-0a1b2c3d4e5f60001",
 		Name:   "web-prod-01",
-		Status: "running",
-		Fields: map[string]string{"InstanceId": "i-0a1b2c3d4e5f60001"},
+		Fields: map[string]string{"InstanceId": "i-0a1b2c3d4e5f60001", "status": "running"},
 	}
 
 	// Navigate to EC2 detail.
@@ -952,8 +949,7 @@ func TestEC2_055_HelpScreenClosesOnAnyKey(t *testing.T) {
 	ec2Res := resource.Resource{
 		ID:     "i-0a1b2c3d4e5f60001",
 		Name:   "web-prod-01",
-		Status: "running",
-		Fields: map[string]string{"InstanceId": "i-0a1b2c3d4e5f60001"},
+		Fields: map[string]string{"InstanceId": "i-0a1b2c3d4e5f60001", "status": "running"},
 	}
 
 	// Navigate to EC2 detail.
@@ -1028,8 +1024,7 @@ func TestEC2_056_YAMLViewFullWidth(t *testing.T) {
 	ec2Res := resource.Resource{
 		ID:     "i-0a1b2c3d4e5f60001",
 		Name:   "web-prod-01",
-		Status: "running",
-		Fields: map[string]string{"InstanceId": "i-0a1b2c3d4e5f60001"},
+		Fields: map[string]string{"InstanceId": "i-0a1b2c3d4e5f60001", "status": "running"},
 	}
 
 	// Navigate to EC2 detail.

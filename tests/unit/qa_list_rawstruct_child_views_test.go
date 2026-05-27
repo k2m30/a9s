@@ -52,7 +52,6 @@ func TestQA_ListRawStruct_LogStreams(t *testing.T) {
 		{
 			ID:     "2024/03/22/[$LATEST]abcdef1234567890",
 			Name:   "2024/03/22/[$LATEST]abcdef1234567890",
-			Status: "",
 			Fields: map[string]string{
 				"stream_name": "2024/03/22/[$LATEST]abcdef1234567890",
 				"last_event":  "2024-03-23 00:00",
@@ -97,7 +96,6 @@ func TestQA_ListRawStruct_LogEvents(t *testing.T) {
 		{
 			ID:     "evt-1711065600000-0",
 			Name:   "ERROR Failed to connect to database",
-			Status: "ERROR",
 			Fields: map[string]string{
 				"timestamp":      "2024-03-22 00:00",
 				"message":        "ERROR Failed to connect to database",
@@ -150,7 +148,6 @@ func TestQA_ListRawStruct_TargetHealth(t *testing.T) {
 		{
 			ID:     "i-0abc1234def56789a",
 			Name:   "i-0abc1234def56789a",
-			Status: "unhealthy",
 			Fields: map[string]string{
 				"target_id":   "i-0abc1234def56789a",
 				"port":        "8080",
@@ -199,7 +196,6 @@ func TestLambdaInvocationsListRawStruct(t *testing.T) {
 		{
 			ID:     "12345678-1234-1234-1234-123456789012",
 			Name:   "12345678-1234-1234-1234-123456789012",
-			Status: "OK",
 			Fields: map[string]string{
 				"request_id":  "12345678-1234-1234-1234-123456789012",
 				"timestamp":   "2024-03-22 00:00",
@@ -248,7 +244,6 @@ func TestLambdaInvocationLogsListRawStruct(t *testing.T) {
 		{
 			ID:     "log-002",
 			Name:   "INFO Processing request for user abc-123",
-			Status: "",
 			Fields: map[string]string{
 				"timestamp": "2024-03-22 00:00",
 				"message":   "INFO Processing request for user abc-123",
@@ -293,7 +288,6 @@ func TestQA_ListRawStruct_EcsSvcEvents(t *testing.T) {
 		{
 			ID:     "evt-list-001",
 			Name:   "(service web-service) has reached a steady state.",
-			Status: "",
 			Fields: map[string]string{
 				"timestamp": "2024-03-22 10:00",
 				"message":   "(service web-service) has reached a steady state.",
@@ -341,7 +335,6 @@ func TestQA_ListRawStruct_EcsSvcTasks(t *testing.T) {
 		{
 			ID:     "abc123def456",
 			Name:   "abc123def456",
-			Status: "RUNNING",
 			Fields: map[string]string{
 				"task_id_short":  "abc123def456",
 				"status":         "RUNNING",
@@ -391,7 +384,6 @@ func TestQA_ListRawStruct_EcsSvcLogs(t *testing.T) {
 		{
 			ID:     "evt-svc-log-list",
 			Name:   "INFO Starting application server on port 8080",
-			Status: "",
 			Fields: map[string]string{
 				"timestamp":    "2024-03-21 16:00",
 				"stream_short": "web/abc123de",
@@ -442,7 +434,6 @@ func TestQA_ListRawStruct_CfnEvents(t *testing.T) {
 		{
 			ID:     "evt-list-cfn-001",
 			Name:   "2024-03-22 10:00",
-			Status: "CREATE_COMPLETE",
 			Fields: map[string]string{
 				"timestamp":              "2024-03-22 10:00",
 				"logical_resource_id":    "MyBucket",
@@ -495,7 +486,6 @@ func TestQA_ListRawStruct_CfnResources(t *testing.T) {
 		{
 			ID:     "MyBucket",
 			Name:   "MyBucket",
-			Status: "CREATE_COMPLETE",
 			Fields: map[string]string{
 				"logical_resource_id":  "MyBucket",
 				"physical_resource_id": "my-stack-mybucket-abc123",
@@ -547,7 +537,6 @@ func TestQA_ListRawStruct_AsgActivities(t *testing.T) {
 		{
 			ID:     "act-list-001",
 			Name:   "2024-03-22 10:00",
-			Status: "Successful",
 			Fields: map[string]string{
 				"start_time":  "2024-03-22 10:00",
 				"status_code": "Successful",
@@ -596,7 +585,6 @@ func TestQA_ListRawStruct_AlarmHistory(t *testing.T) {
 		{
 			ID:     "2024-03-22 10:00",
 			Name:   "2024-03-22 10:00",
-			Status: "StateUpdate",
 			Fields: map[string]string{
 				"timestamp":         "2024-03-22 10:00",
 				"history_item_type": "StateUpdate",
@@ -649,7 +637,6 @@ func TestQA_ListRawStruct_ELBListeners(t *testing.T) {
 		{
 			ID:     "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/api-prod-alb/abc123/def456",
 			Name:   "443",
-			Status: "",
 			Fields: map[string]string{
 				"port":                  "443",
 				"protocol":              "HTTPS",
@@ -715,7 +702,6 @@ func TestQA_ListRawStruct_CBBuilds(t *testing.T) {
 		{
 			ID:     "my-project:build-id-001",
 			Name:   "#142",
-			Status: "SUCCEEDED",
 			Fields: map[string]string{
 				"build_number":         "142",
 				"build_status":         "SUCCEEDED",
@@ -766,7 +752,6 @@ func TestQA_ListRawStruct_CBBuildLogs(t *testing.T) {
 		{
 			ID:     "evt-1718445600000-0",
 			Name:   "[Container] Running command echo hello",
-			Status: "IN_PROGRESS",
 			Fields: map[string]string{
 				"timestamp":      "2024-06-15 10:00",
 				"message":        "[Container] Running command echo hello",
@@ -823,7 +808,6 @@ func TestQA_ListRawStruct_ECRImages(t *testing.T) {
 		{
 			ID:     "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
 			Name:   "latest, v1.0.0",
-			Status: "",
 			Fields: map[string]string{
 				"image_tags":     "latest, v1.0.0",
 				"digest_short":   "abcdef123456",
@@ -876,7 +860,6 @@ func TestQA_ListRawStruct_PipelineStages(t *testing.T) {
 		{
 			ID:     "Source/GitHub",
 			Name:   "GitHub",
-			Status: "running",
 			Fields: map[string]string{
 				"stage_name":       "Source",
 				"stage_status":     "Succeeded",
@@ -930,7 +913,6 @@ func TestQA_ListRawStruct_RolePolicies(t *testing.T) {
 		{
 			ID:     "arn:aws:iam::aws:policy/ReadOnlyAccess",
 			Name:   "ReadOnlyAccess",
-			Status: "",
 			Fields: map[string]string{
 				"policy_name": "ReadOnlyAccess",
 				"policy_arn":  "arn:aws:iam::aws:policy/ReadOnlyAccess",
@@ -977,7 +959,6 @@ func TestQA_ListRawStruct_ELBListenerRules(t *testing.T) {
 		{
 			ID:     "arn:rule/1",
 			Name:   "100",
-			Status: "",
 			Fields: map[string]string{
 				"priority":           "100",
 				"conditions_summary": "path: /api/*",
@@ -1080,7 +1061,6 @@ func TestQA_ListRawStruct_EbRuleTargets(t *testing.T) {
 		{
 			ID:     "lambda-target-1",
 			Name:   "lambda-target-1",
-			Status: "",
 			Fields: map[string]string{
 				"target_id":          "lambda-target-1",
 				"target_arn":         "arn:aws:lambda:us-east-1:123456789012:function:data-pipeline-daily",
@@ -1135,7 +1115,6 @@ func TestQA_ListRawStruct_GlueRuns(t *testing.T) {
 		{
 			ID:     "jr_abc12345-6789-0abc-def0-123456789012",
 			Name:   "2024-08-10 14:30",
-			Status: "SUCCEEDED",
 			Fields: map[string]string{
 				"run_id_short":         "jr_abc12",
 				"job_run_state":        "SUCCEEDED",

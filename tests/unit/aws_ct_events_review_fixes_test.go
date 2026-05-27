@@ -61,32 +61,32 @@ func TestCTSort_RFC3339_AcrossMonthBoundary(t *testing.T) {
 	resources := []resource.Resource{
 		{
 			// Event A: Apr 02 — second-newest
-			ID:     "event-a",
-			Name:   "GetObject",
-			Status: "ct-info",
+			ID:   "event-a",
+			Name: "GetObject",
 			Fields: map[string]string{
 				"time":       "Apr 02 10:00:00",
 				"event_time": "2026-04-02T10:00:00Z",
+				"status":     "ct-info",
 			},
 		},
 		{
 			// Event B: Mar 28 — oldest
-			ID:     "event-b",
-			Name:   "DescribeInstances",
-			Status: "ct-info",
+			ID:   "event-b",
+			Name: "DescribeInstances",
 			Fields: map[string]string{
 				"time":       "Mar 28 10:00:00",
 				"event_time": "2026-03-28T10:00:00Z",
+				"status":     "ct-info",
 			},
 		},
 		{
 			// Event C: Apr 07 — newest
-			ID:     "event-c",
-			Name:   "PutObject",
-			Status: "ct-info",
+			ID:   "event-c",
+			Name: "PutObject",
 			Fields: map[string]string{
 				"time":       "Apr 07 17:00:59",
 				"event_time": "2026-04-07T17:00:59Z",
+				"status":     "ct-info",
 			},
 		},
 	}

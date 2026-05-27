@@ -118,9 +118,8 @@ func osGraphRootResource() resource.Resource {
 	for _, d := range fix.Domains {
 		if d.DomainName != nil && *d.DomainName == fixtures.GraphRootDomain {
 			return resource.Resource{
-				ID:        fixtures.GraphRootDomain,
-				Name:      fixtures.GraphRootDomain,
-				Status:    "",
+				ID:   fixtures.GraphRootDomain,
+				Name: fixtures.GraphRootDomain,
 				Fields: map[string]string{
 					"domain_name": fixtures.GraphRootDomain,
 					"arn":         fixtures.GraphRootDomainARN,

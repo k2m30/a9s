@@ -213,7 +213,6 @@ func TestCR273_AllTypes_ColorClassification(t *testing.T) {
 				t.Helper()
 				r := resource.Resource{
 					ID:     c.shortName + "-test",
-					Status: status,
 					Fields: map[string]string{c.statusField: status},
 				}
 				got := td.ResolveColor(r)

@@ -75,9 +75,6 @@ func TestPR03e_DBIFetcher_HealthyEmitsNoFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 for healthy DBI", len(r.Findings))
 	}
@@ -114,9 +111,6 @@ func TestPR03e_DBIFetcher_BrokenEmitsBrokenFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for failed DBI", len(r.Findings))
 	}
@@ -258,9 +252,6 @@ func TestPR03e_DBISnapFetcher_HealthyEmitsNoFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 for healthy DBI snapshot", len(r.Findings))
 	}
@@ -292,9 +283,6 @@ func TestPR03e_DBISnapFetcher_PendingEmitsWarnFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for creating DBI snapshot", len(r.Findings))
 	}
@@ -381,9 +369,6 @@ func TestPR03e_DBCFetcher_HealthyEmitsNoFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 for healthy DBC", len(r.Findings))
 	}
@@ -411,9 +396,6 @@ func TestPR03e_DBCFetcher_BrokenEmitsBrokenFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for failed DBC", len(r.Findings))
 	}
@@ -499,9 +481,6 @@ func TestPR03e_DBCSnapFetcher_HealthyEmitsNoFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 for healthy DBC snapshot", len(r.Findings))
 	}
@@ -534,9 +513,6 @@ func TestPR03e_DBCSnapFetcher_PendingEmitsWarnFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for creating DBC snapshot", len(r.Findings))
 	}
@@ -615,14 +591,8 @@ func TestPR03e_S3Fetcher_HealthyEmitsNoFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (s3 fetcher must not write Status)", r.Status, "")
-	}
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 (s3 has no Wave-1 signals)", len(r.Findings))
-	}
-	if len(r.Issues) != 0 {
-		t.Errorf("Issues: got %v, want nil (s3 has no Wave-1 signals)", r.Issues)
 	}
 }
 
@@ -672,9 +642,6 @@ func TestPR03e_RedisFetcher_HealthyEmitsNoFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 for healthy Redis RG", len(r.Findings))
 	}
@@ -706,9 +673,6 @@ func TestPR03e_RedisFetcher_PendingEmitsWarnFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for creating Redis RG", len(r.Findings))
 	}
@@ -808,9 +772,6 @@ func TestPR03e_OpenSearchFetcher_HealthyEmitsNoFinding(t *testing.T) {
 	}
 	r := resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 for healthy OpenSearch domain", len(r.Findings))
 	}
@@ -858,9 +819,6 @@ func TestPR03e_OpenSearchFetcher_BrokenEmitsBrokenFinding(t *testing.T) {
 	}
 	r := resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for isolated OpenSearch domain", len(r.Findings))
 	}
@@ -956,9 +914,6 @@ func TestPR03e_DDBFetcher_HealthyEmitsNoFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 for healthy DDB table", len(r.Findings))
 	}
@@ -993,9 +948,6 @@ func TestPR03e_DDBFetcher_BrokenEmitsBrokenFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for KMS-inaccessible DDB table", len(r.Findings))
 	}
@@ -1095,9 +1047,6 @@ func TestPR03e_RedshiftFetcher_HealthyEmitsNoFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 for healthy Redshift cluster", len(r.Findings))
 	}
@@ -1130,9 +1079,6 @@ func TestPR03e_RedshiftFetcher_BrokenEmitsBrokenFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for hardware-failure Redshift cluster", len(r.Findings))
 	}
@@ -1220,9 +1166,6 @@ func TestPR03e_MSKFetcher_HealthyEmitsNoFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 for healthy MSK cluster", len(r.Findings))
 	}
@@ -1257,9 +1200,6 @@ func TestPR03e_MSKFetcher_BrokenEmitsBrokenFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for failed MSK cluster", len(r.Findings))
 	}
@@ -1347,9 +1287,6 @@ func TestPR03e_EFSFetcher_HealthyEmitsNoFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 for healthy EFS filesystem", len(r.Findings))
 	}
@@ -1383,9 +1320,6 @@ func TestPR03e_EFSFetcher_BrokenEmitsBrokenFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) < 1 {
 		t.Fatalf("Findings: got %d, want >= 1 for error EFS filesystem", len(r.Findings))
 	}
@@ -1477,9 +1411,6 @@ func TestPR03e_KinesisFetcher_HealthyEmitsNoFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings: got %d, want 0 for healthy Kinesis stream", len(r.Findings))
 	}
@@ -1519,9 +1450,6 @@ func TestPR03e_KinesisFetcher_PendingEmitsWarnFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for creating Kinesis stream", len(r.Findings))
 	}
@@ -1613,9 +1541,6 @@ func TestPR03e_DBIFetcher_PendingEmitsWarnFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for transitional DBI)", r.Status, "")
-	}
 	if len(r.Findings) < 1 {
 		t.Fatalf("Findings: got %d, want >= 1 for creating DBI", len(r.Findings))
 	}
@@ -1668,9 +1593,6 @@ func TestPR03e_DBISnapFetcher_BrokenEmitsBrokenFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for failed snapshot)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for failed DBI snapshot", len(r.Findings))
 	}
@@ -1714,9 +1636,6 @@ func TestPR03e_DBCFetcher_PendingEmitsWarnFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for creating DBC)", r.Status, "")
-	}
 	if len(r.Findings) < 1 {
 		t.Fatalf("Findings: got %d, want >= 1 for creating DBC", len(r.Findings))
 	}
@@ -1766,9 +1685,6 @@ func TestPR03e_DBCSnapFetcher_BrokenEmitsBrokenFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status)", r.Status, "")
-	}
 	if len(r.Findings) != 1 {
 		t.Fatalf("Findings: got %d, want 1 for failed DBC snapshot", len(r.Findings))
 	}
@@ -1813,9 +1729,6 @@ func TestPR03e_RedisFetcher_BrokenEmitsBrokenFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for create-failed Redis)", r.Status, "")
-	}
 	if len(r.Findings) < 1 {
 		t.Fatalf("Findings: got %d, want >= 1 for create-failed Redis RG", len(r.Findings))
 	}
@@ -1880,9 +1793,6 @@ func TestPR03e_OpenSearchFetcher_PendingEmitsWarnFinding(t *testing.T) {
 	}
 	r := resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for modifying OpenSearch)", r.Status, "")
-	}
 	if len(r.Findings) < 1 {
 		t.Fatalf("Findings: got %d, want >= 1 for modifying OpenSearch domain", len(r.Findings))
 	}
@@ -1929,9 +1839,6 @@ func TestPR03e_DDBFetcher_PendingEmitsWarnFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for CREATING DDB)", r.Status, "")
-	}
 	if len(r.Findings) < 1 {
 		t.Fatalf("Findings: got %d, want >= 1 for creating DDB table", len(r.Findings))
 	}
@@ -1980,9 +1887,6 @@ func TestPR03e_RedshiftFetcher_PendingEmitsWarnFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for creating Redshift)", r.Status, "")
-	}
 	if len(r.Findings) < 1 {
 		t.Fatalf("Findings: got %d, want >= 1 for creating Redshift cluster", len(r.Findings))
 	}
@@ -2031,9 +1935,6 @@ func TestPR03e_MSKFetcher_PendingEmitsWarnFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for CREATING MSK)", r.Status, "")
-	}
 	if len(r.Findings) < 1 {
 		t.Fatalf("Findings: got %d, want >= 1 for creating MSK cluster", len(r.Findings))
 	}
@@ -2084,9 +1985,6 @@ func TestPR03e_EFSFetcher_PendingEmitsWarnFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	if r.Status != "" {
-		t.Errorf("Status: got %q, want %q (fetcher must stop writing Status for creating EFS)", r.Status, "")
-	}
 	if len(r.Findings) < 1 {
 		t.Fatalf("Findings: got %d, want >= 1 for creating EFS filesystem", len(r.Findings))
 	}

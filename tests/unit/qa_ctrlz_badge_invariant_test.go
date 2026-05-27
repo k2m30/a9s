@@ -100,31 +100,31 @@ func parseAttentionTitle(m views.ResourceListModel) (visible, total int, ok bool
 func ctrlZInvariantResources() []resource.Resource {
 	return []resource.Resource{
 		{
-			ID: "r-running", Name: "running-1", Status: "running",
+			ID: "r-running", Name: "running-1",
 			Fields: map[string]string{"state": "running", "status": "running",
 				"db_instance_status": "available", "table_status": "ACTIVE",
 				"last_status": "RUNNING", "life_cycle_state": "available"},
 		},
 		{
-			ID: "r-stopped", Name: "stopped-1", Status: "stopped",
+			ID: "r-stopped", Name: "stopped-1",
 			Fields: map[string]string{"state": "stopped", "status": "stopped",
 				"db_instance_status": "stopped", "table_status": "ARCHIVING",
 				"last_status": "STOPPED", "life_cycle_state": "error"},
 		},
 		{
-			ID: "r-pending", Name: "pending-1", Status: "pending",
+			ID: "r-pending", Name: "pending-1",
 			Fields: map[string]string{"state": "pending", "status": "pending",
 				"db_instance_status": "creating", "table_status": "CREATING",
 				"last_status": "PENDING", "life_cycle_state": "creating"},
 		},
 		{
-			ID: "r-terminated", Name: "terminated-1", Status: "terminated",
+			ID: "r-terminated", Name: "terminated-1",
 			Fields: map[string]string{"state": "terminated", "status": "terminated",
 				"db_instance_status": "deleting", "table_status": "DELETING",
 				"last_status": "STOPPED", "life_cycle_state": "deleting"},
 		},
 		{
-			ID: "r-available", Name: "available-1", Status: "available",
+			ID: "r-available", Name: "available-1",
 			Fields: map[string]string{"state": "available", "status": "available",
 				"db_instance_status": "available", "table_status": "ACTIVE",
 				"last_status": "RUNNING", "life_cycle_state": "available"},
@@ -214,7 +214,6 @@ func TestCtrlZ_EC2_27Rows11Issues(t *testing.T) {
 		resources = append(resources, resource.Resource{
 			ID:     "i-issue-" + string(rune('a'+i)),
 			Name:   "issue-node-" + string(rune('a'+i)),
-			Status: s,
 			Fields: map[string]string{"state": s},
 		})
 	}
@@ -222,12 +221,11 @@ func TestCtrlZ_EC2_27Rows11Issues(t *testing.T) {
 		resources = append(resources, resource.Resource{
 			ID:     "i-run-" + string(rune('a'+i)),
 			Name:   "healthy-node-" + string(rune('a'+i)),
-			Status: "running",
 			Fields: map[string]string{"state": "running"},
 		})
 	}
 	resources = append(resources,
-		resource.Resource{ID: "i-term-1", Name: "legacy-app", Status: "terminated",
+		resource.Resource{ID: "i-term-1", Name: "legacy-app",
 			Fields: map[string]string{"state": "terminated"}},
 	)
 	if got := len(resources); got != 27 {
@@ -284,22 +282,22 @@ func TestCtrlZ_EC2IssueStatuses_Visible(t *testing.T) {
 	// EC2-relevant resources: each has Fields["state"] set so the Color func
 	// classifies them correctly.
 	ec2Resources := []resource.Resource{
-		{ID: "r-stopped", Name: "row-a-stopped", Status: "stopped",
+		{ID: "r-stopped", Name: "row-a-stopped",
 			Fields: map[string]string{"state": "stopped"}},
-		{ID: "r-stopping", Name: "row-b-stopping", Status: "stopping",
+		{ID: "r-stopping", Name: "row-b-stopping",
 			Fields: map[string]string{"state": "stopping"}},
-		{ID: "r-pending", Name: "row-c-pending", Status: "pending",
+		{ID: "r-pending", Name: "row-c-pending",
 			Fields: map[string]string{"state": "pending"}},
-		{ID: "r-impaired", Name: "row-d-impaired", Status: "running",
+		{ID: "r-impaired", Name: "row-d-impaired",
 			Fields: map[string]string{"state": "running", "system_status": "impaired"}},
-		{ID: "r-initializing", Name: "row-e-initializing", Status: "running",
+		{ID: "r-initializing", Name: "row-e-initializing",
 			Fields: map[string]string{"state": "running", "instance_status": "initializing"}},
 		// Non-issue rows that must be hidden.
-		{ID: "r-running", Name: "row-f-running", Status: "running",
+		{ID: "r-running", Name: "row-f-running",
 			Fields: map[string]string{"state": "running", "system_status": "ok", "instance_status": "ok"}},
-		{ID: "r-terminated", Name: "row-g-terminated", Status: "terminated",
+		{ID: "r-terminated", Name: "row-g-terminated",
 			Fields: map[string]string{"state": "terminated"}},
-		{ID: "r-shutting", Name: "row-h-shutting-down", Status: "shutting-down",
+		{ID: "r-shutting", Name: "row-h-shutting-down",
 			Fields: map[string]string{"state": "shutting-down"}},
 	}
 
@@ -312,11 +310,11 @@ func TestCtrlZ_EC2IssueStatuses_Visible(t *testing.T) {
 		isIssue := ec2td.Color(r).IsIssue()
 		if isIssue {
 			if !strings.Contains(view, r.Name) {
-				t.Errorf("ec2 status %q row %q must be visible after ctrl+z (Color.IsIssue=true)", r.Status, r.Name)
+				t.Errorf("ec2 status %q row %q must be visible after ctrl+z (Color.IsIssue=true)", r.Fields["status"], r.Name)
 			}
 		} else {
 			if strings.Contains(view, r.Name) {
-				t.Errorf("ec2 status %q row %q must be hidden after ctrl+z (Color.IsIssue=false)", r.Status, r.Name)
+				t.Errorf("ec2 status %q row %q must be hidden after ctrl+z (Color.IsIssue=false)", r.Fields["status"], r.Name)
 			}
 		}
 	}
@@ -427,13 +425,13 @@ func TestCtrlZ_ResetsCursorToTop(t *testing.T) {
 
 func TestCtrlZ_EC2_ShowsOnlyIssueRows(t *testing.T) {
 	ec2Resources := []resource.Resource{
-		{ID: "i-0001", Name: "web-prod", Status: "running",
+		{ID: "i-0001", Name: "web-prod",
 			Fields: map[string]string{"state": "running"}},
-		{ID: "i-0002", Name: "batch-job", Status: "stopped",
+		{ID: "i-0002", Name: "batch-job",
 			Fields: map[string]string{"state": "stopped"}},
-		{ID: "i-0003", Name: "old-build", Status: "terminated",
+		{ID: "i-0003", Name: "old-build",
 			Fields: map[string]string{"state": "terminated"}},
-		{ID: "i-0004", Name: "api-prod", Status: "running",
+		{ID: "i-0004", Name: "api-prod",
 			Fields: map[string]string{"state": "running"}},
 	}
 	m := ctrlZModel(t, "ec2", ec2Resources)
@@ -472,13 +470,13 @@ func TestCtrlZ_EC2_ShowsOnlyIssueRows(t *testing.T) {
 func TestCtrlZ_PerViewState_DoesNotBleed(t *testing.T) {
 	ctEventsResources := ctEvents4()
 	ec2Resources := []resource.Resource{
-		{ID: "i-0001", Name: "web-prod", Status: "running",
+		{ID: "i-0001", Name: "web-prod",
 			Fields: map[string]string{"state": "running"}},
-		{ID: "i-0002", Name: "batch-job", Status: "stopped",
+		{ID: "i-0002", Name: "batch-job",
 			Fields: map[string]string{"state": "stopped"}},
-		{ID: "i-0003", Name: "old-build", Status: "terminated",
+		{ID: "i-0003", Name: "old-build",
 			Fields: map[string]string{"state": "terminated"}},
-		{ID: "i-0004", Name: "api-prod", Status: "running",
+		{ID: "i-0004", Name: "api-prod",
 			Fields: map[string]string{"state": "running"}},
 	}
 

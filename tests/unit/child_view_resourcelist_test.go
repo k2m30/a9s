@@ -25,7 +25,7 @@ func TestNewChildResourceList_S3Objects(t *testing.T) {
 			Key:            "enter",
 			ContextKeys:    map[string]string{"bucket": "@parent.bucket", "prefix": "ID"},
 			DisplayNameKey: "bucket",
-			DrillCondition: func(r resource.Resource) bool { return r.Status == "folder" },
+			DrillCondition: func(r resource.Resource) bool { return r.Fields["status"] == "folder" },
 		}},
 	}
 	parentCtx := map[string]string{"bucket": "test-bucket"}
@@ -118,7 +118,7 @@ func TestHandleChildKey_EnterOnS3Bucket_ProducesEnterChildViewMsg(t *testing.T) 
 	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources: []resource.Resource{
-			{ID: "my-bucket", Name: "my-bucket", Status: "", Fields: map[string]string{"name": "my-bucket", "creation_date": "2025-01-01"}},
+			{ID: "my-bucket", Name: "my-bucket", Fields: map[string]string{"name": "my-bucket", "creation_date": "2025-01-01"}},
 		},
 	})
 
@@ -167,7 +167,7 @@ func TestHandleChildKey_EnterOnR53Zone_ProducesEnterChildViewMsg(t *testing.T) {
 	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "r53",
 		Resources: []resource.Resource{
-			{ID: "/hostedzone/ZTEST", Name: "example.com.", Status: "", Fields: map[string]string{"zone_id": "/hostedzone/ZTEST", "name": "example.com."}},
+			{ID: "/hostedzone/ZTEST", Name: "example.com.", Fields: map[string]string{"zone_id": "/hostedzone/ZTEST", "name": "example.com."}},
 		},
 	})
 
@@ -206,7 +206,7 @@ func TestHandleChildKey_DrillConditionFalse_FallsThrough(t *testing.T) {
 			Key:            "enter",
 			ContextKeys:    map[string]string{"bucket": "@parent.bucket", "prefix": "ID"},
 			DisplayNameKey: "bucket",
-			DrillCondition: func(r resource.Resource) bool { return r.Status == "folder" },
+			DrillCondition: func(r resource.Resource) bool { return r.Fields["status"] == "folder" },
 		}},
 	}
 	k := keys.Default()
@@ -218,7 +218,7 @@ func TestHandleChildKey_DrillConditionFalse_FallsThrough(t *testing.T) {
 	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "s3_objects",
 		Resources: []resource.Resource{
-			{ID: "data/file.txt", Name: "data/file.txt", Status: "file", Fields: map[string]string{"key": "data/file.txt"}},
+			{ID: "data/file.txt", Name: "data/file.txt", Fields: map[string]string{"status": "file", "key": "data/file.txt"}},
 		},
 	})
 
@@ -248,7 +248,7 @@ func TestHandleChildKey_DrillConditionTrue_ProducesChildMsg(t *testing.T) {
 			Key:            "enter",
 			ContextKeys:    map[string]string{"bucket": "@parent.bucket", "prefix": "ID"},
 			DisplayNameKey: "bucket",
-			DrillCondition: func(r resource.Resource) bool { return r.Status == "folder" },
+			DrillCondition: func(r resource.Resource) bool { return r.Fields["status"] == "folder" },
 		}},
 	}
 	k := keys.Default()
@@ -260,7 +260,7 @@ func TestHandleChildKey_DrillConditionTrue_ProducesChildMsg(t *testing.T) {
 	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "s3_objects",
 		Resources: []resource.Resource{
-			{ID: "data/", Name: "data/", Status: "folder", Fields: map[string]string{"key": "data/"}},
+			{ID: "data/", Name: "data/", Fields: map[string]string{"status": "folder", "key": "data/"}},
 		},
 	})
 
@@ -303,7 +303,7 @@ func TestHandleChildKey_NoChildren_DefaultsToDetail(t *testing.T) {
 	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources: []resource.Resource{
-			{ID: "i-123", Name: "web-1", Status: "running", Fields: map[string]string{"instance_id": "i-123"}},
+			{ID: "i-123", Name: "web-1", Fields: map[string]string{"status": "running", "instance_id": "i-123"}},
 		},
 	})
 
@@ -400,7 +400,7 @@ func TestBuildChildContext_AtParent(t *testing.T) {
 			Key:            "enter",
 			ContextKeys:    map[string]string{"bucket": "@parent.bucket", "prefix": "ID"},
 			DisplayNameKey: "bucket",
-			DrillCondition: func(r resource.Resource) bool { return r.Status == "folder" },
+			DrillCondition: func(r resource.Resource) bool { return r.Fields["status"] == "folder" },
 		}},
 	}
 	k := keys.Default()
@@ -412,7 +412,7 @@ func TestBuildChildContext_AtParent(t *testing.T) {
 	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "s3_objects",
 		Resources: []resource.Resource{
-			{ID: "folder1/", Name: "folder1/", Status: "folder", Fields: map[string]string{"key": "folder1/"}},
+			{ID: "folder1/", Name: "folder1/", Fields: map[string]string{"status": "folder", "key": "folder1/"}},
 		},
 	})
 
@@ -497,8 +497,8 @@ func TestChildResourceList_FrameTitle_WithCount(t *testing.T) {
 	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "s3_objects",
 		Resources: []resource.Resource{
-			{ID: "file1.txt", Name: "file1.txt", Status: "file", Fields: map[string]string{"key": "file1.txt"}},
-			{ID: "file2.txt", Name: "file2.txt", Status: "file", Fields: map[string]string{"key": "file2.txt"}},
+			{ID: "file1.txt", Name: "file1.txt", Fields: map[string]string{"status": "file", "key": "file1.txt"}},
+			{ID: "file2.txt", Name: "file2.txt", Fields: map[string]string{"status": "file", "key": "file2.txt"}},
 		},
 	})
 
@@ -576,7 +576,7 @@ func TestHandleChildKey_NonEnterKey_EventsKey(t *testing.T) {
 	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "test_parent_events",
 		Resources: []resource.Resource{
-			{ID: "res-123", Name: "my-resource", Status: "active", Fields: map[string]string{"id": "res-123", "name": "my-resource"}},
+			{ID: "res-123", Name: "my-resource", Fields: map[string]string{"status": "active", "id": "res-123", "name": "my-resource"}},
 		},
 	})
 
@@ -620,7 +620,7 @@ func TestHandleChildKey_NonEnterKey_NoChildDefined(t *testing.T) {
 	m, _ = m.Update(messages.ResourcesLoaded{
 		ResourceType: "ec2_no_events",
 		Resources: []resource.Resource{
-			{ID: "i-123", Name: "web-1", Status: "running", Fields: map[string]string{"instance_id": "i-123"}},
+			{ID: "i-123", Name: "web-1", Fields: map[string]string{"status": "running", "instance_id": "i-123"}},
 		},
 	})
 
