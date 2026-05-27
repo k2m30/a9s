@@ -61,9 +61,8 @@ func FetchIAMGroupMembers(
 		}
 
 		resources = append(resources, resource.Resource{
-			ID:     userName,
-			Name:   userName,
-			Status: "",
+			ID:   userName,
+			Name: userName,
 			Fields: map[string]string{ //nolint:gosec // "password_last_used" is a display field key, not a credential
 				"user_name":          userName,
 				"user_id":            userID,

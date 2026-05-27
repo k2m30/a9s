@@ -76,9 +76,8 @@ func FetchTargetGroupsPage(ctx context.Context, api ELBv2DescribeTargetGroupsAPI
 		}
 
 		r := resource.Resource{
-			ID:     tgName,
-			Name:   tgName,
-			Status: "",
+			ID:   tgName,
+			Name: tgName,
 			Fields: map[string]string{
 				"target_group_name": tgName,
 				"target_group_arn":  tgArn,
