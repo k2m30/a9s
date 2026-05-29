@@ -29,6 +29,7 @@ ec2:  # ec2types.Instance
   - BlockDeviceMappings[].Ebs.AttachTime
   - BlockDeviceMappings[].Ebs.DeleteOnTermination
   - BlockDeviceMappings[].Ebs.EbsCardIndex
+  - BlockDeviceMappings[].Ebs.Operator.HiddenByDefault
   - BlockDeviceMappings[].Ebs.Operator.Managed
   - BlockDeviceMappings[].Ebs.Operator.Principal
   - BlockDeviceMappings[].Ebs.Status
@@ -106,6 +107,7 @@ ec2:  # ec2types.Instance
   - NetworkInterfaces[].Ipv6Prefixes[].Ipv6Prefix
   - NetworkInterfaces[].MacAddress
   - NetworkInterfaces[].NetworkInterfaceId
+  - NetworkInterfaces[].Operator.HiddenByDefault
   - NetworkInterfaces[].Operator.Managed
   - NetworkInterfaces[].Operator.Principal
   - NetworkInterfaces[].OwnerId
@@ -124,6 +126,7 @@ ec2:  # ec2types.Instance
   - NetworkInterfaces[].SubnetId
   - NetworkInterfaces[].VpcId
   - NetworkPerformanceOptions.BandwidthWeighting
+  - Operator.HiddenByDefault
   - Operator.Managed
   - Operator.Principal
   - OutpostArn
@@ -682,6 +685,11 @@ ng:  # ekstypes.Nodegroup
   - UpdateConfig.MaxUnavailablePercentage
   - UpdateConfig.UpdateStrategy
   - Version
+  - WarmPoolConfig.Enabled
+  - WarmPoolConfig.MaxGroupPreparedCapacity
+  - WarmPoolConfig.MinSize
+  - WarmPoolConfig.PoolState
+  - WarmPoolConfig.ReuseOnScaleIn
 
 subnet:  # ec2types.Subnet
   - AssignIpv6AddressOnCreation
@@ -873,6 +881,8 @@ alarm:  # cwtypes.MetricAlarm
   - Dimensions[].Name
   - Dimensions[].Value
   - EvaluateLowSampleCountPercentile
+  - EvaluationCriteria
+  - EvaluationInterval
   - EvaluationPeriods
   - EvaluationState
   - ExtendedStatistic
@@ -1016,6 +1026,9 @@ ecs-svc:  # ecstypes.Service
   - DeploymentConfiguration.LifecycleHooks[].HookTargetArn
   - DeploymentConfiguration.LifecycleHooks[].LifecycleStages[]
   - DeploymentConfiguration.LifecycleHooks[].RoleArn
+  - DeploymentConfiguration.LifecycleHooks[].TargetType
+  - DeploymentConfiguration.LifecycleHooks[].TimeoutConfiguration.Action
+  - DeploymentConfiguration.LifecycleHooks[].TimeoutConfiguration.TimeoutInMinutes
   - DeploymentConfiguration.LinearConfiguration.StepBakeTimeInMinutes
   - DeploymentConfiguration.LinearConfiguration.StepPercent
   - DeploymentConfiguration.MaximumPercent
@@ -1318,6 +1331,7 @@ ddb:  # ddbtypes.TableDescription
   - Replicas[].OnDemandThroughputOverride.MaxReadRequestUnits
   - Replicas[].ProvisionedThroughputOverride.ReadCapacityUnits
   - Replicas[].RegionName
+  - Replicas[].ReplicaArn
   - Replicas[].ReplicaInaccessibleDateTime
   - Replicas[].ReplicaStatus
   - Replicas[].ReplicaStatusDescription
@@ -1400,6 +1414,7 @@ asg:  # asgtypes.AutoScalingGroup
   - MinSize
   - AutoScalingGroupARN
   - AvailabilityZoneDistribution.CapacityDistributionStrategy
+  - AvailabilityZoneIds[]
   - AvailabilityZoneImpairmentPolicy.ImpairedZoneHealthCheckBehavior
   - AvailabilityZoneImpairmentPolicy.ZonalShiftEnabled
   - CapacityRebalance
@@ -1421,6 +1436,7 @@ asg:  # asgtypes.AutoScalingGroup
   - Instances[].InstanceId
   - Instances[].LifecycleState
   - Instances[].ProtectedFromScaleIn
+  - Instances[].AvailabilityZoneId
   - Instances[].ImageId
   - Instances[].InstanceType
   - Instances[].LaunchConfigurationName
@@ -1547,6 +1563,7 @@ ecs-task:  # ecstypes.Task
   - Containers[].NetworkInterfaces[].AttachmentId
   - Containers[].NetworkInterfaces[].Ipv6Address
   - Containers[].NetworkInterfaces[].PrivateIpv4Address
+  - Containers[].NeuronDeviceIds[]
   - Containers[].Reason
   - Containers[].RuntimeId
   - Containers[].TaskArn
@@ -1762,6 +1779,7 @@ eni:  # ec2types.NetworkInterface
   - Ipv6Prefixes[].Ipv6Prefix
   - MacAddress
   - NetworkInterfaceId
+  - Operator.HiddenByDefault
   - Operator.Managed
   - Operator.Principal
   - OutpostArn
@@ -2644,6 +2662,7 @@ opensearch:  # ostypes.DomainStatus
   - AdvancedSecurityOptions.IAMFederationOptions.SubjectKey
   - AdvancedSecurityOptions.InternalUserDatabaseEnabled
   - AdvancedSecurityOptions.JWTOptions.Enabled
+  - AdvancedSecurityOptions.JWTOptions.JwksUrl
   - AdvancedSecurityOptions.JWTOptions.PublicKey
   - AdvancedSecurityOptions.JWTOptions.RolesKey
   - AdvancedSecurityOptions.JWTOptions.SubjectKey
@@ -2656,6 +2675,10 @@ opensearch:  # ostypes.DomainStatus
   - AutoTuneOptions.ErrorMessage
   - AutoTuneOptions.State
   - AutoTuneOptions.UseOffPeakWindow
+  - AutomatedSnapshotPauseOptions.Enabled
+  - AutomatedSnapshotPauseOptions.EndTime
+  - AutomatedSnapshotPauseOptions.StartTime
+  - AutomatedSnapshotPauseOptions.State
   - ChangeProgressDetails.ChangeId
   - ChangeProgressDetails.ConfigChangeStatus
   - ChangeProgressDetails.InitiatedBy
@@ -2691,6 +2714,7 @@ opensearch:  # ostypes.DomainStatus
   - IdentityCenterOptions.EnabledAPIAccess
   - IdentityCenterOptions.IdentityCenterApplicationARN
   - IdentityCenterOptions.IdentityCenterInstanceARN
+  - IdentityCenterOptions.IdentityCenterInstanceRegion
   - IdentityCenterOptions.IdentityStoreId
   - IdentityCenterOptions.RolesKey
   - IdentityCenterOptions.SubjectKey
@@ -2714,8 +2738,10 @@ opensearch:  # ostypes.DomainStatus
   - ServiceSoftwareOptions.UpdateStatus
   - SnapshotOptions.AutomatedSnapshotStartHour
   - SoftwareUpdateOptions.AutoSoftwareUpdateEnabled
+  - SoftwareUpdateOptions.UseLatestServiceSoftwareForBlueGreen
   - UpgradeProcessing
   - VPCOptions.AvailabilityZones[]
+  - VPCOptions.EgressEnabled
   - VPCOptions.SecurityGroupIds[]
   - VPCOptions.SubnetIds[]
   - VPCOptions.VPCId
@@ -2895,6 +2921,7 @@ ecs_tasks:  # ecstypes.Task
   - Containers[].NetworkInterfaces[].AttachmentId
   - Containers[].NetworkInterfaces[].Ipv6Address
   - Containers[].NetworkInterfaces[].PrivateIpv4Address
+  - Containers[].NeuronDeviceIds[]
   - Containers[].Reason
   - Containers[].RuntimeId
   - Containers[].TaskArn
@@ -3438,6 +3465,7 @@ ebs:  # ec2types.Volume
   - Iops
   - KmsKeyId
   - MultiAttachEnabled
+  - Operator.HiddenByDefault
   - Operator.Managed
   - Operator.Principal
   - OutpostArn
