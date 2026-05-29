@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
+	smithy "github.com/aws/smithy-go"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
@@ -459,6 +460,78 @@ func TestRelated_EKS_AMI_WrongRawStruct(t *testing.T) {
 
 	if result.Count != -1 {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	}
+}
+
+// TestRelated_EKS_AMI_SoftSkipsDeletedLaunchTemplate verifies that when one node
+// group's launch template has been deleted (AWS returns
+// InvalidLaunchTemplateId.NotFound), the checker soft-skips that NG — collecting
+// the valid AMI from the remaining NG — and does NOT surface an Err.
+func TestRelated_EKS_AMI_SoftSkipsDeletedLaunchTemplate(t *testing.T) {
+	const ltValid = "lt-valid"
+	const ltDeleted = "lt-deleted"
+	const ami1 = "ami-0a1b2c3d4e5f60001"
+
+	eksNodegroups := map[string]*ekstypes.Nodegroup{
+		"ng-valid": {
+			NodegroupName: aws.String("ng-valid"),
+			ClusterName:   aws.String("acme-services"),
+			LaunchTemplate: &ekstypes.LaunchTemplateSpecification{
+				Id:      aws.String(ltValid),
+				Version: aws.String("1"),
+			},
+		},
+		"ng-deleted": {
+			NodegroupName: aws.String("ng-deleted"),
+			ClusterName:   aws.String("acme-services"),
+			LaunchTemplate: &ekstypes.LaunchTemplateSpecification{
+				Id:      aws.String(ltDeleted),
+				Version: aws.String("1"),
+			},
+		},
+	}
+	fakeEKS := newFakeEKSWithNodegroups([]string{"ng-valid", "ng-deleted"}, eksNodegroups)
+
+	fakeEC2 := &fakeEC2Batch2{
+		describeLaunchTemplateVersionsFn: func(input *ec2.DescribeLaunchTemplateVersionsInput) (*ec2.DescribeLaunchTemplateVersionsOutput, error) {
+			if input.LaunchTemplateId != nil && *input.LaunchTemplateId == ltDeleted {
+				return nil, &smithy.GenericAPIError{
+					Code:    "InvalidLaunchTemplateId.NotFound",
+					Message: "The launch template ID '" + ltDeleted + "' does not exist",
+				}
+			}
+			return &ec2.DescribeLaunchTemplateVersionsOutput{
+				LaunchTemplateVersions: []ec2types.LaunchTemplateVersion{
+					{
+						LaunchTemplateData: &ec2types.ResponseLaunchTemplateData{
+							ImageId: aws.String(ami1),
+						},
+					},
+				},
+			}, nil
+		},
+	}
+	clients := &awsclient.ServiceClients{EKS: fakeEKS, EC2: fakeEC2}
+	res := eksClusterSrcResource()
+
+	checker := eksCheckerByTarget(t, "ami")
+	result := checker(context.Background(), clients, res, nil)
+
+	if result.Err != nil {
+		t.Errorf("Err = %v, want nil (deleted LT must be soft-skipped, not surfaced as error)", result.Err)
+	}
+	if result.Count != 1 {
+		t.Errorf("Count = %d, want 1 (only valid-LT nodegroup's AMI collected)", result.Count)
+	}
+	found := false
+	for _, id := range result.ResourceIDs {
+		if id == ami1 {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("ResourceIDs %v missing %q (valid nodegroup AMI must appear)", result.ResourceIDs, ami1)
 	}
 }
 

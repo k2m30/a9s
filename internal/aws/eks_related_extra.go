@@ -179,7 +179,6 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 			// "no AMI to relate to" rather than a fetch failure.
 			var apiErr smithy.APIError
 			if errors.As(ltErr, &apiErr) && apiErr.ErrorCode() == "InvalidLaunchTemplateId.NotFound" {
-				failures = append(failures, fmt.Sprintf("%s: launch template deleted", ngName))
 				continue
 			}
 			failures = append(failures, fmt.Sprintf("%s/lt: %v", ngName, ltErr))
