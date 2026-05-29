@@ -59,7 +59,7 @@ require (
 	github.com/charmbracelet/x/ansi v0.11.6
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/sync v0.19.0
-	gopkg.in/ini.v1 v1.67.1
+	gopkg.in/ini.v1 v1.67.2
 	gopkg.in/yaml.v3 v3.0.1
 )
 
