@@ -146,9 +146,18 @@ func TestRealApplyFilter_UnknownVisibleWhenCtrlZActive(t *testing.T) {
 	if allCount <= 0 {
 		t.Fatal("expected nonzero resource type count")
 	}
+	// At cold-start (all unknown), ctrl+z keeps unknown types visible EXCEPT
+	// ExcludeFromIssueBadge types, which are never probed and stay hidden.
+	excluded := 0
+	for _, rt := range resource.AllResourceTypes() {
+		if rt.ExcludeFromIssueBadge {
+			excluded++
+		}
+	}
+	want := allCount - excluded
 	m.Toggle()
-	if extractCount(m.FrameTitle()) != allCount {
-		t.Errorf("ctrl+z with all-unknown: want %d visible, got %d", allCount, extractCount(m.FrameTitle()))
+	if got := extractCount(m.FrameTitle()); got != want {
+		t.Errorf("ctrl+z at cold-start: want %d visible (all %d minus %d excluded), got %d", want, allCount, excluded, got)
 	}
 }
 
