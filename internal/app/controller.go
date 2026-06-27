@@ -56,7 +56,8 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 		// controller pushes ScreenIdentity directly so tests can assert the stack
 		// without standing up a full TUI.
 		c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenIdentity}})
-		// TODO PR-C: set IdentityBody.Loading = true once body state is lifted here.
+		c.core.SetIdentityFetching(true)
+		// TODO PR-C: render IdentityBody.Loading from the session latch once body state is lifted here.
 		fetchTask := runtime.TaskRequest{
 			Key:     runtime.TaskKey{Kind: runtime.TaskKindFetchIdentity},
 			Payload: runtime.FetchIdentityPayload{},
@@ -295,8 +296,18 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) {
 	case runtime.NavigateKindFlash, runtime.NavigateKindNoop:
 		// No stack change — flash is surfaced via FlashIntent in the intent stream.
 
-	// TODO PR-C: NavigateKindPushResourceList / NavigateKindPushResourceListCached
-	//            need ScreenContext{ResourceType} + cache entry from the result.
+	case runtime.NavigateKindPushResourceList, runtime.NavigateKindPushResourceListCached:
+		intent := runtime.PushScreen{
+			ID:      runtime.ScreenResourceList,
+			Context: runtime.ScreenContext{ResourceType: res.ResolvedType},
+		}
+		if res.ReplaceCurrent {
+			c.ApplyIntents([]runtime.UIIntent{runtime.ReplaceScreen{ID: intent.ID, Context: intent.Context}})
+		} else {
+			c.ApplyIntents([]runtime.UIIntent{intent})
+		}
+		// TODO PR-C: populate rows once ListState + the result lane land.
+
 	// TODO PR-C: NavigateKindPushDetail / NavigateKindPushYAML / NavigateKindPushJSON
 	//            need ScreenContext{ResourceType, ResourceID} from result.Resource.
 	// TODO PR-C: NavigateKindFetchReveal needs result.Resource for the reveal payload.
@@ -325,7 +336,7 @@ func bodyKindForScreen(s Screen) BodyKind {
 		return BodyKindSelector
 	case runtime.ScreenReveal:
 		return BodyKindDetail
-	case runtime.ScreenChildList:
+	case runtime.ScreenChildList, runtime.ScreenResourceList:
 		return BodyKindList
 	case runtime.ScreenHelp:
 		return BodyKindHelp
