@@ -275,7 +275,7 @@ func (m *Model) tasksToCmd(tasks []runtime.TaskRequest) tea.Cmd {
 // to tea.Cmds. Used by the Update() switch for messages routed
 // entirely through the orchestrator (availability/enrichment events,
 // identity loaded/error post-h4-b).
-func (m Model) coreUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) coreUpdate(msg messages.Event) (tea.Model, tea.Cmd) {
 	intents, tasks := m.core.HandleEvent(msg)
 	cmds := m.applyIntents(intents)
 	if tc := m.tasksToCmd(tasks); tc != nil {

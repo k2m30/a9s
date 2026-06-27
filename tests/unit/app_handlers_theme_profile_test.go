@@ -215,5 +215,62 @@ func TestHandleProfilesLoaded_PushesProfileSelectorView(t *testing.T) {
 	}
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// handleThemeFileRead — adapter-layer YAML validation (SC-009 boundary fix)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// TestHandleThemeFileRead_MalformedYAML_EmitsErrorFlashNoApply verifies that
+// when ThemeFileRead arrives with syntactically invalid YAML bytes (Err==nil),
+// the adapter calls styles.ThemeFromYAML, sets ParseErr, and the runtime emits
+// a "Bad theme YAML: …" error flash — with no theme-apply side effect.
+//
+// This covers the SC-009 adapter-boundary: the actual parse/validation
+// (real bad bytes → real error) now lives in the TUI adapter's
+// handleThemeFileRead, NOT in the runtime package. The runtime-package
+// tests (TestCore_HandleThemeFileRead_ParseErrorEmitsFlashOnly) only test
+// the ParseErr branch with a synthetic error; this test exercises the real
+// styles.ThemeFromYAML call with genuinely bad bytes.
+func TestHandleThemeFileRead_MalformedYAML_EmitsErrorFlashNoApply(t *testing.T) {
+	withTuiVersion(t, "test")
+	tmp := t.TempDir()
+	t.Setenv("A9S_CONFIG_FOLDER", tmp)
+
+	m := newRootSizedModel()
+
+	// Capture the view before sending the malformed theme so we can assert
+	// the theme was NOT applied (the default theme label stays unchanged).
+	viewBefore := stripANSI(rootViewContent(m))
+
+	// Feed ThemeFileRead with malformed YAML bytes and Err==nil — this is the
+	// path that exercises the adapter's styles.ThemeFromYAML call.
+	malformedBytes := []byte(":\n  not yaml at all\n: : :\n")
+	_, flashCmd := rootApplyMsg(m, messages.ThemeFileRead{
+		Theme: "broken.yaml",
+		Bytes: malformedBytes,
+		Err:   nil,
+	})
+	if flashCmd == nil {
+		t.Fatal("handleThemeFileRead with malformed YAML should return a cmd (flash re-emit)")
+	}
+	msg := flashCmd()
+	flash, ok := msg.(messages.Flash)
+	if !ok {
+		t.Fatalf("expected messages.Flash, got %T: %v", msg, msg)
+	}
+	if !flash.IsError {
+		t.Errorf("Flash.IsError = false, want true for malformed YAML")
+	}
+	if !strings.HasPrefix(flash.Text, "Bad theme YAML: ") {
+		t.Errorf("Flash.Text = %q, want prefix %q", flash.Text, "Bad theme YAML: ")
+	}
+
+	// Assert no apply side-effect: the view is identical to before the bad
+	// theme was sent (no theme-apply message was dispatched).
+	viewAfter := stripANSI(rootViewContent(m))
+	if viewBefore != viewAfter {
+		t.Errorf("view changed after malformed theme — theme was unexpectedly applied\nbefore: %q\nafter:  %q", viewBefore, viewAfter)
+	}
+}
+
 // TestHandleProfilesLoaded_SingleProfile verifies edge case: only one profile
 // in the list still results in the selector being pushed and nil cmd.
