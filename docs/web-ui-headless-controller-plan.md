@@ -244,6 +244,11 @@ filter/focus/selection, pending related dispatch, nav provider. For each field d
 output is the authoritative `ScreenState`/`ViewState` shape PR-C implements against — so
 PR-C cannot silently drop behavior.
 
+*Status (landed):* the full inventory is [`web-ui-state-inventory.md`](web-ui-state-inventory.md)
+— per-model CONTROLLER/DERIVED/RENDERER/DELETE buckets, the consolidated `ScreenState` target,
+task-coupling risks, and three open decisions (`fieldCursor`, `autoOpenSingleDetail` clear
+semantics, `wrap` scope) to confirm during PR-C rather than guess.
+
 **PR-C — Lift view-stack + view-state into the controller.** Move `Model.stack` and the
 filter/sort/search/scroll/selection state out of `internal/tui/views/*` into
 `app.Screen`/`ScreenState`. Refactor view rendering into pure functions
