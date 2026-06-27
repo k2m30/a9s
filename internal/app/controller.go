@@ -1,6 +1,7 @@
 package app
 
 import (
+	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 )
 
@@ -43,9 +44,11 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 		return c.Snapshot(), tasks
 
 	case ActionBack:
-		res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{Target: runtime.NavigateTargetMainMenu})
-		c.applyNavResult(res)
-		return c.Snapshot(), tasks
+		// Pop a single screen, mirroring the TUI's m.popView() — NOT a full
+		// collapse (root-collapse is the "root" Command). Per-view Esc semantics
+		// (clear filter/search before popping) arrive with PR-C view state.
+		c.ApplyIntents([]runtime.UIIntent{runtime.PopScreen{}})
+		return c.Snapshot(), nil
 
 	case ActionOpenIdentity:
 		// The runtime has no NavigateTargetIdentity: the TUI opens the identity
@@ -53,7 +56,12 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 		// controller pushes ScreenIdentity directly so tests can assert the stack
 		// without standing up a full TUI.
 		c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenIdentity}})
-		return c.Snapshot(), nil
+		// TODO PR-C: set IdentityBody.Loading = true once body state is lifted here.
+		fetchTask := runtime.TaskRequest{
+			Key:     runtime.TaskKey{Kind: runtime.TaskKindFetchIdentity},
+			Payload: runtime.FetchIdentityPayload{},
+		}
+		return c.Snapshot(), []runtime.TaskRequest{fetchTask}
 
 	// --- Session-selection actions (PR-B) ---
 
@@ -83,6 +91,53 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 		})
 		c.ApplyIntents(intents)
 		return c.Snapshot(), tasks
+
+	// --- Command lane (PR-B) ---
+
+	case ActionCommand:
+		// Arg carries a colon-command token (mirrors executeCommand in app_input.go).
+		// Only arg-driven tokens are dispatched here; tokens that need selected-row
+		// or per-screen state are noted as PR-C TODOs below.
+		switch a.Arg {
+		case "root", "main":
+			res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{Target: runtime.NavigateTargetMainMenu})
+			c.applyNavResult(res)
+			return c.Snapshot(), tasks
+
+		case "profile", "ctx":
+			res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{Target: runtime.NavigateTargetProfile})
+			c.applyNavResult(res)
+			return c.Snapshot(), tasks
+
+		case "region":
+			res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{Target: runtime.NavigateTargetRegion})
+			c.applyNavResult(res)
+			return c.Snapshot(), tasks
+
+		case "theme":
+			res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{Target: runtime.NavigateTargetTheme})
+			c.applyNavResult(res)
+			return c.Snapshot(), tasks
+
+		case "help":
+			res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{Target: runtime.NavigateTargetHelp})
+			c.applyNavResult(res)
+			return c.Snapshot(), tasks
+
+		default:
+			// Resource short-name or alias (e.g. "ec2", "s3", "dbi").
+			if rt := resource.FindResourceType(a.Arg); rt != nil {
+				res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{
+					Target:       runtime.NavigateTargetResourceList,
+					ResourceType: a.Arg,
+				})
+				c.applyNavResult(res)
+				return c.Snapshot(), tasks
+			}
+			// TODO PR-C: "q"/"quit" needs tea.Quit from the renderer, not the controller.
+			// Unknown tokens are silently dropped at this layer; the renderer flashes.
+		}
+		return c.Snapshot(), nil
 
 	// --- PR-C-blocked actions: need selected-row / per-screen view state ---
 
@@ -143,6 +198,19 @@ func (c *Controller) ApplyIntents(intents []runtime.UIIntent) ViewState {
 				c.stack[len(c.stack)-1] = Screen{ID: v.ID, Ctx: v.Context}
 			}
 
+		case runtime.PopSelectorIntent:
+			// Pop the top screen when it is a selector (profile/region/theme).
+			// Emitted by HandleProfileSelected / HandleRegionSelected /
+			// HandleThemeSelected so the selector dismisses after confirm.
+			if len(c.stack) > 0 {
+				top := c.stack[len(c.stack)-1]
+				if top.ID == runtime.ScreenProfileSelector ||
+					top.ID == runtime.ScreenRegion ||
+					top.ID == runtime.ScreenTheme {
+					c.stack = c.stack[:len(c.stack)-1]
+				}
+			}
+
 		// TODO PR-C: PatchResourceList mutates state lifted in PR-C
 		// TODO PR-C: PatchDetail mutates state lifted in PR-C
 		// TODO PR-C: PatchMenu mutates state lifted in PR-C
@@ -156,7 +224,6 @@ func (c *Controller) ApplyIntents(intents []runtime.UIIntent) ViewState {
 		// TODO PR-C: AppendErrorHistoryIntent mutates state lifted in PR-C
 		// TODO PR-C: ClearActiveListLoadingIntent mutates state lifted in PR-C
 		// TODO PR-C: MenuClearAvailabilityIntent mutates state lifted in PR-C
-		// TODO PR-C: PopSelectorIntent mutates state lifted in PR-C
 		// TODO PR-C: RefreshActiveListIntent mutates state lifted in PR-C
 		// TODO PR-C: PatchResourceCache mutates state lifted in PR-C
 		// TODO PR-C: PatchRelatedCache mutates state lifted in PR-C
