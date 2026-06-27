@@ -202,12 +202,14 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 			}
 			result.DispatchEnrich = true
 		}
-		// Related-check is detail-only and the adapter still owns the
-		// d.NeedsRelatedCheck() / RelatedCache shortcut decision because both
-		// inputs are renderer-side state today (NeedsRelatedCheck inspects the
-		// view, RelatedCache hits short-circuit before any TaskRequest fires).
-		// The flag tells the adapter to evaluate that path; PR-05b will move
-		// the gate fully into the runtime once those inputs are runtime-owned.
+		// Related-check is detail-only. The runtime decides *applicability*
+		// (this is a detail navigation → DispatchRelated); the adapter applies
+		// the *gate* (d.NeedsRelatedCheck() && RelatedCache miss). This split is
+		// the boundary-correct end state, not a deferral: NeedsRelatedCheck is
+		// true only when the right column auto-shows, which depends on terminal
+		// width — inherently renderer-side state a platform-agnostic runtime
+		// cannot (and should not) own. The RelatedCache short-circuit is an
+		// adapter-side render optimization for the same reason.
 		if ev.Target == NavigateTargetDetail {
 			result.DispatchRelated = true
 		}

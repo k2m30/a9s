@@ -19,15 +19,8 @@
 // the adapter because it depends on m.core.Clients(), m.appCtx, and tea.Cmd —
 // platform glue that does not belong in internal/runtime.
 //
-// Decision-locus follow-up (PR-05b): a few branches in this adapter still walk
-// the session cache directly to drive view construction (AMI exact-ID drill,
-// lazy-cache full-coverage shortcut, RelatedIDs partial-coverage pre-populated
-// list). The runtime emits the same task decisions in HandleRelatedNavigate /
-// relatedFetchTasks; the typed payload split lands these incrementally. AS-270
-// handed continuation tokens off via FetchMorePayload so KindFetchMore is a
-// pure pass-through; the remaining lazy-cache slices and client selection
-// branches will follow. Until then the adapter mirrors the runtime's policy
-// and trusts the emitted []TaskRequest rather than overriding it.
+// Exact-ID drills now route through the runtime's KindFetchByIDDetail task for
+// any type with a registered FetchByIDs helper (ami, kms, policy, ebs-snap).
 package tui
 
 import (
@@ -120,16 +113,17 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 
 		// TargetID-based filtered list (cache miss).
 		if result.TargetID != "" {
-			// Exact AMI navigation should fetch by image ID instead of falling
-			// back to the owned-AMI list, which misses public and third-party images.
-			// PR-05b: when m.core.Clients() moves into the runtime Core, the runtime will
-			// emit a typed FetchAMIDetail TaskRequest and this branch collapses
-			// into runtimeTasksToCmd; the adapter override stays for now because
-			// client selection is adapter-owned state.
-			if msg.TargetType == "ami" && m.core.Clients() != nil {
-				cmd := m.fetchAMIDetail(result.TargetID)
-				return m, cmd
+			// If the runtime decided this is a by-ID detail drill and clients are
+			// ready, run that fetch and navigate straight to detail — no list view.
+			if m.core.Clients() != nil {
+				for _, t := range tasks {
+					if t.Key.Kind == runtime.KindFetchByIDDetail {
+						return m, relatedNavigateTasksToCmd(m, msg.TargetType, result, tasks)
+					}
+				}
 			}
+			// No by-ID fetcher or clients not yet ready: fall back to a filtered
+			// list that auto-opens the single match.
 			m.flash = flashState{
 				text:    fmt.Sprintf("Resource %s not in cache; loading %s list", result.TargetID, msg.TargetType),
 				isError: false,
@@ -240,12 +234,9 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 				return m, relatedNavigateTasksToCmd(m, msg.TargetType, result, tasks)
 			}
 			// ResourceCache miss: check LazyResourceCache before triggering a fetch.
-			// PR-05b: this branch builds a fully-cached view when all RelatedIDs are
-			// in the lazy cache. runtime.relatedFetchTasks already returns nil tasks
-			// for full-coverage cases, so dropping `tasks` here is consistent with
-			// the runtime decision rather than a divergence. PR-05b will route the
-			// lazy-row slice through TaskRequest payload so the adapter no longer
-			// re-walks the cache.
+			// When all RelatedIDs are in the lazy cache, runtime.relatedFetchTasks
+			// already returns nil tasks for full-coverage cases, so dropping `tasks`
+			// here is consistent with the runtime decision rather than a divergence.
 			if lazyRows, hasLazy := m.core.LazyResourceCache(msg.TargetType); hasLazy {
 				idSet := make(map[string]bool, len(result.RelatedIDs))
 				for _, id := range result.RelatedIDs {
@@ -434,11 +425,10 @@ func relatedNavigateTasksToCmd(m Model, targetType string, result runtime.Naviga
 			cmds = append(cmds, m.fetchResourcesFiltered(targetType, result.FetchFilter, m.core.AvailabilityGen()))
 		case runtime.KindFetchMore:
 			// Continuation token is runtime-owned and arrives as a structured
-			// payload (AS-270 / PR-05b). The adapter is a pure pass-through
-			// and no longer reads session cache here. A missing or wrong-typed
-			// payload is a runtime bug, not an adapter-recoverable state —
-			// drop the task to surface the regression instead of silently
-			// re-deriving.
+			// payload (AS-270). The adapter is a pure pass-through and no longer
+			// reads session cache here. A missing or wrong-typed payload is a
+			// runtime bug, not an adapter-recoverable state — drop the task to
+			// surface the regression instead of silently re-deriving.
 			payload, ok := t.Payload.(runtime.FetchMorePayload)
 			if !ok {
 				continue
@@ -447,6 +437,12 @@ func relatedNavigateTasksToCmd(m Model, targetType string, result runtime.Naviga
 				ResourceType:      targetType,
 				ContinuationToken: payload.ContinuationToken,
 			}))
+		case runtime.KindFetchByIDDetail:
+			payload, ok := t.Payload.(runtime.FetchByIDDetailPayload)
+			if !ok {
+				continue
+			}
+			cmds = append(cmds, m.fetchByIDDetail(payload.TargetType, payload.ID))
 		}
 	}
 	switch len(cmds) {

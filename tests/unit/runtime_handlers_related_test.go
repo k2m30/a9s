@@ -25,6 +25,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/session"
 )
 
+
 // newRuntimeCore returns a fresh *runtime.Core bound to a clean session and
 // the static catalog. Test cases mutate the returned session's caches
 // directly to seed each branch.
@@ -302,5 +303,129 @@ func TestHandleRelatedNavigate_PureLazyCacheHit_Detail(t *testing.T) {
 	}
 	if len(tasks) != 0 {
 		t.Errorf("len(tasks) = %d, want 0", len(tasks))
+	}
+}
+
+// Case L — exact-ID drill to a by-ID-capable type, cache MISS → emits
+// KindFetchByIDDetail instead of KindFetchResources.
+//
+// This is the key TDD case for the new by-ID dispatch path. The test
+// registers a no-op FetchByIDs helper for a synthetic type, fires a
+// RelatedNavigateEvent whose TargetID is absent from the session cache,
+// and asserts that the runtime emits exactly one KindFetchByIDDetail task
+// with the correct type-asserted FetchByIDDetailPayload.
+func TestHandleRelatedNavigate_ByIDCapableType_CacheMiss_EmitsFetchByIDDetail(t *testing.T) {
+	const targetType = "test-fetchbyid-type-l"
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, _ []string) ([]domain.Resource, error) {
+		return nil, nil
+	})
+	t.Cleanup(func() { resource.CleanupFetchByIDsForTest(targetType) })
+
+	resource.SetPaginatedForTest(targetType, func(_ context.Context, _ any, _ string) (domain.FetchResult, error) {
+		return domain.FetchResult{}, nil
+	})
+	t.Cleanup(func() { resource.CleanupPaginatedForTest(targetType) })
+
+	c, _ := newRuntimeCore(t)
+
+	result, tasks := c.HandleRelatedNavigate(runtime.RelatedNavigateEvent{
+		TargetType: targetType,
+		TargetID:   "snap-0abc123",
+	})
+
+	if result.Kind != runtime.NavigationKindFilteredList {
+		t.Errorf("Kind = %v, want NavigationKindFilteredList", result.Kind)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("len(tasks) = %d, want 1", len(tasks))
+	}
+	if tasks[0].Key.Kind != runtime.KindFetchByIDDetail {
+		t.Errorf("tasks[0].Key.Kind = %q, want %q", tasks[0].Key.Kind, runtime.KindFetchByIDDetail)
+	}
+	if tasks[0].Key.Scope != targetType {
+		t.Errorf("tasks[0].Key.Scope = %q, want %q", tasks[0].Key.Scope, targetType)
+	}
+	payload, ok := tasks[0].Payload.(runtime.FetchByIDDetailPayload)
+	if !ok {
+		t.Fatalf("tasks[0].Payload type = %T, want runtime.FetchByIDDetailPayload", tasks[0].Payload)
+	}
+	wantPayload := runtime.FetchByIDDetailPayload{TargetType: targetType, ID: "snap-0abc123"}
+	if payload != wantPayload {
+		t.Errorf("Payload = %+v, want %+v", payload, wantPayload)
+	}
+}
+
+// Case M — exact-ID drill to a type with NO FetchByIDs helper, cache MISS →
+// regression guard that KindFetchResources is still emitted (not
+// KindFetchByIDDetail).
+//
+// This pins the else-branch of the new conditional so a future refactor
+// cannot accidentally route all cache-miss TargetID drills through the
+// by-ID path.
+func TestHandleRelatedNavigate_NonByIDType_CacheMiss_EmitsFetchResources(t *testing.T) {
+	// "ec2" has no FetchByIDs helper registered in tests/unit (no internal/aws
+	// init side-effects). If that ever changes this test will catch the
+	// regression in the opposite direction.
+	c, _ := newRuntimeCore(t)
+
+	result, tasks := c.HandleRelatedNavigate(runtime.RelatedNavigateEvent{
+		TargetType: "ec2",
+		TargetID:   "i-nofetchbyid",
+	})
+
+	if result.Kind != runtime.NavigationKindFilteredList {
+		t.Errorf("Kind = %v, want NavigationKindFilteredList", result.Kind)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("len(tasks) = %d, want 1", len(tasks))
+	}
+	if tasks[0].Key.Kind != runtime.KindFetchResources {
+		t.Errorf("tasks[0].Key.Kind = %q, want %q (not KindFetchByIDDetail)", tasks[0].Key.Kind, runtime.KindFetchResources)
+	}
+	if tasks[0].Key.Scope != "ec2" {
+		t.Errorf("tasks[0].Key.Scope = %q, want %q", tasks[0].Key.Scope, "ec2")
+	}
+	if _, isDetail := tasks[0].Payload.(runtime.FetchByIDDetailPayload); isDetail {
+		t.Error("Payload is FetchByIDDetailPayload, want none — by-ID path must not fire for ec2 (no FetchByIDs registered)")
+	}
+}
+
+// Case N — exact-ID drill to a by-ID-capable type, cache HIT → NavigationKindDetail,
+// NO fetch task at all.
+//
+// Safety property: the KindFetchByIDDetail path must only fire on cache miss.
+// When the resource is already in the session cache the router must drill
+// directly to the Detail view without any fetch task, regardless of whether
+// the target type has a FetchByIDs helper.
+func TestHandleRelatedNavigate_ByIDCapableType_CacheHit_Detail_NoFetchTask(t *testing.T) {
+	const targetType = "test-fetchbyid-type-n"
+	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, _ []string) ([]domain.Resource, error) {
+		return nil, nil
+	})
+	t.Cleanup(func() { resource.CleanupFetchByIDsForTest(targetType) })
+
+	resource.SetPaginatedForTest(targetType, func(_ context.Context, _ any, _ string) (domain.FetchResult, error) {
+		return domain.FetchResult{}, nil
+	})
+	t.Cleanup(func() { resource.CleanupPaginatedForTest(targetType) })
+
+	c, s := newRuntimeCore(t)
+	s.ResourceCache[targetType] = &session.ResourceCacheEntry{
+		Resources: []resource.Resource{{ID: "snap-cached"}},
+	}
+
+	result, tasks := c.HandleRelatedNavigate(runtime.RelatedNavigateEvent{
+		TargetType: targetType,
+		TargetID:   "snap-cached",
+	})
+
+	if result.Kind != runtime.NavigationKindDetail {
+		t.Errorf("Kind = %v, want NavigationKindDetail", result.Kind)
+	}
+	if result.TargetID != "snap-cached" {
+		t.Errorf("TargetID = %q, want %q", result.TargetID, "snap-cached")
+	}
+	if len(tasks) != 0 {
+		t.Errorf("len(tasks) = %d, want 0 — cache hit must not emit any fetch task", len(tasks))
 	}
 }

@@ -57,18 +57,6 @@ func (c *Core) FetchResourcesFiltered(ctx context.Context, clients *awsclient.Se
 	return pf(ctx, clients, filter, "")
 }
 
-// FetchAMIDetail fetches a single AMI by image ID and returns the resource.
-func (c *Core) FetchAMIDetail(ctx context.Context, clients *awsclient.ServiceClients, imageID string) (resource.Resource, error) {
-	if clients == nil {
-		return resource.Resource{}, fmt.Errorf("AWS clients not initialized; cannot load AMI %s", imageID)
-	}
-	res, err := awsclient.FetchAMIByID(ctx, clients.EC2, imageID)
-	if err != nil {
-		return resource.Resource{}, err
-	}
-	return res, nil
-}
-
 // FetchChildResources calls the registered paginated child fetcher for
 // childType with the given parent context and returns the first-page result.
 func (c *Core) FetchChildResources(ctx context.Context, clients *awsclient.ServiceClients, childType string, parentCtx map[string]string) (resource.FetchResult, error) {
