@@ -180,8 +180,14 @@ type MenuEntry struct {
 	ShortName    string     `json:"short_name"`
 	Display      string     `json:"display"`
 	Alias        string     `json:"alias,omitempty"`
+	Category     string     `json:"category,omitempty"`
 	IssueBadge   IssueBadge `json:"issue_badge,omitzero"`
 	Availability int        `json:"availability"`
+	// AvailKnown distinguishes a known count (rendered with a "(N)" suffix;
+	// confirmed-empty dims) from an unknown one (no suffix, normal style).
+	// AvailTruncated drives the "(N+)" lower-bound suffix.
+	AvailKnown     bool `json:"avail_known,omitempty"`
+	AvailTruncated bool `json:"avail_truncated,omitempty"`
 }
 
 // MenuBody is the body of the main-menu screen.

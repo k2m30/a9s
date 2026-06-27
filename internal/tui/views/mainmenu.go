@@ -7,6 +7,7 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/k2m30/a9s/v3/internal/app"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
@@ -607,4 +608,94 @@ func (m *MainMenuModel) applyFilter() {
 
 	m.filteredItems = result
 	m.scroll.SetTotal(len(m.filteredItems))
+}
+
+// RenderBody renders the menu from a controller-supplied MenuBody, byte-identical
+// to View(). The controller owns the logical state (visible entries, selection,
+// availability/issue badges); the renderer owns scrollOffset and dimensions.
+// PR-C 1b: this replaces View() once app.go drives the menu through the controller.
+func (m *MainMenuModel) RenderBody(body app.MenuBody) string {
+	if len(body.Entries) == 0 {
+		return "No resource types"
+	}
+
+	const aliasW = 15
+
+	lines := buildRenderLinesFromEntries(body.Entries)
+
+	start := m.scrollOffset
+	end := len(lines)
+	if m.height > 0 && start+m.height < end {
+		end = start + m.height
+	}
+
+	var sb strings.Builder
+	for li := start; li < end; li++ {
+		if li > start {
+			sb.WriteString("\n")
+		}
+		rl := lines[li]
+
+		if rl.isHeader {
+			headerText := "  " + rl.header + " "
+			sb.WriteString(styles.DimText.Render(headerText))
+			continue
+		}
+
+		item := body.Entries[rl.itemIndex]
+		aliasPadded := text.PadOrTrunc(item.Alias, aliasW)
+		nameFieldW := max(m.width-4-aliasW-3, 10)
+
+		nameStr := item.Display
+		if item.AvailKnown {
+			countSuffix := " (" + itoa(item.Availability) + ")"
+			if item.AvailTruncated {
+				countSuffix = " (" + itoa(item.Availability) + "+)"
+			}
+			nameStr += countSuffix
+		}
+		nameStr += entryIssueBadge(item)
+		namePadded := text.PadOrTrunc(nameStr, nameFieldW)
+
+		if rl.itemIndex == body.Selected {
+			dimAlias := styles.DimText.Render(aliasPadded)
+			selectedName := "    " + namePadded + " "
+			sb.WriteString(styles.RowSelected.Width(m.width).Render(selectedName + dimAlias))
+			continue
+		}
+
+		dimAlias := styles.DimText.Render(aliasPadded)
+		if item.AvailKnown && item.Availability == 0 && !item.AvailTruncated {
+			// Confirmed-empty resource type — fully dimmed (truncated-zero is not).
+			sb.WriteString(styles.DimText.Render("    "+namePadded+" ") + dimAlias)
+		} else {
+			sb.WriteString(styles.RowNormal.Render("    "+namePadded+" ") + dimAlias)
+		}
+	}
+
+	return sb.String()
+}
+
+// buildRenderLinesFromEntries builds the flat header+item line list from
+// controller-supplied entries, inserting a category header when Category changes.
+func buildRenderLinesFromEntries(entries []app.MenuEntry) []renderLine {
+	lines := make([]renderLine, 0, len(entries)+12)
+	lastCat := ""
+	for i, item := range entries {
+		if item.Category != lastCat {
+			lines = append(lines, renderLine{isHeader: true, header: item.Category})
+			lastCat = item.Category
+		}
+		lines = append(lines, renderLine{itemIndex: i})
+	}
+	return lines
+}
+
+// entryIssueBadge mirrors issueBadge() for a controller-supplied entry: the
+// " issues:N" suffix, only when the count is positive.
+func entryIssueBadge(e app.MenuEntry) string {
+	if e.IssueBadge.Count <= 0 {
+		return ""
+	}
+	return " issues:" + itoa(e.IssueBadge.Count)
 }

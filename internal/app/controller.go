@@ -717,10 +717,11 @@ func buildMenuBody(ms *MenuState) *MenuBody {
 			alias = ":" + item.Aliases[0]
 		}
 
-		avail := 0
+		avail, availKnown := 0, false
 		if ms.Availability != nil {
-			avail = ms.Availability[activeKey]
+			avail, availKnown = ms.Availability[activeKey]
 		}
+		availTruncated := ms.Truncated != nil && ms.Truncated[activeKey]
 
 		badge := IssueBadge{}
 		if ms.IssueKnown != nil && ms.IssueKnown[activeKey] {
@@ -733,11 +734,14 @@ func buildMenuBody(ms *MenuState) *MenuBody {
 		}
 
 		entries = append(entries, MenuEntry{
-			ShortName:    activeKey,
-			Display:      item.Name,
-			Alias:        alias,
-			IssueBadge:   badge,
-			Availability: avail,
+			ShortName:      activeKey,
+			Display:        item.Name,
+			Alias:          alias,
+			Category:       item.Category,
+			IssueBadge:     badge,
+			Availability:   avail,
+			AvailKnown:     availKnown,
+			AvailTruncated: availTruncated,
 		})
 	}
 
