@@ -12,24 +12,22 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // helper: create a model with a size set so View() actually renders
 func newRootSizedModel() tui.Model {
-	m := tui.New("testprofile", "us-east-1")
-	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
-	return m
+	return tuitest.Sized("testprofile", "us-east-1")
 }
 
 // helper: send a message through Update and return the updated model
 func rootApplyMsg(m tui.Model, msg tea.Msg) (tui.Model, tea.Cmd) {
-	newM, cmd := m.Update(msg)
-	return newM.(tui.Model), cmd
+	return tuitest.Step(m, msg)
 }
 
 // helper: get rendered content string from View()
 func rootViewContent(m tui.Model) string {
-	return m.View().Content
+	return tuitest.Render(m)
 }
 
 // helper: create key press for a printable character

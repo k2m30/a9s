@@ -50,6 +50,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/session"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // slugForTest mirrors the unexported slug() function in internal/semantics/attention/derive.go.
@@ -70,8 +71,7 @@ func slugForTest(phrase string) string {
 // applyMsg applies a message to the TUI model and returns the updated model.
 // Relocated from the deleted phase03_shim_wireups_test.go (renamed from applyMsg).
 func applyMsg(m tui.Model, msg tea.Msg) tui.Model {
-	newM, _ := m.Update(msg)
-	return newM.(tui.Model)
+	return tuitest.StepModel(m, msg)
 }
 
 // newRootModel builds a minimal root model suitable for the fold tests.
