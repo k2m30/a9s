@@ -201,7 +201,7 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 		if ms := c.topMenuState(); ms != nil {
 			all := resource.AllResourceTypes()
 			visible := menuVisibleItems(ms, all)
-			ms.Cursor -= menuPageSize
+			ms.Cursor -= menuPageSizeFor(a)
 			if ms.Cursor < 0 {
 				ms.Cursor = 0
 			}
@@ -213,7 +213,7 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 		if ms := c.topMenuState(); ms != nil {
 			all := resource.AllResourceTypes()
 			visible := menuVisibleItems(ms, all)
-			ms.Cursor += menuPageSize
+			ms.Cursor += menuPageSizeFor(a)
 			if n := len(visible); ms.Cursor >= n {
 				ms.Cursor = max(n-1, 0)
 			}
@@ -307,7 +307,10 @@ func (c *Controller) ApplyIntents(intents []runtime.UIIntent) ViewState {
 			})
 
 		case runtime.PopScreen:
-			if len(c.stack) > 0 {
+			// Never pop the root screen (the menu) — mirrors the TUI's popView
+			// (app_stack.go), which refuses to pop the last screen. Popping to an
+			// empty stack would blank the app to BodyKindUnknown.
+			if len(c.stack) > 1 {
 				c.stack = c.stack[:len(c.stack)-1]
 			}
 
@@ -467,9 +470,11 @@ func (c *Controller) Snapshot() ViewState {
 func (c *Controller) applyNavResult(res runtime.NavigateResult) {
 	switch res.Kind {
 	case runtime.NavigateKindPopAll:
-		// Pop every screen until the stack is empty (return to main menu).
-		for len(c.stack) > 0 {
-			c.ApplyIntents([]runtime.UIIntent{runtime.PopScreen{}})
+		// Pop back to the root menu — leave exactly one screen, never empty.
+		// (Popping via ApplyIntents would now stop at the len<=1 guard anyway;
+		// pop directly to keep the intent clear.)
+		if len(c.stack) > 1 {
+			c.stack = c.stack[:1]
 		}
 
 	case runtime.NavigateKindPushHelp:
@@ -520,9 +525,20 @@ func (c *Controller) applyRelatedNavResult(_ runtime.NavigationResult) {
 	// TODO PR-C: needs selected-row / view state (see plan PR-C)
 }
 
-// menuPageSize is the cursor jump for PageUp/PageDown on the menu screen.
-// The menu has no terminal height here; 10 matches the typical visible window.
+// menuPageSize is the default cursor jump for PageUp/PageDown when the renderer
+// does not supply its viewport page size. The controller is renderer-neutral and
+// has no terminal height; 10 matches a typical visible window.
 const menuPageSize = 10
+
+// menuPageSizeFor returns the page size for a PageUp/PageDown action: the
+// renderer-supplied viewport page size (Action.N) when given, else the default.
+// The TUI passes max(height-1, 1) so page movement tracks the live viewport.
+func menuPageSizeFor(a Action) int {
+	if a.N > 0 {
+		return a.N
+	}
+	return menuPageSize
+}
 
 // topMenuState returns the MenuState of the top-of-stack screen if it is
 // ScreenMenu, or nil otherwise.
@@ -588,19 +604,17 @@ func menuVisibleItems(ms *MenuState, all []resource.ResourceTypeDef) []resource.
 // the "dbi" type).
 //
 // PR-C 1b: converge with mainmenu.go isVisibleUnderIssueFilter.
-//
-// Note on cold-start ordering: the cold-start check (len(IssueKnown)==0) is
-// evaluated before ExcludeFromIssueBadge so that the attention-only toggle
-// shows ALL types when no probe has landed yet. Once any probe reports,
-// ExcludeFromIssueBadge types drop out because they can never be known.
 func menuIsVisibleUnderIssueFilter(ms *MenuState, item resource.ResourceTypeDef, activeKey string) bool {
-	// Cold-start: no probe has reported anywhere — show everything so the
+	// ExcludeFromIssueBadge types are never probed — hide them in attention
+	// mode even at cold-start. This ordering matches mainmenu.go exactly:
+	// exclusion is checked BEFORE the cold-start guard.
+	if item.ExcludeFromIssueBadge {
+		return false
+	}
+	// Cold-start: no probe has reported anywhere — show everything else so the
 	// user sees the full catalog rather than an empty menu.
 	if len(ms.IssueKnown) == 0 {
 		return true
-	}
-	if item.ExcludeFromIssueBadge {
-		return false
 	}
 	if ms.IssueKnown == nil || !ms.IssueKnown[activeKey] {
 		return false
