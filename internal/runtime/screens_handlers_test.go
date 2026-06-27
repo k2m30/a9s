@@ -369,22 +369,21 @@ func TestCore_HandleThemeFileRead_ReadErrorEmitsFlashOnly(t *testing.T) {
 }
 
 // TestCore_HandleThemeFileRead_ParseErrorEmitsFlashOnly pins the AS-784
-// invariant: when read succeeds but the YAML cannot be parsed by
-// styles.ThemeFromYAML, the handler must emit exactly one error flash and
-// MUST NOT emit ApplyThemeIntent, PopSelectorIntent, or any
-// TaskKindSaveThemeConfig task. Pre-AS-784 the handler emitted Save
-// unconditionally on read success, persisting an invalid theme choice to
-// disk even though the adapter rejected the apply.
+// invariant: when the adapter reports a theme-validation failure (ParseErr set,
+// post-SC-009 the parse runs in the renderer-side adapter, not the runtime), the
+// handler must emit exactly one error flash and MUST NOT emit ApplyThemeIntent,
+// PopSelectorIntent, or any TaskKindSaveThemeConfig task. Pre-AS-784 the handler
+// emitted Save unconditionally on read success, persisting an invalid theme
+// choice to disk even though the adapter rejected the apply.
 func TestCore_HandleThemeFileRead_ParseErrorEmitsFlashOnly(t *testing.T) {
 	c := newCore()
 
-	// Malformed YAML — the leading `:` token is not a valid YAML node.
-	// styles.ThemeFromYAML returns "theme YAML parse error: …".
-	badBytes := []byte(":\n  not yaml at all\n: : :\n")
-
+	// Malformed-YAML validation failure, as the adapter's styles.ThemeFromYAML
+	// would report it. The runtime branches on ParseErr, not the raw bytes.
 	intents, tasks := c.HandleThemeFileRead(ThemeFileReadEvent{
-		Theme: "broken.yaml",
-		Bytes: badBytes,
+		Theme:    "broken.yaml",
+		Bytes:    []byte(":\n  not yaml at all\n: : :\n"),
+		ParseErr: errors.New("theme YAML parse error: malformed document"),
 	})
 
 	if len(tasks) != 0 {
@@ -413,19 +412,19 @@ func TestCore_HandleThemeFileRead_ParseErrorEmitsFlashOnly(t *testing.T) {
 }
 
 // TestCore_HandleThemeFileRead_InvalidHexColorEmitsFlashOnly exercises the
-// second parse-fail branch styles.ThemeFromYAML guards: YAML that parses as
-// a themeYAML struct but contains an invalid hex colour string. Same
-// invariants as the malformed-YAML test above — Save must NOT fire.
+// second validation-failure mode the adapter's styles.ThemeFromYAML guards:
+// YAML that parses as a themeYAML struct but contains an invalid hex colour
+// string. The adapter surfaces it as ParseErr; same runtime invariants as the
+// malformed-YAML test above — Save must NOT fire.
 func TestCore_HandleThemeFileRead_InvalidHexColorEmitsFlashOnly(t *testing.T) {
 	c := newCore()
 
-	// Valid YAML shape, invalid hex colour value (`notahex` fails
-	// hexColorRe in styles/theme.go).
-	badBytes := []byte("name: Custom\ncolors:\n  accent: \"notahex\"\n")
-
+	// Invalid-hex validation failure as the adapter would report it (`notahex`
+	// fails hexColorRe in styles/theme.go).
 	intents, tasks := c.HandleThemeFileRead(ThemeFileReadEvent{
-		Theme: "bad-hex.yaml",
-		Bytes: badBytes,
+		Theme:    "bad-hex.yaml",
+		Bytes:    []byte("name: Custom\ncolors:\n  accent: \"notahex\"\n"),
+		ParseErr: errors.New("theme YAML parse error: invalid hex colour \"notahex\""),
 	})
 
 	if hasTaskKind(tasks, TaskKindSaveThemeConfig) {

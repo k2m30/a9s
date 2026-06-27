@@ -42,7 +42,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
 
 // Flash auto-clear durations. apiErrorFlashDuration is the longer 5 s window
@@ -448,6 +447,12 @@ type ThemeFileReadEvent struct {
 	Theme string
 	Bytes []byte
 	Err   error
+	// ParseErr is the renderer-side theme-validation result, computed by the
+	// adapter (which owns the styles package) before handing the event to the
+	// runtime. Keeping the parse in the adapter is what lets internal/runtime
+	// stay renderer-agnostic (SC-009): the runtime branches on a domain-safe
+	// error instead of importing internal/tui/styles. Non-nil ⇒ malformed YAML.
+	ParseErr error
 }
 
 // HandleProfilesLoaded emits a PushScreen{ScreenProfileSelector} carrying
@@ -538,9 +543,9 @@ func (c *Core) HandleThemeSelected(ev ThemeSelectedEvent) ([]UIIntent, []TaskReq
 //     no pop, no save.
 //  2. Read OK, parse failure → single "Bad theme YAML: <err>" error flash,
 //     no apply, no pop, no save. The selector stays open so the user can
-//     retry. Validation is performed via styles.ThemeFromYAML; the returned
-//     Theme is discarded because Option B-bytes-carry hands the bytes to the
-//     adapter, which re-derives the Theme for renderer state.
+//     retry. Validation is performed by the adapter (which owns the styles
+//     package) and surfaced to the runtime as ev.ParseErr, so internal/runtime
+//     never imports a renderer package (SC-009).
 //  3. Read OK, parse OK → four results in order: ApplyThemeIntent (carries
 //     the YAML Bytes; the adapter re-parses via styles.ThemeFromYAML),
 //     PopSelectorIntent, success FlashIntent ("Theme: <name>"), and a
@@ -563,9 +568,9 @@ func (c *Core) HandleThemeFileRead(ev ThemeFileReadEvent) ([]UIIntent, []TaskReq
 			IsError: true,
 		}}, nil
 	}
-	if _, err := styles.ThemeFromYAML(ev.Bytes); err != nil {
+	if ev.ParseErr != nil {
 		return []UIIntent{FlashIntent{
-			Text:    "Bad theme YAML: " + err.Error(),
+			Text:    "Bad theme YAML: " + ev.ParseErr.Error(),
 			IsError: true,
 		}}, nil
 	}

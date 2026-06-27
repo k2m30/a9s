@@ -21,6 +21,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -101,8 +102,16 @@ func (m Model) handleThemeSelected(msg messages.ThemeSelected) (tea.Model, tea.C
 // branches on read error → flash or success → ApplyThemeIntent (bytes) +
 // PopSelectorIntent + success Flash + TaskKindSaveThemeConfig.
 func (m Model) handleThemeFileRead(msg messages.ThemeFileRead) (tea.Model, tea.Cmd) {
+	// Validate the theme YAML here in the adapter — styles is a renderer
+	// package, so the runtime stays renderer-agnostic (SC-009) by branching on
+	// the resulting ParseErr rather than parsing the bytes itself. Only parse
+	// when the read succeeded; a read error short-circuits in the runtime.
+	var parseErr error
+	if msg.Err == nil {
+		_, parseErr = styles.ThemeFromYAML(msg.Bytes)
+	}
 	intents, tasks := m.core.HandleThemeFileRead(runtime.ThemeFileReadEvent{
-		Theme: msg.Theme, Bytes: msg.Bytes, Err: msg.Err,
+		Theme: msg.Theme, Bytes: msg.Bytes, Err: msg.Err, ParseErr: parseErr,
 	})
 	cmd := m.dispatchCoreScreenResult(intents, tasks)
 	return m, cmd

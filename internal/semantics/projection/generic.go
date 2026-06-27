@@ -9,7 +9,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
-	"github.com/k2m30/a9s/v3/internal/tui/text"
+	"github.com/k2m30/a9s/v3/internal/jsonyaml"
 )
 
 // ─── Injectable resource-registry callbacks ───────────────────────────────
@@ -272,7 +272,7 @@ func buildItems(r domain.Resource, cfg *config.ViewsConfig, navProvider func(str
 		}
 		level := 0
 		if leading := len(rawLine) - len(strings.TrimLeft(rawLine, " ")); leading > 0 {
-			level = leading / text.YAMLIndentSpaces
+			level = leading / jsonyaml.YAMLIndentSpaces
 		}
 		hasDash := strings.HasPrefix(trimmed, "- ")
 		trimmed = strings.TrimPrefix(trimmed, "- ")
@@ -518,7 +518,7 @@ func expandJSONItems(items []fieldpath.FieldItem) []fieldpath.FieldItem {
 				continue
 			}
 			valuePart = strings.TrimSpace(valuePart)
-			lines := text.TryJSONToYAMLLines(valuePart)
+			lines := jsonyaml.TryJSONToYAMLLines(valuePart)
 			if lines == nil {
 				result = append(result, item)
 				continue
@@ -534,7 +534,7 @@ func expandJSONItems(items []fieldpath.FieldItem) []fieldpath.FieldItem {
 			})
 			for _, line := range lines {
 				leading := len(line) - len(strings.TrimLeft(line, " "))
-				level := leading/text.YAMLIndentSpaces + item.IndentLevel + 1
+				level := leading/jsonyaml.YAMLIndentSpaces + item.IndentLevel + 1
 				result = append(result, fieldpath.FieldItem{
 					Path:        item.Path,
 					Key:         line,
@@ -545,7 +545,7 @@ func expandJSONItems(items []fieldpath.FieldItem) []fieldpath.FieldItem {
 			}
 			continue
 		}
-		lines := text.TryJSONToYAMLLines(item.Value)
+		lines := jsonyaml.TryJSONToYAMLLines(item.Value)
 		if lines == nil {
 			result = append(result, item)
 			continue
@@ -557,7 +557,7 @@ func expandJSONItems(items []fieldpath.FieldItem) []fieldpath.FieldItem {
 		})
 		for _, line := range lines {
 			leading := len(line) - len(strings.TrimLeft(line, " "))
-			level := leading/text.YAMLIndentSpaces + 1
+			level := leading/jsonyaml.YAMLIndentSpaces + 1
 			result = append(result, fieldpath.FieldItem{
 				Path:        item.Path,
 				Key:         line,

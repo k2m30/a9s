@@ -5,7 +5,7 @@ import (
 
 	lipgloss "charm.land/lipgloss/v2"
 
-	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/domain"
 )
 
 // Composed styles built from the Tokyo Night Dark palette.
@@ -62,22 +62,26 @@ func NoColorActive() bool {
 	return ok
 }
 
-// ColorStyle maps a resource.Color to the palette's foreground style.
+// ColorStyle maps a domain.Color to the palette's foreground style.
 // ColorHealthy → ColRunning (green), ColorWarning → ColPending (yellow),
 // ColorBroken → ColStopped (red), ColorDim → ColTerminated (grey).
 // Respects NO_COLOR (returns an empty style when active).
-func ColorStyle(c resource.Color) lipgloss.Style {
+//
+// Takes domain.Color (the renderer-free health enum) rather than the
+// internal/resource compatibility alias, so styles depends only on the
+// zero-dependency domain leaf.
+func ColorStyle(c domain.Color) lipgloss.Style {
 	if NoColorActive() {
 		return lipgloss.NewStyle()
 	}
 	switch c {
-	case resource.ColorHealthy:
+	case domain.ColorHealthy:
 		return lipgloss.NewStyle().Foreground(ColRunning)
-	case resource.ColorWarning:
+	case domain.ColorWarning:
 		return lipgloss.NewStyle().Foreground(ColPending)
-	case resource.ColorBroken:
+	case domain.ColorBroken:
 		return lipgloss.NewStyle().Foreground(ColStopped)
-	case resource.ColorDim:
+	case domain.ColorDim:
 		return lipgloss.NewStyle().Foreground(ColTerminated)
 	}
 	return lipgloss.NewStyle()

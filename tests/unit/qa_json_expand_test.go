@@ -10,7 +10,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/text"
+	"github.com/k2m30/a9s/v3/internal/jsonyaml"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -21,7 +21,7 @@ import (
 // TestTryJSONToYAMLLines_ValidObject verifies that a simple JSON object is converted
 // to YAML lines. YAML sorts keys alphabetically, so "count" comes before "name".
 func TestTryJSONToYAMLLines_ValidObject(t *testing.T) {
-	lines := text.TryJSONToYAMLLines(`{"name":"test","count":42}`)
+	lines := jsonyaml.TryJSONToYAMLLines(`{"name":"test","count":42}`)
 	if lines == nil {
 		t.Fatal("TryJSONToYAMLLines returned nil for valid JSON object")
 	}
@@ -36,7 +36,7 @@ func TestTryJSONToYAMLLines_ValidObject(t *testing.T) {
 
 // TestTryJSONToYAMLLines_ValidArray verifies that a JSON array is converted to YAML list lines.
 func TestTryJSONToYAMLLines_ValidArray(t *testing.T) {
-	lines := text.TryJSONToYAMLLines(`[1,2,3]`)
+	lines := jsonyaml.TryJSONToYAMLLines(`[1,2,3]`)
 	if lines == nil {
 		t.Fatal("TryJSONToYAMLLines returned nil for valid JSON array")
 	}
@@ -54,7 +54,7 @@ func TestTryJSONToYAMLLines_ValidArray(t *testing.T) {
 
 // TestTryJSONToYAMLLines_InvalidJSON verifies that a non-JSON string returns nil.
 func TestTryJSONToYAMLLines_InvalidJSON(t *testing.T) {
-	lines := text.TryJSONToYAMLLines("not json")
+	lines := jsonyaml.TryJSONToYAMLLines("not json")
 	if lines != nil {
 		t.Errorf("TryJSONToYAMLLines returned non-nil for invalid JSON: %v", lines)
 	}
@@ -62,7 +62,7 @@ func TestTryJSONToYAMLLines_InvalidJSON(t *testing.T) {
 
 // TestTryJSONToYAMLLines_EmptyObject verifies that "{}" returns nil (no meaningful content).
 func TestTryJSONToYAMLLines_EmptyObject(t *testing.T) {
-	lines := text.TryJSONToYAMLLines("{}")
+	lines := jsonyaml.TryJSONToYAMLLines("{}")
 	if lines != nil {
 		t.Errorf("TryJSONToYAMLLines returned non-nil for empty object '{}': %v", lines)
 	}
@@ -70,7 +70,7 @@ func TestTryJSONToYAMLLines_EmptyObject(t *testing.T) {
 
 // TestTryJSONToYAMLLines_EmptyArray verifies that "[]" returns nil (no meaningful content).
 func TestTryJSONToYAMLLines_EmptyArray(t *testing.T) {
-	lines := text.TryJSONToYAMLLines("[]")
+	lines := jsonyaml.TryJSONToYAMLLines("[]")
 	if lines != nil {
 		t.Errorf("TryJSONToYAMLLines returned non-nil for empty array '[]': %v", lines)
 	}
@@ -79,7 +79,7 @@ func TestTryJSONToYAMLLines_EmptyArray(t *testing.T) {
 // TestTryJSONToYAMLLines_PlainString verifies that a plain string not starting with { or [
 // returns nil immediately without attempting JSON parse.
 func TestTryJSONToYAMLLines_PlainString(t *testing.T) {
-	lines := text.TryJSONToYAMLLines("hello world")
+	lines := jsonyaml.TryJSONToYAMLLines("hello world")
 	if lines != nil {
 		t.Errorf("TryJSONToYAMLLines returned non-nil for plain string: %v", lines)
 	}
@@ -88,7 +88,7 @@ func TestTryJSONToYAMLLines_PlainString(t *testing.T) {
 // TestTryJSONToYAMLLines_NestedObject verifies that a nested JSON object produces
 // multi-line YAML with indented sub-keys.
 func TestTryJSONToYAMLLines_NestedObject(t *testing.T) {
-	lines := text.TryJSONToYAMLLines(`{"a":{"b":"c"}}`)
+	lines := jsonyaml.TryJSONToYAMLLines(`{"a":{"b":"c"}}`)
 	if lines == nil {
 		t.Fatal("TryJSONToYAMLLines returned nil for nested JSON object")
 	}
