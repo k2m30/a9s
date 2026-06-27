@@ -15,12 +15,13 @@
 //
 // COMMAND LANE (Apply) — 6 actions wired for real in PR-B:
 //
-//	ActionSelectProfile  — returns non-empty tasks (TaskKindConnect).
-//	ActionSelectRegion   — returns non-empty tasks (TaskKindConnect).
+//	ActionSelectProfile  — pops selector (PopSelectorIntent); returns TaskKindConnect.
+//	ActionSelectRegion   — pops selector (PopSelectorIntent); returns TaskKindConnect.
 //	ActionSelectTheme    — returns tasks containing TaskKindReadThemeFile.
 //	ActionOpenHelp       — pushes help screen; Snapshot reflects BodyKindHelp.
-//	ActionBack           — from non-empty stack clears it; Snapshot is BodyKindUnknown.
-//	ActionOpenIdentity   — pushes identity screen; Snapshot reflects BodyKindIdentity.
+//	ActionBack           — single pop (NOT PopAll); from 1-deep → empty/Unknown.
+//	ActionOpenIdentity   — pushes identity screen AND returns TaskKindFetchIdentity.
+//	ActionCommand        — dispatches "help","theme","region","root",<shortname>,unknown.
 //
 // PR-C-BLOCKED LANE — no-ops that must not panic and must return Snapshot:
 //
@@ -463,9 +464,9 @@ func TestController_Apply_PRB_SelectProfile_ReturnsConnectTask(t *testing.T) {
 }
 
 // TestController_Apply_PRB_SelectProfile_PopsSelectorIntent verifies that
-// after ActionSelectProfile the controller stack no longer shows a selector
-// screen (PopSelectorIntent was applied). Precondition: push a selector screen
-// first so the pop has something to remove.
+// after ActionSelectProfile the profile-selector screen is gone from the top
+// of the stack (PopSelectorIntent was applied by HandleProfileSelected).
+// Precondition: push a ScreenProfileSelector so the pop has something to remove.
 func TestController_Apply_PRB_SelectProfile_PopsSelectorIntent(t *testing.T) {
 	c := newTestController()
 
@@ -480,11 +481,30 @@ func TestController_Apply_PRB_SelectProfile_PopsSelectorIntent(t *testing.T) {
 		t.Fatalf("precondition: expected BodyKindSelector after push, got %q", c.Snapshot().Body.Kind)
 	}
 
-	vs, _ := c.Apply(app.Action{Kind: app.ActionSelectProfile, Arg: "prod-fake"})
+	vs, tasks := c.Apply(app.Action{Kind: app.ActionSelectProfile, Arg: "staging-fake"})
 
 	snap := c.Snapshot()
 	assertViewStateEqualsSnapshot(t, "Apply(SelectProfile) with selector on stack", vs, snap)
-	// TODO PR-C: assert snap.Body.Kind != app.BodyKindSelector (PopSelectorIntent wired in PR-C)
+
+	// PopSelectorIntent must have dismissed the selector screen.
+	if snap.Body.Kind == app.BodyKindSelector {
+		t.Errorf("Apply(SelectProfile): selector screen still on top after select — PopSelectorIntent was not applied; Body.Kind=%q", snap.Body.Kind)
+	}
+
+	// The connect task must still be returned even when a selector was popped.
+	if len(tasks) == 0 {
+		t.Fatal("Apply(SelectProfile) with selector on stack returned no tasks — expected TaskKindConnect")
+	}
+	hasConnect := false
+	for _, task := range tasks {
+		if task.Key.Kind == runtime.TaskKindConnect {
+			hasConnect = true
+			break
+		}
+	}
+	if !hasConnect {
+		t.Errorf("Apply(SelectProfile) tasks contain no TaskKindConnect after selector pop; got kinds: %v", taskKindStrings(tasks))
+	}
 }
 
 // TestController_Apply_PRB_SelectRegion_ReturnsConnectTask verifies that
@@ -510,6 +530,49 @@ func TestController_Apply_PRB_SelectRegion_ReturnsConnectTask(t *testing.T) {
 	}
 	if !hasConnect {
 		t.Errorf("Apply(SelectRegion) tasks contain no TaskKindConnect; got kinds: %v", taskKindStrings(tasks))
+	}
+}
+
+// TestController_Apply_PRB_SelectRegion_PopsSelectorIntent verifies that
+// after ActionSelectRegion the region-selector screen is gone from the top of
+// the stack (PopSelectorIntent applied by HandleRegionSelected).
+func TestController_Apply_PRB_SelectRegion_PopsSelectorIntent(t *testing.T) {
+	c := newTestController()
+
+	// Push a region selector so PopSelectorIntent has something to remove.
+	c.ApplyIntents([]runtime.UIIntent{
+		runtime.PushScreen{
+			ID:      runtime.ScreenRegion,
+			Context: runtime.ScreenContext{},
+		},
+	})
+	if c.Snapshot().Body.Kind != app.BodyKindSelector {
+		t.Fatalf("precondition: expected BodyKindSelector after push, got %q", c.Snapshot().Body.Kind)
+	}
+
+	vs, tasks := c.Apply(app.Action{Kind: app.ActionSelectRegion, Arg: "us-west-2"})
+
+	snap := c.Snapshot()
+	assertViewStateEqualsSnapshot(t, "Apply(SelectRegion) with selector on stack", vs, snap)
+
+	// PopSelectorIntent must have dismissed the selector screen.
+	if snap.Body.Kind == app.BodyKindSelector {
+		t.Errorf("Apply(SelectRegion): selector screen still on top after select — PopSelectorIntent was not applied; Body.Kind=%q", snap.Body.Kind)
+	}
+
+	// The connect task must still be returned even when a selector was popped.
+	if len(tasks) == 0 {
+		t.Fatal("Apply(SelectRegion) with selector on stack returned no tasks — expected TaskKindConnect")
+	}
+	hasConnect := false
+	for _, task := range tasks {
+		if task.Key.Kind == runtime.TaskKindConnect {
+			hasConnect = true
+			break
+		}
+	}
+	if !hasConnect {
+		t.Errorf("Apply(SelectRegion) tasks contain no TaskKindConnect after selector pop; got kinds: %v", taskKindStrings(tasks))
 	}
 }
 
@@ -580,38 +643,91 @@ func TestController_Apply_PRB_Back_EmptyStack_NoPanic(t *testing.T) {
 	}
 }
 
-// TestController_Apply_PRB_Back_NonEmptyStack_ClearsStack verifies that
-// ActionBack on a non-empty stack pops all screens, leaving the stack empty
-// and Snapshot reporting BodyKindUnknown. PR-B wires NavigateKindPopAll via
-// applyNavResult.
-func TestController_Apply_PRB_Back_NonEmptyStack_ClearsStack(t *testing.T) {
+// TestController_Apply_PRB_Back_TwoDeepStack_SinglePop verifies that
+// ActionBack on a 2-deep stack pops exactly ONE screen — the stack depth
+// drops by one and Snapshot reflects the REMAINING lower screen, not Unknown.
+// ActionBack is a single pop (PopScreen), not a full collapse (that is the
+// "root" Command). This replaces the old PopAll assertion.
+func TestController_Apply_PRB_Back_TwoDeepStack_SinglePop(t *testing.T) {
 	c := newTestController()
 
-	// Push two screens so Back has something to pop.
+	// Push two screens: lower=ScreenChildList, upper=ScreenProfileSelector.
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{ID: runtime.ScreenChildList, Context: runtime.ScreenContext{ResourceType: "ec2"}},
+	})
+	lowerKind := c.Snapshot().Body.Kind // BodyKindList — the screen we expect to remain
+	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{ID: runtime.ScreenProfileSelector, Context: runtime.ScreenContext{}},
 	})
 	if c.Snapshot().Body.Kind == app.BodyKindUnknown {
-		t.Fatalf("precondition: expected non-empty stack, got BodyKindUnknown")
+		t.Fatalf("precondition: expected non-empty 2-deep stack, got BodyKindUnknown")
 	}
+	upperKind := c.Snapshot().Body.Kind // BodyKindSelector — the screen that must be popped
 
 	vs, tasks := c.Apply(app.Action{Kind: app.ActionBack})
 
 	snap := c.Snapshot()
-	assertViewStateEqualsSnapshot(t, "Apply(Back) on non-empty stack", vs, snap)
+	assertViewStateEqualsSnapshot(t, "Apply(Back) 2-deep stack", vs, snap)
 
-	if snap.Body.Kind != app.BodyKindUnknown {
-		t.Errorf("Apply(Back) on non-empty stack: Body.Kind = %q, want %q — ActionBack must pop all screens via NavigateKindPopAll", snap.Body.Kind, app.BodyKindUnknown)
+	// The upper screen (selector) must be gone.
+	if snap.Body.Kind == upperKind {
+		t.Errorf("Apply(Back) 2-deep: still showing upper screen Body.Kind=%q — Back must pop exactly one screen", snap.Body.Kind)
 	}
-	_ = tasks
+	// The lower screen (child-list) must now be on top.
+	if snap.Body.Kind != lowerKind {
+		t.Errorf("Apply(Back) 2-deep: Body.Kind=%q, want %q (lower screen) — Back must not over-pop", snap.Body.Kind, lowerKind)
+	}
+	// Stack must not be empty — one screen remains.
+	if snap.Body.Kind == app.BodyKindUnknown {
+		t.Errorf("Apply(Back) 2-deep: stack empty after single Back — expected lower screen to remain")
+	}
+	// Back returns nil tasks.
+	if len(tasks) != 0 {
+		t.Errorf("Apply(Back) returned %d tasks, want 0", len(tasks))
+	}
 }
 
-// TestController_Apply_PRB_OpenIdentity_PushesIdentityScreen verifies that
-// ActionOpenIdentity pushes ScreenIdentity onto the stack, making the Snapshot
-// reflect BodyKindIdentity. PR-B pushes ScreenIdentity directly (no
-// NavigateTargetIdentity in the runtime).
-func TestController_Apply_PRB_OpenIdentity_PushesIdentityScreen(t *testing.T) {
+// TestController_Apply_PRB_Back_OneDeepStack_EmptiesStack verifies that
+// ActionBack on a 1-deep stack leaves the stack empty and Snapshot reports
+// BodyKindUnknown without panicking.
+func TestController_Apply_PRB_Back_OneDeepStack_EmptiesStack(t *testing.T) {
+	c := newTestController()
+
+	c.ApplyIntents([]runtime.UIIntent{
+		runtime.PushScreen{ID: runtime.ScreenHelp, Context: runtime.ScreenContext{}},
+	})
+	if c.Snapshot().Body.Kind == app.BodyKindUnknown {
+		t.Fatalf("precondition: expected 1-deep stack with BodyKindHelp, got BodyKindUnknown")
+	}
+
+	var vs app.ViewState
+	var tasks []runtime.TaskRequest
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("Apply(Back) on 1-deep stack panicked: %v", r)
+			}
+		}()
+		vs, tasks = c.Apply(app.Action{Kind: app.ActionBack})
+	}()
+
+	snap := c.Snapshot()
+	assertViewStateEqualsSnapshot(t, "Apply(Back) 1-deep stack", vs, snap)
+
+	if snap.Body.Kind != app.BodyKindUnknown {
+		t.Errorf("Apply(Back) 1-deep: Body.Kind=%q, want %q — stack should be empty after popping last screen", snap.Body.Kind, app.BodyKindUnknown)
+	}
+	if len(tasks) != 0 {
+		t.Errorf("Apply(Back) returned %d tasks, want 0", len(tasks))
+	}
+}
+
+// TestController_Apply_PRB_OpenIdentity_PushesIdentityScreenAndReturnsFetchTask
+// verifies that ActionOpenIdentity pushes ScreenIdentity (Snapshot reflects
+// BodyKindIdentity) AND returns a TaskRequest with Kind == TaskKindFetchIdentity.
+// PR-B pushes ScreenIdentity directly (no NavigateTargetIdentity in the runtime)
+// and enqueues the fetch task so the adapter can call STS GetCallerIdentity.
+func TestController_Apply_PRB_OpenIdentity_PushesIdentityScreenAndReturnsFetchTask(t *testing.T) {
 	c := newTestController()
 
 	vs, tasks := c.Apply(app.Action{Kind: app.ActionOpenIdentity})
@@ -622,7 +738,155 @@ func TestController_Apply_PRB_OpenIdentity_PushesIdentityScreen(t *testing.T) {
 	if snap.Body.Kind != app.BodyKindIdentity {
 		t.Errorf("Apply(OpenIdentity) Body.Kind = %q, want %q — ActionOpenIdentity must push ScreenIdentity", snap.Body.Kind, app.BodyKindIdentity)
 	}
-	_ = tasks
+
+	// A FetchIdentity task must be returned so the adapter triggers STS.
+	if len(tasks) == 0 {
+		t.Fatal("Apply(OpenIdentity) returned no tasks — expected TaskKindFetchIdentity")
+	}
+	hasFetchIdentity := false
+	for _, task := range tasks {
+		if task.Key.Kind == runtime.TaskKindFetchIdentity {
+			hasFetchIdentity = true
+			break
+		}
+	}
+	if !hasFetchIdentity {
+		t.Errorf("Apply(OpenIdentity) tasks contain no TaskKindFetchIdentity; got kinds: %v", taskKindStrings(tasks))
+	}
+}
+
+// =============================================================================
+// COMMAND LANE — ActionCommand token dispatch (PR-B)
+// =============================================================================
+
+// TestController_Apply_PRB_Command_Help_PushesHelpScreen verifies that
+// ActionCommand{Arg:"help"} pushes the help screen, making Snapshot report
+// BodyKindHelp. Mirrors the "help" colon-command token in the TUI.
+func TestController_Apply_PRB_Command_Help_PushesHelpScreen(t *testing.T) {
+	c := newTestController()
+
+	vs, _ := c.Apply(app.Action{Kind: app.ActionCommand, Arg: "help"})
+
+	snap := c.Snapshot()
+	assertViewStateEqualsSnapshot(t, "Apply(Command:help)", vs, snap)
+
+	if snap.Body.Kind != app.BodyKindHelp {
+		t.Errorf("Apply(Command:help) Body.Kind = %q, want %q", snap.Body.Kind, app.BodyKindHelp)
+	}
+}
+
+// TestController_Apply_PRB_Command_Theme_PushesThemeSelector verifies that
+// ActionCommand{Arg:"theme"} pushes the theme selector, making Snapshot report
+// BodyKindSelector. The theme selector uses ScreenTheme → bodyKindForScreen
+// maps it to BodyKindSelector.
+func TestController_Apply_PRB_Command_Theme_PushesThemeSelector(t *testing.T) {
+	c := newTestController()
+
+	vs, _ := c.Apply(app.Action{Kind: app.ActionCommand, Arg: "theme"})
+
+	snap := c.Snapshot()
+	assertViewStateEqualsSnapshot(t, "Apply(Command:theme)", vs, snap)
+
+	if snap.Body.Kind != app.BodyKindSelector {
+		t.Errorf("Apply(Command:theme) Body.Kind = %q, want %q (ScreenTheme → BodyKindSelector)", snap.Body.Kind, app.BodyKindSelector)
+	}
+}
+
+// TestController_Apply_PRB_Command_Region_PushesRegionSelector verifies that
+// ActionCommand{Arg:"region"} pushes the region selector, making Snapshot
+// report BodyKindSelector. The region selector uses ScreenRegion → bodyKindForScreen
+// maps it to BodyKindSelector.
+func TestController_Apply_PRB_Command_Region_PushesRegionSelector(t *testing.T) {
+	c := newTestController()
+
+	vs, _ := c.Apply(app.Action{Kind: app.ActionCommand, Arg: "region"})
+
+	snap := c.Snapshot()
+	assertViewStateEqualsSnapshot(t, "Apply(Command:region)", vs, snap)
+
+	if snap.Body.Kind != app.BodyKindSelector {
+		t.Errorf("Apply(Command:region) Body.Kind = %q, want %q (ScreenRegion → BodyKindSelector)", snap.Body.Kind, app.BodyKindSelector)
+	}
+}
+
+// TestController_Apply_PRB_Command_Root_CollapsesStack verifies that
+// ActionCommand{Arg:"root"} pops all screens (NavigateKindPopAll), leaving
+// the stack empty and Snapshot reporting BodyKindUnknown.
+func TestController_Apply_PRB_Command_Root_CollapsesStack(t *testing.T) {
+	c := newTestController()
+
+	// Push two screens first so there is something to collapse.
+	c.ApplyIntents([]runtime.UIIntent{
+		runtime.PushScreen{ID: runtime.ScreenChildList, Context: runtime.ScreenContext{ResourceType: "ec2"}},
+		runtime.PushScreen{ID: runtime.ScreenHelp, Context: runtime.ScreenContext{}},
+	})
+	if c.Snapshot().Body.Kind == app.BodyKindUnknown {
+		t.Fatalf("precondition: expected non-empty stack before :root command")
+	}
+
+	vs, _ := c.Apply(app.Action{Kind: app.ActionCommand, Arg: "root"})
+
+	snap := c.Snapshot()
+	assertViewStateEqualsSnapshot(t, "Apply(Command:root)", vs, snap)
+
+	if snap.Body.Kind != app.BodyKindUnknown {
+		t.Errorf("Apply(Command:root) Body.Kind = %q, want %q — :root must collapse the stack", snap.Body.Kind, app.BodyKindUnknown)
+	}
+}
+
+// TestController_Apply_PRB_Command_ResourceShortName_NoPanicReturnsSnapshot
+// verifies that ActionCommand{Arg:"ec2"} (a real resource short-name) does not
+// panic and returns a non-nil Snapshot. The stack push is deferred to PR-C
+// (applyNavResult does not yet handle NavigateKindPushResourceList), so we do
+// NOT assert a list body here — just absence of panic and shape validity.
+//
+// TODO PR-C: assert resource-list push once applyNavResult handles NavigateKindPushResourceList.
+func TestController_Apply_PRB_Command_ResourceShortName_NoPanicReturnsSnapshot(t *testing.T) {
+	c := newTestController()
+
+	var vs app.ViewState
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("Apply(Command:ec2) panicked: %v", r)
+			}
+		}()
+		vs, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
+	}()
+
+	snap := c.Snapshot()
+	assertViewStateEqualsSnapshot(t, "Apply(Command:ec2)", vs, snap)
+	// Shape only — VS must be valid (non-zero Kind field).
+	if vs.Body.Kind == "" {
+		t.Errorf("Apply(Command:ec2) returned ViewState with empty Body.Kind")
+	}
+	// TODO PR-C: assert resource-list push once applyNavResult handles it.
+}
+
+// TestController_Apply_PRB_Command_UnknownToken_IsNoPanic verifies that an
+// unrecognised command token ("zzz-not-a-resource") is silently dropped:
+// no panic, no stack change, Snapshot unchanged.
+func TestController_Apply_PRB_Command_UnknownToken_IsNoPanic(t *testing.T) {
+	c := newTestController()
+
+	snapBefore := c.Snapshot()
+
+	var vs app.ViewState
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("Apply(Command:zzz-not-a-resource) panicked: %v", r)
+			}
+		}()
+		vs, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "zzz-not-a-resource"})
+	}()
+
+	snap := c.Snapshot()
+	assertViewStateEqualsSnapshot(t, "Apply(Command:zzz-not-a-resource)", vs, snap)
+
+	if snap.Body.Kind != snapBefore.Body.Kind {
+		t.Errorf("Apply(Command:zzz-not-a-resource) changed Body.Kind from %q to %q — unknown token must be a no-op", snapBefore.Body.Kind, snap.Body.Kind)
+	}
 }
 
 // =============================================================================
