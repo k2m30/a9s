@@ -25,6 +25,7 @@ type Event = messages.Event
 type Core struct {
 	session *session.Session
 	types   []catalog.ResourceTypeDef
+	isDemo  bool
 }
 
 // New constructs a Core bound to the given session and catalog snapshot.
@@ -34,6 +35,13 @@ type Core struct {
 func New(s *session.Session, types []catalog.ResourceTypeDef) *Core {
 	return &Core{session: s, types: types}
 }
+
+// SetIsDemo sets the demo-mode flag. Demo mode skips Wave-2 enrichment probes
+// that require real AWS credentials against synthetic fakes.
+func (c *Core) SetIsDemo(v bool) { c.isDemo = v }
+
+// IsDemo reports whether the runtime is operating in demo mode.
+func (c *Core) IsDemo() bool { return c.isDemo }
 
 // Session returns the runtime-owned session handle. Adapters need this
 // during the migration to read state the per-handler PRs have not yet

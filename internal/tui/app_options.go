@@ -31,9 +31,14 @@ func WithRegion(region string) Option {
 // WithIsDemo marks the session as demo mode, which skips Wave 2 enrichment.
 // Set by the --demo CLI bootstrap path. Distinct from WithNoCache which only
 // disables disk persistence.
+//
+// Sets both m.isDemo (renderer-side, read until Pass B removes it) and
+// m.core.SetIsDemo so Core.ExecuteTask and renderer-neutral callers share
+// the same source of truth.
 func WithIsDemo(demo bool) Option {
 	return func(m *Model) {
 		m.isDemo = demo
+		m.core.SetIsDemo(demo)
 	}
 }
 
