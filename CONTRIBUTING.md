@@ -51,12 +51,13 @@ Claude Code dispatches specialized agents for different tasks. Key ones for cont
 |-------|-------------|-------------|
 | `a9s-coder` | Writes implementation code (TDD) | Features, bug fixes |
 | `a9s-qa` | Writes test code | Test coverage gaps |
-| `a9s-architect` | Reviews architecture (scores against checklist) | Before pushing |
-| `a9s-tui-reviewer` | Reviews Bubble Tea v2 correctness | After TUI changes |
+| `a9s-qa-stories` | Given/when/then stories from the design spec | New views, before tests |
 | `a9s-consistency-checker` | Verifies code/docs/website alignment | Before pushing |
-| `test-coverage-analyzer` | Finds test coverage gaps | Before pushing |
+| `a9s-fixtures` | Builds demo/test fixtures from real AWS | New resource data |
+| `a9s-devops` | AWS-practitioner consult | Resource priorities, workflows |
+| `tui-designer` | TUI wireframes and color schemes | New/redesigned views |
 
-You don't invoke these manually — Claude Code uses them when appropriate. But you can ask for them explicitly: "run the architect agent" or "check test coverage".
+You don't invoke these manually — Claude Code uses them when appropriate. But you can ask for them explicitly: "use a9s-qa to add tests" or "run the consistency checker". Architecture review is the `arch-review` skill; coverage and BT v2 correctness are reviewed directly in-session.
 
 ### Skills
 

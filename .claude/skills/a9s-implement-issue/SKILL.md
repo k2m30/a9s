@@ -279,11 +279,10 @@ Run the full pre-push checklist:
 bash .claude/scripts/arch-review.sh > /tmp/arch-review.txt 2>&1
 ```
 
-### Step 6.2: Agent checks
-Run these agents (read-only, safe to parallel):
-- `a9s-consistency-checker` — code/docs/website alignment
-- `test-coverage-analyzer` — coverage gaps for the new code
-- `a9s-architect` with `a9s-arch-review` skill — architecture score (target: 8.5+/10)
+### Step 6.2: Review checks
+- `a9s-consistency-checker` — code/docs/website alignment (read-only, safe to parallel)
+- Coverage gaps for the new code — review directly (`go test -cover`)
+- `arch-review` skill — architecture score (target: 8.5+/10)
 
 ### Step 6.3: Fix any findings
 

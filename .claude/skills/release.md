@@ -12,8 +12,8 @@ Run all of these and stop if any fail:
 3. `make security` — no known vulnerabilities
 4. `make gofix` — no unfixed inline directives
 5. Run `a9s-consistency-checker` agent — verify code/docs/website alignment
-6. Run `test-coverage-analyzer` agent — check for coverage gaps
-7. Run `a9s-architect` agent — verify architecture (target: 8.5+/10)
+6. Review coverage gaps directly (`go test -cover`)
+7. Run the `arch-review` skill — verify architecture (target: 8.5+/10)
 8. `goreleaser check -f .goreleaser.yaml` — validate release config
 9. `make build` — rebuild binary
 
