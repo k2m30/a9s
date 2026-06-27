@@ -29,58 +29,75 @@ func New(core *runtime.Core) *Controller {
 // the returned UIIntents to the screen stack, enqueues returned TaskRequests,
 // and returns the updated ViewState plus newly-enqueued TaskRequests.
 //
-// USER-INTENT lane: each Action.Kind maps to a specific Core.HandleX method
-// with its own event type and return type. The event construction is added
-// in PR-B once the Action→Event translation contract is finalized.
+// USER-INTENT lane: each Action.Kind maps to a specific Core.HandleX method.
+// PR-B wires the six navigate/session actions that need no selected-row state.
+// PR-C-blocked actions (row-dependent) are kept as documented no-ops.
 func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 	switch a.Kind {
-	case ActionOpenDetail, ActionSelect, ActionCommand,
-		ActionOpenYAML, ActionOpenJSON, ActionOpenHelp,
-		ActionBack, ActionMoveUp, ActionMoveDown,
-		ActionMoveTop, ActionMoveBottom,
-		ActionSetFilter, ActionSort,
-		ActionSearch, ActionSearchNext, ActionSearchPrev, ActionSearchClear,
-		ActionCopy, ActionToggleRelated, ActionToggleWrap, ActionToggleAttention,
-		ActionLoadMore, ActionRefresh, ActionOpenIdentity,
-		ActionSelectProfile, ActionSelectRegion, ActionSelectTheme,
+
+	// --- Navigate actions (PR-B) ---
+
+	case ActionOpenHelp:
+		res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{Target: runtime.NavigateTargetHelp})
+		c.applyNavResult(res)
+		return c.Snapshot(), tasks
+
+	case ActionBack:
+		res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{Target: runtime.NavigateTargetMainMenu})
+		c.applyNavResult(res)
+		return c.Snapshot(), tasks
+
+	case ActionOpenIdentity:
+		// The runtime has no NavigateTargetIdentity: the TUI opens the identity
+		// screen via direct key-handling (not HandleNavigate). The headless
+		// controller pushes ScreenIdentity directly so tests can assert the stack
+		// without standing up a full TUI.
+		c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenIdentity}})
+		return c.Snapshot(), nil
+
+	// --- Session-selection actions (PR-B) ---
+
+	case ActionSelectProfile:
+		// ConnectGen is read pre-Rotate; HandleProfileSelected calls Rotate internally.
+		// NewGen is passed as the bumped flash gen for the "Switching to …" tick.
+		// The headless controller has no flash.gen to bump, so we pass the current
+		// ConnectGen as a stable stand-in — the ClearFlash tick is adapter-owned.
+		intents, tasks := c.core.HandleProfileSelected(runtime.ProfileSelectedEvent{
+			Profile: a.Arg,
+			NewGen:  c.core.ConnectGen(),
+		})
+		c.ApplyIntents(intents)
+		return c.Snapshot(), tasks
+
+	case ActionSelectRegion:
+		intents, tasks := c.core.HandleRegionSelected(runtime.RegionSelectedEvent{
+			Region: a.Arg,
+			NewGen: c.core.ConnectGen(),
+		})
+		c.ApplyIntents(intents)
+		return c.Snapshot(), tasks
+
+	case ActionSelectTheme:
+		intents, tasks := c.core.HandleThemeSelected(runtime.ThemeSelectedEvent{
+			Theme: a.Arg,
+		})
+		c.ApplyIntents(intents)
+		return c.Snapshot(), tasks
+
+	// --- PR-C-blocked actions: need selected-row / per-screen view state ---
+
+	case ActionOpenDetail, ActionSelect,
+		ActionOpenYAML, ActionOpenJSON,
 		ActionReveal, ActionChildView,
-		ActionQuit:
-		// Dispatch table — each case names the Core command method it will call.
-		//
-		//   ActionOpenDetail / ActionSelect / ActionOpenYAML / ActionOpenJSON /
-		//   ActionOpenHelp / ActionBack:
-		//     → c.core.HandleNavigate(NavigateEvent{...}) → (NavigateResult, []TaskRequest)
-		//     TODO PR-B: build NavigateEvent from action and call c.core.HandleNavigate
-		//
-		//   ActionReveal:
-		//     → c.core.HandleNavigate(NavigateEvent{Target: NavigateTargetReveal, ...})
-		//     TODO PR-B: build NavigateEvent from action and call c.core.HandleNavigate
-		//
-		//   ActionOpenIdentity (open the caller-identity screen):
-		//     → c.core.HandleNavigate(NavigateEvent{Target: NavigateTargetIdentity, ...})
-		//     TODO PR-B: build NavigateEvent from action and call c.core.HandleNavigate
-		//
-		//   ActionSelectProfile:
-		//     → c.core.HandleProfileSelected(ProfileSelectedEvent{...}) → ([]UIIntent, []TaskRequest)
-		//     TODO PR-B: build ProfileSelectedEvent from action and call c.core.HandleProfileSelected
-		//
-		//   ActionSelectRegion:
-		//     → c.core.HandleRegionSelected(RegionSelectedEvent{...}) → ([]UIIntent, []TaskRequest)
-		//     TODO PR-B: build RegionSelectedEvent from action and call c.core.HandleRegionSelected
-		//
-		//   ActionSelectTheme (theme selector confirm):
-		//     → c.core.HandleThemeSelected(ThemeSelectedEvent{...}) → ([]UIIntent, []TaskRequest)
-		//     TODO PR-B: build ThemeSelectedEvent from action and call c.core.HandleThemeSelected
-		//
-		//   ActionChildView:
-		//     → c.core.HandleEnterChildView(EnterChildViewEvent{...}) → ([]UIIntent, []TaskRequest)
-		//     TODO PR-B: build EnterChildViewEvent from action and call c.core.HandleEnterChildView
-		//
-		//   ActionToggleRelated (related-panel navigation row selected):
-		//     → c.core.HandleRelatedNavigate(RelatedNavigateEvent{...}) → (NavigationResult, []TaskRequest)
-		//     TODO PR-B: build RelatedNavigateEvent from action and call c.core.HandleRelatedNavigate
+		ActionToggleRelated,
+		ActionLoadMore:
+		// TODO PR-C: needs selected-row / view state (see plan PR-C)
+		return c.Snapshot(), nil
 	}
-	// TODO PR-B: replace this fall-through with the per-case Core call results above.
+
+	// All remaining actions (movement, filter, sort, search, copy, refresh, quit,
+	// toggle-wrap, toggle-attention, command) are either movement-only or require
+	// per-screen state lifted in PR-C. Return current snapshot with no tasks.
 	return c.Snapshot(), nil
 }
 
@@ -181,27 +198,42 @@ func (c *Controller) Snapshot() ViewState {
 // applyNavResult converts a NavigateResult into PushScreen/ReplaceScreen/PopScreen
 // stack operations. Called by Apply after HandleNavigate returns.
 //
-// NavigateResult carries NavigateKind plus ResolvedType, DisplayAlias, Resource,
-// CachedEntry, ReplaceCurrent, DispatchEnrich, DispatchRelated — but no ScreenID.
-// The adapter (not the runtime) decides which ScreenID to push; this method
-// encodes that policy for the headless controller.
+// The adapter (not the runtime) decides which ScreenID to push for each kind;
+// this method encodes that mapping for the headless controller.
 //
-// TODO PR-B: implement — build ScreenContext from result fields and call
-// c.ApplyIntents with the appropriate PushScreen / ReplaceScreen / PopScreen:
-//
-//	NavigateKindPopAll       → PopScreen until stack empty
-//	NavigateKindPushResourceList / NavigateKindPushResourceListCached
-//	                         → PushScreen or ReplaceScreen (when ReplaceCurrent)
-//	                           with ScreenContext{ResourceType: result.ResolvedType}
-//	NavigateKindPushDetail   → PushScreen with ScreenContext{ResourceType, ResourceID}
-//	NavigateKindPushYAML / NavigateKindPushJSON
-//	                         → PushScreen with ScreenContext{ResourceType, ResourceID}
-//	NavigateKindPushHelp / NavigateKindPushRegion / NavigateKindPushTheme
-//	                         → PushScreen with appropriate ScreenID
-//	NavigateKindFetchProfiles / NavigateKindFetchReveal → no stack change
-//	NavigateKindFlash / NavigateKindNoop               → no stack change
-func (c *Controller) applyNavResult(_ runtime.NavigateResult) { //nolint:unused // wired in PR-B
-	// TODO PR-B: applyNavResult
+// Kinds that require selected-row or resource data (PushDetail, PushYAML,
+// PushJSON, PushResourceList/Cached, FetchReveal) are deferred to PR-C where
+// per-screen state is lifted into the controller.
+func (c *Controller) applyNavResult(res runtime.NavigateResult) {
+	switch res.Kind {
+	case runtime.NavigateKindPopAll:
+		// Pop every screen until the stack is empty (return to main menu).
+		for len(c.stack) > 0 {
+			c.ApplyIntents([]runtime.UIIntent{runtime.PopScreen{}})
+		}
+
+	case runtime.NavigateKindPushHelp:
+		c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenHelp}})
+
+	case runtime.NavigateKindPushRegion:
+		c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenRegion}})
+
+	case runtime.NavigateKindPushTheme:
+		c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenTheme}})
+
+	case runtime.NavigateKindFetchProfiles:
+		// No stack change — the adapter starts the fetch task; when the result
+		// arrives (ProfilesLoaded), HandleProfilesLoaded pushes ScreenProfileSelector.
+
+	case runtime.NavigateKindFlash, runtime.NavigateKindNoop:
+		// No stack change — flash is surfaced via FlashIntent in the intent stream.
+
+	// TODO PR-C: NavigateKindPushResourceList / NavigateKindPushResourceListCached
+	//            need ScreenContext{ResourceType} + cache entry from the result.
+	// TODO PR-C: NavigateKindPushDetail / NavigateKindPushYAML / NavigateKindPushJSON
+	//            need ScreenContext{ResourceType, ResourceID} from result.Resource.
+	// TODO PR-C: NavigateKindFetchReveal needs result.Resource for the reveal payload.
+	}
 }
 
 // applyRelatedNavResult converts a NavigationResult into stack operations.
@@ -210,27 +242,28 @@ func (c *Controller) applyNavResult(_ runtime.NavigateResult) { //nolint:unused 
 // RelatedIDs, FetchFilter, FilterText — no ScreenID; the controller maps
 // kind → ScreenID.
 //
-// TODO PR-B: implement — build ScreenContext{ResourceType: result.TargetType}
-// and emit the appropriate PushScreen based on NavigationKind:
+// All NavigationKinds (ResourceList, FilteredList, Detail, EnterChildView)
+// need selected-row and per-screen state that PR-C lifts into the controller.
 //
-//	NavigationKindResourceList / NavigationKindFilteredList → PushScreen (list)
-//	NavigationKindDetail                                    → PushScreen (detail)
-//	NavigationKindEnterChildView → delegate to HandleEnterChildView path
-//	NavigationKindFlash / NavigationKindUnknown            → no stack change
-func (c *Controller) applyRelatedNavResult(_ runtime.NavigationResult) { //nolint:unused // wired in PR-B
-	// TODO PR-B: applyRelatedNavResult
+//nolint:unused // wired in PR-C
+func (c *Controller) applyRelatedNavResult(_ runtime.NavigationResult) {
+	// TODO PR-C: needs selected-row / view state (see plan PR-C)
 }
 
 // bodyKindForScreen maps a Screen to the BodyKind a renderer uses to
 // select the correct template/view.
 func bodyKindForScreen(s Screen) BodyKind {
 	switch s.ID {
-	case runtime.ScreenProfileSelector:
+	case runtime.ScreenProfileSelector, runtime.ScreenRegion, runtime.ScreenTheme:
 		return BodyKindSelector
 	case runtime.ScreenReveal:
 		return BodyKindDetail
 	case runtime.ScreenChildList:
 		return BodyKindList
+	case runtime.ScreenHelp:
+		return BodyKindHelp
+	case runtime.ScreenIdentity:
+		return BodyKindIdentity
 	default:
 		// Capability screens and future IDs not yet enumerated here.
 		// PR-C will extend this switch as new ScreenIDs are registered.

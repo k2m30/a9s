@@ -49,6 +49,33 @@ func (c *Core) Types() []catalog.ResourceTypeDef { return c.types }
 //
 // Handler wiring is added incrementally by the per-handler PRs (AS-72-h1..h8).
 // Unrecognised event types fall through to the nil, nil default.
+//
+// Messages NOT wired here (skipped — double-dispatch risk):
+//
+//	messages.ResourcesLoaded      — TUI shim handleResourcesLoaded calls
+//	                                Core.HandleResourcesLoaded directly after
+//	                                adapter-side derive + updateActiveView.
+//	messages.APIError             — TUI shim handleAPIError bumps flash.gen
+//	                                before calling Core.HandleAPIError.
+//	messages.RelatedCheckResult   — TUI shim handleRelatedCheckResult resolves
+//	                                sourceID from the active detail view before
+//	                                calling Core.HandleRelatedCheckResult.
+//	messages.EnrichDetailResult   — TUI shim handleEnrichDetailResult does
+//	                                adapter-side staleness drop and derive
+//	                                before calling Core.HandleEnrichDetailResult.
+//	messages.ValueRevealed        — TUI shim handleValueRevealed requires the
+//	                                adapter's flash.gen for staleness surface.
+//	messages.ClientsReady         — TUI shim handleClientsReady passes
+//	                                StackDepth and HasActiveRL (renderer state)
+//	                                into Core.HandleClientsReady.
+//	messages.Flash                — TUI shim handleFlash bumps flash.gen before
+//	                                calling Core.HandleFlash.
+//	messages.ClearFlash           — TUI shim handleClearFlash passes flash.gen
+//	                                and flash.isError (adapter state) into Core.
+//	messages.ThemeFileRead        — TUI shim handleThemeFileRead runs
+//	                                styles.ThemeFromYAML (renderer package) to
+//	                                produce ParseErr before calling Core.
+//	profilesLoadedMsg             — TUI-private type; no messages.* counterpart.
 func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 	if g, ok := ev.(messages.GenStamped); ok && messages.IsStale(g, c.session) {
 		return nil, nil

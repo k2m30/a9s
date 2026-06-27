@@ -187,13 +187,19 @@ handler `HandleValueRevealed` runs on the `Handle` lane when the fetched value l
 Build each `XEvent` from its Action; normalize the non-uniform return types
 (`NavigateResult` / `NavigationResult` / `[]UIIntent`) into stack ops via `ApplyIntents`.
 Thin out the now-duplicated `internal/tui/runtime_adapter_*.go` paths.
-**Also decide the result-lane shape:** `HandleEvent` covers only 6 of the `messages.*`
-result events today (the rest are dispatched ad hoc in the TUI adapter). Extend
-`HandleEvent` to dispatch *all* genuine result events — `ResourcesLoaded`,
-`RelatedCheckResult`, `EnrichDetailResult`, `ThemeFileRead`, `ClientsReady`, `Flash`,
-`ClearFlash`, `Copied`, `ValueRevealed`, `APIError` — so `Controller.Handle` is a single
-uniform entry point, rather than having the controller call each `HandleX` directly. This
-is real work, not a no-op rename.
+**Result-lane uniformity is DEFERRED past PR-C — verified blocked.** `HandleEvent` covers
+only 6 events; the other result events (`ResourcesLoaded`, `RelatedCheckResult`,
+`EnrichDetailResult`, `ThemeFileRead`, `ClientsReady`, `Flash`, `ClearFlash`, `ValueRevealed`,
+`APIError`) are NOT cleanly addable to `HandleEvent` yet. Each reaches `Core.HandleX` today
+through a **TUI shim that does renderer-coupled pre-processing first** — bumping `flash.gen`,
+resolving `sourceID` from the active detail view, running `styles.ThemeFromYAML` to compute
+`ParseErr`, passing `StackDepth`/`HasActiveRL`. A naive `messages.X → HandleX` case would
+call Core with missing/wrong data, and (once the controller is live in PR-C) double-dispatch
+against the surviving shim. Relocating that pre-processing into Core / a renderer-neutral step
+depends on the PR-C state lift and the PR-B0 executor. **Until then `Controller.Handle`
+stays at the original 6 events**, and `Handle(<an un-wired result event>)` is a documented
+safe no-op pass-through. So PR-B's delivered scope is the **command lane** (6 stateless
+actions) + `applyNavResult`, not result-lane uniformity.
 
 **PR-B0 — Task executor extraction.** Move task-running logic out of the TUI adapter
 methods into a renderer-neutral `TaskExecutor` with explicit inputs/outputs (no `m.stack`
