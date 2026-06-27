@@ -2,7 +2,7 @@
 
 **3 PRs, all mandatory. Depends on Phase 04 (catalog).**
 
-The Color → severity collapse is handled inline in Phase 04 per-category PRs (the new catalog struct has no `Color` field; per-category PRs replace `td.Color(r)` call sites with `styles.SeverityStyle(rowSeverity(r, td))` in the same PR that builds the catalog literal). No standalone 5a-color PR is needed.
+The `Color` field was **retained** on the catalog struct (`ResourceTypeDef.Color func(domain.Resource) domain.Color`, REQUIRED for all registered types) — it classifies a row's health and returns a `domain.Color` (a renderer-free domain type, not a lipgloss style), so it does not breach the boundary. The originally-planned "Color → severity collapse" was not pursued; the per-type `Color` callback remains the source of row health and the TUI adapter maps `domain.Color` to a concrete `styles` style at render time. No standalone 5a-color PR was needed.
 
 ## Goal
 

@@ -178,6 +178,20 @@ If at the end of the program this test fails — if adding a resource still requ
 
 Update this table as phases complete.
 
+### Post-refactor structural cleanups
+
+The five phases left two residual structural-debt items that the phase-exit gates
+did not catch (their SC verification greps were scoped too narrowly). Both are now
+closed:
+
+| Item | Status | Notes |
+|---|---|---|
+| decision-locus / by-ID drill | LANDED | The TUI related-navigation adapter no longer special-cases `targetType == "ami"`. The runtime now emits a declarative `KindFetchByIDDetail` task for any cache-miss exact-ID drill to a type with a registered `FetchByIDs` (ami, kms, policy, ebs-snap); the adapter is a pure translator (gated on client availability, falling back to the filtered-list path otherwise). Removes the last SC-006 per-type dispatch branch and fixes exact-ID drills into resources absent from the owned list (AWS-managed KMS keys, managed IAM policies, public/cross-account AMIs/snapshots). |
+| ctevent summarizer registry | LANDED | `internal/semantics/ctevent` migrated off `init()` + `RegisterSummarizer` onto a static declarative `map` literal. This subsystem (feature 013) predated the catalog migration and was outside the SC-002/SC-003 grep scope (`internal/aws`, `internal/resource`, `internal/catalog`), so the holdout went unnoticed until a full-tree audit. |
+| renderer-boundary leaks (SC-009) | LANDED | SC-009 was only ever verified by grepping *direct* lipgloss/bubbletea imports; a `go list -deps` audit found shared-core packages leaking lipgloss *transitively*. Two roots: (1) `internal/semantics/projection` imported `internal/tui/text` for JSON→YAML helpers — those moved to a renderer-free `internal/jsonyaml` package (this also cleared the leak for `internal/aws`, `internal/session`, `internal/resource`, which reach projection via `internal/resource`); (2) `internal/runtime` imported `internal/tui/styles` to validate theme YAML — validation moved to the TUI adapter, which hands the runtime a domain-safe `ThemeFileReadEvent.ParseErr`. All shared-core packages now pass `go list -deps … | grep -E 'lipgloss|bubbletea'` empty. SC-009's verification in `spec.md` should use `go list -deps`, not a direct-import grep. |
+| typed runtime Event | LANDED | `runtime.Core.HandleEvent` took `Event any` (a Phase-05 scaffold placeholder). Tightened to `type Event = messages.Event` so the compiler enforces that only the typed event family reaches the orchestrator. |
+| pre-push gate coverage gap | LANDED | `make test` / `make test-race` ran only `./tests/unit/`, never the 31 `*_test.go` files in `internal/*` packages — so package-level test breakage passed the gate silently. Both targets now run `./...`. |
+
 ## Notes on counts and verification
 
 - Per-resource markdown count: at the time of writing, `ls docs/resources/ | grep -v impl-plan | wc -l` returns 66; total file count is 77 (including 9 `*-impl-plan.md` files and any other narrative docs). The Phase 04 exit criterion is "every catalog entry has a corresponding `docs/resources/<short>.md`" — verified by enumerating the catalog, not by hard-coding 66. **Verify the live count in the migration PR; the number above is informational.**
