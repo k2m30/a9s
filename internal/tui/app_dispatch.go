@@ -18,6 +18,8 @@
 package tui
 
 import (
+	"errors"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/domain"
@@ -233,32 +235,31 @@ func (m *Model) tasksToCmd(tasks []runtime.TaskRequest) tea.Cmd {
 	var cmds []tea.Cmd
 	for _, req := range tasks {
 		switch req.Key.Kind {
-		case runtime.TaskKindProbeAvailability:
-			cmd := m.probeResourceAvailability(req.Key.Scope, m.core.AvailabilityGen())
+		case runtime.TaskKindProbeAvailability, runtime.TaskKindProbeEnrich, runtime.TaskKindFetchChildResources:
+			// Route through ExecuteTask; fall back to adapter handling for
+			// ErrAdapterOnlyTask (defensive — these kinds are not adapter-only).
+			cmd := m.executeTaskCmd(req)
 			if cmd != nil {
 				cmds = append(cmds, cmd)
 			}
-		case runtime.TaskKindProbeEnrich:
-			cmd := m.probeEnrichment(req.Key.Scope, m.core.EnrichmentGen())
-			if cmd != nil {
-				cmds = append(cmds, cmd)
-			}
+
 		case runtime.TaskKindSaveCache:
+			// saveAvailabilityCache reads counts from MainMenuModel (the live
+			// TUI view), giving more precise values than ExecuteTask's
+			// availabilityFromResourceCache path. Keep adapter-local.
 			cmd := m.saveAvailabilityCache()
 			if cmd != nil {
 				cmds = append(cmds, cmd)
 			}
-		case runtime.TaskKindFetchChildResources:
-			if p, ok := req.Payload.(runtime.FetchChildResourcesPayload); ok {
-				if cmd := m.fetchChildResources(p.ChildType, p.ParentContext); cmd != nil {
-					cmds = append(cmds, cmd)
-				}
-			}
+
 		case runtime.TaskKindReadThemeFile:
+			// ErrAdapterOnlyTask — renderer concern, keep adapter-local.
 			if p, ok := req.Payload.(runtime.ReadThemePayload); ok {
 				cmds = append(cmds, readThemeFileCmd(p))
 			}
+
 		case runtime.TaskKindSaveThemeConfig:
+			// ErrAdapterOnlyTask — renderer concern, keep adapter-local.
 			if p, ok := req.Payload.(runtime.SaveThemeConfigPayload); ok {
 				cmds = append(cmds, saveThemeConfigCmd(p))
 			}
@@ -268,6 +269,23 @@ func (m *Model) tasksToCmd(tasks []runtime.TaskRequest) tea.Cmd {
 		return nil
 	}
 	return tea.Batch(cmds...)
+}
+
+// executeTaskCmd wraps Core.ExecuteTask in a tea.Cmd. The returned event is
+// delivered back into the Update loop as a tea.Msg. Adapter-only tasks fall
+// back to nil (they must be handled by the caller's kind-specific branch).
+func (m Model) executeTaskCmd(req runtime.TaskRequest) tea.Cmd {
+	ctx := m.appCtx
+	return func() tea.Msg {
+		ev, err := m.core.ExecuteTask(ctx, req)
+		if err != nil {
+			if errors.Is(err, runtime.ErrAdapterOnlyTask) {
+				return nil
+			}
+			return nil
+		}
+		return ev
+	}
 }
 
 // coreUpdate dispatches a tea.Msg through m.core.HandleEvent, applies

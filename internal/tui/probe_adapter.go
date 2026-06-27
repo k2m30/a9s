@@ -60,25 +60,6 @@ func (m *Model) loadAvailabilityCache() tea.Cmd {
 	}
 }
 
-// probeResourceAvailability returns a tea.Cmd that runs a Wave-1 availability
-// probe for shortName and converts the result to AvailabilityCheckedMsg.
-func (m *Model) probeResourceAvailability(shortName string, gen domain.Gen) tea.Cmd {
-	ctx, clients := m.appCtx, m.core.Clients()
-	return func() tea.Msg {
-		r := m.core.ProbeResourceAvailability(ctx, clients, shortName)
-		return messages.AvailabilityChecked{
-			ResourceType: shortName,
-			HasResources: r.HasResources,
-			Count:        r.Count,
-			Truncated:    r.Truncated,
-			Issues:       r.Issues,
-			Resources:    r.Resources,
-			Err:          r.Err,
-			Gen:          gen,
-		}
-	}
-}
-
 // saveAvailabilityCache returns a tea.Cmd that persists the current
 // availability state to disk. No-op when caching is disabled (noCache=true).
 func (m *Model) saveAvailabilityCache() tea.Cmd {
@@ -109,28 +90,6 @@ func (m *Model) saveAvailabilityCache() tea.Cmd {
 		// Best-effort save — ignore cache write failures.
 		_ = m.core.SaveAvailabilityCache(profile, region, entries, truncatedMap, issueCounts, issueTruncated, issueKnown)
 		return nil
-	}
-}
-
-// demoPrefetchCounts returns a tea.Cmd that synchronously calls all registered
-// paginated fetchers and converts the result to AvailabilityPrefetchedMsg.
-// Used when pre-supplied clients are present and no-cache is active so the
-// main menu shows counts immediately without the async probe pipeline.
-func (m *Model) demoPrefetchCounts() tea.Cmd {
-	ctx, clients := m.appCtx, m.core.Clients()
-	gen := m.core.AvailabilityGen()
-	return func() tea.Msg {
-		r := m.core.DemoPrefetchCounts(ctx, clients)
-		return messages.AvailabilityPrefetched{
-			Entries:        r.Entries,
-			Truncated:      r.Truncated,
-			IssueCounts:    r.IssueCounts,
-			IssueTruncated: r.IssueTruncated,
-			Resources:      r.Resources,
-			Pagination:     r.Pagination,
-			Gen:            gen,
-			PrefetchErr:    r.PrefetchErr,
-		}
 	}
 }
 

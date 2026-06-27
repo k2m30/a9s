@@ -209,6 +209,31 @@ read/write, reveal, copy, related fetches — and give each a state-free signatu
 `DrainSync` calls the sync executor. This is the prerequisite that makes `DrainSync` real
 (today it only empties the queue).
 
+*Status (landed):* **Pass A** added `Core.ExecuteTask(ctx, req) (messages.Event, error)`
+(+ `isDemo` promoted to a Core field; `save-cache`/`related-check` de-coupled from
+`m.stack`). **Pass B** rewired the TUI execution sites to delegate to `ExecuteTask` and
+made `DrainSync` execute for real. Two honest residuals remain:
+
+- **`DrainSync` executes but does not yet *apply* most results.** It runs tasks and feeds
+  events through `Controller.Handle`, but the result lane is still deferred (only 6 events
+  dispatched) and `ApplyIntents` no-ops menu/list/detail intents — so draining a fetch task
+  does not yet populate list/detail/cache state through the controller. DrainSync is
+  deterministic for *execution* + the 6 dispatched events; full state application lands with
+  the result lane + `ApplyIntents` in PR-C.
+- **Four task kinds were kept on the TUI's own path** (not yet unified through `ExecuteTask`),
+  because the executor diverges from TUI semantics — this is residual drift to close, not a
+  clean single path yet:
+  1. `enrich-detail` — TUI wraps a 10s per-call timeout `ExecuteTask` lacks. *Fix:* add the
+     timeout in `ExecuteTask`.
+  2. `fetch-by-id-detail` (related) — `ExecuteTask` returns `ResourcesLoaded` but the TUI also
+     emits a `Navigate{TargetDetail}` side-effect. *Fix:* model the navigation as a follow-up
+     intent/result, not buried in the executor.
+  3. `fetch-filtered` (related) — the related handler builds the task with no
+     `fetchFilteredPayload` (filter lives in `result.FetchFilter`). *Fix:* normalize the
+     related handler to populate the payload.
+  4. `save-cache` — TUI reads live `MainMenuModel` counts; `ExecuteTask` derives from session
+     `ResourceCache`. These converge once menu state is lifted in **PR-C**.
+
 **PR-B1 — State inventory + snapshot contract.** Before lifting state, table *every*
 mutable field in `MainMenuModel`, `ResourceListModel`, `DetailModel`, and the
 YAML/JSON/selector/reveal models — including the ones the first draft missed: server-side
