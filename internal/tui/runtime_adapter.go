@@ -138,28 +138,50 @@ func (m Model) runtimeTasksToCmd(tasks []runtime.TaskRequest) tea.Cmd {
 	for _, t := range tasks {
 		switch p := t.Payload.(type) {
 		case runtime.EnrichDetailPayload:
+			// Keep adapter-local: the adapter wraps a 10 s per-call timeout that
+			// Core.ExecuteTask's KindEnrichDetail path does not apply.
 			cmds = append(cmds, m.enrichDetailCmd(p))
+
 		case runtime.ConnectPayload:
-			cmds = append(cmds, m.connectAWS(p.Profile, p.Region, p.Gen))
+			// ExecuteTask handles TaskKindConnect.
+			cmds = append(cmds, m.executeTaskCmd(t))
+
 		case runtime.FetchIdentityPayload:
-			cmds = append(cmds, m.fetchIdentity(m.core.ConnectGen()))
+			// ExecuteTask handles TaskKindFetchIdentity.
+			cmds = append(cmds, m.executeTaskCmd(t))
+
 		case runtime.LoadAvailCachePayload:
-			cmds = append(cmds, m.loadAvailabilityCache())
+			// ExecuteTask handles TaskKindLoadAvailCache.
+			cmds = append(cmds, m.executeTaskCmd(t))
+
 		case runtime.DemoPrefetchCountsPayload:
-			cmds = append(cmds, m.demoPrefetchCounts())
+			// ExecuteTask handles TaskKindDemoPrefetchCounts.
+			cmds = append(cmds, m.executeTaskCmd(t))
+
 		case runtime.FlashTickPayload:
+			// ErrAdapterOnlyTask — timer is a renderer concern; keep adapter-local.
 			cmds = append(cmds, flashTickCmd(p))
+
 		case runtime.EmitNavigatePayload:
+			// ErrAdapterOnlyTask — navigation directive; keep adapter-local.
 			cmds = append(cmds, emitNavigateCmd(p))
+
 		case runtime.EmitAPIErrorPayload:
+			// ErrAdapterOnlyTask — re-dispatches into the render loop; keep adapter-local.
 			cmds = append(cmds, emitAPIErrorCmd(p))
+
 		case runtime.FetchChildResourcesPayload:
-			if cmd := m.fetchChildResources(p.ChildType, p.ParentContext); cmd != nil {
+			// ExecuteTask handles TaskKindFetchChildResources.
+			if cmd := m.executeTaskCmd(t); cmd != nil {
 				cmds = append(cmds, cmd)
 			}
+
 		case runtime.ReadThemePayload:
+			// ErrAdapterOnlyTask — theme file read produces a TUI-private message; keep adapter-local.
 			cmds = append(cmds, readThemeFileCmd(p))
+
 		case runtime.SaveThemeConfigPayload:
+			// ErrAdapterOnlyTask — persists a theme choice with no data event; keep adapter-local.
 			cmds = append(cmds, saveThemeConfigCmd(p))
 		}
 	}

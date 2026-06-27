@@ -347,23 +347,19 @@ func navigateTasksToCmd(m Model, msg messages.Navigate, result runtime.NavigateR
 	for _, t := range tasks {
 		switch t.Key.Kind {
 		case runtime.KindFetchResources:
-			// Use the canonical ShortName (result.ResolvedType) rather than the
-			// user-supplied ResourceType so that aliases (e.g. "rds" → "dbi") are
-			// resolved before the type is stamped on the ResourcesLoaded message.
-			// This ensures the ResourceListModel's type-guard comparison
-			// (msg.ResourceType vs m.typeDef.ShortName) uses the same canonical
-			// value the runtime resolved when it pushed the list view.
-			fetchRT := result.ResolvedType
-			if fetchRT == "" {
-				fetchRT = msg.ResourceType
-			}
-			cmds = append(cmds, m.fetchResources(fetchRT, m.core.AvailabilityGen()))
+			// The runtime stamps the canonical (alias-resolved) ShortName onto
+			// req.Key.Scope when it builds the task, so ExecuteTask uses the same
+			// value that the former fetchResources(fetchRT, ...) call used.
+			// result.ResolvedType / msg.ResourceType fallback is no longer needed.
+			cmds = append(cmds, m.executeTaskCmd(t))
+
 		case runtime.KindFetchProfiles:
+			// ErrAdapterOnlyTask — profiles result is a TUI-private type; keep adapter-local.
 			cmds = append(cmds, m.fetchProfiles())
+
 		case runtime.KindFetchReveal:
-			if p, ok := t.Payload.(runtime.FetchRevealPayload); ok {
-				cmds = append(cmds, m.fetchRevealValue(p.ResourceType, p.ResourceID, m.core.ConnectGen()))
-			}
+			// Route through ExecuteTask; fall back to adapter if needed.
+			cmds = append(cmds, m.executeTaskCmd(t))
 		}
 	}
 	switch len(cmds) {
