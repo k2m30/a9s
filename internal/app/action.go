@@ -77,4 +77,8 @@ const (
 type Action struct {
 	Kind ActionKind `json:"kind"`
 	Arg  string     `json:"arg,omitempty"`
+	// N carries a numeric parameter. Currently the renderer's page size for
+	// PageUp/PageDown, so page movement tracks the live viewport height instead
+	// of a constant. Zero means "use the controller default".
+	N int `json:"n,omitempty"`
 }

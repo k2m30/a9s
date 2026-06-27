@@ -475,27 +475,28 @@ func TestController_Snapshot_FreshControllerNoPanic(t *testing.T) {
 	}
 }
 
-// TestController_Snapshot_EmptyStackAfterPopNoPanic verifies that Snapshot() on
-// a controller whose stack has been emptied (menu root popped) returns
-// BodyKindUnknown without panicking. The menu root is a normal screen entry —
-// popping it produces an empty stack.
+// TestController_Snapshot_EmptyStackAfterPopNoPanic verifies that Snapshot()
+// after repeated PopScreen calls never panics and always returns BodyKindMenu.
+// The root screen (menu) is preserved — PopScreen at depth 1 is a no-op, so
+// the stack never empties and BodyKindUnknown is never returned.
 func TestController_Snapshot_EmptyStackAfterPopNoPanic(t *testing.T) {
 	c := newTestController()
 
-	// Pop the menu root to produce an empty stack.
+	// Attempt to pop the root menu — must be a no-op (root is preserved).
 	var vs app.ViewState
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				t.Errorf("Snapshot() panicked on empty stack: %v", r)
+				t.Errorf("Snapshot() panicked after PopScreen on root: %v", r)
 			}
 		}()
 		c.ApplyIntents([]runtime.UIIntent{runtime.PopScreen{}})
 		vs = c.Snapshot()
 	}()
 
-	if vs.Body.Kind != app.BodyKindUnknown {
-		t.Errorf("empty stack Body.Kind: got %q want %q", vs.Body.Kind, app.BodyKindUnknown)
+	// Root preservation: stack never drops below depth 1.
+	if vs.Body.Kind != app.BodyKindMenu {
+		t.Errorf("after PopScreen on root: Body.Kind = %q, want %q (root preserved)", vs.Body.Kind, app.BodyKindMenu)
 	}
 }
 
@@ -617,30 +618,41 @@ func TestController_Stack_PopShrinksStack(t *testing.T) {
 	}
 }
 
-// TestController_Stack_PopOnEmptyStackNoPanic verifies that PopScreen on an
-// already-empty stack is a no-op and does not panic.
-//
-// PR-C: a fresh controller has one screen (the menu root). Pop that first to
-// reach an empty stack, then verify that a second PopScreen is safe.
+// TestController_Stack_PopOnEmptyStackNoPanic verifies that PopScreen when only
+// the root menu remains is a no-op: it does not panic and the stack stays at
+// depth 1 with BodyKindMenu. The root screen is never popped.
 func TestController_Stack_PopOnEmptyStackNoPanic(t *testing.T) {
 	c := newTestController()
 
-	// First pop removes the menu root, producing an empty stack.
-	c.ApplyIntents([]runtime.UIIntent{runtime.PopScreen{}})
-
-	// Second pop on the now-empty stack must not panic.
+	// Fresh controller starts at depth 1 (root menu).
+	// PopScreen at the root must be a no-op.
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				t.Errorf("PopScreen on empty stack panicked: %v", r)
+				t.Errorf("PopScreen on root-only stack panicked: %v", r)
 			}
 		}()
 		c.ApplyIntents([]runtime.UIIntent{runtime.PopScreen{}})
 	}()
 
 	vs := c.Snapshot()
-	if vs.Body.Kind != app.BodyKindUnknown {
-		t.Errorf("after PopScreen on empty stack: expected BodyKindUnknown, got %q", vs.Body.Kind)
+	if vs.Body.Kind != app.BodyKindMenu {
+		t.Errorf("after PopScreen on root-only stack: expected BodyKindMenu (root preserved), got %q", vs.Body.Kind)
+	}
+
+	// A second pop must also be safe.
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("second PopScreen on root-only stack panicked: %v", r)
+			}
+		}()
+		c.ApplyIntents([]runtime.UIIntent{runtime.PopScreen{}})
+	}()
+
+	vs2 := c.Snapshot()
+	if vs2.Body.Kind != app.BodyKindMenu {
+		t.Errorf("after second PopScreen on root-only stack: expected BodyKindMenu, got %q", vs2.Body.Kind)
 	}
 }
 
@@ -687,21 +699,25 @@ func TestController_Stack_ReplaceSwapsTopWithoutChangingDepth(t *testing.T) {
 	}
 }
 
-// TestController_Stack_ReplaceOnEmptyStackPushesScreen verifies the edge-case
-// documented in controller.go: ReplaceScreen on an empty stack acts as a push.
+// TestController_Stack_ReplaceOnRootSwapsScreen verifies that ReplaceScreen on
+// the root (depth 1) swaps the top screen in-place. The stack stays at depth 1
+// and Snapshot reflects the replacement screen.
 //
-// PR-C: a fresh controller is NOT empty — it starts on the menu root. This test
-// drains the stack first (by popping the menu root) so the ReplaceScreen
-// edge-case path is still exercised.
-func TestController_Stack_ReplaceOnEmptyStackPushesScreen(t *testing.T) {
+// Depth-1 verification: push one more screen on top of the replacement (→ depth
+// 2), then pop once (→ depth 1) to confirm the replacement is the only entry
+// below. This proves ReplaceScreen did not grow the stack past depth 1.
+//
+// The old "drain root to empty then replace" path is gone because PopScreen at
+// depth 1 is a no-op — the root is never popped.
+func TestController_Stack_ReplaceOnRootSwapsScreen(t *testing.T) {
 	c := newTestController()
 
-	// Drain the menu root to produce a genuinely empty stack.
-	c.ApplyIntents([]runtime.UIIntent{runtime.PopScreen{}})
-	if c.Snapshot().Body.Kind != app.BodyKindUnknown {
-		t.Fatalf("precondition: expected empty stack (BodyKindUnknown), got %q", c.Snapshot().Body.Kind)
+	// Precondition: root menu at depth 1.
+	if c.Snapshot().Body.Kind != app.BodyKindMenu {
+		t.Fatalf("precondition: expected BodyKindMenu (root), got %q", c.Snapshot().Body.Kind)
 	}
 
+	// ReplaceScreen swaps the root in-place (depth stays 1).
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.ReplaceScreen{
 			ID:      runtime.ScreenReveal,
@@ -709,20 +725,36 @@ func TestController_Stack_ReplaceOnEmptyStackPushesScreen(t *testing.T) {
 		},
 	})
 
-	vs := c.Snapshot()
-	if vs.Body.Kind != app.BodyKindDetail {
-		t.Errorf("ReplaceScreen on empty stack: expected BodyKindDetail (Reveal), got %q", vs.Body.Kind)
+	afterReplace := c.Snapshot()
+	if afterReplace.Body.Kind != app.BodyKindDetail {
+		t.Errorf("ReplaceScreen on root: expected BodyKindDetail (Reveal), got %q", afterReplace.Body.Kind)
+	}
+
+	// Push one more screen → depth 2, then pop → depth 1 reveals the
+	// replacement (BodyKindDetail), not the original menu (BodyKindMenu).
+	// This confirms stack is depth-1 after the replace, not depth-2.
+	c.ApplyIntents([]runtime.UIIntent{
+		runtime.PushScreen{ID: runtime.ScreenHelp, Context: runtime.ScreenContext{}},
+	})
+	c.ApplyIntents([]runtime.UIIntent{runtime.PopScreen{}})
+	afterPop := c.Snapshot()
+	if afterPop.Body.Kind != app.BodyKindDetail {
+		t.Errorf("after push+pop-post-replace: expected BodyKindDetail (replacement at depth 1), got %q — ReplaceScreen must not have grown the stack", afterPop.Body.Kind)
 	}
 }
 
 // TestController_Stack_MultiPushPreservesDepth verifies that pushing N screens
-// results in the topmost screen reflected by Snapshot and that N sequential
-// pops unwind the pushed screens, finally revealing the menu root and then
-// the empty-stack state after one additional pop.
+// on top of the root results in the topmost screen reflected by Snapshot and
+// that N sequential pops unwind the pushed screens, finally revealing the menu
+// root. An additional pop at the root is a no-op — the stack never empties.
 //
-// PR-C: stack starts at depth-1 (menu root). 3 pushes → depth-4.
-// Pop 1 → depth-3 (BodyKindSelector). Pop 2 → depth-2 (BodyKindList).
-// Pop 3 → depth-1 (BodyKindMenu, menu root). Pop 4 → depth-0 (BodyKindUnknown).
+// Stack depth at each step (root counts as depth 1):
+//   - Fresh:  depth 1 (BodyKindMenu)
+//   - +3 push: depth 4 (BodyKindDetail — Reveal on top)
+//   - Pop 1:  depth 3 (BodyKindSelector)
+//   - Pop 2:  depth 2 (BodyKindList)
+//   - Pop 3:  depth 1 (BodyKindMenu — root)
+//   - Pop 4:  depth 1 (BodyKindMenu — root preserved, no-op)
 func TestController_Stack_MultiPushPreservesDepth(t *testing.T) {
 	c := newTestController()
 
@@ -757,10 +789,10 @@ func TestController_Stack_MultiPushPreservesDepth(t *testing.T) {
 		t.Errorf("after pop 3: expected BodyKindMenu (menu root), got %q", c.Snapshot().Body.Kind)
 	}
 
-	// Pop 4: stack empty → BodyKindUnknown.
+	// Pop 4: root guard fires — stack stays at depth 1, BodyKindMenu (not Unknown).
 	c.ApplyIntents([]runtime.UIIntent{runtime.PopScreen{}})
-	if c.Snapshot().Body.Kind != app.BodyKindUnknown {
-		t.Errorf("after pop 4: expected BodyKindUnknown, got %q", c.Snapshot().Body.Kind)
+	if c.Snapshot().Body.Kind != app.BodyKindMenu {
+		t.Errorf("after pop 4: expected BodyKindMenu (root preserved, no-op pop), got %q", c.Snapshot().Body.Kind)
 	}
 }
 
