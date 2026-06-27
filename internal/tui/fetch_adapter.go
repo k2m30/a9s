@@ -15,9 +15,12 @@
 package tui
 
 import (
+	"fmt"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
@@ -72,20 +75,28 @@ func (m *Model) fetchResourcesFiltered(resourceType string, filter map[string]st
 	}
 }
 
-// fetchAMIDetail returns a tea.Cmd that fetches a single AMI by ID and
-// navigates to its detail view.
-func (m *Model) fetchAMIDetail(imageID string) tea.Cmd {
+// fetchByIDDetail fetches a single resource of targetType by exact ID via its
+// registered FetchByIDs helper and navigates straight to its detail view. It
+// generalises the former ami-only adapter shortcut: the runtime now emits
+// KindFetchByIDDetail for any by-ID-capable type on a cache-miss exact-ID drill.
+func (m *Model) fetchByIDDetail(targetType, id string) tea.Cmd {
 	ctx, clients := m.appCtx, m.core.Clients()
+	fn := resource.GetFetchByIDs(targetType)
+	if fn == nil {
+		return func() tea.Msg {
+			return messages.Flash{Text: fmt.Sprintf("no by-id fetcher for %s", targetType), IsError: true}
+		}
+	}
 	return func() tea.Msg {
-		res, err := m.core.FetchAMIDetail(ctx, clients, imageID)
+		res, err := fn(ctx, clients, []string{id})
 		if err != nil {
 			return messages.Flash{Text: err.Error(), IsError: true}
 		}
-		return messages.Navigate{
-			Target:       messages.TargetDetail,
-			ResourceType: "ami",
-			Resource:     &res,
+		if len(res) == 0 {
+			return messages.Flash{Text: fmt.Sprintf("%s %s not found", targetType, id), IsError: true}
 		}
+		r := res[0]
+		return messages.Navigate{Target: messages.TargetDetail, ResourceType: targetType, Resource: &r}
 	}
 }
 

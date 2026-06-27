@@ -74,8 +74,17 @@ const (
 	// KindFetchMore asks the adapter to fetch the next page of resources for
 	// the type named by TaskKey.Scope. The continuation token rides on the
 	// TaskRequest as a FetchMorePayload so the runtime is the single decision-
-	// maker and the adapter is a pure mechanical translator (AS-270 / PR-05b).
+	// maker and the adapter is a pure mechanical translator (AS-270).
 	KindFetchMore TaskKind = "fetch-more"
+
+	// KindFetchByIDDetail asks the adapter to fetch a single resource by exact
+	// ID via its registered FetchByIDs helper and navigate straight to its
+	// detail view. This replaces the former ami-only adapter shortcut and fires
+	// on any cache-miss exact-ID drill for types that have a registered
+	// FetchByIDs (currently: ami, kms, policy, ebs-snap). When the target type
+	// is in the owned cache, navigation resolves to NavigationKindDetail upstream
+	// and this task is never emitted.
+	KindFetchByIDDetail TaskKind = "fetch-by-id-detail"
 )
 
 // FetchMorePayload carries the continuation token the adapter must use when
@@ -87,6 +96,16 @@ type FetchMorePayload struct {
 }
 
 func (FetchMorePayload) isTaskPayload() {}
+
+// FetchByIDDetailPayload carries the target type and exact ID for a
+// KindFetchByIDDetail task. The runtime populates these at dispatch time so the
+// adapter is a pure pass-through with no session-cache reads.
+type FetchByIDDetailPayload struct {
+	TargetType string
+	ID         string
+}
+
+func (FetchByIDDetailPayload) isTaskPayload() {}
 
 // HandleRelatedNavigate resolves the navigation kind using the session cache
 // and returns the decision plus any fetch tasks the adapter should start.
@@ -115,8 +134,13 @@ func (c *Core) HandleRelatedNavigate(ev RelatedNavigateEvent) (NavigationResult,
 			}}
 		}
 		if result.TargetID != "" {
-			// Client-selection (AMI exact-ID) is adapter-owned state; emit a
-			// generic fetch-resources request and let the adapter specialise.
+			if resource.GetFetchByIDs(ev.TargetType) != nil {
+				return result, []TaskRequest{{
+					Key:     TaskKey{Kind: KindFetchByIDDetail, Scope: ev.TargetType},
+					Cache:   CacheNone,
+					Payload: FetchByIDDetailPayload{TargetType: ev.TargetType, ID: result.TargetID},
+				}}
+			}
 			return result, []TaskRequest{{
 				Key:   TaskKey{Kind: KindFetchResources, Scope: ev.TargetType},
 				Cache: CacheNone,
@@ -168,7 +192,7 @@ func relatedFetchTasks(s *session.Session, targetType string, relatedIDs []strin
 	}
 
 	// Some IDs are missing. If the cache has more pages, ask for more and
-	// carry the continuation token as a structured payload (AS-270 / PR-05b)
+	// carry the continuation token as a structured payload (AS-270)
 	// so the adapter is a pure pass-through.
 	if entry != nil && entry.Pagination != nil && entry.Pagination.IsTruncated {
 		return []TaskRequest{{
