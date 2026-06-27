@@ -1,7 +1,6 @@
 package views
 
 import (
-	"maps"
 	"strings"
 
 	"charm.land/bubbles/v2/key"
@@ -9,6 +8,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/app"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -16,53 +16,34 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/text"
 )
 
-// MainMenuModel displays the resource type selection list.
+// MainMenuModel is a thin delegating renderer. The app.Controller is the single
+// source of truth for all menu data (items, filter, cursor, availability, issues).
+// MainMenuModel owns only renderer state: terminal dimensions, scroll offset, and
+// the key map used to translate key presses into controller actions.
 type MainMenuModel struct {
-	allItems      []resource.ResourceTypeDef
-	filteredItems []resource.ResourceTypeDef
-	filterText    string
-	scroll        ScrollState
-	scrollOffset  int
-	width         int
-	height        int
-	keys          keys.Map
-
-	// renderLinesCache caches the flat list of render lines (category headers + items).
-	// Invalidated when filteredItems changes (in applyFilter, SetFilter).
-	renderLinesCache []renderLine
-
-	// availability tracks resource counts per type.
-	// Absent key = unknown (not yet checked, render normally).
-	// Value 0 = empty (dimmed, skip-navigable).
-	// Value > 0 = has resources (normal style, count shown).
-	availability map[string]int
-
-	// truncated tracks which resource types have truncated counts.
-	// true means the count is from a first page only ("5+" style).
-	truncated map[string]bool
-
-	// availChecked / availTotal track background check progress.
-	// Both zero means "not checking" or "done".
-	availChecked int
-	availTotal   int
-
-	// Issue tracking — parallel to availability maps.
-	AttentionFilter                 // ctrl+z toggle for issue filter
-	issueCounts     map[string]int  // per-type issue counts (red/yellow statuses)
-	issueKnown      map[string]bool // per-type: true = probed, absent = unknown
-	issueTruncated  map[string]bool // per-type: true = issue count is lower bound
-	enrichChecked   int             // Wave 2 enrichment progress
-	enrichTotal     int             // Wave 2 total enrichment probes
+	scrollOffset int
+	width        int
+	height       int
+	keys         keys.Map
+	ctrl         *app.Controller
 }
 
-// NewMainMenu returns an initialized MainMenuModel with all registered resource types.
-func NewMainMenu(k keys.Map) MainMenuModel {
-	all := resource.AllResourceTypes()
+// NewMainMenu returns an initialized MainMenuModel. The ctrl argument is variadic
+// for backward-compatibility: callers that pass no controller (e.g. isolated unit
+// tests) get an auto-constructed stub controller backed by the full resource
+// catalog so all Set*/Get* methods work identically to the production path.
+// In production tui.New() always passes an explicit controller.
+func NewMainMenu(k keys.Map, ctrl ...*app.Controller) MainMenuModel {
+	var c *app.Controller
+	if len(ctrl) > 0 {
+		c = ctrl[0]
+	}
+	if c == nil {
+		c = app.New(runtime.Bootstrap("", "", resource.AllResourceTypes()))
+	}
 	return MainMenuModel{
-		allItems:      all,
-		filteredItems: all,
-		scroll:        NewScrollState(len(all)),
-		keys:          k,
+		keys: k,
+		ctrl: c,
 	}
 }
 
@@ -71,79 +52,64 @@ func (m MainMenuModel) Init() (MainMenuModel, tea.Cmd) {
 	return m, nil
 }
 
-// Update handles navigation keys. Enter sends NavigateMsg to push resource list.
+// Update handles navigation keys by translating them into controller actions.
+// Enter emits a Navigate message directly (navigation stays TUI-side).
 func (m MainMenuModel) Update(msg tea.Msg) (MainMenuModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keys.Up):
-			m.scroll.Up()
-			m.skipUnavailable(-1)
+			m.ctrl.Apply(app.Action{Kind: app.ActionMoveUp})
 		case key.Matches(msg, m.keys.Down):
-			m.scroll.Down()
-			m.skipUnavailable(+1)
+			m.ctrl.Apply(app.Action{Kind: app.ActionMoveDown})
 		case key.Matches(msg, m.keys.Top):
-			m.scroll.Top()
-			m.skipUnavailable(+1)
+			m.ctrl.Apply(app.Action{Kind: app.ActionMoveTop})
 		case key.Matches(msg, m.keys.Bottom):
-			m.scroll.Bottom()
-			m.skipUnavailable(-1)
+			m.ctrl.Apply(app.Action{Kind: app.ActionMoveBottom})
 		case key.Matches(msg, m.keys.PageUp):
-			pageSize := max(m.height-1, 1)
-			m.scroll.PageUp(pageSize)
-			m.skipUnavailable(-1)
+			m.ctrl.Apply(app.Action{Kind: app.ActionPageUp, N: max(m.height-1, 1)})
 		case key.Matches(msg, m.keys.PageDown):
-			pageSize := max(m.height-1, 1)
-			m.scroll.PageDown(pageSize)
-			m.skipUnavailable(+1)
+			m.ctrl.Apply(app.Action{Kind: app.ActionPageDown, N: max(m.height-1, 1)})
 		case key.Matches(msg, m.keys.Enter):
-			c := m.scroll.Cursor()
-			if len(m.filteredItems) > 0 && c < len(m.filteredItems) {
-				selected := m.filteredItems[c]
-				// Block navigation only to confirmed-empty types.
-				// Truncated-zero is not confirmed empty — more pages may exist.
-				if m.availability != nil {
-					isTruncated := m.truncated != nil && m.truncated[selected.ShortName]
-					if count, known := m.availability[selected.ShortName]; known && count == 0 && !isTruncated {
-						return m, nil
-					}
-				}
-				return m, func() tea.Msg {
-					return messages.Navigate{
-						Target:       messages.TargetResourceList,
-						ResourceType: selected.ShortName,
-					}
+			selected, navigable := m.ctrl.MenuSelected()
+			if !navigable {
+				return m, nil
+			}
+			return m, func() tea.Msg {
+				return messages.Navigate{
+					Target:       messages.TargetResourceList,
+					ResourceType: selected.ShortName,
 				}
 			}
 		case key.Matches(msg, m.keys.ToggleAttentionOnly):
-			m.Toggle()
-			m.applyFilter()
-			m.scroll.SetCursor(0)
+			m.ctrl.Apply(app.Action{Kind: app.ActionToggleAttention})
 		}
-		// Keep cursor visible in the viewport using render-line positions.
-		m.adjustScroll()
+		// Adjust scroll to keep cursor visible after any key action.
+		body := m.ctrl.Snapshot().Body.Menu
+		if body != nil {
+			m.adjustScrollForBody(*body)
+		}
 	}
 	return m, nil
 }
 
-// adjustScroll ensures the cursor is visible within the viewport, accounting
-// for category header lines that occupy space but are not selectable.
-func (m *MainMenuModel) adjustScroll() {
+// adjustScrollForBody ensures the cursor is visible within the viewport,
+// accounting for category header lines. Mirrors old adjustScroll but uses
+// controller-supplied body data.
+func (m *MainMenuModel) adjustScrollForBody(body app.MenuBody) {
 	if m.height <= 0 {
 		return
 	}
-	lines := m.buildRenderLines()
-	// Find the render-line index of the cursor.
+	lines := buildRenderLinesFromEntries(body.Entries)
 	cursorLine := 0
 	for i, rl := range lines {
-		if !rl.isHeader && rl.itemIndex == m.scroll.Cursor() {
+		if !rl.isHeader && rl.itemIndex == body.Selected {
 			cursorLine = i
 			break
 		}
 	}
 	if cursorLine < m.scrollOffset {
 		m.scrollOffset = cursorLine
-		// Include the category header above if the cursor is the first item in a group.
 		if m.scrollOffset > 0 && lines[m.scrollOffset-1].isHeader {
 			m.scrollOffset--
 		}
@@ -153,174 +119,15 @@ func (m *MainMenuModel) adjustScroll() {
 	}
 }
 
-// skipUnavailable advances the cursor past empty resource types.
-// direction is +1 (forward) or -1 (backward).
-// If no navigable item is found in the given direction, tries the opposite.
-// If ALL items are empty, gives up (avoids infinite loop).
-func (m *MainMenuModel) skipUnavailable(direction int) {
-	if m.availability == nil || len(m.filteredItems) == 0 {
-		return
-	}
-
-	total := len(m.filteredItems)
-	start := m.scroll.Cursor()
-
-	// Try to find a navigable item in the given direction
-	cur := start
-	for cur >= 0 && cur < total {
-		item := m.filteredItems[cur]
-		isTruncated := m.truncated != nil && m.truncated[item.ShortName]
-		if count, known := m.availability[item.ShortName]; !known || count > 0 || isTruncated {
-			// This item is navigable: unknown, has resources, or page was truncated
-			// (truncated-zero is not confirmed empty — more pages may exist).
-			m.scroll.SetCursor(cur)
-			return
-		}
-		cur += direction
-	}
-
-	// No navigable item found in that direction — try the opposite
-	cur = start - direction
-	for cur >= 0 && cur < total {
-		item := m.filteredItems[cur]
-		isTruncated := m.truncated != nil && m.truncated[item.ShortName]
-		if count, known := m.availability[item.ShortName]; !known || count > 0 || isTruncated {
-			m.scroll.SetCursor(cur)
-			return
-		}
-		cur -= direction
-	}
-
-	// ALL items are empty — leave cursor where it is
-}
-
-// renderLine represents a single line in the menu: either a category header or a selectable item.
-type renderLine struct {
-	isHeader  bool
-	header    string // category name, only set when isHeader is true
-	itemIndex int    // index into filteredItems, only meaningful when isHeader is false
-}
-
-// buildRenderLines builds the flat list of render lines from filteredItems,
-// inserting category headers when the category changes between consecutive items.
-// Results are cached in renderLinesCache until filteredItems changes.
-func (m *MainMenuModel) buildRenderLines() []renderLine {
-	if m.renderLinesCache != nil {
-		return m.renderLinesCache
-	}
-	lines := make([]renderLine, 0, len(m.filteredItems)+12)
-	lastCat := ""
-	for i, item := range m.filteredItems {
-		if item.Category != lastCat {
-			lines = append(lines, renderLine{isHeader: true, header: item.Category})
-			lastCat = item.Category
-		}
-		lines = append(lines, renderLine{itemIndex: i})
-	}
-	m.renderLinesCache = lines
-	return lines
-}
-
-// View renders the menu items. Caller wraps in RenderFrame.
-// Only lines within the visible viewport (scrollOffset..scrollOffset+height) are rendered.
+// View renders the menu by delegating entirely to the controller snapshot.
+// The controller is the single source of truth; no data is read from the model.
 func (m *MainMenuModel) View() string {
-	if len(m.filteredItems) == 0 {
+	body := m.ctrl.Snapshot().Body.Menu
+	if body == nil {
 		return "No resource types"
 	}
-
-	// Alias column width: widest alias is ":codeartifact" = 13, plus trailing pad.
-	const aliasW = 15
-
-	lines := m.buildRenderLines()
-
-	// Calculate visible window
-	start := m.scrollOffset
-	end := len(lines)
-	if m.height > 0 && start+m.height < end {
-		end = start + m.height
-	}
-
-	var sb strings.Builder
-	for li := start; li < end; li++ {
-		if li > start {
-			sb.WriteString("\n")
-		}
-		rl := lines[li]
-
-		if rl.isHeader {
-			headerText := "  " + rl.header + " "
-			sb.WriteString(styles.DimText.Render(headerText))
-			continue
-		}
-
-		item := m.filteredItems[rl.itemIndex]
-
-		aliasStr := ":" + item.ShortName
-		if len(item.Aliases) > 0 {
-			aliasStr = ":" + item.Aliases[0]
-		}
-		aliasPadded := text.PadOrTrunc(aliasStr, aliasW)
-
-		// Name field fills remaining width: total - 4 leading - aliasW - 3 trailing.
-		nameFieldW := max(m.width-4-aliasW-3, 10)
-		if rl.itemIndex == m.scroll.Cursor() {
-			// Build name with count suffix if known.
-			// Count is an operational completeness signal (not a spec-§4
-			// attention surface), so "+" marks a truncated lower bound.
-			nameStr := item.Name
-			if m.availability != nil {
-				if count, known := m.availability[item.ShortName]; known {
-					countSuffix := " (" + itoa(count) + ")"
-					if m.truncated != nil && m.truncated[item.ShortName] {
-						countSuffix = " (" + itoa(count) + "+)"
-					}
-					nameStr += countSuffix
-				}
-			}
-			nameStr += m.issueBadge(item.ShortName)
-			namePadded := text.PadOrTrunc(nameStr, nameFieldW)
-
-			// Selected row: full highlight, alias stays dimmed.
-			dimAlias := styles.DimText.Render(aliasPadded)
-			selectedName := "    " + namePadded + " "
-			line := styles.RowSelected.Width(m.width).Render(selectedName + dimAlias)
-			sb.WriteString(line)
-		} else {
-			// Check availability count
-			count, known := -1, false
-			if m.availability != nil {
-				count, known = m.availability[item.ShortName]
-			}
-
-			// Build name with count suffix if known. "+" marks a truncated
-			// lower bound on the resource count (operational, not §4 attention).
-			nameStr := item.Name
-			if known {
-				countSuffix := " (" + itoa(count) + ")"
-				if m.truncated != nil && m.truncated[item.ShortName] {
-					countSuffix = " (" + itoa(count) + "+)"
-				}
-				nameStr += countSuffix
-			}
-			nameStr += m.issueBadge(item.ShortName)
-			namePadded := text.PadOrTrunc(nameStr, nameFieldW)
-
-			isTruncated := m.truncated != nil && m.truncated[item.ShortName]
-			if known && count == 0 && !isTruncated {
-				// Confirmed-empty resource type — fully dimmed.
-				// Truncated-zero is not dimmed; more pages may exist.
-				dimAlias := styles.DimText.Render(aliasPadded)
-				dimName := styles.DimText.Render("    " + namePadded + " ")
-				sb.WriteString(dimName + dimAlias)
-			} else {
-				dimAlias := styles.DimText.Render(aliasPadded)
-				name := styles.RowNormal.Render("    " + namePadded + " ")
-				sb.WriteString(name + dimAlias)
-			}
-		}
-	}
-
-	return sb.String()
+	m.adjustScrollForBody(*body)
+	return m.RenderBody(*body)
 }
 
 // SetSize updates terminal dimensions.
@@ -329,24 +136,9 @@ func (m *MainMenuModel) SetSize(w, h int) {
 	m.height = h
 }
 
-// FrameTitle returns the frame border title.
+// FrameTitle delegates to the controller.
 func (m MainMenuModel) FrameTitle() string {
-	total := len(m.allItems)
-	filtered := len(m.filteredItems)
-	var title string
-	switch {
-	case m.filterText != "" || m.IsEnabled():
-		title = "resource-types(" + itoa(filtered) + "/" + itoa(total) + ")"
-	default:
-		title = "resource-types(" + itoa(total) + ")"
-	}
-	if m.IsEnabled() {
-		title += " [!]"
-	}
-	if m.enrichTotal > 0 && m.enrichChecked < m.enrichTotal {
-		title += " [enriching " + itoa(m.enrichChecked) + "/" + itoa(m.enrichTotal) + "]"
-	}
-	return title
+	return m.ctrl.MenuFrameTitle()
 }
 
 // BottomHints implements Hintable for MainMenuModel.
@@ -369,251 +161,152 @@ func (m MainMenuModel) GetHelpContext() HelpContext {
 
 // SelectedItem returns the resource type at the current cursor.
 func (m MainMenuModel) SelectedItem() resource.ResourceTypeDef {
-	if len(m.filteredItems) == 0 {
-		return resource.ResourceTypeDef{}
-	}
-	return m.filteredItems[m.scroll.Cursor()]
+	item, _ := m.ctrl.MenuSelected()
+	return item
 }
 
-// SetFilter applies a filter to the menu items; cursor and scroll reset to 0.
-func (m *MainMenuModel) SetFilter(text string) {
-	m.filterText = text
-	m.renderLinesCache = nil
-	m.applyFilter()
-	m.scroll.SetCursor(0)
+// SetFilter delegates filter updates to the controller.
+func (m *MainMenuModel) SetFilter(filterText string) {
+	m.ctrl.Apply(app.Action{Kind: app.ActionSetFilter, Arg: filterText})
 	m.scrollOffset = 0
 }
 
-// GetFilter returns the current filter text.
+// GetFilter returns the current filter text from the controller snapshot.
 func (m *MainMenuModel) GetFilter() string {
-	return m.filterText
+	body := m.ctrl.Snapshot().Body.Menu
+	if body == nil {
+		return ""
+	}
+	return body.Filter
 }
 
-// SetAvailability sets the resource count for a resource type.
+// SetAvailability updates the resource count for a resource type.
+// Paired with the current truncated value from the controller to satisfy the
+// PatchMenuAvailability pairing requirement (Count + Truncated travel together).
 func (m *MainMenuModel) SetAvailability(shortName string, count int) {
-	if m.availability == nil {
-		m.availability = make(map[string]int)
-	}
-	m.availability[shortName] = count
+	truncated := m.ctrl.GetMenuTruncated()[shortName]
+	m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PatchMenuAvailability{
+		ResourceType: shortName,
+		Count:        count,
+		Truncated:    truncated,
+	}})
 }
 
-// ClearAvailability resets all availability and issue state (e.g., on profile/region switch).
+// ClearAvailability resets all availability and issue state via the controller.
 func (m *MainMenuModel) ClearAvailability() {
-	m.availability = nil
-	m.truncated = nil
-	m.availChecked = 0
-	m.availTotal = 0
-	// Clear issue state too — stale badges from a previous account must not survive.
-	m.issueCounts = nil
-	m.issueKnown = nil
-	m.issueTruncated = nil
-	m.enrichChecked = 0
-	m.enrichTotal = 0
-	m.applyFilter() // re-apply so ctrl+z visibility reflects the cleared state
+	m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.MenuClearAvailabilityIntent{}})
 }
 
-// GetAvailability returns a copy of the availability map for cache persistence.
-// Returns nil if no availability data has been set.
+// GetAvailability returns a copy of the availability map from the controller.
 func (m *MainMenuModel) GetAvailability() map[string]int {
-	if m.availability == nil {
-		return nil
-	}
-	cp := make(map[string]int, len(m.availability))
-	maps.Copy(cp, m.availability)
-	return cp
+	return m.ctrl.GetMenuAvailability()
 }
 
 // SetTruncated records whether a resource type's count is truncated.
+// Paired with the current availability count from the controller (PatchMenuAvailability
+// carries Count + Truncated together).
 func (m *MainMenuModel) SetTruncated(shortName string, truncated bool) {
-	if m.truncated == nil {
-		m.truncated = make(map[string]bool)
-	}
-	m.truncated[shortName] = truncated
+	count := m.ctrl.GetMenuAvailability()[shortName]
+	m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PatchMenuAvailability{
+		ResourceType: shortName,
+		Count:        count,
+		Truncated:    truncated,
+	}})
 }
 
-// GetTruncated returns a copy of the truncated map for cache persistence.
-// Returns nil if no truncation data has been set.
+// GetTruncated returns a copy of the truncated map from the controller.
 func (m *MainMenuModel) GetTruncated() map[string]bool {
-	if m.truncated == nil {
-		return nil
-	}
-	cp := make(map[string]bool, len(m.truncated))
-	maps.Copy(cp, m.truncated)
-	return cp
+	return m.ctrl.GetMenuTruncated()
 }
 
 // SetCheckProgress updates the background check progress indicator.
-// checked=0, total=0 means "not checking" (hides the indicator).
 func (m *MainMenuModel) SetCheckProgress(checked, total int) {
-	m.availChecked = checked
-	m.availTotal = total
+	m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PatchMenuCheckProgress{
+		Checked: checked,
+		Total:   total,
+	}})
 }
 
-// SetIssues updates the issue count for a resource type and marks it as known.
+// SetIssues updates the issue count for a resource type.
 func (m *MainMenuModel) SetIssues(shortName string, count int, truncated bool) {
-	if m.issueCounts == nil {
-		m.issueCounts = make(map[string]int)
-	}
-	if m.issueKnown == nil {
-		m.issueKnown = make(map[string]bool)
-	}
-	if m.issueTruncated == nil {
-		m.issueTruncated = make(map[string]bool)
-	}
-	m.issueCounts[shortName] = count
-	m.issueKnown[shortName] = true
-	m.issueTruncated[shortName] = truncated
-	// Reapply filter so ctrl+z quad-state reflects the new issue data.
-	m.applyFilter()
+	m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PatchMenu{
+		ResourceType: shortName,
+		Issues:       count,
+		Truncated:    truncated,
+	}})
 }
 
-// SetIssuesFromCache bulk-loads issue counts from cache, respecting known flags.
+// SetIssuesFromCache bulk-loads issue counts from cache.
+// A nil known map is a no-op; an empty (non-nil) known map initializes
+// the issue maps to empty, matching the pre-controller behavior.
 func (m *MainMenuModel) SetIssuesFromCache(counts map[string]int, truncated map[string]bool, known map[string]bool) {
-	if m.issueCounts == nil {
-		m.issueCounts = make(map[string]int)
+	if known == nil {
+		return
 	}
-	if m.issueKnown == nil {
-		m.issueKnown = make(map[string]bool)
-	}
-	if m.issueTruncated == nil {
-		m.issueTruncated = make(map[string]bool)
-	}
-	for name, k := range known {
-		if k {
-			m.issueCounts[name] = counts[name]
-			m.issueKnown[name] = true
-			m.issueTruncated[name] = truncated[name]
-		}
-	}
-	// Reapply filter so ctrl+z quad-state reflects the cached issue data.
-	m.applyFilter()
+	m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PatchMenuIssueBatch{
+		Counts:    counts,
+		Truncated: truncated,
+		Known:     known,
+	}})
 }
 
-// GetIssueCounts returns a copy of the per-type issue count map for cache persistence.
-// Returns nil if no issue data has been set.
+// GetIssueCounts returns a copy of the issue-count map from the controller.
 func (m *MainMenuModel) GetIssueCounts() map[string]int {
-	if m.issueCounts == nil {
-		return nil
-	}
-	cp := make(map[string]int, len(m.issueCounts))
-	maps.Copy(cp, m.issueCounts)
-	return cp
+	return m.ctrl.GetMenuIssueCounts()
 }
 
-// GetIssueTruncated returns a copy of the per-type issue truncation map for cache persistence.
-// Returns nil if no truncation data has been set.
+// GetIssueTruncated returns a copy of the issue-truncated map from the controller.
 func (m *MainMenuModel) GetIssueTruncated() map[string]bool {
-	if m.issueTruncated == nil {
-		return nil
-	}
-	cp := make(map[string]bool, len(m.issueTruncated))
-	maps.Copy(cp, m.issueTruncated)
-	return cp
+	return m.ctrl.GetMenuIssueTruncated()
 }
 
-// GetIssueKnown returns a copy of the per-type issue known map for cache persistence.
-// Returns nil if no known data has been set.
+// GetIssueKnown returns a copy of the issue-known map from the controller.
 func (m *MainMenuModel) GetIssueKnown() map[string]bool {
-	if m.issueKnown == nil {
-		return nil
-	}
-	cp := make(map[string]bool, len(m.issueKnown))
-	maps.Copy(cp, m.issueKnown)
-	return cp
+	return m.ctrl.GetMenuIssueKnown()
 }
 
-// SetEnrichProgress updates the Wave 2 enrichment progress counters.
+// SetEnrichProgress updates Wave 2 enrichment progress counters.
 func (m *MainMenuModel) SetEnrichProgress(checked, total int) {
-	m.enrichChecked = checked
-	m.enrichTotal = total
+	m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PatchMenuEnrichProgress{
+		Checked: checked,
+		Total:   total,
+	}})
 }
 
-// issueBadge returns the " issues:N" suffix for a resource type per spec §4 S1.
-// No "+" suffix — truncation state is behavioral (drives isVisibleUnderIssueFilter
-// for ctrl+z) and MUST NOT appear in rendered text.
-func (m MainMenuModel) issueBadge(shortName string) string {
-	if !m.issueKnown[shortName] {
-		return ""
-	}
-	count := m.issueCounts[shortName]
-	if count == 0 {
-		return ""
-	}
-	return " issues:" + itoa(count)
+// Toggle flips the attention-only filter via the controller.
+func (m *MainMenuModel) Toggle() {
+	m.ctrl.Apply(app.Action{Kind: app.ActionToggleAttention})
 }
 
-// isVisibleUnderIssueFilter determines whether a resource type should be
-// visible when the ctrl+z issue filter is active.
-//
-// Tri-state visibility (evaluated in order):
-//  1. ExcludeFromIssueBadge types (e.g. ct-events) — never probed; hide always.
-//  2. Unknown (not yet probed) — show ONLY while no type has been probed yet
-//     (true cold-start). Once any probe has reported, unknown → hide so the
-//     user sees a focused issues-only view instead of the whole unknown menu.
-//  3. Has issues → show; zero + not truncated → hide (CONFIRMED zero);
-//     zero + truncated → show (LOWER BOUND — unread pages may hold issues).
-//
-// Per docs/attention-signals.md, every registered resource type has at least
-// a Wave 1 or Wave 2 signal; there is no "always healthy" class.
-func (m MainMenuModel) isVisibleUnderIssueFilter(shortName string) bool {
-	td := resource.FindResourceType(shortName)
-	if td != nil && td.ExcludeFromIssueBadge {
+// IsEnabled reports whether the attention-only filter is currently active.
+func (m MainMenuModel) IsEnabled() bool {
+	body := m.ctrl.Snapshot().Body.Menu
+	if body == nil {
 		return false
 	}
-	if !m.issueKnown[shortName] {
-		// Cold-start: no probe has reported anywhere → keep everything visible
-		// so the user isn't greeted with an empty menu. Once any probe lands,
-		// the filter tightens to "known-issue only".
-		return len(m.issueKnown) == 0
-	}
-	if m.issueCounts[shortName] > 0 {
-		return true
-	}
-	// Zero issues — truncated count is a LOWER BOUND; unread pages may carry
-	// issues, so keep the type visible so the user can drill in.
-	return m.issueTruncated[shortName]
+	return body.AttentionOnly
 }
 
-// applyFilter filters allItems into filteredItems by case-insensitive substring match.
-// Requires at least 2 characters to actually filter; single chars are too ambiguous
-// for the short list of resource types.
-func (m *MainMenuModel) applyFilter() {
-	m.renderLinesCache = nil
-
-	// First pass: text filter.
-	var result []resource.ResourceTypeDef
-	if len(m.filterText) < 2 {
-		result = m.allItems
-	} else {
-		q := strings.ToLower(m.filterText)
-		result = make([]resource.ResourceTypeDef, 0)
-		for _, item := range m.allItems {
-			if strings.Contains(strings.ToLower(item.Name), q) ||
-				strings.Contains(strings.ToLower(item.ShortName), q) {
-				result = append(result, item)
-			}
-		}
+// SetEnabled sets the attention-only filter to the given state via the controller.
+// Calling SetEnabled(true) when already true (or false when already false) is a
+// no-op because ActionToggleAttention flips the current state; this method reads
+// the current state and only applies the toggle when it would change the value.
+func (m *MainMenuModel) SetEnabled(enabled bool) {
+	if m.IsEnabled() != enabled {
+		m.ctrl.Apply(app.Action{Kind: app.ActionToggleAttention})
 	}
+}
 
-	// Second pass: issue filter (ctrl+z) — quad-state visibility.
-	if m.IsEnabled() {
-		filtered := make([]resource.ResourceTypeDef, 0, len(result))
-		for _, item := range result {
-			if m.isVisibleUnderIssueFilter(item.ShortName) {
-				filtered = append(filtered, item)
-			}
-		}
-		result = filtered
-	}
-
-	m.filteredItems = result
-	m.scroll.SetTotal(len(m.filteredItems))
+// renderLine represents a single line in the menu: either a category header or a selectable item.
+type renderLine struct {
+	isHeader  bool
+	header    string
+	itemIndex int
 }
 
 // RenderBody renders the menu from a controller-supplied MenuBody, byte-identical
-// to View(). The controller owns the logical state (visible entries, selection,
-// availability/issue badges); the renderer owns scrollOffset and dimensions.
-// PR-C 1b: this replaces View() once app.go drives the menu through the controller.
+// to the old View(). The controller owns the logical state (visible entries,
+// selection, availability/issue badges); the renderer owns scrollOffset and dimensions.
 func (m *MainMenuModel) RenderBody(body app.MenuBody) string {
 	if len(body.Entries) == 0 {
 		return "No resource types"
@@ -666,7 +359,6 @@ func (m *MainMenuModel) RenderBody(body app.MenuBody) string {
 
 		dimAlias := styles.DimText.Render(aliasPadded)
 		if item.AvailKnown && item.Availability == 0 && !item.AvailTruncated {
-			// Confirmed-empty resource type — fully dimmed (truncated-zero is not).
 			sb.WriteString(styles.DimText.Render("    "+namePadded+" ") + dimAlias)
 		} else {
 			sb.WriteString(styles.RowNormal.Render("    "+namePadded+" ") + dimAlias)

@@ -8,6 +8,7 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/k2m30/a9s/v3/internal/app"
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -109,8 +110,6 @@ func New(profile, region string, opts ...Option) Model {
 	ti := textinput.New()
 	k := keys.Default()
 
-	menu := views.NewMainMenu(k)
-
 	// Load view config synchronously (fast local file read).
 	cfg, cfgErr := config.Load()
 	if cfg == nil {
@@ -122,8 +121,16 @@ func New(profile, region string, opts ...Option) Model {
 	// construction and threaded through all fetchers.
 	ctx, cancel := context.WithCancel(context.Background())
 
+	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
+
+	// The headless controller is the single source of truth for menu state.
+	// MainMenuModel holds no data of its own — it delegates all reads and
+	// writes through menuCtrl.
+	menuCtrl := app.New(core)
+	menu := views.NewMainMenu(k, menuCtrl)
+
 	m := Model{
-		core:        runtime.Bootstrap(profile, region, resource.AllResourceTypes()),
+		core:        core,
 		keys:        k,
 		stack:       []views.View{&menu},
 		cmdInput:    ti,
