@@ -86,20 +86,26 @@ any of these drift.
 These are **current-state invariants**. The 020-architecture-refactor that produced them has landed: the embedded-`sessionRuntime` model is gone (session state lives in `internal/session`), package-`init()` + `Register*` feature wiring is replaced by the declarative catalog (`internal/catalog` + `internal/aws/catalog_*.go`; zero feature-wiring `init()`, enforced by `make verify-zero-init`), the `Status`/`Issues` resource model is replaced by the canonical `Finding` model, markdown is generated (not input), shared selectors live in `internal/semantics/selector/`, and screen/task boundaries are runtime-owned. Cross-cutting capability modules (logs, CloudTrail scan, cost) have declarative contracts (`domain.CapabilityID`, `QuerySpec`, `ScreenRegistry`) but their implementations remain a follow-on workstream.
 
 1. **One root application model owns session state and orchestration.**
-   `tui.Model` owns the UI shell; the session state container lives in
-   `runtime.Core` (Phase-05a, AS-237 / AS-315a) and is accessed via
-   `m.core.Session()`. The field-level ownership boundary is established;
-   the package-import boundary (`internal/tui` not importing
-   `internal/session` or `internal/aws`) is the PR-05a-extract exit
-   criterion and is **not yet met** — see `docs/refactor/05-boundary.md`.
+   `tui.Model` owns the UI shell; the session state container
+   (`session.Session`) lives in `runtime.Core` and is reached through
+   typed `m.core.*` accessors. The renderer-agnostic boundary holds: the
+   shared core (`internal/domain`, `internal/runtime`, `internal/session`,
+   `internal/aws`, `internal/catalog`, `internal/semantics/*`) compiles
+   with zero Bubble Tea / Lipgloss dependencies, verified transitively via
+   `go list -deps`. As the renderer adapter, `internal/tui` legitimately
+   imports `internal/session` and `internal/aws`; nothing imports back into
+   `internal/tui` from the core.
 2. **Views render state and emit typed messages.** Views never call AWS
    directly. `m.clients` is passed to tea.Cmds created by the root model,
    not consumed inside `View()`.
-3. **Registries are the declarative source of truth.** Supported resource
+3. **The catalog is the declarative source of truth.** Supported resource
    types, related defs, navigable fields, fetchers, detail enrichers, and
-   Wave 2 issue enrichers are all registered at package init. There is no
+   Wave 2 issue enrichers are declared as `catalog.ResourceTypeDef` struct
+   literals in `internal/aws/catalog_*.go`, installed once at startup via
+   `aws.Install()` + `catalog.SetTypes(...)` — no package `init()` or
+   `Register*` wiring (enforced by `make verify-zero-init`). There is no
    hand-maintained allowlist in dispatch code — background systems iterate
-   registry state and sort by declarative priority metadata.
+   catalog state and sort by declarative priority metadata.
 4. **`internal/aws` stays non-UI.** It primarily translates SDK types into
    `resource.Resource` and hosts a few helper subsystems, but it does not
    own navigation or Bubble Tea policy. It does not import `internal/tui`.
@@ -225,7 +231,7 @@ internal/
   aws/           # AWS service clients, resource fetchers, related checkers, enrichers
   buildinfo/     # version resolution (ldflags at build time)
   cache/         # on-disk availability cache with TTL (see Caching Layers)
-  catalog/       # canonical resource catalog (static `var ResourceTypes`, per-category `types_*.go`); destination of Phase 04 (`docs/refactor/04-catalog.md`). Coexists with `internal/resource/registry.go` until the PR-04n cutover deletes the legacy `Register*` API.
+  catalog/       # canonical resource catalog: static `var ResourceTypes`, type defs in `internal/aws/catalog_*.go`, installed via `aws.Install()` + `catalog.SetTypes(...)`. The sole source of truth; the legacy `Register*` registry is gone.
   config/        # YAML config loading, built-in defaults per service
   demo/          # synthetic fixture data for --demo mode
     fixtures/    #   per-service Go structs (ec2.go, iam.go, etc.)
@@ -308,9 +314,9 @@ type ResourceTypeDef struct {
 }
 ```
 
-On `main`, `Color func(Resource) Color` is part of the type definition and drives row classification directly. The refactor plan intentionally demotes color to presentation and moves severity into domain data; this section is documenting the current shape, not defending it as the final model.
+`Color func(domain.Resource) domain.Color` is part of the type definition and drives row classification directly. It returns the renderer-free `domain.Color` health enum (the "Color → severity collapse" once contemplated was not pursued); the TUI maps it to a concrete style via `styles.ColorStyle` at render time.
 
-Types are built once at package init by `buildResourceTypes()`. Categories map to type definition files:
+Resource types are installed once at startup via `aws.Install()` + `catalog.SetTypes(...)`, aggregating the per-category `internal/aws/catalog_*.go` literals. Categories map to type definition files:
 
 | File | Category |
 |------|----------|
