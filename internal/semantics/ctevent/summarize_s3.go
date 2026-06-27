@@ -4,10 +4,6 @@ import (
 	"sort"
 )
 
-func init() {
-	RegisterSummarizer("s3.amazonaws.com", SummarizeS3)
-}
-
 // SummarizeS3 summarizes the REQUEST section for S3 events.
 // It receives cleaned params (bucketName and key already lifted by ExtractTarget).
 // All residual fields are emitted as non-navigable rows — bucketName and key are
