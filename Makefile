@@ -19,10 +19,10 @@ install:
 	go install -trimpath -ldflags "$(LDFLAGS)" $(CMD)
 
 test:
-	go test ./tests/unit/ -count=1 -timeout 120s
+	go test ./... -count=1 -timeout 120s
 
 test-race:
-	go test ./tests/unit/ -count=1 -timeout 120s -race
+	go test ./... -count=1 -timeout 120s -race
 
 # AS-104: capture wall time of `make test` and write test-budget.json. The
 # CI `test-budget` job (.github/workflows/ci.yml) runs this, then invokes

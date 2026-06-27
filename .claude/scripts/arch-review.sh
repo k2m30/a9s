@@ -127,12 +127,13 @@ else
   while IFS= read -r line; do detail "$line"; done <<< "$layout_bad"
 fi
 
-# styles must not import other internal/ packages
-styles_bad=$(grep -rn '".*internal/' internal/tui/styles/ 2>/dev/null | grep -v '_test.go' || true)
+# styles may import only the zero-dependency internal/domain leaf (for the
+# domain.Color → lipgloss style mapping); no other internal/ packages.
+styles_bad=$(grep -rn '".*internal/' internal/tui/styles/ 2>/dev/null | grep -v '_test.go' | grep -v 'internal/domain' || true)
 if [ -z "$styles_bad" ]; then
-  pass "styles/ does not import other internal/ packages"
+  pass "styles/ imports only stdlib + lipgloss + internal/domain leaf"
 else
-  fail "styles/ imports internal/ packages (should be stdlib + lipgloss only)"
+  fail "styles/ imports non-leaf internal/ packages (allowed: stdlib + lipgloss + internal/domain)"
   while IFS= read -r line; do detail "$line"; done <<< "$styles_bad"
 fi
 
@@ -162,18 +163,22 @@ fi
 section "init() LOCATION VIOLATIONS"
 # ============================================================================
 
-# init() allowed in: internal/aws/, internal/demo/, internal/tui/styles/
-bad_init=$(grep -rn 'func init()' internal/ 2>/dev/null \
-  | grep -v 'internal/aws/' \
+# init() allowed only in: internal/demo/, internal/tui/styles/.
+# Post-refactor (SC-002, enforced by `make verify-zero-init`) internal/aws/ must
+# contain zero init() — the catalog migration removed all of them — so aws/ is no
+# longer on the allowlist. The `^[[:space:]]*func init()` anchor matches real
+# declarations only, not prose like the "`func init()`" reference in
+# internal/resource/projection_init.go's doc comment.
+bad_init=$(grep -rnE '^[[:space:]]*func init\(\)' internal/ 2>/dev/null \
   | grep -v 'internal/demo/' \
   | grep -v 'internal/tui/styles/' \
   | grep -v '_test.go' \
   || true)
 
 if [ -z "$bad_init" ]; then
-  pass "init() functions only in allowed locations (aws/, demo/, styles/)"
+  pass "init() functions only in allowed locations (demo/, styles/)"
 else
-  fail "init() found in forbidden locations"
+  fail "init() found in forbidden locations (allowed: demo/, styles/)"
   while IFS= read -r line; do detail "$line"; done <<< "$bad_init"
 fi
 
@@ -505,18 +510,21 @@ fi
 section "RESOURCE TYPE CONSISTENCY"
 # ============================================================================
 
-# Count registered fetchers (resource.Register is called from internal/aws/*.go init() funcs)
-reg_count=$(grep -rch 'resource\.Register(' internal/aws/*.go 2>/dev/null | awk '{s+=$1} END {print s+0}')
+# Count catalog-registered resource types. Post-refactor (SC-002/SC-003) the
+# legacy resource.Register()/init() wiring is gone; catalog ShortName entries in
+# internal/aws/catalog_*.go are the source of truth for registered types. The
+# `|| true` guard keeps a zero-match grep from aborting the script under pipefail.
+reg_count=$({ grep -rh 'ShortName:' internal/aws/catalog_*.go 2>/dev/null || true; } | wc -l | awk '{print $1+0}')
 # Count default view definition map keys across all defaults files
-def_count=$(grep -rch '^\t\t"[a-z]' internal/config/defaults_*.go 2>/dev/null | awk '{s+=$1} END {print s+0}')
+def_count=$({ grep -rch '^\t\t"[a-z]' internal/config/defaults_*.go 2>/dev/null || true; } | awk '{s+=$1} END {print s+0}')
 
-detail "Registered fetchers (resource.Register calls in aws/): $reg_count"
+detail "Catalog-registered resource types (ShortName in catalog_*.go): $reg_count"
 detail "Default view definitions (map keys in defaults_*.go): $def_count"
 
 if [ "$reg_count" -le "$def_count" ]; then
-  pass "All $reg_count registered fetchers have default view definitions ($def_count defs, includes child views)"
+  pass "All $reg_count catalog-registered types have default view definitions ($def_count defs, includes child views)"
 else
-  fail "Registered fetchers ($reg_count) exceed default view definitions ($def_count) -- missing view defs"
+  fail "Catalog-registered types ($reg_count) exceed default view definitions ($def_count) -- missing view defs"
 fi
 
 # ============================================================================
