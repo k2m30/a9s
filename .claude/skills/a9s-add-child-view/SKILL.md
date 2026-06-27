@@ -1,29 +1,29 @@
 ---
 name: a9s-add-child-view
-description: Blueprint for adding a new child view to a9s — 3-phase workflow (architect scope -> QA tests -> coder implement) with exact file manifests and hard-won lessons
+description: Blueprint for adding a new child view to a9s — 3-phase workflow (scope -> QA tests -> coder implement) with exact file manifests and hard-won lessons
 disable-model-invocation: true
 ---
 
 # Adding a New Child View
 
-**Workflow: Architect scopes -> QA + Coder execute (parallel-safe for child views).**
+**Workflow: main session scopes -> QA + Coder execute (parallel-safe for child views).**
 
-## Agent Ownership
+## Phase Ownership
 
 | Phase | Owner | Writes to |
 |-------|-------|-----------|
-| Phase 1: Spec | **a9s-architect** | Design output only |
+| Phase 1: Spec & scoping | **Main session** | Scoped task manifests only |
 | Phase 2: Tests | **a9s-qa** | `tests/unit/` only |
 | Phase 3: Implementation | **a9s-coder** | `internal/`, `cmd/`, `.a9s/` only |
 
 **Coder MUST NOT write test files. QA MUST NOT write production code.**
-**Both agents MUST reject tasks without exact scope from the architect.**
+**Both subagents MUST reject tasks without an exact file scope.**
 
-## Phase 1: Architect Spec (a9s-architect agent)
+## Phase 1: Spec & scoping (main session)
 
-The architect reads the design spec and parent fetcher, then produces **two scoped tasks** — one for QA, one for coder. This prevents context drain — downstream agents receive only the manifest, not the full design spec.
+The main session reads the design spec and parent fetcher, then produces **two scoped tasks** — one for QA, one for coder. This prevents context drain — the subagents receive only the manifest, not the full design spec.
 
-### Architect must determine:
+### Scoping must determine:
 
 1. **Parent analysis** — read `internal/aws/{parent}.go`:
    - What is `Resource.ID`? (often a name, NOT an ARN)
@@ -47,7 +47,7 @@ The architect reads the design spec and parent fetcher, then produces **two scop
 
 4. **File manifest** — exact list of files to CREATE/EDIT/APPEND with specific content
 
-### Architect output format (TWO tasks):
+### Scoping output format (TWO tasks):
 
 ```
 CHILD VIEW SPEC: {child_shortname}
@@ -116,7 +116,7 @@ Context files (read-only):
 
 ## Phase 2: Tests (a9s-qa agent)
 
-The QA agent receives the architect's QA task and writes ALL tests.
+The QA agent receives the scoped QA task and writes ALL tests.
 
 ### Test files to create/modify:
 
@@ -149,7 +149,7 @@ The QA agent receives the architect's QA task and writes ALL tests.
 
 ## Phase 3: Implementation (a9s-coder agent)
 
-The coder receives the architect's coder task and makes all tests pass.
+The coder receives the scoped coder task and makes all tests pass.
 
 ### Checklist (order matters):
 
