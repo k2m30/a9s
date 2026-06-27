@@ -420,24 +420,28 @@ func relatedNavigateTasksToCmd(m Model, targetType string, result runtime.Naviga
 	for _, t := range tasks {
 		switch t.Key.Kind {
 		case runtime.KindFetchResources:
-			cmds = append(cmds, m.fetchResources(targetType, m.core.AvailabilityGen()))
+			// ExecuteTask reads req.Key.Scope as the resource type; the runtime
+			// stamps targetType there when building this task.
+			cmds = append(cmds, m.executeTaskCmd(t))
+
 		case runtime.KindFetchFiltered:
+			// The related handler does not set a fetchFilteredPayload on the
+			// task — the filter lives in result.FetchFilter. ExecuteTask would
+			// fail with "missing fetchFilteredPayload", so keep adapter-local.
 			cmds = append(cmds, m.fetchResourcesFiltered(targetType, result.FetchFilter, m.core.AvailabilityGen()))
+
 		case runtime.KindFetchMore:
-			// Continuation token is runtime-owned and arrives as a structured
-			// payload (AS-270). The adapter is a pure pass-through and no longer
-			// reads session cache here. A missing or wrong-typed payload is a
-			// runtime bug, not an adapter-recoverable state — drop the task to
-			// surface the regression instead of silently re-deriving.
-			payload, ok := t.Payload.(runtime.FetchMorePayload)
-			if !ok {
+			// FetchMorePayload is set by the runtime — ExecuteTask can execute it.
+			// A missing or wrong-typed payload is a runtime bug; drop the task.
+			if _, ok := t.Payload.(runtime.FetchMorePayload); !ok {
 				continue
 			}
-			cmds = append(cmds, m.fetchMoreResources(messages.LoadMore{
-				ResourceType:      targetType,
-				ContinuationToken: payload.ContinuationToken,
-			}))
+			cmds = append(cmds, m.executeTaskCmd(t))
+
 		case runtime.KindFetchByIDDetail:
+			// ExecuteTask returns ResourcesLoaded for this kind, but the adapter
+			// must also navigate to the detail view. Keep adapter-local so the
+			// navigation side-effect is preserved.
 			payload, ok := t.Payload.(runtime.FetchByIDDetailPayload)
 			if !ok {
 				continue
@@ -454,6 +458,7 @@ func relatedNavigateTasksToCmd(m Model, targetType string, result runtime.Naviga
 		return tea.Batch(cmds...)
 	}
 }
+
 
 // handleRelatedCheckStarted is the BT adapter entry point for
 // messages.RelatedCheckStarted. Normalises src.Type from msg.ResourceType
