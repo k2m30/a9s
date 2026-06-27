@@ -1,6 +1,7 @@
 package app
 
 import (
+	"maps"
 	"strings"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -161,8 +162,8 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 			visible := menuVisibleItems(ms, all)
 			if ms.Cursor > 0 {
 				ms.Cursor--
-				menuSkipUnavailable(ms, visible, -1)
 			}
+			menuSkipUnavailable(ms, visible, -1)
 		}
 		return c.Snapshot(), nil
 
@@ -172,8 +173,8 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 			visible := menuVisibleItems(ms, all)
 			if ms.Cursor < len(visible)-1 {
 				ms.Cursor++
-				menuSkipUnavailable(ms, visible, +1)
 			}
+			menuSkipUnavailable(ms, visible, +1)
 		}
 		return c.Snapshot(), nil
 
@@ -366,7 +367,7 @@ func (c *Controller) ApplyIntents(intents []runtime.UIIntent) ViewState {
 			}
 
 		case runtime.PatchMenuIssueBatch:
-			if ms := c.rootMenuState(); ms != nil && len(v.Known) > 0 {
+			if ms := c.rootMenuState(); ms != nil && v.Known != nil {
 				if ms.IssueCounts == nil {
 					ms.IssueCounts = make(map[string]int)
 				}
@@ -605,19 +606,19 @@ func menuVisibleItems(ms *MenuState, all []resource.ResourceTypeDef) []resource.
 //
 // PR-C 1b: converge with mainmenu.go isVisibleUnderIssueFilter.
 func menuIsVisibleUnderIssueFilter(ms *MenuState, item resource.ResourceTypeDef, activeKey string) bool {
-	// ExcludeFromIssueBadge types are never probed — hide them in attention
-	// mode even at cold-start. This ordering matches mainmenu.go exactly:
-	// exclusion is checked BEFORE the cold-start guard.
-	if item.ExcludeFromIssueBadge {
+	known := ms.IssueKnown != nil && ms.IssueKnown[activeKey]
+	// ExcludeFromIssueBadge types are never probed — hide them in attention mode,
+	// even at cold-start, UNLESS issue data was explicitly recorded for them (a
+	// real detected issue beats the exclusion). In production these types are
+	// never probed, so this is equivalent to an absolute exclusion; the
+	// conditional only matters for tests that inject issues directly.
+	if item.ExcludeFromIssueBadge && !known {
 		return false
 	}
-	// Cold-start: no probe has reported anywhere — show everything else so the
-	// user sees the full catalog rather than an empty menu.
-	if len(ms.IssueKnown) == 0 {
-		return true
-	}
-	if ms.IssueKnown == nil || !ms.IssueKnown[activeKey] {
-		return false
+	// Unknown non-excluded type: visible only during true cold-start (no type
+	// probed anywhere); once any probe lands, unknown types hide.
+	if !known {
+		return len(ms.IssueKnown) == 0
 	}
 	if ms.IssueCounts != nil && ms.IssueCounts[activeKey] > 0 {
 		return true
@@ -814,6 +815,101 @@ func itoa(n int) string {
 		buf[pos] = '-'
 	}
 	return string(buf[pos:])
+}
+
+// MenuFrameTitle returns the frame-border title for the main-menu screen,
+// delegating to menuFrameTitle with the root MenuState. Returns an empty
+// string when the root screen is not a menu.
+func (c *Controller) MenuFrameTitle() string {
+	ms := c.rootMenuState()
+	if ms == nil {
+		return ""
+	}
+	return menuFrameTitle(ms)
+}
+
+// MenuSelected returns the ResourceTypeDef at the current cursor and a bool
+// that is true when navigation is permitted (i.e. the item is not confirmed
+// empty). Mirrors the Enter-key guard in ActionSelect.
+func (c *Controller) MenuSelected() (resource.ResourceTypeDef, bool) {
+	ms := c.rootMenuState()
+	if ms == nil {
+		return resource.ResourceTypeDef{}, false
+	}
+	all := resource.AllResourceTypes()
+	visible := menuVisibleItems(ms, all)
+	if len(visible) == 0 || ms.Cursor >= len(visible) {
+		return resource.ResourceTypeDef{}, false
+	}
+	selected := visible[ms.Cursor]
+	if ms.Availability != nil {
+		key := menuActiveKey(ms, selected)
+		isTruncated := ms.Truncated != nil && ms.Truncated[key]
+		if count, known := ms.Availability[key]; known && count == 0 && !isTruncated {
+			return selected, false
+		}
+	}
+	return selected, true
+}
+
+// GetMenuAvailability returns a copy of the root MenuState availability map.
+// Returns nil when no availability data has been recorded.
+func (c *Controller) GetMenuAvailability() map[string]int {
+	ms := c.rootMenuState()
+	if ms == nil || ms.Availability == nil {
+		return nil
+	}
+	cp := make(map[string]int, len(ms.Availability))
+	maps.Copy(cp, ms.Availability)
+	return cp
+}
+
+// GetMenuTruncated returns a copy of the root MenuState truncated map.
+// Returns nil when no truncation data has been recorded.
+func (c *Controller) GetMenuTruncated() map[string]bool {
+	ms := c.rootMenuState()
+	if ms == nil || ms.Truncated == nil {
+		return nil
+	}
+	cp := make(map[string]bool, len(ms.Truncated))
+	maps.Copy(cp, ms.Truncated)
+	return cp
+}
+
+// GetMenuIssueCounts returns a copy of the root MenuState issue-count map.
+// Returns nil when no issue data has been recorded.
+func (c *Controller) GetMenuIssueCounts() map[string]int {
+	ms := c.rootMenuState()
+	if ms == nil || ms.IssueCounts == nil {
+		return nil
+	}
+	cp := make(map[string]int, len(ms.IssueCounts))
+	maps.Copy(cp, ms.IssueCounts)
+	return cp
+}
+
+// GetMenuIssueKnown returns a copy of the root MenuState issue-known map.
+// Returns nil when no issue data has been recorded.
+func (c *Controller) GetMenuIssueKnown() map[string]bool {
+	ms := c.rootMenuState()
+	if ms == nil || ms.IssueKnown == nil {
+		return nil
+	}
+	cp := make(map[string]bool, len(ms.IssueKnown))
+	maps.Copy(cp, ms.IssueKnown)
+	return cp
+}
+
+// GetMenuIssueTruncated returns a copy of the root MenuState issue-truncated map.
+// Returns nil when no issue-truncation data has been recorded.
+func (c *Controller) GetMenuIssueTruncated() map[string]bool {
+	ms := c.rootMenuState()
+	if ms == nil || ms.IssueTruncated == nil {
+		return nil
+	}
+	cp := make(map[string]bool, len(ms.IssueTruncated))
+	maps.Copy(cp, ms.IssueTruncated)
+	return cp
 }
 
 // bodyKindForScreen maps a Screen to the BodyKind a renderer uses to
