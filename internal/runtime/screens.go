@@ -42,6 +42,10 @@ const (
 	// pushed by NavigateKindPushResourceList / NavigateKindPushResourceListCached.
 	// Row data (ListState) is populated in PR-C once the result lane lands.
 	ScreenResourceList ScreenID = "resource-list"
+
+	// ScreenMenu is the root main-menu screen. The controller pushes it on
+	// startup so Snapshot() returns BodyKindMenu from the first call.
+	ScreenMenu ScreenID = "menu"
 )
 
 // ScreenContext is the input handed to an adapter when the runtime asks

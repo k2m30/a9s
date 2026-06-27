@@ -15,10 +15,12 @@ package app
 type ActionKind string
 
 const (
-	ActionMoveUp    ActionKind = "move-up"
-	ActionMoveDown  ActionKind = "move-down"
-	ActionMoveTop   ActionKind = "move-top"
+	ActionMoveUp     ActionKind = "move-up"
+	ActionMoveDown   ActionKind = "move-down"
+	ActionMoveTop    ActionKind = "move-top"
 	ActionMoveBottom ActionKind = "move-bottom"
+	ActionPageUp     ActionKind = "page-up"
+	ActionPageDown   ActionKind = "page-down"
 
 	ActionSelect ActionKind = "select"
 	ActionBack   ActionKind = "back"

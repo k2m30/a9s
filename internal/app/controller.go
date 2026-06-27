@@ -1,6 +1,8 @@
 package app
 
 import (
+	"strings"
+
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 )
@@ -22,8 +24,18 @@ type Controller struct {
 }
 
 // New constructs a Controller backed by the given runtime Core.
+// The root screen is always ScreenMenu so Snapshot() returns BodyKindMenu
+// immediately; the QA agent updates the PR-A empty-stack tests accordingly.
 func New(core *runtime.Core) *Controller {
-	return &Controller{core: core}
+	return &Controller{
+		core: core,
+		stack: []Screen{
+			{
+				ID:    runtime.ScreenMenu,
+				State: ScreenState{Menu: &MenuState{}},
+			},
+		},
+	}
 }
 
 // Apply translates a semantic Action into the matching Core command, applies
@@ -140,9 +152,116 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 		}
 		return c.Snapshot(), nil
 
+	// --- Menu screen actions (PR-C slice 1a) ---
+	// These only take effect when the top screen is ScreenMenu.
+
+	case ActionMoveUp:
+		if ms := c.topMenuState(); ms != nil {
+			all := resource.AllResourceTypes()
+			visible := menuVisibleItems(ms, all)
+			if ms.Cursor > 0 {
+				ms.Cursor--
+				menuSkipUnavailable(ms, visible, -1)
+			}
+		}
+		return c.Snapshot(), nil
+
+	case ActionMoveDown:
+		if ms := c.topMenuState(); ms != nil {
+			all := resource.AllResourceTypes()
+			visible := menuVisibleItems(ms, all)
+			if ms.Cursor < len(visible)-1 {
+				ms.Cursor++
+				menuSkipUnavailable(ms, visible, +1)
+			}
+		}
+		return c.Snapshot(), nil
+
+	case ActionMoveTop:
+		if ms := c.topMenuState(); ms != nil {
+			ms.Cursor = 0
+			all := resource.AllResourceTypes()
+			visible := menuVisibleItems(ms, all)
+			menuSkipUnavailable(ms, visible, +1)
+		}
+		return c.Snapshot(), nil
+
+	case ActionMoveBottom:
+		if ms := c.topMenuState(); ms != nil {
+			all := resource.AllResourceTypes()
+			visible := menuVisibleItems(ms, all)
+			if len(visible) > 0 {
+				ms.Cursor = len(visible) - 1
+			}
+			menuSkipUnavailable(ms, visible, -1)
+		}
+		return c.Snapshot(), nil
+
+	case ActionPageUp:
+		if ms := c.topMenuState(); ms != nil {
+			all := resource.AllResourceTypes()
+			visible := menuVisibleItems(ms, all)
+			ms.Cursor -= menuPageSize
+			if ms.Cursor < 0 {
+				ms.Cursor = 0
+			}
+			menuSkipUnavailable(ms, visible, -1)
+		}
+		return c.Snapshot(), nil
+
+	case ActionPageDown:
+		if ms := c.topMenuState(); ms != nil {
+			all := resource.AllResourceTypes()
+			visible := menuVisibleItems(ms, all)
+			ms.Cursor += menuPageSize
+			if n := len(visible); ms.Cursor >= n {
+				ms.Cursor = max(n-1, 0)
+			}
+			menuSkipUnavailable(ms, visible, +1)
+		}
+		return c.Snapshot(), nil
+
+	case ActionToggleAttention:
+		if ms := c.topMenuState(); ms != nil {
+			ms.AttentionOnly = !ms.AttentionOnly
+			ms.Cursor = 0
+		}
+		return c.Snapshot(), nil
+
+	case ActionSetFilter:
+		if ms := c.topMenuState(); ms != nil {
+			ms.Filter = a.Arg
+			ms.Cursor = 0
+			ms.ScrollOffset = 0
+		}
+		return c.Snapshot(), nil
+
+	case ActionSelect:
+		if ms := c.topMenuState(); ms != nil {
+			all := resource.AllResourceTypes()
+			visible := menuVisibleItems(ms, all)
+			if len(visible) > 0 && ms.Cursor < len(visible) {
+				selected := visible[ms.Cursor]
+				// Block navigation to confirmed-empty types (count known, zero, not truncated).
+				if ms.Availability != nil {
+					isTruncated := ms.Truncated != nil && ms.Truncated[selected.ShortName]
+					if count, known := ms.Availability[selected.ShortName]; known && count == 0 && !isTruncated {
+						return c.Snapshot(), nil
+					}
+				}
+				res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{
+					Target:       runtime.NavigateTargetResourceList,
+					ResourceType: selected.ShortName,
+				})
+				c.applyNavResult(res)
+				return c.Snapshot(), tasks
+			}
+		}
+		return c.Snapshot(), nil
+
 	// --- PR-C-blocked actions: need selected-row / per-screen view state ---
 
-	case ActionOpenDetail, ActionSelect,
+	case ActionOpenDetail,
 		ActionOpenYAML, ActionOpenJSON,
 		ActionReveal, ActionChildView,
 		ActionToggleRelated,
@@ -151,9 +270,9 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 		return c.Snapshot(), nil
 	}
 
-	// All remaining actions (movement, filter, sort, search, copy, refresh, quit,
-	// toggle-wrap, toggle-attention, command) are either movement-only or require
-	// per-screen state lifted in PR-C. Return current snapshot with no tasks.
+	// All remaining actions (sort, search, copy, refresh, quit, toggle-wrap,
+	// command) either require per-screen state lifted in later PR-C slices or
+	// are renderer-only (quit). Return current snapshot with no tasks.
 	return c.Snapshot(), nil
 }
 
@@ -212,19 +331,89 @@ func (c *Controller) ApplyIntents(intents []runtime.UIIntent) ViewState {
 				}
 			}
 
+		case runtime.PatchMenuAvailability:
+			if ms := c.rootMenuState(); ms != nil {
+				if ms.Availability == nil {
+					ms.Availability = make(map[string]int)
+				}
+				if ms.Truncated == nil {
+					ms.Truncated = make(map[string]bool)
+				}
+				// Store under the key as emitted by the runtime (may be an alias
+				// such as "rds" for ShortName "dbi"). buildMenuBody resolves the
+				// active key per item using menuActiveKey().
+				ms.Availability[v.ResourceType] = v.Count
+				ms.Truncated[v.ResourceType] = v.Truncated
+			}
+
+		case runtime.PatchMenu:
+			if ms := c.rootMenuState(); ms != nil {
+				if ms.IssueCounts == nil {
+					ms.IssueCounts = make(map[string]int)
+				}
+				if ms.IssueKnown == nil {
+					ms.IssueKnown = make(map[string]bool)
+				}
+				if ms.IssueTruncated == nil {
+					ms.IssueTruncated = make(map[string]bool)
+				}
+				ms.IssueCounts[v.ResourceType] = v.Issues
+				ms.IssueKnown[v.ResourceType] = true
+				ms.IssueTruncated[v.ResourceType] = v.Truncated
+			}
+
+		case runtime.PatchMenuIssueBatch:
+			if ms := c.rootMenuState(); ms != nil && len(v.Known) > 0 {
+				if ms.IssueCounts == nil {
+					ms.IssueCounts = make(map[string]int)
+				}
+				if ms.IssueKnown == nil {
+					ms.IssueKnown = make(map[string]bool)
+				}
+				if ms.IssueTruncated == nil {
+					ms.IssueTruncated = make(map[string]bool)
+				}
+				for name, k := range v.Known {
+					if k {
+						ms.IssueCounts[name] = v.Counts[name]
+						ms.IssueKnown[name] = true
+						ms.IssueTruncated[name] = v.Truncated[name]
+					}
+				}
+			}
+
+		case runtime.PatchMenuCheckProgress:
+			if ms := c.rootMenuState(); ms != nil {
+				ms.AvailChecked = v.Checked
+				ms.AvailTotal = v.Total
+			}
+
+		case runtime.PatchMenuEnrichProgress:
+			if ms := c.rootMenuState(); ms != nil {
+				ms.EnrichChecked = v.Checked
+				ms.EnrichTotal = v.Total
+			}
+
+		case runtime.MenuClearAvailabilityIntent:
+			if ms := c.rootMenuState(); ms != nil {
+				ms.Availability = nil
+				ms.Truncated = nil
+				ms.AvailChecked = 0
+				ms.AvailTotal = 0
+				ms.IssueCounts = nil
+				ms.IssueKnown = nil
+				ms.IssueTruncated = nil
+				ms.EnrichChecked = 0
+				ms.EnrichTotal = 0
+			}
+
 		// TODO PR-C: PatchResourceList mutates state lifted in PR-C
 		// TODO PR-C: PatchDetail mutates state lifted in PR-C
-		// TODO PR-C: PatchMenu mutates state lifted in PR-C
-		// TODO PR-C: PatchMenuAvailability mutates state lifted in PR-C
-		// TODO PR-C: PatchMenuIssueBatch mutates state lifted in PR-C
-		// TODO PR-C: PatchMenuCheckProgress mutates state lifted in PR-C
-		// TODO PR-C: PatchMenuEnrichProgress mutates state lifted in PR-C
 		// TODO PR-C: FlashIntent mutates state lifted in PR-C
 		// TODO PR-C: ClearFlash mutates state lifted in PR-C
 		// TODO PR-C: SetErrorHintIntent mutates state lifted in PR-C
 		// TODO PR-C: AppendErrorHistoryIntent mutates state lifted in PR-C
 		// TODO PR-C: ClearActiveListLoadingIntent mutates state lifted in PR-C
-		// TODO PR-C: MenuClearAvailabilityIntent mutates state lifted in PR-C
 		// TODO PR-C: RefreshActiveListIntent mutates state lifted in PR-C
 		// TODO PR-C: PatchResourceCache mutates state lifted in PR-C
 		// TODO PR-C: PatchRelatedCache mutates state lifted in PR-C
@@ -259,7 +448,10 @@ func (c *Controller) Snapshot() ViewState {
 	top := c.stack[len(c.stack)-1]
 	vs.FrameTitle = string(top.ID)
 	vs.Body.Kind = bodyKindForScreen(top)
-	// TODO PR-C: populate vs.Body.{List,Detail,Text,Menu,Selector} from top.State.
+	if top.State.Menu != nil {
+		vs.Body.Menu = buildMenuBody(top.State.Menu)
+		vs.FrameTitle = menuFrameTitle(top.State.Menu)
+	}
 	return vs
 }
 
@@ -328,10 +520,290 @@ func (c *Controller) applyRelatedNavResult(_ runtime.NavigationResult) {
 	// TODO PR-C: needs selected-row / view state (see plan PR-C)
 }
 
+// menuPageSize is the cursor jump for PageUp/PageDown on the menu screen.
+// The menu has no terminal height here; 10 matches the typical visible window.
+const menuPageSize = 10
+
+// topMenuState returns the MenuState of the top-of-stack screen if it is
+// ScreenMenu, or nil otherwise.
+func (c *Controller) topMenuState() *MenuState {
+	if len(c.stack) == 0 {
+		return nil
+	}
+	top := c.stack[len(c.stack)-1]
+	if top.ID != runtime.ScreenMenu {
+		return nil
+	}
+	return c.stack[len(c.stack)-1].State.Menu
+}
+
+// rootMenuState returns the MenuState of the root (bottom) screen if it is
+// ScreenMenu. Menu intents always target the root menu regardless of which
+// screen is currently on top.
+func (c *Controller) rootMenuState() *MenuState {
+	if len(c.stack) == 0 {
+		return nil
+	}
+	if c.stack[0].ID != runtime.ScreenMenu {
+		return nil
+	}
+	return c.stack[0].State.Menu
+}
+
+// menuVisibleItems returns the resource types visible under the current
+// MenuState filter + attention settings, mirroring mainmenu.go applyFilter.
+//
+// PR-C 1b: converge with mainmenu.go applyFilter + isVisibleUnderIssueFilter.
+func menuVisibleItems(ms *MenuState, all []resource.ResourceTypeDef) []resource.ResourceTypeDef {
+	var result []resource.ResourceTypeDef
+	if len(ms.Filter) < 2 {
+		result = all
+	} else {
+		q := strings.ToLower(ms.Filter)
+		result = make([]resource.ResourceTypeDef, 0, len(all))
+		for _, item := range all {
+			if strings.Contains(strings.ToLower(item.Name), q) ||
+				strings.Contains(strings.ToLower(item.ShortName), q) {
+				result = append(result, item)
+			}
+		}
+	}
+
+	if ms.AttentionOnly {
+		filtered := make([]resource.ResourceTypeDef, 0, len(result))
+		for _, item := range result {
+			if menuIsVisibleUnderIssueFilter(ms, item, menuActiveKey(ms, item)) {
+				filtered = append(filtered, item)
+			}
+		}
+		result = filtered
+	}
+	return result
+}
+
+// menuIsVisibleUnderIssueFilter mirrors mainmenu.go isVisibleUnderIssueFilter.
+//
+// item is the catalog entry; activeKey is the key under which intent data is
+// stored for this item (from menuActiveKey — may be an alias like "rds" for
+// the "dbi" type).
+//
+// PR-C 1b: converge with mainmenu.go isVisibleUnderIssueFilter.
+//
+// Note on cold-start ordering: the cold-start check (len(IssueKnown)==0) is
+// evaluated before ExcludeFromIssueBadge so that the attention-only toggle
+// shows ALL types when no probe has landed yet. Once any probe reports,
+// ExcludeFromIssueBadge types drop out because they can never be known.
+func menuIsVisibleUnderIssueFilter(ms *MenuState, item resource.ResourceTypeDef, activeKey string) bool {
+	// Cold-start: no probe has reported anywhere — show everything so the
+	// user sees the full catalog rather than an empty menu.
+	if len(ms.IssueKnown) == 0 {
+		return true
+	}
+	if item.ExcludeFromIssueBadge {
+		return false
+	}
+	if ms.IssueKnown == nil || !ms.IssueKnown[activeKey] {
+		return false
+	}
+	if ms.IssueCounts != nil && ms.IssueCounts[activeKey] > 0 {
+		return true
+	}
+	return ms.IssueTruncated != nil && ms.IssueTruncated[activeKey]
+}
+
+// menuSkipUnavailable advances the cursor past confirmed-empty resource types,
+// mirroring mainmenu.go skipUnavailable.
+//
+// PR-C 1b: converge with mainmenu.go skipUnavailable.
+func menuSkipUnavailable(ms *MenuState, visible []resource.ResourceTypeDef, direction int) {
+	if ms.Availability == nil || len(visible) == 0 {
+		return
+	}
+	total := len(visible)
+	start := ms.Cursor
+
+	cur := start
+	for cur >= 0 && cur < total {
+		item := visible[cur]
+		key := menuActiveKey(ms, item)
+		isTruncated := ms.Truncated != nil && ms.Truncated[key]
+		if count, known := ms.Availability[key]; !known || count > 0 || isTruncated {
+			ms.Cursor = cur
+			return
+		}
+		cur += direction
+	}
+
+	cur = start - direction
+	for cur >= 0 && cur < total {
+		item := visible[cur]
+		key := menuActiveKey(ms, item)
+		isTruncated := ms.Truncated != nil && ms.Truncated[key]
+		if count, known := ms.Availability[key]; !known || count > 0 || isTruncated {
+			ms.Cursor = cur
+			return
+		}
+		cur -= direction
+	}
+}
+
+// menuActiveKey returns the key under which intent data for the given
+// ResourceTypeDef is stored in a MenuState map. Intents are stored under
+// whatever key the runtime emits (e.g. "rds" for the "dbi" type); this
+// function resolves that key by checking the item's ShortName and all its
+// Aliases in order, returning the first one present in any of the three
+// intent maps. Falls back to item.ShortName when nothing is found.
+//
+// This allows buildMenuBody to expose the same key as the intent used —
+// so MenuEntry.ShortName matches what the runtime and tests expect.
+func menuActiveKey(ms *MenuState, item resource.ResourceTypeDef) string {
+	candidates := make([]string, 0, 1+len(item.Aliases))
+	candidates = append(candidates, item.ShortName)
+	candidates = append(candidates, item.Aliases...)
+	for _, c := range candidates {
+		if ms.Availability != nil {
+			if _, ok := ms.Availability[c]; ok {
+				return c
+			}
+		}
+		if ms.IssueKnown != nil {
+			if ms.IssueKnown[c] {
+				return c
+			}
+		}
+	}
+	return item.ShortName
+}
+
+// buildMenuBody constructs a MenuBody from MenuState + the resource catalog.
+// Applies the same filter + attention + skip-unavailable + badge logic as
+// mainmenu.go View(), but produces renderer-agnostic data instead of styled
+// strings.
+//
+// PR-C 1b: converge with mainmenu.go View() + FrameTitle().
+func buildMenuBody(ms *MenuState) *MenuBody {
+	all := resource.AllResourceTypes()
+	visible := menuVisibleItems(ms, all)
+
+	cursor := ms.Cursor
+	if cursor >= len(visible) && len(visible) > 0 {
+		cursor = len(visible) - 1
+	}
+
+	entries := make([]MenuEntry, 0, len(visible))
+	for _, item := range visible {
+		// Resolve the key under which intent data was stored for this type.
+		// Intents may use an alias ("rds") rather than the canonical ShortName
+		// ("dbi"); menuActiveKey finds whichever key has data, falling back to
+		// item.ShortName when no intent has been received yet.
+		activeKey := menuActiveKey(ms, item)
+
+		alias := ":" + item.ShortName
+		if len(item.Aliases) > 0 {
+			alias = ":" + item.Aliases[0]
+		}
+
+		avail := 0
+		if ms.Availability != nil {
+			avail = ms.Availability[activeKey]
+		}
+
+		badge := IssueBadge{}
+		if ms.IssueKnown != nil && ms.IssueKnown[activeKey] {
+			cnt := 0
+			if ms.IssueCounts != nil {
+				cnt = ms.IssueCounts[activeKey]
+			}
+			trunc := ms.IssueTruncated != nil && ms.IssueTruncated[activeKey]
+			badge = IssueBadge{Count: cnt, Truncated: trunc}
+		}
+
+		entries = append(entries, MenuEntry{
+			ShortName:    activeKey,
+			Display:      item.Name,
+			Alias:        alias,
+			IssueBadge:   badge,
+			Availability: avail,
+		})
+	}
+
+	return &MenuBody{
+		Entries:       entries,
+		Selected:      cursor,
+		Filter:        ms.Filter,
+		AttentionOnly: ms.AttentionOnly,
+		Progress:      menuProgressIndicator(ms),
+	}
+}
+
+// menuFrameTitle mirrors mainmenu.go FrameTitle().
+//
+// PR-C 1b: converge with mainmenu.go FrameTitle().
+func menuFrameTitle(ms *MenuState) string {
+	all := resource.AllResourceTypes()
+	total := len(all)
+	visible := menuVisibleItems(ms, all)
+	filtered := len(visible)
+
+	var title string
+	switch {
+	case ms.Filter != "" || ms.AttentionOnly:
+		title = "resource-types(" + itoa(filtered) + "/" + itoa(total) + ")"
+	default:
+		title = "resource-types(" + itoa(total) + ")"
+	}
+	if ms.AttentionOnly {
+		title += " [!]"
+	}
+	if ms.EnrichTotal > 0 && ms.EnrichChecked < ms.EnrichTotal {
+		title += " [enriching " + itoa(ms.EnrichChecked) + "/" + itoa(ms.EnrichTotal) + "]"
+	}
+	return title
+}
+
+// menuProgressIndicator returns the scan/enrichment progress suffix only —
+// empty when no scan is active. This is what MenuBody.Progress carries;
+// menuFrameTitle() carries the full frame title string (base + suffix).
+func menuProgressIndicator(ms *MenuState) string {
+	if ms.EnrichTotal > 0 && ms.EnrichChecked < ms.EnrichTotal {
+		return "[enriching " + itoa(ms.EnrichChecked) + "/" + itoa(ms.EnrichTotal) + "]"
+	}
+	if ms.AvailTotal > 0 && ms.AvailChecked < ms.AvailTotal {
+		return "[checking " + itoa(ms.AvailChecked) + "/" + itoa(ms.AvailTotal) + "]"
+	}
+	return ""
+}
+
+// itoa converts an int to its decimal string representation without importing
+// strconv (mirrors the views.itoa helper kept in the same conceptual layer).
+func itoa(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	neg := n < 0
+	if neg {
+		n = -n
+	}
+	buf := [20]byte{}
+	pos := len(buf)
+	for n > 0 {
+		pos--
+		buf[pos] = byte('0' + n%10)
+		n /= 10
+	}
+	if neg {
+		pos--
+		buf[pos] = '-'
+	}
+	return string(buf[pos:])
+}
+
 // bodyKindForScreen maps a Screen to the BodyKind a renderer uses to
 // select the correct template/view.
 func bodyKindForScreen(s Screen) BodyKind {
 	switch s.ID {
+	case runtime.ScreenMenu:
+		return BodyKindMenu
 	case runtime.ScreenProfileSelector, runtime.ScreenRegion, runtime.ScreenTheme:
 		return BodyKindSelector
 	case runtime.ScreenReveal:
@@ -344,7 +816,6 @@ func bodyKindForScreen(s Screen) BodyKind {
 		return BodyKindIdentity
 	default:
 		// Capability screens and future IDs not yet enumerated here.
-		// PR-C will extend this switch as new ScreenIDs are registered.
 		return BodyKindUnknown
 	}
 }
