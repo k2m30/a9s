@@ -8,8 +8,6 @@ package unit_test
 //            qa_s3_object_detail_test.go
 
 import (
-	"os"
-	"regexp"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -17,8 +15,8 @@ import (
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // ---------------------------------------------------------------------------
@@ -26,10 +24,8 @@ import (
 // The package-unit (non _test) equivalent lives in helpers_test.go as stripANSI.
 // ---------------------------------------------------------------------------
 
-var ansiRegex = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
-
 func stripAnsi(s string) string {
-	return ansiRegex.ReplaceAllString(s, "")
+	return tuitest.StripANSI(s)
 }
 
 // ---------------------------------------------------------------------------
@@ -39,13 +35,7 @@ func stripAnsi(s string) string {
 // ensureNoColor sets NO_COLOR=1 and reinitializes styles so all Render calls
 // pass through without ANSI escape codes, making string assertions reliable.
 func ensureNoColor(t *testing.T) {
-	t.Helper()
-	t.Setenv("NO_COLOR", "1")
-	styles.Reinit()
-	t.Cleanup(func() {
-		os.Unsetenv("NO_COLOR")
-		styles.Reinit()
-	})
+	tuitest.NoColor(t)
 }
 
 // ---------------------------------------------------------------------------

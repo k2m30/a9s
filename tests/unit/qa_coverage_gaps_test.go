@@ -6,27 +6,20 @@ package unit
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 )
 
 func setupNoColor(t *testing.T) {
-	t.Helper()
-	t.Setenv("NO_COLOR", "1")
-	styles.Reinit()
-	t.Cleanup(func() {
-		os.Unsetenv("NO_COLOR")
-		styles.Reinit()
-	})
+	tuitest.NoColor(t)
 }
 
 // ---------------------------------------------------------------------------
