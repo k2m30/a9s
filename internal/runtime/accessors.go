@@ -173,6 +173,9 @@ func (c *Core) ResetProbeMaps() {
 // SetIdentityFetching sets the session-wide IdentityFetching latch.
 func (c *Core) SetIdentityFetching(v bool) { c.session.IdentityFetching = v }
 
+// IdentityFetching reports whether a fetch-identity task is in-flight.
+func (c *Core) IdentityFetching() bool { return c.session.IdentityFetching }
+
 // Identity returns the renderer-shaped domain mirror of the session's
 // caller identity, or nil if no identity has been resolved yet. The
 // awsclient-typed pointer stays inside Core; the adapter renders only
