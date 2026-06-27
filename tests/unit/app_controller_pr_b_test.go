@@ -622,25 +622,27 @@ func TestController_Apply_PRB_OpenHelp_PushesHelpScreen(t *testing.T) {
 	_ = tasks // help screen push produces no background tasks
 }
 
-// TestController_Apply_PRB_Back_EmptyStack_NoPanic verifies that ActionBack
-// on an empty stack does not panic and returns Snapshot (no-op pop).
-func TestController_Apply_PRB_Back_EmptyStack_NoPanic(t *testing.T) {
+// TestController_Apply_PRB_Back_RootIsNoOp verifies that ActionBack when only
+// the root menu screen remains is a no-op: no panic, stack stays at depth 1,
+// and Snapshot reports BodyKindMenu (the root is never popped).
+func TestController_Apply_PRB_Back_RootIsNoOp(t *testing.T) {
 	c := newTestController()
 
+	// Fresh controller starts at depth-1 (root menu). Back must not pop it.
 	var vs app.ViewState
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				t.Errorf("Apply(Back) on empty stack panicked: %v", r)
+				t.Errorf("Apply(Back) on root-only stack panicked: %v", r)
 			}
 		}()
 		vs, _ = c.Apply(app.Action{Kind: app.ActionBack})
 	}()
 
 	snap := c.Snapshot()
-	assertViewStateEqualsSnapshot(t, "Apply(Back) on empty stack", vs, snap)
-	if snap.Body.Kind != app.BodyKindUnknown {
-		t.Errorf("Apply(Back) on empty stack: expected BodyKindUnknown, got %q", snap.Body.Kind)
+	assertViewStateEqualsSnapshot(t, "Apply(Back) on root-only stack", vs, snap)
+	if snap.Body.Kind != app.BodyKindMenu {
+		t.Errorf("Apply(Back) on root-only stack: expected BodyKindMenu (root preserved), got %q", snap.Body.Kind)
 	}
 }
 
@@ -822,18 +824,19 @@ func TestController_Apply_PRB_Command_Region_PushesRegionSelector(t *testing.T) 
 }
 
 // TestController_Apply_PRB_Command_Root_CollapsesStack verifies that
-// ActionCommand{Arg:"root"} pops all screens (NavigateKindPopAll), leaving
-// the stack empty and Snapshot reporting BodyKindUnknown.
+// ActionCommand{Arg:"root"} collapses the stack via NavigateKindPopAll,
+// leaving exactly the root menu screen. Snapshot reports BodyKindMenu at
+// depth 1 — the root is never popped.
 func TestController_Apply_PRB_Command_Root_CollapsesStack(t *testing.T) {
 	c := newTestController()
 
-	// Push two screens first so there is something to collapse.
+	// Push two screens on top of the root menu → depth 3.
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{ID: runtime.ScreenChildList, Context: runtime.ScreenContext{ResourceType: "ec2"}},
 		runtime.PushScreen{ID: runtime.ScreenHelp, Context: runtime.ScreenContext{}},
 	})
-	if c.Snapshot().Body.Kind == app.BodyKindUnknown {
-		t.Fatalf("precondition: expected non-empty stack before :root command")
+	if c.Snapshot().Body.Kind == app.BodyKindMenu {
+		t.Fatalf("precondition: expected non-menu top of stack before :root command, got BodyKindMenu")
 	}
 
 	vs, _ := c.Apply(app.Action{Kind: app.ActionCommand, Arg: "root"})
@@ -841,8 +844,9 @@ func TestController_Apply_PRB_Command_Root_CollapsesStack(t *testing.T) {
 	snap := c.Snapshot()
 	assertViewStateEqualsSnapshot(t, "Apply(Command:root)", vs, snap)
 
-	if snap.Body.Kind != app.BodyKindUnknown {
-		t.Errorf("Apply(Command:root) Body.Kind = %q, want %q — :root must collapse the stack", snap.Body.Kind, app.BodyKindUnknown)
+	// NavigateKindPopAll leaves exactly the root menu (depth 1), never empties the stack.
+	if snap.Body.Kind != app.BodyKindMenu {
+		t.Errorf("Apply(Command:root) Body.Kind = %q, want %q — :root must collapse to the root menu", snap.Body.Kind, app.BodyKindMenu)
 	}
 }
 

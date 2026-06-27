@@ -417,6 +417,48 @@ func TestMenuAction_PageUp_DecreasesSelectedOrClampsToZero(t *testing.T) {
 	}
 }
 
+// TestMenuAction_PageDown_ActionN_CustomPageSize verifies that Action.N controls
+// the cursor jump for ActionPageDown. When N>0 the cursor moves by exactly N
+// (clamped to the last entry); when N==0 the default page size (10) is used.
+func TestMenuAction_PageDown_ActionN_CustomPageSize(t *testing.T) {
+	c := newMenuController(t)
+
+	allTypes := resource.AllResourceTypes()
+	if len(allTypes) < 5 {
+		t.Skip("fewer than 5 resource types registered — cannot test custom page size")
+	}
+
+	// N=3: cursor must advance by exactly 3 from position 0.
+	before := requireMenuBody(t, c)
+	if before.Selected != 0 {
+		t.Fatalf("precondition: expected cursor at 0, got %d", before.Selected)
+	}
+	c.Apply(app.Action{Kind: app.ActionPageDown, N: 3})
+	afterN3 := requireMenuBody(t, c)
+	if afterN3.Selected != 3 {
+		t.Errorf("ActionPageDown{N:3}: expected Selected=3, got %d", afterN3.Selected)
+	}
+
+	// Reset cursor to 0 via MoveTop.
+	c.Apply(app.Action{Kind: app.ActionMoveTop})
+	if requireMenuBody(t, c).Selected != 0 {
+		t.Fatalf("reset: expected cursor at 0 after MoveTop")
+	}
+
+	// N=0 (unset): default page size (10) is used. Cursor moves by 10 or clamps
+	// to the last entry if fewer than 10 entries remain.
+	c.Apply(app.Action{Kind: app.ActionPageDown})
+	afterDefault := requireMenuBody(t, c)
+	visible := len(allTypes) // unfiltered, no attention mode
+	wantDefault := 10
+	if wantDefault >= visible {
+		wantDefault = visible - 1
+	}
+	if afterDefault.Selected != wantDefault {
+		t.Errorf("ActionPageDown{N:0} (default): expected Selected=%d, got %d", wantDefault, afterDefault.Selected)
+	}
+}
+
 // TestMenuAction_ToggleAttention_FlipsAttentionOnly verifies that
 // ActionToggleAttention toggles MenuBody.AttentionOnly between false and true.
 func TestMenuAction_ToggleAttention_FlipsAttentionOnly(t *testing.T) {
@@ -600,13 +642,30 @@ func TestMenuSnapshot_AllRegisteredTypesVisibleByDefault(t *testing.T) {
 	}
 }
 
-// TestMenuSnapshot_AttentionOnly_ColdStart_AllVisible verifies that when
+// TestMenuSnapshot_AttentionOnly_ColdStart_AllExceptExcluded verifies that when
 // AttentionOnly is enabled but no type has been probed yet (issueKnown is
-// empty), ALL types remain visible. This mirrors isVisibleUnderIssueFilter's
-// cold-start behaviour: len(issueKnown)==0 → show everything.
-func TestMenuSnapshot_AttentionOnly_ColdStart_AllVisible(t *testing.T) {
+// empty), all types are visible EXCEPT those with ExcludeFromIssueBadge=true.
+// ExcludeFromIssueBadge is checked before the cold-start guard, so excluded
+// types are always hidden in attention mode regardless of probe state.
+func TestMenuSnapshot_AttentionOnly_ColdStart_AllExceptExcluded(t *testing.T) {
 	c := newMenuController(t)
 	allTypes := resource.AllResourceTypes()
+
+	// Count how many types have ExcludeFromIssueBadge=true (e.g. "ct-events").
+	excludedCount := 0
+	var excludedShortName string
+	var normalShortName string
+	for _, rt := range allTypes {
+		if rt.ExcludeFromIssueBadge {
+			excludedCount++
+			excludedShortName = rt.ShortName
+		} else if normalShortName == "" {
+			normalShortName = rt.ShortName
+		}
+	}
+	if excludedCount == 0 {
+		t.Skip("no ExcludeFromIssueBadge types registered — nothing to verify")
+	}
 
 	c.Apply(app.Action{Kind: app.ActionToggleAttention})
 
@@ -615,9 +674,30 @@ func TestMenuSnapshot_AttentionOnly_ColdStart_AllVisible(t *testing.T) {
 		t.Fatal("AttentionOnly should be true after toggle")
 	}
 
-	// Cold-start: no issue counts seeded — all types visible.
-	if len(menu.Entries) != len(allTypes) {
-		t.Errorf("cold-start attention-only: got %d entries want %d (all types visible while none probed)", len(menu.Entries), len(allTypes))
+	// Cold-start: no issue counts seeded.
+	// All types visible EXCEPT ExcludeFromIssueBadge ones.
+	want := len(allTypes) - excludedCount
+	if len(menu.Entries) != want {
+		t.Errorf("cold-start attention-only: got %d entries want %d (all except %d excluded types)", len(menu.Entries), want, excludedCount)
+	}
+
+	// The excluded type (e.g. ct-events) must be absent.
+	for _, e := range menu.Entries {
+		if e.ShortName == excludedShortName {
+			t.Errorf("ExcludeFromIssueBadge type %q must be hidden in attention mode even at cold-start", excludedShortName)
+		}
+	}
+
+	// A normal (non-excluded) type must be present.
+	found := false
+	for _, e := range menu.Entries {
+		if e.ShortName == normalShortName {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("normal type %q should be visible at cold-start attention mode", normalShortName)
 	}
 }
 
