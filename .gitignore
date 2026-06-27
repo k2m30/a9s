@@ -72,3 +72,7 @@ website/resources/
 # are tracked; the patterns file is not — it lists words/data we never
 # want in git history.
 .githooks/sensitive_patterns.txt
+
+# graphify knowledge-graph working files (generated locally, regenerable via
+# `graphify update .`; graph.json alone is ~27MB).
+graphify-out/

@@ -4,14 +4,12 @@ Your work will be review by Codex.
 
 ## Process — single source of truth
 
-**Read [`docs/development-process.md`](docs/development-process.md) first.** It defines the 8-stage lifecycle (Stages 1–8, with Stage 6.5 as an optional post-merge real-AWS gate), Definition of Ready, Definition of Done, agent ownership per stage, and the canonical pre-push and pre-release gates. If a rule below conflicts with that document, the document wins until updated.
+**Read [`docs/development-process.md`](docs/development-process.md) first.** It defines the lifecycle stages, Definition of Ready, Definition of Done, and the canonical pre-push and pre-release gates. If a rule below conflicts with that document, the document wins until updated.
 
 Quick reference:
 
 - Pre-push gate (Stage 6): `make ready-to-push`
 - Pre-release gate (Stage 7): `make ready-to-release`
-- Under CAE-1, CTO auto-pulls `todo, unassigned` issues in the active project every heartbeat (see [`docs/development-process.md`](docs/development-process.md) §"Continuous Autonomous Execution"). Other agents (Architect, QA, Coder, DevOps, etc.) act only on explicit dispatch from CTO or Architect — they never browse the backlog or pick up undispatched work.
-- **Issue-creation discipline (mandatory, AS-446 retro).** Before creating any new Paperclip issue, check it against the five rules in [`docs/development-process.md`](docs/development-process.md) §"Issue-creation discipline": (1) one review issue per PR (not one per reviewer); (2) heartbeat ticks do not create issues; (3) drift-detection cap of ≤1 new issue per heartbeat; (4) recovery is a comment, not a child; (5) API probes are never issues. Violations are caught at retro and reverted.
 
 ## GitHub
 
@@ -99,39 +97,35 @@ specs/           # feature specifications
 - **Message-driven** — views communicate via typed messages, never import each other
 - **Single source of truth** — key bindings in `keys/keys.go`, types in `types.go`, styles in `styles/`, **related-panel contract in `docs/related-resources.md`**
 
-## Skills and Subagents — in-session tooling, **not** Paperclip assignees
+## Skills and Subagents — in-session tooling
 
-> **The two tables below describe Claude Code skills and subagents.** They are tools invoked from within an agent's Claude Code session. **They are not Paperclip company agents.** They have no heartbeats, cannot be assigned issues, and cannot sign off on PRs. The Paperclip roster (CEO, CTO, Architect, Coder, QA, E2ETester, DevOps, CodexReviewer, CodeReviewer) is the only set of names that can own a stage or sign off on a PR — see [`docs/development-process.md`](docs/development-process.md) §"Agents". When this file refers to an "agent" by an `a9s-*` / `tui-*` / `test-coverage-analyzer` id, it means a tool a Paperclip agent invokes — never an issue assignee.
+> **The two tables below describe Claude Code skills and subagents.** They are tools invoked from within the Claude Code session. They sign off on nothing and own no stage — the developer owns the work end to end and uses these as scoped helpers. The coder/QA write split (coder ≠ tests, QA ≠ production code) is the TDD guardrail; keep it.
 
 ## Skills
 
 | Skill | Scope | Usage |
 |-------|-------|-------|
-| `a9s-common` | All agents | Shell rules, package access rules, build/test commands |
-| `a9s-bt-v2` | TUI-touching agents | Bubble Tea v2 / Lipgloss v2 / Bubbles v2 API patterns |
-| `a9s-add-resource` | Coder (steps 1-7), QA (steps 8-12) | Split blueprint: coder=implementation, QA=tests |
-| `a9s-add-child-view` | Coder (phase 3), QA (phase 2) | Split blueprint: architect scopes, QA tests, coder implements |
-| `a9s-add-related-view` | Coder (steps 1-6), QA (steps 7-11) | Split blueprint: add related-resource views per resource type |
-| `a9s-implement-issue` | Architect (orchestrator) | End-to-end: analyze → QA stories → design → scope → implement → verify → docs → release |
+| `a9s-common` | All work | Shell rules, package access rules, build/test commands |
+| `a9s-bt-v2` | TUI-touching work | Bubble Tea v2 / Lipgloss v2 / Bubbles v2 API patterns |
+| `a9s-add-resource` | impl + tests | Split blueprint: `a9s-coder`=implementation, `a9s-qa`=tests |
+| `a9s-add-child-view` | impl + tests | Split blueprint: scope, then `a9s-qa` tests, `a9s-coder` implements |
+| `a9s-add-related-view` | impl + tests | Split blueprint: add related-resource views per resource type |
+| `a9s-implement-issue` | Orchestrator | End-to-end: analyze → QA stories → design → scope → implement → verify → docs → release |
 | `a9s-resource-spec` | Main session | Generate `docs/resources/<shortName>.md` implementation-blind from the four golden docs |
 | `a9s-implement-resource` | Main session (orchestrator) | Implement resource from its spec: TBDs → impl-plan → fixtures → QA + coder handoff |
-| `a9s-create-demo-fixture` | Coder (during impl-resource 6a) | Build the single-source fixture file at `internal/demo/fixtures/<shortName>.go` — graph-connected, demo + tests share it |
+| `a9s-create-demo-fixture` | Fixtures | Build the single-source fixture file at `internal/demo/fixtures/<shortName>.go` — graph-connected, demo + tests share it |
 
 ## Agents
 
 | Agent | Role | Writes to | Rejects without |
 |-------|------|-----------|-----------------|
-| `a9s-architect` | Scopes tasks, design decisions, interfaces | Nothing (design output only) | N/A (owns scoping) |
-| `a9s-coder` | Implementation only — no tests | `internal/`, `cmd/`, `.a9s/` | Exact file scope from architect |
-| `a9s-qa` | Tests only — no production code | `tests/unit/` | Exact file scope from architect |
-| `a9s-tui-reviewer` | Code review — BT v2 correctness, design compliance | Nothing (read-only) | N/A |
+| `a9s-coder` | Implementation only — no tests | `internal/`, `cmd/`, `.a9s/` | Exact file scope |
+| `a9s-qa` | Tests only — no production code | `tests/unit/` | Exact file scope |
 | `a9s-qa-stories` | Given/when/then stories from design spec (no source code) | Nothing (read-only) | N/A |
-| `a9s-integrator` | Cross-package wiring, message flow, app.go | `internal/tui/app.go`, `messages/` | N/A |
 | `a9s-fixtures` | Test fixtures from dev-account via AWS MCP | `internal/demo/` | N/A |
-| `test-coverage-analyzer` | Test suite analysis, coverage gaps | Nothing (read-only) | N/A |
-| `tui-ux-auditor` | UX review, k9s comparison, design guidelines | Nothing (read-only) | N/A |
 | `a9s-devops` | AWS practitioner — resource priorities, feature advice | All | N/A |
 | `a9s-consistency-checker` | Verifies consistency across code, tests, README, website, config | Nothing (read-only) | N/A |
+| `tui-designer` | TUI wireframes, color schemes, preview mockups | Design artifacts | N/A |
 
 ## Agent File Access Rules
 
@@ -164,11 +158,11 @@ When a single task would require reading 5+ files totaling >500 lines, OR when y
 
 - ALWAYS rebuild binary (`make build`) after ANY code change — version is resolved at build time via `internal/buildinfo`
 - Do not make any changes until you have 95%+ confidence in what you need to build. Ask me follow up questions until you reach that confidence
-- TDD is non-negotiable: architect scopes both QA and coder tasks; QA writes tests, coder writes implementation. For rigid patterns (resource types, child views) they run in parallel. For novel features, QA goes first.
+- TDD is non-negotiable: scope the QA and coder tasks up front; `a9s-qa` writes tests, `a9s-coder` writes implementation. For rigid patterns (resource types, child views) they run in parallel. For novel features, QA goes first.
 - ALWAYS test ALL resource types (S3, EC2, RDS, Redis, DocumentDB, EKS, Secrets Manager, VPC, SG, Node Groups, etc), not just one
 - NEVER delete code, tests, or helpers just to make a linter happy. Understand WHY the code exists first. If it's genuinely dead, remove it. If it serves a purpose (scaffolding, crash-verification tests), use a targeted `//nolint` with a reason comment. If a linter rule produces widespread false positives, fix the rule in `.golangci.yml`.
 - NEVER make multiple push-and-check cycles. Get it right locally, push once.
-- BEFORE any push, the canonical gate is **`make ready-to-push`** — see [`docs/development-process.md`](docs/development-process.md) §"Stage 6 — Pre-push Validation" for the gate contents and the `internal/aws/` live-integration sub-rule. Stage 5 reviewers (Paperclip agents: **CodeReviewer**, **CodexReviewer**, **Architect** for size ≥ M, **CTO** as final) must sign off before this gate runs. Those reviewers invoke the subagent tools (`a9s-consistency-checker`, `test-coverage-analyzer`, `a9s-tui-reviewer`, `a9s-security-auditor`, `a9s-docs-reviewer`, `tui-ux-auditor`) in-session — see the §"Skills and Subagents" banner below.
+- BEFORE any push, the canonical gate is **`make ready-to-push`** — see [`docs/development-process.md`](docs/development-process.md) §"Stage 6 — Pre-push Validation" for the gate contents and the `internal/aws/` live-integration sub-rule. Review the diff first (Stage 5): `a9s-consistency-checker` for cross-file drift, direct BT v2 / security / coverage review, and CodeRabbit / Codex as external passes.
 - BEFORE any release, the canonical gate is **`make ready-to-release`** — see [`docs/development-process.md`](docs/development-process.md) §"Stage 7 — Merge & Release" for the manual checklist (`CHANGELOG.md`, `releases/vX.Y.Z.md`, `docs/architecture.md` alignment, busywork audit on tests added/modified in the release).
 - **Exception**: Docs-only changes (`*.md`, `docs/`, `website/`, `specs/`, `.claude/`, `LICENSE`) skip `ready-to-push`; `make mdlint` is required.
 
@@ -191,3 +185,13 @@ When code changes affect any of the following, update the shared source and rege
 ## Recent Changes
 
 - 020-architecture-refactor: Added Go 1.26+ + Bubble Tea v2.0.2, Lipgloss v2.0.2, Bubbles v2, AWS SDK Go v2 (autoscaling, codeartifact, codebuild, codepipeline, dynamodb, ec2, ecr, ecs, efs, elasticbeanstalk, elbv2, events, iam, kms, lambda, rds, secretsmanager, ses, sesv2, sfn, sns, ssm, eventbridge, backup), yaml.v3, clipboard
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
