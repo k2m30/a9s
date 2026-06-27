@@ -37,6 +37,11 @@ const (
 	ScreenRegion   ScreenID = "region"
 	ScreenTheme    ScreenID = "theme"
 	ScreenIdentity ScreenID = "identity"
+
+	// ScreenResourceList is the live or cached top-level resource list
+	// pushed by NavigateKindPushResourceList / NavigateKindPushResourceListCached.
+	// Row data (ListState) is populated in PR-C once the result lane lands.
+	ScreenResourceList ScreenID = "resource-list"
 )
 
 // ScreenContext is the input handed to an adapter when the runtime asks

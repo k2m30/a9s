@@ -40,6 +40,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/session"
 )
 
 // =============================================================================
@@ -724,11 +725,12 @@ func TestController_Apply_PRB_Back_OneDeepStack_EmptiesStack(t *testing.T) {
 
 // TestController_Apply_PRB_OpenIdentity_PushesIdentityScreenAndReturnsFetchTask
 // verifies that ActionOpenIdentity pushes ScreenIdentity (Snapshot reflects
-// BodyKindIdentity) AND returns a TaskRequest with Kind == TaskKindFetchIdentity.
+// BodyKindIdentity), returns a TaskRequest with Kind == TaskKindFetchIdentity,
+// AND sets the IdentityFetching latch on Core (P2 review finding #1).
 // PR-B pushes ScreenIdentity directly (no NavigateTargetIdentity in the runtime)
 // and enqueues the fetch task so the adapter can call STS GetCallerIdentity.
 func TestController_Apply_PRB_OpenIdentity_PushesIdentityScreenAndReturnsFetchTask(t *testing.T) {
-	c := newTestController()
+	core, c := newTestControllerWithCore()
 
 	vs, tasks := c.Apply(app.Action{Kind: app.ActionOpenIdentity})
 
@@ -752,6 +754,12 @@ func TestController_Apply_PRB_OpenIdentity_PushesIdentityScreenAndReturnsFetchTa
 	}
 	if !hasFetchIdentity {
 		t.Errorf("Apply(OpenIdentity) tasks contain no TaskKindFetchIdentity; got kinds: %v", taskKindStrings(tasks))
+	}
+
+	// P2 review finding #1: Apply(OpenIdentity) must set the IdentityFetching
+	// latch so the header can show a loading spinner before the fetch completes.
+	if !core.IdentityFetching() {
+		t.Errorf("Apply(OpenIdentity) did not set Core.IdentityFetching = true — latch must be set before returning the fetch task")
 	}
 }
 
@@ -834,33 +842,55 @@ func TestController_Apply_PRB_Command_Root_CollapsesStack(t *testing.T) {
 	}
 }
 
-// TestController_Apply_PRB_Command_ResourceShortName_NoPanicReturnsSnapshot
-// verifies that ActionCommand{Arg:"ec2"} (a real resource short-name) does not
-// panic and returns a non-nil Snapshot. The stack push is deferred to PR-C
-// (applyNavResult does not yet handle NavigateKindPushResourceList), so we do
-// NOT assert a list body here — just absence of panic and shape validity.
+// TestController_Apply_PRB_Command_ResourceShortName_PushesListScreen verifies
+// that ActionCommand{Arg:"ec2"} pushes a resource-list screen (BodyKindList).
+// applyNavResult now handles NavigateKindPushResourceList / Cached, so the
+// stack reflects BodyKindList immediately after Apply returns.
 //
-// TODO PR-C: assert resource-list push once applyNavResult handles NavigateKindPushResourceList.
-func TestController_Apply_PRB_Command_ResourceShortName_NoPanicReturnsSnapshot(t *testing.T) {
+// TODO PR-C: assert populated rows once ListState + result lane land.
+func TestController_Apply_PRB_Command_ResourceShortName_PushesListScreen(t *testing.T) {
 	c := newTestController()
 
-	var vs app.ViewState
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				t.Errorf("Apply(Command:ec2) panicked: %v", r)
-			}
-		}()
-		vs, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
-	}()
+	vs, tasks := c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 
 	snap := c.Snapshot()
 	assertViewStateEqualsSnapshot(t, "Apply(Command:ec2)", vs, snap)
-	// Shape only — VS must be valid (non-zero Kind field).
-	if vs.Body.Kind == "" {
-		t.Errorf("Apply(Command:ec2) returned ViewState with empty Body.Kind")
+
+	// applyNavResult must push ScreenResourceList for NavigateKindPushResourceList.
+	if snap.Body.Kind != app.BodyKindList {
+		t.Errorf("Apply(Command:ec2) Body.Kind = %q, want %q — applyNavResult must push ScreenResourceList for NavigateKindPushResourceList", snap.Body.Kind, app.BodyKindList)
 	}
-	// TODO PR-C: assert resource-list push once applyNavResult handles it.
+
+	// The fetch task must be returned so the adapter loads the list.
+	if len(tasks) == 0 {
+		t.Errorf("Apply(Command:ec2) returned no tasks — expected a resource-fetch task for cache-miss path")
+	}
+	// TODO PR-C: assert populated rows once ListState + result lane land.
+}
+
+// TestController_Apply_PRB_NavigateResourceList_PushesListScreen verifies that
+// driving a resource-type navigate directly (same code path as Command:ec2 but
+// via ActionCommand with a different resource short name) pushes ScreenResourceList
+// (→ BodyKindList) onto the stack. Guards against applyNavResult regressions on
+// any resource short name that resolves through HandleNavigate.
+func TestController_Apply_PRB_NavigateResourceList_PushesListScreen(t *testing.T) {
+	resourceShortNames := []string{"ec2", "rds", "lambda", "s3", "ecs"}
+
+	for _, shortName := range resourceShortNames {
+		shortName := shortName
+		t.Run(shortName, func(t *testing.T) {
+			c := newTestController()
+
+			vs, _ := c.Apply(app.Action{Kind: app.ActionCommand, Arg: shortName})
+
+			snap := c.Snapshot()
+			assertViewStateEqualsSnapshot(t, "Apply(Command:"+shortName+")", vs, snap)
+
+			if snap.Body.Kind != app.BodyKindList {
+				t.Errorf("Apply(Command:%s) Body.Kind = %q, want %q — ScreenResourceList must be pushed for NavigateKindPushResourceList/Cached", shortName, snap.Body.Kind, app.BodyKindList)
+			}
+		})
+	}
 }
 
 // TestController_Apply_PRB_Command_UnknownToken_IsNoPanic verifies that an
@@ -966,6 +996,17 @@ func TestController_Handle_PRB_ResultLane_ConsistencyAfterMultipleEvents(t *test
 				i, ev, vs.Header.Profile, snap.Header.Profile)
 		}
 	}
+}
+
+// newTestControllerWithCore builds a Controller backed by a fresh runtime.Core
+// and returns both so tests can assert on Core state (e.g. IdentityFetching).
+// Mirrors newTestController but exposes the Core for latch/getter assertions.
+func newTestControllerWithCore() (*runtime.Core, *app.Controller) {
+	s := session.New()
+	s.Profile = "demo"
+	s.Region = "us-east-1"
+	core := runtime.New(s, nil)
+	return core, app.New(core)
 }
 
 // taskKindStrings returns the TaskKind strings from a slice of TaskRequests,
