@@ -5,10 +5,6 @@ import (
 	"sort"
 )
 
-func init() {
-	RegisterSummarizer("ec2.amazonaws.com", SummarizeEC2)
-}
-
 // SummarizeEC2 summarizes the REQUEST section for EC2 events.
 // It receives cleaned params with TARGET-lifted fields already removed.
 //

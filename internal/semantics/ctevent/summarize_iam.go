@@ -4,10 +4,6 @@ import (
 	"sort"
 )
 
-func init() {
-	RegisterSummarizer("iam.amazonaws.com", SummarizeIAM)
-}
-
 // SummarizeIAM summarizes the REQUEST section for IAM events.
 // It receives cleaned params with TARGET-lifted fields already removed.
 // policyArn fields are marked navigable to "policy" (registered ShortName in

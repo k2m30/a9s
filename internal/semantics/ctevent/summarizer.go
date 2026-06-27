@@ -4,14 +4,13 @@ package ctevent
 // See specs/013-ct-event-detail-v2/contracts/ctevent-api.md for the contract.
 type Summarizer func(eventName string, params map[string]any) []Row
 
-// summarizerByService is the registry. Populated via init() in summarize_<service>.go files.
-var summarizerByService = map[string]Summarizer{}
-
-// RegisterSummarizer registers a per-service summarizer.
-// Duplicate registration for the same eventSource panics during init.
-func RegisterSummarizer(eventSource string, fn Summarizer) {
-	if _, exists := summarizerByService[eventSource]; exists {
-		panic("ctdetail: duplicate summarizer registration for " + eventSource)
-	}
-	summarizerByService[eventSource] = fn
+// summarizerByService maps a CloudTrail eventSource to its service-specific
+// request summarizer. Static and declarative — adding a service means adding
+// one entry here plus the Summarize<Svc> function. Duplicate keys are a compile
+// error, so no runtime guard is needed. SummarizeGeneric is the fallback and is
+// intentionally NOT in this map (see sections.go).
+var summarizerByService = map[string]Summarizer{
+	"iam.amazonaws.com": SummarizeIAM,
+	"s3.amazonaws.com":  SummarizeS3,
+	"ec2.amazonaws.com": SummarizeEC2,
 }
