@@ -6,12 +6,13 @@ import (
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
-// Event is the marker interface for inputs the runtime accepts from an
-// adapter. Phase 05 PR-05a-scaffold defines it as an empty interface so
-// the Core skeleton compiles without depending on yet-to-be-created
-// concrete event types; PR-05b introduces the typed cmd/event split and
-// will replace this declaration with the typed event interface.
-type Event any
+// Event is the typed marker interface for inputs the runtime accepts from an
+// adapter — an alias for messages.Event (the runtime → UI event family, each
+// implementing isEvent()). Tying HandleEvent to this interface instead of an
+// empty `any` gives compile-time assurance that only event types reach the
+// orchestrator; adapters translate their native messages into a messages.Event
+// before dispatching.
+type Event = messages.Event
 
 // Core is the platform-agnostic app-core orchestrator. It owns session
 // state and the catalog of resource types, dispatches inbound events to
