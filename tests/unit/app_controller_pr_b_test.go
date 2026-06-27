@@ -688,17 +688,21 @@ func TestController_Apply_PRB_Back_TwoDeepStack_SinglePop(t *testing.T) {
 	}
 }
 
-// TestController_Apply_PRB_Back_OneDeepStack_EmptiesStack verifies that
-// ActionBack on a 1-deep stack leaves the stack empty and Snapshot reports
-// BodyKindUnknown without panicking.
-func TestController_Apply_PRB_Back_OneDeepStack_EmptiesStack(t *testing.T) {
+// TestController_Apply_PRB_Back_OneDeepStack_ReturnsToMenu verifies that
+// ActionBack on a 2-deep stack (menu root + help overlay) returns to the
+// menu root and Snapshot reports BodyKindMenu without panicking.
+//
+// PR-C: New(core) starts with ScreenMenu as root, so a fresh stack is
+// [ScreenMenu]. Pushing ScreenHelp yields [ScreenMenu, ScreenHelp].
+// ActionBack pops ScreenHelp, leaving [ScreenMenu] → BodyKindMenu.
+func TestController_Apply_PRB_Back_OneDeepStack_ReturnsToMenu(t *testing.T) {
 	c := newTestController()
 
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{ID: runtime.ScreenHelp, Context: runtime.ScreenContext{}},
 	})
-	if c.Snapshot().Body.Kind == app.BodyKindUnknown {
-		t.Fatalf("precondition: expected 1-deep stack with BodyKindHelp, got BodyKindUnknown")
+	if c.Snapshot().Body.Kind != app.BodyKindHelp {
+		t.Fatalf("precondition: expected BodyKindHelp after push, got %q", c.Snapshot().Body.Kind)
 	}
 
 	var vs app.ViewState
@@ -706,17 +710,17 @@ func TestController_Apply_PRB_Back_OneDeepStack_EmptiesStack(t *testing.T) {
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				t.Errorf("Apply(Back) on 1-deep stack panicked: %v", r)
+				t.Errorf("Apply(Back) on 2-deep stack panicked: %v", r)
 			}
 		}()
 		vs, tasks = c.Apply(app.Action{Kind: app.ActionBack})
 	}()
 
 	snap := c.Snapshot()
-	assertViewStateEqualsSnapshot(t, "Apply(Back) 1-deep stack", vs, snap)
+	assertViewStateEqualsSnapshot(t, "Apply(Back) 2-deep stack", vs, snap)
 
-	if snap.Body.Kind != app.BodyKindUnknown {
-		t.Errorf("Apply(Back) 1-deep: Body.Kind=%q, want %q — stack should be empty after popping last screen", snap.Body.Kind, app.BodyKindUnknown)
+	if snap.Body.Kind != app.BodyKindMenu {
+		t.Errorf("Apply(Back) 2-deep: Body.Kind=%q, want %q — back from help returns to menu root", snap.Body.Kind, app.BodyKindMenu)
 	}
 	if len(tasks) != 0 {
 		t.Errorf("Apply(Back) returned %d tasks, want 0", len(tasks))
@@ -930,9 +934,9 @@ func TestController_Apply_PRB_Command_UnknownToken_IsNoPanic(t *testing.T) {
 func TestController_Apply_PRB_PRCBlockedActions_NoPanicReturnSnapshot(t *testing.T) {
 	// TODO PR-C: wire each of these actions to its Core handler and replace
 	// these no-panic/shape-only assertions with behavioral assertions.
+	// NOTE: ActionSelect is wired for ScreenMenu in PR-C slice 1a and removed here.
 	prcBlockedActions := []app.Action{
 		{Kind: app.ActionOpenDetail},
-		{Kind: app.ActionSelect},
 		{Kind: app.ActionOpenYAML},
 		{Kind: app.ActionOpenJSON},
 		{Kind: app.ActionReveal, Arg: "i-0fakereveal"},

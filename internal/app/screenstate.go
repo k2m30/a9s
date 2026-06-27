@@ -14,11 +14,10 @@ type Screen struct {
 // ScreenState is the per-screen view state union. Exactly one of the
 // pointer fields is non-nil, determined by the screen kind.
 type ScreenState struct {
-	List     *ListState   `json:"list,omitempty"`
-	Detail   *DetailState `json:"detail,omitempty"`
-	Text     *TextState   `json:"text,omitempty"`
-	// Menu and selector screens carry no local state beyond ScreenContext in
-	// this PR; placeholder fields added in PR-C when state is lifted from views.
+	List   *ListState   `json:"list,omitempty"`
+	Detail *DetailState `json:"detail,omitempty"`
+	Text   *TextState   `json:"text,omitempty"`
+	Menu   *MenuState   `json:"menu,omitempty"`
 }
 
 // ListState holds the mutable display state for a resource-list screen.
@@ -47,4 +46,25 @@ type TextState struct {
 	Search  string `json:"search,omitempty"`
 	Wrap    bool   `json:"wrap,omitempty"`
 	ScrollY int    `json:"scroll_y"`
+}
+
+// MenuState holds the mutable display state for the main-menu screen.
+// Maps the CONTROLLER bucket from docs/web-ui-state-inventory.md §MainMenuModel.
+type MenuState struct {
+	Filter         string          `json:"filter,omitempty"`
+	Cursor         int             `json:"cursor"`
+	ScrollOffset   int             `json:"scroll_offset"`
+	AttentionOnly  bool            `json:"attention_only,omitempty"`
+	Availability   map[string]int  `json:"availability,omitempty"`
+	Truncated      map[string]bool `json:"truncated,omitempty"`
+	IssueCounts    map[string]int  `json:"issue_counts,omitempty"`
+	IssueKnown     map[string]bool `json:"issue_known,omitempty"`
+	IssueTruncated map[string]bool `json:"issue_truncated,omitempty"`
+
+	// Progress fields for FrameTitle indicator (DERIVED at Snapshot, stored here
+	// so intents can update them without re-computing from task state).
+	AvailChecked  int `json:"avail_checked,omitempty"`
+	AvailTotal    int `json:"avail_total,omitempty"`
+	EnrichChecked int `json:"enrich_checked,omitempty"`
+	EnrichTotal   int `json:"enrich_total,omitempty"`
 }

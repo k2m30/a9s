@@ -452,11 +452,37 @@ func TestViewState_JSONRoundTrip_IdentityBodyAllFieldsSurvive(t *testing.T) {
 // 2. Empty-stack safety
 // =============================================================================
 
-// TestController_Snapshot_EmptyStackNoPanic verifies that Snapshot() on a
-// freshly-constructed controller never panics and returns BodyKindUnknown.
-func TestController_Snapshot_EmptyStackNoPanic(t *testing.T) {
+// TestController_Snapshot_FreshControllerNoPanic verifies that Snapshot() on a
+// freshly-constructed controller never panics and returns BodyKindMenu.
+//
+// PR-C contract: New(core) starts with ScreenMenu as the root screen, so a
+// fresh controller's Snapshot() returns BodyKindMenu, not BodyKindUnknown.
+func TestController_Snapshot_FreshControllerNoPanic(t *testing.T) {
 	c := newTestController()
 
+	var vs app.ViewState
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("Snapshot() panicked on fresh controller: %v", r)
+			}
+		}()
+		vs = c.Snapshot()
+	}()
+
+	if vs.Body.Kind != app.BodyKindMenu {
+		t.Errorf("fresh controller Body.Kind: got %q want %q", vs.Body.Kind, app.BodyKindMenu)
+	}
+}
+
+// TestController_Snapshot_EmptyStackAfterPopNoPanic verifies that Snapshot() on
+// a controller whose stack has been emptied (menu root popped) returns
+// BodyKindUnknown without panicking. The menu root is a normal screen entry —
+// popping it produces an empty stack.
+func TestController_Snapshot_EmptyStackAfterPopNoPanic(t *testing.T) {
+	c := newTestController()
+
+	// Pop the menu root to produce an empty stack.
 	var vs app.ViewState
 	func() {
 		defer func() {
@@ -464,6 +490,7 @@ func TestController_Snapshot_EmptyStackNoPanic(t *testing.T) {
 				t.Errorf("Snapshot() panicked on empty stack: %v", r)
 			}
 		}()
+		c.ApplyIntents([]runtime.UIIntent{runtime.PopScreen{}})
 		vs = c.Snapshot()
 	}()
 
@@ -497,12 +524,15 @@ func TestController_Snapshot_EmptyStackCarriesProfileAndRegion(t *testing.T) {
 
 // TestController_Stack_PushGrowsStackAndSetsBodyKind verifies that a
 // PushScreen intent causes Snapshot() to reflect the new top screen.
+//
+// PR-C: a fresh controller starts on ScreenMenu (BodyKindMenu). After pushing
+// ScreenProfileSelector, the top becomes BodyKindSelector.
 func TestController_Stack_PushGrowsStackAndSetsBodyKind(t *testing.T) {
 	c := newTestController()
 
 	before := c.Snapshot()
-	if before.Body.Kind != app.BodyKindUnknown {
-		t.Fatalf("precondition: expected empty stack (BodyKindUnknown), got %q", before.Body.Kind)
+	if before.Body.Kind != app.BodyKindMenu {
+		t.Fatalf("precondition: expected menu root (BodyKindMenu), got %q", before.Body.Kind)
 	}
 
 	// ScreenProfileSelector maps to BodyKindSelector via bodyKindForScreen.
@@ -560,33 +590,45 @@ func TestController_Stack_PushRevealBodyKindDetail(t *testing.T) {
 
 // TestController_Stack_PopShrinksStack verifies that PopScreen reduces depth
 // and Snapshot returns to the previous state.
+//
+// PR-C: a fresh controller starts on ScreenMenu. After pushing
+// ScreenProfileSelector and then popping, the stack returns to the menu root
+// (BodyKindMenu), not BodyKindUnknown.
 func TestController_Stack_PopShrinksStack(t *testing.T) {
 	c := newTestController()
 
-	// Push so there is something to pop.
+	// Push a selector on top of the menu root.
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{
 			ID:      runtime.ScreenProfileSelector,
 			Context: runtime.ScreenContext{},
 		},
 	})
-	if c.Snapshot().Body.Kind == app.BodyKindUnknown {
-		t.Fatalf("precondition: stack empty after push — push must have been ignored")
+	if c.Snapshot().Body.Kind != app.BodyKindSelector {
+		t.Fatalf("precondition: expected BodyKindSelector after push, got %q", c.Snapshot().Body.Kind)
 	}
 
+	// Pop the selector — reveals the menu root underneath.
 	c.ApplyIntents([]runtime.UIIntent{runtime.PopScreen{}})
 
 	vs := c.Snapshot()
-	if vs.Body.Kind != app.BodyKindUnknown {
-		t.Errorf("after PopScreen: expected empty stack (BodyKindUnknown), got %q", vs.Body.Kind)
+	if vs.Body.Kind != app.BodyKindMenu {
+		t.Errorf("after PopScreen: expected menu root (BodyKindMenu), got %q", vs.Body.Kind)
 	}
 }
 
 // TestController_Stack_PopOnEmptyStackNoPanic verifies that PopScreen on an
 // already-empty stack is a no-op and does not panic.
+//
+// PR-C: a fresh controller has one screen (the menu root). Pop that first to
+// reach an empty stack, then verify that a second PopScreen is safe.
 func TestController_Stack_PopOnEmptyStackNoPanic(t *testing.T) {
 	c := newTestController()
 
+	// First pop removes the menu root, producing an empty stack.
+	c.ApplyIntents([]runtime.UIIntent{runtime.PopScreen{}})
+
+	// Second pop on the now-empty stack must not panic.
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -604,12 +646,16 @@ func TestController_Stack_PopOnEmptyStackNoPanic(t *testing.T) {
 
 // TestController_Stack_ReplaceSwapsTopWithoutChangingDepth verifies that
 // ReplaceScreen changes the top screen's identity but leaves the stack depth
-// unchanged. Depth is inferred by popping once and confirming the stack is
-// then empty (depth was 1 both before and after replace).
+// unchanged. Depth is inferred by popping once and confirming the stack reverts
+// to the prior top (the menu root), not to BodyKindUnknown.
+//
+// PR-C: stack starts at depth-1 (menu root). Push adds ChildList → depth-2.
+// Replace swaps the ChildList entry with ProfileSelector (still depth-2).
+// Pop reveals the menu root → BodyKindMenu.
 func TestController_Stack_ReplaceSwapsTopWithoutChangingDepth(t *testing.T) {
 	c := newTestController()
 
-	// Push a ChildList (BodyKindList).
+	// Push a ChildList on top of the menu root → depth-2.
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{
 			ID:      runtime.ScreenChildList,
@@ -620,7 +666,7 @@ func TestController_Stack_ReplaceSwapsTopWithoutChangingDepth(t *testing.T) {
 		t.Fatalf("precondition: expected BodyKindList after push, got %q", c.Snapshot().Body.Kind)
 	}
 
-	// Replace with ProfileSelector (BodyKindSelector).
+	// Replace the ChildList with ProfileSelector (still depth-2).
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.ReplaceScreen{
 			ID:      runtime.ScreenProfileSelector,
@@ -633,18 +679,28 @@ func TestController_Stack_ReplaceSwapsTopWithoutChangingDepth(t *testing.T) {
 		t.Errorf("after ReplaceScreen: expected BodyKindSelector, got %q", afterReplace.Body.Kind)
 	}
 
-	// Pop once: if depth is still 1 (correct), stack becomes empty.
+	// Pop once: depth-2 → depth-1, revealing the menu root.
 	c.ApplyIntents([]runtime.UIIntent{runtime.PopScreen{}})
 	afterPop := c.Snapshot()
-	if afterPop.Body.Kind != app.BodyKindUnknown {
-		t.Errorf("after pop-post-replace: expected BodyKindUnknown (depth was 1), got %q — ReplaceScreen must not have grown the stack", afterPop.Body.Kind)
+	if afterPop.Body.Kind != app.BodyKindMenu {
+		t.Errorf("after pop-post-replace: expected BodyKindMenu (menu root at depth-1), got %q — ReplaceScreen must not have grown the stack", afterPop.Body.Kind)
 	}
 }
 
 // TestController_Stack_ReplaceOnEmptyStackPushesScreen verifies the edge-case
 // documented in controller.go: ReplaceScreen on an empty stack acts as a push.
+//
+// PR-C: a fresh controller is NOT empty — it starts on the menu root. This test
+// drains the stack first (by popping the menu root) so the ReplaceScreen
+// edge-case path is still exercised.
 func TestController_Stack_ReplaceOnEmptyStackPushesScreen(t *testing.T) {
 	c := newTestController()
+
+	// Drain the menu root to produce a genuinely empty stack.
+	c.ApplyIntents([]runtime.UIIntent{runtime.PopScreen{}})
+	if c.Snapshot().Body.Kind != app.BodyKindUnknown {
+		t.Fatalf("precondition: expected empty stack (BodyKindUnknown), got %q", c.Snapshot().Body.Kind)
+	}
 
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.ReplaceScreen{
@@ -661,7 +717,12 @@ func TestController_Stack_ReplaceOnEmptyStackPushesScreen(t *testing.T) {
 
 // TestController_Stack_MultiPushPreservesDepth verifies that pushing N screens
 // results in the topmost screen reflected by Snapshot and that N sequential
-// pops return the stack to empty.
+// pops unwind the pushed screens, finally revealing the menu root and then
+// the empty-stack state after one additional pop.
+//
+// PR-C: stack starts at depth-1 (menu root). 3 pushes → depth-4.
+// Pop 1 → depth-3 (BodyKindSelector). Pop 2 → depth-2 (BodyKindList).
+// Pop 3 → depth-1 (BodyKindMenu, menu root). Pop 4 → depth-0 (BodyKindUnknown).
 func TestController_Stack_MultiPushPreservesDepth(t *testing.T) {
 	c := newTestController()
 
@@ -690,10 +751,16 @@ func TestController_Stack_MultiPushPreservesDepth(t *testing.T) {
 		t.Errorf("after pop 2: expected BodyKindList, got %q", c.Snapshot().Body.Kind)
 	}
 
-	// Pop 3: stack empty → BodyKindUnknown.
+	// Pop 3: top returns to menu root → BodyKindMenu.
+	c.ApplyIntents([]runtime.UIIntent{runtime.PopScreen{}})
+	if c.Snapshot().Body.Kind != app.BodyKindMenu {
+		t.Errorf("after pop 3: expected BodyKindMenu (menu root), got %q", c.Snapshot().Body.Kind)
+	}
+
+	// Pop 4: stack empty → BodyKindUnknown.
 	c.ApplyIntents([]runtime.UIIntent{runtime.PopScreen{}})
 	if c.Snapshot().Body.Kind != app.BodyKindUnknown {
-		t.Errorf("after pop 3: expected BodyKindUnknown, got %q", c.Snapshot().Body.Kind)
+		t.Errorf("after pop 4: expected BodyKindUnknown, got %q", c.Snapshot().Body.Kind)
 	}
 }
 
@@ -823,15 +890,17 @@ func TestController_Apply_BackNoPanic(t *testing.T) {
 }
 
 // TestController_Apply_AllSkeletonActionsNoPanic verifies that no documented
-// ActionKind panics when applied to a fresh (empty-stack) controller. In PR-A
-// Apply is a skeleton that ignores the Action; this guards against any
-// mistaken switch-default panic introduced while wiring verbs in PR-C.
+// ActionKind panics when applied to a fresh controller (menu root at bottom of
+// stack). PR-C wires these verbs; this guards against any panic introduced
+// while wiring menu actions.
 func TestController_Apply_AllSkeletonActionsNoPanic(t *testing.T) {
 	verbs := []app.Action{
 		{Kind: app.ActionMoveUp},
 		{Kind: app.ActionMoveDown},
 		{Kind: app.ActionMoveTop},
 		{Kind: app.ActionMoveBottom},
+		{Kind: app.ActionPageUp},
+		{Kind: app.ActionPageDown},
 		{Kind: app.ActionSelect},
 		{Kind: app.ActionBack},
 		{Kind: app.ActionOpenDetail},
