@@ -143,8 +143,8 @@ Agents MUST use targeted file access — never broad globs on large directories.
 
 ### DON'T
 
-- `Glob("tests/unit/*.go")` — returns 148 files, most irrelevant
-- `Glob("internal/aws/*.go")` — returns 77 files, most irrelevant
+- `Glob("tests/unit/*.go")` — returns 710 files, most irrelevant
+- `Glob("internal/aws/*.go")` — returns 357 files, most irrelevant
 - `Glob("internal/demo/*.go")` — only 3 files remain (client.go, handlers.go, transport.go)
 - Reading entire cross-cutting files (mocks_test.go, qa_detail_test.go) — grep for the section first
 
