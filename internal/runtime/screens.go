@@ -20,13 +20,23 @@ import "github.com/k2m30/a9s/v3/internal/domain"
 // constructs renderer types itself.
 type ScreenID string
 
-// Screen IDs emitted by PR-05a-h4-a handlers. Capability screens
-// (logs, ct.scan, cost) reuse the existing ScreenContext-only PushScreen
-// path and are not enumerated here.
+// Screen IDs emitted by PR-05a-h4-a handlers and the headless controller
+// (PR-B). Capability screens (logs, ct.scan, cost) reuse the existing
+// ScreenContext-only PushScreen path and are not enumerated here.
 const (
 	ScreenProfileSelector ScreenID = "profile-selector"
 	ScreenReveal          ScreenID = "reveal"
 	ScreenChildList       ScreenID = "child-list"
+
+	// ScreenHelp, ScreenRegion, ScreenTheme, ScreenIdentity are used by the
+	// headless controller's applyNavResult to push navigate-target screens that
+	// the TUI adapter constructs directly from key-handling context. Introduced
+	// in PR-B so the headless controller has stable ScreenIDs for these screens
+	// without depending on renderer-specific view types.
+	ScreenHelp     ScreenID = "help"
+	ScreenRegion   ScreenID = "region"
+	ScreenTheme    ScreenID = "theme"
+	ScreenIdentity ScreenID = "identity"
 )
 
 // ScreenContext is the input handed to an adapter when the runtime asks
