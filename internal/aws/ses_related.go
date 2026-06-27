@@ -143,7 +143,9 @@ func sesActiveReceiptRuleSet(ctx context.Context, c *ServiceClients) (*ses.Descr
 		return nil, err
 	}
 	if v == nil {
-		return nil, nil //nolint:nilnil
+		// (nil, nil) is the documented sentinel for "no active SES receipt
+		// rule set configured" — absence is a valid state, not an error.
+		return nil, nil //nolint:nilnil // intentional absence sentinel (see comment above)
 	}
 	out, ok := v.(*ses.DescribeActiveReceiptRuleSetOutput)
 	if !ok {
