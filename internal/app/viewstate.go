@@ -184,6 +184,12 @@ type TextBody struct {
 	Lines         []string      `json:"lines,omitempty"`
 	SearchMatches []SearchMatch `json:"search_matches,omitempty"`
 	Wrap          bool          `json:"wrap,omitempty"`
+	// ScrollY is the current viewport Y offset (line index of the top visible line).
+	ScrollY int `json:"scroll_y,omitempty"`
+	// Search is the active query string (empty when no search is active).
+	Search string `json:"search,omitempty"`
+	// SearchCursor is the index of the currently-highlighted match.
+	SearchCursor int `json:"search_cursor,omitempty"`
 }
 
 // IssueBadge is the issue-count badge shown on a menu entry.
