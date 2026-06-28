@@ -101,7 +101,8 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 
 		// FetchFilter path: use server-side filtered fetcher.
 		if len(result.FetchFilter) > 0 {
-			rl := views.NewResourceList(*rt, m.viewConfig, m.keys)
+			m.ctrl.PushChildListScreen(rt.ShortName)
+			rl := views.NewResourceList(*rt, m.viewConfig, m.keys, m.ctrl)
 			rl.SetTitleSuffix(runtime.RelatedTitleSuffix(msg.SourceResource))
 			rl.SetFetchFilter(result.FetchFilter)
 			rl.SetEscPops(true)
@@ -171,6 +172,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 				// Pre-populate with already-cached filtered rows so they remain visible when
 				// subsequent pages arrive via Append:true ResourcesLoadedMsg.
 				if len(filtered) < len(result.RelatedIDs) && entry.Pagination != nil && entry.Pagination.IsTruncated {
+					m.ctrl.PushChildListScreen(rt.ShortName)
 					rl := views.NewResourceListFromCache(
 						*rt, m.viewConfig, m.keys,
 						filtered, entry.Pagination,
@@ -178,6 +180,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 						entry.SortColIdx, entry.SortAsc,
 						0, 0,
 						false,
+						m.ctrl,
 					)
 					rl.SetTitleSuffix(runtime.RelatedTitleSuffix(msg.SourceResource))
 					rl.SetRelatedIDFilter(result.RelatedIDs)
@@ -206,6 +209,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 					clone.NextToken = ""
 					paginationForView = &clone
 				}
+				m.ctrl.PushChildListScreen(rt.ShortName)
 				rl := views.NewResourceListFromCache(
 					*rt, m.viewConfig, m.keys,
 					filtered, paginationForView,
@@ -213,6 +217,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 					entry.SortColIdx, entry.SortAsc,
 					0, 0,
 					false,
+					m.ctrl,
 				)
 				rl.SetTitleSuffix(runtime.RelatedTitleSuffix(msg.SourceResource))
 				rl.SetRelatedIDFilter(result.RelatedIDs)
@@ -249,6 +254,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 					}
 				}
 				if len(filtered) > 0 && len(filtered) == len(result.RelatedIDs) {
+					m.ctrl.PushChildListScreen(rt.ShortName)
 					rl := views.NewResourceListFromCache(
 						*rt, m.viewConfig, m.keys,
 						filtered, nil,
@@ -256,6 +262,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 						0, true,
 						0, 0,
 						false,
+						m.ctrl,
 					)
 					rl.SetTitleSuffix(runtime.RelatedTitleSuffix(msg.SourceResource))
 					rl.SetRelatedIDFilter(result.RelatedIDs)

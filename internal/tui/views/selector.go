@@ -6,6 +6,7 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/k2m30/a9s/v3/internal/app"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
@@ -185,4 +186,38 @@ func (m *SelectorModel) applyFilter() {
 	}
 	m.filteredItems = result
 	m.scroll.SetTotal(len(result))
+}
+
+// RenderSelector renders the selector list from a controller-supplied SelectorBody,
+// byte-identical to View(). The controller owns the logical state (visible items,
+// cursor, active-item); the renderer owns dimensions.
+func (m *SelectorModel) RenderSelector(body app.SelectorBody) string {
+	if len(body.Items) == 0 {
+		return "No items available"
+	}
+
+	synthetic := NewScrollState(len(body.Items))
+	synthetic.SetCursor(body.Selected)
+	startRow, endRow := synthetic.VisibleWindow(m.height)
+
+	var sb strings.Builder
+	for i := startRow; i < endRow; i++ {
+		if i > startRow {
+			sb.WriteString("\n")
+		}
+
+		item := body.Items[i]
+		label := "  " + item
+		if item == body.ActiveItem {
+			label += " " + styles.DimText.Render("(current)")
+		}
+
+		if i == body.Selected {
+			sb.WriteString(styles.RowSelected.Width(m.width).Render(label))
+		} else {
+			sb.WriteString(styles.RowNormal.Render(label))
+		}
+	}
+
+	return sb.String()
 }
