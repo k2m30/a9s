@@ -59,6 +59,21 @@ func (c *Controller) ensureTextState(lines []string) {
 	}
 }
 
+// UpdateTextLines replaces the Lines in the top text screen's TextState with
+// new content. Unlike EnsureTextState this is NOT set-once: it is called when
+// enrichment arrives after the screen was pushed so that the re-rendered
+// syntax-colored content replaces the pre-enrichment snapshot. Other TextState
+// fields (search, wrap, scrollY) are preserved.
+func (c *Controller) UpdateTextLines(lines []string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	ts := c.topTextState()
+	if ts == nil {
+		return
+	}
+	ts.Lines = lines
+}
+
 // buildTextSearchMatches scans lines for all case-insensitive occurrences of
 // query and returns a SearchMatch slice matching the SearchModel.recomputeMatches
 // semantics used by the YAML/JSON views.
