@@ -14,10 +14,11 @@ type Screen struct {
 // ScreenState is the per-screen view state union. Exactly one of the
 // pointer fields is non-nil, determined by the screen kind.
 type ScreenState struct {
-	List   *ListState   `json:"list,omitempty"`
-	Detail *DetailState `json:"detail,omitempty"`
-	Text   *TextState   `json:"text,omitempty"`
-	Menu   *MenuState   `json:"menu,omitempty"`
+	List     *ListState     `json:"list,omitempty"`
+	Detail   *DetailState   `json:"detail,omitempty"`
+	Text     *TextState     `json:"text,omitempty"`
+	Menu     *MenuState     `json:"menu,omitempty"`
+	Selector *SelectorState `json:"selector,omitempty"`
 }
 
 // ListState holds the mutable display state for a resource-list screen.
@@ -62,6 +63,17 @@ type TextState struct {
 	Search  string `json:"search,omitempty"`
 	Wrap    bool   `json:"wrap,omitempty"`
 	ScrollY int    `json:"scroll_y"`
+}
+
+// SelectorState holds the mutable display state for a profile/region/theme
+// selector screen. Items, ActiveItem, and Title are set once at push time and
+// never mutate; Filter and Cursor are updated by Apply actions.
+type SelectorState struct {
+	Items      []string `json:"items,omitempty"`
+	ActiveItem string   `json:"active_item,omitempty"`
+	Title      string   `json:"title,omitempty"`
+	Filter     string   `json:"filter,omitempty"`
+	Cursor     int      `json:"cursor"`
 }
 
 // MenuState holds the mutable display state for the main-menu screen.

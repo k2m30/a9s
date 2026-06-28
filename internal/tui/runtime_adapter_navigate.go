@@ -110,12 +110,16 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
+		// Sync m.ctrl stack before constructing the view so topListState()
+		// inside NewResourceListFromCache resolves to this screen's ListState.
+		m.ctrl.PushChildListScreen(canon)
 		rl := views.NewResourceListFromCache(
 			*rt, m.viewConfig, m.keys,
 			entry.Resources, entry.Pagination,
 			entry.FilterText, entry.SortColIdx, entry.SortAsc,
 			entry.CursorPos, entry.HScrollOffset,
 			entry.AttentionOnly,
+			m.ctrl,
 		)
 		if result.DisplayAlias != "" {
 			rl.SetDisplayName(result.DisplayAlias)
@@ -143,7 +147,10 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
-		rl := views.NewResourceList(*rt, m.viewConfig, m.keys)
+		// Sync m.ctrl stack before constructing the view so topListState()
+		// inside NewResourceList resolves to this screen's ListState.
+		m.ctrl.PushChildListScreen(canon)
+		rl := views.NewResourceList(*rt, m.viewConfig, m.keys, m.ctrl)
 		if result.DisplayAlias != "" {
 			rl.SetDisplayName(result.DisplayAlias)
 		}
