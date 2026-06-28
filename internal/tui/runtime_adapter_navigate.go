@@ -272,7 +272,11 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		for i, r := range regions {
 			regionCodes[i] = r.Code
 		}
-		rg := views.NewRegion(regionCodes, m.core.Region(), m.keys)
+		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenRegion}})
+		m.ctrl.EnsureSelectorState(regionCodes, m.core.Region(), "aws-regions")
+		rg := views.NewSelectorWithCtrl(m.ctrl, func(s string) tea.Msg {
+			return messages.RegionSelected{Region: s}
+		}, m.keys)
 		rg.SetSize(m.innerSize())
 		m.pushView(&rg)
 		return m, nil
@@ -302,7 +306,11 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 				return messages.Flash{Text: "No theme files found in " + themesDir, IsError: true}
 			}
 		}
-		th := views.NewTheme(themeFiles, m.activeTheme, m.keys)
+		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenTheme}})
+		m.ctrl.EnsureSelectorState(themeFiles, m.activeTheme, "themes")
+		th := views.NewSelectorWithCtrl(m.ctrl, func(s string) tea.Msg {
+			return messages.ThemeSelected{Theme: s}
+		}, m.keys)
 		th.SetSize(m.innerSize())
 		m.pushView(&th)
 		return m, nil
