@@ -73,10 +73,11 @@ func (m *Model) popView() bool {
 		}
 	}
 	// Keep the headless controller stack in sync when the view being popped is
-	// a ResourceListModel. Detail, YAML, JSON, and Reveal views are not yet
-	// represented in the controller stack (TODO PR-C) — popping them must not
-	// remove the list screen from the controller.
-	if _, ok := m.stack[len(m.stack)-1].(*views.ResourceListModel); ok {
+	// a ResourceListModel or SelectorModel. Detail, YAML, JSON, and Reveal
+	// views are not yet represented in the controller stack (TODO PR-C) —
+	// popping them must not remove the corresponding screen from the controller.
+	switch m.stack[len(m.stack)-1].(type) {
+	case *views.ResourceListModel, *views.SelectorModel:
 		m.ctrl.Apply(app.Action{Kind: app.ActionBack})
 	}
 	m.stack = m.stack[:len(m.stack)-1]

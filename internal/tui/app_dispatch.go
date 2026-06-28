@@ -138,6 +138,11 @@ func (m *Model) applyIntents(intents []runtime.UIIntent) []tea.Cmd {
 				m.ctrl.PushChildListScreen(resourceType)
 			case runtime.ScreenResourceList:
 				m.ctrl.PushChildListScreen(v.Context.ResourceType)
+			case runtime.ScreenProfileSelector:
+				// Push the selector screen onto the controller stack BEFORE the
+				// builder runs, so EnsureSelectorState (called by the builder) finds
+				// the screen already on top of the controller stack.
+				m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenProfileSelector}})
 			}
 			if c := m.pushScreen(v); c != nil {
 				cmds = append(cmds, c)

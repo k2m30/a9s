@@ -53,7 +53,10 @@ func defaultBuilders() builders {
 			if !ok {
 				return nil, nil
 			}
-			v := views.NewProfile(psp.Profiles, psp.Current, m.keys)
+			m.ctrl.EnsureSelectorState(psp.Profiles, psp.Current, "aws-profiles")
+			v := views.NewSelectorWithCtrl(m.ctrl, func(s string) tea.Msg {
+				return messages.ProfileSelected{Profile: s}
+			}, m.keys)
 			v.SetSize(m.innerSize())
 			return &v, nil
 		},
