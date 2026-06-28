@@ -88,6 +88,11 @@ func (c *Controller) cachedResources(typeName string) []resource.Resource {
 // agree on which row is "selected".
 func (c *Controller) applyListFilters(ls *ListState, typeName string, base []resource.Resource) []resource.Resource {
 	td := resource.FindResourceType(typeName)
+	if td == nil {
+		if fv, ok := c.fallbackTypeDefs[typeName]; ok {
+			td = &fv
+		}
+	}
 
 	// RelatedIDSet prefilter: when non-nil (even if empty), only IDs in the set pass.
 	if ls.RelatedIDSet != nil {
@@ -319,6 +324,7 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	}
 	if ls != nil {
 		ls.Loading = false
+		ls.LoadingMore = false
 		if pagination != nil {
 			ls.HasPagination = pagination.IsTruncated
 			ls.PaginationCursor = pagination.NextToken
@@ -405,10 +411,25 @@ func (c *Controller) PatchListReapplyChecker(checker resource.RelatedChecker, sr
 	}
 }
 
+// ApplyReapplyCheckerAgainst re-runs the stored checker for the top list
+// screen's resource type against newPage and merges matched IDs into
+// RelatedIDSet. This is the public entry point called by
+// ResourceListModel.ReapplyCheckerAgainst — the controller owns the actual
+// merge logic in reapplyCheckerAgainst.
+func (c *Controller) ApplyReapplyCheckerAgainst(newPage []resource.Resource) {
+	ls := c.topListState()
+	if ls == nil {
+		return
+	}
+	if len(c.stack) == 0 {
+		return
+	}
+	typeName := c.stack[len(c.stack)-1].Ctx.ResourceType
+	c.reapplyCheckerAgainst(ls, typeName, newPage)
+}
+
 // reapplyCheckerAgainst re-runs the stored checker for typeName against newPage
 // and merges returned IDs into ls.RelatedIDSet. Mirrors ReapplyCheckerAgainst.
-//
-//nolint:unused // wired in PR-C task-result lane (called from applyResourcesLoaded on each page)
 func (c *Controller) reapplyCheckerAgainst(ls *ListState, typeName string, newPage []resource.Resource) {
 	if c.reapplyCheckers == nil {
 		return
@@ -440,10 +461,28 @@ func (c *Controller) reapplyCheckerAgainst(ls *ListState, typeName string, newPa
 // rows/cells/order/decorators so RenderList parity holds.
 func (c *Controller) buildListBody(ctx runtime.ScreenContext, ls *ListState) *ListBody {
 	typeName := ctx.ResourceType
-	td := resource.FindResourceType(typeName)
 
-	// Resolve column definitions from the view config (mirrors resolveColumns).
-	columns := resolveListColumns(typeName)
+	// Resolve typeDef: prefer the fallback (registered via RegisterFallbackTypeDef
+	// from the model constructor) over the catalog. The model's typeDef is the
+	// authoritative Color classifier and column layout source. For test typeDefs
+	// that share a ShortName with a catalog type but have a different Color func
+	// or column set, the fallback must win. The catalog is consulted only as a
+	// last resort when no fallback is registered.
+	var tdVal resource.ResourceTypeDef
+	var td *resource.ResourceTypeDef
+	if ftd, ok := c.fallbackTypeDefs[typeName]; ok {
+		tdVal = ftd
+		td = &tdVal
+	} else if catalogTD := resource.FindResourceType(typeName); catalogTD != nil {
+		td = catalogTD
+	}
+
+	// Resolve column definitions mirroring resolveColumns() in table_render.go,
+	// using the already-resolved fallback td (not the catalog) for the superset
+	// first-column-title check. This ensures test typeDefs with non-standard
+	// first columns (e.g. rlTestTypeDef starts with "Instance ID" not "Name")
+	// are not silently switched to the 9-column built-in defaults.
+	columns := resolveListColumnsForBuild(c.viewConfig, typeName, td)
 
 	// Build the row set from cache.
 	allResources := c.cachedResources(typeName)
@@ -473,7 +512,7 @@ func (c *Controller) buildListBody(ctx runtime.ScreenContext, ls *ListState) *Li
 	// Build rows.
 	rows := make([]ListRow, 0, len(visible))
 	for _, r := range visible {
-		cells := extractListCells(columns, r, typeName)
+		cells := extractListCells(columns, r, td)
 		decorator, severity, colorTag := resolveListDecoratorFull(td, r, findings)
 		rows = append(rows, ListRow{
 			Cells:      cells,
@@ -519,7 +558,96 @@ func (c *Controller) buildListBody(ctx runtime.ScreenContext, ls *ListState) *Li
 // including the superset check, so the controller column set is always
 // identical to what the TUI renders.
 func resolveListColumns(typeName string) []ColumnDef {
+	return resolveListColumnsWithConfig(nil, typeName)
+}
+
+// resolveListColumnsForBuild mirrors resolveColumns() in table_render.go, using
+// the caller-supplied td (already resolved fallback-first) for the superset
+// first-column-title check. This ensures that custom test typeDefs sharing a
+// ShortName with a catalog type but having a different column layout (e.g.
+// rlTestTypeDef starts with "Instance ID" not "Name") do not get silently
+// switched to the built-in 9-column defaults.
+func resolveListColumnsForBuild(vc *config.ViewsConfig, typeName string, td *resource.ResourceTypeDef) []ColumnDef {
+	if vc != nil {
+		vd := config.GetViewDef(vc, typeName)
+		if len(vd.List) > 0 {
+			cols := make([]ColumnDef, len(vd.List))
+			for i, lc := range vd.List {
+				cols[i] = ColumnDef{Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path}
+			}
+			return cols
+		}
+	}
+
+	defaultVD := config.GetViewDef(nil, typeName)
+
+	// Superset check using the supplied td (fallback-first, not catalog).
+	if td != nil && len(defaultVD.List) > len(td.Columns) {
+		firstMatch := len(td.Columns) == 0 ||
+			(len(defaultVD.List) > 0 && defaultVD.List[0].Title == td.Columns[0].Title)
+		if firstMatch {
+			cols := make([]ColumnDef, len(defaultVD.List))
+			for i, lc := range defaultVD.List {
+				cols[i] = ColumnDef{Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path}
+			}
+			return cols
+		}
+	}
+
+	// Fall back to td.Columns, carrying Path from defaults by title match.
+	if td != nil && len(td.Columns) > 0 {
+		defaultByTitle := make(map[string]config.ListColumn, len(defaultVD.List))
+		for _, lc := range defaultVD.List {
+			defaultByTitle[lc.Title] = lc
+		}
+		cols := make([]ColumnDef, len(td.Columns))
+		for i, c := range td.Columns {
+			cd := ColumnDef{Key: c.Key, Title: c.Title, Width: c.Width}
+			if def, ok := defaultByTitle[c.Title]; ok && cd.Path == "" {
+				cd.Path = def.Path
+			}
+			cols[i] = cd
+		}
+		return cols
+	}
+
+	// No td — fall back to raw built-in defaults.
+	if len(defaultVD.List) > 0 {
+		cols := make([]ColumnDef, len(defaultVD.List))
+		for i, lc := range defaultVD.List {
+			cols[i] = ColumnDef{Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path}
+		}
+		return cols
+	}
+	return nil
+}
+
+// resolveListColumnsWithConfig resolves the column set for typeName, using vc
+// as the per-session view config (nil = built-in defaults only). Mirrors
+// ResourceListModel.resolveColumns so that buildListBody and View() agree.
+func resolveListColumnsWithConfig(vc *config.ViewsConfig, typeName string) []ColumnDef {
 	td := resource.FindResourceType(typeName)
+
+	// When a per-session view config is provided, use it (mirrors the viewConfig
+	// branch in ResourceListModel.resolveColumns). This ensures path-based columns
+	// (e.g. ENI Status with Key="" Path="Status") are returned with the correct
+	// Key/Path from the config, matching what extractCellValue sees at render time.
+	if vc != nil {
+		vd := config.GetViewDef(vc, typeName)
+		if len(vd.List) > 0 {
+			cols := make([]ColumnDef, len(vd.List))
+			for i, lc := range vd.List {
+				cols[i] = ColumnDef{
+					Key:   lc.Key,
+					Title: lc.Title,
+					Width: lc.Width,
+					Path:  lc.Path,
+				}
+			}
+			return cols
+		}
+	}
+
 	defaultVD := config.GetViewDef(nil, typeName)
 
 	// Superset check: use default view config only when it is strictly larger
@@ -579,14 +707,53 @@ func resolveListColumns(typeName string) []ColumnDef {
 }
 
 // extractListCells builds the cell value slice for one row, mirroring
-// extractCellValue in table_render.go. DATA only — no Lipgloss styling.
-func extractListCells(columns []ColumnDef, r resource.Resource, typeName string) []string {
+// extractCellValue + CellDecorators application in table_render.go. DATA only — no Lipgloss styling.
+// td must already be resolved (fallback-first) by the caller so that CellDecorators
+// from the model's typeDef are applied (e.g. EC2 state impaired/initializing prefix).
+func extractListCells(columns []ColumnDef, r resource.Resource, td *resource.ResourceTypeDef) []string {
 	cells := make([]string, len(columns))
-	td := resource.FindResourceType(typeName)
 	for i, col := range columns {
-		cells[i] = listExtractCellValue(col, td, r)
+		v := listExtractCellValue(col, td, r)
+		if td != nil && len(td.CellDecorators) > 0 {
+			if dec := lookupListDecorator(td.CellDecorators, col); dec != nil {
+				v = dec(r, v)
+			}
+		}
+		cells[i] = v
 	}
 	return cells
+}
+
+// lookupListDecorator mirrors lookupDecorator in table_render.go but operates on
+// ColumnDef (Key+Title+Path) instead of listCol. Tries key, path, path last segment
+// (lowercased), and lowercased title — in that order.
+func lookupListDecorator(decs map[string]func(resource.Resource, string) string, col ColumnDef) func(resource.Resource, string) string {
+	if len(decs) == 0 {
+		return nil
+	}
+	if col.Key != "" {
+		if d, ok := decs[col.Key]; ok {
+			return d
+		}
+	}
+	if col.Path != "" {
+		if d, ok := decs[col.Path]; ok {
+			return d
+		}
+		if i := strings.LastIndex(col.Path, "."); i >= 0 {
+			if d, ok := decs[strings.ToLower(col.Path[i+1:])]; ok {
+				return d
+			}
+		} else if d, ok := decs[strings.ToLower(col.Path)]; ok {
+			return d
+		}
+	}
+	if col.Title != "" {
+		if d, ok := decs[strings.ToLower(col.Title)]; ok {
+			return d
+		}
+	}
+	return nil
 }
 
 // listExtractCellValue replicates the full extractCellValue cascade from
@@ -776,6 +943,12 @@ func (c *Controller) buildListFrameTitle(ctx runtime.ScreenContext, ls *ListStat
 		totalStr = itoa(total) + "+"
 	}
 
+	// Loading-more indicator goes inside the count parentheses, mirroring the
+	// baseline FrameTitle: "ec2(200+ loading...)" not "ec2(200+) loading...".
+	if ls.LoadingMore {
+		return name + "(" + totalStr + " loading...)"
+	}
+
 	isAttention := ls.AttentionOnly
 	hasTextFilter := ls.Filter != "" && filtered != total
 
@@ -866,3 +1039,386 @@ func (c *Controller) GetListAttentionOnly() bool {
 	}
 	return ls.AttentionOnly
 }
+
+// PatchListDisplayName sets the display name override on the top list screen.
+func (c *Controller) PatchListDisplayName(name string) {
+	ls := c.topListState()
+	if ls == nil {
+		return
+	}
+	ls.DisplayName = name
+}
+
+// PatchListParentContext sets the parent context map on the top list screen.
+// Used by child-list navigation to carry the parent resource's identifiers
+// (e.g., bucket name, cluster ARN) into fetch and child-routing calls.
+func (c *Controller) PatchListParentContext(ctx map[string]string) {
+	ls := c.topListState()
+	if ls == nil {
+		return
+	}
+	ls.ParentContext = ctx
+}
+
+// GetListAutoOpenSingle reports whether auto-open-single-detail is active
+// on the top list screen.
+func (c *Controller) GetListAutoOpenSingle() bool {
+	ls := c.topListState()
+	if ls == nil {
+		return false
+	}
+	return ls.AutoOpenSingle
+}
+
+// ClearListAutoOpenSingle resets the auto-open-single-detail flag on the
+// top list screen.
+func (c *Controller) ClearListAutoOpenSingle() {
+	ls := c.topListState()
+	if ls == nil {
+		return
+	}
+	ls.AutoOpenSingle = false
+}
+
+// SetListAutoOpenSingle sets the auto-open-single-detail flag on the top
+// list screen.
+func (c *Controller) SetListAutoOpenSingle(v bool) {
+	ls := c.topListState()
+	if ls == nil {
+		return
+	}
+	ls.AutoOpenSingle = v
+}
+
+// GetListExactRelatedTargetID returns the single ID in RelatedIDSet when the
+// set has exactly one non-empty entry, mirroring exactRelatedTargetID in views.
+func (c *Controller) GetListExactRelatedTargetID() (string, bool) {
+	ls := c.topListState()
+	if ls == nil || len(ls.RelatedIDSet) != 1 {
+		return "", false
+	}
+	for id := range ls.RelatedIDSet {
+		if id == "" {
+			return "", false
+		}
+		return id, true
+	}
+	return "", false
+}
+
+// SetListLoadingMore sets the LoadingMore flag on the top list screen.
+func (c *Controller) SetListLoadingMore(v bool) {
+	ls := c.topListState()
+	if ls == nil {
+		return
+	}
+	ls.LoadingMore = v
+}
+
+// ClearListLoading clears both the Loading and LoadingMore flags on the top list
+// screen. Called when a fetch or load-more operation fails (error handler path)
+// so the title reverts from "name loading..." back to the resource count title.
+func (c *Controller) ClearListLoading() {
+	ls := c.topListState()
+	if ls == nil {
+		return
+	}
+	ls.Loading = false
+	ls.LoadingMore = false
+}
+
+// GetListPaginationCursor returns the pagination cursor of the top list screen.
+func (c *Controller) GetListPaginationCursor() string {
+	ls := c.topListState()
+	if ls == nil {
+		return ""
+	}
+	return ls.PaginationCursor
+}
+
+// GetListParentContext returns the parent context map of the top list screen.
+func (c *Controller) GetListParentContext() map[string]string {
+	ls := c.topListState()
+	if ls == nil {
+		return nil
+	}
+	return ls.ParentContext
+}
+
+// GetListFetchFilter returns the server-side fetch filter of the top list screen.
+func (c *Controller) GetListFetchFilter() map[string]string {
+	ls := c.topListState()
+	if ls == nil {
+		return nil
+	}
+	return ls.FetchFilter
+}
+
+// PatchListFetchFilter sets the server-side fetch filter on the top list screen.
+func (c *Controller) PatchListFetchFilter(filter map[string]string) {
+	ls := c.topListState()
+	if ls == nil {
+		return
+	}
+	ls.FetchFilter = filter
+}
+
+// PatchListEscPops sets the EscPops flag on the top list screen.
+func (c *Controller) PatchListEscPops(v bool) {
+	ls := c.topListState()
+	if ls == nil {
+		return
+	}
+	ls.EscPops = v
+}
+
+// PatchListTitleSuffix sets the title suffix on the top list screen.
+func (c *Controller) PatchListTitleSuffix(s string) {
+	ls := c.topListState()
+	if ls == nil {
+		return
+	}
+	ls.TitleSuffix = s
+}
+
+// PatchListShowIssueBadge sets the ShowIssueBadge flag on the top list screen.
+func (c *Controller) PatchListShowIssueBadge(v bool) {
+	ls := c.topListState()
+	if ls == nil {
+		return
+	}
+	ls.ShowIssueBadge = v
+}
+
+// PatchListAutoOpenSingle is an alias for SetListAutoOpenSingle used by
+// navigation adapters that need to configure the flag before resources load.
+func (c *Controller) PatchListAutoOpenSingle(v bool) {
+	c.SetListAutoOpenSingle(v)
+}
+
+// ResolveListColumns exports resolveListColumns for use by constructors that
+// need to translate a 0-based column index to a column key (e.g., sort restore).
+func ResolveListColumns(typeName string) []ColumnDef {
+	return resolveListColumns(typeName)
+}
+
+// ResolveColumnsForType resolves the column set for typeName using this
+// controller's viewConfig and fallbackTypeDefs. Mirrors resolveColumns in
+// table_render.go so that handleSortByCol and buildListBody always agree on
+// the column set — and therefore on what key "N" maps to.
+func (c *Controller) ResolveColumnsForType(typeName string) []ColumnDef {
+	// viewConfig takes highest priority (same as resolveColumns).
+	if c.viewConfig != nil {
+		vd := config.GetViewDef(c.viewConfig, typeName)
+		if len(vd.List) > 0 {
+			cols := make([]ColumnDef, len(vd.List))
+			for i, lc := range vd.List {
+				cols[i] = ColumnDef{Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path}
+			}
+			return cols
+		}
+	}
+
+	// No viewConfig — resolve the fallback typeDef so we can compare against defaults.
+	var ftd *resource.ResourceTypeDef
+	if fv, ok := c.fallbackTypeDefs[typeName]; ok {
+		ftd = &fv
+	} else if ct := resource.FindResourceType(typeName); ct != nil {
+		ftd = ct
+	}
+
+	// Apply the same superset + first-column-title guard as resolveColumns:
+	// use built-in defaults only when they are strictly larger AND the first
+	// column title matches — this ensures custom test typeDefs that share a
+	// ShortName but have different column layouts (e.g. pgTestTypeDef uses
+	// ShortName="ec2" with first col "Instance ID" vs defaults' "Name") are
+	// not silently switched to the defaults.
+	defaultVD := config.GetViewDef(nil, typeName)
+	if ftd != nil && len(defaultVD.List) > len(ftd.Columns) {
+		firstMatch := len(ftd.Columns) == 0 ||
+			(len(defaultVD.List) > 0 && defaultVD.List[0].Title == ftd.Columns[0].Title)
+		if firstMatch {
+			cols := make([]ColumnDef, len(defaultVD.List))
+			for i, lc := range defaultVD.List {
+				cols[i] = ColumnDef{Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path}
+			}
+			return cols
+		}
+	}
+
+	// Fall back to typeDef columns (covers test typeDefs with non-matching first title).
+	if ftd != nil && len(ftd.Columns) > 0 {
+		cols := make([]ColumnDef, len(ftd.Columns))
+		for i, col := range ftd.Columns {
+			cols[i] = ColumnDef{Key: col.Key, Title: col.Title, Width: col.Width}
+		}
+		return cols
+	}
+
+	return nil
+}
+
+// GetListAllResources returns all cached resources for the top list screen's type.
+func (c *Controller) GetListAllResources() []resource.Resource {
+	ls := c.topListState()
+	if ls == nil {
+		return nil
+	}
+	if len(c.stack) == 0 {
+		return nil
+	}
+	top := c.stack[len(c.stack)-1]
+	return c.cachedResources(top.Ctx.ResourceType)
+}
+
+// GetListPagination returns truncated+cursor for the top list screen.
+func (c *Controller) GetListPagination() (truncated bool, cursor string) {
+	ls := c.topListState()
+	if ls == nil {
+		return false, ""
+	}
+	return ls.HasPagination, ls.PaginationCursor
+}
+
+// GetListEscPops reports whether Esc should pop the top list screen.
+func (c *Controller) GetListEscPops() bool {
+	ls := c.topListState()
+	if ls == nil {
+		return false
+	}
+	return ls.EscPops
+}
+
+// GetListDisplayName returns the display name override of the top list screen.
+func (c *Controller) GetListDisplayName() string {
+	ls := c.topListState()
+	if ls == nil {
+		return ""
+	}
+	return ls.DisplayName
+}
+
+// GetListTitleSuffix returns the title suffix of the top list screen.
+func (c *Controller) GetListTitleSuffix() string {
+	ls := c.topListState()
+	if ls == nil {
+		return ""
+	}
+	return ls.TitleSuffix
+}
+
+// GetListShowIssueBadge reports whether the issue badge is shown.
+func (c *Controller) GetListShowIssueBadge() bool {
+	ls := c.topListState()
+	if ls == nil {
+		return false
+	}
+	return ls.ShowIssueBadge
+}
+
+// GetListRelatedIDSet returns the relatedIDSet of the top list screen.
+func (c *Controller) GetListRelatedIDSet() map[string]struct{} {
+	ls := c.topListState()
+	if ls == nil {
+		return nil
+	}
+	return ls.RelatedIDSet
+}
+
+// PushChildListScreen pushes a ScreenChildList for the given resource type
+// directly onto the controller stack, bypassing menu/command routing. Used by
+// NewChildResourceList to ensure topListState() is non-nil before Patch* calls.
+func (c *Controller) PushChildListScreen(typeName string) {
+	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{
+		ID:      runtime.ScreenChildList,
+		Context: runtime.ScreenContext{ResourceType: typeName},
+	}})
+	c.ensureListState()
+}
+
+// GetListEnrichmentFindings returns the enrichment findings map for typeName.
+// Used by renderDataRow to resolve glyph markers without accessing the deleted
+// findingsByID field on ResourceListModel.
+func (c *Controller) GetListEnrichmentFindings(typeName string) map[string]domain.Finding {
+	return c.listEnrichmentFindings(typeName)
+}
+
+// GetListIssueCount returns the number of resources with issue status in the
+// top list screen's resource type, mirroring IssueCount() in ResourceListModel.
+func (c *Controller) GetListIssueCount() int {
+	ls := c.topListState()
+	if ls == nil || len(c.stack) == 0 {
+		return 0
+	}
+	top := c.stack[len(c.stack)-1]
+	typeName := top.Ctx.ResourceType
+
+	// Prefer the fallback typeDef (registered via RegisterFallbackTypeDef from
+	// the model constructor) over the catalog: the model's typeDef is the
+	// authoritative Color classifier for issue counting. This is critical for
+	// test typeDefs that share a ShortName with a catalog type but have a nil
+	// Color (falls back to colorFallback(r.Fields["status"])) or a different
+	// Color implementation.
+	var td resource.ResourceTypeDef
+	if ftd, ok := c.fallbackTypeDefs[typeName]; ok {
+		td = ftd
+	} else if catalogTD := resource.FindResourceType(typeName); catalogTD != nil {
+		td = *catalogTD
+	} else {
+		return 0
+	}
+	all := c.cachedResources(typeName)
+	findings := c.listEnrichmentFindings(typeName)
+	ic := 0
+	for _, r := range all {
+		if listHasIssueFinding(r) {
+			ic++
+		} else if len(r.Findings) == 0 {
+			if td.ResolveColor(r).IsIssue() {
+				ic++
+			} else if _, hasFinding := findings[r.ID]; hasFinding {
+				ic++
+			}
+		}
+	}
+	return ic
+}
+
+// GetListVisibleResources returns the visible (filtered+sorted) resource slice
+// for the top list screen, for test introspection.
+func (c *Controller) GetListVisibleResources() []resource.Resource {
+	ls := c.topListState()
+	if ls == nil || len(c.stack) == 0 {
+		return nil
+	}
+	top := c.stack[len(c.stack)-1]
+	typeName := top.Ctx.ResourceType
+	all := c.cachedResources(typeName)
+	visible := c.applyListFilters(ls, typeName, all)
+	return listSortResources(ls, typeName, visible)
+}
+
+// ApplyListFieldUpdates merges Wave-2 field updates into the cached resource
+// slice for typeName. Keyed by resource ID then field key.
+func (c *Controller) ApplyListFieldUpdates(typeName string, updates map[string]map[string]string) {
+	if len(updates) == 0 || c.resourceCache == nil {
+		return
+	}
+	for i := range c.resourceCache[typeName] {
+		if kvMap, ok := updates[c.resourceCache[typeName][i].ID]; ok {
+			if c.resourceCache[typeName][i].Fields == nil {
+				c.resourceCache[typeName][i].Fields = make(map[string]string, len(kvMap))
+			}
+			maps.Copy(c.resourceCache[typeName][i].Fields, kvMap)
+		}
+	}
+}
+
+// ApplyListTruncatedIDs stores the per-resource truncation set for typeName.
+// Currently retained for API parity with ResourceListModel.SetTruncatedIDs;
+// the controller's attention filter does not yet consult this set.
+func (c *Controller) ApplyListTruncatedIDs(_ string, _ map[string]bool) {
+	// Intentional no-op: truncatedByID was stored but never read in the filter
+	// pipeline. Retained for caller parity.
+}
+
