@@ -71,6 +71,7 @@ cover: coverage
 #   CreateDate/CreateTime/StartRecord/StartTime/StopTime/StopDate — timestamp field names, not API calls
 #   ExecuteCommandConfiguration — ECS cluster struct field read via NavigableField, not an API call
 #   CreateServiceClients — local helper in internal/aws/client.go that constructs SDK client structs, not an API call
+#   ExecuteTaskAt — local runtime executor helper, not an API call
 verify-readonly:
 	@echo "Checking for write API calls in internal/aws/ and internal/runtime/..."
 	@if grep -rn '\.\(Create\|Delete\|Update\|Put\|Modify\|Terminate\|Stop\|Reboot\|RunInstances\|Execute\|Send\|Publish\|Remove\)[A-Z][A-Za-z0-9]*(' internal/aws/*.go internal/runtime/*.go \
@@ -85,7 +86,8 @@ verify-readonly:
 		| grep -v 'Describe\|List\|Get\|Search\|Lookup\|BatchGet\|Scan' \
 		| grep -v 'CreateDate\|CreateTime\|StartRecord\|StartTime\|StopTime\|StopDate' \
 		| grep -v 'ExecuteCommandConfiguration' \
-		| grep -v 'CreateServiceClients' ; then \
+		| grep -v 'CreateServiceClients' \
+		| grep -v 'ExecuteTaskAt' ; then \
 		echo "FAIL: Write API calls detected!"; exit 1; \
 	else \
 		echo "PASS: All API calls are read-only"; \

@@ -492,17 +492,23 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 				msg.Result.Approximate,
 				msg.Result.FetchFilter,
 			)
-			return m, nil
 		}
+		// Keep the local right-column model in sync in both paths: Enter/copy still
+		// delegate to m.rightCol.SelectedRow/Update, so without this the visible
+		// resolved row stays a loading, non-actionable placeholder even though the
+		// rendered count came from DetailState.
 		m.rightCol, _ = m.rightCol.Update(msg)
 		return m, nil
 	case messages.EnrichDetailResult:
 		if m.ctrl != nil {
-			// Controller-backed path: route the wave-2 finding to the matching
-			// detail screen BY RESOURCE ID — it may be a STACKED detail, not the
-			// active one. Passing nil clears any prior finding (recovery case).
+			// Controller-backed path: route the enriched resource AND its wave-2
+			// finding to the matching detail screen BY RESOURCE ID — it may be a
+			// STACKED detail, not the active one. The enriched resource carries
+			// fetched data (e.g. IAM policy documents in RawStruct) that the field
+			// projection and subsequent YAML/JSON opens need; dropping it would keep
+			// showing the pre-enrichment resource. nil finding clears prior findings.
 			ef, ad := wave2FindingFromResource(msg.EnrichedRes)
-			m.ctrl.ApplyDetailFindingForResource(msg.ResourceType, msg.ResourceID, ef, ad)
+			m.ctrl.ApplyDetailEnrichmentForResource(msg.ResourceType, msg.ResourceID, msg.EnrichedRes, ef, ad)
 			return m, nil
 		}
 		// Legacy path: only the active view, so ignore results for another resource.

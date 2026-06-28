@@ -24,7 +24,9 @@ import (
 	"fmt"
 	"maps"
 
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/cache"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
@@ -34,9 +36,46 @@ import (
 // context. See the executor.go package-doc for the complete list.
 var ErrAdapterOnlyTask = errors.New("task kind is adapter-only and cannot be executed by Core.ExecuteTask")
 
-// ExecuteTask executes req synchronously using the existing Core methods and
-// returns the result as a messages.Event. It is safe to call from any
-// goroutine and does not touch any renderer or Bubble Tea state.
+// DispatchSnapshot captures the session state ExecuteTask reads, taken at
+// DISPATCH time (synchronously, before the async command goroutine runs).
+type DispatchSnapshot struct {
+	Clients           *awsclient.ServiceClients
+	AvailabilityGen   domain.Gen
+	EnrichmentGen     domain.Gen
+	ConnectGen        domain.Gen
+	EnrichmentTypeGen map[string]domain.Gen
+	Profile           string
+	Region            string
+	NoCache           bool
+}
+
+// CaptureDispatch snapshots the session generations and clients. Call it
+// synchronously at task-dispatch time (NOT inside a goroutine).
+func (c *Core) CaptureDispatch() DispatchSnapshot {
+	return DispatchSnapshot{
+		Clients:           c.session.Clients,
+		AvailabilityGen:   c.session.AvailabilityGen,
+		EnrichmentGen:     c.session.EnrichmentGen,
+		ConnectGen:        c.session.ConnectGen,
+		EnrichmentTypeGen: c.session.EnrichmentTypeGen,
+		Profile:           c.session.Profile,
+		Region:            c.session.Region,
+		NoCache:           c.session.NoCache,
+	}
+}
+
+// ExecuteTask runs a task using a snapshot captured now. Synchronous callers
+// (DrainSync, non-TUI hosts) have no dispatch/execute gap. Async callers (the
+// TUI's executeTaskCmd) MUST capture via CaptureDispatch at dispatch time and
+// call ExecuteTaskAt instead.
+func (c *Core) ExecuteTask(ctx context.Context, req TaskRequest) (messages.Event, error) {
+	return c.ExecuteTaskAt(ctx, req, c.CaptureDispatch())
+}
+
+// ExecuteTaskAt executes req synchronously using the existing Core methods and
+// returns the result as a messages.Event. snap must be captured at dispatch
+// time via CaptureDispatch so that a concurrent session.Rotate cannot corrupt
+// the generation/client values read during execution.
 //
 // ctx is forwarded to every blocking AWS call; callers should supply a
 // context with an appropriate timeout.
@@ -44,14 +83,14 @@ var ErrAdapterOnlyTask = errors.New("task kind is adapter-only and cannot be exe
 // Adapter-only kinds return (nil, ErrAdapterOnlyTask). A nil Event with a
 // nil error means the task completed with no result to dispatch (e.g.
 // probe-enrich skipped in demo mode, save-cache with nothing to persist).
-func (c *Core) ExecuteTask(ctx context.Context, req TaskRequest) (messages.Event, error) {
+func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap DispatchSnapshot) (messages.Event, error) {
 	switch req.Key.Kind {
 
 	// --- availability probe ---
 	case TaskKindProbeAvailability:
 		shortName := req.Key.Scope
-		gen := c.session.AvailabilityGen
-		r := c.ProbeResourceAvailability(ctx, c.session.Clients, shortName)
+		gen := snap.AvailabilityGen
+		r := c.ProbeResourceAvailability(ctx, snap.Clients, shortName)
 		return messages.AvailabilityChecked{
 			ResourceType: shortName,
 			HasResources: r.HasResources,
@@ -73,9 +112,9 @@ func (c *Core) ExecuteTask(ctx context.Context, req TaskRequest) (messages.Event
 		if !c.HasIssueEnricher(shortName) {
 			return nil, nil
 		}
-		gen := c.session.EnrichmentGen
-		typeGen := c.session.EnrichmentTypeGen[shortName]
-		r := c.ProbeEnrichment(ctx, c.session.Clients, shortName)
+		gen := snap.EnrichmentGen
+		typeGen := snap.EnrichmentTypeGen[shortName]
+		r := c.ProbeEnrichment(ctx, snap.Clients, shortName)
 		return messages.EnrichmentChecked{
 			ResourceType:     shortName,
 			Issues:           r.Issues,
@@ -95,7 +134,7 @@ func (c *Core) ExecuteTask(ctx context.Context, req TaskRequest) (messages.Event
 	// saveAvailabilityCache() continues to use the more precise MainMenuModel
 	// counts for the live TUI; this path serves non-TUI hosts.
 	case TaskKindSaveCache:
-		if c.session.NoCache {
+		if snap.NoCache {
 			return nil, nil
 		}
 		entries, truncated, issueCounts, issueTruncated, issueKnown := c.availabilityFromResourceCache()
@@ -103,7 +142,7 @@ func (c *Core) ExecuteTask(ctx context.Context, req TaskRequest) (messages.Event
 			return nil, nil
 		}
 		err := c.SaveAvailabilityCache(
-			c.session.Profile, c.session.Region,
+			snap.Profile, snap.Region,
 			entries, truncated, issueCounts, issueTruncated, issueKnown,
 		)
 		if err != nil {
@@ -127,8 +166,8 @@ func (c *Core) ExecuteTask(ctx context.Context, req TaskRequest) (messages.Event
 
 	// --- fetch caller identity ---
 	case TaskKindFetchIdentity:
-		gen := c.session.ConnectGen
-		identity, err := c.FetchIdentity(ctx, c.session.Clients)
+		gen := snap.ConnectGen
+		identity, err := c.FetchIdentity(ctx, snap.Clients)
 		if err != nil {
 			return messages.IdentityError{Err: err.Error(), Gen: gen}, nil
 		}
@@ -136,7 +175,7 @@ func (c *Core) ExecuteTask(ctx context.Context, req TaskRequest) (messages.Event
 
 	// --- load on-disk availability cache ---
 	case TaskKindLoadAvailCache:
-		cf, err := c.LoadAvailabilityCache(c.session.Profile, c.session.Region)
+		cf, err := c.LoadAvailabilityCache(snap.Profile, snap.Region)
 		if err != nil || cf == nil {
 			return messages.AvailabilityCacheLoaded{
 				Entries: make(map[string]int),
@@ -147,8 +186,8 @@ func (c *Core) ExecuteTask(ctx context.Context, req TaskRequest) (messages.Event
 
 	// --- demo prefetch ---
 	case TaskKindDemoPrefetchCounts:
-		gen := c.session.AvailabilityGen
-		r := c.DemoPrefetchCounts(ctx, c.session.Clients)
+		gen := snap.AvailabilityGen
+		r := c.DemoPrefetchCounts(ctx, snap.Clients)
 		return messages.AvailabilityPrefetched{
 			Entries:        r.Entries,
 			Truncated:      r.Truncated,
@@ -204,8 +243,8 @@ func (c *Core) ExecuteTask(ctx context.Context, req TaskRequest) (messages.Event
 	// --- fetch resources (top-level) ---
 	case KindFetchResources:
 		resourceType := req.Key.Scope
-		gen := c.session.AvailabilityGen
-		res, err := c.FetchResources(ctx, c.session.Clients, resourceType)
+		gen := snap.AvailabilityGen
+		res, err := c.FetchResources(ctx, snap.Clients, resourceType)
 		if err != nil && len(res.Resources) == 0 {
 			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen}, nil
 		}
@@ -224,8 +263,8 @@ func (c *Core) ExecuteTask(ctx context.Context, req TaskRequest) (messages.Event
 			return nil, fmt.Errorf("ExecuteTask %s: missing fetchFilteredPayload", req.Key.Kind)
 		}
 		resourceType := req.Key.Scope
-		gen := c.session.AvailabilityGen
-		res, err := c.FetchResourcesFiltered(ctx, c.session.Clients, resourceType, p.Filter)
+		gen := snap.AvailabilityGen
+		res, err := c.FetchResourcesFiltered(ctx, snap.Clients, resourceType, p.Filter)
 		if err != nil && len(res.Resources) == 0 {
 			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen}, nil
 		}
@@ -244,8 +283,8 @@ func (c *Core) ExecuteTask(ctx context.Context, req TaskRequest) (messages.Event
 			return nil, fmt.Errorf("ExecuteTask %s: missing FetchMorePayload", req.Key.Kind)
 		}
 		resourceType := req.Key.Scope
-		gen := c.session.AvailabilityGen
-		res, err := c.FetchMoreResources(ctx, c.session.Clients, FetchMoreParams{
+		gen := snap.AvailabilityGen
+		res, err := c.FetchMoreResources(ctx, snap.Clients, FetchMoreParams{
 			ResourceType: resourceType,
 			Token:        p.ContinuationToken,
 		})
@@ -267,8 +306,8 @@ func (c *Core) ExecuteTask(ctx context.Context, req TaskRequest) (messages.Event
 		if !ok {
 			return nil, fmt.Errorf("ExecuteTask %s: missing FetchChildResourcesPayload", req.Key.Kind)
 		}
-		gen := c.session.AvailabilityGen
-		res, err := c.FetchChildResources(ctx, c.session.Clients, p.ChildType, p.ParentContext)
+		gen := snap.AvailabilityGen
+		res, err := c.FetchChildResources(ctx, snap.Clients, p.ChildType, p.ParentContext)
 		if err != nil {
 			return messages.APIError{ResourceType: p.ChildType, Err: err, Gen: gen}, nil
 		}
@@ -285,8 +324,8 @@ func (c *Core) ExecuteTask(ctx context.Context, req TaskRequest) (messages.Event
 		if !ok {
 			return nil, fmt.Errorf("ExecuteTask %s: missing FetchRevealPayload", req.Key.Kind)
 		}
-		gen := c.session.ConnectGen
-		value, err := c.FetchRevealValue(ctx, c.session.Clients, p.ResourceType, p.ResourceID)
+		gen := snap.ConnectGen
+		value, err := c.FetchRevealValue(ctx, snap.Clients, p.ResourceType, p.ResourceID)
 		return messages.ValueRevealed{
 			ResourceType: p.ResourceType,
 			ResourceID:   p.ResourceID,
@@ -308,14 +347,14 @@ func (c *Core) ExecuteTask(ctx context.Context, req TaskRequest) (messages.Event
 		if fn == nil {
 			return messages.Flash{Text: fmt.Sprintf("no by-id fetcher for %s", p.TargetType), IsError: true}, nil
 		}
-		res, err := fn(ctx, c.session.Clients, []string{p.ID})
+		res, err := fn(ctx, snap.Clients, []string{p.ID})
 		if err != nil {
 			return messages.Flash{Text: err.Error(), IsError: true}, nil
 		}
 		if len(res) == 0 {
 			return messages.Flash{Text: fmt.Sprintf("%s %s not found", p.TargetType, p.ID), IsError: true}, nil
 		}
-		gen := c.session.AvailabilityGen
+		gen := snap.AvailabilityGen
 		return messages.ResourcesLoaded{
 			ResourceType: p.TargetType,
 			Resources:    res,

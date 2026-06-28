@@ -586,7 +586,12 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 	intents, tasks := c.core.HandleEvent(ev)
 	c.applyIntents(intents)
 
-	if msg, ok := ev.(messages.ResourcesLoaded); ok {
+	// HandleEvent's central GenStamped guard drops stale events from the intent
+	// path, but the row mutation below runs unconditionally. A host that passes
+	// task results straight to Handle (headless/web) would otherwise let a late
+	// fetch from a previous profile/region overwrite the current list rows, so
+	// re-check staleness with the same predicate before mutating the controller.
+	if msg, ok := ev.(messages.ResourcesLoaded); ok && !messages.IsStale(msg, c.core) {
 		c.handleResourcesLoadedEvent(msg)
 	}
 
@@ -597,8 +602,8 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 // list screen in the controller stack. It finds the screen by resolving the
 // event's ResourceType (including aliases) against each screen's context,
 // so a late result for type X lands on X's screen regardless of which screen
-// is currently on top. Gen staleness is not re-checked here — the upstream
-// DrainSync / adapter shim already dropped stale events before calling Handle.
+// is currently on top. Staleness is the caller's responsibility — Handle drops
+// stale ResourcesLoaded via messages.IsStale before invoking this.
 func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 	if msg.ResourceType == "" {
 		return
@@ -1218,10 +1223,18 @@ func (c *Controller) MenuSelected() (resource.ResourceTypeDef, bool) {
 	}
 	all := resource.AllResourceTypes()
 	visible := menuVisibleItems(ms, all)
-	if len(visible) == 0 || ms.Cursor >= len(visible) {
+	if len(visible) == 0 {
 		return resource.ResourceTypeDef{}, false
 	}
-	selected := visible[ms.Cursor]
+	// Background issue/availability intents can shrink the visible list while the
+	// stored cursor still points past the end. Snapshot clamps the displayed
+	// selection to the last visible row, so clamp here too — otherwise Enter on
+	// the highlighted last row would hit a stale guard and become a no-op.
+	cursor := ms.Cursor
+	if cursor >= len(visible) {
+		cursor = len(visible) - 1
+	}
+	selected := visible[cursor]
 	if ms.Availability != nil {
 		key := menuActiveKey(ms, selected)
 		isTruncated := ms.Truncated != nil && ms.Truncated[key]

@@ -53,10 +53,20 @@ func (c *Controller) ensureDetailState(res resource.Resource, resourceType strin
 		return
 	}
 	if top.State.Detail == nil {
-		top.State.Detail = &DetailState{
+		ds := &DetailState{
 			Resource:     res,
 			ResourceType: resourceType,
+			// Seed Findings with the resource's own (wave-1, fetcher-emitted)
+			// findings so the Attention section shows them — mirrors the legacy
+			// detail, whose injectAttentionSection read m.res.Findings. Wave-2
+			// enrichment findings are merged in later by applyFindingToState,
+			// which strips only prior wave-2 entries and preserves these.
+			Findings: append([]domain.Finding(nil), res.Findings...),
 		}
+		if len(res.AttentionDetails) > 0 {
+			ds.AttentionDetails = maps.Clone(res.AttentionDetails)
+		}
+		top.State.Detail = ds
 	}
 }
 
@@ -129,6 +139,29 @@ func (c *Controller) ApplyDetailFindingForResource(resourceType, resourceID stri
 		if ds == nil || ds.Resource.ID != resourceID || ds.ResourceType != resourceType {
 			continue
 		}
+		c.applyFindingToState(ds, f, ad)
+	}
+}
+
+// ApplyDetailEnrichmentForResource applies a completed detail-enrichment result
+// to the detail screen(s) whose resource matches (resourceType, resourceID),
+// even when stacked beneath the active screen. It replaces ds.Resource with the
+// enriched resource — detail enrichers (e.g. IAM policy/role-policy) put the
+// fetched document into RawStruct, so without this the field projection and
+// subsequent YAML/JSON opens keep showing the pre-enrichment resource — and then
+// applies the wave-2 finding. No-op when no stacked detail matches.
+func (c *Controller) ApplyDetailEnrichmentForResource(resourceType, resourceID string, enriched resource.Resource, f *domain.Finding, ad *domain.AttentionDetail) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for i := range c.stack {
+		if c.stack[i].ID != runtime.ScreenDetail {
+			continue
+		}
+		ds := c.stack[i].State.Detail
+		if ds == nil || ds.Resource.ID != resourceID || ds.ResourceType != resourceType {
+			continue
+		}
+		ds.Resource = enriched
 		c.applyFindingToState(ds, f, ad)
 	}
 }
@@ -662,6 +695,8 @@ func buildDetailFieldItems(ds *DetailState, vc *config.ViewsConfig) []fieldpath.
 
 	// Inject findings from DetailState into the resource for the projector.
 	// This mirrors what the TUI does: m.res.Findings carries the live data.
+	// ds.Findings holds the unified finding set (wave-1 seeded at creation +
+	// wave-2 merged by applyFindingToState), so a straight assignment is correct.
 	if len(ds.Findings) > 0 {
 		r.Findings = ds.Findings
 	}
