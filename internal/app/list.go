@@ -1571,10 +1571,29 @@ func (c *Controller) ApplyListFieldUpdates(typeName string, updates map[string]m
 			}
 		}
 	}
-	// Update the top list screen's per-screen rows first (primary read path).
-	ls := c.topListState()
-	if ls != nil {
-		applyToSlice(ls.Rows)
+	// Apply to EVERY list screen of this type in the stack (primary read path).
+	// PatchResourceList updates every matching ResourceListModel, so the matching
+	// list may be stacked beneath a detail or another list. Targeting only the top
+	// screen leaves a stacked same-type list's per-screen Rows stale (or wrongly
+	// mutates a top list of a different type), and buildListBody prefers ls.Rows
+	// over the type cache, so popping back would render stale cell values.
+	canon := typeName
+	if td := resource.FindResourceType(typeName); td != nil {
+		canon = td.ShortName
+	}
+	for i := range c.stack {
+		s := &c.stack[i]
+		if s.ID != runtime.ScreenResourceList && s.ID != runtime.ScreenChildList {
+			continue
+		}
+		st := s.Ctx.ResourceType
+		if td := resource.FindResourceType(st); td != nil {
+			st = td.ShortName
+		}
+		if st != canon || s.State.List == nil {
+			continue
+		}
+		applyToSlice(s.State.List.Rows)
 	}
 	// Also update the type-keyed cache so GetListAllResources etc. see the same values.
 	if c.resourceCache != nil {
