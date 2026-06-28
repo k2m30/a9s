@@ -128,6 +128,9 @@ func New(profile, region string, opts ...Option) Model {
 	// state. Both MainMenuModel and ResourceListModel hold no data of their
 	// own — they delegate all reads and writes through m.ctrl.
 	ctrl := app.New(core)
+	// Without the view config the controller's detail projection falls back to
+	// flat alphabetical fields instead of the configured per-type order.
+	ctrl.SetViewConfig(cfg)
 	menu := views.NewMainMenu(k, ctrl)
 
 	m := Model{

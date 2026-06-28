@@ -1,19 +1,19 @@
  a9s v  demo:us-east-1                                                                                                           ? for help 
 ┌────────────────────────────────────────────────────────────────── help ──────────────────────────────────────────────────────────────────┐
-│ NAVIGATION                       ACTIONS                          SORT                             OTHER                                 │
+│ NAVIGATION            ACTIONS               SORT                  FILTER                OTHER                 COMMANDS                   │
 │                                                                                                                                          │
-│ j/k      up/down                 enter/d  detail                  N        sort name               ctrl+r   refresh                      │
-│ g/G      top/bottom              y        yaml                    I        sort id                 esc      back                         │
-│ pgup     page up                 J        json                    A        sort date               q        quit                         │
-│ pgdn     page down               t        cloudtrail events                                        i        identity                     │
-│ h/l      scroll cols             c        copy id                                                  ?        help                         │
-│                                  /        filter                                                                                         │
-│                                  :        command                                                                                        │
+│ j/k      up/down      enter/d  detail       1-0      sort col 1-10ctrl+z   Toggle attention filter (hide healthy/dim rows)ctrl+r   refresh      :q       exit│
+│ g/G      top/bottom   y        yaml                                                     esc      back         :ctx     switch profile    │
+│ pgup     page up      J        json                                                     q        quit         :profile switch profile    │
+│ pgdn     page down    t        cloudtrail events                                            i        identity     :region  switch region │
+│ h/l      scroll cols  c        copy id                                                  !        error log    :theme   switch theme      │
+│                       /        filter                                                   ?        help         :help    show help         │
+│                       :        command                                                                        :root    main menu         │
+│                                                                                                               :main    main menu         │
+│                                                                                                               :<res>   e.g. :ec2 :s3 :lambda│
 │                                                                                                                                          │
 │                                                         Theme: Tokyo Night Dark                                                          │
 │                                                          Press any key to close                                                          │
-│                                                                                                                                          │
-│                                                                                                                                          │
 │                                                                                                                                          │
 │                                                                                                                                          │
 │                                                                                                                                          │

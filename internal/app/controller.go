@@ -486,6 +486,13 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 		}
 		return c.snapshot(), nil
 
+	case ActionToggleFocus:
+		// Detail-only: Tab toggles focus between the field and related columns.
+		if vs, tasks, handled := c.applyDetailActions(a); handled {
+			return vs, tasks
+		}
+		return c.snapshot(), nil
+
 	case ActionSearch:
 		if vs, tasks, handled := c.applyDetailActions(a); handled {
 			return vs, tasks

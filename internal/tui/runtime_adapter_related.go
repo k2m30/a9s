@@ -339,7 +339,11 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 					}
 				}
 			}
-			detail := views.NewDetail(r, msg.TargetType, m.viewConfig, m.keys)
+			// Push ScreenDetail onto the controller stack and seed DetailState.
+			m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenDetail}})
+			m.ctrl.EnsureDetailState(r, msg.TargetType)
+			m.ctrl.InitDetailRelatedRows(msg.TargetType)
+			detail := views.NewDetailWithCtrl(r, msg.TargetType, m.viewConfig, m.keys, m.ctrl)
 			detail.SetNavProvider(resource.GetNavigableFields)
 			detail.SetSize(m.innerSize())
 			m.pushView(&detail)

@@ -172,12 +172,21 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		if result.ReplaceCurrent {
 			m.popView()
 		}
-		d := views.NewDetail(*result.Resource, result.ResolvedType, m.viewConfig, m.keys)
+		// Push ScreenDetail onto the controller stack and seed DetailState so
+		// Snapshot().Body.Detail is non-nil from the first render.
+		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenDetail}})
+		m.ctrl.EnsureDetailState(*result.Resource, result.ResolvedType)
+		// Initialise related rows from registered defs so the controller body
+		// shows loading state immediately (mirrors newRightColumn on SetSize).
+		m.ctrl.InitDetailRelatedRows(result.ResolvedType)
+		// Seed wave-2 findings into the controller immediately when the resource
+		// already carries a finding (wave-1 or pre-loaded wave-2).
+		if ef, ad := findingFromResource(*result.Resource); ef != nil {
+			m.ctrl.ApplyDetailFinding(ef, ad)
+		}
+		d := views.NewDetailWithCtrl(*result.Resource, result.ResolvedType, m.viewConfig, m.keys, m.ctrl)
 		d.SetNavProvider(resource.GetNavigableFields)
 		d.SetSize(m.innerSize())
-		if ef, ad := findingFromResource(*result.Resource); ef != nil {
-			d.SetEnrichmentFinding(ef, ad)
-		}
 		m.pushView(&d)
 		var cmds []tea.Cmd
 		if result.DispatchEnrich {
@@ -451,6 +460,12 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	// Detail view: re-trigger related resource checks and enrichment.
 	if d, ok := m.activeView().(*views.DetailModel); ok {
 		d.ResetRightColumn()
+		// Controller-backed path: also reset controller's RelatedRows to loading
+		// state so View() (which renders from the snapshot) shows loading rows
+		// immediately rather than stale counts.
+		if d.IsControllerBacked() {
+			m.ctrl.ResetDetailRelatedRows(d.ResourceType())
+		}
 		rt := d.ResourceType()
 		srcRes := d.SourceResource()
 		m.core.RelatedCacheDelete(runtime.RelatedCacheKey(rt, srcRes.ID))

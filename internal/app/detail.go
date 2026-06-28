@@ -110,7 +110,33 @@ func (c *Controller) ApplyDetailFinding(f *domain.Finding, ad *domain.AttentionD
 	if ds == nil {
 		return
 	}
+	c.applyFindingToState(ds, f, ad)
+}
 
+// ApplyDetailFindingForResource applies a wave-2 finding to the detail screen in
+// the stack whose resource matches (resourceType, resourceID), even when it is
+// NOT the top screen. Enrichment results arrive while a different detail may be
+// active, so the finding must reach the matching STACKED detail.
+// No-op when no stacked detail matches.
+func (c *Controller) ApplyDetailFindingForResource(resourceType, resourceID string, f *domain.Finding, ad *domain.AttentionDetail) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for i := range c.stack {
+		if c.stack[i].ID != runtime.ScreenDetail {
+			continue
+		}
+		ds := c.stack[i].State.Detail
+		if ds == nil || ds.Resource.ID != resourceID || ds.ResourceType != resourceType {
+			continue
+		}
+		c.applyFindingToState(ds, f, ad)
+	}
+}
+
+// applyFindingToState merges (or clears, when f is nil) a wave-2 enrichment
+// finding on the given DetailState, adjusting FieldCursor for the change in the
+// attention-prepend size. Callers must hold c.mu (write).
+func (c *Controller) applyFindingToState(ds *DetailState, f *domain.Finding, ad *domain.AttentionDetail) {
 	// Capture old prepend size before stripping, so the cursor delta can be computed.
 	oldPrepend := attentionPrependCount(ds.Findings, ds.AttentionDetails)
 
@@ -175,8 +201,8 @@ func (c *Controller) ApplyDetailFinding(f *domain.Finding, ad *domain.AttentionD
 }
 
 // ApplyDetailRelated replaces the RelatedRows slice on the top detail screen's
-// DetailState. Called when the related-panel checker results arrive. No-op when
-// the top screen is not ScreenDetail.
+// DetailState. Used for bulk updates (e.g. cache-hit replay). No-op when the
+// top screen is not ScreenDetail.
 func (c *Controller) ApplyDetailRelated(rows []DetailRelatedRow) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -185,6 +211,126 @@ func (c *Controller) ApplyDetailRelated(rows []DetailRelatedRow) {
 		return
 	}
 	ds.RelatedRows = rows
+}
+
+// ApplyDetailRelatedResult merges one checker result into the top detail
+// screen's DetailState.RelatedRows, matching by DefDisplayName (identical to
+// rightColumnModel.Update semantics). If no row with that DisplayName exists,
+// the result is appended. No-op when the top screen is not ScreenDetail.
+func (c *Controller) ApplyDetailRelatedResult(displayName, targetType string, count int, loading bool, errMsg string, approximate bool, fetchFilter map[string]string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	ds := c.topDetailState()
+	if ds == nil {
+		return
+	}
+	// Find existing row by DisplayName.
+	for i := range ds.RelatedRows {
+		if ds.RelatedRows[i].DisplayName == displayName {
+			ds.RelatedRows[i].Count = count
+			ds.RelatedRows[i].Loading = loading
+			ds.RelatedRows[i].Err = errMsg
+			ds.RelatedRows[i].Approximate = approximate
+			ds.RelatedRows[i].FetchFilter = fetchFilter
+			return
+		}
+	}
+	// Not found — append new row.
+	ds.RelatedRows = append(ds.RelatedRows, DetailRelatedRow{
+		TargetType:  targetType,
+		DisplayName: displayName,
+		Count:       count,
+		Loading:     loading,
+		Err:         errMsg,
+		Approximate: approximate,
+		FetchFilter: fetchFilter,
+	})
+}
+
+// InitDetailRelatedRows initialises the RelatedRows slice from registered
+// related defs for the resource type, setting all rows to loading state.
+// This mirrors what newRightColumn() does in the TUI on SetSize. Must be
+// called after EnsureDetailState when the type has related defs, so that
+// Snapshot().Body.Detail.Related shows loading rows immediately.
+// No-op when the top screen is not ScreenDetail or rows are already set.
+func (c *Controller) InitDetailRelatedRows(resourceType string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	ds := c.topDetailState()
+	if ds == nil || len(ds.RelatedRows) > 0 {
+		return
+	}
+	defs := resource.GetRelated(resourceType)
+	if len(defs) == 0 {
+		return
+	}
+	rows := make([]DetailRelatedRow, 0, len(defs))
+	for _, def := range defs {
+		rows = append(rows, DetailRelatedRow{
+			TargetType:  def.TargetType,
+			DisplayName: def.DisplayName,
+			Count:       -1,
+			Loading:     true,
+		})
+	}
+	ds.RelatedRows = rows
+	// A populated related panel is visible; reflect it in the stored flag so
+	// focus/filter/cursor actions (which gate on RelatedVisible) take effect.
+	// A narrow terminal overrides this via SetDetailRelatedVisible(false, …).
+	ds.RelatedVisible = true
+}
+
+// SetDetailRelatedVisible sets the RelatedVisible and RelatedHidden flags on
+// the top detail screen directly. Used by the TUI when it has already computed
+// the desired state from local flags (e.g. auto-show vs explicit toggle) and
+// needs the controller to reflect that state. Setting hidden=true suppresses
+// the auto-show logic in buildDetailBody for the lifetime of the screen.
+// No-op when the top screen is not ScreenDetail.
+func (c *Controller) SetDetailRelatedVisible(visible, hidden bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	ds := c.topDetailState()
+	if ds == nil {
+		return
+	}
+	ds.RelatedVisible = visible
+	ds.RelatedHidden = hidden
+	if !visible {
+		ds.RelatedFocus = false
+	}
+}
+
+// ResetDetailRelatedRows unconditionally resets RelatedRows to loading state
+// from the registered related defs, discarding any loaded counts. Called by
+// handleRefresh so stale counts are cleared before the new checker results
+// arrive — mirrors ResetRightColumn() on the TUI side.
+// No-op when the top screen is not ScreenDetail.
+func (c *Controller) ResetDetailRelatedRows(resourceType string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	ds := c.topDetailState()
+	if ds == nil {
+		return
+	}
+	defs := resource.GetRelated(resourceType)
+	if len(defs) == 0 {
+		ds.RelatedRows = nil
+		return
+	}
+	rows := make([]DetailRelatedRow, 0, len(defs))
+	for _, def := range defs {
+		rows = append(rows, DetailRelatedRow{
+			TargetType:  def.TargetType,
+			DisplayName: def.DisplayName,
+			Count:       -1,
+			Loading:     true,
+		})
+	}
+	ds.RelatedRows = rows
+	// A populated related panel is visible; reflect it in the stored flag so
+	// focus/filter/cursor actions (which gate on RelatedVisible) take effect.
+	// A narrow terminal overrides this via SetDetailRelatedVisible(false, …).
+	ds.RelatedVisible = true
 }
 
 // DetailFrameTitle returns the frame-border title for the top detail screen.
@@ -224,6 +370,12 @@ func (c *Controller) applyDetailActions(a Action) (ViewState, []runtime.TaskRequ
 		if !ds.RelatedFocus {
 			if ds.FieldCursor > 0 {
 				ds.FieldCursor--
+				// Skip section headers and spacers — mirrors the TUI legacy path.
+				items := buildDetailFieldItems(ds, c.viewConfig)
+				for ds.FieldCursor > 0 && ds.FieldCursor < len(items) &&
+					(items[ds.FieldCursor].IsSection || items[ds.FieldCursor].IsSpacer) {
+					ds.FieldCursor--
+				}
 			}
 		} else {
 			if ds.RelatedCursor > 0 {
@@ -234,9 +386,15 @@ func (c *Controller) applyDetailActions(a Action) (ViewState, []runtime.TaskRequ
 
 	case ActionMoveDown:
 		if !ds.RelatedFocus {
-			fieldCount := c.detailFieldCount(ds)
+			items := buildDetailFieldItems(ds, c.viewConfig)
+			fieldCount := len(items)
 			if ds.FieldCursor < fieldCount-1 {
 				ds.FieldCursor++
+				// Skip section headers and spacers — mirrors the TUI legacy path.
+				for ds.FieldCursor < fieldCount-1 &&
+					(items[ds.FieldCursor].IsSection || items[ds.FieldCursor].IsSpacer) {
+					ds.FieldCursor++
+				}
 			}
 		} else {
 			relatedCount := c.detailRelatedVisibleCount(ds)
@@ -324,14 +482,27 @@ func (c *Controller) applyDetailActions(a Action) (ViewState, []runtime.TaskRequ
 
 	case ActionToggleRelated:
 		ds.RelatedVisible = !ds.RelatedVisible
+		// Once the user toggles, RelatedHidden gates auto-show so the panel
+		// stays hidden across resizes when the user has turned it off.
+		ds.RelatedHidden = true
 		if !ds.RelatedVisible {
 			ds.RelatedFocus = false
 		}
 		return c.snapshot(), nil, true
 
+	case ActionToggleFocus:
+		// Tab: toggle focus between left (field) column and right (related) column.
+		// Only effective when the related panel is visible and has actionable rows.
+		if ds.RelatedVisible {
+			ds.RelatedFocus = !ds.RelatedFocus
+		}
+		return c.snapshot(), nil, true
+
 	case ActionSetFilter:
-		// Filter applies to related panel when related is focused and visible.
-		if ds.RelatedVisible && ds.RelatedFocus {
+		// Related-panel filter. The renderer only emits ActionSetFilter for the
+		// related panel while it is focused, so we trust that intent rather than
+		// re-checking ds.RelatedFocus (which can lag the renderer's focus state).
+		if ds.RelatedVisible {
 			ds.RelatedFilter = a.Arg
 			ds.RelatedFilterActive = a.Arg != ""
 			ds.RelatedCursor = 0
@@ -395,8 +566,15 @@ func buildDetailBody(ds *DetailState, vc *config.ViewsConfig) *DetailBody {
 	}
 	keyWidth := computeDetailKeyWidth(topPaths)
 
-	// Build RelatedBlocks.
+	// Build RelatedBlocks. When ds.RelatedRows is nil/empty but the resource
+	// type has registered related defs, synthesise loading-state blocks from
+	// those defs. This mirrors what newRightColumn() does in the TUI: it creates
+	// one row per RelatedDef with count=-1/loading=true so the panel renders
+	// its "loading" state immediately on push, before checker results arrive.
 	related := buildDetailRelatedBlocks(ds)
+	if len(related) == 0 && len(ds.RelatedRows) == 0 {
+		related = buildDetailRelatedLoadingBlocks(ds.ResourceType)
+	}
 
 	// Clamp FieldCursor.
 	fc := ds.FieldCursor
@@ -416,11 +594,29 @@ func buildDetailBody(ds *DetailState, vc *config.ViewsConfig) *DetailBody {
 		rc = 0
 	}
 
+	// Clamp RelatedScroll.
+	rs := max(ds.RelatedScroll, 0)
+	if len(related) > 0 && rs >= len(related) {
+		rs = len(related) - 1
+	}
+
+	// RelatedVisible: auto-show when related blocks exist (matching TUI SetSize
+	// auto-show), unless the user has explicitly hidden the panel (RelatedHidden).
+	// When RelatedHidden is set, use ds.RelatedVisible directly.
+	var relatedVisible bool
+	if ds.RelatedHidden {
+		relatedVisible = ds.RelatedVisible
+	} else {
+		relatedVisible = ds.RelatedVisible || len(related) > 0
+	}
+
 	return &DetailBody{
 		Fields:              fields,
 		Related:             related,
 		RelatedFocused:      ds.RelatedFocus,
+		RelatedVisible:      relatedVisible,
 		RelatedCursor:       rc,
+		RelatedScroll:       rs,
 		RelatedFilter:       ds.RelatedFilter,
 		RelatedFilterActive: ds.RelatedFilterActive,
 		RelatedSourceType:   ds.ResourceType,
@@ -431,6 +627,26 @@ func buildDetailBody(ds *DetailState, vc *config.ViewsConfig) *DetailBody {
 		FieldCursor:         fc,
 		KeyWidth:            keyWidth,
 	}
+}
+
+// buildDetailRelatedLoadingBlocks constructs loading-state RelatedBlocks from
+// registered related defs when the DetailState has no RelatedRows yet. Mirrors
+// newRightColumn(defs, res, sourceType) which sets count=-1, loading=true.
+func buildDetailRelatedLoadingBlocks(resourceType string) []RelatedBlock {
+	defs := resource.GetRelated(resourceType)
+	if len(defs) == 0 {
+		return nil
+	}
+	blocks := make([]RelatedBlock, 0, len(defs))
+	for _, def := range defs {
+		blocks = append(blocks, RelatedBlock{
+			Name:       def.DisplayName,
+			Count:      -1,
+			Loading:    true,
+			TargetType: def.TargetType,
+		})
+	}
+	return blocks
 }
 
 // buildDetailFieldItems runs the same projector pipeline as
