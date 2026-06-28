@@ -608,8 +608,10 @@ func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 	if td := resource.FindResourceType(msg.ResourceType); td != nil {
 		canon = td.ShortName
 	}
-	// Walk the stack from top to bottom; apply to every matching list screen
-	// so stacked same-type lists (rare but possible) all update.
+	// A fetch result belongs to a single list — the active (topmost) one of its
+	// type. Apply it to the FIRST matching list from the top and stop; fanning it
+	// out to every same-type list would overwrite a stacked filtered/child list's
+	// rows onto the list beneath it (and vice-versa).
 	for i := len(c.stack) - 1; i >= 0; i-- {
 		s := &c.stack[i]
 		if s.ID != runtime.ScreenResourceList && s.ID != runtime.ScreenChildList {
@@ -623,6 +625,7 @@ func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 			continue
 		}
 		c.applyResourcesLoaded(s.State.List, canon, msg.Resources, msg.Pagination, msg.Append)
+		return
 	}
 }
 
