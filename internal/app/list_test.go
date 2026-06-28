@@ -35,6 +35,7 @@ import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/app"
+	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
@@ -1164,5 +1165,163 @@ func TestGetters_NoListScreen_ReturnZeroValues(t *testing.T) {
 	}
 	if row := c.GetListSelectedRow(); row != 0 {
 		t.Errorf("GetListSelectedRow on menu: got %d want 0", row)
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Regression tests for the three list-path bugs
+// ─────────────────────────────────────────────────────────────────────────────
+
+// TestBug1_PerScreenRowStorage_SameTypeStackedScreensAreIndependent tests that
+// two stacked list screens of the same resource type each hold their own row
+// set, so navigating back to the first screen shows the original rows (not the
+// second screen's filtered/related rows).
+//
+// Scenario:
+//   - Push list screen 1 for "ec2" → load rows A (3 instances).
+//   - Push list screen 2 for "ec2" (simulates a filtered/related pivot) → load
+//     rows B (1 instance).
+//   - Assert: top screen (screen 2) shows rows B only.
+//   - Pop back to screen 1.
+//   - Assert: top screen (screen 1) shows rows A (not B), with correct count.
+func TestBug1_PerScreenRowStorage_SameTypeStackedScreensAreIndependent(t *testing.T) {
+	c := newListController("ec2")
+
+	// Screen 1: load full row set A.
+	rowsA := fakeEC2Resources() // 3 items
+	c.ApplyResourcesLoaded("ec2", rowsA, nil, false)
+
+	lb1 := listBodyOrFail(t, c)
+	if len(lb1.Rows) != 3 {
+		t.Fatalf("screen 1 after load: want 3 rows, got %d", len(lb1.Rows))
+	}
+
+	// Push screen 2 for same type "ec2" (simulates a related/filtered child list).
+	c.PushChildListScreen("ec2")
+
+	// Screen 2: load a smaller row set B (1 item).
+	rowsB := fakeEC2Resources()[:1] // 1 item
+	c.ApplyResourcesLoaded("ec2", rowsB, nil, false)
+
+	lb2 := listBodyOrFail(t, c)
+	if len(lb2.Rows) != 1 {
+		t.Fatalf("screen 2 after load: want 1 row, got %d", len(lb2.Rows))
+	}
+	if lb2.Rows[0].ResourceID != rowsB[0].ID {
+		t.Errorf("screen 2 row ID: got %q want %q", lb2.Rows[0].ResourceID, rowsB[0].ID)
+	}
+
+	// Pop back to screen 1.
+	c.Apply(app.Action{Kind: app.ActionBack})
+
+	// Screen 1 must still show rows A — not rows B.
+	lb1After := listBodyOrFail(t, c)
+	if len(lb1After.Rows) != 3 {
+		t.Fatalf("screen 1 after pop: want 3 rows (original A), got %d — screen 2's rows corrupted screen 1", len(lb1After.Rows))
+	}
+	for i, want := range rowsA {
+		if lb1After.Rows[i].ResourceID != want.ID {
+			t.Errorf("screen 1 after pop row[%d]: got %q want %q", i, lb1After.Rows[i].ResourceID, want.ID)
+		}
+	}
+
+	// Pagination on screen 1 must also be clean (no bleed from screen 2).
+	if lb1After.Truncated {
+		t.Error("screen 1 after pop: Truncated should be false (not bled from screen 2)")
+	}
+}
+
+// TestBug2_ListSelected_ClampsWhenVisibleShrinks tests that ListSelected
+// returns the clamped visible row (not false/zero-value) when a refresh shrinks
+// the list below the stored SelectedRow index.  Before the fix, the cursor
+// pointed past the end and ListSelected returned (Resource{}, false) even
+// though buildListBody rendered a highlighted last row.
+func TestBug2_ListSelected_ClampsWhenVisibleShrinks(t *testing.T) {
+	c := newListController("ec2")
+	resources := fakeEC2Resources() // 3 rows
+	c.ApplyResourcesLoaded("ec2", resources, nil, false)
+
+	// Move cursor to row 2 (last row in the 3-item list).
+	c.Apply(app.Action{Kind: app.ActionMoveDown})
+	c.Apply(app.Action{Kind: app.ActionMoveDown})
+	if got := c.GetListSelectedRow(); got != 2 {
+		t.Fatalf("precondition: SelectedRow should be 2, got %d", got)
+	}
+
+	// Replace the cache with only 1 item — cursor is now out-of-range.
+	c.ApplyResourcesLoaded("ec2", resources[:1], nil, false)
+
+	// ListSelected must return the clamped last visible row, not false.
+	r, ok := c.ListSelected()
+	if !ok {
+		t.Fatal("ListSelected after shrink: ok should be true (clamped to last row), got false — cursor stuck past end")
+	}
+	if r.ID != resources[0].ID {
+		t.Errorf("ListSelected after shrink: got ID %q want %q (clamped to row 0)", r.ID, resources[0].ID)
+	}
+
+	// buildListBody must also reflect the clamp.
+	lb := listBodyOrFail(t, c)
+	if lb.Selected != 0 {
+		t.Errorf("buildListBody after shrink: Selected=%d want 0", lb.Selected)
+	}
+}
+
+// TestBug3_SortUsesViewConfig_CustomSortKeyApplied tests that listSortResources
+// resolves column definitions from the controller's viewConfig (not just the
+// built-in defaults), so a user-configured sort_key column sorts by the correct
+// field — mirroring the exact same priority as buildListBody and resourcelist.go.
+func TestBug3_SortUsesViewConfig_CustomSortKeyApplied(t *testing.T) {
+	// Build a ViewsConfig that overrides the ec2 column set with a "Score"
+	// column whose sort_key maps to a numeric "score" field.  The built-in
+	// ec2 defaults do not have this column, so without the Bug 3 fix the sort
+	// falls back to lexicographic string comparison on the wrong key.
+	vc := &config.ViewsConfig{
+		Views: map[string]config.ViewDef{
+			"ec2": {
+				List: []config.ListColumn{
+					{Title: "Name", Key: "name", Width: 20},
+					{Title: "Score", Key: "score", Width: 10, SortKey: "score"},
+				},
+			},
+		},
+	}
+
+	c := newListController("ec2")
+	c.SetViewConfig(vc)
+
+	// Resources with numeric scores stored in Fields["score"].  Lexicographic
+	// order would give "10" < "2" < "9", but numeric order is 2 < 9 < 10.
+	resources := []resource.Resource{
+		{ID: "i-score-10", Name: "high", Type: "ec2", Fields: map[string]string{"name": "high", "score": "10"}},
+		{ID: "i-score-02", Name: "low", Type: "ec2", Fields: map[string]string{"name": "low", "score": "2"}},
+		{ID: "i-score-09", Name: "mid", Type: "ec2", Fields: map[string]string{"name": "mid", "score": "9"}},
+	}
+	c.ApplyResourcesLoaded("ec2", resources, nil, false)
+
+	// Sort ascending by the custom "score" column.
+	c.Apply(app.Action{Kind: app.ActionSort, Arg: "score"})
+
+	lb := listBodyOrFail(t, c)
+	if len(lb.Rows) != 3 {
+		t.Fatalf("sort by viewConfig score: want 3 rows, got %d", len(lb.Rows))
+	}
+
+	// Numeric ascending: 2, 9, 10.
+	wantOrder := []string{"i-score-02", "i-score-09", "i-score-10"}
+	for i, want := range wantOrder {
+		if lb.Rows[i].ResourceID != want {
+			t.Errorf("sort by viewConfig score asc: Rows[%d].ResourceID got %q want %q", i, lb.Rows[i].ResourceID, want)
+		}
+	}
+
+	// Now descending: 10, 9, 2.
+	c.Apply(app.Action{Kind: app.ActionSort, Arg: "score"})
+	lb = listBodyOrFail(t, c)
+	wantDesc := []string{"i-score-10", "i-score-09", "i-score-02"}
+	for i, want := range wantDesc {
+		if lb.Rows[i].ResourceID != want {
+			t.Errorf("sort by viewConfig score desc: Rows[%d].ResourceID got %q want %q", i, lb.Rows[i].ResourceID, want)
+		}
 	}
 }
