@@ -60,26 +60,43 @@ func listPageSizeFor(a Action) int {
 }
 
 // listVisibleCount returns the number of rows visible in the current list
-// state (after filter/attention/relatedIDSet). Uses the resource cache stored
-// on the controller.
+// state (after filter/attention/relatedIDSet). Reads rows from ls.Rows so
+// that two stacked screens of the same type stay independent.
 func (c *Controller) listVisibleCount(ls *ListState) int {
 	top := c.stack[len(c.stack)-1]
 	typeName := top.Ctx.ResourceType
 	if typeName == "" {
 		return 0
 	}
-	resources := c.cachedResources(typeName)
+	resources := c.listScreenResources(ls, typeName)
 	visible := c.applyListFilters(ls, typeName, resources)
 	return len(visible)
 }
 
 // cachedResources returns the resource slice for typeName from the controller's
-// resource cache, or nil if no data has been received yet.
+// type-keyed resource cache, or nil if no data has been received yet.
+// Callers that have a per-screen ListState should prefer listScreenResources
+// so that stacked same-type screens read their own rows, not a shared slice.
 func (c *Controller) cachedResources(typeName string) []resource.Resource {
 	if c.resourceCache == nil {
 		return nil
 	}
 	return c.resourceCache[typeName]
+}
+
+// listScreenResources returns the resource slice for the given screen's
+// ListState.  When ls.Rows is non-nil (the normal case after
+// applyResourcesLoaded writes per-screen rows), it is returned directly —
+// guaranteeing that two stacked list screens of the same type see their own
+// independent row sets.  When ls.Rows is nil (e.g. the screen was freshly
+// pushed and no fetch has completed yet), the call falls back to the
+// type-keyed cache so that callers that only have a typeName (e.g.
+// GetListAllResources, ApplyListFieldUpdates) still work correctly.
+func (c *Controller) listScreenResources(ls *ListState, typeName string) []resource.Resource {
+	if ls != nil && ls.Rows != nil {
+		return ls.Rows
+	}
+	return c.cachedResources(typeName)
 }
 
 // applyListFilters applies the relatedIDSet prefilter, text filter, and
@@ -179,12 +196,22 @@ func listHasIssueFinding(r resource.Resource) bool {
 
 // listSortResources sorts resources by ls.SortCol/SortDir, mirroring
 // sortFiltered in views/sort.go. No-op when SortCol is empty.
-func listSortResources(ls *ListState, typeName string, resources []resource.Resource) []resource.Resource {
+// vc is the per-session view config (nil = built-in defaults only); passing
+// the controller's viewConfig ensures user-configured sort_key / sort_path
+// columns resolve correctly — matching what buildListBody and resourcelist.go
+// do (Bug 3 fix).
+func listSortResources(vc *config.ViewsConfig, ls *ListState, typeName string, resources []resource.Resource) []resource.Resource {
 	if ls.SortCol == "" || len(resources) == 0 {
 		return resources
 	}
 
-	vd := config.GetViewDef(nil, typeName)
+	// Resolve columns from viewConfig first (same priority as buildListBody /
+	// resolveColumns in table_render.go) so custom sort_key / sort_path columns
+	// are found even when they are not in the built-in defaults.
+	vd := config.GetViewDef(vc, typeName)
+	if len(vd.List) == 0 {
+		vd = config.GetViewDef(nil, typeName)
+	}
 	var col *config.ListColumn
 	sortColLower := strings.ToLower(ls.SortCol)
 	for i := range vd.List {
@@ -308,12 +335,29 @@ func listToFloat(v reflect.Value) (float64, bool) {
 	}
 }
 
-// applyResourcesLoaded stores a page of resources into the controller's cache
-// for typeName. When appendPage is true the new slice is appended; otherwise
-// it replaces. Mirrors what ResourceListModel.Update does on ResourcesLoaded.
+// applyResourcesLoaded stores a page of resources per-screen (on ls.Rows) and
+// also in the type-keyed resourceCache for callers that only have a typeName
+// (ApplyListFieldUpdates, GetListAllResources). When appendPage is true the
+// new slice is appended; otherwise it replaces. Mirrors what
+// ResourceListModel.Update does on ResourcesLoaded.
 // Called from handleResourcesLoadedEvent (via Handle) and from the public
 // ApplyResourcesLoaded test seam in testing.go.
 func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resources []resource.Resource, pagination *resource.PaginationMeta, appendPage bool) {
+	// --- Per-screen storage (Bug 1 fix) -----------------------------------
+	// Writing to ls.Rows ensures that two stacked list screens of the same
+	// resource type never share a row slice. Each screen's fetch result lands
+	// exclusively on that screen's ListState.
+	if ls != nil {
+		if appendPage {
+			ls.Rows = append(ls.Rows, resources...)
+		} else {
+			ls.Rows = resources
+		}
+	}
+
+	// --- Type-keyed cache (retained for field-update / all-resources reads) --
+	// ApplyListFieldUpdates and GetListAllResources key on typeName, not on a
+	// specific screen. Keep them in sync so those callers still work correctly.
 	if c.resourceCache == nil {
 		c.resourceCache = make(map[string][]resource.Resource)
 	}
@@ -322,6 +366,7 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	} else {
 		c.resourceCache[typeName] = resources
 	}
+
 	if ls != nil {
 		ls.Loading = false
 		ls.LoadingMore = false
@@ -498,14 +543,16 @@ func (c *Controller) buildListBody(ctx runtime.ScreenContext, ls *ListState) *Li
 	// are not silently switched to the 9-column built-in defaults.
 	columns := resolveListColumnsForBuild(c.viewConfig, typeName, td)
 
-	// Build the row set from cache.
-	allResources := c.cachedResources(typeName)
+	// Build the row set from the per-screen store (Bug 1 fix: uses ls.Rows when
+	// available so two stacked same-type screens see their own independent rows).
+	allResources := c.listScreenResources(ls, typeName)
 
 	// Apply filters (relatedIDSet → text → attention).
 	visible := c.applyListFilters(ls, typeName, allResources)
 
-	// Apply sort.
-	visible = listSortResources(ls, typeName, visible)
+	// Apply sort using viewConfig so user-configured sort_key/sort_path columns
+	// resolve correctly (Bug 3 fix).
+	visible = listSortResources(c.viewConfig, ls, typeName, visible)
 
 	// Clamp selected row.
 	selected := ls.SelectedRow
@@ -948,7 +995,7 @@ func (c *Controller) buildListFrameTitle(ctx runtime.ScreenContext, ls *ListStat
 		return name
 	}
 
-	allResources := c.cachedResources(typeName)
+	allResources := c.listScreenResources(ls, typeName)
 	total := len(allResources)
 	visible := c.applyListFilters(ls, typeName, allResources)
 	filtered := len(visible)
@@ -992,6 +1039,10 @@ func (c *Controller) buildListFrameTitle(ctx runtime.ScreenContext, ls *ListStat
 // ListSelected returns the resource at the current cursor position in the
 // visible (filtered+sorted) row set, plus a navigable bool (always true when
 // a resource is present — row-dependent guards are wired in the flip step).
+// The selection index is clamped to the visible count before indexing (Bug 2
+// fix) so that a refresh that shrinks the list never leaves the cursor pointing
+// past the end, causing Enter/copy to silently do nothing while a row is
+// visually highlighted.
 func (c *Controller) ListSelected() (resource.Resource, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -1002,14 +1053,24 @@ func (c *Controller) ListSelected() (resource.Resource, bool) {
 	top := c.stack[len(c.stack)-1]
 	typeName := top.Ctx.ResourceType
 
-	allResources := c.cachedResources(typeName)
+	allResources := c.listScreenResources(ls, typeName)
 	visible := c.applyListFilters(ls, typeName, allResources)
-	visible = listSortResources(ls, typeName, visible)
+	visible = listSortResources(c.viewConfig, ls, typeName, visible)
 
-	if len(visible) == 0 || ls.SelectedRow >= len(visible) {
+	if len(visible) == 0 {
 		return resource.Resource{}, false
 	}
-	return visible[ls.SelectedRow], true
+	// Clamp to match buildListBody so the caller always gets the row that the
+	// UI is actually highlighting, even when a concurrent refresh shrinks the
+	// visible count below the stored SelectedRow.
+	idx := ls.SelectedRow
+	if idx >= len(visible) {
+		idx = len(visible) - 1
+	}
+	if idx < 0 {
+		idx = 0
+	}
+	return visible[idx], true
 }
 
 // GetListFilter returns the current filter text of the top list screen.
@@ -1455,7 +1516,7 @@ func (c *Controller) GetListIssueCount() int {
 	} else {
 		return 0
 	}
-	all := c.cachedResources(typeName)
+	all := c.listScreenResources(ls, typeName)
 	findings := c.listEnrichmentFindings(typeName)
 	ic := 0
 	for _, r := range all {
@@ -1483,26 +1544,41 @@ func (c *Controller) GetListVisibleResources() []resource.Resource {
 	}
 	top := c.stack[len(c.stack)-1]
 	typeName := top.Ctx.ResourceType
-	all := c.cachedResources(typeName)
+	all := c.listScreenResources(ls, typeName)
 	visible := c.applyListFilters(ls, typeName, all)
-	return listSortResources(ls, typeName, visible)
+	return listSortResources(c.viewConfig, ls, typeName, visible)
 }
 
 // ApplyListFieldUpdates merges Wave-2 field updates into the cached resource
 // slice for typeName. Keyed by resource ID then field key.
+// Updates are applied both to the top list screen's ls.Rows (the primary read
+// path after the Bug 1 fix) and to the type-keyed resourceCache (for callers
+// such as GetListAllResources that don't have a specific ListState).
 func (c *Controller) ApplyListFieldUpdates(typeName string, updates map[string]map[string]string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if len(updates) == 0 || c.resourceCache == nil {
+	if len(updates) == 0 {
 		return
 	}
-	for i := range c.resourceCache[typeName] {
-		if kvMap, ok := updates[c.resourceCache[typeName][i].ID]; ok {
-			if c.resourceCache[typeName][i].Fields == nil {
-				c.resourceCache[typeName][i].Fields = make(map[string]string, len(kvMap))
+	// Helper: merge updates into a resource slice in-place.
+	applyToSlice := func(rows []resource.Resource) {
+		for i := range rows {
+			if kvMap, ok := updates[rows[i].ID]; ok {
+				if rows[i].Fields == nil {
+					rows[i].Fields = make(map[string]string, len(kvMap))
+				}
+				maps.Copy(rows[i].Fields, kvMap)
 			}
-			maps.Copy(c.resourceCache[typeName][i].Fields, kvMap)
 		}
+	}
+	// Update the top list screen's per-screen rows first (primary read path).
+	ls := c.topListState()
+	if ls != nil {
+		applyToSlice(ls.Rows)
+	}
+	// Also update the type-keyed cache so GetListAllResources etc. see the same values.
+	if c.resourceCache != nil {
+		applyToSlice(c.resourceCache[typeName])
 	}
 }
 

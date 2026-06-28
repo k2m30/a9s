@@ -27,6 +27,11 @@ type ScreenState struct {
 
 // ListState holds the mutable display state for a resource-list screen.
 type ListState struct {
+	// Rows holds the fetched resource page for THIS screen. Storing rows here
+	// rather than in a Controller-level type-keyed map prevents two stacked
+	// list screens of the same resource type from corrupting each other's data.
+	Rows []resource.Resource `json:"rows,omitempty"`
+
 	Filter           string `json:"filter,omitempty"`
 	SortCol          string `json:"sort_col,omitempty"`
 	SortDir          string `json:"sort_dir,omitempty"` // "asc" | "desc"
