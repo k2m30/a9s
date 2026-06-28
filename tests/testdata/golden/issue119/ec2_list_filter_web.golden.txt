@@ -1,6 +1,6 @@
  a9s v  demo:us-east-1                                                                                                           ? for help 
-┌─────────────────────────────────────────────────────────────── ec2(5/25) ────────────────────────────────────────────────────────────────┐
-│ Name                      State         Lifecycle     Type            Private IP        Public IP         Instance ID                    │
+┌─────────────────────────────────────────────────────────────── ec2(5/27) ────────────────────────────────────────────────────────────────┐
+│ 1:Name                    2:State       3:Lifecycle   4:Type          5:Private IP      6:Public IP       7:Instance ID                  │
 │ web-prod-01               running       on-demand     t3.large        10.0.1.10         54.210.33.112     i-0a1b2c3d4e5f60001            │
 │ web-prod-02               running       on-demand     t3.large        10.0.1.11         54.210.33.113     i-0a1b2c3d4e5f60002            │
 │ web-staging-01            pending       spot          t3.medium       10.0.2.70                           i-0a1b2c3d4e5f60007            │

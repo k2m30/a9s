@@ -1,19 +1,19 @@
  a9s v  demo:us-east-1                                                                                       ? for help 
 ┌──────────────────────────────────────────────────────── help ────────────────────────────────────────────────────────┐
-│ NAVIGATION                           ACTIONS                              OTHER                                      │
+│ NAVIGATION                  ACTIONS                     OTHER                       COMMANDS                         │
 │                                                                                                                      │
-│ j/k      up/down                     enter    select                      i        identity                          │
-│ g        top                         /        filter                      ?        help                              │
-│ G        bottom                      :        command                     esc      back                              │
-│ pgup     page up                     q        quit                                                                   │
-│ pgdn     page down                   ctrl+c   force quit                                                             │
+│ j/k      up/down            enter    select             i        identity           :q       exit                    │
+│ g        top                /        filter             !        error log          :ctx     switch profile          │
+│ G        bottom             :        command            ?        help               :profile switch profile          │
+│ pgup     page up            q        quit               esc      back               :region  switch region           │
+│ pgdn     page down          ctrl+c   force quit                                     :theme   switch theme            │
+│                                                                                     :help    show help               │
+│                                                                                     :root    main menu               │
+│                                                                                     :main    main menu               │
+│                                                                                     :<res>   e.g. :ec2 :s3 :lambda   │
 │                                                                                                                      │
 │                                               Theme: Tokyo Night Dark                                                │
 │                                                Press any key to close                                                │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │
