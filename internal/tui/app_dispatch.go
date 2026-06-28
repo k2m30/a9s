@@ -319,13 +319,21 @@ func (m *Model) tasksToCmd(tasks []runtime.TaskRequest) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-// executeTaskCmd wraps Core.ExecuteTask in a tea.Cmd. The returned event is
+// executeTaskCmd wraps Core.ExecuteTaskAt in a tea.Cmd. The returned event is
 // delivered back into the Update loop as a tea.Msg. Adapter-only tasks fall
 // back to nil (they must be handled by the caller's kind-specific branch).
+//
+// The session snapshot is captured SYNCHRONOUSLY here — before the goroutine
+// runs — so a concurrent session.Rotate (profile/region switch) cannot cause
+// the obsolete task to read the new gen/clients and wrongly pass messages.IsStale.
 func (m Model) executeTaskCmd(req runtime.TaskRequest) tea.Cmd {
 	ctx := m.appCtx
+	// Capture the session snapshot at dispatch time (synchronous, on the Update
+	// goroutine) so a profile/region switch before this cmd executes cannot
+	// restamp the obsolete task with the new generation or clients.
+	snap := m.core.CaptureDispatch()
 	return func() tea.Msg {
-		ev, err := m.core.ExecuteTask(ctx, req)
+		ev, err := m.core.ExecuteTaskAt(ctx, req, snap)
 		if err != nil {
 			if errors.Is(err, runtime.ErrAdapterOnlyTask) {
 				return nil
