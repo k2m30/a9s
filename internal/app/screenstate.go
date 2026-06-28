@@ -1,6 +1,10 @@
 package app
 
-import "github.com/k2m30/a9s/v3/internal/runtime"
+import (
+	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/runtime"
+)
 
 // Screen is one entry on the controller's view stack. It pairs the
 // runtime-issued screen identity and context with the per-screen view
@@ -50,12 +54,46 @@ type ListState struct {
 }
 
 // DetailState holds the mutable display state for a resource-detail screen.
+// Controller-owned fields (per docs/web-ui-state-inventory.md §DetailModel).
 type DetailState struct {
+	// Display-interaction state
 	SearchQuery  string `json:"search_query,omitempty"`
 	SearchCursor int    `json:"search_cursor"`
 	Wrap         bool   `json:"wrap,omitempty"`
-	RelatedFocus bool   `json:"related_focus,omitempty"`
 	ScrollY      int    `json:"scroll_y"`
+	FieldCursor  int    `json:"field_cursor"`
+
+	// Related panel state
+	RelatedVisible bool   `json:"related_visible,omitempty"`
+	RelatedFocus   bool   `json:"related_focus,omitempty"`
+	RelatedCursor  int    `json:"related_cursor"`
+	RelatedScroll  int    `json:"related_scroll"`
+	RelatedFilter  string `json:"related_filter,omitempty"`
+	RelatedFilterActive bool `json:"related_filter_active,omitempty"`
+
+	// Per-screen data: set once at push via EnsureDetailState, updated by enrichment.
+	Resource resource.Resource `json:"resource,omitzero"`
+	// ResourceType is the canonical short name (e.g. "ec2", "rds").
+	ResourceType string `json:"resource_type,omitempty"`
+	// RelatedRows holds the resolved related-panel rows (populated by ApplyDetailRelated).
+	RelatedRows []DetailRelatedRow `json:"related_rows,omitempty"`
+	// Findings holds wave-2 enrichment findings for this resource (set by ApplyDetailFinding).
+	Findings []domain.Finding `json:"findings,omitempty"`
+	// AttentionDetails holds per-finding detail rows (set by ApplyDetailFinding).
+	AttentionDetails map[domain.FindingCode]domain.AttentionDetail `json:"attention_details,omitempty"`
+}
+
+// DetailRelatedRow is one row in the detail screen's related panel, mirroring
+// rightColumnRow but as a serialisable value type (no funcs, no checker).
+type DetailRelatedRow struct {
+	TargetType  string            `json:"target_type"`
+	DisplayName string            `json:"display_name"`
+	Count       int               `json:"count"`      // -1 = loading
+	Loading     bool              `json:"loading,omitempty"`
+	Err         string            `json:"err,omitempty"`
+	Approximate bool              `json:"approximate,omitempty"`
+	ResourceIDs []string          `json:"resource_ids,omitempty"`
+	FetchFilter map[string]string `json:"fetch_filter,omitempty"`
 }
 
 // TextState holds the mutable display state for a YAML/JSON text screen.

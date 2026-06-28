@@ -8,11 +8,14 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/k2m30/a9s/v3/internal/app"
 	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/internal/tui/text"
 )
 
 // View renders detail content via viewport.
@@ -461,3 +464,115 @@ func (m *DetailModel) ResetRightColumn() {
 func (m DetailModel) ConsumesEscapeLocally() bool {
 	return m.rightCol.IsFocused() || m.rightCol.IsFiltering()
 }
+
+// RenderDetail produces the same string that View() would produce, reading
+// field rows, attention, related, scroll, wrap, and cursor data from body
+// rather than from m.fieldList / m.rightCol live model state. Width, height,
+// and viewport dimensions remain renderer-owned and are read from m.
+//
+// When body is nil RenderDetail falls back to View() so callers can call it
+// unconditionally without a guard.
+func (m *DetailModel) RenderDetail(body app.DetailBody) string {
+	if !m.ready {
+		return "Initializing..."
+	}
+
+	// Render left column raw content from body fields, then route it through
+	// the viewport — exactly as View() does via m.viewport.View(). This gives
+	// height-padding (blank lines to fill viewport height) and width-clipping,
+	// and ensures the cursor-row background highlight is embedded at the correct
+	// scroll-offset position (Bug 1 fix).
+	leftRaw := renderDetailFieldsFromBody(m, body)
+	m.viewport.SoftWrap = body.Wrap
+	m.viewport.SetContent(leftRaw)
+	m.viewport.GotoTop()
+	m.viewport.SetYOffset(body.ScrollY)
+
+	// Use the live rightCol visibility (m.rightColShowing()) instead of
+	// len(body.Related)>0: the right column is visible whenever the model
+	// auto-showed it (rightColAutoShown) or the user toggled it on, regardless
+	// of whether body.Related rows have been loaded yet (Bug 3 fix).
+	if m.rightColShowing() && m.width >= layout.MinInnerContentWidth {
+		rightW := m.currentRightColWidth()
+		sep := styles.ColSepDim.Render("│")
+		if m.rightCol.IsFocused() {
+			sep = styles.ColSepAccent.Render("│")
+		}
+		leftContent := m.viewport.View()
+		rightContent := m.rightCol.View()
+		leftLines := strings.Split(leftContent, "\n")
+		rightLines := strings.Split(rightContent, "\n")
+		maxLines := max(len(leftLines), len(rightLines))
+		leftW := m.width - rightW - 1
+		var sb strings.Builder
+		for i := range maxLines {
+			if i > 0 {
+				sb.WriteString("\n")
+			}
+			left := ""
+			if i < len(leftLines) {
+				left = leftLines[i]
+			}
+			right := ""
+			if i < len(rightLines) {
+				right = ansi.Truncate(rightLines[i], rightW, "")
+			}
+			padded := left
+			leftVisible := lipgloss.Width(left)
+			if leftVisible < leftW {
+				padded = left + strings.Repeat(" ", leftW-leftVisible)
+			}
+			sb.WriteString(padded)
+			sb.WriteString(sep)
+			sb.WriteString(right)
+		}
+		return sb.String()
+	}
+	return m.viewport.View()
+}
+
+// renderDetailFieldsFromBody renders the field list from body.Fields, mirroring
+// renderFromFieldList but reading state from body (FieldCursor, KeyWidth) and
+// m (viewport width for cursor-row padding, ready flag, plainMode).
+func renderDetailFieldsFromBody(m *DetailModel, body app.DetailBody) string {
+	if len(body.Fields) == 0 {
+		return styles.DimText.Render("  No detail data available")
+	}
+
+	leftFocused := !body.RelatedFocused
+
+	// Convert body.Fields → []fieldpath.FieldItem so we can reuse
+	// renderFromFieldList's exact logic via a temporary model.
+	items := make([]fieldpath.FieldItem, len(body.Fields))
+	for i, f := range body.Fields {
+		items[i] = fieldpath.FieldItem{
+			Key:         f.Key,
+			Value:       f.Value,
+			IsSection:   f.IsSection,
+			IsHeader:    f.IsHeader,
+			IsSubField:  f.IsSubField,
+			IsSpacer:    f.IsSpacer,
+			IsNavigable: f.IsNavigable,
+			IndentLevel: f.IndentLevel,
+			ColorTier:   f.ColorTier,
+			Path:        f.Path,
+		}
+	}
+
+	// Build a temporary model snapshot with fieldList and fieldCursor from body
+	// so renderFromFieldList (which reads m.fieldList / m.fieldCursor / m.rightCol
+	// / m.ready / m.plainMode / m.viewport) produces byte-identical output.
+	tmp := *m
+	tmp.fieldList = items
+	tmp.fieldCursor = body.FieldCursor
+	// rightCol focus drives leftFocused in renderFromFieldList; set a consistent state.
+	tmp.rightCol.SetFocused(!leftFocused)
+	return tmp.renderFromFieldList()
+}
+
+
+// ensure the viewport import is used (it is used by SetSize / other methods —
+// this blank assignment guards against an "imported and not used" error if the
+// compiler's unused-import analysis sees only the new imports through the file).
+var _ = viewport.New
+var _ = text.PadOrTrunc

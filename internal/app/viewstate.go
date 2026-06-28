@@ -135,10 +135,29 @@ type ListBody struct {
 	LoadingMore bool `json:"loading_more,omitempty"`
 }
 
-// FieldRow is one key-value pair in a detail view.
+// FieldRow is one key-value pair in a detail view, extended with render-time
+// metadata so RenderDetail can reproduce every style branch that
+// renderFromFieldList applies without re-running the projector pipeline.
 type FieldRow struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
+	// IsSection is true for section-header items (rendered with FindingSectionDefault
+	// or tier-colored FindingSectionStopped/FindingSectionPending style).
+	IsSection bool `json:"is_section,omitempty"`
+	// IsHeader is true for sub-section header items (key: style, no value).
+	IsHeader bool `json:"is_header,omitempty"`
+	// IsSubField is true for indented sub-field items (indent via subFieldIndent).
+	IsSubField bool `json:"is_sub_field,omitempty"`
+	// IsSpacer is true for blank separator lines — rendered as "".
+	IsSpacer bool `json:"is_spacer,omitempty"`
+	// IsNavigable is true for navigable (hyperlink-style) fields.
+	IsNavigable bool `json:"is_navigable,omitempty"`
+	// IndentLevel is the sub-field indent depth (1 = phrase, 3 = detail rows).
+	IndentLevel int `json:"indent_level,omitempty"`
+	// ColorTier is the TierColorStyle selector: "!", "~", "ok", "ct-danger", etc.
+	ColorTier string `json:"color_tier,omitempty"`
+	// Path is the field path; "Attention" identifies entries in the attention section.
+	Path string `json:"path,omitempty"`
 }
 
 // FindingRow is one row of supporting evidence for an attention finding.
@@ -153,23 +172,55 @@ type AttentionBlock struct {
 	Message  string       `json:"message"`
 	Severity string       `json:"severity"`
 	Rows     []FindingRow `json:"rows,omitempty"`
+	// Tier is the display tier for coloring: "!" = broken/red, "~" = warning/yellow.
+	Tier string `json:"tier,omitempty"`
+	// RowBucket is the S2 row color bucket used to cap entry colors ("healthy",
+	// "warning", "broken", "dim", ""). Set by buildDetailBody from td.ResolveColor.
+	RowBucket string `json:"row_bucket,omitempty"`
 }
 
 // RelatedBlock is one related-resource panel entry.
 type RelatedBlock struct {
-	Name  string      `json:"name"`
-	Count int         `json:"count"`
-	Items []FieldRow  `json:"items,omitempty"`
+	Name        string            `json:"name"`
+	Count       int               `json:"count"`
+	Items       []FieldRow        `json:"items,omitempty"`
+	Loading     bool              `json:"loading,omitempty"`
+	Err         bool              `json:"err,omitempty"`
+	Approximate bool              `json:"approximate,omitempty"`
+	FetchFilter map[string]string `json:"fetch_filter,omitempty"`
+	// TargetType is the canonical short name of the target resource type.
+	TargetType string `json:"target_type,omitempty"`
 }
 
 // DetailBody is the body of a resource-detail screen.
 type DetailBody struct {
+	// Fields is the ordered list of all rendered field rows (sections + kv pairs
+	// + attention sub-rows + spacers), matching the fieldList that
+	// renderFromFieldList iterates. RenderDetail iterates this slice directly.
 	Fields        []FieldRow       `json:"fields,omitempty"`
 	Attention     []AttentionBlock `json:"attention,omitempty"`
 	Related       []RelatedBlock   `json:"related,omitempty"`
 	RelatedFocused bool            `json:"related_focused,omitempty"`
-	Search        string           `json:"search,omitempty"`
-	Wrap          bool             `json:"wrap,omitempty"`
+	// RelatedCursor is the index in Related of the currently-highlighted row.
+	RelatedCursor int    `json:"related_cursor,omitempty"`
+	// RelatedFilter is the active filter query in the related panel.
+	RelatedFilter string `json:"related_filter,omitempty"`
+	// RelatedFilterActive is true while the related panel filter input is open.
+	RelatedFilterActive bool   `json:"related_filter_active,omitempty"`
+	// RelatedSourceType is the short name of the source resource type, used
+	// for self-pivot-zero filtering in the related panel.
+	RelatedSourceType string `json:"related_source_type,omitempty"`
+	Search        string `json:"search,omitempty"`
+	SearchCursor  int    `json:"search_cursor,omitempty"`
+	Wrap          bool   `json:"wrap,omitempty"`
+	// ScrollY is the viewport top-line offset (mirrors DetailState.ScrollY).
+	ScrollY       int    `json:"scroll_y,omitempty"`
+	// FieldCursor is the index of the highlighted field row (for cursor-selection
+	// rendering in RenderDetail).
+	FieldCursor   int    `json:"field_cursor,omitempty"`
+	// KeyWidth is the pre-computed key-column width so RenderDetail does not
+	// need to scan Fields again.
+	KeyWidth int `json:"key_width,omitempty"`
 }
 
 // SearchMatch is one highlighted match in a text screen.
