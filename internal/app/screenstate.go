@@ -59,10 +59,14 @@ type DetailState struct {
 }
 
 // TextState holds the mutable display state for a YAML/JSON text screen.
+// Lines is the syntax-colored content set once at push time (set by
+// EnsureTextState) and never mutated; all other fields are updated by Apply.
 type TextState struct {
-	Search  string `json:"search,omitempty"`
-	Wrap    bool   `json:"wrap,omitempty"`
-	ScrollY int    `json:"scroll_y"`
+	Lines        []string `json:"lines,omitempty"`
+	Search       string   `json:"search,omitempty"`
+	SearchCursor int      `json:"search_cursor"`
+	Wrap         bool     `json:"wrap,omitempty"`
+	ScrollY      int      `json:"scroll_y"`
 }
 
 // SelectorState holds the mutable display state for a profile/region/theme

@@ -13,6 +13,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/k2m30/a9s/v3/internal/app"
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
@@ -328,6 +329,42 @@ func (m YAMLModel) renderContent() string {
 	}
 
 	return colorizeYAML(string(data))
+}
+
+// RenderText renders a YAML text screen from a controller-supplied TextBody,
+// byte-identical to View() for the same logical state. The Lines in body are
+// the syntax-colored content strings set at push time. Scroll, wrap, and
+// search highlights are applied from body fields; width and height come from
+// the model's viewport (set by SetSize).
+//
+// If the model is not yet ready (SetSize not called), returns "Initializing..."
+// matching View()'s pre-ready behaviour.
+func (m *YAMLModel) RenderText(body app.TextBody) string {
+	if !m.ready {
+		return "Initializing..."
+	}
+
+	content := strings.Join(body.Lines, "\n")
+
+	if body.Search != "" {
+		plain := ansi.Strip(content)
+		var sm SearchModel
+		sm.active = true
+		sm.SetQuery(body.Search)
+		sm.SetContent(plain)
+		if body.SearchCursor >= 0 && body.SearchCursor < len(sm.matches) {
+			sm.currentIdx = body.SearchCursor
+		}
+		var matchLine int
+		content, matchLine = sm.Apply(content)
+		_ = matchLine
+	}
+
+	m.viewport.SoftWrap = body.Wrap
+	m.viewport.SetContent(content)
+	m.viewport.GotoTop()
+	m.viewport.SetYOffset(body.ScrollY)
+	return m.viewport.View()
 }
 
 // Regex patterns for YAML syntax coloring.

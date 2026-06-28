@@ -225,7 +225,11 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 	// --- Shared navigation actions (PR-C): list screen takes priority, then menu ---
 
 	case ActionMoveUp:
-		if ls := c.topListState(); ls != nil {
+		if ts := c.topTextState(); ts != nil {
+			if ts.ScrollY > 0 {
+				ts.ScrollY--
+			}
+		} else if ls := c.topListState(); ls != nil {
 			visible := c.listVisibleCount(ls)
 			if ls.SelectedRow > 0 {
 				ls.SelectedRow--
@@ -248,7 +252,9 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 		return c.snapshot(), nil
 
 	case ActionMoveDown:
-		if ls := c.topListState(); ls != nil {
+		if ts := c.topTextState(); ts != nil {
+			ts.ScrollY++
+		} else if ls := c.topListState(); ls != nil {
 			visible := c.listVisibleCount(ls)
 			if ls.SelectedRow < visible-1 {
 				ls.SelectedRow++
@@ -269,7 +275,9 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 		return c.snapshot(), nil
 
 	case ActionMoveTop:
-		if ls := c.topListState(); ls != nil {
+		if ts := c.topTextState(); ts != nil {
+			ts.ScrollY = 0
+		} else if ls := c.topListState(); ls != nil {
 			ls.SelectedRow = 0
 		} else if ms := c.topMenuState(); ms != nil {
 			ms.Cursor = 0
@@ -282,7 +290,11 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 		return c.snapshot(), nil
 
 	case ActionMoveBottom:
-		if ls := c.topListState(); ls != nil {
+		if ts := c.topTextState(); ts != nil {
+			if n := len(ts.Lines); n > 0 {
+				ts.ScrollY = n - 1
+			}
+		} else if ls := c.topListState(); ls != nil {
 			visible := c.listVisibleCount(ls)
 			if visible > 0 {
 				ls.SelectedRow = visible - 1
@@ -303,7 +315,12 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 		return c.snapshot(), nil
 
 	case ActionPageUp:
-		if ls := c.topListState(); ls != nil {
+		if ts := c.topTextState(); ts != nil {
+			ts.ScrollY -= textPageSizeFor(a)
+			if ts.ScrollY < 0 {
+				ts.ScrollY = 0
+			}
+		} else if ls := c.topListState(); ls != nil {
 			pageSize := listPageSizeFor(a)
 			ls.SelectedRow -= pageSize
 			if ls.SelectedRow < 0 {
@@ -327,7 +344,9 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 		return c.snapshot(), nil
 
 	case ActionPageDown:
-		if ls := c.topListState(); ls != nil {
+		if ts := c.topTextState(); ts != nil {
+			ts.ScrollY += textPageSizeFor(a)
+		} else if ls := c.topListState(); ls != nil {
 			pageSize := listPageSizeFor(a)
 			visible := c.listVisibleCount(ls)
 			ls.SelectedRow += pageSize
@@ -435,6 +454,52 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 		}
 		return c.snapshot(), nil
 
+	// --- Text-screen actions (ScreenYAML / ScreenJSON) ---
+
+	case ActionToggleWrap:
+		if ts := c.topTextState(); ts != nil {
+			ts.Wrap = !ts.Wrap
+		}
+		return c.snapshot(), nil
+
+	case ActionSearch:
+		if ts := c.topTextState(); ts != nil {
+			ts.Search = a.Arg
+			ts.SearchCursor = 0
+		}
+		return c.snapshot(), nil
+
+	case ActionSearchNext:
+		if ts := c.topTextState(); ts != nil && ts.Search != "" {
+			matches := buildTextSearchMatches(ts.Lines, ts.Search)
+			if len(matches) > 0 {
+				ts.SearchCursor = (ts.SearchCursor + 1) % len(matches)
+				if ts.SearchCursor < len(matches) {
+					ts.ScrollY = matches[ts.SearchCursor].Line
+				}
+			}
+		}
+		return c.snapshot(), nil
+
+	case ActionSearchPrev:
+		if ts := c.topTextState(); ts != nil && ts.Search != "" {
+			matches := buildTextSearchMatches(ts.Lines, ts.Search)
+			if len(matches) > 0 {
+				ts.SearchCursor = (ts.SearchCursor - 1 + len(matches)) % len(matches)
+				if ts.SearchCursor < len(matches) {
+					ts.ScrollY = matches[ts.SearchCursor].Line
+				}
+			}
+		}
+		return c.snapshot(), nil
+
+	case ActionSearchClear:
+		if ts := c.topTextState(); ts != nil {
+			ts.Search = ""
+			ts.SearchCursor = 0
+		}
+		return c.snapshot(), nil
+
 	// --- PR-C-blocked actions: need selected-row / per-screen view state ---
 
 	case ActionOpenDetail,
@@ -446,9 +511,9 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 		return c.snapshot(), nil
 	}
 
-	// All remaining actions (sort, search, copy, refresh, quit, toggle-wrap,
-	// command) either require per-screen state lifted in later PR-C slices or
-	// are renderer-only (quit). Return current snapshot with no tasks.
+	// All remaining actions (sort, search, copy, refresh, quit, command)
+	// either require per-screen state lifted in later PR-C slices or are
+	// renderer-only (quit). Return current snapshot with no tasks.
 	return c.snapshot(), nil
 }
 
@@ -708,6 +773,9 @@ func (c *Controller) snapshot() ViewState {
 	if top.State.Selector != nil {
 		vs.Body.Selector = buildSelectorBody(top.State.Selector)
 		vs.FrameTitle = selectorFrameTitle(top.State.Selector)
+	}
+	if top.State.Text != nil {
+		vs.Body.Text = buildTextBody(top.State.Text)
 	}
 	return vs
 }
@@ -1191,6 +1259,8 @@ func bodyKindForScreen(s Screen) BodyKind {
 		return BodyKindDetail
 	case runtime.ScreenChildList, runtime.ScreenResourceList:
 		return BodyKindList
+	case runtime.ScreenYAML, runtime.ScreenJSON:
+		return BodyKindText
 	case runtime.ScreenHelp:
 		return BodyKindHelp
 	case runtime.ScreenIdentity:
