@@ -208,8 +208,14 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		if result.ReplaceCurrent {
 			m.popView()
 		}
-		y := views.NewYAML(*result.Resource, result.ResolvedType, m.keys)
+		y := views.NewYAMLWithCtrl(*result.Resource, result.ResolvedType, m.keys, m.ctrl)
 		y.SetSize(m.innerSize())
+		// Push ScreenYAML onto the controller stack and seed TextState with the
+		// syntax-colored content lines so Snapshot().Body.Text is non-nil from
+		// the first render. Must happen after SetSize so ContentLines() uses the
+		// fully-initialised viewport width for any width-dependent output.
+		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenYAML}})
+		m.ctrl.EnsureTextState(y.ContentLines())
 		m.pushView(&y)
 		if result.DispatchEnrich {
 			res := *result.Resource
@@ -224,8 +230,14 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		if result.ReplaceCurrent {
 			m.popView()
 		}
-		j := views.NewJSON(*result.Resource, result.ResolvedType, m.keys)
+		j := views.NewJSONWithCtrl(*result.Resource, result.ResolvedType, m.keys, m.ctrl)
 		j.SetSize(m.innerSize())
+		// Push ScreenJSON onto the controller stack and seed TextState with the
+		// syntax-colored content lines so Snapshot().Body.Text is non-nil from
+		// the first render. Must happen after SetSize so ContentLines() uses the
+		// fully-initialised viewport width for any width-dependent output.
+		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenJSON}})
+		m.ctrl.EnsureTextState(j.ContentLines())
 		m.pushView(&j)
 		if result.DispatchEnrich {
 			res := *result.Resource
