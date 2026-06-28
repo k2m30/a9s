@@ -16,6 +16,7 @@ package tui
 import (
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/k2m30/a9s/v3/internal/app"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -70,6 +71,13 @@ func (m *Model) popView() bool {
 				}
 			}
 		}
+	}
+	// Keep the headless controller stack in sync when the view being popped is
+	// a ResourceListModel. Detail, YAML, JSON, and Reveal views are not yet
+	// represented in the controller stack (TODO PR-C) — popping them must not
+	// remove the list screen from the controller.
+	if _, ok := m.stack[len(m.stack)-1].(*views.ResourceListModel); ok {
+		m.ctrl.Apply(app.Action{Kind: app.ActionBack})
 	}
 	m.stack = m.stack[:len(m.stack)-1]
 	return true

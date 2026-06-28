@@ -20,8 +20,14 @@ type relatedListOpts struct {
 
 // newRelatedList creates a ResourceList configured for related-resource
 // navigation, pushes it onto the view stack, and returns the init command.
+//
+// A ScreenChildList for rt is pushed onto m.ctrl before constructing the
+// ResourceListModel so that m.ctrl.topListState() points to this list's own
+// ListState (not the parent EC2/etc. list state). The popView guard in
+// app_stack.go pops m.ctrl when this ResourceListModel is later removed.
 func (m *Model) newRelatedList(rt resource.ResourceTypeDef, src resource.Resource, opts relatedListOpts) tea.Cmd {
-	rl := views.NewResourceList(rt, m.viewConfig, m.keys)
+	m.ctrl.PushChildListScreen(rt.ShortName)
+	rl := views.NewResourceList(rt, m.viewConfig, m.keys, m.ctrl)
 	rl.SetTitleSuffix(runtime.RelatedTitleSuffix(src))
 	if opts.pendingFilter != "" {
 		rl.SetPendingFilter(opts.pendingFilter)

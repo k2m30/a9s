@@ -75,7 +75,7 @@ func defaultBuilders() builders {
 			if childTypeDef == nil {
 				return nil, nil
 			}
-			rl := views.NewChildResourceList(*childTypeDef, clp.ParentContext, clp.DisplayName, m.viewConfig, m.keys)
+			rl := views.NewChildResourceList(*childTypeDef, clp.ParentContext, clp.DisplayName, m.viewConfig, m.keys, m.ctrl)
 			rl.SetSize(m.innerSize())
 			rl, initCmd := rl.Init()
 			return &rl, initCmd

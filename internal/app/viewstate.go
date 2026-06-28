@@ -218,8 +218,14 @@ type MenuBody struct {
 
 // SelectorBody is the body of a profile/region/theme selector screen.
 type SelectorBody struct {
+	// Items is the filtered visible item slice (after applying Filter to AllItems).
 	Items    []string `json:"items,omitempty"`
 	Selected int      `json:"selected"`
+	// AllItems is the unfiltered full list, used by FrameTitle to show "N/M" counts.
+	AllItems   []string `json:"all_items,omitempty"`
+	Filter     string   `json:"filter,omitempty"`
+	ActiveItem string   `json:"active_item,omitempty"`
+	Title      string   `json:"title,omitempty"`
 }
 
 // HelpSection is one titled column of key hints rendered in the help overlay.

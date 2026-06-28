@@ -119,6 +119,26 @@ func (m *Model) applyIntents(intents []runtime.UIIntent) []tea.Cmd {
 		case runtime.ClearFlash:
 			m.flash.active = false
 		case runtime.PushScreen:
+			// Keep m.ctrl stack in sync before the builder runs so that
+			// topListState() inside NewChildResourceList resolves to this
+			// screen's own fresh ListState rather than whatever list was
+			// previously on top.
+			//
+			// ScreenChildList: ChildType is in ChildListPayload (Context is
+			// zero-valued for EnterChildView-emitted pushes).
+			// ScreenResourceList: ResourceType is in Context.ResourceType.
+			switch v.ID {
+			case runtime.ScreenChildList:
+				resourceType := v.Context.ResourceType
+				if resourceType == "" {
+					if clp, ok := v.Payload.(runtime.ChildListPayload); ok {
+						resourceType = clp.ChildType
+					}
+				}
+				m.ctrl.PushChildListScreen(resourceType)
+			case runtime.ScreenResourceList:
+				m.ctrl.PushChildListScreen(v.Context.ResourceType)
+			}
 			if c := m.pushScreen(v); c != nil {
 				cmds = append(cmds, c)
 			}
