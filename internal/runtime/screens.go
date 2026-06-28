@@ -46,6 +46,11 @@ const (
 	// ScreenMenu is the root main-menu screen. The controller pushes it on
 	// startup so Snapshot() returns BodyKindMenu from the first call.
 	ScreenMenu ScreenID = "menu"
+
+	// ScreenYAML and ScreenJSON are the YAML/JSON text viewer screens pushed
+	// when the user presses y or j on a resource-list or detail row.
+	ScreenYAML ScreenID = "yaml"
+	ScreenJSON ScreenID = "json"
 )
 
 // ScreenContext is the input handed to an adapter when the runtime asks
