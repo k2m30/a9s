@@ -6,9 +6,7 @@ import (
 
 	lipgloss "charm.land/lipgloss/v2"
 
-	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/text"
@@ -34,45 +32,12 @@ func phraseFromFindings(findings []domain.Finding) string {
 	return fmt.Sprintf("%s (+%d)", findings[0].Phrase, len(findings)-1)
 }
 
-// lookupDecorator resolves a CellDecorator for column c by trying key, path,
-// lowercased title, and path's final segment. Returns nil if no match.
-func lookupDecorator(decs map[string]func(resource.Resource, string) string, c listCol) func(resource.Resource, string) string {
-	if len(decs) == 0 {
-		return nil
-	}
-	if c.key != "" {
-		if d, ok := decs[c.key]; ok {
-			return d
-		}
-	}
-	if c.path != "" {
-		if d, ok := decs[c.path]; ok {
-			return d
-		}
-		if i := strings.LastIndex(c.path, "."); i >= 0 {
-			if d, ok := decs[strings.ToLower(c.path[i+1:])]; ok {
-				return d
-			}
-		} else if d, ok := decs[strings.ToLower(c.path)]; ok {
-			return d
-		}
-	}
-	if c.title != "" {
-		if d, ok := decs[strings.ToLower(c.title)]; ok {
-			return d
-		}
-	}
-	return nil
-}
-
 // listCol is a resolved column definition for rendering.
 type listCol struct {
-	title    string
-	width    int
-	key      string // resource.Fields key (fallback)
-	path     string // config-driven path for ExtractScalar
-	sortKey  string // optional: Fields key to use for sorting instead of display value
-	sortPath string // optional: RawStruct path for raw numeric/time sort comparison
+	title string
+	width int
+	key   string // resource.Fields key (fallback)
+	path  string // config-driven path for ExtractScalar
 }
 
 // colSortKey returns the stable identifier for a column used to match against
@@ -85,82 +50,6 @@ func colSortKey(c listCol) string {
 		return c.path
 	}
 	return c.title
-}
-
-// resolveColumns determines the column definitions to use.
-func (m ResourceListModel) resolveColumns() []listCol {
-	// When viewConfig is explicitly set, use it (merged with defaults via GetViewDef).
-	if m.viewConfig != nil {
-		vd := config.GetViewDef(m.viewConfig, m.typeDef.ShortName)
-		if len(vd.List) > 0 {
-			cols := make([]listCol, len(vd.List))
-			for i, lc := range vd.List {
-				cols[i] = listCol{
-					title:    lc.Title,
-					width:    lc.Width,
-					path:     lc.Path,
-					key:      lc.Key,
-					sortKey:  lc.SortKey,
-					sortPath: lc.SortPath,
-				}
-			}
-			return applySortKeyPrefixWidths(cols)
-		}
-	}
-
-	// When viewConfig is nil, fall back to built-in defaults for this resource
-	// type when the defaults are a superset of the typeDef columns. This ensures
-	// that resource types whose typeDef.Columns is a subset of the defaults (e.g.
-	// S3 which adds a Region column in defaults) render the full column set even
-	// in contexts where no config file is loaded (tests, demo mode). The superset
-	// check uses first-column title equality so that custom test typeDefs that
-	// share a ShortName but define different column layouts (e.g. ec2 sort tests)
-	// are not accidentally switched to defaults.
-	defaultVD := config.GetViewDef(nil, m.typeDef.ShortName)
-	if len(defaultVD.List) > len(m.typeDef.Columns) {
-		firstMatch := len(m.typeDef.Columns) == 0 ||
-			(len(defaultVD.List) > 0 && defaultVD.List[0].Title == m.typeDef.Columns[0].Title)
-		if firstMatch {
-			cols := make([]listCol, len(defaultVD.List))
-			for i, lc := range defaultVD.List {
-				cols[i] = listCol{
-					title:    lc.Title,
-					width:    lc.Width,
-					path:     lc.Path,
-					key:      lc.Key,
-					sortKey:  lc.SortKey,
-					sortPath: lc.SortPath,
-				}
-			}
-			return applySortKeyPrefixWidths(cols)
-		}
-	}
-
-	// Fall back to typeDef columns.
-	// Build a lookup of default columns by title so we can carry over SortKey/SortPath
-	// from defaults for any column that matches by title.
-	defaultByTitle := make(map[string]config.ListColumn, len(defaultVD.List))
-	for _, lc := range defaultVD.List {
-		defaultByTitle[lc.Title] = lc
-	}
-	cols := make([]listCol, len(m.typeDef.Columns))
-	for i, c := range m.typeDef.Columns {
-		lc := listCol{
-			title: c.Title,
-			width: c.Width,
-			key:   c.Key,
-		}
-		if def, ok := defaultByTitle[c.Title]; ok {
-			if lc.sortKey == "" {
-				lc.sortKey = def.SortKey
-			}
-			if lc.sortPath == "" {
-				lc.sortPath = def.SortPath
-			}
-		}
-		cols[i] = lc
-	}
-	return applySortKeyPrefixWidths(cols)
 }
 
 // applySortKeyPrefixWidths auto-grows the first 10 columns' widths to fit the
@@ -292,139 +181,6 @@ func resolveIdentityColumn(cols []listCol, td resource.ResourceTypeDef) int {
 	}
 	// Step 5: fall back to index 0.
 	return 0
-}
-
-// renderDataRow renders a single data row. markerColIdx is the precomputed
-// identity-column index (via resolveIdentityColumn) to avoid recomputing the
-// cascade on every row.
-func (m ResourceListModel) renderDataRow(cols []listCol, r resource.Resource, base lipgloss.Style, totalWidth int, isSelected bool, markerColIdx int) string {
-	var b strings.Builder
-	// Leading single space carries base style.
-	b.WriteString(base.Render(" "))
-	used := 1
-	for i, c := range cols {
-		if i > 0 {
-			b.WriteString(base.Render("  "))
-			used += 2
-		}
-		val := m.extractCellValue(c, r)
-		// Try decorator lookup by column key, then path, then lowercased title.
-		// viewConfig-loaded columns often lack Key; fallbacks keep decorators
-		// robust to the column-definition source.
-		if dec := lookupDecorator(m.typeDef.CellDecorators, c); dec != nil {
-			val = dec(r, val)
-		}
-		// Enrichment row marker: prepend a plain-text severity prefix to the identity
-		// column when this resource has a finding. The whole cell (prefix + value) is
-		// painted by the base row style so cursor highlight is uninterrupted.
-		if i == markerColIdx {
-			if finding, ok := m.findingsByID[r.ID]; ok {
-				// Spec §4 S3: glyphs `!` and `~` only, and only on Healthy
-				// (green) rows. Non-Healthy rows render no glyph — the color
-				// is itself the signal. No `?` glyph, no others.
-				if m.typeDef.ResolveColor(r) == resource.ColorHealthy {
-					switch finding.Severity {
-					case domain.SevBroken:
-						val = "! " + val
-					case domain.SevWarn:
-						val = "~ " + val
-					}
-				}
-			}
-		}
-		// Column width is already correct: widenLifecycleColumn pre-widened the
-		// lifecycle/status column before fitColumns ran, so c.width is the max
-		// across all rows. No per-row widening needed here.
-		padded := text.PadOrTrunc(val, c.width)
-		used += c.width
-		b.WriteString(base.Render(padded))
-	}
-	// Trailing pad to totalWidth for the cursor row so the cursor bg fills the entire line.
-	// Non-cursor rows are not padded (preserving the same plain-text length as the
-	// pre-fix RowColorStyle.Render approach, which did not add Width padding).
-	if isSelected && totalWidth > used {
-		b.WriteString(base.Render(strings.Repeat(" ", totalWidth-used)))
-	}
-	return b.String()
-}
-
-// extractCellValue gets the cell value for a column from a resource.
-func (m ResourceListModel) extractCellValue(c listCol, r resource.Resource) string {
-	// Special key "@id" maps to the resource's canonical ID field.
-	if c.key == "@id" {
-		return r.ID
-	}
-	// Status/lifecycle column priority (AS-140, two-layer):
-	//   1. phraseFromFindings(r.Findings) — aggregates ALL findings (Wave-1
-	//      from the fetcher, Wave-2 from applyEnrichment) into a single
-	//      "<top> (+N)" phrase. Returns "" for a healthy resource.
-	//   2. Fields[lifecycleKey] — lifecycle steady-state ("running",
-	//      "available", etc.) when no findings are active.
-	// The intermediate r.Fields["status"] read was removed by AS-140 because
-	// Wave-2 enrichers no longer overlay it; fetchers emit r.Findings directly
-	// (W1.4b.3 dropped the Status/Issues bridge) so layer 1 is authoritative.
-	// The status column is identified by c.key == "status" (conventional) or
-	// c.key == td.LifecycleKey when an explicit lifecycle key is set.
-	lifecycleKey := lifecycleColumnKey(m.typeDef)
-	isStatusCol := c.key == "status" || c.key == lifecycleKey
-	if isStatusCol {
-		// The 2-layer priority is exhaustive for status columns. Returning ""
-		// rather than falling through is required by AS-140: any fall-through
-		// path below (the generic Fields[c.key] read at the next branch, its
-		// empty-accept second pass, and the title-match loop) would re-read
-		// Fields["status"] / Fields[lifecycleKey] from a stale write source
-		// and undo the spec's removal of the 3-layer priority. Sibling helper
-		// widenLifecycleColumn uses the same 2-layer chain — keeping them
-		// aligned ensures the column width and the rendered value agree.
-		if phrase := phraseFromFindings(r.Findings); phrase != "" {
-			return phrase
-		}
-		return r.Fields[lifecycleKey]
-	}
-	// Fields map (key-based columns) takes priority over raw struct fields.
-	// This ensures Wave-2 enriched values always win over struct literals,
-	// and allows columns to carry both a Key (enriched value) and a Path
-	// (raw-struct fallback for sorting / column introspection).
-	if c.key != "" {
-		if v, ok := r.Fields[c.key]; ok && v != "" {
-			return v
-		}
-	}
-	// Fall back to config-driven path via ExtractScalar (struct field extraction).
-	if c.path != "" && r.RawStruct != nil {
-		val := fieldpath.ExtractScalar(r.RawStruct, c.path)
-		if val != "" {
-			return val
-		}
-	}
-	// Fields map second pass: accept empty-string values stored explicitly.
-	// This covers keys that were set but happen to be empty strings.
-	if c.key != "" {
-		if v, ok := r.Fields[c.key]; ok {
-			return v
-		}
-	}
-	// Try matching column title (lowercased) against Fields keys.
-	// Also try with spaces replaced by underscores (e.g. "Instance ID" → "instance_id").
-	titleLower := strings.ToLower(c.title)
-	titleUnder := strings.ReplaceAll(titleLower, " ", "_")
-	for k, v := range r.Fields {
-		kl := strings.ToLower(k)
-		if kl == titleLower || kl == titleUnder {
-			return v
-		}
-	}
-	// Final fallback: use resource Name for name-style columns when Fields has no value.
-	// This handles test fixtures and resources where Fields is sparse but r.Name is set.
-	// Matches columns whose key, title, or path contains "name"
-	// (e.g., "alarm_name", "Alarm Name", "EventName").
-	if r.Name != "" &&
-		(strings.Contains(strings.ToLower(c.key), "name") ||
-			strings.Contains(strings.ToLower(c.title), "name") ||
-			strings.Contains(strings.ToLower(c.path), "name")) {
-		return r.Name
-	}
-	return ""
 }
 
 func lifecycleColumnKey(td resource.ResourceTypeDef) string {
