@@ -25,7 +25,13 @@ import (
 )
 
 // YAMLModel renders YAML with syntax coloring using bubbles/viewport for scroll.
+// ctrl is non-nil when the model is constructed by the TUI navigator; when
+// ctrl is set, View() delegates to RenderText(ctrl.Snapshot().Body.Text) so
+// the headless/web renderer and the TUI renderer share one code path.
+// Unit tests and isolated callers leave ctrl nil; View() falls back to the
+// direct viewport path in that case so parity tests remain unaffected.
 type YAMLModel struct {
+	ctrl         *app.Controller
 	res          resource.Resource
 	resourceType string
 	viewport     viewport.Model
@@ -42,6 +48,18 @@ type YAMLModel struct {
 // NewYAML creates a YAMLModel for the given resource.
 func NewYAML(res resource.Resource, resourceType string, k keys.Map) YAMLModel {
 	return YAMLModel{
+		res:          res,
+		resourceType: resourceType,
+		keys:         k,
+	}
+}
+
+// NewYAMLWithCtrl creates a YAMLModel backed by the given controller.
+// The controller stack must already have ScreenYAML pushed and EnsureTextState
+// called before the first View() so that Snapshot().Body.Text is non-nil.
+func NewYAMLWithCtrl(res resource.Resource, resourceType string, k keys.Map, ctrl *app.Controller) YAMLModel {
+	return YAMLModel{
+		ctrl:         ctrl,
 		res:          res,
 		resourceType: resourceType,
 		keys:         k,
@@ -77,19 +95,30 @@ func (m YAMLModel) Update(msg tea.Msg) (YAMLModel, tea.Cmd) {
 		}
 		m.res = msg.EnrichedRes
 		m.refreshViewportContent()
+		// When the controller path is active, replace the TextState Lines with
+		// the re-rendered content from the enriched resource so that
+		// Snapshot().Body.Text reflects the latest data, not the pre-enrichment
+		// snapshot seeded at push time.
+		if m.ctrl != nil {
+			m.ctrl.UpdateTextLines(m.ContentLines())
+		}
 		return m, nil
 	case tea.PasteMsg:
 		if m.search.IsInputMode() {
 			var cmd tea.Cmd
 			m.search, cmd = m.search.Update(msg)
-			m.refreshViewportContent()
+			if m.ctrl == nil {
+				m.refreshViewportContent()
+			}
 			return m, cmd
 		}
 	case searchPasteMsg:
 		if m.search.IsInputMode() {
 			var cmd tea.Cmd
 			m.search, cmd = m.search.Update(msg)
-			m.refreshViewportContent()
+			if m.ctrl == nil {
+				m.refreshViewportContent()
+			}
 			return m, cmd
 		}
 	case tea.KeyMsg:
@@ -97,7 +126,20 @@ func (m YAMLModel) Update(msg tea.Msg) (YAMLModel, tea.Cmd) {
 		if m.search.IsInputMode() {
 			var cmd tea.Cmd
 			m.search, cmd = m.search.Update(msg)
-			m.refreshViewportContent()
+			if m.ctrl != nil {
+				// SearchModel.Update may have exited input mode (Enter/Esc).
+				if !m.search.IsInputMode() {
+					if m.search.IsActive() {
+						// Enter was pressed — commit query to controller.
+						m.ctrl.Apply(app.Action{Kind: app.ActionSearch, Arg: m.search.Query()})
+					} else {
+						// Esc was pressed — clear controller search.
+						m.ctrl.Apply(app.Action{Kind: app.ActionSearchClear})
+					}
+				}
+			} else {
+				m.refreshViewportContent()
+			}
 			return m, cmd
 		}
 		switch {
@@ -105,28 +147,74 @@ func (m YAMLModel) Update(msg tea.Msg) (YAMLModel, tea.Cmd) {
 			m.search.Activate()
 			return m, nil
 		case key.Matches(msg, m.keys.SearchNext):
-			if m.search.IsActive() && m.search.MatchCount() > 0 {
-				m.search.NextMatch()
-				m.refreshViewportContent()
+			if m.search.IsActive() {
+				if m.ctrl != nil {
+					m.ctrl.Apply(app.Action{Kind: app.ActionSearchNext})
+				} else if m.search.MatchCount() > 0 {
+					m.search.NextMatch()
+					m.refreshViewportContent()
+				}
 				return m, nil
 			}
 		case key.Matches(msg, m.keys.SearchPrev):
-			if m.search.IsActive() && m.search.MatchCount() > 0 {
-				m.search.PrevMatch()
-				m.refreshViewportContent()
+			if m.search.IsActive() {
+				if m.ctrl != nil {
+					m.ctrl.Apply(app.Action{Kind: app.ActionSearchPrev})
+				} else if m.search.MatchCount() > 0 {
+					m.search.PrevMatch()
+					m.refreshViewportContent()
+				}
 				return m, nil
 			}
 		case key.Matches(msg, m.keys.Escape):
 			if m.search.IsActive() {
 				m.search.Deactivate()
-				m.refreshViewportContent()
+				if m.ctrl != nil {
+					m.ctrl.Apply(app.Action{Kind: app.ActionSearchClear})
+				} else {
+					m.refreshViewportContent()
+				}
 				return m, nil
 			}
 		case key.Matches(msg, m.keys.ToggleWrap):
-			m.wrap = !m.wrap
-			m.viewport.SoftWrap = m.wrap
-			m.refreshViewportContent()
+			if m.ctrl != nil {
+				m.ctrl.Apply(app.Action{Kind: app.ActionToggleWrap})
+			} else {
+				m.wrap = !m.wrap
+				m.viewport.SoftWrap = m.wrap
+				m.refreshViewportContent()
+			}
 			return m, nil
+		case key.Matches(msg, m.keys.Up):
+			if m.ctrl != nil {
+				m.ctrl.Apply(app.Action{Kind: app.ActionMoveUp})
+				return m, nil
+			}
+		case key.Matches(msg, m.keys.Down):
+			if m.ctrl != nil {
+				m.ctrl.Apply(app.Action{Kind: app.ActionMoveDown})
+				return m, nil
+			}
+		case key.Matches(msg, m.keys.Top):
+			if m.ctrl != nil {
+				m.ctrl.Apply(app.Action{Kind: app.ActionMoveTop})
+				return m, nil
+			}
+		case key.Matches(msg, m.keys.Bottom):
+			if m.ctrl != nil {
+				m.ctrl.Apply(app.Action{Kind: app.ActionMoveBottom})
+				return m, nil
+			}
+		case key.Matches(msg, m.keys.PageUp):
+			if m.ctrl != nil {
+				m.ctrl.Apply(app.Action{Kind: app.ActionPageUp, N: max(m.height-1, 1)})
+				return m, nil
+			}
+		case key.Matches(msg, m.keys.PageDown):
+			if m.ctrl != nil {
+				m.ctrl.Apply(app.Action{Kind: app.ActionPageDown, N: max(m.height-1, 1)})
+				return m, nil
+			}
 		case key.Matches(msg, m.keys.CloudTrail):
 			if ff := resource.BuildCloudTrailFilter(m.res, m.resourceType); ff != nil {
 				res := m.res
@@ -180,9 +268,19 @@ func (m YAMLModel) Update(msg tea.Msg) (YAMLModel, tea.Cmd) {
 }
 
 // View renders YAML content via viewport.
+// When a controller is wired (TUI navigator path), delegates to
+// RenderText(ctrl.Snapshot().Body.Text) so the headless and TUI renderers
+// share one code path. When ctrl is nil (unit tests, isolated callers),
+// falls back to the direct viewport path.
 func (m YAMLModel) View() string {
 	if !m.ready {
 		return "Initializing..."
+	}
+	if m.ctrl != nil {
+		body := m.ctrl.Snapshot().Body.Text
+		if body != nil {
+			return m.RenderText(*body)
+		}
 	}
 	return m.viewport.View()
 }
@@ -218,20 +316,43 @@ func (m *YAMLModel) refreshViewportContent() {
 }
 
 // IsSearchActive returns true when search is active (input mode or confirmed highlights).
-func (m YAMLModel) IsSearchActive() bool { return m.search.IsActive() }
+// When the controller is wired, reflects the controller's TextState.
+func (m YAMLModel) IsSearchActive() bool {
+	if m.ctrl != nil {
+		body := m.ctrl.Snapshot().Body.Text
+		return m.search.IsInputMode() || (body != nil && body.Search != "")
+	}
+	return m.search.IsActive()
+}
 
 // IsSearchInputMode returns true when the search input is capturing keystrokes.
+// This is always model-local (the controller has no concept of typing mode).
 func (m YAMLModel) IsSearchInputMode() bool { return m.search.IsInputMode() }
 
 // SearchInfo returns the search state string for the header.
 // Input mode: "/query" (or "/" when query is empty), Confirmed: "N/M matches", Inactive: "".
 func (m YAMLModel) SearchInfo() string {
+	if m.search.IsInputMode() {
+		return "/" + m.search.Query()
+	}
+	if m.ctrl != nil {
+		body := m.ctrl.Snapshot().Body.Text
+		if body == nil || body.Search == "" {
+			return ""
+		}
+		matches := buildTextSearchMatchesForInfo(body.Lines, body.Search)
+		total := len(matches)
+		if total == 0 {
+			return "0/0 matches"
+		}
+		cursor := body.SearchCursor
+		if cursor < 0 || cursor >= total {
+			cursor = 0
+		}
+		return formatSearchInfo(cursor+1, total)
+	}
 	if !m.search.IsActive() {
 		return ""
-	}
-	if m.search.IsInputMode() {
-		q := m.search.Query()
-		return "/" + q
 	}
 	return m.search.MatchInfo()
 }
@@ -281,6 +402,14 @@ func (m YAMLModel) CopyContent() (string, string) {
 // GetHelpContext returns HelpFromYAML.
 func (m YAMLModel) GetHelpContext() HelpContext {
 	return HelpFromYAML
+}
+
+// ContentLines returns the syntax-colored YAML content as a slice of lines,
+// matching exactly what refreshViewportContent passes to the viewport.
+// Used by the TUI navigator at push time to seed EnsureTextState.
+func (m YAMLModel) ContentLines() []string {
+	content := m.renderContent()
+	return strings.Split(content, "\n")
 }
 
 // RawContent returns the uncolored YAML text for clipboard copy.
