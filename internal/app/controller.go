@@ -3,11 +3,13 @@ package app
 import (
 	"maps"
 	"strings"
+	"sync"
 
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
 // Controller is the headless app controller. It wraps runtime.Core and
@@ -21,8 +23,15 @@ import (
 // Task ownership: Apply and Handle RETURN []runtime.TaskRequest to the
 // caller. The controller retains no task state — the host (TUI, web, or
 // DrainSync) is responsible for executing and routing task results.
+//
+// Concurrency: mu guards stack and all map fields. Public mutating methods
+// (Apply, Handle, ApplyIntents, ApplyEnrichmentState, RegisterFallbackTypeDef,
+// etc.) acquire a write lock on entry. Public read-only methods (Snapshot,
+// GetMenu*, GetList*) acquire a read lock. Internal helpers called while a
+// lock is already held must NOT lock — Go mutexes are not reentrant.
 type Controller struct {
-	core  *runtime.Core
+	mu   sync.RWMutex
+	core *runtime.Core
 	stack []Screen
 
 	// resourceCache stores the latest fetched resource pages per resource type,
@@ -72,6 +81,8 @@ func New(core *runtime.Core) *Controller {
 // resolveListColumns picks the correct column set for each resource type.
 // Must be called before the first Snapshot() when a non-nil config is needed.
 func (c *Controller) SetViewConfig(vc *config.ViewsConfig) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.viewConfig = vc
 }
 
@@ -82,6 +93,8 @@ func (c *Controller) SetViewConfig(vc *config.ViewsConfig) {
 // different column layout or nil Color (nil falls back to
 // colorFallback(r.Fields["status"]) per ResolveColor contract in catalog/types.go).
 func (c *Controller) RegisterFallbackTypeDef(td resource.ResourceTypeDef) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if c.fallbackTypeDefs == nil {
 		c.fallbackTypeDefs = make(map[string]resource.ResourceTypeDef, 1)
 	}
@@ -96,6 +109,13 @@ func (c *Controller) RegisterFallbackTypeDef(td resource.ResourceTypeDef) {
 // PR-B wires the six navigate/session actions that need no selected-row state.
 // PR-C-blocked actions (row-dependent) are kept as documented no-ops.
 func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.applyLocked(a)
+}
+
+// applyLocked is the lock-free implementation of Apply. Callers must hold c.mu (write).
+func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 	switch a.Kind {
 
 	// --- Navigate actions (PR-B) ---
@@ -103,28 +123,28 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 	case ActionOpenHelp:
 		res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{Target: runtime.NavigateTargetHelp})
 		c.applyNavResult(res)
-		return c.Snapshot(), tasks
+		return c.snapshot(), tasks
 
 	case ActionBack:
 		// Pop a single screen, mirroring the TUI's m.popView() — NOT a full
 		// collapse (root-collapse is the "root" Command). Per-view Esc semantics
 		// (clear filter/search before popping) arrive with PR-C view state.
-		c.ApplyIntents([]runtime.UIIntent{runtime.PopScreen{}})
-		return c.Snapshot(), nil
+		c.applyIntents([]runtime.UIIntent{runtime.PopScreen{}})
+		return c.snapshot(), nil
 
 	case ActionOpenIdentity:
 		// The runtime has no NavigateTargetIdentity: the TUI opens the identity
 		// screen via direct key-handling (not HandleNavigate). The headless
 		// controller pushes ScreenIdentity directly so tests can assert the stack
 		// without standing up a full TUI.
-		c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenIdentity}})
+		c.applyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenIdentity}})
 		c.core.SetIdentityFetching(true)
 		// TODO PR-C: render IdentityBody.Loading from the session latch once body state is lifted here.
 		fetchTask := runtime.TaskRequest{
 			Key:     runtime.TaskKey{Kind: runtime.TaskKindFetchIdentity},
 			Payload: runtime.FetchIdentityPayload{},
 		}
-		return c.Snapshot(), []runtime.TaskRequest{fetchTask}
+		return c.snapshot(), []runtime.TaskRequest{fetchTask}
 
 	// --- Session-selection actions (PR-B) ---
 
@@ -137,23 +157,23 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 			Profile: a.Arg,
 			NewGen:  c.core.ConnectGen(),
 		})
-		c.ApplyIntents(intents)
-		return c.Snapshot(), tasks
+		c.applyIntents(intents)
+		return c.snapshot(), tasks
 
 	case ActionSelectRegion:
 		intents, tasks := c.core.HandleRegionSelected(runtime.RegionSelectedEvent{
 			Region: a.Arg,
 			NewGen: c.core.ConnectGen(),
 		})
-		c.ApplyIntents(intents)
-		return c.Snapshot(), tasks
+		c.applyIntents(intents)
+		return c.snapshot(), tasks
 
 	case ActionSelectTheme:
 		intents, tasks := c.core.HandleThemeSelected(runtime.ThemeSelectedEvent{
 			Theme: a.Arg,
 		})
-		c.ApplyIntents(intents)
-		return c.Snapshot(), tasks
+		c.applyIntents(intents)
+		return c.snapshot(), tasks
 
 	// --- Command lane (PR-B) ---
 
@@ -165,27 +185,27 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 		case "root", "main":
 			res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{Target: runtime.NavigateTargetMainMenu})
 			c.applyNavResult(res)
-			return c.Snapshot(), tasks
+			return c.snapshot(), tasks
 
 		case "profile", "ctx":
 			res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{Target: runtime.NavigateTargetProfile})
 			c.applyNavResult(res)
-			return c.Snapshot(), tasks
+			return c.snapshot(), tasks
 
 		case "region":
 			res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{Target: runtime.NavigateTargetRegion})
 			c.applyNavResult(res)
-			return c.Snapshot(), tasks
+			return c.snapshot(), tasks
 
 		case "theme":
 			res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{Target: runtime.NavigateTargetTheme})
 			c.applyNavResult(res)
-			return c.Snapshot(), tasks
+			return c.snapshot(), tasks
 
 		case "help":
 			res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{Target: runtime.NavigateTargetHelp})
 			c.applyNavResult(res)
-			return c.Snapshot(), tasks
+			return c.snapshot(), tasks
 
 		default:
 			// Resource short-name or alias (e.g. "ec2", "s3", "dbi").
@@ -195,12 +215,12 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 					ResourceType: a.Arg,
 				})
 				c.applyNavResult(res)
-				return c.Snapshot(), tasks
+				return c.snapshot(), tasks
 			}
 			// TODO PR-C: "q"/"quit" needs tea.Quit from the renderer, not the controller.
 			// Unknown tokens are silently dropped at this layer; the renderer flashes.
 		}
-		return c.Snapshot(), nil
+		return c.snapshot(), nil
 
 	// --- Shared navigation actions (PR-C): list screen takes priority, then menu ---
 
@@ -218,8 +238,14 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 				ms.Cursor--
 			}
 			menuSkipUnavailable(ms, visible, -1)
+		} else if ss := c.topSelectorState(); ss != nil {
+			visible := selectorVisibleItems(ss)
+			if ss.Cursor > 0 {
+				ss.Cursor--
+			}
+			_ = visible
 		}
-		return c.Snapshot(), nil
+		return c.snapshot(), nil
 
 	case ActionMoveDown:
 		if ls := c.topListState(); ls != nil {
@@ -234,8 +260,13 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 				ms.Cursor++
 			}
 			menuSkipUnavailable(ms, visible, +1)
+		} else if ss := c.topSelectorState(); ss != nil {
+			visible := selectorVisibleItems(ss)
+			if ss.Cursor < len(visible)-1 {
+				ss.Cursor++
+			}
 		}
-		return c.Snapshot(), nil
+		return c.snapshot(), nil
 
 	case ActionMoveTop:
 		if ls := c.topListState(); ls != nil {
@@ -245,8 +276,10 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 			all := resource.AllResourceTypes()
 			visible := menuVisibleItems(ms, all)
 			menuSkipUnavailable(ms, visible, +1)
+		} else if ss := c.topSelectorState(); ss != nil {
+			ss.Cursor = 0
 		}
-		return c.Snapshot(), nil
+		return c.snapshot(), nil
 
 	case ActionMoveBottom:
 		if ls := c.topListState(); ls != nil {
@@ -261,8 +294,13 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 				ms.Cursor = len(visible) - 1
 			}
 			menuSkipUnavailable(ms, visible, -1)
+		} else if ss := c.topSelectorState(); ss != nil {
+			visible := selectorVisibleItems(ss)
+			if len(visible) > 0 {
+				ss.Cursor = len(visible) - 1
+			}
 		}
-		return c.Snapshot(), nil
+		return c.snapshot(), nil
 
 	case ActionPageUp:
 		if ls := c.topListState(); ls != nil {
@@ -279,8 +317,14 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 				ms.Cursor = 0
 			}
 			menuSkipUnavailable(ms, visible, -1)
+		} else if ss := c.topSelectorState(); ss != nil {
+			pageSize := selectorPageSizeFor(a)
+			ss.Cursor -= pageSize
+			if ss.Cursor < 0 {
+				ss.Cursor = 0
+			}
 		}
-		return c.Snapshot(), nil
+		return c.snapshot(), nil
 
 	case ActionPageDown:
 		if ls := c.topListState(); ls != nil {
@@ -298,8 +342,15 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 				ms.Cursor = max(n-1, 0)
 			}
 			menuSkipUnavailable(ms, visible, +1)
+		} else if ss := c.topSelectorState(); ss != nil {
+			pageSize := selectorPageSizeFor(a)
+			visible := selectorVisibleItems(ss)
+			ss.Cursor += pageSize
+			if n := len(visible); ss.Cursor >= n {
+				ss.Cursor = max(n-1, 0)
+			}
 		}
-		return c.Snapshot(), nil
+		return c.snapshot(), nil
 
 	case ActionToggleAttention:
 		if ls := c.topListState(); ls != nil {
@@ -309,7 +360,7 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 			ms.AttentionOnly = !ms.AttentionOnly
 			ms.Cursor = 0
 		}
-		return c.Snapshot(), nil
+		return c.snapshot(), nil
 
 	case ActionSetFilter:
 		if ls := c.topListState(); ls != nil {
@@ -320,8 +371,11 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 			ms.Filter = a.Arg
 			ms.Cursor = 0
 			ms.ScrollOffset = 0
+		} else if ss := c.topSelectorState(); ss != nil {
+			ss.Filter = a.Arg
+			ss.Cursor = 0
 		}
-		return c.Snapshot(), nil
+		return c.snapshot(), nil
 
 	// --- List-only actions (PR-C) ---
 
@@ -331,13 +385,13 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 				ls.ScrollX--
 			}
 		}
-		return c.Snapshot(), nil
+		return c.snapshot(), nil
 
 	case ActionScrollRight:
 		if ls := c.topListState(); ls != nil {
 			ls.ScrollX++
 		}
-		return c.Snapshot(), nil
+		return c.snapshot(), nil
 
 	case ActionSort:
 		if ls := c.topListState(); ls != nil && a.Arg != "" {
@@ -353,7 +407,7 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 			}
 			ls.SelectedRow = 0
 		}
-		return c.Snapshot(), nil
+		return c.snapshot(), nil
 
 	case ActionSelect:
 		if ms := c.topMenuState(); ms != nil {
@@ -361,11 +415,14 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 			visible := menuVisibleItems(ms, all)
 			if len(visible) > 0 && ms.Cursor < len(visible) {
 				selected := visible[ms.Cursor]
-				// Block navigation to confirmed-empty types (count known, zero, not truncated).
+				// Block navigation to confirmed-empty types (count known, zero, not
+				// truncated). Availability may be stored under an alias key, so resolve
+				// it via menuActiveKey — matching MenuSelected (the TUI Enter path).
 				if ms.Availability != nil {
-					isTruncated := ms.Truncated != nil && ms.Truncated[selected.ShortName]
-					if count, known := ms.Availability[selected.ShortName]; known && count == 0 && !isTruncated {
-						return c.Snapshot(), nil
+					activeKey := menuActiveKey(ms, selected)
+					isTruncated := ms.Truncated != nil && ms.Truncated[activeKey]
+					if count, known := ms.Availability[activeKey]; known && count == 0 && !isTruncated {
+						return c.snapshot(), nil
 					}
 				}
 				res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{
@@ -373,10 +430,10 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 					ResourceType: selected.ShortName,
 				})
 				c.applyNavResult(res)
-				return c.Snapshot(), tasks
+				return c.snapshot(), tasks
 			}
 		}
-		return c.Snapshot(), nil
+		return c.snapshot(), nil
 
 	// --- PR-C-blocked actions: need selected-row / per-screen view state ---
 
@@ -386,13 +443,13 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 		ActionToggleRelated,
 		ActionLoadMore:
 		// TODO PR-C: needs selected-row / view state (see plan PR-C)
-		return c.Snapshot(), nil
+		return c.snapshot(), nil
 	}
 
 	// All remaining actions (sort, search, copy, refresh, quit, toggle-wrap,
 	// command) either require per-screen state lifted in later PR-C slices or
 	// are renderer-only (quit). Return current snapshot with no tasks.
-	return c.Snapshot(), nil
+	return c.snapshot(), nil
 }
 
 // Handle feeds an event through runtime.Core.HandleEvent, applies the returned
@@ -403,10 +460,57 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 // is responsible for passing only values that implement runtime.Event
 // (i.e. messages.Event) — unrecognised concrete types fall through to
 // Core.HandleEvent's default nil, nil path.
+//
+// ResourcesLoaded events are also routed to applyResourcesLoaded so that
+// DrainSync and the web renderer populate list rows without going through the
+// TUI view stack. The target list screen is found by ResourceType in the
+// controller stack, so a late async result for type X lands on X's screen even
+// when it is not currently on top.
 func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	intents, tasks := c.core.HandleEvent(ev)
-	c.ApplyIntents(intents)
-	return c.Snapshot(), tasks
+	c.applyIntents(intents)
+
+	if msg, ok := ev.(messages.ResourcesLoaded); ok {
+		c.handleResourcesLoadedEvent(msg)
+	}
+
+	return c.snapshot(), tasks
+}
+
+// handleResourcesLoadedEvent routes a ResourcesLoaded event to the matching
+// list screen in the controller stack. It finds the screen by resolving the
+// event's ResourceType (including aliases) against each screen's context,
+// so a late result for type X lands on X's screen regardless of which screen
+// is currently on top. Gen staleness is not re-checked here — the upstream
+// DrainSync / adapter shim already dropped stale events before calling Handle.
+func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
+	if msg.ResourceType == "" {
+		return
+	}
+	// Resolve canonical short name (handles aliases like "rds" → "dbi").
+	canon := msg.ResourceType
+	if td := resource.FindResourceType(msg.ResourceType); td != nil {
+		canon = td.ShortName
+	}
+	// Walk the stack from top to bottom; apply to every matching list screen
+	// so stacked same-type lists (rare but possible) all update.
+	for i := len(c.stack) - 1; i >= 0; i-- {
+		s := &c.stack[i]
+		if s.ID != runtime.ScreenResourceList && s.ID != runtime.ScreenChildList {
+			continue
+		}
+		screenType := s.Ctx.ResourceType
+		if td := resource.FindResourceType(screenType); td != nil {
+			screenType = td.ShortName
+		}
+		if screenType != canon {
+			continue
+		}
+		c.applyResourcesLoaded(s.State.List, canon, msg.Resources, msg.Pagination, msg.Append)
+	}
 }
 
 // ApplyIntents applies a slice of UIIntents to the controller's screen stack.
@@ -417,6 +521,14 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 // ApplyIntents never panics on a PopScreen against an empty stack.
 // It returns the post-apply ViewState snapshot.
 func (c *Controller) ApplyIntents(intents []runtime.UIIntent) ViewState {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.applyIntents(intents)
+}
+
+// applyIntents is the lock-free implementation of ApplyIntents.
+// Callers must hold c.mu (write).
+func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 	for _, intent := range intents {
 		switch v := intent.(type) {
 		case runtime.PushScreen:
@@ -534,7 +646,7 @@ func (c *Controller) ApplyIntents(intents []runtime.UIIntent) ViewState {
 			// enrichment store. Resource rows themselves arrive via applyResourcesLoaded
 			// (called from the task-result lane); this intent carries Wave-2 data only.
 			if v.Enrichment != nil {
-				c.ApplyEnrichmentState(v.ResourceType, 0, false, v.Enrichment.Findings)
+				c.applyEnrichmentState(v.ResourceType, 0, false, v.Enrichment.Findings)
 			}
 
 		// TODO PR-C: PatchDetail mutates state lifted in PR-C
@@ -554,7 +666,7 @@ func (c *Controller) ApplyIntents(intents []runtime.UIIntent) ViewState {
 			_ = v
 		}
 	}
-	return c.Snapshot()
+	return c.snapshot()
 }
 
 // Snapshot builds a ViewState from the current controller state. In PR-A
@@ -564,6 +676,14 @@ func (c *Controller) ApplyIntents(intents []runtime.UIIntent) ViewState {
 // Snapshot never panics on an empty stack — it returns a ViewState with
 // BodyKindUnknown.
 func (c *Controller) Snapshot() ViewState {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.snapshot()
+}
+
+// snapshot is the lock-free implementation of Snapshot.
+// Callers must hold c.mu (at least read).
+func (c *Controller) snapshot() ViewState {
 	vs := ViewState{
 		Header: Header{
 			Profile: c.core.Profile(),
@@ -584,6 +704,10 @@ func (c *Controller) Snapshot() ViewState {
 	if top.State.List != nil {
 		vs.Body.List = c.buildListBody(top.Ctx, top.State.List)
 		vs.FrameTitle = c.buildListFrameTitle(top.Ctx, top.State.List)
+	}
+	if top.State.Selector != nil {
+		vs.Body.Selector = buildSelectorBody(top.State.Selector)
+		vs.FrameTitle = selectorFrameTitle(top.State.Selector)
 	}
 	return vs
 }
@@ -608,13 +732,13 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) {
 		}
 
 	case runtime.NavigateKindPushHelp:
-		c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenHelp}})
+		c.applyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenHelp}})
 
 	case runtime.NavigateKindPushRegion:
-		c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenRegion}})
+		c.applyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenRegion}})
 
 	case runtime.NavigateKindPushTheme:
-		c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenTheme}})
+		c.applyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenTheme}})
 
 	case runtime.NavigateKindFetchProfiles:
 		// No stack change — the adapter starts the fetch task; when the result
@@ -629,9 +753,9 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) {
 			Context: runtime.ScreenContext{ResourceType: res.ResolvedType},
 		}
 		if res.ReplaceCurrent {
-			c.ApplyIntents([]runtime.UIIntent{runtime.ReplaceScreen{ID: intent.ID, Context: intent.Context}})
+			c.applyIntents([]runtime.UIIntent{runtime.ReplaceScreen{ID: intent.ID, Context: intent.Context}})
 		} else {
-			c.ApplyIntents([]runtime.UIIntent{intent})
+			c.applyIntents([]runtime.UIIntent{intent})
 		}
 		c.ensureListState()
 
@@ -950,6 +1074,8 @@ func itoa(n int) string {
 // delegating to menuFrameTitle with the root MenuState. Returns an empty
 // string when the root screen is not a menu.
 func (c *Controller) MenuFrameTitle() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	ms := c.rootMenuState()
 	if ms == nil {
 		return ""
@@ -961,6 +1087,8 @@ func (c *Controller) MenuFrameTitle() string {
 // that is true when navigation is permitted (i.e. the item is not confirmed
 // empty). Mirrors the Enter-key guard in ActionSelect.
 func (c *Controller) MenuSelected() (resource.ResourceTypeDef, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	ms := c.rootMenuState()
 	if ms == nil {
 		return resource.ResourceTypeDef{}, false
@@ -984,6 +1112,8 @@ func (c *Controller) MenuSelected() (resource.ResourceTypeDef, bool) {
 // GetMenuAvailability returns a copy of the root MenuState availability map.
 // Returns nil when no availability data has been recorded.
 func (c *Controller) GetMenuAvailability() map[string]int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	ms := c.rootMenuState()
 	if ms == nil || ms.Availability == nil {
 		return nil
@@ -996,6 +1126,8 @@ func (c *Controller) GetMenuAvailability() map[string]int {
 // GetMenuTruncated returns a copy of the root MenuState truncated map.
 // Returns nil when no truncation data has been recorded.
 func (c *Controller) GetMenuTruncated() map[string]bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	ms := c.rootMenuState()
 	if ms == nil || ms.Truncated == nil {
 		return nil
@@ -1008,6 +1140,8 @@ func (c *Controller) GetMenuTruncated() map[string]bool {
 // GetMenuIssueCounts returns a copy of the root MenuState issue-count map.
 // Returns nil when no issue data has been recorded.
 func (c *Controller) GetMenuIssueCounts() map[string]int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	ms := c.rootMenuState()
 	if ms == nil || ms.IssueCounts == nil {
 		return nil
@@ -1020,6 +1154,8 @@ func (c *Controller) GetMenuIssueCounts() map[string]int {
 // GetMenuIssueKnown returns a copy of the root MenuState issue-known map.
 // Returns nil when no issue data has been recorded.
 func (c *Controller) GetMenuIssueKnown() map[string]bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	ms := c.rootMenuState()
 	if ms == nil || ms.IssueKnown == nil {
 		return nil
@@ -1032,6 +1168,8 @@ func (c *Controller) GetMenuIssueKnown() map[string]bool {
 // GetMenuIssueTruncated returns a copy of the root MenuState issue-truncated map.
 // Returns nil when no issue-truncation data has been recorded.
 func (c *Controller) GetMenuIssueTruncated() map[string]bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	ms := c.rootMenuState()
 	if ms == nil || ms.IssueTruncated == nil {
 		return nil

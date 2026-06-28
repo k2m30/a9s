@@ -311,8 +311,8 @@ func listToFloat(v reflect.Value) (float64, bool) {
 // applyResourcesLoaded stores a page of resources into the controller's cache
 // for typeName. When appendPage is true the new slice is appended; otherwise
 // it replaces. Mirrors what ResourceListModel.Update does on ResourcesLoaded.
-//
-//nolint:unused // wired in PR-C task-result lane (called from Handle on ResourcesLoaded events)
+// Called from handleResourcesLoadedEvent (via Handle) and from the public
+// ApplyResourcesLoaded test seam in testing.go.
 func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resources []resource.Resource, pagination *resource.PaginationMeta, appendPage bool) {
 	if c.resourceCache == nil {
 		c.resourceCache = make(map[string][]resource.Resource)
@@ -338,6 +338,14 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 // ApplyEnrichmentState stores Wave-2 enrichment results for typeName.
 // Mirrors ResourceListModel.SetEnrichmentState.
 func (c *Controller) ApplyEnrichmentState(typeName string, issueCount int, truncated bool, findings map[string]domain.Finding) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.applyEnrichmentState(typeName, issueCount, truncated, findings)
+}
+
+// applyEnrichmentState is the lock-free implementation of ApplyEnrichmentState.
+// Callers must hold c.mu (write).
+func (c *Controller) applyEnrichmentState(typeName string, issueCount int, truncated bool, findings map[string]domain.Finding) {
 	if c.enrichmentStore == nil {
 		c.enrichmentStore = make(map[string]map[string]domain.Finding)
 	}
@@ -359,6 +367,8 @@ func (c *Controller) listEnrichmentFindings(typeName string) map[string]domain.F
 
 // PatchListRelatedIDSet sets the relatedIDSet on the top list screen.
 func (c *Controller) PatchListRelatedIDSet(ids []string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	ls := c.topListState()
 	if ls == nil {
 		return
@@ -387,6 +397,8 @@ type reapplyCheckerEntry struct {
 // top list screen's resource type. When non-nil, subsequent applyResourcesLoaded
 // calls re-run the checker to extend RelatedIDSet with newly matched IDs.
 func (c *Controller) PatchListReapplyChecker(checker resource.RelatedChecker, src resource.Resource) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	ls := c.topListState()
 	if ls == nil {
 		return
@@ -417,6 +429,8 @@ func (c *Controller) PatchListReapplyChecker(checker resource.RelatedChecker, sr
 // ResourceListModel.ReapplyCheckerAgainst — the controller owns the actual
 // merge logic in reapplyCheckerAgainst.
 func (c *Controller) ApplyReapplyCheckerAgainst(newPage []resource.Resource) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	ls := c.topListState()
 	if ls == nil {
 		return
@@ -907,6 +921,8 @@ func resolveListMarkerCol(columns []ColumnDef, td *resource.ResourceTypeDef) int
 
 // ListFrameTitle mirrors FrameTitle in ResourceListModel.
 func (c *Controller) ListFrameTitle() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	ls := c.topListState()
 	if ls == nil {
 		return ""
@@ -977,6 +993,8 @@ func (c *Controller) buildListFrameTitle(ctx runtime.ScreenContext, ls *ListStat
 // visible (filtered+sorted) row set, plus a navigable bool (always true when
 // a resource is present — row-dependent guards are wired in the flip step).
 func (c *Controller) ListSelected() (resource.Resource, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	ls := c.topListState()
 	if ls == nil {
 		return resource.Resource{}, false
@@ -996,6 +1014,8 @@ func (c *Controller) ListSelected() (resource.Resource, bool) {
 
 // GetListFilter returns the current filter text of the top list screen.
 func (c *Controller) GetListFilter() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	ls := c.topListState()
 	if ls == nil {
 		return ""
@@ -1005,6 +1025,8 @@ func (c *Controller) GetListFilter() string {
 
 // GetListSort returns the current sort column and direction of the top list screen.
 func (c *Controller) GetListSort() (col, dir string) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	ls := c.topListState()
 	if ls == nil {
 		return "", ""
@@ -1014,6 +1036,8 @@ func (c *Controller) GetListSort() (col, dir string) {
 
 // GetListScrollX returns the horizontal scroll offset of the top list screen.
 func (c *Controller) GetListScrollX() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	ls := c.topListState()
 	if ls == nil {
 		return 0
@@ -1023,6 +1047,8 @@ func (c *Controller) GetListScrollX() int {
 
 // GetListSelectedRow returns the selected-row index of the top list screen.
 func (c *Controller) GetListSelectedRow() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	ls := c.topListState()
 	if ls == nil {
 		return 0
@@ -1033,6 +1059,8 @@ func (c *Controller) GetListSelectedRow() int {
 // GetListAttentionOnly reports whether attention-only mode is active on the
 // top list screen.
 func (c *Controller) GetListAttentionOnly() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	ls := c.topListState()
 	if ls == nil {
 		return false
@@ -1042,6 +1070,8 @@ func (c *Controller) GetListAttentionOnly() bool {
 
 // PatchListDisplayName sets the display name override on the top list screen.
 func (c *Controller) PatchListDisplayName(name string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	ls := c.topListState()
 	if ls == nil {
 		return
@@ -1053,6 +1083,8 @@ func (c *Controller) PatchListDisplayName(name string) {
 // Used by child-list navigation to carry the parent resource's identifiers
 // (e.g., bucket name, cluster ARN) into fetch and child-routing calls.
 func (c *Controller) PatchListParentContext(ctx map[string]string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	ls := c.topListState()
 	if ls == nil {
 		return
@@ -1063,6 +1095,8 @@ func (c *Controller) PatchListParentContext(ctx map[string]string) {
 // GetListAutoOpenSingle reports whether auto-open-single-detail is active
 // on the top list screen.
 func (c *Controller) GetListAutoOpenSingle() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	ls := c.topListState()
 	if ls == nil {
 		return false
@@ -1073,6 +1107,8 @@ func (c *Controller) GetListAutoOpenSingle() bool {
 // ClearListAutoOpenSingle resets the auto-open-single-detail flag on the
 // top list screen.
 func (c *Controller) ClearListAutoOpenSingle() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	ls := c.topListState()
 	if ls == nil {
 		return
@@ -1083,6 +1119,8 @@ func (c *Controller) ClearListAutoOpenSingle() {
 // SetListAutoOpenSingle sets the auto-open-single-detail flag on the top
 // list screen.
 func (c *Controller) SetListAutoOpenSingle(v bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	ls := c.topListState()
 	if ls == nil {
 		return
@@ -1093,6 +1131,8 @@ func (c *Controller) SetListAutoOpenSingle(v bool) {
 // GetListExactRelatedTargetID returns the single ID in RelatedIDSet when the
 // set has exactly one non-empty entry, mirroring exactRelatedTargetID in views.
 func (c *Controller) GetListExactRelatedTargetID() (string, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	ls := c.topListState()
 	if ls == nil || len(ls.RelatedIDSet) != 1 {
 		return "", false
@@ -1108,6 +1148,8 @@ func (c *Controller) GetListExactRelatedTargetID() (string, bool) {
 
 // SetListLoadingMore sets the LoadingMore flag on the top list screen.
 func (c *Controller) SetListLoadingMore(v bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	ls := c.topListState()
 	if ls == nil {
 		return
@@ -1119,6 +1161,8 @@ func (c *Controller) SetListLoadingMore(v bool) {
 // screen. Called when a fetch or load-more operation fails (error handler path)
 // so the title reverts from "name loading..." back to the resource count title.
 func (c *Controller) ClearListLoading() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	ls := c.topListState()
 	if ls == nil {
 		return
@@ -1129,6 +1173,8 @@ func (c *Controller) ClearListLoading() {
 
 // GetListPaginationCursor returns the pagination cursor of the top list screen.
 func (c *Controller) GetListPaginationCursor() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	ls := c.topListState()
 	if ls == nil {
 		return ""
@@ -1138,6 +1184,8 @@ func (c *Controller) GetListPaginationCursor() string {
 
 // GetListParentContext returns the parent context map of the top list screen.
 func (c *Controller) GetListParentContext() map[string]string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	ls := c.topListState()
 	if ls == nil {
 		return nil
@@ -1147,6 +1195,8 @@ func (c *Controller) GetListParentContext() map[string]string {
 
 // GetListFetchFilter returns the server-side fetch filter of the top list screen.
 func (c *Controller) GetListFetchFilter() map[string]string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	ls := c.topListState()
 	if ls == nil {
 		return nil
@@ -1156,6 +1206,8 @@ func (c *Controller) GetListFetchFilter() map[string]string {
 
 // PatchListFetchFilter sets the server-side fetch filter on the top list screen.
 func (c *Controller) PatchListFetchFilter(filter map[string]string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	ls := c.topListState()
 	if ls == nil {
 		return
@@ -1165,6 +1217,8 @@ func (c *Controller) PatchListFetchFilter(filter map[string]string) {
 
 // PatchListEscPops sets the EscPops flag on the top list screen.
 func (c *Controller) PatchListEscPops(v bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	ls := c.topListState()
 	if ls == nil {
 		return
@@ -1174,6 +1228,8 @@ func (c *Controller) PatchListEscPops(v bool) {
 
 // PatchListTitleSuffix sets the title suffix on the top list screen.
 func (c *Controller) PatchListTitleSuffix(s string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	ls := c.topListState()
 	if ls == nil {
 		return
@@ -1183,6 +1239,8 @@ func (c *Controller) PatchListTitleSuffix(s string) {
 
 // PatchListShowIssueBadge sets the ShowIssueBadge flag on the top list screen.
 func (c *Controller) PatchListShowIssueBadge(v bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	ls := c.topListState()
 	if ls == nil {
 		return
@@ -1192,8 +1250,15 @@ func (c *Controller) PatchListShowIssueBadge(v bool) {
 
 // PatchListAutoOpenSingle is an alias for SetListAutoOpenSingle used by
 // navigation adapters that need to configure the flag before resources load.
+// Calls the lock-free inner directly to avoid double-locking.
 func (c *Controller) PatchListAutoOpenSingle(v bool) {
-	c.SetListAutoOpenSingle(v)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	ls := c.topListState()
+	if ls == nil {
+		return
+	}
+	ls.AutoOpenSingle = v
 }
 
 // ResolveListColumns exports resolveListColumns for use by constructors that
@@ -1207,6 +1272,8 @@ func ResolveListColumns(typeName string) []ColumnDef {
 // table_render.go so that handleSortByCol and buildListBody always agree on
 // the column set — and therefore on what key "N" maps to.
 func (c *Controller) ResolveColumnsForType(typeName string) []ColumnDef {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	// viewConfig takes highest priority (same as resolveColumns).
 	if c.viewConfig != nil {
 		vd := config.GetViewDef(c.viewConfig, typeName)
@@ -1260,6 +1327,8 @@ func (c *Controller) ResolveColumnsForType(typeName string) []ColumnDef {
 
 // GetListAllResources returns all cached resources for the top list screen's type.
 func (c *Controller) GetListAllResources() []resource.Resource {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	ls := c.topListState()
 	if ls == nil {
 		return nil
@@ -1273,6 +1342,8 @@ func (c *Controller) GetListAllResources() []resource.Resource {
 
 // GetListPagination returns truncated+cursor for the top list screen.
 func (c *Controller) GetListPagination() (truncated bool, cursor string) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	ls := c.topListState()
 	if ls == nil {
 		return false, ""
@@ -1282,6 +1353,8 @@ func (c *Controller) GetListPagination() (truncated bool, cursor string) {
 
 // GetListEscPops reports whether Esc should pop the top list screen.
 func (c *Controller) GetListEscPops() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	ls := c.topListState()
 	if ls == nil {
 		return false
@@ -1291,6 +1364,8 @@ func (c *Controller) GetListEscPops() bool {
 
 // GetListDisplayName returns the display name override of the top list screen.
 func (c *Controller) GetListDisplayName() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	ls := c.topListState()
 	if ls == nil {
 		return ""
@@ -1300,6 +1375,8 @@ func (c *Controller) GetListDisplayName() string {
 
 // GetListTitleSuffix returns the title suffix of the top list screen.
 func (c *Controller) GetListTitleSuffix() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	ls := c.topListState()
 	if ls == nil {
 		return ""
@@ -1309,6 +1386,8 @@ func (c *Controller) GetListTitleSuffix() string {
 
 // GetListShowIssueBadge reports whether the issue badge is shown.
 func (c *Controller) GetListShowIssueBadge() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	ls := c.topListState()
 	if ls == nil {
 		return false
@@ -1318,6 +1397,8 @@ func (c *Controller) GetListShowIssueBadge() bool {
 
 // GetListRelatedIDSet returns the relatedIDSet of the top list screen.
 func (c *Controller) GetListRelatedIDSet() map[string]struct{} {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	ls := c.topListState()
 	if ls == nil {
 		return nil
@@ -1328,8 +1409,11 @@ func (c *Controller) GetListRelatedIDSet() map[string]struct{} {
 // PushChildListScreen pushes a ScreenChildList for the given resource type
 // directly onto the controller stack, bypassing menu/command routing. Used by
 // NewChildResourceList to ensure topListState() is non-nil before Patch* calls.
+// Calls lock-free applyIntents + ensureListState to avoid double-locking.
 func (c *Controller) PushChildListScreen(typeName string) {
-	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.applyIntents([]runtime.UIIntent{runtime.PushScreen{
 		ID:      runtime.ScreenChildList,
 		Context: runtime.ScreenContext{ResourceType: typeName},
 	}})
@@ -1340,12 +1424,16 @@ func (c *Controller) PushChildListScreen(typeName string) {
 // Used by renderDataRow to resolve glyph markers without accessing the deleted
 // findingsByID field on ResourceListModel.
 func (c *Controller) GetListEnrichmentFindings(typeName string) map[string]domain.Finding {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	return c.listEnrichmentFindings(typeName)
 }
 
 // GetListIssueCount returns the number of resources with issue status in the
 // top list screen's resource type, mirroring IssueCount() in ResourceListModel.
 func (c *Controller) GetListIssueCount() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	ls := c.topListState()
 	if ls == nil || len(c.stack) == 0 {
 		return 0
@@ -1387,6 +1475,8 @@ func (c *Controller) GetListIssueCount() int {
 // GetListVisibleResources returns the visible (filtered+sorted) resource slice
 // for the top list screen, for test introspection.
 func (c *Controller) GetListVisibleResources() []resource.Resource {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	ls := c.topListState()
 	if ls == nil || len(c.stack) == 0 {
 		return nil
@@ -1401,6 +1491,8 @@ func (c *Controller) GetListVisibleResources() []resource.Resource {
 // ApplyListFieldUpdates merges Wave-2 field updates into the cached resource
 // slice for typeName. Keyed by resource ID then field key.
 func (c *Controller) ApplyListFieldUpdates(typeName string, updates map[string]map[string]string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if len(updates) == 0 || c.resourceCache == nil {
 		return
 	}
@@ -1419,6 +1511,7 @@ func (c *Controller) ApplyListFieldUpdates(typeName string, updates map[string]m
 // the controller's attention filter does not yet consult this set.
 func (c *Controller) ApplyListTruncatedIDs(_ string, _ map[string]bool) {
 	// Intentional no-op: truncatedByID was stored but never read in the filter
-	// pipeline. Retained for caller parity.
+	// pipeline. Retained for caller parity. No lock needed — no shared state
+	// is accessed.
 }
 
