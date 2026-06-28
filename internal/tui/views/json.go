@@ -22,7 +22,13 @@ import (
 )
 
 // JSONModel renders JSON with syntax coloring using bubbles/viewport for scroll.
+// ctrl is non-nil when the model is constructed by the TUI navigator; when
+// ctrl is set, View() delegates to RenderText(ctrl.Snapshot().Body.Text) so
+// the headless/web renderer and the TUI renderer share one code path.
+// Unit tests and isolated callers leave ctrl nil; View() falls back to the
+// direct viewport path in that case so parity tests remain unaffected.
 type JSONModel struct {
+	ctrl         *app.Controller
 	res          resource.Resource
 	resourceType string
 	viewport     viewport.Model
@@ -37,6 +43,18 @@ type JSONModel struct {
 // NewJSON creates a JSONModel for the given resource.
 func NewJSON(res resource.Resource, resourceType string, k keys.Map) JSONModel {
 	return JSONModel{
+		res:          res,
+		resourceType: resourceType,
+		keys:         k,
+	}
+}
+
+// NewJSONWithCtrl creates a JSONModel backed by the given controller.
+// The controller stack must already have ScreenJSON pushed and EnsureTextState
+// called before the first View() so that Snapshot().Body.Text is non-nil.
+func NewJSONWithCtrl(res resource.Resource, resourceType string, k keys.Map, ctrl *app.Controller) JSONModel {
+	return JSONModel{
+		ctrl:         ctrl,
 		res:          res,
 		resourceType: resourceType,
 		keys:         k,
@@ -58,19 +76,30 @@ func (m JSONModel) Update(msg tea.Msg) (JSONModel, tea.Cmd) {
 		}
 		m.res = msg.EnrichedRes
 		m.refreshViewportContent()
+		// When the controller path is active, replace the TextState Lines with
+		// the re-rendered content from the enriched resource so that
+		// Snapshot().Body.Text reflects the latest data, not the pre-enrichment
+		// snapshot seeded at push time.
+		if m.ctrl != nil {
+			m.ctrl.UpdateTextLines(m.ContentLines())
+		}
 		return m, nil
 	case tea.PasteMsg:
 		if m.search.IsInputMode() {
 			var cmd tea.Cmd
 			m.search, cmd = m.search.Update(msg)
-			m.refreshViewportContent()
+			if m.ctrl == nil {
+				m.refreshViewportContent()
+			}
 			return m, cmd
 		}
 	case searchPasteMsg:
 		if m.search.IsInputMode() {
 			var cmd tea.Cmd
 			m.search, cmd = m.search.Update(msg)
-			m.refreshViewportContent()
+			if m.ctrl == nil {
+				m.refreshViewportContent()
+			}
 			return m, cmd
 		}
 	case tea.KeyMsg:
@@ -78,7 +107,20 @@ func (m JSONModel) Update(msg tea.Msg) (JSONModel, tea.Cmd) {
 		if m.search.IsInputMode() {
 			var cmd tea.Cmd
 			m.search, cmd = m.search.Update(msg)
-			m.refreshViewportContent()
+			if m.ctrl != nil {
+				// SearchModel.Update may have exited input mode (Enter/Esc).
+				if !m.search.IsInputMode() {
+					if m.search.IsActive() {
+						// Enter was pressed — commit query to controller.
+						m.ctrl.Apply(app.Action{Kind: app.ActionSearch, Arg: m.search.Query()})
+					} else {
+						// Esc was pressed — clear controller search.
+						m.ctrl.Apply(app.Action{Kind: app.ActionSearchClear})
+					}
+				}
+			} else {
+				m.refreshViewportContent()
+			}
 			return m, cmd
 		}
 		switch {
@@ -86,28 +128,74 @@ func (m JSONModel) Update(msg tea.Msg) (JSONModel, tea.Cmd) {
 			m.search.Activate()
 			return m, nil
 		case key.Matches(msg, m.keys.SearchNext):
-			if m.search.IsActive() && m.search.MatchCount() > 0 {
-				m.search.NextMatch()
-				m.refreshViewportContent()
+			if m.search.IsActive() {
+				if m.ctrl != nil {
+					m.ctrl.Apply(app.Action{Kind: app.ActionSearchNext})
+				} else if m.search.MatchCount() > 0 {
+					m.search.NextMatch()
+					m.refreshViewportContent()
+				}
 				return m, nil
 			}
 		case key.Matches(msg, m.keys.SearchPrev):
-			if m.search.IsActive() && m.search.MatchCount() > 0 {
-				m.search.PrevMatch()
-				m.refreshViewportContent()
+			if m.search.IsActive() {
+				if m.ctrl != nil {
+					m.ctrl.Apply(app.Action{Kind: app.ActionSearchPrev})
+				} else if m.search.MatchCount() > 0 {
+					m.search.PrevMatch()
+					m.refreshViewportContent()
+				}
 				return m, nil
 			}
 		case key.Matches(msg, m.keys.Escape):
 			if m.search.IsActive() {
 				m.search.Deactivate()
-				m.refreshViewportContent()
+				if m.ctrl != nil {
+					m.ctrl.Apply(app.Action{Kind: app.ActionSearchClear})
+				} else {
+					m.refreshViewportContent()
+				}
 				return m, nil
 			}
 		case key.Matches(msg, m.keys.ToggleWrap):
-			m.wrap = !m.wrap
-			m.viewport.SoftWrap = m.wrap
-			m.refreshViewportContent()
+			if m.ctrl != nil {
+				m.ctrl.Apply(app.Action{Kind: app.ActionToggleWrap})
+			} else {
+				m.wrap = !m.wrap
+				m.viewport.SoftWrap = m.wrap
+				m.refreshViewportContent()
+			}
 			return m, nil
+		case key.Matches(msg, m.keys.Up):
+			if m.ctrl != nil {
+				m.ctrl.Apply(app.Action{Kind: app.ActionMoveUp})
+				return m, nil
+			}
+		case key.Matches(msg, m.keys.Down):
+			if m.ctrl != nil {
+				m.ctrl.Apply(app.Action{Kind: app.ActionMoveDown})
+				return m, nil
+			}
+		case key.Matches(msg, m.keys.Top):
+			if m.ctrl != nil {
+				m.ctrl.Apply(app.Action{Kind: app.ActionMoveTop})
+				return m, nil
+			}
+		case key.Matches(msg, m.keys.Bottom):
+			if m.ctrl != nil {
+				m.ctrl.Apply(app.Action{Kind: app.ActionMoveBottom})
+				return m, nil
+			}
+		case key.Matches(msg, m.keys.PageUp):
+			if m.ctrl != nil {
+				m.ctrl.Apply(app.Action{Kind: app.ActionPageUp, N: max(m.height-1, 1)})
+				return m, nil
+			}
+		case key.Matches(msg, m.keys.PageDown):
+			if m.ctrl != nil {
+				m.ctrl.Apply(app.Action{Kind: app.ActionPageDown, N: max(m.height-1, 1)})
+				return m, nil
+			}
 		case key.Matches(msg, m.keys.CloudTrail):
 			if ff := resource.BuildCloudTrailFilter(m.res, m.resourceType); ff != nil {
 				res := m.res
@@ -155,9 +243,19 @@ func (m JSONModel) Update(msg tea.Msg) (JSONModel, tea.Cmd) {
 }
 
 // View renders JSON content via viewport.
+// When a controller is wired (TUI navigator path), delegates to
+// RenderText(ctrl.Snapshot().Body.Text) so the headless and TUI renderers
+// share one code path. When ctrl is nil (unit tests, isolated callers),
+// falls back to the direct viewport path.
 func (m JSONModel) View() string {
 	if !m.ready {
 		return "Initializing..."
+	}
+	if m.ctrl != nil {
+		body := m.ctrl.Snapshot().Body.Text
+		if body != nil {
+			return m.RenderText(*body)
+		}
 	}
 	return m.viewport.View()
 }
@@ -193,20 +291,43 @@ func (m *JSONModel) refreshViewportContent() {
 }
 
 // IsSearchActive returns true when search is active (input mode or confirmed highlights).
-func (m JSONModel) IsSearchActive() bool { return m.search.IsActive() }
+// When the controller is wired, reflects the controller's TextState.
+func (m JSONModel) IsSearchActive() bool {
+	if m.ctrl != nil {
+		body := m.ctrl.Snapshot().Body.Text
+		return m.search.IsInputMode() || (body != nil && body.Search != "")
+	}
+	return m.search.IsActive()
+}
 
 // IsSearchInputMode returns true when the search input is capturing keystrokes.
+// This is always model-local (the controller has no concept of typing mode).
 func (m JSONModel) IsSearchInputMode() bool { return m.search.IsInputMode() }
 
 // SearchInfo returns the search state string for the header.
 // Input mode: "/query" (or "/" when query is empty), Confirmed: "N/M matches", Inactive: "".
 func (m JSONModel) SearchInfo() string {
+	if m.search.IsInputMode() {
+		return "/" + m.search.Query()
+	}
+	if m.ctrl != nil {
+		body := m.ctrl.Snapshot().Body.Text
+		if body == nil || body.Search == "" {
+			return ""
+		}
+		matches := buildTextSearchMatchesForInfo(body.Lines, body.Search)
+		total := len(matches)
+		if total == 0 {
+			return "0/0 matches"
+		}
+		cursor := body.SearchCursor
+		if cursor < 0 || cursor >= total {
+			cursor = 0
+		}
+		return formatSearchInfo(cursor+1, total)
+	}
 	if !m.search.IsActive() {
 		return ""
-	}
-	if m.search.IsInputMode() {
-		q := m.search.Query()
-		return "/" + q
 	}
 	return m.search.MatchInfo()
 }
@@ -244,6 +365,14 @@ func (m JSONModel) CopyContent() (string, string) {
 // GetHelpContext returns HelpFromJSON.
 func (m JSONModel) GetHelpContext() HelpContext {
 	return HelpFromJSON
+}
+
+// ContentLines returns the syntax-colored JSON content as a slice of lines,
+// matching exactly what refreshViewportContent passes to the viewport.
+// Used by the TUI navigator at push time to seed EnsureTextState.
+func (m JSONModel) ContentLines() []string {
+	content := m.renderContent()
+	return strings.Split(content, "\n")
 }
 
 // RawContent returns the uncolored JSON text for clipboard copy.
