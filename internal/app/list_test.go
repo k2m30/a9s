@@ -39,6 +39,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/session"
 )
 
@@ -1177,6 +1178,11 @@ func TestGetters_NoListScreen_ReturnZeroValues(t *testing.T) {
 // set, so navigating back to the first screen shows the original rows (not the
 // second screen's filtered/related rows).
 //
+// NOTE: this test drives the ApplyResourcesLoaded test-helper path. The
+// companion test TestHandleResourcesLoaded_StackedSameType_DoesNotCorruptUnderlyingList
+// covers the real c.Handle(messages.ResourcesLoaded{...}) event path and is
+// the actual regression guard for the "fan-out to every same-type list" bug.
+//
 // Scenario:
 //   - Push list screen 1 for "ec2" → load rows A (3 instances).
 //   - Push list screen 2 for "ec2" (simulates a filtered/related pivot) → load
@@ -1323,5 +1329,163 @@ func TestBug3_SortUsesViewConfig_CustomSortKeyApplied(t *testing.T) {
 		if lb.Rows[i].ResourceID != want {
 			t.Errorf("sort by viewConfig score desc: Rows[%d].ResourceID got %q want %q", i, lb.Rows[i].ResourceID, want)
 		}
+	}
+}
+
+// TestHandleResourcesLoaded_StackedSameType_DoesNotCorruptUnderlyingList is the
+// regression test for the P1 bug where handleResourcesLoadedEvent applied a
+// ResourcesLoaded result to EVERY same-type list on the stack, overwriting a
+// stacked filtered/child list's rows onto the underlying list beneath it.
+//
+// The fix restricts delivery to the TOPMOST matching list only. This test drives
+// the real c.Handle(messages.ResourcesLoaded{...}) event path — unlike the
+// companion TestBug1 which uses the ApplyResourcesLoaded test-helper shortcut
+// and therefore could not catch this bug.
+//
+// Why Gen=0 is correct: ResourcesLoaded.AcceptZeroGen() returns true, so a zero
+// Gen always passes the session-staleness guard in core.HandleEvent. Test and
+// demo callers that do not set Gen always proceed through to handleResourcesLoadedEvent.
+//
+// Regression scenario (pre-fix behaviour):
+//   - handleResourcesLoadedEvent fanned out to every same-type list on the stack.
+//   - Step 3's 1-row result would overwrite both screen 2 (correct) AND screen 1
+//     (wrong), so after pop screen 1 showed 1 row instead of 3.
+func TestHandleResourcesLoaded_StackedSameType_DoesNotCorruptUnderlyingList(t *testing.T) {
+	// Step 1: build controller on an ec2 list screen (screen 1) and give it
+	// 3 rows via the real Handle path.
+	c := newListController("ec2")
+
+	rowsA := fakeEC2Resources() // 3 distinct instances
+
+	// Seed screen 1 via c.Handle so we also exercise the real path on the first load.
+	// Gen=0 passes AcceptZeroGen guard; ResourceType="ec2" routes to the single list.
+	_, _ = c.Handle(messages.ResourcesLoaded{ //nolint:ineffassign,staticcheck // return values not needed here
+		ResourceType: "ec2",
+		Resources:    rowsA,
+	})
+
+	lb1 := listBodyOrFail(t, c)
+	if len(lb1.Rows) != 3 {
+		t.Fatalf("screen 1 after initial Handle: want 3 rows, got %d", len(lb1.Rows))
+	}
+
+	// Step 2: push a second, same-type ec2 list on top (simulates a
+	// filtered/child list — same mechanism used by the related-resource panel).
+	// After this call the stack has two ec2 list screens. The child screen's
+	// ListState.Rows is nil, so listScreenResources falls back to the shared
+	// type-keyed cache and shows the same 3 rows — that is expected and correct
+	// while the child's own fetch hasn't landed yet.
+	c.PushChildListScreen("ec2")
+
+	// Step 3: drive the REAL event path with exactly 1 row, distinct from rowsA.
+	// Pre-fix: this 1-row result would be applied to BOTH screen 2 and screen 1.
+	// Post-fix: it is applied to the topmost matching list only (screen 2).
+	singleRow := []resource.Resource{
+		{
+			ID:   "i-0fff999999999999f",
+			Name: "filtered-node",
+			Type: "ec2",
+			Fields: map[string]string{
+				"instance_id": "i-0fff999999999999f",
+				"name":        "filtered-node",
+				"state":       "running",
+				"type":        "t3.micro",
+				"private_ip":  "10.0.2.99",
+			},
+		},
+	}
+	_, _ = c.Handle(messages.ResourcesLoaded{ //nolint:ineffassign,staticcheck // return values not needed here
+		ResourceType: "ec2",
+		Resources:    singleRow,
+	})
+
+	// Step 4: assert the TOP list (screen 2) now has exactly the 1 row we sent.
+	lb2 := listBodyOrFail(t, c)
+	if len(lb2.Rows) != 1 {
+		t.Fatalf("screen 2 after Handle: want 1 row, got %d", len(lb2.Rows))
+	}
+	if lb2.Rows[0].ResourceID != singleRow[0].ID {
+		t.Errorf("screen 2 row ID: got %q want %q", lb2.Rows[0].ResourceID, singleRow[0].ID)
+	}
+
+	// Step 5: pop back to the underlying list (screen 1) and assert it was NOT
+	// overwritten. Pre-fix this assertion fails: screen 1 would have 1 row.
+	c.Apply(app.Action{Kind: app.ActionBack})
+
+	lb1After := listBodyOrFail(t, c)
+	if len(lb1After.Rows) != 3 {
+		t.Fatalf("screen 1 after pop: want 3 rows (original), got %d — handleResourcesLoadedEvent fan-out bug: 1-row result from screen 2 corrupted screen 1", len(lb1After.Rows))
+	}
+	// Each row must match the original rowsA IDs — not the single filtered row.
+	for i, want := range rowsA {
+		if lb1After.Rows[i].ResourceID != want.ID {
+			t.Errorf("screen 1 after pop row[%d]: got %q want %q (original rowsA corrupted by screen 2 result)", i, lb1After.Rows[i].ResourceID, want.ID)
+		}
+	}
+
+	// The single filtered row must not appear anywhere in screen 1's rows.
+	for _, row := range lb1After.Rows {
+		if row.ResourceID == singleRow[0].ID {
+			t.Errorf("screen 1 after pop: filtered-node %q leaked into underlying list — fan-out bug not fixed", singleRow[0].ID)
+		}
+	}
+}
+
+// fakeRDSResource returns a single synthetic RDS instance resource, confirming
+// that the stacked-same-type bug is type-agnostic (not ec2-specific).
+func fakeRDSResource() resource.Resource {
+	return resource.Resource{
+		ID:   "db-acme-prod-0001",
+		Name: "acme-prod",
+		Type: "rds",
+		Fields: map[string]string{
+			"db_instance_id": "db-acme-prod-0001",
+			"name":           "acme-prod",
+			"status":         "available",
+			"engine":         "postgres",
+			"class":          "db.t3.medium",
+		},
+	}
+}
+
+// TestHandleResourcesLoaded_StackedSameType_RDS confirms the fix is not
+// ec2-specific: the same topmost-only delivery must hold for rds lists.
+func TestHandleResourcesLoaded_StackedSameType_RDS(t *testing.T) {
+	c := newListController("rds")
+
+	underlying := []resource.Resource{fakeRDSResource()}
+	_, _ = c.Handle(messages.ResourcesLoaded{ //nolint:ineffassign,staticcheck // return values not needed here
+		ResourceType: "rds",
+		Resources:    underlying,
+	})
+
+	lb := listBodyOrFail(t, c)
+	if len(lb.Rows) != 1 {
+		t.Fatalf("screen 1 after Handle: want 1 row, got %d", len(lb.Rows))
+	}
+
+	c.PushChildListScreen("rds")
+
+	// The child screen receives an empty result (simulates a related panel
+	// that found zero matching RDS instances).
+	_, _ = c.Handle(messages.ResourcesLoaded{ //nolint:ineffassign,staticcheck // return values not needed here
+		ResourceType: "rds",
+		Resources:    []resource.Resource{},
+	})
+
+	lb2 := listBodyOrFail(t, c)
+	if len(lb2.Rows) != 0 {
+		t.Fatalf("screen 2 after Handle (empty): want 0 rows, got %d", len(lb2.Rows))
+	}
+
+	// Pop back — screen 1 must still hold its 1 row.
+	c.Apply(app.Action{Kind: app.ActionBack})
+
+	lb1After := listBodyOrFail(t, c)
+	if len(lb1After.Rows) != 1 {
+		t.Fatalf("screen 1 after pop: want 1 row, got %d — empty child result corrupted underlying rds list", len(lb1After.Rows))
+	}
+	if lb1After.Rows[0].ResourceID != underlying[0].ID {
+		t.Errorf("screen 1 row ID: got %q want %q", lb1After.Rows[0].ResourceID, underlying[0].ID)
 	}
 }
