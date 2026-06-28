@@ -93,18 +93,41 @@ func (m *Model) applyIntents(intents []runtime.UIIntent) []tea.Cmd {
 				// AS-1395: runtime ships domain.Finding + domain.AttentionDetail
 				// keyed by Resource.ID. nil EnrichmentFindings = clear; non-nil =
 				// update from map.
-				if v.EnrichmentFindings == nil {
-					d.SetEnrichmentFinding(nil, nil)
-				} else if f, exists := v.EnrichmentFindings[d.ResourceID()]; exists {
-					finding := f
-					var ad *domain.AttentionDetail
-					if got, hasAD := v.EnrichmentAttentionDetails[d.ResourceID()]; hasAD && len(got.Rows) > 0 {
-						adVal := got
-						ad = &adVal
+				//
+				// Controller-backed models: route to ctrl.ApplyDetailFinding so the
+				// controller remains the single source of truth for findings.
+				// Legacy models (ctrl == nil): use SetEnrichmentFinding as before.
+				if d.IsControllerBacked() {
+					// Route by resource ID so a STACKED detail (not the active one)
+					// receives its finding — ApplyDetailFinding targets only the top
+					// screen, which drops findings for details below the active one.
+					if v.EnrichmentFindings == nil {
+						m.ctrl.ApplyDetailFindingForResource(d.ResourceType(), d.ResourceID(), nil, nil)
+					} else if f, exists := v.EnrichmentFindings[d.ResourceID()]; exists {
+						finding := f
+						var ad *domain.AttentionDetail
+						if got, hasAD := v.EnrichmentAttentionDetails[d.ResourceID()]; hasAD && len(got.Rows) > 0 {
+							adVal := got
+							ad = &adVal
+						}
+						m.ctrl.ApplyDetailFindingForResource(d.ResourceType(), d.ResourceID(), &finding, ad)
+					} else {
+						m.ctrl.ApplyDetailFindingForResource(d.ResourceType(), d.ResourceID(), nil, nil)
 					}
-					d.SetEnrichmentFinding(&finding, ad)
 				} else {
-					d.SetEnrichmentFinding(nil, nil)
+					if v.EnrichmentFindings == nil {
+						d.SetEnrichmentFinding(nil, nil)
+					} else if f, exists := v.EnrichmentFindings[d.ResourceID()]; exists {
+						finding := f
+						var ad *domain.AttentionDetail
+						if got, hasAD := v.EnrichmentAttentionDetails[d.ResourceID()]; hasAD && len(got.Rows) > 0 {
+							adVal := got
+							ad = &adVal
+						}
+						d.SetEnrichmentFinding(&finding, ad)
+					} else {
+						d.SetEnrichmentFinding(nil, nil)
+					}
 				}
 			}
 		case runtime.FlashIntent:

@@ -7,7 +7,9 @@ import (
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/k2m30/a9s/v3/internal/app"
 	"github.com/k2m30/a9s/v3/internal/config"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -16,7 +18,13 @@ import (
 )
 
 // DetailModel renders the key-value describe view using bubbles/viewport for scroll.
+// ctrl is non-nil when the model is constructed by the TUI navigator via
+// NewDetailWithCtrl; in that case View() delegates to
+// RenderDetail(ctrl.Snapshot().Body.Detail) and key actions route to ctrl.Apply.
+// Unit tests and isolated callers leave ctrl nil; View() builds a live body and
+// delegates to RenderDetail so parity tests remain unaffected.
 type DetailModel struct {
+	ctrl                   *app.Controller             // non-nil = controller-backed TUI path
 	res                    resource.Resource
 	resourceType           string // e.g. "ec2", "s3", "rds" — used to look up correct ViewDef
 	viewConfig             *config.ViewsConfig
@@ -39,6 +47,312 @@ type DetailModel struct {
 	plainMode              bool                        // true only during PlainContent(); causes Attention entries to render Key: Value (full text for clipboard/search)
 }
 
+// updateKeyMsgWithCtrl handles tea.KeyMsg events when m.ctrl is non-nil.
+// Stateful actions (wrap, search, scroll, cursor, related panel) are routed to
+// m.ctrl.Apply so the controller owns all mutable state. Navigation keys that
+// open new screens (YAML, JSON, Enter on navigable fields, CloudTrail, Copy)
+// still emit messages unchanged — they have no effect on detail state.
+func (m DetailModel) updateKeyMsgWithCtrl(msg tea.KeyMsg) (DetailModel, tea.Cmd) {
+	// Search input mode: let the search widget accumulate keystrokes, then sync
+	// the resulting query to the controller on every update.
+	if m.search.IsInputMode() {
+		var cmd tea.Cmd
+		m.search, cmd = m.search.Update(msg)
+		// Sync query into controller so Snapshot().Body.Detail.Search is live.
+		m.ctrl.Apply(app.Action{Kind: app.ActionSearch, Arg: m.search.Query()})
+		// Match computation/highlight is renderer-side: feed m.search the rendered
+		// content so MatchCount()/the N/M header populate (incl. the enter that
+		// confirms the search).
+		m.refreshViewportContent()
+		return m, cmd
+	}
+
+	// When related panel is focused and filtering, delegate to the right column
+	// widget for text input, then sync filter to controller.
+	if m.rightColShowing() && m.rightCol.IsFocused() && m.rightCol.IsFiltering() {
+		var cmd tea.Cmd
+		m.rightCol, cmd = m.rightCol.Update(msg)
+		m.ctrl.Apply(app.Action{Kind: app.ActionSetFilter, Arg: m.rightCol.FilterQuery()})
+		return m, cmd
+	}
+
+	pageSize := max(m.height-4, 1)
+
+	switch {
+	// --- Related panel focused: Up/Down/Enter/Search/Tab/Esc handled by ctrl ---
+	case m.rightColShowing() && m.rightCol.IsFocused():
+		switch {
+		case key.Matches(msg, m.keys.Up):
+			m.ctrl.Apply(app.Action{Kind: app.ActionMoveUp})
+			return m, nil
+		case key.Matches(msg, m.keys.Down):
+			m.ctrl.Apply(app.Action{Kind: app.ActionMoveDown})
+			return m, nil
+		case key.Matches(msg, m.keys.Search):
+			// Start filtering the related panel.
+			m.rightCol, _ = m.rightCol.Update(msg)
+			m.ctrl.Apply(app.Action{Kind: app.ActionSetFilter, Arg: m.rightCol.FilterQuery()})
+			return m, nil
+		case key.Matches(msg, m.keys.Tab):
+			m.ctrl.Apply(app.Action{Kind: app.ActionToggleFocus})
+			m.rightCol.SetFocused(false)
+			return m, nil
+		case key.Matches(msg, m.keys.Escape):
+			if m.rightCol.HasFilter() {
+				m.rightCol, _ = m.rightCol.Update(msg)
+				m.ctrl.Apply(app.Action{Kind: app.ActionSetFilter, Arg: ""})
+				return m, nil
+			}
+			// Unfocus right column.
+			m.ctrl.Apply(app.Action{Kind: app.ActionToggleFocus})
+			m.rightCol.SetFocused(false)
+			return m, nil
+		case key.Matches(msg, m.keys.Enter):
+			// Enter on a related row → navigate (same as legacy).
+			var cmd tea.Cmd
+			m.rightCol, cmd = m.rightCol.Update(msg)
+			return m, cmd
+		}
+		// For any other key fall through to the global cases below (ToggleRelated etc.)
+		fallthrough
+
+	default:
+		switch {
+		case key.Matches(msg, m.keys.ToggleWrap):
+			m.ctrl.Apply(app.Action{Kind: app.ActionToggleWrap})
+			return m, nil
+
+		case key.Matches(msg, m.keys.Search):
+			// When the related pane is focused, '/' activates the rightcol filter,
+			// not the main detail search (renderer-side; query synced to controller).
+			if m.rightColShowing() && m.rightCol.IsFocused() {
+				m.rightCol, _ = m.rightCol.Update(msg)
+				m.ctrl.Apply(app.Action{Kind: app.ActionSetFilter, Arg: m.rightCol.FilterQuery()})
+				return m, nil
+			}
+			m.search.Activate()
+			m.ctrl.Apply(app.Action{Kind: app.ActionSearch, Arg: ""})
+			return m, nil
+
+		case key.Matches(msg, m.keys.SearchNext):
+			// Match navigation/highlight is renderer-side (depends on rendered
+			// content): drive m.search so the N/M header + viewport follow.
+			if m.search.IsActive() && m.search.MatchCount() > 0 {
+				m.search.NextMatch()
+				m.refreshViewportContent()
+			}
+			m.ctrl.Apply(app.Action{Kind: app.ActionSearchNext})
+			return m, nil
+
+		case key.Matches(msg, m.keys.SearchPrev):
+			if m.search.IsActive() && m.search.MatchCount() > 0 {
+				m.search.PrevMatch()
+				m.refreshViewportContent()
+			}
+			m.ctrl.Apply(app.Action{Kind: app.ActionSearchPrev})
+			return m, nil
+
+		case key.Matches(msg, m.keys.Escape):
+			if m.search.IsActive() {
+				m.search.Deactivate()
+				m.ctrl.Apply(app.Action{Kind: app.ActionSearchClear})
+				return m, nil
+			}
+
+		case key.Matches(msg, m.keys.PageDown):
+			m.ctrl.Apply(app.Action{Kind: app.ActionPageDown, N: pageSize})
+			if body := m.ctrl.Snapshot().Body.Detail; body != nil {
+				m.fieldCursor = body.FieldCursor
+			}
+			return m, nil
+
+		case key.Matches(msg, m.keys.PageUp):
+			m.ctrl.Apply(app.Action{Kind: app.ActionPageUp, N: pageSize})
+			if body := m.ctrl.Snapshot().Body.Detail; body != nil {
+				m.fieldCursor = body.FieldCursor
+			}
+			return m, nil
+
+		case key.Matches(msg, m.keys.ToggleRelated):
+			// Mirror the legacy flag management so SetSize auto-show respects
+			// explicit hides: rightColUserToggled gates the auto-show path.
+			m.rightColUserToggled = true
+			if m.width < layout.MinInnerContentWidth {
+				return m, nil
+			}
+			if m.rightColAutoShown {
+				// First explicit toggle: hide the auto-shown column.
+				m.rightColAutoShown = false
+				m.rightColVisible = false
+				m.rightCol.SetFocused(false)
+				m.recalcViewportWidth()
+				// Sync controller: hidden=true suppresses auto-show in buildDetailBody.
+				m.ctrl.SetDetailRelatedVisible(false, true)
+				return m, nil
+			}
+			// Normal toggle: flip visible state.
+			m.rightColVisible = !m.rightColVisible
+			// Sync controller to the resolved state; hidden=true so it stays controlled.
+			m.ctrl.SetDetailRelatedVisible(m.rightColVisible, true)
+			if m.rightColVisible {
+				defs := resource.GetRelated(m.resourceType)
+				m.rightCol = newRightColumn(defs, m.res, m.resourceType)
+				m.rightCol.keys = m.keys
+				m.rightCol.SetSize(m.currentRightColWidth(), m.height)
+				m.recalcViewportWidth()
+				return m, func() tea.Msg {
+					return messages.RelatedCheckStarted{
+						ResourceType:   m.resourceType,
+						SourceResource: m.res,
+					}
+				}
+			}
+			m.rightCol.SetFocused(false)
+			m.recalcViewportWidth()
+			return m, nil
+
+		case key.Matches(msg, m.keys.Tab):
+			m.ctrl.Apply(app.Action{Kind: app.ActionToggleFocus})
+			if m.rightCol.IsFocused() {
+				m.rightCol.SetFocused(false)
+			} else if m.rightColShowing() {
+				m.rightCol.SetFocused(true)
+			}
+			return m, nil
+
+		case key.Matches(msg, m.keys.ScrollRight):
+			// l: focus right column.
+			if m.rightColShowing() && !m.rightCol.IsFocused() {
+				m.ctrl.Apply(app.Action{Kind: app.ActionToggleFocus})
+				m.rightCol.SetFocused(true)
+			}
+			return m, nil
+
+		case key.Matches(msg, m.keys.ScrollLeft):
+			// h: focus left column.
+			if m.rightCol.IsFocused() {
+				m.ctrl.Apply(app.Action{Kind: app.ActionToggleFocus})
+				m.rightCol.SetFocused(false)
+			}
+			return m, nil
+
+		case key.Matches(msg, m.keys.Down):
+			m.ctrl.Apply(app.Action{Kind: app.ActionMoveDown})
+			// Keep local fieldCursor in sync so Enter/Copy can index m.fieldList.
+			if body := m.ctrl.Snapshot().Body.Detail; body != nil {
+				m.fieldCursor = body.FieldCursor
+			}
+			return m, nil
+
+		case key.Matches(msg, m.keys.Up):
+			m.ctrl.Apply(app.Action{Kind: app.ActionMoveUp})
+			if body := m.ctrl.Snapshot().Body.Detail; body != nil {
+				m.fieldCursor = body.FieldCursor
+			}
+			return m, nil
+
+		case key.Matches(msg, m.keys.Top):
+			m.ctrl.Apply(app.Action{Kind: app.ActionMoveTop})
+			if body := m.ctrl.Snapshot().Body.Detail; body != nil {
+				m.fieldCursor = body.FieldCursor
+			}
+			return m, nil
+
+		case key.Matches(msg, m.keys.Bottom):
+			m.ctrl.Apply(app.Action{Kind: app.ActionMoveBottom})
+			if body := m.ctrl.Snapshot().Body.Detail; body != nil {
+				m.fieldCursor = body.FieldCursor
+			}
+			return m, nil
+
+		// --- Navigation keys: emit messages, no ctrl.Apply ---
+		case key.Matches(msg, m.keys.Copy):
+			if m.rightCol.IsFocused() {
+				name := m.rightCol.SelectedTypeName()
+				if name != "" {
+					return m, func() tea.Msg {
+						return messages.Copied{Content: name}
+					}
+				}
+				return m, nil
+			}
+			// Left column: copy the field value at cursor.
+			// Use fieldList (has full field metadata) mirroring the legacy path.
+			if m.fieldList != nil && m.fieldCursor >= 0 && m.fieldCursor < len(m.fieldList) {
+				item := m.fieldList[m.fieldCursor]
+				val := item.Value
+				if val == "" {
+					val = item.Key
+				}
+				return m, func() tea.Msg {
+					return messages.Copied{Content: val}
+				}
+			}
+			return m, nil
+
+		case key.Matches(msg, m.keys.Enter):
+			if m.rightCol.IsFocused() {
+				break
+			}
+			// Use fieldList for nav info (FieldRow in body lacks NavID/TargetType).
+			if m.fieldList != nil && m.fieldCursor >= 0 && m.fieldCursor < len(m.fieldList) {
+				item := m.fieldList[m.fieldCursor]
+				if item.IsNavigable {
+					targetID := item.Value
+					if item.NavID != "" {
+						targetID = item.NavID
+					}
+					res := m.res
+					rt := m.resourceType
+					return m, func() tea.Msg {
+						return messages.RelatedNavigate{
+							TargetType:     item.TargetType,
+							SourceResource: res,
+							SourceType:     rt,
+							TargetID:       targetID,
+						}
+					}
+				}
+			}
+			return m, nil
+
+		case key.Matches(msg, m.keys.YAML):
+			return m, func() tea.Msg {
+				return messages.Navigate{
+					Target:       messages.TargetYAML,
+					Resource:     &m.res,
+					ResourceType: m.resourceType,
+				}
+			}
+
+		case key.Matches(msg, m.keys.JSON):
+			return m, func() tea.Msg {
+				return messages.Navigate{
+					Target:       messages.TargetJSON,
+					Resource:     &m.res,
+					ResourceType: m.resourceType,
+				}
+			}
+
+		case key.Matches(msg, m.keys.CloudTrail):
+			if ff := resource.BuildCloudTrailFilter(m.res, m.resourceType); ff != nil {
+				res := m.res
+				rt := m.resourceType
+				return m, func() tea.Msg {
+					return messages.RelatedNavigate{
+						TargetType:     "ct-events",
+						SourceResource: res,
+						SourceType:     rt,
+						FetchFilter:    ff,
+					}
+				}
+			}
+			return m, nil
+		}
+	}
+	return m, nil
+}
+
 // NewDetail creates a DetailModel for the given resource.
 // resourceType identifies which ViewDef to use from the config (e.g. "ec2", "rds").
 // By default, navProvider is resource.GetActiveNavigableFields (ACTIVE-only).
@@ -48,6 +362,30 @@ func NewDetail(res resource.Resource, resourceType string, viewConfig *config.Vi
 		resourceType = inferDetailResourceType(res)
 	}
 	return DetailModel{
+		resourceType:  resourceType,
+		res:           res,
+		viewConfig:    viewConfig,
+		navProvider:   resource.GetActiveNavigableFields,
+		keys:          k,
+		rightColWidth: 32,
+	}
+}
+
+// NewDetailWithCtrl creates a DetailModel backed by the given controller.
+// The controller stack must already have ScreenDetail pushed and EnsureDetailState
+// called before the first View() so that Snapshot().Body.Detail is non-nil from
+// the first render.
+//
+// Key actions in Update route to ctrl.Apply. Enrichment findings and related
+// results must be applied via ctrl.ApplyDetailFinding / ctrl.ApplyDetailRelated
+// (not via SetEnrichmentFinding / ApplyRelatedResults) so the controller
+// remains the single source of truth.
+func NewDetailWithCtrl(res resource.Resource, resourceType string, viewConfig *config.ViewsConfig, k keys.Map, ctrl *app.Controller) DetailModel {
+	if resourceType == "" {
+		resourceType = inferDetailResourceType(res)
+	}
+	return DetailModel{
+		ctrl:          ctrl,
 		resourceType:  resourceType,
 		res:           res,
 		viewConfig:    viewConfig,
@@ -93,6 +431,27 @@ func inferDetailResourceType(res resource.Resource) string {
 	return ""
 }
 
+// wave2FindingFromResource extracts the first wave-2 Finding and its companion
+// AttentionDetail from r.Findings / r.AttentionDetails. Returns (nil, nil) when
+// no wave-2 finding is present. Mirrors findingFromResource in tui/app_enrich_fold.go
+// but is local to the views package to avoid a cross-package import cycle.
+func wave2FindingFromResource(r resource.Resource) (*domain.Finding, *domain.AttentionDetail) {
+	for _, f := range r.Findings {
+		if strings.HasPrefix(string(f.Source), "wave2:") {
+			finding := f
+			var ad *domain.AttentionDetail
+			if r.AttentionDetails != nil {
+				if got, ok := r.AttentionDetails[f.Code]; ok && len(got.Rows) > 0 {
+					adVal := got
+					ad = &adVal
+				}
+			}
+			return &finding, ad
+		}
+	}
+	return nil, nil
+}
+
 // Init implements tea.Model. No async work.
 func (m DetailModel) Init() (DetailModel, tea.Cmd) {
 	return m, nil
@@ -117,10 +476,36 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 		if msg.ResourceType != m.resourceType || (msg.SourceResourceID != "" && msg.SourceResourceID != m.res.ID) {
 			return m, nil
 		}
+		if m.ctrl != nil {
+			// Controller-backed path: merge one checker result into the controller's
+			// DetailState.RelatedRows by DisplayName (mirrors rightColumnModel.Update).
+			errMsg := ""
+			if msg.Result.Err != nil {
+				errMsg = msg.Result.Err.Error()
+			}
+			m.ctrl.ApplyDetailRelatedResult(
+				msg.DefDisplayName,
+				msg.Result.TargetType,
+				msg.Result.Count,
+				false,
+				errMsg,
+				msg.Result.Approximate,
+				msg.Result.FetchFilter,
+			)
+			return m, nil
+		}
 		m.rightCol, _ = m.rightCol.Update(msg)
 		return m, nil
 	case messages.EnrichDetailResult:
-		// Guard: ignore results for a different resource type or resource ID.
+		if m.ctrl != nil {
+			// Controller-backed path: route the wave-2 finding to the matching
+			// detail screen BY RESOURCE ID — it may be a STACKED detail, not the
+			// active one. Passing nil clears any prior finding (recovery case).
+			ef, ad := wave2FindingFromResource(msg.EnrichedRes)
+			m.ctrl.ApplyDetailFindingForResource(msg.ResourceType, msg.ResourceID, ef, ad)
+			return m, nil
+		}
+		// Legacy path: only the active view, so ignore results for another resource.
 		if msg.ResourceType != m.resourceType || msg.ResourceID != m.res.ID {
 			return m, nil
 		}
@@ -147,6 +532,11 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 		}
 		return m, nil
 	case tea.KeyMsg:
+		// Controller-backed path: route stateful keys to ctrl.Apply.
+		// Navigation keys (YAML/JSON/Enter/CloudTrail/Copy) still emit messages.
+		if m.ctrl != nil {
+			return m.updateKeyMsgWithCtrl(msg)
+		}
 		// Search input mode captures all keys.
 		if m.search.IsInputMode() {
 			var cmd tea.Cmd

@@ -19,12 +19,12 @@
 │    HttpPutResponseHopLimit: "2"                                                                                      │
 │    HttpTokens: required                                                                                              │
 │    State: applied                                                                                                    │
+│NetworkInterfaces:                                                                                                    │
+│    - NetworkInterfaceId: eni-0aaa111111111111a                                                                       │
 │Placement:                                                                                                            │
 │    AvailabilityZone: us-east-1a                                                                                      │
 │Platform: Windows                                                                                                     │
 │PrivateDnsName: ip-10-0-1-10.ec2.internal                                                                             │
 │PrivateIpAddress: 10.0.1.10                                                                                           │
 │PublicIpAddress: 54.210.33.112                                                                                        │
-│SecurityGroups:                                                                                                       │
-│    - GroupId: sg-0aaa111111111111a                                                                                   │
 └──────────────────────────────────────────────────────────────────────────────────────────────────────w Wrap──c Copy──┘

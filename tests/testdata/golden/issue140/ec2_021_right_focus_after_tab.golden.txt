@@ -1,16 +1,16 @@
  a9s v  demo:us-east-1                                                                                       ? for help 
 ┌──────────────────────────────────── detail -- i-0a1b2c3d4e5f60001 (web-prod-01) ─────────────────────────────────────┐
 │ InstanceId:           i-0a1b2c3d4e5f60001                                           │            RELATED             │
-│ State:                running                                                       │  Target Groups (0)             │
-│ InstanceType:         t3.large                                                      │  Auto Scaling Groups (1)       │
-│ InstanceLifecycle:    on-demand                                                     │  CloudWatch Alarms (0)         │
+│ State:                running                                                       │  Target Groups                 │
+│ InstanceType:         t3.large                                                      │  Auto Scaling Groups           │
+│ InstanceLifecycle:    on-demand                                                     │  CloudWatch Alarms             │
 │ ImageId:              ami-0a1b2c3d4e5f60001                                         │  EKS Node Groups               │
 │ KeyName:              acme-prod-keypair                                             │  CloudFormation Stacks         │
 │ Placement:                                                                          │  Elastic Beanstalk             │
 │     AvailabilityZone: us-east-1a                                                    │  Elastic IPs                   │
 │ VpcId:                vpc-0abc123def456789a                                         │  EBS Snapshots                 │
 │ SubnetId:             subnet-0aaa111111111111a                                      │  CloudTrail Events             │
-│ PrivateIpAddress:     10.0.1.10                                                     │                                │
+│ PrivateIpAddress:     10.0.1.10                                                     │   (0)                          │
 │ PrivateDnsName:       ip-10-0-1-10.ec2.internal                                     │                                │
 │ PublicIpAddress:      54.210.33.112                                                 │                                │
 │ IamInstanceProfile:                                                                 │                                │
@@ -32,4 +32,4 @@
 │     HttpTokens: required                                                            │                                │
 │     State: applied                                                                  │                                │
 │ LaunchTime:           2025-11-15 08:30                                              │                                │
-└─────────────────────────────────enter Auto Scaling Groups──tab Fields──y YAML──J JSON──t CloudTrail──ctrl+r Refresh──┘
+└───────────────────────────────────────enter Target Groups──tab Fields──y YAML──J JSON──t CloudTrail──ctrl+r Refresh──┘
