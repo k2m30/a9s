@@ -1,5 +1,7 @@
 package app
 
+import "github.com/k2m30/a9s/v3/internal/domain"
+
 // ViewState is the renderer-agnostic snapshot that both the TUI and web
 // renderers consume and that integration tests assert on. It carries no
 // Lipgloss, Bubble Tea, or AWS SDK types — only scalars, slices, and
@@ -73,6 +75,7 @@ type ColumnDef struct {
 	Key   string `json:"key"`
 	Title string `json:"title"`
 	Width int    `json:"width"`
+	Path  string `json:"path,omitempty"`
 }
 
 // RowDecorator is a short tag that renderers use to apply per-row
@@ -87,9 +90,15 @@ const (
 
 // ListRow is one row in a resource-list body.
 type ListRow struct {
-	Cells     []string     `json:"cells"`
-	Decorator RowDecorator `json:"decorator,omitempty"`
-	Severity  string       `json:"severity,omitempty"`
+	Cells      []string     `json:"cells"`
+	Decorator  RowDecorator `json:"decorator,omitempty"`
+	Severity   string       `json:"severity,omitempty"`
+	ResourceID string       `json:"resource_id,omitempty"`
+	// Color is the pre-resolved row color tag: "healthy", "warning", "broken",
+	// "dim", or "" (normal/no-color). Populated by buildListBody so RenderList
+	// can reproduce the exact lipgloss.Style that View() derives from
+	// td.ResolveColor(r) without needing a live resource.Resource or typeDef.
+	Color string `json:"color,omitempty"`
 }
 
 // SortSpec describes the active sort in a list view.
@@ -106,16 +115,24 @@ type PaginationInfo struct {
 
 // ListBody is the body of a resource-list screen.
 type ListBody struct {
-	Columns       []ColumnDef    `json:"columns,omitempty"`
-	Rows          []ListRow      `json:"rows,omitempty"`
-	Selected      int            `json:"selected"`
-	ScrollX       int            `json:"scroll_x"`
-	Filter        string         `json:"filter,omitempty"`
-	Sort          SortSpec       `json:"sort,omitzero"`
-	AttentionOnly bool           `json:"attention_only,omitempty"`
-	Loading       bool           `json:"loading,omitempty"`
-	Truncated     bool           `json:"truncated,omitempty"`
-	Pagination    PaginationInfo `json:"pagination,omitzero"`
+	Columns             []ColumnDef               `json:"columns,omitempty"`
+	Rows                []ListRow                 `json:"rows,omitempty"`
+	Selected            int                       `json:"selected"`
+	ScrollX             int                       `json:"scroll_x"`
+	Filter              string                    `json:"filter,omitempty"`
+	Sort                SortSpec                  `json:"sort,omitzero"`
+	AttentionOnly       bool                      `json:"attention_only,omitempty"`
+	Loading             bool                      `json:"loading,omitempty"`
+	Truncated           bool                      `json:"truncated,omitempty"`
+	Pagination          PaginationInfo            `json:"pagination,omitzero"`
+	EnrichmentFindings  map[string]domain.Finding `json:"enrichment_findings,omitempty"`
+	EnrichmentTruncated map[string]bool           `json:"enrichment_truncated,omitempty"`
+	// MarkerCol is the full-column-list index (before hscroll) of the identity
+	// column that receives the enrichment-finding glyph ("! "/"~ ") prefix.
+	// Pre-computed by buildListBody so RenderList does not need typeDef.
+	MarkerCol int `json:"marker_col"`
+	// LoadingMore is true while an m-key load-more fetch is in flight.
+	LoadingMore bool `json:"loading_more,omitempty"`
 }
 
 // FieldRow is one key-value pair in a detail view.
