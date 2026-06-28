@@ -56,6 +56,7 @@ type errorEntry struct {
 // invalidate in-flight async results on profile/region switch.
 type Model struct {
 	core    *runtime.Core    // platform-agnostic app core
+	ctrl    *app.Controller  // headless controller — single source of truth for menu + list state
 
 	// --- UI shell state ---
 	width  int
@@ -123,14 +124,15 @@ func New(profile, region string, opts ...Option) Model {
 
 	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
 
-	// The headless controller is the single source of truth for menu state.
-	// MainMenuModel holds no data of its own — it delegates all reads and
-	// writes through menuCtrl.
-	menuCtrl := app.New(core)
-	menu := views.NewMainMenu(k, menuCtrl)
+	// The headless controller is the single source of truth for menu and list
+	// state. Both MainMenuModel and ResourceListModel hold no data of their
+	// own — they delegate all reads and writes through m.ctrl.
+	ctrl := app.New(core)
+	menu := views.NewMainMenu(k, ctrl)
 
 	m := Model{
 		core:        core,
+		ctrl:        ctrl,
 		keys:        k,
 		stack:       []views.View{&menu},
 		cmdInput:    ti,

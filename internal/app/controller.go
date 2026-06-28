@@ -4,6 +4,7 @@ import (
 	"maps"
 	"strings"
 
+	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
@@ -39,6 +40,17 @@ type Controller struct {
 	// reapplyCheckers stores per-type reapply checker + source resource for
 	// approximate-pivot navigations. Populated by PatchListReapplyChecker.
 	reapplyCheckers map[string]reapplyCheckerEntry
+
+	// viewConfig is the per-session view configuration used by resolveListColumns
+	// to pick the correct column set for each resource type. When nil, the built-in
+	// defaults are used. Set by SetViewConfig after construction.
+	viewConfig *config.ViewsConfig
+
+	// fallbackTypeDefs stores ResourceTypeDef for resource types that are not
+	// registered in the catalog (e.g. unit-test minimalTypeDef types). Both
+	// buildListBody (for columns) and GetListIssueCount (for Color func) consult
+	// this map when FindResourceType returns nil. Populated by RegisterFallbackTypeDef.
+	fallbackTypeDefs map[string]resource.ResourceTypeDef
 }
 
 // New constructs a Controller backed by the given runtime Core.
@@ -54,6 +66,26 @@ func New(core *runtime.Core) *Controller {
 			},
 		},
 	}
+}
+
+// SetViewConfig stores the per-session view configuration so that
+// resolveListColumns picks the correct column set for each resource type.
+// Must be called before the first Snapshot() when a non-nil config is needed.
+func (c *Controller) SetViewConfig(vc *config.ViewsConfig) {
+	c.viewConfig = vc
+}
+
+// RegisterFallbackTypeDef stores a ResourceTypeDef so that buildListBody
+// (columns) and GetListIssueCount (Color func) use the model's explicitly-
+// supplied typeDef rather than the catalog's when they differ. This is critical
+// for test typeDefs that share a ShortName with a catalog type but have a
+// different column layout or nil Color (nil falls back to
+// colorFallback(r.Fields["status"]) per ResolveColor contract in catalog/types.go).
+func (c *Controller) RegisterFallbackTypeDef(td resource.ResourceTypeDef) {
+	if c.fallbackTypeDefs == nil {
+		c.fallbackTypeDefs = make(map[string]resource.ResourceTypeDef, 1)
+	}
+	c.fallbackTypeDefs[td.ShortName] = td
 }
 
 // Apply translates a semantic Action into the matching Core command, applies

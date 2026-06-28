@@ -1,7 +1,6 @@
 package views
 
 import (
-	"maps"
 	"strings"
 
 	"charm.land/bubbles/v2/key"
@@ -13,99 +12,105 @@ import (
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/text"
 )
 
-// ResourceListModel is a tea.Model for the resource table view.
+// ResourceListModel is a thin delegating renderer for the resource table view.
+// The app.Controller is the single source of truth for all list data (resources,
+// filter, sort, cursor, pagination, enrichment). ResourceListModel owns only
+// renderer state: terminal dimensions, spinner, the key map, and the typeDef
+// needed for child-view routing and column rendering. All data reads go through
+// m.ctrl.Snapshot().Body.List; all writes go through m.ctrl.Apply().
 type ResourceListModel struct {
 	typeDef    resource.ResourceTypeDef
 	viewConfig *config.ViewsConfig
 
-	allResources      []resource.Resource
-	filteredResources []resource.Resource
-
-	scroll        ScrollState
-	hScrollOffset int
-
-	sortColIdx int // -1 = no sort, 0-based column index
-	sortAsc    bool
-	sortColKey string // exact column key carrying the sort glyph; set when sort changes (§6)
-
-	filterText           string
-	AttentionFilter                          // §7: ctrl+z toggle — when enabled, hide dim/neutral rows
-	issueCount           int                 // count of IsIssueRowColor() resources; recomputed in applySortAndFilter
-	showIssueBadge       bool                // when true, FrameTitle shows "issues:N" badge; set by main menu navigation
-	pendingFilter        string              // auto-applied after ResourcesLoadedMsg arrives
-	relatedIDSet         map[string]struct{} // optional exact-ID prefilter (used by related navigation)
-	fetchFilter          map[string]string   // server-side filter params for filtered paginated fetcher
-	autoOpenSingleDetail bool                // when true, ResourcesLoaded auto-navigates to detail if exactly one row remains
-	parentContext        map[string]string   // context from parent view for child fetchers
-	displayName          string              // custom display name for frame title
-	titleSuffix          string              // optional suffix appended after count, e.g. " -- i-abc (web)"
-	escPops              bool                // when true, Esc pops view instead of clearing filter first
-
-	pagination  *resource.PaginationMeta // nil = unpaginated
-	loadingMore bool                     // true while fetching next page
-
-	loading bool
 	spinner spinner.Model
+	width   int
+	height  int
+	keys    keys.Map
 
-	width  int
-	height int
-	keys   keys.Map
-
-	// styledRowCache caches fully styled row strings (with cursor highlight
-	// or status color applied). On cursor move, only the old and new cursor
-	// positions are invalidated. Full invalidation happens when data, filter,
-	// sort, width, or hScroll changes.
+	// styledRowCache caches fully styled row strings. Keyed by row index in the
+	// visible (post-filter) set. Invalidated whenever the controller snapshot
+	// changes the visible set or selection.
 	styledRowCache map[int]string
 
-	// enrichment state — populated by SetEnrichmentState.
-	enrichmentIssueCount int                                   // unified Wave-1 + Wave-2 distinct-instance count
-	enrichmentTruncated  bool                                  // true if enrichment count is a lower bound
-	findingsByID         map[string]domain.Finding             // this type's per-resource Wave-2 findings (AS-1395 typed model)
-	// truncatedByID is populated by SetTruncatedIDs. Resources in this set
-	// had their enrichment truncated (per-resource API error or page cap) and
-	// are rendered with a "?" prefix in the identity column.
-	truncatedByID map[string]bool
+	ctrl *app.Controller
 
-	// reapplyChecker + reapplySource — carried forward from a related-panel
-	// navigation. On each fresh page of target resources (ResourcesLoadedMsg),
-	// the checker re-runs against the page and new matching IDs merge into
-	// relatedIDSet. This makes approximate pivots (0+, 10+, 25+) behave
-	// symmetrically: the ID set extends organically as the target type's
-	// pagination is consumed. Nil on non-related-navigated lists (no-op).
-	reapplyChecker resource.RelatedChecker
-	reapplySource  resource.Resource
+	// Ephemeral render-time fields — populated from ctrl.Snapshot().Body.List
+	// during RenderList and renderHeaderRow only. Never written by Update();
+	// they carry zero values at all other times.
+	sortColKey    string
+	sortAsc       bool
+	hScrollOffset int
+}
+
+// newResourceListCtrl creates a stub controller for a top-level resource-list
+// screen. Used by NewResourceList for backward-compat paths and unit tests.
+// Routes via ActionCommand so the menu stack is correctly initialised when the
+// type is a registered menu entry. Falls back to PushChildListScreen for types
+// that are not menu entries (unit-test types, ad-hoc types).
+func newResourceListCtrl(typeDef resource.ResourceTypeDef, core *runtime.Core) *app.Controller {
+	if core == nil {
+		core = runtime.Bootstrap("", "", resource.AllResourceTypes())
+	}
+	c := app.New(core)
+	c.Apply(app.Action{Kind: app.ActionCommand, Arg: typeDef.ShortName})
+	// If ActionCommand did not push a list screen (type not in menu), fall back
+	// to a direct push so topListState() is non-nil for all subsequent operations.
+	if c.GetListSelectedRow() == 0 && len(c.GetListAllResources()) == 0 {
+		snap := c.Snapshot()
+		if snap.Body.List == nil {
+			c.PushChildListScreen(typeDef.ShortName)
+		}
+	}
+	return c
+}
+
+// newChildListCtrl creates a stub controller for a child resource-list screen
+// (e.g., s3_objects, r53_records). These types are not menu entries so they
+// cannot be reached via ActionCommand; PushChildListScreen bypasses the menu.
+func newChildListCtrl(typeDef resource.ResourceTypeDef, core *runtime.Core) *app.Controller {
+	if core == nil {
+		core = runtime.Bootstrap("", "", resource.AllResourceTypes())
+	}
+	c := app.New(core)
+	c.PushChildListScreen(typeDef.ShortName)
+	return c
 }
 
 // NewResourceList creates a ResourceListModel in loading state.
-func NewResourceList(typeDef resource.ResourceTypeDef, viewConfig *config.ViewsConfig, k keys.Map) ResourceListModel {
+// ctrl is optional — when nil a stub controller is constructed for backward
+// compatibility with callers that do not yet pass a controller.
+func NewResourceList(typeDef resource.ResourceTypeDef, viewConfig *config.ViewsConfig, k keys.Map, ctrl ...*app.Controller) ResourceListModel {
 	sp := spinner.New()
+	var c *app.Controller
+	if len(ctrl) > 0 {
+		c = ctrl[0]
+	}
+	if c == nil {
+		c = newResourceListCtrl(typeDef, nil)
+	}
+	c.SetViewConfig(viewConfig)
+	// For unregistered types (unit-test typeDefs) the catalog has no entry.
+	// Register the typeDef's columns as a fallback so buildListBody can render rows.
+	c.RegisterFallbackTypeDef(typeDef)
 	m := ResourceListModel{
 		typeDef:    typeDef,
 		viewConfig: viewConfig,
-		loading:    true,
 		spinner:    sp,
 		keys:       k,
-		sortColIdx: SortColNone,
+		ctrl:       c,
 	}
 	// ct-events: default sort is by event_time DESC (newest first).
-	// Only apply when a viewConfig is present (full app mode); unit tests
-	// that pass nil viewConfig work with synthetic data and are not affected.
 	if typeDef.ShortName == "ct-events" && viewConfig != nil {
-		cols := m.resolveColumns()
-		for i, c := range cols {
-			if c.sortKey == "event_time" {
-				m.sortColIdx = i
-				m.sortAsc = false
-				m.sortColKey = colSortKey(c)
-				break
-			}
-		}
+		c.Apply(app.Action{Kind: app.ActionSort, Arg: "event_time"})
+		// Apply twice to get DESC (first apply sets asc, second flips to desc).
+		c.Apply(app.Action{Kind: app.ActionSort, Arg: "event_time"})
 	}
 	return m
 }
@@ -113,17 +118,33 @@ func NewResourceList(typeDef resource.ResourceTypeDef, viewConfig *config.ViewsC
 // NewChildResourceList creates a ResourceListModel for a child resource type.
 // parentCtx provides parameters from the parent view (e.g., bucket name, zone ID).
 // displayName is used for the frame title instead of the type's ShortName.
-func NewChildResourceList(childType resource.ResourceTypeDef, parentCtx map[string]string, displayName string, viewConfig *config.ViewsConfig, k keys.Map) ResourceListModel {
+func NewChildResourceList(childType resource.ResourceTypeDef, parentCtx map[string]string, displayName string, viewConfig *config.ViewsConfig, k keys.Map, ctrl ...*app.Controller) ResourceListModel {
 	sp := spinner.New()
+	var c *app.Controller
+	if len(ctrl) > 0 {
+		c = ctrl[0]
+	}
+	if c == nil {
+		// Child types (s3_objects, r53_records, etc.) are not menu entries;
+		// use PushChildListScreen to bypass ActionCommand routing.
+		c = newChildListCtrl(childType, nil)
+	}
+	c.SetViewConfig(viewConfig)
+	// Register fallback columns for unregistered/child types so buildListBody
+	// can render rows even when the type is absent from the catalog.
+	c.RegisterFallbackTypeDef(childType)
+	if displayName != "" {
+		c.PatchListDisplayName(displayName)
+	}
+	if len(parentCtx) > 0 {
+		c.PatchListParentContext(parentCtx)
+	}
 	return ResourceListModel{
-		typeDef:       childType,
-		viewConfig:    viewConfig,
-		parentContext: parentCtx,
-		displayName:   displayName,
-		loading:       true,
-		spinner:       sp,
-		keys:          k,
-		sortColIdx:    SortColNone,
+		typeDef:    childType,
+		viewConfig: viewConfig,
+		spinner:    sp,
+		keys:       k,
+		ctrl:       c,
 	}
 }
 
@@ -141,27 +162,74 @@ func NewResourceListFromCache(
 	cursorPos int,
 	hScrollOffset int,
 	attentionOnly bool,
+	ctrl ...*app.Controller,
 ) ResourceListModel {
-	m := ResourceListModel{
-		typeDef:         typeDef,
-		viewConfig:      viewConfig,
-		allResources:    resources,
-		pagination:      pagination,
-		filterText:      filterText,
-		sortColIdx:      sortColIdx,
-		sortAsc:         sortAsc,
-		hScrollOffset:   hScrollOffset,
-		loading:         false,
-		keys:            k,
-		AttentionFilter: AttentionFilter{enabled: attentionOnly},
+	var c *app.Controller
+	if len(ctrl) > 0 {
+		c = ctrl[0]
 	}
-	m.applySortAndFilter()
-	m.updateSortColKey()
-	// Restore cursor position after filter application resets scroll.
-	if cursorPos >= 0 && cursorPos < len(m.filteredResources) {
-		m.scroll.SetCursor(cursorPos)
+	if c == nil {
+		c = newResourceListCtrl(typeDef, nil)
 	}
-	return m
+	c.SetViewConfig(viewConfig)
+	c.RegisterFallbackTypeDef(typeDef)
+	c.ApplyResourcesLoaded(typeDef.ShortName, resources, pagination, false)
+	if filterText != "" {
+		c.Apply(app.Action{Kind: app.ActionSetFilter, Arg: filterText})
+	}
+	if attentionOnly {
+		// Toggle attention if not already on.
+		snap := c.Snapshot()
+		if snap.Body.List != nil && !snap.Body.List.AttentionOnly {
+			c.Apply(app.Action{Kind: app.ActionToggleAttention})
+		}
+	}
+	if hScrollOffset > 0 {
+		for range hScrollOffset {
+			c.Apply(app.Action{Kind: app.ActionScrollRight})
+		}
+	}
+	// Apply sort: sortColIdx is a 0-based column index; translate to column key.
+	// Use the controller's instance resolver so fallback typeDefs (e.g. test
+	// types not in the catalog) contribute their columns to the index mapping.
+	if sortColIdx >= 0 {
+		cols := c.ResolveColumnsForType(typeDef.ShortName)
+		if sortColIdx < len(cols) {
+			colKey := cols[sortColIdx].Key
+			// View-config columns (path-based) may have an empty Key. Fall back to
+			// the matching td.Columns entry by title so ActionSort's "Arg != """
+			// guard does not silently drop the sort.
+			if colKey == "" {
+				colTitle := cols[sortColIdx].Title
+				for _, tc := range typeDef.Columns {
+					if tc.Title == colTitle && tc.Key != "" {
+						colKey = tc.Key
+						break
+					}
+				}
+			}
+			if colKey != "" {
+				c.Apply(app.Action{Kind: app.ActionSort, Arg: colKey})
+				if !sortAsc {
+					// First apply sets asc; second flips to desc.
+					c.Apply(app.Action{Kind: app.ActionSort, Arg: colKey})
+				}
+			}
+		}
+	}
+	// Restore cursor.
+	if cursorPos > 0 {
+		for range cursorPos {
+			c.Apply(app.Action{Kind: app.ActionMoveDown})
+		}
+	}
+	return ResourceListModel{
+		typeDef:    typeDef,
+		viewConfig: viewConfig,
+		spinner:    spinner.New(),
+		keys:       k,
+		ctrl:       c,
+	}
 }
 
 // Init starts the spinner tick cycle.
@@ -169,28 +237,13 @@ func (m ResourceListModel) Init() (ResourceListModel, tea.Cmd) {
 	return m, m.spinner.Tick
 }
 
-// Update handles messages: ResourcesLoadedMsg, spinner ticks, key events.
+// Update handles messages: ResourcesLoaded seeds the controller cache; spinner
+// ticks drive the loading animation; key events are translated to controller
+// Actions or emitted as navigation messages.
 func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.ResourcesLoaded:
-		// Drop loads for a different active resource type. A late EC2 fetch
-		// returning after the user has opened S3 must not mutate the S3
-		// list or its loading state — let the root model route the message
-		// to its write-through cache (which keys by msg.ResourceType).
-		//
-		// Compare via the registry so the alias the fetcher carried (e.g.
-		// "rds") still matches the list's canonical ShortName ("dbi"). Empty
-		// ResourceType ("unstamped") falls through: production fetch results
-		// always stamp the type via internal/tui/fetch_adapter.go, so an
-		// empty type only appears in unit-test fixtures that synthesise a
-		// ResourcesLoaded without a ResourceType. AS-648-h2 will tighten
-		// this further by carrying a session generation alongside the type.
-		//
-		// Child views (parentContext != nil) must still be guarded: production
-		// child fetches stamp ResourceType = childType (canonical, e.g.
-		// "s3_objects") at internal/tui/fetch_adapter.go:103, so the same
-		// canonicalised comparison rejects a late ResourcesLoaded from a
-		// different child whose Gen guard happens to still match.
+		// Drop loads for a different active resource type.
 		if msg.ResourceType != "" {
 			canon := msg.ResourceType
 			if td := resource.FindResourceType(msg.ResourceType); td != nil {
@@ -200,76 +253,68 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 				return m, nil
 			}
 		}
-		m.loading = false
-		m.loadingMore = false
-		if msg.Append {
-			m.allResources = append(m.allResources, msg.Resources...)
-		} else {
-			m.allResources = msg.Resources
-		}
-		m.pagination = msg.Pagination
-		if m.pendingFilter != "" {
-			m.filterText = m.pendingFilter
-			m.pendingFilter = ""
-		}
-		m.applySortAndFilter()
+		m.ctrl.ApplyResourcesLoaded(m.typeDef.ShortName, msg.Resources, msg.Pagination, msg.Append)
 		m.styledRowCache = nil
-		if m.autoOpenSingleDetail && len(m.filteredResources) == 1 {
-			r := m.filteredResources[0]
-			m.autoOpenSingleDetail = false
-			// Mirror Enter: if the type registers a child under Key="enter"
-			// and its DrillCondition (if any) admits this row, jump straight
-			// into the child view. Otherwise fall back to the generic detail.
-			// This keeps related-panel pivots consistent with manual drill
-			// from the same list — a pivot that narrows to one row must not
-			// strand the operator on bucket metadata when Enter would have
-			// opened bucket contents.
-			if enterChild := m.enterChildFor(r); enterChild != nil {
-				ctx := m.buildChildContext(*enterChild, &r)
-				displayName := ctx[enterChild.DisplayNameKey]
-				childType := enterChild.ChildType
-				return m, func() tea.Msg {
-					return messages.EnterChildView{
-						ChildType:     childType,
-						ParentContext: ctx,
-						DisplayName:   displayName,
+
+		// Auto-open single detail: mirrors the old logic reading m.filteredResources.
+		snap := m.ctrl.Snapshot()
+		ls := snap.Body.List
+		if ls != nil && m.ctrl.GetListAutoOpenSingle() {
+			if len(ls.Rows) == 1 {
+				r, ok := m.ctrl.ListSelected()
+				if ok {
+					m.ctrl.ClearListAutoOpenSingle()
+					if enterChild := m.enterChildFor(r); enterChild != nil {
+						ctx := m.buildChildContext(*enterChild, &r)
+						displayName := ctx[enterChild.DisplayNameKey]
+						childType := enterChild.ChildType
+						return m, func() tea.Msg {
+							return messages.EnterChildView{
+								ChildType:     childType,
+								ParentContext: ctx,
+								DisplayName:   displayName,
+							}
+						}
+					}
+					rCopy := r
+					return m, func() tea.Msg {
+						return messages.Navigate{
+							Target:         messages.TargetDetail,
+							ResourceType:   m.typeDef.ShortName,
+							Resource:       &rCopy,
+							ReplaceCurrent: true,
+						}
 					}
 				}
 			}
-			return m, func() tea.Msg {
-				return messages.Navigate{
-					Target:         messages.TargetDetail,
-					ResourceType:   m.typeDef.ShortName,
-					Resource:       &r,
-					ReplaceCurrent: true,
-				}
-			}
-		}
-		if m.autoOpenSingleDetail && len(m.filteredResources) == 0 && m.pagination != nil && m.pagination.IsTruncated && !m.loadingMore {
-			if _, ok := m.exactRelatedTargetID(); ok {
-				m.loadingMore = true
-				rt := m.typeDef.ShortName
-				token := m.pagination.NextToken
-				pc := m.parentContext
-				return m, func() tea.Msg {
-					return messages.LoadMore{
-						ResourceType:      rt,
-						ContinuationToken: token,
-						ParentContext:     pc,
+			// Zero rows, paginated, single target ID → load more.
+			if len(ls.Rows) == 0 && ls.Truncated && !ls.LoadingMore {
+				if _, ok := m.ctrl.GetListExactRelatedTargetID(); ok {
+					m.ctrl.SetListLoadingMore(true)
+					rt := m.typeDef.ShortName
+					token := m.ctrl.GetListPaginationCursor()
+					pc := m.ctrl.GetListParentContext()
+					return m, func() tea.Msg {
+						return messages.LoadMore{
+							ResourceType:      rt,
+							ContinuationToken: token,
+							ParentContext:     pc,
+						}
 					}
 				}
 			}
-		}
-		if m.autoOpenSingleDetail && len(m.filteredResources) == 0 && m.typeDef.StubCreator != nil {
-			if targetID, ok := m.exactRelatedTargetID(); ok {
-				m.autoOpenSingleDetail = false
-				stub := m.typeDef.StubCreator(targetID)
-				return m, func() tea.Msg {
-					return messages.Navigate{
-						Target:         messages.TargetDetail,
-						ResourceType:   m.typeDef.ShortName,
-						Resource:       &stub,
-						ReplaceCurrent: true,
+			// Zero rows, StubCreator available → synthesise stub.
+			if len(ls.Rows) == 0 && m.typeDef.StubCreator != nil {
+				if targetID, ok := m.ctrl.GetListExactRelatedTargetID(); ok {
+					m.ctrl.ClearListAutoOpenSingle()
+					stub := m.typeDef.StubCreator(targetID)
+					return m, func() tea.Msg {
+						return messages.Navigate{
+							Target:         messages.TargetDetail,
+							ResourceType:   m.typeDef.ShortName,
+							Resource:       &stub,
+							ReplaceCurrent: true,
+						}
 					}
 				}
 			}
@@ -277,135 +322,140 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 		return m, nil
 
 	case spinner.TickMsg:
-		if m.loading {
+		snap := m.ctrl.Snapshot()
+		if snap.Body.List != nil && snap.Body.List.Loading {
 			var cmd tea.Cmd
 			m.spinner, cmd = m.spinner.Update(msg)
 			return m, cmd
 		}
 
 	case tea.KeyMsg:
-		oldCursor := m.scroll.Cursor()
+		oldSel := m.ctrl.GetListSelectedRow()
 		switch {
 		case key.Matches(msg, m.keys.Up):
-			m.scroll.Up()
+			m.ctrl.Apply(app.Action{Kind: app.ActionMoveUp})
 		case key.Matches(msg, m.keys.Down):
-			m.scroll.Down()
+			m.ctrl.Apply(app.Action{Kind: app.ActionMoveDown})
 		case key.Matches(msg, m.keys.Top):
-			m.scroll.Top()
+			m.ctrl.Apply(app.Action{Kind: app.ActionMoveTop})
 		case key.Matches(msg, m.keys.Bottom):
-			m.scroll.Bottom()
+			m.ctrl.Apply(app.Action{Kind: app.ActionMoveBottom})
 		case key.Matches(msg, m.keys.PageUp):
-			pageSize := max(m.height-1, 1)
-			m.scroll.PageUp(pageSize)
+			m.ctrl.Apply(app.Action{Kind: app.ActionPageUp, N: max(m.height-1, 1)})
 		case key.Matches(msg, m.keys.PageDown):
-			pageSize := max(m.height-1, 1)
-			m.scroll.PageDown(pageSize)
+			m.ctrl.Apply(app.Action{Kind: app.ActionPageDown, N: max(m.height-1, 1)})
 		case key.Matches(msg, m.keys.ScrollLeft):
-			if m.hScrollOffset > 0 {
-				m.hScrollOffset--
-				m.styledRowCache = nil
-			}
+			m.ctrl.Apply(app.Action{Kind: app.ActionScrollLeft})
+			m.styledRowCache = nil
 		case key.Matches(msg, m.keys.ScrollRight):
-			cols := m.resolveColumns()
-			visible := cols
-			if m.hScrollOffset < len(cols) {
-				visible = cols[m.hScrollOffset:]
-			}
-			fitted := m.fitColumns(visible)
-			// Allow scroll if: columns were dropped, OR last column was shrunk.
-			canScroll := len(fitted) < len(visible)
-			if !canScroll && len(fitted) > 0 && len(visible) > 0 {
-				lastFit := fitted[len(fitted)-1]
-				lastOrig := visible[len(fitted)-1]
-				canScroll = lastFit.width < lastOrig.width
-			}
-			if canScroll {
-				m.hScrollOffset++
-				m.styledRowCache = nil
+			// Guard: only scroll right if columns actually overflow.
+			snap := m.ctrl.Snapshot()
+			if snap.Body.List != nil {
+				scrollX := snap.Body.List.ScrollX
+				cols := snap.Body.List.Columns
+				visible := cols
+				if scrollX < len(cols) {
+					visible = cols[scrollX:]
+				}
+				// Build listCol slice for fitColumns check.
+				lcols := make([]listCol, len(visible))
+				for i, cd := range visible {
+					lcols[i] = listCol{title: cd.Title, width: cd.Width, key: cd.Key, path: cd.Path}
+				}
+				fitted := m.fitColumns(lcols)
+				canScroll := len(fitted) < len(lcols)
+				if !canScroll && len(fitted) > 0 && len(lcols) > 0 {
+					canScroll = fitted[len(fitted)-1].width < lcols[len(fitted)-1].width
+				}
+				if canScroll {
+					m.ctrl.Apply(app.Action{Kind: app.ActionScrollRight})
+					m.styledRowCache = nil
+				}
 			}
 		case key.Matches(msg, m.keys.Enter):
-			if r := m.SelectedResource(); r != nil {
-				// Data-driven child view routing
-				if updated, cmd := m.handleChildKey("enter", r); cmd != nil {
+			if r, ok := m.ctrl.ListSelected(); ok {
+				if updated, cmd := m.handleChildKey("enter", &r); cmd != nil {
 					return updated, cmd
 				}
-				// No child matched — default to detail view
+				rCopy := r
 				return m, func() tea.Msg {
 					return messages.Navigate{
 						Target:   messages.TargetDetail,
-						Resource: r,
+						Resource: &rCopy,
 					}
 				}
 			}
 		case key.Matches(msg, m.keys.Describe):
-			// d key always opens detail view (never drills into S3)
-			if r := m.SelectedResource(); r != nil {
+			if r, ok := m.ctrl.ListSelected(); ok {
+				rCopy := r
 				return m, func() tea.Msg {
 					return messages.Navigate{
 						Target:   messages.TargetDetail,
-						Resource: r,
+						Resource: &rCopy,
 					}
 				}
 			}
 		case key.Matches(msg, m.keys.YAML):
-			if r := m.SelectedResource(); r != nil {
+			if r, ok := m.ctrl.ListSelected(); ok {
+				rCopy := r
 				return m, func() tea.Msg {
 					return messages.Navigate{
 						Target:   messages.TargetYAML,
-						Resource: r,
+						Resource: &rCopy,
 					}
 				}
 			}
 		case key.Matches(msg, m.keys.JSON):
-			if r := m.SelectedResource(); r != nil {
+			if r, ok := m.ctrl.ListSelected(); ok {
+				rCopy := r
 				return m, func() tea.Msg {
 					return messages.Navigate{
 						Target:   messages.TargetJSON,
-						Resource: r,
+						Resource: &rCopy,
 					}
 				}
 			}
 		case key.Matches(msg, m.keys.ToggleAttentionOnly):
-			m.Toggle()
-			m.applySortAndFilter()
-			m.scroll.SetCursor(0)
+			m.ctrl.Apply(app.Action{Kind: app.ActionToggleAttention})
 			m.styledRowCache = nil
 			return m, nil
 		case key.Matches(msg, m.keys.Events):
-			if r := m.SelectedResource(); r != nil {
-				if updated, cmd := m.handleChildKey("e", r); cmd != nil {
+			if r, ok := m.ctrl.ListSelected(); ok {
+				if updated, cmd := m.handleChildKey("e", &r); cmd != nil {
 					return updated, cmd
 				}
 			}
 		case key.Matches(msg, m.keys.Logs):
-			if r := m.SelectedResource(); r != nil {
-				if updated, cmd := m.handleChildKey("L", r); cmd != nil {
+			if r, ok := m.ctrl.ListSelected(); ok {
+				if updated, cmd := m.handleChildKey("L", &r); cmd != nil {
 					return updated, cmd
 				}
 			}
 		case key.Matches(msg, m.keys.Resources):
-			if r := m.SelectedResource(); r != nil {
-				if updated, cmd := m.handleChildKey("R", r); cmd != nil {
+			if r, ok := m.ctrl.ListSelected(); ok {
+				if updated, cmd := m.handleChildKey("R", &r); cmd != nil {
 					return updated, cmd
 				}
 			}
 		case key.Matches(msg, m.keys.Source):
-			if r := m.SelectedResource(); r != nil {
-				if updated, cmd := m.handleChildKey("s", r); cmd != nil {
+			if r, ok := m.ctrl.ListSelected(); ok {
+				if updated, cmd := m.handleChildKey("s", &r); cmd != nil {
 					return updated, cmd
 				}
 			}
 		case key.Matches(msg, m.keys.CloudTrail):
-			if m.typeDef.CloudTrailKey == "" || m.parentContext != nil {
+			pc := m.ctrl.GetListParentContext()
+			if m.typeDef.CloudTrailKey == "" || pc != nil {
 				break
 			}
-			if r := m.SelectedResource(); r != nil {
-				filter := resource.BuildCloudTrailFilter(*r, m.typeDef.ShortName)
+			if r, ok := m.ctrl.ListSelected(); ok {
+				filter := resource.BuildCloudTrailFilter(r, m.typeDef.ShortName)
 				if filter != nil {
+					rCopy := r
 					return m, func() tea.Msg {
 						return messages.RelatedNavigate{
 							TargetType:     "ct-events",
-							SourceResource: *r,
+							SourceResource: rCopy,
 							SourceType:     m.typeDef.ShortName,
 							FetchFilter:    filter,
 						}
@@ -413,12 +463,13 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 				}
 			}
 		case key.Matches(msg, m.keys.LoadMore):
-			if m.pagination != nil && m.pagination.IsTruncated && !m.loadingMore {
-				m.loadingMore = true
+			snap := m.ctrl.Snapshot()
+			if snap.Body.List != nil && snap.Body.List.Truncated && !snap.Body.List.LoadingMore {
+				m.ctrl.SetListLoadingMore(true)
 				rt := m.typeDef.ShortName
-				token := m.pagination.NextToken
-				pc := m.parentContext
-				ff := m.fetchFilter
+				token := m.ctrl.GetListPaginationCursor()
+				pc := m.ctrl.GetListParentContext()
+				ff := m.ctrl.GetListFetchFilter()
 				return m, func() tea.Msg {
 					return messages.LoadMore{
 						ResourceType:      rt,
@@ -433,10 +484,10 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 				return m, nil
 			}
 		}
-		// Invalidate styled row cache for old and new cursor positions.
-		if oldCursor != m.scroll.Cursor() {
-			delete(m.styledRowCache, oldCursor)
-			delete(m.styledRowCache, m.scroll.Cursor())
+		// Invalidate styled row cache when selection moves.
+		if newSel := m.ctrl.GetListSelectedRow(); newSel != oldSel {
+			delete(m.styledRowCache, oldSel)
+			delete(m.styledRowCache, newSel)
 		}
 	}
 	return m, nil
@@ -445,115 +496,11 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 // View renders the table content. Caller wraps in RenderFrame.
 // Pointer receiver so that row caches persist across frames.
 func (m *ResourceListModel) View() string {
-	if m.loading {
+	snap := m.ctrl.Snapshot()
+	if snap.Body.List == nil {
 		return m.spinner.View() + " Loading..."
 	}
-	if len(m.filteredResources) == 0 {
-		return "No resources found"
-	}
-
-	fullCols := m.resolveColumns()
-
-	// Resolve marker column index on the FULL (unsliced) column list so that
-	// horizontal scrolling cannot move the marker to a different semantic column
-	// (e.g. State.Name path matching "Name" when Name itself is scrolled off).
-	fullMarkerColIdx := resolveIdentityColumn(fullCols, m.typeDef)
-
-	cols := fullCols
-
-	// Apply horizontal scroll: skip hScrollOffset columns from the left.
-	if m.hScrollOffset > 0 && m.hScrollOffset < len(cols) {
-		cols = cols[m.hScrollOffset:]
-	} else if m.hScrollOffset >= len(cols) {
-		cols = nil
-	}
-
-	// Pre-widen the lifecycle/status column to the max natural phrase width
-	// across ALL rows BEFORE fitColumns and renderHeaderRow. This ensures the
-	// header and all data rows use the same (widened) column width; per-row
-	// widening in renderDataRow is therefore no longer needed.
-	cols = m.widenLifecycleColumn(cols, m.filteredResources)
-
-	// Hide rightmost columns that don't fit in width.
-	cols = m.fitColumns(cols)
-
-	if len(cols) == 0 {
-		return "No resources found"
-	}
-
-	// Render header row.
-	headerLine := m.renderHeaderRow(cols)
-
-	// Translate the full-column marker index to the visible (post-hscroll, post-fit)
-	// column index. If the identity column is scrolled off-screen or truncated out,
-	// set to -1 so renderDataRow skips the marker entirely rather than falling back
-	// to the first visible column (which would jump the dot to State/Type/etc.).
-	// Must be computed here (before VisibleWindow) so findingsBanner can use it.
-	markerColIdx := -1
-	if fullMarkerColIdx >= m.hScrollOffset {
-		candidate := fullMarkerColIdx - m.hScrollOffset
-		if candidate < len(cols) && cols[candidate].key == fullCols[fullMarkerColIdx].key && cols[candidate].path == fullCols[fullMarkerColIdx].path {
-			markerColIdx = candidate
-		}
-	}
-
-	// Determine visible row count: height minus column header row (1).
-	// Frame borders are already excluded from m.height by the root model.
-	visibleRows := max(m.height-1, 1)
-
-	// Reserve one row for the "load more" indicator when paginated and truncated.
-	showLoadMore := m.pagination != nil && m.pagination.IsTruncated
-	if showLoadMore && visibleRows > 2 {
-		visibleRows--
-	}
-
-	// Spec §4: only S1–S5 surfaces are rendered. No findings banner.
-	// Determine the window of rows to display, keeping cursor centered.
-	startRow, endRow := m.scroll.VisibleWindow(visibleRows)
-
-	var sb strings.Builder
-	_ = markerColIdx // column index reserved for per-row glyph rendering downstream.
-
-	sb.WriteString(headerLine)
-
-	for i := startRow; i < endRow; i++ {
-		sb.WriteString("\n")
-		r := m.filteredResources[i]
-
-		styled, ok := m.styledRowCache[i]
-		if !ok {
-			isSelected := i == m.scroll.Cursor()
-			var base lipgloss.Style
-			if isSelected {
-				base = styles.RowSelected
-			} else {
-				base = styles.ColorStyle(resolveRowColor(m.typeDef, r))
-			}
-			styled = m.renderDataRow(cols, r, base, m.width, isSelected, markerColIdx)
-			if m.styledRowCache == nil {
-				m.styledRowCache = make(map[int]string)
-			}
-			m.styledRowCache[i] = styled
-		}
-		sb.WriteString(styled)
-	}
-
-	// Append "load more" or "loading..." indicator when truncated.
-	if showLoadMore {
-		sb.WriteString("\n")
-		var hint string
-		switch {
-		case m.loadingMore:
-			hint = "── loading... ──"
-		case m.filterText != "":
-			hint = "── m: load more (filter applies to loaded data only) ──"
-		default:
-			hint = "── m: load more ──"
-		}
-		sb.WriteString(styles.DimText.Render(hint))
-	}
-
-	return sb.String()
+	return m.RenderList(*snap.Body.List)
 }
 
 // RenderList renders the list body from a controller-supplied ListBody,
@@ -617,17 +564,16 @@ func (m *ResourceListModel) RenderList(body app.ListBody) string {
 		return "No resources found"
 	}
 
-	// Reconstruct sort state from body for header rendering.
-	savedSortColKey := m.sortColKey
-	savedSortAsc := m.sortAsc
-	savedHScrollOffset := m.hScrollOffset
+	// Populate ephemeral render-time fields from body for header rendering,
+	// then restore after. These fields exist only to satisfy renderHeaderRow's
+	// value-receiver reads; they carry no state between frames.
 	m.sortColKey = renderListSortColKey(body.Sort, fullCols, m.typeDef)
 	m.sortAsc = body.Sort.Dir != "desc"
 	m.hScrollOffset = scrollX
 	headerLine := m.renderHeaderRow(cols)
-	m.sortColKey = savedSortColKey
-	m.sortAsc = savedSortAsc
-	m.hScrollOffset = savedHScrollOffset
+	m.sortColKey = ""
+	m.sortAsc = false
+	m.hScrollOffset = 0
 
 	// Translate full-column marker index to visible (post-hscroll, post-fit) index.
 	markerColIdx := -1
@@ -856,49 +802,26 @@ func renderListDataRow(cols []listCol, row app.ListRow, base lipgloss.Style, tot
 }
 
 // SetEnrichmentState stores Wave 2 enrichment results for this resource type.
-// issueCount is the unified Wave-1 + Wave-2 distinct-instance count (R2/R3 source of truth).
-// truncated indicates a lower-bound count; findings is the per-resource finding map.
-// Invalidates the styled row cache because findings affect marker rendering and
-// re-runs applySortAndFilter so that the ctrl+z attention filter picks up newly
-// flagged rows immediately — otherwise enabling ctrl+z before Wave 2 completes
-// would leave the enriched rows hidden until the next filter edit.
+// Delegates to the controller's ApplyEnrichmentState and invalidates the render cache.
 func (m *ResourceListModel) SetEnrichmentState(issueCount int, truncated bool, findings map[string]domain.Finding) {
-	m.enrichmentIssueCount = issueCount
-	m.enrichmentTruncated = truncated
-	m.findingsByID = findings
+	m.ctrl.ApplyEnrichmentState(m.typeDef.ShortName, issueCount, truncated, findings)
 	m.styledRowCache = nil
-	m.applySortAndFilter()
 }
 
 // ApplyFieldUpdates merges Wave-2-derived field values into the in-memory
-// resource slices. Keyed by resource ID, then by field key. Invalidates the
-// styled row cache so the new values appear on the next render.
+// resource slices via the controller. Invalidates the styled row cache.
 func (m *ResourceListModel) ApplyFieldUpdates(updates map[string]map[string]string) {
 	if len(updates) == 0 {
 		return
 	}
-	for i := range m.allResources {
-		if kvMap, ok := updates[m.allResources[i].ID]; ok {
-			if m.allResources[i].Fields == nil {
-				m.allResources[i].Fields = make(map[string]string, len(kvMap))
-			}
-			maps.Copy(m.allResources[i].Fields, kvMap)
-		}
-	}
-	for i := range m.filteredResources {
-		if kvMap, ok := updates[m.filteredResources[i].ID]; ok {
-			if m.filteredResources[i].Fields == nil {
-				m.filteredResources[i].Fields = make(map[string]string, len(kvMap))
-			}
-			maps.Copy(m.filteredResources[i].Fields, kvMap)
-		}
-	}
+	m.ctrl.ApplyListFieldUpdates(m.typeDef.ShortName, updates)
 	m.styledRowCache = nil
 }
 
 // SetTruncatedIDs stores the per-resource truncation set for this resource type.
+// Delegated to the controller.
 func (m *ResourceListModel) SetTruncatedIDs(truncatedIDs map[string]bool) {
-	m.truncatedByID = truncatedIDs
+	m.ctrl.ApplyListTruncatedIDs(m.typeDef.ShortName, truncatedIDs)
 	m.styledRowCache = nil
 }
 
