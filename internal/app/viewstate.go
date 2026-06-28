@@ -201,8 +201,18 @@ type DetailBody struct {
 	Attention     []AttentionBlock `json:"attention,omitempty"`
 	Related       []RelatedBlock   `json:"related,omitempty"`
 	RelatedFocused bool            `json:"related_focused,omitempty"`
+	// RelatedVisible is true when the related panel should be shown. It mirrors
+	// DetailState.RelatedVisible and is also set when the renderer auto-shows
+	// the panel (RelatedRows non-nil or defs exist). Used by RenderDetail to
+	// gate the side-by-side layout independently of len(Related)>0 (the panel
+	// must show even while rows are loading, i.e. Related contains loading rows).
+	RelatedVisible bool `json:"related_visible,omitempty"`
 	// RelatedCursor is the index in Related of the currently-highlighted row.
 	RelatedCursor int    `json:"related_cursor,omitempty"`
+	// RelatedScroll is the scroll offset (first visible row index) in the
+	// related panel. Together with RelatedCursor it lets renderDetailRelatedFromBody
+	// reproduce the exact window that rightColumnModel.View() shows.
+	RelatedScroll int `json:"related_scroll,omitempty"`
 	// RelatedFilter is the active filter query in the related panel.
 	RelatedFilter string `json:"related_filter,omitempty"`
 	// RelatedFilterActive is true while the related panel filter input is open.

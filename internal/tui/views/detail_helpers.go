@@ -21,50 +21,130 @@ import (
 // View renders detail content via viewport.
 // When the right column is showing and width >= 60, renders left and right columns side by side
 // with a │ separator.
+//
+// When ctrl is set (controller-backed TUI path), delegates to
+// RenderDetail(ctrl.Snapshot().Body.Detail) so the headless and TUI renderers
+// share one code path (mirrors YAMLModel.View()).
+//
+// When ctrl is nil (parity tests, isolated callers), builds a DetailBody from
+// the live model state and delegates to RenderDetail — this ensures View() and
+// RenderDetail(body) produce byte-identical output for the same logical state.
 func (m DetailModel) View() string {
 	if !m.ready {
 		return "Initializing..."
 	}
-	if m.rightColShowing() && m.width >= layout.MinInnerContentWidth {
-		// Keep RELATED visible at medium widths by using side-by-side layout.
-		rightW := m.currentRightColWidth()
-		sep := styles.ColSepDim.Render("│")
-		if m.rightCol.IsFocused() {
-			sep = styles.ColSepAccent.Render("│")
+	if m.ctrl != nil {
+		body := m.ctrl.Snapshot().Body.Detail
+		if body == nil {
+			return "Initializing..."
 		}
-		leftContent := m.viewport.View()
-		rightContent := m.rightCol.View()
-		leftLines := strings.Split(leftContent, "\n")
-		rightLines := strings.Split(rightContent, "\n")
-		// Normalise to same number of lines.
-		maxLines := max(len(leftLines), len(rightLines))
-		leftW := m.width - rightW - 1 // -1 for separator character
-		var sb strings.Builder
-		for i := range maxLines {
-			if i > 0 {
-				sb.WriteString("\n")
-			}
-			left := ""
-			if i < len(leftLines) {
-				left = leftLines[i]
-			}
-			right := ""
-			if i < len(rightLines) {
-				right = ansi.Truncate(rightLines[i], rightW, "")
-			}
-			// Pad left column to its fixed width so right column aligns correctly.
-			padded := left
-			leftVisible := lipgloss.Width(left)
-			if leftVisible < leftW {
-				padded = left + strings.Repeat(" ", leftW-leftVisible)
-			}
-			sb.WriteString(padded)
-			sb.WriteString(sep)
-			sb.WriteString(right)
-		}
-		return sb.String()
+		return m.RenderDetail(*body)
 	}
-	return m.viewport.View()
+	// Build a body from live model state and delegate to RenderDetail so View()
+	// and RenderDetail(body) are guaranteed byte-identical (parity invariant).
+	body := m.buildLiveBody()
+	return m.RenderDetail(body)
+}
+
+// buildLiveBody constructs a DetailBody from the live DetailModel state, used
+// by View() when ctrl is nil. This is the inverse of buildDetailBody: it reads
+// from m.fieldList / m.rightCol / m.search / m.wrap / etc. to produce the same
+// body that the controller would snapshot for this exact visual state.
+func (m DetailModel) buildLiveBody() app.DetailBody {
+	// Build field rows from live fieldList.
+	fields := make([]app.FieldRow, len(m.fieldList))
+	for i, item := range m.fieldList {
+		fields[i] = app.FieldRow{
+			Key:         item.Key,
+			Value:       item.Value,
+			IsSection:   item.IsSection,
+			IsHeader:    item.IsHeader,
+			IsSubField:  item.IsSubField,
+			IsSpacer:    item.IsSpacer,
+			IsNavigable: item.IsNavigable,
+			IndentLevel: item.IndentLevel,
+			ColorTier:   item.ColorTier,
+			Path:        item.Path,
+		}
+	}
+
+	// Compute key width from live fieldList.
+	var topKeys []string
+	for _, item := range m.fieldList {
+		if !item.IsHeader && !item.IsSubField {
+			topKeys = append(topKeys, item.Key)
+		}
+	}
+	keyWidth := 0
+	for _, k := range topKeys {
+		if n := len(k) + 1; n > keyWidth {
+			keyWidth = n
+		}
+	}
+
+	// Build related blocks from live rightCol rows — mirrors buildDetailRelatedBlocks.
+	var related []app.RelatedBlock
+	relatedQuery := strings.TrimSpace(strings.ToLower(m.rightCol.filterQuery))
+	if m.rightColShowing() {
+		for _, row := range m.rightCol.rows {
+			if m.rightCol.isSelfPivotZeroRow(row) {
+				continue
+			}
+			// Mirror buildDetailRelatedBlocks: drop rows that don't match the filter.
+			if relatedQuery != "" && !strings.Contains(strings.ToLower(row.displayName), relatedQuery) {
+				continue
+			}
+			related = append(related, app.RelatedBlock{
+				Name:        row.displayName,
+				Count:       row.count,
+				Loading:     row.loading,
+				Err:         row.err != nil,
+				Approximate: row.approximate,
+				FetchFilter: row.fetchFilter,
+				TargetType:  row.targetType,
+			})
+		}
+	}
+
+	// Compute scroll offset from rightCol state.
+	relatedScroll := 0
+	relatedCursor := 0
+	if m.rightColShowing() {
+		relatedScroll = m.rightCol.scrollOffset
+		relatedCursor = m.rightCol.cursor
+		// Convert absolute cursor index to index-in-Related slice (visible filtered slice).
+		// body.Related contains only non-self-pivot-zero rows in definition order.
+		// The cursor in rightCol is an index into m.rightCol.rows (raw); we need
+		// the index into body.Related (filtered). Map via name match.
+		if len(related) > 0 {
+			cursorRow := m.rightCol.SelectedRow()
+			if cursorRow != nil {
+				for i, blk := range related {
+					if blk.Name == cursorRow.displayName {
+						relatedCursor = i
+						break
+					}
+				}
+			}
+		}
+	}
+
+	return app.DetailBody{
+		Fields:              fields,
+		Related:             related,
+		RelatedFocused:      m.rightCol.IsFocused(),
+		RelatedVisible:      m.rightColShowing(),
+		RelatedCursor:       relatedCursor,
+		RelatedScroll:       relatedScroll,
+		RelatedFilter:       m.rightCol.filterQuery,
+		RelatedFilterActive: m.rightCol.filterActive,
+		RelatedSourceType:   m.resourceType,
+		Search:              m.search.Query(),
+		Wrap:                m.wrap,
+		ScrollY:             m.viewport.YOffset(),
+		FieldCursor:         m.fieldCursor,
+		KeyWidth:            keyWidth,
+	}
 }
 
 // SetSize initializes or resizes the viewport. Must be called before View().
@@ -85,6 +165,12 @@ func (m *DetailModel) SetSize(w, h int) {
 		m.rightColAutoShown = true
 		m.rightCol = newRightColumn(resource.GetRelated(m.resourceType), m.res, m.resourceType)
 		m.rightCol.keys = m.keys
+		if m.ctrl != nil {
+			// Sync the auto-show to the controller so Tab/cursor/filter actions
+			// (which gate on ds.RelatedVisible) take effect. hidden=false preserves
+			// the auto-show contract; an explicit hide sets hidden=true elsewhere.
+			m.ctrl.SetDetailRelatedVisible(true, false)
+		}
 		if m.ready { // resize case — first paint is handled via Init/first Update
 			m.pendingRelatedDispatch = true
 		}
@@ -92,6 +178,9 @@ func (m *DetailModel) SetSize(w, h int) {
 		m.rightColAutoShown = false
 		m.rightColVisible = false
 		m.rightCol.SetFocused(false)
+		if m.ctrl != nil {
+			m.ctrl.SetDetailRelatedVisible(false, false)
+		}
 	}
 
 	viewportW := w
@@ -163,6 +252,13 @@ func (m *DetailModel) syncViewportToCursor() {
 // FieldCursor returns the current field cursor index for testing.
 func (m DetailModel) FieldCursor() int {
 	return m.fieldCursor
+}
+
+// IsControllerBacked reports whether this DetailModel was constructed with a
+// controller (NewDetailWithCtrl). popView uses this to decide whether to sync
+// the controller stack on pop.
+func (m DetailModel) IsControllerBacked() bool {
+	return m.ctrl != nil
 }
 
 // refreshViewportContent re-renders content and applies search highlights.
@@ -443,6 +539,24 @@ func (m DetailModel) NeedsRelatedCheck() bool {
 func (m *DetailModel) ApplyRelatedResults(msgs []messages.RelatedCheckResult) {
 	for _, msg := range msgs {
 		m.rightCol, _ = m.rightCol.Update(msg)
+		if m.ctrl != nil {
+			// Mirror the live RelatedCheckResult handler: cached results must also
+			// land in the controller's DetailState.RelatedRows so the body render
+			// (counts) reflects them immediately on re-entry.
+			errMsg := ""
+			if msg.Result.Err != nil {
+				errMsg = msg.Result.Err.Error()
+			}
+			m.ctrl.ApplyDetailRelatedResult(
+				msg.DefDisplayName,
+				msg.Result.TargetType,
+				msg.Result.Count,
+				false,
+				errMsg,
+				msg.Result.Approximate,
+				msg.Result.FetchFilter,
+			)
+		}
 	}
 }
 
@@ -470,8 +584,12 @@ func (m DetailModel) ConsumesEscapeLocally() bool {
 // rather than from m.fieldList / m.rightCol live model state. Width, height,
 // and viewport dimensions remain renderer-owned and are read from m.
 //
-// When body is nil RenderDetail falls back to View() so callers can call it
-// unconditionally without a guard.
+// The related panel is rendered from body.Related + body.RelatedCursor +
+// body.RelatedScroll + body.RelatedFocused via renderDetailRelatedFromBody,
+// which replicates rightColumnModel.View() byte-for-byte from body data.
+// The panel visibility gate uses body.RelatedVisible (set by buildDetailBody
+// when the type has registered defs or ds.RelatedVisible is true), matching
+// the TUI's rightColShowing() auto-show behaviour.
 func (m *DetailModel) RenderDetail(body app.DetailBody) string {
 	if !m.ready {
 		return "Initializing..."
@@ -488,18 +606,17 @@ func (m *DetailModel) RenderDetail(body app.DetailBody) string {
 	m.viewport.GotoTop()
 	m.viewport.SetYOffset(body.ScrollY)
 
-	// Use the live rightCol visibility (m.rightColShowing()) instead of
-	// len(body.Related)>0: the right column is visible whenever the model
-	// auto-showed it (rightColAutoShown) or the user toggled it on, regardless
-	// of whether body.Related rows have been loaded yet (Bug 3 fix).
-	if m.rightColShowing() && m.width >= layout.MinInnerContentWidth {
+	// Use body.RelatedVisible as the gate — it mirrors the TUI's rightColShowing()
+	// (auto-show when defs exist + wide terminal, or explicit user toggle).
+	// Width guard matches the TUI's MinInnerContentWidth check.
+	if body.RelatedVisible && m.width >= layout.MinInnerContentWidth {
 		rightW := m.currentRightColWidth()
 		sep := styles.ColSepDim.Render("│")
-		if m.rightCol.IsFocused() {
+		if body.RelatedFocused {
 			sep = styles.ColSepAccent.Render("│")
 		}
 		leftContent := m.viewport.View()
-		rightContent := m.rightCol.View()
+		rightContent := renderDetailRelatedFromBody(body, rightW, m.height)
 		leftLines := strings.Split(leftContent, "\n")
 		rightLines := strings.Split(rightContent, "\n")
 		maxLines := max(len(leftLines), len(rightLines))
@@ -529,6 +646,95 @@ func (m *DetailModel) RenderDetail(body app.DetailBody) string {
 		return sb.String()
 	}
 	return m.viewport.View()
+}
+
+// renderDetailRelatedFromBody renders the RELATED right panel from body data,
+// replicating rightColumnModel.View() byte-for-byte without a live model.
+// w is the panel width; h is the panel height (same as viewport height).
+func renderDetailRelatedFromBody(body app.DetailBody, w, h int) string {
+	if w <= 0 {
+		return ""
+	}
+
+	lines := make([]string, 0, h)
+
+	// Header: "RELATED" centered — mirrors rightColumnModel.View() header block.
+	header := "RELATED"
+	padLeft := max((w-lipgloss.Width(header))/2, 0)
+	centeredHeader := strings.Repeat(" ", padLeft) + header
+	lines = append(lines, styles.DimText.Render(centeredHeader))
+
+	switch {
+	case len(body.Related) == 0:
+		// Mirror rightColumnModel.View(): an active filter with no surviving
+		// rows shows "No matches"; otherwise the panel is genuinely empty.
+		if body.RelatedFilterActive {
+			lines = append(lines, styles.DimText.Render("  No matches"))
+		} else {
+			lines = append(lines, styles.DimText.Render("  No related types registered"))
+		}
+	default:
+		usableHeight := max(h-1, 1) // after header
+
+		start := body.RelatedScroll
+		// Keep the focused cursor row visible. Scroll-to-cursor is renderer-side
+		// (it depends on the panel height the controller doesn't own) — mirrors the
+		// menu's adjustScroll.
+		if body.RelatedFocused {
+			if body.RelatedCursor < start {
+				start = body.RelatedCursor
+			} else if body.RelatedCursor >= start+usableHeight {
+				start = body.RelatedCursor - usableHeight + 1
+			}
+		}
+		if start < 0 {
+			start = 0
+		}
+		end := min(start+usableHeight, len(body.Related))
+
+		for i, blk := range body.Related[start:end] {
+			idx := start + i // index into body.Related (matches rightCol cursor logic)
+			var rowText string
+			var rowStyle lipgloss.Style
+
+			switch {
+			case blk.Loading:
+				rowText = "  " + blk.Name
+				rowStyle = styles.DimText
+			case blk.Err:
+				rowText = "  " + blk.Name + "  —" // em dash
+				rowStyle = styles.DimText
+			case blk.Count == -1 && len(blk.FetchFilter) > 0:
+				rowText = "  " + blk.Name
+				rowStyle = styles.RowNormal
+			case blk.Count == -1:
+				rowText = "  " + blk.Name
+				rowStyle = styles.DimText
+			case blk.Count == 0 && blk.Approximate:
+				rowText = "  " + blk.Name + " (0)"
+				rowStyle = styles.RowNormal
+			case blk.Count == 0:
+				rowText = "  " + blk.Name + " (0)"
+				rowStyle = styles.DimText
+			default:
+				rowText = "  " + blk.Name + " (" + itoa(blk.Count) + ")"
+				rowStyle = styles.RowNormal
+			}
+
+			if body.RelatedFocused && body.RelatedCursor == idx {
+				lines = append(lines, styles.RowSelected.Width(w).Render(rowText))
+			} else {
+				lines = append(lines, rowStyle.Render(rowText))
+			}
+		}
+	}
+
+	// Pad remaining height with empty strings.
+	for len(lines) < h {
+		lines = append(lines, "")
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 // renderDetailFieldsFromBody renders the field list from body.Fields, mirroring

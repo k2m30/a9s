@@ -48,6 +48,7 @@ const (
 	ActionCopy ActionKind = "copy"
 
 	ActionToggleRelated   ActionKind = "toggle-related"
+	ActionToggleFocus     ActionKind = "toggle-focus"
 	ActionToggleWrap      ActionKind = "toggle-wrap"
 	ActionToggleAttention ActionKind = "toggle-attention"
 

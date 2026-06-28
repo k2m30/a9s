@@ -69,8 +69,12 @@ type DetailState struct {
 	FieldCursor  int    `json:"field_cursor"`
 
 	// Related panel state
-	RelatedVisible bool   `json:"related_visible,omitempty"`
-	RelatedFocus   bool   `json:"related_focus,omitempty"`
+	RelatedVisible bool `json:"related_visible,omitempty"`
+	// RelatedHidden is set when the user explicitly hides the panel (overrides
+	// auto-show logic). Distinct from RelatedVisible so that the default
+	// "show when defs exist" behaviour is preserved until the user acts.
+	RelatedHidden bool   `json:"related_hidden,omitempty"`
+	RelatedFocus  bool   `json:"related_focus,omitempty"`
 	RelatedCursor  int    `json:"related_cursor"`
 	RelatedScroll  int    `json:"related_scroll"`
 	RelatedFilter  string `json:"related_filter,omitempty"`

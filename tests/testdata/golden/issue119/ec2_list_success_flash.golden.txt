@@ -1,6 +1,6 @@
  a9s v  demo:us-east-1                                                                                                        Copied ec2 id 
-┌──────────────────────────────────────────────────────────────── ec2(25) ─────────────────────────────────────────────────────────────────┐
-│ Name                      State         Lifecycle     Type            Private IP        Public IP         Instance ID                    │
+┌──────────────────────────────────────────────────────────────── ec2(27) ─────────────────────────────────────────────────────────────────┐
+│ 1:Name                    2:State       3:Lifecycle   4:Type          5:Private IP      6:Public IP       7:Instance ID                  │
 │ web-prod-01               running       on-demand     t3.large        10.0.1.10         54.210.33.112     i-0a1b2c3d4e5f60001            │
 │ web-prod-02               running       on-demand     t3.large        10.0.1.11         54.210.33.113     i-0a1b2c3d4e5f60002            │
 │ api-staging-01            ! running     spot          m5.xlarge       10.0.2.50                           i-0a1b2c3d4e5f60003            │
@@ -11,6 +11,8 @@
 │ ml-trainer-gpu            stopping      spot          g4dn.xlarge     10.0.5.30                           i-0a1b2c3d4e5f60008            │
 │ temp-load-test            shutting-do…  on-demand     c5.large        10.0.3.55                           i-0a1b2c3d4e5f60009            │
 │ old-migration-worker      terminated    on-demand     t3.small                                            i-0a1b2c3d4e5f60010            │
+│ dev-sandbox-01            stopped       on-demand     t3.medium       10.1.0.20                           i-0a1b2c3d4e5f60030            │
+│ dev-sandbox-02            stopped       on-demand     t3.small        10.1.0.21                           i-0a1b2c3d4e5f60031            │
 │ worker-11                 running       on-demand     t3.medium       10.0.2.21         54.210.34.100     i-0a1b2c3d4e5f60011            │
 │ api-12                    stopped       on-demand     m5.large        10.0.2.22                           i-0a1b2c3d4e5f60012            │
 │ web-13                    running       on-demand     c5.large        10.0.2.23                           i-0a1b2c3d4e5f60013            │
@@ -25,6 +27,4 @@
 │ api-22                    stopped       on-demand     c5.large        10.0.3.32                           i-0a1b2c3d4e5f60022            │
 │ web-23                    running       on-demand     t3.medium       10.0.3.33                           i-0a1b2c3d4e5f60023            │
 │ db-24                     running       on-demand     r5.large        10.0.3.34                           i-0a1b2c3d4e5f60024            │
-│ cache-25                  stopped       on-demand     t3.large        10.0.3.35                           i-0a1b2c3d4e5f60025            │
-│                                                                                                                                          │
 └─────────────────────────────────────────────────────────────────────────────y YAML──J JSON──t CloudTrail──ctrl+r Refresh──ctrl+z Only !──┘

@@ -73,12 +73,18 @@ func (m *Model) popView() bool {
 		}
 	}
 	// Keep the headless controller stack in sync when the view being popped has
-	// a corresponding screen on the controller stack. YAML and JSON screens are
-	// now represented in the controller stack (pushed in runtime_adapter_navigate.go)
-	// so they must be popped here too. Detail and Reveal remain adapter-only.
-	switch m.stack[len(m.stack)-1].(type) {
+	// a corresponding screen on the controller stack. YAML, JSON, and Detail
+	// screens are represented in the controller stack so they must be popped here.
+	switch top := m.stack[len(m.stack)-1].(type) {
 	case *views.ResourceListModel, *views.SelectorModel, *views.YAMLModel, *views.JSONModel:
 		m.ctrl.Apply(app.Action{Kind: app.ActionBack})
+	case *views.DetailModel:
+		// Only pop the controller stack when this DetailModel is controller-backed
+		// (ctrl non-nil). Adapter-only Detail views (pre-flip callers) do not push
+		// onto the controller stack so must not pop it.
+		if top.IsControllerBacked() {
+			m.ctrl.Apply(app.Action{Kind: app.ActionBack})
+		}
 	}
 	m.stack = m.stack[:len(m.stack)-1]
 	return true
