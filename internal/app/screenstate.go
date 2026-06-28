@@ -22,14 +22,29 @@ type ScreenState struct {
 
 // ListState holds the mutable display state for a resource-list screen.
 type ListState struct {
-	Filter          string `json:"filter,omitempty"`
-	SortCol         string `json:"sort_col,omitempty"`
-	SortDir         string `json:"sort_dir,omitempty"` // "asc" | "desc"
-	SelectedRow     int    `json:"selected_row"`
-	ScrollX         int    `json:"scroll_x"`
-	ScrollY         int    `json:"scroll_y"`
-	AttentionOnly   bool   `json:"attention_only,omitempty"`
+	Filter           string `json:"filter,omitempty"`
+	SortCol          string `json:"sort_col,omitempty"`
+	SortDir          string `json:"sort_dir,omitempty"` // "asc" | "desc"
+	SelectedRow      int    `json:"selected_row"`
+	ScrollX          int    `json:"scroll_x"`
+	ScrollY          int    `json:"scroll_y"`
+	AttentionOnly    bool   `json:"attention_only,omitempty"`
 	PaginationCursor string `json:"pagination_cursor,omitempty"`
+
+	// Inventory fields from docs/web-ui-state-inventory.md §ResourceListModel.
+	HasPagination    bool              `json:"has_pagination,omitempty"`
+	AutoOpenSingle   bool              `json:"auto_open_single,omitempty"`
+	RelatedIDSet     map[string]struct{} `json:"related_id_set,omitempty"`
+	FetchFilter      map[string]string `json:"fetch_filter,omitempty"`
+	DisplayName      string            `json:"display_name,omitempty"`
+	TitleSuffix      string            `json:"title_suffix,omitempty"`
+	EscPops          bool              `json:"esc_pops,omitempty"`
+	ShowIssueBadge   bool              `json:"show_issue_badge,omitempty"`
+
+	// Loading tracks whether the initial fetch is still in flight.
+	Loading bool `json:"loading,omitempty"`
+	// LoadingMore tracks whether an m-key load-more fetch is in flight.
+	LoadingMore bool `json:"loading_more,omitempty"`
 }
 
 // DetailState holds the mutable display state for a resource-detail screen.

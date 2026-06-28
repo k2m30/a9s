@@ -54,6 +54,10 @@ const (
 	// ActionChildView carries the trigger key in Arg (e, L, r, s, Enter, t).
 	ActionChildView ActionKind = "child-view"
 
+	// ActionScrollLeft / ActionScrollRight move the horizontal column viewport.
+	ActionScrollLeft  ActionKind = "scroll-left"
+	ActionScrollRight ActionKind = "scroll-right"
+
 	ActionLoadMore ActionKind = "load-more"
 	ActionRefresh  ActionKind = "refresh"
 

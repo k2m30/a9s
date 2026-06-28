@@ -4,6 +4,7 @@ import (
 	"maps"
 	"strings"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 )
@@ -22,6 +23,22 @@ import (
 type Controller struct {
 	core  *runtime.Core
 	stack []Screen
+
+	// resourceCache stores the latest fetched resource pages per resource type,
+	// keyed by canonical short name. Populated by applyResourcesLoaded.
+	resourceCache map[string][]resource.Resource
+
+	// enrichmentStore stores Wave-2 per-resource findings per resource type,
+	// keyed by canonical short name. Populated by ApplyEnrichmentState.
+	enrichmentStore map[string]map[string]domain.Finding
+
+	// enrichmentTruncated stores the truncation flag per resource type from
+	// ApplyEnrichmentState, parallel to enrichmentStore.
+	enrichmentTruncated map[string]bool
+
+	// reapplyCheckers stores per-type reapply checker + source resource for
+	// approximate-pivot navigations. Populated by PatchListReapplyChecker.
+	reapplyCheckers map[string]reapplyCheckerEntry
 }
 
 // New constructs a Controller backed by the given runtime Core.
@@ -153,11 +170,16 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 		}
 		return c.Snapshot(), nil
 
-	// --- Menu screen actions (PR-C slice 1a) ---
-	// These only take effect when the top screen is ScreenMenu.
+	// --- Shared navigation actions (PR-C): list screen takes priority, then menu ---
 
 	case ActionMoveUp:
-		if ms := c.topMenuState(); ms != nil {
+		if ls := c.topListState(); ls != nil {
+			visible := c.listVisibleCount(ls)
+			if ls.SelectedRow > 0 {
+				ls.SelectedRow--
+			}
+			_ = visible
+		} else if ms := c.topMenuState(); ms != nil {
 			all := resource.AllResourceTypes()
 			visible := menuVisibleItems(ms, all)
 			if ms.Cursor > 0 {
@@ -168,7 +190,12 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 		return c.Snapshot(), nil
 
 	case ActionMoveDown:
-		if ms := c.topMenuState(); ms != nil {
+		if ls := c.topListState(); ls != nil {
+			visible := c.listVisibleCount(ls)
+			if ls.SelectedRow < visible-1 {
+				ls.SelectedRow++
+			}
+		} else if ms := c.topMenuState(); ms != nil {
 			all := resource.AllResourceTypes()
 			visible := menuVisibleItems(ms, all)
 			if ms.Cursor < len(visible)-1 {
@@ -179,7 +206,9 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 		return c.Snapshot(), nil
 
 	case ActionMoveTop:
-		if ms := c.topMenuState(); ms != nil {
+		if ls := c.topListState(); ls != nil {
+			ls.SelectedRow = 0
+		} else if ms := c.topMenuState(); ms != nil {
 			ms.Cursor = 0
 			all := resource.AllResourceTypes()
 			visible := menuVisibleItems(ms, all)
@@ -188,7 +217,12 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 		return c.Snapshot(), nil
 
 	case ActionMoveBottom:
-		if ms := c.topMenuState(); ms != nil {
+		if ls := c.topListState(); ls != nil {
+			visible := c.listVisibleCount(ls)
+			if visible > 0 {
+				ls.SelectedRow = visible - 1
+			}
+		} else if ms := c.topMenuState(); ms != nil {
 			all := resource.AllResourceTypes()
 			visible := menuVisibleItems(ms, all)
 			if len(visible) > 0 {
@@ -199,7 +233,13 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 		return c.Snapshot(), nil
 
 	case ActionPageUp:
-		if ms := c.topMenuState(); ms != nil {
+		if ls := c.topListState(); ls != nil {
+			pageSize := listPageSizeFor(a)
+			ls.SelectedRow -= pageSize
+			if ls.SelectedRow < 0 {
+				ls.SelectedRow = 0
+			}
+		} else if ms := c.topMenuState(); ms != nil {
 			all := resource.AllResourceTypes()
 			visible := menuVisibleItems(ms, all)
 			ms.Cursor -= menuPageSizeFor(a)
@@ -211,7 +251,14 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 		return c.Snapshot(), nil
 
 	case ActionPageDown:
-		if ms := c.topMenuState(); ms != nil {
+		if ls := c.topListState(); ls != nil {
+			pageSize := listPageSizeFor(a)
+			visible := c.listVisibleCount(ls)
+			ls.SelectedRow += pageSize
+			if n := visible; ls.SelectedRow >= n {
+				ls.SelectedRow = max(n-1, 0)
+			}
+		} else if ms := c.topMenuState(); ms != nil {
 			all := resource.AllResourceTypes()
 			visible := menuVisibleItems(ms, all)
 			ms.Cursor += menuPageSizeFor(a)
@@ -223,17 +270,56 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 		return c.Snapshot(), nil
 
 	case ActionToggleAttention:
-		if ms := c.topMenuState(); ms != nil {
+		if ls := c.topListState(); ls != nil {
+			ls.AttentionOnly = !ls.AttentionOnly
+			ls.SelectedRow = 0
+		} else if ms := c.topMenuState(); ms != nil {
 			ms.AttentionOnly = !ms.AttentionOnly
 			ms.Cursor = 0
 		}
 		return c.Snapshot(), nil
 
 	case ActionSetFilter:
-		if ms := c.topMenuState(); ms != nil {
+		if ls := c.topListState(); ls != nil {
+			ls.Filter = a.Arg
+			ls.SelectedRow = 0
+			ls.ScrollY = 0
+		} else if ms := c.topMenuState(); ms != nil {
 			ms.Filter = a.Arg
 			ms.Cursor = 0
 			ms.ScrollOffset = 0
+		}
+		return c.Snapshot(), nil
+
+	// --- List-only actions (PR-C) ---
+
+	case ActionScrollLeft:
+		if ls := c.topListState(); ls != nil {
+			if ls.ScrollX > 0 {
+				ls.ScrollX--
+			}
+		}
+		return c.Snapshot(), nil
+
+	case ActionScrollRight:
+		if ls := c.topListState(); ls != nil {
+			ls.ScrollX++
+		}
+		return c.Snapshot(), nil
+
+	case ActionSort:
+		if ls := c.topListState(); ls != nil && a.Arg != "" {
+			if ls.SortCol == a.Arg {
+				if ls.SortDir == "asc" {
+					ls.SortDir = "desc"
+				} else {
+					ls.SortDir = "asc"
+				}
+			} else {
+				ls.SortCol = a.Arg
+				ls.SortDir = "asc"
+			}
+			ls.SelectedRow = 0
 		}
 		return c.Snapshot(), nil
 
@@ -411,7 +497,14 @@ func (c *Controller) ApplyIntents(intents []runtime.UIIntent) ViewState {
 				ms.EnrichTotal = 0
 			}
 
-		// TODO PR-C: PatchResourceList mutates state lifted in PR-C
+		case runtime.PatchResourceList:
+			// Apply enrichment data (findings + issue badge) to the controller's
+			// enrichment store. Resource rows themselves arrive via applyResourcesLoaded
+			// (called from the task-result lane); this intent carries Wave-2 data only.
+			if v.Enrichment != nil {
+				c.ApplyEnrichmentState(v.ResourceType, 0, false, v.Enrichment.Findings)
+			}
+
 		// TODO PR-C: PatchDetail mutates state lifted in PR-C
 		// TODO PR-C: FlashIntent mutates state lifted in PR-C
 		// TODO PR-C: ClearFlash mutates state lifted in PR-C
@@ -455,6 +548,10 @@ func (c *Controller) Snapshot() ViewState {
 	if top.State.Menu != nil {
 		vs.Body.Menu = buildMenuBody(top.State.Menu)
 		vs.FrameTitle = menuFrameTitle(top.State.Menu)
+	}
+	if top.State.List != nil {
+		vs.Body.List = c.buildListBody(top.Ctx, top.State.List)
+		vs.FrameTitle = c.buildListFrameTitle(top.Ctx, top.State.List)
 	}
 	return vs
 }
@@ -504,7 +601,7 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) {
 		} else {
 			c.ApplyIntents([]runtime.UIIntent{intent})
 		}
-		// TODO PR-C: populate rows once ListState + the result lane land.
+		c.ensureListState()
 
 	// TODO PR-C: NavigateKindPushDetail / NavigateKindPushYAML / NavigateKindPushJSON
 	//            need ScreenContext{ResourceType, ResourceID} from result.Resource.

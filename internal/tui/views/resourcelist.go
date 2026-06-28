@@ -9,12 +9,14 @@ import (
 	tea "charm.land/bubbletea/v2"
 	lipgloss "charm.land/lipgloss/v2"
 
+	"github.com/k2m30/a9s/v3/internal/app"
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/internal/tui/text"
 )
 
 // ResourceListModel is a tea.Model for the resource table view.
@@ -552,6 +554,305 @@ func (m *ResourceListModel) View() string {
 	}
 
 	return sb.String()
+}
+
+// RenderList renders the list body from a controller-supplied ListBody,
+// byte-identical to View()'s output. The renderer owns scrollOffset/width/height
+// (read from m); all data comes from body.
+//
+// Mapping from body fields to View() state:
+//   - body.Loading            → m.loading
+//   - body.Rows               → m.filteredResources (cells pre-extracted by controller)
+//   - body.Selected           → m.scroll.Cursor()
+//   - body.Columns            → resolved listCol slice (width/title/key from body)
+//   - body.Sort               → m.sortColKey / m.sortAsc
+//   - body.ScrollX            → m.hScrollOffset
+//   - body.Truncated          → m.pagination.IsTruncated
+//   - body.LoadingMore        → m.loadingMore
+//   - body.Filter             → m.filterText (for load-more hint text)
+//   - body.MarkerCol          → fullMarkerColIdx (identity column, before hscroll)
+//   - body.EnrichmentFindings → m.findingsByID (for glyph prepend on identity col)
+//   - body.Rows[i].Color      → resolveRowColor(m.typeDef, r) → styles.ColorStyle
+//   - body.Rows[i].Decorator  → "!" / "~" glyph prefix on identity cell
+func (m *ResourceListModel) RenderList(body app.ListBody) string {
+	if body.Loading {
+		return m.spinner.View() + " Loading..."
+	}
+	if len(body.Rows) == 0 {
+		return "No resources found"
+	}
+
+	// Build listCol slice from body.Columns, mirroring resolveColumns output.
+	fullCols := make([]listCol, len(body.Columns))
+	for i, cd := range body.Columns {
+		fullCols[i] = listCol{
+			title: cd.Title,
+			width: cd.Width,
+			key:   cd.Key,
+			path:  cd.Path,
+		}
+	}
+	// Apply sort-key prefix widths so header titles match View() exactly.
+	fullCols = applySortKeyPrefixWidths(fullCols)
+
+	// The marker column index is pre-computed on the full column list by the controller.
+	fullMarkerColIdx := body.MarkerCol
+
+	cols := fullCols
+	scrollX := body.ScrollX
+	if scrollX > 0 && scrollX < len(cols) {
+		cols = cols[scrollX:]
+	} else if scrollX >= len(cols) {
+		cols = nil
+	}
+
+	// Widen lifecycle/status column to the max natural phrase width across all rows.
+	// body.Rows[i].Cells are indexed by the full (pre-scroll) column list, so fullCols
+	// is passed to resolve the correct cell index regardless of the scroll offset.
+	cols = renderListWidenLifecycleColumn(cols, fullCols, body.Rows, m.typeDef)
+
+	cols = m.fitColumns(cols)
+
+	if len(cols) == 0 {
+		return "No resources found"
+	}
+
+	// Reconstruct sort state from body for header rendering.
+	savedSortColKey := m.sortColKey
+	savedSortAsc := m.sortAsc
+	savedHScrollOffset := m.hScrollOffset
+	m.sortColKey = renderListSortColKey(body.Sort, fullCols, m.typeDef)
+	m.sortAsc = body.Sort.Dir != "desc"
+	m.hScrollOffset = scrollX
+	headerLine := m.renderHeaderRow(cols)
+	m.sortColKey = savedSortColKey
+	m.sortAsc = savedSortAsc
+	m.hScrollOffset = savedHScrollOffset
+
+	// Translate full-column marker index to visible (post-hscroll, post-fit) index.
+	markerColIdx := -1
+	if fullMarkerColIdx >= scrollX {
+		candidate := fullMarkerColIdx - scrollX
+		if candidate < len(cols) && candidate < len(fullCols[scrollX:]) {
+			origIdx := scrollX + candidate
+			if origIdx < len(fullCols) && cols[candidate].key == fullCols[origIdx].key {
+				markerColIdx = candidate
+			}
+		}
+	}
+
+	visibleRows := max(m.height-1, 1)
+	showLoadMore := body.Truncated
+	if showLoadMore && visibleRows > 2 {
+		visibleRows--
+	}
+
+	// Compute visible window using a synthetic ScrollState keyed on body.Selected.
+	total := len(body.Rows)
+	startRow, endRow := renderListVisibleWindow(body.Selected, total, visibleRows)
+
+	var sb strings.Builder
+	sb.WriteString(headerLine)
+
+	for i := startRow; i < endRow; i++ {
+		sb.WriteString("\n")
+		row := body.Rows[i]
+		isSelected := i == body.Selected
+		base := renderListRowStyle(row, isSelected)
+		styled := renderListDataRow(cols, row, base, m.width, isSelected, markerColIdx, body.EnrichmentFindings, scrollX)
+		sb.WriteString(styled)
+	}
+
+	if showLoadMore {
+		sb.WriteString("\n")
+		var hint string
+		switch {
+		case body.LoadingMore:
+			hint = "── loading... ──"
+		case body.Filter != "":
+			hint = "── m: load more (filter applies to loaded data only) ──"
+		default:
+			hint = "── m: load more ──"
+		}
+		sb.WriteString(styles.DimText.Render(hint))
+	}
+
+	return sb.String()
+}
+
+// renderListSortColKey returns the sort column key matching body.Sort.Col against
+// the full resolved column list, mirroring how m.sortColKey is set via updateSortColKey.
+//
+// body.Sort.Col may be a td.Columns key (e.g. "workgroup_name") while fullCols
+// contains path-based view-config columns (e.g. key="" title="Workgroup"). The
+// cross-reference via td.Columns bridges the two: find the td column whose Key
+// matches sort.Col, then find the fullCols column whose Title matches that td
+// column's Title, and return its canonical colSortKey.
+func renderListSortColKey(sort app.SortSpec, fullCols []listCol, td resource.ResourceTypeDef) string {
+	if sort.Col == "" {
+		return ""
+	}
+	sortColLower := strings.ToLower(sort.Col)
+	for _, c := range fullCols {
+		if c.key == sort.Col || c.path == sort.Col || c.title == sort.Col {
+			return colSortKey(c)
+		}
+		// Title-underscore match: "Plan Name" → "plan_name" to bridge td.Columns
+		// key identifiers with view-config path-only columns.
+		titleUnder := strings.ToLower(strings.ReplaceAll(c.title, " ", "_"))
+		if titleUnder == sortColLower {
+			return colSortKey(c)
+		}
+	}
+	// Cross-reference via td.Columns: sort.Col may be a td.Columns key (e.g.
+	// "workgroup_name"). Find the td column with that key, then look up the
+	// fullCols column by matching Title to get the canonical colSortKey.
+	for _, tc := range td.Columns {
+		if tc.Key == sort.Col {
+			for _, c := range fullCols {
+				if c.title == tc.Title {
+					return colSortKey(c)
+				}
+			}
+		}
+	}
+	return sort.Col
+}
+
+// renderListWidenLifecycleColumn mirrors widenLifecycleColumn but operates on
+// pre-extracted cell strings from ListRow.Cells rather than resource.Resource.
+// The lifecycle/status column is identified by key "status" or the type's LifecycleKey.
+//
+// fullCols is the pre-scroll full column list used to resolve the correct cell index in
+// ListRow.Cells (which is always indexed by full-column position). cols is the
+// post-scroll visible slice whose matching entry gets widened.
+func renderListWidenLifecycleColumn(cols []listCol, fullCols []listCol, rows []app.ListRow, td resource.ResourceTypeDef) []listCol {
+	if len(cols) == 0 || len(rows) == 0 {
+		return cols
+	}
+	lifecycleKey := lifecycleColumnKey(td)
+
+	// Find the lifecycle column's index in fullCols for correct row.Cells lookup.
+	fullIdx := -1
+	for i, c := range fullCols {
+		if c.key == "status" || c.key == lifecycleKey {
+			fullIdx = i
+			break
+		}
+	}
+	if fullIdx < 0 {
+		return cols
+	}
+
+	// Find the same column in the visible (post-scroll) slice for widening.
+	visIdx := -1
+	for i, c := range cols {
+		if c.key == "status" || c.key == lifecycleKey {
+			visIdx = i
+			break
+		}
+	}
+	if visIdx < 0 {
+		// Lifecycle column is scrolled off; nothing to widen.
+		return cols
+	}
+
+	maxW := cols[visIdx].width
+	for _, row := range rows {
+		if fullIdx < len(row.Cells) {
+			if nat := lipgloss.Width(row.Cells[fullIdx]); nat > maxW {
+				maxW = nat
+			}
+		}
+	}
+	if maxW == cols[visIdx].width {
+		return cols
+	}
+	out := make([]listCol, len(cols))
+	copy(out, cols)
+	out[visIdx].width = maxW
+	return out
+}
+
+// renderListRowStyle returns the lipgloss.Style for a row, mirroring the base
+// style selection in View(). Uses ListRow.Color (pre-resolved by the controller)
+// to reconstruct the exact style that resolveRowColor + styles.ColorStyle would produce.
+func renderListRowStyle(row app.ListRow, isSelected bool) lipgloss.Style {
+	if isSelected {
+		return styles.RowSelected
+	}
+	return styles.ColorStyle(colorTagToDomain(row.Color))
+}
+
+// colorTagToDomain converts a ListRow.Color string tag back to domain.Color.
+func colorTagToDomain(tag string) domain.Color {
+	switch tag {
+	case "healthy":
+		return domain.ColorHealthy
+	case "warning":
+		return domain.ColorWarning
+	case "broken":
+		return domain.ColorBroken
+	case "dim":
+		return domain.ColorDim
+	}
+	return domain.ColorHealthy
+}
+
+// renderListVisibleWindow mirrors ScrollState.VisibleWindow for RenderList,
+// computing the centered visible window from the selected row index.
+func renderListVisibleWindow(selected, total, viewHeight int) (int, int) {
+	if total <= viewHeight {
+		return 0, total
+	}
+	half := viewHeight / 2
+	start := max(selected-half, 0)
+	end := start + viewHeight
+	if end > total {
+		end = total
+		start = max(end-viewHeight, 0)
+	}
+	return start, end
+}
+
+// renderListDataRow renders a single data row from pre-extracted ListRow.Cells,
+// mirroring renderDataRow but reading cells from the body instead of resource.Resource.
+// The decorator glyph ("! "/"~ ") is prepended to the identity cell (markerColIdx)
+// for ColorHealthy rows with enrichment findings, exactly as renderDataRow does.
+func renderListDataRow(cols []listCol, row app.ListRow, base lipgloss.Style, totalWidth int, isSelected bool, markerColIdx int, findings map[string]domain.Finding, cellOffset int) string {
+	var b strings.Builder
+	b.WriteString(base.Render(" "))
+	used := 1
+	for i, c := range cols {
+		if i > 0 {
+			b.WriteString(base.Render("  "))
+			used += 2
+		}
+		var val string
+		if cellOffset+i < len(row.Cells) {
+			val = row.Cells[cellOffset+i]
+		}
+		// Enrichment glyph on identity column: mirrors renderDataRow's marker logic.
+		// Only applies when the row is ColorHealthy (Decorator carries "!"/"~" only
+		// for healthy rows per resolveListDecoratorFull).
+		if i == markerColIdx && row.Color == "healthy" {
+			if f, ok := findings[row.ResourceID]; ok {
+				switch f.Severity {
+				case domain.SevBroken:
+					val = "! " + val
+				case domain.SevWarn:
+					val = "~ " + val
+				}
+			}
+		}
+		padded := text.PadOrTrunc(val, c.width)
+		used += c.width
+		b.WriteString(base.Render(padded))
+	}
+	if isSelected && totalWidth > used {
+		b.WriteString(base.Render(strings.Repeat(" ", totalWidth-used)))
+	}
+	return b.String()
 }
 
 // SetEnrichmentState stores Wave 2 enrichment results for this resource type.
