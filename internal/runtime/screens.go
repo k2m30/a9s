@@ -51,6 +51,12 @@ const (
 	// when the user presses y or j on a resource-list or detail row.
 	ScreenYAML ScreenID = "yaml"
 	ScreenJSON ScreenID = "json"
+
+	// ScreenDetail is the resource key-value detail screen pushed when the
+	// user selects a resource from the list (Enter/d). The headless controller
+	// uses this ID; the TUI adapter constructs a DetailModel from the
+	// associated DetailState.Resource.
+	ScreenDetail ScreenID = "detail"
 )
 
 // ScreenContext is the input handed to an adapter when the runtime asks
