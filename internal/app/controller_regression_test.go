@@ -20,6 +20,7 @@
 package app_test
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -632,5 +633,62 @@ func TestApplyDetailFinding_PreservesWave1Findings(t *testing.T) {
 	}
 	if !attentionContains(vs.Body.Detail, "wave one") {
 		t.Errorf("P2-4: wave-1 finding LOST from Attention after wave-2 apply — buildDetailFieldItems replaced r.Findings instead of merging wave-1 + wave-2")
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Fix P2 (APIError): Handle(APIError) must clear Loading and surface a flash
+// ─────────────────────────────────────────────────────────────────────────────
+
+// TestController_APIErrorClearsListLoadingAndFlashes is the regression guard for
+// the headless-controller APIError handling path added in commit 56910d32.
+//
+// Pre-fix failure: Controller.Handle dropped messages.APIError entirely, so the
+// active list screen stayed stuck with Loading=true and no error flash was set.
+// The fix routes APIError through core.HandleAPIError and applies the returned
+// intents: ClearActiveListLoadingIntent (clears Loading) and FlashIntent
+// (surfaces Header.Flash).
+//
+// Test strategy:
+//  1. Navigate to an ec2 list screen (Loading=true, no resources seeded yet).
+//  2. Assert the precondition: Loading==true so the test is meaningful.
+//  3. Deliver messages.APIError with Gen=0 (AcceptZeroGen=true — never stale).
+//  4. Assert both intents were applied: Loading==false and Header.Flash is an error.
+func TestController_APIErrorClearsListLoadingAndFlashes(t *testing.T) {
+	c := newListController("ec2")
+
+	// Precondition: list screen exists and Loading is true (fetch not yet drained).
+	pre := c.Snapshot()
+	if pre.Body.List == nil {
+		t.Fatal("precondition: Body.List is nil — controller not on a list screen")
+	}
+	if !pre.Body.List.Loading {
+		t.Fatal("precondition: Body.List.Loading is false — test is not meaningful unless Loading starts true")
+	}
+
+	// Deliver the failed fetch. Gen=0 satisfies AcceptZeroGen=true so IsStale
+	// never discards this message regardless of session AvailabilityGen.
+	c.Handle(messages.APIError{ //nolint:ineffassign,staticcheck // return values intentionally ignored; asserting via Snapshot
+		ResourceType: "ec2",
+		Err:          errors.New("AccessDeniedException: User is not authorized to perform ec2:DescribeInstances"),
+		Gen:          0,
+	})
+
+	vs := c.Snapshot()
+
+	// Assert Fix 1: ClearActiveListLoadingIntent must have cleared Loading.
+	if vs.Body.List == nil {
+		t.Fatal("Body.List is nil after Handle(APIError) — list screen was unexpectedly popped")
+	}
+	if vs.Body.List.Loading {
+		t.Error("APIError left list stuck Loading=true — review P2 regression: ClearActiveListLoadingIntent was not applied by Handle(APIError)")
+	}
+
+	// Assert Fix 2: FlashIntent must have surfaced an error flash in the header.
+	if !vs.Header.Flash.IsError {
+		t.Error("APIError did not set Header.Flash.IsError=true — review P2 regression: FlashIntent was not applied by Handle(APIError)")
+	}
+	if vs.Header.Flash.Text == "" {
+		t.Error("APIError produced an empty Header.Flash.Text — review P2 regression: FlashIntent was applied but carried no error message")
 	}
 }

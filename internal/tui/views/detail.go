@@ -84,9 +84,15 @@ func (m DetailModel) updateKeyMsgWithCtrl(msg tea.KeyMsg) (DetailModel, tea.Cmd)
 		switch {
 		case key.Matches(msg, m.keys.Up):
 			m.ctrl.Apply(app.Action{Kind: app.ActionMoveUp})
+			if body := m.ctrl.Snapshot().Body.Detail; body != nil {
+				m.rightCol.cursor = body.RelatedCursor
+			}
 			return m, nil
 		case key.Matches(msg, m.keys.Down):
 			m.ctrl.Apply(app.Action{Kind: app.ActionMoveDown})
+			if body := m.ctrl.Snapshot().Body.Detail; body != nil {
+				m.rightCol.cursor = body.RelatedCursor
+			}
 			return m, nil
 		case key.Matches(msg, m.keys.Search):
 			// Start filtering the related panel.

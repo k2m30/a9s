@@ -60,6 +60,23 @@ type Controller struct {
 	// buildListBody (for columns) and GetListIssueCount (for Color func) consult
 	// this map when FindResourceType returns nil. Populated by RegisterFallbackTypeDef.
 	fallbackTypeDefs map[string]resource.ResourceTypeDef
+
+	// identityResult holds the resolved caller identity received via
+	// messages.IdentityLoaded so snapshot can build IdentityBody without
+	// importing internal/aws or touching the TUI view stack.
+	identityResult *domain.CallerIdentity
+
+	// identityLoading is true from ActionOpenIdentity dispatch until either
+	// messages.IdentityLoaded or messages.IdentityError arrives in Handle.
+	identityLoading bool
+
+	// identityErrMsg is non-empty when the identity fetch has failed.
+	identityErrMsg string
+
+	// flash holds the transient status-bar notification surfaced via FlashIntent
+	// (e.g. an API error). snapshot() emits it as Header.Flash; it is cleared at
+	// the start of each user Apply so it persists until the next action.
+	flash Flash
 }
 
 // New constructs a Controller backed by the given runtime Core.
@@ -134,8 +151,68 @@ func (c *Controller) selectedResourceForAction() (resource.Resource, string, boo
 	return resource.Resource{}, "", false
 }
 
+// openSelectedListDetail opens the detail view for the currently-selected row
+// of the top list screen (resource list or child list). Called by both
+// ActionOpenDetail and the list branch of ActionSelect so the two entry points
+// share identical logic. Callers must hold c.mu (write).
+func (c *Controller) openSelectedListDetail() (ViewState, []runtime.TaskRequest) {
+	r, ok := c.listSelected()
+	if !ok {
+		return c.snapshot(), nil
+	}
+	typeName := ""
+	if top := c.stack[len(c.stack)-1]; top.ID == runtime.ScreenResourceList || top.ID == runtime.ScreenChildList {
+		typeName = top.Ctx.ResourceType
+	}
+	res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{
+		Target:       runtime.NavigateTargetDetail,
+		ResourceType: typeName,
+		Resource:     &r,
+	})
+	c.applyNavResult(res)
+	// When HandleNavigate signals DispatchRelated, emit a KindRelatedCheck task
+	// so DrainSync (and the web renderer) run the checkers headlessly. The TUI
+	// adapter handles this separately via messages.RelatedCheckStarted; the
+	// headless path uses the executor's runRelatedCheckers instead. Check the
+	// related cache first — if results are already cached, replay them
+	// synchronously into the stacked detail's RelatedRows (mirrors the TUI's
+	// RelatedCacheGet/Replay path in runtime_adapter_navigate.go).
+	if res.DispatchRelated && res.Resource != nil && len(resource.GetRelated(res.ResolvedType)) > 0 {
+		ck := runtime.RelatedCacheKey(res.ResolvedType, res.Resource.ID)
+		if cached, hit := c.core.RelatedCacheGet(ck); hit && len(cached) > 0 {
+			// Cache hit: replay rows directly into the stacked detail.
+			if ds := c.topDetailState(); ds != nil {
+				for _, entry := range cached {
+					errMsg := ""
+					if entry.Result.Err != nil {
+						errMsg = entry.Result.Err.Error()
+					}
+					mergeDetailRelatedRow(ds, entry.DefDisplayName, entry.Result.TargetType,
+						entry.Result.Count, false, errMsg, entry.Result.Approximate, entry.Result.ResourceIDs, entry.Result.FetchFilter)
+				}
+			}
+		} else {
+			// Cache miss: dispatch a KindRelatedCheck task with the source resource
+			// so the headless executor can invoke the checkers via runRelatedCheckers.
+			src := *res.Resource
+			tasks = append(tasks, runtime.TaskRequest{
+				Key:     runtime.TaskKey{Kind: runtime.KindRelatedCheck, Scope: res.ResolvedType + "/" + src.ID},
+				Cache:   runtime.CacheNone,
+				Payload: runtime.RelatedCheckPayload{ResourceType: res.ResolvedType, Resource: src},
+			})
+		}
+	}
+	return c.snapshot(), tasks
+}
+
 // applyLocked is the lock-free implementation of Apply. Callers must hold c.mu (write).
 func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
+	// A new user action supersedes any prior transient flash (e.g. a stale
+	// API error). Clear it up front; a FlashIntent applied later in this action
+	// or by its task results (via Handle) re-sets it, so an error still shows
+	// until the next action.
+	c.flash = Flash{}
+
 	switch a.Kind {
 
 	// --- Navigate actions (PR-B) ---
@@ -159,7 +236,9 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 		// without standing up a full TUI.
 		c.applyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenIdentity}})
 		c.core.SetIdentityFetching(true)
-		// TODO PR-C: render IdentityBody.Loading from the session latch once body state is lifted here.
+		c.identityLoading = true
+		c.identityResult = nil
+		c.identityErrMsg = ""
 		fetchTask := runtime.TaskRequest{
 			Key:     runtime.TaskKey{Kind: runtime.TaskKindFetchIdentity},
 			Payload: runtime.FetchIdentityPayload{},
@@ -470,6 +549,13 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 		return c.snapshot(), nil
 
 	case ActionSelect:
+		// Resource/child list: open the detail of the currently-selected row,
+		// identical to ActionOpenDetail. Enter and row-clicks in the web UI both
+		// send ActionSelect; the TUI uses ActionOpenDetail from its key handler.
+		if ls := c.topListState(); ls != nil {
+			return c.openSelectedListDetail()
+		}
+
 		// Related-panel Enter: when the top screen is a detail view and
 		// RelatedFocus is active, navigate to the focused related row.
 		if ds := c.topDetailState(); ds != nil && ds.RelatedFocus {
@@ -645,53 +731,7 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 	// --- Row-dependent actions: require selected row + per-screen state ---
 
 	case ActionOpenDetail:
-		r, ok := c.listSelected()
-		if !ok {
-			return c.snapshot(), nil
-		}
-		typeName := ""
-		if top := c.stack[len(c.stack)-1]; top.ID == runtime.ScreenResourceList || top.ID == runtime.ScreenChildList {
-			typeName = top.Ctx.ResourceType
-		}
-		res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{
-			Target:       runtime.NavigateTargetDetail,
-			ResourceType: typeName,
-			Resource:     &r,
-		})
-		c.applyNavResult(res)
-		// When HandleNavigate signals DispatchRelated, emit a KindRelatedCheck task
-		// so DrainSync (and the web renderer) run the checkers headlessly. The TUI
-		// adapter handles this separately via messages.RelatedCheckStarted; the
-		// headless path uses the executor's runRelatedCheckers instead. Check the
-		// related cache first — if results are already cached, replay them
-		// synchronously into the stacked detail's RelatedRows (mirrors the TUI's
-		// RelatedCacheGet/Replay path in runtime_adapter_navigate.go).
-		if res.DispatchRelated && res.Resource != nil && len(resource.GetRelated(res.ResolvedType)) > 0 {
-			ck := runtime.RelatedCacheKey(res.ResolvedType, res.Resource.ID)
-			if cached, hit := c.core.RelatedCacheGet(ck); hit && len(cached) > 0 {
-				// Cache hit: replay rows directly into the stacked detail.
-				if ds := c.topDetailState(); ds != nil {
-					for _, entry := range cached {
-						errMsg := ""
-						if entry.Result.Err != nil {
-							errMsg = entry.Result.Err.Error()
-						}
-						mergeDetailRelatedRow(ds, entry.DefDisplayName, entry.Result.TargetType,
-							entry.Result.Count, false, errMsg, entry.Result.Approximate, entry.Result.ResourceIDs, entry.Result.FetchFilter)
-					}
-				}
-			} else {
-				// Cache miss: dispatch a KindRelatedCheck task with the source resource
-				// so the headless executor can invoke the checkers via runRelatedCheckers.
-				src := *res.Resource
-				tasks = append(tasks, runtime.TaskRequest{
-					Key:     runtime.TaskKey{Kind: runtime.KindRelatedCheck, Scope: res.ResolvedType + "/" + src.ID},
-					Cache:   runtime.CacheNone,
-					Payload: runtime.RelatedCheckPayload{ResourceType: res.ResolvedType, Resource: src},
-				})
-			}
-		}
-		return c.snapshot(), tasks
+		return c.openSelectedListDetail()
 
 	case ActionOpenYAML:
 		r, typeName, ok := c.selectedResourceForAction()
@@ -938,6 +978,30 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 	// path the TUI uses, so DrainSync populates the detail's RelatedRows.
 	if batch, ok := ev.(messages.RelatedCheckBatch); ok && !messages.IsStale(batch, c.core) {
 		c.handleRelatedCheckBatch(batch)
+	}
+
+	// messages.APIError: a failed fetch clears the list Loading flag and surfaces
+	// an error flash. The TUI bumps flash.gen before calling HandleAPIError; the
+	// headless controller has no flash.gen, so ConnectGen serves as stable stand-in
+	// (same pattern as ActionSelectProfile/Region). The FlashTick task returned by
+	// HandleAPIError is suppressed here — it is only meaningful in a running event
+	// loop (TUI/web timer); the headless path has no loop to process it.
+	// IsStale is not applicable here — APIError has AcceptZeroGen=true.
+	if msg, ok := ev.(messages.APIError); ok {
+		apiIntents, _ := c.core.HandleAPIError(runtime.APIErrorEvent{
+			Err:    msg.Err,
+			NewGen: c.core.ConnectGen(),
+		})
+		c.applyIntents(apiIntents)
+	}
+
+	// messages.IdentityError: the identity fetch failed. Core.HandleEvent routes
+	// this through HandleIdentityError which clears IdentityFetching but does not
+	// store the error string (it is view-layer state). Store it here so snapshot
+	// can build IdentityBody.ErrorMsg. IsStale uses AspectConnect + Gen.
+	if msg, ok := ev.(messages.IdentityError); ok && !messages.IsStale(msg, c.core) {
+		c.identityLoading = false
+		c.identityErrMsg = msg.Err
 	}
 
 	return c.snapshot(), tasks
@@ -1200,17 +1264,39 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 				c.applyEnrichmentState(v.ResourceType, 0, false, v.Enrichment.Findings)
 			}
 
+		case runtime.SetIdentityIntent:
+			// SetIdentityIntent is emitted by Core.HandleIdentityLoaded (via
+			// HandleEvent) when the identity fetch succeeds. Store the resolved
+			// domain mirror so snapshot can build IdentityBody without importing
+			// internal/aws or inspecting the TUI view stack.
+			if v.Identity != nil {
+				c.identityResult = v.Identity
+				c.identityLoading = false
+				c.identityErrMsg = ""
+			}
+
+		case runtime.FlashIntent:
+			// Surface the transient notification (e.g. the API-error flash from
+			// HandleAPIError) as Header.Flash; cleared at the start of the next Apply.
+			c.flash = Flash{Text: v.Text, IsError: v.IsError}
+
+		case runtime.ClearFlash:
+			c.flash = Flash{}
+
+		case runtime.ClearActiveListLoadingIntent:
+			// A failed AWS fetch must drop the spinner on the active list rather
+			// than leaving it stuck Loading=true (emitted by HandleAPIError).
+			if ls := c.topListState(); ls != nil {
+				ls.Loading = false
+			}
+
 		// TODO PR-C: PatchDetail mutates state lifted in PR-C
-		// TODO PR-C: FlashIntent mutates state lifted in PR-C
-		// TODO PR-C: ClearFlash mutates state lifted in PR-C
 		// TODO PR-C: SetErrorHintIntent mutates state lifted in PR-C
 		// TODO PR-C: AppendErrorHistoryIntent mutates state lifted in PR-C
-		// TODO PR-C: ClearActiveListLoadingIntent mutates state lifted in PR-C
 		// TODO PR-C: RefreshActiveListIntent mutates state lifted in PR-C
 		// TODO PR-C: PatchResourceCache mutates state lifted in PR-C
 		// TODO PR-C: PatchRelatedCache mutates state lifted in PR-C
 		// TODO PR-C: PatchLazyResourceCache mutates state lifted in PR-C
-		// TODO PR-C: SetIdentityIntent mutates state lifted in PR-C
 		// TODO PR-C: HeaderInvalidateIntent mutates state lifted in PR-C
 		// TODO PR-C: ApplyThemeIntent mutates state lifted in PR-C
 		default:
@@ -1239,6 +1325,7 @@ func (c *Controller) snapshot() ViewState {
 		Header: Header{
 			Profile: c.core.Profile(),
 			Region:  c.core.Region(),
+			Flash:   c.flash,
 		},
 	}
 	if len(c.stack) == 0 {
@@ -1266,6 +1353,12 @@ func (c *Controller) snapshot() ViewState {
 	if top.State.Detail != nil {
 		vs.Body.Detail = buildDetailBody(top.State.Detail, c.viewConfig)
 		vs.FrameTitle = c.detailFrameTitleLocked()
+	}
+	if top.ID == runtime.ScreenHelp {
+		vs.Body.Help = buildHelpBody()
+	}
+	if top.ID == runtime.ScreenIdentity {
+		vs.Body.Identity = c.buildIdentityBody()
 	}
 	return vs
 }
@@ -1952,4 +2045,90 @@ func bodyKindForScreen(s Screen) BodyKind {
 		// Capability screens and future IDs not yet enumerated here.
 		return BodyKindUnknown
 	}
+}
+
+// buildHelpBody constructs the HelpBody that the web renderer uses to populate
+// the ? help overlay. It mirrors the helpGroup structure from
+// internal/tui/views/help.go, sourcing the same static keybinding strings.
+// The context is "main-menu" (the default) since the controller does not track
+// which view opened help; a richer context can be wired in PR-C when per-screen
+// state is lifted.
+func buildHelpBody() *HelpBody {
+	nav := HelpSection{
+		Title: "NAVIGATION",
+		Hints: []KeyHint{
+			{Key: "j/k", Help: "up/down"},
+			{Key: "g", Help: "top"},
+			{Key: "G", Help: "bottom"},
+			{Key: "pgup", Help: "page up"},
+			{Key: "pgdn", Help: "page down"},
+		},
+	}
+	actions := HelpSection{
+		Title: "ACTIONS",
+		Hints: []KeyHint{
+			{Key: "enter", Help: "select"},
+			{Key: "/", Help: "filter"},
+			{Key: ":", Help: "command"},
+			{Key: "q", Help: "quit"},
+			{Key: "ctrl+c", Help: "force quit"},
+		},
+	}
+	other := HelpSection{
+		Title: "OTHER",
+		Hints: []KeyHint{
+			{Key: "i", Help: "identity"},
+			{Key: "!", Help: "error log"},
+			{Key: "?", Help: "help"},
+			{Key: "esc", Help: "back"},
+		},
+	}
+	commands := HelpSection{
+		Title: "COMMANDS",
+		Hints: []KeyHint{
+			{Key: ":q", Help: "exit"},
+			{Key: ":ctx", Help: "switch profile"},
+			{Key: ":profile", Help: "switch profile"},
+			{Key: ":region", Help: "switch region"},
+			{Key: ":theme", Help: "switch theme"},
+			{Key: ":help", Help: "show help"},
+			{Key: ":root", Help: "main menu"},
+			{Key: ":main", Help: "main menu"},
+			{Key: ":<res>", Help: "e.g. :ec2 :s3 :lambda"},
+		},
+	}
+	return &HelpBody{
+		Context:  "main-menu",
+		Sections: []HelpSection{nav, actions, other, commands},
+	}
+}
+
+// buildIdentityBody constructs the IdentityBody from the controller's
+// in-memory identity state. It returns Loading=true while the fetch is in
+// flight, ErrorMsg on failure, or the fully-populated fields on success.
+// Callers must hold c.mu (at least read).
+func (c *Controller) buildIdentityBody() *IdentityBody {
+	body := &IdentityBody{
+		Profile: c.core.Profile(),
+		Region:  c.core.Region(),
+	}
+	if c.identityLoading {
+		body.Loading = true
+		return body
+	}
+	if c.identityErrMsg != "" {
+		body.ErrorMsg = c.identityErrMsg
+		return body
+	}
+	if c.identityResult != nil {
+		id := c.identityResult
+		body.AccountID = id.AccountID
+		body.AccountAlias = id.AccountAlias
+		body.ARN = id.Arn
+		body.IsAssumedRole = id.IsAssumedRole
+		body.RoleName = id.RoleName
+		body.SessionName = id.SessionName
+		body.UserName = id.UserName
+	}
+	return body
 }

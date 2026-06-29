@@ -5,7 +5,14 @@
 //
 // Security model (mandatory — this endpoint serves live AWS state):
 //   - Binds 127.0.0.1 only; --web-addr configurable but never defaults to 0.0.0.0.
-//   - Random per-run token required on every /action, /state, /events request.
+//   - Host-header validation on every request: rejects any Host whose host part
+//     is not a loopback address (127.x.x.x, ::1, localhost). Defeats DNS-rebinding
+//     attacks where a hostile page resolves its hostname to 127.0.0.1 and then
+//     issues requests against this listener.
+//   - Origin-header validation when present: rejects cross-origin requests whose
+//     Origin host is not loopback. Same-origin GETs and EventSource connections
+//     may omit Origin; the check is skipped when the header is absent.
+//   - Random per-run token required on every /action, /state, /events, /body request.
 //   - No CORS headers. Cache-Control: no-store on all responses.
 //   - Per-session *app.Controller keyed by session cookie.
 //   - CSRF protection on POST /action via custom header X-A9S-Token.
@@ -124,14 +131,29 @@ func (s *Server) Addr() string { return s.addr }
 // Token returns the per-run auth token.
 func (s *Server) Token() string { return s.token }
 
-// registerRoutes wires all HTTP handlers to mux.
+// dnsRebindGuard is middleware that rejects any request whose Host header is
+// not a loopback address, and any request that carries a non-loopback Origin
+// header. This defeats DNS-rebinding attacks: a hostile page whose hostname
+// resolves to 127.0.0.1 is blocked because its Host value is not loopback.
+// Static assets are also guarded so an attacker cannot use them as an oracle.
+func (s *Server) dnsRebindGuard(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !hostOK(r) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// registerRoutes wires all HTTP handlers to mux, wrapped in DNS-rebind guard.
 func (s *Server) registerRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /", s.handleIndex)
-	mux.HandleFunc("POST /action", s.handleAction)
-	mux.HandleFunc("GET /body", s.handleBody)
-	mux.HandleFunc("GET /state", s.handleState)
-	mux.HandleFunc("GET /events", s.handleEvents)
-	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticContent))))
+	mux.Handle("GET /", s.dnsRebindGuard(http.HandlerFunc(s.handleIndex)))
+	mux.Handle("POST /action", s.dnsRebindGuard(http.HandlerFunc(s.handleAction)))
+	mux.Handle("GET /body", s.dnsRebindGuard(http.HandlerFunc(s.handleBody)))
+	mux.Handle("GET /state", s.dnsRebindGuard(http.HandlerFunc(s.handleState)))
+	mux.Handle("GET /events", s.dnsRebindGuard(http.HandlerFunc(s.handleEvents)))
+	mux.Handle("GET /static/", s.dnsRebindGuard(http.StripPrefix("/static/", http.FileServer(http.FS(staticContent)))))
 }
 
 // getOrCreateSession returns (or lazily creates) the session for the given
