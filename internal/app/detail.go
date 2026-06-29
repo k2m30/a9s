@@ -929,6 +929,8 @@ func fieldItemsToFieldRows(items []fieldpath.FieldItem) []FieldRow {
 			IsSubField:  item.IsSubField,
 			IsSpacer:    item.IsSpacer,
 			IsNavigable: item.IsNavigable,
+			TargetType:  item.TargetType,
+			NavID:       item.NavID,
 			IndentLevel: item.IndentLevel,
 			ColorTier:   item.ColorTier,
 			Path:        item.Path,
