@@ -73,8 +73,13 @@ type DetailState struct {
 	// RelatedHidden is set when the user explicitly hides the panel (overrides
 	// auto-show logic). Distinct from RelatedVisible so that the default
 	// "show when defs exist" behaviour is preserved until the user acts.
-	RelatedHidden bool   `json:"related_hidden,omitempty"`
-	RelatedFocus  bool   `json:"related_focus,omitempty"`
+	RelatedHidden bool `json:"related_hidden,omitempty"`
+	// RelatedUserVisible is true only when the user explicitly toggled the panel
+	// ON (mirrors rightColVisible in the TUI). Auto-show (initDetailRelatedRows)
+	// does NOT set this flag. Used by buildDetailFooterHints to gate the
+	// "tab: Cols" hint, which matches DetailModel.BottomHints checking m.rightColVisible.
+	RelatedUserVisible bool  `json:"related_user_visible,omitempty"`
+	RelatedFocus       bool  `json:"related_focus,omitempty"`
 	RelatedCursor  int    `json:"related_cursor"`
 	RelatedScroll  int    `json:"related_scroll"`
 	RelatedFilter  string `json:"related_filter,omitempty"`

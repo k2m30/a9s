@@ -284,6 +284,18 @@
       return;
     }
 
+    // Enter on a navigable, focused detail field navigates that field (the
+    // controller's field-select) rather than the generic select. The navigation
+    // logic lives in the controller; this only routes the key.
+    if (e.key === "Enter") {
+      var fcur = document.querySelector(".field-row.field-cursor.field-navigable");
+      if (fcur && fcur.getAttribute("data-fidx") !== null) {
+        sendAction("field-select", fcur.getAttribute("data-fidx"));
+        e.preventDefault();
+        return;
+      }
+    }
+
     // Look up in key map.
     for (var i = 0; i < keyMap.length; i++) {
       var entry = keyMap[i];
