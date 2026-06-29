@@ -230,4 +230,25 @@ test.describe("a9s web UI — menu fidelity + interaction (TUI parity)", () => {
     ).toHaveCount(0);
     await expect(page.locator(".list-table")).toBeVisible();
   });
+
+  test("the menu shows footer key hints (ctrl+z / ctrl+r)", async ({ page }) => {
+    // Bug: ViewState.Footer was never populated by the controller, so the web
+    // footer was empty while the TUI shows 'ctrl+z Issues only' / 'ctrl+r Refresh'.
+    const footer = page.locator("#footer");
+    await expect(footer).toContainText("Issues only");
+    await expect(footer).toContainText("Refresh");
+    await expect(footer.locator(".key-hint")).toHaveCount(2);
+  });
+
+  test("ctrl+z toggles the issues-only filter from the menu", async ({ page }) => {
+    // Bug: ctrl+z (the TUI's issues-only toggle) was unmapped in the web.
+    const before = await page.locator(".menu-entry").count();
+    await press(page, "Control+z");
+    const after = await page.locator(".menu-entry").count();
+    expect(after, "ctrl+z must filter to issues-only (fewer rows)").toBeLessThan(before);
+    const allBadged = await page
+      .locator(".menu-entry")
+      .evaluateAll((rows) => rows.every((r) => !!r.querySelector(".badge")));
+    expect(allBadged, "every remaining row must carry an issue badge").toBe(true);
+  });
 });
