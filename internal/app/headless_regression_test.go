@@ -418,6 +418,49 @@ func TestActionSelect_RelatedNav_FetchFilter_TaskCarriesPayload(t *testing.T) {
 	}
 }
 
+// TestRelatedNav_MultiID_SeedsRelatedIDSet verifies the [P2] fix: navigating a
+// related row that carries multiple ResourceIDs and NO FetchFilter (e.g. an EC2
+// instance → its several security groups) resolves to NavigationKindFilteredList
+// and seeds the pushed list's RelatedIDSet to exactly those IDs — so the list
+// renders only the related subset (list.go's RelatedIDSet prefilter), not every
+// resource of the target type. Both the mouse click (ActionRelatedSelect) and
+// the keyboard Enter (ActionSelect) paths must seed it identically, since Fix #6
+// routes both through the shared dispatchRelatedNavigate.
+//
+// Pre-fix, applyRelatedNavResult's filtered-list branch handled FilterText and
+// FetchFilter but never seeded RelatedIDSet for the multi-ID case, so the web
+// showed all resources of the type.
+func TestRelatedNav_MultiID_SeedsRelatedIDSet(t *testing.T) {
+	ids := []string{"sg-aaa111", "sg-bbb222", "sg-ccc333"}
+	c := newControllerAtDetail(fakeEC2Resources()[0], "ec2")
+	c.ApplyDetailRelated([]app.DetailRelatedRow{{
+		TargetType:  "sg",
+		DisplayName: "Security Groups",
+		Count:       len(ids), // >1 → filtered list, not the single-resource fast-path
+		ResourceIDs: ids,
+		// no FetchFilter → the multi-ID subset path
+	}})
+
+	// Click the related row. Fix #6 routes the click (ActionRelatedSelect) and
+	// the keyboard Enter (ActionSelect) through the same dispatchRelatedNavigate,
+	// so this exercises the shared applyRelatedNavResult seeding that both use.
+	c.Apply(app.Action{Kind: app.ActionRelatedSelect, Arg: "0"})
+
+	got := c.GetListRelatedIDSet()
+	if len(got) == 0 {
+		t.Fatal("RelatedIDSet empty after multi-ID related navigation — the list shows ALL " +
+			"resources of the target type, not just the related subset (P2 regression)")
+	}
+	if len(got) != len(ids) {
+		t.Errorf("RelatedIDSet has %d ids, want %d %v", len(got), len(ids), ids)
+	}
+	for _, id := range ids {
+		if _, ok := got[id]; !ok {
+			t.Errorf("RelatedIDSet missing %q (got %v)", id, got)
+		}
+	}
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Fix 6: live connect — not tested (see rationale)
 // ─────────────────────────────────────────────────────────────────────────────
