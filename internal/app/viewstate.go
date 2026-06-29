@@ -197,6 +197,13 @@ type RelatedBlock struct {
 	FetchFilter map[string]string `json:"fetch_filter,omitempty"`
 	// TargetType is the canonical short name of the target resource type.
 	TargetType string `json:"target_type,omitempty"`
+	// Actionable is pre-computed by resource.IsRelatedActionable so the web
+	// template can use .Actionable directly without re-deriving the predicate.
+	Actionable bool `json:"actionable,omitempty"`
+	// CountDisplay is the pre-computed count badge from resource.FormatRelatedCount
+	// ("" for the unknown -1 sentinel, "(N)" for N>=0), so the web template
+	// renders it directly instead of re-deriving the format (which leaked "(-1)").
+	CountDisplay string `json:"count_display,omitempty"`
 }
 
 // DetailBody is the body of a resource-detail screen.
