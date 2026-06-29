@@ -1,4 +1,4 @@
-.PHONY: build install test test-budget test-race lint gofix fmt run clean cover integration security coverage verify-readonly verify-zero-init demo readme check-readme mdlint snapshot snapshot-update ready-to-push ready-to-release generate
+.PHONY: build install test test-budget test-race lint gofix fmt run clean cover integration e2e e2e-install security coverage verify-readonly verify-zero-init demo readme check-readme mdlint snapshot snapshot-update ready-to-push ready-to-release generate
 
 BINARY   = a9s
 CMD      = ./cmd/a9s
@@ -51,6 +51,20 @@ clean:
 
 integration:
 	go test -tags integration ./tests/integration/... -v -count=1 -timeout 300s
+
+# e2e runs the Playwright browser tests: a real Chromium drives keystrokes
+# through the web UI (app.js -> POST /action -> #main swap) and asserts
+# navigation + rendering. Catches the dead-keys / 404-asset / stale-chrome /
+# DOM-duplication class of bug that Go/curl tests cannot, because they never
+# execute the page JavaScript. global-setup builds the binary and boots
+# `a9s --demo --web`. Run `make e2e-install` once first (Node 18+ required).
+# Kept out of ready-to-push: it needs Node + a browser binary, so it is a
+# separate lane (also run in CI via .github/workflows/e2e.yml).
+e2e:
+	cd tests/e2e && npx playwright test
+
+e2e-install:
+	cd tests/e2e && npm ci && npx playwright install chromium
 
 security:
 	govulncheck ./...

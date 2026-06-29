@@ -1,0 +1,14 @@
+{
+  "name": "a9s-e2e",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Playwright end-to-end tests for the a9s web UI: a real browser drives keystrokes through the headless controller and asserts navigation + rendering. These catch the class of bug (no JS loaded, dead keys, stale chrome, DOM duplication) that HTTP/curl tests cannot, because they never execute the page's JavaScript.",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.1"
+  }
+}
