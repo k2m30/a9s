@@ -143,6 +143,30 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// handleBody renders only the body fragment for the current session state.
+// GET /body — token-gated, no Apply, no notifySubscribers.
+// Used by the SSE "update" handler in app.js to refresh the body without
+// triggering another SSE event (which would create an infinite loop).
+func (s *Server) handleBody(w http.ResponseWriter, r *http.Request) {
+	noStore(w)
+
+	if !s.tokenOK(r) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	entry := s.requireSession(w, r)
+
+	entry.mu.Lock()
+	vs := entry.ctrl.Snapshot()
+	entry.mu.Unlock()
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := renderBodyFragment(w, vs.Body); err != nil {
+		http.Error(w, "render error", http.StatusInternalServerError)
+	}
+}
+
 // handleState returns the current ViewState as JSON.
 // GET /state
 func (s *Server) handleState(w http.ResponseWriter, r *http.Request) {

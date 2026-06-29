@@ -251,29 +251,15 @@
     var evtSrc = new EventSource(url);
 
     evtSrc.addEventListener("update", function () {
-      // Reload the body fragment from state.
-      fetch("/state", {
+      // Fetch the body fragment directly — no POST, no notifySubscribers,
+      // no risk of triggering another "update" event.
+      fetch("/body", {
         headers: { "X-A9S-Token": token },
       })
-        .then(function (r) { return r.json(); })
-        .then(function (vs) {
-          // Re-render by posting a no-op refresh — simpler than building a
-          // client-side renderer. Just re-fetch the current body fragment.
-          fetch("/action", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-A9S-Token": token,
-            },
-            // send a harmless action that re-returns the current state
-            body: JSON.stringify({ kind: "_noop" }),
-          })
-            .then(function (r) { return r.text(); })
-            .then(function (html) {
-              var el = document.getElementById("body");
-              if (el && html) el.innerHTML = html;
-            })
-            .catch(function () {});
+        .then(function (r) { return r.text(); })
+        .then(function (html) {
+          var el = document.getElementById("body");
+          if (el && html) el.innerHTML = html;
         })
         .catch(function () {});
     });

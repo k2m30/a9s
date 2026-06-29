@@ -519,7 +519,26 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 				}
 				navRes, tasks := c.core.HandleRelatedNavigate(ev)
 				extraTasks := c.applyRelatedNavResult(navRes)
-				return c.snapshot(), append(tasks, extraTasks...)
+				// applyRelatedNavResult may return a payload-bearing replacement for
+				// a task that HandleRelatedNavigate emitted without a payload (e.g.
+				// KindFetchFiltered). When extraTasks is non-empty and contains the
+				// same Kind+Scope, prefer extraTasks so DrainSync uses the version
+				// the executor can actually execute.
+				if len(extraTasks) > 0 {
+					extraKeys := make(map[runtime.TaskKey]struct{}, len(extraTasks))
+					for _, t := range extraTasks {
+						extraKeys[t.Key] = struct{}{}
+					}
+					merged := make([]runtime.TaskRequest, 0, len(tasks)+len(extraTasks))
+					for _, t := range tasks {
+						if _, replaced := extraKeys[t.Key]; !replaced {
+							merged = append(merged, t)
+						}
+					}
+					merged = append(merged, extraTasks...)
+					tasks = merged
+				}
+				return c.snapshot(), tasks
 			}
 			return c.snapshot(), nil
 		}
@@ -658,7 +677,7 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 							errMsg = entry.Result.Err.Error()
 						}
 						mergeDetailRelatedRow(ds, entry.DefDisplayName, entry.Result.TargetType,
-							entry.Result.Count, false, errMsg, entry.Result.Approximate, entry.Result.FetchFilter)
+							entry.Result.Count, false, errMsg, entry.Result.Approximate, entry.Result.ResourceIDs, entry.Result.FetchFilter)
 					}
 				}
 			} else {
@@ -809,6 +828,8 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 			Key: runtime.TaskKey{Kind: runtime.KindFetchMore, Scope: typeName},
 			Payload: runtime.FetchMorePayload{
 				ContinuationToken: ls.PaginationCursor,
+				ParentContext:     ls.ParentContext,
+				FetchFilter:       ls.FetchFilter,
 			},
 		}}
 		return c.snapshot(), tasks
@@ -1012,20 +1033,21 @@ func (c *Controller) handleRelatedCheckBatch(batch messages.RelatedCheckBatch) {
 			errMsg = result.Result.Err.Error()
 		}
 		mergeDetailRelatedRow(targetDetail, result.DefDisplayName, result.Result.TargetType,
-			result.Result.Count, false, errMsg, result.Result.Approximate, result.Result.FetchFilter)
+			result.Result.Count, false, errMsg, result.Result.Approximate, result.Result.ResourceIDs, result.Result.FetchFilter)
 	}
 }
 
 // mergeDetailRelatedRow updates or appends one RelatedRow in ds, matching by
 // DisplayName. Mirrors ApplyDetailRelatedResult but operates on a DetailState
 // pointer directly rather than the top-of-stack screen.
-func mergeDetailRelatedRow(ds *DetailState, displayName, targetType string, count int, loading bool, errMsg string, approximate bool, fetchFilter map[string]string) {
+func mergeDetailRelatedRow(ds *DetailState, displayName, targetType string, count int, loading bool, errMsg string, approximate bool, resourceIDs []string, fetchFilter map[string]string) {
 	for i := range ds.RelatedRows {
 		if ds.RelatedRows[i].DisplayName == displayName {
 			ds.RelatedRows[i].Count = count
 			ds.RelatedRows[i].Loading = loading
 			ds.RelatedRows[i].Err = errMsg
 			ds.RelatedRows[i].Approximate = approximate
+			ds.RelatedRows[i].ResourceIDs = resourceIDs
 			ds.RelatedRows[i].FetchFilter = fetchFilter
 			return
 		}
@@ -1037,6 +1059,7 @@ func mergeDetailRelatedRow(ds *DetailState, displayName, targetType string, coun
 		Loading:     loading,
 		Err:         errMsg,
 		Approximate: approximate,
+		ResourceIDs: resourceIDs,
 		FetchFilter: fetchFilter,
 	})
 }
@@ -1379,8 +1402,21 @@ func (c *Controller) applyRelatedNavResult(res runtime.NavigationResult) []runti
 		}
 		c.applyIntents([]runtime.UIIntent{intent})
 		c.ensureListState()
-		if ls := c.topListState(); ls != nil && res.FilterText != "" {
-			ls.Filter = res.FilterText
+		if ls := c.topListState(); ls != nil {
+			if res.FilterText != "" {
+				ls.Filter = res.FilterText
+			}
+			if len(res.FetchFilter) > 0 {
+				ls.FetchFilter = res.FetchFilter
+				// HandleRelatedNavigate returns a no-payload KindFetchFiltered task
+				// (tested as-is by the QA suite). Replace it here with a payload-
+				// bearing version so the executor can invoke the filtered fetcher.
+				return []runtime.TaskRequest{{
+					Key:     runtime.TaskKey{Kind: runtime.KindFetchFiltered, Scope: res.TargetType},
+					Cache:   runtime.CacheNone,
+					Payload: runtime.FetchFilteredPayload{Filter: res.FetchFilter},
+				}}
+			}
 		}
 
 	case runtime.NavigationKindDetail:

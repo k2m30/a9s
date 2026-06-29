@@ -91,8 +91,14 @@ const (
 // the runtime requests a KindFetchMore fetch. The runtime captures the token
 // from the session cache at dispatch time so the adapter no longer reaches
 // back into session state to re-derive it.
+//
+// ParentContext and FetchFilter are non-nil when the list being paginated is
+// a child list (ParentContext) or a filtered list (FetchFilter). The executor
+// routes to the appropriate child/filtered fetcher when either is set.
 type FetchMorePayload struct {
 	ContinuationToken string
+	ParentContext     map[string]string
+	FetchFilter       map[string]string
 }
 
 func (FetchMorePayload) isTaskPayload() {}
