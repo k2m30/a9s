@@ -289,6 +289,12 @@ func (c *Controller) ApplyDetailRelatedResult(displayName, targetType string, co
 func (c *Controller) InitDetailRelatedRows(resourceType string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.initDetailRelatedRows(resourceType)
+}
+
+// initDetailRelatedRows is the lock-free implementation of InitDetailRelatedRows.
+// Callers must hold c.mu (write).
+func (c *Controller) initDetailRelatedRows(resourceType string) {
 	ds := c.topDetailState()
 	if ds == nil || len(ds.RelatedRows) > 0 {
 		return
