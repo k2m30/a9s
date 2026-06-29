@@ -6,7 +6,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -55,6 +58,51 @@ func (s *Server) tokenOK(r *http.Request) bool {
 	}
 	// constant-time compare to prevent timing attacks
 	return subtle.ConstantTimeCompare([]byte(candidate), []byte(s.token)) == 1
+}
+
+// isLoopbackHost reports whether h (a bare hostname, no port) is a loopback
+// address: "localhost", "127.x.x.x", or "::1" / "[::1]".
+func isLoopbackHost(h string) bool {
+	h = strings.TrimPrefix(h, "[")
+	h = strings.TrimSuffix(h, "]")
+	if h == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(h)
+	return ip != nil && ip.IsLoopback()
+}
+
+// hostOK validates the HTTP Host header and, when present, the Origin header.
+// It returns false (and must result in HTTP 403) when:
+//   - Host is absent or empty.
+//   - The host part of Host is not a loopback address.
+//   - Origin is present and its host part is not a loopback address.
+func hostOK(r *http.Request) bool {
+	// --- Host header ---
+	rawHost := r.Host // already stripped of port by Go's net/http for HTTP/1.1
+	if rawHost == "" {
+		return false
+	}
+	host, _, err := net.SplitHostPort(rawHost)
+	if err != nil {
+		// No port present — rawHost is the bare host.
+		host = rawHost
+	}
+	if !isLoopbackHost(host) {
+		return false
+	}
+
+	// --- Origin header (only checked when present) ---
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true
+	}
+	u, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	oHost := u.Hostname() // strips port if present
+	return isLoopbackHost(oHost)
 }
 
 // requireSession resolves (or creates) the session for the request and returns

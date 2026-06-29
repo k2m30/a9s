@@ -115,4 +115,35 @@ test.describe("a9s web UI — real-browser key navigation", () => {
     await press(page, "Escape");
     await expect(page.locator(".menu-entry").first()).toBeVisible();
   });
+
+  // Regression: ActionSelect on a resource list was a no-op, so Enter on a row
+  // (and a row click) did nothing instead of opening the detail like the TUI.
+  test("Enter on a list row opens the detail (was a no-op)", async ({ page }) => {
+    await press(page, "Enter"); // menu -> list
+    await expect(page.locator(".list-table")).toBeVisible();
+    await press(page, "Enter"); // list ROW -> detail
+    await expect(page.locator(".detail-layout")).toBeVisible();
+    await expect(page.locator("#frame-title")).toHaveText("web-prod-01");
+  });
+
+  test("clicking a list row opens the detail", async ({ page }) => {
+    await press(page, "Enter"); // menu -> list
+    await expect(page.locator(".list-table tbody tr").first()).toBeVisible();
+    await page.locator(".list-table tbody tr").first().click(); // clickSelect -> select -> detail
+    await expect(page.locator(".detail-layout")).toBeVisible();
+  });
+
+  // Regression: snapshot() set Body.Kind for help/identity but never the body
+  // data, so ? and i swapped to a blank pane.
+  test("? opens the help screen with real keybindings", async ({ page }) => {
+    await press(page, "?");
+    await expect(page.locator(".help-hint").first()).toBeVisible();
+    await expect(page.getByText("up/down", { exact: false }).first()).toBeVisible();
+  });
+
+  test("i opens the identity screen populated with the caller identity", async ({ page }) => {
+    await press(page, "i");
+    await expect(page.locator(".identity-table")).toBeVisible();
+    await expect(page.getByText("Account ID", { exact: false })).toBeVisible();
+  });
 });
