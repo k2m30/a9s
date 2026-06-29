@@ -2,11 +2,14 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -18,6 +21,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/styles/themes"
+	"github.com/k2m30/a9s/v3/internal/web"
 )
 
 var (
@@ -53,16 +57,24 @@ func main() {
 	resource.WireProjection()
 
 	var (
-		profile     string
-		region      string
-		showVersion bool
-		showHelp    bool
-		demoMode    bool
-		noCache     bool
-		command     string
-		resetViews  bool
-		resetThemes bool
+		profile      string
+		region       string
+		showVersion  bool
+		showHelp     bool
+		demoMode     bool
+		noCache      bool
+		command      string
+		resetViews   bool
+		resetThemes  bool
+		webMode      bool
+		webAddr      string
+		webAllowReveal bool
 	)
+
+	// A9S_MODE=web activates the web server without requiring --web on the CLI.
+	if os.Getenv("A9S_MODE") == "web" {
+		webMode = true
+	}
 
 	flag.StringVar(&profile, "profile", "", "AWS profile to use")
 	flag.StringVar(&profile, "p", "", "AWS profile to use (shorthand)")
@@ -79,20 +91,26 @@ func main() {
 	flag.StringVar(&command, "c", "", "Resource type to open directly (shorthand)")
 	flag.BoolVar(&resetViews, "reset-views", false, "Delete all view configs; defaults recreated on next launch")
 	flag.BoolVar(&resetThemes, "reset-themes", false, "Delete all theme files; defaults recreated on next launch")
+	flag.BoolVar(&webMode, "web", webMode, "Run as HTTP server instead of TUI (also: A9S_MODE=web)")
+	flag.StringVar(&webAddr, "web-addr", "127.0.0.1:7682", "Listen address for web mode (127.0.0.1 only)")
+	flag.BoolVar(&webAllowReveal, "web-allow-reveal", false, "Allow ActionReveal in web mode (off by default)")
 
 	flag.Usage = func() {
 		fmt.Println("a9s - Terminal UI AWS Resource Manager")
 		fmt.Printf("Version: %s\n\n", version)
 		fmt.Println("Usage: a9s [flags]")
-		fmt.Println("  -p, --profile      AWS profile to use")
-		fmt.Println("  -r, --region       AWS region override")
-		fmt.Println("  -d, --demo         Run with synthetic demo data (no AWS credentials needed)")
-		fmt.Println("      --no-cache     Disable resource availability cache")
-		fmt.Println("  -c, --command      Open directly to a resource list (e.g. ec2, s3, events)")
-		fmt.Println("      --reset-views  Delete view configs; defaults recreated on next launch")
-		fmt.Println("      --reset-themes Delete theme files; defaults recreated on next launch")
-		fmt.Println("  -v, --version      Print version and exit")
-		fmt.Println("  -h, --help         Print this help")
+		fmt.Println("  -p, --profile         AWS profile to use")
+		fmt.Println("  -r, --region          AWS region override")
+		fmt.Println("  -d, --demo            Run with synthetic demo data (no AWS credentials needed)")
+		fmt.Println("      --no-cache        Disable resource availability cache")
+		fmt.Println("  -c, --command         Open directly to a resource list (e.g. ec2, s3, events)")
+		fmt.Println("      --reset-views     Delete view configs; defaults recreated on next launch")
+		fmt.Println("      --reset-themes    Delete theme files; defaults recreated on next launch")
+		fmt.Println("      --web             Run as HTTP server (also: A9S_MODE=web)")
+		fmt.Println("      --web-addr        Listen address for web mode (default 127.0.0.1:7682)")
+		fmt.Println("      --web-allow-reveal Allow secret reveal in web mode (default off)")
+		fmt.Println("  -v, --version         Print version and exit")
+		fmt.Println("  -h, --help            Print this help")
 	}
 
 	flag.Parse()
@@ -209,6 +227,20 @@ func main() {
 	// functions have populated the DEFAULT registry via SetDefaultNavFieldsForTest.
 	resource.BootstrapActiveNavFields()
 
+	if webMode {
+		// Security: reject any attempt to bind on a non-loopback address as the default.
+		// The user may supply --web-addr explicitly, but we warn if it looks like 0.0.0.0.
+		if strings.HasPrefix(webAddr, "0.0.0.0") {
+			fmt.Fprintln(os.Stderr, "Error: --web-addr must not use 0.0.0.0 (binds all interfaces). Use 127.0.0.1:<port> instead.")
+			os.Exit(1)
+		}
+		if err := runWebServer(profile, region, resolvedCommand, webAddr, webAllowReveal, demoMode, noCache); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	if err := runProgram(profile, region, extraOpts, activeTheme); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
@@ -263,6 +295,42 @@ func resetYAMLDir(label, dir string) bool {
 	}
 	fmt.Printf("Removed %d files. Run a9s to recreate defaults.\n", removed)
 	return failed == 0
+}
+
+// runWebServer starts the HTTP web server and blocks until SIGINT/SIGTERM.
+func runWebServer(profile, region, command, addr string, allowReveal, demoMode, noCache bool) error {
+	token, err := web.GenerateToken()
+	if err != nil {
+		return fmt.Errorf("generating token: %w", err)
+	}
+
+	viewCfg, cfgErr := config.Load()
+	if cfgErr != nil {
+		viewCfg = config.SharedDefaultConfig()
+	}
+
+	srv := web.NewServer(profile, region, command, addr, token, demoMode, noCache, allowReveal, viewCfg)
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	readyCh := make(chan struct{})
+	srvErr := make(chan error, 1)
+	go func() {
+		srvErr <- srv.ListenAndServe(ctx, readyCh)
+	}()
+
+	// Wait for the server to bind (or fail immediately).
+	select {
+	case err := <-srvErr:
+		return err
+	case <-readyCh:
+	}
+
+	fmt.Fprintf(os.Stderr, "a9s web server: http://%s/?token=%s\n", srv.Addr(), srv.Token())
+	fmt.Fprintf(os.Stderr, "Press Ctrl+C to stop.\n")
+
+	return <-srvErr
 }
 
 // runProgram constructs the model, starts the Bubble Tea program, and guarantees

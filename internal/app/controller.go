@@ -886,6 +886,12 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) {
 			c.applyIntents([]runtime.UIIntent{intent})
 		}
 		c.ensureListState()
+		// For the cached path, populate rows immediately from the cache entry so
+		// headless/web callers see data without waiting for a fetch round-trip.
+		if res.Kind == runtime.NavigateKindPushResourceListCached && res.CachedEntry != nil {
+			top := &c.stack[len(c.stack)-1]
+			c.applyResourcesLoaded(top.State.List, res.ResolvedType, res.CachedEntry.Resources, res.CachedEntry.Pagination, false)
+		}
 
 	// TODO PR-C: NavigateKindPushDetail / NavigateKindPushYAML / NavigateKindPushJSON
 	//            need ScreenContext{ResourceType, ResourceID} from result.Resource.

@@ -1,0 +1,12 @@
+{{define "selector.html"}}
+{{if .Title}}<div style="color:var(--accent);font-weight:bold;margin-bottom:8px;">{{.Title}}</div>{{end}}
+{{if .Filter}}<div style="color:var(--warn);font-size:12px;margin-bottom:4px;">Filter: {{.Filter}}</div>{{end}}
+<ul class="selector-list">
+{{range $i, $item := .Items}}
+  <li class="selector-item{{if eq $i $.Selected}} selected{{end}}"
+      onclick="clickSelect({{$i}})">
+    {{if eq $item $.ActiveItem}}<span class="selector-active">&#10003; </span>{{end}}{{$item}}
+  </li>
+{{end}}
+</ul>
+{{end}}
