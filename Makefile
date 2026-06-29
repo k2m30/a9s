@@ -70,7 +70,8 @@ e2e:
 # The live-readonly.spec.ts assertions are data-agnostic: no names or counts
 # are hardcoded, so they work against any AWS account.
 e2e-live:
-	cd tests/e2e && A9S_E2E_PROFILE=$(PROFILE) A9S_E2E_REGION=$(REGION) npx playwright test live-readonly.spec.ts
+	@test -n "$(PROFILE)" || { echo "PROFILE is required: make e2e-live PROFILE=my-readonly-profile [REGION=us-east-1]" >&2; exit 1; }
+	cd tests/e2e && A9S_E2E_PROFILE="$(PROFILE)" A9S_E2E_REGION="$(REGION)" npx playwright test live-readonly.spec.ts
 
 e2e-install:
 	cd tests/e2e && npm ci && npx playwright install chromium

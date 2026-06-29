@@ -965,7 +965,7 @@ func buildDetailRelatedBlocks(ds *DetailState) []RelatedBlock {
 			Approximate: row.Approximate,
 			FetchFilter: row.FetchFilter,
 			TargetType:   row.TargetType,
-			Actionable:   resource.IsRelatedActionable(row.Count, row.Approximate, len(row.FetchFilter) > 0, row.Loading, row.Err != ""),
+			Actionable:   isActionableDetailRow(row),
 			CountDisplay: resource.FormatRelatedCount(row.Count),
 		})
 	}

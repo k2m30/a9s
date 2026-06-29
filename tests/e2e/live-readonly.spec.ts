@@ -206,8 +206,8 @@ test.describe("a9s web UI — live read-only AWS data structural checks", () => 
     // -----------------------------------------------------------------------
     let navigableRowIdx = -1;
     for (let i = 0; i < rowCount; i++) {
-      const txt = await allRows.nth(i).textContent();
-      if (txt && /[1-9]/.test(txt)) {
+      const countText = await allRows.nth(i).locator(".related-count").textContent();
+      if (countText && /\(\s*[1-9]\d*\s*\)/.test(countText)) {
         navigableRowIdx = i;
         break;
       }
