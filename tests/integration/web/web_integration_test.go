@@ -925,3 +925,598 @@ func TestWebRichTypes_AllHaveNonEmptyRows(t *testing.T) {
 		})
 	}
 }
+
+// =============================================================================
+// 11. LIST → DETAIL — open-detail flow (PR-E new, wired in commit 2fb04f2b)
+// =============================================================================
+
+// navigateToDetail is a helper: navigates list → selects first row → opens
+// detail. Returns the DetailBody or fatals. Callers must start their own server.
+func navigateToDetail(t *testing.T, c *client, shortName string) *app.DetailBody {
+	t.Helper()
+	navigateToListWithRows(t, c, shortName)
+
+	// open-detail uses the currently-selected row (index 0 by default).
+	c.action(t, app.ActionOpenDetail, "")
+	vs := c.state(t)
+	if vs.Body.Kind != app.BodyKindDetail {
+		t.Fatalf("[%s] after open-detail: Body.Kind=%q, want %q",
+			shortName, vs.Body.Kind, app.BodyKindDetail)
+	}
+	if vs.Body.Detail == nil {
+		t.Fatalf("[%s] Body.Detail is nil after open-detail", shortName)
+	}
+	return vs.Body.Detail
+}
+
+// TestWebDetail_OpenDetail_ShowsDetailBody verifies that ActionOpenDetail from
+// a list with a selected row navigates to a detail screen with non-empty Fields.
+// Tests a representative spread: ec2, s3, dbi, lambda, ecs.
+func TestWebDetail_OpenDetail_ShowsDetailBody(t *testing.T) {
+	// Representative spread of rich types with distinct field structures.
+	types := []string{"ec2", "s3", "dbi", "lambda", "ecs"}
+
+	for _, shortName := range types {
+		shortName := shortName
+		t.Run(shortName, func(t *testing.T) {
+			c, cleanup := startServer(t)
+			defer cleanup()
+
+			db := navigateToDetail(t, c, shortName)
+
+			// The detail body must carry Fields — the headless resourceFieldList builder
+			// must have populated at least one key-value pair for any real resource.
+			if len(db.Fields) == 0 {
+				t.Errorf("[%s] Body.Detail.Fields is empty — detail projector must populate fields", shortName)
+			}
+		})
+	}
+}
+
+// TestWebDetail_OpenDetail_RelatedVisibleForTypesWithRelatedDefs verifies that
+// types registered with at least one RelatedDef show RelatedVisible==true in
+// the detail body. Tests dbi and lambda (both have inline Related defs).
+func TestWebDetail_OpenDetail_RelatedVisibleForTypesWithRelatedDefs(t *testing.T) {
+	// dbi and lambda are confirmed to have Related: []domain.RelatedDef{...} in
+	// the catalog. Their demo fixtures are populated, so detail always has a row.
+	relatedTypes := []string{"dbi", "lambda"}
+
+	for _, shortName := range relatedTypes {
+		shortName := shortName
+		t.Run(shortName, func(t *testing.T) {
+			c, cleanup := startServer(t)
+			defer cleanup()
+
+			db := navigateToDetail(t, c, shortName)
+
+			if !db.RelatedVisible {
+				t.Errorf("[%s] Body.Detail.RelatedVisible=false — types with RelatedDefs must show the related panel", shortName)
+			}
+			// Related slice may be non-nil even when all rows are still loading.
+			// Asserting non-nil is sufficient to prove the panel was initialised.
+			if db.Related == nil {
+				t.Errorf("[%s] Body.Detail.Related is nil — related panel entries must be initialised", shortName)
+			}
+		})
+	}
+}
+
+// TestWebDetail_BackFromDetail_ReturnsToList verifies that ActionBack from a
+// detail screen returns to the parent resource list.
+func TestWebDetail_BackFromDetail_ReturnsToList(t *testing.T) {
+	c, cleanup := startServer(t)
+	defer cleanup()
+
+	navigateToDetail(t, c, "ec2")
+
+	c.action(t, app.ActionBack, "")
+	vs := c.state(t)
+	if vs.Body.Kind != app.BodyKindList {
+		t.Fatalf("after back from detail: expected list, got %q", vs.Body.Kind)
+	}
+}
+
+// =============================================================================
+// 12. DETAIL → YAML / JSON — text-body flows (PR-E new)
+// =============================================================================
+
+// TestWebYAML_OpenYAML_ShowsTextBodyWithLines verifies that ActionOpenYAML from
+// a detail screen pushes a text body with real YAML content. Empty Lines is the
+// regression: the headless resourceYAMLLines builder must produce at least one
+// line for any real resource.
+func TestWebYAML_OpenYAML_ShowsTextBodyWithLines(t *testing.T) {
+	// ec2 is known to produce ~40 YAML lines in demo mode (verified over HTTP).
+	// Test a spread to catch per-type projector gaps.
+	types := []string{"ec2", "dbi", "lambda", "s3"}
+
+	for _, shortName := range types {
+		shortName := shortName
+		t.Run(shortName, func(t *testing.T) {
+			c, cleanup := startServer(t)
+			defer cleanup()
+
+			navigateToDetail(t, c, shortName)
+
+			c.action(t, app.ActionOpenYAML, "")
+			vs := c.state(t)
+
+			if vs.Body.Kind != app.BodyKindText {
+				t.Fatalf("[%s] after open-yaml from detail: Body.Kind=%q, want %q",
+					shortName, vs.Body.Kind, app.BodyKindText)
+			}
+			if vs.Body.Text == nil {
+				t.Fatalf("[%s] Body.Text is nil after open-yaml", shortName)
+			}
+			// ASSERTION WITH TEETH: empty Lines == regression in the headless
+			// resourceYAMLLines builder (serialises nothing).
+			if len(vs.Body.Text.Lines) == 0 {
+				t.Errorf("[%s] Body.Text.Lines is empty after open-yaml — "+
+					"the headless YAML builder must produce content; "+
+					"empty Lines means the projector returned a zero-value resource", shortName)
+			}
+		})
+	}
+}
+
+// TestWebYAML_OpenJSON_ShowsTextBodyWithLines verifies that ActionOpenJSON from
+// a detail screen produces a text body with JSON content.
+func TestWebYAML_OpenJSON_ShowsTextBodyWithLines(t *testing.T) {
+	types := []string{"ec2", "dbi"}
+
+	for _, shortName := range types {
+		shortName := shortName
+		t.Run(shortName, func(t *testing.T) {
+			c, cleanup := startServer(t)
+			defer cleanup()
+
+			navigateToDetail(t, c, shortName)
+
+			c.action(t, app.ActionOpenJSON, "")
+			vs := c.state(t)
+
+			if vs.Body.Kind != app.BodyKindText {
+				t.Fatalf("[%s] after open-json from detail: Body.Kind=%q, want %q",
+					shortName, vs.Body.Kind, app.BodyKindText)
+			}
+			if vs.Body.Text == nil {
+				t.Fatalf("[%s] Body.Text is nil after open-json", shortName)
+			}
+			if len(vs.Body.Text.Lines) == 0 {
+				t.Errorf("[%s] Body.Text.Lines is empty after open-json — JSON builder must produce content", shortName)
+			}
+		})
+	}
+}
+
+// TestWebYAML_BackFromYAML_ReturnsToDetail verifies that ActionBack from a YAML
+// text screen returns to the detail screen (unwinds one stack frame).
+func TestWebYAML_BackFromYAML_ReturnsToDetail(t *testing.T) {
+	c, cleanup := startServer(t)
+	defer cleanup()
+
+	navigateToDetail(t, c, "ec2")
+
+	c.action(t, app.ActionOpenYAML, "")
+	vs := c.state(t)
+	if vs.Body.Kind != app.BodyKindText {
+		t.Fatalf("expected text after open-yaml, got %q", vs.Body.Kind)
+	}
+
+	c.action(t, app.ActionBack, "")
+	vs = c.state(t)
+	if vs.Body.Kind != app.BodyKindDetail {
+		t.Fatalf("after back from yaml: expected detail, got %q", vs.Body.Kind)
+	}
+}
+
+// TestWebYAML_OpenJSON_BackReturnsToDetail verifies back-from-JSON also returns
+// to detail.
+func TestWebYAML_OpenJSON_BackReturnsToDetail(t *testing.T) {
+	c, cleanup := startServer(t)
+	defer cleanup()
+
+	navigateToDetail(t, c, "ec2")
+
+	c.action(t, app.ActionOpenJSON, "")
+	vs := c.state(t)
+	if vs.Body.Kind != app.BodyKindText {
+		t.Fatalf("expected text after open-json, got %q", vs.Body.Kind)
+	}
+
+	c.action(t, app.ActionBack, "")
+	vs = c.state(t)
+	if vs.Body.Kind != app.BodyKindDetail {
+		t.Fatalf("after back from json: expected detail, got %q", vs.Body.Kind)
+	}
+}
+
+// TestWebYAML_OpenYAML_DirectFromList verifies that ActionOpenYAML can also be
+// invoked directly from the list screen (selectedResourceForAction resolves
+// from the selected list row when no detail is on the stack).
+func TestWebYAML_OpenYAML_DirectFromList(t *testing.T) {
+	c, cleanup := startServer(t)
+	defer cleanup()
+
+	navigateToListWithRows(t, c, "ec2")
+
+	c.action(t, app.ActionOpenYAML, "")
+	vs := c.state(t)
+
+	if vs.Body.Kind != app.BodyKindText {
+		t.Fatalf("open-yaml from list: Body.Kind=%q, want %q", vs.Body.Kind, app.BodyKindText)
+	}
+	if vs.Body.Text == nil || len(vs.Body.Text.Lines) == 0 {
+		t.Errorf("open-yaml from list: Lines empty — must produce YAML content for selected row")
+	}
+}
+
+// =============================================================================
+// 13. CHILD VIEWS — ActionChildView with trigger keys (PR-E new)
+// =============================================================================
+
+// childViewCase describes one child-view scenario to drive via HTTP.
+type childViewCase struct {
+	// parentType is the resource short name that declares Children.
+	parentType string
+	// triggerKey is the Key field from the ChildViewDef (e.g. "enter", "e", "L").
+	triggerKey string
+	// expectedChildType is the ChildType value expected after navigation.
+	// We do not assert on it directly but document for reviewer clarity.
+	expectedChildType string
+}
+
+// TestWebChildView_ActionChildView_NavigatesToChildList verifies that
+// ActionChildView with a registered trigger key, called from a list screen
+// with a selected row, pushes a child-list screen (Body.Kind==list).
+//
+// The child list must have Columns defined. Rows may be empty (child fetcher
+// runs async in the real runtime; in demo-sync mode they may be populated).
+//
+// Trigger keys are the Key field from ChildViewDef, NOT raw keystrokes:
+//
+//	ecs-svc: "enter"→ecs_tasks, "e"→ecs_svc_events, "L"→ecs_svc_logs
+//	lambda:  "enter"→lambda_invocations
+//	asg:     "enter"→asg_activities
+//	dbi:     "enter"→dbi_events
+//	s3:      "enter"→s3_objects
+//	sfn:     "enter"→sfn_executions
+func TestWebChildView_ActionChildView_NavigatesToChildList(t *testing.T) {
+	cases := []childViewCase{
+		// ecs-svc has three children with three distinct trigger keys.
+		{parentType: "ecs-svc", triggerKey: "enter", expectedChildType: "ecs_tasks"},
+		{parentType: "ecs-svc", triggerKey: "e", expectedChildType: "ecs_svc_events"},
+		{parentType: "ecs-svc", triggerKey: "L", expectedChildType: "ecs_svc_logs"},
+		// lambda: single child with "enter".
+		{parentType: "lambda", triggerKey: "enter", expectedChildType: "lambda_invocations"},
+		// asg: single child with "enter".
+		{parentType: "asg", triggerKey: "enter", expectedChildType: "asg_activities"},
+		// dbi: single child with "enter".
+		{parentType: "dbi", triggerKey: "enter", expectedChildType: "dbi_events"},
+		// s3: single child with "enter".
+		{parentType: "s3", triggerKey: "enter", expectedChildType: "s3_objects"},
+		// sfn: single child with "enter".
+		{parentType: "sfn", triggerKey: "enter", expectedChildType: "sfn_executions"},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		name := tc.parentType + "/" + tc.triggerKey
+		t.Run(name, func(t *testing.T) {
+			c, cleanup := startServer(t)
+			defer cleanup()
+
+			// Navigate to the parent list and verify it has rows.
+			navigateToListWithRows(t, c, tc.parentType)
+
+			// Dispatch the child-view action with the trigger key as Arg.
+			c.action(t, app.ActionChildView, tc.triggerKey)
+			vs := c.state(t)
+
+			// The controller must have pushed a child-list screen.
+			if vs.Body.Kind != app.BodyKindList {
+				t.Fatalf("[%s key=%s] after ActionChildView: Body.Kind=%q, want %q — "+
+					"controller must push ScreenChildList; if this returns the same screen "+
+					"the trigger key dispatch is broken",
+					tc.parentType, tc.triggerKey, vs.Body.Kind, app.BodyKindList)
+			}
+			if vs.Body.List == nil {
+				t.Fatalf("[%s key=%s] Body.List is nil after ActionChildView", tc.parentType, tc.triggerKey)
+			}
+			// Columns must be non-empty — the child type must be registered with columns.
+			if len(vs.Body.List.Columns) == 0 {
+				t.Errorf("[%s key=%s] Body.List.Columns is empty — child type %q must have columns",
+					tc.parentType, tc.triggerKey, tc.expectedChildType)
+			}
+		})
+	}
+}
+
+// TestWebChildView_BackFromChildList_ReturnsToParentList verifies that ActionBack
+// from a child list pops back to the parent resource list.
+func TestWebChildView_BackFromChildList_ReturnsToParentList(t *testing.T) {
+	c, cleanup := startServer(t)
+	defer cleanup()
+
+	navigateToListWithRows(t, c, "ecs-svc")
+
+	c.action(t, app.ActionChildView, "enter") // → ecs_tasks child list
+	vs := c.state(t)
+	if vs.Body.Kind != app.BodyKindList {
+		t.Fatalf("expected child list after ActionChildView, got %q", vs.Body.Kind)
+	}
+
+	c.action(t, app.ActionBack, "")
+	vs = c.state(t)
+	if vs.Body.Kind != app.BodyKindList {
+		t.Fatalf("after back from child list: expected parent list, got %q", vs.Body.Kind)
+	}
+}
+
+// TestWebChildView_FromDetail_ActionChildView_NavigatesToChildList verifies that
+// ActionChildView works when called from the detail screen (the controller's
+// selectedResourceForAction resolves from the top detail screen's resource).
+func TestWebChildView_FromDetail_ActionChildView_NavigatesToChildList(t *testing.T) {
+	c, cleanup := startServer(t)
+	defer cleanup()
+
+	// Navigate to detail first.
+	navigateToDetail(t, c, "ecs-svc")
+
+	// Trigger child view from detail.
+	c.action(t, app.ActionChildView, "enter")
+	vs := c.state(t)
+
+	if vs.Body.Kind != app.BodyKindList {
+		t.Fatalf("ActionChildView from detail: Body.Kind=%q, want %q — "+
+			"controller must resolve resource from detail screen",
+			vs.Body.Kind, app.BodyKindList)
+	}
+}
+
+// =============================================================================
+// 14. RELATED PANEL NAVIGATION (PR-E new)
+// =============================================================================
+
+// TestWebRelated_ToggleFocus_SetsRelatedFocused verifies that ActionToggleFocus
+// on a detail screen with a related panel sets RelatedFocused=true.
+func TestWebRelated_ToggleFocus_SetsRelatedFocused(t *testing.T) {
+	c, cleanup := startServer(t)
+	defer cleanup()
+
+	// dbi has RelatedDefs and demo fixtures, so RelatedVisible will be true.
+	db := navigateToDetail(t, c, "dbi")
+	if !db.RelatedVisible {
+		t.Skip("dbi detail: RelatedVisible=false — cannot test focus toggle without a visible panel")
+	}
+
+	c.action(t, app.ActionToggleFocus, "")
+	vs := c.state(t)
+
+	if vs.Body.Kind != app.BodyKindDetail {
+		t.Fatalf("after toggle-focus: Body.Kind=%q, want %q", vs.Body.Kind, app.BodyKindDetail)
+	}
+	if vs.Body.Detail == nil {
+		t.Fatal("Body.Detail is nil after toggle-focus")
+	}
+	if !vs.Body.Detail.RelatedFocused {
+		t.Errorf("Body.Detail.RelatedFocused=false after ActionToggleFocus — "+
+			"toggle-focus must move focus to the related panel")
+	}
+}
+
+// TestWebRelated_ToggleFocusTwice_RestoresFieldFocus verifies that a second
+// ActionToggleFocus returns focus to the field column.
+func TestWebRelated_ToggleFocusTwice_RestoresFieldFocus(t *testing.T) {
+	c, cleanup := startServer(t)
+	defer cleanup()
+
+	db := navigateToDetail(t, c, "dbi")
+	if !db.RelatedVisible {
+		t.Skip("dbi detail: RelatedVisible=false — cannot test focus toggle without a visible panel")
+	}
+
+	c.action(t, app.ActionToggleFocus, "")
+	c.action(t, app.ActionToggleFocus, "")
+	vs := c.state(t)
+
+	if vs.Body.Detail == nil {
+		t.Fatal("Body.Detail is nil after double toggle-focus")
+	}
+	if vs.Body.Detail.RelatedFocused {
+		t.Errorf("Body.Detail.RelatedFocused=true after two toggles — second toggle must restore field focus")
+	}
+}
+
+// TestWebRelated_SelectFocusedRow_NavigatesStack verifies that ActionSelect
+// while RelatedFocused navigates the stack (pushes a new screen). The exact
+// Kind depends on the related def's NavigationKind:
+//
+//   - NavigationKindResourceList → list
+//   - NavigationKindFilteredList → list
+//   - NavigationKindDetail       → detail
+//
+// We assert that the Kind changed away from detail (the stack was mutated),
+// which covers the NavigationKind variants. If the related panel has no loaded
+// rows, we skip rather than produce a vacuous assertion.
+func TestWebRelated_SelectFocusedRow_NavigatesStack(t *testing.T) {
+	c, cleanup := startServer(t)
+	defer cleanup()
+
+	db := navigateToDetail(t, c, "dbi")
+	if !db.RelatedVisible {
+		t.Skip("dbi detail: RelatedVisible=false — cannot test related-navigate")
+	}
+
+	// Focus the related panel.
+	c.action(t, app.ActionToggleFocus, "")
+	vs := c.state(t)
+	if vs.Body.Detail == nil || !vs.Body.Detail.RelatedFocused {
+		t.Skip("related panel not focused after toggle-focus — cannot test navigate")
+	}
+
+	// Check whether any related row is non-loading (required for navigation).
+	hasLoaded := false
+	for _, rel := range vs.Body.Detail.Related {
+		if !rel.Loading && !rel.Err {
+			hasLoaded = true
+			break
+		}
+	}
+	if !hasLoaded {
+		t.Skip("all related rows are still loading in demo mode — cannot assert navigation")
+	}
+
+	// Select the focused row (RelatedCursor=0 by default).
+	c.action(t, app.ActionSelect, "")
+	vs = c.state(t)
+
+	// The stack must have changed — the detail screen is no longer on top.
+	// (Either a list or a detail for the related resource was pushed.)
+	if vs.Body.Kind == app.BodyKindDetail && vs.Body.Detail != nil && vs.Body.Detail.RelatedFocused {
+		// Still on the same detail screen with focus still on related panel
+		// means navigation was a no-op — that is the broken state.
+		t.Errorf("ActionSelect on related panel did not navigate: still on detail with RelatedFocused=true — "+
+			"HandleRelatedNavigate must produce a non-Unknown NavigationKind for dbi's related rows")
+	}
+	// The resulting Kind should be list or detail (never menu/text/help).
+	switch vs.Body.Kind {
+	case app.BodyKindList, app.BodyKindDetail:
+		// Correct: stack was mutated by applyRelatedNavResult.
+	default:
+		t.Errorf("after related-panel select: unexpected Body.Kind=%q — expected list or detail", vs.Body.Kind)
+	}
+}
+
+// =============================================================================
+// 15. REVEAL STAYS BLOCKED (PR-E confirm)
+// =============================================================================
+
+// TestWebReveal_ActionReveal_BlockedOver HTTP confirms that ActionReveal is
+// rejected 403 even from a detail context where reveal would otherwise make
+// sense. The server is constructed with allowReveal=false (startServer default).
+func TestWebReveal_ActionReveal_BlockedFromDetailContext(t *testing.T) {
+	c, cleanup := startServer(t)
+	defer cleanup()
+
+	// Navigate to a detail screen so the controller has a resource context.
+	navigateToDetail(t, c, "secrets")
+
+	// Post reveal directly, bypassing the client.action helper (which fatals on
+	// non-2xx) so we can observe the 403.
+	form := url.Values{}
+	form.Set("kind", string(app.ActionReveal))
+	req, err := http.NewRequestWithContext(bgctx, http.MethodPost, c.baseURL+"/action", strings.NewReader(form.Encode()))
+	if err != nil {
+		t.Fatalf("NewRequestWithContext: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("X-A9S-Token", c.token)
+
+	resp, doErr := c.http.Do(req)
+	if doErr != nil {
+		t.Fatalf("POST /action reveal: %v", doErr)
+	}
+	_ = resp.Body.Close()
+
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("ActionReveal from detail context: expected 403, got %d — "+
+			"reveal must remain blocked when allowReveal=false regardless of navigation state", resp.StatusCode)
+	}
+}
+
+// =============================================================================
+// 16. BACK UNWINDS DEEP STACK (PR-E new)
+// =============================================================================
+
+// TestWebBack_DeepStack_UnwindsCorrectly exercises the full menu→list→detail→
+// yaml→back→back→back→back unwind sequence and verifies each transition is
+// correct. This catches stack-corruption bugs introduced by the new Apply lanes.
+func TestWebBack_DeepStack_UnwindsCorrectly(t *testing.T) {
+	c, cleanup := startServer(t)
+	defer cleanup()
+
+	// menu (start)
+	vs := c.state(t)
+	if vs.Body.Kind != app.BodyKindMenu {
+		t.Fatalf("initial state: expected menu, got %q", vs.Body.Kind)
+	}
+
+	// → list
+	c.action(t, app.ActionCommand, "ec2")
+	vs = c.state(t)
+	if vs.Body.Kind != app.BodyKindList {
+		t.Fatalf("after command ec2: expected list, got %q", vs.Body.Kind)
+	}
+	if len(vs.Body.List.Rows) == 0 {
+		t.Fatal("ec2 list has no rows — cannot navigate to detail")
+	}
+
+	// → detail
+	c.action(t, app.ActionOpenDetail, "")
+	vs = c.state(t)
+	if vs.Body.Kind != app.BodyKindDetail {
+		t.Fatalf("after open-detail: expected detail, got %q", vs.Body.Kind)
+	}
+
+	// → yaml
+	c.action(t, app.ActionOpenYAML, "")
+	vs = c.state(t)
+	if vs.Body.Kind != app.BodyKindText {
+		t.Fatalf("after open-yaml: expected text, got %q", vs.Body.Kind)
+	}
+	if vs.Body.Text == nil || len(vs.Body.Text.Lines) == 0 {
+		t.Errorf("YAML text body is empty — regression in headless YAML builder")
+	}
+
+	// back → detail
+	c.action(t, app.ActionBack, "")
+	vs = c.state(t)
+	if vs.Body.Kind != app.BodyKindDetail {
+		t.Fatalf("back from yaml: expected detail, got %q", vs.Body.Kind)
+	}
+
+	// back → list
+	c.action(t, app.ActionBack, "")
+	vs = c.state(t)
+	if vs.Body.Kind != app.BodyKindList {
+		t.Fatalf("back from detail: expected list, got %q", vs.Body.Kind)
+	}
+
+	// back → menu
+	c.action(t, app.ActionBack, "")
+	vs = c.state(t)
+	if vs.Body.Kind != app.BodyKindMenu {
+		t.Fatalf("back from list: expected menu, got %q", vs.Body.Kind)
+	}
+}
+
+// TestWebBack_ChildViewStack_UnwindsCorrectly verifies that the child-view stack
+// also unwinds correctly: menu→list→child-list→back→list→back→menu.
+func TestWebBack_ChildViewStack_UnwindsCorrectly(t *testing.T) {
+	c, cleanup := startServer(t)
+	defer cleanup()
+
+	// → list (ecs-svc, which has children)
+	navigateToListWithRows(t, c, "ecs-svc")
+
+	// → child list
+	c.action(t, app.ActionChildView, "enter")
+	vs := c.state(t)
+	if vs.Body.Kind != app.BodyKindList {
+		t.Fatalf("after ActionChildView: expected child list, got %q", vs.Body.Kind)
+	}
+
+	// back → parent list
+	c.action(t, app.ActionBack, "")
+	vs = c.state(t)
+	if vs.Body.Kind != app.BodyKindList {
+		t.Fatalf("back from child list: expected parent list, got %q", vs.Body.Kind)
+	}
+
+	// back → menu
+	c.action(t, app.ActionBack, "")
+	vs = c.state(t)
+	if vs.Body.Kind != app.BodyKindMenu {
+		t.Fatalf("back from parent list: expected menu, got %q", vs.Body.Kind)
+	}
+}
