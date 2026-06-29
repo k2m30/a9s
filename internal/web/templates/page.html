@@ -104,6 +104,12 @@ body { background: var(--bg); color: var(--fg); min-height: 100vh; display: flex
 .list-table tr.selected td { background: var(--sel); }
 .list-table tr.dec-error td { color: var(--err); }
 .list-table tr.dec-warn  td { color: var(--warn); }
+/* Row health from the shared ListRow.Color tag (td.ResolveColor), matching the
+   TUI: healthy=green, warning=yellow, broken=red, dim=gray. */
+.list-table tr.row-healthy td { color: var(--ok); }
+.list-table tr.row-warning td { color: var(--warn); }
+.list-table tr.row-broken  td { color: var(--err); }
+.list-table tr.row-dim     td { color: var(--dim); }
 .list-table tr:hover td  { background: var(--border); }
 .list-filter { color: var(--warn); font-style: italic; margin-bottom: 4px; }
 .list-loading { color: var(--dim); font-style: italic; }
