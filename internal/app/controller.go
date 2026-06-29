@@ -114,6 +114,26 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 	return c.applyLocked(a)
 }
 
+// selectedResourceForAction resolves the resource a row-dependent action targets:
+// the top detail's resource when a detail is on top, otherwise the selected row
+// of the top list. Returns (resource, resourceType, ok). Lock-free — callers
+// must already hold c.mu (it is only called from applyLocked).
+func (c *Controller) selectedResourceForAction() (resource.Resource, string, bool) {
+	if ds := c.topDetailState(); ds != nil {
+		return ds.Resource, ds.ResourceType, true
+	}
+	if r, ok := c.listSelected(); ok {
+		typeName := ""
+		if len(c.stack) > 0 {
+			if top := c.stack[len(c.stack)-1]; top.ID == runtime.ScreenResourceList || top.ID == runtime.ScreenChildList {
+				typeName = top.Ctx.ResourceType
+			}
+		}
+		return r, typeName, true
+	}
+	return resource.Resource{}, "", false
+}
+
 // applyLocked is the lock-free implementation of Apply. Callers must hold c.mu (write).
 func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 	switch a.Kind {
@@ -450,6 +470,60 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 		return c.snapshot(), nil
 
 	case ActionSelect:
+		// Related-panel Enter: when the top screen is a detail view and
+		// RelatedFocus is active, navigate to the focused related row.
+		if ds := c.topDetailState(); ds != nil && ds.RelatedFocus {
+			// Find the row at RelatedCursor using the same filter logic as
+			// detailRelatedVisibleCount.
+			query := strings.TrimSpace(strings.ToLower(ds.RelatedFilter))
+			var focusedRow *DetailRelatedRow
+			idx := 0
+			for i := range ds.RelatedRows {
+				row := &ds.RelatedRows[i]
+				if isSelfPivotZeroDetailRow(*row, ds.ResourceType) {
+					continue
+				}
+				if query != "" && !strings.Contains(strings.ToLower(row.DisplayName), query) {
+					continue
+				}
+				if idx == ds.RelatedCursor {
+					focusedRow = row
+					break
+				}
+				idx++
+			}
+			if focusedRow != nil && !focusedRow.Loading {
+				// Derive the single target ID when there is exactly one related
+				// resource (used by NavigationKindDetail cache-hit path).
+				targetID := ""
+				if len(focusedRow.ResourceIDs) == 1 {
+					targetID = focusedRow.ResourceIDs[0]
+				}
+				// Look up the checker from the registered RelatedDef; DetailRelatedRow
+				// is a serialisable value type (no funcs/checker field).
+				var checker resource.RelatedChecker
+				for _, def := range resource.GetRelated(ds.ResourceType) {
+					if def.TargetType == focusedRow.TargetType {
+						checker = def.Checker
+						break
+					}
+				}
+				ev := runtime.RelatedNavigateEvent{
+					TargetType:     focusedRow.TargetType,
+					SourceResource: ds.Resource,
+					SourceType:     ds.ResourceType,
+					TargetID:       targetID,
+					RelatedIDs:     focusedRow.ResourceIDs,
+					FetchFilter:    focusedRow.FetchFilter,
+					Checker:        checker,
+				}
+				navRes, tasks := c.core.HandleRelatedNavigate(ev)
+				extraTasks := c.applyRelatedNavResult(navRes)
+				return c.snapshot(), append(tasks, extraTasks...)
+			}
+			return c.snapshot(), nil
+		}
+
 		if ms := c.topMenuState(); ms != nil {
 			all := resource.AllResourceTypes()
 			visible := menuVisibleItems(ms, all)
@@ -549,19 +623,209 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 		}
 		return c.snapshot(), nil
 
-	// --- PR-C-blocked actions: need selected-row / per-screen view state ---
+	// --- Row-dependent actions: require selected row + per-screen state ---
 
-	case ActionOpenDetail,
-		ActionOpenYAML, ActionOpenJSON,
-		ActionReveal, ActionChildView,
-		ActionLoadMore:
-		// TODO PR-C: needs selected-row / view state (see plan PR-C)
+	case ActionOpenDetail:
+		r, ok := c.listSelected()
+		if !ok {
+			return c.snapshot(), nil
+		}
+		typeName := ""
+		if top := c.stack[len(c.stack)-1]; top.ID == runtime.ScreenResourceList || top.ID == runtime.ScreenChildList {
+			typeName = top.Ctx.ResourceType
+		}
+		res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{
+			Target:       runtime.NavigateTargetDetail,
+			ResourceType: typeName,
+			Resource:     &r,
+		})
+		c.applyNavResult(res)
+		return c.snapshot(), tasks
+
+	case ActionOpenYAML:
+		r, typeName, ok := c.selectedResourceForAction()
+		if !ok {
+			return c.snapshot(), nil
+		}
+		res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{
+			Target:       runtime.NavigateTargetYAML,
+			ResourceType: typeName,
+			Resource:     &r,
+		})
+		c.applyNavResult(res)
+		return c.snapshot(), tasks
+
+	case ActionOpenJSON:
+		r, typeName, ok := c.selectedResourceForAction()
+		if !ok {
+			return c.snapshot(), nil
+		}
+		res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{
+			Target:       runtime.NavigateTargetJSON,
+			ResourceType: typeName,
+			Resource:     &r,
+		})
+		c.applyNavResult(res)
+		return c.snapshot(), tasks
+
+	case ActionReveal:
+		// Resolve the resource from the active list or detail screen.
+		var revealRes *resource.Resource
+		var revealType string
+		if ds := c.topDetailState(); ds != nil {
+			r := ds.Resource
+			revealRes = &r
+			revealType = ds.ResourceType
+		} else if ls := c.topListState(); ls != nil {
+			r, ok := c.listSelected()
+			if ok {
+				revealRes = &r
+				if top := c.stack[len(c.stack)-1]; len(c.stack) > 0 {
+					revealType = top.Ctx.ResourceType
+				}
+			}
+		}
+		if revealRes == nil {
+			return c.snapshot(), nil
+		}
+		res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{
+			Target:       runtime.NavigateTargetReveal,
+			ResourceType: revealType,
+			Resource:     revealRes,
+		})
+		// KindFetchReveal: no stack push yet — the push happens when
+		// Handle receives messages.ValueRevealed and calls HandleValueRevealed.
+		_ = res
+		return c.snapshot(), tasks
+
+	case ActionChildView:
+		// Arg carries the trigger key (e, L, R, r, s, Enter, t …).
+		triggerKey := a.Arg
+		if triggerKey == "" {
+			return c.snapshot(), nil
+		}
+		r, typeName, ok := c.selectedResourceForAction()
+		if !ok {
+			return c.snapshot(), nil
+		}
+		td := resource.FindResourceType(typeName)
+		if td == nil {
+			return c.snapshot(), nil
+		}
+		// Walk the type's children to find the one registered under this key.
+		var matchedChild *resource.ChildViewDef
+		for i := range td.Children {
+			ch := &td.Children[i]
+			if ch.Key != triggerKey {
+				continue
+			}
+			if ch.DrillCondition != nil && !ch.DrillCondition(r) {
+				continue
+			}
+			matchedChild = ch
+			break
+		}
+		if matchedChild == nil {
+			return c.snapshot(), nil
+		}
+		// Build the parent context from ContextKeys.
+		ctx := make(map[string]string, len(matchedChild.ContextKeys))
+		for param, source := range matchedChild.ContextKeys {
+			switch source {
+			case "ID":
+				ctx[param] = r.ID
+			case "Name":
+				ctx[param] = r.Name
+			default:
+				ctx[param] = r.Fields[source]
+			}
+		}
+		displayName := ctx[matchedChild.DisplayNameKey]
+		ev := runtime.EnterChildViewEvent{
+			ChildType:     matchedChild.ChildType,
+			ParentContext: ctx,
+			DisplayName:   displayName,
+		}
+		intents, tasks := c.core.HandleEnterChildView(ev)
+		c.applyIntents(intents)
+		// Seed the child list screen's context and state after PushScreen.
+		if len(c.stack) > 0 {
+			top := &c.stack[len(c.stack)-1]
+			if top.ID == runtime.ScreenChildList {
+				top.Ctx.ResourceType = matchedChild.ChildType
+				if top.State.List == nil {
+					top.State.List = &ListState{
+						Loading:       true,
+						ParentContext: ctx,
+					}
+				}
+			}
+		}
+		return c.snapshot(), tasks
+
+	case ActionLoadMore:
+		ls := c.topListState()
+		if ls == nil || !ls.HasPagination || ls.LoadingMore {
+			return c.snapshot(), nil
+		}
+		ls.LoadingMore = true
+		typeName := ""
+		if top := c.stack[len(c.stack)-1]; len(c.stack) > 0 {
+			typeName = top.Ctx.ResourceType
+		}
+		tasks := []runtime.TaskRequest{{
+			Key: runtime.TaskKey{Kind: runtime.KindFetchMore, Scope: typeName},
+			Payload: runtime.FetchMorePayload{
+				ContinuationToken: ls.PaginationCursor,
+			},
+		}}
+		return c.snapshot(), tasks
+
+	case ActionRefresh:
+		// Detail view: re-dispatch enrich + related.
+		if ds := c.topDetailState(); ds != nil {
+			rt := ds.ResourceType
+			srcRes := ds.Resource
+			var tasks []runtime.TaskRequest
+			if resource.HasDetailEnricher(rt) {
+				tasks = append(tasks, runtime.TaskRequest{
+					Key: runtime.TaskKey{Kind: runtime.KindFetchResources, Scope: rt},
+				})
+			}
+			// Emit the enrich detail task so the executor re-runs enrichment.
+			// The related-check task is emitted separately via Handle(RelatedCheckStarted).
+			_ = srcRes
+			return c.snapshot(), tasks
+		}
+		// List view: delete cache and re-fetch.
+		if ls := c.topListState(); ls != nil {
+			typeName := ""
+			if top := c.stack[len(c.stack)-1]; len(c.stack) > 0 {
+				typeName = top.Ctx.ResourceType
+			}
+			if typeName == "" {
+				return c.snapshot(), nil
+			}
+			c.core.DeleteResourceCache(typeName)
+			ls.Loading = true
+			ls.Rows = nil
+			tasks := []runtime.TaskRequest{{
+				Key:   runtime.TaskKey{Kind: runtime.KindFetchResources, Scope: typeName},
+				Cache: runtime.CacheNone,
+			}}
+			return c.snapshot(), tasks
+		}
+		return c.snapshot(), nil
+
+	case ActionCopy:
+		// Copy is renderer-only (clipboard access is a renderer concern).
+		// The controller has no clipboard; the web/TUI renderer handles this
+		// directly without routing through Apply.
 		return c.snapshot(), nil
 	}
 
-	// All remaining actions (sort, search, copy, refresh, quit, command)
-	// either require per-screen state lifted in later PR-C slices or are
-	// renderer-only (quit). Return current snapshot with no tasks.
+	// All remaining actions (sort, search, quit) are either renderer-only
+	// or require state not yet lifted here.
 	return c.snapshot(), nil
 }
 
@@ -593,6 +857,26 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 	// re-check staleness with the same predicate before mutating the controller.
 	if msg, ok := ev.(messages.ResourcesLoaded); ok && !messages.IsStale(msg, c.core) {
 		c.handleResourcesLoadedEvent(msg)
+	}
+
+	// messages.ValueRevealed is explicitly excluded from HandleEvent
+	// (orchestrator.go routes it nowhere) — the controller must handle it
+	// directly here. HandleValueRevealed emits PushScreen{ScreenReveal} on
+	// success or a FlashIntent on error.
+	//
+	// Guard: only process when the stack contains a resource-bearing screen
+	// (list or detail) — a reveal can only be initiated from those screens.
+	// A menu-only stack receiving ValueRevealed is a spurious event (e.g.
+	// late delivery after a profile switch) and is silently dropped.
+	if msg, ok := ev.(messages.ValueRevealed); ok && !messages.IsStale(msg, c.core) && c.hasResourceScreen() {
+		revealed := runtime.ValueRevealedEvent{
+			ResourceID: msg.ResourceID,
+			Value:      msg.Value,
+			Err:        msg.Err,
+		}
+		revealIntents, revealTasks := c.core.HandleValueRevealed(revealed)
+		c.applyIntents(revealIntents)
+		tasks = append(tasks, revealTasks...)
 	}
 
 	return c.snapshot(), tasks
@@ -893,24 +1177,131 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) {
 			c.applyResourcesLoaded(top.State.List, res.ResolvedType, res.CachedEntry.Resources, res.CachedEntry.Pagination, false)
 		}
 
-	// TODO PR-C: NavigateKindPushDetail / NavigateKindPushYAML / NavigateKindPushJSON
-	//            need ScreenContext{ResourceType, ResourceID} from result.Resource.
-	// TODO PR-C: NavigateKindFetchReveal needs result.Resource for the reveal payload.
+	case runtime.NavigateKindPushDetail:
+		if res.Resource == nil {
+			return
+		}
+		intent := runtime.PushScreen{
+			ID: runtime.ScreenDetail,
+			Context: runtime.ScreenContext{
+				ResourceType: res.ResolvedType,
+				ResourceID:   res.Resource.ID,
+			},
+		}
+		c.applyIntents([]runtime.UIIntent{intent})
+		// Use lock-free variants — applyNavResult is always called while c.mu
+		// is already held by Apply or Handle.
+		c.ensureDetailState(*res.Resource, res.ResolvedType)
+		if res.DispatchRelated {
+			c.initDetailRelatedRows(res.ResolvedType)
+		}
+
+	case runtime.NavigateKindPushYAML:
+		if res.Resource == nil {
+			return
+		}
+		lines := resourceYAMLLines(*res.Resource)
+		intent := runtime.PushScreen{
+			ID: runtime.ScreenYAML,
+			Context: runtime.ScreenContext{
+				ResourceType: res.ResolvedType,
+				ResourceID:   res.Resource.ID,
+			},
+		}
+		c.applyIntents([]runtime.UIIntent{intent})
+		c.ensureTextState(lines)
+
+	case runtime.NavigateKindPushJSON:
+		if res.Resource == nil {
+			return
+		}
+		lines := resourceJSONLines(*res.Resource)
+		intent := runtime.PushScreen{
+			ID: runtime.ScreenJSON,
+			Context: runtime.ScreenContext{
+				ResourceType: res.ResolvedType,
+				ResourceID:   res.Resource.ID,
+			},
+		}
+		c.applyIntents([]runtime.UIIntent{intent})
+		c.ensureTextState(lines)
+
+	case runtime.NavigateKindFetchReveal:
+		// No stack push yet — the push happens when Handle receives
+		// messages.ValueRevealed and routes it to HandleValueRevealed.
+		// Tasks are returned by Apply's ActionReveal branch directly.
 	}
 }
 
-// applyRelatedNavResult converts a NavigationResult into stack operations.
+// applyRelatedNavResult converts a NavigationResult into stack operations and
+// returns any additional task requests the result spawns.
 //
 // NavigationResult carries NavigationKind plus TargetType, TargetID,
 // RelatedIDs, FetchFilter, FilterText — no ScreenID; the controller maps
 // kind → ScreenID.
-//
-// All NavigationKinds (ResourceList, FilteredList, Detail, EnterChildView)
-// need selected-row and per-screen state that PR-C lifts into the controller.
-//
-//nolint:unused // wired in PR-C
-func (c *Controller) applyRelatedNavResult(_ runtime.NavigationResult) {
-	// TODO PR-C: needs selected-row / view state (see plan PR-C)
+func (c *Controller) applyRelatedNavResult(res runtime.NavigationResult) []runtime.TaskRequest {
+	switch res.Kind {
+	case runtime.NavigationKindResourceList:
+		intent := runtime.PushScreen{
+			ID:      runtime.ScreenResourceList,
+			Context: runtime.ScreenContext{ResourceType: res.TargetType},
+		}
+		c.applyIntents([]runtime.UIIntent{intent})
+		c.ensureListState()
+
+	case runtime.NavigationKindFilteredList:
+		intent := runtime.PushScreen{
+			ID:      runtime.ScreenResourceList,
+			Context: runtime.ScreenContext{ResourceType: res.TargetType},
+		}
+		c.applyIntents([]runtime.UIIntent{intent})
+		c.ensureListState()
+		if ls := c.topListState(); ls != nil && res.FilterText != "" {
+			ls.Filter = res.FilterText
+		}
+
+	case runtime.NavigationKindDetail:
+		// Navigate to a detail view for the single related resource.
+		// The resource itself must be fetched — the task is returned by
+		// HandleRelatedNavigate and starts the KindFetchByIDDetail pipeline.
+		// We push a ScreenDetail placeholder so the stack reflects the intent
+		// immediately; the detail state is seeded when the fetch result arrives.
+		intent := runtime.PushScreen{
+			ID:      runtime.ScreenDetail,
+			Context: runtime.ScreenContext{ResourceType: res.TargetType, ResourceID: res.TargetID},
+		}
+		c.applyIntents([]runtime.UIIntent{intent})
+
+	case runtime.NavigationKindEnterChildView:
+		// Delegate to the same path used by ActionChildView but with the
+		// target type already resolved. Build a minimal EnterChildViewEvent.
+		ev := runtime.EnterChildViewEvent{
+			ChildType: res.TargetType,
+		}
+		intents, tasks := c.core.HandleEnterChildView(ev)
+		c.applyIntents(intents)
+		if len(c.stack) > 0 {
+			top := &c.stack[len(c.stack)-1]
+			if top.ID == runtime.ScreenChildList {
+				top.Ctx.ResourceType = res.TargetType
+				if top.State.List == nil {
+					top.State.List = &ListState{Loading: true}
+				}
+				if res.FetchFilter != nil {
+					top.State.List.ParentContext = res.FetchFilter
+				}
+			}
+		}
+		return tasks
+
+	case runtime.NavigationKindFlash:
+		// Flash is surfaced as a FlashIntent by HandleRelatedNavigate — no
+		// stack change needed here.
+
+	default:
+		// NavigationKindUnknown or future kinds: no-op.
+	}
+	return nil
 }
 
 // menuPageSize is the default cursor jump for PageUp/PageDown when the renderer
@@ -952,6 +1343,22 @@ func (c *Controller) rootMenuState() *MenuState {
 		return nil
 	}
 	return c.stack[0].State.Menu
+}
+
+// hasResourceScreen reports whether the stack contains at least one screen that
+// can initiate a reveal (ScreenResourceList, ScreenChildList, or ScreenDetail).
+// Used to guard spurious ValueRevealed events delivered when the only screen
+// visible is the menu (e.g. late delivery after a profile/region switch).
+// Caller must hold c.mu.
+func (c *Controller) hasResourceScreen() bool {
+	for _, s := range c.stack {
+		if s.ID == runtime.ScreenResourceList ||
+			s.ID == runtime.ScreenChildList ||
+			s.ID == runtime.ScreenDetail {
+			return true
+		}
+	}
+	return false
 }
 
 // menuVisibleItems returns the resource types visible under the current
