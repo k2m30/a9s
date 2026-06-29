@@ -51,9 +51,8 @@ func (c *Controller) hasResourceScreen() bool {
 }
 
 // menuVisibleItems returns the resource types visible under the current
-// MenuState filter + attention settings, mirroring mainmenu.go applyFilter.
-//
-// PR-C 1b: converge with mainmenu.go applyFilter + isVisibleUnderIssueFilter.
+// MenuState filter + attention settings. mainmenu.go delegates to this via
+// the controller snapshot — this is the single implementation.
 func menuVisibleItems(ms *MenuState, all []resource.ResourceTypeDef) []resource.ResourceTypeDef {
 	var result []resource.ResourceTypeDef
 	if len(ms.Filter) < 2 {
@@ -81,13 +80,12 @@ func menuVisibleItems(ms *MenuState, all []resource.ResourceTypeDef) []resource.
 	return result
 }
 
-// menuIsVisibleUnderIssueFilter mirrors mainmenu.go isVisibleUnderIssueFilter.
+// menuIsVisibleUnderIssueFilter determines whether a resource type is shown
+// when attention-only mode is active.
 //
 // item is the catalog entry; activeKey is the key under which intent data is
 // stored for this item (from menuActiveKey — may be an alias like "rds" for
-// the "dbi" type).
-//
-// PR-C 1b: converge with mainmenu.go isVisibleUnderIssueFilter.
+// the "dbi" type). mainmenu.go delegates to this via the controller snapshot.
 func menuIsVisibleUnderIssueFilter(ms *MenuState, item resource.ResourceTypeDef, activeKey string) bool {
 	known := ms.IssueKnown != nil && ms.IssueKnown[activeKey]
 	// ExcludeFromIssueBadge types are never probed — hide them in attention mode,
@@ -109,10 +107,9 @@ func menuIsVisibleUnderIssueFilter(ms *MenuState, item resource.ResourceTypeDef,
 	return ms.IssueTruncated != nil && ms.IssueTruncated[activeKey]
 }
 
-// menuSkipUnavailable advances the cursor past confirmed-empty resource types,
-// mirroring mainmenu.go skipUnavailable.
-//
-// PR-C 1b: converge with mainmenu.go skipUnavailable.
+// menuSkipUnavailable advances the cursor past confirmed-empty resource types.
+// mainmenu.go delegates cursor movement to the controller; this is the single
+// implementation.
 func menuSkipUnavailable(ms *MenuState, visible []resource.ResourceTypeDef, direction int) {
 	if ms.Availability == nil || len(visible) == 0 {
 		return
@@ -174,11 +171,9 @@ func menuActiveKey(ms *MenuState, item resource.ResourceTypeDef) string {
 }
 
 // buildMenuBody constructs a MenuBody from MenuState + the resource catalog.
-// Applies the same filter + attention + skip-unavailable + badge logic as
-// mainmenu.go View(), but produces renderer-agnostic data instead of styled
-// strings.
-//
-// PR-C 1b: converge with mainmenu.go View() + FrameTitle().
+// Applies filter + attention + skip-unavailable + badge logic and produces
+// renderer-agnostic data. mainmenu.go View() delegates to this via the
+// controller snapshot.
 func buildMenuBody(ms *MenuState) *MenuBody {
 	all := resource.AllResourceTypes()
 	visible := menuVisibleItems(ms, all)
@@ -238,9 +233,8 @@ func buildMenuBody(ms *MenuState) *MenuBody {
 	}
 }
 
-// menuFrameTitle mirrors mainmenu.go FrameTitle().
-//
-// PR-C 1b: converge with mainmenu.go FrameTitle().
+// menuFrameTitle returns the frame-border title string for the main-menu screen.
+// mainmenu.go FrameTitle() delegates to this via the controller.
 func menuFrameTitle(ms *MenuState) string {
 	all := resource.AllResourceTypes()
 	total := len(all)

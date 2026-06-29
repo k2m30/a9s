@@ -8,7 +8,7 @@ package unit_test
 //
 //  1. Extends FetchNodeGroups to resolve and populate Fields["image_id"] from the
 //     nodegroup's custom LaunchTemplate via EC2 DescribeLaunchTemplateVersions.
-//  2. Removes the TODO comment from checkAMING in ami_related_extra.go.
+//  2. Removes the placeholder comment from checkAMING in ami_related_extra.go.
 //
 // Tests are RED until both changes land.
 

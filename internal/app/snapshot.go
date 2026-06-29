@@ -92,8 +92,7 @@ func bodyKindForScreen(s Screen) BodyKind {
 // the ? help overlay. It mirrors the helpGroup structure from
 // internal/tui/views/help.go, sourcing the same static keybinding strings.
 // The context is "main-menu" (the default) since the controller does not track
-// which view opened help; a richer context can be wired in PR-C when per-screen
-// state is lifted.
+// which view opened help.
 func buildHelpBody() *HelpBody {
 	nav := HelpSection{
 		Title: "NAVIGATION",

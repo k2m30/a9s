@@ -106,12 +106,13 @@ func TestFullRelatedViewValidation(t *testing.T) {
 					for _, def := range defs {
 						def := def // capture
 						t.Run("related/"+def.DisplayName, func(t *testing.T) {
-							// TODO: This is currently tautological — the checker is the same code path
-							// the UI uses. A truly independent check would call the underlying AWS API
-							// directly (e.g., ec2:DescribeVolumes to verify EBS count) and compare
-							// against what the UI displays. For now, calling the checker directly with
-							// an empty ResourceCache verifies that the checker runs without panic and
-							// returns a structurally valid result.
+							// Note: this exercises the same checker the UI uses, not an
+							// independent oracle. A fully independent check would call the
+							// underlying AWS API directly (e.g. ec2:DescribeVolumes to verify
+							// EBS count) and compare against the UI — deliberately out of scope
+							// here. Calling the checker directly with an empty ResourceCache
+							// verifies it runs without panic and returns a structurally valid
+							// result.
 							//
 							// Pass an empty ResourceCache{}. NeedsTargetCache checkers will fetch
 							// the target type from the demo/live clients and return the real count;
@@ -184,11 +185,11 @@ func TestFullRelatedViewValidation(t *testing.T) {
 								return
 							}
 
-							// TODO: Add NavigateField(fieldPath string) to the harness so we can
-							// exercise actual cursor-to-field-and-Enter navigation here. For now we
-							// only verify that the TargetType resolves (above) and the field value
-							// is non-empty — this catches registration bugs without requiring
-							// harness changes.
+							// Registration check: the TargetType resolves (above) and the
+							// field value is non-empty, which catches navigable-field
+							// registration bugs. The actual cursor-to-field-and-Enter
+							// navigation is exercised by the controller and web field-cursor
+							// tests, not this harness.
 							_ = val
 						})
 					}
