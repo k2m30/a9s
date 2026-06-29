@@ -1,8 +1,10 @@
 {{define "menu.html"}}
 {{if .Filter}}<div class="menu-filter">Filter: {{.Filter}}</div>{{end}}
 <ul class="menu-entries" id="menu-list">
+{{$lastCat := ""}}
 {{range $i, $e := .Entries}}
-  <li class="menu-entry{{if eq $i $.Selected}} selected{{end}}"
+  {{if and $e.Category (ne $e.Category $lastCat)}}<li class="menu-section">{{$e.Category}}</li>{{end}}{{$lastCat = $e.Category}}
+  <li class="menu-entry{{if eq $i $.Selected}} selected{{end}}{{if and $e.AvailKnown (eq $e.Availability 0) (not $e.AvailTruncated)}} dim{{end}}"
       onclick="clickSelect({{$i}})">
     <span class="name">{{$e.Display}}</span>
     <span class="avail{{if and $e.AvailKnown (eq $e.Availability 0)}} zero{{end}}">

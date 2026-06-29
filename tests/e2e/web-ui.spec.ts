@@ -173,3 +173,61 @@ test.describe("a9s web UI — real-browser key navigation", () => {
     await expect(page.locator(".detail-layout, .list-table")).toBeVisible();
   });
 });
+
+test.describe("a9s web UI — menu fidelity + interaction (TUI parity)", () => {
+  test("menu renders category section headers (COMPUTE, NETWORKING, …)", async ({ page }) => {
+    // Bug: the web menu was a flat list with no category grouping, while the TUI
+    // groups resource types under COMPUTE / NETWORKING / DATABASES & STORAGE / ….
+    // MenuEntry.Category was already in the ViewState; the template never used it.
+    const sections = page.locator(".menu-section");
+    await expect(sections.first()).toBeVisible();
+    const labels = (await sections.allTextContents()).map((s) => s.trim());
+    expect(labels, "menu must group under COMPUTE").toContain("COMPUTE");
+    expect(labels, "menu must group under NETWORKING").toContain("NETWORKING");
+    expect(labels.length, "expected the full TUI category set").toBeGreaterThanOrEqual(8);
+  });
+
+  test("a keypress does not synchronously flash the loading indicator", async ({ page }) => {
+    // Bug: sendAction() flipped #loading-indicator to display:block on every
+    // keydown, so every key visibly blinked "loading". Fixed by delaying the
+    // reveal ~180ms so sub-frame round-trips never show it.
+    const disp = await page.evaluate(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "j", bubbles: true }));
+      return getComputedStyle(document.getElementById("loading-indicator")!).display;
+    });
+    expect(disp, "loading indicator must not flip visible synchronously on a keypress").toBe("none");
+  });
+
+  test("vim j/k move the menu selection", async ({ page }) => {
+    const selName = async () => (await page.locator(".menu-entry.selected .name").textContent())?.trim();
+    const first = await selName();
+    await press(page, "j");
+    expect(await selName(), "j must move selection down").not.toBe(first);
+    await press(page, "k");
+    expect(await selName(), "k must move selection back up").toBe(first);
+  });
+
+  test("vim h/l are mapped (horizontal scroll) inside a list", async ({ page }) => {
+    // Bug: only ArrowLeft/ArrowRight scrolled; h/l were unmapped so they did
+    // nothing. press() waits for POST /action — pre-fix it would time out
+    // because no action was ever sent for h/l.
+    await press(page, "Enter");
+    await expect(page.locator(".list-table")).toBeVisible();
+    await press(page, "l");
+    await press(page, "h");
+  });
+
+  test("double-clicking a menu row navigates exactly one level (not two)", async ({ page }) => {
+    // Bug: clickSelect chained move-top → N×move-down → select; a double-click
+    // fired it twice and the 2nd run executed on the screen the 1st had already
+    // opened, drilling a level deeper ("double click leads to two screens away").
+    await page.locator(".menu-entry").first().dblclick();
+    await expect(page.locator(".list-table")).toBeVisible({ timeout: 10_000 });
+    await page.waitForTimeout(700); // allow any (buggy) 2nd-click chain to land
+    await expect(
+      page.locator(".detail-layout"),
+      "a double-click must not drill past the list into a detail",
+    ).toHaveCount(0);
+    await expect(page.locator(".list-table")).toBeVisible();
+  });
+});
