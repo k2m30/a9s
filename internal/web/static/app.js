@@ -13,7 +13,13 @@
     if (arg !== undefined && arg !== "") body.arg = String(arg);
     if (n !== undefined && n !== 0) body.n = n;
 
-    document.getElementById("loading-indicator").style.display = "block";
+    // Only reveal the loading indicator if the round-trip is actually slow.
+    // Most actions return within a frame, so showing it immediately made every
+    // keypress flash "loading". Delay it ~180ms and cancel on completion.
+    var loadingTimer = setTimeout(function () {
+      var li = document.getElementById("loading-indicator");
+      if (li) li.style.display = "block";
+    }, 180);
 
     fetch("/action", {
       method: "POST",
@@ -35,7 +41,9 @@
       })
       .catch(function (e) { console.error("action error:", e); })
       .finally(function () {
-        document.getElementById("loading-indicator").style.display = "none";
+        clearTimeout(loadingTimer);
+        var li = document.getElementById("loading-indicator");
+        if (li) li.style.display = "none";
       });
   }
 
@@ -43,18 +51,31 @@
   // Sends move-up (to top) then the right number of move-downs, then select.
   // Simpler: just send a special "goto" by looping move-down from 0. Instead,
   // use move-top + N×move-down + select chained sequentially via async.
+  // clickBusy guards against a double-click firing the move-chain twice: the
+  // second click would run move-top/down/select on the screen the first click
+  // already navigated to, drilling a level deeper ("two screens away").
+  var clickBusy = false, lastClickIdx = -1, lastClickAt = 0;
   function clickSelect(idx) {
+    var now = Date.now();
+    if (clickBusy) return;
+    // Ignore a repeat click on the same row within 500ms: a double-click would
+    // otherwise navigate, then re-run the move-chain on the new screen, landing
+    // two levels deep.
+    if (idx === lastClickIdx && now - lastClickAt < 500) return;
+    lastClickIdx = idx;
+    lastClickAt = now;
+    clickBusy = true;
     // Chain: move-top → N × move-down → select (all sequential).
     var steps = [{ kind: "move-top" }];
     for (var i = 0; i < idx; i++) {
       steps.push({ kind: "move-down" });
     }
     steps.push({ kind: "select" });
-    chainActions(steps, 0);
+    chainActions(steps, 0, function () { clickBusy = false; });
   }
 
-  function chainActions(steps, i) {
-    if (i >= steps.length) return;
+  function chainActions(steps, i, done) {
+    if (i >= steps.length) { if (done) done(); return; }
     var s = steps[i];
     var body = { kind: s.kind };
     if (s.arg) body.arg = s.arg;
@@ -68,14 +89,14 @@
       body: JSON.stringify(body),
     })
       .then(function (r) {
-        if (!r.ok) return;
+        if (!r.ok) { if (done) done(); return; }
         return r.text().then(function (html) {
           var el = document.getElementById("main");
           if (el) el.innerHTML = html;
-          chainActions(steps, i + 1);
+          chainActions(steps, i + 1, done);
         });
       })
-      .catch(function (e) { console.error(e); });
+      .catch(function (e) { console.error(e); if (done) done(); });
   }
 
   // clickRelated navigates to the related-panel row at visible index idx.
@@ -106,6 +127,8 @@
     { key: "ArrowRight", action: { kind: "scroll-right" } },
     { key: "k",          action: { kind: "move-up" } },
     { key: "j",          action: { kind: "move-down" } },
+    { key: "h",          action: { kind: "scroll-left" } },
+    { key: "l",          action: { kind: "scroll-right" } },
     { key: "g",          action: { kind: "move-top" } },
     { key: "G",          action: { kind: "move-bottom" } },
     { key: "Enter",      action: { kind: "select" } },

@@ -83,6 +83,10 @@ body { background: var(--bg); color: var(--fg); min-height: 100vh; display: flex
 .menu-entry .avail.zero { color: var(--dim); }
 .menu-entry .badge { color: var(--err); font-size: 12px; }
 .menu-entry .alias { color: var(--dim); margin-left: auto; }
+.menu-section { list-style: none; color: var(--dim); padding: 6px 8px 1px; font-size: 12px; letter-spacing: 0.05em; }
+.menu-entry.dim:not(.selected) .name,
+.menu-entry.dim:not(.selected) .avail,
+.menu-entry.dim:not(.selected) .alias { color: var(--dim); }
 .menu-filter { color: var(--warn); font-style: italic; margin-bottom: 4px; }
 
 /* list */
