@@ -168,6 +168,22 @@ func (c *Core) HandleRelatedNavigate(ev RelatedNavigateEvent) (NavigationResult,
 	return result, nil
 }
 
+// RelatedCachedResource returns the cached resource of targetType with the given
+// id, using the same snapshot ResolveRelatedNavigate consults. The controller
+// uses it to seed a detail for a NavigationKindDetail (cache-hit) related-
+// navigate without a server fetch — mirroring the TUI adapter, which serves
+// Detail from cached state. NavigationKindDetail is only ever returned on a
+// cache hit, so this lookup succeeds for that path.
+func (c *Core) RelatedCachedResource(targetType, id string) (resource.Resource, bool) {
+	snap := relatedCacheSnapshot(c.session)
+	for _, r := range snap[targetType] {
+		if r.ID == id {
+			return r, true
+		}
+	}
+	return resource.Resource{}, false
+}
+
 // relatedFetchTasks decides what fetch task (if any) is needed for a
 // RelatedIDs-based filtered list. It checks ResourceCache and LazyResourceCache
 // to determine coverage before emitting a task.
