@@ -579,7 +579,7 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 				}
 				idx++
 			}
-			if focusedRow != nil && !focusedRow.Loading {
+			if focusedRow != nil && isActionableDetailRow(*focusedRow) {
 				// Derive the single target ID when there is exactly one related
 				// resource (used by NavigationKindDetail cache-hit path).
 				targetID := ""
@@ -604,28 +604,7 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 					FetchFilter:    focusedRow.FetchFilter,
 					Checker:        checker,
 				}
-				navRes, tasks := c.core.HandleRelatedNavigate(ev)
-				extraTasks := c.applyRelatedNavResult(navRes)
-				// applyRelatedNavResult may return a payload-bearing replacement for
-				// a task that HandleRelatedNavigate emitted without a payload (e.g.
-				// KindFetchFiltered). When extraTasks is non-empty and contains the
-				// same Kind+Scope, prefer extraTasks so DrainSync uses the version
-				// the executor can actually execute.
-				if len(extraTasks) > 0 {
-					extraKeys := make(map[runtime.TaskKey]struct{}, len(extraTasks))
-					for _, t := range extraTasks {
-						extraKeys[t.Key] = struct{}{}
-					}
-					merged := make([]runtime.TaskRequest, 0, len(tasks)+len(extraTasks))
-					for _, t := range tasks {
-						if _, replaced := extraKeys[t.Key]; !replaced {
-							merged = append(merged, t)
-						}
-					}
-					merged = append(merged, extraTasks...)
-					tasks = merged
-				}
-				return c.snapshot(), tasks
+				return c.snapshot(), c.dispatchRelatedNavigate(ev)
 			}
 			return c.snapshot(), nil
 		}
@@ -790,23 +769,7 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 			FetchFilter:    targetRow.FetchFilter,
 			Checker:        checker,
 		}
-		navRes, tasks := c.core.HandleRelatedNavigate(ev)
-		extraTasks := c.applyRelatedNavResult(navRes)
-		if len(extraTasks) > 0 {
-			extraKeys := make(map[runtime.TaskKey]struct{}, len(extraTasks))
-			for _, t := range extraTasks {
-				extraKeys[t.Key] = struct{}{}
-			}
-			merged := make([]runtime.TaskRequest, 0, len(tasks)+len(extraTasks))
-			for _, t := range tasks {
-				if _, replaced := extraKeys[t.Key]; !replaced {
-					merged = append(merged, t)
-				}
-			}
-			merged = append(merged, extraTasks...)
-			tasks = merged
-		}
-		return c.snapshot(), tasks
+		return c.snapshot(), c.dispatchRelatedNavigate(ev)
 
 	case ActionFieldSelect:
 		// Web UI click path: navigate to the resource linked by the navigable
@@ -843,23 +806,7 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 			SourceType:     ds.ResourceType,
 			TargetID:       targetID,
 		}
-		navRes, tasks := c.core.HandleRelatedNavigate(ev)
-		extraTasks := c.applyRelatedNavResult(navRes)
-		if len(extraTasks) > 0 {
-			extraKeys := make(map[runtime.TaskKey]struct{}, len(extraTasks))
-			for _, t := range extraTasks {
-				extraKeys[t.Key] = struct{}{}
-			}
-			merged := make([]runtime.TaskRequest, 0, len(tasks)+len(extraTasks))
-			for _, t := range tasks {
-				if _, replaced := extraKeys[t.Key]; !replaced {
-					merged = append(merged, t)
-				}
-			}
-			merged = append(merged, extraTasks...)
-			tasks = merged
-		}
-		return c.snapshot(), tasks
+		return c.snapshot(), c.dispatchRelatedNavigate(ev)
 
 	// --- Row-dependent actions: require selected row + per-screen state ---
 
@@ -1605,6 +1552,32 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) {
 	}
 }
 
+// dispatchRelatedNavigate calls HandleRelatedNavigate then applyRelatedNavResult
+// and merges the two task slices, preferring extraTasks when the same Key
+// appears in both (applyRelatedNavResult returns payload-bearing replacements
+// for tasks HandleRelatedNavigate emits without payloads, e.g. KindFetchFiltered).
+// All three related-nav callers — ActionSelect keyboard, ActionRelatedSelect
+// click, and ActionFieldSelect click — use this shared tail.
+func (c *Controller) dispatchRelatedNavigate(ev runtime.RelatedNavigateEvent) []runtime.TaskRequest {
+	navRes, tasks := c.core.HandleRelatedNavigate(ev)
+	extraTasks := c.applyRelatedNavResult(navRes)
+	if len(extraTasks) == 0 {
+		return tasks
+	}
+	extraKeys := make(map[runtime.TaskKey]struct{}, len(extraTasks))
+	for _, t := range extraTasks {
+		extraKeys[t.Key] = struct{}{}
+	}
+	merged := make([]runtime.TaskRequest, 0, len(tasks)+len(extraTasks))
+	for _, t := range tasks {
+		if _, replaced := extraKeys[t.Key]; !replaced {
+			merged = append(merged, t)
+		}
+	}
+	merged = append(merged, extraTasks...)
+	return merged
+}
+
 // applyRelatedNavResult converts a NavigationResult into stack operations and
 // returns any additional task requests the result spawns.
 //
@@ -1642,6 +1615,21 @@ func (c *Controller) applyRelatedNavResult(res runtime.NavigationResult) []runti
 					Cache:   runtime.CacheNone,
 					Payload: runtime.FetchFilteredPayload{Filter: res.FetchFilter},
 				}}
+			}
+			if len(res.RelatedIDs) > 0 {
+				// Multi-ID related nav with no server-side filter (e.g. an EC2
+				// instance → its several security groups): prefilter the list to
+				// just the related subset, mirroring the TUI related-list path.
+				// Without this the list shows every resource of the target type
+				// instead of the related ones. We're already under c.mu, so seed
+				// ls directly — PatchListRelatedIDSet would re-lock and deadlock.
+				set := make(map[string]struct{}, len(res.RelatedIDs))
+				for _, id := range res.RelatedIDs {
+					if id != "" {
+						set[id] = struct{}{}
+					}
+				}
+				ls.RelatedIDSet = set
 			}
 		}
 
