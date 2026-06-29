@@ -1420,16 +1420,59 @@ func (c *Controller) applyRelatedNavResult(res runtime.NavigationResult) []runti
 		}
 
 	case runtime.NavigationKindDetail:
-		// Navigate to a detail view for the single related resource.
-		// The resource itself must be fetched — the task is returned by
-		// HandleRelatedNavigate and starts the KindFetchByIDDetail pipeline.
-		// We push a ScreenDetail placeholder so the stack reflects the intent
-		// immediately; the detail state is seeded when the fetch result arrives.
-		intent := runtime.PushScreen{
-			ID:      runtime.ScreenDetail,
-			Context: runtime.ScreenContext{ResourceType: res.TargetType, ResourceID: res.TargetID},
+		// The target resource is already cached: NavigationKindDetail is only
+		// returned on a cache hit (ResolveRelatedNavigate), and HandleRelatedNavigate
+		// returns no fetch task for it ("the adapter serves these from cached
+		// state"). Seed the detail synchronously from the cache — this works for
+		// every type (most have no by-id fetcher, so a fetch would land on an empty
+		// detail). Mirrors ActionOpenDetail's related-panel handling.
+		id := res.TargetID
+		if id == "" && len(res.RelatedIDs) == 1 {
+			id = res.RelatedIDs[0]
 		}
-		c.applyIntents([]runtime.UIIntent{intent})
+		cached, ok := c.core.RelatedCachedResource(res.TargetType, id)
+		if !ok {
+			// Defensive: cache unexpectedly missing. Land on a filtered list by id
+			// instead of an empty detail so navigation still resolves somewhere.
+			c.applyIntents([]runtime.UIIntent{runtime.PushScreen{
+				ID:      runtime.ScreenResourceList,
+				Context: runtime.ScreenContext{ResourceType: res.TargetType},
+			}})
+			c.ensureListState()
+			if ls := c.topListState(); ls != nil && id != "" {
+				ls.Filter = id
+			}
+			return nil
+		}
+		c.applyIntents([]runtime.UIIntent{runtime.PushScreen{
+			ID:      runtime.ScreenDetail,
+			Context: runtime.ScreenContext{ResourceType: res.TargetType, ResourceID: id},
+		}})
+		c.ensureDetailState(cached, res.TargetType)
+		ds := c.topDetailState()
+		if ds == nil || len(resource.GetRelated(res.TargetType)) == 0 {
+			return nil
+		}
+		c.initDetailRelatedRows(res.TargetType)
+		// Populate the related panel: replay the related cache if present, else
+		// dispatch a KindRelatedCheck task — same as ActionOpenDetail.
+		ck := runtime.RelatedCacheKey(res.TargetType, cached.ID)
+		if cachedRows, hit := c.core.RelatedCacheGet(ck); hit && len(cachedRows) > 0 {
+			for _, entry := range cachedRows {
+				errMsg := ""
+				if entry.Result.Err != nil {
+					errMsg = entry.Result.Err.Error()
+				}
+				mergeDetailRelatedRow(ds, entry.DefDisplayName, entry.Result.TargetType,
+					entry.Result.Count, false, errMsg, entry.Result.Approximate, entry.Result.ResourceIDs, entry.Result.FetchFilter)
+			}
+			return nil
+		}
+		return []runtime.TaskRequest{{
+			Key:     runtime.TaskKey{Kind: runtime.KindRelatedCheck, Scope: res.TargetType + "/" + cached.ID},
+			Cache:   runtime.CacheNone,
+			Payload: runtime.RelatedCheckPayload{ResourceType: res.TargetType, Resource: cached},
+		}}
 
 	case runtime.NavigationKindEnterChildView:
 		// Delegate to the same path used by ActionChildView but with the
