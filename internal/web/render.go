@@ -18,12 +18,23 @@ var staticFS embed.FS
 // templates holds the parsed template set, initialised once at package init.
 var templates *template.Template
 
+// staticContent is the embedded static dir rooted at "static/" so that the
+// /static/ route (after StripPrefix) resolves files like app.js directly.
+// Serving http.FS(staticFS) without this sub would 404: the embed roots files
+// at "static/app.js" while StripPrefix turns the request into "app.js".
+var staticContent fs.FS
+
 func init() {
 	sub, err := fs.Sub(templateFS, "templates")
 	if err != nil {
 		panic("web: cannot sub templateFS: " + err.Error())
 	}
 	templates = template.Must(template.New("").Funcs(tmplFuncs).ParseFS(sub, "*.html"))
+
+	staticContent, err = fs.Sub(staticFS, "static")
+	if err != nil {
+		panic("web: cannot sub staticFS: " + err.Error())
+	}
 }
 
 // tmplFuncs is the function map available in all templates.

@@ -131,7 +131,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /body", s.handleBody)
 	mux.HandleFunc("GET /state", s.handleState)
 	mux.HandleFunc("GET /events", s.handleEvents)
-	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
+	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticContent))))
 }
 
 // getOrCreateSession returns (or lazily creates) the session for the given
