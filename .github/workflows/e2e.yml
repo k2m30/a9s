@@ -1,0 +1,48 @@
+name: E2E
+
+# Playwright browser tests for the --web UI. Real Chromium drives keystrokes
+# through app.js -> POST /action -> #main swap. Catches the dead-keys /
+# 404-asset / stale-chrome / DOM-duplication class of bug that Go/curl tests
+# cannot, because they never execute the page JavaScript. Separate from CI
+# because it needs Node + a browser binary.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'internal/web/**'
+      - 'internal/app/**'
+      - 'cmd/a9s/**'
+      - 'tests/e2e/**'
+      - '.github/workflows/e2e.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'internal/web/**'
+      - 'internal/app/**'
+      - 'cmd/a9s/**'
+      - 'tests/e2e/**'
+      - '.github/workflows/e2e.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: Playwright web UI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c  # v6.4.0
+        with:
+          go-version-file: go.mod
+      # Uses the runner's pre-installed Node (no setup-node pin needed).
+      - name: Install e2e dependencies
+        working-directory: tests/e2e
+        run: npm ci
+      - name: Install Playwright Chromium
+        working-directory: tests/e2e
+        run: npx playwright install --with-deps chromium
+      # make e2e builds the binary (global-setup) and boots `a9s --demo --web`.
+      - name: Run Playwright e2e
+        run: make e2e
