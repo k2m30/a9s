@@ -48,22 +48,15 @@
   <div class="related-panel">
     <div class="related-title">Related</div>
     {{range $i, $rel := .Related}}
-    {{if or $rel.Loading (gt $rel.Count 0)}}
-    <div class="related-row{{if eq $i $.RelatedCursor}} focused{{end}}"
-         onclick="clickRelated({{$i}})">
+    {{/* One row template. Clickability is the shared .Actionable
+         (resource.IsRelatedActionable); the count badge is the shared
+         .CountDisplay (resource.FormatRelatedCount). Neither is re-derived here,
+         so the web cannot drift from the TUI (this is what leaked "(-1)"). */}}
+    <div class="related-row{{if and (not $rel.Loading) (not $rel.Actionable)}} dead-end{{end}}{{if eq $i $.RelatedCursor}} focused{{end}}"
+         {{if $rel.Actionable}}onclick="clickRelated({{$i}})"{{end}}>
       <span>{{$rel.Name}}</span>
-      <span class="related-count{{if $rel.Loading}} related-loading{{end}}{{if $rel.Err}} related-err{{end}}">
-        {{if $rel.Loading}}…{{else}}({{$rel.Count}}){{end}}
-      </span>
+      <span class="related-count{{if $rel.Loading}} related-loading{{else if $rel.Err}} related-err{{else if not $rel.Actionable}} related-zero{{end}}">{{if $rel.Loading}}…{{else if $rel.Err}}err{{else}}{{$rel.CountDisplay}}{{end}}</span>
     </div>
-    {{else}}
-    <div class="related-row dead-end">
-      <span>{{$rel.Name}}</span>
-      <span class="related-count{{if $rel.Err}} related-err{{else if lt $rel.Count 0}} related-unknown{{else}} related-zero{{end}}">
-        {{if $rel.Err}}err{{else if lt $rel.Count 0}}—{{else}}(0){{end}}
-      </span>
-    </div>
-    {{end}}
     {{if and (eq $i $.RelatedCursor) $rel.Items}}
     <div style="margin-left:8px;font-size:12px;">
       {{range $rel.Items}}

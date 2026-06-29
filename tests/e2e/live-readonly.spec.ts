@@ -160,33 +160,44 @@ test.describe("a9s web UI — live read-only AWS data structural checks", () => 
     const counts = page.locator(".related-count");
     const countTexts = await counts.allTextContents();
     for (const txt of countTexts) {
+      // toContain, not toBe: catches both the bare "-1" and the "(-1)" the
+      // actionable branch used to leak before the count was pre-formatted by
+      // resource.FormatRelatedCount (which renders -1 as an empty badge).
       expect(
         txt.trim(),
         `related-count must not render the raw "-1" sentinel — got "${txt.trim()}"`,
-      ).not.toBe("-1");
+      ).not.toContain("-1");
     }
     console.log(`live test: related-count values: ${JSON.stringify(countTexts)}`);
 
     // -----------------------------------------------------------------------
-    // Bug 2: Zero/unknown rows must carry a dim/disabled class and must NOT be
-    // navigable (clicking them should not change the body content).
+    // Bug 2: every resolved row is EITHER actionable-and-clickable OR a marked
+    // dead-end — never both, never neither. (A zero/-1 row is NOT automatically a
+    // dead-end: a FetchFilter or Approximate row resolves the real count on
+    // drill-in and stays clickable, per resource.IsRelatedActionable. A true
+    // dead-end — zero with no FetchFilter, not approximate — must be dimmed and
+    // non-navigable.)
     // -----------------------------------------------------------------------
     const allRows = page.locator(".related-row");
     const rowCount = await allRows.count();
 
     for (let i = 0; i < rowCount; i++) {
       const row = allRows.nth(i);
-      const rowText = await row.textContent();
-      // Check whether this row's count is zero or unknown (no digit > 0).
-      const isZeroOrUnknown = !rowText || !/[1-9]/.test(rowText);
-      if (!isZeroOrUnknown) continue;
+      const rowText = (await row.textContent()) ?? "";
+      if (rowText.includes("…")) continue; // skip still-loading rows
 
-      // The row should carry a CSS class that marks it as disabled/dim.
-      const classes = await row.getAttribute("class");
+      const cls = (await row.getAttribute("class")) ?? "";
+      const onclick = (await row.getAttribute("onclick")) ?? "";
+      const isDeadEnd = cls.includes("dead-end");
+      const isClickable = onclick.includes("clickRelated");
+
       expect(
-        classes,
-        `zero/unknown related row "${rowText?.trim()}" must carry a dim or disabled class`,
-      ).toMatch(/dim|disabled|zero|no-data|dead-end|unknown/);
+        isClickable !== isDeadEnd,
+        `related row "${rowText.trim()}" must be either clickable (actionable) or a marked dead-end, not both/neither (class="${cls}", onclick="${onclick}")`,
+      ).toBe(true);
+      if (isDeadEnd) {
+        expect(isClickable, `dead-end row "${rowText.trim()}" must not be clickable`).toBe(false);
+      }
     }
 
     // -----------------------------------------------------------------------
@@ -212,16 +223,20 @@ test.describe("a9s web UI — live read-only AWS data structural checks", () => 
     const rowLabel = await allRows.nth(navigableRowIdx).textContent();
     console.log(`live test: clicking related row ${navigableRowIdx}: "${rowLabel?.trim()}"`);
 
-    // Focus the related panel and navigate to the chosen row.
-    await press(page, "Tab"); // move focus to related panel
-    for (let i = 0; i < navigableRowIdx; i++) {
-      await press(page, "ArrowDown");
-    }
-
     // Capture the body content before navigation.
     const bodyBefore = await page.locator("#body").innerHTML();
 
-    await press(page, "Enter", 20_000);
+    // CLICK the related row directly to exercise the clickRelated() /
+    // related-select onclick path. A keyboard Tab+Enter would pass through the
+    // key handler even if the click path regressed, so it would not protect the
+    // click regression this test describes.
+    await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().includes("/action") && r.request().method() === "POST",
+        { timeout: 20_000 },
+      ),
+      allRows.nth(navigableRowIdx).click(),
+    ]);
 
     // The body must have changed — we navigated somewhere.
     const bodyAfter = await page.locator("#body").innerHTML();

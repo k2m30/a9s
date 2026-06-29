@@ -229,6 +229,54 @@ func UnknownRelated(targetType string) RelatedCheckResult {
 	return RelatedCheckResult{TargetType: targetType, Count: -1}
 }
 
+// IsRelatedActionable is the single source of truth for "can the user drill into
+// this related-resource pivot". It is consumed by the TUI right column
+// (isActionableRow), the headless controller (ActionRelatedSelect +
+// RelatedBlock.Actionable), and — via that ViewState field — the web template,
+// so the rule cannot drift between renderers.
+//
+//   - loading or errored      → not actionable
+//   - has a server-side filter → actionable regardless of the local count
+//     (the filtered fetch resolves the real count)
+//   - count == -1 (no filter)  → unknown, not drillable
+//   - approximate (0+/N+)      → actionable (the target list re-runs the checker
+//     as more pages load, so matches surface incrementally)
+//   - otherwise                → count > 0
+func IsRelatedActionable(count int, approximate, hasFetchFilter, loading, hasErr bool) bool {
+	if loading || hasErr {
+		return false
+	}
+	if hasFetchFilter {
+		return true
+	}
+	if count == -1 {
+		return false
+	}
+	if approximate {
+		return true
+	}
+	return count > 0
+}
+
+// FormatRelatedCount is the single source of truth for the count BADGE text on a
+// related-resource row (the resolved, non-loading/non-error case). It is
+// consumed by the TUI right column and — via RelatedBlock.CountDisplay computed
+// in the controller — the web template, so the displayed count cannot drift.
+//
+//   - count == -1 (unknown) → ""  (no badge — the row shows its name only)
+//   - count >= 0            → "(N)"
+//
+// Approximate-ness is intentionally NOT marked in the text (no "N+"): per the
+// design spec it is conveyed by row style alone, and the integration tests
+// assert a literal "(<N>)" substring. Loading and error states are handled by
+// the renderers (spinner / em-dash), not here.
+func FormatRelatedCount(count int) string {
+	if count < 0 {
+		return ""
+	}
+	return fmt.Sprintf("(%d)", count)
+}
+
 // NoopChecker is a stub RelatedChecker suitable for tests that exercise
 // registry wiring (SetRelatedForTest / AppendRelated / GetRelated) without
 // exercising real related-resource logic. Production code MUST NOT use it:

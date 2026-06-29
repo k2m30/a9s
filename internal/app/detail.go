@@ -586,6 +586,12 @@ func isSelfPivotZeroDetailRow(row DetailRelatedRow, sourceType string) bool {
 		row.TargetType == sourceType
 }
 
+// isActionableDetailRow delegates to the single shared predicate
+// resource.IsRelatedActionable so the actionability rule is defined once.
+func isActionableDetailRow(row DetailRelatedRow) bool {
+	return resource.IsRelatedActionable(row.Count, row.Approximate, len(row.FetchFilter) > 0, row.Loading, row.Err != "")
+}
+
 // buildDetailBody constructs a DetailBody from a DetailState, mirroring the
 // data that DetailModel.View() + renderFromFieldList() consume. The body is
 // renderer-agnostic: scroll, width, and height remain owned by the renderer.
@@ -958,7 +964,9 @@ func buildDetailRelatedBlocks(ds *DetailState) []RelatedBlock {
 			Err:         row.Err != "",
 			Approximate: row.Approximate,
 			FetchFilter: row.FetchFilter,
-			TargetType:  row.TargetType,
+			TargetType:   row.TargetType,
+			Actionable:   resource.IsRelatedActionable(row.Count, row.Approximate, len(row.FetchFilter) > 0, row.Loading, row.Err != ""),
+			CountDisplay: resource.FormatRelatedCount(row.Count),
 		})
 	}
 	return blocks

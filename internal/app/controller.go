@@ -760,8 +760,9 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 			}
 			visIdx++
 		}
-		if targetRow == nil || targetRow.Loading || targetRow.Count <= 0 {
-			// Dead-end row (loading, zero, or unknown count): no navigation.
+		if targetRow == nil || !isActionableDetailRow(*targetRow) {
+			// Dead-end row: loading, error, count==-1 without FetchFilter, or
+			// confirmed zero without FetchFilter/Approximate. No navigation.
 			return c.snapshot(), nil
 		}
 		// Sync cursor state so the selection highlight is consistent with the
