@@ -18,6 +18,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/k2m30/a9s/v3/internal/app"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
@@ -84,16 +85,35 @@ func (m Model) View() tea.View {
 			}
 		}
 	}
-	// Footer hints: use the controller snapshot for all views that delegate
-	// footer computation to the controller (menu, list, yaml, json, detail).
-	// For overlays (help, reveal, selector) fall back to Hintable.BottomHints().
+	// Footer hints: use the controller snapshot for views that delegate footer
+	// computation to the controller (menu, list, detail always; yaml/json only
+	// when the controller is also on a text screen — otherwise the top of the
+	// controller stack is the previous screen and its hints would be wrong for
+	// overlay text views such as the TUI error-log). For all other views
+	// (overlays: help, reveal, selector) fall back to Hintable.BottomHints().
 	var hints []layout.KeyHint
 	switch active.(type) {
-	case *views.MainMenuModel, *views.ResourceListModel, *views.YAMLModel, *views.JSONModel, *views.DetailModel:
+	case *views.MainMenuModel, *views.ResourceListModel, *views.DetailModel:
 		if ctrlHints := m.ctrl.Snapshot().Footer; len(ctrlHints) > 0 {
 			hints = make([]layout.KeyHint, len(ctrlHints))
 			for i, kh := range ctrlHints {
 				hints[i] = layout.KeyHint{Key: kh.Key, Desc: kh.Help}
+			}
+		} else if h, ok := active.(views.Hintable); ok {
+			hints = h.BottomHints()
+		}
+	case *views.YAMLModel, *views.JSONModel:
+		// Use the controller footer only when the controller is actually on a
+		// text screen — so that overlays (e.g. error-log) don't inherit the
+		// previous screen's hints from the controller.
+		if m.ctrl.Snapshot().Body.Kind == app.BodyKindText {
+			if ctrlHints := m.ctrl.Snapshot().Footer; len(ctrlHints) > 0 {
+				hints = make([]layout.KeyHint, len(ctrlHints))
+				for i, kh := range ctrlHints {
+					hints[i] = layout.KeyHint{Key: kh.Key, Desc: kh.Help}
+				}
+			} else if h, ok := active.(views.Hintable); ok {
+				hints = h.BottomHints()
 			}
 		} else if h, ok := active.(views.Hintable); ok {
 			hints = h.BottomHints()
