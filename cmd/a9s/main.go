@@ -5,6 +5,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -228,10 +229,11 @@ func main() {
 	resource.BootstrapActiveNavFields()
 
 	if webMode {
-		// Security: reject any attempt to bind on a non-loopback address as the default.
-		// The user may supply --web-addr explicitly, but we warn if it looks like 0.0.0.0.
-		if strings.HasPrefix(webAddr, "0.0.0.0") {
-			fmt.Fprintln(os.Stderr, "Error: --web-addr must not use 0.0.0.0 (binds all interfaces). Use 127.0.0.1:<port> instead.")
+		// Security: reject any non-loopback bind address. GET / is unauthenticated
+		// and embeds the session token, so binding to any non-loopback interface
+		// exposes live AWS credentials to the local network.
+		if err := requireLoopbackAddr(webAddr); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 		if err := runWebServer(profile, region, resolvedCommand, webAddr, webAllowReveal, demoMode, noCache); err != nil {
@@ -295,6 +297,31 @@ func resetYAMLDir(label, dir string) bool {
 	}
 	fmt.Printf("Removed %d files. Run a9s to recreate defaults.\n", removed)
 	return failed == 0
+}
+
+// requireLoopbackAddr returns an error if addr does not resolve to a loopback
+// interface. Accepts "host:port" or ":port" (port-only) forms.
+// Rejects empty host (binds all interfaces), 0.0.0.0, ::, and any routable IP.
+// Accepts "localhost" and any IP for which net.IP.IsLoopback() is true (127.x.x.x, ::1).
+func requireLoopbackAddr(addr string) error {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return fmt.Errorf("--web-addr %q is not a valid host:port address: %w", addr, err)
+	}
+	if host == "" {
+		return fmt.Errorf("--web-addr %q binds all interfaces; use 127.0.0.1:<port> or localhost:<port>", addr)
+	}
+	if host == "localhost" {
+		return nil
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return fmt.Errorf("--web-addr host %q is not a valid IP address; use 127.0.0.1:<port> or localhost:<port>", host)
+	}
+	if !ip.IsLoopback() {
+		return fmt.Errorf("--web-addr %q binds a non-loopback interface; use 127.0.0.1:<port> or localhost:<port>", addr)
+	}
+	return nil
 }
 
 // runWebServer starts the HTTP web server and blocks until SIGINT/SIGTERM.
