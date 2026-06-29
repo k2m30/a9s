@@ -640,6 +640,38 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 			Resource:     &r,
 		})
 		c.applyNavResult(res)
+		// When HandleNavigate signals DispatchRelated, emit a KindRelatedCheck task
+		// so DrainSync (and the web renderer) run the checkers headlessly. The TUI
+		// adapter handles this separately via messages.RelatedCheckStarted; the
+		// headless path uses the executor's runRelatedCheckers instead. Check the
+		// related cache first — if results are already cached, replay them
+		// synchronously into the stacked detail's RelatedRows (mirrors the TUI's
+		// RelatedCacheGet/Replay path in runtime_adapter_navigate.go).
+		if res.DispatchRelated && res.Resource != nil && len(resource.GetRelated(res.ResolvedType)) > 0 {
+			ck := runtime.RelatedCacheKey(res.ResolvedType, res.Resource.ID)
+			if cached, hit := c.core.RelatedCacheGet(ck); hit && len(cached) > 0 {
+				// Cache hit: replay rows directly into the stacked detail.
+				if ds := c.topDetailState(); ds != nil {
+					for _, entry := range cached {
+						errMsg := ""
+						if entry.Result.Err != nil {
+							errMsg = entry.Result.Err.Error()
+						}
+						mergeDetailRelatedRow(ds, entry.DefDisplayName, entry.Result.TargetType,
+							entry.Result.Count, false, errMsg, entry.Result.Approximate, entry.Result.FetchFilter)
+					}
+				}
+			} else {
+				// Cache miss: dispatch a KindRelatedCheck task with the source resource
+				// so the headless executor can invoke the checkers via runRelatedCheckers.
+				src := *res.Resource
+				tasks = append(tasks, runtime.TaskRequest{
+					Key:     runtime.TaskKey{Kind: runtime.KindRelatedCheck, Scope: res.ResolvedType + "/" + src.ID},
+					Cache:   runtime.CacheNone,
+					Payload: runtime.RelatedCheckPayload{ResourceType: res.ResolvedType, Resource: src},
+				})
+			}
+		}
 		return c.snapshot(), tasks
 
 	case ActionOpenYAML:
@@ -879,6 +911,14 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 		tasks = append(tasks, revealTasks...)
 	}
 
+	// messages.RelatedCheckBatch is the headless executor's counterpart to the
+	// per-def RelatedCheckResult messages the TUI fan-out emits. Route each
+	// per-def result through the same Core handler and ApplyDetailRelatedResult
+	// path the TUI uses, so DrainSync populates the detail's RelatedRows.
+	if batch, ok := ev.(messages.RelatedCheckBatch); ok && !messages.IsStale(batch, c.core) {
+		c.handleRelatedCheckBatch(batch)
+	}
+
 	return c.snapshot(), tasks
 }
 
@@ -916,6 +956,89 @@ func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 		c.applyResourcesLoaded(s.State.List, canon, msg.Resources, msg.Pagination, msg.Append)
 		return
 	}
+}
+
+// handleRelatedCheckBatch routes a RelatedCheckBatch (produced by the headless
+// executor's runRelatedCheckers) into the stacked detail screen that matches
+// the batch's (ResourceType, SourceResourceID). For each per-def result it
+// calls HandleRelatedCheckResult on Core (to update the session RelatedCache
+// and resource/lazy caches) and then ApplyDetailRelatedResult to merge the
+// row into the matching detail's RelatedRows — mirroring the TUI's
+// handleRelatedCheckResult path.
+//
+// The matching detail may not be the topmost screen (e.g. a YAML overlay is
+// on top while the detail is stacked underneath). The search walks the stack
+// from top to bottom and applies to the FIRST matching ScreenDetail.
+//
+// Callers must hold c.mu (write).
+func (c *Controller) handleRelatedCheckBatch(batch messages.RelatedCheckBatch) {
+	// Find the matching detail screen in the stack.
+	var targetDetail *DetailState
+	for i := len(c.stack) - 1; i >= 0; i-- {
+		s := &c.stack[i]
+		if s.ID != runtime.ScreenDetail {
+			continue
+		}
+		ds := s.State.Detail
+		if ds == nil {
+			continue
+		}
+		if ds.ResourceType != batch.ResourceType || ds.Resource.ID != batch.SourceResourceID {
+			continue
+		}
+		targetDetail = ds
+		break
+	}
+
+	for _, result := range batch.Results {
+		// Route through Core to update session caches (RelatedCache, ResourceCache,
+		// LazyResourceCache) — mirrors handleRelatedCheckResult in the TUI adapter.
+		intents, _ := c.core.HandleRelatedCheckResult(runtime.RelatedCheckResultEvent{
+			ResourceType:     result.ResourceType,
+			SourceResourceID: result.SourceResourceID,
+			DefDisplayName:   result.DefDisplayName,
+			Result:           result.Result,
+		})
+		c.applyIntents(intents)
+
+		// Merge the row into the matching detail's RelatedRows directly, since
+		// ApplyDetailRelatedResult operates on the TOP detail screen but the
+		// target may be stacked. Use the found targetDetail pointer directly.
+		if targetDetail == nil {
+			continue
+		}
+		errMsg := ""
+		if result.Result.Err != nil {
+			errMsg = result.Result.Err.Error()
+		}
+		mergeDetailRelatedRow(targetDetail, result.DefDisplayName, result.Result.TargetType,
+			result.Result.Count, false, errMsg, result.Result.Approximate, result.Result.FetchFilter)
+	}
+}
+
+// mergeDetailRelatedRow updates or appends one RelatedRow in ds, matching by
+// DisplayName. Mirrors ApplyDetailRelatedResult but operates on a DetailState
+// pointer directly rather than the top-of-stack screen.
+func mergeDetailRelatedRow(ds *DetailState, displayName, targetType string, count int, loading bool, errMsg string, approximate bool, fetchFilter map[string]string) {
+	for i := range ds.RelatedRows {
+		if ds.RelatedRows[i].DisplayName == displayName {
+			ds.RelatedRows[i].Count = count
+			ds.RelatedRows[i].Loading = loading
+			ds.RelatedRows[i].Err = errMsg
+			ds.RelatedRows[i].Approximate = approximate
+			ds.RelatedRows[i].FetchFilter = fetchFilter
+			return
+		}
+	}
+	ds.RelatedRows = append(ds.RelatedRows, DetailRelatedRow{
+		TargetType:  targetType,
+		DisplayName: displayName,
+		Count:       count,
+		Loading:     loading,
+		Err:         errMsg,
+		Approximate: approximate,
+		FetchFilter: fetchFilter,
+	})
 }
 
 // ApplyIntents applies a slice of UIIntents to the controller's screen stack.
