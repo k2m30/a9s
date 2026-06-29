@@ -75,14 +75,14 @@ body { background: var(--bg); color: var(--fg); min-height: 100vh; display: flex
 
 /* menu */
 .menu-entries { list-style: none; }
-.menu-entry { padding: 2px 8px; cursor: pointer; display: flex; justify-content: space-between; }
+.menu-entry { padding: 2px 8px; cursor: pointer; display: flex; align-items: baseline; gap: 8px; }
 .menu-entry:hover { background: var(--border); }
 .menu-entry.selected { background: var(--sel); color: var(--fg); }
-.menu-entry .name { color: var(--accent); min-width: 120px; }
-.menu-entry .alias { color: var(--dim); min-width: 80px; }
-.menu-entry .avail { color: var(--ok); min-width: 60px; text-align: right; }
+.menu-entry .name { color: var(--accent); }
+.menu-entry .avail { color: var(--ok); }
 .menu-entry .avail.zero { color: var(--dim); }
 .menu-entry .badge { color: var(--err); font-size: 12px; }
+.menu-entry .alias { color: var(--dim); margin-left: auto; }
 .menu-filter { color: var(--warn); font-style: italic; margin-bottom: 4px; }
 
 /* list */

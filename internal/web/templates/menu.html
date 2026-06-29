@@ -5,13 +5,13 @@
   <li class="menu-entry{{if eq $i $.Selected}} selected{{end}}"
       onclick="clickSelect({{$i}})">
     <span class="name">{{$e.Display}}</span>
-    <span class="alias">{{$e.Alias}}</span>
     <span class="avail{{if and $e.AvailKnown (eq $e.Availability 0)}} zero{{end}}">
       {{if $e.AvailKnown}}
         {{if $e.AvailTruncated}}({{$e.Availability}}+){{else}}({{$e.Availability}}){{end}}
       {{end}}
     </span>
     {{if $e.IssueBadge.Count}}<span class="badge">! {{$e.IssueBadge.Count}}{{if $e.IssueBadge.Truncated}}+{{end}}</span>{{end}}
+    <span class="alias">{{$e.Alias}}</span>
   </li>
 {{end}}
 </ul>
