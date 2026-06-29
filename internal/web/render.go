@@ -61,8 +61,10 @@ func renderPage(w io.Writer, vs app.ViewState, token string) error {
 	return templates.ExecuteTemplate(w, "page.html", pageData{VS: vs, Token: token})
 }
 
-// renderBodyFragment writes only the body partial for the given Body to w.
-// Used by POST /action to return the htmx-swappable fragment.
-func renderBodyFragment(w io.Writer, body app.Body) error {
-	return templates.ExecuteTemplate(w, "body.html", body)
+// renderMainFragment writes the main content fragment (frame-title + body +
+// footer) for the given ViewState to w. Used by POST /action and GET /body so
+// navigation swaps the title/footer too, not just the body — otherwise the
+// frame title stays stale on the prior screen after navigating.
+func renderMainFragment(w io.Writer, vs app.ViewState) error {
+	return templates.ExecuteTemplate(w, "main.html", vs)
 }

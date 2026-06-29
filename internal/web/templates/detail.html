@@ -12,8 +12,13 @@
           <div class="field-row header">{{.Key}}</div>
         {{else if .IsSubField}}
           <div class="field-row sub{{if .IsNavigable}} field-navigable{{end}}">
+            {{if eq .Key .Value}}
+            {{/* label-less pre-formatted line (Key==Value) — render once, like the TUI */}}
+            <span class="field-value">{{.Value}}</span>
+            {{else}}
             <span class="field-key">{{.Key}}</span>
             <span class="field-value">{{.Value}}</span>
+            {{end}}
           </div>
         {{else}}
           <div class="field-row{{if .IsNavigable}} field-navigable{{end}}">

@@ -1,0 +1,11 @@
+{{define "main.html"}}
+{{if .FrameTitle}}<div id="frame-title">{{.FrameTitle}}</div>{{end}}
+<div id="body">
+  {{template "body.html" .Body}}
+</div>
+<div id="footer">
+  {{range .Footer}}
+  <span class="key-hint"><span class="k">{{.Key}}</span><span class="h">{{.Help}}</span></span>
+  {{end}}
+</div>
+{{end}}

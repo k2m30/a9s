@@ -51,6 +51,10 @@ body { background: var(--bg); color: var(--fg); min-height: 100vh; display: flex
   flex-shrink: 0;
 }
 
+/* main content (frame-title + body + footer) — swapped as one fragment on
+   navigation so the title/footer update, not just the body. */
+#main { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+
 /* main body */
 #body { flex: 1; overflow: auto; padding: 8px 12px; }
 
@@ -181,18 +185,8 @@ body { background: var(--bg); color: var(--fg); min-height: 100vh; display: flex
   </div>
 </div>
 
-{{if .VS.FrameTitle}}
-<div id="frame-title">{{.VS.FrameTitle}}</div>
-{{end}}
-
-<div id="body">
-  {{template "body.html" .VS.Body}}
-</div>
-
-<div id="footer">
-  {{range .VS.Footer}}
-  <span class="key-hint"><span class="k">{{.Key}}</span><span class="h">{{.Help}}</span></span>
-  {{end}}
+<div id="main">
+{{template "main.html" .VS}}
 </div>
 
 <div id="loading-indicator">loading…</div>

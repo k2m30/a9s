@@ -29,7 +29,7 @@
           return r.text().then(function (t) { console.error(t); });
         }
         return r.text().then(function (html) {
-          var el = document.getElementById("body");
+          var el = document.getElementById("main");
           if (el) el.innerHTML = html;
         });
       })
@@ -70,7 +70,7 @@
       .then(function (r) {
         if (!r.ok) return;
         return r.text().then(function (html) {
-          var el = document.getElementById("body");
+          var el = document.getElementById("main");
           if (el) el.innerHTML = html;
           chainActions(steps, i + 1);
         });
@@ -258,7 +258,7 @@
       })
         .then(function (r) { return r.text(); })
         .then(function (html) {
-          var el = document.getElementById("body");
+          var el = document.getElementById("main");
           if (el && html) el.innerHTML = html;
         })
         .catch(function () {});
