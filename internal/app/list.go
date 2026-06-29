@@ -1046,6 +1046,13 @@ func (c *Controller) buildListFrameTitle(ctx runtime.ScreenContext, ls *ListStat
 func (c *Controller) ListSelected() (resource.Resource, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
+	return c.listSelected()
+}
+
+// listSelected is the lock-free core of ListSelected. Callers MUST already hold
+// c.mu (e.g. applyLocked dispatching a row-dependent action) — taking the lock
+// again would self-deadlock the non-reentrant RWMutex.
+func (c *Controller) listSelected() (resource.Resource, bool) {
 	ls := c.topListState()
 	if ls == nil {
 		return resource.Resource{}, false
