@@ -126,6 +126,8 @@ a9s -c ec2                # open directly to EC2 instances, skipping the menu
 a9s -p prod -c events     # open CloudTrail events list in a specific profile
 a9s --version             # print version
 a9s --demo                # run with synthetic demo data (no AWS credentials needed)
+a9s --web                 # serve the web UI on 127.0.0.1 (token-gated; pairs with --demo)
+a9s --web --web-addr 127.0.0.1:7682  # pin the web UI address (never binds 0.0.0.0)
 a9s --no-cache            # disable resource availability cache
 a9s --reset-views         # delete view configs and regenerate defaults
 a9s --reset-themes        # delete theme files and regenerate defaults
