@@ -152,6 +152,13 @@ type FieldRow struct {
 	IsSpacer bool `json:"is_spacer,omitempty"`
 	// IsNavigable is true for navigable (hyperlink-style) fields.
 	IsNavigable bool `json:"is_navigable,omitempty"`
+	// TargetType is the canonical short name of the resource type this field
+	// links to (e.g. "vpc", "sg", "ami"). Non-empty only when IsNavigable is true.
+	TargetType string `json:"target_type,omitempty"`
+	// NavID is the navigation ID for this field when it differs from Value
+	// (e.g. ct-events Principal rows where Value is the display label). When
+	// empty, Value is used as the target ID — mirrors fieldpath.FieldItem.NavID.
+	NavID string `json:"nav_id,omitempty"`
 	// IndentLevel is the sub-field indent depth (1 = phrase, 3 = detail rows).
 	IndentLevel int `json:"indent_level,omitempty"`
 	// ColorTier is the TierColorStyle selector: "!", "~", "ok", "ct-danger", etc.
