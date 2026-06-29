@@ -138,12 +138,36 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 // session-cookie value. A new Controller is bootstrapped for each new session.
 func (s *Server) getOrCreateSession(sessionID string) *sessionEntry {
 	s.sessionsMu.Lock()
-	defer s.sessionsMu.Unlock()
 	if entry, ok := s.sessions[sessionID]; ok {
+		s.sessionsMu.Unlock()
 		return entry
 	}
 	ctrl := newSession(s.profile, s.region, s.command, s.demoMode, s.noCache, s.viewCfg)
 	entry := &sessionEntry{ctrl: ctrl}
 	s.sessions[sessionID] = entry
+	s.sessionsMu.Unlock()
+
+	// Live sessions connect to AWS in the background so GET / renders the menu
+	// immediately; availability is pushed to the browser over SSE once ready.
+	// Demo sessions are already fully bootstrapped (pre-supplied clients), so
+	// there is nothing to do asynchronously.
+	if !s.demoMode {
+		go s.bootstrapLiveSession(entry)
+	}
 	return entry
+}
+
+// bootstrapLiveSession performs the AWS connect for a live session and applies
+// any startup command, then notifies SSE subscribers so the browser refreshes
+// to the populated menu. It runs in its own goroutine and relies on the
+// controller's internal locking (not entry.mu), so request handlers are never
+// blocked for the connect's duration — the page renders the menu while this
+// runs.
+func (s *Server) bootstrapLiveSession(entry *sessionEntry) {
+	entry.ctrl.BootstrapLive(s.profile, s.region)
+	if s.command != "" {
+		_, tasks := entry.ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: s.command})
+		app.DrainSync(entry.ctrl, tasks)
+	}
+	s.notifySubscribers(entry)
 }
