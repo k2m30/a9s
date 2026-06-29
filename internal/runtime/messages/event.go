@@ -144,6 +144,25 @@ func (m RelatedCheckResult) GenStamp() domain.Gen { return m.Generation }
 func (RelatedCheckResult) GenAspect() Aspect      { return AspectRelated }
 func (RelatedCheckResult) AcceptZeroGen() bool    { return true }
 
+// RelatedCheckBatch is the headless-executor counterpart to the per-def
+// RelatedCheckResult messages the TUI fan-out emits. The executor runs
+// checkers sequentially and bundles all per-def results into one event so
+// DrainSync can route them through Controller.Handle in a single call.
+// The Generation field mirrors the RelatedGen captured at dispatch time —
+// stale batches are dropped by the same IsStale guard used for individual
+// RelatedCheckResult messages.
+type RelatedCheckBatch struct {
+	ResourceType     string
+	SourceResourceID string
+	Results          []RelatedCheckResult
+	Generation       domain.Gen
+}
+
+func (RelatedCheckBatch) isEvent()              {}
+func (m RelatedCheckBatch) GenStamp() domain.Gen { return m.Generation }
+func (RelatedCheckBatch) GenAspect() Aspect      { return AspectRelated }
+func (RelatedCheckBatch) AcceptZeroGen() bool    { return true }
+
 // AvailabilityCacheLoaded delivers cached availability data loaded from disk.
 // Entries maps resource short names to resource counts.
 // Only entries with a successful check (no error) are included.

@@ -1363,7 +1363,8 @@ func TestWebRelated_SelectFocusedRow_NavigatesStack(t *testing.T) {
 		}
 	}
 	if !hasLoaded {
-		t.Skip("all related rows are still loading in demo mode — cannot assert navigation")
+		t.Fatal("related rows still loading after open-detail — the headless related-check (runRelatedCheckers) " +
+			"must populate counts via DrainSync so the panel is navigable; a regression there would surface here")
 	}
 
 	// Select the focused row (RelatedCursor=0 by default).
