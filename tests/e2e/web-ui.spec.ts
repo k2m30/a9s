@@ -295,4 +295,20 @@ test.describe("a9s web UI — menu fidelity + interaction (TUI parity)", () => {
       "'!' must not filter the menu (that is ctrl+z)",
     ).toBe(before);
   });
+
+  test("'t' on a resource YAML opens CloudTrail (footer hint is executable, not a no-op)", async ({ page }) => {
+    // Codex P2: the YAML/JSON footer advertised 't CloudTrail' but ActionChildView
+    // could not resolve the resource on a text screen, so 't' was a no-op.
+    // selectedResourceForAction now resolves the top text screen's resource.
+    await press(page, "Enter"); // menu -> ec2 list
+    await expect(page.locator(".list-table")).toBeVisible();
+    await press(page, "y"); // -> YAML of the selected resource
+    const yamlTitle = (await page.locator("#frame-title").textContent())?.trim();
+    await expect(page.locator("#footer")).toContainText("CloudTrail");
+    await press(page, "t"); // child-view 't' -> CloudTrail events
+    expect(
+      (await page.locator("#frame-title").textContent())?.trim(),
+      "'t' on a resource YAML must navigate to CloudTrail, not be a no-op",
+    ).not.toBe(yamlTitle);
+  });
 });

@@ -151,12 +151,26 @@ func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 }
 
 // selectedResourceForAction resolves the resource a row-dependent action targets:
-// the top detail's resource when a detail is on top, otherwise the selected row
-// of the top list. Returns (resource, resourceType, ok). Lock-free — callers
-// must already hold c.mu (it is only called from applyLocked).
+// the top detail's resource when a detail is on top, the resource identified by
+// the top text screen's ScreenContext when on a YAML/JSON screen, otherwise the
+// selected row of the top list. Returns (resource, resourceType, ok). Lock-free
+// — callers must already hold c.mu (it is only called from applyLocked).
 func (c *Controller) selectedResourceForAction() (resource.Resource, string, bool) {
 	if ds := c.topDetailState(); ds != nil {
 		return ds.Resource, ds.ResourceType, true
+	}
+	// Text screens (YAML/JSON): resolve the resource from the cache using the
+	// screen's ScreenContext so that resource-backed actions (CloudTrail, child
+	// views, etc.) work identically to how they work on detail screens.
+	if len(c.stack) > 0 {
+		top := c.stack[len(c.stack)-1]
+		if isTextScreen(top.ID) && top.Ctx.ResourceType != "" && top.Ctx.ResourceID != "" {
+			for _, r := range c.resourceCache[top.Ctx.ResourceType] {
+				if r.ID == top.Ctx.ResourceID {
+					return r, top.Ctx.ResourceType, true
+				}
+			}
+		}
 	}
 	if r, ok := c.listSelected(); ok {
 		typeName := ""
@@ -649,7 +663,8 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 					FetchFilter:    focusedRow.FetchFilter,
 					Checker:        checker,
 				}
-				return c.snapshot(), c.dispatchRelatedNavigate(ev)
+				tasks := c.dispatchRelatedNavigate(ev)
+				return c.snapshot(), tasks
 			}
 			return c.snapshot(), nil
 		}
@@ -814,7 +829,8 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 			FetchFilter:    targetRow.FetchFilter,
 			Checker:        checker,
 		}
-		return c.snapshot(), c.dispatchRelatedNavigate(ev)
+		tasks := c.dispatchRelatedNavigate(ev)
+		return c.snapshot(), tasks
 
 	case ActionFieldSelect:
 		// Web UI click path: navigate to the resource linked by the navigable
@@ -851,7 +867,8 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 			SourceType:     ds.ResourceType,
 			TargetID:       targetID,
 		}
-		return c.snapshot(), c.dispatchRelatedNavigate(ev)
+		tasks := c.dispatchRelatedNavigate(ev)
+		return c.snapshot(), tasks
 
 	// --- Row-dependent actions: require selected row + per-screen state ---
 
@@ -977,6 +994,28 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 				}
 			}
 		}
+		return c.snapshot(), tasks
+
+	case ActionCloudTrail:
+		// Navigate to the CloudTrail Events ("ct-events") list filtered to the
+		// active resource. Mirrors the TUI's 't' key: BuildCloudTrailFilter →
+		// RelatedNavigate to "ct-events" with a FetchFilter (server-side filtered
+		// fetch). No-ops when the resource type has no CloudTrailKey.
+		r, typeName, ok := c.selectedResourceForAction()
+		if !ok {
+			return c.snapshot(), nil
+		}
+		ff := resource.BuildCloudTrailFilter(r, typeName)
+		if ff == nil {
+			return c.snapshot(), nil
+		}
+		ev := runtime.RelatedNavigateEvent{
+			TargetType:     "ct-events",
+			SourceResource: r,
+			SourceType:     typeName,
+			FetchFilter:    ff,
+		}
+		tasks := c.dispatchRelatedNavigate(ev)
 		return c.snapshot(), tasks
 
 	case ActionLoadMore:

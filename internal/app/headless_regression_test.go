@@ -444,7 +444,16 @@ func TestRelatedNav_MultiID_SeedsRelatedIDSet(t *testing.T) {
 	// Click the related row. Fix #6 routes the click (ActionRelatedSelect) and
 	// the keyboard Enter (ActionSelect) through the same dispatchRelatedNavigate,
 	// so this exercises the shared applyRelatedNavResult seeding that both use.
-	c.Apply(app.Action{Kind: app.ActionRelatedSelect, Arg: "0"})
+	vs, _ := c.Apply(app.Action{Kind: app.ActionRelatedSelect, Arg: "0"})
+
+	// [Codex P2] Apply must return the POST-navigation snapshot. c.snapshot() now
+	// runs AFTER dispatchRelatedNavigate pushes the filtered list; pre-fix the
+	// snapshot was taken first (Go evaluates return operands left-to-right), so a
+	// caller trusting Apply's ViewState got the stale source detail.
+	if vs.Body.Kind != app.BodyKindList {
+		t.Errorf("Apply returned Body.Kind=%q after the related click, want %q "+
+			"(stale pre-navigation snapshot — snapshot taken before dispatch)", vs.Body.Kind, app.BodyKindList)
+	}
 
 	got := c.GetListRelatedIDSet()
 	if len(got) == 0 {

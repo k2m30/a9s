@@ -223,7 +223,15 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		// syntax-colored content lines so Snapshot().Body.Text is non-nil from
 		// the first render. Must happen after SetSize so ContentLines() uses the
 		// fully-initialised viewport width for any width-dependent output.
-		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenYAML}})
+		// Carry ResourceType + ResourceID so selectedResourceForAction resolves
+		// the resource from this text screen (enables 't', child views, etc.).
+		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{
+			ID: runtime.ScreenYAML,
+			Context: runtime.ScreenContext{
+				ResourceType: result.ResolvedType,
+				ResourceID:   result.Resource.ID,
+			},
+		}})
 		m.ctrl.EnsureTextState(y.ContentLines())
 		m.pushView(&y)
 		if result.DispatchEnrich {
@@ -245,7 +253,15 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		// syntax-colored content lines so Snapshot().Body.Text is non-nil from
 		// the first render. Must happen after SetSize so ContentLines() uses the
 		// fully-initialised viewport width for any width-dependent output.
-		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenJSON}})
+		// Carry ResourceType + ResourceID so selectedResourceForAction resolves
+		// the resource from this text screen (enables 't', child views, etc.).
+		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{
+			ID: runtime.ScreenJSON,
+			Context: runtime.ScreenContext{
+				ResourceType: result.ResolvedType,
+				ResourceID:   result.Resource.ID,
+			},
+		}})
 		m.ctrl.EnsureTextState(j.ContentLines())
 		m.pushView(&j)
 		if result.DispatchEnrich {

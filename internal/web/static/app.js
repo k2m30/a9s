@@ -150,6 +150,7 @@
     { key: "!",          action: { kind: "open-error-log" } },
     { key: "R",          action: { kind: "toggle-related" } },
     { key: "Tab",        action: { kind: "toggle-focus" } },
+    { key: "t",          action: { kind: "cloudtrail" } },
 
     // Page scroll
     { key: "PageUp",     action: { kind: "page-up",   n: 20 } },
@@ -277,7 +278,7 @@
     }
 
     // Child-view triggers.
-    var childKeys = { "e": "e", "L": "L", "s": "s", "t": "t" };
+    var childKeys = { "e": "e", "L": "L", "s": "s" };
     if (childKeys[e.key] && !e.ctrlKey) {
       sendAction("child-view", e.key);
       e.preventDefault();

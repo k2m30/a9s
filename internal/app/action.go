@@ -62,7 +62,13 @@ const (
 	ActionToggleWrap      ActionKind = "toggle-wrap"
 	ActionToggleAttention ActionKind = "toggle-attention"
 
-	// ActionChildView carries the trigger key in Arg (e, L, r, s, Enter, t).
+	// ActionCloudTrail navigates to the CloudTrail Events list filtered to the
+	// currently selected/active resource. Mirrors the TUI's 't' key handler
+	// (BuildCloudTrailFilter → RelatedNavigate to "ct-events"). No-ops when the
+	// resource type has no CloudTrailKey or no resource is active.
+	ActionCloudTrail ActionKind = "cloudtrail"
+
+	// ActionChildView carries the trigger key in Arg (e, L, r, s, Enter).
 	ActionChildView ActionKind = "child-view"
 
 	// ActionScrollLeft / ActionScrollRight move the horizontal column viewport.
