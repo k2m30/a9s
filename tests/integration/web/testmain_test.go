@@ -1,3 +1,5 @@
+//go:build integration
+
 // Package webintegration drives the real web server (internal/web) over HTTP
 // in demo mode and asserts on GET /state JSON. All tests are deterministic —
 // demo fetchers are synchronous, DrainSync runs inline, no sleeps needed.

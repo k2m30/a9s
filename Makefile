@@ -50,7 +50,7 @@ clean:
 	rm -f $(BINARY) coverage.out coverage.html
 
 integration:
-	go test -tags integration ./tests/integration/ -v -count=1 -timeout 300s
+	go test -tags integration ./tests/integration/... -v -count=1 -timeout 300s
 
 security:
 	govulncheck ./...

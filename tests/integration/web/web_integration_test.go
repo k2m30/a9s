@@ -1,6 +1,11 @@
+//go:build integration
+
 // Package webintegration drives the real web server (internal/web) over HTTP
 // in demo mode and asserts on GET /state JSON. All tests are deterministic —
 // demo fetchers are synchronous, DrainSync runs inline, no sleeps needed.
+//
+// Gated behind the `integration` build tag (like the rest of tests/integration)
+// so `make test` does not spin up real HTTP servers; `make integration` runs them.
 //
 // Coverage at PR-E:
 //   - Security contract: 403 without token, Cache-Control, no CORS, reveal blocked
@@ -68,7 +73,7 @@ func startServer(t *testing.T) (*client, func()) {
 	srv := web.NewServer(
 		demo.DemoProfile,
 		demo.DemoRegion,
-		"",             // no --command pre-navigation
+		"",            // no --command pre-navigation
 		"127.0.0.1:0", // OS-assigned port
 		token,
 		true,  // demoMode
@@ -79,15 +84,23 @@ func startServer(t *testing.T) (*client, func()) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	readyCh := make(chan struct{})
+	errCh := make(chan error, 1)
 
 	go func() {
 		if listenErr := srv.ListenAndServe(ctx, readyCh); listenErr != nil && ctx.Err() == nil {
-			t.Logf("ListenAndServe: %v", listenErr)
+			errCh <- listenErr
 		}
 	}()
 
-	// Wait for the server to bind; readyCh is closed when the port is known.
-	<-readyCh
+	// Wait for the server to bind (readyCh closed) — or fail fast if ListenAndServe
+	// returns a startup error before binding (address taken/invalid, localhost
+	// listening denied), instead of blocking on readyCh until the global timeout.
+	select {
+	case <-readyCh:
+	case err := <-errCh:
+		cancel()
+		t.Fatalf("web server failed to start: %v", err)
+	}
 
 	jar, _ := cookiejar.New(nil)
 	c := &client{
@@ -347,7 +360,7 @@ var richDemoTypes = map[string]bool{
 	"lambda":     true,
 	"ecs":        true,
 	"iam-user":   true,
-	"iam-role":   true,
+	"role":       true,
 	"secrets":    true,
 	"eks":        true,
 	"redis":      true,
@@ -360,11 +373,10 @@ var richDemoTypes = map[string]bool{
 	"asg":        true,
 	"cfn":        true,
 	"kms":        true,
-	"rds":        true,
 	"backup":     true,
-	"cwlogs":     true,
-	"cloudwatch": true,
-	"cloudfront": true,
+	"logs":       true,
+	"alarm":      true,
+	"cf":         true,
 	"r53":        true,
 	"ecr":        true,
 	"sns":        true,
@@ -394,6 +406,21 @@ func TestWebAllResourceTypes_List_NavigatesAndShowsColumns(t *testing.T) {
 	allTypes := resource.AllResourceTypes()
 	if len(allTypes) == 0 {
 		t.Fatal("AllResourceTypes() returned empty — catalog not installed")
+	}
+
+	// Guard against stale richDemoTypes keys: every key MUST be a registered short
+	// name, else the Rows>0 assertion below is silently skipped and a regression in
+	// that list passes unnoticed (the cwlogs/cloudwatch/cloudfront/rds drift this
+	// guard catches).
+	registered := make(map[string]bool, len(allTypes))
+	for _, rt := range allTypes {
+		registered[rt.ShortName] = true
+	}
+	for k := range richDemoTypes {
+		if !registered[k] {
+			t.Errorf("richDemoTypes key %q is not a registered resource short name — "+
+				"its Rows>0 assertion is silently skipped; fix the stale/aliased name", k)
+		}
 	}
 
 	for _, rt := range allTypes {
