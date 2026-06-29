@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>a9s — {{.VS.Header.Profile}} / {{.VS.Header.Region}}</title>
+<style>
+:root {
+  --bg:      #1a1b26;
+  --fg:      #c0caf5;
+  --accent:  #7aa2f7;
+  --warn:    #e0af68;
+  --err:     #f7768e;
+  --ok:      #9ece6a;
+  --dim:     #565f89;
+  --header:  #24283b;
+  --border:  #3b4261;
+  --sel:     #364a82;
+  --code:    #bb9af7;
+  font-family: "Fira Code", "Cascadia Code", "Menlo", monospace;
+  font-size: 14px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--fg); min-height: 100vh; display: flex; flex-direction: column; }
+
+/* header */
+#header {
+  background: var(--header);
+  border-bottom: 1px solid var(--border);
+  padding: 4px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+.hdr-left { display: flex; gap: 12px; align-items: center; }
+.hdr-version { color: var(--dim); font-size: 12px; }
+.hdr-profile { color: var(--accent); font-weight: bold; }
+.hdr-region  { color: var(--code); }
+.hdr-mode    { color: var(--warn); font-size: 12px; }
+.hdr-flash-ok  { color: var(--ok); }
+.hdr-flash-err { color: var(--err); }
+
+/* frame title */
+#frame-title {
+  background: var(--header);
+  border-bottom: 1px solid var(--border);
+  padding: 2px 12px;
+  color: var(--accent);
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+/* main body */
+#body { flex: 1; overflow: auto; padding: 8px 12px; }
+
+/* footer */
+#footer {
+  background: var(--header);
+  border-top: 1px solid var(--border);
+  padding: 4px 12px;
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  font-size: 12px;
+}
+.key-hint { display: flex; gap: 4px; }
+.key-hint .k { color: var(--accent); background: var(--border); padding: 0 4px; border-radius: 3px; }
+.key-hint .h { color: var(--dim); }
+
+/* menu */
+.menu-entries { list-style: none; }
+.menu-entry { padding: 2px 8px; cursor: pointer; display: flex; justify-content: space-between; }
+.menu-entry:hover { background: var(--border); }
+.menu-entry.selected { background: var(--sel); color: var(--fg); }
+.menu-entry .name { color: var(--accent); min-width: 120px; }
+.menu-entry .alias { color: var(--dim); min-width: 80px; }
+.menu-entry .avail { color: var(--ok); min-width: 60px; text-align: right; }
+.menu-entry .avail.zero { color: var(--dim); }
+.menu-entry .badge { color: var(--err); font-size: 12px; }
+.menu-filter { color: var(--warn); font-style: italic; margin-bottom: 4px; }
+
+/* list */
+.list-table { width: 100%; border-collapse: collapse; }
+.list-table th {
+  background: var(--header);
+  color: var(--accent);
+  text-align: left;
+  padding: 2px 8px;
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0;
+  white-space: nowrap;
+}
+.list-table td { padding: 2px 8px; white-space: nowrap; }
+.list-table tr.selected td { background: var(--sel); }
+.list-table tr.dec-error td { color: var(--err); }
+.list-table tr.dec-warn  td { color: var(--warn); }
+.list-table tr:hover td  { background: var(--border); }
+.list-filter { color: var(--warn); font-style: italic; margin-bottom: 4px; }
+.list-loading { color: var(--dim); font-style: italic; }
+.list-truncated { color: var(--warn); font-size: 12px; }
+
+/* detail */
+.detail-fields { font-size: 13px; }
+.field-row { display: flex; padding: 1px 0; }
+.field-row.section { color: var(--accent); font-weight: bold; margin-top: 8px; }
+.field-row.header  { color: var(--code); font-weight: bold; }
+.field-row.sub     { padding-left: 16px; color: var(--dim); }
+.field-row.spacer  { height: 6px; }
+.field-key   { min-width: 200px; color: var(--dim); flex-shrink: 0; }
+.field-value { color: var(--fg); word-break: break-all; }
+.field-navigable .field-value { color: var(--accent); text-decoration: underline; cursor: pointer; }
+
+/* text */
+.text-body { font-size: 13px; line-height: 1.5; white-space: pre-wrap; word-break: break-all; }
+.text-line { display: block; }
+
+/* selector */
+.selector-list { list-style: none; }
+.selector-item { padding: 2px 8px; cursor: pointer; }
+.selector-item.selected { background: var(--sel); }
+.selector-item:hover { background: var(--border); }
+.selector-active { color: var(--ok); }
+
+/* help */
+.help-sections { display: flex; flex-wrap: wrap; gap: 24px; }
+.help-section h3 { color: var(--accent); margin-bottom: 8px; }
+.help-hint { display: flex; gap: 8px; padding: 1px 0; }
+.help-hint .k { color: var(--accent); min-width: 80px; }
+.help-hint .h { color: var(--dim); }
+
+/* identity */
+.identity-table { border-collapse: collapse; }
+.identity-table td { padding: 2px 12px; }
+.identity-table td:first-child { color: var(--dim); }
+
+/* attention */
+.attention-block { margin-top: 8px; border-left: 3px solid var(--err); padding-left: 8px; }
+.attention-block.warn { border-color: var(--warn); }
+.attention-header { font-weight: bold; }
+.attention-err  { color: var(--err); }
+.attention-warn { color: var(--warn); }
+.finding-row { display: flex; gap: 8px; padding: 1px 8px; font-size: 12px; }
+.finding-label { color: var(--dim); min-width: 120px; }
+.finding-value { color: var(--fg); }
+
+/* related panel */
+.detail-layout { display: flex; gap: 16px; }
+.detail-main  { flex: 1; min-width: 0; }
+.related-panel { min-width: 220px; max-width: 300px; border-left: 1px solid var(--border); padding-left: 12px; }
+.related-title { color: var(--accent); font-weight: bold; margin-bottom: 4px; }
+.related-row { display: flex; justify-content: space-between; padding: 2px 0; cursor: pointer; }
+.related-row:hover { color: var(--accent); }
+.related-row.focused { background: var(--sel); padding: 2px 4px; }
+.related-count { color: var(--ok); }
+.related-loading { color: var(--dim); font-style: italic; }
+.related-err { color: var(--err); }
+
+#loading-indicator { display: none; position: fixed; top: 8px; right: 12px; color: var(--warn); }
+</style>
+</head>
+<body data-token="{{.Token}}">
+
+<div id="header">
+  <div class="hdr-left">
+    <span class="hdr-version">a9s {{.VS.Header.Version}}</span>
+    <span class="hdr-profile">{{.VS.Header.Profile}}</span>
+    <span class="hdr-region">{{.VS.Header.Region}}</span>
+    {{if .VS.Header.Mode}}<span class="hdr-mode">[{{.VS.Header.Mode}}]</span>{{end}}
+  </div>
+  <div class="hdr-right">
+    {{if .VS.Header.Flash.Text}}
+      {{if .VS.Header.Flash.IsError}}
+        <span class="hdr-flash-err">{{.VS.Header.Flash.Text}}</span>
+      {{else}}
+        <span class="hdr-flash-ok">{{.VS.Header.Flash.Text}}</span>
+      {{end}}
+    {{end}}
+    {{if .VS.Header.RightSide}}<span style="color:var(--dim)">{{.VS.Header.RightSide}}</span>{{end}}
+  </div>
+</div>
+
+{{if .VS.FrameTitle}}
+<div id="frame-title">{{.VS.FrameTitle}}</div>
+{{end}}
+
+<div id="body">
+  {{template "body.html" .VS.Body}}
+</div>
+
+<div id="footer">
+  {{range .VS.Footer}}
+  <span class="key-hint"><span class="k">{{.Key}}</span><span class="h">{{.Help}}</span></span>
+  {{end}}
+</div>
+
+<div id="loading-indicator">loading…</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

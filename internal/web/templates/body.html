@@ -1,0 +1,27 @@
+{{define "body.html"}}
+{{$k := kindStr .Kind}}
+{{if eq $k "menu"}}{{if .Menu}}
+  {{template "menu.html" .Menu}}
+{{end}}
+{{else if eq $k "list"}}{{if .List}}
+  {{template "list.html" .List}}
+{{end}}
+{{else if eq $k "detail"}}{{if .Detail}}
+  {{template "detail.html" .Detail}}
+{{end}}
+{{else if eq $k "text"}}{{if .Text}}
+  {{template "text.html" .Text}}
+{{end}}
+{{else if eq $k "selector"}}{{if .Selector}}
+  {{template "selector.html" .Selector}}
+{{end}}
+{{else if eq $k "help"}}{{if .Help}}
+  {{template "help.html" .Help}}
+{{end}}
+{{else if eq $k "identity"}}{{if .Identity}}
+  {{template "identity.html" .Identity}}
+{{end}}
+{{else}}
+  <div style="color:var(--dim);font-style:italic;">Loading…</div>
+{{end}}
+{{end}}

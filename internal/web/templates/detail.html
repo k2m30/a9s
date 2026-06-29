@@ -1,0 +1,67 @@
+{{define "detail.html"}}
+<div class="detail-layout">
+  <div class="detail-main">
+    {{if .Search}}<div style="color:var(--warn);font-size:12px;">Search: {{.Search}}</div>{{end}}
+    <div class="detail-fields">
+      {{range .Fields}}
+        {{if .IsSpacer}}
+          <div class="field-row spacer"></div>
+        {{else if .IsSection}}
+          <div class="field-row section">{{.Key}}</div>
+        {{else if .IsHeader}}
+          <div class="field-row header">{{.Key}}</div>
+        {{else if .IsSubField}}
+          <div class="field-row sub{{if .IsNavigable}} field-navigable{{end}}">
+            <span class="field-key">{{.Key}}</span>
+            <span class="field-value">{{.Value}}</span>
+          </div>
+        {{else}}
+          <div class="field-row{{if .IsNavigable}} field-navigable{{end}}">
+            <span class="field-key">{{.Key}}</span>
+            <span class="field-value">{{.Value}}</span>
+          </div>
+        {{end}}
+      {{end}}
+    </div>
+
+    {{range .Attention}}
+    <div class="attention-block{{if eq .Tier "~"}} warn{{end}}">
+      <div class="attention-header {{if eq .Tier "!"}}attention-err{{else}}attention-warn{{end}}">
+        {{.Code}}: {{.Message}}
+      </div>
+      {{range .Rows}}
+      <div class="finding-row">
+        <span class="finding-label">{{.Label}}</span>
+        <span class="finding-value">{{.Value}}</span>
+      </div>
+      {{end}}
+    </div>
+    {{end}}
+  </div>
+
+  {{if .RelatedVisible}}
+  <div class="related-panel">
+    <div class="related-title">Related</div>
+    {{range $i, $rel := .Related}}
+    <div class="related-row{{if eq $i $.RelatedCursor}} focused{{end}}"
+         onclick="sendAction('toggle-related','')">
+      <span>{{$rel.Name}}</span>
+      <span class="related-count{{if $rel.Loading}} related-loading{{end}}{{if $rel.Err}} related-err{{end}}">
+        {{if $rel.Loading}}…{{else if $rel.Err}}err{{else}}{{$rel.Count}}{{end}}
+      </span>
+    </div>
+    {{if and (eq $i $.RelatedCursor) $rel.Items}}
+    <div style="margin-left:8px;font-size:12px;">
+      {{range $rel.Items}}
+      <div class="field-row sub">
+        <span class="field-key">{{.Key}}</span>
+        <span class="field-value">{{.Value}}</span>
+      </div>
+      {{end}}
+    </div>
+    {{end}}
+    {{end}}
+  </div>
+  {{end}}
+</div>
+{{end}}

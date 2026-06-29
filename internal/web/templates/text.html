@@ -1,0 +1,5 @@
+{{define "text.html"}}
+{{if .Search}}<div style="color:var(--warn);font-size:12px;margin-bottom:4px;">Search: {{.Search}} ({{len .SearchMatches}} matches)</div>{{end}}
+<div class="text-body">{{range .Lines}}<span class="text-line">{{.}}</span>
+{{end}}</div>
+{{end}}
