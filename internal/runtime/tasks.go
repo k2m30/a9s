@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // TaskKind names a family of background tasks ("enrich", "related",
@@ -254,3 +255,14 @@ type SaveThemeConfigPayload struct {
 }
 
 func (SaveThemeConfigPayload) isTaskPayload() {}
+
+// RelatedCheckPayload carries the source resource the executor needs to
+// invoke RelatedDef.Checker. The Scope field on the parent TaskKey
+// ("type/id") is the dedup key; this struct carries the full resource so
+// runRelatedCheckers can pass it to each checker without re-fetching.
+type RelatedCheckPayload struct {
+	ResourceType string
+	Resource     resource.Resource
+}
+
+func (RelatedCheckPayload) isTaskPayload() {}

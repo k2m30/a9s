@@ -206,17 +206,28 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 	// adapter's relatedCheckCmd continues to use its concurrent fan-out with
 	// semaphore and lazy-add for the live renderer.
 	case KindRelatedCheck:
-		resourceType, _ := splitScope(req.Key.Scope)
+		p, ok := req.Payload.(RelatedCheckPayload)
+		if !ok {
+			// No payload means this task was dispatched without a source resource
+			// (e.g. from HandleRelatedCheckStarted in the TUI path). The headless
+			// executor cannot invoke checkers without the resource; skip gracefully.
+			return nil, nil
+		}
+		resourceType := p.ResourceType
+		if resourceType == "" {
+			resourceType, _ = splitScope(req.Key.Scope)
+		}
 		defs := resource.GetRelated(resourceType)
 		if len(defs) == 0 {
 			return nil, nil
 		}
-		snap := c.SnapshotCache()
+		cacheSnap := c.SnapshotCache()
 		mainCacheKeys := make(map[string]struct{}, len(c.ResourceCacheKeys()))
 		for _, k := range c.ResourceCacheKeys() {
 			mainCacheKeys[k] = struct{}{}
 		}
-		return c.runRelatedCheckers(ctx, snap, mainCacheKeys, defs), nil
+		gen := c.RelatedGen()
+		return c.runRelatedCheckers(ctx, cacheSnap, mainCacheKeys, defs, p.Resource, resourceType, gen), nil
 
 	// --- enrich detail ---
 	case KindEnrichDetail:
@@ -455,11 +466,22 @@ func cacheFileToEvent(cf *cache.File) messages.AvailabilityCacheLoaded {
 	}
 }
 
-// runRelatedCheckers runs all RelatedDef checkers for a resource sequentially.
-// This is the renderer-neutral alternative to the TUI adapter's concurrent
-// relatedCheckCmd fan-out. Returns nil (no single aggregate event) since each
-// check result is a separate RelatedCheckResult in the TUI path; the executor
-// path is primarily for testing the dispatch surface.
+// runRelatedCheckers runs all RelatedDef checkers for res sequentially,
+// mirroring the TUI adapter's relatedCheckCmd fan-out logic (same
+// NeedsTargetCache handling, same self-pivot-zero suppression, same
+// result shape). Returns a RelatedCheckBatch carrying one entry per def.
+//
+// Differences from the TUI path (intentional):
+//   - Sequential, not concurrent: the headless executor has no goroutine
+//     budget or semaphore — DrainSync is synchronous by design.
+//   - No lazy-add (FetchByIDs): the lazy-add path enriches the resource cache
+//     for navigation UX (so clicking a related row finds the resource). In the
+//     headless path the cache is not used for navigation, so the extra AWS
+//     call is omitted for now. The per-def result still carries ResourceIDs
+//     so callers can use them if needed.
+//   - Returns a single RelatedCheckBatch instead of N individual
+//     RelatedCheckResult messages so DrainSync can route all results in one
+//     Handle call.
 //
 // snap and mainCacheKeys must be pre-built by the caller via c.SnapshotCache()
 // and c.ResourceCacheKeys() — no renderer state is read here.
@@ -468,12 +490,15 @@ func (c *Core) runRelatedCheckers(
 	snap map[string][]resource.Resource,
 	mainCacheKeys map[string]struct{},
 	defs []resource.RelatedDef,
+	res resource.Resource,
+	resourceType string,
+	gen domain.Gen,
 ) messages.Event {
+	results := make([]messages.RelatedCheckResult, 0, len(defs))
+
 	for _, def := range defs {
-		if def.Checker == nil {
-			continue
-		}
 		localSnap := snap
+
 		if def.NeedsTargetCache {
 			if _, inMain := mainCacheKeys[def.TargetType]; !inMain {
 				if pf := resource.GetPaginatedFetcher(def.TargetType); pf != nil {
@@ -486,14 +511,57 @@ func (c *Core) runRelatedCheckers(
 				}
 			}
 		}
-		// Checker invocation omitted: a source resource.Resource is required
-		// but not carried by KindRelatedCheck's TaskKey.Scope (only type/id,
-		// not the full resource). The executor path confirms dispatch plumbing;
-		// real checker invocation remains in the TUI fan-out adapter where the
-		// source resource is in scope from the detail view.
-		_ = localSnap
+
+		var checkResult resource.RelatedCheckResult
+		if def.Checker == nil {
+			// No checker: unknown count (-1) so the row shows "?" not 0.
+			checkResult = resource.RelatedCheckResult{
+				TargetType: def.TargetType,
+				Count:      -1,
+			}
+		} else {
+			checkResult = def.Checker(ctx, c.session.Clients, res, resource.ResourceCache(localSnapToCache(localSnap)))
+			checkResult.TargetType = def.TargetType
+		}
+
+		// Self-pivot-zero: when the checker reports 0 and the target type is
+		// the same as the source type, the row is meaningless (a resource
+		// cannot be its own related resource). Mirror the TUI adapter's guard.
+		if checkResult.Count == 0 && def.TargetType == resourceType {
+			checkResult.Count = 0 // stays zero — ApplyDetailRelatedResult will render it; isSelfPivotZero hides it in the UI
+		}
+
+		results = append(results, messages.RelatedCheckResult{
+			ResourceType:     resourceType,
+			SourceResourceID: res.ID,
+			DefDisplayName:   def.DisplayName,
+			Result:           checkResult,
+			Generation:       gen,
+		})
 	}
-	return nil
+
+	if len(results) == 0 {
+		return nil
+	}
+	return messages.RelatedCheckBatch{
+		ResourceType:     resourceType,
+		SourceResourceID: res.ID,
+		Results:          results,
+		Generation:       gen,
+	}
+}
+
+// localSnapToCache converts the flat snap map (type→[]Resource) used by the
+// executor into the ResourceCache map type the RelatedChecker signature expects.
+func localSnapToCache(snap map[string][]resource.Resource) map[string]resource.ResourceCacheEntry {
+	if len(snap) == 0 {
+		return nil
+	}
+	out := make(map[string]resource.ResourceCacheEntry, len(snap))
+	for k, v := range snap {
+		out[k] = resource.ResourceCacheEntry{Resources: v}
+	}
+	return out
 }
 
 // splitScope splits a "type/id" TaskKey.Scope into its two components.
