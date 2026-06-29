@@ -9,7 +9,7 @@
   </thead>
   <tbody>
     {{range $i, $row := .Rows}}
-    <tr class="{{if eq $i $.Selected}}selected{{end}}{{if eq $row.Decorator "!"}} dec-error{{else if eq $row.Decorator "~"}} dec-warn{{end}}"
+    <tr class="{{if eq $i $.Selected}}selected{{end}}{{if $row.Color}} row-{{$row.Color}}{{end}}{{if eq $row.Decorator "!"}} dec-error{{else if eq $row.Decorator "~"}} dec-warn{{end}}"
         onclick="clickSelect({{$i}})">
       {{range $row.Cells}}<td>{{.}}</td>{{end}}
     </tr>

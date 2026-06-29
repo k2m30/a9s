@@ -41,6 +41,17 @@ type KeyHint struct {
 	Help string `json:"help"`
 }
 
+// MenuFooterHints is the SINGLE source of the main-menu footer key hints,
+// consumed by both the web renderer (ViewState.Footer in snapshot) and the TUI
+// (MainMenuModel.BottomHints). Defining it once is what keeps the two renderers
+// from drifting — do not re-list these hints anywhere else.
+func MenuFooterHints() []KeyHint {
+	return []KeyHint{
+		{Key: "ctrl+z", Help: "Issues only"},
+		{Key: "ctrl+r", Help: "Refresh"},
+	}
+}
+
 // BodyKind is the discriminator that identifies which Body pointer field
 // is populated. It matches the screen kind, not the ScreenID, so renderers
 // can switch on it without knowing every registered ScreenID.

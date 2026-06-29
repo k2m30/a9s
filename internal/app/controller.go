@@ -1418,11 +1418,7 @@ func (c *Controller) snapshot() ViewState {
 	if top.State.Menu != nil {
 		vs.Body.Menu = buildMenuBody(top.State.Menu)
 		vs.FrameTitle = menuFrameTitle(top.State.Menu)
-		// Mirrors MainMenuModel.BottomHints so the web footer matches the TUI.
-		vs.Footer = []KeyHint{
-			{Key: "ctrl+z", Help: "Issues only"},
-			{Key: "ctrl+r", Help: "Refresh"},
-		}
+		vs.Footer = MenuFooterHints()
 	}
 	if top.State.List != nil {
 		vs.Body.List = c.buildListBody(top.Ctx, top.State.List)
