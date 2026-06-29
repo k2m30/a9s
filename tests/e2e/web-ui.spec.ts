@@ -251,4 +251,36 @@ test.describe("a9s web UI — menu fidelity + interaction (TUI parity)", () => {
       .evaluateAll((rows) => rows.every((r) => !!r.querySelector(".badge")));
     expect(allBadged, "every remaining row must carry an issue badge").toBe(true);
   });
+
+  test("detail field cursor moves with up/down and Enter navigates the focused field", async ({ page }) => {
+    // Bug 6: the web detail had no visible left-column cursor (up/down did
+    // nothing) and Enter on a focused navigable field was a no-op — only the
+    // mouse could navigate a field.
+    await press(page, "Enter"); // menu -> ec2 list
+    await expect(page.locator(".list-table")).toBeVisible();
+    await press(page, "d"); // -> web-prod-01 detail
+    await expect(page.locator("#frame-title")).toHaveText("web-prod-01");
+
+    await press(page, "ArrowDown");
+    await expect(page.locator(".field-row.field-cursor")).toHaveCount(1);
+    const firstCursor = await page.locator(".field-row.field-cursor").textContent();
+    await press(page, "ArrowDown");
+    expect(
+      await page.locator(".field-row.field-cursor").textContent(),
+      "ArrowDown must move the field cursor to a different field",
+    ).not.toBe(firstCursor);
+
+    // Walk down onto a navigable field, then Enter must navigate.
+    for (let i = 0; i < 12; i++) {
+      if ((await page.locator(".field-row.field-cursor.field-navigable").count()) > 0) break;
+      await press(page, "ArrowDown");
+    }
+    await expect(page.locator(".field-row.field-cursor.field-navigable")).toHaveCount(1);
+    await press(page, "Enter");
+    await expect(
+      page.locator("#frame-title"),
+      "Enter on a focused navigable field must navigate away from web-prod-01",
+    ).not.toHaveText("web-prod-01");
+    await expect(page.locator(".detail-layout")).toBeVisible();
+  });
 });
