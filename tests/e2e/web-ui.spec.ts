@@ -146,4 +146,25 @@ test.describe("a9s web UI — real-browser key navigation", () => {
     await expect(page.locator(".identity-table")).toBeVisible();
     await expect(page.getByText("Account ID", { exact: false })).toBeVisible();
   });
+
+  // Regression: navigable detail fields (the underlined links — ImageId, VpcId,
+  // SubnetId, …) had no onclick, so clicking them did nothing ("navigation in
+  // the detail view doesn't work").
+  test("clicking a navigable detail field navigates to that resource", async ({ page }) => {
+    await press(page, "Enter"); // menu -> ec2 list
+    await expect(page.locator(".list-table")).toBeVisible();
+    await press(page, "d"); // -> web-prod-01 detail
+    await expect(page.locator(".detail-layout")).toBeVisible();
+    await expect(page.locator("#frame-title")).toHaveText("web-prod-01");
+
+    const navField = page.locator(".field-navigable").first();
+    await expect(navField).toBeVisible();
+    await navField.click(); // clickField -> navigate to the field's target
+
+    await expect(
+      page.locator("#frame-title"),
+      "clicking a navigable field must navigate away from the web-prod-01 detail",
+    ).not.toHaveText("web-prod-01");
+    await expect(page.locator(".detail-layout, .list-table")).toBeVisible();
+  });
 });

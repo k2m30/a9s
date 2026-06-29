@@ -12,6 +12,10 @@ export type ServerInfo = {
   url: string;
   token: string;
   pid: number;
+  // live is true when the server was booted against a real AWS profile.
+  live: boolean;
+  // profile is the AWS profile name used, or null in demo mode.
+  profile: string | null;
 };
 
 export function readServer(): ServerInfo {

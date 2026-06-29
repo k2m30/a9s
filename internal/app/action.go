@@ -48,6 +48,16 @@ const (
 	ActionCopy ActionKind = "copy"
 
 	ActionToggleRelated   ActionKind = "toggle-related"
+	// ActionRelatedSelect navigates to the related row at the visible index
+	// carried in Arg (decimal integer). Used by the web UI click path; it sets
+	// RelatedFocus + RelatedCursor then runs the same HandleRelatedNavigate
+	// logic as the keyboard Enter path in ActionSelect.
+	ActionRelatedSelect ActionKind = "related-select"
+	// ActionFieldSelect navigates to the resource linked by the navigable
+	// detail field at the visible index carried in Arg (decimal integer). Used
+	// by the web UI click path; mirrors the TUI's Enter-on-navigable-field path
+	// (TargetType + NavID/Value → HandleRelatedNavigate).
+	ActionFieldSelect ActionKind = "field-select"
 	ActionToggleFocus     ActionKind = "toggle-focus"
 	ActionToggleWrap      ActionKind = "toggle-wrap"
 	ActionToggleAttention ActionKind = "toggle-attention"

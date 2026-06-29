@@ -2,6 +2,7 @@ package app
 
 import (
 	"maps"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -727,6 +728,137 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 			return vs, tasks
 		}
 		return c.snapshot(), nil
+
+	case ActionRelatedSelect:
+		// Web UI click path: navigate to the related row at the visible index in
+		// Arg. Sets RelatedFocus + RelatedCursor then delegates to the same
+		// HandleRelatedNavigate path as the keyboard Enter in ActionSelect.
+		ds := c.topDetailState()
+		if ds == nil {
+			return c.snapshot(), nil
+		}
+		clickIdx, err := strconv.Atoi(strings.TrimSpace(a.Arg))
+		if err != nil || clickIdx < 0 {
+			return c.snapshot(), nil
+		}
+		// Locate the row at clickIdx in the filtered visible list (mirrors
+		// buildDetailRelatedBlocks / detailRelatedVisibleCount filter logic).
+		query := strings.TrimSpace(strings.ToLower(ds.RelatedFilter))
+		var targetRow *DetailRelatedRow
+		visIdx := 0
+		for i := range ds.RelatedRows {
+			row := &ds.RelatedRows[i]
+			if isSelfPivotZeroDetailRow(*row, ds.ResourceType) {
+				continue
+			}
+			if query != "" && !strings.Contains(strings.ToLower(row.DisplayName), query) {
+				continue
+			}
+			if visIdx == clickIdx {
+				targetRow = row
+				break
+			}
+			visIdx++
+		}
+		if targetRow == nil || targetRow.Loading || targetRow.Count <= 0 {
+			// Dead-end row (loading, zero, or unknown count): no navigation.
+			return c.snapshot(), nil
+		}
+		// Sync cursor state so the selection highlight is consistent with the
+		// navigation that follows.
+		ds.RelatedFocus = true
+		ds.RelatedCursor = clickIdx
+		// Navigate — identical to the ActionSelect related-Enter path.
+		targetID := ""
+		if len(targetRow.ResourceIDs) == 1 {
+			targetID = targetRow.ResourceIDs[0]
+		}
+		var checker resource.RelatedChecker
+		for _, def := range resource.GetRelated(ds.ResourceType) {
+			if def.TargetType == targetRow.TargetType {
+				checker = def.Checker
+				break
+			}
+		}
+		ev := runtime.RelatedNavigateEvent{
+			TargetType:     targetRow.TargetType,
+			SourceResource: ds.Resource,
+			SourceType:     ds.ResourceType,
+			TargetID:       targetID,
+			RelatedIDs:     targetRow.ResourceIDs,
+			FetchFilter:    targetRow.FetchFilter,
+			Checker:        checker,
+		}
+		navRes, tasks := c.core.HandleRelatedNavigate(ev)
+		extraTasks := c.applyRelatedNavResult(navRes)
+		if len(extraTasks) > 0 {
+			extraKeys := make(map[runtime.TaskKey]struct{}, len(extraTasks))
+			for _, t := range extraTasks {
+				extraKeys[t.Key] = struct{}{}
+			}
+			merged := make([]runtime.TaskRequest, 0, len(tasks)+len(extraTasks))
+			for _, t := range tasks {
+				if _, replaced := extraKeys[t.Key]; !replaced {
+					merged = append(merged, t)
+				}
+			}
+			merged = append(merged, extraTasks...)
+			tasks = merged
+		}
+		return c.snapshot(), tasks
+
+	case ActionFieldSelect:
+		// Web UI click path: navigate to the resource linked by the navigable
+		// detail field at the visible index in Arg. Mirrors the TUI Enter-on-
+		// navigable-field path (TargetType + NavID/Value → HandleRelatedNavigate).
+		ds := c.topDetailState()
+		if ds == nil {
+			return c.snapshot(), nil
+		}
+		fieldIdx, err := strconv.Atoi(strings.TrimSpace(a.Arg))
+		if err != nil || fieldIdx < 0 {
+			return c.snapshot(), nil
+		}
+		// Build the fields list using the same pipeline as buildDetailBody so
+		// $i in the template aligns with the slice index here.
+		fields := buildDetailBody(ds, c.viewConfig).Fields
+		if fieldIdx >= len(fields) {
+			return c.snapshot(), nil
+		}
+		field := fields[fieldIdx]
+		if !field.IsNavigable || field.TargetType == "" {
+			return c.snapshot(), nil
+		}
+		// Mirror TUI: NavID overrides Value when present.
+		targetID := field.Value
+		if field.NavID != "" {
+			targetID = field.NavID
+		}
+		// No RelatedIDs / FetchFilter / Checker needed: HandleRelatedNavigate
+		// routes a single-ID event to a cache-hit detail or a by-ID fetch.
+		ev := runtime.RelatedNavigateEvent{
+			TargetType:     field.TargetType,
+			SourceResource: ds.Resource,
+			SourceType:     ds.ResourceType,
+			TargetID:       targetID,
+		}
+		navRes, tasks := c.core.HandleRelatedNavigate(ev)
+		extraTasks := c.applyRelatedNavResult(navRes)
+		if len(extraTasks) > 0 {
+			extraKeys := make(map[runtime.TaskKey]struct{}, len(extraTasks))
+			for _, t := range extraTasks {
+				extraKeys[t.Key] = struct{}{}
+			}
+			merged := make([]runtime.TaskRequest, 0, len(tasks)+len(extraTasks))
+			for _, t := range tasks {
+				if _, replaced := extraKeys[t.Key]; !replaced {
+					merged = append(merged, t)
+				}
+			}
+			merged = append(merged, extraTasks...)
+			tasks = merged
+		}
+		return c.snapshot(), tasks
 
 	// --- Row-dependent actions: require selected row + per-screen state ---
 

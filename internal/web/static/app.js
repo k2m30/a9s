@@ -78,9 +78,24 @@
       .catch(function (e) { console.error(e); });
   }
 
+  // clickRelated navigates to the related-panel row at visible index idx.
+  // Dead-end rows (count <= 0 and not loading) have no onclick so this is
+  // only called for navigable rows, but the controller guards as well.
+  function clickRelated(idx) {
+    sendAction("related-select", String(idx));
+  }
+
+  // clickField navigates to the resource linked by the navigable detail field
+  // at visible index idx (matches $i in {{range $i, $f := .Fields}}).
+  function clickField(idx) {
+    sendAction("field-select", String(idx));
+  }
+
   // Expose for use in onclick handlers in templates.
   window.sendAction = sendAction;
   window.clickSelect = clickSelect;
+  window.clickRelated = clickRelated;
+  window.clickField = clickField;
 
   // Keyboard map: TUI key → Action
   var keyMap = [

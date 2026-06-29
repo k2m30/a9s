@@ -186,10 +186,15 @@ func (s *Server) getOrCreateSession(sessionID string) *sessionEntry {
 // blocked for the connect's duration — the page renders the menu while this
 // runs.
 func (s *Server) bootstrapLiveSession(entry *sessionEntry) {
-	entry.ctrl.BootstrapLive(s.profile, s.region)
+	tasks := entry.ctrl.BootstrapLive(s.profile, s.region)
+	// Drain the availability fetches with a per-result SSE notify so the menu
+	// fills in progressively. Live fetches across all resource types take tens
+	// of seconds; a single notify at the end would leave the browser's menu
+	// blank that whole time, then populate all at once.
+	app.DrainSyncProgress(entry.ctrl, tasks, func() { s.notifySubscribers(entry) })
 	if s.command != "" {
-		_, tasks := entry.ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: s.command})
-		app.DrainSync(entry.ctrl, tasks)
+		_, ctasks := entry.ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: s.command})
+		app.DrainSync(entry.ctrl, ctasks)
 	}
 	s.notifySubscribers(entry)
 }

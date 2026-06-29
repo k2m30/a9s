@@ -37,6 +37,22 @@ func DrainSync(c *Controller, pending []runtime.TaskRequest) {
 // forwarded to every Core.ExecuteTask call; callers should supply a context
 // with an appropriate deadline when execution time must be bounded.
 func DrainSyncContext(ctx context.Context, c *Controller, pending []runtime.TaskRequest) {
+	DrainSyncContextProgress(ctx, c, pending, nil)
+}
+
+// DrainSyncProgress is like DrainSync but invokes onEvent after each handled
+// event, letting a caller push incremental UI updates (e.g. SSE notifications)
+// as results arrive instead of only once at the end. This is what keeps a live
+// (non-demo) web session's menu filling in progressively rather than staying
+// blank for the entire — slow — availability drain. onEvent may be nil.
+func DrainSyncProgress(c *Controller, pending []runtime.TaskRequest, onEvent func()) {
+	DrainSyncContextProgress(context.Background(), c, pending, onEvent)
+}
+
+// DrainSyncContextProgress is the context-aware progress variant. The loop is
+// identical to the plain drain but calls onEvent (when non-nil) after each
+// event is handled, so the controller state is observable as it fills in.
+func DrainSyncContextProgress(ctx context.Context, c *Controller, pending []runtime.TaskRequest, onEvent func()) {
 	iterations := 0
 	for len(pending) > 0 {
 		if iterations >= maxDrainIterations {
@@ -63,5 +79,8 @@ func DrainSyncContext(ctx context.Context, c *Controller, pending []runtime.Task
 
 		_, followUp := c.Handle(ev)
 		pending = append(pending, followUp...)
+		if onEvent != nil {
+			onEvent()
+		}
 	}
 }

@@ -160,6 +160,10 @@ body { background: var(--bg); color: var(--fg); min-height: 100vh; display: flex
 .related-count { color: var(--ok); }
 .related-loading { color: var(--dim); font-style: italic; }
 .related-err { color: var(--err); }
+.related-zero { color: var(--dim); }
+.related-unknown { color: var(--dim); }
+.related-row.dead-end { cursor: default; opacity: 0.5; }
+.related-row.dead-end:hover { color: inherit; }
 
 #loading-indicator { display: none; position: fixed; top: 8px; right: 12px; color: var(--warn); }
 </style>
