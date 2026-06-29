@@ -7,11 +7,11 @@
         {{if $f.IsSpacer}}
           <div class="field-row spacer"></div>
         {{else if $f.IsSection}}
-          <div class="field-row section">{{$f.Key}}</div>
+          <div class="field-row section{{if eq $i $.FieldCursor}} field-cursor{{end}}">{{$f.Key}}</div>
         {{else if $f.IsHeader}}
-          <div class="field-row header">{{$f.Key}}</div>
+          <div class="field-row header{{if eq $i $.FieldCursor}} field-cursor{{end}}">{{$f.Key}}</div>
         {{else if $f.IsSubField}}
-          <div class="field-row sub{{if $f.IsNavigable}} field-navigable{{end}}"{{if $f.IsNavigable}} onclick="clickField({{$i}})"{{end}}>
+          <div class="field-row sub{{if $f.IsNavigable}} field-navigable{{end}}{{if eq $i $.FieldCursor}} field-cursor{{end}}" data-fidx="{{$i}}"{{if $f.IsNavigable}} onclick="clickField({{$i}})"{{end}}>
             {{if eq $f.Key $f.Value}}
             {{/* label-less pre-formatted line (Key==Value) — render once, like the TUI */}}
             <span class="field-value">{{$f.Value}}</span>
@@ -21,7 +21,7 @@
             {{end}}
           </div>
         {{else}}
-          <div class="field-row{{if $f.IsNavigable}} field-navigable{{end}}"{{if $f.IsNavigable}} onclick="clickField({{$i}})"{{end}}>
+          <div class="field-row{{if $f.IsNavigable}} field-navigable{{end}}{{if eq $i $.FieldCursor}} field-cursor{{end}}" data-fidx="{{$i}}"{{if $f.IsNavigable}} onclick="clickField({{$i}})"{{end}}>
             <span class="field-key">{{$f.Key}}</span>
             <span class="field-value">{{$f.Value}}</span>
           </div>

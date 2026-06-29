@@ -289,7 +289,19 @@ func (m DetailModel) FrameTitle() string {
 }
 
 // BottomHints implements Hintable for DetailModel.
+// When the model is controller-backed, delegates to the controller's footer
+// hints so the TUI and web renderers share a single source of truth.
+// Non-controller-backed callers (tests, isolated views) use the live model state.
 func (m DetailModel) BottomHints() []layout.KeyHint {
+	if m.ctrl != nil {
+		ctrlHints := m.ctrl.Snapshot().Footer
+		hints := make([]layout.KeyHint, len(ctrlHints))
+		for i, kh := range ctrlHints {
+			hints[i] = layout.KeyHint{Key: kh.Key, Desc: kh.Help}
+		}
+		return hints
+	}
+
 	var hints []layout.KeyHint
 
 	// Right column focused state

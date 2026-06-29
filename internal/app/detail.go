@@ -334,6 +334,11 @@ func (c *Controller) SetDetailRelatedVisible(visible, hidden bool) {
 	}
 	ds.RelatedVisible = visible
 	ds.RelatedHidden = hidden
+	// Mirror m.rightColVisible: true only when the user explicitly toggled ON.
+	// hidden=true means the user acted; visible=true means they turned it on.
+	if hidden {
+		ds.RelatedUserVisible = visible
+	}
 	if !visible {
 		ds.RelatedFocus = false
 	}

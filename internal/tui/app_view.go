@@ -84,13 +84,12 @@ func (m Model) View() tea.View {
 			}
 		}
 	}
-	// Footer hints: use the controller snapshot when the active view is one of
-	// the four that delegate footer computation to the controller (menu, list,
-	// yaml, json). For overlays (help, reveal, selector) and detail (which still
-	// owns its own cursor-dependent footer), fall back to Hintable.BottomHints().
+	// Footer hints: use the controller snapshot for all views that delegate
+	// footer computation to the controller (menu, list, yaml, json, detail).
+	// For overlays (help, reveal, selector) fall back to Hintable.BottomHints().
 	var hints []layout.KeyHint
 	switch active.(type) {
-	case *views.MainMenuModel, *views.ResourceListModel, *views.YAMLModel, *views.JSONModel:
+	case *views.MainMenuModel, *views.ResourceListModel, *views.YAMLModel, *views.JSONModel, *views.DetailModel:
 		if ctrlHints := m.ctrl.Snapshot().Footer; len(ctrlHints) > 0 {
 			hints = make([]layout.KeyHint, len(ctrlHints))
 			for i, kh := range ctrlHints {
