@@ -1,4 +1,5 @@
 {{define "main.html"}}
+{{if .Header.Flash.Text}}<div id="flash" class="{{if .Header.Flash.IsError}}hdr-flash-err{{else}}hdr-flash-ok{{end}}">{{.Header.Flash.Text}}</div>{{else if .Header.ErrorHintVisible}}<div id="flash" class="hdr-flash-err">! for errors</div>{{end}}
 {{if .FrameTitle}}<div id="frame-title">{{.FrameTitle}}</div>{{end}}
 <div id="body">
   {{template "body.html" .Body}}

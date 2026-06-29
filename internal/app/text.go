@@ -19,14 +19,20 @@ func textPageSizeFor(a Action) int {
 	return textPageSize
 }
 
+// isTextScreen reports whether id is one of the text-viewer screen IDs
+// (YAML, JSON, or error-log).
+func isTextScreen(id runtime.ScreenID) bool {
+	return id == runtime.ScreenYAML || id == runtime.ScreenJSON || id == runtime.ScreenErrorLog
+}
+
 // topTextState returns the TextState of the top-of-stack screen when the top
-// screen is a text viewer (ScreenYAML or ScreenJSON), nil otherwise.
+// screen is a text viewer (ScreenYAML, ScreenJSON, or ScreenErrorLog), nil otherwise.
 func (c *Controller) topTextState() *TextState {
 	if len(c.stack) == 0 {
 		return nil
 	}
 	top := c.stack[len(c.stack)-1]
-	if top.ID != runtime.ScreenYAML && top.ID != runtime.ScreenJSON {
+	if !isTextScreen(top.ID) {
 		return nil
 	}
 	return c.stack[len(c.stack)-1].State.Text
@@ -49,7 +55,7 @@ func (c *Controller) ensureTextState(lines []string) {
 		return
 	}
 	top := &c.stack[len(c.stack)-1]
-	if top.ID != runtime.ScreenYAML && top.ID != runtime.ScreenJSON {
+	if !isTextScreen(top.ID) {
 		return
 	}
 	if top.State.Text == nil {
