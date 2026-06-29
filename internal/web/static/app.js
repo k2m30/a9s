@@ -251,6 +251,19 @@
       return;
     }
 
+    // Ctrl+Z: issues-only filter. Ctrl+R: refresh. preventDefault stops the
+    // browser's undo/reload so these reach the app like the TUI footer keys.
+    if ((e.ctrlKey || e.metaKey) && (e.key === "z" || e.key === "Z")) {
+      sendAction("toggle-attention", "");
+      e.preventDefault();
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && (e.key === "r" || e.key === "R")) {
+      sendAction("refresh", "");
+      e.preventDefault();
+      return;
+    }
+
     // Search navigation.
     if (e.key === "n" && !e.ctrlKey) {
       sendAction("search-next", "");
