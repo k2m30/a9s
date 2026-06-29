@@ -1,0 +1,16 @@
+{{define "help.html"}}
+{{if .Context}}<div style="color:var(--dim);font-size:12px;margin-bottom:8px;">Context: {{.Context}}</div>{{end}}
+<div class="help-sections">
+{{range .Sections}}
+  <div class="help-section">
+    <h3>{{.Title}}</h3>
+    {{range .Hints}}
+    <div class="help-hint">
+      <span class="k">{{.Key}}</span>
+      <span class="h">{{.Help}}</span>
+    </div>
+    {{end}}
+  </div>
+{{end}}
+</div>
+{{end}}
