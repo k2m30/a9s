@@ -147,7 +147,7 @@
     { key: "m",          action: { kind: "load-more" } },
     { key: "c",          action: { kind: "copy" } },
     { key: "w",          action: { kind: "toggle-wrap" } },
-    { key: "!",          action: { kind: "toggle-attention" } },
+    { key: "!",          action: { kind: "open-error-log" } },
     { key: "R",          action: { kind: "toggle-related" } },
     { key: "Tab",        action: { kind: "toggle-focus" } },
 

@@ -283,4 +283,16 @@ test.describe("a9s web UI — menu fidelity + interaction (TUI parity)", () => {
     ).not.toHaveText("web-prod-01");
     await expect(page.locator(".detail-layout")).toBeVisible();
   });
+
+  test("'!' shows the error log, not the attention filter", async ({ page }) => {
+    // Bug: '!' was wrongly mapped to toggle-attention; it is the TUI's error-log
+    // key. Demo has no errors -> an info flash, and the menu must NOT be filtered.
+    const before = await page.locator(".menu-entry").count();
+    await press(page, "!");
+    await expect(page.locator("#flash")).toHaveText("No errors this session");
+    expect(
+      await page.locator(".menu-entry").count(),
+      "'!' must not filter the menu (that is ctrl+z)",
+    ).toBe(before);
+  });
 });

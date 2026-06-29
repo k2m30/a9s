@@ -50,6 +50,7 @@ body { background: var(--bg); color: var(--fg); min-height: 100vh; display: flex
   font-weight: bold;
   flex-shrink: 0;
 }
+#flash { padding: 2px 12px; background: var(--header); border-bottom: 1px solid var(--border); flex-shrink: 0; font-size: 13px; }
 
 /* main content (frame-title + body + footer) — swapped as one fragment on
    navigation so the title/footer update, not just the body. */
@@ -189,13 +190,6 @@ body { background: var(--bg); color: var(--fg); min-height: 100vh; display: flex
     {{if .VS.Header.Mode}}<span class="hdr-mode">[{{.VS.Header.Mode}}]</span>{{end}}
   </div>
   <div class="hdr-right">
-    {{if .VS.Header.Flash.Text}}
-      {{if .VS.Header.Flash.IsError}}
-        <span class="hdr-flash-err">{{.VS.Header.Flash.Text}}</span>
-      {{else}}
-        <span class="hdr-flash-ok">{{.VS.Header.Flash.Text}}</span>
-      {{end}}
-    {{end}}
     {{if .VS.Header.RightSide}}<span style="color:var(--dim)">{{.VS.Header.RightSide}}</span>{{end}}
   </div>
 </div>

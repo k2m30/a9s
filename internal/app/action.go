@@ -83,6 +83,11 @@ const (
 	ActionSelectTheme ActionKind = "select-theme"
 
 	ActionQuit ActionKind = "quit"
+
+	// ActionOpenErrorLog opens the session error log as a text viewer.
+	// Mirrors the TUI's '!' key (keys.ErrorLog). Emits a flash when no errors
+	// have been recorded this session.
+	ActionOpenErrorLog ActionKind = "open-error-log"
 )
 
 // Action is a single semantic input from a renderer to the controller.

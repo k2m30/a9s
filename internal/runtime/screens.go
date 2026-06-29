@@ -57,6 +57,11 @@ const (
 	// uses this ID; the TUI adapter constructs a DetailModel from the
 	// associated DetailState.Resource.
 	ScreenDetail ScreenID = "detail"
+
+	// ScreenErrorLog is the session error-log text viewer pushed when the user
+	// presses '!' and at least one error has been recorded this session.
+	// Its body is a TextBody with one line per error entry (newest-first).
+	ScreenErrorLog ScreenID = "error-log"
 )
 
 // ScreenContext is the input handed to an adapter when the runtime asks
