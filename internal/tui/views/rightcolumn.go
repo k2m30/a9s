@@ -2,7 +2,6 @@
 package views
 
 import (
-	"fmt"
 	"slices"
 	"strings"
 
@@ -238,35 +237,23 @@ func (m rightColumnModel) View() string {
 			case row.err != nil:
 				rowText = "  " + row.displayName + "  \u2014" // em dash
 				rowStyle = styles.DimText
-			case row.count == -1 && len(row.fetchFilter) > 0:
-				rowText = "  " + row.displayName
-				rowStyle = styles.RowNormal
-			case row.count == -1:
-				rowText = "  " + row.displayName
-				rowStyle = styles.DimText
-			case row.count == 0 && row.approximate:
-				// Reverse-scan over a truncated cache hit zero matches so
-				// far. Render the literal "(0)" — the design-spec contract
-				// (docs/design/related-resources.md §5.3 "Available — count
-				// known") and the integration-test assertion both demand a
-				// literal "(<N>)" substring for any count >= 0. The "lower
-				// bound — more pages may reveal matches" signal is preserved
-				// via the RowNormal style (vs DimText for confirmed-zero)
-				// and the row stays navigable; the target list carries the
-				// checker forward and re-runs it on m-loads-more (AS-378).
-				rowText = "  " + row.displayName + " (0)"
-				rowStyle = styles.RowNormal
-			case row.count == 0:
-				// Confirmed zero — cache fully scanned, no matches. Dim.
-				rowText = "  " + row.displayName + " (0)"
-				rowStyle = styles.DimText
 			default:
-				// Known count (>0). Approximate-ness for non-zero counts is
-				// signaled via RowNormal style alone; the "+" text marker is
-				// not part of the design-spec rendering and breaks the
-				// integration-test literal-"(<N>)" contract (AS-378).
-				rowText = "  " + row.displayName + " (" + fmt.Sprintf("%d", row.count) + ")"
-				rowStyle = styles.RowNormal
+				// Count badge + actionability come from the shared rules
+				// (resource.FormatRelatedCount / IsRelatedActionable) so the TUI,
+				// the headless controller, and the web cannot drift. -1 (unknown)
+				// yields an empty badge — the row shows its name only; a known
+				// count >= 0 yields the literal "(N)" the design spec and the
+				// integration tests require. Approximate-ness for a non-zero count
+				// is conveyed by RowNormal style alone (no "+" text marker).
+				rowText = "  " + row.displayName
+				if badge := resource.FormatRelatedCount(row.count); badge != "" {
+					rowText += " " + badge
+				}
+				if isActionableRow(row) {
+					rowStyle = styles.RowNormal
+				} else {
+					rowStyle = styles.DimText
+				}
 			}
 
 			if m.focused && m.cursor == idx {
@@ -321,28 +308,13 @@ func (m rightColumnModel) SelectedTypeName() string {
 	return row.displayName
 }
 
+// isActionableRow reports whether the right-column row is drillable. The rule
+// itself lives in resource.IsRelatedActionable so the TUI, the headless
+// controller (ActionRelatedSelect / RelatedBlock.Actionable), and the web
+// renderer all share one definition and cannot drift (see that func for the
+// per-case rationale).
 func isActionableRow(row rightColumnRow) bool {
-	if row.loading || row.err != nil {
-		return false
-	}
-	if len(row.fetchFilter) > 0 {
-		// Server-side filter carries the pivot intent; the fetch resolves
-		// the real count. Navigable regardless of local count.
-		return true
-	}
-	if row.count == -1 {
-		// Unknown without a fetchFilter → not drillable.
-		return false
-	}
-	if row.approximate {
-		// 0+ or N+ — reverse-scan cache was truncated. Navigable: the target
-		// list carries the checker forward and re-runs it on each fetched
-		// page (m-loads-more), so new matches appear as pages arrive. Zero
-		// initial matches is honest: "we haven't seen any yet, scroll m for
-		// more." See docs/resources/<short>.md §2 per-pivot discovery.
-		return true
-	}
-	return row.count > 0
+	return resource.IsRelatedActionable(row.count, row.approximate, len(row.fetchFilter) > 0, row.loading, row.err != nil)
 }
 
 // isSelfPivotZeroRow reports whether a row is a self-pivot row (its TargetType equals

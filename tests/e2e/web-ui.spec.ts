@@ -4,6 +4,11 @@ import { readServer } from "./server";
 // Booted + tokenized by global-setup. The tokenized URL establishes the session.
 const server = readServer();
 
+// This spec asserts demo-fixture specifics (web-prod-01, acme-web-tg, ec2(27)…),
+// so it is meaningless against live AWS data. Skip the whole file in live mode;
+// the data-agnostic live checks live in live-readonly.spec.ts.
+test.skip(server.live, "demo-only spec — skipped in live mode (A9S_E2E_PROFILE set)");
+
 // press dispatches a real keystroke to the page and waits for the resulting
 // POST /action to return, so the #main fragment has been swapped before the
 // next assertion. Every mapped key in app.js calls sendAction -> POST /action.
