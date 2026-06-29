@@ -1521,3 +1521,114 @@ func TestWebBack_ChildViewStack_UnwindsCorrectly(t *testing.T) {
 		t.Fatalf("back from parent list: expected menu, got %q", vs.Body.Kind)
 	}
 }
+
+// =============================================================================
+// REGRESSION: Fix 2 — GET /body is token-gated, read-only, and non-mutating
+// =============================================================================
+
+// bodyRaw performs GET /body with the given token header value and returns
+// the HTTP status code and response body string.
+func (c *client) bodyRaw(t *testing.T, token string) (int, string) {
+	t.Helper()
+	req, err := http.NewRequestWithContext(bgctx, http.MethodGet, c.baseURL+"/body", nil)
+	if err != nil {
+		t.Fatalf("http.NewRequestWithContext GET /body: %v", err)
+	}
+	if token != "" {
+		req.Header.Set("X-A9S-Token", token)
+	}
+	resp, doErr := c.http.Do(req)
+	if doErr != nil {
+		t.Fatalf("GET /body: %v", doErr)
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+	return resp.StatusCode, string(raw)
+}
+
+// TestWebBody_WithValidToken_Returns200WithHTML verifies that GET /body with a
+// valid X-A9S-Token header returns 200 and non-empty HTML after navigating to a
+// resource list.
+//
+// Pre-fix failure: /body did not exist; the SSE update handler called GET /action
+// with an empty form body to refresh the fragment, which applied a no-op action
+// and triggered notifySubscribers, creating an infinite SSE→GET /action→SSE loop.
+func TestWebBody_WithValidToken_Returns200WithHTML(t *testing.T) {
+	c, cleanup := startServer(t)
+	defer cleanup()
+
+	// Navigate to a resource list so the body fragment contains list markup.
+	c.action(t, app.ActionCommand, "ec2")
+
+	status, html := c.bodyRaw(t, c.token)
+	if status != http.StatusOK {
+		t.Fatalf("GET /body with valid token: status=%d, want 200", status)
+	}
+	if html == "" {
+		t.Fatal("GET /body with valid token: response body is empty, want HTML fragment")
+	}
+	// The rendered list fragment must contain a table or list element. The exact
+	// markup is template-owned but a non-empty response that includes the word
+	// "list" (from data-kind="list" or class attributes) is the minimum signal.
+	if !strings.Contains(html, "list") {
+		t.Errorf("GET /body: response does not contain 'list' — expected rendered list fragment, got: %q", html[:min(len(html), 200)])
+	}
+}
+
+// TestWebBody_WithNoToken_Returns403 verifies that GET /body without a token is
+// rejected with 403 — /body is an authenticated endpoint.
+//
+// Pre-fix failure: /body did not exist. Without the endpoint the implicit
+// fallback was a 404, which the SSE client silently ignored rather than failing.
+func TestWebBody_WithNoToken_Returns403(t *testing.T) {
+	c, cleanup := startServer(t)
+	defer cleanup()
+
+	status, _ := c.bodyRaw(t, "") // no token
+	if status != http.StatusForbidden {
+		t.Errorf("GET /body with no token: status=%d, want 403", status)
+	}
+}
+
+// TestWebBody_IsReadOnly verifies that calling GET /body does not mutate state:
+// the Body.Kind observed after two successive /body calls is the same, and a
+// subsequent GET /state shows the same Body.Kind (proving /body has no Apply).
+//
+// Pre-fix failure: /body did not exist. Without the endpoint the SSE refresh
+// path routed to POST /action with an empty body, which mutated LastApplied and
+// triggered spurious notifySubscribers calls.
+func TestWebBody_IsReadOnly(t *testing.T) {
+	c, cleanup := startServer(t)
+	defer cleanup()
+
+	// Navigate to a list so we have a non-menu state to inspect.
+	c.action(t, app.ActionCommand, "ec2")
+
+	// Capture kind before /body calls.
+	vsBefore := c.state(t)
+	kindBefore := vsBefore.Body.Kind
+
+	// Call /body twice.
+	status1, _ := c.bodyRaw(t, c.token)
+	if status1 != http.StatusOK {
+		t.Fatalf("first GET /body: status=%d", status1)
+	}
+	status2, _ := c.bodyRaw(t, c.token)
+	if status2 != http.StatusOK {
+		t.Fatalf("second GET /body: status=%d", status2)
+	}
+
+	// State must be unchanged.
+	vsAfter := c.state(t)
+	if vsAfter.Body.Kind != kindBefore {
+		t.Errorf("GET /body mutated state: Body.Kind changed from %q to %q — /body must be read-only", kindBefore, vsAfter.Body.Kind)
+	}
+}
+
+// min is a local helper so the test file does not need to import math.
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
