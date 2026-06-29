@@ -342,7 +342,20 @@ func (m JSONModel) FrameTitle() string {
 }
 
 // BottomHints implements Hintable for JSONModel.
+// Delegates to the controller snapshot when a controller is wired; falls back
+// to local state for nil-controller (test/preview) paths.
 func (m JSONModel) BottomHints() []layout.KeyHint {
+	if m.ctrl != nil {
+		src := m.ctrl.Snapshot().Footer
+		if len(src) > 0 {
+			hints := make([]layout.KeyHint, len(src))
+			for i, kh := range src {
+				hints[i] = layout.KeyHint{Key: kh.Key, Desc: kh.Help}
+			}
+			return hints
+		}
+	}
+	// Nil-controller path: compute from local model state.
 	hints := []layout.KeyHint{
 		{Key: "w", Desc: "Wrap"},
 		{Key: "c", Desc: "Copy"},

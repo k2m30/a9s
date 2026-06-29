@@ -350,11 +350,32 @@ func (m ResourceListModel) FrameTitle() string {
 	return m.ctrl.ListFrameTitle()
 }
 
+
 // BottomHints implements Hintable for ResourceListModel.
+// Delegates to the controller's snapshot footer when a controller is wired,
+// falling back to local computation for nil-controller (test/preview) paths.
 func (m ResourceListModel) BottomHints() []layout.KeyHint {
+	if m.ctrl != nil {
+		src := m.ctrl.Snapshot().Footer
+		if len(src) > 0 {
+			hints := make([]layout.KeyHint, len(src))
+			for i, kh := range src {
+				hints[i] = layout.KeyHint{Key: kh.Key, Desc: kh.Help}
+			}
+			return hints
+		}
+	}
+	// Nil-controller path: compute locally from typeDef.
+	return m.bottomHintsFromTypeDef()
+}
+
+// bottomHintsFromTypeDef computes footer hints using only the view model's
+// typeDef and ctrl accessors (nil-safe). Used when no controller snapshot
+// is available (preview/test paths with no controller wired).
+func (m ResourceListModel) bottomHintsFromTypeDef() []layout.KeyHint {
 	var hints []layout.KeyHint
 
-	if m.ctrl.GetListEscPops() {
+	if m.ctrl != nil && m.ctrl.GetListEscPops() {
 		hints = append(hints, layout.KeyHint{Key: "esc", Desc: "Back"})
 	}
 
@@ -399,15 +420,17 @@ func (m ResourceListModel) BottomHints() []layout.KeyHint {
 		hints = append(hints, layout.KeyHint{Key: child.Key, Desc: desc})
 	}
 
-	if m.typeDef.CloudTrailKey != "" && m.ctrl.GetListParentContext() == nil {
+	if m.typeDef.CloudTrailKey != "" && (m.ctrl == nil || m.ctrl.GetListParentContext() == nil) {
 		hints = append(hints, layout.KeyHint{Key: "t", Desc: "CloudTrail"})
 	}
 
 	hints = append(hints, layout.KeyHint{Key: "ctrl+r", Desc: "Refresh"})
 	hints = append(hints, layout.KeyHint{Key: "ctrl+z", Desc: "Only !"})
 
-	if truncated, _ := m.ctrl.GetListPagination(); truncated {
-		hints = append(hints, layout.KeyHint{Key: "m", Desc: "More"})
+	if m.ctrl != nil {
+		if truncated, _ := m.ctrl.GetListPagination(); truncated {
+			hints = append(hints, layout.KeyHint{Key: "m", Desc: "More"})
+		}
 	}
 
 	return hints

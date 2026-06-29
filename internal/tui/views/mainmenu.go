@@ -142,9 +142,9 @@ func (m MainMenuModel) FrameTitle() string {
 }
 
 // BottomHints implements Hintable for MainMenuModel.
+// Single-sourced in app.MenuFooterHints, shared with the web footer
+// (ViewState.Footer) so the two renderers cannot drift.
 func (m MainMenuModel) BottomHints() []layout.KeyHint {
-	// Single-sourced in app.MenuFooterHints, shared with the web footer
-	// (ViewState.Footer) so the two renderers cannot drift.
 	src := app.MenuFooterHints()
 	hints := make([]layout.KeyHint, len(src))
 	for i, h := range src {

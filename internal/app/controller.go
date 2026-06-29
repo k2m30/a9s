@@ -1423,6 +1423,7 @@ func (c *Controller) snapshot() ViewState {
 	if top.State.List != nil {
 		vs.Body.List = c.buildListBody(top.Ctx, top.State.List)
 		vs.FrameTitle = c.buildListFrameTitle(top.Ctx, top.State.List)
+		vs.Footer = c.buildListFooterHints(top.Ctx, top.State.List)
 	}
 	if top.State.Selector != nil {
 		vs.Body.Selector = buildSelectorBody(top.State.Selector)
@@ -1430,6 +1431,7 @@ func (c *Controller) snapshot() ViewState {
 	}
 	if top.State.Text != nil {
 		vs.Body.Text = buildTextBody(top.State.Text)
+		vs.Footer = c.buildTextFooterHints(top.ID, top.Ctx)
 	}
 	if top.State.Detail != nil {
 		vs.Body.Detail = buildDetailBody(top.State.Detail, c.viewConfig)
@@ -1442,6 +1444,105 @@ func (c *Controller) snapshot() ViewState {
 		vs.Body.Identity = c.buildIdentityBody()
 	}
 	return vs
+}
+
+// buildListFooterHints builds the footer key hints for a resource-list screen,
+// ported faithfully from ResourceListModel.BottomHints() so the controller is
+// the single source of truth for all renderers. Callers must hold c.mu.
+func (c *Controller) buildListFooterHints(ctx runtime.ScreenContext, ls *ListState) []KeyHint {
+	var hints []KeyHint
+
+	if ls.EscPops {
+		hints = append(hints, KeyHint{Key: "esc", Help: "Back"})
+	}
+
+	td := resource.FindResourceType(ctx.ResourceType)
+	if td == nil {
+		if fv, ok := c.fallbackTypeDefs[ctx.ResourceType]; ok {
+			td = &fv
+		}
+	}
+	if td != nil {
+		var enterChild *resource.ChildViewDef
+		for i := range td.Children {
+			if td.Children[i].Key == "enter" {
+				enterChild = &td.Children[i]
+				break
+			}
+		}
+		if enterChild != nil {
+			showEnterChild := true
+			if enterChild.DrillCondition != nil {
+				sel, ok := c.listSelected()
+				showEnterChild = ok && enterChild.DrillCondition(sel)
+			}
+			if showEnterChild {
+				desc := enterChild.ChildType
+				if ct := resource.GetChildType(enterChild.ChildType); ct != nil {
+					desc = ct.Name
+				}
+				hints = append(hints, KeyHint{Key: "enter", Help: desc})
+				hints = append(hints, KeyHint{Key: "d", Help: "Detail"})
+			}
+		}
+
+		if resource.HasRevealFetcher(td.ShortName) {
+			hints = append(hints, KeyHint{Key: "x", Help: "Reveal"})
+		}
+	}
+
+	hints = append(hints, KeyHint{Key: "y", Help: "YAML"})
+	hints = append(hints, KeyHint{Key: "J", Help: "JSON"})
+
+	if td != nil {
+		for _, child := range td.Children {
+			if child.Key == "enter" {
+				continue
+			}
+			desc := child.ChildType
+			if ct := resource.GetChildType(child.ChildType); ct != nil {
+				desc = ct.Name
+			}
+			hints = append(hints, KeyHint{Key: child.Key, Help: desc})
+		}
+
+		if td.CloudTrailKey != "" && ls.ParentContext == nil {
+			hints = append(hints, KeyHint{Key: "t", Help: "CloudTrail"})
+		}
+	}
+
+	hints = append(hints, KeyHint{Key: "ctrl+r", Help: "Refresh"})
+	hints = append(hints, KeyHint{Key: "ctrl+z", Help: "Only !"})
+
+	if ls.HasPagination {
+		hints = append(hints, KeyHint{Key: "m", Help: "More"})
+	}
+
+	return hints
+}
+
+// buildTextFooterHints builds the footer key hints for a YAML or JSON text
+// screen. The CloudTrail hint appears only when the resource type has a
+// CloudTrailKey and the resource can be found in the cache. Callers must hold c.mu.
+func (c *Controller) buildTextFooterHints(screenID runtime.ScreenID, ctx runtime.ScreenContext) []KeyHint {
+	hints := []KeyHint{
+		{Key: "w", Help: "Wrap"},
+		{Key: "c", Help: "Copy"},
+	}
+	// CloudTrail hint: needs a resource that has a CloudTrailKey.
+	// Skip when no resource type is set (raw-text / reveal YAML path).
+	if ctx.ResourceType != "" && ctx.ResourceID != "" {
+		// Find the resource in the cache to call BuildCloudTrailFilter.
+		for _, r := range c.resourceCache[ctx.ResourceType] {
+			if r.ID == ctx.ResourceID {
+				if resource.BuildCloudTrailFilter(r, ctx.ResourceType) != nil {
+					hints = append(hints, KeyHint{Key: "t", Help: "CloudTrail"})
+				}
+				break
+			}
+		}
+	}
+	return hints
 }
 
 // applyNavResult converts a NavigateResult into PushScreen/ReplaceScreen/PopScreen
