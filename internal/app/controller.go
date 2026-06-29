@@ -1,10 +1,12 @@
 package app
 
 import (
+	"fmt"
 	"maps"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/domain"
@@ -78,6 +80,22 @@ type Controller struct {
 	// (e.g. an API error). snapshot() emits it as Header.Flash; it is cleared at
 	// the start of each user Apply so it persists until the next action.
 	flash Flash
+
+	// errorHistory records each error entry appended via AppendErrorHistoryIntent.
+	// The '!' / open-error-log action renders these newest-first as a text screen.
+	errorHistory []controllerErrorEntry
+
+	// showErrorHint is true after an error flash clears (SetErrorHintIntent{Show:true})
+	// and cleared on any subsequent action. Surfaced as Header.ErrorHintVisible in snapshot().
+	showErrorHint bool
+}
+
+// controllerErrorEntry is one session-error-log entry stored in Controller.
+// Mirrors the tui.errorEntry private type but lives in the app package so
+// the controller can build the error-log text body without importing tui.
+type controllerErrorEntry struct {
+	t       time.Time
+	message string
 }
 
 // New constructs a Controller backed by the given runtime Core.
@@ -213,6 +231,10 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 	// or by its task results (via Handle) re-sets it, so an error still shows
 	// until the next action.
 	c.flash = Flash{}
+	// Any user action dismisses the persistent error hint (mirrors the TUI's
+	// m.showErrorHint = false at the top of handleKeyMsg). ActionOpenErrorLog
+	// re-clears it explicitly after this point so the hint doesn't reappear.
+	c.showErrorHint = false
 
 	switch a.Kind {
 
@@ -245,6 +267,29 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 			Payload: runtime.FetchIdentityPayload{},
 		}
 		return c.snapshot(), []runtime.TaskRequest{fetchTask}
+
+	case ActionOpenErrorLog:
+		// Mirror the TUI's '!' key: flash when no errors recorded; otherwise push
+		// a text screen with the log entries newest-first.
+		c.showErrorHint = false
+		if len(c.errorHistory) == 0 {
+			intents, tasks := c.core.HandleFlash(runtime.FlashEvent{
+				Text:    "No errors this session",
+				IsError: false,
+				NewGen:  c.core.ConnectGen(),
+			})
+			c.applyIntents(intents)
+			return c.snapshot(), tasks
+		}
+		var sb strings.Builder
+		for i := len(c.errorHistory) - 1; i >= 0; i-- {
+			e := c.errorHistory[i]
+			fmt.Fprintf(&sb, "[%s] %s\n", e.t.Format("15:04:05"), e.message)
+		}
+		lines := strings.Split(strings.TrimRight(sb.String(), "\n"), "\n")
+		c.applyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenErrorLog}})
+		c.ensureTextState(lines)
+		return c.snapshot(), nil
 
 	// --- Session-selection actions (PR-B) ---
 
@@ -1370,9 +1415,16 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 				ls.Loading = false
 			}
 
+		case runtime.SetErrorHintIntent:
+			c.showErrorHint = v.Show
+
+		case runtime.AppendErrorHistoryIntent:
+			c.errorHistory = append(c.errorHistory, controllerErrorEntry{
+				t:       v.Time,
+				message: v.Message,
+			})
+
 		// TODO PR-C: PatchDetail mutates state lifted in PR-C
-		// TODO PR-C: SetErrorHintIntent mutates state lifted in PR-C
-		// TODO PR-C: AppendErrorHistoryIntent mutates state lifted in PR-C
 		// TODO PR-C: RefreshActiveListIntent mutates state lifted in PR-C
 		// TODO PR-C: PatchResourceCache mutates state lifted in PR-C
 		// TODO PR-C: PatchRelatedCache mutates state lifted in PR-C
@@ -1403,9 +1455,10 @@ func (c *Controller) Snapshot() ViewState {
 func (c *Controller) snapshot() ViewState {
 	vs := ViewState{
 		Header: Header{
-			Profile: c.core.Profile(),
-			Region:  c.core.Region(),
-			Flash:   c.flash,
+			Profile:          c.core.Profile(),
+			Region:           c.core.Region(),
+			Flash:            c.flash,
+			ErrorHintVisible: c.showErrorHint && len(c.errorHistory) > 0,
 		},
 	}
 	if len(c.stack) == 0 {
@@ -2341,7 +2394,7 @@ func bodyKindForScreen(s Screen) BodyKind {
 		return BodyKindDetail
 	case runtime.ScreenChildList, runtime.ScreenResourceList:
 		return BodyKindList
-	case runtime.ScreenYAML, runtime.ScreenJSON:
+	case runtime.ScreenYAML, runtime.ScreenJSON, runtime.ScreenErrorLog:
 		return BodyKindText
 	case runtime.ScreenHelp:
 		return BodyKindHelp
