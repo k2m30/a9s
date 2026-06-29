@@ -94,8 +94,8 @@ func (c *Controller) handleActionSelectTheme(a Action) (ViewState, []runtime.Tas
 // handleActionCommand handles ActionCommand.
 func (c *Controller) handleActionCommand(a Action) (ViewState, []runtime.TaskRequest) {
 	// Arg carries a colon-command token (mirrors executeCommand in app_input.go).
-	// Only arg-driven tokens are dispatched here; tokens that need selected-row
-	// or per-screen state are noted as PR-C TODOs below.
+	// Arg-driven tokens (navigate to a resource type, profile, region, etc.) are
+	// dispatched here; "q"/"quit" is intentionally left to the renderer.
 	switch a.Arg {
 	case "root", "main":
 		res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{Target: runtime.NavigateTargetMainMenu})
@@ -132,8 +132,9 @@ func (c *Controller) handleActionCommand(a Action) (ViewState, []runtime.TaskReq
 			c.applyNavResult(res)
 			return c.snapshot(), tasks
 		}
-		// TODO PR-C: "q"/"quit" needs tea.Quit from the renderer, not the controller.
-		// Unknown tokens are silently dropped at this layer; the renderer flashes.
+		// "q"/"quit" is intentionally not handled here: quitting requires tea.Quit,
+		// a renderer concern the controller cannot (and must not) own. Unknown
+		// command tokens are silently dropped at this layer; the renderer flashes.
 	}
 	return c.snapshot(), nil
 }

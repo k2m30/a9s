@@ -7,9 +7,8 @@ import "github.com/k2m30/a9s/v3/internal/domain"
 // Lipgloss, Bubble Tea, or AWS SDK types — only scalars, slices, and
 // structs with JSON tags so it round-trips through encoding/json cleanly.
 //
-// PR-C fills the Body fields from live controller state. In this PR
-// (PR-A) Snapshot() returns a zero-value Body with the correct BodyKind
-// derived from the top-of-stack screen.
+// Snapshot() builds the full per-screen Body (menu/list/detail/text/
+// selector/help/identity) from live controller state.
 type ViewState struct {
 	Header     Header   `json:"header"`
 	FrameTitle string   `json:"frame_title"`

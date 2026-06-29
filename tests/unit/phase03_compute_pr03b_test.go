@@ -1102,11 +1102,11 @@ func TestPR03b_EBFetcher_DoesNotEmitHealthAsWave1Finding(t *testing.T) {
 	}
 }
 
-// TODO(follow-up): consolidate per-type single-method mock adapters
-// (pr03bLambdaMock, pr03bEKSListMock, pr03bASGMock, etc.) into shared helpers
-// in tests/unit/helpers_*.go — each is a trivial struct satisfying a one-method
-// interface. Consolidation is intentionally deferred to avoid disrupting the
-// current coder → QA diff cycle.
+// Per-type single-method mock adapters (pr03bLambdaMock, pr03bEKSListMock,
+// pr03bASGMock, etc.) are candidates for consolidation into shared helpers in
+// tests/unit/helpers_*.go. Each satisfies a one-method interface and the
+// boilerplate is repetitive, but consolidation was deferred to avoid disrupting
+// the coder → QA diff cycle.
 
 // =============================================================================
 // A1 — Lambda Inactive emits NO Finding

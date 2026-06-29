@@ -12,7 +12,8 @@ import (
 func (c *Controller) handleActionBack(_ Action) (ViewState, []runtime.TaskRequest) {
 	// Pop a single screen, mirroring the TUI's m.popView() — NOT a full
 	// collapse (root-collapse is the "root" Command). Per-view Esc semantics
-	// (clear filter/search before popping) arrive with PR-C view state.
+	// (clear filter/search before popping) are handled in the per-screen
+	// Update methods in the TUI adapter.
 	c.applyIntents([]runtime.UIIntent{runtime.PopScreen{}})
 	return c.snapshot(), nil
 }

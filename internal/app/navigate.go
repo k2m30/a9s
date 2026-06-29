@@ -65,9 +65,9 @@ func resourceJSONLines(r resource.Resource) []string {
 // The adapter (not the runtime) decides which ScreenID to push for each kind;
 // this method encodes that mapping for the headless controller.
 //
-// Kinds that require selected-row or resource data (PushDetail, PushYAML,
-// PushJSON, PushResourceList/Cached, FetchReveal) are deferred to PR-C where
-// per-screen state is lifted into the controller.
+// All NavigateResult kinds are handled, including those that require
+// selected-row or resource data (PushDetail, PushYAML, PushJSON,
+// PushResourceList/Cached, FetchReveal).
 func (c *Controller) applyNavResult(res runtime.NavigateResult) {
 	switch res.Kind {
 	case runtime.NavigateKindPopAll:

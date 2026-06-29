@@ -18,7 +18,9 @@ import (
 // ec2 canonical FindingCodes.
 const (
 	ec2CodeInstanceStatusImpaired domain.FindingCode = "ec2.instance-status-impaired"
-	// TODO(W1-future): split scheduled-event branch into a typed constant once ec2 enricher is further split.
+	// Scheduled-event findings intentionally reuse the code above, distinguished
+	// by tier ("~" vs "!"); a separate code is unnecessary while the ec2 status
+	// and scheduled-event checks live in one enricher function.
 )
 
 // EnrichEC2InstanceStatus calls DescribeInstanceStatus(IncludeAllInstances=true) (account-wide,

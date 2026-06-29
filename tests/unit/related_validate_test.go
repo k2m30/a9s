@@ -153,8 +153,8 @@ func TestValidateRelatedResult_Invalid(t *testing.T) {
 //
 // Parent types scoped per ARCH-06 task: asg, ecr, ecs-svc, secrets, ses, kms, eb, eks.
 //
-// TODO(no-middle-state): this is a shape/invariant guard only. A checker can
-// still be inert, non-drillable, or fed by incomplete runtime data and pass.
+// Shape/invariant guard only — a checker can still be inert, non-drillable,
+// or fed by incomplete runtime data and pass.
 func TestRegisteredCheckers_ProduceValidResults(t *testing.T) {
 	parentTypes := []string{"asg", "ecr", "ecs-svc", "secrets", "ses", "kms", "eb", "eks"}
 
@@ -176,9 +176,9 @@ func TestRegisteredCheckers_ProduceValidResults(t *testing.T) {
 			for _, def := range defs {
 				def := def
 				if def.Checker == nil {
-					// TODO(no-middle-state): nil Checker is not an acceptable steady
-					// state for a registered relation. This legacy skip should become
-					// a hard failure once the remaining allowances are removed.
+					// Nil Checker is not an acceptable steady state for a registered
+					// relation. This legacy skip should become a hard failure once
+					// the remaining allowances are removed.
 					continue
 				}
 

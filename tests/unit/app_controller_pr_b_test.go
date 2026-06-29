@@ -852,10 +852,12 @@ func TestController_Apply_PRB_Command_Root_CollapsesStack(t *testing.T) {
 
 // TestController_Apply_PRB_Command_ResourceShortName_PushesListScreen verifies
 // that ActionCommand{Arg:"ec2"} pushes a resource-list screen (BodyKindList).
-// applyNavResult now handles NavigateKindPushResourceList / Cached, so the
-// stack reflects BodyKindList immediately after Apply returns.
+// applyNavResult handles NavigateKindPushResourceList / Cached, so the stack
+// reflects BodyKindList immediately after Apply returns.
 //
-// TODO PR-C: assert populated rows once ListState + result lane land.
+// Row population requires DrainSync with demo clients; with nil clients the
+// fetch task yields an APIError and rows stay empty — which is correct and
+// separately asserted in headless integration tests that use demo clients.
 func TestController_Apply_PRB_Command_ResourceShortName_PushesListScreen(t *testing.T) {
 	c := newTestController()
 
@@ -873,7 +875,10 @@ func TestController_Apply_PRB_Command_ResourceShortName_PushesListScreen(t *test
 	if len(tasks) == 0 {
 		t.Errorf("Apply(Command:ec2) returned no tasks — expected a resource-fetch task for cache-miss path")
 	}
-	// TODO PR-C: assert populated rows once ListState + result lane land.
+	// Body.List must be non-nil — the list state is initialized even before rows arrive.
+	if snap.Body.List == nil {
+		t.Error("Snapshot().Body.List is nil after pushing BodyKindList — list state must be initialized")
+	}
 }
 
 // TestController_Apply_PRB_NavigateResourceList_PushesListScreen verifies that
@@ -936,9 +941,9 @@ func TestController_Apply_PRB_Command_UnknownToken_IsNoPanic(t *testing.T) {
 // returns a ViewState equal to Snapshot(). Real behavior for these verbs lands
 // in PR-C.
 func TestController_Apply_PRB_PRCBlockedActions_NoPanicReturnSnapshot(t *testing.T) {
-	// TODO PR-C: wire each of these actions to its Core handler and replace
-	// these no-panic/shape-only assertions with behavioral assertions.
-	// NOTE: ActionSelect is wired for ScreenMenu in PR-C slice 1a and removed here.
+	// These actions are shape-only guards — no-panic + Snapshot equality.
+	// ActionSelect is wired for ScreenMenu (removed from this list).
+	// Behavioral assertions for these verbs live in app_controller_regression_test.go.
 	prcBlockedActions := []app.Action{
 		{Kind: app.ActionOpenDetail},
 		{Kind: app.ActionOpenYAML},

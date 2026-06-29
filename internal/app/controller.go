@@ -95,7 +95,7 @@ type controllerErrorEntry struct {
 
 // New constructs a Controller backed by the given runtime Core.
 // The root screen is always ScreenMenu so Snapshot() returns BodyKindMenu
-// immediately; the QA agent updates the PR-A empty-stack tests accordingly.
+// immediately.
 func New(core *runtime.Core) *Controller {
 	return &Controller{
 		core: core,
@@ -137,8 +137,7 @@ func (c *Controller) RegisterFallbackTypeDef(td resource.ResourceTypeDef) {
 // and returns the updated ViewState plus newly-enqueued TaskRequests.
 //
 // USER-INTENT lane: each Action.Kind maps to a specific Core.HandleX method.
-// PR-B wires the six navigate/session actions that need no selected-row state.
-// PR-C-blocked actions (row-dependent) are kept as documented no-ops.
+// All navigate/session actions and row-dependent actions are fully wired.
 func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
