@@ -1292,10 +1292,12 @@ func mergeDetailRelatedRow(ds *DetailState, displayName, targetType string, coun
 	})
 }
 
-// ApplyIntents applies a slice of UIIntents to the controller's screen stack.
-// Stack-navigation intents (PushScreen / PopScreen / ReplaceScreen) are fully
-// implemented. All other intent variants are no-ops with a PR-C marker so
-// tests can drive the stack directly without standing up a full renderer.
+// ApplyIntents applies a slice of UIIntents to the controller's screen stack
+// and state: stack navigation (Push/Pop/Replace/PopSelector), menu
+// availability/issue/progress patches, list enrichment, identity, flash, and
+// error-log/hint state. The few remaining variants are intentional no-ops
+// (documented at the default case) — renderer-specific or served via another
+// controller path, not migration leftovers.
 //
 // ApplyIntents never panics on a PopScreen against an empty stack.
 // It returns the post-apply ViewState snapshot.
@@ -1463,13 +1465,22 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 				message: v.Message,
 			})
 
-		// TODO PR-C: PatchDetail mutates state lifted in PR-C
-		// TODO PR-C: RefreshActiveListIntent mutates state lifted in PR-C
-		// TODO PR-C: PatchResourceCache mutates state lifted in PR-C
-		// TODO PR-C: PatchRelatedCache mutates state lifted in PR-C
-		// TODO PR-C: PatchLazyResourceCache mutates state lifted in PR-C
-		// TODO PR-C: HeaderInvalidateIntent mutates state lifted in PR-C
-		// TODO PR-C: ApplyThemeIntent mutates state lifted in PR-C
+		// The remaining intents are renderer-specific or are served through
+		// another controller path, so they are intentional no-ops here rather
+		// than migration leftovers:
+		//   PatchDetail             — detail enrichment is applied via
+		//                             ApplyDetailFinding (the task-result lane).
+		//   RefreshActiveListIntent — refresh runs as the Refresh action's fetch
+		//                             task, not as an intent.
+		//   HeaderInvalidateIntent  — the Header is rebuilt from core on every
+		//                             snapshot(); there is nothing to invalidate.
+		//   ApplyThemeIntent        — lipgloss theming is a TUI concern; the web
+		//                             renderer uses static CSS.
+		//   PatchResourceCache / PatchRelatedCache / PatchLazyResourceCache —
+		//                             the controller seeds its caches via
+		//                             applyResourcesLoaded; these incremental TUI
+		//                             cache writes belong to the cache-subsystem
+		//                             rework (plan goal 2), not the renderer split.
 		default:
 			_ = v
 		}
@@ -1477,9 +1488,9 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 	return c.snapshot()
 }
 
-// Snapshot builds a ViewState from the current controller state. In PR-A
-// only the Header, FrameTitle, and BodyKind are populated; full body
-// rendering is added in PR-C when per-screen state is lifted here.
+// Snapshot builds the full ViewState from the controller's screen state:
+// Header, FrameTitle, Footer, and the per-screen Body (menu/list/detail/text/
+// selector/help/identity). Both the TUI and web render from this snapshot.
 //
 // Snapshot never panics on an empty stack — it returns a ViewState with
 // BodyKindUnknown.
