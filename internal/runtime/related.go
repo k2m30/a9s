@@ -20,15 +20,20 @@ type RelatedCheckStartedEvent struct {
 }
 
 // HandleRelatedCheckStarted dispatches a KindRelatedCheck TaskRequest when
-// defs are registered for the event's resource type.
+// defs are registered for the event's resource type. The RelatedCheckPayload
+// carries the full source resource so the headless executor (runRelatedCheckers)
+// can invoke checkers without re-fetching. The TUI adapter's relatedCheckCmd
+// fan-out uses the payload as a fallback source but continues its own concurrent
+// path — the payload is additive and does not change the TUI code path.
 func (c *Core) HandleRelatedCheckStarted(ev RelatedCheckStartedEvent) ([]UIIntent, []TaskRequest) {
 	defs := resource.GetRelated(ev.ResourceType)
 	if len(defs) == 0 {
 		return nil, nil
 	}
 	return nil, []TaskRequest{{
-		Key:   TaskKey{Kind: KindRelatedCheck, Scope: ev.ResourceType + "/" + ev.SourceResource.ID},
-		Cache: CacheNone,
+		Key:     TaskKey{Kind: KindRelatedCheck, Scope: ev.ResourceType + "/" + ev.SourceResource.ID},
+		Cache:   CacheNone,
+		Payload: RelatedCheckPayload{ResourceType: ev.ResourceType, Resource: ev.SourceResource},
 	}}
 }
 
