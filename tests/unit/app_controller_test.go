@@ -28,6 +28,7 @@ import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/app"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/session"
@@ -854,9 +855,10 @@ func TestDrainSync_AfterSeededPendingApplyIsShapeCorrect(t *testing.T) {
 	if vs.Body.Kind == "" {
 		t.Error("Apply after DrainSync returned ViewState with empty BodyKind")
 	}
-	// TODO PR-B0: once tasks execute and produce events, assert that subsequent
-	// tasks reflect any state driven by the drained tasks.
-	_ = subsequent
+	// MoveDown on a menu never enqueues background tasks regardless of prior DrainSync state.
+	if len(subsequent) != 0 {
+		t.Errorf("Apply(MoveDown) after DrainSync returned %d tasks, want 0", len(subsequent))
+	}
 }
 
 // TestDrainSync_NoPanicOnRepeatedCalls verifies that calling DrainSync
@@ -896,7 +898,10 @@ func TestController_Apply_MoveDownNoPanic(t *testing.T) {
 		vs, tasks = c.Apply(app.Action{Kind: app.ActionMoveDown})
 	}()
 
-	_ = tasks // may be nil or empty in the PR-A skeleton — TODO PR-B: verify task routing
+	// MoveDown on a menu produces no tasks (no background work triggered by cursor moves).
+	if len(tasks) != 0 {
+		t.Errorf("Apply(MoveDown) returned %d tasks, want 0 — cursor moves must not enqueue background tasks", len(tasks))
+	}
 
 	snap := c.Snapshot()
 	assertViewStateEqualsSnapshot(t, "Apply(MoveDown)", vs, snap)
@@ -1021,7 +1026,11 @@ func TestController_Handle_IdentityErrorNoPanic(t *testing.T) {
 		vs, tasks = c.Handle(messages.IdentityError{Err: "identity fetch failed", Gen: 0})
 	}()
 
-	_ = tasks // TODO PR-B: verify IdentityError produces an appropriate intent/task
+	// IdentityError is handled by Controller.Handle (sets identityErrMsg) and
+	// produces no follow-up tasks — the result lane requires no background work.
+	if len(tasks) != 0 {
+		t.Errorf("Handle(IdentityError) returned %d tasks, want 0 — error events must not enqueue follow-up tasks", len(tasks))
+	}
 
 	snap := c.Snapshot()
 	assertViewStateEqualsSnapshot(t, "Handle(IdentityError)", vs, snap)
@@ -1063,14 +1072,13 @@ func TestController_Handle_ReturnedViewStateEqualsSnapshot(t *testing.T) {
 }
 
 // TestController_Handle_IdentityLoadedNoPanic verifies that Handle tolerates
-// messages.IdentityLoaded without panicking. Identity is typed as any — nil
-// is a valid value in a no-AWS-client test context; the runtime handler must
-// not dereference it without a nil check. Gen=0 is accepted (AcceptZeroGen=true).
-// TODO PR-B: once HandleIdentityLoaded is wired, assert that a non-nil
-// Identity populates Header.RightSide with the account ARN.
+// messages.IdentityLoaded without panicking. A non-nil Identity must populate
+// Snapshot().Body.Identity.ARN once ScreenIdentity is on the stack.
+// Gen=0 is accepted (AcceptZeroGen=true).
 func TestController_Handle_IdentityLoadedNoPanic(t *testing.T) {
 	c := newTestController()
 
+	// nil Identity must not panic.
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -1079,6 +1087,32 @@ func TestController_Handle_IdentityLoadedNoPanic(t *testing.T) {
 		}()
 		_, _ = c.Handle(messages.IdentityLoaded{Identity: nil, Gen: 0})
 	}()
+
+	// Push ScreenIdentity so Snapshot().Body.Identity is populated.
+	_, _ = c.Apply(app.Action{Kind: app.ActionOpenIdentity})
+
+	// IdentityLoaded.Identity is type-asserted to *awsclient.CallerIdentity in
+	// Core.HandleIdentityLoaded; passing the domain mirror type yields nil/nil.
+	wantARN := "arn:aws:iam::111122223333:user/test-operator"
+	_, _ = c.Handle(messages.IdentityLoaded{
+		Identity: &awsclient.CallerIdentity{
+			AccountID: "111122223333",
+			Arn:       wantARN,
+			UserName:  "test-operator",
+		},
+		Gen: 0,
+	})
+
+	snap := c.Snapshot()
+	if snap.Body.Identity == nil {
+		t.Fatal("Snapshot().Body.Identity is nil after Handle(IdentityLoaded) with ScreenIdentity on stack")
+	}
+	if snap.Body.Identity.ARN != wantARN {
+		t.Errorf("Snapshot().Body.Identity.ARN = %q, want %q", snap.Body.Identity.ARN, wantARN)
+	}
+	if snap.Body.Identity.AccountID != "111122223333" {
+		t.Errorf("Snapshot().Body.Identity.AccountID = %q, want %q", snap.Body.Identity.AccountID, "111122223333")
+	}
 }
 
 // =============================================================================

@@ -237,8 +237,9 @@ func collectTagItems(sections []domain.Section) []domain.Item {
 // a JSON string. The projector must detect it and emit an ItemHeader + multiple
 // ItemSubfield rows.
 //
-// TODO: populate via FetchIAMRoles when the IAM fixtures include the full
-// AssumeRolePolicyDocument value in the RawStruct (verify in internal/demo/fixtures/iam.go).
+// Fixture limitation: this test requires that internal/demo/fixtures/iam.go
+// includes a RawStruct with AssumeRolePolicyDocument. Currently the fixture
+// omits RawStruct, so the test skips. Add the field to the fixture to enable it.
 func TestProjectionFieldAudit_JSONExpansion(t *testing.T) {
 	clients := demo.NewServiceClients()
 	roles, err := awsclient.FetchIAMRoles(context.Background(), clients.IAM)
@@ -259,7 +260,7 @@ func TestProjectionFieldAudit_JSONExpansion(t *testing.T) {
 	}
 	if target == nil {
 		t.Skip("no IAM role fixture with RawStruct — cannot test JSON expansion; " +
-			"TODO: add policy document to internal/demo/fixtures/iam.go")
+			"add AssumeRolePolicyDocument to internal/demo/fixtures/iam.go to enable")
 	}
 
 	sections := projection.Generic(*target)

@@ -236,8 +236,8 @@ func TestIssueEnricherRegistry_NoUnexpectedKeys(t *testing.T) {
 	// AllWave2 returns one entry per catalog Wave2 field. Every entry must
 	// correspond to a registered ResourceTypeDef.
 	//
-	// TODO(no-middle-state): avoid calling this the "full contract". Registration
-	// is necessary, but it does not prove that the feature is fully implemented.
+	// Registry-shape guard only — registration is necessary but does not prove
+	// the feature is fully implemented.
 	for _, entry := range awsclient.AllWave2() {
 		if resource.FindResourceType(entry.ShortName) == nil {
 			t.Errorf("AllWave2 entry %q has no matching ResourceTypeDef", entry.ShortName)

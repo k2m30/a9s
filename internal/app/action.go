@@ -3,9 +3,10 @@
 // (TUI, web, test). It owns the screen stack, per-screen view state,
 // the semantic Action vocabulary, and the serialisable ViewState snapshot.
 //
-// PR-A creates the contract types and a skeleton Controller. No behavior
-// is moved from internal/tui in this PR; that happens in PR-B (event
-// migration) and PR-C (state lift).
+// Renderers translate native input (keystroke, HTTP POST, test call) into
+// an Action, call Apply/Handle, and render the returned ViewState. The TUI
+// and web share this controller as the single source of truth for screen
+// state and action availability.
 package app
 
 // ActionKind is the semantic verb that a renderer translates its native

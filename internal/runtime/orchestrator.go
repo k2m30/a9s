@@ -18,10 +18,6 @@ type Event = messages.Event
 // state and the catalog of resource types, dispatches inbound events to
 // the appropriate handler, and returns a list of UI intents plus task
 // requests that adapters apply to their renderer-specific state.
-//
-// The handlers are not yet wired in PR-05a-scaffold — that work lands in
-// per-handler PRs AS-72-h1..h8. This struct exists so dependent PRs can
-// reference the entry-point type while the handler moves are sequenced.
 type Core struct {
 	session *session.Session
 	types   []catalog.ResourceTypeDef
