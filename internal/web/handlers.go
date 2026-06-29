@@ -138,7 +138,7 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 	s.notifySubscribers(entry)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := renderBodyFragment(w, vs.Body); err != nil {
+	if err := renderMainFragment(w, vs); err != nil {
 		http.Error(w, "render error", http.StatusInternalServerError)
 	}
 }
@@ -162,7 +162,7 @@ func (s *Server) handleBody(w http.ResponseWriter, r *http.Request) {
 	entry.mu.Unlock()
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := renderBodyFragment(w, vs.Body); err != nil {
+	if err := renderMainFragment(w, vs); err != nil {
 		http.Error(w, "render error", http.StatusInternalServerError)
 	}
 }
