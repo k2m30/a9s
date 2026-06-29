@@ -1,0 +1,19 @@
+{{define "identity.html"}}
+{{if .Loading}}<div style="color:var(--dim);font-style:italic;">Loading identity…</div>{{end}}
+{{if .ErrorMsg}}<div style="color:var(--err);">Error: {{.ErrorMsg}}</div>{{end}}
+{{if not .Loading}}
+<table class="identity-table">
+  {{if .AccountID}}<tr><td>Account ID</td><td>{{.AccountID}}</td></tr>{{end}}
+  {{if .AccountAlias}}<tr><td>Account Alias</td><td>{{.AccountAlias}}</td></tr>{{end}}
+  {{if .ARN}}<tr><td>ARN</td><td>{{.ARN}}</td></tr>{{end}}
+  {{if .IsAssumedRole}}
+    {{if .RoleName}}<tr><td>Role</td><td>{{.RoleName}}</td></tr>{{end}}
+    {{if .SessionName}}<tr><td>Session</td><td>{{.SessionName}}</td></tr>{{end}}
+  {{else}}
+    {{if .UserName}}<tr><td>User</td><td>{{.UserName}}</td></tr>{{end}}
+  {{end}}
+  {{if .Profile}}<tr><td>Profile</td><td>{{.Profile}}</td></tr>{{end}}
+  {{if .Region}}<tr><td>Region</td><td>{{.Region}}</td></tr>{{end}}
+</table>
+{{end}}
+{{end}}
