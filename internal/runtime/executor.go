@@ -269,9 +269,9 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 
 	// --- fetch filtered resources ---
 	case KindFetchFiltered:
-		p, ok := req.Payload.(fetchFilteredPayload)
+		p, ok := req.Payload.(FetchFilteredPayload)
 		if !ok {
-			return nil, fmt.Errorf("ExecuteTask %s: missing fetchFilteredPayload", req.Key.Kind)
+			return nil, fmt.Errorf("ExecuteTask %s: missing FetchFilteredPayload", req.Key.Kind)
 		}
 		resourceType := req.Key.Scope
 		gen := snap.AvailabilityGen
@@ -298,6 +298,8 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		res, err := c.FetchMoreResources(ctx, snap.Clients, FetchMoreParams{
 			ResourceType: resourceType,
 			Token:        p.ContinuationToken,
+			ParentCtx:    p.ParentContext,
+			FetchFilter:  p.FetchFilter,
 		})
 		if err != nil && len(res.Resources) == 0 {
 			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen}, nil
@@ -574,11 +576,12 @@ func splitScope(scope string) (resourceType, id string) {
 	return scope, ""
 }
 
-// fetchFilteredPayload is the typed payload for KindFetchFiltered tasks created
-// through the executor. The TUI adapter derives the filter from its own message
-// fields at dispatch time; this type lets ExecuteTask carry the same data.
-type fetchFilteredPayload struct {
+// FetchFilteredPayload is the typed payload for KindFetchFiltered tasks.
+// The TUI adapter derives the filter from its own message fields at dispatch
+// time; headless callers (web, DrainSync) attach this payload so ExecuteTask
+// can invoke the filtered fetcher without reaching into renderer state.
+type FetchFilteredPayload struct {
 	Filter map[string]string
 }
 
-func (fetchFilteredPayload) isTaskPayload() {}
+func (FetchFilteredPayload) isTaskPayload() {}
