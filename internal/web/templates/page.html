@@ -178,6 +178,21 @@ body { background: var(--bg); color: var(--fg); min-height: 100vh; display: flex
 .related-row.dead-end:hover { color: inherit; }
 
 #loading-indicator { display: none; position: fixed; top: 8px; right: 12px; color: var(--warn); }
+
+/* command/filter/search input bar — client-side mode indicator, mirrors the
+   TUI's bottom input line. Lives outside #main so it survives body swaps. */
+#input-bar {
+  display: none;
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  background: var(--header);
+  border-top: 1px solid var(--accent);
+  padding: 4px 12px;
+  color: var(--warn);
+  font-size: 13px;
+  z-index: 10;
+  white-space: pre;
+}
 </style>
 </head>
 <body data-token="{{.Token}}">
@@ -197,6 +212,8 @@ body { background: var(--bg); color: var(--fg); min-height: 100vh; display: flex
 <div id="main">
 {{template "main.html" .VS}}
 </div>
+
+<div id="input-bar"></div>
 
 <div id="loading-indicator">loading…</div>
 
