@@ -186,7 +186,7 @@ func renderMenu(body *app.MenuBody, rs *rendererState) string {
 }
 
 // renderList renders a resource-list screen from the controller ListBody.
-func renderList(body *app.ListBody, rs *rendererState, ctrl *app.Controller) string {
+func renderList(body *app.ListBody, rs *rendererState) string {
 	if body == nil {
 		return ""
 	}
@@ -199,7 +199,6 @@ func renderList(body *app.ListBody, rs *rendererState, ctrl *app.Controller) str
 		td = *child
 	}
 	m := views.NewTransientResourceList(td, rs.width, rs.height)
-	_ = ctrl // ctrl available for future use; body carries all we need
 	return m.RenderList(*body)
 }
 
