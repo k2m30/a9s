@@ -220,13 +220,16 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 					if msg.Result.Err != nil {
 						errMsg = msg.Result.Err.Error()
 					}
-					m.ctrl.ApplyDetailRelatedResult(
+					m.ctrl.ApplyDetailRelatedResultForResource(
+						result.ResolvedType,
+						result.Resource.ID,
 						msg.DefDisplayName,
 						msg.Result.TargetType,
 						msg.Result.Count,
 						false,
 						errMsg,
 						msg.Result.Approximate,
+						msg.Result.ResourceIDs,
 						msg.Result.FetchFilter,
 					)
 				}

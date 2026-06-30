@@ -200,7 +200,8 @@ func (m Model) handleRelatedCheckResult(msg messages.RelatedCheckResult) (tea.Mo
 	if msg.Result.Err != nil {
 		errMsg = msg.Result.Err.Error()
 	}
-	m.ctrl.ApplyDetailRelatedResultForSource(
+	m.ctrl.ApplyDetailRelatedResultForResource(
+		msg.ResourceType,
 		sourceID,
 		msg.DefDisplayName,
 		msg.Result.TargetType,
@@ -208,6 +209,7 @@ func (m Model) handleRelatedCheckResult(msg messages.RelatedCheckResult) (tea.Mo
 		false,
 		errMsg,
 		msg.Result.Approximate,
+		msg.Result.ResourceIDs,
 		msg.Result.FetchFilter,
 	)
 	// Keep the active detail's right-column widget rows in sync so keyboard Enter

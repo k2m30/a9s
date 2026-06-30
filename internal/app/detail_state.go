@@ -245,61 +245,23 @@ func (c *Controller) ApplyDetailRelated(rows []DetailRelatedRow) {
 	ds.RelatedRows = rows
 }
 
-// ApplyDetailRelatedResult merges one checker result into the TOP detail screen's
-// RelatedRows by DefDisplayName. Used by the synchronous cache-replay paths that
-// run immediately after pushing the source detail, where the top IS the source.
-// No-op when the top screen is not ScreenDetail.
-func (c *Controller) ApplyDetailRelatedResult(displayName, targetType string, count int, loading bool, errMsg string, approximate bool, fetchFilter map[string]string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	ds := c.topDetailState()
-	if ds == nil {
-		return
-	}
-	c.applyRelatedResultToState(ds, displayName, targetType, count, loading, errMsg, approximate, fetchFilter)
-}
-
-// ApplyDetailRelatedResultForSource merges a result into the STACKED detail whose
-// resource matches sourceResourceID rather than the top. The async related-check
-// handler uses this: the user may have navigated to a different detail while the
-// check was in flight, so applying to the top would populate the wrong panel.
-// No-op when no stacked detail matches sourceResourceID.
-func (c *Controller) ApplyDetailRelatedResultForSource(sourceResourceID, displayName, targetType string, count int, loading bool, errMsg string, approximate bool, fetchFilter map[string]string) {
+// ApplyDetailRelatedResultForResource merges one checker result into the RelatedRows
+// of the stacked detail whose resource matches (sourceType, sourceID) — not the top,
+// since a check in flight can complete after the user has navigated to another
+// detail. Delegates to mergeDetailRelatedRow so ResourceIDs are preserved (the
+// controller-owned Enter navigation reads them). No-op when no stacked detail matches.
+func (c *Controller) ApplyDetailRelatedResultForResource(sourceType, sourceID, displayName, targetType string, count int, loading bool, errMsg string, approximate bool, resourceIDs []string, fetchFilter map[string]string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for i := range c.stack {
 		if c.stack[i].ID != runtime.ScreenDetail {
 			continue
 		}
-		if ds := c.stack[i].State.Detail; ds != nil && ds.Resource.ID == sourceResourceID {
-			c.applyRelatedResultToState(ds, displayName, targetType, count, loading, errMsg, approximate, fetchFilter)
+		if ds := c.stack[i].State.Detail; ds != nil && ds.Resource.ID == sourceID && ds.ResourceType == sourceType {
+			mergeDetailRelatedRow(ds, displayName, targetType, count, loading, errMsg, approximate, resourceIDs, fetchFilter)
 			return
 		}
 	}
-}
-
-// applyRelatedResultToState merges one checker result into ds.RelatedRows, matching
-// by DisplayName (update in place, else append). Callers must hold c.mu (write).
-func (c *Controller) applyRelatedResultToState(ds *DetailState, displayName, targetType string, count int, loading bool, errMsg string, approximate bool, fetchFilter map[string]string) {
-	for i := range ds.RelatedRows {
-		if ds.RelatedRows[i].DisplayName == displayName {
-			ds.RelatedRows[i].Count = count
-			ds.RelatedRows[i].Loading = loading
-			ds.RelatedRows[i].Err = errMsg
-			ds.RelatedRows[i].Approximate = approximate
-			ds.RelatedRows[i].FetchFilter = fetchFilter
-			return
-		}
-	}
-	ds.RelatedRows = append(ds.RelatedRows, DetailRelatedRow{
-		TargetType:  targetType,
-		DisplayName: displayName,
-		Count:       count,
-		Loading:     loading,
-		Err:         errMsg,
-		Approximate: approximate,
-		FetchFilter: fetchFilter,
-	})
 }
 
 // InitDetailRelatedRows initialises the RelatedRows slice from registered
