@@ -1,5 +1,5 @@
 // runtime_adapter.go is the Bubble Tea adapter glue for the platform-
-// agnostic runtime.Core (Phase 05 PR-05a-extract / -h3). It owns:
+// agnostic runtime.Core. It owns:
 //
 //  1. handleEnrichDetail — a Model-receiver wrapper that replaces the
 //     deleted internal/tui/app_enrich.go entry point. It constructs a
