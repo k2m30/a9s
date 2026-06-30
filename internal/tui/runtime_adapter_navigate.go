@@ -1,27 +1,12 @@
 // runtime_adapter_navigate.go — Bubble Tea adapter glue for runtime.Core's
-// HandleNavigate entry point (Phase 05 PR-05a-h3, AS-149).
+// HandleNavigate entry point.
 //
-// handleNavigate replaces the deleted entry point from
-// internal/tui/app_handlers_navigate.go. The signature is identical so the
-// existing app.go dispatch line is unchanged.
+// handleNavigate calls core.HandleNavigate, applies the navigation decision to
+// the view stack, and translates the returned TaskRequests into tea.Cmd values.
 //
-// It constructs a transient runtime.Core, calls core.HandleNavigate, then
-// applies the navigation decision to the view stack and translates any
-// returned TaskRequests into tea.Cmd values.
-//
-// handleCopy, handleRefresh / refreshResourceList, handleReveal,
-// and the identity-error view-update tail stay here as TUI-only helpers
-// because every line of their bodies depends on adapter state (view
-// stack, view-typed methods, flashState, tea.Cmd returns). Their
-// runtime-policy parts (cache-mutation gen bumps, per-type
-// enrichment-rerun bookkeeping) are reads/writes against the session
-// owned by core — same data the runtime sees through its session field.
-//
-// PR-05a-h4-b (AS-962) removed the inline handleIdentityLoaded /
-// handleIdentityError helpers in favour of HandleEvent-routed dispatch
-// + applyIntents (SetIdentityIntent, HeaderInvalidateIntent). The
-// IdentityError view-side note now flows through the runtime_adapter
-// SetIdentityError path; handleIdentityError-the-method is gone.
+// handleCopy, handleRefresh / refreshResourceList, and handleReveal stay here as
+// TUI-only helpers: their bodies depend on adapter state (view stack, view-typed
+// methods, flash, tea.Cmd returns) and read/write the session owned by core.
 package tui
 
 import (
