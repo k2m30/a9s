@@ -377,13 +377,16 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 						if relMsg.Result.Err != nil {
 							errMsg = relMsg.Result.Err.Error()
 						}
-						m.ctrl.ApplyDetailRelatedResult(
+						m.ctrl.ApplyDetailRelatedResultForResource(
+							msg.TargetType,
+							r.ID,
 							relMsg.DefDisplayName,
 							relMsg.Result.TargetType,
 							relMsg.Result.Count,
 							false,
 							errMsg,
 							relMsg.Result.Approximate,
+							relMsg.Result.ResourceIDs,
 							relMsg.Result.FetchFilter,
 						)
 					}

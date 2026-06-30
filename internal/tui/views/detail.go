@@ -489,13 +489,16 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 			if msg.Result.Err != nil {
 				errMsg = msg.Result.Err.Error()
 			}
-			m.ctrl.ApplyDetailRelatedResult(
+			m.ctrl.ApplyDetailRelatedResultForResource(
+				m.resourceType,
+				m.res.ID,
 				msg.DefDisplayName,
 				msg.Result.TargetType,
 				msg.Result.Count,
 				false,
 				errMsg,
 				msg.Result.Approximate,
+				msg.Result.ResourceIDs,
 				msg.Result.FetchFilter,
 			)
 		}
