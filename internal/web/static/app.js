@@ -173,6 +173,25 @@
     sendAction("search", val);
   }
 
+  // commandMode holds state for the ":" command palette.
+  var commandMode = false;
+  var commandBuf = "";
+
+  // showInputBar / hideInputBar render the client-side mode line (mirrors the
+  // TUI's bottom input). prefix is "/" (filter), ":" (command), or "search: ".
+  // Shown the instant the mode key is pressed so an empty buffer is still
+  // visible — the fix for "/ shows nothing until the first letter".
+  function showInputBar(prefix, buf) {
+    var bar = document.getElementById("input-bar");
+    if (!bar) return;
+    bar.textContent = prefix + buf + "█"; // block cursor
+    bar.style.display = "block";
+  }
+  function hideInputBar() {
+    var bar = document.getElementById("input-bar");
+    if (bar) bar.style.display = "none";
+  }
+
   document.addEventListener("keydown", function (e) {
     // Ignore when focus is in an input/textarea.
     var tag = (document.activeElement || {}).tagName || "";
@@ -184,23 +203,27 @@
         filterMode = false;
         filterBuf = "";
         setFilter("");
+        hideInputBar();
         e.preventDefault();
         return;
       }
       if (e.key === "Enter") {
         filterMode = false;
+        hideInputBar();
         e.preventDefault();
         return;
       }
       if (e.key === "Backspace") {
         filterBuf = filterBuf.slice(0, -1);
         setFilter(filterBuf);
+        showInputBar("/", filterBuf);
         e.preventDefault();
         return;
       }
       if (e.key.length === 1) {
         filterBuf += e.key;
         setFilter(filterBuf);
+        showInputBar("/", filterBuf);
         e.preventDefault();
         return;
       }
@@ -213,6 +236,7 @@
         searchMode = false;
         searchBuf = "";
         sendAction("search-clear", "");
+        hideInputBar();
         e.preventDefault();
         return;
       }
@@ -224,12 +248,48 @@
       if (e.key === "Backspace") {
         searchBuf = searchBuf.slice(0, -1);
         setSearch(searchBuf);
+        showInputBar("search: ", searchBuf);
         e.preventDefault();
         return;
       }
       if (e.key.length === 1) {
         searchBuf += e.key;
         setSearch(searchBuf);
+        showInputBar("search: ", searchBuf);
+        e.preventDefault();
+        return;
+      }
+      return;
+    }
+
+    // Command mode: : was pressed. Mirrors the TUI's colon-command palette;
+    // the command is collected locally and dispatched on Enter (the controller's
+    // ActionCommand handles root/profile/region/theme/help/<resource-shortname>).
+    if (commandMode) {
+      if (e.key === "Escape") {
+        commandMode = false;
+        commandBuf = "";
+        hideInputBar();
+        e.preventDefault();
+        return;
+      }
+      if (e.key === "Enter") {
+        commandMode = false;
+        hideInputBar();
+        if (commandBuf) sendAction("command", commandBuf);
+        commandBuf = "";
+        e.preventDefault();
+        return;
+      }
+      if (e.key === "Backspace") {
+        commandBuf = commandBuf.slice(0, -1);
+        showInputBar(":", commandBuf);
+        e.preventDefault();
+        return;
+      }
+      if (e.key.length === 1) {
+        commandBuf += e.key;
+        showInputBar(":", commandBuf);
         e.preventDefault();
         return;
       }
@@ -240,6 +300,16 @@
     if (e.key === "/" && !e.ctrlKey && !e.metaKey) {
       filterMode = true;
       filterBuf = "";
+      showInputBar("/", "");
+      e.preventDefault();
+      return;
+    }
+
+    // Enter command mode (:).
+    if (e.key === ":" && !e.ctrlKey && !e.metaKey) {
+      commandMode = true;
+      commandBuf = "";
+      showInputBar(":", "");
       e.preventDefault();
       return;
     }
@@ -248,6 +318,7 @@
     if (e.key === "s" && (e.ctrlKey || e.metaKey)) {
       searchMode = true;
       searchBuf = "";
+      showInputBar("search: ", "");
       e.preventDefault();
       return;
     }
