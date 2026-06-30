@@ -143,12 +143,14 @@
     { key: "i",          action: { kind: "open-identity" } },
 
     // List actions
-    { key: "r",          action: { kind: "refresh" } },
+    // r toggles the related panel (TUI keys.go ToggleRelated="r"); refresh is
+    // ctrl+r (handled in the keydown handler), matching the footer hints. The
+    // web keymap previously had these reversed (r=refresh, R=toggle-related).
+    { key: "r",          action: { kind: "toggle-related" } },
     { key: "m",          action: { kind: "load-more" } },
     { key: "c",          action: { kind: "copy" } },
     { key: "w",          action: { kind: "toggle-wrap" } },
     { key: "!",          action: { kind: "open-error-log" } },
-    { key: "R",          action: { kind: "toggle-related" } },
     { key: "Tab",        action: { kind: "toggle-focus" } },
     { key: "t",          action: { kind: "cloudtrail" } },
 

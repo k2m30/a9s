@@ -381,3 +381,73 @@ test.describe("a9s web UI — command palette + input modes (TUI parity)", () =>
     await expect(page.locator("#input-bar")).toBeHidden();
   });
 });
+
+test.describe("a9s web UI — detail related-panel + layout (TUI parity)", () => {
+  test("Enter navigates the related row, not the left field, when related is focused", async ({ page }) => {
+    // Codex P2a: with the field cursor on a navigable left-column field, the
+    // detail template still rendered .field-cursor.field-navigable even after
+    // tabbing to the related panel, so app.js's Enter interception fired
+    // field-select and opened the LEFT field's target instead of the related
+    // row. The template now gates .field-cursor on (not RelatedFocused).
+    await press(page, "Enter"); // menu -> ec2 list
+    await press(page, "d"); // -> web-prod-01 detail
+    await expect(page.locator("#frame-title")).toHaveText("web-prod-01");
+    await expect(page.locator(".related-panel")).toBeVisible();
+
+    // Move the left field cursor onto a navigable field.
+    for (let i = 0; i < 12; i++) {
+      if ((await page.locator(".field-row.field-cursor.field-navigable").count()) > 0) break;
+      await press(page, "ArrowDown");
+    }
+    await expect(page.locator(".field-row.field-cursor.field-navigable")).toHaveCount(1);
+
+    // Tab to the related panel — the left field cursor must clear so app.js
+    // cannot field-select the now-inactive column. This count is the direct
+    // regression check: pre-fix it stayed at 1.
+    await press(page, "Tab");
+    await expect(
+      page.locator(".field-row.field-cursor"),
+      "left field cursor must clear when the related panel is focused",
+    ).toHaveCount(0);
+
+    await press(page, "Enter"); // routes to select -> navigates the related row
+    await expect(
+      page.locator("#frame-title"),
+      "Enter on the focused related row must navigate away from web-prod-01",
+    ).not.toHaveText("web-prod-01");
+  });
+
+  test("r toggles the related panel (footer advertises 'r Related', not refresh)", async ({ page }) => {
+    // Codex P2b: the detail footer advertises 'r Related' but the web keymap had
+    // r=refresh / R=toggle-related (TUI keys.go has r=ToggleRelated, ctrl+r=Refresh).
+    await press(page, "Enter"); // menu -> ec2 list
+    await press(page, "d"); // -> detail
+    await expect(page.locator(".related-panel")).toBeVisible(); // shown by default (wide viewport)
+    // r is ToggleRelated: it flips RelatedVisible, hiding the panel. A refresh
+    // would re-render the same detail and leave the panel shown.
+    await press(page, "r");
+    await expect(
+      page.locator(".related-panel"),
+      "r must toggle the related panel off, not refresh",
+    ).toHaveCount(0);
+    await press(page, "r");
+    await expect(
+      page.locator(".related-panel"),
+      "r again must toggle it back on",
+    ).toBeVisible();
+  });
+
+  test("the footer stays in the viewport on a long detail (no scroll needed)", async ({ page }) => {
+    // Bug: body used min-height:100vh, so a long body grew the page and pushed
+    // the footer below the fold ('footer visible only after long scroll'). With
+    // height:100vh and an internally-scrolling #body, the footer stays pinned.
+    await page.setViewportSize({ width: 1000, height: 400 }); // force overflow
+    await press(page, "Enter"); // menu -> ec2 list
+    await press(page, "d"); // -> a detail with many fields
+    await expect(page.locator(".detail-layout")).toBeVisible();
+    await expect(
+      page.locator("#footer"),
+      "footer must stay in the viewport without scrolling the page",
+    ).toBeInViewport();
+  });
+});
