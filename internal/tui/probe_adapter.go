@@ -1,10 +1,6 @@
-// probe_adapter.go — Bubble Tea adapter over runtime.Core probe methods.
-//
-// PR-05a-h5 (AS-151) moves probe logic to internal/runtime/probes.go.
-// This file bridges the Core methods to the tea.Cmd factories that the TUI
-// Update loop and handler files expect. Each method captures ctx and clients,
-// delegates to the corresponding Core method, and converts the result to TUI
-// message types.
+// probe_adapter.go — Bubble Tea adapter over runtime.Core probe methods. Each
+// method captures ctx and clients, delegates to the corresponding Core method,
+// and converts the result to TUI message types.
 package tui
 
 import (
@@ -99,7 +95,7 @@ func (m *Model) saveAvailabilityCache() tea.Cmd {
 // entirely — registered enrichers are AWS-keyed and would issue real API calls
 // against synthetic fakes / missing credentials. The early return here matches
 // the documented WithIsDemo behavior; the registry is not consulted so AWS-only
-// enricher contracts are not exercised in demo sessions (AS-658 / AS-648-h3).
+// enricher contracts are not exercised in demo sessions.
 func (m *Model) probeEnrichment(shortName string, gen domain.Gen) tea.Cmd {
 	if m.isDemo {
 		return nil

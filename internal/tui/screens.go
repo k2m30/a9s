@@ -6,10 +6,8 @@
 // views.View; the adapter never invents ScreenIDs (they live in
 // internal/runtime).
 //
-// Three builders ship in PR-05a-h4-a (AS-769) for the four ported
-// view-stack handlers: profile selector, reveal, child list. Capability
-// screens (logs, ct.scan, cost) remain out of scope until their handler
-// PRs land.
+// The registered builders cover the profile selector, reveal, and child list.
+// Capability screens (logs, ct.scan, cost) are not yet built here.
 package tui
 
 import (

@@ -1,9 +1,5 @@
-// app_view.go — PR-05a-h4-c (AS-963) tui.Model render-path helpers.
-//
-// Split out of app.go so the View() composition + header-right /
-// account-badge / identity-role / identity-to-view-data helpers live in
-// their own file and app.go stays inside the 300–400 LOC budget that the
-// spec acceptance check enforces (`wc -l internal/tui/app.go`).
+// app_view.go — tui.Model render-path helpers: the View() composition plus the
+// header-right / account-badge / identity-role / identity-to-view-data helpers.
 //
 // All five functions here are pure renderer-side composition: they read
 // rendererState + controller snapshot plus a small slice of session metadata

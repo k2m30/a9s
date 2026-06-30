@@ -1,15 +1,8 @@
-// app_accessors.go — exported Model accessors for tests and external callers.
-//
-// These methods live outside _test.go so that tests in tests/unit/ (package
-// unit_test) can reach them without being in the same package. Production code
-// does not call them.
-//
-// PR-05a-h4-c (AS-963) deleted the Session() accessor (its return type
-// was the last production-side leak of the session package into the tui
-// package). Callers in tests must go through m.Core().Session() instead.
-// Core() returns the platform-agnostic *runtime.Core so the boundary
-// check (`go list .Imports` against internal/tui) no longer reports the
-// session package.
+// app_accessors.go — exported Model accessors for tests in tests/unit/
+// (package unit_test), which can't reach unexported fields from outside the
+// package. Production code does not call them; test callers reach session state
+// via m.Core().Session() (Core() returns the platform-agnostic *runtime.Core,
+// keeping the session package out of internal/tui's import surface).
 package tui
 
 import (

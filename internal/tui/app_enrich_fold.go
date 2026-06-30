@@ -1,13 +1,11 @@
 package tui
 
-// app_enrich_fold.go — PR-03a-fold helpers that replace the parallel
-// m.EnrichmentFindings map approach with direct mutation of cached row
-// Findings/AttentionDetails.
+// app_enrich_fold.go — Wave-2 enrichment helpers that mutate cached row
+// Findings/AttentionDetails directly (no parallel findings map).
 //
 // applyEnrichment is the canonical write path for Wave 2 results.
-// findingFromResource and findingsFromRows rebuild detail/list view input
-// from the authoritative r.Findings + r.AttentionDetails state on each cached
-// row, replacing the side maps that PR-03a-fold removed.
+// findingFromResource and findingsFromRows rebuild detail/list view input from
+// the authoritative r.Findings + r.AttentionDetails state on each cached row.
 
 import (
 	"strings"
@@ -111,11 +109,10 @@ func findingFromResource(r resource.Resource) (*domain.Finding, *domain.Attentio
 	return nil, nil
 }
 
-// findingsFromRows rebuilds a per-resource domain.Finding map from wave2
-// entries in the supplied resource slice. AS-1395 retyped this to emit
-// domain.Finding (matching the runtime→adapter PatchResourceList contract).
-// Used by cache-hit navigation sites that populate
-// views.ResourceListModel.findingsByID (row marker glyphs) from the
+// findingsFromRows rebuilds a per-resource domain.Finding map from wave2 entries
+// in the supplied resource slice (emitting domain.Finding to match the
+// runtime→adapter PatchResourceList contract). Used by cache-hit navigation sites
+// that populate views.ResourceListModel.findingsByID (row marker glyphs) from the
 // authoritative r.Findings on each cached row.
 //
 // Only the first wave2 finding per resource is mapped (at most one wave2
