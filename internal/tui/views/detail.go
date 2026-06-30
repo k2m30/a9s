@@ -484,7 +484,7 @@ func (m DetailModel) Update(msg tea.Msg) (DetailModel, tea.Cmd) {
 		}
 		if m.ctrl != nil {
 			// Controller-backed path: merge one checker result into the controller's
-			// DetailState.RelatedRows by DisplayName (mirrors rightColumnModel.Update).
+			// DetailState.RelatedRows by DisplayName (mirrors RightColumnModel.Update).
 			errMsg := ""
 			if msg.Result.Err != nil {
 				errMsg = msg.Result.Err.Error()

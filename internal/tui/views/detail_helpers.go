@@ -606,7 +606,7 @@ func (m DetailModel) ConsumesEscapeLocally() bool {
 //
 // The related panel is rendered from body.Related + body.RelatedCursor +
 // body.RelatedScroll + body.RelatedFocused via renderDetailRelatedFromBody,
-// which replicates rightColumnModel.View() byte-for-byte from body data.
+// which replicates RightColumnModel.View() byte-for-byte from body data.
 // The panel visibility gate uses body.RelatedVisible (set by buildDetailBody
 // when the type has registered defs or ds.RelatedVisible is true), matching
 // the TUI's rightColShowing() auto-show behaviour.
@@ -698,7 +698,7 @@ func (m *DetailModel) RenderDetail(body app.DetailBody) string {
 }
 
 // renderDetailRelatedFromBody renders the RELATED right panel from body data,
-// replicating rightColumnModel.View() byte-for-byte without a live model.
+// replicating RightColumnModel.View() byte-for-byte without a live model.
 // w is the panel width; h is the panel height (same as viewport height).
 func renderDetailRelatedFromBody(body app.DetailBody, w, h int) string {
 	if w <= 0 {
@@ -707,7 +707,7 @@ func renderDetailRelatedFromBody(body app.DetailBody, w, h int) string {
 
 	lines := make([]string, 0, h)
 
-	// Header: "RELATED" centered — mirrors rightColumnModel.View() header block.
+	// Header: "RELATED" centered — mirrors RightColumnModel.View() header block.
 	header := "RELATED"
 	padLeft := max((w-lipgloss.Width(header))/2, 0)
 	centeredHeader := strings.Repeat(" ", padLeft) + header
@@ -715,7 +715,7 @@ func renderDetailRelatedFromBody(body app.DetailBody, w, h int) string {
 
 	switch {
 	case len(body.Related) == 0:
-		// Mirror rightColumnModel.View(): an active filter with no surviving
+		// Mirror RightColumnModel.View(): an active filter with no surviving
 		// rows shows "No matches"; otherwise the panel is genuinely empty.
 		if body.RelatedFilterActive {
 			lines = append(lines, styles.DimText.Render("  No matches"))
