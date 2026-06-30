@@ -219,7 +219,7 @@ func listExtractCellValue(col ColumnDef, td *resource.ResourceTypeDef, r resourc
 		return r.ID
 	}
 
-	// Status/lifecycle column — two-layer priority (AS-140).
+	// Status/lifecycle column — two-layer priority.
 	lifecycleKey := "state"
 	if td != nil && td.LifecycleKey != "" {
 		lifecycleKey = td.LifecycleKey

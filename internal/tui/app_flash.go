@@ -1,13 +1,10 @@
 package tui
 
-// app_flash.go — flash-message lifecycle and API-error surface, owned by the
-// TUI adapter. These handlers were split out of internal/tui/app_handlers.go
-// in Phase-05 PR-05a-h1 (AS-147), and their handler bodies were ported to
-// runtime.Core in PR-05a-h3 (AS-324). The functions below are thin
-// (≤12-line) adapters: they pre-bump the tui-side flashState.gen counter
-// (which the Core echoes back via FlashTickPayload.Gen), translate the
-// messages.* into the runtime.*Event, call the Core method, apply the
-// returned intents, and translate the returned tasks into tea.Cmds.
+// app_flash.go — flash-message lifecycle and API-error surface. These handlers
+// are thin adapters: they pre-bump the tui-side flashState.gen counter (which the
+// Core echoes back via FlashTickPayload.Gen), translate the messages.* into the
+// runtime.*Event, call the Core method, apply the returned intents, and translate
+// the returned tasks into tea.Cmds.
 
 import (
 	tea "charm.land/bubbletea/v2"

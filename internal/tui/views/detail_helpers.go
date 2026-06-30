@@ -447,7 +447,7 @@ func (m DetailModel) SourceResource() resource.Resource {
 // a new value invalidates the field list and triggers a viewport re-render so
 // the Attention section appears or disappears immediately.
 //
-// Phase 03 W1.4b.3: the wave-2 entry now lives directly on m.res.Findings
+// The wave-2 entry lives directly on m.res.Findings
 // (tagged with Source="wave2:…") instead of a separate DetailModel field, so
 // the renderer reads a single source of truth (m.res.Findings + AttentionDetails).
 // Subsequent calls strip any existing wave-2 entry before appending the new

@@ -17,11 +17,9 @@ import (
 // "<top> (+N)" when N additional findings are stacked. Returns "" when
 // findings is empty.
 //
-// AS-140 collapsed the 3-layer status priority in extractCellValue to two
-// layers by computing the merged phrase here at render time instead of
-// during Wave-2 enrichment. Both Wave-1 (fetcher-emitted) and Wave-2
-// (applyEnrichment-derived) findings live on r.Findings by the time a row
-// reaches the renderer.
+// The merged phrase is computed here at render time (not during Wave-2
+// enrichment): both Wave-1 (fetcher-emitted) and Wave-2 (applyEnrichment-
+// derived) findings live on r.Findings by the time a row reaches the renderer.
 func phraseFromFindings(findings []domain.Finding) string {
 	if len(findings) == 0 {
 		return ""
@@ -216,7 +214,7 @@ func (m ResourceListModel) widenLifecycleColumn(cols []listCol, rows []resource.
 	}
 	maxW := cols[idx].width
 	for _, r := range rows {
-		// Mirror extractCellValue's AS-140 two-layer priority:
+		// Mirror extractCellValue's two-layer priority:
 		// phraseFromFindings(r.Findings) — which composes "<top> (+N)" for
 		// stacked findings — first, then Fields[lifecycleKey]. Sizing on
 		// Findings[0].Phrase alone would under-size the column whenever a

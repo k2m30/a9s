@@ -779,7 +779,7 @@ func (m Model) handleReveal() (tea.Model, tea.Cmd) {
 // adapter because IdentityModel.SetError requires inspecting the
 // renderer's view stack — out of scope for the platform-agnostic Core.
 //
-// AS-657 stamped IdentityError with AspectConnect; the shim performs
+// IdentityError is stamped with AspectConnect; the shim performs
 // the stale-gen check up-front so the view-side SetError() does not
 // fire on a stale error from a prior profile/region.
 func (m Model) handleIdentityError(msg messages.IdentityError) (tea.Model, tea.Cmd) {

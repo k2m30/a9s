@@ -1,13 +1,10 @@
 package tui
 
-// app_screens.go — view-stack push handlers for screens that are
-// constructed in response to a runtime/event signal (reveal result,
-// child-view enter). Split out of internal/tui/app_handlers.go in
-// Phase-05 PR-05a-h1 (AS-147). PR-05a-h4-a (AS-769) ported both bodies
-// to (c *Core) Handle* methods backed by the screen-builder registry
-// in internal/tui/screens.go; each adapter below is a ≤12-line shim
-// that translates the message to its runtime.*Event, calls the Core
-// method, and dispatches the returned intents/tasks.
+// app_screens.go — view-stack push handlers for screens constructed in response
+// to a runtime event (reveal result, child-view enter). Each adapter translates
+// the message to its runtime.*Event, calls the Core method backed by the
+// screen-builder registry in internal/tui/screens.go, and dispatches the
+// returned intents/tasks.
 
 import (
 	tea "charm.land/bubbletea/v2"

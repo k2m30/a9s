@@ -1,15 +1,10 @@
-// app_options.go — PR-05a-h4-c (AS-963) tui.Model option setters.
+// app_options.go — tui.Model construction options (WithProfile, WithRegion,
+// WithIsDemo, WithNoCache, WithClients, WithActiveTheme, WithCommand).
 //
-// Split out of app.go so the option surface (WithProfile, WithRegion,
-// WithIsDemo, WithNoCache, WithClients, WithActiveTheme, WithCommand)
-// lives next to its sibling option setters and app.go stays inside the
-// 300–400 LOC budget that the spec acceptance check enforces
-// (`wc -l internal/tui/app.go`).
-//
-// Each option is a tiny closure that mutates the renderer-side Model or
-// pokes a typed setter on m.core. WithClients accepts the runtime-side
-// ServiceClients alias so the package never imports the AWS-client
-// package directly (post-h4-c boundary contract).
+// Each option is a small closure that mutates the renderer-side Model or pokes a
+// typed setter on m.core. WithClients takes the runtime-side ServiceClients alias
+// so this package never imports the AWS-client package directly — an enforced
+// import boundary.
 package tui
 
 import "github.com/k2m30/a9s/v3/internal/runtime"
@@ -32,9 +27,8 @@ func WithRegion(region string) Option {
 // Set by the --demo CLI bootstrap path. Distinct from WithNoCache which only
 // disables disk persistence.
 //
-// Sets both m.isDemo (renderer-side, read until Pass B removes it) and
-// m.core.SetIsDemo so Core.ExecuteTask and renderer-neutral callers share
-// the same source of truth.
+// Sets both m.isDemo (renderer-side) and m.core.SetIsDemo so Core.ExecuteTask and
+// renderer-neutral callers share the same source of truth.
 func WithIsDemo(demo bool) Option {
 	return func(m *Model) {
 		m.isDemo = demo
