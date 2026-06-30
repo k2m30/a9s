@@ -42,7 +42,7 @@ import (
 //     the partial-success flash, and the enrichment-rerun probe dispatch
 //     to Core.HandleResourcesLoaded.
 func (m Model) handleResourcesLoaded(msg messages.ResourcesLoaded) (tea.Model, tea.Cmd) {
-	// Stale-gen drop: AS-657 stamps ResourcesLoaded against AspectAvailability.
+	// Stale-gen drop: ResourcesLoaded is stamped against AspectAvailability.
 	// The shim performs the check up-front because Core.HandleResourcesLoaded is
 	// invoked directly (not via HandleEvent's central GenStamped gate) and the
 	// pre-Core view-side derive + updateActiveView would otherwise mutate state

@@ -1,20 +1,12 @@
-// app_dispatch.go — TUI-side runtime intent + task dispatchers.
+// app_dispatch.go — TUI-side runtime intent + task dispatchers (applyIntents,
+// pushScreen, applyTheme, tasksToCmd, coreUpdate).
 //
-// Split out of app.go in PR-05a-h4-b (AS-962) so the runtime↔adapter
-// glue (applyIntents, pushScreen, applyTheme, tasksToCmd, coreUpdate)
-// lives next to runtime_adapter.go's per-intent helper (applyIntent),
-// and so app.go stays under the 700 LOC budget set by the spec
-// acceptance check (`wc -l internal/tui/app.go`).
-//
-// The five new h4-b intents — PatchResourceCache, PatchRelatedCache,
-// PatchLazyResourceCache, SetIdentityIntent, HeaderInvalidateIntent —
-// each land as a case in applyIntents below. They cross-write
-// session-state owned by Core via the typed accessors in
-// internal/runtime/accessors.go (SetResourceCache, RelatedCacheSet,
-// ExtendLazyResourceCache). PR-05a-h4-c (AS-963) routed the related-cache
-// key + result type through the internal/runtime package and migrated
-// every session-field access in the renderer onto those typed accessors,
-// so the dispatcher no longer reaches into the session struct shape.
+// The cache-cross-write intents — PatchResourceCache, PatchRelatedCache,
+// PatchLazyResourceCache, SetIdentityIntent, HeaderInvalidateIntent — each land
+// as a case in applyIntents below. They write session state owned by Core via
+// the typed accessors in internal/runtime/accessors.go (SetResourceCache,
+// RelatedCacheSet, ExtendLazyResourceCache), so the dispatcher never reaches
+// into the session struct shape directly.
 package tui
 
 import (
@@ -140,12 +132,10 @@ func (m *Model) applyIntents(intents []runtime.UIIntent) []tea.Cmd {
 		case runtime.PatchResourceCache:
 			m.core.SetResourceCache(v.ResourceType, v.Entry)
 		case runtime.PatchRelatedCache:
-			// PR-05a-h4-b: kept as an applyIntents case for forward-
-			// compatibility, even though Core today writes the
-			// RelatedCache directly inside HandleRelatedCheckResult
-			// (the renderer-agnostic alternative path is unused in
-			// production but keeps the intent set complete for tests
-			// and future emitters that may surface this branch).
+			// Kept as an applyIntents case for forward-compatibility: Core today
+			// writes the RelatedCache directly inside HandleRelatedCheckResult, so
+			// this renderer-agnostic path is unused in production but keeps the
+			// intent set complete for tests and future emitters.
 			if v.SourceID != "" {
 				key := runtime.RelatedCacheKey(v.ResourceType, v.SourceID)
 				existing, _ := m.core.RelatedCacheGet(key)
@@ -213,7 +203,7 @@ func (m *Model) pushScreen(v runtime.PushScreen) tea.Cmd {
 // m.activeTheme so the next theme selector renders the "(current)"
 // indicator correctly.
 //
-// Post-AS-784: Core's HandleThemeFileRead pre-validates the YAML via
+// Core's HandleThemeFileRead pre-validates the YAML via
 // styles.ThemeFromYAML before emitting ApplyThemeIntent + Save task. The
 // adapter parse-error branch below is therefore defensive — under normal
 // flow the bytes are guaranteed to parse.

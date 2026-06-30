@@ -1,13 +1,9 @@
 // fetch_adapter.go — thin Bubble Tea adapter over runtime.Core fetch methods.
+// Each method captures ctx and clients, delegates to the corresponding Core
+// method, and converts the result to TUI message types.
 //
-// PR-05a-h6 moves fetch-execution logic to internal/runtime/fetchers.go.
-// This file bridges the runtime Core methods to the tea.Cmd factories that
-// the TUI Update loop and handler files expect. Each method captures ctx and
-// clients, delegates to the corresponding Core method, and converts the result
-// to TUI message types.
-//
-// AS-657: every fetch that produces ResourcesLoaded / APIError / IdentityLoaded /
-// IdentityError / ValueRevealed now captures the dispatch-time generation counter
+// Every fetch that produces ResourcesLoaded / APIError / IdentityLoaded /
+// IdentityError / ValueRevealed captures the dispatch-time generation counter
 // (gen domain.Gen) at the call site. The gen is stamped onto the returned message
 // so the app.go handler can discard stale results after a profile/region switch
 // (messages.IsStale guard). Callers pass m.core.AvailabilityGen() (for

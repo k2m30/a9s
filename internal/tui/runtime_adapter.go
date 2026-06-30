@@ -1,12 +1,9 @@
 // runtime_adapter.go is the Bubble Tea adapter glue for the platform-
 // agnostic runtime.Core. It owns:
 //
-//  1. handleEnrichDetail — a Model-receiver wrapper that replaces the
-//     deleted internal/tui/app_enrich.go entry point. It constructs a
-//     transient runtime.Core bound to the Model's session owned by core,
-//     calls core.HandleEnrichDetail, and translates the returned
-//     TaskRequests into tea.Cmd values. The existing app.go dispatch
-//     line (return m.handleEnrichDetail(msg)) is unchanged.
+//  1. handleEnrichDetail — a Model-receiver wrapper that calls
+//     core.HandleEnrichDetail and translates the returned TaskRequests into
+//     tea.Cmd values.
 //
 //  2. applyIntent — the per-intent applier used by the 6 ported
 //     handlers (HandleFlash / HandleClearFlash / HandleAPIError /
@@ -38,15 +35,10 @@ import (
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
-// handleEnrichDetail replaces the entry point previously in
-// internal/tui/app_enrich.go. The signature is identical — (tea.Model,
-// tea.Cmd) — so the existing app.go dispatch line is unchanged.
-//
-// It invokes m.core.HandleEnrichDetail (Core constructs the payload's
-// DetailCtx + Generation from session state post-PR-05a-h4-b), applies
-// any returned UIIntents to the view stack, then converts the returned
-// TaskRequests into Bubble Tea commands. The pre-h4-b transient-Core
-// shim is gone — the live Core has access to the same session pointer.
+// handleEnrichDetail invokes m.core.HandleEnrichDetail (Core builds the payload's
+// DetailCtx + Generation from session state), applies any returned UIIntents to
+// the view stack, then converts the returned TaskRequests into Bubble Tea
+// commands.
 func (m Model) handleEnrichDetail(msg messages.EnrichDetail) (tea.Model, tea.Cmd) {
 	intents, tasks := m.core.HandleEnrichDetail(runtime.EnrichDetailEvent{
 		ResourceType: msg.ResourceType,
@@ -195,11 +187,9 @@ func (m Model) runtimeTasksToCmd(tasks []runtime.TaskRequest) tea.Cmd {
 // enrichDetailCmd builds the Bubble Tea command that runs the on-demand
 // detail enricher and emits an EnrichDetailResultMsg. It reads every
 // runtime-side input (DetailCtx, Generation) from the typed payload —
-// PR-05a-h4-b (AS-962) moved DetailEnrichmentCtx construction onto Core
-// so the adapter no longer touches the AWS-side DetailEnrichmentCtx
-// directly here. The remaining adapter-owned input is m.appCtx (the
-// app-wide cancellation context); ctx still wraps a 10 s per-call
-// timeout the runtime cannot express because tea.Cmd composition
+// DetailEnrichmentCtx construction lives on Core; the only adapter-owned input
+// here is m.appCtx (the app-wide cancellation context), wrapped in a 10 s
+// per-call timeout the runtime cannot express because tea.Cmd composition
 // happens here.
 func (m Model) enrichDetailCmd(p runtime.EnrichDetailPayload) tea.Cmd {
 	enricher := resource.GetDetailEnricher(p.ResourceType)

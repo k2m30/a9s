@@ -363,8 +363,7 @@ func (c *Controller) ResetDetailRelatedRows(resourceType string) {
 
 // GetDetailResource returns the resource stored in the top detail screen's
 // DetailState. Returns the zero-value Resource when the top screen is not a
-// detail screen. Used by the renderer-side stack-lift to route detail-state
-// reads through the controller instead of the stored TUI view model.
+// detail screen. Lets the renderer read detail state from the controller.
 func (c *Controller) GetDetailResource() resource.Resource {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -377,7 +376,7 @@ func (c *Controller) GetDetailResource() resource.Resource {
 
 // GetDetailResourceType returns the resource type stored in the top detail
 // screen's DetailState. Returns an empty string when the top screen is not a
-// detail screen. Used by the renderer-side stack-lift.
+// detail screen.
 func (c *Controller) GetDetailResourceType() string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

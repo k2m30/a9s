@@ -1,6 +1,5 @@
 // runtime_adapter_related.go — Bubble Tea adapter glue for two runtime entry
-// points: HandleRelatedNavigate (Phase 05 PR-05a-h4, AS-150) and
-// HandleRelatedCheckStarted (Phase 05 PR-05a-h-related, AS-154).
+// points: HandleRelatedNavigate and HandleRelatedCheckStarted.
 //
 // handleRelatedNavigate replaces the deleted entry point from
 // internal/tui/app_handlers_related_navigate.go. It constructs a transient
@@ -37,13 +36,9 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
-// handleRelatedNavigate replaces the entry point previously in
-// internal/tui/app_handlers_related_navigate.go. The signature is identical
-// so the existing app.go dispatch line is unchanged.
-//
-// It constructs a transient runtime.Core to invoke the migrated policy
-// (HandleRelatedNavigate), then builds the view and starts any required fetch
-// based on the returned NavigationResult and TaskRequests.
+// handleRelatedNavigate invokes runtime.Core's HandleRelatedNavigate, then builds
+// the view and starts any required fetch based on the returned NavigationResult
+// and TaskRequests.
 func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, tea.Cmd) {
 	ev := runtime.RelatedNavigateEvent{
 		TargetType:     msg.TargetType,

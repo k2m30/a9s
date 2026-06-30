@@ -1,20 +1,12 @@
 package tui
 
 // app_session.go — AWS-session lifecycle handlers: clients-ready bootstrap,
-// profile/region/theme selectors, and the profile-list loader. Split out of
-// internal/tui/app_handlers.go in Phase-05 PR-05a-h1 (AS-147). The three
-// session-driven handlers (handleClientsReady, handleProfileSelected,
-// handleRegionSelected) were ported to runtime.Core in PR-05a-h3 (AS-324)
-// and are ≤12-line adapters here that pre-bump the flash gen, translate
-// the messages.* into the runtime.*Event, call the Core method, apply
-// returned intents, and translate returned tasks into tea.Cmds.
-//
-// PR-05a-h4-a (AS-769) ports the remaining four view-stack handlers
-// (handleProfilesLoaded, handleValueRevealed, handleEnterChildView,
-// handleThemeSelected) to (c *Core) Handle* methods backed by the
-// screen-builder registry in screens.go. handleThemeFileRead is a new
-// thin adapter introduced by h4-a to complete the two-step theme flow
-// (read task → HandleThemeFileRead → Apply/Pop/Flash + Save task).
+// profile/region/theme selectors, and the profile-list loader. Each is a thin
+// adapter: it pre-bumps the flash gen where needed, translates the messages.*
+// into the runtime.*Event, calls the runtime.Core method, applies the returned
+// intents, and translates returned tasks into tea.Cmds. handleThemeFileRead
+// completes the two-step theme flow (read task → HandleThemeFileRead →
+// Apply/Pop/Flash + Save task).
 
 import (
 	tea "charm.land/bubbletea/v2"

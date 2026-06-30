@@ -12,8 +12,7 @@ import (
 )
 
 // handleKeyMsg processes all keyboard input: force-quit, input modes, global
-// keys, then falls through to the active view. Moved from app_handlers.go in
-// Phase-05 PR-05a-h1 (AS-147).
+// keys, then falls through to the active view.
 func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Global keys handled before delegation
 	if key.Matches(msg, m.keys.ForceQuit) {
