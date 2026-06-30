@@ -9,7 +9,6 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
 // handleKeyMsg processes all keyboard input: force-quit, input modes, global
@@ -32,49 +31,63 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Clear error hint on any navigation keypress (not during text input).
 	m.showErrorHint = false
 
-	// If the active view is in search input mode, delegate all keys to it.
-	// This prevents global keys (q, ?, i, etc.) from firing while typing a search query.
-	if s, ok := m.activeView().(views.Searchable); ok && s.IsSearchInputMode() {
-		return m.updateActiveView(msg)
+	rs := m.activeRS()
+
+	// If the active screen has search in input mode, delegate all keys to it.
+	// This prevents global keys (q, ?, i, etc.) from firing while typing a search.
+	if rs.search.IsInputMode() {
+		return m.updateActiveRS(msg)
+	}
+
+	// When the right-column filter is active on a detail screen, character keys
+	// must reach the filter widget — not trigger global bindings like ToggleRelated
+	// ('r'), Quit ('q'), Copy ('c'), etc. Esc is already caught above by the Escape
+	// handler; ForceQuit is intentionally preserved as a universal exit.
+	if rs.kind == rsKindDetail && rs.rightCol.IsFiltering() {
+		return m.updateActiveRS(msg)
 	}
 
 	// Global keys in normal mode
 	if key.Matches(msg, m.keys.Help) {
-		// If already on help, let the help view handle it (closes help)
-		if _, ok := m.activeView().(*views.HelpModel); ok {
-			return m.updateActiveView(msg)
+		// If already on help, route to rs update (which handles close).
+		if rs.kind == rsKindHelp {
+			return m.updateActiveRS(msg)
 		}
 		ctx := m.helpContext()
 		activeShortName := ""
-		if rl, ok := m.activeView().(*views.ResourceListModel); ok {
-			activeShortName = rl.ShortName()
+		if rs.kind == rsKindList {
+			activeShortName = rs.resourceType
 		}
-		help := views.NewHelpWithResource(m.keys, ctx, activeShortName)
-		help.SetSize(m.innerSize())
-		m.pushView(&help)
+		helpRS := newHelpRS(ctx, activeShortName)
+		w, h := m.innerSize()
+		helpRS.width, helpRS.height = w, h
+		m.pushRS(helpRS)
 		return m, nil
 	}
 	if key.Matches(msg, m.keys.Identity) {
-		// If already on identity view, let it handle the key (dismisses)
-		if _, ok := m.activeView().(*views.IdentityModel); ok {
-			return m.updateActiveView(msg)
+		// If already on identity view, let the rs update handle it (dismisses).
+		if rs.kind == rsKindIdentity {
+			return m.updateActiveRS(msg)
 		}
-		id := views.NewIdentity(m.core.Profile(), m.core.Region(), m.keys)
+		idRS := newIdentityRS()
+		// Seed with current identity if available so it shows immediately.
 		if m.core.Identity() != nil {
 			data := m.identityToViewData()
-			id.SetIdentity(data)
+			idRS.identityData = data
+			idRS.identityLoading = false
 		}
-		id.SetSize(m.innerSize())
-		m.pushView(&id)
-		// Always re-fetch on i press
+		w, h := m.innerSize()
+		idRS.width, idRS.height = w, h
+		m.pushRS(idRS)
+		// Always re-fetch on i press.
 		m.core.SetIdentityFetching(true)
 		cmd := m.fetchIdentity(m.core.ConnectGen())
 		return m, cmd
 	}
 	if key.Matches(msg, m.keys.ErrorLog) {
-		// If already viewing the error log, let the view handle the key.
-		if ym, ok := m.activeView().(*views.YAMLModel); ok && ym.IsTextViewer() {
-			return m.updateActiveView(msg)
+		// If already viewing the error log (non-ctrl-backed text screen), let rs update handle it.
+		if rs.kind == rsKindText && !rs.ctrlBacked {
+			return m.updateActiveRS(msg)
 		}
 		if len(m.errorHistory) == 0 {
 			return m.handleFlash(messages.Flash{Text: "No errors this session"})
@@ -84,37 +97,46 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			e := m.errorHistory[i]
 			fmt.Fprintf(&sb, "[%s] %s\n", e.time.Format("15:04:05"), e.message)
 		}
-		tv := views.NewTextViewer("errors", sb.String(), m.keys)
-		tv.SetSize(m.innerSize())
-		m.pushView(&tv)
+		errRS := newErrorLogRS(sb.String())
+		w, h := m.innerSize()
+		errRS.width, errRS.height = w, h
+		m.pushRS(errRS)
 		return m, nil
 	}
 	if key.Matches(msg, m.keys.Quit) {
 		return m, tea.Quit
 	}
 	if key.Matches(msg, m.keys.Escape) {
-		if d, ok := m.activeView().(*views.DetailModel); ok && d.ConsumesEscapeLocally() {
-			return m.updateActiveView(msg)
+		// Detail: if right-column is focused or filtering, consume Esc locally.
+		if rs.kind == rsKindDetail && (rs.rightCol.IsFocused() || rs.rightCol.IsFiltering()) {
+			return m.updateActiveRS(msg)
 		}
-		// If active view has active search (confirmed highlights), delegate Esc to clear it.
-		if s, ok := m.activeView().(views.Searchable); ok && s.IsSearchActive() {
-			return m.updateActiveView(msg)
+		// If active screen has active search (confirmed highlights), delegate Esc to clear it.
+		if rs.search.IsActive() {
+			return m.updateActiveRS(msg)
 		}
 		// Related-navigation resource lists should pop immediately on Esc.
-		if rl, ok := m.activeView().(*views.ResourceListModel); ok && rl.EscPops() {
-			m.popView()
+		if rs.kind == rsKindList && m.ctrl.GetListEscPops() {
+			m.popRS()
 			return m, nil
 		}
-		// If active view has a confirmed filter, clear it first
-		if f, ok := m.activeView().(views.Filterable); ok && f.GetFilter() != "" {
-			f.SetFilter("")
-			if rl, ok := m.activeView().(*views.ResourceListModel); ok {
-				m.cacheTopLevelResourceList(*rl)
+		// If active screen has a confirmed filter, clear it first.
+		if rs.kind == rsKindMenu || rs.kind == rsKindList {
+			filter := m.ctrl.GetListFilter()
+			if rs.kind == rsKindMenu {
+				// Menu filter state is in the menu body — check via snapshot.
+				body := m.ctrl.Snapshot().Body
+				if body.Menu != nil {
+					filter = body.Menu.Filter
+				}
 			}
-			return m, nil
+			if filter != "" {
+				m.applyFilterToActiveRS("")
+				return m, nil
+			}
 		}
-		// Otherwise pop view; no-op on main menu (never quit from Esc)
-		m.popView()
+		// Otherwise pop; no-op on main menu (never quit from Esc).
+		m.popRS()
 		return m, nil
 	}
 	if key.Matches(msg, m.keys.Colon) {
@@ -124,22 +146,22 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if key.Matches(msg, m.keys.Filter) {
-		// Only activate filter mode on filterable views
-		if _, ok := m.activeView().(views.Filterable); ok {
+		// Activate filter mode on filterable screen kinds (menu, list, selector).
+		if rs.kind == rsKindMenu || rs.kind == rsKindList || rs.kind == rsKindSelector {
 			m.inputMode = modeFilter
 			m.cmdInput.Reset()
 			m.cmdInput.Focus()
 			return m, nil
 		}
-		// On help views, delegate / to the view (which sends PopViewMsg to close).
-		if _, ok := m.activeView().(*views.HelpModel); ok {
-			return m.updateActiveView(msg)
+		// On help screens, delegate / to the screen (which sends PopViewMsg to close).
+		if rs.kind == rsKindHelp {
+			return m.updateActiveRS(msg)
 		}
-		// On searchable views (detail, YAML), delegate / for search activation.
-		if _, ok := m.activeView().(views.Searchable); ok {
-			return m.updateActiveView(msg)
+		// On searchable screens (detail, text), delegate / for search activation.
+		if rs.kind == rsKindDetail || rs.kind == rsKindText {
+			return m.updateActiveRS(msg)
 		}
-		// On other static views (reveal), consume / without action.
+		// On reveal — / is ignored (no filter, no search in reveal view).
 		return m, nil
 	}
 
@@ -158,7 +180,14 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleReveal()
 	}
 
-	return m.updateActiveView(msg)
+	// ToggleRelated (r) — show/hide the right-column related panel on detail screens.
+	// Handled here (not delegated to updateActiveRS) because there is no stored
+	// DetailModel on the stack; all right-column state lives directly on the rs.
+	if key.Matches(msg, m.keys.ToggleRelated) && rs.kind == rsKindDetail {
+		return m.handleToggleRelated()
+	}
+
+	return m.updateActiveRS(msg)
 }
 
 // updateFilterMode handles keys while in filter input mode.
@@ -166,7 +195,7 @@ func (m Model) updateFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if key.Matches(msg, m.keys.Escape) {
 		m.inputMode = modeNormal
 		m.cmdInput.Blur()
-		m.applyFilterToActiveView("")
+		m.applyFilterToActiveRS("")
 		return m, nil
 	}
 	if key.Matches(msg, m.keys.Enter) {
@@ -177,18 +206,8 @@ func (m Model) updateFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	var cmd tea.Cmd
 	m.cmdInput, cmd = m.cmdInput.Update(msg)
-	m.applyFilterToActiveView(m.cmdInput.Value())
+	m.applyFilterToActiveRS(m.cmdInput.Value())
 	return m, cmd
-}
-
-// applyFilterToActiveView applies the given filter text to whichever navigable view is active.
-func (m *Model) applyFilterToActiveView(text string) {
-	if f, ok := m.activeView().(views.Filterable); ok {
-		f.SetFilter(text)
-	}
-	if rl, ok := m.activeView().(*views.ResourceListModel); ok {
-		m.cacheTopLevelResourceList(*rl)
-	}
 }
 
 // updateCommandMode handles keys while in command input mode.
@@ -342,3 +361,5 @@ func (m Model) executeCommand(cmd string) (tea.Model, tea.Cmd) {
 		}
 	}
 }
+
+
