@@ -181,9 +181,8 @@ func (c *Controller) handleRelatedCheckBatch(batch messages.RelatedCheckBatch) {
 		})
 		c.applyIntents(intents)
 
-		// Merge the row into the matching detail's RelatedRows directly, since
-		// ApplyDetailRelatedResult operates on the TOP detail screen but the
-		// target may be stacked. Use the found targetDetail pointer directly.
+		// Merge the row into the matching (possibly stacked) detail's RelatedRows
+		// using the targetDetail pointer resolved above.
 		if targetDetail == nil {
 			continue
 		}
@@ -197,8 +196,8 @@ func (c *Controller) handleRelatedCheckBatch(batch messages.RelatedCheckBatch) {
 }
 
 // mergeDetailRelatedRow updates or appends one RelatedRow in ds, matching by
-// DisplayName. Mirrors ApplyDetailRelatedResult but operates on a DetailState
-// pointer directly rather than the top-of-stack screen.
+// DisplayName and preserving ResourceIDs. The single merge used by every
+// related-result path (result lane, cache replay, batch, async adapter).
 func mergeDetailRelatedRow(ds *DetailState, displayName, targetType string, count int, loading bool, errMsg string, approximate bool, resourceIDs []string, fetchFilter map[string]string) {
 	for i := range ds.RelatedRows {
 		if ds.RelatedRows[i].DisplayName == displayName {
