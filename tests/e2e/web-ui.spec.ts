@@ -312,3 +312,72 @@ test.describe("a9s web UI — menu fidelity + interaction (TUI parity)", () => {
     ).not.toBe(yamlTitle);
   });
 });
+
+test.describe("a9s web UI — command palette + input modes (TUI parity)", () => {
+  test(": opens the command palette and dispatches to the help view", async ({ page }) => {
+    // Bug: app.js never wired the ':' colon-command palette, so commands were
+    // dead in the web. The controller's ActionCommand already handled
+    // root/profile/region/theme/help/<resource-shortname> — only the renderer
+    // was missing. ':help' reaches a view a single menu Enter cannot, so it
+    // proves the command actually dispatched.
+    await page.keyboard.press(":"); // client-side bar, no POST
+    const bar = page.locator("#input-bar");
+    await expect(bar, "':' must open the command bar immediately").toBeVisible();
+    await expect(bar).toHaveText(":█");
+    await page.keyboard.type("help"); // collected locally, no POST per letter
+    await expect(bar).toHaveText(":help█");
+    await press(page, "Enter"); // POST /action {command, help}
+    await expect(
+      page.locator(".help-sections"),
+      "':help' must dispatch to the help view (unreachable by a single Enter)",
+    ).toBeVisible();
+    await expect(bar, "the input bar hides after dispatch").toBeHidden();
+  });
+
+  test(":<resource> navigates to that resource list", async ({ page }) => {
+    await page.keyboard.press(":");
+    await page.keyboard.type("ec2");
+    // The bar text before Enter proves ':' is wired — without it the keys would
+    // fall through to the keymap and this assertion would fail.
+    await expect(page.locator("#input-bar")).toHaveText(":ec2█");
+    await press(page, "Enter"); // POST /action {command, ec2}
+    await expect(
+      page.locator(".list-table"),
+      "':ec2' must open the ec2 resource list",
+    ).toBeVisible();
+  });
+
+  test("Escape cancels command mode without dispatching", async ({ page }) => {
+    await page.keyboard.press(":");
+    await page.keyboard.type("ec2");
+    await page.keyboard.press("Escape"); // command-mode Escape does NOT POST
+    await expect(page.locator("#input-bar"), "Escape hides the bar").toBeHidden();
+    await expect(
+      page.locator(".menu-entry").first(),
+      "Escape must leave us on the menu (no navigation)",
+    ).toBeVisible();
+  });
+
+  test("/ shows the filter input immediately, before the first letter", async ({ page }) => {
+    // Bug: '/' set filterMode but rendered nothing until a letter made the
+    // server-side .Filter non-empty, so the panel appeared 'only after the
+    // first letter'. The client-side bar now shows the instant '/' is pressed.
+    await press(page, "Enter"); // menu -> list
+    await expect(page.locator(".list-table")).toBeVisible();
+    await page.keyboard.press("/"); // client-side, no POST
+    const bar = page.locator("#input-bar");
+    await expect(bar, "'/' must show the filter bar immediately").toBeVisible();
+    await expect(bar, "empty buffer still shows prompt + cursor").toHaveText("/█");
+    await press(page, "a"); // typing a letter filters live + updates the bar
+    await expect(bar).toHaveText("/a█");
+  });
+
+  test("Escape closes the filter bar", async ({ page }) => {
+    await press(page, "Enter");
+    await expect(page.locator(".list-table")).toBeVisible();
+    await page.keyboard.press("/");
+    await expect(page.locator("#input-bar")).toBeVisible();
+    await press(page, "Escape"); // setFilter("") posts, then the bar hides
+    await expect(page.locator("#input-bar")).toBeHidden();
+  });
+});
