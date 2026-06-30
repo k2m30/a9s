@@ -59,7 +59,7 @@ var sharedR53Fixtures = sync.OnceValue(func() *R53Fixtures {
 				},
 			},
 			// S3 healthy-bucket alias zone (checkS3R53 pivot).
-			// alias_targets field is populated by the r53 fetcher in Phase 7.
+			// alias_targets is emitted by the r53 fetcher.
 			// The record's AliasTarget.DNSName contains the S3 website endpoint.
 			{
 				Id:                     aws.String("/hostedzone/Z4567890123ABCDEFGHIJ"),
