@@ -138,6 +138,10 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 			// (called from the task-result lane); this intent carries Wave-2 data only.
 			if v.Enrichment != nil {
 				c.applyEnrichmentState(v.ResourceType, 0, false, v.Enrichment.Findings)
+				// applyEnrichmentState only stores findings + the issue badge; the
+				// Wave-2 column updates (status/summary) must also reach the cached
+				// list rows or enriched columns render stale (ECR/WAF/CodeArtifact).
+				c.applyListFieldUpdates(v.ResourceType, v.Enrichment.FieldUpdates)
 			}
 
 		case runtime.SetIdentityIntent:

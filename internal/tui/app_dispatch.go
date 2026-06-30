@@ -64,11 +64,12 @@ func (m *Model) applyIntents(intents []runtime.UIIntent) []tea.Cmd {
 				// recovered: clear enrichment from every stacked detail screen.
 				m.ctrl.ClearDetailFindingsForType(v.ResourceType)
 			} else {
-				// Apply each per-resource finding independently. The controller's
+				// Clear stale findings from every stacked detail of this type first,
+				// so a resource that recovered (absent from the new map) loses its
+				// Attention; then re-apply for resources still reporting findings.
 				// ApplyDetailFindingForResource searches all stacked screens by
-				// (type, id), so a resource that is stacked but not active is
-				// still updated. Resources NOT in the map have recovered: clear
-				// their findings via a nil-finding call.
+				// (type, id), so a stacked-but-not-active detail is still updated.
+				m.ctrl.ClearDetailFindingsForType(v.ResourceType)
 				for resourceID, f := range v.EnrichmentFindings {
 					finding := f
 					var ad *domain.AttentionDetail

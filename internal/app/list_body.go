@@ -333,6 +333,13 @@ func (c *Controller) GetListVisibleResources() []resource.Resource {
 func (c *Controller) ApplyListFieldUpdates(typeName string, updates map[string]map[string]string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.applyListFieldUpdates(typeName, updates)
+}
+
+// applyListFieldUpdates is the lock-free body of ApplyListFieldUpdates so it can
+// be called from the intents handler, which already holds c.mu. Callers must
+// hold c.mu (write).
+func (c *Controller) applyListFieldUpdates(typeName string, updates map[string]map[string]string) {
 	if len(updates) == 0 {
 		return
 	}

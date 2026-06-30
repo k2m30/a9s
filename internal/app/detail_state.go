@@ -245,10 +245,10 @@ func (c *Controller) ApplyDetailRelated(rows []DetailRelatedRow) {
 	ds.RelatedRows = rows
 }
 
-// ApplyDetailRelatedResult merges one checker result into the top detail
-// screen's DetailState.RelatedRows, matching by DefDisplayName (identical to
-// rightColumnModel.Update semantics). If no row with that DisplayName exists,
-// the result is appended. No-op when the top screen is not ScreenDetail.
+// ApplyDetailRelatedResult merges one checker result into the TOP detail screen's
+// RelatedRows by DefDisplayName. Used by the synchronous cache-replay paths that
+// run immediately after pushing the source detail, where the top IS the source.
+// No-op when the top screen is not ScreenDetail.
 func (c *Controller) ApplyDetailRelatedResult(displayName, targetType string, count int, loading bool, errMsg string, approximate bool, fetchFilter map[string]string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -256,7 +256,31 @@ func (c *Controller) ApplyDetailRelatedResult(displayName, targetType string, co
 	if ds == nil {
 		return
 	}
-	// Find existing row by DisplayName.
+	c.applyRelatedResultToState(ds, displayName, targetType, count, loading, errMsg, approximate, fetchFilter)
+}
+
+// ApplyDetailRelatedResultForSource merges a result into the STACKED detail whose
+// resource matches sourceResourceID rather than the top. The async related-check
+// handler uses this: the user may have navigated to a different detail while the
+// check was in flight, so applying to the top would populate the wrong panel.
+// No-op when no stacked detail matches sourceResourceID.
+func (c *Controller) ApplyDetailRelatedResultForSource(sourceResourceID, displayName, targetType string, count int, loading bool, errMsg string, approximate bool, fetchFilter map[string]string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for i := range c.stack {
+		if c.stack[i].ID != runtime.ScreenDetail {
+			continue
+		}
+		if ds := c.stack[i].State.Detail; ds != nil && ds.Resource.ID == sourceResourceID {
+			c.applyRelatedResultToState(ds, displayName, targetType, count, loading, errMsg, approximate, fetchFilter)
+			return
+		}
+	}
+}
+
+// applyRelatedResultToState merges one checker result into ds.RelatedRows, matching
+// by DisplayName (update in place, else append). Callers must hold c.mu (write).
+func (c *Controller) applyRelatedResultToState(ds *DetailState, displayName, targetType string, count int, loading bool, errMsg string, approximate bool, fetchFilter map[string]string) {
 	for i := range ds.RelatedRows {
 		if ds.RelatedRows[i].DisplayName == displayName {
 			ds.RelatedRows[i].Count = count
@@ -267,7 +291,6 @@ func (c *Controller) ApplyDetailRelatedResult(displayName, targetType string, co
 			return
 		}
 	}
-	// Not found — append new row.
 	ds.RelatedRows = append(ds.RelatedRows, DetailRelatedRow{
 		TargetType:  targetType,
 		DisplayName: displayName,
