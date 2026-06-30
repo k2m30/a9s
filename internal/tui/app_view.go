@@ -62,7 +62,7 @@ func (m Model) View() tea.View {
 	case rsKindMenu:
 		content = renderMenu(snap.Body.Menu, rs)
 	case rsKindList:
-		content = renderList(snap.Body.List, rs, m.ctrl)
+		content = renderList(snap.Body.List, rs)
 	case rsKindDetail:
 		content = renderDetail(snap.Body.Detail, rs)
 	case rsKindReveal:
