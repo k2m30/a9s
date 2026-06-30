@@ -421,5 +421,8 @@ func (c *Controller) GetListAllResources() []resource.Resource {
 		return nil
 	}
 	top := c.stack[len(c.stack)-1]
-	return c.cachedResources(top.Ctx.ResourceType)
+	// Prefer per-screen rows (ls.Rows) over the shared type-keyed cache so that
+	// a related-navigation list (EscPops, same ResourceType) cannot overwrite the
+	// type key and corrupt the top-level list's resource count on cache-back.
+	return c.listScreenResources(ls, top.Ctx.ResourceType)
 }

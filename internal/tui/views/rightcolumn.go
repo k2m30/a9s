@@ -28,7 +28,10 @@ type rightColumnRow struct {
 	checker     resource.RelatedChecker // originating RelatedDef.Checker — carried forward for re-apply on load-more
 }
 
-type rightColumnModel struct {
+// RightColumnModel manages the RELATED panel rendered next to a detail view.
+// Exported so tui.rendererState can hold one without importing internal view
+// model types into the forbidden files.
+type RightColumnModel struct {
 	rows               []rightColumnRow
 	cursor             int
 	focused            bool

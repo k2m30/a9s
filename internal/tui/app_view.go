@@ -6,8 +6,8 @@
 // spec acceptance check enforces (`wc -l internal/tui/app.go`).
 //
 // All five functions here are pure renderer-side composition: they read
-// view-stack state plus a small slice of session metadata (profile,
-// region, identity) and produce strings or tea.View values for the
+// rendererState + controller snapshot plus a small slice of session metadata
+// (profile, region, identity) and produce strings or tea.View values for the
 // renderer to display. No runtime / handler logic lives here.
 package tui
 
@@ -41,17 +41,47 @@ func (m Model) View() tea.View {
 		return alt("Terminal too short (min 7 lines)")
 	}
 
-	active := m.activeView()
+	rs := m.activeRS()
+	snap := m.ctrl.Snapshot()
 
 	headerProfile := m.core.Profile()
 	headerRegion := m.core.Region()
-	if sel, ok := active.(*views.SelectorModel); ok {
-		if sel.Title() == "aws-regions" {
+	// Selector screens show "..." in place of the real profile/region.
+	if rs.kind == rsKindSelector && snap.Body.Selector != nil {
+		switch snap.Body.Selector.Title {
+		case "aws-regions":
 			headerRegion = "..."
-		} else if sel.Title() == "aws-profiles" {
+		case "aws-profiles":
 			headerProfile = "..."
 		}
 	}
+	// Render content first so that renderDetail/renderText can sync the search
+	// widget's content (SetContent) before headerRight reads MatchInfo().
+	var content string
+	switch rs.kind {
+	case rsKindMenu:
+		content = renderMenu(snap.Body.Menu, rs)
+	case rsKindList:
+		content = renderList(snap.Body.List, rs, m.ctrl)
+	case rsKindDetail:
+		content = renderDetail(snap.Body.Detail, rs)
+	case rsKindReveal:
+		content = renderReveal(rs)
+	case rsKindText:
+		if rs.ctrlBacked {
+			content = renderText(snap.Body.Text, rs)
+		} else {
+			// Non-ctrl-backed text = error-log overlay. Wrap raw text in a TextBody.
+			content = renderText(&app.TextBody{Lines: strings.Split(rs.errorLogText, "\n")}, rs)
+		}
+	case rsKindSelector:
+		content = renderSelector(snap.Body.Selector, rs)
+	case rsKindHelp:
+		content = renderHelp(rs)
+	case rsKindIdentity:
+		content = renderIdentity(rs, m.core.Profile(), m.core.Region())
+	}
+
 	rightContent := m.headerRight()
 	badge := m.accountBadge()
 	role := m.identityRoleName()
@@ -68,66 +98,101 @@ func (m Model) View() tea.View {
 		m.headerCacheKey = cacheKey
 	}
 
-	content := active.View()
 	var lines []string
 	if content != "" {
 		lines = strings.Split(content, "\n")
 	}
 	frameHeight := max(m.height-1, 3)
-	frameTitle := active.FrameTitle()
-	if d, ok := active.(*views.DetailModel); ok {
-		src := d.SourceResource()
-		if src.ID != "" {
-			if src.Name != "" {
-				frameTitle = fmt.Sprintf("detail -- %s (%s)", src.ID, src.Name)
-			} else {
-				frameTitle = "detail -- " + src.ID
-			}
-		}
-	}
-	// Footer hints: use the controller snapshot for views that delegate footer
-	// computation to the controller (menu, list, detail always; yaml/json only
-	// when the controller is also on a text screen — otherwise the top of the
-	// controller stack is the previous screen and its hints would be wrong for
-	// overlay text views such as the TUI error-log). For all other views
-	// (overlays: help, reveal, selector) fall back to Hintable.BottomHints().
+
+	// Frame title: derive from rs.kind and controller state.
+	frameTitle := m.frameTitle(rs, snap)
+
+	// Footer hints: controller owns hints for ctrl-backed screens.
 	var hints []layout.KeyHint
-	switch active.(type) {
-	case *views.MainMenuModel, *views.ResourceListModel, *views.DetailModel:
-		if ctrlHints := m.ctrl.Snapshot().Footer; len(ctrlHints) > 0 {
+	switch rs.kind {
+	case rsKindMenu, rsKindList, rsKindDetail:
+		if ctrlHints := snap.Footer; len(ctrlHints) > 0 {
 			hints = make([]layout.KeyHint, len(ctrlHints))
 			for i, kh := range ctrlHints {
 				hints[i] = layout.KeyHint{Key: kh.Key, Desc: kh.Help}
 			}
-		} else if h, ok := active.(views.Hintable); ok {
-			hints = h.BottomHints()
 		}
-	case *views.YAMLModel, *views.JSONModel:
+	case rsKindText:
 		// Use the controller footer only when the controller is actually on a
-		// text screen — so that overlays (e.g. error-log) don't inherit the
-		// previous screen's hints from the controller.
-		if m.ctrl.Snapshot().Body.Kind == app.BodyKindText {
-			if ctrlHints := m.ctrl.Snapshot().Footer; len(ctrlHints) > 0 {
+		// text screen — so that the error-log overlay (not ctrl-backed) doesn't
+		// inherit the previous screen's hints from the controller.
+		if rs.ctrlBacked && snap.Body.Kind == app.BodyKindText {
+			if ctrlHints := snap.Footer; len(ctrlHints) > 0 {
 				hints = make([]layout.KeyHint, len(ctrlHints))
 				for i, kh := range ctrlHints {
 					hints[i] = layout.KeyHint{Key: kh.Key, Desc: kh.Help}
 				}
-			} else if h, ok := active.(views.Hintable); ok {
-				hints = h.BottomHints()
 			}
-		} else if h, ok := active.(views.Hintable); ok {
-			hints = h.BottomHints()
-		}
-	default:
-		if h, ok := active.(views.Hintable); ok {
-			hints = h.BottomHints()
 		}
 	}
+
 	frame := layout.RenderFrameWithHints(lines, frameTitle, hints, m.width, frameHeight)
 
 	v := tea.NewView(header + "\n" + frame)
 	v.AltScreen = true
 	return v
+}
+
+// frameTitle returns the frame title string for the current active screen.
+func (m Model) frameTitle(rs *rendererState, snap app.ViewState) string {
+	switch rs.kind {
+	case rsKindMenu:
+		return m.ctrl.MenuFrameTitle()
+	case rsKindList:
+		if t := m.ctrl.ListFrameTitle(); t != "" {
+			return t
+		}
+		return rs.resourceType
+	case rsKindDetail:
+		src := m.ctrl.GetDetailResource()
+		if src.ID != "" {
+			if src.Name != "" {
+				return fmt.Sprintf("detail -- %s (%s)", src.ID, src.Name)
+			}
+			return "detail -- " + src.ID
+		}
+		return "detail"
+	case rsKindReveal:
+		if rs.revealName != "" {
+			return "reveal -- " + rs.revealName
+		}
+		return "reveal"
+	case rsKindText:
+		if !rs.ctrlBacked {
+			return "errors"
+		}
+		screenID := m.ctrl.TextFrameTitle()
+		if screenID == "" {
+			return "text"
+		}
+		// Build resource-qualified title: "<name> yaml" or "<id> yaml".
+		if rs.textResource != nil && rs.textResource.ID != "" {
+			label := rs.textResource.Name
+			if label == "" {
+				label = rs.textResource.ID
+			}
+			return label + " " + screenID
+		}
+		return screenID
+	case rsKindSelector:
+		if t := m.ctrl.SelectorFrameTitle(); t != "" {
+			return t
+		}
+		if snap.Body.Selector != nil {
+			return snap.Body.Selector.Title
+		}
+		return "selector"
+	case rsKindHelp:
+		return "help"
+	case rsKindIdentity:
+		return "identity"
+	}
+	return ""
 }
 
 // headerRight returns the pre-rendered right-side string for the header.
@@ -138,12 +203,21 @@ func (m Model) headerRight() string {
 	case modeCommand:
 		return styles.FilterActive.Render(":" + m.cmdInput.Value())
 	}
-	// Show search state from active view.
-	if s, ok := m.activeView().(views.Searchable); ok && s.IsSearchActive() {
-		info := s.SearchInfo()
+	// Show search state from active rendererState.
+	rs := m.activeRS()
+	if rs.search.IsInputMode() {
+		return styles.FilterActive.Render("/" + rs.search.Query())
+	}
+	if rs.search.IsActive() {
+		info := rs.search.MatchInfo()
 		if info != "" {
 			return styles.FilterActive.Render(info)
 		}
+	}
+	// Right-column filter on detail screens — show filter text so the user can
+	// see what they've typed or confirmed, mirroring the list-filter "/" display.
+	if rs.kind == rsKindDetail && (rs.rightCol.IsFiltering() || rs.rightCol.HasFilter()) {
+		return styles.FilterActive.Render("/" + rs.rightCol.FilterQuery())
 	}
 	if m.flash.active {
 		text := m.flash.text
@@ -166,8 +240,8 @@ func (m Model) headerRight() string {
 		}
 		return styles.FlashSuccess.Render(text)
 	}
-	if rv, ok := m.activeView().(*views.RevealModel); ok {
-		return rv.HeaderWarning()
+	if rs.kind == rsKindReveal {
+		return styles.FlashError.Render("Secret visible — press esc to close")
 	}
 	if m.showErrorHint && len(m.errorHistory) > 0 {
 		return styles.FlashError.Render("! for errors")
@@ -198,12 +272,11 @@ func (m Model) identityRoleName() string {
 
 // identityToViewData converts the session-cached caller identity (mirrored
 // to the renderer-shaped *domain.CallerIdentity by m.core.Identity()) to a
-// view-layer IdentityData. Used at IdentityModel construction time (the
-// `i` key press) to seed the view from current session state before the
+// view-layer IdentityData. Used at identity rs construction time (the
+// `i` key press) to seed the rs from current session state before the
 // in-flight identity fetch returns. The post-h4-b SetIdentityIntent
-// updates the IdentityModel via applyIntents using the same domain mirror —
-// this helper covers the construction path that runs before any intent
-// fires.
+// updates the identity rs via applyIntents using the same domain mirror —
+// this helper covers the construction path that runs before any intent fires.
 func (m Model) identityToViewData() views.IdentityData {
 	id := m.core.Identity()
 	if id == nil {

@@ -135,7 +135,7 @@ func (c *Controller) applyDetailActions(a Action) (ViewState, []runtime.TaskRequ
 		return c.snapshot(), nil, true
 
 	case ActionSearchPrev:
-		if ds.SearchQuery != "" && ds.SearchCursor > 0 {
+		if ds.SearchQuery != "" {
 			ds.SearchCursor--
 		}
 		return c.snapshot(), nil, true

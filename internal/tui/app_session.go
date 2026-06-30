@@ -22,7 +22,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
-	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
 // handleClientsReady defers to runtime.Core.HandleClientsReady for the
@@ -35,7 +34,7 @@ import (
 // the current flash still matches and clears on schedule (CXR/Architect
 // Stage 5 R3 finding on the prior `len(intents)>0||len(tasks)>0` gate).
 func (m Model) handleClientsReady(msg messages.ClientsReady) (tea.Model, tea.Cmd) {
-	_, hasRL := m.activeView().(*views.ResourceListModel)
+	hasRL := m.activeRS().kind == rsKindList
 	intents, tasks := m.core.HandleClientsReady(runtime.ClientsReadyEvent{
 		Clients: msg.Clients, Err: msg.Err, Region: msg.Region, Gen: msg.Gen,
 		StackDepth: len(m.stack), HasActiveRL: hasRL, NewGen: m.flash.gen + 1,

@@ -220,15 +220,23 @@ func (m *DetailModel) recalcViewportWidth() {
 }
 
 func (m DetailModel) currentRightColWidth() int {
+	return ComputeRightColWidth(m.width, m.rightColWidth)
+}
+
+// ComputeRightColWidth returns the right-column width for a given terminal
+// inner width and base right-column width. Used by the renderer stack to size
+// the right column without a DetailModel instance (e.g., after Ctrl+R resets
+// the column on the rendererState directly).
+func ComputeRightColWidth(innerWidth, baseWidth int) int {
 	// Keep right panel readable at medium widths while preserving left detail space.
-	if m.width <= 0 {
-		return m.rightColWidth
+	if innerWidth <= 0 {
+		return baseWidth
 	}
-	if m.width >= 100 {
-		return m.rightColWidth
+	if innerWidth >= 100 {
+		return baseWidth
 	}
-	w := max(24, m.width/3)
-	maxAllowed := max(16, m.width-40) // keep at least 40 cols for left pane
+	w := max(24, innerWidth/3)
+	maxAllowed := max(16, innerWidth-40) // keep at least 40 cols for left pane
 	if w > maxAllowed {
 		w = maxAllowed
 	}
@@ -613,16 +621,46 @@ func (m *DetailModel) RenderDetail(body app.DetailBody) string {
 	// and ensures the cursor-row background highlight is embedded at the correct
 	// scroll-offset position (Bug 1 fix).
 	leftRaw := renderDetailFieldsFromBody(m, body)
+
+	// Apply search highlights when a query is active. Uses the same approach
+	// as RenderText: construct a local SearchModel from body state, call Apply
+	// to inject ANSI colour spans, and scroll the viewport to the current match.
+	scrollY := body.ScrollY
+	if body.Search != "" {
+		plain := ansi.Strip(leftRaw)
+		var sm SearchModel
+		sm.active = true
+		sm.SetQuery(body.Search)
+		sm.SetContent(plain)
+		n := len(sm.matches)
+		if n > 0 {
+			// Apply modulo so the controller's unbounded cursor wraps correctly.
+			sm.currentIdx = ((body.SearchCursor % n) + n) % n
+		}
+		var matchLine int
+		leftRaw, matchLine = sm.Apply(leftRaw)
+		if matchLine >= 0 {
+			scrollY = matchLine
+		}
+	}
+
 	m.viewport.SoftWrap = body.Wrap
 	m.viewport.SetContent(leftRaw)
 	m.viewport.GotoTop()
-	m.viewport.SetYOffset(body.ScrollY)
+	m.viewport.SetYOffset(scrollY)
 
 	// Use body.RelatedVisible as the gate — it mirrors the TUI's rightColShowing()
 	// (auto-show when defs exist + wide terminal, or explicit user toggle).
 	// Width guard matches the TUI's MinInnerContentWidth check.
 	if body.RelatedVisible && m.width >= layout.MinInnerContentWidth {
 		rightW := m.currentRightColWidth()
+		leftW := m.width - rightW - 1
+		// Size the viewport to the left-panel width so its View() clips content
+		// to leftW, not to m.width. Without this, transient detail paths (e.g.
+		// renderDetail in renderer.go) that create a fresh viewport at rs.width
+		// produce leftContent lines wider than leftW, causing the combined line
+		// (left + sep + right) to exceed m.width.
+		m.viewport.SetWidth(leftW)
 		sep := styles.ColSepDim.Render("│")
 		if body.RelatedFocused {
 			sep = styles.ColSepAccent.Render("│")
@@ -632,7 +670,6 @@ func (m *DetailModel) RenderDetail(body app.DetailBody) string {
 		leftLines := strings.Split(leftContent, "\n")
 		rightLines := strings.Split(rightContent, "\n")
 		maxLines := max(len(leftLines), len(rightLines))
-		leftW := m.width - rightW - 1
 		var sb strings.Builder
 		for i := range maxLines {
 			if i > 0 {

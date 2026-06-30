@@ -34,10 +34,13 @@ import (
 
 	"github.com/atotto/clipboard"
 
+	"github.com/k2m30/a9s/v3/internal/app"
 	"github.com/k2m30/a9s/v3/internal/config"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui/layout"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -56,24 +59,22 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		Resource:       msg.Resource,
 		ReplaceCurrent: msg.ReplaceCurrent,
 	}
-	// Resolve empty ResourceType from the active view for Detail/YAML/JSON.
+	// Resolve empty ResourceType from the active rs for Detail/YAML/JSON.
 	// The runtime has no view stack to consult; canonicalization happens here.
 	if ev.ResourceType == "" {
+		rs := m.activeRS()
 		switch ev.Target {
 		case runtime.NavigateTargetDetail:
-			if rl, ok := m.activeView().(*views.ResourceListModel); ok {
-				ev.ResourceType = rl.ResourceType()
+			if rs.kind == rsKindList {
+				ev.ResourceType = rs.resourceType
 			}
 		case runtime.NavigateTargetYAML, runtime.NavigateTargetJSON:
-			switch av := m.activeView().(type) {
-			case *views.ResourceListModel:
-				ev.ResourceType = av.ResourceType()
-			case *views.DetailModel:
-				ev.ResourceType = av.ResourceType()
+			if rs.kind == rsKindList || rs.kind == rsKindDetail {
+				ev.ResourceType = rs.resourceType
 			}
 		case runtime.NavigateTargetReveal:
-			if rl, ok := m.activeView().(*views.ResourceListModel); ok {
-				ev.ResourceType = rl.ResourceType()
+			if rs.kind == rsKindList {
+				ev.ResourceType = rs.resourceType
 			}
 		}
 	}
@@ -92,7 +93,7 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		}
 
 	case runtime.NavigateKindPopAll:
-		for m.popView() {
+		for m.popRS() {
 		}
 		return m, nil
 
@@ -110,8 +111,9 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
-		// Sync m.ctrl stack before constructing the view so topListState()
-		// inside NewResourceListFromCache resolves to this screen's ListState.
+		// Sync m.ctrl stack before constructing the transient view so
+		// topListState() inside NewResourceListFromCache resolves to this
+		// screen's ListState.
 		m.ctrl.PushChildListScreen(canon)
 		rl := views.NewResourceListFromCache(
 			*rt, m.viewConfig, m.keys,
@@ -124,16 +126,16 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		if result.DisplayAlias != "" {
 			rl.SetDisplayName(result.DisplayAlias)
 		}
-		rl.SetShowIssueBadge(true) // top-level list from main menu
+		rl.SetShowIssueBadge(true)
 		rl.SetSize(m.innerSize())
-		issueCount, issueTrunc := 0, false
-		if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
-			issueCount = menu.GetIssueCounts()[canon]
-			issueTrunc = menu.GetIssueTruncated()[canon]
-		}
+		issueCount := m.ctrl.GetMenuIssueCounts()[canon]
+		issueTrunc := m.ctrl.GetMenuIssueTruncated()[canon]
 		rl.SetEnrichmentState(issueCount, issueTrunc, findingsFromRows(entry.Resources))
 		rl.SetTruncatedIDs(m.core.EnrichmentTruncatedIDs(canon))
-		m.pushView(&rl)
+		rs := newListRS(canon)
+		w, h := m.innerSize()
+		rs.width, rs.height = w, h
+		m.pushRS(rs)
 		return m, nil
 
 	case runtime.NavigateKindPushResourceList:
@@ -147,8 +149,8 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
-		// Sync m.ctrl stack before constructing the view so topListState()
-		// inside NewResourceList resolves to this screen's ListState.
+		// Sync m.ctrl stack before constructing the transient view so
+		// topListState() inside NewResourceList resolves to this screen's ListState.
 		m.ctrl.PushChildListScreen(canon)
 		rl := views.NewResourceList(*rt, m.viewConfig, m.keys, m.ctrl)
 		if result.DisplayAlias != "" {
@@ -156,21 +158,21 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		}
 		rl.SetShowIssueBadge(true)
 		rl.SetSize(m.innerSize())
-		issueCount, issueTrunc := 0, false
-		if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
-			issueCount = menu.GetIssueCounts()[canon]
-			issueTrunc = menu.GetIssueTruncated()[canon]
-		}
+		issueCount := m.ctrl.GetMenuIssueCounts()[canon]
+		issueTrunc := m.ctrl.GetMenuIssueTruncated()[canon]
 		rl.SetEnrichmentState(issueCount, issueTrunc, nil)
 		rl.SetTruncatedIDs(m.core.EnrichmentTruncatedIDs(canon))
-		rl, initCmd := rl.Init()
-		m.pushView(&rl)
+		_, initCmd := rl.Init()
+		rs := newListRS(canon)
+		w, h := m.innerSize()
+		rs.width, rs.height = w, h
+		m.pushRS(rs)
 		fetchCmd := navigateTasksToCmd(m, msg, result, tasks)
 		return m, tea.Batch(initCmd, fetchCmd)
 
 	case runtime.NavigateKindPushDetail:
 		if result.ReplaceCurrent {
-			m.popView()
+			m.popRS()
 		}
 		// Push ScreenDetail onto the controller stack and seed DetailState so
 		// Snapshot().Body.Detail is non-nil from the first render.
@@ -184,10 +186,23 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		if ef, ad := findingFromResource(*result.Resource); ef != nil {
 			m.ctrl.ApplyDetailFinding(ef, ad)
 		}
+		// Create a transient detail model only to configure the controller state
+		// (SetNavProvider seeds navigable-field data into the ctrl).
 		d := views.NewDetailWithCtrl(*result.Resource, result.ResolvedType, m.viewConfig, m.keys, m.ctrl)
 		d.SetNavProvider(resource.GetNavigableFields)
 		d.SetSize(m.innerSize())
-		m.pushView(&d)
+		// Push a detail rendererState instead of the view model.
+		detailRS := newDetailRS(result.ResolvedType)
+		w, h := m.innerSize()
+		detailRS.width, detailRS.height = w, h
+		// The right column auto-shows when related defs exist — mirror SetSize behaviour.
+		defs := resource.GetRelated(result.ResolvedType)
+		if len(defs) > 0 {
+			detailRS.rightCol = views.NewRightColumn(defs, *result.Resource, result.ResolvedType)
+			detailRS.rightColAutoShown = true
+			detailRS.rightColVisible = true
+		}
+		m.pushRS(detailRS)
 		var cmds []tea.Cmd
 		if result.DispatchEnrich {
 			res := *result.Resource
@@ -196,10 +211,25 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 				return messages.EnrichDetail{ResourceType: rt, Resource: res}
 			})
 		}
-		if result.DispatchRelated && d.NeedsRelatedCheck() {
+		if result.DispatchRelated && detailRS.rightColAutoShown {
 			ck := runtime.RelatedCacheKey(result.ResolvedType, result.Resource.ID)
 			if cached, ok := m.core.RelatedCacheGet(ck); ok && len(cached) > 0 {
-				d.ApplyRelatedResults(runtime.RelatedCacheReplay(result.ResolvedType, cached))
+				// Replay cached related results directly into the controller.
+				for _, msg := range runtime.RelatedCacheReplay(result.ResolvedType, cached) {
+					errMsg := ""
+					if msg.Result.Err != nil {
+						errMsg = msg.Result.Err.Error()
+					}
+					m.ctrl.ApplyDetailRelatedResult(
+						msg.DefDisplayName,
+						msg.Result.TargetType,
+						msg.Result.Count,
+						false,
+						errMsg,
+						msg.Result.Approximate,
+						msg.Result.FetchFilter,
+					)
+				}
 			} else {
 				res := *result.Resource
 				rt := result.ResolvedType
@@ -215,7 +245,7 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 
 	case runtime.NavigateKindPushYAML:
 		if result.ReplaceCurrent {
-			m.popView()
+			m.popRS()
 		}
 		y := views.NewYAMLWithCtrl(*result.Resource, result.ResolvedType, m.keys, m.ctrl)
 		y.SetSize(m.innerSize())
@@ -233,9 +263,13 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 			},
 		}})
 		m.ctrl.EnsureTextState(y.ContentLines())
-		m.pushView(&y)
+		textRS := newTextRS()
+		res := *result.Resource
+		textRS.textResource = &res
+		w, h := m.innerSize()
+		textRS.width, textRS.height = w, h
+		m.pushRS(textRS)
 		if result.DispatchEnrich {
-			res := *result.Resource
 			rt := result.ResolvedType
 			return m, func() tea.Msg {
 				return messages.EnrichDetail{ResourceType: rt, Resource: res}
@@ -245,7 +279,7 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 
 	case runtime.NavigateKindPushJSON:
 		if result.ReplaceCurrent {
-			m.popView()
+			m.popRS()
 		}
 		j := views.NewJSONWithCtrl(*result.Resource, result.ResolvedType, m.keys, m.ctrl)
 		j.SetSize(m.innerSize())
@@ -263,12 +297,16 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 			},
 		}})
 		m.ctrl.EnsureTextState(j.ContentLines())
-		m.pushView(&j)
+		textRS := newTextRS()
+		jres := *result.Resource
+		textRS.textResource = &jres
+		w, h := m.innerSize()
+		textRS.width, textRS.height = w, h
+		m.pushRS(textRS)
 		if result.DispatchEnrich {
-			res := *result.Resource
 			rt := result.ResolvedType
 			return m, func() tea.Msg {
-				return messages.EnrichDetail{ResourceType: rt, Resource: res}
+				return messages.EnrichDetail{ResourceType: rt, Resource: jres}
 			}
 		}
 		return m, nil
@@ -276,12 +314,13 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 	case runtime.NavigateKindPushHelp:
 		ctx := m.helpContext()
 		activeShortName := ""
-		if rl, ok := m.activeView().(*views.ResourceListModel); ok {
-			activeShortName = rl.ShortName()
+		if rs := m.activeRS(); rs.kind == rsKindList {
+			activeShortName = rs.resourceType
 		}
-		h := views.NewHelpWithResource(m.keys, ctx, activeShortName)
-		h.SetSize(m.innerSize())
-		m.pushView(&h)
+		helpRS := newHelpRS(ctx, activeShortName)
+		w, h := m.innerSize()
+		helpRS.width, helpRS.height = w, h
+		m.pushRS(helpRS)
 		return m, nil
 
 	case runtime.NavigateKindFetchProfiles:
@@ -311,11 +350,12 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		}
 		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenRegion}})
 		m.ctrl.EnsureSelectorState(regionCodes, m.core.Region(), "aws-regions")
-		rg := views.NewSelectorWithCtrl(m.ctrl, func(s string) tea.Msg {
+		selRS := newSelectorRS(func(s string) tea.Msg {
 			return messages.RegionSelected{Region: s}
-		}, m.keys)
-		rg.SetSize(m.innerSize())
-		m.pushView(&rg)
+		})
+		wR, hR := m.innerSize()
+		selRS.width, selRS.height = wR, hR
+		m.pushRS(selRS)
 		return m, nil
 
 	case runtime.NavigateKindPushTheme:
@@ -345,11 +385,12 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		}
 		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenTheme}})
 		m.ctrl.EnsureSelectorState(themeFiles, m.activeTheme, "themes")
-		th := views.NewSelectorWithCtrl(m.ctrl, func(s string) tea.Msg {
+		thRS := newSelectorRS(func(s string) tea.Msg {
 			return messages.ThemeSelected{Theme: s}
-		}, m.keys)
-		th.SetSize(m.innerSize())
-		m.pushView(&th)
+		})
+		wT, hT := m.innerSize()
+		thRS.width, thRS.height = wT, hT
+		m.pushRS(thRS)
 		return m, nil
 
 	case runtime.NavigateKindFetchReveal:
@@ -425,11 +466,74 @@ func navigateTasksToCmd(m Model, msg messages.Navigate, result runtime.NavigateR
 }
 
 // handleCopy performs context-dependent clipboard copy as a tea.Cmd.
-// Each view implements CopyContent() to provide its own content and label.
-//
-// Pure adapter: depends only on m.activeView() and tea.Cmd.
+// Dispatches by active rs.kind to produce (content, label) pairs.
 func (m Model) handleCopy() (tea.Model, tea.Cmd) {
-	content, label := m.activeView().CopyContent()
+	rs := m.activeRS()
+	snap := m.ctrl.Snapshot()
+	var content, label string
+	switch rs.kind {
+	case rsKindList:
+		r, ok := m.ctrl.ListSelected()
+		if !ok {
+			return m, nil
+		}
+		rt := resource.FindResourceType(rs.resourceType)
+		if rt != nil && rt.CopyField != "" {
+			if val, ok2 := r.Fields[rt.CopyField]; ok2 && val != "" {
+				content, label = val, "Copied: "+val
+				break
+			}
+		}
+		content, label = r.ID, "Copied: "+r.ID
+	case rsKindDetail:
+		if rs.rightCol.IsFocused() {
+			name := rs.rightCol.SelectedTypeName()
+			if name != "" {
+				content, label = name, "Copied: "+name
+			}
+			break
+		}
+		if snap.Body.Detail != nil {
+			fc := snap.Body.Detail.FieldCursor
+			if fc >= 0 && fc < len(snap.Body.Detail.Fields) {
+				item := snap.Body.Detail.Fields[fc]
+				val := item.Value
+				if val == "" {
+					val = item.Key
+				}
+				if val != "" {
+					content, label = val, "Copied: "+val
+					break
+				}
+			}
+		}
+		// Fallback: copy raw YAML of the detail resource.
+		if snap.Body.Detail != nil {
+			rawLines := snap.Body.Detail.Fields
+			_ = rawLines
+			// Build raw YAML using the controller resource.
+			res := m.ctrl.GetDetailResource()
+			if res.ID != "" {
+				content = rawYAMLFromResource(res)
+				if content != "" {
+					label = "Copied detail to clipboard"
+				}
+			}
+		}
+	case rsKindReveal:
+		content, label = rs.revealValue, "Secret copied to clipboard"
+	case rsKindText:
+		if snap.Body.Text != nil {
+			content = rawContentFromTextBody(snap.Body.Text)
+			if content != "" {
+				label = "Copied YAML to clipboard"
+			}
+		}
+	case rsKindIdentity:
+		if !rs.identityLoading && rs.identityData.ARN != "" {
+			content, label = rs.identityData.ARN, "Copied!"
+		}
+	}
 	if content == "" {
 		return m, nil
 	}
@@ -448,8 +552,10 @@ func (m Model) handleCopy() (tea.Model, tea.Cmd) {
 // c.session — so a future split into runtime-side helpers can land
 // without re-shaping the call sites here.
 func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
+	rs := m.activeRS()
+
 	// Main menu: restart availability checks (no-op in no-cache mode).
-	if _, ok := m.activeView().(*views.MainMenuModel); ok {
+	if rs.kind == rsKindMenu {
 		if m.core.NoCache() {
 			return m, nil
 		}
@@ -463,27 +569,27 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		// finding B).
 		clearAllWave2(&m)
 		m.core.ResetProbeMaps()
-		// Reset the menu's view-side state (availability, issue counts) in
-		// lockstep with the model-side maps above.
-		if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
-			menu.ClearAvailability()
-		}
+		// Reset the menu's availability / issue-count state via the controller.
+		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.MenuClearAvailabilityIntent{}})
 		m.flash = flashState{text: "Refreshing availability...", isError: false, active: true}
 		cmd := m.loadAvailabilityCache()
 		return m, cmd
 	}
 
 	// Detail view: re-trigger related resource checks and enrichment.
-	if d, ok := m.activeView().(*views.DetailModel); ok {
-		d.ResetRightColumn()
-		// Controller-backed path: also reset controller's RelatedRows to loading
-		// state so View() (which renders from the snapshot) shows loading rows
-		// immediately rather than stale counts.
-		if d.IsControllerBacked() {
-			m.ctrl.ResetDetailRelatedRows(d.ResourceType())
+	if rs.kind == rsKindDetail {
+		rt := rs.resourceType
+		srcRes := m.ctrl.GetDetailResource()
+		// Reset right column widget on the active rendererState.
+		if rs.rightColVisible || rs.rightColAutoShown {
+			defs := resource.GetRelated(rt)
+			rs.rightCol = views.NewRightColumn(defs, srcRes, rt)
+			rcw := views.ComputeRightColWidth(rs.width, 32)
+			rs.rightCol.SetSize(rcw, rs.height)
 		}
-		rt := d.ResourceType()
-		srcRes := d.SourceResource()
+		// Reset controller's RelatedRows to loading state so View() shows
+		// loading rows immediately rather than stale counts.
+		m.ctrl.ResetDetailRelatedRows(rt)
 		m.core.RelatedCacheDelete(runtime.RelatedCacheKey(rt, srcRes.ID))
 		m.core.BumpRelatedGen() // cancel in-flight results from previous batch
 		m.core.BumpEnrichGen()  // cancel in-flight enrichment from previous batch
@@ -518,11 +624,12 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		return m, tea.Batch(cmds...)
 	}
 
-	rl, ok := m.activeView().(*views.ResourceListModel)
-	if !ok {
+	if rs.kind != rsKindList {
 		return m, nil
 	}
-	rt := rl.ResourceType()
+	rt := rs.resourceType
+	parentCtx := m.ctrl.GetListParentContext()
+	escPops := m.ctrl.GetListEscPops()
 
 	// Pre-fetch cleanup: strip stale Wave 2 findings from all cached rows of
 	// this type BEFORE deleting the cache entry. applyEnrichment walks
@@ -533,7 +640,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	// fetch); the view rows are already cleared. This fixes the PR #310
 	// CodeRabbit finding A: previously delete() ran first so applyEnrichment
 	// found no rows and the rl's slice retained stale wave2 state.
-	if rl.ParentContext() == nil && !rl.EscPops() {
+	if parentCtx == nil && !escPops {
 		(&m).applyEnrichment(rt, nil, nil)
 	}
 
@@ -549,7 +656,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	// findings, and dispatch a wrapped fetch that stamps TypeGen onto the
 	// outgoing ResourcesLoadedMsg so the tail branch in app.go can seed
 	// probeResources and dispatch probeEnrichment on success.
-	if rl.ParentContext() == nil && !rl.EscPops() {
+	if parentCtx == nil && !escPops {
 		if m.core.HasIssueEnricher(rt) {
 			tok := m.core.BumpEnrichmentTypeGen(rt)
 			m.core.DeleteEnrichmentRan(rt)
@@ -561,56 +668,117 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 			// are NOT covered by the pre-fetch cleanup above, which only
 			// covers the ResourceCache entry before deletion).
 			(&m).applyEnrichment(rt, nil, nil)
-			// Propagate the cleared state to the active ResourceListModel so
-			// row markers disappear immediately at Ctrl+R — otherwise stale
-			// markers would remain visible until the rerun completes (and
-			// indefinitely if the refresh errors out).
-			rl.SetEnrichmentState(0, false, nil)
-			rl.SetTruncatedIDs(nil)
-			cmd := m.refreshResourceListWithEnrichmentRerun(*rl, tok)
+			// Propagate the cleared enrichment state to the controller so row
+			// markers disappear immediately at Ctrl+R.
+			m.ctrl.ApplyEnrichmentState(rt, 0, false, nil)
+			cmd := m.refreshActiveListWithEnrichmentRerun(rt, tok)
 			return m, cmd
 		}
-		// Top-level list without an enricher: propagate the cleared state.
+		// Top-level list without an enricher: clear the enrichment state.
 		// Wave2 was already stripped in the pre-fetch cleanup above.
-		rl.SetEnrichmentState(0, false, nil)
+		m.ctrl.ApplyEnrichmentState(rt, 0, false, nil)
 	}
-	return m, m.refreshResourceList(*rl)
+	return m, m.refreshActiveList()
 }
 
-// refreshResourceList chooses the right fetcher entry point for rl: filtered,
-// child, or top-level paginated. Adapter-side helper used by handleRefresh
-// and by other callers in the TUI.
-func (m Model) refreshResourceList(rl views.ResourceListModel) tea.Cmd {
-	rt := rl.ResourceType()
+// refreshActiveList refreshes the top-of-stack resource list, reading its
+// resource type + fetch configuration from the controller rather than from
+// a stored view model. Used by handleRefresh and the RefreshActiveListIntent
+// handler in runtime_adapter.go (applyIntent).
+func (m Model) refreshActiveList() tea.Cmd {
+	rs := m.activeRS()
+	if rs.kind != rsKindList {
+		return nil
+	}
+	rt := rs.resourceType
 	gen := m.core.AvailabilityGen()
 
-	// Filtered lists must refresh through the same filtered fetcher so their
-	// pagination token remains valid for subsequent load-more requests.
-	if ff := rl.FetchFilter(); len(ff) > 0 {
+	if ff := m.ctrl.GetListFetchFilter(); len(ff) > 0 {
 		return m.fetchResourcesFiltered(rt, ff, gen)
 	}
-
-	// Child lists refresh through the child fetcher using their parent context.
-	if pc := rl.ParentContext(); pc != nil {
+	if pc := m.ctrl.GetListParentContext(); pc != nil {
 		return m.fetchChildResources(rt, pc)
 	}
-
 	return m.fetchResources(rt, gen)
 }
 
+// refreshActiveListWithEnrichmentRerun wraps refreshActiveList with an
+// enrichment-rerun token stamp — mirrors refreshResourceListWithEnrichmentRerun
+// in probe_adapter.go but reads config from the controller rather than a
+// stored ResourceListModel.
+func (m Model) refreshActiveListWithEnrichmentRerun(rt string, tok domain.Gen) tea.Cmd {
+	inner := m.refreshActiveList()
+	return func() tea.Msg {
+		msg := inner()
+		if loaded, ok := msg.(messages.ResourcesLoaded); ok {
+			loaded.TypeGen = tok
+			return loaded
+		}
+		return msg
+	}
+}
+
+// rawYAMLFromResource converts a resource.Resource to YAML for clipboard copy.
+// Delegates to the exported views.RawYAMLFromResource to reuse the same
+// reflect+yaml.Marshal logic as DetailModel.RawYAML() without needing a stored
+// DetailModel instance.
+func rawYAMLFromResource(res resource.Resource) string {
+	return views.RawYAMLFromResource(res)
+}
+
+// rawContentFromTextBody returns the plain-text content from a TextBody for
+// clipboard copy. Joins lines with newlines, stripping any ANSI color codes
+// that the syntax-colorizer may have embedded.
+func rawContentFromTextBody(body *app.TextBody) string {
+	if body == nil {
+		return ""
+	}
+	var sb strings.Builder
+	for i, line := range body.Lines {
+		if i > 0 {
+			sb.WriteByte('\n')
+		}
+		sb.WriteString(stripANSIInline(line))
+	}
+	return sb.String()
+}
+
+// stripANSIInline removes ANSI escape sequences from s. Mirrors the inline
+// logic in DetailModel.PlainContent() in internal/tui/views/detail_render.go.
+func stripANSIInline(s string) string {
+	result := make([]byte, 0, len(s))
+	i := 0
+	for i < len(s) {
+		if s[i] == '\x1b' && i+1 < len(s) && s[i+1] == '[' {
+			j := i + 2
+			for j < len(s) && (s[j] < 'a' || s[j] > 'z') && (s[j] < 'A' || s[j] > 'Z') {
+				j++
+			}
+			if j < len(s) {
+				j++
+			}
+			i = j
+		} else {
+			result = append(result, s[i])
+			i++
+		}
+	}
+	return string(result)
+}
+
 // handleReveal fetches a revealed value using the resource type's registered
-// reveal fetcher. Adapter-side because the lookup gates on the active view.
+// reveal fetcher. Adapter-side because the lookup gates on the active rs.
 func (m Model) handleReveal() (tea.Model, tea.Cmd) {
-	rl, ok := m.activeView().(*views.ResourceListModel)
-	if !ok {
+	rs := m.activeRS()
+	if rs.kind != rsKindList {
 		return m, nil
 	}
-	rt := rl.ResourceType()
+	rt := rs.resourceType
 	if !resource.HasRevealFetcher(rt) {
 		return m, nil
 	}
-	r := rl.SelectedResource()
-	if r == nil {
+	r, ok := m.ctrl.ListSelected()
+	if !ok {
 		return m, nil
 	}
 	cmd := m.fetchRevealValue(rt, r.ID, m.core.ConnectGen())
@@ -634,10 +802,54 @@ func (m Model) handleIdentityError(msg messages.IdentityError) (tea.Model, tea.C
 	if um, ok := updated.(Model); ok {
 		m = um
 	}
-	if idView, ok := m.activeView().(*views.IdentityModel); ok {
-		idView.SetError(msg.Err)
+	// Update the identity rendererState error field if an identity rs is active.
+	if rs := m.activeRS(); rs.kind == rsKindIdentity {
+		rs.identityLoading = false
+		if msg.Err != "" {
+			rs.identityErr = msg.Err
+		}
 	}
 	return m, cmd
+}
+
+// handleToggleRelated handles the 'r' key on detail screens: toggles the right-column
+// related panel. Replaces the equivalent case in DetailModel.Update which is no
+// longer stored on the stack. State lives directly on the rendererState.
+func (m Model) handleToggleRelated() (tea.Model, tea.Cmd) {
+	rs := m.activeRS()
+	if rs.kind != rsKindDetail {
+		return m, nil
+	}
+	rs.rightColUserToggled = true
+	if rs.width < layout.MinInnerContentWidth {
+		return m, nil
+	}
+	rt := rs.resourceType
+	srcRes := m.ctrl.GetDetailResource()
+	if rs.rightColAutoShown {
+		// First explicit toggle: hide the auto-shown column.
+		rs.rightColAutoShown = false
+		rs.rightColVisible = false
+		rs.rightCol.SetFocused(false)
+		m.ctrl.SetDetailRelatedVisible(false, true)
+		return m, nil
+	}
+	// Normal toggle: flip visible state.
+	rs.rightColVisible = !rs.rightColVisible
+	if rs.rightColVisible {
+		defs := resource.GetRelated(rt)
+		rs.rightCol = views.NewRightColumn(defs, srcRes, rt)
+		m.ctrl.SetDetailRelatedVisible(true, false)
+		return m, func() tea.Msg {
+			return messages.RelatedCheckStarted{
+				ResourceType:   rt,
+				SourceResource: srcRes,
+			}
+		}
+	}
+	rs.rightCol.SetFocused(false)
+	m.ctrl.SetDetailRelatedVisible(false, true)
+	return m, nil
 }
 
 // copyToClipboard returns a tea.Cmd that writes content to the system
