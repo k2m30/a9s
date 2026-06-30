@@ -252,8 +252,8 @@ func buildIAMRoles() []iamtypes.Role {
 
 	// S3 healthy-bucket access role (checkS3Role pivot).
 	// checkS3Role matches roles whose policy_resources field contains the bucket ARN.
-	// policy_resources is populated by the IAM roles fetcher in Phase 7.
-	// Adding this role now so the graph is ready when Phase 7 wires the field.
+	// policy_resources is emitted by the IAM roles fetcher; this role is pre-set
+	// so the demo related graph renders.
 	roles = append(roles, iamtypes.Role{
 		RoleName:    aws.String("a9s-demo-s3-access-role"),
 		RoleId:      aws.String("AROAEXAMPLES3ACCESS01"),
