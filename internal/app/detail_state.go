@@ -124,6 +124,24 @@ func (c *Controller) ApplyDetailFindingForResource(resourceType, resourceID stri
 	}
 }
 
+// ClearDetailFindingsForType clears wave-2 enrichment findings from every stacked
+// detail screen whose resource type matches resourceType. Called when enrichment
+// returns no findings for the entire type (nil EnrichmentFindings in PatchDetail).
+func (c *Controller) ClearDetailFindingsForType(resourceType string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for i := range c.stack {
+		if c.stack[i].ID != runtime.ScreenDetail {
+			continue
+		}
+		ds := c.stack[i].State.Detail
+		if ds == nil || ds.ResourceType != resourceType {
+			continue
+		}
+		c.applyFindingToState(ds, nil, nil)
+	}
+}
+
 // ApplyDetailEnrichmentForResource applies a completed detail-enrichment result
 // to the detail screen(s) whose resource matches (resourceType, resourceID),
 // even when stacked beneath the active screen. It replaces ds.Resource with the
@@ -356,6 +374,33 @@ func (c *Controller) ResetDetailRelatedRows(resourceType string) {
 	// focus/filter/cursor actions (which gate on RelatedVisible) take effect.
 	// A narrow terminal overrides this via SetDetailRelatedVisible(false, …).
 	ds.RelatedVisible = true
+}
+
+// GetDetailResource returns the resource stored in the top detail screen's
+// DetailState. Returns the zero-value Resource when the top screen is not a
+// detail screen. Used by the renderer-side stack-lift to route detail-state
+// reads through the controller instead of the stored TUI view model.
+func (c *Controller) GetDetailResource() resource.Resource {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	ds := c.topDetailState()
+	if ds == nil {
+		return resource.Resource{}
+	}
+	return ds.Resource
+}
+
+// GetDetailResourceType returns the resource type stored in the top detail
+// screen's DetailState. Returns an empty string when the top screen is not a
+// detail screen. Used by the renderer-side stack-lift.
+func (c *Controller) GetDetailResourceType() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	ds := c.topDetailState()
+	if ds == nil {
+		return ""
+	}
+	return ds.ResourceType
 }
 
 // DetailFrameTitle returns the frame-border title for the top detail screen.

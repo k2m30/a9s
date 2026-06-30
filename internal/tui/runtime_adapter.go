@@ -36,7 +36,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
 // handleEnrichDetail replaces the entry point previously in
@@ -100,25 +99,23 @@ func (m *Model) applyIntent(intent runtime.UIIntent) tea.Cmd {
 			message: v.Message,
 		})
 	case runtime.ClearActiveListLoadingIntent:
-		if rl, ok := m.activeView().(*views.ResourceListModel); ok {
-			rl.ClearLoading()
+		if m.activeRS().kind == rsKindList {
+			m.ctrl.ClearListLoading()
 		}
 	case runtime.MenuClearAvailabilityIntent:
-		if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
-			menu.ClearAvailability()
-		}
+		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.MenuClearAvailabilityIntent{}})
 	case runtime.PopSelectorIntent:
-		if _, ok := m.activeView().(*views.SelectorModel); ok {
-			m.popView()
+		if m.activeRS().kind == rsKindSelector {
+			m.popRS()
 		}
 	case runtime.RefreshActiveListIntent:
-		if rl, ok := m.activeView().(*views.ResourceListModel); ok {
-			return m.refreshResourceList(*rl)
+		if m.activeRS().kind == rsKindList {
+			return m.refreshActiveList()
 		}
 	case runtime.PushScreen:
 		return m.pushScreen(v)
 	case runtime.PopScreen:
-		m.popView()
+		m.popRS()
 	case runtime.ApplyThemeIntent:
 		return m.applyTheme(v)
 	}

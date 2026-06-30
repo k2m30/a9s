@@ -36,7 +36,7 @@ type DetailModel struct {
 	height                 int
 	keys                   keys.Map
 	search                 SearchModel
-	rightCol               rightColumnModel
+	rightCol               RightColumnModel
 	rightColVisible        bool                        // true when explicitly toggled on
 	rightColAutoShown      bool                        // true when right column was auto-shown on SetSize (wide terminal + registered defs)
 	rightColUserToggled    bool                        // true after user explicitly toggles related visibility

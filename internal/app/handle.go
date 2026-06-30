@@ -127,6 +127,17 @@ func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 	}
 }
 
+// HandleResourcesLoadedEvent is the public adapter seam used by the TUI's
+// runtime_adapter_resources.go. It routes a ResourcesLoaded message into the
+// matching controller list screen's state, replacing the old updateActiveView
+// path that routed the message through a stored ResourceListModel.Update(). The
+// caller must perform the IsStale check before invoking this.
+func (c *Controller) HandleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.handleResourcesLoadedEvent(msg)
+}
+
 // handleRelatedCheckBatch routes a RelatedCheckBatch (produced by the headless
 // executor's runRelatedCheckers) into the stacked detail screen that matches
 // the batch's (ResourceType, SourceResourceID). For each per-def result it

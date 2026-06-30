@@ -123,6 +123,22 @@ func (s SearchModel) MatchCount() int { return len(s.matches) }
 // CurrentMatch returns the 0-based index of the currently-highlighted match.
 func (s SearchModel) CurrentMatch() int { return s.currentIdx }
 
+// SyncCursor applies an externally-tracked cursor index (e.g. from the
+// controller's DetailState.SearchCursor) so MatchInfo reflects navigation
+// performed by the controller. The index is taken modulo the match count so
+// that the controller's monotonically-incrementing/decrementing cursor wraps
+// around naturally without the controller needing to know the match count.
+func (s *SearchModel) SyncCursor(idx int) {
+	if len(s.matches) == 0 {
+		s.currentIdx = 0
+		return
+	}
+	n := len(s.matches)
+	// Modulo with adjustment for negative values handles both forward wrap
+	// (n → 0) and backward wrap (−1 → n−1).
+	s.currentIdx = ((idx % n) + n) % n
+}
+
 // MatchInfo returns a human-readable match summary: "N/M matches" (1-based N).
 func (s SearchModel) MatchInfo() string {
 	total := len(s.matches)
