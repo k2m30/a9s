@@ -1,16 +1,16 @@
 // runtime_adapter_resources.go — Bubble Tea adapter glue for runtime.Core's
-// resource-flow Handle* methods ported in PR-05a-h4-b (AS-962).
-//
-// Three thin (~10-20 LOC) shims:
+// resource-flow handlers. Each resolves adapter-only state, delegates the
+// platform-agnostic work (wave-1 derive, cache writes, error flash) to
+// runtime.Core, and routes the result into controller detail/list state:
 //
 //	handleResourcesLoaded     — wave-1 derive on msg.Resources, route through
 //	                            ctrl.HandleResourcesLoadedEvent (replaces the
 //	                            old updateActiveView path), then delegate
 //	                            cross-view cache write + rerun probe to Core.
-//	handleRelatedCheckResult  — resolve sourceID fallback from the active
-//	                            detail controller state, delegate cache writes
-//	                            + error-flash surface to Core, then update the
-//	                            detail's related rows via ctrl.ApplyDetailRelatedResult.
+//	handleRelatedCheckResult  — resolve the source detail, delegate cache writes
+//	                            + error-flash surface to Core, then merge the row
+//	                            into the source detail's controller state via
+//	                            ctrl.ApplyDetailRelatedResultForResource.
 //	handleEnrichDetailResult  — stale-gen drop, delegate flash-on-error to
 //	                            Core, then on success apply the enriched resource
 //	                            via ctrl.ApplyDetailEnrichmentForResource.
