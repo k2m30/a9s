@@ -37,6 +37,12 @@
         return r.text().then(function (html) {
           var el = document.getElementById("main");
           if (el) el.innerHTML = html;
+          // Screen changed: clear the row-click debounce so a same-index click
+          // on the new screen is never suppressed. Covers clickField /
+          // clickRelated / keyboard actions; clickSelect clears it via its own
+          // move-chain callback (which does not route through sendAction).
+          lastClickIdx = -1;
+          lastClickAt = 0;
         });
       })
       .catch(function (e) { console.error("action error:", e); })
@@ -58,11 +64,11 @@
   function clickSelect(idx) {
     var now = Date.now();
     if (clickBusy) return;
-    // Ignore a repeat click on the same row within 500ms of the last click on
-    // THIS screen. The done-callback clears this after navigation completes, so
-    // the guard only suppresses a double-click's second tap before the
-    // move-chain finishes — not a legitimate click on the same row index of the
-    // screen we just navigated to.
+    // Ignore a repeat click on the same row within 500ms. lastClickIdx is reset
+    // to -1 after every navigation — this chain's done-callback below and every
+    // sendAction DOM swap — so the window only ever suppresses a double-click's
+    // second tap before the screen changes, never a legitimate click on the same
+    // row index of the screen we just navigated to.
     if (idx === lastClickIdx && now - lastClickAt < 500) return;
     lastClickIdx = idx;
     lastClickAt = now;
