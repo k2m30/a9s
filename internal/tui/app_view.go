@@ -270,7 +270,7 @@ func (m Model) identityRoleName() string {
 // to the renderer-shaped *domain.CallerIdentity by m.core.Identity()) to a
 // view-layer IdentityData. Used at identity rs construction time (the
 // `i` key press) to seed the rs from current session state before the
-// in-flight identity fetch returns. The post-h4-b SetIdentityIntent
+// in-flight identity fetch returns. The SetIdentityIntent
 // updates the identity rs via applyIntents using the same domain mirror —
 // this helper covers the construction path that runs before any intent fires.
 func (m Model) identityToViewData() views.IdentityData {

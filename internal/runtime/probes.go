@@ -1,10 +1,8 @@
 // probes.go — platform-agnostic availability and Wave-2 enrichment probes.
 //
-// Moved from internal/tui/app_probes.go (PR-05a-h5, AS-151).
-// Receiver changed from *Model to *Core; tea.Cmd wrappers removed; field
-// accesses go through c.session instead of the embedded *session.Session.
-// The Bubble Tea adapter in internal/tui/probe_adapter.go wraps these
-// methods in tea.Cmd closures for the TUI runtime.
+// These are (c *Core) methods reading session state via c.session. The
+// Bubble Tea adapter in internal/tui/probe_adapter.go wraps them in tea.Cmd
+// closures for the TUI runtime.
 //
 // No Bubble Tea, Lipgloss, or Bubbles imports are permitted in this file.
 package runtime

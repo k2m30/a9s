@@ -38,11 +38,10 @@ import (
 // Used to restore the list when the user re-enters the same resource type
 // from the main menu, avoiding redundant API calls.
 //
-// Defined as an alias to domain.ListViewCacheEntry in PR-05a-h4-c (AS-963)
-// so renderer adapters can construct entries without importing
-// internal/session. The existing `session.ResourceCacheEntry` name stays
-// available for callers (tests, runtime handlers) that already reference
-// it. Field set is unchanged.
+// Defined as an alias to domain.ListViewCacheEntry so renderer adapters can
+// construct entries without importing internal/session. The
+// `session.ResourceCacheEntry` name stays available for callers (tests,
+// runtime handlers) that reference it. Field set is unchanged.
 type ResourceCacheEntry = domain.ListViewCacheEntry
 
 // Session owns the in-memory orchestration state for the active

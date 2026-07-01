@@ -1,8 +1,7 @@
-// transport.go — PR-05a-h4-c (AS-963) tui→runtime transport alias.
+// transport.go — tui→runtime transport alias for the AWS ServiceClients.
 //
-// The TUI used to expose `WithClients(*awsclient.ServiceClients)` as its
-// AWS bootstrap option, forcing internal/tui to import internal/aws. After
-// h4-c the option signature reads `*runtime.ServiceClients` — a transparent
+// The TUI's WithClients bootstrap option takes `*runtime.ServiceClients` — a
+// transparent
 // alias for the AWS-typed ServiceClients struct. internal/runtime owns the
 // alias because runtime already legitimately imports internal/aws; the TUI
 // only sees the runtime-exported name so its production-side import set

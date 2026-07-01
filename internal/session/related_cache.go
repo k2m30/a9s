@@ -2,14 +2,11 @@
 //
 // The bounded LRU and the per-row payload type live here because
 // session.Session owns the cache instance (RelatedCacheLRU field). The
-// `RelatedCacheKey` / `RelatedCacheReplay` free helpers used to live here
-// too; PR-05a-h4-c (AS-963) moved them to internal/runtime so renderer
-// adapters can resolve cache keys without importing internal/session.
-// Tests and runtime code reach the helpers via runtime.RelatedCacheKey /
-// runtime.RelatedCacheReplay; there is no session-side re-export to keep
-// drift between two copies impossible.
-//
-// Moved from internal/tui/related_cache.go as part of Phase 02 session owner migration.
+// RelatedCacheKey / RelatedCacheReplay free helpers live in internal/runtime
+// so renderer adapters can resolve cache keys without importing
+// internal/session; tests and runtime code reach them via
+// runtime.RelatedCacheKey / runtime.RelatedCacheReplay. There is no
+// session-side re-export, so the two copies can never drift.
 package session
 
 import (
