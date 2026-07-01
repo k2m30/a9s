@@ -262,6 +262,7 @@ func (c *Controller) handleActionChildView(a Action) (ViewState, []runtime.TaskR
 					Loading:       true,
 					ParentContext: ctx,
 				}
+				applyListDefaults(top.State.List, top.Ctx.ResourceType)
 			}
 		}
 	}

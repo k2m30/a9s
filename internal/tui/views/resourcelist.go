@@ -106,18 +106,9 @@ func NewResourceList(typeDef resource.ResourceTypeDef, viewConfig *config.ViewsC
 		keys:       k,
 		ctrl:       c,
 	}
-	// ct-events: default sort is event_time DESC (newest first), but apply it ONLY
-	// when no sort is set yet. NewResourceList is reconstructed on every list
-	// keystroke (app_stack.go delegates keys through a fresh model), so applying
-	// unconditionally would reset a user-selected sort back to event_time on the
-	// next key.
-	if typeDef.ShortName == "ct-events" && viewConfig != nil {
-		if col, _ := c.GetListSort(); col == "" {
-			c.Apply(app.Action{Kind: app.ActionSort, Arg: "event_time"})
-			// Apply twice to get DESC (first apply sets asc, second flips to desc).
-			c.Apply(app.Action{Kind: app.ActionSort, Arg: "event_time"})
-		}
-	}
+	// ct-events default sort (event_time DESC) is seeded once by the controller
+	// at list-state creation (app.applyListDefaults), not here — this constructor
+	// runs on every keystroke and must not re-apply it.
 	return m
 }
 

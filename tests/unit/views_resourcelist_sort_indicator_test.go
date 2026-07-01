@@ -43,10 +43,7 @@ func headerLine(view string) string {
 
 // buildSortModel creates a ResourceListModel for the given resource type with
 // a config-driven view, loads one synthetic resource, and applies the given
-// sort column index. Uses sortAsc=false (descending) to match ct-events default.
-//
-// For ct-events the model must receive viewConfig so the default sort
-// initialisation in NewResourceList kicks in (§6 requirement).
+// sort column index via key presses.
 func buildSortModel(
 	t *testing.T,
 	shortName string,
