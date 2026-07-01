@@ -93,16 +93,15 @@ func defaultBuilders() builders {
 	}
 }
 
-// dispatchCoreScreenResult walks the intents/tasks returned by an h4-a
-// Handle* method using the plural-semantics path (applyIntents +
+// dispatchCoreScreenResult walks the intents/tasks returned by a screen
+// (view-stack) Handle* method using the plural-semantics path (applyIntents +
 // tasksToCmd). The key behavioural difference from dispatchHandlerResult
-// (used by h3 handlers) is that FlashIntent is re-emitted as
-// messages.Flash via cmd rather than direct-mutated. h3 handlers
+// (used by the flash/session handlers) is that FlashIntent is re-emitted as
+// messages.Flash via cmd rather than direct-mutated. Those handlers
 // pre-bump m.flash.gen and pair FlashIntent with FlashTickPayload so
-// direct-mutation works there; h4-a handlers do not own the flash gen
+// direct-mutation works there; screen handlers do not own the flash gen
 // dance (their flashes route back through handleFlash → HandleFlash to
-// pick up the auto-clear tick), so re-emitting preserves the
-// pre-port observable behaviour: the cmd produces a messages.Flash
+// pick up the auto-clear tick), so re-emitting produces a messages.Flash
 // that downstream tests assert on.
 func (m *Model) dispatchCoreScreenResult(intents []runtime.UIIntent, tasks []runtime.TaskRequest) tea.Cmd {
 	cmds := m.applyIntents(intents)

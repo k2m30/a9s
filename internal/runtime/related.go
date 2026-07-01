@@ -112,7 +112,7 @@ func MissingFromCache(cache resource.ResourceCache, targetType string, ids []str
 	return missing
 }
 
-// BuildResourceCacheSnapshot is defined in probes.go (AS-151). The
+// BuildResourceCacheSnapshot is defined in probes.go. The
 // related-check fan-out in runtime_adapter_related.go calls Core.BuildResourceCacheSnapshot
 // directly, so no wrapper is needed here.
 

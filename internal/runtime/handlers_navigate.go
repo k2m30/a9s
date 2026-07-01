@@ -1,9 +1,5 @@
 // handlers_navigate.go — NavigateEvent dispatch.
 //
-// PR-05a-h3 (AS-149) moves the unified-navigation entry point out of
-// internal/tui per the Phase 05 boundary contract
-// (docs/refactor/05-boundary.md §"5a-extract").
-//
 //	HandleNavigate — resolves the navigation kind for the requested target,
 //	                 mutates session state where the runtime owns it
 //	                 (canonical-type resolution, EnrichGen / EnrichResKey
@@ -113,10 +109,6 @@ func (FetchRevealPayload) isTaskPayload() {}
 // state the runtime owns (EnrichGen / EnrichResKey bumps for detail
 // enrichment dispatch), and returns the decision plus any fetch tasks the
 // adapter should start.
-//
-// Receiver migrated from *Model to *Core per docs/refactor/05-boundary.md.
-// Session fields (ResourceCache, EnrichGen, EnrichResKey) are accessed
-// through c.session instead of the previously-embedded model fields.
 //
 // View construction and Bubble Tea specifics remain in the TUI adapter so
 // this handler is platform-agnostic and testable without standing up

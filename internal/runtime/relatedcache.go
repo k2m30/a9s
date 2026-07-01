@@ -1,8 +1,8 @@
-// relatedcache.go — PR-05a-h4-c (AS-963) related-cache helpers.
+// relatedcache.go — related-cache helpers.
 //
-// RelatedCacheKey and RelatedCacheReplay are free functions moved verbatim
-// from internal/session/related_cache.go so renderer adapters can call them
-// via internal/runtime instead of internal/session. RelatedCacheResult is
+// RelatedCacheKey and RelatedCacheReplay are free functions that live here
+// (rather than internal/session) so renderer adapters can call them via
+// internal/runtime instead of importing internal/session. RelatedCacheResult is
 // re-exported as a type alias so callers can construct cache entries using
 // the runtime name; the underlying type still lives in internal/session
 // because *session.RelatedCacheLRU stores it and session.Session.New
