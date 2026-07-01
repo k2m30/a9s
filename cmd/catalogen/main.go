@@ -14,9 +14,8 @@
 //   - docs/related-resources.md  — generated from Related defs
 //   - docs/resources/<short>.md  — per-resource markdown (section-marker mode)
 //
-// When the catalog is empty (PR-04a), no output files are written.
-// Per-category PRs (04b–04m) populate the catalog and the generator begins
-// producing content.
+// When the catalog is empty, no output files are written; the generator
+// produces content once the catalog is populated.
 //
 // Verify flag: run with -verify to assert that every catalog entry has a
 // corresponding docs/resources/<short>.md. Exits non-zero on violations.
