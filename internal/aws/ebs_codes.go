@@ -1,5 +1,5 @@
 // ebs_codes.go — canonical FindingCode constants for the ebs and ebs-snap resource types.
-// Phase 03 PR-03b. The fetcher writes Findings using these codes; the
+// The fetcher writes Findings using these codes; the
 // EBS Color func reads wave1 Findings (Source == "wave1") to color rows.
 package aws
 

@@ -115,7 +115,7 @@ func FetchEC2InstancesPage(ctx context.Context, api EC2FetchInstancesAPI, contin
 				ID:   instanceID,
 				Name: name,
 				Type: "ec2",
-				// Status: state — removed; PR-03b migrates fetcher to Findings
+				// Status intentionally unset — lifecycle state is emitted as a Finding.
 				Fields: map[string]string{
 					"instance_id":       instanceID,
 					"name":              name,
@@ -132,7 +132,7 @@ func FetchEC2InstancesPage(ctx context.Context, api EC2FetchInstancesAPI, contin
 				RawStruct: inst,
 			}
 
-			// Phase 03 PR-03b: emit canonical Findings for non-healthy lifecycle states.
+			// emit canonical Findings for non-healthy lifecycle states.
 			// Healthy ("running") and terminal ("terminated", "shutting-down") lifecycle
 			// states have no Finding — rendered via Fields[LifecycleKey] fallback.
 			switch state {

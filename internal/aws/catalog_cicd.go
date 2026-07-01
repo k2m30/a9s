@@ -233,13 +233,11 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 }
 
 // cicdChildTypes is the declarative child-type catalog for the CI/CD category.
-// Migrated under AS-816 / AS-795k per spec docs/refactor/AS-795-init-cycle-break.md §3 + §5.2.
-// Sibling category PRs (AS-795b/c/d–m) own their own `<cat>ChildTypes` slice
-// appended into allChildTypes() in install.go without merge conflicts.
+// Each per-category `<cat>ChildTypes` slice is appended into allChildTypes()
+// in install.go.
 //
-// Each entry carries Name/ShortName/Columns/CopyField (verbatim from the deleted
-// child-type registrations) plus FieldKeys and a ChildFetcher closure (verbatim
-// from the deleted paginated-child registrations).
+// Each entry carries Name/ShortName/Columns/CopyField plus FieldKeys and a
+// ChildFetcher closure.
 var cicdChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
 		Name:      "CodeBuild Builds",

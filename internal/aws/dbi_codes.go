@@ -1,5 +1,5 @@
 // dbi_codes.go — canonical FindingCode constants for the dbi resource type
-// (RDS DB instance). Phase 03 PR-03e. The fetcher writes Findings using
+// (RDS DB instance). The fetcher writes Findings using
 // these codes; the dbi Color func reads wave1 Findings (Source == "wave1")
 // to color rows.
 package aws

@@ -1,5 +1,5 @@
 // dbc_snap_codes.go — canonical FindingCode constants for the dbc-snap
-// resource type (DocumentDB + Aurora DB cluster snapshot). Phase 03 PR-03e.
+// resource type (DocumentDB + Aurora DB cluster snapshot).
 package aws
 
 import "github.com/k2m30/a9s/v3/internal/domain"

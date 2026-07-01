@@ -45,8 +45,7 @@ type sdkRegionDescriptor struct {
 }
 
 // Package-level region catalogue, parsed once at package load from the embedded
-// partitions.json. The multi-return loader replaces the AS-947-pruned init()
-// so the file no longer trips the `rg ^func init\(\)` gate.
+// partitions.json via a multi-return loader (no package init()).
 //
 //nolint:gochecknoglobals // process-scope region catalogue: parsed once at package load
 var (

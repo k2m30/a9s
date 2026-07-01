@@ -63,7 +63,7 @@ func FetchElasticIPs(ctx context.Context, api EC2DescribeAddressesAPI) ([]resour
 		r := resource.Resource{
 			ID:   allocationID,
 			Name: name,
-			// Status: removed — PR-03b migrates fetcher to Findings.
+			// Status intentionally unset — an EIP has no health lifecycle state.
 			// Legacy Status=domain (vpc/standard) was not a health state.
 			Fields: map[string]string{
 				"allocation_id":  allocationID,
@@ -77,7 +77,7 @@ func FetchElasticIPs(ctx context.Context, api EC2DescribeAddressesAPI) ([]resour
 			RawStruct: addr,
 		}
 
-		// Phase 03 PR-03b: emit CodeEIPUnassociated Finding when the EIP is
+		// emit CodeEIPUnassociated Finding when the EIP is
 		// allocated but not associated with any instance, ENI, or NAT gateway.
 		if unassociated {
 			r.Findings = []domain.Finding{{

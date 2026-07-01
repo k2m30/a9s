@@ -258,13 +258,8 @@ func fetchNodeGroupsPage(ctx context.Context, clients any, continuationToken str
 }
 
 // containersChildTypes is the declarative child-type catalog for the CONTAINERS
-// category. First per-category child-type slice in the AS-795 migration —
-// sibling category PRs (AS-795b/d–m) append their own `<cat>ChildTypes` slice
-// to allChildTypes() in install.go without merge conflicts.
-//
-// AS-808 / PR #395 (round 2): ecr_images migrates here from ecr_images.go's
-// init() body per AS-795 §3 spec scope (eks, ecr, ecr-images) and CTO
-// arbitration on the round-1 review (2026-05-21T06:45Z).
+// category. Each per-category `<cat>ChildTypes` slice is appended to
+// allChildTypes() in install.go.
 var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
 		Name:      "ECR Images",
