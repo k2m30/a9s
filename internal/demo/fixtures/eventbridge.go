@@ -71,8 +71,8 @@ var sharedEventBridgeFixtures = sync.OnceValue(func() *EventBridgeFixtures {
 			RoleArn:            aws.String(prodEBRoleARN),
 		},
 		// S3 healthy-bucket event bridge rule (checkS3EBRule pivot).
-		// checkS3EBRule reads ruleRes.Fields["target_arns"] which is populated in Phase 7.
-		// Adding now so the graph is ready when Phase 7 wires the field.
+		// checkS3EBRule reads ruleRes.Fields["target_arns"] (emitted by the
+		// eventbridge fetcher); this rule is pre-set so the demo related graph renders.
 		{
 			Name:         aws.String("a9s-demo-s3-events-rule"),
 			Arn:          aws.String("arn:aws:events:us-east-1:123456789012:rule/a9s-demo-s3-events-rule"),

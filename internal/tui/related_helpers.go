@@ -43,8 +43,11 @@ func (m *Model) newRelatedList(rt resource.ResourceTypeDef, src resource.Resourc
 	}
 	rl.SetEscPops(true)
 	rl.SetSize(m.innerSize())
-	rl, initCmd := rl.Init()
-	m.pushView(&rl)
+	_, initCmd := rl.Init()
+	rs := newListRS(rt.ShortName)
+	w, h := m.innerSize()
+	rs.width, rs.height = w, h
+	m.pushRS(rs)
 	return initCmd
 }
 

@@ -1,8 +1,7 @@
-// Package views — rightColumnModel renders the RELATED panel in the detail view.
+// Package views — RightColumnModel renders the RELATED panel in the detail view.
 package views
 
 import (
-	"fmt"
 	"slices"
 	"strings"
 
@@ -29,7 +28,10 @@ type rightColumnRow struct {
 	checker     resource.RelatedChecker // originating RelatedDef.Checker — carried forward for re-apply on load-more
 }
 
-type rightColumnModel struct {
+// RightColumnModel manages the RELATED panel rendered next to a detail view.
+// Exported so tui.rendererState can hold one without importing internal view
+// model types into the forbidden files.
+type RightColumnModel struct {
 	rows               []rightColumnRow
 	cursor             int
 	focused            bool
@@ -43,10 +45,10 @@ type rightColumnModel struct {
 	keys               keys.Map
 }
 
-// newRightColumn constructs a rightColumnModel from related definitions and a parent resource.
+// newRightColumn constructs a RightColumnModel from related definitions and a parent resource.
 // sourceType is the short name of the resource type being detailed (e.g. "ct-events").
 // All rows start in loading state; checkers are dispatched by app.go.
-func newRightColumn(defs []resource.RelatedDef, parentRes resource.Resource, sourceType string) rightColumnModel {
+func newRightColumn(defs []resource.RelatedDef, parentRes resource.Resource, sourceType string) RightColumnModel {
 	rows := make([]rightColumnRow, len(defs))
 	for i, def := range defs {
 		rows[i] = rightColumnRow{
@@ -57,7 +59,7 @@ func newRightColumn(defs []resource.RelatedDef, parentRes resource.Resource, sou
 			checker:     def.Checker,
 		}
 	}
-	return rightColumnModel{
+	return RightColumnModel{
 		rows:               rows,
 		parentRes:          parentRes,
 		sourceResourceType: sourceType,
@@ -66,12 +68,12 @@ func newRightColumn(defs []resource.RelatedDef, parentRes resource.Resource, sou
 }
 
 // Init implements the sub-component init pattern. No async work — checkers are dispatched by app.go.
-func (m rightColumnModel) Init() (rightColumnModel, tea.Cmd) {
+func (m RightColumnModel) Init() (RightColumnModel, tea.Cmd) {
 	return m, nil
 }
 
 // Update handles key navigation and result delivery.
-func (m rightColumnModel) Update(msg tea.Msg) (rightColumnModel, tea.Cmd) {
+func (m RightColumnModel) Update(msg tea.Msg) (RightColumnModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		return m.updateKeyMsg(msg)
@@ -125,7 +127,7 @@ func (m rightColumnModel) Update(msg tea.Msg) (rightColumnModel, tea.Cmd) {
 	return m, nil
 }
 
-func (m rightColumnModel) updateKeyMsg(msg tea.KeyMsg) (rightColumnModel, tea.Cmd) {
+func (m RightColumnModel) updateKeyMsg(msg tea.KeyMsg) (RightColumnModel, tea.Cmd) {
 	if !m.focused {
 		return m, nil
 	}
@@ -200,7 +202,7 @@ func (m rightColumnModel) updateKeyMsg(msg tea.KeyMsg) (rightColumnModel, tea.Cm
 }
 
 // View renders the right column content (no frame — frame is added externally).
-func (m rightColumnModel) View() string {
+func (m RightColumnModel) View() string {
 	if m.width <= 0 {
 		return ""
 	}
@@ -238,35 +240,23 @@ func (m rightColumnModel) View() string {
 			case row.err != nil:
 				rowText = "  " + row.displayName + "  \u2014" // em dash
 				rowStyle = styles.DimText
-			case row.count == -1 && len(row.fetchFilter) > 0:
-				rowText = "  " + row.displayName
-				rowStyle = styles.RowNormal
-			case row.count == -1:
-				rowText = "  " + row.displayName
-				rowStyle = styles.DimText
-			case row.count == 0 && row.approximate:
-				// Reverse-scan over a truncated cache hit zero matches so
-				// far. Render the literal "(0)" — the design-spec contract
-				// (docs/design/related-resources.md §5.3 "Available — count
-				// known") and the integration-test assertion both demand a
-				// literal "(<N>)" substring for any count >= 0. The "lower
-				// bound — more pages may reveal matches" signal is preserved
-				// via the RowNormal style (vs DimText for confirmed-zero)
-				// and the row stays navigable; the target list carries the
-				// checker forward and re-runs it on m-loads-more (AS-378).
-				rowText = "  " + row.displayName + " (0)"
-				rowStyle = styles.RowNormal
-			case row.count == 0:
-				// Confirmed zero — cache fully scanned, no matches. Dim.
-				rowText = "  " + row.displayName + " (0)"
-				rowStyle = styles.DimText
 			default:
-				// Known count (>0). Approximate-ness for non-zero counts is
-				// signaled via RowNormal style alone; the "+" text marker is
-				// not part of the design-spec rendering and breaks the
-				// integration-test literal-"(<N>)" contract (AS-378).
-				rowText = "  " + row.displayName + " (" + fmt.Sprintf("%d", row.count) + ")"
-				rowStyle = styles.RowNormal
+				// Count badge + actionability come from the shared rules
+				// (resource.FormatRelatedCount / IsRelatedActionable) so the TUI,
+				// the headless controller, and the web cannot drift. -1 (unknown)
+				// yields an empty badge — the row shows its name only; a known
+				// count >= 0 yields the literal "(N)" the design spec and the
+				// integration tests require. Approximate-ness for a non-zero count
+				// is conveyed by RowNormal style alone (no "+" text marker).
+				rowText = "  " + row.displayName
+				if badge := resource.FormatRelatedCount(row.count); badge != "" {
+					rowText += " " + badge
+				}
+				if isActionableRow(row) {
+					rowStyle = styles.RowNormal
+				} else {
+					rowStyle = styles.DimText
+				}
 			}
 
 			if m.focused && m.cursor == idx {
@@ -286,13 +276,13 @@ func (m rightColumnModel) View() string {
 }
 
 // SetSize sets the rendering dimensions.
-func (m *rightColumnModel) SetSize(w, h int) {
+func (m *RightColumnModel) SetSize(w, h int) {
 	m.width = w
 	m.height = h
 }
 
 // SetFocused sets whether this column has keyboard focus.
-func (m *rightColumnModel) SetFocused(focused bool) {
+func (m *RightColumnModel) SetFocused(focused bool) {
 	m.focused = focused
 	if focused {
 		m.ensureCursorValid()
@@ -300,12 +290,12 @@ func (m *rightColumnModel) SetFocused(focused bool) {
 }
 
 // IsFocused reports whether this column has keyboard focus.
-func (m rightColumnModel) IsFocused() bool {
+func (m RightColumnModel) IsFocused() bool {
 	return m.focused
 }
 
 // SelectedRow returns a pointer to the currently selected row, or nil if the cursor is out of range.
-func (m rightColumnModel) SelectedRow() *rightColumnRow {
+func (m RightColumnModel) SelectedRow() *rightColumnRow {
 	if m.cursor >= 0 && m.cursor < len(m.rows) {
 		return &m.rows[m.cursor]
 	}
@@ -313,7 +303,7 @@ func (m rightColumnModel) SelectedRow() *rightColumnRow {
 }
 
 // SelectedTypeName returns the display name of the currently selected row, or "" if none.
-func (m rightColumnModel) SelectedTypeName() string {
+func (m RightColumnModel) SelectedTypeName() string {
 	row := m.SelectedRow()
 	if row == nil {
 		return ""
@@ -321,28 +311,13 @@ func (m rightColumnModel) SelectedTypeName() string {
 	return row.displayName
 }
 
+// isActionableRow reports whether the right-column row is drillable. The rule
+// itself lives in resource.IsRelatedActionable so the TUI, the headless
+// controller (ActionRelatedSelect / RelatedBlock.Actionable), and the web
+// renderer all share one definition and cannot drift (see that func for the
+// per-case rationale).
 func isActionableRow(row rightColumnRow) bool {
-	if row.loading || row.err != nil {
-		return false
-	}
-	if len(row.fetchFilter) > 0 {
-		// Server-side filter carries the pivot intent; the fetch resolves
-		// the real count. Navigable regardless of local count.
-		return true
-	}
-	if row.count == -1 {
-		// Unknown without a fetchFilter → not drillable.
-		return false
-	}
-	if row.approximate {
-		// 0+ or N+ — reverse-scan cache was truncated. Navigable: the target
-		// list carries the checker forward and re-runs it on each fetched
-		// page (m-loads-more), so new matches appear as pages arrive. Zero
-		// initial matches is honest: "we haven't seen any yet, scroll m for
-		// more." See docs/resources/<short>.md §2 per-pivot discovery.
-		return true
-	}
-	return row.count > 0
+	return resource.IsRelatedActionable(row.count, row.approximate, len(row.fetchFilter) > 0, row.loading, row.err != nil)
 }
 
 // isSelfPivotZeroRow reports whether a row is a self-pivot row (its TargetType equals
@@ -351,7 +326,7 @@ func isActionableRow(row rightColumnRow) bool {
 // showing "(0)" for a self-pivot is semantically meaningless and must be hidden.
 // Non-self target types (e.g. "ec2" rows visible on a different source type) always
 // remain visible even when their count is 0.
-func (m rightColumnModel) isSelfPivotZeroRow(row rightColumnRow) bool {
+func (m RightColumnModel) isSelfPivotZeroRow(row rightColumnRow) bool {
 	return !row.loading &&
 		row.err == nil &&
 		row.count == 0 &&
@@ -359,7 +334,7 @@ func (m rightColumnModel) isSelfPivotZeroRow(row rightColumnRow) bool {
 		row.targetType == m.sourceResourceType
 }
 
-func (m rightColumnModel) visibleIndexes() []int {
+func (m RightColumnModel) visibleIndexes() []int {
 	if len(m.rows) == 0 {
 		return nil
 	}
@@ -382,7 +357,7 @@ func (m rightColumnModel) visibleIndexes() []int {
 	return idx
 }
 
-func (m *rightColumnModel) ensureCursorValid() {
+func (m *RightColumnModel) ensureCursorValid() {
 	visible := m.visibleIndexes()
 	if len(visible) == 0 {
 		m.cursor = 0
@@ -414,7 +389,7 @@ func (m *rightColumnModel) ensureCursorValid() {
 	m.ensureScrollVisible()
 }
 
-func (m *rightColumnModel) ensureScrollVisible() {
+func (m *RightColumnModel) ensureScrollVisible() {
 	visible := m.visibleIndexes()
 	if len(visible) == 0 {
 		return
@@ -437,7 +412,7 @@ func (m *rightColumnModel) ensureScrollVisible() {
 	m.scrollOffset = min(m.scrollOffset, len(visible)-1)
 }
 
-func (m *rightColumnModel) moveCursor(dir int) {
+func (m *RightColumnModel) moveCursor(dir int) {
 	visible := m.visibleIndexes()
 	if len(visible) == 0 {
 		return
@@ -474,22 +449,22 @@ func (m *rightColumnModel) moveCursor(dir int) {
 	}
 }
 
-func (m rightColumnModel) IsFiltering() bool {
+func (m RightColumnModel) IsFiltering() bool {
 	return m.filterActive
 }
 
-func (m rightColumnModel) FilterQuery() string {
+func (m RightColumnModel) FilterQuery() string {
 	return m.filterQuery
 }
 
-func (m rightColumnModel) HasFilter() bool {
+func (m RightColumnModel) HasFilter() bool {
 	return strings.TrimSpace(m.filterQuery) != ""
 }
 
 // HasActionableRows reports whether the right column is worth focusing.
 // Loading rows remain focusable so users can inspect and filter while checks run.
 // Fully-resolved all-zero rows are not focusable.
-func (m rightColumnModel) HasActionableRows() bool {
+func (m RightColumnModel) HasActionableRows() bool {
 	for _, idx := range m.visibleIndexes() {
 		if m.rows[idx].loading || isActionableRow(m.rows[idx]) {
 			return true

@@ -13,7 +13,7 @@ import (
 // Used by ResolveColor in types.go; per-type classifiers (e.g. colorEC2) and
 // other shared helpers (colorFromSeverity, stripFindingSuffix, cfnStackColor,
 // acmColor, r53Color) live alongside the catalog data in
-// internal/aws/catalog_color_helpers.go (per AS-795a).
+// internal/aws/catalog_color_helpers.go.
 func colorFallback(status string) domain.Color {
 	switch status {
 	case "running", "available", "active", "ACTIVE", "AVAILABLE", "RUNNING",

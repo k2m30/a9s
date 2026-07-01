@@ -7,19 +7,19 @@
 // Gated behind the `integration` build tag (like the rest of tests/integration)
 // so `make test` does not spin up real HTTP servers; `make integration` runs them.
 //
-// Coverage at PR-E:
+// Coverage:
 //   - Security contract: 403 without token, Cache-Control, no CORS, reveal blocked
 //   - Startup: fresh session shows main menu
 //   - All resource types: ActionCommand → list, columns present, rich types have rows
-//   - Deeper list flows: sort, filter, cursor navigation (wired in PR-C list state)
+//   - Deeper list flows: sort, filter, cursor navigation
 //   - Back navigation: full stack unwind
 //   - Isolated sessions: two clients share server but have independent state
-//   - Child views: wired via ActionCommand (PR-C will add open-detail path)
+//   - Child views: wired via ActionCommand
 //   - Harness-has-teeth: asserts a property the fix introduced; documents regression
 //
-// Actions that are PR-C-blocked stubs (open-detail, open-yaml, child-view,
-// load-more) are not tested here — they return the current snapshot unchanged
-// and would produce vacuous assertions. PR-E tests cover the PR-D deliverables.
+// open-detail, open-yaml, open-json, child-view, and load-more are now wired
+// through the controller (no longer stubs); the keyboard-driven navigation for
+// those flows is exercised by the Playwright suite in tests/e2e.
 package webintegration
 
 import (

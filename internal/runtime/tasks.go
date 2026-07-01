@@ -247,9 +247,8 @@ func (ReadThemePayload) isTaskPayload() {}
 // persist to config.yaml via config.SaveTheme. Emitted by
 // HandleThemeFileRead's success branch after the apply/pop/flash
 // intents. A save failure surfaces as a Flash; the in-memory theme
-// remains applied (intentional ordering change vs the pre-h4-a
-// persist-before-apply behaviour, documented in
-// docs/refactor/05-pr-05a-h4.md §"Theme-selected split").
+// remains applied (the theme is applied before the config save, so a save
+// failure does not revert it).
 type SaveThemeConfigPayload struct {
 	Theme string
 }

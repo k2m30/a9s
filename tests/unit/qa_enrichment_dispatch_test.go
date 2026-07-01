@@ -28,8 +28,8 @@ import (
 // allowlist is no longer the source of truth — it's a regression pin for the
 // initial enricher set.
 //
-// TODO(no-middle-state): registry-pin tests like this catch absence, not
-// completeness. A feature can still be disabled, inert, or half-fed and pass.
+// Registry-shape guard only — catches absence, not completeness.
+// A feature can still be disabled, inert, or half-fed and pass.
 var originalIssue196Enrichers = []string{
 	"rds",
 	"dbi",
@@ -63,8 +63,8 @@ func TestIssueEnricherRegistry_OriginalSetStillRegistered(t *testing.T) {
 // true — but the test stays as a regression guard for stub test injections
 // that forget to clean up.
 //
-// TODO(no-middle-state): this test proves only registry shape. Keep behavioral
-// tests for any feature that is claimed as implemented.
+// Registry-shape guard only — proves registration, not feature completeness.
+// Keep behavioral tests for any feature that is claimed as implemented.
 func TestIssueEnricherRegistry_NoEntriesForUnregisteredTypes(t *testing.T) {
 	for _, entry := range awsclient.AllWave2() {
 		if resource.FindResourceType(entry.ShortName) == nil {

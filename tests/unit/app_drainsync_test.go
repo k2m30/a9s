@@ -1,4 +1,4 @@
-// app_drainsync_test.go — behavioral tests for app.DrainSync / app.DrainSyncContext (PR-B0 Pass B).
+// app_drainsync_test.go — behavioral tests for app.DrainSync / app.DrainSyncContext.
 //
 // Coverage map (matches task spec items 1–5):
 //
@@ -16,17 +16,12 @@
 //     (TaskKindFetchIdentity). Assert no panic and that the batch drains fully.
 //
 //  4. Executes real work — TaskKindFetchIdentity with nil AWS clients produces
-//     messages.IdentityError (nil STS client path). DrainSync must complete
-//     without hanging or panicking. Deeper state assertions (identity panel
-//     populated) are deferred — Handle(IdentityError) is not yet dispatched
-//     through HandleEvent.
-//     TODO PR-C: once the result lane is wired, assert identity state in ViewState.
+//     messages.IdentityError (nil STS client path). DrainSync completes without
+//     hanging or panicking and Handle(IdentityError) sets the identity error state
+//     visible in Snapshot().Body.Identity.ErrorMsg.
 //
-//  5. Follow-up tasks — Handle(messages.IdentityError) currently returns no
-//     follow-up tasks (IdentityError is not dispatched through HandleEvent yet).
-//     No follow-up drain is exercised in PR-B. If a future PR wires
-//     IdentityError → follow-up tasks, this section gains assertions.
-//     TODO PR-C: assert follow-up tasks once IdentityError is wired through HandleEvent.
+//  5. Follow-up tasks — Handle(messages.IdentityError) returns no follow-up tasks
+//     by design. DrainSync terminates after the initial batch without growing pending.
 //
 // All tests are hermetic: no AWS credentials, no disk I/O, no goroutines.
 // newTestController() uses runtime.New(session, nil) — no demo clients —
@@ -47,19 +42,16 @@ import (
 // returns without hanging. The task executes against nil AWS clients, which
 // produces messages.IdentityError synchronously — no network, no goroutines.
 //
-// This covers spec item 2: "seed with a real executable task and assert DrainSync
-// returns without hanging." The maxDrainIterations cap is not reached here; normal
-// task completion is the exit condition. A self-replenishing task is not
-// constructable without fakes against the real executor, so cap-termination is
-// noted but not asserted separately.
+// After DrainSync, Handle(IdentityError) has been called internally and the
+// identity error state is reflected in Snapshot().Body.Identity.ErrorMsg.
 func TestDrainSync_RealExecutableTask_TerminatesWithoutHanging(t *testing.T) {
 	c := newTestController()
 
 	// ActionOpenIdentity pushes ScreenIdentity and returns a TaskKindFetchIdentity
-	// task request. This is one of the 6 PR-B wired actions.
+	// task request.
 	_, tasks := c.Apply(app.Action{Kind: app.ActionOpenIdentity})
 	if len(tasks) == 0 {
-		t.Skip("Apply(OpenIdentity) returned no tasks — test depends on PR-B wiring TaskKindFetchIdentity")
+		t.Skip("Apply(OpenIdentity) returned no tasks — test depends on TaskKindFetchIdentity wiring")
 	}
 
 	// Verify the seeded task is the kind we expect (catches any wiring change).
@@ -83,6 +75,16 @@ func TestDrainSync_RealExecutableTask_TerminatesWithoutHanging(t *testing.T) {
 	// The test harness -timeout flag catches an infinite loop; receiving on done
 	// catches panics (goroutine exits without sending) via the test framework.
 	<-done
+
+	// After DrainSync: FetchIdentity against nil clients produces IdentityError,
+	// which Handle routes to set identityErrMsg. Snapshot must reflect the error.
+	snap := c.Snapshot()
+	if snap.Body.Identity == nil {
+		t.Fatal("Snapshot().Body.Identity is nil after DrainSync with FetchIdentity — expected IdentityBody")
+	}
+	if snap.Body.Identity.ErrorMsg == "" {
+		t.Error("Snapshot().Body.Identity.ErrorMsg is empty after nil-client FetchIdentity — expected an error message")
+	}
 }
 
 // TestDrainSync_AdapterOnlyTasksSkipped_NoPanic verifies spec item 3:
@@ -183,16 +185,16 @@ func TestDrainSync_MixedBatch_RealAndAdapterOnly_AllDrain(t *testing.T) {
 // This exercises a second "real executable task" path, distinct from
 // FetchIdentity, confirming DrainSync is not accidentally gated on task kind.
 //
-// TODO PR-C: once Handle(ClientsReady) is wired through HandleEvent, assert
-// that the resulting session state (new clients or error flash) is reflected
-// in Snapshot after DrainSync returns.
+// ClientsReady is handled via BootstrapLive, not Controller.Handle, so the
+// observable post-DrainSync assertion is structural: Snapshot must be valid
+// (non-empty BodyKind, no panic) regardless of the connect outcome.
 func TestDrainSync_SelectProfile_ConnectTask_TerminatesWithoutHanging(t *testing.T) {
 	c := newTestController()
 
-	// ActionSelectProfile returns a TaskKindConnect task (PR-B wired).
+	// ActionSelectProfile returns a TaskKindConnect task.
 	_, tasks := c.Apply(app.Action{Kind: app.ActionSelectProfile, Arg: "fake-profile-000000000000"})
 	if len(tasks) == 0 {
-		t.Skip("Apply(SelectProfile) returned no tasks — test depends on PR-B TaskKindConnect wiring")
+		t.Skip("Apply(SelectProfile) returned no tasks — test depends on TaskKindConnect wiring")
 	}
 
 	hasConnect := false
@@ -213,21 +215,24 @@ func TestDrainSync_SelectProfile_ConnectTask_TerminatesWithoutHanging(t *testing
 	}()
 
 	<-done
-	// TODO PR-C: assert applied state once ClientsReady is dispatched through HandleEvent.
+
+	// Controller must remain in a structurally valid state after the connect task.
+	snap := c.Snapshot()
+	if snap.Body.Kind == "" {
+		t.Error("Snapshot().Body.Kind is empty after DrainSync(Connect) — controller state is invalid")
+	}
 }
 
 // TestDrainSync_NilFollowUpTasks_DoesNotGrow verifies spec item 5:
-// when Handle returns nil follow-up tasks (the PR-B no-op contract for all
-// result events), the pending slice does not grow and DrainSync terminates
-// after the initial batch is exhausted.
+// Handle(IdentityError) returns no follow-up tasks by design, so the pending
+// slice does not grow and DrainSync terminates after the initial batch.
 //
-// Mechanism: seed 1 task, observe that DrainSync returns (not a goroutine
-// timeout). If Handle were accidentally appending to pending, the loop would
-// grow unboundedly until maxDrainIterations — the test harness -timeout
-// flag would catch that. The test name documents the expected invariant.
+// Mechanism: seed 1 FetchIdentity task, observe that DrainSync returns without
+// hanging. If Handle were accidentally appending to pending the loop would grow
+// unboundedly until maxDrainIterations — the test harness -timeout catches that.
 //
-// TODO PR-C: once IdentityError is wired through HandleEvent and produces
-// follow-up tasks, assert those tasks are also drained.
+// IdentityError IS wired through Handle (sets identityErrMsg) but produces no
+// follow-up task requests, so the initial batch of 1 is the only drain cycle.
 func TestDrainSync_NilFollowUpTasks_DoesNotGrow(t *testing.T) {
 	c := newTestController()
 
@@ -243,6 +248,15 @@ func TestDrainSync_NilFollowUpTasks_DoesNotGrow(t *testing.T) {
 	}()
 
 	<-done
-	// If we reach here, no follow-up task inflation occurred — the loop exited
-	// after draining the initial single TaskKindFetchIdentity task.
+
+	// IdentityError produces no follow-up tasks — the loop must have exited after
+	// draining the single initial task, not via the maxDrainIterations cap.
+	// Verify the identity error state is set (confirming Handle was called).
+	snap := c.Snapshot()
+	if snap.Body.Identity != nil && snap.Body.Identity.ErrorMsg == "" && !snap.Body.Identity.Loading {
+		// Identity screen is showing but has neither an error nor a loading state —
+		// this would mean FetchIdentity completed without producing IdentityError,
+		// which is unexpected for a nil-client path.
+		t.Error("identity screen shows neither ErrorMsg nor Loading after nil-client FetchIdentity drain")
+	}
 }

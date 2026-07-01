@@ -205,8 +205,8 @@ func (AvailabilityPrefetched) GenAspect() Aspect      { return AspectAvailabilit
 // was bumped) cannot bypass the staleness guard once Rotate() has advanced
 // AvailabilityGen past it. Session.New() seeds AvailabilityGen=1 so the
 // legitimate first prefetch on a fresh session is still applied; the
-// AS-648-h4 hazard is a zero-stamped message arriving after Rotate(), which
-// the AS-657 stale-drop guard must reject. Mirrors AvailabilityChecked.
+// hazard is a zero-stamped message arriving after Rotate(), which the
+// stale-drop guard must reject. Mirrors AvailabilityChecked.
 func (AvailabilityPrefetched) AcceptZeroGen() bool { return false }
 
 // AvailabilityChecked reports one resource type's background probe result.
@@ -312,10 +312,9 @@ func (EnrichDetailResult) AcceptZeroGen() bool    { return true }
 // ThemeFileRead delivers the bytes of a theme YAML file read from disk
 // in response to a TaskKindReadThemeFile dispatch. Theme is the theme
 // filename the user selected; Bytes is the raw YAML payload (nil on
-// read error); Err is non-nil when the read failed. PR-05a-h4-a
-// (AS-769) introduced this event so the runtime can split the
-// theme-selected flow into a Core-side handler (HandleThemeSelected,
-// emits the read task) and a second Core-side handler
+// read error); Err is non-nil when the read failed. This event lets the
+// runtime split the theme-selected flow into a Core-side handler
+// (HandleThemeSelected, emits the read task) and a second Core-side handler
 // (HandleThemeFileRead, emits Apply/Pop/Flash + Save task) without
 // performing file I/O inside Core.
 type ThemeFileRead struct {

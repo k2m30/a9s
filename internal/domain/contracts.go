@@ -5,7 +5,6 @@ import "context"
 // ─── Column / view types ───────────────────────────────────────────────────
 
 // Column defines a column in a resource table view.
-// Moved from internal/resource/types.go in Phase 01.
 type Column struct {
 	// Key is the field key used to extract the value from Resource.Fields.
 	Key string
@@ -18,7 +17,7 @@ type Column struct {
 }
 
 // ChildViewDef describes a child view that can be drilled into from a parent
-// resource list. Moved from internal/resource/types.go in Phase 01.
+// resource list.
 type ChildViewDef struct {
 	// ChildType is the registered child type short name (e.g., "s3_objects").
 	ChildType string
@@ -39,7 +38,6 @@ type ChildViewDef struct {
 // ─── Related types ─────────────────────────────────────────────────────────
 
 // RelatedDef defines one related resource class for a given resource type.
-// Moved from internal/resource/related.go in Phase 01.
 type RelatedDef struct {
 	TargetType       string // target resource short name (e.g., "tg", "alarm")
 	DisplayName      string // right-column row label (e.g., "Target Groups")
@@ -48,14 +46,13 @@ type RelatedDef struct {
 }
 
 // NavigableField associates a detail view field path with a target resource type.
-// Moved from internal/resource/related.go in Phase 01.
 type NavigableField struct {
 	FieldPath  string // matches a path in ViewDef.Detail (e.g., "VpcId")
 	TargetType string // resource short name (e.g., "vpc")
 }
 
 // ResourceCacheEntry holds a snapshot of one resource type's list plus
-// truncation state. Moved from internal/resource/related.go in Phase 01.
+// truncation state.
 type ResourceCacheEntry struct {
 	Resources   []Resource
 	IsTruncated bool
@@ -63,13 +60,12 @@ type ResourceCacheEntry struct {
 }
 
 // ResourceCache is a read-only snapshot of already-loaded resource lists,
-// keyed by resource short name. Moved from internal/resource/related.go in Phase 01.
+// keyed by resource short name.
 type ResourceCache map[string]ResourceCacheEntry
 
 // ─── Pagination types ──────────────────────────────────────────────────────
 
 // PaginationMeta holds cursor state for paginated fetches.
-// Moved from internal/resource/pagination.go in Phase 01.
 type PaginationMeta struct {
 	// IsTruncated is true when more pages exist beyond what was returned.
 	IsTruncated bool
@@ -82,7 +78,6 @@ type PaginationMeta struct {
 }
 
 // FetchResult wraps a resource page with pagination state.
-// Moved from internal/resource/pagination.go in Phase 01.
 type FetchResult struct {
 	Resources  []Resource
 	Pagination *PaginationMeta // nil when pagination info is not available
@@ -91,15 +86,13 @@ type FetchResult struct {
 // ─── Parent context ────────────────────────────────────────────────────────
 
 // ParentContext holds key-value pairs passed from a parent view to a child
-// fetcher. Moved from internal/resource/registry.go in Phase 01.
+// fetcher.
 type ParentContext map[string]string
 
 // ─── Function signatures ───────────────────────────────────────────────────
 //
-// These are MOVED here from internal/resource/* and internal/aws/* in Phase 01.
-// The original sites keep `type X = domain.X` re-export aliases.
+// The internal/resource sites keep `type X = domain.X` re-export aliases.
 // Current signatures use `any` for clients and `string` for tokens.
-// The aspirational Capabilities/Cursor redesign is a later phase.
 
 // PaginatedFetcher returns a single page of resources.
 type PaginatedFetcher func(ctx context.Context, clients any, continuationToken string) (FetchResult, error)
@@ -118,11 +111,9 @@ type RevealFetcher func(ctx context.Context, clients any, resourceID string) (st
 type FetchByIDsFunc func(ctx context.Context, clients any, ids []string) ([]Resource, error)
 
 // DetailEnricher enriches a single resource on demand for detail views.
-// Moved from internal/resource/enricher.go in Phase 01.
 type DetailEnricher func(ctx context.Context, clients any, res Resource) (Resource, error)
 
 // RelatedChecker returns a count of related resources of a specific type.
-// Moved from internal/resource/related.go in Phase 01.
 // Note: returns RelatedCheckResult which remains in internal/resource/ for now.
 type RelatedChecker func(ctx context.Context, clients any, res Resource, cache ResourceCache) RelatedCheckResult
 

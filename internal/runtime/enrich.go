@@ -1,11 +1,8 @@
 // Package runtime — see orchestrator.go for the package overview.
 //
-// enrich.go owns the on-demand detail-view enrichment dispatch policy.
-// PR-05a-h7 moves the entry point off internal/tui per the boundary
-// contract in docs/refactor/05-boundary.md §"5a-extract": the receiver
-// migrates from *Model to *Core, and the function no longer returns a
-// tea.Cmd. Instead it emits a TaskRequest the adapter translates into
-// platform-specific async work.
+// enrich.go owns the on-demand detail-view enrichment dispatch policy. The
+// receiver is *Core (not *Model) and it returns a TaskRequest rather than a
+// tea.Cmd — the adapter translates that into platform-specific async work.
 package runtime
 
 import (
@@ -39,11 +36,11 @@ type EnrichDetailEvent struct {
 // Clients/PolicyDocCache, and the EnrichGen captured at dispatch so
 // the adapter can stamp the result for stale-rejection on receipt.
 //
-// PR-05a-h4-b (AS-962) moved DetailCtx construction off the adapter so
-// internal/tui no longer touches awsclient.DetailEnrichmentCtx directly;
-// the adapter reads the typed payload fields verbatim instead. The
-// DetailCtx pointer is nil only when session.Clients is unset (test
-// harnesses constructing a Core without a transport) — the adapter is
+// DetailCtx construction lives on the runtime, not the adapter, so
+// internal/tui never touches awsclient.DetailEnrichmentCtx directly; the
+// adapter reads the typed payload fields verbatim. The DetailCtx pointer is
+// nil only when both session.Clients and session.PolicyDocCache are unset
+// (test harnesses constructing a Core without a transport) — the adapter is
 // responsible for tolerating that branch.
 type EnrichDetailPayload struct {
 	ResourceType string
@@ -66,10 +63,7 @@ func (EnrichDetailPayload) isTaskPayload() {}
 // that an enricher is registered for Payload.ResourceType. The adapter
 // does not re-check, ensuring SSOT for the policy gate.
 //
-// Receiver migrated from *Model to *Core per docs/refactor/05-boundary.md.
-// EnrichGen / PolicyDocCache reads stay adapter-side (read from
-// c.Session()) until those fields migrate in the orchestrator/state-
-// promotion PR.
+// EnrichGen / PolicyDocCache reads stay adapter-side (read from c.Session()).
 //
 // Sibling per-handler PRs expose their own entry points in the same
 // pattern. Once enough handlers have migrated, Core.HandleEvent will

@@ -88,10 +88,9 @@ func (PatchMenu) isIntent() {}
 // Payload carries per-screen typed data (selectors, reveal results,
 // child-list parameters). It is nil for capability screens whose
 // adapter-side builder resolves everything from ScreenContext alone.
-// PR-05a-h4-a introduced Payload alongside the four ported view-stack
-// handlers; pre-h4-a callers that emit PushScreen with Context only
-// continue to work because the builder closures type-switch on Payload
-// and tolerate the zero value when their ScreenID does not require it.
+// Callers that emit PushScreen with Context only continue to work because
+// the builder closures type-switch on Payload and tolerate the zero value
+// when their ScreenID does not require it.
 type PushScreen struct {
 	ID      ScreenID
 	Context ScreenContext
@@ -104,9 +103,8 @@ func (PushScreen) isIntent() {}
 // invalidate any caches that materialised colour-dependent state
 // (header text, per-row styled caches in ResourceListModel views, …).
 //
-// PR-05a-h4-a chose Option B from docs/refactor/05-pr-05a-h4.md
-// §"Theme-selected split": the runtime carries the parsed YAML *bytes*
-// and the theme filename, and the adapter re-parses via
+// The runtime carries the parsed YAML *bytes* and the theme filename, and
+// the adapter re-parses via
 // styles.ThemeFromYAML before applying. This keeps the runtime free of
 // any lipgloss / Bubble Tea coupling that hosting a *styles.Theme
 // would force. Option A (extracting a domain.Theme value type) was
@@ -251,11 +249,9 @@ func (RefreshActiveListIntent) isIntent() {}
 // cacheTopLevelResourceList will not fire). Entry may be nil to signal a
 // clear (no current emitter exercises that branch — kept for symmetry).
 //
-// The Entry type remains *session.ResourceCacheEntry under h4-b because
-// h4-c moves the type definition into internal/domain. Adapters that
-// already import internal/session apply the intent with a direct map
-// assignment; once h4-c lands the field will retype to *domain.ResourceCacheEntry
-// with no call-site changes beyond import sweeps.
+// Entry is *session.ResourceCacheEntry (a type alias to
+// *domain.ListViewCacheEntry); adapters apply the intent with a direct map
+// assignment.
 type PatchResourceCache struct {
 	ResourceType string
 	Entry        *session.ResourceCacheEntry
@@ -289,7 +285,7 @@ func (PatchLazyResourceCache) isIntent() {}
 
 // SetIdentityIntent carries the resolved caller-identity mirror to the
 // adapter. The runtime writes session.Identity (still typed as
-// *awsclient.CallerIdentity until h4-c retypes it) before emitting; this
+// *awsclient.CallerIdentity) before emitting; this
 // intent gives the renderer a renderer-shaped value to apply to active
 // views (today: IdentityModel.SetIdentity) without importing internal/aws.
 // nil Identity is permitted and signals a no-op render-side update

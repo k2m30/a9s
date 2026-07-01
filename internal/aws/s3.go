@@ -154,6 +154,11 @@ func firstS3NotificationTargets(
 // A single API call is made per invocation; IsTruncated and NextContinuationToken
 // are forwarded as pagination metadata for the caller to request the next page.
 func FetchS3Objects(ctx context.Context, api S3ListObjectsV2API, bucket, prefix string, continuationToken string) (resource.FetchResult, error) {
+	if bucket == "" {
+		// No bucket context to list — return an empty result rather than
+		// calling ListObjectsV2("") (which surfaces a spurious NoSuchBucket).
+		return resource.FetchResult{}, nil
+	}
 	input := &s3.ListObjectsV2Input{
 		Bucket:    aws.String(bucket),
 		Prefix:    aws.String(prefix),

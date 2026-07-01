@@ -12,9 +12,9 @@ import (
 // Shared helpers used by the per-category catalog data files
 // (catalog_<cat>.go) for color classification and status-phrase parsing.
 //
-// These helpers were relocated from internal/catalog as part of AS-795a so
-// the catalog data slices can live in the same package as the fetchers and
-// transports they describe. The intrinsic ResolveColor fallback used by
+// These helpers live here (not internal/catalog) so the catalog data slices
+// can live in the same package as the fetchers and transports they describe.
+// The intrinsic ResolveColor fallback used by
 // catalog.ResourceTypeDef.ResolveColor stays in internal/catalog.
 
 // colorFallback classifies a resource status string when no per-type Color func
@@ -74,9 +74,9 @@ func colorFromWave1(r domain.Resource) (domain.Color, bool) {
 
 // colorWave1OrHealthy classifies r from its first wave1 Finding, defaulting to
 // healthy when none is present. Used by child-type catalog entries whose only
-// severity signal comes from fetcher-emitted wave1 Findings (AS-1393: replaced
-// the prior status-string fallback for cb_builds, cfn_resources, glue_runs,
-// log_events, lambda_invocation_logs, role_policies).
+// severity signal comes from fetcher-emitted wave1 Findings (cb_builds,
+// cfn_resources, glue_runs, log_events, lambda_invocation_logs,
+// role_policies).
 func colorWave1OrHealthy(r domain.Resource) domain.Color {
 	if c, ok := colorFromWave1(r); ok {
 		return c

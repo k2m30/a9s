@@ -1,20 +1,12 @@
-// app_dispatch.go — TUI-side runtime intent + task dispatchers.
+// app_dispatch.go — TUI-side runtime intent + task dispatchers (applyIntents,
+// pushScreen, applyTheme, tasksToCmd, coreUpdate).
 //
-// Split out of app.go in PR-05a-h4-b (AS-962) so the runtime↔adapter
-// glue (applyIntents, pushScreen, applyTheme, tasksToCmd, coreUpdate)
-// lives next to runtime_adapter.go's per-intent helper (applyIntent),
-// and so app.go stays under the 700 LOC budget set by the spec
-// acceptance check (`wc -l internal/tui/app.go`).
-//
-// The five new h4-b intents — PatchResourceCache, PatchRelatedCache,
-// PatchLazyResourceCache, SetIdentityIntent, HeaderInvalidateIntent —
-// each land as a case in applyIntents below. They cross-write
-// session-state owned by Core via the typed accessors in
-// internal/runtime/accessors.go (SetResourceCache, RelatedCacheSet,
-// ExtendLazyResourceCache). PR-05a-h4-c (AS-963) routed the related-cache
-// key + result type through the internal/runtime package and migrated
-// every session-field access in the renderer onto those typed accessors,
-// so the dispatcher no longer reaches into the session struct shape.
+// The cache-cross-write intents — PatchResourceCache, PatchRelatedCache,
+// PatchLazyResourceCache, SetIdentityIntent, HeaderInvalidateIntent — each land
+// as a case in applyIntents below. They write session state owned by Core via
+// the typed accessors in internal/runtime/accessors.go (SetResourceCache,
+// RelatedCacheSet, ExtendLazyResourceCache), so the dispatcher never reaches
+// into the session struct shape directly.
 package tui
 
 import (
@@ -35,101 +27,52 @@ import (
 // follow-up tea.Cmds the intents themselves require (flash re-emit,
 // screen-builder closures, theme-apply errors).
 //
-// Session-state mutations land through m.core's typed accessors
-// (SetResourceCache, RelatedCacheSet, ExtendLazyResourceCache) so the
-// dispatcher never reaches through Core into the session struct.
+// Menu and enrichment state mutations land through m.ctrl.ApplyIntents so
+// the controller remains the single source of truth. No concrete view
+// model instances are stored — the stack holds only *rendererState.
 func (m *Model) applyIntents(intents []runtime.UIIntent) []tea.Cmd {
 	var cmds []tea.Cmd
 	for _, intent := range intents {
 		switch v := intent.(type) {
-		case runtime.PatchMenuAvailability:
-			if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
-				menu.SetAvailability(v.ResourceType, v.Count)
-				menu.SetTruncated(v.ResourceType, v.Truncated)
-			}
-		case runtime.PatchMenuIssueBatch:
-			if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
-				if len(v.Known) > 0 {
-					menu.SetIssuesFromCache(v.Counts, v.Truncated, v.Known)
-				}
-			}
-		case runtime.PatchMenuCheckProgress:
-			if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
-				menu.SetCheckProgress(v.Checked, v.Total)
-			}
-		case runtime.PatchMenuEnrichProgress:
-			if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
-				menu.SetEnrichProgress(v.Checked, v.Total)
-			}
-		case runtime.PatchMenu:
-			if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
-				menu.SetIssues(v.ResourceType, v.Issues, v.Truncated)
-			}
-		case runtime.PatchResourceList:
-			for _, sv := range m.stack {
-				rl, ok := sv.(*views.ResourceListModel)
-				if !ok || rl.ResourceType() != v.ResourceType {
-					continue
-				}
-				if v.Issues != nil && v.Enrichment != nil {
-					rl.SetEnrichmentState(v.Issues.Count, v.Issues.Truncated, v.Enrichment.Findings)
-					rl.SetTruncatedIDs(v.Enrichment.TruncatedIDs)
-				} else if v.Issues != nil {
-					rl.SetEnrichmentState(v.Issues.Count, v.Issues.Truncated, nil)
-				}
-				if v.Enrichment != nil && len(v.Enrichment.FieldUpdates) > 0 {
-					rl.ApplyFieldUpdates(v.Enrichment.FieldUpdates)
-				}
-			}
+		case runtime.PatchMenuAvailability,
+			runtime.PatchMenuIssueBatch,
+			runtime.PatchMenuCheckProgress,
+			runtime.PatchMenuEnrichProgress,
+			runtime.PatchMenu,
+			runtime.PatchResourceList,
+			runtime.MenuClearAvailabilityIntent:
+			// All menu + list enrichment patches route directly to the controller
+			// which owns the MenuState / ListState. No stored view model exists.
+			m.ctrl.ApplyIntents([]runtime.UIIntent{intent})
+
 		case runtime.PatchDetail:
-			for _, sv := range m.stack {
-				d, ok := sv.(*views.DetailModel)
-				if !ok || d.ResourceType() != v.ResourceType {
-					continue
-				}
-				if v.ResourceID != "" && d.ResourceID() != v.ResourceID {
-					continue
-				}
-				// AS-1395: runtime ships domain.Finding + domain.AttentionDetail
-				// keyed by Resource.ID. nil EnrichmentFindings = clear; non-nil =
-				// update from map.
-				//
-				// Controller-backed models: route to ctrl.ApplyDetailFinding so the
-				// controller remains the single source of truth for findings.
-				// Legacy models (ctrl == nil): use SetEnrichmentFinding as before.
-				if d.IsControllerBacked() {
-					// Route by resource ID so a STACKED detail (not the active one)
-					// receives its finding — ApplyDetailFinding targets only the top
-					// screen, which drops findings for details below the active one.
-					if v.EnrichmentFindings == nil {
-						m.ctrl.ApplyDetailFindingForResource(d.ResourceType(), d.ResourceID(), nil, nil)
-					} else if f, exists := v.EnrichmentFindings[d.ResourceID()]; exists {
-						finding := f
-						var ad *domain.AttentionDetail
-						if got, hasAD := v.EnrichmentAttentionDetails[d.ResourceID()]; hasAD && len(got.Rows) > 0 {
-							adVal := got
-							ad = &adVal
-						}
-						m.ctrl.ApplyDetailFindingForResource(d.ResourceType(), d.ResourceID(), &finding, ad)
-					} else {
-						m.ctrl.ApplyDetailFindingForResource(d.ResourceType(), d.ResourceID(), nil, nil)
+			// Apply enrichment findings to every stacked detail screen of this
+			// resource type — not just the currently active one. When a user has
+			// navigated from detail-A to detail-B, enrichment results for both
+			// must reach both screens, so popping back to detail-A shows the
+			// correct Attention section immediately.
+			if len(v.EnrichmentFindings) == 0 {
+				// Nil or empty Findings means all resources of this type have
+				// recovered: clear enrichment from every stacked detail screen.
+				m.ctrl.ClearDetailFindingsForType(v.ResourceType)
+			} else {
+				// Clear stale findings from every stacked detail of this type first,
+				// so a resource that recovered (absent from the new map) loses its
+				// Attention; then re-apply for resources still reporting findings.
+				// ApplyDetailFindingForResource searches all stacked screens by
+				// (type, id), so a stacked-but-not-active detail is still updated.
+				m.ctrl.ClearDetailFindingsForType(v.ResourceType)
+				for resourceID, f := range v.EnrichmentFindings {
+					finding := f
+					var ad *domain.AttentionDetail
+					if got, hasAD := v.EnrichmentAttentionDetails[resourceID]; hasAD && len(got.Rows) > 0 {
+						adVal := got
+						ad = &adVal
 					}
-				} else {
-					if v.EnrichmentFindings == nil {
-						d.SetEnrichmentFinding(nil, nil)
-					} else if f, exists := v.EnrichmentFindings[d.ResourceID()]; exists {
-						finding := f
-						var ad *domain.AttentionDetail
-						if got, hasAD := v.EnrichmentAttentionDetails[d.ResourceID()]; hasAD && len(got.Rows) > 0 {
-							adVal := got
-							ad = &adVal
-						}
-						d.SetEnrichmentFinding(&finding, ad)
-					} else {
-						d.SetEnrichmentFinding(nil, nil)
-					}
+					m.ctrl.ApplyDetailFindingForResource(v.ResourceType, resourceID, &finding, ad)
 				}
 			}
+
 		case runtime.FlashIntent:
 			// Re-emit as messages.Flash so the flash routes through
 			// HandleFlash and picks up the auto-clear tick + history
@@ -166,29 +109,33 @@ func (m *Model) applyIntents(intents []runtime.UIIntent) []tea.Cmd {
 				// builder runs, so EnsureSelectorState (called by the builder) finds
 				// the screen already on top of the controller stack.
 				m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenProfileSelector}})
+			case runtime.ScreenReveal:
+				// Push the reveal screen onto the controller so that ActionBack on
+				// Esc pops it (not the list below). Without this, the ctrl stack
+				// would be one screen behind the TUI rs stack, and Esc from reveal
+				// would incorrectly pop the secrets list out of the controller.
+				m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenReveal, Payload: v.Payload}})
 			}
 			if c := m.pushScreen(v); c != nil {
 				cmds = append(cmds, c)
 			}
 		case runtime.PopScreen:
-			m.popView()
+			m.popRS()
 		case runtime.ApplyThemeIntent:
 			if c := m.applyTheme(v); c != nil {
 				cmds = append(cmds, c)
 			}
 		case runtime.PopSelectorIntent:
-			if _, ok := m.activeView().(*views.SelectorModel); ok {
-				m.popView()
+			if m.activeRS().kind == rsKindSelector {
+				m.popRS()
 			}
 		case runtime.PatchResourceCache:
 			m.core.SetResourceCache(v.ResourceType, v.Entry)
 		case runtime.PatchRelatedCache:
-			// PR-05a-h4-b: kept as an applyIntents case for forward-
-			// compatibility, even though Core today writes the
-			// RelatedCache directly inside HandleRelatedCheckResult
-			// (the renderer-agnostic alternative path is unused in
-			// production but keeps the intent set complete for tests
-			// and future emitters that may surface this branch).
+			// Kept as an applyIntents case for forward-compatibility: Core today
+			// writes the RelatedCache directly inside HandleRelatedCheckResult, so
+			// this renderer-agnostic path is unused in production but keeps the
+			// intent set complete for tests and future emitters.
 			if v.SourceID != "" {
 				key := runtime.RelatedCacheKey(v.ResourceType, v.SourceID)
 				existing, _ := m.core.RelatedCacheGet(key)
@@ -200,19 +147,26 @@ func (m *Model) applyIntents(intents []runtime.UIIntent) []tea.Cmd {
 		case runtime.PatchLazyResourceCache:
 			m.core.ExtendLazyResourceCache(v.Adds)
 		case runtime.SetIdentityIntent:
+			// Identity overlay state lives in the rs (not ctrl-backed). Find it
+			// and update directly. If no identity rs is on the stack, noop.
 			if v.Identity == nil {
 				continue
 			}
-			if idView, ok := m.activeView().(*views.IdentityModel); ok {
-				idView.SetIdentity(views.IdentityData{
-					AccountID:     v.Identity.AccountID,
-					AccountAlias:  v.Identity.AccountAlias,
-					ARN:           v.Identity.Arn,
-					RoleName:      v.Identity.RoleName,
-					UserName:      v.Identity.UserName,
-					SessionName:   v.Identity.SessionName,
-					IsAssumedRole: v.Identity.IsAssumedRole,
-				})
+			for _, rs := range m.stack {
+				if rs.kind == rsKindIdentity {
+					rs.identityLoading = false
+					rs.identityErr = ""
+					rs.identityData = views.IdentityData{
+						AccountID:     v.Identity.AccountID,
+						AccountAlias:  v.Identity.AccountAlias,
+						ARN:           v.Identity.Arn,
+						RoleName:      v.Identity.RoleName,
+						UserName:      v.Identity.UserName,
+						SessionName:   v.Identity.SessionName,
+						IsAssumedRole: v.Identity.IsAssumedRole,
+					}
+					break
+				}
 			}
 		case runtime.HeaderInvalidateIntent:
 			m.headerCacheKey = ""
@@ -222,12 +176,12 @@ func (m *Model) applyIntents(intents []runtime.UIIntent) []tea.Cmd {
 }
 
 // pushScreen resolves the runtime-emitted PushScreen via the screens
-// builder map and pushes the resulting view onto the stack. The live
+// builder map and pushes the resulting rendererState onto the stack. The live
 // *Model is passed to the builder at invocation so it observes the
 // current keymap / viewConfig / innerSize() rather than a stale
 // snapshot captured at tui.New time. A missing builder (unknown
 // ScreenID) surfaces as a flash so the operator sees the misconfig;
-// a builder that returns a nil view is silently dropped (the builder
+// a builder that returns a nil rs is silently dropped (the builder
 // itself owns the "I refuse to render this payload" decision).
 func (m *Model) pushScreen(v runtime.PushScreen) tea.Cmd {
 	builder, ok := m.screens[v.ID]
@@ -237,23 +191,26 @@ func (m *Model) pushScreen(v runtime.PushScreen) tea.Cmd {
 			return messages.Flash{Text: "no screen builder: " + id, IsError: true}
 		}
 	}
-	view, cmd := builder(m, v.Payload)
-	if view != nil {
-		m.pushView(view)
+	rs, cmd := builder(m, v.Payload)
+	if rs != nil {
+		m.pushRS(rs)
 	}
 	return cmd
 }
 
 // applyTheme parses the YAML bytes carried by ApplyThemeIntent and, on
-// success, swaps the active theme, invalidates the header cache, walks
-// the view stack invalidating ResourceListModel style caches, and sets
+// success, swaps the active theme, invalidates the header cache, and sets
 // m.activeTheme so the next theme selector renders the "(current)"
 // indicator correctly.
 //
-// Post-AS-784: Core's HandleThemeFileRead pre-validates the YAML via
+// Core's HandleThemeFileRead pre-validates the YAML via
 // styles.ThemeFromYAML before emitting ApplyThemeIntent + Save task. The
 // adapter parse-error branch below is therefore defensive — under normal
 // flow the bytes are guaranteed to parse.
+//
+// With the renderer-state stack, there are no stored ResourceListModel
+// instances whose style caches need invalidating — transient models are
+// created fresh per render frame, so no cache walk is needed.
 func (m *Model) applyTheme(v runtime.ApplyThemeIntent) tea.Cmd {
 	t, err := styles.ThemeFromYAML(v.Bytes)
 	if err != nil {
@@ -265,11 +222,6 @@ func (m *Model) applyTheme(v runtime.ApplyThemeIntent) tea.Cmd {
 	styles.ApplyTheme(t)
 	m.activeTheme = v.Name
 	m.headerCacheKey = ""
-	for _, sv := range m.stack {
-		if rl, ok := sv.(*views.ResourceListModel); ok {
-			rl.InvalidateStyleCache()
-		}
-	}
 	return nil
 }
 
@@ -277,8 +229,8 @@ func (m *Model) applyTheme(v runtime.ApplyThemeIntent) tea.Cmd {
 // single tea.Cmd (or nil when the slice is empty). The TaskKind switch
 // matches the symmetric runtimeTasksToCmd in runtime_adapter.go used
 // by handleEnrichDetail; this dispatcher additionally covers the
-// availability/enrich probe + save-cache tasks emitted by the h3 +
-// h4-a handlers, which the singular dispatcher does not route.
+// availability/enrich probe + save-cache tasks that the singular
+// dispatcher does not route.
 func (m *Model) tasksToCmd(tasks []runtime.TaskRequest) tea.Cmd {
 	var cmds []tea.Cmd
 	for _, req := range tasks {
@@ -292,9 +244,8 @@ func (m *Model) tasksToCmd(tasks []runtime.TaskRequest) tea.Cmd {
 			}
 
 		case runtime.TaskKindSaveCache:
-			// saveAvailabilityCache reads counts from MainMenuModel (the live
-			// TUI view), giving more precise values than ExecuteTask's
-			// availabilityFromResourceCache path. Keep adapter-local.
+			// saveAvailabilityCache reads counts from the controller state,
+			// giving authoritative values from MenuState.
 			cmd := m.saveAvailabilityCache()
 			if cmd != nil {
 				cmds = append(cmds, cmd)
@@ -348,7 +299,7 @@ func (m Model) executeTaskCmd(req runtime.TaskRequest) tea.Cmd {
 // the returned UIIntents to the view tree, and converts TaskRequests
 // to tea.Cmds. Used by the Update() switch for messages routed
 // entirely through the orchestrator (availability/enrichment events,
-// identity loaded/error post-h4-b).
+// identity loaded/error).
 func (m Model) coreUpdate(msg messages.Event) (tea.Model, tea.Cmd) {
 	intents, tasks := m.core.HandleEvent(msg)
 	cmds := m.applyIntents(intents)

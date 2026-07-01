@@ -4,6 +4,11 @@ import { readServer } from "./server";
 // Booted + tokenized by global-setup. The tokenized URL establishes the session.
 const server = readServer();
 
+// This spec asserts demo-fixture specifics (web-prod-01, acme-web-tg, ec2(27)…),
+// so it is meaningless against live AWS data. Skip the whole file in live mode;
+// the data-agnostic live checks live in live-readonly.spec.ts.
+test.skip(server.live, "demo-only spec — skipped in live mode (A9S_E2E_PROFILE set)");
+
 // press dispatches a real keystroke to the page and waits for the resulting
 // POST /action to return, so the #main fragment has been swapped before the
 // next assertion. Every mapped key in app.js calls sendAction -> POST /action.
@@ -145,5 +150,304 @@ test.describe("a9s web UI — real-browser key navigation", () => {
     await press(page, "i");
     await expect(page.locator(".identity-table")).toBeVisible();
     await expect(page.getByText("Account ID", { exact: false })).toBeVisible();
+  });
+
+  // Regression: navigable detail fields (the underlined links — ImageId, VpcId,
+  // SubnetId, …) had no onclick, so clicking them did nothing ("navigation in
+  // the detail view doesn't work").
+  test("clicking a navigable detail field navigates to that resource", async ({ page }) => {
+    await press(page, "Enter"); // menu -> ec2 list
+    await expect(page.locator(".list-table")).toBeVisible();
+    await press(page, "d"); // -> web-prod-01 detail
+    await expect(page.locator(".detail-layout")).toBeVisible();
+    await expect(page.locator("#frame-title")).toHaveText("web-prod-01");
+
+    const navField = page.locator(".field-navigable").first();
+    await expect(navField).toBeVisible();
+    await navField.click(); // clickField -> navigate to the field's target
+
+    await expect(
+      page.locator("#frame-title"),
+      "clicking a navigable field must navigate away from the web-prod-01 detail",
+    ).not.toHaveText("web-prod-01");
+    await expect(page.locator(".detail-layout, .list-table")).toBeVisible();
+  });
+});
+
+test.describe("a9s web UI — menu fidelity + interaction (TUI parity)", () => {
+  test("menu renders category section headers (COMPUTE, NETWORKING, …)", async ({ page }) => {
+    // Bug: the web menu was a flat list with no category grouping, while the TUI
+    // groups resource types under COMPUTE / NETWORKING / DATABASES & STORAGE / ….
+    // MenuEntry.Category was already in the ViewState; the template never used it.
+    const sections = page.locator(".menu-section");
+    await expect(sections.first()).toBeVisible();
+    const labels = (await sections.allTextContents()).map((s) => s.trim());
+    expect(labels, "menu must group under COMPUTE").toContain("COMPUTE");
+    expect(labels, "menu must group under NETWORKING").toContain("NETWORKING");
+    expect(labels.length, "expected the full TUI category set").toBeGreaterThanOrEqual(8);
+  });
+
+  test("a keypress does not synchronously flash the loading indicator", async ({ page }) => {
+    // Bug: sendAction() flipped #loading-indicator to display:block on every
+    // keydown, so every key visibly blinked "loading". Fixed by delaying the
+    // reveal ~180ms so sub-frame round-trips never show it.
+    const disp = await page.evaluate(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "j", bubbles: true }));
+      return getComputedStyle(document.getElementById("loading-indicator")!).display;
+    });
+    expect(disp, "loading indicator must not flip visible synchronously on a keypress").toBe("none");
+  });
+
+  test("vim j/k move the menu selection", async ({ page }) => {
+    const selName = async () => (await page.locator(".menu-entry.selected .name").textContent())?.trim();
+    const first = await selName();
+    await press(page, "j");
+    expect(await selName(), "j must move selection down").not.toBe(first);
+    await press(page, "k");
+    expect(await selName(), "k must move selection back up").toBe(first);
+  });
+
+  test("vim h/l are mapped (horizontal scroll) inside a list", async ({ page }) => {
+    // Bug: only ArrowLeft/ArrowRight scrolled; h/l were unmapped so they did
+    // nothing. press() waits for POST /action — pre-fix it would time out
+    // because no action was ever sent for h/l.
+    await press(page, "Enter");
+    await expect(page.locator(".list-table")).toBeVisible();
+    await press(page, "l");
+    await press(page, "h");
+  });
+
+  test("double-clicking a menu row navigates exactly one level (not two)", async ({ page }) => {
+    // Bug: clickSelect chained move-top → N×move-down → select; a double-click
+    // fired it twice and the 2nd run executed on the screen the 1st had already
+    // opened, drilling a level deeper ("double click leads to two screens away").
+    await page.locator(".menu-entry").first().dblclick();
+    await expect(page.locator(".list-table")).toBeVisible({ timeout: 10_000 });
+    await page.waitForTimeout(700); // allow any (buggy) 2nd-click chain to land
+    await expect(
+      page.locator(".detail-layout"),
+      "a double-click must not drill past the list into a detail",
+    ).toHaveCount(0);
+    await expect(page.locator(".list-table")).toBeVisible();
+  });
+
+  test("the menu shows footer key hints (ctrl+z / ctrl+r)", async ({ page }) => {
+    // Bug: ViewState.Footer was never populated by the controller, so the web
+    // footer was empty while the TUI shows 'ctrl+z Issues only' / 'ctrl+r Refresh'.
+    const footer = page.locator("#footer");
+    await expect(footer).toContainText("Issues only");
+    await expect(footer).toContainText("Refresh");
+    await expect(footer.locator(".key-hint")).toHaveCount(2);
+  });
+
+  test("ctrl+z toggles the issues-only filter from the menu", async ({ page }) => {
+    // Bug: ctrl+z (the TUI's issues-only toggle) was unmapped in the web.
+    const before = await page.locator(".menu-entry").count();
+    await press(page, "Control+z");
+    const after = await page.locator(".menu-entry").count();
+    expect(after, "ctrl+z must filter to issues-only (fewer rows)").toBeLessThan(before);
+    const allBadged = await page
+      .locator(".menu-entry")
+      .evaluateAll((rows) => rows.every((r) => !!r.querySelector(".badge")));
+    expect(allBadged, "every remaining row must carry an issue badge").toBe(true);
+  });
+
+  test("detail field cursor moves with up/down and Enter navigates the focused field", async ({ page }) => {
+    // Bug 6: the web detail had no visible left-column cursor (up/down did
+    // nothing) and Enter on a focused navigable field was a no-op — only the
+    // mouse could navigate a field.
+    await press(page, "Enter"); // menu -> ec2 list
+    await expect(page.locator(".list-table")).toBeVisible();
+    await press(page, "d"); // -> web-prod-01 detail
+    await expect(page.locator("#frame-title")).toHaveText("web-prod-01");
+
+    await press(page, "ArrowDown");
+    await expect(page.locator(".field-row.field-cursor")).toHaveCount(1);
+    const firstCursor = await page.locator(".field-row.field-cursor").textContent();
+    await press(page, "ArrowDown");
+    expect(
+      await page.locator(".field-row.field-cursor").textContent(),
+      "ArrowDown must move the field cursor to a different field",
+    ).not.toBe(firstCursor);
+
+    // Walk down onto a navigable field, then Enter must navigate.
+    for (let i = 0; i < 12; i++) {
+      if ((await page.locator(".field-row.field-cursor.field-navigable").count()) > 0) break;
+      await press(page, "ArrowDown");
+    }
+    await expect(page.locator(".field-row.field-cursor.field-navigable")).toHaveCount(1);
+    await press(page, "Enter");
+    await expect(
+      page.locator("#frame-title"),
+      "Enter on a focused navigable field must navigate away from web-prod-01",
+    ).not.toHaveText("web-prod-01");
+    await expect(page.locator(".detail-layout")).toBeVisible();
+  });
+
+  test("'!' shows the error log, not the attention filter", async ({ page }) => {
+    // Bug: '!' was wrongly mapped to toggle-attention; it is the TUI's error-log
+    // key. Demo has no errors -> an info flash, and the menu must NOT be filtered.
+    const before = await page.locator(".menu-entry").count();
+    await press(page, "!");
+    await expect(page.locator("#flash")).toHaveText("No errors this session");
+    expect(
+      await page.locator(".menu-entry").count(),
+      "'!' must not filter the menu (that is ctrl+z)",
+    ).toBe(before);
+  });
+
+  test("'t' on a resource YAML opens CloudTrail (footer hint is executable, not a no-op)", async ({ page }) => {
+    // Codex P2: the YAML/JSON footer advertised 't CloudTrail' but ActionChildView
+    // could not resolve the resource on a text screen, so 't' was a no-op.
+    // selectedResourceForAction now resolves the top text screen's resource.
+    await press(page, "Enter"); // menu -> ec2 list
+    await expect(page.locator(".list-table")).toBeVisible();
+    await press(page, "y"); // -> YAML of the selected resource
+    const yamlTitle = (await page.locator("#frame-title").textContent())?.trim();
+    await expect(page.locator("#footer")).toContainText("CloudTrail");
+    await press(page, "t"); // child-view 't' -> CloudTrail events
+    expect(
+      (await page.locator("#frame-title").textContent())?.trim(),
+      "'t' on a resource YAML must navigate to CloudTrail, not be a no-op",
+    ).not.toBe(yamlTitle);
+  });
+});
+
+test.describe("a9s web UI — command palette + input modes (TUI parity)", () => {
+  test(": opens the command palette and dispatches to the help view", async ({ page }) => {
+    // Bug: app.js never wired the ':' colon-command palette, so commands were
+    // dead in the web. The controller's ActionCommand already handled
+    // root/profile/region/theme/help/<resource-shortname> — only the renderer
+    // was missing. ':help' reaches a view a single menu Enter cannot, so it
+    // proves the command actually dispatched.
+    await page.keyboard.press(":"); // client-side bar, no POST
+    const bar = page.locator("#input-bar");
+    await expect(bar, "':' must open the command bar immediately").toBeVisible();
+    await expect(bar).toHaveText(":█");
+    await page.keyboard.type("help"); // collected locally, no POST per letter
+    await expect(bar).toHaveText(":help█");
+    await press(page, "Enter"); // POST /action {command, help}
+    await expect(
+      page.locator(".help-sections"),
+      "':help' must dispatch to the help view (unreachable by a single Enter)",
+    ).toBeVisible();
+    await expect(bar, "the input bar hides after dispatch").toBeHidden();
+  });
+
+  test(":<resource> navigates to that resource list", async ({ page }) => {
+    await page.keyboard.press(":");
+    await page.keyboard.type("ec2");
+    // The bar text before Enter proves ':' is wired — without it the keys would
+    // fall through to the keymap and this assertion would fail.
+    await expect(page.locator("#input-bar")).toHaveText(":ec2█");
+    await press(page, "Enter"); // POST /action {command, ec2}
+    await expect(
+      page.locator(".list-table"),
+      "':ec2' must open the ec2 resource list",
+    ).toBeVisible();
+  });
+
+  test("Escape cancels command mode without dispatching", async ({ page }) => {
+    await page.keyboard.press(":");
+    await page.keyboard.type("ec2");
+    await page.keyboard.press("Escape"); // command-mode Escape does NOT POST
+    await expect(page.locator("#input-bar"), "Escape hides the bar").toBeHidden();
+    await expect(
+      page.locator(".menu-entry").first(),
+      "Escape must leave us on the menu (no navigation)",
+    ).toBeVisible();
+  });
+
+  test("/ shows the filter input immediately, before the first letter", async ({ page }) => {
+    // Bug: '/' set filterMode but rendered nothing until a letter made the
+    // server-side .Filter non-empty, so the panel appeared 'only after the
+    // first letter'. The client-side bar now shows the instant '/' is pressed.
+    await press(page, "Enter"); // menu -> list
+    await expect(page.locator(".list-table")).toBeVisible();
+    await page.keyboard.press("/"); // client-side, no POST
+    const bar = page.locator("#input-bar");
+    await expect(bar, "'/' must show the filter bar immediately").toBeVisible();
+    await expect(bar, "empty buffer still shows prompt + cursor").toHaveText("/█");
+    await press(page, "a"); // typing a letter filters live + updates the bar
+    await expect(bar).toHaveText("/a█");
+  });
+
+  test("Escape closes the filter bar", async ({ page }) => {
+    await press(page, "Enter");
+    await expect(page.locator(".list-table")).toBeVisible();
+    await page.keyboard.press("/");
+    await expect(page.locator("#input-bar")).toBeVisible();
+    await press(page, "Escape"); // setFilter("") posts, then the bar hides
+    await expect(page.locator("#input-bar")).toBeHidden();
+  });
+});
+
+test.describe("a9s web UI — detail related-panel + layout (TUI parity)", () => {
+  test("Enter navigates the related row, not the left field, when related is focused", async ({ page }) => {
+    // Codex P2a: with the field cursor on a navigable left-column field, the
+    // detail template still rendered .field-cursor.field-navigable even after
+    // tabbing to the related panel, so app.js's Enter interception fired
+    // field-select and opened the LEFT field's target instead of the related
+    // row. The template now gates .field-cursor on (not RelatedFocused).
+    await press(page, "Enter"); // menu -> ec2 list
+    await press(page, "d"); // -> web-prod-01 detail
+    await expect(page.locator("#frame-title")).toHaveText("web-prod-01");
+    await expect(page.locator(".related-panel")).toBeVisible();
+
+    // Move the left field cursor onto a navigable field.
+    for (let i = 0; i < 12; i++) {
+      if ((await page.locator(".field-row.field-cursor.field-navigable").count()) > 0) break;
+      await press(page, "ArrowDown");
+    }
+    await expect(page.locator(".field-row.field-cursor.field-navigable")).toHaveCount(1);
+
+    // Tab to the related panel — the left field cursor must clear so app.js
+    // cannot field-select the now-inactive column. This count is the direct
+    // regression check: pre-fix it stayed at 1.
+    await press(page, "Tab");
+    await expect(
+      page.locator(".field-row.field-cursor"),
+      "left field cursor must clear when the related panel is focused",
+    ).toHaveCount(0);
+
+    await press(page, "Enter"); // routes to select -> navigates the related row
+    await expect(
+      page.locator("#frame-title"),
+      "Enter on the focused related row must navigate away from web-prod-01",
+    ).not.toHaveText("web-prod-01");
+  });
+
+  test("r toggles the related panel (footer advertises 'r Related', not refresh)", async ({ page }) => {
+    // Codex P2b: the detail footer advertises 'r Related' but the web keymap had
+    // r=refresh / R=toggle-related (TUI keys.go has r=ToggleRelated, ctrl+r=Refresh).
+    await press(page, "Enter"); // menu -> ec2 list
+    await press(page, "d"); // -> detail
+    await expect(page.locator(".related-panel")).toBeVisible(); // shown by default (wide viewport)
+    // r is ToggleRelated: it flips RelatedVisible, hiding the panel. A refresh
+    // would re-render the same detail and leave the panel shown.
+    await press(page, "r");
+    await expect(
+      page.locator(".related-panel"),
+      "r must toggle the related panel off, not refresh",
+    ).toHaveCount(0);
+    await press(page, "r");
+    await expect(
+      page.locator(".related-panel"),
+      "r again must toggle it back on",
+    ).toBeVisible();
+  });
+
+  test("the footer stays in the viewport on a long detail (no scroll needed)", async ({ page }) => {
+    // Bug: body used min-height:100vh, so a long body grew the page and pushed
+    // the footer below the fold ('footer visible only after long scroll'). With
+    // height:100vh and an internally-scrolling #body, the footer stays pinned.
+    await page.setViewportSize({ width: 1000, height: 400 }); // force overflow
+    await press(page, "Enter"); // menu -> ec2 list
+    await press(page, "d"); // -> a detail with many fields
+    await expect(page.locator(".detail-layout")).toBeVisible();
+    await expect(
+      page.locator("#footer"),
+      "footer must stay in the viewport without scrolling the page",
+    ).toBeInViewport();
   });
 });

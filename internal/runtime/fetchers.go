@@ -1,9 +1,6 @@
-// fetchers.go — pure fetch-execution layer for the runtime Core.
-//
-// PR-05a-h6 moves the fetch-execution logic out of internal/tui/app_fetchers.go
-// into the platform-agnostic runtime package. Each method performs the AWS call
-// and returns a raw result; adapters wrap the call in platform-specific async
-// machinery (e.g. tea.Cmd for the Bubble Tea adapter).
+// fetchers.go — pure fetch-execution layer for the runtime Core. Each method
+// performs the AWS call and returns a raw result; adapters wrap the call in
+// platform-specific async machinery (e.g. tea.Cmd for the Bubble Tea adapter).
 //
 // No Bubble Tea, Lipgloss, or Bubbles imports are permitted in this file.
 package runtime

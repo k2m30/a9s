@@ -142,11 +142,15 @@ func (m MainMenuModel) FrameTitle() string {
 }
 
 // BottomHints implements Hintable for MainMenuModel.
+// Single-sourced in app.MenuFooterHints, shared with the web footer
+// (ViewState.Footer) so the two renderers cannot drift.
 func (m MainMenuModel) BottomHints() []layout.KeyHint {
-	return []layout.KeyHint{
-		{Key: "ctrl+z", Desc: "Issues only"},
-		{Key: "ctrl+r", Desc: "Refresh"},
+	src := app.MenuFooterHints()
+	hints := make([]layout.KeyHint, len(src))
+	for i, h := range src {
+		hints[i] = layout.KeyHint{Key: h.Key, Desc: h.Help}
 	}
+	return hints
 }
 
 // CopyContent returns empty — nothing to copy from the main menu.

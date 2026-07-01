@@ -20,6 +20,11 @@ func FetchIAMGroupMembers(
 	continuationToken string,
 ) (resource.FetchResult, error) {
 	groupName := parentCtx["group_name"]
+	if groupName == "" {
+		// No group context to expand — return an empty result rather than
+		// calling GetGroup("") (which surfaces a spurious "group not found").
+		return resource.FetchResult{}, nil
+	}
 
 	input := &iam.GetGroupInput{
 		GroupName: &groupName,

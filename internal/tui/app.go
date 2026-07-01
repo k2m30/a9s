@@ -15,7 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
 // Version is set by cmd/a9s/main.go.
@@ -44,19 +43,19 @@ type errorEntry struct {
 	message string
 }
 
-// Model is the root Bubble Tea model. It owns the view stack, header state,
-// AWS clients, and routes all messages to the active child view.
+// Model is the root Bubble Tea model. It owns the renderer-state stack, header
+// state, AWS clients, and routes all messages to the headless controller.
 //
-// Session state is owned exclusively by core via *runtime.Core. The renderer
-// reads and mutates session-scoped state through the typed accessors in
-// internal/runtime/accessors.go (m.core.Profile(), m.core.ResourceCache(rt),
-// m.core.BumpRelatedGen(), etc.) — internal/session's struct shape is no
-// longer visible to the tui package. handleProfileSelected /
-// handleRegionSelected call runtime.Core.Rotate (via the orchestrator) to
-// invalidate in-flight async results on profile/region switch.
+// The stack []*rendererState replaces the former []views.View: no concrete view
+// model instances are stored between frames. All logical screen state lives in
+// the headless app.Controller; the renderer reads m.ctrl.Snapshot().Body.Kind
+// and dispatches to free render functions (renderer.go) that create transient
+// view-model instances just long enough to produce a string, then discard them.
+//
+// Session state is owned exclusively by core via *runtime.Core.
 type Model struct {
-	core    *runtime.Core    // platform-agnostic app core
-	ctrl    *app.Controller  // headless controller — single source of truth for menu + list state
+	core *runtime.Core   // platform-agnostic app core
+	ctrl *app.Controller // headless controller — single source of truth for screen state
 
 	// --- UI shell state ---
 	width  int
@@ -65,7 +64,7 @@ type Model struct {
 	appCtx    context.Context
 	appCancel context.CancelFunc
 
-	stack []views.View
+	stack []*rendererState
 
 	inputMode inputMode
 	cmdInput  textinput.Model
@@ -124,20 +123,17 @@ func New(profile, region string, opts ...Option) Model {
 
 	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
 
-	// The headless controller is the single source of truth for menu and list
-	// state. Both MainMenuModel and ResourceListModel hold no data of their
-	// own — they delegate all reads and writes through m.ctrl.
+	// The headless controller is the single source of truth for all screen state.
 	ctrl := app.New(core)
 	// Without the view config the controller's detail projection falls back to
 	// flat alphabetical fields instead of the configured per-type order.
 	ctrl.SetViewConfig(cfg)
-	menu := views.NewMainMenu(k, ctrl)
 
 	m := Model{
 		core:        core,
 		ctrl:        ctrl,
 		keys:        k,
-		stack:       []views.View{&menu},
+		stack:       []*rendererState{newMenuRS()},
 		cmdInput:    ti,
 		viewConfig:  cfg,
 		configErr:   cfgErr,
@@ -212,13 +208,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.propagateSize()
-		if d, ok := m.activeView().(*views.DetailModel); ok && d.TakePendingRelatedDispatch() {
-			src := d.SourceResource()
-			rtype := d.ResourceType()
-			return m, func() tea.Msg {
-				return messages.RelatedCheckStarted{
-					ResourceType:   rtype,
-					SourceResource: src,
+		rs := m.activeRS()
+		if rs.pendingRelated {
+			rs.pendingRelated = false
+			body := m.ctrl.Snapshot().Body
+			if body.Kind == app.BodyKindDetail && body.Detail != nil {
+				rtype := m.ctrl.GetDetailResourceType()
+				src := m.ctrl.GetDetailResource()
+				return m, func() tea.Msg {
+					return messages.RelatedCheckStarted{
+						ResourceType:   rtype,
+						SourceResource: src,
+					}
 				}
 			}
 		}
@@ -230,15 +231,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			var cmd tea.Cmd
 			m.cmdInput, cmd = m.cmdInput.Update(msg)
 			if m.inputMode == modeFilter {
-				m.applyFilterToActiveView(m.cmdInput.Value())
+				m.applyFilterToActiveRS(m.cmdInput.Value())
 			}
 			return m, cmd
 		}
-		return m.updateActiveView(msg)
+		return m.updateActiveRS(msg)
 	case messages.Navigate:
 		return m.handleNavigate(msg)
 	case messages.PopView:
-		m.popView()
+		m.popRS()
 		return m, nil
 	case messages.Flash:
 		return m.handleFlash(msg)
@@ -314,10 +315,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.cmdInput, cmd = m.cmdInput.Update(msg)
 		if m.inputMode == modeFilter {
-			m.applyFilterToActiveView(m.cmdInput.Value())
+			m.applyFilterToActiveRS(m.cmdInput.Value())
 		}
 		return m, cmd
 	}
-	return m.updateActiveView(msg)
+	return m.updateActiveRS(msg)
 }
-

@@ -9,7 +9,7 @@
 // "" from these helpers when the info cannot be resolved; honest Count: -1
 // follows.
 //
-// Concurrency note (PR-02b precedent): no top-level lock is held across the
+// Concurrency note: no top-level lock is held across the
 // "check store / fetch / set" sequence. Two concurrent Pattern C checks may
 // both observe AccountID()=="" + Err()==nil and both invoke
 // STS.GetCallerIdentity. The store itself remains correct; duplicate Set

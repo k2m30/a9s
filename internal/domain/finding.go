@@ -2,8 +2,7 @@ package domain
 
 // FindingCode is a stable identifier for a finding. Never displayed.
 // Codes are namespaced by resource short-name (e.g. "ec2.impaired",
-// "rds.maint.pending"). Phase 03 introduces these as typed constants
-// per enricher; Phase 04 may graduate them to a declarative table.
+// "rds.maint.pending"). They are declared as typed constants per enricher.
 type FindingCode string
 
 // Finding is the canonical row/menu/status semantics carrier on Resource.

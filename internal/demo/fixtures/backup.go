@@ -100,8 +100,8 @@ func buildBackupRecoveryPoints() map[string][]backuptypes.RecoveryPointByResourc
 	efsARN := "arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-0abc111111111111a"
 	return map[string][]backuptypes.RecoveryPointByResource{
 		// S3 healthy-bucket recovery point (checkS3Backup pivot).
-		// checkS3Backup reads bk.Fields["resource_arn"] which is populated in Phase 7.
-		// Adding the recovery point now so the graph is ready when Phase 7 wires the field.
+		// checkS3Backup reads bk.Fields["resource_arn"] (emitted by the backup
+		// fetcher); this recovery point is pre-set so the demo related graph renders.
 		HealthyBucketARN: {
 			{
 				RecoveryPointArn: aws.String("arn:aws:backup:us-east-1:123456789012:recovery-point:rp-s3-daily-20260416"),

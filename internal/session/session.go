@@ -15,9 +15,9 @@
 //     EnrichmentRan, EnrichmentTypeGen, EnrichmentTruncatedIDs) MUST be
 //     constructed by New(). ProbeResources and the availability/enrich queues
 //     stay nil until a probe retains its first batch — they are built in place.
-//   - EnrichmentFindings was removed in PR-03a-fold. There is no parallel
-//     EnrichmentFindings map on tui.Model or on Session; Wave 2 findings are
-//     written directly onto each cached `resource.Resource.Findings` slice
+//   - There is no parallel EnrichmentFindings map on tui.Model or on Session;
+//     Wave 2 findings are written directly onto each cached
+//     `resource.Resource.Findings` slice
 //     (Source = "wave2:<short>") and r.AttentionDetails, via applyEnrichment
 //     in internal/tui/app_enrich_fold.go. The cached rows are the authority;
 //     runtime.RuntimeState.EnrichmentFindings and PatchDetail.EnrichmentFindings
@@ -38,11 +38,10 @@ import (
 // Used to restore the list when the user re-enters the same resource type
 // from the main menu, avoiding redundant API calls.
 //
-// Defined as an alias to domain.ListViewCacheEntry in PR-05a-h4-c (AS-963)
-// so renderer adapters can construct entries without importing
-// internal/session. The existing `session.ResourceCacheEntry` name stays
-// available for callers (tests, runtime handlers) that already reference
-// it. Field set is unchanged.
+// Defined as an alias to domain.ListViewCacheEntry so renderer adapters can
+// construct entries without importing internal/session. The
+// `session.ResourceCacheEntry` name stays available for callers (tests,
+// runtime handlers) that reference it. Field set is unchanged.
 type ResourceCacheEntry = domain.ListViewCacheEntry
 
 // Session owns the in-memory orchestration state for the active
@@ -115,8 +114,8 @@ type Session struct {
 	EnrichTotal    int                            // total enrichment probes to run in current gen
 
 	// Per-type Wave 2 finding state (feature 018-enrichment-visibility).
-	// NOTE: PR-03a-fold deleted the parallel EnrichmentFindings map entirely;
-	// Wave 2 findings now live on each cached resource.Resource.Findings slice
+	// NOTE: there is no parallel EnrichmentFindings map;
+	// Wave 2 findings live on each cached resource.Resource.Findings slice
 	// (see internal/tui/app_enrich_fold.go applyEnrichment). The Wave-2 progress
 	// / control maps below remain here because they are session-scoped and are
 	// cleared on Session.Rotate() — they are not the authority for finding data.

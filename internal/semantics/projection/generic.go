@@ -14,8 +14,8 @@ import (
 
 // ─── Injectable resource-registry callbacks ───────────────────────────────
 //
-// projection cannot import internal/resource (exit criterion #5 — no import
-// cycle from internal/semantics back to internal/resource).  The callbacks
+// projection cannot import internal/resource (no import cycle from
+// internal/semantics back to internal/resource). The callbacks
 // below are set by internal/resource at init time so Generic can access
 // per-type metadata without creating that cycle.
 //
@@ -388,7 +388,7 @@ func fieldItemToDomainItem(fi fieldpath.FieldItem) domain.Item {
 	}
 }
 
-// ─── flattenTagItems (ported from detail_fields.go) ───────────────────────
+// ─── flattenTagItems ───────────────────────────────────────────────────────
 
 // flattenTagItems post-processes FieldItems to render tag sections as flat
 // Key:Value pairs instead of verbose Key/Value struct sub-fields.
@@ -494,7 +494,7 @@ func flattenTagItems(items []fieldpath.FieldItem) []fieldpath.FieldItem {
 	return result
 }
 
-// ─── expandJSONItems (ported from detail_fields.go) ───────────────────────
+// ─── expandJSONItems ───────────────────────────────────────────────────────
 
 // expandJSONItems detects JSON strings in field values and expands them as
 // YAML-formatted sub-fields.

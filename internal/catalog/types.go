@@ -127,7 +127,6 @@ type ResourceTypeDef struct {
 	// ─── Findings ──────────────────────────────────────────────────────────
 
 	// Findings is the declarative table of finding codes for this type.
-	// Graduated from Phase 03's per-enricher constants.
 	Findings []FindingDef
 }
 

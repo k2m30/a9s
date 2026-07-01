@@ -13,7 +13,7 @@ import (
 // Test: Every registered RelatedDef MUST have a live Checker.
 //
 // If Checker is nil the right column shows "—" in live mode while demo
-// mode happily shows a count. That's a bug, not a TODO.
+// mode happily shows a count. That's a bug requiring a fix, not a deferral.
 // See: https://github.com/k2m30/a9s/issues/243
 // ---------------------------------------------------------------------------
 
