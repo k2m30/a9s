@@ -335,6 +335,29 @@ func (m Model) handleDetailKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model,
 			m.ctrl.Apply(app.Action{Kind: app.ActionMoveDown})
 			rs.rightCol, _ = rs.rightCol.Update(msg)
 			return m, nil
+		case !rs.rightCol.IsFiltering() && key.Matches(msg, m.keys.Enter):
+			// Related-panel Enter: navigate using ResourceIDs from controller
+			// state (the focused ds.RelatedRows row), not the right-column
+			// widget — the renderer holds no duplicate copy of the IDs.
+			row, ok := m.ctrl.SelectedRelatedRow()
+			if !ok || !resource.IsRelatedActionable(row.Count, row.Approximate, len(row.FetchFilter) > 0, row.Loading, row.Err != "") {
+				return m, nil
+			}
+			var checker resource.RelatedChecker
+			for _, def := range resource.GetRelated(rs.resourceType) {
+				if def.TargetType == row.TargetType {
+					checker = def.Checker
+					break
+				}
+			}
+			nav := messages.RelatedNavigate{
+				TargetType:     row.TargetType,
+				SourceResource: m.ctrl.GetDetailResource(),
+				RelatedIDs:     row.ResourceIDs,
+				FetchFilter:    row.FetchFilter,
+				Checker:        checker,
+			}
+			return m, func() tea.Msg { return nav }
 		default:
 			// All other keys (including '/', character typing when filtering, Enter
 			// for navigation/confirm, Backspace) go to the right-column widget.

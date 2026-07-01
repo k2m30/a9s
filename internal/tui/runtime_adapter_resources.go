@@ -212,14 +212,6 @@ func (m Model) handleRelatedCheckResult(msg messages.RelatedCheckResult) (tea.Mo
 		msg.Result.ResourceIDs,
 		msg.Result.FetchFilter,
 	)
-	// Keep the active detail's right-column widget rows in sync so keyboard Enter
-	// has the resourceIDs to navigate: the lift renders related counts from the
-	// controller, but Enter still reads rs.rightCol. Sync only when the active
-	// detail IS this result's source — rightColumnModel.Update matches rows by
-	// TargetType alone, so feeding another detail's widget would mispopulate it.
-	if rs := m.activeRS(); rs != nil && rs.kind == rsKindDetail && m.ctrl.GetDetailResource().ID == sourceID {
-		rs.rightCol, _ = rs.rightCol.Update(msg)
-	}
 	return m, coreCmd
 }
 

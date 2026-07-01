@@ -225,25 +225,7 @@ func (c *Controller) handleActionSelect(a Action) (ViewState, []runtime.TaskRequ
 	// Related-panel Enter: when the top screen is a detail view and
 	// RelatedFocus is active, navigate to the focused related row.
 	if ds := c.topDetailState(); ds != nil && ds.RelatedFocus {
-		// Find the row at RelatedCursor using the same filter logic as
-		// detailRelatedVisibleCount.
-		query := strings.TrimSpace(strings.ToLower(ds.RelatedFilter))
-		var focusedRow *DetailRelatedRow
-		idx := 0
-		for i := range ds.RelatedRows {
-			row := &ds.RelatedRows[i]
-			if isSelfPivotZeroDetailRow(*row, ds.ResourceType) {
-				continue
-			}
-			if query != "" && !strings.Contains(strings.ToLower(row.DisplayName), query) {
-				continue
-			}
-			if idx == ds.RelatedCursor {
-				focusedRow = row
-				break
-			}
-			idx++
-		}
+		focusedRow := ds.focusedRelatedRow()
 		if focusedRow != nil && isActionableDetailRow(*focusedRow) {
 			// Derive the single target ID when there is exactly one related
 			// resource (used by NavigationKindDetail cache-hit path).

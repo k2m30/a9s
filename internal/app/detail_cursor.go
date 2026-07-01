@@ -217,3 +217,26 @@ func isSelfPivotZeroDetailRow(row DetailRelatedRow, sourceType string) bool {
 func isActionableDetailRow(row DetailRelatedRow) bool {
 	return resource.IsRelatedActionable(row.Count, row.Approximate, len(row.FetchFilter) > 0, row.Loading, row.Err != "")
 }
+
+// focusedRelatedRow returns the related row under RelatedCursor honoring the
+// active RelatedFilter and self-pivot suppression (the same visibility logic as
+// detailRelatedVisibleCount), or nil when the cursor points past the visible
+// rows.
+func (ds *DetailState) focusedRelatedRow() *DetailRelatedRow {
+	query := strings.TrimSpace(strings.ToLower(ds.RelatedFilter))
+	idx := 0
+	for i := range ds.RelatedRows {
+		row := &ds.RelatedRows[i]
+		if isSelfPivotZeroDetailRow(*row, ds.ResourceType) {
+			continue
+		}
+		if query != "" && !strings.Contains(strings.ToLower(row.DisplayName), query) {
+			continue
+		}
+		if idx == ds.RelatedCursor {
+			return row
+		}
+		idx++
+	}
+	return nil
+}

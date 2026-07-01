@@ -475,9 +475,10 @@ func (m Model) handleCopy() (tea.Model, tea.Cmd) {
 		content, label = r.ID, "Copied: "+r.ID
 	case rsKindDetail:
 		if rs.rightCol.IsFocused() {
-			name := rs.rightCol.SelectedTypeName()
-			if name != "" {
-				content, label = name, "Copied: "+name
+			// Copy the focused related row's name from controller state (the
+			// same row the renderer highlights), not the right-column widget.
+			if row, ok := m.ctrl.SelectedRelatedRow(); ok && row.DisplayName != "" {
+				content, label = row.DisplayName, "Copied: "+row.DisplayName
 			}
 			break
 		}
