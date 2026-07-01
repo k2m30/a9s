@@ -290,9 +290,10 @@ func (c *Controller) applyRelatedNavResult(res runtime.NavigationResult) []runti
 			// target's detail once the fetched row arrives — the TUI drills to
 			// by-ID detail in its own adapter and never reaches this path.
 			if res.TargetID != "" && resource.GetFetchByIDs(res.TargetType) != nil {
-				if len(ls.RelatedIDSet) == 0 {
-					ls.RelatedIDSet = map[string]struct{}{res.TargetID: {}}
-				}
+				// Always key on TargetID: autoOpenSingleDetail matches ls.Rows
+				// against this set and the KindFetchByIDDetail task fetches by
+				// TargetID, so the set must reference that same ID.
+				ls.RelatedIDSet = map[string]struct{}{res.TargetID: {}}
 				ls.AutoOpenSingle = true
 			}
 		}
