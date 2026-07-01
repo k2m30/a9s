@@ -201,6 +201,11 @@ func (m Model) headerRight() string {
 	}
 	// Show search state from active rendererState.
 	rs := m.activeRS()
+	// An active related-panel filter input on a detail screen is the current
+	// user action — show it ahead of a lingering left-panel search indicator.
+	if rs.kind == rsKindDetail && rs.rightCol.IsFiltering() {
+		return styles.FilterActive.Render("/" + rs.rightCol.FilterQuery())
+	}
 	if rs.search.IsInputMode() {
 		return styles.FilterActive.Render("/" + rs.search.Query())
 	}
