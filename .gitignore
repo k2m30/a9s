@@ -11,6 +11,11 @@ vendor/
 /preview_detail
 /preview-pagination
 /related-resources-preview
+/snapshot
+/checklist
+
+# Real-account snapshots + derived checklists (real resource names) — local only
+tests/e2e/testdata/snapshot/
 
 # IDE
 .vscode/

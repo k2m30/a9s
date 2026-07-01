@@ -43,14 +43,14 @@ type sessionEntry struct {
 // browser session (keyed by session cookie).
 type Server struct {
 	// opts supplied at construction time.
-	profile      string
-	region       string
-	command      string
-	demoMode     bool
-	noCache      bool
-	allowReveal  bool
-	addr         string
-	viewCfg      *config.ViewsConfig
+	profile     string
+	region      string
+	command     string
+	demoMode    bool
+	noCache     bool
+	allowReveal bool
+	addr        string
+	viewCfg     *config.ViewsConfig
 
 	// token is the random per-run auth token embedded into every served page.
 	token string
