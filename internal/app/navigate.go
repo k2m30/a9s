@@ -318,6 +318,7 @@ func (c *Controller) applyRelatedNavResult(res runtime.NavigationResult) []runti
 				top.Ctx.ResourceType = res.TargetType
 				if top.State.List == nil {
 					top.State.List = &ListState{Loading: true}
+					applyListDefaults(top.State.List, top.Ctx.ResourceType)
 				}
 				if res.FetchFilter != nil {
 					top.State.List.ParentContext = res.FetchFilter
