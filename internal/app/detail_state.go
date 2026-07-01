@@ -387,6 +387,26 @@ func (c *Controller) GetDetailResourceType() string {
 	return ds.ResourceType
 }
 
+// SelectedRelatedRow returns a copy of the related row currently under the
+// cursor on the top detail screen when the related panel has focus. ok is
+// false when the top screen is not a focused detail related panel or the
+// cursor points past the visible rows. The TUI Enter and yank paths use this
+// to source navigation/copy data (ResourceIDs, FetchFilter, DisplayName) from
+// controller state rather than the renderer's right-column widget.
+func (c *Controller) SelectedRelatedRow() (DetailRelatedRow, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	ds := c.topDetailState()
+	if ds == nil || !ds.RelatedFocus {
+		return DetailRelatedRow{}, false
+	}
+	row := ds.focusedRelatedRow()
+	if row == nil {
+		return DetailRelatedRow{}, false
+	}
+	return *row, true
+}
+
 // DetailFrameTitle returns the frame-border title for the top detail screen.
 // Returns an empty string when the top screen is not a detail screen.
 func (c *Controller) DetailFrameTitle() string {
