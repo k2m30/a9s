@@ -1,8 +1,8 @@
 // policy_store.go — session-scoped IAM policy resource cache with per-phase
 // build memoization.
 //
-// Made load-bearing in PR-02b (replaces the package-level globals in
-// internal/aws/iam_policies.go).
+// Replaces the package-level globals that previously lived in
+// internal/aws/iam_policies.go.
 package session
 
 import (

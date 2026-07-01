@@ -15,9 +15,9 @@
 //     EnrichmentRan, EnrichmentTypeGen, EnrichmentTruncatedIDs) MUST be
 //     constructed by New(). ProbeResources and the availability/enrich queues
 //     stay nil until a probe retains its first batch — they are built in place.
-//   - EnrichmentFindings was removed in PR-03a-fold. There is no parallel
-//     EnrichmentFindings map on tui.Model or on Session; Wave 2 findings are
-//     written directly onto each cached `resource.Resource.Findings` slice
+//   - There is no parallel EnrichmentFindings map on tui.Model or on Session;
+//     Wave 2 findings are written directly onto each cached
+//     `resource.Resource.Findings` slice
 //     (Source = "wave2:<short>") and r.AttentionDetails, via applyEnrichment
 //     in internal/tui/app_enrich_fold.go. The cached rows are the authority;
 //     runtime.RuntimeState.EnrichmentFindings and PatchDetail.EnrichmentFindings
@@ -114,8 +114,8 @@ type Session struct {
 	EnrichTotal    int                            // total enrichment probes to run in current gen
 
 	// Per-type Wave 2 finding state (feature 018-enrichment-visibility).
-	// NOTE: PR-03a-fold deleted the parallel EnrichmentFindings map entirely;
-	// Wave 2 findings now live on each cached resource.Resource.Findings slice
+	// NOTE: there is no parallel EnrichmentFindings map;
+	// Wave 2 findings live on each cached resource.Resource.Findings slice
 	// (see internal/tui/app_enrich_fold.go applyEnrichment). The Wave-2 progress
 	// / control maps below remain here because they are session-scoped and are
 	// cleared on Session.Rotate() — they are not the authority for finding data.

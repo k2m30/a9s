@@ -1,7 +1,7 @@
 // rule_set_store.go — session-scoped SES receipt rule set cache.
 //
-// Wired by PR-02d (replaces the package-level globals previously in
-// internal/aws/ses_related.go: sesRuleSetCacheMu, sesRuleSetCaches map keyed
+// Replaces the package-level globals that previously lived in
+// internal/aws/ses_related.go (sesRuleSetCacheMu, sesRuleSetCaches map keyed
 // by *ServiceClients pointer).
 package session
 

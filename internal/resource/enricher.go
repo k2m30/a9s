@@ -9,7 +9,7 @@ import (
 
 // DetailEnricher is the function signature for on-demand detail enrichers.
 // Declaration lives in internal/domain/contracts.go; this alias keeps
-// existing consumers compiling. Deleted in PR-04n.
+// existing consumers compiling.
 type DetailEnricher = domain.DetailEnricher
 
 var detailEnricherRegistry = map[string]DetailEnricher{}
