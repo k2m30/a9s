@@ -388,7 +388,7 @@ func fieldItemToDomainItem(fi fieldpath.FieldItem) domain.Item {
 	}
 }
 
-// ─── flattenTagItems (ported from detail_fields.go) ───────────────────────
+// ─── flattenTagItems ───────────────────────────────────────────────────────
 
 // flattenTagItems post-processes FieldItems to render tag sections as flat
 // Key:Value pairs instead of verbose Key/Value struct sub-fields.
@@ -494,7 +494,7 @@ func flattenTagItems(items []fieldpath.FieldItem) []fieldpath.FieldItem {
 	return result
 }
 
-// ─── expandJSONItems (ported from detail_fields.go) ───────────────────────
+// ─── expandJSONItems ───────────────────────────────────────────────────────
 
 // expandJSONItems detects JSON strings in field values and expands them as
 // YAML-formatted sub-fields.

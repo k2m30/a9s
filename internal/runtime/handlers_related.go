@@ -1,7 +1,5 @@
-// handlers_related.go — RelatedNavigateEvent dispatch.
-//
-// PR-05a-h4 moves the related-navigation entry point out of internal/tui per
-// the Phase 05 boundary contract (docs/refactor/05-boundary.md §"5a-extract").
+// handlers_related.go — RelatedNavigateEvent dispatch (platform-agnostic; no
+// Bubble Tea imports).
 //
 //   HandleRelatedNavigate — resolves the navigation kind from the session
 //                           cache and returns the decision plus any fetch
@@ -74,7 +72,7 @@ const (
 	// KindFetchMore asks the adapter to fetch the next page of resources for
 	// the type named by TaskKey.Scope. The continuation token rides on the
 	// TaskRequest as a FetchMorePayload so the runtime is the single decision-
-	// maker and the adapter is a pure mechanical translator (AS-270).
+	// maker and the adapter is a pure mechanical translator.
 	KindFetchMore TaskKind = "fetch-more"
 
 	// KindFetchByIDDetail asks the adapter to fetch a single resource by exact
@@ -115,10 +113,6 @@ func (FetchByIDDetailPayload) isTaskPayload() {}
 
 // HandleRelatedNavigate resolves the navigation kind using the session cache
 // and returns the decision plus any fetch tasks the adapter should start.
-//
-// Receiver migrated from *Model to *Core per docs/refactor/05-boundary.md.
-// Session fields (ResourceCache, LazyResourceCache) are accessed through
-// c.session instead of the previously-embedded model fields.
 //
 // View construction and Bubble Tea specifics remain in the TUI adapter so this
 // handler is platform-agnostic and testable without standing up Bubble Tea.
@@ -214,7 +208,7 @@ func relatedFetchTasks(s *session.Session, targetType string, relatedIDs []strin
 	}
 
 	// Some IDs are missing. If the cache has more pages, ask for more and
-	// carry the continuation token as a structured payload (AS-270)
+	// carry the continuation token as a structured payload
 	// so the adapter is a pure pass-through.
 	if entry != nil && entry.Pagination != nil && entry.Pagination.IsTruncated {
 		return []TaskRequest{{
@@ -258,10 +252,9 @@ func relatedCacheSnapshot(s *session.Session) map[string][]resource.Resource {
 }
 
 // ResolveRelatedNavigate computes the navigation kind for a RelatedNavigateEvent
-// against a flat resource-cache snapshot. After AS-150 it is the SSOT for
-// related-navigation resolution; the prior internal/tui resolver was deleted in
-// the same PR. Exported so tests/unit can drive it without reaching into
-// runtime internals.
+// against a flat resource-cache snapshot. It is the SSOT for
+// related-navigation resolution. Exported so tests/unit can drive it without
+// reaching into runtime internals.
 //
 // Related-navigation contract (#278):
 //

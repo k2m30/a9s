@@ -51,7 +51,6 @@ func (c *Core) Types() []catalog.ResourceTypeDef { return c.types }
 // inbound event. It returns the UI intents to apply and the background
 // tasks to start.
 //
-// Handler wiring is added incrementally by the per-handler PRs (AS-72-h1..h8).
 // Unrecognised event types fall through to the nil, nil default.
 //
 // Messages NOT wired here (skipped — double-dispatch risk):

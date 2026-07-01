@@ -9,9 +9,6 @@ import (
 // they need a one-shot read of runtime state (initial mount, debug
 // overlays, future IPC bridges). It is a snapshot, not a live handle —
 // adapters should still react to UIIntent for incremental updates.
-//
-// Per-handler PRs (AS-72-h1..h8) populate the fields below as the
-// corresponding handler logic moves out of internal/tui.
 type RuntimeState struct {
 	// ResourceCache mirrors session.Session.ResourceCache for the active
 	// session: per-resource-type cached list state.

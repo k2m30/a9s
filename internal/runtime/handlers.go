@@ -1,16 +1,15 @@
-// handlers.go — shell-level handler bodies ported from internal/tui in
-// Phase-05 PR-05a-h3 (AS-315b / AS-324) and PR-05a-h4-a (AS-650 / AS-769).
+// handlers.go — shell-level handler bodies for the platform-agnostic Core.
 //
-// Each ported handler is a (c *Core) Handle* method that consumes a typed
+// Each handler is a (c *Core) Handle* method that consumes a typed
 // runtime event, applies session-scoped state changes, and returns
-// ([]UIIntent, []TaskRequest) so the platform-agnostic core stays free of
+// ([]UIIntent, []TaskRequest) so the core stays free of
 // Bubble Tea / Lipgloss / Bubbles types. The TUI adapter wraps each handler
-// in a thin (≤12-line) (tea.Model, tea.Cmd) shim that translates the
+// in a thin (tea.Model, tea.Cmd) shim that translates the
 // adapter's messages.* into the runtime event, calls the Core method, and
 // translates the returned intents and tasks back into adapter-visible side
 // effects.
 //
-// What lives here (post h3 + h4-a):
+// What lives here:
 //
 //	HandleFlash          — flash gen bump + history; schedules ClearFlash tick.
 //	HandleClearFlash     — flash auto-clear honouring the session-owned gen.
@@ -18,20 +17,18 @@
 //	HandleClientsReady   — clients/identity wiring + post-connect refresh / boot.
 //	HandleProfileSelected— rotate, rollback latch, request reconnect.
 //	HandleRegionSelected — mirror of HandleProfileSelected for region.
-//	HandleProfilesLoaded — emits PushScreen{ScreenProfileSelector,...} (h4-a).
-//	HandleValueRevealed  — emits PushScreen{ScreenReveal,...} or FlashIntent (h4-a).
-//	HandleEnterChildView — emits PushScreen{ScreenChildList,...} + fetch task (h4-a).
-//	HandleThemeSelected  — emits TaskKindReadThemeFile (h4-a).
+//	HandleProfilesLoaded — emits PushScreen{ScreenProfileSelector,...}.
+//	HandleValueRevealed  — emits PushScreen{ScreenReveal,...} or FlashIntent.
+//	HandleEnterChildView — emits PushScreen{ScreenChildList,...} + fetch task.
+//	HandleThemeSelected  — emits TaskKindReadThemeFile.
 //	HandleThemeFileRead  — parses YAML; on parse OK emits Apply/Pop/Flash +
 //	                       Save task; on parse fail emits error flash only
-//	                       (Save is gated on parse success — AS-784).
+//	                       (Save is gated on parse success).
 //
-// What stays in the TUI adapter (out of scope):
+// What stays in the TUI adapter:
 //
 //   - handleKeyMsg (keyboard dispatch) — owns key.Matches semantics on
 //     adapter-owned tea types.
-//   - The Update()-switch session-mutation extraction (ResourcesLoaded,
-//     RelatedCheckResult, IdentityLoaded, EnrichDetailResult) — PR-05a-h4-b.
 package runtime
 
 import (
@@ -401,7 +398,7 @@ func (c *Core) HandleProfileSelected(ev ProfileSelectedEvent) ([]UIIntent, []Tas
 // ProfilesLoadedEvent / ValueRevealedEvent / EnterChildViewEvent /
 // ThemeSelectedEvent / ThemeFileReadEvent — adapter-translated forms of
 // the corresponding messages.* (and TUI-private profilesLoadedMsg) for
-// the four h3-deferred view-stack handlers ported in PR-05a-h4-a.
+// the view-stack handlers.
 
 // ProfilesLoadedEvent carries the list of AWS profiles the adapter loaded
 // from disk. HandleProfilesLoaded emits a PushScreen{ScreenProfileSelector}
@@ -439,10 +436,10 @@ type ThemeSelectedEvent struct {
 // ThemeFileReadEvent carries the bytes read from disk in response to
 // the read task, together with any I/O error. HandleThemeFileRead
 // branches on Err: read failure emits a flash error; read success emits
-// ApplyThemeIntent (Option B carries Bytes + Name, adapter re-parses
+// ApplyThemeIntent (carries Bytes + Name; the adapter re-parses
 // via styles.ThemeFromYAML before applying), PopSelectorIntent, a
 // success FlashIntent ("Theme: <name>"), and a TaskKindSaveThemeConfig
-// task. See docs/refactor/05-pr-05a-h4.md §"Theme-selected split".
+// task.
 type ThemeFileReadEvent struct {
 	Theme string
 	Bytes []byte
@@ -551,16 +548,13 @@ func (c *Core) HandleThemeSelected(ev ThemeSelectedEvent) ([]UIIntent, []TaskReq
 //     PopSelectorIntent, success FlashIntent ("Theme: <name>"), and a
 //     TaskKindSaveThemeConfig task that persists the choice to config.yaml.
 //
-// The parse-then-emit ordering is the AS-784 fix for the AS-769 invariant
-// violation: the pre-fix handler emitted Save unconditionally on read
-// success, so a malformed-YAML theme would be persisted to disk even though
-// the adapter rejected the apply.
+// The parse-then-emit ordering matters: emitting Save unconditionally on
+// read success would persist a malformed-YAML theme to disk even though the
+// adapter rejected the apply, so Save is gated on a successful parse.
 //
-// PR-05a-h4-a Option B-bytes-carry keeps ApplyThemeIntent's payload as raw
-// bytes (the adapter does the second parse for the renderer state); the
-// save-fail UX delta (theme stays applied for the session even if config
-// save fails) is documented in docs/refactor/05-pr-05a-h4.md §"Theme-
-// selected split".
+// ApplyThemeIntent's payload carries raw bytes (the adapter does the second
+// parse for the renderer state); the save-fail UX delta is that the theme
+// stays applied for the session even if the config save fails.
 func (c *Core) HandleThemeFileRead(ev ThemeFileReadEvent) ([]UIIntent, []TaskRequest) {
 	if ev.Err != nil {
 		return []UIIntent{FlashIntent{

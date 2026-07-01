@@ -2,9 +2,9 @@ package runtime
 
 // handlers_availability.go — app-core availability + Wave-2 enrichment handlers.
 //
-// Moved from internal/tui/app_handlers_availability.go.  Receiver changed from
-// *Model to *Core; field accesses go through c.session; view updates are
-// returned as []UIIntent; async probe dispatch is returned as []TaskRequest.
+// These are (c *Core) handlers reading session state via c.session; view
+// updates are returned as []UIIntent and async probe dispatch as
+// []TaskRequest.
 //
 // Handler dispatch:
 //
@@ -306,8 +306,8 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		}
 		c.session.EnrichmentTruncatedIDs[msg.ResourceType] = msg.TruncatedIDs
 
-		// Site 3 (Wave-2 bridge, PR-03a-fold): applyEnrichment directly mutates
-		// r.Findings and r.AttentionDetails on every cached row of this type.
+		// applyEnrichment directly mutates r.Findings and r.AttentionDetails on
+		// every cached row of this type.
 		c.applyEnrichment(msg.ResourceType, msg.Findings, msg.AttentionDetails)
 
 		// Merge FieldUpdates into ProbeResources and ResourceCache.

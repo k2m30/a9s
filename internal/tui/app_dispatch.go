@@ -229,8 +229,8 @@ func (m *Model) applyTheme(v runtime.ApplyThemeIntent) tea.Cmd {
 // single tea.Cmd (or nil when the slice is empty). The TaskKind switch
 // matches the symmetric runtimeTasksToCmd in runtime_adapter.go used
 // by handleEnrichDetail; this dispatcher additionally covers the
-// availability/enrich probe + save-cache tasks emitted by the h3 +
-// h4-a handlers, which the singular dispatcher does not route.
+// availability/enrich probe + save-cache tasks that the singular
+// dispatcher does not route.
 func (m *Model) tasksToCmd(tasks []runtime.TaskRequest) tea.Cmd {
 	var cmds []tea.Cmd
 	for _, req := range tasks {
@@ -299,7 +299,7 @@ func (m Model) executeTaskCmd(req runtime.TaskRequest) tea.Cmd {
 // the returned UIIntents to the view tree, and converts TaskRequests
 // to tea.Cmds. Used by the Update() switch for messages routed
 // entirely through the orchestrator (availability/enrichment events,
-// identity loaded/error post-h4-b).
+// identity loaded/error).
 func (m Model) coreUpdate(msg messages.Event) (tea.Model, tea.Cmd) {
 	intents, tasks := m.core.HandleEvent(msg)
 	cmds := m.applyIntents(intents)

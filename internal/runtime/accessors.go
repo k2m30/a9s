@@ -1,14 +1,12 @@
-// accessors.go — PR-05a-h4-c (AS-963) typed Core accessors.
+// accessors.go — typed Core accessors.
 //
-// Exports a typed read/write surface on *Core that lifts every session-state
-// read or mutation the renderer used to do via `m.core.Session().<Field>`.
-// After h4-c the renderer never reaches through Core into Session — the
+// Exports a typed read/write surface on *Core for every session-state read or
+// mutation, so the renderer never reaches through Core into Session — the
 // accessors here, the ServiceClients alias in transport.go, and the
 // related-cache helpers in relatedcache.go are the entire renderer-facing
 // surface that replaces direct session-shape coupling.
 //
-// The accessor list covers the field set the renderer actually touches
-// (see docs/refactor/05-pr-05a-h4.md §2 and CodeReviewer's AS-963 verdict).
+// The accessor list covers the field set the renderer actually touches.
 // Convenience constructors that internalise session.New() also live here so
 // the renderer's Model construction path does not need to import
 // internal/session.

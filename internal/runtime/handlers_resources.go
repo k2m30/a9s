@@ -1,7 +1,7 @@
-// handlers_resources.go — PR-05a-h4-b (AS-962) Update()-switch extraction.
+// handlers_resources.go — Update()-switch session-mutation handlers.
 //
-// Ports five inline-mutation branches off internal/tui/app.go's Update()
-// switch into platform-agnostic (c *Core) Handle* methods:
+// Platform-agnostic (c *Core) Handle* methods for the five resource/detail
+// mutation events the TUI adapter forwards from its Update() switch:
 //
 //	HandleResourcesLoaded     — ResourceCache write-through + Wave-2 probe
 //	                            re-dispatch on enrichment-rerun token match.
@@ -12,18 +12,17 @@
 //	                            (renderer reads the mirror, not awsclient).
 //	HandleIdentityError       — fetch-flag clear; adapter handles view note.
 //
-// Plus two utility methods used by the adapter after h4-b:
+// Plus two utility methods used by the adapter:
 //
 //	(*Core).AllRegions        — call-through to awsclient.AllRegions so the
-//	                            adapter can drop its internal/aws import in h4-c.
+//	                            adapter need not import internal/aws.
 //	(*Core).ResetRuleSets     — session.RuleSets swap + Clients rewire (used
 //	                            by SES refresh paths in handleRefresh).
 //
-// Companion file: handlers.go owns the h3 + h4-a ports. Splitting the
-// five h4-b methods into a sibling file mirrors the existing
-// handlers_availability.go / handlers_navigate.go / handlers_related.go
-// organisation: each shell-level concern lives in its own file so a Core
-// handler grep stays narrow.
+// Companion file: handlers.go owns the flash / session / view-stack
+// handlers. Each shell-level concern lives in its own file (alongside
+// handlers_availability.go / handlers_navigate.go / handlers_related.go)
+// so a Core handler grep stays narrow.
 package runtime
 
 import (
@@ -151,8 +150,8 @@ type RelatedCheckResultEvent struct {
 // async related-check result. The actual session writes are emitted as
 // intents (PatchRelatedCache, PatchResourceCache, PatchLazyResourceCache)
 // so applyIntents is the single locus of session-cache mutation; this
-// keeps the handler-result graph diff-able and shapes h4-c's eventual
-// "Session() accessor goes away" move into one place. The adapter shim
+// keeps the handler-result graph diff-able and keeps session-cache
+// mutation in one place. The adapter shim
 // still routes the message through updateActiveView after applying the
 // returned intents so the detail view's right-column model receives
 // the result.
@@ -267,8 +266,7 @@ type IdentityLoadedEvent struct {
 // state, clears IdentityFetching, and emits SetIdentityIntent paired with
 // HeaderInvalidateIntent so the next View() picks up the new badge / role.
 // A nil or wrong-typed Identity clears IdentityFetching but emits no
-// further intents — the adapter sees the same observable result as the
-// pre-h4-b inline assertion (which silently dropped non-matching types).
+// further intents — a non-matching Identity type is silently dropped.
 func (c *Core) HandleIdentityLoaded(ev IdentityLoadedEvent) ([]UIIntent, []TaskRequest) {
 	c.session.IdentityFetching = false
 	awsID, ok := ev.Identity.(*awsclient.CallerIdentity)
@@ -303,8 +301,7 @@ func (c *Core) HandleIdentityError(ev IdentityErrorEvent) ([]UIIntent, []TaskReq
 
 // AllRegions returns the commercial-partition region catalogue. Exposed
 // on Core so the adapter does not need to import internal/aws directly
-// for the region selector — h4-c uses this to drop the awsclient import
-// from runtime_adapter_navigate.go.
+// for the region selector.
 func (c *Core) AllRegions() []awsclient.AWSRegion {
 	return awsclient.AllRegions()
 }
@@ -315,7 +312,7 @@ func (c *Core) AllRegions() []awsclient.AWSRegion {
 // completion. Called by the SES refresh paths in handleRefresh (detail
 // view and resource list view, when ResourceType == "ses"). Exposed on
 // Core so the adapter does not need to import internal/session for the
-// NewRuleSetStore call — h4-c uses this to shrink the session import.
+// NewRuleSetStore call.
 func (c *Core) ResetRuleSets() {
 	c.session.RuleSets = session.NewRuleSetStore()
 	if c.session.Clients != nil {

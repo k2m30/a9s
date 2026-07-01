@@ -4,10 +4,10 @@ package catalog
 // SetTypes (called from aws.Install at program start / TestMain). All Find /
 // All / ByCategory / AllShortNames lookups read from this slice.
 //
-// AS-795a moved the per-category catalog data into internal/aws/ to break the
+// The per-category catalog data lives in internal/aws/ (not here) to break the
 // `catalog → aws` cycle that direct fetcher references would otherwise force.
-// The data slice is now installed at startup via aws.Install() instead of
-// being computed at package-init time in this file.
+// The data slice is installed at startup via aws.Install() rather than
+// computed at package-init time in this file.
 var registry []ResourceTypeDef //nolint:gochecknoglobals // process-scope catalog: set once at startup
 
 // childRegistry is the installed child-type catalog. Populated exactly once by
@@ -132,8 +132,7 @@ func FindChild(name string) *ResourceTypeDef {
 
 // AllChildren returns the installed child-type catalog as a slice. The order
 // is not stable — child types are stored in a map for ShortName lookup. Use
-// only for replay walks (e.g. the AS-795 legacy-bridge) where iteration order
-// is irrelevant.
+// only for replay walks where iteration order is irrelevant.
 //
 // Panics if SetChildTypes has not been called.
 func AllChildren() []ResourceTypeDef {
