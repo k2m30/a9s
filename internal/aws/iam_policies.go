@@ -155,7 +155,7 @@ func FetchIAMPoliciesPage(ctx context.Context, api IAMListPoliciesAPI, continuat
 // last-write-wins on identical data, so the final cache state is consistent;
 // (c) introducing a sync.Once or
 // build-in-progress flag would re-couple the transport layer to a session
-// concern that PR-02b explicitly removed. Same applies to InlineBuilt.
+// concern the transport layer should not own. Same applies to InlineBuilt.
 func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string, store iamPolicyStore) ([]resource.Resource, error) {
 	if len(ids) == 0 {
 		return nil, nil

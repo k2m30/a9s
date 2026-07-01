@@ -97,7 +97,7 @@ func FetchEBEnvironmentsPage(ctx context.Context, api EBDescribeEnvironmentsAPI,
 		r := resource.Resource{
 			ID:   envID,
 			Name: envName,
-			// Status: removed — PR-03b migrates fetcher to Findings for lifecycle states.
+			// Status intentionally unset — lifecycle state is emitted as a Finding.
 			Fields: map[string]string{
 				"environment_name": envName,
 				"environment_id":   envID,

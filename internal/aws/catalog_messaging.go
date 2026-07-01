@@ -11,14 +11,8 @@ import (
 )
 
 // messagingChildTypes is the declarative child-type catalog for the MESSAGING
-// category. Appended to allChildTypes() in install.go alongside the other
-// per-category child slices (containers, …) introduced by AS-808.
-//
-// AS-812 PR #402 round 2 (CTO arbitration 2026-05-22T01:46Z): eb_rule_targets
-// migrates here from eb_rule_targets.go's init() body. Identity / Columns /
-// CopyField preserved from the removed SetChildTypeForTest call; FieldKeys and
-// ChildFetcher carried over from the removed SetFieldKeysForTest /
-// SetPaginatedChildForTest calls.
+// category, appended to allChildTypes() in install.go alongside the other
+// per-category child slices.
 var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
 		Name:      "EB Rule Targets",
@@ -154,7 +148,7 @@ func colorMSK(r domain.Resource) domain.Color {
 }
 
 func colorSES(r domain.Resource) domain.Color {
-	// AS-1397: Wave-2 SES findings (account SHUTDOWN/PROBATION/quota) live in
+	// Wave-2 SES findings (account SHUTDOWN/PROBATION/quota) live in
 	// r.Findings with Source="wave2:ses"; FieldUpdates["status"] is no longer
 	// written. Wave-1 (verification/sending) is in Fields["status"] from the
 	// SES fetcher's sesTopPhrase. Wave-2 wins when present — Severity drives
@@ -294,12 +288,9 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 	},
 	{
-		// Elastic Beanstalk migrates from catalog_compute.go → catalog_messaging.go
-		// per AS-795 §3 spec row (messaging category lists eb) + CTO arbitration
-		// on AS-812 PR #402 round 2 (2026-05-22T01:46Z). Category is now
-		// MESSAGING to keep the main menu's category-grouping contiguous
-		// (TestQA_MainMenu_CategoryOrderMatchesSpec). Identity / Columns / Color
-		// preserved from the removed catalog_compute.go entry.
+		// Elastic Beanstalk lives in the MESSAGING category (not compute) so the
+		// main menu's category grouping stays contiguous
+		// (TestQA_MainMenu_CategoryOrderMatchesSpec).
 		Name:          "Elastic Beanstalk",
 		ShortName:     "eb",
 		Aliases:       []string{"eb", "beanstalk", "elastic-beanstalk"},

@@ -1,5 +1,5 @@
 // ecs_task_codes.go — canonical FindingCode constants for the ecs-task resource type.
-// Phase 03 PR-03c. The fetcher writes Findings using these codes; the
+// The fetcher writes Findings using these codes; the
 // ecs-task Color func reads wave1 Findings (Source == "wave1") to color rows.
 //
 // NOTE: RUNNING and STOPPED are lifecycle states with no Finding emitted.

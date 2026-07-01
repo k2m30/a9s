@@ -2,11 +2,10 @@
 // the IssueEnricher metadata struct, InFetcherWave2Sentinel, the result/func
 // contracts, and truly-shared helpers used by more than one enricher file.
 //
-// AS-795n removed the legacy package-init IssueEnricherRegistry map and the
-// registerIssueEnricher helper. Wave 2 enricher registrations now live as
-// the Wave2 field on each catalog.ResourceTypeDef literal in the
-// catalog_<category>.go files. Read access goes through
-// awsclient.Wave2EnricherFor / awsclient.AllWave2 in wave2.go.
+// Wave 2 enricher registrations live as the Wave2 field on each
+// catalog.ResourceTypeDef literal in the catalog_<category>.go files. Read
+// access goes through awsclient.Wave2EnricherFor / awsclient.AllWave2 in
+// wave2.go.
 package aws
 
 import (
@@ -41,11 +40,6 @@ type IssueEnricher struct {
 // must omit the Wave2 field entirely; this sentinel is reserved for the
 // in-fetcher case. Returns zero findings, zero issues, not truncated, never
 // fails. Tests use it as a benign Fn fixture too.
-//
-// Renamed in AS-731 to make the in-fetcher contract explicit; the prior
-// name read as "no-op" and prompted the question "why is a no-op enricher
-// in the catalog at all?" during review. The rename also satisfies the
-// AS-731 zero-hit grep gate for the prior name in internal/.
 func InFetcherWave2Sentinel(_ context.Context, _ *ServiceClients, _ []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	return IssueEnricherResult{
 		Findings:         map[string]domain.Finding{},
@@ -82,10 +76,9 @@ func formatDate(t interface{ Format(string) string }) string {
 }
 
 // setWave2Finding writes a Wave-2 Finding + AttentionDetail pair into the
-// IssueEnricherResult maps. AS-1395 helper that keeps per-file migration
-// uniform: every enricher constructs its emission via this helper rather than
-// re-implementing the glyph→Severity mapping and the AttentionDetail{Rows: …}
-// packing in every file.
+// IssueEnricherResult maps. Every enricher constructs its emission via this
+// helper rather than re-implementing the glyph→Severity mapping and the
+// AttentionDetail{Rows: …} packing in every file.
 //
 // severityGlyph: "!" → SevBroken, "~" → SevWarn, otherwise → SevDim. Matches
 // the legacy EnrichmentFinding.Severity glyph contract used by per-enricher

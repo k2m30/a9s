@@ -98,7 +98,7 @@ func FetchAutoScalingGroupsPage(ctx context.Context, api ASGDescribeAutoScalingG
 		r := resource.Resource{
 			ID:   asgName,
 			Name: asgName,
-			// Status: removed — PR-03b migrates fetcher to Findings for lifecycle states.
+			// Status intentionally unset — lifecycle state is emitted as a Finding.
 			Fields: map[string]string{
 				"asg_name":                  asgName,
 				"min_size":                  minSize,
@@ -113,7 +113,7 @@ func FetchAutoScalingGroupsPage(ctx context.Context, api ASGDescribeAutoScalingG
 			RawStruct: asg,
 		}
 
-		// Phase 03 PR-03b: emit canonical Findings for "Delete in progress".
+		// emit canonical Findings for "Delete in progress".
 		// Empty status → healthy (no Finding). Structural signals (unhealthy
 		// instance count, in_service < min) are handled by the Color func.
 		if status == "Delete in progress" {
