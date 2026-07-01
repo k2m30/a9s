@@ -36,6 +36,19 @@ func (c *Controller) ensureListState() {
 	}
 	if top.State.List == nil {
 		top.State.List = &ListState{Loading: true}
+		applyListDefaults(top.State.List, top.Ctx.ResourceType)
+	}
+}
+
+// applyListDefaults seeds per-type defaults on a freshly-created ListState.
+// ct-events defaults to newest-first (event_time DESC). Called by every
+// list-screen creation path so the default is applied exactly once, at init,
+// and survives the renderer's per-keystroke view reconstruction without a
+// constructor-time re-apply that could fight a user-chosen sort.
+func applyListDefaults(ls *ListState, resourceType string) {
+	if resourceType == "ct-events" {
+		ls.SortCol = "event_time"
+		ls.SortDir = "desc"
 	}
 }
 
