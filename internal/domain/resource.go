@@ -4,10 +4,9 @@
 package domain
 
 // Resource represents a single AWS resource instance.
-// Moved from internal/resource/resource.go in Phase 01.
 // internal/resource re-exports this via a type alias.
 //
-// Phase 03 canonical model — see `docs/refactor/03-finding-model.md`.
+// Canonical model — see `docs/refactor/03-finding-model.md`.
 type Resource struct {
 	// ID is the primary identifier (instance ID, ARN, name).
 	ID string
@@ -24,8 +23,9 @@ type Resource struct {
 	// RawStruct holds the original AWS SDK typed struct for reflection-based
 	// field extraction.
 	RawStruct any
-	// Findings is the canonical finding list. Phase 03 populates this; views
-	// read Findings[0].Phrase / Findings[0].Severity for list rendering.
+	// Findings is the canonical finding list. Fetchers and enrichers populate
+	// it; views read Findings[0].Phrase / Findings[0].Severity for list
+	// rendering.
 	// Empty for healthy rows.
 	Findings []Finding
 	// AttentionDetails carries supporting structured facts per finding,

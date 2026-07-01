@@ -9,8 +9,8 @@ import (
 // resolvers, and field-alias normalisers without importing internal/resource
 // (which would create an import cycle).
 //
-// Per the AS-731 exit criterion, `internal/resource/` must contain zero
-// `func init()`. WireProjection replaces the former package init() and is
+// `internal/resource/` deliberately contains zero `func init()`.
+// WireProjection replaces the former package init() and is
 // explicitly called from cmd/a9s/main.go and from every TestMain that needs
 // a wired projector. Idempotent: callers may invoke it multiple times safely.
 func WireProjection() {
