@@ -110,10 +110,22 @@ func (c *Controller) buildListBody(ctx runtime.ScreenContext, ls *ListState) *Li
 	}
 
 	// Build rows.
+	statusCol := resolveListStatusCol(columns, td)
 	rows := make([]ListRow, 0, len(visible))
 	for _, r := range visible {
 		cells := extractListCells(columns, r, td)
 		decorator, severity, colorTag := resolveListDecoratorFull(td, r, findings)
+		// S4: bake the Wave-2 issue-Finding Phrase into the status cell, from the
+		// same enrichment findings map that drives the glyph. Without this the web
+		// renders a blank Status for flagged rows in live mode (the cell only
+		// reflects Wave-1 r.Findings / a FieldUpdate that live never applies),
+		// while the glyph still shows — a web/TUI parity break. Mirrors the
+		// render-time override in resourcelist.go's renderListDataRow.
+		if statusCol >= 0 && statusCol < len(cells) {
+			if f, ok := findings[r.ID]; ok && f.Severity.IsIssue() && f.Phrase != "" {
+				cells[statusCol] = f.Phrase
+			}
+		}
 		rows = append(rows, ListRow{
 			Cells:      cells,
 			Decorator:  decorator,

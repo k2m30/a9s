@@ -360,6 +360,32 @@ func resolveListMarkerCol(columns []ColumnDef, td *resource.ResourceTypeDef) int
 	return 0
 }
 
+// resolveListStatusCol mirrors the statusColIdx resolution in resourcelist.go
+// View(): the column whose key is "status" or the type's LifecycleKey, else a
+// case-insensitive "State"/"Status" title match. Returns -1 when no status
+// column exists. buildListBody uses it to bake the issue-Finding Phrase (S4)
+// into the status cell so the ViewState is render-ready — the TUI does this
+// override at render time, but the web renders Cells verbatim, so it must live
+// in the ViewState for both renderers (and the enrichment findings map, not the
+// resource's embedded Wave-1 Findings, is the authoritative source).
+func resolveListStatusCol(columns []ColumnDef, td *resource.ResourceTypeDef) int {
+	lifecycleKey := "state"
+	if td != nil && td.LifecycleKey != "" {
+		lifecycleKey = td.LifecycleKey
+	}
+	for i, c := range columns {
+		if c.Key == "status" || c.Key == lifecycleKey {
+			return i
+		}
+	}
+	for i, c := range columns {
+		if strings.EqualFold(c.Title, "State") || strings.EqualFold(c.Title, "Status") {
+			return i
+		}
+	}
+	return -1
+}
+
 // ResolveListColumns exports resolveListColumns for use by constructors that
 // need to translate a 0-based column index to a column key (e.g., sort restore).
 func ResolveListColumns(typeName string) []ColumnDef {
