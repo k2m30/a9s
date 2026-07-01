@@ -19,6 +19,12 @@ const (
 	s3CodePublicAccessBlockIncomplete domain.FindingCode = "s3.public-access-block-incomplete"
 )
 
+// s3PABIncompleteDetail is the S5 operator sentence for the PAB-incomplete
+// finding (docs/resources/s3.md §4): a bucket-level PAB block that is missing
+// or partial does not guarantee public exposure — account-level PAB may still
+// apply — but the bucket itself provides no defense-in-depth.
+const s3PABIncompleteDetail = "Bucket-level public access block is missing or partial — account-level PAB may still apply."
+
 // EnrichS3PublicAccessBlock calls GetPublicAccessBlock per bucket (cap EnrichmentCap)
 // and emits a finding when the bucket has no PAB configuration or when any of the
 // four PAB flags is false.
@@ -86,7 +92,7 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 				setWave2Finding(&result, name, s3CodePublicAccessBlockIncomplete, "public access block incomplete", "!", "s3", []domain.DetailRow{
 					{Label: "Status", Value: "no public access block configuration"},
 					{Label: "Account-level PAB", Value: "may still apply"},
-				})
+				}, s3PABIncompleteDetail)
 				result.FieldUpdates[name] = map[string]string{"status": "public access block incomplete"}
 				continue
 			}
@@ -113,7 +119,7 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 			setWave2Finding(&result, name, s3CodePublicAccessBlockIncomplete, "public access block incomplete", "!", "s3", []domain.DetailRow{
 				{Label: "Status", Value: "no public access block configuration"},
 				{Label: "Account-level PAB", Value: "may still apply"},
-			})
+			}, s3PABIncompleteDetail)
 			result.FieldUpdates[name] = map[string]string{"status": "public access block incomplete"}
 			continue
 		}
@@ -139,7 +145,7 @@ func EnrichS3PublicAccessBlock(ctx context.Context, clients *ServiceClients, res
 			continue
 		}
 		falseFlags = append(falseFlags, domain.DetailRow{Label: "Account-level PAB", Value: "may still apply"})
-		setWave2Finding(&result, name, s3CodePublicAccessBlockIncomplete, "public access block incomplete", "!", "s3", falseFlags)
+		setWave2Finding(&result, name, s3CodePublicAccessBlockIncomplete, "public access block incomplete", "!", "s3", falseFlags, s3PABIncompleteDetail)
 		result.FieldUpdates[name] = map[string]string{"status": "public access block incomplete"}
 	}
 	result.IssueCount = 0

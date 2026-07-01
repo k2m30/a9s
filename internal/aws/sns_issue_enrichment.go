@@ -69,7 +69,7 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 		if len(subs) == 0 {
 			setWave2Finding(&result, r.ID, snsCodeNoSubscribers, "topic has no subscribers", "~", "sns", []domain.DetailRow{
 				{Label: "Subscribers", Value: "topic has no subscribers", Tier: "~"},
-			})
+			}, "")
 			continue
 		}
 		allPending := true
@@ -86,7 +86,7 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 		if allPending {
 			setWave2Finding(&result, r.ID, snsCodeAllPending, "all pending confirmation", "~", "sns", []domain.DetailRow{
 				{Label: "Subscribers", Value: "all pending confirmation", Tier: "~"},
-			})
+			}, "")
 		}
 	}
 	result.IssueCount = 0

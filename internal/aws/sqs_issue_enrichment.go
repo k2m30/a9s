@@ -87,7 +87,7 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 		if len(rows) == 0 {
 			continue
 		}
-		setWave2Finding(&result, r.ID, sqsCodeMissingDLQ, rows[0].Value, "~", "sqs", rows)
+		setWave2Finding(&result, r.ID, sqsCodeMissingDLQ, rows[0].Value, "~", "sqs", rows, "")
 	}
 	result.IssueCount = 0
 	result.Truncated = truncated

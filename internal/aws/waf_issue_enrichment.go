@@ -135,7 +135,7 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 		if len(rows) == 0 {
 			continue
 		}
-		setWave2Finding(&result, r.ID, wafCodeNoLogging, rows[0].Value, "~", "waf", rows)
+		setWave2Finding(&result, r.ID, wafCodeNoLogging, rows[0].Value, "~", "waf", rows, "")
 	}
 	// All WAF logging findings are severity "~" (informational).
 	result.IssueCount = 0

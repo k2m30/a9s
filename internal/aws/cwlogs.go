@@ -7,8 +7,14 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
+
+// logsCodeRetentionNeverExpire is the canonical FindingCode for a log group
+// with no retention policy (RetentionInDays == nil), meaning events are kept
+// forever and billed indefinitely. docs/resources/logs.md §4.
+const logsCodeRetentionNeverExpire domain.FindingCode = "logs.retention-never-expire"
 
 // FetchCloudWatchLogGroups calls the CloudWatchLogs DescribeLogGroups API and
 // returns all pages of log groups. Used by tests; the production path uses the per-page fetcher for pagination.
@@ -82,6 +88,19 @@ func FetchCloudWatchLogGroupsPage(ctx context.Context, api CWLogsDescribeLogGrou
 				"kms_key_id":     kmsKeyID,
 			},
 			RawStruct: lg,
+		}
+
+		// Wave-1 classification: RetentionInDays == nil means the log group
+		// never expires — events are kept forever and billed indefinitely
+		// (docs/resources/logs.md §4).
+		if lg.RetentionInDays == nil {
+			r.Findings = []domain.Finding{{
+				Code:     logsCodeRetentionNeverExpire,
+				Phrase:   "retention: never expire",
+				Detail:   "No retention policy set — events kept forever, billed indefinitely.",
+				Severity: domain.SevWarn,
+				Source:   "wave1",
+			}}
 		}
 
 		resources = append(resources, r)

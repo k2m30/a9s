@@ -116,7 +116,7 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 		setWave2Finding(&result, r.ID, logsCodeMissingMetricFilters, "audit log group missing metric filters", "~", "logs", []domain.DetailRow{
 			{Label: "Log Group", Value: logGroupName, Tier: "~"},
 			{Label: "Metric Filters", Value: "none", Tier: "~"},
-		})
+		}, "")
 	}
 	// Metric filter findings are severity "~" (informational); IssueCount stays 0.
 	result.IssueCount = 0

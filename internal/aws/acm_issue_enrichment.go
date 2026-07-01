@@ -73,14 +73,14 @@ func EnrichACMCertificate(ctx context.Context, clients *ServiceClients, resource
 					days := int(remaining.Hours() / 24)
 					summary = fmt.Sprintf("expires in %d days", days)
 				}
-				setWave2Finding(&result, r.ID, acmCodeExpiresSoon, summary, "!", "acm", nil)
+				setWave2Finding(&result, r.ID, acmCodeExpiresSoon, summary, "!", "acm", nil, "")
 				bangCount++
 				continue
 			}
 		}
 		// Orphan check — only for ISSUED certs not already flagged.
 		if cert.Status == acmtypes.CertificateStatusIssued && len(cert.InUseBy) == 0 {
-			setWave2Finding(&result, r.ID, acmCodeOrphan, "certificate not in use (orphan)", "~", "acm", nil)
+			setWave2Finding(&result, r.ID, acmCodeOrphan, "certificate not in use (orphan)", "~", "acm", nil, "")
 			// "~" is informational — not counted in IssueCount.
 		}
 	}

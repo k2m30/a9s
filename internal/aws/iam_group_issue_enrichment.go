@@ -194,7 +194,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		if len(rows) == 0 {
 			continue
 		}
-		setWave2Finding(&result, r.ID, iamGroupCodeOrphanOrNoop, rows[0].Value, "~", "iam-group", rows)
+		setWave2Finding(&result, r.ID, iamGroupCodeOrphanOrNoop, rows[0].Value, "~", "iam-group", rows, "")
 	}
 	// Group findings are severity "~" (informational); IssueCount stays 0.
 	result.IssueCount = 0

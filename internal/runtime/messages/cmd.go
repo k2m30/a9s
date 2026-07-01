@@ -124,6 +124,17 @@ type RelatedNavigate struct {
 	// the predicate and extend the visible ID set — essential for
 	// approximate pivots whose initial count is a lower bound.
 	Checker resource.RelatedChecker
+	// DirectDetail is true only when this event originates from a detail
+	// view's navigable-field Enter handler (internal/tui/app_stack.go). It
+	// means the user asked to see the TARGET resource itself — navigation
+	// must land on the target's own detail view, even when the target type
+	// registers a Children[Key="enter"] child view (e.g. "role" →
+	// role_policies). This is deliberately narrower than the related-PANEL
+	// Count=1 pivot (rightcolumn.go, DirectDetail left false), which must
+	// keep mirroring "press Enter in the target's list view" — including
+	// drilling into that child view — per the pinned 2026-04-24 invariant
+	// (tests/unit/related_navigate_cache_enter_child_test.go).
+	DirectDetail bool
 }
 
 func (RelatedNavigate) isCmd() {}

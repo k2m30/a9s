@@ -117,7 +117,7 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		if b.EndTime != nil {
 			summary = fmt.Sprintf("latest build %s (%s)", statusVal, b.EndTime.Format("2006-01-02"))
 		}
-		setWave2Finding(&result, projectName, cbCodeLatestBuildFailed, summary, "!", "cb", rows)
+		setWave2Finding(&result, projectName, cbCodeLatestBuildFailed, summary, "!", "cb", rows, "")
 		result.FieldUpdates[projectName] = map[string]string{"last_build": lastBuildVal}
 	}
 	result.IssueCount = len(result.Findings)

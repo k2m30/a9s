@@ -62,7 +62,7 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 			// phrase (e.g. "archived: kms key lost") is computed at render time
 			// by phraseFromFindings(r.Findings) — not by writing
 			// FieldUpdates["status"] here.
-			setWave2Finding(&result, r.ID, ddbCodePITROff, "PITR off", "~", "ddb", nil)
+			setWave2Finding(&result, r.ID, ddbCodePITROff, "PITR off", "~", "ddb", nil, "")
 		}
 	}
 	result.IssueCount = 0

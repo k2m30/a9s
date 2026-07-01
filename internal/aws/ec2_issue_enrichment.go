@@ -4,7 +4,6 @@ package aws
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -124,11 +123,17 @@ func EnrichEC2InstanceStatus(ctx context.Context, clients *ServiceClients, resou
 			continue
 		}
 
-		// Build summary: prefer the first "!" row's value, fall back to "~".
+		// Build summary: any "!" status-check row means the instance is impaired
+		// (docs/resources/ec2.md §4 row "SystemStatus.Status == impaired" — the
+		// same §4-mandated phrase covers InstanceStatus impairment too, since
+		// both surface as the same operator-facing signal). Fall back to a
+		// scheduled-event summary when no status check is impaired.
 		summary := ""
+		detail := ""
 		for _, row := range rows {
 			if row.Tier == "!" {
-				summary = fmt.Sprintf("%s: %s", strings.ToLower(row.Label), row.Value)
+				summary = "impaired: system checks failing"
+				detail = "AWS reports this instance is impaired — system or instance status checks are failing."
 				break
 			}
 		}
@@ -136,7 +141,7 @@ func EnrichEC2InstanceStatus(ctx context.Context, clients *ServiceClients, resou
 			summary = fmt.Sprintf("scheduled event: %s", rows[0].Value)
 		}
 
-		setWave2Finding(&result, id, ec2CodeInstanceStatusImpaired, summary, severity, "ec2", rows)
+		setWave2Finding(&result, id, ec2CodeInstanceStatusImpaired, summary, severity, "ec2", rows, detail)
 	}
 
 	issueCount := 0

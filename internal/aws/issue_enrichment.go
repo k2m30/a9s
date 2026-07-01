@@ -84,6 +84,10 @@ func formatDate(t interface{ Format(string) string }) string {
 // the legacy EnrichmentFinding.Severity glyph contract used by per-enricher
 // docstrings — view code now consumes domain.Severity directly.
 //
+// detail is the S5 "concrete operator sentence" stamped onto Finding.Detail.
+// Pass "" for enrichers that have not yet been given real S5 text — the
+// detail view falls back to rendering Phrase alone.
+//
 // rows MAY be nil; the helper omits the AttentionDetail entry when empty so a
 // nil-row finding does not surface an empty Attention section.
 //
@@ -101,10 +105,12 @@ func setWave2Finding(
 	severityGlyph string,
 	shortName string,
 	rows []domain.DetailRow,
+	detail string,
 ) {
 	r.Findings[resourceID] = domain.Finding{
 		Code:     code,
 		Phrase:   phrase,
+		Detail:   detail,
 		Severity: glyphToSeverity(severityGlyph),
 		Source:   "wave2:" + shortName,
 	}

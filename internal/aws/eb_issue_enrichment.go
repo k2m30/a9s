@@ -69,7 +69,7 @@ func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, res
 		if key == "" {
 			key = name
 		}
-		setWave2Finding(&result, key, ebCodeEnvironmentCauses, fmt.Sprintf("EB causes: %s", firstCause), "~", "eb", rows)
+		setWave2Finding(&result, key, ebCodeEnvironmentCauses, fmt.Sprintf("EB causes: %s", firstCause), "~", "eb", rows, "")
 	}
 	result.IssueCount = 0
 	result.Truncated = truncated

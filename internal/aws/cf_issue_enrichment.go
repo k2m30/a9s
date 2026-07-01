@@ -97,7 +97,7 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 			continue
 		}
 		summary := strings.Join(summaries, "; ")
-		setWave2Finding(&result, distID, cfCodeInsecureProtocol, summary, "~", "cf", rows)
+		setWave2Finding(&result, distID, cfCodeInsecureProtocol, summary, "~", "cf", rows, "")
 	}
 	// All CloudFront findings are severity "~" (informational).
 	// IssueCount counts only "!" severity findings; "~" do not contribute.

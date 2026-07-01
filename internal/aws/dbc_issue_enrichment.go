@@ -133,7 +133,7 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 				}
 			}
 
-			setWave2Finding(&result, key, dbcCodeMaintenanceOverdue, "maintenance overdue", "!", "dbc", rows)
+			setWave2Finding(&result, key, dbcCodeMaintenanceOverdue, "maintenance overdue", "!", "dbc", rows, "")
 			issueCount++
 		}
 

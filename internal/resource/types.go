@@ -43,3 +43,26 @@ func AllShortNames() []string {
 func FindResourceType(name string) *ResourceTypeDef {
 	return catalog.Find(name)
 }
+
+// DetailFrameTitle composes the TUI detail-view frame-border title. When
+// omitID is true (types whose ID is an opaque synthetic key, e.g. a 56-digit
+// CloudWatch event id — see ResourceTypeDef.TitleOmitsID) it renders
+// "detail -- <Name>", falling back to "detail -- <ID>" when name is empty.
+// Otherwise it renders the standard "detail -- <ID> (<Name>)" form. Pure
+// string composition — callers resolve TitleOmitsID via GetChildType /
+// FindResourceType and pass it in.
+func DetailFrameTitle(id, name string, omitID bool) string {
+	if omitID {
+		if name != "" {
+			return "detail -- " + name
+		}
+		return "detail -- " + id
+	}
+	if id == "" {
+		return "detail"
+	}
+	if name != "" {
+		return "detail -- " + id + " (" + name + ")"
+	}
+	return "detail -- " + id
+}

@@ -15,6 +15,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/k2m30/a9s/v3/internal/app"
+	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
@@ -146,13 +147,10 @@ func (m Model) frameTitle(rs *rendererState, snap app.ViewState) string {
 		return rs.resourceType
 	case rsKindDetail:
 		src := m.ctrl.GetDetailResource()
-		if src.ID != "" {
-			if src.Name != "" {
-				return fmt.Sprintf("detail -- %s (%s)", src.ID, src.Name)
-			}
-			return "detail -- " + src.ID
+		if src.ID == "" {
+			return "detail"
 		}
-		return "detail"
+		return resource.DetailFrameTitle(src.ID, src.Name, m.detailTitleOmitsID())
 	case rsKindReveal:
 		if rs.revealName != "" {
 			return "reveal -- " + rs.revealName
@@ -189,6 +187,25 @@ func (m Model) frameTitle(rs *rendererState, snap app.ViewState) string {
 		return "identity"
 	}
 	return ""
+}
+
+// detailTitleOmitsID reports whether the currently detailed resource type opts
+// out of showing its ID in the detail frame title (ResourceTypeDef.TitleOmitsID
+// — e.g. log_events, lambda_invocation_logs, whose IDs are opaque synthetic
+// keys). Checks the child-type registry first since these types are always
+// child views, falling back to the top-level type registry.
+func (m Model) detailTitleOmitsID() bool {
+	rtype := m.ctrl.GetDetailResourceType()
+	if rtype == "" {
+		return false
+	}
+	if ct := resource.GetChildType(rtype); ct != nil {
+		return ct.TitleOmitsID
+	}
+	if rt := resource.FindResourceType(rtype); rt != nil {
+		return rt.TitleOmitsID
+	}
+	return false
 }
 
 // headerRight returns the pre-rendered right-side string for the header.

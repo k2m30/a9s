@@ -80,7 +80,7 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 		if act.StartTime != nil {
 			rows = append(rows, domain.DetailRow{Label: "Started", Value: act.StartTime.Format("2006-01-02")})
 		}
-		setWave2Finding(&result, r.ID, asgCodeScalingActivityFailed, summary, "!", "asg", rows)
+		setWave2Finding(&result, r.ID, asgCodeScalingActivityFailed, summary, "!", "asg", rows, "")
 	}
 	result.IssueCount = len(result.Findings)
 	result.Truncated = truncated

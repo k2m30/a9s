@@ -89,7 +89,7 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 			if firstReason != "" {
 				rows = append(rows, domain.DetailRow{Label: "Reason", Value: firstReason, Tier: "~"})
 			}
-			setWave2Finding(&result, r.ID, tgCodeUnhealthyTargets, fmt.Sprintf("unhealthy targets: %d/%d", unhealthy, targetCount), "!", "tg", rows)
+			setWave2Finding(&result, r.ID, tgCodeUnhealthyTargets, fmt.Sprintf("unhealthy targets: %d/%d", unhealthy, targetCount), "!", "tg", rows, "")
 		}
 	}
 	result.IssueCount = len(result.Findings)

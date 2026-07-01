@@ -141,7 +141,7 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 			"att_status": attStatusVal,
 		}
 		if worst != nil {
-			setWave2Finding(&result, tgwID, worst.code, worst.summary, worst.glyph, "tgw", worst.rows)
+			setWave2Finding(&result, tgwID, worst.code, worst.summary, worst.glyph, "tgw", worst.rows, "")
 		}
 	}
 	result.IssueCount = len(result.Findings)

@@ -449,6 +449,7 @@ func (m Model) handleDetailKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model,
 				SourceResource: res,
 				SourceType:     rt,
 				TargetID:       targetID,
+				DirectDetail:   true,
 			}
 		}
 

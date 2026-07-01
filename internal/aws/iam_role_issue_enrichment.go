@@ -71,7 +71,7 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 			isDormant = true
 		}
 		if isDormant {
-			setWave2Finding(&result, r.ID, iamRoleCodeDormant, "dormant role (>90d)", "~", "iam-role", nil)
+			setWave2Finding(&result, r.ID, iamRoleCodeDormant, "dormant role (>90d)", "~", "iam-role", nil, "")
 		}
 	}
 	// Dormant-role findings are severity "~" (informational); IssueCount stays 0.

@@ -1126,6 +1126,7 @@ func (s *fullIntegrationScenario) FollowNavigableField(fieldPath string) resourc
 		SourceResource: sourceRes,
 		SourceType:     sourceType,
 		TargetID:       targetID,
+		DirectDetail:   true,
 	})
 
 	// Case 1: single-resource detail auto-opened.

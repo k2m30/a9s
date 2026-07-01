@@ -72,7 +72,7 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 		setWave2Finding(&result, r.ID, r53CodeOrphanPrivateZone, "private zone with no VPC associations (orphan)", "~", "r53", []domain.DetailRow{
 			{Label: "Zone ID", Value: zoneID, Tier: "~"},
 			{Label: "Issue", Value: "private zone with no VPC associations (orphan)", Tier: "~"},
-		})
+		}, "")
 	}
 	// All Route53 findings are severity "~" (informational).
 	result.IssueCount = 0

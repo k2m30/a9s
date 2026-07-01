@@ -137,7 +137,7 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 				Tier:  "~",
 			})
 		}
-		setWave2Finding(&result, r.ID, ecrCodeVulnerabilities, rows[0].Value, tier, "ecr", rows)
+		setWave2Finding(&result, r.ID, ecrCodeVulnerabilities, rows[0].Value, tier, "ecr", rows, "")
 	}
 
 	issueCount := 0

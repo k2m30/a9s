@@ -79,6 +79,17 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			"assume_role_policy_document", "trust_wildcard", "trust_summary",
 			"policy_resources",
 		},
+		FetchByIDs: func(ctx context.Context, clients any, ids []string) ([]resource.Resource, error) {
+			c, ok := clients.(*ServiceClients)
+			if !ok || c == nil {
+				return nil, fmt.Errorf("AWS clients not initialized")
+			}
+			getRoleAPI, ok := c.IAM.(IAMGetRoleAPI)
+			if !ok || getRoleAPI == nil {
+				return nil, fmt.Errorf("IAM client does not support GetRole")
+			}
+			return FetchRolesByIDs(ctx, getRoleAPI, ids)
+		},
 		Related: []domain.RelatedDef{
 			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkRoleLambda, NeedsTargetCache: true},
 			{TargetType: "glue", DisplayName: "Glue Jobs", Checker: checkRoleGlue, NeedsTargetCache: true},

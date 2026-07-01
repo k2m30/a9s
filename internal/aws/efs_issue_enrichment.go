@@ -122,7 +122,7 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 			{Label: "AZ", Value: az},
 			{Label: "State", Value: state, Tier: "!"},
 			{Label: "Degraded", Value: fmt.Sprintf("%d/%d", unavailableCount, totalMT)},
-		})
+		}, "")
 	}
 	result.IssueCount = len(result.Findings)
 	result.Truncated = truncated

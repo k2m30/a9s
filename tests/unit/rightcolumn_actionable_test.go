@@ -1,14 +1,16 @@
 package unit_test
 
 // rightcolumn_actionable_test.go — regression tests for isActionableRow
-// approximate-zero handling (fixed in feat: related-panel checker completion (019)).
+// approximate-zero handling.
 //
-// Background:
-//   rightcolumn.go:319-322 treats approximate==true as actionable:
-//     if row.approximate { return true }
-//   This is the correct fix for the "dead-end UI" where "(0+)" rows were
-//   visible but non-navigable.  These tests are regression guards to ensure
-//   this invariant is never accidentally reverted.
+// Background (contract updated — resolved count==0 is NEVER actionable):
+//   resource.IsRelatedActionable now treats a RESOLVED count==0 as never
+//   actionable, even when approximate==true. ApproximateZero() (related.go:209)
+//   sets Count:0, so "(0)" rows must not be drillable into an empty view.
+//   FetchFilter pivots always use Count:-1 (never 0), so they remain
+//   actionable regardless of the approximate flag.  These tests are
+//   regression guards to ensure this invariant is never accidentally
+//   reverted back to "approximate implies actionable".
 //
 // Test strategy:
 //   isActionableRow is unexported and lives in internal/tui/views.  Tests in
@@ -34,10 +36,48 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
+
+// ---------------------------------------------------------------------------
+// Direct resource.IsRelatedActionable table test — the single source of truth
+// consumed by isActionableRow. Covers the full contract from related.go:245.
+// ---------------------------------------------------------------------------
+
+func TestIsRelatedActionable_Table(t *testing.T) {
+	cases := []struct {
+		name           string
+		count          int
+		approximate    bool
+		hasFetchFilter bool
+		loading        bool
+		hasErr         bool
+		wantActionable bool
+	}{
+		{"DefiniteZero_NoFilter", 0, false, false, false, false, false},
+		{"ApproxZero_NoFilter_NEW_NotActionable", 0, true, false, false, false, false},
+		{"DefiniteZero_WithFetchFilter_NEW_NotActionable", 0, false, true, false, false, false},
+		{"UnknownCount_WithFetchFilter_Actionable", -1, false, true, false, false, true},
+		{"UnknownCount_NoFilter_NotActionable", -1, false, false, false, false, false},
+		{"PositiveCount_NoFilter_Actionable", 3, false, false, false, false, true},
+		{"PositiveCount_Approximate_Actionable", 3, true, false, false, false, true},
+		{"Loading_BlocksRegardlessOfCount", 5, false, true, true, false, false},
+		{"Error_BlocksRegardlessOfCount", 5, false, true, false, true, false},
+		{"ApproxZero_WithFetchFilter_NEW_NotActionable", 0, true, true, false, false, false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := resource.IsRelatedActionable(tc.count, tc.approximate, tc.hasFetchFilter, tc.loading, tc.hasErr)
+			if got != tc.wantActionable {
+				t.Errorf("IsRelatedActionable(count=%d, approximate=%v, hasFetchFilter=%v, loading=%v, hasErr=%v) = %v, want %v",
+					tc.count, tc.approximate, tc.hasFetchFilter, tc.loading, tc.hasErr, got, tc.wantActionable)
+			}
+		})
+	}
+}
 
 // ---------------------------------------------------------------------------
 // helpers local to this file
@@ -149,7 +189,9 @@ func pressScrollRightDetail(d views.DetailModel) (views.DetailModel, bool) {
 // the actual gating logic regardless of whether focus was acquired via loading.
 
 // TestIsActionableRow_ApproxZero_NoFilter — count=0, approximate=true, no fetchFilter
-// Expected: actionable (approximate flag makes row navigable regardless of count)
+// Expected: NOT actionable. NEW contract: a resolved count==0 is never
+// actionable even when approximate==true — ApproximateZero() rows must not
+// let the user drill into an empty view.
 func TestIsActionableRow_ApproxZero_NoFilter(t *testing.T) {
 	ensureNoColor(t)
 	d, cleanup := buildApproxDetail(t)
@@ -161,15 +203,19 @@ func TestIsActionableRow_ApproxZero_NoFilter(t *testing.T) {
 	// Inject the approximate-zero result.
 	d = injectApproxResult(d, 0, true, nil, nil)
 
-	// Enter must produce RelatedNavigateMsg — approximate rows are always navigable.
+	// Enter must NOT produce RelatedNavigateMsg — resolved zero is a dead end
+	// regardless of the approximate flag.
 	msg := pressEnterCmd(d)
-	if !isApproxNavMsg(msg) {
-		t.Errorf("Enter on approximate-zero row (count=0, approximate=true, no fetchFilter) must produce RelatedNavigateMsg; got %T", msg)
+	if isApproxNavMsg(msg) {
+		t.Errorf("Enter on approximate-zero row (count=0, approximate=true, no fetchFilter) must NOT produce RelatedNavigateMsg; got RelatedNavigateMsg")
 	}
 }
 
 // TestIsActionableRow_ApproxZero_WithFilter — count=0, approximate=true, fetchFilter={"x":"y"}
-// Expected: actionable (approximate flag + fetchFilter both make the row navigable)
+// Expected: NOT actionable. NEW contract: count==0 is never actionable even
+// with a fetchFilter set, because FetchFilter pivots always carry Count:-1
+// (never 0) in production — a resolved Count:0 with a fetchFilter is still a
+// definite empty result and must not be navigable.
 func TestIsActionableRow_ApproxZero_WithFilter(t *testing.T) {
 	ensureNoColor(t)
 	d, cleanup := buildApproxDetail(t)
@@ -179,8 +225,26 @@ func TestIsActionableRow_ApproxZero_WithFilter(t *testing.T) {
 	d = injectApproxResult(d, 0, true, map[string]string{"x": "y"}, nil)
 
 	msg := pressEnterCmd(d)
-	if !isApproxNavMsg(msg) {
-		t.Errorf("Enter on approximate-zero row (count=0, approximate=true, fetchFilter set) must produce RelatedNavigateMsg; got %T", msg)
+	if isApproxNavMsg(msg) {
+		t.Errorf("Enter on approximate-zero row (count=0, approximate=true, fetchFilter set) must NOT produce RelatedNavigateMsg; got RelatedNavigateMsg")
+	}
+}
+
+// TestIsActionableRow_DefiniteZero_WithFilter — count=0, approximate=false, fetchFilter={"x":"y"}
+// Expected: NOT actionable. A resolved zero count must block navigation even
+// when a fetchFilter is present — only count==-1 (unknown) is rescued by
+// hasFetchFilter.
+func TestIsActionableRow_DefiniteZero_WithFilter(t *testing.T) {
+	ensureNoColor(t)
+	d, cleanup := buildApproxDetail(t)
+	defer cleanup()
+
+	d = focusRightColWhileLoading(t, d)
+	d = injectApproxResult(d, 0, false, map[string]string{"x": "y"}, nil)
+
+	msg := pressEnterCmd(d)
+	if isApproxNavMsg(msg) {
+		t.Errorf("Enter on definite-zero row (count=0, approximate=false, fetchFilter set) must NOT produce RelatedNavigateMsg; got RelatedNavigateMsg")
 	}
 }
 
@@ -324,10 +388,11 @@ func TestIsActionableRow_Error_Blocks(t *testing.T) {
 // Probing "l" AFTER injecting a result (from an unfocused state) directly tests
 // whether HasActionableRows() considers the injected row actionable.
 
-// TestIsActionableRow_HasActionableRows_ApproxZero_EnablesFocus
-// Expected: after injecting approximate-zero, "l" must transfer focus
-// (HasActionableRows returns true for approximate rows)
-func TestIsActionableRow_HasActionableRows_ApproxZero_EnablesFocus(t *testing.T) {
+// TestIsActionableRow_HasActionableRows_ApproxZero_BlocksFocus
+// NEW contract: a resolved approximate-zero row is never actionable, so with
+// only that single row registered, "l" must NOT transfer focus (mirrors the
+// existing definite-zero behavior below).
+func TestIsActionableRow_HasActionableRows_ApproxZero_BlocksFocus(t *testing.T) {
 	ensureNoColor(t)
 	d, cleanup := buildApproxDetail(t)
 	defer cleanup()
@@ -339,17 +404,11 @@ func TestIsActionableRow_HasActionableRows_ApproxZero_EnablesFocus(t *testing.T)
 	// Inject approximate-zero BEFORE any focus attempt.
 	d = injectApproxResult(d, 0, true, nil, nil)
 
-	// "l" focuses right column only when HasActionableRows()==true.
-	d, focused := pressScrollRightDetail(d)
-	if !focused {
-		t.Errorf("'l' key must transfer focus to right column when approximate-zero row is present (HasActionableRows must return true); view unchanged after l press")
-		return
-	}
-
-	// With focus transferred, Enter must also produce RelatedNavigateMsg.
-	msg := pressEnterCmd(d)
-	if !isApproxNavMsg(msg) {
-		t.Errorf("Enter on focused approximate-zero row must produce RelatedNavigateMsg; got %T", msg)
+	// "l" focuses right column only when HasActionableRows()==true. Under the
+	// new contract, approximate-zero is not actionable, so focus must NOT transfer.
+	_, focused := pressScrollRightDetail(d)
+	if focused {
+		t.Errorf("REGRESSION: 'l' key must NOT transfer focus when the only row is a resolved approximate-zero row (count==0 is never actionable); view changed after l press")
 	}
 }
 
@@ -439,5 +498,165 @@ func TestIsActionableRow_DefiniteZero_ViewShape_NoPlusSign(t *testing.T) {
 	}
 	if !strings.Contains(plain, "(0)") {
 		t.Errorf("definite-zero row must render as 'Target Groups (0)'; got:\n%s", plain)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Cursor-skip tests: mixed rows (some count==0, one count>0) — the cursor
+// must never land on a resolved count==0 row, mirroring the root list's
+// "never select a non-actionable row" behavior.
+// ---------------------------------------------------------------------------
+//
+// buildMixedRelatedDetail registers three RelatedDefs on "ec2":
+//   - "Zero A" (targetType "tg")  — resolved to count=0 (approximate=true, a
+//     realistic ApproximateZero() result)
+//   - "Zero B" (targetType "vpc") — resolved to count=0 (approximate=false)
+//   - "Positive" (targetType "asg") — resolved to count=3 (actionable)
+//
+// All three results are injected before any cursor movement, then focus is
+// acquired via the explicit-visible + Tab sequence used by the sibling
+// detail_focus_test.go helpers (focusRightColumn, replaceEC2Related).
+
+// buildMixedRelatedDetail returns a focused DetailModel with the three rows
+// described above, and a cleanup func the caller must defer.
+func buildMixedRelatedDetail(t *testing.T) (views.DetailModel, func()) {
+	t.Helper()
+	replaceEC2Related(t, []resource.RelatedDef{
+		{TargetType: "tg", DisplayName: "Zero A", Checker: noopChecker},
+		{TargetType: "vpc", DisplayName: "Zero B", Checker: noopChecker},
+		{TargetType: "asg", DisplayName: "Positive", Checker: noopChecker},
+	})
+	cleanup := func() { unregisterEC2Related(t) }
+
+	d := makeDetailForFocusTest(t, 140)
+	if !strings.Contains(d.View(), "RELATED") {
+		cleanup()
+		t.Skip("right column not auto-shown at width=140; skipping mixed cursor-skip test")
+	}
+
+	d = focusRightColumn(d)
+
+	d, _ = d.Update(messages.RelatedCheckResult{
+		ResourceType:   "ec2",
+		DefDisplayName: "Zero A",
+		Result: resource.RelatedCheckResult{
+			TargetType:  "tg",
+			Count:       0,
+			Approximate: true,
+		},
+	})
+	d, _ = d.Update(messages.RelatedCheckResult{
+		ResourceType:   "ec2",
+		DefDisplayName: "Zero B",
+		Result: resource.RelatedCheckResult{
+			TargetType:  "vpc",
+			Count:       0,
+			Approximate: false,
+		},
+	})
+	d, _ = d.Update(messages.RelatedCheckResult{
+		ResourceType:   "ec2",
+		DefDisplayName: "Positive",
+		Result: resource.RelatedCheckResult{
+			TargetType:  "asg",
+			Count:       3,
+			ResourceIDs: []string{"asg-1", "asg-2", "asg-3"},
+		},
+	})
+
+	return d, cleanup
+}
+
+// TestRightColumn_CursorSkipsZeroRows_DownNavigation verifies that moving the
+// cursor down from the first row never lands on either "Zero A" or "Zero B"
+// (both resolved to count==0), landing only on "Positive" (count=3).
+func TestRightColumn_CursorSkipsZeroRows_DownNavigation(t *testing.T) {
+	ensureNoColor(t)
+	d, cleanup := buildMixedRelatedDetail(t)
+	defer cleanup()
+
+	// ensureCursorValid (invoked on every RelatedCheckResult) should have
+	// already parked the cursor on the sole actionable row ("Positive").
+	// Pressing Down repeatedly must never move it onto a zero row: since
+	// "Positive" is the only actionable row, Down is a no-op and Enter must
+	// always resolve to TargetType "asg".
+	for i := 0; i < 4; i++ {
+		d, _ = d.Update(tea.KeyPressMsg{Code: -1, Text: "j"})
+		msg := pressEnterCmd(d)
+		nav, ok := msg.(messages.RelatedNavigate)
+		if !ok {
+			t.Fatalf("iteration %d: Enter did not produce RelatedNavigate; got %T (cursor may have landed on a non-actionable zero row)", i, msg)
+		}
+		if nav.TargetType != "asg" {
+			t.Errorf("iteration %d: cursor landed on TargetType %q; want \"asg\" (the only count>0 row) — a zero row must never be selectable", i, nav.TargetType)
+		}
+	}
+}
+
+// TestRightColumn_CursorSkipsZeroRows_UpNavigation mirrors the Down test using
+// the Up key, confirming the skip logic is symmetric.
+func TestRightColumn_CursorSkipsZeroRows_UpNavigation(t *testing.T) {
+	ensureNoColor(t)
+	d, cleanup := buildMixedRelatedDetail(t)
+	defer cleanup()
+
+	for i := 0; i < 4; i++ {
+		d, _ = d.Update(tea.KeyPressMsg{Code: -1, Text: "k"})
+		msg := pressEnterCmd(d)
+		nav, ok := msg.(messages.RelatedNavigate)
+		if !ok {
+			t.Fatalf("iteration %d: Enter did not produce RelatedNavigate; got %T (cursor may have landed on a non-actionable zero row)", i, msg)
+		}
+		if nav.TargetType != "asg" {
+			t.Errorf("iteration %d: cursor landed on TargetType %q; want \"asg\" (the only count>0 row) — a zero row must never be selectable", i, nav.TargetType)
+		}
+	}
+}
+
+// TestRightColumn_EnterOnAllZeroRows_NoNavigate verifies that when every
+// registered row resolves to count==0 (mix of approximate true/false, no
+// count>0 row present at all), Enter never emits RelatedNavigate — there is
+// no reachable actionable row to land on.
+func TestRightColumn_EnterOnAllZeroRows_NoNavigate(t *testing.T) {
+	ensureNoColor(t)
+	replaceEC2Related(t, []resource.RelatedDef{
+		{TargetType: "tg", DisplayName: "Zero A", Checker: noopChecker},
+		{TargetType: "vpc", DisplayName: "Zero B", Checker: noopChecker},
+	})
+	defer unregisterEC2Related(t)
+
+	d := makeDetailForFocusTest(t, 140)
+	if !strings.Contains(d.View(), "RELATED") {
+		t.Skip("right column not auto-shown at width=140; skipping all-zero test")
+	}
+	d = focusRightColumn(d)
+
+	d, _ = d.Update(messages.RelatedCheckResult{
+		ResourceType:   "ec2",
+		DefDisplayName: "Zero A",
+		Result: resource.RelatedCheckResult{
+			TargetType:  "tg",
+			Count:       0,
+			Approximate: true,
+		},
+	})
+	d, _ = d.Update(messages.RelatedCheckResult{
+		ResourceType:   "ec2",
+		DefDisplayName: "Zero B",
+		Result: resource.RelatedCheckResult{
+			TargetType:  "vpc",
+			Count:       0,
+			Approximate: false,
+		},
+	})
+
+	// Try navigating around — with no actionable row reachable, Enter must
+	// never emit RelatedNavigate regardless of cursor position.
+	for i := 0; i < 3; i++ {
+		msg := pressEnterCmd(d)
+		if isApproxNavMsg(msg) {
+			t.Errorf("iteration %d: Enter on all-zero rows (no actionable row present) must NOT produce RelatedNavigateMsg; got RelatedNavigateMsg", i)
+		}
+		d, _ = d.Update(tea.KeyPressMsg{Code: -1, Text: "j"})
 	}
 }

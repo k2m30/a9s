@@ -224,6 +224,7 @@ func injectAttentionSectionDetail(items []fieldpath.FieldItem, ds *DetailState, 
 	type entry struct {
 		tier          string
 		primary       string
+		detail        string // S5 operator sentence (Finding.Detail); "" ⇒ Phrase-only, no extra line
 		rows          []domain.DetailRow
 		splitKeyValue bool
 	}
@@ -245,7 +246,7 @@ func injectAttentionSectionDetail(items []fieldpath.FieldItem, ds *DetailState, 
 				rows = det.Rows
 			}
 		}
-		entries = append(entries, entry{tier: tier, primary: f.Phrase, rows: rows, splitKeyValue: true})
+		entries = append(entries, entry{tier: tier, primary: f.Phrase, detail: f.Detail, rows: rows, splitKeyValue: true})
 	}
 	if len(entries) == 0 {
 		return items
@@ -274,6 +275,9 @@ func injectAttentionSectionDetail(items []fieldpath.FieldItem, ds *DetailState, 
 		Path:      "Attention",
 		ColorTier: capTierToRowBucketDetail(headerTier, rowBucket),
 	})
+	// lastEntryBare mirrors injectAttentionSection in detail_fields.go — see
+	// that function's comment for the rationale. Both must stay in lockstep.
+	lastEntryBare := false
 	for _, e := range entries {
 		glyph := e.tier
 		if glyph != "!" && glyph != "~" {
@@ -296,6 +300,17 @@ func injectAttentionSectionDetail(items []fieldpath.FieldItem, ds *DetailState, 
 			Path:        "Attention",
 			ColorTier:   entryColor,
 		})
+		if e.detail != "" {
+			// S5 operator sentence — mirrors injectAttentionSection in detail_fields.go.
+			injected = append(injected, fieldpath.FieldItem{
+				IsSubField:  true,
+				IndentLevel: 1,
+				Key:         e.detail,
+				Value:       e.detail,
+				Path:        "Attention",
+				ColorTier:   entryColor,
+			})
+		}
 		for _, row := range e.rows {
 			tier := row.Tier
 			if tier == "" {
@@ -310,8 +325,11 @@ func injectAttentionSectionDetail(items []fieldpath.FieldItem, ds *DetailState, 
 				ColorTier:   capTierToRowBucketDetail(tier, rowBucket),
 			})
 		}
+		lastEntryBare = e.detail == "" && len(e.rows) == 0
 	}
-	injected = append(injected, fieldpath.FieldItem{IsSpacer: true, Path: "Attention"})
+	if !lastEntryBare {
+		injected = append(injected, fieldpath.FieldItem{IsSpacer: true, Path: "Attention"})
+	}
 	return append(injected, items...)
 }
 

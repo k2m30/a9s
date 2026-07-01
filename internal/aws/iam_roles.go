@@ -9,6 +9,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -137,6 +138,113 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// FetchRolesByIDs resolves a batch of IAM role names to resource.Resource
+// values via one GetRole call per id. Each id is the bare RoleName (no path)
+// — the same shape FetchIAMRolesPage produces as Resource.ID/Name, and the
+// shape callers extract from a role ARN via arnLastSlashSegment even when the
+// ARN carries an IAM path such as ".../role/service-role/<name>". GetRole
+// itself only ever takes the bare RoleName, so no path-stripping is needed
+// here.
+//
+// Mirrors the resilience contract of FetchIAMPoliciesByIDsFull /
+// FetchIAMPoliciesByIDs: per-id failures (e.g. NoSuchEntity) are collected
+// and returned as a composite error via AggregateFailures, while the
+// resources that did resolve are still returned so the caller gets partial
+// success rather than an all-or-nothing failure.
+func FetchRolesByIDs(ctx context.Context, api IAMGetRoleAPI, ids []string) ([]resource.Resource, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	var failures []string
+	resources := make([]resource.Resource, 0, len(ids))
+	seen := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		if id == "" {
+			continue
+		}
+		if _, dup := seen[id]; dup {
+			continue
+		}
+		seen[id] = struct{}{}
+
+		output, err := api.GetRole(ctx, &iam.GetRoleInput{RoleName: aws.String(id)})
+		if err != nil || output == nil || output.Role == nil {
+			if err == nil {
+				err = fmt.Errorf("empty response")
+			}
+			failures = append(failures, fmt.Sprintf("%s: %s", id, err.Error()))
+			continue
+		}
+		resources = append(resources, roleToResource(*output.Role))
+	}
+	return resources, AggregateFailures("role FetchByIDs", failures, len(ids))
+}
+
+// roleToResource converts a single iam.Role (as returned by GetRole) into the
+// same resource.Resource shape FetchIAMRolesPage produces from ListRoles, so
+// a lazily-fetched role is indistinguishable from a paginated one.
+func roleToResource(role iamtypes.Role) resource.Resource {
+	roleName := ""
+	if role.RoleName != nil {
+		roleName = *role.RoleName
+	}
+
+	roleID := ""
+	if role.RoleId != nil {
+		roleID = *role.RoleId
+	}
+
+	path := ""
+	if role.Path != nil {
+		path = *role.Path
+	}
+
+	createDate := ""
+	if role.CreateDate != nil {
+		createDate = role.CreateDate.Format("2006-01-02 15:04")
+	}
+
+	description := ""
+	if role.Description != nil {
+		description = *role.Description
+	}
+
+	assumeRolePolicyDoc := ""
+	if role.AssumeRolePolicyDocument != nil {
+		decoded, err := url.QueryUnescape(*role.AssumeRolePolicyDocument)
+		if err == nil {
+			assumeRolePolicyDoc = decoded
+		} else {
+			assumeRolePolicyDoc = *role.AssumeRolePolicyDocument
+		}
+	}
+
+	trustWildcard, trustSummary := parseTrustWildcard(assumeRolePolicyDoc)
+
+	return resource.Resource{
+		ID:   roleName,
+		Name: roleName,
+		Type: "role",
+		Fields: map[string]string{
+			"role_name":                   roleName,
+			"role_id":                     roleID,
+			"path":                        path,
+			"create_date":                 createDate,
+			"description":                 description,
+			"assume_role_policy_document": assumeRolePolicyDoc,
+			"trust_wildcard":              trustWildcard,
+			"trust_summary":               trustSummary,
+			// GetRole does not return inline-policy resources; leaving this
+			// empty on a lazily-fetched role (vs. a ListRoles page fetch)
+			// mirrors how other by-ID fetchers omit list-only enrichment
+			// fields rather than pay for it on every single-ID drill.
+			"policy_resources": "",
+		},
+		RawStruct: role,
+	}
 }
 
 // enumerateRoleInlinePolicyResources walks a role's inline policies and

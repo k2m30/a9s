@@ -100,7 +100,7 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 			key = stackName
 		}
 		setWave2Finding(&result, key, cfnCodeRecentResourceFailure,
-			fmt.Sprintf("recent resource failure: %s", failedRows[0].Label), "!", "cfn", failedRows)
+			fmt.Sprintf("recent resource failure: %s", failedRows[0].Label), "!", "cfn", failedRows, "")
 	}
 	result.IssueCount = len(result.Findings)
 	result.Truncated = truncated
@@ -214,7 +214,7 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 				setWave2Finding(&result, key, cfnCodeStackDrifted, "stack drifted from template", "~", "cfn",
 					[]domain.DetailRow{
 						{Label: "Drift Status", Value: driftStatus, Tier: "~"},
-					})
+					}, "")
 			}
 		}
 	}

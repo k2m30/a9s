@@ -76,11 +76,11 @@ func EnrichOpenSearchDomains(_ context.Context, _ *ServiceClients, resources []r
 				// its value must not appear in Summary).
 				rows = append(rows, domain.DetailRow{Label: "Additional", Value: "encryption at rest off", Tier: "~"})
 			}
-			setWave2Finding(&result, r.ID, opensearchCodeUpdateForced, "software update forced soon", "!", "opensearch", rows)
+			setWave2Finding(&result, r.ID, opensearchCodeUpdateForced, "software update forced soon", "!", "opensearch", rows, "")
 			bangCount++
 		} else {
 			// Only enc-off — "~" finding, no rows needed.
-			setWave2Finding(&result, r.ID, opensearchCodeEncryptionOff, "encryption at rest off", "~", "opensearch", nil)
+			setWave2Finding(&result, r.ID, opensearchCodeEncryptionOff, "encryption at rest off", "~", "opensearch", nil, "")
 			// "~" never bumps bangCount.
 		}
 	}

@@ -105,7 +105,7 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 		if err != nil {
 			if _, ok := errors.AsType[*codeartifacttypes.ResourceNotFoundException](err); ok {
 				// No policy set — default open within the domain.
-				setWave2Finding(&result, key, codeartifactCodeNoPermissionsPolicy, "no permissions policy", "~", "codeartifact", nil)
+				setWave2Finding(&result, key, codeartifactCodeNoPermissionsPolicy, "no permissions policy", "~", "codeartifact", nil, "")
 				// "~" does not contribute to IssueCount.
 				continue
 			}
@@ -122,7 +122,7 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 			setWave2Finding(&result, key, codeartifactCodePublicAccessPolicy, "public access policy", "!", "codeartifact",
 				[]domain.DetailRow{
 					{Label: "Principal", Value: "*", Tier: "!"},
-				})
+				}, "")
 			issueCount++
 		}
 	}

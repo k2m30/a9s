@@ -93,7 +93,7 @@ func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resourc
 				rows = append(rows, domain.DetailRow{Label: "Action Code", Value: *ac.Code})
 			}
 		}
-		setWave2Finding(&result, volID, ebsCodeVolumeIODegraded, "volume I/O degraded", "!", "ebs", rows)
+		setWave2Finding(&result, volID, ebsCodeVolumeIODegraded, "volume I/O degraded", "!", "ebs", rows, "")
 	}
 	result.IssueCount = len(result.Findings)
 	result.Truncated = truncated

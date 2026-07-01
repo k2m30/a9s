@@ -61,7 +61,7 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 			"rotation_enabled": rotationVal,
 		}
 		if !out.KeyRotationEnabled {
-			setWave2Finding(&result, keyID, kmsCodeRotationDisabled, "key rotation disabled (CIS KMS.1)", "~", "kms", nil)
+			setWave2Finding(&result, keyID, kmsCodeRotationDisabled, "key rotation disabled (CIS KMS.1)", "~", "kms", nil, "")
 		}
 	}
 	result.IssueCount = 0

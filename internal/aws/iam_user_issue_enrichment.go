@@ -162,7 +162,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 		if severity == "!" {
 			code = iamUserCodeNoMFA
 		}
-		setWave2Finding(&result, r.ID, code, rows[0].Value, severity, "iam-user", rows)
+		setWave2Finding(&result, r.ID, code, rows[0].Value, severity, "iam-user", rows, "")
 	}
 	result.IssueCount = issueCount
 	result.Truncated = truncated

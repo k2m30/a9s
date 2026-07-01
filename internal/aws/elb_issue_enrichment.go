@@ -89,7 +89,7 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 		if len(rows) >= 2 {
 			severity = "!"
 		}
-		setWave2Finding(&result, r.ID, elbCodeMisconfigured, rows[0].Label+": "+rows[0].Value, severity, "elb", rows)
+		setWave2Finding(&result, r.ID, elbCodeMisconfigured, rows[0].Label+": "+rows[0].Value, severity, "elb", rows, "")
 	}
 	issueCount := 0
 	for _, f := range result.Findings {

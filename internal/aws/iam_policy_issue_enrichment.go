@@ -76,7 +76,7 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 			setWave2Finding(&result, r.ID, iamPolicyCodeAdminStar, "admin star (CIS IAM.16)", "!", "iam-policy", []domain.DetailRow{
 				{Label: "Action", Value: "*", Tier: "!"},
 				{Label: "Resource", Value: "*", Tier: "!"},
-			})
+			}, "")
 			issueCount++
 		}
 		result.FieldUpdates[r.ID] = map[string]string{

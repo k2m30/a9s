@@ -131,7 +131,7 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 				Label: "Issue",
 				Value: "no deployed stages",
 				Tier:  "~",
-			}})
+			}}, "")
 			continue
 		}
 		if len(summaries) == 0 {
@@ -146,7 +146,7 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 				uniqueSummaries = append(uniqueSummaries, s)
 			}
 		}
-		setWave2Finding(&result, apiID, apigwCodeStageConfigIssues, strings.Join(uniqueSummaries, "; "), "~", "apigw", rows)
+		setWave2Finding(&result, apiID, apigwCodeStageConfigIssues, strings.Join(uniqueSummaries, "; "), "~", "apigw", rows, "")
 	}
 	// All API Gateway findings are severity "~" (informational).
 	// IssueCount counts only "!" severity findings; "~" do not contribute.

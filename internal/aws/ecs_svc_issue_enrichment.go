@@ -166,7 +166,7 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 					summary = eventIssues[0]
 				}
 
-				setWave2Finding(&result, svcName, ecsSvcCodeDeploymentFailed, summary, "!", "ecs-svc", rows)
+				setWave2Finding(&result, svcName, ecsSvcCodeDeploymentFailed, summary, "!", "ecs-svc", rows, "")
 			}
 		}
 	}

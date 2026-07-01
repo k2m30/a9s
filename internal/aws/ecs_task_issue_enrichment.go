@@ -126,7 +126,7 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 				}
 
 				summary := rows[0].Value
-				setWave2Finding(&result, taskID, ecsTaskCodeTaskFailed, summary, "!", "ecs-task", rows)
+				setWave2Finding(&result, taskID, ecsTaskCodeTaskFailed, summary, "!", "ecs-task", rows, "")
 			}
 		}
 	}

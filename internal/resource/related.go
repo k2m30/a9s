@@ -235,15 +235,22 @@ func UnknownRelated(targetType string) RelatedCheckResult {
 // RelatedBlock.Actionable), and — via that ViewState field — the web template,
 // so the rule cannot drift between renderers.
 //
-//   - loading or errored      → not actionable
+//   - loading or errored       → not actionable
+//   - resolved count == 0      → never actionable, even when approximate
+//     (ApproximateZero() sets Count:0 — those are the "(0)" rows; a resolved
+//     zero is a dead-end pivot regardless of the approximate flag)
 //   - has a server-side filter → actionable regardless of the local count
-//     (the filtered fetch resolves the real count)
+//     (FetchFilter pivots always carry Count:-1, never 0, so they remain
+//     actionable via this branch — the filtered fetch resolves the real count)
 //   - count == -1 (no filter)  → unknown, not drillable
-//   - approximate (0+/N+)      → actionable (the target list re-runs the checker
-//     as more pages load, so matches surface incrementally)
+//   - approximate (N+)         → actionable when count > 0 (the target list
+//     re-runs the checker as more pages load, so matches surface incrementally)
 //   - otherwise                → count > 0
 func IsRelatedActionable(count int, approximate, hasFetchFilter, loading, hasErr bool) bool {
 	if loading || hasErr {
+		return false
+	}
+	if count == 0 {
 		return false
 	}
 	if hasFetchFilter {
