@@ -33,32 +33,22 @@ func ctEventsCheckerFor(shortName string) domain.RelatedChecker {
 // exactly once at program start (main() / TestMain) before any
 // catalog.Find / catalog.All / catalog.ByCategory call.
 //
-// Replaces the package-init-time `var ResourceTypes = allTypes()` pattern in
-// internal/catalog. By relocating the per-category catalog data into
-// internal/aws (AS-795a), Install can populate the catalog without forcing
-// internal/catalog to import internal/aws (which would close a cycle since
-// internal/aws already depends on internal/catalog through this file and
-// issue_enrichment.go).
+// The per-category catalog data lives in internal/aws so Install can populate
+// the catalog without forcing internal/catalog to import internal/aws (which
+// would close a cycle: internal/aws already depends on internal/catalog through
+// this file and issue_enrichment.go).
 //
 // Install is idempotent on identical input — calling it twice produces no
 // change. Calling SetTypes a second time with different data panics, which
 // catches double-install bugs in tests where one TestMain forgot to use the
 // same source slice as another.
-//
-// Per-category PRs AS-795b–m will populate the Fetcher / Wave2 / Related /
-// Navigable / FieldKeys / FieldAliases / FetchByIDs / FilteredFetcher /
-// ChildFetcher / IssueEnricherFieldKeys fields on each entry. AS-795a installs
-// identity / columns / color / augment only — the init() bodies in
-// internal/aws/*.go continue to populate internal/resource registries until
-// each category PR migrates them.
 func Install() {
 	catalog.SetTypes(allTopLevelTypes())
 	catalog.SetChildTypes(allChildTypes())
-	// AS-731: catalog → legacy bridge deleted. Production consumers read the
-	// catalog directly via resource.Get* wrappers, which fall back to catalog
-	// fields when their legacy registry map is empty. Tests that override
-	// behavior continue to use resource.Register* on the legacy maps for
-	// scoped, undo-able injection.
+	// Production consumers read the catalog directly via resource.Get*
+	// wrappers, which fall back to catalog fields when their legacy registry
+	// map is empty. Tests that override behavior continue to use
+	// resource.Register* on the legacy maps for scoped, undo-able injection.
 }
 
 // allTopLevelTypes concatenates the per-category top-level catalog slices into
@@ -86,19 +76,8 @@ func allTopLevelTypes() []catalog.ResourceTypeDef {
 }
 
 // allChildTypes concatenates the per-category child-type catalog slices into
-// one flat slice. The order mirrors allTopLevelTypes for consistency. Sibling
-// category PRs (AS-795b/d–m) extend this by appending their own
-// `<cat>ChildTypes` slice — using append-of-slices keeps the per-PR diff
-// localized to one new `all = append(all, <cat>ChildTypes...)` line.
-//
-// First populated in AS-808 / PR #395 round-2 with containersChildTypes
-// (ecr_images); AS-812 / PR #402 adds messagingChildTypes
-// (eb_rule_targets); AS-815 / PR #397 adds securityChildTypes
-// (iam_group_members, role_policies); AS-816 / PR #400 adds cicdChildTypes
-// (cb_builds, cb_build_logs, pipeline_stages). AS-947 / PR #TBD adds the
-// remaining per-category child slices (compute, containers, monitoring,
-// data, backup, databases, dns-cdn, networking, messaging) so the init()
-// bodies in internal/aws/*.go can be deleted in the same PR.
+// one flat slice. The order mirrors allTopLevelTypes for consistency; each
+// category appends its own `<cat>ChildTypes` slice.
 func allChildTypes() []catalog.ResourceTypeDef {
 	var all []catalog.ResourceTypeDef
 	all = append(all, computeChildTypes...)

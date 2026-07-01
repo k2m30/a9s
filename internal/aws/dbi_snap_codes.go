@@ -1,5 +1,5 @@
 // dbi_snap_codes.go — canonical FindingCode constants for the dbi-snap
-// resource type (RDS DB instance snapshot). Phase 03 PR-03e.
+// resource type (RDS DB instance snapshot).
 package aws
 
 import "github.com/k2m30/a9s/v3/internal/domain"

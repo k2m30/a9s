@@ -213,7 +213,7 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 
 			// Findings emits the entry for the detail-view Attention section
 			// AND drives the S4 status column at render time via
-			// phraseFromFindings(r.Findings) (per AS-140).
+			// phraseFromFindings(r.Findings).
 			result.Findings[res.ID] = domain.Finding{
 				Code:     code,
 				Phrase:   phrase,
@@ -231,8 +231,7 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 
 // glyphToSeverity maps a legacy "!" / "~" / "" severity glyph to the canonical
 // domain.Severity. Used by snapshot_cross_ref.go (and any other enricher
-// callsite that still parameterizes via glyph strings) until the per-enricher
-// migration replaces the glyph parameter with a typed domain.Severity.
+// callsite that still parameterizes via glyph strings).
 func glyphToSeverity(s string) domain.Severity {
 	switch s {
 	case "!":

@@ -27,7 +27,7 @@ const (
 //   - quota > 80% → severity "~", Summary "quota 80%+ used"
 //   - otherwise → no finding
 //
-// AS-1397: the enricher no longer writes FieldUpdates["status"]. The Wave-2
+// The enricher no longer writes FieldUpdates["status"]. The Wave-2
 // phrase is sourced at render time from r.Findings via phraseFromFindings;
 // row color is sourced from the Wave-2 finding's Severity via colorSES.
 //

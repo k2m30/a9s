@@ -114,7 +114,7 @@ func applyWave2ToRow(
 	if !ok || f.Phrase == "" {
 		return
 	}
-	// AS-1395: enricher-emitted Findings already carry the canonical Code and
+	// Enricher-emitted Findings already carry the canonical Code and
 	// Source. Source must be "wave2:<short>" for the existing app_enrich_fold
 	// readers (findingFromResource, findingsFromRows, stripWave2) to recognise
 	// the entry. Tolerate enrichers that forgot to set Source by stamping the

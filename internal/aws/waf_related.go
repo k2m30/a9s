@@ -1,7 +1,7 @@
 // waf_related.go defines the related-resource checkers for WAF Web ACLs.
 // The Related slice for "waf" is registered via the catalog struct literal in
-// catalog_security.go (AS-814); this file now contains only the per-target
-// checker functions referenced from that catalog entry.
+// catalog_security.go; this file contains only the per-target checker
+// functions referenced from that catalog entry.
 package aws
 
 import (

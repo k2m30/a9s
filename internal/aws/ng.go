@@ -156,7 +156,7 @@ func buildNodeGroupResource(clusterName, ngName string, ng *ekstypes.Nodegroup) 
 		}
 	}
 
-	// PR-03c: emit wave1 Findings for non-healthy lifecycle states.
+	// emit wave1 Findings for non-healthy lifecycle states.
 	// ACTIVE → no Finding (healthy). Fields["status"] is still populated
 	// so the existing structural Color path works for the wave2 fallback.
 	var findings []domain.Finding

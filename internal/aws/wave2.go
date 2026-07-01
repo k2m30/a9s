@@ -1,9 +1,9 @@
 // wave2.go — Wave 2 enricher accessors over the catalog struct literals.
 //
-// AS-795n replaced the legacy package-init IssueEnricherRegistry map with the
-// catalog.ResourceTypeDef.Wave2 field. This file provides the read-side API
-// (Wave2EnricherFor, AllWave2) plus a test override map so test packages can
-// inject sentinel enrichers without mutating the immutable catalog.
+// Wave 2 enricher registrations live as the catalog.ResourceTypeDef.Wave2
+// field. This file provides the read-side API (Wave2EnricherFor, AllWave2)
+// plus a test override map so test packages can inject sentinel enrichers
+// without mutating the immutable catalog.
 package aws
 
 import (
@@ -36,8 +36,6 @@ var testWave2Overrides = map[string]IssueEnricher{} //nolint:gochecknoglobals //
 //  2. catalog.Find(shortName).Wave2 cast to IssueEnricher
 //
 // ok is false when neither source has a non-nil Fn for the name.
-//
-// Post-AS-795n: replaces direct IssueEnricherRegistry[shortName] reads.
 func Wave2EnricherFor(shortName string) (IssueEnricher, bool) {
 	testWave2Mu.RLock()
 	override, hasOverride := testWave2Overrides[shortName]
@@ -61,7 +59,7 @@ func Wave2EnricherFor(shortName string) (IssueEnricher, bool) {
 
 // AllWave2 returns every Wave 2 enricher (from catalog + test overrides) in
 // dispatch order: ascending Priority, then alphabetical ShortName within a
-// priority tier. Replaces iteration over IssueEnricherRegistry after AS-795n.
+// priority tier.
 //
 // Test overrides win on name collision; a test override with a nil Fn deletes
 // the catalog entry from the returned slice for the duration of the test.

@@ -219,7 +219,7 @@ func computeDBCFindings(cluster docdbtypes.DBCluster) []domain.Finding {
 // dedupResourcesByID returns rs with duplicate Resource.ID entries removed,
 // keeping the first occurrence. Used by the dbc and dbc-snap fetchers where
 // the DocDB and RDS SDKs both return overlapping rows for the same cluster /
-// snapshot (AS-145, verified live: the DocDB DescribeDBClusters endpoint
+// snapshot (verified live: the DocDB DescribeDBClusters endpoint
 // returns aurora-postgresql clusters too). DocDB-side rows are appended first
 // at the call sites, so first-occurrence wins keeps the docdb-side row.
 //

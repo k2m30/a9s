@@ -43,10 +43,10 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 		return result, nil
 	}
 
-	// Deterministic ARN-suffix matching via ordered probeIDs. AS-140 removed
-	// the parallel statusByID map: the merged S4 phrase (single-finding or
+	// Deterministic ARN-suffix matching via ordered probeIDs. There is no
+	// parallel statusByID map: the merged S4 phrase (single-finding or
 	// Wave-1+Wave-2 stacked) is computed at render time from r.Findings, so
-	// the enricher no longer needs to read the fetcher's status overlay here.
+	// the enricher does not read the fetcher's status overlay here.
 	probeIDs := make([]string, 0, len(resources))
 	for _, r := range resources {
 		if r.ID != "" {

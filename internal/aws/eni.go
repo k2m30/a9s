@@ -85,7 +85,7 @@ func FetchNetworkInterfacesPage(ctx context.Context, api EC2DescribeNetworkInter
 		r := resource.Resource{
 			ID:   eniID,
 			Name: name,
-			// Status: removed — PR-03b migrates fetcher to Findings for lifecycle states.
+			// Status intentionally unset — lifecycle state is emitted as a Finding.
 			Fields: map[string]string{
 				"eni_id":            eniID,
 				"name":              name,
@@ -98,7 +98,7 @@ func FetchNetworkInterfacesPage(ctx context.Context, api EC2DescribeNetworkInter
 			RawStruct: eni,
 		}
 
-		// Phase 03 PR-03b: emit canonical Findings for non-healthy ENI states.
+		// emit canonical Findings for non-healthy ENI states.
 		// in-use → healthy (no Finding). available → SevWarn (potential cost waste,
 		// except for requester-managed which are managed by AWS services).
 		// attaching / detaching → SevWarn (transitional).
