@@ -249,9 +249,9 @@ func computeDBIFindings(db rdstypes.DBInstance) []domain.Finding {
 	}
 	// Unknown status: do NOT emit a wave1 finding. The fetcher falls back to
 	// the raw RDS status string for Fields["status"], and colorDBI's legacy
-	// classifier handles severity (preserves the pre-PR-03e overlay semantics
-	// for new/unforeseen states such as `incompatible-*` / `inaccessible-*`
-	// variants the broken map does not enumerate).
+	// classifier handles severity for new/unforeseen states such as
+	// `incompatible-*` / `inaccessible-*` variants the broken map does not
+	// enumerate.
 	return nil
 }
 

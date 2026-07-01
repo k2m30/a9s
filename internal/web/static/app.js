@@ -13,7 +13,13 @@
     if (arg !== undefined && arg !== "") body.arg = String(arg);
     if (n !== undefined && n !== 0) body.n = n;
 
-    document.getElementById("loading-indicator").style.display = "block";
+    // Only reveal the loading indicator if the round-trip is actually slow.
+    // Most actions return within a frame, so showing it immediately made every
+    // keypress flash "loading". Delay it ~180ms and cancel on completion.
+    var loadingTimer = setTimeout(function () {
+      var li = document.getElementById("loading-indicator");
+      if (li) li.style.display = "block";
+    }, 180);
 
     fetch("/action", {
       method: "POST",
@@ -31,11 +37,19 @@
         return r.text().then(function (html) {
           var el = document.getElementById("main");
           if (el) el.innerHTML = html;
+          // Screen changed: clear the row-click debounce so a same-index click
+          // on the new screen is never suppressed. Covers clickField /
+          // clickRelated / keyboard actions; clickSelect clears it via its own
+          // move-chain callback (which does not route through sendAction).
+          lastClickIdx = -1;
+          lastClickAt = 0;
         });
       })
       .catch(function (e) { console.error("action error:", e); })
       .finally(function () {
-        document.getElementById("loading-indicator").style.display = "none";
+        clearTimeout(loadingTimer);
+        var li = document.getElementById("loading-indicator");
+        if (li) li.style.display = "none";
       });
   }
 
@@ -43,18 +57,42 @@
   // Sends move-up (to top) then the right number of move-downs, then select.
   // Simpler: just send a special "goto" by looping move-down from 0. Instead,
   // use move-top + N×move-down + select chained sequentially via async.
+  // clickBusy guards against a double-click firing the move-chain twice: the
+  // second click would run move-top/down/select on the screen the first click
+  // already navigated to, drilling a level deeper ("two screens away").
+  var clickBusy = false, lastClickIdx = -1, lastClickAt = 0;
   function clickSelect(idx) {
+    var now = Date.now();
+    if (clickBusy) return;
+    // Ignore a repeat click on the same row within 500ms. lastClickIdx is reset
+    // to -1 after every navigation — this chain's done-callback below and every
+    // sendAction DOM swap — so the window only ever suppresses a double-click's
+    // second tap before the screen changes, never a legitimate click on the same
+    // row index of the screen we just navigated to.
+    if (idx === lastClickIdx && now - lastClickAt < 500) return;
+    lastClickIdx = idx;
+    lastClickAt = now;
+    clickBusy = true;
     // Chain: move-top → N × move-down → select (all sequential).
     var steps = [{ kind: "move-top" }];
     for (var i = 0; i < idx; i++) {
       steps.push({ kind: "move-down" });
     }
     steps.push({ kind: "select" });
-    chainActions(steps, 0);
+    chainActions(steps, 0, function () {
+      clickBusy = false;
+      // Navigation finished and the screen changed: clear the same-row debounce
+      // so an intentional click on the same row index of the new screen is not
+      // dropped. The in-flight move-chain (clickBusy) already absorbed the
+      // second tap of a physical double-click, which lands well before these
+      // sequential round-trips complete.
+      lastClickIdx = -1;
+      lastClickAt = 0;
+    });
   }
 
-  function chainActions(steps, i) {
-    if (i >= steps.length) return;
+  function chainActions(steps, i, done) {
+    if (i >= steps.length) { if (done) done(); return; }
     var s = steps[i];
     var body = { kind: s.kind };
     if (s.arg) body.arg = s.arg;
@@ -68,19 +106,34 @@
       body: JSON.stringify(body),
     })
       .then(function (r) {
-        if (!r.ok) return;
+        if (!r.ok) { if (done) done(); return; }
         return r.text().then(function (html) {
           var el = document.getElementById("main");
           if (el) el.innerHTML = html;
-          chainActions(steps, i + 1);
+          chainActions(steps, i + 1, done);
         });
       })
-      .catch(function (e) { console.error(e); });
+      .catch(function (e) { console.error(e); if (done) done(); });
+  }
+
+  // clickRelated navigates to the related-panel row at visible index idx.
+  // Dead-end rows (count <= 0 and not loading) have no onclick so this is
+  // only called for navigable rows, but the controller guards as well.
+  function clickRelated(idx) {
+    sendAction("related-select", String(idx));
+  }
+
+  // clickField navigates to the resource linked by the navigable detail field
+  // at visible index idx (matches $i in {{range $i, $f := .Fields}}).
+  function clickField(idx) {
+    sendAction("field-select", String(idx));
   }
 
   // Expose for use in onclick handlers in templates.
   window.sendAction = sendAction;
   window.clickSelect = clickSelect;
+  window.clickRelated = clickRelated;
+  window.clickField = clickField;
 
   // Keyboard map: TUI key → Action
   var keyMap = [
@@ -91,6 +144,8 @@
     { key: "ArrowRight", action: { kind: "scroll-right" } },
     { key: "k",          action: { kind: "move-up" } },
     { key: "j",          action: { kind: "move-down" } },
+    { key: "h",          action: { kind: "scroll-left" } },
+    { key: "l",          action: { kind: "scroll-right" } },
     { key: "g",          action: { kind: "move-top" } },
     { key: "G",          action: { kind: "move-bottom" } },
     { key: "Enter",      action: { kind: "select" } },
@@ -105,13 +160,16 @@
     { key: "i",          action: { kind: "open-identity" } },
 
     // List actions
-    { key: "r",          action: { kind: "refresh" } },
+    // r toggles the related panel (TUI keys.go ToggleRelated="r"); refresh is
+    // ctrl+r (handled in the keydown handler), matching the footer hints. The
+    // web keymap previously had these reversed (r=refresh, R=toggle-related).
+    { key: "r",          action: { kind: "toggle-related" } },
     { key: "m",          action: { kind: "load-more" } },
     { key: "c",          action: { kind: "copy" } },
     { key: "w",          action: { kind: "toggle-wrap" } },
-    { key: "!",          action: { kind: "toggle-attention" } },
-    { key: "R",          action: { kind: "toggle-related" } },
+    { key: "!",          action: { kind: "open-error-log" } },
     { key: "Tab",        action: { kind: "toggle-focus" } },
+    { key: "t",          action: { kind: "cloudtrail" } },
 
     // Page scroll
     { key: "PageUp",     action: { kind: "page-up",   n: 20 } },
@@ -134,6 +192,25 @@
     sendAction("search", val);
   }
 
+  // commandMode holds state for the ":" command palette.
+  var commandMode = false;
+  var commandBuf = "";
+
+  // showInputBar / hideInputBar render the client-side mode line (mirrors the
+  // TUI's bottom input). prefix is "/" (filter), ":" (command), or "search: ".
+  // Shown the instant the mode key is pressed so an empty buffer is still
+  // visible — the fix for "/ shows nothing until the first letter".
+  function showInputBar(prefix, buf) {
+    var bar = document.getElementById("input-bar");
+    if (!bar) return;
+    bar.textContent = prefix + buf + "█"; // block cursor
+    bar.style.display = "block";
+  }
+  function hideInputBar() {
+    var bar = document.getElementById("input-bar");
+    if (bar) bar.style.display = "none";
+  }
+
   document.addEventListener("keydown", function (e) {
     // Ignore when focus is in an input/textarea.
     var tag = (document.activeElement || {}).tagName || "";
@@ -145,23 +222,27 @@
         filterMode = false;
         filterBuf = "";
         setFilter("");
+        hideInputBar();
         e.preventDefault();
         return;
       }
       if (e.key === "Enter") {
         filterMode = false;
+        hideInputBar();
         e.preventDefault();
         return;
       }
       if (e.key === "Backspace") {
         filterBuf = filterBuf.slice(0, -1);
         setFilter(filterBuf);
+        showInputBar("/", filterBuf);
         e.preventDefault();
         return;
       }
       if (e.key.length === 1) {
         filterBuf += e.key;
         setFilter(filterBuf);
+        showInputBar("/", filterBuf);
         e.preventDefault();
         return;
       }
@@ -174,6 +255,7 @@
         searchMode = false;
         searchBuf = "";
         sendAction("search-clear", "");
+        hideInputBar();
         e.preventDefault();
         return;
       }
@@ -185,12 +267,48 @@
       if (e.key === "Backspace") {
         searchBuf = searchBuf.slice(0, -1);
         setSearch(searchBuf);
+        showInputBar("search: ", searchBuf);
         e.preventDefault();
         return;
       }
       if (e.key.length === 1) {
         searchBuf += e.key;
         setSearch(searchBuf);
+        showInputBar("search: ", searchBuf);
+        e.preventDefault();
+        return;
+      }
+      return;
+    }
+
+    // Command mode: : was pressed. Mirrors the TUI's colon-command palette;
+    // the command is collected locally and dispatched on Enter (the controller's
+    // ActionCommand handles root/profile/region/theme/help/<resource-shortname>).
+    if (commandMode) {
+      if (e.key === "Escape") {
+        commandMode = false;
+        commandBuf = "";
+        hideInputBar();
+        e.preventDefault();
+        return;
+      }
+      if (e.key === "Enter") {
+        commandMode = false;
+        hideInputBar();
+        if (commandBuf) sendAction("command", commandBuf);
+        commandBuf = "";
+        e.preventDefault();
+        return;
+      }
+      if (e.key === "Backspace") {
+        commandBuf = commandBuf.slice(0, -1);
+        showInputBar(":", commandBuf);
+        e.preventDefault();
+        return;
+      }
+      if (e.key.length === 1) {
+        commandBuf += e.key;
+        showInputBar(":", commandBuf);
         e.preventDefault();
         return;
       }
@@ -201,6 +319,16 @@
     if (e.key === "/" && !e.ctrlKey && !e.metaKey) {
       filterMode = true;
       filterBuf = "";
+      showInputBar("/", "");
+      e.preventDefault();
+      return;
+    }
+
+    // Enter command mode (:).
+    if (e.key === ":" && !e.ctrlKey && !e.metaKey) {
+      commandMode = true;
+      commandBuf = "";
+      showInputBar(":", "");
       e.preventDefault();
       return;
     }
@@ -209,6 +337,20 @@
     if (e.key === "s" && (e.ctrlKey || e.metaKey)) {
       searchMode = true;
       searchBuf = "";
+      showInputBar("search: ", "");
+      e.preventDefault();
+      return;
+    }
+
+    // Ctrl+Z: issues-only filter. Ctrl+R: refresh. preventDefault stops the
+    // browser's undo/reload so these reach the app like the TUI footer keys.
+    if ((e.ctrlKey || e.metaKey) && (e.key === "z" || e.key === "Z")) {
+      sendAction("toggle-attention", "");
+      e.preventDefault();
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && (e.key === "r" || e.key === "R")) {
+      sendAction("refresh", "");
       e.preventDefault();
       return;
     }
@@ -226,11 +368,23 @@
     }
 
     // Child-view triggers.
-    var childKeys = { "e": "e", "L": "L", "s": "s", "t": "t" };
+    var childKeys = { "e": "e", "L": "L", "s": "s" };
     if (childKeys[e.key] && !e.ctrlKey) {
       sendAction("child-view", e.key);
       e.preventDefault();
       return;
+    }
+
+    // Enter on a navigable, focused detail field navigates that field (the
+    // controller's field-select) rather than the generic select. The navigation
+    // logic lives in the controller; this only routes the key.
+    if (e.key === "Enter") {
+      var fcur = document.querySelector(".field-row.field-cursor.field-navigable");
+      if (fcur && fcur.getAttribute("data-fidx") !== null) {
+        sendAction("field-select", fcur.getAttribute("data-fidx"));
+        e.preventDefault();
+        return;
+      }
     }
 
     // Look up in key map.

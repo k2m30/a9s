@@ -556,5 +556,29 @@ func buildECSTaskDefinitions() map[string]*ecstypes.TaskDefinition {
 			},
 		},
 	}
+
+	// The generated filler services (ecsServiceNamePool) reference task-def
+	// "<name>:<i+1>" (matching buildECSServices' tdVersion = i+1). Register a
+	// minimal task-def for each so DescribeTaskDefinition resolves them instead
+	// of returning a ClientException — a self-consistent demo graph never points
+	// a service at a task definition the fake does not have.
+	for i, name := range ecsServiceNamePool {
+		arn := fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:task-definition/%s:%d", name, i+1)
+		defs[arn] = &ecstypes.TaskDefinition{
+			TaskDefinitionArn: aws.String(arn),
+			Family:            aws.String(name),
+			Status:            ecstypes.TaskDefinitionStatusActive,
+			NetworkMode:       ecstypes.NetworkModeAwsvpc,
+			Cpu:               aws.String("256"),
+			Memory:            aws.String("512"),
+			ContainerDefinitions: []ecstypes.ContainerDefinition{
+				{
+					Name:  aws.String(name),
+					Image: aws.String("alpine:latest"),
+					Cpu:   256,
+				},
+			},
+		}
+	}
 	return defs
 }

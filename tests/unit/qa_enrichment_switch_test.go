@@ -36,9 +36,8 @@ import (
 // Types seeded: "ec2", "rds" — two different types to verify both are cleared.
 func seedEnrichmentFindings(m tui.Model) tui.Model {
 	// ec2: Gen=0 (matches fresh enrichmentGen=0), TypeGen=0 (matches fresh per-type gen=0).
-	// TODO: expose tui.Model.EnrichmentGen() accessor to read the actual pre-switch gen
-	// dynamically instead of hardcoding 0. Currently requires invasive refactor; 0 is
-	// the correct value for a freshly constructed model.
+	// Gen=0 is hardcoded because tui.Model does not expose an EnrichmentGen() accessor.
+	// 0 is the correct value for a freshly constructed model.
 	m, _ = rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Issues:       2,

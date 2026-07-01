@@ -1,6 +1,6 @@
 // dbc_codes.go — canonical FindingCode constants for the dbc resource type
 // (DocumentDB cluster + Aurora DB cluster — they share the dbc short-name).
-// Phase 03 PR-03e.
+//
 package aws
 
 import "github.com/k2m30/a9s/v3/internal/domain"

@@ -6,11 +6,9 @@
 //
 // This file defines the screen-descriptor contract used by adapters to
 // render multi-screen workflows (logs, CloudTrail, cost views, …) without
-// growing central shell switches. Phase 05 PR-05a-scaffold creates the
-// types only; per-handler PRs (AS-72-h1..h8) wire them to live behavior.
-// PR-05a-h4-a (AS-769) adds the typed ScreenPayload contract and the
-// concrete selector/reveal/child-list payloads used by the four ported
-// view-stack-pushing handlers.
+// growing central shell switches. It includes the typed ScreenPayload
+// contract and the concrete selector/reveal/child-list payloads used by
+// the view-stack-pushing handlers.
 package runtime
 
 import "github.com/k2m30/a9s/v3/internal/domain"
@@ -20,8 +18,8 @@ import "github.com/k2m30/a9s/v3/internal/domain"
 // constructs renderer types itself.
 type ScreenID string
 
-// Screen IDs emitted by PR-05a-h4-a handlers and the headless controller
-// (PR-B). Capability screens (logs, ct.scan, cost) reuse the existing
+// Screen IDs used by the headless controller's applyNavResult and the TUI
+// adapter. Capability screens (logs, ct.scan, cost) reuse the existing
 // ScreenContext-only PushScreen path and are not enumerated here.
 const (
 	ScreenProfileSelector ScreenID = "profile-selector"
@@ -30,9 +28,7 @@ const (
 
 	// ScreenHelp, ScreenRegion, ScreenTheme, ScreenIdentity are used by the
 	// headless controller's applyNavResult to push navigate-target screens that
-	// the TUI adapter constructs directly from key-handling context. Introduced
-	// in PR-B so the headless controller has stable ScreenIDs for these screens
-	// without depending on renderer-specific view types.
+	// the TUI adapter constructs directly from key-handling context.
 	ScreenHelp     ScreenID = "help"
 	ScreenRegion   ScreenID = "region"
 	ScreenTheme    ScreenID = "theme"
@@ -40,7 +36,7 @@ const (
 
 	// ScreenResourceList is the live or cached top-level resource list
 	// pushed by NavigateKindPushResourceList / NavigateKindPushResourceListCached.
-	// Row data (ListState) is populated in PR-C once the result lane lands.
+	// Row data (ListState) is populated by applyResourcesLoaded when resources arrive.
 	ScreenResourceList ScreenID = "resource-list"
 
 	// ScreenMenu is the root main-menu screen. The controller pushes it on
@@ -57,6 +53,11 @@ const (
 	// uses this ID; the TUI adapter constructs a DetailModel from the
 	// associated DetailState.Resource.
 	ScreenDetail ScreenID = "detail"
+
+	// ScreenErrorLog is the session error-log text viewer pushed when the user
+	// presses '!' and at least one error has been recorded this session.
+	// Its body is a TextBody with one line per error entry (newest-first).
+	ScreenErrorLog ScreenID = "error-log"
 )
 
 // ScreenContext is the input handed to an adapter when the runtime asks

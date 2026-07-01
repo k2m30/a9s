@@ -220,15 +220,23 @@ func (m *DetailModel) recalcViewportWidth() {
 }
 
 func (m DetailModel) currentRightColWidth() int {
+	return ComputeRightColWidth(m.width, m.rightColWidth)
+}
+
+// ComputeRightColWidth returns the right-column width for a given terminal
+// inner width and base right-column width. Used by the renderer stack to size
+// the right column without a DetailModel instance (e.g., after Ctrl+R resets
+// the column on the rendererState directly).
+func ComputeRightColWidth(innerWidth, baseWidth int) int {
 	// Keep right panel readable at medium widths while preserving left detail space.
-	if m.width <= 0 {
-		return m.rightColWidth
+	if innerWidth <= 0 {
+		return baseWidth
 	}
-	if m.width >= 100 {
-		return m.rightColWidth
+	if innerWidth >= 100 {
+		return baseWidth
 	}
-	w := max(24, m.width/3)
-	maxAllowed := max(16, m.width-40) // keep at least 40 cols for left pane
+	w := max(24, innerWidth/3)
+	maxAllowed := max(16, innerWidth-40) // keep at least 40 cols for left pane
 	if w > maxAllowed {
 		w = maxAllowed
 	}
@@ -289,7 +297,19 @@ func (m DetailModel) FrameTitle() string {
 }
 
 // BottomHints implements Hintable for DetailModel.
+// When the model is controller-backed, delegates to the controller's footer
+// hints so the TUI and web renderers share a single source of truth.
+// Non-controller-backed callers (tests, isolated views) use the live model state.
 func (m DetailModel) BottomHints() []layout.KeyHint {
+	if m.ctrl != nil {
+		ctrlHints := m.ctrl.Snapshot().Footer
+		hints := make([]layout.KeyHint, len(ctrlHints))
+		for i, kh := range ctrlHints {
+			hints[i] = layout.KeyHint{Key: kh.Key, Desc: kh.Help}
+		}
+		return hints
+	}
+
 	var hints []layout.KeyHint
 
 	// Right column focused state
@@ -427,7 +447,7 @@ func (m DetailModel) SourceResource() resource.Resource {
 // a new value invalidates the field list and triggers a viewport re-render so
 // the Attention section appears or disappears immediately.
 //
-// Phase 03 W1.4b.3: the wave-2 entry now lives directly on m.res.Findings
+// The wave-2 entry lives directly on m.res.Findings
 // (tagged with Source="wave2:…") instead of a separate DetailModel field, so
 // the renderer reads a single source of truth (m.res.Findings + AttentionDetails).
 // Subsequent calls strip any existing wave-2 entry before appending the new
@@ -547,13 +567,16 @@ func (m *DetailModel) ApplyRelatedResults(msgs []messages.RelatedCheckResult) {
 			if msg.Result.Err != nil {
 				errMsg = msg.Result.Err.Error()
 			}
-			m.ctrl.ApplyDetailRelatedResult(
+			m.ctrl.ApplyDetailRelatedResultForResource(
+				m.resourceType,
+				m.res.ID,
 				msg.DefDisplayName,
 				msg.Result.TargetType,
 				msg.Result.Count,
 				false,
 				errMsg,
 				msg.Result.Approximate,
+				msg.Result.ResourceIDs,
 				msg.Result.FetchFilter,
 			)
 		}
@@ -586,7 +609,7 @@ func (m DetailModel) ConsumesEscapeLocally() bool {
 //
 // The related panel is rendered from body.Related + body.RelatedCursor +
 // body.RelatedScroll + body.RelatedFocused via renderDetailRelatedFromBody,
-// which replicates rightColumnModel.View() byte-for-byte from body data.
+// which replicates RightColumnModel.View() byte-for-byte from body data.
 // The panel visibility gate uses body.RelatedVisible (set by buildDetailBody
 // when the type has registered defs or ds.RelatedVisible is true), matching
 // the TUI's rightColShowing() auto-show behaviour.
@@ -601,16 +624,46 @@ func (m *DetailModel) RenderDetail(body app.DetailBody) string {
 	// and ensures the cursor-row background highlight is embedded at the correct
 	// scroll-offset position (Bug 1 fix).
 	leftRaw := renderDetailFieldsFromBody(m, body)
+
+	// Apply search highlights when a query is active. Uses the same approach
+	// as RenderText: construct a local SearchModel from body state, call Apply
+	// to inject ANSI colour spans, and scroll the viewport to the current match.
+	scrollY := body.ScrollY
+	if body.Search != "" {
+		plain := ansi.Strip(leftRaw)
+		var sm SearchModel
+		sm.active = true
+		sm.SetQuery(body.Search)
+		sm.SetContent(plain)
+		n := len(sm.matches)
+		if n > 0 {
+			// Apply modulo so the controller's unbounded cursor wraps correctly.
+			sm.currentIdx = ((body.SearchCursor % n) + n) % n
+		}
+		var matchLine int
+		leftRaw, matchLine = sm.Apply(leftRaw)
+		if matchLine >= 0 {
+			scrollY = matchLine
+		}
+	}
+
 	m.viewport.SoftWrap = body.Wrap
 	m.viewport.SetContent(leftRaw)
 	m.viewport.GotoTop()
-	m.viewport.SetYOffset(body.ScrollY)
+	m.viewport.SetYOffset(scrollY)
 
 	// Use body.RelatedVisible as the gate — it mirrors the TUI's rightColShowing()
 	// (auto-show when defs exist + wide terminal, or explicit user toggle).
 	// Width guard matches the TUI's MinInnerContentWidth check.
 	if body.RelatedVisible && m.width >= layout.MinInnerContentWidth {
 		rightW := m.currentRightColWidth()
+		leftW := m.width - rightW - 1
+		// Size the viewport to the left-panel width so its View() clips content
+		// to leftW, not to m.width. Without this, transient detail paths (e.g.
+		// renderDetail in renderer.go) that create a fresh viewport at rs.width
+		// produce leftContent lines wider than leftW, causing the combined line
+		// (left + sep + right) to exceed m.width.
+		m.viewport.SetWidth(leftW)
 		sep := styles.ColSepDim.Render("│")
 		if body.RelatedFocused {
 			sep = styles.ColSepAccent.Render("│")
@@ -620,7 +673,6 @@ func (m *DetailModel) RenderDetail(body app.DetailBody) string {
 		leftLines := strings.Split(leftContent, "\n")
 		rightLines := strings.Split(rightContent, "\n")
 		maxLines := max(len(leftLines), len(rightLines))
-		leftW := m.width - rightW - 1
 		var sb strings.Builder
 		for i := range maxLines {
 			if i > 0 {
@@ -649,7 +701,7 @@ func (m *DetailModel) RenderDetail(body app.DetailBody) string {
 }
 
 // renderDetailRelatedFromBody renders the RELATED right panel from body data,
-// replicating rightColumnModel.View() byte-for-byte without a live model.
+// replicating RightColumnModel.View() byte-for-byte without a live model.
 // w is the panel width; h is the panel height (same as viewport height).
 func renderDetailRelatedFromBody(body app.DetailBody, w, h int) string {
 	if w <= 0 {
@@ -658,7 +710,7 @@ func renderDetailRelatedFromBody(body app.DetailBody, w, h int) string {
 
 	lines := make([]string, 0, h)
 
-	// Header: "RELATED" centered — mirrors rightColumnModel.View() header block.
+	// Header: "RELATED" centered — mirrors RightColumnModel.View() header block.
 	header := "RELATED"
 	padLeft := max((w-lipgloss.Width(header))/2, 0)
 	centeredHeader := strings.Repeat(" ", padLeft) + header
@@ -666,7 +718,7 @@ func renderDetailRelatedFromBody(body app.DetailBody, w, h int) string {
 
 	switch {
 	case len(body.Related) == 0:
-		// Mirror rightColumnModel.View(): an active filter with no surviving
+		// Mirror RightColumnModel.View(): an active filter with no surviving
 		// rows shows "No matches"; otherwise the panel is genuinely empty.
 		if body.RelatedFilterActive {
 			lines = append(lines, styles.DimText.Render("  No matches"))

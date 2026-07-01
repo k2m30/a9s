@@ -1,6 +1,5 @@
 // runtime_adapter_related.go — Bubble Tea adapter glue for two runtime entry
-// points: HandleRelatedNavigate (Phase 05 PR-05a-h4, AS-150) and
-// HandleRelatedCheckStarted (Phase 05 PR-05a-h-related, AS-154).
+// points: HandleRelatedNavigate and HandleRelatedCheckStarted.
 //
 // handleRelatedNavigate replaces the deleted entry point from
 // internal/tui/app_handlers_related_navigate.go. It constructs a transient
@@ -37,13 +36,9 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
-// handleRelatedNavigate replaces the entry point previously in
-// internal/tui/app_handlers_related_navigate.go. The signature is identical
-// so the existing app.go dispatch line is unchanged.
-//
-// It constructs a transient runtime.Core to invoke the migrated policy
-// (HandleRelatedNavigate), then builds the view and starts any required fetch
-// based on the returned NavigationResult and TaskRequests.
+// handleRelatedNavigate invokes runtime.Core's HandleRelatedNavigate, then builds
+// the view and starts any required fetch based on the returned NavigationResult
+// and TaskRequests.
 func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, tea.Cmd) {
 	ev := runtime.RelatedNavigateEvent{
 		TargetType:     msg.TargetType,
@@ -107,8 +102,11 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 			rl.SetFetchFilter(result.FetchFilter)
 			rl.SetEscPops(true)
 			rl.SetSize(m.innerSize())
-			rl, initCmd := rl.Init()
-			m.pushView(&rl)
+			_, initCmd := rl.Init()
+			rs := newListRS(rt.ShortName)
+			w, h := m.innerSize()
+			rs.width, rs.height = w, h
+			m.pushRS(rs)
 			return m, tea.Batch(initCmd, m.fetchResourcesFiltered(msg.TargetType, result.FetchFilter, m.core.AvailabilityGen()))
 		}
 
@@ -189,7 +187,10 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 					}
 					rl.SetEscPops(true)
 					rl.SetSize(m.innerSize())
-					m.pushView(&rl)
+					rs := newListRS(rt.ShortName)
+					w, h := m.innerSize()
+					rs.width, rs.height = w, h
+					m.pushRS(rs)
 					fetchCmd := relatedNavigateTasksToCmd(m, msg.TargetType, result, tasks)
 					return m, fetchCmd
 				}
@@ -226,7 +227,10 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 				}
 				rl.SetEscPops(true)
 				rl.SetSize(m.innerSize())
-				m.pushView(&rl)
+				rs2 := newListRS(rt.ShortName)
+				w2, h2 := m.innerSize()
+				rs2.width, rs2.height = w2, h2
+				m.pushRS(rs2)
 				if fullyCovered {
 					return m, nil
 				}
@@ -271,7 +275,10 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 					}
 					rl.SetEscPops(true)
 					rl.SetSize(m.innerSize())
-					m.pushView(&rl)
+					rs3 := newListRS(rt.ShortName)
+					w3, h3 := m.innerSize()
+					rs3.width, rs3.height = w3, h3
+					m.pushRS(rs3)
 					return m, nil
 				}
 			}
@@ -346,11 +353,38 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 			detail := views.NewDetailWithCtrl(r, msg.TargetType, m.viewConfig, m.keys, m.ctrl)
 			detail.SetNavProvider(resource.GetNavigableFields)
 			detail.SetSize(m.innerSize())
-			m.pushView(&detail)
-			if detail.NeedsRelatedCheck() {
+			detailRS := newDetailRS(msg.TargetType)
+			wD, hD := m.innerSize()
+			detailRS.width, detailRS.height = wD, hD
+			defs := resource.GetRelated(msg.TargetType)
+			if len(defs) > 0 {
+				detailRS.rightCol = views.NewRightColumn(defs, r, msg.TargetType)
+				detailRS.rightColAutoShown = true
+				detailRS.rightColVisible = true
+			}
+			m.pushRS(detailRS)
+			needsRelated := detail.NeedsRelatedCheck()
+			if needsRelated {
 				ck := runtime.RelatedCacheKey(msg.TargetType, r.ID)
 				if cached, ok := m.core.RelatedCacheGet(ck); ok && len(cached) > 0 {
-					detail.ApplyRelatedResults(runtime.RelatedCacheReplay(msg.TargetType, cached))
+					for _, relMsg := range runtime.RelatedCacheReplay(msg.TargetType, cached) {
+						errMsg := ""
+						if relMsg.Result.Err != nil {
+							errMsg = relMsg.Result.Err.Error()
+						}
+						m.ctrl.ApplyDetailRelatedResultForResource(
+							msg.TargetType,
+							r.ID,
+							relMsg.DefDisplayName,
+							relMsg.Result.TargetType,
+							relMsg.Result.Count,
+							false,
+							errMsg,
+							relMsg.Result.Approximate,
+							relMsg.Result.ResourceIDs,
+							relMsg.Result.FetchFilter,
+						)
+					}
 					return m, nil
 				}
 				srcRes := r

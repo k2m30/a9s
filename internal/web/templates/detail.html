@@ -3,27 +3,27 @@
   <div class="detail-main">
     {{if .Search}}<div style="color:var(--warn);font-size:12px;">Search: {{.Search}}</div>{{end}}
     <div class="detail-fields">
-      {{range .Fields}}
-        {{if .IsSpacer}}
+      {{range $i, $f := .Fields}}
+        {{if $f.IsSpacer}}
           <div class="field-row spacer"></div>
-        {{else if .IsSection}}
-          <div class="field-row section">{{.Key}}</div>
-        {{else if .IsHeader}}
-          <div class="field-row header">{{.Key}}</div>
-        {{else if .IsSubField}}
-          <div class="field-row sub{{if .IsNavigable}} field-navigable{{end}}">
-            {{if eq .Key .Value}}
+        {{else if $f.IsSection}}
+          <div class="field-row section{{if and (eq $i $.FieldCursor) (not $.RelatedFocused)}} field-cursor{{end}}">{{$f.Key}}</div>
+        {{else if $f.IsHeader}}
+          <div class="field-row header{{if and (eq $i $.FieldCursor) (not $.RelatedFocused)}} field-cursor{{end}}">{{$f.Key}}</div>
+        {{else if $f.IsSubField}}
+          <div class="field-row sub{{if $f.IsNavigable}} field-navigable{{end}}{{if and (eq $i $.FieldCursor) (not $.RelatedFocused)}} field-cursor{{end}}" data-fidx="{{$i}}"{{if $f.IsNavigable}} onclick="clickField({{$i}})"{{end}}>
+            {{if eq $f.Key $f.Value}}
             {{/* label-less pre-formatted line (Key==Value) — render once, like the TUI */}}
-            <span class="field-value">{{.Value}}</span>
+            <span class="field-value">{{$f.Value}}</span>
             {{else}}
-            <span class="field-key">{{.Key}}</span>
-            <span class="field-value">{{.Value}}</span>
+            <span class="field-key">{{$f.Key}}</span>
+            <span class="field-value">{{$f.Value}}</span>
             {{end}}
           </div>
         {{else}}
-          <div class="field-row{{if .IsNavigable}} field-navigable{{end}}">
-            <span class="field-key">{{.Key}}</span>
-            <span class="field-value">{{.Value}}</span>
+          <div class="field-row{{if $f.IsNavigable}} field-navigable{{end}}{{if and (eq $i $.FieldCursor) (not $.RelatedFocused)}} field-cursor{{end}}" data-fidx="{{$i}}"{{if $f.IsNavigable}} onclick="clickField({{$i}})"{{end}}>
+            <span class="field-key">{{$f.Key}}</span>
+            <span class="field-value">{{$f.Value}}</span>
           </div>
         {{end}}
       {{end}}
@@ -48,12 +48,14 @@
   <div class="related-panel">
     <div class="related-title">Related</div>
     {{range $i, $rel := .Related}}
-    <div class="related-row{{if eq $i $.RelatedCursor}} focused{{end}}"
-         onclick="sendAction('toggle-related','')">
+    {{/* One row template. Clickability is the shared .Actionable
+         (resource.IsRelatedActionable); the count badge is the shared
+         .CountDisplay (resource.FormatRelatedCount). Neither is re-derived here,
+         so the web cannot drift from the TUI (this is what leaked "(-1)"). */}}
+    <div class="related-row{{if and (not $rel.Loading) (not $rel.Actionable)}} dead-end{{end}}{{if eq $i $.RelatedCursor}} focused{{end}}"
+         {{if $rel.Actionable}}onclick="clickRelated({{$i}})"{{end}}>
       <span>{{$rel.Name}}</span>
-      <span class="related-count{{if $rel.Loading}} related-loading{{end}}{{if $rel.Err}} related-err{{end}}">
-        {{if $rel.Loading}}…{{else if $rel.Err}}err{{else}}{{$rel.Count}}{{end}}
-      </span>
+      <span class="related-count{{if $rel.Loading}} related-loading{{else if $rel.Err}} related-err{{else if not $rel.Actionable}} related-zero{{end}}">{{if $rel.Loading}}…{{else if $rel.Err}}err{{else}}{{$rel.CountDisplay}}{{end}}</span>
     </div>
     {{if and (eq $i $.RelatedCursor) $rel.Items}}
     <div style="margin-left:8px;font-size:12px;">

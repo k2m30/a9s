@@ -370,7 +370,20 @@ func (m YAMLModel) FrameTitle() string {
 }
 
 // BottomHints implements Hintable for YAMLModel.
+// Delegates to the controller snapshot when a controller is wired; falls back
+// to local state (rawText branch) for nil-controller (test/preview) paths.
 func (m YAMLModel) BottomHints() []layout.KeyHint {
+	if m.ctrl != nil {
+		src := m.ctrl.Snapshot().Footer
+		if len(src) > 0 {
+			hints := make([]layout.KeyHint, len(src))
+			for i, kh := range src {
+				hints[i] = layout.KeyHint{Key: kh.Key, Desc: kh.Help}
+			}
+			return hints
+		}
+	}
+	// Nil-controller path: compute from local model state.
 	if m.rawText != "" {
 		return []layout.KeyHint{
 			{Key: "w", Desc: "Wrap"},

@@ -1,15 +1,13 @@
 // screens.go — Bubble Tea adapter's screen-builder registry. This is the
 // renderer-side parallel of runtime.ScreenRegistry: the runtime emits
 // PushScreen{ID, Context, Payload}; the adapter resolves ID through the
-// builders map below and invokes the closure to construct the concrete
-// views.View plus any follow-up tea.Cmd. The runtime never sees
-// tea.Model or views.View; the adapter never invents ScreenIDs (they
-// live in internal/runtime).
+// builders map below and invokes the closure to construct a *rendererState
+// plus any follow-up tea.Cmd. The runtime never sees tea.Model or
+// views.View; the adapter never invents ScreenIDs (they live in
+// internal/runtime).
 //
-// Three builders ship in PR-05a-h4-a (AS-769) for the four ported
-// view-stack handlers: profile selector, reveal, child list. Capability
-// screens (logs, ct.scan, cost) remain out of scope until their handler
-// PRs land.
+// The registered builders cover the profile selector, reveal, and child list.
+// Capability screens (logs, ct.scan, cost) are not yet built here.
 package tui
 
 import (
@@ -24,7 +22,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
-// screenBuilder constructs a renderer-side view from a runtime-emitted
+// screenBuilder constructs a renderer-side *rendererState from a runtime-emitted
 // screen payload. The adapter holds one builder per runtime.ScreenID
 // and invokes it with the live *Model so the builder sees the current
 // keymap, viewConfig, and innerSize() — not a snapshot from tui.New
@@ -32,10 +30,10 @@ import (
 // that captured *Model at construction would see a stale, zero-sized
 // copy after the first WindowSizeMsg).
 //
-// A builder may return a nil view to signal "skip the push" — used by
-// the child-list builder when the runtime emitted an unknown ChildType
+// A builder may return a nil *rendererState to signal "skip the push" — used
+// by the child-list builder when the runtime emitted an unknown ChildType
 // (defensive: Core already validates, so this is belt-and-suspenders).
-type screenBuilder func(m *Model, payload runtime.ScreenPayload) (views.View, tea.Cmd)
+type screenBuilder func(m *Model, payload runtime.ScreenPayload) (*rendererState, tea.Cmd)
 
 // builders maps runtime.ScreenID -> concrete builder closure. Populated
 // once in tui.New(...) via defaultBuilders; tests may shadow individual
@@ -48,28 +46,30 @@ type builders map[runtime.ScreenID]screenBuilder
 // PushScreens reflect the current keymap / viewConfig / terminal size.
 func defaultBuilders() builders {
 	return builders{
-		runtime.ScreenProfileSelector: func(m *Model, p runtime.ScreenPayload) (views.View, tea.Cmd) {
+		runtime.ScreenProfileSelector: func(m *Model, p runtime.ScreenPayload) (*rendererState, tea.Cmd) {
 			psp, ok := p.(runtime.ProfileSelectorPayload)
 			if !ok {
 				return nil, nil
 			}
 			m.ctrl.EnsureSelectorState(psp.Profiles, psp.Current, "aws-profiles")
-			v := views.NewSelectorWithCtrl(m.ctrl, func(s string) tea.Msg {
+			rs := newSelectorRS(func(s string) tea.Msg {
 				return messages.ProfileSelected{Profile: s}
-			}, m.keys)
-			v.SetSize(m.innerSize())
-			return &v, nil
+			})
+			w, h := m.innerSize()
+			rs.width, rs.height = w, h
+			return rs, nil
 		},
-		runtime.ScreenReveal: func(m *Model, p runtime.ScreenPayload) (views.View, tea.Cmd) {
+		runtime.ScreenReveal: func(m *Model, p runtime.ScreenPayload) (*rendererState, tea.Cmd) {
 			rp, ok := p.(runtime.RevealPayload)
 			if !ok {
 				return nil, nil
 			}
-			v := views.NewReveal(rp.ResourceID, rp.Value, m.keys)
-			v.SetSize(m.innerSize())
-			return &v, nil
+			rs := newRevealRS(rp.ResourceID, rp.Value)
+			w, h := m.innerSize()
+			rs.width, rs.height = w, h
+			return rs, nil
 		},
-		runtime.ScreenChildList: func(m *Model, p runtime.ScreenPayload) (views.View, tea.Cmd) {
+		runtime.ScreenChildList: func(m *Model, p runtime.ScreenPayload) (*rendererState, tea.Cmd) {
 			clp, ok := p.(runtime.ChildListPayload)
 			if !ok {
 				return nil, nil
@@ -78,24 +78,30 @@ func defaultBuilders() builders {
 			if childTypeDef == nil {
 				return nil, nil
 			}
+			// For child lists we still need to initialise the controller list state.
+			// Use a transient ResourceListModel only to call Init() which fires the
+			// initial data load. The model is discarded after Init — state is owned
+			// by the controller.
 			rl := views.NewChildResourceList(*childTypeDef, clp.ParentContext, clp.DisplayName, m.viewConfig, m.keys, m.ctrl)
-			rl.SetSize(m.innerSize())
-			rl, initCmd := rl.Init()
-			return &rl, initCmd
+			w, h := m.innerSize()
+			rl.SetSize(w, h)
+			_, initCmd := rl.Init()
+			rs := newListRS(clp.ChildType)
+			rs.width, rs.height = w, h
+			return rs, initCmd
 		},
 	}
 }
 
-// dispatchCoreScreenResult walks the intents/tasks returned by an h4-a
-// Handle* method using the plural-semantics path (applyIntents +
+// dispatchCoreScreenResult walks the intents/tasks returned by a screen
+// (view-stack) Handle* method using the plural-semantics path (applyIntents +
 // tasksToCmd). The key behavioural difference from dispatchHandlerResult
-// (used by h3 handlers) is that FlashIntent is re-emitted as
-// messages.Flash via cmd rather than direct-mutated. h3 handlers
+// (used by the flash/session handlers) is that FlashIntent is re-emitted as
+// messages.Flash via cmd rather than direct-mutated. Those handlers
 // pre-bump m.flash.gen and pair FlashIntent with FlashTickPayload so
-// direct-mutation works there; h4-a handlers do not own the flash gen
+// direct-mutation works there; screen handlers do not own the flash gen
 // dance (their flashes route back through handleFlash → HandleFlash to
-// pick up the auto-clear tick), so re-emitting preserves the
-// pre-port observable behaviour: the cmd produces a messages.Flash
+// pick up the auto-clear tick), so re-emitting produces a messages.Flash
 // that downstream tests assert on.
 func (m *Model) dispatchCoreScreenResult(intents []runtime.UIIntent, tasks []runtime.TaskRequest) tea.Cmd {
 	cmds := m.applyIntents(intents)

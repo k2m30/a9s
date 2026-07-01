@@ -7,9 +7,8 @@ import "github.com/k2m30/a9s/v3/internal/domain"
 // Lipgloss, Bubble Tea, or AWS SDK types — only scalars, slices, and
 // structs with JSON tags so it round-trips through encoding/json cleanly.
 //
-// PR-C fills the Body fields from live controller state. In this PR
-// (PR-A) Snapshot() returns a zero-value Body with the correct BodyKind
-// derived from the top-of-stack screen.
+// Snapshot() builds the full per-screen Body (menu/list/detail/text/
+// selector/help/identity) from live controller state.
 type ViewState struct {
 	Header     Header   `json:"header"`
 	FrameTitle string   `json:"frame_title"`
@@ -39,6 +38,17 @@ type Flash struct {
 type KeyHint struct {
 	Key  string `json:"key"`
 	Help string `json:"help"`
+}
+
+// MenuFooterHints is the SINGLE source of the main-menu footer key hints,
+// consumed by both the web renderer (ViewState.Footer in snapshot) and the TUI
+// (MainMenuModel.BottomHints). Defining it once is what keeps the two renderers
+// from drifting — do not re-list these hints anywhere else.
+func MenuFooterHints() []KeyHint {
+	return []KeyHint{
+		{Key: "ctrl+z", Help: "Issues only"},
+		{Key: "ctrl+r", Help: "Refresh"},
+	}
 }
 
 // BodyKind is the discriminator that identifies which Body pointer field
@@ -152,6 +162,13 @@ type FieldRow struct {
 	IsSpacer bool `json:"is_spacer,omitempty"`
 	// IsNavigable is true for navigable (hyperlink-style) fields.
 	IsNavigable bool `json:"is_navigable,omitempty"`
+	// TargetType is the canonical short name of the resource type this field
+	// links to (e.g. "vpc", "sg", "ami"). Non-empty only when IsNavigable is true.
+	TargetType string `json:"target_type,omitempty"`
+	// NavID is the navigation ID for this field when it differs from Value
+	// (e.g. ct-events Principal rows where Value is the display label). When
+	// empty, Value is used as the target ID — mirrors fieldpath.FieldItem.NavID.
+	NavID string `json:"nav_id,omitempty"`
 	// IndentLevel is the sub-field indent depth (1 = phrase, 3 = detail rows).
 	IndentLevel int `json:"indent_level,omitempty"`
 	// ColorTier is the TierColorStyle selector: "!", "~", "ok", "ct-danger", etc.
@@ -190,6 +207,13 @@ type RelatedBlock struct {
 	FetchFilter map[string]string `json:"fetch_filter,omitempty"`
 	// TargetType is the canonical short name of the target resource type.
 	TargetType string `json:"target_type,omitempty"`
+	// Actionable is pre-computed by resource.IsRelatedActionable so the web
+	// template can use .Actionable directly without re-deriving the predicate.
+	Actionable bool `json:"actionable,omitempty"`
+	// CountDisplay is the pre-computed count badge from resource.FormatRelatedCount
+	// ("" for the unknown -1 sentinel, "(N)" for N>=0), so the web template
+	// renders it directly instead of re-deriving the format (which leaked "(-1)").
+	CountDisplay string `json:"count_display,omitempty"`
 }
 
 // DetailBody is the body of a resource-detail screen.

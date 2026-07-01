@@ -107,7 +107,7 @@ func buildEKSResource(name string, cluster *ekstypes.Cluster) resource.Resource 
 	r := resource.Resource{
 		ID:   name,
 		Name: clusterName,
-		// Status: removed — PR-03b migrates fetcher to Findings for lifecycle states.
+		// Status intentionally unset — lifecycle state is emitted as a Finding.
 		Fields: map[string]string{
 			"cluster_name":        clusterName,
 			"version":             version,
@@ -121,7 +121,7 @@ func buildEKSResource(name string, cluster *ekstypes.Cluster) resource.Resource 
 		RawStruct: cluster,
 	}
 
-	// Phase 03 PR-03b: emit canonical Findings for non-healthy lifecycle states.
+	// emit canonical Findings for non-healthy lifecycle states.
 	// ACTIVE is healthy — no Finding. DELETING is terminal — no Finding.
 	// CREATING and UPDATING are transitional → SevWarn. FAILED → SevBroken.
 	switch cluster.Status {

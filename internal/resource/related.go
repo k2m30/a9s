@@ -13,12 +13,12 @@ import (
 
 // RelatedDef defines one related resource class for a given resource type.
 // Declaration lives in internal/domain/contracts.go; this alias keeps
-// existing consumers compiling. Deleted in PR-04n.
+// existing consumers compiling.
 type RelatedDef = domain.RelatedDef
 
 // NavigableField associates a detail view field path with a target resource type.
 // Declaration lives in internal/domain/contracts.go; this alias keeps
-// existing consumers compiling. Deleted in PR-04n.
+// existing consumers compiling.
 type NavigableField = domain.NavigableField
 
 // NavIDFromValue returns the bare resource ID suitable for target lookup,
@@ -94,7 +94,7 @@ func s3BucketFromARN(s string) string {
 // RelatedCheckResult is returned by a RelatedChecker and carries all state
 // needed by the right-column panel to display a row and navigate on Enter.
 // Declaration lives in internal/domain/contracts.go; this alias keeps
-// existing consumers compiling. Deleted in PR-04n.
+// existing consumers compiling.
 //
 // Semantics (FR-008 / FR-014):
 //
@@ -107,17 +107,17 @@ type RelatedCheckResult = domain.RelatedCheckResult
 
 // ResourceCacheEntry holds a snapshot of one resource type's list plus
 // truncation state. Declaration lives in internal/domain/contracts.go; this
-// alias keeps existing consumers compiling. Deleted in PR-04n.
+// alias keeps existing consumers compiling.
 type ResourceCacheEntry = domain.ResourceCacheEntry
 
 // ResourceCache is a read-only snapshot of already-loaded resource lists,
 // keyed by resource short name. Declaration lives in internal/domain/contracts.go;
-// this alias keeps existing consumers compiling. Deleted in PR-04n.
+// this alias keeps existing consumers compiling.
 type ResourceCache = domain.ResourceCache
 
 // RelatedChecker returns a count of related resources of a specific type.
 // Declaration lives in internal/domain/contracts.go; this alias keeps
-// existing consumers compiling. Deleted in PR-04n.
+// existing consumers compiling.
 type RelatedChecker = domain.RelatedChecker
 
 // ValidateRelatedResult sanity-checks that a checker's result is internally
@@ -229,6 +229,54 @@ func UnknownRelated(targetType string) RelatedCheckResult {
 	return RelatedCheckResult{TargetType: targetType, Count: -1}
 }
 
+// IsRelatedActionable is the single source of truth for "can the user drill into
+// this related-resource pivot". It is consumed by the TUI right column
+// (isActionableRow), the headless controller (ActionRelatedSelect +
+// RelatedBlock.Actionable), and — via that ViewState field — the web template,
+// so the rule cannot drift between renderers.
+//
+//   - loading or errored      → not actionable
+//   - has a server-side filter → actionable regardless of the local count
+//     (the filtered fetch resolves the real count)
+//   - count == -1 (no filter)  → unknown, not drillable
+//   - approximate (0+/N+)      → actionable (the target list re-runs the checker
+//     as more pages load, so matches surface incrementally)
+//   - otherwise                → count > 0
+func IsRelatedActionable(count int, approximate, hasFetchFilter, loading, hasErr bool) bool {
+	if loading || hasErr {
+		return false
+	}
+	if hasFetchFilter {
+		return true
+	}
+	if count == -1 {
+		return false
+	}
+	if approximate {
+		return true
+	}
+	return count > 0
+}
+
+// FormatRelatedCount is the single source of truth for the count BADGE text on a
+// related-resource row (the resolved, non-loading/non-error case). It is
+// consumed by the TUI right column and — via RelatedBlock.CountDisplay computed
+// in the controller — the web template, so the displayed count cannot drift.
+//
+//   - count == -1 (unknown) → ""  (no badge — the row shows its name only)
+//   - count >= 0            → "(N)"
+//
+// Approximate-ness is intentionally NOT marked in the text (no "N+"): per the
+// design spec it is conveyed by row style alone, and the integration tests
+// assert a literal "(<N>)" substring. Loading and error states are handled by
+// the renderers (spinner / em-dash), not here.
+func FormatRelatedCount(count int) string {
+	if count < 0 {
+		return ""
+	}
+	return fmt.Sprintf("(%d)", count)
+}
+
 // NoopChecker is a stub RelatedChecker suitable for tests that exercise
 // registry wiring (SetRelatedForTest / AppendRelated / GetRelated) without
 // exercising real related-resource logic. Production code MUST NOT use it:
@@ -298,7 +346,7 @@ var defaultNavFieldRegistry = map[string][]NavigableField{}
 // restore the previous registration instead of destroying it. This is critical
 // for tests: production init() registers production defs once, and tests that
 // override-then-cleanup must not nuke the production registration for the rest
-// of the test process (AS-67).
+// of the test process.
 func SetRelatedForTest(shortName string, defs []RelatedDef) {
 	for _, d := range defs {
 		if d.Checker == nil {
@@ -318,11 +366,9 @@ func SetRelatedForTest(shortName string, defs []RelatedDef) {
 // GetRelated returns the related definitions for the given resource short name.
 // Legacy-first: reads the mutable runtime map so SetRelatedForTest / AppendRelated
 // overrides (test helpers, zzz_ct_events_all_related.go) take precedence over
-// the catalog source slice. The catalog acts as the read-only fallback for the
-// AS-795b–m transition window when a type's init() body is gone but the
-// runtime map was not populated by either a sibling init() or aws.Install's
-// bridgeCatalogToLegacy pass. AS-731 deletes both the legacy map and this
-// fallback once every consumer reads catalog directly.
+// the catalog source slice. The catalog acts as the read-only fallback when a
+// type's init() body is gone but the runtime map was not populated by either
+// a sibling init() or aws.Install's bridgeCatalogToLegacy pass.
 func GetRelated(shortName string) []RelatedDef {
 	relatedRegistryMu.RLock()
 	if defs, ok := relatedRegistry[shortName]; ok {
@@ -367,7 +413,7 @@ func CleanupRelatedForTest(shortName string) {
 // FetchByIDsFunc fetches specific resource instances by ID, bypassing any
 // filter the top-level paginated fetcher applies.
 // Declaration lives in internal/domain/contracts.go; this alias keeps
-// existing consumers compiling. Deleted in PR-04n.
+// existing consumers compiling.
 type FetchByIDsFunc = domain.FetchByIDsFunc
 
 // fetchByIDsRegistry maps target resource short name to its FetchByIDs helper.
@@ -382,7 +428,7 @@ func SetFetchByIDsForTest(shortName string, fn FetchByIDsFunc) {
 
 // GetFetchByIDs returns the FetchByIDs helper for the target short name.
 // Catalog-backed: falls through to the legacy map (catalog does not carry
-// FetchByIDs separately in PR-04a; per-category PRs wire this). Legacy-first:
+// FetchByIDs separately). Legacy-first:
 // test overrides via SetFetchByIDsForTest take effect; otherwise reads the
 // catalog FetchByIDs field.
 func GetFetchByIDs(shortName string) FetchByIDsFunc {
@@ -426,9 +472,7 @@ func SetNavigableFieldsForTest(shortName string, fields []NavigableField) {
 // entry for shortName, it falls back to the default (init-time) registry,
 // then to the catalog. Returns nil only when no entry exists anywhere.
 //
-// Catalog-backed: catalog is checked after the active and default registries;
-// per-category PRs (04b+) populate catalog entries. Fallback to legacy removed
-// in PR-04n.
+// Catalog-backed: catalog is checked after the active and default registries.
 func GetNavigableFields(shortName string) []NavigableField {
 	navigableFieldMu.RLock()
 	if fields := navigableFieldRegistry[shortName]; len(fields) > 0 {

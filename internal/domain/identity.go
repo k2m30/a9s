@@ -1,8 +1,8 @@
 // Package domain — see contracts.go for the package overview.
 //
 // identity.go owns the platform-agnostic mirror of the AWS caller-identity
-// record. The on-the-wire fetch type lives in internal/aws (which Bubble
-// Tea cannot depend on after Phase-05 5a-extract); the runtime converts
+// record. The on-the-wire fetch type lives in internal/aws (which the Bubble
+// Tea layer cannot depend on); the runtime converts
 // *awsclient.CallerIdentity → *domain.CallerIdentity at the runtime/aws
 // boundary and emits the mirror via SetIdentityIntent so the adapter has a
 // renderer-shaped value to apply to views without importing internal/aws.

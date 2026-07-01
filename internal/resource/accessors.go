@@ -16,7 +16,7 @@ const DefaultPageSize = 50
 
 // ParentContext holds key-value pairs passed from a parent view to a child
 // fetcher. Declaration lives in internal/domain/contracts.go; this alias keeps
-// existing consumers compiling. Deleted in PR-04n.
+// existing consumers compiling.
 type ParentContext = domain.ParentContext
 
 // fieldKeyRegistry maps resource short names to their valid Fields keys.
@@ -184,8 +184,8 @@ func ApplyFieldAliases(shortName string, fields map[string]string) map[string]st
 
 // CleanupFieldAliasesForTest removes field alias overrides AND test-registered
 // builtins for the given short name. Used only in tests for cleanup.
-// After AS-731 deleted the catalog→legacy bridge, fieldAliasBuiltins starts
-// empty for every shortName: any builtin entry was placed there by a test's
+// fieldAliasBuiltins starts empty for every shortName: any builtin entry was
+// placed there by a test's
 // SetFieldAliasesForTest call (the "first call becomes builtin" branch) and
 // must be cleared on cleanup so subsequent reads fall through to the catalog
 // FieldAliases field in ApplyFieldAliases.
@@ -258,12 +258,12 @@ func CleanupChildTypeForTest(shortName string) {
 
 // PaginatedFetcher returns a single page of resources.
 // Declaration lives in internal/domain/contracts.go; this alias keeps
-// existing consumers compiling. Deleted in PR-04n.
+// existing consumers compiling.
 type PaginatedFetcher = domain.PaginatedFetcher
 
 // PaginatedChildFetcher returns a single page of child resources.
 // Declaration lives in internal/domain/contracts.go; this alias keeps
-// existing consumers compiling. Deleted in PR-04n.
+// existing consumers compiling.
 type PaginatedChildFetcher = domain.PaginatedChildFetcher
 
 // paginatedRegistry maps resource short names to their paginated fetcher functions.
@@ -280,7 +280,7 @@ func SetPaginatedForTest(shortName string, f PaginatedFetcher) {
 
 // GetPaginatedFetcher returns the paginated fetcher for the given resource short name.
 // Legacy-first: the runtime map wins so SetPaginatedForTest test overrides take
-// effect. Catalog is the read-only fallback during the AS-795b–m transition.
+// effect. Catalog is the read-only fallback.
 func GetPaginatedFetcher(shortName string) PaginatedFetcher {
 	if fn, ok := paginatedRegistry[shortName]; ok {
 		return fn
@@ -322,7 +322,7 @@ func CleanupPaginatedChildForTest(shortName string) {
 
 // FilteredPaginatedFetcher returns a single page of resources filtered server-side.
 // Declaration lives in internal/domain/contracts.go; this alias keeps
-// existing consumers compiling. Deleted in PR-04n.
+// existing consumers compiling.
 type FilteredPaginatedFetcher = domain.FilteredPaginatedFetcher
 
 var filteredPaginatedRegistry = map[string]FilteredPaginatedFetcher{}
@@ -352,7 +352,7 @@ func CleanupFilteredPaginatedForTest(shortName string) {
 
 // RevealFetcher is the function signature for reveal value fetchers.
 // Declaration lives in internal/domain/contracts.go; this alias keeps
-// existing consumers compiling. Deleted in PR-04n.
+// existing consumers compiling.
 type RevealFetcher = domain.RevealFetcher
 
 // revealRegistry maps resource short names to their reveal fetcher functions.
@@ -366,7 +366,7 @@ func SetRevealFetcherForTest(shortName string, f RevealFetcher) {
 
 // GetRevealFetcher returns the reveal fetcher for the given resource short name.
 // Legacy-first: runtime map wins so test overrides via SetRevealFetcherForTest
-// take effect. Catalog is the read-only fallback during AS-795b–m.
+// take effect. Catalog is the read-only fallback.
 func GetRevealFetcher(shortName string) RevealFetcher {
 	if fn, ok := revealRegistry[shortName]; ok {
 		return fn
@@ -384,7 +384,7 @@ func CleanupRevealFetcherForTest(shortName string) {
 
 // HasRevealFetcher returns true if a reveal fetcher is registered for the given short name.
 // Legacy-first: runtime map wins so test overrides via SetRevealFetcherForTest
-// are honored. Catalog is the read-only fallback during AS-795b–m.
+// are honored. Catalog is the read-only fallback.
 func HasRevealFetcher(shortName string) bool {
 	if _, ok := revealRegistry[shortName]; ok {
 		return true

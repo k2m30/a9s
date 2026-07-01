@@ -105,7 +105,7 @@ func FetchLambdaFunctionsPageWithEventSources(
 		r := resource.Resource{
 			ID:   functionName,
 			Name: functionName,
-			// Status: removed — PR-03b migrates fetcher to Findings for lifecycle states.
+			// Status intentionally unset — lifecycle state is emitted as a Finding.
 			Fields: map[string]string{
 				"function_name":    functionName,
 				"runtime":          runtime,
@@ -123,7 +123,7 @@ func FetchLambdaFunctionsPageWithEventSources(
 			RawStruct: fn,
 		}
 
-		// Phase 03 PR-03b: emit canonical Findings for non-healthy lifecycle states.
+		// emit canonical Findings for non-healthy lifecycle states.
 		// Active is healthy — no Finding. Inactive is lifecycle-class (evicted from
 		// memory after 14 days idle) — no Finding; Color func returns ColorDim via the
 		// structural Inactive case in Fields["state"]. Pending and Failed are

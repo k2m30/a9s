@@ -1,10 +1,6 @@
-// probe_adapter.go — Bubble Tea adapter over runtime.Core probe methods.
-//
-// PR-05a-h5 (AS-151) moves probe logic to internal/runtime/probes.go.
-// This file bridges the Core methods to the tea.Cmd factories that the TUI
-// Update loop and handler files expect. Each method captures ctx and clients,
-// delegates to the corresponding Core method, and converts the result to TUI
-// message types.
+// probe_adapter.go — Bubble Tea adapter over runtime.Core probe methods. Each
+// method captures ctx and clients, delegates to the corresponding Core method,
+// and converts the result to TUI message types.
 package tui
 
 import (
@@ -13,7 +9,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/cache"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
 // loadAvailabilityCache returns a tea.Cmd that reads the availability cache
@@ -75,42 +70,21 @@ func (m *Model) saveAvailabilityCache() tea.Cmd {
 	var issueCounts map[string]int
 	var issueTruncated map[string]bool
 	var issueKnown map[string]bool
-	if menu, ok := m.stack[0].(*views.MainMenuModel); ok {
-		entries = menu.GetAvailability()
-		truncatedMap = menu.GetTruncated()
-		issueCounts = menu.GetIssueCounts()
-		issueTruncated = menu.GetIssueTruncated()
-		issueKnown = menu.GetIssueKnown()
-	}
-	if entries == nil {
+	// Read availability/issue state from the controller (single source of truth).
+	availability := m.ctrl.GetMenuAvailability()
+	if len(availability) == 0 {
 		return nil
 	}
+	entries = availability
+	truncatedMap = m.ctrl.GetMenuTruncated()
+	issueCounts = m.ctrl.GetMenuIssueCounts()
+	issueTruncated = m.ctrl.GetMenuIssueTruncated()
+	issueKnown = m.ctrl.GetMenuIssueKnown()
 
 	return func() tea.Msg {
 		// Best-effort save — ignore cache write failures.
 		_ = m.core.SaveAvailabilityCache(profile, region, entries, truncatedMap, issueCounts, issueTruncated, issueKnown)
 		return nil
-	}
-}
-
-// refreshResourceListWithEnrichmentRerun wraps the ordinary refresh fetch for
-// a top-level list so that the ResourcesLoadedMsg it produces carries an
-// enrichment-rerun token. The token is captured at Ctrl+R dispatch time and
-// stamped into the message; the ResourcesLoadedMsg handler in app.go checks
-// TypeGen in its tail branch to decide whether to seed probeResources and
-// dispatch probeEnrichment. APIErrorMsg and any other message pass through
-// unchanged.
-func (m *Model) refreshResourceListWithEnrichmentRerun(
-	rl views.ResourceListModel, tok domain.Gen,
-) tea.Cmd {
-	inner := m.refreshResourceList(rl)
-	return func() tea.Msg {
-		msg := inner()
-		if loaded, ok := msg.(messages.ResourcesLoaded); ok {
-			loaded.TypeGen = tok
-			return loaded
-		}
-		return msg
 	}
 }
 
@@ -121,7 +95,7 @@ func (m *Model) refreshResourceListWithEnrichmentRerun(
 // entirely — registered enrichers are AWS-keyed and would issue real API calls
 // against synthetic fakes / missing credentials. The early return here matches
 // the documented WithIsDemo behavior; the registry is not consulted so AWS-only
-// enricher contracts are not exercised in demo sessions (AS-658 / AS-648-h3).
+// enricher contracts are not exercised in demo sessions.
 func (m *Model) probeEnrichment(shortName string, gen domain.Gen) tea.Cmd {
 	if m.isDemo {
 		return nil

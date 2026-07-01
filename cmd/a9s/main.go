@@ -52,8 +52,8 @@ func main() {
 	// catalog accessors that panic when SetTypes has not yet been invoked.
 	aws.Install()
 	// Wire resource-registry callbacks into the projection layer. Replaces
-	// the legacy internal/resource init() per AS-731 exit criterion (zero
-	// init() in internal/resource/). Must run after aws.Install so callbacks
+	// the legacy internal/resource init() (internal/resource has zero
+	// init()). Must run after aws.Install so callbacks
 	// resolve catalog-backed defaults.
 	resource.WireProjection()
 

@@ -139,7 +139,7 @@ func fetchECSTasksPageWithJoin(
 				fields["task_def_join_error"] = "true"
 			}
 
-			// PR-03c: emit wave1 Findings for non-healthy transitional states.
+			// emit wave1 Findings for non-healthy transitional states.
 			// RUNNING and STOPPED → no Finding (lifecycle; stop_code handled structurally).
 			findings := ecsTaskWave1Findings(status)
 

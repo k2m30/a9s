@@ -1,5 +1,5 @@
 // ng_codes.go — canonical FindingCode constants for the ng resource type.
-// Phase 03 PR-03c. The fetcher writes Findings using these codes; the
+// The fetcher writes Findings using these codes; the
 // ng Color func reads wave1 Findings (Source == "wave1") to color rows.
 package aws
 

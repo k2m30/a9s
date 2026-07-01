@@ -1,5 +1,5 @@
 // ami_codes.go — canonical FindingCode constants for the ami resource type.
-// Phase 03 PR-03b. The fetcher writes Findings using these codes; the
+// The fetcher writes Findings using these codes; the
 // AMI Color func reads wave1 Findings (Source == "wave1") to color rows.
 package aws
 

@@ -21,7 +21,7 @@
   font-size: 14px;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: var(--bg); color: var(--fg); min-height: 100vh; display: flex; flex-direction: column; }
+body { background: var(--bg); color: var(--fg); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
 
 /* header */
 #header {
@@ -50,6 +50,7 @@ body { background: var(--bg); color: var(--fg); min-height: 100vh; display: flex
   font-weight: bold;
   flex-shrink: 0;
 }
+#flash { padding: 2px 12px; background: var(--header); border-bottom: 1px solid var(--border); flex-shrink: 0; font-size: 13px; }
 
 /* main content (frame-title + body + footer) — swapped as one fragment on
    navigation so the title/footer update, not just the body. */
@@ -75,14 +76,18 @@ body { background: var(--bg); color: var(--fg); min-height: 100vh; display: flex
 
 /* menu */
 .menu-entries { list-style: none; }
-.menu-entry { padding: 2px 8px; cursor: pointer; display: flex; justify-content: space-between; }
+.menu-entry { padding: 2px 8px; cursor: pointer; display: flex; align-items: baseline; gap: 8px; }
 .menu-entry:hover { background: var(--border); }
 .menu-entry.selected { background: var(--sel); color: var(--fg); }
-.menu-entry .name { color: var(--accent); min-width: 120px; }
-.menu-entry .alias { color: var(--dim); min-width: 80px; }
-.menu-entry .avail { color: var(--ok); min-width: 60px; text-align: right; }
+.menu-entry .name { color: var(--accent); }
+.menu-entry .avail { color: var(--ok); }
 .menu-entry .avail.zero { color: var(--dim); }
 .menu-entry .badge { color: var(--err); font-size: 12px; }
+.menu-entry .alias { color: var(--dim); margin-left: auto; }
+.menu-section { list-style: none; color: var(--dim); padding: 6px 8px 1px; font-size: 12px; letter-spacing: 0.05em; }
+.menu-entry.dim:not(.selected) .name,
+.menu-entry.dim:not(.selected) .avail,
+.menu-entry.dim:not(.selected) .alias { color: var(--dim); }
 .menu-filter { color: var(--warn); font-style: italic; margin-bottom: 4px; }
 
 /* list */
@@ -100,6 +105,12 @@ body { background: var(--bg); color: var(--fg); min-height: 100vh; display: flex
 .list-table tr.selected td { background: var(--sel); }
 .list-table tr.dec-error td { color: var(--err); }
 .list-table tr.dec-warn  td { color: var(--warn); }
+/* Row health from the shared ListRow.Color tag (td.ResolveColor), matching the
+   TUI: healthy=green, warning=yellow, broken=red, dim=gray. */
+.list-table tr.row-healthy td { color: var(--ok); }
+.list-table tr.row-warning td { color: var(--warn); }
+.list-table tr.row-broken  td { color: var(--err); }
+.list-table tr.row-dim     td { color: var(--dim); }
 .list-table tr:hover td  { background: var(--border); }
 .list-filter { color: var(--warn); font-style: italic; margin-bottom: 4px; }
 .list-loading { color: var(--dim); font-style: italic; }
@@ -112,6 +123,7 @@ body { background: var(--bg); color: var(--fg); min-height: 100vh; display: flex
 .field-row.header  { color: var(--code); font-weight: bold; }
 .field-row.sub     { padding-left: 16px; color: var(--dim); }
 .field-row.spacer  { height: 6px; }
+.field-row.field-cursor { background: var(--sel); box-shadow: inset 2px 0 0 var(--accent); }
 .field-key   { min-width: 200px; color: var(--dim); flex-shrink: 0; }
 .field-value { color: var(--fg); word-break: break-all; }
 .field-navigable .field-value { color: var(--accent); text-decoration: underline; cursor: pointer; }
@@ -160,8 +172,27 @@ body { background: var(--bg); color: var(--fg); min-height: 100vh; display: flex
 .related-count { color: var(--ok); }
 .related-loading { color: var(--dim); font-style: italic; }
 .related-err { color: var(--err); }
+.related-zero { color: var(--dim); }
+.related-unknown { color: var(--dim); }
+.related-row.dead-end { cursor: default; opacity: 0.5; }
+.related-row.dead-end:hover { color: inherit; }
 
 #loading-indicator { display: none; position: fixed; top: 8px; right: 12px; color: var(--warn); }
+
+/* command/filter/search input bar — client-side mode indicator, mirrors the
+   TUI's bottom input line. Lives outside #main so it survives body swaps. */
+#input-bar {
+  display: none;
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  background: var(--header);
+  border-top: 1px solid var(--accent);
+  padding: 4px 12px;
+  color: var(--warn);
+  font-size: 13px;
+  z-index: 10;
+  white-space: pre;
+}
 </style>
 </head>
 <body data-token="{{.Token}}">
@@ -174,13 +205,6 @@ body { background: var(--bg); color: var(--fg); min-height: 100vh; display: flex
     {{if .VS.Header.Mode}}<span class="hdr-mode">[{{.VS.Header.Mode}}]</span>{{end}}
   </div>
   <div class="hdr-right">
-    {{if .VS.Header.Flash.Text}}
-      {{if .VS.Header.Flash.IsError}}
-        <span class="hdr-flash-err">{{.VS.Header.Flash.Text}}</span>
-      {{else}}
-        <span class="hdr-flash-ok">{{.VS.Header.Flash.Text}}</span>
-      {{end}}
-    {{end}}
     {{if .VS.Header.RightSide}}<span style="color:var(--dim)">{{.VS.Header.RightSide}}</span>{{end}}
   </div>
 </div>
@@ -188,6 +212,8 @@ body { background: var(--bg); color: var(--fg); min-height: 100vh; display: flex
 <div id="main">
 {{template "main.html" .VS}}
 </div>
+
+<div id="input-bar"></div>
 
 <div id="loading-indicator">loading…</div>
 

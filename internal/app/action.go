@@ -3,9 +3,10 @@
 // (TUI, web, test). It owns the screen stack, per-screen view state,
 // the semantic Action vocabulary, and the serialisable ViewState snapshot.
 //
-// PR-A creates the contract types and a skeleton Controller. No behavior
-// is moved from internal/tui in this PR; that happens in PR-B (event
-// migration) and PR-C (state lift).
+// Renderers translate native input (keystroke, HTTP POST, test call) into
+// an Action, call Apply/Handle, and render the returned ViewState. The TUI
+// and web share this controller as the single source of truth for screen
+// state and action availability.
 package app
 
 // ActionKind is the semantic verb that a renderer translates its native
@@ -48,11 +49,27 @@ const (
 	ActionCopy ActionKind = "copy"
 
 	ActionToggleRelated   ActionKind = "toggle-related"
+	// ActionRelatedSelect navigates to the related row at the visible index
+	// carried in Arg (decimal integer). Used by the web UI click path; it sets
+	// RelatedFocus + RelatedCursor then runs the same HandleRelatedNavigate
+	// logic as the keyboard Enter path in ActionSelect.
+	ActionRelatedSelect ActionKind = "related-select"
+	// ActionFieldSelect navigates to the resource linked by the navigable
+	// detail field at the visible index carried in Arg (decimal integer). Used
+	// by the web UI click path; mirrors the TUI's Enter-on-navigable-field path
+	// (TargetType + NavID/Value → HandleRelatedNavigate).
+	ActionFieldSelect ActionKind = "field-select"
 	ActionToggleFocus     ActionKind = "toggle-focus"
 	ActionToggleWrap      ActionKind = "toggle-wrap"
 	ActionToggleAttention ActionKind = "toggle-attention"
 
-	// ActionChildView carries the trigger key in Arg (e, L, r, s, Enter, t).
+	// ActionCloudTrail navigates to the CloudTrail Events list filtered to the
+	// currently selected/active resource. Mirrors the TUI's 't' key handler
+	// (BuildCloudTrailFilter → RelatedNavigate to "ct-events"). No-ops when the
+	// resource type has no CloudTrailKey or no resource is active.
+	ActionCloudTrail ActionKind = "cloudtrail"
+
+	// ActionChildView carries the trigger key in Arg (e, L, r, s, Enter).
 	ActionChildView ActionKind = "child-view"
 
 	// ActionScrollLeft / ActionScrollRight move the horizontal column viewport.
@@ -73,6 +90,11 @@ const (
 	ActionSelectTheme ActionKind = "select-theme"
 
 	ActionQuit ActionKind = "quit"
+
+	// ActionOpenErrorLog opens the session error log as a text viewer.
+	// Mirrors the TUI's '!' key (keys.ErrorLog). Emits a flash when no errors
+	// have been recorded this session.
+	ActionOpenErrorLog ActionKind = "open-error-log"
 )
 
 // Action is a single semantic input from a renderer to the controller.

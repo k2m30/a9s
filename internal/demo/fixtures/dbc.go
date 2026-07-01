@@ -69,7 +69,7 @@ const (
 	// WarnDBCSnapFailedAndManualOldID — failed AND manual >365d AND parent
 	// missing → stacks 3 Wave-1 phrases. Pins the dbc-snap fetcher Issues
 	// contract; the merged "(+N)" display is composed at render time by
-	// phraseFromFindings (AS-140).
+	// phraseFromFindings.
 	WarnDBCSnapFailedAndManualOldID  = "broken-dbc-snap-failed-manual-old"
 	WarnDBCSnapFailedAndManualOldARN = "arn:aws:rds:us-east-1:123456789012:cluster-snapshot:broken-dbc-snap-failed-manual-old"
 
@@ -323,7 +323,7 @@ func buildDBCSnapshots() []docdbtypes.DBClusterSnapshot {
 		// so only the "failed" phrase is in Issues (Broken wins). Orphan signal
 		// from the cross-ref enricher arrives as a separate Wave-2 finding; the
 		// merged "<top> (+N)" display is composed at render time by
-		// phraseFromFindings (AS-140).
+		// phraseFromFindings.
 		{
 			DBClusterSnapshotIdentifier: aws.String(WarnDBCSnapFailedAndManualOldID),
 			DBClusterIdentifier:         aws.String("deleted-legacy-cluster"), // orphan: same parent as WarnDBCSnapOrphanID

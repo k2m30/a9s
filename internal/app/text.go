@@ -3,6 +3,7 @@ package app
 import (
 	"strings"
 
+	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 )
 
@@ -19,14 +20,20 @@ func textPageSizeFor(a Action) int {
 	return textPageSize
 }
 
+// isTextScreen reports whether id is one of the text-viewer screen IDs
+// (YAML, JSON, or error-log).
+func isTextScreen(id runtime.ScreenID) bool {
+	return id == runtime.ScreenYAML || id == runtime.ScreenJSON || id == runtime.ScreenErrorLog
+}
+
 // topTextState returns the TextState of the top-of-stack screen when the top
-// screen is a text viewer (ScreenYAML or ScreenJSON), nil otherwise.
+// screen is a text viewer (ScreenYAML, ScreenJSON, or ScreenErrorLog), nil otherwise.
 func (c *Controller) topTextState() *TextState {
 	if len(c.stack) == 0 {
 		return nil
 	}
 	top := c.stack[len(c.stack)-1]
-	if top.ID != runtime.ScreenYAML && top.ID != runtime.ScreenJSON {
+	if !isTextScreen(top.ID) {
 		return nil
 	}
 	return c.stack[len(c.stack)-1].State.Text
@@ -49,7 +56,7 @@ func (c *Controller) ensureTextState(lines []string) {
 		return
 	}
 	top := &c.stack[len(c.stack)-1]
-	if top.ID != runtime.ScreenYAML && top.ID != runtime.ScreenJSON {
+	if !isTextScreen(top.ID) {
 		return
 	}
 	if top.State.Text == nil {
@@ -72,6 +79,24 @@ func (c *Controller) UpdateTextLines(lines []string) {
 		return
 	}
 	ts.Lines = lines
+}
+
+// GetTextScreenContext returns the ScreenID and ScreenContext of the top text
+// screen (YAML, JSON, or error-log). Used by the TUI adapter to determine
+// whether the active text view is YAML or JSON before regenerating enriched
+// content lines. Returns ("", empty context) when the top screen is not a
+// text screen.
+func (c *Controller) GetTextScreenContext() (runtime.ScreenID, runtime.ScreenContext) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if len(c.stack) == 0 {
+		return "", runtime.ScreenContext{}
+	}
+	top := c.stack[len(c.stack)-1]
+	if !isTextScreen(top.ID) {
+		return "", runtime.ScreenContext{}
+	}
+	return top.ID, top.Ctx
 }
 
 // buildTextSearchMatches scans lines for all case-insensitive occurrences of
@@ -142,4 +167,29 @@ func (c *Controller) TextFrameTitle() string {
 	}
 	top := c.stack[len(c.stack)-1]
 	return string(top.ID)
+}
+
+// GetTextResource returns the resource for the top text screen (YAML/JSON)
+// by resolving it from the resource cache using the screen's ScreenContext.
+// Returns the zero-value Resource when the top screen is not a text screen
+// or when the resource cannot be resolved from the cache.
+func (c *Controller) GetTextResource() resource.Resource {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if len(c.stack) == 0 {
+		return resource.Resource{}
+	}
+	top := c.stack[len(c.stack)-1]
+	if !isTextScreen(top.ID) {
+		return resource.Resource{}
+	}
+	if top.Ctx.ResourceType == "" || top.Ctx.ResourceID == "" {
+		return resource.Resource{}
+	}
+	for _, r := range c.resourceCache[top.Ctx.ResourceType] {
+		if r.ID == top.Ctx.ResourceID {
+			return r
+		}
+	}
+	return resource.Resource{}
 }

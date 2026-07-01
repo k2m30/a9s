@@ -102,7 +102,7 @@ func FetchEBSVolumesPage(ctx context.Context, api EC2DescribeVolumesAPI, continu
 		r := resource.Resource{
 			ID:   volumeID,
 			Name: name,
-			// Status: removed — PR-03b migrates fetcher to Findings for lifecycle states.
+			// Status intentionally unset — lifecycle state is emitted as a Finding.
 			Fields: map[string]string{
 				"volume_id":   volumeID,
 				"name":        name,
@@ -118,7 +118,7 @@ func FetchEBSVolumesPage(ctx context.Context, api EC2DescribeVolumesAPI, continu
 			RawStruct: vol,
 		}
 
-		// Phase 03 PR-03b: emit canonical Findings for non-healthy volume states.
+		// emit canonical Findings for non-healthy volume states.
 		// in-use and available are healthy (no Finding). deleting is terminal (no Finding).
 		// creating → SevWarn. error → SevBroken.
 		switch vol.State {
@@ -322,7 +322,7 @@ func snapshotToResource(snap ec2types.Snapshot) resource.Resource {
 	r := resource.Resource{
 		ID:   snapshotID,
 		Name: name,
-		// Status: removed — PR-03b migrates fetcher to Findings for lifecycle states.
+		// Status intentionally unset — lifecycle state is emitted as a Finding.
 		Fields: map[string]string{
 			"snapshot_id": snapshotID,
 			"name":        name,
@@ -337,7 +337,7 @@ func snapshotToResource(snap ec2types.Snapshot) resource.Resource {
 		RawStruct: snap,
 	}
 
-	// Phase 03 PR-03b: emit canonical Findings for non-healthy snapshot states.
+	// emit canonical Findings for non-healthy snapshot states.
 	// completed → healthy (no Finding). pending → SevWarn.
 	// error / recoverable / recovering → SevBroken.
 	switch snap.State {

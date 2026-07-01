@@ -203,7 +203,7 @@ func imageResource(img ec2types.Image) resource.Resource {
 	r := resource.Resource{
 		ID:   imageID,
 		Name: name,
-		// Status: removed — PR-03b migrates fetcher to Findings for lifecycle states.
+		// Status intentionally unset — lifecycle state is emitted as a Finding.
 		Fields: map[string]string{
 			"image_id":         imageID,
 			"name":             name,
@@ -218,7 +218,7 @@ func imageResource(img ec2types.Image) resource.Resource {
 		RawStruct: img,
 	}
 
-	// Phase 03 PR-03b: emit canonical Findings for non-healthy AMI states.
+	// emit canonical Findings for non-healthy AMI states.
 	// available → healthy (no Finding). deregistered / disabled → terminal (no Finding).
 	// pending / transient → SevWarn. failed / error / invalid → SevBroken.
 	switch img.State {

@@ -14,9 +14,8 @@
 //   - docs/related-resources.md  — generated from Related defs
 //   - docs/resources/<short>.md  — per-resource markdown (section-marker mode)
 //
-// When the catalog is empty (PR-04a), no output files are written.
-// Per-category PRs (04b–04m) populate the catalog and the generator begins
-// producing content.
+// When the catalog is empty, no output files are written; the generator
+// produces content once the catalog is populated.
 //
 // Verify flag: run with -verify to assert that every catalog entry has a
 // corresponding docs/resources/<short>.md. Exits non-zero on violations.
@@ -206,9 +205,9 @@ func buildStub(rt catalog.ResourceTypeDef, header, findings, related string) str
 	var b strings.Builder
 	fmt.Fprintf(&b, "# %s\n\n", rt.Name)
 	fmt.Fprintf(&b, "<!-- BEGIN GENERATED: header -->\n%s<!-- END GENERATED: header -->\n\n", header)
-	b.WriteString("## Why this matters\n\n(TODO: write narrative)\n\n")
+	b.WriteString("## Why this matters\n\n_Narrative pending._\n\n")
 	fmt.Fprintf(&b, "## Findings\n\n<!-- BEGIN GENERATED: findings -->\n%s<!-- END GENERATED: findings -->\n\n", findings)
-	b.WriteString("## Workflow\n\n(TODO: write narrative)\n\n")
+	b.WriteString("## Workflow\n\n_Narrative pending._\n\n")
 	fmt.Fprintf(&b, "## Related Resources\n\n<!-- BEGIN GENERATED: related -->\n%s<!-- END GENERATED: related -->\n", related)
 	return b.String()
 }

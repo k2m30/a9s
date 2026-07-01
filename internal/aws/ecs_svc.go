@@ -84,7 +84,7 @@ func FetchECSServicesPage(
 				taskDefinition = *svc.TaskDefinition
 			}
 
-			// PR-03c: emit wave1 Findings for non-healthy lifecycle states.
+			// emit wave1 Findings for non-healthy lifecycle states.
 			// ACTIVE → no Finding (healthy). Fields["status"] is still populated
 			// so the existing structural Color path works as fallback.
 			var findings []domain.Finding
