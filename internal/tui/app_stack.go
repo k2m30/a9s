@@ -350,9 +350,18 @@ func (m Model) handleDetailKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model,
 					break
 				}
 			}
+			// Derive the single-ID TargetID so a keyboard Enter on a one-resource
+			// related row gets the cache-hit detail fast path, matching the web
+			// click (handleActionSelect) and field-Enter paths.
+			targetID := ""
+			if len(row.ResourceIDs) == 1 {
+				targetID = row.ResourceIDs[0]
+			}
 			nav := messages.RelatedNavigate{
 				TargetType:     row.TargetType,
 				SourceResource: m.ctrl.GetDetailResource(),
+				SourceType:     rs.resourceType,
+				TargetID:       targetID,
 				RelatedIDs:     row.ResourceIDs,
 				FetchFilter:    row.FetchFilter,
 				Checker:        checker,
