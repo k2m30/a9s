@@ -39,9 +39,9 @@ type EnrichDetailEvent struct {
 // DetailCtx construction lives on the runtime, not the adapter, so
 // internal/tui never touches awsclient.DetailEnrichmentCtx directly; the
 // adapter reads the typed payload fields verbatim. The DetailCtx pointer is
-// nil only when session.Clients is unset (test harnesses constructing a Core
-// without a transport) — the adapter is responsible for tolerating that
-// branch.
+// nil only when both session.Clients and session.PolicyDocCache are unset
+// (test harnesses constructing a Core without a transport) — the adapter is
+// responsible for tolerating that branch.
 type EnrichDetailPayload struct {
 	ResourceType string
 	Resource     resource.Resource

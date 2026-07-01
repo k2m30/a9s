@@ -63,8 +63,8 @@ func FetchElasticIPs(ctx context.Context, api EC2DescribeAddressesAPI) ([]resour
 		r := resource.Resource{
 			ID:   allocationID,
 			Name: name,
-			// Status intentionally unset — an EIP has no health lifecycle state.
-			// Legacy Status=domain (vpc/standard) was not a health state.
+			// Fields["status"] carries the association state (ATTACHED/UNATTACHED);
+			// an EIP has no health lifecycle state, so it emits no Finding.
 			Fields: map[string]string{
 				"allocation_id":  allocationID,
 				"name":           name,
