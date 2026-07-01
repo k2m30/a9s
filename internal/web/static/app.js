@@ -58,9 +58,11 @@
   function clickSelect(idx) {
     var now = Date.now();
     if (clickBusy) return;
-    // Ignore a repeat click on the same row within 500ms: a double-click would
-    // otherwise navigate, then re-run the move-chain on the new screen, landing
-    // two levels deep.
+    // Ignore a repeat click on the same row within 500ms of the last click on
+    // THIS screen. The done-callback clears this after navigation completes, so
+    // the guard only suppresses a double-click's second tap before the
+    // move-chain finishes — not a legitimate click on the same row index of the
+    // screen we just navigated to.
     if (idx === lastClickIdx && now - lastClickAt < 500) return;
     lastClickIdx = idx;
     lastClickAt = now;
@@ -71,7 +73,16 @@
       steps.push({ kind: "move-down" });
     }
     steps.push({ kind: "select" });
-    chainActions(steps, 0, function () { clickBusy = false; });
+    chainActions(steps, 0, function () {
+      clickBusy = false;
+      // Navigation finished and the screen changed: clear the same-row debounce
+      // so an intentional click on the same row index of the new screen is not
+      // dropped. The in-flight move-chain (clickBusy) already absorbed the
+      // second tap of a physical double-click, which lands well before these
+      // sequential round-trips complete.
+      lastClickIdx = -1;
+      lastClickAt = 0;
+    });
   }
 
   function chainActions(steps, i, done) {

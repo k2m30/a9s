@@ -34,6 +34,11 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 	// re-check staleness with the same predicate before mutating the controller.
 	if msg, ok := ev.(messages.ResourcesLoaded); ok && !messages.IsStale(msg, c.core) {
 		c.handleResourcesLoadedEvent(msg)
+		// Web/headless by-ID drill: replace a flagged placeholder list with the
+		// target's detail once its single row loads. TUI-safe — Handle is the
+		// headless/web entry point; the TUI routes ResourcesLoaded through the
+		// HandleResourcesLoadedEvent seam and drills to detail in its own adapter.
+		tasks = append(tasks, c.autoOpenSingleDetail()...)
 	}
 
 	// messages.ValueRevealed is explicitly excluded from HandleEvent
@@ -125,6 +130,51 @@ func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 		c.applyResourcesLoaded(s.State.List, canon, msg.Resources, msg.Pagination, msg.Append)
 		return
 	}
+}
+
+// autoOpenSingleDetail replaces a web/headless by-ID placeholder list with the
+// target resource's detail once its single row has loaded. Returns any
+// related-check tasks the opened detail dispatches, or nil when no auto-open is
+// pending or the target row has not arrived yet. Caller must hold c.mu (write).
+//
+// TUI-safe: only reached from Handle (the headless/web entry point). The TUI
+// drills to by-ID detail in its own adapter and renders from a separate
+// renderer stack, so it never opens detail through this controller path.
+func (c *Controller) autoOpenSingleDetail() []runtime.TaskRequest {
+	if len(c.stack) == 0 {
+		return nil
+	}
+	top := &c.stack[len(c.stack)-1]
+	if top.ID != runtime.ScreenResourceList && top.ID != runtime.ScreenChildList {
+		return nil
+	}
+	ls := top.State.List
+	if ls == nil || !ls.AutoOpenSingle || len(ls.RelatedIDSet) != 1 {
+		return nil
+	}
+	var targetID string
+	for id := range ls.RelatedIDSet {
+		targetID = id
+	}
+	if targetID == "" {
+		return nil
+	}
+	var matched *resource.Resource
+	for i := range ls.Rows {
+		if ls.Rows[i].ID == targetID {
+			matched = &ls.Rows[i]
+			break
+		}
+	}
+	if matched == nil {
+		return nil // target row not loaded yet; keep the placeholder list
+	}
+	res := *matched
+	targetType := top.Ctx.ResourceType
+	ls.AutoOpenSingle = false
+	// Replace the placeholder list with the resource's detail.
+	c.applyIntents([]runtime.UIIntent{runtime.PopScreen{}})
+	return c.openRelatedDetail(res, targetType)
 }
 
 // HandleResourcesLoadedEvent is the public adapter seam used by the TUI's
