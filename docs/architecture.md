@@ -429,7 +429,7 @@ All in `internal/tui/views/`:
 | View | File(s) | Purpose |
 |------|---------|---------|
 | **MainMenuModel** | `mainmenu.go` | Category-grouped resource list with availability badges, issue count badges (`issues:N`), ctrl+z quad-state filter, enrichment progress indicator |
-| **ResourceListModel** | `resourcelist.go` | Paginated table with filter, sort, child drill-down; embeds `AttentionFilter` for ctrl+z; tracks `issueCount` for title badge |
+| **ResourceListModel** | `resourcelist.go` | Paginated table with filter, sort, child drill-down; embeds `AttentionFilter` for ctrl+z; tracks `issueCount` for the frame-title `!N` issue suffix (`s3(50+) !5`; `!N+` when truncated, omitted when zero or in ctrl+z attention-only mode) and menu sync-back |
 | **DetailModel** | `detail.go`, `detail_fields.go`, `detail_helpers.go` | Two-column: field list (left) + related panel (right) |
 | **YAMLModel** | `yaml.go` | YAML dump of RawStruct with syntax highlighting + search. Also doubles as a raw-text viewer via `NewTextViewer()` (used for the `!` error log) |
 | **JSONModel** | `json.go` | JSON dump of RawStruct with syntax highlighting + search |
