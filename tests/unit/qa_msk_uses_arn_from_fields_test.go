@@ -10,6 +10,7 @@ package unit
 import (
 	"context"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -22,9 +23,12 @@ import (
 )
 
 // strictMSKFake mirrors AWS: rejects DescribeClusterV2 when ClusterArn is not
-// a valid ARN.
+// a valid ARN. mu guards calledWith, which is written concurrently:
+// EnrichMSKCluster fans out DescribeClusterV2 calls per resource via
+// internal/aws.ForEachParallel (EnrichmentParallelism goroutines).
 type strictMSKFake struct {
 	awsclient.MSKAPI
+	mu         sync.Mutex
 	calledWith string
 }
 
@@ -34,7 +38,9 @@ func (f *strictMSKFake) DescribeClusterV2(
 	_ ...func(*kafkasvc.Options),
 ) (*kafkasvc.DescribeClusterV2Output, error) {
 	got := aws.ToString(input.ClusterArn)
+	f.mu.Lock()
 	f.calledWith = got
+	f.mu.Unlock()
 	if !strings.HasPrefix(got, "arn:aws:") {
 		return nil, &smithy.GenericAPIError{
 			Code:    "ValidationError",
@@ -44,6 +50,14 @@ func (f *strictMSKFake) DescribeClusterV2(
 	return &kafkasvc.DescribeClusterV2Output{
 		ClusterInfo: &kafkatypes.Cluster{},
 	}, nil
+}
+
+// calledWithSafe returns calledWith, safe for concurrent use with
+// DescribeClusterV2.
+func (f *strictMSKFake) calledWithSafe() string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.calledWith
 }
 
 // TestEnrichMSKCluster_UsesARNFromFields verifies the enricher passes
@@ -64,8 +78,8 @@ func TestEnrichMSKCluster_UsesARNFromFields(t *testing.T) {
 	if err != nil && strings.Contains(err.Error(), "ValidationError") {
 		t.Fatalf("enricher passed bare cluster name to AWS instead of ARN; got: %v", err)
 	}
-	if fake.calledWith != clusterARN {
+	if got := fake.calledWithSafe(); got != clusterARN {
 		t.Errorf("DescribeClusterV2 was called with %q, want %q (ARN from Fields[\"cluster_arn\"])",
-			fake.calledWith, clusterARN)
+			got, clusterARN)
 	}
 }

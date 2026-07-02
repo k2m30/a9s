@@ -22,6 +22,7 @@ package unit
 import (
 	"context"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -33,9 +34,13 @@ import (
 )
 
 // strictSFNFake mirrors AWS: rejects ListExecutions when StateMachineArn is not
-// a valid ARN (does not start with "arn:aws:").
+// a valid ARN (does not start with "arn:aws:"). mu guards listCalledWith,
+// which is written concurrently: EnrichStepFunctionsStatus fans out
+// ListExecutions calls per resource via internal/aws.ForEachParallel
+// (EnrichmentParallelism goroutines).
 type strictSFNFake struct {
 	awsclient.SFNAPI
+	mu             sync.Mutex
 	listCalledWith string
 }
 
@@ -45,7 +50,9 @@ func (f *strictSFNFake) ListExecutions(
 	_ ...func(*sfn.Options),
 ) (*sfn.ListExecutionsOutput, error) {
 	got := aws.ToString(input.StateMachineArn)
+	f.mu.Lock()
 	f.listCalledWith = got
+	f.mu.Unlock()
 	if !strings.HasPrefix(got, "arn:aws:") {
 		return nil, &smithy.GenericAPIError{
 			Code:    "InvalidArn",
@@ -53,6 +60,14 @@ func (f *strictSFNFake) ListExecutions(
 		}
 	}
 	return &sfn.ListExecutionsOutput{}, nil
+}
+
+// listCalledWithSafe returns listCalledWith, safe for concurrent use with
+// ListExecutions.
+func (f *strictSFNFake) listCalledWithSafe() string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.listCalledWith
 }
 
 // TestEnrichStepFunctions_UsesARNFromFields verifies the enricher passes
@@ -75,8 +90,8 @@ func TestEnrichStepFunctions_UsesARNFromFields(t *testing.T) {
 	if err != nil && strings.Contains(err.Error(), "InvalidArn") {
 		t.Fatalf("enricher passed the bare name to AWS instead of the ARN; got: %v", err)
 	}
-	if fake.listCalledWith != smARN {
+	if got := fake.listCalledWithSafe(); got != smARN {
 		t.Errorf("ListExecutions was called with %q, want %q (the ARN from Fields[\"arn\"])",
-			fake.listCalledWith, smARN)
+			got, smARN)
 	}
 }

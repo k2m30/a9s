@@ -4,6 +4,7 @@ package aws
 import (
 	"context"
 	"strings"
+	"sync"
 
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
@@ -40,10 +41,10 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 	}
 	truncated := len(resources) > EnrichmentCap
 	issueCount := 0
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 		// Resolve the policy ARN — prefer RawStruct, fall back to r.ID when it is an ARN.
 		policyARN, ok := extractIAMPolicyARN(r)
 		if !ok || policyARN == "" {
@@ -53,17 +54,19 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 			}
 		}
 		if policyARN == "" {
-			continue
+			return
 		}
 		// Skip AWS-managed policies.
 		if strings.HasPrefix(policyARN, "arn:aws:iam::aws:policy/") {
-			continue
+			return
 		}
 		doc, err := FetchManagedPolicyDocument(ctx, getPolicyAPI, getPolicyVersionAPI, policyARN)
+		mu.Lock()
+		defer mu.Unlock()
 		if err != nil {
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
-			continue
+			return
 		}
 		riskVal := ""
 		// Check if the policy is not attached to any entity — orphan.
@@ -82,7 +85,7 @@ func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []r
 		result.FieldUpdates[r.ID] = map[string]string{
 			"risk": riskVal,
 		}
-	}
+	})
 	result.IssueCount = issueCount
 	result.Truncated = truncated
 	return result, nil

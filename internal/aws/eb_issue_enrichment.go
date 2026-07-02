@@ -4,6 +4,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk"
@@ -32,28 +33,30 @@ func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, res
 		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 		name := r.Name
 		if name == "" {
 			name = r.Fields["environment_name"]
 		}
 		if name == "" {
-			continue
+			return
 		}
 		out, err := clients.ElasticBeanstalk.DescribeEnvironmentHealth(ctx, &elasticbeanstalk.DescribeEnvironmentHealthInput{
 			EnvironmentName: aws.String(name),
 			AttributeNames:  []ebtypes.EnvironmentHealthAttribute{ebtypes.EnvironmentHealthAttributeCauses},
 		})
+		mu.Lock()
+		defer mu.Unlock()
 		if err != nil {
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
-			continue
+			return
 		}
 		if len(out.Causes) == 0 {
-			continue
+			return
 		}
 		firstCause := out.Causes[0]
 		rows := []domain.DetailRow{
@@ -70,7 +73,7 @@ func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, res
 			key = name
 		}
 		setWave2Finding(&result, key, ebCodeEnvironmentCauses, fmt.Sprintf("EB causes: %s", firstCause), "~", "eb", rows, "")
-	}
+	})
 	result.IssueCount = 0
 	result.Truncated = truncated
 	return result, nil

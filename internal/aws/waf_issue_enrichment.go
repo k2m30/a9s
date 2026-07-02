@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	wafv2svc "github.com/aws/aws-sdk-go-v2/service/wafv2"
@@ -41,18 +43,20 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 	truncated := len(resources) > EnrichmentCap
 	var failures []string
 	total := 0
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 		arn := r.Fields["arn"]
 		if arn == "" {
 			arn = r.ID
 		}
 		if arn == "" {
-			continue
+			return
 		}
+		mu.Lock()
 		total++
+		mu.Unlock()
 		var rows []domain.DetailRow
 
 		// Check logging configuration.
@@ -70,10 +74,12 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 				})
 			} else {
 				// Unexpected error — skip this ACL.
+				mu.Lock()
 				failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 				truncated = true
 				result.TruncatedIDs[r.ID] = true
-				continue
+				mu.Unlock()
+				return
 			}
 		}
 
@@ -84,10 +90,12 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 			})
 		})
 		if err != nil {
+			mu.Lock()
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
-			continue
+			mu.Unlock()
+			return
 		}
 		if len(assocOut.ResourceArns) == 0 {
 			rows = append(rows, domain.DetailRow{
@@ -128,15 +136,19 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 				}
 			}
 		}
+
+		mu.Lock()
+		defer mu.Unlock()
 		result.FieldUpdates[r.ID] = map[string]string{
 			"rules_summary": rulesSummary,
 		}
 
 		if len(rows) == 0 {
-			continue
+			return
 		}
 		setWave2Finding(&result, r.ID, wafCodeNoLogging, rows[0].Value, "~", "waf", rows, "")
-	}
+	})
+	sort.Strings(failures)
 	// All WAF logging findings are severity "~" (informational).
 	result.IssueCount = 0
 	result.Truncated = truncated

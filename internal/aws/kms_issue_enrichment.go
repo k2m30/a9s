@@ -3,6 +3,7 @@ package aws
 
 import (
 	"context"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
@@ -31,27 +32,29 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 		keyID := r.ID
 		if keyID == "" {
-			continue
+			return
 		}
 		out, err := clients.KMS.GetKeyRotationStatus(ctx, &kms.GetKeyRotationStatusInput{
 			KeyId: aws.String(keyID),
 		})
+		mu.Lock()
+		defer mu.Unlock()
 		if err != nil {
 			code, _, _ := ClassifyAWSError(err)
 			if code == "AccessDeniedException" || code == "AccessDenied" {
 				// AWS-managed keys: skip silently without marking truncated
-				continue
+				return
 			}
 			// Any other error: skip this key but signal incomplete data via truncated
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
-			continue
+			return
 		}
 		rotationVal := "false"
 		if out.KeyRotationEnabled {
@@ -63,7 +66,7 @@ func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources [
 		if !out.KeyRotationEnabled {
 			setWave2Finding(&result, keyID, kmsCodeRotationDisabled, "key rotation disabled (CIS KMS.1)", "~", "kms", nil, "")
 		}
-	}
+	})
 	result.IssueCount = 0
 	result.Truncated = truncated
 	return result, nil

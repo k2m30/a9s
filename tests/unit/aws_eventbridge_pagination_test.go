@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -43,6 +44,11 @@ type ebPaginatedFake struct {
 	// pages maps ruleName → ordered pages of ListTargetsByRuleOutput.
 	pages map[string][]*eventbridge.ListTargetsByRuleOutput
 
+	// mu guards callCounts, which is written concurrently:
+	// EnrichEventBridgeRuleTargets fans out ListTargetsByRule calls per
+	// resource via internal/aws.ForEachParallel (EnrichmentParallelism
+	// goroutines).
+	mu sync.Mutex
 	// callCounts tracks how many times ListTargetsByRule was called per rule.
 	callCounts map[string]int
 }
@@ -63,8 +69,10 @@ func (f *ebPaginatedFake) ListTargetsByRule(
 	if in != nil && in.Rule != nil {
 		rule = *in.Rule
 	}
+	f.mu.Lock()
 	idx := f.callCounts[rule]
 	f.callCounts[rule] = idx + 1
+	f.mu.Unlock()
 
 	pages := f.pages[rule]
 	if idx >= len(pages) {
@@ -74,6 +82,14 @@ func (f *ebPaginatedFake) ListTargetsByRule(
 		}, nil
 	}
 	return pages[idx], nil
+}
+
+// callsFor returns the recorded ListTargetsByRule call count for rule, safe
+// for concurrent use with the fake's ListTargetsByRule method.
+func (f *ebPaginatedFake) callsFor(rule string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.callCounts[rule]
 }
 
 // Compile-time check: ebPaginatedFake satisfies EventBridgeAPI.
@@ -182,7 +198,7 @@ func TestEnrichEventBridgeRule_PaginatesTargets(t *testing.T) {
 	}
 
 	// ListTargetsByRule must have been called twice
-	calls := fake.callCounts[ruleName]
+	calls := fake.callsFor(ruleName)
 	if calls != 2 {
 		t.Errorf("ListTargetsByRule called %d times, want 2", calls)
 	}
@@ -229,7 +245,7 @@ func TestEnrichEventBridgeRule_CappedAtPerParentPageCap(t *testing.T) {
 	}
 
 	// ListTargetsByRule must be called exactly PerParentPageCap times
-	calls := fake.callCounts[ruleName]
+	calls := fake.callsFor(ruleName)
 	if calls != awsclient.PerParentPageCap {
 		t.Errorf("ListTargetsByRule called %d times, want exactly %d (PerParentPageCap)", calls, awsclient.PerParentPageCap)
 	}

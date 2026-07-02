@@ -4,7 +4,9 @@ package aws
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -50,18 +52,20 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 	truncated := len(resources) > EnrichmentCap
 	var failures []string
 	total := 0
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 		logGroupName := r.Fields["log_group_name"]
 		if logGroupName == "" {
 			logGroupName = r.ID
 		}
 		if logGroupName == "" {
-			continue
+			return
 		}
+		mu.Lock()
 		total++
+		mu.Unlock()
 
 		// Compute last_event_at by fetching the most-recently-written stream.
 		// safeDescribeLogStreams is best-effort — errors (including panic-recoveries from
@@ -84,17 +88,19 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 					default:
 						rel = t.Format("2006-01-02")
 					}
+					mu.Lock()
 					if result.FieldUpdates[r.ID] == nil {
 						result.FieldUpdates[r.ID] = make(map[string]string)
 					}
 					result.FieldUpdates[r.ID]["last_event_at"] = rel
+					mu.Unlock()
 				}
 			}
 		}
 
 		// Only inspect audit (CloudTrail) log groups for metric filter findings.
 		if !strings.HasPrefix(logGroupName, "/aws/cloudtrail/") {
-			continue
+			return
 		}
 
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cwlogssvc.DescribeMetricFiltersOutput, error) {
@@ -102,22 +108,25 @@ func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resou
 				LogGroupName: aws.String(logGroupName),
 			})
 		})
+		mu.Lock()
+		defer mu.Unlock()
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
-			continue
+			return
 		}
 
 		if len(out.MetricFilters) > 0 {
-			continue
+			return
 		}
 
 		setWave2Finding(&result, r.ID, logsCodeMissingMetricFilters, "audit log group missing metric filters", "~", "logs", []domain.DetailRow{
 			{Label: "Log Group", Value: logGroupName, Tier: "~"},
 			{Label: "Metric Filters", Value: "none", Tier: "~"},
 		}, "")
-	}
+	})
+	sort.Strings(failures)
 	// Metric filter findings are severity "~" (informational); IssueCount stays 0.
 	result.IssueCount = 0
 	result.Truncated = truncated

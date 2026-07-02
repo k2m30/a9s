@@ -4,6 +4,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/glue"
@@ -31,21 +32,23 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 		if r.Name == "" {
-			continue
+			return
 		}
 		out, err := clients.Glue.GetJobRuns(ctx, &glue.GetJobRunsInput{
 			JobName:    aws.String(r.Name),
 			MaxResults: aws.Int32(1),
 		})
+		mu.Lock()
+		defer mu.Unlock()
 		if err != nil {
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
-			continue
+			return
 		}
 		key := r.ID
 		if key == "" {
@@ -70,7 +73,7 @@ func EnrichGlueJobStatus(ctx context.Context, clients *ServiceClients, resources
 				result.FieldUpdates[key] = map[string]string{"last_run": "OK"}
 			}
 		}
-	}
+	})
 	result.IssueCount = len(result.Findings)
 	result.Truncated = truncated
 	return result, nil

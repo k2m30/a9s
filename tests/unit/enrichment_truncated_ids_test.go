@@ -24,6 +24,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -43,6 +44,10 @@ import (
 type iamGroupErrorOnSecondFake struct {
 	awsclient.IAMAPI
 
+	// mu guards callOrder, which is written concurrently: EnrichIAMGroup fans
+	// out GetGroup calls per resource via internal/aws.ForEachParallel
+	// (EnrichmentParallelism goroutines).
+	mu sync.Mutex
 	// callOrder records the order of GetGroup calls by group name.
 	callOrder []string
 
@@ -65,7 +70,9 @@ func (f *iamGroupErrorOnSecondFake) GetGroup(
 	if in != nil && in.GroupName != nil {
 		name = *in.GroupName
 	}
+	f.mu.Lock()
 	f.callOrder = append(f.callOrder, name)
+	f.mu.Unlock()
 	if name == f.errorOnGroup {
 		return nil, errors.New("simulated GetGroup API error for " + name)
 	}
@@ -187,7 +194,7 @@ func TestEnrichEventBridgeRuleTargets_TruncatedIDsPopulatedOnCapHit(t *testing.T
 	}
 
 	// Verify pagination was capped.
-	calls := fake.callCounts[ruleName]
+	calls := fake.callsFor(ruleName)
 	if calls != awsclient.PerParentPageCap {
 		t.Errorf("ListTargetsByRule called %d times, want %d (PerParentPageCap)", calls, awsclient.PerParentPageCap)
 	}

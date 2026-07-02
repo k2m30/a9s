@@ -4,7 +4,9 @@ package aws
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strconv"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
@@ -63,18 +65,20 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 	truncated := len(resources) > EnrichmentCap
 	var failures []string
 	total := 0
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 		repoName := r.Name
 		if repoName == "" {
 			repoName = r.ID
 		}
 		if repoName == "" {
-			continue
+			return
 		}
+		mu.Lock()
 		total++
+		mu.Unlock()
 
 		// ONE call per repo. Returns up to ECRImagesPerRepo most-recent images
 		// with ImageScanFindingsSummary populated inline.
@@ -84,11 +88,13 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 				MaxResults:     aws.Int32(int32(ECRImagesPerRepo)),
 			})
 		})
+		mu.Lock()
+		defer mu.Unlock()
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
-			continue
+			return
 		}
 
 		scannedCount := 0
@@ -117,7 +123,7 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 		}
 
 		if criticalTotal == 0 && highTotal == 0 {
-			continue
+			return
 		}
 
 		var rows []domain.DetailRow
@@ -138,7 +144,8 @@ func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources
 			})
 		}
 		setWave2Finding(&result, r.ID, ecrCodeVulnerabilities, rows[0].Value, tier, "ecr", rows, "")
-	}
+	})
+	sort.Strings(failures)
 
 	issueCount := 0
 	for _, f := range result.Findings {

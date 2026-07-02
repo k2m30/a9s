@@ -4,6 +4,8 @@ package aws
 import (
 	"context"
 	"fmt"
+	"sort"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -34,32 +36,36 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 	truncated := len(resources) > EnrichmentCap
 	var failures []string
 	total := 0
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 		if r.ID == "" {
-			continue
+			return
 		}
 		// ListExecutions requires the state-machine ARN. The sfn fetcher
 		// (sfn.go) sets ID = bare name and stores the ARN in Fields["arn"].
 		// Passing r.ID errors with "Invalid ARN prefix" against real AWS.
 		smARN := r.Fields["arn"]
 		if smARN == "" {
-			continue
+			return
 		}
+		mu.Lock()
 		total++
+		mu.Unlock()
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sfn.ListExecutionsOutput, error) {
 			return clients.SFN.ListExecutions(ctx, &sfn.ListExecutionsInput{
 				StateMachineArn: aws.String(smARN),
 				MaxResults:      1,
 			})
 		})
+		mu.Lock()
+		defer mu.Unlock()
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
-			continue
+			return
 		}
 		if len(out.Executions) > 0 {
 			s := out.Executions[0].Status
@@ -88,7 +94,8 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 				"last_run": lastRunVal,
 			}
 		}
-	}
+	})
+	sort.Strings(failures)
 	result.IssueCount = len(result.Findings)
 	result.Truncated = truncated
 	return result,

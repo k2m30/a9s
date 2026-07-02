@@ -4,6 +4,8 @@ package aws
 import (
 	"context"
 	"fmt"
+	"sort"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/efs"
@@ -41,26 +43,27 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 	truncated := len(resources) > EnrichmentCap
 	var failures []string
 	total := 0
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 		fsID := r.ID
 		if fsID == "" {
-			continue
+			return
 		}
+		mu.Lock()
 		total++
+		mu.Unlock()
 		// Paginate mount targets per file system using Marker/NextMarker.
 		var allMountTargets []efstypes.MountTargetDescription
 		var mtMarker *string
 		mtPages := 0
 		mtTruncated := false
 		pageFailed := false
+		var pageErr error
 		for {
 			if mtPages >= PerParentPageCap {
 				mtTruncated = true
-				truncated = true
-				result.TruncatedIDs[r.ID] = true
 				break
 			}
 			out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*efs.DescribeMountTargetsOutput, error) {
@@ -71,10 +74,8 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 			})
 			mtPages++
 			if err != nil {
-				failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
-				truncated = true
-				result.TruncatedIDs[r.ID] = true
 				pageFailed = true
+				pageErr = err
 				break
 			}
 			allMountTargets = append(allMountTargets, out.MountTargets...)
@@ -83,8 +84,16 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 			}
 			mtMarker = out.NextMarker
 		}
+
 		if mtTruncated || pageFailed {
-			continue
+			mu.Lock()
+			defer mu.Unlock()
+			truncated = true
+			result.TruncatedIDs[r.ID] = true
+			if pageFailed {
+				failures = append(failures, fmt.Sprintf("%s: %v", r.ID, pageErr))
+			}
+			return
 		}
 
 		// Count unavailable mount targets (N) and total (M).
@@ -103,7 +112,7 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 
 		if firstBad == nil {
 			// All mount targets healthy — no finding.
-			continue
+			return
 		}
 
 		mtID := ""
@@ -116,6 +125,8 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 		}
 		state := string(firstBad.LifeCycleState)
 
+		mu.Lock()
+		defer mu.Unlock()
 		// Summary must NOT embed any Row value (U11 contract).
 		setWave2Finding(&result, fsID, efsCodeMountTargetDown, "mount target down", "!", "efs", []domain.DetailRow{
 			{Label: "Mount Target", Value: mtID, Tier: "!"},
@@ -123,7 +134,8 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 			{Label: "State", Value: state, Tier: "!"},
 			{Label: "Degraded", Value: fmt.Sprintf("%d/%d", unavailableCount, totalMT)},
 		}, "")
-	}
+	})
+	sort.Strings(failures)
 	result.IssueCount = len(result.Findings)
 	result.Truncated = truncated
 	result.FieldUpdates = make(map[string]map[string]string)

@@ -4,6 +4,8 @@ package aws
 import (
 	"context"
 	"fmt"
+	"sort"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	sqssvc "github.com/aws/aws-sdk-go-v2/service/sqs"
@@ -36,15 +38,17 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 	truncated := len(resources) > EnrichmentCap
 	var failures []string
 	total := 0
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 		queueURL := r.Fields["queue_url"]
 		if queueURL == "" {
-			continue
+			return
 		}
+		mu.Lock()
 		total++
+		mu.Unlock()
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sqssvc.GetQueueAttributesOutput, error) {
 			return clients.SQS.GetQueueAttributes(ctx, &sqssvc.GetQueueAttributesInput{
 				QueueUrl: aws.String(queueURL),
@@ -55,11 +59,13 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 				},
 			})
 		})
+		mu.Lock()
+		defer mu.Unlock()
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
-			continue
+			return
 		}
 		_, hasDLQ := out.Attributes["RedrivePolicy"]
 		dlqVal := "no"
@@ -85,10 +91,11 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 			})
 		}
 		if len(rows) == 0 {
-			continue
+			return
 		}
 		setWave2Finding(&result, r.ID, sqsCodeMissingDLQ, rows[0].Value, "~", "sqs", rows, "")
-	}
+	})
+	sort.Strings(failures)
 	result.IssueCount = 0
 	result.Truncated = truncated
 	return result,

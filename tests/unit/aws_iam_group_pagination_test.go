@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -52,6 +53,12 @@ type iamGroupPaginatedFake struct {
 	// inlinePoliciesPages maps groupName → ordered pages of ListGroupPoliciesOutput.
 	inlinePoliciesPages map[string][]*iam.ListGroupPoliciesOutput
 
+	// mu guards the call counters below, which are written concurrently:
+	// EnrichIAMGroup fans out GetGroup/ListAttachedGroupPolicies/
+	// ListGroupPolicies calls per resource via internal/aws.ForEachParallel
+	// (EnrichmentParallelism goroutines).
+	mu sync.Mutex
+
 	// call counters (per group)
 	getGroupCalls         map[string]int
 	attachedPoliciesCalls map[string]int
@@ -79,8 +86,10 @@ func (f *iamGroupPaginatedFake) GetGroup(
 		name = *in.GroupName
 	}
 	pages := f.getGroupPages[name]
+	f.mu.Lock()
 	idx := f.getGroupCalls[name]
 	f.getGroupCalls[name] = idx + 1
+	f.mu.Unlock()
 	if idx >= len(pages) {
 		// No more pages defined — return a final empty page.
 		return &iam.GetGroupOutput{
@@ -101,8 +110,10 @@ func (f *iamGroupPaginatedFake) ListAttachedGroupPolicies(
 		name = *in.GroupName
 	}
 	pages := f.attachedPoliciesPages[name]
+	f.mu.Lock()
 	idx := f.attachedPoliciesCalls[name]
 	f.attachedPoliciesCalls[name] = idx + 1
+	f.mu.Unlock()
 	if idx >= len(pages) {
 		return &iam.ListAttachedGroupPoliciesOutput{
 			AttachedPolicies: []iamtypes.AttachedPolicy{},
@@ -121,8 +132,10 @@ func (f *iamGroupPaginatedFake) ListGroupPolicies(
 		name = *in.GroupName
 	}
 	pages := f.inlinePoliciesPages[name]
+	f.mu.Lock()
 	idx := f.inlinePoliciesCalls[name]
 	f.inlinePoliciesCalls[name] = idx + 1
+	f.mu.Unlock()
 	if idx >= len(pages) {
 		return &iam.ListGroupPoliciesOutput{PolicyNames: []string{}}, nil
 	}
@@ -131,6 +144,32 @@ func (f *iamGroupPaginatedFake) ListGroupPolicies(
 
 // Compile-time check: iamGroupPaginatedFake satisfies IAMAPI.
 var _ awsclient.IAMAPI = (*iamGroupPaginatedFake)(nil)
+
+// getGroupCallsFor returns the recorded GetGroup call count for groupName,
+// safe for concurrent use with the fake's GetGroup method.
+func (f *iamGroupPaginatedFake) getGroupCallsFor(groupName string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.getGroupCalls[groupName]
+}
+
+// attachedPoliciesCallsFor returns the recorded ListAttachedGroupPolicies call
+// count for groupName, safe for concurrent use with the fake's
+// ListAttachedGroupPolicies method.
+func (f *iamGroupPaginatedFake) attachedPoliciesCallsFor(groupName string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.attachedPoliciesCalls[groupName]
+}
+
+// inlinePoliciesCallsFor returns the recorded ListGroupPolicies call count for
+// groupName, safe for concurrent use with the fake's ListGroupPolicies
+// method.
+func (f *iamGroupPaginatedFake) inlinePoliciesCallsFor(groupName string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.inlinePoliciesCalls[groupName]
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -221,7 +260,7 @@ func TestEnrichIAMGroup_PaginatesGetGroupMembers(t *testing.T) {
 	}
 
 	// GetGroup must have been called twice (once per page)
-	calls := fake.getGroupCalls[groupName]
+	calls := fake.getGroupCallsFor(groupName)
 	if calls != 2 {
 		t.Errorf("GetGroup called %d times, want 2", calls)
 	}
@@ -285,7 +324,7 @@ func TestEnrichIAMGroup_PaginatesAttachedPolicies(t *testing.T) {
 	}
 
 	// ListAttachedGroupPolicies must have been called twice
-	calls := fake.attachedPoliciesCalls[groupName]
+	calls := fake.attachedPoliciesCallsFor(groupName)
 	if calls != 2 {
 		t.Errorf("ListAttachedGroupPolicies called %d times, want 2", calls)
 	}
@@ -344,7 +383,7 @@ func TestEnrichIAMGroup_PaginatesInlinePolicies(t *testing.T) {
 	}
 
 	// ListGroupPolicies must have been called twice
-	calls := fake.inlinePoliciesCalls[groupName]
+	calls := fake.inlinePoliciesCallsFor(groupName)
 	if calls != 2 {
 		t.Errorf("ListGroupPolicies called %d times, want 2", calls)
 	}
@@ -393,7 +432,7 @@ func TestEnrichIAMGroup_CappedAtPerParentPageCap(t *testing.T) {
 	}
 
 	// GetGroup must be called exactly PerParentPageCap times
-	calls := fake.getGroupCalls[groupName]
+	calls := fake.getGroupCallsFor(groupName)
 	if calls != awsclient.PerParentPageCap {
 		t.Errorf("GetGroup called %d times, want exactly %d (PerParentPageCap)", calls, awsclient.PerParentPageCap)
 	}

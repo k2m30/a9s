@@ -4,6 +4,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -43,25 +44,33 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 	buildIDToProject := make(map[string]string, len(names))
 	var buildIDs []string
 	truncated := len(resources) > EnrichmentCap
-	for _, name := range names {
-		if len(buildIDs) >= EnrichmentCap {
-			break
+	nNames := min(len(names), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, nNames, EnrichmentParallelism, func(i int) {
+		name := names[i]
+		mu.Lock()
+		atCap := len(buildIDs) >= EnrichmentCap
+		mu.Unlock()
+		if atCap {
+			return
 		}
 		out, err := clients.CodeBuild.ListBuildsForProject(ctx, &codebuild.ListBuildsForProjectInput{
 			ProjectName: aws.String(name),
 			SortOrder:   cbtypes.SortOrderTypeDescending,
 		})
+		mu.Lock()
+		defer mu.Unlock()
 		if err != nil {
 			truncated = true
 			result.TruncatedIDs[name] = true
-			continue
+			return
 		}
 		if len(out.Ids) > 0 {
 			id := out.Ids[0]
 			buildIDs = append(buildIDs, id)
 			buildIDToProject[id] = name
 		}
-	}
+	})
 	if len(buildIDs) == 0 {
 		result.Truncated = truncated
 		return result, nil

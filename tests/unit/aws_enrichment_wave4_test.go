@@ -14,6 +14,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -245,14 +246,19 @@ func TestEnrichWAFLogging_EmptyScopeDefaultsToREGIONAL(t *testing.T) {
 	if !getACLCalled {
 		t.Error("GetWebACL was not called — scope-default branch not reached")
 	}
-	if wrapped.capturedScope != string(wafv2types.ScopeRegional) {
-		t.Errorf("scope passed to GetWebACL = %q, want %q", wrapped.capturedScope, string(wafv2types.ScopeRegional))
+	if got := wrapped.capturedScopeSafe(); got != string(wafv2types.ScopeRegional) {
+		t.Errorf("scope passed to GetWebACL = %q, want %q", got, string(wafv2types.ScopeRegional))
 	}
 }
 
-// scopeCaptureFake wraps wafFullFake and records the Scope argument passed to GetWebACL.
+// scopeCaptureFake wraps wafFullFake and records the Scope argument passed to
+// GetWebACL. mu guards scopeCapture/capturedScope: EnrichWAFLogging fans out
+// GetWebACL calls per resource via internal/aws.ForEachParallel
+// (EnrichmentParallelism goroutines), so concurrent writers are possible even
+// though the tests in this file currently drive it with a single resource.
 type scopeCaptureFake struct {
 	*wafFullFake
+	mu            sync.Mutex
 	scopeCapture  *bool
 	capturedScope string
 }
@@ -262,11 +268,21 @@ func (f *scopeCaptureFake) GetWebACL(
 	in *wafv2svc.GetWebACLInput,
 	opts ...func(*wafv2svc.Options),
 ) (*wafv2svc.GetWebACLOutput, error) {
+	f.mu.Lock()
 	*f.scopeCapture = true
 	if in != nil {
 		f.capturedScope = string(in.Scope)
 	}
+	f.mu.Unlock()
 	return f.wafFullFake.GetWebACL(ctx, in, opts...)
+}
+
+// capturedScopeSafe returns capturedScope, safe for concurrent use with
+// GetWebACL.
+func (f *scopeCaptureFake) capturedScopeSafe() string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.capturedScope
 }
 
 // Compile-time: scopeCaptureFake satisfies WAFv2API and WAFv2GetWebACLAPI.

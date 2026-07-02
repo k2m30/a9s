@@ -4,6 +4,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -38,27 +39,29 @@ func EnrichACMCertificate(ctx context.Context, clients *ServiceClients, resource
 	truncated := len(resources) > EnrichmentCap
 	now := time.Now()
 	bangCount := 0
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 		// DescribeCertificate requires the certificate ARN. The acm fetcher
 		// (acm.go) sets ID = domain name and stores the ARN in
 		// Fields["certificate_arn"]. Passing r.ID errors with ValidationError.
 		certARN := r.Fields["certificate_arn"]
 		if certARN == "" {
-			continue
+			return
 		}
 		out, err := clients.ACM.DescribeCertificate(ctx, &acmsvc.DescribeCertificateInput{
 			CertificateArn: aws.String(certARN),
 		})
+		mu.Lock()
+		defer mu.Unlock()
 		if err != nil {
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
-			continue
+			return
 		}
 		if out.Certificate == nil {
-			continue
+			return
 		}
 		cert := out.Certificate
 		// Expiry check — takes priority over orphan check.
@@ -75,7 +78,7 @@ func EnrichACMCertificate(ctx context.Context, clients *ServiceClients, resource
 				}
 				setWave2Finding(&result, r.ID, acmCodeExpiresSoon, summary, "!", "acm", nil, "")
 				bangCount++
-				continue
+				return
 			}
 		}
 		// Orphan check — only for ISSUED certs not already flagged.
@@ -83,7 +86,7 @@ func EnrichACMCertificate(ctx context.Context, clients *ServiceClients, resource
 			setWave2Finding(&result, r.ID, acmCodeOrphan, "certificate not in use (orphan)", "~", "acm", nil, "")
 			// "~" is informational — not counted in IssueCount.
 		}
-	}
+	})
 	result.IssueCount = bangCount
 	result.Truncated = truncated
 	return result, nil

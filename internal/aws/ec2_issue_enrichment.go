@@ -22,6 +22,48 @@ const (
 	// and scheduled-event checks live in one enricher function.
 )
 
+// ec2StatusFinding is the (tier, phrase, detail) triple for a single
+// SystemStatus/InstanceStatus value, per docs/resources/ec2.md §4 rows
+// "impaired" / "initializing" / "insufficient-data" (lines 225-227).
+type ec2StatusFinding struct {
+	tier   string
+	phrase string
+	detail string
+}
+
+// classifyEC2Status maps an AWS instance/system status-check value to the
+// severity, list phrase (S4), and detail sentence (S5) mandated by
+// docs/resources/ec2.md §4. Only "impaired" is Broken; "initializing" and
+// "insufficient-data" are Warning and must never carry the "impaired"
+// wording. "ok" and "not-applicable" produce no finding — "not-applicable"
+// is explicitly out of scope per docs/resources/ec2.md §5 (line 244): AWS
+// classifies it as Healthy/informational, not surfaced.
+func classifyEC2Status(status ec2types.SummaryStatus) (ec2StatusFinding, bool) {
+	switch status {
+	case ec2types.SummaryStatusImpaired:
+		return ec2StatusFinding{
+			tier:   "!",
+			phrase: "impaired: system checks failing",
+			detail: "AWS reports this instance is impaired — system or instance status checks are failing.",
+		}, true
+	case ec2types.SummaryStatusInitializing:
+		return ec2StatusFinding{
+			tier:   "~",
+			phrase: "initializing: checks in progress",
+			detail: "Instance status checks have not yet passed since start.",
+		}, true
+	case ec2types.SummaryStatusInsufficientData:
+		return ec2StatusFinding{
+			tier:   "~",
+			phrase: "status unknown: AWS insufficient-data",
+			detail: "AWS cannot determine status — insufficient data from the hypervisor.",
+		}, true
+	default:
+		// "ok" and "not-applicable" — no finding.
+		return ec2StatusFinding{}, false
+	}
+}
+
 // EnrichEC2InstanceStatus calls DescribeInstanceStatus(IncludeAllInstances=true) (account-wide,
 // paginated) and returns a Finding for every instance whose system or instance status is not "ok".
 // Scheduled events with NotBeforeDeadline within the next 7 days also produce a Finding.
@@ -81,20 +123,38 @@ func EnrichEC2InstanceStatus(ctx context.Context, clients *ServiceClients, resou
 
 		// Collect rows for this instance.
 		var rows []domain.DetailRow
-		severity := "~" // start informational; upgrade to "!" on real impairment
+		severity := "~" // start informational; upgrade to "!" only for a real "impaired" status
+		var statusFinding ec2StatusFinding
+		haveStatusFinding := false
 
-		// Check instance status.
-		if is.InstanceStatus != nil && is.InstanceStatus.Status != ec2types.SummaryStatusOk {
-			statusStr := string(is.InstanceStatus.Status)
-			rows = append(rows, domain.DetailRow{Label: "Instance Status", Value: statusStr, Tier: "!"})
-			severity = "!"
+		// Check instance status (docs/resources/ec2.md §4 lines 225-227).
+		if is.InstanceStatus != nil {
+			if sf, ok := classifyEC2Status(is.InstanceStatus.Status); ok {
+				statusStr := string(is.InstanceStatus.Status)
+				rows = append(rows, domain.DetailRow{Label: "Instance Status", Value: statusStr, Tier: sf.tier})
+				if sf.tier == "!" {
+					severity = "!"
+				}
+				if !haveStatusFinding || sf.tier == "!" {
+					statusFinding = sf
+					haveStatusFinding = true
+				}
+			}
 		}
 
-		// Check system status.
-		if is.SystemStatus != nil && is.SystemStatus.Status != ec2types.SummaryStatusOk {
-			statusStr := string(is.SystemStatus.Status)
-			rows = append(rows, domain.DetailRow{Label: "System Status", Value: statusStr, Tier: "!"})
-			severity = "!"
+		// Check system status (docs/resources/ec2.md §4 lines 225-227).
+		if is.SystemStatus != nil {
+			if sf, ok := classifyEC2Status(is.SystemStatus.Status); ok {
+				statusStr := string(is.SystemStatus.Status)
+				rows = append(rows, domain.DetailRow{Label: "System Status", Value: statusStr, Tier: sf.tier})
+				if sf.tier == "!" {
+					severity = "!"
+				}
+				if !haveStatusFinding || sf.tier == "!" {
+					statusFinding = sf
+					haveStatusFinding = true
+				}
+			}
 		}
 
 		// Check scheduled events within 7 days.
@@ -123,19 +183,14 @@ func EnrichEC2InstanceStatus(ctx context.Context, clients *ServiceClients, resou
 			continue
 		}
 
-		// Build summary: any "!" status-check row means the instance is impaired
-		// (docs/resources/ec2.md §4 row "SystemStatus.Status == impaired" — the
-		// same §4-mandated phrase covers InstanceStatus impairment too, since
-		// both surface as the same operator-facing signal). Fall back to a
-		// scheduled-event summary when no status check is impaired.
+		// Build summary from the status-check classification (docs/resources/ec2.md
+		// §4 lines 225-227); an "impaired" status-check row takes priority over a
+		// scheduled-event summary since it is the most severe signal.
 		summary := ""
 		detail := ""
-		for _, row := range rows {
-			if row.Tier == "!" {
-				summary = "impaired: system checks failing"
-				detail = "AWS reports this instance is impaired — system or instance status checks are failing."
-				break
-			}
+		if haveStatusFinding {
+			summary = statusFinding.phrase
+			detail = statusFinding.detail
 		}
 		if summary == "" && len(rows) > 0 {
 			summary = fmt.Sprintf("scheduled event: %s", rows[0].Value)

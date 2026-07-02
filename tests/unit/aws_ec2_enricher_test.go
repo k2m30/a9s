@@ -14,6 +14,7 @@ package unit
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -209,6 +210,105 @@ func TestEnrichEC2InstanceStatus_NilClientReturnsEmptyFindingsNoError(t *testing
 	}
 	if len(result.Findings) != 0 {
 		t.Errorf("expected empty Findings, got %d entries", len(result.Findings))
+	}
+}
+
+// TestEnrichEC2InstanceStatus_SystemStatusInitializingIsWarningNotImpaired pins
+// Finding B (internal/aws/ec2_issue_enrichment.go ~line 134): AWS
+// "initializing" status must NOT be stamped with the "impaired" wording.
+//
+// docs/resources/ec2.md §4 row (line 226):
+//
+//	| `SystemStatus.Status == initializing` | 2 | Warning | `~` | S3, S4, S5 |
+//	`initializing: checks in progress` | `Instance status checks have not yet
+//	passed since start.` |
+//
+// Current code (ec2_issue_enrichment.go lines 87-97) stamps Tier:"!" and
+// severity="!" for ANY non-"ok" status, including "initializing" — which is
+// wrong per the doc row above (Warning/"~", not Broken/"!", and the summary
+// text must not claim "impaired").
+func TestEnrichEC2InstanceStatus_SystemStatusInitializingIsWarningNotImpaired(t *testing.T) {
+	fake := &ec2InstanceStatusFake{
+		statuses: []ec2types.InstanceStatus{
+			{
+				InstanceId: aws.String("i-0eeee5555fffff666"),
+				SystemStatus: &ec2types.InstanceStatusSummary{
+					Status: ec2types.SummaryStatusInitializing,
+				},
+				InstanceStatus: &ec2types.InstanceStatusSummary{
+					Status: ec2types.SummaryStatusOk,
+				},
+			},
+		},
+	}
+	clients := &awsclient.ServiceClients{EC2: fake}
+	resources := []resource.Resource{{ID: "i-0eeee5555fffff666", Fields: map[string]string{"state": "running"}}}
+
+	result, err := awsclient.EnrichEC2InstanceStatus(context.Background(), clients, resources, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	f, ok := result.Findings["i-0eeee5555fffff666"]
+	if !ok {
+		t.Fatalf("expected finding keyed by instance ID %q for initializing system status", "i-0eeee5555fffff666")
+	}
+	if f.Severity != domain.SevWarn {
+		t.Errorf("severity = %v, want %v (ec2.md line 226: initializing -> Warning, not Broken)", f.Severity, domain.SevWarn)
+	}
+	if strings.Contains(f.Phrase, "impaired") {
+		t.Errorf("Phrase = %q must NOT contain %q — ec2.md line 226 mandates the phrase %q for initializing status", f.Phrase, "impaired", "initializing: checks in progress")
+	}
+	wantPhrase := "initializing: checks in progress"
+	if f.Phrase != wantPhrase {
+		t.Errorf("Phrase = %q, want %q (ec2.md line 226 List text (S4) column)", f.Phrase, wantPhrase)
+	}
+}
+
+// TestEnrichEC2InstanceStatus_InstanceStatusInsufficientDataIsWarningNotImpaired
+// pins Finding B for the "insufficient-data" status value.
+//
+// docs/resources/ec2.md §4 row (line 227):
+//
+//	| `SystemStatus.Status == insufficient-data` | 2 | Warning | `~` | S3, S4,
+//	S5 | `status unknown: AWS insufficient-data` | `AWS cannot determine status
+//	— insufficient data from the hypervisor.` |
+//
+// Current code stamps Tier:"!" / severity="!" for this status too, which is
+// wrong per the doc row above.
+func TestEnrichEC2InstanceStatus_InstanceStatusInsufficientDataIsWarningNotImpaired(t *testing.T) {
+	fake := &ec2InstanceStatusFake{
+		statuses: []ec2types.InstanceStatus{
+			{
+				InstanceId: aws.String("i-0ffff6666aaaaa777"),
+				SystemStatus: &ec2types.InstanceStatusSummary{
+					Status: ec2types.SummaryStatusOk,
+				},
+				InstanceStatus: &ec2types.InstanceStatusSummary{
+					Status: ec2types.SummaryStatusInsufficientData,
+				},
+			},
+		},
+	}
+	clients := &awsclient.ServiceClients{EC2: fake}
+	resources := []resource.Resource{{ID: "i-0ffff6666aaaaa777", Fields: map[string]string{"state": "running"}}}
+
+	result, err := awsclient.EnrichEC2InstanceStatus(context.Background(), clients, resources, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	f, ok := result.Findings["i-0ffff6666aaaaa777"]
+	if !ok {
+		t.Fatalf("expected finding keyed by instance ID %q for insufficient-data instance status", "i-0ffff6666aaaaa777")
+	}
+	if f.Severity != domain.SevWarn {
+		t.Errorf("severity = %v, want %v (ec2.md line 227: insufficient-data -> Warning, not Broken)", f.Severity, domain.SevWarn)
+	}
+	if strings.Contains(f.Phrase, "impaired") {
+		t.Errorf("Phrase = %q must NOT contain %q — ec2.md line 227 mandates the phrase %q for insufficient-data status", f.Phrase, "impaired", "status unknown: AWS insufficient-data")
+	}
+	wantPhrase := "status unknown: AWS insufficient-data"
+	if f.Phrase != wantPhrase {
+		t.Errorf("Phrase = %q, want %q (ec2.md line 227 List text (S4) column)", f.Phrase, wantPhrase)
 	}
 }
 

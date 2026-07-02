@@ -4,6 +4,7 @@ package aws
 import (
 	"context"
 	"strings"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
@@ -35,24 +36,26 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 		distID := r.ID
 		if distID == "" {
-			continue
+			return
 		}
 		out, err := clients.CloudFront.GetDistributionConfig(ctx, &cloudfront.GetDistributionConfigInput{
 			Id: aws.String(distID),
 		})
+		mu.Lock()
+		defer mu.Unlock()
 		if err != nil {
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
-			continue
+			return
 		}
 		if out.DistributionConfig == nil {
-			continue
+			return
 		}
 		cfg := out.DistributionConfig
 		var rows []domain.DetailRow
@@ -94,11 +97,11 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 		}
 
 		if len(summaries) == 0 {
-			continue
+			return
 		}
 		summary := strings.Join(summaries, "; ")
 		setWave2Finding(&result, distID, cfCodeInsecureProtocol, summary, "~", "cf", rows, "")
-	}
+	})
 	// All CloudFront findings are severity "~" (informational).
 	// IssueCount counts only "!" severity findings; "~" do not contribute.
 	result.IssueCount = 0

@@ -54,6 +54,14 @@ func InFetcherWave2Sentinel(_ context.Context, _ *ServiceClients, _ []resource.R
 // EnrichmentCap is the maximum number of per-resource API calls for non-batchable enrichers.
 const EnrichmentCap = 50
 
+// EnrichmentParallelism bounds concurrent per-resource API calls in Wave-2
+// enrichers that fan out via aws.ForEachParallel. Kept well under typical AWS
+// service-side throttling limits (RetryOnThrottle still wraps each call as a
+// second line of defense against bursts); 8 gives a meaningful wall-clock
+// speedup over a sequential loop without materially increasing the odds of
+// tripping per-second rate limits on accounts with default quotas.
+const EnrichmentParallelism = 8
+
 // PerParentPageCap limits per-parent pagination walks in enrichers to avoid
 // runaway enumeration on huge tenants. When hit, the emitted count is marked
 // with a "+" suffix to signal approximate.
@@ -196,6 +204,7 @@ type IssueEnricherResult struct {
 //   - DO NOT mutate fields on cache[k].Resources[i] or cache[k].Resources[i].RawStruct
 //     (those are pointers / interface values shared with the running app).
 //   - DO read field values, lengths, and IsTruncated freely.
+//
 // Violations are not currently caught at compile time. Future contributors
 // who need to derive a mutable view should append([]Resource{}, slice...) into
 // a local slice first.

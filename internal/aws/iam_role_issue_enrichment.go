@@ -4,6 +4,7 @@ package aws
 import (
 	"context"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -38,31 +39,33 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 		roleName := r.Fields["role_name"]
 		if roleName == "" {
 			roleName = r.ID
 		}
 		if roleName == "" {
-			continue
+			return
 		}
 		// Skip AWS service-linked roles.
 		if strings.HasPrefix(r.Fields["path"], "/aws-service-role/") {
-			continue
+			return
 		}
 		out, err := getRoleAPI.GetRole(ctx, &iam.GetRoleInput{
 			RoleName: aws.String(roleName),
 		})
+		mu.Lock()
+		defer mu.Unlock()
 		if err != nil {
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
-			continue
+			return
 		}
 		if out.Role == nil {
-			continue
+			return
 		}
 		isDormant := false
 		if out.Role.RoleLastUsed == nil || out.Role.RoleLastUsed.LastUsedDate == nil {
@@ -73,7 +76,7 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 		if isDormant {
 			setWave2Finding(&result, r.ID, iamRoleCodeDormant, "dormant role (>90d)", "~", "iam-role", nil, "")
 		}
-	}
+	})
 	// Dormant-role findings are severity "~" (informational); IssueCount stays 0.
 	result.IssueCount = 0
 	result.Truncated = truncated

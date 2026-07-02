@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
@@ -35,20 +36,18 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 	}
 
 	truncated := len(resources) > EnrichmentCap
-	checked := 0
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
 
-	for _, r := range resources {
-		if checked >= EnrichmentCap {
-			truncated = true
-			break
-		}
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 
 		ruleName := r.Fields["name"]
 		if ruleName == "" {
 			ruleName = r.ID
 		}
 		if ruleName == "" {
-			continue
+			return
 		}
 
 		eventBus := r.Fields["event_bus"]
@@ -58,11 +57,10 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 		targetsTruncated := false
 		var targetsNextToken *string
 		targetPages := 0
+		fetchErr := false
 		for {
 			if targetPages >= PerParentPageCap {
 				targetsTruncated = true
-				truncated = true
-				result.TruncatedIDs[r.ID] = true
 				break
 			}
 			pageInput := &eventbridge.ListTargetsByRuleInput{
@@ -75,8 +73,7 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 			out, err := clients.EventBridge.ListTargetsByRule(ctx, pageInput)
 			targetPages++
 			if err != nil {
-				truncated = true
-				result.TruncatedIDs[r.ID] = true
+				fetchErr = true
 				break
 			}
 			targets = append(targets, out.Targets...)
@@ -85,14 +82,10 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 			}
 			targetsNextToken = out.NextToken
 		}
-		checked++
 
 		targetCountStr := resource.FormatExact(len(targets))
 		if targetsTruncated {
 			targetCountStr = resource.FormatApproximate(len(targets))
-		}
-		result.FieldUpdates[ruleName] = map[string]string{
-			"target_count": targetCountStr,
 		}
 		var rows []domain.DetailRow
 
@@ -129,8 +122,19 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 			}
 		}
 
+		mu.Lock()
+		defer mu.Unlock()
+
+		if targetsTruncated || fetchErr {
+			truncated = true
+			result.TruncatedIDs[r.ID] = true
+		}
+		result.FieldUpdates[ruleName] = map[string]string{
+			"target_count": targetCountStr,
+		}
+
 		if len(rows) == 0 {
-			continue
+			return
 		}
 
 		// Determine severity: "!" if any row is "!", otherwise "~".
@@ -143,7 +147,7 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 		}
 
 		setWave2Finding(&result, ruleName, ebRuleCodeTargetIssue, rows[0].Value, severity, "eb-rule", rows, "")
-	}
+	})
 
 	issueCount := 0
 	for _, f := range result.Findings {

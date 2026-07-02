@@ -12,6 +12,7 @@ package unit
 import (
 	"context"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -24,9 +25,12 @@ import (
 )
 
 // strictACMFake mirrors AWS: rejects DescribeCertificate when CertificateArn
-// is not a valid ARN.
+// is not a valid ARN. mu guards calledWith, which is written concurrently:
+// EnrichACMCertificate fans out DescribeCertificate calls per resource via
+// internal/aws.ForEachParallel (EnrichmentParallelism goroutines).
 type strictACMFake struct {
 	awsclient.ACMAPI
+	mu         sync.Mutex
 	calledWith string
 }
 
@@ -36,7 +40,9 @@ func (f *strictACMFake) DescribeCertificate(
 	_ ...func(*acm.Options),
 ) (*acm.DescribeCertificateOutput, error) {
 	got := aws.ToString(input.CertificateArn)
+	f.mu.Lock()
 	f.calledWith = got
+	f.mu.Unlock()
 	if !strings.HasPrefix(got, "arn:aws:") {
 		return nil, &smithy.GenericAPIError{
 			Code:    "ValidationError",
@@ -46,6 +52,14 @@ func (f *strictACMFake) DescribeCertificate(
 	return &acm.DescribeCertificateOutput{
 		Certificate: &acmtypes.CertificateDetail{CertificateArn: &got},
 	}, nil
+}
+
+// calledWithSafe returns calledWith, safe for concurrent use with
+// DescribeCertificate.
+func (f *strictACMFake) calledWithSafe() string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.calledWith
 }
 
 // TestEnrichACMCertificate_UsesARNFromFields verifies the enricher passes
@@ -67,8 +81,8 @@ func TestEnrichACMCertificate_UsesARNFromFields(t *testing.T) {
 	if err != nil && strings.Contains(err.Error(), "ValidationError") {
 		t.Fatalf("enricher passed bare domain to AWS instead of ARN; got: %v", err)
 	}
-	if fake.calledWith != certARN {
+	if got := fake.calledWithSafe(); got != certARN {
 		t.Errorf("DescribeCertificate was called with %q, want %q (ARN from Fields[\"certificate_arn\"])",
-			fake.calledWith, certARN)
+			got, certARN)
 	}
 }
