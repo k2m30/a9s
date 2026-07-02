@@ -415,8 +415,8 @@ func TestPerTypeSave_TouchingOneType_LeavesSiblingFilesByteExact(t *testing.T) {
 			{ID: "bucket-new-2", Name: "new-bucket-2", Fields: map[string]string{"region": "us-east-1"}},
 		},
 	})
-	if err := store2.SaveType("s3"); err != nil {
-		t.Fatalf("SaveType(s3): %v", err)
+	if saveErr := store2.SaveType("s3"); saveErr != nil {
+		t.Fatalf("SaveType(s3): %v", saveErr)
 	}
 
 	after, err := readFileForAudit(t, ec2Path)
@@ -966,7 +966,7 @@ func TestCacheFileIO_OnlyThroughCachePackage_NoDirectDiskAccessElsewhere(t *test
 			}
 			// Case 2: any selector cache.Dir, anywhere in the file — even
 			// outside an os.* call — is itself the seam violation.
-			if pkgIdent, ok := sel.X.(*ast.Ident); ok && pkgIdent.Name == "cache" && sel.Sel.Name == "Dir" {
+			if pkgIdent, isIdent := sel.X.(*ast.Ident); isIdent && pkgIdent.Name == "cache" && sel.Sel.Name == "Dir" {
 				key := baseName + ":cache.Dir"
 				if !cacheDiskAccessAllowlist[key] {
 					line := fset.Position(call.Pos()).Line

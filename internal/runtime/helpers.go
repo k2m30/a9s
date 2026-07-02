@@ -42,7 +42,7 @@ func (c *Core) applyEnrichment(
 
 	apply := func(rows []resource.Resource) {
 		for i := range rows {
-			applyWave2ToRow(&rows[i], td, findings, attentionDetails)
+			ApplyWave2ToRow(&rows[i], td, findings, attentionDetails)
 		}
 	}
 
@@ -72,7 +72,7 @@ func (c *Core) clearEnrichmentFor(resourceType string) {
 
 	clear := func(rows []resource.Resource) {
 		for i := range rows {
-			applyWave2ToRow(&rows[i], td, nil, nil)
+			ApplyWave2ToRow(&rows[i], td, nil, nil)
 		}
 	}
 
@@ -87,11 +87,11 @@ func (c *Core) clearEnrichmentFor(resourceType string) {
 	}
 }
 
-// applyWave2ToRow strips any existing Wave-2 entries from r.Findings, then
+// ApplyWave2ToRow strips any existing Wave-2 entries from r.Findings, then
 // appends the per-row Wave-2 Finding (if present) and writes its AttentionDetail
 // under the Finding's Code. Nil findings/attentionDetails behaves as the clear
 // path (strip only, no Wave-2 appended).
-func applyWave2ToRow(
+func ApplyWave2ToRow(
 	r *domain.Resource,
 	td resource.ResourceTypeDef,
 	findings map[string]domain.Finding,

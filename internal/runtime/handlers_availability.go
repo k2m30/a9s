@@ -500,7 +500,7 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 // they stood at dispatch time, not as they stand whenever the task executes.
 //
 // A shallow map copy is NOT sufficient here: clearEnrichmentFor mutates each
-// resource.Resource IN PLACE (via applyWave2ToRow on &rows[i]) on the SAME
+// resource.Resource IN PLACE (via ApplyWave2ToRow on &rows[i]) on the SAME
 // backing array a shallow []resource.Resource slice copy would still alias —
 // a plain maps.Copy of the outer map would still observe that later
 // in-place strip. Each per-type slice (and each resource's Findings slice,

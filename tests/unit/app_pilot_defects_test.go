@@ -684,6 +684,154 @@ func TestAvailabilitySweepAndEnrichment_PersistsRowsPerType_WithoutAnyListOpen(t
 }
 
 // -----------------------------------------------------------------------
+// DEF-8 (C6) — Wave-2 findings applied to an OPEN live list must reach the
+// persisted per-type cache. Verified live (last gap before the S3-pilot
+// rerun): applyEnrichment (internal/runtime/helpers.go, driven from
+// Core.handleEnrichmentChecked via the real messages.EnrichmentChecked
+// event) mutates findings into session.ResourceCache / LazyResourceCache /
+// ProbeResources only. Separately, PatchResourceList's intent handler
+// (internal/app/intents.go) stores the SAME findings into the controller's
+// own c.enrichmentStore map (applyEnrichmentState) — a parallel
+// id->domain.Finding lookup used only by GetListEnrichmentFindings for glyph
+// rendering. Neither of those two writes ever touches ls.Rows[i].Findings or
+// c.resourceCache[type][i].Findings, which is what
+// maybeSaveResourceListCache (internal/app/handle.go) reads when persisting
+// (Findings: r.Findings, copied straight from ls.Rows). Net effect on a real
+// account: s3.yaml carries issues:5 in the header and every row with ZERO
+// findings — a cold-boot reseed then has nothing for the already-green DEF-3
+// render-time classification to classify, so no glyphs render.
+//
+// This differs from DEF-3 above: DEF-3 pins findings that arrive ALREADY
+// baked onto the Resource passed to ApplyResourcesLoaded (the Wave-1 initial
+// load). DEF-8 pins the Wave-2 path: rows land with NO findings, enrichment
+// is applied afterward through the production EnrichmentChecked seam, and
+// only THEN is the list-open save re-triggered — exactly the sequence a live
+// account produces (fetch, then a later enrichment probe).
+//
+// Contract note for the fix: the controller's enrichment-application seam
+// (PatchResourceList's intent case in internal/app/intents.go, alongside its
+// existing applyEnrichmentState + applyListFieldUpdates calls) must ALSO
+// write findings onto the controller's own row stores (ls.Rows +
+// c.resourceCache) — the same explicit dual-store propagation pattern
+// ClearRowFindings (list_body.go) already established for the clearing
+// direction. Persisting then needs no special logic: maybeSaveResourceListCache
+// already reads Findings straight off ls.Rows.
+// -----------------------------------------------------------------------
+
+// TestEnrichmentChecked_OpenList_FindingsReachPersistedCacheAndColdBootGlyph
+// pins DEF-8 end-to-end through the production seams a live app actually
+// uses: open the s3 list, land its Wave-1 rows with NO findings (mirrors a
+// real fetch, findings are not known yet), apply Wave-2 enrichment through
+// the real Controller.Handle(messages.EnrichmentChecked{...}) seam the live
+// enrichment probe emits, re-land the same rows (mirrors the next sync that
+// re-triggers the list-open save path, e.g. a background re-poll or Ctrl+R),
+// then assert the persisted TypeFile's Rows carry the finding for the
+// flagged row. A second assertion cold-boots a fresh controller from that
+// same on-disk pair and asserts the seeded row renders with a non-empty
+// Severity — the already-green DEF-3 machinery, closing the loop end to end.
+func TestEnrichmentChecked_OpenList_FindingsReachPersistedCacheAndColdBootGlyph(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("A9S_CONFIG_FOLDER", tmp)
+
+	s := session.New()
+	s.Profile = "pilot-def8-prof"
+	s.Region = "us-east-1"
+	core := runtime.New(s, resource.AllResourceTypes())
+	ctrl := app.New(core)
+
+	finding := domain.Finding{
+		Code:     "s3-public-read",
+		Phrase:   "publicly readable",
+		Severity: domain.SevBroken,
+		Source:   "wave2:s3",
+	}
+
+	// Open the s3 list and land its Wave-1 rows with NO findings — mirrors a
+	// real fetch landing before any enrichment probe has run.
+	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
+	baseRows := []resource.Resource{
+		{ID: "bucket-def8-1", Name: "def8-bucket", Type: "s3", Fields: map[string]string{"region": "us-east-1"}},
+	}
+	ctrl.ApplyResourcesLoaded("s3", baseRows, nil, false)
+
+	// Sanity: the pre-enrichment save must NOT carry the finding yet (setup
+	// assumption, not the defect under test).
+	preStore := cache.LoadDir("pilot-def8-prof", "us-east-1")
+	preTF, ok := preStore.Type("s3")
+	if !ok || len(preTF.Rows) != 1 {
+		t.Fatalf("test setup: pre-enrichment s3 TypeFile missing or wrong row count: ok=%v rows=%+v", ok, preTF.Rows)
+	}
+	if len(preTF.Rows[0].Findings) != 0 {
+		t.Fatalf("test setup: pre-enrichment s3 TypeFile.Rows[0].Findings = %+v, want empty (findings must not exist before enrichment runs)", preTF.Rows[0].Findings)
+	}
+
+	// Apply Wave-2 enrichment through the PRODUCTION seam: the real
+	// messages.EnrichmentChecked event via Controller.Handle — exactly what
+	// Core.handleEnrichmentChecked processes from a live enrichment probe.
+	// TypeGen left at zero: EnrichmentChecked.AcceptZeroGen()==true and the
+	// per-type gen guard only fires when msg.TypeGen != 0.
+	ctrl.Handle(messages.EnrichmentChecked{
+		ResourceType: "s3",
+		Issues:       1,
+		Findings:     map[string]domain.Finding{"bucket-def8-1": finding},
+	})
+
+	// Re-trigger the list-open save path — the same seam
+	// maybeSaveResourceListCache uses (ResourcesLoaded landing on the open
+	// top-level list), mirroring the next background sync/poll after
+	// enrichment has landed. Rows carry no baked-in findings here either —
+	// if the fix is missing, this save re-persists the same findings-less
+	// rows maybeSaveResourceListCache always reads from ls.Rows.
+	ctrl.ApplyResourcesLoaded("s3", baseRows, nil, false)
+
+	store := cache.LoadDir("pilot-def8-prof", "us-east-1")
+	tf, ok := store.Type("s3")
+	if !ok {
+		t.Fatal(`store.Type("s3") missing after enrichment + list-open save`)
+	}
+	if len(tf.Rows) != 1 {
+		t.Fatalf("persisted s3 TypeFile.Rows has %d entries, want 1", len(tf.Rows))
+	}
+	if len(tf.Rows[0].Findings) != 1 || tf.Rows[0].Findings[0].Code != "s3-public-read" {
+		t.Errorf("persisted s3 TypeFile.Rows[0].Findings = %+v, want 1 finding with Code=%q — DEF-8/C6: Wave-2 findings applied to an OPEN live list via the real EnrichmentChecked seam must reach ls.Rows/resourceCache so the list-open save path persists them, not just the session-side stores applyEnrichment writes to", tf.Rows[0].Findings, "s3-public-read")
+	}
+
+	// Cold-boot half: a brand-new controller for the SAME pair must seed the
+	// list-open with the persisted row's Findings intact, closing the loop to
+	// the already-green DEF-3 render-time classification.
+	s2 := session.New()
+	s2.Profile = "pilot-def8-prof"
+	s2.Region = "us-east-1"
+	core2 := runtime.New(s2, resource.AllResourceTypes())
+	ctrl2 := app.New(core2)
+
+	ctrl2.Handle(messages.AvailabilityCacheLoaded{
+		Entries: map[string]int{"s3": tf.Count},
+	})
+	_, _ = ctrl2.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
+	snap := ctrl2.Snapshot()
+	lb := snap.Body.List
+	if lb == nil {
+		t.Fatal("Body.List is nil after cold-boot s3 list open")
+	}
+	if len(lb.Rows) == 0 {
+		t.Fatal("cold-boot seeded zero rows for s3 — cannot assert on findings-derived rendering")
+	}
+	found := false
+	for i := range lb.Rows {
+		if lb.Rows[i].ResourceID == "bucket-def8-1" {
+			found = true
+			if lb.Rows[i].Severity == "" {
+				t.Error("cold-boot seeded row for bucket-def8-1 has empty Severity — DEF-8: the seeded row's persisted Findings must drive render-time severity classification, closing the loop back to DEF-3's glyph rendering")
+			}
+		}
+	}
+	if !found {
+		t.Error("cold-boot seeded rows missing bucket-def8-1 — the persisted row was not seeded back at all")
+	}
+}
+
+// -----------------------------------------------------------------------
 // small local helpers (kept file-local per this package's existing
 // convention of not sharing helpers across test files, mirrored from
 // app_web_live_cold_boot_test.go's readFileForAudit/itoaColdBoot)

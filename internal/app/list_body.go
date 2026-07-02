@@ -71,6 +71,15 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 			ls.PaginationCursor = ""
 		}
 	}
+
+	// Fresh rows arrive without Wave-2 findings; re-apply the latest known
+	// findings from the enrichment store so a silent-swap refetch never leaves
+	// the controller rows (and therefore the list-open save path, DEF-8)
+	// glyph-blind until the next EnrichmentChecked. Mirrors the session-side
+	// fold, which re-applies onto Core stores after every result lands.
+	if known := c.listEnrichmentFindings(typeName); len(known) > 0 {
+		c.applyRowFindings(typeName, known, nil)
+	}
 }
 
 // materializeListFieldsForType resolves the column set for typeName the same
@@ -409,7 +418,7 @@ func (c *Controller) listIssueCount(ls *ListState, typeName string) int {
 	findings := c.listEnrichmentFindings(typeName)
 	ic := 0
 	for _, r := range all {
-		if listHasIssueFinding(r) {
+		if listHasBadgeFinding(r) {
 			ic++
 		} else if len(r.Findings) == 0 {
 			if td.ResolveColor(r).IsIssue() {
@@ -559,6 +568,75 @@ func (c *Controller) clearRowFindings(typeName string) {
 			clearSlice(c.resourceCache[canon])
 		}
 	}
+}
+
+// applyRowFindings is the applying-direction mirror of clearRowFindings: it
+// writes Wave-2 findings (and their attention details) onto the controller's
+// own row stores — every matching list screen's ls.Rows plus c.resourceCache.
+// Without it, enrichment applied to an OPEN live list reaches only the
+// session-owned stores (Core.applyEnrichment) and the controller's
+// enrichmentStore glyph map, so the list-open save path (which persists from
+// ls.Rows) writes rows with no findings — cached rows then reseed glyphless
+// (S3-pilot DEF-8). Callers must hold c.mu (write); the PatchResourceList
+// intent case is the production entry point. A nil findings map clears Wave-2
+// entries, matching runtime.ApplyWave2ToRow's contract.
+func (c *Controller) applyRowFindings(typeName string, findings map[string]domain.Finding, details map[string]domain.AttentionDetail) {
+	canon := typeName
+	var td resource.ResourceTypeDef
+	if t := resource.FindResourceType(typeName); t != nil {
+		canon = t.ShortName
+		td = *t
+	} else {
+		td = resource.ResourceTypeDef{ShortName: canon}
+	}
+
+	applySlice := func(rows []resource.Resource) {
+		for i := range rows {
+			runtime.ApplyWave2ToRow(&rows[i], td, findings, details)
+		}
+	}
+
+	for i := range c.stack {
+		s := &c.stack[i]
+		if s.ID != runtime.ScreenResourceList && s.ID != runtime.ScreenChildList {
+			continue
+		}
+		st := s.Ctx.ResourceType
+		if t := resource.FindResourceType(st); t != nil {
+			st = t.ShortName
+		}
+		if st != canon || s.State.List == nil {
+			continue
+		}
+		applySlice(s.State.List.Rows)
+	}
+
+	if c.resourceCache != nil {
+		applySlice(c.resourceCache[typeName])
+		if typeName != canon {
+			applySlice(c.resourceCache[canon])
+		}
+	}
+}
+
+// listHasBadgeFinding reports whether a row's own findings bump the S1 issue
+// count. Wave-1 findings (fetcher-written, no "wave2:" Source prefix) count at
+// any issue severity — a Wave-1 warning IS the yellow row the menu badge
+// counts by color. Wave-2 findings count only at "!" severity: per the S1
+// contract "~ findings do not bump", and now that applyRowFindings writes
+// Wave-2 findings onto controller rows, counting them at warn severity here
+// would reintroduce the very drift the severity gate on the enrichment-store
+// branch fixed.
+func listHasBadgeFinding(r resource.Resource) bool {
+	for _, f := range r.Findings {
+		if f.Severity == domain.SevBroken {
+			return true
+		}
+		if resource.IsIssueSeverity(f.Severity) && !strings.HasPrefix(f.Source, "wave2:") {
+			return true
+		}
+	}
+	return false
 }
 
 // stripWave2Findings returns findings with every Wave-2 entry (Source
