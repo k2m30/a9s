@@ -1,6 +1,7 @@
 package app
 
 import (
+	"maps"
 	"strings"
 
 	"github.com/k2m30/a9s/v3/internal/config"
@@ -8,6 +9,56 @@ import (
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
+
+// MaterializeListFields returns a copy of r with Fields populated for every
+// Path-based, Key-less column in columns, extracting the scalar via
+// fieldpath.ExtractScalar(r.RawStruct, col.Path) and writing it under the
+// column's resolved Fields key (col.Key when non-empty, else the lowercased
+// Title). This is the generic render-sufficiency step Contract B requires:
+// running it once, before a fetch result is cached or a screen's rows are
+// stored, means a later cache replay with RawStruct stripped renders
+// identical cells (extractListCells's key-based Fields lookup finds the
+// value directly, without falling back to fieldpath on a nil RawStruct).
+//
+// Key-based columns (col.Key != "") are left untouched — they already
+// resolve via the Fields-map lookup and may carry a Wave-2 enrichment
+// override that fieldpath cannot see, so materializing over them risks
+// clobbering a value RawStruct doesn't know about.
+//
+// A column is only materialized when Fields does not already carry a
+// non-empty value under the resolved key, so a prior explicit value (or an
+// earlier materialization pass) is never overwritten.
+func MaterializeListFields(r resource.Resource, columns []ColumnDef) resource.Resource {
+	if r.RawStruct == nil {
+		return r
+	}
+	out := r
+	copied := false
+	for _, col := range columns {
+		if col.Path == "" || col.Key != "" {
+			continue
+		}
+		key := strings.ToLower(col.Title)
+		if key == "" {
+			continue
+		}
+		if v, ok := out.Fields[key]; ok && v != "" {
+			continue
+		}
+		val := fieldpath.ExtractScalar(out.RawStruct, col.Path)
+		if val == "" {
+			continue
+		}
+		if !copied {
+			fresh := make(map[string]string, len(out.Fields)+1)
+			maps.Copy(fresh, out.Fields)
+			out.Fields = fresh
+			copied = true
+		}
+		out.Fields[key] = val
+	}
+	return out
+}
 
 // resolveListColumns mirrors resolveColumns from table_render.go exactly,
 // including the superset check, so the controller column set is always
@@ -283,6 +334,22 @@ func listPhraseFromFindings(findings []domain.Finding) string {
 		return findings[0].Phrase
 	}
 	return findings[0].Phrase + " (+" + itoa(len(findings)-1) + ")"
+}
+
+// hasWave2Finding reports whether findings already contains a Wave-2 entry
+// (Source prefixed "wave2:"). Used by buildListBody's S4 status-cell override
+// to detect when applyWave2ToRow has already mutated r.Findings directly
+// (the demo path and the internal/tui fold-layer live path both do this) —
+// in that case extractListCells has already derived the correct, possibly
+// stacked ("<top> (+N)") status cell from r.Findings, and the single-Finding
+// enrichment-store map must not override it.
+func hasWave2Finding(findings []domain.Finding) bool {
+	for _, f := range findings {
+		if strings.HasPrefix(f.Source, "wave2:") {
+			return true
+		}
+	}
+	return false
 }
 
 // resolveListDecoratorFull mirrors the marker logic in renderDataRow and extends it

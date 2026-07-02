@@ -151,8 +151,17 @@ type ListBody struct {
 	// column that receives the enrichment-finding glyph ("! "/"~ ") prefix.
 	// Pre-computed by buildListBody so RenderList does not need typeDef.
 	MarkerCol int `json:"marker_col"`
+	// StatusCol is the full-column-list index (before hscroll) of the
+	// status/lifecycle column, or -1 when the type has none. Sibling of
+	// MarkerCol: pre-computed by buildListBody (via resolveListStatusCol) so
+	// renderers consume the index verbatim instead of re-resolving it from
+	// td.LifecycleKey/column titles.
+	StatusCol int `json:"status_col"`
 	// LoadingMore is true while an m-key load-more fetch is in flight.
 	LoadingMore bool `json:"loading_more,omitempty"`
+	// Refreshing mirrors ListState.Refreshing: true when Rows were seeded
+	// from a cache-first source and a fresh fetch is still confirming them.
+	Refreshing bool `json:"refreshing,omitempty"`
 }
 
 // FieldRow is one key-value pair in a detail view, extended with render-time
@@ -315,6 +324,11 @@ type MenuBody struct {
 	Filter        string      `json:"filter,omitempty"`
 	AttentionOnly bool        `json:"attention_only,omitempty"`
 	Progress      string      `json:"progress,omitempty"`
+	// Refreshing is true while a background availability sweep is running
+	// after a cache-seeded startup (session ProbeResources holds entries that
+	// have not yet been acknowledged by a matching AvailabilityChecked
+	// result). False once every outstanding probe result has landed.
+	Refreshing bool `json:"refreshing,omitempty"`
 }
 
 // SelectorBody is the body of a profile/region/theme selector screen.

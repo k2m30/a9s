@@ -55,6 +55,13 @@ type ListState struct {
 	Loading bool `json:"loading,omitempty"`
 	// LoadingMore tracks whether an m-key load-more fetch is in flight.
 	LoadingMore bool `json:"loading_more,omitempty"`
+	// Refreshing is true when the screen opened with rows seeded from a
+	// cache-first source (session ProbeResources, a previous visit's
+	// ResourceCache, or the on-disk availability cache) while a fresh fetch
+	// is still in flight to confirm/replace them. Cleared once the fetch's
+	// ResourcesLoaded result lands. Distinct from Loading, which gates the
+	// no-rows-known spinner path.
+	Refreshing bool `json:"refreshing,omitempty"`
 }
 
 // DetailState holds the mutable display state for a resource-detail screen.

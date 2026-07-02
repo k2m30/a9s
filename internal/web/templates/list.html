@@ -1,6 +1,7 @@
 {{define "list.html"}}
 {{if .Filter}}<div class="list-filter">Filter: {{.Filter}}</div>{{end}}
 {{if .Loading}}<div class="list-loading">Loading…</div>{{end}}
+{{if .Refreshing}}<div class="list-loading">Refreshing…</div>{{end}}
 <table class="list-table">
   <thead>
     <tr>

@@ -35,6 +35,7 @@ func (c *Controller) snapshot() ViewState {
 	vs.Body.Kind = bodyKindForScreen(top)
 	if top.State.Menu != nil {
 		vs.Body.Menu = buildMenuBody(top.State.Menu)
+		vs.Body.Menu.Refreshing = c.menuRefreshing()
 		vs.FrameTitle = menuFrameTitle(top.State.Menu)
 		vs.Footer = MenuFooterHintsFor(c.uiMode)
 	}

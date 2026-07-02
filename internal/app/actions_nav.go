@@ -276,7 +276,7 @@ func (c *Controller) handleActionSelect(a Action) (ViewState, []runtime.TaskRequ
 				Target:       runtime.NavigateTargetResourceList,
 				ResourceType: selected.ShortName,
 			})
-			c.applyNavResult(res)
+			tasks = append(tasks, c.applyNavResult(res)...)
 			return c.snapshot(), tasks
 		}
 	}

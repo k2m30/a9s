@@ -60,7 +60,11 @@ func resourceJSONLines(r resource.Resource) []string {
 }
 
 // applyNavResult converts a NavigateResult into PushScreen/ReplaceScreen/PopScreen
-// stack operations. Called by Apply after HandleNavigate returns.
+// stack operations. Called by Apply after HandleNavigate returns. Returns any
+// additional TaskRequests the stack operation itself spawns (currently only
+// the cache-first-seeding fresh-fetch dispatch for
+// NavigateKindPushResourceListCached) — callers must append these to the
+// tasks HandleNavigate already returned.
 //
 // The adapter (not the runtime) decides which ScreenID to push for each kind;
 // this method encodes that mapping for the headless controller.
@@ -68,7 +72,7 @@ func resourceJSONLines(r resource.Resource) []string {
 // All NavigateResult kinds are handled, including those that require
 // selected-row or resource data (PushDetail, PushYAML, PushJSON,
 // PushResourceList/Cached, FetchReveal).
-func (c *Controller) applyNavResult(res runtime.NavigateResult) {
+func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRequest {
 	switch res.Kind {
 	case runtime.NavigateKindPopAll:
 		// Pop back to the root menu — leave exactly one screen, never empty.
@@ -105,16 +109,38 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) {
 			c.applyIntents([]runtime.UIIntent{intent})
 		}
 		c.ensureListState()
-		// For the cached path, populate rows immediately from the cache entry so
-		// headless/web callers see data without waiting for a fetch round-trip.
+		top := &c.stack[len(c.stack)-1]
+		// For the cache-hit path (a previous visit's session.ResourceCache),
+		// populate rows immediately from the cache entry so headless/web
+		// callers see data without waiting for a fetch round-trip — then mark
+		// Refreshing and dispatch a fresh fetch task so the seeded rows are
+		// confirmed/replaced (Contract A: cache-first seeding never skips the
+		// live fetch, it only removes the visible wait for it).
 		if res.Kind == runtime.NavigateKindPushResourceListCached && res.CachedEntry != nil {
-			top := &c.stack[len(c.stack)-1]
 			c.applyResourcesLoaded(top.State.List, res.ResolvedType, res.CachedEntry.Resources, res.CachedEntry.Pagination, false)
+			top.State.List.Refreshing = true
+			return []runtime.TaskRequest{{
+				Key:   runtime.TaskKey{Kind: runtime.KindFetchResources, Scope: res.ResolvedType},
+				Cache: runtime.CacheNone,
+			}}
+		}
+		// Cache miss (NavigateKindPushResourceList): HandleNavigate already
+		// emits the KindFetchResources task. Seed from session.ProbeResources
+		// (first-page rows retained by the availability probe, or replayed
+		// from the on-disk availability cache at startup) when present, so the
+		// list still renders instantly instead of falling back to the
+		// no-rows-known Loading=true path ensureListState already applied.
+		if res.Kind == runtime.NavigateKindPushResourceList {
+			if rows := c.core.Session().ProbeResources[res.ResolvedType]; len(rows) > 0 {
+				c.applyResourcesLoaded(top.State.List, res.ResolvedType, rows, nil, false)
+				top.State.List.Loading = false
+				top.State.List.Refreshing = true
+			}
 		}
 
 	case runtime.NavigateKindPushDetail:
 		if res.Resource == nil {
-			return
+			return nil
 		}
 		intent := runtime.PushScreen{
 			ID: runtime.ScreenDetail,
@@ -130,10 +156,24 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) {
 		if res.DispatchRelated {
 			c.initDetailRelatedRows(res.ResolvedType)
 		}
+		if res.DispatchEnrich {
+			// Mirrors the TUI adapter's handleEnrichDetail: the runtime is the
+			// single source of truth for the dispatch gate (only resource types
+			// with a registered detail enricher get a TaskRequest back), so the
+			// headless controller invokes the same Core method rather than
+			// re-checking resource.HasDetailEnricher itself. KindEnrichDetail is
+			// classified background by IsBackgroundTaskKind, so it never blocks
+			// the initial detail render.
+			_, enrichTasks := c.core.HandleEnrichDetail(runtime.EnrichDetailEvent{
+				ResourceType: res.ResolvedType,
+				Resource:     *res.Resource,
+			})
+			return enrichTasks
+		}
 
 	case runtime.NavigateKindPushYAML:
 		if res.Resource == nil {
-			return
+			return nil
 		}
 		lines := resourceYAMLLines(*res.Resource)
 		intent := runtime.PushScreen{
@@ -148,7 +188,7 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) {
 
 	case runtime.NavigateKindPushJSON:
 		if res.Resource == nil {
-			return
+			return nil
 		}
 		lines := resourceJSONLines(*res.Resource)
 		intent := runtime.PushScreen{
@@ -166,6 +206,7 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) {
 		// messages.ValueRevealed and routes it to HandleValueRevealed.
 		// Tasks are returned by Apply's ActionReveal branch directly.
 	}
+	return nil
 }
 
 // dispatchRelatedNavigate calls HandleRelatedNavigate then applyRelatedNavResult

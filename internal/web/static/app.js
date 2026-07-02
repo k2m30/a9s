@@ -148,10 +148,23 @@
   var filterMode = false;
   var filterBuf = "";
 
-  // searchInput holds state for the search input (no keyboard entry point
-  // currently wired up; see the keydown handler for details).
+  // searchInput holds state for the search input, entered via "/" on
+  // detail/YAML/text views (TUI parity: keys.go Search binding is also "/",
+  // scoped per-view — Filter on list/menu, Search on detail/text).
   var searchMode = false;
   var searchBuf = "";
+
+  // isTextSearchView reports whether the currently rendered #body is a view
+  // where "/" means text-search rather than filter — mirrors the TUI's
+  // per-context binding of the same "/" key (keys.go: Filter on
+  // list/menu, Search on detail/YAML/text). Detected via the DOM containers
+  // the matching templates render: detail.html's .detail-layout and
+  // text.html's .text-body (YAML/JSON/log child views).
+  function isTextSearchView() {
+    var body = document.getElementById("body");
+    if (!body) return false;
+    return !!(body.querySelector(".detail-layout") || body.querySelector(".text-body"));
+  }
 
   function setFilter(val) {
     sendAction("set-filter", val);
@@ -226,9 +239,7 @@
       return;
     }
 
-    // Search mode: no keyboard trigger currently enters this (ctrl+s was
-    // removed so the browser's save-page shortcut works); state and handling
-    // kept in case a future non-hijacking entry point is added.
+    // Search mode: entered via "/" on detail/YAML/text views (see below).
     if (searchMode) {
       if (e.key === "Escape") {
         searchMode = false;
@@ -239,6 +250,12 @@
         return;
       }
       if (e.key === "Enter") {
+        // Commit the query and exit search-typing mode (mirrors filterMode's
+        // Enter handling above) so subsequent "n"/"N" reach the global
+        // search-next/search-prev handlers below instead of being swallowed
+        // into searchBuf as literal characters.
+        searchMode = false;
+        hideInputBar();
         sendAction("search-next", "");
         e.preventDefault();
         return;
@@ -294,11 +311,19 @@
       return;
     }
 
-    // Enter filter mode.
+    // Enter filter or search mode. TUI parity: keys.go binds "/" to both
+    // Filter (list/menu) and Search (detail/YAML/text) — the two are
+    // mutually exclusive per view, so the DOM tells us which one is active.
     if (e.key === "/" && !e.ctrlKey && !e.metaKey) {
-      filterMode = true;
-      filterBuf = "";
-      showInputBar("/", "");
+      if (isTextSearchView()) {
+        searchMode = true;
+        searchBuf = "";
+        showInputBar("search: ", "");
+      } else {
+        filterMode = true;
+        filterBuf = "";
+        showInputBar("/", "");
+      }
       e.preventDefault();
       return;
     }

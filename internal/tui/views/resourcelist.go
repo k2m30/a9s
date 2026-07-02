@@ -551,16 +551,17 @@ func (m *ResourceListModel) RenderList(body app.ListBody) string {
 	}
 
 	// Widen lifecycle/status column to the max natural phrase width across all rows.
-	// body.Rows[i].Cells are indexed by the full (pre-scroll) column list, so fullCols
-	// is passed to resolve the correct cell index regardless of the scroll offset.
-	// body.EnrichmentFindings is also considered so the S4 status-column override
-	// (an issue-severity Finding's Phrase, applied later in renderListDataRow)
-	// is never truncated relative to its natural width. fullMarkerColIdx is passed
-	// so the widen pass can add room for the "! "/"~ " glyph prefix when the
-	// status column and the identity/marker column are the same column (common
-	// for built-in view configs whose "State" column doubles as the marker
-	// column) — renderListDataRow prepends that glyph to the overridden phrase.
-	cols = renderListWidenLifecycleColumn(cols, fullCols, body.Rows, m.typeDef, body.EnrichmentFindings, fullMarkerColIdx)
+	// body.Rows[i].Cells are indexed by the full (pre-scroll) column list, so
+	// body.StatusCol (also full-column-space) is passed to resolve the correct
+	// cell index regardless of the scroll offset. The widen pass measures
+	// row.Cells verbatim — the S4 status-column override is already baked into
+	// Cells by buildListBody, so no separate findings-phrase measurement is
+	// needed. fullMarkerColIdx is passed so the widen pass can add room for the
+	// "! "/"~ " glyph prefix when the status column and the identity/marker
+	// column are the same column (common for built-in view configs whose
+	// "State" column doubles as the marker column) — renderListDataRow prepends
+	// that glyph to the baked cell value.
+	cols = renderListWidenLifecycleColumn(cols, fullCols, body.Rows, body.StatusCol, scrollX, fullMarkerColIdx)
 
 	cols = m.fitColumns(cols)
 
@@ -591,31 +592,6 @@ func (m *ResourceListModel) RenderList(body app.ListBody) string {
 		}
 	}
 
-	// Resolve the Status/lifecycle column once per render (mirrors markerColIdx
-	// above): the column whose key is "status" or the type's LifecycleKey. Used
-	// by renderListDataRow to override a flagged row's status cell with the
-	// issue-severity Finding's concrete Phrase (S4, docs/resources/*.md §4).
-	statusColIdx := -1
-	lifecycleKey := lifecycleColumnKey(m.typeDef)
-	for i, c := range cols {
-		if c.key == "status" || c.key == lifecycleKey {
-			statusColIdx = i
-			break
-		}
-	}
-	if statusColIdx < 0 {
-		// Path-based view-config columns (e.g. built-in ec2 "State" column has
-		// Key:"" Path:"State.Name") carry no key at all — fall back to a
-		// case-insensitive title match against "State"/"Status", mirroring the
-		// title-fallback step in resolveIdentityColumn/resolveListMarkerCol.
-		for i, c := range cols {
-			if strings.EqualFold(c.title, "State") || strings.EqualFold(c.title, "Status") {
-				statusColIdx = i
-				break
-			}
-		}
-	}
-
 	visibleRows := max(m.height-1, 1)
 	showLoadMore := body.Truncated
 	if showLoadMore && visibleRows > 2 {
@@ -634,7 +610,7 @@ func (m *ResourceListModel) RenderList(body app.ListBody) string {
 		row := body.Rows[i]
 		isSelected := i == body.Selected
 		base := renderListRowStyle(row, isSelected)
-		styled := renderListDataRow(cols, row, base, m.width, isSelected, markerColIdx, statusColIdx, body.EnrichmentFindings, scrollX)
+		styled := renderListDataRow(cols, row, base, m.width, isSelected, markerColIdx, scrollX)
 		sb.WriteString(styled)
 	}
 
@@ -650,6 +626,15 @@ func (m *ResourceListModel) RenderList(body app.ListBody) string {
 			hint = "── m: load more ──"
 		}
 		sb.WriteString(styles.DimText.Render(hint))
+	}
+
+	// Cache-first seeding (Contract A): the list opened with rows already
+	// visible while a fresh fetch confirms/replaces them. Additive-only — this
+	// line never renders when Refreshing is false (the default), so it does
+	// not affect the byte-parity gate against the legacy View() path.
+	if body.Refreshing {
+		sb.WriteString("\n")
+		sb.WriteString(styles.DimText.Render("── refreshing... ──"))
 	}
 
 	return sb.String()
@@ -694,72 +679,37 @@ func renderListSortColKey(sort app.SortSpec, fullCols []listCol, td resource.Res
 	return sort.Col
 }
 
-// renderListWidenLifecycleColumn mirrors widenLifecycleColumn but operates on
-// pre-extracted cell strings from ListRow.Cells rather than resource.Resource.
-// The lifecycle/status column is identified by key "status" or the type's
-// LifecycleKey; when no column carries that key (path-based view-config
-// columns, e.g. built-in ec2's "State" column has Key:"" Path:"State.Name"),
-// falls back to a case-insensitive title match against "State"/"Status" —
-// mirroring the same fallback in resolveIdentityColumn/resolveListMarkerCol.
+// renderListWidenLifecycleColumn widens the status/lifecycle column to the
+// max natural width of its baked cell text (body.Rows[i].Cells[statusCol]) —
+// a pure consumer of the pre-resolved body.StatusCol index, mirroring the
+// markerColIdx translation in RenderList. No re-measurement of
+// EnrichmentFindings phrases happens here: buildListBody has already baked
+// any S4 status-column override into Cells, so measuring Cells verbatim is
+// sufficient.
 //
-// fullCols is the pre-scroll full column list used to resolve the correct cell index in
-// ListRow.Cells (which is always indexed by full-column position). cols is the
-// post-scroll visible slice whose matching entry gets widened.
-//
-// findings is considered alongside the raw cell text so the column is wide
-// enough for the S4 status-column override (an issue-severity Finding's
-// Phrase, applied later in renderListDataRow) — otherwise the override text
-// could be silently truncated relative to the raw AWS state/lifecycle value
-// it replaces. fullMarkerColIdx (full-column-space identity/marker column
-// index) is used to add 2 extra columns of width when the status column IS
-// the marker column, accounting for the "! "/"~ " glyph prefix renderListDataRow
-// prepends to a ColorHealthy row's marker cell.
-func renderListWidenLifecycleColumn(cols []listCol, fullCols []listCol, rows []app.ListRow, td resource.ResourceTypeDef, findings map[string]domain.Finding, fullMarkerColIdx int) []listCol {
-	if len(cols) == 0 || len(rows) == 0 {
-		return cols
-	}
-	lifecycleKey := lifecycleColumnKey(td)
-
-	statusColMatch := func(c listCol) bool {
-		return c.key == "status" || c.key == lifecycleKey
-	}
-	statusColMatchFallback := func(c listCol) bool {
-		return strings.EqualFold(c.title, "State") || strings.EqualFold(c.title, "Status")
-	}
-
-	// Find the lifecycle column's index in fullCols for correct row.Cells lookup.
-	fullIdx := -1
-	for i, c := range fullCols {
-		if statusColMatch(c) {
-			fullIdx = i
-			break
-		}
-	}
-	if fullIdx < 0 {
-		for i, c := range fullCols {
-			if statusColMatchFallback(c) {
-				fullIdx = i
-				break
-			}
-		}
-	}
-	if fullIdx < 0 {
+// statusCol is the full-column-space index (body.StatusCol); -1 means the
+// type has no status column, a no-op. cols is the post-scroll visible slice
+// whose matching entry gets widened; fullCols is the pre-scroll full column
+// list used to translate statusCol into a visible index exactly as RenderList
+// translates fullMarkerColIdx into markerColIdx. fullMarkerColIdx is used to
+// add 2 extra columns of width when the status column IS the marker column,
+// accounting for the "! "/"~ " glyph prefix renderListDataRow prepends to a
+// decorated row's marker cell.
+func renderListWidenLifecycleColumn(cols []listCol, fullCols []listCol, rows []app.ListRow, statusCol int, scrollX int, fullMarkerColIdx int) []listCol {
+	if len(cols) == 0 || len(rows) == 0 || statusCol < 0 {
 		return cols
 	}
 
-	// Find the same column in the visible (post-scroll) slice for widening.
+	// Translate the full-column-space status index into the visible
+	// (post-scroll, post-fit) index, mirroring RenderList's markerColIdx
+	// translation.
 	visIdx := -1
-	for i, c := range cols {
-		if statusColMatch(c) {
-			visIdx = i
-			break
-		}
-	}
-	if visIdx < 0 {
-		for i, c := range cols {
-			if statusColMatchFallback(c) {
-				visIdx = i
-				break
+	if statusCol >= scrollX {
+		candidate := statusCol - scrollX
+		if candidate < len(cols) && candidate < len(fullCols[scrollX:]) {
+			origIdx := scrollX + candidate
+			if origIdx < len(fullCols) && cols[candidate].key == fullCols[origIdx].key {
+				visIdx = candidate
 			}
 		}
 	}
@@ -771,19 +721,14 @@ func renderListWidenLifecycleColumn(cols []listCol, fullCols []listCol, rows []a
 	// glyphRoom accounts for the "! "/"~ " prefix renderListDataRow prepends
 	// when this status column is also the identity/marker column.
 	glyphRoom := 0
-	if fullIdx == fullMarkerColIdx {
+	if statusCol == fullMarkerColIdx {
 		glyphRoom = 2
 	}
 
 	maxW := cols[visIdx].width
 	for _, row := range rows {
-		if fullIdx < len(row.Cells) {
-			if nat := lipgloss.Width(row.Cells[fullIdx]); nat > maxW {
-				maxW = nat
-			}
-		}
-		if f, ok := findings[row.ResourceID]; ok && f.Severity.IsIssue() {
-			if nat := lipgloss.Width(f.Phrase) + glyphRoom; nat > maxW {
+		if statusCol < len(row.Cells) {
+			if nat := lipgloss.Width(row.Cells[statusCol]) + glyphRoom; nat > maxW {
 				maxW = nat
 			}
 		}
@@ -838,20 +783,14 @@ func renderListVisibleWindow(selected, total, viewHeight int) (int, int) {
 	return start, end
 }
 
-// renderListDataRow renders a single data row from pre-extracted ListRow.Cells,
-// mirroring renderDataRow but reading cells from the body instead of resource.Resource.
-// The decorator glyph ("! "/"~ ") is prepended to the identity cell (markerColIdx)
-// for ColorHealthy rows with enrichment findings, exactly as renderDataRow does.
-//
-// statusColIdx (S4, docs/resources/*.md §4): when a row carries an
-// issue-severity Finding (SevWarn/SevBroken) in findings[row.ResourceID], the
-// Status/lifecycle column's cell text is overridden with that Finding's
-// concrete Phrase instead of the raw AWS state/lifecycle value — so a flagged
-// row shows its cause, not just a glyph on the identity column. Healthy rows
-// (no finding, or a non-issue-severity finding) keep their existing status
-// cell unchanged. statusColIdx == -1 (no status column for this type) is a
-// no-op; the enrichment glyph still shows on the identity column.
-func renderListDataRow(cols []listCol, row app.ListRow, base lipgloss.Style, totalWidth int, isSelected bool, markerColIdx int, statusColIdx int, findings map[string]domain.Finding, cellOffset int) string {
+// renderListDataRow renders a single data row as a pure consumer of
+// app.ListRow: cell text comes from row.Cells verbatim (buildListBody has
+// already baked any S4 status-column override into the appropriate cell,
+// docs/resources/*.md §4) and the marker glyph comes from row.Decorator
+// verbatim (buildListBody has already resolved it via
+// resolveListDecoratorFull). No re-derivation from an enrichment findings map
+// happens here.
+func renderListDataRow(cols []listCol, row app.ListRow, base lipgloss.Style, totalWidth int, isSelected bool, markerColIdx int, cellOffset int) string {
 	var b strings.Builder
 	b.WriteString(base.Render(" "))
 	used := 1
@@ -864,30 +803,10 @@ func renderListDataRow(cols []listCol, row app.ListRow, base lipgloss.Style, tot
 		if cellOffset+i < len(row.Cells) {
 			val = row.Cells[cellOffset+i]
 		}
-		// S4 status-column override: a flagged row's Status/lifecycle cell shows
-		// the issue-severity Finding's concrete Phrase instead of the raw AWS
-		// state/lifecycle value. Applied before the marker-glyph branch below so
-		// that when statusColIdx and markerColIdx are the SAME column (common —
-		// many built-in view configs have no distinct identity column separate
-		// from "State"), the marker glyph still gets prepended to the overridden
-		// phrase rather than being clobbered by it.
-		if i == statusColIdx {
-			if f, ok := findings[row.ResourceID]; ok && f.Severity.IsIssue() {
-				val = f.Phrase
-			}
-		}
-		// Enrichment glyph on identity column: mirrors renderDataRow's marker logic.
-		// Only applies when the row is ColorHealthy (Decorator carries "!"/"~" only
-		// for healthy rows per resolveListDecoratorFull).
-		if i == markerColIdx && row.Color == "healthy" {
-			if f, ok := findings[row.ResourceID]; ok {
-				switch f.Severity {
-				case domain.SevBroken:
-					val = "! " + val
-				case domain.SevWarn:
-					val = "~ " + val
-				}
-			}
+		// Marker glyph on the identity column: prepend row.Decorator ("!"/"~")
+		// verbatim, exactly as pre-resolved by buildListBody.
+		if i == markerColIdx && row.Decorator != "" {
+			val = string(row.Decorator) + " " + val
 		}
 		padded := text.PadOrTrunc(val, c.width)
 		used += c.width

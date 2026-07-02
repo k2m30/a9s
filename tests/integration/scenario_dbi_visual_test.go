@@ -69,8 +69,9 @@ func TestScenario_DBIVisual(t *testing.T) {
 	// Rule 7 — W1 + W2 stack: Warning phrase + (+1) for the hidden Wave-2 finding.
 	scenario.ExpectRowStatusEquals(demofixtures.WarnDbiPublicMaintID, "publicly accessible (+1)")
 
-	// Rule 3 — Wave 2 on Healthy row: S4 = "pending maintenance".
-	scenario.ExpectRowStatusEquals(demofixtures.MaintDbiScheduledID, "pending maintenance")
+	// Rule 3 — Wave 2 on Healthy row: S4 = "maintenance scheduled"
+	// (docs/resources/dbi.md §4 signal row "Pending maintenance overdue").
+	scenario.ExpectRowStatusEquals(demofixtures.MaintDbiScheduledID, "maintenance scheduled")
 
 	// -----------------------------------------------------------------
 	// Glyph rules.

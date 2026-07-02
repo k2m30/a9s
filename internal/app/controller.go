@@ -90,6 +90,17 @@ type Controller struct {
 	// independent of core.IsDemo() — a demo session is still a TUI or web
 	// session and carries its own Header.Mode value ("demo") set elsewhere.
 	uiMode string
+
+	// menuSweepAcked tracks, per resource type, whether an AvailabilityChecked
+	// result has landed for a type currently retained in
+	// core.Session().ProbeResources. MenuBody.Refreshing (Contract C) is true
+	// while any type present in ProbeResources has not yet been acked here —
+	// i.e. a background availability sweep is still confirming/replacing a
+	// cache-seeded startup. Handle marks a type acked unconditionally on any
+	// AvailabilityChecked arrival (even one the central gen-guard treats as
+	// stale) because the sweep-in-flight signal tracks wall-clock probe
+	// completion, not generation validity.
+	menuSweepAcked map[string]bool
 }
 
 // controllerErrorEntry is one session-error-log entry stored in Controller.
@@ -220,7 +231,7 @@ func (c *Controller) openSelectedListDetail() (ViewState, []runtime.TaskRequest)
 		ResourceType: typeName,
 		Resource:     &r,
 	})
-	c.applyNavResult(res)
+	tasks = append(tasks, c.applyNavResult(res)...)
 	// When HandleNavigate signals DispatchRelated, emit a KindRelatedCheck task
 	// so DrainSync (and the web renderer) run the checkers headlessly. The TUI
 	// adapter handles this separately via messages.RelatedCheckStarted; the

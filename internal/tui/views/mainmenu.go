@@ -371,6 +371,15 @@ func (m *MainMenuModel) RenderBody(body app.MenuBody) string {
 		}
 	}
 
+	// Contract C: a background availability sweep is still confirming/
+	// replacing cache-seeded startup counts. Additive-only — never renders
+	// when Refreshing is false (the default), so it does not affect existing
+	// render-parity assertions.
+	if body.Refreshing {
+		sb.WriteString("\n")
+		sb.WriteString(styles.DimText.Render("  refreshing…"))
+	}
+
 	return sb.String()
 }
 
