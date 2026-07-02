@@ -15,8 +15,9 @@ Context: a9s is a read-only AWS viewer with two renderers (TUI and web) over one
 4. Both renderers behave identically; renderers contain zero cache logic.
 5. One mechanism for all 66 types; a rule that needs per-type code is not met.
 6. No user intent is silently lost.
+7. Simplicity of implementation beats architectural elegance. Where this document permits a dumber mechanism, the dumber mechanism is the requirement.
 
-Non-goals: cross-profile sharing, multi-region aggregation, any write path to AWS, multi-page row caching, live propagation between concurrent instances.
+Non-goals: cross-profile sharing, multi-region aggregation, any write path to AWS, live propagation between concurrent instances.
 
 ## 2. Rules
 
@@ -31,12 +32,10 @@ Non-goals: cross-profile sharing, multi-region aggregation, any write path to AW
 **C5 — Exact totals stick.** When paging reaches the last page, the type's total becomes exact: displayed everywhere as `N` (not `N+`), persisted, surviving restart. Exactness is only ever replaced by newer exactness: a full-depth fetch, or a first-page fetch that is itself complete (untruncated — the whole population fits one page), produces a new exact total; a TRUNCATED first-page fetch never downgrades a stored exact total to `N+` — it merely knows less, and the exact value stays (stale-marked) until the next exact observation corrects it.
 
 **C6 — What is cached.**
-Persisted, one file per profile+region, structured per the data contract below. Issue counts everywhere in this document follow the menu-badge aggregation: only `!`-severity findings count; warning (`~`) findings never bump a count (see docs/attention-signals.md, Visualization Surfaces).
-Session-only, per resource: related-panel results and detail enrichments. A related-panel result stores everything its interactions need — target identifiers, fetch filters/scope, approximate/truncated markers, and per-row errors — so that activating a cached row navigates identically to a fresh one and never triggers the fan-out. Session caches live until `Ctrl+R` on their screen or a pair switch, and are exempt from C1's re-verify-on-sight: re-opening a detail renders the cached panel in < 100 ms and MUST NOT re-run the fan-out (that re-run is defect D6).
+Persisted, one file per profile+region: EVERYTHING the menu and list screens learned from the AWS API. Per type: the count (+ exact flag), the issue count, and ALL loaded rows — every page the session fetched, not just the first — with their findings, colors, glyphs and status texts. Issue counts everywhere in this document follow the menu-badge aggregation: only `!`-severity findings count; warning (`~`) findings never bump a count (see docs/attention-signals.md, Visualization Surfaces).
+Session-only (in memory, gone on restart): detail-screen data — fields, detail enrichments, and related-panel results. A related-panel result stores everything its interactions need — navigation targets, fetch filters/scope, approximate/truncated markers, per-row errors — so activating a cached row navigates identically to a fresh one and never triggers the fan-out. Session caches live until `Ctrl+R` on their screen or a pair switch, and are exempt from C1's re-verify-on-sight: re-opening a detail renders the cached panel in < 100 ms and MUST NOT re-run the fan-out (that re-run is defect D6).
 
-**C7 — Merge on save.** Saving reads the latest file, merges the session's knowledge PER FIELD GROUP (newest group saved-at wins), and writes via atomic rename. A session that only re-learned s3's count must not disturb s3's cached rows or findings, nor any other type's entry. Two concurrent instances may cost each other one save; the loss self-heals on the next view (C1). No locks.
-
-**Data contract.** The persisted file is: a single integer schema version, then per type three independently-timestamped field groups — `count {value, exact, savedAt}`, `issues {value, truncated, savedAt}`, `rows {items with their findings, savedAt}`. Merge-on-save (C7) and staleness are decided per group by its own savedAt; the UI still surfaces a single per-surface staleness overlay (C3) — per-group timestamps exist for correct merging, not for extra UI states. An unreadable or wrong-version file means "no cache" (normal cold start, one log line, replaced on the next save).
+**C7 — Whole-state save, no merge logic.** The file is loaded whole into memory at startup; from that moment memory is a superset of the file. Saving writes the ENTIRE in-memory cache state back (all types), via atomic rename, after a type's fetch or enrichment completes and on clean exit. There is no merge code to get wrong: a session that only touched s3 still writes every other type's knowledge back untouched, because it loaded it at boot. Two concurrent instances: last complete write wins; the loss self-heals on the next view (C1). No locks. An unreadable or wrong-schema-version file (version is a single integer) means "no cache": normal cold start, one log line, replaced on the next save.
 
 **C8 — Manual refresh.** `Ctrl+R` re-verifies the current surface (menu: the availability sweep; list: that type's rows and findings; detail: fan-out and enrichment). Cached content stays visible under the marker while the refetch runs; other types are untouched.
 
