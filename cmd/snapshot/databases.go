@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -177,6 +178,11 @@ func captureDBIPendingMaintenance(ctx context.Context, client *rds.Client) ([]db
 
 type dbcData struct {
 	Clusters []dbcCluster `json:"clusters"`
+	// PartialErrors records per-source list failures (e.g. "rds: AccessDenied")
+	// when the other source still returned rows — mirrors the app fetcher's
+	// partial-success contract so a half-readable account keeps its DocDB
+	// coverage instead of losing the whole section.
+	PartialErrors []string `json:"partial_errors,omitempty"`
 }
 
 type dbcCluster struct {
@@ -199,14 +205,16 @@ type dbcCluster struct {
 }
 
 func captureDBC(ctx context.Context, cfg aws.Config) (any, error) {
-	docdbClient := docdb.NewFromConfig(cfg)
-	rdsClient := rds.NewFromConfig(cfg)
+	docdbRows, docdbErr := listDocDBClusters(ctx, docdb.NewFromConfig(cfg))
+	rdsRows, rdsErr := listRDSClusters(ctx, rds.NewFromConfig(cfg))
+	return combineDBCClusters(docdbRows, docdbErr, rdsRows, rdsErr)
+}
 
+func listDocDBClusters(ctx context.Context, client *docdb.Client) ([]dbcCluster, error) {
 	var clusters []dbcCluster
-
-	var docdbMarker *string
+	var marker *string
 	for {
-		out, err := docdbClient.DescribeDBClusters(ctx, &docdb.DescribeDBClustersInput{Marker: docdbMarker})
+		out, err := client.DescribeDBClusters(ctx, &docdb.DescribeDBClustersInput{Marker: marker})
 		if err != nil {
 			return nil, err
 		}
@@ -214,14 +222,17 @@ func captureDBC(ctx context.Context, cfg aws.Config) (any, error) {
 			clusters = append(clusters, dbcClusterFromDocDB(c))
 		}
 		if out.Marker == nil || *out.Marker == "" {
-			break
+			return clusters, nil
 		}
-		docdbMarker = out.Marker
+		marker = out.Marker
 	}
+}
 
-	var rdsMarker *string
+func listRDSClusters(ctx context.Context, client *rds.Client) ([]dbcCluster, error) {
+	var clusters []dbcCluster
+	var marker *string
 	for {
-		out, err := rdsClient.DescribeDBClusters(ctx, &rds.DescribeDBClustersInput{Marker: rdsMarker})
+		out, err := client.DescribeDBClusters(ctx, &rds.DescribeDBClustersInput{Marker: marker})
 		if err != nil {
 			return nil, err
 		}
@@ -229,12 +240,30 @@ func captureDBC(ctx context.Context, cfg aws.Config) (any, error) {
 			clusters = append(clusters, dbcClusterFromRDS(c))
 		}
 		if out.Marker == nil || *out.Marker == "" {
-			break
+			return clusters, nil
 		}
-		rdsMarker = out.Marker
+		marker = out.Marker
 	}
+}
 
-	return dbcData{Clusters: dedupDBCByID(clusters)}, nil
+// combineDBCClusters merges the two DescribeDBClusters sources with docdb-first
+// dedup, tolerating one-sided failures: when one source errors but the other
+// returned rows, the rows are kept and the failure lands in PartialErrors
+// instead of sinking the section (the app's DBC fetcher behaves the same way).
+// Both sides failing is a real capture failure.
+func combineDBCClusters(docdbRows []dbcCluster, docdbErr error, rdsRows []dbcCluster, rdsErr error) (dbcData, error) {
+	if docdbErr != nil && rdsErr != nil {
+		return dbcData{}, fmt.Errorf("dbc: docdb: %v; rds: %v", docdbErr, rdsErr)
+	}
+	var partial []string
+	if docdbErr != nil {
+		partial = append(partial, "docdb: "+docdbErr.Error())
+	}
+	if rdsErr != nil {
+		partial = append(partial, "rds: "+rdsErr.Error())
+	}
+	merged := append(append([]dbcCluster{}, docdbRows...), rdsRows...)
+	return dbcData{Clusters: dedupDBCByID(merged), PartialErrors: partial}, nil
 }
 
 // dedupDBCByID dedups by DBClusterIdentifier, first-occurrence-wins, matching
@@ -371,6 +400,8 @@ func captureDBISnap(ctx context.Context, cfg aws.Config) (any, error) {
 
 type dbcSnapData struct {
 	Snapshots []dbcSnapshot `json:"snapshots"`
+	// PartialErrors — same partial-success contract as dbcData.PartialErrors.
+	PartialErrors []string `json:"partial_errors,omitempty"`
 }
 
 type dbcSnapshot struct {
@@ -388,14 +419,16 @@ type dbcSnapshot struct {
 }
 
 func captureDBCSnap(ctx context.Context, cfg aws.Config) (any, error) {
-	docdbClient := docdb.NewFromConfig(cfg)
-	rdsClient := rds.NewFromConfig(cfg)
+	docdbRows, docdbErr := listDocDBClusterSnapshots(ctx, docdb.NewFromConfig(cfg))
+	rdsRows, rdsErr := listRDSClusterSnapshots(ctx, rds.NewFromConfig(cfg))
+	return combineDBCSnapshots(docdbRows, docdbErr, rdsRows, rdsErr)
+}
 
+func listDocDBClusterSnapshots(ctx context.Context, client *docdb.Client) ([]dbcSnapshot, error) {
 	var snaps []dbcSnapshot
-
-	var docdbMarker *string
+	var marker *string
 	for {
-		out, err := docdbClient.DescribeDBClusterSnapshots(ctx, &docdb.DescribeDBClusterSnapshotsInput{Marker: docdbMarker})
+		out, err := client.DescribeDBClusterSnapshots(ctx, &docdb.DescribeDBClusterSnapshotsInput{Marker: marker})
 		if err != nil {
 			return nil, err
 		}
@@ -415,14 +448,17 @@ func captureDBCSnap(ctx context.Context, cfg aws.Config) (any, error) {
 			})
 		}
 		if out.Marker == nil || *out.Marker == "" {
-			break
+			return snaps, nil
 		}
-		docdbMarker = out.Marker
+		marker = out.Marker
 	}
+}
 
-	var rdsMarker *string
+func listRDSClusterSnapshots(ctx context.Context, client *rds.Client) ([]dbcSnapshot, error) {
+	var snaps []dbcSnapshot
+	var marker *string
 	for {
-		out, err := rdsClient.DescribeDBClusterSnapshots(ctx, &rds.DescribeDBClusterSnapshotsInput{Marker: rdsMarker})
+		out, err := client.DescribeDBClusterSnapshots(ctx, &rds.DescribeDBClusterSnapshotsInput{Marker: marker})
 		if err != nil {
 			return nil, err
 		}
@@ -442,12 +478,26 @@ func captureDBCSnap(ctx context.Context, cfg aws.Config) (any, error) {
 			})
 		}
 		if out.Marker == nil || *out.Marker == "" {
-			break
+			return snaps, nil
 		}
-		rdsMarker = out.Marker
+		marker = out.Marker
 	}
+}
 
-	return dbcSnapData{Snapshots: dedupDBCSnapByID(snaps)}, nil
+// combineDBCSnapshots — same partial-success contract as combineDBCClusters.
+func combineDBCSnapshots(docdbRows []dbcSnapshot, docdbErr error, rdsRows []dbcSnapshot, rdsErr error) (dbcSnapData, error) {
+	if docdbErr != nil && rdsErr != nil {
+		return dbcSnapData{}, fmt.Errorf("dbc-snap: docdb: %v; rds: %v", docdbErr, rdsErr)
+	}
+	var partial []string
+	if docdbErr != nil {
+		partial = append(partial, "docdb: "+docdbErr.Error())
+	}
+	if rdsErr != nil {
+		partial = append(partial, "rds: "+rdsErr.Error())
+	}
+	merged := append(append([]dbcSnapshot{}, docdbRows...), rdsRows...)
+	return dbcSnapData{Snapshots: dedupDBCSnapByID(merged), PartialErrors: partial}, nil
 }
 
 // dedupDBCSnapByID dedups by DBClusterSnapshotIdentifier, first-occurrence-wins
