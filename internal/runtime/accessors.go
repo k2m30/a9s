@@ -16,6 +16,7 @@ import (
 	"maps"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/cache"
 	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -61,6 +62,26 @@ func (c *Core) NoCache() bool { return c.session.NoCache }
 
 // SetNoCache sets the NoCache policy flag. Constructor-option only.
 func (c *Core) SetNoCache(v bool) { c.session.NoCache = v }
+
+// CacheStore returns the loaded per-type disk cache for the CURRENT
+// Profile+Region pair, or nil when no LoadDir has run yet for this pair
+// (cold start before TaskKindLoadAvailCache completes, or --no-cache).
+func (c *Core) CacheStore() *cache.Store { return c.session.CacheStore }
+
+// EnsureCacheStore returns the current pair's *cache.Store, calling
+// cache.LoadDir(profile, region) to populate it if this is the first call
+// since the last Rotate (C9) or process start. NoCache=true always returns
+// nil without ever calling LoadDir (C7b: --no-cache disables persisted load
+// entirely).
+func (c *Core) EnsureCacheStore() *cache.Store {
+	if c.session.NoCache {
+		return nil
+	}
+	if c.session.CacheStore == nil {
+		c.session.CacheStore = cache.LoadDir(c.session.Profile, c.session.Region)
+	}
+	return c.session.CacheStore
+}
 
 // Command returns the one-shot resource short name to navigate to on the
 // first ClientsReady (from the -c CLI flag).

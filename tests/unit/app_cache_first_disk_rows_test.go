@@ -3,23 +3,22 @@
 //
 // Contract B: the on-disk cache (internal/cache) additionally persists, per
 // type, the last first-page rows (ID, Name, Fields map — NO RawStruct) and
-// the last enrichment findings map. On a cold start with a valid cache file,
-// opening a list before probes complete seeds rows+findings from disk with
-// Refreshing=true. Fields must be render-sufficient: a generic materialization
-// step runs on every fetch result (controller/runtime layer, before
-// caching/rendering) that, for each view-config column with a Path and empty
-// Key, extracts the scalar via fieldpath and writes it into Fields under the
-// column key — so cached rows render identically without RawStruct.
+// the last enrichment findings per row. On a cold start with a valid cache
+// file, opening a list before probes complete seeds rows+findings from disk
+// with Refreshing=true. Fields must be render-sufficient: a generic
+// materialization step runs on every fetch result (controller/runtime
+// layer, before caching/rendering) that, for each view-config column with a
+// Path and empty Key, extracts the scalar via fieldpath and writes it into
+// Fields under the column key — so cached rows render identically without
+// RawStruct.
+//
+// Round-2 migration note: the disk-cache surface below is repinned onto
+// cache.TypeFile/cache.Row/cache.LoadDir/(*Store).Put/SaveType per
+// docs/design/cache-requirements.md round 2 (per-type files, C7). Findings
+// live on cache.Row.Findings ([]domain.Finding) — a per-row slice — not a
+// type-level map, since each row carries its own findings now.
 //
 // AMBIGUITY RESOLUTIONS (stated, not deferred):
-//   - New disk-cache fields: pinned as cache.Entry.Rows ([]cache.CachedRow
-//     with ID/Name/Fields) and cache.Entry.Findings (map[string]domain.Finding)
-//     — the natural extension of the existing per-type cache.Entry struct
-//     (internal/cache/cache.go), which already holds count/truncated/issues
-//     per type. If the coder prefers different field/type names the RENAME
-//     is fine; the pinned behavior (round-trips through yaml.Marshal/
-//     Unmarshal via cache.Save/cache.Load, and seeds a list on cold start) is
-//     what must hold.
 //   - "Generic materialization step" is pinned as a new exported function
 //     app.MaterializeListFields(r resource.Resource, columns []app.ColumnDef)
 //     resource.Resource — placed in internal/app (same package as
@@ -191,90 +190,81 @@ func TestMaterializeListFields_KeyBasedColumn_Untouched(t *testing.T) {
 // Disk persistence of rows + findings (the on-disk half of Contract B)
 // -----------------------------------------------------------------------
 
-// TestCacheEntry_RowsRoundTripThroughSaveLoad pins that cache.Entry gains a
-// Rows field (ID/Name/Fields, NO RawStruct) that survives a full
-// cache.Save → cache.Load round trip via YAML.
-func TestCacheEntry_RowsRoundTripThroughSaveLoad(t *testing.T) {
+// TestCacheTypeFile_RowsRoundTripThroughSaveLoad pins that cache.TypeFile
+// carries a Rows field ([]cache.Row: ID/Name/Fields, NO RawStruct) that
+// survives a full Put → SaveType → LoadDir round trip via YAML.
+func TestCacheTypeFile_RowsRoundTripThroughSaveLoad(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 
-	f := &cache.File{
-		Profile: "demo",
-		Region:  "us-east-1",
-		Resources: map[string]cache.Entry{
-			"ec2": {
-				HasResources: true,
-				Count:        1,
-				Rows: []cache.CachedRow{
-					{ID: "i-0disk0000001", Name: "disk-row", Fields: map[string]string{"state": "running"}},
-				},
-			},
+	store := cache.LoadDir("demo", "us-east-1")
+	store.Put("ec2", cache.TypeFile{
+		HasResources: true,
+		Count:        1,
+		Rows: []cache.Row{
+			{ID: "i-0disk0000001", Name: "disk-row", Fields: map[string]string{"state": "running"}},
 		},
-	}
-	if err := cache.Save(f); err != nil {
-		t.Fatalf("cache.Save: %v", err)
+	})
+	if err := store.SaveType("ec2"); err != nil {
+		t.Fatalf("SaveType: %v", err)
 	}
 
-	loaded, err := cache.Load("demo", "us-east-1")
-	if err != nil {
-		t.Fatalf("cache.Load: %v", err)
+	reloaded := cache.LoadDir("demo", "us-east-1")
+	if reloaded == nil {
+		t.Fatal("LoadDir returned nil after SaveType")
 	}
-	if loaded == nil {
-		t.Fatal("cache.Load returned nil after Save")
-	}
-	entry, ok := loaded.Resources["ec2"]
+	tf, ok := reloaded.Type("ec2")
 	if !ok {
-		t.Fatal(`loaded.Resources["ec2"] missing`)
+		t.Fatal(`reloaded.Type("ec2") missing`)
 	}
-	if len(entry.Rows) != 1 {
-		t.Fatalf("len(entry.Rows) = %d, want 1", len(entry.Rows))
+	if len(tf.Rows) != 1 {
+		t.Fatalf("len(tf.Rows) = %d, want 1", len(tf.Rows))
 	}
-	got := entry.Rows[0]
+	got := tf.Rows[0]
 	if got.ID != "i-0disk0000001" || got.Name != "disk-row" || got.Fields["state"] != "running" {
-		t.Errorf("entry.Rows[0] = %+v, want ID=i-0disk0000001 Name=disk-row Fields[state]=running", got)
+		t.Errorf("tf.Rows[0] = %+v, want ID=i-0disk0000001 Name=disk-row Fields[state]=running", got)
 	}
 }
 
-// TestCacheEntry_FindingsRoundTripThroughSaveLoad pins the sibling
-// requirement: the last enrichment findings map persists per type alongside
-// Rows.
-func TestCacheEntry_FindingsRoundTripThroughSaveLoad(t *testing.T) {
+// TestCacheTypeFile_RowFindingsRoundTripThroughSaveLoad pins the sibling
+// requirement: the last enrichment findings persist per row (cache.Row.
+// Findings, a []domain.Finding) alongside the row's ID/Name/Fields.
+func TestCacheTypeFile_RowFindingsRoundTripThroughSaveLoad(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 
-	f := &cache.File{
-		Profile: "demo",
-		Region:  "us-east-1",
-		Resources: map[string]cache.Entry{
-			"ec2": {
-				HasResources: true,
-				Count:        1,
-				Findings: map[string]domain.Finding{
-					"i-0disk0000001": {
-						Code:     "ec2-stopped-with-eip",
-						Phrase:   "stopped, has EIP",
-						Severity: domain.SevWarn,
-						Source:   "wave2:ec2",
-					},
+	store := cache.LoadDir("demo", "us-east-1")
+	store.Put("ec2", cache.TypeFile{
+		HasResources: true,
+		Count:        1,
+		Rows: []cache.Row{
+			{
+				ID:   "i-0disk0000001",
+				Name: "disk-row",
+				Findings: []domain.Finding{
+					{Code: "ec2-stopped-with-eip", Phrase: "stopped, has EIP", Severity: domain.SevWarn, Source: "wave2:ec2"},
 				},
 			},
 		},
-	}
-	if err := cache.Save(f); err != nil {
-		t.Fatalf("cache.Save: %v", err)
+	})
+	if err := store.SaveType("ec2"); err != nil {
+		t.Fatalf("SaveType: %v", err)
 	}
 
-	loaded, err := cache.Load("demo", "us-east-1")
-	if err != nil {
-		t.Fatalf("cache.Load: %v", err)
-	}
-	entry := loaded.Resources["ec2"]
-	finding, ok := entry.Findings["i-0disk0000001"]
+	reloaded := cache.LoadDir("demo", "us-east-1")
+	tf, ok := reloaded.Type("ec2")
 	if !ok {
-		t.Fatal(`entry.Findings["i-0disk0000001"] missing after round trip`)
+		t.Fatal(`reloaded.Type("ec2") missing`)
 	}
-	if finding.Phrase != "stopped, has EIP" || finding.Severity != domain.SevWarn {
-		t.Errorf("finding = %+v, want Phrase=%q Severity=SevWarn", finding, "stopped, has EIP")
+	if len(tf.Rows) != 1 {
+		t.Fatalf("len(tf.Rows) = %d, want 1", len(tf.Rows))
+	}
+	findings := tf.Rows[0].Findings
+	if len(findings) != 1 {
+		t.Fatalf("tf.Rows[0].Findings has %d entries, want 1", len(findings))
+	}
+	if findings[0].Phrase != "stopped, has EIP" || findings[0].Severity != domain.SevWarn {
+		t.Errorf("finding = %+v, want Phrase=%q Severity=SevWarn", findings[0], "stopped, has EIP")
 	}
 }
 
@@ -290,7 +280,7 @@ func TestCacheEntry_FindingsRoundTripThroughSaveLoad(t *testing.T) {
 // sourced from disk instead of session state.
 //
 // Ambiguity resolution: "seeds from disk" is modeled at the controller
-// level as the disk cache.Entry.Rows having already been loaded into
+// level as the disk cache.TypeFile.Rows having already been loaded into
 // session.ProbeResources by the startup cache-load path (the same seam
 // LoadAvailabilityCache/SaveAvailabilityCache in internal/runtime/probes.go
 // already uses for counts) — this test drives that outcome directly via
@@ -301,29 +291,25 @@ func TestListOpen_ColdStart_SeedsFromDiskCache_WithRefreshing(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 
-	diskFile := &cache.File{
-		Profile: "demo",
-		Region:  "us-east-1",
-		Resources: map[string]cache.Entry{
-			"ec2": {
-				HasResources: true,
-				Count:        1,
-				Rows: []cache.CachedRow{
-					{ID: "i-0coldstart001", Name: "cold-start-row", Fields: map[string]string{"state": "running"}},
-				},
-			},
+	store := cache.LoadDir("demo", "us-east-1")
+	store.Put("ec2", cache.TypeFile{
+		HasResources: true,
+		Count:        1,
+		Rows: []cache.Row{
+			{ID: "i-0coldstart001", Name: "cold-start-row", Fields: map[string]string{"state": "running"}},
 		},
-	}
-	if err := cache.Save(diskFile); err != nil {
-		t.Fatalf("cache.Save: %v", err)
+	})
+	if err := store.SaveType("ec2"); err != nil {
+		t.Fatalf("SaveType: %v", err)
 	}
 
-	loaded, err := cache.Load("demo", "us-east-1")
-	if err != nil {
-		t.Fatalf("cache.Load: %v", err)
+	reloaded := cache.LoadDir("demo", "us-east-1")
+	if reloaded == nil {
+		t.Fatal("LoadDir returned nil")
 	}
-	if loaded == nil {
-		t.Fatal("cache.Load returned nil")
+	diskTF, ok := reloaded.Type("ec2")
+	if !ok {
+		t.Fatal(`reloaded.Type("ec2") missing`)
 	}
 
 	s := session.New()
@@ -333,9 +319,9 @@ func TestListOpen_ColdStart_SeedsFromDiskCache_WithRefreshing(t *testing.T) {
 	c := app.New(core)
 
 	// Simulate the startup cache-load path seeding session state from the
-	// loaded disk entry's Rows before any probe has completed.
-	rows := make([]resource.Resource, len(loaded.Resources["ec2"].Rows))
-	for i, cr := range loaded.Resources["ec2"].Rows {
+	// loaded disk TypeFile's Rows before any probe has completed.
+	rows := make([]resource.Resource, len(diskTF.Rows))
+	for i, cr := range diskTF.Rows {
 		rows[i] = resource.Resource{ID: cr.ID, Name: cr.Name, Type: "ec2", Fields: cr.Fields}
 	}
 	core.Session().ProbeResources = map[string][]resource.Resource{"ec2": rows}

@@ -63,15 +63,33 @@ type DemoPrefetchResult struct {
 	PrefetchErr    error
 }
 
-// LoadAvailabilityCache reads the on-disk availability cache for profile/region.
-// Returns nil, nil when no cache file exists yet.
-func (c *Core) LoadAvailabilityCache(profile, region string) (*cache.File, error) {
-	return cache.Load(profile, region)
+// LoadAvailabilityCache loads (or reuses the already-loaded) per-type disk
+// cache for profile/region via EnsureCacheStore and returns it converted to
+// the counts-only *cache.File-equivalent shape callers expect: a map of
+// per-type TypeFile snapshots. Returns the Store directly — callers read it
+// via (*cache.Store).Type/Types. NoCache=true (or a profile/region mismatch
+// with the currently-loaded pair) is handled by EnsureCacheStore itself.
+//
+// profile/region are accepted for signature stability with the pre-existing
+// call sites; the Store loaded reflects c.session.Profile/Region (the caller
+// is expected to have already set them via SetProfile/SetRegion or Rotate).
+func (c *Core) LoadAvailabilityCache(profile, region string) *cache.Store {
+	_ = profile
+	_ = region
+	return c.EnsureCacheStore()
 }
 
-// SaveAvailabilityCache persists the supplied availability state to disk.
-// Returns nil immediately when entries is nil. The caller is responsible for
-// checking whether caching is disabled (noCache flag) before calling.
+// SaveAvailabilityCache persists the supplied availability state to disk, one
+// type file per resource type (C7: per-type files, no merge logic). Returns
+// nil immediately when entries is nil or caching is disabled (NoCache). The
+// per-type Store is obtained via EnsureCacheStore so a save can never precede
+// that pair's own load (C7 hard invariant).
+//
+// Row/Findings persistence (C6, all loaded pages) is intentionally NOT done
+// here — this method only carries the counts-only availability-probe shape
+// callers historically populated it with. Full-row persistence for a type's
+// canonical top-level list happens via Core.SaveResourceListCache, called
+// from the list-fetch-completion seam (applyResourcesLoaded).
 func (c *Core) SaveAvailabilityCache(
 	profile, region string,
 	entries map[string]int,
@@ -80,30 +98,101 @@ func (c *Core) SaveAvailabilityCache(
 	issueTruncated map[string]bool,
 	issueKnown map[string]bool,
 ) error {
-	if entries == nil {
+	_ = profile
+	_ = region
+	if entries == nil || c.session.NoCache {
 		return nil
 	}
-	cf := &cache.File{
-		Profile:   profile,
-		Region:    region,
-		CheckedAt: time.Now(),
-		Resources: make(map[string]cache.Entry, len(entries)),
+	store := c.EnsureCacheStore()
+	if store == nil {
+		return nil
 	}
+	var firstErr error
 	for name, count := range entries {
 		trunc := false
 		if truncated != nil {
 			trunc = truncated[name]
 		}
-		e := cache.Entry{HasResources: count > 0, Count: count, Truncated: trunc}
-		if issueKnown[name] {
-			e.Issues = issueCounts[name]
-			e.IssuesKnown = true
-			e.IssuesTruncated = issueTruncated[name]
+		existing, _ := store.Type(name)
+		tf := cache.TypeFile{
+			HasResources: count > 0,
+			Count:        count,
+			// C5: a truncated first-page probe never downgrades a stored
+			// exact total — only replace Exact when this observation is
+			// itself untruncated (a genuine exact observation).
+			Exact: existing.Exact || !trunc,
+			Rows:  existing.Rows,
 		}
-		cf.Resources[name] = e
+		if existing.Exact && trunc && existing.Count > count {
+			// Preserve the previously-observed exact count/rows rather than
+			// letting a smaller truncated lower-bound regress it.
+			tf.Count = existing.Count
+			tf.HasResources = existing.Count > 0
+		}
+		if issueKnown[name] {
+			tf.Issues = issueCounts[name]
+			tf.IssuesKnown = true
+			tf.IssuesTruncated = issueTruncated[name]
+		} else {
+			tf.Issues = existing.Issues
+			tf.IssuesKnown = existing.IssuesKnown
+			tf.IssuesTruncated = existing.IssuesTruncated
+		}
+		store.Put(name, tf)
+		if err := store.SaveType(name); err != nil && firstErr == nil {
+			firstErr = err
+		}
 	}
-	// Best-effort save — callers ignore cache write failures.
-	return cache.Save(cf)
+	return firstErr
+}
+
+// SaveResourceListCache persists rows for one resource type's canonical
+// top-level, unfiltered list (C6): every loaded page's rows (ID/Name/Fields/
+// Findings — colors/glyphs/status are derived at render time and never
+// persisted), the current count, and the exact flag. Callers are responsible
+// for the C6 scope gate (only calling this for a top-level unfiltered list,
+// never a child/related/filtered view) and for skipping the call entirely
+// when NoCache is set (mirrored here defensively).
+func (c *Core) SaveResourceListCache(shortName string, rows []cache.Row, count int, exact bool, issues int, issuesKnown, issuesTruncated bool) error {
+	if c.session.NoCache {
+		return nil
+	}
+	store := c.EnsureCacheStore()
+	if store == nil {
+		return nil
+	}
+	existing, _ := store.Type(shortName)
+	tf := cache.TypeFile{
+		HasResources: count > 0,
+		Count:        count,
+		Rows:         rows,
+	}
+	// C5: exactness only ever advances — a truncated observation never
+	// downgrades an already-exact stored total.
+	switch {
+	case exact:
+		tf.Exact = true
+	case existing.Exact:
+		tf.Exact = true
+		if existing.Count > count {
+			tf.Count = existing.Count
+			tf.HasResources = existing.Count > 0
+			if len(rows) == 0 {
+				tf.Rows = existing.Rows
+			}
+		}
+	}
+	if issuesKnown {
+		tf.Issues = issues
+		tf.IssuesKnown = true
+		tf.IssuesTruncated = issuesTruncated
+	} else {
+		tf.Issues = existing.Issues
+		tf.IssuesKnown = existing.IssuesKnown
+		tf.IssuesTruncated = existing.IssuesTruncated
+	}
+	store.Put(shortName, tf)
+	return store.SaveType(shortName)
 }
 
 // ProbeResourceAvailability calls the registered paginated fetcher for

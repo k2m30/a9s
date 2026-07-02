@@ -41,6 +41,21 @@ func newSession(profile, region, command string, demoMode, noCache bool, viewCfg
 			_, tasks := ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: command})
 			app.DrainSync(ctrl, tasks)
 		}
+	} else if !core.NoCache() {
+		// Live path, no pre-supplied clients: C1 requires the cached menu to
+		// render "before any AWS activity" — the AWS connect itself (and thus
+		// the TaskKindLoadAvailCache dispatch inside handleClientsReadySuccess)
+		// only starts once getOrCreateSession's background BootstrapLive
+		// goroutine runs, which can lag the first GET/ /state response. Load
+		// (or reuse) this pair's disk Store synchronously here, before
+		// returning, so the very first snapshot already carries the cached
+		// counts/issue badges/exact flags — mirroring what the
+		// TaskKindLoadAvailCache executor path does, without waiting on a live
+		// connection.
+		if store := core.EnsureCacheStore(); store != nil {
+			ev := runtime.CacheStoreToEvent(store)
+			ctrl.Handle(ev)
+		}
 	}
 	// Live path: ctrl is returned on the menu; getOrCreateSession connects to AWS
 	// in the background and applies any startup command there.

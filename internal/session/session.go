@@ -29,6 +29,7 @@ package session
 
 import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/cache"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -99,11 +100,21 @@ type Session struct {
 	// static policy, not session state.
 	NoCache bool
 
+	// CacheStore is the loaded per-type disk cache (C7) for the CURRENT
+	// Profile+Region pair. nil until LoadDir has run for this pair (either at
+	// startup via TaskKindLoadAvailCache, or after a pair switch). The HARD
+	// INVARIANT (C7 "load before save") is structural: Put/SaveType are
+	// methods on *cache.Store, and the only way to obtain one is
+	// cache.LoadDir — so no save can happen for a pair before its own load.
+	// Cleared (set to nil) by Rotate so a pair switch never lets writes for
+	// the OLD pair's Store race a save for the NEW pair (C9).
+	CacheStore *cache.Store
+
 	// Wave 1 availability scan.
 	AvailabilityGen domain.Gen // bumped on profile/region switch to cancel stale probes
-	AvailQueue      []string // resource short names remaining to probe
-	AvailChecked    int      // number probed so far in current gen
-	AvailTotal      int      // total types to probe in current gen
+	AvailQueue      []string   // resource short names remaining to probe
+	AvailChecked    int        // number probed so far in current gen
+	AvailTotal      int        // total types to probe in current gen
 
 	// Wave 2 issue-enrichment dispatch.
 	ProbeResources map[string][]resource.Resource // retained first-page resources from Wave 1
@@ -133,7 +144,7 @@ type Session struct {
 	RelatedCache      *RelatedCacheLRU
 	RelatedGen        domain.Gen // bumped on refresh/profile/region switch
 	EnrichGen         domain.Gen // bumped on refresh/profile/region switch (detail-enrichment only)
-	EnrichResKey      string // "resourceType:resourceID" of last detail-enrichment dispatch
+	EnrichResKey      string     // "resourceType:resourceID" of last detail-enrichment dispatch
 
 	// Feature-specific session caches. These used to hang off *ServiceClients
 	// but that blurred the AWS-transport/session-state boundary; they live
@@ -232,6 +243,11 @@ func (s *Session) Rotate() {
 	// for setting Profile/Region to the new target, and for capturing rollback
 	// state via local vars BEFORE Rotate (so the rapid A→B→C case keeps A as
 	// the rollback target).
+	// C9: drop the old pair's Store atomically. The new pair's Store is
+	// re-obtained via a fresh cache.LoadDir call dispatched by the pair-switch
+	// handler (TaskKindLoadAvailCache), never carried over from the old pair.
+	s.CacheStore = nil
+
 	s.Identity = nil
 	s.IdentityFetching = false
 	s.PendingRefresh = false

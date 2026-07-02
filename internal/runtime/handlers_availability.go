@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"maps"
 
+	"github.com/k2m30/a9s/v3/internal/cache"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -63,6 +64,47 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 			Count:        count,
 			Truncated:    truncated[shortName],
 		})
+	}
+
+	// Contract D / C1: seed session.ProbeResources with the disk-cached rows
+	// for every known type so a cold list-open renders real cells instantly
+	// (Loading=false, Refreshing=true) instead of the empty Loading shell —
+	// mirrors Count/Truncated already being applied to the menu above.
+	//
+	// Prefers real per-row data from the current pair's disk Store (all pages
+	// C6 persisted, not just the first) when available. Falls back to
+	// Count-many placeholder rows (ID-only, no Fields) when the Store has no
+	// row data for a type that nonetheless carries a known count — this keeps
+	// the seeded-list contract (Loading=false) intact even for callers that
+	// deliver a counts-only AvailabilityCacheLoaded event without a populated
+	// on-disk per-type file (e.g. a synthetic/legacy counts projection).
+	if len(entries) > 0 {
+		store := c.EnsureCacheStore()
+		if c.session.ProbeResources == nil {
+			c.session.ProbeResources = make(map[string][]resource.Resource, len(entries))
+		}
+		if c.session.ProbeTruncated == nil {
+			c.session.ProbeTruncated = make(map[string]bool, len(entries))
+		}
+		for shortName, count := range entries {
+			if count <= 0 {
+				continue
+			}
+			if _, already := c.session.ProbeResources[shortName]; already {
+				continue
+			}
+			var rows []resource.Resource
+			if store != nil {
+				if tf, ok := store.Type(shortName); ok && len(tf.Rows) > 0 {
+					rows = rowsFromCacheRows(shortName, tf.Rows)
+				}
+			}
+			if len(rows) == 0 {
+				rows = placeholderRows(shortName, count)
+			}
+			c.session.ProbeResources[shortName] = rows
+			c.session.ProbeTruncated[shortName] = truncated[shortName]
+		}
 	}
 
 	// Apply cached issue counts (T033).
@@ -419,6 +461,42 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 	}
 
 	return intents, tasks
+}
+
+// rowsFromCacheRows converts a per-type file's persisted Rows (ID/Name/Fields
+// + Findings, C6: no RawStruct, no color/glyph/status) into the
+// resource.Resource shape session.ProbeResources carries. Colors/glyphs/
+// status are intentionally NOT reconstructed here — buildListBody derives
+// them at render time from Fields + Findings via the same classification
+// rules live data uses (C6).
+func rowsFromCacheRows(shortName string, rows []cache.Row) []resource.Resource {
+	out := make([]resource.Resource, len(rows))
+	for i, row := range rows {
+		out[i] = resource.Resource{
+			ID:       row.ID,
+			Name:     row.Name,
+			Type:     shortName,
+			Fields:   row.Fields,
+			Findings: row.Findings,
+		}
+	}
+	return out
+}
+
+// placeholderRows synthesizes count ID-only resource.Resource rows for a type
+// whose cached count is known but whose per-row disk data is unavailable
+// (e.g. a counts-only cache projection). Placeholder IDs are never shown to
+// the operator as real identifiers by themselves — the immediate live fetch
+// this seeding always accompanies (Refreshing=true) replaces them.
+func placeholderRows(shortName string, count int) []resource.Resource {
+	out := make([]resource.Resource, count)
+	for i := range out {
+		out[i] = resource.Resource{
+			ID:   fmt.Sprintf("%s-cached-%d", shortName, i),
+			Type: shortName,
+		}
+	}
+	return out
 }
 
 // unifiedIssueCount returns the distinct count of resource IDs with ≥1 issue

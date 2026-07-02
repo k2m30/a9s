@@ -1,6 +1,9 @@
 package app
 
-import "github.com/k2m30/a9s/v3/internal/resource"
+import (
+	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/runtime"
+)
 
 // ApplyResourcesLoaded is a test-support seam that seeds the controller's
 // resource cache directly, bypassing the task-result lane. It mirrors the
@@ -9,9 +12,17 @@ import "github.com/k2m30/a9s/v3/internal/resource"
 //
 // typeName is the canonical short name (e.g. "ec2", "s3").
 // appendPage=true accumulates onto the existing cache page; false replaces it.
+//
+// Mirrors handleResourcesLoadedEvent's C6 scope gate: the disk-cache save
+// only fires when the top-of-stack screen is the canonical top-level
+// ScreenResourceList (not ScreenChildList, and not a filtered/related-nav
+// list — EscPops/ParentContext), matching the real task-result lane.
 func (c *Controller) ApplyResourcesLoaded(typeName string, resources []resource.Resource, pagination *resource.PaginationMeta, appendPage bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	ls := c.topListState()
 	c.applyResourcesLoaded(ls, typeName, resources, pagination, appendPage)
+	if ls != nil && !ls.EscPops && ls.ParentContext == nil && c.topScreenID() == runtime.ScreenResourceList {
+		c.maybeSaveResourceListCache(ls, typeName)
+	}
 }

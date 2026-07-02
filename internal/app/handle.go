@@ -3,6 +3,7 @@ package app
 import (
 	"maps"
 
+	"github.com/k2m30/a9s/v3/internal/cache"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -184,6 +185,12 @@ func (c *Controller) syncExactTotalToMenu(screen *Screen, canon string) {
 	if ls == nil || ls.EscPops || ls.ParentContext != nil {
 		return
 	}
+	// C6 scope boundary: only the canonical top-level, unfiltered list may
+	// reach the persisted per-type cache file. A ScreenChildList never does,
+	// even when (by coincidence) its resource type matches canon.
+	if screen.ID == runtime.ScreenResourceList {
+		c.maybeSaveResourceListCache(ls, canon)
+	}
 	newCount := len(ls.Rows)
 	newTrunc := ls.HasPagination
 
@@ -247,6 +254,34 @@ func (c *Controller) syncExactTotalToMenu(screen *Screen, canon string) {
 		maps.Copy(issueKnown, ms.IssueKnown)
 		_ = c.core.SaveAvailabilityCache(profile, region, avail, trunc, issueCounts, issueTrunc, issueKnown)
 	}
+}
+
+// maybeSaveResourceListCache persists ls.Rows for canon's canonical
+// top-level, unfiltered list to its per-type disk cache file (C6: every
+// loaded page, not just the first — ls.Rows already holds append-mode
+// accumulation from applyResourcesLoaded). No-op when NoCache is set (C7b)
+// or when canon has no resolvable ResourceTypeDef (issue-badge exclusion
+// cannot be determined). Best-effort — a write failure is silently dropped,
+// mirroring every other cache-write call site in this file.
+//
+// Callers MUST already have applied the C6 scope gate (top-level
+// ScreenResourceList, not EscPops, not ParentContext) before calling this.
+func (c *Controller) maybeSaveResourceListCache(ls *ListState, canon string) {
+	if ls == nil || c.core.NoCache() {
+		return
+	}
+	rows := make([]cache.Row, len(ls.Rows))
+	for i, r := range ls.Rows {
+		rows[i] = cache.Row{
+			ID:       r.ID,
+			Name:     r.Name,
+			Fields:   r.Fields,
+			Findings: r.Findings,
+		}
+	}
+	issues := c.listIssueCount(ls, canon)
+	exact := !ls.HasPagination
+	_ = c.core.SaveResourceListCache(canon, rows, len(ls.Rows), exact, issues, true, ls.HasPagination)
 }
 
 // autoOpenSingleDetail replaces a web/headless by-ID placeholder list with the
@@ -388,4 +423,3 @@ func mergeDetailRelatedRow(ds *DetailState, displayName, targetType string, coun
 		FetchFilter: fetchFilter,
 	})
 }
-

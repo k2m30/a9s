@@ -22,6 +22,17 @@ func (c *Controller) topListState() *ListState {
 	return c.stack[len(c.stack)-1].State.List
 }
 
+// topScreenID returns the ScreenID of the top-of-stack screen, or "" when the
+// stack is empty. Used by save-gating logic (C6 scope boundary) that needs to
+// distinguish ScreenResourceList (persist-eligible) from ScreenChildList
+// (never persisted) without a full Screen reference.
+func (c *Controller) topScreenID() runtime.ScreenID {
+	if len(c.stack) == 0 {
+		return ""
+	}
+	return c.stack[len(c.stack)-1].ID
+}
+
 // ensureListState ensures the top list screen has an initialised ListState
 // (push via ApplyIntents only sets the Screen; State.List starts nil). Called
 // lazily from applyNavResult after a PushScreen so that action handlers never

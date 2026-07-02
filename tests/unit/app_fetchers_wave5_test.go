@@ -1,30 +1,31 @@
 package unit
 
 // app_fetchers_wave5_test.go — behavioral tests for zero-hit and near-zero-hit
-// functions in internal/tui/app_fetchers.go (wave 5 coverage fill):
+// functions reachable via internal/tui (wave 5 coverage fill):
 //
 //   - fetchAMIDetail (0.0%)          — nil-client guard (only testable path)
 //   - loadAvailabilityCache (27.3%)  — success path with real disk cache data
 //   - fetchMoreResources (26.7%)     — filtered success path with registered fetcher
 //   - fetchResourcesFiltered (41.7%) — no-fetcher error path with non-nil clients
+//
+// Round-2 migration: the on-disk fixture writer now writes per-type files
+// via cache.LoadDir/(*Store).Put/SaveType instead of the deleted single-file
+// cache.File/cache.Save, per docs/design/cache-requirements.md C7. The
+// production consumer (internal/tui/probe_adapter.go's loadAvailabilityCache,
+// via Core.LoadAvailabilityCache) is exercised end-to-end exactly as before.
 
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"testing"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
-
-	"gopkg.in/yaml.v3"
 
 	"github.com/k2m30/a9s/v3/internal/cache"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -53,19 +54,19 @@ import (
 // loadAvailabilityCache — success path with populated disk cache
 // ─────────────────────────────────────────────────────────────────────────────
 
-// writeCacheFileForModel writes a cache.File for the given profile/region.
-func writeCacheFileForModel(t *testing.T, profile, region string, f cache.File) {
+// writeCacheTypesForModel writes one or more per-type cache.TypeFile entries
+// for the given profile/region via the real Store API (Put+SaveType), the
+// per-type-file replacement for the deleted single-file writeCacheFileForModel.
+func writeCacheTypesForModel(t *testing.T, profile, region string, entries map[string]cache.TypeFile) {
 	t.Helper()
-	p := cache.Path(profile, region)
-	if err := os.MkdirAll(filepath.Dir(p), 0700); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
+	store := cache.LoadDir(profile, region)
+	for name, tf := range entries {
+		store.Put(name, tf)
 	}
-	data, err := yaml.Marshal(f)
-	if err != nil {
-		t.Fatalf("yaml.Marshal: %v", err)
-	}
-	if err := os.WriteFile(p, data, 0600); err != nil {
-		t.Fatalf("WriteFile: %v", err)
+	for name := range entries {
+		if err := store.SaveType(name); err != nil {
+			t.Fatalf("SaveType(%s): %v", name, err)
+		}
 	}
 }
 
@@ -84,16 +85,11 @@ func TestLoadAvailabilityCache_PopulatedCacheReturnsEntries(t *testing.T) {
 	profile := "wave5-cache-profile"
 	region := "eu-west-1"
 
-	// Write a fresh cache file with known entries.
-	writeCacheFileForModel(t, profile, region, cache.File{
-		Profile:   profile,
-		Region:    region,
-		CheckedAt: time.Now(),
-		Resources: map[string]cache.Entry{
-			"ec2": {HasResources: true, Count: 12},
-			"s3":  {HasResources: true, Count: 5},
-			"kms": {Error: "AccessDeniedException"}, // error entries excluded from Entries
-		},
+	// Write fresh per-type cache files with known entries.
+	writeCacheTypesForModel(t, profile, region, map[string]cache.TypeFile{
+		"ec2": {HasResources: true, Count: 12},
+		"s3":  {HasResources: true, Count: 5},
+		"kms": {}, // empty/errored entry excluded from Entries
 	})
 
 	clients := demo.NewServiceClients()
@@ -120,9 +116,6 @@ func TestLoadAvailabilityCache_PopulatedCacheReturnsEntries(t *testing.T) {
 	if cacheMsg == nil {
 		t.Fatal("AvailabilityCacheLoadedMsg not found in batch (loadAvailabilityCache not exercised)")
 	}
-	if cacheMsg.Expired {
-		t.Errorf("AvailabilityCacheLoadedMsg.Expired = true, want false (fresh cache file)")
-	}
 	if cacheMsg.Entries["ec2"] != 12 {
 		t.Errorf("Entries[ec2] = %d, want 12", cacheMsg.Entries["ec2"])
 	}
@@ -145,18 +138,13 @@ func TestLoadAvailabilityCache_IssueFieldsMapped(t *testing.T) {
 	profile := "wave5-issues-profile"
 	region := "us-west-2"
 
-	writeCacheFileForModel(t, profile, region, cache.File{
-		Profile:   profile,
-		Region:    region,
-		CheckedAt: time.Now(),
-		Resources: map[string]cache.Entry{
-			"ec2": {
-				HasResources:    true,
-				Count:           8,
-				Issues:          3,
-				IssuesKnown:     true,
-				IssuesTruncated: true,
-			},
+	writeCacheTypesForModel(t, profile, region, map[string]cache.TypeFile{
+		"ec2": {
+			HasResources:    true,
+			Count:           8,
+			Issues:          3,
+			IssuesKnown:     true,
+			IssuesTruncated: true,
 		},
 	})
 

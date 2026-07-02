@@ -175,14 +175,14 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 
 	// --- load on-disk availability cache ---
 	case TaskKindLoadAvailCache:
-		cf, err := c.LoadAvailabilityCache(snap.Profile, snap.Region)
-		if err != nil || cf == nil {
+		store := c.LoadAvailabilityCache(snap.Profile, snap.Region)
+		if store == nil {
 			return messages.AvailabilityCacheLoaded{
 				Entries: make(map[string]int),
 				Expired: true,
 			}, nil
 		}
-		return cacheFileToEvent(cf), nil
+		return cacheStoreToEvent(store), nil
 
 	// --- demo prefetch ---
 	case TaskKindDemoPrefetchCounts:
@@ -434,26 +434,50 @@ func (c *Core) availabilityFromResourceCache() (
 	return
 }
 
-// cacheFileToEvent converts a *cache.File into a messages.AvailabilityCacheLoaded
-// event. Mirrors the conversion logic in probe_adapter.go loadAvailabilityCache.
-func cacheFileToEvent(cf *cache.File) messages.AvailabilityCacheLoaded {
-	entries := make(map[string]int, len(cf.Resources))
+// CacheStoreToEvent converts a *cache.Store's loaded per-type files into a
+// messages.AvailabilityCacheLoaded event carrying the counts-only projection
+// (Entries/Truncated/IssueCounts/IssueTruncated/IssueKnown). Row/Findings data
+// stays in the Store itself — handleAvailabilityCacheLoaded reads it directly
+// via Core.CacheStore()/EnsureCacheStore() to seed session.ProbeResources, so
+// it is not duplicated onto this event. Exported so renderer adapters (e.g.
+// the TUI's tea.Cmd-based loadAvailabilityCache) share this single
+// conversion instead of re-deriving it.
+//
+// Expired is always false: C1 is a deliberate no-TTL contract — arbitrarily
+// old rows render as long as they are stale-marked (Refreshing) and
+// re-verification is already running. The field is retained for message-shape
+// stability only; no production code branches on it.
+func CacheStoreToEvent(store *cache.Store) messages.AvailabilityCacheLoaded {
+	return cacheStoreToEvent(store)
+}
+
+func cacheStoreToEvent(store *cache.Store) messages.AvailabilityCacheLoaded {
+	types := store.Types()
+	entries := make(map[string]int, len(types))
 	truncated := make(map[string]bool)
 	issueCounts := make(map[string]int)
 	issueTruncated := make(map[string]bool)
 	issueKnown := make(map[string]bool)
-	for name, entry := range cf.Resources {
-		if entry.Error != "" {
+	for name, tf := range types {
+		// A completely zero-value TypeFile (never Put with any real
+		// probe/fetch data — HasResources false, Count 0, no issues known, no
+		// rows) carries no observation to report. Excluding it here mirrors
+		// the pre-round-2 cache.Entry.Error-string exclusion and C1's "never
+		// 0" placeholder rule: a genuinely-observed empty type still reports
+		// Count=0 through this same path, but only once something has
+		// actually Put it (HasResources/Count/IssuesKnown/Rows all zero at
+		// once is the "nothing was ever recorded" signature).
+		if !tf.HasResources && tf.Count == 0 && !tf.IssuesKnown && len(tf.Rows) == 0 {
 			continue
 		}
-		entries[name] = entry.Count
-		if entry.Truncated {
+		entries[name] = tf.Count
+		if !tf.Exact {
 			truncated[name] = true
 		}
-		if entry.IssuesKnown {
-			issueCounts[name] = entry.Issues
+		if tf.IssuesKnown {
+			issueCounts[name] = tf.Issues
 			issueKnown[name] = true
-			if entry.IssuesTruncated {
+			if tf.IssuesTruncated {
 				issueTruncated[name] = true
 			}
 		}
@@ -461,7 +485,7 @@ func cacheFileToEvent(cf *cache.File) messages.AvailabilityCacheLoaded {
 	return messages.AvailabilityCacheLoaded{
 		Entries:        entries,
 		Truncated:      truncated,
-		Expired:        cf.IsExpired(cache.DefaultTTL),
+		Expired:        false,
 		IssueCounts:    issueCounts,
 		IssueTruncated: issueTruncated,
 		IssueKnown:     issueKnown,
