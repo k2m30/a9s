@@ -21,6 +21,7 @@ func (c *Controller) snapshot() ViewState {
 		Header: Header{
 			Profile:          c.core.Profile(),
 			Region:           c.core.Region(),
+			Mode:             c.uiMode,
 			Flash:            c.flash,
 			ErrorHintVisible: c.showErrorHint && len(c.errorHistory) > 0,
 		},
@@ -34,8 +35,9 @@ func (c *Controller) snapshot() ViewState {
 	vs.Body.Kind = bodyKindForScreen(top)
 	if top.State.Menu != nil {
 		vs.Body.Menu = buildMenuBody(top.State.Menu)
+		vs.Body.Menu.Refreshing = c.menuRefreshing()
 		vs.FrameTitle = menuFrameTitle(top.State.Menu)
-		vs.Footer = MenuFooterHints()
+		vs.Footer = MenuFooterHintsFor(c.uiMode)
 	}
 	if top.State.List != nil {
 		vs.Body.List = c.buildListBody(top.Ctx, top.State.List)

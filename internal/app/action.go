@@ -26,6 +26,20 @@ const (
 	ActionSelect ActionKind = "select"
 	ActionBack   ActionKind = "back"
 
+	// ActionSelectIndex atomically selects the visible row at index N (see
+	// Action.N) on the current screen — resource/child list, main menu, or
+	// selector (profile/region/theme) — and then performs the same logic as
+	// ActionSelect. N is the same visible index the renderer's template used
+	// to iterate the screen (ListBody.Rows / MenuBody.Entries /
+	// SelectorBody.Items), so template index == controller index by
+	// definition; the controller does not need to replay cursor-movement
+	// semantics (e.g. the menu's skip-unavailable stepping) to reach it.
+	// Used by the web UI's row/entry click path, replacing a move-top +
+	// N×move-down + select round-trip chain that could land on the wrong
+	// row whenever cursor movement skips entries (e.g. the main menu's
+	// confirmed-empty resource types).
+	ActionSelectIndex ActionKind = "select-index"
+
 	ActionOpenDetail   ActionKind = "open-detail"
 	ActionOpenYAML     ActionKind = "open-yaml"
 	ActionOpenJSON     ActionKind = "open-json"

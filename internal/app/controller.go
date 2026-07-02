@@ -83,6 +83,24 @@ type Controller struct {
 	// showErrorHint is true after an error flash clears (SetErrorHintIntent{Show:true})
 	// and cleared on any subsequent action. Surfaced as Header.ErrorHintVisible in snapshot().
 	showErrorHint bool
+
+	// uiMode is the renderer mode surfaced as Header.Mode ("" = TUI, "web").
+	// Set once via SetUIMode after construction (e.g. internal/web/construct.go
+	// for web sessions). The TUI never calls SetUIMode, so it stays "". This is
+	// independent of core.IsDemo() — a demo session is still a TUI or web
+	// session and carries its own Header.Mode value ("demo") set elsewhere.
+	uiMode string
+
+	// menuSweepAcked tracks, per resource type, whether an AvailabilityChecked
+	// result has landed for a type currently retained in
+	// core.Session().ProbeResources. MenuBody.Refreshing (Contract C) is true
+	// while any type present in ProbeResources has not yet been acked here —
+	// i.e. a background availability sweep is still confirming/replacing a
+	// cache-seeded startup. Handle marks a type acked unconditionally on any
+	// AvailabilityChecked arrival (even one the central gen-guard treats as
+	// stale) because the sweep-in-flight signal tracks wall-clock probe
+	// completion, not generation validity.
+	menuSweepAcked map[string]bool
 }
 
 // controllerErrorEntry is one session-error-log entry stored in Controller.
@@ -115,6 +133,23 @@ func (c *Controller) SetViewConfig(vc *config.ViewsConfig) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.viewConfig = vc
+}
+
+// SetUIMode sets the renderer mode surfaced as Header.Mode ("" = TUI, "web").
+// Called once after construction by hosts that render outside a terminal —
+// internal/web/construct.go's newSession calls SetUIMode("web"). The TUI
+// never calls this, so its Header.Mode stays "".
+func (c *Controller) SetUIMode(mode string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.uiMode = mode
+}
+
+// UIMode returns the renderer mode previously set via SetUIMode.
+func (c *Controller) UIMode() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.uiMode
 }
 
 // RegisterFallbackTypeDef stores a ResourceTypeDef so that buildListBody
@@ -196,7 +231,7 @@ func (c *Controller) openSelectedListDetail() (ViewState, []runtime.TaskRequest)
 		ResourceType: typeName,
 		Resource:     &r,
 	})
-	c.applyNavResult(res)
+	tasks = append(tasks, c.applyNavResult(res)...)
 	// When HandleNavigate signals DispatchRelated, emit a KindRelatedCheck task
 	// so DrainSync (and the web renderer) run the checkers headlessly. The TUI
 	// adapter handles this separately via messages.RelatedCheckStarted; the
@@ -286,6 +321,8 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 		return c.handleActionSort(a)
 	case ActionSelect:
 		return c.handleActionSelect(a)
+	case ActionSelectIndex:
+		return c.handleActionSelectIndex(a)
 	case ActionToggleWrap:
 		return c.handleActionToggleWrap(a)
 	case ActionToggleFocus:

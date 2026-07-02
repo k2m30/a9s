@@ -11,7 +11,7 @@ import (
 // handleActionOpenHelp handles ActionOpenHelp.
 func (c *Controller) handleActionOpenHelp(a Action) (ViewState, []runtime.TaskRequest) {
 	res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{Target: runtime.NavigateTargetHelp})
-	c.applyNavResult(res)
+	tasks = append(tasks, c.applyNavResult(res)...)
 	return c.snapshot(), tasks
 }
 
@@ -99,27 +99,27 @@ func (c *Controller) handleActionCommand(a Action) (ViewState, []runtime.TaskReq
 	switch a.Arg {
 	case "root", "main":
 		res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{Target: runtime.NavigateTargetMainMenu})
-		c.applyNavResult(res)
+		tasks = append(tasks, c.applyNavResult(res)...)
 		return c.snapshot(), tasks
 
 	case "profile", "ctx":
 		res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{Target: runtime.NavigateTargetProfile})
-		c.applyNavResult(res)
+		tasks = append(tasks, c.applyNavResult(res)...)
 		return c.snapshot(), tasks
 
 	case "region":
 		res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{Target: runtime.NavigateTargetRegion})
-		c.applyNavResult(res)
+		tasks = append(tasks, c.applyNavResult(res)...)
 		return c.snapshot(), tasks
 
 	case "theme":
 		res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{Target: runtime.NavigateTargetTheme})
-		c.applyNavResult(res)
+		tasks = append(tasks, c.applyNavResult(res)...)
 		return c.snapshot(), tasks
 
 	case "help":
 		res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{Target: runtime.NavigateTargetHelp})
-		c.applyNavResult(res)
+		tasks = append(tasks, c.applyNavResult(res)...)
 		return c.snapshot(), tasks
 
 	default:
@@ -129,7 +129,7 @@ func (c *Controller) handleActionCommand(a Action) (ViewState, []runtime.TaskReq
 				Target:       runtime.NavigateTargetResourceList,
 				ResourceType: a.Arg,
 			})
-			c.applyNavResult(res)
+			tasks = append(tasks, c.applyNavResult(res)...)
 			return c.snapshot(), tasks
 		}
 		// "q"/"quit" is intentionally not handled here: quitting requires tea.Quit,
@@ -150,7 +150,7 @@ func (c *Controller) handleActionOpenYAML(_ Action) (ViewState, []runtime.TaskRe
 		ResourceType: typeName,
 		Resource:     &r,
 	})
-	c.applyNavResult(res)
+	tasks = append(tasks, c.applyNavResult(res)...)
 	return c.snapshot(), tasks
 }
 
@@ -165,7 +165,7 @@ func (c *Controller) handleActionOpenJSON(_ Action) (ViewState, []runtime.TaskRe
 		ResourceType: typeName,
 		Resource:     &r,
 	})
-	c.applyNavResult(res)
+	tasks = append(tasks, c.applyNavResult(res)...)
 	return c.snapshot(), tasks
 }
 

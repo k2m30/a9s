@@ -8,8 +8,8 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/app"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/layout"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui/layout"
 )
 
 // handleSortByCol checks all 10 positional sort bindings against msg.
@@ -262,11 +262,6 @@ func (m ResourceListModel) IssueCount() int {
 	return m.ctrl.GetListIssueCount()
 }
 
-// SetShowIssueBadge enables the "issues:N" badge in FrameTitle.
-func (m *ResourceListModel) SetShowIssueBadge(v bool) {
-	m.ctrl.PatchListShowIssueBadge(v)
-}
-
 // enterChildFor returns the Children entry registered under Key="enter" for
 // this resource type, or nil if none is registered or its DrillCondition
 // vetoes the given row.
@@ -349,7 +344,6 @@ func (m *ResourceListModel) ClearLoading() {
 func (m ResourceListModel) FrameTitle() string {
 	return m.ctrl.ListFrameTitle()
 }
-
 
 // BottomHints implements Hintable for ResourceListModel.
 // Delegates to the controller's snapshot footer when a controller is wired,
@@ -508,4 +502,3 @@ func (m *ResourceListModel) SetEnabled(v bool) {
 func (m ResourceListModel) IsEnabled() bool {
 	return m.ctrl.GetListAttentionOnly()
 }
-

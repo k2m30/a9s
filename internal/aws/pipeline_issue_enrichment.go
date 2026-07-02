@@ -4,6 +4,8 @@ package aws
 import (
 	"context"
 	"fmt"
+	"sort"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/codepipeline"
@@ -33,24 +35,28 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 	truncated := len(resources) > EnrichmentCap
 	var failures []string
 	total := 0
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 		if r.Name == "" {
-			continue
+			return
 		}
+		mu.Lock()
 		total++
+		mu.Unlock()
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*codepipeline.GetPipelineStateOutput, error) {
 			return clients.CodePipeline.GetPipelineState(ctx, &codepipeline.GetPipelineStateInput{
 				Name: aws.String(r.Name),
 			})
 		})
+		mu.Lock()
+		defer mu.Unlock()
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
-			continue
+			return
 		}
 		key := r.ID
 		if key == "" {
@@ -86,11 +92,12 @@ func EnrichCodePipelineStatus(ctx context.Context, clients *ServiceClients, reso
 					break
 				}
 			}
-			setWave2Finding(&result, key, pipelineCodeStageFailed, fmt.Sprintf("stage %s failed", stageName), "!", "pipeline", rows)
+			setWave2Finding(&result, key, pipelineCodeStageFailed, fmt.Sprintf("stage %s failed", stageName), "!", "pipeline", rows, "")
 			break // first failed stage is sufficient
 		}
 		result.FieldUpdates[key] = map[string]string{"last_status": lastStatus}
-	}
+	})
+	sort.Strings(failures)
 	result.IssueCount = len(result.Findings)
 	result.Truncated = truncated
 	return result,

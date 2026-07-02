@@ -3,6 +3,7 @@ package aws
 
 import (
 	"context"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
@@ -42,16 +43,16 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 	}
 
 	truncated := len(resources) > EnrichmentCap
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 		groupName := r.Fields["group_name"]
 		if groupName == "" {
 			groupName = r.ID
 		}
 		if groupName == "" {
-			continue
+			return
 		}
 
 		// Paginate members via GetGroup (uses Marker/IsTruncated).
@@ -59,11 +60,11 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		memberTruncated := false
 		var groupMarker *string
 		memberPages := 0
+		memberErrd := false
 		memberFirstCallErrd := false
 		for {
 			if memberPages >= PerParentPageCap {
 				memberTruncated = true
-				result.TruncatedIDs[r.ID] = true
 				break
 			}
 			groupOut, err := getGroupAPI.GetGroup(ctx, &iam.GetGroupInput{
@@ -71,8 +72,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 				Marker:    groupMarker,
 			})
 			if err != nil {
-				truncated = true
-				result.TruncatedIDs[r.ID] = true
+				memberErrd = true
 				if memberPages == 0 {
 					memberFirstCallErrd = true
 				} else {
@@ -94,11 +94,11 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		attachedTruncated := false
 		var attachedMarker *string
 		attachedPages := 0
+		attachedErrd := false
 		attachedFirstCallErrd := false
 		for {
 			if attachedPages >= PerParentPageCap {
 				attachedTruncated = true
-				result.TruncatedIDs[r.ID] = true
 				break
 			}
 			attachedOut, err := attachedPoliciesAPI.ListAttachedGroupPolicies(ctx, &iam.ListAttachedGroupPoliciesInput{
@@ -106,8 +106,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 				Marker:    attachedMarker,
 			})
 			if err != nil {
-				truncated = true
-				result.TruncatedIDs[r.ID] = true
+				attachedErrd = true
 				if attachedPages == 0 {
 					attachedFirstCallErrd = true
 				} else {
@@ -129,11 +128,11 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		inlineTruncated := false
 		var inlineMarker *string
 		inlinePages := 0
+		inlineErrd := false
 		inlineFirstCallErrd := false
 		for {
 			if inlinePages >= PerParentPageCap {
 				inlineTruncated = true
-				result.TruncatedIDs[r.ID] = true
 				break
 			}
 			inlineOut, err := inlinePoliciesAPI.ListGroupPolicies(ctx, &iam.ListGroupPoliciesInput{
@@ -141,8 +140,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 				Marker:    inlineMarker,
 			})
 			if err != nil {
-				truncated = true
-				result.TruncatedIDs[r.ID] = true
+				inlineErrd = true
 				if inlinePages == 0 {
 					inlineFirstCallErrd = true
 				} else {
@@ -159,9 +157,17 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 			}
 		}
 
+		mu.Lock()
+		defer mu.Unlock()
+
+		if memberTruncated || memberErrd || attachedTruncated || attachedErrd || inlineTruncated || inlineErrd {
+			truncated = true
+			result.TruncatedIDs[r.ID] = true
+		}
+
 		// If any first call failed, we have no data at all — skip findings for this group.
 		if memberFirstCallErrd || attachedFirstCallErrd || inlineFirstCallErrd {
-			continue
+			return
 		}
 
 		memberCount := len(allUsers)
@@ -192,10 +198,10 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		}
 
 		if len(rows) == 0 {
-			continue
+			return
 		}
-		setWave2Finding(&result, r.ID, iamGroupCodeOrphanOrNoop, rows[0].Value, "~", "iam-group", rows)
-	}
+		setWave2Finding(&result, r.ID, iamGroupCodeOrphanOrNoop, rows[0].Value, "~", "iam-group", rows, "")
+	})
 	// Group findings are severity "~" (informational); IssueCount stays 0.
 	result.IssueCount = 0
 	result.Truncated = truncated

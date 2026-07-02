@@ -4,6 +4,8 @@ package aws
 import (
 	"context"
 	"fmt"
+	"sort"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
@@ -32,14 +34,16 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 	truncated := len(resources) > EnrichmentCap
 	var failures []string
 	total := 0
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 		if r.ID == "" {
-			continue
+			return
 		}
+		mu.Lock()
 		total++
+		mu.Unlock()
 		name := r.ID
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*autoscaling.DescribeScalingActivitiesOutput, error) {
 			return clients.AutoScaling.DescribeScalingActivities(ctx, &autoscaling.DescribeScalingActivitiesInput{
@@ -47,18 +51,20 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 				MaxRecords:           aws.Int32(1),
 			})
 		})
+		mu.Lock()
+		defer mu.Unlock()
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
-			continue
+			return
 		}
 		if len(out.Activities) == 0 {
-			continue
+			return
 		}
 		act := out.Activities[0]
 		if act.StatusCode != asgtypes.ScalingActivityStatusCodeFailed {
-			continue
+			return
 		}
 		statusMsg := ""
 		if act.StatusMessage != nil {
@@ -80,8 +86,9 @@ func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, re
 		if act.StartTime != nil {
 			rows = append(rows, domain.DetailRow{Label: "Started", Value: act.StartTime.Format("2006-01-02")})
 		}
-		setWave2Finding(&result, r.ID, asgCodeScalingActivityFailed, summary, "!", "asg", rows)
-	}
+		setWave2Finding(&result, r.ID, asgCodeScalingActivityFailed, summary, "!", "asg", rows, "")
+	})
+	sort.Strings(failures)
 	result.IssueCount = len(result.Findings)
 	result.Truncated = truncated
 	return result, AggregateFailures("asg-enrich: DescribeScalingActivities", failures, total)

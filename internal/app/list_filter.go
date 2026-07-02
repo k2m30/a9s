@@ -19,11 +19,18 @@ import (
 // ResourceListModel.applyFilter exactly so ListSelected and buildListBody
 // agree on which row is "selected".
 func (c *Controller) applyListFilters(ls *ListState, typeName string, base []resource.Resource) []resource.Resource {
-	td := resource.FindResourceType(typeName)
-	if td == nil {
-		if fv, ok := c.fallbackTypeDefs[typeName]; ok {
-			td = &fv
-		}
+	// Prefer the fallback typeDef (registered via RegisterFallbackTypeDef from
+	// the model constructor) over the catalog: the model's typeDef is the
+	// authoritative Color classifier, matching listIssueCount/GetListIssueCount.
+	// Test typeDefs frequently share a ShortName with a catalog type (e.g.
+	// "ec2") but use a different Color implementation (or none, falling back
+	// to colorFallback(r.Fields["status"])) — using the catalog type here
+	// would silently disagree with the issue count the title/badge report.
+	var td *resource.ResourceTypeDef
+	if fv, ok := c.fallbackTypeDefs[typeName]; ok {
+		td = &fv
+	} else if catalogTD := resource.FindResourceType(typeName); catalogTD != nil {
+		td = catalogTD
 	}
 
 	// RelatedIDSet prefilter: when non-nil (even if empty), only IDs in the set pass.

@@ -12,6 +12,7 @@ package unit
 import (
 	"context"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -23,9 +24,13 @@ import (
 )
 
 // strictELBv2Fake mirrors AWS: rejects DescribeLoadBalancerAttributes when
-// LoadBalancerArn is not a valid ARN.
+// LoadBalancerArn is not a valid ARN. mu guards calledWith, which is written
+// concurrently: EnrichELBAttributes fans out DescribeLoadBalancerAttributes
+// calls per resource via internal/aws.ForEachParallel (EnrichmentParallelism
+// goroutines).
 type strictELBv2Fake struct {
 	awsclient.ELBv2API
+	mu         sync.Mutex
 	calledWith string
 }
 
@@ -35,7 +40,9 @@ func (f *strictELBv2Fake) DescribeLoadBalancerAttributes(
 	_ ...func(*elbv2.Options),
 ) (*elbv2.DescribeLoadBalancerAttributesOutput, error) {
 	got := aws.ToString(input.LoadBalancerArn)
+	f.mu.Lock()
 	f.calledWith = got
+	f.mu.Unlock()
 	if !strings.HasPrefix(got, "arn:aws:") {
 		return nil, &smithy.GenericAPIError{
 			Code:    "ValidationError",
@@ -43,6 +50,14 @@ func (f *strictELBv2Fake) DescribeLoadBalancerAttributes(
 		}
 	}
 	return &elbv2.DescribeLoadBalancerAttributesOutput{}, nil
+}
+
+// calledWithSafe returns calledWith, safe for concurrent use with
+// DescribeLoadBalancerAttributes.
+func (f *strictELBv2Fake) calledWithSafe() string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.calledWith
 }
 
 // TestEnrichELBAttributes_UsesARNFromFields verifies the enricher passes
@@ -64,8 +79,8 @@ func TestEnrichELBAttributes_UsesARNFromFields(t *testing.T) {
 	if err != nil && strings.Contains(err.Error(), "ValidationError") {
 		t.Fatalf("enricher passed bare name to AWS instead of ARN; got: %v", err)
 	}
-	if fake.calledWith != lbARN {
+	if got := fake.calledWithSafe(); got != lbARN {
 		t.Errorf("DescribeLoadBalancerAttributes was called with %q, want %q (the ARN from Fields[\"load_balancer_arn\"])",
-			fake.calledWith, lbARN)
+			got, lbARN)
 	}
 }

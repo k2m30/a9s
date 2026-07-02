@@ -14,6 +14,7 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -34,7 +35,12 @@ type ecrDescribeImagesFake struct {
 	// is what the enricher aggregates.
 	detailsByRepo map[string][]ecrtypes.ImageDetail
 	// errByRepo maps repositoryName → error (overrides the normal response).
-	errByRepo    map[string]error
+	errByRepo map[string]error
+
+	// mu guards callsPerRepo, which is written concurrently: the enricher
+	// fans out DescribeImages calls per repo via internal/aws.ForEachParallel
+	// (EnrichmentParallelism goroutines).
+	mu           sync.Mutex
 	callsPerRepo map[string]int
 }
 
@@ -47,14 +53,24 @@ func (f *ecrDescribeImagesFake) DescribeImages(
 	if in != nil && in.RepositoryName != nil {
 		repo = *in.RepositoryName
 	}
+	f.mu.Lock()
 	if f.callsPerRepo == nil {
 		f.callsPerRepo = map[string]int{}
 	}
 	f.callsPerRepo[repo]++
+	f.mu.Unlock()
 	if err, ok := f.errByRepo[repo]; ok {
 		return nil, err
 	}
 	return &ecrsvc.DescribeImagesOutput{ImageDetails: f.detailsByRepo[repo]}, nil
+}
+
+// callsFor returns the recorded DescribeImages call count for repo, safe for
+// concurrent use with the fake's DescribeImages method.
+func (f *ecrDescribeImagesFake) callsFor(repo string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.callsPerRepo[repo]
 }
 
 func ecrImageDetailWithCounts(repo string, counts map[string]int32) ecrtypes.ImageDetail {
@@ -116,10 +132,10 @@ func TestEnrichECRRepository_N1_OneCallPerRepo(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if got := fake.callsPerRepo[repoA]; got != 1 {
+	if got := fake.callsFor(repoA); got != 1 {
 		t.Errorf("DescribeImages calls for %q: got %d, want 1 (N+1 budget)", repoA, got)
 	}
-	if got := fake.callsPerRepo[repoB]; got != 1 {
+	if got := fake.callsFor(repoB); got != 1 {
 		t.Errorf("DescribeImages calls for %q: got %d, want 1 (N+1 budget)", repoB, got)
 	}
 }
@@ -319,7 +335,7 @@ func TestEnrichECRRepository_N1_RespectsEnrichmentCap(t *testing.T) {
 	uncalled := 0
 	for i := awsclient.EnrichmentCap; i < count; i++ {
 		name := "cap-repo-" + strconv.Itoa(i)
-		if fake.callsPerRepo[name] == 0 {
+		if fake.callsFor(name) == 0 {
 			uncalled++
 		}
 	}

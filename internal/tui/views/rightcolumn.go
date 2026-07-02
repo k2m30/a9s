@@ -11,8 +11,8 @@ import (
 	lipgloss "charm.land/lipgloss/v2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
 
@@ -427,13 +427,6 @@ func (m *RightColumnModel) moveCursor(dir int) {
 	if pos < 0 {
 		pos = 0
 	}
-	hasActionable := false
-	for _, idx := range visible {
-		if isActionableRow(m.rows[idx]) {
-			hasActionable = true
-			break
-		}
-	}
 	for {
 		next := pos + dir
 		if next < 0 || next >= len(visible) {
@@ -441,7 +434,7 @@ func (m *RightColumnModel) moveCursor(dir int) {
 		}
 		pos = next
 		idx := visible[pos]
-		if !hasActionable || isActionableRow(m.rows[idx]) {
+		if isActionableRow(m.rows[idx]) {
 			m.cursor = idx
 			m.ensureScrollVisible()
 			return

@@ -12,11 +12,23 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
 // DefaultTTL is the default cache expiration duration.
 const DefaultTTL = 1 * time.Hour
+
+// CachedRow is a render-sufficient snapshot of one list row, persisted
+// alongside the type's availability Entry so a cold start can seed the list
+// screen with real cells before any live fetch completes. NO RawStruct is
+// carried on disk — Fields must already contain every value a column needs
+// (see app.MaterializeListFields, which runs before a page is cached).
+type CachedRow struct {
+	ID     string            `yaml:"id"`
+	Name   string            `yaml:"name,omitempty"`
+	Fields map[string]string `yaml:"fields,omitempty"`
+}
 
 // Entry holds availability info for a single resource type.
 type Entry struct {
@@ -27,6 +39,16 @@ type Entry struct {
 	Issues          int    `yaml:"issues,omitempty"`           // issue-state resource count (red/yellow only)
 	IssuesTruncated bool   `yaml:"issues_truncated,omitempty"` // true if issue count is lower bound
 	IssuesKnown     bool   `yaml:"issues_known,omitempty"`     // true = probed (even if Issues=0); false = unknown
+
+	// Rows holds the last first-page rows for this type (ID/Name/Fields,
+	// NO RawStruct) so a cold-start list open can seed real cells before the
+	// live fetch completes. Best-effort: absent on older cache files.
+	Rows []CachedRow `yaml:"rows,omitempty"`
+	// Findings holds the last Wave-2 enrichment findings map for this type,
+	// keyed by resource ID, persisted alongside Rows so a cold-start seed
+	// also carries issue markers instead of rendering rows as unconditionally
+	// healthy until enrichment re-runs.
+	Findings map[string]domain.Finding `yaml:"findings,omitempty"`
 }
 
 // File is the on-disk cache structure.

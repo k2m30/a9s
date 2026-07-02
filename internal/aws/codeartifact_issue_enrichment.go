@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/codeartifact"
@@ -16,7 +17,7 @@ import (
 
 // codeartifact canonical FindingCodes.
 const (
-	codeartifactCodePublicAccessPolicy domain.FindingCode = "codeartifact.public-access-policy"
+	codeartifactCodePublicAccessPolicy  domain.FindingCode = "codeartifact.public-access-policy"
 	codeartifactCodeNoPermissionsPolicy domain.FindingCode = "codeartifact.no-permissions-policy"
 )
 
@@ -40,10 +41,10 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 	}
 	truncated := len(resources) > EnrichmentCap
 	issueCount := 0
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 		// Support both "repo_name" (fetcher canonical) and "repository_name" (legacy/test alias).
 		repoName := r.Fields["repo_name"]
 		if repoName == "" {
@@ -59,7 +60,7 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 		}
 		domainOwner := r.Fields["domain_owner"]
 		if repoName == "" || domainName == "" {
-			continue
+			return
 		}
 		key := r.ID
 		if key == "" {
@@ -91,7 +92,9 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 				nextToken = pkgOut.NextToken
 			}
 			if total >= 0 {
+				mu.Lock()
 				result.FieldUpdates[key] = map[string]string{"package_count": resource.FormatExact(total)}
+				mu.Unlock()
 			}
 		}
 		input := &codeartifact.GetRepositoryPermissionsPolicyInput{
@@ -102,30 +105,32 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 			input.DomainOwner = aws.String(domainOwner)
 		}
 		out, err := clients.CodeArtifact.GetRepositoryPermissionsPolicy(ctx, input)
+		mu.Lock()
+		defer mu.Unlock()
 		if err != nil {
 			if _, ok := errors.AsType[*codeartifacttypes.ResourceNotFoundException](err); ok {
 				// No policy set — default open within the domain.
-				setWave2Finding(&result, key, codeartifactCodeNoPermissionsPolicy, "no permissions policy", "~", "codeartifact", nil)
+				setWave2Finding(&result, key, codeartifactCodeNoPermissionsPolicy, "no permissions policy", "~", "codeartifact", nil, "")
 				// "~" does not contribute to IssueCount.
-				continue
+				return
 			}
 			// Any other error — skip this repo but flag truncation.
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
-			continue
+			return
 		}
 		if out.Policy == nil || out.Policy.Document == nil {
-			continue
+			return
 		}
 		doc := *out.Policy.Document
 		if strings.Contains(doc, `"Principal":"*"`) || strings.Contains(doc, `"Principal": "*"`) {
 			setWave2Finding(&result, key, codeartifactCodePublicAccessPolicy, "public access policy", "!", "codeartifact",
 				[]domain.DetailRow{
 					{Label: "Principal", Value: "*", Tier: "!"},
-				})
+				}, "")
 			issueCount++
 		}
-	}
+	})
 	result.IssueCount = issueCount
 	result.Truncated = truncated
 	return result, nil

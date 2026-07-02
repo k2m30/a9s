@@ -16,7 +16,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/app"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -33,55 +32,15 @@ func (m *Model) pushRS(rs *rendererState) {
 
 // popRS removes the top rendererState. Returns false when only one entry remains.
 //
-// At depth 2 (menu → list), we sync the list's loaded count back to the menu
-// availability badge if the controller reports this is a top-level list.
-// All controller-state reads happen BEFORE calling ActionBack so we observe
-// the list's state, not the menu's.
+// The list-count → menu-availability-badge sync-back (previously performed
+// here at depth 2, menu → list) now runs at the controller level in
+// internal/app/handle.go's handleResourcesLoadedEvent/syncExactTotalToMenu,
+// on every ResourcesLoaded for a top-level list — so both the TUI and the
+// web renderer get it, and it fires as soon as a fetch or load-more result
+// lands rather than only when the user pops back to the menu.
 func (m *Model) popRS() bool {
 	if len(m.stack) <= 1 {
 		return false
-	}
-	// Sync list counts back to the menu badge when popping directly from list → menu.
-	// Only depth 2 (menu → list) triggers this. Related lists (escPops=true) are
-	// skipped — they show filtered subsets, not the global population.
-	if len(m.stack) == 2 {
-		body := m.ctrl.Snapshot().Body
-		if body.Kind == app.BodyKindList {
-			if !m.ctrl.GetListEscPops() && m.ctrl.GetListParentContext() == nil {
-				shortName := m.activeRS().resourceType
-				if shortName != "" {
-					newCount := len(m.ctrl.GetListAllResources())
-					newTrunc, _ := m.ctrl.GetListPagination()
-					availability := m.ctrl.GetMenuAvailability()
-					curCount, known := availability[shortName]
-					if !newTrunc || !known || newCount > curCount {
-						m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PatchMenuAvailability{
-							ResourceType: shortName,
-							Count:        newCount,
-							Truncated:    newTrunc,
-						}})
-					}
-					// Sync-back issue count with only-increase guard (T036, FR-022).
-					newIssues := m.ctrl.GetListIssueCount()
-					curIssues := m.ctrl.GetMenuIssueCounts()[shortName]
-					curIssueTrunc := m.ctrl.GetMenuIssueTruncated()[shortName]
-					switch {
-					case newIssues > curIssues:
-						m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PatchMenu{
-							ResourceType: shortName,
-							Issues:       newIssues,
-							Truncated:    newTrunc,
-						}})
-					case newIssues == curIssues && curIssueTrunc && !newTrunc:
-						m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PatchMenu{
-							ResourceType: shortName,
-							Issues:       newIssues,
-							Truncated:    false,
-						}})
-					}
-				}
-			}
-		}
 	}
 	// Persist sort/cursor/scroll state to session cache before popping a list.
 	// Must run before ActionBack so the controller still holds the list state.
@@ -449,6 +408,7 @@ func (m Model) handleDetailKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model,
 				SourceResource: res,
 				SourceType:     rt,
 				TargetID:       targetID,
+				DirectDetail:   true,
 			}
 		}
 

@@ -551,9 +551,17 @@ func (m *ResourceListModel) RenderList(body app.ListBody) string {
 	}
 
 	// Widen lifecycle/status column to the max natural phrase width across all rows.
-	// body.Rows[i].Cells are indexed by the full (pre-scroll) column list, so fullCols
-	// is passed to resolve the correct cell index regardless of the scroll offset.
-	cols = renderListWidenLifecycleColumn(cols, fullCols, body.Rows, m.typeDef)
+	// body.Rows[i].Cells are indexed by the full (pre-scroll) column list, so
+	// body.StatusCol (also full-column-space) is passed to resolve the correct
+	// cell index regardless of the scroll offset. The widen pass measures
+	// row.Cells verbatim — the S4 status-column override is already baked into
+	// Cells by buildListBody, so no separate findings-phrase measurement is
+	// needed. fullMarkerColIdx is passed so the widen pass can add room for the
+	// "! "/"~ " glyph prefix when the status column and the identity/marker
+	// column are the same column (common for built-in view configs whose
+	// "State" column doubles as the marker column) — renderListDataRow prepends
+	// that glyph to the baked cell value.
+	cols = renderListWidenLifecycleColumn(cols, fullCols, body.Rows, body.StatusCol, scrollX, fullMarkerColIdx)
 
 	cols = m.fitColumns(cols)
 
@@ -602,7 +610,7 @@ func (m *ResourceListModel) RenderList(body app.ListBody) string {
 		row := body.Rows[i]
 		isSelected := i == body.Selected
 		base := renderListRowStyle(row, isSelected)
-		styled := renderListDataRow(cols, row, base, m.width, isSelected, markerColIdx, body.EnrichmentFindings, scrollX)
+		styled := renderListDataRow(cols, row, base, m.width, isSelected, markerColIdx, scrollX)
 		sb.WriteString(styled)
 	}
 
@@ -618,6 +626,15 @@ func (m *ResourceListModel) RenderList(body app.ListBody) string {
 			hint = "── m: load more ──"
 		}
 		sb.WriteString(styles.DimText.Render(hint))
+	}
+
+	// Cache-first seeding (Contract A): the list opened with rows already
+	// visible while a fresh fetch confirms/replaces them. Additive-only — this
+	// line never renders when Refreshing is false (the default), so it does
+	// not affect the byte-parity gate against the legacy View() path.
+	if body.Refreshing {
+		sb.WriteString("\n")
+		sb.WriteString(styles.DimText.Render("── refreshing... ──"))
 	}
 
 	return sb.String()
@@ -662,37 +679,38 @@ func renderListSortColKey(sort app.SortSpec, fullCols []listCol, td resource.Res
 	return sort.Col
 }
 
-// renderListWidenLifecycleColumn mirrors widenLifecycleColumn but operates on
-// pre-extracted cell strings from ListRow.Cells rather than resource.Resource.
-// The lifecycle/status column is identified by key "status" or the type's LifecycleKey.
+// renderListWidenLifecycleColumn widens the status/lifecycle column to the
+// max natural width of its baked cell text (body.Rows[i].Cells[statusCol]) —
+// a pure consumer of the pre-resolved body.StatusCol index, mirroring the
+// markerColIdx translation in RenderList. No re-measurement of
+// EnrichmentFindings phrases happens here: buildListBody has already baked
+// any S4 status-column override into Cells, so measuring Cells verbatim is
+// sufficient.
 //
-// fullCols is the pre-scroll full column list used to resolve the correct cell index in
-// ListRow.Cells (which is always indexed by full-column position). cols is the
-// post-scroll visible slice whose matching entry gets widened.
-func renderListWidenLifecycleColumn(cols []listCol, fullCols []listCol, rows []app.ListRow, td resource.ResourceTypeDef) []listCol {
-	if len(cols) == 0 || len(rows) == 0 {
-		return cols
-	}
-	lifecycleKey := lifecycleColumnKey(td)
-
-	// Find the lifecycle column's index in fullCols for correct row.Cells lookup.
-	fullIdx := -1
-	for i, c := range fullCols {
-		if c.key == "status" || c.key == lifecycleKey {
-			fullIdx = i
-			break
-		}
-	}
-	if fullIdx < 0 {
+// statusCol is the full-column-space index (body.StatusCol); -1 means the
+// type has no status column, a no-op. cols is the post-scroll visible slice
+// whose matching entry gets widened; fullCols is the pre-scroll full column
+// list used to translate statusCol into a visible index exactly as RenderList
+// translates fullMarkerColIdx into markerColIdx. fullMarkerColIdx is used to
+// add 2 extra columns of width when the status column IS the marker column,
+// accounting for the "! "/"~ " glyph prefix renderListDataRow prepends to a
+// decorated row's marker cell.
+func renderListWidenLifecycleColumn(cols []listCol, fullCols []listCol, rows []app.ListRow, statusCol int, scrollX int, fullMarkerColIdx int) []listCol {
+	if len(cols) == 0 || len(rows) == 0 || statusCol < 0 {
 		return cols
 	}
 
-	// Find the same column in the visible (post-scroll) slice for widening.
+	// Translate the full-column-space status index into the visible
+	// (post-scroll, post-fit) index, mirroring RenderList's markerColIdx
+	// translation.
 	visIdx := -1
-	for i, c := range cols {
-		if c.key == "status" || c.key == lifecycleKey {
-			visIdx = i
-			break
+	if statusCol >= scrollX {
+		candidate := statusCol - scrollX
+		if candidate < len(cols) && candidate < len(fullCols[scrollX:]) {
+			origIdx := scrollX + candidate
+			if origIdx < len(fullCols) && cols[candidate].key == fullCols[origIdx].key {
+				visIdx = candidate
+			}
 		}
 	}
 	if visIdx < 0 {
@@ -700,10 +718,17 @@ func renderListWidenLifecycleColumn(cols []listCol, fullCols []listCol, rows []a
 		return cols
 	}
 
+	// glyphRoom accounts for the "! "/"~ " prefix renderListDataRow prepends
+	// when this status column is also the identity/marker column.
+	glyphRoom := 0
+	if statusCol == fullMarkerColIdx {
+		glyphRoom = 2
+	}
+
 	maxW := cols[visIdx].width
 	for _, row := range rows {
-		if fullIdx < len(row.Cells) {
-			if nat := lipgloss.Width(row.Cells[fullIdx]); nat > maxW {
+		if statusCol < len(row.Cells) {
+			if nat := lipgloss.Width(row.Cells[statusCol]) + glyphRoom; nat > maxW {
 				maxW = nat
 			}
 		}
@@ -758,11 +783,14 @@ func renderListVisibleWindow(selected, total, viewHeight int) (int, int) {
 	return start, end
 }
 
-// renderListDataRow renders a single data row from pre-extracted ListRow.Cells,
-// mirroring renderDataRow but reading cells from the body instead of resource.Resource.
-// The decorator glyph ("! "/"~ ") is prepended to the identity cell (markerColIdx)
-// for ColorHealthy rows with enrichment findings, exactly as renderDataRow does.
-func renderListDataRow(cols []listCol, row app.ListRow, base lipgloss.Style, totalWidth int, isSelected bool, markerColIdx int, findings map[string]domain.Finding, cellOffset int) string {
+// renderListDataRow renders a single data row as a pure consumer of
+// app.ListRow: cell text comes from row.Cells verbatim (buildListBody has
+// already baked any S4 status-column override into the appropriate cell,
+// docs/resources/*.md §4) and the marker glyph comes from row.Decorator
+// verbatim (buildListBody has already resolved it via
+// resolveListDecoratorFull). No re-derivation from an enrichment findings map
+// happens here.
+func renderListDataRow(cols []listCol, row app.ListRow, base lipgloss.Style, totalWidth int, isSelected bool, markerColIdx int, cellOffset int) string {
 	var b strings.Builder
 	b.WriteString(base.Render(" "))
 	used := 1
@@ -775,18 +803,10 @@ func renderListDataRow(cols []listCol, row app.ListRow, base lipgloss.Style, tot
 		if cellOffset+i < len(row.Cells) {
 			val = row.Cells[cellOffset+i]
 		}
-		// Enrichment glyph on identity column: mirrors renderDataRow's marker logic.
-		// Only applies when the row is ColorHealthy (Decorator carries "!"/"~" only
-		// for healthy rows per resolveListDecoratorFull).
-		if i == markerColIdx && row.Color == "healthy" {
-			if f, ok := findings[row.ResourceID]; ok {
-				switch f.Severity {
-				case domain.SevBroken:
-					val = "! " + val
-				case domain.SevWarn:
-					val = "~ " + val
-				}
-			}
+		// Marker glyph on the identity column: prepend row.Decorator ("!"/"~")
+		// verbatim, exactly as pre-resolved by buildListBody.
+		if i == markerColIdx && row.Decorator != "" {
+			val = string(row.Decorator) + " " + val
 		}
 		padded := text.PadOrTrunc(val, c.width)
 		used += c.width

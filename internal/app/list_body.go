@@ -2,6 +2,7 @@ package app
 
 import (
 	"maps"
+	"strings"
 
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -15,7 +16,17 @@ import (
 // ResourceListModel.Update does on ResourcesLoaded.
 // Called from handleResourcesLoadedEvent (via Handle) and from the public
 // ApplyResourcesLoaded test seam in testing.go.
+//
+// Every incoming page is run through MaterializeListFields first (Contract B
+// render-sufficiency): Path-based, Key-less columns get their scalar value
+// written into Fields while RawStruct is still present, so a later on-disk
+// cache replay (which never carries RawStruct) renders identical cells.
+// Resources that already have Fields populated (e.g. a cache-replay caller
+// passing rows with RawStruct==nil) pass through unchanged — see
+// MaterializeListFields's early-return.
 func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resources []resource.Resource, pagination *resource.PaginationMeta, appendPage bool) {
+	resources = c.materializeListFieldsForType(typeName, resources)
+
 	// --- Per-screen storage (Bug 1 fix) -----------------------------------
 	// Writing to ls.Rows ensures that two stacked list screens of the same
 	// resource type never share a row slice. Each screen's fetch result lands
@@ -43,6 +54,12 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	if ls != nil {
 		ls.Loading = false
 		ls.LoadingMore = false
+		// Contract A: a fetch result landing clears Refreshing — the seeded
+		// (or now-replaced) rows are confirmed. Callers that seed rows from a
+		// cache-first source set Refreshing=true themselves AFTER calling this
+		// method, so this unconditional clear only ever fires for a genuine
+		// fetch-result swap, never undoing the seed-time flag.
+		ls.Refreshing = false
 		if pagination != nil {
 			ls.HasPagination = pagination.IsTruncated
 			ls.PaginationCursor = pagination.NextToken
@@ -51,6 +68,34 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 			ls.PaginationCursor = ""
 		}
 	}
+}
+
+// materializeListFieldsForType resolves the column set for typeName the same
+// way buildListBody does (fallback typeDef first, then catalog) and runs
+// every resource through MaterializeListFields. Resources without a matching
+// column set (typeName unregistered, no columns resolved) pass through
+// unchanged.
+func (c *Controller) materializeListFieldsForType(typeName string, resources []resource.Resource) []resource.Resource {
+	if len(resources) == 0 {
+		return resources
+	}
+	var tdVal resource.ResourceTypeDef
+	var td *resource.ResourceTypeDef
+	if ftd, ok := c.fallbackTypeDefs[typeName]; ok {
+		tdVal = ftd
+		td = &tdVal
+	} else if catalogTD := resource.FindResourceType(typeName); catalogTD != nil {
+		td = catalogTD
+	}
+	columns := resolveListColumnsForBuild(c.viewConfig, typeName, td)
+	if len(columns) == 0 {
+		return resources
+	}
+	out := make([]resource.Resource, len(resources))
+	for i, r := range resources {
+		out[i] = MaterializeListFields(r, columns)
+	}
+	return out
 }
 
 // buildListBody constructs a ListBody from the top list screen's ListState and
@@ -110,10 +155,36 @@ func (c *Controller) buildListBody(ctx runtime.ScreenContext, ls *ListState) *Li
 	}
 
 	// Build rows.
+	statusCol := resolveListStatusCol(columns, td)
 	rows := make([]ListRow, 0, len(visible))
 	for _, r := range visible {
 		cells := extractListCells(columns, r, td)
 		decorator, severity, colorTag := resolveListDecoratorFull(td, r, findings)
+		// S4: bake the Wave-2 issue-Finding Phrase into the status cell, from the
+		// same enrichment findings map that drives the glyph. Without this the web
+		// renders a blank Status for flagged rows in live mode (the cell only
+		// reflects Wave-1 r.Findings / a FieldUpdate that live never applies),
+		// while the glyph still shows — a web/TUI parity break. Mirrors the
+		// render-time override in resourcelist.go's renderListDataRow.
+		//
+		// This override is only a fallback for the case where Wave-2 enrichment
+		// has landed in the enrichment-store map but has NOT yet been mutated
+		// onto r.Findings (the live-mode lag the comment above describes). When
+		// r.Findings already carries a Wave-2 entry for this resource (the demo
+		// path and the fold-layer live path both mutate r.Findings directly via
+		// applyWave2ToRow), extractListCells has already derived the correct
+		// cell from listPhraseFromFindings(r.Findings) — including the "<top>
+		// (+N)" stacking notation for multi-finding rows. The enrichment-store
+		// map holds at most one Wave-2 entry per resource ID (see
+		// findingsFromRows) and carries no stacking information, so applying it
+		// on top of an already-stacked cell would silently drop the "(+N)"
+		// suffix and/or clobber a higher-priority Wave-1 phrase with a
+		// same-or-lower-severity Wave-2 one.
+		if statusCol >= 0 && statusCol < len(cells) && !hasWave2Finding(r.Findings) {
+			if f, ok := findings[r.ID]; ok && f.Severity.IsIssue() && f.Phrase != "" {
+				cells[statusCol] = f.Phrase
+			}
+		}
 		rows = append(rows, ListRow{
 			Cells:      cells,
 			Decorator:  decorator,
@@ -148,7 +219,9 @@ func (c *Controller) buildListBody(ctx runtime.ScreenContext, ls *ListState) *Li
 		EnrichmentFindings:  findings,
 		EnrichmentTruncated: enrichTruncated,
 		MarkerCol:           markerCol,
+		StatusCol:           statusCol,
 		LoadingMore:         ls.LoadingMore,
+		Refreshing:          ls.Refreshing,
 	}
 }
 
@@ -166,6 +239,19 @@ func (c *Controller) ListFrameTitle() string {
 
 // buildListFrameTitle computes the frame title string for a list screen,
 // mirroring FrameTitle() in resourcelist.go.
+//
+// Per docs/attention-signals.md §Visualization Surfaces: the " !N" issue
+// suffix is UNCONDITIONAL — it renders after the count parentheses on any
+// list screen (top-level or ScreenChildList), on any renderer (TUI or web),
+// whenever N > 0 and the screen is not in attention-only mode. N is the
+// current list's issue count — aggregated the same way as the menu badge
+// (Controller.GetListIssueCount's algorithm, mirrored lock-free below since
+// buildListFrameTitle already runs under c.mu). N=0 renders no suffix. When
+// the Wave-2 enrichment issue count itself is a truncated lower bound
+// (c.enrichmentTruncated[typeName]), the suffix becomes " !N+" instead of
+// " !N". The suffix is OMITTED entirely in attention-only (ctrl+z) mode,
+// where the filtered count already IS the issue count and an " !N" suffix
+// would be redundant.
 func (c *Controller) buildListFrameTitle(ctx runtime.ScreenContext, ls *ListState) string {
 	typeName := ctx.ResourceType
 	name := typeName
@@ -215,6 +301,14 @@ func (c *Controller) buildListFrameTitle(ctx runtime.ScreenContext, ls *ListStat
 
 	if ls.TitleSuffix != "" {
 		title += ls.TitleSuffix
+	}
+	if !isAttention {
+		if issueCount := c.listIssueCount(ls, typeName); issueCount > 0 {
+			title += " !" + itoa(issueCount)
+			if c.enrichmentTruncated[typeName] {
+				title += "+"
+			}
+		}
 	}
 	if isAttention {
 		title += " [!]"
@@ -276,8 +370,14 @@ func (c *Controller) GetListIssueCount() int {
 		return 0
 	}
 	top := c.stack[len(c.stack)-1]
-	typeName := top.Ctx.ResourceType
+	return c.listIssueCount(ls, top.Ctx.ResourceType)
+}
 
+// listIssueCount is the lock-free core of GetListIssueCount. Callers MUST
+// already hold c.mu (e.g. buildListFrameTitle, which runs under c.mu) —
+// taking the lock again would self-deadlock the non-reentrant RWMutex.
+// Mirrors the ListSelected()/listSelected() split in this file.
+func (c *Controller) listIssueCount(ls *ListState, typeName string) int {
 	// Prefer the fallback typeDef (registered via RegisterFallbackTypeDef from
 	// the model constructor) over the catalog: the model's typeDef is the
 	// authoritative Color classifier for issue counting. This is critical for
@@ -292,6 +392,15 @@ func (c *Controller) GetListIssueCount() int {
 	} else {
 		return 0
 	}
+	// S1 contract: the list-title suffix and the menu sync-back use the SAME
+	// aggregation as the menu badge — and the badge never counts types with
+	// ExcludeFromIssueBadge (e.g. ct-events, where "issue-colored" rows are
+	// historical events, not live problems). Without this, an excluded type
+	// would grow a title suffix and, via the app_stack sync-back, a forbidden
+	// menu badge after its list was visited.
+	if td.ExcludeFromIssueBadge {
+		return 0
+	}
 	all := c.listScreenResources(ls, typeName)
 	findings := c.listEnrichmentFindings(typeName)
 	ic := 0
@@ -301,7 +410,11 @@ func (c *Controller) GetListIssueCount() int {
 		} else if len(r.Findings) == 0 {
 			if td.ResolveColor(r).IsIssue() {
 				ic++
-			} else if _, hasFinding := findings[r.ID]; hasFinding {
+			} else if f, hasFinding := findings[r.ID]; hasFinding && f.Severity == domain.SevBroken {
+				// S1: Wave-2 findings bump the count only at "!" severity —
+				// "~ findings do not bump" (docs/attention-signals.md). Wave-1
+				// yellow/red rows are already counted by the color branch above,
+				// matching the menu badge's probe-side aggregation.
 				ic++
 			}
 		}
@@ -382,6 +495,86 @@ func (c *Controller) applyListFieldUpdates(typeName string, updates map[string]m
 	if c.resourceCache != nil {
 		applyToSlice(c.resourceCache[typeName])
 	}
+}
+
+// ClearRowFindings strips every Wave-2 finding (domain.Finding with Source
+// prefixed "wave2:") from the cached resource rows for typeName, on both
+// per-screen ls.Rows and the type-keyed resourceCache — mirroring the
+// dual-store walk in applyListFieldUpdates. AttentionDetails entries keyed by
+// a stripped Wave-2 Finding's Code are dropped alongside it.
+//
+// This is the controller-side half of a Ctrl+R refresh's stale-findings
+// cleanup. internal/tui's Model.applyEnrichment strips Wave-2 findings from
+// the session-owned stores (Core.ResourceCache / LazyResourceCache /
+// ProbeResources); those stores no longer alias the controller's rows since
+// applyResourcesLoaded materializes copies (MaterializeListFields) into
+// ls.Rows / c.resourceCache. Without this explicit companion call, a
+// ResourceListModel constructed from the (now-copied) cache-hit rows retains
+// stale Wave-2 findings across Ctrl+R even after the session-side clear.
+func (c *Controller) ClearRowFindings(typeName string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.clearRowFindings(typeName)
+}
+
+// clearRowFindings is the lock-free body of ClearRowFindings so it can be
+// called from contexts that already hold c.mu (write).
+func (c *Controller) clearRowFindings(typeName string) {
+	clearSlice := func(rows []resource.Resource) {
+		for i := range rows {
+			rows[i].Findings = stripWave2Findings(rows[i].Findings)
+			rows[i].AttentionDetails = nil
+		}
+	}
+
+	canon := typeName
+	if td := resource.FindResourceType(typeName); td != nil {
+		canon = td.ShortName
+	}
+
+	// Every list screen of this type in the stack (mirrors applyListFieldUpdates).
+	for i := range c.stack {
+		s := &c.stack[i]
+		if s.ID != runtime.ScreenResourceList && s.ID != runtime.ScreenChildList {
+			continue
+		}
+		st := s.Ctx.ResourceType
+		if td := resource.FindResourceType(st); td != nil {
+			st = td.ShortName
+		}
+		if st != canon || s.State.List == nil {
+			continue
+		}
+		clearSlice(s.State.List.Rows)
+	}
+
+	// Type-keyed cache (GetListAllResources and other typeName-only callers).
+	if c.resourceCache != nil {
+		clearSlice(c.resourceCache[typeName])
+		if typeName != canon {
+			clearSlice(c.resourceCache[canon])
+		}
+	}
+}
+
+// stripWave2Findings returns findings with every Wave-2 entry (Source
+// prefixed "wave2:") removed, preserving the order of the remaining entries.
+// Mirrors stripWave2 in internal/tui/app_enrich_fold.go and applyWave2ToRow's
+// strip step in internal/runtime/helpers.go — kept as a sibling here (rather
+// than imported) because internal/app must not depend on internal/tui
+// (internal/tui already depends on internal/app) or internal/runtime's
+// unexported helpers.
+func stripWave2Findings(findings []domain.Finding) []domain.Finding {
+	if len(findings) == 0 {
+		return findings
+	}
+	out := findings[:0:0]
+	for _, f := range findings {
+		if !strings.HasPrefix(f.Source, "wave2:") {
+			out = append(out, f)
+		}
+	}
+	return out
 }
 
 // ApplyListTruncatedIDs stores the per-resource truncation set for typeName.

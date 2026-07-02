@@ -4,6 +4,8 @@ package aws
 import (
 	"context"
 	"fmt"
+	"sort"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
@@ -38,31 +40,35 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 	truncated := len(resources) > EnrichmentCap
 	var failures []string
 	total := 0
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 		if r.ID == "" {
-			continue
+			return
 		}
 		// DescribeLoadBalancerAttributes requires the LB ARN. The elb fetcher
 		// (elb.go) sets ID = bare name and stores the ARN in
 		// Fields["load_balancer_arn"]. Passing r.ID errors with ValidationError.
 		lbARN := r.Fields["load_balancer_arn"]
 		if lbARN == "" {
-			continue
+			return
 		}
+		mu.Lock()
 		total++
+		mu.Unlock()
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticloadbalancingv2.DescribeLoadBalancerAttributesOutput, error) {
 			return clients.ELBv2.DescribeLoadBalancerAttributes(ctx, &elasticloadbalancingv2.DescribeLoadBalancerAttributesInput{
 				LoadBalancerArn: aws.String(lbARN),
 			})
 		})
+		mu.Lock()
+		defer mu.Unlock()
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
-			continue
+			return
 		}
 		var rows []domain.DetailRow
 		for _, attr := range out.Attributes {
@@ -81,7 +87,7 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 			}
 		}
 		if len(rows) == 0 {
-			continue
+			return
 		}
 		// Severity is "~" for each individual finding; promote to "!" only
 		// when both misconfiguration flags are present simultaneously.
@@ -89,8 +95,9 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 		if len(rows) >= 2 {
 			severity = "!"
 		}
-		setWave2Finding(&result, r.ID, elbCodeMisconfigured, rows[0].Label+": "+rows[0].Value, severity, "elb", rows)
-	}
+		setWave2Finding(&result, r.ID, elbCodeMisconfigured, rows[0].Label+": "+rows[0].Value, severity, "elb", rows, "")
+	})
+	sort.Strings(failures)
 	issueCount := 0
 	for _, f := range result.Findings {
 		if f.Severity == domain.SevBroken {

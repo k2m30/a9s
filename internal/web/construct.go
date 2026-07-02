@@ -27,6 +27,7 @@ func newSession(profile, region, command string, demoMode, noCache bool, viewCfg
 	}
 	ctrl := app.New(core)
 	ctrl.SetViewConfig(viewCfg)
+	ctrl.SetUIMode("web")
 
 	if pre := core.PreSuppliedClients(); pre != nil {
 		// Demo / test path: clients are pre-supplied, so the handshake + command

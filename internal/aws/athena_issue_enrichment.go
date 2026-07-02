@@ -4,6 +4,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/athena"
@@ -37,27 +38,29 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 		wgName := r.Fields["workgroup_name"]
 		if wgName == "" {
 			wgName = r.ID
 		}
 		if wgName == "" {
-			continue
+			return
 		}
 		out, err := clients.Athena.GetWorkGroup(ctx, &athena.GetWorkGroupInput{
 			WorkGroup: aws.String(wgName),
 		})
+		mu.Lock()
+		defer mu.Unlock()
 		if err != nil {
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
-			continue
+			return
 		}
 		if out.WorkGroup == nil || out.WorkGroup.Configuration == nil {
-			continue
+			return
 		}
 		cfg := out.WorkGroup.Configuration
 		key := r.ID
@@ -82,15 +85,15 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 			})
 		}
 		if len(rows) == 0 {
-			continue
+			return
 		}
 		summary := rows[0].Label
 		if len(rows) > 1 {
 			summary = fmt.Sprintf("%s (%d findings)", rows[0].Label, len(rows))
 		}
-		setWave2Finding(&result, key, athenaCodeGovernanceMisconfigured, summary, "~", "athena", rows)
+		setWave2Finding(&result, key, athenaCodeGovernanceMisconfigured, summary, "~", "athena", rows, "")
 		// "~" severity does not contribute to IssueCount.
-	}
+	})
 	result.IssueCount = 0
 	result.Truncated = truncated
 	return result, nil

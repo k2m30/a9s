@@ -62,26 +62,40 @@ func (c *Controller) EnsureDetailState(res resource.Resource, resourceType strin
 
 // attentionPrependCount returns the number of items that injectAttentionSectionDetail
 // would prepend for the given findings and attentionDetails. Mirrors the layout in
-// injectAttentionSectionDetail: 1 section header + 1 entry per issue finding +
-// len(rows) per entry + 1 spacer. Returns 0 when there are no issue findings.
+// injectAttentionSectionDetail: 1 section header + per issue-severity finding
+// (1 phrase line + 1 Detail line when Finding.Detail != "" + len(rows)) + a
+// trailing spacer, UNLESS the last issue-severity finding is "bare" (no Detail,
+// no rows) — injectAttentionSectionDetail omits the spacer in that case so it
+// does not sit directly against a bare Phrase line. Returns 0 when there are no
+// issue findings.
+//
+// Single source of truth: entries are built via buildAttentionEntries (same
+// helper injectAttentionSectionDetail renders from), so "last entry" here
+// means the same SORTED last entry the renderer actually emits — not the
+// last entry in the original findings order. Deriving lastEntryBare from the
+// unsorted order previously caused a prepend-count mismatch (see
+// tests/unit/app_detail_attention_cursor_test.go), shifting FieldCursor by
+// the wrong delta after a mixed-severity Attention re-sort.
 func attentionPrependCount(findings []domain.Finding, attentionDetails map[domain.FindingCode]domain.AttentionDetail) int {
-	issueCount := 0
-	rowCount := 0
-	for _, fi := range findings {
-		if !fi.Severity.IsIssue() {
-			continue
-		}
-		issueCount++
-		if attentionDetails != nil {
-			if det, ok := attentionDetails[fi.Code]; ok {
-				rowCount += len(det.Rows)
-			}
-		}
-	}
-	if issueCount == 0 {
+	entries := buildAttentionEntries(findings, attentionDetails)
+	if len(entries) == 0 {
 		return 0
 	}
-	return 1 + issueCount + rowCount + 1 // header + entries + detail rows + spacer
+	entryLineCount := 0
+	lastEntryBare := false
+	for _, e := range entries {
+		entryLineCount++ // phrase line
+		if e.detail != "" {
+			entryLineCount++
+		}
+		entryLineCount += len(e.rows)
+		lastEntryBare = e.bare()
+	}
+	spacer := 1
+	if lastEntryBare {
+		spacer = 0
+	}
+	return 1 + entryLineCount + spacer // header + entry lines (+ detail + rows) + spacer
 }
 
 // ApplyDetailFinding merges a wave-2 enrichment finding (and its optional

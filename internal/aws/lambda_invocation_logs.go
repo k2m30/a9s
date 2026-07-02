@@ -11,7 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-
 // maxInvocationLogLines caps the result set for a single invocation's logs.
 const maxInvocationLogLines = 500
 
@@ -63,11 +62,7 @@ func FetchLambdaInvocationLogs(ctx context.Context, api CWLogsFilterLogEventsAPI
 				id = fmt.Sprintf("evt-%d", *event.Timestamp)
 			}
 
-			// Name: message (truncated to 80 chars)
-			name := message
-			if len(name) > 80 {
-				name = name[:80]
-			}
+			name := logEventDisplayName(message)
 
 			// Status classification using shared function from log_events.go
 			status := classifyLogEventStatus(message)

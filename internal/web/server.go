@@ -12,7 +12,8 @@
 //   - Origin-header validation when present: rejects cross-origin requests whose
 //     Origin host is not loopback. Same-origin GETs and EventSource connections
 //     may omit Origin; the check is skipped when the header is absent.
-//   - Random per-run token required on every /action, /state, /events, /body request.
+//   - Random per-run token required on every GET / (page embeds the real token),
+//     /action, /state, /events, /body request.
 //   - No CORS headers. Cache-Control: no-store on all responses.
 //   - Per-session *app.Controller keyed by session cookie.
 //   - CSRF protection on POST /action via custom header X-A9S-Token.
@@ -29,6 +30,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/app"
 	"github.com/k2m30/a9s/v3/internal/config"
+	"github.com/k2m30/a9s/v3/internal/runtime"
 )
 
 // sessionEntry holds the per-browser-session controller and its action mutex.
@@ -37,20 +39,28 @@ import (
 type sessionEntry struct {
 	ctrl *app.Controller
 	mu   sync.Mutex
+
+	// inFlight dedups background task drains keyed by runtime.TaskKey (kind +
+	// scope): re-opening the same detail mid-flight must not stack a second
+	// concurrent related-check/enrich fan-out for the same key. Entries are
+	// deleted on completion. Guarded by inFlightMu, independent of mu (the
+	// background drain never holds entry.mu — see drainBackgroundTasks).
+	inFlight   map[runtime.TaskKey]struct{}
+	inFlightMu sync.Mutex
 }
 
 // Server is the web renderer. One instance per process; one Controller per
 // browser session (keyed by session cookie).
 type Server struct {
 	// opts supplied at construction time.
-	profile      string
-	region       string
-	command      string
-	demoMode     bool
-	noCache      bool
-	allowReveal  bool
-	addr         string
-	viewCfg      *config.ViewsConfig
+	profile     string
+	region      string
+	command     string
+	demoMode    bool
+	noCache     bool
+	allowReveal bool
+	addr        string
+	viewCfg     *config.ViewsConfig
 
 	// token is the random per-run auth token embedded into every served page.
 	token string
@@ -165,7 +175,7 @@ func (s *Server) getOrCreateSession(sessionID string) *sessionEntry {
 		return entry
 	}
 	ctrl := newSession(s.profile, s.region, s.command, s.demoMode, s.noCache, s.viewCfg)
-	entry := &sessionEntry{ctrl: ctrl}
+	entry := &sessionEntry{ctrl: ctrl, inFlight: make(map[runtime.TaskKey]struct{})}
 	s.sessions[sessionID] = entry
 	s.sessionsMu.Unlock()
 
@@ -197,4 +207,58 @@ func (s *Server) bootstrapLiveSession(entry *sessionEntry) {
 		app.DrainSync(entry.ctrl, ctasks)
 	}
 	s.notifySubscribers(entry)
+}
+
+// backgroundDrainTimeout bounds a single background-task drain (related-check
+// fan-out, detail enrichment, save-cache). 60s comfortably covers a live
+// (non-demo) related-check fan-out across many resource types without risking
+// an unbounded goroutine on a slow/hung AWS call.
+const backgroundDrainTimeout = 60 * time.Second
+
+// drainBackgroundTasks runs pending (already partitioned as background by
+// handleAction via app.DrainSyncPartition) to completion in its own
+// goroutine, notifying SSE subscribers as each result lands and once more
+// when the drain finishes. It does NOT hold entry.mu while draining — mirrors
+// bootstrapLiveSession's locking model, so in-flight POST/GET handlers for
+// the same session are never blocked on a slow related-check/enrich fan-out.
+//
+// In-flight dedup: pending tasks whose Key is already draining (tracked in
+// entry.inFlight) are skipped so re-opening the same detail mid-flight does
+// not stack a second concurrent fan-out for the same key. Each drained key is
+// removed from entry.inFlight on completion (success or timeout).
+func (s *Server) drainBackgroundTasks(entry *sessionEntry, pending []runtime.TaskRequest) {
+	if len(pending) == 0 {
+		return
+	}
+
+	entry.inFlightMu.Lock()
+	deduped := pending[:0:0]
+	for _, t := range pending {
+		if _, running := entry.inFlight[t.Key]; running {
+			continue
+		}
+		entry.inFlight[t.Key] = struct{}{}
+		deduped = append(deduped, t)
+	}
+	entry.inFlightMu.Unlock()
+
+	if len(deduped) == 0 {
+		return
+	}
+
+	go func() {
+		defer func() {
+			entry.inFlightMu.Lock()
+			for _, t := range deduped {
+				delete(entry.inFlight, t.Key)
+			}
+			entry.inFlightMu.Unlock()
+		}()
+
+		ctx, cancel := context.WithTimeout(context.Background(), backgroundDrainTimeout)
+		defer cancel()
+
+		app.DrainSyncContextProgress(ctx, entry.ctrl, deduped, func() { s.notifySubscribers(entry) })
+		s.notifySubscribers(entry)
+	}()
 }

@@ -40,14 +40,24 @@ type KeyHint struct {
 	Help string `json:"help"`
 }
 
-// MenuFooterHints is the SINGLE source of the main-menu footer key hints,
+// MenuFooterHintsFor is the SINGLE source of the main-menu footer key hints,
 // consumed by both the web renderer (ViewState.Footer in snapshot) and the TUI
 // (MainMenuModel.BottomHints). Defining it once is what keeps the two renderers
 // from drifting — do not re-list these hints anywhere else.
-func MenuFooterHints() []KeyHint {
+//
+// mode is the ViewState Header.Mode value ("" = TUI, "web", "demo"). The hint
+// choice keys on web-vs-not-web, NOT on demo — a demo-TUI session
+// (Header.Mode=="demo") is still a terminal renderer and gets the TUI hint
+// set. Only mode=="web" swaps ctrl+r for R, since browsers intercept ctrl+r
+// for page reload and cannot bind it in-page.
+func MenuFooterHintsFor(mode string) []KeyHint {
+	refresh := KeyHint{Key: "ctrl+r", Help: "Refresh"}
+	if mode == "web" {
+		refresh = KeyHint{Key: "R", Help: "Refresh"}
+	}
 	return []KeyHint{
 		{Key: "ctrl+z", Help: "Issues only"},
-		{Key: "ctrl+r", Help: "Refresh"},
+		refresh,
 	}
 }
 
@@ -141,8 +151,17 @@ type ListBody struct {
 	// column that receives the enrichment-finding glyph ("! "/"~ ") prefix.
 	// Pre-computed by buildListBody so RenderList does not need typeDef.
 	MarkerCol int `json:"marker_col"`
+	// StatusCol is the full-column-list index (before hscroll) of the
+	// status/lifecycle column, or -1 when the type has none. Sibling of
+	// MarkerCol: pre-computed by buildListBody (via resolveListStatusCol) so
+	// renderers consume the index verbatim instead of re-resolving it from
+	// td.LifecycleKey/column titles.
+	StatusCol int `json:"status_col"`
 	// LoadingMore is true while an m-key load-more fetch is in flight.
 	LoadingMore bool `json:"loading_more,omitempty"`
+	// Refreshing mirrors ListState.Refreshing: true when Rows were seeded
+	// from a cache-first source and a fresh fetch is still confirming them.
+	Refreshing bool `json:"refreshing,omitempty"`
 }
 
 // FieldRow is one key-value pair in a detail view, extended with render-time
@@ -305,6 +324,11 @@ type MenuBody struct {
 	Filter        string      `json:"filter,omitempty"`
 	AttentionOnly bool        `json:"attention_only,omitempty"`
 	Progress      string      `json:"progress,omitempty"`
+	// Refreshing is true while a background availability sweep is running
+	// after a cache-seeded startup (session ProbeResources holds entries that
+	// have not yet been acknowledged by a matching AvailabilityChecked
+	// result). False once every outstanding probe result has landed.
+	Refreshing bool `json:"refreshing,omitempty"`
 }
 
 // SelectorBody is the body of a profile/region/theme selector screen.

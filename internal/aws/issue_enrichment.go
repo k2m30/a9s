@@ -54,6 +54,14 @@ func InFetcherWave2Sentinel(_ context.Context, _ *ServiceClients, _ []resource.R
 // EnrichmentCap is the maximum number of per-resource API calls for non-batchable enrichers.
 const EnrichmentCap = 50
 
+// EnrichmentParallelism bounds concurrent per-resource API calls in Wave-2
+// enrichers that fan out via aws.ForEachParallel. Kept well under typical AWS
+// service-side throttling limits (RetryOnThrottle still wraps each call as a
+// second line of defense against bursts); 8 gives a meaningful wall-clock
+// speedup over a sequential loop without materially increasing the odds of
+// tripping per-second rate limits on accounts with default quotas.
+const EnrichmentParallelism = 8
+
 // PerParentPageCap limits per-parent pagination walks in enrichers to avoid
 // runaway enumeration on huge tenants. When hit, the emitted count is marked
 // with a "+" suffix to signal approximate.
@@ -84,6 +92,10 @@ func formatDate(t interface{ Format(string) string }) string {
 // the legacy EnrichmentFinding.Severity glyph contract used by per-enricher
 // docstrings — view code now consumes domain.Severity directly.
 //
+// detail is the S5 "concrete operator sentence" stamped onto Finding.Detail.
+// Pass "" for enrichers that have not yet been given real S5 text — the
+// detail view falls back to rendering Phrase alone.
+//
 // rows MAY be nil; the helper omits the AttentionDetail entry when empty so a
 // nil-row finding does not surface an empty Attention section.
 //
@@ -101,10 +113,12 @@ func setWave2Finding(
 	severityGlyph string,
 	shortName string,
 	rows []domain.DetailRow,
+	detail string,
 ) {
 	r.Findings[resourceID] = domain.Finding{
 		Code:     code,
 		Phrase:   phrase,
+		Detail:   detail,
 		Severity: glyphToSeverity(severityGlyph),
 		Source:   "wave2:" + shortName,
 	}
@@ -190,6 +204,7 @@ type IssueEnricherResult struct {
 //   - DO NOT mutate fields on cache[k].Resources[i] or cache[k].Resources[i].RawStruct
 //     (those are pointers / interface values shared with the running app).
 //   - DO read field values, lengths, and IsTruncated freely.
+//
 // Violations are not currently caught at compile time. Future contributors
 // who need to derive a mutable view should append([]Resource{}, slice...) into
 // a local slice first.

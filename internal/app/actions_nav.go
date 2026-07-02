@@ -276,11 +276,59 @@ func (c *Controller) handleActionSelect(a Action) (ViewState, []runtime.TaskRequ
 				Target:       runtime.NavigateTargetResourceList,
 				ResourceType: selected.ShortName,
 			})
-			c.applyNavResult(res)
+			tasks = append(tasks, c.applyNavResult(res)...)
 			return c.snapshot(), tasks
 		}
 	}
 	return c.snapshot(), nil
+}
+
+// handleActionSelectIndex handles ActionSelectIndex: sets the cursor of the
+// current screen (resource/child list, main menu, or selector) to the
+// visible index carried in a.N, clamped to the visible range, then performs
+// the same logic as ActionSelect. This is the atomic replacement for the web
+// UI's row/entry click path, which previously replayed move-top + N×move-down
+// + select as separate round-trips — a chain that landed on the wrong row
+// whenever cursor movement skips entries (e.g. the main menu's
+// skip-unavailable stepping over confirmed-empty resource types).
+//
+// a.N is the same visible index the renderer's template used to iterate the
+// screen (ListBody.Rows / MenuBody.Entries / SelectorBody.Items), which is
+// exactly what buildListBody/buildMenuBody/buildSelectorBody expose as
+// .Selected — so template index == controller index by construction, and no
+// cursor-movement replay is needed to reach it.
+func (c *Controller) handleActionSelectIndex(a Action) (ViewState, []runtime.TaskRequest) {
+	if ls := c.topListState(); ls != nil {
+		visible := c.listVisibleCount(ls)
+		ls.SelectedRow = clampIndex(a.N, visible)
+		return c.handleActionSelect(a)
+	}
+	if ms := c.topMenuState(); ms != nil {
+		all := resource.AllResourceTypes()
+		visible := menuVisibleItems(ms, all)
+		ms.Cursor = clampIndex(a.N, len(visible))
+		return c.handleActionSelect(a)
+	}
+	if ss := c.topSelectorState(); ss != nil {
+		visible := selectorVisibleItems(ss)
+		ss.Cursor = clampIndex(a.N, len(visible))
+		return c.handleActionSelect(a)
+	}
+	return c.snapshot(), nil
+}
+
+// clampIndex clamps idx into [0, n-1]. Returns 0 when n <= 0.
+func clampIndex(idx, n int) int {
+	if n <= 0 {
+		return 0
+	}
+	if idx < 0 {
+		return 0
+	}
+	if idx >= n {
+		return n - 1
+	}
+	return idx
 }
 
 // handleActionRelatedSelect handles ActionRelatedSelect.

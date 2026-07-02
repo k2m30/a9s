@@ -3,6 +3,7 @@ package aws
 
 import (
 	"context"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ec2svc "github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -35,13 +36,13 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 		vpcID := r.ID
 		if vpcID == "" {
-			continue
+			return
 		}
 		// Paginate through all flow logs for this VPC.
 		var allFlowLogs []ec2types.FlowLog
@@ -51,8 +52,6 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 		for {
 			if flPages >= PerParentPageCap {
 				flTruncated = true
-				truncated = true
-				result.TruncatedIDs[r.ID] = true
 				break
 			}
 			out, err := clients.EC2.DescribeFlowLogs(ctx, &ec2svc.DescribeFlowLogsInput{
@@ -63,8 +62,6 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 			})
 			flPages++
 			if err != nil {
-				truncated = true
-				result.TruncatedIDs[r.ID] = true
 				flTruncated = true
 				break
 			}
@@ -74,8 +71,13 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 			}
 			flNextToken = out.NextToken
 		}
+
+		mu.Lock()
+		defer mu.Unlock()
 		if flTruncated {
-			continue
+			truncated = true
+			result.TruncatedIDs[r.ID] = true
+			return
 		}
 		// No flow logs at all, or none with ACTIVE status → finding.
 		hasActive := false
@@ -88,12 +90,12 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 		flowLogsVal := "yes"
 		if !hasActive {
 			flowLogsVal = "no"
-			setWave2Finding(&result, vpcID, vpcCodeNoFlowLogs, "no active VPC flow logs (CIS EC2.6)", "~", "vpc", nil)
+			setWave2Finding(&result, vpcID, vpcCodeNoFlowLogs, "no active VPC flow logs (CIS EC2.6)", "~", "vpc", nil, "")
 		}
 		result.FieldUpdates[vpcID] = map[string]string{
 			"flow_logs": flowLogsVal,
 		}
-	}
+	})
 	result.IssueCount = 0
 	result.Truncated = truncated
 	return result, nil

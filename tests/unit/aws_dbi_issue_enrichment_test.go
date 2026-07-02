@@ -120,13 +120,22 @@ func TestDBI_Enrich_MaintenancePending_HealthyRow(t *testing.T) {
 		t.Errorf("Severity = %v, want SevWarn", finding.Severity)
 	}
 
-	// Phrase is the short S5 phrase — concrete details (Action, Description)
-	// must NOT appear here; they belong in AttentionDetail rows.
-	if finding.Phrase != "pending maintenance" {
-		t.Errorf("Phrase = %q, want %q", finding.Phrase, "pending maintenance")
+	// Phrase is the short S4 phrase — concrete details (Action, Description)
+	// must NOT appear here; they belong in AttentionDetail rows and in Detail.
+	// docs/resources/dbi.md §4 row "Pending maintenance overdue": List text (S4).
+	if finding.Phrase != "maintenance scheduled" {
+		t.Errorf("Phrase = %q, want %q", finding.Phrase, "maintenance scheduled")
 	}
 	if strings.Contains(finding.Phrase, "system-update") || strings.Contains(finding.Phrase, "New minor engine patch") {
 		t.Errorf("Phrase must not embed Row content; got %q", finding.Phrase)
+	}
+
+	// Detail is the S5 full operator sentence — docs/resources/dbi.md §4 row
+	// "Pending maintenance overdue": Detail text (S5), concretized with this
+	// fixture's Action="system-update" / Description="New minor engine patch 16.2.3".
+	const wantDetail = "Pending maintenance action overdue: system-update (New minor engine patch 16.2.3)."
+	if finding.Detail != wantDetail {
+		t.Errorf("Detail = %q, want %q", finding.Detail, wantDetail)
 	}
 	// The same facts must be present in AttentionDetail rows.
 	wantRows := map[string]string{
@@ -187,8 +196,8 @@ func TestDBI_Enrich_MaintenancePending_NilDescription(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected finding for %q", resourceID)
 	}
-	if finding.Phrase != "pending maintenance" {
-		t.Errorf("Phrase = %q, want %q", finding.Phrase, "pending maintenance")
+	if finding.Phrase != "maintenance scheduled" {
+		t.Errorf("Phrase = %q, want %q", finding.Phrase, "maintenance scheduled")
 	}
 	var labels []string
 	for _, r := range result.AttentionDetails[resourceID].Rows {
@@ -198,6 +207,18 @@ func TestDBI_Enrich_MaintenancePending_NilDescription(t *testing.T) {
 		if l == "Description" {
 			t.Errorf("Rows must omit Description when source field is nil; got labels=%v", labels)
 		}
+	}
+
+	// Detail (S5): the production template is
+	// "Pending maintenance action overdue: %s (%s)." (ActionType, Description).
+	// EnrichDBIMaintenance only builds Detail when BOTH Action and Description
+	// are non-empty (see dbi_issue_enrichment.go: `if firstAction != "" &&
+	// firstDescription != ""`) — with a nil Description, Detail must be the
+	// empty string, never a malformed "...: os-upgrade ()." with empty
+	// parens. This asserts the clean form; production code already emits it
+	// correctly, no coder fix needed here.
+	if finding.Detail != "" {
+		t.Errorf("Detail = %q, want empty string (Description is nil — Detail must be omitted entirely, not rendered with empty parens)", finding.Detail)
 	}
 }
 

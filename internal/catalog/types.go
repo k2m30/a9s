@@ -29,6 +29,11 @@ type ResourceTypeDef struct {
 	// ListTitle overrides ShortName for list-view frame titles.
 	// When empty, ShortName is used.
 	ListTitle string
+	// TitleOmitsID suppresses the resource ID in the detail frame title for
+	// types whose ID is an opaque synthetic key (e.g. a 56-digit CloudWatch
+	// event id). When true the detail title renders "detail -- <Name>"
+	// instead of "detail -- <ID> (<Name>)".
+	TitleOmitsID bool
 
 	// ─── Display ───────────────────────────────────────────────────────────
 

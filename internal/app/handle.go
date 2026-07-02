@@ -1,6 +1,8 @@
 package app
 
 import (
+	"maps"
+
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -26,6 +28,16 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 
 	intents, tasks := c.core.HandleEvent(ev)
 	c.applyIntents(intents)
+
+	// Contract C: mark the type's availability sweep acked the moment its
+	// AvailabilityChecked result arrives, regardless of whether HandleEvent's
+	// central gen-guard treated it as stale. MenuBody.Refreshing tracks
+	// wall-clock probe completion (has this type's background check landed
+	// yet), not generation validity — a stale-but-arrived result still means
+	// the sweep is no longer waiting on that type.
+	if msg, ok := ev.(messages.AvailabilityChecked); ok {
+		c.markMenuSweepAcked(msg.ResourceType)
+	}
 
 	// HandleEvent's central GenStamped guard drops stale events from the intent
 	// path, but the row mutation below runs unconditionally. A host that passes
@@ -128,7 +140,112 @@ func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 			continue
 		}
 		c.applyResourcesLoaded(s.State.List, canon, msg.Resources, msg.Pagination, msg.Append)
+		// Contract D: sync the list's now-current row count to the root menu's
+		// availability badge here, at the controller level, so both the TUI and
+		// web renderer get it — this replaces the TUI-only sync-back that used
+		// to run only on pop, in internal/tui/app_stack.go's popRS. Firing on
+		// every ResourcesLoaded (not just a load-more that exhausts pagination)
+		// preserves the pre-existing "non-exhausted visits syncing counts
+		// upward" behavior popRS also provided: the only-increase guard inside
+		// syncExactTotalToMenu makes this safe to call unconditionally — a
+		// truncated or smaller result never regresses a larger known count.
+		c.syncExactTotalToMenu(s, canon)
 		return
+	}
+}
+
+// syncExactTotalToMenu applies the load-more-exhaustion exact-total sync-back
+// (Contract D) to the root menu's availability + issue-badge state. screen is
+// the list screen whose ResourcesLoaded just landed; canon is its canonical
+// resource type. Skipped for related/filtered/child-context lists (EscPops or
+// a non-nil ParentContext) — those show a filtered subset, not the global
+// population.
+//
+// The availability guard applies three rules, in order of priority:
+//  1. Unknown type: always seed it.
+//  2. The currently-known count is itself a truncated lower bound (e.g.
+//     "10+" from an availability probe) and the new result is exact
+//     (untruncated): the exact result always wins, even if numerically
+//     smaller than the lower-bound placeholder — an exact 3 is more useful
+//     than an unconfirmed "10+".
+//  3. Otherwise (both exact, or the new result is itself still truncated):
+//     pure directional "never shrink a known count" — update only when
+//     newCount is strictly larger than curCount.
+//
+// This differs from the TUI's original popRS guard
+// (`!newTrunc || !known || newCount > curCount`), which would also let ANY
+// untruncated result overwrite a larger already-EXACT count. Contract D pins
+// the stricter rule 3 explicitly (a smaller exact result must not regress a
+// larger already-exact one, e.g. a concurrent fuller probe already landed a
+// bigger number) while still requiring rule 2 (an exact result must replace
+// a truncated lower-bound placeholder regardless of magnitude).
+func (c *Controller) syncExactTotalToMenu(screen *Screen, canon string) {
+	ls := screen.State.List
+	if ls == nil || ls.EscPops || ls.ParentContext != nil {
+		return
+	}
+	newCount := len(ls.Rows)
+	newTrunc := ls.HasPagination
+
+	ms := c.rootMenuState()
+	if ms == nil {
+		return
+	}
+	if ms.Availability == nil {
+		ms.Availability = make(map[string]int)
+	}
+	if ms.Truncated == nil {
+		ms.Truncated = make(map[string]bool)
+	}
+	curCount, known := ms.Availability[canon]
+	curTrunc := ms.Truncated[canon]
+	if !known || (curTrunc && !newTrunc) || newCount > curCount {
+		ms.Availability[canon] = newCount
+		ms.Truncated[canon] = newTrunc
+	}
+
+	newIssues := c.listIssueCount(ls, canon)
+	curIssues := ms.IssueCounts[canon]
+	curIssueTrunc := ms.IssueTruncated[canon]
+	switch {
+	case newIssues > curIssues:
+		if ms.IssueCounts == nil {
+			ms.IssueCounts = make(map[string]int)
+		}
+		if ms.IssueKnown == nil {
+			ms.IssueKnown = make(map[string]bool)
+		}
+		if ms.IssueTruncated == nil {
+			ms.IssueTruncated = make(map[string]bool)
+		}
+		ms.IssueCounts[canon] = newIssues
+		ms.IssueKnown[canon] = true
+		ms.IssueTruncated[canon] = newTrunc
+	case newIssues == curIssues && curIssueTrunc && !newTrunc:
+		if ms.IssueTruncated == nil {
+			ms.IssueTruncated = make(map[string]bool)
+		}
+		ms.IssueTruncated[canon] = false
+	}
+
+	// Persist the updated availability to disk, mirroring the "survives an
+	// app restart" half of Contract D. Best-effort — a write failure here
+	// must not surface as a controller error; the existing
+	// TaskKindSaveCache/probe-completion paths already treat cache writes as
+	// best-effort.
+	profile, region := c.core.Profile(), c.core.Region()
+	if profile != "" && region != "" {
+		avail := make(map[string]int, len(ms.Availability))
+		maps.Copy(avail, ms.Availability)
+		trunc := make(map[string]bool, len(ms.Truncated))
+		maps.Copy(trunc, ms.Truncated)
+		issueCounts := make(map[string]int, len(ms.IssueCounts))
+		maps.Copy(issueCounts, ms.IssueCounts)
+		issueTrunc := make(map[string]bool, len(ms.IssueTruncated))
+		maps.Copy(issueTrunc, ms.IssueTruncated)
+		issueKnown := make(map[string]bool, len(ms.IssueKnown))
+		maps.Copy(issueKnown, ms.IssueKnown)
+		_ = c.core.SaveAvailabilityCache(profile, region, avail, trunc, issueCounts, issueTrunc, issueKnown)
 	}
 }
 

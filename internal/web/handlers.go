@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/hex"
@@ -126,9 +127,17 @@ func (s *Server) requireSession(w http.ResponseWriter, r *http.Request) *session
 }
 
 // handleIndex renders the full HTML page from the current ViewState snapshot.
-// GET /
+// GET / — token-gated: the page embeds the real per-run token via data-token,
+// so serving it without proof of the token would let any local process scrape
+// the token straight out of the response and drive the session API with it.
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	noStore(w)
+
+	if !s.tokenOK(r) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
 	entry := s.requireSession(w, r)
 
 	entry.mu.Lock()
@@ -176,14 +185,23 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Drain blocking tasks (the response body's own content) synchronously
+	// under entry.mu; partition off background tasks (related-check fan-out,
+	// detail enrichment, save-cache) so the response is not held hostage to
+	// them — they run in their own goroutine after the response is written.
 	entry.mu.Lock()
 	_, tasks := entry.ctrl.Apply(action)
-	app.DrainSync(entry.ctrl, tasks)
+	background := app.DrainSyncPartition(context.Background(), entry.ctrl, tasks, app.IsBackgroundTaskKind, nil)
 	vs := entry.ctrl.Snapshot()
 	entry.mu.Unlock()
 
 	// Notify SSE subscribers that state changed.
 	s.notifySubscribers(entry)
+
+	// Background tasks drain in their own goroutine, outside entry.mu and
+	// outside the request lifetime (a bounded timeout context, not r.Context,
+	// since the request itself is about to complete).
+	s.drainBackgroundTasks(entry, background)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := renderMainFragment(w, vs); err != nil {

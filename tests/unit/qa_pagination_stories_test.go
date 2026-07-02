@@ -35,8 +35,8 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -47,6 +47,47 @@ func effectiveTitleName(rt resource.ResourceTypeDef) string {
 		return rt.ListTitle
 	}
 	return rt.ShortName
+}
+
+// expectedIssueSuffix derives the " !N" frame-title suffix the pagination
+// contract (docs/attention-signals.md §Visualization Surfaces / §S1) mandates
+// for the given page of resources, independent of buildListFrameTitle's
+// internals (Controller.listIssueCount, internal/app/list_body.go).
+//
+// It mirrors listIssueCount's exact per-resource predicate: a resource counts
+// as an issue when it carries an issue-severity Finding (listHasIssueFinding,
+// internal/app/list_filter.go), or — when it has no Findings at all — when
+// rt.ResolveColor(r).IsIssue() is true (Warning/Broken). These tests never
+// trigger Wave-2 enrichment (no AvailabilityCheckedMsg is sent), so the
+// enrichment-findings-map branch of listIssueCount is always empty here and
+// intentionally omitted. Returns "" when N == 0 (no suffix), matching the
+// contract's "Healthy list: no suffix" rule; this harness sends the page in
+// one shot (no incremental load-more), so the "+" truncated-count suffix
+// never applies to these derivations.
+func expectedIssueSuffix(rt resource.ResourceTypeDef, page []resource.Resource) string {
+	if rt.ExcludeFromIssueBadge || rt.Color == nil {
+		return ""
+	}
+	n := 0
+	for _, r := range page {
+		hasIssueFinding := false
+		for _, f := range r.Findings {
+			if f.Severity.IsIssue() {
+				hasIssueFinding = true
+				break
+			}
+		}
+		switch {
+		case hasIssueFinding:
+			n++
+		case len(r.Findings) == 0 && rt.ResolveColor(r).IsIssue():
+			n++
+		}
+	}
+	if n == 0 {
+		return ""
+	}
+	return " !" + fmt.Sprintf("%d", n)
 }
 
 // ===========================================================================
@@ -798,10 +839,11 @@ func TestStoryH1_DemoMode_PaginationForLargeTypes(t *testing.T) {
 
 			title := m.FrameTitle()
 			pageCount := len(result.Resources)
+			issueSuffix := expectedIssueSuffix(rt, result.Resources)
 
 			if total <= pageSize {
 				// Small type: all items returned, no truncation
-				expected := fmt.Sprintf("%s(%d)", effectiveTitleName(rt), pageCount)
+				expected := fmt.Sprintf("%s(%d)%s", effectiveTitleName(rt), pageCount, issueSuffix)
 				if title != expected {
 					t.Errorf("demo %s (small): expected title %q, got %q", rt.ShortName, expected, title)
 				}
@@ -813,7 +855,7 @@ func TestStoryH1_DemoMode_PaginationForLargeTypes(t *testing.T) {
 				}
 			} else {
 				// Large type: first page returned with truncation
-				expected := fmt.Sprintf("%s(%d+)", effectiveTitleName(rt), pageCount)
+				expected := fmt.Sprintf("%s(%d+)%s", effectiveTitleName(rt), pageCount, issueSuffix)
 				if title != expected {
 					t.Errorf("demo %s (large): expected title %q, got %q", rt.ShortName, expected, title)
 				}
@@ -1430,15 +1472,21 @@ func TestStoryJ1_ResizeDuringLoadMore_PreservesData(t *testing.T) {
 			}
 
 			// Now complete the load-more
+			appended := resources[:50]
 			m, _ = m.Update(messages.ResourcesLoaded{
 				ResourceType: rt.ShortName,
-				Resources:    resources[:50],
+				Resources:    appended,
 				Pagination:   &resource.PaginationMeta{IsTruncated: false},
 				Append:       true,
 			})
 
-			// Should now have 150 items, no truncation
-			expected := effectiveTitleName(rt) + "(150)"
+			// Should now have 150 items, no truncation. Issue suffix is derived
+			// over the full 150-row post-append set (the initial 100 plus the
+			// appended 50, both built from the same synthetic-field generator
+			// above), mirroring Controller.listIssueCount which counts over
+			// ls.Rows (all currently loaded rows), not just the newest page.
+			combined := append(append([]resource.Resource{}, resources...), appended...)
+			expected := effectiveTitleName(rt) + "(150)" + expectedIssueSuffix(rt, combined)
 			if m.FrameTitle() != expected {
 				t.Errorf("J.1/%s: expected %q after append, got %q",
 					rt.ShortName, expected, m.FrameTitle())
@@ -1706,8 +1754,10 @@ func TestStoryL2_ErrorFlashDuringLoadMore_PreservesPagination(t *testing.T) {
 			}
 
 			// After ClearLoading(), loadingMore must be cleared.
-			// Frame title should NOT contain "loading..." — it should be "rt(100+)".
-			expectedTitle := effectiveTitleName(rt) + "(100+)"
+			// Frame title should NOT contain "loading..." — it should be "rt(100+)",
+			// plus the " !N" issue suffix derived from the same synthetic
+			// resources loaded above (see expectedIssueSuffix).
+			expectedTitle := effectiveTitleName(rt) + "(100+)" + expectedIssueSuffix(rt, resources)
 			if title != expectedTitle {
 				t.Errorf("L.2/%s: after ClearLoading(), frame title should be %q, got %q",
 					rt.ShortName, expectedTitle, title)
@@ -2282,8 +2332,9 @@ func TestStoryDFGI_AllResourceTypes_PaginationViewConsistency(t *testing.T) {
 					NextToken:   "tok",
 				},
 			})
-			if m.FrameTitle() != effectiveTitleName(rt)+"(100+)" {
-				t.Errorf("truncated: expected %q, got %q", effectiveTitleName(rt)+"(100+)", m.FrameTitle())
+			wantTruncated := effectiveTitleName(rt) + "(100+)" + expectedIssueSuffix(rt, resources)
+			if m.FrameTitle() != wantTruncated {
+				t.Errorf("truncated: expected %q, got %q", wantTruncated, m.FrameTitle())
 			}
 
 			// 3. Press M → loading more
@@ -2292,15 +2343,19 @@ func TestStoryDFGI_AllResourceTypes_PaginationViewConsistency(t *testing.T) {
 				t.Errorf("loading more: expected 'loading...' in %q", m.FrameTitle())
 			}
 
-			// 4. Append page 2 (final)
+			// 4. Append page 2 (final) — the same 100-row `resources` slice is
+			// appended again, so the post-append set is `resources` doubled
+			// (200 rows); the issue suffix is derived over that doubled set.
 			m, _ = m.Update(messages.ResourcesLoaded{
 				ResourceType: rt.ShortName,
 				Resources:    resources,
 				Pagination:   &resource.PaginationMeta{IsTruncated: false},
 				Append:       true,
 			})
-			if m.FrameTitle() != effectiveTitleName(rt)+"(200)" {
-				t.Errorf("complete: expected %q, got %q", effectiveTitleName(rt)+"(200)", m.FrameTitle())
+			doubled := append(append([]resource.Resource{}, resources...), resources...)
+			wantComplete := effectiveTitleName(rt) + "(200)" + expectedIssueSuffix(rt, doubled)
+			if m.FrameTitle() != wantComplete {
+				t.Errorf("complete: expected %q, got %q", wantComplete, m.FrameTitle())
 			}
 
 			// 5. M should be no-op now
@@ -2309,14 +2364,17 @@ func TestStoryDFGI_AllResourceTypes_PaginationViewConsistency(t *testing.T) {
 				t.Errorf("M after complete should be no-op")
 			}
 
-			// 6. Replace (simulate refresh) resets
+			// 6. Replace (simulate refresh) resets — a non-Append ResourcesLoaded
+			// replaces ls.Rows outright, so the issue suffix is derived over
+			// just the new 50-row page, not the prior 200.
 			m, _ = m.Update(messages.ResourcesLoaded{
 				ResourceType: rt.ShortName,
 				Resources:    resources[:50],
 				Pagination:   nil,
 			})
-			if m.FrameTitle() != effectiveTitleName(rt)+"(50)" {
-				t.Errorf("refresh: expected %q, got %q", effectiveTitleName(rt)+"(50)", m.FrameTitle())
+			wantRefresh := effectiveTitleName(rt) + "(50)" + expectedIssueSuffix(rt, resources[:50])
+			if m.FrameTitle() != wantRefresh {
+				t.Errorf("refresh: expected %q, got %q", wantRefresh, m.FrameTitle())
 			}
 		})
 	}

@@ -4,6 +4,8 @@ package aws
 import (
 	"context"
 	"fmt"
+	"sort"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	r53svc "github.com/aws/aws-sdk-go-v2/service/route53"
@@ -36,44 +38,49 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 	truncated := len(resources) > EnrichmentCap
 	var failures []string
 	total := 0
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 		zoneID := r.Fields["zone_id"]
 		if zoneID == "" {
 			zoneID = r.ID
 		}
 		if zoneID == "" {
-			continue
+			return
 		}
+		mu.Lock()
 		total++
+		mu.Unlock()
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*r53svc.GetHostedZoneOutput, error) {
 			return clients.Route53.GetHostedZone(ctx, &r53svc.GetHostedZoneInput{
 				Id: aws.String(zoneID),
 			})
 		})
+		mu.Lock()
+		defer mu.Unlock()
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
-			continue
+			return
 		}
 		if out.HostedZone == nil {
-			continue
+			return
 		}
 		// Only raise a finding for private zones — public zones cannot have VPC associations.
 		if out.HostedZone.Config == nil || !out.HostedZone.Config.PrivateZone {
-			continue
+			return
 		}
 		if len(out.VPCs) > 0 {
-			continue
+			return
 		}
 		setWave2Finding(&result, r.ID, r53CodeOrphanPrivateZone, "private zone with no VPC associations (orphan)", "~", "r53", []domain.DetailRow{
 			{Label: "Zone ID", Value: zoneID, Tier: "~"},
 			{Label: "Issue", Value: "private zone with no VPC associations (orphan)", Tier: "~"},
-		})
-	}
+		}, "")
+	})
+	sort.Strings(failures)
 	// All Route53 findings are severity "~" (informational).
 	result.IssueCount = 0
 	result.Truncated = truncated

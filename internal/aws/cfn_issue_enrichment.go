@@ -5,7 +5,9 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"sort"
 	"strings"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudformation"
@@ -36,28 +38,32 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 	truncated := len(resources) > EnrichmentCap
 	var failures []string
 	total := 0
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 		stackName := r.Fields["stack_name"]
 		if stackName == "" {
 			stackName = r.ID
 		}
 		if stackName == "" {
-			continue
+			return
 		}
+		mu.Lock()
 		total++
+		mu.Unlock()
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cloudformation.DescribeStackEventsOutput, error) {
 			return clients.CloudFormation.DescribeStackEvents(ctx, &cloudformation.DescribeStackEventsInput{
 				StackName: aws.String(stackName),
 			})
 		})
+		mu.Lock()
+		defer mu.Unlock()
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
-			continue
+			return
 		}
 		// Scan events from the first page for any resource with a _FAILED status.
 		// The API returns events in reverse-chronological order; we inspect all
@@ -93,15 +99,16 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 			}
 		}
 		if len(failedRows) == 0 {
-			continue
+			return
 		}
 		key := r.ID
 		if key == "" {
 			key = stackName
 		}
 		setWave2Finding(&result, key, cfnCodeRecentResourceFailure,
-			fmt.Sprintf("recent resource failure: %s", failedRows[0].Label), "!", "cfn", failedRows)
-	}
+			fmt.Sprintf("recent resource failure: %s", failedRows[0].Label), "!", "cfn", failedRows, "")
+	})
+	sort.Strings(failures)
 	result.IssueCount = len(result.Findings)
 	result.Truncated = truncated
 	return result, AggregateFailures("cfn-enrich: DescribeStackEvents", failures, total)
@@ -174,31 +181,35 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 	truncated := len(resources) > EnrichmentCap
 	var failures []string
 	total := 0
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 		stackName := r.Fields["stack_name"]
 		if stackName == "" {
 			stackName = r.ID
 		}
 		if stackName == "" {
-			continue
+			return
 		}
+		mu.Lock()
 		total++
+		mu.Unlock()
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*cloudformation.DescribeStacksOutput, error) {
 			return clients.CloudFormation.DescribeStacks(ctx, &cloudformation.DescribeStacksInput{
 				StackName: aws.String(stackName),
 			})
 		})
+		mu.Lock()
+		defer mu.Unlock()
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
-			continue
+			return
 		}
 		if len(out.Stacks) == 0 {
-			continue
+			return
 		}
 		stack := out.Stacks[0]
 		key := r.ID
@@ -214,10 +225,11 @@ func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []re
 				setWave2Finding(&result, key, cfnCodeStackDrifted, "stack drifted from template", "~", "cfn",
 					[]domain.DetailRow{
 						{Label: "Drift Status", Value: driftStatus, Tier: "~"},
-					})
+					}, "")
 			}
 		}
-	}
+	})
+	sort.Strings(failures)
 	// "~" findings do not contribute to IssueCount per the IssueEnricherResult contract.
 	result.IssueCount = 0
 	result.Truncated = truncated

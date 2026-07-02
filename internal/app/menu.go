@@ -170,6 +170,47 @@ func menuActiveKey(ms *MenuState, item resource.ResourceTypeDef) string {
 	return item.ShortName
 }
 
+// markMenuSweepAcked records that resource type shortName's background
+// availability probe result has landed, clearing it from the Refreshing
+// computation in menuRefreshing. Canonicalizes aliases to the registered
+// ShortName so an alias-keyed ProbeResources entry (e.g. "rds" retained
+// under the canonical "dbi" key) still matches.  Caller must hold c.mu
+// (write) — called from Handle, which already holds the lock.
+func (c *Controller) markMenuSweepAcked(shortName string) {
+	if shortName == "" {
+		return
+	}
+	canon := shortName
+	if td := resource.FindResourceType(shortName); td != nil {
+		canon = td.ShortName
+	}
+	if c.menuSweepAcked == nil {
+		c.menuSweepAcked = make(map[string]bool)
+	}
+	c.menuSweepAcked[canon] = true
+}
+
+// menuRefreshing reports whether a background availability sweep is still in
+// flight: true when core.Session().ProbeResources holds at least one type
+// whose probe result has not yet been acked via markMenuSweepAcked. This is
+// Contract C's MenuBody.Refreshing signal — a cache-seeded startup (session
+// ProbeResources populated from the on-disk availability cache before any
+// live probe completes) shows Refreshing=true until every retained type's
+// AvailabilityChecked result lands. Caller must hold c.mu (at least read).
+func (c *Controller) menuRefreshing() bool {
+	probeResources := c.core.Session().ProbeResources
+	for shortName := range probeResources {
+		canon := shortName
+		if td := resource.FindResourceType(shortName); td != nil {
+			canon = td.ShortName
+		}
+		if !c.menuSweepAcked[canon] {
+			return true
+		}
+	}
+	return false
+}
+
 // buildMenuBody constructs a MenuBody from MenuState + the resource catalog.
 // Applies filter + attention + skip-unavailable + badge logic and produces
 // renderer-agnostic data. mainmenu.go View() delegates to this via the

@@ -105,7 +105,7 @@ func EnrichECSClusters(ctx context.Context, clients *ServiceClients, resources [
 			}
 
 			summary := strings.Join(summaries, "; ")
-			setWave2Finding(&result, name, ecsCodeClusterIssue, summary, "~", "ecs", rows)
+			setWave2Finding(&result, name, ecsCodeClusterIssue, summary, "~", "ecs", rows, "")
 		}
 	}
 

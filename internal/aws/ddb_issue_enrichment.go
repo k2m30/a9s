@@ -3,6 +3,7 @@ package aws
 
 import (
 	"context"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -29,32 +30,34 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 		name := r.Name
 		if name == "" {
 			name = r.ID
 		}
 		if name == "" {
-			continue
+			return
 		}
 		out, err := clients.DynamoDB.DescribeContinuousBackups(ctx, &dynamodb.DescribeContinuousBackupsInput{
 			TableName: aws.String(name),
 		})
+		mu.Lock()
+		defer mu.Unlock()
 		if err != nil {
 			// sub-call error: skip this table, mark truncated to signal incomplete data
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
-			continue
+			return
 		}
 		if out.ContinuousBackupsDescription == nil {
-			continue
+			return
 		}
 		pitr := out.ContinuousBackupsDescription.PointInTimeRecoveryDescription
 		if pitr == nil {
-			continue
+			return
 		}
 		pitrEnabled := string(pitr.PointInTimeRecoveryStatus) == "ENABLED"
 		if !pitrEnabled {
@@ -62,9 +65,9 @@ func EnrichDynamoDBPITR(ctx context.Context, clients *ServiceClients, resources 
 			// phrase (e.g. "archived: kms key lost") is computed at render time
 			// by phraseFromFindings(r.Findings) — not by writing
 			// FieldUpdates["status"] here.
-			setWave2Finding(&result, r.ID, ddbCodePITROff, "PITR off", "~", "ddb", nil)
+			setWave2Finding(&result, r.ID, ddbCodePITROff, "PITR off", "~", "ddb", nil, "")
 		}
-	}
+	})
 	result.IssueCount = 0
 	result.Truncated = truncated
 	return result, nil

@@ -127,7 +127,7 @@ func EnrichRDSDocDBMaintenance(ctx context.Context, clients *ServiceClients, res
 				// for an instance; or page truncation evicted it). Append to
 				continue
 			}
-			setWave2Finding(&result, key, rdsCodePendingMaintenance, summary, "~", "rds", rows)
+			setWave2Finding(&result, key, rdsCodePendingMaintenance, summary, "~", "rds", rows, "")
 		}
 	}
 	result.IssueCount = 0

@@ -58,17 +58,17 @@ func main() {
 	resource.WireProjection()
 
 	var (
-		profile      string
-		region       string
-		showVersion  bool
-		showHelp     bool
-		demoMode     bool
-		noCache      bool
-		command      string
-		resetViews   bool
-		resetThemes  bool
-		webMode      bool
-		webAddr      string
+		profile        string
+		region         string
+		showVersion    bool
+		showHelp       bool
+		demoMode       bool
+		noCache        bool
+		command        string
+		resetViews     bool
+		resetThemes    bool
+		webMode        bool
+		webAddr        string
 		webAllowReveal bool
 	)
 

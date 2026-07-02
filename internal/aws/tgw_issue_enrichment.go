@@ -4,6 +4,8 @@ package aws
 import (
 	"context"
 	"fmt"
+	"sort"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ec2svc "github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -15,7 +17,7 @@ import (
 
 // tgw canonical FindingCodes.
 const (
-	tgwCodeAttachmentFailed      domain.FindingCode = "tgw.attachment-failed"
+	tgwCodeAttachmentFailed       domain.FindingCode = "tgw.attachment-failed"
 	tgwCodeAttachmentTransitional domain.FindingCode = "tgw.attachment-transitional"
 )
 
@@ -46,25 +48,27 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 	truncated := len(resources) > EnrichmentCap
 	var failures []string
 	total := 0
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 		tgwID := r.ID
 		if tgwID == "" {
-			continue
+			return
 		}
+		mu.Lock()
 		total++
+		mu.Unlock()
 		// Paginate attachments per TGW using NextToken.
 		var allAttachments []ec2types.TransitGatewayAttachment
 		var attNextToken *string
 		attPages := 0
 		attTruncated := false
+		fetchErr := false
+		var lastErr error
 		for {
 			if attPages >= PerParentPageCap {
 				attTruncated = true
-				truncated = true
-				result.TruncatedIDs[r.ID] = true
 				break
 			}
 			out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2svc.DescribeTransitGatewayAttachmentsOutput, error) {
@@ -77,9 +81,8 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 			})
 			attPages++
 			if err != nil {
-				failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
-				truncated = true
-				result.TruncatedIDs[r.ID] = true
+				fetchErr = true
+				lastErr = err
 				break
 			}
 			allAttachments = append(allAttachments, out.TransitGatewayAttachments...)
@@ -88,8 +91,16 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 			}
 			attNextToken = out.NextToken
 		}
-		if attTruncated {
-			continue
+
+		if attTruncated || fetchErr {
+			mu.Lock()
+			defer mu.Unlock()
+			truncated = true
+			result.TruncatedIDs[r.ID] = true
+			if fetchErr {
+				failures = append(failures, fmt.Sprintf("%s: %v", r.ID, lastErr))
+			}
+			return
 		}
 		// Collect worst finding across all attachments for this TGW.
 		// "!" severity beats "~" severity.
@@ -137,13 +148,17 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 		if issueCount > 0 {
 			attStatusVal = fmt.Sprintf("%d issues", issueCount)
 		}
+
+		mu.Lock()
+		defer mu.Unlock()
 		result.FieldUpdates[tgwID] = map[string]string{
 			"att_status": attStatusVal,
 		}
 		if worst != nil {
-			setWave2Finding(&result, tgwID, worst.code, worst.summary, worst.glyph, "tgw", worst.rows)
+			setWave2Finding(&result, tgwID, worst.code, worst.summary, worst.glyph, "tgw", worst.rows, "")
 		}
-	}
+	})
+	sort.Strings(failures)
 	result.IssueCount = len(result.Findings)
 	result.Truncated = truncated
 	return result,

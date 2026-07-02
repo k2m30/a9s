@@ -3,6 +3,7 @@ package aws
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/rds"
@@ -90,9 +91,13 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 		// Description, Earliest Target, Apply Method) lives only in Rows so
 		// the Attention section does not render duplicated content.
 		var rows []domain.DetailRow
+		var firstAction, firstDescription string
 		for _, pa := range action.PendingMaintenanceActionDetails {
 			if pa.Action != nil && *pa.Action != "" {
 				rows = append(rows, domain.DetailRow{Label: "Action", Value: *pa.Action, Tier: "~"})
+				if firstAction == "" {
+					firstAction = *pa.Action
+				}
 			}
 			if pa.OptInStatus != nil && *pa.OptInStatus != "" {
 				rows = append(rows, domain.DetailRow{Label: "Apply Method", Value: *pa.OptInStatus})
@@ -104,10 +109,19 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 			}
 			if pa.Description != nil && *pa.Description != "" {
 				rows = append(rows, domain.DetailRow{Label: "Description", Value: *pa.Description})
+				if firstDescription == "" {
+					firstDescription = *pa.Description
+				}
 			}
 		}
 
-		setWave2Finding(&result, key, dbiCodePendingMaintenance, "pending maintenance", "~", "dbi", rows)
+		// Detail (S5): docs/resources/dbi.md §4 row "Pending maintenance overdue".
+		detail := ""
+		if firstAction != "" && firstDescription != "" {
+			detail = fmt.Sprintf("Pending maintenance action overdue: %s (%s).", firstAction, firstDescription)
+		}
+
+		setWave2Finding(&result, key, dbiCodePendingMaintenance, "maintenance scheduled", "~", "dbi", rows, detail)
 	}
 
 	result.IssueCount = 0 // "~" findings never bump the S1 badge

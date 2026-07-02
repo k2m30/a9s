@@ -320,11 +320,20 @@ func TestEnrichDBI_Wave1StoppedPlusWave2_StackedFindings_AS140(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected wave-2 Finding for %q; result.Findings keys = %v", resourceID, findingKeys(result.Findings))
 	}
-	if wave2.Phrase != "pending maintenance" {
-		t.Errorf("wave-2 Phrase = %q, want %q", wave2.Phrase, "pending maintenance")
+	// docs/resources/dbi.md §4 row "Pending maintenance overdue": List text (S4).
+	if wave2.Phrase != "maintenance scheduled" {
+		t.Errorf("wave-2 Phrase = %q, want %q", wave2.Phrase, "maintenance scheduled")
 	}
 	if wave2.Severity != domain.SevWarn {
 		t.Errorf("wave-2 Severity = %v, want SevWarn", wave2.Severity)
+	}
+
+	// Detail (S5) — docs/resources/dbi.md §4 row "Pending maintenance overdue":
+	// Detail text (S5), concretized with this test's Action="system-update" /
+	// Description="Engine patch".
+	const wantWave2Detail = "Pending maintenance action overdue: system-update (Engine patch)."
+	if wave2.Detail != wantWave2Detail {
+		t.Errorf("wave-2 Detail = %q, want %q", wave2.Detail, wantWave2Detail)
 	}
 
 	// AS-140: result.FieldUpdates must be empty — the merged "stopped (+1)"

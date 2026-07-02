@@ -23,8 +23,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -467,7 +467,7 @@ func TestResourceList_FrameTitle_Pagination_AllResourceTypes(t *testing.T) {
 				Append:       false,
 			})
 			title := m.FrameTitle()
-			expected := effectiveTitleName(rt) + "(100)"
+			expected := effectiveTitleName(rt) + "(100)" + expectedIssueSuffix(rt, resources)
 			if title != expected {
 				t.Errorf("non-truncated: expected %q, got %q", expected, title)
 			}
@@ -483,7 +483,7 @@ func TestResourceList_FrameTitle_Pagination_AllResourceTypes(t *testing.T) {
 				Append: false,
 			})
 			title = m.FrameTitle()
-			expected = effectiveTitleName(rt) + "(100+)"
+			expected = effectiveTitleName(rt) + "(100+)" + expectedIssueSuffix(rt, resources)
 			if title != expected {
 				t.Errorf("truncated: expected %q, got %q", expected, title)
 			}

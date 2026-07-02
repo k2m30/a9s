@@ -42,20 +42,26 @@ type ListState struct {
 	PaginationCursor string `json:"pagination_cursor,omitempty"`
 
 	// Inventory fields from docs/web-ui-state-inventory.md §ResourceListModel.
-	HasPagination    bool                `json:"has_pagination,omitempty"`
-	AutoOpenSingle   bool                `json:"auto_open_single,omitempty"`
-	RelatedIDSet     map[string]struct{} `json:"related_id_set,omitempty"`
-	FetchFilter      map[string]string   `json:"fetch_filter,omitempty"`
-	ParentContext    map[string]string   `json:"parent_context,omitempty"`
-	DisplayName      string              `json:"display_name,omitempty"`
-	TitleSuffix      string              `json:"title_suffix,omitempty"`
-	EscPops          bool                `json:"esc_pops,omitempty"`
-	ShowIssueBadge   bool                `json:"show_issue_badge,omitempty"`
+	HasPagination  bool                `json:"has_pagination,omitempty"`
+	AutoOpenSingle bool                `json:"auto_open_single,omitempty"`
+	RelatedIDSet   map[string]struct{} `json:"related_id_set,omitempty"`
+	FetchFilter    map[string]string   `json:"fetch_filter,omitempty"`
+	ParentContext  map[string]string   `json:"parent_context,omitempty"`
+	DisplayName    string              `json:"display_name,omitempty"`
+	TitleSuffix    string              `json:"title_suffix,omitempty"`
+	EscPops        bool                `json:"esc_pops,omitempty"`
 
 	// Loading tracks whether the initial fetch is still in flight.
 	Loading bool `json:"loading,omitempty"`
 	// LoadingMore tracks whether an m-key load-more fetch is in flight.
 	LoadingMore bool `json:"loading_more,omitempty"`
+	// Refreshing is true when the screen opened with rows seeded from a
+	// cache-first source (session ProbeResources, a previous visit's
+	// ResourceCache, or the on-disk availability cache) while a fresh fetch
+	// is still in flight to confirm/replace them. Cleared once the fetch's
+	// ResourcesLoaded result lands. Distinct from Loading, which gates the
+	// no-rows-known spinner path.
+	Refreshing bool `json:"refreshing,omitempty"`
 }
 
 // DetailState holds the mutable display state for a resource-detail screen.
@@ -78,12 +84,12 @@ type DetailState struct {
 	// ON (mirrors rightColVisible in the TUI). Auto-show (initDetailRelatedRows)
 	// does NOT set this flag. Used by buildDetailFooterHints to gate the
 	// "tab: Cols" hint, which matches DetailModel.BottomHints checking m.rightColVisible.
-	RelatedUserVisible bool  `json:"related_user_visible,omitempty"`
-	RelatedFocus       bool  `json:"related_focus,omitempty"`
-	RelatedCursor  int    `json:"related_cursor"`
-	RelatedScroll  int    `json:"related_scroll"`
-	RelatedFilter  string `json:"related_filter,omitempty"`
-	RelatedFilterActive bool `json:"related_filter_active,omitempty"`
+	RelatedUserVisible  bool   `json:"related_user_visible,omitempty"`
+	RelatedFocus        bool   `json:"related_focus,omitempty"`
+	RelatedCursor       int    `json:"related_cursor"`
+	RelatedScroll       int    `json:"related_scroll"`
+	RelatedFilter       string `json:"related_filter,omitempty"`
+	RelatedFilterActive bool   `json:"related_filter_active,omitempty"`
 
 	// Per-screen data: set once at push via EnsureDetailState, updated by enrichment.
 	Resource resource.Resource `json:"resource,omitzero"`
@@ -102,7 +108,7 @@ type DetailState struct {
 type DetailRelatedRow struct {
 	TargetType  string            `json:"target_type"`
 	DisplayName string            `json:"display_name"`
-	Count       int               `json:"count"`      // -1 = loading
+	Count       int               `json:"count"` // -1 = loading
 	Loading     bool              `json:"loading,omitempty"`
 	Err         string            `json:"err,omitempty"`
 	Approximate bool              `json:"approximate,omitempty"`

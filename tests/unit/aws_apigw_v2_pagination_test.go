@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -42,6 +43,10 @@ type apigwPaginatedFake struct {
 	// pages maps apiID → ordered pages of GetStagesOutput.
 	pages map[string][]*apigatewayv2.GetStagesOutput
 
+	// mu guards callCounts, which is written concurrently: EnrichAPIGatewayStage
+	// fans out GetStages calls per resource via internal/aws.ForEachParallel
+	// (EnrichmentParallelism goroutines).
+	mu sync.Mutex
 	// callCounts tracks how many times GetStages was called per API ID.
 	callCounts map[string]int
 }
@@ -62,8 +67,10 @@ func (f *apigwPaginatedFake) GetStages(
 	if in != nil && in.ApiId != nil {
 		apiID = *in.ApiId
 	}
+	f.mu.Lock()
 	idx := f.callCounts[apiID]
 	f.callCounts[apiID] = idx + 1
+	f.mu.Unlock()
 
 	pages := f.pages[apiID]
 	if idx >= len(pages) {
@@ -73,6 +80,14 @@ func (f *apigwPaginatedFake) GetStages(
 		}, nil
 	}
 	return pages[idx], nil
+}
+
+// callsFor returns the recorded GetStages call count for apiID, safe for
+// concurrent use with the fake's GetStages method.
+func (f *apigwPaginatedFake) callsFor(apiID string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.callCounts[apiID]
 }
 
 // Compile-time check: apigwPaginatedFake satisfies APIGatewayV2API.
@@ -146,7 +161,7 @@ func TestEnrichAPIGatewayStage_PaginatesStages(t *testing.T) {
 	}
 
 	// GetStages must have been called twice
-	calls := fake.callCounts[apiID]
+	calls := fake.callsFor(apiID)
 	if calls != 2 {
 		t.Errorf("GetStages called %d times, want 2", calls)
 	}
@@ -189,7 +204,7 @@ func TestEnrichAPIGatewayStage_CappedAtPerParentPageCap(t *testing.T) {
 	}
 
 	// GetStages must be called exactly PerParentPageCap times
-	calls := fake.callCounts[apiID]
+	calls := fake.callsFor(apiID)
 	if calls != awsclient.PerParentPageCap {
 		t.Errorf("GetStages called %d times, want exactly %d (PerParentPageCap)", calls, awsclient.PerParentPageCap)
 	}

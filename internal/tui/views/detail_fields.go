@@ -158,6 +158,7 @@ func (m *DetailModel) injectAttentionSection() {
 	type entry struct {
 		tier          string
 		primary       string
+		detail        string // S5 operator sentence (Finding.Detail); "" ⇒ Phrase-only, no extra line
 		rows          []domain.DetailRow
 		splitKeyValue bool // when true: Key=primary (raw phrase), Value=glyph+capitalizedPhrase (display)
 	}
@@ -189,7 +190,7 @@ func (m *DetailModel) injectAttentionSection() {
 		// renders "raw phrase: ! Capitalized phrase" so callers can match against
 		// the original lowercase text; the TUI viewport renders only the Value to
 		// keep the line short enough to fit the viewport.
-		entries = append(entries, entry{tier: tier, primary: f.Phrase, rows: rows, splitKeyValue: true})
+		entries = append(entries, entry{tier: tier, primary: f.Phrase, detail: f.Detail, rows: rows, splitKeyValue: true})
 	}
 	if len(entries) == 0 {
 		return
@@ -213,6 +214,18 @@ func (m *DetailModel) injectAttentionSection() {
 		Path:      "Attention",
 		ColorTier: capTierToRowBucket(headerTier, rowBucket),
 	})
+	// lastEntryBare tracks whether the final entry rendered no Detail line and
+	// no AttentionDetail rows — i.e. its Phrase sub-field is the very last
+	// Attention-block line. In that case the trailing spacer below would sit
+	// directly against the bare Phrase line, reading as a stray blank Detail
+	// placeholder; omit it there and let the next real field follow directly.
+	// Richer entries (Detail present, or rows present) keep the spacer as the
+	// visual separator from subsequent identity/AWS fields.
+	//
+	// Mirrored in internal/app/detail_body.go injectAttentionSectionDetail —
+	// keep both in lockstep (TestDetailRenderParity requires byte-identical
+	// output between View() and RenderDetail()).
+	lastEntryBare := false
 	for _, e := range entries {
 		glyph := e.tier
 		if glyph != "!" && glyph != "~" {
@@ -241,6 +254,21 @@ func (m *DetailModel) injectAttentionSection() {
 			Path:        "Attention",
 			ColorTier:   entryColor,
 		})
+		if e.detail != "" {
+			// S5 operator sentence: its own line alongside the S4 Phrase above.
+			// Key==Value (general sub-field path) so it always renders as the
+			// plain sentence in both TUI and plainMode, tier-colored to match
+			// the Phrase line. Omitted entirely when Detail=="" — no stray
+			// blank line, Phrase-only fallback.
+			items = append(items, fieldpath.FieldItem{
+				IsSubField:  true,
+				IndentLevel: 1,
+				Key:         e.detail,
+				Value:       e.detail,
+				Path:        "Attention",
+				ColorTier:   entryColor,
+			})
+		}
 		for _, row := range e.rows {
 			tier := row.Tier
 			if tier == "" {
@@ -255,10 +283,14 @@ func (m *DetailModel) injectAttentionSection() {
 				ColorTier:   capTierToRowBucket(tier, rowBucket),
 			})
 		}
+		lastEntryBare = e.detail == "" && len(e.rows) == 0
 	}
 	// Blank line below the Attention block so the section is visually separated
-	// from identity / AWS fields that follow.
-	items = append(items, fieldpath.FieldItem{IsSpacer: true, Path: "Attention"})
+	// from identity / AWS fields that follow. Omitted when the last entry is a
+	// bare Phrase-only line (no Detail, no rows) — see lastEntryBare above.
+	if !lastEntryBare {
+		items = append(items, fieldpath.FieldItem{IsSpacer: true, Path: "Attention"})
+	}
 	m.fieldList = append(items, m.fieldList...)
 }
 

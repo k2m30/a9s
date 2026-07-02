@@ -4,6 +4,7 @@ package aws
 import (
 	"context"
 	"strings"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
@@ -15,8 +16,8 @@ import (
 
 // apigw canonical FindingCodes.
 const (
-	apigwCodeNoDeployedStages   domain.FindingCode = "apigw.no-deployed-stages"
-	apigwCodeStageConfigIssues  domain.FindingCode = "apigw.stage-config-issues"
+	apigwCodeNoDeployedStages  domain.FindingCode = "apigw.no-deployed-stages"
+	apigwCodeStageConfigIssues domain.FindingCode = "apigw.stage-config-issues"
 )
 
 // EnrichAPIGatewayStage calls GetStages per API (cap EnrichmentCap)
@@ -39,22 +40,22 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 		return result, nil
 	}
 	truncated := len(resources) > EnrichmentCap
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 		apiID := r.ID
 		if apiID == "" {
-			continue
+			return
 		}
 		var stages []apigatewayv2types.Stage
 		stagesTruncated := false
 		var stagesNextToken *string
 		stagePages := 0
+		fetchErr := false
 		for {
 			if stagePages >= PerParentPageCap {
 				stagesTruncated = true
-				result.TruncatedIDs[r.ID] = true
 				break
 			}
 			out, err := clients.APIGatewayV2.GetStages(ctx, &apigatewayv2.GetStagesInput{
@@ -63,8 +64,7 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 			})
 			stagePages++
 			if err != nil {
-				truncated = true
-				result.TruncatedIDs[r.ID] = true
+				fetchErr = true
 				break
 			}
 			stages = append(stages, out.Items...)
@@ -78,7 +78,6 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 		if stagesTruncated {
 			stagesCountStr = resource.FormatApproximate(len(stages))
 		}
-		result.FieldUpdates[apiID] = map[string]string{"stages_count": stagesCountStr}
 		var summaries []string
 		var rows []domain.DetailRow
 
@@ -123,19 +122,28 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 			}
 		}
 
+		mu.Lock()
+		defer mu.Unlock()
+
+		if stagesTruncated || fetchErr {
+			truncated = true
+			result.TruncatedIDs[r.ID] = true
+		}
+		result.FieldUpdates[apiID] = map[string]string{"stages_count": stagesCountStr}
+
 		stagesCount := len(stages)
-		if stagesCount == 0 && !stagesTruncated && !result.TruncatedIDs[r.ID] {
+		if stagesCount == 0 && !stagesTruncated && !fetchErr {
 			// No deployed stages — surface as an informational finding.
 			// Only emitted when stage fetch succeeded (no error, no page cap).
 			setWave2Finding(&result, apiID, apigwCodeNoDeployedStages, "no deployed stages", "~", "apigw", []domain.DetailRow{{
 				Label: "Issue",
 				Value: "no deployed stages",
 				Tier:  "~",
-			}})
-			continue
+			}}, "")
+			return
 		}
 		if len(summaries) == 0 {
-			continue
+			return
 		}
 		// Deduplicate repeated summary messages.
 		seen := make(map[string]bool)
@@ -146,8 +154,8 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 				uniqueSummaries = append(uniqueSummaries, s)
 			}
 		}
-		setWave2Finding(&result, apiID, apigwCodeStageConfigIssues, strings.Join(uniqueSummaries, "; "), "~", "apigw", rows)
-	}
+		setWave2Finding(&result, apiID, apigwCodeStageConfigIssues, strings.Join(uniqueSummaries, "; "), "~", "apigw", rows, "")
+	})
 	// All API Gateway findings are severity "~" (informational).
 	// IssueCount counts only "!" severity findings; "~" do not contribute.
 	result.IssueCount = 0

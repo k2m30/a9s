@@ -111,7 +111,6 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		if result.DisplayAlias != "" {
 			rl.SetDisplayName(result.DisplayAlias)
 		}
-		rl.SetShowIssueBadge(true)
 		rl.SetSize(m.innerSize())
 		issueCount := m.ctrl.GetMenuIssueCounts()[canon]
 		issueTrunc := m.ctrl.GetMenuIssueTruncated()[canon]
@@ -141,7 +140,6 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		if result.DisplayAlias != "" {
 			rl.SetDisplayName(result.DisplayAlias)
 		}
-		rl.SetShowIssueBadge(true)
 		rl.SetSize(m.innerSize())
 		issueCount := m.ctrl.GetMenuIssueCounts()[canon]
 		issueTrunc := m.ctrl.GetMenuIssueTruncated()[canon]
@@ -580,8 +578,8 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		// loading rows immediately rather than stale counts.
 		m.ctrl.ResetDetailRelatedRows(rt)
 		m.core.RelatedCacheDelete(runtime.RelatedCacheKey(rt, srcRes.ID))
-		m.core.BumpRelatedGen() // cancel in-flight results from previous batch
-		m.core.BumpEnrichGen()  // cancel in-flight enrichment from previous batch
+		m.core.BumpRelatedGen()    // cancel in-flight results from previous batch
+		m.core.BumpEnrichGen()     // cancel in-flight enrichment from previous batch
 		m.core.ClearEnrichResKey() // force gen bump on next enrichment dispatch
 		// Invalidate the SES v1 receipt rule set cache so Ctrl+R on a detail
 		// view picks up receipt-rule changes without requiring a profile/region
@@ -621,16 +619,23 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	escPops := m.ctrl.GetListEscPops()
 
 	// Pre-fetch cleanup: strip stale Wave 2 findings from all cached rows of
-	// this type BEFORE deleting the cache entry. applyEnrichment walks
-	// ResourceCache[rt] to find rows; because the active ResourceListModel's
-	// allResources slice shares the same backing array as entry.Resources, the
-	// mutation clears both the cache copy and the view's rows in one pass.
-	// Deleting the cache entry afterwards is still correct (forces a fresh
-	// fetch); the view rows are already cleared. This fixes the PR #310
-	// CodeRabbit finding A: previously delete() ran first so applyEnrichment
-	// found no rows and the rl's slice retained stale wave2 state.
+	// this type BEFORE deleting the cache entry. applyEnrichment walks the
+	// session-owned ResourceCache[rt]/LazyResourceCache/ProbeResources to find
+	// rows. Deleting the cache entry afterwards is still correct (forces a
+	// fresh fetch). This fixes the PR #310 CodeRabbit finding A: previously
+	// delete() ran first so applyEnrichment found no rows and stale wave2
+	// state survived.
+	//
+	// applyEnrichment only mutates the session-owned stores above — it does
+	// NOT reach the controller's own row stores (ls.Rows / c.resourceCache),
+	// which applyResourcesLoaded populates as independent MaterializeListFields
+	// copies (not aliases) of the session rows. ActiveListResources() and the
+	// rendered ResourceListModel read from the controller's stores, so without
+	// the explicit ClearRowFindings call below, Ctrl+R would clear the session
+	// copy while the active list view keeps showing the stale Wave-2 finding.
 	if parentCtx == nil && !escPops {
 		(&m).applyEnrichment(rt, nil, nil)
+		m.ctrl.ClearRowFindings(rt)
 	}
 
 	m.core.DeleteResourceCache(rt) // clear cache for refreshed type only

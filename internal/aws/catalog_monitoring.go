@@ -288,11 +288,12 @@ var monitoringChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 		},
 	},
 	{
-		Name:      "Log Events",
-		ShortName: "log_events",
-		Columns:   resource.LogEventColumns(),
-		Color:     colorWave1OrHealthy,
-		FieldKeys: []string{"timestamp", "message", "ingestion_time", "event_id"},
+		Name:         "Log Events",
+		ShortName:    "log_events",
+		TitleOmitsID: true,
+		Columns:      resource.LogEventColumns(),
+		Color:        colorWave1OrHealthy,
+		FieldKeys:    []string{"timestamp", "message", "ingestion_time", "event_id"},
 		ChildFetcher: func(ctx context.Context, clients any, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			c, ok := clients.(*ServiceClients)
 			if !ok || c == nil {

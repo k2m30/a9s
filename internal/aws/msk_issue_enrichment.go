@@ -4,7 +4,9 @@ package aws
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	kafkasvc "github.com/aws/aws-sdk-go-v2/service/kafka"
@@ -16,8 +18,8 @@ import (
 
 // msk canonical FindingCodes.
 const (
-	mskCodeBrokerOutdated    domain.FindingCode = "msk.broker-outdated"
-	mskCodeEncryptionNotTLS  domain.FindingCode = "msk.encryption-not-tls"
+	mskCodeBrokerOutdated   domain.FindingCode = "msk.broker-outdated"
+	mskCodeEncryptionNotTLS domain.FindingCode = "msk.encryption-not-tls"
 )
 
 // EnrichMSKCluster calls DescribeClusterV2 per provisioned MSK cluster (cap EnrichmentCap)
@@ -38,41 +40,45 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 	truncated := len(resources) > EnrichmentCap
 	var failures []string
 	total := 0
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 		// DescribeClusterV2 requires the cluster ARN. The msk fetcher (msk.go)
 		// sets ID = cluster name and stores the ARN in Fields["cluster_arn"].
 		// Passing r.ID errors with ValidationError.
 		clusterARN := r.Fields["cluster_arn"]
 		if clusterARN == "" {
-			continue
+			return
 		}
+		mu.Lock()
 		total++
+		mu.Unlock()
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kafkasvc.DescribeClusterV2Output, error) {
 			return clients.MSK.DescribeClusterV2(ctx, &kafkasvc.DescribeClusterV2Input{
 				ClusterArn: aws.String(clusterARN),
 			})
 		})
+		mu.Lock()
+		defer mu.Unlock()
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
-			continue
+			return
 		}
 		if out.ClusterInfo == nil {
-			continue
+			return
 		}
 		prov := out.ClusterInfo.Provisioned
 		if prov == nil {
 			// Serverless cluster — skip checks.
-			continue
+			return
 		}
 		// Check broker software version.
 		if prov.CurrentBrokerSoftwareInfo != nil && prov.CurrentBrokerSoftwareInfo.KafkaVersion != nil {
 			if isMSKVersionOutdated(*prov.CurrentBrokerSoftwareInfo.KafkaVersion) {
-				setWave2Finding(&result, r.ID, mskCodeBrokerOutdated, "broker software outdated", "~", "msk", nil)
+				setWave2Finding(&result, r.ID, mskCodeBrokerOutdated, "broker software outdated", "~", "msk", nil, "")
 			}
 		}
 		// Check encryption in transit (only set finding if not already set).
@@ -80,10 +86,11 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 			if prov.EncryptionInfo != nil &&
 				prov.EncryptionInfo.EncryptionInTransit != nil &&
 				prov.EncryptionInfo.EncryptionInTransit.ClientBroker != kafkatypes.ClientBrokerTls {
-				setWave2Finding(&result, r.ID, mskCodeEncryptionNotTLS, "encryption in transit not enforced", "~", "msk", nil)
+				setWave2Finding(&result, r.ID, mskCodeEncryptionNotTLS, "encryption in transit not enforced", "~", "msk", nil, "")
 			}
 		}
-	}
+	})
+	sort.Strings(failures)
 	// All MSK findings are severity "~" (informational) and do not contribute to the
 	// attention menu badge. IssueCount is always 0 for this enricher.
 	result.IssueCount = 0

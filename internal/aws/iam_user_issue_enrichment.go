@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -18,8 +19,8 @@ import (
 
 // iam-user canonical FindingCodes.
 const (
-	iamUserCodeNoMFA   domain.FindingCode = "iam-user.no-mfa"
-	iamUserCodeOldKey  domain.FindingCode = "iam-user.old-key"
+	iamUserCodeNoMFA  domain.FindingCode = "iam-user.no-mfa"
+	iamUserCodeOldKey domain.FindingCode = "iam-user.old-key"
 )
 
 // EnrichIAMUserMFA calls GetLoginProfile + ListMFADevices + ListAccessKeys per user
@@ -48,16 +49,16 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 
 	truncated := len(resources) > EnrichmentCap
 	issueCount := 0
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 		userName := r.Fields["user_name"]
 		if userName == "" {
 			userName = r.ID
 		}
 		if userName == "" {
-			continue
+			return
 		}
 
 		// Determine if the user has a console password via GetLoginProfile.
@@ -72,9 +73,11 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 				(errors.As(err, &apiErr) && apiErr.ErrorCode() == "NoSuchEntityException")
 			if !isNoSuchEntity {
 				// Unexpected error — skip this user but flag truncation.
+				mu.Lock()
 				truncated = true
 				result.TruncatedIDs[r.ID] = true
-				continue
+				mu.Unlock()
+				return
 			}
 			// NoSuchEntityException means the user has no console password.
 		} else {
@@ -85,6 +88,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 		severity := "~"
 		hasMFA := false
 		riskLabel := ""
+		localIssue := false
 
 		// Check MFA only for console users.
 		if hasConsolePassword {
@@ -92,9 +96,11 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 				UserName: aws.String(userName),
 			})
 			if mfaErr != nil {
+				mu.Lock()
 				truncated = true
 				result.TruncatedIDs[r.ID] = true
-				continue
+				mu.Unlock()
+				return
 			}
 			hasMFA = len(mfaOut.MFADevices) > 0
 			if !hasMFA {
@@ -104,7 +110,7 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 					Tier:  "!",
 				})
 				severity = "!"
-				issueCount++
+				localIssue = true
 				riskLabel = "NO_MFA"
 			}
 		}
@@ -114,9 +120,11 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 			UserName: aws.String(userName),
 		})
 		if keysErr != nil {
+			mu.Lock()
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
-			continue
+			mu.Unlock()
+			return
 		}
 		hasOldKey := false
 		for _, key := range keysOut.AccessKeyMetadata {
@@ -149,21 +157,27 @@ func EnrichIAMUserMFA(ctx context.Context, clients *ServiceClients, resources []
 		if hasMFA || !hasConsolePassword {
 			mfaVal = "true"
 		}
+
+		mu.Lock()
+		defer mu.Unlock()
+		if localIssue {
+			issueCount++
+		}
 		result.FieldUpdates[r.ID] = map[string]string{
 			"mfa":  mfaVal,
 			"risk": riskLabel,
 		}
 
 		if len(rows) == 0 {
-			continue
+			return
 		}
 		// Use the no-mfa code when severity is "!", otherwise old-key code.
 		code := iamUserCodeOldKey
 		if severity == "!" {
 			code = iamUserCodeNoMFA
 		}
-		setWave2Finding(&result, r.ID, code, rows[0].Value, severity, "iam-user", rows)
-	}
+		setWave2Finding(&result, r.ID, code, rows[0].Value, severity, "iam-user", rows, "")
+	})
 	result.IssueCount = issueCount
 	result.Truncated = truncated
 	return result, nil

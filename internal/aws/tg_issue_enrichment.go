@@ -4,6 +4,8 @@ package aws
 import (
 	"context"
 	"fmt"
+	"sort"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
@@ -34,12 +36,12 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 	truncated := len(resources) > EnrichmentCap
 	var failures []string
 	total := 0
-	for i, r := range resources {
-		if i >= EnrichmentCap {
-			break
-		}
+	n := min(len(resources), EnrichmentCap)
+	var mu sync.Mutex
+	_ = ForEachParallel(ctx, n, EnrichmentParallelism, func(i int) {
+		r := resources[i]
 		if r.ID == "" {
-			continue
+			return
 		}
 		// DescribeTargetHealth requires the full ARN, not the bare target-group
 		// name. Resource.ID is the name (set by the fetcher for display); the
@@ -47,19 +49,23 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 		// error with "target group not found" on both demo fake and real AWS.
 		tgARN := r.Fields["target_group_arn"]
 		if tgARN == "" {
-			continue
+			return
 		}
+		mu.Lock()
 		total++
+		mu.Unlock()
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elasticloadbalancingv2.DescribeTargetHealthOutput, error) {
 			return clients.ELBv2.DescribeTargetHealth(ctx, &elasticloadbalancingv2.DescribeTargetHealthInput{
 				TargetGroupArn: aws.String(tgARN),
 			})
 		})
+		mu.Lock()
+		defer mu.Unlock()
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", r.ID, err))
 			truncated = true
 			result.TruncatedIDs[r.ID] = true
-			continue
+			return
 		}
 		targetCount := len(out.TargetHealthDescriptions)
 		unhealthy := 0
@@ -89,9 +95,10 @@ func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resou
 			if firstReason != "" {
 				rows = append(rows, domain.DetailRow{Label: "Reason", Value: firstReason, Tier: "~"})
 			}
-			setWave2Finding(&result, r.ID, tgCodeUnhealthyTargets, fmt.Sprintf("unhealthy targets: %d/%d", unhealthy, targetCount), "!", "tg", rows)
+			setWave2Finding(&result, r.ID, tgCodeUnhealthyTargets, fmt.Sprintf("unhealthy targets: %d/%d", unhealthy, targetCount), "!", "tg", rows, "")
 		}
-	}
+	})
+	sort.Strings(failures)
 	result.IssueCount = len(result.Findings)
 	result.Truncated = truncated
 	return result,

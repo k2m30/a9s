@@ -84,3 +84,68 @@ func DrainSyncContextProgress(ctx context.Context, c *Controller, pending []runt
 		}
 	}
 }
+
+// DrainSyncPartition behaves like DrainSyncContextProgress but partitions the
+// pending queue by isBackground: tasks classified background (isBackground
+// returns true) are collected — never executed — and returned to the caller
+// instead of being run inline, INCLUDING follow-up tasks emitted by tasks
+// that WERE executed. Tasks classified blocking (isBackground returns false)
+// run exactly as DrainSyncContextProgress would: executed via
+// Core.ExecuteTask, results fed through Controller.Handle, with any
+// follow-ups re-enqueued (subject to the same background/blocking split).
+//
+// This lets a caller (e.g. a web request handler) drain only the tasks whose
+// result the response needs (blocking) and hand background tasks (related-
+// check fan-out, detail enrichment, save-cache) to a goroutine that completes
+// after the response has already been written.
+//
+// onEvent fires once per executed (blocking) task result — mirroring
+// DrainSyncProgress semantics — and is never invoked for tasks that were
+// deferred as background without executing. onEvent may be nil.
+func DrainSyncPartition(
+	ctx context.Context,
+	c *Controller,
+	pending []runtime.TaskRequest,
+	isBackground func(runtime.TaskKind) bool,
+	onEvent func(),
+) []runtime.TaskRequest {
+	var deferred []runtime.TaskRequest
+
+	iterations := 0
+	for len(pending) > 0 {
+		if iterations >= maxDrainIterations {
+			break
+		}
+		iterations++
+
+		req := pending[0]
+		pending = pending[1:]
+
+		if isBackground != nil && isBackground(req.Key.Kind) {
+			deferred = append(deferred, req)
+			continue
+		}
+
+		ev, err := c.core.ExecuteTask(ctx, req)
+		if err != nil {
+			if errors.Is(err, runtime.ErrAdapterOnlyTask) {
+				// Renderer-only kind — irrelevant in a headless sync context.
+				continue
+			}
+			// Execution error: no event to dispatch, no follow-up tasks.
+			continue
+		}
+		if ev == nil {
+			// Task completed with no result to dispatch (e.g. save-cache no-op).
+			continue
+		}
+
+		_, followUp := c.Handle(ev)
+		pending = append(pending, followUp...)
+		if onEvent != nil {
+			onEvent()
+		}
+	}
+
+	return deferred
+}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
@@ -205,8 +206,8 @@ func TestFetchLogEvents_StatusClassification(t *testing.T) {
 	}
 }
 
-// TestFetchLogEvents_MessageTruncation verifies that the Name field is truncated
-// to at most 80 characters when the message exceeds that length.
+// TestFetchLogEvents_MessageTruncation verifies that the Name field is capped
+// to roughly 100 runes (rune-safe) when the message exceeds that length.
 func TestFetchLogEvents_MessageTruncation(t *testing.T) {
 	longMessage := strings.Repeat("a", 150)
 
@@ -231,9 +232,9 @@ func TestFetchLogEvents_MessageTruncation(t *testing.T) {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
 
-	t.Run("Name_truncated_to_80", func(t *testing.T) {
-		if len(resources[0].Name) > 80 {
-			t.Errorf("Name length should be <= 80, got %d", len(resources[0].Name))
+	t.Run("Name_capped_at_100_runes", func(t *testing.T) {
+		if len([]rune(resources[0].Name)) > 100 {
+			t.Errorf("Name length should be <= 100 runes, got %d", len([]rune(resources[0].Name)))
 		}
 	})
 
@@ -425,4 +426,176 @@ func TestFetchLogEvents_NewestFirst(t *testing.T) {
 	if mock.lastInput.StartFromHead == nil || *mock.lastInput.StartFromHead != false {
 		t.Errorf("StartFromHead should be false (newest first), got %v", mock.lastInput.StartFromHead)
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Clean-Name tests (bug fix): Name must be a clean, human-readable summary —
+// never a raw-JSON prefix or a byte-sliced multibyte string. Fields["message"]
+// must always retain the full RAW message unchanged.
+// ---------------------------------------------------------------------------
+
+// TestFetchLogEvents_Name_JSONMessage_ExtractsInnerMessageField verifies that
+// when the raw log message is a JSON object with a string "message" field,
+// Resource.Name is that inner value — not the raw "{...}" prefix.
+func TestFetchLogEvents_Name_JSONMessage_ExtractsInnerMessageField(t *testing.T) {
+	raw := `{"level":"INFO","message":"Lambda invocation event","timestamp":"2026-07-01T17:20:00Z"}`
+	mock := &mockCWLogsGetLogEventsClient{
+		output: &cloudwatchlogs.GetLogEventsOutput{
+			Events: []cwlogstypes.OutputLogEvent{
+				{Timestamp: aws.Int64(1711065600000), Message: aws.String(raw)},
+			},
+		},
+	}
+
+	result, err := awsclient.FetchLogEvents(context.Background(), mock, "/aws/lambda/json-msg", "stream-1", "")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+	r := result.Resources[0]
+
+	t.Run("Name_is_inner_message_value", func(t *testing.T) {
+		if r.Name != "Lambda invocation event" {
+			t.Errorf("Name: expected %q, got %q", "Lambda invocation event", r.Name)
+		}
+	})
+
+	t.Run("Name_does_not_start_with_brace", func(t *testing.T) {
+		if strings.HasPrefix(r.Name, "{") {
+			t.Errorf("Name must not be a raw-JSON prefix; got %q", r.Name)
+		}
+	})
+
+	t.Run("Fields_message_is_full_raw_JSON", func(t *testing.T) {
+		if r.Fields["message"] != raw {
+			t.Errorf("Fields[message] must equal the full raw message including braces; got %q, want %q", r.Fields["message"], raw)
+		}
+	})
+}
+
+// TestFetchLogEvents_Name_PlainTextMessage_UsesMessageVerbatim verifies that a
+// plain-text (non-JSON) message becomes the Name unchanged.
+func TestFetchLogEvents_Name_PlainTextMessage_UsesMessageVerbatim(t *testing.T) {
+	raw := "START RequestId: abc"
+	mock := &mockCWLogsGetLogEventsClient{
+		output: &cloudwatchlogs.GetLogEventsOutput{
+			Events: []cwlogstypes.OutputLogEvent{
+				{Timestamp: aws.Int64(1711065600000), Message: aws.String(raw)},
+			},
+		},
+	}
+
+	result, err := awsclient.FetchLogEvents(context.Background(), mock, "/aws/lambda/plain-msg", "stream-1", "")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+	r := result.Resources[0]
+
+	if r.Name != raw {
+		t.Errorf("Name: expected plain-text message verbatim %q, got %q", raw, r.Name)
+	}
+	if r.Fields["message"] != raw {
+		t.Errorf("Fields[message]: expected full raw message %q, got %q", raw, r.Fields["message"])
+	}
+}
+
+// TestFetchLogEvents_Name_MultiLineMessage_UsesFirstNonEmptyLineOnly verifies
+// that a multi-line message produces a Name containing only the first
+// non-empty line, with no embedded newline.
+func TestFetchLogEvents_Name_MultiLineMessage_UsesFirstNonEmptyLineOnly(t *testing.T) {
+	raw := "\n\nERROR something broke\nstack trace line 1\nstack trace line 2\n"
+	mock := &mockCWLogsGetLogEventsClient{
+		output: &cloudwatchlogs.GetLogEventsOutput{
+			Events: []cwlogstypes.OutputLogEvent{
+				{Timestamp: aws.Int64(1711065600000), Message: aws.String(raw)},
+			},
+		},
+	}
+
+	result, err := awsclient.FetchLogEvents(context.Background(), mock, "/aws/lambda/multiline-msg", "stream-1", "")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+	r := result.Resources[0]
+
+	t.Run("Name_has_no_newline", func(t *testing.T) {
+		if strings.Contains(r.Name, "\n") {
+			t.Errorf("Name must not contain an embedded newline; got %q", r.Name)
+		}
+	})
+
+	t.Run("Name_is_first_non_empty_line", func(t *testing.T) {
+		if r.Name != "ERROR something broke" {
+			t.Errorf("Name: expected first non-empty line %q, got %q", "ERROR something broke", r.Name)
+		}
+	})
+
+	t.Run("Fields_message_is_full_raw_multiline", func(t *testing.T) {
+		if r.Fields["message"] != raw {
+			t.Errorf("Fields[message] must equal the full raw message including newlines; got %q, want %q", r.Fields["message"], raw)
+		}
+	})
+}
+
+// TestFetchLogEvents_Name_LongMessage_CapsAtApprox100RunesRuneSafe verifies
+// that a very long message (>100 runes, including multibyte characters) is
+// capped to roughly 100 runes without splitting a multibyte rune — a naive
+// byte-slice (e.g. name[:100]) would corrupt a multibyte rune straddling the
+// cut point.
+func TestFetchLogEvents_Name_LongMessage_CapsAtApprox100RunesRuneSafe(t *testing.T) {
+	// Build a message where multibyte runes (emoji + CJK) straddle the
+	// approx-100-rune cut boundary, so a byte-slice cap would corrupt it.
+	prefix := strings.Repeat("a", 95)
+	multibyte := "日本語テスト🎉🎉🎉ending-tail-content-that-must-be-truncated-away"
+	raw := prefix + multibyte
+
+	mock := &mockCWLogsGetLogEventsClient{
+		output: &cloudwatchlogs.GetLogEventsOutput{
+			Events: []cwlogstypes.OutputLogEvent{
+				{Timestamp: aws.Int64(1711065600000), Message: aws.String(raw)},
+			},
+		},
+	}
+
+	result, err := awsclient.FetchLogEvents(context.Background(), mock, "/aws/lambda/long-msg", "stream-1", "")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+	r := result.Resources[0]
+
+	nameRunes := []rune(r.Name)
+
+	t.Run("Name_capped_to_approx_100_runes", func(t *testing.T) {
+		if len(nameRunes) > 100 {
+			t.Errorf("Name must be capped to ~100 runes, got %d runes: %q", len(nameRunes), r.Name)
+		}
+	})
+
+	t.Run("Name_is_valid_utf8_no_corrupted_rune", func(t *testing.T) {
+		if !utf8.ValidString(r.Name) {
+			t.Errorf("Name must be valid UTF-8 (rune-safe truncation); got invalid string %q", r.Name)
+		}
+		// A corrupted truncation would introduce the UTF-8 replacement
+		// character when a multibyte rune is split mid-sequence.
+		if strings.ContainsRune(r.Name, utf8.RuneError) {
+			t.Errorf("Name contains utf8.RuneError — truncation split a multibyte rune; got %q", r.Name)
+		}
+	})
+
+	t.Run("Fields_message_is_full_raw_multibyte", func(t *testing.T) {
+		if r.Fields["message"] != raw {
+			t.Errorf("Fields[message] must equal the full raw message including all multibyte runes; got %q, want %q", r.Fields["message"], raw)
+		}
+	})
 }
