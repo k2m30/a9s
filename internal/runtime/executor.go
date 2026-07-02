@@ -278,6 +278,25 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		if err != nil && len(res.Resources) == 0 {
 			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen}, nil
 		}
+		// C1: a verify-refetch must verify the content actually being shown,
+		// not just page 1 — so page up to the previously-cached depth. C5: a
+		// truncated first page must never downgrade a stored exact total;
+		// without this loop a 55-row cached/exact list would silently swap
+		// down to a 50-row truncated one. Bounded by CachedListDepth so this
+		// never fetches deeper than what was already shown.
+		for err == nil && res.Pagination != nil && res.Pagination.IsTruncated &&
+			res.Pagination.NextToken != "" && len(res.Resources) < c.CachedListDepth(resourceType) {
+			var more resource.FetchResult
+			more, err = c.FetchMoreResources(ctx, snap.Clients, FetchMoreParams{
+				ResourceType: resourceType,
+				Token:        res.Pagination.NextToken,
+			})
+			if err != nil {
+				break
+			}
+			res.Resources = append(res.Resources, more.Resources...)
+			res.Pagination = more.Pagination
+		}
 		return messages.ResourcesLoaded{
 			ResourceType: resourceType,
 			Resources:    res.Resources,

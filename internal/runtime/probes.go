@@ -200,6 +200,31 @@ func (c *Core) SaveResourceListCache(shortName string, rows []cache.Row, count i
 	return store.SaveType(shortName)
 }
 
+// CachedListDepth returns the number of rows previously persisted for
+// shortName's canonical top-level list, so a background verify-refetch
+// (KindFetchResources) can be bounded to at most the depth already shown to
+// the user (C1: re-verify must verify the content being shown, not just page
+// 1; C5: a truncated first-page fetch must never downgrade a stored exact
+// total — paginating up to the prior depth keeps the refetch from silently
+// shrinking a wider cached list back to a single page). Returns 0 when
+// caching is disabled or no stored rows exist for shortName, in which case
+// callers fall back to the un-paginated first-page result.
+func (c *Core) CachedListDepth(shortName string) int {
+	if c.session.NoCache {
+		return 0
+	}
+	store := c.EnsureCacheStore()
+	if store == nil {
+		return 0
+	}
+	canon := canonShortName(shortName)
+	tf, ok := store.Type(canon)
+	if !ok {
+		return 0
+	}
+	return len(tf.Rows)
+}
+
 // ProbeResourceAvailability calls the registered paginated fetcher for
 // shortName with a 10-second timeout, applies Wave-1 issue counting, and
 // returns the result. Adapters wrap this in platform-specific async
