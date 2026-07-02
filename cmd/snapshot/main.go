@@ -124,6 +124,14 @@ func main() {
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		log.Fatalf("snapshot: %v", err)
 	}
+	// MkdirAll is a no-op on an existing directory, so a dir created by an
+	// older binary keeps its wider mode — enforce explicitly (real resource
+	// names live under it).
+	// 0700, not 0600: a directory without the owner execute bit cannot be
+	// traversed at all — G302's file-oriented threshold doesn't fit dirs.
+	if err := os.Chmod(dir, 0o700); err != nil { //nolint:gosec // G302: dirs need +x
+		log.Printf("snapshot: warning: cannot tighten permissions on %s: %v", dir, err)
+	}
 	if err := writeJSON(path, snap); err != nil {
 		log.Fatalf("snapshot: %v", err)
 	}
@@ -171,5 +179,10 @@ func writeJSON(path string, v any) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o600)
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		return err
+	}
+	// WriteFile applies the mode only on creation — chmod pre-existing files
+	// written by older binaries down to owner-only.
+	return os.Chmod(path, 0o600)
 }

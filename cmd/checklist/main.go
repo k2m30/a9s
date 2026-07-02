@@ -74,6 +74,13 @@ func main() {
 	if err := os.MkdirAll(expDir, 0o750); err != nil {
 		log.Fatalf("checklist: %v", err)
 	}
+	// MkdirAll is a no-op on an existing directory — enforce the mode on dirs
+	// created by older binaries too.
+	// 0700, not 0600: a directory without the owner execute bit cannot be
+	// traversed at all — G302's file-oriented threshold doesn't fit dirs.
+	if err := os.Chmod(expDir, 0o700); err != nil { //nolint:gosec // G302: dirs need +x
+		log.Printf("checklist: warning: cannot tighten permissions on %s: %v", expDir, err)
+	}
 
 	// The collector writes ONE big file with a section per type; each per-type
 	// checklist generator gets its raw section.
@@ -120,5 +127,10 @@ func writeJSON(path string, v any) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o600)
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		return err
+	}
+	// WriteFile applies the mode only on creation — chmod pre-existing files
+	// written by older binaries down to owner-only.
+	return os.Chmod(path, 0o600)
 }

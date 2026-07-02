@@ -29,6 +29,7 @@
 package unit_test
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/domain"
@@ -170,17 +171,6 @@ func TestController_ListIssueCount_TitleSuffixParity_MatchesMenuAggregation(t *t
 	}
 }
 
-// itoaParity avoids importing strconv in this small parity-focused file;
-// mirrors itoaPad's non-negative-int-to-string need without its zero-padding.
 func itoaParity(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	digits := "0123456789"
-	var buf []byte
-	for n > 0 {
-		buf = append([]byte{digits[n%10]}, buf...)
-		n /= 10
-	}
-	return string(buf)
+	return strconv.Itoa(n)
 }

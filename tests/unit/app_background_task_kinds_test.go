@@ -1,15 +1,12 @@
-// app_background_task_kinds_test.go — RED-phase pin for app.IsBackgroundTaskKind.
+// app_background_task_kinds_test.go — contract pin for app.IsBackgroundTaskKind.
 //
-// TDD RED: app.IsBackgroundTaskKind does not exist yet. This file is
-// compile-red until the web detail-latency fix adds it to internal/app.
-//
-// Contract (per the fix task spec): IsBackgroundTaskKind classifies a
+// Contract: IsBackgroundTaskKind classifies a
 // runtime.TaskKind as "background" (its result feeds internal/session state
 // that a later render consumes, rather than being the screen content itself)
 // versus "blocking" (its result IS the screen content, or it is a
 // renderer-only adapter task that must complete before the screen is usable).
 //
-// Background kinds (exactly 4, per spec):
+// Background kinds (exactly 4):
 //
 //	runtime.KindRelatedCheck     — related-panel fan-out; result feeds RelatedCache/RelatedRows async.
 //	runtime.KindEnrichDetail     — Wave-2 detail enrichment; result patches DetailState async.
