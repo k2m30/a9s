@@ -82,6 +82,9 @@ body { background: var(--bg); color: var(--fg); height: 100vh; overflow: hidden;
 .menu-entry .name { color: var(--accent); }
 .menu-entry .avail { color: var(--ok); }
 .menu-entry .avail.zero { color: var(--dim); }
+/* DEF-6/C3: a disk-cache-seeded, not-yet-re-verified count is dimmed
+   distinctly from the confirmed-empty (.zero) dim above. */
+.menu-entry .avail.origin-cache { color: var(--dim); }
 .menu-entry .badge { color: var(--err); font-size: 12px; }
 .menu-entry .alias { color: var(--dim); margin-left: auto; }
 .menu-section { list-style: none; color: var(--dim); padding: 6px 8px 1px; font-size: 12px; letter-spacing: 0.05em; }
@@ -114,6 +117,7 @@ body { background: var(--bg); color: var(--fg); height: 100vh; overflow: hidden;
 .list-table tr:hover td  { background: var(--border); }
 .list-filter { color: var(--warn); font-style: italic; margin-bottom: 4px; }
 .list-loading { color: var(--dim); font-style: italic; }
+.list-error { color: var(--err); font-style: italic; }
 .list-truncated { color: var(--warn); font-size: 12px; }
 
 /* detail */

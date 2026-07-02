@@ -67,8 +67,36 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 				// Store under the key as emitted by the runtime (may be an alias
 				// such as "rds" for ShortName "dbi"). buildMenuBody resolves the
 				// active key per item using menuActiveKey().
-				ms.Availability[v.ResourceType] = v.Count
-				ms.Truncated[v.ResourceType] = v.Truncated
+				//
+				// DEF-2/C5: a truncated probe result must never downgrade an
+				// already-exact stored total — mirrors the guard
+				// SaveResourceListCache/SaveAvailabilityCache already apply on the
+				// disk-persist path (internal/runtime/probes.go). Exactness only
+				// ever advances: an untruncated observation always wins; a
+				// truncated one only wins when the current entry is itself unknown
+				// or already truncated, or reports a count that is not SMALLER than
+				// the one already stored (equal or larger) — a same-count update
+				// that only flips Truncated (e.g. toggling the lower-bound marker
+				// on an unchanged count) is not the "downgrade" C5 forbids; only a
+				// truncated result reporting FEWER items than the stored exact
+				// total is.
+				curCount, known := ms.Availability[v.ResourceType]
+				curTruncated := ms.Truncated[v.ResourceType]
+				if !v.Truncated || !known || curTruncated || v.Count >= curCount {
+					ms.Availability[v.ResourceType] = v.Count
+					ms.Truncated[v.ResourceType] = v.Truncated
+				}
+				// DEF-6/C3: track cache-seeded vs live-verified origin
+				// independently of the exactness guard above — a truncated
+				// sweep result that loses the count/truncated race still
+				// means the type WAS live-checked this session, so its
+				// origin must still flip to "verified".
+				if v.Origin != "" {
+					if ms.Origin == nil {
+						ms.Origin = make(map[string]string)
+					}
+					ms.Origin[v.ResourceType] = v.Origin
+				}
 			}
 
 		case runtime.PatchMenu:
@@ -168,6 +196,13 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 			// than leaving it stuck Loading=true (emitted by HandleAPIError).
 			if ls := c.topListState(); ls != nil {
 				ls.Loading = false
+				// DEF-5/C4: a fetch failure over cached content stops the
+				// refreshing marker and swaps in an error marker instead —
+				// nothing goes blank, rows stay on screen.
+				if v.Err != "" {
+					ls.Refreshing = false
+					ls.LastFetchError = v.Err
+				}
 			}
 
 		case runtime.SetErrorHintIntent:
@@ -217,4 +252,3 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 	}
 	return c.snapshot()
 }
-

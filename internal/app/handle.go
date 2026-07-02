@@ -82,20 +82,11 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 		c.handleRelatedCheckBatch(batch)
 	}
 
-	// messages.APIError: a failed fetch clears the list Loading flag and surfaces
-	// an error flash. The TUI bumps flash.gen before calling HandleAPIError; the
-	// headless controller has no flash.gen, so ConnectGen serves as stable stand-in
-	// (same pattern as ActionSelectProfile/Region). The FlashTick task returned by
-	// HandleAPIError is suppressed here — it is only meaningful in a running event
-	// loop (TUI/web timer); the headless path has no loop to process it.
-	// IsStale is not applicable here — APIError has AcceptZeroGen=true.
-	if msg, ok := ev.(messages.APIError); ok {
-		apiIntents, _ := c.core.HandleAPIError(runtime.APIErrorEvent{
-			Err:    msg.Err,
-			NewGen: c.core.ConnectGen(),
-		})
-		c.applyIntents(apiIntents)
-	}
+	// messages.APIError: routed entirely through runtime.Core.HandleEvent
+	// (the case added there mirrors this same ConnectGen stand-in + intent
+	// application) — DEF-5's orchestrator gap fix. Handling it a second time
+	// here would double-apply the ClearActiveListLoadingIntent/FlashIntent
+	// the Core already returns via the intents/tasks captured above.
 
 	// messages.IdentityError: the identity fetch failed. Core.HandleEvent routes
 	// this through HandleIdentityError which clears IdentityFetching but does not

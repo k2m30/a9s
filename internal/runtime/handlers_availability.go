@@ -58,11 +58,15 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 	var intents []UIIntent
 
 	// Emit one PatchMenuAvailability intent per resource type with cached data.
+	// DEF-6/C3: Origin="cache" — seeded from disk, not yet re-verified this
+	// session (handleAvailabilityChecked flips it to "verified" once the
+	// matching live probe result lands).
 	for shortName, count := range entries {
 		intents = append(intents, PatchMenuAvailability{
 			ResourceType: shortName,
 			Count:        count,
 			Truncated:    truncated[shortName],
+			Origin:       "cache",
 		})
 	}
 
@@ -146,6 +150,10 @@ func (c *Core) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetched)
 			ResourceType: shortName,
 			Count:        count,
 			Truncated:    msg.Truncated[shortName],
+			// DEF-6/C3: a prefetch is a synchronous LIVE count (demo /
+			// no-cache mode), not a disk-cache seed — origin is "verified"
+			// from the moment it lands, no separate probe confirms it.
+			Origin: "verified",
 		})
 	}
 	// T034: wire issue counts from prefetch.
@@ -217,6 +225,12 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 			ResourceType: msg.ResourceType,
 			Count:        msg.Count,
 			Truncated:    msg.Truncated,
+			// DEF-6/C3: a live AvailabilityChecked result confirms this type
+			// this session — origin flips from "cache" (or unset) to
+			// "verified" regardless of whether the exactness guard in
+			// applyIntents' PatchMenuAvailability case ends up keeping the
+			// prior Count/Truncated.
+			Origin: "verified",
 		})
 		// T032: wire issue counts from probe.
 		intents = append(intents, PatchMenu{
@@ -272,7 +286,14 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 	intents = append(intents, PatchMenuCheckProgress{Checked: 0, Total: 0}) // 0,0 = done
 	intents = append(intents, ClearFlash{})
 
-	tasks = append(tasks, TaskRequest{Key: TaskKey{Kind: TaskKindSaveCache}})
+	// DEF-7: snapshot ProbeResources/ProbeTruncated NOW, before startEnrichment
+	// (below) can mutate them via clearEnrichmentFor's clear-on-rerun-start
+	// step — see SaveCachePayload's doc comment for why dispatch-time capture
+	// is required here.
+	tasks = append(tasks, TaskRequest{
+		Key:     TaskKey{Kind: TaskKindSaveCache},
+		Payload: c.snapshotProbeResourcesForSave(),
+	})
 
 	enrichIntents, enrichTasks := c.startEnrichment()
 	intents = append(intents, enrichIntents...)
@@ -455,12 +476,53 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 	// All enrichment done — clear progress, free retained resources, save cache.
 	if c.session.EnrichChecked >= c.session.EnrichTotal {
 		intents = append(intents, PatchMenuEnrichProgress{Checked: 0, Total: 0})
+		// DEF-7: snapshot BEFORE freeing ProbeResources/ProbeTruncated below —
+		// this is the completion path that carries the FINAL Wave-2-enriched
+		// findings (applyEnrichment above already mutated r.Findings on every
+		// cached row of this type), so it must not be lost to the free.
+		saveSnapshot := c.snapshotProbeResourcesForSave()
 		c.session.ProbeResources = nil
 		c.session.ProbeTruncated = nil
-		tasks = append(tasks, TaskRequest{Key: TaskKey{Kind: TaskKindSaveCache}})
+		tasks = append(tasks, TaskRequest{
+			Key:     TaskKey{Kind: TaskKindSaveCache},
+			Payload: saveSnapshot,
+		})
 	}
 
 	return intents, tasks
+}
+
+// snapshotProbeResourcesForSave captures a deep-enough copy of
+// c.session.ProbeResources/ProbeTruncated for a TaskKindSaveCache dispatch —
+// DEF-7. Must be called BEFORE any subsequent same-call mutation of those
+// maps (clearEnrichmentFor's clear-on-rerun-start step, or the
+// free-on-enrichment-complete nil-out) so the eventual save sees the rows as
+// they stood at dispatch time, not as they stand whenever the task executes.
+//
+// A shallow map copy is NOT sufficient here: clearEnrichmentFor mutates each
+// resource.Resource IN PLACE (via applyWave2ToRow on &rows[i]) on the SAME
+// backing array a shallow []resource.Resource slice copy would still alias —
+// a plain maps.Copy of the outer map would still observe that later
+// in-place strip. Each per-type slice (and each resource's Findings slice,
+// the field clearEnrichmentFor mutates) is copied element-by-element so the
+// snapshot is fully isolated from any later mutation of the live session
+// state.
+func (c *Core) snapshotProbeResourcesForSave() *SaveCachePayload {
+	if len(c.session.ProbeResources) == 0 {
+		return nil
+	}
+	resources := make(map[string][]resource.Resource, len(c.session.ProbeResources))
+	for shortName, rows := range c.session.ProbeResources {
+		cp := make([]resource.Resource, len(rows))
+		for i, r := range rows {
+			r.Findings = append([]domain.Finding(nil), r.Findings...)
+			cp[i] = r
+		}
+		resources[shortName] = cp
+	}
+	truncated := make(map[string]bool, len(c.session.ProbeTruncated))
+	maps.Copy(truncated, c.session.ProbeTruncated)
+	return &SaveCachePayload{Resources: resources, Truncated: truncated}
 }
 
 // rowsFromCacheRows converts a per-type file's persisted Rows (ID/Name/Fields

@@ -137,16 +137,35 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		if snap.NoCache {
 			return nil, nil
 		}
+		var flashErr error
 		entries, truncated, issueCounts, issueTruncated, issueKnown := c.availabilityFromResourceCache()
-		if entries == nil {
-			return nil, nil
+		if entries != nil {
+			if err := c.SaveAvailabilityCache(
+				snap.Profile, snap.Region,
+				entries, truncated, issueCounts, issueTruncated, issueKnown,
+			); err != nil {
+				flashErr = err
+			}
 		}
-		err := c.SaveAvailabilityCache(
-			snap.Profile, snap.Region,
-			entries, truncated, issueCounts, issueTruncated, issueKnown,
-		)
-		if err != nil {
-			return messages.Flash{Text: fmt.Sprintf("cache save: %v", err), IsError: true}, nil
+		// DEF-7/C7/C8: an availability-sweep + Wave-2 enrichment completion
+		// must persist that type's per-row rows/findings (SaveResourceListCache)
+		// WITHOUT requiring any list screen to have been opened — mirrors the
+		// list-open persistence path (app.Controller.maybeSaveResourceListCache)
+		// but is driven from the dispatch-time snapshot the caller captured via
+		// SaveCachePayload (see its doc comment for why dispatch-time capture,
+		// not a live session read, is required), falling back to a live read of
+		// c.session.ProbeResources for any nil-Payload dispatch. C6 scope:
+		// ProbeResources IS this session's canonical top-level population for
+		// each type — the same rows a fresh list-open would seed from.
+		saveResources, saveTruncated := c.session.ProbeResources, c.session.ProbeTruncated
+		if p, ok := req.Payload.(*SaveCachePayload); ok && p != nil {
+			saveResources, saveTruncated = p.Resources, p.Truncated
+		}
+		if err := c.saveProbeResourcesToTypeFiles(saveResources, saveTruncated); err != nil && flashErr == nil {
+			flashErr = err
+		}
+		if flashErr != nil {
+			return messages.Flash{Text: fmt.Sprintf("cache save: %v", flashErr), IsError: true}, nil
 		}
 		return nil, nil
 
@@ -432,6 +451,52 @@ func (c *Core) availabilityFromResourceCache() (
 		issueKnown[rt] = true
 	}
 	return
+}
+
+// saveProbeResourcesToTypeFiles persists probeResources — a snapshot (or, for
+// a nil-Payload dispatch, a live read) of the availability sweep's (and
+// Wave-2 enrichment's) retained per-type rows, findings included — to each
+// type's on-disk file via SaveResourceListCache. DEF-7/C7/C8: this is the
+// sweep-completion counterpart to app.Controller.maybeSaveResourceListCache,
+// which only runs when a list screen has been opened; this path lets that
+// same per-type persistence happen from a background sweep alone, so a
+// corrupt/missing type file self-heals on the next sweep rather than only on
+// the next list visit.
+//
+// No-op when probeResources is empty (nothing retained — e.g. mid-sweep with
+// no completions yet, or every probe failed). Best-effort per type: a save
+// failure for one type does not prevent the others from being attempted: the
+// first error is returned to the caller (mirrors SaveAvailabilityCache's
+// firstErr convention), matching every other cache-write call site's
+// best-effort posture.
+func (c *Core) saveProbeResourcesToTypeFiles(probeResources map[string][]resource.Resource, probeTruncated map[string]bool) error {
+	if len(probeResources) == 0 {
+		return nil
+	}
+	var firstErr error
+	for shortName, resources := range probeResources {
+		rows := make([]cache.Row, len(resources))
+		for i, r := range resources {
+			rows[i] = cache.Row{
+				ID:       r.ID,
+				Name:     r.Name,
+				Fields:   r.Fields,
+				Findings: r.Findings,
+			}
+		}
+		truncated := probeTruncated[shortName]
+		exact := !truncated
+		td := resource.FindResourceType(shortName)
+		issuesKnown := td != nil && !td.ExcludeFromIssueBadge
+		issues := 0
+		if issuesKnown {
+			issues = unifiedIssueCount(resources, *td, nil)
+		}
+		if err := c.SaveResourceListCache(shortName, rows, len(resources), exact, issues, issuesKnown, truncated); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
 }
 
 // CacheStoreToEvent converts a *cache.Store's loaded per-type files into a

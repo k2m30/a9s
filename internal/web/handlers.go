@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/k2m30/a9s/v3/internal/app"
+	"github.com/k2m30/a9s/v3/internal/runtime"
 )
 
 const (
@@ -150,6 +151,21 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// isScreenRenderable reports whether vs's active body already has SOMETHING
+// to show a caller besides an empty screen — either a list with rows already
+// on it (cache-seeded or otherwise) or an explicit Loading shell. Used to
+// bind DEF-1/C4's IsBackgroundFetchTask classifier to the post-Apply snapshot
+// so a warm (already-renderable) list open defers its KindFetchResources task
+// to the background, while a genuinely cold open (no rows, no Loading shell)
+// keeps it blocking so the response carries the shell itself.
+func isScreenRenderable(vs app.ViewState) bool {
+	lb := vs.Body.List
+	if lb == nil {
+		return false
+	}
+	return lb.Loading || len(lb.Rows) > 0
+}
+
 // handleAction decodes a semantic Action from the request body (JSON or form),
 // applies it to the session controller, and returns the updated body fragment.
 // POST /action
@@ -187,11 +203,23 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 
 	// Drain blocking tasks (the response body's own content) synchronously
 	// under entry.mu; partition off background tasks (related-check fan-out,
-	// detail enrichment, save-cache) so the response is not held hostage to
-	// them — they run in their own goroutine after the response is written.
+	// detail enrichment, save-cache, and — per DEF-1/C4 — a KindFetchResources
+	// task whose target screen is already renderable) so the response is not
+	// held hostage to them — they run in their own goroutine after the
+	// response is written.
+	//
+	// screenAlreadyRenderable is read from the post-Apply snapshot: a list
+	// screen with rows already seeded, or an explicit Loading shell, both
+	// count as "the response already has something to show" — only a truly
+	// cold KindFetchResources fetch (no rows, no Loading shell) must stay
+	// blocking so the response carries the `Loading…` shell itself.
 	entry.mu.Lock()
 	_, tasks := entry.ctrl.Apply(action)
-	background := app.DrainSyncPartition(context.Background(), entry.ctrl, tasks, app.IsBackgroundTaskKind, nil)
+	renderable := isScreenRenderable(entry.ctrl.Snapshot())
+	isBackground := func(kind runtime.TaskKind) bool {
+		return app.IsBackgroundFetchTask(runtime.TaskRequest{Key: runtime.TaskKey{Kind: kind}}, renderable)
+	}
+	background := app.DrainSyncPartition(context.Background(), entry.ctrl, tasks, isBackground, nil)
 	vs := entry.ctrl.Snapshot()
 	entry.mu.Unlock()
 

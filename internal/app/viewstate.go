@@ -10,11 +10,11 @@ import "github.com/k2m30/a9s/v3/internal/domain"
 // Snapshot() builds the full per-screen Body (menu/list/detail/text/
 // selector/help/identity) from live controller state.
 type ViewState struct {
-	Header     Header   `json:"header"`
-	FrameTitle string   `json:"frame_title"`
-	Footer     []KeyHint `json:"footer,omitempty"`
-	HelpContext string   `json:"help_context,omitempty"`
-	Body        Body     `json:"body"`
+	Header      Header    `json:"header"`
+	FrameTitle  string    `json:"frame_title"`
+	Footer      []KeyHint `json:"footer,omitempty"`
+	HelpContext string    `json:"help_context,omitempty"`
+	Body        Body      `json:"body"`
 }
 
 // Header mirrors the top bar rendered by internal/tui/layout.
@@ -162,6 +162,13 @@ type ListBody struct {
 	// Refreshing mirrors ListState.Refreshing: true when Rows were seeded
 	// from a cache-first source and a fresh fetch is still confirming them.
 	Refreshing bool `json:"refreshing,omitempty"`
+	// LastFetchError is the error marker text for the most recent failed
+	// fetch over this list, or "" when no error is outstanding. Set by a
+	// messages.APIError landing while cached content is on screen (DEF-5/C4:
+	// "keeps the content, swaps the marker for an error marker") — Refreshing
+	// is cleared in the same event so the two markers never show together.
+	// Renderers (web list.html, TUI RenderList) consume this field verbatim.
+	LastFetchError string `json:"last_fetch_error,omitempty"`
 }
 
 // FieldRow is one key-value pair in a detail view, extended with render-time
@@ -240,10 +247,10 @@ type DetailBody struct {
 	// Fields is the ordered list of all rendered field rows (sections + kv pairs
 	// + attention sub-rows + spacers), matching the fieldList that
 	// renderFromFieldList iterates. RenderDetail iterates this slice directly.
-	Fields        []FieldRow       `json:"fields,omitempty"`
-	Attention     []AttentionBlock `json:"attention,omitempty"`
-	Related       []RelatedBlock   `json:"related,omitempty"`
-	RelatedFocused bool            `json:"related_focused,omitempty"`
+	Fields         []FieldRow       `json:"fields,omitempty"`
+	Attention      []AttentionBlock `json:"attention,omitempty"`
+	Related        []RelatedBlock   `json:"related,omitempty"`
+	RelatedFocused bool             `json:"related_focused,omitempty"`
 	// RelatedVisible is true when the related panel should be shown. It mirrors
 	// DetailState.RelatedVisible and is also set when the renderer auto-shows
 	// the panel (RelatedRows non-nil or defs exist). Used by RenderDetail to
@@ -251,7 +258,7 @@ type DetailBody struct {
 	// must show even while rows are loading, i.e. Related contains loading rows).
 	RelatedVisible bool `json:"related_visible,omitempty"`
 	// RelatedCursor is the index in Related of the currently-highlighted row.
-	RelatedCursor int    `json:"related_cursor,omitempty"`
+	RelatedCursor int `json:"related_cursor,omitempty"`
 	// RelatedScroll is the scroll offset (first visible row index) in the
 	// related panel. Together with RelatedCursor it lets renderDetailRelatedFromBody
 	// reproduce the exact window that rightColumnModel.View() shows.
@@ -259,18 +266,18 @@ type DetailBody struct {
 	// RelatedFilter is the active filter query in the related panel.
 	RelatedFilter string `json:"related_filter,omitempty"`
 	// RelatedFilterActive is true while the related panel filter input is open.
-	RelatedFilterActive bool   `json:"related_filter_active,omitempty"`
+	RelatedFilterActive bool `json:"related_filter_active,omitempty"`
 	// RelatedSourceType is the short name of the source resource type, used
 	// for self-pivot-zero filtering in the related panel.
 	RelatedSourceType string `json:"related_source_type,omitempty"`
-	Search        string `json:"search,omitempty"`
-	SearchCursor  int    `json:"search_cursor,omitempty"`
-	Wrap          bool   `json:"wrap,omitempty"`
+	Search            string `json:"search,omitempty"`
+	SearchCursor      int    `json:"search_cursor,omitempty"`
+	Wrap              bool   `json:"wrap,omitempty"`
 	// ScrollY is the viewport top-line offset (mirrors DetailState.ScrollY).
-	ScrollY       int    `json:"scroll_y,omitempty"`
+	ScrollY int `json:"scroll_y,omitempty"`
 	// FieldCursor is the index of the highlighted field row (for cursor-selection
 	// rendering in RenderDetail).
-	FieldCursor   int    `json:"field_cursor,omitempty"`
+	FieldCursor int `json:"field_cursor,omitempty"`
 	// KeyWidth is the pre-computed key-column width so RenderDetail does not
 	// need to scan Fields again.
 	KeyWidth int `json:"key_width,omitempty"`
@@ -278,7 +285,7 @@ type DetailBody struct {
 
 // SearchMatch is one highlighted match in a text screen.
 type SearchMatch struct {
-	Line   int `json:"line"`
+	Line     int `json:"line"`
 	ColStart int `json:"col_start"`
 	ColEnd   int `json:"col_end"`
 }
@@ -315,6 +322,11 @@ type MenuEntry struct {
 	// AvailTruncated drives the "(N+)" lower-bound suffix.
 	AvailKnown     bool `json:"avail_known,omitempty"`
 	AvailTruncated bool `json:"avail_truncated,omitempty"`
+	// Origin is "cache" (disk-cache-seeded, not yet re-verified this session)
+	// or "verified" (confirmed by a live AvailabilityChecked probe this
+	// session), or "" when no availability data has landed at all — DEF-6/C3.
+	// Drives the dimmed stale style; renderers read it, never compute it.
+	Origin string `json:"origin,omitempty"`
 }
 
 // MenuBody is the body of the main-menu screen.

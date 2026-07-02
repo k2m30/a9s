@@ -60,6 +60,9 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 		// method, so this unconditional clear only ever fires for a genuine
 		// fetch-result swap, never undoing the seed-time flag.
 		ls.Refreshing = false
+		// DEF-5/C4: a successful fetch result clears any outstanding error
+		// marker from a previous failed attempt.
+		ls.LastFetchError = ""
 		if pagination != nil {
 			ls.HasPagination = pagination.IsTruncated
 			ls.PaginationCursor = pagination.NextToken
@@ -222,6 +225,7 @@ func (c *Controller) buildListBody(ctx runtime.ScreenContext, ls *ListState) *Li
 		StatusCol:           statusCol,
 		LoadingMore:         ls.LoadingMore,
 		Refreshing:          ls.Refreshing,
+		LastFetchError:      ls.LastFetchError,
 	}
 }
 

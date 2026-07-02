@@ -242,6 +242,10 @@ func buildMenuBody(ms *MenuState) *MenuBody {
 			avail, availKnown = ms.Availability[activeKey]
 		}
 		availTruncated := ms.Truncated != nil && ms.Truncated[activeKey]
+		origin := ""
+		if ms.Origin != nil {
+			origin = ms.Origin[activeKey]
+		}
 
 		badge := IssueBadge{}
 		if ms.IssueKnown != nil && ms.IssueKnown[activeKey] {
@@ -262,6 +266,7 @@ func buildMenuBody(ms *MenuState) *MenuBody {
 			Availability:   avail,
 			AvailKnown:     availKnown,
 			AvailTruncated: availTruncated,
+			Origin:         origin,
 		})
 	}
 

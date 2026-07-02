@@ -62,6 +62,11 @@ type ListState struct {
 	// ResourcesLoaded result lands. Distinct from Loading, which gates the
 	// no-rows-known spinner path.
 	Refreshing bool `json:"refreshing,omitempty"`
+	// LastFetchError is the error marker text for the most recent failed
+	// fetch over this screen, or "" when no error is outstanding (DEF-5/C4).
+	// Set by a messages.APIError landing while this screen is active; cleared
+	// on the next successful ResourcesLoaded for this screen.
+	LastFetchError string `json:"last_fetch_error,omitempty"`
 }
 
 // DetailState holds the mutable display state for a resource-detail screen.
@@ -150,6 +155,10 @@ type MenuState struct {
 	IssueCounts    map[string]int  `json:"issue_counts,omitempty"`
 	IssueKnown     map[string]bool `json:"issue_known,omitempty"`
 	IssueTruncated map[string]bool `json:"issue_truncated,omitempty"`
+	// Origin tracks, per resource type, whether the stored availability count
+	// is disk-cache-seeded ("cache") or confirmed by a live probe this
+	// session ("verified") — DEF-6/C3.
+	Origin map[string]string `json:"origin,omitempty"`
 
 	// Progress fields for FrameTitle indicator (DERIVED at Snapshot, stored here
 	// so intents can update them without re-computing from task state).

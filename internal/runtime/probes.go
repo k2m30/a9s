@@ -168,7 +168,14 @@ func (c *Core) SaveResourceListCache(shortName string, rows []cache.Row, count i
 		Rows:         rows,
 	}
 	// C5: exactness only ever advances — a truncated observation never
-	// downgrades an already-exact stored total.
+	// downgrades an already-exact stored total. DEF-4b: when a truncated
+	// refetch's smaller row set would otherwise regress an already-exact,
+	// fuller stored state, the PRIOR (fuller, exact) row set is kept in its
+	// entirety — never a Count taken from `existing` paired with a smaller
+	// `rows` slice, which would leave len(Rows) != Count inconsistent. The
+	// fuller row set is only ever replaced by a NEW exact observation (the
+	// `case exact` branch above, which always takes the fresh rows/count as
+	// a matched pair).
 	switch {
 	case exact:
 		tf.Exact = true
@@ -177,9 +184,7 @@ func (c *Core) SaveResourceListCache(shortName string, rows []cache.Row, count i
 		if existing.Count > count {
 			tf.Count = existing.Count
 			tf.HasResources = existing.Count > 0
-			if len(rows) == 0 {
-				tf.Rows = existing.Rows
-			}
+			tf.Rows = existing.Rows
 		}
 	}
 	if issuesKnown {

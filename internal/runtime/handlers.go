@@ -157,7 +157,7 @@ func (c *Core) HandleAPIError(ev APIErrorEvent) ([]UIIntent, []TaskRequest) {
 	intents := []UIIntent{
 		FlashIntent{Text: text, IsError: true},
 		AppendErrorHistoryIntent{Time: time.Now(), Message: text},
-		ClearActiveListLoadingIntent{},
+		ClearActiveListLoadingIntent{Err: text},
 	}
 	tasks := []TaskRequest{{
 		Key:     TaskKey{Kind: TaskKindFlashTick},

@@ -355,6 +355,18 @@ func hasWave2Finding(findings []domain.Finding) bool {
 // resolveListDecoratorFull mirrors the marker logic in renderDataRow and extends it
 // ("healthy", "warning", "broken", "dim", "") so RenderList can reproduce
 // the exact lipgloss.Style that View() derives from td.ResolveColor(r).
+//
+// DEF-3/C6: a row's OWN persisted findings (r.Findings — what a cold-boot
+// reseed from cache.Row.Findings populates, and what the demo/live fold
+// layer mutates directly via applyWave2ToRow) are consulted FIRST, before
+// falling back to the findings map (the session-scoped Wave-2 enrichment
+// store, which is empty until a live enrichment probe lands this session).
+// Without this, a seeded row's persisted Findings never drive render-time
+// severity — the map lookup alone only ever hits after a live probe
+// re-confirms the same finding, so a freshly cold-booted list shows no
+// glyph/severity on flagged rows until the sweep completes. r.Findings is
+// assumed pre-ordered by severity (the same convention listPhraseFromFindings
+// relies on via findings[0]), so the first entry is "the top" finding.
 func resolveListDecoratorFull(td *resource.ResourceTypeDef, r resource.Resource, findings map[string]domain.Finding) (RowDecorator, string, string) {
 	if td == nil {
 		return DecoratorNormal, "", ""
@@ -362,7 +374,14 @@ func resolveListDecoratorFull(td *resource.ResourceTypeDef, r resource.Resource,
 	color := td.ResolveColor(r)
 	colorTag := colorToTag(color)
 	if color == resource.ColorHealthy {
-		if f, ok := findings[r.ID]; ok {
+		if len(r.Findings) > 0 {
+			switch r.Findings[0].Severity {
+			case domain.SevBroken:
+				return DecoratorError, "broken", colorTag
+			case domain.SevWarn:
+				return DecoratorWarning, "warn", colorTag
+			}
+		} else if f, ok := findings[r.ID]; ok {
 			switch f.Severity {
 			case domain.SevBroken:
 				return DecoratorError, "broken", colorTag
