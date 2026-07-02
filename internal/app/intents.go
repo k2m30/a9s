@@ -245,8 +245,11 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 		// than migration leftovers:
 		//   PatchDetail             — detail enrichment is applied via
 		//                             ApplyDetailFinding (the task-result lane).
-		//   RefreshActiveListIntent — refresh runs as the Refresh action's fetch
-		//                             task, not as an intent.
+		//   RefreshActiveListIntent — carries no state of its own to apply here;
+		//                             the C10 replay it signals is turned into a
+		//                             fetch task by refreshTasksForIntents, which
+		//                             callers (Handle, BootstrapLive) invoke
+		//                             alongside applyIntents.
 		//   HeaderInvalidateIntent  — the Header is rebuilt from core on every
 		//                             snapshot(); there is nothing to invalidate.
 		//   ApplyThemeIntent        — lipgloss theming is a TUI concern; the web
@@ -256,4 +259,18 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 		}
 	}
 	return c.snapshot()
+}
+
+// refreshTasksForIntents scans intents for RefreshActiveListIntent and, when
+// present, returns the active-list refresh tasks (C10: a navigation issued
+// before AWS connect completes must replay once connected). Shared by Handle
+// and BootstrapLive so the scan is not duplicated across the TUI-independent
+// ClientsReady seams. Callers must hold c.mu.
+func (c *Controller) refreshTasksForIntents(intents []runtime.UIIntent) []runtime.TaskRequest {
+	for _, intent := range intents {
+		if _, ok := intent.(runtime.RefreshActiveListIntent); ok {
+			return c.activeListRefreshTasks()
+		}
+	}
+	return nil
 }

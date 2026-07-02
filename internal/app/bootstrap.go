@@ -47,12 +47,21 @@ func (c *Controller) BootstrapLive(profile, region string) []runtime.TaskRequest
 	// HandleClientsReady mutates core (installs clients, bumps the availability
 	// gen). Run it under the controller lock so it is serialised with request
 	// handlers that touch the controller; the slow ExecuteTask above stayed
-	// lock-free on purpose.
+	// lock-free on purpose. StackDepth/HasActiveRL are read under the same
+	// lock so HandleClientsReady sees the real screen stack instead of the
+	// hardcoded StackDepth: 1 that used to make maybeRefreshIntents think no
+	// active list existed (C10: this is what caused a pre-connect navigation's
+	// replay to be dropped on the web/headless lane).
 	c.mu.Lock()
 	intents, tasks := c.core.HandleClientsReady(runtime.ClientsReadyEvent{
-		Clients: cr.Clients, Region: cr.Region, Gen: cr.Gen, StackDepth: 1,
+		Clients:     cr.Clients,
+		Region:      cr.Region,
+		Gen:         cr.Gen,
+		StackDepth:  len(c.stack),
+		HasActiveRL: c.topListState() != nil,
 	})
 	c.applyIntents(intents)
+	tasks = append(tasks, c.refreshTasksForIntents(intents)...)
 	c.mu.Unlock()
 
 	// Return the availability/initial-fetch tasks for the caller to drain. The

@@ -78,8 +78,10 @@ type Session struct {
 	ConnectGen domain.Gen
 
 	// PendingRefresh marks that a successful ClientsReady should re-fetch the
-	// active resource list (set by profile/region switch handlers). Cleared by
-	// Rotate; re-set to true after Rotate in the switch handlers.
+	// active resource list (set by profile/region switch handlers, and true
+	// by default from New() so a navigation issued before the first connect
+	// replays once connected — C10). Cleared by Rotate; re-set to true after
+	// Rotate in the switch handlers.
 	PendingRefresh bool
 
 	// Rollback target for an in-flight profile/region switch. Captured BEFORE
@@ -183,7 +185,12 @@ type Session struct {
 // Gen at its zero value are rejected by the gen guards.
 func New() *Session {
 	return &Session{
-		ProbeResources:         nil, // initialized lazily on first probe retention
+		ProbeResources: nil, // initialized lazily on first probe retention
+		// C10: a navigation issued before the first connect must trigger the
+		// active-list re-fetch once connected, exactly like a post-switch
+		// reconnect. On a menu-only startup, maybeRefreshIntents consumes this
+		// flag harmlessly via the HasActiveRL gate.
+		PendingRefresh:         true,
 		EnrichmentRan:          make(map[string]bool),
 		EnrichmentTypeGen:      make(map[string]domain.Gen),
 		EnrichmentTruncatedIDs: make(map[string]map[string]bool),

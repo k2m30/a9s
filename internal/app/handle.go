@@ -29,6 +29,11 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 
 	intents, tasks := c.core.HandleEvent(ev)
 	c.applyIntents(intents)
+	// C10: a navigation issued before AWS connect completes must replay once
+	// ClientsReady lands. HandleEvent's ClientsReady path (and any other event
+	// that can carry PendingRefresh) emits RefreshActiveListIntent for that;
+	// applyIntents does not act on it, so route it through the shared helper.
+	tasks = append(tasks, c.refreshTasksForIntents(intents)...)
 
 	// Contract C: mark the type's availability sweep acked the moment its
 	// AvailabilityChecked result arrives, regardless of whether HandleEvent's
@@ -52,6 +57,27 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 		// headless/web entry point; the TUI routes ResourcesLoaded through the
 		// HandleResourcesLoadedEvent seam and drills to detail in its own adapter.
 		tasks = append(tasks, c.autoOpenSingleDetail()...)
+	}
+
+	// messages.ClientsReady is explicitly excluded from HandleEvent
+	// (orchestrator.go documents it as TUI-shim-only: the TUI's
+	// handleClientsReady computes StackDepth/HasActiveRL from its own view
+	// stack before calling Core.HandleClientsReady). The headless/web lane has
+	// no TUI shim, so Handle must do the same renderer-shape computation here
+	// — mirroring BootstrapLive — or a connect result fed through DrainSync
+	// (drainsync.go) never reaches HandleClientsReady at all, and C10's
+	// pre-connect-navigation replay never fires on this lane.
+	if msg, ok := ev.(messages.ClientsReady); ok && msg.Err == nil {
+		crIntents, crTasks := c.core.HandleClientsReady(runtime.ClientsReadyEvent{
+			Clients:     msg.Clients,
+			Region:      msg.Region,
+			Gen:         msg.Gen,
+			StackDepth:  len(c.stack),
+			HasActiveRL: c.topListState() != nil,
+		})
+		c.applyIntents(crIntents)
+		tasks = append(tasks, crTasks...)
+		tasks = append(tasks, c.refreshTasksForIntents(crIntents)...)
 	}
 
 	// messages.ValueRevealed is explicitly excluded from HandleEvent
