@@ -126,9 +126,17 @@ func (s *Server) requireSession(w http.ResponseWriter, r *http.Request) *session
 }
 
 // handleIndex renders the full HTML page from the current ViewState snapshot.
-// GET /
+// GET / — token-gated: the page embeds the real per-run token via data-token,
+// so serving it without proof of the token would let any local process scrape
+// the token straight out of the response and drive the session API with it.
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	noStore(w)
+
+	if !s.tokenOK(r) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
 	entry := s.requireSession(w, r)
 
 	entry.mu.Lock()

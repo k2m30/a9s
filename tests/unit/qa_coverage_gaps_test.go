@@ -67,7 +67,15 @@ func TestEnrichProgressIndicator_CombinesWithCtrlZ(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// SetShowIssueBadge controls badge display in ResourceListModel.FrameTitle()
+// Issue-count suffix on ResourceListModel.FrameTitle() — UNCONDITIONAL contract.
+//
+// Supersedes the prior "SetShowIssueBadge controls badge display" / "S1 is
+// menu-only" contract: ListState.ShowIssueBadge and
+// ResourceListModel.SetShowIssueBadge were deleted. The " !N" issue-count
+// suffix documented in docs/attention-signals.md now renders on the list
+// title unconditionally whenever N>0 (see qa_frame_title_issues_test.go for
+// the exhaustive format/edge-case coverage) — there is no flag to set, and no
+// "count-only, no issue suffix" mode to opt out of.
 // ---------------------------------------------------------------------------
 
 func gapResources(statuses ...string) []resource.Resource {
@@ -81,44 +89,31 @@ func gapResources(statuses ...string) []resource.Resource {
 	return res
 }
 
-func TestSetShowIssueBadge_False_HidesBadge(t *testing.T) {
-	resources := gapResources("running", "running", "stopped", "failed")
-	td := resource.ResourceTypeDef{ShortName: "ec2", Name: "EC2 Instances"}
-	m := views.NewResourceListFromCache(td, nil, keys.Default(), resources, nil, "", views.SortColNone, true, 0, 0, false)
-	title := m.FrameTitle()
-	if strings.Contains(title, "issues") {
-		t.Errorf("FrameTitle() = %q, should NOT contain 'issues' when showIssueBadge=false", title)
-	}
-}
-
-func TestSetShowIssueBadge_True_ShowsBadge(t *testing.T) {
-	// Spec §4: S1 (issues:N badge) is MENU-only; it does NOT appear in the
-	// list title. showIssueBadge=true still opts the model into menu-level
-	// issue signaling (issueCount is tracked), but the title stays count-only.
-	resources := gapResources("running", "running", "stopped", "failed")
-	td := resource.ResourceTypeDef{ShortName: "ec2", Name: "EC2 Instances"}
-	m := views.NewResourceListFromCache(td, nil, keys.Default(), resources, nil, "", views.SortColNone, true, 0, 0, false)
-	m.SetShowIssueBadge(true)
-	title := m.FrameTitle()
-	if title != "ec2(4)" {
-		t.Errorf("FrameTitle() = %q, want %q (title carries resource count only)", title, "ec2(4)")
-	}
-	if strings.Contains(title, "issue") {
-		t.Errorf("FrameTitle() = %q; spec §4 S1 is menu-only, no 'issue' in title", title)
-	}
-	if m.IssueCount() != 2 {
-		t.Errorf("IssueCount() = %d, want 2 (stopped+failed)", m.IssueCount())
-	}
-}
-
-func TestSetShowIssueBadge_True_NoIssues_NoBadge(t *testing.T) {
+func TestFrameTitle_NoIssues_NoSuffix(t *testing.T) {
 	resources := gapResources("running", "running", "available")
 	td := resource.ResourceTypeDef{ShortName: "ec2", Name: "EC2 Instances"}
 	m := views.NewResourceListFromCache(td, nil, keys.Default(), resources, nil, "", views.SortColNone, true, 0, 0, false)
-	m.SetShowIssueBadge(true)
 	title := m.FrameTitle()
-	if strings.Contains(title, "issues") {
-		t.Errorf("FrameTitle() = %q, should NOT contain 'issues' when all healthy", title)
+	if strings.Contains(title, "!") {
+		t.Errorf("FrameTitle() = %q, should NOT contain a ' !N' suffix when all healthy (N=0)", title)
+	}
+	if title != "ec2(3)" {
+		t.Errorf("FrameTitle() = %q, want %q", title, "ec2(3)")
+	}
+}
+
+func TestFrameTitle_WithIssues_UnconditionalSuffix(t *testing.T) {
+	// Supersedes the old "S1 is menu-only" contract: the list title now
+	// carries the ' !N' issue suffix unconditionally, with no flag to enable it.
+	resources := gapResources("running", "running", "stopped", "failed")
+	td := resource.ResourceTypeDef{ShortName: "ec2", Name: "EC2 Instances"}
+	m := views.NewResourceListFromCache(td, nil, keys.Default(), resources, nil, "", views.SortColNone, true, 0, 0, false)
+	title := m.FrameTitle()
+	if title != "ec2(4) !2" {
+		t.Errorf("FrameTitle() = %q, want %q (unconditional ' !N' issue suffix, N = stopped+failed)", title, "ec2(4) !2")
+	}
+	if m.IssueCount() != 2 {
+		t.Errorf("IssueCount() = %d, want 2 (stopped+failed)", m.IssueCount())
 	}
 }
 

@@ -218,18 +218,35 @@ func domainItemToFieldItemDetail(it domain.Item, sectionTitle string) fieldpath.
 	return fi
 }
 
-// injectAttentionSectionDetail mirrors injectAttentionSection in detail_fields.go,
-// prepending the Attention block when the resource has issue-severity findings.
-func injectAttentionSectionDetail(items []fieldpath.FieldItem, ds *DetailState, td *resource.ResourceTypeDef) []fieldpath.FieldItem {
-	type entry struct {
-		tier          string
-		primary       string
-		detail        string // S5 operator sentence (Finding.Detail); "" ⇒ Phrase-only, no extra line
-		rows          []domain.DetailRow
-		splitKeyValue bool
-	}
-	var entries []entry
-	for _, f := range ds.Findings {
+// attentionEntry is one rendered Attention-block entry, built and sorted by
+// buildAttentionEntries. Single source of truth for BOTH the rendered layout
+// (injectAttentionSectionDetail) and the prepend-size calculation
+// (attentionPrependCount) — they MUST agree on entry count, order, and
+// bareness, or the FieldCursor delta computed in applyFindingToState drifts
+// from the actual rendered layout (see attentionPrependCount's doc comment).
+type attentionEntry struct {
+	tier          string
+	primary       string
+	detail        string // S5 operator sentence (Finding.Detail); "" ⇒ Phrase-only, no extra line
+	rows          []domain.DetailRow
+	splitKeyValue bool
+}
+
+// bare reports whether this entry renders as a Phrase-only line with no
+// Detail sentence and no supporting rows.
+func (e attentionEntry) bare() bool {
+	return e.detail == "" && len(e.rows) == 0
+}
+
+// buildAttentionEntries converts issue-severity findings into sorted
+// attentionEntry values, mirroring the entry construction + sort that
+// injectAttentionSectionDetail renders. Sort: "!" (broken) before "~"
+// (warning), stable otherwise — the SAME order both the renderer and the
+// prepend-count calculation must observe, so they extract from this one
+// function rather than deriving the order independently in two places.
+func buildAttentionEntries(findings []domain.Finding, attentionDetails map[domain.FindingCode]domain.AttentionDetail) []attentionEntry {
+	var entries []attentionEntry
+	for _, f := range findings {
 		if !f.Severity.IsIssue() {
 			continue
 		}
@@ -241,19 +258,29 @@ func injectAttentionSectionDetail(items []fieldpath.FieldItem, ds *DetailState, 
 			tier = "~"
 		}
 		var rows []domain.DetailRow
-		if ds.AttentionDetails != nil {
-			if det, ok := ds.AttentionDetails[f.Code]; ok {
+		if attentionDetails != nil {
+			if det, ok := attentionDetails[f.Code]; ok {
 				rows = det.Rows
 			}
 		}
-		entries = append(entries, entry{tier: tier, primary: f.Phrase, detail: f.Detail, rows: rows, splitKeyValue: true})
+		entries = append(entries, attentionEntry{tier: tier, primary: f.Phrase, detail: f.Detail, rows: rows, splitKeyValue: true})
 	}
 	if len(entries) == 0 {
-		return items
+		return entries
 	}
 	sort.SliceStable(entries, func(i, j int) bool {
 		return entries[i].tier == "!" && entries[j].tier != "!"
 	})
+	return entries
+}
+
+// injectAttentionSectionDetail mirrors injectAttentionSection in detail_fields.go,
+// prepending the Attention block when the resource has issue-severity findings.
+func injectAttentionSectionDetail(items []fieldpath.FieldItem, ds *DetailState, td *resource.ResourceTypeDef) []fieldpath.FieldItem {
+	entries := buildAttentionEntries(ds.Findings, ds.AttentionDetails)
+	if len(entries) == 0 {
+		return items
+	}
 	// Resolve S2 color bucket for the cap invariant.
 	var rowBucket resource.Color
 	if td != nil {
@@ -325,7 +352,7 @@ func injectAttentionSectionDetail(items []fieldpath.FieldItem, ds *DetailState, 
 				ColorTier:   capTierToRowBucketDetail(tier, rowBucket),
 			})
 		}
-		lastEntryBare = e.detail == "" && len(e.rows) == 0
+		lastEntryBare = e.bare()
 	}
 	if !lastEntryBare {
 		injected = append(injected, fieldpath.FieldItem{IsSpacer: true, Path: "Attention"})

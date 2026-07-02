@@ -23,8 +23,8 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
@@ -98,10 +98,11 @@ func TestAllEnrichers_IssueCountNeverExceedsResources(t *testing.T) {
 // Test 2: unified issue count never exceeds union of Wave-1 and Wave-2 IDs
 // ─────────────────────────────────────────────────────────────────────────────
 
-// buildUnifiedModelWithBadge builds a ResourceListModel with the issue badge enabled
-// so that FrameTitle() includes the issue count when enrichmentIssueCount > 0.
-// It reuses buildUnifiedModel from qa_unified_issue_count_test.go for loading,
-// then enables the badge on the returned model.
+// buildUnifiedModelWithBadge builds a ResourceListModel and loads resources +
+// enrichment state so that FrameTitle() includes the issue count when
+// enrichmentIssueCount > 0. The issue-count suffix is unconditional (no
+// SetShowIssueBadge/Patch gate) — it reuses buildUnifiedModel from
+// qa_unified_issue_count_test.go for loading.
 func buildUnifiedModelWithBadge(t *testing.T, resources []resource.Resource, enrichIC int, findings map[string]domain.Finding) string {
 	t.Helper()
 	td := resource.ResourceTypeDef{
@@ -120,7 +121,6 @@ func buildUnifiedModelWithBadge(t *testing.T, resources []resource.Resource, enr
 		Resources:    resources,
 	})
 	m.SetEnrichmentState(enrichIC, false, findings)
-	m.SetShowIssueBadge(true)
 	return m.FrameTitle()
 }
 

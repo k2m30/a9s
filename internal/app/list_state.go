@@ -395,17 +395,6 @@ func (c *Controller) PatchListTitleSuffix(s string) {
 	ls.TitleSuffix = s
 }
 
-// PatchListShowIssueBadge sets the ShowIssueBadge flag on the top list screen.
-func (c *Controller) PatchListShowIssueBadge(v bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	ls := c.topListState()
-	if ls == nil {
-		return
-	}
-	ls.ShowIssueBadge = v
-}
-
 // PatchListAutoOpenSingle is an alias for SetListAutoOpenSingle used by
 // navigation adapters that need to configure the flag before resources load.
 // Calls the lock-free inner directly to avoid double-locking.
@@ -461,17 +450,6 @@ func (c *Controller) GetListTitleSuffix() string {
 		return ""
 	}
 	return ls.TitleSuffix
-}
-
-// GetListShowIssueBadge reports whether the issue badge is shown.
-func (c *Controller) GetListShowIssueBadge() bool {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	ls := c.topListState()
-	if ls == nil {
-		return false
-	}
-	return ls.ShowIssueBadge
 }
 
 // GetListRelatedIDSet returns the relatedIDSet of the top list screen.

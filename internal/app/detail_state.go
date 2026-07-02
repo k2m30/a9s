@@ -68,30 +68,28 @@ func (c *Controller) EnsureDetailState(res resource.Resource, resourceType strin
 // no rows) — injectAttentionSectionDetail omits the spacer in that case so it
 // does not sit directly against a bare Phrase line. Returns 0 when there are no
 // issue findings.
+//
+// Single source of truth: entries are built via buildAttentionEntries (same
+// helper injectAttentionSectionDetail renders from), so "last entry" here
+// means the same SORTED last entry the renderer actually emits — not the
+// last entry in the original findings order. Deriving lastEntryBare from the
+// unsorted order previously caused a prepend-count mismatch (see
+// tests/unit/app_detail_attention_cursor_test.go), shifting FieldCursor by
+// the wrong delta after a mixed-severity Attention re-sort.
 func attentionPrependCount(findings []domain.Finding, attentionDetails map[domain.FindingCode]domain.AttentionDetail) int {
-	issueCount := 0
+	entries := buildAttentionEntries(findings, attentionDetails)
+	if len(entries) == 0 {
+		return 0
+	}
 	entryLineCount := 0
 	lastEntryBare := false
-	for _, fi := range findings {
-		if !fi.Severity.IsIssue() {
-			continue
-		}
-		issueCount++
+	for _, e := range entries {
 		entryLineCount++ // phrase line
-		rowCount := 0
-		if attentionDetails != nil {
-			if det, ok := attentionDetails[fi.Code]; ok {
-				rowCount = len(det.Rows)
-			}
-		}
-		if fi.Detail != "" {
+		if e.detail != "" {
 			entryLineCount++
 		}
-		entryLineCount += rowCount
-		lastEntryBare = fi.Detail == "" && rowCount == 0
-	}
-	if issueCount == 0 {
-		return 0
+		entryLineCount += len(e.rows)
+		lastEntryBare = e.bare()
 	}
 	spacer := 1
 	if lastEntryBare {

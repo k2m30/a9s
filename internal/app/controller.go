@@ -83,6 +83,13 @@ type Controller struct {
 	// showErrorHint is true after an error flash clears (SetErrorHintIntent{Show:true})
 	// and cleared on any subsequent action. Surfaced as Header.ErrorHintVisible in snapshot().
 	showErrorHint bool
+
+	// uiMode is the renderer mode surfaced as Header.Mode ("" = TUI, "web").
+	// Set once via SetUIMode after construction (e.g. internal/web/construct.go
+	// for web sessions). The TUI never calls SetUIMode, so it stays "". This is
+	// independent of core.IsDemo() — a demo session is still a TUI or web
+	// session and carries its own Header.Mode value ("demo") set elsewhere.
+	uiMode string
 }
 
 // controllerErrorEntry is one session-error-log entry stored in Controller.
@@ -115,6 +122,23 @@ func (c *Controller) SetViewConfig(vc *config.ViewsConfig) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.viewConfig = vc
+}
+
+// SetUIMode sets the renderer mode surfaced as Header.Mode ("" = TUI, "web").
+// Called once after construction by hosts that render outside a terminal —
+// internal/web/construct.go's newSession calls SetUIMode("web"). The TUI
+// never calls this, so its Header.Mode stays "".
+func (c *Controller) SetUIMode(mode string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.uiMode = mode
+}
+
+// UIMode returns the renderer mode previously set via SetUIMode.
+func (c *Controller) UIMode() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.uiMode
 }
 
 // RegisterFallbackTypeDef stores a ResourceTypeDef so that buildListBody
@@ -286,6 +310,8 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 		return c.handleActionSort(a)
 	case ActionSelect:
 		return c.handleActionSelect(a)
+	case ActionSelectIndex:
+		return c.handleActionSelectIndex(a)
 	case ActionToggleWrap:
 		return c.handleActionToggleWrap(a)
 	case ActionToggleFocus:

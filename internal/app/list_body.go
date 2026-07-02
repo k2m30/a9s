@@ -178,6 +178,19 @@ func (c *Controller) ListFrameTitle() string {
 
 // buildListFrameTitle computes the frame title string for a list screen,
 // mirroring FrameTitle() in resourcelist.go.
+//
+// Per docs/attention-signals.md §Visualization Surfaces: the " !N" issue
+// suffix is UNCONDITIONAL — it renders after the count parentheses on any
+// list screen (top-level or ScreenChildList), on any renderer (TUI or web),
+// whenever N > 0 and the screen is not in attention-only mode. N is the
+// current list's issue count — aggregated the same way as the menu badge
+// (Controller.GetListIssueCount's algorithm, mirrored lock-free below since
+// buildListFrameTitle already runs under c.mu). N=0 renders no suffix. When
+// the Wave-2 enrichment issue count itself is a truncated lower bound
+// (c.enrichmentTruncated[typeName]), the suffix becomes " !N+" instead of
+// " !N". The suffix is OMITTED entirely in attention-only (ctrl+z) mode,
+// where the filtered count already IS the issue count and an " !N" suffix
+// would be redundant.
 func (c *Controller) buildListFrameTitle(ctx runtime.ScreenContext, ls *ListState) string {
 	typeName := ctx.ResourceType
 	name := typeName
@@ -227,6 +240,14 @@ func (c *Controller) buildListFrameTitle(ctx runtime.ScreenContext, ls *ListStat
 
 	if ls.TitleSuffix != "" {
 		title += ls.TitleSuffix
+	}
+	if !isAttention {
+		if issueCount := c.listIssueCount(ls, typeName); issueCount > 0 {
+			title += " !" + itoa(issueCount)
+			if c.enrichmentTruncated[typeName] {
+				title += "+"
+			}
+		}
 	}
 	if isAttention {
 		title += " [!]"
@@ -288,8 +309,14 @@ func (c *Controller) GetListIssueCount() int {
 		return 0
 	}
 	top := c.stack[len(c.stack)-1]
-	typeName := top.Ctx.ResourceType
+	return c.listIssueCount(ls, top.Ctx.ResourceType)
+}
 
+// listIssueCount is the lock-free core of GetListIssueCount. Callers MUST
+// already hold c.mu (e.g. buildListFrameTitle, which runs under c.mu) —
+// taking the lock again would self-deadlock the non-reentrant RWMutex.
+// Mirrors the ListSelected()/listSelected() split in this file.
+func (c *Controller) listIssueCount(ls *ListState, typeName string) int {
 	// Prefer the fallback typeDef (registered via RegisterFallbackTypeDef from
 	// the model constructor) over the catalog: the model's typeDef is the
 	// authoritative Color classifier for issue counting. This is critical for
@@ -302,6 +329,15 @@ func (c *Controller) GetListIssueCount() int {
 	} else if catalogTD := resource.FindResourceType(typeName); catalogTD != nil {
 		td = *catalogTD
 	} else {
+		return 0
+	}
+	// S1 contract: the list-title suffix and the menu sync-back use the SAME
+	// aggregation as the menu badge — and the badge never counts types with
+	// ExcludeFromIssueBadge (e.g. ct-events, where "issue-colored" rows are
+	// historical events, not live problems). Without this, an excluded type
+	// would grow a title suffix and, via the app_stack sync-back, a forbidden
+	// menu badge after its list was visited.
+	if td.ExcludeFromIssueBadge {
 		return 0
 	}
 	all := c.listScreenResources(ls, typeName)

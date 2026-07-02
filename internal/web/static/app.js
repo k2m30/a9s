@@ -8,7 +8,9 @@
   const token = document.body.getAttribute("data-token") || "";
 
   // sendAction posts a semantic action to /action and swaps the #body content.
-  function sendAction(kind, arg, n) {
+  // done, if provided, is called after the round-trip settles (success or
+  // failure) — used by clickSelect to release its double-click guard.
+  function sendAction(kind, arg, n, done) {
     const body = { kind: kind };
     if (arg !== undefined && arg !== "") body.arg = String(arg);
     if (n !== undefined && n !== 0) body.n = n;
@@ -39,8 +41,7 @@
           if (el) el.innerHTML = html;
           // Screen changed: clear the row-click debounce so a same-index click
           // on the new screen is never suppressed. Covers clickField /
-          // clickRelated / keyboard actions; clickSelect clears it via its own
-          // move-chain callback (which does not route through sendAction).
+          // clickRelated / clickSelect / keyboard actions.
           lastClickIdx = -1;
           lastClickAt = 0;
         });
@@ -50,70 +51,36 @@
         clearTimeout(loadingTimer);
         var li = document.getElementById("loading-indicator");
         if (li) li.style.display = "none";
+        if (done) done();
       });
   }
 
-  // clickSelect navigates to item at index idx and selects it.
-  // Sends move-up (to top) then the right number of move-downs, then select.
-  // Simpler: just send a special "goto" by looping move-down from 0. Instead,
-  // use move-top + N×move-down + select chained sequentially via async.
-  // clickBusy guards against a double-click firing the move-chain twice: the
-  // second click would run move-top/down/select on the screen the first click
+  // clickSelect navigates to the item at visible index idx and selects it,
+  // via a single atomic "select-index" action (the controller sets the
+  // cursor to idx directly, matching whatever visible index the template
+  // rendered). Previously this replayed move-top + N×move-down + select as
+  // separate round-trips; that chain landed on the wrong row whenever cursor
+  // movement skips entries (e.g. the main menu's skip-unavailable stepping
+  // over confirmed-empty resource types), opening the wrong resource.
+  // clickBusy guards against a double-click firing the action twice: the
+  // second click would run select-index on the screen the first click
   // already navigated to, drilling a level deeper ("two screens away").
   var clickBusy = false, lastClickIdx = -1, lastClickAt = 0;
   function clickSelect(idx) {
     var now = Date.now();
     if (clickBusy) return;
     // Ignore a repeat click on the same row within 500ms. lastClickIdx is reset
-    // to -1 after every navigation — this chain's done-callback below and every
-    // sendAction DOM swap — so the window only ever suppresses a double-click's
-    // second tap before the screen changes, never a legitimate click on the same
-    // row index of the screen we just navigated to.
+    // to -1 after every navigation (sendAction's DOM-swap handler) — so the
+    // window only ever suppresses a double-click's second tap before the
+    // screen changes, never a legitimate click on the same row index of the
+    // screen we just navigated to.
     if (idx === lastClickIdx && now - lastClickAt < 500) return;
     lastClickIdx = idx;
     lastClickAt = now;
     clickBusy = true;
-    // Chain: move-top → N × move-down → select (all sequential).
-    var steps = [{ kind: "move-top" }];
-    for (var i = 0; i < idx; i++) {
-      steps.push({ kind: "move-down" });
-    }
-    steps.push({ kind: "select" });
-    chainActions(steps, 0, function () {
+    sendAction("select-index", undefined, idx, function () {
       clickBusy = false;
-      // Navigation finished and the screen changed: clear the same-row debounce
-      // so an intentional click on the same row index of the new screen is not
-      // dropped. The in-flight move-chain (clickBusy) already absorbed the
-      // second tap of a physical double-click, which lands well before these
-      // sequential round-trips complete.
-      lastClickIdx = -1;
-      lastClickAt = 0;
     });
-  }
-
-  function chainActions(steps, i, done) {
-    if (i >= steps.length) { if (done) done(); return; }
-    var s = steps[i];
-    var body = { kind: s.kind };
-    if (s.arg) body.arg = s.arg;
-
-    fetch("/action", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-A9S-Token": token,
-      },
-      body: JSON.stringify(body),
-    })
-      .then(function (r) {
-        if (!r.ok) { if (done) done(); return; }
-        return r.text().then(function (html) {
-          var el = document.getElementById("main");
-          if (el) el.innerHTML = html;
-          chainActions(steps, i + 1, done);
-        });
-      })
-      .catch(function (e) { console.error(e); if (done) done(); });
   }
 
   // clickRelated navigates to the related-panel row at visible index idx.
@@ -160,10 +127,11 @@
     { key: "i",          action: { kind: "open-identity" } },
 
     // List actions
-    // r toggles the related panel (TUI keys.go ToggleRelated="r"); refresh is
-    // ctrl+r (handled in the keydown handler), matching the footer hints. The
-    // web keymap previously had these reversed (r=refresh, R=toggle-related).
+    // r toggles the related panel (TUI keys.go ToggleRelated="r"). Refresh
+    // used to be ctrl+r, but that hijacked the browser's reload shortcut, so
+    // it now lives on bare "R" (shift+r) instead.
     { key: "r",          action: { kind: "toggle-related" } },
+    { key: "R",          action: { kind: "refresh" } },
     { key: "m",          action: { kind: "load-more" } },
     { key: "c",          action: { kind: "copy" } },
     { key: "w",          action: { kind: "toggle-wrap" } },
@@ -180,7 +148,8 @@
   var filterMode = false;
   var filterBuf = "";
 
-  // searchInput holds state for Ctrl+S search input.
+  // searchInput holds state for the search input (no keyboard entry point
+  // currently wired up; see the keydown handler for details).
   var searchMode = false;
   var searchBuf = "";
 
@@ -216,6 +185,14 @@
     var tag = (document.activeElement || {}).tagName || "";
     if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
 
+    // Never hijack Cmd/Meta combos (copy, paste, reload, address bar, etc.) —
+    // let the browser handle them untouched.
+    if (e.metaKey) return;
+
+    // Ctrl combos: only ctrl+z (issues-only toggle) is ours. Everything else
+    // (ctrl+r reload, ctrl+s save, ctrl+c/v, ...) falls through to the browser.
+    if (e.ctrlKey && e.key !== "z" && e.key !== "Z") return;
+
     // Filter mode: / was pressed.
     if (filterMode) {
       if (e.key === "Escape") {
@@ -249,7 +226,9 @@
       return;
     }
 
-    // Search mode: ctrl+s was pressed.
+    // Search mode: no keyboard trigger currently enters this (ctrl+s was
+    // removed so the browser's save-page shortcut works); state and handling
+    // kept in case a future non-hijacking entry point is added.
     if (searchMode) {
       if (e.key === "Escape") {
         searchMode = false;
@@ -333,24 +312,11 @@
       return;
     }
 
-    // Enter search mode (Ctrl+S).
-    if (e.key === "s" && (e.ctrlKey || e.metaKey)) {
-      searchMode = true;
-      searchBuf = "";
-      showInputBar("search: ", "");
-      e.preventDefault();
-      return;
-    }
-
-    // Ctrl+Z: issues-only filter. Ctrl+R: refresh. preventDefault stops the
-    // browser's undo/reload so these reach the app like the TUI footer keys.
-    if ((e.ctrlKey || e.metaKey) && (e.key === "z" || e.key === "Z")) {
+    // Ctrl+Z: issues-only filter. This is the only ctrl combo we intercept
+    // (guarded above); everything else falls through to the browser. Must
+    // still check e.ctrlKey here — a bare z/Z keypress is not a shortcut.
+    if (e.ctrlKey && (e.key === "z" || e.key === "Z")) {
       sendAction("toggle-attention", "");
-      e.preventDefault();
-      return;
-    }
-    if ((e.ctrlKey || e.metaKey) && (e.key === "r" || e.key === "R")) {
-      sendAction("refresh", "");
       e.preventDefault();
       return;
     }

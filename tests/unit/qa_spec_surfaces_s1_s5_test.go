@@ -78,7 +78,6 @@ func TestSpec_NoBanner_WhenEnrichmentTruncated(t *testing.T) {
 		},
 		nil, "", views.SortColNone, true, 0, 0, false,
 	)
-	m.SetShowIssueBadge(true)
 	m.SetSize(120, 40)
 	// Buggy code: truncated=true causes findingsBanner to emit the ⓘ banner.
 	m.SetEnrichmentState(0, true, nil)
@@ -105,7 +104,6 @@ func TestSpec_NoBanner_WhenFindingsOffViewport(t *testing.T) {
 		resource.ResourceTypeDef{ShortName: "ec2", Name: "EC2 Instances"},
 		nil, keys.Default(), res, nil, "", views.SortColNone, true, 0, 0, false,
 	)
-	m.SetShowIssueBadge(true)
 	m.SetSize(120, 5) // tiny viewport — forces hidden findings
 	// Attach findings to rows that would be off-viewport after sort/filter.
 	findings := map[string]domain.Finding{
@@ -134,7 +132,6 @@ func TestSpec_S3_NoQuestionGlyph_OnTruncatedEnrichment(t *testing.T) {
 		resource.ResourceTypeDef{ShortName: "ec2", Name: "EC2 Instances"},
 		nil, keys.Default(), res, nil, "", views.SortColNone, true, 0, 0, false,
 	)
-	m.SetShowIssueBadge(true)
 	m.SetSize(120, 20)
 	// Buggy code: truncatedByID renders a "? " prefix on the identity column.
 	m.SetTruncatedIDs(map[string]bool{"i-001": true})
@@ -175,7 +172,6 @@ func TestSpec_S4_S3HealthyStatus_BlankNotBucketName(t *testing.T) {
 		resource.ResourceTypeDef{ShortName: "s3", Name: "S3 Buckets"},
 		cfg, keys.Default(), res, nil, "", views.SortColNone, true, 0, 0, false,
 	)
-	m.SetShowIssueBadge(true)
 	m.SetSize(200, 20)
 	view := stripANSISpec(m.View())
 	// Find the row for our bucket.
@@ -199,34 +195,51 @@ func TestSpec_S4_S3HealthyStatus_BlankNotBucketName(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------------
-// Frame title — No `+` suffix, no "(N/M issue)" duplicate of S1.
-// Spec §4: S1 is the MENU badge. Re-exposing the issue count inside the list
-// title duplicates the signal to an unauthorized surface, and `+` is the
-// same invented truncation marker as S1 (banned).
+// Frame title — docs/attention-signals.md contract amendment: S1's issue
+// count IS now duplicated onto the list title as a " !N" suffix (or " !N+"
+// when N is a truncated lower bound), aggregated identically to the menu
+// badge (Controller.GetListIssueCount / Controller.buildListFrameTitle — the
+// single source consumed by both TUI and web). The prior "S1 is menu-only"
+// rule is superseded for this one surface; the format itself stays
+// constrained: no bare "issues"/"issue" word, no "+" on the count itself
+// (only on the total, or on the " !N+" issue suffix when truncated).
 // -----------------------------------------------------------------------------
 
-// Note: "+" on the TOTAL count in the frame title is an operational
-// completeness signal (count is a lower bound), NOT a spec §4 attention
-// signal. It is allowed. What IS illegal is "issues:N+" on the menu badge
-// (tested elsewhere) and the "(N/M issue)" S1 duplicate.
-
-func TestSpec_ListTitle_NoIssueBadge_DuplicatedFromMenu(t *testing.T) {
-	// Four broken instances → issueCount = 4 after applySortAndFilter.
+func TestSpec_ListTitle_IssueBadge_DuplicatesMenuCount(t *testing.T) {
+	// Four broken instances → issueCount = 4, matching the menu badge count
+	// for the same underlying data.
 	res := []resource.Resource{
-		{ID: "i-001", Name: "a"},
-		{ID: "i-002", Name: "b"},
-		{ID: "i-003", Name: "c"},
-		{ID: "i-004", Name: "d"},
+		{ID: "i-001", Name: "a", Fields: map[string]string{"status": "stopped"}},
+		{ID: "i-002", Name: "b", Fields: map[string]string{"status": "stopped"}},
+		{ID: "i-003", Name: "c", Fields: map[string]string{"status": "stopped"}},
+		{ID: "i-004", Name: "d", Fields: map[string]string{"status": "stopped"}},
 	}
 	m := views.NewResourceListFromCache(
 		resource.ResourceTypeDef{ShortName: "ec2", Name: "EC2 Instances"},
 		nil, keys.Default(), res, nil, "", views.SortColNone, true, 0, 0, false,
 	)
-	m.SetShowIssueBadge(true)
 	title := m.FrameTitle()
-	// Spec §4: S1 is the MENU badge. The list title is NOT S1.
-	// Acceptable: "ec2(4)". Illegal: "ec2(4/4 issues)".
+
+	wantTitle := "ec2(4) !4"
+	if title != wantTitle {
+		t.Errorf("FrameTitle() = %q, want %q (list title duplicates the menu badge issue count as ' !N')", title, wantTitle)
+	}
+
+	// Consistency with the menu badge: seed the main menu with the SAME issue
+	// count for the same resource type and verify both surfaces agree on N.
+	menu := views.NewMainMenu(keys.Default())
+	menu.SetIssues("ec2", m.IssueCount(), false)
+	menu.SetAvailability("ec2", 4)
+	menu.SetSize(120, 40)
+	menuView := stripANSISpec(menu.View())
+	if !strings.Contains(menuView, "issues:4") {
+		t.Errorf("menu badge and list title disagree: list title N=%d (%q) but menu view does not contain 'issues:4':\n%s", m.IssueCount(), title, menuView)
+	}
+
+	// Format constraints: no bare "issue"/"issues" word, no "+" duplicated
+	// onto the issue-count digits themselves (only the truncation variant
+	// " !N+" is allowed, tested separately).
 	if strings.Contains(title, "issue") || strings.Contains(title, "issues") {
-		t.Errorf("spec §4 violation: list title must not duplicate S1 'issues' count; got %q", title)
+		t.Errorf("spec violation: list title must not contain the word 'issue(s)'; got %q", title)
 	}
 }

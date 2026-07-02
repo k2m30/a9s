@@ -12,7 +12,8 @@
 //   - Origin-header validation when present: rejects cross-origin requests whose
 //     Origin host is not loopback. Same-origin GETs and EventSource connections
 //     may omit Origin; the check is skipped when the header is absent.
-//   - Random per-run token required on every /action, /state, /events, /body request.
+//   - Random per-run token required on every GET / (page embeds the real token),
+//     /action, /state, /events, /body request.
 //   - No CORS headers. Cache-Control: no-store on all responses.
 //   - Per-session *app.Controller keyed by session cookie.
 //   - CSRF protection on POST /action via custom header X-A9S-Token.

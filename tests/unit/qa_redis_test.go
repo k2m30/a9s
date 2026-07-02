@@ -11,9 +11,9 @@ import (
 	elasticachetypes "github.com/aws/aws-sdk-go-v2/service/elasticache/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -273,16 +273,25 @@ func TestQA_Redis_ListFilter(t *testing.T) {
 		t.Error("filtered Redis list should NOT contain 'redis-available'")
 	}
 
+	// The " !N" issue suffix is unconditional and counts over ALL loaded rows
+	// (Controller.listIssueCount reads c.listScreenResources, not the
+	// filtered/visible set) — so it renders identically whether or not a text
+	// filter narrows what's on screen. Of the 3 multiStatusRedisFixtures rows,
+	// colorRedis (internal/aws/catalog_databases.go) classifies "redis-creating"
+	// (Fields["status"]="creating — new group") and "redis-deleting"
+	// (Fields["status"]="deleting — teardown") as ColorWarning (both match the
+	// explicit Warning-phrase switch cases); "redis-available"
+	// (Fields["status"]="") falls through to the default ColorHealthy. So N=2.
 	title := m.FrameTitle()
-	if title != "redis(1/3)" {
-		t.Errorf("expected filtered FrameTitle = %q, got %q", "redis(1/3)", title)
+	if title != "redis(1/3) !2" {
+		t.Errorf("expected filtered FrameTitle = %q, got %q", "redis(1/3) !2", title)
 	}
 
 	// Clear filter
 	m.SetFilter("")
 	title = m.FrameTitle()
-	if title != "redis(3)" {
-		t.Errorf("expected unfiltered FrameTitle = %q, got %q", "redis(3)", title)
+	if title != "redis(3) !2" {
+		t.Errorf("expected unfiltered FrameTitle = %q, got %q", "redis(3) !2", title)
 	}
 }
 

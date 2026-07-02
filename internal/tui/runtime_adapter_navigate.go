@@ -111,7 +111,6 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		if result.DisplayAlias != "" {
 			rl.SetDisplayName(result.DisplayAlias)
 		}
-		rl.SetShowIssueBadge(true)
 		rl.SetSize(m.innerSize())
 		issueCount := m.ctrl.GetMenuIssueCounts()[canon]
 		issueTrunc := m.ctrl.GetMenuIssueTruncated()[canon]
@@ -141,7 +140,6 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		if result.DisplayAlias != "" {
 			rl.SetDisplayName(result.DisplayAlias)
 		}
-		rl.SetShowIssueBadge(true)
 		rl.SetSize(m.innerSize())
 		issueCount := m.ctrl.GetMenuIssueCounts()[canon]
 		issueTrunc := m.ctrl.GetMenuIssueTruncated()[canon]
@@ -580,8 +578,8 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 		// loading rows immediately rather than stale counts.
 		m.ctrl.ResetDetailRelatedRows(rt)
 		m.core.RelatedCacheDelete(runtime.RelatedCacheKey(rt, srcRes.ID))
-		m.core.BumpRelatedGen() // cancel in-flight results from previous batch
-		m.core.BumpEnrichGen()  // cancel in-flight enrichment from previous batch
+		m.core.BumpRelatedGen()    // cancel in-flight results from previous batch
+		m.core.BumpEnrichGen()     // cancel in-flight enrichment from previous batch
 		m.core.ClearEnrichResKey() // force gen bump on next enrichment dispatch
 		// Invalidate the SES v1 receipt rule set cache so Ctrl+R on a detail
 		// view picks up receipt-rule changes without requiring a profile/region

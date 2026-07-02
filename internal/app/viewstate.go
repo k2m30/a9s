@@ -40,14 +40,24 @@ type KeyHint struct {
 	Help string `json:"help"`
 }
 
-// MenuFooterHints is the SINGLE source of the main-menu footer key hints,
+// MenuFooterHintsFor is the SINGLE source of the main-menu footer key hints,
 // consumed by both the web renderer (ViewState.Footer in snapshot) and the TUI
 // (MainMenuModel.BottomHints). Defining it once is what keeps the two renderers
 // from drifting — do not re-list these hints anywhere else.
-func MenuFooterHints() []KeyHint {
+//
+// mode is the ViewState Header.Mode value ("" = TUI, "web", "demo"). The hint
+// choice keys on web-vs-not-web, NOT on demo — a demo-TUI session
+// (Header.Mode=="demo") is still a terminal renderer and gets the TUI hint
+// set. Only mode=="web" swaps ctrl+r for R, since browsers intercept ctrl+r
+// for page reload and cannot bind it in-page.
+func MenuFooterHintsFor(mode string) []KeyHint {
+	refresh := KeyHint{Key: "ctrl+r", Help: "Refresh"}
+	if mode == "web" {
+		refresh = KeyHint{Key: "R", Help: "Refresh"}
+	}
 	return []KeyHint{
 		{Key: "ctrl+z", Help: "Issues only"},
-		{Key: "ctrl+r", Help: "Refresh"},
+		refresh,
 	}
 }
 

@@ -9,9 +9,9 @@ import (
 	"github.com/k2m30/a9s/v3/internal/app"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/text"
 )
@@ -142,10 +142,12 @@ func (m MainMenuModel) FrameTitle() string {
 }
 
 // BottomHints implements Hintable for MainMenuModel.
-// Single-sourced in app.MenuFooterHints, shared with the web footer
-// (ViewState.Footer) so the two renderers cannot drift.
+// Single-sourced in app.MenuFooterHintsFor, shared with the web footer
+// (ViewState.Footer) so the two renderers cannot drift. The TUI always
+// renders in terminal mode ("" — non-web), so it passes "" regardless of
+// demo mode; MenuFooterHintsFor keys on web-vs-not-web, not on demo.
 func (m MainMenuModel) BottomHints() []layout.KeyHint {
-	src := app.MenuFooterHints()
+	src := app.MenuFooterHintsFor("")
 	hints := make([]layout.KeyHint, len(src))
 	for i, h := range src {
 		hints[i] = layout.KeyHint{Key: h.Key, Desc: h.Help}
