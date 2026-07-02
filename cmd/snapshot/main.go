@@ -90,15 +90,15 @@ func main() {
 	}
 	// A partial run (--types x,y) refreshes just those types in the existing
 	// file instead of clobbering the other 60+ — the file stays the one big
-	// snapshot of everything.
+	// snapshot of everything. Carried sections stay json.RawMessage so their
+	// numbers never round-trip through float64 (int64 facts above 2^53 would
+	// silently lose precision otherwise).
 	if *types != "all" {
-		if prev, err := os.ReadFile(path); err == nil {
-			var old snapshotFile
-			if err := json.Unmarshal(prev, &old); err == nil {
-				maps.Copy(snap.Types, old.Types)
-				maps.Copy(snap.Errors, old.Errors)
-			}
+		carried, carriedErrs := mergeSnapshotFile(path, selected)
+		for k, v := range carried {
+			snap.Types[k] = v
 		}
+		maps.Copy(snap.Errors, carriedErrs)
 	}
 
 	// One type failing (missing permission, unavailable service) must not sink
@@ -121,7 +121,7 @@ func main() {
 		snap.Errors = nil
 	}
 
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		log.Fatalf("snapshot: %v", err)
 	}
 	if err := writeJSON(path, snap); err != nil {
@@ -130,10 +130,46 @@ func main() {
 	fmt.Printf("snapshot: wrote %s (%d types, %d errors)\n", path, len(snap.Types), failed)
 }
 
+// mergeSnapshotFile loads the existing snapshot at path (if any) and returns
+// the sections to carry over for a partial run: every type section EXCEPT
+// those in selected, preserved byte-for-byte, plus prior errors minus selected.
+// A missing or malformed file degrades to empty maps — a partial run on a
+// fresh directory simply produces a partial snapshot.
+func mergeSnapshotFile(path string, selected []string) (map[string]json.RawMessage, map[string]string) {
+	types := make(map[string]json.RawMessage)
+	errs := make(map[string]string)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return types, errs
+	}
+	var old struct {
+		Types  map[string]json.RawMessage `json:"types"`
+		Errors map[string]string          `json:"errors"`
+	}
+	if err := json.Unmarshal(data, &old); err != nil {
+		return types, errs
+	}
+	sel := make(map[string]bool, len(selected))
+	for _, s := range selected {
+		sel[s] = true
+	}
+	for k, v := range old.Types {
+		if !sel[k] {
+			types[k] = v
+		}
+	}
+	for k, v := range old.Errors {
+		if !sel[k] {
+			errs[k] = v
+		}
+	}
+	return types, errs
+}
+
 func writeJSON(path string, v any) error {
 	data, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o644)
+	return os.WriteFile(path, data, 0o600)
 }

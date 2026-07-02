@@ -957,10 +957,11 @@ func captureAthena(ctx context.Context, cfg aws.Config) (any, error) {
 		}
 
 		getOut, err := client.GetWorkGroup(ctx, &athena.GetWorkGroupInput{WorkGroup: aws.String(s.Name)})
-		if err != nil {
+		switch {
+		case err != nil:
 			wg.GetOutcome = "error"
 			wg.GetErrorCode = apiErrorCode(err)
-		} else if getOut.WorkGroup != nil && getOut.WorkGroup.Configuration != nil {
+		case getOut.WorkGroup != nil && getOut.WorkGroup.Configuration != nil:
 			wg.GetOutcome = "ok"
 			c := getOut.WorkGroup.Configuration
 			wg.EnforceWorkGroupConfiguration = aws.ToBool(c.EnforceWorkGroupConfiguration)
@@ -983,7 +984,7 @@ func captureAthena(ctx context.Context, cfg aws.Config) (any, error) {
 				wg.LoggingEnabled = aws.ToBool(cwl.Enabled)
 				wg.LogGroup = aws.ToString(cwl.LogGroup)
 			}
-		} else {
+		default:
 			wg.GetOutcome = "ok"
 		}
 

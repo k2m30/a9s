@@ -55,7 +55,7 @@ func checklistS3(section json.RawMessage) (Checklist, error) {
 		case "none":
 			incomplete = true
 		case "configured":
-			if !(b.PAB.BlockPublicAcls && b.PAB.IgnorePublicAcls && b.PAB.BlockPublicPolicy && b.PAB.RestrictPublicBuckets) {
+			if !b.PAB.BlockPublicAcls || !b.PAB.IgnorePublicAcls || !b.PAB.BlockPublicPolicy || !b.PAB.RestrictPublicBuckets {
 				incomplete = true
 			}
 		case "error":

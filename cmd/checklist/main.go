@@ -71,7 +71,7 @@ func main() {
 		log.Fatal("checklist: --snapshot is required")
 	}
 	expDir := filepath.Join(*dir, "checklists")
-	if err := os.MkdirAll(expDir, 0o755); err != nil {
+	if err := os.MkdirAll(expDir, 0o750); err != nil {
 		log.Fatalf("checklist: %v", err)
 	}
 
@@ -120,5 +120,5 @@ func writeJSON(path string, v any) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o644)
+	return os.WriteFile(path, data, 0o600)
 }
