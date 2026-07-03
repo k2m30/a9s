@@ -51,8 +51,10 @@ func newSession(profile, region, command string, demoMode, noCache bool, viewCfg
 		// returning, so the very first snapshot already carries the cached
 		// counts/issue badges/exact flags — mirroring what the
 		// TaskKindLoadAvailCache executor path does, without waiting on a live
-		// connection.
-		if store := core.EnsureCacheStore(); store != nil {
+		// connection. LoadAvailabilityCache (not the raw EnsureCacheStore)
+		// resolves an unset Region from the profile's config-file default so
+		// the seed still fires when no -r flag was passed.
+		if store := core.LoadAvailabilityCache(); store != nil {
 			ev := runtime.CacheStoreToEvent(store)
 			ctrl.Handle(ev)
 		}

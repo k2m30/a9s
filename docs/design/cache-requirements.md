@@ -63,6 +63,7 @@ Lifecycle, all content kinds: `none → cached (stale) → fresh`; "refreshing" 
 | D7 | Warm list open: the verify-refetch fetched only the truncated first page and the silent swap replaced 55 cached rows with 50, downgrading the exact title `s3(55)` to `s3(50+)` | C2 + C5 (re-verify must walk to the cached depth) |
 | D8 | A TUI session persisted only availability counts — its type files carried zero rows/findings, so the next start (either renderer) had no cells to seed; the web lane persisted full rows for the same flow | C6 + goal 4 (one save path for both renderers) |
 | D9 | TUI warm list-open rendered a bare `Loading…` shell although the pair's disk-cached rows were already seeded in memory; the web lane rendered them instantly — the seed decision lived only in the web controller | C1 + C3 + goal 4 (seed attached by HandleNavigate, one decision for both adapters, `⟳` marker on the seeded surface) |
+| D10 | TUI main menu rendered empty until the AWS connect completed — the disk seed was sequenced behind ClientsReady although it needs no AWS; and with no `-r` flag the unresolved pair skipped the seed entirely although the config default region is a synchronous file read; web `-c` navigated only after the full availability sweep | C1 + goal 4 (seed fires at Init parallel to connect; pair resolved from config default; startup command applied before the sweep drain) |
 
 ## 4. S3 pilot acceptance
 

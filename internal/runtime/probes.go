@@ -67,14 +67,26 @@ type DemoPrefetchResult struct {
 // cache for the CURRENT session pair via EnsureCacheStore and returns it
 // converted to the counts-only *cache.File-equivalent shape callers expect:
 // a map of per-type TypeFile snapshots. Returns the Store directly —
-// callers read it via (*cache.Store).Type/Types. NoCache=true (or a
-// profile/region mismatch with the currently-loaded pair) is handled by
-// EnsureCacheStore itself, which is also the sole place profile/region are
-// read — so this method takes no params (a prior profile/region pair here
-// was accepted but ignored, which let a caller for the wrong pair silently
-// read the current pair's Store).
+// callers read it via (*cache.Store).Type/Types.
+//
+// When session.Region is still unresolved ("", e.g. cold boot with no -r
+// flag before the AWS connect settles it), the profile's default region is
+// resolved synchronously from the local AWS config file so the disk seed
+// does not have to wait on a live connection (C1: cached data renders
+// before any AWS activity). This mirrors the resolution
+// handleClientsReadySuccess performs post-connect. The resolved region is
+// passed directly to Session.EnsureCacheStore and is NOT written back to
+// c.session.Region — connect owns that field, and if it resolves a
+// different region the pair-stamped Store self-corrects on the next call.
 func (c *Core) LoadAvailabilityCache() *cache.Store {
-	return c.EnsureCacheStore()
+	if c.session.NoCache {
+		return nil
+	}
+	region := c.session.Region
+	if region == "" {
+		region = awsclient.GetDefaultRegion(awsclient.DefaultConfigPath(), c.session.Profile)
+	}
+	return c.session.EnsureCacheStore(c.session.Profile, region)
 }
 
 // SaveAvailabilityCache persists the supplied availability state to disk, one
