@@ -99,6 +99,21 @@ type Session struct {
 	// initial connect failed and rolled back).
 	Command string
 
+	// CommandArmed latches that the live (cached) connect path has decided
+	// the one-shot -c navigation for PendingCommand is eligible to fire
+	// (Command was set and StackDepth==1 at ClientsReady time), but must wait
+	// for handleAvailabilityCacheLoaded to seed session.ProbeResources first
+	// so the navigation never races the availability-cache seed (DEF-14/D11).
+	// Consumed (cleared) by handleAvailabilityCacheLoaded; not cleared by
+	// Rotate for the same reason Command survives it.
+	CommandArmed bool
+
+	// PendingCommand carries the resource short name captured from Command at
+	// ClientsReady time, for handleAvailabilityCacheLoaded to consume once
+	// CommandArmed is set (Command itself is cleared immediately on every
+	// ClientsReadyMsg, armed or not — see the Command field doc).
+	PendingCommand string
+
 	// NoCache disables on-disk availability caching and background probes
 	// (set by the --no-cache / --demo CLI flags). Survives Rotate — it is a
 	// static policy, not session state.

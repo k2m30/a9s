@@ -124,10 +124,32 @@ func ValidateRegionCode(code string) bool {
 	return awsPartitionRegionRegex.MatchString(code)
 }
 
-// GetDefaultRegion reads the region configured for a given profile in the AWS config file.
-// If the config file doesn't exist or the profile has no region, it falls back to "us-east-1".
+// maxSourceProfileDepth bounds the source_profile chain walk in
+// resolveProfileRegion so a cyclical or accidentally-long chain in a
+// malformed config file cannot loop or recurse unbounded.
+const maxSourceProfileDepth = 5
+
+// GetDefaultRegion resolves the effective region for a given profile the same
+// way the AWS SDK's static config chain does (no network calls, no SSO/STS):
+//
+//  1. AWS_REGION, then AWS_DEFAULT_REGION environment variables.
+//  2. The profile's own `region` key in the AWS config file.
+//  3. Following `source_profile` links recursively (cycle-guarded, capped at
+//     maxSourceProfileDepth hops), taking the first `region` found along the
+//     chain — this is what lets an assume-role profile (role_arn +
+//     source_profile, no region of its own) inherit its source profile's
+//     region.
+//  4. The `[default]` section's `region` key.
+//  5. "us-east-1" as a last-resort fallback.
 func GetDefaultRegion(configPath, profile string) string {
 	const fallback = "us-east-1"
+
+	if region := strings.TrimSpace(os.Getenv("AWS_REGION")); region != "" {
+		return region
+	}
+	if region := strings.TrimSpace(os.Getenv("AWS_DEFAULT_REGION")); region != "" {
+		return region
+	}
 
 	if configPath == "" {
 		return fallback
@@ -147,31 +169,79 @@ func GetDefaultRegion(configPath, profile string) string {
 		return fallback
 	}
 
-	// Determine the section name to look up
+	lookupProfile := profile
+	if lookupProfile == "" {
+		lookupProfile = "default"
+	}
+
+	if region, ok := resolveProfileRegion(cfg, lookupProfile, make(map[string]bool)); ok {
+		return region
+	}
+
+	if region, ok := sectionRegion(cfg, "default"); ok {
+		return region
+	}
+	if region, ok := sectionRegion(cfg, "DEFAULT"); ok {
+		return region
+	}
+
+	return fallback
+}
+
+// resolveProfileRegion looks up the region for profile directly, then —
+// when absent — follows the profile's source_profile link recursively.
+// visited guards against cycles (A -> B -> A) and, via its growing size,
+// bounds the walk to maxSourceProfileDepth hops.
+func resolveProfileRegion(cfg *ini.File, profile string, visited map[string]bool) (string, bool) {
+	if profile == "" || visited[profile] || len(visited) >= maxSourceProfileDepth {
+		return "", false
+	}
+	visited[profile] = true
+
 	sectionName := "profile " + profile
-	if profile == "default" || profile == "" {
+	if profile == "default" {
 		sectionName = "default"
 	}
 
 	section, err := cfg.GetSection(sectionName)
 	if err != nil {
-		// Try without "profile " prefix for default
-		if profile == "default" || profile == "" {
+		if profile == "default" {
 			section, err = cfg.GetSection("DEFAULT")
-			if err != nil {
-				return fallback
-			}
-		} else {
-			return fallback
+		}
+		if err != nil {
+			return "", false
 		}
 	}
 
 	if section.HasKey("region") {
-		region := strings.TrimSpace(section.Key("region").String())
-		if region != "" {
-			return region
+		if region := strings.TrimSpace(section.Key("region").String()); region != "" {
+			return region, true
 		}
 	}
 
-	return fallback
+	if section.HasKey("source_profile") {
+		sourceProfile := strings.TrimSpace(section.Key("source_profile").String())
+		if sourceProfile != "" {
+			return resolveProfileRegion(cfg, sourceProfile, visited)
+		}
+	}
+
+	return "", false
+}
+
+// sectionRegion reads the region key from a named section, reporting ok=false
+// when the section or the key is missing/empty.
+func sectionRegion(cfg *ini.File, sectionName string) (string, bool) {
+	section, err := cfg.GetSection(sectionName)
+	if err != nil {
+		return "", false
+	}
+	if !section.HasKey("region") {
+		return "", false
+	}
+	region := strings.TrimSpace(section.Key("region").String())
+	if region == "" {
+		return "", false
+	}
+	return region, true
 }

@@ -136,6 +136,23 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 		tasks = append(tasks, TaskRequest{Key: TaskKey{Kind: TaskKindProbeAvailability, Scope: shortName}})
 	}
 
+	// DEF-14/D11: consume the one-shot -c navigation armed by
+	// handleClientsReadySuccess on the live path, now that the
+	// session.ProbeResources seed above has landed — dispatching it any
+	// earlier (e.g. alongside TaskKindLoadAvailCache) would race the seed,
+	// since the adapter runs task cmds concurrently via tea.Batch.
+	if c.session.CommandArmed {
+		tasks = append(tasks, TaskRequest{
+			Key: TaskKey{Kind: TaskKindEmitNavigate},
+			Payload: EmitNavigatePayload{
+				Target:       NavigateTargetResourceList,
+				ResourceType: c.session.PendingCommand,
+			},
+		})
+		c.session.CommandArmed = false
+		c.session.PendingCommand = ""
+	}
+
 	return intents, tasks
 }
 

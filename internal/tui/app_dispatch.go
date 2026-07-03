@@ -264,6 +264,16 @@ func (m *Model) tasksToCmd(tasks []runtime.TaskRequest) tea.Cmd {
 			if p, ok := req.Payload.(runtime.SaveThemeConfigPayload); ok {
 				cmds = append(cmds, saveThemeConfigCmd(p))
 			}
+
+		case runtime.TaskKindEmitNavigate:
+			// ErrAdapterOnlyTask — navigation directive; keep adapter-local.
+			// DEF-14/D11: handleAvailabilityCacheLoaded emits this once its
+			// ProbeResources seed has landed, so this must reach the same
+			// emitNavigateCmd translator runtimeTasksToCmd uses for the
+			// NoCache path's direct emission.
+			if p, ok := req.Payload.(runtime.EmitNavigatePayload); ok {
+				cmds = append(cmds, emitNavigateCmd(p))
+			}
 		}
 	}
 	if len(cmds) == 0 {

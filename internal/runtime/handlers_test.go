@@ -669,7 +669,15 @@ func TestHandleClientsReady_Success_LivePath(t *testing.T) {
 }
 
 // TestHandleClientsReady_Success_Command_StackDepth1: Command set + StackDepth==1
-// → EmitNavigate task + Command cleared.
+// → the live path does NOT emit TaskKindEmitNavigate directly (DEF-14/D11
+// Cause B). Emitting it here would race handleAvailabilityCacheLoaded's
+// session.ProbeResources seed (tea.Batch runs task cmds concurrently),
+// landing on a bare "Loading..." list with no title count. Instead
+// HandleClientsReady arms the deferred navigation — session.CommandArmed
+// is set, session.PendingCommand carries the resource short name — and
+// Command itself is cleared immediately (consumed exactly once, regardless
+// of eligibility). handleAvailabilityCacheLoaded is the one that actually
+// dispatches TaskKindEmitNavigate, once its ProbeResources seed has landed.
 func TestHandleClientsReady_Success_Command_StackDepth1(t *testing.T) {
 	c := newCore()
 	s := c.session
@@ -682,15 +690,14 @@ func TestHandleClientsReady_Success_Command_StackDepth1(t *testing.T) {
 		StackDepth: 1,
 	})
 
-	nav, ok := findEmitNavigatePayload(tasks)
-	if !ok {
-		t.Fatal("expected TaskKindEmitNavigate task when Command set and StackDepth==1")
+	if hasTaskKind(tasks, TaskKindEmitNavigate) {
+		t.Error("unexpected TaskKindEmitNavigate directly from HandleClientsReady on the live path — the one-shot -c navigation must be armed and deferred to handleAvailabilityCacheLoaded, not fired here (DEF-14/D11 Cause B)")
 	}
-	if nav.Target != NavigateTargetResourceList {
-		t.Errorf("EmitNavigatePayload.Target = %v, want NavigateTargetResourceList", nav.Target)
+	if !s.CommandArmed {
+		t.Error("session.CommandArmed = false, want true — Command set + StackDepth==1 must arm the deferred navigation")
 	}
-	if nav.ResourceType != "ec2" {
-		t.Errorf("EmitNavigatePayload.ResourceType = %q, want %q", nav.ResourceType, "ec2")
+	if s.PendingCommand != "ec2" {
+		t.Errorf("session.PendingCommand = %q, want %q", s.PendingCommand, "ec2")
 	}
 	if s.Command != "" {
 		t.Errorf("session.Command should be cleared after use, got %q", s.Command)

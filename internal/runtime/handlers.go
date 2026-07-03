@@ -246,9 +246,21 @@ func (c *Core) handleClientsReadyFailure(ev ClientsReadyEvent) ([]UIIntent, []Ta
 
 // handleClientsReadySuccess installs the new clients (or falls back to the
 // pre-supplied demo transport when ev.Clients is nil), defaults Profile /
-// Region when empty, dispatches the one-shot -c navigation, and fires the
-// identity + availability tasks (plus a refresh-list flash + intent when
-// PendingRefresh is set and the active view is a ResourceListModel).
+// Region when empty, dispatches or arms the one-shot -c navigation, and
+// fires the identity + availability tasks (plus a refresh-list flash +
+// intent when PendingRefresh is set and the active view is a
+// ResourceListModel).
+//
+// -c navigation ordering (DEF-14/D11): on the NoCache/demo path the counts
+// are seeded synchronously below (DemoPrefetchCounts), so it is safe to emit
+// TaskKindEmitNavigate immediately. On the live path the availability cache
+// seed (session.ProbeResources) is populated asynchronously by
+// handleAvailabilityCacheLoaded once TaskKindLoadAvailCache completes; a
+// navigation task dispatched here would race that seed on some machines
+// (tea.Batch runs task cmds concurrently) and land on a bare "Loading..."
+// list. So on the live path this only arms s.CommandArmed — the actual
+// TaskKindEmitNavigate is deferred to the END of
+// handleAvailabilityCacheLoaded, after the seed has landed.
 func (c *Core) handleClientsReadySuccess(ev ClientsReadyEvent) ([]UIIntent, []TaskRequest) {
 	s := c.session
 
@@ -281,20 +293,13 @@ func (c *Core) handleClientsReadySuccess(ev ClientsReadyEvent) ([]UIIntent, []Ta
 
 	var tasks []TaskRequest
 
-	// One-shot -c navigation: only fire when we have an unconsumed Command
-	// AND the active view is still the main menu (Stack depth 1).
-	if s.Command != "" {
-		if ev.StackDepth == 1 {
-			tasks = append(tasks, TaskRequest{
-				Key: TaskKey{Kind: TaskKindEmitNavigate},
-				Payload: EmitNavigatePayload{
-					Target:       NavigateTargetResourceList,
-					ResourceType: s.Command,
-				},
-			})
-		}
-		s.Command = ""
-	}
+	// One-shot -c navigation: only eligible when we have an unconsumed
+	// Command AND the active view is still the main menu (Stack depth 1).
+	// Command itself is always cleared here (consumed exactly once,
+	// regardless of eligibility) — see the Command field doc.
+	commandEligible := s.Command != "" && ev.StackDepth == 1
+	pendingCommand := s.Command
+	s.Command = ""
 
 	if s.Profile == "" {
 		s.Profile = "default"
@@ -310,7 +315,18 @@ func (c *Core) handleClientsReadySuccess(ev ClientsReadyEvent) ([]UIIntent, []Ta
 
 	// Demo / no-cache: synchronous prefetch instead of the async probe
 	// pipeline. Identity fetch is skipped in this mode (synthetic creds).
+	// Counts land synchronously (DemoPrefetchCounts), so the navigation task
+	// can be emitted directly here without racing any seed.
 	if s.NoCache {
+		if commandEligible {
+			tasks = append(tasks, TaskRequest{
+				Key: TaskKey{Kind: TaskKindEmitNavigate},
+				Payload: EmitNavigatePayload{
+					Target:       NavigateTargetResourceList,
+					ResourceType: pendingCommand,
+				},
+			})
+		}
 		tasks = append(tasks, TaskRequest{
 			Key:     TaskKey{Kind: TaskKindDemoPrefetchCounts},
 			Payload: DemoPrefetchCountsPayload{},
@@ -318,6 +334,14 @@ func (c *Core) handleClientsReadySuccess(ev ClientsReadyEvent) ([]UIIntent, []Ta
 		intents, refreshTasks := c.maybeRefreshIntents(ev)
 		tasks = append(tasks, refreshTasks...)
 		return intents, tasks
+	}
+
+	// Live path: arm the navigation instead of emitting it now — see the
+	// handleClientsReadySuccess doc comment for why. handleAvailabilityCacheLoaded
+	// consumes s.CommandArmed/s.PendingCommand once its own seed has landed.
+	if commandEligible {
+		s.CommandArmed = true
+		s.PendingCommand = pendingCommand
 	}
 
 	// Live AWS path: fetch identity + load disk cache.

@@ -181,6 +181,79 @@ func TestQA_CLICommand_DemoMode_EmitsNavigateMsg(t *testing.T) {
 	}
 }
 
+// TestQA_CLICommand_LivePath_ClientsReady_ArmsButDoesNotEmitNavigateYet
+// verifies DEF-14/D11's Cause B fix reaches the real TUI Update loop: on the
+// LIVE (non-demo, NoCache=false) path, a ClientsReadyMsg must NOT produce a
+// NavigateMsg directly — the one-shot -c navigation is armed
+// (session.CommandArmed/PendingCommand) and deferred to the follow-up
+// AvailabilityCacheLoaded event, so that ProbeResources is seeded before
+// HandleNavigate can ever run. This is the race TestQA_CLICommand_* above
+// never exercised: every existing case in this file uses WithNoCache(true),
+// which stays on the synchronous-prefetch lane where direct emission is
+// still correct and unchanged.
+func TestQA_CLICommand_LivePath_ClientsReady_ArmsButDoesNotEmitNavigateYet(t *testing.T) {
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+	m := tui.New(
+		"testprofile",
+		"us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithCommand("ec2"),
+	)
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
+
+	_, cmd := rootApplyMsg(m, messages.ClientsReady{
+		Clients: demo.NewServiceClients(),
+		Region:  "us-east-1",
+	})
+
+	if nav := findNavigateMsg(cmd); nav != nil {
+		t.Fatalf("live-path ClientsReadyMsg emitted a NavigateMsg immediately (Target:%v, ResourceType:%q) — the -c navigation must be armed and deferred to the post-seed AvailabilityCacheLoaded event, not fired here (DEF-14/D11 Cause B)", nav.Target, nav.ResourceType)
+	}
+}
+
+// TestQA_CLICommand_LivePath_AvailabilityCacheLoaded_EmitsNavigateMsg is the
+// other half of the live-path pin: once the deferred AvailabilityCacheLoaded
+// event (what TaskKindLoadAvailCache's real Cmd produces) reaches the
+// Update loop, the armed -c navigation must surface as a real NavigateMsg —
+// proving TaskKindEmitNavigate's dispatch case in app_dispatch.go actually
+// wires through to messages.Navigate, not just that the runtime Core
+// returns the right TaskRequest in isolation.
+func TestQA_CLICommand_LivePath_AvailabilityCacheLoaded_EmitsNavigateMsg(t *testing.T) {
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+	m := tui.New(
+		"testprofile",
+		"us-east-1",
+		tui.WithClients(demo.NewServiceClients()),
+		tui.WithCommand("ec2"),
+	)
+	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
+
+	m, _ = rootApplyMsg(m, messages.ClientsReady{
+		Clients: demo.NewServiceClients(),
+		Region:  "us-east-1",
+	})
+
+	_, cmd := rootApplyMsg(m, messages.AvailabilityCacheLoaded{
+		Entries: map[string]int{"ec2": 1},
+	})
+
+	nav := extractMsg(t, cmd, func(msg tea.Msg) bool {
+		_, ok := msg.(messages.Navigate)
+		return ok
+	})
+
+	navMsg, ok := nav.(messages.Navigate)
+	if !ok {
+		t.Fatalf("expected messages.Navigate to reach the Update loop after AvailabilityCacheLoaded on the live -c path, got %T — check the TaskKindEmitNavigate case in internal/tui/app_dispatch.go", nav)
+	}
+	if navMsg.Target != messages.TargetResourceList {
+		t.Errorf("NavigateMsg.Target should be TargetResourceList, got %v", navMsg.Target)
+	}
+	if navMsg.ResourceType != "ec2" {
+		t.Errorf("NavigateMsg.ResourceType should be %q, got %q", "ec2", navMsg.ResourceType)
+	}
+}
+
 // TestQA_CLICommand_SkippedWhenUserNavigatedAway verifies that if the initial
 // AWS connection is slow and the user navigates away from the main menu before
 // ClientsReadyMsg arrives, the -c auto-navigation is suppressed to avoid
