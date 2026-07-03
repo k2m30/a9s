@@ -15,6 +15,7 @@ package runtime
 import (
 	"fmt"
 
+	"github.com/k2m30/a9s/v3/internal/cache"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/session"
 )
@@ -180,15 +181,21 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 					},
 				}
 			}
-		} else if store := c.EnsureCacheStore(); store != nil {
-			if tf, ok := store.Type(canon); ok && len(tf.Rows) > 0 {
-				result.CachedEntry = &session.ResourceCacheEntry{
-					Resources: rowsFromCacheRows(canon, tf.Rows),
-					Pagination: &resource.PaginationMeta{
-						IsTruncated: !tf.Exact,
-					},
+		} else {
+			_ = c.ReadCacheStore(func(store *cache.Store) error {
+				if store == nil {
+					return nil
 				}
-			}
+				if tf, ok := store.Type(canon); ok && len(tf.Rows) > 0 {
+					result.CachedEntry = &session.ResourceCacheEntry{
+						Resources: rowsFromCacheRows(canon, tf.Rows),
+						Pagination: &resource.PaginationMeta{
+							IsTruncated: !tf.Exact,
+						},
+					}
+				}
+				return nil
+			})
 		}
 		return result, []TaskRequest{{
 			Key:   TaskKey{Kind: KindFetchResources, Scope: ev.ResourceType},

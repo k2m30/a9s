@@ -585,9 +585,10 @@ func TestStoryF1_CtrlR_ResetsPagination(t *testing.T) {
 		t.Fatalf("precondition: expected %q, got %q", "ec2(200+)", m.FrameTitle())
 	}
 
-	// Press M to load more — appends page 2
+	// Press M to load more — appends page 2. IDs start at 200 (disjoint
+	// from page 1's 0-199) — AWS pagination never repeats an ID across pages.
 	m, _ = m.Update(pgKeyPress("M"))
-	m = storyLoadResources(m, pgTestResources(200), &resource.PaginationMeta{
+	m = storyLoadResources(m, pgTestResourcesFrom(200, 200), &resource.PaginationMeta{
 		IsTruncated: true,
 		NextToken:   "tok-p3",
 	}, true)
@@ -1471,8 +1472,20 @@ func TestStoryJ1_ResizeDuringLoadMore_PreservesData(t *testing.T) {
 					rt.ShortName, m.FrameTitle())
 			}
 
-			// Now complete the load-more
-			appended := resources[:50]
+			// Now complete the load-more. IDs start at 100 (disjoint from
+			// page 1's id-0..id-99) — AWS pagination never repeats an ID
+			// across pages, and a synthetic page-2 reusing page-1 IDs would
+			// be silently dropped by the ID-dedup guard on append.
+			appended := make([]resource.Resource, 50)
+			for i := range 50 {
+				fields := make(map[string]string)
+				for _, col := range rt.Columns {
+					fields[col.Key] = fmt.Sprintf("%s-%d", col.Key, 100+i)
+				}
+				appended[i] = resource.Resource{
+					ID: fmt.Sprintf("id-%d", 100+i), Name: fmt.Sprintf("name-%d", 100+i), Fields: fields,
+				}
+			}
 			m, _ = m.Update(messages.ResourcesLoaded{
 				ResourceType: rt.ShortName,
 				Resources:    appended,
@@ -1532,11 +1545,24 @@ func TestStoryJ2_MinimumTerminalSize_PreservesData(t *testing.T) {
 				Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "tok"},
 			})
 
-			// Append 200 more
+			// Append 200 more. IDs start at 200 (disjoint from page 1's
+			// id-0..id-199) — AWS pagination never repeats an ID across
+			// pages, and a synthetic page-2 reusing page-1 IDs would be
+			// silently dropped by the ID-dedup guard on append.
+			appended := make([]resource.Resource, 200)
+			for i := range 200 {
+				fields := make(map[string]string)
+				for _, col := range rt.Columns {
+					fields[col.Key] = fmt.Sprintf("%s-%d", col.Key, 200+i)
+				}
+				appended[i] = resource.Resource{
+					ID: fmt.Sprintf("id-%d", 200+i), Name: fmt.Sprintf("name-%d", 200+i), Fields: fields,
+				}
+			}
 			m, _ = m.Update(pgKeyPress("M"))
 			m, _ = m.Update(messages.ResourcesLoaded{
 				ResourceType: rt.ShortName,
-				Resources:    resources,
+				Resources:    appended,
 				Pagination:   &resource.PaginationMeta{IsTruncated: false},
 				Append:       true,
 			})
@@ -2343,17 +2369,30 @@ func TestStoryDFGI_AllResourceTypes_PaginationViewConsistency(t *testing.T) {
 				t.Errorf("loading more: expected 'loading...' in %q", m.FrameTitle())
 			}
 
-			// 4. Append page 2 (final) — the same 100-row `resources` slice is
-			// appended again, so the post-append set is `resources` doubled
-			// (200 rows); the issue suffix is derived over that doubled set.
+			// 4. Append page 2 (final) — a genuinely distinct 100-row page
+			// with IDs starting at 100 (disjoint from page 1's id-0..id-99),
+			// mirroring real AWS pagination (never repeats an ID across
+			// pages) and exercising the append-time ID-dedup guard
+			// correctly instead of tripping it. Post-append set is 200 rows
+			// total; the issue suffix is derived over that combined set.
+			page2 := make([]resource.Resource, 100)
+			for i := range 100 {
+				fields := make(map[string]string)
+				for _, col := range rt.Columns {
+					fields[col.Key] = fmt.Sprintf("%s-%d", col.Key, 100+i)
+				}
+				page2[i] = resource.Resource{
+					ID: fmt.Sprintf("id-%d", 100+i), Name: fmt.Sprintf("name-%d", 100+i), Fields: fields,
+				}
+			}
 			m, _ = m.Update(messages.ResourcesLoaded{
 				ResourceType: rt.ShortName,
-				Resources:    resources,
+				Resources:    page2,
 				Pagination:   &resource.PaginationMeta{IsTruncated: false},
 				Append:       true,
 			})
-			doubled := append(append([]resource.Resource{}, resources...), resources...)
-			wantComplete := effectiveTitleName(rt) + "(200)" + expectedIssueSuffix(rt, doubled)
+			combined := append(append([]resource.Resource{}, resources...), page2...)
+			wantComplete := effectiveTitleName(rt) + "(200)" + expectedIssueSuffix(rt, combined)
 			if m.FrameTitle() != wantComplete {
 				t.Errorf("complete: expected %q, got %q", wantComplete, m.FrameTitle())
 			}

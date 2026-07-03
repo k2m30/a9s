@@ -87,6 +87,29 @@ func (c *Core) EnsureCacheStore() *cache.Store {
 	return c.session.EnsureCacheStore(c.session.Profile, c.session.Region)
 }
 
+// WithCacheStore runs fn against the current pair's *cache.Store with
+// session.cacheStoreMu held for fn's entire duration, so a caller's own
+// store.Type/Put/SaveType read-modify-write sequence for one type file can
+// never interleave with another such sequence running concurrently (DEF-17).
+// No-op (fn not called) when NoCache is set, mirroring EnsureCacheStore.
+func (c *Core) WithCacheStore(fn func(store *cache.Store) error) error {
+	if c.session.NoCache {
+		return nil
+	}
+	return c.session.WithCacheStore(c.session.Profile, c.session.Region, fn)
+}
+
+// ReadCacheStore runs fn against the current pair's *cache.Store with
+// session.cacheStoreMu held, for read-only callers (store.Type/store.Types).
+// See Session.ReadCacheStore for why a read call site must not bypass this
+// lock even though it never mutates the store itself.
+func (c *Core) ReadCacheStore(fn func(store *cache.Store) error) error {
+	if c.session.NoCache {
+		return nil
+	}
+	return c.session.ReadCacheStore(c.session.Profile, c.session.Region, fn)
+}
+
 // Command returns the one-shot resource short name to navigate to on the
 // first ClientsReady (from the -c CLI flag).
 func (c *Core) Command() string { return c.session.Command }

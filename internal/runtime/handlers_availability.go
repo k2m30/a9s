@@ -83,13 +83,24 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 	// deliver a counts-only AvailabilityCacheLoaded event without a populated
 	// on-disk per-type file (e.g. a synthetic/legacy counts projection).
 	if len(entries) > 0 {
-		store := c.EnsureCacheStore()
 		if c.session.ProbeResources == nil {
 			c.session.ProbeResources = make(map[string][]resource.Resource, len(entries))
 		}
 		if c.session.ProbeTruncated == nil {
 			c.session.ProbeTruncated = make(map[string]bool, len(entries))
 		}
+		rowsByType := make(map[string][]cache.Row, len(entries))
+		_ = c.ReadCacheStore(func(store *cache.Store) error {
+			if store == nil {
+				return nil
+			}
+			for shortName := range entries {
+				if tf, ok := store.Type(shortName); ok && len(tf.Rows) > 0 {
+					rowsByType[shortName] = tf.Rows
+				}
+			}
+			return nil
+		})
 		for shortName, count := range entries {
 			if count <= 0 {
 				continue
@@ -98,10 +109,8 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 				continue
 			}
 			var rows []resource.Resource
-			if store != nil {
-				if tf, ok := store.Type(shortName); ok && len(tf.Rows) > 0 {
-					rows = rowsFromCacheRows(shortName, tf.Rows)
-				}
+			if cr, ok := rowsByType[shortName]; ok {
+				rows = rowsFromCacheRows(shortName, cr)
 			}
 			if len(rows) == 0 {
 				rows = placeholderRows(shortName, count)

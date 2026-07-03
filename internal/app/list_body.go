@@ -31,9 +31,15 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	// Writing to ls.Rows ensures that two stacked list screens of the same
 	// resource type never share a row slice. Each screen's fetch result lands
 	// exclusively on that screen's ListState.
+	//
+	// DEF-17 backstop: an append must never introduce a row whose ID already
+	// exists on the screen. This is a backstop, not the fix for the root
+	// cause below — it only prevents a duplicate that already reached this
+	// call from becoming visible; the empty-cursor guard is what stops the
+	// duplicate fetch from happening in the first place.
 	if ls != nil {
 		if appendPage {
-			ls.Rows = append(ls.Rows, resources...)
+			ls.Rows = append(ls.Rows, dedupAgainstExisting(ls.Rows, resources)...)
 		} else {
 			ls.Rows = resources
 		}
@@ -46,7 +52,8 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 		c.resourceCache = make(map[string][]resource.Resource)
 	}
 	if appendPage {
-		c.resourceCache[typeName] = append(c.resourceCache[typeName], resources...)
+		existing := c.resourceCache[typeName]
+		c.resourceCache[typeName] = append(existing, dedupAgainstExisting(existing, resources)...)
 	} else {
 		c.resourceCache[typeName] = resources
 	}
@@ -80,6 +87,29 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	if known := c.listEnrichmentFindings(typeName); len(known) > 0 {
 		c.applyRowFindings(typeName, known, nil)
 	}
+}
+
+// dedupAgainstExisting returns the subset of incoming whose ID is not already
+// present in existing. Rows are keyed by their stable resource ID (C2/C6):
+// an append that would introduce a row already on the screen is dropped
+// rather than shown twice. Order of the surviving rows is preserved.
+func dedupAgainstExisting(existing, incoming []resource.Resource) []resource.Resource {
+	if len(incoming) == 0 {
+		return incoming
+	}
+	seen := make(map[string]struct{}, len(existing))
+	for _, r := range existing {
+		seen[r.ID] = struct{}{}
+	}
+	out := make([]resource.Resource, 0, len(incoming))
+	for _, r := range incoming {
+		if _, dup := seen[r.ID]; dup {
+			continue
+		}
+		seen[r.ID] = struct{}{}
+		out = append(out, r)
+	}
+	return out
 }
 
 // materializeListFieldsForType resolves the column set for typeName the same

@@ -92,8 +92,15 @@ func (c *Core) LoadAvailabilityCache() *cache.Store {
 // SaveAvailabilityCache persists the supplied availability state to disk, one
 // type file per resource type (C7: per-type files, no merge logic). Returns
 // nil immediately when entries is nil or caching is disabled (NoCache). The
-// per-type Store is obtained via EnsureCacheStore so a save can never precede
-// that pair's own load (C7 hard invariant).
+// entire per-type read-modify-write-to-disk sequence runs inside
+// WithCacheStore (DEF-17) so it can never interleave with a concurrent
+// SaveResourceListCache/SaveAvailabilityCache call for the same type file
+// dispatched from another tea.Cmd goroutine (e.g. a background availability
+// sweep's save racing a list screen's own fetch-completion save) — that race
+// previously let one call's Count and another's Rows land in the same
+// on-disk TypeFile as a mismatched pair, even though each call's own write
+// was individually consistent. WithCacheStore also covers the initial load
+// (C7 hard invariant: a save can never precede that pair's own load).
 //
 // Row/Findings persistence (C6, all loaded pages) is intentionally NOT done
 // here — this method only carries the counts-only availability-probe shape
@@ -107,61 +114,62 @@ func (c *Core) SaveAvailabilityCache(
 	issueTruncated map[string]bool,
 	issueKnown map[string]bool,
 ) error {
-	if entries == nil || c.session.NoCache {
+	if entries == nil {
 		return nil
 	}
-	store := c.EnsureCacheStore()
-	if store == nil {
-		return nil
-	}
-	var firstErr error
-	for rawName, count := range entries {
-		name := canonShortName(rawName)
-		trunc := false
-		if truncated != nil {
-			trunc = truncated[rawName]
+	return c.WithCacheStore(func(store *cache.Store) error {
+		if store == nil {
+			return nil
 		}
-		existing, _ := store.Type(name)
-		tf := cache.TypeFile{
-			HasResources: count > 0,
-			Count:        count,
-			// C5: a truncated first-page probe never downgrades a stored
-			// exact total — only replace Exact when this observation is
-			// itself untruncated (a genuine exact observation).
-			Exact: existing.Exact || !trunc,
-			Rows:  existing.Rows,
+		var firstErr error
+		for rawName, count := range entries {
+			name := canonShortName(rawName)
+			trunc := false
+			if truncated != nil {
+				trunc = truncated[rawName]
+			}
+			existing, _ := store.Type(name)
+			tf := cache.TypeFile{
+				HasResources: count > 0,
+				Count:        count,
+				// C5: a truncated first-page probe never downgrades a stored
+				// exact total — only replace Exact when this observation is
+				// itself untruncated (a genuine exact observation).
+				Exact: existing.Exact || !trunc,
+				Rows:  existing.Rows,
+			}
+			switch {
+			case existing.Exact && trunc && existing.Count > count:
+				// Preserve the previously-observed exact count/rows rather than
+				// letting a smaller truncated lower-bound regress it.
+				tf.Count = existing.Count
+				tf.HasResources = existing.Count > 0
+			case existing.Exact && !trunc && count != len(existing.Rows):
+				// DEF-4b matched-pair rule: a fresh EXACT count that disagrees
+				// with the row count it would otherwise inherit must not carry
+				// the stale, now-mismatched Rows forward — an exact Count and a
+				// Rows slice of a different length is the exact inconsistency
+				// C6/DEF-4b forbids. The fresh rows for this type land moments
+				// later via saveProbeResourcesToTypeFiles; until then this type
+				// file has no row data rather than a knowingly-wrong pairing.
+				tf.Rows = nil
+			}
+			if issueKnown[rawName] {
+				tf.Issues = issueCounts[rawName]
+				tf.IssuesKnown = true
+				tf.IssuesTruncated = issueTruncated[rawName]
+			} else {
+				tf.Issues = existing.Issues
+				tf.IssuesKnown = existing.IssuesKnown
+				tf.IssuesTruncated = existing.IssuesTruncated
+			}
+			store.Put(name, tf)
+			if err := store.SaveType(name); err != nil && firstErr == nil {
+				firstErr = err
+			}
 		}
-		switch {
-		case existing.Exact && trunc && existing.Count > count:
-			// Preserve the previously-observed exact count/rows rather than
-			// letting a smaller truncated lower-bound regress it.
-			tf.Count = existing.Count
-			tf.HasResources = existing.Count > 0
-		case existing.Exact && !trunc && count != len(existing.Rows):
-			// DEF-4b matched-pair rule: a fresh EXACT count that disagrees
-			// with the row count it would otherwise inherit must not carry
-			// the stale, now-mismatched Rows forward — an exact Count and a
-			// Rows slice of a different length is the exact inconsistency
-			// C6/DEF-4b forbids. The fresh rows for this type land moments
-			// later via saveProbeResourcesToTypeFiles; until then this type
-			// file has no row data rather than a knowingly-wrong pairing.
-			tf.Rows = nil
-		}
-		if issueKnown[rawName] {
-			tf.Issues = issueCounts[rawName]
-			tf.IssuesKnown = true
-			tf.IssuesTruncated = issueTruncated[rawName]
-		} else {
-			tf.Issues = existing.Issues
-			tf.IssuesKnown = existing.IssuesKnown
-			tf.IssuesTruncated = existing.IssuesTruncated
-		}
-		store.Put(name, tf)
-		if err := store.SaveType(name); err != nil && firstErr == nil {
-			firstErr = err
-		}
-	}
-	return firstErr
+		return firstErr
+	})
 }
 
 // SaveResourceListCache persists rows for one resource type's canonical
@@ -169,57 +177,62 @@ func (c *Core) SaveAvailabilityCache(
 // Findings — colors/glyphs/status are derived at render time and never
 // persisted), the current count, and the exact flag. Callers are responsible
 // for the C6 scope gate (only calling this for a top-level unfiltered list,
-// never a child/related/filtered view) and for skipping the call entirely
-// when NoCache is set (mirrored here defensively).
+// never a child/related/filtered view).
+//
+// The entire read-modify-write-to-disk sequence runs inside WithCacheStore
+// (DEF-17) — see SaveAvailabilityCache's doc comment for why obtaining the
+// store via EnsureCacheStore and mutating it afterward is not sufficient:
+// that shape only serializes the pointer lookup, not the store.Type/Put/
+// SaveType sequence, letting two concurrent saves for the same type file
+// interleave.
 func (c *Core) SaveResourceListCache(shortName string, rows []cache.Row, count int, exact bool, issues int, issuesKnown, issuesTruncated bool) error {
-	if c.session.NoCache {
-		return nil
-	}
-	store := c.EnsureCacheStore()
-	if store == nil {
-		return nil
-	}
 	// Canonicalize so an alias caller (e.g. "rds") and CachedListDepth's own
-	// canonShortName lookup always agree on the stored key — an uncanonicalized
-	// Put here would silently miss the depth lookup for every alias caller.
-	shortName = canonShortName(shortName)
-	existing, _ := store.Type(shortName)
-	tf := cache.TypeFile{
-		HasResources: count > 0,
-		Count:        count,
-		Rows:         rows,
-	}
-	// C5: exactness only ever advances — a truncated observation never
-	// downgrades an already-exact stored total. DEF-4b: when a truncated
-	// refetch's smaller row set would otherwise regress an already-exact,
-	// fuller stored state, the PRIOR (fuller, exact) row set is kept in its
-	// entirety — never a Count taken from `existing` paired with a smaller
-	// `rows` slice, which would leave len(Rows) != Count inconsistent. The
-	// fuller row set is only ever replaced by a NEW exact observation (the
-	// `case exact` branch above, which always takes the fresh rows/count as
-	// a matched pair).
-	switch {
-	case exact:
-		tf.Exact = true
-	case existing.Exact:
-		tf.Exact = true
-		if existing.Count > count {
-			tf.Count = existing.Count
-			tf.HasResources = existing.Count > 0
-			tf.Rows = existing.Rows
+	// canonShortName lookup always agree on the stored key — an
+	// uncanonicalized Put here would silently miss the depth lookup for
+	// every alias caller.
+	canon := canonShortName(shortName)
+	return c.WithCacheStore(func(store *cache.Store) error {
+		if store == nil {
+			return nil
 		}
-	}
-	if issuesKnown {
-		tf.Issues = issues
-		tf.IssuesKnown = true
-		tf.IssuesTruncated = issuesTruncated
-	} else {
-		tf.Issues = existing.Issues
-		tf.IssuesKnown = existing.IssuesKnown
-		tf.IssuesTruncated = existing.IssuesTruncated
-	}
-	store.Put(shortName, tf)
-	return store.SaveType(shortName)
+		existing, _ := store.Type(canon)
+		tf := cache.TypeFile{
+			HasResources: count > 0,
+			Count:        count,
+			Rows:         rows,
+		}
+		// C5: exactness only ever advances — a truncated observation never
+		// downgrades an already-exact stored total. DEF-4b: when a truncated
+		// refetch's smaller row set would otherwise regress an already-exact,
+		// fuller stored state, the PRIOR (fuller, exact) row set is kept in its
+		// entirety — never a Count taken from `existing` paired with a smaller
+		// `rows` slice, which would leave len(Rows) != Count inconsistent. The
+		// fuller row set is only ever replaced by a NEW exact observation (the
+		// `case exact` branch above, which always takes the fresh rows/count as
+		// a matched pair).
+		switch {
+		case exact:
+			tf.Exact = true
+		case existing.Exact:
+			tf.Exact = true
+			if existing.Count > count {
+				tf.Count = existing.Count
+				tf.HasResources = existing.Count > 0
+				tf.Rows = existing.Rows
+			}
+		}
+		if issuesKnown {
+			tf.Issues = issues
+			tf.IssuesKnown = true
+			tf.IssuesTruncated = issuesTruncated
+		} else {
+			tf.Issues = existing.Issues
+			tf.IssuesKnown = existing.IssuesKnown
+			tf.IssuesTruncated = existing.IssuesTruncated
+		}
+		store.Put(canon, tf)
+		return store.SaveType(canon)
+	})
 }
 
 // CachedListDepth returns the number of rows previously persisted for
@@ -232,19 +245,18 @@ func (c *Core) SaveResourceListCache(shortName string, rows []cache.Row, count i
 // caching is disabled or no stored rows exist for shortName, in which case
 // callers fall back to the un-paginated first-page result.
 func (c *Core) CachedListDepth(shortName string) int {
-	if c.session.NoCache {
-		return 0
-	}
-	store := c.EnsureCacheStore()
-	if store == nil {
-		return 0
-	}
 	canon := canonShortName(shortName)
-	tf, ok := store.Type(canon)
-	if !ok {
-		return 0
-	}
-	return len(tf.Rows)
+	depth := 0
+	_ = c.ReadCacheStore(func(store *cache.Store) error {
+		if store == nil {
+			return nil
+		}
+		if tf, ok := store.Type(canon); ok {
+			depth = len(tf.Rows)
+		}
+		return nil
+	})
+	return depth
 }
 
 // ProbeResourceAvailability calls the registered paginated fetcher for

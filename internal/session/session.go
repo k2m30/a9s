@@ -270,6 +270,68 @@ func (s *Session) EnsureCacheStore(profile, region string) *cache.Store {
 	return s.CacheStore
 }
 
+// WithCacheStore runs fn against the current pair's *cache.Store while
+// holding cacheStoreMu for the entire call, then returns fn's error.
+//
+// DEF-17: SaveResourceListCache and SaveAvailabilityCache each perform their
+// own store.Type (read) / mutate / store.Put+SaveType (write) sequence for
+// the same on-disk type file. Obtaining the *cache.Store via EnsureCacheStore
+// and then mutating it afterward (the previous shape of both callers) only
+// serializes the pointer lookup — the lock is released before the
+// read-modify-write runs, so two of these sequences dispatched from
+// concurrent tea.Cmd goroutines (e.g. a list's own fetch-completion save
+// racing a background availability-sweep save for the same resource type)
+// can interleave: each reads the other's stale pre-write TypeFile, and
+// whichever's Put+SaveType lands last wins with a Count/Rows pairing that
+// never itself violated the DEF-4b matched-pair rule but does not reflect
+// either write in full (e.g. one call's Count together with the other
+// call's Rows). cache.Store also has no internal locking of its own — two
+// goroutines writing s.types[shortName] concurrently is a data race on the
+// map, independent of the logical inconsistency above.
+//
+// fn must not call back into WithCacheStore/EnsureCacheStore (Session's mutex
+// is not reentrant) and should do no blocking I/O beyond store.SaveType.
+// Returns nil without calling fn when NoCache is set or profile/region has
+// not resolved yet — matching EnsureCacheStore's nil-store contract.
+func (s *Session) WithCacheStore(profile, region string, fn func(store *cache.Store) error) error {
+	s.cacheStoreMu.Lock()
+	defer s.cacheStoreMu.Unlock()
+
+	if profile == "" || region == "" {
+		return nil
+	}
+	if s.CacheStore == nil || s.cacheStoreProfile != profile || s.cacheStoreRegion != region {
+		s.CacheStore = cache.LoadDir(profile, region)
+		s.cacheStoreProfile = profile
+		s.cacheStoreRegion = region
+	}
+	return fn(s.CacheStore)
+}
+
+// ReadCacheStore runs fn against the current pair's *cache.Store while
+// holding cacheStoreMu, for callers that only read (store.Type/store.Types)
+// and never Put/SaveType. Pairs with WithCacheStore (DEF-17): a reader that
+// bypassed the lock (the shape every read call site had before DEF-17) could
+// observe cache.Store's internal map mid-write from a concurrent
+// WithCacheStore call — a data race on the map itself, independent of the
+// logical Count/Rows consistency WithCacheStore's callers already guard.
+// Same nil-fn contract as WithCacheStore: NoCache or unresolved profile/
+// region skips fn and returns nil.
+func (s *Session) ReadCacheStore(profile, region string, fn func(store *cache.Store) error) error {
+	s.cacheStoreMu.Lock()
+	defer s.cacheStoreMu.Unlock()
+
+	if profile == "" || region == "" {
+		return nil
+	}
+	if s.CacheStore == nil || s.cacheStoreProfile != profile || s.cacheStoreRegion != region {
+		s.CacheStore = cache.LoadDir(profile, region)
+		s.cacheStoreProfile = profile
+		s.cacheStoreRegion = region
+	}
+	return fn(s.CacheStore)
+}
+
 // CurrentGenFor implements messages.GenSource. It maps an Aspect to the
 // corresponding session generation counter so the central guard in
 // Core.HandleEvent can check staleness without importing session.

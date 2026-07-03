@@ -47,12 +47,22 @@ func pgTestTypeDef() resource.ResourceTypeDef {
 	}
 }
 
-// pgTestResources creates n resources with sequential IDs.
+// pgTestResources creates n resources with sequential IDs starting at 0.
 func pgTestResources(n int) []resource.Resource {
+	return pgTestResourcesFrom(0, n)
+}
+
+// pgTestResourcesFrom creates n resources with sequential IDs starting at
+// offset, so a caller simulating a second/third page of a paginated list can
+// generate IDs disjoint from an earlier page's pgTestResources(n) or
+// pgTestResourcesFrom(0, n) call — AWS pagination never repeats an ID across
+// pages, so a synthetic page-2 fixture that starts back at index 0 does not
+// mirror real pagination and defeats an append-time ID-dedup guard.
+func pgTestResourcesFrom(offset, n int) []resource.Resource {
 	res := make([]resource.Resource, n)
 	for i := range n {
-		id := fmt.Sprintf("i-%05d", i)
-		name := fmt.Sprintf("instance-%05d", i)
+		id := fmt.Sprintf("i-%05d", offset+i)
+		name := fmt.Sprintf("instance-%05d", offset+i)
 		res[i] = resource.Resource{
 			ID: id, Name: name,
 			Fields: map[string]string{
@@ -328,8 +338,9 @@ func TestResourceList_Update_Append_StoresPagination(t *testing.T) {
 			t.Fatalf("precondition failed: %q", m.FrameTitle())
 		}
 
-		// Load page 2: still truncated
-		m = pgLoadResources(m, pgTestResources(50), &resource.PaginationMeta{
+		// Load page 2: still truncated. IDs start at 100 (disjoint from
+		// page 1's 0-99) — AWS pagination never repeats an ID across pages.
+		m = pgLoadResources(m, pgTestResourcesFrom(100, 50), &resource.PaginationMeta{
 			IsTruncated: true,
 			NextToken:   "token-2",
 		}, true)
@@ -339,8 +350,8 @@ func TestResourceList_Update_Append_StoresPagination(t *testing.T) {
 			t.Errorf("expected FrameTitle() = %q after second page, got %q", "ec2(150+)", title)
 		}
 
-		// Load page 3: final page (not truncated)
-		m = pgLoadResources(m, pgTestResources(25), &resource.PaginationMeta{
+		// Load page 3: final page (not truncated). IDs start at 150.
+		m = pgLoadResources(m, pgTestResourcesFrom(150, 25), &resource.PaginationMeta{
 			IsTruncated: false,
 		}, true)
 
@@ -576,8 +587,9 @@ func TestResourceList_LoadMore_SetsAndClearsLoadingMore(t *testing.T) {
 		t.Errorf("after pressing M, FrameTitle should contain 'loading...', got %q", title)
 	}
 
-	// Receive the appended page — loadingMore should clear
-	m = pgLoadResources(m, pgTestResources(50), &resource.PaginationMeta{
+	// Receive the appended page — loadingMore should clear. IDs start at
+	// 100 (disjoint from page 1's 0-99).
+	m = pgLoadResources(m, pgTestResourcesFrom(100, 50), &resource.PaginationMeta{
 		IsTruncated: false,
 	}, true)
 
