@@ -164,12 +164,21 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 		// finds no seed here even though the on-disk per-type Store still holds
 		// every row. Fall back to the loaded cache Store, which outlives the
 		// ProbeResources free and is already pair-stamped by EnsureCacheStore.
-		if rows := c.session.ProbeResources[canon]; len(rows) > 0 {
-			result.CachedEntry = &session.ResourceCacheEntry{
-				Resources: rows,
-				Pagination: &resource.PaginationMeta{
-					IsTruncated: c.session.ProbeTruncated[canon],
-				},
+		//
+		// DEF-15/P2: the fallback fires only when this session never observed
+		// canon (map key absent, e.g. after the post-sweep free). A key present
+		// with a zero-length slice means a live Wave-1 probe already confirmed
+		// the type is empty this session — that observed-empty result is
+		// fresher than any disk row (C2), so it seeds a bare list rather than
+		// falling back to stale disk rows.
+		if rows, observed := c.session.ProbeResources[canon]; observed {
+			if len(rows) > 0 {
+				result.CachedEntry = &session.ResourceCacheEntry{
+					Resources: rows,
+					Pagination: &resource.PaginationMeta{
+						IsTruncated: c.session.ProbeTruncated[canon],
+					},
+				}
 			}
 		} else if store := c.EnsureCacheStore(); store != nil {
 			if tf, ok := store.Type(canon); ok && len(tf.Rows) > 0 {

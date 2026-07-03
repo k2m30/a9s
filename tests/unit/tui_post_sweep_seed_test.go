@@ -485,3 +485,202 @@ func TestPairSwitch_PostSweep_NoStaleSeed(t *testing.T) {
 		}
 	}
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// Test 6/7 — Codex P2 on DEF-15's own seed: an observed-empty probe result
+// this session must NOT fall back to stale disk-store rows.
+//
+// Storage-shape finding (dispatch item 3): handleAvailabilityChecked
+// (internal/runtime/handlers_availability.go L233-274) stores into
+// session.ProbeResources[canonType] whenever "msg.Err == nil ||
+// len(msg.Resources) > 0" (L240). For a genuinely-empty type the live probe
+// sends Err=nil, Resources=nil/empty, HasResources=false, Count=0 — Err==nil
+// alone satisfies the guard, so the store DOES run:
+// session.ProbeResources[canon] = msg.Resources (nil/empty slice). The map
+// key is therefore PRESENT with a zero-length slice, not absent. This is the
+// exact shape HandleNavigate's fallback must distinguish via a two-value map
+// read (observed bool) rather than a bare "len(rows) > 0" truthiness check.
+// No gap: the zero-resource path is reachable through the real handler with
+// real message fields, driven below via Core.HandleEvent(AvailabilityChecked)
+// exactly as production code would emit it.
+//
+// P2 defect (pre-fix, working tree at time of writing): HandleNavigate read
+// "if rows := c.session.ProbeResources[canon]; len(rows) > 0" — an
+// observed-empty slice fails that truthiness check identically to an absent
+// key, so execution falls through to the disk-store branch and seeds stale
+// rows for a type the current session just confirmed is empty.
+// ────────────────────────────────────────────────────────────────────────────
+
+// TestObservedEmpty_DoesNotSeedStaleDiskRows pins the P2 fix at the
+// Core.HandleNavigate seam: the disk store for "s3" carries 3 stale rows
+// (written before this session started, e.g. a prior session's sweep), but
+// THIS session's live Wave-1 probe already confirmed s3 has zero resources.
+// HandleNavigate must not seed CachedEntry from the stale disk rows — a
+// current-session observed-empty result is fresher than any disk row (C2).
+func TestObservedEmpty_DoesNotSeedStaleDiskRows(t *testing.T) {
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+	profile, region := "def15p2-store-profile", "us-east-1"
+
+	store := cache.LoadDir(profile, region)
+	store.Put("s3", cache.TypeFile{
+		HasResources: true,
+		Count:        3,
+		Exact:        true,
+		Rows: []cache.Row{
+			{ID: "arn:aws:s3:::def15p2-stale-bucket-1", Name: "def15p2-stale-bucket-1", Fields: map[string]string{"region": region}},
+			{ID: "arn:aws:s3:::def15p2-stale-bucket-2", Name: "def15p2-stale-bucket-2", Fields: map[string]string{"region": region}},
+			{ID: "arn:aws:s3:::def15p2-stale-bucket-3", Name: "def15p2-stale-bucket-3", Fields: map[string]string{"region": region}},
+		},
+	})
+	if err := store.SaveType("s3"); err != nil {
+		t.Fatalf("seed fixture SaveType(s3): %v", err)
+	}
+
+	sess := session.New()
+	sess.Profile = profile
+	sess.Region = region
+	core := runtime.New(sess, catalog.All())
+
+	// Drive the real live-probe event for a genuinely-empty type, exactly as
+	// production fires it: Err=nil, HasResources=false, Count=0,
+	// Resources=nil. Per the storage-shape finding above, this DOES populate
+	// session.ProbeResources["s3"] with a zero-length slice (Err==nil alone
+	// satisfies handleAvailabilityChecked's storage guard).
+	_, _ = core.HandleEvent(messages.AvailabilityChecked{
+		ResourceType: "s3",
+		HasResources: false,
+		Count:        0,
+		Gen:          1,
+		Err:          nil,
+		Resources:    nil,
+	})
+
+	// Precondition: prove the key is observed-present (not absent) with a
+	// zero-length slice — this is not a trivially-true setup. If this fails,
+	// the storage-shape assumption above is wrong and the test cannot
+	// validate the observed-empty fallback distinction.
+	rows, observed := core.ProbeResources("s3")
+	if !observed {
+		t.Fatal("fixture assumption broken: session.ProbeResources[s3] key absent after a live AvailabilityChecked{Err:nil} event — the storage-shape finding (Err==nil alone triggers storage) does not hold; HandleNavigate cannot be pinned against this precondition")
+	}
+	if len(rows) != 0 {
+		t.Fatalf("fixture assumption broken: session.ProbeResources[s3] = %d rows, want 0 (observed-empty)", len(rows))
+	}
+
+	result, tasks := core.HandleNavigate(runtime.NavigateEvent{
+		Target:       runtime.NavigateTargetResourceList,
+		ResourceType: "s3",
+	})
+
+	if result.Kind != runtime.NavigateKindPushResourceList {
+		t.Fatalf("result.Kind = %v, want NavigateKindPushResourceList (still a session.ResourceCache miss)", result.Kind)
+	}
+	if result.CachedEntry != nil {
+		t.Fatalf("result.CachedEntry = %+v, want nil — this session observed s3 as empty via a live probe; seeding from the stale on-disk store rows (%d rows) would render resources the current session already knows do not exist (Codex P2 on DEF-15)", result.CachedEntry, len(result.CachedEntry.Resources))
+	}
+	if len(tasks) != 1 || tasks[0].Key.Kind != runtime.KindFetchResources {
+		t.Errorf("tasks = %+v, want exactly one KindFetchResources task — an observed-empty seed still requires the verify-on-sight fetch (C1)", tasks)
+	}
+}
+
+// TestObservedEmpty_TUI_DoesNotRenderStaleRows is the TUI-level companion to
+// TestObservedEmpty_DoesNotSeedStaleDiskRows: after a live Wave-1 probe
+// confirms s3 is empty this session, opening the s3 list via
+// messages.Navigate must render a bare (non-stale) list — none of the
+// disk-store's stale row names may appear — even though the disk cache for
+// this pair is fully populated with 3 rows from a prior session.
+func TestObservedEmpty_TUI_DoesNotRenderStaleRows(t *testing.T) {
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+	const profile, region = "def15p2-tui-profile", "us-east-1"
+
+	store := cache.LoadDir(profile, region)
+	store.Put("s3", cache.TypeFile{
+		HasResources: true,
+		Count:        3,
+		Exact:        true,
+		Rows: []cache.Row{
+			{ID: "arn:aws:s3:::def15p2-tui-stale-1", Name: "def15p2-tui-stale-1", Fields: map[string]string{"region": region}},
+			{ID: "arn:aws:s3:::def15p2-tui-stale-2", Name: "def15p2-tui-stale-2", Fields: map[string]string{"region": region}},
+			{ID: "arn:aws:s3:::def15p2-tui-stale-3", Name: "def15p2-tui-stale-3", Fields: map[string]string{"region": region}},
+		},
+	})
+	if err := store.SaveType("s3"); err != nil {
+		t.Fatalf("seed fixture SaveType(s3): %v", err)
+	}
+
+	m := newPostSweepApp(t, profile, region)
+
+	m, _ = rootApplyMsg(m, messages.AvailabilityChecked{
+		ResourceType: "s3",
+		HasResources: false,
+		Count:        0,
+		Gen:          1,
+		Err:          nil,
+		Resources:    nil,
+	})
+
+	m, _ = rootApplyMsg(m, messages.Navigate{
+		Target:       messages.TargetResourceList,
+		ResourceType: "s3",
+	})
+
+	content := stripANSI(rootViewContent(m))
+	for _, stale := range []string{"def15p2-tui-stale-1", "def15p2-tui-stale-2", "def15p2-tui-stale-3"} {
+		if strings.Contains(content, stale) {
+			t.Errorf("rendered view after opening s3 (observed empty this session via live probe) contains stale disk-store row %q — Codex P2 on DEF-15:\n%s", stale, content)
+		}
+	}
+}
+
+// TestUnobserved_StillSeedsFromStore is the regression guard for DEF-15
+// itself: when ProbeResources lacks the "s3" key entirely (never observed
+// this session — the map is nil, e.g. before any probe or after the
+// post-sweep free), HandleNavigate must still fall back to the on-disk
+// per-type store and seed CachedEntry from its rows. Must stay green both
+// before and after the P2 fix — it pins the DEF-15 base behavior the P2 fix
+// must not regress.
+func TestUnobserved_StillSeedsFromStore(t *testing.T) {
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+	profile, region := "def15p2-unobserved-profile", "us-east-1"
+	seedDiskStoreWithS3Rows(t, profile, region)
+
+	sess := session.New()
+	sess.Profile = profile
+	sess.Region = region
+	core := runtime.New(sess, catalog.All())
+
+	// Precondition: prove the key is genuinely absent, not merely empty.
+	if _, observed := core.ProbeResources("s3"); observed {
+		t.Fatal("fixture assumption broken: session.ProbeResources[s3] already observed before any probe ran — a fresh session.New() must not pre-populate ProbeResources")
+	}
+
+	result, tasks := core.HandleNavigate(runtime.NavigateEvent{
+		Target:       runtime.NavigateTargetResourceList,
+		ResourceType: "s3",
+	})
+
+	if result.Kind != runtime.NavigateKindPushResourceList {
+		t.Fatalf("result.Kind = %v, want NavigateKindPushResourceList (still a session.ResourceCache miss)", result.Kind)
+	}
+	if result.CachedEntry == nil {
+		t.Fatal("result.CachedEntry = nil, want a synthetic entry seeded from the on-disk per-type store — DEF-15 base behavior: an unobserved type (key absent) must still fall back to disk-store rows")
+	}
+	if len(result.CachedEntry.Resources) != 2 {
+		t.Fatalf("len(result.CachedEntry.Resources) = %d, want 2 (the disk store's persisted rows)", len(result.CachedEntry.Resources))
+	}
+	gotIDs := map[string]bool{}
+	for _, r := range result.CachedEntry.Resources {
+		gotIDs[r.ID] = true
+	}
+	for _, want := range []string{"arn:aws:s3:::def15-store-bucket-1", "arn:aws:s3:::def15-store-bucket-2"} {
+		if !gotIDs[want] {
+			t.Errorf("result.CachedEntry.Resources missing disk-store row %q, got IDs %v", want, gotIDs)
+		}
+	}
+	if result.CachedEntry.Pagination == nil || result.CachedEntry.Pagination.IsTruncated {
+		t.Errorf("result.CachedEntry.Pagination = %+v, want non-nil with IsTruncated=false (disk store's TypeFile.Exact=true for this fixture)", result.CachedEntry.Pagination)
+	}
+	if len(tasks) != 1 || tasks[0].Key.Kind != runtime.KindFetchResources {
+		t.Errorf("tasks = %+v, want exactly one KindFetchResources task", tasks)
+	}
+}
