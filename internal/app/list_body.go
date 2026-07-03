@@ -27,6 +27,35 @@ import (
 func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resources []resource.Resource, pagination *resource.PaginationMeta, appendPage bool) {
 	resources = c.materializeListFieldsForType(typeName, resources)
 
+	// DEF-18 mechanism A: a background verify-refetch (e.g. cold-open's
+	// KindFetchResources, bounded by a CachedListDepth snapshot taken at
+	// dispatch time) can complete AFTER a foreground load-more (m) has
+	// already appended deeper rows onto this same screen. No per-list
+	// dispatch sequence/generation exists in the plumbing to reject this by
+	// gen-stamp (messages.ResourcesLoaded.Gen is a session-wide
+	// AvailabilityGen, unrelated to per-screen fetch ordering), so a smaller,
+	// still-truncated, ID-subset result is treated as stale by construction
+	// (C2: a result older than a later invalidation — here, the append — is
+	// discarded) and the richer on-screen state (rows, pagination, cache
+	// mirror) is kept rather than clobbered.
+	//
+	// The gate is ls.HasPagination == false (the screen already reached a
+	// CONFIRMED EXACT total), not merely "an append happened" — a Ctrl+R
+	// full reset legitimately replays the exact same page-1 IDs with
+	// IsTruncated=true while the screen was ALSO still truncated (never
+	// confirmed exact), and that reset must win (qa_pagination_stories_test.go
+	// TestStoryF1_CtrlR_ResetsPagination). Once a screen's pagination has
+	// been exhausted to an exact total (ls.HasPagination == false — C5: exact
+	// only ever advances), a smaller, still-truncated, ID-subset replace can
+	// only be an out-of-order straggler: nothing legitimate re-truncates an
+	// already-exact list back down to a subset of itself. Computed once and
+	// applied consistently to every mutation below — ls.Rows, the type-keyed
+	// cache mirror, and ls.HasPagination/PaginationCursor all originate from
+	// the same stale fetch result and must be rejected together, or the
+	// title (derived from HasPagination) and the cursor would regress even
+	// if ls.Rows itself were protected.
+	stale := !appendPage && ls != nil && !ls.HasPagination && isStaleReplace(ls.Rows, resources, pagination)
+
 	// --- Per-screen storage (Bug 1 fix) -----------------------------------
 	// Writing to ls.Rows ensures that two stacked list screens of the same
 	// resource type never share a row slice. Each screen's fetch result lands
@@ -38,9 +67,12 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	// call from becoming visible; the empty-cursor guard is what stops the
 	// duplicate fetch from happening in the first place.
 	if ls != nil {
-		if appendPage {
+		switch {
+		case appendPage:
 			ls.Rows = append(ls.Rows, dedupAgainstExisting(ls.Rows, resources)...)
-		} else {
+		case stale:
+			// Discard: see the DEF-18 mechanism A comment above.
+		default:
 			ls.Rows = resources
 		}
 	}
@@ -51,10 +83,15 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	if c.resourceCache == nil {
 		c.resourceCache = make(map[string][]resource.Resource)
 	}
-	if appendPage {
+	switch {
+	case appendPage:
 		existing := c.resourceCache[typeName]
 		c.resourceCache[typeName] = append(existing, dedupAgainstExisting(existing, resources)...)
-	} else {
+	case stale:
+		// Discard: see the DEF-18 mechanism A comment above — the type-keyed
+		// mirror must not diverge from ls.Rows by accepting the stale page
+		// that ls.Rows just rejected.
+	default:
 		c.resourceCache[typeName] = resources
 	}
 
@@ -70,10 +107,14 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 		// DEF-5/C4: a successful fetch result clears any outstanding error
 		// marker from a previous failed attempt.
 		ls.LastFetchError = ""
-		if pagination != nil {
+		switch {
+		case stale:
+			// Keep the richer on-screen pagination state (HasPagination/
+			// PaginationCursor) — see the DEF-18 mechanism A comment above.
+		case pagination != nil:
 			ls.HasPagination = pagination.IsTruncated
 			ls.PaginationCursor = pagination.NextToken
-		} else {
+		default:
 			ls.HasPagination = false
 			ls.PaginationCursor = ""
 		}
@@ -87,6 +128,51 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	if known := c.listEnrichmentFindings(typeName); len(known) > 0 {
 		c.applyRowFindings(typeName, known, nil)
 	}
+}
+
+// isStaleReplace reports whether a non-append ResourcesLoaded result looks
+// like a stale background verify-refetch that raced a later foreground
+// append on the same screen (DEF-18 mechanism A), evaluating only the
+// content shape. The caller additionally gates this on ls.HasPagination ==
+// false (the screen already reached a confirmed exact total) before
+// treating the result as stale — see the call site's comment for why that
+// extra gate is required to avoid rejecting a legitimate Ctrl+R reset to
+// page 1, which can carry an identical content shape.
+//
+// A replace's content is treated as "shaped like a stale straggler" only
+// when ALL of the following hold:
+//   - incoming is smaller than what is already on screen (a shrink);
+//   - the incoming page is itself still truncated (pagination reports more
+//     exist) — a genuine smaller-but-EXACT result is never stale, it is a
+//     real shrink (e.g. resources were deleted) and must win;
+//   - every incoming row ID is already present on screen — i.e. incoming is
+//     a strict ID subset of existing, meaning it can only be an earlier,
+//     shallower page of the same list, not a disjoint or refreshed set.
+//
+// This is a heuristic, not a generation stamp: no per-list-screen fetch
+// dispatch sequence exists in the current plumbing (messages.ResourcesLoaded.
+// Gen is a session-wide AvailabilityGen for profile/region rotation, not
+// per-fetch ordering within a pair). The subset check is a conservative,
+// false-negative-biased approximation — it only suppresses a replace when
+// the incoming set could not possibly be anything other than a shallower
+// view of the same, already-superseded page.
+func isStaleReplace(existing, incoming []resource.Resource, pagination *resource.PaginationMeta) bool {
+	if len(incoming) == 0 || len(incoming) >= len(existing) {
+		return false
+	}
+	if pagination == nil || !pagination.IsTruncated {
+		return false
+	}
+	existingIDs := make(map[string]struct{}, len(existing))
+	for _, r := range existing {
+		existingIDs[r.ID] = struct{}{}
+	}
+	for _, r := range incoming {
+		if _, ok := existingIDs[r.ID]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 // dedupAgainstExisting returns the subset of incoming whose ID is not already

@@ -152,6 +152,11 @@ func (c *Core) SaveAvailabilityCache(
 				// C6/DEF-4b forbids. The fresh rows for this type land moments
 				// later via saveProbeResourcesToTypeFiles; until then this type
 				// file has no row data rather than a knowingly-wrong pairing.
+				// This branch's correctness depends on `trunc` being a genuine
+				// observation, not an unknown treated as false (DEF-18
+				// mechanism B) — availabilityFromResourceCache now derives
+				// `truncated` conservatively (nil Pagination => truncated) so
+				// !trunc here only fires on a confirmed exact page.
 				tf.Rows = nil
 			}
 			if issueKnown[rawName] {

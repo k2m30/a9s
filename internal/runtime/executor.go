@@ -468,7 +468,15 @@ func (c *Core) availabilityFromResourceCache() (
 			continue
 		}
 		entries[rt] = len(entry.Resources)
-		isTrunc := entry.Pagination != nil && entry.Pagination.IsTruncated
+		// C5: a nil Pagination means this entry's truncation state was never
+		// observed (e.g. a partial/legacy cache write) — treat as unknown,
+		// which must NOT be conflated with a genuine "not truncated"
+		// observation. Unknown truncation is conservatively truncated so a
+		// downstream Exact-count derivation (SaveAvailabilityCache) never
+		// promotes an unobserved page-1-shaped count to Exact (DEF-18
+		// mechanism B: a false Exact=true silently downgraded a real exact
+		// 55 to a false exact 50 and then dropped the stored Rows).
+		isTrunc := entry.Pagination == nil || entry.Pagination.IsTruncated
 		if isTrunc {
 			truncated[rt] = true
 			issueTruncated[rt] = true
