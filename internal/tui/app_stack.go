@@ -39,6 +39,24 @@ func (m *Model) pushRS(rs *rendererState) {
 // web renderer get it, and it fires as soon as a fetch or load-more result
 // lands rather than only when the user pops back to the menu.
 func (m *Model) popRS() bool {
+	return m.popRSWithCtrlPop(true)
+}
+
+// popRSOnly removes the top rendererState WITHOUT popping the controller's
+// own screen stack. Used exclusively by applyIntents' PopScreen case: the
+// intents forward (m.ctrl.ApplyIntents) already popped c.stack via the
+// controller's own PopScreen case, so calling popRS() here would pop the
+// controller stack a second time for one logical "go back".
+func (m *Model) popRSOnly() bool {
+	return m.popRSWithCtrlPop(false)
+}
+
+// popRSWithCtrlPop is the shared implementation. When ctrlPop is true and the
+// rs being removed is ctrlBacked, the controller screen is popped via
+// ActionBack — the path every non-applyIntents caller of popRS() still
+// relies on. When ctrlPop is false, the controller stack is left untouched
+// because the caller already popped it (or intends to leave it alone).
+func (m *Model) popRSWithCtrlPop(ctrlPop bool) bool {
 	if len(m.stack) <= 1 {
 		return false
 	}
@@ -50,7 +68,7 @@ func (m *Model) popRS() bool {
 	// Keep the headless controller stack in sync: pop controller screen when the
 	// rs being removed was ctrl-backed (i.e. a PushScreen was issued when it was
 	// pushed). Help, identity-overlay, and error-log overlay are NOT ctrl-backed.
-	if m.activeRS().ctrlBacked {
+	if ctrlPop && m.activeRS().ctrlBacked {
 		m.ctrl.Apply(app.Action{Kind: app.ActionBack})
 	}
 	m.stack = m.stack[:len(m.stack)-1]

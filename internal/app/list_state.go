@@ -33,6 +33,17 @@ func (c *Controller) topScreenID() runtime.ScreenID {
 	return c.stack[len(c.stack)-1].ID
 }
 
+// EnsureListState is the exported surface that TUI builders call immediately
+// after a ScreenResourceList/ScreenChildList PushScreen intent has already
+// been applied (e.g. via ApplyIntents) so that State.List is non-nil before
+// the renderer's builder reads topListState(). Delegates to ensureListState.
+// Mirrors EnsureSelectorState (selector.go).
+func (c *Controller) EnsureListState() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.ensureListState()
+}
+
 // ensureListState ensures the top list screen has an initialised ListState
 // (push via ApplyIntents only sets the Screen; State.List starts nil). Called
 // lazily from applyNavResult after a PushScreen so that action handlers never

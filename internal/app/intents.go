@@ -23,9 +23,21 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 	for _, intent := range intents {
 		switch v := intent.(type) {
 		case runtime.PushScreen:
+			ctx := v.Context
+			// EnterChildView-emitted pushes (HandleEnterChildView) leave Context
+			// zero-valued and carry the child type in ChildListPayload instead —
+			// resolve it here so the pushed Screen.Ctx.ResourceType is non-empty
+			// (topListState/ensureListState key off it, and the renderer builder
+			// resolves the same field). Mirrors the TUI adapter's pre-collapse
+			// PushScreen case in app_dispatch.go.
+			if ctx.ResourceType == "" {
+				if clp, ok := v.Payload.(runtime.ChildListPayload); ok {
+					ctx.ResourceType = clp.ChildType
+				}
+			}
 			c.stack = append(c.stack, Screen{
 				ID:  v.ID,
-				Ctx: v.Context,
+				Ctx: ctx,
 			})
 
 		case runtime.PopScreen:
