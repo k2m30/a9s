@@ -6,8 +6,9 @@ import (
 	tea "charm.land/bubbletea/v2"
 	lipgloss "charm.land/lipgloss/v2"
 
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/text"
 )
@@ -75,6 +76,33 @@ func (m HelpModel) Update(msg tea.Msg) (HelpModel, tea.Cmd) {
 type helpBinding struct {
 	key  string
 	desc string
+}
+
+// domainContext maps the TUI's HelpContext (which screen opened help) to the
+// renderer-neutral domain.HelpContext the shared key table is keyed on.
+func (c HelpContext) domainContext() domain.HelpContext {
+	switch c {
+	case HelpFromResourceList:
+		return domain.HelpFromResourceList
+	case HelpFromSecretsList:
+		return domain.HelpFromSecretsList
+	case HelpFromResourceListPaginated:
+		return domain.HelpFromResourceListPaginated
+	case HelpFromSecretsListPaginated:
+		return domain.HelpFromSecretsListPaginated
+	case HelpFromDetail:
+		return domain.HelpFromDetail
+	case HelpFromYAML:
+		return domain.HelpFromYAML
+	case HelpFromJSON:
+		return domain.HelpFromJSON
+	case HelpFromSelector:
+		return domain.HelpFromSelector
+	case HelpFromReveal:
+		return domain.HelpFromReveal
+	default:
+		return domain.HelpFromMainMenu
+	}
 }
 
 // View renders context-sensitive keybinding layout.
@@ -169,328 +197,20 @@ type helpGroup struct {
 	bindings []helpBinding
 }
 
-// buildGroups returns the column groups appropriate for the current context.
+// buildGroups returns the column groups appropriate for the current context,
+// sourced from the shared domain.HelpGroupsFor table (single source of truth
+// for help-overlay key/description content; see internal/domain/helpkeys.go).
 func (m HelpModel) buildGroups() []helpGroup {
-	switch m.context {
-	case HelpFromMainMenu:
-		return m.mainMenuGroups()
-	case HelpFromResourceList:
-		return m.resourceListGroups(false, false)
-	case HelpFromSecretsList:
-		return m.resourceListGroups(true, false)
-	case HelpFromResourceListPaginated:
-		return m.resourceListGroups(false, true)
-	case HelpFromSecretsListPaginated:
-		return m.resourceListGroups(true, true)
-	case HelpFromDetail:
-		return m.detailGroups()
-	case HelpFromYAML:
-		return m.yamlGroups()
-	case HelpFromJSON:
-		return m.jsonGroups()
-	case HelpFromSelector:
-		return m.selectorGroups()
-	case HelpFromReveal:
-		return m.revealGroups()
-	default:
-		return m.mainMenuGroups()
+	sections := domain.HelpGroupsFor(m.context.domainContext(), m.keys.ToggleAttentionOnly.Help().Key)
+	groups := make([]helpGroup, len(sections))
+	for i, s := range sections {
+		bindings := make([]helpBinding, len(s.Hints))
+		for j, h := range s.Hints {
+			bindings[j] = helpBinding{key: h.Key, desc: h.Help}
+		}
+		groups[i] = helpGroup{title: s.Title, bindings: bindings}
 	}
-}
-
-func (m HelpModel) commandsGroup() helpGroup {
-	return helpGroup{
-		title: "COMMANDS",
-		bindings: []helpBinding{
-			{":q", "exit"},
-			{":ctx", "switch profile"},
-			{":profile", "switch profile"},
-			{":region", "switch region"},
-			{":theme", "switch theme"},
-			{":help", "show help"},
-			{":root", "main menu"},
-			{":main", "main menu"},
-			{":<res>", "e.g. :ec2 :s3 :lambda"},
-		},
-	}
-}
-
-func (m HelpModel) mainMenuGroups() []helpGroup {
-	groups := []helpGroup{
-		{
-			title: "NAVIGATION",
-			bindings: []helpBinding{
-				{"j/k", "up/down"},
-				{"g", "top"},
-				{"G", "bottom"},
-				{"pgup", "page up"},
-				{"pgdn", "page down"},
-			},
-		},
-		{
-			title: "ACTIONS",
-			bindings: []helpBinding{
-				{"enter", "select"},
-				{"/", "filter"},
-				{":", "command"},
-				{"q", "quit"},
-				{"ctrl+c", "force quit"},
-			},
-		},
-		{
-			title: "OTHER",
-			bindings: []helpBinding{
-				{"i", "identity"},
-				{"!", "error log"},
-				{"?", "help"},
-				{"esc", "back"},
-			},
-		},
-	}
-	return append(groups, m.commandsGroup())
-}
-
-func (m HelpModel) resourceListGroups(secrets, paginated bool) []helpGroup {
-	nav := helpGroup{
-		title: "NAVIGATION",
-		bindings: []helpBinding{
-			{"j/k", "up/down"},
-			{"g/G", "top/bottom"},
-			{"pgup", "page up"},
-			{"pgdn", "page down"},
-			{"h/l", "scroll cols"},
-		},
-	}
-
-	actions := helpGroup{
-		title: "ACTIONS",
-		bindings: []helpBinding{
-			{"enter/d", "detail"},
-			{"y", "yaml"},
-			{"J", "json"},
-			{"t", "cloudtrail events"},
-			{"c", "copy id"},
-			{"/", "filter"},
-			{":", "command"},
-		},
-	}
-	if paginated {
-		actions.bindings = append(actions.bindings, helpBinding{"M", "load more"})
-	}
-	if secrets {
-		actions.bindings = append(actions.bindings, helpBinding{"x", "reveal"})
-	}
-
-	sortGroup := helpGroup{
-		title: "SORT",
-		bindings: []helpBinding{
-			{"1-0", "sort col 1-10"},
-		},
-	}
-
-	filter := helpGroup{
-		title: "FILTER",
-		bindings: []helpBinding{
-			{m.keys.ToggleAttentionOnly.Help().Key, "Toggle attention filter (hide healthy/dim rows)"},
-		},
-	}
-
-	other := helpGroup{
-		title: "OTHER",
-		bindings: []helpBinding{
-			{"ctrl+r", "refresh"},
-			{"esc", "back"},
-			{"q", "quit"},
-			{"i", "identity"},
-			{"!", "error log"},
-			{"?", "help"},
-		},
-	}
-
-	return append([]helpGroup{nav, actions, sortGroup, filter, other}, m.commandsGroup())
-}
-
-func (m HelpModel) detailGroups() []helpGroup {
-	groups := []helpGroup{
-		{
-			title: "SCROLL",
-			bindings: []helpBinding{
-				{"j/k", "up/down"},
-				{"g", "top"},
-				{"G", "bottom"},
-			},
-		},
-		{
-			title: "ACTIONS",
-			bindings: []helpBinding{
-				{"y", "yaml"},
-				{"J", "json"},
-				{"t", "cloudtrail events"},
-				{"c", "copy value"},
-				{"w", "wrap toggle"},
-				{"r", "related"},
-				{"tab", "focus switch"},
-				{"h/l", "focus cols"},
-			},
-		},
-		{
-			title: "SEARCH",
-			bindings: []helpBinding{
-				{"/", "search"},
-				{"n", "next match"},
-				{"N", "prev match"},
-			},
-		},
-		{
-			title: "RELATED",
-			bindings: []helpBinding{
-				{"/", "filter list"},
-				{"c", "copy type"},
-				{"tab", "focus switch"},
-				{"r", "related"},
-				{"esc", "unfocus"},
-			},
-		},
-		{
-			title: "OTHER",
-			bindings: []helpBinding{
-				{"esc", "back"},
-				{"i", "identity"},
-				{"!", "error log"},
-				{"?", "help"},
-			},
-		},
-	}
-	return append(groups, m.commandsGroup())
-}
-
-func (m HelpModel) yamlGroups() []helpGroup {
-	groups := []helpGroup{
-		{
-			title: "SCROLL",
-			bindings: []helpBinding{
-				{"j/k", "up/down"},
-				{"g", "top"},
-				{"G", "bottom"},
-			},
-		},
-		{
-			title: "ACTIONS",
-			bindings: []helpBinding{
-				{"c", "copy yaml"},
-				{"t", "cloudtrail events"},
-				{"w", "wrap toggle"},
-			},
-		},
-		{
-			title: "SEARCH",
-			bindings: []helpBinding{
-				{"/", "search"},
-				{"n", "next match"},
-				{"N", "prev match"},
-			},
-		},
-		{
-			title: "OTHER",
-			bindings: []helpBinding{
-				{"esc", "back"},
-				{"i", "identity"},
-				{"!", "error log"},
-				{"?", "help"},
-			},
-		},
-	}
-	return append(groups, m.commandsGroup())
-}
-
-func (m HelpModel) jsonGroups() []helpGroup {
-	groups := []helpGroup{
-		{
-			title: "SCROLL",
-			bindings: []helpBinding{
-				{"j/k", "up/down"},
-				{"g", "top"},
-				{"G", "bottom"},
-			},
-		},
-		{
-			title: "ACTIONS",
-			bindings: []helpBinding{
-				{"c", "copy json"},
-				{"t", "cloudtrail events"},
-				{"w", "wrap toggle"},
-			},
-		},
-		{
-			title: "SEARCH",
-			bindings: []helpBinding{
-				{"/", "search"},
-				{"n", "next match"},
-				{"N", "prev match"},
-			},
-		},
-		{
-			title: "OTHER",
-			bindings: []helpBinding{
-				{"esc", "back"},
-				{"i", "identity"},
-				{"!", "error log"},
-				{"?", "help"},
-			},
-		},
-	}
-	return append(groups, m.commandsGroup())
-}
-
-func (m HelpModel) selectorGroups() []helpGroup {
-	groups := []helpGroup{
-		{
-			title: "NAVIGATION",
-			bindings: []helpBinding{
-				{"j/k", "up/down"},
-				{"g", "top"},
-				{"G", "bottom"},
-				{"/", "filter"},
-			},
-		},
-		{
-			title: "ACTIONS",
-			bindings: []helpBinding{
-				{"enter", "select"},
-				{"esc", "cancel"},
-			},
-		},
-		{
-			title: "OTHER",
-			bindings: []helpBinding{
-				{"i", "identity"},
-				{"!", "error log"},
-				{"?", "help"},
-			},
-		},
-	}
-	return append(groups, m.commandsGroup())
-}
-
-func (m HelpModel) revealGroups() []helpGroup {
-	groups := []helpGroup{
-		{
-			title: "ACTIONS",
-			bindings: []helpBinding{
-				{"c", "copy value"},
-				{"w", "wrap toggle"},
-				{"esc", "close"},
-			},
-		},
-		{
-			title: "OTHER",
-			bindings: []helpBinding{
-				{"i", "identity"},
-				{"!", "error log"},
-				{"?", "help"},
-			},
-		},
-	}
-	return append(groups, m.commandsGroup())
+	return groups
 }
 
 // CopyContent returns empty — nothing to copy from the help view.

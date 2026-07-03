@@ -25,10 +25,11 @@ import (
 )
 
 // rsKind identifies what kind of screen a rendererState represents.
-// Used by View() to dispatch to the correct free render function without
-// relying on ctrl.Snapshot().Body.Kind — which only reflects ctrl-backed
-// screens and would show the wrong content for overlay screens (help,
-// identity, error-log) that do not push onto the controller stack.
+// Used by View() to dispatch to the correct free render function directly
+// from rs.kind (rather than ctrl.Snapshot().Body.Kind) since one rsKind may
+// cover more than one ScreenID (e.g. rsKindText covers YAML/JSON/error-log;
+// rsKindList covers top-level and child lists) — see screenIDMatchesRSKind
+// in app_stack_invariant.go for the full kind-to-ScreenID mapping.
 type rsKind int
 
 const (
@@ -38,8 +39,8 @@ const (
 	rsKindReveal          // secret reveal overlay (BodyKindDetail with nil Detail)
 	rsKindText            // YAML / JSON / error-log
 	rsKindSelector        // profile / region / theme selector
-	rsKindHelp            // help overlay (not ctrl-backed)
-	rsKindIdentity        // identity overlay (not ctrl-backed)
+	rsKindHelp            // help overlay
+	rsKindIdentity        // identity overlay
 )
 
 // rendererState is per-stack-entry renderer state. One rendererState is pushed
@@ -88,10 +89,6 @@ type rendererState struct {
 	// so it can resolve typeDef for column rendering). Mirrors rs.ctrl screen Ctx.
 	resourceType string
 
-	// errorLogText holds the pre-formatted error log content for rsKindText
-	// overlays created by the error-log viewer (! key). Not ctrl-backed.
-	errorLogText string
-
 	// textResource holds the resource whose YAML/JSON content is being shown.
 	// Set when navigating to YAML/JSON so frameTitle can show "<name> yaml".
 	textResource *resource.Resource
@@ -102,8 +99,9 @@ type rendererState struct {
 
 	// ctrlBacked is true when a corresponding controller screen was pushed at the
 	// same time as this rendererState. Used by popRS() to decide whether to call
-	// ActionBack on the controller when popping this entry. Help, identity-overlay,
-	// and error-log overlay are NOT ctrl-backed (they do not push ctrl screens).
+	// ActionBack on the controller when popping this entry. As of goal-4 wave 4a
+	// every rsKind pushes a matching controller screen (help/identity/error-log
+	// included) — see docs/architecture.md "the controller stack is authoritative".
 	ctrlBacked bool
 }
 
@@ -142,10 +140,14 @@ func newTextRS() *rendererState {
 	return &rendererState{kind: rsKindText, ctrlBacked: true, helpContext: views.HelpFromYAML}
 }
 
-// newErrorLogRS returns a fresh rendererState for the error-log text overlay.
-// ctrlBacked=false: the error-log viewer is a local overlay, NOT on the ctrl stack.
-func newErrorLogRS(errorText string) *rendererState {
-	return &rendererState{kind: rsKindText, errorLogText: errorText}
+// newErrorLogRS returns a fresh rendererState for the error-log text screen.
+// ctrlBacked=true: the caller pushes runtime.ScreenErrorLog onto the
+// controller and seeds its TextState via m.ctrl.EnsureTextState (mirroring
+// YAML/JSON) before calling this, so the error-log viewer renders from
+// snap.Body.Text like every other ctrl-backed text screen — no adapter-local
+// errorLogText copy (goal-4 wave 4a: StackInSync sees error-log as ctrl-backed).
+func newErrorLogRS() *rendererState {
+	return &rendererState{kind: rsKindText, ctrlBacked: true}
 }
 
 // newSelectorRS returns a fresh rendererState for a selector screen.
@@ -155,17 +157,27 @@ func newSelectorRS(onSelect func(string) tea.Msg) *rendererState {
 }
 
 // newHelpRS returns a fresh rendererState for the help overlay.
-// ctrlBacked=false: help does NOT push a ctrl screen.
+// ctrlBacked=true: the caller pushes runtime.ScreenHelp onto the controller
+// before calling this (goal-4 wave 4a), so StackInSync sees the help overlay
+// as ctrl-backed. The rs still carries helpContext/helpShortName — the TUI's
+// help rendering stays view-model-driven (NewHelpWithResource) rather than
+// consuming Body.Help, since the TUI already resolves the richer per-context
+// groups (secrets/paginated variants, CloudTrail legend) that the controller's
+// Snapshot-derived context cannot distinguish from ScreenID alone.
 func newHelpRS(ctx views.HelpContext, shortName string) *rendererState {
-	return &rendererState{kind: rsKindHelp, helpContext: ctx, helpShortName: shortName}
+	return &rendererState{kind: rsKindHelp, helpContext: ctx, helpShortName: shortName, ctrlBacked: true}
 }
 
 // newIdentityRS returns a fresh rendererState for the identity overlay.
-// ctrlBacked=false: the TUI identity overlay is adapter-managed; it does NOT
-// push ScreenIdentity onto the controller stack (matching the old pushView path
-// which bypassed ActionOpenIdentity). The rs carries all identity state directly.
+// ctrlBacked=true: the caller pushes runtime.ScreenIdentity onto the
+// controller before calling this (goal-4 wave 4a), so StackInSync sees the
+// identity overlay as ctrl-backed. The rs still carries identity
+// loading/error/data state directly (SetIdentityIntent updates it via
+// applyIntents) rather than reading Body.Identity, since the identity fetch
+// lifecycle is driven by the same TaskKindFetchIdentity flow that already
+// targets this rs.
 func newIdentityRS() *rendererState {
-	return &rendererState{kind: rsKindIdentity, identityLoading: true}
+	return &rendererState{kind: rsKindIdentity, identityLoading: true, ctrlBacked: true}
 }
 
 // ── Free render functions ────────────────────────────────────────────────────

@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 )
 
@@ -57,6 +58,7 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if rs.kind == rsKindList {
 			activeShortName = rs.resourceType
 		}
+		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenHelp}})
 		helpRS := newHelpRS(ctx, activeShortName)
 		w, h := m.innerSize()
 		helpRS.width, helpRS.height = w, h
@@ -68,6 +70,7 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if rs.kind == rsKindIdentity {
 			return m.updateActiveRS(msg)
 		}
+		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenIdentity}})
 		idRS := newIdentityRS()
 		// Seed with current identity if available so it shows immediately.
 		if m.core.Identity() != nil {
@@ -84,19 +87,18 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 	if key.Matches(msg, m.keys.ErrorLog) {
-		// If already viewing the error log (non-ctrl-backed text screen), let rs update handle it.
-		if rs.kind == rsKindText && !rs.ctrlBacked {
+		// If already viewing the error log, let rs update handle it (dismisses).
+		// screenID (not rs.kind) distinguishes error-log from ctrl-backed
+		// YAML/JSON, which also report rsKindText+ctrlBacked=true.
+		if screenID, _ := m.ctrl.GetTextScreenContext(); screenID == runtime.ScreenErrorLog {
 			return m.updateActiveRS(msg)
 		}
-		if len(m.errorHistory) == 0 {
+		if !m.ctrl.HasErrorHistory() {
 			return m.handleFlash(messages.Flash{Text: "No errors this session"})
 		}
-		var sb strings.Builder
-		for i := len(m.errorHistory) - 1; i >= 0; i-- {
-			e := m.errorHistory[i]
-			fmt.Fprintf(&sb, "[%s] %s\n", e.time.Format("15:04:05"), e.message)
-		}
-		errRS := newErrorLogRS(sb.String())
+		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenErrorLog}})
+		m.ctrl.EnsureTextState(m.ctrl.ErrorHistoryLines())
+		errRS := newErrorLogRS()
 		w, h := m.innerSize()
 		errRS.width, errRS.height = w, h
 		m.pushRS(errRS)

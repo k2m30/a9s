@@ -10,9 +10,10 @@
 //     HandleClientsReady / HandleProfileSelected / HandleRegionSelected
 //     adapters in app_flash.go and app_session.go) AND any future
 //     handler that wires through this file. It mutates the *Model in
-//     place (errorHistory, flash state, showErrorHint, …) and returns
-//     a single tea.Cmd for intents that need follow-up work, such as
-//     RefreshActiveListIntent.
+//     place (flash state, showErrorHint, …), forwards to the controller
+//     where the controller is the source of truth (AppendErrorHistoryIntent),
+//     and returns a single tea.Cmd for intents that need follow-up work,
+//     such as RefreshActiveListIntent.
 //
 //  3. runtimeTasksToCmd / enrichDetailCmd — the TaskRequest-to-tea.Cmd
 //     translator. Tasks carry typed Payload values (runtime.TaskPayload
@@ -84,6 +85,11 @@ func (m Model) handleEnrichDetail(msg messages.EnrichDetail) (tea.Model, tea.Cmd
 // and the renderer stack must be a strict mirror (see StackInSync in
 // app_stack_invariant.go).
 //
+// AppendErrorHistoryIntent also forwards to m.ctrl.ApplyIntents (single-intent
+// slice, not the caller's whole batch) so the controller's errorHistory stays
+// in sync with this adapter's — see that case for why a single-intent forward
+// is safe here where a blanket forward of the whole intents slice would not be.
+//
 // Unknown intent types are silently dropped for forward compatibility.
 func (m *Model) applyIntent(intent runtime.UIIntent) tea.Cmd {
 	switch v := intent.(type) {
@@ -96,10 +102,15 @@ func (m *Model) applyIntent(intent runtime.UIIntent) tea.Cmd {
 	case runtime.SetErrorHintIntent:
 		m.showErrorHint = v.Show
 	case runtime.AppendErrorHistoryIntent:
-		m.errorHistory = append(m.errorHistory, errorEntry{
-			time:    v.Time,
-			message: v.Message,
-		})
+		// The controller (internal/app/controller.go) is the single source of
+		// truth for session error history as of goal-4 wave 4a — Header.
+		// ErrorHintVisible, HasErrorHistory, and the ctrl-backed ScreenErrorLog
+		// text screen all read c.errorHistory. This adapter has no local copy to
+		// update; forward only this single-intent slice (rather than the whole
+		// `intents` slice dispatchHandlerResult received) to avoid double-applying
+		// PopSelectorIntent/PushScreen/PopScreen, whose controller-first forwards
+		// are handled by their own cases below.
+		m.ctrl.ApplyIntents([]runtime.UIIntent{v})
 	case runtime.ClearActiveListLoadingIntent:
 		if m.activeRS().kind == rsKindList {
 			m.ctrl.ClearListLoading()
