@@ -65,22 +65,26 @@ func (c *Core) SetNoCache(v bool) { c.session.NoCache = v }
 
 // CacheStore returns the loaded per-type disk cache for the CURRENT
 // Profile+Region pair, or nil when no LoadDir has run yet for this pair
-// (cold start before TaskKindLoadAvailCache completes, or --no-cache).
-func (c *Core) CacheStore() *cache.Store { return c.session.CacheStore }
+// (cold start before TaskKindLoadAvailCache completes, or --no-cache). Goes
+// through EnsureCacheStore so this getter never returns a store memoized for
+// a stale pair (see Session.EnsureCacheStore).
+func (c *Core) CacheStore() *cache.Store { return c.EnsureCacheStore() }
 
-// EnsureCacheStore returns the current pair's *cache.Store, calling
-// cache.LoadDir(profile, region) to populate it if this is the first call
-// since the last Rotate (C9) or process start. NoCache=true always returns
-// nil without ever calling LoadDir (C7b: --no-cache disables persisted load
-// entirely).
+// EnsureCacheStore returns the current pair's *cache.Store, reloading via
+// cache.LoadDir(profile, region) whenever the memoized store (if any) was
+// not loaded for the CURRENT session.Profile/session.Region pair — this
+// covers both the first call since the last Rotate (C9) or process start,
+// and a pair switch that lands between two calls without an intervening
+// Rotate observation. NoCache=true always returns nil without ever calling
+// LoadDir (C7b: --no-cache disables persisted load entirely). session == ""
+// Profile or Region (pair not yet resolved) returns nil WITHOUT memoizing,
+// so a pre-connect call never pins the store to the wrong "<profile>--"
+// directory. All access serializes on session.cacheStoreMu.
 func (c *Core) EnsureCacheStore() *cache.Store {
 	if c.session.NoCache {
 		return nil
 	}
-	if c.session.CacheStore == nil {
-		c.session.CacheStore = cache.LoadDir(c.session.Profile, c.session.Region)
-	}
-	return c.session.CacheStore
+	return c.session.EnsureCacheStore(c.session.Profile, c.session.Region)
 }
 
 // Command returns the one-shot resource short name to navigate to on the

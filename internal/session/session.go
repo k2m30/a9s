@@ -28,6 +28,8 @@
 package session
 
 import (
+	"sync"
+
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/cache"
 	"github.com/k2m30/a9s/v3/internal/domain"
@@ -102,15 +104,32 @@ type Session struct {
 	// static policy, not session state.
 	NoCache bool
 
-	// CacheStore is the loaded per-type disk cache (C7) for the CURRENT
-	// Profile+Region pair. nil until LoadDir has run for this pair (either at
-	// startup via TaskKindLoadAvailCache, or after a pair switch). The HARD
-	// INVARIANT (C7 "load before save") is structural: Put/SaveType are
-	// methods on *cache.Store, and the only way to obtain one is
-	// cache.LoadDir — so no save can happen for a pair before its own load.
-	// Cleared (set to nil) by Rotate so a pair switch never lets writes for
-	// the OLD pair's Store race a save for the NEW pair (C9).
+	// cacheStoreMu guards CacheStore and the cacheStore{Profile,Region} stamp
+	// below. TUI tea.Cmd goroutines and concurrent web drains both reach
+	// EnsureCacheStore/CacheStore, and Rotate clears the field from the
+	// event-handling goroutine on a profile/region switch — all three must
+	// serialize on this lock (Codex P1 / CodeRabbit race).
+	cacheStoreMu sync.Mutex
+
+	// CacheStore is the loaded per-type disk cache (C7) for the pair recorded
+	// in cacheStoreProfile/cacheStoreRegion. nil until LoadDir has run for a
+	// pair (either at startup via TaskKindLoadAvailCache, or after a pair
+	// switch). The HARD INVARIANT (C7 "load before save") is structural:
+	// Put/SaveType are methods on *cache.Store, and the only way to obtain
+	// one is cache.LoadDir — so no save can happen for a pair before its own
+	// load. Cleared (set to nil) by Rotate so a pair switch never lets writes
+	// for the OLD pair's Store race a save for the NEW pair (C9). Access only
+	// through EnsureCacheStore — never read/write this field directly
+	// outside cacheStoreMu.
 	CacheStore *cache.Store
+
+	// cacheStoreProfile/cacheStoreRegion are the pair CacheStore was loaded
+	// for. EnsureCacheStore compares these against the caller's current pair
+	// and reloads via cache.LoadDir when they disagree, so a task dispatched
+	// for pair A that executes after a switch to pair B never writes into
+	// A's directory using a memoized Store (see EnsureCacheStore).
+	cacheStoreProfile string
+	cacheStoreRegion  string
 
 	// Wave 1 availability scan.
 	AvailabilityGen domain.Gen // bumped on profile/region switch to cancel stale probes
@@ -208,6 +227,34 @@ func New() *Session {
 	}
 }
 
+// EnsureCacheStore returns the *cache.Store for the given profile/region
+// pair, loading (or reloading) it via cache.LoadDir when no store is
+// memoized yet or the memoized store was loaded for a different pair.
+// profile/region == "" means the pair has not resolved yet (pre-connect or
+// cold boot before the first ClientsReady/Rotate settles Profile/Region);
+// the empty pair is never memoized so a later call with the real pair always
+// reloads instead of forever returning a store keyed by "<profile>--".
+//
+// All CacheStore reads/writes are serialized on cacheStoreMu so concurrent
+// TUI tea.Cmd goroutines, concurrent web drains, and a same-moment Rotate
+// (profile/region switch) can never interleave a check-then-write on the
+// field or observe a store loaded for the wrong pair.
+func (s *Session) EnsureCacheStore(profile, region string) *cache.Store {
+	s.cacheStoreMu.Lock()
+	defer s.cacheStoreMu.Unlock()
+
+	if profile == "" || region == "" {
+		return nil
+	}
+	if s.CacheStore != nil && s.cacheStoreProfile == profile && s.cacheStoreRegion == region {
+		return s.CacheStore
+	}
+	s.CacheStore = cache.LoadDir(profile, region)
+	s.cacheStoreProfile = profile
+	s.cacheStoreRegion = region
+	return s.CacheStore
+}
+
 // CurrentGenFor implements messages.GenSource. It maps an Aspect to the
 // corresponding session generation counter so the central guard in
 // Core.HandleEvent can check staleness without importing session.
@@ -250,10 +297,17 @@ func (s *Session) Rotate() {
 	// for setting Profile/Region to the new target, and for capturing rollback
 	// state via local vars BEFORE Rotate (so the rapid A→B→C case keeps A as
 	// the rollback target).
-	// C9: drop the old pair's Store atomically. The new pair's Store is
-	// re-obtained via a fresh cache.LoadDir call dispatched by the pair-switch
-	// handler (TaskKindLoadAvailCache), never carried over from the old pair.
+	// C9: drop the old pair's Store atomically, under the same lock
+	// EnsureCacheStore uses, so a concurrent EnsureCacheStore call cannot
+	// observe a torn state (old Store with a stale/zeroed pair stamp, or
+	// vice versa). The new pair's Store is re-obtained via a fresh
+	// cache.LoadDir call dispatched by the pair-switch handler
+	// (TaskKindLoadAvailCache), never carried over from the old pair.
+	s.cacheStoreMu.Lock()
 	s.CacheStore = nil
+	s.cacheStoreProfile = ""
+	s.cacheStoreRegion = ""
+	s.cacheStoreMu.Unlock()
 
 	s.Identity = nil
 	s.IdentityFetching = false

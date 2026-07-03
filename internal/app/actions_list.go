@@ -190,8 +190,14 @@ func (c *Controller) handleActionRefresh(_ Action) (ViewState, []runtime.TaskReq
 			return c.snapshot(), nil
 		}
 		c.core.DeleteResourceCache(typeName)
-		ls.Loading = true
-		ls.Rows = nil
+		// C8: cached content stays visible under the refreshing marker while
+		// the refetch runs — only blank Loading/Rows when there is nothing to
+		// show yet (the empty-list case never had a marker to keep rows under).
+		if len(ls.Rows) == 0 {
+			ls.Loading = true
+			ls.Rows = nil
+		}
+		ls.LastFetchError = ""
 		return c.snapshot(), c.activeListRefreshTasks()
 	}
 	return c.snapshot(), nil
@@ -205,8 +211,9 @@ func (c *Controller) handleActionRefresh(_ Action) (ViewState, []runtime.TaskReq
 // connect completes — once ClientsReady lands, the pending refresh must
 // re-fetch the list the user is already looking at. C8 requires the cached
 // content stay visible under the refreshing marker during that replay, so
-// (unlike handleActionRefresh's own destructive Loading/Rows reset above)
-// this helper only sets Refreshing and never blanks Rows/Loading itself.
+// this helper only sets Refreshing and never blanks Rows/Loading itself —
+// handleActionRefresh's own Loading/Rows reset above is now also
+// non-destructive whenever the list already has rows to keep.
 func (c *Controller) activeListRefreshTasks() []runtime.TaskRequest {
 	ls := c.topListState()
 	if ls == nil {

@@ -340,6 +340,25 @@ func (c *Controller) ClearListLoading() {
 	ls.LoadingMore = false
 }
 
+// SetListFetchError records a failed fetch's error text on the top list
+// screen, mirroring the headless ClearActiveListLoadingIntent application in
+// intents.go (DEF-5/C4): a fetch failure over cached content stops the
+// refreshing marker and swaps in an error marker instead of leaving the list
+// with no error surfaced. No-op when err is empty.
+func (c *Controller) SetListFetchError(err string) {
+	if err == "" {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	ls := c.topListState()
+	if ls == nil {
+		return
+	}
+	ls.Refreshing = false
+	ls.LastFetchError = err
+}
+
 // GetListPaginationCursor returns the pagination cursor of the top list screen.
 func (c *Controller) GetListPaginationCursor() string {
 	c.mu.RLock()

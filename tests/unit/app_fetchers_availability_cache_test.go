@@ -207,10 +207,15 @@ func TestCacheLoadDir_ProfileRegionIsolation(t *testing.T) {
 	}
 }
 
-// TestCacheLoadDir_StaleTypeFileStripped verifies that an unrecognized
-// per-type file (from an old a9s version or renamed type) does not surface
-// via Store.Types(), while a sibling recognized type still loads normally.
-func TestCacheLoadDir_StaleTypeFileStripped(t *testing.T) {
+// TestCacheLoadDir_StaleTypeFileDoesNotCorrupt_SiblingIsolation verifies
+// that an unrecognized per-type file (from an old a9s version or renamed
+// type) loads under its own name without corrupting or shadowing a sibling
+// recognized type's file — cache.LoadDir performs no registry cross-check
+// itself (registry filtering, if any, is a caller concern), so the
+// unrecognized type's TypeFile DOES surface via Store.Type/Types like any
+// other loaded file; this test only pins that its presence leaves ec2's
+// own per-type file unaffected.
+func TestCacheLoadDir_StaleTypeFileDoesNotCorrupt_SiblingIsolation(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 

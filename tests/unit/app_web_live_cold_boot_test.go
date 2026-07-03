@@ -144,6 +144,7 @@ func newLiveWebStyleController(profile, region string) (*runtime.Core, *app.Cont
 // while Contract B below pins the part that is genuinely broken (Refreshing
 // staying false throughout the sweep this same event kicks off).
 func TestWebBoot_AvailabilityCacheLoaded_AppliesCountsAndIssuesToMenu(t *testing.T) {
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	_, ctrl := newLiveWebStyleController("", "us-east-1")
 
 	vs, _ := ctrl.Handle(messages.AvailabilityCacheLoaded{
@@ -195,6 +196,7 @@ func TestWebBoot_AvailabilityCacheLoaded_AppliesCountsAndIssuesToMenu(t *testing
 // cache load, even though a real multi-type background sweep has just been
 // queued and is about to run for real (slow, network-bound) probes.
 func TestWebBoot_Refreshing_TrueDuringCacheSeededSweep_FalseOnComplete(t *testing.T) {
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	core, ctrl := newLiveWebStyleController("", "us-east-1")
 
 	vs, tasks := ctrl.Handle(messages.AvailabilityCacheLoaded{
@@ -262,6 +264,7 @@ func TestWebBoot_Refreshing_TrueDuringCacheSeededSweep_FalseOnComplete(t *testin
 // ResourceCache), Apply(open-list) already returns Loading=true in the same
 // snapshot as the KindFetchResources task.
 func TestWebBoot_ColdListOpen_ControllerLevel_ReturnsLoadingShellAndFetchTask(t *testing.T) {
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	_, ctrl := newLiveWebStyleController("", "us-east-1")
 
 	_, tasks := ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
@@ -311,6 +314,7 @@ func TestWebBoot_ColdListOpen_ControllerLevel_ReturnsLoadingShellAndFetchTask(t 
 // TestColdBoot_SeedsAllLoadedPages_PerTypeFile_InstantlySeedsBeforeFetch
 // Completes below for the round-2, all-pages, per-type-file extension.
 func TestWebBoot_AvailabilityCacheLoaded_DoesNotSeedProbeResourcesRows(t *testing.T) {
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	_, ctrl := newLiveWebStyleController("", "us-east-1")
 
 	// Models exactly what ExecuteTask(TaskKindLoadAvailCache) would produce

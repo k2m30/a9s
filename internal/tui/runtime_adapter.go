@@ -93,6 +93,10 @@ func (m *Model) applyIntent(intent runtime.UIIntent) tea.Cmd {
 	case runtime.ClearActiveListLoadingIntent:
 		if m.activeRS().kind == rsKindList {
 			m.ctrl.ClearListLoading()
+			// DEF-5/C4: mirror the headless applyIntents case (intents.go) —
+			// a fetch failure over cached content must set the list's error
+			// marker too, or the TUI never renders it (renderer parity).
+			m.ctrl.SetListFetchError(v.Err)
 		}
 	case runtime.MenuClearAvailabilityIntent:
 		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.MenuClearAvailabilityIntent{}})

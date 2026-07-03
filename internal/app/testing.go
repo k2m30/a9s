@@ -20,9 +20,16 @@ import (
 func (c *Controller) ApplyResourcesLoaded(typeName string, resources []resource.Resource, pagination *resource.PaginationMeta, appendPage bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	// Resolve canonical short name (handles aliases like "rds" → "dbi"),
+	// matching handleResourcesLoadedEvent — the real task-result lane never
+	// saves under the raw incoming typeName.
+	canon := typeName
+	if td := resource.FindResourceType(typeName); td != nil {
+		canon = td.ShortName
+	}
 	ls := c.topListState()
-	c.applyResourcesLoaded(ls, typeName, resources, pagination, appendPage)
+	c.applyResourcesLoaded(ls, canon, resources, pagination, appendPage)
 	if ls != nil && !ls.EscPops && ls.ParentContext == nil && c.topScreenID() == runtime.ScreenResourceList {
-		c.maybeSaveResourceListCache(ls, typeName)
+		c.maybeSaveResourceListCache(ls, canon)
 	}
 }

@@ -64,18 +64,16 @@ type DemoPrefetchResult struct {
 }
 
 // LoadAvailabilityCache loads (or reuses the already-loaded) per-type disk
-// cache for profile/region via EnsureCacheStore and returns it converted to
-// the counts-only *cache.File-equivalent shape callers expect: a map of
-// per-type TypeFile snapshots. Returns the Store directly — callers read it
-// via (*cache.Store).Type/Types. NoCache=true (or a profile/region mismatch
-// with the currently-loaded pair) is handled by EnsureCacheStore itself.
-//
-// profile/region are accepted for signature stability with the pre-existing
-// call sites; the Store loaded reflects c.session.Profile/Region (the caller
-// is expected to have already set them via SetProfile/SetRegion or Rotate).
-func (c *Core) LoadAvailabilityCache(profile, region string) *cache.Store {
-	_ = profile
-	_ = region
+// cache for the CURRENT session pair via EnsureCacheStore and returns it
+// converted to the counts-only *cache.File-equivalent shape callers expect:
+// a map of per-type TypeFile snapshots. Returns the Store directly —
+// callers read it via (*cache.Store).Type/Types. NoCache=true (or a
+// profile/region mismatch with the currently-loaded pair) is handled by
+// EnsureCacheStore itself, which is also the sole place profile/region are
+// read — so this method takes no params (a prior profile/region pair here
+// was accepted but ignored, which let a caller for the wrong pair silently
+// read the current pair's Store).
+func (c *Core) LoadAvailabilityCache() *cache.Store {
 	return c.EnsureCacheStore()
 }
 
@@ -91,15 +89,12 @@ func (c *Core) LoadAvailabilityCache(profile, region string) *cache.Store {
 // canonical top-level list happens via Core.SaveResourceListCache, called
 // from the list-fetch-completion seam (applyResourcesLoaded).
 func (c *Core) SaveAvailabilityCache(
-	profile, region string,
 	entries map[string]int,
 	truncated map[string]bool,
 	issueCounts map[string]int,
 	issueTruncated map[string]bool,
 	issueKnown map[string]bool,
 ) error {
-	_ = profile
-	_ = region
 	if entries == nil || c.session.NoCache {
 		return nil
 	}
@@ -108,10 +103,11 @@ func (c *Core) SaveAvailabilityCache(
 		return nil
 	}
 	var firstErr error
-	for name, count := range entries {
+	for rawName, count := range entries {
+		name := canonShortName(rawName)
 		trunc := false
 		if truncated != nil {
-			trunc = truncated[name]
+			trunc = truncated[rawName]
 		}
 		existing, _ := store.Type(name)
 		tf := cache.TypeFile{
@@ -123,16 +119,26 @@ func (c *Core) SaveAvailabilityCache(
 			Exact: existing.Exact || !trunc,
 			Rows:  existing.Rows,
 		}
-		if existing.Exact && trunc && existing.Count > count {
+		switch {
+		case existing.Exact && trunc && existing.Count > count:
 			// Preserve the previously-observed exact count/rows rather than
 			// letting a smaller truncated lower-bound regress it.
 			tf.Count = existing.Count
 			tf.HasResources = existing.Count > 0
+		case existing.Exact && !trunc && count != len(existing.Rows):
+			// DEF-4b matched-pair rule: a fresh EXACT count that disagrees
+			// with the row count it would otherwise inherit must not carry
+			// the stale, now-mismatched Rows forward — an exact Count and a
+			// Rows slice of a different length is the exact inconsistency
+			// C6/DEF-4b forbids. The fresh rows for this type land moments
+			// later via saveProbeResourcesToTypeFiles; until then this type
+			// file has no row data rather than a knowingly-wrong pairing.
+			tf.Rows = nil
 		}
-		if issueKnown[name] {
-			tf.Issues = issueCounts[name]
+		if issueKnown[rawName] {
+			tf.Issues = issueCounts[rawName]
 			tf.IssuesKnown = true
-			tf.IssuesTruncated = issueTruncated[name]
+			tf.IssuesTruncated = issueTruncated[rawName]
 		} else {
 			tf.Issues = existing.Issues
 			tf.IssuesKnown = existing.IssuesKnown
@@ -161,6 +167,10 @@ func (c *Core) SaveResourceListCache(shortName string, rows []cache.Row, count i
 	if store == nil {
 		return nil
 	}
+	// Canonicalize so an alias caller (e.g. "rds") and CachedListDepth's own
+	// canonShortName lookup always agree on the stored key — an uncanonicalized
+	// Put here would silently miss the depth lookup for every alias caller.
+	shortName = canonShortName(shortName)
 	existing, _ := store.Type(shortName)
 	tf := cache.TypeFile{
 		HasResources: count > 0,

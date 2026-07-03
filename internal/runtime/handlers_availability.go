@@ -66,7 +66,7 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 			ResourceType: shortName,
 			Count:        count,
 			Truncated:    truncated[shortName],
-			Origin:       "cache",
+			Origin:       OriginCache,
 		})
 	}
 
@@ -153,7 +153,7 @@ func (c *Core) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetched)
 			// DEF-6/C3: a prefetch is a synchronous LIVE count (demo /
 			// no-cache mode), not a disk-cache seed — origin is "verified"
 			// from the moment it lands, no separate probe confirms it.
-			Origin: "verified",
+			Origin: OriginVerified,
 		})
 	}
 	// T034: wire issue counts from prefetch.
@@ -230,7 +230,7 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 			// "verified" regardless of whether the exactness guard in
 			// applyIntents' PatchMenuAvailability case ends up keeping the
 			// prior Count/Truncated.
-			Origin: "verified",
+			Origin: OriginVerified,
 		})
 		// T032: wire issue counts from probe.
 		intents = append(intents, PatchMenu{
@@ -503,8 +503,11 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 // resource.Resource IN PLACE (via ApplyWave2ToRow on &rows[i]) on the SAME
 // backing array a shallow []resource.Resource slice copy would still alias —
 // a plain maps.Copy of the outer map would still observe that later
-// in-place strip. Each per-type slice (and each resource's Findings slice,
-// the field clearEnrichmentFor mutates) is copied element-by-element so the
+// in-place strip. Each per-type slice, each resource's Findings slice (the
+// field clearEnrichmentFor mutates), AND each resource's Fields map (the
+// field the later FieldUpdates enrichment step maps.Copy's INTO on the same
+// backing map — an aliased Fields map would let that later mutation corrupt
+// an already-dispatched snapshot) are copied element-by-element so the
 // snapshot is fully isolated from any later mutation of the live session
 // state.
 func (c *Core) snapshotProbeResourcesForSave() *SaveCachePayload {
@@ -516,6 +519,11 @@ func (c *Core) snapshotProbeResourcesForSave() *SaveCachePayload {
 		cp := make([]resource.Resource, len(rows))
 		for i, r := range rows {
 			r.Findings = append([]domain.Finding(nil), r.Findings...)
+			if r.Fields != nil {
+				fields := make(map[string]string, len(r.Fields))
+				maps.Copy(fields, r.Fields)
+				r.Fields = fields
+			}
 			cp[i] = r
 		}
 		resources[shortName] = cp
@@ -531,15 +539,28 @@ func (c *Core) snapshotProbeResourcesForSave() *SaveCachePayload {
 // status are intentionally NOT reconstructed here — buildListBody derives
 // them at render time from Fields + Findings via the same classification
 // rules live data uses (C6).
+//
+// row.Fields/row.Findings are copied rather than assigned by reference:
+// (*cache.Store).Type returns a TypeFile by value, but its Rows slice and
+// each Row's Fields map / Findings slice still alias the Store's own backing
+// data. Downstream mutators (ApplyWave2ToRow, the FieldUpdates maps.Copy in
+// handleEnrichmentChecked) write into the seeded ProbeResources rows this
+// function produces — an aliased Fields/Findings would let those writes
+// corrupt the in-memory Store the next save reads from.
 func rowsFromCacheRows(shortName string, rows []cache.Row) []resource.Resource {
 	out := make([]resource.Resource, len(rows))
 	for i, row := range rows {
+		var fields map[string]string
+		if row.Fields != nil {
+			fields = make(map[string]string, len(row.Fields))
+			maps.Copy(fields, row.Fields)
+		}
 		out[i] = resource.Resource{
 			ID:       row.ID,
 			Name:     row.Name,
 			Type:     shortName,
-			Fields:   row.Fields,
-			Findings: row.Findings,
+			Fields:   fields,
+			Findings: append([]domain.Finding(nil), row.Findings...),
 		}
 	}
 	return out

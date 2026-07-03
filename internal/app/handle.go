@@ -269,7 +269,7 @@ func (c *Controller) syncExactTotalToMenu(screen *Screen, canon string) {
 		maps.Copy(issueTrunc, ms.IssueTruncated)
 		issueKnown := make(map[string]bool, len(ms.IssueKnown))
 		maps.Copy(issueKnown, ms.IssueKnown)
-		_ = c.core.SaveAvailabilityCache(profile, region, avail, trunc, issueCounts, issueTrunc, issueKnown)
+		_ = c.core.SaveAvailabilityCache(avail, trunc, issueCounts, issueTrunc, issueKnown)
 	}
 }
 
@@ -287,6 +287,11 @@ func (c *Controller) maybeSaveResourceListCache(ls *ListState, canon string) {
 	if ls == nil || c.core.NoCache() {
 		return
 	}
+	td := resource.FindResourceType(canon)
+	if td == nil {
+		// Issue-badge eligibility unknowable without a ResourceTypeDef.
+		return
+	}
 	rows := make([]cache.Row, len(ls.Rows))
 	for i, r := range ls.Rows {
 		rows[i] = cache.Row{
@@ -296,9 +301,10 @@ func (c *Controller) maybeSaveResourceListCache(ls *ListState, canon string) {
 			Findings: r.Findings,
 		}
 	}
+	issuesKnown := !td.ExcludeFromIssueBadge
 	issues := c.listIssueCount(ls, canon)
 	exact := !ls.HasPagination
-	_ = c.core.SaveResourceListCache(canon, rows, len(ls.Rows), exact, issues, true, ls.HasPagination)
+	_ = c.core.SaveResourceListCache(canon, rows, len(ls.Rows), exact, issues, issuesKnown, ls.HasPagination)
 }
 
 // autoOpenSingleDetail replaces a web/headless by-ID placeholder list with the

@@ -112,11 +112,17 @@ func page2Resources(offset, n int) []resource.Resource {
 	return out
 }
 
-// registerDepthFetcher registers a paginated fetcher for shortName that
-// returns page1 (50 resources, truncated, NextToken="p2") on an empty token,
-// and page2 (5 resources, not truncated) when the token is "p2". Any other
-// token is an error. Cleanup restores prior state.
-func registerDepthFetcher(t *testing.T, shortName string) {
+// registerDepthFetcherWithPage2 registers a paginated fetcher for shortName
+// that returns page1 (50 resources, truncated, NextToken="p2") on an empty
+// token, and defers to page2 for the "p2" token. Any other token is an
+// error. Cleanup restores prior state.
+//
+// page2 lets each call site control the follow-up page's outcome without
+// duplicating the (identical) page-1 setup: registerDepthFetcher's default
+// (page2Resources(50, 5), untruncated) is reused via
+// registerDepthFetcher below; registerDepthFetcherErrorOnPage2 supplies a
+// page2 that returns an error instead.
+func registerDepthFetcherWithPage2(t *testing.T, shortName string, page2 func() (resource.FetchResult, error)) {
 	t.Helper()
 	resource.SetPaginatedForTest(shortName, func(_ context.Context, _ any, token string) (resource.FetchResult, error) {
 		switch token {
@@ -131,15 +137,7 @@ func registerDepthFetcher(t *testing.T, shortName string) {
 				},
 			}, nil
 		case "p2":
-			return resource.FetchResult{
-				Resources: page2Resources(50, 5),
-				Pagination: &resource.PaginationMeta{
-					IsTruncated: false,
-					NextToken:   "",
-					TotalHint:   55,
-					PageSize:    5,
-				},
-			}, nil
+			return page2()
 		default:
 			return resource.FetchResult{}, errors.New("depth-test fetcher: unexpected token " + token)
 		}
@@ -147,29 +145,32 @@ func registerDepthFetcher(t *testing.T, shortName string) {
 	t.Cleanup(func() { resource.CleanupPaginatedForTest(shortName) })
 }
 
-// registerDepthFetcherErrorOnPage2 is identical to registerDepthFetcher
-// except the "p2" token returns an error instead of a second page.
+// registerDepthFetcher registers the standard depth-test fetcher: page1 (50
+// resources, truncated) followed by page2 (5 resources, not truncated, 55
+// total) on token "p2".
+func registerDepthFetcher(t *testing.T, shortName string) {
+	t.Helper()
+	registerDepthFetcherWithPage2(t, shortName, func() (resource.FetchResult, error) {
+		return resource.FetchResult{
+			Resources: page2Resources(50, 5),
+			Pagination: &resource.PaginationMeta{
+				IsTruncated: false,
+				NextToken:   "",
+				TotalHint:   55,
+				PageSize:    5,
+			},
+		}, nil
+	})
+}
+
+// registerDepthFetcherErrorOnPage2 registers the depth-test fetcher with the
+// same page1 as registerDepthFetcher, but the "p2" token returns an error
+// instead of a second page.
 func registerDepthFetcherErrorOnPage2(t *testing.T, shortName string) {
 	t.Helper()
-	resource.SetPaginatedForTest(shortName, func(_ context.Context, _ any, token string) (resource.FetchResult, error) {
-		switch token {
-		case "":
-			return resource.FetchResult{
-				Resources: page1Resources(50),
-				Pagination: &resource.PaginationMeta{
-					IsTruncated: true,
-					NextToken:   "p2",
-					TotalHint:   -1,
-					PageSize:    50,
-				},
-			}, nil
-		case "p2":
-			return resource.FetchResult{}, errors.New("simulated follow-up page failure")
-		default:
-			return resource.FetchResult{}, errors.New("depth-test fetcher: unexpected token " + token)
-		}
+	registerDepthFetcherWithPage2(t, shortName, func() (resource.FetchResult, error) {
+		return resource.FetchResult{}, errors.New("simulated follow-up page failure")
 	})
-	t.Cleanup(func() { resource.CleanupPaginatedForTest(shortName) })
 }
 
 // ────────────────────────────────────────────────────────────────────────────

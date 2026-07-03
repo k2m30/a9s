@@ -139,6 +139,17 @@ type ReplaceScreen struct {
 
 func (ReplaceScreen) isIntent() {}
 
+// OriginCache and OriginVerified are the two valid values for
+// PatchMenuAvailability.Origin — a cross-layer contract shared by every
+// Core handler that sets Origin and every adapter that reads it (DEF-6/C3).
+// Defined as constants (rather than inline string literals) so a typo in
+// either producer or consumer fails to compile instead of silently landing
+// on the "leave origin unchanged" empty-string branch.
+const (
+	OriginCache    = "cache"
+	OriginVerified = "verified"
+)
+
 // PatchMenuAvailability updates the resource-count display for one menu entry.
 // Combines SetAvailability + SetTruncated into a single intent.
 type PatchMenuAvailability struct {

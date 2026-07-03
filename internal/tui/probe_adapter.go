@@ -18,7 +18,7 @@ import (
 // renderers seed identically.
 func (m *Model) loadAvailabilityCache() tea.Cmd {
 	return func() tea.Msg {
-		store := m.core.LoadAvailabilityCache(m.core.Profile(), m.core.Region())
+		store := m.core.LoadAvailabilityCache()
 		if store == nil {
 			return messages.AvailabilityCacheLoaded{
 				Entries: make(map[string]int),

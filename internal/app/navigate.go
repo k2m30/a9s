@@ -132,7 +132,15 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 		// no-rows-known Loading=true path ensureListState already applied.
 		if res.Kind == runtime.NavigateKindPushResourceList {
 			if rows := c.core.Session().ProbeResources[res.ResolvedType]; len(rows) > 0 {
-				c.applyResourcesLoaded(top.State.List, res.ResolvedType, rows, nil, false)
+				// C1/C5: carry the probe's truncation signal into the seeded
+				// page so the title renders "N+" immediately — without this the
+				// seeded (possibly-truncated) count displays as an exact "N"
+				// until the background refetch in Refreshing lands.
+				var pagination *resource.PaginationMeta
+				if c.core.Session().ProbeTruncated[res.ResolvedType] {
+					pagination = &resource.PaginationMeta{IsTruncated: true}
+				}
+				c.applyResourcesLoaded(top.State.List, res.ResolvedType, rows, pagination, false)
 				top.State.List.Loading = false
 				top.State.List.Refreshing = true
 			}
@@ -398,4 +406,3 @@ func (c *Controller) applyRelatedNavResult(res runtime.NavigationResult) []runti
 	}
 	return nil
 }
-

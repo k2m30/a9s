@@ -140,15 +140,6 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			return nil, nil
 		}
 		var flashErr error
-		entries, truncated, issueCounts, issueTruncated, issueKnown := c.availabilityFromResourceCache()
-		if entries != nil {
-			if err := c.SaveAvailabilityCache(
-				snap.Profile, snap.Region,
-				entries, truncated, issueCounts, issueTruncated, issueKnown,
-			); err != nil {
-				flashErr = err
-			}
-		}
 		// DEF-7/C7/C8: an availability-sweep + Wave-2 enrichment completion
 		// must persist that type's per-row rows/findings (SaveResourceListCache)
 		// WITHOUT requiring any list screen to have been opened — mirrors the
@@ -159,12 +150,29 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		// c.session.ProbeResources for any nil-Payload dispatch. C6 scope:
 		// ProbeResources IS this session's canonical top-level population for
 		// each type — the same rows a fresh list-open would seed from.
+		//
+		// Runs BEFORE SaveAvailabilityCache (order matters): both calls write
+		// tf.Issues for the same type, and SaveAvailabilityCache's issueKnown
+		// branch is the one with access to the fuller ResourceCache-derived
+		// aggregate — it must run second so it either overwrites with that
+		// exact aggregate (issueKnown) or carries forward the rows/issues this
+		// call just persisted via existing.Issues/existing.Rows (not known).
+		// The reverse order let the row-derived, potentially-incomplete count
+		// computed here unconditionally clobber a more accurate aggregate.
 		saveResources, saveTruncated := c.session.ProbeResources, c.session.ProbeTruncated
 		if p, ok := req.Payload.(*SaveCachePayload); ok && p != nil {
 			saveResources, saveTruncated = p.Resources, p.Truncated
 		}
-		if err := c.saveProbeResourcesToTypeFiles(saveResources, saveTruncated); err != nil && flashErr == nil {
+		if err := c.saveProbeResourcesToTypeFiles(saveResources, saveTruncated); err != nil {
 			flashErr = err
+		}
+		entries, truncated, issueCounts, issueTruncated, issueKnown := c.availabilityFromResourceCache()
+		if entries != nil {
+			if err := c.SaveAvailabilityCache(
+				entries, truncated, issueCounts, issueTruncated, issueKnown,
+			); err != nil && flashErr == nil {
+				flashErr = err
+			}
 		}
 		if flashErr != nil {
 			return messages.Flash{Text: fmt.Sprintf("cache save: %v", flashErr), IsError: true}, nil
@@ -196,7 +204,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 
 	// --- load on-disk availability cache ---
 	case TaskKindLoadAvailCache:
-		store := c.LoadAvailabilityCache(snap.Profile, snap.Region)
+		store := c.LoadAvailabilityCache()
 		if store == nil {
 			return messages.AvailabilityCacheLoaded{
 				Entries: make(map[string]int),
@@ -294,6 +302,14 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 				Token:        res.Pagination.NextToken,
 			})
 			if err != nil {
+				break
+			}
+			if len(more.Resources) == 0 {
+				// A zero-progress page (hostile/buggy pagination: a NextToken
+				// that keeps returning empty pages) must terminate the loop —
+				// len(res.Resources) never grows past this point, so the
+				// CachedListDepth bound above would otherwise spin forever.
+				res.Pagination = more.Pagination
 				break
 			}
 			res.Resources = append(res.Resources, more.Resources...)
@@ -534,6 +550,14 @@ func (c *Core) saveProbeResourcesToTypeFiles(probeResources map[string][]resourc
 // re-verification is already running. The field is retained for message-shape
 // stability only; no production code branches on it.
 func CacheStoreToEvent(store *cache.Store) messages.AvailabilityCacheLoaded {
+	if store == nil {
+		// Mirrors the TaskKindLoadAvailCache case above: a nil store (no
+		// cache loaded for this pair) is "no knowledge yet", not a panic.
+		return messages.AvailabilityCacheLoaded{
+			Entries: make(map[string]int),
+			Expired: true,
+		}
+	}
 	return cacheStoreToEvent(store)
 }
 

@@ -418,12 +418,18 @@ func (c *Controller) listIssueCount(ls *ListState, typeName string) int {
 	findings := c.listEnrichmentFindings(typeName)
 	ic := 0
 	for _, r := range all {
-		if listHasBadgeFinding(r) {
+		switch {
+		case listHasBadgeFinding(r):
 			ic++
-		} else if len(r.Findings) == 0 {
-			if td.ResolveColor(r).IsIssue() {
-				ic++
-			} else if f, hasFinding := findings[r.ID]; hasFinding && f.Severity == domain.SevBroken {
+		case td.ResolveColor(r).IsIssue():
+			// DEF-8: rows carry Wave-2 findings directly, so a row that is a
+			// Wave-1 issue by td.ResolveColor but whose only findings are
+			// non-badge (e.g. a lone Wave-2 "~" warn) must still count here —
+			// gating this fallback on len(r.Findings) == 0 undercounted any
+			// such row. The color check is independent of r.Findings content.
+			ic++
+		case len(r.Findings) == 0:
+			if f, hasFinding := findings[r.ID]; hasFinding && f.Severity == domain.SevBroken {
 				// S1: Wave-2 findings bump the count only at "!" severity —
 				// "~ findings do not bump" (docs/attention-signals.md). Wave-1
 				// yellow/red rows are already counted by the color branch above,
