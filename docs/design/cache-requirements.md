@@ -62,6 +62,7 @@ Lifecycle, all content kinds: `none → cached (stale) → fresh`; "refreshing" 
 | D6 | Re-opening a detail re-ran the full related fan-out (~18 s) in one UI | C6 |
 | D7 | Warm list open: the verify-refetch fetched only the truncated first page and the silent swap replaced 55 cached rows with 50, downgrading the exact title `s3(55)` to `s3(50+)` | C2 + C5 (re-verify must walk to the cached depth) |
 | D8 | A TUI session persisted only availability counts — its type files carried zero rows/findings, so the next start (either renderer) had no cells to seed; the web lane persisted full rows for the same flow | C6 + goal 4 (one save path for both renderers) |
+| D9 | TUI warm list-open rendered a bare `Loading…` shell although the pair's disk-cached rows were already seeded in memory; the web lane rendered them instantly — the seed decision lived only in the web controller | C1 + C3 + goal 4 (seed attached by HandleNavigate, one decision for both adapters, `⟳` marker on the seeded surface) |
 
 ## 4. S3 pilot acceptance
 

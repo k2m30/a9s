@@ -359,6 +359,22 @@ func (c *Controller) SetListFetchError(err string) {
 	ls.LastFetchError = err
 }
 
+// SetListRefreshing sets the Refreshing flag on the top list screen. Mirrors
+// SetListFetchError's locking/topListState pattern. Used by cache-first
+// seeding callers (DEF-12, C3: docs/design/cache-requirements.md) to mark a
+// seeded-but-unverified list surface so the renderer's refreshing marker
+// (⟳ / "── refreshing... ──") distinguishes it from verified-fresh content —
+// renderers read this flag, they never compute it.
+func (c *Controller) SetListRefreshing(v bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	ls := c.topListState()
+	if ls == nil {
+		return
+	}
+	ls.Refreshing = v
+}
+
 // GetListPaginationCursor returns the pagination cursor of the top list screen.
 func (c *Controller) GetListPaginationCursor() string {
 	c.mu.RLock()

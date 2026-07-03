@@ -125,25 +125,17 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 			}}
 		}
 		// Cache miss (NavigateKindPushResourceList): HandleNavigate already
-		// emits the KindFetchResources task. Seed from session.ProbeResources
-		// (first-page rows retained by the availability probe, or replayed
-		// from the on-disk availability cache at startup) when present, so the
-		// list still renders instantly instead of falling back to the
-		// no-rows-known Loading=true path ensureListState already applied.
-		if res.Kind == runtime.NavigateKindPushResourceList {
-			if rows := c.core.Session().ProbeResources[res.ResolvedType]; len(rows) > 0 {
-				// C1/C5: carry the probe's truncation signal into the seeded
-				// page so the title renders "N+" immediately — without this the
-				// seeded (possibly-truncated) count displays as an exact "N"
-				// until the background refetch in Refreshing lands.
-				var pagination *resource.PaginationMeta
-				if c.core.Session().ProbeTruncated[res.ResolvedType] {
-					pagination = &resource.PaginationMeta{IsTruncated: true}
-				}
-				c.applyResourcesLoaded(top.State.List, res.ResolvedType, rows, pagination, false)
-				top.State.List.Loading = false
-				top.State.List.Refreshing = true
-			}
+		// emits the KindFetchResources task. HandleNavigate attaches CachedEntry
+		// on this Kind too, seeded from session.ProbeResources (first-page rows
+		// retained by the availability probe, or replayed from the on-disk
+		// availability cache at startup) — C1/C5: render what you know, verify
+		// on sight. Consume it here the same way the cache-hit branch above
+		// does, so the list still renders instantly instead of falling back to
+		// the no-rows-known Loading=true path ensureListState already applied.
+		if res.Kind == runtime.NavigateKindPushResourceList && res.CachedEntry != nil {
+			c.applyResourcesLoaded(top.State.List, res.ResolvedType, res.CachedEntry.Resources, res.CachedEntry.Pagination, false)
+			top.State.List.Loading = false
+			top.State.List.Refreshing = true
 		}
 
 	case runtime.NavigateKindPushDetail:

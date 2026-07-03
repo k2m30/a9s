@@ -134,9 +134,37 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 			}
 		}
 		// Sync m.ctrl stack before constructing the transient view so
-		// topListState() inside NewResourceList resolves to this screen's ListState.
+		// topListState() inside NewResourceList/NewResourceListFromCache
+		// resolves to this screen's ListState.
 		m.ctrl.PushChildListScreen(canon)
-		rl := views.NewResourceList(*rt, m.viewConfig, m.keys, m.ctrl)
+		var rl views.ResourceListModel
+		var initCmd tea.Cmd
+		if result.CachedEntry != nil {
+			// C1/Goal 4 (DEF-12): HandleNavigate attached a synthetic seed from
+			// session.ProbeResources/ProbeTruncated on this cache-miss branch —
+			// build the list the same way the PushResourceListCached case does
+			// (no loading shell, no spinner) so warm list-open renders instantly.
+			// The fetch task below (already emitted by HandleNavigate for every
+			// PushResourceList result) still runs to verify/replace the seeded
+			// rows — render what you know, verify on sight.
+			entry := result.CachedEntry
+			rl = views.NewResourceListFromCache(
+				*rt, m.viewConfig, m.keys,
+				entry.Resources, entry.Pagination,
+				"", 0, false, 0, 0, false,
+				m.ctrl,
+			)
+			// C3 (docs/design/cache-requirements.md): a seeded-but-unverified
+			// surface must carry the refreshing marker so it renders
+			// distinguishably from verified-fresh content. NewResourceListFromCache
+			// (via ApplyResourcesLoaded) clears Refreshing as part of applying the
+			// seeded page, so this must run after construction — mirrors the
+			// headless controller's ordering in applyNavResult.
+			m.ctrl.SetListRefreshing(true)
+		} else {
+			rl = views.NewResourceList(*rt, m.viewConfig, m.keys, m.ctrl)
+			_, initCmd = rl.Init()
+		}
 		if result.DisplayAlias != "" {
 			rl.SetDisplayName(result.DisplayAlias)
 		}
@@ -145,7 +173,6 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		issueTrunc := m.ctrl.GetMenuIssueTruncated()[canon]
 		rl.SetEnrichmentState(issueCount, issueTrunc, nil)
 		rl.SetTruncatedIDs(m.core.EnrichmentTruncatedIDs(canon))
-		_, initCmd := rl.Init()
 		rs := newListRS(canon)
 		w, h := m.innerSize()
 		rs.width, rs.height = w, h

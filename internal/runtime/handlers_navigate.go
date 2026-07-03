@@ -147,14 +147,28 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 		// Cache miss: adapter pushes a fresh list and the fetch task loads it.
 		// Scope keeps the user-supplied type (alias preserved) so the fetcher
 		// resolves to the same registry entry the adapter chose for display.
-		return NavigateResult{
-				Kind:         NavigateKindPushResourceList,
-				ResolvedType: canon,
-				DisplayAlias: alias,
-			}, []TaskRequest{{
-				Key:   TaskKey{Kind: KindFetchResources, Scope: ev.ResourceType},
-				Cache: CacheNone,
-			}}
+		result := NavigateResult{
+			Kind:         NavigateKindPushResourceList,
+			ResolvedType: canon,
+			DisplayAlias: alias,
+		}
+		// The seed rides the miss branch, not a NavigateKindPushResourceListCached
+		// promotion: ProbeResources/ProbeTruncated hold disk-cached/probe knowledge
+		// that is distinct from session.ResourceCache (DEF-12 C1 + Goal 4) — the
+		// fetch must still run to confirm/replace what the probe retained, so Kind
+		// and the KindFetchResources task below are unchanged.
+		if rows := c.session.ProbeResources[canon]; len(rows) > 0 {
+			result.CachedEntry = &session.ResourceCacheEntry{
+				Resources: rows,
+				Pagination: &resource.PaginationMeta{
+					IsTruncated: c.session.ProbeTruncated[canon],
+				},
+			}
+		}
+		return result, []TaskRequest{{
+			Key:   TaskKey{Kind: KindFetchResources, Scope: ev.ResourceType},
+			Cache: CacheNone,
+		}}
 
 	case NavigateTargetDetail, NavigateTargetYAML, NavigateTargetJSON:
 		if ev.Resource == nil {
