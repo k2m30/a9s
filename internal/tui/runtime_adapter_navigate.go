@@ -222,28 +222,14 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 			})
 		}
 		if result.DispatchRelated && detailRS.rightColAutoShown {
-			ck := runtime.RelatedCacheKey(result.ResolvedType, result.Resource.ID)
-			if cached, ok := m.core.RelatedCacheGet(ck); ok && len(cached) > 0 {
-				// Replay cached related results directly into the controller.
-				for _, msg := range runtime.RelatedCacheReplay(result.ResolvedType, cached) {
-					errMsg := ""
-					if msg.Result.Err != nil {
-						errMsg = msg.Result.Err.Error()
-					}
-					m.ctrl.ApplyDetailRelatedResultForResource(
-						result.ResolvedType,
-						result.Resource.ID,
-						msg.DefDisplayName,
-						msg.Result.TargetType,
-						msg.Result.Count,
-						false,
-						errMsg,
-						msg.Result.Approximate,
-						msg.Result.ResourceIDs,
-						msg.Result.FetchFilter,
-					)
-				}
-			} else {
+			// D6: no re-fan-out over cached data. ReplayRelatedCache merges
+			// cached rows directly into the controller's DetailState and
+			// reports whether it did — single source of truth shared with the
+			// headless/web NavigateKindPushDetail case in
+			// internal/app/navigate.go (applyNavResult). Only dispatch the
+			// TUI's own concurrent fan-out (relatedCheckCmd, one goroutine per
+			// RelatedDef) on a cache miss.
+			if !m.ctrl.ReplayRelatedCache(result.ResolvedType, *result.Resource) {
 				res := *result.Resource
 				rt := result.ResolvedType
 				cmds = append(cmds, func() tea.Msg {

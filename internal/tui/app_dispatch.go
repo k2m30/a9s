@@ -4,8 +4,9 @@
 // applyIntents forwards every intent to the headless controller
 // (m.ctrl.ApplyIntents) first — see internal/app/intents.go for the
 // controller-side cases, including the cache-cross-write intents
-// (PatchResourceCache, PatchRelatedCache, PatchLazyResourceCache) which write
-// session state owned by Core via the typed accessors in
+// (PatchResourceCache, PatchRelatedCache, PatchLazyResourceCache) and
+// PatchDetail (detail-view enrichment), which write session/screen-stack
+// state owned by Core/Controller via the typed accessors in
 // internal/runtime/accessors.go. The local switch in applyIntents below only
 // covers renderer-side effects with no controller equivalent, or the
 // rendererState half of an intent already applied controller-side by the
@@ -17,7 +18,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
@@ -36,9 +36,9 @@ import (
 // identity, flash, error-log, and the cache-cross-write intents
 // PatchResourceCache/PatchRelatedCache/PatchLazyResourceCache, which write
 // through the same *runtime.Core the TUI holds as m.core). Intents the
-// controller does not model (PatchDetail, HeaderInvalidateIntent,
-// ApplyThemeIntent) are documented no-ops there; RefreshActiveListIntent is
-// handled separately via refreshTasksForIntents at the Handle call site.
+// controller does not model (HeaderInvalidateIntent, ApplyThemeIntent) are
+// documented no-ops there; RefreshActiveListIntent is handled separately via
+// refreshTasksForIntents at the Handle call site.
 //
 // The local switch below runs AFTER the forward and handles ONLY
 // renderer-side effects that have no controller equivalent, or the
@@ -51,34 +51,6 @@ func (m *Model) applyIntents(intents []runtime.UIIntent) []tea.Cmd {
 	var cmds []tea.Cmd
 	for _, intent := range intents {
 		switch v := intent.(type) {
-		case runtime.PatchDetail:
-			// Apply enrichment findings to every stacked detail screen of this
-			// resource type — not just the currently active one. When a user has
-			// navigated from detail-A to detail-B, enrichment results for both
-			// must reach both screens, so popping back to detail-A shows the
-			// correct Attention section immediately.
-			if len(v.EnrichmentFindings) == 0 {
-				// Nil or empty Findings means all resources of this type have
-				// recovered: clear enrichment from every stacked detail screen.
-				m.ctrl.ClearDetailFindingsForType(v.ResourceType)
-			} else {
-				// Clear stale findings from every stacked detail of this type first,
-				// so a resource that recovered (absent from the new map) loses its
-				// Attention; then re-apply for resources still reporting findings.
-				// ApplyDetailFindingForResource searches all stacked screens by
-				// (type, id), so a stacked-but-not-active detail is still updated.
-				m.ctrl.ClearDetailFindingsForType(v.ResourceType)
-				for resourceID, f := range v.EnrichmentFindings {
-					finding := f
-					var ad *domain.AttentionDetail
-					if got, hasAD := v.EnrichmentAttentionDetails[resourceID]; hasAD && len(got.Rows) > 0 {
-						adVal := got
-						ad = &adVal
-					}
-					m.ctrl.ApplyDetailFindingForResource(v.ResourceType, resourceID, &finding, ad)
-				}
-			}
-
 		case runtime.FlashIntent:
 			// Re-emit as messages.Flash so the flash routes through
 			// HandleFlash and picks up the auto-clear tick + history

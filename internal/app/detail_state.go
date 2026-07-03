@@ -126,6 +126,12 @@ func (c *Controller) ApplyDetailFinding(f *domain.Finding, ad *domain.AttentionD
 func (c *Controller) ApplyDetailFindingForResource(resourceType, resourceID string, f *domain.Finding, ad *domain.AttentionDetail) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.applyDetailFindingForResource(resourceType, resourceID, f, ad)
+}
+
+// applyDetailFindingForResource is the lock-free implementation of
+// ApplyDetailFindingForResource. Callers must hold c.mu (write).
+func (c *Controller) applyDetailFindingForResource(resourceType, resourceID string, f *domain.Finding, ad *domain.AttentionDetail) {
 	for i := range c.stack {
 		if c.stack[i].ID != runtime.ScreenDetail {
 			continue
@@ -144,6 +150,12 @@ func (c *Controller) ApplyDetailFindingForResource(resourceType, resourceID stri
 func (c *Controller) ClearDetailFindingsForType(resourceType string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.clearDetailFindingsForType(resourceType)
+}
+
+// clearDetailFindingsForType is the lock-free implementation of
+// ClearDetailFindingsForType. Callers must hold c.mu (write).
+func (c *Controller) clearDetailFindingsForType(resourceType string) {
 	for i := range c.stack {
 		if c.stack[i].ID != runtime.ScreenDetail {
 			continue

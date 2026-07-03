@@ -1,6 +1,9 @@
 package app
 
-import "github.com/k2m30/a9s/v3/internal/runtime"
+import (
+	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/internal/runtime"
+)
 
 // ApplyIntents applies a slice of UIIntents to the controller's screen stack
 // and state: stack navigation (Push/Pop/Replace/PopSelector), menu
@@ -252,11 +255,39 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 		case runtime.PatchLazyResourceCache:
 			c.core.ExtendLazyResourceCache(v.Adds)
 
+		case runtime.PatchDetail:
+			// Apply enrichment findings to every stacked detail screen of this
+			// resource type — not just the currently active one. When a user has
+			// navigated from detail-A to detail-B, enrichment results for both
+			// must reach both screens, so popping back to detail-A shows the
+			// correct Attention section immediately. Mirrors the TUI adapter's
+			// former local PatchDetail case in app_dispatch.go (removed — this is
+			// now the single source of truth for both TUI and web/headless).
+			if len(v.EnrichmentFindings) == 0 {
+				// Nil or empty Findings means all resources of this type have
+				// recovered: clear enrichment from every stacked detail screen.
+				c.clearDetailFindingsForType(v.ResourceType)
+			} else {
+				// Clear stale findings from every stacked detail of this type first,
+				// so a resource that recovered (absent from the new map) loses its
+				// Attention; then re-apply for resources still reporting findings.
+				// applyDetailFindingForResource searches all stacked screens by
+				// (type, id), so a stacked-but-not-active detail is still updated.
+				c.clearDetailFindingsForType(v.ResourceType)
+				for resourceID, f := range v.EnrichmentFindings {
+					finding := f
+					var ad *domain.AttentionDetail
+					if got, hasAD := v.EnrichmentAttentionDetails[resourceID]; hasAD && len(got.Rows) > 0 {
+						adVal := got
+						ad = &adVal
+					}
+					c.applyDetailFindingForResource(v.ResourceType, resourceID, &finding, ad)
+				}
+			}
+
 		// The remaining intents are renderer-specific or are served through
 		// another controller path, so they are intentional no-ops here rather
 		// than migration leftovers:
-		//   PatchDetail             — detail enrichment is applied via
-		//                             ApplyDetailFinding (the task-result lane).
 		//   RefreshActiveListIntent — carries no state of its own to apply here;
 		//                             the C10 replay it signals is turned into a
 		//                             fetch task by refreshTasksForIntents, which
