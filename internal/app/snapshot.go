@@ -66,6 +66,23 @@ func (c *Controller) snapshot() ViewState {
 	return vs
 }
 
+// ScreenIDs returns the ScreenID of every entry on the controller's screen
+// stack, bottom-to-top. It exists so that renderer adapters (today: the TUI's
+// stackInSync debug assertion in internal/tui/app_stack_invariant.go) can
+// compare their own view stack against the controller's without reaching
+// into unexported Controller state — the controller stays the single source
+// of truth for stack depth and per-level screen identity (see docs/architecture.md
+// "the controller stack is authoritative").
+func (c *Controller) ScreenIDs() []runtime.ScreenID {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	ids := make([]runtime.ScreenID, len(c.stack))
+	for i, s := range c.stack {
+		ids[i] = s.ID
+	}
+	return ids
+}
+
 // bodyKindForScreen maps a Screen to the BodyKind a renderer uses to
 // select the correct template/view.
 func bodyKindForScreen(s Screen) BodyKind {
