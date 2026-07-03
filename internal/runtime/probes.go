@@ -89,6 +89,97 @@ func (c *Core) LoadAvailabilityCache() *cache.Store {
 	return c.session.EnsureCacheStore(c.session.Profile, region)
 }
 
+// reconcileTypeFile is the SINGLE chokepoint every type-file write goes
+// through (task #17 wave 1 — the row-store unification save chokepoint).
+// SaveAvailabilityCache (counts-only) and SaveResourceListCache/
+// saveProbeResourcesToTypeFiles (rows-carrying) both stage their observation
+// through this function before store.Put — no other code path may construct
+// a cache.TypeFile to persist. Replaces the previously scattered no-shrink/
+// exact-stick/mismatch-drop guards that lived independently in each caller
+// and could disagree about which write lane's Rows should survive.
+//
+// Persisted-pair invariant (supersedes the old DEF-4b/D14 comments): a
+// pair may only ever show Count > len(Rows) in the COUNTS-ONLY shape (rule
+// 2 below) — and it never loses rows it already had. A write never reduces
+// row richness merely to make Count and len(Rows) match; C1/goal 3 (a
+// stale-marked answer beats an empty screen) outranks that cosmetic
+// consistency. D14's exact-shrink-drops-rows regression is the shape this
+// chokepoint forbids going forward.
+//
+// incoming.Rows == nil (rowsProvided=false) marks a counts-only observation
+// (SaveAvailabilityCache). incoming.Rows != nil, including an empty
+// non-nil slice, marks a rows-carrying observation (SaveResourceListCache /
+// saveProbeResourcesToTypeFiles) — such a caller always passes a real
+// (possibly zero-length) slice, never nil, so the nil check alone
+// distinguishes the two lanes.
+//
+// Rules, applied in order:
+//
+//  1. Rows-carrying, incoming shallower than existing AND incoming's IDs are
+//     a subset of existing's (a shallower page of the same list): existing
+//     Rows are kept in full — a shallower observation never regresses a
+//     deeper one. Count/Exact still advance per C5 (a new EXACT count wins
+//     even if its row set is thinner; only a fresh EXACT observation
+//     replaces a stored EXACT).
+//  2. Counts-only (incoming.Rows == nil): Rows are NEVER touched — existing
+//     Rows (if any) are carried forward untouched regardless of whether
+//     Count now disagrees with len(Rows). The pair is reconstructable: the
+//     row set is the last-known page(s), Count is the authoritative total,
+//     and the renderer already treats Rows as stale-until-verified (C1).
+//     Only Count/Exact/HasResources/Issues* are written.
+//  3. Rows-carrying, incoming has MORE rows than existing: incoming's rows
+//     always win (deeper knowledge).
+//  4. Rows-carrying, same depth but different content (non-subset — a
+//     genuine refresh): incoming wins by recency.
+func reconcileTypeFile(existing cache.TypeFile, incoming cache.TypeFile, rowsProvided bool) cache.TypeFile {
+	tf := incoming
+	tf.HasResources = incoming.Count > 0
+
+	if !rowsProvided {
+		// Rule 2: counts-only write. Rows are never inspected or dropped.
+		tf.Rows = existing.Rows
+		if existing.Count > 0 || len(existing.Rows) > 0 {
+			tf.HasResources = tf.HasResources || existing.HasResources
+		}
+		return tf
+	}
+
+	switch {
+	case len(incoming.Rows) < len(existing.Rows) && rowIDsAreSubset(incoming.Rows, existing.Rows):
+		// Rule 1: shallower page of the same list — keep the deeper rows.
+		tf.Rows = existing.Rows
+		if !incoming.Exact && existing.Count > tf.Count {
+			tf.Count = existing.Count
+		}
+		tf.HasResources = tf.Count > 0 || len(tf.Rows) > 0
+	default:
+		// Rules 3 & 4: incoming has more rows, or same/differing depth with
+		// non-subset content (a genuine refresh) — incoming's rows win.
+	}
+	return tf
+}
+
+// rowIDsAreSubset reports whether every ID in candidate also appears in
+// superset — used by reconcileTypeFile's rule 1 to detect "a shallower page
+// of the same list" (e.g. a truncated first-page refetch over an
+// already-exact, fuller stored list) as opposed to a genuine content change
+// that merely happens to be no longer.
+func rowIDsAreSubset(candidate, superset []cache.Row) bool {
+	if len(candidate) == 0 {
+		return true
+	}
+	known := make(map[string]struct{}, len(superset))
+	for _, r := range superset {
+		known[r.ID] = struct{}{}
+	}
+	for _, r := range candidate {
+		if _, ok := known[r.ID]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
 // SaveAvailabilityCache persists the supplied availability state to disk, one
 // type file per resource type (C7: per-type files, no merge logic). Returns
 // nil immediately when entries is nil or caching is disabled (NoCache). The
@@ -106,7 +197,9 @@ func (c *Core) LoadAvailabilityCache() *cache.Store {
 // here — this method only carries the counts-only availability-probe shape
 // callers historically populated it with. Full-row persistence for a type's
 // canonical top-level list happens via Core.SaveResourceListCache, called
-// from the list-fetch-completion seam (applyResourcesLoaded).
+// from the list-fetch-completion seam (applyResourcesLoaded). Every write
+// this method stages goes through reconcileTypeFile (rule 2: a counts-only
+// write never touches existing Rows).
 func (c *Core) SaveAvailabilityCache(
 	entries map[string]int,
 	truncated map[string]bool,
@@ -129,36 +222,19 @@ func (c *Core) SaveAvailabilityCache(
 				trunc = truncated[rawName]
 			}
 			existing, _ := store.Type(name)
-			tf := cache.TypeFile{
-				HasResources: count > 0,
-				Count:        count,
+			incoming := cache.TypeFile{
+				Count: count,
 				// C5: a truncated first-page probe never downgrades a stored
 				// exact total — only replace Exact when this observation is
 				// itself untruncated (a genuine exact observation).
 				Exact: existing.Exact || !trunc,
-				Rows:  existing.Rows,
 			}
-			switch {
-			case existing.Exact && trunc && existing.Count > count:
-				// Preserve the previously-observed exact count/rows rather than
+			if existing.Exact && trunc && existing.Count > count {
+				// Preserve the previously-observed exact count rather than
 				// letting a smaller truncated lower-bound regress it.
-				tf.Count = existing.Count
-				tf.HasResources = existing.Count > 0
-			case existing.Exact && !trunc && count != len(existing.Rows):
-				// DEF-4b matched-pair rule: a fresh EXACT count that disagrees
-				// with the row count it would otherwise inherit must not carry
-				// the stale, now-mismatched Rows forward — an exact Count and a
-				// Rows slice of a different length is the exact inconsistency
-				// C6/DEF-4b forbids. The fresh rows for this type land moments
-				// later via saveProbeResourcesToTypeFiles; until then this type
-				// file has no row data rather than a knowingly-wrong pairing.
-				// This branch's correctness depends on `trunc` being a genuine
-				// observation, not an unknown treated as false (DEF-18
-				// mechanism B) — availabilityFromResourceCache now derives
-				// `truncated` conservatively (nil Pagination => truncated) so
-				// !trunc here only fires on a confirmed exact page.
-				tf.Rows = nil
+				incoming.Count = existing.Count
 			}
+			tf := reconcileTypeFile(existing, incoming, false)
 			if issueKnown[rawName] {
 				tf.Issues = issueCounts[rawName]
 				tf.IssuesKnown = true
@@ -189,43 +265,35 @@ func (c *Core) SaveAvailabilityCache(
 // store via EnsureCacheStore and mutating it afterward is not sufficient:
 // that shape only serializes the pointer lookup, not the store.Type/Put/
 // SaveType sequence, letting two concurrent saves for the same type file
-// interleave.
+// interleave. rows is always passed as a real (possibly zero-length, never
+// nil) slice so reconcileTypeFile's rows-carrying lane (rules 1/3/4) is the
+// one that applies here.
 func (c *Core) SaveResourceListCache(shortName string, rows []cache.Row, count int, exact bool, issues int, issuesKnown, issuesTruncated bool) error {
 	// Canonicalize so an alias caller (e.g. "rds") and CachedListDepth's own
 	// canonShortName lookup always agree on the stored key — an
 	// uncanonicalized Put here would silently miss the depth lookup for
 	// every alias caller.
 	canon := canonShortName(shortName)
+	if rows == nil {
+		rows = []cache.Row{}
+	}
 	return c.WithCacheStore(func(store *cache.Store) error {
 		if store == nil {
 			return nil
 		}
 		existing, _ := store.Type(canon)
-		tf := cache.TypeFile{
-			HasResources: count > 0,
-			Count:        count,
-			Rows:         rows,
+		incoming := cache.TypeFile{
+			Count: count,
+			Exact: exact,
+			Rows:  rows,
 		}
-		// C5: exactness only ever advances — a truncated observation never
-		// downgrades an already-exact stored total. DEF-4b: when a truncated
-		// refetch's smaller row set would otherwise regress an already-exact,
-		// fuller stored state, the PRIOR (fuller, exact) row set is kept in its
-		// entirety — never a Count taken from `existing` paired with a smaller
-		// `rows` slice, which would leave len(Rows) != Count inconsistent. The
-		// fuller row set is only ever replaced by a NEW exact observation (the
-		// `case exact` branch above, which always takes the fresh rows/count as
-		// a matched pair).
-		switch {
-		case exact:
-			tf.Exact = true
-		case existing.Exact:
-			tf.Exact = true
-			if existing.Count > count {
-				tf.Count = existing.Count
-				tf.HasResources = existing.Count > 0
-				tf.Rows = existing.Rows
-			}
+		if !exact && existing.Exact {
+			// C5: exactness only ever advances — a truncated observation
+			// never downgrades an already-exact stored total.
+			incoming.Exact = true
+			incoming.Count = existing.Count
 		}
+		tf := reconcileTypeFile(existing, incoming, true)
 		if issuesKnown {
 			tf.Issues = issues
 			tf.IssuesKnown = true

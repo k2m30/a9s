@@ -242,15 +242,17 @@ func TestSaveProbeResourcesToTypeFiles_AliasCanonicalizes_OnDiskFileIsCanonical(
 // Test 3 — exact-shrink consistency (SaveAvailabilityCache counts-only path)
 // ────────────────────────────────────────────────────────────────────────────
 
-// TestSaveAvailabilityCache_ExactShrink_NeverLeavesRowsCountMismatch pins the
-// counts-only availability-save path (writeAvailability in probes.go, called
-// from SaveAvailabilityCache): a TypeFile that already carries
-// {Count:50, Exact:true, Rows: 50 rows} followed by a NEW exact observation
-// of count 48 must not persist a mismatched pair — either Rows must shrink
-// to 48 (so len(Rows)==Count), or Rows must be dropped entirely for a
-// counts-only save. What must NEVER happen is Count=48 paired with
-// len(Rows)=50 carried forward from the stale existing.Rows.
-func TestSaveAvailabilityCache_ExactShrink_NeverLeavesRowsCountMismatch(t *testing.T) {
+// TestSaveAvailabilityCache_ExactShrink_CountAdvancesRowsUntouched pins the
+// C6a reconciler contract for the counts-only availability-save path
+// (reconcileTypeFile rule 2, called from SaveAvailabilityCache): a TypeFile
+// that already carries {Count:50, Exact:true, Rows: 50 rows} followed by a
+// NEW exact observation of count 48 must advance Count to 48 while leaving
+// Rows COMPLETELY UNTOUCHED — the stale 50 rows are kept in full, producing a
+// reconstructable Count/Rows pair (Count is the authoritative total, Rows is
+// the last-known page). A counts-only write must never shrink, truncate, or
+// drop Rows merely to make len(Rows)==Count — see
+// docs/design/cache-requirements.md C6a.
+func TestSaveAvailabilityCache_ExactShrink_CountAdvancesRowsUntouched(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	const shortName = "exactshrink"
 
@@ -282,8 +284,16 @@ func TestSaveAvailabilityCache_ExactShrink_NeverLeavesRowsCountMismatch(t *testi
 	if tf.Count != 48 {
 		t.Errorf("TypeFile.Count = %d, want 48 (the new exact observation)", tf.Count)
 	}
-	if len(tf.Rows) != 0 && len(tf.Rows) != tf.Count {
-		t.Errorf("TypeFile: Count=%d but len(Rows)=%d — a new exact observation smaller than the stale Rows carry-forward must not leave Count/Rows inconsistent (either Rows tracks the new Count, or Rows is empty)", tf.Count, len(tf.Rows))
+	if len(tf.Rows) != 50 {
+		t.Errorf("TypeFile.Rows has %d entries, want 50 UNTOUCHED — a counts-only write must never touch existing Rows, even when the new exact Count is smaller (C6a: Count/Rows form a reconstructable pair, not a forced-equal pair)", len(tf.Rows))
+	}
+	for i, want := range rows50 {
+		if i >= len(tf.Rows) {
+			break
+		}
+		if tf.Rows[i].ID != want.ID {
+			t.Errorf("tf.Rows[%d].ID = %q, want %q — stale row identity must survive a counts-only write verbatim", i, tf.Rows[i].ID, want.ID)
+		}
 	}
 }
 
