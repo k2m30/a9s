@@ -189,38 +189,30 @@ func (s *Server) getOrCreateSession(sessionID string) *sessionEntry {
 	return entry
 }
 
-// bootstrapLiveSession performs the AWS connect for a live session, applies
-// any startup command immediately once the connect completes, and only then
-// drains the full availability sweep in the background — mirroring the TUI
-// lane's ClientsReady-time dispatch (goal 4 parity) so the browser navigates
-// to the requested screen right away instead of waiting out the sweep.
+// bootstrapLiveSession performs the AWS connect for a live session and drains
+// the full availability sweep in the background — mirroring the TUI lane's
+// ClientsReady-time dispatch. Any startup command (-c) is no longer applied
+// here: newSession arms it via Core.SetCommand (the same runtime.Core.Session
+// .Command field tui.WithCommand sets), so BootstrapLive's HandleClientsReady
+// call below arms session.CommandArmed/PendingCommand itself, and the
+// DrainSyncProgress call's per-task interception of TaskKindEmitNavigate
+// (see drainsync.go) applies the deferred navigation the moment
+// handleAvailabilityCacheLoaded emits it — the same one lane the TUI's -c
+// flag drives (DEF-14/D11), instead of a second server-side apply racing or
+// duplicating it.
+//
 // It runs in its own goroutine and relies on the controller's internal
 // locking (not entry.mu), so request handlers are never blocked for the
 // connect's duration — the page renders the menu while this runs.
 func (s *Server) bootstrapLiveSession(entry *sessionEntry) {
 	tasks := entry.ctrl.BootstrapLive(s.profile, s.region)
 
-	if s.command != "" {
-		_, ctasks := entry.ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: s.command})
-		// The command's own tasks are drained with the same background/
-		// blocking split as handleAction: a screen that's already renderable
-		// (cache-seeded on the HandleNavigate miss branch) must not force a
-		// synchronous fetch — only truly blocking tasks (no content to show
-		// yet) drain inline here so the first notify already carries the
-		// navigated screen.
-		renderable := isScreenRenderable(entry.ctrl.Snapshot())
-		isBackground := func(kind runtime.TaskKind) bool {
-			return app.IsBackgroundFetchTask(runtime.TaskRequest{Key: runtime.TaskKey{Kind: kind}}, renderable)
-		}
-		background := app.DrainSyncPartition(context.Background(), entry.ctrl, ctasks, isBackground, nil)
-		s.notifySubscribers(entry)
-		s.drainBackgroundTasks(entry, background)
-	}
-
-	// Drain the availability fetches with a per-result SSE notify so the menu
-	// fills in progressively. Live fetches across all resource types take tens
-	// of seconds; a single notify at the end would leave the browser's menu
-	// blank that whole time, then populate all at once.
+	// Drain the availability fetches (and, when armed, the deferred -c
+	// navigation task nested among them) with a per-result SSE notify so the
+	// menu — and the navigated screen, the instant it lands — fills in
+	// progressively. Live fetches across all resource types take tens of
+	// seconds; a single notify at the end would leave the browser blank that
+	// whole time, then populate all at once.
 	app.DrainSyncProgress(entry.ctrl, tasks, func() { s.notifySubscribers(entry) })
 	s.notifySubscribers(entry)
 }

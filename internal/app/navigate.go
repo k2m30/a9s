@@ -227,6 +227,27 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 	return nil
 }
 
+// ApplyEmitNavigate is the headless/web counterpart of the TUI adapter's
+// emitNavigateCmd (internal/tui/runtime_adapter.go): it resolves a
+// TaskKindEmitNavigate task's EmitNavigatePayload into the equivalent
+// Controller navigation, instead of the payload only reaching the TUI's
+// tea.Msg pipeline. TaskKindEmitNavigate is adapter-only from
+// Core.ExecuteTask's perspective (ErrAdapterOnlyTask) — DrainSync* calls
+// this method for that one kind instead of executing it, so the one-shot
+// -c/ActionCommand navigation armed by HandleClientsReady and dispatched by
+// handleAvailabilityCacheLoaded (DEF-14/D11) actually lands on the headless
+// stack the same way it lands on the TUI's view stack.
+func (c *Controller) ApplyEmitNavigate(p runtime.EmitNavigatePayload) []runtime.TaskRequest {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{
+		Target:       p.Target,
+		ResourceType: p.ResourceType,
+	})
+	tasks = append(tasks, c.applyNavResult(res)...)
+	return tasks
+}
+
 // ReplayRelatedCache populates the related panel for the top detail screen
 // matching (resourceType, res.ID) from any cached RelatedCacheResult entries,
 // merging them directly into RelatedRows. Returns true when a cache hit was

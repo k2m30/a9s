@@ -58,8 +58,19 @@ func newSession(profile, region, command string, demoMode, noCache bool, viewCfg
 			ev := runtime.CacheStoreToEvent(store)
 			ctrl.Handle(ev)
 		}
+		if command != "" {
+			// Mirror tui.WithCommand: arm the runtime's one-shot -c navigation
+			// (session.Command) instead of applying it server-side later.
+			// HandleClientsReady (called from BootstrapLive once AWS connects)
+			// arms session.CommandArmed/PendingCommand, and
+			// handleAvailabilityCacheLoaded dispatches the deferred
+			// TaskKindEmitNavigate once its ProbeResources seed has landed
+			// (DEF-14/D11) — the same ordering the TUI's -c flag relies on.
+			core.SetCommand(command)
+		}
 	}
 	// Live path: ctrl is returned on the menu; getOrCreateSession connects to AWS
-	// in the background and applies any startup command there.
+	// in the background (BootstrapLive) which drives the armed -c navigation
+	// once ClientsReady + the availability seed land.
 	return ctrl
 }
