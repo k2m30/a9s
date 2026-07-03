@@ -129,10 +129,12 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		}, nil
 
 	// --- save availability cache ---
-	// Renderer-neutral coupling resolved: derive entries from c.session.ResourceCache
-	// instead of reading from m.stack[0] (MainMenuModel). The TUI adapter's
-	// saveAvailabilityCache() continues to use the more precise MainMenuModel
-	// counts for the live TUI; this path serves non-TUI hosts.
+	// Single save path for both renderers: TUI and web both route
+	// TaskKindSaveCache through this executor case, so availability counts
+	// and per-type rows/findings persist identically regardless of host.
+	// Entries derive from c.session.ResourceCache rather than any
+	// renderer-local model state (e.g. MainMenuModel), keeping this path
+	// renderer-neutral.
 	case TaskKindSaveCache:
 		if snap.NoCache {
 			return nil, nil

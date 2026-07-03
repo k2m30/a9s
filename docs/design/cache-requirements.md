@@ -61,6 +61,7 @@ Lifecycle, all content kinds: `none → cached (stale) → fresh`; "refreshing" 
 | D5 | Persisting an exact total overwrote the file, destroying other types' knowledge | C7 |
 | D6 | Re-opening a detail re-ran the full related fan-out (~18 s) in one UI | C6 |
 | D7 | Warm list open: the verify-refetch fetched only the truncated first page and the silent swap replaced 55 cached rows with 50, downgrading the exact title `s3(55)` to `s3(50+)` | C2 + C5 (re-verify must walk to the cached depth) |
+| D8 | A TUI session persisted only availability counts — its type files carried zero rows/findings, so the next start (either renderer) had no cells to seed; the web lane persisted full rows for the same flow | C6 + goal 4 (one save path for both renderers) |
 
 ## 4. S3 pilot acceptance
 

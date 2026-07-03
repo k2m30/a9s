@@ -244,9 +244,11 @@ func (m *Model) tasksToCmd(tasks []runtime.TaskRequest) tea.Cmd {
 			}
 
 		case runtime.TaskKindSaveCache:
-			// saveAvailabilityCache reads counts from the controller state,
-			// giving authoritative values from MenuState.
-			cmd := m.saveAvailabilityCache()
+			// Must route through the shared executor (not an adapter-local
+			// save) so req.Payload's *SaveCachePayload reaches the
+			// executor's row/finding persistence — an adapter-local save
+			// would silently drop per-type rows, keeping only counts.
+			cmd := m.executeTaskCmd(req)
 			if cmd != nil {
 				cmds = append(cmds, cmd)
 			}

@@ -29,39 +29,6 @@ func (m *Model) loadAvailabilityCache() tea.Cmd {
 	}
 }
 
-// saveAvailabilityCache returns a tea.Cmd that persists the current
-// availability state to disk. No-op when caching is disabled (noCache=true).
-func (m *Model) saveAvailabilityCache() tea.Cmd {
-	if m.core.NoCache() {
-		return nil
-	}
-	profile := m.core.Profile()
-	region := m.core.Region()
-
-	// Collect availability, truncation, and issue counts from main menu.
-	var entries map[string]int
-	var truncatedMap map[string]bool
-	var issueCounts map[string]int
-	var issueTruncated map[string]bool
-	var issueKnown map[string]bool
-	// Read availability/issue state from the controller (single source of truth).
-	availability := m.ctrl.GetMenuAvailability()
-	if len(availability) == 0 {
-		return nil
-	}
-	entries = availability
-	truncatedMap = m.ctrl.GetMenuTruncated()
-	issueCounts = m.ctrl.GetMenuIssueCounts()
-	issueTruncated = m.ctrl.GetMenuIssueTruncated()
-	issueKnown = m.ctrl.GetMenuIssueKnown()
-
-	return func() tea.Msg {
-		// Best-effort save — ignore cache write failures.
-		_ = m.core.SaveAvailabilityCache(profile, region, entries, truncatedMap, issueCounts, issueTruncated, issueKnown)
-		return nil
-	}
-}
-
 // probeEnrichment returns a tea.Cmd that runs the registered Wave-2 enricher
 // for shortName and converts the result to EnrichmentCheckedMsg.
 //
