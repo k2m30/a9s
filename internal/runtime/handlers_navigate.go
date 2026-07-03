@@ -120,6 +120,36 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 		return NavigateResult{Kind: NavigateKindPopAll}, nil
 
 	case NavigateTargetResourceList:
+		// DEF-19: disarm the deferred one-shot -c navigation the instant any
+		// resource-list navigation actually happens. CommandArmed/PendingCommand
+		// (session.go) latch a REPLAY of this exact navigation, deferred until
+		// handleAvailabilityCacheLoaded's seed lands (DEF-14/D11) — but nothing
+		// previously re-checked "has the user already navigated since arming"
+		// at consumption time. A manually-typed navigation to the SAME or a
+		// DIFFERENT resource type in the race window between arming (connect
+		// time) and consumption (availability-cache-loaded time) left the flag
+		// armed, so the later deferred emit fired a second, redundant
+		// NavigateTargetResourceList for the (still-armed) PendingCommand type —
+		// pushing a second ScreenChildList/ScreenResourceList of that type onto
+		// an already-navigated stack. Two ListStates then existed for one
+		// visible screen: the first fetch landed on the first push, the second
+		// (armed-replay) fetch landed on the second push, and callers reading
+		// topListState() (the load-more gate, the renderer) saw whichever push
+		// was topmost — silently diverging from whichever push the frame last
+		// rendered. Clearing the arming here (not at the push site) closes the
+		// race at its source: by the time handleAvailabilityCacheLoaded checks
+		// CommandArmed, any real navigation that already happened has disarmed
+		// it, so the deferred emit becomes the intended no-op instead of a
+		// duplicate push. The armed emit's own eventual HandleNavigate call
+		// re-disarms harmlessly (CommandArmed is already false by then, cleared
+		// synchronously by handleAvailabilityCacheLoaded before dispatch).
+		// Guarded on the current value (not an unconditional write) so the
+		// overwhelmingly common never-armed case costs only a bool read.
+		if c.session.CommandArmed {
+			c.session.CommandArmed = false
+			c.session.PendingCommand = ""
+		}
+
 		rt := resource.FindResourceType(ev.ResourceType)
 		if rt == nil {
 			return NavigateResult{
