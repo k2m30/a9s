@@ -129,7 +129,7 @@ func TestMaterializeListFields_CachedRowRendersIdenticallyToLive(t *testing.T) {
 	columns := app.ResolveListColumns("ec2")
 
 	// Render the live row (RawStruct present, Fields not yet materialized).
-	_, liveCtrl := newSeededTestController()
+	_, liveCtrl := newSeededTestController(t)
 	liveCtrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 	liveCtrl.ApplyResourcesLoaded("ec2", []resource.Resource{live}, nil, false)
 	liveRows := liveCtrl.Snapshot().Body.List.Rows
@@ -143,7 +143,7 @@ func TestMaterializeListFields_CachedRowRendersIdenticallyToLive(t *testing.T) {
 	cached := app.MaterializeListFields(live, columns)
 	cached.RawStruct = nil
 
-	_, cachedCtrl := newSeededTestController()
+	_, cachedCtrl := newSeededTestController(t)
 	cachedCtrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 	cachedCtrl.ApplyResourcesLoaded("ec2", []resource.Resource{cached}, nil, false)
 	cachedRows := cachedCtrl.Snapshot().Body.List.Rows

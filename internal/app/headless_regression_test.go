@@ -48,7 +48,7 @@ import (
 // `ds.RelatedRows[i].ResourceIDs = resourceIDs`.
 func TestHandleRelatedCheckBatch_ResourceIDs_EnableSingleResourceNav(t *testing.T) {
 	res := fakeEC2Resources()[0]
-	c := newControllerAtDetail(res, "ec2")
+	c := newControllerAtDetail(t, res, "ec2")
 
 	snap := c.Snapshot()
 	if snap.Body.Kind != app.BodyKindDetail {
@@ -118,7 +118,7 @@ func TestHandleRelatedCheckBatch_ResourceIDs_EnableSingleResourceNav(t *testing.
 // the full struct.  This test guards both paths against regression.
 func TestHandleRelatedCheckBatch_ResourceIDs_InsertPath(t *testing.T) {
 	res := fakeEC2Resources()[0]
-	c := newControllerAtDetail(res, "ec2")
+	c := newControllerAtDetail(t, res, "ec2")
 
 	snap := c.Snapshot()
 	if snap.Body.Kind != app.BodyKindDetail {
@@ -173,7 +173,7 @@ func TestHandleRelatedCheckBatch_ResourceIDs_InsertPath(t *testing.T) {
 // executor routed the request to the top-level fetcher instead of the child
 // fetcher, returning incorrect results.
 func TestActionLoadMore_ChildList_PayloadCarriesParentContext(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 
 	wantParentCtx := map[string]string{
 		"cluster": "prod-cluster",
@@ -232,7 +232,7 @@ func TestActionLoadMore_ChildList_PayloadCarriesParentContext(t *testing.T) {
 // FetchFilter was omitted, causing the executor to call the wrong fetcher for
 // filtered lists (e.g., related-navigation filtered by vpc-id).
 func TestActionLoadMore_FilteredList_PayloadCarriesFetchFilter(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 
 	wantFilter := map[string]string{
 		"vpc-id": "vpc-0deadbeef",
@@ -286,7 +286,7 @@ func TestActionLoadMore_FilteredList_PayloadCarriesFetchFilter(t *testing.T) {
 // with only the ContinuationToken set and both maps nil/empty.  This is the
 // baseline case — it must still work correctly after the fix.
 func TestActionLoadMore_NoContext_PayloadHasOnlyToken(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 
 	wantCursor := "cursor-plain-789"
 
@@ -348,7 +348,7 @@ func TestActionLoadMore_NoContext_PayloadHasOnlyToken(t *testing.T) {
 // and returned all resources (or errored), leaving the list empty.
 func TestActionSelect_RelatedNav_FetchFilter_TaskCarriesPayload(t *testing.T) {
 	res := fakeEC2Resources()[0]
-	c := newControllerAtDetail(res, "ec2")
+	c := newControllerAtDetail(t, res, "ec2")
 
 	snap := c.Snapshot()
 	if snap.Body.Kind != app.BodyKindDetail {
@@ -432,7 +432,7 @@ func TestActionSelect_RelatedNav_FetchFilter_TaskCarriesPayload(t *testing.T) {
 // showed all resources of the type.
 func TestRelatedNav_MultiID_SeedsRelatedIDSet(t *testing.T) {
 	ids := []string{"sg-aaa111", "sg-bbb222", "sg-ccc333"}
-	c := newControllerAtDetail(fakeEC2Resources()[0], "ec2")
+	c := newControllerAtDetail(t, fakeEC2Resources()[0], "ec2")
 	c.ApplyDetailRelated([]app.DetailRelatedRow{{
 		TargetType:  "sg",
 		DisplayName: "Security Groups",

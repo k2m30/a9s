@@ -157,12 +157,28 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 		// that is distinct from session.ResourceCache (DEF-12 C1 + Goal 4) — the
 		// fetch must still run to confirm/replace what the probe retained, so Kind
 		// and the KindFetchResources task below are unchanged.
+		//
+		// DEF-15: ProbeResources is freed (set nil) by handleEnrichmentChecked
+		// once the Wave-2 sweep completes (DEF-7 memory free), so any list open
+		// AFTER the sweep — or mid-sweep via a lane that lands after the free —
+		// finds no seed here even though the on-disk per-type Store still holds
+		// every row. Fall back to the loaded cache Store, which outlives the
+		// ProbeResources free and is already pair-stamped by EnsureCacheStore.
 		if rows := c.session.ProbeResources[canon]; len(rows) > 0 {
 			result.CachedEntry = &session.ResourceCacheEntry{
 				Resources: rows,
 				Pagination: &resource.PaginationMeta{
 					IsTruncated: c.session.ProbeTruncated[canon],
 				},
+			}
+		} else if store := c.EnsureCacheStore(); store != nil {
+			if tf, ok := store.Type(canon); ok && len(tf.Rows) > 0 {
+				result.CachedEntry = &session.ResourceCacheEntry{
+					Resources: rowsFromCacheRows(canon, tf.Rows),
+					Pagination: &resource.PaginationMeta{
+						IsTruncated: !tf.Exact,
+					},
+				}
 			}
 		}
 		return result, []TaskRequest{{

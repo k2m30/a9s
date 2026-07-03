@@ -96,7 +96,7 @@ func TestHandle_StaleResourcesLoaded_Dropped(t *testing.T) {
 func TestApplyListFieldUpdates_UpdatesBothStackedLists(t *testing.T) {
 	targetID := fakeEC2Resources()[0].ID // "i-0aaa111111111111a"
 
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 
 	lb := listBodyOrFail(t, c)
@@ -163,7 +163,7 @@ func TestMenuSelected_ClampsCursorWhenVisibleShrinks(t *testing.T) {
 		t.Skip("need >= 4 resource types")
 	}
 
-	c := newBaseController()
+	c := newBaseController(t)
 
 	// Inject issue counts for exactly 2 resource types so the attention filter
 	// produces a visible list of 2 entries.
@@ -223,8 +223,9 @@ func TestMenuSelected_ClampsCursorWhenVisibleShrinks(t *testing.T) {
 
 // newControllerAtDetail pushes a list then a detail screen for res/resourceType
 // and calls EnsureDetailState so Snapshot().Body.Detail is non-nil.
-func newControllerAtDetail(res resource.Resource, resourceType string) *app.Controller {
-	c := newListController(resourceType)
+func newControllerAtDetail(t *testing.T, res resource.Resource, resourceType string) *app.Controller {
+	t.Helper()
+	c := newListController(t, resourceType)
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{
 			ID:      runtime.ScreenDetail,
@@ -283,7 +284,7 @@ func TestApplyDetailEnrichmentForResource_UpdatesDetailFields(t *testing.T) {
 		Source:   "wave2:ec2-enricher",
 	}
 
-	c := newControllerAtDetail(baseRes, "ec2")
+	c := newControllerAtDetail(t, baseRes, "ec2")
 
 	vs := c.Snapshot()
 	if vs.Body.Detail == nil {
@@ -337,7 +338,7 @@ func TestApplyDetailEnrichmentForResource_TargetsStackedDetail(t *testing.T) {
 		},
 	}
 
-	c := newControllerAtDetail(resA, "ec2")
+	c := newControllerAtDetail(t, resA, "ec2")
 
 	// Push a second detail for resB on top of resA's detail.
 	c.ApplyIntents([]runtime.UIIntent{
@@ -407,7 +408,7 @@ func TestApplyDetailFindingForResource_LandsInAttentionBlock(t *testing.T) {
 		},
 	}
 
-	c := newControllerAtDetail(res, "ec2")
+	c := newControllerAtDetail(t, res, "ec2")
 
 	vs := c.Snapshot()
 	if vs.Body.Detail == nil {
@@ -462,7 +463,7 @@ func TestApplyDetailFindingForResource_SecondApplyReplacesFirst(t *testing.T) {
 		},
 	}
 
-	c := newControllerAtDetail(res, "ec2")
+	c := newControllerAtDetail(t, res, "ec2")
 
 	first := domain.Finding{
 		Code:     "ec2.first-finding",
@@ -525,7 +526,7 @@ func TestApplyDetailFindingForResource_ResourceFieldsPreserved(t *testing.T) {
 		},
 	}
 
-	c := newControllerAtDetail(res, "ec2")
+	c := newControllerAtDetail(t, res, "ec2")
 
 	vs := c.Snapshot()
 	if vs.Body.Detail == nil {
@@ -606,7 +607,7 @@ func TestApplyDetailFinding_PreservesWave1Findings(t *testing.T) {
 		}},
 	}
 
-	c := newControllerAtDetail(res, "ec2")
+	c := newControllerAtDetail(t, res, "ec2")
 
 	vs0 := c.Snapshot()
 	if vs0.Body.Detail == nil {
@@ -655,7 +656,7 @@ func TestApplyDetailFinding_PreservesWave1Findings(t *testing.T) {
 //  3. Deliver messages.APIError with Gen=0 (AcceptZeroGen=true — never stale).
 //  4. Assert both intents were applied: Loading==false and Header.Flash is an error.
 func TestController_APIErrorClearsListLoadingAndFlashes(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 
 	// Precondition: list screen exists and Loading is true (fetch not yet drained).
 	pre := c.Snapshot()
