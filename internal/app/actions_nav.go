@@ -331,6 +331,38 @@ func clampIndex(idx, n int) int {
 	return idx
 }
 
+// stepToSelectable advances cur in the given direction (+1/-1) over a list of
+// length total, skipping any index for which isSkippable reports true — the
+// shared scan behind the main menu's skip-unavailable stepping and the detail
+// related-panel's cursor movement (menu.go's menuSkipUnavailable and
+// detail_cursor.go's related-cursor stepping both delegate here so the two
+// panels can never diverge in behavior).
+//
+// cur is the position already moved by the caller's ±1/page/top/bottom logic
+// (this function does not perform that initial move). It first scans forward
+// from cur in direction; if every remaining index in that direction is
+// skippable, it falls back to scanning from cur-direction in the opposite
+// direction (back toward and past the start), so a direction that runs off
+// the end of the list still lands on the nearest selectable item behind it.
+// If nothing in the list is selectable, cur is returned unchanged (stay put).
+func stepToSelectable(cur, total, direction int, isSkippable func(i int) bool) int {
+	if total <= 0 {
+		return cur
+	}
+	start := cur
+	for i := cur; i >= 0 && i < total; i += direction {
+		if !isSkippable(i) {
+			return i
+		}
+	}
+	for i := start - direction; i >= 0 && i < total; i -= direction {
+		if !isSkippable(i) {
+			return i
+		}
+	}
+	return cur
+}
+
 // handleActionRelatedSelect handles ActionRelatedSelect.
 func (c *Controller) handleActionRelatedSelect(a Action) (ViewState, []runtime.TaskRequest) {
 	// Web UI click path: navigate to the related row at the visible index in
@@ -344,25 +376,9 @@ func (c *Controller) handleActionRelatedSelect(a Action) (ViewState, []runtime.T
 	if err != nil || clickIdx < 0 {
 		return c.snapshot(), nil
 	}
-	// Locate the row at clickIdx in the filtered visible list (mirrors
-	// buildDetailRelatedBlocks / detailRelatedVisibleCount filter logic).
-	query := strings.TrimSpace(strings.ToLower(ds.RelatedFilter))
-	var targetRow *DetailRelatedRow
-	visIdx := 0
-	for i := range ds.RelatedRows {
-		row := &ds.RelatedRows[i]
-		if isSelfPivotZeroDetailRow(*row, ds.ResourceType) {
-			continue
-		}
-		if query != "" && !strings.Contains(strings.ToLower(row.DisplayName), query) {
-			continue
-		}
-		if visIdx == clickIdx {
-			targetRow = row
-			break
-		}
-		visIdx++
-	}
+	// Locate the row at clickIdx in the filtered visible list (same walk as
+	// buildDetailRelatedBlocks / detailRelatedVisibleCount / cursor stepping).
+	targetRow := visibleRelatedRowAt(ds, clickIdx)
 	if targetRow == nil || !isActionableDetailRow(*targetRow) {
 		// Dead-end row: loading, error, count==-1 without FetchFilter, or
 		// confirmed zero without FetchFilter/Approximate. No navigation.
