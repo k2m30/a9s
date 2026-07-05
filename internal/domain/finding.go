@@ -1,5 +1,12 @@
 package domain
 
+import "strings"
+
+// wave2SourcePrefix is the Source prefix stamped on every Wave-2-emitted
+// Finding ("wave2:<short>"). Wave-1 findings never carry this prefix — their
+// Source is the empty string or a Wave-1-specific value.
+const wave2SourcePrefix = "wave2:"
+
 // FindingCode is a stable identifier for a finding. Never displayed.
 // Codes are namespaced by resource short-name (e.g. "ec2.impaired",
 // "rds.maint.pending"). They are declared as typed constants per enricher.
@@ -19,6 +26,17 @@ type Finding struct {
 	Detail   string
 	Severity Severity
 	Source   string // "wave1" | "wave2:<short>"
+}
+
+// IsWave2Sourced reports whether f was emitted by a Wave-2 issue enricher
+// (Source prefixed "wave2:"), as opposed to a Wave-1 fetcher-written finding.
+// This is the single definition of the wave2-source predicate — every caller
+// that needs to distinguish carryable Wave-2 findings from Wave-1 findings
+// (which never carry across a rows-carrying write, since their absence in a
+// fresh fetch means resolved) must use this method rather than re-deriving
+// the "wave2:" prefix check.
+func (f Finding) IsWave2Sourced() bool {
+	return strings.HasPrefix(f.Source, wave2SourcePrefix)
 }
 
 // AttentionDetail carries the rows shown in the detail-view Attention

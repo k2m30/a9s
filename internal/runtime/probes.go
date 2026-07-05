@@ -156,10 +156,23 @@ func (c *Core) LoadAvailabilityCache() *cache.Store {
 //     and the renderer already treats Rows as stale-until-verified (C1).
 //     Only Count/Exact/HasResources/Issues* are written.
 //  3. Rows-carrying, incoming has MORE rows than existing: incoming's rows
-//     always win (deeper knowledge).
+//     always win (deeper knowledge) — but see the C6b carry note below.
 //  4. Rows-carrying, same depth but different content (non-subset — a
-//     genuine refresh): incoming wins by recency.
-func reconcileTypeFile(existing cache.TypeFile, incoming cache.TypeFile, rowsProvided bool, rawTruncated bool, rawCount int) cache.TypeFile {
+//     genuine refresh): incoming wins by recency — but see the C6b carry
+//     note below.
+//
+// C6b Wave-2 carry: rules 3 and 4 let incoming's rows replace existing's
+// wholesale, which — for a bare Wave-1 rows-carrying observation (e.g. the
+// sweep-completion save) — would silently drop any Wave-2-sourced Findings
+// and registered enricher Fields a prior enrichment pass wrote onto
+// existing's rows (D17). Unless wave2Authoritative is true (this write IS
+// the Wave-2-completion save for shortName, which must supersede carried
+// data so healed/resolved issues clear), every row incoming replaces under
+// rules 3/4 carries forward its existing counterpart's Wave-2 Findings and
+// shortName's IssueEnricherFieldKeys when the incoming row itself has no
+// Wave-2 Finding of its own. Wave-1 findings never carry (see
+// carryWave2ForRows).
+func reconcileTypeFile(existing cache.TypeFile, incoming cache.TypeFile, rowsProvided bool, rawTruncated bool, rawCount int, shortName string, wave2Authoritative bool) cache.TypeFile {
 	if existing.Exact && rawTruncated && rawCount >= existing.Count && existing.Count > 0 {
 		// Rule 0: the stored Exact is provably false — accept the poisoned
 		// pair's self-healing observation instead of letting it re-stick.
@@ -191,7 +204,14 @@ func reconcileTypeFile(existing cache.TypeFile, incoming cache.TypeFile, rowsPro
 		tf.HasResources = tf.Count > 0 || len(tf.Rows) > 0
 	default:
 		// Rules 3 & 4: incoming has more rows, or same/differing depth with
-		// non-subset content (a genuine refresh) — incoming's rows win.
+		// non-subset content (a genuine refresh) — incoming's rows win,
+		// carrying forward any Wave-2 data (C6b) the replaced rows have that
+		// incoming itself lacks, unless this write is itself the
+		// Wave-2-completion save (which must supersede carried data wholesale
+		// so healed/resolved issues clear).
+		if !wave2Authoritative {
+			tf.Rows = carryWave2ForRows(existing.Rows, tf.Rows, issueEnricherFieldKeysFor(shortName))
+		}
 	}
 	return tf
 }
@@ -276,7 +296,7 @@ func (c *Core) SaveAvailabilityCache(
 				// overrides this too when the contradiction condition holds.
 				incoming.Count = existing.Count
 			}
-			tf := reconcileTypeFile(existing, incoming, false, trunc, count)
+			tf := reconcileTypeFile(existing, incoming, false, trunc, count, name, false)
 			if issueKnown[rawName] {
 				tf.Issues = issueCounts[rawName]
 				tf.IssuesKnown = true
@@ -438,7 +458,30 @@ func materializeResourceFields(r resource.Resource, columns []config.ListColumn,
 // interleave. rows is always passed as a real (possibly zero-length, never
 // nil) slice so reconcileTypeFile's rows-carrying lane (rules 1/3/4) is the
 // one that applies here.
+//
+// This is the list-open save lane (app.Controller.maybeSaveResourceListCache
+// and the executor's per-type sweep loop) — never the Wave-2-completion save,
+// so it always runs reconcileTypeFile with wave2Authoritative=false (C6b: a
+// bare rows-carrying write here carries forward any Wave-2 data the replaced
+// rows have that rows itself lacks). The Wave-2-completion save
+// (handleEnrichmentChecked's "all done" branch, via the TaskKindSaveCache
+// executor case) uses saveResourceListCacheWave2Complete instead, which is
+// reached only through the executor's SaveCachePayload.Wave2Complete tag —
+// never through this exported entry point.
 func (c *Core) SaveResourceListCache(shortName string, rows []cache.Row, count int, exact bool, issues int, issuesKnown, issuesTruncated bool) error {
+	return c.saveResourceListCache(shortName, rows, count, exact, issues, issuesKnown, issuesTruncated, false)
+}
+
+// saveResourceListCacheWave2Complete is saveResourceListCache's counterpart
+// for the Wave-2-completion save (handleEnrichmentChecked's "all done"
+// branch): this observation IS the fresh enrichment result, so it must
+// supersede any carried Wave-2 data wholesale for the rows it replaces —
+// otherwise a healed/resolved issue could never clear (C6b).
+func (c *Core) saveResourceListCacheWave2Complete(shortName string, rows []cache.Row, count int, exact bool, issues int, issuesKnown, issuesTruncated bool) error {
+	return c.saveResourceListCache(shortName, rows, count, exact, issues, issuesKnown, issuesTruncated, true)
+}
+
+func (c *Core) saveResourceListCache(shortName string, rows []cache.Row, count int, exact bool, issues int, issuesKnown, issuesTruncated, wave2Authoritative bool) error {
 	// Canonicalize so an alias caller (e.g. "rds") and CachedListDepth's own
 	// canonShortName lookup always agree on the stored key — an
 	// uncanonicalized Put here would silently miss the depth lookup for
@@ -467,7 +510,7 @@ func (c *Core) SaveResourceListCache(shortName string, rows []cache.Row, count i
 			incoming.Exact = true
 			incoming.Count = existing.Count
 		}
-		tf := reconcileTypeFile(existing, incoming, true, !exact, count)
+		tf := reconcileTypeFile(existing, incoming, true, !exact, count, canon, wave2Authoritative)
 		if issuesKnown {
 			tf.Issues = issues
 			tf.IssuesKnown = true

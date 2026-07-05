@@ -258,22 +258,35 @@ func (SaveThemeConfigPayload) isTaskPayload() {}
 // SaveCachePayload carries a snapshot of the per-type rows the sweep/
 // enrichment completion just retained, captured at TASK-DISPATCH time (inside
 // handleAvailabilityChecked / handleEnrichmentChecked's "all done" branch) —
-// DEF-7/C7/C8. This matters because c.session.ProbeResources is mutated
-// in-place by the SAME batch's startEnrichment -> clearEnrichmentFor
-// clear-on-rerun-start step (it strips stale Wave-2 findings from every
-// retained row before the fresh enrichment probe runs); a save that read
-// c.session.ProbeResources live at EXECUTE time (after clearEnrichmentFor has
-// already run for types re-entering the enrichment queue) would silently
-// persist rows with their findings stripped. Capturing the snapshot at
-// dispatch time — mirroring the DispatchSnapshot/CaptureDispatch pattern
-// already used for generations/clients — avoids that race entirely.
+// DEF-7/C7/C8. This matters because c.session.ProbeResources can still be
+// mutated in-place after dispatch but before the task executes (e.g. a LATER
+// handleEnrichmentChecked call's applyEnrichment/FieldUpdates merge touching a
+// type already captured in this snapshot); a save that read
+// c.session.ProbeResources live at EXECUTE time would race that later
+// mutation. Capturing the snapshot at dispatch time — mirroring the
+// DispatchSnapshot/CaptureDispatch pattern already used for
+// generations/clients — avoids that race entirely. (Historical note:
+// startEnrichment's rerun-start step used to eagerly strip Wave-2 findings
+// here too via clearEnrichmentFor; that eager strip was removed — C1/C6b:
+// stale-until-replaced, not blank-until-replaced — but the dispatch-time
+// snapshot requirement stands on its own regardless.)
 //
 // Resources and Truncated are shallow copies of the maps (values are the
 // existing []resource.Resource slices/headers at capture time); the executor
 // only reads them, never mutates in place, so no deeper copy is needed.
+//
+// Wave2Complete (C6b) tags the dispatch source: handleEnrichmentChecked's
+// "all done" branch sets it true because that save IS the fresh Wave-2
+// enrichment result and must supersede any carried Wave-2 data wholesale
+// (a healed/resolved issue must be able to clear). Every other dispatcher of
+// this payload (currently only handleAvailabilityChecked's sweep-completion
+// save) leaves it false, so the executor's save-cache case carries forward
+// on-disk Wave-2 data the fresh rows themselves lack instead of letting a
+// bare Wave-1 observation blank it (D17).
 type SaveCachePayload struct {
-	Resources map[string][]resource.Resource
-	Truncated map[string]bool
+	Resources     map[string][]resource.Resource
+	Truncated     map[string]bool
+	Wave2Complete bool
 }
 
 func (SaveCachePayload) isTaskPayload() {}

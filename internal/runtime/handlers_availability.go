@@ -275,7 +275,16 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 		}
 		// Fetcher-emitted rows already carry Findings; no re-derive needed
 		// (W1.4b.3 dropped the legacy Status/Issues bridge).
-		c.session.ProbeResources[canonType] = msg.Resources
+		//
+		// C6b/D17: this bare Wave-1 probe result carries no Wave-2 data of its
+		// own — if a prior Wave-2 enrichment pass this session already wrote
+		// Findings/Fields onto the type's previous in-memory rows, a plain
+		// overwrite here would blank them until the next enrichment sweep
+		// completes (the visible mid-session blink D17 describes). Carry
+		// forward the previous rows' Wave-2-sourced Findings and this type's
+		// registered enricher Fields keys per matching resource ID first.
+		freshResources := carryWave2ForResources(c.session.ProbeResources[canonType], msg.Resources, issueEnricherFieldKeysFor(canonType))
+		c.session.ProbeResources[canonType] = freshResources
 		if c.session.ProbeTruncated == nil {
 			c.session.ProbeTruncated = make(map[string]bool)
 		}
@@ -312,13 +321,17 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 	intents = append(intents, PatchMenuCheckProgress{Checked: 0, Total: 0}) // 0,0 = done
 	intents = append(intents, ClearFlash{})
 
-	// DEF-7: snapshot ProbeResources/ProbeTruncated NOW, before startEnrichment
-	// (below) can mutate them via clearEnrichmentFor's clear-on-rerun-start
-	// step — see SaveCachePayload's doc comment for why dispatch-time capture
-	// is required here.
+	// DEF-7: snapshot ProbeResources/ProbeTruncated NOW, before a later mutation
+	// (e.g. a subsequent handleEnrichmentChecked's applyEnrichment/FieldUpdates
+	// merge for a type already in this snapshot) could change them out from
+	// under an already-dispatched save — see SaveCachePayload's doc comment for
+	// why dispatch-time capture is required here. This is the Wave-1
+	// sweep-completion save, not the Wave-2-completion save, so
+	// wave2Complete=false (C6b): the executor carries forward on-disk Wave-2
+	// data these bare rows themselves lack instead of letting them clobber it.
 	tasks = append(tasks, TaskRequest{
 		Key:     TaskKey{Kind: TaskKindSaveCache},
-		Payload: c.snapshotProbeResourcesForSave(),
+		Payload: c.snapshotProbeResourcesForSave(false),
 	})
 
 	enrichIntents, enrichTasks := c.startEnrichment()
@@ -348,10 +361,21 @@ func (c *Core) startEnrichment() ([]UIIntent, []TaskRequest) {
 		name := c.session.EnrichQueue[0]
 		c.session.EnrichQueue = c.session.EnrichQueue[1:]
 
-		// Clear-on-rerun-start: bump type gen, wipe stale ran flag, strip wave-2.
+		// Rerun-start bookkeeping: bump type gen and wipe the stale ran flag
+		// so the eventual EnrichmentChecked result's staleness guard and
+		// EnrichmentRan bookkeeping are correct for THIS run. Deliberately
+		// does NOT strip the type's existing Wave-2 findings here (C1/C6b:
+		// stale-until-replaced, not blank-until-replaced — mirrors the fix
+		// already applied to internal/tui's Ctrl+R handleRefresh path, see
+		// TestRerunStart_KeepsVisibleFindingsUntilReplaced). Merely queuing a
+		// fresh enrichment probe must not blank a row's visible glyph before
+		// the fresh result actually lands; applyEnrichment (called from
+		// handleEnrichmentChecked once the result arrives) already
+		// strips-then-reapplies Wave-2 findings from the fresh map, which
+		// naturally clears a genuinely-healed row and replaces a still-broken
+		// one — no separate eager clear is needed to reach that end state.
 		c.session.EnrichmentTypeGen[name]++
 		delete(c.session.EnrichmentRan, name)
-		c.clearEnrichmentFor(name)
 
 		tasks = append(tasks, TaskRequest{Key: TaskKey{Kind: TaskKindProbeEnrich, Scope: name}})
 	}
@@ -486,14 +510,15 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		})
 	}
 
-	// Fire next from queue.
+	// Fire next from queue. Mirrors startEnrichment's rerun-start bookkeeping
+	// (C1/C6b: stale-until-replaced — no eager clearEnrichmentFor here either,
+	// see startEnrichment's doc comment for why).
 	if len(c.session.EnrichQueue) > 0 {
 		next := c.session.EnrichQueue[0]
 		c.session.EnrichQueue = c.session.EnrichQueue[1:]
 
 		c.session.EnrichmentTypeGen[next]++
 		delete(c.session.EnrichmentRan, next)
-		c.clearEnrichmentFor(next)
 
 		tasks = append(tasks, TaskRequest{Key: TaskKey{Kind: TaskKindProbeEnrich, Scope: next}})
 		return intents, tasks
@@ -506,7 +531,10 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		// this is the completion path that carries the FINAL Wave-2-enriched
 		// findings (applyEnrichment above already mutated r.Findings on every
 		// cached row of this type), so it must not be lost to the free.
-		saveSnapshot := c.snapshotProbeResourcesForSave()
+		// wave2Complete=true (C6b): this save IS the fresh enrichment result
+		// and must supersede any carried Wave-2 data wholesale so a
+		// healed/resolved issue can clear.
+		saveSnapshot := c.snapshotProbeResourcesForSave(true)
 		c.session.ProbeResources = nil
 		c.session.ProbeTruncated = nil
 		tasks = append(tasks, TaskRequest{
@@ -521,22 +549,27 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 // snapshotProbeResourcesForSave captures a deep-enough copy of
 // c.session.ProbeResources/ProbeTruncated for a TaskKindSaveCache dispatch —
 // DEF-7. Must be called BEFORE any subsequent same-call mutation of those
-// maps (clearEnrichmentFor's clear-on-rerun-start step, or the
-// free-on-enrichment-complete nil-out) so the eventual save sees the rows as
-// they stood at dispatch time, not as they stand whenever the task executes.
+// maps (the free-on-enrichment-complete nil-out, or a LATER
+// handleEnrichmentChecked call's applyEnrichment/FieldUpdates merge for a
+// type already captured here) so the eventual save sees the rows as they
+// stood at dispatch time, not as they stand whenever the task executes.
 //
-// A shallow map copy is NOT sufficient here: clearEnrichmentFor mutates each
+// A shallow map copy is NOT sufficient here: applyEnrichment mutates each
 // resource.Resource IN PLACE (via ApplyWave2ToRow on &rows[i]) on the SAME
 // backing array a shallow []resource.Resource slice copy would still alias —
 // a plain maps.Copy of the outer map would still observe that later
-// in-place strip. Each per-type slice, each resource's Findings slice (the
-// field clearEnrichmentFor mutates), AND each resource's Fields map (the
-// field the later FieldUpdates enrichment step maps.Copy's INTO on the same
+// in-place mutation. Each per-type slice, each resource's Findings slice (the
+// field ApplyWave2ToRow mutates), AND each resource's Fields map (the field
+// the later FieldUpdates enrichment step maps.Copy's INTO on the same
 // backing map — an aliased Fields map would let that later mutation corrupt
 // an already-dispatched snapshot) are copied element-by-element so the
 // snapshot is fully isolated from any later mutation of the live session
 // state.
-func (c *Core) snapshotProbeResourcesForSave() *SaveCachePayload {
+//
+// wave2Complete is stamped onto the returned payload's Wave2Complete field
+// as-is (C6b) — see SaveCachePayload's doc comment for what it drives at
+// execute time.
+func (c *Core) snapshotProbeResourcesForSave(wave2Complete bool) *SaveCachePayload {
 	if len(c.session.ProbeResources) == 0 {
 		return nil
 	}
@@ -556,7 +589,7 @@ func (c *Core) snapshotProbeResourcesForSave() *SaveCachePayload {
 	}
 	truncated := make(map[string]bool, len(c.session.ProbeTruncated))
 	maps.Copy(truncated, c.session.ProbeTruncated)
-	return &SaveCachePayload{Resources: resources, Truncated: truncated}
+	return &SaveCachePayload{Resources: resources, Truncated: truncated, Wave2Complete: wave2Complete}
 }
 
 // rowsFromCacheRows converts a per-type file's persisted Rows (ID/Name/Fields

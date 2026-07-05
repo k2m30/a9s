@@ -57,36 +57,6 @@ func (c *Core) applyEnrichment(
 	}
 }
 
-// clearEnrichmentFor strips wave-2 findings from every cached row of the given
-// resource type, preserving Wave-1 entries already on r.Findings. Used by
-// clear-on-rerun-start logic in handleEnrichmentChecked.
-func (c *Core) clearEnrichmentFor(resourceType string) {
-	canon := resourceType
-	var td resource.ResourceTypeDef
-	if t := resource.FindResourceType(resourceType); t != nil {
-		canon = t.ShortName
-		td = *t
-	} else {
-		td = resource.ResourceTypeDef{ShortName: canon}
-	}
-
-	clear := func(rows []resource.Resource) {
-		for i := range rows {
-			ApplyWave2ToRow(&rows[i], td, nil, nil)
-		}
-	}
-
-	if entry, ok := c.session.ResourceCache[canon]; ok {
-		clear(entry.Resources)
-	}
-	if rows, ok := c.session.LazyResourceCache[canon]; ok {
-		clear(rows)
-	}
-	if rows, ok := c.session.ProbeResources[canon]; ok {
-		clear(rows)
-	}
-}
-
 // ApplyWave2ToRow strips any existing Wave-2 entries from r.Findings, then
 // appends the per-row Wave-2 Finding (if present) and writes its AttentionDetail
 // under the Finding's Code. Nil findings/attentionDetails behaves as the clear
