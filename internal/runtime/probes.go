@@ -10,11 +10,15 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"maps"
+	"strings"
 	"time"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/cache"
+	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -113,8 +117,32 @@ func (c *Core) LoadAvailabilityCache() *cache.Store {
 // (possibly zero-length) slice, never nil, so the nil check alone
 // distinguishes the two lanes.
 //
+// rawTruncated/rawCount carry the CURRENT fetch's own observation exactly as
+// it came off the wire, BEFORE any caller-side "exactness sticks" adjustment
+// — reconcileTypeFile needs the untouched values to detect rule 0 below; a
+// caller that pre-collapses a truncated observation into a sticky-exact one
+// (as both SaveAvailabilityCache and SaveResourceListCache used to do
+// unconditionally) destroys the very information this chokepoint needs to
+// tell a genuine still-exact re-observation apart from a poisoned one.
+//
 // Rules, applied in order:
 //
+//  0. Contradiction (DEF-18/DEF-9 self-heal): existing.Exact is stored true,
+//     but the CURRENT observation is itself truncated (rawTruncated) AND its
+//     own accumulated depth already reaches or exceeds the stored exact
+//     count (rawCount >= existing.Count). A truncated fetch cannot, by
+//     construction, have exhausted a list that is genuinely done at
+//     existing.Count — either a continuation token still exists past that
+//     depth, or the DEF-9 verify-depth walk reached the stored-exact depth
+//     and AWS still reports more. The stored Exact was therefore never true
+//     for the CURRENT population (a shrink/growth since it was set, or it
+//     was poisoned by an old build's false-exact bug) — live contradiction
+//     beats a stored claim, so Exact is dropped and the deeper truncated
+//     observation's own count/rows become the new (lower-bound) truth. This
+//     is the one case where a truncated observation is allowed to REGRESS a
+//     stored Exact — every other rule below assumes exactness, once true,
+//     only advances (C5), which is the assumption rule 0 exists to correct
+//     when it demonstrably no longer holds.
 //  1. Rows-carrying, incoming shallower than existing AND incoming's IDs are
 //     a subset of existing's (a shallower page of the same list): existing
 //     Rows are kept in full — a shallower observation never regresses a
@@ -131,7 +159,16 @@ func (c *Core) LoadAvailabilityCache() *cache.Store {
 //     always win (deeper knowledge).
 //  4. Rows-carrying, same depth but different content (non-subset — a
 //     genuine refresh): incoming wins by recency.
-func reconcileTypeFile(existing cache.TypeFile, incoming cache.TypeFile, rowsProvided bool) cache.TypeFile {
+func reconcileTypeFile(existing cache.TypeFile, incoming cache.TypeFile, rowsProvided bool, rawTruncated bool, rawCount int) cache.TypeFile {
+	if existing.Exact && rawTruncated && rawCount >= existing.Count && existing.Count > 0 {
+		// Rule 0: the stored Exact is provably false — accept the poisoned
+		// pair's self-healing observation instead of letting it re-stick.
+		incoming.Exact = false
+		if rawCount > incoming.Count {
+			incoming.Count = rawCount
+		}
+	}
+
 	tf := incoming
 	tf.HasResources = incoming.Count > 0
 
@@ -227,14 +264,19 @@ func (c *Core) SaveAvailabilityCache(
 				// C5: a truncated first-page probe never downgrades a stored
 				// exact total — only replace Exact when this observation is
 				// itself untruncated (a genuine exact observation).
+				// reconcileTypeFile's rule 0 overrides this stickiness when
+				// the raw observation (trunc, count) itself CONTRADICTS the
+				// stored exactness (a self-heal for a poisoned pair — see
+				// rule 0's doc comment).
 				Exact: existing.Exact || !trunc,
 			}
 			if existing.Exact && trunc && existing.Count > count {
 				// Preserve the previously-observed exact count rather than
-				// letting a smaller truncated lower-bound regress it.
+				// letting a smaller truncated lower-bound regress it. Rule 0
+				// overrides this too when the contradiction condition holds.
 				incoming.Count = existing.Count
 			}
-			tf := reconcileTypeFile(existing, incoming, false)
+			tf := reconcileTypeFile(existing, incoming, false, trunc, count)
 			if issueKnown[rawName] {
 				tf.Issues = issueCounts[rawName]
 				tf.IssuesKnown = true
@@ -251,6 +293,134 @@ func (c *Core) SaveAvailabilityCache(
 		}
 		return firstErr
 	})
+}
+
+// materializeListFieldsForSave resolves shortName's built-in list column set
+// (owner decision, item A: "для всех ресурсов должны быть закешированы все
+// колонки, которые могут меняться" — every renderable list column must be
+// cached, driven by the column CONFIG, no hardcode) and, for every Path-backed
+// column whose Fields entry is still empty, extracts the scalar from
+// RawStruct and writes it into Fields under the column's resolved key (Key
+// when set, else the lowercased Title). Mirrors
+// app.materializeAllListFieldsForSave (the list-lane save's counterpart) so
+// both save seams persist the identical column set — but lives in
+// internal/runtime (which internal/app already imports) so the sweep-lane
+// save (saveProbeResourcesToTypeFiles, package internal/runtime) can run it
+// too, without an internal/runtime -> internal/app import cycle.
+//
+// Unlike the render-time app.MaterializeListFields (which the render path
+// uses and intentionally skips every Key-based column, since a live
+// Fields-map lookup or a Wave-2 override already covers them while RawStruct
+// is still present), this SAVE-seam pass also materializes a Path-backed
+// column that additionally declares a Key: cache.Row never carries RawStruct,
+// so a Key-based column whose value has so far only ever come from a
+// RawStruct fallback needs the exact same one-time materialization a pure
+// Path-only column needs, or it goes blank once the row is replayed from
+// disk. The status/lifecycle column is always excluded regardless of Path —
+// its cell is derived at render time from Findings, so persisting a
+// RawStruct-derived value for it would be actively wrong once Findings
+// disagree (mirrors app.materializeAllPathFields's exclusion).
+//
+// internal/runtime has no per-session view-config override (that is an
+// internal/app.Controller-only concept), so this always resolves against the
+// built-in defaults (config.GetViewDef(nil, shortName)), same as
+// resolveSaveColumns's fallback when vc == nil. A resource whose RawStruct is
+// nil (e.g. a cache-replay round-trip) passes through unchanged.
+func materializeListFieldsForSave(shortName string, resources []resource.Resource) []resource.Resource {
+	if len(resources) == 0 {
+		return resources
+	}
+	columns := resolveSaveColumns(shortName)
+	if len(columns) == 0 {
+		return resources
+	}
+	lifecycleKey := "state"
+	if td := resource.FindResourceType(shortName); td != nil && td.LifecycleKey != "" {
+		lifecycleKey = td.LifecycleKey
+	}
+	out := make([]resource.Resource, len(resources))
+	for i, r := range resources {
+		out[i] = materializeResourceFields(r, columns, lifecycleKey)
+	}
+	return out
+}
+
+// resolveSaveColumns mirrors app.resolveListColumnsForBuild(nil, shortName,
+// td)'s cascade: prefer the built-in default ViewDef's List when it is a
+// strict superset of the catalog's own Columns (same first-column-title
+// guard), else fall back to the catalog Columns (carrying Path from the
+// defaults by title match when present), else the raw built-in defaults.
+func resolveSaveColumns(shortName string) []config.ListColumn {
+	td := resource.FindResourceType(shortName)
+	defaultVD := config.GetViewDef(nil, shortName)
+
+	if td != nil && len(defaultVD.List) > len(td.Columns) {
+		firstMatch := len(td.Columns) == 0 ||
+			(len(defaultVD.List) > 0 && defaultVD.List[0].Title == td.Columns[0].Title)
+		if firstMatch {
+			return defaultVD.List
+		}
+	}
+
+	if td != nil && len(td.Columns) > 0 {
+		defaultByTitle := make(map[string]config.ListColumn, len(defaultVD.List))
+		for _, lc := range defaultVD.List {
+			defaultByTitle[lc.Title] = lc
+		}
+		cols := make([]config.ListColumn, len(td.Columns))
+		for i, c := range td.Columns {
+			cd := config.ListColumn{Key: c.Key, Title: c.Title, Width: c.Width}
+			if def, ok := defaultByTitle[c.Title]; ok {
+				cd.Path = def.Path
+			}
+			cols[i] = cd
+		}
+		return cols
+	}
+
+	return defaultVD.List
+}
+
+// materializeResourceFields is the single-resource core of
+// materializeListFieldsForSave: every Path-backed column (Key-based or not,
+// excluding the status/lifecycle column) whose resolved Fields key is not
+// already populated gets its RawStruct scalar written in.
+func materializeResourceFields(r resource.Resource, columns []config.ListColumn, lifecycleKey string) resource.Resource {
+	if r.RawStruct == nil {
+		return r
+	}
+	out := r
+	copied := false
+	for _, col := range columns {
+		if col.Path == "" {
+			continue
+		}
+		if col.Key == "status" || col.Key == lifecycleKey {
+			continue
+		}
+		key := col.Key
+		if key == "" {
+			key = strings.ToLower(col.Title)
+		}
+		if key == "" {
+			continue
+		}
+		if v, ok := out.Fields[key]; ok && v != "" {
+			continue
+		}
+		val := fieldpath.ExtractScalar(out.RawStruct, col.Path)
+		if val == "" {
+			continue
+		}
+		if !copied {
+			fresh := make(map[string]string, len(out.Fields)+1)
+			maps.Copy(fresh, out.Fields)
+			out.Fields = fresh
+			copied = true
+		}
+		out.Fields[key] = val
+	}
+	return out
 }
 
 // SaveResourceListCache persists rows for one resource type's canonical
@@ -289,11 +459,15 @@ func (c *Core) SaveResourceListCache(shortName string, rows []cache.Row, count i
 		}
 		if !exact && existing.Exact {
 			// C5: exactness only ever advances — a truncated observation
-			// never downgrades an already-exact stored total.
+			// never downgrades an already-exact stored total. reconcileTypeFile's
+			// rule 0 overrides this stickiness when the raw (exact, count)
+			// observation itself contradicts the stored exactness — e.g. the
+			// DEF-9 verify-depth walk reaching the stored-exact depth while
+			// AWS still reports truncation (a self-heal for a poisoned pair).
 			incoming.Exact = true
 			incoming.Count = existing.Count
 		}
-		tf := reconcileTypeFile(existing, incoming, true)
+		tf := reconcileTypeFile(existing, incoming, true, !exact, count)
 		if issuesKnown {
 			tf.Issues = issues
 			tf.IssuesKnown = true

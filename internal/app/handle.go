@@ -2,8 +2,10 @@ package app
 
 import (
 	"maps"
+	"strings"
 
 	"github.com/k2m30/a9s/v3/internal/cache"
+	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -292,8 +294,22 @@ func (c *Controller) maybeSaveResourceListCache(ls *ListState, canon string) {
 		// Issue-badge eligibility unknowable without a ResourceTypeDef.
 		return
 	}
-	rows := make([]cache.Row, len(ls.Rows))
-	for i, r := range ls.Rows {
+	// Item A (owner decision): every renderable list column — including
+	// Path-based ones like s3's Region — must be cached, driven by the
+	// column config, no hardcode. cache.Row is built from r.Fields only, so a
+	// Path-based column must be materialized into Fields first, exactly as
+	// the render path (buildListBody/extractListCells) does at render time
+	// via its own RawStruct fallback — otherwise a column that only ever
+	// resolved from RawStruct silently never reaches the persisted cache.Row,
+	// which never carries RawStruct. materializeAllListFieldsForSave (unlike
+	// the render-time materializeListFieldsForType/MaterializeListFields)
+	// also covers Path-carrying columns that ALSO declare a Key: at render
+	// time such a column's RawStruct fallback only matters when nothing has
+	// set Fields[key] yet, but at the SAVE seam RawStruct is about to be
+	// stripped for good, so the same "no value yet" gap applies to it too.
+	materialized := c.materializeAllListFieldsForSave(canon, ls.Rows)
+	rows := make([]cache.Row, len(materialized))
+	for i, r := range materialized {
 		rows[i] = cache.Row{
 			ID:       r.ID,
 			Name:     r.Name,
@@ -311,6 +327,100 @@ func (c *Controller) maybeSaveResourceListCache(ls *ListState, canon string) {
 	// of a stale, independently-fetched probe snapshot that reconcileTypeFile's
 	// subset check might not recognise as a subset. See SyncProbeResourcesForType.
 	c.core.SyncProbeResourcesForType(canon, ls.Rows, ls.HasPagination)
+}
+
+// materializeAllListFieldsForSave resolves typeName's column set the same
+// way buildListBody/materializeListFieldsForType do (fallback typeDef first,
+// then catalog, via resolveListColumnsForBuild), then writes every Path-
+// backed column's RawStruct scalar into Fields when that column's resolved
+// key is not already populated — including a column that ALSO declares a
+// Key (unlike MaterializeListFields, which the render path uses and which
+// intentionally skips Key-based columns since a live Fields-map lookup or a
+// Wave-2 override already covers them while RawStruct is still present).
+//
+// This wider rule only applies at this SAVE seam: cache.Row never carries
+// RawStruct (SaveResourceListCache's doc comment), so a Key-based column
+// whose value has so far only ever come from a RawStruct fallback (never an
+// explicit Fields write) needs the exact same one-time materialization a
+// pure Path-only column needs, or it goes blank the moment the row is
+// replayed from disk. The existing non-empty-value guard this mirrors from
+// MaterializeListFields means a column already carrying an explicit value
+// (e.g. a Wave-2 enrichment override) is never overwritten by this pass.
+func (c *Controller) materializeAllListFieldsForSave(typeName string, resources []resource.Resource) []resource.Resource {
+	if len(resources) == 0 {
+		return resources
+	}
+	var tdVal resource.ResourceTypeDef
+	var td *resource.ResourceTypeDef
+	if ftd, ok := c.fallbackTypeDefs[typeName]; ok {
+		tdVal = ftd
+		td = &tdVal
+	} else if catalogTD := resource.FindResourceType(typeName); catalogTD != nil {
+		td = catalogTD
+	}
+	columns := resolveListColumnsForBuild(c.viewConfig, typeName, td)
+	if len(columns) == 0 {
+		return resources
+	}
+	lifecycleKey := "state"
+	if td != nil && td.LifecycleKey != "" {
+		lifecycleKey = td.LifecycleKey
+	}
+	out := make([]resource.Resource, len(resources))
+	for i, r := range resources {
+		out[i] = materializeAllPathFields(r, columns, lifecycleKey)
+	}
+	return out
+}
+
+// materializeAllPathFields is materializeAllListFieldsForSave's single-
+// resource core: for every column with a non-empty Path (Key-based or not),
+// write RawStruct's extracted scalar into Fields under the column's
+// resolved key (Key when set, else the lowercased Title) whenever that key
+// is not already populated with a non-empty value. The status/lifecycle
+// column is always skipped regardless of Path: its cell is derived at
+// render time from Findings (listExtractCellValue's isStatusCol branch,
+// buildListBody's S4 override), so persisting a RawStruct-derived value for
+// it would render a stale/wrong status once Findings disagree — the same
+// exclusion the render-time MaterializeListFields effectively gets for free
+// by skipping every Key-based column, which this wider save-time pass must
+// reproduce explicitly since it no longer skips Key-based columns in general.
+func materializeAllPathFields(r resource.Resource, columns []ColumnDef, lifecycleKey string) resource.Resource {
+	if r.RawStruct == nil {
+		return r
+	}
+	out := r
+	copied := false
+	for _, col := range columns {
+		if col.Path == "" {
+			continue
+		}
+		if col.Key == "status" || col.Key == lifecycleKey {
+			continue
+		}
+		key := col.Key
+		if key == "" {
+			key = strings.ToLower(col.Title)
+		}
+		if key == "" {
+			continue
+		}
+		if v, ok := out.Fields[key]; ok && v != "" {
+			continue
+		}
+		val := fieldpath.ExtractScalar(out.RawStruct, col.Path)
+		if val == "" {
+			continue
+		}
+		if !copied {
+			fresh := make(map[string]string, len(out.Fields)+1)
+			maps.Copy(fresh, out.Fields)
+			out.Fields = fresh
+			copied = true
+		}
+		out.Fields[key] = val
+	}
+	return out
 }
 
 // autoOpenSingleDetail replaces a web/headless by-ID placeholder list with the

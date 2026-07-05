@@ -27,6 +27,20 @@ import (
 func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resources []resource.Resource, pagination *resource.PaginationMeta, appendPage bool) {
 	resources = c.materializeListFieldsForType(typeName, resources)
 
+	// Item C: a silent swap (a non-append replace — the common cold-boot shape
+	// where a seeded/cached list is replaced by its own verify-refetch) must
+	// never let a row's glyph flash off. The fresh resources argument arrives
+	// findings-less on a brand-new session (the Wave-2 enrichment store is
+	// empty until the sweep re-enriches this session), so the existing
+	// re-apply-from-enrichment-store step below (which only reads
+	// c.listEnrichmentFindings) is a no-op on that very first swap. Capture
+	// the OUTGOING rows' own findings (r.Findings — what a cache-seeded row
+	// carries from disk, or what an earlier live enrichment already wrote
+	// onto this screen) BEFORE they are overwritten, keyed by resource ID, so
+	// they can be carried onto the incoming replacement rows for any ID that
+	// survives the swap.
+	priorFindings := outgoingRowFindingsByID(ls, c.resourceCache[typeName])
+
 	// DEF-18 mechanism A: a background verify-refetch (e.g. cold-open's
 	// KindFetchResources, bounded by a CachedListDepth snapshot taken at
 	// dispatch time) can complete AFTER a foreground load-more (m) has
@@ -55,6 +69,24 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	// title (derived from HasPagination) and the cursor would regress even
 	// if ls.Rows itself were protected.
 	stale := !appendPage && ls != nil && !ls.HasPagination && isStaleReplace(ls.Rows, resources, pagination)
+
+	// Item C (continued): a silent swap is exactly the !appendPage && !stale
+	// replace path below. Fold the captured prior findings onto the incoming
+	// resources for any surviving ID BEFORE they land on ls.Rows/
+	// c.resourceCache — only when the session enrichment store has nothing
+	// for this type yet (checked via listEnrichmentFindings) and the incoming
+	// row does not already carry its own findings (never clobber a fresh
+	// Wave-1/Wave-2 result that already landed on this exact swap).
+	if !appendPage && !stale && len(priorFindings) > 0 && len(c.listEnrichmentFindings(typeName)) == 0 {
+		for i := range resources {
+			if len(resources[i].Findings) > 0 {
+				continue
+			}
+			if f, ok := priorFindings[resources[i].ID]; ok && len(f) > 0 {
+				resources[i].Findings = f
+			}
+		}
+	}
 
 	// --- Per-screen storage (Bug 1 fix) -----------------------------------
 	// Writing to ls.Rows ensures that two stacked list screens of the same
@@ -133,6 +165,32 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	if known := c.listEnrichmentFindings(typeName); len(known) > 0 {
 		c.applyRowFindings(typeName, known, nil)
 	}
+}
+
+// outgoingRowFindingsByID captures the findings currently attached to the
+// row set about to be replaced by a silent swap (item C), keyed by resource
+// ID. Prefers ls.Rows (the per-screen store applyResourcesLoaded is about to
+// overwrite) since it is the richer, currently-displayed source; falls back
+// to the type-keyed resourceCache mirror when ls is nil or carries no rows
+// yet (e.g. the very first ResourcesLoaded for a screen whose seed only
+// populated the type-keyed cache). Rows with no findings are omitted so the
+// caller's len(priorFindings) == 0 check short-circuits cheaply when there is
+// nothing to carry forward.
+func outgoingRowFindingsByID(ls *ListState, cachedRows []resource.Resource) map[string][]domain.Finding {
+	source := cachedRows
+	if ls != nil && len(ls.Rows) > 0 {
+		source = ls.Rows
+	}
+	if len(source) == 0 {
+		return nil
+	}
+	out := make(map[string][]domain.Finding, len(source))
+	for _, r := range source {
+		if len(r.Findings) > 0 {
+			out[r.ID] = r.Findings
+		}
+	}
+	return out
 }
 
 // isStaleReplace reports whether a non-append ResourcesLoaded result looks

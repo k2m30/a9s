@@ -520,6 +520,15 @@ func (c *Core) saveProbeResourcesToTypeFiles(probeResources map[string][]resourc
 	}
 	var firstErr error
 	for shortName, resources := range probeResources {
+		// Item A (owner decision): every renderable list column — including
+		// Path-based ones like s3's Region — must be cached, driven by the
+		// column config, not hardcoded per type. The sweep lane builds
+		// cache.Row directly from r.Fields, which a Path-based column never
+		// populates unless materialized first; the list-open lane
+		// (app.Controller.maybeSaveResourceListCache) already runs this via
+		// materializeListFieldsForType — mirror it here so both save seams
+		// persist the same column set.
+		resources = materializeListFieldsForSave(shortName, resources)
 		rows := make([]cache.Row, len(resources))
 		for i, r := range resources {
 			rows[i] = cache.Row{
