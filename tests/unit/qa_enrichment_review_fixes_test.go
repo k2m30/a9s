@@ -95,17 +95,20 @@ func TestRowMarker_HiddenWhenIdentityColumnScrolledOff(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------------
-// Fix 2: Ctrl+R clears the active ResourceListModel's findings immediately
+// Fix 2 (superseded): Ctrl+R keeps findings visible until the fresh result
+// lands, rather than blanking them at keypress time
 // -----------------------------------------------------------------------------
 
-// TestCtrlR_ClearsActiveListFindingsImmediately asserts that pressing Ctrl+R on
-// a top-level list clears the findingsByID on the active ResourceListModel
-// BEFORE the wrapped fetch returns — so stale markers disappear at keypress
-// time, not only after a successful rerun.
-//
-// Pre-fix: the handler cleared the root-model maps but left the active
-// ResourceListModel.findingsByID populated until a subsequent SetEnrichmentState.
-// If the refresh errored, the stale state persisted indefinitely.
+// TestCtrlR_ClearsActiveListFindingsImmediately asserted that pressing Ctrl+R
+// on a top-level list blanked the active ResourceListModel's findings
+// immediately, before the wrapped fetch even returned. That contract is
+// superseded: eagerly blanking findings at keypress time produced a real,
+// user-visible flicker for the full AWS round-trip between the keypress and
+// the rerun's EnrichmentChecked arrival — findings must be stale-until-
+// replaced, not blank-until-replaced (see qa_glyph_continuity_test.go's
+// TestRerunStart_KeepsVisibleFindingsUntilReplaced for the corrected pin,
+// which asserts BOTH halves: no blank window before the fresh result lands,
+// and real removal once the fresh result genuinely omits the finding).
 //
 // Uses the test helpers defined in qa_enrichment_rerun_overlap_test.go:
 // newRootSizedModel, rootApplyMsg, navigateToEC2List, ctrlRKeyMsg.
@@ -134,11 +137,29 @@ func TestCtrlR_ClearsActiveListFindingsImmediately(t *testing.T) {
 	// Dispatch Ctrl+R via the real key path.
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
 
-	// Assertion: the prefix marker is gone immediately (no fetch response processed yet).
-	// Pre-fix, the marker would persist until a follow-up SetEnrichmentState, which
-	// only happens after a successful rerun.
-	after := m.View().Content
-	if strings.Contains(after, "! ") {
-		t.Errorf("Ctrl+R must clear the active list's findings immediately; '! ' prefix marker still present in rendered output:\n%s", after)
+	// Assertion (corrected): the marker must still be present immediately
+	// after Ctrl+R — no fetch/enrichment response has landed yet, so the old
+	// finding is still the best-known truth (stale-until-replaced).
+	afterKeypress := m.View().Content
+	if !strings.Contains(afterKeypress, "! ") {
+		t.Errorf("Ctrl+R must NOT blank the active list's findings before the fresh result lands; '! ' prefix marker missing immediately after keypress:\n%s", afterKeypress)
+	}
+
+	// Once a fresh EnrichmentCheckedMsg lands and genuinely omits the
+	// finding (resource recovered), the marker MUST be removed — this test
+	// still confirms removal works, just not before the result lands.
+	recovered := messages.EnrichmentChecked{
+		ResourceType: "ec2",
+		Issues:       0,
+		Truncated:    false,
+		Findings:     map[string]domain.Finding{},
+		Gen:          0,
+		TypeGen:      0,
+	}
+	m, _ = rootApplyMsg(m, recovered)
+
+	afterFreshResult := m.View().Content
+	if strings.Contains(afterFreshResult, "! ") {
+		t.Errorf("a finding absent from the fresh enrichment result must be removed once that result lands; '! ' prefix marker still present:\n%s", afterFreshResult)
 	}
 }

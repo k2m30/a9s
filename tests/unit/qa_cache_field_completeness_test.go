@@ -490,23 +490,26 @@ func TestPoisonedExact_HealsOnContradiction(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────
 
 // TestSilentSwap_NeverDropsKnownFindings seeds a top-level list with rows
-// that already carry persisted Wave-1 findings (glyphs) — mirroring a
-// cold-boot reseed from cache.Row.Findings — with the session's Wave-2
+// that already carry a persisted WAVE-2 finding (glyph) — the user-visible
+// case that actually motivated this pin: an enrichment-derived issue like
+// "PITR off" or "public access block disabled" — with the session's Wave-2
 // enrichment store left EMPTY (a genuinely fresh session, no enrichment
-// probe has completed yet). A replace then lands with the SAME row IDs but
-// carrying NO findings at all (the live fetch shape: Wave-1 findings are
-// re-derived by the fetcher itself and, in this reproduction, simply
-// haven't been re-attached yet — exactly the window between a fetch
-// landing and the next enrichment sweep). The post-swap rows must still
-// carry the previously-known findings (inherited), not silently drop them.
+// probe has completed yet this session). A replace then lands with the SAME
+// row IDs but carrying NO findings at all (the live fetch shape: a fresh
+// Wave-1 fetch result, before the next enrichment sweep re-checks this
+// type). The post-swap rows must still carry the previously-known WAVE-2
+// finding (inherited, since enrichment genuinely has not re-run yet), not
+// silently drop it.
 //
-// RED at HEAD: applyResourcesLoaded's tail only re-applies findings sourced
-// from c.listEnrichmentFindings(typeName) (the Wave-2 enrichmentStore) —
-// when that map is empty (len(known) == 0), the "if known := ...; len(known)
-// > 0" guard short-circuits and NO re-application happens at all, so the
-// swapped-in rows (ls.Rows = resources, list_body.go's default case) are
-// left with their fresh, empty Findings — the glyph vanishes until an
-// unrelated enrichment sweep completes.
+// Contract (fixed, mirrors qa_cache_lifecycle_test.go's Scenario 3 finding
+// and internal/app/list_body.go's applyResourcesLoaded carry-forward): a
+// fresh fetch result IS the authoritative statement about WAVE-1 state for a
+// row — a row that comes back with zero findings this time means any
+// WAVE-1-sourced issue is RESOLVED, and carrying that old Wave-1 finding
+// forward would make a fixed issue immortal. Only the "wave2:"-prefixed
+// portion of a prior finding — the enrichment pass, which runs separately
+// from the fetch and has genuinely not re-checked this row yet — may
+// outlive a silent swap, and only until the next enrichment sweep completes.
 func TestSilentSwap_NeverDropsKnownFindings(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
@@ -521,7 +524,7 @@ func TestSilentSwap_NeverDropsKnownFindings(t *testing.T) {
 		Code:     "s3-public-read",
 		Phrase:   "public read",
 		Severity: domain.SevBroken,
-		Source:   "wave1",
+		Source:   "wave2:s3",
 	}
 	seeded := []resource.Resource{
 		{ID: "bucket-known-1", Name: "bucket-known-1", Type: "s3", Findings: []domain.Finding{seededFinding}},
@@ -561,7 +564,7 @@ func TestSilentSwap_NeverDropsKnownFindings(t *testing.T) {
 		}
 	}
 	if !postGlyph {
-		t.Error("bucket-known-1's error decorator vanished after the silent swap even though the enrichment store never changed — the row's previously-known finding must be inherited, not silently dropped")
+		t.Error("bucket-known-1's error decorator vanished after the silent swap even though the enrichment store never changed — the row's previously-known WAVE-2 finding must be inherited, not silently dropped")
 	}
 
 	all := ctrl.GetListAllResources()
@@ -572,8 +575,82 @@ func TestSilentSwap_NeverDropsKnownFindings(t *testing.T) {
 		}
 	}
 	if len(gotFindings) == 0 {
-		t.Error("post-swap resource.Findings for bucket-known-1 is empty, want the inherited seeded finding to still be present")
+		t.Error("post-swap resource.Findings for bucket-known-1 is empty, want the inherited seeded WAVE-2 finding to still be present")
 	} else if gotFindings[0].Code != seededFinding.Code {
-		t.Errorf("post-swap resource.Findings[0].Code = %q, want %q (the inherited seeded finding)", gotFindings[0].Code, seededFinding.Code)
+		t.Errorf("post-swap resource.Findings[0].Code = %q, want %q (the inherited seeded WAVE-2 finding)", gotFindings[0].Code, seededFinding.Code)
+	}
+}
+
+// TestSilentSwap_Wave1FindingNotCarriedOnResolve is the counterpart to
+// TestSilentSwap_NeverDropsKnownFindings: a row seeded with a WAVE-1-sourced
+// finding (Source: "wave1", the fetcher's own per-fetch observation, e.g. an
+// EC2 instance's "stopped" state or an S3 bucket flagged public-read by the
+// fetcher itself) must NOT have that finding carried forward onto a silent
+// swap's fresh, zero-findings replacement row — a fresh fetch result with no
+// Wave-1 finding for that ID IS the authoritative "this is resolved now"
+// signal (mirrors qa_cache_lifecycle_test.go's Scenario 3: one resource's
+// issue resolves between boots). Only "wave2:"-prefixed findings survive a
+// silent swap; this pins the Wave-1 half of that same carry-forward rule.
+func TestSilentSwap_Wave1FindingNotCarriedOnResolve(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("A9S_CONFIG_FOLDER", tmp)
+	const profile, region = "silentswap-wave1-resolve-prof", "us-east-1"
+
+	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
+	ctrl := app.New(core)
+	ctrl.SetUIMode("web")
+	openTopLevelList(ctrl, "s3")
+
+	wave1Finding := domain.Finding{
+		Code:     "s3-public-read",
+		Phrase:   "public read",
+		Severity: domain.SevBroken,
+		Source:   "wave1",
+	}
+	seeded := []resource.Resource{
+		{ID: "bucket-resolve-1", Name: "bucket-resolve-1", Type: "s3", Findings: []domain.Finding{wave1Finding}},
+		{ID: "bucket-resolve-2", Name: "bucket-resolve-2", Type: "s3"},
+	}
+	ctrl.ApplyResourcesLoaded("s3", seeded, nil, false)
+
+	preSwap := ctrl.Snapshot()
+	foundGlyphBeforeSwap := false
+	for _, r := range preSwap.Body.List.Rows {
+		if r.ResourceID == "bucket-resolve-1" && r.Decorator == app.DecoratorError {
+			foundGlyphBeforeSwap = true
+		}
+	}
+	if !foundGlyphBeforeSwap {
+		t.Fatal("fixture assumption broken — seeded bucket-resolve-1 does not show an error decorator before the swap")
+	}
+
+	// Silent swap: same IDs, no findings attached — the fresh fetch's
+	// authoritative statement that the Wave-1 issue is now resolved.
+	replacement := []resource.Resource{
+		{ID: "bucket-resolve-1", Name: "bucket-resolve-1", Type: "s3"},
+		{ID: "bucket-resolve-2", Name: "bucket-resolve-2", Type: "s3"},
+	}
+	ctrl.ApplyResourcesLoaded("s3", replacement, nil, false)
+
+	postSwap := ctrl.Snapshot()
+	lb := postSwap.Body.List
+	if lb == nil {
+		t.Fatal("Body.List is nil after the silent swap")
+	}
+	for _, r := range lb.Rows {
+		if r.ResourceID == "bucket-resolve-1" && r.Decorator == app.DecoratorError {
+			t.Error("bucket-resolve-1 still shows an error decorator after the silent swap — a Wave-1 finding absent from a fresh fetch result means RESOLVED and must not be carried forward")
+		}
+	}
+
+	all := ctrl.GetListAllResources()
+	var gotFindings []domain.Finding
+	for _, r := range all {
+		if r.ID == "bucket-resolve-1" {
+			gotFindings = r.Findings
+		}
+	}
+	if len(gotFindings) != 0 {
+		t.Errorf("post-swap resource.Findings for bucket-resolve-1 = %+v, want empty — the resolved Wave-1 finding must not survive the swap", gotFindings)
 	}
 }

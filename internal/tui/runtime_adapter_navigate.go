@@ -651,24 +651,25 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	parentCtx := m.ctrl.GetListParentContext()
 	escPops := m.ctrl.GetListEscPops()
 
-	// Pre-fetch cleanup: strip stale Wave 2 findings from all cached rows of
-	// this type BEFORE deleting the cache entry. applyEnrichment walks the
-	// session-owned ResourceCache[rt]/LazyResourceCache/ProbeResources to find
-	// rows. Deleting the cache entry afterwards is still correct (forces a
-	// fresh fetch). This fixes the PR #310 CodeRabbit finding A: previously
-	// delete() ran first so applyEnrichment found no rows and stale wave2
-	// state survived.
+	// Pre-fetch cleanup: strip stale Wave 2 findings from the session-owned
+	// mirrors (ResourceCache[rt]/LazyResourceCache/ProbeResources) BEFORE
+	// deleting the cache entry, so a later cache-open (before this rerun's
+	// fresh EnrichmentChecked lands) never reseeds from a stale wave2 row.
+	// Deleting the cache entry afterwards is still correct (forces a fresh
+	// fetch).
 	//
-	// applyEnrichment only mutates the session-owned stores above — it does
-	// NOT reach the controller's own row stores (ls.Rows / c.resourceCache),
-	// which applyResourcesLoaded populates as independent MaterializeListFields
-	// copies (not aliases) of the session rows. ActiveListResources() and the
-	// rendered ResourceListModel read from the controller's stores, so without
-	// the explicit ClearRowFindings call below, Ctrl+R would clear the session
-	// copy while the active list view keeps showing the stale Wave-2 finding.
+	// Deliberately NOT clearing the controller's own rendered rows
+	// (ls.Rows / c.resourceCache via ClearRowFindings) here: that used to
+	// blank every Wave-2 glyph on screen for the full AWS round-trip between
+	// this Update() and the rerun's EnrichmentChecked arrival — a real,
+	// user-visible flicker, not just a stale-state risk. Wave-2 state is
+	// stale-until-replaced (never blank-until-replaced): ApplyWave2ToRow
+	// already strips-then-conditionally-reappends per resource ID against the
+	// FULL fresh findings map when the rerun's result lands, so any row
+	// missing from that map is correctly cleared at that point — pre-clearing
+	// here only widened the visible gap without changing the eventual state.
 	if parentCtx == nil && !escPops {
 		(&m).applyEnrichment(rt, nil, nil)
-		m.ctrl.ClearRowFindings(rt)
 	}
 
 	m.core.DeleteResourceCache(rt) // clear cache for refreshed type only
@@ -679,10 +680,10 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	}
 	m.flash = flashState{text: "Refreshing...", isError: false, active: true}
 
-	// Top-level list with a registered enricher: bump per-type gen, clear
-	// findings, and dispatch a wrapped fetch that stamps TypeGen onto the
-	// outgoing ResourcesLoadedMsg so the tail branch in app.go can seed
-	// probeResources and dispatch probeEnrichment on success.
+	// Top-level list with a registered enricher: bump per-type gen and
+	// dispatch a wrapped fetch that stamps TypeGen onto the outgoing
+	// ResourcesLoadedMsg so the tail branch in app.go can seed probeResources
+	// and dispatch probeEnrichment on success.
 	if parentCtx == nil && !escPops {
 		if m.core.HasIssueEnricher(rt) {
 			tok := m.core.BumpEnrichmentTypeGen(rt)
@@ -690,20 +691,21 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 			// Clear per-resource truncation markers too: if the refresh errors
 			// out, stale "?" prefixes must not persist across the rerun.
 			m.core.DeleteEnrichmentTruncatedIDs(rt)
-			// Wave2 already stripped above (pre-fetch cleanup). Strip any rows
-			// that entered via ProbeResources/LazyResourceCache (those paths
-			// are NOT covered by the pre-fetch cleanup above, which only
-			// covers the ResourceCache entry before deletion).
+			// Wave2 already stripped above (pre-fetch cleanup) on the
+			// session-owned mirrors. Strip any rows that entered via
+			// ProbeResources/LazyResourceCache (those paths are NOT covered by
+			// the pre-fetch cleanup above, which only covers the ResourceCache
+			// entry before deletion).
 			(&m).applyEnrichment(rt, nil, nil)
-			// Propagate the cleared enrichment state to the controller so row
-			// markers disappear immediately at Ctrl+R.
-			m.ctrl.ApplyEnrichmentState(rt, 0, false, nil)
+			// Deliberately NOT clearing the controller's enrichment store
+			// (ApplyEnrichmentState(rt, 0, false, nil)) here — see the
+			// pre-fetch cleanup comment above. The menu issue badge and row
+			// glyphs stay at their last-known value until the rerun's
+			// EnrichmentChecked overwrites c.enrichmentStore[rt] with the
+			// fresh findings, so nothing renders blank in between.
 			cmd := m.refreshActiveListWithEnrichmentRerun(rt, tok)
 			return m, cmd
 		}
-		// Top-level list without an enricher: clear the enrichment state.
-		// Wave2 was already stripped in the pre-fetch cleanup above.
-		m.ctrl.ApplyEnrichmentState(rt, 0, false, nil)
 	}
 	return m, m.refreshActiveList()
 }

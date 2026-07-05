@@ -174,6 +174,16 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 				ms.EnrichChecked = 0
 				ms.EnrichTotal = 0
 			}
+			// C9: this intent is the only rotation-visible chokepoint on the
+			// Controller — fired by both HandleProfileSelected and
+			// HandleRegionSelected (internal/runtime/handlers.go), as well as
+			// menu Ctrl+R. session.Rotate bumps generation counters but never
+			// reaches into the Controller, so without this a stale
+			// enrichmentStore[type] entry from a prior profile/region pair can
+			// resurrect its glyphs on a same-ID resource under the new pair. A
+			// frame may never mix findings from two profile/region pairs.
+			c.enrichmentStore = nil
+			c.enrichmentTruncated = nil
 
 		case runtime.PatchResourceList:
 			// Apply enrichment data (findings + issue badge) to the controller's

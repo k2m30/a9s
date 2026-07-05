@@ -74,16 +74,30 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	// replace path below. Fold the captured prior findings onto the incoming
 	// resources for any surviving ID BEFORE they land on ls.Rows/
 	// c.resourceCache — only when the session enrichment store has nothing
-	// for this type yet (checked via listEnrichmentFindings) and the incoming
-	// row does not already carry its own findings (never clobber a fresh
-	// Wave-1/Wave-2 result that already landed on this exact swap).
+	// for this type yet (checked via listEnrichmentFindings).
+	//
+	// Merged per-source, never wholesale: a fresh fetch result IS the
+	// authoritative statement about Wave-1 state for that row — a row that
+	// comes back with zero Wave-1 findings this time means the fetcher-side
+	// condition (e.g. an instance's "stopped" state) is resolved, and carrying
+	// the old Wave-1 finding forward would make a fixed issue immortal (stale
+	// glyph, stale menu badge, stale persisted Findings). Only the "wave2:"
+	// portion of priorFindings — the enrichment pass, which runs separately
+	// from the fetch and has genuinely not re-checked this row yet — outlives
+	// the swap, and only when the incoming row does not already carry its own
+	// Wave-2 entry (never clobber a fresh Wave-2 result that already landed on
+	// this exact swap; the "wave2:" Source prefix is the same discipline
+	// ApplyWave2ToRow/stripWave2Findings use elsewhere).
 	if !appendPage && !stale && len(priorFindings) > 0 && len(c.listEnrichmentFindings(typeName)) == 0 {
 		for i := range resources {
-			if len(resources[i].Findings) > 0 {
+			f, ok := priorFindings[resources[i].ID]
+			if !ok || len(f) == 0 || hasWave2Finding(resources[i].Findings) {
 				continue
 			}
-			if f, ok := priorFindings[resources[i].ID]; ok && len(f) > 0 {
-				resources[i].Findings = f
+			for _, pf := range f {
+				if strings.HasPrefix(pf.Source, "wave2:") {
+					resources[i].Findings = append(resources[i].Findings, pf)
+				}
 			}
 		}
 	}
