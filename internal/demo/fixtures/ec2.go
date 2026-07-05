@@ -2,9 +2,9 @@
 package fixtures
 
 import (
-	"sync"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -34,23 +34,23 @@ type EC2Fixtures struct {
 
 // shared constants (mirrors internal/demo/constants_shared.go — no import allowed)
 const (
-	fixtProdVPCID               = "vpc-0abc123def456789a"
-	fixtStagingVPCID            = "vpc-0def456789abc123d"
-	fixtProdPublicSubnetA       = "subnet-0aaa111111111111a"
-	fixtProdPublicSubnetB       = "subnet-0bbb222222222222b"
-	fixtProdPrivateSubnetA      = "subnet-0ccc333333333333c"
-	fixtProdPrivateSubnetB      = "subnet-0ddd444444444444d"
-	fixtStagingSubnetA          = "subnet-0eee555555555555e"
-	fixtStagingSubnetB          = "subnet-0fff666666666666f"
-	fixtProdWebALBSGID          = "sg-0aaa111111111111a"
-	fixtProdAPIInternalSGID     = "sg-0bbb222222222222b"
-	fixtProdRDSSGID             = "sg-0ccc333333333333c"
-	fixtProdDBProxySGID         = "sg-0ddd444444444444d"
-	fixtStagingDefaultSGID      = "sg-0fff888888888888f"
-	fixtProdAMIID1              = "ami-0a1b2c3d4e5f60001"
-	fixtProdAMIID2              = "ami-0a1b2c3d4e5f60002"
-	fixtProdAMIID3              = "ami-0a1b2c3d4e5f60003"
-	fixtProdInstanceProfileARN  = "arn:aws:iam::123456789012:instance-profile/acme-ec2-instance-profile"
+	fixtProdVPCID              = "vpc-0abc123def456789a"
+	fixtStagingVPCID           = "vpc-0def456789abc123d"
+	fixtProdPublicSubnetA      = "subnet-0aaa111111111111a"
+	fixtProdPublicSubnetB      = "subnet-0bbb222222222222b"
+	fixtProdPrivateSubnetA     = "subnet-0ccc333333333333c"
+	fixtProdPrivateSubnetB     = "subnet-0ddd444444444444d"
+	fixtStagingSubnetA         = "subnet-0eee555555555555e"
+	fixtStagingSubnetB         = "subnet-0fff666666666666f"
+	fixtProdWebALBSGID         = "sg-0aaa111111111111a"
+	fixtProdAPIInternalSGID    = "sg-0bbb222222222222b"
+	fixtProdRDSSGID            = "sg-0ccc333333333333c"
+	fixtProdDBProxySGID        = "sg-0ddd444444444444d"
+	fixtStagingDefaultSGID     = "sg-0fff888888888888f"
+	fixtProdAMIID1             = "ami-0a1b2c3d4e5f60001"
+	fixtProdAMIID2             = "ami-0a1b2c3d4e5f60002"
+	fixtProdAMIID3             = "ami-0a1b2c3d4e5f60003"
+	fixtProdInstanceProfileARN = "arn:aws:iam::123456789012:instance-profile/acme-ec2-instance-profile"
 	// fixtProdEKSClusterName / fixtRelatedEC2NGNodeGroupID must match the real
 	// EKS cluster ("acme-prod") and nodegroup ("general-pool") fixture names in
 	// eks.go so ec2→ng (checkEC2NodeGroups) and ct-events→ec2 tag-based
@@ -58,6 +58,21 @@ const (
 	// names no sibling fixture defines.
 	fixtProdEKSClusterName      = "acme-prod"
 	fixtRelatedEC2NGNodeGroupID = "general-pool"
+)
+
+// AMIEBSKmsKeyID / AMIEBSKmsKeyARN back the ami→kms related-panel pivot.
+// checkAMIKMS (internal/aws/ami_related_extra.go) passes the raw
+// BlockDeviceMappings[].Ebs.KmsKeyId ARN through as the navigation ID
+// unmodified (unlike checkS3KMS/checkDdbKMS, which strip the ARN to a bare
+// key ID first). Real DescribeKey-by-ARN always reports the true bare KeyId
+// in its response, never the ARN that was searched by — so this AMI cannot
+// share the widely-reused "primary" KMS key (referenced by bare ID from many
+// sibling fixtures); it needs its own key whose KeyId is the ARN string
+// itself, keeping the fake's DescribeKey response self-consistent with what
+// checkAMIKMS looked up. See kms.go for the corresponding fixture entry.
+const (
+	AMIEBSKmsKeyID  = "ami-ebs-boot-volume-key"
+	AMIEBSKmsKeyARN = "arn:aws:kms:us-east-1:123456789012:key/" + AMIEBSKmsKeyID
 )
 
 // NewEC2Fixtures builds and returns a fully-populated EC2Fixtures struct
@@ -323,6 +338,13 @@ func makeInstance(
 		inst.Tags = append(inst.Tags, ec2types.Tag{
 			Key:   aws.String("aws:autoscaling:groupName"),
 			Value: aws.String("acme-web-prod-asg"),
+		})
+		// backup=daily tag — required for the ec2:backup related-panel pivot
+		// witness. Matches the ListOfTags condition on HealthyDailyPlanID's
+		// selection (backup.go).
+		inst.Tags = append(inst.Tags, ec2types.Tag{
+			Key:   aws.String("backup"),
+			Value: aws.String("daily"),
 		})
 		inst.NetworkInterfaces = []ec2types.InstanceNetworkInterface{
 			{NetworkInterfaceId: aws.String("eni-0aaa111111111111a")},
@@ -2084,9 +2106,11 @@ func buildNetworkInterfaces() []ec2types.NetworkInterface {
 			MacAddress:         aws.String("0a:1b:2c:3d:4e:99"),
 			Description:        aws.String("AWS Lambda VPC ENI-api-gateway-authorizer-a1b2c3d4-5678-90ab-cdef-111111111111"),
 			OwnerId:            aws.String("123456789012"),
-			RequesterId:        aws.String("lambda"),
-			RequesterManaged:   aws.Bool(true),
-			SourceDestCheck:    aws.Bool(true),
+			// RequesterId must be the exact real-AWS value "AWS Lambda VPC
+			// ENI" — checkLambdaENI matches it exactly (docs/resources/lambda.md).
+			RequesterId:      aws.String("AWS Lambda VPC ENI"),
+			RequesterManaged: aws.Bool(true),
+			SourceDestCheck:  aws.Bool(true),
 			Groups: []ec2types.GroupIdentifier{
 				{GroupId: aws.String(lambdaProdALBSGID), GroupName: aws.String("acme-web-alb-sg")},
 			},
@@ -2117,9 +2141,13 @@ func buildVolumes() []ec2types.Volume {
 			Attachments:        []ec2types.VolumeAttachment{{InstanceId: aws.String("i-0a1b2c3d4e5f60001")}},
 			// aws:cloudformation:stack-name tag — required for ebs→cfn related-panel
 			// pivot. acme-eks-cluster is a real stack fixture (cfn.go).
+			// backup=daily tag — required for the ebs:backup related-panel
+			// pivot witness. Matches the ListOfTags condition on
+			// HealthyDailyPlanID's selection (backup.go).
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("web-prod-01-root")},
 				{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("acme-eks-cluster")},
+				{Key: aws.String("backup"), Value: aws.String("daily")},
 			},
 		},
 		{
@@ -2222,6 +2250,23 @@ func buildSnapshots() []ec2types.Snapshot {
 			KmsKeyId: aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
 			Tags:     []ec2types.Tag{},
 		},
+		// AWS Backup-created snapshot — required for the ebs-snap:backup
+		// related-panel pivot witness. Description prefix + the
+		// aws:backup:source-resource tag are the real AWS Backup signature;
+		// the tag value matches the volume ARN in HealthyDailyPlanID's
+		// selection (backup.go) so checkEBSSnapBackup resolves a specific plan.
+		{
+			SnapshotId: aws.String("snap-awsbackup000001"), State: ec2types.SnapshotStateCompleted,
+			VolumeId: aws.String("vol-0a1b2c3d4e5f60001"), VolumeSize: aws.Int32(50),
+			Encrypted: aws.Bool(true), Description: aws.String("Created by AWS Backup for BackupPlan: acme-daily-backup"),
+			StartTime: aws.Time(time.Date(2026, 4, 16, 3, 0, 0, 0, time.UTC)),
+			Progress:  aws.String("100%"), OwnerId: aws.String("123456789012"),
+			KmsKeyId: aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("web-prod-01-root-awsbackup")},
+				{Key: aws.String("aws:backup:source-resource"), Value: aws.String("arn:aws:ec2:us-east-1:123456789012:volume/vol-0a1b2c3d4e5f60001")},
+			},
+		},
 		// Old automated snapshot (400+ days) → stale / attention signal
 		{
 			SnapshotId: aws.String("snap-completed-old00a"), State: ec2types.SnapshotStateCompleted,
@@ -2275,7 +2320,7 @@ func buildImages() []ec2types.Image {
 				{DeviceName: aws.String("/dev/xvda"), Ebs: &ec2types.EbsBlockDevice{
 					VolumeSize: aws.Int32(20), VolumeType: ec2types.VolumeTypeGp3, DeleteOnTermination: aws.Bool(true),
 					SnapshotId: aws.String("snap-0a1b2c3d4e5f60001"),
-					KmsKeyId:   aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
+					KmsKeyId:   aws.String(AMIEBSKmsKeyARN),
 				}},
 			},
 			BootMode: ec2types.BootModeValuesUefi, DeprecationTime: aws.String("2028-01-01T00:00:00Z"),

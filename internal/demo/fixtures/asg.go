@@ -198,7 +198,7 @@ func buildLaunchConfigurations() map[string]asgtypes.LaunchConfiguration {
 	return map[string]asgtypes.LaunchConfiguration{
 		"acme-web-prod-lc": {
 			LaunchConfigurationName: aws.String("acme-web-prod-lc"),
-			ImageId:                 aws.String("ami-0abcdef1234567890"),
+			ImageId:                 aws.String(fixtProdAMIID1),
 			InstanceType:            aws.String("m5.large"),
 			SecurityGroups:          []string{"sg-0web111111111111w"},
 			KeyName:                 aws.String("acme-prod-key"),

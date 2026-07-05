@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -82,6 +83,23 @@ func FetchNetworkInterfacesPage(ctx context.Context, api EC2DescribeNetworkInter
 			requesterManaged = "true"
 		}
 
+		description := ""
+		if eni.Description != nil {
+			description = *eni.Description
+		}
+
+		requesterID := ""
+		if eni.RequesterId != nil {
+			requesterID = *eni.RequesterId
+		}
+
+		securityGroupIDs := make([]string, 0, len(eni.Groups))
+		for _, g := range eni.Groups {
+			if g.GroupId != nil && *g.GroupId != "" {
+				securityGroupIDs = append(securityGroupIDs, *g.GroupId)
+			}
+		}
+
 		r := resource.Resource{
 			ID:   eniID,
 			Name: name,
@@ -94,6 +112,15 @@ func FetchNetworkInterfacesPage(ctx context.Context, api EC2DescribeNetworkInter
 				"vpc_id":            vpcID,
 				"private_ip":        privateIP,
 				"requester_managed": requesterManaged,
+				// description/requester_id — required for the lambda:eni
+				// related-panel pivot (checkLambdaENI matches Description
+				// prefix "AWS Lambda VPC ENI-<FunctionName>-" and
+				// RequesterId=="AWS Lambda VPC ENI" per docs/resources/lambda.md).
+				"description":  description,
+				"requester_id": requesterID,
+				// security_groups — required for the ecs-task:sg related-panel
+				// pivot (checkECSTaskSG chains Task -> ENI -> SG via this field).
+				"security_groups": strings.Join(securityGroupIDs, ","),
 			},
 			RawStruct: eni,
 		}

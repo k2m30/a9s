@@ -854,6 +854,10 @@ func TestRelatedFieldExtraction_ECSTask_Role_ReturnsZeroForNilRawStruct(t *testi
 	}
 }
 
+// TestRelatedFieldExtraction_ECSTask_Role_ExtractsTaskRole verifies the
+// checker cross-references the already-loaded role cache per
+// ecs-task.md:79 — Fields["task_role"] alone is not sufficient without a
+// matching role cache entry.
 func TestRelatedFieldExtraction_ECSTask_Role_ExtractsTaskRole(t *testing.T) {
 	res := resource.Resource{
 		ID: "arn:aws:ecs:us-east-1:123456789012:task/my-cluster/abc123",
@@ -861,11 +865,16 @@ func TestRelatedFieldExtraction_ECSTask_Role_ExtractsTaskRole(t *testing.T) {
 			"task_role": "arn:aws:iam::123456789012:role/app-task-role",
 		},
 	}
+	cache := resource.ResourceCache{
+		"role": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "app-task-role", Name: "app-task-role"},
+		}},
+	}
 	checker := fieldExtractionChecker(t, "ecs-task", "role")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count != 1 {
-		t.Fatalf("Count = %d, want 1", result.Count)
+		t.Fatalf("Count = %d, want 1 (spec ecs-task.md:79 cross-refs the loaded role cache)", result.Count)
 	}
 	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "app-task-role" {
 		t.Errorf("ResourceIDs = %v, want [app-task-role]", result.ResourceIDs)
@@ -880,11 +889,17 @@ func TestRelatedFieldExtraction_ECSTask_Role_ExtractsBothRoles(t *testing.T) {
 			"execution_role": "arn:aws:iam::123456789012:role/ecs-task-exec-role",
 		},
 	}
+	cache := resource.ResourceCache{
+		"role": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "app-task-role", Name: "app-task-role"},
+			{ID: "ecs-task-exec-role", Name: "ecs-task-exec-role"},
+		}},
+	}
 	checker := fieldExtractionChecker(t, "ecs-task", "role")
-	result := checker(context.Background(), nil, res, resource.ResourceCache{})
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count != 2 {
-		t.Fatalf("Count = %d, want 2", result.Count)
+		t.Fatalf("Count = %d, want 2 (spec ecs-task.md:79 cross-refs the loaded role cache)", result.Count)
 	}
 	got := map[string]bool{}
 	for _, id := range result.ResourceIDs {
@@ -892,6 +907,29 @@ func TestRelatedFieldExtraction_ECSTask_Role_ExtractsBothRoles(t *testing.T) {
 	}
 	if !got["app-task-role"] || !got["ecs-task-exec-role"] {
 		t.Errorf("ResourceIDs = %v, want both app-task-role and ecs-task-exec-role", result.ResourceIDs)
+	}
+}
+
+// TestRelatedFieldExtraction_ECSTask_Role_ARNAbsentFromLoadedCache verifies
+// that a role ARN present in Fields but absent from the loaded role cache
+// is not counted, per ecs-task.md:79 ("cross-reference the already-loaded
+// role list by ARN").
+func TestRelatedFieldExtraction_ECSTask_Role_ARNAbsentFromLoadedCache(t *testing.T) {
+	res := resource.Resource{
+		ID: "arn:aws:ecs:us-east-1:123456789012:task/my-cluster/abc123",
+		Fields: map[string]string{
+			"task_role": "arn:aws:iam::123456789012:role/deleted-role",
+		},
+	}
+	checker := fieldExtractionChecker(t, "ecs-task", "role")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{
+		"role": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "unrelated-role", Name: "unrelated-role"},
+		}},
+	})
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (task_role ARN not present in loaded role cache)", result.Count)
 	}
 }
 
@@ -961,5 +999,71 @@ func TestRelatedFieldExtraction_Trail_Role_ReturnsZeroWhenARNHasNoSlash(t *testi
 
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0 (ARN without slash cannot extract role name)", result.Count)
+	}
+}
+
+// =============================================================================
+// Backup checkers — checkEC2Backup matches on selection_tags (a backup-plan
+// field emitted by the backup fetcher's BackupSelection.ListOfTags join) OR
+// the ARN pattern (Fields["resources"]/["not_resources"]), per ec2.md:49.
+// =============================================================================
+
+// TestRelatedFieldExtraction_EC2_Backup_MatchesBySelectionTag verifies that
+// a backup plan's Fields["selection_tags"] matching the instance's own
+// Tags[] counts as related, independent of the ARN-pattern signal.
+func TestRelatedFieldExtraction_EC2_Backup_MatchesBySelectionTag(t *testing.T) {
+	res := resource.Resource{
+		ID: "i-0abc123def456",
+		RawStruct: ec2types.Instance{
+			Tags: []ec2types.Tag{
+				{Key: aws.String("backup-tier"), Value: aws.String("prod")},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"backup": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{
+				ID:     "plan-tag-selected",
+				Name:   "plan-tag-selected",
+				Fields: map[string]string{"selection_tags": "backup-tier=prod"},
+			},
+		}},
+	}
+	checker := fieldExtractionChecker(t, "ec2", "backup")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 1 {
+		t.Fatalf("Count = %d, want 1 (spec ec2.md:49 selection_tags match against Instance.Tags[])", result.Count)
+	}
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "plan-tag-selected" {
+		t.Errorf("ResourceIDs = %v, want [plan-tag-selected]", result.ResourceIDs)
+	}
+}
+
+// TestRelatedFieldExtraction_EC2_Backup_NoMatchWhenTagsDiffer verifies that
+// a mismatched selection tag value does not count.
+func TestRelatedFieldExtraction_EC2_Backup_NoMatchWhenTagsDiffer(t *testing.T) {
+	res := resource.Resource{
+		ID: "i-0abc123def456",
+		RawStruct: ec2types.Instance{
+			Tags: []ec2types.Tag{
+				{Key: aws.String("backup-tier"), Value: aws.String("dev")},
+			},
+		},
+	}
+	cache := resource.ResourceCache{
+		"backup": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{
+				ID:     "plan-tag-selected",
+				Name:   "plan-tag-selected",
+				Fields: map[string]string{"selection_tags": "backup-tier=prod"},
+			},
+		}},
+	}
+	checker := fieldExtractionChecker(t, "ec2", "backup")
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (selection_tags value mismatch)", result.Count)
 	}
 }

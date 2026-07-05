@@ -2,8 +2,8 @@
 package fixtures
 
 import (
-	"sync"
 	"fmt"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
@@ -15,6 +15,15 @@ type LambdaFixtures struct {
 	Functions []lambdatypes.FunctionConfiguration
 	// EventSourceMappings is the full list returned by ListEventSourceMappings.
 	EventSourceMappings []lambdatypes.EventSourceMappingConfiguration
+	// ImageURIs maps function name -> Code.ImageUri, served by GetFunction.
+	// Real AWS only returns ImageUri via GetFunction (never ListFunctions),
+	// so this is a GetFunction-only fixture — required for the lambda:ecr
+	// related-panel pivot (checkLambdaECR).
+	ImageURIs map[string]string
+	// Tags maps function name -> tag map, served by ListTags. Required for
+	// the lambda:cfn related-panel pivot (checkLambdaCFN reads
+	// "aws:cloudformation:stack-name").
+	Tags map[string]map[string]string
 }
 
 // NewLambdaFixtures builds and returns a fully-populated LambdaFixtures struct.
@@ -23,6 +32,17 @@ var sharedLambdaFixtures = sync.OnceValue(func() *LambdaFixtures {
 	return &LambdaFixtures{
 		Functions:           fns,
 		EventSourceMappings: buildLambdaEventSourceMappings(fns),
+		ImageURIs: map[string]string{
+			// api-service-runner is the container-image function (PackageType=Image)
+			// declared below; acme/api-service is a real ecr.go repository fixture.
+			"api-service-runner": "123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/api-service:latest",
+		},
+		Tags: map[string]map[string]string{
+			// api-gateway-authorizer carries the CFN stack tag — required for
+			// the lambda:cfn related-panel pivot witness. acme-eks-cluster is
+			// a real stack fixture (cfn.go).
+			"api-gateway-authorizer": {"aws:cloudformation:stack-name": "acme-eks-cluster"},
+		},
 	}
 })
 

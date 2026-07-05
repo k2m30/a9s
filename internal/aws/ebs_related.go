@@ -4,8 +4,6 @@ import (
 	"context"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/backup"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -145,45 +143,42 @@ func checkEBSCFN(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResult("cfn", ids)
 }
 
-// checkEBSBackup calls backup:ListRecoveryPointsByResource with the volume's
-// ARN and returns the recovery-point ARNs. Pattern C — single API call.
-// The volume ARN is constructed from account ID (STS) + region (env) + volume
-// ID. When those are unresolvable, Count: -1.
-func checkEBSBackup(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// checkEBSBackup scans the backup cache for backup plans whose selection
+// tags (BackupSelection.ListOfTags, joined into Fields["selection_tags"] by
+// the backup fetcher) match this volume's own tags. Zero extra calls — a
+// pure cross-reference of the already-loaded backup cache, per
+// docs/resources/ebs.md ("sibling-list cross-ref when backup list is loaded,
+// otherwise the panel renders an empty backup group").
+func checkEBSBackup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	volID := res.ID
 	if volID == "" {
 		return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
 	}
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil || c.Backup == nil {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
+	tags := map[string]string{}
+	if vol, ok := assertStruct[ec2types.Volume](res.RawStruct); ok {
+		for _, t := range vol.Tags {
+			if t.Key != nil && t.Value != nil {
+				tags[*t.Key] = *t.Value
+			}
+		}
 	}
-	region := regionFromEnv()
-	account := accountIDFromClients(ctx, c, c.IdentityStore())
-	if region == "" || account == "" {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
-	}
-	volARN := "arn:aws:ec2:" + region + ":" + account + ":volume/" + volID
-	api, ok := c.Backup.(BackupListRecoveryPointsByResourceAPI)
-	if !ok {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
-	}
-	out, err := api.ListRecoveryPointsByResource(ctx, &backup.ListRecoveryPointsByResourceInput{
-		ResourceArn: aws.String(volARN),
-	})
+
+	backupList, truncated, err := ebsRelatedResources(ctx, clients, cache, "backup")
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "backup", Count: -1, Err: err}
 	}
+	if backupList == nil {
+		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
+	}
+
 	var ids []string
-	for _, rp := range out.RecoveryPoints {
-		if rp.RecoveryPointArn == nil {
-			continue
+	for _, planRes := range backupList {
+		if backupSelectionTagsMatch(planRes.Fields["selection_tags"], tags) {
+			ids = append(ids, planRes.ID)
 		}
-		arn := *rp.RecoveryPointArn
-		// Recovery-point ARN: arn:aws:backup:REGION:ACCOUNT:recovery-point:ID
-		if _, after, ok := strings.Cut(arn, ":recovery-point:"); ok {
-			ids = append(ids, after)
-		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.ApproximateZero("backup")
 	}
 	return relatedResult("backup", ids)
 }

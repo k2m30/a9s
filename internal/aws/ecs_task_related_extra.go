@@ -166,97 +166,169 @@ func checkECSTaskENI(_ context.Context, _ any, res resource.Resource, _ resource
 	return relatedResult("eni", ids)
 }
 
-// checkECSTaskSecrets scans ContainerDefinitions[].Secrets[].ValueFrom for secretsmanager ARNs.
-// Pattern F — no AWS call needed; all data is in RawStruct (ecstypes.TaskDefinition).
-// NOTE: The registration in ecs_task_related.go passes ecstypes.Task, but the Secrets
-// field lives on TaskDefinition. The fetcher stores the TaskDefinition in the Resource
-// RawStruct (res.RawStruct may be *ecstypes.TaskDefinition). Try both types.
-func checkECSTaskSecrets(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	var containers []ecstypes.ContainerDefinition
-	if td, ok := assertStruct[ecstypes.TaskDefinition](res.RawStruct); ok {
-		containers = td.ContainerDefinitions
-	} else if task, ok := assertStruct[ecstypes.Task](res.RawStruct); ok {
-		// ecstypes.Task does not carry ContainerDefinitions — return 0.
-		_ = task
+// checkECSTaskSecrets reads Fields["secret_arns"] (a comma-joined list of
+// Secrets Manager ARNs emitted by the fetcher's ecsJoinTaskDefinition join —
+// ContainerDefinitions[].Secrets[].ValueFrom and
+// ContainerDefinitions[].RepositoryCredentials.CredentialsParameter, filtered
+// to the secretsmanager ARN prefix) and cross-references the already-loaded
+// secrets cache by ARN, per docs/resources/ecs-task.md.
+func checkECSTaskSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	joined := res.Fields["secret_arns"]
+	if joined == "" {
 		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
-	} else {
+	}
+	arnSet := make(map[string]struct{})
+	for arn := range strings.SplitSeq(joined, ",") {
+		if arn != "" {
+			arnSet[arn] = struct{}{}
+		}
+	}
+	if len(arnSet) == 0 {
+		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+	}
+
+	secretList, truncated, err := ecsTaskRelatedResources(ctx, clients, cache, "secrets")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1, Err: err}
+	}
+	if secretList == nil {
 		return resource.RelatedCheckResult{TargetType: "secrets", Count: -1}
 	}
 
-	seen := make(map[string]struct{})
-	for _, c := range containers {
-		for _, s := range c.Secrets {
-			if s.ValueFrom == nil || *s.ValueFrom == "" {
-				continue
-			}
-			if strings.HasPrefix(*s.ValueFrom, "arn:aws:secretsmanager:") {
-				seen[*s.ValueFrom] = struct{}{}
+	var ids []string
+	for _, sRes := range secretList {
+		if _, match := arnSet[sRes.ID]; match {
+			ids = append(ids, sRes.ID)
+			continue
+		}
+		if arn := sRes.Fields["arn"]; arn != "" {
+			if _, match := arnSet[arn]; match {
+				ids = append(ids, sRes.ID)
 			}
 		}
 	}
-	var ids []string
-	for id := range seen {
-		ids = append(ids, id)
-	}
-	if len(ids) == 0 {
-		return resource.RelatedCheckResult{TargetType: "secrets", Count: 0}
+	if len(ids) == 0 && truncated {
+		return resource.ApproximateZero("secrets")
 	}
 	return relatedResult("secrets", ids)
 }
 
-// checkECSTaskSSM scans ContainerDefinitions[].Secrets[].ValueFrom for SSM parameter ARNs.
-// Pattern F — no AWS call needed; all data is in RawStruct.
-// Returns SSM parameter names extracted from the ARN suffix after "/".
-func checkECSTaskSSM(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	var containers []ecstypes.ContainerDefinition
-	if td, ok := assertStruct[ecstypes.TaskDefinition](res.RawStruct); ok {
-		containers = td.ContainerDefinitions
-	} else if task, ok := assertStruct[ecstypes.Task](res.RawStruct); ok {
-		_ = task
+// checkECSTaskSSM reads Fields["ssm_param_names"] (a comma-joined list of SSM
+// parameter names emitted by the fetcher's ecsJoinTaskDefinition join —
+// ContainerDefinitions[].Secrets[].ValueFrom filtered to the ssm ARN prefix
+// or a bare "/"-prefixed parameter name) and cross-references the
+// already-loaded ssm cache by name, per docs/resources/ecs-task.md.
+func checkECSTaskSSM(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	joined := res.Fields["ssm_param_names"]
+	if joined == "" {
 		return resource.RelatedCheckResult{TargetType: "ssm", Count: 0}
-	} else {
+	}
+	nameSet := make(map[string]struct{})
+	for name := range strings.SplitSeq(joined, ",") {
+		if name != "" {
+			nameSet[name] = struct{}{}
+		}
+	}
+	if len(nameSet) == 0 {
+		return resource.RelatedCheckResult{TargetType: "ssm", Count: 0}
+	}
+
+	ssmList, truncated, err := ecsTaskRelatedResources(ctx, clients, cache, "ssm")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "ssm", Count: -1, Err: err}
+	}
+	if ssmList == nil {
 		return resource.RelatedCheckResult{TargetType: "ssm", Count: -1}
 	}
 
-	// SSM parameter ARN form: arn:aws:ssm:<region>:<account>:parameter/<name>
-	const ssmPrefix = "arn:aws:ssm:"
-	const paramPart = ":parameter/"
-	seen := make(map[string]struct{})
-	for _, c := range containers {
-		for _, s := range c.Secrets {
-			if s.ValueFrom == nil || *s.ValueFrom == "" {
-				continue
-			}
-			v := *s.ValueFrom
-			if !strings.HasPrefix(v, ssmPrefix) {
-				continue
-			}
-			if _, after, found := strings.Cut(v, paramPart); found && after != "" {
-				seen[after] = struct{}{}
-			}
+	var ids []string
+	for _, pRes := range ssmList {
+		if _, match := nameSet[pRes.ID]; match {
+			ids = append(ids, pRes.ID)
+			continue
+		}
+		if _, match := nameSet[pRes.Name]; match {
+			ids = append(ids, pRes.ID)
 		}
 	}
-	var ids []string
-	for id := range seen {
-		ids = append(ids, id)
-	}
-	if len(ids) == 0 {
-		return resource.RelatedCheckResult{TargetType: "ssm", Count: 0}
+	if len(ids) == 0 && truncated {
+		return resource.ApproximateZero("ssm")
 	}
 	return relatedResult("ssm", ids)
 }
 
-// checkECSTaskSG extracts security group IDs from task.Attachments (awsvpc). Pattern F.
-func checkECSTaskSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// checkECSTaskSG chains Task -> ENI -> SG per docs/resources/ecs-task.md:
+// derive the task's ENI id from task.Attachments (awsvpc mode), cross-
+// reference the already-loaded eni cache to read Fields["security_groups"]
+// on that ENI row, then cross-reference the already-loaded sg cache by ID.
+// No extra API call beyond what the eni cache already consumed.
+func checkECSTaskSG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	task, ok := assertStruct[ecstypes.Task](res.RawStruct)
 	if !ok {
 		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
 	}
-	// SGs are on the service's NetworkConfiguration, not the Task. The Task
-	// Attachments.Details don't carry SG IDs directly — they live in the
-	// parent service/run-task call. Return Count:0 here.
-	_ = task
-	return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+	var eniIDs []string
+	for _, att := range task.Attachments {
+		if att.Type != nil && strings.EqualFold(*att.Type, "ElasticNetworkInterface") {
+			for _, d := range att.Details {
+				if d.Name != nil && *d.Name == "networkInterfaceId" && d.Value != nil && *d.Value != "" {
+					eniIDs = append(eniIDs, *d.Value)
+				}
+			}
+		}
+	}
+	if len(eniIDs) == 0 {
+		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+	}
+
+	eniList, eniTruncated, err := ecsTaskRelatedResources(ctx, clients, cache, "eni")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "sg", Count: -1, Err: err}
+	}
+	if eniList == nil {
+		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+	}
+
+	eniIDSet := make(map[string]struct{}, len(eniIDs))
+	for _, id := range eniIDs {
+		eniIDSet[id] = struct{}{}
+	}
+	sgIDSet := make(map[string]struct{})
+	for _, eniRes := range eniList {
+		if _, match := eniIDSet[eniRes.ID]; !match {
+			continue
+		}
+		for sgID := range strings.SplitSeq(eniRes.Fields["security_groups"], ",") {
+			if sgID != "" {
+				sgIDSet[sgID] = struct{}{}
+			}
+		}
+	}
+	if len(sgIDSet) == 0 {
+		if eniTruncated {
+			return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+		}
+		return resource.RelatedCheckResult{TargetType: "sg", Count: 0}
+	}
+
+	sgList, sgTruncated, err := ecsTaskRelatedResources(ctx, clients, cache, "sg")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "sg", Count: -1, Err: err}
+	}
+	if sgList == nil {
+		return resource.RelatedCheckResult{TargetType: "sg", Count: -1}
+	}
+
+	var ids []string
+	for _, sgRes := range sgList {
+		if _, match := sgIDSet[sgRes.ID]; match {
+			ids = append(ids, sgRes.ID)
+		}
+	}
+	if len(ids) == 0 && sgTruncated {
+		return resource.ApproximateZero("sg")
+	}
+	return relatedResult("sg", ids)
 }
 
 // checkECSTaskSubnet extracts subnet IDs from task.Attachments (awsvpc). Pattern F.

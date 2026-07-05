@@ -646,21 +646,24 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			}
 			return fetchECSTasksPageWithJoin(ctx, c.ECS, c.ECS, c.ECS, c.ECS, continuationToken)
 		},
-		Wave2:     IssueEnricher{Fn: EnrichECSTasks, Priority: 100},
-		FieldKeys: []string{"task_id", "cluster", "last_status", "stop_code", "health_status", "task_definition", "launch_type", "cpu", "memory", "status", "efs_file_system_ids"},
+		Wave2: IssueEnricher{Fn: EnrichECSTasks, Priority: 100},
+		// task_role/execution_role/secret_arns/ssm_param_names — emitted by
+		// ecsJoinTaskDefinition's DescribeTaskDefinition join; required by
+		// the ecs-task:role, ecs-task:secrets, and ecs-task:ssm pivots.
+		FieldKeys: []string{"task_id", "cluster", "last_status", "stop_code", "health_status", "task_definition", "launch_type", "cpu", "memory", "status", "efs_file_system_ids", "task_role", "execution_role", "secret_arns", "ssm_param_names"},
 		Related: []domain.RelatedDef{
 			{TargetType: "ecs-svc", DisplayName: "ECS Services", Checker: checkECSTaskService},
 			{TargetType: "ecs", DisplayName: "ECS Clusters", Checker: checkECSTaskCluster},
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkECSTaskLogs, NeedsTargetCache: true},
-			{TargetType: "role", DisplayName: "IAM Role", Checker: checkECSTaskRole},
+			{TargetType: "role", DisplayName: "IAM Role", Checker: checkECSTaskRole, NeedsTargetCache: true},
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkECSTaskAlarm, NeedsTargetCache: true},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkECSTaskCTEvents, NeedsTargetCache: true},
 			{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkECSTaskEC2},
 			{TargetType: "ecr", DisplayName: "ECR Repositories", Checker: checkECSTaskECR},
 			{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkECSTaskENI},
-			{TargetType: "secrets", DisplayName: "Secrets", Checker: checkECSTaskSecrets},
-			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkECSTaskSG},
-			{TargetType: "ssm", DisplayName: "SSM Parameters", Checker: checkECSTaskSSM},
+			{TargetType: "secrets", DisplayName: "Secrets", Checker: checkECSTaskSecrets, NeedsTargetCache: true},
+			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkECSTaskSG, NeedsTargetCache: true},
+			{TargetType: "ssm", DisplayName: "SSM Parameters", Checker: checkECSTaskSSM, NeedsTargetCache: true},
 			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkECSTaskSubnet},
 		},
 		// ecstypes.Task: ClusterArn (parent cluster for this task execution)
@@ -821,7 +824,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{TargetType: "ebs-snap", DisplayName: "EBS Snapshots", Checker: checkEBSSnap, NeedsTargetCache: true},
 			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkEBSKMS, NeedsTargetCache: false},
 			{TargetType: "alarm", DisplayName: "CW Alarms", Checker: checkEBSAlarm, NeedsTargetCache: true},
-			{TargetType: "backup", DisplayName: "Backup", Checker: checkEBSBackup},
+			{TargetType: "backup", DisplayName: "Backup", Checker: checkEBSBackup, NeedsTargetCache: true},
 			{TargetType: "cfn", DisplayName: "CloudFormation", Checker: checkEBSCFN, NeedsTargetCache: true},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("ebs")},
 		},
@@ -868,7 +871,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{TargetType: "ebs", DisplayName: "EBS Volume", Checker: checkEBSSnapEBS, NeedsTargetCache: false},
 			{TargetType: "ec2", DisplayName: "EC2 Instance", Checker: checkEBSSnapEC2, NeedsTargetCache: false},
 			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkEBSSnapKMS, NeedsTargetCache: false},
-			{TargetType: "backup", DisplayName: "Backup", Checker: checkEBSSnapBackup},
+			{TargetType: "backup", DisplayName: "Backup", Checker: checkEBSSnapBackup, NeedsTargetCache: true},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("ebs-snap")},
 		},
 		Navigable: []domain.NavigableField{

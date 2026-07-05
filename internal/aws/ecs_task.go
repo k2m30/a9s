@@ -114,13 +114,15 @@ func fetchECSTasksPageWithJoin(
 			stopCode := string(task.StopCode)
 			healthStatus := string(task.HealthStatus)
 
-			// Join task definition to extract EFS file-system IDs.
-			// Skipped gracefully when describeTaskDefAPI is nil. A join failure
-			// is recorded as a per-task Fields["task_def_join_error"]="true" so
-			// reverse-scan checkers (e.g. checkEFSECSTask) can report
-			// Approximate without the fetcher lying about pagination
-			// truncation (which would misleadingly surface "m: load more").
-			efsFileSystemIDs, joinErr := ecsJoinEFSVolumes(ctx, task, seenTaskDefs, describeTaskDefAPI)
+			// Join task definition to extract EFS file-system IDs, IAM
+			// roles, and Secrets Manager / SSM ValueFrom references.
+			// Skipped gracefully when describeTaskDefAPI is nil. A join
+			// failure is recorded as a per-task
+			// Fields["task_def_join_error"]="true" so reverse-scan checkers
+			// (e.g. checkEFSECSTask) can report Approximate without the
+			// fetcher lying about pagination truncation (which would
+			// misleadingly surface "m: load more").
+			taskDefJoin, joinErr := ecsJoinTaskDefinition(ctx, task, seenTaskDefs, describeTaskDefAPI)
 
 			fields := map[string]string{
 				"task_id":             taskID,
@@ -133,7 +135,11 @@ func fetchECSTasksPageWithJoin(
 				"launch_type":         launchType,
 				"cpu":                 cpu,
 				"memory":              memory,
-				"efs_file_system_ids": efsFileSystemIDs,
+				"efs_file_system_ids": taskDefJoin.efsFileSystemIDs,
+				"task_role":           taskDefJoin.taskRoleARN,
+				"execution_role":      taskDefJoin.executionRoleARN,
+				"secret_arns":         taskDefJoin.secretARNs,
+				"ssm_param_names":     taskDefJoin.ssmParamNames,
 			}
 			if joinErr != nil {
 				fields["task_def_join_error"] = "true"
@@ -172,24 +178,43 @@ func fetchECSTasksPageWithJoin(
 	}, nil
 }
 
-// ecsJoinEFSVolumes resolves the task definition for a task (using the memoized
-// seenTaskDefs map) and extracts the unique EFS file-system IDs from its Volumes.
-// Returns a sorted, comma-separated string of file-system IDs (or "" if none)
-// and an error when DescribeTaskDefinition failed. The caller surfaces the
-// error as pagination truncation so downstream reverse-scan checkers
-// (e.g. checkEFSECSTask) report Approximate rather than a silently-wrong
-// definite zero.
-func ecsJoinEFSVolumes(
+// taskDefJoinFields holds the per-task fields resolved by ecsJoinTaskDefinition
+// from a single DescribeTaskDefinition call.
+type taskDefJoinFields struct {
+	efsFileSystemIDs string
+	taskRoleARN      string
+	executionRoleARN string
+	// secretARNs is a sorted, comma-joined list of Secrets Manager ARNs from
+	// ContainerDefinitions[].Secrets[].ValueFrom and
+	// ContainerDefinitions[].RepositoryCredentials.CredentialsParameter —
+	// required for the ecs-task:secrets related-panel pivot.
+	secretARNs string
+	// ssmParamNames is a sorted, comma-joined list of SSM parameter names
+	// resolved from ContainerDefinitions[].Secrets[].ValueFrom — required for
+	// the ecs-task:ssm related-panel pivot.
+	ssmParamNames string
+}
+
+// ecsJoinTaskDefinition resolves the task definition for a task (using the
+// memoized seenTaskDefs map) and extracts the fields required by the
+// ecs-task related-panel pivots: EFS file-system IDs, the task/execution IAM
+// role ARNs, and the Secrets Manager / SSM references injected via
+// ContainerDefinitions[].Secrets[]. Returns a zero-value taskDefJoinFields and
+// an error when DescribeTaskDefinition failed. The caller surfaces the error
+// as pagination truncation so downstream reverse-scan checkers (e.g.
+// checkEFSECSTask) report Approximate rather than a silently-wrong definite
+// zero.
+func ecsJoinTaskDefinition(
 	ctx context.Context,
 	task ecstypes.Task,
 	seenTaskDefs map[string]*ecstypes.TaskDefinition,
 	api ECSDescribeTaskDefinitionAPI,
-) (string, error) {
+) (taskDefJoinFields, error) {
 	if api == nil {
-		return "", nil
+		return taskDefJoinFields{}, nil
 	}
 	if task.TaskDefinitionArn == nil || *task.TaskDefinitionArn == "" {
-		return "", nil
+		return taskDefJoinFields{}, nil
 	}
 	arn := *task.TaskDefinitionArn
 
@@ -210,40 +235,99 @@ func ecsJoinEFSVolumes(
 			// checkers report Approximate.
 			var apiErr smithy.APIError
 			if errors.As(err, &apiErr) && apiErr.ErrorCode() == "ClientException" {
-				return "", nil
+				return taskDefJoinFields{}, nil
 			}
-			return "", fmt.Errorf("describing task definition %s: %w", arn, err)
+			return taskDefJoinFields{}, fmt.Errorf("describing task definition %s: %w", arn, err)
 		}
 		if out == nil || out.TaskDefinition == nil {
 			seenTaskDefs[arn] = nil
-			return "", nil
+			return taskDefJoinFields{}, nil
 		}
 		seenTaskDefs[arn] = out.TaskDefinition
 		td = out.TaskDefinition
 	}
 	if td == nil {
-		return "", nil
+		return taskDefJoinFields{}, nil
 	}
 
+	var out taskDefJoinFields
+
 	// Collect unique EFS file-system IDs from Volumes.
-	seen := make(map[string]struct{})
+	efsSeen := make(map[string]struct{})
 	for _, v := range td.Volumes {
 		if v.EfsVolumeConfiguration != nil &&
 			v.EfsVolumeConfiguration.FileSystemId != nil &&
 			*v.EfsVolumeConfiguration.FileSystemId != "" {
-			seen[*v.EfsVolumeConfiguration.FileSystemId] = struct{}{}
+			efsSeen[*v.EfsVolumeConfiguration.FileSystemId] = struct{}{}
 		}
 	}
-	if len(seen) == 0 {
-		return "", nil
+	if len(efsSeen) > 0 {
+		ids := make([]string, 0, len(efsSeen))
+		for id := range efsSeen {
+			ids = append(ids, id)
+		}
+		sort.Strings(ids)
+		out.efsFileSystemIDs = strings.Join(ids, ",")
 	}
 
-	ids := make([]string, 0, len(seen))
-	for id := range seen {
-		ids = append(ids, id)
+	if td.TaskRoleArn != nil {
+		out.taskRoleARN = *td.TaskRoleArn
 	}
-	sort.Strings(ids)
-	return strings.Join(ids, ","), nil
+	if td.ExecutionRoleArn != nil {
+		out.executionRoleARN = *td.ExecutionRoleArn
+	}
+
+	secretsSeen := make(map[string]struct{})
+	ssmSeen := make(map[string]struct{})
+	const ssmPrefix = "arn:aws:ssm:"
+	const ssmParamPart = ":parameter/"
+	for _, c := range td.ContainerDefinitions {
+		for _, s := range c.Secrets {
+			if s.ValueFrom == nil || *s.ValueFrom == "" {
+				continue
+			}
+			v := *s.ValueFrom
+			switch {
+			case strings.HasPrefix(v, "arn:aws:secretsmanager:"):
+				secretsSeen[v] = struct{}{}
+			case strings.HasPrefix(v, ssmPrefix):
+				// ARN form: arn:aws:ssm:region:account:parameter/name — the
+				// parameter's real Name (as returned by DescribeParameters)
+				// keeps its own leading "/", which the "parameter/" ARN
+				// separator absorbs; re-add it so the extracted name matches
+				// the ssm cache's canonical Resource.ID.
+				if _, after, found := strings.Cut(v, ssmParamPart); found && after != "" {
+					ssmSeen["/"+after] = struct{}{}
+				}
+			case strings.HasPrefix(v, "/"):
+				// Bare SSM parameter name (no ARN) resolved to the
+				// account/region namespace by the SSM client at read time.
+				ssmSeen[v] = struct{}{}
+			}
+		}
+		if c.RepositoryCredentials != nil && c.RepositoryCredentials.CredentialsParameter != nil &&
+			*c.RepositoryCredentials.CredentialsParameter != "" {
+			secretsSeen[*c.RepositoryCredentials.CredentialsParameter] = struct{}{}
+		}
+	}
+	if len(secretsSeen) > 0 {
+		ids := make([]string, 0, len(secretsSeen))
+		for id := range secretsSeen {
+			ids = append(ids, id)
+		}
+		sort.Strings(ids)
+		out.secretARNs = strings.Join(ids, ",")
+	}
+	if len(ssmSeen) > 0 {
+		ids := make([]string, 0, len(ssmSeen))
+		for id := range ssmSeen {
+			ids = append(ids, id)
+		}
+		sort.Strings(ids)
+		out.ssmParamNames = strings.Join(ids, ",")
+	}
+
+	return out, nil
 }
 
 // FetchECSTasks performs a three-step fetch:

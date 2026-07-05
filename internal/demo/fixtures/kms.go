@@ -254,14 +254,17 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 		// "arn:aws:kms:...:alias/aws/s3" — the exact shape that caused the
 		// pre-fix truncation bug (the naive last-"/" split used to chop it
 		// down to "s3", the bucket's own resource type, instead of passing
-		// the alias through whole). checkS3KMS now returns the alias-style
-		// ID "alias/aws/s3" (AWSManagedS3KeyID) as the navigation ID; real
-		// DescribeKey accepts that as KeyId directly, so this entry is
-		// keyed by the alias string below (not by KeyMetadata.KeyId, which
-		// AWS always reports as the real UUID even for alias lookups).
+		// the alias through whole). checkS3KMS returns the alias-style ID
+		// "alias/aws/s3" (AWSManagedS3KeyID) as the navigation ID; real
+		// DescribeKey accepts that as KeyId directly and the KeyMetadata it
+		// returns always carries the true KeyId, so this fixture entry uses
+		// the alias string as its KeyId to keep the fake's DescribeKey
+		// response self-consistent with what was looked up (AWS-managed
+		// keys report a stable, well-known KeyId across all callers; there is
+		// no separate real UUID to reconcile with in this fixture set).
 		{
-			KeyId:                aws.String("aws-s3-managed-0001"),
-			Arn:                  aws.String("arn:aws:kms:us-east-1:123456789012:key/aws-s3-managed-0001"),
+			KeyId:                aws.String(AWSManagedS3KeyID),
+			Arn:                  aws.String("arn:aws:kms:us-east-1:123456789012:key/" + AWSManagedS3KeyID),
 			Description:          aws.String("Default master key that protects my S3 objects when no other key is defined"),
 			KeyState:             kmstypes.KeyStateEnabled,
 			KeyManager:           kmstypes.KeyManagerTypeAws,
@@ -272,15 +275,68 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 			MultiRegion:          aws.Bool(false),
 			Origin:               kmstypes.OriginTypeAwsKms,
 		},
+		// AMI EBS boot-volume encryption key — required for ami→kms related-panel
+		// pivot. checkAMIKMS returns the AMI's BlockDeviceMappings[].Ebs.KmsKeyId
+		// verbatim (full ARN, not stripped to a bare ID), so this entry's KeyId
+		// is the ARN string itself (AMIEBSKmsKeyARN in ec2.go) rather than a bare
+		// UUID — see the AMIEBSKmsKeyID doc comment in ec2.go for why this key
+		// cannot share the widely-reused "primary" KMS key.
+		{
+			KeyId:                aws.String(AMIEBSKmsKeyARN),
+			Arn:                  aws.String(AMIEBSKmsKeyARN),
+			Description:          aws.String("Boot volume encryption key for acme-app-server AMI"),
+			KeyState:             kmstypes.KeyStateEnabled,
+			KeyManager:           kmstypes.KeyManagerTypeCustomer,
+			KeyUsage:             kmstypes.KeyUsageTypeEncryptDecrypt,
+			CreationDate:         aws.Time(time.Date(2025, 2, 15, 10, 0, 0, 0, time.UTC)),
+			Enabled:              true,
+			EncryptionAlgorithms: []kmstypes.EncryptionAlgorithmSpec{kmstypes.EncryptionAlgorithmSpecSymmetricDefault},
+			MultiRegion:          aws.Bool(false),
+			Origin:               kmstypes.OriginTypeAwsKms,
+		},
+		// legacy-prod-cmk-deleted — required for ddb→kms related-panel pivot on
+		// legacy-kms-lost (INACCESSIBLE_ENCRYPTION_CREDENTIALS). Modeled as
+		// PendingDeletion rather than fully absent: a real deleted CMK stops
+		// resolving via DescribeKey entirely once deletion completes (which
+		// would make the related panel unable to offer a drill target at all,
+		// same as any other 404), whereas a CMK scheduled for deletion still
+		// resolves but is unusable for encryption — the same real AWS failure
+		// mode DynamoDB reports as INACCESSIBLE_ENCRYPTION_CREDENTIALS, and it
+		// keeps the pivot drillable while preserving the "lost key" scenario.
+		{
+			KeyId:        aws.String("legacy-prod-cmk-deleted"),
+			Arn:          aws.String("arn:aws:kms:us-east-1:123456789012:key/legacy-prod-cmk-deleted"),
+			Description:  aws.String("Former production CMK for legacy-kms-lost — scheduled for deletion, table lost access"),
+			KeyState:     kmstypes.KeyStatePendingDeletion,
+			KeyManager:   kmstypes.KeyManagerTypeCustomer,
+			KeyUsage:     kmstypes.KeyUsageTypeEncryptDecrypt,
+			CreationDate: aws.Time(time.Date(2022, 6, 1, 8, 0, 0, 0, time.UTC)),
+			Enabled:      false,
+		},
+		// legacy-archived-cmk-lost — required for ddb→kms related-panel pivot on
+		// legacy-archived (ARCHIVED via INACCESSIBLE_ENCRYPTION_CREDENTIALS).
+		// Same PendingDeletion modeling rationale as legacy-prod-cmk-deleted above.
+		{
+			KeyId:        aws.String("legacy-archived-cmk-lost"),
+			Arn:          aws.String("arn:aws:kms:us-east-1:123456789012:key/legacy-archived-cmk-lost"),
+			Description:  aws.String("Former CMK for legacy-archived — scheduled for deletion, triggered table archival"),
+			KeyState:     kmstypes.KeyStatePendingDeletion,
+			KeyManager:   kmstypes.KeyManagerTypeCustomer,
+			KeyUsage:     kmstypes.KeyUsageTypeEncryptDecrypt,
+			CreationDate: aws.Time(time.Date(2022, 5, 1, 8, 0, 0, 0, time.UTC)),
+			Enabled:      false,
+		},
 	}
 
-	keys := make(map[string]*kmstypes.KeyMetadata, len(keyMetadata))
+	// Indexed by both bare KeyId and full key ARN, mirroring real DescribeKey,
+	// which accepts either form (plus alias name/ARN, added below) as KeyId.
+	keys := make(map[string]*kmstypes.KeyMetadata, len(keyMetadata)*2)
 	for _, k := range keyMetadata {
 		keys[*k.KeyId] = k
+		if k.Arn != nil {
+			keys[*k.Arn] = k
+		}
 	}
-	// AWS-managed key is additionally indexed by its alias-style ID, since
-	// checkS3KMS's navigation ID is the alias (not the key's real KeyId).
-	keys[AWSManagedS3KeyID] = keyMetadata[len(keyMetadata)-1]
 
 	aliases := []kmstypes.AliasListEntry{
 		{
@@ -339,7 +395,7 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 		{
 			AliasName:   aws.String(AWSManagedS3KeyID),
 			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:" + AWSManagedS3KeyID),
-			TargetKeyId: aws.String("aws-s3-managed-0001"),
+			TargetKeyId: aws.String(AWSManagedS3KeyID),
 		},
 		// Redis prod KMS key alias.
 		{
@@ -382,6 +438,12 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 			AliasName:   aws.String("alias/acme-opensearch-key"),
 			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/acme-opensearch-key"),
 			TargetKeyId: aws.String(OpenSearchKMSKeyID),
+		},
+		// AMI EBS boot-volume encryption key alias.
+		{
+			AliasName:   aws.String("alias/acme-ami-ebs-boot-key"),
+			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/acme-ami-ebs-boot-key"),
+			TargetKeyId: aws.String(AMIEBSKmsKeyARN),
 		},
 	}
 

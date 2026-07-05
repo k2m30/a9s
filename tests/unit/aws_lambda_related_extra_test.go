@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	apigwtypes "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
+	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	lambdapkg "github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
@@ -327,6 +328,13 @@ func TestRelated_Lambda_APIGW_TruncatedCacheNoMatch(t *testing.T) {
 // checkLambdaCF — cache scan (lambda_function_arn field match)
 // ---------------------------------------------------------------------------
 
+// TestRelated_Lambda_CF_MatchByField verifies the checkLambdaCF mechanism per
+// lambda.md:42: the cf fetcher joins DefaultCacheBehavior and
+// CacheBehaviors[] associations into the comma-joined
+// Fields["lambda_function_arns"] (plural), and Lambda@Edge associations
+// always reference a specific published VERSION ARN — never the bare
+// unversioned FunctionArn — so the checker must match by versioned-ARN
+// prefix, not by an exact Fields["lambda_function_arn"] (singular) value.
 func TestRelated_Lambda_CF_MatchByField(t *testing.T) {
 	const fnARN = "arn:aws:lambda:us-east-1:123:function:my-edge-fn"
 
@@ -334,7 +342,7 @@ func TestRelated_Lambda_CF_MatchByField(t *testing.T) {
 		ID:   "E1EDGE123456",
 		Name: "my-cf-dist",
 		Fields: map[string]string{
-			"lambda_function_arn": fnARN,
+			"lambda_function_arns": fnARN + ":4",
 		},
 	}
 	cache := resource.ResourceCache{
@@ -351,13 +359,17 @@ func TestRelated_Lambda_CF_MatchByField(t *testing.T) {
 	checker := lambdaExtraCheckerByTarget(t, "cf")
 	result := checker(context.Background(), nil, src, cache)
 	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+		t.Errorf("Count = %d, want 1 (spec lambda.md:42 versioned-ARN association match)", result.Count)
 	}
 	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "E1EDGE123456" {
 		t.Errorf("ResourceIDs = %v, want [E1EDGE123456]", result.ResourceIDs)
 	}
 }
 
+// TestRelated_Lambda_CF_NoMatch uses Fields["lambda_function_arns"] (plural,
+// per lambda.md:42) with a genuinely different function's versioned ARN, so
+// this exercises the real no-match path rather than a stale field name the
+// checker no longer reads at all.
 func TestRelated_Lambda_CF_NoMatch(t *testing.T) {
 	const fnARN = "arn:aws:lambda:us-east-1:123:function:my-edge-fn"
 
@@ -365,7 +377,7 @@ func TestRelated_Lambda_CF_NoMatch(t *testing.T) {
 		ID:   "E1OTHER9999",
 		Name: "other-dist",
 		Fields: map[string]string{
-			"lambda_function_arn": "arn:aws:lambda:us-east-1:123:function:other-fn",
+			"lambda_function_arns": "arn:aws:lambda:us-east-1:123:function:other-fn:2",
 		},
 	}
 	cache := resource.ResourceCache{
@@ -535,48 +547,83 @@ func TestRelated_Lambda_CTEvents_EmptyFunctionName(t *testing.T) {
 // checkLambdaTG — cache scan (target_type=lambda, name/arn match)
 // ---------------------------------------------------------------------------
 
+// TestRelated_Lambda_TG_MatchByFunctionName verifies the checkLambdaTG
+// mechanism per lambda.md:169: for a TG with TargetType==lambda, the checker
+// must call ELBv2 DescribeTargetHealth and match Targets[].Id==FunctionArn —
+// there is no lambda_function_name field the tg fetcher populates to match
+// on directly.
 func TestRelated_Lambda_TG_MatchByFunctionName(t *testing.T) {
 	const fnName = "my-function"
+	const fnARN = "arn:aws:lambda:us-east-1:123456789012:function:" + fnName
+	const tgARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/tg-abc123/aaa111"
 	tgRes := resource.Resource{
 		ID:   "tg-abc123",
 		Name: "tg-abc123",
 		Fields: map[string]string{
-			"target_type":          "lambda",
-			"lambda_function_name": fnName,
+			"target_type":      "lambda",
+			"target_group_arn": tgARN,
 		},
 	}
 	cache := resource.ResourceCache{
 		"tg": resource.ResourceCacheEntry{Resources: []resource.Resource{tgRes}},
 	}
-	src := resource.Resource{ID: fnName, Name: fnName}
+	src := resource.Resource{
+		ID:        fnName,
+		Name:      fnName,
+		RawStruct: lambdatypes.FunctionConfiguration{FunctionArn: aws.String(fnARN), FunctionName: aws.String(fnName)},
+	}
+	fake := &fakeELBv2TargetHealth{
+		healthByTG: map[string][]elbv2types.TargetHealthDescription{
+			tgARN: {{Target: &elbv2types.TargetDescription{Id: aws.String(fnARN)}}},
+		},
+	}
+	clients := &awsclient.ServiceClients{ELBv2: fake}
+
 	checker := lambdaExtraCheckerByTarget(t, "tg")
-	result := checker(context.Background(), nil, src, cache)
+	result := checker(context.Background(), clients, src, cache)
 	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (lambda_function_name match)", result.Count)
+		t.Errorf("Count = %d, want 1 (spec lambda.md:169 DescribeTargetHealth Targets[].Id==FunctionArn)", result.Count)
 	}
 	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "tg-abc123" {
 		t.Errorf("ResourceIDs = %v, want [tg-abc123]", result.ResourceIDs)
 	}
 }
 
+// TestRelated_Lambda_TG_MatchByARNSuffix verifies the same DescribeTargetHealth
+// mechanism matches when the function is identified by its unqualified name
+// suffix (":function:<name>") rather than an exact ARN, per checkLambdaTG's
+// documented fallback.
 func TestRelated_Lambda_TG_MatchByARNSuffix(t *testing.T) {
 	const fnName = "my-function"
+	const fnARN = "arn:aws:lambda:us-east-1:123456789012:function:" + fnName
+	const tgARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/tg-def456/bbb222"
 	tgRes := resource.Resource{
 		ID:   "tg-def456",
 		Name: "tg-def456",
 		Fields: map[string]string{
-			"target_type": "lambda",
-			"target_arn":  "arn:aws:lambda:us-east-1:123:function:" + fnName,
+			"target_type":      "lambda",
+			"target_group_arn": tgARN,
 		},
 	}
 	cache := resource.ResourceCache{
 		"tg": resource.ResourceCacheEntry{Resources: []resource.Resource{tgRes}},
 	}
-	src := resource.Resource{ID: fnName, Name: fnName}
+	src := resource.Resource{
+		ID:        fnName,
+		Name:      fnName,
+		RawStruct: lambdatypes.FunctionConfiguration{FunctionName: aws.String(fnName)},
+	}
+	fake := &fakeELBv2TargetHealth{
+		healthByTG: map[string][]elbv2types.TargetHealthDescription{
+			tgARN: {{Target: &elbv2types.TargetDescription{Id: aws.String(fnARN)}}},
+		},
+	}
+	clients := &awsclient.ServiceClients{ELBv2: fake}
+
 	checker := lambdaExtraCheckerByTarget(t, "tg")
-	result := checker(context.Background(), nil, src, cache)
+	result := checker(context.Background(), clients, src, cache)
 	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (target_arn suffix match)", result.Count)
+		t.Errorf("Count = %d, want 1 (target ARN suffix match via DescribeTargetHealth)", result.Count)
 	}
 }
 
@@ -901,13 +948,21 @@ func TestRelated_Lambda_S3_NilCache(t *testing.T) {
 // checkLambdaENI — eni cache scan (description contains function name)
 // ---------------------------------------------------------------------------
 
+// TestRelated_Lambda_ENI_MatchByDescription verifies the checkLambdaENI
+// mechanism per lambda.md:84: a match requires BOTH
+// Fields["requester_id"]=="AWS Lambda VPC ENI" AND a Description prefix of
+// "AWS Lambda VPC ENI-<FunctionName>-" — RequesterId alone is identical
+// across every VPC-attached function's ENIs, so Description is what
+// disambiguates which function it belongs to; a description-only match
+// (missing requester_id) must not count.
 func TestRelated_Lambda_ENI_MatchByDescription(t *testing.T) {
 	const fnName = "my-vpc-function"
 	eniRes := resource.Resource{
 		ID:   "eni-aaa111",
 		Name: "eni-aaa111",
 		Fields: map[string]string{
-			"description": "AWS Lambda VPC ENI-my-vpc-function-abcdef",
+			"requester_id": "AWS Lambda VPC ENI",
+			"description":  "AWS Lambda VPC ENI-my-vpc-function-abcdef",
 		},
 	}
 	cache := resource.ResourceCache{
@@ -917,7 +972,7 @@ func TestRelated_Lambda_ENI_MatchByDescription(t *testing.T) {
 	checker := lambdaExtraCheckerByTarget(t, "eni")
 	result := checker(context.Background(), nil, src, cache)
 	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1 (description contains function name)", result.Count)
+		t.Errorf("Count = %d, want 1 (requester_id + description prefix match)", result.Count)
 	}
 	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "eni-aaa111" {
 		t.Errorf("ResourceIDs = %v, want [eni-aaa111]", result.ResourceIDs)
@@ -928,7 +983,7 @@ func TestRelated_Lambda_ENI_NoDescriptionField(t *testing.T) {
 	eniRes := resource.Resource{
 		ID:     "eni-bbb222",
 		Name:   "eni-bbb222",
-		Fields: map[string]string{}, // no description
+		Fields: map[string]string{"requester_id": "AWS Lambda VPC ENI"}, // no description
 	}
 	cache := resource.ResourceCache{
 		"eni": resource.ResourceCacheEntry{Resources: []resource.Resource{eniRes}},
@@ -938,6 +993,30 @@ func TestRelated_Lambda_ENI_NoDescriptionField(t *testing.T) {
 	result := checker(context.Background(), nil, src, cache)
 	if result.Count != 0 {
 		t.Errorf("Count = %d, want 0 (no description field)", result.Count)
+	}
+}
+
+// TestRelated_Lambda_ENI_RequesterIdMissingNoMatch verifies that a
+// description-only match without the requester_id gate does not count —
+// requester_id is mandatory per lambda.md:84, not just a hint.
+func TestRelated_Lambda_ENI_RequesterIdMissingNoMatch(t *testing.T) {
+	const fnName = "my-vpc-function"
+	eniRes := resource.Resource{
+		ID:   "eni-ccc333",
+		Name: "eni-ccc333",
+		Fields: map[string]string{
+			"description": "AWS Lambda VPC ENI-my-vpc-function-abcdef",
+			// requester_id intentionally absent/wrong.
+		},
+	}
+	cache := resource.ResourceCache{
+		"eni": resource.ResourceCacheEntry{Resources: []resource.Resource{eniRes}},
+	}
+	src := resource.Resource{ID: fnName, Name: fnName}
+	checker := lambdaExtraCheckerByTarget(t, "eni")
+	result := checker(context.Background(), nil, src, cache)
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (requester_id missing — description alone is insufficient)", result.Count)
 	}
 }
 

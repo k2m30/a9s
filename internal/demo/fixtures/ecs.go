@@ -2,8 +2,8 @@
 package fixtures
 
 import (
-	"sync"
 	"fmt"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
@@ -419,8 +419,8 @@ func buildECSTasks() []ecstypes.Task {
 			Group:                aws.String("service:batch-etl-runner"),
 			StartedAt:            aws.Time(mustTime("2026-03-21T02:00:00Z")),
 			HealthStatus:         ecstypes.HealthStatusHealthy,
-			Connectivity:      ecstypes.ConnectivityConnected,
-			AvailabilityZone:  aws.String("us-east-1c"),
+			Connectivity:         ecstypes.ConnectivityConnected,
+			AvailabilityZone:     aws.String("us-east-1c"),
 		},
 		{
 			TaskArn:           aws.String("arn:aws:ecs:us-east-1:123456789012:task/acme-batch/e5f6a1b2c3d4e5f601020304"),
@@ -487,6 +487,12 @@ func buildECSTaskDefinitions() map[string]*ecstypes.TaskDefinition {
 			NetworkMode:       ecstypes.NetworkModeAwsvpc,
 			Cpu:               aws.String("512"),
 			Memory:            aws.String("1024"),
+			// TaskRoleArn/ExecutionRoleArn — required for the ecs-task:role
+			// related-panel pivot witness (checkECSTaskRole, Count:2).
+			// acme-lambda-execution and acme-ci-deploy-role are real iam.go
+			// role fixtures.
+			TaskRoleArn:      aws.String("arn:aws:iam::123456789012:role/service-role/acme-lambda-execution"),
+			ExecutionRoleArn: aws.String("arn:aws:iam::123456789012:role/acme-ci-deploy-role"),
 			ContainerDefinitions: []ecstypes.ContainerDefinition{
 				{
 					Name:  aws.String("api"),
@@ -495,6 +501,12 @@ func buildECSTaskDefinitions() map[string]*ecstypes.TaskDefinition {
 					PortMappings: []ecstypes.PortMapping{
 						{ContainerPort: aws.Int32(8080), Protocol: ecstypes.TransportProtocolTcp},
 					},
+					// Secrets — required for the ecs-task:secrets and
+					// ecs-task:ssm related-panel pivot witnesses. DB_PASSWORD
+					// and API_KEY are Secrets Manager ARNs (secrets.go
+					// fixtures prod/database/primary and prod/api/gateway-key);
+					// CONFIG_PARAM is an SSM parameter ARN (ssm.go fixture
+					// /acme/prod/app/config).
 					Secrets: []ecstypes.Secret{
 						{
 							Name:      aws.String("DB_PASSWORD"),
@@ -503,6 +515,10 @@ func buildECSTaskDefinitions() map[string]*ecstypes.TaskDefinition {
 						{
 							Name:      aws.String("API_KEY"),
 							ValueFrom: aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/api/gateway-key-XyZ123"),
+						},
+						{
+							Name:      aws.String("CONFIG_PARAM"),
+							ValueFrom: aws.String("arn:aws:ssm:us-east-1:123456789012:parameter/acme/prod/app/config"),
 						},
 					},
 				},

@@ -7,6 +7,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
+	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
@@ -76,16 +77,41 @@ func FetchCloudFrontDistributionsPage(ctx context.Context, api CloudFrontListDis
 
 			priceClass := string(dist.PriceClass)
 
+			// lambda_function_arns — required for the lambda:cf related-panel
+			// pivot (checkLambdaCF). DistributionSummary already carries both
+			// cache-behavior lists in the ListDistributions response, so this
+			// is a zero-extra-call join (no need for GetDistributionConfig).
+			var lambdaARNs []string
+			collectLambdaARNs := func(lfa *cftypes.LambdaFunctionAssociations) {
+				if lfa == nil {
+					return
+				}
+				for _, item := range lfa.Items {
+					if item.LambdaFunctionARN != nil && *item.LambdaFunctionARN != "" {
+						lambdaARNs = append(lambdaARNs, *item.LambdaFunctionARN)
+					}
+				}
+			}
+			if dist.DefaultCacheBehavior != nil {
+				collectLambdaARNs(dist.DefaultCacheBehavior.LambdaFunctionAssociations)
+			}
+			if dist.CacheBehaviors != nil {
+				for _, cb := range dist.CacheBehaviors.Items {
+					collectLambdaARNs(cb.LambdaFunctionAssociations)
+				}
+			}
+
 			r := resource.Resource{
-				ID:    distID,
-				Name:  distID,
+				ID:   distID,
+				Name: distID,
 				Fields: map[string]string{
-					"distribution_id": distID,
-					"domain_name":     domainName,
-					"status":          status,
-					"enabled":         enabled,
-					"aliases":         aliases,
-					"price_class":     priceClass,
+					"distribution_id":      distID,
+					"domain_name":          domainName,
+					"status":               status,
+					"enabled":              enabled,
+					"aliases":              aliases,
+					"price_class":          priceClass,
+					"lambda_function_arns": strings.Join(lambdaARNs, ","),
 				},
 				RawStruct: dist,
 			}

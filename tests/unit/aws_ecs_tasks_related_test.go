@@ -172,35 +172,40 @@ func TestRelated_ECSTask_Cluster_NoCluster(t *testing.T) {
 	}
 }
 
-// --- Secrets checker (Pattern F — TaskDefinition.ContainerDefinitions[].Secrets) ---
+// --- Secrets checker (Pattern C — Fields["secret_arns"] cross-referenced
+// against the already-loaded secrets cache, per ecs-task.md:84. The real
+// ecs-task fetcher's RawStruct is ecstypes.Task — DescribeTasks never
+// returns a TaskDefinition — so the join result is only available via
+// Fields["secret_arns"], populated by the fetcher's ecsJoinTaskDefinition
+// join over ContainerDefinitions[].Secrets[].ValueFrom /
+// RepositoryCredentials.CredentialsParameter, filtered to the
+// secretsmanager ARN prefix.) ---
 
 // TestRelated_ECSTask_Secrets_Match verifies that secretsmanager ARNs in
-// ContainerDefinitions[].Secrets[].ValueFrom are returned as ResourceIDs.
+// Fields["secret_arns"] are cross-referenced against the loaded secrets
+// cache and returned as ResourceIDs.
 func TestRelated_ECSTask_Secrets_Match(t *testing.T) {
 	const smARN1 = "arn:aws:secretsmanager:us-east-1:123456789012:secret:db-password-AbcXyz"
 	const smARN2 = "arn:aws:secretsmanager:us-east-1:123456789012:secret:api-key-XyzAbc"
-	td := ecstypes.TaskDefinition{
-		ContainerDefinitions: []ecstypes.ContainerDefinition{
-			{
-				Name: aws.String("app"),
-				Secrets: []ecstypes.Secret{
-					{Name: aws.String("DB_PASSWORD"), ValueFrom: aws.String(smARN1)},
-					{Name: aws.String("API_KEY"), ValueFrom: aws.String(smARN2)},
-				},
+	res := resource.Resource{
+		ID:        "my-task-def:5",
+		RawStruct: mechanismECSTaskFixture("abc123"),
+		Fields:    map[string]string{"secret_arns": smARN1 + "," + smARN2},
+	}
+	cache := resource.ResourceCache{
+		"secrets": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{
+				{ID: "db-password", Name: "db-password", Fields: map[string]string{"arn": smARN1}},
+				{ID: "api-key", Name: "api-key", Fields: map[string]string{"arn": smARN2}},
 			},
 		},
 	}
-	res := resource.Resource{
-		ID:        "my-task-def:5",
-		Fields:    map[string]string{},
-		RawStruct: td,
-	}
 
 	checker := ecsTaskCheckerByTarget(t, "secrets")
-	result := checker(context.Background(), nil, res, nil)
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count != 2 {
-		t.Fatalf("Count = %d, want 2", result.Count)
+		t.Fatalf("Count = %d, want 2 (spec ecs-task.md:84 cross-refs Fields[\"secret_arns\"] against the loaded secrets cache)", result.Count)
 	}
 	if len(result.ResourceIDs) != 2 {
 		t.Fatalf("ResourceIDs length = %d, want 2: %v", len(result.ResourceIDs), result.ResourceIDs)
@@ -209,86 +214,83 @@ func TestRelated_ECSTask_Secrets_Match(t *testing.T) {
 	for _, id := range result.ResourceIDs {
 		seen[id] = true
 	}
-	for _, want := range []string{smARN1, smARN2} {
+	for _, want := range []string{"db-password", "api-key"} {
 		if !seen[want] {
 			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs)
 		}
 	}
 }
 
-// TestRelated_ECSTask_Secrets_Empty verifies that a TaskDefinition with no
-// secretsmanager ARNs in Secrets produces Count=0.
+// TestRelated_ECSTask_Secrets_Empty verifies that an empty
+// Fields["secret_arns"] produces Count=0.
 func TestRelated_ECSTask_Secrets_Empty(t *testing.T) {
-	td := ecstypes.TaskDefinition{
-		ContainerDefinitions: []ecstypes.ContainerDefinition{
-			{
-				Name: aws.String("app"),
-				Secrets: []ecstypes.Secret{
-					// SSM parameter only — not a secretsmanager ARN
-					{Name: aws.String("PARAM"), ValueFrom: aws.String("arn:aws:ssm:us-east-1:123456789012:parameter/my-param")},
-				},
-			},
-		},
-	}
 	res := resource.Resource{
 		ID:        "my-task-def:5",
-		Fields:    map[string]string{},
-		RawStruct: td,
+		RawStruct: mechanismECSTaskFixture("abc123"),
+		Fields:    map[string]string{"secret_arns": ""},
 	}
 
 	checker := ecsTaskCheckerByTarget(t, "secrets")
-	result := checker(context.Background(), nil, res, nil)
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
 	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no secretsmanager ARNs)", result.Count)
+		t.Errorf("Count = %d, want 0 (no secret_arns field)", result.Count)
 	}
 }
 
-// TestRelated_ECSTask_Secrets_WrongRawStruct verifies that a non-TaskDefinition
-// RawStruct returns Count=-1 (wrong type guard).
-func TestRelated_ECSTask_Secrets_WrongRawStruct(t *testing.T) {
+// TestRelated_ECSTask_Secrets_ARNAbsentFromLoadedCache verifies that an ARN
+// present in Fields["secret_arns"] but absent from the loaded secrets cache
+// is not counted — the checker must cross-reference, not trust the field
+// blindly (ecs-task.md:84).
+func TestRelated_ECSTask_Secrets_ARNAbsentFromLoadedCache(t *testing.T) {
+	const smARN = "arn:aws:secretsmanager:us-east-1:123456789012:secret:stale-deleted-AbcXyz"
 	res := resource.Resource{
-		ID:        "task-abc123",
-		RawStruct: "not-a-task-definition",
+		ID:        "my-task-def:5",
+		RawStruct: mechanismECSTaskFixture("abc123"),
+		Fields:    map[string]string{"secret_arns": smARN},
 	}
 
 	checker := ecsTaskCheckerByTarget(t, "secrets")
-	result := checker(context.Background(), nil, res, nil)
+	result := checker(context.Background(), nil, res, resource.ResourceCache{
+		"secrets": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "unrelated-secret", Name: "unrelated-secret", Fields: map[string]string{"arn": "arn:aws:secretsmanager:us-east-1:123456789012:secret:unrelated-QqQqQq"}},
+		}},
+	})
 
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (ARN not present in loaded secrets cache)", result.Count)
 	}
 }
 
-// --- SSM checker (Pattern F — TaskDefinition.ContainerDefinitions[].Secrets) ---
+// --- SSM checker (Pattern C — Fields["ssm_param_names"] cross-referenced
+// against the already-loaded ssm cache, per ecs-task.md:96. Same join as
+// Secrets above, filtered to the ssm ARN prefix / bare parameter name.) ---
 
-// TestRelated_ECSTask_SSM_Match verifies that SSM parameter ARNs in
-// ContainerDefinitions[].Secrets[].ValueFrom are returned as parameter names.
+// TestRelated_ECSTask_SSM_Match verifies that parameter names in
+// Fields["ssm_param_names"] are cross-referenced against the loaded ssm
+// cache and returned as ResourceIDs.
 func TestRelated_ECSTask_SSM_Match(t *testing.T) {
-	const ssmARN1 = "arn:aws:ssm:us-east-1:123456789012:parameter/prod/db/host"
-	const ssmARN2 = "arn:aws:ssm:us-east-1:123456789012:parameter/prod/api/key"
-	td := ecstypes.TaskDefinition{
-		ContainerDefinitions: []ecstypes.ContainerDefinition{
-			{
-				Name: aws.String("app"),
-				Secrets: []ecstypes.Secret{
-					{Name: aws.String("DB_HOST"), ValueFrom: aws.String(ssmARN1)},
-					{Name: aws.String("API_KEY"), ValueFrom: aws.String(ssmARN2)},
-				},
-			},
-		},
-	}
+	const param1 = "prod/db/host"
+	const param2 = "prod/api/key"
 	res := resource.Resource{
 		ID:        "my-task-def:5",
-		Fields:    map[string]string{},
-		RawStruct: td,
+		RawStruct: mechanismECSTaskFixture("abc123"),
+		Fields:    map[string]string{"ssm_param_names": param1 + "," + param2},
+	}
+	cache := resource.ResourceCache{
+		"ssm": resource.ResourceCacheEntry{
+			Resources: []resource.Resource{
+				{ID: param1, Name: param1},
+				{ID: param2, Name: param2},
+			},
+		},
 	}
 
 	checker := ecsTaskCheckerByTarget(t, "ssm")
-	result := checker(context.Background(), nil, res, nil)
+	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count != 2 {
-		t.Fatalf("Count = %d, want 2", result.Count)
+		t.Fatalf("Count = %d, want 2 (spec ecs-task.md:96 cross-refs Fields[\"ssm_param_names\"] against the loaded ssm cache)", result.Count)
 	}
 	if len(result.ResourceIDs) != 2 {
 		t.Fatalf("ResourceIDs length = %d, want 2: %v", len(result.ResourceIDs), result.ResourceIDs)
@@ -297,55 +299,49 @@ func TestRelated_ECSTask_SSM_Match(t *testing.T) {
 	for _, id := range result.ResourceIDs {
 		seen[id] = true
 	}
-	// The checker extracts the parameter name (suffix after "/parameter/").
-	for _, want := range []string{"prod/db/host", "prod/api/key"} {
+	for _, want := range []string{param1, param2} {
 		if !seen[want] {
 			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs)
 		}
 	}
 }
 
-// TestRelated_ECSTask_SSM_Empty verifies that a TaskDefinition with only
-// secretsmanager ARNs (no SSM) produces Count=0.
+// TestRelated_ECSTask_SSM_Empty verifies that an empty
+// Fields["ssm_param_names"] produces Count=0.
 func TestRelated_ECSTask_SSM_Empty(t *testing.T) {
-	td := ecstypes.TaskDefinition{
-		ContainerDefinitions: []ecstypes.ContainerDefinition{
-			{
-				Name: aws.String("app"),
-				Secrets: []ecstypes.Secret{
-					// secretsmanager only — not SSM
-					{Name: aws.String("DB_PWD"), ValueFrom: aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:db-pwd-AbcXyz")},
-				},
-			},
-		},
-	}
 	res := resource.Resource{
 		ID:        "my-task-def:5",
-		Fields:    map[string]string{},
-		RawStruct: td,
+		RawStruct: mechanismECSTaskFixture("abc123"),
+		Fields:    map[string]string{"ssm_param_names": ""},
 	}
 
 	checker := ecsTaskCheckerByTarget(t, "ssm")
-	result := checker(context.Background(), nil, res, nil)
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
 	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (no SSM ARNs)", result.Count)
+		t.Errorf("Count = %d, want 0 (no ssm_param_names field)", result.Count)
 	}
 }
 
-// TestRelated_ECSTask_SSM_WrongRawStruct verifies that a non-TaskDefinition
-// RawStruct returns Count=-1 (wrong type guard).
-func TestRelated_ECSTask_SSM_WrongRawStruct(t *testing.T) {
+// TestRelated_ECSTask_SSM_NameAbsentFromLoadedCache verifies that a name
+// present in Fields["ssm_param_names"] but absent from the loaded ssm cache
+// is not counted (ecs-task.md:96).
+func TestRelated_ECSTask_SSM_NameAbsentFromLoadedCache(t *testing.T) {
 	res := resource.Resource{
-		ID:        "task-abc123",
-		RawStruct: "not-a-task-definition",
+		ID:        "my-task-def:5",
+		RawStruct: mechanismECSTaskFixture("abc123"),
+		Fields:    map[string]string{"ssm_param_names": "/prod/rotated-away"},
 	}
 
 	checker := ecsTaskCheckerByTarget(t, "ssm")
-	result := checker(context.Background(), nil, res, nil)
+	result := checker(context.Background(), nil, res, resource.ResourceCache{
+		"ssm": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "/prod/unrelated", Name: "/prod/unrelated"},
+		}},
+	})
 
-	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+	if result.Count != 0 {
+		t.Errorf("Count = %d, want 0 (parameter name not present in loaded ssm cache)", result.Count)
 	}
 }
 
@@ -769,30 +765,63 @@ func TestRelated_ECSTask_Subnet_InvalidRawStruct(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// checkECSTaskSG — always Count:0 for Task (SGs not in Task.Attachments)
+// checkECSTaskSG — Task -> ENI -> SG cross-reference (ecs-task.md:90): derive
+// the task's ENI id from task.Attachments, read Fields["security_groups"] on
+// the matched eni cache row, then cross-reference the sg cache by ID. No
+// extra API call beyond what the eni cache already consumed.
 // ---------------------------------------------------------------------------
 
-// TestRelated_ECSTask_SG_AlwaysZeroForValidTask verifies that the checker
-// returns Count:0 even for a task with attachments — SG IDs are on the service,
-// not the task.
-func TestRelated_ECSTask_SG_AlwaysZeroForValidTask(t *testing.T) {
+// TestRelated_ECSTask_SG_ViaENICrossReference verifies that SG IDs are
+// resolved through the task's ENI attachment, not read directly off Task.
+func TestRelated_ECSTask_SG_ViaENICrossReference(t *testing.T) {
 	task := ecstypes.Task{
 		Attachments: []ecstypes.Attachment{
 			{
 				Type: aws.String("ElasticNetworkInterface"),
 				Details: []ecstypes.KeyValuePair{
+					{Name: aws.String("networkInterfaceId"), Value: aws.String("eni-0a1b2c3d")},
 					{Name: aws.String("subnetId"), Value: aws.String("subnet-0a1b2c3d")},
 				},
 			},
 		},
 	}
 	res := resource.Resource{ID: "task-abc", RawStruct: task}
+	cache := resource.ResourceCache{
+		"eni": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "eni-0a1b2c3d", Name: "eni-0a1b2c3d", Fields: map[string]string{"security_groups": "sg-11111111,sg-22222222"}},
+		}},
+		"sg": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "sg-11111111", Name: "app-sg"},
+			{ID: "sg-22222222", Name: "db-sg"},
+		}},
+	}
 
 	checker := ecsTaskCheckerByTarget(t, "sg")
-	result := checker(context.Background(), nil, res, nil)
+	result := checker(context.Background(), nil, res, cache)
+
+	if result.Count != 2 {
+		t.Fatalf("Count = %d, want 2 (spec ecs-task.md:90 Task -> ENI -> SG cross-reference)", result.Count)
+	}
+	found := map[string]bool{}
+	for _, id := range result.ResourceIDs {
+		found[id] = true
+	}
+	if !found["sg-11111111"] || !found["sg-22222222"] {
+		t.Errorf("ResourceIDs = %v, want [sg-11111111 sg-22222222]", result.ResourceIDs)
+	}
+}
+
+// TestRelated_ECSTask_SG_NoAttachmentsReturnsZero verifies Count=0 when the
+// task has no ENI attachment at all (e.g. bridge/host networking).
+func TestRelated_ECSTask_SG_NoAttachmentsReturnsZero(t *testing.T) {
+	task := ecstypes.Task{}
+	res := resource.Resource{ID: "task-abc", RawStruct: task}
+
+	checker := ecsTaskCheckerByTarget(t, "sg")
+	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
 	if result.Count != 0 {
-		t.Errorf("Count = %d, want 0 (SGs not in Task.Attachments)", result.Count)
+		t.Errorf("Count = %d, want 0 (no ENI attachment, nothing to cross-reference)", result.Count)
 	}
 }
 
