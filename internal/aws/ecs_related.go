@@ -139,10 +139,7 @@ func checkECSKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		*cluster.Configuration.ExecuteCommandConfiguration.KmsKeyId == "" {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
-	keyID := *cluster.Configuration.ExecuteCommandConfiguration.KmsKeyId
-	if idx := strings.LastIndex(keyID, "/"); idx >= 0 && idx < len(keyID)-1 {
-		keyID = keyID[idx+1:]
-	}
+	keyID := kmsKeyIDFromField(*cluster.Configuration.ExecuteCommandConfiguration.KmsKeyId, res.Type)
 	return relatedResult("kms", []string{keyID})
 }
 

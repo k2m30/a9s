@@ -478,7 +478,12 @@ func TestRelated_Kinesis_CFN_NoTag(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestRelated_Kinesis_KMS_Present verifies that a stream with KMS encryption
-// has its KeyId extracted (stripping the alias prefix) and returned as Count=1.
+// has its KeyId extracted and returned as Count=1. "alias/aws/kinesis/mrk-abc1234"
+// is a bare alias name (no "arn:aws:kms:...:alias/" prefix for
+// kmsKeyIDFromField's ":alias/" strip to match), so it must pass through
+// WHOLE — including the embedded "aws/kinesis/" segment. Splitting on the
+// last "/" (the pre-fix behavior) would truncate this to "mrk-abc1234",
+// discarding a real, meaningful part of the alias name.
 func TestRelated_Kinesis_KMS_Present(t *testing.T) {
 	const streamName = "clickstream-ingest"
 
@@ -493,9 +498,9 @@ func TestRelated_Kinesis_KMS_Present(t *testing.T) {
 	if result.Count != 1 {
 		t.Errorf("Count = %d, want 1 (KMS key present)", result.Count)
 	}
-	// KeyId after stripping last "/" prefix segment: "mrk-abc1234"
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "mrk-abc1234" {
-		t.Errorf("ResourceIDs = %v, want [mrk-abc1234]", result.ResourceIDs)
+	// Bare alias, no ARN prefix: kmsKeyIDFromField returns it unchanged in full.
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "alias/aws/kinesis/mrk-abc1234" {
+		t.Errorf("ResourceIDs = %v, want [alias/aws/kinesis/mrk-abc1234]", result.ResourceIDs)
 	}
 }
 

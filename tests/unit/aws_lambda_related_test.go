@@ -621,8 +621,13 @@ func TestRelated_Lambda_KMS_EmptyKMSArn(t *testing.T) {
 	}
 }
 
-// TestRelated_Lambda_KMS_KMSKeyNoSlash: KMS key ARN with no "/" (alias or bare key ID)
-// should be returned as-is.
+// TestRelated_Lambda_KMS_KMSKeyNoSlash: "alias/aws/lambda" is a bare alias
+// name (no "arn:aws:kms:...:alias/" prefix for kmsKeyIDFromField's ":alias/"
+// strip to match), so it must pass through WHOLE. Splitting on the last "/"
+// (the pre-fix behavior) would truncate this to "lambda" — the trailing
+// service-name segment of the AWS-managed alias, not a real DescribeKey-
+// compatible identifier — which is exactly the fabrication bug class this
+// helper now guards against.
 func TestRelated_Lambda_KMS_KMSKeyNoSlash(t *testing.T) {
 	src := resource.Resource{
 		ID:   "function-bare-kms",
@@ -634,12 +639,12 @@ func TestRelated_Lambda_KMS_KMSKeyNoSlash(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	// Has "/" → last segment after final "/" is "lambda"
+	// Bare alias, no ARN prefix: kmsKeyIDFromField returns it unchanged in full.
 	if result.Count != 1 {
 		t.Errorf("Count = %d, want 1", result.Count)
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "lambda" {
-		t.Errorf("ResourceIDs = %v, want [lambda]", result.ResourceIDs)
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "alias/aws/lambda" {
+		t.Errorf("ResourceIDs = %v, want [alias/aws/lambda]", result.ResourceIDs)
 	}
 }
 

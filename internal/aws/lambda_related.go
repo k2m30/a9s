@@ -165,10 +165,7 @@ func checkLambdaKMS(_ context.Context, _ any, res resource.Resource, _ resource.
 	if !ok || fn.KMSKeyArn == nil || *fn.KMSKeyArn == "" {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
-	keyID := *fn.KMSKeyArn
-	if idx := strings.LastIndex(keyID, "/"); idx >= 0 && idx < len(keyID)-1 {
-		keyID = keyID[idx+1:]
-	}
+	keyID := kmsKeyIDFromField(*fn.KMSKeyArn, res.Type)
 	return relatedResult("kms", []string{keyID})
 }
 

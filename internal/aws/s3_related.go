@@ -188,10 +188,9 @@ func checkS3KMS(ctx context.Context, clients any, res resource.Resource, _ resou
 		if keyID == "" {
 			continue
 		}
-		// KMSMasterKeyID may be a full ARN (arn:aws:kms:…:key/ID) or bare ID/alias.
-		if idx := strings.LastIndex(keyID, "/"); idx >= 0 && idx < len(keyID)-1 {
-			keyID = keyID[idx+1:]
-		}
+		// KMSMasterKeyID may be a full key ARN, a full alias ARN (including
+		// AWS-managed aliases like "alias/aws/s3"), or a bare ID/alias.
+		keyID = kmsKeyIDFromField(keyID, res.Type)
 		ids = append(ids, keyID)
 	}
 	return relatedResult("kms", ids)

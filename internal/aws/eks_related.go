@@ -195,10 +195,7 @@ func checkEKSKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		*raw.EncryptionConfig[0].Provider.KeyArn == "" {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
-	keyID := *raw.EncryptionConfig[0].Provider.KeyArn
-	if idx := strings.LastIndex(keyID, "/"); idx >= 0 && idx < len(keyID)-1 {
-		keyID = keyID[idx+1:]
-	}
+	keyID := kmsKeyIDFromField(*raw.EncryptionConfig[0].Provider.KeyArn, res.Type)
 	return relatedResult("kms", []string{keyID})
 }
 
