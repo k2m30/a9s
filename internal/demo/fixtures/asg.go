@@ -52,6 +52,14 @@ func buildASGGroups() []asgtypes.AutoScalingGroup {
 			LaunchConfigurationName: aws.String("acme-web-prod-lc"),
 			VPCZoneIdentifier:       aws.String(asgSubnetA + "," + asgSubnetB + "," + asgSubnetC),
 			CreatedTime:             aws.Time(mustTime("2025-01-15T10:00:00Z")),
+			// Instances — required for ami→asg (via ec2 cache image_id match) and
+			// ec2→asg related-panel pivots. Both instances launched from
+			// fixtProdAMIID1 (ec2.go), so checkAMIASG's ec2-cache cross-reference
+			// resolves this ASG for that AMI.
+			Instances: []asgtypes.Instance{
+				{InstanceId: aws.String("i-0a1b2c3d4e5f60001"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
+				{InstanceId: aws.String("i-0a1b2c3d4e5f60002"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
+			},
 			Tags: []asgtypes.TagDescription{
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
 				{Key: aws.String("Service"), Value: aws.String("web")},
@@ -67,9 +75,12 @@ func buildASGGroups() []asgtypes.AutoScalingGroup {
 			HealthCheckGracePeriod: aws.Int32(60),
 			VPCZoneIdentifier:      aws.String(asgSubnetA + "," + asgSubnetB),
 			CreatedTime:            aws.Time(mustTime("2025-02-01T08:00:00Z")),
+			// AmazonECSManaged — required for ecs→asg related-panel pivot.
+			// Marks this ASG as owned by an ECS cluster capacity provider.
 			Tags: []asgtypes.TagDescription{
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
 				{Key: aws.String("Service"), Value: aws.String("batch-worker")},
+				{Key: aws.String("AmazonECSManaged"), Value: aws.String("true")},
 			},
 		},
 		{
@@ -111,6 +122,11 @@ func buildASGGroups() []asgtypes.AutoScalingGroup {
 			VPCZoneIdentifier:      aws.String(asgSubnetA + "," + asgSubnetB + "," + asgSubnetC),
 			Status:                 aws.String("Delete in progress"),
 			CreatedTime:            aws.Time(mustTime("2025-03-05T12:00:00Z")),
+			// Instances — required for eks→ec2 related-panel pivot (via
+			// ListNodegroups/DescribeNodegroup → this ASG → DescribeAutoScalingGroups).
+			Instances: []asgtypes.Instance{
+				{InstanceId: aws.String("i-0a1b2c3d4e5f60003"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
+			},
 			Tags: []asgtypes.TagDescription{
 				{Key: aws.String("eks:cluster-name"), Value: aws.String("acme-prod")},
 				{Key: aws.String("eks:nodegroup-name"), Value: aws.String("general-pool")},

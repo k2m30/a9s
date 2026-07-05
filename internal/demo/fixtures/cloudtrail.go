@@ -660,5 +660,89 @@ func buildCTEvents() []cloudtrailtypes.Event {
 				ProdRedisID,
 			)),
 		},
+		// api-gateway ECS service events — required for ecs-svc→ct-events
+		// related-panel pivot. checkECSSvcCTEvents matches ResourceName
+		// containing the service name (api-gateway).
+		{
+			EventId:     aws.String("evt-ecs-svc-api-gateway-update-001"),
+			EventName:   aws.String("UpdateService"),
+			EventSource: aws.String("ecs.amazonaws.com"),
+			EventTime:   aws.Time(time.Date(2026, 4, 17, 15, 0, 0, 0, time.UTC)),
+			Username:    aws.String("ci-service-account"),
+			ReadOnly:    aws.String("false"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::ECS::Service"), ResourceName: aws.String("arn:aws:ecs:us-east-1:123456789012:service/acme-services/api-gateway")},
+			},
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/ci-service-account","accountId":"123456789012","userName":"ci-service-account"},"eventSource":"ecs.amazonaws.com","eventName":"UpdateService","requestParameters":{"service":"api-gateway","cluster":"acme-services","desiredCount":4}}`),
+		},
+		// api-gateway ECS task events — required for ecs-task→ct-events
+		// related-panel pivot. checkECSTaskCTEvents matches ResourceName
+		// containing the task UUID.
+		{
+			EventId:     aws.String("evt-ecs-task-api-gateway-stop-001"),
+			EventName:   aws.String("StopTask"),
+			EventSource: aws.String("ecs.amazonaws.com"),
+			EventTime:   aws.Time(time.Date(2026, 3, 20, 8, 30, 0, 0, time.UTC)),
+			Username:    aws.String("ci-service-account"),
+			ReadOnly:    aws.String("false"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::ECS::Task"), ResourceName: aws.String("arn:aws:ecs:us-east-1:123456789012:task/acme-services/a1b2c3d4e5f6a1b2c3d4e5f6")},
+			},
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/ci-service-account","accountId":"123456789012","userName":"ci-service-account"},"eventSource":"ecs.amazonaws.com","eventName":"StopTask","requestParameters":{"task":"a1b2c3d4e5f6a1b2c3d4e5f6","cluster":"acme-services"}}`),
+		},
+		// acme-docdb-prod events — required for dbc→ct-events related-panel pivot.
+		// ResourceName matches ProdDbcID (DBClusterIdentifier) so checkDbcCTEvents
+		// resolves fields["resource_name"] == res.ID.
+		{
+			EventId:     aws.String("evt-docdb-prod-modify-001"),
+			EventName:   aws.String("ModifyDBCluster"),
+			EventSource: aws.String("rds.amazonaws.com"),
+			EventTime:   aws.Time(time.Date(2026, 4, 16, 9, 0, 0, 0, time.UTC)),
+			Username:    aws.String("alice.johnson"),
+			ReadOnly:    aws.String("false"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::RDS::DBCluster"), ResourceName: aws.String(ProdDbcID)},
+			},
+			CloudTrailEvent: aws.String(fmt.Sprintf(
+				`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/alice.johnson","accountId":"123456789012","userName":"alice.johnson"},"eventSource":"rds.amazonaws.com","eventName":"ModifyDBCluster","requestParameters":{"dBClusterIdentifier":%q,"backupRetentionPeriod":7}}`,
+				ProdDbcID,
+			)),
+		},
+		// rds:acme-docdb-prod-2026-03-20 events — required for dbc-snap→ct-events
+		// related-panel pivot. ResourceName matches ProdDBCSnapDocDBID
+		// (DBClusterSnapshotIdentifier).
+		{
+			EventId:     aws.String("evt-docdb-snap-prod-create-001"),
+			EventName:   aws.String("CreateDBClusterSnapshot"),
+			EventSource: aws.String("rds.amazonaws.com"),
+			EventTime:   aws.Time(time.Date(2026, 3, 20, 4, 0, 0, 0, time.UTC)),
+			Username:    aws.String("ci-service-account"),
+			ReadOnly:    aws.String("false"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::RDS::DBClusterSnapshot"), ResourceName: aws.String(ProdDBCSnapDocDBID)},
+			},
+			CloudTrailEvent: aws.String(fmt.Sprintf(
+				`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/ci-service-account","accountId":"123456789012","userName":"ci-service-account"},"eventSource":"rds.amazonaws.com","eventName":"CreateDBClusterSnapshot","requestParameters":{"dBClusterSnapshotIdentifier":%q,"dBClusterIdentifier":%q}}`,
+				ProdDBCSnapDocDBID, ProdDbcID,
+			)),
+		},
+		// rds:prod-dbi-1-2026-04-15 events — required for dbi-snap→ct-events
+		// related-panel pivot. ResourceName matches ProdDBISnapID
+		// (DBSnapshotIdentifier).
+		{
+			EventId:     aws.String("evt-dbi-snap-prod-create-001"),
+			EventName:   aws.String("CreateDBSnapshot"),
+			EventSource: aws.String("rds.amazonaws.com"),
+			EventTime:   aws.Time(time.Date(2026, 4, 15, 4, 0, 0, 0, time.UTC)),
+			Username:    aws.String("ci-service-account"),
+			ReadOnly:    aws.String("false"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::RDS::DBSnapshot"), ResourceName: aws.String(ProdDBISnapID)},
+			},
+			CloudTrailEvent: aws.String(fmt.Sprintf(
+				`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/ci-service-account","accountId":"123456789012","userName":"ci-service-account"},"eventSource":"rds.amazonaws.com","eventName":"CreateDBSnapshot","requestParameters":{"dBSnapshotIdentifier":%q,"dBInstanceIdentifier":"prod-dbi-1"}}`,
+				ProdDBISnapID,
+			)),
+		},
 	}
 }

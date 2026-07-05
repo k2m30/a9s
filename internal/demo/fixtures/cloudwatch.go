@@ -395,6 +395,140 @@ var sharedCloudWatchFixtures = sync.OnceValue(func() *CloudWatchFixtures {
 					{Name: aws.String("ClusterIdentifier"), Value: aws.String(AcmeReportingID)},
 				},
 			},
+			// acme-services ECS cluster alarm — required for ecs→alarm related-panel pivot.
+			// Dimension ClusterName matches the acme-services cluster (ecs.go).
+			{
+				AlarmName:             aws.String("ecs-acme-services-cpu-reservation"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:ecs-acme-services-cpu-reservation"),
+				AlarmDescription:      aws.String("Triggers when acme-services cluster CPU reservation exceeds 90%"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 3 datapoints were less than the threshold (90.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 19, 7, 0, 0, 0, time.UTC)),
+				MetricName:            aws.String("CPUReservation"),
+				Namespace:             aws.String("AWS/ECS"),
+				Threshold:             aws.Float64(90.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanThreshold,
+				EvaluationPeriods:     aws.Int32(3),
+				Period:                aws.Int32(300),
+				Statistic:             cwtypes.StatisticAverage,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("ClusterName"), Value: aws.String("acme-services")},
+				},
+			},
+			// api-gateway ECS service alarm — required for ecs-svc→alarm related-panel
+			// pivot. Dimensions match ServiceName=api-gateway + ClusterName=acme-services.
+			{
+				AlarmName:             aws.String("ecs-svc-api-gateway-running-count"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:ecs-svc-api-gateway-running-count"),
+				AlarmDescription:      aws.String("Triggers when api-gateway running task count drops below desired"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 3 datapoints were greater than or equal to the threshold (4.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 19, 8, 0, 0, 0, time.UTC)),
+				MetricName:            aws.String("RunningTaskCount"),
+				Namespace:             aws.String("ECS/ContainerInsights"),
+				Threshold:             aws.Float64(4.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorLessThanThreshold,
+				EvaluationPeriods:     aws.Int32(3),
+				Period:                aws.Int32(60),
+				Statistic:             cwtypes.StatisticMinimum,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("ServiceName"), Value: aws.String("api-gateway")},
+					{Name: aws.String("ClusterName"), Value: aws.String("acme-services")},
+				},
+			},
+			// api-gateway ECS task alarm — required for ecs-task→alarm related-panel
+			// pivot. Dimension TaskId matches the STOPPED api-gateway task UUID.
+			{
+				AlarmName:             aws.String("ecs-task-api-gateway-memory-util"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:ecs-task-api-gateway-memory-util"),
+				AlarmDescription:      aws.String("Triggers when task memory utilization exceeds 90%"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 3 datapoints were less than the threshold (90.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 3, 20, 8, 20, 0, 0, time.UTC)),
+				MetricName:            aws.String("MemoryUtilized"),
+				Namespace:             aws.String("ECS/ContainerInsights"),
+				Threshold:             aws.Float64(90.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanThreshold,
+				EvaluationPeriods:     aws.Int32(3),
+				Period:                aws.Int32(60),
+				Statistic:             cwtypes.StatisticAverage,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("TaskId"), Value: aws.String("a1b2c3d4e5f6a1b2c3d4e5f6")},
+				},
+			},
+			// acme-prod EKS cluster alarm — required for eks→alarm related-panel pivot.
+			// Dimension ClusterName matches the acme-prod EKS cluster (eks.go).
+			{
+				AlarmName:             aws.String("eks-acme-prod-control-plane-errors"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:eks-acme-prod-control-plane-errors"),
+				AlarmDescription:      aws.String("Triggers when EKS control-plane API server error rate exceeds threshold"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 3 datapoints were less than the threshold (5.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 18, 9, 0, 0, 0, time.UTC)),
+				MetricName:            aws.String("apiserver_request_total"),
+				Namespace:             aws.String("AWS/EKS"),
+				Threshold:             aws.Float64(5.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanThreshold,
+				EvaluationPeriods:     aws.Int32(3),
+				Period:                aws.Int32(300),
+				Statistic:             cwtypes.StatisticSum,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("ClusterName"), Value: aws.String("acme-prod")},
+				},
+			},
+			// api-gateway-authorizer Lambda alarm — required for lambda→alarm
+			// related-panel pivot. Dimension FunctionName matches the function
+			// name (lambda.go).
+			{
+				AlarmName:             aws.String("lambda-api-gateway-authorizer-errors"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:lambda-api-gateway-authorizer-errors"),
+				AlarmDescription:      aws.String("Triggers when api-gateway-authorizer error count exceeds 5 in 5 minutes"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 3 datapoints were less than the threshold (5.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 19, 9, 0, 0, 0, time.UTC)),
+				MetricName:            aws.String("Errors"),
+				Namespace:             aws.String("AWS/Lambda"),
+				Threshold:             aws.Float64(5.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanThreshold,
+				EvaluationPeriods:     aws.Int32(2),
+				Period:                aws.Int32(300),
+				Statistic:             cwtypes.StatisticSum,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("FunctionName"), Value: aws.String("api-gateway-authorizer")},
+				},
+			},
+			// web-prod-01-root volume alarm — required for ebs→alarm related-panel pivot.
+			// Dimension VolumeId matches vol-0a1b2c3d4e5f60001 (ec2.go buildVolumes).
+			{
+				AlarmName:             aws.String("ebs-web-prod-root-burst-balance"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:ebs-web-prod-root-burst-balance"),
+				AlarmDescription:      aws.String("Triggers when EBS burst balance drops below 20%"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 3 datapoints were greater than the threshold (20.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 19, 6, 0, 0, 0, time.UTC)),
+				MetricName:            aws.String("BurstBalance"),
+				Namespace:             aws.String("AWS/EBS"),
+				Threshold:             aws.Float64(20.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorLessThanThreshold,
+				EvaluationPeriods:     aws.Int32(3),
+				Period:                aws.Int32(300),
+				Statistic:             cwtypes.StatisticAverage,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("VolumeId"), Value: aws.String("vol-0a1b2c3d4e5f60001")},
+				},
+			},
 			// Issue: OK state but ActionsEnabled=false → Warning (alarm silenced/muted)
 			{
 				AlarmName:             aws.String("alarm-muted"),

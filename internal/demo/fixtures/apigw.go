@@ -27,7 +27,9 @@ var sharedAPIGWFixtures = sync.OnceValue(func() *APIGWFixtures {
 				CreatedDate:               aws.Time(time.Date(2025, 3, 10, 9, 0, 0, 0, time.UTC)),
 				ApiKeySelectionExpression: aws.String("$request.header.x-api-key"),
 				CorsConfiguration:         &apigwtypes.Cors{AllowMethods: []string{"GET", "POST", "PUT", "DELETE"}, AllowOrigins: []string{"https://app.acme-corp.com"}},
-				Tags:                      map[string]string{"Environment": "production"},
+				// api-gateway-authorizer tag — required for lambda→apigw
+				// related-panel pivot. checkLambdaAPIGW matches api.Tags[fnName].
+				Tags: map[string]string{"Environment": "production", "api-gateway-authorizer": "custom-authorizer"},
 			},
 			{
 				ApiId:                    aws.String("efg567hij8"),

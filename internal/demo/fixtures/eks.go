@@ -78,9 +78,12 @@ func buildEKSClusters() []*ekstypes.Cluster {
 			},
 			CreatedAt:       aws.Time(mustTime("2025-03-01T10:00:00Z")),
 			PlatformVersion: aws.String("eks.5"),
+			// aws:cloudformation:stack-name tag — required for eks→cfn
+			// related-panel pivot. acme-eks-cluster is a real stack fixture (cfn.go).
 			Tags: map[string]string{
-				"Environment": "prod",
-				"Team":        "platform",
+				"Environment":                    "prod",
+				"Team":                           "platform",
+				"aws:cloudformation:stack-name": "acme-eks-cluster",
 			},
 		},
 		{
@@ -188,10 +191,12 @@ func buildEKSNodegroups() map[string][]ekstypes.Nodegroup {
 					MaxSize:     aws.Int32(8),
 					DesiredSize: aws.Int32(3),
 				},
+				// RemoteAccessSecurityGroup — required for ng→sg related-panel pivot.
 				Resources: &ekstypes.NodegroupResources{
 					AutoScalingGroups: []ekstypes.AutoScalingGroup{
 						{Name: aws.String("eks-acme-prod-ng-general")},
 					},
+					RemoteAccessSecurityGroup: aws.String("sg-0eks111111111111e"),
 				},
 				LaunchTemplate: &ekstypes.LaunchTemplateSpecification{
 					Id:      aws.String("lt-0eks111111111111a"),

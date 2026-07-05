@@ -193,6 +193,36 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 			RetentionInDays: aws.Int32(30),
 			CreationTime:    aws.Int64(1741996800000), // 2025-03-15
 		},
+		// bastion-prod (i-0a1b2c3d4e5f60005) CloudWatch-agent log group —
+		// required for ec2→logs related-panel pivot. checkEC2Logs matches log
+		// groups whose ID contains the instance ID.
+		{
+			LogGroupName:    aws.String("/aws/ec2/i-0a1b2c3d4e5f60005"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/ec2/i-0a1b2c3d4e5f60005:*"),
+			StoredBytes:     aws.Int64(20971520),
+			RetentionInDays: aws.Int32(14),
+			CreationTime:    aws.Int64(1748736000000), // 2025-06-01
+		},
+		// acme-services ECS cluster log group — required for ecs→logs
+		// related-panel pivot. checkECSLogs matches log groups whose ID
+		// contains the cluster name.
+		{
+			LogGroupName:    aws.String("/ecs/acme-services/app"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/ecs/acme-services/app:*"),
+			StoredBytes:     aws.Int64(157286400),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1750000000000),
+		},
+		// api-gateway ECS task-definition family log group — required for
+		// ecs-svc→logs and ecs-task→logs related-panel pivots. Both checkers
+		// match log groups whose ID contains the task-def family name.
+		{
+			LogGroupName:    aws.String("/ecs/api-gateway"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/ecs/api-gateway:*"),
+			StoredBytes:     aws.Int64(78643200),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1750100000000),
+		},
 	}
 
 	logStreams := map[string][]cwlogstypes.LogStream{

@@ -76,9 +76,12 @@ func buildECSClusters() []ecstypes.Cluster {
 					KmsKeyId: aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
 				},
 			},
+			// aws:cloudformation:stack-name tag — required for ecs→cfn
+			// related-panel pivot. acme-eks-cluster is a real stack fixture (cfn.go).
 			Tags: []ecstypes.Tag{
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
 				{Key: aws.String("Team"), Value: aws.String("platform")},
+				{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("acme-eks-cluster")},
 			},
 		},
 		{
@@ -153,9 +156,28 @@ func buildECSServices() []ecstypes.Service {
 			TaskDefinition:     aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/api-gateway:12"),
 			SchedulingStrategy: ecstypes.SchedulingStrategyReplica,
 			CreatedAt:          aws.Time(mustTime("2025-06-15T10:30:00Z")),
+			// RoleArn — required for ecs-svc→role related-panel pivot.
+			RoleArn: aws.String("arn:aws:iam::123456789012:role/acme-ecs-service-role"),
+			// LoadBalancers — required for ecs-svc→tg and ecs-svc→elb related-panel
+			// pivots. fixtProdWebTGARN is a real TG fixture (elb.go) attached to a
+			// real ELB (fixtProdELBARN).
+			LoadBalancers: []ecstypes.LoadBalancer{
+				{TargetGroupArn: aws.String(fixtProdWebTGARN), ContainerName: aws.String("api"), ContainerPort: aws.Int32(8080)},
+			},
+			// NetworkConfiguration — required for ecs-svc→sg, ecs-svc→subnet, and
+			// ecs-svc→vpc related-panel pivots. SG and subnet are real ec2.go fixtures.
+			NetworkConfiguration: &ecstypes.NetworkConfiguration{
+				AwsvpcConfiguration: &ecstypes.AwsVpcConfiguration{
+					SecurityGroups: []string{"sg-0bbb222222222222b"},
+					Subnets:        []string{"subnet-0aaa111111111111a"},
+				},
+			},
+			// aws:cloudformation:stack-name tag — required for ecs-svc→cfn
+			// related-panel pivot. acme-eks-cluster is a real stack fixture (cfn.go).
 			Tags: []ecstypes.Tag{
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
 				{Key: aws.String("Team"), Value: aws.String("platform")},
+				{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("acme-eks-cluster")},
 			},
 		},
 		{
@@ -333,6 +355,21 @@ func buildECSTasks() []ecstypes.Task {
 			PlatformVersion:   aws.String("1.4.0"),
 			PlatformFamily:    aws.String("Linux"),
 			AvailabilityZone:  aws.String("us-east-1a"),
+			// Attachments — required for ecs-task→eni and ecs-task→subnet
+			// related-panel pivots (awsvpc networking mode).
+			Attachments: []ecstypes.Attachment{
+				{
+					Type: aws.String("ElasticNetworkInterface"),
+					Details: []ecstypes.KeyValuePair{
+						{Name: aws.String("networkInterfaceId"), Value: aws.String("eni-0aaa111111111111a")},
+						{Name: aws.String("subnetId"), Value: aws.String("subnet-0aaa111111111111a")},
+					},
+				},
+			},
+			// Containers — required for ecs-task→ecr related-panel pivot.
+			Containers: []ecstypes.Container{
+				{Name: aws.String("api"), Image: aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/api-service:latest")},
+			},
 		},
 		{
 			TaskArn:           aws.String("arn:aws:ecs:us-east-1:123456789012:task/acme-services/b2c3d4e5f6a1b2c3d4e5f601"),
@@ -374,11 +411,14 @@ func buildECSTasks() []ecstypes.Task {
 			DesiredStatus:     aws.String("RUNNING"),
 			TaskDefinitionArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/batch-etl-runner:3"),
 			LaunchType:        ecstypes.LaunchTypeEc2,
-			Cpu:               aws.String("2048"),
-			Memory:            aws.String("4096"),
-			Group:             aws.String("service:batch-etl-runner"),
-			StartedAt:         aws.Time(mustTime("2026-03-21T02:00:00Z")),
-			HealthStatus:      ecstypes.HealthStatusHealthy,
+			// ContainerInstanceArn — required for ecs-task→ec2 related-panel
+			// pivot (EC2 launch-type task).
+			ContainerInstanceArn: aws.String("arn:aws:ecs:us-east-1:123456789012:container-instance/acme-batch/e1f2a3b4c5d6e1f2a3b4c5d6"),
+			Cpu:                  aws.String("2048"),
+			Memory:               aws.String("4096"),
+			Group:                aws.String("service:batch-etl-runner"),
+			StartedAt:            aws.Time(mustTime("2026-03-21T02:00:00Z")),
+			HealthStatus:         ecstypes.HealthStatusHealthy,
 			Connectivity:      ecstypes.ConnectivityConnected,
 			AvailabilityZone:  aws.String("us-east-1c"),
 		},

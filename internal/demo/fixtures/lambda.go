@@ -98,8 +98,16 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 			DeadLetterConfig: &lambdatypes.DeadLetterConfig{
 				TargetArn: aws.String("arn:aws:sqs:us-east-1:123456789012:dead-letter-queue"),
 			},
+			// Environment variables carry a Secrets Manager ARN and an SSM
+			// parameter-style path — required for lambda→secrets and
+			// lambda→ssm related-panel pivots.
 			Environment: &lambdatypes.EnvironmentResponse{
-				Variables: map[string]string{"ENV": "production", "LOG_LEVEL": "INFO"},
+				Variables: map[string]string{
+					"ENV":           "production",
+					"LOG_LEVEL":     "INFO",
+					"DB_SECRET_ARN": "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/database/primary-AbCdEf",
+					"CONFIG_PARAM":  "/acme/prod/app/config",
+				},
 			},
 			LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
 			VpcConfig: &lambdatypes.VpcConfigResponse{
@@ -107,6 +115,8 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 				SubnetIds:        []string{lambdaProdSubnetA},
 				SecurityGroupIds: []string{lambdaProdALBSGID},
 			},
+			// KMSKeyArn — required for lambda→kms related-panel pivot.
+			KMSKeyArn: aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
 		},
 		{
 			FunctionName:     aws.String("data-pipeline-transform"),
@@ -564,6 +574,30 @@ func buildLambdaEventSourceMappings(fns []lambdatypes.FunctionConfiguration) []l
 				StartingPosition:     lambdatypes.EventSourcePositionTrimHorizon,
 				LastProcessingResult: aws.String("OK"),
 			})
+		case "data-pipeline-transform":
+			// data-pipeline-transform is triggered by both a Kinesis stream and
+			// an MSK cluster — required for lambda→kinesis and lambda→msk
+			// related-panel pivots. clickstream-ingest and acme-events-prod are
+			// real fixtures (kinesis.go, msk.go).
+			mappings = append(mappings,
+				lambdatypes.EventSourceMappingConfiguration{
+					UUID:                 aws.String("esm-data-pipeline-kinesis-01"),
+					FunctionArn:          fn.FunctionArn,
+					EventSourceArn:       aws.String("arn:aws:kinesis:us-east-1:123456789012:stream/clickstream-ingest"),
+					State:                aws.String("Enabled"),
+					BatchSize:            aws.Int32(100),
+					StartingPosition:     lambdatypes.EventSourcePositionLatest,
+					LastProcessingResult: aws.String("OK"),
+				},
+				lambdatypes.EventSourceMappingConfiguration{
+					UUID:                 aws.String("esm-data-pipeline-msk-01"),
+					FunctionArn:          fn.FunctionArn,
+					EventSourceArn:       aws.String("arn:aws:kafka:us-east-1:123456789012:cluster/acme-events-prod/a1b2c3d4"),
+					State:                aws.String("Enabled"),
+					BatchSize:            aws.Int32(100),
+					LastProcessingResult: aws.String("OK"),
+				},
+			)
 		}
 	}
 	return mappings
