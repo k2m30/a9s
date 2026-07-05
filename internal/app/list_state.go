@@ -386,6 +386,27 @@ func (c *Controller) SetListRefreshing(v bool) {
 	ls.Refreshing = v
 }
 
+// SetListTotalCount sets the TotalCount override on the top list screen.
+// Mirrors SetListRefreshing's locking/topListState pattern. Used by
+// cache-first seeding callers (item B, #17 wave 2, DEF-21) AFTER
+// applyResourcesLoaded so the seed-time value survives the unconditional
+// clear inside it — same set-after-seed ordering SetListRefreshing already
+// requires. n <= 0 is a no-op: TotalCount's zero value already means
+// "not applicable", and buildListFrameTitle only prefers TotalCount when it
+// exceeds len(Rows).
+func (c *Controller) SetListTotalCount(n int) {
+	if n <= 0 {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	ls := c.topListState()
+	if ls == nil {
+		return
+	}
+	ls.TotalCount = n
+}
+
 // GetListPaginationCursor returns the pagination cursor of the top list screen.
 func (c *Controller) GetListPaginationCursor() string {
 	c.mu.RLock()

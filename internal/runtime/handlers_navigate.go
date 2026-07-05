@@ -222,6 +222,14 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 						Pagination: &resource.PaginationMeta{
 							IsTruncated: !tf.Exact,
 						},
+						// Item B/DEF-21: tf.Count is the authoritative total for the
+						// C6a reconstructable pair (Count may exceed len(tf.Rows) — a
+						// counts-only write never touches Rows). Carry it through so
+						// the seeded list's title shows the real total, not the
+						// last-known page count. Only set when it actually exceeds
+						// what Rows would already report, matching TotalCount's
+						// "unknown/not applicable" zero-value contract.
+						TotalCount: max(tf.Count, len(tf.Rows)),
 					}
 				}
 				return nil

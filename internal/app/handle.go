@@ -305,6 +305,12 @@ func (c *Controller) maybeSaveResourceListCache(ls *ListState, canon string) {
 	issues := c.listIssueCount(ls, canon)
 	exact := !ls.HasPagination
 	_ = c.core.SaveResourceListCache(canon, rows, len(ls.Rows), exact, issues, issuesKnown, ls.HasPagination)
+	// Item A / DEF-21: keep the sweep lane's ProbeResources mirror in lockstep
+	// with what was just persisted, so a LATER sweep/enrichment-completion
+	// TaskKindSaveCache dispatch re-saves these same accumulated rows instead
+	// of a stale, independently-fetched probe snapshot that reconcileTypeFile's
+	// subset check might not recognise as a subset. See SyncProbeResourcesForType.
+	c.core.SyncProbeResourcesForType(canon, ls.Rows, ls.HasPagination)
 }
 
 // autoOpenSingleDetail replaces a web/headless by-ID placeholder list with the

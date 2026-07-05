@@ -308,6 +308,40 @@ func (c *Core) SaveResourceListCache(shortName string, rows []cache.Row, count i
 	})
 }
 
+// SyncProbeResourcesForType overwrites session.ProbeResources/ProbeTruncated
+// for shortName with the caller's current, fully-accumulated row set (item A,
+// #17 wave 2, DEF-21). Without this, ProbeResources[shortName] is only ever
+// written by the availability sweep's own first-page probe call (
+// handleAvailabilityChecked) or an enrichment rerun — never by a plain
+// list-open append (`m`/load-more) — so it silently drifts behind the
+// controller's own ls.Rows once a user pages past page 1. A LATER
+// TaskKindSaveCache dispatch (sweep or enrichment completion) then persists
+// that stale, smaller snapshot via saveProbeResourcesToTypeFiles /
+// SaveResourceListCache. reconcileTypeFile's rule 1 (shallower-subset-keeps-
+// deeper) only protects the on-disk rows when the stale snapshot's IDs are a
+// literal subset of the richer stored set — true when both observations came
+// from the same accumulated page set, but not guaranteed when the sweep's
+// probe and the list's own page 1 are independent AWS list calls without a
+// deterministic sort key (rule 1 then falls through to "incoming wins" and
+// destroys the deeper rows). Keeping ProbeResources in lockstep with the
+// controller's own accumulated rows removes the dependency on that
+// coincidence entirely: any later sweep-lane save re-persists the SAME rows
+// the list screen already wrote, so the two lanes can never disagree.
+//
+// Callers are responsible for the same C6 scope gate as
+// SaveResourceListCache (top-level, unfiltered list only).
+func (c *Core) SyncProbeResourcesForType(shortName string, resources []resource.Resource, truncated bool) {
+	canon := canonShortName(shortName)
+	if c.session.ProbeResources == nil {
+		c.session.ProbeResources = make(map[string][]resource.Resource)
+	}
+	c.session.ProbeResources[canon] = resources
+	if c.session.ProbeTruncated == nil {
+		c.session.ProbeTruncated = make(map[string]bool)
+	}
+	c.session.ProbeTruncated[canon] = truncated
+}
+
 // CachedListDepth returns the number of rows previously persisted for
 // shortName's canonical top-level list, so a background verify-refetch
 // (KindFetchResources) can be bounded to at most the depth already shown to

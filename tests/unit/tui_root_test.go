@@ -3,6 +3,7 @@ package unit
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -15,8 +16,51 @@ import (
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
-// helper: create a model with a size set so View() actually renders
+// lastAutoIsolatedConfigFolder records the value newRootSizedModel itself
+// last wrote to A9S_CONFIG_FOLDER via its own auto-isolation (below), so a
+// later call can tell "still my own auto-isolated dir from an earlier call in
+// this same test, or nobody has repointed it since" apart from "some OTHER
+// caller (this test's own t.Setenv, e.g. to seed a themes/ dir the theme
+// selector reads from disk) repointed it after my last call, and that
+// override must win, not be clobbered". Comparing against a single recorded
+// TestMain default (rather than this last-self-written value) breaks the
+// first time ANY test's t.Setenv rotates the var away from that default —
+// every subsequent default-relying call would then wrongly skip isolation
+// for the rest of the binary. Tracking "did *I* set the current value" stays
+// correct call over call regardless of how many tests in between used their
+// own t.Setenv.
+var lastAutoIsolatedConfigFolder string
+
+// helper: create a model with a size set so View() actually renders.
+//
+// #17 wave 2 isolation fix: every one of this helper's ~575 call sites shares
+// the hardcoded "testprofile"/"us-east-1" pair. Since Item A (#17 wave 1)
+// made a top-level TUI list open genuinely persist to
+// <A9S_CONFIG_FOLDER>/cache/testprofile--us-east-1/<type>.yaml (previously a
+// dead gate — see runtime_adapter_navigate.go), every caller now reads and
+// writes the SAME on-disk pair within one binary-wide TestMain temp dir,
+// so an earlier test's list rows leak into a later test's "fresh model"
+// precondition (12 tests flipped red on ec2/dbi/rds once the save gate
+// started firing for real). None of these ~575 call sites thread a
+// *testing.T through today, and retrofitting one is a much larger, riskier
+// diff than isolating at this single shared constructor — so a fresh,
+// unique A9S_CONFIG_FOLDER is set via plain os.Setenv (not t.Setenv, since
+// there is no *testing.T parameter here) on every call, UNLESS the calling
+// test already redirected A9S_CONFIG_FOLDER itself since this helper's last
+// call (see lastAutoIsolatedConfigFolder above) — that per-test override
+// must win, e.g. so a seeded themes/ directory the theme selector reads from
+// disk is not silently swapped out for an empty one. Every caller in this
+// package runs sequentially (no t.Parallel() call site here also invokes
+// this helper — see tui_stack_sync_test.go), so a later call's Setenv safely
+// lands before that caller's own I/O runs.
 func newRootSizedModel() tui.Model {
+	current := os.Getenv("A9S_CONFIG_FOLDER")
+	if lastAutoIsolatedConfigFolder == "" || current == lastAutoIsolatedConfigFolder {
+		if dir, err := os.MkdirTemp("", "a9s-roottest-config-*"); err == nil {
+			os.Setenv("A9S_CONFIG_FOLDER", dir) //nolint:errcheck // best-effort per-call isolation, not test-critical
+			lastAutoIsolatedConfigFolder = dir
+		}
+	}
 	return tuitest.Sized("testprofile", "us-east-1")
 }
 

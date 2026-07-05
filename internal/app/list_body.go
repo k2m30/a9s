@@ -104,6 +104,11 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 		// method, so this unconditional clear only ever fires for a genuine
 		// fetch-result swap, never undoing the seed-time flag.
 		ls.Refreshing = false
+		// Item B/DEF-21: a genuine fetch result also retires the seed-time
+		// TotalCount override — len(ls.Rows) is authoritative again once a real
+		// fetch has confirmed/replaced the seeded page. Mirrors Refreshing's
+		// clear-then-caller-rearms-after-seed ordering above.
+		ls.TotalCount = 0
 		// DEF-5/C4: a successful fetch result clears any outstanding error
 		// marker from a previous failed attempt.
 		ls.LastFetchError = ""
@@ -398,6 +403,12 @@ func (c *Controller) buildListFrameTitle(ctx runtime.ScreenContext, ls *ListStat
 
 	allResources := c.listScreenResources(ls, typeName)
 	total := len(allResources)
+	// Item B/DEF-21: a seeded-but-unverified list (C6a reconstructable disk
+	// pair) may know a larger authoritative total than its last-known Rows —
+	// prefer it for display until the next real fetch result clears it
+	// (applyResourcesLoaded). Only the displayed total is overridden; filtered
+	// still reflects the rows actually on screen.
+	total = max(total, ls.TotalCount)
 	visible := c.applyListFilters(ls, typeName, allResources)
 	filtered := len(visible)
 	truncated := ls.HasPagination

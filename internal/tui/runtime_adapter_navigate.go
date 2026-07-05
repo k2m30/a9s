@@ -98,8 +98,18 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		}
 		// Sync m.ctrl stack before constructing the transient view so
 		// topListState() inside NewResourceListFromCache resolves to this
-		// screen's ListState.
-		m.ctrl.PushChildListScreen(canon)
+		// screen's ListState. This is a top-level, menu-driven list — pushed as
+		// ScreenResourceList (not PushChildListScreen's ScreenChildList, which
+		// is reserved for actual child/related lists, see list_state.go's
+		// "persist-eligible" contract). Using ScreenChildList here silently
+		// disabled item A's C6 disk-cache save gate
+		// (maybeSaveResourceListCache checks screen.ID == ScreenResourceList)
+		// for every top-level TUI list (item A / DEF-21).
+		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{
+			ID:      runtime.ScreenResourceList,
+			Context: runtime.ScreenContext{ResourceType: canon},
+		}})
+		m.ctrl.EnsureListState()
 		rl := views.NewResourceListFromCache(
 			*rt, m.viewConfig, m.keys,
 			entry.Resources, entry.Pagination,
@@ -135,8 +145,14 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		}
 		// Sync m.ctrl stack before constructing the transient view so
 		// topListState() inside NewResourceList/NewResourceListFromCache
-		// resolves to this screen's ListState.
-		m.ctrl.PushChildListScreen(canon)
+		// resolves to this screen's ListState. Top-level, menu-driven list —
+		// see the ScreenResourceList-not-ScreenChildList note on the
+		// NavigateKindPushResourceListCached branch above (item A / DEF-21).
+		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{
+			ID:      runtime.ScreenResourceList,
+			Context: runtime.ScreenContext{ResourceType: canon},
+		}})
+		m.ctrl.EnsureListState()
 		var rl views.ResourceListModel
 		var initCmd tea.Cmd
 		if result.CachedEntry != nil {
@@ -161,6 +177,10 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 			// seeded page, so this must run after construction — mirrors the
 			// headless controller's ordering in applyNavResult.
 			m.ctrl.SetListRefreshing(true)
+			// Item B/DEF-21: same set-after-seed ordering — ApplyResourcesLoaded
+			// unconditionally clears TotalCount as part of applying the seeded
+			// page, so this must also run after construction.
+			m.ctrl.SetListTotalCount(entry.TotalCount)
 		} else {
 			rl = views.NewResourceList(*rt, m.viewConfig, m.keys, m.ctrl)
 			_, initCmd = rl.Init()

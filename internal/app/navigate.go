@@ -119,6 +119,13 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 		if res.Kind == runtime.NavigateKindPushResourceListCached && res.CachedEntry != nil {
 			c.applyResourcesLoaded(top.State.List, res.ResolvedType, res.CachedEntry.Resources, res.CachedEntry.Pagination, false)
 			top.State.List.Refreshing = true
+			// Item B/DEF-21: set AFTER applyResourcesLoaded, same ordering as
+			// Refreshing above — applyResourcesLoaded unconditionally clears
+			// TotalCount as part of every fetch-result landing (including this
+			// seed call itself).
+			if res.CachedEntry.TotalCount > 0 {
+				top.State.List.TotalCount = res.CachedEntry.TotalCount
+			}
 			return []runtime.TaskRequest{{
 				Key:   runtime.TaskKey{Kind: runtime.KindFetchResources, Scope: res.ResolvedType},
 				Cache: runtime.CacheNone,
@@ -136,6 +143,11 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 			c.applyResourcesLoaded(top.State.List, res.ResolvedType, res.CachedEntry.Resources, res.CachedEntry.Pagination, false)
 			top.State.List.Loading = false
 			top.State.List.Refreshing = true
+			// Item B/DEF-21: same set-after-seed ordering as the cache-hit branch
+			// above.
+			if res.CachedEntry.TotalCount > 0 {
+				top.State.List.TotalCount = res.CachedEntry.TotalCount
+			}
 		}
 
 	case runtime.NavigateKindPushDetail:
