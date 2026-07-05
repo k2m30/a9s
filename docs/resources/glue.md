@@ -171,7 +171,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — sibling Glue object types (crawlers, triggers, workflows) deliberately excluded for now — `a9s-devops persona (2026-04-20): possible=yes, worth=no. Would warrant their own shortNames in a future iteration; current glue shortName scopes to Jobs per related-resources.md.`
 
 <!-- BEGIN GENERATED: header -->
-glue — DATA & ANALYTICS. Lifecycle key: `state`.
+glue — DATA & ANALYTICS. Lifecycle key: none (the list API returns no lifecycle field).
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

@@ -130,7 +130,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Detail text (S5) wording `No packages published since repository was created 47 days ago — consider removing if unused.` — a9s-devops (2026-04-20): possible=yes, worth=yes; plain-English operator sentence with a next-step hint; ≤100 chars (exactly 99 with illustrative `47`). Avoids all banned jargon (no `Wave`, no `enrichment`, no `finding`, no `bucket`).
 
 <!-- BEGIN GENERATED: header -->
-codeartifact — CI/CD. Lifecycle key: `state`.
+codeartifact — CI/CD. Lifecycle key: none (the list API returns no lifecycle field).
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

@@ -7,6 +7,8 @@ derivedFrom: docs/resources/s3.md
 
 This doc is the execution contract between QA (tests) and coder (implementation). It derives from `docs/resources/s3.md` (the golden spec) — if the two disagree, the spec wins and this plan is regenerated.
 
+> **Status (2026-07-05): executed and landed 2026-04-23.** Every action in §4/§5 is in the tree: the two out-of-scope checkers are deleted, the enricher emits `!` / `"public access block incomplete"` / `FieldUpdates["status"]`, the `Status` column replaced `Public Access` in `internal/config/defaults_databases.go` and `.a9s/views/s3.yaml`, and all four test files exist (`aws_s3_test.go`, `aws_s3_related_test.go`, `aws_s3_issue_enrichment_test.go`, `tests/integration/scenario_s3_visual_test.go`). The "Current state" column in §4 describes the pre-execution April state and is kept as history. The fixture inventory in §3 was extended on 2026-07-05 (see the two additions marked below).
+
 ## 0. TBD resolution (phase 2)
 
 The spec contains two `TBD` markers — both were resolved by the spec itself in §5 Out of Scope and §6 Citations (already carried as a9s-devops decisions dated 2026-04-20). No new user input required this run.
@@ -215,12 +217,25 @@ A bucket whose GetPublicAccessBlock returns out.PublicAccessBlockConfiguration =
   BucketArn = "arn:aws:s3:::a9s-demo-nilcfg"
   CreationDate = 2025-05-01T14:00:00Z
   BucketRegion = "us-east-1"
+
+FIXTURE: access-log-bucket   (added 2026-04-23 with the wave; formalized here 2026-07-05)
+The healthy bucket's server-access-log destination — witnesses the "Access Log Bucket" pivot.
+  Name = "a9s-demo-logs"
+  Healthy (PAB fully blocked); no notification / encryption / logging of its own.
+
+FIXTURE: managed-kms-bucket   (added 2026-07-05)
+A bucket encrypted with the AWS-managed default key via its alias — witnesses the
+"managed default" KMS panel case from spec §2 (`kms` subsection).
+  Name = "a9s-demo-managed-kms"
+  Healthy (PAB fully blocked).
+  Encryption: SSE-KMS with KMSMasterKeyID = "alias/aws/s3" (alias-style KeyId, no ARN);
+  the kms fixture indexes the key by that alias verbatim, mirroring DescribeKey semantics.
 ```
 
-**Coverage-matrix counts:**
-- Healthy: 1 (`healthy-bucket`)
+**Coverage-matrix counts (updated 2026-07-05):**
+- Healthy: 3 (`healthy-bucket`, `access-log-bucket`, `managed-kms-bucket`)
 - `!` findings: 4 (`bucket-no-pab`, `bucket-partial-pab`, `bucket-multi-false-pab`, `bucket-nil-pab-cfg`)
-- → **expected S1 badge = `issues:4`**
+- → **expected S1 badge = `issues:4`** (unchanged — both additions are healthy)
 
 The U6 pseudocode test above states 3 `!` fixtures. Reconcile: 4 is correct for the demo fixture file. The test must assert N = 4 against this fixture set. (The earlier "3" text in U6 is illustrative from the matrix table template — the authoritative number is the fixture count.)
 

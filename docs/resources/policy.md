@@ -136,7 +136,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Managed policies have no trust-policy wildcard check (§5) — `a9s-devops (2026-04-20): possible=no — managed policies do not have trust policies; AssumeRole-wildcard checks live on role resource type, not here.`
 
 <!-- BEGIN GENERATED: header -->
-policy — SECURITY & IAM. Lifecycle key: `state`.
+policy — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecycle field).
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

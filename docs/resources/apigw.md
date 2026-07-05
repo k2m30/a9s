@@ -207,7 +207,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Severity choice `~` (not `!`) for "no deployed stage" — user decision deferred; current call is a9s-devops (2026-04-20): undeployed API is a cleanup/audit concern, not a page-the-on-call concern; promote to `!` only if governance escalation is adopted.
 
 <!-- BEGIN GENERATED: header -->
-apigw — DNS & CDN. Lifecycle key: `state`.
+apigw — DNS & CDN. Lifecycle key: none (the list API returns no lifecycle field).
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

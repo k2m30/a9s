@@ -28,6 +28,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/k2m30/a9s/v3/internal/aws"
@@ -155,8 +156,8 @@ func generateResourceDoc(repoRoot string, rt catalog.ResourceTypeDef) error {
 	path := filepath.Join(repoRoot, "docs", "resources", rt.ShortName+".md")
 
 	// Header section content.
-	header := fmt.Sprintf("%s — %s. Lifecycle key: `%s`.\n",
-		rt.ShortName, rt.Category, lifecycleKey(rt))
+	header := fmt.Sprintf("%s — %s. %s\n",
+		rt.ShortName, rt.Category, lifecycleFragment(rt))
 
 	// Findings section content.
 	var findingsContent strings.Builder
@@ -290,6 +291,18 @@ func lifecycleKey(rt catalog.ResourceTypeDef) string {
 		return "state"
 	}
 	return rt.LifecycleKey
+}
+
+// lifecycleFragment returns the "Lifecycle key: …" header sentence. When the
+// Wave 1 fetcher declares its field keys and the effective lifecycle key is
+// not among them, the type has no row-color driver — naming a key would send
+// QA hunting for a field that never exists.
+func lifecycleFragment(rt catalog.ResourceTypeDef) string {
+	key := lifecycleKey(rt)
+	if len(rt.FieldKeys) > 0 && !slices.Contains(rt.FieldKeys, key) {
+		return "Lifecycle key: none (the list API returns no lifecycle field)."
+	}
+	return fmt.Sprintf("Lifecycle key: `%s`.", key)
 }
 
 // readLines is a helper used to parse existing markdown files line by line.

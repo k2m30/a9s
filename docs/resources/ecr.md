@@ -187,7 +187,7 @@ One bullet per claim in §§2–4.1.
 - Removed stale `ecs` bullet from detailed `ecr` section — `a9s-resource-spec amendment (2026-04-20): contradicted per-type contract and Non-matches section; reason in HTML comment inline.`
 
 <!-- BEGIN GENERATED: header -->
-ecr — CI/CD. Lifecycle key: `state`.
+ecr — CI/CD. Lifecycle key: none (the list API returns no lifecycle field).
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

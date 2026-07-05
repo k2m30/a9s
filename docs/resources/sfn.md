@@ -163,7 +163,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `Read-only invariant` — `docs/architecture.md` § "What is a9s?".
 
 <!-- BEGIN GENERATED: header -->
-sfn — MESSAGING. Lifecycle key: `state`.
+sfn — MESSAGING. Lifecycle key: none (the list API returns no lifecycle field).
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

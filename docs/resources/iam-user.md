@@ -143,7 +143,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `iam-user` NOT-related pairs (`kms`, `role`) — `docs/related-resources.md` §"Known NOT-related pairs" lines 1101–1102.
 
 <!-- BEGIN GENERATED: header -->
-iam-user — SECURITY & IAM. Lifecycle key: `state`.
+iam-user — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecycle field).
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

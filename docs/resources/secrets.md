@@ -205,7 +205,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `DeletedDate set` classified as Warning rather than Dim — `docs/attention-signals.md` § Secrets & Config, `Wave 1` cell for `secrets`. The golden doc explicitly writes `Warning`; this spec honors the classification.
 
 <!-- BEGIN GENERATED: header -->
-secrets — SECRETS & CONFIG. Lifecycle key: `state`.
+secrets — SECRETS & CONFIG. Lifecycle key: none (the list API returns no lifecycle field).
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
