@@ -114,15 +114,33 @@ func runCmdTree(t *testing.T, m tui.Model, cmd tea.Cmd) tui.Model {
 
 // TestTUISaveCache_PersistsRowsToTypeFile pins DEF-11: a TUI-driven
 // availability-sweep-completion save must persist the swept type's rows to
-// disk, not just its availability count. RED today — tasksToCmd's
-// TaskKindSaveCache case calls m.saveAvailabilityCache() (counts-only from
-// MenuState), never reaching saveProbeResourcesToTypeFiles, so tf.Rows stays
+// disk, not just its availability count. RED originally — tasksToCmd's
+// TaskKindSaveCache case called m.saveAvailabilityCache() (counts-only from
+// MenuState), never reaching saveProbeResourcesToTypeFiles, so tf.Rows stayed
 // empty even though the sweep carried a real row with a finding.
+//
+// This pin is about SAVE-PLUMBING, not enrichment: TaskKindSaveCache persists
+// from the dispatch-time SaveCachePayload snapshot taken BEFORE Wave-2
+// enrichment ever runs (handlers_availability.go's handleAvailabilityChecked
+// captures c.snapshotProbeResourcesForSave() specifically so a later
+// startEnrichment() mutation of ProbeResources cannot retroactively change
+// what gets persisted). So the finding under test here must already be
+// present on the Wave-1 resource at dispatch time — exactly what a real
+// Wave-1 fetcher can emit (fetcher-sourced findings, e.g. public bucket ACL
+// detected inline during ListBuckets/GetBucketAcl, are a real and current
+// Wave-1 surface; see docs/refactor/03-finding-model.md). The Source label is
+// deliberately NOT "wave2:s3" — since the wave-2-in-demo change made Wave-2
+// enrichment run for real even in demo mode, a "wave2:*" Source on a
+// synthetic finding that was never actually produced by the s3 enricher would
+// misrepresent what this pin asserts. The finding here stays synthetic
+// (Source: "wave1:s3") because DEF-11's point is that the save-cache dispatch
+// persists whatever Findings the row already carries at snapshot time — not
+// that any particular enricher produced them.
 func TestTUISaveCache_PersistsRowsToTypeFile(t *testing.T) {
 	const profile, region = "def11-tui-prof", "us-east-1"
 	m := newSaveCacheApp(t, profile, region)
 
-	finding := domain.Finding{Code: "s3-public-read", Phrase: "publicly readable", Severity: domain.SevBroken, Source: "wave2:s3"}
+	finding := domain.Finding{Code: "s3-public-read", Phrase: "publicly readable", Severity: domain.SevBroken, Source: "wave1:s3"}
 	sweepResources := []resource.Resource{
 		{
 			ID:       "bucket-def11-1",

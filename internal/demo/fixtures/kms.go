@@ -113,17 +113,17 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 		// DescribeBackupVault("acme-prod-vault").EncryptionKeyArn points here.
 		// ID must match BackupProdVaultKMSKeyID in backup.go.
 		{
-			KeyId:        aws.String(BackupProdVaultKMSKeyID),
-			Arn:          aws.String("arn:aws:kms:us-east-1:123456789012:key/" + BackupProdVaultKMSKeyID),
-			Description:  aws.String("Encryption key for acme-prod-vault (AWS Backup)"),
-			KeyState:     kmstypes.KeyStateEnabled,
-			KeyManager:   kmstypes.KeyManagerTypeCustomer,
-			KeyUsage:     kmstypes.KeyUsageTypeEncryptDecrypt,
-			CreationDate: aws.Time(time.Date(2025, 4, 10, 9, 0, 0, 0, time.UTC)),
-			Enabled:      true,
+			KeyId:                aws.String(BackupProdVaultKMSKeyID),
+			Arn:                  aws.String("arn:aws:kms:us-east-1:123456789012:key/" + BackupProdVaultKMSKeyID),
+			Description:          aws.String("Encryption key for acme-prod-vault (AWS Backup)"),
+			KeyState:             kmstypes.KeyStateEnabled,
+			KeyManager:           kmstypes.KeyManagerTypeCustomer,
+			KeyUsage:             kmstypes.KeyUsageTypeEncryptDecrypt,
+			CreationDate:         aws.Time(time.Date(2025, 4, 10, 9, 0, 0, 0, time.UTC)),
+			Enabled:              true,
 			EncryptionAlgorithms: []kmstypes.EncryptionAlgorithmSpec{kmstypes.EncryptionAlgorithmSpecSymmetricDefault},
-			MultiRegion:  aws.Bool(false),
-			Origin:       kmstypes.OriginTypeAwsKms,
+			MultiRegion:          aws.Bool(false),
+			Origin:               kmstypes.OriginTypeAwsKms,
 		},
 		// S3 healthy-bucket SSE-KMS key (checkS3KMS pivot).
 		// The checker strips everything up to the last "/" from the KMS key ARN,
@@ -249,12 +249,38 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 			MultiRegion:          aws.Bool(false),
 			Origin:               kmstypes.OriginTypeAwsKms,
 		},
+		// AWS-managed default S3 key (checkS3KMS pivot, ManagedKeyBucketName
+		// in s3.go). GetBucketEncryption reports the full alias ARN
+		// "arn:aws:kms:...:alias/aws/s3" — the exact shape that caused the
+		// pre-fix truncation bug (the naive last-"/" split used to chop it
+		// down to "s3", the bucket's own resource type, instead of passing
+		// the alias through whole). checkS3KMS now returns the alias-style
+		// ID "alias/aws/s3" (AWSManagedS3KeyID) as the navigation ID; real
+		// DescribeKey accepts that as KeyId directly, so this entry is
+		// keyed by the alias string below (not by KeyMetadata.KeyId, which
+		// AWS always reports as the real UUID even for alias lookups).
+		{
+			KeyId:                aws.String("aws-s3-managed-0001"),
+			Arn:                  aws.String("arn:aws:kms:us-east-1:123456789012:key/aws-s3-managed-0001"),
+			Description:          aws.String("Default master key that protects my S3 objects when no other key is defined"),
+			KeyState:             kmstypes.KeyStateEnabled,
+			KeyManager:           kmstypes.KeyManagerTypeAws,
+			KeyUsage:             kmstypes.KeyUsageTypeEncryptDecrypt,
+			CreationDate:         aws.Time(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)),
+			Enabled:              true,
+			EncryptionAlgorithms: []kmstypes.EncryptionAlgorithmSpec{kmstypes.EncryptionAlgorithmSpecSymmetricDefault},
+			MultiRegion:          aws.Bool(false),
+			Origin:               kmstypes.OriginTypeAwsKms,
+		},
 	}
 
 	keys := make(map[string]*kmstypes.KeyMetadata, len(keyMetadata))
 	for _, k := range keyMetadata {
 		keys[*k.KeyId] = k
 	}
+	// AWS-managed key is additionally indexed by its alias-style ID, since
+	// checkS3KMS's navigation ID is the alias (not the key's real KeyId).
+	keys[AWSManagedS3KeyID] = keyMetadata[len(keyMetadata)-1]
 
 	aliases := []kmstypes.AliasListEntry{
 		{
@@ -308,6 +334,12 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 			AliasName:   aws.String("alias/" + S3BucketKMSKeyID),
 			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:alias/" + S3BucketKMSKeyID),
 			TargetKeyId: aws.String(S3BucketKMSKeyID),
+		},
+		// AWS-managed default S3 key alias (ManagedKeyBucketName in s3.go).
+		{
+			AliasName:   aws.String(AWSManagedS3KeyID),
+			AliasArn:    aws.String("arn:aws:kms:us-east-1:123456789012:" + AWSManagedS3KeyID),
+			TargetKeyId: aws.String("aws-s3-managed-0001"),
 		},
 		// Redis prod KMS key alias.
 		{

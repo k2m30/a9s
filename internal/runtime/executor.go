@@ -103,11 +103,10 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		}, nil
 
 	// --- enrichment probe (Wave 2) ---
-	// Renderer-neutral coupling resolved: gate on c.isDemo instead of m.isDemo.
+	// Demo clients are real *awsclient.ServiceClients backed by typed fakes
+	// (internal/demo.NewServiceClients), so Wave-2 enrichers run against them
+	// exactly as they run against live AWS clients — no demo-mode skip here.
 	case TaskKindProbeEnrich:
-		if c.isDemo {
-			return nil, nil
-		}
 		shortName := req.Key.Scope
 		if !c.HasIssueEnricher(shortName) {
 			return nil, nil
