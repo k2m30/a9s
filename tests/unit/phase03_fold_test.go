@@ -581,28 +581,20 @@ func TestFold_EnrichmentFindingsFieldDeleted(t *testing.T) {
 
 // ── CodeRabbit PR #310 finding A: Ctrl+R on resource list leaves stale wave2 ──
 
-// TestFold_CtrlROnList_ClearsActiveRowFindings verifies that pressing Ctrl+R
-// while viewing a resource list clears stale wave2 findings from the rows held
-// by the active ResourceListModel.
+// TestFold_CtrlROnList_ClearsActiveRowFindings verified that pressing Ctrl+R
+// while viewing a resource list cleared stale wave2 findings from the rows
+// held by the active ResourceListModel IMMEDIATELY at keypress time. That
+// contract is superseded: eagerly blanking findings on Ctrl+R produced a
+// real, user-visible flicker for the full AWS round-trip between the
+// keypress and the rerun's EnrichmentChecked arrival. Findings are now
+// stale-until-replaced, not blank-until-replaced — this test asserts both
+// halves: the wave2 finding must still be present immediately after Ctrl+R
+// (no blank window), and it must be genuinely removed once a fresh
+// EnrichmentChecked result lands that no longer contains it (real
+// replacement still works, it just doesn't fire eagerly at keypress time).
 //
-// The pre-fix bug (PR #310 CodeRabbit finding A):
-//
-//	handleRefresh calls delete(m.Core().Session().ResourceCache[rt]) BEFORE applyEnrichment(rt, nil).
-//	applyEnrichment walks ResourceCache[rt] to find rows to clear — but the entry
-//	was just deleted, so it finds nothing. The ResourceListModel was constructed
-//	from entry.Resources when NavigateMsg was handled; the rl's internal slice
-//	reference still holds the rows with stale r.Findings even after Ctrl+R.
-//
-// This test requires a tui.Model accessor:
-//
-//	func (m Model) ActiveListResources() []resource.Resource
-//
-// Returns the resource slice currently held by the top-of-stack
-// ResourceListModel, or nil if the active view is not a ResourceListModel.
-// The coder must add this method (see internal/tui/app.go alongside
-// ActiveDetailResource).
-//
-// Expected red-light: fails to compile because ActiveListResources is undefined.
+// See qa_glyph_continuity_test.go's TestRerunStart_KeepsVisibleFindingsUntilReplaced
+// for the from-scratch pin of the same corrected invariant.
 func TestFold_CtrlROnList_ClearsActiveRowFindings(t *testing.T) {
 	const (
 		rid        = "i-ctrl-r"
@@ -660,27 +652,52 @@ func TestFold_CtrlROnList_ClearsActiveRowFindings(t *testing.T) {
 		}
 	}
 	if !hasWave2Pre {
-		t.Log("pre-Ctrl+R wave2 finding not present — applyEnrichment may not be wired yet; continuing to assert post-Ctrl+R state")
+		t.Fatal("pre-condition failed: expected wave2 finding present on the active row before Ctrl+R")
 	}
 
 	// Step 5: send Ctrl+R — this triggers handleRefresh on the resource list path.
 	m = applyMsg(m, tea.KeyPressMsg{Code: -1, Text: "\x12"})
 
-	// Assertion: after Ctrl+R, no wave2 entry should remain on the rows
-	// visible in the active ResourceListModel. The fix requires applyEnrichment
-	// to run BEFORE delete(m.Core().Session().ResourceCache[rt]), so that rl's internal slice
-	// has its wave2 findings cleared before the cache entry is removed.
-	postResources := m.ActiveListResources()
-	if len(postResources) == 0 {
-		// The list view may have been popped on Ctrl+R in edge cases; treat empty as failure.
+	// Assertion (corrected), half 1: immediately after Ctrl+R, BEFORE any
+	// fresh enrichment result has landed, the wave2 finding must still be
+	// present — no blank window (stale-until-replaced).
+	postKeypress := m.ActiveListResources()
+	if len(postKeypress) == 0 {
 		t.Fatal("ActiveListResources: empty after Ctrl+R — ResourceListModel unexpectedly absent")
 	}
-	for _, r := range postResources {
+	hasWave2PostKeypress := false
+	for _, r := range postKeypress {
+		for _, f := range r.Findings {
+			if f.Source == wantSource {
+				hasWave2PostKeypress = true
+			}
+		}
+	}
+	if !hasWave2PostKeypress {
+		t.Error("wave2 finding vanished immediately after Ctrl+R, before any fresh result landed — findings must be stale-until-replaced, not blanked eagerly at keypress time")
+	}
+
+	// Step 6: deliver a fresh EnrichmentChecked result that genuinely omits
+	// rid (resource recovered) — this MUST remove the finding.
+	m = applyMsg(m, messages.EnrichmentChecked{
+		ResourceType: "ec2",
+		Findings:     map[string]domain.Finding{},
+		Gen:          0,
+		TypeGen:      0,
+	})
+
+	// Assertion, half 2: after the fresh result lands and genuinely omits
+	// rid, no wave2 entry should remain on the rows visible in the active
+	// ResourceListModel.
+	postFreshResult := m.ActiveListResources()
+	if len(postFreshResult) == 0 {
+		t.Fatal("ActiveListResources: empty after the fresh EnrichmentChecked result — ResourceListModel unexpectedly absent")
+	}
+	for _, r := range postFreshResult {
 		for _, f := range r.Findings {
 			if f.Source == wantSource {
 				t.Errorf(
-					"resource %q still has stale wave2 finding after Ctrl+R: Source=%q Phrase=%q; "+
-						"fix: call applyEnrichment(rt, nil) BEFORE delete(m.Core().Session().ResourceCache[rt]) in handleRefresh",
+					"resource %q still has stale wave2 finding after a fresh EnrichmentChecked result that omitted it: Source=%q Phrase=%q",
 					r.ID, f.Source, f.Phrase,
 				)
 			}

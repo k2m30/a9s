@@ -9,7 +9,7 @@ package unit
 // TaskKind → expected result table:
 //
 //	TaskKindProbeAvailability  → messages.AvailabilityChecked
-//	TaskKindProbeEnrich        → nil,nil (isDemo=true); messages.EnrichmentChecked (isDemo=false, no enricher registered → nil,nil)
+//	TaskKindProbeEnrich        → messages.EnrichmentChecked when HasIssueEnricher(shortName); nil,nil otherwise (isDemo is not a gate — demo clients are real fakes and dispatch identically to live)
 //	TaskKindSaveCache          → nil,nil (NoCache=true); nil,nil (empty cache)
 //	TaskKindConnect            → messages.ClientsReady (error path — no real AWS creds)
 //	TaskKindFetchIdentity      → messages.IdentityError (nil STS client)
@@ -137,16 +137,32 @@ func TestExecuteTask_ProbeAvailability_AllDemoResourceTypes(t *testing.T) {
 // TaskKindProbeEnrich — isDemo gating
 // ────────────────────────────────────────────────────────────────────────────
 
-// When isDemo=true the executor must return nil,nil without calling any
-// enricher (demo fixtures do not require real credentials).
-func TestExecuteTask_ProbeEnrich_IsDemo_ReturnsNilNil(t *testing.T) {
+// Demo clients are real *awsclient.ServiceClients backed by typed fakes, so
+// Wave-2 enrichers run against them exactly as they run against live AWS
+// clients — isDemo is no longer a gate on TaskKindProbeEnrich. When the
+// resource type has a registered issue enricher, the executor must return
+// messages.EnrichmentChecked even in demo mode.
+func TestExecuteTask_ProbeEnrich_IsDemo_ReturnsEnrichmentChecked(t *testing.T) {
 	c := newExecutorCore(t) // isDemo=true
-	ev, err := c.ExecuteTask(context.Background(), req(runtime.TaskKindProbeEnrich, "ec2"))
+
+	// Find a resource type that has a Wave-2 enricher (ec2 always does).
+	var enricherType string
+	for _, td := range catalog.All() {
+		if c.HasIssueEnricher(td.ShortName) {
+			enricherType = td.ShortName
+			break
+		}
+	}
+	if enricherType == "" {
+		t.Skip("no registered types have issue enrichers; cannot test demo enrichment path")
+	}
+
+	ev, err := c.ExecuteTask(context.Background(), req(runtime.TaskKindProbeEnrich, enricherType))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev != nil {
-		t.Errorf("expected nil event in demo mode, got %T", ev)
+	if _, ok := ev.(messages.EnrichmentChecked); !ok {
+		t.Errorf("expected messages.EnrichmentChecked in demo mode (isDemo is no longer a gate), got %T", ev)
 	}
 }
 
@@ -671,9 +687,14 @@ func TestExecuteTask_UnknownKind_ReturnsError(t *testing.T) {
 // isDemo gating contrast — same kind, same core, toggled flag
 // ────────────────────────────────────────────────────────────────────────────
 
-// Confirms that isDemo=true → nil,nil and isDemo=false (with enricher) →
-// non-nil event for TaskKindProbeEnrich, proving the flag is the only
-// deciding variable.
+// Confirms that isDemo is NO LONGER a deciding variable for
+// TaskKindProbeEnrich: both isDemo=true and isDemo=false produce
+// messages.EnrichmentChecked for the same enricher-bearing type, since demo
+// clients are real *awsclient.ServiceClients backed by typed fakes and Wave-2
+// enrichers dispatch against them exactly as they do against live clients.
+// The only remaining deciding variable is HasIssueEnricher(shortName) — see
+// TestExecuteTask_ProbeEnrich_NonDemo_NoEnricher_ReturnsNilNil, which is
+// unaffected by this change and still pins the true nil,nil path.
 func TestExecuteTask_ProbeEnrich_IsDemoContrast(t *testing.T) {
 	// Find a type with an enricher; skip if none.
 	var enricherType string
@@ -688,17 +709,17 @@ func TestExecuteTask_ProbeEnrich_IsDemoContrast(t *testing.T) {
 		t.Skip("no enricher registered; cannot contrast isDemo flag")
 	}
 
-	// isDemo=true → nil,nil
+	// isDemo=true → EnrichmentChecked (no demo skip anymore).
 	cDemo := newExecutorCore(t) // isDemo=true
 	evDemo, errDemo := cDemo.ExecuteTask(context.Background(), req(runtime.TaskKindProbeEnrich, enricherType))
 	if errDemo != nil {
 		t.Fatalf("isDemo=true: unexpected error: %v", errDemo)
 	}
-	if evDemo != nil {
-		t.Errorf("isDemo=true: expected nil event, got %T", evDemo)
+	if _, ok := evDemo.(messages.EnrichmentChecked); !ok {
+		t.Errorf("isDemo=true: expected messages.EnrichmentChecked (isDemo is no longer a gate), got %T", evDemo)
 	}
 
-	// isDemo=false → EnrichmentChecked
+	// isDemo=false → EnrichmentChecked (unchanged contract).
 	evLive, errLive := cProbe.ExecuteTask(context.Background(), req(runtime.TaskKindProbeEnrich, enricherType))
 	if errLive != nil {
 		t.Fatalf("isDemo=false: unexpected error: %v", errLive)

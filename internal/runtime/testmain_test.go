@@ -9,9 +9,21 @@ import (
 )
 
 // TestMain installs the AWS catalog before any runtime test runs.
-// See tests/unit/testmain_test.go for the rationale.
+// See tests/unit/testmain_test.go for the rationale, including the
+// hermetic A9S_CONFIG_FOLDER default applied below.
 func TestMain(m *testing.M) {
+	var cleanupDir string
+	if os.Getenv("A9S_CONFIG_FOLDER") == "" {
+		if dir, err := os.MkdirTemp("", "a9s-testmain-config-*"); err == nil {
+			os.Setenv("A9S_CONFIG_FOLDER", dir) //nolint:errcheck // best-effort hermetic default, not test-critical
+			cleanupDir = dir
+		}
+	}
 	aws.Install()
 	resource.WireProjection()
-	os.Exit(m.Run())
+	code := m.Run()
+	if cleanupDir != "" {
+		os.RemoveAll(cleanupDir) //nolint:errcheck // best-effort cleanup, process is exiting regardless
+	}
+	os.Exit(code)
 }

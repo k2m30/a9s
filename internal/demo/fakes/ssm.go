@@ -41,8 +41,31 @@ func (f *SSMFake) GetParameter(_ context.Context, input *ssm.GetParameterInput, 
 	}, nil
 }
 
-// DescribeInstanceInformation is a no-op stub satisfying SSMDescribeInstanceInformationAPI.
-// Demo mode does not model SSM managed instances.
-func (f *SSMFake) DescribeInstanceInformation(_ context.Context, _ *ssm.DescribeInstanceInformationInput, _ ...func(*ssm.Options)) (*ssm.DescribeInstanceInformationOutput, error) {
-	return &ssm.DescribeInstanceInformationOutput{}, nil
+// DescribeInstanceInformation serves fixture-enrolled SSM managed-instance
+// IDs, filtered by the InstanceIds filter when present — required for the
+// ec2:ssm related-panel pivot witness (checkEC2SSM).
+func (f *SSMFake) DescribeInstanceInformation(_ context.Context, input *ssm.DescribeInstanceInformationInput, _ ...func(*ssm.Options)) (*ssm.DescribeInstanceInformationOutput, error) {
+	wanted := make(map[string]struct{}, len(f.fix.ManagedInstanceIDs))
+	for _, id := range f.fix.ManagedInstanceIDs {
+		wanted[id] = struct{}{}
+	}
+	if input != nil {
+		for _, filter := range input.Filters {
+			if filter.Key == nil || *filter.Key != "InstanceIds" {
+				continue
+			}
+			filtered := make(map[string]struct{}, len(filter.Values))
+			for _, v := range filter.Values {
+				if _, ok := wanted[v]; ok {
+					filtered[v] = struct{}{}
+				}
+			}
+			wanted = filtered
+		}
+	}
+	var infos []ssmtypes.InstanceInformation
+	for id := range wanted {
+		infos = append(infos, ssmtypes.InstanceInformation{InstanceId: aws.String(id)})
+	}
+	return &ssm.DescribeInstanceInformationOutput{InstanceInformationList: infos}, nil
 }

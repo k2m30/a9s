@@ -1,14 +1,14 @@
 package unit
 
-// qa_cache_issues_test.go — T013: cache Entry round-trip with issue count fields.
+// qa_cache_issues_test.go — T013: cache TypeFile round-trip with issue count
+// fields.
 //
-// Tests that cache.Entry carries Issues int, IssuesTruncated bool, and
+// Tests that cache.TypeFile carries Issues int, IssuesTruncated bool, and
 // IssuesKnown bool fields, and that they survive a YAML marshal/unmarshal
 // round-trip correctly — including the tri-state where IssuesKnown=true,
-// Issues=0 distinguishes "probed and found zero issues" from "not yet probed".
-//
-// NOTE: Issues, IssuesTruncated, and IssuesKnown fields do not yet exist on
-// cache.Entry. These tests will compile and pass once the refactor adds them.
+// Issues=0 distinguishes "probed and found zero issues" from "not yet
+// probed". Round-2 migration: repinned from the deleted cache.Entry onto
+// cache.TypeFile (docs/design/cache-requirements.md C7).
 
 import (
 	"testing"
@@ -19,13 +19,13 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// TestCacheEntryIssueFields
+// TestCacheTypeFileIssueFields
 // ---------------------------------------------------------------------------
 
-// TestCacheEntryIssueFields verifies that Issues=3, IssuesKnown=true, and
+// TestCacheTypeFileIssueFields verifies that Issues=3, IssuesKnown=true, and
 // IssuesTruncated=false survive a YAML marshal/unmarshal round-trip.
-func TestCacheEntryIssueFields(t *testing.T) {
-	original := cache.Entry{
+func TestCacheTypeFileIssueFields(t *testing.T) {
+	original := cache.TypeFile{
 		HasResources:    true,
 		Count:           10,
 		Issues:          3,
@@ -38,7 +38,7 @@ func TestCacheEntryIssueFields(t *testing.T) {
 		t.Fatalf("yaml.Marshal failed: %v", err)
 	}
 
-	var roundTripped cache.Entry
+	var roundTripped cache.TypeFile
 	if err := yaml.Unmarshal(data, &roundTripped); err != nil {
 		t.Fatalf("yaml.Unmarshal failed: %v", err)
 	}
@@ -72,14 +72,15 @@ func TestCacheEntryIssueFields(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// TestCacheEntryIssueFieldsZeroKnown
+// TestCacheTypeFileIssueFieldsZeroKnown
 // ---------------------------------------------------------------------------
 
-// TestCacheEntryIssueFieldsZeroKnown verifies that Issues=0 with IssuesKnown=true
-// survives a YAML round-trip — this is the critical tri-state case that
-// distinguishes "probed and found zero issues" from "not yet probed".
-func TestCacheEntryIssueFieldsZeroKnown(t *testing.T) {
-	original := cache.Entry{
+// TestCacheTypeFileIssueFieldsZeroKnown verifies that Issues=0 with
+// IssuesKnown=true survives a YAML round-trip — this is the critical
+// tri-state case that distinguishes "probed and found zero issues" from
+// "not yet probed".
+func TestCacheTypeFileIssueFieldsZeroKnown(t *testing.T) {
+	original := cache.TypeFile{
 		HasResources:    true,
 		Count:           5,
 		Issues:          0,
@@ -92,7 +93,7 @@ func TestCacheEntryIssueFieldsZeroKnown(t *testing.T) {
 		t.Fatalf("yaml.Marshal failed: %v", err)
 	}
 
-	var roundTripped cache.Entry
+	var roundTripped cache.TypeFile
 	if err := yaml.Unmarshal(data, &roundTripped); err != nil {
 		t.Fatalf("yaml.Unmarshal failed: %v", err)
 	}
@@ -114,64 +115,66 @@ func TestCacheEntryIssueFieldsZeroKnown(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// TestCacheEntryIssueFieldsAbsent
+// TestCacheTypeFileIssueFieldsAbsent
 // ---------------------------------------------------------------------------
 
-// TestCacheEntryIssueFieldsAbsent verifies that when an old-format YAML cache
-// entry (without issue fields) is unmarshalled, Issues=0 and IssuesKnown=false
-// — meaning "unknown/not probed", not "probed and healthy".
-func TestCacheEntryIssueFieldsAbsent(t *testing.T) {
-	// Simulate an old cache file that has no issue fields.
-	oldCacheYAML := `has_resources: true
+// TestCacheTypeFileIssueFieldsAbsent verifies that when an old-format
+// per-type YAML file (without issue fields) is unmarshalled, Issues=0 and
+// IssuesKnown=false — meaning "unknown/not probed", not "probed and
+// healthy".
+func TestCacheTypeFileIssueFieldsAbsent(t *testing.T) {
+	// Simulate an old per-type cache file that has no issue fields.
+	oldCacheYAML := `version: 1
+has_resources: true
 count: 7
 `
 
-	var entry cache.Entry
-	if err := yaml.Unmarshal([]byte(oldCacheYAML), &entry); err != nil {
+	var tf cache.TypeFile
+	if err := yaml.Unmarshal([]byte(oldCacheYAML), &tf); err != nil {
 		t.Fatalf("yaml.Unmarshal failed: %v", err)
 	}
 
 	t.Run("Issues defaults to 0 when absent in YAML", func(t *testing.T) {
-		if entry.Issues != 0 {
-			t.Errorf("Issues = %d, want 0 for old cache format", entry.Issues)
+		if tf.Issues != 0 {
+			t.Errorf("Issues = %d, want 0 for old cache format", tf.Issues)
 		}
 	})
 
 	t.Run("IssuesKnown defaults to false when absent in YAML", func(t *testing.T) {
 		// IssuesKnown=false means "not yet probed" — the UI should treat
 		// this as unknown rather than "zero issues found".
-		if entry.IssuesKnown {
+		if tf.IssuesKnown {
 			t.Error("IssuesKnown = true for old cache format, want false (= not probed)")
 		}
 	})
 
 	t.Run("IssuesTruncated defaults to false when absent in YAML", func(t *testing.T) {
-		if entry.IssuesTruncated {
+		if tf.IssuesTruncated {
 			t.Error("IssuesTruncated = true for old cache format, want false")
 		}
 	})
 
 	t.Run("base fields parsed correctly from old format", func(t *testing.T) {
-		if !entry.HasResources {
+		if !tf.HasResources {
 			t.Error("HasResources = false, want true")
 		}
-		if entry.Count != 7 {
-			t.Errorf("Count = %d, want 7", entry.Count)
+		if tf.Count != 7 {
+			t.Errorf("Count = %d, want 7", tf.Count)
 		}
 	})
 }
 
 // ---------------------------------------------------------------------------
-// TestCacheEntryIssuesTruncatedRoundTrip
+// TestCacheTypeFileIssuesTruncatedRoundTrip
 // ---------------------------------------------------------------------------
 
-// TestCacheEntryIssuesTruncatedRoundTrip verifies the truncated case where
-// the issue count is a lower bound (from a partial first page).
-func TestCacheEntryIssuesTruncatedRoundTrip(t *testing.T) {
-	original := cache.Entry{
+// TestCacheTypeFileIssuesTruncatedRoundTrip verifies the truncated case
+// where the issue count is a lower bound (from a partial first page).
+func TestCacheTypeFileIssuesTruncatedRoundTrip(t *testing.T) {
+	original := cache.TypeFile{
 		HasResources:    true,
 		Count:           50,
-		Truncated:       true,
+		Exact:           false,
 		Issues:          12,
 		IssuesKnown:     true,
 		IssuesTruncated: true,
@@ -182,7 +185,7 @@ func TestCacheEntryIssuesTruncatedRoundTrip(t *testing.T) {
 		t.Fatalf("yaml.Marshal failed: %v", err)
 	}
 
-	var roundTripped cache.Entry
+	var roundTripped cache.TypeFile
 	if err := yaml.Unmarshal(data, &roundTripped); err != nil {
 		t.Fatalf("yaml.Unmarshal failed: %v", err)
 	}

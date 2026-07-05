@@ -190,13 +190,45 @@ func (c *Controller) handleActionRefresh(_ Action) (ViewState, []runtime.TaskReq
 			return c.snapshot(), nil
 		}
 		c.core.DeleteResourceCache(typeName)
-		ls.Loading = true
-		ls.Rows = nil
-		tasks := []runtime.TaskRequest{{
-			Key:   runtime.TaskKey{Kind: runtime.KindFetchResources, Scope: typeName},
-			Cache: runtime.CacheNone,
-		}}
-		return c.snapshot(), tasks
+		// C8: cached content stays visible under the refreshing marker while
+		// the refetch runs — only blank Loading/Rows when there is nothing to
+		// show yet (the empty-list case never had a marker to keep rows under).
+		if len(ls.Rows) == 0 {
+			ls.Loading = true
+			ls.Rows = nil
+		}
+		ls.LastFetchError = ""
+		return c.snapshot(), c.activeListRefreshTasks()
 	}
 	return c.snapshot(), nil
+}
+
+// activeListRefreshTasks builds the fetch task for the top-of-stack list
+// screen without disturbing its currently rendered rows. Callers must hold
+// c.mu.
+//
+// C10: this is also the replay path for a navigation issued before AWS
+// connect completes — once ClientsReady lands, the pending refresh must
+// re-fetch the list the user is already looking at. C8 requires the cached
+// content stay visible under the refreshing marker during that replay, so
+// this helper only sets Refreshing and never blanks Rows/Loading itself —
+// handleActionRefresh's own Loading/Rows reset above is now also
+// non-destructive whenever the list already has rows to keep.
+func (c *Controller) activeListRefreshTasks() []runtime.TaskRequest {
+	ls := c.topListState()
+	if ls == nil {
+		return nil
+	}
+	typeName := ""
+	if len(c.stack) > 0 {
+		typeName = c.stack[len(c.stack)-1].Ctx.ResourceType
+	}
+	if typeName == "" {
+		return nil
+	}
+	ls.Refreshing = true
+	return []runtime.TaskRequest{{
+		Key:   runtime.TaskKey{Kind: runtime.KindFetchResources, Scope: typeName},
+		Cache: runtime.CacheNone,
+	}}
 }

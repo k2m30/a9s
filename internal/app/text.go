@@ -169,6 +169,36 @@ func (c *Controller) TextFrameTitle() string {
 	return string(top.ID)
 }
 
+// ErrorHistoryLines formats the controller's session error history as
+// display lines, newest-first, "[HH:MM:SS] message" per entry — matching the
+// format the TUI's error-log viewer (! key) has always shown. Used to seed
+// ScreenErrorLog's TextState via EnsureTextState so the error-log screen
+// renders from Snapshot().Body.Text like every other ctrl-backed text screen,
+// with the controller's errorHistory as the single source of truth (goal-4
+// wave 4a — see AppendErrorHistoryIntent in intents.go for how entries land).
+func (c *Controller) ErrorHistoryLines() []string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if len(c.errorHistory) == 0 {
+		return nil
+	}
+	lines := make([]string, len(c.errorHistory))
+	for i := 0; i < len(c.errorHistory); i++ {
+		e := c.errorHistory[len(c.errorHistory)-1-i]
+		lines[i] = "[" + e.t.Format("15:04:05") + "] " + e.message
+	}
+	return lines
+}
+
+// HasErrorHistory reports whether the controller has recorded any session
+// errors. Used by the TUI's '!' key handler to short-circuit with a "No
+// errors this session" flash instead of pushing an empty error-log screen.
+func (c *Controller) HasErrorHistory() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return len(c.errorHistory) > 0
+}
+
 // GetTextResource returns the resource for the top text screen (YAML/JSON)
 // by resolving it from the resource cache using the screen's ScreenContext.
 // Returns the zero-value Resource when the top screen is not a text screen

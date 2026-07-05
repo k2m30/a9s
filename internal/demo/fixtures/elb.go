@@ -2,8 +2,8 @@
 package fixtures
 
 import (
-	"sync"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -35,6 +35,11 @@ const (
 	fixtProdWebTGARN     = "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/acme-web-tg/1234567890abcdef"
 	fixtProdAPITGARN     = "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/acme-api-tg/0987654321fedcba"
 	fixtProdListenerRule = "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/acme-prod-web/1234567890abcdef/aaaa1111bbbb2222/rule1111111111111"
+
+	// fixtLambdaProcessorTGARN backs the lambda:tg related-panel pivot
+	// witness — a Lambda-type target group registering process-orders
+	// (lambda.go) as its target.
+	fixtLambdaProcessorTGARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/lambda-processor-tg/3333333333333333"
 )
 
 // NewELBFixtures builds and returns a fully-populated ELBFixtures struct.
@@ -258,6 +263,19 @@ func buildTargetGroups() []elbv2types.TargetGroup {
 			HealthCheckEnabled: aws.Bool(true),
 			LoadBalancerArns:   []string{"arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/staging-web-alb/5555555555aaaaaa"},
 		},
+		// Lambda-type target group — required for the lambda:tg related-panel
+		// pivot witness. checkLambdaTG calls DescribeTargetHealth and matches
+		// Target.Id against the function ARN; process-orders is a real
+		// lambda.go fixture.
+		{
+			TargetGroupName:    aws.String("lambda-processor-tg"),
+			TargetGroupArn:     aws.String(fixtLambdaProcessorTGARN),
+			Protocol:           elbv2types.ProtocolEnumHttps,
+			VpcId:              aws.String(fixtELBProdVPCID),
+			TargetType:         elbv2types.TargetTypeEnumLambda,
+			HealthCheckEnabled: aws.Bool(false),
+			LoadBalancerArns:   []string{fixtProdELBARN},
+		},
 	}
 }
 
@@ -336,6 +354,19 @@ func buildTargetHealth(f *ELBFixtures) {
 				Port: aws.Int32(8080),
 			},
 			HealthCheckPort: aws.String("8080"),
+			TargetHealth: &elbv2types.TargetHealth{
+				State: elbv2types.TargetHealthStateEnumHealthy,
+			},
+		},
+	}
+	// Lambda-type target — Target.Id is the function ARN (no Port for
+	// lambda targets). process-orders is a real lambda.go fixture; matches
+	// the lambda:tg related-panel pivot witness (checkLambdaTG).
+	f.TargetHealth[fixtLambdaProcessorTGARN] = []elbv2types.TargetHealthDescription{
+		{
+			Target: &elbv2types.TargetDescription{
+				Id: aws.String("arn:aws:lambda:us-east-1:123456789012:function:process-orders"),
+			},
 			TargetHealth: &elbv2types.TargetHealth{
 				State: elbv2types.TargetHealthStateEnumHealthy,
 			},

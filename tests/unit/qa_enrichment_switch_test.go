@@ -73,10 +73,15 @@ func seedEnrichmentFindings(m tui.Model) tui.Model {
 //  1. Seed findings for "ec2" and "rds" at Gen=0, TypeGen=0.
 //  2. Switch profile → handleProfileSelected increments enrichmentGen (0→1+)
 //     AND resets enrichmentTypeGen to empty map.
-//  3. Deliver EnrichmentCheckedMsg{ec2, Gen=0, TypeGen=0} → must be dropped
-//     (stale Gen — enrichmentGen was bumped) → cmd is nil.
-//  4. Deliver EnrichmentCheckedMsg{rds, Gen=0, TypeGen=0} → same, must be dropped.
-//  5. Deliver EnrichmentCheckedMsg with the NEW session gen → must NOT panic
+//  3. Deliver EnrichmentCheckedMsg{ec2, Gen=0, TypeGen=0} — Gen=0 is never
+//     stale by itself (EnrichmentChecked.AcceptZeroGen()==true short-circuits
+//     the generic gen guard), so this message is accepted regardless of the
+//     switch. What must hold: it must not spuriously trigger a new
+//     re-enrichment probe or refetch (a same-call TaskKindSaveCache
+//     background-cache-save cmd is tolerated — see hasReenrichOrRefetch doc
+//     in qa_enrichment_rerun_overlap_test.go).
+//  4. Deliver EnrichmentCheckedMsg{rds, Gen=0, TypeGen=0} → same check.
+//  5. Deliver EnrichmentCheckedMsg with a high TypeGen → must NOT panic
 //     (maps are non-nil after re-initialization).
 func TestProfileSwitch_ClearsEnrichmentState(t *testing.T) {
 	withTuiVersion(t, "test")
@@ -93,32 +98,33 @@ func TestProfileSwitch_ClearsEnrichmentState(t *testing.T) {
 	// execute it; we only care about the enrichment state reset.
 	_ = switchCmd
 
-	// Step 3: stale ec2 message (old Gen=0) must be dropped.
+	// Step 3: redelivering the old ec2 message must not spuriously trigger a
+	// new re-enrichment probe or refetch.
 	_, dropEC2Cmd := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Issues:       2,
 		Findings: map[string]domain.Finding{
 			"i-0abc1111aaa111111": {Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
 		},
-		Gen:     0, // stale — switch bumped enrichmentGen above 0
+		Gen:     0,
 		TypeGen: 0,
 	})
-	if dropEC2Cmd != nil {
-		t.Error("after profile switch: ec2 EnrichmentCheckedMsg{Gen=0} must be dropped (enrichmentGen was bumped) — enrichment state not cleared")
+	if hasReenrichOrRefetch(dropEC2Cmd) {
+		t.Error("after profile switch: redelivering ec2 EnrichmentCheckedMsg{Gen=0} must not spuriously trigger a re-enrichment probe or refetch")
 	}
 
-	// Step 4: stale rds message (old Gen=0) must also be dropped.
+	// Step 4: same check for rds.
 	_, dropRDSCmd := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "rds",
 		Issues:       0,
 		Findings: map[string]domain.Finding{
 			"arn:aws:rds:us-east-1:123456789012:db:prod-db": {Code: "rds.pending-maintenance", Phrase: "pending maintenance", Severity: domain.SevWarn, Source: "wave2:rds"},
 		},
-		Gen:     0, // stale
+		Gen:     0,
 		TypeGen: 0,
 	})
-	if dropRDSCmd != nil {
-		t.Error("after profile switch: rds EnrichmentCheckedMsg{Gen=0} must be dropped (enrichmentGen was bumped)")
+	if hasReenrichOrRefetch(dropRDSCmd) {
+		t.Error("after profile switch: redelivering rds EnrichmentCheckedMsg{Gen=0} must not spuriously trigger a re-enrichment probe or refetch")
 	}
 
 	// Step 5: non-nil map after re-init — new messages with the new session gen
@@ -153,8 +159,9 @@ func TestProfileSwitch_ClearsEnrichmentState(t *testing.T) {
 }
 
 // TestProfileSwitch_BothEnrichmentMapsCleared verifies that after switching
-// profiles, a TypeGen=0 message for any enriched type is stale regardless of
-// which type was seeded — both ec2 AND rds must be cleared simultaneously.
+// profiles, redelivering an old EnrichmentCheckedMsg for any enriched type
+// must not spuriously trigger new enrichment/refetch work — both ec2 AND
+// rds must behave identically.
 func TestProfileSwitch_BothEnrichmentMapsCleared(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel()
@@ -163,17 +170,20 @@ func TestProfileSwitch_BothEnrichmentMapsCleared(t *testing.T) {
 	// Switch profile.
 	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "dev"})
 
-	// Both types' stale messages must be dropped — neither should have surviving
-	// state that could be "reactivated" by a matching gen.
+	// Redelivering the old message for each type must not spuriously trigger
+	// a new re-enrichment probe or refetch (Gen=0 is never stale by itself —
+	// see hasReenrichOrRefetch doc in qa_enrichment_rerun_overlap_test.go —
+	// so a same-call TaskKindSaveCache background-cache-save cmd is
+	// tolerated, but real re-enrichment/refetch work is not).
 	for _, rt := range []string{"ec2", "rds", "ebs", "ddb"} {
 		_, cmd := rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: rt,
 			Findings:     map[string]domain.Finding{},
-			Gen:          0, // old session gen (stale after profile switch)
+			Gen:          0,
 			TypeGen:      0,
 		})
-		if cmd != nil {
-			t.Errorf("after profile switch: EnrichmentCheckedMsg{%s, Gen=0} must be dropped — state not cleared", rt)
+		if hasReenrichOrRefetch(cmd) {
+			t.Errorf("after profile switch: redelivering EnrichmentCheckedMsg{%s, Gen=0} must not spuriously trigger a re-enrichment probe or refetch", rt)
 		}
 	}
 }
@@ -197,32 +207,34 @@ func TestRegionSwitch_ClearsEnrichmentState(t *testing.T) {
 	m, switchCmd := rootApplyMsg(m, messages.RegionSelected{Region: "eu-west-1"})
 	_ = switchCmd
 
-	// Step 3: stale ec2 message (old Gen=0) must be dropped.
+	// Step 3: redelivering the old ec2 message must not spuriously trigger a
+	// new re-enrichment probe or refetch (Gen=0 is never stale by itself —
+	// see hasReenrichOrRefetch doc in qa_enrichment_rerun_overlap_test.go).
 	_, dropEC2Cmd := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		Issues:       2,
 		Findings: map[string]domain.Finding{
 			"i-0abc1111aaa111111": {Code: "ec2.system.status.impaired", Phrase: "system status impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
 		},
-		Gen:     0, // stale — switch bumped enrichmentGen
+		Gen:     0,
 		TypeGen: 0,
 	})
-	if dropEC2Cmd != nil {
-		t.Error("after region switch: ec2 EnrichmentCheckedMsg{Gen=0} must be dropped — enrichment state not cleared")
+	if hasReenrichOrRefetch(dropEC2Cmd) {
+		t.Error("after region switch: redelivering ec2 EnrichmentCheckedMsg{Gen=0} must not spuriously trigger a re-enrichment probe or refetch")
 	}
 
-	// Step 4: stale rds message must also be dropped.
+	// Step 4: same check for rds.
 	_, dropRDSCmd := rootApplyMsg(m, messages.EnrichmentChecked{
 		ResourceType: "rds",
 		Issues:       0,
 		Findings: map[string]domain.Finding{
 			"arn:aws:rds:us-east-1:123456789012:db:prod-db": {Code: "rds.pending-maintenance", Phrase: "pending maintenance", Severity: domain.SevWarn, Source: "wave2:rds"},
 		},
-		Gen:     0, // stale
+		Gen:     0,
 		TypeGen: 0,
 	})
-	if dropRDSCmd != nil {
-		t.Error("after region switch: rds EnrichmentCheckedMsg{Gen=0} must be dropped")
+	if hasReenrichOrRefetch(dropRDSCmd) {
+		t.Error("after region switch: redelivering rds EnrichmentCheckedMsg{Gen=0} must not spuriously trigger a re-enrichment probe or refetch")
 	}
 
 	// Step 5: verify non-nil maps — no panic on subsequent message delivery.
@@ -243,7 +255,9 @@ func TestRegionSwitch_ClearsEnrichmentState(t *testing.T) {
 }
 
 // TestRegionSwitch_BothEnrichmentMapsCleared verifies that region switch
-// clears state for all enriched types simultaneously (parallel to T062 test).
+// leaves redelivered old-gen messages unable to trigger new enrichment/refetch
+// work, for all enriched types simultaneously (parallel to the profile-switch
+// test above).
 func TestRegionSwitch_BothEnrichmentMapsCleared(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel()
@@ -252,16 +266,17 @@ func TestRegionSwitch_BothEnrichmentMapsCleared(t *testing.T) {
 	// Switch region.
 	m, _ = rootApplyMsg(m, messages.RegionSelected{Region: "ap-southeast-1"})
 
-	// All types' old-gen messages must be dropped.
+	// Redelivering the old message for each type must not spuriously trigger
+	// a re-enrichment probe or refetch.
 	for _, rt := range []string{"ec2", "rds", "ebs", "ddb"} {
 		_, cmd := rootApplyMsg(m, messages.EnrichmentChecked{
 			ResourceType: rt,
 			Findings:     map[string]domain.Finding{},
-			Gen:          0, // old session gen (stale after region switch)
+			Gen:          0,
 			TypeGen:      0,
 		})
-		if cmd != nil {
-			t.Errorf("after region switch: EnrichmentCheckedMsg{%s, Gen=0} must be dropped — state not cleared", rt)
+		if hasReenrichOrRefetch(cmd) {
+			t.Errorf("after region switch: redelivering EnrichmentCheckedMsg{%s, Gen=0} must not spuriously trigger a re-enrichment probe or refetch", rt)
 		}
 	}
 }

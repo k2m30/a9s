@@ -46,6 +46,7 @@ import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/app"
+	"github.com/k2m30/a9s/v3/internal/cache"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -232,8 +233,13 @@ func TestLoadMoreExhausted_OnlyIncreaseGuard(t *testing.T) {
 // availability to an exact count, SaveAvailabilityCache (the existing
 // probes.go seam) must be able to write that exact/untruncated state to
 // disk when invoked with the controller's updated menu availability maps —
-// and cache.Load must read back the same exact, untruncated entry,
-// modeling "survives an app restart".
+// and cache.LoadDir must read back the same exact, untruncated per-type
+// entry, modeling "survives an app restart". Round-2 migration: repinned at
+// the same controller seam (core.SaveAvailabilityCache/LoadAvailabilityCache)
+// but the on-disk assertion now goes through cache.LoadDir/Store.Type
+// directly, since the exact-total persistence flows through
+// (*cache.Store).SaveType's per-type file, not the deleted single-file
+// cache.File/cache.Entry shape.
 func TestLoadMoreExhausted_PersistsToDiskCache(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
@@ -260,26 +266,23 @@ func TestLoadMoreExhausted_PersistsToDiskCache(t *testing.T) {
 
 	avail := c.GetMenuAvailability()
 	trunc := c.GetMenuTruncated()
-	if err := core.SaveAvailabilityCache("demo", "us-east-1", avail, trunc, nil, nil, nil); err != nil {
+	if err := core.SaveAvailabilityCache(avail, trunc, nil, nil, nil); err != nil {
 		t.Fatalf("SaveAvailabilityCache: %v", err)
 	}
 
-	loaded, err := core.LoadAvailabilityCache("demo", "us-east-1")
-	if err != nil {
-		t.Fatalf("LoadAvailabilityCache: %v", err)
+	store := cache.LoadDir("demo", "us-east-1")
+	if store == nil {
+		t.Fatal("cache.LoadDir returned nil after SaveAvailabilityCache")
 	}
-	if loaded == nil {
-		t.Fatal("LoadAvailabilityCache returned nil after SaveAvailabilityCache")
-	}
-	entry, ok := loaded.Resources["ec2"]
+	tf, ok := store.Type("ec2")
 	if !ok {
-		t.Fatal(`loaded.Resources["ec2"] missing`)
+		t.Fatal(`cache.LoadDir(...).Type("ec2") missing after SaveAvailabilityCache`)
 	}
-	if entry.Count != 102 {
-		t.Errorf("persisted ec2 Count = %d, want 102 (exact total after load-more exhaustion)", entry.Count)
+	if tf.Count != 102 {
+		t.Errorf("persisted ec2 Count = %d, want 102 (exact total after load-more exhaustion)", tf.Count)
 	}
-	if entry.Truncated {
-		t.Error("persisted ec2 Truncated = true, want false — exact total must clear truncation on disk too")
+	if !tf.Exact {
+		t.Error("persisted ec2 Exact = false, want true — an untruncated exact total must be persisted as exact on disk too")
 	}
 }
 

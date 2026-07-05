@@ -37,6 +37,7 @@ import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/app"
+	"github.com/k2m30/a9s/v3/internal/cache"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
@@ -48,7 +49,17 @@ import (
 // like newTestControllerWithCore in app_controller_pr_b_test.go (same
 // package, precedented helper) — duplicated here as a small variant so this
 // file has no cross-file coupling to another test file's helper lifetime.
-func newSeededTestController() (*runtime.Core, *app.Controller) {
+//
+// A9S_CONFIG_FOLDER is redirected to t.TempDir() so the disk-store fallback
+// HandleNavigate now consults (DEF-15) reads/writes an isolated per-test
+// directory instead of the developer's real ~/.a9s/cache — a leftover
+// ec2.yaml from a prior manual run (or another test package sharing the same
+// "demo"/"us-east-1" pair) would otherwise leak rows into
+// TestListOpen_NoProbeResources_KeepsTodaysLoadingBehavior's "nothing seeded"
+// precondition.
+func newSeededTestController(t *testing.T) (*runtime.Core, *app.Controller) {
+	t.Helper()
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	s := session.New()
 	s.Profile = "demo"
 	s.Region = "us-east-1"
@@ -64,7 +75,7 @@ func newSeededTestController() (*runtime.Core, *app.Controller) {
 // the session already holds ProbeResources for ec2, opening the ec2 list
 // must render those rows immediately with Loading=false and Refreshing=true.
 func TestListOpen_SeedsFromProbeResources_EC2(t *testing.T) {
-	core, c := newSeededTestController()
+	core, c := newSeededTestController(t)
 
 	seeded := []resource.Resource{
 		{ID: "i-0aaaa1111bbbb2222", Name: "web-1", Type: "ec2", Fields: map[string]string{"state": "running"}},
@@ -104,7 +115,7 @@ func TestListOpen_SeedsFromProbeResources_EC2(t *testing.T) {
 // Path-based columns) to guard against a seeding path that only works for
 // one column-resolution style.
 func TestListOpen_SeedsFromProbeResources_S3(t *testing.T) {
-	core, c := newSeededTestController()
+	core, c := newSeededTestController(t)
 
 	seeded := []resource.Resource{
 		{ID: "my-bucket-one", Name: "my-bucket-one", Type: "s3", Fields: map[string]string{"region": "us-east-1"}},
@@ -129,13 +140,24 @@ func TestListOpen_SeedsFromProbeResources_S3(t *testing.T) {
 	}
 }
 
-// TestListOpen_NoProbeResources_KeepsTodaysLoadingBehavior verifies the "no
-// rows known" branch is unchanged: Loading=true, Refreshing not set, no rows.
-// This is the regression guard that stops Contract A from firing
-// unconditionally.
-func TestListOpen_NoProbeResources_KeepsTodaysLoadingBehavior(t *testing.T) {
-	_, c := newSeededTestController()
-	// No ProbeResources seeded at all.
+// TestListOpen_NoProbeResourcesNoDiskStore_KeepsTodaysLoadingBehavior
+// verifies the "genuinely nothing known" branch is unchanged: Loading=true,
+// Refreshing not set, no rows. This is the regression guard that stops
+// Contract A from firing unconditionally.
+//
+// Renamed from TestListOpen_NoProbeResources_KeepsTodaysLoadingBehavior
+// (DEF-15): once HandleNavigate grew a disk-store fallback for warm
+// list-opens, "no ProbeResources" alone no longer implies Loading=true — a
+// populated on-disk per-type cache for this pair now seeds the list too (see
+// TestListOpen_NoProbeResourcesButDiskStoreHasRows_SeedsFromDiskStore below).
+// This test's actual precondition is narrower than its old name claimed: NO
+// ProbeResources AND NO on-disk cache for the pair (newSeededTestController's
+// t.TempDir()-isolated A9S_CONFIG_FOLDER guarantees the disk side is empty
+// here) — the true "nothing anywhere" cold-start case.
+func TestListOpen_NoProbeResourcesNoDiskStore_KeepsTodaysLoadingBehavior(t *testing.T) {
+	_, c := newSeededTestController(t)
+	// No ProbeResources seeded, and newSeededTestController's isolated
+	// A9S_CONFIG_FOLDER guarantees no on-disk per-type cache exists either.
 
 	_, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 	snap := c.Snapshot()
@@ -145,13 +167,63 @@ func TestListOpen_NoProbeResources_KeepsTodaysLoadingBehavior(t *testing.T) {
 		t.Fatal("Body.List is nil after opening ec2 list with no seeded rows")
 	}
 	if !lb.Loading {
-		t.Error("Loading = false, want true — with no ProbeResources known, today's Loading=true behavior must be preserved")
+		t.Error("Loading = false, want true — with no ProbeResources and no disk-store data known, today's Loading=true behavior must be preserved")
 	}
 	if lb.Refreshing {
 		t.Error("Refreshing = true, want false — Refreshing must not fire when there was nothing to seed from")
 	}
 	if len(lb.Rows) != 0 {
 		t.Errorf("len(Rows) = %d, want 0 with no seeded data", len(lb.Rows))
+	}
+}
+
+// TestListOpen_NoProbeResourcesButDiskStoreHasRows_SeedsFromDiskStore pins
+// the DEF-15 disk-store fallback contract at the Controller/list-open layer
+// (a layer above the runtime.HandleNavigate-level and TUI-Update-level pins
+// in tests/unit/tui_post_sweep_seed_test.go): when ProbeResources holds
+// nothing for the type but the on-disk per-type cache for the current
+// profile/region pair does, opening the list must still seed
+// Loading=false/Refreshing=true/rows-populated from that disk data — exactly
+// as if ProbeResources had held it. This is the behavior that makes the
+// renamed guard above's narrower precondition ("no ProbeResources" is no
+// longer sufficient by itself) correct.
+func TestListOpen_NoProbeResourcesButDiskStoreHasRows_SeedsFromDiskStore(t *testing.T) {
+	core, c := newSeededTestController(t)
+	// No ProbeResources seeded — this isolates the disk-store fallback from
+	// the ProbeResources seeding source pinned in
+	// TestListOpen_SeedsFromProbeResources_EC2.
+
+	store := core.EnsureCacheStore()
+	if store == nil {
+		t.Fatal("core.EnsureCacheStore() = nil — test fixture requires a live disk store to seed rows into")
+	}
+	store.Put("ec2", cache.TypeFile{
+		HasResources: true,
+		Count:        1,
+		Exact:        true,
+		Rows: []cache.Row{
+			{ID: "i-0diskstore0001", Name: "disk-seeded-1", Fields: map[string]string{"state": "running"}},
+		},
+	})
+	if err := store.SaveType("ec2"); err != nil {
+		t.Fatalf("seed fixture SaveType(ec2): %v", err)
+	}
+
+	_, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
+	snap := c.Snapshot()
+
+	lb := snap.Body.List
+	if lb == nil {
+		t.Fatal("Body.List is nil after opening ec2 list with a disk-store-only seed")
+	}
+	if lb.Loading {
+		t.Error("Loading = true, want false — a populated on-disk per-type cache must seed the list immediately even with no ProbeResources known (DEF-15)")
+	}
+	if !lb.Refreshing {
+		t.Error("Refreshing = false, want true — a fresh fetch must still run to confirm/replace the disk-seeded rows")
+	}
+	if len(lb.Rows) != 1 || lb.Rows[0].ResourceID != "i-0diskstore0001" {
+		t.Fatalf("Rows = %+v, want single row with ResourceID=i-0diskstore0001", lb.Rows)
 	}
 }
 
@@ -162,7 +234,7 @@ func TestListOpen_NoProbeResources_KeepsTodaysLoadingBehavior(t *testing.T) {
 // ResourceCache), popped back to the menu, then re-opens the list — the
 // second open must seed instantly.
 func TestListOpen_SeedsFromResourceCache_PreviousVisit(t *testing.T) {
-	core, c := newSeededTestController()
+	core, c := newSeededTestController(t)
 
 	priorVisitRows := []resource.Resource{
 		{ID: "i-0prevvisit0001", Name: "cached-1", Type: "ec2", Fields: map[string]string{"state": "running"}},
@@ -195,7 +267,7 @@ func TestListOpen_SeedsFromResourceCache_PreviousVisit(t *testing.T) {
 // "on ResourcesLoaded the rows swap in place and Refreshing=false" half of
 // Contract A.
 func TestListOpen_ResourcesLoaded_ClearsRefreshingAndSwapsRows(t *testing.T) {
-	core, c := newSeededTestController()
+	core, c := newSeededTestController(t)
 
 	seeded := []resource.Resource{
 		{ID: "i-0seeded0001", Name: "stale-seed", Type: "ec2", Fields: map[string]string{"state": "pending"}},
@@ -254,7 +326,7 @@ func TestListOpen_ResourcesLoaded_ClearsRefreshingAndSwapsRows(t *testing.T) {
 // name, so the coder is free to wire it through PatchMenuAvailability/
 // AvailabilityChecked intents however is cleanest.
 func TestMenu_Refreshing_TrueDuringBackgroundSweep_FalseOnComplete(t *testing.T) {
-	core, c := newSeededTestController()
+	core, c := newSeededTestController(t)
 
 	// Cold start with cache-seeded counts already applied (mirrors a disk
 	// cache load having already populated menu availability before any live
@@ -304,7 +376,7 @@ func TestMenu_Refreshing_TrueDuringBackgroundSweep_FalseOnComplete(t *testing.T)
 // firing unconditionally on every menu snapshot (the "no probe ever
 // started" baseline).
 func TestMenu_Refreshing_FalseWithNoSweepInFlight(t *testing.T) {
-	_, c := newSeededTestController()
+	_, c := newSeededTestController(t)
 
 	snap := c.Snapshot()
 	if snap.Body.Menu == nil {
@@ -324,7 +396,7 @@ func TestListOpen_Refreshing_AllResourceTypes_Generic(t *testing.T) {
 	for _, td := range resource.AllResourceTypes() {
 		shortName := td.ShortName
 		t.Run(shortName, func(t *testing.T) {
-			core, c := newSeededTestController()
+			core, c := newSeededTestController(t)
 			core.Session().ProbeResources = map[string][]resource.Resource{
 				shortName: {{ID: "generic-seed-1", Name: "generic-seed-1", Type: shortName, Fields: map[string]string{}}},
 			}

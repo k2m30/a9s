@@ -410,6 +410,21 @@ func buildBackupSelections() map[string][]backuptypes.BackupSelection {
 					ProdEFSARN,
 					OrdersProdARN,
 					ProdDbiAuroraARN,
+					// vol-0a1b2c3d4e5f60001 is the EBS volume whose
+					// AWS-Backup-created snapshot witnesses the ebs-snap:backup
+					// related-panel pivot (ec2.go snapshot fixture).
+					"arn:aws:ec2:us-east-1:123456789012:volume/vol-0a1b2c3d4e5f60001",
+				},
+				// ListOfTags — tag-based selection required for the ec2:backup
+				// and ebs:backup related-panel pivot witnesses. Matches the
+				// backup=daily tag on i-0a1b2c3d4e5f60001 (ec2.go) and its
+				// root volume vol-0a1b2c3d4e5f60001 (ec2.go).
+				ListOfTags: []backuptypes.Condition{
+					{
+						ConditionKey:   aws.String("aws:ResourceTag/backup"),
+						ConditionValue: aws.String("daily"),
+						ConditionType:  backuptypes.ConditionTypeStringequals,
+					},
 				},
 			},
 		},

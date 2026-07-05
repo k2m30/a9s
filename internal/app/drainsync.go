@@ -19,7 +19,9 @@ const maxDrainIterations = 10_000
 // Core.ExecuteTask and feeding the result event through Handle to collect
 // any follow-up tasks. Adapter-only kinds (those for which ExecuteTask
 // returns ErrAdapterOnlyTask) are skipped — they are renderer concerns
-// and have no meaning in a headless sync context.
+// and have no meaning in a headless sync context — with one exception:
+// TaskKindEmitNavigate is routed through Controller.ApplyEmitNavigate so the
+// one-shot -c/ActionCommand navigation still lands on the headless stack.
 //
 // This is the testing keystone: tests call Apply (or Handle) to get an initial
 // pending slice, then pass it to DrainSync to run tasks inline without a
@@ -62,6 +64,22 @@ func DrainSyncContextProgress(ctx context.Context, c *Controller, pending []runt
 
 		req := pending[0]
 		pending = pending[1:]
+
+		if req.Key.Kind == runtime.TaskKindEmitNavigate {
+			// Adapter-only from Core.ExecuteTask's perspective — the TUI
+			// intercepts this kind before ExecuteTask and translates it into
+			// a view-stack push (runtime_adapter.go's emitNavigateCmd); the
+			// headless/web lane does the same via Controller.ApplyEmitNavigate
+			// so the one-shot -c navigation is not silently dropped.
+			if p, ok := req.Payload.(runtime.EmitNavigatePayload); ok {
+				followUp := c.ApplyEmitNavigate(p)
+				pending = append(pending, followUp...)
+				if onEvent != nil {
+					onEvent()
+				}
+			}
+			continue
+		}
 
 		ev, err := c.core.ExecuteTask(ctx, req)
 		if err != nil {
@@ -123,6 +141,20 @@ func DrainSyncPartition(
 
 		if isBackground != nil && isBackground(req.Key.Kind) {
 			deferred = append(deferred, req)
+			continue
+		}
+
+		if req.Key.Kind == runtime.TaskKindEmitNavigate {
+			// See DrainSyncContextProgress — adapter-only from
+			// Core.ExecuteTask's perspective; route through
+			// Controller.ApplyEmitNavigate instead of dropping it.
+			if p, ok := req.Payload.(runtime.EmitNavigatePayload); ok {
+				followUp := c.ApplyEmitNavigate(p)
+				pending = append(pending, followUp...)
+				if onEvent != nil {
+					onEvent()
+				}
+			}
 			continue
 		}
 

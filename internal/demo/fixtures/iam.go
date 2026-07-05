@@ -2,10 +2,10 @@
 package fixtures
 
 import (
-	"sync"
 	"fmt"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -177,33 +177,33 @@ func buildIAMRoles() []iamtypes.Role {
 	// ListBackupSelections for plan-broken-2failed returns this ARN in IamRoleArn.
 	// checkBackupRole extracts the role name as the last segment after "/".
 	roles = append(roles, iamtypes.Role{
-		RoleName:    aws.String("AcmeBackupRoleProd"),
-		RoleId:      aws.String("AROAEXAMPLEBKUPPROD01"),
-		Arn:         aws.String(AcmeBackupRoleARN),
-		Path:        aws.String("/"),
-		CreateDate:  aws.Time(time.Date(2025, 4, 10, 9, 0, 0, 0, time.UTC)),
-		Description: aws.String("IAM role assumed by AWS Backup for prod database and critical plan backups"),
+		RoleName:                 aws.String("AcmeBackupRoleProd"),
+		RoleId:                   aws.String("AROAEXAMPLEBKUPPROD01"),
+		Arn:                      aws.String(AcmeBackupRoleARN),
+		Path:                     aws.String("/"),
+		CreateDate:               aws.Time(time.Date(2025, 4, 10, 9, 0, 0, 0, time.UTC)),
+		Description:              aws.String("IAM role assumed by AWS Backup for prod database and critical plan backups"),
 		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"backup.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
 	})
 
 	// RDS monitoring roles — required for dbi→role related-panel pivot.
 	// Matched by checkDbiRole via AssociatedRoles[].RoleArn and MonitoringRoleArn on prod-dbi-1.
 	roles = append(roles, iamtypes.Role{
-		RoleName:    aws.String("rds-monitoring-role"),
-		RoleId:      aws.String("AROAEXAMPLERDSMON001"),
-		Arn:         aws.String("arn:aws:iam::123456789012:role/rds-monitoring-role"),
-		Path:        aws.String("/"),
-		CreateDate:  aws.Time(time.Date(2025, 2, 10, 9, 0, 0, 0, time.UTC)),
-		Description: aws.String("IAM role for RDS Enhanced Monitoring (associated via AssociatedRoles)"),
+		RoleName:                 aws.String("rds-monitoring-role"),
+		RoleId:                   aws.String("AROAEXAMPLERDSMON001"),
+		Arn:                      aws.String("arn:aws:iam::123456789012:role/rds-monitoring-role"),
+		Path:                     aws.String("/"),
+		CreateDate:               aws.Time(time.Date(2025, 2, 10, 9, 0, 0, 0, time.UTC)),
+		Description:              aws.String("IAM role for RDS Enhanced Monitoring (associated via AssociatedRoles)"),
 		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"monitoring.rds.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
 	})
 	roles = append(roles, iamtypes.Role{
-		RoleName:    aws.String("rds-enhanced-monitoring"),
-		RoleId:      aws.String("AROAEXAMPLERDSMON002"),
-		Arn:         aws.String("arn:aws:iam::123456789012:role/rds-enhanced-monitoring"),
-		Path:        aws.String("/"),
-		CreateDate:  aws.Time(time.Date(2025, 2, 10, 9, 5, 0, 0, time.UTC)),
-		Description: aws.String("IAM role for RDS Enhanced Monitoring (referenced via MonitoringRoleArn)"),
+		RoleName:                 aws.String("rds-enhanced-monitoring"),
+		RoleId:                   aws.String("AROAEXAMPLERDSMON002"),
+		Arn:                      aws.String("arn:aws:iam::123456789012:role/rds-enhanced-monitoring"),
+		Path:                     aws.String("/"),
+		CreateDate:               aws.Time(time.Date(2025, 2, 10, 9, 5, 0, 0, time.UTC)),
+		Description:              aws.String("IAM role for RDS Enhanced Monitoring (referenced via MonitoringRoleArn)"),
 		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"monitoring.rds.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
 	})
 
@@ -223,31 +223,94 @@ func buildIAMRoles() []iamtypes.Role {
 	// checkRedshiftRole matches IamRoles[].IamRoleArn on the cluster; the checker
 	// extracts the role name as the last segment after "/" from each ARN.
 	roles = append(roles, iamtypes.Role{
-		RoleName:    aws.String("redshift-copy-role"),
-		RoleId:      aws.String("AROAEXAMPLERSSHIFT001"),
-		Arn:         aws.String(RedshiftCopyRoleARN),
-		Path:        aws.String("/"),
-		CreateDate:  aws.Time(time.Date(2025, 3, 1, 9, 0, 0, 0, time.UTC)),
-		Description: aws.String("IAM role allowing acme-warehouse Redshift to COPY data from S3"),
+		RoleName:                 aws.String("redshift-copy-role"),
+		RoleId:                   aws.String("AROAEXAMPLERSSHIFT001"),
+		Arn:                      aws.String(RedshiftCopyRoleARN),
+		Path:                     aws.String("/"),
+		CreateDate:               aws.Time(time.Date(2025, 3, 1, 9, 0, 0, 0, time.UTC)),
+		Description:              aws.String("IAM role allowing acme-warehouse Redshift to COPY data from S3"),
 		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"redshift.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
 	})
 	roles = append(roles, iamtypes.Role{
-		RoleName:    aws.String("redshift-unload-role"),
-		RoleId:      aws.String("AROAEXAMPLERSSHIFT002"),
-		Arn:         aws.String(RedshiftUnloadRoleARN),
-		Path:        aws.String("/"),
-		CreateDate:  aws.Time(time.Date(2025, 3, 1, 9, 5, 0, 0, time.UTC)),
-		Description: aws.String("IAM role allowing acme-warehouse Redshift to UNLOAD data to S3"),
+		RoleName:                 aws.String("redshift-unload-role"),
+		RoleId:                   aws.String("AROAEXAMPLERSSHIFT002"),
+		Arn:                      aws.String(RedshiftUnloadRoleARN),
+		Path:                     aws.String("/"),
+		CreateDate:               aws.Time(time.Date(2025, 3, 1, 9, 5, 0, 0, time.UTC)),
+		Description:              aws.String("IAM role allowing acme-warehouse Redshift to UNLOAD data to S3"),
 		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"redshift.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
 	})
 	roles = append(roles, iamtypes.Role{
-		RoleName:    aws.String("redshift-reporting-copy-role"),
-		RoleId:      aws.String("AROAEXAMPLERSSHIFT003"),
-		Arn:         aws.String(RedshiftReportingCopyRoleARN),
-		Path:        aws.String("/"),
-		CreateDate:  aws.Time(time.Date(2025, 7, 22, 9, 0, 0, 0, time.UTC)),
-		Description: aws.String("IAM role allowing acme-reporting Redshift to COPY data from S3"),
+		RoleName:                 aws.String("redshift-reporting-copy-role"),
+		RoleId:                   aws.String("AROAEXAMPLERSSHIFT003"),
+		Arn:                      aws.String(RedshiftReportingCopyRoleARN),
+		Path:                     aws.String("/"),
+		CreateDate:               aws.Time(time.Date(2025, 7, 22, 9, 0, 0, 0, time.UTC)),
+		Description:              aws.String("IAM role allowing acme-reporting Redshift to COPY data from S3"),
 		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"redshift.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
+	})
+
+	// EC2 instance-profile role — required for the ec2:role related-panel
+	// pivot. checkEC2Role extracts the last "/" segment of
+	// Instance.IamInstanceProfile.Arn (fixtProdInstanceProfileARN, ec2.go)
+	// and uses it directly as the role name.
+	roles = append(roles, iamtypes.Role{
+		RoleName:                 aws.String("acme-ec2-instance-profile"),
+		RoleId:                   aws.String("AROAEXAMPLEEC2PROFILE1"),
+		Arn:                      aws.String("arn:aws:iam::123456789012:role/acme-ec2-instance-profile"),
+		Path:                     aws.String("/"),
+		CreateDate:               aws.Time(time.Date(2025, 1, 5, 9, 0, 0, 0, time.UTC)),
+		Description:              aws.String("Instance-profile role attached to acme production EC2 instances"),
+		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
+	})
+
+	// AWS Backup default service role — required for backup:role related-panel
+	// pivot on plans that use the AWS-managed default role (as opposed to
+	// AcmeBackupRoleProd's custom role above).
+	roles = append(roles, iamtypes.Role{
+		RoleName:                 aws.String("AWSBackupDefaultServiceRole"),
+		RoleId:                   aws.String("AROAEXAMPLEBKUPDFLT01"),
+		Arn:                      aws.String("arn:aws:iam::123456789012:role/service-role/AWSBackupDefaultServiceRole"),
+		Path:                     aws.String("/service-role/"),
+		CreateDate:               aws.Time(time.Date(2024, 9, 1, 8, 0, 0, 0, time.UTC)),
+		Description:              aws.String("Default AWS-managed service role used by AWS Backup for plans without a custom IAM role"),
+		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"backup.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
+	})
+
+	// EventBridge rule target-invocation role — required for eb-rule:role
+	// related-panel pivot (checkEBRuleRole matches Target.RoleArn on rule targets).
+	roles = append(roles, iamtypes.Role{
+		RoleName:                 aws.String("prod-ci-deploy-role"),
+		RoleId:                   aws.String("AROAEXAMPLEEBRULE001"),
+		Arn:                      aws.String("arn:aws:iam::123456789012:role/prod-ci-deploy-role"),
+		Path:                     aws.String("/"),
+		CreateDate:               aws.Time(time.Date(2025, 3, 12, 9, 0, 0, 0, time.UTC)),
+		Description:              aws.String("Role assumed by EventBridge to invoke CI/CD deployment targets"),
+		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"events.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
+	})
+
+	// ECS service-linked role — required for ecs-svc:role related-panel pivot
+	// (checkECSSvcRole matches Service.RoleArn on the api-gateway service).
+	roles = append(roles, iamtypes.Role{
+		RoleName:                 aws.String("acme-ecs-service-role"),
+		RoleId:                   aws.String("AROAEXAMPLEECSSVC001"),
+		Arn:                      aws.String("arn:aws:iam::123456789012:role/aws-service-role/ecs.amazonaws.com/acme-ecs-service-role"),
+		Path:                     aws.String("/aws-service-role/ecs.amazonaws.com/"),
+		CreateDate:               aws.Time(time.Date(2025, 1, 25, 10, 0, 0, 0, time.UTC)),
+		Description:              aws.String("Service-linked role allowing ECS to manage load balancers and network interfaces on behalf of the api-gateway service"),
+		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ecs.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
+	})
+
+	// EKS cluster role — required for eks:role related-panel pivot
+	// (checkEKSRole matches Cluster.RoleArn across all acme-* EKS clusters).
+	roles = append(roles, iamtypes.Role{
+		RoleName:                 aws.String("acme-eks-cluster-role"),
+		RoleId:                   aws.String("AROAEXAMPLEEKSCLST01"),
+		Arn:                      aws.String("arn:aws:iam::123456789012:role/acme-eks-cluster-role"),
+		Path:                     aws.String("/"),
+		CreateDate:               aws.Time(time.Date(2025, 1, 5, 8, 0, 0, 0, time.UTC)),
+		Description:              aws.String("EKS control-plane role assumed by the acme-* clusters to manage AWS resources on their behalf"),
+		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"eks.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
 	})
 
 	// S3 healthy-bucket access role (checkS3Role pivot).
@@ -255,12 +318,12 @@ func buildIAMRoles() []iamtypes.Role {
 	// policy_resources is emitted by the IAM roles fetcher; this role is pre-set
 	// so the demo related graph renders.
 	roles = append(roles, iamtypes.Role{
-		RoleName:    aws.String("a9s-demo-s3-access-role"),
-		RoleId:      aws.String("AROAEXAMPLES3ACCESS01"),
-		Arn:         aws.String("arn:aws:iam::123456789012:role/a9s-demo-s3-access-role"),
-		Path:        aws.String("/"),
-		CreateDate:  aws.Time(time.Date(2025, 1, 10, 10, 0, 0, 0, time.UTC)),
-		Description: aws.String("Role granting read access to a9s-demo-healthy S3 bucket (" + HealthyBucketARN + ")"),
+		RoleName:                 aws.String("a9s-demo-s3-access-role"),
+		RoleId:                   aws.String("AROAEXAMPLES3ACCESS01"),
+		Arn:                      aws.String("arn:aws:iam::123456789012:role/a9s-demo-s3-access-role"),
+		Path:                     aws.String("/"),
+		CreateDate:               aws.Time(time.Date(2025, 1, 10, 10, 0, 0, 0, time.UTC)),
+		Description:              aws.String("Role granting read access to a9s-demo-healthy S3 bucket (" + HealthyBucketARN + ")"),
 		AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"lambda.amazonaws.com"},"Action":"sts:AssumeRole"}]}`),
 	})
 
@@ -378,6 +441,28 @@ func buildIAMPolicies() []iamtypes.Policy {
 			AttachmentCount:  aws.Int32(6),
 			Path:             aws.String("/"),
 			CreateDate:       aws.Time(time.Date(2015, 12, 21, 0, 0, 0, 0, time.UTC)),
+			DefaultVersionId: aws.String("v1"),
+		},
+		// AWS-managed AWSBackupServiceRolePolicyForBackup — attached to
+		// AcmeBackupRoleProd (role→policy related-panel pivot).
+		{
+			PolicyName:       aws.String("AWSBackupServiceRolePolicyForBackup"),
+			PolicyId:         aws.String("ANPAEXAMPLE000000004"),
+			Arn:              aws.String("arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForBackup"),
+			AttachmentCount:  aws.Int32(1),
+			Path:             aws.String("/service-role/"),
+			CreateDate:       aws.Time(time.Date(2018, 11, 26, 0, 0, 0, 0, time.UTC)),
+			DefaultVersionId: aws.String("v1"),
+		},
+		// AWS-managed AmazonRedshiftAllCommandsFullAccess — attached to
+		// redshift-reporting-copy-role (role→policy related-panel pivot).
+		{
+			PolicyName:       aws.String("AmazonRedshiftAllCommandsFullAccess"),
+			PolicyId:         aws.String("ANPAEXAMPLE000000005"),
+			Arn:              aws.String("arn:aws:iam::aws:policy/AmazonRedshiftAllCommandsFullAccess"),
+			AttachmentCount:  aws.Int32(1),
+			Path:             aws.String("/"),
+			CreateDate:       aws.Time(time.Date(2016, 3, 21, 0, 0, 0, 0, time.UTC)),
 			DefaultVersionId: aws.String("v1"),
 		},
 	}

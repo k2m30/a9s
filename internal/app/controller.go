@@ -231,39 +231,12 @@ func (c *Controller) openSelectedListDetail() (ViewState, []runtime.TaskRequest)
 		ResourceType: typeName,
 		Resource:     &r,
 	})
+	// applyNavResult's NavigateKindPushDetail case owns the related-cache
+	// replay (cache hit: rows merged directly into the stacked detail; cache
+	// miss: a KindRelatedCheck task so DrainSync/the web renderer run the
+	// checkers headlessly) — single source of truth shared with the TUI
+	// adapter's handleNavigate.
 	tasks = append(tasks, c.applyNavResult(res)...)
-	// When HandleNavigate signals DispatchRelated, emit a KindRelatedCheck task
-	// so DrainSync (and the web renderer) run the checkers headlessly. The TUI
-	// adapter handles this separately via messages.RelatedCheckStarted; the
-	// headless path uses the executor's runRelatedCheckers instead. Check the
-	// related cache first — if results are already cached, replay them
-	// synchronously into the stacked detail's RelatedRows (mirrors the TUI's
-	// RelatedCacheGet/Replay path in runtime_adapter_navigate.go).
-	if res.DispatchRelated && res.Resource != nil && len(resource.GetRelated(res.ResolvedType)) > 0 {
-		ck := runtime.RelatedCacheKey(res.ResolvedType, res.Resource.ID)
-		if cached, hit := c.core.RelatedCacheGet(ck); hit && len(cached) > 0 {
-			// Cache hit: replay rows directly into the stacked detail.
-			if ds := c.topDetailState(); ds != nil {
-				for _, entry := range cached {
-					errMsg := ""
-					if entry.Result.Err != nil {
-						errMsg = entry.Result.Err.Error()
-					}
-					mergeDetailRelatedRow(ds, entry.DefDisplayName, entry.Result.TargetType,
-						entry.Result.Count, false, errMsg, entry.Result.Approximate, entry.Result.ResourceIDs, entry.Result.FetchFilter)
-				}
-			}
-		} else {
-			// Cache miss: dispatch a KindRelatedCheck task with the source resource
-			// so the headless executor can invoke the checkers via runRelatedCheckers.
-			src := *res.Resource
-			tasks = append(tasks, runtime.TaskRequest{
-				Key:     runtime.TaskKey{Kind: runtime.KindRelatedCheck, Scope: res.ResolvedType + "/" + src.ID},
-				Cache:   runtime.CacheNone,
-				Payload: runtime.RelatedCheckPayload{ResourceType: res.ResolvedType, Resource: src},
-			})
-		}
-	}
 	return c.snapshot(), tasks
 }
 

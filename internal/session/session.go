@@ -28,7 +28,10 @@
 package session
 
 import (
+	"sync"
+
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/cache"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -77,8 +80,10 @@ type Session struct {
 	ConnectGen domain.Gen
 
 	// PendingRefresh marks that a successful ClientsReady should re-fetch the
-	// active resource list (set by profile/region switch handlers). Cleared by
-	// Rotate; re-set to true after Rotate in the switch handlers.
+	// active resource list (set by profile/region switch handlers, and true
+	// by default from New() so a navigation issued before the first connect
+	// replays once connected — C10). Cleared by Rotate; re-set to true after
+	// Rotate in the switch handlers.
 	PendingRefresh bool
 
 	// Rollback target for an in-flight profile/region switch. Captured BEFORE
@@ -94,16 +99,58 @@ type Session struct {
 	// initial connect failed and rolled back).
 	Command string
 
+	// CommandArmed latches that the live (cached) connect path has decided
+	// the one-shot -c navigation for PendingCommand is eligible to fire
+	// (Command was set and StackDepth==1 at ClientsReady time), but must wait
+	// for handleAvailabilityCacheLoaded to seed session.ProbeResources first
+	// so the navigation never races the availability-cache seed (DEF-14/D11).
+	// Consumed (cleared) by handleAvailabilityCacheLoaded; not cleared by
+	// Rotate for the same reason Command survives it.
+	CommandArmed bool
+
+	// PendingCommand carries the resource short name captured from Command at
+	// ClientsReady time, for handleAvailabilityCacheLoaded to consume once
+	// CommandArmed is set (Command itself is cleared immediately on every
+	// ClientsReadyMsg, armed or not — see the Command field doc).
+	PendingCommand string
+
 	// NoCache disables on-disk availability caching and background probes
 	// (set by the --no-cache / --demo CLI flags). Survives Rotate — it is a
 	// static policy, not session state.
 	NoCache bool
 
+	// cacheStoreMu guards CacheStore and the cacheStore{Profile,Region} stamp
+	// below. TUI tea.Cmd goroutines and concurrent web drains both reach
+	// EnsureCacheStore/CacheStore, and Rotate clears the field from the
+	// event-handling goroutine on a profile/region switch — all three must
+	// serialize on this lock (Codex P1 / CodeRabbit race).
+	cacheStoreMu sync.Mutex
+
+	// CacheStore is the loaded per-type disk cache (C7) for the pair recorded
+	// in cacheStoreProfile/cacheStoreRegion. nil until LoadDir has run for a
+	// pair (either at startup via TaskKindLoadAvailCache, or after a pair
+	// switch). The HARD INVARIANT (C7 "load before save") is structural:
+	// Put/SaveType are methods on *cache.Store, and the only way to obtain
+	// one is cache.LoadDir — so no save can happen for a pair before its own
+	// load. Cleared (set to nil) by Rotate so a pair switch never lets writes
+	// for the OLD pair's Store race a save for the NEW pair (C9). Access only
+	// through EnsureCacheStore — never read/write this field directly
+	// outside cacheStoreMu.
+	CacheStore *cache.Store
+
+	// cacheStoreProfile/cacheStoreRegion are the pair CacheStore was loaded
+	// for. EnsureCacheStore compares these against the caller's current pair
+	// and reloads via cache.LoadDir when they disagree, so a task dispatched
+	// for pair A that executes after a switch to pair B never writes into
+	// A's directory using a memoized Store (see EnsureCacheStore).
+	cacheStoreProfile string
+	cacheStoreRegion  string
+
 	// Wave 1 availability scan.
 	AvailabilityGen domain.Gen // bumped on profile/region switch to cancel stale probes
-	AvailQueue      []string // resource short names remaining to probe
-	AvailChecked    int      // number probed so far in current gen
-	AvailTotal      int      // total types to probe in current gen
+	AvailQueue      []string   // resource short names remaining to probe
+	AvailChecked    int        // number probed so far in current gen
+	AvailTotal      int        // total types to probe in current gen
 
 	// Wave 2 issue-enrichment dispatch.
 	ProbeResources map[string][]resource.Resource // retained first-page resources from Wave 1
@@ -133,7 +180,7 @@ type Session struct {
 	RelatedCache      *RelatedCacheLRU
 	RelatedGen        domain.Gen // bumped on refresh/profile/region switch
 	EnrichGen         domain.Gen // bumped on refresh/profile/region switch (detail-enrichment only)
-	EnrichResKey      string // "resourceType:resourceID" of last detail-enrichment dispatch
+	EnrichResKey      string     // "resourceType:resourceID" of last detail-enrichment dispatch
 
 	// Feature-specific session caches. These used to hang off *ServiceClients
 	// but that blurred the AWS-transport/session-state boundary; they live
@@ -172,7 +219,12 @@ type Session struct {
 // Gen at its zero value are rejected by the gen guards.
 func New() *Session {
 	return &Session{
-		ProbeResources:         nil, // initialized lazily on first probe retention
+		ProbeResources: nil, // initialized lazily on first probe retention
+		// C10: a navigation issued before the first connect must trigger the
+		// active-list re-fetch once connected, exactly like a post-switch
+		// reconnect. On a menu-only startup, maybeRefreshIntents consumes this
+		// flag harmlessly via the HasActiveRL gate.
+		PendingRefresh:         true,
 		EnrichmentRan:          make(map[string]bool),
 		EnrichmentTypeGen:      make(map[string]domain.Gen),
 		EnrichmentTruncatedIDs: make(map[string]map[string]bool),
@@ -188,6 +240,96 @@ func New() *Session {
 		IdentityStore:          NewIdentityStore(),
 		RuleSets:               NewRuleSetStore(),
 	}
+}
+
+// EnsureCacheStore returns the *cache.Store for the given profile/region
+// pair, loading (or reloading) it via cache.LoadDir when no store is
+// memoized yet or the memoized store was loaded for a different pair.
+// profile/region == "" means the pair has not resolved yet (pre-connect or
+// cold boot before the first ClientsReady/Rotate settles Profile/Region);
+// the empty pair is never memoized so a later call with the real pair always
+// reloads instead of forever returning a store keyed by "<profile>--".
+//
+// All CacheStore reads/writes are serialized on cacheStoreMu so concurrent
+// TUI tea.Cmd goroutines, concurrent web drains, and a same-moment Rotate
+// (profile/region switch) can never interleave a check-then-write on the
+// field or observe a store loaded for the wrong pair.
+func (s *Session) EnsureCacheStore(profile, region string) *cache.Store {
+	s.cacheStoreMu.Lock()
+	defer s.cacheStoreMu.Unlock()
+
+	if profile == "" || region == "" {
+		return nil
+	}
+	if s.CacheStore != nil && s.cacheStoreProfile == profile && s.cacheStoreRegion == region {
+		return s.CacheStore
+	}
+	s.CacheStore = cache.LoadDir(profile, region)
+	s.cacheStoreProfile = profile
+	s.cacheStoreRegion = region
+	return s.CacheStore
+}
+
+// WithCacheStore runs fn against the current pair's *cache.Store while
+// holding cacheStoreMu for the entire call, then returns fn's error.
+//
+// DEF-17: SaveResourceListCache and SaveAvailabilityCache each perform their
+// own store.Type (read) / mutate / store.Put+SaveType (write) sequence for
+// the same on-disk type file. Obtaining the *cache.Store via EnsureCacheStore
+// and then mutating it afterward (the previous shape of both callers) only
+// serializes the pointer lookup — the lock is released before the
+// read-modify-write runs, so two of these sequences dispatched from
+// concurrent tea.Cmd goroutines (e.g. a list's own fetch-completion save
+// racing a background availability-sweep save for the same resource type)
+// can interleave: each reads the other's stale pre-write TypeFile, and
+// whichever's Put+SaveType lands last wins with a Count/Rows pairing that
+// never itself violated the DEF-4b matched-pair rule but does not reflect
+// either write in full (e.g. one call's Count together with the other
+// call's Rows). cache.Store also has no internal locking of its own — two
+// goroutines writing s.types[shortName] concurrently is a data race on the
+// map, independent of the logical inconsistency above.
+//
+// fn must not call back into WithCacheStore/EnsureCacheStore (Session's mutex
+// is not reentrant) and should do no blocking I/O beyond store.SaveType.
+// Returns nil without calling fn when NoCache is set or profile/region has
+// not resolved yet — matching EnsureCacheStore's nil-store contract.
+func (s *Session) WithCacheStore(profile, region string, fn func(store *cache.Store) error) error {
+	s.cacheStoreMu.Lock()
+	defer s.cacheStoreMu.Unlock()
+
+	if profile == "" || region == "" {
+		return nil
+	}
+	if s.CacheStore == nil || s.cacheStoreProfile != profile || s.cacheStoreRegion != region {
+		s.CacheStore = cache.LoadDir(profile, region)
+		s.cacheStoreProfile = profile
+		s.cacheStoreRegion = region
+	}
+	return fn(s.CacheStore)
+}
+
+// ReadCacheStore runs fn against the current pair's *cache.Store while
+// holding cacheStoreMu, for callers that only read (store.Type/store.Types)
+// and never Put/SaveType. Pairs with WithCacheStore (DEF-17): a reader that
+// bypassed the lock (the shape every read call site had before DEF-17) could
+// observe cache.Store's internal map mid-write from a concurrent
+// WithCacheStore call — a data race on the map itself, independent of the
+// logical Count/Rows consistency WithCacheStore's callers already guard.
+// Same nil-fn contract as WithCacheStore: NoCache or unresolved profile/
+// region skips fn and returns nil.
+func (s *Session) ReadCacheStore(profile, region string, fn func(store *cache.Store) error) error {
+	s.cacheStoreMu.Lock()
+	defer s.cacheStoreMu.Unlock()
+
+	if profile == "" || region == "" {
+		return nil
+	}
+	if s.CacheStore == nil || s.cacheStoreProfile != profile || s.cacheStoreRegion != region {
+		s.CacheStore = cache.LoadDir(profile, region)
+		s.cacheStoreProfile = profile
+		s.cacheStoreRegion = region
+	}
+	return fn(s.CacheStore)
 }
 
 // CurrentGenFor implements messages.GenSource. It maps an Aspect to the
@@ -232,6 +374,18 @@ func (s *Session) Rotate() {
 	// for setting Profile/Region to the new target, and for capturing rollback
 	// state via local vars BEFORE Rotate (so the rapid A→B→C case keeps A as
 	// the rollback target).
+	// C9: drop the old pair's Store atomically, under the same lock
+	// EnsureCacheStore uses, so a concurrent EnsureCacheStore call cannot
+	// observe a torn state (old Store with a stale/zeroed pair stamp, or
+	// vice versa). The new pair's Store is re-obtained via a fresh
+	// cache.LoadDir call dispatched by the pair-switch handler
+	// (TaskKindLoadAvailCache), never carried over from the old pair.
+	s.cacheStoreMu.Lock()
+	s.CacheStore = nil
+	s.cacheStoreProfile = ""
+	s.cacheStoreRegion = ""
+	s.cacheStoreMu.Unlock()
+
 	s.Identity = nil
 	s.IdentityFetching = false
 	s.PendingRefresh = false

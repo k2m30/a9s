@@ -25,3 +25,25 @@ func IsBackgroundTaskKind(kind runtime.TaskKind) bool {
 		return false
 	}
 }
+
+// IsBackgroundFetchTask is a context-aware sibling of IsBackgroundTaskKind for
+// classifying a single TaskRequest, adding one additional case on top of the
+// existing table: a runtime.KindFetchResources task is background exactly
+// when screenAlreadyRenderable is true (the target screen already has cached
+// rows seeded, or a Loading shell is already on screen) — the transport must
+// never block the response on a fetch whose result the response doesn't need
+// to already show SOMETHING. A genuinely cold fetch (nothing renderable yet,
+// screenAlreadyRenderable=false) stays blocking, since the synchronous half
+// of the partition is what produces the `Loading…` shell in the same
+// response (DEF-1/C4, pilot step 2).
+//
+// Every other TaskKind's classification is delegated unchanged to
+// IsBackgroundTaskKind — this function only changes behavior for
+// KindFetchResources; it never diverges from the existing table for any
+// other kind, regardless of screenAlreadyRenderable.
+func IsBackgroundFetchTask(req runtime.TaskRequest, screenAlreadyRenderable bool) bool {
+	if req.Key.Kind == runtime.KindFetchResources {
+		return screenAlreadyRenderable
+	}
+	return IsBackgroundTaskKind(req.Key.Kind)
+}

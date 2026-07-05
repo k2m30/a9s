@@ -27,6 +27,13 @@ import (
 // cannot bridge the space-vs-underscore difference.
 func newEC2ListModel(t *testing.T) tui.Model {
 	t.Helper()
+	// #17 wave 2 isolation: this constructor calls tui.New directly (not
+	// newRootSizedModel/tuitest.Sized), so it needs its own
+	// A9S_CONFIG_FOLDER redirect — otherwise every call in this file shares
+	// the same on-disk testprofile--us-east-1/ec2.yaml once a top-level list
+	// open genuinely persists to disk (Item A, #17 wave 1), and an earlier
+	// test's loaded EC2 rows leak into a later test's "fresh list" precondition.
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	tui.Version = "0.6.0"
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 40})
@@ -194,6 +201,7 @@ func TestQA_EC2_A4_StatusColoring_RunningRowHasANSI(t *testing.T) {
 }
 
 func TestQA_EC2_A4_StatusColoring_StoppedRowHasANSI(t *testing.T) {
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir()) // #17 wave 2 isolation
 	tui.Version = "0.6.0"
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 40})
@@ -695,6 +703,7 @@ func TestQA_EC2_A11_3_TerminatedInstancesAppearInList(t *testing.T) {
 // A.12 Empty and Error States
 
 func TestQA_EC2_A12_1_EmptyInstanceList(t *testing.T) {
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir()) // #17 wave 2 isolation
 	tui.Version = "0.6.0"
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 40})
@@ -717,6 +726,7 @@ func TestQA_EC2_A12_1_EmptyInstanceList(t *testing.T) {
 // A.13 Loading State
 
 func TestQA_EC2_A13_1_LoadingState(t *testing.T) {
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir()) // #17 wave 2 isolation
 	tui.Version = "0.6.0"
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 40})
@@ -735,6 +745,7 @@ func TestQA_EC2_A13_1_LoadingState(t *testing.T) {
 // A.14 Responsive Behavior
 
 func TestQA_EC2_A14_1_TerminalTooNarrow(t *testing.T) {
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir()) // #17 wave 2 isolation
 	tui.Version = "0.6.0"
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 50, Height: 40})
@@ -746,6 +757,7 @@ func TestQA_EC2_A14_1_TerminalTooNarrow(t *testing.T) {
 }
 
 func TestQA_EC2_A14_5_TerminalTooShort(t *testing.T) {
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir()) // #17 wave 2 isolation
 	tui.Version = "0.6.0"
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 5})
@@ -762,6 +774,8 @@ func TestQA_EC2_A14_5_TerminalTooShort(t *testing.T) {
 
 func newEC2DetailModel(t *testing.T, r resource.Resource) tui.Model {
 	t.Helper()
+	// #17 wave 2 isolation: see newEC2ListModel's comment above.
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	tui.Version = "0.6.0"
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 40})
@@ -907,6 +921,8 @@ func TestQA_EC2_Detail_AllFieldsFromFixture(t *testing.T) {
 
 func newEC2YAMLModel(t *testing.T, r resource.Resource) tui.Model {
 	t.Helper()
+	// #17 wave 2 isolation: see newEC2ListModel's comment above.
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	tui.Version = "0.6.0"
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 40})
@@ -1095,6 +1111,7 @@ func TestQA_EC2_YAML_FieldsMapRendersCorrectly(t *testing.T) {
 // ===========================================================================
 
 func TestQA_EC2_D1_FullNavigationStack(t *testing.T) {
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir()) // #17 wave 2 isolation
 	tui.Version = "0.6.0"
 	m := tui.New("testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 40})

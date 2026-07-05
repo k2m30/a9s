@@ -75,7 +75,8 @@ func (c *Core) HandleResourcesLoaded(ev ResourcesLoadedEvent) ([]UIIntent, []Tas
 			intents = append(intents, PatchResourceCache{
 				ResourceType: ev.ResourceType,
 				Entry: &session.ResourceCacheEntry{
-					Resources: ev.Resources,
+					Resources:  ev.Resources,
+					Pagination: ev.Pagination,
 				},
 			})
 		}

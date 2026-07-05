@@ -1,6 +1,9 @@
 package app
 
-import "github.com/k2m30/a9s/v3/internal/runtime"
+import (
+	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/internal/runtime"
+)
 
 // Snapshot builds the full ViewState from the controller's screen state:
 // Header, FrameTitle, Footer, and the per-screen Body (menu/list/detail/text/
@@ -58,12 +61,29 @@ func (c *Controller) snapshot() ViewState {
 		vs.Footer = c.buildDetailFooterHints(top.State.Detail)
 	}
 	if top.ID == runtime.ScreenHelp {
-		vs.Body.Help = buildHelpBody()
+		vs.Body.Help = c.buildHelpBody()
 	}
 	if top.ID == runtime.ScreenIdentity {
 		vs.Body.Identity = c.buildIdentityBody()
 	}
 	return vs
+}
+
+// ScreenIDs returns the ScreenID of every entry on the controller's screen
+// stack, bottom-to-top. It exists so that renderer adapters (today: the TUI's
+// stackInSync debug assertion in internal/tui/app_stack_invariant.go) can
+// compare their own view stack against the controller's without reaching
+// into unexported Controller state — the controller stays the single source
+// of truth for stack depth and per-level screen identity (see docs/architecture.md
+// "the controller stack is authoritative").
+func (c *Controller) ScreenIDs() []runtime.ScreenID {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	ids := make([]runtime.ScreenID, len(c.stack))
+	for i, s := range c.stack {
+		ids[i] = s.ID
+	}
+	return ids
 }
 
 // bodyKindForScreen maps a Screen to the BodyKind a renderer uses to
@@ -90,59 +110,85 @@ func bodyKindForScreen(s Screen) BodyKind {
 	}
 }
 
-// buildHelpBody constructs the HelpBody that the web renderer uses to populate
-// the ? help overlay. It mirrors the helpGroup structure from
-// internal/tui/views/help.go, sourcing the same static keybinding strings.
-// The context is "main-menu" (the default) since the controller does not track
-// which view opened help.
-func buildHelpBody() *HelpBody {
-	nav := HelpSection{
-		Title: "NAVIGATION",
-		Hints: []KeyHint{
-			{Key: "j/k", Help: "up/down"},
-			{Key: "g", Help: "top"},
-			{Key: "G", Help: "bottom"},
-			{Key: "pgup", Help: "page up"},
-			{Key: "pgdn", Help: "page down"},
-		},
+// helpContextName is the ViewState.Body.Help.Context string for each
+// domain.HelpContext, so the web renderer can label/filter sections the same
+// way the TUI's per-context HelpModel constructors imply via their name.
+func helpContextName(ctx domain.HelpContext) string {
+	switch ctx {
+	case domain.HelpFromResourceList, domain.HelpFromResourceListPaginated:
+		return "resource-list"
+	case domain.HelpFromSecretsList, domain.HelpFromSecretsListPaginated:
+		return "secrets-list"
+	case domain.HelpFromDetail:
+		return "detail"
+	case domain.HelpFromYAML:
+		return "yaml"
+	case domain.HelpFromJSON:
+		return "json"
+	case domain.HelpFromSelector:
+		return "selector"
+	case domain.HelpFromReveal:
+		return "reveal"
+	default:
+		return "main-menu"
 	}
-	actions := HelpSection{
-		Title: "ACTIONS",
-		Hints: []KeyHint{
-			{Key: "enter", Help: "select"},
-			{Key: "/", Help: "filter"},
-			{Key: ":", Help: "command"},
-			{Key: "q", Help: "quit"},
-			{Key: "ctrl+c", Help: "force quit"},
-		},
+}
+
+// helpContextForScreen derives the domain.HelpContext from the ScreenID of
+// the screen directly under ScreenHelp on the controller's stack — the
+// screen that was active when the user opened help. Screens with no help
+// context of their own (unknown/absent) fall back to the main-menu context,
+// matching the TUI's own HelpModel default.
+func helpContextForScreen(id runtime.ScreenID) domain.HelpContext {
+	switch id {
+	case runtime.ScreenResourceList, runtime.ScreenChildList:
+		return domain.HelpFromResourceList
+	case runtime.ScreenDetail:
+		return domain.HelpFromDetail
+	case runtime.ScreenYAML:
+		return domain.HelpFromYAML
+	case runtime.ScreenJSON:
+		return domain.HelpFromJSON
+	case runtime.ScreenProfileSelector, runtime.ScreenRegion, runtime.ScreenTheme:
+		return domain.HelpFromSelector
+	case runtime.ScreenReveal:
+		return domain.HelpFromReveal
+	default:
+		return domain.HelpFromMainMenu
 	}
-	other := HelpSection{
-		Title: "OTHER",
-		Hints: []KeyHint{
-			{Key: "i", Help: "identity"},
-			{Key: "!", Help: "error log"},
-			{Key: "?", Help: "help"},
-			{Key: "esc", Help: "back"},
-		},
+}
+
+// buildHelpBody constructs the HelpBody that the web renderer uses to
+// populate the ? help overlay, sourced from the same domain.HelpGroupsFor
+// table the TUI's internal/tui/views/help.go renders directly (single source
+// of truth for help-overlay key/description content — see
+// internal/domain/helpkeys.go). The context is derived from the screen
+// directly beneath ScreenHelp on the controller stack, i.e. the screen that
+// was active when help was opened.
+//
+// toggleAttentionKey is hardcoded to "ctrl+z" — the built-in default for
+// keys.Map.ToggleAttentionOnly (internal/tui/keys/keys.go). The web renderer
+// has no per-session remapped keymap today, so this matches what every web
+// session actually sees; if per-session keymaps are added later this must
+// read the live binding the same way the TUI does.
+func (c *Controller) buildHelpBody() *HelpBody {
+	ctx := domain.HelpFromMainMenu
+	if len(c.stack) >= 2 {
+		ctx = helpContextForScreen(c.stack[len(c.stack)-2].ID)
 	}
-	commands := HelpSection{
-		Title: "COMMANDS",
-		Hints: []KeyHint{
-			{Key: ":q", Help: "exit"},
-			{Key: ":ctx", Help: "switch profile"},
-			{Key: ":profile", Help: "switch profile"},
-			{Key: ":region", Help: "switch region"},
-			{Key: ":theme", Help: "switch theme"},
-			{Key: ":help", Help: "show help"},
-			{Key: ":root", Help: "main menu"},
-			{Key: ":main", Help: "main menu"},
-			{Key: ":<res>", Help: "e.g. :ec2 :s3 :lambda"},
-		},
+	sections := domain.HelpGroupsFor(ctx, "ctrl+z")
+	body := &HelpBody{
+		Context:  helpContextName(ctx),
+		Sections: make([]HelpSection, len(sections)),
 	}
-	return &HelpBody{
-		Context:  "main-menu",
-		Sections: []HelpSection{nav, actions, other, commands},
+	for i, s := range sections {
+		hints := make([]KeyHint, len(s.Hints))
+		for j, h := range s.Hints {
+			hints[j] = KeyHint{Key: h.Key, Help: h.Help}
+		}
+		body.Sections[i] = HelpSection{Title: s.Title, Hints: hints}
 	}
+	return body
 }
 
 // buildIdentityBody constructs the IdentityBody from the controller's

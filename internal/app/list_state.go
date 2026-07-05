@@ -22,6 +22,28 @@ func (c *Controller) topListState() *ListState {
 	return c.stack[len(c.stack)-1].State.List
 }
 
+// topScreenID returns the ScreenID of the top-of-stack screen, or "" when the
+// stack is empty. Used by save-gating logic (C6 scope boundary) that needs to
+// distinguish ScreenResourceList (persist-eligible) from ScreenChildList
+// (never persisted) without a full Screen reference.
+func (c *Controller) topScreenID() runtime.ScreenID {
+	if len(c.stack) == 0 {
+		return ""
+	}
+	return c.stack[len(c.stack)-1].ID
+}
+
+// EnsureListState is the exported surface that TUI builders call immediately
+// after a ScreenResourceList/ScreenChildList PushScreen intent has already
+// been applied (e.g. via ApplyIntents) so that State.List is non-nil before
+// the renderer's builder reads topListState(). Delegates to ensureListState.
+// Mirrors EnsureSelectorState (selector.go).
+func (c *Controller) EnsureListState() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.ensureListState()
+}
+
 // ensureListState ensures the top list screen has an initialised ListState
 // (push via ApplyIntents only sets the Screen; State.List starts nil). Called
 // lazily from applyNavResult after a PushScreen so that action handlers never
@@ -327,6 +349,62 @@ func (c *Controller) ClearListLoading() {
 	}
 	ls.Loading = false
 	ls.LoadingMore = false
+}
+
+// SetListFetchError records a failed fetch's error text on the top list
+// screen, mirroring the headless ClearActiveListLoadingIntent application in
+// intents.go (DEF-5/C4): a fetch failure over cached content stops the
+// refreshing marker and swaps in an error marker instead of leaving the list
+// with no error surfaced. No-op when err is empty.
+func (c *Controller) SetListFetchError(err string) {
+	if err == "" {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	ls := c.topListState()
+	if ls == nil {
+		return
+	}
+	ls.Refreshing = false
+	ls.LastFetchError = err
+}
+
+// SetListRefreshing sets the Refreshing flag on the top list screen. Mirrors
+// SetListFetchError's locking/topListState pattern. Used by cache-first
+// seeding callers (DEF-12, C3: docs/design/cache-requirements.md) to mark a
+// seeded-but-unverified list surface so the renderer's refreshing marker
+// (⟳ / "── refreshing... ──") distinguishes it from verified-fresh content —
+// renderers read this flag, they never compute it.
+func (c *Controller) SetListRefreshing(v bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	ls := c.topListState()
+	if ls == nil {
+		return
+	}
+	ls.Refreshing = v
+}
+
+// SetListTotalCount sets the TotalCount override on the top list screen.
+// Mirrors SetListRefreshing's locking/topListState pattern. Used by
+// cache-first seeding callers (item B, #17 wave 2, DEF-21) AFTER
+// applyResourcesLoaded so the seed-time value survives the unconditional
+// clear inside it — same set-after-seed ordering SetListRefreshing already
+// requires. n <= 0 is a no-op: TotalCount's zero value already means
+// "not applicable", and buildListFrameTitle only prefers TotalCount when it
+// exceeds len(Rows).
+func (c *Controller) SetListTotalCount(n int) {
+	if n <= 0 {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	ls := c.topListState()
+	if ls == nil {
+		return
+	}
+	ls.TotalCount = n
 }
 
 // GetListPaginationCursor returns the pagination cursor of the top list screen.

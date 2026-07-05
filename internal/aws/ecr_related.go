@@ -135,10 +135,7 @@ func checkECRKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	if !ok || repo.EncryptionConfiguration == nil || repo.EncryptionConfiguration.KmsKey == nil || *repo.EncryptionConfiguration.KmsKey == "" {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
-	keyID := *repo.EncryptionConfiguration.KmsKey
-	if idx := strings.LastIndex(keyID, "/"); idx >= 0 && idx < len(keyID)-1 {
-		keyID = keyID[idx+1:]
-	}
+	keyID := kmsKeyIDFromField(*repo.EncryptionConfiguration.KmsKey, res.Type)
 	return relatedResult("kms", []string{keyID})
 }
 

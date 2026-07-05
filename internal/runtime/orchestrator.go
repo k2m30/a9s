@@ -2,8 +2,8 @@ package runtime
 
 import (
 	"github.com/k2m30/a9s/v3/internal/catalog"
-	"github.com/k2m30/a9s/v3/internal/session"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/session"
 )
 
 // Event is the typed marker interface for inputs the runtime accepts from an
@@ -58,8 +58,6 @@ func (c *Core) Types() []catalog.ResourceTypeDef { return c.types }
 //	messages.ResourcesLoaded      — TUI shim handleResourcesLoaded calls
 //	                                Core.HandleResourcesLoaded directly after
 //	                                adapter-side derive + updateActiveView.
-//	messages.APIError             — TUI shim handleAPIError bumps flash.gen
-//	                                before calling Core.HandleAPIError.
 //	messages.RelatedCheckResult   — TUI shim handleRelatedCheckResult resolves
 //	                                sourceID from the active detail view before
 //	                                calling Core.HandleRelatedCheckResult.
@@ -96,6 +94,18 @@ func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 		return c.HandleIdentityLoaded(IdentityLoadedEvent{Identity: msg.Identity})
 	case messages.IdentityError:
 		return c.HandleIdentityError(IdentityErrorEvent{Err: msg.Err})
+	case messages.APIError:
+		// DEF-5/C4: a headless/web caller feeding a failed KindFetchResources
+		// execution's messages.APIError straight through HandleEvent (rather
+		// than the TUI shim's bump-then-call path) must still get the
+		// classification + ClearActiveListLoadingIntent(Err) intent — a web
+		// caller has no adapter-owned flash.gen, so ConnectGen serves as the
+		// stable stand-in (same pattern Controller.Handle already uses for
+		// this event). The FlashTick task is dropped: it is only meaningful
+		// to a running event loop (TUI/web timer), and a headless/orchestrator
+		// caller has no loop to process it.
+		intents, _ := c.HandleAPIError(APIErrorEvent{Err: msg.Err, NewGen: c.session.ConnectGen})
+		return intents, nil
 	}
 	return nil, nil
 }

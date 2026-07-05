@@ -41,8 +41,36 @@ func newSession(profile, region, command string, demoMode, noCache bool, viewCfg
 			_, tasks := ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: command})
 			app.DrainSync(ctrl, tasks)
 		}
+	} else if !core.NoCache() {
+		// Live path, no pre-supplied clients: C1 requires the cached menu to
+		// render "before any AWS activity" — the AWS connect itself (and thus
+		// the TaskKindLoadAvailCache dispatch inside handleClientsReadySuccess)
+		// only starts once getOrCreateSession's background BootstrapLive
+		// goroutine runs, which can lag the first GET/ /state response. Load
+		// (or reuse) this pair's disk Store synchronously here, before
+		// returning, so the very first snapshot already carries the cached
+		// counts/issue badges/exact flags — mirroring what the
+		// TaskKindLoadAvailCache executor path does, without waiting on a live
+		// connection. LoadAvailabilityCache (not the raw EnsureCacheStore)
+		// resolves an unset Region from the profile's config-file default so
+		// the seed still fires when no -r flag was passed.
+		if store := core.LoadAvailabilityCache(); store != nil {
+			ev := runtime.CacheStoreToEvent(store)
+			ctrl.Handle(ev)
+		}
+		if command != "" {
+			// Mirror tui.WithCommand: arm the runtime's one-shot -c navigation
+			// (session.Command) instead of applying it server-side later.
+			// HandleClientsReady (called from BootstrapLive once AWS connects)
+			// arms session.CommandArmed/PendingCommand, and
+			// handleAvailabilityCacheLoaded dispatches the deferred
+			// TaskKindEmitNavigate once its ProbeResources seed has landed
+			// (DEF-14/D11) — the same ordering the TUI's -c flag relies on.
+			core.SetCommand(command)
+		}
 	}
 	// Live path: ctrl is returned on the menu; getOrCreateSession connects to AWS
-	// in the background and applies any startup command there.
+	// in the background (BootstrapLive) which drives the armed -c navigation
+	// once ClientsReady + the availability seed land.
 	return ctrl
 }

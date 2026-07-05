@@ -637,6 +637,15 @@ func (m *ResourceListModel) RenderList(body app.ListBody) string {
 		sb.WriteString(styles.DimText.Render("── refreshing... ──"))
 	}
 
+	// DEF-5/C4: a fetch failure over cached content swaps the refreshing
+	// marker for an error marker — cached rows stay on screen, nothing goes
+	// blank. LastFetchError is consumed verbatim (already-classified text
+	// from HandleAPIError); this view performs no further formatting.
+	if body.LastFetchError != "" {
+		sb.WriteString("\n")
+		sb.WriteString(styles.FlashError.Render("── error: " + body.LastFetchError + " ──"))
+	}
+
 	return sb.String()
 }
 

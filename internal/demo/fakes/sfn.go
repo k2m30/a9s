@@ -38,8 +38,10 @@ func (f *SFNFake) GetExecutionHistory(_ context.Context, _ *sfn.GetExecutionHist
 	return &sfn.GetExecutionHistoryOutput{}, nil
 }
 
-// DescribeStateMachine returns an empty state machine — demo mode does not
-// model ASL definitions.
+// DescribeStateMachine returns the fixture's ASL definition for the given
+// state machine ARN, when one is registered (see SFNFixtures.Definitions).
+// Falls back to an empty definition for state machines without a modeled
+// ASL body.
 func (f *SFNFake) DescribeStateMachine(_ context.Context, input *sfn.DescribeStateMachineInput, _ ...func(*sfn.Options)) (*sfn.DescribeStateMachineOutput, error) {
 	var arn string
 	if input != nil && input.StateMachineArn != nil {
@@ -48,7 +50,11 @@ func (f *SFNFake) DescribeStateMachine(_ context.Context, input *sfn.DescribeSta
 		}
 		arn = *input.StateMachineArn
 	}
-	return &sfn.DescribeStateMachineOutput{StateMachineArn: &arn}, nil
+	definition := "{}"
+	if d, ok := f.fix.Definitions[arn]; ok {
+		definition = d
+	}
+	return &sfn.DescribeStateMachineOutput{StateMachineArn: &arn, Definition: &definition}, nil
 }
 
 // validateSFNArn mirrors the real SFN API which returns InvalidArn (not ValidationError)

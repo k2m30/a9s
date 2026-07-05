@@ -255,6 +255,29 @@ type SaveThemeConfigPayload struct {
 
 func (SaveThemeConfigPayload) isTaskPayload() {}
 
+// SaveCachePayload carries a snapshot of the per-type rows the sweep/
+// enrichment completion just retained, captured at TASK-DISPATCH time (inside
+// handleAvailabilityChecked / handleEnrichmentChecked's "all done" branch) —
+// DEF-7/C7/C8. This matters because c.session.ProbeResources is mutated
+// in-place by the SAME batch's startEnrichment -> clearEnrichmentFor
+// clear-on-rerun-start step (it strips stale Wave-2 findings from every
+// retained row before the fresh enrichment probe runs); a save that read
+// c.session.ProbeResources live at EXECUTE time (after clearEnrichmentFor has
+// already run for types re-entering the enrichment queue) would silently
+// persist rows with their findings stripped. Capturing the snapshot at
+// dispatch time — mirroring the DispatchSnapshot/CaptureDispatch pattern
+// already used for generations/clients — avoids that race entirely.
+//
+// Resources and Truncated are shallow copies of the maps (values are the
+// existing []resource.Resource slices/headers at capture time); the executor
+// only reads them, never mutates in place, so no deeper copy is needed.
+type SaveCachePayload struct {
+	Resources map[string][]resource.Resource
+	Truncated map[string]bool
+}
+
+func (SaveCachePayload) isTaskPayload() {}
+
 // RelatedCheckPayload carries the source resource the executor needs to
 // invoke RelatedDef.Checker. The Scope field on the parent TaskKey
 // ("type/id") is the dedup key; this struct carries the full resource so

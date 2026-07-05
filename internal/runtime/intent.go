@@ -139,12 +139,28 @@ type ReplaceScreen struct {
 
 func (ReplaceScreen) isIntent() {}
 
+// OriginCache and OriginVerified are the two valid values for
+// PatchMenuAvailability.Origin — a cross-layer contract shared by every
+// Core handler that sets Origin and every adapter that reads it (DEF-6/C3).
+// Defined as constants (rather than inline string literals) so a typo in
+// either producer or consumer fails to compile instead of silently landing
+// on the "leave origin unchanged" empty-string branch.
+const (
+	OriginCache    = "cache"
+	OriginVerified = "verified"
+)
+
 // PatchMenuAvailability updates the resource-count display for one menu entry.
 // Combines SetAvailability + SetTruncated into a single intent.
 type PatchMenuAvailability struct {
 	ResourceType string
 	Count        int
 	Truncated    bool
+	// Origin distinguishes a disk-cache-seeded entry ("cache", not yet
+	// re-verified this session) from one confirmed by a live probe this
+	// session ("verified") — DEF-6/C3. Empty means "leave the stored origin
+	// unchanged" (used by callers that only ever touch Count/Truncated).
+	Origin string
 }
 
 func (PatchMenuAvailability) isIntent() {}
@@ -214,7 +230,16 @@ func (AppendErrorHistoryIntent) isIntent() {}
 // indicator on the currently-active resource-list view (if any). Emitted by
 // HandleAPIError so a failed AWS call removes the spinner immediately rather
 // than waiting for the next render.
-type ClearActiveListLoadingIntent struct{}
+//
+// Err carries the error-marker text (DEF-5/C4): when non-empty, the adapter
+// must also clear the active list's Refreshing flag and set its
+// LastFetchError to Err, so cached content stays on screen with the marker
+// swapped from "refreshing" to "error" instead of going blank. Empty when
+// the failure is not list-scoped (matches the pre-existing spinner-only
+// behavior for other HandleAPIError call sites).
+type ClearActiveListLoadingIntent struct {
+	Err string
+}
 
 func (ClearActiveListLoadingIntent) isIntent() {}
 

@@ -254,7 +254,10 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 		Wave2:                  IssueEnricher{Fn: EnrichTargetGroupHealth, Priority: 10},
 		IssueEnricherFieldKeys: []string{"health_summary"},
-		FieldKeys:              []string{"target_group_name", "port", "protocol", "vpc_id", "target_type", "health_check_path"},
+		// target_group_arn is required by checkLambdaTG (lambda:tg pivot) to
+		// call DescribeTargetHealth on cache-restored rows — without it in
+		// FieldKeys the ARN does not survive a YAML cache round-trip.
+		FieldKeys: []string{"target_group_name", "target_group_arn", "port", "protocol", "vpc_id", "target_type", "health_check_path"},
 		Related: []domain.RelatedDef{
 			{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkTGELB, NeedsTargetCache: false},
 			{TargetType: "ecs-svc", DisplayName: "ECS Services", Checker: checkTGECSSvc, NeedsTargetCache: true},
@@ -654,7 +657,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			}
 			return FetchNetworkInterfacesPage(ctx, c.EC2, continuationToken)
 		},
-		FieldKeys: []string{"eni_id", "name", "status", "type", "vpc_id", "private_ip", "requester_managed"},
+		FieldKeys: []string{"eni_id", "name", "status", "type", "vpc_id", "private_ip", "requester_managed", "description", "requester_id", "security_groups"},
 		Related: []domain.RelatedDef{
 			{TargetType: "ec2", DisplayName: "EC2 Instances", Checker: checkENIEC2, NeedsTargetCache: true},
 			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkENISG, NeedsTargetCache: true},

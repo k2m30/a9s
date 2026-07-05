@@ -43,12 +43,10 @@ func checkDbiKMS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	if db.KmsKeyId == nil || *db.KmsKeyId == "" {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
-	arn := *db.KmsKeyId
-	idx := strings.LastIndex(arn, "/")
-	if idx < 0 || idx == len(arn)-1 {
+	keyID := kmsKeyIDFromField(*db.KmsKeyId, res.Type)
+	if keyID == "" {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
-	keyID := arn[idx+1:]
 	return relatedResult("kms", []string{keyID})
 }
 

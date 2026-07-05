@@ -2,8 +2,8 @@
 package fixtures
 
 import (
-	"sync"
 	"fmt"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
@@ -15,6 +15,15 @@ type LambdaFixtures struct {
 	Functions []lambdatypes.FunctionConfiguration
 	// EventSourceMappings is the full list returned by ListEventSourceMappings.
 	EventSourceMappings []lambdatypes.EventSourceMappingConfiguration
+	// ImageURIs maps function name -> Code.ImageUri, served by GetFunction.
+	// Real AWS only returns ImageUri via GetFunction (never ListFunctions),
+	// so this is a GetFunction-only fixture — required for the lambda:ecr
+	// related-panel pivot (checkLambdaECR).
+	ImageURIs map[string]string
+	// Tags maps function name -> tag map, served by ListTags. Required for
+	// the lambda:cfn related-panel pivot (checkLambdaCFN reads
+	// "aws:cloudformation:stack-name").
+	Tags map[string]map[string]string
 }
 
 // NewLambdaFixtures builds and returns a fully-populated LambdaFixtures struct.
@@ -23,6 +32,17 @@ var sharedLambdaFixtures = sync.OnceValue(func() *LambdaFixtures {
 	return &LambdaFixtures{
 		Functions:           fns,
 		EventSourceMappings: buildLambdaEventSourceMappings(fns),
+		ImageURIs: map[string]string{
+			// api-service-runner is the container-image function (PackageType=Image)
+			// declared below; acme/api-service is a real ecr.go repository fixture.
+			"api-service-runner": "123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/api-service:latest",
+		},
+		Tags: map[string]map[string]string{
+			// api-gateway-authorizer carries the CFN stack tag — required for
+			// the lambda:cfn related-panel pivot witness. acme-eks-cluster is
+			// a real stack fixture (cfn.go).
+			"api-gateway-authorizer": {"aws:cloudformation:stack-name": "acme-eks-cluster"},
+		},
 	}
 })
 
@@ -98,8 +118,16 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 			DeadLetterConfig: &lambdatypes.DeadLetterConfig{
 				TargetArn: aws.String("arn:aws:sqs:us-east-1:123456789012:dead-letter-queue"),
 			},
+			// Environment variables carry a Secrets Manager ARN and an SSM
+			// parameter-style path — required for lambda→secrets and
+			// lambda→ssm related-panel pivots.
 			Environment: &lambdatypes.EnvironmentResponse{
-				Variables: map[string]string{"ENV": "production", "LOG_LEVEL": "INFO"},
+				Variables: map[string]string{
+					"ENV":           "production",
+					"LOG_LEVEL":     "INFO",
+					"DB_SECRET_ARN": "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/database/primary-AbCdEf",
+					"CONFIG_PARAM":  "/acme/prod/app/config",
+				},
 			},
 			LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
 			VpcConfig: &lambdatypes.VpcConfigResponse{
@@ -107,6 +135,8 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 				SubnetIds:        []string{lambdaProdSubnetA},
 				SecurityGroupIds: []string{lambdaProdALBSGID},
 			},
+			// KMSKeyArn — required for lambda→kms related-panel pivot.
+			KMSKeyArn: aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
 		},
 		{
 			FunctionName:     aws.String("data-pipeline-transform"),
@@ -564,6 +594,30 @@ func buildLambdaEventSourceMappings(fns []lambdatypes.FunctionConfiguration) []l
 				StartingPosition:     lambdatypes.EventSourcePositionTrimHorizon,
 				LastProcessingResult: aws.String("OK"),
 			})
+		case "data-pipeline-transform":
+			// data-pipeline-transform is triggered by both a Kinesis stream and
+			// an MSK cluster — required for lambda→kinesis and lambda→msk
+			// related-panel pivots. clickstream-ingest and acme-events-prod are
+			// real fixtures (kinesis.go, msk.go).
+			mappings = append(mappings,
+				lambdatypes.EventSourceMappingConfiguration{
+					UUID:                 aws.String("esm-data-pipeline-kinesis-01"),
+					FunctionArn:          fn.FunctionArn,
+					EventSourceArn:       aws.String("arn:aws:kinesis:us-east-1:123456789012:stream/clickstream-ingest"),
+					State:                aws.String("Enabled"),
+					BatchSize:            aws.Int32(100),
+					StartingPosition:     lambdatypes.EventSourcePositionLatest,
+					LastProcessingResult: aws.String("OK"),
+				},
+				lambdatypes.EventSourceMappingConfiguration{
+					UUID:                 aws.String("esm-data-pipeline-msk-01"),
+					FunctionArn:          fn.FunctionArn,
+					EventSourceArn:       aws.String("arn:aws:kafka:us-east-1:123456789012:cluster/acme-events-prod/a1b2c3d4"),
+					State:                aws.String("Enabled"),
+					BatchSize:            aws.Int32(100),
+					LastProcessingResult: aws.String("OK"),
+				},
+			)
 		}
 	}
 	return mappings

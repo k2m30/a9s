@@ -40,9 +40,22 @@ var sharedCloudFrontFixtures = sync.OnceValue(func() *CloudFrontFixtures {
 						},
 					},
 				},
+				// LambdaFunctionAssociations — required for the lambda:cf
+				// related-panel pivot witness (checkLambdaCF). Lambda@Edge
+				// always references a published version; api-gateway-authorizer
+				// is a real lambda.go fixture.
 				DefaultCacheBehavior: &cftypes.DefaultCacheBehavior{
 					TargetOriginId:       aws.String("s3-static-assets"),
 					ViewerProtocolPolicy: cftypes.ViewerProtocolPolicyRedirectToHttps,
+					LambdaFunctionAssociations: &cftypes.LambdaFunctionAssociations{
+						Quantity: aws.Int32(1),
+						Items: []cftypes.LambdaFunctionAssociation{
+							{
+								EventType:         cftypes.EventTypeViewerRequest,
+								LambdaFunctionARN: aws.String("arn:aws:lambda:us-east-1:123456789012:function:api-gateway-authorizer:1"),
+							},
+						},
+					},
 				},
 				HttpVersion:      cftypes.HttpVersionHttp2,
 				PriceClass:       cftypes.PriceClassPriceClassAll,

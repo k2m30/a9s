@@ -15,6 +15,7 @@ package runtime
 import (
 	"fmt"
 
+	"github.com/k2m30/a9s/v3/internal/cache"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/session"
 )
@@ -119,6 +120,36 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 		return NavigateResult{Kind: NavigateKindPopAll}, nil
 
 	case NavigateTargetResourceList:
+		// DEF-19: disarm the deferred one-shot -c navigation the instant any
+		// resource-list navigation actually happens. CommandArmed/PendingCommand
+		// (session.go) latch a REPLAY of this exact navigation, deferred until
+		// handleAvailabilityCacheLoaded's seed lands (DEF-14/D11) — but nothing
+		// previously re-checked "has the user already navigated since arming"
+		// at consumption time. A manually-typed navigation to the SAME or a
+		// DIFFERENT resource type in the race window between arming (connect
+		// time) and consumption (availability-cache-loaded time) left the flag
+		// armed, so the later deferred emit fired a second, redundant
+		// NavigateTargetResourceList for the (still-armed) PendingCommand type —
+		// pushing a second ScreenChildList/ScreenResourceList of that type onto
+		// an already-navigated stack. Two ListStates then existed for one
+		// visible screen: the first fetch landed on the first push, the second
+		// (armed-replay) fetch landed on the second push, and callers reading
+		// topListState() (the load-more gate, the renderer) saw whichever push
+		// was topmost — silently diverging from whichever push the frame last
+		// rendered. Clearing the arming here (not at the push site) closes the
+		// race at its source: by the time handleAvailabilityCacheLoaded checks
+		// CommandArmed, any real navigation that already happened has disarmed
+		// it, so the deferred emit becomes the intended no-op instead of a
+		// duplicate push. The armed emit's own eventual HandleNavigate call
+		// re-disarms harmlessly (CommandArmed is already false by then, cleared
+		// synchronously by handleAvailabilityCacheLoaded before dispatch).
+		// Guarded on the current value (not an unconditional write) so the
+		// overwhelmingly common never-armed case costs only a bool read.
+		if c.session.CommandArmed {
+			c.session.CommandArmed = false
+			c.session.PendingCommand = ""
+		}
+
 		rt := resource.FindResourceType(ev.ResourceType)
 		if rt == nil {
 			return NavigateResult{
@@ -147,14 +178,67 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 		// Cache miss: adapter pushes a fresh list and the fetch task loads it.
 		// Scope keeps the user-supplied type (alias preserved) so the fetcher
 		// resolves to the same registry entry the adapter chose for display.
-		return NavigateResult{
-				Kind:         NavigateKindPushResourceList,
-				ResolvedType: canon,
-				DisplayAlias: alias,
-			}, []TaskRequest{{
-				Key:   TaskKey{Kind: KindFetchResources, Scope: ev.ResourceType},
-				Cache: CacheNone,
-			}}
+		result := NavigateResult{
+			Kind:         NavigateKindPushResourceList,
+			ResolvedType: canon,
+			DisplayAlias: alias,
+		}
+		// The seed rides the miss branch, not a NavigateKindPushResourceListCached
+		// promotion: ProbeResources/ProbeTruncated hold disk-cached/probe knowledge
+		// that is distinct from session.ResourceCache (DEF-12 C1 + Goal 4) — the
+		// fetch must still run to confirm/replace what the probe retained, so Kind
+		// and the KindFetchResources task below are unchanged.
+		//
+		// DEF-15: ProbeResources is freed (set nil) by handleEnrichmentChecked
+		// once the Wave-2 sweep completes (DEF-7 memory free), so any list open
+		// AFTER the sweep — or mid-sweep via a lane that lands after the free —
+		// finds no seed here even though the on-disk per-type Store still holds
+		// every row. Fall back to the loaded cache Store, which outlives the
+		// ProbeResources free and is already pair-stamped by EnsureCacheStore.
+		//
+		// DEF-15/P2: the fallback fires only when this session never observed
+		// canon (map key absent, e.g. after the post-sweep free). A key present
+		// with a zero-length slice means a live Wave-1 probe already confirmed
+		// the type is empty this session — that observed-empty result is
+		// fresher than any disk row (C2), so it seeds a bare list rather than
+		// falling back to stale disk rows.
+		if rows, observed := c.session.ProbeResources[canon]; observed {
+			if len(rows) > 0 {
+				result.CachedEntry = &session.ResourceCacheEntry{
+					Resources: rows,
+					Pagination: &resource.PaginationMeta{
+						IsTruncated: c.session.ProbeTruncated[canon],
+					},
+				}
+			}
+		} else {
+			_ = c.ReadCacheStore(func(store *cache.Store) error {
+				if store == nil {
+					return nil
+				}
+				if tf, ok := store.Type(canon); ok && len(tf.Rows) > 0 {
+					result.CachedEntry = &session.ResourceCacheEntry{
+						Resources: rowsFromCacheRows(canon, tf.Rows),
+						Pagination: &resource.PaginationMeta{
+							IsTruncated: !tf.Exact,
+						},
+						// Item B/DEF-21: tf.Count is the authoritative total for the
+						// C6a reconstructable pair (Count may exceed len(tf.Rows) — a
+						// counts-only write never touches Rows). Carry it through so
+						// the seeded list's title shows the real total, not the
+						// last-known page count. Only set when it actually exceeds
+						// what Rows would already report, matching TotalCount's
+						// "unknown/not applicable" zero-value contract.
+						TotalCount: max(tf.Count, len(tf.Rows)),
+					}
+				}
+				return nil
+			})
+		}
+		return result, []TaskRequest{{
+			Key:   TaskKey{Kind: KindFetchResources, Scope: ev.ResourceType},
+			Cache: CacheNone,
+		}}
 
 	case NavigateTargetDetail, NavigateTargetYAML, NavigateTargetJSON:
 		if ev.Resource == nil {

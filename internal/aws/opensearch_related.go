@@ -139,10 +139,7 @@ func checkOpenSearchKMS(_ context.Context, _ any, res resource.Resource, _ resou
 		// Legitimately no KMS key configured (encryption-off) — 0 is correct.
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
-	keyID := *domain.EncryptionAtRestOptions.KmsKeyId
-	if idx := strings.LastIndex(keyID, "/"); idx >= 0 && idx < len(keyID)-1 {
-		keyID = keyID[idx+1:]
-	}
+	keyID := kmsKeyIDFromField(*domain.EncryptionAtRestOptions.KmsKeyId, res.Type)
 	return relatedResult("kms", []string{keyID})
 }
 

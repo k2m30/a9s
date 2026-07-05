@@ -13,173 +13,139 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Dir()
+// Dir(profile, region)
 // ---------------------------------------------------------------------------
 
 func TestCache_Dir(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
 
-	got := cache.Dir()
-	want := filepath.Join(tmpDir, "cache")
+	got := cache.Dir("test-profile", "us-east-1")
+	want := filepath.Join(tmpDir, "cache", "test-profile--us-east-1")
 	if got != want {
 		t.Errorf("Dir() = %q, want %q", got, want)
 	}
 }
 
-func TestCache_Dir_Default(t *testing.T) {
-	// Unset env var to exercise the fallback path.
-	t.Setenv("A9S_CONFIG_FOLDER", "")
+func TestCache_Dir_SanitizesSlashes(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
 
-	got := cache.Dir()
-	home, err := os.UserHomeDir()
-	if err != nil {
-		t.Skipf("cannot determine home dir: %v", err)
-	}
-	want := filepath.Join(home, ".a9s", "cache")
+	got := cache.Dir("my/profile", "us-east-1")
+	want := filepath.Join(tmpDir, "cache", "my_profile--us-east-1")
 	if got != want {
-		t.Errorf("Dir() without env var = %q, want %q", got, want)
+		t.Errorf("Dir() with slashes = %q, want %q", got, want)
+	}
+}
+
+func TestCache_Dir_SanitizesSpaces(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
+
+	got := cache.Dir("my profile", "us west 2")
+	want := filepath.Join(tmpDir, "cache", "my_profile--us_west_2")
+	if got != want {
+		t.Errorf("Dir() with spaces = %q, want %q", got, want)
+	}
+}
+
+func TestCache_Dir_SanitizesBackslash(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
+
+	got := cache.Dir("corp\\admin", "us-east-1")
+	want := filepath.Join(tmpDir, "cache", "corp_admin--us-east-1")
+	if got != want {
+		t.Errorf("Dir() with backslash = %q, want %q", got, want)
+	}
+}
+
+func TestCache_Dir_EmptyProfile(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
+
+	got := cache.Dir("", "us-east-1")
+	want := filepath.Join(tmpDir, "cache", "--us-east-1")
+	if got != want {
+		t.Errorf("Dir('', 'us-east-1') = %q, want %q", got, want)
+	}
+}
+
+func TestCache_Dir_EmptyRegion(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
+
+	got := cache.Dir("test-profile", "")
+	want := filepath.Join(tmpDir, "cache", "test-profile--")
+	if got != want {
+		t.Errorf("Dir('test-profile', '') = %q, want %q", got, want)
 	}
 }
 
 // ---------------------------------------------------------------------------
-// Path()
+// LoadDir() — never fails, absent directory
 // ---------------------------------------------------------------------------
 
-func TestCache_Path(t *testing.T) {
+func TestCache_LoadDir_NotExists(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
 
-	got := cache.Path("test-profile", "us-east-1")
-	want := filepath.Join(tmpDir, "cache", "test-profile--us-east-1.yaml")
-	if got != want {
-		t.Errorf("Path() = %q, want %q", got, want)
+	store := cache.LoadDir("nonexistent-profile", "us-east-1")
+	if store == nil {
+		t.Fatal("LoadDir() on an absent directory must return a non-nil (empty) Store, per C7 — never fail")
+	}
+	if len(store.Types()) != 0 {
+		t.Errorf("LoadDir() on an absent directory returned %d types, want 0", len(store.Types()))
 	}
 }
 
-func TestCache_Path_SanitizesSlashes(t *testing.T) {
+func TestCache_LoadDir_EmptyTypeFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
 
-	got := cache.Path("my/profile", "us-east-1")
-	want := filepath.Join(tmpDir, "cache", "my_profile--us-east-1.yaml")
-	if got != want {
-		t.Errorf("Path() with slashes = %q, want %q", got, want)
-	}
-}
-
-func TestCache_Path_SanitizesSpaces(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
-
-	got := cache.Path("my profile", "us west 2")
-	want := filepath.Join(tmpDir, "cache", "my_profile--us_west_2.yaml")
-	if got != want {
-		t.Errorf("Path() with spaces = %q, want %q", got, want)
-	}
-}
-
-func TestCache_Path_SanitizesBackslash(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
-
-	got := cache.Path("corp\\admin", "us-east-1")
-	want := filepath.Join(tmpDir, "cache", "corp_admin--us-east-1.yaml")
-	if got != want {
-		t.Errorf("Path() with backslash = %q, want %q", got, want)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Load()
-// ---------------------------------------------------------------------------
-
-func TestCache_Load_NotExists(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
-
-	f, err := cache.Load("nonexistent-profile", "us-east-1")
-	if err != nil {
-		t.Fatalf("Load() for missing file should return nil error, got: %v", err)
-	}
-	if f != nil {
-		t.Error("Load() for missing file should return nil *File")
-	}
-}
-
-func TestCache_Load_EmptyFile(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
-
-	// Create the cache dir and an empty file.
-	cacheDir := filepath.Join(tmpDir, "cache")
-	if err := os.MkdirAll(cacheDir, 0700); err != nil {
+	dir := cache.Dir("test-profile", "us-east-1")
+	if err := os.MkdirAll(dir, 0700); err != nil {
 		t.Fatalf("creating cache dir: %v", err)
 	}
-	emptyFile := filepath.Join(cacheDir, "test-profile--us-east-1.yaml")
+	emptyFile := filepath.Join(dir, "ec2.yaml")
 	if err := os.WriteFile(emptyFile, []byte{}, 0600); err != nil {
 		t.Fatalf("writing empty file: %v", err)
 	}
 
-	f, err := cache.Load("test-profile", "us-east-1")
-	if err != nil {
-		t.Fatalf("Load() for empty file should return nil error, got: %v", err)
+	store := cache.LoadDir("test-profile", "us-east-1")
+	if store == nil {
+		t.Fatal("LoadDir() must return a non-nil Store even with a corrupt/empty per-type file")
 	}
-	if f != nil {
-		t.Error("Load() for empty file should return nil *File")
+	if _, ok := store.Type("ec2"); ok {
+		t.Error(`Type("ec2") should not be present — an empty/unparseable per-type file means "no cache" for that type only (C7)`)
 	}
 }
 
-func TestCache_Load_ValidFile(t *testing.T) {
+func TestCache_LoadDir_ValidTypeFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
 
-	cacheDir := filepath.Join(tmpDir, "cache")
-	if err := os.MkdirAll(cacheDir, 0700); err != nil {
-		t.Fatalf("creating cache dir: %v", err)
+	store := cache.LoadDir("test-profile", "us-east-1")
+	if store == nil {
+		t.Fatal("LoadDir() returned nil on an empty directory")
+	}
+	store.Put("ec2", cache.TypeFile{HasResources: true, Count: 7})
+	store.Put("s3", cache.TypeFile{HasResources: false, Count: 0})
+	if err := store.SaveType("ec2"); err != nil {
+		t.Fatalf("SaveType(ec2): %v", err)
+	}
+	if err := store.SaveType("s3"); err != nil {
+		t.Fatalf("SaveType(s3): %v", err)
 	}
 
-	yamlContent := `profile: test-profile
-region: us-east-1
-checked_at: 2026-03-27T10:00:00Z
-resources:
-  ec2:
-    has_resources: true
-    count: 7
-  s3:
-    has_resources: false
-    count: 0
-    error: "access denied"
-`
-	filePath := filepath.Join(cacheDir, "test-profile--us-east-1.yaml")
-	if err := os.WriteFile(filePath, []byte(yamlContent), 0600); err != nil {
-		t.Fatalf("writing test file: %v", err)
+	reloaded := cache.LoadDir("test-profile", "us-east-1")
+	if reloaded == nil {
+		t.Fatal("LoadDir() returned nil for a populated directory")
 	}
 
-	f, err := cache.Load("test-profile", "us-east-1")
-	if err != nil {
-		t.Fatalf("Load() returned error: %v", err)
-	}
-	if f == nil {
-		t.Fatal("Load() returned nil *File for valid content")
-	}
-
-	if f.Profile != "test-profile" {
-		t.Errorf("Profile = %q, want %q", f.Profile, "test-profile")
-	}
-	if f.Region != "us-east-1" {
-		t.Errorf("Region = %q, want %q", f.Region, "us-east-1")
-	}
-	if f.CheckedAt.IsZero() {
-		t.Error("CheckedAt should not be zero")
-	}
-	if len(f.Resources) != 2 {
-		t.Fatalf("Resources count = %d, want 2", len(f.Resources))
-	}
-
-	ec2Entry, ok := f.Resources["ec2"]
+	ec2Entry, ok := reloaded.Type("ec2")
 	if !ok {
-		t.Fatal("Resources missing ec2 entry")
+		t.Fatal(`Type("ec2") missing after reload`)
 	}
 	if !ec2Entry.HasResources {
 		t.Error("ec2 HasResources should be true")
@@ -187,13 +153,10 @@ resources:
 	if ec2Entry.Count != 7 {
 		t.Errorf("ec2 Count = %d, want 7", ec2Entry.Count)
 	}
-	if ec2Entry.Error != "" {
-		t.Errorf("ec2 Error = %q, want empty", ec2Entry.Error)
-	}
 
-	s3Entry, ok := f.Resources["s3"]
+	s3Entry, ok := reloaded.Type("s3")
 	if !ok {
-		t.Fatal("Resources missing s3 entry")
+		t.Fatal(`Type("s3") missing after reload`)
 	}
 	if s3Entry.HasResources {
 		t.Error("s3 HasResources should be false")
@@ -201,59 +164,64 @@ resources:
 	if s3Entry.Count != 0 {
 		t.Errorf("s3 Count = %d, want 0", s3Entry.Count)
 	}
-	if s3Entry.Error != "access denied" {
-		t.Errorf("s3 Error = %q, want %q", s3Entry.Error, "access denied")
-	}
 }
 
-func TestCache_Load_CorruptFile(t *testing.T) {
+func TestCache_LoadDir_CorruptTypeFile_SkipsOnlyThatType(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
 
-	cacheDir := filepath.Join(tmpDir, "cache")
-	if err := os.MkdirAll(cacheDir, 0700); err != nil {
+	dir := cache.Dir("test-profile", "us-east-1")
+	if err := os.MkdirAll(dir, 0700); err != nil {
 		t.Fatalf("creating cache dir: %v", err)
 	}
-
 	corruptContent := `{{{not: valid: yaml: [[[`
-	filePath := filepath.Join(cacheDir, "test-profile--us-east-1.yaml")
-	if err := os.WriteFile(filePath, []byte(corruptContent), 0600); err != nil {
+	corruptPath := filepath.Join(dir, "ec2.yaml")
+	if err := os.WriteFile(corruptPath, []byte(corruptContent), 0600); err != nil {
 		t.Fatalf("writing corrupt file: %v", err)
 	}
 
-	f, err := cache.Load("test-profile", "us-east-1")
-	if err == nil {
-		t.Error("Load() for corrupt file should return error")
+	// A sibling healthy type file must still load normally (C7: "An
+	// unreadable or wrong-version file means 'no cache' for that type
+	// only: the other types load normally").
+	healthy := cache.LoadDir("test-profile", "us-east-1")
+	healthy.Put("s3", cache.TypeFile{HasResources: true, Count: 3})
+	if err := healthy.SaveType("s3"); err != nil {
+		t.Fatalf("SaveType(s3): %v", err)
 	}
-	if f != nil {
-		t.Error("Load() for corrupt file should return nil *File")
+
+	store := cache.LoadDir("test-profile", "us-east-1")
+	if store == nil {
+		t.Fatal("LoadDir() must return a non-nil Store even with a corrupt sibling type file")
+	}
+	if _, ok := store.Type("ec2"); ok {
+		t.Error(`Type("ec2") should be absent — the corrupt file must not be surfaced as valid cache data`)
+	}
+	s3Entry, ok := store.Type("s3")
+	if !ok {
+		t.Fatal(`Type("s3") missing — a corrupt sibling file must not prevent a healthy type from loading (C7)`)
+	}
+	if s3Entry.Count != 3 {
+		t.Errorf("s3 Count = %d, want 3", s3Entry.Count)
 	}
 }
 
 // ---------------------------------------------------------------------------
-// Save()
+// Store.Put / Store.SaveType — round trip
 // ---------------------------------------------------------------------------
 
-func TestCache_Save_CreatesDir(t *testing.T) {
+func TestCache_SaveType_CreatesDir(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
 
-	f := &cache.File{
-		Profile:   "test-profile",
-		Region:    "eu-west-1",
-		CheckedAt: time.Now(),
-		Resources: map[string]cache.Entry{
-			"ec2": {HasResources: true, Count: 5},
-		},
+	store := cache.LoadDir("test-profile", "eu-west-1")
+	store.Put("ec2", cache.TypeFile{HasResources: true, Count: 5})
+
+	if err := store.SaveType("ec2"); err != nil {
+		t.Fatalf("SaveType() returned error: %v", err)
 	}
 
-	if err := cache.Save(f); err != nil {
-		t.Fatalf("Save() returned error: %v", err)
-	}
-
-	// Verify the cache directory was created.
-	cacheDir := filepath.Join(tmpDir, "cache")
-	info, err := os.Stat(cacheDir)
+	dir := cache.Dir("test-profile", "eu-west-1")
+	info, err := os.Stat(dir)
 	if err != nil {
 		t.Fatalf("cache directory was not created: %v", err)
 	}
@@ -261,320 +229,79 @@ func TestCache_Save_CreatesDir(t *testing.T) {
 		t.Error("cache path should be a directory")
 	}
 
-	// Verify the file exists.
-	expectedPath := filepath.Join(cacheDir, "test-profile--eu-west-1.yaml")
+	expectedPath := filepath.Join(dir, "ec2.yaml")
 	if _, err := os.Stat(expectedPath); err != nil {
-		t.Errorf("cache file was not created at %s: %v", expectedPath, err)
+		t.Errorf("per-type cache file was not created at %s: %v", expectedPath, err)
 	}
 }
 
-func TestCache_Save_WritesValidYAML(t *testing.T) {
+func TestCache_SaveType_WritesValidYAML(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
 
-	f := &cache.File{
-		Profile:   "test-profile",
-		Region:    "us-west-2",
-		CheckedAt: time.Date(2026, 3, 27, 12, 0, 0, 0, time.UTC),
-		Resources: map[string]cache.Entry{
-			"rds":    {HasResources: true, Count: 3},
-			"lambda": {HasResources: false, Count: 0, Error: "timeout"},
-		},
+	store := cache.LoadDir("test-profile", "us-west-2")
+	store.Put("rds", cache.TypeFile{HasResources: true, Count: 3})
+	store.Put("lambda", cache.TypeFile{HasResources: false, Count: 0})
+
+	if err := store.SaveType("rds"); err != nil {
+		t.Fatalf("SaveType(rds): %v", err)
+	}
+	if err := store.SaveType("lambda"); err != nil {
+		t.Fatalf("SaveType(lambda): %v", err)
 	}
 
-	if err := cache.Save(f); err != nil {
-		t.Fatalf("Save() returned error: %v", err)
+	reloaded := cache.LoadDir("test-profile", "us-west-2")
+	rds, ok := reloaded.Type("rds")
+	if !ok || rds.Count != 3 {
+		t.Errorf("Type(rds) = %+v (ok=%v), want Count=3", rds, ok)
 	}
-
-	// Read the file back and verify it's valid YAML by loading it.
-	loaded, err := cache.Load("test-profile", "us-west-2")
-	if err != nil {
-		t.Fatalf("Load() after Save() returned error: %v", err)
-	}
-	if loaded == nil {
-		t.Fatal("Load() after Save() returned nil")
-	}
-	if loaded.Profile != "test-profile" {
-		t.Errorf("loaded Profile = %q, want %q", loaded.Profile, "test-profile")
-	}
-	if loaded.Region != "us-west-2" {
-		t.Errorf("loaded Region = %q, want %q", loaded.Region, "us-west-2")
+	lambda, ok := reloaded.Type("lambda")
+	if !ok || lambda.Count != 0 {
+		t.Errorf("Type(lambda) = %+v (ok=%v), want Count=0", lambda, ok)
 	}
 }
 
-func TestCache_Save_NilFile(t *testing.T) {
-	err := cache.Save(nil)
-	if err != nil {
-		t.Errorf("Save(nil) should return nil, got: %v", err)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// IsExpired()
-// ---------------------------------------------------------------------------
-
-func TestCache_IsExpired_NilFile(t *testing.T) {
-	var f *cache.File
-	if !f.IsExpired(cache.DefaultTTL) {
-		t.Error("nil File.IsExpired() should return true")
-	}
-}
-
-func TestCache_IsExpired_ZeroTime(t *testing.T) {
-	f := &cache.File{
-		Profile: "test-profile",
-		Region:  "us-east-1",
-		// CheckedAt is zero value
-	}
-	if !f.IsExpired(cache.DefaultTTL) {
-		t.Error("File with zero CheckedAt.IsExpired() should return true")
-	}
-}
-
-func TestCache_IsExpired_Fresh(t *testing.T) {
-	f := &cache.File{
-		Profile:   "test-profile",
-		Region:    "us-east-1",
-		CheckedAt: time.Now(),
-	}
-	if f.IsExpired(cache.DefaultTTL) {
-		t.Error("File checked just now should not be expired with 1h TTL")
-	}
-}
-
-func TestCache_IsExpired_Stale(t *testing.T) {
-	f := &cache.File{
-		Profile:   "test-profile",
-		Region:    "us-east-1",
-		CheckedAt: time.Now().Add(-2 * time.Hour),
-	}
-	if !f.IsExpired(cache.DefaultTTL) {
-		t.Error("File checked 2h ago should be expired with 1h TTL")
-	}
-}
-
-func TestCache_IsExpired_ExactlyAtTTL(t *testing.T) {
-	// At exactly TTL boundary, time.Since > ttl should be false (or barely true).
-	// Use a slightly past TTL to avoid race conditions.
-	f := &cache.File{
-		Profile:   "test-profile",
-		Region:    "us-east-1",
-		CheckedAt: time.Now().Add(-cache.DefaultTTL - time.Second),
-	}
-	if !f.IsExpired(cache.DefaultTTL) {
-		t.Error("File checked just past TTL should be expired")
-	}
-}
-
-func TestCache_IsExpired_CustomTTL(t *testing.T) {
-	f := &cache.File{
-		Profile:   "test-profile",
-		Region:    "us-east-1",
-		CheckedAt: time.Now().Add(-30 * time.Minute),
-	}
-	// With 1h TTL, 30min old should be fresh.
-	if f.IsExpired(time.Hour) {
-		t.Error("30min old file should NOT be expired with 1h TTL")
-	}
-	// With 15min TTL, 30min old should be stale.
-	if !f.IsExpired(15 * time.Minute) {
-		t.Error("30min old file should be expired with 15min TTL")
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Round-trip: Save + Load
-// ---------------------------------------------------------------------------
-
-func TestCache_SaveLoad_RoundTrip(t *testing.T) {
+func TestCache_SaveType_OverwritesExisting(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
 
-	checkedAt := time.Date(2026, 3, 27, 15, 30, 0, 0, time.UTC)
-	original := &cache.File{
-		Profile:   "prod-account",
-		Region:    "ap-southeast-1",
-		CheckedAt: checkedAt,
-		Resources: map[string]cache.Entry{
-			"ec2":     {HasResources: true, Count: 12},
-			"s3":      {HasResources: true, Count: 45},
-			"rds":     {HasResources: false, Count: 0},
-			"lambda":  {HasResources: true, Count: 8},
-			"vpc":     {HasResources: false, Count: 0, Error: "access denied"},
-			"eks":     {HasResources: false, Count: 0},
-			"redis":   {HasResources: true, Count: 2},
-			"docdb":   {HasResources: false, Count: 0},
-			"secrets": {HasResources: true, Count: 15},
-			"sg":      {HasResources: true, Count: 30},
-		},
+	store := cache.LoadDir("test-profile", "us-east-1")
+	store.Put("ec2", cache.TypeFile{HasResources: true, Count: 10})
+	if err := store.SaveType("ec2"); err != nil {
+		t.Fatalf("SaveType() first write error: %v", err)
 	}
 
-	if err := cache.Save(original); err != nil {
-		t.Fatalf("Save() error: %v", err)
+	store2 := cache.LoadDir("test-profile", "us-east-1")
+	store2.Put("ec2", cache.TypeFile{HasResources: false, Count: 0})
+	if err := store2.SaveType("ec2"); err != nil {
+		t.Fatalf("SaveType() second write error: %v", err)
 	}
 
-	loaded, err := cache.Load("prod-account", "ap-southeast-1")
-	if err != nil {
-		t.Fatalf("Load() error: %v", err)
+	reloaded := cache.LoadDir("test-profile", "us-east-1")
+	ec2, ok := reloaded.Type("ec2")
+	if !ok {
+		t.Fatal(`Type("ec2") missing after overwrite`)
 	}
-	if loaded == nil {
-		t.Fatal("Load() returned nil after Save()")
+	if ec2.HasResources {
+		t.Error("ec2 should be false after overwrite (should reflect second write)")
 	}
-
-	// Verify all fields preserved.
-	if loaded.Profile != original.Profile {
-		t.Errorf("Profile = %q, want %q", loaded.Profile, original.Profile)
-	}
-	if loaded.Region != original.Region {
-		t.Errorf("Region = %q, want %q", loaded.Region, original.Region)
-	}
-	if !loaded.CheckedAt.Equal(original.CheckedAt) {
-		t.Errorf("CheckedAt = %v, want %v", loaded.CheckedAt, original.CheckedAt)
-	}
-	if len(loaded.Resources) != len(original.Resources) {
-		t.Fatalf("Resources count = %d, want %d", len(loaded.Resources), len(original.Resources))
-	}
-
-	for name, origEntry := range original.Resources {
-		loadedEntry, ok := loaded.Resources[name]
-		if !ok {
-			t.Errorf("Resources missing %q after round-trip", name)
-			continue
-		}
-		if loadedEntry.HasResources != origEntry.HasResources {
-			t.Errorf("Resources[%q].HasResources = %v, want %v", name, loadedEntry.HasResources, origEntry.HasResources)
-		}
-		if loadedEntry.Count != origEntry.Count {
-			t.Errorf("Resources[%q].Count = %d, want %d", name, loadedEntry.Count, origEntry.Count)
-		}
-		if loadedEntry.Error != origEntry.Error {
-			t.Errorf("Resources[%q].Error = %q, want %q", name, loadedEntry.Error, origEntry.Error)
-		}
+	if ec2.Count != 0 {
+		t.Errorf("ec2 Count = %d, want 0 after overwrite", ec2.Count)
 	}
 }
 
-func TestCache_SaveLoad_RoundTrip_EmptyResources(t *testing.T) {
+func TestCache_LoadDir_AllResourceTypes(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
 
-	original := &cache.File{
-		Profile:   "test-profile",
-		Region:    "us-east-1",
-		CheckedAt: time.Now().UTC(),
-		Resources: map[string]cache.Entry{},
-	}
-
-	if err := cache.Save(original); err != nil {
-		t.Fatalf("Save() error: %v", err)
-	}
-
-	loaded, err := cache.Load("test-profile", "us-east-1")
-	if err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
-	if loaded == nil {
-		t.Fatal("Load() returned nil after Save()")
-	}
-	if len(loaded.Resources) != 0 {
-		t.Errorf("Resources count = %d, want 0", len(loaded.Resources))
-	}
-}
-
-// ---------------------------------------------------------------------------
-// DefaultTTL constant
-// ---------------------------------------------------------------------------
-
-func TestCache_DefaultTTL_IsOneHour(t *testing.T) {
-	if cache.DefaultTTL != time.Hour {
-		t.Errorf("DefaultTTL = %v, want %v", cache.DefaultTTL, time.Hour)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Edge cases
-// ---------------------------------------------------------------------------
-
-func TestCache_Save_OverwritesExisting(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
-
-	// Save first version.
-	f1 := &cache.File{
-		Profile:   "test-profile",
-		Region:    "us-east-1",
-		CheckedAt: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
-		Resources: map[string]cache.Entry{
-			"ec2": {HasResources: true, Count: 10},
-		},
-	}
-	if err := cache.Save(f1); err != nil {
-		t.Fatalf("Save() first write error: %v", err)
-	}
-
-	// Save second version with different data.
-	f2 := &cache.File{
-		Profile:   "test-profile",
-		Region:    "us-east-1",
-		CheckedAt: time.Date(2026, 3, 27, 0, 0, 0, 0, time.UTC),
-		Resources: map[string]cache.Entry{
-			"ec2": {HasResources: false, Count: 0},
-			"s3":  {HasResources: true, Count: 20},
-		},
-	}
-	if err := cache.Save(f2); err != nil {
-		t.Fatalf("Save() second write error: %v", err)
-	}
-
-	loaded, err := cache.Load("test-profile", "us-east-1")
-	if err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
-	if loaded == nil {
-		t.Fatal("Load() returned nil")
-	}
-	if len(loaded.Resources) != 2 {
-		t.Errorf("Resources count = %d, want 2 (should reflect second write)", len(loaded.Resources))
-	}
-	if loaded.Resources["ec2"].HasResources {
-		t.Error("ec2 should be false after overwrite")
-	}
-}
-
-func TestCache_Path_EmptyProfile(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
-
-	got := cache.Path("", "us-east-1")
-	want := filepath.Join(tmpDir, "cache", "--us-east-1.yaml")
-	if got != want {
-		t.Errorf("Path('', 'us-east-1') = %q, want %q", got, want)
-	}
-}
-
-func TestCache_Path_EmptyRegion(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
-
-	got := cache.Path("test-profile", "")
-	want := filepath.Join(tmpDir, "cache", "test-profile--.yaml")
-	if got != want {
-		t.Errorf("Path('test-profile', '') = %q, want %q", got, want)
-	}
-}
-
-func TestCache_Load_AllResourceTypes(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
-
-	// Build a cache file with many resource types to verify all survive round-trip.
-	entries := map[string]cache.Entry{
+	entries := map[string]cache.TypeFile{
 		"ec2":          {HasResources: true, Count: 10},
 		"s3":           {HasResources: true, Count: 25},
 		"rds":          {HasResources: false, Count: 0},
 		"redis":        {HasResources: true, Count: 3},
 		"docdb":        {HasResources: false, Count: 0},
 		"eks":          {HasResources: true, Count: 2},
-		"secrets":      {HasResources: false, Count: 0, Error: "no access"},
+		"secrets":      {HasResources: false, Count: 0},
 		"vpc":          {HasResources: true, Count: 4},
 		"sg":           {HasResources: true, Count: 50},
 		"nodegroups":   {HasResources: false, Count: 0},
@@ -624,155 +351,85 @@ func TestCache_Load_AllResourceTypes(t *testing.T) {
 		"efs":          {HasResources: false, Count: 0},
 	}
 
-	original := &cache.File{
-		Profile:   "multi-resource-profile",
-		Region:    "us-east-1",
-		CheckedAt: time.Date(2026, 3, 27, 10, 0, 0, 0, time.UTC),
-		Resources: entries,
+	store := cache.LoadDir("multi-resource-profile", "us-east-1")
+	for name, tf := range entries {
+		store.Put(name, tf)
+	}
+	for name := range entries {
+		if err := store.SaveType(name); err != nil {
+			t.Fatalf("SaveType(%s): %v", name, err)
+		}
 	}
 
-	if err := cache.Save(original); err != nil {
-		t.Fatalf("Save() error: %v", err)
-	}
-
-	loaded, err := cache.Load("multi-resource-profile", "us-east-1")
-	if err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
-	if loaded == nil {
-		t.Fatal("Load() returned nil")
-	}
-
-	for name, origEntry := range entries {
-		loadedEntry, ok := loaded.Resources[name]
+	reloaded := cache.LoadDir("multi-resource-profile", "us-east-1")
+	for name, orig := range entries {
+		got, ok := reloaded.Type(name)
 		if !ok {
 			t.Errorf("missing resource type %q after round-trip", name)
 			continue
 		}
-		if loadedEntry.HasResources != origEntry.HasResources {
-			t.Errorf("%q: HasResources = %v, want %v", name, loadedEntry.HasResources, origEntry.HasResources)
+		if got.HasResources != orig.HasResources {
+			t.Errorf("%q: HasResources = %v, want %v", name, got.HasResources, orig.HasResources)
 		}
-		if loadedEntry.Count != origEntry.Count {
-			t.Errorf("%q: Count = %d, want %d", name, loadedEntry.Count, origEntry.Count)
-		}
-		if loadedEntry.Error != origEntry.Error {
-			t.Errorf("%q: Error = %q, want %q", name, loadedEntry.Error, origEntry.Error)
+		if got.Count != orig.Count {
+			t.Errorf("%q: Count = %d, want %d", name, got.Count, orig.Count)
 		}
 	}
 }
 
 // ---------------------------------------------------------------------------
-// Round-trip: Count field survives Save + Load
+// SchemaVersion constant
 // ---------------------------------------------------------------------------
 
-func TestCache_SaveLoad_RoundTrip_Count(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
-
-	checkedAt := time.Date(2026, 3, 27, 16, 0, 0, 0, time.UTC)
-	original := &cache.File{
-		Profile:   "count-test-profile",
-		Region:    "eu-west-1",
-		CheckedAt: checkedAt,
-		Resources: map[string]cache.Entry{
-			"ec2":    {HasResources: false, Count: 0},
-			"s3":     {HasResources: true, Count: 1},
-			"rds":    {HasResources: true, Count: 100},
-			"lambda": {HasResources: true, Count: 1000},
-		},
-	}
-
-	if err := cache.Save(original); err != nil {
-		t.Fatalf("Save() error: %v", err)
-	}
-
-	loaded, err := cache.Load("count-test-profile", "eu-west-1")
-	if err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
-	if loaded == nil {
-		t.Fatal("Load() returned nil after Save()")
-	}
-
-	if len(loaded.Resources) != len(original.Resources) {
-		t.Fatalf("Resources count = %d, want %d", len(loaded.Resources), len(original.Resources))
-	}
-
-	for name, origEntry := range original.Resources {
-		loadedEntry, ok := loaded.Resources[name]
-		if !ok {
-			t.Errorf("Resources missing %q after round-trip", name)
-			continue
-		}
-		if loadedEntry.Count != origEntry.Count {
-			t.Errorf("Resources[%q].Count = %d, want %d", name, loadedEntry.Count, origEntry.Count)
-		}
-		if loadedEntry.HasResources != origEntry.HasResources {
-			t.Errorf("Resources[%q].HasResources = %v, want %v", name, loadedEntry.HasResources, origEntry.HasResources)
-		}
+func TestCache_SchemaVersion_IsOne(t *testing.T) {
+	if cache.SchemaVersion != 1 {
+		t.Errorf("SchemaVersion = %d, want 1", cache.SchemaVersion)
 	}
 }
 
 // ---------------------------------------------------------------------------
-// Save() atomicity tests
+// SaveType() atomicity — per-type file
 // ---------------------------------------------------------------------------
 
-// TestCache_Save_NoTempFileLingers verifies that after Save returns, no .tmp
-// file remains in the cache directory. With the current os.WriteFile
-// implementation this passes trivially (no temp file is ever created). After
-// the temp+rename fix lands it continues to pass — the rename removes the
-// temp file as part of the atomic swap.
-func TestCache_Save_NoTempFileLingers(t *testing.T) {
+// TestCache_SaveType_NoTempFileLingers verifies that after SaveType returns,
+// no .tmp file remains in the per-pair cache directory.
+func TestCache_SaveType_NoTempFileLingers(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
 
-	f := &cache.File{
-		Profile:   "p",
-		Region:    "r",
-		CheckedAt: time.Now().UTC(),
-		Resources: map[string]cache.Entry{
-			"ec2": {HasResources: true, Count: 3},
-		},
+	store := cache.LoadDir("p", "r")
+	store.Put("ec2", cache.TypeFile{HasResources: true, Count: 3})
+	if err := store.SaveType("ec2"); err != nil {
+		t.Fatalf("SaveType() error: %v", err)
 	}
 
-	if err := cache.Save(f); err != nil {
-		t.Fatalf("Save() error: %v", err)
-	}
-
-	cacheDir := filepath.Join(tmpDir, "cache")
-	entries, err := os.ReadDir(cacheDir)
+	dir := cache.Dir("p", "r")
+	entries, err := os.ReadDir(dir)
 	if err != nil {
-		t.Fatalf("ReadDir(%s) error: %v", cacheDir, err)
+		t.Fatalf("ReadDir(%s) error: %v", dir, err)
 	}
 
 	for _, entry := range entries {
 		if strings.HasSuffix(entry.Name(), ".tmp") {
-			t.Errorf("stale temp file found after Save: %s", entry.Name())
+			t.Errorf("stale temp file found after SaveType: %s", entry.Name())
 		}
 	}
 }
 
-// TestCache_Save_ConcurrentWrites_NoCorruption spawns N goroutines that each
-// call Save concurrently. After all goroutines complete, Load must succeed and
-// return a well-formed *File. With os.WriteFile (truncate then write) two
-// goroutines can interleave their writes, producing a partial YAML that
-// Load cannot parse. This test surfaces that corruption.
-func TestCache_Save_ConcurrentWrites_NoCorruption(t *testing.T) {
+// TestCache_SaveType_ConcurrentWrites_NoCorruption spawns N goroutines that
+// each call SaveType on the SAME type concurrently. After all goroutines
+// complete, LoadDir must succeed and return a well-formed TypeFile for that
+// type — the atomic-rename write must never leave a half-written file
+// observable.
+func TestCache_SaveType_ConcurrentWrites_NoCorruption(t *testing.T) {
 	const N = 20
 	tmpDir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
 
-	// Write a baseline so the file exists before the race begins.
-	baseline := &cache.File{
-		Profile:   "race-profile",
-		Region:    "us-east-1",
-		CheckedAt: time.Now().UTC(),
-		Resources: map[string]cache.Entry{
-			"ec2": {HasResources: true, Count: 0},
-		},
-	}
-	if err := cache.Save(baseline); err != nil {
-		t.Fatalf("Save() baseline error: %v", err)
+	baseline := cache.LoadDir("race-profile", "us-east-1")
+	baseline.Put("ec2", cache.TypeFile{HasResources: true, Count: 0})
+	if err := baseline.SaveType("ec2"); err != nil {
+		t.Fatalf("SaveType() baseline error: %v", err)
 	}
 
 	var wg sync.WaitGroup
@@ -780,68 +437,46 @@ func TestCache_Save_ConcurrentWrites_NoCorruption(t *testing.T) {
 	for i := range N {
 		go func(idx int) {
 			defer wg.Done()
-			f := &cache.File{
-				Profile:   "race-profile",
-				Region:    "us-east-1",
-				CheckedAt: time.Date(2026, 1, idx+1, 0, 0, 0, 0, time.UTC),
-				Resources: map[string]cache.Entry{
-					"ec2": {HasResources: true, Count: idx + 1},
-				},
-			}
-			//nolint:errcheck // best-effort concurrent write; we check result via Load below
-			_ = cache.Save(f)
+			store := cache.LoadDir("race-profile", "us-east-1")
+			store.Put("ec2", cache.TypeFile{HasResources: true, Count: idx + 1})
+			//nolint:errcheck // best-effort concurrent write; we check result via LoadDir below
+			_ = store.SaveType("ec2")
 		}(i)
 	}
 	wg.Wait()
 
-	// After all writers have finished, the file must be parseable.
-	loaded, err := cache.Load("race-profile", "us-east-1")
-	if err != nil {
-		t.Fatalf("Load() after concurrent Save() returned parse error (file corrupted): %v", err)
+	reloaded := cache.LoadDir("race-profile", "us-east-1")
+	if reloaded == nil {
+		t.Fatal("LoadDir() after concurrent SaveType() returned nil")
 	}
-	if loaded == nil {
-		t.Fatal("Load() after concurrent Save() returned nil (file missing or empty)")
+	tf, ok := reloaded.Type("ec2")
+	if !ok {
+		t.Fatal("LoadDir() after concurrent SaveType() found no ec2 type file — corrupted or missing")
 	}
-	// The file must have a non-zero CheckedAt — a zero value indicates a
-	// partial write that produced an otherwise valid but empty struct.
-	if loaded.CheckedAt.IsZero() {
-		t.Error("Load() returned a File with zero CheckedAt — indicates partial write corruption")
+	if tf.Count < 1 || tf.Count > N {
+		t.Errorf("ec2.Count = %d after concurrent writes, want a value written by one of the goroutines (1..%d)", tf.Count, N)
 	}
 }
 
-// TestCache_Save_AtomicVisibility is the strongest atomicity test. A writer
-// goroutine repeatedly calls Save in a tight loop. The main goroutine
-// concurrently calls Load and asserts that every successful (non-nil-error)
-// Load returns a well-formed *File. A half-written file will cause Load to
-// return a YAML parse error — that error IS the failure signal. The test runs
-// for ~500 ms. With os.WriteFile this test is expected to fail intermittently;
-// after the temp+rename fix it must not fail.
-func TestCache_Save_AtomicVisibility(t *testing.T) {
+// TestCache_SaveType_AtomicVisibility is the strongest atomicity test. A
+// writer goroutine repeatedly calls SaveType in a tight loop on one type. The
+// main goroutine concurrently calls LoadDir and asserts every read observes
+// a well-formed TypeFile — never a corrupt/partial one.
+func TestCache_SaveType_AtomicVisibility(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Windows file locking prevents concurrent read during rename")
 	}
 	tmpDir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
 
-	// Seed a valid file so readers always have something to observe.
-	seed := &cache.File{
-		Profile:   "atomic-profile",
-		Region:    "eu-central-1",
-		CheckedAt: time.Now().UTC(),
-		Resources: map[string]cache.Entry{
-			"ec2": {HasResources: true, Count: 1},
-			"rds": {HasResources: false, Count: 0},
-			"eks": {HasResources: true, Count: 2},
-		},
-	}
-	if err := cache.Save(seed); err != nil {
-		t.Fatalf("Save() seed error: %v", err)
+	seed := cache.LoadDir("atomic-profile", "eu-central-1")
+	seed.Put("ec2", cache.TypeFile{HasResources: true, Count: 1})
+	if err := seed.SaveType("ec2"); err != nil {
+		t.Fatalf("SaveType() seed error: %v", err)
 	}
 
 	deadline := time.Now().Add(50 * time.Millisecond)
 
-	// Writer goroutine: alternate between two distinct payloads so the file
-	// content actually changes on each iteration.
 	stopWriter := make(chan struct{})
 	writerDone := make(chan struct{})
 	go func() {
@@ -858,39 +493,27 @@ func TestCache_Save_AtomicVisibility(t *testing.T) {
 				count = 9999
 			}
 			alt = !alt
-			f := &cache.File{
-				Profile:   "atomic-profile",
-				Region:    "eu-central-1",
-				CheckedAt: time.Now().UTC(),
-				Resources: map[string]cache.Entry{
-					"ec2": {HasResources: true, Count: count},
-					"rds": {HasResources: false, Count: 0},
-					"eks": {HasResources: true, Count: 2},
-				},
-			}
+			store := cache.LoadDir("atomic-profile", "eu-central-1")
+			store.Put("ec2", cache.TypeFile{HasResources: true, Count: count})
 			//nolint:errcheck // writer races are expected; we observe via reader
-			_ = cache.Save(f)
+			_ = store.SaveType("ec2")
 		}
 	}()
 
-	// Reader loop: every successful Load must be well-formed.
 	corruptReads := 0
 	for time.Now().Before(deadline) {
-		loaded, err := cache.Load("atomic-profile", "eu-central-1")
-		if err != nil {
-			// A parse error means the reader observed a half-written file —
-			// the atomicity guarantee was violated.
+		reloaded := cache.LoadDir("atomic-profile", "eu-central-1")
+		if reloaded == nil {
 			corruptReads++
-			t.Errorf("Load() returned parse error during concurrent Save() (atomicity violation): %v", err)
+			t.Errorf("LoadDir() returned nil during concurrent SaveType() — atomicity violation")
 			if corruptReads >= 3 {
-				// Bail early after 3 violations to avoid flooding the log.
 				break
 			}
+			continue
 		}
-		// nil + nil means file disappeared between writes — also a violation.
-		if err == nil && loaded == nil {
+		if _, ok := reloaded.Type("ec2"); !ok {
 			corruptReads++
-			t.Errorf("Load() returned (nil, nil) during concurrent Save() — file vanished mid-write")
+			t.Errorf("LoadDir() found no ec2 type file during concurrent SaveType() — file vanished mid-write")
 			if corruptReads >= 3 {
 				break
 			}

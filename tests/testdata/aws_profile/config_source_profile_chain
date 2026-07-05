@@ -1,0 +1,33 @@
+[default]
+region = us-east-1
+output = json
+
+[profile role-only]
+role_arn = arn:aws:iam::111111111111:role/DeployRole
+source_profile = source-with-region
+output = json
+
+[profile source-with-region]
+region = eu-central-1
+output = json
+
+[profile role-two-level]
+role_arn = arn:aws:iam::222222222222:role/MidRole
+source_profile = role-only
+output = json
+
+[profile role-cycle-a]
+role_arn = arn:aws:iam::333333333333:role/CycleRoleA
+source_profile = role-cycle-b
+output = json
+
+[profile role-cycle-b]
+role_arn = arn:aws:iam::333333333333:role/CycleRoleB
+source_profile = role-cycle-a
+output = json
+
+[profile role-own-region]
+role_arn = arn:aws:iam::444444444444:role/OwnRegionRole
+source_profile = source-with-region
+region = ap-northeast-1
+output = json

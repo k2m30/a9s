@@ -189,23 +189,31 @@ func (s *Server) getOrCreateSession(sessionID string) *sessionEntry {
 	return entry
 }
 
-// bootstrapLiveSession performs the AWS connect for a live session and applies
-// any startup command, then notifies SSE subscribers so the browser refreshes
-// to the populated menu. It runs in its own goroutine and relies on the
-// controller's internal locking (not entry.mu), so request handlers are never
-// blocked for the connect's duration — the page renders the menu while this
-// runs.
+// bootstrapLiveSession performs the AWS connect for a live session and drains
+// the full availability sweep in the background — mirroring the TUI lane's
+// ClientsReady-time dispatch. Any startup command (-c) is no longer applied
+// here: newSession arms it via Core.SetCommand (the same runtime.Core.Session
+// .Command field tui.WithCommand sets), so BootstrapLive's HandleClientsReady
+// call below arms session.CommandArmed/PendingCommand itself, and the
+// DrainSyncProgress call's per-task interception of TaskKindEmitNavigate
+// (see drainsync.go) applies the deferred navigation the moment
+// handleAvailabilityCacheLoaded emits it — the same one lane the TUI's -c
+// flag drives (DEF-14/D11), instead of a second server-side apply racing or
+// duplicating it.
+//
+// It runs in its own goroutine and relies on the controller's internal
+// locking (not entry.mu), so request handlers are never blocked for the
+// connect's duration — the page renders the menu while this runs.
 func (s *Server) bootstrapLiveSession(entry *sessionEntry) {
 	tasks := entry.ctrl.BootstrapLive(s.profile, s.region)
-	// Drain the availability fetches with a per-result SSE notify so the menu
-	// fills in progressively. Live fetches across all resource types take tens
-	// of seconds; a single notify at the end would leave the browser's menu
-	// blank that whole time, then populate all at once.
+
+	// Drain the availability fetches (and, when armed, the deferred -c
+	// navigation task nested among them) with a per-result SSE notify so the
+	// menu — and the navigated screen, the instant it lands — fills in
+	// progressively. Live fetches across all resource types take tens of
+	// seconds; a single notify at the end would leave the browser blank that
+	// whole time, then populate all at once.
 	app.DrainSyncProgress(entry.ctrl, tasks, func() { s.notifySubscribers(entry) })
-	if s.command != "" {
-		_, ctasks := entry.ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: s.command})
-		app.DrainSync(entry.ctrl, ctasks)
-	}
 	s.notifySubscribers(entry)
 }
 

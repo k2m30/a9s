@@ -2,9 +2,9 @@
 package fixtures
 
 import (
-	"sync"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -34,25 +34,45 @@ type EC2Fixtures struct {
 
 // shared constants (mirrors internal/demo/constants_shared.go — no import allowed)
 const (
-	fixtProdVPCID               = "vpc-0abc123def456789a"
-	fixtStagingVPCID            = "vpc-0def456789abc123d"
-	fixtProdPublicSubnetA       = "subnet-0aaa111111111111a"
-	fixtProdPublicSubnetB       = "subnet-0bbb222222222222b"
-	fixtProdPrivateSubnetA      = "subnet-0ccc333333333333c"
-	fixtProdPrivateSubnetB      = "subnet-0ddd444444444444d"
-	fixtStagingSubnetA          = "subnet-0eee555555555555e"
-	fixtStagingSubnetB          = "subnet-0fff666666666666f"
-	fixtProdWebALBSGID          = "sg-0aaa111111111111a"
-	fixtProdAPIInternalSGID     = "sg-0bbb222222222222b"
-	fixtProdRDSSGID             = "sg-0ccc333333333333c"
-	fixtProdDBProxySGID         = "sg-0ddd444444444444d"
-	fixtStagingDefaultSGID      = "sg-0fff888888888888f"
-	fixtProdAMIID1              = "ami-0a1b2c3d4e5f60001"
-	fixtProdAMIID2              = "ami-0a1b2c3d4e5f60002"
-	fixtProdAMIID3              = "ami-0a1b2c3d4e5f60003"
-	fixtProdInstanceProfileARN  = "arn:aws:iam::123456789012:instance-profile/acme-ec2-instance-profile"
-	fixtProdEKSClusterName      = "acme-prod-eks"
-	fixtRelatedEC2NGNodeGroupID = "acme-node-group-01"
+	fixtProdVPCID              = "vpc-0abc123def456789a"
+	fixtStagingVPCID           = "vpc-0def456789abc123d"
+	fixtProdPublicSubnetA      = "subnet-0aaa111111111111a"
+	fixtProdPublicSubnetB      = "subnet-0bbb222222222222b"
+	fixtProdPrivateSubnetA     = "subnet-0ccc333333333333c"
+	fixtProdPrivateSubnetB     = "subnet-0ddd444444444444d"
+	fixtStagingSubnetA         = "subnet-0eee555555555555e"
+	fixtStagingSubnetB         = "subnet-0fff666666666666f"
+	fixtProdWebALBSGID         = "sg-0aaa111111111111a"
+	fixtProdAPIInternalSGID    = "sg-0bbb222222222222b"
+	fixtProdRDSSGID            = "sg-0ccc333333333333c"
+	fixtProdDBProxySGID        = "sg-0ddd444444444444d"
+	fixtStagingDefaultSGID     = "sg-0fff888888888888f"
+	fixtProdAMIID1             = "ami-0a1b2c3d4e5f60001"
+	fixtProdAMIID2             = "ami-0a1b2c3d4e5f60002"
+	fixtProdAMIID3             = "ami-0a1b2c3d4e5f60003"
+	fixtProdInstanceProfileARN = "arn:aws:iam::123456789012:instance-profile/acme-ec2-instance-profile"
+	// fixtProdEKSClusterName / fixtRelatedEC2NGNodeGroupID must match the real
+	// EKS cluster ("acme-prod") and nodegroup ("general-pool") fixture names in
+	// eks.go so ec2→ng (checkEC2NodeGroups) and ct-events→ec2 tag-based
+	// reverse-scans resolve real cross-file matches instead of pointing at
+	// names no sibling fixture defines.
+	fixtProdEKSClusterName      = "acme-prod"
+	fixtRelatedEC2NGNodeGroupID = "general-pool"
+)
+
+// AMIEBSKmsKeyID / AMIEBSKmsKeyARN back the ami→kms related-panel pivot.
+// checkAMIKMS (internal/aws/ami_related_extra.go) passes the raw
+// BlockDeviceMappings[].Ebs.KmsKeyId ARN through as the navigation ID
+// unmodified (unlike checkS3KMS/checkDdbKMS, which strip the ARN to a bare
+// key ID first). Real DescribeKey-by-ARN always reports the true bare KeyId
+// in its response, never the ARN that was searched by — so this AMI cannot
+// share the widely-reused "primary" KMS key (referenced by bare ID from many
+// sibling fixtures); it needs its own key whose KeyId is the ARN string
+// itself, keeping the fake's DescribeKey response self-consistent with what
+// checkAMIKMS looked up. See kms.go for the corresponding fixture entry.
+const (
+	AMIEBSKmsKeyID  = "ami-ebs-boot-volume-key"
+	AMIEBSKmsKeyARN = "arn:aws:kms:us-east-1:123456789012:key/" + AMIEBSKmsKeyID
 )
 
 // NewEC2Fixtures builds and returns a fully-populated EC2Fixtures struct
@@ -313,6 +333,19 @@ func makeInstance(
 			Key:   aws.String("kubernetes.io/cluster/" + fixtProdEKSClusterName),
 			Value: aws.String("owned"),
 		})
+		// aws:autoscaling:groupName tag — required for eip→asg related-panel
+		// pivot. Matches this instance's membership in acme-web-prod-asg (asg.go).
+		inst.Tags = append(inst.Tags, ec2types.Tag{
+			Key:   aws.String("aws:autoscaling:groupName"),
+			Value: aws.String("acme-web-prod-asg"),
+		})
+		// backup=daily tag — required for the ec2:backup related-panel pivot
+		// witness. Matches the ListOfTags condition on HealthyDailyPlanID's
+		// selection (backup.go).
+		inst.Tags = append(inst.Tags, ec2types.Tag{
+			Key:   aws.String("backup"),
+			Value: aws.String("daily"),
+		})
 		inst.NetworkInterfaces = []ec2types.InstanceNetworkInterface{
 			{NetworkInterfaceId: aws.String("eni-0aaa111111111111a")},
 		}
@@ -321,6 +354,20 @@ func makeInstance(
 		inst.Tags = append(inst.Tags,
 			ec2types.Tag{Key: aws.String("eks:cluster-name"), Value: aws.String(fixtProdEKSClusterName)},
 			ec2types.Tag{Key: aws.String("eks:nodegroup-name"), Value: aws.String(fixtRelatedEC2NGNodeGroupID)},
+		)
+	}
+	// aws:cloudformation:stack-name tag — required for ec2→cfn related-panel
+	// pivot. acme-eks-cluster is a real stack fixture (cfn.go).
+	if instanceID == "i-0a1b2c3d4e5f60005" {
+		inst.Tags = append(inst.Tags,
+			ec2types.Tag{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("acme-eks-cluster")},
+		)
+	}
+	// aws:ecs:cluster-name tag — required for ecs→ec2 related-panel pivot.
+	// acme-services is a real ECS cluster fixture (ecs.go).
+	if instanceID == "i-0a1b2c3d4e5f60004" {
+		inst.Tags = append(inst.Tags,
+			ec2types.Tag{Key: aws.String("aws:ecs:cluster-name"), Value: aws.String("acme-services")},
 		)
 	}
 	if publicIP != "" {
@@ -1590,9 +1637,12 @@ func buildAddresses() []ec2types.Address {
 			SubnetId: aws.String(fixtProdPublicSubnetA), Domain: ec2types.DomainTypeVpc,
 			NetworkBorderGroup: aws.String("us-east-1"), NetworkInterfaceId: aws.String("eni-0aaa111111111111a"),
 			PrivateIpAddress: aws.String("10.0.1.50"),
+			// aws:cloudformation:stack-name tag — required for eip→cfn related-panel
+			// pivot. acme-eks-cluster is a real stack fixture (cfn.go).
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("prod-nat-eip-1a")},
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
+				{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("acme-eks-cluster")},
 			},
 		},
 		{
@@ -2042,6 +2092,32 @@ func buildNetworkInterfaces() []ec2types.NetworkInterface {
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
 			},
 		},
+		// Lambda hyperplane ENI — required for lambda→eni related-panel pivot.
+		// checkLambdaENI matches ENIs whose Description contains the function name.
+		{
+			NetworkInterfaceId: aws.String("eni-0lambda000000001a"),
+			Status:             ec2types.NetworkInterfaceStatusInUse,
+			InterfaceType:      ec2types.NetworkInterfaceTypeLambda,
+			VpcId:              aws.String(lambdaProdVPCID),
+			SubnetId:           aws.String(lambdaProdSubnetA),
+			AvailabilityZone:   aws.String("us-east-1a"),
+			PrivateIpAddress:   aws.String("10.0.1.200"),
+			PrivateDnsName:     aws.String("ip-10-0-1-200.ec2.internal"),
+			MacAddress:         aws.String("0a:1b:2c:3d:4e:99"),
+			Description:        aws.String("AWS Lambda VPC ENI-api-gateway-authorizer-a1b2c3d4-5678-90ab-cdef-111111111111"),
+			OwnerId:            aws.String("123456789012"),
+			// RequesterId must be the exact real-AWS value "AWS Lambda VPC
+			// ENI" — checkLambdaENI matches it exactly (docs/resources/lambda.md).
+			RequesterId:      aws.String("AWS Lambda VPC ENI"),
+			RequesterManaged: aws.Bool(true),
+			SourceDestCheck:  aws.Bool(true),
+			Groups: []ec2types.GroupIdentifier{
+				{GroupId: aws.String(lambdaProdALBSGID), GroupName: aws.String("acme-web-alb-sg")},
+			},
+			TagSet: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("lambda-api-gateway-authorizer-eni")},
+			},
+		},
 	}
 }
 
@@ -2063,7 +2139,16 @@ func buildVolumes() []ec2types.Volume {
 			KmsKeyId:           aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
 			MultiAttachEnabled: aws.Bool(false),
 			Attachments:        []ec2types.VolumeAttachment{{InstanceId: aws.String("i-0a1b2c3d4e5f60001")}},
-			Tags:               []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("web-prod-01-root")}},
+			// aws:cloudformation:stack-name tag — required for ebs→cfn related-panel
+			// pivot. acme-eks-cluster is a real stack fixture (cfn.go).
+			// backup=daily tag — required for the ebs:backup related-panel
+			// pivot witness. Matches the ListOfTags condition on
+			// HealthyDailyPlanID's selection (backup.go).
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("web-prod-01-root")},
+				{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("acme-eks-cluster")},
+				{Key: aws.String("backup"), Value: aws.String("daily")},
+			},
 		},
 		{
 			VolumeId: aws.String("vol-0a1b2c3d4e5f60002"), State: ec2types.VolumeStateInUse,
@@ -2165,6 +2250,23 @@ func buildSnapshots() []ec2types.Snapshot {
 			KmsKeyId: aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
 			Tags:     []ec2types.Tag{},
 		},
+		// AWS Backup-created snapshot — required for the ebs-snap:backup
+		// related-panel pivot witness. Description prefix + the
+		// aws:backup:source-resource tag are the real AWS Backup signature;
+		// the tag value matches the volume ARN in HealthyDailyPlanID's
+		// selection (backup.go) so checkEBSSnapBackup resolves a specific plan.
+		{
+			SnapshotId: aws.String("snap-awsbackup000001"), State: ec2types.SnapshotStateCompleted,
+			VolumeId: aws.String("vol-0a1b2c3d4e5f60001"), VolumeSize: aws.Int32(50),
+			Encrypted: aws.Bool(true), Description: aws.String("Created by AWS Backup for BackupPlan: acme-daily-backup"),
+			StartTime: aws.Time(time.Date(2026, 4, 16, 3, 0, 0, 0, time.UTC)),
+			Progress:  aws.String("100%"), OwnerId: aws.String("123456789012"),
+			KmsKeyId: aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("web-prod-01-root-awsbackup")},
+				{Key: aws.String("aws:backup:source-resource"), Value: aws.String("arn:aws:ec2:us-east-1:123456789012:volume/vol-0a1b2c3d4e5f60001")},
+			},
+		},
 		// Old automated snapshot (400+ days) → stale / attention signal
 		{
 			SnapshotId: aws.String("snap-completed-old00a"), State: ec2types.SnapshotStateCompleted,
@@ -2212,15 +2314,24 @@ func buildImages() []ec2types.Image {
 			CreationDate: aws.String("2026-02-15T10:30:00.000Z"), Public: aws.Bool(false),
 			OwnerId: aws.String("123456789012"), Description: aws.String("Production app server image x86_64 v2.3.1"),
 			EnaSupport: aws.Bool(true),
+			// SnapshotId/KmsKeyId — required for ami→ebs-snap and ami→kms related-panel
+			// pivots. snap-0a1b2c3d4e5f60001 is a real snapshot fixture (ec2.go buildSnapshots).
 			BlockDeviceMappings: []ec2types.BlockDeviceMapping{
-				{DeviceName: aws.String("/dev/xvda"), Ebs: &ec2types.EbsBlockDevice{VolumeSize: aws.Int32(20), VolumeType: ec2types.VolumeTypeGp3, DeleteOnTermination: aws.Bool(true)}},
+				{DeviceName: aws.String("/dev/xvda"), Ebs: &ec2types.EbsBlockDevice{
+					VolumeSize: aws.Int32(20), VolumeType: ec2types.VolumeTypeGp3, DeleteOnTermination: aws.Bool(true),
+					SnapshotId: aws.String("snap-0a1b2c3d4e5f60001"),
+					KmsKeyId:   aws.String(AMIEBSKmsKeyARN),
+				}},
 			},
 			BootMode: ec2types.BootModeValuesUefi, DeprecationTime: aws.String("2028-01-01T00:00:00Z"),
 			ImageLocation: aws.String("123456789012/amazon-linux-2023-x86_64"), ImageOwnerAlias: aws.String("amazon"),
 			SriovNetSupport: aws.String("simple"), UsageOperation: aws.String("RunInstances"),
+			// aws:cloudformation:stack-name tag — required for ami→cfn related-panel
+			// pivot. acme-eks-cluster is a real stack fixture (cfn.go).
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("acme-app-server-x86-v2.3.1")},
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
+				{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("acme-eks-cluster")},
 			},
 		},
 		{
@@ -2294,6 +2405,26 @@ func buildImages() []ec2types.Image {
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("acme-app-build-failed")},
 				{Key: aws.String("Environment"), Value: aws.String("ci")},
+			},
+		},
+		// ami-0eks111111111111a — pinned by the EC2 fake's
+		// DescribeLaunchTemplateVersions(lt-0eks111111111111a) response (see
+		// internal/demo/fakes/ec2.go), which the EKS general-pool nodegroup's
+		// LaunchTemplate resolves to via FetchNodeGroups. Required so the AMI
+		// this nodegroup actually launches from exists as a real fixture,
+		// closing the ami→ng and eks→ami related-panel pivots.
+		{
+			ImageId: aws.String("ami-0eks111111111111a"), Name: aws.String("acme-eks-worker-al2-1.29"),
+			State: ec2types.ImageStateAvailable, Architecture: ec2types.ArchitectureValuesX8664,
+			PlatformDetails: aws.String("Linux/UNIX"), RootDeviceType: ec2types.DeviceTypeEbs,
+			RootDeviceName: aws.String("/dev/xvda"), Hypervisor: ec2types.HypervisorTypeXen,
+			VirtualizationType: ec2types.VirtualizationTypeHvm, ImageType: ec2types.ImageTypeValuesMachine,
+			CreationDate: aws.String("2026-01-10T08:00:00.000Z"), Public: aws.Bool(false),
+			OwnerId: aws.String("602401143452"), Description: aws.String("EKS Kubernetes Worker AMI (amazon-eks-node-1.29)"),
+			EnaSupport: aws.Bool(true),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("acme-eks-worker-al2-1.29")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
 			},
 		},
 	}

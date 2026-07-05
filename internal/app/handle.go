@@ -2,7 +2,10 @@ package app
 
 import (
 	"maps"
+	"strings"
 
+	"github.com/k2m30/a9s/v3/internal/cache"
+	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -28,6 +31,11 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 
 	intents, tasks := c.core.HandleEvent(ev)
 	c.applyIntents(intents)
+	// C10: a navigation issued before AWS connect completes must replay once
+	// ClientsReady lands. HandleEvent's ClientsReady path (and any other event
+	// that can carry PendingRefresh) emits RefreshActiveListIntent for that;
+	// applyIntents does not act on it, so route it through the shared helper.
+	tasks = append(tasks, c.refreshTasksForIntents(intents)...)
 
 	// Contract C: mark the type's availability sweep acked the moment its
 	// AvailabilityChecked result arrives, regardless of whether HandleEvent's
@@ -51,6 +59,27 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 		// headless/web entry point; the TUI routes ResourcesLoaded through the
 		// HandleResourcesLoadedEvent seam and drills to detail in its own adapter.
 		tasks = append(tasks, c.autoOpenSingleDetail()...)
+	}
+
+	// messages.ClientsReady is explicitly excluded from HandleEvent
+	// (orchestrator.go documents it as TUI-shim-only: the TUI's
+	// handleClientsReady computes StackDepth/HasActiveRL from its own view
+	// stack before calling Core.HandleClientsReady). The headless/web lane has
+	// no TUI shim, so Handle must do the same renderer-shape computation here
+	// — mirroring BootstrapLive — or a connect result fed through DrainSync
+	// (drainsync.go) never reaches HandleClientsReady at all, and C10's
+	// pre-connect-navigation replay never fires on this lane.
+	if msg, ok := ev.(messages.ClientsReady); ok && msg.Err == nil {
+		crIntents, crTasks := c.core.HandleClientsReady(runtime.ClientsReadyEvent{
+			Clients:     msg.Clients,
+			Region:      msg.Region,
+			Gen:         msg.Gen,
+			StackDepth:  len(c.stack),
+			HasActiveRL: c.topListState() != nil,
+		})
+		c.applyIntents(crIntents)
+		tasks = append(tasks, crTasks...)
+		tasks = append(tasks, c.refreshTasksForIntents(crIntents)...)
 	}
 
 	// messages.ValueRevealed is explicitly excluded from HandleEvent
@@ -81,20 +110,11 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 		c.handleRelatedCheckBatch(batch)
 	}
 
-	// messages.APIError: a failed fetch clears the list Loading flag and surfaces
-	// an error flash. The TUI bumps flash.gen before calling HandleAPIError; the
-	// headless controller has no flash.gen, so ConnectGen serves as stable stand-in
-	// (same pattern as ActionSelectProfile/Region). The FlashTick task returned by
-	// HandleAPIError is suppressed here — it is only meaningful in a running event
-	// loop (TUI/web timer); the headless path has no loop to process it.
-	// IsStale is not applicable here — APIError has AcceptZeroGen=true.
-	if msg, ok := ev.(messages.APIError); ok {
-		apiIntents, _ := c.core.HandleAPIError(runtime.APIErrorEvent{
-			Err:    msg.Err,
-			NewGen: c.core.ConnectGen(),
-		})
-		c.applyIntents(apiIntents)
-	}
+	// messages.APIError: routed entirely through runtime.Core.HandleEvent
+	// (the case added there mirrors this same ConnectGen stand-in + intent
+	// application) — DEF-5's orchestrator gap fix. Handling it a second time
+	// here would double-apply the ClearActiveListLoadingIntent/FlashIntent
+	// the Core already returns via the intents/tasks captured above.
 
 	// messages.IdentityError: the identity fetch failed. Core.HandleEvent routes
 	// this through HandleIdentityError which clears IdentityFetching but does not
@@ -184,6 +204,12 @@ func (c *Controller) syncExactTotalToMenu(screen *Screen, canon string) {
 	if ls == nil || ls.EscPops || ls.ParentContext != nil {
 		return
 	}
+	// C6 scope boundary: only the canonical top-level, unfiltered list may
+	// reach the persisted per-type cache file. A ScreenChildList never does,
+	// even when (by coincidence) its resource type matches canon.
+	if screen.ID == runtime.ScreenResourceList {
+		c.maybeSaveResourceListCache(ls, canon)
+	}
 	newCount := len(ls.Rows)
 	newTrunc := ls.HasPagination
 
@@ -245,8 +271,156 @@ func (c *Controller) syncExactTotalToMenu(screen *Screen, canon string) {
 		maps.Copy(issueTrunc, ms.IssueTruncated)
 		issueKnown := make(map[string]bool, len(ms.IssueKnown))
 		maps.Copy(issueKnown, ms.IssueKnown)
-		_ = c.core.SaveAvailabilityCache(profile, region, avail, trunc, issueCounts, issueTrunc, issueKnown)
+		_ = c.core.SaveAvailabilityCache(avail, trunc, issueCounts, issueTrunc, issueKnown)
 	}
+}
+
+// maybeSaveResourceListCache persists ls.Rows for canon's canonical
+// top-level, unfiltered list to its per-type disk cache file (C6: every
+// loaded page, not just the first — ls.Rows already holds append-mode
+// accumulation from applyResourcesLoaded). No-op when NoCache is set (C7b)
+// or when canon has no resolvable ResourceTypeDef (issue-badge exclusion
+// cannot be determined). Best-effort — a write failure is silently dropped,
+// mirroring every other cache-write call site in this file.
+//
+// Callers MUST already have applied the C6 scope gate (top-level
+// ScreenResourceList, not EscPops, not ParentContext) before calling this.
+func (c *Controller) maybeSaveResourceListCache(ls *ListState, canon string) {
+	if ls == nil || c.core.NoCache() {
+		return
+	}
+	td := resource.FindResourceType(canon)
+	if td == nil {
+		// Issue-badge eligibility unknowable without a ResourceTypeDef.
+		return
+	}
+	// Item A (owner decision): every renderable list column — including
+	// Path-based ones like s3's Region — must be cached, driven by the
+	// column config, no hardcode. cache.Row is built from r.Fields only, so a
+	// Path-based column must be materialized into Fields first, exactly as
+	// the render path (buildListBody/extractListCells) does at render time
+	// via its own RawStruct fallback — otherwise a column that only ever
+	// resolved from RawStruct silently never reaches the persisted cache.Row,
+	// which never carries RawStruct. materializeAllListFieldsForSave (unlike
+	// the render-time materializeListFieldsForType/MaterializeListFields)
+	// also covers Path-carrying columns that ALSO declare a Key: at render
+	// time such a column's RawStruct fallback only matters when nothing has
+	// set Fields[key] yet, but at the SAVE seam RawStruct is about to be
+	// stripped for good, so the same "no value yet" gap applies to it too.
+	materialized := c.materializeAllListFieldsForSave(canon, ls.Rows)
+	rows := make([]cache.Row, len(materialized))
+	for i, r := range materialized {
+		rows[i] = cache.Row{
+			ID:       r.ID,
+			Name:     r.Name,
+			Fields:   r.Fields,
+			Findings: r.Findings,
+		}
+	}
+	issuesKnown := !td.ExcludeFromIssueBadge
+	issues := c.listIssueCount(ls, canon)
+	exact := !ls.HasPagination
+	_ = c.core.SaveResourceListCache(canon, rows, len(ls.Rows), exact, issues, issuesKnown, ls.HasPagination)
+	// Item A / DEF-21: keep the sweep lane's ProbeResources mirror in lockstep
+	// with what was just persisted, so a LATER sweep/enrichment-completion
+	// TaskKindSaveCache dispatch re-saves these same accumulated rows instead
+	// of a stale, independently-fetched probe snapshot that reconcileTypeFile's
+	// subset check might not recognise as a subset. See SyncProbeResourcesForType.
+	c.core.SyncProbeResourcesForType(canon, ls.Rows, ls.HasPagination)
+}
+
+// materializeAllListFieldsForSave resolves typeName's column set the same
+// way buildListBody/materializeListFieldsForType do (fallback typeDef first,
+// then catalog, via resolveListColumnsForBuild), then writes every Path-
+// backed column's RawStruct scalar into Fields when that column's resolved
+// key is not already populated — including a column that ALSO declares a
+// Key (unlike MaterializeListFields, which the render path uses and which
+// intentionally skips Key-based columns since a live Fields-map lookup or a
+// Wave-2 override already covers them while RawStruct is still present).
+//
+// This wider rule only applies at this SAVE seam: cache.Row never carries
+// RawStruct (SaveResourceListCache's doc comment), so a Key-based column
+// whose value has so far only ever come from a RawStruct fallback (never an
+// explicit Fields write) needs the exact same one-time materialization a
+// pure Path-only column needs, or it goes blank the moment the row is
+// replayed from disk. The existing non-empty-value guard this mirrors from
+// MaterializeListFields means a column already carrying an explicit value
+// (e.g. a Wave-2 enrichment override) is never overwritten by this pass.
+func (c *Controller) materializeAllListFieldsForSave(typeName string, resources []resource.Resource) []resource.Resource {
+	if len(resources) == 0 {
+		return resources
+	}
+	var tdVal resource.ResourceTypeDef
+	var td *resource.ResourceTypeDef
+	if ftd, ok := c.fallbackTypeDefs[typeName]; ok {
+		tdVal = ftd
+		td = &tdVal
+	} else if catalogTD := resource.FindResourceType(typeName); catalogTD != nil {
+		td = catalogTD
+	}
+	columns := resolveListColumnsForBuild(c.viewConfig, typeName, td)
+	if len(columns) == 0 {
+		return resources
+	}
+	lifecycleKey := "state"
+	if td != nil && td.LifecycleKey != "" {
+		lifecycleKey = td.LifecycleKey
+	}
+	out := make([]resource.Resource, len(resources))
+	for i, r := range resources {
+		out[i] = materializeAllPathFields(r, columns, lifecycleKey)
+	}
+	return out
+}
+
+// materializeAllPathFields is materializeAllListFieldsForSave's single-
+// resource core: for every column with a non-empty Path (Key-based or not),
+// write RawStruct's extracted scalar into Fields under the column's
+// resolved key (Key when set, else the lowercased Title) whenever that key
+// is not already populated with a non-empty value. The status/lifecycle
+// column is always skipped regardless of Path: its cell is derived at
+// render time from Findings (listExtractCellValue's isStatusCol branch,
+// buildListBody's S4 override), so persisting a RawStruct-derived value for
+// it would render a stale/wrong status once Findings disagree — the same
+// exclusion the render-time MaterializeListFields effectively gets for free
+// by skipping every Key-based column, which this wider save-time pass must
+// reproduce explicitly since it no longer skips Key-based columns in general.
+func materializeAllPathFields(r resource.Resource, columns []ColumnDef, lifecycleKey string) resource.Resource {
+	if r.RawStruct == nil {
+		return r
+	}
+	out := r
+	copied := false
+	for _, col := range columns {
+		if col.Path == "" {
+			continue
+		}
+		if col.Key == "status" || col.Key == lifecycleKey {
+			continue
+		}
+		key := col.Key
+		if key == "" {
+			key = strings.ToLower(col.Title)
+		}
+		if key == "" {
+			continue
+		}
+		if v, ok := out.Fields[key]; ok && v != "" {
+			continue
+		}
+		val := fieldpath.ExtractScalar(out.RawStruct, col.Path)
+		if val == "" {
+			continue
+		}
+		if !copied {
+			fresh := make(map[string]string, len(out.Fields)+1)
+			maps.Copy(fresh, out.Fields)
+			out.Fields = fresh
+			copied = true
+		}
+		out.Fields[key] = val
+	}
+	return out
 }
 
 // autoOpenSingleDetail replaces a web/headless by-ID placeholder list with the
@@ -388,4 +562,3 @@ func mergeDetailRelatedRow(ds *DetailState, displayName, targetType string, coun
 		FetchFilter: fetchFilter,
 	})
 }
-

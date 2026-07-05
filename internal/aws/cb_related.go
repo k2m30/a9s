@@ -126,10 +126,7 @@ func checkCbKMS(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 	if !ok || project.EncryptionKey == nil || *project.EncryptionKey == "" {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
-	keyID := *project.EncryptionKey
-	if idx := strings.LastIndex(keyID, "/"); idx >= 0 && idx < len(keyID)-1 {
-		keyID = keyID[idx+1:]
-	}
+	keyID := kmsKeyIDFromField(*project.EncryptionKey, res.Type)
 	return relatedResult("kms", []string{keyID})
 }
 

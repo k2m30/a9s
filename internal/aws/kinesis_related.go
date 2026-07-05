@@ -4,7 +4,6 @@ package aws
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
@@ -160,10 +159,7 @@ func checkKinesisKMS(ctx context.Context, clients any, res resource.Resource, _ 
 	if out.StreamDescriptionSummary == nil || out.StreamDescriptionSummary.KeyId == nil || *out.StreamDescriptionSummary.KeyId == "" {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
-	keyID := *out.StreamDescriptionSummary.KeyId
-	if idx := strings.LastIndex(keyID, "/"); idx >= 0 && idx < len(keyID)-1 {
-		keyID = keyID[idx+1:]
-	}
+	keyID := kmsKeyIDFromField(*out.StreamDescriptionSummary.KeyId, res.Type)
 	return relatedResult("kms", []string{keyID})
 }
 

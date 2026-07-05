@@ -7,12 +7,14 @@ package aws
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	apigwtypes "github.com/aws/aws-sdk-go-v2/service/apigatewayv2/types"
-	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
+	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
@@ -108,11 +110,13 @@ func checkLambdaAPIGW(ctx context.Context, clients any, res resource.Resource, c
 	return relatedResult("apigw", ids)
 }
 
-// checkLambdaCF scans the cloudfront cache for Lambda@Edge or
-// CloudFront-Functions-adjacent distributions that reference this Lambda.
-// cftypes.DistributionSummary does not embed association detail in list
-// responses, so the cache alone cannot resolve the link. Returns Count:0 when
-// no signal exists.
+// checkLambdaCF scans the cloudfront cache for Lambda@Edge distributions that
+// associate this Lambda function. The cf fetcher joins both
+// DefaultCacheBehavior and CacheBehaviors[] LambdaFunctionAssociations at
+// fetch time (zero extra calls) into the comma-joined
+// Fields["lambda_function_arns"]. Lambda@Edge associations always reference a
+// specific published VERSION (never $LATEST), so matching requires an
+// unversioned-ARN-prefix comparison against this function's base ARN.
 func checkLambdaCF(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnARN := ""
 	if fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct); ok && fn.FunctionArn != nil {
@@ -128,15 +132,20 @@ func checkLambdaCF(ctx context.Context, clients any, res resource.Resource, cach
 	if cfList == nil {
 		return resource.RelatedCheckResult{TargetType: "cf", Count: -1}
 	}
+	wantPrefix := fnARN + ":"
 	var ids []string
 	for _, cfRes := range cfList {
-		// DistributionSummary.AliasICPRecordals is not useful here; the list
-		// response doesn't carry Lambda associations. Use Fields heuristic.
-		if cfRes.Fields["lambda_function_arn"] == fnARN {
-			ids = append(ids, cfRes.ID)
+		joined := cfRes.Fields["lambda_function_arns"]
+		if joined == "" {
+			continue
+		}
+		for assocARN := range strings.SplitSeq(joined, ",") {
+			if strings.HasPrefix(assocARN, wantPrefix) {
+				ids = append(ids, cfRes.ID)
+				break
+			}
 		}
 	}
-	_ = cftypes.DistributionSummary{}
 	if len(ids) == 0 && truncated {
 		return resource.ApproximateZero("cf")
 	}
@@ -311,12 +320,18 @@ func checkLambdaCTEvents(ctx context.Context, clients any, res resource.Resource
 // scan.
 
 // checkLambdaTG scans the tg cache for target groups whose TargetType is
-// "lambda" and whose Targets include this function ARN. ELB v2's
-// DescribeTargetHealth would be needed to resolve target set; without it we
-// return -1 when clients are available OR match by name hint in Fields.
+// "lambda" and, for each such TG, calls ELBv2 DescribeTargetHealth to resolve
+// its registered targets — Target.Id for a Lambda-type TG is the function
+// ARN. Only lambda-type TGs trigger a call, bounding the fan-out to the
+// number of Lambda TGs in the account (typically small). Per-TG failures are
+// aggregated per the error contract rather than silently skipped.
 func checkLambdaTG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	fnARN := ""
+	if fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct); ok && fn.FunctionArn != nil {
+		fnARN = *fn.FunctionArn
+	}
 	fnName := res.ID
-	if fnName == "" {
+	if fnARN == "" && fnName == "" {
 		return resource.RelatedCheckResult{TargetType: "tg", Count: 0}
 	}
 	tgList, truncated, err := lambdaRelatedResources(ctx, clients, cache, "tg")
@@ -326,20 +341,66 @@ func checkLambdaTG(ctx context.Context, clients any, res resource.Resource, cach
 	if tgList == nil {
 		return resource.RelatedCheckResult{TargetType: "tg", Count: -1}
 	}
-	var ids []string
+
+	var lambdaTGs []resource.Resource
 	for _, tgRes := range tgList {
-		if tgRes.Fields["target_type"] != "lambda" {
+		if tgRes.Fields["target_type"] == "lambda" {
+			lambdaTGs = append(lambdaTGs, tgRes)
+		}
+	}
+	if len(lambdaTGs) == 0 {
+		if truncated {
+			return resource.ApproximateZero("tg")
+		}
+		return resource.RelatedCheckResult{TargetType: "tg", Count: 0}
+	}
+
+	c, sok := clients.(*ServiceClients)
+	if !sok || c == nil || c.ELBv2 == nil {
+		return resource.RelatedCheckResult{TargetType: "tg", Count: -1}
+	}
+	healthAPI, hok := c.ELBv2.(ELBv2DescribeTargetHealthAPI)
+	if !hok {
+		return resource.RelatedCheckResult{TargetType: "tg", Count: -1}
+	}
+
+	var ids []string
+	var failures []string
+	for _, tgRes := range lambdaTGs {
+		tgArn := tgRes.Fields["target_group_arn"]
+		if tgArn == "" {
+			if tg, ok := assertStruct[elbv2types.TargetGroup](tgRes.RawStruct); ok && tg.TargetGroupArn != nil {
+				tgArn = *tg.TargetGroupArn
+			}
+		}
+		if tgArn == "" {
 			continue
 		}
-		if tgRes.Fields["lambda_function_name"] == fnName ||
-			tgRes.Fields["target_arn"] != "" && strings.HasSuffix(tgRes.Fields["target_arn"], ":function:"+fnName) {
-			ids = append(ids, tgRes.ID)
+		out, healthErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elbv2.DescribeTargetHealthOutput, error) {
+			return healthAPI.DescribeTargetHealth(ctx, &elbv2.DescribeTargetHealthInput{TargetGroupArn: &tgArn})
+		})
+		if healthErr != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", tgRes.ID, healthErr))
+			continue
+		}
+		for _, thd := range out.TargetHealthDescriptions {
+			if thd.Target == nil || thd.Target.Id == nil {
+				continue
+			}
+			targetID := *thd.Target.Id
+			if (fnARN != "" && targetID == fnARN) ||
+				(fnName != "" && strings.HasSuffix(targetID, ":function:"+fnName)) {
+				ids = append(ids, tgRes.ID)
+				break
+			}
 		}
 	}
+	result := relatedResult("tg", ids)
 	if len(ids) == 0 && truncated {
-		return resource.ApproximateZero("tg")
+		result = resource.ApproximateZero("tg")
 	}
-	return relatedResult("tg", ids)
+	result.Err = AggregateFailures("lambda-related: DescribeTargetHealth", failures, len(lambdaTGs))
+	return result
 }
 
 // checkLambdaSNS scans the sns cache and surfaces topics that subscribe this
@@ -459,8 +520,9 @@ func checkLambdaS3(ctx context.Context, clients any, res resource.Resource, cach
 }
 
 // checkLambdaENI scans the eni cache for ENIs attached to this Lambda's
-// hyperplane (VPC-attached functions get AWS-managed ENIs with a
-// well-known description prefix "AWS Lambda VPC ENI").
+// hyperplane (VPC-attached functions get AWS-managed requester-managed ENIs).
+// Per docs/resources/lambda.md, the match is RequesterId=="AWS Lambda VPC
+// ENI" or Description starting with "AWS Lambda VPC ENI-<FunctionName>-".
 func checkLambdaENI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
 	if fnName == "" {
@@ -473,19 +535,20 @@ func checkLambdaENI(ctx context.Context, clients any, res resource.Resource, cac
 	if eniList == nil {
 		return resource.RelatedCheckResult{TargetType: "eni", Count: -1}
 	}
+	// RequesterId=="AWS Lambda VPC ENI" identifies the ENI as Lambda-managed;
+	// the Description prefix is what disambiguates which function it
+	// belongs to, since RequesterId alone is identical across every
+	// VPC-attached function's ENIs.
+	wantPrefix := "AWS Lambda VPC ENI-" + fnName + "-"
 	var ids []string
 	for _, eniRes := range eniList {
-		desc := eniRes.Fields["description"]
-		if desc == "" {
+		if eniRes.Fields["requester_id"] != "AWS Lambda VPC ENI" {
 			continue
 		}
-		// Hyperplane ENIs have a description like
-		// "AWS Lambda VPC ENI-{FunctionName}-..." but the AWS-managed form
-		// varies. Match on the function name as a substring of the
-		// description (a conservative signal).
-		if strings.Contains(desc, fnName) {
-			ids = append(ids, eniRes.ID)
+		if !strings.HasPrefix(eniRes.Fields["description"], wantPrefix) {
+			continue
 		}
+		ids = append(ids, eniRes.ID)
 	}
 	if len(ids) == 0 && truncated {
 		return resource.ApproximateZero("eni")

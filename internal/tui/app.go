@@ -3,7 +3,6 @@ package tui
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
@@ -37,12 +36,6 @@ type flashState struct {
 	gen     domain.Gen // generation counter to avoid stale clears
 }
 
-// errorEntry records a single error for the session error log.
-type errorEntry struct {
-	time    time.Time
-	message string
-}
-
 // Model is the root Bubble Tea model. It owns the renderer-state stack, header
 // state, AWS clients, and routes all messages to the headless controller.
 //
@@ -70,7 +63,6 @@ type Model struct {
 	cmdInput  textinput.Model
 	flash     flashState
 
-	errorHistory  []errorEntry
 	showErrorHint bool
 
 	// Tab-completion cycle state for command mode. tabPrefix is the user's
@@ -185,15 +177,19 @@ func (m Model) Init() tea.Cmd {
 			Region:  m.core.Region(),
 		}
 	}
+	// C1: the disk-cached menu must render before AWS connect settles —
+	// seed it synchronously alongside the connect kickoff rather than
+	// waiting for ClientsReady to dispatch TaskKindLoadAvailCache.
+	seedCmd := m.loadAvailabilityCache()
 	if m.configErr != nil {
-		return tea.Batch(connectCmd, func() tea.Msg {
+		return tea.Batch(connectCmd, seedCmd, func() tea.Msg {
 			return messages.Flash{
 				Text:    fmt.Sprintf("Config error: %v (using defaults)", m.configErr),
 				IsError: true,
 			}
 		})
 	}
-	return connectCmd
+	return tea.Batch(connectCmd, seedCmd)
 }
 
 // Update implements tea.Model. Routes messages to global handlers or active view.

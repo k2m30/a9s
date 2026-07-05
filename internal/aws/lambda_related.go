@@ -165,10 +165,7 @@ func checkLambdaKMS(_ context.Context, _ any, res resource.Resource, _ resource.
 	if !ok || fn.KMSKeyArn == nil || *fn.KMSKeyArn == "" {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
-	keyID := *fn.KMSKeyArn
-	if idx := strings.LastIndex(keyID, "/"); idx >= 0 && idx < len(keyID)-1 {
-		keyID = keyID[idx+1:]
-	}
+	keyID := kmsKeyIDFromField(*fn.KMSKeyArn, res.Type)
 	return relatedResult("kms", []string{keyID})
 }
 
@@ -272,27 +269,38 @@ func checkLambdaCFN(ctx context.Context, clients any, res resource.Resource, cac
 	return relatedResult("cfn", ids)
 }
 
-// checkLambdaECR resolves the ECR repository for container-image Lambda functions.
-// Pattern F — no AWS call needed. Reads PackageType from FunctionConfiguration
-// and the image URI from res.Fields["image_uri"]. ECR image URIs follow the
-// pattern <account>.dkr.ecr.<region>.amazonaws.com/<repo>[:<tag>|@<digest>].
-// Returns Count: 0 if PackageType != Image, Count: -1 if the URI is missing or
-// the repository name cannot be parsed.
-func checkLambdaECR(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
-	if !ok {
-		return resource.RelatedCheckResult{TargetType: "ecr", Count: -1}
-	}
-	if fn.PackageType != "Image" {
+// checkLambdaECR resolves the ECR repository for container-image Lambda
+// functions. Short-circuits unless Fields["package_type"]=="Image" (set by
+// the lambda fetcher). The image URI is only returned by GetFunction's
+// Code.ImageUri — never by ListFunctions/FunctionConfiguration — so this
+// checker calls GetFunction for this one function (in budget: one call per
+// open Image-package function, per docs/resources/lambda.md). ECR image URIs
+// follow the pattern <account>.dkr.ecr.<region>.amazonaws.com/<repo>[:<tag>|@<digest>].
+func checkLambdaECR(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+	if res.Fields["package_type"] != "Image" {
 		return resource.RelatedCheckResult{TargetType: "ecr", Count: 0}
 	}
-	// Image URI is only available via lambda:GetFunction (not ListFunctions).
-	// If the fetcher has stored it in Fields["image_uri"] use it; otherwise
-	// we cannot determine the repository without an extra API call.
-	imageURI := res.Fields["image_uri"]
-	if imageURI == "" {
+	fnName := res.ID
+	if fnName == "" {
+		fnName = res.Name
+	}
+	if fnName == "" {
 		return resource.RelatedCheckResult{TargetType: "ecr", Count: -1}
 	}
+	c, ok := clients.(*ServiceClients)
+	if !ok || c == nil || c.Lambda == nil {
+		return resource.RelatedCheckResult{TargetType: "ecr", Count: -1}
+	}
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.GetFunctionOutput, error) {
+		return c.Lambda.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: &fnName})
+	})
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "ecr", Count: -1, Err: err}
+	}
+	if out == nil || out.Code == nil || out.Code.ImageUri == nil || *out.Code.ImageUri == "" {
+		return resource.RelatedCheckResult{TargetType: "ecr", Count: -1}
+	}
+	imageURI := *out.Code.ImageUri
 	// URI form: <account>.dkr.ecr.<region>.amazonaws.com/<repo>[:<tag>|@<digest>]
 	// We need the <repo> portion — everything after the hostname "/" and before ":" or "@".
 	slashIdx := strings.Index(imageURI, "/")

@@ -16,6 +16,7 @@ import (
 	"maps"
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/cache"
 	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -61,6 +62,53 @@ func (c *Core) NoCache() bool { return c.session.NoCache }
 
 // SetNoCache sets the NoCache policy flag. Constructor-option only.
 func (c *Core) SetNoCache(v bool) { c.session.NoCache = v }
+
+// CacheStore returns the loaded per-type disk cache for the CURRENT
+// Profile+Region pair, or nil when no LoadDir has run yet for this pair
+// (cold start before TaskKindLoadAvailCache completes, or --no-cache). Goes
+// through EnsureCacheStore so this getter never returns a store memoized for
+// a stale pair (see Session.EnsureCacheStore).
+func (c *Core) CacheStore() *cache.Store { return c.EnsureCacheStore() }
+
+// EnsureCacheStore returns the current pair's *cache.Store, reloading via
+// cache.LoadDir(profile, region) whenever the memoized store (if any) was
+// not loaded for the CURRENT session.Profile/session.Region pair — this
+// covers both the first call since the last Rotate (C9) or process start,
+// and a pair switch that lands between two calls without an intervening
+// Rotate observation. NoCache=true always returns nil without ever calling
+// LoadDir (C7b: --no-cache disables persisted load entirely). session == ""
+// Profile or Region (pair not yet resolved) returns nil WITHOUT memoizing,
+// so a pre-connect call never pins the store to the wrong "<profile>--"
+// directory. All access serializes on session.cacheStoreMu.
+func (c *Core) EnsureCacheStore() *cache.Store {
+	if c.session.NoCache {
+		return nil
+	}
+	return c.session.EnsureCacheStore(c.session.Profile, c.session.Region)
+}
+
+// WithCacheStore runs fn against the current pair's *cache.Store with
+// session.cacheStoreMu held for fn's entire duration, so a caller's own
+// store.Type/Put/SaveType read-modify-write sequence for one type file can
+// never interleave with another such sequence running concurrently (DEF-17).
+// No-op (fn not called) when NoCache is set, mirroring EnsureCacheStore.
+func (c *Core) WithCacheStore(fn func(store *cache.Store) error) error {
+	if c.session.NoCache {
+		return nil
+	}
+	return c.session.WithCacheStore(c.session.Profile, c.session.Region, fn)
+}
+
+// ReadCacheStore runs fn against the current pair's *cache.Store with
+// session.cacheStoreMu held, for read-only callers (store.Type/store.Types).
+// See Session.ReadCacheStore for why a read call site must not bypass this
+// lock even though it never mutates the store itself.
+func (c *Core) ReadCacheStore(fn func(store *cache.Store) error) error {
+	if c.session.NoCache {
+		return nil
+	}
+	return c.session.ReadCacheStore(c.session.Profile, c.session.Region, fn)
+}
 
 // Command returns the one-shot resource short name to navigate to on the
 // first ClientsReady (from the -c CLI flag).

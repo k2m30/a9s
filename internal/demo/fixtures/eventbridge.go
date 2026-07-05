@@ -70,6 +70,17 @@ var sharedEventBridgeFixtures = sync.OnceValue(func() *EventBridgeFixtures {
 			Description:        aws.String("Disabled rule — targets are configured but this rule will not trigger"),
 			RoleArn:            aws.String(prodEBRoleARN),
 		},
+		// ECS service-scheduled-task rule — required for ecs-svc→eb-rule
+		// related-panel pivot. checkECSSvcEbRule matches source=["aws.ecs"] +
+		// detail.clusterArn containing "acme-services".
+		{
+			Name:         aws.String("ecs-acme-services-task-state-change"),
+			Arn:          aws.String("arn:aws:events:us-east-1:123456789012:rule/ecs-acme-services-task-state-change"),
+			State:        eventbridgetypes.RuleStateEnabled,
+			EventBusName: aws.String("default"),
+			EventPattern: aws.String(`{"source":["aws.ecs"],"detail-type":["ECS Task State Change"],"detail":{"clusterArn":["arn:aws:ecs:us-east-1:123456789012:cluster/acme-services"]}}`),
+			Description:  aws.String("Routes ECS task state changes for the acme-services cluster to SNS"),
+		},
 		// S3 healthy-bucket event bridge rule (checkS3EBRule pivot).
 		// checkS3EBRule reads ruleRes.Fields["target_arns"] (emitted by the
 		// eventbridge fetcher); this rule is pre-set so the demo related graph renders.
@@ -103,6 +114,12 @@ var sharedEventBridgeFixtures = sync.OnceValue(func() *EventBridgeFixtures {
 			{
 				Id:  aws.String("SQSDeadLetterQueue"),
 				Arn: aws.String("arn:aws:sqs:us-east-1:123456789012:scheduled-tasks-dlq"),
+			},
+		},
+		"ecs-acme-services-task-state-change": {
+			{
+				Id:  aws.String("SNSECSAlertTopic"),
+				Arn: aws.String("arn:aws:sns:us-east-1:123456789012:alarm-notifications"),
 			},
 		},
 		// S3 healthy-bucket rule targets.

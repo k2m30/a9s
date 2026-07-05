@@ -164,7 +164,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Count-shown values left `unknown` — `docs/related-resources.md` and `docs/enrichment-visibility.md` do not specify per-target count visibility for `rtb`; HOW decision deferred to a per-resource UX review rather than invented here.
 
 <!-- BEGIN GENERATED: header -->
-rtb — NETWORKING. Lifecycle key: `state`.
+rtb — NETWORKING. Lifecycle key: none (the list API returns no lifecycle field).
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

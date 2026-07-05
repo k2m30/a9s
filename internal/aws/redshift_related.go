@@ -110,10 +110,7 @@ func checkRedshiftKMS(_ context.Context, _ any, res resource.Resource, _ resourc
 	if !ok || cluster.KmsKeyId == nil || *cluster.KmsKeyId == "" {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
-	keyID := *cluster.KmsKeyId
-	if idx := strings.LastIndex(keyID, "/"); idx >= 0 && idx < len(keyID)-1 {
-		keyID = keyID[idx+1:]
-	}
+	keyID := kmsKeyIDFromField(*cluster.KmsKeyId, res.Type)
 	return relatedResult("kms", []string{keyID})
 }
 

@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"maps"
 
+	"github.com/k2m30/a9s/v3/internal/cache"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
@@ -57,12 +58,66 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 	var intents []UIIntent
 
 	// Emit one PatchMenuAvailability intent per resource type with cached data.
+	// DEF-6/C3: Origin="cache" — seeded from disk, not yet re-verified this
+	// session (handleAvailabilityChecked flips it to "verified" once the
+	// matching live probe result lands).
 	for shortName, count := range entries {
 		intents = append(intents, PatchMenuAvailability{
 			ResourceType: shortName,
 			Count:        count,
 			Truncated:    truncated[shortName],
+			Origin:       OriginCache,
 		})
+	}
+
+	// Contract D / C1: seed session.ProbeResources with the disk-cached rows
+	// for every known type so a cold list-open renders real cells instantly
+	// (Loading=false, Refreshing=true) instead of the empty Loading shell —
+	// mirrors Count/Truncated already being applied to the menu above.
+	//
+	// Prefers real per-row data from the current pair's disk Store (all pages
+	// C6 persisted, not just the first) when available. Falls back to
+	// Count-many placeholder rows (ID-only, no Fields) when the Store has no
+	// row data for a type that nonetheless carries a known count — this keeps
+	// the seeded-list contract (Loading=false) intact even for callers that
+	// deliver a counts-only AvailabilityCacheLoaded event without a populated
+	// on-disk per-type file (e.g. a synthetic/legacy counts projection).
+	if len(entries) > 0 {
+		if c.session.ProbeResources == nil {
+			c.session.ProbeResources = make(map[string][]resource.Resource, len(entries))
+		}
+		if c.session.ProbeTruncated == nil {
+			c.session.ProbeTruncated = make(map[string]bool, len(entries))
+		}
+		rowsByType := make(map[string][]cache.Row, len(entries))
+		_ = c.ReadCacheStore(func(store *cache.Store) error {
+			if store == nil {
+				return nil
+			}
+			for shortName := range entries {
+				if tf, ok := store.Type(shortName); ok && len(tf.Rows) > 0 {
+					rowsByType[shortName] = tf.Rows
+				}
+			}
+			return nil
+		})
+		for shortName, count := range entries {
+			if count <= 0 {
+				continue
+			}
+			if _, already := c.session.ProbeResources[shortName]; already {
+				continue
+			}
+			var rows []resource.Resource
+			if cr, ok := rowsByType[shortName]; ok {
+				rows = rowsFromCacheRows(shortName, cr)
+			}
+			if len(rows) == 0 {
+				rows = placeholderRows(shortName, count)
+			}
+			c.session.ProbeResources[shortName] = rows
+			c.session.ProbeTruncated[shortName] = truncated[shortName]
+		}
 	}
 
 	// Apply cached issue counts (T033).
@@ -90,6 +145,23 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 		tasks = append(tasks, TaskRequest{Key: TaskKey{Kind: TaskKindProbeAvailability, Scope: shortName}})
 	}
 
+	// DEF-14/D11: consume the one-shot -c navigation armed by
+	// handleClientsReadySuccess on the live path, now that the
+	// session.ProbeResources seed above has landed — dispatching it any
+	// earlier (e.g. alongside TaskKindLoadAvailCache) would race the seed,
+	// since the adapter runs task cmds concurrently via tea.Batch.
+	if c.session.CommandArmed {
+		tasks = append(tasks, TaskRequest{
+			Key: TaskKey{Kind: TaskKindEmitNavigate},
+			Payload: EmitNavigatePayload{
+				Target:       NavigateTargetResourceList,
+				ResourceType: c.session.PendingCommand,
+			},
+		})
+		c.session.CommandArmed = false
+		c.session.PendingCommand = ""
+	}
+
 	return intents, tasks
 }
 
@@ -104,6 +176,10 @@ func (c *Core) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetched)
 			ResourceType: shortName,
 			Count:        count,
 			Truncated:    msg.Truncated[shortName],
+			// DEF-6/C3: a prefetch is a synchronous LIVE count (demo /
+			// no-cache mode), not a disk-cache seed — origin is "verified"
+			// from the moment it lands, no separate probe confirms it.
+			Origin: OriginVerified,
 		})
 	}
 	// T034: wire issue counts from prefetch.
@@ -175,6 +251,12 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 			ResourceType: msg.ResourceType,
 			Count:        msg.Count,
 			Truncated:    msg.Truncated,
+			// DEF-6/C3: a live AvailabilityChecked result confirms this type
+			// this session — origin flips from "cache" (or unset) to
+			// "verified" regardless of whether the exactness guard in
+			// applyIntents' PatchMenuAvailability case ends up keeping the
+			// prior Count/Truncated.
+			Origin: OriginVerified,
 		})
 		// T032: wire issue counts from probe.
 		intents = append(intents, PatchMenu{
@@ -230,7 +312,14 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 	intents = append(intents, PatchMenuCheckProgress{Checked: 0, Total: 0}) // 0,0 = done
 	intents = append(intents, ClearFlash{})
 
-	tasks = append(tasks, TaskRequest{Key: TaskKey{Kind: TaskKindSaveCache}})
+	// DEF-7: snapshot ProbeResources/ProbeTruncated NOW, before startEnrichment
+	// (below) can mutate them via clearEnrichmentFor's clear-on-rerun-start
+	// step — see SaveCachePayload's doc comment for why dispatch-time capture
+	// is required here.
+	tasks = append(tasks, TaskRequest{
+		Key:     TaskKey{Kind: TaskKindSaveCache},
+		Payload: c.snapshotProbeResourcesForSave(),
+	})
 
 	enrichIntents, enrichTasks := c.startEnrichment()
 	intents = append(intents, enrichIntents...)
@@ -413,12 +502,110 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 	// All enrichment done — clear progress, free retained resources, save cache.
 	if c.session.EnrichChecked >= c.session.EnrichTotal {
 		intents = append(intents, PatchMenuEnrichProgress{Checked: 0, Total: 0})
+		// DEF-7: snapshot BEFORE freeing ProbeResources/ProbeTruncated below —
+		// this is the completion path that carries the FINAL Wave-2-enriched
+		// findings (applyEnrichment above already mutated r.Findings on every
+		// cached row of this type), so it must not be lost to the free.
+		saveSnapshot := c.snapshotProbeResourcesForSave()
 		c.session.ProbeResources = nil
 		c.session.ProbeTruncated = nil
-		tasks = append(tasks, TaskRequest{Key: TaskKey{Kind: TaskKindSaveCache}})
+		tasks = append(tasks, TaskRequest{
+			Key:     TaskKey{Kind: TaskKindSaveCache},
+			Payload: saveSnapshot,
+		})
 	}
 
 	return intents, tasks
+}
+
+// snapshotProbeResourcesForSave captures a deep-enough copy of
+// c.session.ProbeResources/ProbeTruncated for a TaskKindSaveCache dispatch —
+// DEF-7. Must be called BEFORE any subsequent same-call mutation of those
+// maps (clearEnrichmentFor's clear-on-rerun-start step, or the
+// free-on-enrichment-complete nil-out) so the eventual save sees the rows as
+// they stood at dispatch time, not as they stand whenever the task executes.
+//
+// A shallow map copy is NOT sufficient here: clearEnrichmentFor mutates each
+// resource.Resource IN PLACE (via ApplyWave2ToRow on &rows[i]) on the SAME
+// backing array a shallow []resource.Resource slice copy would still alias —
+// a plain maps.Copy of the outer map would still observe that later
+// in-place strip. Each per-type slice, each resource's Findings slice (the
+// field clearEnrichmentFor mutates), AND each resource's Fields map (the
+// field the later FieldUpdates enrichment step maps.Copy's INTO on the same
+// backing map — an aliased Fields map would let that later mutation corrupt
+// an already-dispatched snapshot) are copied element-by-element so the
+// snapshot is fully isolated from any later mutation of the live session
+// state.
+func (c *Core) snapshotProbeResourcesForSave() *SaveCachePayload {
+	if len(c.session.ProbeResources) == 0 {
+		return nil
+	}
+	resources := make(map[string][]resource.Resource, len(c.session.ProbeResources))
+	for shortName, rows := range c.session.ProbeResources {
+		cp := make([]resource.Resource, len(rows))
+		for i, r := range rows {
+			r.Findings = append([]domain.Finding(nil), r.Findings...)
+			if r.Fields != nil {
+				fields := make(map[string]string, len(r.Fields))
+				maps.Copy(fields, r.Fields)
+				r.Fields = fields
+			}
+			cp[i] = r
+		}
+		resources[shortName] = cp
+	}
+	truncated := make(map[string]bool, len(c.session.ProbeTruncated))
+	maps.Copy(truncated, c.session.ProbeTruncated)
+	return &SaveCachePayload{Resources: resources, Truncated: truncated}
+}
+
+// rowsFromCacheRows converts a per-type file's persisted Rows (ID/Name/Fields
+// + Findings, C6: no RawStruct, no color/glyph/status) into the
+// resource.Resource shape session.ProbeResources carries. Colors/glyphs/
+// status are intentionally NOT reconstructed here — buildListBody derives
+// them at render time from Fields + Findings via the same classification
+// rules live data uses (C6).
+//
+// row.Fields/row.Findings are copied rather than assigned by reference:
+// (*cache.Store).Type returns a TypeFile by value, but its Rows slice and
+// each Row's Fields map / Findings slice still alias the Store's own backing
+// data. Downstream mutators (ApplyWave2ToRow, the FieldUpdates maps.Copy in
+// handleEnrichmentChecked) write into the seeded ProbeResources rows this
+// function produces — an aliased Fields/Findings would let those writes
+// corrupt the in-memory Store the next save reads from.
+func rowsFromCacheRows(shortName string, rows []cache.Row) []resource.Resource {
+	out := make([]resource.Resource, len(rows))
+	for i, row := range rows {
+		var fields map[string]string
+		if row.Fields != nil {
+			fields = make(map[string]string, len(row.Fields))
+			maps.Copy(fields, row.Fields)
+		}
+		out[i] = resource.Resource{
+			ID:       row.ID,
+			Name:     row.Name,
+			Type:     shortName,
+			Fields:   fields,
+			Findings: append([]domain.Finding(nil), row.Findings...),
+		}
+	}
+	return out
+}
+
+// placeholderRows synthesizes count ID-only resource.Resource rows for a type
+// whose cached count is known but whose per-row disk data is unavailable
+// (e.g. a counts-only cache projection). Placeholder IDs are never shown to
+// the operator as real identifiers by themselves — the immediate live fetch
+// this seeding always accompanies (Refreshing=true) replaces them.
+func placeholderRows(shortName string, count int) []resource.Resource {
+	out := make([]resource.Resource, count)
+	for i := range out {
+		out[i] = resource.Resource{
+			ID:   fmt.Sprintf("%s-cached-%d", shortName, i),
+			Type: shortName,
+		}
+	}
+	return out
 }
 
 // unifiedIssueCount returns the distinct count of resource IDs with ≥1 issue

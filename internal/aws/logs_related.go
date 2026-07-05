@@ -94,10 +94,7 @@ func checkLogsKMS(_ context.Context, _ any, res resource.Resource, _ resource.Re
 	if !ok || lg.KmsKeyId == nil || *lg.KmsKeyId == "" {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
-	keyID := *lg.KmsKeyId
-	if idx := strings.LastIndex(keyID, "/"); idx >= 0 && idx < len(keyID)-1 {
-		keyID = keyID[idx+1:]
-	}
+	keyID := kmsKeyIDFromField(*lg.KmsKeyId, res.Type)
 	return relatedResult("kms", []string{keyID})
 }
 

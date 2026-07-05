@@ -1,0 +1,10 @@
+[default]
+output = json
+
+[profile role-no-region]
+role_arn = arn:aws:iam::555555555555:role/NoRegionRole
+source_profile = source-no-region
+output = json
+
+[profile source-no-region]
+output = json

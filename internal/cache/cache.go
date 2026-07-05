@@ -1,10 +1,20 @@
-// Package cache provides resource availability persistence for the a9s TUI.
-// It stores which resource types have resources in a per-profile+region YAML file
-// under ~/.a9s/cache/, enabling instant grey-out of empty resource types on startup.
+// Package cache provides per-profile+region, per-resource-type persistence
+// of what the menu and top-level list screens have learned from the AWS
+// API. See docs/design/cache-requirements.md for the full contract (C1-C10).
+//
+// Layout: one directory per profile+region pair
+// (<cache root>/<profile>--<region>/), containing one YAML file per resource
+// type (<shortName>.yaml). Loading the directory never fails — a missing
+// directory yields an empty Store, and an unreadable or wrong-version file is
+// skipped (one log line) without affecting sibling files (C7). Saving writes
+// ONLY the touched type's file via atomic temp+rename, so a session that only
+// touched one type physically cannot disturb another type's file.
 package cache
 
 import (
 	"fmt"
+	"log"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,54 +23,71 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/k2m30/a9s/v3/internal/domain"
-	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
-// DefaultTTL is the default cache expiration duration.
-const DefaultTTL = 1 * time.Hour
+// SchemaVersion is the current on-disk format marker. Every TypeFile's
+// Version field is stamped with this value on save (C7a: encode/decode is a
+// single chokepoint inside this package; a version bump only changes this
+// constant plus the encode/decode logic, never callers).
+const SchemaVersion = 1
 
-// CachedRow is a render-sufficient snapshot of one list row, persisted
-// alongside the type's availability Entry so a cold start can seed the list
-// screen with real cells before any live fetch completes. NO RawStruct is
-// carried on disk — Fields must already contain every value a column needs
-// (see app.MaterializeListFields, which runs before a page is cached).
-type CachedRow struct {
-	ID     string            `yaml:"id"`
-	Name   string            `yaml:"name,omitempty"`
-	Fields map[string]string `yaml:"fields,omitempty"`
+// Row is a render-sufficient snapshot of one list row, persisted alongside
+// the type's TypeFile so a cold start can seed the list screen with real
+// cells and issue markers before any live fetch completes.
+//
+// NO RawStruct, color, glyph, or status text is carried on disk (C6): Fields
+// must already contain every value a column needs (see
+// app.MaterializeListFields, which runs before a page is cached), and
+// colors/glyphs/status are derived at render time from Fields + Findings by
+// the same classification rules live data uses.
+type Row struct {
+	ID       string            `yaml:"id"`
+	Name     string            `yaml:"name,omitempty"`
+	Fields   map[string]string `yaml:"fields,omitempty"`
+	Findings []domain.Finding  `yaml:"findings,omitempty"`
 }
 
-// Entry holds availability info for a single resource type.
-type Entry struct {
-	HasResources    bool   `yaml:"has_resources"`
-	Count           int    `yaml:"count"`
-	Truncated       bool   `yaml:"truncated,omitempty"`
-	Error           string `yaml:"error,omitempty"`
-	Issues          int    `yaml:"issues,omitempty"`           // issue-state resource count (red/yellow only)
-	IssuesTruncated bool   `yaml:"issues_truncated,omitempty"` // true if issue count is lower bound
-	IssuesKnown     bool   `yaml:"issues_known,omitempty"`     // true = probed (even if Issues=0); false = unknown
+// TypeFile is the on-disk, self-contained state for one resource type within
+// one profile+region pair. Version MUST stay the first field (C7a: a future
+// encrypted format is detected by this marker before the rest of the file is
+// parsed).
+type TypeFile struct {
+	Version int `yaml:"version"`
 
-	// Rows holds the last first-page rows for this type (ID/Name/Fields,
-	// NO RawStruct) so a cold-start list open can seed real cells before the
-	// live fetch completes. Best-effort: absent on older cache files.
-	Rows []CachedRow `yaml:"rows,omitempty"`
-	// Findings holds the last Wave-2 enrichment findings map for this type,
-	// keyed by resource ID, persisted alongside Rows so a cold-start seed
-	// also carries issue markers instead of rendering rows as unconditionally
-	// healthy until enrichment re-runs.
-	Findings map[string]domain.Finding `yaml:"findings,omitempty"`
+	HasResources bool `yaml:"has_resources"`
+	Count        int  `yaml:"count"`
+	Exact        bool `yaml:"exact,omitempty"`
+
+	Issues          int  `yaml:"issues,omitempty"`
+	IssuesKnown     bool `yaml:"issues_known,omitempty"`
+	IssuesTruncated bool `yaml:"issues_truncated,omitempty"`
+
+	Rows []Row `yaml:"rows,omitempty"`
+
+	SavedAt time.Time `yaml:"saved_at"`
 }
 
-// File is the on-disk cache structure.
-type File struct {
-	Profile   string           `yaml:"profile"`
-	Region    string           `yaml:"region"`
-	CheckedAt time.Time        `yaml:"checked_at"`
-	Resources map[string]Entry `yaml:"resources"`
+// Dir returns the cache directory path for one profile+region pair:
+// <cache root>/<profile>--<region>/. Reuses the profile/region filename
+// sanitation from the previous single-file layout (replace path separators
+// and spaces with underscores).
+func Dir(profile, region string) string {
+	root := cacheRoot()
+	if root == "" {
+		return ""
+	}
+	safe := func(s string) string {
+		s = strings.ReplaceAll(s, "/", "_")
+		s = strings.ReplaceAll(s, "\\", "_")
+		s = strings.ReplaceAll(s, " ", "_")
+		return s
+	}
+	return filepath.Join(root, safe(profile)+"--"+safe(region))
 }
 
-// Dir returns the cache directory path (~/.a9s/cache/).
-func Dir() string {
+// cacheRoot returns the cache root directory (~/.a9s/cache/), honoring the
+// A9S_CONFIG_FOLDER override used by tests.
+func cacheRoot() string {
 	if folder := os.Getenv("A9S_CONFIG_FOLDER"); folder != "" {
 		return filepath.Join(folder, "cache")
 	}
@@ -70,86 +97,139 @@ func Dir() string {
 	return ""
 }
 
-// Path returns the full path to the cache file for a profile+region combination.
-// Uses double-dash separator: <profile>--<region>.yaml
-func Path(profile, region string) string {
-	dir := Dir()
-	if dir == "" {
-		return ""
+// Store holds the in-memory, loaded state of every resource type's TypeFile
+// for one profile+region pair. Obtained via LoadDir; Put stages a type's new
+// state, SaveType persists exactly that one type's file.
+type Store struct {
+	profile string
+	region  string
+	types   map[string]TypeFile
+}
+
+// LoadDir loads every readable, current-version type file under
+// Dir(profile, region) into memory and returns a Store. Never fails: a
+// missing directory yields an empty (non-nil) Store; an unreadable or
+// wrong-version file is skipped (one log line) without affecting the other
+// files' load (C7).
+func LoadDir(profile, region string) *Store {
+	s := &Store{
+		profile: profile,
+		region:  region,
+		types:   make(map[string]TypeFile),
 	}
-	// Sanitize profile/region for filenames (replace / and spaces)
-	safe := func(s string) string {
-		s = strings.ReplaceAll(s, "/", "_")
-		s = strings.ReplaceAll(s, "\\", "_")
-		s = strings.ReplaceAll(s, " ", "_")
+
+	dir := Dir(profile, region)
+	if dir == "" {
 		return s
 	}
-	return filepath.Join(dir, safe(profile)+"--"+safe(region)+".yaml")
-}
 
-// Load reads and parses the cache file for the given profile+region.
-// Returns (nil, nil) if the file does not exist.
-// Returns (nil, err) if the file exists but cannot be parsed.
-func Load(profile, region string) (*File, error) {
-	p := Path(profile, region)
-	if p == "" {
-		return nil, nil
-	}
-	data, err := os.ReadFile(p)
+	entries, err := os.ReadDir(dir)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
+		// Missing (or otherwise unreadable) directory: "no cache" for every
+		// type. Not an error condition per C1/C7 — a fresh pair has no
+		// history yet.
+		return s
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
 		}
-		return nil, fmt.Errorf("reading cache %s: %w", p, err)
-	}
-	if len(data) == 0 {
-		return nil, nil
-	}
-	var f File
-	if err := yaml.Unmarshal(data, &f); err != nil {
-		return nil, fmt.Errorf("parsing cache %s: %w", p, err)
-	}
-	// Strip resource keys that are not in the registry. This guards against
-	// stale cache files from older versions containing unknown type keys.
-	// Both ShortNames and Aliases are valid keys (aliases allow old cache files
-	// written under a previous name to survive gracefully).
-	if len(f.Resources) > 0 {
-		known := make(map[string]bool)
-		for _, rt := range resource.AllResourceTypes() {
-			known[rt.ShortName] = true
-			for _, alias := range rt.Aliases {
-				known[alias] = true
-			}
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".yaml") {
+			continue
 		}
-		for key := range f.Resources {
-			if !known[key] {
-				delete(f.Resources, key)
-			}
+		shortName := strings.TrimSuffix(name, ".yaml")
+		path := filepath.Join(dir, name)
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			log.Printf("cache: skipping %s: %v", path, err)
+			continue
 		}
+		if len(data) == 0 {
+			log.Printf("cache: skipping %s: empty file", path)
+			continue
+		}
+		var tf TypeFile
+		if err := yaml.Unmarshal(data, &tf); err != nil {
+			log.Printf("cache: skipping %s: %v", path, err)
+			continue
+		}
+		if tf.Version != SchemaVersion {
+			log.Printf("cache: skipping %s: unsupported schema version %d (want %d)", path, tf.Version, SchemaVersion)
+			continue
+		}
+		s.types[shortName] = tf
 	}
-	return &f, nil
+
+	return s
 }
 
-// Save writes the cache file to disk, creating the cache directory if needed.
-func Save(f *File) error {
-	if f == nil {
-		return nil
+// Type returns the loaded (or since-Put) TypeFile for shortName.
+func (s *Store) Type(shortName string) (TypeFile, bool) {
+	tf, ok := s.types[shortName]
+	return tf, ok
+}
+
+// Types returns every currently-known TypeFile, keyed by resource short
+// name. The returned map is a snapshot copy — callers may not mutate the
+// Store through it.
+func (s *Store) Types() map[string]TypeFile {
+	out := make(map[string]TypeFile, len(s.types))
+	maps.Copy(out, s.types)
+	return out
+}
+
+// Put stages tf as shortName's current state, stamping Version and (when tf
+// carries a zero-valued SavedAt — the normal case for every caller except a
+// deliberate backdate/round-trip) SavedAt=now. A caller that explicitly sets
+// a non-zero SavedAt before calling Put (e.g. to preserve a prior save's
+// timestamp across a re-Put) has that value honored as-is — C1 requires no
+// TTL / age-based discard, so nothing downstream depends on SavedAt being
+// "now"; this only avoids clobbering a caller-supplied value. Does not touch
+// disk — call SaveType to persist.
+func (s *Store) Put(shortName string, tf TypeFile) {
+	tf.Version = SchemaVersion
+	if tf.SavedAt.IsZero() {
+		tf.SavedAt = time.Now()
 	}
-	p := Path(f.Profile, f.Region)
-	if p == "" {
-		return fmt.Errorf("cannot determine cache path")
+	s.types[shortName] = tf
+}
+
+// SaveType atomically writes shortName's current staged state (as set by
+// Put) to its own file — <dir>/<shortName>.yaml — via a temp file in the same
+// directory followed by rename. No other type's file is opened or touched
+// (C7: per-type files, no merge logic). The directory is created (0700) if
+// missing; the written file is 0600.
+func (s *Store) SaveType(shortName string) error {
+	tf, ok := s.types[shortName]
+	if !ok {
+		return fmt.Errorf("cache: SaveType(%s): no staged state (call Put first)", shortName)
 	}
-	dir := filepath.Dir(p)
+
+	dir := Dir(s.profile, s.region)
+	if dir == "" {
+		return fmt.Errorf("cache: cannot determine cache directory")
+	}
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return fmt.Errorf("creating cache directory %s: %w", dir, err)
 	}
-	data, err := yaml.Marshal(f)
-	if err != nil {
-		return fmt.Errorf("marshaling cache: %w", err)
+	// Enforce 0700 even on a pre-existing directory (C7b). gosec's G302 rule
+	// flags any Chmod call expecting file-oriented (<=0600) permissions; 0700
+	// is the correct, more-restrictive owner-only mode for a DIRECTORY (needs
+	// the execute bit to remain traversable by its owner), not a file.
+	if err := os.Chmod(dir, 0700); err != nil { //nolint:gosec // 0700 is correct for a directory, not a file
+		return fmt.Errorf("setting permissions on cache directory %s: %w", dir, err)
 	}
-	// Use CreateTemp so concurrent Save calls (two a9s processes, or two goroutines
-	// targeting the same profile/region) don't race on a shared temp path.
-	tmpFile, err := os.CreateTemp(dir, filepath.Base(p)+".tmp.*")
+
+	data, err := yaml.Marshal(tf)
+	if err != nil {
+		return fmt.Errorf("marshaling cache type %s: %w", shortName, err)
+	}
+
+	path := filepath.Join(dir, shortName+".yaml")
+	tmpFile, err := os.CreateTemp(dir, shortName+".yaml.tmp.*")
 	if err != nil {
 		return fmt.Errorf("creating cache temp file in %s: %w", dir, err)
 	}
@@ -163,18 +243,13 @@ func Save(f *File) error {
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("closing cache %s: %w", tmpPath, err)
 	}
-	if err := os.Rename(tmpPath, p); err != nil {
+	if err := os.Chmod(tmpPath, 0600); err != nil {
 		_ = os.Remove(tmpPath)
-		return fmt.Errorf("renaming cache %s: %w", p, err)
+		return fmt.Errorf("setting permissions on cache %s: %w", tmpPath, err)
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("renaming cache %s: %w", path, err)
 	}
 	return nil
-}
-
-// IsExpired returns true if the cache is older than the given TTL,
-// or if CheckedAt is zero (never set).
-func (f *File) IsExpired(ttl time.Duration) bool {
-	if f == nil || f.CheckedAt.IsZero() {
-		return true
-	}
-	return time.Since(f.CheckedAt) > ttl
 }

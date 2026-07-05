@@ -17,7 +17,7 @@ import (
 // gone, so a regression here would break keyboard related-navigation.
 func TestSelectedRelatedRow_SourcesIDsFromControllerState(t *testing.T) {
 	res := fakeEC2Resources()[0]
-	c := newControllerAtDetail(res, "ec2")
+	c := newControllerAtDetail(t, res, "ec2")
 
 	c.ApplyDetailRelated([]app.DetailRelatedRow{
 		{

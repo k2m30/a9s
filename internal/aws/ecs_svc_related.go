@@ -201,7 +201,12 @@ func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.RelatedCheckResult{TargetType: "elb", Count: 0}
 	}
 
-	// Step 4: match ELB ARNs against the ELB cache.
+	// Step 4: match ELB ARNs against the ELB cache. LoadBalancerArn — not the
+	// LB name (res.ID) — is the join key: elbTargetGroup.LoadBalancerArns[]
+	// carries full ARNs, so matching against elbRes.ID (the LB name) never
+	// hits. The elb fetcher populates Fields["load_balancer_arn"]; RawStruct
+	// is the fallback for cache-restored rows that predate the field or lost
+	// it to a stale replay.
 	elbList, truncatedELB, err := ecsSvcRelatedResources(ctx, clients, cache, "elb")
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "elb", Count: -1, Err: err}
@@ -212,7 +217,16 @@ func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cac
 
 	var ids []string
 	for _, elbRes := range elbList {
-		if _, found := elbARNs[elbRes.ID]; found {
+		arn := elbRes.Fields["load_balancer_arn"]
+		if arn == "" {
+			if raw, ok := assertStruct[elbv2types.LoadBalancer](elbRes.RawStruct); ok && raw.LoadBalancerArn != nil {
+				arn = *raw.LoadBalancerArn
+			}
+		}
+		if arn == "" {
+			continue
+		}
+		if _, found := elbARNs[arn]; found {
 			ids = append(ids, elbRes.ID)
 		}
 	}

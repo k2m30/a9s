@@ -103,11 +103,10 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		}, nil
 
 	// --- enrichment probe (Wave 2) ---
-	// Renderer-neutral coupling resolved: gate on c.isDemo instead of m.isDemo.
+	// Demo clients are real *awsclient.ServiceClients backed by typed fakes
+	// (internal/demo.NewServiceClients), so Wave-2 enrichers run against them
+	// exactly as they run against live AWS clients — no demo-mode skip here.
 	case TaskKindProbeEnrich:
-		if c.isDemo {
-			return nil, nil
-		}
 		shortName := req.Key.Scope
 		if !c.HasIssueEnricher(shortName) {
 			return nil, nil
@@ -129,24 +128,53 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		}, nil
 
 	// --- save availability cache ---
-	// Renderer-neutral coupling resolved: derive entries from c.session.ResourceCache
-	// instead of reading from m.stack[0] (MainMenuModel). The TUI adapter's
-	// saveAvailabilityCache() continues to use the more precise MainMenuModel
-	// counts for the live TUI; this path serves non-TUI hosts.
+	// Single save path for both renderers: TUI and web both route
+	// TaskKindSaveCache through this executor case, so availability counts
+	// and per-type rows/findings persist identically regardless of host.
+	// Entries derive from c.session.ResourceCache rather than any
+	// renderer-local model state (e.g. MainMenuModel), keeping this path
+	// renderer-neutral.
 	case TaskKindSaveCache:
 		if snap.NoCache {
 			return nil, nil
 		}
-		entries, truncated, issueCounts, issueTruncated, issueKnown := c.availabilityFromResourceCache()
-		if entries == nil {
-			return nil, nil
+		var flashErr error
+		// DEF-7/C7/C8: an availability-sweep + Wave-2 enrichment completion
+		// must persist that type's per-row rows/findings (SaveResourceListCache)
+		// WITHOUT requiring any list screen to have been opened — mirrors the
+		// list-open persistence path (app.Controller.maybeSaveResourceListCache)
+		// but is driven from the dispatch-time snapshot the caller captured via
+		// SaveCachePayload (see its doc comment for why dispatch-time capture,
+		// not a live session read, is required), falling back to a live read of
+		// c.session.ProbeResources for any nil-Payload dispatch. C6 scope:
+		// ProbeResources IS this session's canonical top-level population for
+		// each type — the same rows a fresh list-open would seed from.
+		//
+		// Runs BEFORE SaveAvailabilityCache (order matters): both calls write
+		// tf.Issues for the same type, and SaveAvailabilityCache's issueKnown
+		// branch is the one with access to the fuller ResourceCache-derived
+		// aggregate — it must run second so it either overwrites with that
+		// exact aggregate (issueKnown) or carries forward the rows/issues this
+		// call just persisted via existing.Issues/existing.Rows (not known).
+		// The reverse order let the row-derived, potentially-incomplete count
+		// computed here unconditionally clobber a more accurate aggregate.
+		saveResources, saveTruncated := c.session.ProbeResources, c.session.ProbeTruncated
+		if p, ok := req.Payload.(*SaveCachePayload); ok && p != nil {
+			saveResources, saveTruncated = p.Resources, p.Truncated
 		}
-		err := c.SaveAvailabilityCache(
-			snap.Profile, snap.Region,
-			entries, truncated, issueCounts, issueTruncated, issueKnown,
-		)
-		if err != nil {
-			return messages.Flash{Text: fmt.Sprintf("cache save: %v", err), IsError: true}, nil
+		if err := c.saveProbeResourcesToTypeFiles(saveResources, saveTruncated); err != nil {
+			flashErr = err
+		}
+		entries, truncated, issueCounts, issueTruncated, issueKnown := c.availabilityFromResourceCache()
+		if entries != nil {
+			if err := c.SaveAvailabilityCache(
+				entries, truncated, issueCounts, issueTruncated, issueKnown,
+			); err != nil && flashErr == nil {
+				flashErr = err
+			}
+		}
+		if flashErr != nil {
+			return messages.Flash{Text: fmt.Sprintf("cache save: %v", flashErr), IsError: true}, nil
 		}
 		return nil, nil
 
@@ -175,14 +203,14 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 
 	// --- load on-disk availability cache ---
 	case TaskKindLoadAvailCache:
-		cf, err := c.LoadAvailabilityCache(snap.Profile, snap.Region)
-		if err != nil || cf == nil {
+		store := c.LoadAvailabilityCache()
+		if store == nil {
 			return messages.AvailabilityCacheLoaded{
 				Entries: make(map[string]int),
 				Expired: true,
 			}, nil
 		}
-		return cacheFileToEvent(cf), nil
+		return cacheStoreToEvent(store), nil
 
 	// --- demo prefetch ---
 	case TaskKindDemoPrefetchCounts:
@@ -258,6 +286,33 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		res, err := c.FetchResources(ctx, snap.Clients, resourceType)
 		if err != nil && len(res.Resources) == 0 {
 			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen}, nil
+		}
+		// C1: a verify-refetch must verify the content actually being shown,
+		// not just page 1 — so page up to the previously-cached depth. C5: a
+		// truncated first page must never downgrade a stored exact total;
+		// without this loop a 55-row cached/exact list would silently swap
+		// down to a 50-row truncated one. Bounded by CachedListDepth so this
+		// never fetches deeper than what was already shown.
+		for err == nil && res.Pagination != nil && res.Pagination.IsTruncated &&
+			res.Pagination.NextToken != "" && len(res.Resources) < c.CachedListDepth(resourceType) {
+			var more resource.FetchResult
+			more, err = c.FetchMoreResources(ctx, snap.Clients, FetchMoreParams{
+				ResourceType: resourceType,
+				Token:        res.Pagination.NextToken,
+			})
+			if err != nil {
+				break
+			}
+			if len(more.Resources) == 0 {
+				// A zero-progress page (hostile/buggy pagination: a NextToken
+				// that keeps returning empty pages) must terminate the loop —
+				// len(res.Resources) never grows past this point, so the
+				// CachedListDepth bound above would otherwise spin forever.
+				res.Pagination = more.Pagination
+				break
+			}
+			res.Resources = append(res.Resources, more.Resources...)
+			res.Pagination = more.Pagination
 		}
 		return messages.ResourcesLoaded{
 			ResourceType: resourceType,
@@ -412,7 +467,15 @@ func (c *Core) availabilityFromResourceCache() (
 			continue
 		}
 		entries[rt] = len(entry.Resources)
-		isTrunc := entry.Pagination != nil && entry.Pagination.IsTruncated
+		// C5: a nil Pagination means this entry's truncation state was never
+		// observed (e.g. a partial/legacy cache write) — treat as unknown,
+		// which must NOT be conflated with a genuine "not truncated"
+		// observation. Unknown truncation is conservatively truncated so a
+		// downstream Exact-count derivation (SaveAvailabilityCache) never
+		// promotes an unobserved page-1-shaped count to Exact (DEF-18
+		// mechanism B: a false Exact=true silently downgraded a real exact
+		// 55 to a false exact 50 and then dropped the stored Rows).
+		isTrunc := entry.Pagination == nil || entry.Pagination.IsTruncated
 		if isTrunc {
 			truncated[rt] = true
 			issueTruncated[rt] = true
@@ -434,26 +497,113 @@ func (c *Core) availabilityFromResourceCache() (
 	return
 }
 
-// cacheFileToEvent converts a *cache.File into a messages.AvailabilityCacheLoaded
-// event. Mirrors the conversion logic in probe_adapter.go loadAvailabilityCache.
-func cacheFileToEvent(cf *cache.File) messages.AvailabilityCacheLoaded {
-	entries := make(map[string]int, len(cf.Resources))
+// saveProbeResourcesToTypeFiles persists probeResources — a snapshot (or, for
+// a nil-Payload dispatch, a live read) of the availability sweep's (and
+// Wave-2 enrichment's) retained per-type rows, findings included — to each
+// type's on-disk file via SaveResourceListCache. DEF-7/C7/C8: this is the
+// sweep-completion counterpart to app.Controller.maybeSaveResourceListCache,
+// which only runs when a list screen has been opened; this path lets that
+// same per-type persistence happen from a background sweep alone, so a
+// corrupt/missing type file self-heals on the next sweep rather than only on
+// the next list visit.
+//
+// No-op when probeResources is empty (nothing retained — e.g. mid-sweep with
+// no completions yet, or every probe failed). Best-effort per type: a save
+// failure for one type does not prevent the others from being attempted: the
+// first error is returned to the caller (mirrors SaveAvailabilityCache's
+// firstErr convention), matching every other cache-write call site's
+// best-effort posture.
+func (c *Core) saveProbeResourcesToTypeFiles(probeResources map[string][]resource.Resource, probeTruncated map[string]bool) error {
+	if len(probeResources) == 0 {
+		return nil
+	}
+	var firstErr error
+	for shortName, resources := range probeResources {
+		// Item A (owner decision): every renderable list column — including
+		// Path-based ones like s3's Region — must be cached, driven by the
+		// column config, not hardcoded per type. The sweep lane builds
+		// cache.Row directly from r.Fields, which a Path-based column never
+		// populates unless materialized first; the list-open lane
+		// (app.Controller.maybeSaveResourceListCache) already runs this via
+		// materializeListFieldsForType — mirror it here so both save seams
+		// persist the same column set.
+		resources = materializeListFieldsForSave(shortName, resources)
+		rows := make([]cache.Row, len(resources))
+		for i, r := range resources {
+			rows[i] = cache.Row{
+				ID:       r.ID,
+				Name:     r.Name,
+				Fields:   r.Fields,
+				Findings: r.Findings,
+			}
+		}
+		truncated := probeTruncated[shortName]
+		exact := !truncated
+		td := resource.FindResourceType(shortName)
+		issuesKnown := td != nil && !td.ExcludeFromIssueBadge
+		issues := 0
+		if issuesKnown {
+			issues = unifiedIssueCount(resources, *td, nil)
+		}
+		if err := c.SaveResourceListCache(shortName, rows, len(resources), exact, issues, issuesKnown, truncated); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
+}
+
+// CacheStoreToEvent converts a *cache.Store's loaded per-type files into a
+// messages.AvailabilityCacheLoaded event carrying the counts-only projection
+// (Entries/Truncated/IssueCounts/IssueTruncated/IssueKnown). Row/Findings data
+// stays in the Store itself — handleAvailabilityCacheLoaded reads it directly
+// via Core.CacheStore()/EnsureCacheStore() to seed session.ProbeResources, so
+// it is not duplicated onto this event. Exported so renderer adapters (e.g.
+// the TUI's tea.Cmd-based loadAvailabilityCache) share this single
+// conversion instead of re-deriving it.
+//
+// Expired is always false: C1 is a deliberate no-TTL contract — arbitrarily
+// old rows render as long as they are stale-marked (Refreshing) and
+// re-verification is already running. The field is retained for message-shape
+// stability only; no production code branches on it.
+func CacheStoreToEvent(store *cache.Store) messages.AvailabilityCacheLoaded {
+	if store == nil {
+		// Mirrors the TaskKindLoadAvailCache case above: a nil store (no
+		// cache loaded for this pair) is "no knowledge yet", not a panic.
+		return messages.AvailabilityCacheLoaded{
+			Entries: make(map[string]int),
+			Expired: true,
+		}
+	}
+	return cacheStoreToEvent(store)
+}
+
+func cacheStoreToEvent(store *cache.Store) messages.AvailabilityCacheLoaded {
+	types := store.Types()
+	entries := make(map[string]int, len(types))
 	truncated := make(map[string]bool)
 	issueCounts := make(map[string]int)
 	issueTruncated := make(map[string]bool)
 	issueKnown := make(map[string]bool)
-	for name, entry := range cf.Resources {
-		if entry.Error != "" {
+	for name, tf := range types {
+		// A completely zero-value TypeFile (never Put with any real
+		// probe/fetch data — HasResources false, Count 0, no issues known, no
+		// rows) carries no observation to report. Excluding it here mirrors
+		// the pre-round-2 cache.Entry.Error-string exclusion and C1's "never
+		// 0" placeholder rule: a genuinely-observed empty type still reports
+		// Count=0 through this same path, but only once something has
+		// actually Put it (HasResources/Count/IssuesKnown/Rows all zero at
+		// once is the "nothing was ever recorded" signature).
+		if !tf.HasResources && tf.Count == 0 && !tf.IssuesKnown && len(tf.Rows) == 0 {
 			continue
 		}
-		entries[name] = entry.Count
-		if entry.Truncated {
+		entries[name] = tf.Count
+		if !tf.Exact {
 			truncated[name] = true
 		}
-		if entry.IssuesKnown {
-			issueCounts[name] = entry.Issues
+		if tf.IssuesKnown {
+			issueCounts[name] = tf.Issues
 			issueKnown[name] = true
-			if entry.IssuesTruncated {
+			if tf.IssuesTruncated {
 				issueTruncated[name] = true
 			}
 		}
@@ -461,7 +611,7 @@ func cacheFileToEvent(cf *cache.File) messages.AvailabilityCacheLoaded {
 	return messages.AvailabilityCacheLoaded{
 		Entries:        entries,
 		Truncated:      truncated,
-		Expired:        cf.IsExpired(cache.DefaultTTL),
+		Expired:        false,
 		IssueCounts:    issueCounts,
 		IssueTruncated: issueTruncated,
 		IssueKnown:     issueKnown,

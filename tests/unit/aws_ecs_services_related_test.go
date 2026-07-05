@@ -7,8 +7,8 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cfntypes "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
-	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	cloudtrailtypes "github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
+	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
@@ -1468,9 +1468,13 @@ func TestRelated_ECSSvc_ELB_FoundViaTG(t *testing.T) {
 			LoadBalancerArns: []string{elbARN},
 		},
 	}
+	// elb.go's fetcher assigns ID: lbName (bare name, not ARN) — the checker
+	// per ecs-svc.md:66 must cross-reference by Fields["load_balancer_arn"],
+	// not by matching the bare ID against the full LoadBalancerArns ARN.
 	elbRes := resource.Resource{
-		ID:   elbARN,
-		Name: "api-alb",
+		ID:     "api-alb",
+		Name:   "api-alb",
+		Fields: map[string]string{"load_balancer_arn": elbARN},
 	}
 	cache := resource.ResourceCache{
 		"tg":  resource.ResourceCacheEntry{Resources: []resource.Resource{tgRes}},
@@ -1493,8 +1497,8 @@ func TestRelated_ECSSvc_ELB_FoundViaTG(t *testing.T) {
 	if result.Count != 1 {
 		t.Errorf("Count = %d, want 1", result.Count)
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != elbARN {
-		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs, elbARN)
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "api-alb" {
+		t.Errorf("ResourceIDs = %v, want [api-alb]", result.ResourceIDs)
 	}
 }
 
@@ -1532,10 +1536,12 @@ func TestRelated_ECSSvc_ELB_TGInCacheButNoELBMatch(t *testing.T) {
 			LoadBalancerArns: []string{elbARN},
 		},
 	}
-	// ELB cache has only a different ELB
+	// ELB cache has only a different ELB — matched by Fields["load_balancer_arn"]
+	// per ecs-svc.md:66, not by bare ID.
 	elbRes := resource.Resource{
-		ID:   otherELBARN,
-		Name: "other-alb",
+		ID:     "other-alb",
+		Name:   "other-alb",
+		Fields: map[string]string{"load_balancer_arn": otherELBARN},
 	}
 	cache := resource.ResourceCache{
 		"tg":  resource.ResourceCacheEntry{Resources: []resource.Resource{tgRes}},

@@ -119,22 +119,34 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 		if res.Kind == runtime.NavigateKindPushResourceListCached && res.CachedEntry != nil {
 			c.applyResourcesLoaded(top.State.List, res.ResolvedType, res.CachedEntry.Resources, res.CachedEntry.Pagination, false)
 			top.State.List.Refreshing = true
+			// Item B/DEF-21: set AFTER applyResourcesLoaded, same ordering as
+			// Refreshing above — applyResourcesLoaded unconditionally clears
+			// TotalCount as part of every fetch-result landing (including this
+			// seed call itself).
+			if res.CachedEntry.TotalCount > 0 {
+				top.State.List.TotalCount = res.CachedEntry.TotalCount
+			}
 			return []runtime.TaskRequest{{
 				Key:   runtime.TaskKey{Kind: runtime.KindFetchResources, Scope: res.ResolvedType},
 				Cache: runtime.CacheNone,
 			}}
 		}
 		// Cache miss (NavigateKindPushResourceList): HandleNavigate already
-		// emits the KindFetchResources task. Seed from session.ProbeResources
-		// (first-page rows retained by the availability probe, or replayed
-		// from the on-disk availability cache at startup) when present, so the
-		// list still renders instantly instead of falling back to the
-		// no-rows-known Loading=true path ensureListState already applied.
-		if res.Kind == runtime.NavigateKindPushResourceList {
-			if rows := c.core.Session().ProbeResources[res.ResolvedType]; len(rows) > 0 {
-				c.applyResourcesLoaded(top.State.List, res.ResolvedType, rows, nil, false)
-				top.State.List.Loading = false
-				top.State.List.Refreshing = true
+		// emits the KindFetchResources task. HandleNavigate attaches CachedEntry
+		// on this Kind too, seeded from session.ProbeResources (first-page rows
+		// retained by the availability probe, or replayed from the on-disk
+		// availability cache at startup) — C1/C5: render what you know, verify
+		// on sight. Consume it here the same way the cache-hit branch above
+		// does, so the list still renders instantly instead of falling back to
+		// the no-rows-known Loading=true path ensureListState already applied.
+		if res.Kind == runtime.NavigateKindPushResourceList && res.CachedEntry != nil {
+			c.applyResourcesLoaded(top.State.List, res.ResolvedType, res.CachedEntry.Resources, res.CachedEntry.Pagination, false)
+			top.State.List.Loading = false
+			top.State.List.Refreshing = true
+			// Item B/DEF-21: same set-after-seed ordering as the cache-hit branch
+			// above.
+			if res.CachedEntry.TotalCount > 0 {
+				top.State.List.TotalCount = res.CachedEntry.TotalCount
 			}
 		}
 
@@ -153,8 +165,25 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 		// Use lock-free variants — applyNavResult is always called while c.mu
 		// is already held by Apply or Handle.
 		c.ensureDetailState(*res.Resource, res.ResolvedType)
+		var tasks []runtime.TaskRequest
 		if res.DispatchRelated {
 			c.initDetailRelatedRows(res.ResolvedType)
+			// Populate the related panel: replay the related cache if present
+			// (D6: no re-fan-out over cached data — replayRelatedCache is the
+			// single source of truth for the hit path, shared with the TUI
+			// adapter's NavigateKindPushDetail case in
+			// runtime_adapter_navigate.go); otherwise dispatch a KindRelatedCheck
+			// task so DrainSync/the web renderer run the checkers headlessly.
+			if len(resource.GetRelated(res.ResolvedType)) > 0 && !c.replayRelatedCache(res.ResolvedType, *res.Resource) {
+				if ds := c.topDetailState(); ds != nil {
+					src := *res.Resource
+					tasks = append(tasks, runtime.TaskRequest{
+						Key:     runtime.TaskKey{Kind: runtime.KindRelatedCheck, Scope: res.ResolvedType + "/" + src.ID},
+						Cache:   runtime.CacheNone,
+						Payload: runtime.RelatedCheckPayload{ResourceType: res.ResolvedType, Resource: src},
+					})
+				}
+			}
 		}
 		if res.DispatchEnrich {
 			// Mirrors the TUI adapter's handleEnrichDetail: the runtime is the
@@ -168,8 +197,9 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 				ResourceType: res.ResolvedType,
 				Resource:     *res.Resource,
 			})
-			return enrichTasks
+			tasks = append(tasks, enrichTasks...)
 		}
+		return tasks
 
 	case runtime.NavigateKindPushYAML:
 		if res.Resource == nil {
@@ -207,6 +237,74 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 		// Tasks are returned by Apply's ActionReveal branch directly.
 	}
 	return nil
+}
+
+// ApplyEmitNavigate is the headless/web counterpart of the TUI adapter's
+// emitNavigateCmd (internal/tui/runtime_adapter.go): it resolves a
+// TaskKindEmitNavigate task's EmitNavigatePayload into the equivalent
+// Controller navigation, instead of the payload only reaching the TUI's
+// tea.Msg pipeline. TaskKindEmitNavigate is adapter-only from
+// Core.ExecuteTask's perspective (ErrAdapterOnlyTask) — DrainSync* calls
+// this method for that one kind instead of executing it, so the one-shot
+// -c/ActionCommand navigation armed by HandleClientsReady and dispatched by
+// handleAvailabilityCacheLoaded (DEF-14/D11) actually lands on the headless
+// stack the same way it lands on the TUI's view stack.
+func (c *Controller) ApplyEmitNavigate(p runtime.EmitNavigatePayload) []runtime.TaskRequest {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{
+		Target:       p.Target,
+		ResourceType: p.ResourceType,
+	})
+	tasks = append(tasks, c.applyNavResult(res)...)
+	return tasks
+}
+
+// ReplayRelatedCache populates the related panel for the top detail screen
+// matching (resourceType, res.ID) from any cached RelatedCacheResult entries,
+// merging them directly into RelatedRows. Returns true when a cache hit was
+// replayed (the caller must NOT also dispatch a fan-out check — D6: no
+// re-fan-out over cached data) and false when the type has no registered
+// related defs, no matching detail screen is on top of the stack, or the
+// cache misses (the caller is responsible for dispatching the fan-out check
+// via its own platform-specific path — TUI: messages.RelatedCheckStarted;
+// headless/web: a KindRelatedCheck TaskRequest).
+//
+// Exported so the TUI adapter's NavigateKindPushDetail handling
+// (runtime_adapter_navigate.go) can share this replay instead of carrying
+// its own copy — the headless/web callers reach the same logic via
+// applyNavResult's NavigateKindPushDetail case (lock-free, under Apply/Handle's
+// already-held c.mu).
+func (c *Controller) ReplayRelatedCache(resourceType string, res resource.Resource) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.replayRelatedCache(resourceType, res)
+}
+
+// replayRelatedCache is the lock-free implementation of ReplayRelatedCache.
+// Callers must hold c.mu (write).
+func (c *Controller) replayRelatedCache(resourceType string, res resource.Resource) bool {
+	if len(resource.GetRelated(resourceType)) == 0 {
+		return false
+	}
+	ds := c.topDetailState()
+	if ds == nil {
+		return false
+	}
+	ck := runtime.RelatedCacheKey(resourceType, res.ID)
+	cached, hit := c.core.RelatedCacheGet(ck)
+	if !hit || len(cached) == 0 {
+		return false
+	}
+	for _, entry := range cached {
+		errMsg := ""
+		if entry.Result.Err != nil {
+			errMsg = entry.Result.Err.Error()
+		}
+		mergeDetailRelatedRow(ds, entry.DefDisplayName, entry.Result.TargetType,
+			entry.Result.Count, false, errMsg, entry.Result.Approximate, entry.Result.ResourceIDs, entry.Result.FetchFilter)
+	}
+	return true
 }
 
 // dispatchRelatedNavigate calls HandleRelatedNavigate then applyRelatedNavResult
@@ -398,4 +496,3 @@ func (c *Controller) applyRelatedNavResult(res runtime.NavigationResult) []runti
 	}
 	return nil
 }
-

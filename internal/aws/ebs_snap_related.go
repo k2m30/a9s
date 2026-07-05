@@ -5,8 +5,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/backup"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
@@ -88,42 +86,62 @@ func checkEBSSnapKMS(_ context.Context, _ any, res resource.Resource, _ resource
 	return relatedResult("kms", []string{keyID})
 }
 
-// checkEBSSnapBackup calls backup:ListRecoveryPointsByResource with the
-// snapshot's ARN and returns the recovery-point ARNs. Pattern C.
-// Snapshot ARN: arn:aws:ec2:REGION::snapshot/SNAP-ID (no account segment).
-func checkEBSSnapBackup(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	snapID := res.ID
-	if snapID == "" {
+// checkEBSSnapBackup scans this snapshot's own Description and Tags for the
+// AWS Backup signature (Description prefix "Created by AWS Backup" or the
+// auto-tag "aws:backup:source-resource", whose value is the source
+// resource's ARN) per docs/resources/ebs-snap.md — no direct field on
+// Snapshot points at a Backup plan. Once the signature is found, the source
+// ARN is cross-referenced against the already-loaded backup cache's
+// Fields["resources"] (the ARN list every plan's selections cover — already
+// joined by the backup fetcher for sibling pivots) to resolve the owning
+// plan(s). Zero extra calls.
+func checkEBSSnapBackup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	description := ""
+	sourceARN := ""
+	if snap, ok := assertStruct[ec2types.Snapshot](res.RawStruct); ok {
+		if snap.Description != nil {
+			description = *snap.Description
+		}
+		for _, tag := range snap.Tags {
+			if tag.Key != nil && *tag.Key == "aws:backup:source-resource" && tag.Value != nil {
+				sourceARN = *tag.Value
+				break
+			}
+		}
+	}
+	isBackupCreated := strings.HasPrefix(description, "Created by AWS Backup") || sourceARN != ""
+	if !isBackupCreated {
+		// No RawStruct, or no Backup signature in Description/Tags — the
+		// parent's own fields definitively rule out coverage; not a
+		// truncated-cache situation.
 		return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
 	}
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil || c.Backup == nil {
+	if sourceARN == "" {
+		// Backup-created signature confirmed via Description alone, but no
+		// source-resource ARN to cross-reference against plan selections —
+		// honestly unresolvable to a specific plan.
 		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
 	}
-	region := regionFromEnv()
-	if region == "" {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
-	}
-	snapARN := "arn:aws:ec2:" + region + "::snapshot/" + snapID
-	api, ok := c.Backup.(BackupListRecoveryPointsByResourceAPI)
-	if !ok {
-		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
-	}
-	out, err := api.ListRecoveryPointsByResource(ctx, &backup.ListRecoveryPointsByResourceInput{
-		ResourceArn: aws.String(snapARN),
-	})
+
+	backupList, truncated, err := ebsSnapRelatedResources(ctx, clients, cache, "backup")
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "backup", Count: -1, Err: err}
 	}
+	if backupList == nil {
+		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
+	}
+
 	var ids []string
-	for _, rp := range out.RecoveryPoints {
-		if rp.RecoveryPointArn == nil {
-			continue
+	for _, planRes := range backupList {
+		for arn := range strings.SplitSeq(planRes.Fields["resources"], ",") {
+			if arn != "" && arn == sourceARN {
+				ids = append(ids, planRes.ID)
+				break
+			}
 		}
-		arn := *rp.RecoveryPointArn
-		if _, after, ok := strings.Cut(arn, ":recovery-point:"); ok {
-			ids = append(ids, after)
-		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.ApproximateZero("backup")
 	}
 	return relatedResult("backup", ids)
 }

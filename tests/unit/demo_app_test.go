@@ -382,17 +382,26 @@ func TestDemoMode_RefreshReturnsSameData(t *testing.T) {
 // 8. TestNonDemoMode_Unchanged
 // ---------------------------------------------------------------------------
 
+// TestNonDemoMode_Unchanged pins that non-demo mode still initiates a live
+// AWS connect (messages.InitConnect), not a demo handshake
+// (messages.ClientsReady). Updated for DEF-13: Init() on the live
+// (no-pre-supplied-clients) path now returns tea.Batch(connectCmd, seedCmd)
+// instead of a bare connectCmd, so the InitConnect message must be located by
+// walking the returned cmd tree (extractMsg, already defined in this file)
+// rather than asserting cmd() produces InitConnect directly.
 func TestNonDemoMode_Unchanged(t *testing.T) {
 	t.Parallel()
 	model := tui.New("", "")
 	cmd := model.Init()
 	if cmd == nil {
-		t.Fatal("Init() returned nil cmd; expected InitConnectMsg")
+		t.Fatal("Init() returned nil cmd; expected a cmd tree containing InitConnectMsg")
 	}
-	msg := cmd()
-	_, ok := msg.(messages.InitConnect)
-	if !ok {
-		t.Fatalf("Init() produced %T; expected messages.InitConnect", msg)
+	msg := extractMsg(t, cmd, func(m tea.Msg) bool {
+		_, ok := m.(messages.InitConnect)
+		return ok
+	})
+	if _, ok := msg.(messages.InitConnect); !ok {
+		t.Fatalf("extractMsg returned %T; expected messages.InitConnect", msg)
 	}
 }
 

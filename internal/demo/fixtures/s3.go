@@ -29,6 +29,22 @@ const (
 	S3BucketKMSKeyID = "a9s-demo-s3-key"
 	// S3CFNStackName is the CloudFormation stack that owns the healthy bucket.
 	S3CFNStackName = "a9s-demo-stack"
+	// ManagedKeyBucketName is encrypted with the AWS-managed `aws/s3` default
+	// key, reported by GetBucketEncryption as the full alias ARN
+	// "arn:aws:kms:...:alias/aws/s3" — the exact shape that caused the
+	// pre-fix truncation bug (kmsKeyIDFromField naively took the last "/"
+	// segment, "s3", the resource's own type name). kmsKeyIDFromField now
+	// strips only the region/account ARN prefix up to ":alias/" itself
+	// (keeping the literal ":" separator), so checkS3KMS returns the alias
+	// name whole — AWSManagedS3KeyID below, "alias/aws/s3" — matching real
+	// AWS DescribeKey semantics where an alias-style KeyId is always
+	// prefixed with "alias/".
+	ManagedKeyBucketName = "a9s-demo-managed-kms"
+	// AWSManagedS3KeyID is the alias-style KeyId checkS3KMS returns for the
+	// account's default S3-managed key ("alias/aws/s3"). DescribeKey accepts
+	// this value directly as a KeyId, so the fake's Keys map is indexed by
+	// it verbatim to mirror that AWS behavior.
+	AWSManagedS3KeyID = "alias/aws/s3"
 )
 
 // S3Fixtures holds all S3 domain objects served by the fake.
@@ -129,6 +145,10 @@ func buildS3Buckets() []s3types.Bucket {
 		// acme-reporting cluster has S3-logging enabled with destination = RedshiftAuditBucket.
 		// DescribeLoggingStatus for acme-reporting returns BucketName=RedshiftAuditBucket.
 		{RedshiftAuditBucket, "arn:aws:s3:::" + RedshiftAuditBucket, "us-east-1", "2025-07-22T14:00:00+00:00"},
+		// Healthy: encrypted with the AWS-managed `aws/s3` key reported as a
+		// full alias ARN — the exact shape that caused the pre-fix KMS
+		// truncation bug (checkS3KMS / kmsKeyIDFromField).
+		{ManagedKeyBucketName, "arn:aws:s3:::" + ManagedKeyBucketName, "us-east-1", "2025-08-01T09:00:00+00:00"},
 	}
 
 	// Named legacy buckets with objects.
@@ -260,6 +280,26 @@ func buildS3EncryptionConfigs() map[string]*s3.GetBucketEncryptionOutput {
 			Rules: []s3types.ServerSideEncryptionRule{kmsRule},
 		},
 	}
+
+	// AWS-managed `aws/s3` default key, reported as a full alias ARN —
+	// the shape that caused the pre-fix truncation bug (checkS3KMS /
+	// kmsKeyIDFromField naively split on the last "/", yielding "s3" —
+	// the resource's own type name — instead of the alias-style key ID
+	// "alias/aws/s3").
+	managedKeyARN := "arn:aws:kms:us-east-1:123456789012:" + AWSManagedS3KeyID
+	managedKeyRule := s3types.ServerSideEncryptionRule{
+		ApplyServerSideEncryptionByDefault: &s3types.ServerSideEncryptionByDefault{
+			SSEAlgorithm:   s3types.ServerSideEncryptionAwsKms,
+			KMSMasterKeyID: aws.String(managedKeyARN),
+		},
+		BucketKeyEnabled: aws.Bool(false),
+	}
+	managedKeyOut := &s3.GetBucketEncryptionOutput{
+		ServerSideEncryptionConfiguration: &s3types.ServerSideEncryptionConfiguration{
+			Rules: []s3types.ServerSideEncryptionRule{managedKeyRule},
+		},
+	}
+
 	return map[string]*s3.GetBucketEncryptionOutput{
 		// Graph-root healthy bucket uses a dedicated CMK.
 		HealthyBucketName: kmsOut,
@@ -270,6 +310,7 @@ func buildS3EncryptionConfigs() map[string]*s3.GetBucketEncryptionOutput {
 		"a9s-demo-partial-pab":   kmsOut,
 		"a9s-demo-multifail-pab": kmsOut,
 		"a9s-demo-nilcfg":        kmsOut,
+		ManagedKeyBucketName:     managedKeyOut,
 	}
 }
 

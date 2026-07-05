@@ -364,7 +364,13 @@ func (m *MainMenuModel) RenderBody(body app.MenuBody) string {
 		}
 
 		dimAlias := styles.DimText.Render(aliasPadded)
-		if item.AvailKnown && item.Availability == 0 && !item.AvailTruncated {
+		// DEF-6/C3: a disk-cache-seeded, not-yet-re-verified count (Origin ==
+		// "cache") dims the same as a confirmed-empty entry — both are "not
+		// yet a confirmed answer this session" states the operator should be
+		// able to tell apart from a verified one at a glance.
+		confirmedEmpty := item.AvailKnown && item.Availability == 0 && !item.AvailTruncated
+		cacheOrigin := item.Origin == "cache"
+		if confirmedEmpty || cacheOrigin {
 			sb.WriteString(styles.DimText.Render("    "+namePadded+" ") + dimAlias)
 		} else {
 			sb.WriteString(styles.RowNormal.Render("    "+namePadded+" ") + dimAlias)

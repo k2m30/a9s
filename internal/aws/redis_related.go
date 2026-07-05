@@ -216,10 +216,7 @@ func checkRedisKMS(_ context.Context, _ any, res resource.Resource, _ resource.R
 	if rg.KmsKeyId == nil || *rg.KmsKeyId == "" {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}
-	keyID := *rg.KmsKeyId
-	if idx := strings.LastIndex(keyID, "/"); idx >= 0 && idx < len(keyID)-1 {
-		keyID = keyID[idx+1:]
-	}
+	keyID := kmsKeyIDFromField(*rg.KmsKeyId, res.Type)
 	return relatedResult("kms", []string{keyID})
 }
 

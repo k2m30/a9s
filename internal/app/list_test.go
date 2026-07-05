@@ -49,7 +49,20 @@ import (
 
 // newListController builds a Controller and navigates to a ScreenResourceList
 // for typeName via ActionCommand. After this call topListState() is non-nil.
-func newListController(typeName string) *app.Controller {
+//
+// A9S_CONFIG_FOLDER is redirected to a fresh t.TempDir() per call (not just
+// per test binary run) so the disk-store fallback HandleNavigate now
+// consults (DEF-15) cannot leak rows between tests that share the same
+// "demo"/"us-east-1" profile/region pair — a per-package-run shared temp dir
+// was tried and rejected: every newListController(t, "ec2") call in the package
+// would still read/write the SAME demo--us-east-1/ec2.yaml file, so an
+// earlier test's persisted rows silently seeded a later test's supposedly
+// pristine "fresh list, still Loading" precondition (observed as
+// TestController_APIErrorClearsListLoadingAndFlashes' precondition check
+// failing only in a full-package run, never in isolation).
+func newListController(t *testing.T, typeName string) *app.Controller {
+	t.Helper()
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	s := session.New()
 	s.Profile = "demo"
 	s.Region = "us-east-1"
@@ -60,7 +73,11 @@ func newListController(typeName string) *app.Controller {
 }
 
 // newBaseController builds a Controller on the menu root (no list screen).
-func newBaseController() *app.Controller {
+// See newListController's doc comment for why A9S_CONFIG_FOLDER is
+// redirected per-call rather than once per package run.
+func newBaseController(t *testing.T) *app.Controller {
+	t.Helper()
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	s := session.New()
 	s.Profile = "demo"
 	s.Region = "us-east-1"
@@ -182,7 +199,7 @@ func pad4(n int) string {
 // ─────────────────────────────────────────────────────────────────────────────
 
 func TestApplyResourcesLoaded_EC2_StoresNRows(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	resources := fakeEC2Resources()
 	c.ApplyResourcesLoaded("ec2", resources, nil, false)
 
@@ -198,7 +215,7 @@ func TestApplyResourcesLoaded_EC2_StoresNRows(t *testing.T) {
 }
 
 func TestApplyResourcesLoaded_S3_StoresNRows(t *testing.T) {
-	c := newListController("s3")
+	c := newListController(t, "s3")
 	resources := fakeS3Resources()
 	c.ApplyResourcesLoaded("s3", resources, nil, false)
 
@@ -214,7 +231,7 @@ func TestApplyResourcesLoaded_S3_StoresNRows(t *testing.T) {
 }
 
 func TestApplyResourcesLoaded_ReplacesCache(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	single := fakeEC2Resources()[:1]
 	c.ApplyResourcesLoaded("ec2", single, nil, false)
@@ -229,7 +246,7 @@ func TestApplyResourcesLoaded_ReplacesCache(t *testing.T) {
 }
 
 func TestApplyResourcesLoaded_AppendMode(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	all := fakeEC2Resources()
 	c.ApplyResourcesLoaded("ec2", all[:2], nil, false)
 	c.ApplyResourcesLoaded("ec2", all[2:], nil, true)
@@ -241,7 +258,7 @@ func TestApplyResourcesLoaded_AppendMode(t *testing.T) {
 }
 
 func TestApplyResourcesLoaded_CellCountMatchesColumns(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 
 	lb := listBodyOrFail(t, c)
@@ -264,7 +281,7 @@ func TestApplyResourcesLoaded_CellCountMatchesColumns(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 func TestListFilter_MatchingRowsOnly(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	c.Apply(app.Action{Kind: app.ActionSetFilter, Arg: "web-server"})
 
@@ -281,7 +298,7 @@ func TestListFilter_MatchingRowsOnly(t *testing.T) {
 }
 
 func TestListFilter_NoMatchProducesZeroRows(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	c.Apply(app.Action{Kind: app.ActionSetFilter, Arg: "xyzzy-no-match-at-all"})
 
@@ -292,7 +309,7 @@ func TestListFilter_NoMatchProducesZeroRows(t *testing.T) {
 }
 
 func TestListFilter_EmptyFilterShowsAll(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	resources := fakeEC2Resources()
 	c.ApplyResourcesLoaded("ec2", resources, nil, false)
 	c.Apply(app.Action{Kind: app.ActionSetFilter, Arg: "web-server"})
@@ -305,7 +322,7 @@ func TestListFilter_EmptyFilterShowsAll(t *testing.T) {
 }
 
 func TestListFilter_ResetsSelectedRow(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	c.Apply(app.Action{Kind: app.ActionMoveDown})
 	c.Apply(app.Action{Kind: app.ActionMoveDown})
@@ -321,7 +338,7 @@ func TestListFilter_ResetsSelectedRow(t *testing.T) {
 }
 
 func TestListFilter_S3_MatchesBucketName(t *testing.T) {
-	c := newListController("s3")
+	c := newListController(t, "s3")
 	c.ApplyResourcesLoaded("s3", fakeS3Resources(), nil, false)
 	c.Apply(app.Action{Kind: app.ActionSetFilter, Arg: "acme-cdn"})
 
@@ -339,7 +356,7 @@ func TestListFilter_S3_MatchesBucketName(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 func TestListSort_FirstSortSetsAsc(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	c.Apply(app.Action{Kind: app.ActionSort, Arg: "name"})
 
@@ -353,7 +370,7 @@ func TestListSort_FirstSortSetsAsc(t *testing.T) {
 }
 
 func TestListSort_SecondSortSameColTogglesToDesc(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	c.Apply(app.Action{Kind: app.ActionSort, Arg: "name"})
 	c.Apply(app.Action{Kind: app.ActionSort, Arg: "name"})
@@ -365,7 +382,7 @@ func TestListSort_SecondSortSameColTogglesToDesc(t *testing.T) {
 }
 
 func TestListSort_ThirdSortTogglesBackToAsc(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	c.Apply(app.Action{Kind: app.ActionSort, Arg: "name"})
 	c.Apply(app.Action{Kind: app.ActionSort, Arg: "name"})
@@ -378,7 +395,7 @@ func TestListSort_ThirdSortTogglesBackToAsc(t *testing.T) {
 }
 
 func TestListSort_DifferentColResetsToAsc(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	c.Apply(app.Action{Kind: app.ActionSort, Arg: "name"})
 	c.Apply(app.Action{Kind: app.ActionSort, Arg: "name"}) // desc
@@ -394,7 +411,7 @@ func TestListSort_DifferentColResetsToAsc(t *testing.T) {
 }
 
 func TestListSort_RowsOrderedAscByName(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	c.Apply(app.Action{Kind: app.ActionSort, Arg: "name"})
 
@@ -412,7 +429,7 @@ func TestListSort_RowsOrderedAscByName(t *testing.T) {
 }
 
 func TestListSort_RowsOrderedDescByName(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	c.Apply(app.Action{Kind: app.ActionSort, Arg: "name"})
 	c.Apply(app.Action{Kind: app.ActionSort, Arg: "name"}) // desc
@@ -431,7 +448,7 @@ func TestListSort_RowsOrderedDescByName(t *testing.T) {
 }
 
 func TestListSort_ResetsSelectedRow(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	c.Apply(app.Action{Kind: app.ActionMoveDown})
 	c.Apply(app.Action{Kind: app.ActionMoveDown})
@@ -447,7 +464,7 @@ func TestListSort_ResetsSelectedRow(t *testing.T) {
 }
 
 func TestListSort_EmptyArgIsNoop(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	c.Apply(app.Action{Kind: app.ActionSort, Arg: "name"})
 	c.Apply(app.Action{Kind: app.ActionSort, Arg: ""}) // no-op
@@ -466,7 +483,7 @@ func TestListSort_EmptyArgIsNoop(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 func TestListAttention_OnlyRowsWithIssueFindingsVisible(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	resources := []resource.Resource{
 		{ID: "i-healthy", Fields: map[string]string{"state": "running", "instance_id": "i-healthy"}},
 		{
@@ -502,7 +519,7 @@ func TestListAttention_OnlyRowsWithIssueFindingsVisible(t *testing.T) {
 }
 
 func TestListAttention_EmptyWhenNoIssues(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	// All running — no issue color, no findings.
 	resources := []resource.Resource{
 		{ID: "i-x1", Fields: map[string]string{"instance_id": "i-x1", "state": "running"}},
@@ -518,7 +535,7 @@ func TestListAttention_EmptyWhenNoIssues(t *testing.T) {
 }
 
 func TestListAttention_ToggleOffRestoresAll(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	resources := fakeEC2Resources()
 	c.ApplyResourcesLoaded("ec2", resources, nil, false)
 	c.Apply(app.Action{Kind: app.ActionToggleAttention})
@@ -534,7 +551,7 @@ func TestListAttention_ToggleOffRestoresAll(t *testing.T) {
 }
 
 func TestListAttention_ResetsSelectedRow(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	resources := []resource.Resource{
 		{ID: "i-a", Fields: map[string]string{"instance_id": "i-a", "state": "running"}},
 		{
@@ -565,7 +582,7 @@ func TestListAttention_ResetsSelectedRow(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 func TestRelatedIDSet_FiltersToMatchingIDs(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	c.PatchListRelatedIDSet([]string{"i-0aaa111111111111a", "i-0bbb222222222222b"})
 
@@ -581,7 +598,7 @@ func TestRelatedIDSet_FiltersToMatchingIDs(t *testing.T) {
 }
 
 func TestRelatedIDSet_UnknownIDHidesAll(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	c.PatchListRelatedIDSet([]string{"i-does-not-exist"})
 
@@ -592,7 +609,7 @@ func TestRelatedIDSet_UnknownIDHidesAll(t *testing.T) {
 }
 
 func TestRelatedIDSet_NilClearsFilter(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	resources := fakeEC2Resources()
 	c.ApplyResourcesLoaded("ec2", resources, nil, false)
 	c.PatchListRelatedIDSet([]string{"i-0aaa111111111111a"})
@@ -609,7 +626,7 @@ func TestRelatedIDSet_NilClearsFilter(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 func TestListAction_MoveDown_IncrementsCursor(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	c.Apply(app.Action{Kind: app.ActionMoveDown})
 	if got := c.GetListSelectedRow(); got != 1 {
@@ -622,7 +639,7 @@ func TestListAction_MoveDown_IncrementsCursor(t *testing.T) {
 }
 
 func TestListAction_MoveDown_ClampsAtLastRow(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	resources := fakeEC2Resources()
 	c.ApplyResourcesLoaded("ec2", resources, nil, false)
 	n := len(resources)
@@ -635,7 +652,7 @@ func TestListAction_MoveDown_ClampsAtLastRow(t *testing.T) {
 }
 
 func TestListAction_MoveUp_DecrementsCursor(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	c.Apply(app.Action{Kind: app.ActionMoveDown})
 	c.Apply(app.Action{Kind: app.ActionMoveDown})
@@ -646,7 +663,7 @@ func TestListAction_MoveUp_DecrementsCursor(t *testing.T) {
 }
 
 func TestListAction_MoveUp_ClampsAtZero(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	c.Apply(app.Action{Kind: app.ActionMoveUp})
 	c.Apply(app.Action{Kind: app.ActionMoveUp})
@@ -656,7 +673,7 @@ func TestListAction_MoveUp_ClampsAtZero(t *testing.T) {
 }
 
 func TestListAction_MoveTop_JumpsToFirst(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	c.Apply(app.Action{Kind: app.ActionMoveDown})
 	c.Apply(app.Action{Kind: app.ActionMoveDown})
@@ -667,7 +684,7 @@ func TestListAction_MoveTop_JumpsToFirst(t *testing.T) {
 }
 
 func TestListAction_MoveBottom_JumpsToLast(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	resources := fakeEC2Resources()
 	c.ApplyResourcesLoaded("ec2", resources, nil, false)
 	c.Apply(app.Action{Kind: app.ActionMoveBottom})
@@ -678,7 +695,7 @@ func TestListAction_MoveBottom_JumpsToLast(t *testing.T) {
 }
 
 func TestListAction_MoveBottom_EmptyList_NoPanic(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -693,7 +710,7 @@ func TestListAction_MoveBottom_EmptyList_NoPanic(t *testing.T) {
 }
 
 func TestListAction_PageDown_MovesRows(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	c.Apply(app.Action{Kind: app.ActionPageDown, N: 2})
 	if got := c.GetListSelectedRow(); got != 2 {
@@ -702,7 +719,7 @@ func TestListAction_PageDown_MovesRows(t *testing.T) {
 }
 
 func TestListAction_PageDown_ClampsAtLastRow(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	resources := fakeEC2Resources()
 	c.ApplyResourcesLoaded("ec2", resources, nil, false)
 	c.Apply(app.Action{Kind: app.ActionPageDown, N: 100})
@@ -712,7 +729,7 @@ func TestListAction_PageDown_ClampsAtLastRow(t *testing.T) {
 }
 
 func TestListAction_PageUp_DecreasesRows(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	c.Apply(app.Action{Kind: app.ActionMoveBottom})
 	c.Apply(app.Action{Kind: app.ActionPageUp, N: 1})
@@ -722,7 +739,7 @@ func TestListAction_PageUp_DecreasesRows(t *testing.T) {
 }
 
 func TestListAction_PageUp_ClampsAtZero(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	c.Apply(app.Action{Kind: app.ActionPageUp, N: 100})
 	if got := c.GetListSelectedRow(); got != 0 {
@@ -731,7 +748,7 @@ func TestListAction_PageUp_ClampsAtZero(t *testing.T) {
 }
 
 func TestListAction_ScrollRight_IncreasesScrollX(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	c.Apply(app.Action{Kind: app.ActionScrollRight})
 	if got := c.GetListScrollX(); got != 1 {
@@ -744,7 +761,7 @@ func TestListAction_ScrollRight_IncreasesScrollX(t *testing.T) {
 }
 
 func TestListAction_ScrollLeft_DecreasesScrollX(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	c.Apply(app.Action{Kind: app.ActionScrollRight})
 	c.Apply(app.Action{Kind: app.ActionScrollRight})
@@ -755,7 +772,7 @@ func TestListAction_ScrollLeft_DecreasesScrollX(t *testing.T) {
 }
 
 func TestListAction_ScrollLeft_ClampsAtZero(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	c.Apply(app.Action{Kind: app.ActionScrollLeft})
 	c.Apply(app.Action{Kind: app.ActionScrollLeft})
@@ -765,7 +782,7 @@ func TestListAction_ScrollLeft_ClampsAtZero(t *testing.T) {
 }
 
 func TestListAction_SetFilter_SetsFilter(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	c.Apply(app.Action{Kind: app.ActionSetFilter, Arg: "cache"})
 	if got := c.GetListFilter(); got != "cache" {
@@ -777,7 +794,7 @@ func TestListAction_SetFilter_SetsFilter(t *testing.T) {
 }
 
 func TestListAction_ToggleAttention_FlipsFlag(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	if c.GetListAttentionOnly() {
 		t.Fatal("precondition: AttentionOnly should start false")
@@ -797,7 +814,7 @@ func TestListAction_ToggleAttention_FlipsFlag(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 func TestListSelected_ReturnsResourceAtCursor(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	resources := fakeEC2Resources()
 	c.ApplyResourcesLoaded("ec2", resources, nil, false)
 
@@ -820,7 +837,7 @@ func TestListSelected_ReturnsResourceAtCursor(t *testing.T) {
 }
 
 func TestListSelected_EmptyList_ReturnsFalse(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -835,7 +852,7 @@ func TestListSelected_EmptyList_ReturnsFalse(t *testing.T) {
 }
 
 func TestListSelected_AfterFilter_ReturnsFilteredResource(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	c.Apply(app.Action{Kind: app.ActionSetFilter, Arg: "db-server"})
 
@@ -849,7 +866,7 @@ func TestListSelected_AfterFilter_ReturnsFilteredResource(t *testing.T) {
 }
 
 func TestListSelected_NoListScreen_ReturnsFalse(t *testing.T) {
-	c := newBaseController()
+	c := newBaseController(t)
 	r, ok := c.ListSelected()
 	if ok {
 		t.Errorf("ListSelected on menu screen: ok should be false, got %q", r.ID)
@@ -861,7 +878,7 @@ func TestListSelected_NoListScreen_ReturnsFalse(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 func TestPagination_TruncatedFlagPropagates(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	pagination := &resource.PaginationMeta{
 		IsTruncated: true,
 		NextToken:   "tok-next-page",
@@ -881,7 +898,7 @@ func TestPagination_TruncatedFlagPropagates(t *testing.T) {
 }
 
 func TestPagination_NotTruncated(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), &resource.PaginationMeta{IsTruncated: false}, false)
 
 	lb := listBodyOrFail(t, c)
@@ -894,7 +911,7 @@ func TestPagination_NotTruncated(t *testing.T) {
 }
 
 func TestPagination_NilMetaClearsPagination(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), &resource.PaginationMeta{IsTruncated: true, NextToken: "tok"}, false)
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 
@@ -908,7 +925,7 @@ func TestPagination_NilMetaClearsPagination(t *testing.T) {
 }
 
 func TestPagination_AppendAccumulatesCount(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	all := fakeEC2Resources()
 	c.ApplyResourcesLoaded("ec2", all[:2], &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-2"}, false)
 	c.ApplyResourcesLoaded("ec2", all[2:], &resource.PaginationMeta{IsTruncated: false}, true)
@@ -927,7 +944,7 @@ func TestPagination_AppendAccumulatesCount(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 func TestEnrichment_FindingsInBody(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	c.ApplyEnrichmentState("ec2", 1, false, map[string]domain.Finding{
 		"i-0bbb222222222222b": {Code: "ec2.stopped", Phrase: "instance stopped", Severity: domain.SevWarn},
@@ -950,7 +967,7 @@ func TestEnrichment_FindingsInBody(t *testing.T) {
 }
 
 func TestEnrichment_BrokenRowHasDecoratorError(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", []resource.Resource{
 		{ID: "i-0aaa111111111111a", Name: "web-server", Type: "ec2",
 			Fields: map[string]string{"instance_id": "i-0aaa111111111111a", "state": "running"}},
@@ -969,7 +986,7 @@ func TestEnrichment_BrokenRowHasDecoratorError(t *testing.T) {
 }
 
 func TestEnrichment_WarnRowHasDecoratorWarning(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", []resource.Resource{
 		{ID: "i-0bbb222222222222b", Name: "db-server", Type: "ec2",
 			Fields: map[string]string{"instance_id": "i-0bbb222222222222b", "state": "running"}},
@@ -988,7 +1005,7 @@ func TestEnrichment_WarnRowHasDecoratorWarning(t *testing.T) {
 }
 
 func TestEnrichment_AttentionFilterIncludesEnrichmentRows(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	resources := []resource.Resource{
 		{ID: "i-0aaa111111111111a", Name: "web-server", Type: "ec2",
 			Fields: map[string]string{"instance_id": "i-0aaa111111111111a", "state": "running"}},
@@ -1011,7 +1028,7 @@ func TestEnrichment_AttentionFilterIncludesEnrichmentRows(t *testing.T) {
 }
 
 func TestEnrichment_TypeIsolation(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	c.ApplyEnrichmentState("ec2", 1, false, map[string]domain.Finding{
 		"i-0aaa111111111111a": {Code: "test.x", Phrase: "broken", Severity: domain.SevBroken},
@@ -1033,7 +1050,7 @@ func TestEnrichment_TypeIsolation(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 func TestListFrameTitle_LoadingState_NonEmpty(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	// No resources loaded — Loading=true.
 	title := c.ListFrameTitle()
 	if title == "" {
@@ -1042,7 +1059,7 @@ func TestListFrameTitle_LoadingState_NonEmpty(t *testing.T) {
 }
 
 func TestListFrameTitle_ShowsCountAfterLoad(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	title := c.ListFrameTitle()
 	if title == "" {
@@ -1063,7 +1080,7 @@ func TestListFrameTitle_ShowsCountAfterLoad(t *testing.T) {
 }
 
 func TestListFrameTitle_NoListScreen_ReturnsEmpty(t *testing.T) {
-	c := newBaseController()
+	c := newBaseController(t)
 	if title := c.ListFrameTitle(); title != "" {
 		t.Errorf("ListFrameTitle on menu screen: got %q want empty", title)
 	}
@@ -1074,7 +1091,7 @@ func TestListFrameTitle_NoListScreen_ReturnsEmpty(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 func TestListBody_EmptyCache_NoPanic(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	var lb *app.ListBody
 	func() {
 		defer func() {
@@ -1090,7 +1107,7 @@ func TestListBody_EmptyCache_NoPanic(t *testing.T) {
 }
 
 func TestListBody_SingleResource(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources()[:1], nil, false)
 	lb := listBodyOrFail(t, c)
 	if len(lb.Rows) != 1 {
@@ -1099,7 +1116,7 @@ func TestListBody_SingleResource(t *testing.T) {
 }
 
 func TestListBody_LargeList_NoPanic(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	large := make([]resource.Resource, 1000)
 	for i := range large {
 		large[i] = resource.Resource{
@@ -1137,7 +1154,7 @@ func TestListActions_NoPanicOnMenuScreen(t *testing.T) {
 	for _, a := range actions {
 		a := a
 		t.Run(string(a.Kind), func(t *testing.T) {
-			c := newBaseController()
+			c := newBaseController(t)
 			func() {
 				defer func() {
 					if r := recover(); r != nil {
@@ -1151,7 +1168,7 @@ func TestListActions_NoPanicOnMenuScreen(t *testing.T) {
 }
 
 func TestGetters_NoListScreen_ReturnZeroValues(t *testing.T) {
-	c := newBaseController()
+	c := newBaseController(t)
 	if col, dir := c.GetListSort(); col != "" || dir != "" {
 		t.Errorf("GetListSort on menu: got col=%q dir=%q want both empty", col, dir)
 	}
@@ -1191,7 +1208,7 @@ func TestGetters_NoListScreen_ReturnZeroValues(t *testing.T) {
 //   - Pop back to screen 1.
 //   - Assert: top screen (screen 1) shows rows A (not B), with correct count.
 func TestBug1_PerScreenRowStorage_SameTypeStackedScreensAreIndependent(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 
 	// Screen 1: load full row set A.
 	rowsA := fakeEC2Resources() // 3 items
@@ -1243,7 +1260,7 @@ func TestBug1_PerScreenRowStorage_SameTypeStackedScreensAreIndependent(t *testin
 // pointed past the end and ListSelected returned (Resource{}, false) even
 // though buildListBody rendered a highlighted last row.
 func TestBug2_ListSelected_ClampsWhenVisibleShrinks(t *testing.T) {
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	resources := fakeEC2Resources() // 3 rows
 	c.ApplyResourcesLoaded("ec2", resources, nil, false)
 
@@ -1293,7 +1310,7 @@ func TestBug3_SortUsesViewConfig_CustomSortKeyApplied(t *testing.T) {
 		},
 	}
 
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 	c.SetViewConfig(vc)
 
 	// Resources with numeric scores stored in Fields["score"].  Lexicographic
@@ -1353,7 +1370,7 @@ func TestBug3_SortUsesViewConfig_CustomSortKeyApplied(t *testing.T) {
 func TestHandleResourcesLoaded_StackedSameType_DoesNotCorruptUnderlyingList(t *testing.T) {
 	// Step 1: build controller on an ec2 list screen (screen 1) and give it
 	// 3 rows via the real Handle path.
-	c := newListController("ec2")
+	c := newListController(t, "ec2")
 
 	rowsA := fakeEC2Resources() // 3 distinct instances
 
@@ -1451,7 +1468,7 @@ func fakeRDSResource() resource.Resource {
 // TestHandleResourcesLoaded_StackedSameType_RDS confirms the fix is not
 // ec2-specific: the same topmost-only delivery must hold for rds lists.
 func TestHandleResourcesLoaded_StackedSameType_RDS(t *testing.T) {
-	c := newListController("rds")
+	c := newListController(t, "rds")
 
 	underlying := []resource.Resource{fakeRDSResource()}
 	_, _ = c.Handle(messages.ResourcesLoaded{ //nolint:ineffassign,staticcheck // return values not needed here

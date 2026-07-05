@@ -98,8 +98,18 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		}
 		// Sync m.ctrl stack before constructing the transient view so
 		// topListState() inside NewResourceListFromCache resolves to this
-		// screen's ListState.
-		m.ctrl.PushChildListScreen(canon)
+		// screen's ListState. This is a top-level, menu-driven list — pushed as
+		// ScreenResourceList (not PushChildListScreen's ScreenChildList, which
+		// is reserved for actual child/related lists, see list_state.go's
+		// "persist-eligible" contract). Using ScreenChildList here silently
+		// disabled item A's C6 disk-cache save gate
+		// (maybeSaveResourceListCache checks screen.ID == ScreenResourceList)
+		// for every top-level TUI list (item A / DEF-21).
+		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{
+			ID:      runtime.ScreenResourceList,
+			Context: runtime.ScreenContext{ResourceType: canon},
+		}})
+		m.ctrl.EnsureListState()
 		rl := views.NewResourceListFromCache(
 			*rt, m.viewConfig, m.keys,
 			entry.Resources, entry.Pagination,
@@ -134,9 +144,47 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 			}
 		}
 		// Sync m.ctrl stack before constructing the transient view so
-		// topListState() inside NewResourceList resolves to this screen's ListState.
-		m.ctrl.PushChildListScreen(canon)
-		rl := views.NewResourceList(*rt, m.viewConfig, m.keys, m.ctrl)
+		// topListState() inside NewResourceList/NewResourceListFromCache
+		// resolves to this screen's ListState. Top-level, menu-driven list —
+		// see the ScreenResourceList-not-ScreenChildList note on the
+		// NavigateKindPushResourceListCached branch above (item A / DEF-21).
+		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{
+			ID:      runtime.ScreenResourceList,
+			Context: runtime.ScreenContext{ResourceType: canon},
+		}})
+		m.ctrl.EnsureListState()
+		var rl views.ResourceListModel
+		var initCmd tea.Cmd
+		if result.CachedEntry != nil {
+			// C1/Goal 4 (DEF-12): HandleNavigate attached a synthetic seed from
+			// session.ProbeResources/ProbeTruncated on this cache-miss branch —
+			// build the list the same way the PushResourceListCached case does
+			// (no loading shell, no spinner) so warm list-open renders instantly.
+			// The fetch task below (already emitted by HandleNavigate for every
+			// PushResourceList result) still runs to verify/replace the seeded
+			// rows — render what you know, verify on sight.
+			entry := result.CachedEntry
+			rl = views.NewResourceListFromCache(
+				*rt, m.viewConfig, m.keys,
+				entry.Resources, entry.Pagination,
+				"", 0, false, 0, 0, false,
+				m.ctrl,
+			)
+			// C3 (docs/design/cache-requirements.md): a seeded-but-unverified
+			// surface must carry the refreshing marker so it renders
+			// distinguishably from verified-fresh content. NewResourceListFromCache
+			// (via ApplyResourcesLoaded) clears Refreshing as part of applying the
+			// seeded page, so this must run after construction — mirrors the
+			// headless controller's ordering in applyNavResult.
+			m.ctrl.SetListRefreshing(true)
+			// Item B/DEF-21: same set-after-seed ordering — ApplyResourcesLoaded
+			// unconditionally clears TotalCount as part of applying the seeded
+			// page, so this must also run after construction.
+			m.ctrl.SetListTotalCount(entry.TotalCount)
+		} else {
+			rl = views.NewResourceList(*rt, m.viewConfig, m.keys, m.ctrl)
+			_, initCmd = rl.Init()
+		}
 		if result.DisplayAlias != "" {
 			rl.SetDisplayName(result.DisplayAlias)
 		}
@@ -145,7 +193,6 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		issueTrunc := m.ctrl.GetMenuIssueTruncated()[canon]
 		rl.SetEnrichmentState(issueCount, issueTrunc, nil)
 		rl.SetTruncatedIDs(m.core.EnrichmentTruncatedIDs(canon))
-		_, initCmd := rl.Init()
 		rs := newListRS(canon)
 		w, h := m.innerSize()
 		rs.width, rs.height = w, h
@@ -195,28 +242,14 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 			})
 		}
 		if result.DispatchRelated && detailRS.rightColAutoShown {
-			ck := runtime.RelatedCacheKey(result.ResolvedType, result.Resource.ID)
-			if cached, ok := m.core.RelatedCacheGet(ck); ok && len(cached) > 0 {
-				// Replay cached related results directly into the controller.
-				for _, msg := range runtime.RelatedCacheReplay(result.ResolvedType, cached) {
-					errMsg := ""
-					if msg.Result.Err != nil {
-						errMsg = msg.Result.Err.Error()
-					}
-					m.ctrl.ApplyDetailRelatedResultForResource(
-						result.ResolvedType,
-						result.Resource.ID,
-						msg.DefDisplayName,
-						msg.Result.TargetType,
-						msg.Result.Count,
-						false,
-						errMsg,
-						msg.Result.Approximate,
-						msg.Result.ResourceIDs,
-						msg.Result.FetchFilter,
-					)
-				}
-			} else {
+			// D6: no re-fan-out over cached data. ReplayRelatedCache merges
+			// cached rows directly into the controller's DetailState and
+			// reports whether it did — single source of truth shared with the
+			// headless/web NavigateKindPushDetail case in
+			// internal/app/navigate.go (applyNavResult). Only dispatch the
+			// TUI's own concurrent fan-out (relatedCheckCmd, one goroutine per
+			// RelatedDef) on a cache miss.
+			if !m.ctrl.ReplayRelatedCache(result.ResolvedType, *result.Resource) {
 				res := *result.Resource
 				rt := result.ResolvedType
 				cmds = append(cmds, func() tea.Msg {
@@ -618,24 +651,25 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	parentCtx := m.ctrl.GetListParentContext()
 	escPops := m.ctrl.GetListEscPops()
 
-	// Pre-fetch cleanup: strip stale Wave 2 findings from all cached rows of
-	// this type BEFORE deleting the cache entry. applyEnrichment walks the
-	// session-owned ResourceCache[rt]/LazyResourceCache/ProbeResources to find
-	// rows. Deleting the cache entry afterwards is still correct (forces a
-	// fresh fetch). This fixes the PR #310 CodeRabbit finding A: previously
-	// delete() ran first so applyEnrichment found no rows and stale wave2
-	// state survived.
+	// Pre-fetch cleanup: strip stale Wave 2 findings from the session-owned
+	// mirrors (ResourceCache[rt]/LazyResourceCache/ProbeResources) BEFORE
+	// deleting the cache entry, so a later cache-open (before this rerun's
+	// fresh EnrichmentChecked lands) never reseeds from a stale wave2 row.
+	// Deleting the cache entry afterwards is still correct (forces a fresh
+	// fetch).
 	//
-	// applyEnrichment only mutates the session-owned stores above — it does
-	// NOT reach the controller's own row stores (ls.Rows / c.resourceCache),
-	// which applyResourcesLoaded populates as independent MaterializeListFields
-	// copies (not aliases) of the session rows. ActiveListResources() and the
-	// rendered ResourceListModel read from the controller's stores, so without
-	// the explicit ClearRowFindings call below, Ctrl+R would clear the session
-	// copy while the active list view keeps showing the stale Wave-2 finding.
+	// Deliberately NOT clearing the controller's own rendered rows
+	// (ls.Rows / c.resourceCache via ClearRowFindings) here: that used to
+	// blank every Wave-2 glyph on screen for the full AWS round-trip between
+	// this Update() and the rerun's EnrichmentChecked arrival — a real,
+	// user-visible flicker, not just a stale-state risk. Wave-2 state is
+	// stale-until-replaced (never blank-until-replaced): ApplyWave2ToRow
+	// already strips-then-conditionally-reappends per resource ID against the
+	// FULL fresh findings map when the rerun's result lands, so any row
+	// missing from that map is correctly cleared at that point — pre-clearing
+	// here only widened the visible gap without changing the eventual state.
 	if parentCtx == nil && !escPops {
 		(&m).applyEnrichment(rt, nil, nil)
-		m.ctrl.ClearRowFindings(rt)
 	}
 
 	m.core.DeleteResourceCache(rt) // clear cache for refreshed type only
@@ -646,10 +680,10 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	}
 	m.flash = flashState{text: "Refreshing...", isError: false, active: true}
 
-	// Top-level list with a registered enricher: bump per-type gen, clear
-	// findings, and dispatch a wrapped fetch that stamps TypeGen onto the
-	// outgoing ResourcesLoadedMsg so the tail branch in app.go can seed
-	// probeResources and dispatch probeEnrichment on success.
+	// Top-level list with a registered enricher: bump per-type gen and
+	// dispatch a wrapped fetch that stamps TypeGen onto the outgoing
+	// ResourcesLoadedMsg so the tail branch in app.go can seed probeResources
+	// and dispatch probeEnrichment on success.
 	if parentCtx == nil && !escPops {
 		if m.core.HasIssueEnricher(rt) {
 			tok := m.core.BumpEnrichmentTypeGen(rt)
@@ -657,20 +691,21 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 			// Clear per-resource truncation markers too: if the refresh errors
 			// out, stale "?" prefixes must not persist across the rerun.
 			m.core.DeleteEnrichmentTruncatedIDs(rt)
-			// Wave2 already stripped above (pre-fetch cleanup). Strip any rows
-			// that entered via ProbeResources/LazyResourceCache (those paths
-			// are NOT covered by the pre-fetch cleanup above, which only
-			// covers the ResourceCache entry before deletion).
+			// Wave2 already stripped above (pre-fetch cleanup) on the
+			// session-owned mirrors. Strip any rows that entered via
+			// ProbeResources/LazyResourceCache (those paths are NOT covered by
+			// the pre-fetch cleanup above, which only covers the ResourceCache
+			// entry before deletion).
 			(&m).applyEnrichment(rt, nil, nil)
-			// Propagate the cleared enrichment state to the controller so row
-			// markers disappear immediately at Ctrl+R.
-			m.ctrl.ApplyEnrichmentState(rt, 0, false, nil)
+			// Deliberately NOT clearing the controller's enrichment store
+			// (ApplyEnrichmentState(rt, 0, false, nil)) here — see the
+			// pre-fetch cleanup comment above. The menu issue badge and row
+			// glyphs stay at their last-known value until the rerun's
+			// EnrichmentChecked overwrites c.enrichmentStore[rt] with the
+			// fresh findings, so nothing renders blank in between.
 			cmd := m.refreshActiveListWithEnrichmentRerun(rt, tok)
 			return m, cmd
 		}
-		// Top-level list without an enricher: clear the enrichment state.
-		// Wave2 was already stripped in the pre-fetch cleanup above.
-		m.ctrl.ApplyEnrichmentState(rt, 0, false, nil)
 	}
 	return m, m.refreshActiveList()
 }

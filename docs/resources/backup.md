@@ -153,7 +153,7 @@ At 3am, glancing at the list, the operator sees `! plan-daily-prod 2 jobs failed
 - Severity choice: `FAILED/EXPIRED/ABORTED` = `!` (Broken) and `PARTIAL` = `~` (Warning) — `docs/attention-signals.md` § "Backup & Email" Wave 2 cell ("any job State in FAILED/EXPIRED/ABORTED → Broken; PARTIAL → Warning") maps directly to the S1-bumping `!` glyph for Broken and the non-bumping `~` glyph for Warning per the skill's Wave-to-surface rules.
 
 <!-- BEGIN GENERATED: header -->
-backup — BACKUP. Lifecycle key: `state`.
+backup — BACKUP. Lifecycle key: none (the list API returns no lifecycle field).
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

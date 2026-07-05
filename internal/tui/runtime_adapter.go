@@ -10,9 +10,10 @@
 //     HandleClientsReady / HandleProfileSelected / HandleRegionSelected
 //     adapters in app_flash.go and app_session.go) AND any future
 //     handler that wires through this file. It mutates the *Model in
-//     place (errorHistory, flash state, showErrorHint, …) and returns
-//     a single tea.Cmd for intents that need follow-up work, such as
-//     RefreshActiveListIntent.
+//     place (flash state, showErrorHint, …), forwards to the controller
+//     where the controller is the source of truth (AppendErrorHistoryIntent),
+//     and returns a single tea.Cmd for intents that need follow-up work,
+//     such as RefreshActiveListIntent.
 //
 //  3. runtimeTasksToCmd / enrichDetailCmd — the TaskRequest-to-tea.Cmd
 //     translator. Tasks carry typed Payload values (runtime.TaskPayload
@@ -74,6 +75,21 @@ func (m Model) handleEnrichDetail(msg messages.EnrichDetail) (tea.Model, tea.Cmd
 // Core, so by the time we get here the gen is already in sync with the
 // FlashTickPayload the Core returned.
 //
+// PushScreen / PopScreen / PopSelectorIntent forward to m.ctrl.ApplyIntents
+// first, then apply only the rendererState half — the same controller-first
+// ordering app_dispatch.go's applyIntents (plural) uses. Before this both
+// paths independently re-derived the controller-side gate (rs.kind checks
+// mirroring the controller's Screen.ID checks) instead of asking the
+// controller directly, which is the divergence risk goal 4 closes: the
+// controller's screen stack is the single source of truth for depth/identity,
+// and the renderer stack must be a strict mirror (see StackInSync in
+// app_stack_invariant.go).
+//
+// AppendErrorHistoryIntent also forwards to m.ctrl.ApplyIntents (single-intent
+// slice, not the caller's whole batch) so the controller's errorHistory stays
+// in sync with this adapter's — see that case for why a single-intent forward
+// is safe here where a blanket forward of the whole intents slice would not be.
+//
 // Unknown intent types are silently dropped for forward compatibility.
 func (m *Model) applyIntent(intent runtime.UIIntent) tea.Cmd {
 	switch v := intent.(type) {
@@ -86,28 +102,58 @@ func (m *Model) applyIntent(intent runtime.UIIntent) tea.Cmd {
 	case runtime.SetErrorHintIntent:
 		m.showErrorHint = v.Show
 	case runtime.AppendErrorHistoryIntent:
-		m.errorHistory = append(m.errorHistory, errorEntry{
-			time:    v.Time,
-			message: v.Message,
-		})
+		// The controller (internal/app/controller.go) is the single source of
+		// truth for session error history as of goal-4 wave 4a — Header.
+		// ErrorHintVisible, HasErrorHistory, and the ctrl-backed ScreenErrorLog
+		// text screen all read c.errorHistory. This adapter has no local copy to
+		// update; forward only this single-intent slice (rather than the whole
+		// `intents` slice dispatchHandlerResult received) to avoid double-applying
+		// PopSelectorIntent/PushScreen/PopScreen, whose controller-first forwards
+		// are handled by their own cases below.
+		m.ctrl.ApplyIntents([]runtime.UIIntent{v})
 	case runtime.ClearActiveListLoadingIntent:
 		if m.activeRS().kind == rsKindList {
 			m.ctrl.ClearListLoading()
+			// DEF-5/C4: mirror the headless applyIntents case (intents.go) —
+			// a fetch failure over cached content must set the list's error
+			// marker too, or the TUI never renders it (renderer parity).
+			m.ctrl.SetListFetchError(v.Err)
 		}
 	case runtime.MenuClearAvailabilityIntent:
 		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.MenuClearAvailabilityIntent{}})
 	case runtime.PopSelectorIntent:
+		// Controller-first (goal 4): forward so the controller applies its own
+		// type-checked gate (pop only when top.ID is a selector screen —
+		// internal/app/intents.go) BEFORE the renderer decides whether to drop
+		// its own rendererState. Previously this case gated on rs.kind==
+		// rsKindSelector alone and popped via popRS() (which re-derives its own
+		// ActionBack-driven controller pop) — two independently-maintained
+		// conditionals that only agreed because the stacks were assumed already
+		// in sync. Forwarding first makes the controller state authoritative;
+		// popRSOnly then removes only the renderer half so ActionBack is not
+		// invoked a second time.
+		m.ctrl.ApplyIntents([]runtime.UIIntent{v})
 		if m.activeRS().kind == rsKindSelector {
-			m.popRS()
+			m.popRSOnly()
 		}
 	case runtime.RefreshActiveListIntent:
 		if m.activeRS().kind == rsKindList {
 			return m.refreshActiveList()
 		}
 	case runtime.PushScreen:
+		// Controller-first (goal 4): forward the intent so the controller's
+		// Screen{ID, Ctx} push (internal/app/intents.go) lands before the
+		// renderer constructs its rendererState half. pushScreen only calls
+		// m.pushRS — it never touches m.ctrl — so this cannot double-push.
+		m.ctrl.ApplyIntents([]runtime.UIIntent{v})
 		return m.pushScreen(v)
 	case runtime.PopScreen:
-		m.popRS()
+		// Controller-first (goal 4), mirroring app_dispatch.go's applyIntents
+		// PushScreen/PopScreen handling: forward to the controller, then
+		// popRSOnly to remove only the renderer half — popRS() would re-derive
+		// an ActionBack call and pop the controller stack a second time.
+		m.ctrl.ApplyIntents([]runtime.UIIntent{v})
+		m.popRSOnly()
 	case runtime.ApplyThemeIntent:
 		return m.applyTheme(v)
 	}

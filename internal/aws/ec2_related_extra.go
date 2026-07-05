@@ -133,13 +133,32 @@ func checkEC2Logs(ctx context.Context, clients any, res resource.Resource, cache
 	return relatedResult("logs", ids)
 }
 
-// checkEC2Backup scans the backup cache for backup plans that select this
-// EC2 instance by tag or by resource ARN. Pattern C.
+// checkEC2Backup scans the backup cache for backup plans that cover this
+// instance, matching on two independent signals with zero extra calls: (1)
+// the plan's selection tags (BackupSelection.ListOfTags, joined into
+// Fields["selection_tags"] by the backup fetcher) against this instance's
+// own tags, and (2) the plan's selection ARN list/wildcards
+// (Fields["resources"]/Fields["not_resources"]) against this instance's ARN,
+// via the same BackupPlanCoversARN helper checkS3Backup and other ARN-based
+// backup pivots already use. Per docs/resources/ec2.md: "match by
+// backup-plan selection tags present on Instance.Tags[] or by ARN".
 func checkEC2Backup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	instanceID := res.ID
 	if instanceID == "" {
 		return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
 	}
+
+	tags := map[string]string{}
+	if inst, ok := assertStruct[ec2types.Instance](res.RawStruct); ok {
+		for _, t := range inst.Tags {
+			if t.Key != nil && t.Value != nil {
+				tags[*t.Key] = *t.Value
+			}
+		}
+	}
+
+	instanceARN := res.Fields["arn"]
+
 	backupList, truncated, err := ec2RelatedResources(ctx, clients, cache, "backup")
 	if err != nil {
 		return resource.RelatedCheckResult{TargetType: "backup", Count: -1, Err: err}
@@ -147,11 +166,16 @@ func checkEC2Backup(ctx context.Context, clients any, res resource.Resource, cac
 	if backupList == nil {
 		return resource.RelatedCheckResult{TargetType: "backup", Count: -1}
 	}
-	// Backup plan selections are not embedded in the cached BackupPlan list
-	// entry — resolving would require GetBackupSelection per plan (N+1).
-	// Without that detail we conservatively report Count:0 here; the presence
-	// of a registration keeps the panel slot surfaced.
-	_ = backupList
-	_ = truncated
-	return resource.RelatedCheckResult{TargetType: "backup", Count: 0}
+
+	var ids []string
+	for _, planRes := range backupList {
+		if backupSelectionTagsMatch(planRes.Fields["selection_tags"], tags) ||
+			BackupPlanCoversARN(planRes.Fields["resources"], planRes.Fields["not_resources"], instanceARN) {
+			ids = append(ids, planRes.ID)
+		}
+	}
+	if len(ids) == 0 && truncated {
+		return resource.ApproximateZero("backup")
+	}
+	return relatedResult("backup", ids)
 }

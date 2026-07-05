@@ -116,12 +116,13 @@ func ecsTaskRelatedResources(ctx context.Context, clients any, cache resource.Re
 // checkECSTaskRole returns the IAM role(s) associated with this ECS task:
 // the task role (application-level) and the execution role (pull/log). The
 // ecstypes.Task struct returned by DescribeTasks does NOT include these ARNs
-// directly — they live on the TaskDefinition. The fetcher may pre-populate
-// Fields["task_role"] and Fields["execution_role"] when it resolves the task
-// definition; when those are set this checker returns the extracted role
-// names. When neither is present we return Count:0 (no role information
-// available from the cached task alone, no API call to make from here).
-func checkECSTaskRole(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
+// directly — they live on the TaskDefinition. The fetcher's
+// ecsJoinTaskDefinition join pre-populates Fields["task_role"] and
+// Fields["execution_role"] via DescribeTaskDefinition. This checker
+// cross-references the already-loaded role cache by ARN suffix/name per
+// docs/resources/ecs-task.md so the returned IDs resolve to real role rows
+// (0, 1, or 2 roles).
+func checkECSTaskRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	var arns []string
 	if v := strings.TrimSpace(res.Fields["task_role"]); v != "" {
 		arns = append(arns, v)
@@ -132,21 +133,41 @@ func checkECSTaskRole(_ context.Context, _ any, res resource.Resource, _ resourc
 	if len(arns) == 0 {
 		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
 	}
-	seen := make(map[string]struct{}, len(arns))
-	var ids []string
+
+	names := make(map[string]struct{}, len(arns))
 	for _, arn := range arns {
 		name := arn
 		if idx := strings.LastIndex(arn, "/"); idx >= 0 && idx < len(arn)-1 {
 			name = arn[idx+1:]
 		}
-		if name == "" {
+		if name != "" {
+			names[name] = struct{}{}
+		}
+	}
+	if len(names) == 0 {
+		return resource.RelatedCheckResult{TargetType: "role", Count: 0}
+	}
+
+	roleList, truncated, err := ecsTaskRelatedResources(ctx, clients, cache, "role")
+	if err != nil {
+		return resource.RelatedCheckResult{TargetType: "role", Count: -1, Err: err}
+	}
+	if roleList == nil {
+		return resource.RelatedCheckResult{TargetType: "role", Count: -1}
+	}
+
+	var ids []string
+	for _, roleRes := range roleList {
+		if _, match := names[roleRes.Name]; match {
+			ids = append(ids, roleRes.ID)
 			continue
 		}
-		if _, dup := seen[name]; dup {
-			continue
+		if _, match := names[roleRes.Fields["role_name"]]; match {
+			ids = append(ids, roleRes.ID)
 		}
-		seen[name] = struct{}{}
-		ids = append(ids, name)
+	}
+	if len(ids) == 0 && truncated {
+		return resource.ApproximateZero("role")
 	}
 	return relatedResult("role", ids)
 }

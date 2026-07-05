@@ -12,6 +12,12 @@ import (
 type SFNFixtures struct {
 	StateMachines []sfntypes.StateMachineListItem
 	Executions    map[string][]sfntypes.ExecutionListItem // key: state machine ARN
+	// Definitions maps state machine ARN -> ASL definition JSON, served by
+	// DescribeStateMachine. Required for the ecs-svc:sfn related-panel pivot
+	// witness (checkECSSvcSFN matches Task states whose Resource starts with
+	// "arn:aws:states:::ecs:runTask" and whose Parameters.TaskDefinition
+	// contains the ECS service's task-definition family name).
+	Definitions map[string]string
 }
 
 // NewSFNFixtures constructs SFNFixtures from the canonical demo data.
@@ -122,6 +128,27 @@ var sharedSFNFixtures = sync.OnceValue(func() *SFNFixtures {
 					Status:          sfntypes.ExecutionStatusSucceeded,
 				},
 			},
+		},
+		// order-fulfillment-workflow's ASL definition runs an ECS task on
+		// the acme-services cluster using the api-gateway task-definition
+		// family (both real ecs.go fixtures) — required for the
+		// ecs-svc:sfn related-panel pivot witness (checkECSSvcSFN).
+		Definitions: map[string]string{
+			smARNOrderFulfillment: `{
+				"Comment": "Order fulfillment workflow",
+				"StartAt": "RunFulfillmentTask",
+				"States": {
+					"RunFulfillmentTask": {
+						"Type": "Task",
+						"Resource": "arn:aws:states:::ecs:runTask.sync",
+						"Parameters": {
+							"Cluster": "` + ecsClusterArnServices + `",
+							"TaskDefinition": "api-gateway"
+						},
+						"End": true
+					}
+				}
+			}`,
 		},
 	}
 })

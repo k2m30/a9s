@@ -254,17 +254,18 @@ func TestController_Handle_PRB_ValueRevealed_Error_IsNoOpPassThrough(t *testing.
 	}
 }
 
-// TestController_Handle_PRB_ClientsReady_Success_IsNoOpPassThrough verifies that
-// Handle fed a messages.ClientsReady returns Snapshot() unchanged with no tasks
-// and does not panic.
-//
-// Deferred to post-PR-C: ClientsReady dispatch is blocked on relocating
-// TUI-shim pre-processing (see plan PR-B note).
-func TestController_Handle_PRB_ClientsReady_Success_IsNoOpPassThrough(t *testing.T) {
+// TestController_Handle_PRB_ClientsReady_Success_DispatchesToCore verifies
+// that Handle fed a messages.ClientsReady with Err == nil computes
+// StackDepth/HasActiveRL from its own view stack and dispatches to
+// core.HandleClientsReady, returning the identity + availability-cache
+// bootstrap tasks that dispatch produces, without panicking or changing the
+// active screen kind (a menu-only stack stays on the menu — ClientsReady
+// never itself navigates).
+func TestController_Handle_PRB_ClientsReady_Success_DispatchesToCore(t *testing.T) {
 	c := newTestController()
 
 	ev := messages.ClientsReady{
-		Clients: nil, // demo/no-AWS path — PreSuppliedClients is nil too; safe no-op
+		Clients: nil, // no pre-supplied clients on this controller — HandleClientsReady still dispatches identity/avail-cache tasks
 		Err:     nil,
 		Region:  "us-east-1",
 		Gen:     0, // AcceptZeroGen=true
@@ -286,10 +287,24 @@ func TestController_Handle_PRB_ClientsReady_Success_IsNoOpPassThrough(t *testing
 	snap := c.Snapshot()
 	assertViewStateEqualsSnapshot(t, "Handle(ClientsReady success)", vs, snap)
 	if vs.Body.Kind != snapBefore.Body.Kind {
-		t.Errorf("Handle(ClientsReady success) changed Body.Kind: before=%q after=%q — expected no-op", snapBefore.Body.Kind, vs.Body.Kind)
+		t.Errorf("Handle(ClientsReady success) changed Body.Kind: before=%q after=%q — a menu-only stack must stay on the menu", snapBefore.Body.Kind, vs.Body.Kind)
 	}
-	if len(tasks) != 0 {
-		t.Errorf("Handle(ClientsReady success) returned %d tasks, want 0 (no-op until PR-C)", len(tasks))
+	if len(tasks) == 0 {
+		t.Error("Handle(ClientsReady success) returned 0 tasks, want the identity + availability-cache bootstrap tasks core.HandleClientsReady dispatches on a successful connect")
+	}
+	wantKinds := map[runtime.TaskKind]bool{
+		runtime.TaskKindFetchIdentity:  false,
+		runtime.TaskKindLoadAvailCache: false,
+	}
+	for _, task := range tasks {
+		if _, ok := wantKinds[task.Key.Kind]; ok {
+			wantKinds[task.Key.Kind] = true
+		}
+	}
+	for kind, found := range wantKinds {
+		if !found {
+			t.Errorf("Handle(ClientsReady success) tasks = %+v, missing expected task kind %q", tasks, kind)
+		}
 	}
 }
 

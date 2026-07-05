@@ -777,13 +777,16 @@ func TestViews_HasIssueFinding_ScansAllFindings(t *testing.T) {
 			{Code: "ec2.maint", Phrase: "pending maintenance", Severity: domain.SevBroken, Source: "wave2:ec2"},
 		},
 	}
-	// Row B — only Findings[0]; SevWarn — both pre-fix and post-fix count this.
+	// Row B — only Findings[0]; a Wave-1 SevWarn finding counts per the S1
+	// aggregation (docs/attention-signals.md): Wave-1 issue-colored rows bump,
+	// while a Wave-2 ("wave2:"-sourced) warn would NOT — see
+	// qa_title_warning_findings_test.go for that pin.
 	resB := resource.Resource{
 		ID:     "i-mixed-2",
 		Name:   "mixed-findings-2",
 		Fields: map[string]string{"state": "running"},
 		Findings: []domain.Finding{
-			{Code: "ec2.warn", Phrase: "node group degraded", Severity: domain.SevWarn, Source: "wave2:ec2"},
+			{Code: "ec2.warn", Phrase: "node group degraded", Severity: domain.SevWarn, Source: "wave1"},
 		},
 	}
 	// Row C — no findings; must not be counted.

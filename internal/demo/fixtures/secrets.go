@@ -1,8 +1,8 @@
 package fixtures
 
 import (
-	"sync"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -109,6 +109,21 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 			RotationLambdaARN: aws.String("arn:aws:lambda:us-east-1:123456789012:function:rotate-rds-credentials"),
 			RotationRules:     &smtypes.RotationRulesType{AutomaticallyAfterDays: aws.Int64(30)},
 			Tags:              []smtypes.Tag{{Key: aws.String("Environment"), Value: aws.String("production")}},
+		},
+		{
+			// prod/api/gateway-key — required for the ecs-task:secrets
+			// related-panel pivot witness. Referenced by the api-gateway
+			// task definition's API_KEY container secret (ecs.go).
+			Name:             aws.String("prod/api/gateway-key"),
+			ARN:              aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/api/gateway-key-XyZ123"),
+			Description:      aws.String("API Gateway shared secret key for the api-gateway ECS service"),
+			LastAccessedDate: aws.Time(time.Date(2026, 3, 20, 0, 0, 0, 0, time.UTC)),
+			LastChangedDate:  aws.Time(time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)),
+			RotationEnabled:  aws.Bool(false),
+			CreatedDate:      aws.Time(time.Date(2025, 4, 1, 9, 0, 0, 0, time.UTC)),
+			KmsKeyId:         aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
+			PrimaryRegion:    aws.String("us-east-1"),
+			Tags:             []smtypes.Tag{{Key: aws.String("Environment"), Value: aws.String("production")}},
 		},
 		{
 			Name:             aws.String("prod/api/stripe-key"),

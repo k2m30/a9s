@@ -16,6 +16,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/app"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
@@ -65,12 +66,9 @@ func (m Model) View() tea.View {
 	case rsKindReveal:
 		content = renderReveal(rs)
 	case rsKindText:
-		if rs.ctrlBacked {
-			content = renderText(snap.Body.Text, rs)
-		} else {
-			// Non-ctrl-backed text = error-log overlay. Wrap raw text in a TextBody.
-			content = renderText(&app.TextBody{Lines: strings.Split(rs.errorLogText, "\n")}, rs)
-		}
+		// YAML, JSON, and error-log are all ctrl-backed text screens as of
+		// goal-4 wave 4a; content always comes from the controller's TextBody.
+		content = renderText(snap.Body.Text, rs)
 	case rsKindSelector:
 		content = renderSelector(snap.Body.Selector, rs)
 	case rsKindHelp:
@@ -116,8 +114,9 @@ func (m Model) View() tea.View {
 		}
 	case rsKindText:
 		// Use the controller footer only when the controller is actually on a
-		// text screen — so that the error-log overlay (not ctrl-backed) doesn't
-		// inherit the previous screen's hints from the controller.
+		// text screen (YAML/JSON/error-log are all ctrl-backed as of goal-4 wave
+		// 4a) — guards against a stale snapshot mid-transition where rs.kind has
+		// already switched but snap.Body has not (or vice versa).
 		if rs.ctrlBacked && snap.Body.Kind == app.BodyKindText {
 			if ctrlHints := snap.Footer; len(ctrlHints) > 0 {
 				hints = make([]layout.KeyHint, len(ctrlHints))
@@ -157,10 +156,10 @@ func (m Model) frameTitle(rs *rendererState, snap app.ViewState) string {
 		}
 		return "reveal"
 	case rsKindText:
-		if !rs.ctrlBacked {
+		screenID := m.ctrl.TextFrameTitle()
+		if screenID == string(runtime.ScreenErrorLog) {
 			return "errors"
 		}
-		screenID := m.ctrl.TextFrameTitle()
 		if screenID == "" {
 			return "text"
 		}
@@ -261,7 +260,7 @@ func (m Model) headerRight() string {
 	if rs.kind == rsKindReveal {
 		return styles.FlashError.Render("Secret visible — press esc to close")
 	}
-	if m.showErrorHint && len(m.errorHistory) > 0 {
+	if m.showErrorHint && m.ctrl.HasErrorHistory() {
 		return styles.FlashError.Render("! for errors")
 	}
 	return styles.DimText.Render("? for help")

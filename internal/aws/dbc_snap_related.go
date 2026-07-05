@@ -2,7 +2,6 @@ package aws
 
 import (
 	"context"
-	"strings"
 
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
 	rdstypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
@@ -72,9 +71,7 @@ func checkDbcSnapKMS(_ context.Context, _ any, res resource.Resource, _ resource
 	} else {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: -1}
 	}
-	if idx := strings.LastIndex(keyID, "/"); idx >= 0 {
-		keyID = keyID[idx+1:]
-	}
+	keyID = kmsKeyIDFromField(keyID, res.Type)
 	if keyID == "" {
 		return resource.RelatedCheckResult{TargetType: "kms", Count: 0}
 	}

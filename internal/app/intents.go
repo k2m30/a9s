@@ -1,6 +1,9 @@
 package app
 
-import "github.com/k2m30/a9s/v3/internal/runtime"
+import (
+	"github.com/k2m30/a9s/v3/internal/domain"
+	"github.com/k2m30/a9s/v3/internal/runtime"
+)
 
 // ApplyIntents applies a slice of UIIntents to the controller's screen stack
 // and state: stack navigation (Push/Pop/Replace/PopSelector), menu
@@ -23,9 +26,21 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 	for _, intent := range intents {
 		switch v := intent.(type) {
 		case runtime.PushScreen:
+			ctx := v.Context
+			// EnterChildView-emitted pushes (HandleEnterChildView) leave Context
+			// zero-valued and carry the child type in ChildListPayload instead —
+			// resolve it here so the pushed Screen.Ctx.ResourceType is non-empty
+			// (topListState/ensureListState key off it, and the renderer builder
+			// resolves the same field). Mirrors the TUI adapter's pre-collapse
+			// PushScreen case in app_dispatch.go.
+			if ctx.ResourceType == "" {
+				if clp, ok := v.Payload.(runtime.ChildListPayload); ok {
+					ctx.ResourceType = clp.ChildType
+				}
+			}
 			c.stack = append(c.stack, Screen{
 				ID:  v.ID,
-				Ctx: v.Context,
+				Ctx: ctx,
 			})
 
 		case runtime.PopScreen:
@@ -67,8 +82,36 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 				// Store under the key as emitted by the runtime (may be an alias
 				// such as "rds" for ShortName "dbi"). buildMenuBody resolves the
 				// active key per item using menuActiveKey().
-				ms.Availability[v.ResourceType] = v.Count
-				ms.Truncated[v.ResourceType] = v.Truncated
+				//
+				// DEF-2/C5: a truncated probe result must never downgrade an
+				// already-exact stored total — mirrors the guard
+				// SaveResourceListCache/SaveAvailabilityCache already apply on the
+				// disk-persist path (internal/runtime/probes.go). Exactness only
+				// ever advances: an untruncated observation always wins; a
+				// truncated one only wins when the current entry is itself unknown
+				// or already truncated, or reports a count that is not SMALLER than
+				// the one already stored (equal or larger) — a same-count update
+				// that only flips Truncated (e.g. toggling the lower-bound marker
+				// on an unchanged count) is not the "downgrade" C5 forbids; only a
+				// truncated result reporting FEWER items than the stored exact
+				// total is.
+				curCount, known := ms.Availability[v.ResourceType]
+				curTruncated := ms.Truncated[v.ResourceType]
+				if !v.Truncated || !known || curTruncated || v.Count >= curCount {
+					ms.Availability[v.ResourceType] = v.Count
+					ms.Truncated[v.ResourceType] = v.Truncated
+				}
+				// DEF-6/C3: track cache-seeded vs live-verified origin
+				// independently of the exactness guard above — a truncated
+				// sweep result that loses the count/truncated race still
+				// means the type WAS live-checked this session, so its
+				// origin must still flip to "verified".
+				if v.Origin != "" {
+					if ms.Origin == nil {
+						ms.Origin = make(map[string]string)
+					}
+					ms.Origin[v.ResourceType] = v.Origin
+				}
 			}
 
 		case runtime.PatchMenu:
@@ -131,6 +174,16 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 				ms.EnrichChecked = 0
 				ms.EnrichTotal = 0
 			}
+			// C9: this intent is the only rotation-visible chokepoint on the
+			// Controller — fired by both HandleProfileSelected and
+			// HandleRegionSelected (internal/runtime/handlers.go), as well as
+			// menu Ctrl+R. session.Rotate bumps generation counters but never
+			// reaches into the Controller, so without this a stale
+			// enrichmentStore[type] entry from a prior profile/region pair can
+			// resurrect its glyphs on a same-ID resource under the new pair. A
+			// frame may never mix findings from two profile/region pairs.
+			c.enrichmentStore = nil
+			c.enrichmentTruncated = nil
 
 		case runtime.PatchResourceList:
 			// Apply enrichment data (findings + issue badge) to the controller's
@@ -142,6 +195,11 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 				// Wave-2 column updates (status/summary) must also reach the cached
 				// list rows or enriched columns render stale (ECR/WAF/CodeArtifact).
 				c.applyListFieldUpdates(v.ResourceType, v.Enrichment.FieldUpdates)
+				// ...and the findings themselves must land on the controller's own
+				// rows (ls.Rows / resourceCache) — the list-open save path persists
+				// from them, so without this the on-disk cache rows carry no
+				// findings and reseed glyphless (DEF-8).
+				c.applyRowFindings(v.ResourceType, v.Enrichment.Findings, v.Enrichment.AttentionDetails)
 			}
 
 		case runtime.SetIdentityIntent:
@@ -168,6 +226,13 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 			// than leaving it stuck Loading=true (emitted by HandleAPIError).
 			if ls := c.topListState(); ls != nil {
 				ls.Loading = false
+				// DEF-5/C4: a fetch failure over cached content stops the
+				// refreshing marker and swaps in an error marker instead —
+				// nothing goes blank, rows stay on screen.
+				if v.Err != "" {
+					ls.Refreshing = false
+					ls.LastFetchError = v.Err
+				}
 			}
 
 		case runtime.SetErrorHintIntent:
@@ -200,13 +265,44 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 		case runtime.PatchLazyResourceCache:
 			c.core.ExtendLazyResourceCache(v.Adds)
 
+		case runtime.PatchDetail:
+			// Apply enrichment findings to every stacked detail screen of this
+			// resource type — not just the currently active one. When a user has
+			// navigated from detail-A to detail-B, enrichment results for both
+			// must reach both screens, so popping back to detail-A shows the
+			// correct Attention section immediately. Mirrors the TUI adapter's
+			// former local PatchDetail case in app_dispatch.go (removed — this is
+			// now the single source of truth for both TUI and web/headless).
+			if len(v.EnrichmentFindings) == 0 {
+				// Nil or empty Findings means all resources of this type have
+				// recovered: clear enrichment from every stacked detail screen.
+				c.clearDetailFindingsForType(v.ResourceType)
+			} else {
+				// Clear stale findings from every stacked detail of this type first,
+				// so a resource that recovered (absent from the new map) loses its
+				// Attention; then re-apply for resources still reporting findings.
+				// applyDetailFindingForResource searches all stacked screens by
+				// (type, id), so a stacked-but-not-active detail is still updated.
+				c.clearDetailFindingsForType(v.ResourceType)
+				for resourceID, f := range v.EnrichmentFindings {
+					finding := f
+					var ad *domain.AttentionDetail
+					if got, hasAD := v.EnrichmentAttentionDetails[resourceID]; hasAD && len(got.Rows) > 0 {
+						adVal := got
+						ad = &adVal
+					}
+					c.applyDetailFindingForResource(v.ResourceType, resourceID, &finding, ad)
+				}
+			}
+
 		// The remaining intents are renderer-specific or are served through
 		// another controller path, so they are intentional no-ops here rather
 		// than migration leftovers:
-		//   PatchDetail             — detail enrichment is applied via
-		//                             ApplyDetailFinding (the task-result lane).
-		//   RefreshActiveListIntent — refresh runs as the Refresh action's fetch
-		//                             task, not as an intent.
+		//   RefreshActiveListIntent — carries no state of its own to apply here;
+		//                             the C10 replay it signals is turned into a
+		//                             fetch task by refreshTasksForIntents, which
+		//                             callers (Handle, BootstrapLive) invoke
+		//                             alongside applyIntents.
 		//   HeaderInvalidateIntent  — the Header is rebuilt from core on every
 		//                             snapshot(); there is nothing to invalidate.
 		//   ApplyThemeIntent        — lipgloss theming is a TUI concern; the web
@@ -218,3 +314,16 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 	return c.snapshot()
 }
 
+// refreshTasksForIntents scans intents for RefreshActiveListIntent and, when
+// present, returns the active-list refresh tasks (C10: a navigation issued
+// before AWS connect completes must replay once connected). Shared by Handle
+// and BootstrapLive so the scan is not duplicated across the TUI-independent
+// ClientsReady seams. Callers must hold c.mu.
+func (c *Controller) refreshTasksForIntents(intents []runtime.UIIntent) []runtime.TaskRequest {
+	for _, intent := range intents {
+		if _, ok := intent.(runtime.RefreshActiveListIntent); ok {
+			return c.activeListRefreshTasks()
+		}
+	}
+	return nil
+}

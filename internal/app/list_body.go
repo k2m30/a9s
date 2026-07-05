@@ -27,14 +27,98 @@ import (
 func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resources []resource.Resource, pagination *resource.PaginationMeta, appendPage bool) {
 	resources = c.materializeListFieldsForType(typeName, resources)
 
+	// Item C: a silent swap (a non-append replace — the common cold-boot shape
+	// where a seeded/cached list is replaced by its own verify-refetch) must
+	// never let a row's glyph flash off. The fresh resources argument arrives
+	// findings-less on a brand-new session (the Wave-2 enrichment store is
+	// empty until the sweep re-enriches this session), so the existing
+	// re-apply-from-enrichment-store step below (which only reads
+	// c.listEnrichmentFindings) is a no-op on that very first swap. Capture
+	// the OUTGOING rows' own findings (r.Findings — what a cache-seeded row
+	// carries from disk, or what an earlier live enrichment already wrote
+	// onto this screen) BEFORE they are overwritten, keyed by resource ID, so
+	// they can be carried onto the incoming replacement rows for any ID that
+	// survives the swap.
+	priorFindings := outgoingRowFindingsByID(ls, c.resourceCache[typeName])
+
+	// DEF-18 mechanism A: a background verify-refetch (e.g. cold-open's
+	// KindFetchResources, bounded by a CachedListDepth snapshot taken at
+	// dispatch time) can complete AFTER a foreground load-more (m) has
+	// already appended deeper rows onto this same screen. No per-list
+	// dispatch sequence/generation exists in the plumbing to reject this by
+	// gen-stamp (messages.ResourcesLoaded.Gen is a session-wide
+	// AvailabilityGen, unrelated to per-screen fetch ordering), so a smaller,
+	// still-truncated, ID-subset result is treated as stale by construction
+	// (C2: a result older than a later invalidation — here, the append — is
+	// discarded) and the richer on-screen state (rows, pagination, cache
+	// mirror) is kept rather than clobbered.
+	//
+	// The gate is ls.HasPagination == false (the screen already reached a
+	// CONFIRMED EXACT total), not merely "an append happened" — a Ctrl+R
+	// full reset legitimately replays the exact same page-1 IDs with
+	// IsTruncated=true while the screen was ALSO still truncated (never
+	// confirmed exact), and that reset must win (qa_pagination_stories_test.go
+	// TestStoryF1_CtrlR_ResetsPagination). Once a screen's pagination has
+	// been exhausted to an exact total (ls.HasPagination == false — C5: exact
+	// only ever advances), a smaller, still-truncated, ID-subset replace can
+	// only be an out-of-order straggler: nothing legitimate re-truncates an
+	// already-exact list back down to a subset of itself. Computed once and
+	// applied consistently to every mutation below — ls.Rows, the type-keyed
+	// cache mirror, and ls.HasPagination/PaginationCursor all originate from
+	// the same stale fetch result and must be rejected together, or the
+	// title (derived from HasPagination) and the cursor would regress even
+	// if ls.Rows itself were protected.
+	stale := !appendPage && ls != nil && !ls.HasPagination && isStaleReplace(ls.Rows, resources, pagination)
+
+	// Item C (continued): a silent swap is exactly the !appendPage && !stale
+	// replace path below. Fold the captured prior findings onto the incoming
+	// resources for any surviving ID BEFORE they land on ls.Rows/
+	// c.resourceCache — only when the session enrichment store has nothing
+	// for this type yet (checked via listEnrichmentFindings).
+	//
+	// Merged per-source, never wholesale: a fresh fetch result IS the
+	// authoritative statement about Wave-1 state for that row — a row that
+	// comes back with zero Wave-1 findings this time means the fetcher-side
+	// condition (e.g. an instance's "stopped" state) is resolved, and carrying
+	// the old Wave-1 finding forward would make a fixed issue immortal (stale
+	// glyph, stale menu badge, stale persisted Findings). Only the "wave2:"
+	// portion of priorFindings — the enrichment pass, which runs separately
+	// from the fetch and has genuinely not re-checked this row yet — outlives
+	// the swap, and only when the incoming row does not already carry its own
+	// Wave-2 entry (never clobber a fresh Wave-2 result that already landed on
+	// this exact swap; the "wave2:" Source prefix is the same discipline
+	// ApplyWave2ToRow/stripWave2Findings use elsewhere).
+	if !appendPage && !stale && len(priorFindings) > 0 && len(c.listEnrichmentFindings(typeName)) == 0 {
+		for i := range resources {
+			f, ok := priorFindings[resources[i].ID]
+			if !ok || len(f) == 0 || hasWave2Finding(resources[i].Findings) {
+				continue
+			}
+			for _, pf := range f {
+				if strings.HasPrefix(pf.Source, "wave2:") {
+					resources[i].Findings = append(resources[i].Findings, pf)
+				}
+			}
+		}
+	}
+
 	// --- Per-screen storage (Bug 1 fix) -----------------------------------
 	// Writing to ls.Rows ensures that two stacked list screens of the same
 	// resource type never share a row slice. Each screen's fetch result lands
 	// exclusively on that screen's ListState.
+	//
+	// DEF-17 backstop: an append must never introduce a row whose ID already
+	// exists on the screen. This is a backstop, not the fix for the root
+	// cause below — it only prevents a duplicate that already reached this
+	// call from becoming visible; the empty-cursor guard is what stops the
+	// duplicate fetch from happening in the first place.
 	if ls != nil {
-		if appendPage {
-			ls.Rows = append(ls.Rows, resources...)
-		} else {
+		switch {
+		case appendPage:
+			ls.Rows = append(ls.Rows, dedupAgainstExisting(ls.Rows, resources)...)
+		case stale:
+			// Discard: see the DEF-18 mechanism A comment above.
+		default:
 			ls.Rows = resources
 		}
 	}
@@ -45,9 +129,15 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	if c.resourceCache == nil {
 		c.resourceCache = make(map[string][]resource.Resource)
 	}
-	if appendPage {
-		c.resourceCache[typeName] = append(c.resourceCache[typeName], resources...)
-	} else {
+	switch {
+	case appendPage:
+		existing := c.resourceCache[typeName]
+		c.resourceCache[typeName] = append(existing, dedupAgainstExisting(existing, resources)...)
+	case stale:
+		// Discard: see the DEF-18 mechanism A comment above — the type-keyed
+		// mirror must not diverge from ls.Rows by accepting the stale page
+		// that ls.Rows just rejected.
+	default:
 		c.resourceCache[typeName] = resources
 	}
 
@@ -60,14 +150,129 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 		// method, so this unconditional clear only ever fires for a genuine
 		// fetch-result swap, never undoing the seed-time flag.
 		ls.Refreshing = false
-		if pagination != nil {
+		// Item B/DEF-21: a genuine fetch result also retires the seed-time
+		// TotalCount override — len(ls.Rows) is authoritative again once a real
+		// fetch has confirmed/replaced the seeded page. Mirrors Refreshing's
+		// clear-then-caller-rearms-after-seed ordering above.
+		ls.TotalCount = 0
+		// DEF-5/C4: a successful fetch result clears any outstanding error
+		// marker from a previous failed attempt.
+		ls.LastFetchError = ""
+		switch {
+		case stale:
+			// Keep the richer on-screen pagination state (HasPagination/
+			// PaginationCursor) — see the DEF-18 mechanism A comment above.
+		case pagination != nil:
 			ls.HasPagination = pagination.IsTruncated
 			ls.PaginationCursor = pagination.NextToken
-		} else {
+		default:
 			ls.HasPagination = false
 			ls.PaginationCursor = ""
 		}
 	}
+
+	// Fresh rows arrive without Wave-2 findings; re-apply the latest known
+	// findings from the enrichment store so a silent-swap refetch never leaves
+	// the controller rows (and therefore the list-open save path, DEF-8)
+	// glyph-blind until the next EnrichmentChecked. Mirrors the session-side
+	// fold, which re-applies onto Core stores after every result lands.
+	if known := c.listEnrichmentFindings(typeName); len(known) > 0 {
+		c.applyRowFindings(typeName, known, nil)
+	}
+}
+
+// outgoingRowFindingsByID captures the findings currently attached to the
+// row set about to be replaced by a silent swap (item C), keyed by resource
+// ID. Prefers ls.Rows (the per-screen store applyResourcesLoaded is about to
+// overwrite) since it is the richer, currently-displayed source; falls back
+// to the type-keyed resourceCache mirror when ls is nil or carries no rows
+// yet (e.g. the very first ResourcesLoaded for a screen whose seed only
+// populated the type-keyed cache). Rows with no findings are omitted so the
+// caller's len(priorFindings) == 0 check short-circuits cheaply when there is
+// nothing to carry forward.
+func outgoingRowFindingsByID(ls *ListState, cachedRows []resource.Resource) map[string][]domain.Finding {
+	source := cachedRows
+	if ls != nil && len(ls.Rows) > 0 {
+		source = ls.Rows
+	}
+	if len(source) == 0 {
+		return nil
+	}
+	out := make(map[string][]domain.Finding, len(source))
+	for _, r := range source {
+		if len(r.Findings) > 0 {
+			out[r.ID] = r.Findings
+		}
+	}
+	return out
+}
+
+// isStaleReplace reports whether a non-append ResourcesLoaded result looks
+// like a stale background verify-refetch that raced a later foreground
+// append on the same screen (DEF-18 mechanism A), evaluating only the
+// content shape. The caller additionally gates this on ls.HasPagination ==
+// false (the screen already reached a confirmed exact total) before
+// treating the result as stale — see the call site's comment for why that
+// extra gate is required to avoid rejecting a legitimate Ctrl+R reset to
+// page 1, which can carry an identical content shape.
+//
+// A replace's content is treated as "shaped like a stale straggler" only
+// when ALL of the following hold:
+//   - incoming is smaller than what is already on screen (a shrink);
+//   - the incoming page is itself still truncated (pagination reports more
+//     exist) — a genuine smaller-but-EXACT result is never stale, it is a
+//     real shrink (e.g. resources were deleted) and must win;
+//   - every incoming row ID is already present on screen — i.e. incoming is
+//     a strict ID subset of existing, meaning it can only be an earlier,
+//     shallower page of the same list, not a disjoint or refreshed set.
+//
+// This is a heuristic, not a generation stamp: no per-list-screen fetch
+// dispatch sequence exists in the current plumbing (messages.ResourcesLoaded.
+// Gen is a session-wide AvailabilityGen for profile/region rotation, not
+// per-fetch ordering within a pair). The subset check is a conservative,
+// false-negative-biased approximation — it only suppresses a replace when
+// the incoming set could not possibly be anything other than a shallower
+// view of the same, already-superseded page.
+func isStaleReplace(existing, incoming []resource.Resource, pagination *resource.PaginationMeta) bool {
+	if len(incoming) == 0 || len(incoming) >= len(existing) {
+		return false
+	}
+	if pagination == nil || !pagination.IsTruncated {
+		return false
+	}
+	existingIDs := make(map[string]struct{}, len(existing))
+	for _, r := range existing {
+		existingIDs[r.ID] = struct{}{}
+	}
+	for _, r := range incoming {
+		if _, ok := existingIDs[r.ID]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// dedupAgainstExisting returns the subset of incoming whose ID is not already
+// present in existing. Rows are keyed by their stable resource ID (C2/C6):
+// an append that would introduce a row already on the screen is dropped
+// rather than shown twice. Order of the surviving rows is preserved.
+func dedupAgainstExisting(existing, incoming []resource.Resource) []resource.Resource {
+	if len(incoming) == 0 {
+		return incoming
+	}
+	seen := make(map[string]struct{}, len(existing))
+	for _, r := range existing {
+		seen[r.ID] = struct{}{}
+	}
+	out := make([]resource.Resource, 0, len(incoming))
+	for _, r := range incoming {
+		if _, dup := seen[r.ID]; dup {
+			continue
+		}
+		seen[r.ID] = struct{}{}
+		out = append(out, r)
+	}
+	return out
 }
 
 // materializeListFieldsForType resolves the column set for typeName the same
@@ -222,6 +427,7 @@ func (c *Controller) buildListBody(ctx runtime.ScreenContext, ls *ListState) *Li
 		StatusCol:           statusCol,
 		LoadingMore:         ls.LoadingMore,
 		Refreshing:          ls.Refreshing,
+		LastFetchError:      ls.LastFetchError,
 	}
 }
 
@@ -269,6 +475,12 @@ func (c *Controller) buildListFrameTitle(ctx runtime.ScreenContext, ls *ListStat
 
 	allResources := c.listScreenResources(ls, typeName)
 	total := len(allResources)
+	// Item B/DEF-21: a seeded-but-unverified list (C6a reconstructable disk
+	// pair) may know a larger authoritative total than its last-known Rows —
+	// prefer it for display until the next real fetch result clears it
+	// (applyResourcesLoaded). Only the displayed total is overridden; filtered
+	// still reflects the rows actually on screen.
+	total = max(total, ls.TotalCount)
 	visible := c.applyListFilters(ls, typeName, allResources)
 	filtered := len(visible)
 	truncated := ls.HasPagination
@@ -405,12 +617,18 @@ func (c *Controller) listIssueCount(ls *ListState, typeName string) int {
 	findings := c.listEnrichmentFindings(typeName)
 	ic := 0
 	for _, r := range all {
-		if listHasIssueFinding(r) {
+		switch {
+		case listHasBadgeFinding(r):
 			ic++
-		} else if len(r.Findings) == 0 {
-			if td.ResolveColor(r).IsIssue() {
-				ic++
-			} else if f, hasFinding := findings[r.ID]; hasFinding && f.Severity == domain.SevBroken {
+		case td.ResolveColor(r).IsIssue():
+			// DEF-8: rows carry Wave-2 findings directly, so a row that is a
+			// Wave-1 issue by td.ResolveColor but whose only findings are
+			// non-badge (e.g. a lone Wave-2 "~" warn) must still count here —
+			// gating this fallback on len(r.Findings) == 0 undercounted any
+			// such row. The color check is independent of r.Findings content.
+			ic++
+		case len(r.Findings) == 0:
+			if f, hasFinding := findings[r.ID]; hasFinding && f.Severity == domain.SevBroken {
 				// S1: Wave-2 findings bump the count only at "!" severity —
 				// "~ findings do not bump" (docs/attention-signals.md). Wave-1
 				// yellow/red rows are already counted by the color branch above,
@@ -555,6 +773,75 @@ func (c *Controller) clearRowFindings(typeName string) {
 			clearSlice(c.resourceCache[canon])
 		}
 	}
+}
+
+// applyRowFindings is the applying-direction mirror of clearRowFindings: it
+// writes Wave-2 findings (and their attention details) onto the controller's
+// own row stores — every matching list screen's ls.Rows plus c.resourceCache.
+// Without it, enrichment applied to an OPEN live list reaches only the
+// session-owned stores (Core.applyEnrichment) and the controller's
+// enrichmentStore glyph map, so the list-open save path (which persists from
+// ls.Rows) writes rows with no findings — cached rows then reseed glyphless
+// (S3-pilot DEF-8). Callers must hold c.mu (write); the PatchResourceList
+// intent case is the production entry point. A nil findings map clears Wave-2
+// entries, matching runtime.ApplyWave2ToRow's contract.
+func (c *Controller) applyRowFindings(typeName string, findings map[string]domain.Finding, details map[string]domain.AttentionDetail) {
+	canon := typeName
+	var td resource.ResourceTypeDef
+	if t := resource.FindResourceType(typeName); t != nil {
+		canon = t.ShortName
+		td = *t
+	} else {
+		td = resource.ResourceTypeDef{ShortName: canon}
+	}
+
+	applySlice := func(rows []resource.Resource) {
+		for i := range rows {
+			runtime.ApplyWave2ToRow(&rows[i], td, findings, details)
+		}
+	}
+
+	for i := range c.stack {
+		s := &c.stack[i]
+		if s.ID != runtime.ScreenResourceList && s.ID != runtime.ScreenChildList {
+			continue
+		}
+		st := s.Ctx.ResourceType
+		if t := resource.FindResourceType(st); t != nil {
+			st = t.ShortName
+		}
+		if st != canon || s.State.List == nil {
+			continue
+		}
+		applySlice(s.State.List.Rows)
+	}
+
+	if c.resourceCache != nil {
+		applySlice(c.resourceCache[typeName])
+		if typeName != canon {
+			applySlice(c.resourceCache[canon])
+		}
+	}
+}
+
+// listHasBadgeFinding reports whether a row's own findings bump the S1 issue
+// count. Wave-1 findings (fetcher-written, no "wave2:" Source prefix) count at
+// any issue severity — a Wave-1 warning IS the yellow row the menu badge
+// counts by color. Wave-2 findings count only at "!" severity: per the S1
+// contract "~ findings do not bump", and now that applyRowFindings writes
+// Wave-2 findings onto controller rows, counting them at warn severity here
+// would reintroduce the very drift the severity gate on the enrichment-store
+// branch fixed.
+func listHasBadgeFinding(r resource.Resource) bool {
+	for _, f := range r.Findings {
+		if f.Severity == domain.SevBroken {
+			return true
+		}
+		if resource.IsIssueSeverity(f.Severity) && !strings.HasPrefix(f.Source, "wave2:") {
+			return true
+		}
+	}
+	return false
 }
 
 // stripWave2Findings returns findings with every Wave-2 entry (Source

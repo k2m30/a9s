@@ -9,6 +9,7 @@ import (
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
 	_ "github.com/k2m30/a9s/v3/internal/aws"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
 
@@ -235,23 +236,39 @@ func TestRelated_Lambda_Alarms_CacheMissNoClients(t *testing.T) {
 
 // TestRelated_Lambda_ECR_Match verifies that a container-image Lambda with an
 // image URI field returns Count=1 with the repository name.
+// TestRelated_Lambda_ECR_Match verifies the checkLambdaECR mechanism per
+// lambda.md:72: the image URI is only available from GetFunction's
+// Code.ImageUri (ListFunctions/FunctionConfiguration never carries it), so
+// the checker must call GetFunction for this one Image-package function
+// rather than trust a Fields["image_uri"] value the real fetcher never sets.
 func TestRelated_Lambda_ECR_Match(t *testing.T) {
 	src := resource.Resource{
 		ID:   "my-image-function",
 		Name: "my-image-function",
 		Fields: map[string]string{
-			"image_uri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-ecr-repo:latest",
+			"package_type": "Image",
 		},
 		RawStruct: lambdatypes.FunctionConfiguration{
 			FunctionName: aws.String("my-image-function"),
 			PackageType:  lambdatypes.PackageTypeImage,
 		},
 	}
+	cache := resource.ResourceCache{
+		"ecr": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "my-ecr-repo", Name: "my-ecr-repo"},
+		}},
+	}
+	fake := &fakeLambdaGetFunctionAPI{
+		functionName: "my-image-function",
+		imageURI:     "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-ecr-repo:latest",
+	}
+	clients := &awsclient.ServiceClients{Lambda: fake}
+
 	checker := lambdaCheckerByTarget(t, "ecr")
-	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	result := checker(context.Background(), clients, src, cache)
 
 	if result.Count != 1 {
-		t.Errorf("Count = %d, want 1", result.Count)
+		t.Errorf("Count = %d, want 1 (spec lambda.md:72 GetFunction Code.ImageUri -> ecr repo)", result.Count)
 	}
 	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "my-ecr-repo" {
 		t.Errorf("ResourceIDs = %v, want [my-ecr-repo]", result.ResourceIDs)
@@ -278,53 +295,71 @@ func TestRelated_Lambda_ECR_Empty(t *testing.T) {
 	}
 }
 
-// TestRelated_Lambda_ECR_WrongRawStruct verifies that a resource with a
-// non-FunctionConfiguration RawStruct returns Count=-1.
-func TestRelated_Lambda_ECR_WrongRawStruct(t *testing.T) {
+// TestRelated_Lambda_ECR_NoClientReturnsUnknown verifies that an Image-package
+// function with no live Lambda client available (GetFunction is required per
+// lambda.md:72 — there is no cached fallback) returns Count=-1.
+func TestRelated_Lambda_ECR_NoClientReturnsUnknown(t *testing.T) {
 	src := resource.Resource{
-		ID:        "my-function",
-		RawStruct: "not-a-function-configuration",
+		ID:     "my-function",
+		Fields: map[string]string{"package_type": "Image"},
+		RawStruct: lambdatypes.FunctionConfiguration{
+			FunctionName: aws.String("my-function"),
+			PackageType:  lambdatypes.PackageTypeImage,
+		},
 	}
 	checker := lambdaCheckerByTarget(t, "ecr")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
 
 	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count)
+		t.Errorf("Count = %d, want -1 (no live Lambda client to call GetFunction)", result.Count)
 	}
 }
 
-// TestRelated_Lambda_ECR_ImageTypeNoURI: Image type but no image_uri field → Count: -1.
+// TestRelated_Lambda_ECR_ImageTypeNoURI: GetFunction succeeds but Code.ImageUri
+// is empty/absent (e.g. an inconsistent Image-package function) → Count: -1.
 func TestRelated_Lambda_ECR_ImageTypeNoURI(t *testing.T) {
 	src := resource.Resource{
 		ID:     "my-image-function",
-		Fields: map[string]string{}, // no image_uri
+		Fields: map[string]string{"package_type": "Image"},
 		RawStruct: lambdatypes.FunctionConfiguration{
 			FunctionName: aws.String("my-image-function"),
 			PackageType:  lambdatypes.PackageTypeImage,
 		},
 	}
+	fake := &fakeLambdaGetFunctionAPI{functionName: "my-image-function", imageURI: ""}
+	clients := &awsclient.ServiceClients{Lambda: fake}
+
 	checker := lambdaCheckerByTarget(t, "ecr")
-	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	result := checker(context.Background(), clients, src, resource.ResourceCache{})
 	if result.Count != -1 {
-		t.Errorf("Count = %d, want -1 (Image type but no image_uri)", result.Count)
+		t.Errorf("Count = %d, want -1 (Image type but GetFunction returned no ImageUri)", result.Count)
 	}
 }
 
 // TestRelated_Lambda_ECR_ImageURIWithDigest: image URI with @sha256 digest suffix
-// is parsed correctly (digest stripped).
+// is parsed correctly (digest stripped), sourced via GetFunction per lambda.md:72.
 func TestRelated_Lambda_ECR_ImageURIWithDigest(t *testing.T) {
 	src := resource.Resource{
-		ID: "my-digest-function",
-		Fields: map[string]string{
-			"image_uri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-ecr-repo@sha256:abc123",
-		},
+		ID:     "my-digest-function",
+		Fields: map[string]string{"package_type": "Image"},
 		RawStruct: lambdatypes.FunctionConfiguration{
 			FunctionName: aws.String("my-digest-function"),
 			PackageType:  lambdatypes.PackageTypeImage,
 		},
 	}
+	cache := resource.ResourceCache{
+		"ecr": resource.ResourceCacheEntry{Resources: []resource.Resource{
+			{ID: "my-ecr-repo", Name: "my-ecr-repo"},
+		}},
+	}
+	fake := &fakeLambdaGetFunctionAPI{
+		functionName: "my-digest-function",
+		imageURI:     "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-ecr-repo@sha256:abc123",
+	}
+	clients := &awsclient.ServiceClients{Lambda: fake}
+
 	checker := lambdaCheckerByTarget(t, "ecr")
-	result := checker(context.Background(), nil, src, resource.ResourceCache{})
+	result := checker(context.Background(), clients, src, cache)
 	if result.Count != 1 {
 		t.Errorf("Count = %d, want 1", result.Count)
 	}
@@ -621,8 +656,13 @@ func TestRelated_Lambda_KMS_EmptyKMSArn(t *testing.T) {
 	}
 }
 
-// TestRelated_Lambda_KMS_KMSKeyNoSlash: KMS key ARN with no "/" (alias or bare key ID)
-// should be returned as-is.
+// TestRelated_Lambda_KMS_KMSKeyNoSlash: "alias/aws/lambda" is a bare alias
+// name (no "arn:aws:kms:...:alias/" prefix for kmsKeyIDFromField's ":alias/"
+// strip to match), so it must pass through WHOLE. Splitting on the last "/"
+// (the pre-fix behavior) would truncate this to "lambda" — the trailing
+// service-name segment of the AWS-managed alias, not a real DescribeKey-
+// compatible identifier — which is exactly the fabrication bug class this
+// helper now guards against.
 func TestRelated_Lambda_KMS_KMSKeyNoSlash(t *testing.T) {
 	src := resource.Resource{
 		ID:   "function-bare-kms",
@@ -634,12 +674,12 @@ func TestRelated_Lambda_KMS_KMSKeyNoSlash(t *testing.T) {
 	}
 	checker := lambdaCheckerByTarget(t, "kms")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	// Has "/" → last segment after final "/" is "lambda"
+	// Bare alias, no ARN prefix: kmsKeyIDFromField returns it unchanged in full.
 	if result.Count != 1 {
 		t.Errorf("Count = %d, want 1", result.Count)
 	}
-	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "lambda" {
-		t.Errorf("ResourceIDs = %v, want [lambda]", result.ResourceIDs)
+	if len(result.ResourceIDs) != 1 || result.ResourceIDs[0] != "alias/aws/lambda" {
+		t.Errorf("ResourceIDs = %v, want [alias/aws/lambda]", result.ResourceIDs)
 	}
 }
 
