@@ -6,9 +6,18 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
 
 func TestMain(m *testing.M) {
+	// styles holds package-level vars rebuilt by styles.Reinit(), which reads
+	// NO_COLOR at call time. The invoking shell's NO_COLOR must not change
+	// which SGR assertions pass in this binary, so the baseline is normalized
+	// to "colors on" before any test runs.
+	if _, noColorSet := os.LookupEnv("NO_COLOR"); noColorSet {
+		os.Unsetenv("NO_COLOR") //nolint:errcheck // best-effort hermetic default, not test-critical
+		styles.Reinit()
+	}
 	// Package-wide hermetic default: any test constructor in this binary
 	// (package unit AND package unit_test share this one TestMain) that
 	// builds a tui.Model/session without its own t.Setenv("A9S_CONFIG_FOLDER",

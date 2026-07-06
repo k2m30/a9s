@@ -822,6 +822,10 @@ func TestDetailViewCTEvents_Regression_ColorTierInvariant(t *testing.T) {
 			// Guard: verify ct-events branch is active by checking ACTION appears in plain view.
 			t.Setenv("NO_COLOR", "1")
 			styles.Reinit()
+			t.Cleanup(func() {
+				os.Unsetenv("NO_COLOR") //nolint:errcheck
+				styles.Reinit()
+			})
 			guardModel := newDetailModel(res, "ct-events", cfg)
 			plainView := stripAnsi(guardModel.View())
 			if !strings.Contains(plainView, "ACTION") {
@@ -831,7 +835,6 @@ func TestDetailViewCTEvents_Regression_ColorTierInvariant(t *testing.T) {
 			// Enable colors and build a fresh model so styles are applied at render time.
 			os.Unsetenv("NO_COLOR")
 			styles.Reinit()
-			t.Cleanup(func() { styles.Reinit() })
 			coloredModel := newDetailModel(res, "ct-events", cfg)
 			coloredView := coloredModel.View()
 

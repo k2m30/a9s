@@ -76,8 +76,8 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // ---------------------------------------------------------------------------
@@ -103,9 +103,7 @@ func wave2S4TypeDef() resource.ResourceTypeDef {
 // Status/lifecycle column — not the raw AWS state ("available") the row was
 // seeded with. This is the LIST S4 surface (docs/resources/*.md §4 "S4").
 func TestWave2_ListStatusColumn_ShowsConcretePhrase_ForIssueFinding(t *testing.T) {
-	t.Setenv("NO_COLOR", "")
-	styles.Reinit()
-	t.Cleanup(func() { styles.Reinit() })
+	tuitest.NoColor(t)
 
 	td := wave2S4TypeDef()
 	k := keys.Default()

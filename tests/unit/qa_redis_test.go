@@ -1,7 +1,6 @@
 package unit
 
 import (
-	"os"
 	"strings"
 	"testing"
 
@@ -16,6 +15,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // ===========================================================================
@@ -33,8 +33,7 @@ func redisTypeDef() resource.ResourceTypeDef {
 
 func loadedRedisModel(t *testing.T) views.ResourceListModel {
 	t.Helper()
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 	td := redisTypeDef()
 	k := keys.Default()
 	m := views.NewResourceList(td, nil, k)
@@ -162,8 +161,7 @@ func TestQA_Redis_FrameTitle(t *testing.T) {
 // ===========================================================================
 
 func TestQA_Redis_StatusColoring(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := redisTypeDef()
 	k := keys.Default()
@@ -196,8 +194,7 @@ func TestQA_Redis_StatusColoring(t *testing.T) {
 // ===========================================================================
 
 func TestQA_Redis_CursorNavigation(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := redisTypeDef()
 	k := keys.Default()
@@ -249,8 +246,7 @@ func TestQA_Redis_CursorNavigation(t *testing.T) {
 // ===========================================================================
 
 func TestQA_Redis_ListFilter(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := redisTypeDef()
 	k := keys.Default()
@@ -300,8 +296,7 @@ func TestQA_Redis_ListFilter(t *testing.T) {
 // ===========================================================================
 
 func TestQA_Redis_ListSort(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := redisTypeDef()
 	k := keys.Default()
@@ -342,8 +337,7 @@ func TestQA_Redis_ListSort(t *testing.T) {
 // ===========================================================================
 
 func TestQA_Redis_EmptyList(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := redisTypeDef()
 	k := keys.Default()
@@ -429,8 +423,7 @@ func TestQA_Redis_DetailFrameTitle(t *testing.T) {
 // ===========================================================================
 
 func TestQA_Redis_DetailStatusColoring(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	// Redis Color func reads Fields["status"].
 	td := resource.FindResourceType("redis")
@@ -720,8 +713,7 @@ func TestQA_Redis_CommandNavigation(t *testing.T) {
 func TestQA_Redis_HorizontalScroll(t *testing.T) {
 	fixtures := fixtureRedisClusters()
 
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := redisTypeDef()
 	k := keys.Default()
@@ -749,8 +741,7 @@ func TestQA_Redis_HorizontalScroll(t *testing.T) {
 // ===========================================================================
 
 func TestQA_Redis_LoadingSpinner(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := redisTypeDef()
 	k := keys.Default()

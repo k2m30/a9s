@@ -7,7 +7,6 @@ package unit
 import (
 	"context"
 	"errors"
-	"os"
 	"strings"
 	"testing"
 
@@ -18,11 +17,11 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // ---------------------------------------------------------------------------
@@ -61,8 +60,7 @@ func rowContaining(content, substr string) string {
 // ec2DetailModel creates a DetailModel for the given EC2 resource, sized 120x40.
 func ec2DetailModel(t *testing.T, r resource.Resource) views.DetailModel {
 	t.Helper()
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	k := keys.Default()
 	d := views.NewDetail(r, "ec2", nil, k)

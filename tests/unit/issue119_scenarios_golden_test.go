@@ -11,11 +11,11 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // Scenario-driven golden snapshots for Issue #119.
@@ -109,11 +109,10 @@ func collectIssue119ScenarioViews(t *testing.T, noColor bool) map[string]string 
 	t.Cleanup(func() { tui.Version = oldVersion })
 
 	if noColor {
-		t.Setenv("NO_COLOR", "1")
+		tuitest.NoColor(t)
 	} else {
-		os.Unsetenv("NO_COLOR")
+		tuitest.ForceColor(t)
 	}
-	styles.Reinit()
 
 	out := make(map[string]string)
 	for _, sc := range issue119Scenarios() {
@@ -136,11 +135,10 @@ func collectIssue119ScenarioViewsFiltered(t *testing.T, noColor bool, keep map[s
 	t.Cleanup(func() { tui.Version = oldVersion })
 
 	if noColor {
-		t.Setenv("NO_COLOR", "1")
+		tuitest.NoColor(t)
 	} else {
-		os.Unsetenv("NO_COLOR")
+		tuitest.ForceColor(t)
 	}
-	styles.Reinit()
 
 	out := make(map[string]string)
 	for _, sc := range issue119Scenarios() {
@@ -557,9 +555,7 @@ func issue119ScenarioNameSet() map[string]struct{} {
 }
 
 func TestIssue119SelectorStandaloneProfileRender(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
-	styles.Reinit()
-	defer styles.Reinit()
+	tuitest.NoColor(t)
 
 	sel := views.NewProfile([]string{"default", "staging", "prod"}, "default", keys.Default())
 	sel.SetSize(60, 8)

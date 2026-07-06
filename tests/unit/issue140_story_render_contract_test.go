@@ -1,7 +1,6 @@
 package unit_test
 
 import (
-	"os"
 	"strings"
 	"testing"
 
@@ -10,9 +9,9 @@ import (
 	_ "github.com/k2m30/a9s/v3/internal/aws"
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/internal/tui"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // Issue #140 / docs/qa/ec2-related-navigation-stories.md
@@ -52,9 +51,7 @@ func TestIssue140_Story_EC2_001_InitialDetailRenderContract(t *testing.T) {
 }
 
 func TestIssue140_Story_EC2_017_UnderlineVisibilityOnNavigableRow(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	tuitest.ForceColor(t)
 	withIssue140EC2RelatedDefs(t)
 
 	d := makePreviewEC2Detail(t, 120, 35)

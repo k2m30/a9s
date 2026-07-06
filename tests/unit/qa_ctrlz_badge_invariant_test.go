@@ -15,7 +15,6 @@ package unit
 // but the expected count is computed from their Color func, not a global set.
 
 import (
-	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -26,10 +25,10 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // ctrlZ constructs the ctrl+z key press message understood by bubbles/v2 key.Matches.
@@ -42,8 +41,7 @@ func ctrlZ() tea.KeyPressMsg {
 // provided resources, and returns the model ready for Update calls.
 func ctrlZModel(t *testing.T, shortName string, resources []resource.Resource) views.ResourceListModel {
 	t.Helper()
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := resource.FindResourceType(shortName)
 	if td == nil {
@@ -512,8 +510,7 @@ func TestCtrlZ_PerViewState_DoesNotBleed(t *testing.T) {
 
 func TestCtrlZ_PersistsAcrossCacheRoundTrip(t *testing.T) {
 	t.Helper()
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := resource.FindResourceType("ct-events")
 	if td == nil {

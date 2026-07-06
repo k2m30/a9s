@@ -15,7 +15,6 @@ package unit
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 
@@ -25,8 +24,8 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // ---------------------------------------------------------------------------
@@ -83,8 +82,7 @@ func pgKeyPress(char string) tea.KeyPressMsg {
 // pgNewModel creates a fresh ResourceListModel, calls Init, and sets size.
 func pgNewModel(t *testing.T) views.ResourceListModel {
 	t.Helper()
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := pgTestTypeDef()
 	k := keys.Default()
@@ -448,8 +446,7 @@ func TestResourceList_LoadMore_WhenAlreadyLoading_Noop(t *testing.T) {
 // TestResourceList_FrameTitle_Pagination_AllResourceTypes verifies that
 // FrameTitle works correctly for all resource types, not just EC2.
 func TestResourceList_FrameTitle_Pagination_AllResourceTypes(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	for _, rt := range resource.AllResourceTypes() {
 		t.Run(rt.ShortName, func(t *testing.T) {

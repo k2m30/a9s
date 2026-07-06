@@ -2,18 +2,17 @@ package unit
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -706,8 +705,7 @@ func TestQA_HelpContext_AllResourceTypes_ShowResourceListKeys(t *testing.T) {
 // TestQA_HelpContext_PaginatedResourceList_ShowsLoadMore verifies that the
 // paginated help context includes "load more" and "M" key bindings.
 func TestQA_HelpContext_PaginatedResourceList_ShowsLoadMore(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	help := views.NewHelp(keys.Default(), views.HelpFromResourceListPaginated)
 	help.SetSize(120, 30)
@@ -726,8 +724,7 @@ func TestQA_HelpContext_PaginatedResourceList_ShowsLoadMore(t *testing.T) {
 // TestQA_HelpContext_PaginatedSecretsList_ShowsLoadMoreAndReveal verifies
 // that the paginated secrets help context includes both "load more" and "reveal".
 func TestQA_HelpContext_PaginatedSecretsList_ShowsLoadMoreAndReveal(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	help := views.NewHelp(keys.Default(), views.HelpFromSecretsListPaginated)
 	help.SetSize(120, 30)
@@ -747,8 +744,7 @@ func TestQA_HelpContext_PaginatedSecretsList_ShowsLoadMoreAndReveal(t *testing.T
 // a ResourceListModel with truncated pagination returns the paginated
 // help context variant.
 func TestQA_HelpContext_ResourceList_GetHelpContext_Paginated(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	// Create ec2 resource list
 	td := resource.ResourceTypeDef{
@@ -794,8 +790,7 @@ func TestQA_HelpContext_ResourceList_GetHelpContext_Paginated(t *testing.T) {
 // TestQA_HelpContext_ResourceList_GetHelpContext_NotPaginated verifies that
 // a ResourceListModel without truncation returns the standard help context.
 func TestQA_HelpContext_ResourceList_GetHelpContext_NotPaginated(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	// Create ec2 resource list
 	td := resource.ResourceTypeDef{
@@ -842,8 +837,7 @@ func TestQA_HelpContext_ResourceList_GetHelpContext_NotPaginated(t *testing.T) {
 // a secrets ResourceListModel with truncated pagination returns the
 // paginated secrets help context variant.
 func TestQA_HelpContext_SecretsList_GetHelpContext_Paginated(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	rtDef := resource.FindResourceType("secrets")
 	if rtDef == nil {

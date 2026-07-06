@@ -35,8 +35,8 @@ import (
 	"github.com/k2m30/a9s/v3/internal/app"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // ---------------------------------------------------------------------------
@@ -277,9 +277,7 @@ func reportTextParityMismatch(t *testing.T, legacy, got, kind, scenario string) 
 
 // TestTextRenderParity_YAML covers all YAML scenarios.
 func TestTextRenderParity_YAML(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	tuitest.NoColor(t)
 
 	res := textParityResource()
 	lines := yamlContentLines(res)
@@ -461,9 +459,7 @@ func TestTextRenderParity_YAML(t *testing.T) {
 
 // TestTextRenderParity_JSON covers all JSON scenarios.
 func TestTextRenderParity_JSON(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	tuitest.NoColor(t)
 
 	res := textParityResource()
 	lines := jsonContentLines(res)

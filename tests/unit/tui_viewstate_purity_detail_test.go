@@ -46,8 +46,8 @@ import (
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/session"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // TestViewStatePurity_Detail_FieldListConsistencyAcrossAllTypes sweeps every
@@ -60,9 +60,7 @@ import (
 // implementations disagreed on a resource type that the fixture-based sweep
 // in detail_render_parity_test.go does not cover.
 func TestViewStatePurity_Detail_FieldListConsistencyAcrossAllTypes(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	tuitest.NoColor(t)
 
 	allTypes := resource.AllResourceTypes()
 	if len(allTypes) == 0 {

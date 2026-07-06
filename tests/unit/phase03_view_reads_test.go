@@ -8,16 +8,15 @@
 package unit_test
 
 import (
-	"os"
 	"strings"
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // ---------------------------------------------------------------------------
@@ -199,18 +198,7 @@ func TestViews_ListStatusColumn_FallsBackToLifecycleKey(t *testing.T) {
 // the two resources we care about at positions 1 (healthy) and 2 (findings-broken)
 // so both render without cursor overlay and their base styles are comparable.
 func TestViews_ListColor_DelegatesToTypeColor(t *testing.T) {
-	// Ensure NO_COLOR is absent so lipgloss emits ANSI escape sequences.
-	old, wasSet := os.LookupEnv("NO_COLOR")
-	os.Unsetenv("NO_COLOR") //nolint:errcheck
-	styles.Reinit()
-	t.Cleanup(func() {
-		if wasSet {
-			os.Setenv("NO_COLOR", old) //nolint:errcheck
-		} else {
-			os.Unsetenv("NO_COLOR") //nolint:errcheck
-		}
-		styles.Reinit()
-	})
+	tuitest.ForceColor(t)
 
 	// td.Color returns ColorHealthy for status="running" — any resource with
 	// Fields["status"]="running" is green regardless of Findings.

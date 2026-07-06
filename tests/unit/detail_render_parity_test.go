@@ -41,8 +41,8 @@ import (
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/session"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // ---------------------------------------------------------------------------
@@ -334,9 +334,7 @@ func detailParityTypes() []detailParityCase {
 // A mismatch is a real regression in RenderDetail or buildDetailBody. Report it;
 // do NOT loosen the assertion. The architect decides how to fix it.
 func TestDetailRenderParity(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	tuitest.NoColor(t)
 
 	const (
 		stdW    = 160 // wide — triggers right-column auto-show when defs registered
@@ -606,9 +604,7 @@ func TestDetailRenderParity(t *testing.T) {
 // finding that has a known row bucket (EC2 instances can be ColorBroken when
 // stopped). This exercises the capTierToRowBucket capping logic on both sides.
 func TestDetailRenderParity_EC2Attention(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	tuitest.NoColor(t)
 
 	k := keys.Default()
 	const narrowW = 40
@@ -657,9 +653,7 @@ func TestDetailRenderParity_EC2Attention(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestDetailRenderParity_RDSAttentionWarn(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	tuitest.NoColor(t)
 
 	k := keys.Default()
 	const narrowW = 40
@@ -697,9 +691,7 @@ func TestDetailRenderParity_RDSAttentionWarn(t *testing.T) {
 // rendering algorithms diverge once scroll/cursor advance. Loading state is
 // where they must agree before the flip.
 func TestDetailRenderParity_RelatedPanel_LoadingState(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	tuitest.NoColor(t)
 
 	k := keys.Default()
 	allTypes := resource.AllResourceTypes()

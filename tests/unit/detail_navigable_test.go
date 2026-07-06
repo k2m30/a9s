@@ -9,7 +9,6 @@ package unit_test
 // messages.RelatedNavigate.
 
 import (
-	"os"
 	"strings"
 	"testing"
 
@@ -17,10 +16,10 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // testNavEC2 is a minimal stand-in for an EC2 instance used only in navigable
@@ -79,10 +78,7 @@ func makeNavDetail(width, height int) views.DetailModel {
 
 func TestDetail_NavigableField_HighlightedInView(t *testing.T) {
 	// Colours must be ON so the underline escape is emitted.
-	// Explicitly unset NO_COLOR and reinitialize styles.
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
-	t.Cleanup(func() { styles.Reinit() })
+	tuitest.ForceColor(t)
 
 	replaceEC2NavigableFields(t, []resource.NavigableField{
 		{FieldPath: "VpcId", TargetType: "vpc"},

@@ -17,15 +17,14 @@ package unit
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // ===========================================================================
@@ -84,12 +83,7 @@ func wideTestResources() []resource.Resource {
 // at the given terminal width.
 func wideModel(t *testing.T, width int) views.ResourceListModel {
 	t.Helper()
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
-	t.Cleanup(func() {
-		os.Unsetenv("NO_COLOR")
-		styles.Reinit()
-	})
+	tuitest.ForceColor(t)
 
 	td := wideTypeDef()
 	k := keys.Default()
@@ -122,12 +116,7 @@ func wideModel(t *testing.T, width int) views.ResourceListModel {
 // did not merge SortKey/SortPath from defaults, leaving sortKey empty on columns
 // that needed it — sort would fall back to display-value string comparison.
 func TestQA_Sort_NilConfigFallback_S3_CreationDateHasSortMetadata(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
-	t.Cleanup(func() {
-		os.Unsetenv("NO_COLOR")
-		styles.Reinit()
-	})
+	tuitest.ForceColor(t)
 
 	// s3BucketTypeDef has only 2 columns — Bucket Name + Creation Date.
 	// The defaults for "s3" have 3 columns (Bucket Name + Region + Creation Date).
@@ -361,12 +350,7 @@ func TestQA_Sort_IndicatorPersistsAcrossScroll(t *testing.T) {
 // (Bucket Name, Region, Creation Date). The superset path in resolveColumns()
 // fires and uses defaults, so 3 columns are visible and "3" is the correct key.
 func TestQA_Sort_S3_CreationDate_VisiblePositionKey(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
-	t.Cleanup(func() {
-		os.Unsetenv("NO_COLOR")
-		styles.Reinit()
-	})
+	tuitest.ForceColor(t)
 
 	m := s3RLBucketModel()
 
@@ -406,12 +390,7 @@ func TestQA_Sort_S3_CreationDate_VisiblePositionKey(t *testing.T) {
 //	cdn-website...       2025-05-13
 //	test-app-state       2025-06-20
 func TestQA_Sort_S3_CreationDate_SortsDataCorrectly(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
-	t.Cleanup(func() {
-		os.Unsetenv("NO_COLOR")
-		styles.Reinit()
-	})
+	tuitest.ForceColor(t)
 
 	m := s3RLBucketModel()
 

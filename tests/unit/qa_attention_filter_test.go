@@ -6,10 +6,10 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 func TestAttentionFilter_DefaultDisabled(t *testing.T) {
@@ -67,9 +67,7 @@ func TestAttentionFilter_SetEnabledIdempotent(t *testing.T) {
 // "|| findingsByID has r.ID" to the kept predicate.
 func TestAttentionFilter_IncludesResourcesWithFindings(t *testing.T) {
 	t.Helper()
-	t.Setenv("NO_COLOR", "")
-	styles.Reinit()
-	t.Cleanup(func() { styles.Reinit() })
+	tuitest.NoColor(t)
 
 	// s3 Color always returns ColorHealthy regardless of resource fields,
 	// so all three resources below will fail the IsIssue() Wave-1 gate.

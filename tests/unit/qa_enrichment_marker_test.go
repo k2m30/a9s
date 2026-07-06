@@ -16,10 +16,11 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // ---------------------------------------------------------------------------
@@ -61,11 +62,7 @@ func markerResources() []resource.Resource {
 // buildMarkerModel constructs a fully-loaded ResourceListModel for marker tests.
 func buildMarkerModel(t *testing.T, findings map[string]domain.Finding) views.ResourceListModel {
 	t.Helper()
-	t.Setenv("NO_COLOR", "")
-	styles.Reinit()
-	t.Cleanup(func() {
-		styles.Reinit()
-	})
+	tuitest.NoColor(t)
 
 	td := markerTypeDef()
 	k := keys.Default()
@@ -232,11 +229,7 @@ func TestRowMarker_OnlyOnAffectedRows_Multiple(t *testing.T) {
 // "~ " prefix marker still appears in the plain-text rendered output.
 // Color styling is additive; the prefix character itself must always render.
 func TestRowMarker_NoColorMode_StillVisible(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
-	styles.Reinit()
-	t.Cleanup(func() {
-		styles.Reinit()
-	})
+	tuitest.NoColor(t)
 
 	findings := map[string]domain.Finding{
 		"i-2": {Code: "rds.pending-maintenance", Phrase: "pending maintenance", Severity: domain.SevWarn, Source: "wave2:rds"},

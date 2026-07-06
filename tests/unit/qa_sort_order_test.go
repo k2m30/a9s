@@ -1,15 +1,14 @@
 package unit
 
 import (
-	"os"
 	"strings"
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // ===========================================================================
@@ -80,12 +79,7 @@ func sortTestResources() []resource.Resource {
 // sort key presses.
 func sortLoadedModel(t *testing.T) views.ResourceListModel {
 	t.Helper()
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
-	t.Cleanup(func() {
-		os.Unsetenv("NO_COLOR")
-		styles.Reinit()
-	})
+	tuitest.ForceColor(t)
 
 	td := sortTestTypeDef()
 	k := keys.Default()
@@ -477,12 +471,7 @@ func logStreamSortResources() []resource.Resource {
 }
 
 func TestQA_SortOrder_LogStreams_AgeSortWorks(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
-	t.Cleanup(func() {
-		os.Unsetenv("NO_COLOR")
-		styles.Reinit()
-	})
+	tuitest.ForceColor(t)
 
 	td := logStreamSortTypeDef()
 	k := keys.Default()
@@ -588,12 +577,7 @@ func multiTimeFieldResources() []resource.Resource {
 // Expected ascending order by creation_date: alpha, charlie, bravo.
 // If modified_date were used instead: bravo, charlie, alpha — a different order.
 func TestQA_SortOrder_AgeDeterministic_MultipleTimeFields(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
-	t.Cleanup(func() {
-		os.Unsetenv("NO_COLOR")
-		styles.Reinit()
-	})
+	tuitest.ForceColor(t)
 
 	td := multiTimeFieldTypeDef()
 	k := keys.Default()
@@ -638,12 +622,7 @@ func TestQA_SortOrder_AgeDeterministic_MultipleTimeFields(t *testing.T) {
 // Expected ascending order by started: foo, bar.
 // If last_event were used: bar, foo — reversed.
 func TestQA_SortOrder_AgeUsesFirstColumnMatch(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
-	t.Cleanup(func() {
-		os.Unsetenv("NO_COLOR")
-		styles.Reinit()
-	})
+	tuitest.ForceColor(t)
 
 	td := resource.ResourceTypeDef{
 		Name:      "Started First Type",

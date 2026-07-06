@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 func snapshotEC2RelatedView(t *testing.T) string {
@@ -55,10 +55,7 @@ func TestGolden_EC2RelatedView_Text(t *testing.T) {
 }
 
 func TestGolden_EC2RelatedView_ANSI(t *testing.T) {
-	// Explicitly force color-enabled style init for ANSI snapshot.
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	tuitest.ForceColor(t)
 
 	actual := snapshotEC2RelatedView(t)
 	actual = strings.ReplaceAll(actual, "\r\n", "\n")

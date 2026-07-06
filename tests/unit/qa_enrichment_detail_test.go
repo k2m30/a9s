@@ -13,8 +13,8 @@ import (
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // ---------------------------------------------------------------------------
@@ -38,11 +38,7 @@ func rdsDetailResource() resource.Resource {
 // newRDSDetailModel builds a DetailModel for an RDS resource with a fixed size.
 func newRDSDetailModel(t *testing.T) views.DetailModel {
 	t.Helper()
-	t.Setenv("NO_COLOR", "")
-	styles.Reinit()
-	t.Cleanup(func() {
-		styles.Reinit()
-	})
+	tuitest.NoColor(t)
 	k := keys.Default()
 	m := views.NewDetail(rdsDetailResource(), "rds", nil, k)
 	m.SetSize(120, 40)
@@ -238,9 +234,7 @@ func TestDetailView_YAMLViewDoesNotShowFinding(t *testing.T) {
 // section renders correctly for resource types that have per-type enrichers.
 // Each type has its own section header injected by the per-type injector.
 func TestDetailView_FindingRendersForMultipleResourceTypes(t *testing.T) {
-	t.Setenv("NO_COLOR", "")
-	styles.Reinit()
-	t.Cleanup(func() { styles.Reinit() })
+	tuitest.NoColor(t)
 
 	type tc struct {
 		resourceType  string

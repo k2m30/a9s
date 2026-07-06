@@ -14,7 +14,6 @@ package unit
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 
@@ -37,8 +36,8 @@ import (
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // effectiveTitleName returns the name FrameTitle() uses: ListTitle if set, else ShortName.
@@ -552,8 +551,7 @@ func TestStoryD6_SG_1200Groups_CurrentBehavior(t *testing.T) {
 // storyNewModel creates a fresh ResourceListModel and initializes it.
 func storyNewModel(t *testing.T) views.ResourceListModel {
 	t.Helper()
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := pgTestTypeDef()
 	k := keys.Default()
@@ -725,8 +723,7 @@ func TestStoryG1_DetailAndBack_PreservesLoadedData(t *testing.T) {
 }
 
 func TestStoryG3_SwitchingResourceType_ResetsPagination(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	// Create a model for EC2 and load paginated data
 	ec2TD := pgTestTypeDef()
@@ -788,8 +785,7 @@ func TestStoryG3_SwitchingResourceType_ResetsPagination(t *testing.T) {
 // ===========================================================================
 
 func TestStoryH1_DemoMode_PaginationForLargeTypes(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	clients := demo.NewServiceClients()
 	ctx := context.Background()
@@ -872,8 +868,7 @@ func TestStoryH1_DemoMode_PaginationForLargeTypes(t *testing.T) {
 }
 
 func TestStoryH1_DemoMode_ChildViews_Pagination(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	// Test a selection of child view types that have demo data.
 	childTypes := []struct {
@@ -1195,8 +1190,7 @@ func TestStoryI2_RapidMPresses_Debounced(t *testing.T) {
 // view (opened via HelpFromResourceListPaginated context) should show the
 // "M" / "load more" key binding.
 func TestStoryC1_HelpView_ShowsMKey_WhenTruncated(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	// When opened from a truncated resource list, help uses HelpFromResourceListPaginated.
 	help := views.NewHelp(keys.Default(), views.HelpFromResourceListPaginated)
@@ -1233,8 +1227,7 @@ func TestStoryC1_HelpView_ShowsMKey_WhenTruncated(t *testing.T) {
 // TestStoryC2_HelpView_HidesMKey_WhenNotTruncated verifies that the help
 // view does NOT show "Load More" when the list is fully loaded.
 func TestStoryC2_HelpView_HidesMKey_WhenNotTruncated(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	// For a non-truncated list, help uses HelpFromResourceList (non-paginated),
 	// which should NOT show "Load More".
@@ -1324,8 +1317,7 @@ func TestStoryE4_ErrorDuringLoadMore_PreservesData(t *testing.T) {
 
 // TestStoryE4_AllResourceTypes verifies error-preserves-data for all resource types.
 func TestStoryE4_AllResourceTypes(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	for _, rt := range resource.AllResourceTypes() {
 		t.Run(rt.ShortName+"_error_preserves_data", func(t *testing.T) {
@@ -1420,8 +1412,7 @@ func TestStoryI3_RapidRefresh_ReplaceClean(t *testing.T) {
 // TestStoryJ1_ResizeDuringLoadMore_PreservesData verifies that terminal
 // resize during an in-flight load-more does not lose data or interrupt state.
 func TestStoryJ1_ResizeDuringLoadMore_PreservesData(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	for _, rt := range resource.AllResourceTypes() {
 		t.Run(rt.ShortName+"_resize_during_load_more", func(t *testing.T) {
@@ -1511,8 +1502,7 @@ func TestStoryJ1_ResizeDuringLoadMore_PreservesData(t *testing.T) {
 // TestStoryJ2_MinimumTerminalSize_PreservesData verifies that resizing below
 // minimum dimensions and back does not lose paginated data.
 func TestStoryJ2_MinimumTerminalSize_PreservesData(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	// Representative sample — full sweep in CI slow suite
 	sampleJ2 := []resource.ResourceTypeDef{
@@ -1734,8 +1724,7 @@ func TestStoryK2_LogEvents_ContinuationToken(t *testing.T) {
 // after a load-more error, the model retains resources and pagination metadata.
 // ClearLoading() must clear both loading and loadingMore flags.
 func TestStoryL2_ErrorFlashDuringLoadMore_PreservesPagination(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	for _, rt := range resource.AllResourceTypes() {
 		t.Run(rt.ShortName+"_error_flash_preserves_pagination", func(t *testing.T) {
@@ -1802,8 +1791,7 @@ func TestStoryL2_ErrorFlashDuringLoadMore_PreservesPagination(t *testing.T) {
 // TestStoryN1_CopyID_OnAppendedItems verifies that the copy action works
 // on resources loaded via M (items beyond the initial page boundary).
 func TestStoryN1_CopyID_OnAppendedItems(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	// Representative sample — full sweep in CI slow suite
 	sampleN1 := []resource.ResourceTypeDef{
@@ -2058,8 +2046,7 @@ func TestStoryN5_PageUpDown_AcrossLoadMoreBoundary(t *testing.T) {
 // TestStoryN_AllResourceTypes_AppendedItemsAccessible verifies that for all
 // resource types, items loaded via M are fully accessible for interactions.
 func TestStoryN_AllResourceTypes_AppendedItemsAccessible(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	// Representative sample — full sweep in CI slow suite
 	sampleN := []resource.ResourceTypeDef{
@@ -2258,8 +2245,7 @@ func TestStory_LoadMoreIndicator_HiddenAfterAllPagesLoaded(t *testing.T) {
 // TestStory_LoadMoreIndicator_AllResourceTypes verifies the load-more
 // indicator for every resource type: shown when truncated, hidden when complete.
 func TestStory_LoadMoreIndicator_AllResourceTypes(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	// Representative sample — full sweep in CI slow suite
 	sampleLoadMore := []resource.ResourceTypeDef{
@@ -2323,8 +2309,7 @@ func TestStory_LoadMoreIndicator_AllResourceTypes(t *testing.T) {
 // ===========================================================================
 
 func TestStoryDFGI_AllResourceTypes_PaginationViewConsistency(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	for _, rt := range resource.AllResourceTypes() {
 		t.Run(rt.ShortName+"_pagination_lifecycle", func(t *testing.T) {

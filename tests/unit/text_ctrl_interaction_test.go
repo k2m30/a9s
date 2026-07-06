@@ -31,8 +31,8 @@ import (
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/session"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // ---------------------------------------------------------------------------
@@ -106,9 +106,7 @@ func textSnapshot(t *testing.T, ctrl *app.Controller) *app.TextBody {
 // ---------------------------------------------------------------------------
 
 func TestTextCtrlInteraction_YAML_ToggleWrap(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	tuitest.NoColor(t)
 
 	res := textInteractionResource()
 	m := views.NewYAML(res, "ec2", keys.Default())
@@ -142,9 +140,7 @@ func TestTextCtrlInteraction_YAML_ToggleWrap(t *testing.T) {
 }
 
 func TestTextCtrlInteraction_YAML_ToggleWrap_ViaUpdate(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	tuitest.NoColor(t)
 
 	res := textInteractionResource()
 	m := views.NewYAML(res, "ec2", keys.Default())
@@ -180,9 +176,7 @@ func TestTextCtrlInteraction_YAML_ToggleWrap_ViaUpdate(t *testing.T) {
 }
 
 func TestTextCtrlInteraction_YAML_Search(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	tuitest.NoColor(t)
 
 	res := textInteractionResource()
 	m := views.NewYAML(res, "ec2", keys.Default())
@@ -222,9 +216,7 @@ func TestTextCtrlInteraction_YAML_Search(t *testing.T) {
 }
 
 func TestTextCtrlInteraction_YAML_SearchNextPrev(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	tuitest.NoColor(t)
 
 	res := textInteractionResource()
 	m := views.NewYAML(res, "ec2", keys.Default())
@@ -259,9 +251,7 @@ func TestTextCtrlInteraction_YAML_SearchNextPrev(t *testing.T) {
 }
 
 func TestTextCtrlInteraction_YAML_SearchNextPrev_ViaUpdate(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	tuitest.NoColor(t)
 
 	res := textInteractionResource()
 	m := views.NewYAML(res, "ec2", keys.Default())
@@ -305,9 +295,7 @@ func TestTextCtrlInteraction_YAML_SearchNextPrev_ViaUpdate(t *testing.T) {
 }
 
 func TestTextCtrlInteraction_YAML_Scroll(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	tuitest.NoColor(t)
 
 	// Build a long resource so scrolling is observable.
 	res := textInteractionResource()
@@ -361,9 +349,7 @@ func TestTextCtrlInteraction_YAML_Scroll(t *testing.T) {
 }
 
 func TestTextCtrlInteraction_YAML_Scroll_ViaUpdate(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	tuitest.NoColor(t)
 
 	res := textInteractionResource()
 	m := views.NewYAML(res, "ec2", keys.Default())
@@ -399,9 +385,7 @@ func TestTextCtrlInteraction_YAML_Scroll_ViaUpdate(t *testing.T) {
 }
 
 func TestTextCtrlInteraction_YAML_SearchClear_ViaUpdate(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	tuitest.NoColor(t)
 
 	res := textInteractionResource()
 	m := views.NewYAML(res, "ec2", keys.Default())
@@ -437,9 +421,7 @@ func TestTextCtrlInteraction_YAML_SearchClear_ViaUpdate(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestTextCtrlInteraction_JSON_ToggleWrap(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	tuitest.NoColor(t)
 
 	res := textInteractionResource()
 	m := views.NewJSON(res, "ec2", keys.Default())
@@ -467,9 +449,7 @@ func TestTextCtrlInteraction_JSON_ToggleWrap(t *testing.T) {
 }
 
 func TestTextCtrlInteraction_JSON_Search(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	tuitest.NoColor(t)
 
 	res := textInteractionResource()
 	m := views.NewJSON(res, "ec2", keys.Default())
@@ -499,9 +479,7 @@ func TestTextCtrlInteraction_JSON_Search(t *testing.T) {
 }
 
 func TestTextCtrlInteraction_JSON_SearchNextPrev_ViaUpdate(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	tuitest.NoColor(t)
 
 	res := textInteractionResource()
 	m := views.NewJSON(res, "ec2", keys.Default())
@@ -541,9 +519,7 @@ func TestTextCtrlInteraction_JSON_SearchNextPrev_ViaUpdate(t *testing.T) {
 }
 
 func TestTextCtrlInteraction_JSON_Scroll_ViaUpdate(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	tuitest.NoColor(t)
 
 	res := textInteractionResource()
 	m := views.NewJSON(res, "ec2", keys.Default())

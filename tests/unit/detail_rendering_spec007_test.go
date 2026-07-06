@@ -17,7 +17,6 @@ package unit_test
 //   Bug5: No stacked layout for width 80-99 with right column registered
 
 import (
-	"os"
 	"strings"
 	"testing"
 
@@ -26,6 +25,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // ---------------------------------------------------------------------------
@@ -65,13 +65,10 @@ func twoFieldNavConfig() *config.ViewsConfig {
 
 // make007NavDetailWithColors creates a DetailModel with colors enabled, a
 // 2-field nav config, and "VpcId" registered as navigable → "vpc".
-// Caller must call defer resource.CleanupNavigableFieldsForTest("ec2") and
-// defer styles.Reinit().
+// Caller must call defer resource.CleanupNavigableFieldsForTest("ec2").
 func make007NavDetailWithColors(t *testing.T, width, height int) views.DetailModel {
 	t.Helper()
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
-	t.Cleanup(func() { styles.Reinit() })
+	tuitest.ForceColor(t)
 
 	resource.SetNavigableFieldsForTest("ec2", []resource.NavigableField{
 		{FieldPath: "VpcId", TargetType: "vpc"},
@@ -180,9 +177,7 @@ func TestDetail_007_SeparatorAbsent_NoRightCol(t *testing.T) {
 // FAILS NOW: sub-field lines have only DetailVal ANSI, not DetailKey.
 // PASSES AFTER FIX: sub-field lines contain both DetailKey and DetailVal ANSI sequences.
 func TestDetail_007_SubField_RendersKeyAndValue(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
-	t.Cleanup(func() { styles.Reinit() })
+	tuitest.ForceColor(t)
 	resource.CleanupNavigableFieldsForTest("ec2")
 	defer resource.CleanupNavigableFieldsForTest("ec2")
 	unregisterEC2Related(t)
@@ -342,9 +337,7 @@ func TestDetail_007_CursorHighlight_MovesAfterJ(t *testing.T) {
 // when the right column takes focus.
 func TestDetail_007_CursorHighlight_AbsentWhenRightFocused(t *testing.T) {
 	register007EC2Defs(t)
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
-	t.Cleanup(func() { styles.Reinit() })
+	tuitest.ForceColor(t)
 
 	d := make007EC2Detail(120, 30, twoFieldNavConfig())
 

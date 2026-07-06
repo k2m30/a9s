@@ -7,22 +7,16 @@ package unit
 // so the user can drill in.
 
 import (
-	"os"
 	"strings"
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 func TestCtrlZ_TruncatedZero_Visible(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
-	styles.Reinit()
-	defer func() {
-		os.Unsetenv("NO_COLOR")
-		styles.Reinit()
-	}()
+	tuitest.NoColor(t)
 
 	m := views.NewMainMenu(keys.Default())
 	m.SetSize(80, 200)
@@ -51,12 +45,7 @@ func TestCtrlZ_TruncatedZero_Visible(t *testing.T) {
 }
 
 func TestCtrlZ_TruncatedNonzero_Visible(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
-	styles.Reinit()
-	defer func() {
-		os.Unsetenv("NO_COLOR")
-		styles.Reinit()
-	}()
+	tuitest.NoColor(t)
 
 	m := views.NewMainMenu(keys.Default())
 	m.SetSize(80, 200)

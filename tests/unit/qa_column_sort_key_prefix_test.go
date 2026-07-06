@@ -19,18 +19,18 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // buildResourceList creates a ResourceListModel for the given resource type with
 // a realistic resource loaded, at the given terminal width. Uses DefaultConfig so
-// view columns match production defaults.
+// view columns match production defaults. Callers are responsible for
+// establishing the NO_COLOR baseline (e.g. via tuitest.NoColor) before calling.
 func buildResourceList(t *testing.T, shortName string, width int) views.ResourceListModel {
 	t.Helper()
-	styles.Reinit()
 
 	td := resource.FindResourceType(shortName)
 	if td == nil {
@@ -75,7 +75,7 @@ func headerLineFrom(m views.ResourceListModel) string {
 // We test with ec2 (many columns) at a wide terminal so column 5 prefix "6:" is
 // visible without truncation interfering.
 func TestColumnHeader_ShowsPrefixOnNarrowColumn(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
+	tuitest.NoColor(t)
 
 	// "ec2" has multiple columns. At width 200 all fit. Column at absIdx=5
 	// (6th column, 0-based) should have "6:" prefix in the header.
@@ -94,7 +94,7 @@ func TestColumnHeader_ShowsPrefixOnNarrowColumn(t *testing.T) {
 //
 // Keys: absIdx 0-8 → prefixes "1:"-"9:", absIdx 9 → prefix "0:".
 func TestColumnHeader_ShowsPrefixForAllTenColumns(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
+	tuitest.NoColor(t)
 
 	// Find a resource type with at least 10 columns in defaults.
 	var targetType string
@@ -143,7 +143,7 @@ func TestColumnHeader_ShowsPrefixForAllTenColumns(t *testing.T) {
 // The colHeaderTitle contract: "only when absIdx < 10".
 // We test with a type that has more than 10 columns and a wide enough terminal.
 func TestColumnHeader_NoPrefixForColumn11Plus(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
+	tuitest.NoColor(t)
 
 	// Find a resource type with at least 11 columns.
 	var targetType string
@@ -193,7 +193,7 @@ func TestColumnHeader_NoPrefixForColumn11Plus(t *testing.T) {
 // This is a regression pin: if the column order changes or prefixes are
 // accidentally suppressed, this test catches it.
 func TestColumnHeader_DocDBClustersHaveAllFivePrefixes(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
+	tuitest.NoColor(t)
 
 	m := buildResourceList(t, "dbc", 300)
 	header := headerLineFrom(m)

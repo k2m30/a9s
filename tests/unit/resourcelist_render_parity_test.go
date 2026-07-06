@@ -38,8 +38,8 @@ import (
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/session"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // ---------------------------------------------------------------------------
@@ -206,9 +206,7 @@ func TestResourceListRenderParity(t *testing.T) {
 		td := td // capture loop variable
 		t.Run(td.ShortName, func(t *testing.T) {
 			// Ensure NO_COLOR for deterministic styled output.
-			t.Setenv("NO_COLOR", "1")
-			styles.Reinit()
-			t.Cleanup(styles.Reinit)
+			tuitest.NoColor(t)
 
 			k := keys.Default()
 			resources10 := listParityResources(td, 10)

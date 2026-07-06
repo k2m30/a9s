@@ -9,17 +9,16 @@ package unit
 // truncated. The fix should detect shrinkage and allow scrolling.
 
 import (
-	"os"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // hScrollKeyPress builds a tea.KeyPressMsg for single-character keys used in
@@ -44,8 +43,7 @@ func hScrollKeyPress(char string) tea.KeyPressMsg {
 // exact scenario that triggers the #105 bug.
 func hScrollRDSModel(t *testing.T, width int) views.ResourceListModel {
 	t.Helper()
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := resource.FindResourceType("dbi")
 	if td == nil {
@@ -70,8 +68,7 @@ func hScrollRDSModel(t *testing.T, width int) views.ResourceListModel {
 // changes the view even when the last visible column was shrunk (not dropped).
 // Before the #105 fix this test FAILS because scrolling right does nothing.
 func TestQA_HScroll_ScrollRightWhenLastColumnShrunk(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	// Width 70: db_identifier+engine+engine_version fill 57 cols, status gets
 	// shrunk to 11 instead of dropped — this triggers the bug.
@@ -94,8 +91,7 @@ func TestQA_HScroll_ScrollRightWhenLastColumnShrunk(t *testing.T) {
 // TestQA_HScroll_ScrollLeftRestoresOriginal verifies that scrolling right
 // then left returns the view to its original appearance.
 func TestQA_HScroll_ScrollLeftRestoresOriginal(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	m := hScrollRDSModel(t, 70)
 	outOriginal := m.View()
@@ -119,8 +115,7 @@ func TestQA_HScroll_ScrollLeftRestoresOriginal(t *testing.T) {
 // TestQA_HScroll_ScrollRightStopsAtEnd verifies that scrolling right
 // repeatedly does not scroll past the end (no infinite progression).
 func TestQA_HScroll_ScrollRightStopsAtEnd(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	m := hScrollRDSModel(t, 70)
 
@@ -152,8 +147,7 @@ func TestQA_HScroll_ScrollRightStopsAtEnd(t *testing.T) {
 // NOT change the view when the terminal is wide enough to show all columns
 // at full width.
 func TestQA_HScroll_NoScrollWhenAllColumnsFit(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	// Width 200 is wide enough for all RDS columns (total ~145 chars).
 	m := hScrollRDSModel(t, 200)
@@ -176,8 +170,7 @@ func TestQA_HScroll_NoScrollWhenAllColumnsFit(t *testing.T) {
 // the header row and data rows start with the same column title / cell text,
 // confirming they are rendered with the same column set.
 func TestQA_HScroll_HeaderAndDataAligned(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	m := hScrollRDSModel(t, 70)
 

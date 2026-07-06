@@ -16,16 +16,15 @@ package unit
 // The sort glyph appears after the prefix+title: "2:TIME↓" (descending).
 
 import (
-	"os"
 	"strings"
 	"testing"
 
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // countSortGlyphs returns the total number of ↑ or ↓ characters in s.
@@ -51,8 +50,7 @@ func buildSortModel(
 	sortAsc bool,
 ) views.ResourceListModel {
 	t.Helper()
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := resource.FindResourceType(shortName)
 	if td == nil {
@@ -319,8 +317,7 @@ func TestSortIndicator_ExactlyOnePerSort(t *testing.T) {
 func TestSortIndicator_NoGlyphWhenUnsorted(t *testing.T) {
 	for _, shortName := range []string{"ec2", "dbi"} {
 		t.Run(shortName, func(t *testing.T) {
-			os.Unsetenv("NO_COLOR")
-			styles.Reinit()
+			tuitest.ForceColor(t)
 
 			td := resource.FindResourceType(shortName)
 			if td == nil {

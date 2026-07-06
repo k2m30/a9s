@@ -72,3 +72,22 @@ func NoColor(t *testing.T) {
 		styles.Reinit()
 	})
 }
+
+// ForceColor unsets NO_COLOR for the duration of t, reinitialises the style
+// palette so all Render calls emit ANSI escape sequences, and restores the
+// original environment on cleanup. Call at the top of any test that does
+// string matching on colored rendered output.
+func ForceColor(t *testing.T) {
+	t.Helper()
+	original, wasSet := os.LookupEnv("NO_COLOR")
+	os.Unsetenv("NO_COLOR") //nolint:errcheck
+	styles.Reinit()
+	t.Cleanup(func() {
+		if wasSet {
+			os.Setenv("NO_COLOR", original) //nolint:errcheck
+		} else {
+			_ = os.Unsetenv("NO_COLOR")
+		}
+		styles.Reinit()
+	})
+}

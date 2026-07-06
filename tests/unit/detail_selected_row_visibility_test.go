@@ -1,7 +1,6 @@
 package unit_test
 
 import (
-	"os"
 	"strings"
 	"testing"
 
@@ -9,15 +8,13 @@ import (
 	lipgloss "charm.land/lipgloss/v2"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // Regression guard: selected rows must keep labels readable and avoid carrying
 // navigable underline into the selected state.
 func TestDetail_SelectedRow_LabelVisible_NoNestedKeyTint(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	tuitest.ForceColor(t)
 
 	d := makePreviewEC2Detail(t, 120, 35)
 	line := findLineContaining(d.View(), "InstanceId:")
@@ -33,9 +30,7 @@ func TestDetail_SelectedRow_LabelVisible_NoNestedKeyTint(t *testing.T) {
 }
 
 func TestDetail_SelectedNavigableRow_DropsUnderline(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	tuitest.ForceColor(t)
 	withIssue140EC2RelatedDefs(t)
 
 	d := makePreviewEC2Detail(t, 120, 35)
@@ -60,9 +55,7 @@ func TestDetail_SelectedNavigableRow_DropsUnderline(t *testing.T) {
 }
 
 func TestDetail_SelectedRow_FillsViewportWidth(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	tuitest.ForceColor(t)
 
 	// Disable related to keep single-column width deterministic.
 	oldDefs := resource.GetRelated("ec2")

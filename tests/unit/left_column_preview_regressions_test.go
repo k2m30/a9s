@@ -2,7 +2,6 @@ package unit_test
 
 import (
 	"context"
-	"os"
 	"strings"
 	"testing"
 
@@ -13,11 +12,11 @@ import (
 	"github.com/k2m30/a9s/v3/internal/demo"
 	"github.com/k2m30/a9s/v3/internal/demo/fakes"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 func makePreviewEC2Detail(t *testing.T, w, h int) views.DetailModel {
@@ -35,9 +34,7 @@ func makePreviewEC2Detail(t *testing.T, w, h int) views.DetailModel {
 }
 
 func TestPreviewLeft_FirstSelectedRowShowsInstanceIDLabel(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	tuitest.ForceColor(t)
 
 	d := makePreviewEC2Detail(t, 120, 35)
 	view := d.View()
@@ -101,9 +98,7 @@ func TestPreviewLeft_SecurityGroupsSubFields_YAMLStructure(t *testing.T) {
 // ansi.Strip(renderContent()) and uses literal substring matching, so the plain
 // text must not change when the cursor moves (e.g., no extra spaces on selected rows).
 func TestPreviewLeft_PlainTextIdenticalAcrossCursorPositions(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	tuitest.ForceColor(t)
 
 	d := makePreviewEC2Detail(t, 120, 35)
 	baseline := stripAnsi(d.View())

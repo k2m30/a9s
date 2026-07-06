@@ -1,7 +1,6 @@
 package unit
 
 import (
-	"os"
 	"strings"
 	"testing"
 
@@ -10,11 +9,12 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // ===========================================================================
@@ -33,8 +33,7 @@ func rdsTypeDef() resource.ResourceTypeDef {
 // rdsLoadedModel returns a ResourceListModel loaded with fixture RDS data.
 func rdsLoadedModel(t *testing.T) views.ResourceListModel {
 	t.Helper()
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := rdsTypeDef()
 	k := keys.Default()
@@ -51,8 +50,7 @@ func rdsLoadedModel(t *testing.T) views.ResourceListModel {
 // rdsLoadedModelWide returns a model with a wide terminal to show all columns.
 func rdsLoadedModelWide(t *testing.T) views.ResourceListModel {
 	t.Helper()
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := rdsTypeDef()
 	k := keys.Default()
@@ -116,8 +114,7 @@ func fixtureRDSInstancesExtended() []resource.Resource {
 // rdsExtendedModel loads a model with the extended fixture set.
 func rdsExtendedModel(t *testing.T) views.ResourceListModel {
 	t.Helper()
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := rdsTypeDef()
 	k := keys.Default()
@@ -371,8 +368,7 @@ func rdsColorResource(dbStatus string) resource.Resource {
 }
 
 func TestQA_RDS_StatusColor_Available(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 	td := resource.FindResourceType("rds")
 	if td == nil {
 		t.Fatal("rds resource type not found")
@@ -392,8 +388,7 @@ func TestQA_RDS_StatusColor_Available(t *testing.T) {
 }
 
 func TestQA_RDS_StatusColor_Stopped(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 	td := resource.FindResourceType("rds")
 	if td == nil {
 		t.Fatal("rds resource type not found")
@@ -410,8 +405,7 @@ func TestQA_RDS_StatusColor_Stopped(t *testing.T) {
 }
 
 func TestQA_RDS_StatusColor_Creating(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 	td := resource.FindResourceType("rds")
 	if td == nil {
 		t.Fatal("rds resource type not found")
@@ -428,8 +422,7 @@ func TestQA_RDS_StatusColor_Creating(t *testing.T) {
 }
 
 func TestQA_RDS_StatusColor_Modifying(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 	td := resource.FindResourceType("rds")
 	if td == nil {
 		t.Fatal("rds resource type not found")
@@ -446,8 +439,7 @@ func TestQA_RDS_StatusColor_Modifying(t *testing.T) {
 }
 
 func TestQA_RDS_StatusColor_Failed(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 	td := resource.FindResourceType("rds")
 	if td == nil {
 		t.Fatal("rds resource type not found")
@@ -464,8 +456,7 @@ func TestQA_RDS_StatusColor_Failed(t *testing.T) {
 }
 
 func TestQA_RDS_StatusColor_AvailableAndStoppedDifferent(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 	td := resource.FindResourceType("rds")
 	if td == nil {
 		t.Fatal("rds resource type not found")
@@ -480,8 +471,7 @@ func TestQA_RDS_StatusColor_AvailableAndStoppedDifferent(t *testing.T) {
 }
 
 func TestQA_RDS_StatusColor_AvailableAndCreatingDifferent(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 	td := resource.FindResourceType("rds")
 	if td == nil {
 		t.Fatal("rds resource type not found")
@@ -548,8 +538,7 @@ func TestQA_RDS_EdgeCase_AuroraInstancePresent(t *testing.T) {
 }
 
 func TestQA_RDS_EdgeCase_EmptyList(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := rdsTypeDef()
 	k := keys.Default()
@@ -901,8 +890,7 @@ func TestQA_RDS_Navigation_YOpensYAML(t *testing.T) {
 // ===========================================================================
 
 func TestQA_RDS_LoadingSpinner(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := rdsTypeDef()
 	k := keys.Default()
@@ -1259,8 +1247,7 @@ func TestQA_RDS_YAML_CreatingInstanceNoEndpoint(t *testing.T) {
 }
 
 func TestQA_RDS_YAML_SyntaxColoring(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	k := keys.Default()
 	res := fixtureRDSInstances()[0]
@@ -1420,8 +1407,7 @@ func TestQA_RDS_CrossView_EscFromListReturnsToMainMenu(t *testing.T) {
 // ===========================================================================
 
 func TestQA_RDS_HorizontalScroll(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := rdsTypeDef()
 	k := keys.Default()
@@ -1449,8 +1435,7 @@ func TestQA_RDS_HorizontalScroll(t *testing.T) {
 // ===========================================================================
 
 func TestQA_RDS_ConfigDrivenColumns(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := rdsTypeDef()
 	k := keys.Default()

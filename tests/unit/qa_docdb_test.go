@@ -1,7 +1,6 @@
 package unit
 
 import (
-	"os"
 	"strings"
 	"testing"
 
@@ -11,11 +10,12 @@ import (
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
 
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // ===========================================================================
@@ -33,8 +33,7 @@ func docdbTypeDef() resource.ResourceTypeDef {
 
 func loadedDocDBModel(t *testing.T) views.ResourceListModel {
 	t.Helper()
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 	td := docdbTypeDef()
 	k := keys.Default()
 	m := views.NewResourceList(td, nil, k)
@@ -179,8 +178,7 @@ func TestQA_DocDB_InstancesCount(t *testing.T) {
 // ===========================================================================
 
 func TestQA_DocDB_StatusColoring(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := docdbTypeDef()
 	k := keys.Default()
@@ -210,8 +208,7 @@ func TestQA_DocDB_StatusColoring(t *testing.T) {
 // ===========================================================================
 
 func TestQA_DocDB_CursorNavigation(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := docdbTypeDef()
 	k := keys.Default()
@@ -263,8 +260,7 @@ func TestQA_DocDB_CursorNavigation(t *testing.T) {
 // ===========================================================================
 
 func TestQA_DocDB_ListFilter(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := docdbTypeDef()
 	k := keys.Default()
@@ -303,8 +299,7 @@ func TestQA_DocDB_ListFilter(t *testing.T) {
 // ===========================================================================
 
 func TestQA_DocDB_ListSort(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := docdbTypeDef()
 	k := keys.Default()
@@ -343,8 +338,7 @@ func TestQA_DocDB_ListSort(t *testing.T) {
 // ===========================================================================
 
 func TestQA_DocDB_EmptyList(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := docdbTypeDef()
 	k := keys.Default()
@@ -416,8 +410,7 @@ func TestQA_DocDB_DetailFrameTitle(t *testing.T) {
 // ===========================================================================
 
 func TestQA_DocDB_DetailStatusColoring(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	// DocumentDB cluster (dbc) Color func reads Fields["status"].
 	td := resource.FindResourceType("dbc")
@@ -693,8 +686,7 @@ func TestQA_DocDB_CommandNavigation(t *testing.T) {
 func TestQA_DocDB_HorizontalScroll(t *testing.T) {
 	fixtures := fixtureDocDBClusters()
 
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := docdbTypeDef()
 	k := keys.Default()
@@ -721,8 +713,7 @@ func TestQA_DocDB_HorizontalScroll(t *testing.T) {
 // ===========================================================================
 
 func TestQA_DocDB_LoadingSpinner(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := docdbTypeDef()
 	k := keys.Default()
@@ -812,8 +803,7 @@ func TestQA_CrossCommand_SwitchDocDBToRedis(t *testing.T) {
 // ===========================================================================
 
 func TestQA_DocDB_ZeroInstancesCount(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := docdbTypeDef()
 	k := keys.Default()

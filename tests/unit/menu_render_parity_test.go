@@ -30,8 +30,8 @@ import (
 	"github.com/k2m30/a9s/v3/internal/runtime"
 	"github.com/k2m30/a9s/v3/internal/session"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // ---------------------------------------------------------------------------
@@ -43,9 +43,7 @@ import (
 // Both share NO_COLOR so styled output is deterministic.
 func newParityPair(t *testing.T, w, h int) (views.MainMenuModel, *app.Controller) {
 	t.Helper()
-	t.Setenv("NO_COLOR", "1")
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	tuitest.NoColor(t)
 
 	m := views.NewMainMenu(keys.Default())
 	m.SetSize(w, h)

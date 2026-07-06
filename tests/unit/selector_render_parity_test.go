@@ -31,8 +31,8 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/app"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // ---------------------------------------------------------------------------
@@ -193,9 +193,7 @@ func selectorKinds() []selectorKind {
 // Each subtest builds the same logical state on the legacy (View) and
 // controller (RenderSelector) sides and asserts identical output.
 func TestSelectorRenderParity(t *testing.T) {
-	t.Setenv("NO_COLOR", "1")
-	styles.Reinit()
-	t.Cleanup(styles.Reinit)
+	tuitest.NoColor(t)
 
 	for _, kind := range selectorKinds() {
 		kind := kind

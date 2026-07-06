@@ -2,7 +2,6 @@ package unit
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 
@@ -10,10 +9,10 @@ import (
 
 	"github.com/k2m30/a9s/v3/internal/config"
 	"github.com/k2m30/a9s/v3/internal/resource"
-	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // ---------------------------------------------------------------------------
@@ -81,8 +80,7 @@ func rlKeyPress(char string) tea.KeyPressMsg {
 
 func rlLoadedModel(t *testing.T) views.ResourceListModel {
 	t.Helper()
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := rlTestTypeDef()
 	k := keys.Default()
@@ -102,8 +100,7 @@ func rlLoadedModel(t *testing.T) views.ResourceListModel {
 // ===========================================================================
 
 func TestResourceListView_LoadingShowsSpinner(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := rlTestTypeDef()
 	k := keys.Default()
@@ -237,8 +234,7 @@ func TestResourceListView_SetFilterFilters(t *testing.T) {
 // ===========================================================================
 
 func TestResourceListView_HorizontalScroll(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := rlTestTypeDef()
 	k := keys.Default()
@@ -264,8 +260,7 @@ func TestResourceListView_HorizontalScroll(t *testing.T) {
 }
 
 func TestResourceListView_HorizontalScroll_ClampsAtLastColumn(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := rlTestTypeDef() // 4 columns
 	k := keys.Default()
@@ -297,8 +292,7 @@ func TestResourceListView_HorizontalScroll_ClampsAtLastColumn(t *testing.T) {
 }
 
 func TestResourceListView_HorizontalScroll_CannotScrollPastEnd(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := rlTestTypeDef() // 4 columns
 	k := keys.Default()
@@ -327,8 +321,7 @@ func TestResourceListView_HorizontalScroll_CannotScrollPastEnd(t *testing.T) {
 // ===========================================================================
 
 func TestResourceListView_EmptyList(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := rlTestTypeDef()
 	k := keys.Default()
@@ -352,8 +345,7 @@ func TestResourceListView_EmptyList(t *testing.T) {
 // ===========================================================================
 
 func TestResourceListView_ConfigDrivenColumns(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := rlTestTypeDef()
 	k := keys.Default()
@@ -393,8 +385,7 @@ func TestResourceListView_ConfigDrivenColumns(t *testing.T) {
 // ===========================================================================
 
 func TestResourceListView_VerticalScrollLimitsRows(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := rlTestTypeDef()
 	k := keys.Default()
@@ -425,8 +416,7 @@ func TestResourceListView_VerticalScrollLimitsRows(t *testing.T) {
 // ===========================================================================
 
 func TestResourceListView_SortIndicator(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := rlTestTypeDef()
 	k := keys.Default()
@@ -525,8 +515,7 @@ func TestResourceList_DownPastEnd_CursorStaysAtLast(t *testing.T) {
 // TestResourceList_DownPastEnd_ManyItems tests the same bug with more items
 // than fit on screen, which requires actual scrolling.
 func TestResourceList_DownPastEnd_ManyItems(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := resource.ResourceTypeDef{
 		Name:      "Log Streams",
@@ -597,8 +586,7 @@ func TestResourceList_DownPastEnd_ManyItems(t *testing.T) {
 // ===========================================================================
 
 func TestResourceList_NarrowScreen_ShowsAllColumns(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	td := resource.ResourceTypeDef{
 		Name:      "Log Events",
@@ -646,8 +634,7 @@ func TestResourceList_NarrowScreen_ShowsAllColumns(t *testing.T) {
 // ===========================================================================
 
 func TestResourceListView_SetDisplayName(t *testing.T) {
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
+	tuitest.ForceColor(t)
 
 	k := keys.Default()
 	m := views.NewResourceList(rlTestTypeDef(), nil, k)

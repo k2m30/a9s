@@ -53,6 +53,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // ---------------------------------------------------------------------------
@@ -205,6 +206,10 @@ func TestDetailRenderColorTier_CTInfo(t *testing.T) {
 	// Reference: plain output (NO_COLOR=1)
 	t.Setenv("NO_COLOR", "1")
 	styles.Reinit()
+	t.Cleanup(func() {
+		os.Unsetenv("NO_COLOR") //nolint:errcheck
+		styles.Reinit()
+	})
 	mPlain := newCTDetailForTier(t, res)
 	plainView := mPlain.View()
 	plainEventLine, found := findActionEventLine(stripANSI(plainView), eventName)
@@ -215,7 +220,6 @@ func TestDetailRenderColorTier_CTInfo(t *testing.T) {
 	// Colored output (colors enabled)
 	os.Unsetenv("NO_COLOR")
 	styles.Reinit()
-	t.Cleanup(func() { styles.Reinit() })
 	mColored := newCTDetailForTier(t, res)
 	coloredView := mColored.View()
 	coloredPlain := stripANSI(coloredView)
@@ -263,9 +267,7 @@ func TestDetailRenderColorTier_CTAttention(t *testing.T) {
 	res := buildCTResourceForTier(eventName, "s3.amazonaws.com", "AssumedRole", "ct-attention")
 
 	// Colored output
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
-	t.Cleanup(func() { styles.Reinit() })
+	tuitest.ForceColor(t)
 	m := newCTDetailForTier(t, res)
 	view := m.View()
 	plain := stripANSI(view)
@@ -299,9 +301,7 @@ func TestDetailRenderColorTier_CTDanger(t *testing.T) {
 	const eventName = "DescribeInstances"
 	res := buildCTResourceForTier(eventName, "ec2.amazonaws.com", "AssumedRole", "ct-danger")
 
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
-	t.Cleanup(func() { styles.Reinit() })
+	tuitest.ForceColor(t)
 	m := newCTDetailForTier(t, res)
 	view := m.View()
 	plain := stripANSI(view)
@@ -341,9 +341,7 @@ func TestDetailRenderColorTier_EmptyFallsThrough(t *testing.T) {
 	const eventName = "DescribeInstances"
 	res := buildCTResourceForTier(eventName, "ec2.amazonaws.com", "AssumedRole", "ct-info")
 
-	t.Setenv("NO_COLOR", "1")
-	styles.Reinit()
-	t.Cleanup(func() { styles.Reinit() })
+	tuitest.NoColor(t)
 
 	m := newCTDetailForTier(t, res)
 	plain := stripANSI(m.View())
@@ -398,9 +396,7 @@ func TestDetailRenderColorTier_IsNavigableWinsOverColorTier(t *testing.T) {
 	res := buildCTResourceForTier(eventName, "ec2.amazonaws.com", "AssumedRole", "ct-info")
 
 	// Colors on so we can detect underline escapes.
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
-	t.Cleanup(func() { styles.Reinit() })
+	tuitest.ForceColor(t)
 
 	m := newCTDetailForTier(t, res)
 	view := m.View()
@@ -452,9 +448,7 @@ func TestDetailRenderColorTier_LabelIsAlwaysNeutral(t *testing.T) {
 	const eventName = "DescribeInstances"
 	res := buildCTResourceForTier(eventName, "ec2.amazonaws.com", "AssumedRole", "ct-info")
 
-	os.Unsetenv("NO_COLOR")
-	styles.Reinit()
-	t.Cleanup(func() { styles.Reinit() })
+	tuitest.ForceColor(t)
 
 	m := newCTDetailForTier(t, res)
 	view := m.View()
