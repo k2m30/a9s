@@ -70,7 +70,7 @@ The codebase has a clean separation of concerns. The 020-architecture-refactor h
 - **`cmd/a9s`** — bootstrap only: parse flags, validate startup inputs, load config/theme, wire clients and options, start Bubble Tea.
 - **`internal/tui`** — UI shell and adapter: view stack, global key handling, message routing, sizing, and transient UI state. Holds a `*runtime.Core` and reaches session-scoped state through typed `m.core.*` accessors. As the renderer adapter it legitimately imports `internal/session` and `internal/aws` (to supply clients and translate runtime `TaskRequest`s into `tea.Cmd`s); the shared core never imports back into `internal/tui`.
 - **`internal/runtime`** — platform-agnostic app core: `runtime.Core` owns the active `*session.Session` and the catalog snapshot, dispatches inbound `messages.Event`s to handlers, and returns `UIIntent` / `TaskRequest` lists for adapters to apply. It compiles with zero Bubble Tea / Lipgloss dependencies (verified transitively via `go list -deps`). The cmd/event message taxonomy and screen-builder registry have landed; `HandleEvent` takes the typed `messages.Event` interface.
-- **`internal/session`** — session-scoped state container (Phase 02 deliverable, **done**): `session.Session` owns per-profile/region orchestration state — `ResourceCache`, `LazyResourceCache`, `RelatedCache`, the enrichment queues and per-type maps, every generation counter (all typed `domain.Gen` after Phase 05a-gens), and the capability stores (`PolicyStore`, `IdentityStore`, `RuleSetStore`) that replaced the deleted `internal/aws/` package globals (`allPoliciesMu`, `identityCacheMu`, `sesRuleSetCacheMu`). `Session.Rotate()` is the single point that invalidates all of it on profile/region switch.
+- **`internal/session`** — session-scoped state container (Phase 02 deliverable, **done**): `session.Session` owns per-profile/region orchestration state — the `RowStore` (the single session-scoped per-type row store; see Caching Layers), `RelatedCache`, the enrichment queues and per-type maps, every generation counter (all typed `domain.Gen` after Phase 05a-gens), and the capability stores (`PolicyStore`, `IdentityStore`, `RuleSetStore`) that replaced the deleted `internal/aws/` package globals (`allPoliciesMu`, `identityCacheMu`, `sesRuleSetCacheMu`). `Session.Rotate()` is the single point that invalidates all of it on profile/region switch.
 - **`internal/resource`** — declarative registry: resource types, child-view metadata, related defs, navigable fields, and fetcher/enricher registration.
 - **`internal/aws`** — primarily the adapter layer: call AWS SDK APIs, transform responses into `resource.Resource`, and host a few non-UI helper subsystems that have not yet been split out. This layer should not know about Bubble Tea views.
 - **`internal/cache`** — persistence only: on-disk availability cache and TTL rules.
@@ -370,25 +370,25 @@ This section documents the current Wave 2 implementation on `main`. The refactor
 
 ```text
 Wave 1 probes complete
-  → startEnrichment() builds queue from awsclient.AllWave2() ∩ probeResources
+  → startEnrichment() builds queue from awsclient.AllWave2() ∩ observed RowStore types
   → probeEnrichment() dispatches issue enrichers (4-at-a-time, same as Wave 1)
   → EnrichmentCheckedMsg arrives
     → only-increase guard: menu badge updated only if new count > current
     → progress indicator updated
-  → all done: clear probeResources, save cache with enriched counts (when caching enabled)
+  → all done: save cache with enriched counts (when caching enabled); the RowStore retains the enriched rows for the session
 ```
 
 **Registry**: Wave 2 capability is declared on each `catalog.ResourceTypeDef` literal's `Wave2` field, including `NoOpIssueEnricher` placeholders that make "no Wave 2 signal" explicit and testable. Some types with `NoOpIssueEnricher` still perform in-fetcher Wave 2 work — their fetchers already make per-resource Describe calls and populate health fields at fetch time (e.g., EKS `health_issues_count`, CloudTrail `is_logging`, OpenSearch `cluster_health`).
 
-**Priority order** (`(*Core).BuildEnrichQueue`): Batchable enrichers that make account-wide calls are dispatched first (e.g., RDS/DocDB maintenance, EC2 instance status). Per-resource enrichers (e.g., DynamoDB PITR, KMS rotation, S3 PAB) iterate over resource IDs/ARNs, capped at `EnrichmentCap` (50). The registry key for each enricher must match the `ShortName` Wave 1 uses to store probe resources — a mismatch silently skips the enricher.
+**Priority order** (`(*Core).BuildEnrichQueue`): Batchable enrichers that make account-wide calls are dispatched first (e.g., RDS/DocDB maintenance, EC2 instance status). Per-resource enrichers (e.g., DynamoDB PITR, KMS rotation, S3 PAB) iterate over resource IDs/ARNs, capped at `EnrichmentCap` (50). The registry key for each enricher must match the `ShortName` Wave 1 uses when observing rows into the `RowStore` — a mismatch silently skips the enricher. Queue membership comes from the store: a type enriches if its entry was observed at all (`TypeRows.Gen != 0` — observed-empty types still enrich); `Partial`-only entries never enter the queue.
 
-**Resource identity**: Enrichers receive retained first-page resources from Wave 1 probes (`probeResources map[string][]resource.Resource`). Account-wide enrichers make a single API call covering all resources. Per-resource enrichers fan out to individual resources, capped at `EnrichmentCap` (50).
+**Resource identity**: Enrichers receive the session `RowStore`'s retained rows for the type (seeded by Wave 1 probes with first-page resources — the role the deleted `session.ProbeResources` map used to play). Account-wide enrichers make a single API call covering all resources. Per-resource enrichers fan out to individual resources, capped at `EnrichmentCap` (50).
 
 **Current contract on `main`**: [`docs/attention-signals.md`](attention-signals.md) is the hand-maintained source of truth for Wave 1 (Color func) and Wave 2 (issue-enricher) assignments per resource type. `TestAttentionSignalsDoc` parses the markdown table and enforces: every type with Wave 1 != "None" has a non-nil `Color` func, and every type with Wave 2 != "None" returns a non-nil entry from `awsclient.Wave2EnricherFor(shortName)`. The refactor plan replaces this with generated docs from catalog data.
 
 **Skip condition**: Wave 2 runs only when `isDemo=false`. Demo mode has no real AWS to query. `--no-cache` on live AWS still runs Wave 2 (it only disables disk persistence, not capabilities).
 
-**Lifecycle**: `probeResources` is cleared after Wave 2 completes and on profile/region switch. On a top-level resource list with a registered enricher, Ctrl+R bumps `enrichmentTypeGen[rt]`, clears `enrichmentFindings[rt]` and `enrichmentRan[rt]`, calls `SetEnrichmentState(0, false, false, nil)` on the active list, and dispatches `refreshResourceListWithEnrichmentRerun` to rerun Wave 2 for that type. The main-menu Ctrl+R path invalidates Wave 2 for all types: it bumps `enrichmentGen` (the session-wide generation counter), resets `enrichmentTypeGen` to an empty map, clears `enrichmentFindings` and `enrichmentRan` — then reloads the cache from disk. Wave 2 re-runs when the user next navigates to a resource list.
+**Lifecycle**: the `RowStore` retains its rows for the whole session — there is no post-Wave-2 memory free, which is why a warm list open after the sweep seeds instantly — and is cleared only on profile/region switch (`Rotate()`). On a top-level resource list with a registered enricher, Ctrl+R bumps `enrichmentTypeGen[rt]`, clears `enrichmentFindings[rt]` and `enrichmentRan[rt]`, calls `SetEnrichmentState(0, false, false, nil)` on the active list, and dispatches `refreshResourceListWithEnrichmentRerun` to rerun Wave 2 for that type. The main-menu Ctrl+R path invalidates Wave 2 for all types: it bumps `enrichmentGen` (the session-wide generation counter), resets `enrichmentTypeGen` to an empty map, clears `enrichmentFindings` and `enrichmentRan` — then reloads the cache from disk. Wave 2 re-runs when the user next navigates to a resource list.
 
 ### Issue-Enrichment Visibility Subsystem
 
@@ -415,10 +415,10 @@ Representative fields on `session.Session` (`internal/session/session.go`):
 - `EnrichmentTypeGen map[string]domain.Gen` — per-type Wave 2 generation counter; bumped on Ctrl+R rerun to invalidate stale in-flight results.
 - `EnrichmentTruncatedIDs map[string]map[string]bool` — per-type set of resource IDs the enricher had to skip due to API truncation.
 - `EnrichmentGen`, `AvailabilityGen`, `RelatedGen`, `EnrichGen` — per-purpose session-wide generation counters; guard stale in-flight async results.
-- `ResourceCache`, `RelatedCache`, `LazyResourceCache` — session-scoped resource and related-check caches.
-- `LazyResourceCache map[string][]resource.Resource` — sparse per-type cache populated by the related-panel lazy-add path when a checker emits IDs outside the top-level fetcher's scope filter (e.g. AWS-managed KMS key, public AMI, IAM `AdministratorAccess`). Consulted by `handleRelatedNavigate` (union-read with `ResourceCache`, `ResourceCache` wins on ID collision) but NEVER by the main-menu top-level list. Cleared on `Rotate()`.
+- `RowStore *session.RowStore` — the single session-scoped per-type row store (see Caching Layers); `RelatedCache` — the related-check LRU. Both cleared on `Rotate()`.
+- Sparse related-panel lazy adds — a checker emits IDs outside the top-level fetcher's scope filter (e.g. AWS-managed KMS key, public AMI, IAM `AdministratorAccess`) — land as `Partial` `RowStore` entries via `ObservePartial`. `handleRelatedNavigate` reads one store entry per type (full-beats-partial is a flag on the entry, not a two-map merge), and partial-only entries are visible to related checkers — that is their purpose — but NEVER eligible for the main-menu top-level list, the enrich queue, navigation seeds, or disk saves.
 
-**Wave 2 findings (where they live):** PR-03a-fold deleted the parallel `EnrichmentFindings map[string]map[string]resource.EnrichmentFinding` map from `session.Session`. Wave 2 findings are now written directly onto each cached `resource.Resource.Findings` slice (with `Source` prefix `wave2:`) and `r.AttentionDetails`, via `applyEnrichment` in `internal/tui/app_enrich_fold.go`. Reads use `findingFromResource` / `findingsFromRows` against the cached rows. The runtime's view-ready snapshot surface (`runtime.RuntimeState.EnrichmentFindings`, `internal/runtime/state.go`) and the `PatchDetail.EnrichmentFindings` intent payload (`internal/runtime/intent.go`) carry per-resource findings out to adapters, but neither replaces the cached-row authority — they are derived from it.
+**Wave 2 findings (where they live):** PR-03a-fold deleted the parallel `EnrichmentFindings map[string]map[string]resource.EnrichmentFinding` map from `session.Session`. Wave 2 findings are now written onto each cached `resource.Resource.Findings` slice (with `Source` prefix `wave2:`) and `r.AttentionDetails`, via `applyEnrichment` in `internal/tui/app_enrich_fold.go`, which folds them into the `RowStore` through `Core.AmendRows`' copy-on-write mutation — findings and field updates apply exactly once, at the store. Reads use `findingFromResource` / `findingsFromRows` against the cached rows. The runtime's view-ready snapshot surface (`runtime.RuntimeState.EnrichmentFindings`, `internal/runtime/state.go`) and the `PatchDetail.EnrichmentFindings` intent payload (`internal/runtime/intent.go`) carry per-resource findings out to adapters, but neither replaces the cached-row authority — they are derived from it.
 
 ---
 
@@ -579,13 +579,13 @@ type RelatedDef struct {
     TargetType       string         // e.g., "vpc"
     DisplayName      string         // e.g., "VPCs"
     Checker          RelatedChecker // async function
-    NeedsTargetCache bool           // true = reads from ResourceCache
+    NeedsTargetCache bool           // true = reads from the session RowStore
 }
 ```
 
 **Two checker patterns:**
 - **Live API** (`NeedsTargetCache: false`): Calls AWS directly (e.g., `DescribeTargetHealth`). Fast, specific.
-- **Cache scan** (`NeedsTargetCache: true`): Reads from `ResourceCache` (snapshot of loaded lists). The dispatcher pre-fetches the target type if absent.
+- **Cache scan** (`NeedsTargetCache: true`): Reads a `RowStore.SnapshotAll(true)` snapshot — one entry per type, `Partial` (lazy-add) entries included, and observed-empty types stay present in the snapshot. The dispatcher pre-fetches the target type if absent.
 
 `handleRelatedCheckStarted` (`app_related.go`) fans out one goroutine per `RelatedDef`, capped by `maxConcurrentProbes=4`. Results include a `Generation uint64` to discard stale results after Ctrl+R or profile/region switch.
 
@@ -676,19 +676,27 @@ When triggered, `EnterChildViewMsg` is emitted. `handleEnterChildView` construct
 
 The app has four distinct caches plus one enrichment-visibility state store:
 
-This table describes the caches that exist on `main` today. The refactor plan's target is stricter ownership through an explicit session/runtime boundary; until that lands, the cache behavior below is the current contract.
+The row-store unification (task #17) landed: every in-memory per-type row copy — Wave-1 probe retention (`ProbeResources`/`ProbeTruncated`), the list cache (`ResourceCache`), lazy related adds (`LazyResourceCache`), and the controller-side row mirror — collapsed into the single `session.RowStore`. Those maps are gone; a type's rows live in exactly one entry regardless of which lane wrote them.
 
 | Cache | Location | Scope | Invalidation |
 |-------|----------|-------|-------------|
 | **Disk availability cache** | `internal/cache/` | Persisted at `~/.a9s/cache/<profile>--<region>.yaml` | TTL of 1 hour; file replaced atomically |
-| **Resource cache** | `session.Session.ResourceCache` (owned by `runtime.Core`) | In-memory `map[string]*session.ResourceCacheEntry` | Cleared on profile/region switch via `session.Rotate()` |
+| **Row store** | `session.Session.RowStore` (owned by `runtime.Core`) | In-memory `map[string]session.TypeRows` — one entry per canonical resource type | Cleared on profile/region switch via `session.Rotate()` |
 | **Related cache** | `session.Session.RelatedCache` | In-memory LRU with fixed capacity | Cleared on `Rotate()`; entry deleted on Ctrl+R |
 | **Detail-enricher caches** | Feature-specific cache on `session.Session`, delivered to enrichers via `*awsclient.DetailEnrichmentCtx` (current example: `PolicyDocumentCache`) | In-memory, session-scoped | Rotated by `session.Rotate()` on profile/region switch |
 | **Enrichment visibility state** | `EnrichmentRan`, `EnrichmentTypeGen`, `EnrichmentTruncatedIDs`, `EnrichmentGen` on `session.Session` (Wave 2 progress/control); per-resource findings are folded into `resource.Resource.Findings` on cached rows — see "Wave 2 findings (where they live)" above | In-memory, session-scoped | Cleared per-type on Ctrl+R rerun start; cleared entirely on `Rotate()` |
 
 **Disk availability cache** (`internal/cache/cache.go`): Tracks which resource types have resources, their counts, and issue counts. Loaded on startup to instantly grey-out empty types and show issue badges in the main menu. Structure: `File{Profile, Region, CheckedAt, Resources map[string]Entry}` where `Entry{HasResources, Count, Truncated, Issues, IssuesTruncated, IssuesKnown}`. The `IssuesKnown` bool distinguishes "probed and found zero issues" from "not yet probed" (both unmarshal as int 0 without this flag). When caching is enabled (not `--no-cache`), the cache is saved after Wave 1 probes complete and again after Wave 2 enrichment completes, so enriched issue counts persist across restarts. When `--no-cache` is active, `saveAvailabilityCache()` is a no-op.
 
-**Resource cache**: Stores the full view state of previously-viewed resource lists (resources, pagination, filter, sort, cursor position). Enables instant back-navigation without re-fetching.
+**Row store** (`internal/session/rowstore.go`): The single source of truth for every cached resource-list row the session has observed. One `TypeRows` entry per canonical short name carries: `Rows` (immutable once stored — every change produces a new slice, so snapshots can never be invalidated by a later write), `Pagination` (nil is never exact — conservatively treated as truncated, C5), `TotalCount` (may exceed `len(Rows)`), `Origin` (`disk|probe|fetch` — which lane last accepted a rows-carrying write), `Partial` (sparse `FetchByIDs` lazy adds; a full observe clears it — full-beats-partial — and a sparse add never downgrades a full entry), `Gen` (increments on every accepted write; `Gen != 0` makes "observed empty" first-class, distinct from "never observed"), and `ViewState` (filter/sort/cursor/h-scroll, so a warm re-entry restores the exact view the user left). Writes go through `Observe` (full rows), `ObservePartial` (sparse adds), `ObserveCount` (counts-only — never touches rows), and `Amend` (copy-on-write content mutation — the enrichment fold and finding patches apply exactly once, here); reads are defensive-copy `Snapshot`/`SnapshotAll`. Reconciliation rules: appends dedup by ID; a stale truncated ID-subset replace is rejected once an entry is exact; a disk seed never overwrites live probe/fetch rows. The store is pair-scoped — `Rotate()` clears it on profile/region switch (C9).
+
+The legacy accessor names survive on `runtime.Core` as store-backed views: `Core.ResourceCache(rt)` reports a hit only for a FULL, `OriginFetch` entry — this gates navigation's cache-hit promotion (a probe- or disk-origin entry seeds the list but still verifies with a live fetch, per C1: cached content renders before any AWS activity, then is verified); `Core.LazyResourceCache(rt)` reads `Partial` entries; `Core.AnyOriginResourceCache(rt)` serves related-navigate's any-origin cache hits.
+
+**Per-screen views**: the headless controller's `ListState.Rows` is a per-screen VIEW adopted from the store's accepted rows for the canonical top-level list — the store reconciles, the screen adopts, and `ListState.RowsGen` pins the store generation the rows were adopted at. Child, related, and filtered screens stay screen-local (the C6 scope boundary) — their rows never route through the store. There is no controller-side row mirror; field updates and finding patches reach every screen through the store's `Amend`.
+
+**One save lane**: every per-type disk save goes through `Core.SaveTypeRows` (`internal/runtime/probes.go`), which resolves save columns via a view-config-aware resolver injected with `SetSaveColumns` and hands the rows to `reconcileTypeFile` — the on-disk reconciliation rules are unchanged, now reachable from exactly one chokepoint (the former sweep/list two-materializer split persisted different field sets for the same row under user-reordered columns).
+
+The numbered rules above (C1, C5, C6, C9) are the cache contract in [`design/cache-requirements.md`](design/cache-requirements.md).
 
 **Related cache**: LRU mapping `"resourceType:resourceID"` → related check results. Avoids re-running related checks when re-entering a detail view for the same resource.
 
@@ -762,7 +770,7 @@ main.go → parseFlags → tui.New(profile, region, opts...)
 - Seeds the main menu as `stack[0]` (the menu is always present)
 - Loads `ViewsConfig` from disk
 - Creates `appCtx`/`appCancel` for graceful shutdown
-- Initialises `resourceCache`, `relatedCache`, generation counters
+- Bootstraps `runtime.Core` (`runtime.Bootstrap`) — its `session.Session` carries the `RowStore`, `RelatedCache`, and generation counters — and wraps it in the headless controller (`app.New(core)`)
 - Applies all options (`WithClients`, `WithNoCache`, etc.)
 
 **`Init()` (first Bubble Tea message):**
@@ -953,4 +961,4 @@ Detail views render from pre-fetched `Fields`/`RawStruct`. Some data (like polic
 
 ### Why four separate caches?
 
-Each cache serves a fundamentally different access pattern: disk cache survives restarts for instant startup; resource cache enables instant back-navigation; related cache avoids redundant API fanouts; enricher caches prevent repeated expensive single-resource fetches. Collapsing them would conflate TTL/invalidation/eviction policies.
+Each cache serves a fundamentally different access pattern: disk cache survives restarts for instant startup; the session row store is the one in-memory copy of every type's rows (probe retention, disk seed, list cache, and lazy related adds are lanes into it, not separate copies) and enables instant back-navigation; related cache avoids redundant API fanouts; enricher caches prevent repeated expensive single-resource fetches. Collapsing them would conflate TTL/invalidation/eviction policies.

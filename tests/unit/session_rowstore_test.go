@@ -38,8 +38,13 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/k2m30/a9s/v3/internal/app"
+	awsclient "github.com/k2m30/a9s/v3/internal/aws"
+	"github.com/k2m30/a9s/v3/internal/cache"
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/runtime"
+	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/session"
 )
 
@@ -623,4 +628,364 @@ func idFor(i int) string {
 		return "row-" + string(letters[i])
 	}
 	return "row-n" + string(rune('a'+i%26))
+}
+
+// -----------------------------------------------------------------------
+// Pin 9 — Controller.Handle wiring into RowStore (ported from the retired
+// rowstore_differential_test.go at Stage 5: those store-only assertions
+// pinned the SAME contract this file pins at the RowStore-direct level, but
+// through the real Controller.Handle event path rather than calling
+// RowStore/Core methods directly — a regression here would mean the wiring
+// between an inbound event and the store broke even though RowStore's own
+// unit contract (Pins 1-8 above) stayed intact.
+// -----------------------------------------------------------------------
+
+// newRowStoreControllerPin mirrors the other per-file controller
+// constructors in this package (newSeededTestController,
+// newStage2PinTestController, newRowStorePinsTestController) — duplicated
+// as its own small variant so this file has no cross-file coupling to
+// another test file's helper lifetime.
+func newRowStoreControllerPin(t *testing.T) (*session.Session, *runtime.Core, *app.Controller) {
+	t.Helper()
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+	s := session.New()
+	s.Profile = "demo"
+	s.Region = "us-east-1"
+	core := runtime.New(s, nil)
+	return s, core, app.New(core)
+}
+
+func rowStoreControllerPinIDSet(rows []resource.Resource) map[string]bool {
+	out := make(map[string]bool, len(rows))
+	for _, r := range rows {
+		out[r.ID] = true
+	}
+	return out
+}
+
+func assertRowStoreControllerPinHasIDs(t *testing.T, s *session.Session, shortName string, wantIDs ...string) {
+	t.Helper()
+	snap := s.RowStore.Snapshot(shortName)
+
+	want := make(map[string]bool, len(wantIDs))
+	for _, id := range wantIDs {
+		want[id] = true
+	}
+	got := rowStoreControllerPinIDSet(snap.Rows)
+	if len(got) != len(want) {
+		t.Errorf("type %q: RowStore.Snapshot(%q).Rows ID set = %v, want %v", shortName, shortName, got, want)
+		return
+	}
+	for id := range want {
+		if !got[id] {
+			t.Errorf("type %q: RowStore.Snapshot(%q).Rows ID set = %v, want %v", shortName, shortName, got, want)
+			return
+		}
+	}
+}
+
+// TestRowStoreControllerPin_AvailabilityCacheLoaded_RealDiskRows_SeedRowStore
+// drives the disk-cache-loaded seed event through Controller.Handle with a
+// populated on-disk per-type file (real row data, not the placeholder
+// fallback) and asserts RowStore retains exactly those rows (OriginDisk).
+func TestRowStoreControllerPin_AvailabilityCacheLoaded_RealDiskRows_SeedRowStore(t *testing.T) {
+	s, core, c := newRowStoreControllerPin(t)
+
+	store := core.EnsureCacheStore()
+	if store == nil {
+		t.Fatal("core.EnsureCacheStore() = nil — test fixture requires a live disk store")
+	}
+	store.Put("ec2", cache.TypeFile{
+		HasResources: true,
+		Count:        1,
+		Exact:        true,
+		Rows: []cache.Row{
+			{ID: "i-diskrow-1", Name: "disk-row-1", Fields: map[string]string{"state": "running"}},
+		},
+	})
+	if err := store.SaveType("ec2"); err != nil {
+		t.Fatalf("seed fixture SaveType(ec2): %v", err)
+	}
+
+	_, _ = c.Handle(messages.AvailabilityCacheLoaded{
+		Entries:   map[string]int{"ec2": 1},
+		Truncated: map[string]bool{"ec2": false},
+	})
+
+	assertRowStoreControllerPinHasIDs(t, s, "ec2", "i-diskrow-1")
+	snap := s.RowStore.Snapshot("ec2")
+	if len(snap.Rows) != 1 || snap.Rows[0].ID != "i-diskrow-1" {
+		t.Errorf("RowStore.Snapshot(ec2).Rows = %+v, want [i-diskrow-1] seeded from the real on-disk row data", snap.Rows)
+	}
+}
+
+// TestRowStoreControllerPin_AvailabilityCacheLoaded_PlaceholderFallback_IsCountsOnly
+// drives the disk-cache-loaded seed event through Controller.Handle with NO
+// on-disk per-type file (the placeholder-row fallback path) and asserts
+// RowStore treats it as a counts-only observation (C6a: TotalCount set, Rows
+// untouched/empty) — a placeholder-only fallback must never fabricate Rows
+// in the store.
+func TestRowStoreControllerPin_AvailabilityCacheLoaded_PlaceholderFallback_IsCountsOnly(t *testing.T) {
+	s, _, c := newRowStoreControllerPin(t)
+
+	_, _ = c.Handle(messages.AvailabilityCacheLoaded{
+		Entries:   map[string]int{"ec2": 3},
+		Truncated: map[string]bool{"ec2": false},
+	})
+
+	snap := s.RowStore.Snapshot("ec2")
+	if snap.TotalCount != 3 {
+		t.Errorf("RowStore.Snapshot(ec2).TotalCount = %d, want 3 to mirror the cache-loaded count (C6a)", snap.TotalCount)
+	}
+	if len(snap.Rows) != 0 {
+		t.Errorf("RowStore.Snapshot(ec2).Rows = %+v, want empty — a placeholder-only fallback must never fabricate Rows in the store (C6a)", snap.Rows)
+	}
+}
+
+// TestRowStoreControllerPin_AvailabilityPrefetched_SeedsRowStore drives the
+// synchronous no-cache-mode prefetch event through Controller.Handle and
+// asserts RowStore retains exactly the prefetched rows for the type
+// (OriginFetch).
+func TestRowStoreControllerPin_AvailabilityPrefetched_SeedsRowStore(t *testing.T) {
+	s, _, c := newRowStoreControllerPin(t)
+
+	rows := []resource.Resource{
+		{ID: "i-prefetch-1", Name: "prefetch-1", Type: "ec2"},
+		{ID: "i-prefetch-2", Name: "prefetch-2", Type: "ec2"},
+	}
+	_, _ = c.Handle(messages.AvailabilityPrefetched{
+		Entries:    map[string]int{"ec2": 2},
+		Truncated:  map[string]bool{"ec2": false},
+		Resources:  map[string][]resource.Resource{"ec2": rows},
+		Pagination: map[string]*resource.PaginationMeta{"ec2": {IsTruncated: false}},
+		Gen:        s.AvailabilityGen,
+	})
+
+	assertRowStoreControllerPinHasIDs(t, s, "ec2", "i-prefetch-1", "i-prefetch-2")
+}
+
+// TestRowStoreControllerPin_ListOpen_ThenLoadMore_AppendsIntoRowStore opens a
+// list screen, drives a first-page ResourcesLoaded, then a load-more append,
+// through Controller.Handle and asserts RowStore accumulates all three
+// pages' worth of rows without duplication — the Controller-wired
+// counterpart to TestRowStore_Observe_AppendDedupsByID above (that pin
+// drives RowStore.Observe directly; this one drives the same outcome through
+// core.HandleEvent's messages.ResourcesLoaded case).
+func TestRowStoreControllerPin_ListOpen_ThenLoadMore_AppendsIntoRowStore(t *testing.T) {
+	s, _, c := newRowStoreControllerPin(t)
+
+	_, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
+
+	page1 := []resource.Resource{
+		{ID: "bucket-1", Name: "bucket-1", Type: "s3"},
+		{ID: "bucket-2", Name: "bucket-2", Type: "s3"},
+	}
+	_, _ = c.Handle(messages.ResourcesLoaded{
+		ResourceType: "s3",
+		Resources:    page1,
+		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-1"},
+		Append:       false,
+		Gen:          0,
+	})
+	assertRowStoreControllerPinHasIDs(t, s, "s3", "bucket-1", "bucket-2")
+
+	page2 := []resource.Resource{
+		{ID: "bucket-3", Name: "bucket-3", Type: "s3"},
+	}
+	_, _ = c.Handle(messages.ResourcesLoaded{
+		ResourceType: "s3",
+		Resources:    page2,
+		Pagination:   &resource.PaginationMeta{IsTruncated: false},
+		Append:       true,
+		Gen:          0,
+	})
+
+	final := s.RowStore.Snapshot("s3")
+	if len(final.Rows) != 3 {
+		t.Fatalf("after load-more append, RowStore.Snapshot(s3).Rows = %+v, want 3 rows total", final.Rows)
+	}
+	assertRowStoreControllerPinHasIDs(t, s, "s3", "bucket-1", "bucket-2", "bucket-3")
+}
+
+// rowStoreControllerPinSentinelWave2Type is a catalog-absent Wave-2 short
+// name used to keep the enrichment queue open past the "ec2" completion in
+// TestRowStoreControllerPin_EnrichmentChecked_FieldUpdates_FoldsIntoRowStore.
+// A single-type queue would make that one EnrichmentChecked delivery the
+// FINAL one (EnrichChecked >= EnrichTotal) — see
+// TestRowStoreControllerPin_EnrichmentChecked_AllDone_RowStoreSurvives for
+// the dedicated all-done-completion pin. Registering this second sentinel
+// keeps EnrichTotal at 2 so the ec2 delivery is a genuine partial
+// completion.
+const rowStoreControllerPinSentinelWave2Type = "rowstore-ctrl-pin-sentinel-wave2"
+
+// TestRowStoreControllerPin_EnrichmentChecked_FieldUpdates_FoldsIntoRowStore
+// drives a Wave 2 enrichment completion carrying FieldUpdates through
+// Controller.Handle and asserts RowStore's amended rows (via AmendRows)
+// carry the merged FieldUpdates values.
+func TestRowStoreControllerPin_EnrichmentChecked_FieldUpdates_FoldsIntoRowStore(t *testing.T) {
+	awsclient.SetWave2EnricherForTest(t, rowStoreControllerPinSentinelWave2Type, awsclient.IssueEnricher{
+		Fn:       awsclient.InFetcherWave2Sentinel,
+		Priority: 100,
+	})
+
+	s, _, c := newRowStoreControllerPin(t)
+
+	seed := []resource.Resource{
+		{ID: "i-enrich-1", Name: "enrich-1", Type: "ec2", Fields: map[string]string{"state": "running"}},
+	}
+	_, _ = c.Handle(messages.AvailabilityChecked{
+		ResourceType: "ec2",
+		HasResources: true,
+		Count:        1,
+		Gen:          s.AvailabilityGen,
+		Resources:    seed,
+	})
+
+	// Seed the sentinel type's own RowStore entry too — BuildEnrichQueue
+	// (internal/runtime/probes.go) only enqueues a Wave-2 entry when
+	// RowStore.Snapshot(type).Gen != 0 (observed-at-all).
+	_, _ = c.Handle(messages.AvailabilityChecked{
+		ResourceType: rowStoreControllerPinSentinelWave2Type,
+		HasResources: true,
+		Count:        1,
+		Gen:          s.AvailabilityGen,
+		Resources: []resource.Resource{
+			{ID: "sentinel-1", Name: "sentinel-1", Type: rowStoreControllerPinSentinelWave2Type},
+		},
+	})
+
+	if s.EnrichTotal != 2 {
+		t.Fatalf("precondition: want EnrichTotal=2 (ec2 + sentinel) after both AvailabilityChecked deliveries drained the avail queue and startEnrichment ran, got %d", s.EnrichTotal)
+	}
+
+	_, _ = c.Handle(messages.EnrichmentChecked{
+		ResourceType: "ec2",
+		Issues:       1,
+		Gen:          s.EnrichmentGen,
+		TypeGen:      s.EnrichmentTypeGen["ec2"],
+		FieldUpdates: map[string]map[string]string{
+			"i-enrich-1": {"cost_estimate": "12.50"},
+		},
+	})
+
+	if s.EnrichChecked >= s.EnrichTotal {
+		t.Fatalf("precondition: want a partial enrichment completion (EnrichChecked < EnrichTotal) so handleEnrichmentChecked's all-done free does not fire; got EnrichChecked=%d EnrichTotal=%d", s.EnrichChecked, s.EnrichTotal)
+	}
+
+	assertRowStoreControllerPinHasIDs(t, s, "ec2", "i-enrich-1")
+
+	snap := s.RowStore.Snapshot("ec2")
+	if len(snap.Rows) != 1 || snap.Rows[0].Fields["cost_estimate"] != "12.50" {
+		t.Errorf("RowStore.Snapshot(ec2).Rows = %+v, want Fields[cost_estimate]=12.50 from the applyEnrichment FieldUpdates fold", snap.Rows)
+	}
+}
+
+// TestRowStoreControllerPin_EnrichmentChecked_AllDone_RowStoreSurvives pins
+// the D12-class survival behavior RowStore exists for: when a single-type
+// enrichment queue drains on the FIRST EnrichmentChecked delivery
+// (handleEnrichmentChecked's "all done" branch), RowStore's rows for that
+// type are retained after the sweep completes.
+func TestRowStoreControllerPin_EnrichmentChecked_AllDone_RowStoreSurvives(t *testing.T) {
+	s, _, c := newRowStoreControllerPin(t)
+
+	seed := []resource.Resource{
+		{ID: "i-enrich-2", Name: "enrich-2", Type: "ec2", Fields: map[string]string{"state": "running"}},
+	}
+	_, _ = c.Handle(messages.AvailabilityChecked{
+		ResourceType: "ec2",
+		HasResources: true,
+		Count:        1,
+		Gen:          s.AvailabilityGen,
+		Resources:    seed,
+	})
+
+	if s.EnrichTotal != 1 {
+		t.Fatalf("precondition: want EnrichTotal=1 (ec2 only) so the next EnrichmentChecked is the terminal one, got %d", s.EnrichTotal)
+	}
+
+	_, _ = c.Handle(messages.EnrichmentChecked{
+		ResourceType: "ec2",
+		Issues:       1,
+		Gen:          s.EnrichmentGen,
+		TypeGen:      s.EnrichmentTypeGen["ec2"],
+		FieldUpdates: map[string]map[string]string{
+			"i-enrich-2": {"cost_estimate": "9.99"},
+		},
+	})
+
+	if s.EnrichChecked < s.EnrichTotal {
+		t.Fatalf("precondition: want the all-done branch to have fired (EnrichChecked >= EnrichTotal), got EnrichChecked=%d EnrichTotal=%d", s.EnrichChecked, s.EnrichTotal)
+	}
+
+	snap := s.RowStore.Snapshot("ec2")
+	if len(snap.Rows) != 1 || snap.Rows[0].Fields["cost_estimate"] != "9.99" {
+		t.Errorf("RowStore.Snapshot(ec2).Rows = %+v, want the merged cost_estimate=9.99 row to survive enrichment-sweep completion", snap.Rows)
+	}
+}
+
+// TestRowStoreControllerPin_RelatedCheckResult_DualLane_BothWriteRowStore
+// drives a related lazy-add result through BOTH lanes that legitimately
+// exist for this message today:
+//
+//  1. runtime.Core.HandleRelatedCheckResult (the intent-returning method) +
+//     Controller.ApplyIntents — populates RowStore's Partial entry via
+//     PatchLazyResourceCache, exactly as the TUI adapter and the headless
+//     RelatedCheckBatch executor do.
+//  2. app.Controller.Handle(messages.RelatedCheckResult{...}) — feeds
+//     RowStore via core.HandleEvent's dedicated observeRelatedCheckResultRows
+//     case, deliberately side-effect-only so Controller.Handle never
+//     double-applies path 1's intents for a bare RelatedCheckResult.
+//
+// A real production caller normally only exercises ONE of these two paths
+// per message; driving both here is deliberate — it is the only test that
+// exercises path 2 (a bare Controller.Handle(messages.RelatedCheckResult{})
+// call) at all.
+func TestRowStoreControllerPin_RelatedCheckResult_DualLane_BothWriteRowStore(t *testing.T) {
+	s, core, c := newRowStoreControllerPin(t)
+
+	lazyRows := []resource.Resource{
+		{ID: "key-lazy-1", Name: "lazy-key-1", Type: "kms"},
+	}
+
+	intents, _ := core.HandleRelatedCheckResult(runtime.RelatedCheckResultEvent{
+		ResourceType:       "ec2",
+		SourceResourceID:   "i-source-1",
+		DefDisplayName:     "KMS Keys",
+		LazyAddedResources: map[string][]resource.Resource{"kms": lazyRows},
+	})
+	c.ApplyIntents(intents)
+
+	_, _ = c.Handle(messages.RelatedCheckResult{
+		ResourceType:       "ec2",
+		SourceResourceID:   "i-source-1",
+		DefDisplayName:     "KMS Keys",
+		Generation:         s.RelatedGen,
+		LazyAddedResources: map[string][]resource.Resource{"kms": lazyRows},
+	})
+
+	afterLane1 := s.RowStore.Snapshot("kms")
+	if len(afterLane1.Rows) != 1 || afterLane1.Rows[0].ID != "key-lazy-1" {
+		t.Fatalf("precondition: RowStore.Snapshot(kms) after lane 1 (PatchLazyResourceCache) = %+v, want [key-lazy-1]", afterLane1.Rows)
+	}
+
+	all := s.RowStore.SnapshotAll(true)
+	storeSnap := all["kms"]
+	storeIDs := rowStoreControllerPinIDSet(storeSnap.Rows)
+	if !storeIDs["key-lazy-1"] {
+		t.Errorf("RowStore partial view for kms = %+v, want key-lazy-1 present", storeSnap.Rows)
+	}
+	if !storeSnap.Partial {
+		t.Error("RowStore SnapshotAll(true)[kms].Partial = false, want true — a lazy-add observation must mark Partial")
+	}
+
+	// Scope boundary (C6): a lazy-add row must never poison the canonical
+	// (non-partial) view of a type it was added under.
+	canonical := s.RowStore.SnapshotAll(false)
+	if tr, ok := canonical["kms"]; ok {
+		for _, r := range tr.Rows {
+			if r.ID == "key-lazy-1" {
+				t.Error("lazy-added row leaked into the canonical (non-partial) RowStore view — violates C6 scope boundary")
+			}
+		}
+	}
 }
