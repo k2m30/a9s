@@ -126,6 +126,32 @@ func resolveNGImageID(ctx context.Context, api EC2DescribeLaunchTemplateVersions
 	return *data.ImageId
 }
 
+// healthIssueFinding builds a Broken Finding for an unhealthy lifecycle
+// state, folding the specific AWS health-issue text (e.g. "insufficient
+// free addresses") into the Phrase instead of a generic lifecycle label —
+// an operator scanning the Status column needs the cause, not just the
+// state name. issueCodes is the already-humanized list from
+// Health.Issues; when empty (AWS reported the state without an issues[]
+// entry, which happens transiently) fallbackPhrase is used instead. A
+// second and later issue is folded into Detail as "+N more" rather than
+// widening the Phrase, keeping the Status cell short.
+func healthIssueFinding(code domain.FindingCode, fallbackPhrase string, issueCodes []string) domain.Finding {
+	if len(issueCodes) == 0 {
+		return domain.Finding{Code: code, Phrase: fallbackPhrase, Severity: domain.SevBroken, Source: "wave1"}
+	}
+	detail := ""
+	if len(issueCodes) > 1 {
+		detail = "+" + strconv.Itoa(len(issueCodes)-1) + " more: " + strings.Join(issueCodes[1:], ", ")
+	}
+	return domain.Finding{
+		Code:     code,
+		Phrase:   issueCodes[0],
+		Detail:   detail,
+		Severity: domain.SevBroken,
+		Source:   "wave1",
+	}
+}
+
 // buildNodeGroupResource constructs a Resource from cluster name, nodegroup name, and EKS Nodegroup struct.
 func buildNodeGroupResource(clusterName, ngName string, ng *ekstypes.Nodegroup) resource.Resource {
 	nodegroupName := ngName
@@ -172,7 +198,7 @@ func buildNodeGroupResource(clusterName, ngName string, ng *ekstypes.Nodegroup) 
 	case "DELETE_FAILED":
 		findings = []domain.Finding{{Code: CodeNGStateDeleteFailed, Phrase: "delete failed", Severity: domain.SevBroken, Source: "wave1"}}
 	case "DEGRADED":
-		findings = []domain.Finding{{Code: CodeNGStateDegraded, Phrase: "degraded", Severity: domain.SevBroken, Source: "wave1"}}
+		findings = []domain.Finding{healthIssueFinding(CodeNGStateDegraded, "degraded", issueCodes)}
 	}
 
 	return resource.Resource{

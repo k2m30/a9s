@@ -270,22 +270,29 @@ func listExtractCellValue(col ColumnDef, td *resource.ResourceTypeDef, r resourc
 		return r.ID
 	}
 
-	// Status/lifecycle column — two-layer priority. A Key-less, Path-based
-	// column (e.g. lambda/ec2's per-session view {Title:"State", Path:"State"}
-	// with no Key, or acm/eks/ng's default-view {Path:"Status"} with no Key) is
-	// still the status column by title, so it must route through the same
-	// phraseFromFindings + HumanizeStatusPhrase chokepoint as the Key-based
-	// case — otherwise it falls through to the raw fieldpath/Fields value
-	// further down and a raw AWS enum (e.g. "FAILED", "Active") reaches the
-	// screen. The title check mirrors resolveListStatusCol's own cascade
-	// ("State" OR "Status", case-insensitive) so the two functions never
-	// disagree about which column is the status column.
+	// Status/lifecycle column — OWNER CONTRACT: a column whose Title equals
+	// "Status" (case-insensitive, exact word) IS the status column,
+	// regardless of its Key. This covers keyed columns whose data lives
+	// under their own key (e.g. cb's {Key:"last_status", Title:"Status"},
+	// tg's {Key:"health_summary", Title:"Status"}, sg's
+	// {Key:"risk_summary", Title:"Status"}) as well as the pre-existing
+	// Key-less, Path-based case (e.g. lambda/ec2's per-session view
+	// {Title:"State", Path:"State"} with no Key, or acm/eks/ng's
+	// default-view {Path:"Status"} with no Key). Every qualifying column
+	// must route through the same phraseFromFindings + HumanizeStatusPhrase
+	// chokepoint — otherwise it falls through to the raw fieldpath/Fields
+	// value further down and a raw AWS enum (e.g. "FAILED", "STALE")
+	// reaches the screen. The Key==status/lifecycleKey checks are kept for
+	// defensive parity with columns whose Title doesn't literally say
+	// "Status"/"State". The title check mirrors resolveListStatusCol's own
+	// cascade so the two functions never disagree about which column is
+	// the status column.
 	lifecycleKey := "state"
 	if td != nil && td.LifecycleKey != "" {
 		lifecycleKey = td.LifecycleKey
 	}
 	isStatusCol := col.Key == "status" || col.Key == lifecycleKey ||
-		(col.Key == "" && (strings.EqualFold(col.Title, "status") || strings.EqualFold(col.Title, "state")))
+		strings.EqualFold(col.Title, "status") || strings.EqualFold(col.Title, "state")
 	if isStatusCol {
 		if phrase := listPhraseFromFindings(r.Findings); phrase != "" {
 			return phrase
@@ -295,6 +302,11 @@ func listExtractCellValue(col ColumnDef, td *resource.ResourceTypeDef, r resourc
 		}
 		if v, ok := r.Fields["status"]; ok && v != "" {
 			return domain.HumanizeStatusPhrase(v)
+		}
+		if col.Key != "" {
+			if v, ok := r.Fields[col.Key]; ok && v != "" {
+				return domain.HumanizeStatusPhrase(v)
+			}
 		}
 		if col.Path != "" && r.RawStruct != nil {
 			return domain.HumanizeStatusPhrase(fieldpath.ExtractScalar(r.RawStruct, col.Path))
