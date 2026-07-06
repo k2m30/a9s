@@ -90,6 +90,28 @@ func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 		return c.handleAvailabilityChecked(msg)
 	case messages.EnrichmentChecked:
 		return c.handleEnrichmentChecked(msg)
+	case messages.ResourcesLoaded:
+		// Row-store dual-write ONLY (task #17 wave 1): this case must never
+		// return the intents/tasks HandleResourcesLoaded computes — the TUI
+		// adapter calls Core.HandleResourcesLoaded directly (bypassing
+		// HandleEvent entirely, see runtime_adapter_resources.go) and
+		// Controller.Handle (internal/app/handle.go) already runs its own,
+		// separate ResourcesLoaded pipeline (handleResourcesLoadedEvent /
+		// applyResourcesLoaded). Applying HandleResourcesLoaded's intents here
+		// too would double-apply PatchResourceCache/ClearFlash for every
+		// Controller.Handle caller (web/headless/tests) — a real internal/app
+		// behavior change this stage must not make. Feed RowStore the same
+		// canonicalization + Fetch-origin write HandleResourcesLoaded performs,
+		// then return nil, nil exactly like the pre-existing default case.
+		c.observeResourcesLoadedRows(msg)
+		return nil, nil
+	case messages.RelatedCheckResult:
+		// Row-store dual-write ONLY — same double-dispatch hazard as
+		// ResourcesLoaded above (Controller.Handle applies its own
+		// PatchRelatedCache/PatchResourceCache/PatchLazyResourceCache intents
+		// for this message via a path outside HandleEvent).
+		c.observeRelatedCheckResultRows(msg)
+		return nil, nil
 	case messages.IdentityLoaded:
 		return c.HandleIdentityLoaded(IdentityLoadedEvent{Identity: msg.Identity})
 	case messages.IdentityError:

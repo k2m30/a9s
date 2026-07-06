@@ -170,6 +170,13 @@ type Session struct {
 	EnrichmentTypeGen      map[string]domain.Gen
 	EnrichmentTruncatedIDs map[string]map[string]bool
 
+	// RowStore is the session-scoped, per-type row store (task #17 wave 1 —
+	// row-store unification). Introduced as dual-write scaffolding behind
+	// ProbeResources/ResourceCache/LazyResourceCache below: every chokepoint
+	// that writes one of those maps also feeds RowStore, but nothing yet
+	// reads from it (Stage 2/3 re-point reads). Never nil after New()/Rotate.
+	RowStore *RowStore
+
 	// Session-scoped caches + stale-result guards.
 	ResourceCache map[string]*ResourceCacheEntry
 	// LazyResourceCache holds resources pulled via FetchByIDs for filtered-target
@@ -228,6 +235,7 @@ func New() *Session {
 		EnrichmentRan:          make(map[string]bool),
 		EnrichmentTypeGen:      make(map[string]domain.Gen),
 		EnrichmentTruncatedIDs: make(map[string]map[string]bool),
+		RowStore:               NewRowStore(),
 		ResourceCache:          make(map[string]*ResourceCacheEntry),
 		LazyResourceCache:      make(map[string][]resource.Resource),
 		RelatedCache:           NewRelatedCacheLRU(MaxRelatedCacheEntries),
@@ -401,6 +409,7 @@ func (s *Session) Rotate() {
 	s.AvailTotal = 0
 	s.EnrichChecked = 0
 	s.EnrichTotal = 0
+	s.RowStore.Clear()
 	s.ResourceCache = make(map[string]*ResourceCacheEntry)
 	s.LazyResourceCache = make(map[string][]resource.Resource)
 	s.EnrichmentRan = make(map[string]bool)

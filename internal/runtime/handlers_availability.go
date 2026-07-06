@@ -108,15 +108,27 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 			if _, already := c.session.ProbeResources[shortName]; already {
 				continue
 			}
-			var rows []resource.Resource
+			var realRows []resource.Resource
 			if cr, ok := rowsByType[shortName]; ok {
-				rows = rowsFromCacheRows(shortName, cr)
+				realRows = rowsFromCacheRows(shortName, cr)
 			}
+			rows := realRows
 			if len(rows) == 0 {
 				rows = placeholderRows(shortName, count)
 			}
 			c.session.ProbeResources[shortName] = rows
 			c.session.ProbeTruncated[shortName] = truncated[shortName]
+			// Dual-write (task #17 wave 1): only real per-type disk row data
+			// feeds RowStore's rows-carrying Observe (OriginDisk — a later live
+			// probe/fetch result is never regressed by a race-losing disk seed).
+			// A type with no real disk rows (placeholder-only fallback) is a
+			// counts-only observation (C6a): it must never fabricate Rows, so it
+			// feeds ObserveCount instead of Observe.
+			if len(realRows) > 0 {
+				c.ObserveRows(shortName, realRows, &resource.PaginationMeta{IsTruncated: truncated[shortName]}, session.OriginDisk, false)
+			} else {
+				c.ObserveCountRows(shortName, count)
+			}
 		}
 	}
 
@@ -210,12 +222,16 @@ func (c *Core) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetched)
 			c.session.ResourceCache = make(map[string]*session.ResourceCacheEntry, len(msg.Resources))
 		}
 		for rt, resources := range msg.Resources {
-			if _, exists := c.session.ResourceCache[rt]; exists {
-				continue
-			}
 			pageMeta := msg.Pagination[rt]
 			if pageMeta == nil {
 				pageMeta = &resource.PaginationMeta{IsTruncated: msg.Truncated[rt]}
+			}
+			// Dual-write (task #17 wave 1): a synchronous prefetch is a live,
+			// full result — OriginFetch — regardless of whether the legacy
+			// ResourceCache write below is skipped by the exists-guard.
+			c.ObserveRows(rt, resources, pageMeta, session.OriginFetch, false)
+			if _, exists := c.session.ResourceCache[rt]; exists {
+				continue
 			}
 			c.session.ResourceCache[rt] = &session.ResourceCacheEntry{
 				Resources:  resources,
@@ -289,6 +305,11 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 			c.session.ProbeTruncated = make(map[string]bool)
 		}
 		c.session.ProbeTruncated[canonType] = msg.Truncated
+		// Dual-write (task #17 wave 1): the Wave-2-carried result IS this
+		// probe's final row state — feed RowStore the same freshResources the
+		// legacy map above just received, so the store never sees a
+		// pre-carry, Wave-2-blind snapshot.
+		c.ObserveRows(canonType, freshResources, &resource.PaginationMeta{IsTruncated: msg.Truncated}, session.OriginProbe, false)
 	}
 
 	// Surface partial-success failures as flash errors.
@@ -449,6 +470,26 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 					}
 				}
 			}
+
+			// Dual-write (task #17 wave 1): apply the same FieldUpdates onto
+			// RowStore's copy via copy-on-write Amend, mirroring the legacy
+			// in-place merge above without aliasing its backing arrays.
+			c.AmendRows(msg.ResourceType, func(rows []resource.Resource) []resource.Resource {
+				out := make([]resource.Resource, len(rows))
+				for i, r := range rows {
+					updates, ok := msg.FieldUpdates[r.ID]
+					if !ok {
+						out[i] = r
+						continue
+					}
+					fields := make(map[string]string, len(r.Fields)+len(updates))
+					maps.Copy(fields, r.Fields)
+					maps.Copy(fields, updates)
+					r.Fields = fields
+					out[i] = r
+				}
+				return out
+			})
 		}
 
 		td := resource.FindResourceType(msg.ResourceType)

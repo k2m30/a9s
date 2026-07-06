@@ -20,6 +20,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/fieldpath"
 	"github.com/k2m30/a9s/v3/internal/resource"
+	"github.com/k2m30/a9s/v3/internal/session"
 )
 
 // ProbeAvailabilityResult carries the outcome of a single Wave-1 resource
@@ -557,6 +558,11 @@ func (c *Core) SyncProbeResourcesForType(shortName string, resources []resource.
 		c.session.ProbeTruncated = make(map[string]bool)
 	}
 	c.session.ProbeTruncated[canon] = truncated
+	// Dual-write (task #17 wave 1): resources here is the controller's own
+	// full accumulated row set (this method's whole purpose is keeping
+	// ProbeResources in lockstep with it) — OriginFetch, wholesale
+	// replace.
+	c.ObserveRows(canon, resources, &resource.PaginationMeta{IsTruncated: truncated}, session.OriginFetch, false)
 }
 
 // CachedListDepth returns the number of rows previously persisted for

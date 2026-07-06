@@ -310,6 +310,13 @@ func (c *Core) ForEachLazyResourceCache(fn func(rt string, rows []resource.Resou
 // `maps.Copy(m.core.Session().LazyResourceCache, ...)`.
 func (c *Core) ExtendLazyResourceCache(adds map[string][]resource.Resource) {
 	maps.Copy(c.session.LazyResourceCache, adds)
+	// Dual-write (task #17 wave 1): each adds[rt] is already the full
+	// merged slice HandleRelatedCheckResult computed (dedup-appended against
+	// the prior LazyResourceCache entry) — ObservePartial's own dedup-append
+	// makes re-merging it against the store idempotent.
+	for rt, rows := range adds {
+		c.ObservePartialRows(rt, rows)
+	}
 }
 
 // ProbeResources returns the Wave-1 retained first-page resources for the
@@ -351,4 +358,39 @@ func (c *Core) RelatedCacheDelete(key string) { c.session.RelatedCache.Delete(ke
 func (c *Core) HasIssueEnricher(shortName string) bool {
 	_, ok := awsclient.Wave2EnricherFor(shortName)
 	return ok
+}
+
+// ObserveRows is the thin dual-write chokepoint every rows-carrying write to
+// ProbeResources/ResourceCache feeds alongside its existing map write (task
+// #17 wave 1 — row-store unification, Stage 1: dual-write scaffolding, zero
+// behavior change). canon must already be the canonicalized resource short
+// name — callers resolve aliases before calling, matching every other
+// canon-keyed write in this package. Returns the accepted rows + Gen so a
+// future caller can compare it against the legacy map write during the
+// Stage-1 differential harness; today's callers only need the side effect
+// and may discard the result.
+func (c *Core) ObserveRows(canon string, rows []resource.Resource, pagination *resource.PaginationMeta, origin session.Origin, appendPage bool) ([]resource.Resource, domain.Gen) {
+	return c.session.RowStore.Observe(canon, rows, pagination, origin, appendPage)
+}
+
+// ObserveCountRows is the dual-write chokepoint for a counts-only observation
+// (C6a: never touches Rows — e.g. the disk-cache-loaded seed when no
+// per-type disk row data is available and the legacy map falls back to
+// placeholder rows, which must never be fed into RowStore).
+func (c *Core) ObserveCountRows(canon string, totalCount int) domain.Gen {
+	return c.session.RowStore.ObserveCount(canon, totalCount)
+}
+
+// ObservePartialRows is ObserveRows' counterpart for the LazyResourceCache
+// dual-write lane (sparse FetchByIDs adds, never a full first page).
+func (c *Core) ObservePartialRows(canon string, rows []resource.Resource) ([]resource.Resource, domain.Gen) {
+	return c.session.RowStore.ObservePartial(canon, rows)
+}
+
+// AmendRows is the dual-write counterpart for a copy-on-write enrichment
+// fold over canon's currently retained row set. fn receives the existing
+// slice and returns its replacement — see RowStore.Amend's doc comment for
+// the copy-on-write invariant this enforces.
+func (c *Core) AmendRows(canon string, fn func([]resource.Resource) []resource.Resource) domain.Gen {
+	return c.session.RowStore.Amend(canon, fn)
 }

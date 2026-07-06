@@ -99,6 +99,11 @@ func (c *Core) HandleResourcesLoaded(ev ResourcesLoadedEvent) ([]UIIntent, []Tas
 			c.session.ProbeTruncated = make(map[string]bool)
 		}
 		c.session.ProbeTruncated[ev.ResourceType] = ev.Pagination != nil && ev.Pagination.IsTruncated
+		// Dual-write (task #17 wave 1): the enrichment-rerun reseed is a
+		// genuine fetch result — OriginFetch, wholesale replace (mirrors
+		// the unconditional ProbeResources[ev.ResourceType] = ev.Resources
+		// assignment above, not an append).
+		c.ObserveRows(ev.ResourceType, ev.Resources, ev.Pagination, session.OriginFetch, false)
 		tasks = append(tasks, TaskRequest{
 			Key: TaskKey{Kind: TaskKindProbeEnrich, Scope: ev.ResourceType},
 		})
