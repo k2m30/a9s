@@ -10,4 +10,5 @@ const (
 
 	CodeDBCSnapCreating     domain.FindingCode = "dbc-snap.warn.creating"
 	CodeDBCSnapManualUnused domain.FindingCode = "dbc-snap.warn.manual_unused"
+	CodeDBCSnapUnencrypted  domain.FindingCode = "dbc-snap.warn.unencrypted"
 )

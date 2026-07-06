@@ -68,11 +68,20 @@ var sharedELBFixtures = sync.OnceValue(func() *ELBFixtures {
 		},
 		// LoadBalancerAttributes — the prod ALB has access logging enabled
 		// to the a9s-demo-logs bucket (s3.go LogsBucketName), backing elb→s3.
+		// acme-internal-api has deletion protection disabled — pins
+		// elbCodeMisconfigured ("elb.misconfigured") firing dynamically in
+		// demo mode; before this entry no fixture LB carried
+		// deletion_protection.enabled=false, so the Wave-2 enricher had
+		// nothing to classify against (the OWNER GAP qa_finding_dynamic_witness_test.go
+		// pins as knownUnwitnessedFindings["elb:elb.misconfigured"]).
 		LoadBalancerAttributes: map[string][]elbv2types.LoadBalancerAttribute{
 			fixtProdELBARN: {
 				{Key: aws.String("access_logs.s3.enabled"), Value: aws.String("true")},
 				{Key: aws.String("access_logs.s3.bucket"), Value: aws.String(LogsBucketName)},
 				{Key: aws.String("access_logs.s3.prefix"), Value: aws.String("acme-prod-web")},
+			},
+			"arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/acme-internal-api/0987654321fedcba": {
+				{Key: aws.String("deletion_protection.enabled"), Value: aws.String("false")},
 			},
 		},
 	}

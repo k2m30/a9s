@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/k2m30/a9s/v3/internal/catalog"
 	"github.com/k2m30/a9s/v3/internal/domain"
@@ -250,6 +249,12 @@ func colorDBISnap(r domain.Resource) domain.Color {
 	return domain.ColorWarning
 }
 
+// colorDBCSnap classifies a dbc-snap row. Every Warning/Broken bucket here is
+// backed by a wave1 domain.Finding emitted by computeDBCSnapFindings /
+// computeRDSDBClusterSnapshotFindings (failed, incompatible-*, creating,
+// manual age > 365d, unencrypted) — colorFromWave1 always resolves first, so
+// the phrase-parsing fallback below only classifies rows whose RawStruct
+// predates a Findings-carrying fetch (e.g. cache replay of an older schema).
 func colorDBCSnap(r domain.Resource) domain.Color {
 	if c, ok := colorFromWave1(r); ok {
 		return c
@@ -263,16 +268,6 @@ func colorDBCSnap(r domain.Resource) domain.Color {
 	}
 	if phrase != "" && phrase != "available" {
 		return domain.ColorWarning
-	}
-	if r.Fields["storage_encrypted"] == "false" {
-		return domain.ColorWarning
-	}
-	if r.Fields["snapshot_type"] == "manual" {
-		if ts, err := time.Parse("2006-01-02 15:04", r.Fields["snapshot_create_time"]); err == nil {
-			if time.Since(ts) > 365*24*time.Hour {
-				return domain.ColorWarning
-			}
-		}
 	}
 	return domain.ColorHealthy
 }
@@ -938,6 +933,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeDBCSnapIncompatible, Phrase: "<incompatible-* status>", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeDBCSnapCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeDBCSnapManualUnused, Phrase: "manual, unused <N>d", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeDBCSnapUnencrypted, Phrase: "unencrypted", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: dbcSnapOrphanCode, Phrase: "orphan: source cluster deleted", Severity: domain.SevBroken, Source: "wave2"},
 			{Code: dbcSnapPastRetentionCode, Phrase: "automated, <N>d past retention", Severity: domain.SevBroken, Source: "wave2"},
 		},

@@ -184,7 +184,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "dns_name", Title: "DNS Name", Width: 48, Sortable: false},
 			{Key: "type", Title: "Type", Width: 12, Sortable: true},
 			{Key: "scheme", Title: "Scheme", Width: 14, Sortable: true},
-			{Key: "state", Title: "State", Width: 12, Sortable: true},
+			{Key: "state", Title: "Status", Width: 12, Sortable: true},
 			{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
 		},
 		Children: []domain.ChildViewDef{{
@@ -226,7 +226,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Code: CodeELBStateProvisioning, Phrase: "provisioning", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeELBStateActiveImpaired, Phrase: "active impaired", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeELBStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: elbCodeMisconfigured, Phrase: "Deletion Protection: disabled", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: elbCodeMisconfigured, Phrase: "deletion protection disabled", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
 	{
@@ -239,6 +239,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "target_group_name", Title: "Target Group", Width: 32, Sortable: true},
 			{Key: "port", Title: "Port", Width: 8, Sortable: true},
 			{Key: "protocol", Title: "Protocol", Width: 10, Sortable: true},
+			{Key: "health_summary", Title: "Status", Width: 14, Sortable: true},
 			{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
 			{Key: "target_type", Title: "Target Type", Width: 12, Sortable: true},
 			{Key: "health_check_path", Title: "Health Check", Width: 24, Sortable: false},
@@ -291,6 +292,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Columns: []domain.Column{
 			{Key: "group_name", Title: "Group Name", Width: 28, Sortable: true},
 			{Key: "group_id", Title: "Group ID", Width: 24, Sortable: true},
+			{Key: "risk_summary", Title: "Status", Width: 22, Sortable: true},
 			{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
 			{Key: "description", Title: "Description", Width: 36, Sortable: false},
 		},
@@ -512,7 +514,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "name", Title: "Name", Width: 28, Sortable: true},
 			{Key: "igw_id", Title: "IGW ID", Width: 26, Sortable: true},
 			{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
-			{Key: "state", Title: "State", Width: 12, Sortable: true},
+			{Key: "state", Title: "Status", Width: 12, Sortable: true},
 		},
 		Color: colorIGW,
 		Fetcher: func(ctx context.Context, clients any, continuationToken string) (resource.FetchResult, error) {
