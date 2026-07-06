@@ -611,7 +611,8 @@ func (m DetailModel) ConsumesEscapeLocally() bool {
 //
 // The related panel is rendered from body.Related + body.RelatedCursor +
 // body.RelatedScroll + body.RelatedFocused via renderDetailRelatedFromBody,
-// which replicates RightColumnModel.View() byte-for-byte from body data.
+// a thin adapter over the shared renderRelatedPanel — the same function
+// RightColumnModel.View() calls, so the two lanes cannot drift.
 // The panel visibility gate uses body.RelatedVisible (set by buildDetailBody
 // when the type has registered defs or ds.RelatedVisible is true), matching
 // the TUI's rightColShowing() auto-show behaviour.
@@ -702,27 +703,40 @@ func (m *DetailModel) RenderDetail(body app.DetailBody) string {
 	return m.viewport.View()
 }
 
-// renderDetailRelatedFromBody renders the RELATED right panel from body data,
-// replicating RightColumnModel.View() byte-for-byte without a live model.
+// renderDetailRelatedFromBody renders the RELATED right panel from body data.
 // w is the panel width; h is the panel height (same as viewport height).
 func renderDetailRelatedFromBody(body app.DetailBody, w, h int) string {
+	return renderRelatedPanel(body.Related, body.RelatedFilterActive, body.RelatedCursor, body.RelatedScroll, body.RelatedFocused, w, h)
+}
+
+// renderRelatedPanel is the single pure renderer for the RELATED right panel,
+// shared by the live TUI (RightColumnModel.View(), via an []app.RelatedBlock
+// adapter) and the controller-backed renderer (RenderDetail, via
+// renderDetailRelatedFromBody). Both lanes must produce byte-identical output
+// for the same logical state — this function is the one place that logic
+// lives, so it can no longer drift between the two call sites the way it did
+// before this consolidation (the dim/count-badge bug had to be fixed twice).
+//
+// rows is the visible, filtered, ordered list of related-panel entries.
+// cursor is an index into rows (-1 when no row is selected/highlighted).
+// scroll is the first visible row index. focused gates the scroll-to-cursor
+// adjustment and the cursor-row highlight. w/h are the panel's rendering
+// dimensions (h includes the header line).
+func renderRelatedPanel(rows []app.RelatedBlock, filterActive bool, cursor, scroll int, focused bool, w, h int) string {
 	if w <= 0 {
 		return ""
 	}
 
 	lines := make([]string, 0, h)
 
-	// Header: "RELATED" centered — mirrors RightColumnModel.View() header block.
 	header := "RELATED"
 	padLeft := max((w-lipgloss.Width(header))/2, 0)
 	centeredHeader := strings.Repeat(" ", padLeft) + header
 	lines = append(lines, styles.DimText.Render(centeredHeader))
 
 	switch {
-	case len(body.Related) == 0:
-		// Mirror RightColumnModel.View(): an active filter with no surviving
-		// rows shows "No matches"; otherwise the panel is genuinely empty.
-		if body.RelatedFilterActive {
+	case len(rows) == 0:
+		if filterActive {
 			lines = append(lines, styles.DimText.Render("  No matches"))
 		} else {
 			lines = append(lines, styles.DimText.Render("  No related types registered"))
@@ -730,24 +744,26 @@ func renderDetailRelatedFromBody(body app.DetailBody, w, h int) string {
 	default:
 		usableHeight := max(h-1, 1) // after header
 
-		start := body.RelatedScroll
-		// Keep the focused cursor row visible. Scroll-to-cursor is renderer-side
-		// (it depends on the panel height the controller doesn't own) — mirrors the
-		// menu's adjustScroll.
-		if body.RelatedFocused {
-			if body.RelatedCursor < start {
-				start = body.RelatedCursor
-			} else if body.RelatedCursor >= start+usableHeight {
-				start = body.RelatedCursor - usableHeight + 1
+		start := scroll
+		// Keep the focused cursor row visible. Idempotent with respect to a
+		// caller that has already applied the same clamp (e.g. RightColumnModel's
+		// ensureScrollVisible): re-running these two branches on an already-valid
+		// start is a no-op, since start already satisfies
+		// start <= cursor < start+usableHeight.
+		if focused {
+			if cursor < start {
+				start = cursor
+			} else if cursor >= start+usableHeight {
+				start = cursor - usableHeight + 1
 			}
 		}
 		if start < 0 {
 			start = 0
 		}
-		end := min(start+usableHeight, len(body.Related))
+		end := min(start+usableHeight, len(rows))
 
-		for i, blk := range body.Related[start:end] {
-			idx := start + i // index into body.Related (matches rightCol cursor logic)
+		for i, blk := range rows[start:end] {
+			idx := start + i // index into rows (matches cursor)
 			var rowText string
 			var rowStyle lipgloss.Style
 
@@ -770,7 +786,7 @@ func renderDetailRelatedFromBody(body app.DetailBody, w, h int) string {
 				}
 			}
 
-			if body.RelatedFocused && body.RelatedCursor == idx {
+			if focused && cursor == idx {
 				lines = append(lines, styles.RowSelected.Width(w).Render(rowText))
 			} else {
 				lines = append(lines, rowStyle.Render(rowText))

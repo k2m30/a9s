@@ -8,12 +8,10 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
-	lipgloss "charm.land/lipgloss/v2"
-
+	"github.com/k2m30/a9s/v3/internal/app"
 	"github.com/k2m30/a9s/v3/internal/resource"
 	"github.com/k2m30/a9s/v3/internal/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
-	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
 
 type rightColumnRow struct {
@@ -201,78 +199,42 @@ func (m RightColumnModel) updateKeyMsg(msg tea.KeyMsg) (RightColumnModel, tea.Cm
 	return m, nil
 }
 
-// View renders the right column content (no frame — frame is added externally).
+// View renders the right column content (no frame - frame is added externally).
+// It is a thin adapter over the shared renderRelatedPanel (detail_helpers.go):
+// visible rows are mapped to []app.RelatedBlock in visibleIndexes() order,
+// count badge and actionability come from the same shared rules
+// (resource.FormatRelatedCount / isActionableRow) so the TUI, the headless
+// controller, and the web renderer cannot drift - this is the single render
+// implementation; renderDetailRelatedFromBody calls the same function.
 func (m RightColumnModel) View() string {
 	if m.width <= 0 {
 		return ""
 	}
 
-	lines := make([]string, 0, m.height)
-
-	// Header: "RELATED" centered.
-	header := "RELATED"
-	padLeft := (m.width - lipgloss.Width(header)) / 2
-	padLeft = max(padLeft, 0)
-	centeredHeader := strings.Repeat(" ", padLeft) + header
-	lines = append(lines, styles.DimText.Render(centeredHeader))
-
 	visible := m.visibleIndexes()
-	switch {
-	case len(m.rows) == 0:
-		lines = append(lines, styles.DimText.Render("  No related types registered"))
-	case len(visible) == 0:
-		lines = append(lines, styles.DimText.Render("  No matches"))
-	default:
-		usableHeight := max(m.height-1, 1) // after header
-
-		start := m.scrollOffset
-		end := min(start+usableHeight, len(visible))
-
-		for _, idx := range visible[start:end] {
-			row := m.rows[idx]
-			var rowText string
-			var rowStyle lipgloss.Style
-
-			switch {
-			case row.loading:
-				rowText = "  " + row.displayName
-				rowStyle = styles.DimText
-			case row.err != nil:
-				rowText = "  " + row.displayName + "  \u2014" // em dash
-				rowStyle = styles.DimText
-			default:
-				// Count badge + actionability come from the shared rules
-				// (resource.FormatRelatedCount / IsRelatedActionable) so the TUI,
-				// the headless controller, and the web cannot drift. -1 (unknown)
-				// yields an empty badge — the row shows its name only; a known
-				// count >= 0 yields the literal "(N)" the design spec and the
-				// integration tests require. Approximate-ness for a non-zero count
-				// is conveyed by RowNormal style alone (no "+" text marker).
-				rowText = "  " + row.displayName
-				if badge := resource.FormatRelatedCount(row.count); badge != "" {
-					rowText += " " + badge
-				}
-				if isActionableRow(row) {
-					rowStyle = styles.RowNormal
-				} else {
-					rowStyle = styles.DimText
-				}
-			}
-
-			if m.focused && m.cursor == idx {
-				lines = append(lines, styles.RowSelected.Width(m.width).Render(rowText))
-			} else {
-				lines = append(lines, rowStyle.Render(rowText))
-			}
+	rows := make([]app.RelatedBlock, len(visible))
+	cursor := -1
+	for i, idx := range visible {
+		row := m.rows[idx]
+		rows[i] = app.RelatedBlock{
+			Name:         row.displayName,
+			Loading:      row.loading,
+			Err:          row.err != nil,
+			CountDisplay: resource.FormatRelatedCount(row.count),
+			Actionable:   isActionableRow(row),
+		}
+		if idx == m.cursor {
+			cursor = i
 		}
 	}
 
-	// Pad remaining height with empty strings.
-	for len(lines) < m.height {
-		lines = append(lines, "")
-	}
+	// filterActive here means "rows exist but the visible/filtered set is
+	// empty" - the same condition RightColumnModel used to render "No
+	// matches" (as opposed to "No related types registered" when there were
+	// no rows at all).
+	filterActive := len(m.rows) > 0 && len(visible) == 0
 
-	return strings.Join(lines, "\n")
+	return renderRelatedPanel(rows, filterActive, cursor, m.scrollOffset, m.focused, m.width, m.height)
 }
 
 // SetSize sets the rendering dimensions.
