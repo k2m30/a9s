@@ -23,6 +23,9 @@ func (f *CodePipelineFake) ListPipelines(_ context.Context, _ *codepipeline.List
 	return &codepipeline.ListPipelinesOutput{Pipelines: f.fix.Pipelines}, nil
 }
 
+// GetPipelineState returns the fixture-registered stage states for the
+// requested pipeline (see CodePipelineFixtures.States). Required for
+// EnrichCodePipelineStatus's Wave-2 failed-stage issue check.
 func (f *CodePipelineFake) GetPipelineState(_ context.Context, input *codepipeline.GetPipelineStateInput, _ ...func(*codepipeline.Options)) (*codepipeline.GetPipelineStateOutput, error) {
 	var name string
 	if input != nil && input.Name != nil {
@@ -30,7 +33,7 @@ func (f *CodePipelineFake) GetPipelineState(_ context.Context, input *codepipeli
 	}
 	return &codepipeline.GetPipelineStateOutput{
 		PipelineName: &name,
-		StageStates:  []cptypes.StageState{},
+		StageStates:  f.fix.States[name],
 	}, nil
 }
 

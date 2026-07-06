@@ -122,6 +122,13 @@ var sharedCFNFixtures = sync.OnceValue(func() *CFNFixtures {
 			Description:     aws.String("CloudWatch alarms and dashboards"),
 			StackId:         aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-monitoring/44444444-4444-4444-4444-444444444444"),
 			RoleARN:         aws.String(prodCIDeployRoleARN),
+			// ParentId — required for the cfn:cfn related-panel pivot
+			// (checkCFNCFN nested-stack reverse scan). Marks acme-monitoring
+			// as a nested stack of acme-vpc-stack.
+			ParentId: aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-vpc-stack/11111111-1111-1111-1111-111111111111"),
+			// NotificationARNs — required for the cfn:sns related-panel pivot
+			// (checkCfnSNS). Reuses the shared ops-alerts SNS topic.
+			NotificationARNs: []string{relatedAlarmSNSARN},
 		},
 		{
 			StackName:         aws.String("acme-legacy-api"),
@@ -388,6 +395,26 @@ var sharedCFNFixtures = sync.OnceValue(func() *CFNFixtures {
 				ResourceType:         aws.String("AWS::EC2::Subnet"),
 				ResourceStatus:       cfntypes.ResourceStatusCreateComplete,
 				LastUpdatedTimestamp: aws.Time(time.Date(2024, 10, 15, 9, 8, 0, 0, time.UTC)),
+			},
+			// FlowLogsBucket — required for the cfn:s3 related-panel pivot
+			// (checkCfnS3 → ListStackResources → AWS::S3::Bucket).
+			{
+				LogicalResourceId:    aws.String("FlowLogsBucket"),
+				PhysicalResourceId:   aws.String(LogsBucketName),
+				ResourceType:         aws.String("AWS::S3::Bucket"),
+				ResourceStatus:       cfntypes.ResourceStatusCreateComplete,
+				LastUpdatedTimestamp: aws.Time(time.Date(2024, 10, 15, 9, 10, 0, 0, time.UTC)),
+			},
+			// FlowLogsRule — required for the cfn:eb-rule related-panel pivot
+			// (checkCfnEBRule → ListStackResources → AWS::Events::Rule). The
+			// PhysicalResourceId of an Events::Rule is the rule name, matching
+			// the nightly-db-backup fixture (eventbridge.go).
+			{
+				LogicalResourceId:    aws.String("FlowLogsRule"),
+				PhysicalResourceId:   aws.String("nightly-db-backup"),
+				ResourceType:         aws.String("AWS::Events::Rule"),
+				ResourceStatus:       cfntypes.ResourceStatusCreateComplete,
+				LastUpdatedTimestamp: aws.Time(time.Date(2024, 10, 15, 9, 12, 0, 0, time.UTC)),
 			},
 		},
 	}

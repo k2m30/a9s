@@ -13,6 +13,10 @@ type CWLogsFixtures struct {
 	LogStreams map[string][]cwlogstypes.LogStream
 	// LogEvents maps log group name to its events (for GetLogEvents / FilterLogEvents).
 	LogEvents map[string][]cwlogstypes.OutputLogEvent
+	// SubscriptionFilters maps log group name to its subscription filters —
+	// backs logs:DescribeSubscriptionFilters for the logs:kinesis and
+	// logs:s3 related-panel pivots.
+	SubscriptionFilters map[string][]cwlogstypes.SubscriptionFilter
 }
 
 // NewCWLogsFixtures constructs CWLogsFixtures from the canonical demo data.
@@ -119,6 +123,23 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 			StoredBytes:     aws.Int64(209715200),
 			RetentionInDays: aws.Int32(90),
 			CreationTime:    aws.Int64(1745769600000), // 2025-04-28
+		},
+		// Glue shared job log groups — required for glue:logs related-panel
+		// pivot. checkGlueLogs matches the fixed IDs "/aws-glue/jobs/output"
+		// and "/aws-glue/jobs/error" (shared across all Glue jobs).
+		{
+			LogGroupName:    aws.String("/aws-glue/jobs/output"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws-glue/jobs/output:*"),
+			StoredBytes:     aws.Int64(41943040),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1715731200000), // 2024-05-15
+		},
+		{
+			LogGroupName:    aws.String("/aws-glue/jobs/error"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws-glue/jobs/error:*"),
+			StoredBytes:     aws.Int64(10485760),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1715731200000), // 2024-05-15
 		},
 		{
 			LogGroupName:    aws.String("/aws/docdb/acme-docdb-prod/profiler"),
@@ -262,6 +283,26 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 			StoredBytes:     aws.Int64(10485760),
 			RetentionInDays: aws.Int32(14),
 			CreationTime:    aws.Int64(1750500000000),
+		},
+		// CloudTrail delivery log group — required for trail:logs related-panel
+		// pivot. checkTrailLogs parses the log group name out of the trail's
+		// CloudWatchLogsLogGroupArn and matches it against this cache by ID.
+		{
+			LogGroupName:    aws.String("/aws/cloudtrail"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/cloudtrail:*"),
+			StoredBytes:     aws.Int64(104857600),
+			RetentionInDays: aws.Int32(90),
+			CreationTime:    aws.Int64(1750600000000),
+		},
+		// VPC endpoint flow-log destination — required for vpce:logs
+		// related-panel pivot. checkVPCELogs reads the LogGroupName off the
+		// matching ec2:DescribeFlowLogs entry (see EC2Fixtures.FlowLogsByResourceID).
+		{
+			LogGroupName:    aws.String("/aws/vpc/flowlogs/vpce-s3-endpoint"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/vpc/flowlogs/vpce-s3-endpoint:*"),
+			StoredBytes:     aws.Int64(31457280),
+			RetentionInDays: aws.Int32(14),
+			CreationTime:    aws.Int64(1750700000000),
 		},
 	}
 
@@ -426,10 +467,38 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 	logEvents["/aws/lambda/acme-inbound-parser"] = lambdaInvocationReport("acme-inbound-parser")
 	logEvents["/aws/lambda/orders-projector"] = lambdaInvocationReport("orders-projector")
 
+	// SubscriptionFilters — required for the logs:kinesis and logs:s3
+	// related-panel pivots (checkLogsKinesis / checkLogsS3 via
+	// DescribeSubscriptionFilters). /aws-glue/jobs/output streams to Kinesis
+	// for real-time monitoring; /aws-glue/jobs/error archives to S3.
+	subscriptionFilters := map[string][]cwlogstypes.SubscriptionFilter{
+		"/aws-glue/jobs/output": {
+			{
+				FilterName:     aws.String("stream-to-audit-log"),
+				LogGroupName:   aws.String("/aws-glue/jobs/output"),
+				FilterPattern:  aws.String(""),
+				DestinationArn: aws.String("arn:aws:kinesis:us-east-1:123456789012:stream/audit-log-stream"),
+				Distribution:   cwlogstypes.DistributionByLogStream,
+				CreationTime:   aws.Int64(1715731200000),
+			},
+		},
+		"/aws-glue/jobs/error": {
+			{
+				FilterName:     aws.String("archive-errors-to-s3"),
+				LogGroupName:   aws.String("/aws-glue/jobs/error"),
+				FilterPattern:  aws.String("ERROR"),
+				DestinationArn: aws.String("arn:aws:s3:::" + LogsBucketName),
+				Distribution:   cwlogstypes.DistributionByLogStream,
+				CreationTime:   aws.Int64(1715731200000),
+			},
+		},
+	}
+
 	return &CWLogsFixtures{
-		LogGroups:  logGroups,
-		LogStreams: logStreams,
-		LogEvents:  logEvents,
+		LogGroups:           logGroups,
+		LogStreams:          logStreams,
+		LogEvents:           logEvents,
+		SubscriptionFilters: subscriptionFilters,
 	}
 })
 

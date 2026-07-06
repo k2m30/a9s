@@ -798,6 +798,209 @@ var sharedCloudWatchFixtures = sync.OnceValue(func() *CloudWatchFixtures {
 					{Name: aws.String("VpcEndpointId"), Value: aws.String("vpce-0aaa111111111111a")},
 				},
 			},
+			// acme-web-prod-asg alarm — required for alarm:asg related-panel
+			// pivot. checkAlarmASG matches dimension AutoScalingGroupName
+			// against the acme-web-prod-asg fixture (asg.go).
+			{
+				AlarmName:             aws.String("asg-acme-web-prod-group-in-service"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:asg-acme-web-prod-group-in-service"),
+				AlarmDescription:      aws.String("Triggers when acme-web-prod-asg has fewer than 2 InService instances"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 3 datapoints were greater than or equal to the threshold (2.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 22, 6, 25, 0, 0, time.UTC)),
+				MetricName:            aws.String("GroupInServiceInstances"),
+				Namespace:             aws.String("AWS/AutoScaling"),
+				Threshold:             aws.Float64(2.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorLessThanThreshold,
+				EvaluationPeriods:     aws.Int32(3),
+				Period:                aws.Int32(60),
+				Statistic:             cwtypes.StatisticMinimum,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("AutoScalingGroupName"), Value: aws.String("acme-web-prod-asg")},
+				},
+			},
+			// KMS key-usage alarm — required for alarm:kms related-panel pivot.
+			// checkAlarmKMS matches dimension KeyId against the primary
+			// production KMS key fixture (kms.go).
+			{
+				AlarmName:             aws.String("kms-primary-key-decrypt-errors"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:kms-primary-key-decrypt-errors"),
+				AlarmDescription:      aws.String("Triggers when primary encryption key sees 5+ decrypt errors in 5 minutes"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 1 datapoint was less than the threshold (5.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 22, 6, 30, 0, 0, time.UTC)),
+				MetricName:            aws.String("SecondsUntilKeyMaterialExpiration"),
+				Namespace:             aws.String("AWS/KMS"),
+				Threshold:             aws.Float64(5.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanThreshold,
+				EvaluationPeriods:     aws.Int32(1),
+				Period:                aws.Int32(300),
+				Statistic:             cwtypes.StatisticSum,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("KeyId"), Value: aws.String("a1b2c3d4-5678-90ab-cdef-111111111111")},
+				},
+			},
+			// Log group metric-filter alarm — required for alarm:logs
+			// related-panel pivot. checkAlarmLogs matches dimension
+			// LogGroupName against the /app/legacy/orphan-old fixture (cwlogs.go).
+			{
+				AlarmName:             aws.String("logs-orphan-old-error-count"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:logs-orphan-old-error-count"),
+				AlarmDescription:      aws.String("Triggers when /app/legacy/orphan-old ERROR count exceeds 20 in 5 minutes"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 1 datapoint was less than the threshold (20.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 22, 6, 35, 0, 0, time.UTC)),
+				MetricName:            aws.String("ErrorCount"),
+				Namespace:             aws.String("LogMetrics"),
+				Threshold:             aws.Float64(20.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanThreshold,
+				EvaluationPeriods:     aws.Int32(1),
+				Period:                aws.Int32(300),
+				Statistic:             cwtypes.StatisticSum,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("LogGroupName"), Value: aws.String("/app/legacy/orphan-old")},
+				},
+			},
+			// S3 request-metrics alarm — required for alarm:s3 related-panel
+			// pivot. checkAlarmS3 matches dimension BucketName against the
+			// graph-root healthy bucket (s3.go HealthyBucketName).
+			{
+				AlarmName:             aws.String("s3-healthy-bucket-4xx-errors"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:s3-healthy-bucket-4xx-errors"),
+				AlarmDescription:      aws.String("Triggers when a9s-demo-healthy 4xx error count exceeds 50 in 5 minutes"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 1 datapoint was less than the threshold (50.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 22, 6, 40, 0, 0, time.UTC)),
+				MetricName:            aws.String("4xxErrors"),
+				Namespace:             aws.String("AWS/S3"),
+				Threshold:             aws.Float64(50.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanThreshold,
+				EvaluationPeriods:     aws.Int32(1),
+				Period:                aws.Int32(300),
+				Statistic:             cwtypes.StatisticSum,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("BucketName"), Value: aws.String(HealthyBucketName)},
+				},
+			},
+			// WAF blocked-request alarm — required for alarm:waf related-panel
+			// pivot. checkAlarmWAF matches dimension WebACL against the
+			// acme-prod-api-waf fixture (waf.go).
+			{
+				AlarmName:             aws.String("waf-acme-prod-api-blocked-requests"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:waf-acme-prod-api-blocked-requests"),
+				AlarmDescription:      aws.String("Triggers when acme-prod-api-waf blocks 100+ requests in 5 minutes"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 1 datapoint was less than the threshold (100.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 22, 6, 45, 0, 0, time.UTC)),
+				MetricName:            aws.String("BlockedRequests"),
+				Namespace:             aws.String("AWS/WAFV2"),
+				Threshold:             aws.Float64(100.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanThreshold,
+				EvaluationPeriods:     aws.Int32(1),
+				Period:                aws.Int32(300),
+				Statistic:             cwtypes.StatisticSum,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("WebACL"), Value: aws.String("acme-prod-api-waf")},
+				},
+			},
+			// acme-etl-orders alarm — required for glue:alarm related-panel
+			// pivot. checkGlueAlarms matches dimension JobName.
+			{
+				AlarmName:             aws.String("glue-acme-etl-orders-failed-runs"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:glue-acme-etl-orders-failed-runs"),
+				AlarmDescription:      aws.String("Triggers when acme-etl-orders has 1+ failed job runs in 1 hour"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 1 datapoint was less than the threshold (1.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 22, 6, 50, 0, 0, time.UTC)),
+				MetricName:            aws.String("glue.driver.aggregate.numFailedTasks"),
+				Namespace:             aws.String("Glue"),
+				Threshold:             aws.Float64(1.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanOrEqualToThreshold,
+				EvaluationPeriods:     aws.Int32(1),
+				Period:                aws.Int32(3600),
+				Statistic:             cwtypes.StatisticSum,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("JobName"), Value: aws.String("acme-etl-orders")},
+				},
+			},
+			// clickstream-ingest alarm — required for kinesis:alarm related-panel
+			// pivot. checkKinesisAlarms matches dimension StreamName.
+			{
+				AlarmName:             aws.String("kinesis-clickstream-ingest-iterator-age"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:kinesis-clickstream-ingest-iterator-age"),
+				AlarmDescription:      aws.String("Triggers when clickstream-ingest consumer iterator age exceeds 60s"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 3 datapoints were less than the threshold (60000.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 22, 6, 55, 0, 0, time.UTC)),
+				MetricName:            aws.String("GetRecords.IteratorAgeMilliseconds"),
+				Namespace:             aws.String("AWS/Kinesis"),
+				Threshold:             aws.Float64(60000.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanThreshold,
+				EvaluationPeriods:     aws.Int32(3),
+				Period:                aws.Int32(60),
+				Statistic:             cwtypes.StatisticMaximum,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("StreamName"), Value: aws.String("clickstream-ingest")},
+				},
+			},
+			// acme-events-prod alarm — required for msk:alarm related-panel
+			// pivot. checkMSKAlarms matches dimension "Cluster Name".
+			{
+				AlarmName:             aws.String("msk-acme-events-prod-under-replicated"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:msk-acme-events-prod-under-replicated"),
+				AlarmDescription:      aws.String("Triggers when acme-events-prod has under-replicated partitions"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 3 datapoints were less than the threshold (1.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 22, 7, 0, 0, 0, time.UTC)),
+				MetricName:            aws.String("UnderReplicatedPartitions"),
+				Namespace:             aws.String("AWS/Kafka"),
+				Threshold:             aws.Float64(1.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanOrEqualToThreshold,
+				EvaluationPeriods:     aws.Int32(3),
+				Period:                aws.Int32(300),
+				Statistic:             cwtypes.StatisticMaximum,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("Cluster Name"), Value: aws.String("acme-events-prod")},
+				},
+			},
+			// order-processing-queue alarm — required for sqs:alarm related-panel
+			// pivot. checkSQSAlarm matches Namespace=AWS/SQS + dimension QueueName.
+			{
+				AlarmName:             aws.String("sqs-order-processing-queue-oldest-message-age"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:sqs-order-processing-queue-oldest-message-age"),
+				AlarmDescription:      aws.String("Triggers when order-processing-queue oldest message age exceeds 300s"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 3 datapoints were less than the threshold (300.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 22, 7, 5, 0, 0, time.UTC)),
+				MetricName:            aws.String("ApproximateAgeOfOldestMessage"),
+				Namespace:             aws.String("AWS/SQS"),
+				Threshold:             aws.Float64(300.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanThreshold,
+				EvaluationPeriods:     aws.Int32(3),
+				Period:                aws.Int32(60),
+				Statistic:             cwtypes.StatisticMaximum,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("QueueName"), Value: aws.String("order-processing-queue")},
+				},
+			},
 		},
 		// AlarmHistory — every graph-root-reachable alarm needs at least one
 		// entry so alarm→alarm_history drill lands on non-empty content.

@@ -280,6 +280,16 @@ var sharedCloudFrontFixtures = sync.OnceValue(func() *CloudFrontFixtures {
 					Bucket:  aws.String(LogsBucketName + ".s3.amazonaws.com"),
 				},
 			},
+			// E5E6F7G8H9I0J1 — required for the Wave-2 issue-coverage gate
+			// (TestDemoIssueCoverage). Mirrors its DistributionSummary's
+			// already-modeled insecure ViewerProtocolPolicyAllowAll so
+			// EnrichCloudFrontDistribution's viewer-protocol check fires.
+			"E5E6F7G8H9I0J1": {
+				DefaultCacheBehavior: &cftypes.DefaultCacheBehavior{
+					TargetOriginId:       aws.String("alb-old-api"),
+					ViewerProtocolPolicy: cftypes.ViewerProtocolPolicyAllowAll,
+				},
+			},
 		},
 	}
 })

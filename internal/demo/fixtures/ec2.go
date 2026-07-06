@@ -35,6 +35,11 @@ type EC2Fixtures struct {
 	// related-panel pivot (checkTGWSubnet), mirroring
 	// ec2:DescribeTransitGatewayVpcAttachments.TransitGatewayVpcAttachments[].SubnetIds.
 	TGWVpcAttachmentSubnets map[string][]string
+	// FlowLogsByResourceID maps a "resource-id" filter value (e.g. a VPC
+	// endpoint ID) to the flow logs configured against it. Backs
+	// ec2:DescribeFlowLogs for the vpce:logs related-panel pivot
+	// (checkVPCELogs).
+	FlowLogsByResourceID map[string][]ec2types.FlowLog
 }
 
 // shared constants (mirrors internal/demo/constants_shared.go — no import allowed)
@@ -105,6 +110,22 @@ var sharedEC2Fixtures = sync.OnceValue(func() *EC2Fixtures {
 	// two prod public subnets, backing the tgw→subnet related-panel pivot.
 	f.TGWVpcAttachmentSubnets = map[string][]string{
 		"tgw-attach-0aaa111111111111a": {fixtProdPublicSubnetA, fixtProdPublicSubnetB},
+	}
+	// FlowLogsByResourceID — the prod S3 gateway endpoint has a flow log
+	// delivering to CloudWatch Logs, backing the vpce:logs related-panel
+	// pivot (checkVPCELogs via ec2:DescribeFlowLogs filtered by resource-id).
+	f.FlowLogsByResourceID = map[string][]ec2types.FlowLog{
+		"vpce-0aaa111111111111a": {
+			{
+				FlowLogId:          aws.String("fl-0aaa111111111111a"),
+				ResourceId:         aws.String("vpce-0aaa111111111111a"),
+				LogDestinationType: ec2types.LogDestinationTypeCloudWatchLogs,
+				LogGroupName:       aws.String("/aws/vpc/flowlogs/vpce-s3-endpoint"),
+				DeliverLogsStatus:  aws.String("SUCCESS"),
+				TrafficType:        ec2types.TrafficTypeAll,
+				CreationTime:       aws.Time(time.Date(2025, 6, 15, 12, 10, 0, 0, time.UTC)),
+			},
+		},
 	}
 	return f
 })
@@ -2332,8 +2353,15 @@ func buildSnapshots() []ec2types.Snapshot {
 		{
 			SnapshotId: aws.String("snap-0a1b2c3d4e5f60001"), State: ec2types.SnapshotStateCompleted,
 			VolumeId: aws.String("vol-0a1b2c3d4e5f60001"), VolumeSize: aws.Int32(50),
-			Encrypted: aws.Bool(true), Description: aws.String("Quarterly backup of web-prod-01 root volume"),
-			StartTime: aws.Time(t1), Progress: aws.String("100%"), OwnerId: aws.String("123456789012"),
+			Encrypted: aws.Bool(true),
+			// Description — required for the ebs-snap:ec2 related-panel pivot
+			// (checkEBSSnapEC2 parses "Created by CreateImage(i-xxx)"), matching
+			// real AWS behavior where CreateImage auto-generates this snapshot
+			// description. This snapshot is also referenced by an AMI's block
+			// device mapping (ebs-snap:ami pivot) — consistent with the AMI
+			// having been created from this same instance.
+			Description: aws.String("Created by CreateImage(i-0a1b2c3d4e5f60001) for ami-0a1b2c3d4e5f60001 from vol-0a1b2c3d4e5f60001"),
+			StartTime:   aws.Time(t1), Progress: aws.String("100%"), OwnerId: aws.String("123456789012"),
 			KmsKeyId: aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
 			Tags:     []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("web-prod-snapshot-2025q3")}},
 		},

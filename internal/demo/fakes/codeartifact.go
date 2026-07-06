@@ -24,10 +24,23 @@ func (f *CodeArtifactFake) ListRepositories(_ context.Context, _ *codeartifact.L
 	return &codeartifact.ListRepositoriesOutput{Repositories: f.fix.Repositories}, nil
 }
 
-// GetRepositoryPermissionsPolicy is a stub satisfying CodeArtifactGetRepositoryPermissionsPolicyAPI.
-// Demo mode returns no policy (nil Policy), simulating repositories without a permissions policy.
-func (f *CodeArtifactFake) GetRepositoryPermissionsPolicy(_ context.Context, _ *codeartifact.GetRepositoryPermissionsPolicyInput, _ ...func(*codeartifact.Options)) (*codeartifact.GetRepositoryPermissionsPolicyOutput, error) {
-	return &codeartifact.GetRepositoryPermissionsPolicyOutput{}, nil
+// GetRepositoryPermissionsPolicy returns the fixture-registered policy for
+// the requested repository (see CodeArtifactFixtures.PermissionsPolicies).
+// Repositories with no registered policy return ResourceNotFoundException,
+// matching real AWS behavior for a repository with no permissions policy set —
+// required for EnrichCodeArtifactRepository's Wave-2 issue checks.
+func (f *CodeArtifactFake) GetRepositoryPermissionsPolicy(_ context.Context, input *codeartifact.GetRepositoryPermissionsPolicyInput, _ ...func(*codeartifact.Options)) (*codeartifact.GetRepositoryPermissionsPolicyOutput, error) {
+	var repoName string
+	if input != nil && input.Repository != nil {
+		repoName = *input.Repository
+	}
+	policy, ok := f.fix.PermissionsPolicies[repoName]
+	if !ok {
+		return nil, &codeartifacttypes.ResourceNotFoundException{
+			Message: aws.String("policy does not exist for repository " + repoName),
+		}
+	}
+	return &codeartifact.GetRepositoryPermissionsPolicyOutput{Policy: policy}, nil
 }
 
 // DescribeRepository returns an empty repository — demo mode does not model repository details.

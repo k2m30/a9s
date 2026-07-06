@@ -62,8 +62,15 @@ func (f *KMSFake) ListGrants(_ context.Context, _ *kms.ListGrantsInput, _ ...fun
 	return &kms.ListGrantsOutput{}, nil
 }
 
-// GetKeyPolicy is a no-op stub satisfying KMSGetKeyPolicyAPI.
-// Demo mode does not model KMS key policies.
-func (f *KMSFake) GetKeyPolicy(_ context.Context, _ *kms.GetKeyPolicyInput, _ ...func(*kms.Options)) (*kms.GetKeyPolicyOutput, error) {
-	return &kms.GetKeyPolicyOutput{}, nil
+// GetKeyPolicy returns the named key's default policy document from fixture
+// data. Backs the kms:role related-panel pivot (checkKMSRole).
+func (f *KMSFake) GetKeyPolicy(_ context.Context, input *kms.GetKeyPolicyInput, _ ...func(*kms.Options)) (*kms.GetKeyPolicyOutput, error) {
+	if input == nil || input.KeyId == nil {
+		return &kms.GetKeyPolicyOutput{}, nil
+	}
+	policy, ok := f.fix.KeyPolicies[*input.KeyId]
+	if !ok {
+		return &kms.GetKeyPolicyOutput{}, nil
+	}
+	return &kms.GetKeyPolicyOutput{Policy: &policy}, nil
 }

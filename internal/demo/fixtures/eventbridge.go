@@ -123,6 +123,25 @@ var sharedEventBridgeFixtures = sync.OnceValue(func() *EventBridgeFixtures {
 				Id:  aws.String("LambdaBackupFunction"),
 				Arn: aws.String("arn:aws:lambda:us-east-1:123456789012:function:db-backup-trigger"),
 			},
+			// KinesisAuditStream — required for eb-rule:kinesis related-panel
+			// pivot (checkEbRuleKinesis). Streams a copy of every backup event.
+			{
+				Id:  aws.String("KinesisAuditStream"),
+				Arn: aws.String("arn:aws:kinesis:us-east-1:123456789012:stream/audit-log-stream"),
+			},
+			// CloudWatchLogsTarget — required for eb-rule:logs related-panel
+			// pivot (checkEbRuleLogs).
+			{
+				Id:  aws.String("CloudWatchLogsTarget"),
+				Arn: aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/app/legacy/orphan-old:*"),
+			},
+			// SQSBackupCompletionQueue — required for sqs:eb-rule related-panel
+			// pivot (checkSQSEbRule calls events:ListRuleNamesByTarget with the
+			// queue's ARN as TargetArn).
+			{
+				Id:  aws.String("SQSBackupCompletionQueue"),
+				Arn: aws.String("arn:aws:sqs:us-east-1:123456789012:order-processing-queue"),
+			},
 		},
 		"ec2-state-change-handler": {
 			{

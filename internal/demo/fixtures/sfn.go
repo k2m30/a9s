@@ -33,6 +33,7 @@ type SFNFixtures struct {
 // NewSFNFixtures constructs SFNFixtures from the canonical demo data.
 var sharedSFNFixtures = sync.OnceValue(func() *SFNFixtures {
 	const smARNOrderFulfillment = "arn:aws:states:us-east-1:123456789012:stateMachine:order-fulfillment-workflow"
+	const smARNPaymentValidation = "arn:aws:states:us-east-1:123456789012:stateMachine:payment-validation"
 
 	redriveCount := int32(1)
 	redriveDate := time.Date(2026, 3, 21, 19, 0, 0, 0, time.UTC)
@@ -67,7 +68,7 @@ var sharedSFNFixtures = sync.OnceValue(func() *SFNFixtures {
 			},
 			{
 				Name:            aws.String("payment-validation"),
-				StateMachineArn: aws.String("arn:aws:states:us-east-1:123456789012:stateMachine:payment-validation"),
+				StateMachineArn: aws.String(smARNPaymentValidation),
 				Type:            sfntypes.StateMachineTypeExpress,
 				CreationDate:    aws.Time(time.Date(2025, 11, 20, 10, 45, 0, 0, time.UTC)),
 			},
@@ -136,6 +137,19 @@ var sharedSFNFixtures = sync.OnceValue(func() *SFNFixtures {
 					StopDate:        &stop7,
 					StateMachineArn: aws.String(smARNOrderFulfillment),
 					Status:          sfntypes.ExecutionStatusSucceeded,
+				},
+			},
+			// payment-validation's single (and therefore latest) execution
+			// failed — required for EnrichStepFunctionsStatus's Wave-2 issue
+			// check.
+			smARNPaymentValidation: {
+				{
+					ExecutionArn:    aws.String("arn:aws:states:us-east-1:123456789012:execution:payment-validation:exec-2026-0322-0400-b1c2d3e4"),
+					Name:            aws.String("exec-2026-0322-0400-b1c2d3e4"),
+					StartDate:       aws.Time(time.Date(2026, 3, 22, 4, 0, 0, 0, time.UTC)),
+					StopDate:        aws.Time(time.Date(2026, 3, 22, 4, 0, 8, 0, time.UTC)),
+					StateMachineArn: aws.String(smARNPaymentValidation),
+					Status:          sfntypes.ExecutionStatusFailed,
 				},
 			},
 		},

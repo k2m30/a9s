@@ -15,6 +15,12 @@ type ASGFixtures struct {
 	Activities map[string][]asgtypes.Activity
 	// LaunchConfigurations maps LC name → LaunchConfiguration.
 	LaunchConfigurations map[string]asgtypes.LaunchConfiguration
+	// NotificationConfigurations maps ASG name → []NotificationConfiguration —
+	// required for the asg:sns related-panel pivot (checkASGSNS).
+	NotificationConfigurations map[string][]asgtypes.NotificationConfiguration
+	// LifecycleHooks maps ASG name → []LifecycleHook — reverse-scanned by
+	// checkASGSNS for SNS-ARN NotificationTargetARN values.
+	LifecycleHooks map[string][]asgtypes.LifecycleHook
 }
 
 // NewASGFixtures builds and returns a fully-populated ASGFixtures struct.
@@ -23,11 +29,46 @@ var sharedASGFixtures = sync.OnceValue(func() *ASGFixtures {
 	activities := buildASGActivities()
 	lcs := buildLaunchConfigurations()
 	return &ASGFixtures{
-		AutoScalingGroups:    groups,
-		Activities:           activities,
-		LaunchConfigurations: lcs,
+		AutoScalingGroups:          groups,
+		Activities:                 activities,
+		LaunchConfigurations:       lcs,
+		NotificationConfigurations: buildASGNotificationConfigurations(),
+		LifecycleHooks:             buildASGLifecycleHooks(),
 	}
 })
+
+// buildASGNotificationConfigurations wires acme-web-prod-asg's scaling
+// notifications to the shared ops-alerts SNS topic — required for the
+// asg:sns related-panel pivot (checkASGSNS).
+func buildASGNotificationConfigurations() map[string][]asgtypes.NotificationConfiguration {
+	return map[string][]asgtypes.NotificationConfiguration{
+		"acme-web-prod-asg": {
+			{
+				AutoScalingGroupName: aws.String("acme-web-prod-asg"),
+				TopicARN:             aws.String(relatedAlarmSNSARN),
+				NotificationType:     aws.String("autoscaling:EC2_INSTANCE_LAUNCH"),
+			},
+		},
+	}
+}
+
+// buildASGLifecycleHooks provides a lifecycle hook targeting the shared
+// ops-alerts SNS topic — an alternate asg:sns witness path via
+// NotificationTargetARN, mirroring the real AWS lifecycle-hook shape.
+func buildASGLifecycleHooks() map[string][]asgtypes.LifecycleHook {
+	return map[string][]asgtypes.LifecycleHook{
+		"acme-web-prod-asg": {
+			{
+				AutoScalingGroupName:  aws.String("acme-web-prod-asg"),
+				LifecycleHookName:     aws.String("acme-web-prod-drain-hook"),
+				LifecycleTransition:   aws.String("autoscaling:EC2_INSTANCE_TERMINATING"),
+				NotificationTargetARN: aws.String(relatedAlarmSNSARN),
+				DefaultResult:         aws.String("CONTINUE"),
+				HeartbeatTimeout:      aws.Int32(300),
+			},
+		},
+	}
+}
 
 func NewASGFixtures() *ASGFixtures {
 	return sharedASGFixtures()

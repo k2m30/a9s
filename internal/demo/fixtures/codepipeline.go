@@ -17,6 +17,9 @@ type CodePipelineFixtures struct {
 	// all call pipelineGetDeclaration and scan Stages[].Actions[]), and for
 	// the reverse cb:pipeline pivot (checkCbPipeline calls the same API).
 	Declarations map[string]*cptypes.PipelineDeclaration
+	// States maps pipeline name -> GetPipelineState stage states. Backs
+	// EnrichCodePipelineStatus's Wave-2 failed-stage issue check.
+	States map[string][]cptypes.StageState
 }
 
 const pipelineArtifactStoreKMSKeyID = "arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"
@@ -198,6 +201,29 @@ var sharedCodePipelineFixtures = sync.OnceValue(func() *CodePipelineFixtures {
 								Configuration: map[string]string{
 									"BucketName": HealthyBucketName,
 									"Extract":    "false",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		// States — acme-frontend-deploy has a failed Deploy stage, required
+		// for EnrichCodePipelineStatus's Wave-2 issue check.
+		States: map[string][]cptypes.StageState{
+			"acme-frontend-deploy": {
+				{
+					StageName: aws.String("Deploy"),
+					LatestExecution: &cptypes.StageExecution{
+						Status: cptypes.StageExecutionStatusFailed,
+					},
+					ActionStates: []cptypes.ActionState{
+						{
+							ActionName: aws.String("DeployToS3"),
+							LatestExecution: &cptypes.ActionExecution{
+								Status: cptypes.ActionExecutionStatusFailed,
+								ErrorDetails: &cptypes.ErrorDetails{
+									Message: aws.String("Access Denied: insufficient permissions to write to target bucket"),
 								},
 							},
 						},

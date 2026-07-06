@@ -16,6 +16,12 @@ type CodeArtifactFixtures struct {
 	// witness (checkCodeartifactKMS reads Domain.EncryptionKey — CodeArtifact
 	// encryption is a domain-level, not repository-level, property).
 	Domains map[string]codeartifacttypes.DomainDescription
+	// PermissionsPolicies maps repository name to its GetRepositoryPermissionsPolicy
+	// response. Backs EnrichCodeArtifactRepository's Wave-2 issue checks: a
+	// missing entry surfaces as ResourceNotFoundException ("no permissions
+	// policy" — "~"); a policy document containing "Principal":"*" surfaces
+	// as "public access policy" ("!").
+	PermissionsPolicies map[string]*codeartifacttypes.ResourcePolicy
 }
 
 func mustParseCATime(s string) time.Time {
@@ -62,6 +68,17 @@ var sharedCodeArtifactFixtures = sync.OnceValue(func() *CodeArtifactFixtures {
 				Arn:           aws.String("arn:aws:codeartifact:us-east-1:123456789012:domain/acme-artifacts"),
 				EncryptionKey: aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
 				CreatedTime:   aws.Time(mustParseCATime("2025-04-01T08:00:00+00:00")),
+			},
+		},
+		// PermissionsPolicies — acme-npm carries an over-broad access policy
+		// (Principal:"*") so EnrichCodeArtifactRepository's public-access-policy
+		// "!" check fires. acme-pypi and acme-maven have no entry, so
+		// GetRepositoryPermissionsPolicy returns ResourceNotFoundException and
+		// the "no permissions policy" "~" check fires for them instead.
+		PermissionsPolicies: map[string]*codeartifacttypes.ResourcePolicy{
+			"acme-npm": {
+				ResourceArn: aws.String("arn:aws:codeartifact:us-east-1:123456789012:repository/acme-artifacts/acme-npm"),
+				Document:    aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":"codeartifact:ReadFromRepository","Resource":"*"}]}`),
 			},
 		},
 	}

@@ -86,48 +86,247 @@ import (
 // by a parallel fixture rebuild before this ratchet was written, and must
 // never be re-added here.
 var knownDisconnectedPivots = map[string]bool{
-	"alarm:asg": true, "alarm:ct-events": true,
-	"alarm:kms":  true,
-	"alarm:logs": true, "alarm:s3": true, "alarm:waf": true,
+	// alarm:ct-events is structurally unwitnessable: checkAlarmCTEvents
+	// (internal/aws/alarm_related_extra.go) reads evRes.Fields["event_source"],
+	// but FetchCTEvents (internal/aws/ct_events.go) never writes that key — it
+	// writes Fields["source"] for the AWS EventSource value instead. The
+	// Contains() guard is permanently comparing against "", so no fixture can
+	// produce a witness without a checker-code fix (out of scope for this
+	// fixture-only wave).
+	"alarm:ct-events": true,
+	// apigw:elb, apigw:r53, apigw:role, apigw:vpce, apigw:waf: each checker
+	// (internal/aws/apigw_related.go checkApigwELB/R53/Role/VPCE/WAF) is
+	// hardcoded to return Count:-1 whenever res.ID != "" (i.e. always, for any
+	// real fixture) — the AWS API path needed to resolve a concrete ID is
+	// documented in each function's comment as unavailable from GetApis
+	// (e.g. VpcLink->NLB needs GetVpcLinks, role/authorizer needs
+	// per-route GetAuthorizer, private-API endpoint id is v1-only). Since
+	// isWitnessResult requires Count>0 for non-FetchFilter results, no
+	// fixture can ever produce a witness here.
 	"apigw:elb": true, "apigw:r53": true,
-	"apigw:role": true, "apigw:sfn": true, "apigw:sns": true, "apigw:vpce": true, "apigw:waf": true,
-	"asg:alarm": true, "asg:role": true, "asg:sns": true,
-	"athena:glue": true, "athena:kms": true, "athena:logs": true, "athena:role": true,
-	"cfn:cfn": true, "cfn:eb-rule": true, "cfn:s3": true, "cfn:sns": true,
-	"ct-events:cfn": true, "ct-events:lambda": true, "ct-events:secrets": true,
-	"ct-events:sg": true, "ct-events:trail": true, "ct-events:vpce": true,
-	"eb-rule:kinesis": true, "eb-rule:logs": true,
-	"ebs-snap:ec2": true,
-	"ecr:cfn":      true, "ecr:ecs-task": true, "ecr:role": true,
+	"apigw:role": true, "apigw:vpce": true, "apigw:waf": true,
+	// apigw:sfn, apigw:sns: checkApigwSFN/SNS (same file) can detect that an
+	// SFN/SNS integration exists but the target ARN lives in the per-route
+	// request template, not the integration URI — both functions explicitly
+	// return Count:-1 (found-but-unidentified) or Count:0 (not found), never
+	// Count>0. Structurally unwitnessable without request-template parsing.
+	"apigw:sfn": true, "apigw:sns": true,
+	// asg:role: checkASGRole (internal/aws/asg_related.go) returns role IDs as
+	// full ARNs (ServiceLinkedRoleARN verbatim, and asgInstanceProfileToRoles'
+	// r.Arn), unlike every sibling role-pivot checker (checkEC2Role,
+	// checkEKSRole, checkNGRole) which all extract the bare role name via the
+	// last "/" segment before emitting it. FetchRolesByIDs
+	// (internal/aws/iam_roles.go) calls iam:GetRole(RoleName: id), which AWS
+	// requires to be a bare name, not an ARN — a fixture wired to produce a
+	// non-zero checkASGRole count resolves the pivot-coverage witness but then
+	// fails the harder TestDemoRelatedIDsResolve_EveryWitnessedIDIsFetchable
+	// gate (drill click 404s: "NoSuchEntity ... cannot be found" on the ARN
+	// string). Fixing this requires editing checkASGRole/asgInstanceProfileToRoles
+	// to strip the ARN to a name like its siblings do — internal/aws/ is
+	// frozen for this fixture-only wave.
+	"asg:role": true,
+	// athena:glue: checkAthenaGlue (internal/aws/athena_related.go) is
+	// documented as structurally incapable of a non-zero result — its own
+	// comment states "No structured glue job/catalog field exists on the WG
+	// config... resolving which specific Glue jobs share this catalog
+	// requires a catalog crawl" — the function always returns Count:0 or
+	// Count:-1, never Count>0.
+	"athena:glue": true,
+	// ecr:cfn: ecrCFNStackName (internal/aws/ecr_related.go) reads
+	// res.Fields["cfn_stack_name"], but FetchECRRepositories
+	// (internal/aws/ecr.go) never writes that key — no ListTagsForResource
+	// enrichment call is wired for ECR anywhere in the fetcher. The field is
+	// permanently "", so no fixture can produce a witness without a
+	// fetcher-code change (out of scope for this fixture-only wave).
+	// ecr:ecs-task: checkECRECSTask (internal/aws/ecr_related_extra.go) scans
+	// every ecs-task Fields value for a substring match on ".dkr.ecr." — but
+	// FetchECSTasks (internal/aws/ecs_task.go) never stores the container
+	// image URI in any Fields entry (only task_id/cluster/status/roles/etc are
+	// populated). No fixture can produce a matching field without a
+	// fetcher-code change.
+	// ecr:role: checkECRRole → ecrPolicyRoleARNs (internal/aws/ecr_related_extra.go)
+	// returns role IDs as full ARNs verbatim from the repository policy's
+	// Principal.AWS field, same class of bug as asg:role — FetchRolesByIDs
+	// (internal/aws/iam_roles.go) requires a bare role name for
+	// iam:GetRole(RoleName:...). A fixture policy would produce a
+	// pivot-coverage witness that then fails
+	// TestDemoRelatedIDsResolve_EveryWitnessedIDIsFetchable. See
+	// internal/demo/fakes/ecr.go GetRepositoryPolicy for the documented
+	// rationale.
+	"ecr:cfn": true, "ecr:ecs-task": true, "ecr:role": true,
+	// eip:ecs, eip:ecs-svc, eip:ecs-task, eip:logs: each checker
+	// (internal/aws/eip_related.go checkEIPECS/ECSSvc/ECSTask/Logs) is
+	// hardcoded to return Count:-1 whenever res.ID != "" — every function's
+	// own comment documents the missing AWS API path (ECS task-to-EIP
+	// association requires per-cluster DescribeTasks; EIP flow logs require
+	// per-ENI DescribeFlowLogs), both explicitly "outside the 1-call budget".
+	// Structurally unwitnessable; no fixture changes this.
 	"eip:ecs": true, "eip:ecs-svc": true, "eip:ecs-task": true, "eip:logs": true,
+	// elb:r53: checkELBR53 (internal/aws/elb_related.go) is hardcoded to
+	// return Count:-1 whenever Fields["dns_name"] != "" (true for every real
+	// ELB) — reverse-resolving which R53 records alias to this LB's DNS name
+	// requires enumerating every hosted zone's record sets, outside the
+	// checker's call budget. Structurally unwitnessable.
 	"elb:r53": true,
-	"glue:alarm": true, "glue:athena": true, "glue:cfn": true, "glue:kms": true, "glue:logs": true, "glue:secrets": true,
-	"kinesis:alarm": true, "kinesis:cfn": true, "kinesis:kms": true, "kinesis:lambda": true,
-	"kms:role": true, "kms:s3": true,
-	"logs:alarm": true, "logs:ecs-task": true, "logs:kinesis": true, "logs:s3": true,
-	"msk:alarm": true, "msk:cfn": true, "msk:kms": true, "msk:lambda": true, "msk:logs": true,
-	"msk:s3": true, "msk:secrets": true, "msk:sg": true, "msk:vpc": true,
+	// glue:cfn: checkGlueCFN (internal/aws/glue_related.go) constructs the
+	// job ARN from regionFromEnv() (reads AWS_REGION / AWS_DEFAULT_REGION)
+	// and accountIDFromClients() (STS GetCallerIdentity), returning Count:-1
+	// whenever either is empty. This test process runs with neither
+	// AWS_REGION nor AWS_DEFAULT_REGION set, so region is always "" here —
+	// no fixture data can influence an os.Getenv read. Fixed fixture data
+	// (SecurityConfigurations/TagsByResourceARN) is in place and the pivot
+	// resolves correctly whenever a region env var is present (e.g. real
+	// `./a9s --demo` launches, which typically inherit AWS_REGION from the
+	// operator's shell/profile).
+	"glue:cfn": true,
+	// kinesis:lambda: checkKinesisLambda (internal/aws/kinesis_related.go)
+	// matches lambda cache entries whose Fields["event_source_arn"] equals
+	// this stream's ARN — but the registered Wave-1 Lambda Fetcher
+	// (internal/aws/catalog_compute.go) calls FetchLambdaFunctionsPage, which
+	// always passes eventSourceAPI=nil into
+	// FetchLambdaFunctionsPageWithEventSources. That nil guard means
+	// Fields["event_source_arn"] is permanently "" for every lambda resource
+	// in both production and demo, regardless of fixture data (the demo
+	// fixtures already model a working ESM — data-pipeline-transform →
+	// clickstream-ingest — the field is just never populated). Fixing this
+	// requires passing a real eventSourceAPI into the registered fetcher,
+	// which is an internal/aws/ change out of scope for this fixture-only wave.
+	"kinesis:lambda": true,
+	// kms:s3: checkKMSS3 (internal/aws/kms_related.go) is hardcoded to return
+	// Count:-1 whenever res.ID != "" — its own comment states "S3 resources
+	// do not expose KMS key IDs in Fields or RawStruct, so the relationship
+	// cannot be determined from cache alone." Structurally unwitnessable.
+	"kms:s3": true,
+	// logs:ecs-task: checkLogsECSTask (internal/aws/logs_related.go) extracts
+	// a "family" substring from the log group name (text after "/ecs/" up to
+	// the next "/") and checks whether any cached ecs-task's ID or Name
+	// contains that family. But FetchECSTasks (internal/aws/ecs_task.go)
+	// always sets task ID/Name to the bare task UUID parsed from the task
+	// ARN's last "/" segment — never the family/service name. No real AWS
+	// task UUID would contain a human-readable family substring; the only way
+	// to produce a witness would be to fabricate a UUID that happens to embed
+	// the literal family string, which is an artificial ID collision, not a
+	// realistic fixture. Structurally unwitnessable without a fetcher/checker
+	// change (out of scope for this fixture-only wave).
+	"logs:ecs-task": true,
+	// msk:lambda: checkMSKLambda (internal/aws/msk_related.go) matches lambda
+	// cache entries whose Fields["event_source_arn"] equals the cluster ARN —
+	// same eventSourceAPI=nil registration bug as kinesis:lambda above (the
+	// registered Wave-1 Lambda Fetcher never populates this field). The demo
+	// fixture already models a working ESM (data-pipeline-transform →
+	// acme-events-prod), the field is just never populated. Out of scope for
+	// this fixture-only wave.
+	"msk:lambda": true,
+	// pipeline:eb-rule: checkPipelineEbRule (internal/aws/pipeline_related.go)
+	// reads res.Fields["arn"], but FetchPipelines (internal/aws/pipeline.go)
+	// never populates that key in its Fields map (only name/pipeline_type/
+	// created/updated/version are set) — the read is permanently "" and the
+	// checker short-circuits to Count:0 before ever calling
+	// eventbridge:ListRuleNamesByTarget (which the fake already implements
+	// correctly). Fixing this requires adding Fields["arn"] to the pipeline
+	// fetcher, an internal/aws/ change out of scope for this fixture-only wave.
 	"pipeline:eb-rule": true,
-	"r53:acm":          true, "r53:apigw": true, "r53:logs": true, "r53:s3": true, "r53:vpc": true,
-	"role:iam-group": true, "role:iam-user": true,
-	"sns:kms": true, "sns:role": true,
-	"sqs:alarm": true, "sqs:eb-rule": true, "sqs:kms": true, "sqs:sqs": true,
-	"subnet:asg": true, "subnet:efs": true, "subnet:eks": true,
+	// r53:logs: checkR53Logs (internal/aws/r53_related.go) is hardcoded to
+	// return Count:-1 whenever res.ID != "" — its own comment states the
+	// query-log configuration API (route53:ListQueryLoggingConfigs) "is not
+	// in Route53API yet" and there is "no second-call workaround... at 1-call
+	// budget." Structurally unwitnessable without adding that API to the
+	// Route53 interface — out of scope for this fixture-only wave.
+	"r53:logs": true,
+	// sqs:kms: checkSQSKMS (internal/aws/sqs_related.go) reads
+	// res.Fields["kms_key_id"], but FetchSQSQueuesPage (internal/aws/sqs.go)
+	// never writes that key — its Fields map only sets queue_name/queue_url/
+	// arn/approx_messages/approx_not_visible/delay_seconds (kms_key_id is only
+	// ever populated by the unrelated cwlogs.go fetcher for log groups). The
+	// KmsMasterKeyId value lives in the raw GetQueueAttributes Attributes map
+	// but the checker's own comment documents it deliberately does not read
+	// RawStruct there. No fixture can produce a witness without a
+	// fetcher-code change — out of scope for this fixture-only wave.
+	"sqs:kms": true,
+	// subnet:asg: checkSubnetASG (internal/aws/subnet_related.go) reads
+	// asgRes.Fields["vpc_zone_identifier"] (falling back to Fields["subnets"]),
+	// but FetchAutoScalingGroupsPage (internal/aws/asg.go) never writes either
+	// key into its Fields map (only asg_name/min_size/max_size/desired/
+	// instances/status/instances_unhealthy_count/in_service_count/
+	// suspended_processes are set) — the sibling forward checker checkASGSubnets
+	// reads RawStruct.VPCZoneIdentifier directly and works fine, but the
+	// reverse checker here only looks at Fields. No fixture can produce a
+	// witness without a fetcher-code change — out of scope for this
+	// fixture-only wave.
+	"subnet:asg": true,
+	// subnet:efs: checkSubnetEFS (internal/aws/subnet_related.go) is hardcoded
+	// to return Count:-1 whenever res.ID != "" — its own comment states mount
+	// targets are listed per-file-system via DescribeMountTargets, and the EFS
+	// list cache only carries FileSystemDescription (no mount targets),
+	// "outside the 1-call budget." Structurally unwitnessable.
+	"subnet:efs": true,
+	// subnet:eks: checkSubnetEKS (internal/aws/subnet_related.go) reads
+	// eksRes.Fields["subnets"] (falling back to Fields["subnet_ids"]), but
+	// buildEKSResource (internal/aws/eks.go) never writes either key into its
+	// Fields map (only cluster_name/version/status/endpoint/platform_version/
+	// arn/health_issues_count/health_issues are set) — the subnet IDs live in
+	// RawStruct.ResourcesVpcConfig.SubnetIds, which this checker never reads.
+	// Same class of bug as subnet:asg above — a fetcher-code change out of
+	// scope for this fixture-only wave.
+	"subnet:eks": true,
+	// tg:backup, tg:dbc, tg:dbi, tg:dbi-snap, tg:logs, tg:sg, tg:subnet: each
+	// checker (internal/aws/tg_related.go checkTGBackup/DBC/DBI/DBISnap/Logs/
+	// SG/Subnet) is hardcoded to return Count:-1 whenever the TG has an ARN
+	// (or, for sg/subnet, whenever Fields["vpc_id"] != "") — every function's
+	// own comment documents the missing AWS API path: target identity
+	// (backup/dbc/dbi/dbi-snap) requires DescribeTargetHealth + matching IP
+	// addresses against instance/DB ENIs; logs requires resolving to the
+	// parent ELB's access logs; sg/subnet require DescribeTargetHealth + ENI
+	// lookup — all explicitly "outside the 1-call budget." Structurally
+	// unwitnessable; no fixture changes this.
 	"tg:backup": true, "tg:dbc": true, "tg:dbi": true,
 	"tg:dbi-snap": true, "tg:logs": true, "tg:sg": true, "tg:subnet": true,
-	"trail:logs": true, "trail:role": true, "trail:sns": true,
-	"vpce:acm": true, "vpce:cf": true, "vpce:logs": true, "vpce:r53": true,
+	// vpce:acm, vpce:cf, vpce:r53, vpce:s3, vpce:tg, vpce:waf: each checker
+	// (internal/aws/vpce_related.go checkVPCEACM/CF/R53/S3/TG/WAF) is
+	// hardcoded to return Count:-1 whenever res.ID != "" — every function's
+	// own comment documents the missing AWS API path (CloudFront->VPCE needs
+	// VPC Origins, not on DistributionSummary; R53 needs
+	// route53:ListHostedZonesByVPC, not in the hosted-zone cache; S3 gateway
+	// access needs policy-document JSON interpretation; TG/WAF associations
+	// require DescribeTargetHealth / wafv2:ListResourcesForWebACL from the
+	// other side). Structurally unwitnessable; no fixture changes this.
+	"vpce:acm": true, "vpce:cf": true, "vpce:r53": true,
 	"vpce:s3": true, "vpce:tg": true, "vpce:waf": true,
-	"waf:alarm": true, "waf:cf": true,
+	// waf:cf: checkWAFCF (internal/aws/waf_related.go) guards on
+	// res.Fields["scope"] == wafv2types.ScopeCloudfront before ever calling
+	// cloudfront:ListDistributionsByWebACLId. But FetchWAFWebACLsPage
+	// (internal/aws/waf.go) hardcodes both the ListWebACLs request
+	// (Scope: wafv2types.ScopeRegional) and every returned resource's
+	// Fields["scope"] to ScopeRegional — it never issues the separate
+	// Scope=CLOUDFRONT ListWebACLs call CloudFront-associated WebACLs require
+	// (which AWS also mandates be made against us-east-1). No WAF resource,
+	// in demo or production, can ever carry scope=CLOUDFRONT, so the guard
+	// permanently short-circuits to Count:0. Fixing this requires a second
+	// fetch path in the WAF fetcher — an internal/aws/ change out of scope
+	// for this fixture-only wave.
+	"waf:cf": true,
 }
 
 // knownIssueCoverageGaps pins the exact issue-capable types that had zero
 // flagged demo fixtures at ratchet-conversion time. Same burn-down semantics
 // as knownDisconnectedPivots: still-gapped -> skip (logged); now-flagged ->
 // FAIL ("remove from allowlist"); a gap NOT in this list -> FAIL unconditionally.
+// trail: registered with Wave2: IssueEnricher{Fn: InFetcherWave2Sentinel} —
+// a documentation-only marker meaning "this type's Wave-2 signal is computed
+// inside the fetcher, not via a separate enricher call." But
+// FetchCloudTrailTrails (internal/aws/trail.go) only ever writes
+// is_logging/latest_delivery_error/log_file_validation_enabled into
+// Fields — colorTrail (internal/aws/catalog_monitoring.go) reads those Fields
+// directly for row coloring, but no code path ever appends to r.Findings.
+// InFetcherWave2Sentinel itself unconditionally returns empty
+// Findings/IssueCount. So isIssueCapable reports trail as issue-capable (a
+// Wave2 enricher is registered) but neither Wave-1 Findings nor the Wave-2
+// enricher result can ever be non-empty, in demo or production, regardless
+// of fixture data. Fixing this requires the fetcher to append r.Findings for
+// the same conditions colorTrail already checks — an internal/aws/ change
+// out of scope for this fixture-only wave.
 var knownIssueCoverageGaps = map[string]bool{
-	"acm": true, "cf": true, "codeartifact": true, "eb": true, "ecr": true,
-	"iam-user": true, "pipeline": true, "sfn": true, "sns": true, "trail": true,
+	"trail": true,
 }
 
 // demoPivotMaxFetchPages bounds the pagination drain per type as a safety

@@ -65,10 +65,22 @@ var sharedR53Fixtures = sync.OnceValue(func() *R53Fixtures {
 				Id:                     aws.String("/hostedzone/Z4567890123ABCDEFGHIJ"),
 				Name:                   aws.String("demo.acme-corp.com."),
 				CallerReference:        aws.String("2025-10-01T00:00:00Z"),
-				ResourceRecordSetCount: aws.Int64(3),
+				ResourceRecordSetCount: aws.Int64(4),
 				Config: &r53types.HostedZoneConfig{
 					Comment:     aws.String("Demo zone with S3-website alias for a9s-demo-healthy"),
 					PrivateZone: false,
+				},
+			},
+			// Private zone with an active VPC association — required for the
+			// r53:vpc related-panel pivot (checkR53VPC).
+			{
+				Id:                     aws.String("/hostedzone/Z5678901234ABCDEFGHIJ"),
+				Name:                   aws.String("vpc-private.acme-corp.com."),
+				CallerReference:        aws.String("2025-11-01T00:00:00Z"),
+				ResourceRecordSetCount: aws.Int64(1),
+				Config: &r53types.HostedZoneConfig{
+					Comment:     aws.String("Private zone associated with the production VPC"),
+					PrivateZone: true,
 				},
 			},
 		},
@@ -117,6 +129,29 @@ var sharedR53Fixtures = sync.OnceValue(func() *R53Fixtures {
 					TTL:  aws.Int64(300),
 					ResourceRecords: []r53types.ResourceRecord{
 						{Value: aws.String("10 inbound-smtp.us-east-1.amazonaws.com.")},
+					},
+				},
+				// ACM DNS-validation CNAME — required for the r53:acm
+				// related-panel pivot (checkR53ACM). Validation record name
+				// starts with "_" and value ends with ".acm-validations.aws".
+				{
+					Name: aws.String("_a1b2c3d4e5f6.acme-corp.com."),
+					Type: r53types.RRTypeCname,
+					TTL:  aws.Int64(300),
+					ResourceRecords: []r53types.ResourceRecord{
+						{Value: aws.String("_x1y2z3.acm-validations.aws.")},
+					},
+				},
+				// API Gateway custom-domain alias — required for the
+				// r53:apigw related-panel pivot (checkR53APIGW). Matches
+				// PublicAPIGWID (apigw.go).
+				{
+					Name: aws.String("api-v2.acme-corp.com."),
+					Type: r53types.RRTypeA,
+					AliasTarget: &r53types.AliasTarget{
+						DNSName:              aws.String("abc123def4.execute-api.us-east-1.amazonaws.com."),
+						HostedZoneId:         aws.String("Z1UJRXOUMOOFQ8"),
+						EvaluateTargetHealth: false,
 					},
 				},
 			},
@@ -198,6 +233,34 @@ var sharedR53Fixtures = sync.OnceValue(func() *R53Fixtures {
 						DNSName:              aws.String("s3-website-us-east-1.amazonaws.com."),
 						HostedZoneId:         aws.String("Z3AQBSTGFYJSTF"),
 						EvaluateTargetHealth: false,
+					},
+				},
+				// downloads.demo.acme-corp.com — required for the r53:s3
+				// related-panel pivot (checkR53S3, the forward r53→s3
+				// direction). Uses the bucket-prefixed DNS-name alias style
+				// (record name != bucket name, so the S3-website endpoint
+				// itself carries the bucket segment).
+				{
+					Name: aws.String("downloads.demo.acme-corp.com."),
+					Type: r53types.RRTypeA,
+					AliasTarget: &r53types.AliasTarget{
+						DNSName:              aws.String(HealthyBucketName + ".s3-website-us-east-1.amazonaws.com."),
+						HostedZoneId:         aws.String("Z3AQBSTGFYJSTF"),
+						EvaluateTargetHealth: false,
+					},
+				},
+			},
+			// Private zone with an active VPC association — required for the
+			// r53:vpc related-panel pivot (checkR53VPC). Kept distinct from
+			// the intentionally-orphaned Z1234567890ABCDEFGHIJ private zone
+			// (which demonstrates the Wave-2 "no VPC associations" finding).
+			"/hostedzone/Z5678901234ABCDEFGHIJ": {
+				{
+					Name: aws.String("db.vpc-private.acme-corp.com."),
+					Type: r53types.RRTypeCname,
+					TTL:  aws.Int64(60),
+					ResourceRecords: []r53types.ResourceRecord{
+						{Value: aws.String("prod-api-primary.cluster-c9xyz123.us-east-1.rds.amazonaws.com.")},
 					},
 				},
 			},

@@ -24,6 +24,9 @@ var sharedSQSFixtures = sync.OnceValue(func() *SQSFixtures {
 					"VisibilityTimeout":                     "30",
 					"MessageRetentionPeriod":                "345600",
 					"QueueArn":                              "arn:aws:sqs:us-east-1:123456789012:order-processing-queue",
+					// RedrivePolicy — required for the sqs:sqs related-panel pivot
+					// (checkSQSSQS forward direction: this queue's DLQ target).
+					"RedrivePolicy": `{"deadLetterTargetArn":"arn:aws:sqs:us-east-1:123456789012:data-pipeline-dlq","maxReceiveCount":5}`,
 				},
 			},
 			{

@@ -25,10 +25,16 @@ func (f *EBFake) DescribeEnvironments(_ context.Context, _ *elasticbeanstalk.Des
 	return &elasticbeanstalk.DescribeEnvironmentsOutput{Environments: f.fix.Environments}, nil
 }
 
-// DescribeEnvironmentHealth is a no-op stub for demo mode.
-// Wave 2 enrichment is skipped in demo mode; this satisfies the ElasticBeanstalkAPI interface.
-func (f *EBFake) DescribeEnvironmentHealth(_ context.Context, _ *elasticbeanstalk.DescribeEnvironmentHealthInput, _ ...func(*elasticbeanstalk.Options)) (*elasticbeanstalk.DescribeEnvironmentHealthOutput, error) {
-	return &elasticbeanstalk.DescribeEnvironmentHealthOutput{}, nil
+// DescribeEnvironmentHealth returns the fixture-registered health causes for
+// the requested environment name (see EBFixtures.EnvironmentHealthCauses).
+// Required for EnrichEBEnvironmentHealth's Wave-2 issue check.
+func (f *EBFake) DescribeEnvironmentHealth(_ context.Context, input *elasticbeanstalk.DescribeEnvironmentHealthInput, _ ...func(*elasticbeanstalk.Options)) (*elasticbeanstalk.DescribeEnvironmentHealthOutput, error) {
+	if input == nil || input.EnvironmentName == nil {
+		return &elasticbeanstalk.DescribeEnvironmentHealthOutput{}, nil
+	}
+	return &elasticbeanstalk.DescribeEnvironmentHealthOutput{
+		Causes: f.fix.EnvironmentHealthCauses[aws.ToString(input.EnvironmentName)],
+	}, nil
 }
 
 // DescribeConfigurationSettings returns the fixture-registered configuration

@@ -60,3 +60,14 @@ func (f *CWLogsFake) FilterLogEvents(_ context.Context, input *cloudwatchlogs.Fi
 func (f *CWLogsFake) DescribeMetricFilters(_ context.Context, _ *cloudwatchlogs.DescribeMetricFiltersInput, _ ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeMetricFiltersOutput, error) {
 	return &cloudwatchlogs.DescribeMetricFiltersOutput{MetricFilters: []cwlogstypes.MetricFilter{}}, nil
 }
+
+// DescribeSubscriptionFilters returns subscription filters for the named log
+// group from fixture data. Backs the logs:kinesis and logs:s3 related-panel
+// pivots (checkLogsKinesis / checkLogsS3).
+func (f *CWLogsFake) DescribeSubscriptionFilters(_ context.Context, input *cloudwatchlogs.DescribeSubscriptionFiltersInput, _ ...func(*cloudwatchlogs.Options)) (*cloudwatchlogs.DescribeSubscriptionFiltersOutput, error) {
+	var logGroupName string
+	if input != nil && input.LogGroupName != nil {
+		logGroupName = *input.LogGroupName
+	}
+	return &cloudwatchlogs.DescribeSubscriptionFiltersOutput{SubscriptionFilters: f.fix.SubscriptionFilters[logGroupName]}, nil
+}

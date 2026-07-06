@@ -154,9 +154,23 @@ func (f *EC2Fake) DescribeVolumeStatus(_ context.Context, _ *ec2.DescribeVolumeS
 	return &ec2.DescribeVolumeStatusOutput{}, nil
 }
 
-// DescribeFlowLogs is a stub for the Wave 2 enrichment interface.
-// Returns empty flow logs so all demo VPCs appear without active flow logs.
-func (f *EC2Fake) DescribeFlowLogs(_ context.Context, _ *ec2.DescribeFlowLogsInput, _ ...func(*ec2.Options)) (*ec2.DescribeFlowLogsOutput, error) {
+// DescribeFlowLogs filters the fixture-registered FlowLogsByResourceID map by
+// the "resource-id" filter value. Required for the vpce:logs related-panel
+// pivot (checkVPCELogs).
+func (f *EC2Fake) DescribeFlowLogs(_ context.Context, input *ec2.DescribeFlowLogsInput, _ ...func(*ec2.Options)) (*ec2.DescribeFlowLogsOutput, error) {
+	if input == nil {
+		return &ec2.DescribeFlowLogsOutput{}, nil
+	}
+	for _, filter := range input.Filter {
+		if filter.Name == nil || *filter.Name != "resource-id" {
+			continue
+		}
+		var out []ec2types.FlowLog
+		for _, resourceID := range filter.Values {
+			out = append(out, f.fix.FlowLogsByResourceID[resourceID]...)
+		}
+		return &ec2.DescribeFlowLogsOutput{FlowLogs: out}, nil
+	}
 	return &ec2.DescribeFlowLogsOutput{}, nil
 }
 

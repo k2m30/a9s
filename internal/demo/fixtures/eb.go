@@ -23,6 +23,9 @@ type EBFixtures struct {
 	// DescribeApplicationVersions. Required for the eb:s3 related-panel
 	// pivot witness (checkEbS3).
 	ApplicationVersions map[string][]ebtypes.ApplicationVersionDescription
+	// EnvironmentHealthCauses maps environmentName -> DescribeEnvironmentHealth
+	// causes. Backs EnrichEBEnvironmentHealth's Wave-2 "~" issue check.
+	EnvironmentHealthCauses map[string][]string
 }
 
 // NewEBFixtures builds and returns a fully-populated EBFixtures struct.
@@ -87,6 +90,14 @@ var sharedEBFixtures = sync.OnceValue(func() *EBFixtures {
 						S3Key:    aws.String("acme-api/v2.4.1.zip"),
 					},
 				},
+			},
+		},
+		// EnvironmentHealthCauses — acme-eb-red (Health=Red) has a real cause
+		// explaining the critical health state, so EnrichEBEnvironmentHealth's
+		// "~" issue check fires in demo mode.
+		EnvironmentHealthCauses: map[string][]string{
+			"acme-eb-red": {
+				"40% of the requests are failing with HTTP 5xx.",
 			},
 		},
 	}

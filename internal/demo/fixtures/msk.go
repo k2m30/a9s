@@ -11,6 +11,9 @@ import (
 // MSKFixtures holds typed fixture data for MSK (Managed Streaming for Kafka).
 type MSKFixtures struct {
 	Clusters []kafkatypes.Cluster
+	// ScramSecretsByCluster maps cluster ARN to its SCRAM secret ARNs — backs
+	// kafka:ListScramSecrets for the msk:secrets related-panel pivot.
+	ScramSecretsByCluster map[string][]string
 }
 
 func mustParseMSKTime(s string) time.Time {
@@ -31,14 +34,50 @@ var sharedMSKFixtures = sync.OnceValue(func() *MSKFixtures {
 				CreationTime:   aws.Time(mustParseMSKTime("2025-04-10T14:00:00+00:00")),
 				Provisioned: &kafkatypes.Provisioned{
 					BrokerNodeGroupInfo: &kafkatypes.BrokerNodeGroupInfo{
-						ClientSubnets: []string{"subnet-0a1b2c3d4e5f60001", "subnet-0a1b2c3d4e5f60002"},
+						// ClientSubnets — required for msk:subnet and msk:vpc
+						// related-panel pivots. Real cached subnets (ec2.go
+						// fixtProdPublicSubnetA/fixtProdPrivateSubnetA).
+						ClientSubnets: []string{"subnet-0aaa111111111111a", "subnet-0ccc333333333333c"},
 						InstanceType:  aws.String("kafka.m5.large"),
+						// SecurityGroups — required for the msk:sg related-panel
+						// pivot (checkMSKSG). Reuses the acme-web-alb-sg fixture.
+						SecurityGroups: []string{"sg-0aaa111111111111a"},
 					},
 					NumberOfBrokerNodes: aws.Int32(3),
+					// EncryptionInfo — required for the msk:kms related-panel
+					// pivot (checkMSKKMS). checkMSKKMS passes the raw field
+					// value straight through to FetchByIDs (no ARN-to-bare-ID
+					// stripping like the sibling kms checkers), so this must
+					// be the bare key ID, not the ARN — matches the primary
+					// production KMS key (kms.go).
+					EncryptionInfo: &kafkatypes.EncryptionInfo{
+						EncryptionAtRest: &kafkatypes.EncryptionAtRest{
+							DataVolumeKMSKeyId: aws.String("a1b2c3d4-5678-90ab-cdef-111111111111"),
+						},
+					},
+					// LoggingInfo — required for the msk:logs and msk:s3
+					// related-panel pivots (checkMSKLogs / checkMSKS3).
+					LoggingInfo: &kafkatypes.LoggingInfo{
+						BrokerLogs: &kafkatypes.BrokerLogs{
+							CloudWatchLogs: &kafkatypes.CloudWatchLogs{
+								Enabled:  aws.Bool(true),
+								LogGroup: aws.String("/aws/msk/acme-events-prod"),
+							},
+							S3: &kafkatypes.S3{
+								Enabled: aws.Bool(true),
+								Bucket:  aws.String(LogsBucketName),
+								Prefix:  aws.String("msk-broker-logs/acme-events-prod/"),
+							},
+						},
+					},
 				},
 				Tags: map[string]string{
 					"Environment": "production",
 					"Team":        "platform",
+					// aws:cloudformation:stack-name — required for the msk:cfn
+					// related-panel pivot (checkMSKCFN). Points at acme-vpc-stack
+					// (cfn.go).
+					"aws:cloudformation:stack-name": "acme-vpc-stack",
 				},
 			},
 			{
@@ -95,6 +134,14 @@ var sharedMSKFixtures = sync.OnceValue(func() *MSKFixtures {
 					"Environment": "prod",
 					"Team":        "data",
 				},
+			},
+		},
+		// ScramSecretsByCluster — required for the msk:secrets related-panel
+		// pivot (checkMSKSecrets → kafka:ListScramSecrets). Points at the
+		// prod/database/primary secret (secrets.go).
+		ScramSecretsByCluster: map[string][]string{
+			"arn:aws:kafka:us-east-1:123456789012:cluster/acme-events-prod/a1b2c3d4": {
+				"arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/database/primary-AbCdEf",
 			},
 		},
 	}
