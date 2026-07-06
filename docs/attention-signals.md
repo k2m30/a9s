@@ -362,8 +362,8 @@ resource-list frame title. The frame-title rules:
 | trail | trail.not-logging | not logging | broken | wave2 |
 | trail | trail.delivery-error | delivery error: <LatestDeliveryError> | broken | wave2 |
 | trail | trail.delivery-stale | delivery stale since <LatestDeliveryTime> | broken | wave2 |
-| ct-events | ct_event.severity.danger | danger | broken | wave1 |
-| ct-events | ct_event.severity.attention | attention | warn | wave1 |
+| ct-events | ct_event.severity.danger | destructive call | broken | wave1 |
+| ct-events | ct_event.severity.attention | root account activity | warn | wave1 |
 | ct-events | ct_event.severity.info | routine event | dim | wave1 |
 | sqs | sqs.missing-dlq | no DLQ configured | warn | wave2 |
 | sns | sns.no-subscribers | topic has no subscribers | warn | wave2 |

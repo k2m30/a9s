@@ -229,14 +229,16 @@ func buildCTResource(event cloudtrailtypes.Event) resource.Resource {
 	sourceIP := strFromMap(parsed, "sourceIPAddress")
 	region := strFromMap(parsed, "awsRegion")
 
-	// Compute the §1.2 severity tier ("ct-info" | "ct-attention" | "ct-danger").
-	// Written below to Fields["status"] and used to build wave1 Findings.
-	status := computeCTStatus(verb, eventName, source, errorCode, uiType, accountID, recipientAccount)
+	// Compute the §1.2 severity tier ("ct-info" | "ct-attention" | "ct-danger")
+	// and the cause that earned it. The tier is written below to Fields["status"]
+	// (branching/color); the cause drives the finding phrase so the operator
+	// sees WHY the row is flagged, not just its severity name.
+	status, cause := computeCTStatus(verb, eventName, source, errorCode, uiType, accountID, recipientAccount)
 
 	r := resource.Resource{
 		ID:       eventID,
 		Name:     eventName,
-		Findings: ctEventFindings(status),
+		Findings: ctEventFindings(status, cause, errorCode, eventName),
 		Fields: map[string]string{
 			// Existing keys (kept for backwards compat with related-checkers and tests).
 			"event_name":     eventName,
@@ -556,12 +558,30 @@ func extractInsightRatio(parsed map[string]any) string {
 	return formatted
 }
 
-func ctEventFindings(status string) []domain.Finding {
+// ctEvent cause tags — the reason computeCTStatus assigned a given tier.
+// Each maps 1:1 to a branch in the §1.2 ladder; ctCauseNone marks the
+// ct-info default (no branch matched).
+const (
+	ctCauseError         = "error"
+	ctCauseDestructive   = "destructive"
+	ctCauseWrite         = "write"
+	ctCauseRoot          = "root"
+	ctCauseCrossAccount  = "cross_account"
+	ctCauseSensitiveRead = "sensitive_read"
+	ctCauseNone          = ""
+)
+
+// ctEventFindings builds the wave1 Finding for a CT event, carrying the
+// cause computeCTStatus derived so the phrase names WHY the row is flagged
+// instead of restating its severity.
+func ctEventFindings(status, cause, errorCode, eventName string) []domain.Finding {
 	switch status {
 	case "ct-danger":
-		return []domain.Finding{{Code: CodeCTEventDanger, Phrase: "danger", Severity: domain.SevBroken, Source: "wave1"}}
+		phrase, detail := ctDangerPhrase(cause, errorCode, eventName)
+		return []domain.Finding{{Code: CodeCTEventDanger, Phrase: phrase, Detail: detail, Severity: domain.SevBroken, Source: "wave1"}}
 	case "ct-attention":
-		return []domain.Finding{{Code: CodeCTEventAttention, Phrase: "attention", Severity: domain.SevWarn, Source: "wave1"}}
+		phrase, detail := ctAttentionPhrase(cause, eventName)
+		return []domain.Finding{{Code: CodeCTEventAttention, Phrase: phrase, Detail: detail, Severity: domain.SevWarn, Source: "wave1"}}
 	}
 	// ct-info (or any unrecognized tier) — colorCTEvents has no healthy
 	// bucket for events, so the routine/no-signal tier still needs a
@@ -569,31 +589,63 @@ func ctEventFindings(status string) []domain.Finding {
 	return []domain.Finding{{Code: CodeCTEventInfo, Phrase: "routine event", Severity: domain.SevDim, Source: "wave1"}}
 }
 
-// computeCTStatus implements the §1.2 severity ladder.
-// Precedence: danger > attention > info. Highest match wins, top to bottom.
-func computeCTStatus(verb, eventName, eventSource, errorCode, userIdentityType, accountID, recipientAccountID string) string {
+// ctDangerPhrase renders the ct-danger cause as a lowercase operator phrase
+// plus a one-sentence detail. Precedence matches computeCTStatus: error
+// before destructive verb.
+func ctDangerPhrase(cause, errorCode, eventName string) (phrase, detail string) {
+	switch cause {
+	case ctCauseError:
+		humanized := domain.HumanizeStatusPhrase(errorCode)
+		return "failed: " + humanized, fmt.Sprintf("CloudTrail recorded %s failing with %s.", eventName, errorCode)
+	case ctCauseDestructive:
+		return "destructive call", fmt.Sprintf("CloudTrail recorded a destructive call (%s) — verify it was expected.", eventName)
+	}
+	return "danger", ""
+}
+
+// ctAttentionPhrase renders the ct-attention cause as a lowercase operator
+// phrase plus a one-sentence detail. Precedence matches computeCTStatus:
+// write verb, then root, then cross-account, then sensitive read.
+func ctAttentionPhrase(cause, eventName string) (phrase, detail string) {
+	switch cause {
+	case ctCauseWrite:
+		return "modifying call", fmt.Sprintf("CloudTrail recorded a modifying call (%s) — verify the change was expected.", eventName)
+	case ctCauseRoot:
+		return "root account activity", fmt.Sprintf("CloudTrail recorded %s performed by the account root user.", eventName)
+	case ctCauseCrossAccount:
+		return "cross-account access", fmt.Sprintf("CloudTrail recorded %s from a different AWS account than the recipient.", eventName)
+	case ctCauseSensitiveRead:
+		return "reads sensitive data (" + eventName + ")", fmt.Sprintf("CloudTrail recorded a read of sensitive data (%s) — verify the caller is expected.", eventName)
+	}
+	return "attention", ""
+}
+
+// computeCTStatus implements the §1.2 severity ladder, returning the tier
+// and the cause that earned it. Precedence: danger > attention > info.
+// Highest match wins, top to bottom, within each tier.
+func computeCTStatus(verb, eventName, eventSource, errorCode, userIdentityType, accountID, recipientAccountID string) (tier, cause string) {
 	// 1. ct-danger
 	if errorCode != "" {
-		return "ct-danger"
+		return "ct-danger", ctCauseError
 	}
 	if verb == "D" {
-		return "ct-danger"
+		return "ct-danger", ctCauseDestructive
 	}
 	// 2. ct-attention
 	if verb == "W" {
-		return "ct-attention"
+		return "ct-attention", ctCauseWrite
 	}
 	if userIdentityType == "Root" {
-		return "ct-attention"
+		return "ct-attention", ctCauseRoot
 	}
 	if accountID != "" && recipientAccountID != "" && accountID != recipientAccountID {
-		return "ct-attention"
+		return "ct-attention", ctCauseCrossAccount
 	}
 	if isSensitiveRead(eventSource, eventName) {
-		return "ct-attention"
+		return "ct-attention", ctCauseSensitiveRead
 	}
 	// 3. ct-info (default)
-	return "ct-info"
+	return "ct-info", ctCauseNone
 }
 
 // isSensitiveRead reports whether an event is in the §1.3 hard-coded
