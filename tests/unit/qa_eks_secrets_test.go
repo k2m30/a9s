@@ -50,11 +50,19 @@ func TestQA_EKS_ListColumns(t *testing.T) {
 	// matches "version", "Status" matches "status", but "Cluster Name" does
 	// not match "cluster_name" (space vs underscore). This is expected behavior
 	// for fixture-only resources.
+	//
+	// Status is a Key-based status column (Key:"status") — per list_columns.go's
+	// isStatusCol chokepoint (11933a6f), Fields["status"] is routed through
+	// domain.HumanizeStatusPhrase before reaching the cell, so the raw AWS enum
+	// "ACTIVE" renders as "active".
 	if !strings.Contains(plain, "1.31") {
 		t.Errorf("EKS list should contain version '1.31', got: %s", plain)
 	}
-	if !strings.Contains(plain, "ACTIVE") {
-		t.Errorf("EKS list should contain status 'ACTIVE', got: %s", plain)
+	if !strings.Contains(plain, "active") {
+		t.Errorf("EKS list should contain humanized status 'active', got: %s", plain)
+	}
+	if strings.Contains(plain, "ACTIVE") {
+		t.Errorf("EKS list should NOT contain the raw AWS enum 'ACTIVE' — it must be humanized (lowercased), got: %s", plain)
 	}
 }
 
