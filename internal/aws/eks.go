@@ -142,10 +142,7 @@ func buildEKSResource(name string, cluster *ekstypes.Cluster) resource.Resource 
 			Severity: domain.SevWarn, Source: "wave1",
 		}}
 	case ekstypes.ClusterStatusFailed:
-		r.Findings = []domain.Finding{{
-			Code: CodeEKSStateFailed, Phrase: "failed",
-			Severity: domain.SevBroken, Source: "wave1",
-		}}
+		r.Findings = []domain.Finding{healthIssueFinding(CodeEKSStateFailed, "failed", issueCodes)}
 	}
 
 	return r
