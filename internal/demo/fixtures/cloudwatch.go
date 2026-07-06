@@ -684,22 +684,141 @@ var sharedCloudWatchFixtures = sync.OnceValue(func() *CloudWatchFixtures {
 					{Name: aws.String("EnvironmentName"), Value: aws.String("acme-prod-api")},
 				},
 			},
+			// cf-E1A2B3C4D5E6F7 alarm — required for cf:alarm related-panel
+			// pivot. checkCfAlarm matches dimension DistributionId to the
+			// distribution's Id (cloudfront.go E1A2B3C4D5E6F7).
+			{
+				AlarmName:             aws.String("cf-e1a2b3c4d5e6f7-error-rate"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:cf-e1a2b3c4d5e6f7-error-rate"),
+				AlarmDescription:      aws.String("Triggers when acme-corp.com CDN 5xx error rate exceeds 5%"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 3 datapoints were less than the threshold (5.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 22, 6, 0, 0, 0, time.UTC)),
+				MetricName:            aws.String("5xxErrorRate"),
+				Namespace:             aws.String("AWS/CloudFront"),
+				Threshold:             aws.Float64(5.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanThreshold,
+				EvaluationPeriods:     aws.Int32(3),
+				Period:                aws.Int32(300),
+				Statistic:             cwtypes.StatisticAverage,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("DistributionId"), Value: aws.String("E1A2B3C4D5E6F7")},
+				},
+			},
+			// acme-prod-web alarm — required for elb:alarm related-panel
+			// pivot. checkELBAlarms matches dimension LoadBalancer to the ARN
+			// suffix after "loadbalancer/" (elb.go fixtProdELBARN).
+			{
+				AlarmName:             aws.String("elb-acme-prod-web-5xx"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:elb-acme-prod-web-5xx"),
+				AlarmDescription:      aws.String("Triggers when acme-prod-web 5XX count exceeds 10 in 5 minutes"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 2 datapoints were less than the threshold (10.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 22, 6, 5, 0, 0, time.UTC)),
+				MetricName:            aws.String("HTTPCode_Target_5XX_Count"),
+				Namespace:             aws.String("AWS/ApplicationELB"),
+				Threshold:             aws.Float64(10.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanThreshold,
+				EvaluationPeriods:     aws.Int32(2),
+				Period:                aws.Int32(300),
+				Statistic:             cwtypes.StatisticSum,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("LoadBalancer"), Value: aws.String("app/acme-prod-web/1234567890abcdef")},
+				},
+			},
+			// acme-web-tg alarm — required for tg:alarm related-panel pivot.
+			// checkTGAlarm matches dimension TargetGroup containing the TG's
+			// ARN suffix (elb.go fixtProdWebTGARN).
+			{
+				AlarmName:             aws.String("tg-acme-web-tg-unhealthy-hosts"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:tg-acme-web-tg-unhealthy-hosts"),
+				AlarmDescription:      aws.String("Triggers when acme-web-tg has 1+ unhealthy hosts"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 3 datapoints were less than the threshold (1.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 22, 6, 10, 0, 0, time.UTC)),
+				MetricName:            aws.String("UnHealthyHostCount"),
+				Namespace:             aws.String("AWS/ApplicationELB"),
+				Threshold:             aws.Float64(1.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanOrEqualToThreshold,
+				EvaluationPeriods:     aws.Int32(3),
+				Period:                aws.Int32(60),
+				Statistic:             cwtypes.StatisticMaximum,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("TargetGroup"), Value: aws.String("targetgroup/acme-web-tg/1234567890abcdef")},
+				},
+			},
+			// nat-0aaa111111111111a alarm — required for nat:alarm related-panel
+			// pivot. checkNATAlarm matches dimension NatGatewayId (ec2.go).
+			{
+				AlarmName:             aws.String("nat-0aaa111111111111a-error-port-alloc"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:nat-0aaa111111111111a-error-port-alloc"),
+				AlarmDescription:      aws.String("Triggers when prod-nat-1a has 1+ error port allocation errors"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 5 datapoints were less than the threshold (1.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 22, 6, 15, 0, 0, time.UTC)),
+				MetricName:            aws.String("ErrorPortAllocation"),
+				Namespace:             aws.String("AWS/NATGateway"),
+				Threshold:             aws.Float64(1.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanOrEqualToThreshold,
+				EvaluationPeriods:     aws.Int32(5),
+				Period:                aws.Int32(60),
+				Statistic:             cwtypes.StatisticSum,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("NatGatewayId"), Value: aws.String("nat-0aaa111111111111a")},
+				},
+			},
+			// vpce-0aaa111111111111a alarm — required for vpce:alarm
+			// related-panel pivot. checkVPCEAlarm matches dimension
+			// VpcEndpointId (ec2.go).
+			{
+				AlarmName:             aws.String("vpce-0aaa111111111111a-packet-drop"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:vpce-0aaa111111111111a-packet-drop"),
+				AlarmDescription:      aws.String("Triggers when prod-s3-endpoint drops 100+ packets in 5 minutes"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 3 datapoints were less than the threshold (100.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 22, 6, 20, 0, 0, time.UTC)),
+				MetricName:            aws.String("PacketDropCount"),
+				Namespace:             aws.String("AWS/PrivateLinkEndpoints"),
+				Threshold:             aws.Float64(100.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanOrEqualToThreshold,
+				EvaluationPeriods:     aws.Int32(3),
+				Period:                aws.Int32(300),
+				Statistic:             cwtypes.StatisticSum,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("VpcEndpointId"), Value: aws.String("vpce-0aaa111111111111a")},
+				},
+			},
 		},
 		// AlarmHistory — every graph-root-reachable alarm needs at least one
 		// entry so alarm→alarm_history drill lands on non-empty content.
 		AlarmHistory: map[string][]cwtypes.AlarmHistoryItem{
-			"orders-prod-throttle":         minimalAlarmHistory("orders-prod-throttle"),
-			"rds-prod-dbi-aurora-1-cpu":    minimalAlarmHistory("rds-prod-dbi-aurora-1-cpu"),
-			"docdb-acme-prod-cpu":          minimalAlarmHistory("docdb-acme-prod-cpu"),
-			"aurora-prod-cluster-cpu":      minimalAlarmHistory("aurora-prod-cluster-cpu"),
-			"redis-prod-cache-hits":        minimalAlarmHistory("redis-prod-cache-hits"),
-			"redshift-acme-reporting-cpu":  minimalAlarmHistory("redshift-acme-reporting-cpu"),
-			"redshift-acme-warehouse-cpu":  minimalAlarmHistory("redshift-acme-warehouse-cpu"),
-			"redshift-acme-warehouse-disk": minimalAlarmHistory("redshift-acme-warehouse-disk"),
-			"acme-logs-cluster-red":        minimalAlarmHistory("acme-logs-cluster-red"),
-			"acme-logs-freestorage-low":    minimalAlarmHistory("acme-logs-freestorage-low"),
-			"prod-efs-burst-credit-low":    minimalAlarmHistory("prod-efs-burst-credit-low"),
-			"prod-efs-percent-io-high":     minimalAlarmHistory("prod-efs-percent-io-high"),
+			"orders-prod-throttle":                   minimalAlarmHistory("orders-prod-throttle"),
+			"rds-prod-dbi-aurora-1-cpu":              minimalAlarmHistory("rds-prod-dbi-aurora-1-cpu"),
+			"docdb-acme-prod-cpu":                    minimalAlarmHistory("docdb-acme-prod-cpu"),
+			"aurora-prod-cluster-cpu":                minimalAlarmHistory("aurora-prod-cluster-cpu"),
+			"redis-prod-cache-hits":                  minimalAlarmHistory("redis-prod-cache-hits"),
+			"redshift-acme-reporting-cpu":            minimalAlarmHistory("redshift-acme-reporting-cpu"),
+			"redshift-acme-warehouse-cpu":            minimalAlarmHistory("redshift-acme-warehouse-cpu"),
+			"redshift-acme-warehouse-disk":           minimalAlarmHistory("redshift-acme-warehouse-disk"),
+			"acme-logs-cluster-red":                  minimalAlarmHistory("acme-logs-cluster-red"),
+			"acme-logs-freestorage-low":              minimalAlarmHistory("acme-logs-freestorage-low"),
+			"prod-efs-burst-credit-low":              minimalAlarmHistory("prod-efs-burst-credit-low"),
+			"prod-efs-percent-io-high":               minimalAlarmHistory("prod-efs-percent-io-high"),
+			"cf-e1a2b3c4d5e6f7-error-rate":           minimalAlarmHistory("cf-e1a2b3c4d5e6f7-error-rate"),
+			"elb-acme-prod-web-5xx":                  minimalAlarmHistory("elb-acme-prod-web-5xx"),
+			"tg-acme-web-tg-unhealthy-hosts":         minimalAlarmHistory("tg-acme-web-tg-unhealthy-hosts"),
+			"nat-0aaa111111111111a-error-port-alloc": minimalAlarmHistory("nat-0aaa111111111111a-error-port-alloc"),
+			"vpce-0aaa111111111111a-packet-drop":     minimalAlarmHistory("vpce-0aaa111111111111a-packet-drop"),
 		},
 	}
 })

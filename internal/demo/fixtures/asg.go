@@ -51,7 +51,11 @@ func buildASGGroups() []asgtypes.AutoScalingGroup {
 			HealthCheckGracePeriod:  aws.Int32(300),
 			LaunchConfigurationName: aws.String("acme-web-prod-lc"),
 			VPCZoneIdentifier:       aws.String(asgSubnetA + "," + asgSubnetB + "," + asgSubnetC),
-			CreatedTime:             aws.Time(mustTime("2025-01-15T10:00:00Z")),
+			// TargetGroupARNs — required for tg→asg related-panel pivot
+			// (checkTGASG). acme-web-tg (elb.go fixtProdWebTGARN) already
+			// registers this ASG's instances as healthy targets.
+			TargetGroupARNs: []string{"arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/acme-web-tg/1234567890abcdef"},
+			CreatedTime:     aws.Time(mustTime("2025-01-15T10:00:00Z")),
 			// Instances — required for ami→asg (via ec2 cache image_id match) and
 			// ec2→asg related-panel pivots. Both instances launched from
 			// fixtProdAMIID1 (ec2.go), so checkAMIASG's ec2-cache cross-reference

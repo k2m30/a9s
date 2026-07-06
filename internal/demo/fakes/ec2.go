@@ -160,11 +160,38 @@ func (f *EC2Fake) DescribeFlowLogs(_ context.Context, _ *ec2.DescribeFlowLogsInp
 	return &ec2.DescribeFlowLogsOutput{}, nil
 }
 
-// DescribeTransitGatewayVpcAttachments returns an empty but non-nil output.
-// The demo mode does not exercise tgw→vpc related-panel behavior; this stub
-// exists solely so EC2Fake satisfies the EC2API aggregate interface.
-func (f *EC2Fake) DescribeTransitGatewayVpcAttachments(_ context.Context, _ *ec2.DescribeTransitGatewayVpcAttachmentsInput, _ ...func(*ec2.Options)) (*ec2.DescribeTransitGatewayVpcAttachmentsOutput, error) {
-	return &ec2.DescribeTransitGatewayVpcAttachmentsOutput{}, nil
+// DescribeTransitGatewayVpcAttachments filters the shared TGWAttachments
+// fixture data by transit-gateway-id, mirroring DescribeTransitGatewayAttachments
+// above. Backs the tgw→vpc and tgw→subnet related-panel pivots (checkTGWVPC /
+// checkTGWSubnet), which call this API directly.
+func (f *EC2Fake) DescribeTransitGatewayVpcAttachments(_ context.Context, input *ec2.DescribeTransitGatewayVpcAttachmentsInput, _ ...func(*ec2.Options)) (*ec2.DescribeTransitGatewayVpcAttachmentsOutput, error) {
+	var tgwIDs []string
+	for _, filter := range input.Filters {
+		if filter.Name != nil && *filter.Name == "transit-gateway-id" {
+			tgwIDs = filter.Values
+		}
+	}
+	tgwSet := toSet(tgwIDs)
+
+	var out []ec2types.TransitGatewayVpcAttachment
+	for _, att := range f.fix.TGWAttachments {
+		if att.ResourceType != ec2types.TransitGatewayAttachmentResourceTypeVpc {
+			continue
+		}
+		if len(tgwSet) > 0 && (att.TransitGatewayId == nil || !tgwSet[*att.TransitGatewayId]) {
+			continue
+		}
+		out = append(out, ec2types.TransitGatewayVpcAttachment{
+			TransitGatewayAttachmentId: att.TransitGatewayAttachmentId,
+			TransitGatewayId:           att.TransitGatewayId,
+			VpcId:                      att.ResourceId,
+			State:                      ec2types.TransitGatewayAttachmentStateAvailable,
+			SubnetIds:                  f.fix.TGWVpcAttachmentSubnets[aws.ToString(att.TransitGatewayAttachmentId)],
+			CreationTime:               att.CreationTime,
+			Tags:                       att.Tags,
+		})
+	}
+	return &ec2.DescribeTransitGatewayVpcAttachmentsOutput{TransitGatewayVpcAttachments: out}, nil
 }
 
 // DescribeTransitGatewayRouteTables is a no-op stub satisfying EC2DescribeTransitGatewayRouteTablesAPI.

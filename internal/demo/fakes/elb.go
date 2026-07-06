@@ -87,8 +87,36 @@ func (f *ELBFake) DescribeRules(_ context.Context, input *elbv2.DescribeRulesInp
 	return &elbv2.DescribeRulesOutput{Rules: rules}, nil
 }
 
-// DescribeLoadBalancerAttributes is a no-op stub for demo mode.
-// Wave 2 enrichment is skipped in demo mode; this satisfies the ELBv2API interface.
-func (f *ELBFake) DescribeLoadBalancerAttributes(_ context.Context, _ *elbv2.DescribeLoadBalancerAttributesInput, _ ...func(*elbv2.Options)) (*elbv2.DescribeLoadBalancerAttributesOutput, error) {
+// DescribeLoadBalancerAttributes returns the access-log S3 destination for
+// known demo load balancers, backing the elb→s3 related-panel pivot
+// (checkELBS3). Returns an empty attribute set for everything else so Wave 2
+// enrichment produces no findings for those load balancers in demo mode.
+func (f *ELBFake) DescribeLoadBalancerAttributes(_ context.Context, input *elbv2.DescribeLoadBalancerAttributesInput, _ ...func(*elbv2.Options)) (*elbv2.DescribeLoadBalancerAttributesOutput, error) {
+	if input != nil && input.LoadBalancerArn != nil {
+		if attrs, ok := f.fix.LoadBalancerAttributes[*input.LoadBalancerArn]; ok {
+			return &elbv2.DescribeLoadBalancerAttributesOutput{Attributes: attrs}, nil
+		}
+	}
 	return &elbv2.DescribeLoadBalancerAttributesOutput{}, nil
+}
+
+// DescribeTags returns resource tags for known demo ELB/TG ARNs, backing the
+// elb→cfn and tg→cfn related-panel pivots (checkELBCFN / checkTGCFN).
+func (f *ELBFake) DescribeTags(_ context.Context, input *elbv2.DescribeTagsInput, _ ...func(*elbv2.Options)) (*elbv2.DescribeTagsOutput, error) {
+	if input == nil {
+		return &elbv2.DescribeTagsOutput{}, nil
+	}
+	var descriptions []elbv2types.TagDescription
+	for _, arn := range input.ResourceArns {
+		if err := validateARN(arn); err != nil {
+			return nil, err
+		}
+		tags, ok := f.fix.ResourceTags[arn]
+		if !ok {
+			continue
+		}
+		a := arn
+		descriptions = append(descriptions, elbv2types.TagDescription{ResourceArn: &a, Tags: tags})
+	}
+	return &elbv2.DescribeTagsOutput{TagDescriptions: descriptions}, nil
 }

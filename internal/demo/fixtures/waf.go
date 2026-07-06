@@ -47,8 +47,10 @@ var sharedWAFFixtures = sync.OnceValue(func() *WAFFixtures {
 			"arn:aws:wafv2:us-east-1:123456789012:regional/webacl/acme-cloudfront-waf/a1b2c3d4-5678-90ab-cdef-222222222222": {
 				"arn:aws:cloudfront::123456789012:distribution/E1A2B3C4D5E6F7",
 			},
+			// staging-web-alb — matches the real elb.go fixture ARN exactly
+			// so checkELBWAF's GetWebACLForResource reverse lookup resolves.
 			"arn:aws:wafv2:us-east-1:123456789012:regional/webacl/acme-staging-waf/a1b2c3d4-5678-90ab-cdef-333333333333": {
-				"arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/staging-alb/5555555555555555",
+				"arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/staging-web-alb/5555555555aaaaaa",
 			},
 		},
 	}

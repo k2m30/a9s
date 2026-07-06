@@ -11,6 +11,14 @@ import (
 // ACMFixtures holds typed fixture data for ACM.
 type ACMFixtures struct {
 	Certificates []acmtypes.CertificateSummary
+	// InUseBy maps a certificate ARN to the ARNs of resources using it, mirroring
+	// acm:DescribeCertificate.Certificate.InUseBy. Backs the acm→elb and acm→apigw
+	// related-panel pivots (checkACMELB / checkACMAPIGW).
+	InUseBy map[string][]string
+	// DomainValidationOptions maps a certificate ARN to its DNS validation
+	// records, mirroring acm:DescribeCertificate.Certificate.DomainValidationOptions.
+	// Backs the acm→r53 related-panel pivot (checkACMR53).
+	DomainValidationOptions map[string][]acmtypes.DomainValidation
 }
 
 const (
@@ -171,6 +179,33 @@ var sharedACMFixtures = sync.OnceValue(func() *ACMFixtures {
 					"expiring-soon.acme-corp.com",
 				},
 				RenewalEligibility: acmtypes.RenewalEligibilityIneligible,
+			},
+		},
+		// InUseBy — backs the acm→elb and acm→apigw related-panel pivots.
+		// ProdACMCertARN1 (acme-corp.com) is attached to the prod ALB
+		// (elb.go fixtProdELBARN) and to the public API Gateway custom
+		// domain (apigw.go PublicAPIGWID) via a realistic InUseBy ARN set.
+		InUseBy: map[string][]string{
+			ProdACMCertARN1: {
+				"arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/acme-prod-web/1234567890abcdef",
+				"arn:aws:apigateway:us-east-1::/restapis/abc123def4",
+			},
+		},
+		// DomainValidationOptions — backs the acm→r53 related-panel pivot.
+		// The validation CNAME for ProdACMCertARN1 lives under
+		// acme-corp.com, matching the public zone Z0123456789ABCDEFGHIJ
+		// (r53.go) by longest-suffix match.
+		DomainValidationOptions: map[string][]acmtypes.DomainValidation{
+			ProdACMCertARN1: {
+				{
+					DomainName: aws.String("acme-corp.com"),
+					ResourceRecord: &acmtypes.ResourceRecord{
+						Name:  aws.String("_a1b2c3d4e5f6.acme-corp.com."),
+						Type:  acmtypes.RecordTypeCname,
+						Value: aws.String("_f6e5d4c3b2a1.acm-validations.aws."),
+					},
+					ValidationStatus: acmtypes.DomainStatusSuccess,
+				},
 			},
 		},
 	}

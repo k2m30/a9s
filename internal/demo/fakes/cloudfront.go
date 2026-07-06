@@ -27,10 +27,17 @@ func (f *CloudFrontFake) ListDistributions(_ context.Context, _ *cloudfront.List
 	}, nil
 }
 
-// GetDistributionConfig returns an empty config for demo mode.
-// Wave 2 enrichment uses this to check viewer/origin protocol policies;
-// returning an empty config produces no findings in demo mode.
-func (f *CloudFrontFake) GetDistributionConfig(_ context.Context, _ *cloudfront.GetDistributionConfigInput, _ ...func(*cloudfront.Options)) (*cloudfront.GetDistributionConfigOutput, error) {
+// GetDistributionConfig returns a config carrying the Lambda@Edge
+// associations and access-log destination for known demo distributions
+// (backing checkCfLambda / checkCfLogs), and an empty config for everything
+// else so Wave 2 enrichment (viewer/origin protocol policy checks) produces
+// no findings for those distributions in demo mode.
+func (f *CloudFrontFake) GetDistributionConfig(_ context.Context, input *cloudfront.GetDistributionConfigInput, _ ...func(*cloudfront.Options)) (*cloudfront.GetDistributionConfigOutput, error) {
+	if input != nil && input.Id != nil {
+		if cfg, ok := f.fix.DistributionConfigs[*input.Id]; ok {
+			return &cloudfront.GetDistributionConfigOutput{DistributionConfig: cfg}, nil
+		}
+	}
 	return &cloudfront.GetDistributionConfigOutput{
 		DistributionConfig: &cftypes.DistributionConfig{},
 	}, nil

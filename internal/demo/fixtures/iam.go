@@ -372,6 +372,32 @@ func buildIAMRoles() []iamtypes.Role {
 			Description: aws.String(fmt.Sprintf("Service role for %s", name)),
 		})
 	}
+	// AWSServiceRoleForVPCTransitGateway — required for the tgw→role
+	// related-panel pivot (checkTGWRole), which probes for this exact
+	// service-linked-role name via iam:GetRole. checkTGWRole's navigation ID
+	// is the role's ARN (not the bare name), and the demo drill's role
+	// FetchByIDs passes that ID straight through as GetRoleInput.RoleName —
+	// so a second alias entry keyed by the ARN itself is required, mirroring
+	// the fixtIAMProdLambdaRoleARN pattern above.
+	const tgwSLRArn = "arn:aws:iam::123456789012:role/aws-service-role/transitgateway.amazonaws.com/AWSServiceRoleForVPCTransitGateway"
+	roles = append(roles,
+		iamtypes.Role{
+			RoleName:    aws.String("AWSServiceRoleForVPCTransitGateway"),
+			RoleId:      aws.String("AROAEXAMPLETGW0001"),
+			Arn:         aws.String(tgwSLRArn),
+			Path:        aws.String("/aws-service-role/transitgateway.amazonaws.com/"),
+			CreateDate:  aws.Time(time.Date(2025, 3, 1, 9, 0, 0, 0, time.UTC)),
+			Description: aws.String("Service-linked role for AWS Transit Gateway"),
+		},
+		iamtypes.Role{
+			RoleName:    aws.String(tgwSLRArn),
+			RoleId:      aws.String("AROAEXAMPLETGW0002"),
+			Arn:         aws.String(tgwSLRArn),
+			Path:        aws.String("/aws-service-role/transitgateway.amazonaws.com/"),
+			CreateDate:  aws.Time(time.Date(2025, 3, 1, 9, 0, 0, 0, time.UTC)),
+			Description: aws.String("Transit Gateway SLR ARN alias (navigable-field cross-reference)"),
+		},
+	)
 	return roles
 }
 
