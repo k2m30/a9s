@@ -58,7 +58,7 @@ func TestQA_EC2_A1_1_ListColumns_AllSixPresent(t *testing.T) {
 	m := newEC2ListModel(t)
 	plain := stripANSI(rootViewContent(m))
 
-	expected := []string{"Instance ID", "State", "Type", "Private IP", "Public IP", "Launch Time"}
+	expected := []string{"Instance ID", "Status", "Type", "Private IP", "Public IP", "Launch Time"}
 	for _, col := range expected {
 		if !strings.Contains(plain, col) {
 			t.Errorf("A.1.1: EC2 list should contain column header %q", col)

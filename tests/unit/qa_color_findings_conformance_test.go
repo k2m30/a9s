@@ -259,12 +259,6 @@ var knownColorDivergence = map[string]bool{
 	"sqs:webhook-ingest-queue.fifo":                                true,
 	"tg:acme-web-tg":                                               true,
 	"tgw:tgw-0deleted11111111e":                                    true,
-	"vpc:vpc-0abc123def456789a":                                    true,
-	"vpc:vpc-0def456789abc123d":                                    true,
-	"vpc:vpc-0default00000000":                                     true,
-	"vpc:vpc-0efs0prod0000001":                                     true,
-	"vpc:vpc-demo-a":                                               true,
-	"vpc:vpc-prod-main":                                            true,
 	"vpce:vpce-0deleted111111111f":                                 true,
 	"waf:a1b2c3d4-5678-90ab-cdef-333333333333":                     true,
 }

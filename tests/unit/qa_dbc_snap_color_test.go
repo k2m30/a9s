@@ -37,18 +37,25 @@ func TestDbcSnapColor(t *testing.T) {
 			want:   resource.ColorBroken,
 		},
 		{
+			// storage_encrypted/snapshot age classification now lives entirely in
+			// computeDBCSnapFindings (wave1), which runs against a real DBClusterSnapshot.
+			// A bare Fields map carries no Findings, so colorFromWave1 misses and the
+			// fallback only inspects "status" — unencrypted alone no longer warns here.
 			name:   "unencrypted",
 			fields: map[string]string{"status": "available", "storage_encrypted": "false"},
-			want:   resource.ColorWarning,
+			want:   resource.ColorHealthy,
 		},
 		{
+			// Same rationale as "unencrypted": manual-snapshot-age is a wave1-only
+			// signal (computeDBCSnapFindings); the fallback path ignores snapshot_type
+			// and snapshot_create_time entirely.
 			name: "manual_old",
 			fields: map[string]string{
 				"status":               "available",
 				"snapshot_type":        "manual",
 				"snapshot_create_time": twoYearsAgo,
 			},
-			want: resource.ColorWarning,
+			want: resource.ColorHealthy,
 		},
 		{
 			name: "automated_old",

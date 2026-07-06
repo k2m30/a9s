@@ -196,26 +196,27 @@ func TestSortIndicator_ExactlyOnePerSort(t *testing.T) {
 		wantCount    int
 		wantOnColumn string // non-empty: assert the glyph appears immediately after this text
 	}{
-		// ct-events + col 1 (TIME) descending: BUG CASE — should be 1 glyph on 2:TIME, not 2.
-		// The config-driven ct-events column order is: V[0], TIME[1], ACTOR[2], ORIGIN[3],
-		// EVENT[4], TARGET[5], OUTCOME[6]. Key "2" selects column 1 (TIME).
+		// ct-events + col 2 (TIME) descending: BUG CASE — should be 1 glyph on 3:TIME, not 2.
+		// The config-driven ct-events column order is: V[0], Status[1], TIME[2], ACTOR[3],
+		// ORIGIN[4], EVENT[5], TARGET[6], OUTCOME[7] (Status column added by the
+		// title-based cascade, a56dc887). Key "3" selects column 2 (TIME).
 		// This test FAILS against HEAD until the P3 coder ships the sortColIdx fix.
 		{
 			name:         "ct-events_TIME_col1_desc",
 			typeName:     "ct-events",
-			sortColIdx:   1, // TIME column (0-based index 1, key "2")
+			sortColIdx:   2, // TIME column (0-based index 2, key "3")
 			sortAsc:      false,
 			wantCount:    1,
-			wantOnColumn: "2:TIME", // header prefix + title; glyph appended → "2:TIME↓"
+			wantOnColumn: "3:TIME", // header prefix + title; glyph appended → "3:TIME↓"
 		},
-		// ct-events + col 1 (TIME) ascending: same fix, different glyph direction.
+		// ct-events + col 2 (TIME) ascending: same fix, different glyph direction.
 		{
 			name:         "ct-events_TIME_col1_asc",
 			typeName:     "ct-events",
-			sortColIdx:   1,
+			sortColIdx:   2,
 			sortAsc:      true,
 			wantCount:    1,
-			wantOnColumn: "2:TIME",
+			wantOnColumn: "3:TIME",
 		},
 		// ec2 + sort by column — verify no regression on a non-ct resource.
 		// ec2 default config columns include a launch_time-like column; check count only.
@@ -236,17 +237,17 @@ func TestSortIndicator_ExactlyOnePerSort(t *testing.T) {
 			wantCount:    1,
 			wantOnColumn: "",
 		},
-		// ct-events + col 4 (EVENT): regression for the legacy substring-match
-		// bug. Sorting by the EVENT column must place the glyph on 5:EVENT and
+		// ct-events + col 5 (EVENT): regression for the legacy substring-match
+		// bug. Sorting by the EVENT column must place the glyph on 6:EVENT and
 		// nowhere else — not on the TIME column which also contains "time" in
 		// its key.
 		{
 			name:         "ct-events_EVENT_col4",
 			typeName:     "ct-events",
-			sortColIdx:   4, // EVENT column (0-based index 4, key "5")
+			sortColIdx:   5, // EVENT column (0-based index 5, key "6")
 			sortAsc:      true,
 			wantCount:    1,
-			wantOnColumn: "5:EVENT",
+			wantOnColumn: "6:EVENT",
 		},
 		// ec2 + col 1: verify exactly one glyph on the second column.
 		{
@@ -360,17 +361,18 @@ func TestSortIndicator_NoGlyphWhenUnsorted(t *testing.T) {
 //
 // Explicit regression: the ↓ glyph must NOT appear anywhere near the word
 // "EVENT" in the ct-events header when sorting by the TIME column
-// (column index 1, key "2").
+// (column index 2, key "3").
 //
-// "Sort by time" means pressing "2" to activate column 1 (TIME). The header
-// renders as "2:TIME↓". This is the most precise catch for the §6
+// "Sort by time" means pressing "3" to activate column 2 (TIME). The header
+// renders as "3:TIME↓". This is the most precise catch for the §6
 // double-glyph bug from the legacy substring-match era.
 // ===========================================================================
 
 func TestSortIndicator_CTEvents_TimeSort_OnlyTIMEColumn(t *testing.T) {
-	// ct-events config column order: V[0], TIME[1], ACTOR[2], ORIGIN[3], EVENT[4], ...
-	// Sort by column 1 (TIME) descending.
-	m := buildSortModel(t, "ct-events", 1, false)
+	// ct-events config column order: V[0], Status[1], TIME[2], ACTOR[3], ORIGIN[4], EVENT[5], ...
+	// (Status column added by the title-based cascade, a56dc887.)
+	// Sort by column 2 (TIME) descending.
+	m := buildSortModel(t, "ct-events", 2, false)
 
 	view := m.View()
 	if strings.HasPrefix(view, "Loading") || view == "No resources found" {
@@ -380,7 +382,7 @@ func TestSortIndicator_CTEvents_TimeSort_OnlyTIMEColumn(t *testing.T) {
 	hdr := headerLine(view)
 	plainHdr := stripANSI(hdr)
 
-	// The EVENT column (rendered as "5:EVENT") must NOT carry a sort glyph.
+	// The EVENT column (rendered as "6:EVENT") must NOT carry a sort glyph.
 	if strings.Contains(plainHdr, "EVENT\u2193") || strings.Contains(plainHdr, "EVENT\u2191") {
 		t.Errorf(
 			"sort glyph incorrectly appears on EVENT column\n"+
@@ -393,12 +395,12 @@ func TestSortIndicator_CTEvents_TimeSort_OnlyTIMEColumn(t *testing.T) {
 		)
 	}
 
-	// The TIME column (rendered as "2:TIME") MUST carry the ↓ glyph (descending = newest first).
-	if !strings.Contains(plainHdr, "2:TIME\u2193") {
+	// The TIME column (rendered as "3:TIME") MUST carry the ↓ glyph (descending = newest first).
+	if !strings.Contains(plainHdr, "3:TIME\u2193") {
 		t.Errorf(
 			"sort glyph missing from TIME column\n"+
 				"  header: %q\n"+
-				"  want: 2:TIME column to carry ↓ glyph when sorting column 1 descending",
+				"  want: 3:TIME column to carry ↓ glyph when sorting column 2 descending",
 			plainHdr,
 		)
 	}
