@@ -2469,12 +2469,13 @@ func buildVolumes() []ec2types.Volume {
 			Attachments: []ec2types.VolumeAttachment{{InstanceId: aws.String("i-0a1b2c3d4e5f60006")}},
 			Tags:        []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("new-db-volume")}},
 		},
-		// Orphan: Available, no attachments, 45 days old → attention signal
+		// Orphan: Available, no attachments, well over 7 days old (fixed past
+		// date, not relative to time.Now()) → ebs.orphan-unattached finding.
 		{
 			VolumeId: aws.String("vol-0orphan00000000a1"), State: ec2types.VolumeStateAvailable,
 			Size: aws.Int32(80), VolumeType: ec2types.VolumeTypeGp2, Iops: aws.Int32(240),
 			Encrypted: aws.Bool(true), AvailabilityZone: aws.String("us-east-1a"),
-			CreateTime:  aws.Time(time.Now().AddDate(0, 0, -45)),
+			CreateTime:  aws.Time(time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)),
 			Attachments: nil,
 			Tags:        []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("old-orphan-vol")}},
 		},
@@ -2487,12 +2488,13 @@ func buildVolumes() []ec2types.Volume {
 			Attachments: nil,
 			Tags:        []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("failed-restore-vol")}},
 		},
-		// Unencrypted InUse → CIS EC2.7 violation
+		// Unencrypted InUse (fixed past date, not relative to time.Now()) →
+		// CIS EC2.7 violation, ebs.encryption.disabled finding.
 		{
 			VolumeId: aws.String("vol-0unenc00000000c3"), State: ec2types.VolumeStateInUse,
 			Size: aws.Int32(50), VolumeType: ec2types.VolumeTypeGp2, Iops: aws.Int32(150),
 			Encrypted: aws.Bool(false), AvailabilityZone: aws.String("us-east-1a"),
-			CreateTime:  aws.Time(time.Now().AddDate(0, -6, 0)),
+			CreateTime:  aws.Time(time.Date(2025, 9, 15, 8, 0, 0, 0, time.UTC)),
 			Attachments: []ec2types.VolumeAttachment{{InstanceId: aws.String("i-0a1b2c3d4e5f60002")}},
 			Tags:        []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("legacy-unencrypted-vol")}},
 		},

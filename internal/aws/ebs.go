@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -12,6 +13,10 @@ import (
 	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
+
+// ebsOrphanAge is the unattached-volume age threshold past which an
+// "available" volume is flagged as an orphan (billed hourly, no workload).
+const ebsOrphanAge = 7 * 24 * time.Hour
 
 // FetchEBSVolumes calls the EC2 DescribeVolumes API and returns all pages
 // of volumes. Used by tests; the production path uses the per-page fetcher for pagination.
@@ -132,6 +137,10 @@ func FetchEBSVolumesPage(ctx context.Context, api EC2DescribeVolumesAPI, continu
 				Code: CodeEBSStateError, Phrase: "error",
 				Severity: domain.SevBroken, Source: "wave1",
 			}}
+		}
+
+		if len(r.Findings) == 0 {
+			r.Findings = ebsStructuralFindings(vol, attachedTo)
 		}
 
 		resources = append(resources, r)
@@ -354,4 +363,39 @@ func snapshotToResource(snap ec2types.Snapshot) resource.Resource {
 	}
 
 	return r
+}
+
+// ebsStructuralFindings mirrors colorEBS's own precedence (orphan check,
+// then unencrypted check) for the branches that carry no state-derived
+// Finding, so the list Status cell / detail Attention block always explain
+// the Warning color. Only called when len(r.Findings)==0 (state is
+// "in-use"/"available"/"deleting", none of which write a Finding above).
+//
+// The orphan check reads vol.CreateTime directly (the typed value) rather
+// than round-tripping through the formatted Fields["created"] string —
+// colorEBS still parses Fields["created"] for its own Warning coloring, but
+// the Finding emission does not need to repeat that string round-trip when
+// the typed *time.Time is already in hand here.
+func ebsStructuralFindings(vol ec2types.Volume, attachedTo string) []domain.Finding {
+	if vol.State == ec2types.VolumeStateAvailable && attachedTo == "" && vol.CreateTime != nil {
+		if age := time.Since(*vol.CreateTime); age > ebsOrphanAge {
+			days := int(age.Hours() / 24)
+			return []domain.Finding{{
+				Code:   CodeEBSOrphanUnattached,
+				Phrase: "orphan: unattached " + strconv.Itoa(days) + "d",
+				Detail: "Unattached since creation " + strconv.Itoa(days) +
+					" days ago — billed hourly for no workload.",
+				Severity: domain.SevWarn, Source: "wave1",
+			}}
+		}
+	}
+	if vol.Encrypted == nil || !*vol.Encrypted {
+		return []domain.Finding{{
+			Code: CodeEBSUnencrypted, Phrase: "unencrypted",
+			Detail: "Volume is not encrypted at rest — " +
+				"re-create from encrypted snapshot.",
+			Severity: domain.SevWarn, Source: "wave1",
+		}}
+	}
+	return nil
 }

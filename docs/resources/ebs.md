@@ -89,7 +89,7 @@ Transcribed from `docs/attention-signals.md` §Compute row `ebs`.
   - **State bucket**: Warning.
   - **How obtained**: `Volume.State` + `Volume.CreateTime` on the list response, compared against current time client-side.
 
-- **Signal**: `Encrypted == false` → Warning (CIS EC2.7 — EBS encryption-at-rest best practice).
+- **Signal**: `Encrypted == false` → Warning (data at rest is unprotected; a leaked snapshot or detached volume exposes its contents).
   - **State bucket**: Warning.
   - **How obtained**: `Volume.Encrypted` on the list response (`AWS SDK Go v2 — ec2/types.Volume § Encrypted`).
 
@@ -143,7 +143,7 @@ One row per signal from §3:
 | `State == deleting` | 1 | Warning | n/a | S2, S4 | `deleting` | `Volume is being deleted.` |
 | `State == error` | 1 | Broken | n/a | S2, S4 | `error: volume unusable` | `Volume entered error state — AWS marked it unusable; recreate from snapshot.` |
 | `State == available` & age > 7d | 1 | Warning | n/a | S2, S4 | `orphan: unattached <N>d` | `Unattached since creation <N> days ago — billed hourly for no workload.` |
-| `Encrypted == false` (row in-use) | 2 | Healthy | `!` | S1, S3, S4, S5 | `unencrypted (CIS EC2.7)` | `Volume is not encrypted at rest — violates CIS EC2.7; re-create from encrypted snapshot.` |
+| `Encrypted == false` (row in-use) | 2 | Healthy | `!` | S1, S3, S4, S5 | `unencrypted` | `Volume is not encrypted at rest — re-create from encrypted snapshot.` |
 | `VolumeStatus.Status == impaired` | 2 | Broken | n/a | S2, S4, S5 | `impaired: I/O failing` | `AWS reports impaired volume status — I/O is failing; detach and restore from snapshot.` |
 | `VolumeStatus.Status == warning` | 2 | Warning | n/a | S2, S4, S5 | `degraded: I/O warning` | `AWS reports degraded performance — investigate recent workload and snapshot before action.` |
 | `Events[] non-empty` (row in-use) | 2 | Warning | `~` | S3, S4, S5 | `event: <EventType>` | `<Event.Description> — window <NotBefore> to <NotAfter>.` |
@@ -156,7 +156,7 @@ Notes on rows omitted:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every non-healthy row carries a cause in S4 (`orphan: unattached 42d`, `impaired: I/O failing`, `unencrypted (CIS EC2.7)`) and the color is already the attention signal; the operator can triage "delete me", "AWS broke it", or "security debt" at a glance without opening detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every non-healthy row carries a cause in S4 (`orphan: unattached 42d`, `impaired: I/O failing`, `unencrypted`) and the color is already the attention signal; the operator can triage "delete me", "AWS broke it", or "security debt" at a glance without opening detail.
 
 ## 5. Out of Scope
 
@@ -187,7 +187,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation (persona fallback, 2026-04-20) — `alarm` discovery: sibling-list cross-ref via `Dimensions[].Name=="VolumeId"`, same pattern as ec2↔alarm. possible=yes, worth=yes. Rationale: standard CloudWatch-for-EBS namespace pattern.
 - a9s-devops consultation (persona fallback, 2026-04-20) — `backup` discovery: AWS Backup uses tag-based / resource-type selection rather than a per-volume `BackupPlanId` field; practical mechanism is sibling-list cross-ref or cached `ListProtectedResources`. possible=yes (with caveat), worth=yes. Rationale: operators regularly ask "is this volume protected before I delete it?".
 - a9s-devops consultation (persona fallback, 2026-04-20) — `cfn` discovery: `Volume.Tags[]` lookup for `aws:cloudformation:stack-name` / `aws:cloudformation:stack-id` — CFN propagates these automatically. possible=yes, worth=yes. Rationale: IaC-ownership pivot is a standard ops question and requires no extra API.
-- UX decision — `Encrypted==false` on in-use volumes uses `!` severity — governed by `docs/attention-signals.md` Wave 1 entry (Warning), rendered as `!` on Healthy rows per this skill's §4 mapping rule "Wave 2 background finding on a Healthy row, important". Treated as important (`!`) because CIS EC2.7 is a hard security-audit finding, not an informational note.
+- UX decision — `Encrypted==false` on in-use volumes uses `!` severity — governed by `docs/attention-signals.md` Wave 1 entry (Warning), rendered as `!` on Healthy rows per this skill's §4 mapping rule "Wave 2 background finding on a Healthy row, important". Treated as important (`!`) because unencrypted data at rest is a hard security-audit finding, not an informational note.
 - UX decision — `Events[] non-empty` uses `~` severity — informational scheduled/AWS-notification event; does not require immediate action, so does not bump S1 menu count.
 
 <!-- BEGIN GENERATED: header -->
@@ -199,6 +199,8 @@ ebs — COMPUTE. Lifecycle key: `state`.
 | --- | --- | --- | --- |
 | ebs.state.creating | creating | warn | wave1 |
 | ebs.state.error | error | broken | wave1 |
+| ebs.orphan-unattached | orphan: unattached Nd | warn | wave1 |
+| ebs.encryption.disabled | unencrypted | warn | wave1 |
 | ebs.volume-io-degraded | volume I/O degraded | broken | wave2 |
 <!-- END GENERATED: findings -->
 

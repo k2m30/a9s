@@ -14,6 +14,14 @@ const (
 	// Severity: SevBroken.
 	CodeEBSStateError domain.FindingCode = "ebs.state.error"
 
+	// CodeEBSOrphanUnattached — volume is "available" (unattached) and older
+	// than 7 days — billed hourly with no workload. Severity: SevWarn.
+	CodeEBSOrphanUnattached domain.FindingCode = "ebs.orphan-unattached"
+
+	// CodeEBSUnencrypted — volume is not encrypted at rest, violating CIS
+	// EC2.7. Severity: SevWarn.
+	CodeEBSUnencrypted domain.FindingCode = "ebs.encryption.disabled"
+
 	// CodeEBSSnapStatePending — EBS snapshot is in the "pending" state.
 	// Severity: SevWarn (transitional).
 	CodeEBSSnapStatePending domain.FindingCode = "ebs-snap.state.pending"

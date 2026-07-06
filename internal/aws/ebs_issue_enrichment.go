@@ -68,7 +68,7 @@ func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resourc
 		if v.VolumeStatus == nil || v.VolumeStatus.Status == ec2types.VolumeStatusInfoStatusOk {
 			continue
 		}
-		ioState := string(v.VolumeStatus.Status)
+		ioState := domain.HumanizeStatusPhrase(string(v.VolumeStatus.Status))
 		rows := []domain.DetailRow{
 			{Label: "I/O State", Value: ioState, Tier: "!"},
 		}
