@@ -6,8 +6,10 @@
 # Asserts data-independent invariants the demo cannot exercise: the in-session
 # availability sweep reaching "verified" origins, humanized statuses on real
 # enum values, issue titles explained per row, related drills landing on
-# details without fetch errors. Assertions are pattern-based — no fixture
-# counts — so any account works. Read-only by construction (a9s never writes).
+# details without fetch errors, and a full-catalog sweep of every resource
+# type the account actually returns rows for. Assertions are pattern-based —
+# no fixture counts — so any account works. Read-only by construction (a9s
+# never writes).
 #
 # Not part of the push gate (needs credentials); it is the Stage 6 live
 # sub-rule companion for changes touching internal/aws/ or rendering.
@@ -37,7 +39,10 @@ cleanup() {
 }
 trap cleanup EXIT
 
-tmux new-session -d -s "$SESSION" -x 220 -y 50 \
+# -y 90: tall enough that every registered resource-type row (66 today) is
+# captured on a single pane, so the full-catalog sweep below never has to
+# scroll the menu to see a type past the fold.
+tmux new-session -d -s "$SESSION" -x 220 -y 90 \
 	"$BIN --profile $PROFILE --region $REGION"
 
 # The sweep needs real time: poll the menu until most rows leave the dim
@@ -108,6 +113,29 @@ fi
 expect ec2_detail.txt 'RELATED' "ec2 detail renders the related panel"
 expect ec2_detail.txt '\([0-9]+\)' "ec2 related checks settled to counts"
 forbid ec2_detail.txt 'FetchByIDs failed|cannot be found' "no fetch errors on the detail"
+
+# Full-catalog sweep: every resource type the menu shows with a non-zero
+# count gets its own list capture and the same two forbids the targeted
+# captures above already carry — a raw UPPER_SNAKE cell, or a vacuous
+# whole-cell status word standing in for a real cause. Data-independent: the
+# set of types and their counts come from the live menu capture, never a
+# hardcoded list.
+catalog_line=0
+while IFS= read -r line; do
+	catalog_line=$((catalog_line + 1))
+	count=$(printf '%s' "$line" | grep -oE '\([0-9]+' | head -1 | tr -d '(')
+	shortname=$(printf '%s' "$line" | grep -oE ':[a-z0-9-]+ *│' | head -1 | tr -d ': │')
+	[ -n "$count" ] || continue
+	[ -n "$shortname" ] || continue
+	[ "$count" -gt 0 ] || continue
+
+	cap="catalog_${shortname}.txt"
+	open_and_capture "$shortname" "$cap" 5
+
+	forbid "$cap" ' [A-Z][A-Z0-9]*(_[A-Z0-9]+)+ ' "no raw UPPER_SNAKE cell in $shortname list"
+	forbid "$cap" ' (Attention|Danger|Warning|Issue|Problem) ' "no vacuous whole-word status in $shortname list"
+done < "$CAPDIR/menu.txt"
+echo "smoke-readonly: full-catalog sweep covered $catalog_line menu line(s)"
 
 if [ "$FAILURES" -gt 0 ]; then
 	echo "smoke-readonly: $FAILURES failure(s); captures kept in $CAPDIR"
