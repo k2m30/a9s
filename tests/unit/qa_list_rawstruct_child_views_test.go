@@ -1135,8 +1135,18 @@ func TestQA_ListRawStruct_GlueRuns(t *testing.T) {
 	if !strings.Contains(view, "jr_abc12") {
 		t.Errorf("glue_runs list should contain run_id_short, got:\n%s", view)
 	}
-	if !strings.Contains(view, "SUCCEEDED") {
-		t.Errorf("glue_runs list should contain state, got:\n%s", view)
+	// The glue_runs config-driven State column is {Title:"State", Path:"JobRunState"}
+	// with no Key — a Key-less, Path-based status column. Per list_columns.go's
+	// isStatusCol chokepoint (11933a6f), that routes RawStruct.JobRunState through
+	// domain.HumanizeStatusPhrase before reaching the cell (r.Fields carries
+	// "job_run_state", not the "state"/"status" keys the chokepoint checks, so the
+	// RawStruct Path fallback is what actually renders here). The raw AWS enum
+	// "SUCCEEDED" must not reach the screen.
+	if !strings.Contains(view, "succeeded") {
+		t.Errorf("glue_runs list should contain humanized state 'succeeded', got:\n%s", view)
+	}
+	if strings.Contains(view, "SUCCEEDED") {
+		t.Errorf("glue_runs list should NOT contain the raw AWS enum 'SUCCEEDED' — it must be humanized (lowercased), got:\n%s", view)
 	}
 }
 
