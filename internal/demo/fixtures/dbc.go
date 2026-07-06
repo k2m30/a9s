@@ -78,6 +78,21 @@ const (
 	WarnDBCSnapIncompatibleRestoreID  = "broken-dbc-snap-incompat-restore"
 	WarnDBCSnapIncompatibleRestoreARN = "arn:aws:rds:us-east-1:123456789012:cluster-snapshot:broken-dbc-snap-incompat-restore"
 
+	// WarnDBCSnapUnencryptedID — available + StorageEncrypted=false. Pins
+	// CodeDBCSnapUnencrypted — the OWNER BUG fix: docdb-cluster-dev-style
+	// automated snapshots that are unencrypted must carry a wave1 Finding
+	// (colorDBCSnap no longer classifies Warning from Fields["storage_encrypted"]
+	// directly; the finding is the only path to the yellow row + cause phrase).
+	WarnDBCSnapUnencryptedID  = "unenc-docdb-cluster-dev-snap"
+	WarnDBCSnapUnencryptedARN = "arn:aws:rds:us-east-1:123456789012:cluster-snapshot:unenc-docdb-cluster-dev-snap"
+
+	// WarnDBCSnapManualUnusedID — available + manual + age > 365d. Pins
+	// CodeDBCSnapManualUnused firing on its own (unlike
+	// WarnDBCSnapFailedAndManualOldID, whose Status=failed early-return
+	// suppresses the manual-age check per ComputeDBCSnapStatusAndIssues §0.1).
+	WarnDBCSnapManualUnusedID  = "manual-forgotten-dbc-snap"
+	WarnDBCSnapManualUnusedARN = "arn:aws:rds:us-east-1:123456789012:cluster-snapshot:manual-forgotten-dbc-snap"
+
 	// shared internal constants
 	dbcKMSKeyID = "arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"
 	dbcSGID     = "sg-0ccc333333333333c"
@@ -361,6 +376,40 @@ func buildDBCSnapshots() []docdbtypes.DBClusterSnapshot {
 			EngineVersion:               aws.String("5.0.0"),
 			SnapshotType:                aws.String("manual"),
 			SnapshotCreateTime:          aws.Time(time.Now().UTC().Add(-30 * 24 * time.Hour)),
+			StorageType:                 aws.String("standard"),
+			StorageEncrypted:            aws.Bool(true),
+			VpcId:                       aws.String(dbcVPCID),
+		},
+		// WarnDBCSnapUnencryptedID — available, automated, StorageEncrypted=false.
+		// Pins CodeDBCSnapUnencrypted: the OWNER BUG fixture — an automated
+		// snapshot with no other Wave-1 signal must still carry a Finding so
+		// the yellow row shows a cause phrase.
+		{
+			DBClusterSnapshotIdentifier: aws.String(WarnDBCSnapUnencryptedID),
+			DBClusterIdentifier:         aws.String(ProdDbcID),
+			DBClusterSnapshotArn:        aws.String(WarnDBCSnapUnencryptedARN),
+			Status:                      aws.String("available"),
+			Engine:                      aws.String("docdb"),
+			EngineVersion:               aws.String("5.0.0"),
+			SnapshotType:                aws.String("automated"),
+			SnapshotCreateTime:          aws.Time(time.Now().UTC().Add(-2 * 24 * time.Hour)),
+			StorageType:                 aws.String("standard"),
+			StorageEncrypted:            aws.Bool(false),
+			VpcId:                       aws.String(dbcVPCID),
+		},
+		// WarnDBCSnapManualUnusedID — available, manual, 400d old. Pins
+		// CodeDBCSnapManualUnused firing standalone (Status stays "available",
+		// so it is not suppressed by the Broken-precedence early return).
+		{
+			DBClusterSnapshotIdentifier: aws.String(WarnDBCSnapManualUnusedID),
+			DBClusterIdentifier:         aws.String(ProdDbcID),
+			DBClusterSnapshotArn:        aws.String(WarnDBCSnapManualUnusedARN),
+			Status:                      aws.String("available"),
+			Engine:                      aws.String("docdb"),
+			EngineVersion:               aws.String("5.0.0"),
+			SnapshotType:                aws.String("manual"),
+			SnapshotCreateTime:          aws.Time(time.Now().UTC().Add(-400 * 24 * time.Hour)),
+			KmsKeyId:                    aws.String(dbcKMSKeyID),
 			StorageType:                 aws.String("standard"),
 			StorageEncrypted:            aws.Bool(true),
 			VpcId:                       aws.String(dbcVPCID),

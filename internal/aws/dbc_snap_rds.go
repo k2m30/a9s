@@ -80,6 +80,9 @@ func computeRDSDBClusterSnapshotFindings(snap rdstypes.DBClusterSnapshot) []doma
 			findings = append(findings, domain.Finding{Code: CodeDBCSnapManualUnused, Phrase: phrase, Severity: domain.SevWarn, Source: "wave1"})
 		}
 	}
+	if snap.StorageEncrypted != nil && !*snap.StorageEncrypted {
+		findings = append(findings, domain.Finding{Code: CodeDBCSnapUnencrypted, Phrase: "unencrypted", Severity: domain.SevWarn, Source: "wave1"})
+	}
 	return findings
 }
 

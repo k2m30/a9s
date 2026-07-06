@@ -71,6 +71,7 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 			return
 		}
 		var rows []domain.DetailRow
+		var phrases []string
 		for _, attr := range out.Attributes {
 			if attr.Key == nil || attr.Value == nil {
 				continue
@@ -79,10 +80,12 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 			case "deletion_protection.enabled":
 				if *attr.Value == "false" {
 					rows = append(rows, domain.DetailRow{Label: "Deletion Protection", Value: "disabled", Tier: "~"})
+					phrases = append(phrases, "deletion protection disabled")
 				}
 			case "access_logs.s3.enabled":
 				if *attr.Value == "false" {
 					rows = append(rows, domain.DetailRow{Label: "Access Logs", Value: "disabled", Tier: "~"})
+					phrases = append(phrases, "access logs disabled")
 				}
 			}
 		}
@@ -95,7 +98,7 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 		if len(rows) >= 2 {
 			severity = "!"
 		}
-		setWave2Finding(&result, r.ID, elbCodeMisconfigured, rows[0].Label+": "+rows[0].Value, severity, "elb", rows, "")
+		setWave2Finding(&result, r.ID, elbCodeMisconfigured, phrases[0], severity, "elb", rows, "")
 	})
 	sort.Strings(failures)
 	issueCount := 0
