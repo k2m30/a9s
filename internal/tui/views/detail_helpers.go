@@ -756,21 +756,16 @@ func renderDetailRelatedFromBody(body app.DetailBody, w, h int) string {
 			case blk.Err:
 				rowText = "  " + blk.Name + "  —" // em dash
 				rowStyle = styles.DimText
-			case blk.Count == -1 && len(blk.FetchFilter) > 0:
-				rowText = "  " + blk.Name
-				rowStyle = styles.RowNormal
-			case blk.Count == -1:
-				rowText = "  " + blk.Name
-				rowStyle = styles.DimText
-			case blk.Count == 0 && blk.Approximate:
-				rowText = "  " + blk.Name + " (0)"
-				rowStyle = styles.RowNormal
-			case blk.Count == 0:
-				rowText = "  " + blk.Name + " (0)"
-				rowStyle = styles.DimText
 			default:
-				rowText = "  " + blk.Name + " (" + itoa(blk.Count) + ")"
-				rowStyle = styles.RowNormal
+				rowText = "  " + blk.Name
+				if blk.CountDisplay != "" {
+					rowText += " " + blk.CountDisplay
+				}
+				if blk.Actionable {
+					rowStyle = styles.RowNormal
+				} else {
+					rowStyle = styles.DimText
+				}
 			}
 
 			if body.RelatedFocused && body.RelatedCursor == idx {
