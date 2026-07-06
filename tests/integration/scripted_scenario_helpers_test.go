@@ -79,7 +79,13 @@ func fullIntegrationNewLiveScenario(t *testing.T, profile, region string) *fullI
 	m := tui.New(profile, region, tui.WithNoCache(true))
 	m, _ = fullIntegrationApplyMsg(m, tea.WindowSizeMsg{Width: 240, Height: 220})
 
-	initMsg := fullIntegrationRequireCmdMsg(t, m.Init(), "live scenario Init")
+	// Init batches the connect kickoff with the C1 availability-cache seed;
+	// pick the InitConnect message out of the batch rather than assuming a
+	// single-command Init.
+	initMsg := fullIntegrationExtractMsg(t, m.Init(), func(msg tea.Msg) bool {
+		_, ok := msg.(messages.InitConnect)
+		return ok
+	})
 	var connectCmd tea.Cmd
 	m, connectCmd = fullIntegrationApplyMsg(m, initMsg)
 	clientsReadyRaw := fullIntegrationRequireCmdMsg(t, connectCmd, "live scenario AWS connect")

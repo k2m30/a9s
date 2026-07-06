@@ -346,7 +346,12 @@ func fullIntegrationEnterRelatedSingleDetail(t *testing.T, m *tui.Model, targetT
 	loaded := raw.(messages.ResourcesLoaded)
 	var autoOpenCmd tea.Cmd
 	*m, autoOpenCmd = fullIntegrationApplyMsg(*m, loaded)
-	navRaw := fullIntegrationRequireCmdMsg(t, autoOpenCmd, "auto-open related "+displayName)
+	// The auto-open cmd may batch a Wave-2 ProbeEnrich task alongside the
+	// navigation for issue-capable types — pick the Navigate out of the batch.
+	navRaw := fullIntegrationExtractMsg(t, autoOpenCmd, func(msg tea.Msg) bool {
+		_, ok := msg.(messages.Navigate)
+		return ok
+	})
 	nav, ok := navRaw.(messages.Navigate)
 	if !ok {
 		t.Fatalf("auto-open related %q returned %T, expected messages.Navigate", displayName, navRaw)

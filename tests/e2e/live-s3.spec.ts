@@ -133,11 +133,16 @@ test("live s3: root menu + list match the checklist", async ({ page }) => {
   expect(nonBlankStatus, "only findings may populate the Status column").toBe(expected.list.flagged.length);
 
   // --- back to menu: S1 issue badge (session kept the enrichment state) ----
+  // The list's row flags can arrive instantly from the persisted type cache
+  // (C6b), so reaching this point does NOT mean the in-session Wave-2 pass
+  // has finished — on live data it makes one call per bucket and the badge
+  // lands via SSE when the background drain completes. Give the badge the
+  // same enrichment budget the in-list wait has, not the default 5s.
   await press(page, "Escape");
   await expect(s3Entry).toBeVisible();
   if (expected.menu.issues > 0) {
     const badgeText = `! ${expected.menu.issues}${expected.menu.issues_truncated ? "+" : ""}`;
-    await expect(s3Entry.locator(".badge")).toHaveText(badgeText);
+    await expect(s3Entry.locator(".badge")).toHaveText(badgeText, { timeout: ENRICH_WAIT_MS });
   } else {
     await expect(s3Entry.locator(".badge")).toHaveCount(0);
   }
