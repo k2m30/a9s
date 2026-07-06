@@ -104,7 +104,7 @@ func TestAttentionFilter_IncludesResourcesWithFindings(t *testing.T) {
 	findings := map[string]domain.Finding{
 		"res-0": {Code: "s3.public.access.enabled", Phrase: "public access enabled", Severity: domain.SevWarn, Source: "wave2:s3"},
 	}
-	m.SetEnrichmentState(1, false, findings)
+	m.SetEnrichmentState(1, false, findings, nil)
 
 	// Enable attention filter — mirrors ctrl+z. SetFilter("") re-runs applyFilter()
 	// so the attention predicate sees the freshly-set findingsByID map.

@@ -77,9 +77,28 @@ func carryWave2ForResources(oldResources, newResources []resource.Resource, fiel
 			out[i] = r
 			continue
 		}
+		carried := !rowHasWave2Finding(r.Findings)
 		findings, fields := carryWave2(old.Findings, old.Fields, r.Findings, r.Fields, fieldKeys)
 		r.Findings = findings
 		r.Fields = fields
+		// The carried Wave-2 Findings above are meaningless in the detail view's
+		// Attention section without their companion AttentionDetail rows (same
+		// D17/C6b class as the Findings themselves) — carry the matching
+		// FindingCode entries too, into a fresh map so neither side's backing
+		// map can be mutated through the other (carryWave2's own no-alias
+		// discipline, extended to AttentionDetails).
+		if carried && len(old.AttentionDetails) > 0 {
+			for _, f := range wave2FindingsOf(old.Findings) {
+				ad, ok := old.AttentionDetails[f.Code]
+				if !ok {
+					continue
+				}
+				if r.AttentionDetails == nil {
+					r.AttentionDetails = make(map[domain.FindingCode]domain.AttentionDetail, len(old.AttentionDetails))
+				}
+				r.AttentionDetails[f.Code] = ad
+			}
+		}
 		out[i] = r
 	}
 	return out

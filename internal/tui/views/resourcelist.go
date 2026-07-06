@@ -829,8 +829,8 @@ func renderListDataRow(cols []listCol, row app.ListRow, base lipgloss.Style, tot
 
 // SetEnrichmentState stores Wave 2 enrichment results for this resource type.
 // Delegates to the controller's ApplyEnrichmentState and invalidates the render cache.
-func (m *ResourceListModel) SetEnrichmentState(issueCount int, truncated bool, findings map[string]domain.Finding) {
-	m.ctrl.ApplyEnrichmentState(m.typeDef.ShortName, issueCount, truncated, findings)
+func (m *ResourceListModel) SetEnrichmentState(issueCount int, truncated bool, findings map[string]domain.Finding, details map[string]domain.AttentionDetail) {
+	m.ctrl.ApplyEnrichmentState(m.typeDef.ShortName, issueCount, truncated, findings, details)
 	m.styledRowCache = nil
 }
 

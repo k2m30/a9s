@@ -293,22 +293,26 @@ func (c *Controller) reapplyCheckerAgainst(ls *ListState, typeName string, newPa
 
 // ApplyEnrichmentState stores Wave-2 enrichment results for typeName.
 // Mirrors ResourceListModel.SetEnrichmentState.
-func (c *Controller) ApplyEnrichmentState(typeName string, issueCount int, truncated bool, findings map[string]domain.Finding) {
+func (c *Controller) ApplyEnrichmentState(typeName string, issueCount int, truncated bool, findings map[string]domain.Finding, details map[string]domain.AttentionDetail) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.applyEnrichmentState(typeName, issueCount, truncated, findings)
+	c.applyEnrichmentState(typeName, issueCount, truncated, findings, details)
 }
 
 // applyEnrichmentState is the lock-free implementation of ApplyEnrichmentState.
 // Callers must hold c.mu (write).
-func (c *Controller) applyEnrichmentState(typeName string, issueCount int, truncated bool, findings map[string]domain.Finding) {
+func (c *Controller) applyEnrichmentState(typeName string, issueCount int, truncated bool, findings map[string]domain.Finding, details map[string]domain.AttentionDetail) {
 	if c.enrichmentStore == nil {
 		c.enrichmentStore = make(map[string]map[string]domain.Finding)
+	}
+	if c.enrichmentDetails == nil {
+		c.enrichmentDetails = make(map[string]map[string]domain.AttentionDetail)
 	}
 	if c.enrichmentTruncated == nil {
 		c.enrichmentTruncated = make(map[string]bool)
 	}
 	c.enrichmentStore[typeName] = findings
+	c.enrichmentDetails[typeName] = details
 	c.enrichmentTruncated[typeName] = truncated
 	_ = issueCount // retained for caller parity; issue count is recomputed in buildListBody
 }
@@ -319,4 +323,13 @@ func (c *Controller) listEnrichmentFindings(typeName string) map[string]domain.F
 		return nil
 	}
 	return c.enrichmentStore[typeName]
+}
+
+// listEnrichmentDetails returns the per-resource AttentionDetail map for
+// typeName, or nil. Mirrors listEnrichmentFindings.
+func (c *Controller) listEnrichmentDetails(typeName string) map[string]domain.AttentionDetail {
+	if c.enrichmentDetails == nil {
+		return nil
+	}
+	return c.enrichmentDetails[typeName]
 }

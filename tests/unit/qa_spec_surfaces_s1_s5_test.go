@@ -80,7 +80,7 @@ func TestSpec_NoBanner_WhenEnrichmentTruncated(t *testing.T) {
 	)
 	m.SetSize(120, 40)
 	// Buggy code: truncated=true causes findingsBanner to emit the ⓘ banner.
-	m.SetEnrichmentState(0, true, nil)
+	m.SetEnrichmentState(0, true, nil, nil)
 	view := stripANSISpec(m.View())
 	for _, forbidden := range []string{
 		"ⓘ",
@@ -110,7 +110,7 @@ func TestSpec_NoBanner_WhenFindingsOffViewport(t *testing.T) {
 		"i-001": {Code: "ec2.system.status.impaired", Phrase: "some finding", Severity: domain.SevBroken, Source: "wave2:ec2"},
 		"i-002": {Code: "ec2.system.status.impaired", Phrase: "some finding", Severity: domain.SevBroken, Source: "wave2:ec2"},
 	}
-	m.SetEnrichmentState(2, false, findings)
+	m.SetEnrichmentState(2, false, findings, nil)
 	view := stripANSISpec(m.View())
 	if strings.Contains(view, "background-check finding") || strings.Contains(view, "ⓘ") {
 		t.Errorf("spec §4 violation: no off-viewport banner. view:\n%s", view)

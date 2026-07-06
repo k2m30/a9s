@@ -73,7 +73,7 @@ func buildMarkerModel(t *testing.T, findings map[string]domain.Finding) views.Re
 		ResourceType: "ec2",
 		Resources:    markerResources(),
 	})
-	m.SetEnrichmentState(len(findings), false, findings)
+	m.SetEnrichmentState(len(findings), false, findings, nil)
 	return m
 }
 
@@ -244,7 +244,7 @@ func TestRowMarker_NoColorMode_StillVisible(t *testing.T) {
 		ResourceType: "ec2",
 		Resources:    markerResources(),
 	})
-	m.SetEnrichmentState(1, false, findings)
+	m.SetEnrichmentState(1, false, findings, nil)
 
 	rendered := m.View()
 	plain := stripANSI(rendered)
@@ -285,7 +285,7 @@ func TestRowMarker_AllResourceTypes(t *testing.T) {
 				ResourceType: td.ShortName,
 				Resources:    res,
 			})
-			m.SetEnrichmentState(1, false, finding)
+			m.SetEnrichmentState(1, false, finding, nil)
 			// Must not panic.
 			_ = m.View()
 		})

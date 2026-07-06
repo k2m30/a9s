@@ -266,7 +266,7 @@ func TestProfileSwitch_StillClearsFindings(t *testing.T) {
 	ctrl.ApplyResourcesLoaded("ec2", seeded, nil, false)
 	ctrl.ApplyEnrichmentState("ec2", 1, false, map[string]domain.Finding{
 		"i-sharedid": {Code: "ec2.impaired", Phrase: "system check failed", Severity: domain.SevBroken, Source: "wave2:ec2"},
-	})
+	}, nil)
 
 	if !hasDecoratorForID(ctrl, "i-sharedid", app.DecoratorError) {
 		t.Fatal("fixture assumption broken — expected an error decorator on i-sharedid before rotation")

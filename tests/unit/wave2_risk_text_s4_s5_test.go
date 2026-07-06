@@ -129,7 +129,7 @@ func TestWave2_ListStatusColumn_ShowsConcretePhrase_ForIssueFinding(t *testing.T
 			Source:   "wave2:dbi",
 		},
 	}
-	m.SetEnrichmentState(0, false, findings)
+	m.SetEnrichmentState(0, false, findings, nil)
 
 	rendered := m.View()
 	plain := stripANSI(rendered)

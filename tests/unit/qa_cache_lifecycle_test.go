@@ -211,7 +211,7 @@ func deliverVerifyFetch(ctrl *app.Controller, resources []resource.Resource, tru
 // Controller.enrichmentStore, so this seam is the correct one to drive
 // glyph-visible wave-2 state on a bare app.Controller.
 func deliverEnrichment(ctrl *app.Controller, issues int, findings map[string]domain.Finding) {
-	ctrl.ApplyEnrichmentState(lifecycleShortName, issues, false, findings)
+	ctrl.ApplyEnrichmentState(lifecycleShortName, issues, false, findings, nil)
 }
 
 // readTypeFile re-reads the on-disk TypeFile for lifecycleShortName under

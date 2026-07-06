@@ -948,7 +948,7 @@ func TestEnrichment_FindingsInBody(t *testing.T) {
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	c.ApplyEnrichmentState("ec2", 1, false, map[string]domain.Finding{
 		"i-0bbb222222222222b": {Code: "ec2.stopped", Phrase: "instance stopped", Severity: domain.SevWarn},
-	})
+	}, nil)
 
 	lb := listBodyOrFail(t, c)
 	if lb.EnrichmentFindings == nil {
@@ -974,7 +974,7 @@ func TestEnrichment_BrokenRowHasDecoratorError(t *testing.T) {
 	}, nil, false)
 	c.ApplyEnrichmentState("ec2", 1, false, map[string]domain.Finding{
 		"i-0aaa111111111111a": {Code: "ec2.impaired", Phrase: "system check failed", Severity: domain.SevBroken},
-	})
+	}, nil)
 
 	lb := listBodyOrFail(t, c)
 	if len(lb.Rows) != 1 {
@@ -993,7 +993,7 @@ func TestEnrichment_WarnRowHasDecoratorWarning(t *testing.T) {
 	}, nil, false)
 	c.ApplyEnrichmentState("ec2", 1, false, map[string]domain.Finding{
 		"i-0bbb222222222222b": {Code: "ec2.degraded", Phrase: "instance degraded", Severity: domain.SevWarn},
-	})
+	}, nil)
 
 	lb := listBodyOrFail(t, c)
 	if len(lb.Rows) != 1 {
@@ -1015,7 +1015,7 @@ func TestEnrichment_AttentionFilterIncludesEnrichmentRows(t *testing.T) {
 	c.ApplyResourcesLoaded("ec2", resources, nil, false)
 	c.ApplyEnrichmentState("ec2", 1, false, map[string]domain.Finding{
 		"i-0bbb222222222222b": {Code: "ec2.degraded", Phrase: "degraded", Severity: domain.SevWarn},
-	})
+	}, nil)
 	c.Apply(app.Action{Kind: app.ActionToggleAttention})
 
 	lb := listBodyOrFail(t, c)
@@ -1032,9 +1032,9 @@ func TestEnrichment_TypeIsolation(t *testing.T) {
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 	c.ApplyEnrichmentState("ec2", 1, false, map[string]domain.Finding{
 		"i-0aaa111111111111a": {Code: "test.x", Phrase: "broken", Severity: domain.SevBroken},
-	})
+	}, nil)
 	// Applying s3 enrichment must not erase ec2 findings.
-	c.ApplyEnrichmentState("s3", 0, false, map[string]domain.Finding{})
+	c.ApplyEnrichmentState("s3", 0, false, map[string]domain.Finding{}, nil)
 
 	lb := listBodyOrFail(t, c)
 	if lb.EnrichmentFindings == nil {

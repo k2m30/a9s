@@ -62,7 +62,7 @@ func TestAttentionFilter_SetEnrichmentState_ReappliesFilter(t *testing.T) {
 	findings := map[string]domain.Finding{
 		"b-0": {Code: "s3.public.access.enabled", Phrase: "public access enabled", Severity: domain.SevBroken, Source: "wave2:s3"},
 	}
-	m.SetEnrichmentState(1, false, findings)
+	m.SetEnrichmentState(1, false, findings, nil)
 
 	rendered := stripANSI(m.View())
 

@@ -124,7 +124,7 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		rl.SetSize(m.innerSize())
 		issueCount := m.ctrl.GetMenuIssueCounts()[canon]
 		issueTrunc := m.ctrl.GetMenuIssueTruncated()[canon]
-		rl.SetEnrichmentState(issueCount, issueTrunc, findingsFromRows(entry.Resources))
+		rl.SetEnrichmentState(issueCount, issueTrunc, findingsFromRows(entry.Resources), attentionDetailsFromRows(entry.Resources))
 		rl.SetTruncatedIDs(m.core.EnrichmentTruncatedIDs(canon))
 		rs := newListRS(canon)
 		w, h := m.innerSize()
@@ -191,7 +191,7 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		rl.SetSize(m.innerSize())
 		issueCount := m.ctrl.GetMenuIssueCounts()[canon]
 		issueTrunc := m.ctrl.GetMenuIssueTruncated()[canon]
-		rl.SetEnrichmentState(issueCount, issueTrunc, nil)
+		rl.SetEnrichmentState(issueCount, issueTrunc, nil, nil)
 		rl.SetTruncatedIDs(m.core.EnrichmentTruncatedIDs(canon))
 		rs := newListRS(canon)
 		w, h := m.innerSize()

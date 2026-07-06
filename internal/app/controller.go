@@ -36,6 +36,14 @@ type Controller struct {
 	// keyed by canonical short name. Populated by ApplyEnrichmentState.
 	enrichmentStore map[string]map[string]domain.Finding
 
+	// enrichmentDetails stores Wave-2 per-resource AttentionDetail per
+	// resource type, keyed by canonical short name then Resource.ID. Delivered
+	// alongside enrichmentStore's findings in the same EnrichmentChecked
+	// payload; kept separate so a findings-only re-apply (e.g. a fresh-fetch
+	// re-apply that only needs the finding for row glyphs) can still recover
+	// the paired AttentionDetail without re-deriving it.
+	enrichmentDetails map[string]map[string]domain.AttentionDetail
+
 	// enrichmentTruncated stores the truncation flag per resource type from
 	// ApplyEnrichmentState, parallel to enrichmentStore.
 	enrichmentTruncated map[string]bool

@@ -192,7 +192,7 @@ func buildUnifiedModel(t *testing.T, resources []resource.Resource, enrichIC int
 		ResourceType: "ec2",
 		Resources:    resources,
 	})
-	m.SetEnrichmentState(enrichIC, false, findings)
+	m.SetEnrichmentState(enrichIC, false, findings, nil)
 	return m.FrameTitle()
 }
 

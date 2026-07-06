@@ -51,7 +51,7 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	// onto this screen) BEFORE they are overwritten, keyed by resource ID, so
 	// they can be carried onto the incoming replacement rows for any ID that
 	// survives the swap.
-	priorFindings := outgoingRowFindingsByID(ls, c.cachedResources(typeName))
+	priorFindings, priorDetails := outgoingRowFindingsByID(ls, c.cachedResources(typeName))
 
 	// DEF-18 mechanism A: a background verify-refetch (e.g. cold-open's
 	// KindFetchResources, bounded by a CachedListDepth snapshot taken at
@@ -106,9 +106,16 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 			if !ok || len(f) == 0 || hasWave2Finding(resources[i].Findings) {
 				continue
 			}
+			ad := priorDetails[resources[i].ID]
 			for _, pf := range f {
 				if strings.HasPrefix(pf.Source, "wave2:") {
 					resources[i].Findings = append(resources[i].Findings, pf)
+					if detail, ok := ad[pf.Code]; ok {
+						if resources[i].AttentionDetails == nil {
+							resources[i].AttentionDetails = make(map[domain.FindingCode]domain.AttentionDetail, 1)
+						}
+						resources[i].AttentionDetails[pf.Code] = detail
+					}
 				}
 			}
 		}
@@ -183,34 +190,45 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	// glyph-blind until the next EnrichmentChecked. Mirrors the session-side
 	// fold, which re-applies onto Core stores after every result lands.
 	if known := c.listEnrichmentFindings(typeName); len(known) > 0 {
-		c.applyRowFindings(typeName, known, nil)
+		c.applyRowFindings(typeName, known, c.listEnrichmentDetails(typeName))
 	}
 }
 
-// outgoingRowFindingsByID captures the findings currently attached to the
-// row set about to be replaced by a silent swap (item C), keyed by resource
-// ID. Prefers ls.Rows (the per-screen store applyResourcesLoaded is about to
-// overwrite) since it is the richer, currently-displayed source; falls back
-// to the RowStore-backed type cache when ls is nil or carries no rows yet
-// (e.g. the very first ResourcesLoaded for a screen whose seed only
-// populated the type cache). Rows with no findings are omitted so the
-// caller's len(priorFindings) == 0 check short-circuits cheaply when there is
-// nothing to carry forward.
-func outgoingRowFindingsByID(ls *ListState, cachedRows []resource.Resource) map[string][]domain.Finding {
+// outgoingRowFindingsByID captures the findings (and their companion
+// AttentionDetail rows) currently attached to the row set about to be
+// replaced by a silent swap (item C), keyed by resource ID. Prefers ls.Rows
+// (the per-screen store applyResourcesLoaded is about to overwrite) since it
+// is the richer, currently-displayed source; falls back to the
+// RowStore-backed type cache when ls is nil or carries no rows yet (e.g. the
+// very first ResourcesLoaded for a screen whose seed only populated the type
+// cache). Rows with no findings are omitted so the caller's
+// len(priorFindings) == 0 check short-circuits cheaply when there is nothing
+// to carry forward. The second return value is only ever consulted for a
+// FindingCode present in the first, so it is captured verbatim (r.
+// AttentionDetails itself, not a filtered copy) with no cost to the common
+// no-findings path.
+func outgoingRowFindingsByID(ls *ListState, cachedRows []resource.Resource) (map[string][]domain.Finding, map[string]map[domain.FindingCode]domain.AttentionDetail) {
 	source := cachedRows
 	if ls != nil && len(ls.Rows) > 0 {
 		source = ls.Rows
 	}
 	if len(source) == 0 {
-		return nil
+		return nil, nil
 	}
 	out := make(map[string][]domain.Finding, len(source))
+	var details map[string]map[domain.FindingCode]domain.AttentionDetail
 	for _, r := range source {
 		if len(r.Findings) > 0 {
 			out[r.ID] = r.Findings
 		}
+		if len(r.AttentionDetails) > 0 {
+			if details == nil {
+				details = make(map[string]map[domain.FindingCode]domain.AttentionDetail, len(source))
+			}
+			details[r.ID] = r.AttentionDetails
+		}
 	}
-	return out
+	return out, details
 }
 
 // isStaleReplace reports whether a non-append ResourcesLoaded result looks

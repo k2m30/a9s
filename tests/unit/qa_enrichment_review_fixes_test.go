@@ -65,7 +65,7 @@ func TestRowMarker_HiddenWhenIdentityColumnScrolledOff(t *testing.T) {
 	findings := map[string]domain.Finding{
 		"r-1": {Code: "ec2.system.status.impaired", Phrase: "broken", Severity: domain.SevBroken, Source: "wave2:ec2"},
 	}
-	m.SetEnrichmentState(len(findings), false, findings)
+	m.SetEnrichmentState(len(findings), false, findings, nil)
 
 	// Baseline: prefix marker present at hScrollOffset=0.
 	baseline := m.View()

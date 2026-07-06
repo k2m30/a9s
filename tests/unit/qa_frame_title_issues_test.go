@@ -160,7 +160,7 @@ func TestFrameTitleIssueSuffixTruncated(t *testing.T) {
 		"i-0000": {Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
 		"i-0001": {Code: "ec2.system.status.impaired", Phrase: "impaired", Severity: domain.SevBroken, Source: "wave2:ec2"},
 	}
-	m.SetEnrichmentState(2, true, findings)
+	m.SetEnrichmentState(2, true, findings, nil)
 	got := m.FrameTitle()
 	want := "ec2(5) !2+"
 	if got != want {

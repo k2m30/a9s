@@ -183,6 +183,7 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 			// resurrect its glyphs on a same-ID resource under the new pair. A
 			// frame may never mix findings from two profile/region pairs.
 			c.enrichmentStore = nil
+			c.enrichmentDetails = nil
 			c.enrichmentTruncated = nil
 
 		case runtime.PatchResourceList:
@@ -190,7 +191,7 @@ func (c *Controller) applyIntents(intents []runtime.UIIntent) ViewState {
 			// enrichment store. Resource rows themselves arrive via applyResourcesLoaded
 			// (called from the task-result lane); this intent carries Wave-2 data only.
 			if v.Enrichment != nil {
-				c.applyEnrichmentState(v.ResourceType, 0, false, v.Enrichment.Findings)
+				c.applyEnrichmentState(v.ResourceType, 0, false, v.Enrichment.Findings, v.Enrichment.AttentionDetails)
 				// applyEnrichmentState only stores findings + the issue badge; the
 				// Wave-2 column updates (status/summary) must also reach the cached
 				// list rows or enriched columns render stale (ECR/WAF/CodeArtifact).

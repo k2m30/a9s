@@ -135,6 +135,30 @@ func findingsFromRows(rows []resource.Resource) map[string]domain.Finding {
 	return out
 }
 
+// attentionDetailsFromRows mirrors findingsFromRows: it rebuilds a
+// per-resource domain.AttentionDetail map from each row's first wave2-sourced
+// finding's companion AttentionDetail, keyed by Resource.ID to match the
+// runtime→adapter PatchResourceList contract (ListEnrichmentPatch.
+// AttentionDetails). Only entries with at least one DetailRow are included.
+// Returns nil when no row has a non-empty companion AttentionDetail.
+func attentionDetailsFromRows(rows []resource.Resource) map[string]domain.AttentionDetail {
+	var out map[string]domain.AttentionDetail
+	for _, r := range rows {
+		for _, f := range r.Findings {
+			if strings.HasPrefix(f.Source, "wave2:") {
+				if ad, ok := r.AttentionDetails[f.Code]; ok && len(ad.Rows) > 0 {
+					if out == nil {
+						out = make(map[string]domain.AttentionDetail)
+					}
+					out[r.ID] = ad
+				}
+				break // at most one wave2 finding per resource
+			}
+		}
+	}
+	return out
+}
+
 
 // stripWave2 returns a copy of findings with wave2 entries removed.
 // Wave 1 entries (Source = "wave1") are preserved in order.

@@ -487,11 +487,11 @@ func TestResourceListRenderParity(t *testing.T) {
 					Resources:    resources10,
 					ResourceType: td.ShortName,
 				})
-				m.SetEnrichmentState(len(findings), false, findings)
+				m.SetEnrichmentState(len(findings), false, findings, nil)
 
 				c := newListController(t, td.ShortName)
 				c.ApplyResourcesLoaded(td.ShortName, resources10, nil, false)
-				c.ApplyEnrichmentState(td.ShortName, len(findings), false, findings)
+				c.ApplyEnrichmentState(td.ShortName, len(findings), false, findings, nil)
 				body := *c.Snapshot().Body.List
 
 				assertListParity(t, td.ShortName, "S13_EnrichmentFindings", &m, body)
@@ -507,11 +507,11 @@ func TestResourceListRenderParity(t *testing.T) {
 					0, 0, true, // attentionOnly=true
 				)
 				m.SetSize(stdW, stdH)
-				m.SetEnrichmentState(len(findings), false, findings)
+				m.SetEnrichmentState(len(findings), false, findings, nil)
 
 				c := newListController(t, td.ShortName)
 				c.ApplyResourcesLoaded(td.ShortName, resources10, nil, false)
-				c.ApplyEnrichmentState(td.ShortName, len(findings), false, findings)
+				c.ApplyEnrichmentState(td.ShortName, len(findings), false, findings, nil)
 				c.Apply(app.Action{Kind: app.ActionToggleAttention})
 				body := *c.Snapshot().Body.List
 
@@ -534,11 +534,11 @@ func TestResourceListRenderParity(t *testing.T) {
 					0, 1, false, // hScrollOffset=1
 				)
 				m.SetSize(stdW, stdH)
-				m.SetEnrichmentState(len(findings), false, findings)
+				m.SetEnrichmentState(len(findings), false, findings, nil)
 
 				c := newListController(t, td.ShortName)
 				c.ApplyResourcesLoaded(td.ShortName, resources10, nil, false)
-				c.ApplyEnrichmentState(td.ShortName, len(findings), false, findings)
+				c.ApplyEnrichmentState(td.ShortName, len(findings), false, findings, nil)
 				c.Apply(app.Action{Kind: app.ActionScrollRight})
 				body := *c.Snapshot().Body.List
 
