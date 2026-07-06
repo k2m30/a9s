@@ -837,27 +837,27 @@ func listHasBadgeFinding(r resource.Resource) bool {
 		if f.Severity == domain.SevBroken {
 			return true
 		}
-		if resource.IsIssueSeverity(f.Severity) && !strings.HasPrefix(f.Source, "wave2:") {
+		if resource.IsIssueSeverity(f.Severity) && !f.IsWave2Sourced() {
 			return true
 		}
 	}
 	return false
 }
 
-// stripWave2Findings returns findings with every Wave-2 entry (Source
-// prefixed "wave2:") removed, preserving the order of the remaining entries.
-// Mirrors stripWave2 in internal/tui/app_enrich_fold.go and applyWave2ToRow's
-// strip step in internal/runtime/helpers.go — kept as a sibling here (rather
-// than imported) because internal/app must not depend on internal/tui
-// (internal/tui already depends on internal/app) or internal/runtime's
-// unexported helpers.
+// stripWave2Findings returns findings with every Wave-2 entry
+// (domain.Finding.IsWave2Sourced) removed, preserving the order of the
+// remaining entries. Mirrors stripWave2 in internal/tui/app_enrich_fold.go
+// and applyWave2ToRow's strip step in internal/runtime/helpers.go — kept as a
+// sibling here (rather than imported) because internal/app must not depend
+// on internal/tui (internal/tui already depends on internal/app) or
+// internal/runtime's unexported helpers.
 func stripWave2Findings(findings []domain.Finding) []domain.Finding {
 	if len(findings) == 0 {
 		return findings
 	}
 	out := findings[:0:0]
 	for _, f := range findings {
-		if !strings.HasPrefix(f.Source, "wave2:") {
+		if !f.IsWave2Sourced() {
 			out = append(out, f)
 		}
 	}

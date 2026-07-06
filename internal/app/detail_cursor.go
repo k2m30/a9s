@@ -46,6 +46,7 @@ func (c *Controller) applyDetailActions(a Action) (ViewState, []runtime.TaskRequ
 			if ds.RelatedCursor > 0 {
 				ds.RelatedCursor--
 			}
+			detailSkipUnselectableRelated(ds, -1)
 		}
 		return c.snapshot(), nil, true
 
@@ -66,6 +67,7 @@ func (c *Controller) applyDetailActions(a Action) (ViewState, []runtime.TaskRequ
 			if ds.RelatedCursor < relatedCount-1 {
 				ds.RelatedCursor++
 			}
+			detailSkipUnselectableRelated(ds, +1)
 		}
 		return c.snapshot(), nil, true
 
@@ -76,6 +78,7 @@ func (c *Controller) applyDetailActions(a Action) (ViewState, []runtime.TaskRequ
 		} else {
 			ds.RelatedCursor = 0
 			ds.RelatedScroll = 0
+			detailSkipUnselectableRelated(ds, +1)
 		}
 		return c.snapshot(), nil, true
 
@@ -90,6 +93,7 @@ func (c *Controller) applyDetailActions(a Action) (ViewState, []runtime.TaskRequ
 			if relatedCount > 0 {
 				ds.RelatedCursor = relatedCount - 1
 			}
+			detailSkipUnselectableRelated(ds, -1)
 		}
 		return c.snapshot(), nil, true
 
@@ -189,6 +193,14 @@ func (c *Controller) detailFieldCount(ds *DetailState) int {
 // detailRelatedVisibleCount returns the number of visible related rows after
 // applying the current filter.
 func (c *Controller) detailRelatedVisibleCount(ds *DetailState) int {
+	return visibleRelatedRowCount(ds)
+}
+
+// visibleRelatedRowCount returns the number of visible related rows after
+// applying the current filter and self-pivot suppression — the free-function
+// form of detailRelatedVisibleCount, usable from contexts without a
+// Controller (e.g. detailSkipUnselectableRelated).
+func visibleRelatedRowCount(ds *DetailState) int {
 	query := strings.TrimSpace(strings.ToLower(ds.RelatedFilter))
 	count := 0
 	for _, row := range ds.RelatedRows {
@@ -213,18 +225,27 @@ func isSelfPivotZeroDetailRow(row DetailRelatedRow, sourceType string) bool {
 }
 
 // isActionableDetailRow delegates to the single shared predicate
-// resource.IsRelatedActionable so the actionability rule is defined once.
+// resource.IsRelatedActionable so the actionability rule is defined once. It
+// is also the renderer's dim predicate: buildDetailRelatedBlocks sets
+// RelatedBlock.Actionable from this same call, and both the TUI
+// (rightcolumn.go isRowActionable) and the web template (detail.html's
+// "dead-end" class) render a row dim exactly when this is false. Cursor
+// movement (detailSkipUnselectableRelated) skips a row under the identical
+// condition so the highlighted row and the dimmed row can never diverge.
 func isActionableDetailRow(row DetailRelatedRow) bool {
 	return resource.IsRelatedActionable(row.Count, row.Approximate, len(row.FetchFilter) > 0, row.Loading, row.Err != "")
 }
 
-// focusedRelatedRow returns the related row under RelatedCursor honoring the
-// active RelatedFilter and self-pivot suppression (the same visibility logic as
-// detailRelatedVisibleCount), or nil when the cursor points past the visible
-// rows.
-func (ds *DetailState) focusedRelatedRow() *DetailRelatedRow {
+// visibleRelatedRowAt returns the related row at position idx in the visible
+// (filtered, self-pivot-suppressed) list — the same walk as
+// detailRelatedVisibleCount/focusedRelatedRow, but addressable by an arbitrary
+// index rather than ds.RelatedCursor. Returns nil when idx is out of range.
+func visibleRelatedRowAt(ds *DetailState, idx int) *DetailRelatedRow {
+	if idx < 0 {
+		return nil
+	}
 	query := strings.TrimSpace(strings.ToLower(ds.RelatedFilter))
-	idx := 0
+	vis := 0
 	for i := range ds.RelatedRows {
 		row := &ds.RelatedRows[i]
 		if isSelfPivotZeroDetailRow(*row, ds.ResourceType) {
@@ -233,10 +254,36 @@ func (ds *DetailState) focusedRelatedRow() *DetailRelatedRow {
 		if query != "" && !strings.Contains(strings.ToLower(row.DisplayName), query) {
 			continue
 		}
-		if idx == ds.RelatedCursor {
+		if vis == idx {
 			return row
 		}
-		idx++
+		vis++
 	}
 	return nil
+}
+
+// detailSkipUnselectableRelated advances ds.RelatedCursor past related rows
+// that render dim (non-actionable per isActionableDetailRow), mirroring
+// menuSkipUnavailable's skip-unavailable stepping via the shared
+// stepToSelectable helper. direction is +1 for downward movement (MoveDown,
+// MoveTop, PageDown-ward) or -1 for upward movement (MoveUp, MoveBottom,
+// PageUp-ward) — callers pass the same direction sign the menu path uses for
+// the analogous action.
+func detailSkipUnselectableRelated(ds *DetailState, direction int) {
+	visCount := visibleRelatedRowCount(ds)
+	if visCount == 0 {
+		return
+	}
+	ds.RelatedCursor = stepToSelectable(ds.RelatedCursor, visCount, direction, func(i int) bool {
+		row := visibleRelatedRowAt(ds, i)
+		return row == nil || !isActionableDetailRow(*row)
+	})
+}
+
+// focusedRelatedRow returns the related row under RelatedCursor honoring the
+// active RelatedFilter and self-pivot suppression (the same visibility logic as
+// detailRelatedVisibleCount), or nil when the cursor points past the visible
+// rows.
+func (ds *DetailState) focusedRelatedRow() *DetailRelatedRow {
+	return visibleRelatedRowAt(ds, ds.RelatedCursor)
 }

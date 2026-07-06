@@ -109,37 +109,26 @@ func menuIsVisibleUnderIssueFilter(ms *MenuState, item resource.ResourceTypeDef,
 
 // menuSkipUnavailable advances the cursor past confirmed-empty resource types.
 // mainmenu.go delegates cursor movement to the controller; this is the single
-// implementation.
+// implementation. The scan itself lives in the shared stepToSelectable helper
+// (actions_nav.go) so the related-panel cursor can run the identical
+// skip-stepping semantics.
 func menuSkipUnavailable(ms *MenuState, visible []resource.ResourceTypeDef, direction int) {
 	if ms.Availability == nil || len(visible) == 0 {
 		return
 	}
-	total := len(visible)
-	start := ms.Cursor
+	ms.Cursor = stepToSelectable(ms.Cursor, len(visible), direction, func(i int) bool {
+		return menuIsConfirmedEmpty(ms, visible[i])
+	})
+}
 
-	cur := start
-	for cur >= 0 && cur < total {
-		item := visible[cur]
-		key := menuActiveKey(ms, item)
-		isTruncated := ms.Truncated != nil && ms.Truncated[key]
-		if count, known := ms.Availability[key]; !known || count > 0 || isTruncated {
-			ms.Cursor = cur
-			return
-		}
-		cur += direction
-	}
-
-	cur = start - direction
-	for cur >= 0 && cur < total {
-		item := visible[cur]
-		key := menuActiveKey(ms, item)
-		isTruncated := ms.Truncated != nil && ms.Truncated[key]
-		if count, known := ms.Availability[key]; !known || count > 0 || isTruncated {
-			ms.Cursor = cur
-			return
-		}
-		cur -= direction
-	}
+// menuIsConfirmedEmpty reports whether item's resource type is confirmed to
+// have zero resources (known count, zero, not truncated) — the skip predicate
+// menuSkipUnavailable steps over.
+func menuIsConfirmedEmpty(ms *MenuState, item resource.ResourceTypeDef) bool {
+	key := menuActiveKey(ms, item)
+	isTruncated := ms.Truncated != nil && ms.Truncated[key]
+	count, known := ms.Availability[key]
+	return known && count == 0 && !isTruncated
 }
 
 // menuActiveKey returns the key under which intent data for the given

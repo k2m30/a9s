@@ -159,10 +159,16 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		// The reverse order let the row-derived, potentially-incomplete count
 		// computed here unconditionally clobber a more accurate aggregate.
 		saveResources, saveTruncated := c.session.ProbeResources, c.session.ProbeTruncated
+		var wave2Complete bool
 		if p, ok := req.Payload.(*SaveCachePayload); ok && p != nil {
 			saveResources, saveTruncated = p.Resources, p.Truncated
+			wave2Complete = p.Wave2Complete
 		}
-		if err := c.saveProbeResourcesToTypeFiles(saveResources, saveTruncated); err != nil {
+		// A nil-Payload dispatch is never the tagged Wave-2-completion save
+		// (wave2Complete stays false — C6b): only handleEnrichmentChecked's
+		// "all done" branch sets Wave2Complete, and it always carries a
+		// SaveCachePayload.
+		if err := c.saveProbeResourcesToTypeFiles(saveResources, saveTruncated, wave2Complete); err != nil {
 			flashErr = err
 		}
 		entries, truncated, issueCounts, issueTruncated, issueKnown := c.availabilityFromResourceCache()
@@ -513,7 +519,16 @@ func (c *Core) availabilityFromResourceCache() (
 // first error is returned to the caller (mirrors SaveAvailabilityCache's
 // firstErr convention), matching every other cache-write call site's
 // best-effort posture.
-func (c *Core) saveProbeResourcesToTypeFiles(probeResources map[string][]resource.Resource, probeTruncated map[string]bool) error {
+//
+// wave2Complete distinguishes the two TaskKindSaveCache dispatch sites that
+// both route through this function (C6b): the Wave-1 sweep-completion save
+// (handleAvailabilityChecked) passes false — a bare rows-carrying observation
+// that must carry forward any Wave-2 data the on-disk rows already have
+// (reconcileTypeFile's carry step). The Wave-2-completion save
+// (handleEnrichmentChecked) passes true — this observation IS the fresh
+// enrichment result and must supersede carried data wholesale so a
+// healed/resolved issue can clear.
+func (c *Core) saveProbeResourcesToTypeFiles(probeResources map[string][]resource.Resource, probeTruncated map[string]bool, wave2Complete bool) error {
 	if len(probeResources) == 0 {
 		return nil
 	}
@@ -545,7 +560,13 @@ func (c *Core) saveProbeResourcesToTypeFiles(probeResources map[string][]resourc
 		if issuesKnown {
 			issues = unifiedIssueCount(resources, *td, nil)
 		}
-		if err := c.SaveResourceListCache(shortName, rows, len(resources), exact, issues, issuesKnown, truncated); err != nil && firstErr == nil {
+		var err error
+		if wave2Complete {
+			err = c.saveResourceListCacheWave2Complete(shortName, rows, len(resources), exact, issues, issuesKnown, truncated)
+		} else {
+			err = c.SaveResourceListCache(shortName, rows, len(resources), exact, issues, issuesKnown, truncated)
+		}
+		if err != nil && firstErr == nil {
 			firstErr = err
 		}
 	}
