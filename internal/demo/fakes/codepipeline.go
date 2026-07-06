@@ -34,12 +34,16 @@ func (f *CodePipelineFake) GetPipelineState(_ context.Context, input *codepipeli
 	}, nil
 }
 
-// GetPipeline returns an empty pipeline declaration — demo mode does not
-// model pipeline stage details.
+// GetPipeline returns the fixture-registered stage/action declaration for
+// the requested pipeline, falling back to a bare declaration (no stages)
+// when no fixture entry exists.
 func (f *CodePipelineFake) GetPipeline(_ context.Context, input *codepipeline.GetPipelineInput, _ ...func(*codepipeline.Options)) (*codepipeline.GetPipelineOutput, error) {
 	var name string
 	if input != nil && input.Name != nil {
 		name = *input.Name
+	}
+	if decl, ok := f.fix.Declarations[name]; ok {
+		return &codepipeline.GetPipelineOutput{Pipeline: decl}, nil
 	}
 	return &codepipeline.GetPipelineOutput{
 		Pipeline: &cptypes.PipelineDeclaration{

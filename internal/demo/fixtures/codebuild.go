@@ -34,14 +34,42 @@ var sharedCodeBuildFixtures = sync.OnceValue(func() *CodeBuildFixtures {
 			Source: &cbtypes.ProjectSource{
 				Type: cbtypes.SourceTypeGithub,
 			},
+			// Artifacts.Location — required for the cb:s3 related-panel pivot
+			// witness (checkCbS3). a9s-demo-healthy is a real s3.go bucket.
+			Artifacts: &cbtypes.ProjectArtifacts{
+				Type:     cbtypes.ArtifactsTypeS3,
+				Location: aws.String(HealthyBucketName),
+			},
 			Cache: &cbtypes.ProjectCache{
 				Type: cbtypes.CacheTypeLocal,
 			},
 			Environment: &cbtypes.ProjectEnvironment{
-				Type:        cbtypes.EnvironmentTypeLinuxContainer,
-				Image:       aws.String("aws/codebuild/standard:7.0"),
+				Type: cbtypes.EnvironmentTypeLinuxContainer,
+				// ECR-hosted build image — required for the cb:ecr
+				// related-panel pivot witness (checkCbECR). acme/api-service
+				// is a real ecr.go repository fixture.
+				Image:       aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/api-service:builder"),
 				ComputeType: cbtypes.ComputeTypeBuildGeneral1Small,
+				// EnvironmentVariables — required for the cb:secrets and
+				// cb:ssm related-panel pivot witnesses (checkCbSecrets /
+				// checkCbSSM). prod/api/gateway-key is a real secrets.go
+				// fixture; /acme/prod/app/config is a real ssm.go fixture.
+				EnvironmentVariables: []cbtypes.EnvironmentVariable{
+					{Name: aws.String("API_GATEWAY_KEY"), Type: cbtypes.EnvironmentVariableTypeSecretsManager, Value: aws.String("prod/api/gateway-key")},
+					{Name: aws.String("APP_CONFIG"), Type: cbtypes.EnvironmentVariableTypeParameterStore, Value: aws.String("/acme/prod/app/config")},
+				},
 			},
+			// VpcConfig — required for the cb:sg, cb:subnet and cb:vpc
+			// related-panel pivot witnesses (checkCbSG / checkCbSubnet /
+			// checkCbVPC). All three IDs are real ec2.go fixtures.
+			VpcConfig: &cbtypes.VpcConfig{
+				VpcId:            aws.String(fixtProdVPCID),
+				Subnets:          []string{fixtProdPrivateSubnetA},
+				SecurityGroupIds: []string{fixtProdAPIInternalSGID},
+			},
+			// EncryptionKey — required for the cb:kms related-panel pivot
+			// witness (checkCbKMS). Shared prod KMS key used across fixtures.
+			EncryptionKey: aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
 			LogsConfig: &cbtypes.LogsConfig{
 				CloudWatchLogs: &cbtypes.CloudWatchLogsConfig{
 					Status:    cbtypes.LogsConfigStatusTypeEnabled,

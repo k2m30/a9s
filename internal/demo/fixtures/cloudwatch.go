@@ -592,6 +592,98 @@ var sharedCloudWatchFixtures = sync.OnceValue(func() *CloudWatchFixtures {
 					{Name: aws.String("FileSystemId"), Value: aws.String(ProdEFSID)},
 				},
 			},
+			// acme-public-api alarm — required for apigw:alarm related-panel
+			// pivot. Dimension ApiId matches PublicAPIGWID (apigw.go).
+			// checkApigwAlarm scans MetricAlarm.Dimensions for Name="ApiId".
+			{
+				AlarmName:             aws.String("apigw-public-api-5xx"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:apigw-public-api-5xx"),
+				AlarmDescription:      aws.String("Triggers when acme-public-api 5XX error count exceeds 10 in 5 minutes"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 3 datapoints were less than the threshold (10.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 21, 11, 0, 0, 0, time.UTC)),
+				MetricName:            aws.String("5XXError"),
+				Namespace:             aws.String("AWS/ApiGateway"),
+				Threshold:             aws.Float64(10.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanThreshold,
+				EvaluationPeriods:     aws.Int32(3),
+				Period:                aws.Int32(300),
+				Statistic:             cwtypes.StatisticSum,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("ApiId"), Value: aws.String(PublicAPIGWID)},
+				},
+			},
+			// acme-api-build alarm — required for cb:alarm related-panel
+			// pivot. checkCbAlarm matches Namespace="AWS/CodeBuild" +
+			// dimension ProjectName=acme-api-build.
+			{
+				AlarmName:             aws.String("cb-acme-api-build-failed-builds"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:cb-acme-api-build-failed-builds"),
+				AlarmDescription:      aws.String("Triggers when acme-api-build has 2+ failed builds in 15 minutes"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 1 datapoint was less than the threshold (2.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 21, 12, 0, 0, 0, time.UTC)),
+				MetricName:            aws.String("FailedBuilds"),
+				Namespace:             aws.String("AWS/CodeBuild"),
+				Threshold:             aws.Float64(2.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanOrEqualToThreshold,
+				EvaluationPeriods:     aws.Int32(1),
+				Period:                aws.Int32(900),
+				Statistic:             cwtypes.StatisticSum,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("ProjectName"), Value: aws.String("acme-api-build")},
+				},
+			},
+			// order-fulfillment-workflow alarm — required for sfn:alarm
+			// related-panel pivot. checkSFNAlarm matches dimension
+			// StateMachineArn to the state machine's full ARN (sfn.go).
+			{
+				AlarmName:             aws.String("sfn-order-fulfillment-execution-failures"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:sfn-order-fulfillment-execution-failures"),
+				AlarmDescription:      aws.String("Triggers when order-fulfillment-workflow has 3+ failed executions in 15 minutes"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 1 datapoint was less than the threshold (3.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 22, 4, 0, 0, 0, time.UTC)),
+				MetricName:            aws.String("ExecutionsFailed"),
+				Namespace:             aws.String("AWS/States"),
+				Threshold:             aws.Float64(3.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanOrEqualToThreshold,
+				EvaluationPeriods:     aws.Int32(1),
+				Period:                aws.Int32(900),
+				Statistic:             cwtypes.StatisticSum,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("StateMachineArn"), Value: aws.String("arn:aws:states:us-east-1:123456789012:stateMachine:order-fulfillment-workflow")},
+				},
+			},
+			// acme-prod-api alarm — required for eb:alarm related-panel
+			// pivot. checkEbAlarm matches any dimension Value equal to the
+			// environment name (acme-prod-api).
+			{
+				AlarmName:             aws.String("eb-acme-prod-api-health"),
+				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:eb-acme-prod-api-health"),
+				AlarmDescription:      aws.String("Triggers when acme-prod-api environment health degrades"),
+				StateValue:            cwtypes.StateValueOk,
+				StateReason:           aws.String("Threshold Crossed: 1 datapoint was less than the threshold (1.0)."),
+				StateUpdatedTimestamp: aws.Time(time.Date(2026, 4, 22, 5, 0, 0, 0, time.UTC)),
+				MetricName:            aws.String("EnvironmentHealth"),
+				Namespace:             aws.String("AWS/ElasticBeanstalk"),
+				Threshold:             aws.Float64(1.0),
+				ComparisonOperator:    cwtypes.ComparisonOperatorGreaterThanOrEqualToThreshold,
+				EvaluationPeriods:     aws.Int32(1),
+				Period:                aws.Int32(300),
+				Statistic:             cwtypes.StatisticMaximum,
+				ActionsEnabled:        aws.Bool(true),
+				AlarmActions:          []string{relatedAlarmSNSARN},
+				Dimensions: []cwtypes.Dimension{
+					{Name: aws.String("EnvironmentName"), Value: aws.String("acme-prod-api")},
+				},
+			},
 		},
 		// AlarmHistory — every graph-root-reachable alarm needs at least one
 		// entry so alarm→alarm_history drill lands on non-empty content.

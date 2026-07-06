@@ -1,9 +1,9 @@
 package fixtures
 
 import (
-	"sync"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
+	"sync"
 )
 
 // CWLogsFixtures holds typed fixture data for CloudWatch Logs.
@@ -223,6 +223,46 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 			RetentionInDays: aws.Int32(30),
 			CreationTime:    aws.Int64(1750100000000),
 		},
+		// acme-public-api execution log group — required for apigw:logs
+		// related-panel pivot. checkApigwLogs matches log groups whose ID
+		// has the "API-Gateway-Execution-Logs_{apiID}/" prefix.
+		{
+			LogGroupName:    aws.String("API-Gateway-Execution-Logs_" + PublicAPIGWID + "/$default"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:API-Gateway-Execution-Logs_" + PublicAPIGWID + "/$default:*"),
+			StoredBytes:     aws.Int64(31457280),
+			RetentionInDays: aws.Int32(14),
+			CreationTime:    aws.Int64(1750200000000),
+		},
+		// acme-api-build CodeBuild log group — required for cb:logs
+		// related-panel pivot. checkCbLogs matches Project.LogsConfig.
+		// CloudWatchLogs.GroupName exactly.
+		{
+			LogGroupName:    aws.String("/aws/codebuild/acme-api-build"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/codebuild/acme-api-build:*"),
+			StoredBytes:     aws.Int64(20971520),
+			RetentionInDays: aws.Int32(14),
+			CreationTime:    aws.Int64(1750300000000),
+		},
+		// order-fulfillment-workflow vendedlogs log group — required for
+		// sfn:logs related-panel pivot. checkSFNLogs matches log groups
+		// whose ID is exactly "/aws/vendedlogs/states/{sfnName}".
+		{
+			LogGroupName:    aws.String("/aws/vendedlogs/states/order-fulfillment-workflow"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/vendedlogs/states/order-fulfillment-workflow:*"),
+			StoredBytes:     aws.Int64(15728640),
+			RetentionInDays: aws.Int32(30),
+			CreationTime:    aws.Int64(1750400000000),
+		},
+		// acme-prod-api Elastic Beanstalk log group — required for eb:logs
+		// related-panel pivot. checkEbLogs matches log groups whose ID has
+		// the "/aws/elasticbeanstalk/{envName}/" prefix.
+		{
+			LogGroupName:    aws.String("/aws/elasticbeanstalk/acme-prod-api/var/log/eb-engine.log"),
+			Arn:             aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/aws/elasticbeanstalk/acme-prod-api/var/log/eb-engine.log:*"),
+			StoredBytes:     aws.Int64(10485760),
+			RetentionInDays: aws.Int32(14),
+			CreationTime:    aws.Int64(1750500000000),
+		},
 	}
 
 	logStreams := map[string][]cwlogstypes.LogStream{
@@ -266,16 +306,16 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 			},
 		},
 		// Graph-root log groups that must have streams so logs→log_streams drill lands non-empty.
-		"/aws/dynamodb/tables/" + OrdersProdID + "/insights/default":     minimalLogStreams("ddb-insights"),
-		"/aws/rds/instance/prod-dbi-aurora-1/postgresql":                 minimalLogStreams("dbi-aurora-pg"),
-		"/aws/rds/cluster/prod-aurora-cluster/postgresql":                minimalLogStreams("dbc-aurora-pg"),
-		ProdRedisLogGroup:                                                minimalLogStreams("redis-slow"),
-		OpenSearchLogGroupAudit:                                          minimalLogStreams("os-audit"),
-		OpenSearchLogGroupIndexSlow:                                      minimalLogStreams("os-index-slow"),
-		OpenSearchLogGroupSearchSlow:                                     minimalLogStreams("os-search-slow"),
-		"/aws/redshift/cluster/" + AcmeWarehouseID + "/connectionlog":    minimalLogStreams("rs-conn"),
-		"/aws/redshift/cluster/" + AcmeWarehouseID + "/userlog":          minimalLogStreams("rs-user"),
-		"/aws/redshift/cluster/" + AcmeWarehouseID + "/useractivitylog":  minimalLogStreams("rs-useract"),
+		"/aws/dynamodb/tables/" + OrdersProdID + "/insights/default": minimalLogStreams("ddb-insights"),
+		"/aws/rds/instance/prod-dbi-aurora-1/postgresql":             minimalLogStreams("dbi-aurora-pg"),
+		"/aws/rds/cluster/prod-aurora-cluster/postgresql":            minimalLogStreams("dbc-aurora-pg"),
+		ProdRedisLogGroup:            minimalLogStreams("redis-slow"),
+		OpenSearchLogGroupAudit:      minimalLogStreams("os-audit"),
+		OpenSearchLogGroupIndexSlow:  minimalLogStreams("os-index-slow"),
+		OpenSearchLogGroupSearchSlow: minimalLogStreams("os-search-slow"),
+		"/aws/redshift/cluster/" + AcmeWarehouseID + "/connectionlog":   minimalLogStreams("rs-conn"),
+		"/aws/redshift/cluster/" + AcmeWarehouseID + "/userlog":         minimalLogStreams("rs-user"),
+		"/aws/redshift/cluster/" + AcmeWarehouseID + "/useractivitylog": minimalLogStreams("rs-useract"),
 		// Lambda log groups for graph-root-drilled functions — required for
 		// lambda→lambda_invocations (parses REPORT lines from FilterLogEvents).
 		"/aws/lambda/a9s-demo-s3-notifier": minimalLogStreams("lambda-s3-notifier"),

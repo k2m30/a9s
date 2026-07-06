@@ -356,6 +356,13 @@ func makeInstance(
 			ec2types.Tag{Key: aws.String("eks:nodegroup-name"), Value: aws.String(fixtRelatedEC2NGNodeGroupID)},
 		)
 	}
+	// elasticbeanstalk:environment-name tag — required for eb:ec2 related-panel
+	// pivot. acme-prod-api is a real eb.go environment fixture.
+	if instanceID == "i-0a1b2c3d4e5f60002" {
+		inst.Tags = append(inst.Tags,
+			ec2types.Tag{Key: aws.String("elasticbeanstalk:environment-name"), Value: aws.String("acme-prod-api")},
+		)
+	}
 	// aws:cloudformation:stack-name tag — required for ec2→cfn related-panel
 	// pivot. acme-eks-cluster is a real stack fixture (cfn.go).
 	if instanceID == "i-0a1b2c3d4e5f60005" {

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
+	sfntypes "github.com/aws/aws-sdk-go-v2/service/sfn/types"
 	"github.com/aws/smithy-go"
 
 	"github.com/k2m30/a9s/v3/internal/demo/fixtures"
@@ -38,10 +39,10 @@ func (f *SFNFake) GetExecutionHistory(_ context.Context, _ *sfn.GetExecutionHist
 	return &sfn.GetExecutionHistoryOutput{}, nil
 }
 
-// DescribeStateMachine returns the fixture's ASL definition for the given
-// state machine ARN, when one is registered (see SFNFixtures.Definitions).
-// Falls back to an empty definition for state machines without a modeled
-// ASL body.
+// DescribeStateMachine returns the fixture's ASL definition, execution role,
+// and encryption key for the given state machine ARN, when registered (see
+// SFNFixtures.Definitions/RoleArns/EncryptionKeyIDs). Falls back to an empty
+// definition and no role/encryption for state machines without modeled data.
 func (f *SFNFake) DescribeStateMachine(_ context.Context, input *sfn.DescribeStateMachineInput, _ ...func(*sfn.Options)) (*sfn.DescribeStateMachineOutput, error) {
 	var arn string
 	if input != nil && input.StateMachineArn != nil {
@@ -54,7 +55,17 @@ func (f *SFNFake) DescribeStateMachine(_ context.Context, input *sfn.DescribeSta
 	if d, ok := f.fix.Definitions[arn]; ok {
 		definition = d
 	}
-	return &sfn.DescribeStateMachineOutput{StateMachineArn: &arn, Definition: &definition}, nil
+	out := &sfn.DescribeStateMachineOutput{StateMachineArn: &arn, Definition: &definition}
+	if roleArn, ok := f.fix.RoleArns[arn]; ok {
+		out.RoleArn = &roleArn
+	}
+	if keyID, ok := f.fix.EncryptionKeyIDs[arn]; ok {
+		out.EncryptionConfiguration = &sfntypes.EncryptionConfiguration{
+			Type:     sfntypes.EncryptionTypeCustomerManagedKmsKey,
+			KmsKeyId: &keyID,
+		}
+	}
+	return out, nil
 }
 
 // validateSFNArn mirrors the real SFN API which returns InvalidArn (not ValidationError)

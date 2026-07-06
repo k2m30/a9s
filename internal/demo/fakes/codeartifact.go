@@ -41,10 +41,18 @@ func (f *CodeArtifactFake) GetDomainPermissionsPolicy(_ context.Context, _ *code
 	return &codeartifact.GetDomainPermissionsPolicyOutput{}, nil
 }
 
-// DescribeDomain is a no-op stub satisfying CodeArtifactDescribeDomainAPI.
-// Demo mode does not model CodeArtifact domain KMS encryption keys.
-func (f *CodeArtifactFake) DescribeDomain(_ context.Context, _ *codeartifact.DescribeDomainInput, _ ...func(*codeartifact.Options)) (*codeartifact.DescribeDomainOutput, error) {
-	return &codeartifact.DescribeDomainOutput{}, nil
+// DescribeDomain returns the fixture-registered domain description for the
+// requested domain name (see CodeArtifactFixtures.Domains).
+func (f *CodeArtifactFake) DescribeDomain(_ context.Context, input *codeartifact.DescribeDomainInput, _ ...func(*codeartifact.Options)) (*codeartifact.DescribeDomainOutput, error) {
+	var domainName string
+	if input != nil && input.Domain != nil {
+		domainName = *input.Domain
+	}
+	domain, ok := f.fix.Domains[domainName]
+	if !ok {
+		return &codeartifact.DescribeDomainOutput{}, nil
+	}
+	return &codeartifact.DescribeDomainOutput{Domain: &domain}, nil
 }
 
 // ListPackages returns stub package summaries for demo mode.

@@ -268,6 +268,13 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 				LogGroup:  aws.String("/aws/lambda/" + lambdaRotateDocDB),
 				LogFormat: lambdatypes.LogFormatText,
 			},
+			// DeadLetterConfig — required for the secrets:sns related-panel
+			// pivot witness (checkSecretsSNS reads the rotation Lambda's
+			// DLQ TargetArn when it points at an SNS topic). ops-alerts is
+			// the shared prod SNS topic (relatedAlarmSNSARN in cloudwatch.go).
+			DeadLetterConfig: &lambdatypes.DeadLetterConfig{
+				TargetArn: aws.String("arn:aws:sns:us-east-1:123456789012:ops-alerts"),
+			},
 			LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
 		},
 		{

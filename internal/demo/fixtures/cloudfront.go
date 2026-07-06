@@ -28,7 +28,7 @@ var sharedCloudFrontFixtures = sync.OnceValue(func() *CloudFrontFixtures {
 					Items:    []string{"acme-corp.com", "www.acme-corp.com"},
 				},
 				Origins: &cftypes.Origins{
-					Quantity: aws.Int32(2),
+					Quantity: aws.Int32(3),
 					Items: []cftypes.Origin{
 						{
 							Id:         aws.String("s3-static-assets"),
@@ -37,6 +37,13 @@ var sharedCloudFrontFixtures = sync.OnceValue(func() *CloudFrontFixtures {
 						{
 							Id:         aws.String("alb-api-backend"),
 							DomainName: aws.String("prod-api-alb-1234567890.us-east-1.elb.amazonaws.com"),
+						},
+						// acme-public-api origin — required for apigw:cf
+						// related-panel pivot. checkApigwCF matches origin
+						// DomainName containing "{apiID}.execute-api.".
+						{
+							Id:         aws.String("apigw-public-api"),
+							DomainName: aws.String(PublicAPIGWID + ".execute-api.us-east-1.amazonaws.com"),
 						},
 					},
 				},

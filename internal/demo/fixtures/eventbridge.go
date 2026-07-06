@@ -1,9 +1,9 @@
 package fixtures
 
 import (
-	"sync"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	eventbridgetypes "github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
+	"sync"
 )
 
 // EventBridgeFixtures holds typed fixture data for EventBridge.
@@ -92,6 +92,29 @@ var sharedEventBridgeFixtures = sync.OnceValue(func() *EventBridgeFixtures {
 			EventPattern: aws.String(`{"source":["aws.s3"],"detail-type":["Object Created"],"detail":{"bucket":{"name":["` + HealthyBucketName + `"]}}}`),
 			Description:  aws.String("Routes S3 object-created events from a9s-demo-healthy (" + HealthyBucketARN + ") to Lambda"),
 		},
+		// ECR image-scan-complete rule for acme/api-service — required for
+		// ecr:eb-rule related-panel pivot. checkECREbRule matches
+		// source=["aws.ecr"] + detail.repository-name containing the repo name.
+		{
+			Name:         aws.String("ecr-api-service-scan-complete"),
+			Arn:          aws.String("arn:aws:events:us-east-1:123456789012:rule/ecr-api-service-scan-complete"),
+			State:        eventbridgetypes.RuleStateEnabled,
+			EventBusName: aws.String("default"),
+			EventPattern: aws.String(`{"source":["aws.ecr"],"detail-type":["ECR Image Scan"],"detail":{"repository-name":["acme/api-service"]}}`),
+			Description:  aws.String("Routes ECR image scan completion events for acme/api-service to SNS"),
+		},
+		// order-fulfillment-workflow schedule rule — required for sfn:eb-rule
+		// related-panel pivot. checkSFNEbRule calls ListRuleNamesByTarget
+		// with the state machine ARN as TargetArn (see EventBridgeFake).
+		{
+			Name:               aws.String("nightly-order-fulfillment-trigger"),
+			Arn:                aws.String("arn:aws:events:us-east-1:123456789012:rule/nightly-order-fulfillment-trigger"),
+			State:              eventbridgetypes.RuleStateEnabled,
+			EventBusName:       aws.String("default"),
+			ScheduleExpression: aws.String("cron(0 3 * * ? *)"),
+			Description:        aws.String("Triggers order-fulfillment-workflow nightly at 3 AM UTC"),
+			RoleArn:            aws.String(prodEBRoleARN),
+		},
 	}
 
 	targetsByRule := map[string][]eventbridgetypes.Target{
@@ -127,6 +150,18 @@ var sharedEventBridgeFixtures = sync.OnceValue(func() *EventBridgeFixtures {
 			{
 				Id:  aws.String("S3NotifierLambda"),
 				Arn: aws.String("arn:aws:lambda:us-east-1:123456789012:function:" + S3NotifierLambdaName),
+			},
+		},
+		"ecr-api-service-scan-complete": {
+			{
+				Id:  aws.String("SNSECRScanAlertTopic"),
+				Arn: aws.String(relatedAlarmSNSARN),
+			},
+		},
+		"nightly-order-fulfillment-trigger": {
+			{
+				Id:  aws.String("SFNOrderFulfillmentWorkflow"),
+				Arn: aws.String("arn:aws:states:us-east-1:123456789012:stateMachine:order-fulfillment-workflow"),
 			},
 		},
 	}

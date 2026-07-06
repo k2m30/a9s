@@ -261,6 +261,18 @@ var sharedCFNFixtures = sync.OnceValue(func() *CFNFixtures {
 				{Key: aws.String("Service"), Value: aws.String("storage")},
 			},
 		},
+		// Elastic Beanstalk auto-generated stack for acme-prod-api — required
+		// for eb:cfn related-panel pivot. checkEbCFN matches stack names with
+		// the "awseb-{envID}" prefix; e-acmeprodapi is acme-prod-api's
+		// EnvironmentId (eb.go).
+		{
+			StackName:    aws.String("awseb-e-acmeprodapi-stack"),
+			StackStatus:  cfntypes.StackStatusUpdateComplete,
+			CreationTime: aws.Time(mustParseCFNTime("2025-01-10T09:00:00+00:00")),
+			Description:  aws.String("Elastic Beanstalk-managed stack for acme-prod-api"),
+			StackId:      aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/awseb-e-acmeprodapi-stack/cccc5555-dddd-6666-eeee-777777777777"),
+			RoleARN:      aws.String(prodCIDeployRoleARN),
+		},
 	}
 
 	stackEvents := map[string][]cfntypes.StackEvent{

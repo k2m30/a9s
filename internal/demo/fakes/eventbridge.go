@@ -30,8 +30,25 @@ func (f *EventBridgeFake) ListTargetsByRule(_ context.Context, input *eventbridg
 	return &eventbridge.ListTargetsByRuleOutput{Targets: f.fix.TargetsByRule[ruleName]}, nil
 }
 
-// ListRuleNamesByTarget is a no-op stub satisfying EventBridgeListRuleNamesByTargetAPI.
-// Demo mode does not model EventBridge rules-by-target lookups.
-func (f *EventBridgeFake) ListRuleNamesByTarget(_ context.Context, _ *eventbridge.ListRuleNamesByTargetInput, _ ...func(*eventbridge.Options)) (*eventbridge.ListRuleNamesByTargetOutput, error) {
-	return &eventbridge.ListRuleNamesByTargetOutput{}, nil
+// ListRuleNamesByTarget scans the fixture-registered TargetsByRule map for
+// any rule with a target whose Arn matches the requested TargetArn, deriving
+// the reverse (target -> rule names) lookup generically rather than
+// requiring a second fixture map. Required for the pipeline:eb-rule and
+// sfn:eb-rule related-panel pivot witnesses (both call this API directly
+// with the pipeline/state-machine ARN as TargetArn).
+func (f *EventBridgeFake) ListRuleNamesByTarget(_ context.Context, input *eventbridge.ListRuleNamesByTargetInput, _ ...func(*eventbridge.Options)) (*eventbridge.ListRuleNamesByTargetOutput, error) {
+	if input == nil || input.TargetArn == nil || *input.TargetArn == "" {
+		return &eventbridge.ListRuleNamesByTargetOutput{}, nil
+	}
+	targetArn := *input.TargetArn
+	var names []string
+	for ruleName, targets := range f.fix.TargetsByRule {
+		for _, t := range targets {
+			if t.Arn != nil && *t.Arn == targetArn {
+				names = append(names, ruleName)
+				break
+			}
+		}
+	}
+	return &eventbridge.ListRuleNamesByTargetOutput{RuleNames: names}, nil
 }

@@ -113,7 +113,10 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 		{
 			// prod/api/gateway-key — required for the ecs-task:secrets
 			// related-panel pivot witness. Referenced by the api-gateway
-			// task definition's API_KEY container secret (ecs.go).
+			// task definition's API_KEY container secret (ecs.go). The
+			// aws:cloudformation:stack-name tag is required for the
+			// secrets:cfn related-panel pivot witness (checkSecretsCFN);
+			// acme-eks-cluster is a real cfn.go stack fixture.
 			Name:             aws.String("prod/api/gateway-key"),
 			ARN:              aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/api/gateway-key-XyZ123"),
 			Description:      aws.String("API Gateway shared secret key for the api-gateway ECS service"),
@@ -123,7 +126,10 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 			CreatedDate:      aws.Time(time.Date(2025, 4, 1, 9, 0, 0, 0, time.UTC)),
 			KmsKeyId:         aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
 			PrimaryRegion:    aws.String("us-east-1"),
-			Tags:             []smtypes.Tag{{Key: aws.String("Environment"), Value: aws.String("production")}},
+			Tags: []smtypes.Tag{
+				{Key: aws.String("Environment"), Value: aws.String("production")},
+				{Key: aws.String("aws:cloudformation:stack-name"), Value: aws.String("acme-eks-cluster")},
+			},
 		},
 		{
 			Name:             aws.String("prod/api/stripe-key"),
@@ -208,6 +214,20 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 			RotationRules:     &smtypes.RotationRulesType{AutomaticallyAfterDays: aws.Int64(30)},
 			CreatedDate:       aws.Time(time.Date(2024, 8, 15, 10, 0, 0, 0, time.UTC)),
 			Tags:              []smtypes.Tag{{Key: aws.String("Environment"), Value: aws.String("production")}},
+		},
+		// prod/codeartifact/npm-publish-token — required for secrets:codeartifact
+		// related-panel pivot witness. checkSecretsCodeArtifact matches secret
+		// names/tags containing "codeartifact" (no cache lookup — Wave1
+		// name/tag heuristic only, no cross-reference to a specific repo id).
+		{
+			Name:             aws.String("prod/codeartifact/npm-publish-token"),
+			ARN:              aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/codeartifact/npm-publish-token-QwErTy"),
+			Description:      aws.String("CodeArtifact publish token for the acme-npm repository"),
+			LastAccessedDate: aws.Time(time.Date(2026, 3, 20, 0, 0, 0, 0, time.UTC)),
+			LastChangedDate:  aws.Time(time.Date(2026, 1, 10, 0, 0, 0, 0, time.UTC)),
+			RotationEnabled:  aws.Bool(false),
+			CreatedDate:      aws.Time(time.Date(2025, 5, 1, 9, 0, 0, 0, time.UTC)),
+			Tags:             []smtypes.Tag{{Key: aws.String("Environment"), Value: aws.String("production")}},
 		},
 		// Issue: DeletedDate set → Warning (pending deletion, restore window)
 		{

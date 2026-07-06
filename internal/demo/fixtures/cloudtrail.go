@@ -2,8 +2,8 @@
 package fixtures
 
 import (
-	"sync"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -743,6 +743,21 @@ func buildCTEvents() []cloudtrailtypes.Event {
 				`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/ci-service-account","accountId":"123456789012","userName":"ci-service-account"},"eventSource":"rds.amazonaws.com","eventName":"CreateDBSnapshot","requestParameters":{"dBSnapshotIdentifier":%q,"dBInstanceIdentifier":"prod-dbi-1"}}`,
 				ProdDBISnapID,
 			)),
+		},
+		// acme/api-service push event — required for ecr:ct-events
+		// related-panel pivot. checkECRCTEvents matches ResourceName
+		// containing the repository name (ecr.go).
+		{
+			EventId:     aws.String("evt-ecr-api-service-push-001"),
+			EventName:   aws.String("PutImage"),
+			EventSource: aws.String("ecr.amazonaws.com"),
+			EventTime:   aws.Time(time.Date(2026, 3, 22, 3, 20, 0, 0, time.UTC)),
+			Username:    aws.String("acme-ci-deploy-role"),
+			ReadOnly:    aws.String("false"),
+			Resources: []cloudtrailtypes.Resource{
+				{ResourceType: aws.String("AWS::ECR::Repository"), ResourceName: aws.String("acme/api-service")},
+			},
+			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","arn":"arn:aws:sts::123456789012:assumed-role/acme-ci-deploy-role/build-142","accountId":"123456789012"},"eventSource":"ecr.amazonaws.com","eventName":"PutImage","requestParameters":{"repositoryName":"acme/api-service","imageTag":"v2.5.1"}}`),
 		},
 	}
 }
