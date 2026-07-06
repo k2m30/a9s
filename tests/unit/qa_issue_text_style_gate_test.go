@@ -112,41 +112,32 @@ var awsAccessKeyIDPattern = regexp.MustCompile(`^A(KIA|SIA)[A-Z0-9]{12,}$`)
 //
 // Target: EMPTY. Any entry here names a concrete file/line the coder (or a
 // follow-up PR) must fix; it is not a permanent exemption.
-var styleGateAllowlist = map[string]string{
-	"rendered:eks:prod-eks-healthy:list-status":         "listExtractCellValue's title-match Fields fallback (internal/app/list_columns.go) never calls domain.HumanizeStatusPhrase — only the col.Key==\"status\" branch does. eks's default view column is Path-based (Title:\"Status\", no Key), so it reaches the cell via the raw title-match branch. Needs the humanize call extended to that fallback.",
-	"rendered:ng:prod-ng-healthy:list-status":           "same listExtractCellValue title-match-fallback gap as eks — ng's Status column is also Path-based (Title:\"Status\", no Key) in defaults_containers.go.",
-	"rendered:ecs-svc:prod-ecs-svc-healthy:list-status":  "same listExtractCellValue title-match-fallback gap as eks — ecs-svc's Status column is Path-based in defaults_compute.go.",
-	"rendered:ecs:prod-ecs-healthy:list-status":          "same listExtractCellValue title-match-fallback gap as eks — ecs's Status column is Path-based in defaults_compute.go.",
-	"rendered:ecs-task:prod-ecs-task-healthy:list-status": "same listExtractCellValue title-match-fallback gap as eks — ecs-task's Status column is Path-based in defaults_compute.go.",
-	"rendered:eb:prod-eb-healthy:list-status":            "same listExtractCellValue title-match-fallback gap as eks — eb's Status column is Path-based in defaults_compute.go.",
-	"rendered:cf:prod-cf-healthy:list-status":            "same listExtractCellValue title-match-fallback gap as eks — cf's Status column is Path-based in defaults_dns_cdn.go.",
-	"rendered:acm:prod-acm-healthy:list-status":          "same listExtractCellValue title-match-fallback gap as eks — acm's Status column is Path-based in defaults_dns_cdn.go.",
-	"rendered:kinesis:prod-kinesis-healthy:list-status":  "same listExtractCellValue title-match-fallback gap as eks — kinesis's Status column is Path-based in defaults_messaging.go.",
-	"rendered:cfn:prod-cfn-healthy:list-status":          "same listExtractCellValue title-match-fallback gap as eks — cfn's Status column is Path-based in defaults_cicd.go.",
-	"rendered:kms:prod-kms-healthy:list-status":          "same listExtractCellValue title-match-fallback gap as eks — kms's Status column is Path-based in defaults_secrets.go.",
-
-	// The four entries below are pre-existing debt surfaced by the
-	// "eleven silent classifiers emit findings" wave (commit 5520e89c): each
-	// enricher builds its Attention/list-status phrase at runtime via
-	// fmt.Sprintf embedding a raw AWS enum word straight from the SDK
-	// response (CRITICAL/FAILED/ERROR severity/status constants), not a
-	// hand-authored catalog literal. Fixing these means rewording the
-	// enricher's fmt.Sprintf template itself (internal/aws/ecr_issue_enrichment.go,
-	// codebuild/glue/sfn's equivalents) — out of scope for this wave's
-	// sg/ng/lambda fix.
-	"rendered:cb:acme-integration-tests:detail-attention[0]": "codebuild enricher's Attention phrase embeds the raw CodeBuild BuildStatus enum word \"FAILED\" verbatim (\"Latest build FAILED (...)\" ) — needs a humanized cause-text rewrite.",
-	"rendered:ecr:acme/api-service:detail-attention[0]":      "ecr_issue_enrichment.go builds the Attention phrase via fmt.Sprintf(\"%d CRITICAL findings across %d image(s)\", ...) — the raw ECR finding-severity enum word CRITICAL is embedded verbatim; mirrors the catalog literal's own wording (see styleGateAllowlist... this file's phrase-sweep gate would need the same fix).",
-	"rendered:glue:glue-error-run:detail-attention[0]":       "glue enricher's Attention phrase embeds the raw Glue JobRun.JobRunState enum word \"ERROR\" verbatim (\"Latest run ERROR\") — needs a humanized cause-text rewrite.",
-	"rendered:sfn:payment-validation:detail-attention[0]":    "sfn enricher's Attention phrase embeds the raw Step Functions ExecutionStatus enum word \"FAILED\" verbatim (\"Latest execution FAILED\") — needs a humanized cause-text rewrite.",
-
-	// Catalog-literal counterparts of the same "eleven silent classifiers"
-	// wave: the FindingDef.Phrase documentation literal mirrors the exact
-	// wording the runtime enricher builds (see the "rendered:ecr:..."
-	// entry above for ecr specifically), so the same fix applies to both.
-	"phrase:ecr:ecr.vulnerabilities":    "FindingDef.Phrase \"<N> CRITICAL findings across <M> image(s)\" documents the runtime-built phrase verbatim (see rendered:ecr:acme/api-service:detail-attention[0] above) — needs the same humanized rewrite as the enricher.",
-	"phrase:ses:ses.account-shutdown":   "FindingDef.Phrase \"account SHUTDOWN\" embeds the raw SES AccountSendingStatus/health-event enum word verbatim — needs a lowercase-prose rewrite (e.g. \"account shut down\").",
-	"phrase:ses:ses.account-probation":  "FindingDef.Phrase \"account PROBATION\" embeds the raw SES account-health enum word verbatim — needs a lowercase-prose rewrite (e.g. \"account on probation\").",
-}
+//
+// PRUNED (2026-07-07): every entry this map ever held has been removed as
+// stale. Two independent classes of staleness were found while verifying
+// this gate, neither of which this file's own switch statements in
+// TestIssueTextStyleGate_CatalogPhrasesNeverRawEnum / checkStyleGateSurface
+// surface as a failure on their own — both silently Skip a no-longer-
+// violating allowlisted key instead of erroring "remove from allowlist",
+// unlike the explicit BURN-DOWN branch other gates in this package use
+// (e.g. qa_status_column_uniformity_test.go's checkRule) — so each entry
+// below was confirmed stale by reading current production source directly:
+//   - The 11 "rendered:<type>:prod-<type>-healthy:list-status" entries named
+//     resource IDs (prod-eks-healthy, prod-ng-healthy, prod-ecs-healthy, ...)
+//     that do not exist anywhere in internal/demo/ — dead keys that can never
+//     match a real subtest.
+//   - The 4 "rendered:*:detail-attention[0]" entries (cb, ecr, glue, sfn) and
+//     the 3 "phrase:*" entries (ecr.vulnerabilities, ses.account-shutdown,
+//     ses.account-probation) named enrichers/literals that already route
+//     through domain.HumanizeStatusPhrase or already use lowercase prose
+//     (cb_issue_enrichment.go's statusPhrase, glue_issue_enrichment.go's
+//     statePhrase, sfn_issue_enrichment.go's statusPhrase, ecr_issue_enrichment.go's
+//     "%d critical findings"/"%d high findings", catalog_cicd.go's
+//     "<N> critical, <M> high vulnerabilities", catalog_messaging.go's
+//     "sending paused by AWS (shutdown)" / "account under review (probation)")
+//     — all fixed by the same wave that landed the humanize call, never
+//     needing this allowlist at all.
+var styleGateAllowlist = map[string]string{}
 
 // extractTokens splits s on any character that is not a letter, digit, or
 // underscore, returning the non-empty remainder tokens. Mirrors how a human
