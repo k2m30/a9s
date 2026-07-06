@@ -119,12 +119,33 @@ func FetchAutoScalingGroupsPage(ctx context.Context, api ASGDescribeAutoScalingG
 			RawStruct: asg,
 		}
 
-		// emit canonical Findings for "Delete in progress".
-		// Empty status → healthy (no Finding). Structural signals (unhealthy
-		// instance count, in_service < min) are handled by the Color func.
-		if status == "Delete in progress" {
+		// emit canonical Findings for every non-healthy branch colorASG reads,
+		// mirroring colorASG's own precedence (status, then underprovisioned,
+		// then unhealthy count, then suspended processes) so the list Status
+		// cell / detail Attention block always explain the color instead of
+		// relying on a bare structural read.
+		switch {
+		case status == "Delete in progress":
 			r.Findings = []domain.Finding{{
 				Code: CodeASGStateDeleting, Phrase: "delete in progress",
+				Severity: domain.SevWarn, Source: "wave1",
+			}}
+		case asg.MinSize != nil && inServiceCount < int(*asg.MinSize):
+			r.Findings = []domain.Finding{{
+				Code:     CodeASGUnderprovisioned,
+				Phrase:   fmt.Sprintf("%d of %d instances in service", inServiceCount, *asg.MinSize),
+				Severity: domain.SevBroken, Source: "wave1",
+			}}
+		case unhealthyCount > 0:
+			r.Findings = []domain.Finding{{
+				Code:     CodeASGUnhealthyInstances,
+				Phrase:   fmt.Sprintf("%d unhealthy instance(s)", unhealthyCount),
+				Severity: domain.SevWarn, Source: "wave1",
+			}}
+		case suspendedProcesses != "" && (strings.Contains(suspendedProcesses, "Launch") ||
+			strings.Contains(suspendedProcesses, "Terminate") || strings.Contains(suspendedProcesses, "HealthCheck")):
+			r.Findings = []domain.Finding{{
+				Code: CodeASGScalingSuspended, Phrase: "scaling suspended",
 				Severity: domain.SevWarn, Source: "wave1",
 			}}
 		}

@@ -97,6 +97,9 @@ func FetchSecretsPage(ctx context.Context, api SecretsManagerListSecretsAPI, con
 			},
 			RawStruct: secret,
 		}
+		if len(r.Findings) == 0 {
+			r.Findings = secretStructuralFindings(rotationEnabled, lastChanged)
+		}
 
 		resources = append(resources, r)
 	}
@@ -133,6 +136,33 @@ func secretStateFindings(status string) []domain.Finding {
 		return []domain.Finding{{Code: CodeSecretStateRotationOverdue, Phrase: "rotation overdue", Severity: domain.SevWarn, Source: "wave1"}}
 	case "DORMANT":
 		return []domain.Finding{{Code: CodeSecretStateDormant, Phrase: "dormant", Severity: domain.SevWarn, Source: "wave1"}}
+	}
+	return nil
+}
+
+// secretStructuralFindings mirrors colorSecrets's own precedence (rotation
+// disabled, then stale value) for the branches that carry no status-derived
+// Finding, so the list Status cell / detail Attention block always explain
+// the Warning color.
+//
+// colorSecrets's "stale access" branch (last_accessed > 180d) is NOT
+// represented here: that condition always produces secretStateFindings'
+// DORMANT status first (same threshold, same source field), so this
+// function — only called when len(r.Findings)==0 — never observes it.
+func secretStructuralFindings(rotationEnabled, lastChanged string) []domain.Finding {
+	switch {
+	case rotationEnabled == "No":
+		return []domain.Finding{{
+			Code: CodeSecretRotationDisabled, Phrase: "rotation not enabled",
+			Severity: domain.SevWarn, Source: "wave1",
+		}}
+	case lastChanged != "":
+		if t, err := time.Parse("2006-01-02", lastChanged); err == nil && time.Since(t) > 365*24*time.Hour {
+			return []domain.Finding{{
+				Code: CodeSecretStaleValue, Phrase: "value unchanged in over 365 days",
+				Severity: domain.SevWarn, Source: "wave1",
+			}}
+		}
 	}
 	return nil
 }

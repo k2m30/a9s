@@ -175,6 +175,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		},
 		DetailEnrich: enrichPolicy,
 		Findings: []catalog.FindingDef{
+			{Code: iamPolicyCodeOrphanUnattached, Phrase: "unattached, no roles/users/groups use it", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: iamPolicyCodeAdminStar, Phrase: "admin star (CIS IAM.16)", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},

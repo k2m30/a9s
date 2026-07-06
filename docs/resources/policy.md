@@ -142,6 +142,7 @@ policy — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecycl
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source |
 | --- | --- | --- | --- |
+| iam-policy.orphan-unattached | unattached, no roles/users/groups use it | warn | wave1 |
 | iam-policy.admin-star | admin star (CIS IAM.16) | broken | wave2 |
 <!-- END GENERATED: findings -->
 

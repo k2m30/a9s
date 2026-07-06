@@ -293,6 +293,10 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Navigable: []domain.NavigableField{
 			{FieldPath: "TopicArn", TargetType: "sns"},
 		},
+		Findings: []catalog.FindingDef{
+			{Code: CodeSNSSubPendingConfirmation, Phrase: "endpoint has not confirmed the subscription", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeSNSSubDeleted, Phrase: "endpoint deleted", Severity: domain.SevDim, Source: "wave1"},
+		},
 	},
 	{
 		// Elastic Beanstalk lives in the MESSAGING category (not compute) so the

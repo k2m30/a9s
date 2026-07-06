@@ -19,9 +19,11 @@ package unit_test
 //            post-migration writes Fields["state"] + emits Finding for non-Active)
 //   eks:    ACTIVE→healthy, CREATING/UPDATING→SevWarn, FAILED→SevBroken,
 //           DELETING→no Finding (lifecycle terminal)
-//   asg:    ""→healthy, "Delete in progress"→SevWarn (only Status source)
-//           No SevBroken at the fetcher level; asg.Color uses structural fields
-//           (in_service_count, instances_unhealthy_count) for Broken — those remain.
+//   asg:    ""→healthy, "Delete in progress"→SevWarn (only Status source);
+//           in_service_count<min_size→SevBroken (CodeASGUnderprovisioned),
+//           unhealthy instances→SevWarn, suspended Launch/Terminate/HealthCheck
+//           processes→SevWarn — each of these branches now emits a wave1
+//           Finding mirroring colorASG's own structural read.
 //   eb:     Green→healthy, Yellow→SevWarn, Red→SevBroken, Grey→SevWarn
 //           (fetcher writes Status=health; post-migration emits Finding for non-Green)
 //   ebs:    in-use/available→healthy, creating→SevWarn, error→SevBroken,
@@ -68,7 +70,12 @@ func TestPR03b_LambdaCodes_ConstantsExist(t *testing.T) {
 }
 
 // TestPR03b_LambdaFetcher_ActiveEmitsNoFinding asserts that an Active lambda
-// function emits no Finding and no Status after migration.
+// function with a configured DLQ emits no Finding and no Status after
+// migration — Active state and deprecated-runtime are both healthy here, so
+// only the no-DLQ fallback branch could otherwise fire; giving the fixture a
+// DeadLetterConfig isolates the Active-state assertion from that unrelated
+// structural check (see TestPR03b_LambdaFetcher_NoDLQEmitsWarnFinding for
+// that branch on its own).
 func TestPR03b_LambdaFetcher_ActiveEmitsNoFinding(t *testing.T) {
 	mock := &pr03bLambdaMock{
 		fns: []lambdatypes.FunctionConfiguration{
@@ -76,6 +83,9 @@ func TestPR03b_LambdaFetcher_ActiveEmitsNoFinding(t *testing.T) {
 				FunctionName: aws.String("my-api-handler"),
 				Runtime:      lambdatypes.RuntimeNodejs20x,
 				State:        lambdatypes.StateActive,
+				DeadLetterConfig: &lambdatypes.DeadLetterConfig{
+					TargetArn: aws.String("arn:aws:sqs:us-east-1:123456789012:my-api-handler-dlq"),
+				},
 			},
 		},
 	}
@@ -94,6 +104,42 @@ func TestPR03b_LambdaFetcher_ActiveEmitsNoFinding(t *testing.T) {
 	}
 	if r.Fields["state"] != "Active" {
 		t.Errorf("Fields[\"state\"]: got %q, want %q", r.Fields["state"], "Active")
+	}
+}
+
+// TestPR03b_LambdaFetcher_NoDLQEmitsWarnFinding asserts that an Active,
+// non-deprecated-runtime lambda function with no DeadLetterConfig falls
+// through to the no-DLQ structural check and emits exactly one SevWarn
+// Finding with CodeLambdaNoDLQ.
+func TestPR03b_LambdaFetcher_NoDLQEmitsWarnFinding(t *testing.T) {
+	mock := &pr03bLambdaMock{
+		fns: []lambdatypes.FunctionConfiguration{
+			{
+				FunctionName: aws.String("no-dlq-handler"),
+				Runtime:      lambdatypes.RuntimeNodejs20x,
+				State:        lambdatypes.StateActive,
+			},
+		},
+	}
+
+	result, err := awsclient.FetchLambdaFunctionsPage(context.Background(), mock, "")
+	if err != nil {
+		t.Fatalf("FetchLambdaFunctionsPage: unexpected error: %v", err)
+	}
+	if len(result.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
+	}
+	r := result.Resources[0]
+
+	if len(r.Findings) != 1 {
+		t.Fatalf("Findings: got %d, want 1 (CodeLambdaNoDLQ)", len(r.Findings))
+	}
+	f := r.Findings[0]
+	if f.Code != awsclient.CodeLambdaNoDLQ {
+		t.Errorf("Findings[0].Code: got %q, want %q", f.Code, awsclient.CodeLambdaNoDLQ)
+	}
+	if f.Severity != domain.SevWarn {
+		t.Errorf("Findings[0].Severity: got %v, want %v (SevWarn)", f.Severity, domain.SevWarn)
 	}
 }
 
@@ -283,7 +329,16 @@ func TestPR03b_ASGFetcher_HealthyEmitsNoFinding(t *testing.T) {
 				MinSize:              aws.Int32(2),
 				MaxSize:              aws.Int32(10),
 				DesiredCapacity:      aws.Int32(4),
-				// Status is nil → healthy (no "Delete in progress")
+				// Status is nil → healthy (no "Delete in progress").
+				// 4 healthy InService instances so in_service_count(4) >= min_size(2)
+				// and instances_unhealthy_count == 0 — otherwise the underprovisioned
+				// branch fires by construction (Instances defaults to empty).
+				Instances: []autoscalingtypes.Instance{
+					{InstanceId: aws.String("i-0aaaaaaaaaaaaaaaa"), LifecycleState: autoscalingtypes.LifecycleStateInService, HealthStatus: aws.String("Healthy")},
+					{InstanceId: aws.String("i-0bbbbbbbbbbbbbbbb"), LifecycleState: autoscalingtypes.LifecycleStateInService, HealthStatus: aws.String("Healthy")},
+					{InstanceId: aws.String("i-0cccccccccccccccc"), LifecycleState: autoscalingtypes.LifecycleStateInService, HealthStatus: aws.String("Healthy")},
+					{InstanceId: aws.String("i-0dddddddddddddddd"), LifecycleState: autoscalingtypes.LifecycleStateInService, HealthStatus: aws.String("Healthy")},
+				},
 			},
 		},
 	}
@@ -305,10 +360,10 @@ func TestPR03b_ASGFetcher_HealthyEmitsNoFinding(t *testing.T) {
 // TestPR03b_ASGFetcher_DeletingEmitsWarnFinding asserts that an ASG with
 // "Delete in progress" status emits one SevWarn Finding with CodeASGStateDeleting.
 //
-// NOTE: ASG has no SevBroken lifecycle state at the fetcher level. The asg.Color
-// func derives Broken from structural fields (in_service_count < min_size) that
-// are computed by the fetcher separately — those remain structural; only the
-// "Delete in progress" string status is migrated to a Finding.
+// NOTE: "Delete in progress" takes precedence over the underprovisioned check
+// in the fetcher's switch (see internal/aws/asg.go), so a deleting ASG with
+// MinSize/DesiredCapacity both 0 emits only CodeASGStateDeleting, not
+// CodeASGUnderprovisioned.
 func TestPR03b_ASGFetcher_DeletingEmitsWarnFinding(t *testing.T) {
 	mock := &pr03bASGMock{
 		asgs: []autoscalingtypes.AutoScalingGroup{
@@ -1112,12 +1167,12 @@ func TestPR03b_EBFetcher_DoesNotEmitHealthAsWave1Finding(t *testing.T) {
 // A1 — Lambda Inactive emits NO Finding
 // =============================================================================
 
-// TestPR03b_LambdaFetcher_InactiveEmitsNoFinding pins that Lambda Inactive
-// state is treated as lifecycle-class (ColorDim) — NOT promoted to a wave1
-// Finding. Lambda Inactive functions are non-broken and excluded from the
-// issue badge / ctrl+z filter; emitting a SevWarn Finding would reverse
-// that intent and make the legacy "Inactive": ColorDim case unreachable.
-func TestPR03b_LambdaFetcher_InactiveEmitsNoFinding(t *testing.T) {
+// TestPR03b_LambdaFetcher_InactiveEmitsDimFinding pins that Lambda Inactive
+// state is treated as lifecycle-class: it is surfaced as a SevDim wave1
+// Finding (CodeLambdaInactive), not SevWarn/SevBroken. SevDim keeps it out
+// of the issue badge / ctrl+z filter (those only count SevBroken) while
+// still making the state visible on the list/Attention surfaces.
+func TestPR03b_LambdaFetcher_InactiveEmitsDimFinding(t *testing.T) {
 	mock := &pr03bLambdaMock{
 		fns: []lambdatypes.FunctionConfiguration{
 			{
@@ -1138,9 +1193,10 @@ func TestPR03b_LambdaFetcher_InactiveEmitsNoFinding(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	// Inactive is lifecycle-class — NOT an actionable issue.
-	if len(r.Findings) != 0 {
-		t.Errorf("Inactive function: Findings = %d, want 0 (Inactive is lifecycle-class, not an issue)", len(r.Findings))
+	// Inactive is lifecycle-class, but is now surfaced as a SevDim wave1
+	// Finding (CodeLambdaInactive) so the list/Attention surfaces can show it.
+	if len(r.Findings) != 1 {
+		t.Errorf("Inactive function: Findings = %d, want 1 (CodeLambdaInactive, SevDim)", len(r.Findings))
 	}
 	// State field must still be written so the Color func can return ColorDim.
 	if r.Fields["state"] != "Inactive" {

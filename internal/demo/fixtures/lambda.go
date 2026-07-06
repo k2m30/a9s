@@ -376,6 +376,35 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 		LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
 	})
 
+	// Issue: State=Failed with LastUpdateStatus=Successful → Broken via the
+	// lifecycle-state branch alone (lambda.state.failed). legacy-data-sync
+	// above hits the higher-precedence last-update-failed branch instead
+	// (LastUpdateStatus=Failed on that fixture), so this fixture is needed to
+	// demonstrate the State=Failed branch in isolation.
+	fns = append(fns, lambdatypes.FunctionConfiguration{
+		FunctionName:     aws.String("lambda-runtime-crash"),
+		FunctionArn:      aws.String("arn:aws:lambda:us-east-1:123456789012:function:lambda-runtime-crash"),
+		Role:             aws.String(lambdaProdRoleARN),
+		Runtime:          lambdatypes.RuntimePython312,
+		MemorySize:       aws.Int32(256),
+		Timeout:          aws.Int32(30),
+		Handler:          aws.String("handler.lambda_handler"),
+		Description:      aws.String("Function entered Failed state after an unrecoverable internal error"),
+		LastModified:     aws.String("2026-04-02T11:20:00+00:00"),
+		CodeSize:         1048576,
+		State:            lambdatypes.StateFailed,
+		StateReason:      aws.String("Function is unable to service requests due to an internal error"),
+		StateReasonCode:  lambdatypes.StateReasonCodeInternalError,
+		PackageType:      lambdatypes.PackageTypeZip,
+		Architectures:    []lambdatypes.Architecture{lambdatypes.ArchitectureX8664},
+		EphemeralStorage: &lambdatypes.EphemeralStorage{Size: aws.Int32(512)},
+		LoggingConfig: &lambdatypes.LoggingConfig{
+			LogGroup:  aws.String("/aws/lambda/lambda-runtime-crash"),
+			LogFormat: lambdatypes.LogFormatText,
+		},
+		LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
+	})
+
 	// Add one container-image function to demonstrate ECR→Lambda relationship.
 	// checkECRLambda matches any lambda with PackageType=Image as potentially using an ECR repo.
 	fns = append(fns, lambdatypes.FunctionConfiguration{

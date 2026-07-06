@@ -240,6 +240,33 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 			CreatedDate:      aws.Time(time.Date(2024, 3, 1, 8, 0, 0, 0, time.UTC)),
 			DeletedDate:      aws.Time(time.Date(2026, 4, 15, 12, 0, 0, 0, time.UTC)),
 		},
+		// Issue: RotationEnabled=true (clears the rotation-disabled branch),
+		// LastAccessedDate >180 days ago → Warning, DORMANT status
+		// (secrets.state.dormant — the >180d-stale-access condition always
+		// resolves to DORMANT, never the separate structural branch).
+		{
+			Name:             aws.String("prod/legacy/archive-decrypt-key"),
+			ARN:              aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/legacy/archive-decrypt-key-LmNoPq"),
+			Description:      aws.String("Decryption key for legacy archive exports, rarely used"),
+			LastAccessedDate: aws.Time(time.Date(2025, 9, 1, 0, 0, 0, 0, time.UTC)),
+			LastChangedDate:  aws.Time(time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)),
+			RotationEnabled:  aws.Bool(true),
+			RotationRules:    &smtypes.RotationRulesType{AutomaticallyAfterDays: aws.Int64(90)},
+			CreatedDate:      aws.Time(time.Date(2024, 6, 1, 9, 0, 0, 0, time.UTC)),
+		},
+		// Issue: RotationEnabled=true and recently accessed (clears the
+		// rotation-disabled and stale-access branches), LastChangedDate >365
+		// days ago → Warning (secrets.value.stale).
+		{
+			Name:             aws.String("prod/app/long-lived-signing-key"),
+			ARN:              aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/app/long-lived-signing-key-RsTuVw"),
+			Description:      aws.String("Message-signing key, actively read but never rotated"),
+			LastAccessedDate: aws.Time(time.Date(2026, 4, 25, 0, 0, 0, 0, time.UTC)),
+			LastChangedDate:  aws.Time(time.Date(2024, 12, 1, 0, 0, 0, 0, time.UTC)),
+			RotationEnabled:  aws.Bool(true),
+			RotationRules:    &smtypes.RotationRulesType{AutomaticallyAfterDays: aws.Int64(180)},
+			CreatedDate:      aws.Time(time.Date(2023, 11, 1, 9, 0, 0, 0, time.UTC)),
+		},
 	}
 
 	for i := range 18 {

@@ -8,8 +8,18 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
+
+// rtbCodeBlackholeRoute is the canonical FindingCode for a route table with
+// at least one blackhole route (target deleted, e.g. a NAT gateway or peering
+// connection that no longer exists).
+const rtbCodeBlackholeRoute domain.FindingCode = "rtb.route.blackhole"
+
+// rtbCodeOrphanUnassociated is the canonical FindingCode for a non-main route
+// table with zero subnet associations — unreachable, likely orphaned.
+const rtbCodeOrphanUnassociated domain.FindingCode = "rtb.orphan-unassociated"
 
 // FetchRouteTables calls the EC2 DescribeRouteTables API and converts the
 // response into a slice of generic Resource structs.
@@ -100,6 +110,21 @@ func FetchRouteTablesPage(ctx context.Context, api EC2DescribeRouteTablesAPI, co
 				"is_main":                isMain,
 			},
 			RawStruct: rtb,
+		}
+
+		// mirrors colorRTB's own precedence: blackhole routes win first, then
+		// an unassociated non-main table.
+		switch {
+		case blackholeCount > 0:
+			r.Findings = []domain.Finding{{
+				Code: rtbCodeBlackholeRoute, Phrase: "blackhole route (target deleted)",
+				Severity: domain.SevBroken, Source: "wave1",
+			}}
+		case len(rtb.Associations) == 0 && isMain != "true":
+			r.Findings = []domain.Finding{{
+				Code: rtbCodeOrphanUnassociated, Phrase: "no subnet associations",
+				Severity: domain.SevWarn, Source: "wave1",
+			}}
 		}
 
 		resources = append(resources, r)

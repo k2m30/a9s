@@ -563,7 +563,10 @@ func ctEventFindings(status string) []domain.Finding {
 	case "ct-attention":
 		return []domain.Finding{{Code: CodeCTEventAttention, Phrase: "attention", Severity: domain.SevWarn, Source: "wave1"}}
 	}
-	return nil
+	// ct-info (or any unrecognized tier) — colorCTEvents has no healthy
+	// bucket for events, so the routine/no-signal tier still needs a
+	// Finding to explain its Dim color on the list/detail surfaces.
+	return []domain.Finding{{Code: CodeCTEventInfo, Phrase: "routine event", Severity: domain.SevDim, Source: "wave1"}}
 }
 
 // computeCTStatus implements the §1.2 severity ladder.

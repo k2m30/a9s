@@ -11,8 +11,18 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
+
+// sgCodeWideOpen is the canonical FindingCode for a security group with an
+// all-protocols (-1) ingress rule open to 0.0.0.0/0 or ::/0.
+const sgCodeWideOpen domain.FindingCode = "sg.ingress.wide-open"
+
+// sgCodeDangerousPorts is the canonical FindingCode for a security group
+// exposing one or more sensitive ports (SSH, RDP, database, etc.) to the
+// public internet.
+const sgCodeDangerousPorts domain.FindingCode = "sg.ingress.dangerous-ports"
 
 // sensitivePorts is the set of ports that are considered security-sensitive
 // when exposed to the internet (0.0.0.0/0 or ::/0).
@@ -136,6 +146,27 @@ func computeSGRiskFields(perms []ec2types.IpPermission) (string, string, string)
 	return strconv.Itoa(dangerousCount), wideOpenStr, riskSummary
 }
 
+// sgRiskFindings mirrors colorSG's own precedence (wide-open first, then
+// dangerous ports) so the list Status cell / detail Attention block always
+// explain the Broken color with a jargon-free cause instead of the raw
+// risk_summary token (WIDE_OPEN / PORTS:...).
+func sgRiskFindings(wideOpen, dangerousOpenCount, riskSummary string) []domain.Finding {
+	switch {
+	case wideOpen == "true":
+		return []domain.Finding{{
+			Code: sgCodeWideOpen, Phrase: "all ports open to 0.0.0.0/0",
+			Severity: domain.SevBroken, Source: "wave1",
+		}}
+	case dangerousOpenCount != "" && dangerousOpenCount != "0":
+		ports := strings.TrimPrefix(riskSummary, "PORTS:")
+		return []domain.Finding{{
+			Code: sgCodeDangerousPorts, Phrase: "ports " + ports + " open to 0.0.0.0/0",
+			Severity: domain.SevBroken, Source: "wave1",
+		}}
+	}
+	return nil
+}
+
 // FetchSecurityGroups calls the EC2 DescribeSecurityGroups API and returns all
 // pages of security groups. Used by tests; the production path uses the per-page fetcher for pagination.
 func FetchSecurityGroups(ctx context.Context, api EC2DescribeSecurityGroupsAPI) ([]resource.Resource, error) {
@@ -212,6 +243,7 @@ func FetchSecurityGroupsPage(ctx context.Context, api EC2DescribeSecurityGroupsA
 				"wide_open":            wideOpen,
 				"risk_summary":         riskSummary,
 			},
+			Findings:  sgRiskFindings(wideOpen, dangerousCount, riskSummary),
 			RawStruct: sg,
 		}
 

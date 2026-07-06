@@ -35,6 +35,14 @@ var deprecatedLambdaRuntimes = map[string]struct{}{ //nolint:gochecknoglobals //
 	"go1.x":         {},
 }
 
+// isDeprecatedLambdaRuntime reports whether runtime is in the AWS
+// end-of-life set. Shared by colorLambda and the lambda fetcher's Wave-1
+// Finding emission so both read the same catalog.
+func isDeprecatedLambdaRuntime(runtime string) bool {
+	_, ok := deprecatedLambdaRuntimes[runtime]
+	return ok
+}
+
 func colorEC2(r domain.Resource) domain.Color {
 	for i := range r.Findings {
 		if r.Findings[i].Source == "wave1" {
@@ -767,8 +775,12 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{FieldPath: "VpcConfig.SecurityGroupIds", TargetType: "sg"},
 		},
 		Findings: []catalog.FindingDef{
+			{Code: CodeLambdaLastUpdateFailed, Phrase: "last update failed to apply", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeLambdaDeprecatedRuntime, Phrase: "runtime is end-of-life", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeLambdaStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeLambdaStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeLambdaInactive, Phrase: "inactive, evicted after extended idle time", Severity: domain.SevDim, Source: "wave1"},
+			{Code: CodeLambdaNoDLQ, Phrase: "no dead-letter queue configured", Severity: domain.SevWarn, Source: "wave1"},
 		},
 	},
 	{
@@ -823,6 +835,9 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		},
 		Findings: []catalog.FindingDef{
 			{Code: CodeASGStateDeleting, Phrase: "delete in progress", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeASGUnderprovisioned, Phrase: "<N> of <M> instances in service", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeASGUnhealthyInstances, Phrase: "<N> unhealthy instance(s)", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeASGScalingSuspended, Phrase: "scaling suspended", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: asgCodeScalingActivityFailed, Phrase: "latest scaling activity failed", Severity: domain.SevBroken, Source: "wave2"},
 		},
 	},

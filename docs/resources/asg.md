@@ -198,6 +198,9 @@ asg — COMPUTE. Lifecycle key: `status`.
 | Code | Phrase | Severity | Source |
 | --- | --- | --- | --- |
 | asg.state.deleting | delete in progress | warn | wave1 |
+| asg.instances.underprovisioned | <N> of <M> instances in service | broken | wave1 |
+| asg.instances.unhealthy | <N> unhealthy instance(s) | warn | wave1 |
+| asg.scaling.suspended | scaling suspended | warn | wave1 |
 | asg.scaling-activity-failed | latest scaling activity failed | broken | wave2 |
 <!-- END GENERATED: findings -->
 

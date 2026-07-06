@@ -14,4 +14,19 @@ const (
 	// Severity: SevBroken.
 	CodeLambdaStateFailed domain.FindingCode = "lambda.state.failed"
 
+	// CodeLambdaNoDLQ — function has no dead-letter queue configured, so
+	// failed async invocations are silently dropped. Severity: SevWarn.
+	CodeLambdaNoDLQ domain.FindingCode = "lambda.dlq.missing"
+
+	// CodeLambdaDeprecatedRuntime — function uses an AWS end-of-lifed
+	// runtime identifier. Severity: SevBroken.
+	CodeLambdaDeprecatedRuntime domain.FindingCode = "lambda.runtime.deprecated"
+
+	// CodeLambdaLastUpdateFailed — the function's last code/config update
+	// failed to apply. Severity: SevBroken.
+	CodeLambdaLastUpdateFailed domain.FindingCode = "lambda.last-update.failed"
+
+	// CodeLambdaInactive — function has been evicted from memory after
+	// extended idle time. Severity: SevDim (lifecycle, not an issue).
+	CodeLambdaInactive domain.FindingCode = "lambda.state.inactive"
 )

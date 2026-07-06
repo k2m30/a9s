@@ -7,8 +7,17 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
+
+// CodeSNSSubPendingConfirmation is the canonical FindingCode for a
+// subscription that has not yet confirmed its endpoint.
+const CodeSNSSubPendingConfirmation domain.FindingCode = "sns-sub.state.pending-confirmation"
+
+// CodeSNSSubDeleted is the canonical FindingCode for a subscription whose
+// endpoint has been deleted.
+const CodeSNSSubDeleted domain.FindingCode = "sns-sub.state.deleted"
 
 // FetchSNSSubscriptions calls the SNS ListSubscriptions API and converts the
 // response into a slice of generic Resource structs.
@@ -79,6 +88,7 @@ func FetchSNSSubscriptionsPage(ctx context.Context, api SNSListSubscriptionsAPI,
 				"endpoint":         endpoint,
 				"subscription_arn": subscriptionArn,
 			},
+			Findings:  snsSubStateFindings(subscriptionArn),
 			RawStruct: sub,
 		}
 
@@ -111,4 +121,23 @@ func FetchSNSSubscriptionsPage(ctx context.Context, api SNSListSubscriptionsAPI,
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// snsSubStateFindings mirrors colorSNSSub's own precedence: AWS returns the
+// literal strings "PendingConfirmation" / "Deleted" AS the SubscriptionArn
+// value for subscriptions in those states.
+func snsSubStateFindings(subscriptionArn string) []domain.Finding {
+	switch subscriptionArn {
+	case "PendingConfirmation":
+		return []domain.Finding{{
+			Code: CodeSNSSubPendingConfirmation, Phrase: "endpoint has not confirmed the subscription",
+			Severity: domain.SevWarn, Source: "wave1",
+		}}
+	case "Deleted":
+		return []domain.Finding{{
+			Code: CodeSNSSubDeleted, Phrase: "endpoint deleted",
+			Severity: domain.SevDim, Source: "wave1",
+		}}
+	}
+	return nil
 }

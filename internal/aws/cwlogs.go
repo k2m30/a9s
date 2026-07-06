@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
@@ -15,6 +16,15 @@ import (
 // with no retention policy (RetentionInDays == nil), meaning events are kept
 // forever and billed indefinitely. docs/resources/logs.md §4.
 const logsCodeRetentionNeverExpire domain.FindingCode = "logs.retention-never-expire"
+
+// logsCodeStaleEmpty is the canonical FindingCode for a log group that is
+// empty (StoredBytes == 0) and was created more than 90 days ago — likely an
+// orphaned log group no application still writes to.
+const logsCodeStaleEmpty domain.FindingCode = "logs.stale-empty"
+
+// logsStaleEmptyAge is the age threshold colorLogs uses to flag an empty log
+// group as stale.
+const logsStaleEmptyAge = 90 * 24 * time.Hour
 
 // FetchCloudWatchLogGroups calls the CloudWatchLogs DescribeLogGroups API and
 // returns all pages of log groups. Used by tests; the production path uses the per-page fetcher for pagination.
@@ -90,14 +100,23 @@ func FetchCloudWatchLogGroupsPage(ctx context.Context, api CWLogsDescribeLogGrou
 			RawStruct: lg,
 		}
 
-		// Wave-1 classification: RetentionInDays == nil means the log group
-		// never expires — events are kept forever and billed indefinitely
-		// (docs/resources/logs.md §4).
-		if lg.RetentionInDays == nil {
+		// Wave-1 classification mirrors colorLogs's own precedence:
+		// RetentionInDays == nil (never expires, billed indefinitely) wins
+		// first; only when retention IS set do we flag an empty log group
+		// that has sat unwritten for 90+ days (likely orphaned).
+		switch {
+		case lg.RetentionInDays == nil:
 			r.Findings = []domain.Finding{{
 				Code:     logsCodeRetentionNeverExpire,
 				Phrase:   "retention: never expire",
 				Detail:   "No retention policy set — events kept forever, billed indefinitely.",
+				Severity: domain.SevWarn,
+				Source:   "wave1",
+			}}
+		case lg.StoredBytes != nil && *lg.StoredBytes == 0 && lg.CreationTime != nil && time.Since(time.UnixMilli(*lg.CreationTime)) > logsStaleEmptyAge:
+			r.Findings = []domain.Finding{{
+				Code:     logsCodeStaleEmpty,
+				Phrase:   "empty, created over 90 days ago",
 				Severity: domain.SevWarn,
 				Source:   "wave1",
 			}}

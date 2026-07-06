@@ -8,8 +8,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
+
+// r53CodeUnusedZone is the canonical FindingCode for a hosted zone with two
+// or fewer record sets (only the default NS+SOA remain) — likely unused.
+const r53CodeUnusedZone domain.FindingCode = "r53.zone.unused"
 
 // FetchHostedZones calls the Route53 ListHostedZones API and converts
 // the response into a slice of generic Resource structs.
@@ -94,6 +99,15 @@ func FetchHostedZonesPage(ctx context.Context, api Route53ListHostedZonesAPI, co
 				"s3website_alias_names": s3WebsiteAliasNames,
 			},
 			RawStruct: zone,
+		}
+
+		// mirrors r53Color: two or fewer records means only the default
+		// NS+SOA remain — likely an unused zone.
+		if zone.ResourceRecordSetCount != nil && *zone.ResourceRecordSetCount <= 2 {
+			r.Findings = []domain.Finding{{
+				Code: r53CodeUnusedZone, Phrase: "only default NS/SOA records remain",
+				Severity: domain.SevWarn, Source: "wave1",
+			}}
 		}
 
 		resources = append(resources, r)

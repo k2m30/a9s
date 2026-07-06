@@ -316,6 +316,10 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Navigable: []domain.NavigableField{
 			{FieldPath: "VpcId", TargetType: "vpc"},
 		},
+		Findings: []catalog.FindingDef{
+			{Code: sgCodeWideOpen, Phrase: "all ports open to 0.0.0.0/0", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: sgCodeDangerousPorts, Phrase: "ports <list> open to 0.0.0.0/0", Severity: domain.SevBroken, Source: "wave1"},
+		},
 	},
 	{
 		Name:          "VPCs",
@@ -449,6 +453,10 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "Routes.NetworkInterfaceId", TargetType: "eni"},
 			{FieldPath: "Routes.TransitGatewayId", TargetType: "tgw"},
 			{FieldPath: "Routes.VpcPeeringConnectionId", TargetType: "vpc"},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: rtbCodeBlackholeRoute, Phrase: "blackhole route (target deleted)", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: rtbCodeOrphanUnassociated, Phrase: "no subnet associations", Severity: domain.SevWarn, Source: "wave1"},
 		},
 	},
 	{

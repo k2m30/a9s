@@ -121,6 +121,8 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{Code: CodeSecretStateDeleted, Phrase: "deleted", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeSecretStateRotationOverdue, Phrase: "rotation overdue", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: CodeSecretStateDormant, Phrase: "dormant", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeSecretRotationDisabled, Phrase: "rotation not enabled", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeSecretStaleValue, Phrase: "value unchanged in over 365 days", Severity: domain.SevWarn, Source: "wave1"},
 		},
 	},
 	{
@@ -158,6 +160,10 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		},
 		Navigable: []domain.NavigableField{
 			{FieldPath: "KeyId", TargetType: "kms"},
+		},
+		Findings: []catalog.FindingDef{
+			{Code: ssmCodePlaintextSensitive, Phrase: "plaintext value looks like a credential", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: ssmCodeStaleValue, Phrase: "not modified in over 365 days", Severity: domain.SevWarn, Source: "wave1"},
 		},
 	},
 	{

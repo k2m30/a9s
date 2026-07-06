@@ -818,21 +818,23 @@ func (m *pr03dTGWMock) DescribeTransitGateways(
 }
 
 // =============================================================================
-// RTB (Route Table) — special case: drop Status write, no Findings emitted
+// RTB (Route Table) — special case: drop Status write, structural Findings
 // =============================================================================
 
-// TestPR03d_RTBFetcher_NeverEmitsFindingsOrStatus asserts that the route table
-// fetcher NEVER writes Status (isMain is structural metadata, not a health
-// state) and NEVER emits Findings (rtb's Color is structural: blackhole routes
-// and unassociated non-main tables). Fields["is_main"] must still be present.
-//
-// Migration: remove `Status: isMain` from the Resource literal in rtb.go.
-// Findings: none — rtb has no lifecycle findings to emit.
-func TestPR03d_RTBFetcher_NeverEmitsFindingsOrStatus(t *testing.T) {
+// TestPR03d_RTBFetcher_StructuralCasesEmitMatchingFindings asserts that the
+// route table fetcher NEVER writes Status (isMain is structural metadata, not
+// a health state) and emits a wave1 Finding mirroring colorRTB's own
+// structural precedence: blackhole routes win first, then an unassociated
+// non-main table gets rtbCodeOrphanUnassociated; a main table or a non-main
+// table with an association stays healthy. Fields["is_main"] must still be
+// present in every case.
+func TestPR03d_RTBFetcher_StructuralCasesEmitMatchingFindings(t *testing.T) {
 	cases := []struct {
-		name    string
-		isMain  bool
-		assocs  []ec2types.RouteTableAssociation
+		name         string
+		isMain       bool
+		assocs       []ec2types.RouteTableAssociation
+		wantFindings int
+		wantCode     domain.FindingCode
 	}{
 		{
 			name:   "main route table",
@@ -840,6 +842,7 @@ func TestPR03d_RTBFetcher_NeverEmitsFindingsOrStatus(t *testing.T) {
 			assocs: []ec2types.RouteTableAssociation{
 				{Main: aws.Bool(true)},
 			},
+			wantFindings: 0,
 		},
 		{
 			name:   "non-main route table with subnet association",
@@ -847,11 +850,14 @@ func TestPR03d_RTBFetcher_NeverEmitsFindingsOrStatus(t *testing.T) {
 			assocs: []ec2types.RouteTableAssociation{
 				{Main: aws.Bool(false), SubnetId: aws.String("subnet-01234abcd")},
 			},
+			wantFindings: 0,
 		},
 		{
-			name:   "non-main unassociated route table",
-			isMain: false,
-			assocs: []ec2types.RouteTableAssociation{},
+			name:         "non-main unassociated route table",
+			isMain:       false,
+			assocs:       []ec2types.RouteTableAssociation{},
+			wantFindings: 1,
+			wantCode:     "rtb.orphan-unassociated",
 		},
 	}
 
@@ -882,10 +888,11 @@ func TestPR03d_RTBFetcher_NeverEmitsFindingsOrStatus(t *testing.T) {
 			}
 			r := result.Resources[0]
 
-			// Status must be empty — "is_main" is NOT a lifecycle state.
-			// No Findings — rtb has no lifecycle states to emit.
-			if len(r.Findings) != 0 {
-				t.Errorf("Findings: got %d, want 0 (rtb emits no wave1 Findings)", len(r.Findings))
+			if len(r.Findings) != tc.wantFindings {
+				t.Fatalf("Findings: got %d, want %d", len(r.Findings), tc.wantFindings)
+			}
+			if tc.wantFindings > 0 && r.Findings[0].Code != tc.wantCode {
+				t.Errorf("Findings[0].Code: got %q, want %q", r.Findings[0].Code, tc.wantCode)
 			}
 			// Fields["is_main"] must still be present for Color's structural check.
 			if got := r.Fields["is_main"]; got != expectedIsMain {

@@ -128,6 +128,10 @@ ssm — SECRETS & CONFIG. Lifecycle key: none (the list API returns no lifecycle
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
+| Code | Phrase | Severity | Source |
+| --- | --- | --- | --- |
+| ssm.value.plaintext-sensitive | plaintext value looks like a credential | broken | wave1 |
+| ssm.value.stale | not modified in over 365 days | warn | wave1 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

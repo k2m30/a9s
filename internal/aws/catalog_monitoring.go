@@ -169,6 +169,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 		Findings: []catalog.FindingDef{
 			{Code: logsCodeRetentionNeverExpire, Phrase: "retention: never expire", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: logsCodeStaleEmpty, Phrase: "empty, created over 90 days ago", Severity: domain.SevWarn, Source: "wave1"},
 			{Code: logsCodeMissingMetricFilters, Phrase: "audit log group missing metric filters", Severity: domain.SevWarn, Source: "wave2"},
 		},
 	},
@@ -285,6 +286,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Findings: []catalog.FindingDef{
 			{Code: CodeCTEventDanger, Phrase: "danger", Severity: domain.SevBroken, Source: "wave1"},
 			{Code: CodeCTEventAttention, Phrase: "attention", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeCTEventInfo, Phrase: "routine event", Severity: domain.SevDim, Source: "wave1"},
 		},
 	},
 }

@@ -8,8 +8,26 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
+
+// iamPolicyCodeOrphanUnattached is the canonical FindingCode for a
+// customer-managed policy that is attachable but currently attached to
+// nothing (AttachmentCount == 0) — dead permission surface worth pruning.
+const iamPolicyCodeOrphanUnattached domain.FindingCode = "iam-policy.orphan-unattached"
+
+// orphanUnattachedPolicyFinding returns the wave1 Finding for an attachable
+// policy with zero attachments, or nil when the policy doesn't match.
+func orphanUnattachedPolicyFinding(attachmentCount string, isAttachable bool) []domain.Finding {
+	if attachmentCount == "0" && isAttachable {
+		return []domain.Finding{{
+			Code: iamPolicyCodeOrphanUnattached, Phrase: "unattached, no roles/users/groups use it",
+			Severity: domain.SevWarn, Source: "wave1",
+		}}
+	}
+	return nil
+}
 
 // iamPolicyStore is the subset of session.PolicyStore consumed by this file.
 // Defined locally to avoid an import cycle (internal/session imports internal/aws).
@@ -98,6 +116,7 @@ func FetchIAMPoliciesPage(ctx context.Context, api IAMListPoliciesAPI, continuat
 				"path":             path,
 				"create_date":      createDate,
 			},
+			Findings:  orphanUnattachedPolicyFinding(attachmentCount, policy.IsAttachable),
 			RawStruct: policy,
 		}
 
@@ -324,6 +343,7 @@ func buildAllManagedPolicies(ctx context.Context, api IAMListPoliciesAPI, store 
 					"path":             path,
 					"create_date":      createDate,
 				},
+				Findings:  orphanUnattachedPolicyFinding(attachmentCount, p.IsAttachable),
 				RawStruct: p,
 			}
 			// Index by PolicyName AND by ARN so callers that emit ARN-based IDs

@@ -228,7 +228,6 @@ var knownStateCoverageGaps = map[string]bool{
 	"redshift:redshift.warn.renaming":                  true,
 	"redshift:redshift.warn.deleting":                  true,
 	"secrets:secrets.state.rotation_overdue":           true,
-	"secrets:secrets.state.dormant":                    true,
 	"ses:ses.account-shutdown":                         true,
 	"ses:ses.account-probation":                        true,
 	"ses:ses.quota-high":                               true,

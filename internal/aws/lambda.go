@@ -130,25 +130,41 @@ func FetchLambdaFunctionsPageWithEventSources(
 			RawStruct: fn,
 		}
 
-		// emit canonical Findings for non-healthy lifecycle states.
-		// Active is healthy — no Finding. Inactive is lifecycle-class (evicted from
-		// memory after 14 days idle) — no Finding; Color func returns ColorDim via the
-		// structural Inactive case in Fields["state"]. Pending and Failed are
-		// non-healthy → SevWarn / SevBroken.
-		switch fn.State {
-		case lambdatypes.StatePending:
+		// emit canonical Findings for every non-healthy branch colorLambda
+		// reads, mirroring its own precedence: last-update failure, then
+		// deprecated runtime, then lifecycle state, then no-DLQ fallback.
+		switch {
+		case fn.LastUpdateStatus == lambdatypes.LastUpdateStatusFailed:
+			r.Findings = []domain.Finding{{
+				Code: CodeLambdaLastUpdateFailed, Phrase: "last update failed to apply",
+				Severity: domain.SevBroken, Source: "wave1",
+			}}
+		case isDeprecatedLambdaRuntime(runtime):
+			r.Findings = []domain.Finding{{
+				Code: CodeLambdaDeprecatedRuntime, Phrase: "runtime is end-of-life",
+				Severity: domain.SevBroken, Source: "wave1",
+			}}
+		case fn.State == lambdatypes.StatePending:
 			r.Findings = []domain.Finding{{
 				Code: CodeLambdaStatePending, Phrase: "pending",
 				Severity: domain.SevWarn, Source: "wave1",
 			}}
-		case lambdatypes.StateFailed:
+		case fn.State == lambdatypes.StateFailed:
 			r.Findings = []domain.Finding{{
 				Code: CodeLambdaStateFailed, Phrase: "failed",
 				Severity: domain.SevBroken, Source: "wave1",
 			}}
+		case fn.State == lambdatypes.StateInactive:
+			r.Findings = []domain.Finding{{
+				Code: CodeLambdaInactive, Phrase: "inactive, evicted after extended idle time",
+				Severity: domain.SevDim, Source: "wave1",
+			}}
+		case dlqTargetARN == "":
+			r.Findings = []domain.Finding{{
+				Code: CodeLambdaNoDLQ, Phrase: "no dead-letter queue configured",
+				Severity: domain.SevWarn, Source: "wave1",
+			}}
 		}
-		// Inactive is lifecycle-class — no Finding; Color func returns ColorDim
-		// via the structural fallback reading Fields["state"] == "Inactive".
 
 		resources = append(resources, r)
 	}

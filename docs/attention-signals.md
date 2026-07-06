@@ -204,9 +204,16 @@ resource-list frame title. The frame-title rules:
 | ecs-task | ecs-task.state.stopping | stopping | warn | wave1 |
 | ecs-task | ecs-task.state.deprovisioning | deprovisioning | warn | wave1 |
 | ecs-task | ecs-task.task-failed | <stop code or container> failed | broken | wave2 |
+| lambda | lambda.last-update.failed | last update failed to apply | broken | wave1 |
+| lambda | lambda.runtime.deprecated | runtime is end-of-life | broken | wave1 |
 | lambda | lambda.state.pending | pending | warn | wave1 |
 | lambda | lambda.state.failed | failed | broken | wave1 |
+| lambda | lambda.state.inactive | inactive, evicted after extended idle time | dim | wave1 |
+| lambda | lambda.dlq.missing | no dead-letter queue configured | warn | wave1 |
 | asg | asg.state.deleting | delete in progress | warn | wave1 |
+| asg | asg.instances.underprovisioned | <N> of <M> instances in service | broken | wave1 |
+| asg | asg.instances.unhealthy | <N> unhealthy instance(s) | warn | wave1 |
+| asg | asg.scaling.suspended | scaling suspended | warn | wave1 |
 | asg | asg.scaling-activity-failed | latest scaling activity failed | broken | wave2 |
 | ebs | ebs.state.creating | creating | warn | wave1 |
 | ebs | ebs.state.error | error | broken | wave1 |
@@ -229,12 +236,16 @@ resource-list frame title. The frame-title rules:
 | elb | elb.state.failed | failed | broken | wave1 |
 | elb | elb.misconfigured | Deletion Protection: disabled | warn | wave2 |
 | tg | tg.unhealthy-targets | unhealthy targets: <N>/<M> | broken | wave2 |
+| sg | sg.ingress.wide-open | all ports open to 0.0.0.0/0 | broken | wave1 |
+| sg | sg.ingress.dangerous-ports | ports <list> open to 0.0.0.0/0 | broken | wave1 |
 | vpc | vpc.state.pending | pending | warn | wave1 |
 | vpc | vpc.no-flow-logs | no active VPC flow logs (CIS EC2.6) | warn | wave2 |
 | subnet | subnet.state.pending | pending | warn | wave1 |
 | subnet | subnet.state.unavailable | unavailable | broken | wave1 |
 | subnet | subnet.state.failed | failed | broken | wave1 |
 | subnet | subnet.state.failed-insufficient-capacity | failed-insufficient-capacity | broken | wave1 |
+| rtb | rtb.route.blackhole | blackhole route (target deleted) | broken | wave1 |
+| rtb | rtb.orphan-unassociated | no subnet associations | warn | wave1 |
 | nat | nat.state.pending | pending | warn | wave1 |
 | nat | nat.state.deleting | deleting | warn | wave1 |
 | nat | nat.state.failed | failed | broken | wave1 |
@@ -343,6 +354,7 @@ resource-list frame title. The frame-title rules:
 | alarm | alarm.state.insufficient_data | insufficient data | warn | wave1 |
 | alarm | alarm.no_actions | no actions | warn | wave1 |
 | logs | logs.retention-never-expire | retention: never expire | warn | wave1 |
+| logs | logs.stale-empty | empty, created over 90 days ago | warn | wave1 |
 | logs | logs.missing-metric-filters | audit log group missing metric filters | warn | wave2 |
 | trail | trail.log-file-validation.disabled | log file validation disabled | warn | wave1 |
 | trail | trail.not-logging | not logging | broken | wave2 |
@@ -350,9 +362,12 @@ resource-list frame title. The frame-title rules:
 | trail | trail.delivery-stale | delivery stale since <LatestDeliveryTime> | broken | wave2 |
 | ct-events | ct_event.severity.danger | danger | broken | wave1 |
 | ct-events | ct_event.severity.attention | attention | warn | wave1 |
+| ct-events | ct_event.severity.info | routine event | dim | wave1 |
 | sqs | sqs.missing-dlq | no DLQ configured | warn | wave2 |
 | sns | sns.no-subscribers | topic has no subscribers | warn | wave2 |
 | sns | sns.all-pending-confirmation | all pending confirmation | warn | wave2 |
+| sns-sub | sns-sub.state.pending-confirmation | endpoint has not confirmed the subscription | warn | wave1 |
+| sns-sub | sns-sub.state.deleted | endpoint deleted | dim | wave1 |
 | eb | eb.environment-causes | EB causes: <first cause> | warn | wave2 |
 | eb-rule | eb-rule.target-issue | enabled rule has no targets (rule matches but goes nowhere) | broken | wave2 |
 | kinesis | kinesis.warn.creating | creating | warn | wave1 |
@@ -379,10 +394,15 @@ resource-list frame title. The frame-title rules:
 | secrets | secrets.state.deleted | deleted | broken | wave1 |
 | secrets | secrets.state.rotation_overdue | rotation overdue | warn | wave1 |
 | secrets | secrets.state.dormant | dormant | warn | wave1 |
+| secrets | secrets.rotation.disabled | rotation not enabled | warn | wave1 |
+| secrets | secrets.value.stale | value unchanged in over 365 days | warn | wave1 |
+| ssm | ssm.value.plaintext-sensitive | plaintext value looks like a credential | broken | wave1 |
+| ssm | ssm.value.stale | not modified in over 365 days | warn | wave1 |
 | kms | kms.state.pending_deletion | pending deletion | broken | wave1 |
 | kms | kms.state.disabled | disabled | warn | wave1 |
 | kms | kms.state.unavailable | <key state> | broken | wave1 |
 | kms | kms.rotation-disabled | key rotation disabled (CIS KMS.1) | warn | wave2 |
+| r53 | r53.zone.unused | only default NS/SOA records remain | warn | wave1 |
 | r53 | r53.orphan-private-zone | private zone with no VPC associations (orphan) | warn | wave2 |
 | cf | cf.insecure-protocol | no HTTPS redirect (insecure); origin without TLS | warn | wave2 |
 | acm | acm.expires-soon | expires in <N> days | broken | wave2 |
@@ -390,6 +410,7 @@ resource-list frame title. The frame-title rules:
 | apigw | apigw.no-deployed-stages | no deployed stages | warn | wave2 |
 | apigw | apigw.stage-config-issues | no throttling configured (DoS risk); access logs disabled | warn | wave2 |
 | role | iam-role.dormant | dormant role (>90d) | warn | wave2 |
+| policy | iam-policy.orphan-unattached | unattached, no roles/users/groups use it | warn | wave1 |
 | policy | iam-policy.admin-star | admin star (CIS IAM.16) | broken | wave2 |
 | iam-user | iam-user.no-mfa | console user without MFA (CIS IAM.5) | broken | wave2 |
 | iam-user | iam-user.old-key | key <keyID> >90d (rotation) | warn | wave2 |

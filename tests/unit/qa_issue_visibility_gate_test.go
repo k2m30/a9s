@@ -1,7 +1,16 @@
 // qa_issue_visibility_gate_test.go — the standing OWNER RULE gate: if a
-// resource row carries a glyph or a non-green color, the problem must be
-// visible either (a) in the list view's Status column cell, or (b) at the
-// top of the detail view (the Attention block).
+// resource row carries a PROBLEM signal — a row color with IsIssue()==true,
+// or an issue-severity Finding (SevWarn/SevBroken; a glyph decorator is just
+// the render-time echo of that same Finding, see isVisibilityViolation) — the
+// problem must be visible either (a) in the list view's Status column cell,
+// or (b) at the top of the detail view (the Attention block).
+//
+// SCOPE: Dim-ONLY rows (color == ColorDim, findings all SevDim, e.g. a
+// ct-events "routine event", a Lambda Inactive function, a deleted SNS
+// subscription) are OUT of scope by design — SevDim is a neutral/routine
+// state, not a problem, per domain.Severity.IsIssue() and the same "dim =
+// neutral" convention used elsewhere (related-panel rows, menu entries). See
+// isVisibilityViolation for the exact predicate and rationale.
 //
 // Registry+demo-driven, one subtest per (type, resource) violation, mirroring
 // the ratchet style of qa_demo_state_coverage_test.go / qa_demo_pivot_coverage_test.go:
@@ -17,8 +26,8 @@
 //     without reimplementing that fold's full mechanics: the Color funcs and
 //     Attention builder only ever read Resource.Findings, so appending the
 //     Wave-2 finding there reproduces the same input those consumers see.
-//  3. For every (type, resource) where td.ResolveColor(merged) is not
-//     domain.ColorHealthy OR merged.Findings is non-empty, verify:
+//  3. For every (type, resource) that isVisibilityViolation flags (in-scope
+//     PROBLEM signal, not a Dim-only state), verify:
 //     (a) the REAL list Status cell for that row (driven through
 //     Controller.ApplyResourcesLoaded + Snapshot().Body.List, indexed by
 //     ListBody.StatusCol) is non-empty, OR
@@ -52,10 +61,12 @@ import (
 )
 
 // knownVisibilityGaps pins the exact inventory of (type, resource-key)
-// violations found by this gate at ratchet-conversion time: a row colored
-// non-healthy or carrying issue findings, yet showing the problem on NEITHER
-// the list Status cell NOR the detail Attention block. Same burn-down
-// semantics as knownStateCoverageGaps in qa_demo_state_coverage_test.go:
+// violations found by this gate: a row with an in-scope PROBLEM signal (see
+// isVisibilityViolation — IsIssue()==true color or an issue-severity
+// Finding; Dim-only/neutral rows never reach this predicate at all) yet
+// showing the problem on NEITHER the list Status cell NOR the detail
+// Attention block. Same burn-down semantics as knownStateCoverageGaps in
+// qa_demo_state_coverage_test.go:
 //   - present + still invisible on both surfaces today -> skip (logged),
 //     expected pre-existing debt.
 //   - present + now visible on either surface           -> FAIL ("remove
@@ -66,127 +77,22 @@ import (
 // Key shape: "<shortName>:<resourceID>" so per-type resource IDs never
 // collide across types.
 //
-// Seeded 2026-07-06 from the first run of this gate against
-// demo.NewServiceClients() fixtures. Every entry below has findings=0 in the
-// gate's own failure message: each is a resource type whose Color classifier
-// derives a non-healthy bucket PURELY from structural Fields reads (no
-// catalog.FindingDef backs the state), so neither listPhraseFromFindings nor
-// buildAttentionEntries — both of which read only Resource.Findings — have
-// anything to surface. The Status-cell lifecycle fallback (r.Fields[lifecycleKey])
-// also comes back empty for each of these specific fixtures, which is the
-// second half of the gap. Grouped by type; reason given once per type, entries
-// listed per resource ID as the allowlist key shape requires.
-var knownVisibilityGaps = map[string]bool{
-	// asg: colorASG (internal/aws/catalog_compute.go) derives Broken/Warning
-	// from in_service_count<min_size / suspended_processes / "Delete in
-	// progress" reads on r.Fields — none of these branches emit a Finding,
-	// and these fixtures carry no populated per-instance "status" Field for
-	// the lifecycle fallback to show.
-	"asg:acme-staging-asg":        true,
-	"asg:awseb-e-acmeprodapi-asg": true,
-	"asg:asg-underprovisioned":    true,
-	"asg:asg-suspended":           true,
-
-	// ct-events: colorCTEvents (internal/aws/catalog_monitoring.go, structural)
-	// resolves Dim for these fixtures with no accompanying wave1/wave2
-	// Finding, and ct-events has no LifecycleKey-backed status column for
-	// the fallback to populate.
-	"ct-events:evt-0a1b2c3d4e5f60003":        true,
-	"ct-events:evt-0a1b2c3d4e5f60004":        true,
-	"ct-events:evt-0a1b2c3d4e5f60005":        true,
-	"ct-events:e-a1b2c3d4":                   true,
-	"ct-events:e-d4e5f6a7":                   true,
-	"ct-events:e-f6a7b8c9":                   true,
-	"ct-events:e-b8c9d0e1":                   true,
-	"ct-events:evt-eks-describe-001":         true,
-	"ct-events:evt-sg-web-alb-authorize-001": true,
-
-	// lambda: colorLambda (internal/aws/catalog_compute.go) derives
-	// Warning/Broken/Dim from structural State/LastUpdateStatus Fields reads
-	// with no matching Finding emission for these particular fixture states
-	// (only Pending/Failed states are wired to catalog.FindingDef per
-	// catalog_compute.go's Findings table).
-	"lambda:data-pipeline-transform":   true,
-	"lambda:process-orders":            true,
-	"lambda:image-thumbnail-gen":       true,
-	"lambda:payment-webhook":           true,
-	"lambda:cloudwatch-slack-notifier": true,
-	"lambda:rotate-rds-credentials":    true,
-	"lambda:lambda-inactive-runtime":   true,
-	"lambda:api-service-runner":        true,
-	"lambda:orders-projector":          true,
-	"lambda:a9s-demo-s3-notifier":      true,
-	"lambda:acme-inbound-parser":       true,
-	"lambda:efs-data-processor":        true,
-	"lambda:efs-report-generator":      true,
-	"lambda:pdf-generator":             true,
-	"lambda:webhook-processor":         true,
-	"lambda:rate-limiter":              true,
-
-	// logs: colorLogs (internal/aws/catalog_monitoring.go) derives Warning
-	// structurally (e.g. missing retention / stale group) with no matching
-	// Finding for this fixture.
-	"logs:/app/legacy/orphan-old": true,
-
-	// policy: colorPolicy (internal/aws/catalog_security.go) derives
-	// Warning from an "orphan/unattached" structural read with no matching
-	// Finding.
-	"policy:orphan-unattached-policy": true,
-
-	// r53: r53Color (internal/aws/catalog_dns_cdn.go) derives Warning
-	// structurally (e.g. zero record count) with no matching Finding.
-	"r53:/hostedzone/Z3456789012ABCDEFGHIJ": true,
-	"r53:/hostedzone/Z5678901234ABCDEFGHIJ": true,
-
-	// rtb: colorRTB (internal/aws/catalog_networking.go) derives
-	// Broken/Warning from a structural blackhole-route / orphan read with
-	// no matching Finding.
-	"rtb:rtb-0blackhole1111111e": true,
-	"rtb:rtb-0orphan111111111f":  true,
-
-	// secrets: colorSecrets (internal/aws/catalog_secrets.go) derives
-	// Warning from a structural rotation/age read with no matching Finding
-	// for these fixtures (the registered secrets.state.rotation_overdue /
-	// secrets.state.dormant FindingDefs are themselves still in
-	// knownStateCoverageGaps — no fixture produces them yet, per
-	// qa_demo_state_coverage_test.go).
-	"secrets:prod/api/gateway-key":                true,
-	"secrets:prod/api/stripe-key":                 true,
-	"secrets:staging/database/mysql":              true,
-	"secrets:prod/codeartifact/npm-publish-token": true,
-	"secrets:prod/app/oauth-client-secret":        true,
-	"secrets:prod/elk/elasticsearch-password":     true,
-	"secrets:prod/monitoring/grafana-admin":       true,
-	"secrets:prod/app/sendgrid-api-key":           true,
-	"secrets:prod/app/github-webhook-secret":      true,
-	"secrets:prod/rds/replica-password":           true,
-	"secrets:staging/database/postgres":           true,
-	"secrets:staging/app/jwt-secret":              true,
-	"secrets:dev/database/postgres":               true,
-	"secrets:dev/app/jwt-secret":                  true,
-	"secrets:shared/monitoring/pagerduty-key":     true,
-	"secrets:prod/app/slack-webhook":              true,
-
-	// sg: colorSG (internal/aws/catalog_networking.go) derives Broken from a
-	// structural "public/wide-open ingress rule" scan with no matching
-	// Finding.
-	"sg:sg-0public0ssh000001": true,
-	"sg:sg-0public0db0000002": true,
-	"sg:sg-0wide0open0000003": true,
-
-	// sns-sub: colorSNSSub (internal/aws/catalog_messaging.go) derives
-	// Warning/Dim from structural PendingConfirmation/Deleted status reads
-	// with no matching Finding, and sns-sub has no lifecycle-backed status
-	// column fallback.
-	"sns-sub:PendingConfirmation": true,
-	"sns-sub:Deleted":             true,
-
-	// ssm: colorSSM (internal/aws/catalog_secrets.go) derives
-	// Warning/Broken from a structural legacy-path / stale-value read with
-	// no matching Finding.
-	"ssm:/acme/legacy/db/password":             true,
-	"ssm:/acme/shared/legacy_service_password": true,
-}
+// TERMINAL STATE (2026-07-06, after the wave1-findings conversion —
+// asg/ct-events/lambda/logs/policy/r53/rtb/secrets/sg/sns-sub/ssm — and the
+// gate's own scope refinement to PROBLEM-only signals): EMPTY. Every
+// (type, resource) pair that carries an issue-severity color or Finding now
+// shows the problem on the list Status cell or the detail Attention block.
+// The previous 11-entry inventory here (9 ct-events "routine event" rows,
+// lambda's Inactive-runtime fixture, sns-sub's Deleted fixture) was never a
+// visibility BUG — every one of those rows is Dim-only (SevDim Finding, Dim
+// color), which is a neutral/routine state, not a problem, per
+// domain.Severity.IsIssue()/domain.Color.IsIssue() (same precedent as
+// pivot-coverage's structurally-uncomputable-pivot exclusions). They were
+// removed once the predicate stopped flagging Dim-only rows as violations,
+// not because a fix made them visible. If this map ever needs a new entry
+// again, it means a genuine issue-severity row is invisible on both
+// surfaces — a real regression, not a Dim/neutral non-issue.
+var knownVisibilityGaps = map[string]bool{}
 
 // demoVisibilityMaxFetchPages mirrors demoPivotMaxFetchPages — a safety
 // valve against a runaway fake fetcher during drain.
@@ -379,21 +285,55 @@ func detailHasAttentionFor(t *testing.T, res resource.Resource, shortName string
 }
 
 // isVisibilityViolation reports whether res is a candidate for the OWNER
-// RULE: a non-healthy row color OR at least one Finding present.
+// RULE: the rule triggers on PROBLEM signals — a row color with
+// IsIssue()==true (domain.Color.IsIssue: Warning/Broken), OR at least one
+// issue-severity Finding (domain.Severity.IsIssue: SevWarn/SevBroken) —
+// Wave-1 seeded or Wave-2 merged. A glyph decorator (resolveListDecoratorFull
+// in internal/app/list_columns.go) only ever fires from that same
+// issue-severity Finding check (the "healthy color + hidden issue-severity
+// Finding" case), so it is already covered by the Finding leg above and is
+// not a separate condition to test here.
+//
+// Dim-ONLY rows (color == ColorDim, and every Finding present is SevDim) are
+// explicitly OUT of scope: SevDim is a neutral/routine state by the app's own
+// severity design (domain.Severity.IsIssue excludes it, matching the same
+// "dim = neutral" convention used by related-panel rows and menu entries),
+// not a problem the OWNER RULE is meant to police. A ct-events "routine
+// event" tier, a Lambda Inactive function, or a deleted SNS subscription are
+// all Dim-only under this design — they are states to observe, not issues to
+// surface via Status cell / Attention, so they never become gate violations
+// regardless of whether a Finding is attached.
 func isVisibilityViolation(td resource.ResourceTypeDef, res resource.Resource) bool {
-	if td.Color == nil {
-		return len(res.Findings) > 0
+	if hasIssueSeverityFinding(res.Findings) {
+		return true
 	}
-	return td.ResolveColor(res) != domain.ColorHealthy || len(res.Findings) > 0
+	if td.Color == nil {
+		return false
+	}
+	return td.ResolveColor(res).IsIssue()
+}
+
+// hasIssueSeverityFinding reports whether findings contains at least one
+// Finding whose Severity.IsIssue() is true (SevWarn/SevBroken) — SevDim
+// findings never count, mirroring domain.Severity.IsIssue itself.
+func hasIssueSeverityFinding(findings []domain.Finding) bool {
+	for _, f := range findings {
+		if f.Severity.IsIssue() {
+			return true
+		}
+	}
+	return false
 }
 
 // TestIssueVisibilityGate_EveryColoredOrFlaggedRowIsVisibleSomewhere is the
 // standing OWNER RULE gate. For every registered type with a Wave-1 Fetcher,
-// every fixture resource whose resolved color is non-healthy or which carries
-// at least one Finding (Wave-1 seeded or Wave-2 merged) must show the problem
-// on the list Status cell or the detail Attention block — UNLESS the
-// (type, resourceID) pair is pinned in knownVisibilityGaps as pre-existing
-// debt, in which case it is skipped (logged) instead of failed.
+// every fixture resource that isVisibilityViolation flags as an in-scope
+// PROBLEM signal (issue-severity color or Finding — Wave-1 seeded or Wave-2
+// merged; Dim-only/neutral rows are out of scope, see isVisibilityViolation)
+// must show the problem on the list Status cell or the detail Attention
+// block — UNLESS the (type, resourceID) pair is pinned in knownVisibilityGaps
+// as pre-existing debt, in which case it is skipped (logged) instead of
+// failed.
 func TestIssueVisibilityGate_EveryColoredOrFlaggedRowIsVisibleSomewhere(t *testing.T) {
 	clients := demo.NewServiceClients()
 	byType, cache := buildVisibilityTypeCache(t)

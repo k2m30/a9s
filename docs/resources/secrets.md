@@ -214,6 +214,8 @@ secrets — SECRETS & CONFIG. Lifecycle key: none (the list API returns no lifec
 | secrets.state.deleted | deleted | broken | wave1 |
 | secrets.state.rotation_overdue | rotation overdue | warn | wave1 |
 | secrets.state.dormant | dormant | warn | wave1 |
+| secrets.rotation.disabled | rotation not enabled | warn | wave1 |
+| secrets.value.stale | value unchanged in over 365 days | warn | wave1 |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

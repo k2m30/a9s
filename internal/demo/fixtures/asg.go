@@ -198,7 +198,12 @@ func buildASGGroups() []asgtypes.AutoScalingGroup {
 				{Key: aws.String("Service"), Value: aws.String("api-worker")},
 			},
 		},
-		// Issue: SuspendedProcesses includes Launch + HealthCheck → Warning (scaling disabled)
+		// Issue: SuspendedProcesses includes Launch + HealthCheck → Warning
+		// (scaling disabled). In-service instance count meets MinSize and
+		// zero instances are Unhealthy, so this fixture demonstrates the
+		// suspended-processes branch alone (asg.scaling.suspended), not the
+		// underprovisioned or unhealthy branches that take precedence in
+		// colorASG/the fetcher's Finding emission.
 		{
 			AutoScalingGroupName:   aws.String("asg-suspended"),
 			AutoScalingGroupARN:    aws.String("arn:aws:autoscaling:us-east-1:123456789012:autoScalingGroup:77777777-7777-7777-7777-777777777777:autoScalingGroupName/asg-suspended"),
@@ -209,6 +214,10 @@ func buildASGGroups() []asgtypes.AutoScalingGroup {
 			HealthCheckGracePeriod: aws.Int32(120),
 			VPCZoneIdentifier:      aws.String(asgSubnetA),
 			CreatedTime:            aws.Time(mustTime("2025-04-20T08:00:00Z")),
+			Instances: []asgtypes.Instance{
+				{InstanceId: aws.String("i-0ccc333333333333c"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
+				{InstanceId: aws.String("i-0ddd444444444444d"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
+			},
 			SuspendedProcesses: []asgtypes.SuspendedProcess{
 				{ProcessName: aws.String("Launch"), SuspensionReason: aws.String("User suspended the process")},
 				{ProcessName: aws.String("HealthCheck"), SuspensionReason: aws.String("User suspended the process")},
@@ -216,6 +225,29 @@ func buildASGGroups() []asgtypes.AutoScalingGroup {
 			Tags: []asgtypes.TagDescription{
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
 				{Key: aws.String("Service"), Value: aws.String("batch-processor")},
+			},
+		},
+		// Issue: one Unhealthy instance while in-service count still meets
+		// MinSize → Warning (asg.instances.unhealthy). Not underprovisioned
+		// (2 in service >= MinSize=2), no suspended processes.
+		{
+			AutoScalingGroupName:   aws.String("asg-unhealthy-instance"),
+			AutoScalingGroupARN:    aws.String("arn:aws:autoscaling:us-east-1:123456789012:autoScalingGroup:88888888-8888-8888-8888-888888888888:autoScalingGroupName/asg-unhealthy-instance"),
+			MinSize:                aws.Int32(2),
+			MaxSize:                aws.Int32(6),
+			DesiredCapacity:        aws.Int32(3),
+			HealthCheckType:        aws.String("EC2"),
+			HealthCheckGracePeriod: aws.Int32(120),
+			VPCZoneIdentifier:      aws.String(asgSubnetA + "," + asgSubnetB),
+			CreatedTime:            aws.Time(mustTime("2025-05-12T08:00:00Z")),
+			Instances: []asgtypes.Instance{
+				{InstanceId: aws.String("i-0eee555555555555e"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
+				{InstanceId: aws.String("i-0fff666666666666f"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
+				{InstanceId: aws.String("i-0aaa777777777777a"), HealthStatus: aws.String("Unhealthy"), LifecycleState: asgtypes.LifecycleStateInService},
+			},
+			Tags: []asgtypes.TagDescription{
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+				{Key: aws.String("Service"), Value: aws.String("web-worker")},
 			},
 		},
 	}

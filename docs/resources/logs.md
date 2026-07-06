@@ -180,6 +180,7 @@ logs — MONITORING. Lifecycle key: none (the list API returns no lifecycle fiel
 | Code | Phrase | Severity | Source |
 | --- | --- | --- | --- |
 | logs.retention-never-expire | retention: never expire | warn | wave1 |
+| logs.stale-empty | empty, created over 90 days ago | warn | wave1 |
 | logs.missing-metric-filters | audit log group missing metric filters | warn | wave2 |
 <!-- END GENERATED: findings -->
 

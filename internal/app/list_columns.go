@@ -325,15 +325,31 @@ func listExtractCellValue(col ColumnDef, td *resource.ResourceTypeDef, r resourc
 	return ""
 }
 
-// listPhraseFromFindings mirrors phraseFromFindings in table_render.go.
+// listPhraseFromFindings mirrors phraseFromFindings in table_render.go, with
+// one addition: SevDim findings are included as the lowest-priority phrase
+// source. An issue-severity (SevWarn/SevBroken) finding always wins over a
+// SevDim one regardless of slice order, so a row whose only findings are dim
+// (e.g. ct-events "routine event", lambda.state.inactive, sns-sub.state.deleted)
+// still gets a Status-cell phrase instead of falling through to the raw
+// lifecycle field — dim rows are a state, not a problem, so they must not
+// count as issues (Attention filter, menu badges, unifiedIssueCount all stay
+// severity-gated via domain.Severity.IsIssue()), but the cell should still
+// explain why the row is dim.
 func listPhraseFromFindings(findings []domain.Finding) string {
 	if len(findings) == 0 {
 		return ""
 	}
-	if len(findings) == 1 {
-		return findings[0].Phrase
+	top := 0
+	for i, f := range findings {
+		if f.Severity.IsIssue() {
+			top = i
+			break
+		}
 	}
-	return findings[0].Phrase + " (+" + itoa(len(findings)-1) + ")"
+	if len(findings) == 1 {
+		return findings[top].Phrase
+	}
+	return findings[top].Phrase + " (+" + itoa(len(findings)-1) + ")"
 }
 
 // hasWave2Finding reports whether findings already contains a Wave-2 entry

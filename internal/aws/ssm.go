@@ -9,8 +9,24 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 
+	"github.com/k2m30/a9s/v3/internal/domain"
 	"github.com/k2m30/a9s/v3/internal/resource"
 )
+
+// ssmSensitiveSuffixes is the set of name suffixes colorSSM treats as
+// sensitive when found on a plaintext (String) parameter.
+var ssmSensitiveSuffixes = []string{ //nolint:gochecknoglobals // static catalog: intentional package-level var
+	"_password", "_secret", "_token", "_apikey",
+	"_api_key", "_credentials", "_passwd",
+}
+
+// ssmCodePlaintextSensitive is the canonical FindingCode for a String-type
+// parameter whose name suggests it holds a credential, stored unencrypted.
+const ssmCodePlaintextSensitive domain.FindingCode = "ssm.value.plaintext-sensitive"
+
+// ssmCodeStaleValue is the canonical FindingCode for a parameter that has
+// not been modified in over 365 days.
+const ssmCodeStaleValue domain.FindingCode = "ssm.value.stale"
 
 // FetchSSMParameters calls the SSM DescribeParameters API and returns all pages
 // of parameters. Used by tests; the production path uses the per-page fetcher for pagination.
@@ -88,6 +104,7 @@ func FetchSSMParametersPage(ctx context.Context, api SSMDescribeParametersAPI, c
 				"description":   description,
 				"risk":          risk,
 			},
+			Findings:  ssmColorFindings(paramName, paramType, param.LastModifiedDate),
 			RawStruct: param,
 		}
 
@@ -116,6 +133,31 @@ func FetchSSMParametersPage(ctx context.Context, api SSMDescribeParametersAPI, c
 			TotalHint:   totalHint,
 		},
 	}, nil
+}
+
+// ssmColorFindings mirrors colorSSM's own precedence (plaintext-sensitive
+// String parameter wins first, then a stale last-modified date on any type)
+// so the list Status cell / detail Attention block always explain the
+// non-healthy color.
+func ssmColorFindings(paramName, paramType string, lastModifiedDate *time.Time) []domain.Finding {
+	name := strings.ToLower(paramName)
+	if paramType == "String" {
+		for _, suffix := range ssmSensitiveSuffixes {
+			if strings.HasSuffix(name, suffix) {
+				return []domain.Finding{{
+					Code: ssmCodePlaintextSensitive, Phrase: "plaintext value looks like a credential",
+					Severity: domain.SevBroken, Source: "wave1",
+				}}
+			}
+		}
+	}
+	if lastModifiedDate != nil && time.Since(*lastModifiedDate) > 365*24*time.Hour {
+		return []domain.Finding{{
+			Code: ssmCodeStaleValue, Phrase: "not modified in over 365 days",
+			Severity: domain.SevWarn, Source: "wave1",
+		}}
+	}
+	return nil
 }
 
 // RevealSSMParameter calls the SSM GetParameter API with decryption enabled
