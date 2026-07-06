@@ -131,6 +131,7 @@ This target is the canonical gate. It MUST pass locally with zero edits before a
 6. `make check-readme` — README in sync with `docs/shared/`.
 7. `make snapshot` — golden-file render checks.
 8. `make mdlint` — markdown lint across `docs/`, `CLAUDE.md`, `CONTRIBUTING.md`, `CHANGELOG.md`.
+9. `make smoke` — tmux-driven demo smoke over the compiled binary (`scripts/smoke-demo.sh`): rendered menu counts, humanized statuses, per-row issue causes, the reference bucket's related panel. Requires tmux. When demo fixtures legitimately change, update the script's assertions in the same PR.
 
 For changes that touch `internal/aws/` real-account behavior, additionally run the live integration test against a real AWS profile (this is also the entry to Stage 6.5):
 
