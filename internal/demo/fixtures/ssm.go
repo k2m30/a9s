@@ -105,10 +105,13 @@ var sharedSSMFixtures = sync.OnceValue(func() *SSMFixtures {
 			KeyId:            aws.String("alias/aws/ssm"),
 			DataType:         aws.String("text"),
 		},
-		// Issue: Type=String AND name suffix=/password → Warning (plaintext sensitive value)
+		// Issue: Type=String AND name suffix=_token (exact match — colorSSM's
+		// sensitiveSuffixes are underscore-delimited, e.g. "_token", not
+		// "-token" or "/token") → Broken (plaintext credential in a
+		// non-encrypted parameter type).
 		{
-			Name:             aws.String("/acme/shared/thirdparty-api-token"),
-			ARN:              aws.String("arn:aws:ssm:us-east-1:123456789012:parameter/acme/shared/thirdparty-api-token"),
+			Name:             aws.String("/acme/shared/thirdparty_api_token"),
+			ARN:              aws.String("arn:aws:ssm:us-east-1:123456789012:parameter/acme/shared/thirdparty_api_token"),
 			Type:             ssmtypes.ParameterTypeString,
 			Version:          2,
 			LastModifiedDate: aws.Time(mustParseSSMTime("2025-11-20T14:00:00+00:00")),
