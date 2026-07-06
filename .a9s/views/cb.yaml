@@ -5,7 +5,7 @@ list:
   Source Type:
     path: Source.Type
     width: 14
-  Last Build:
+  Status:
     key: last_build
     width: 18
   Description:

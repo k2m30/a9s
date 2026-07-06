@@ -22,7 +22,7 @@ func secretsDefaultViews() map[string]ViewDef {
 			List: []ListColumn{
 				{Title: "Name", Path: "Name", Width: 40},
 				{Title: "Type", Path: "Type", Width: 14},
-				{Title: "Risk", Key: "risk", Width: 10},
+				{Title: "Status", Key: "risk", Width: 10},
 				{Title: "Version", Path: "Version", Width: 8},
 				{Title: "Last Modified", Path: "LastModifiedDate", Width: 22},
 				{Title: "Description", Path: "Description", Width: 30},

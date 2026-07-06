@@ -5,7 +5,7 @@ list:
   MFA:
     key: mfa
     width: 5
-  Risk:
+  Status:
     key: risk
     width: 14
   User ID:

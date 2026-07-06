@@ -8,7 +8,7 @@ list:
   Protocol:
     path: Protocol
     width: 10
-  Health:
+  Status:
     key: health_summary
     width: 14
   VPC ID:

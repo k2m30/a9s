@@ -7,7 +7,7 @@ list:
   CIDR Block:
     path: CidrBlock
     width: 18
-  State:
+  Status:
     path: State
     width: 12
   Default:

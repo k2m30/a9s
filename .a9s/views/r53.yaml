@@ -2,6 +2,9 @@ list:
   Name:
     path: Name
     width: 36
+  Status:
+    key: status
+    width: 12
   Zone ID:
     path: Id
     width: 30

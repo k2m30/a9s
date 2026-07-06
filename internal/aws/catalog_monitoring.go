@@ -235,6 +235,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Category:  "MONITORING",
 		Columns: []domain.Column{
 			{Key: "time", Title: "Time", Width: 22, Sortable: true},
+			{Key: "status", Title: "Status", Width: 12, Sortable: true},
 			{Key: "event_name", Title: "Event Name", Width: 28, Sortable: true},
 			{Key: "user", Title: "User", Width: 24, Sortable: true},
 			{Key: "source", Title: "Source", Width: 28, Sortable: true},

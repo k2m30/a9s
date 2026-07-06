@@ -2,6 +2,9 @@ list:
   Trail Name:
     path: Name
     width: 28
+  Status:
+    key: status
+    width: 12
   Logging:
     key: is_logging
     width: 10

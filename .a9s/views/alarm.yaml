@@ -2,7 +2,7 @@ list:
   Alarm Name:
     path: AlarmName
     width: 36
-  State:
+  Status:
     path: StateValue
     width: 12
   Actions On:

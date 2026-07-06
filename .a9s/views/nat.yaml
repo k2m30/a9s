@@ -10,7 +10,7 @@ list:
   Subnet ID:
     path: SubnetId
     width: 26
-  State:
+  Status:
     path: State
     width: 12
   Failure:

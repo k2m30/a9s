@@ -434,7 +434,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Columns: []domain.Column{
 			{Key: "cluster_name", Title: "Cluster Name", Width: 28, Sortable: true},
 			{Key: "cluster_type", Title: "Type", Width: 14, Sortable: true},
-			{Key: "state", Title: "State", Width: 14, Sortable: true},
+			{Key: "state", Title: "Status", Width: 14, Sortable: true},
 			{Key: "version", Title: "Version", Width: 14, Sortable: true},
 		},
 		Color: colorMSK,

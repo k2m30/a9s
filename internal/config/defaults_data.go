@@ -5,6 +5,7 @@ func dataDefaultViews() map[string]ViewDef {
 		"glue": {
 			List: []ListColumn{
 				{Title: "Job Name", Path: "Name", Width: 32},
+				{Title: "Status", Key: "status", Width: 12},
 				{Title: "Last Run", Key: "last_run", Width: 14},
 				{Title: "Version", Path: "GlueVersion", Width: 10},
 				{Title: "Worker Type", Path: "WorkerType", Width: 14},
@@ -37,7 +38,7 @@ func dataDefaultViews() map[string]ViewDef {
 		"athena": {
 			List: []ListColumn{
 				{Title: "Workgroup", Path: "Name", Width: 28},
-				{Title: "State", Path: "State", Width: 12},
+				{Title: "Status", Path: "State", Width: 12},
 				{Title: "Cost Cap", Path: "Configuration.BytesScannedCutoffPerQuery", Width: 12},
 				{Title: "Description", Path: "Description", Width: 30},
 				{Title: "Engine", Path: "EngineVersion.EffectiveEngineVersion", Width: 28},

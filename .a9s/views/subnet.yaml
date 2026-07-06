@@ -13,7 +13,7 @@ list:
   AZ:
     path: AvailabilityZone
     width: 14
-  State:
+  Status:
     path: State
     width: 12
   Public:
